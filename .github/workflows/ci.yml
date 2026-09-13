@@ -13,7 +13,7 @@ jobs:
   quality:
     name: quality
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -53,6 +53,19 @@ jobs:
           node --check web/network-transport.mjs
           node --check scripts/network_capacity_probe.mjs
           node --test tests/networking.test.mjs
+
+      - name: Validate authoritative Rust server
+        run: |
+          rustc --version
+          cargo --version
+          cargo generate-lockfile --manifest-path server/Cargo.toml
+          cargo fmt --manifest-path server/Cargo.toml -- --check
+          cargo check --manifest-path server/Cargo.toml
+          cargo clippy --manifest-path server/Cargo.toml --all-targets -- -D warnings
+          cargo test --manifest-path server/Cargo.toml
+          printf 'MYASO_CARGO_LOCK_B64='
+          base64 -w0 server/Cargo.lock
+          printf '\n'
 
       - name: Check whitespace
         env:
