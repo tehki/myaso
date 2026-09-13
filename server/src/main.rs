@@ -1,8 +1,6 @@
 use anyhow::{bail, Context, Result};
 use myaso_server::{
-    decode_input_packet, is_sequence_newer16,
-    simulation::World,
-    snapshot::SnapshotSession,
+    decode_input_packet, is_sequence_newer16, simulation::World, snapshot::SnapshotSession,
     AdmissionGate, InputIngressWindow, CONSERVATIVE_DATAGRAM_BYTES, TARGET_PLAYERS_PER_MAP,
 };
 use std::{
@@ -160,7 +158,11 @@ async fn run_authoritative_clock(game: Arc<SharedGame>) {
     }
 }
 
-async fn handle_connection(connection: Connection, player_id: u32, game: Arc<SharedGame>) -> Result<()> {
+async fn handle_connection(
+    connection: Connection,
+    player_id: u32,
+    game: Arc<SharedGame>,
+) -> Result<()> {
     let stable_id = connection.stable_id();
     let remote = connection.remote_address();
     println!("session {stable_id} assigned player {player_id} from {remote}");
