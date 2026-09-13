@@ -46,6 +46,7 @@ jobs:
           node --check src/network/constants.mjs
           node --check src/network/sequence.mjs
           node --check src/network/input-codec.mjs
+          node --check src/network/input-ack-codec.mjs
           node --check src/network/input-ingress.mjs
           node --check src/network/snapshot-codec.mjs
           node --check src/network/interest-grid.mjs
@@ -59,9 +60,15 @@ jobs:
         run: |
           node --check src/browser/frame-budget.mjs
           node --check src/browser/snapshot-store.mjs
+          node --check src/browser/reconciliation.mjs
+          node --check src/browser/remote-interpolation.mjs
+          node --check web/authoritative-client.mjs
+          node --check web/bootstrap.mjs
+          node --check web/online-game.mjs
           node --check tests/browser-runtime.test.mjs
+          node --check tests/m6-browser-authority.test.mjs
           node --check scripts/browser_hotpath_probe.mjs
-          node --test tests/browser-runtime.test.mjs
+          node --test tests/browser-runtime.test.mjs tests/m6-browser-authority.test.mjs
           node scripts/browser_hotpath_probe.mjs
 
       - name: Validate authoritative Rust server

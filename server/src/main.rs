@@ -1,7 +1,8 @@
 use anyhow::{bail, Context, Result};
 use myaso_server::{
-    decode_input_packet, is_sequence_newer16, simulation::World, snapshot::SnapshotSession,
-    AdmissionGate, InputIngressWindow, CONSERVATIVE_DATAGRAM_BYTES, TARGET_PLAYERS_PER_MAP,
+    decode_input_packet, is_sequence_newer16, is_tick_newer32, simulation::World,
+    snapshot::SnapshotSession, AdmissionGate, InputIngressWindow, CONSERVATIVE_DATAGRAM_BYTES,
+    PROTOCOL_VERSION, TARGET_PLAYERS_PER_MAP,
 };
 use std::{
     env,
@@ -18,6 +19,8 @@ use wtransport::{Connection, Endpoint, Identity, ServerConfig, VarInt};
 const GAME_PATH: &str = "/game";
 const CLOSE_DATAGRAM_UNAVAILABLE: u32 = 0x11;
 const SNAPSHOT_INTERVAL: Duration = Duration::from_millis(50);
+const INPUT_ACK_PACKET_TYPE: u8 = 3;
+const INPUT_ACK_BYTES: usize = 16;
 
 struct SharedGame {
     world: Mutex<World>,
@@ -64,7 +67,7 @@ async fn main() -> Result<()> {
     let endpoint = Arc::new(Endpoint::server(config).context("create WebTransport endpoint")?);
     let local_addr = endpoint.local_addr().context("read server address")?;
 
-    println!("myaso M4 authoritative server listening on https://{local_addr}{GAME_PATH}");
+    println!("myaso M6 authoritative server listening on https://{local_addr}{GAME_PATH}");
     if let Some(hash) = certificate_hash {
         println!("development certificate SHA-256: {hash}");
     }
@@ -171,6 +174,7 @@ async fn handle_connection(
     let mut snapshots = SnapshotSession::default();
     let mut acknowledged_snapshot = u16::MAX;
     let mut last_input_sequence = None;
+    let mut pending_input_ack: Option<(u32, u32)> = None;
     let mut snapshot_interval = tokio::time::interval(SNAPSHOT_INTERVAL);
     snapshot_interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
 
@@ -193,7 +197,9 @@ async fn handle_connection(
 
                 let accepted = ingress.ingest(&packet);
                 if let Some(newest) = accepted.last().copied() {
-                    game.world.lock().await.set_input(player_id, newest.into());
+                    let mut world = game.world.lock().await;
+                    world.set_input(player_id, newest.into());
+                    pending_input_ack = Some((newest.tick, world.tick));
                 }
 
                 let server_tick = game.world.lock().await.tick;
@@ -205,20 +211,42 @@ async fn handle_connection(
                 }
             }
             _ = snapshot_interval.tick() => {
-                let snapshot = {
+                let (snapshot, safe_input_ack) = {
                     let world = game.world.lock().await;
-                    snapshots.build(
+                    let snapshot = snapshots.build(
                         acknowledged_snapshot,
                         world.tick,
                         player_id,
                         world.fighters(),
                         CONSERVATIVE_DATAGRAM_BYTES,
-                    )
+                    );
+                    let safe_input_ack = pending_input_ack.filter(|(_, accepted_at_tick)| {
+                        is_tick_newer32(world.tick, *accepted_at_tick)
+                    }).map(|(client_tick, _)| (client_tick, world.tick));
+                    (snapshot, safe_input_ack)
                 };
                 connection
                     .send_datagram(snapshot.bytes)
                     .context("send authoritative snapshot datagram")?;
+                if let Some((client_tick, server_tick)) = safe_input_ack {
+                    connection
+                        .send_datagram(encode_input_ack(client_tick, server_tick, player_id))
+                        .context("send processed-input acknowledgement datagram")?;
+                    pending_input_ack = None;
+                }
             }
         }
     }
+}
+
+fn encode_input_ack(processed_client_tick: u32, server_tick: u32, player_net_id: u32) -> Vec<u8> {
+    let mut bytes = Vec::with_capacity(INPUT_ACK_BYTES);
+    bytes.push(PROTOCOL_VERSION);
+    bytes.push(INPUT_ACK_PACKET_TYPE);
+    bytes.extend_from_slice(&0_u16.to_le_bytes());
+    bytes.extend_from_slice(&processed_client_tick.to_le_bytes());
+    bytes.extend_from_slice(&server_tick.to_le_bytes());
+    bytes.extend_from_slice(&player_net_id.to_le_bytes());
+    debug_assert_eq!(bytes.len(), INPUT_ACK_BYTES);
+    bytes
 }
