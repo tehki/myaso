@@ -151,7 +151,9 @@ impl InputIngressWindow {
                 self.newest_tick = Some(sample.tick);
             }
             let newest = self.newest_tick.expect("sample established newest tick");
-            if tick_distance32(newest, sample.tick) > self.history_ticks || self.seen.contains(&sample.tick) {
+            if tick_distance32(newest, sample.tick) > self.history_ticks
+                || self.seen.contains(&sample.tick)
+            {
                 continue;
             }
             self.seen.insert(sample.tick);
@@ -301,7 +303,13 @@ mod tests {
         let first = decode_input_packet(&sample_packet()).expect("first packet");
         let mut ingress = InputIngressWindow::new(10);
         let accepted = ingress.ingest(&first);
-        assert_eq!(accepted.iter().map(|sample| sample.tick).collect::<Vec<_>>(), vec![998, 999, 1000]);
+        assert_eq!(
+            accepted
+                .iter()
+                .map(|sample| sample.tick)
+                .collect::<Vec<_>>(),
+            vec![998, 999, 1000]
+        );
         assert!(ingress.ingest(&first).is_empty());
 
         let mut newer_bytes = sample_packet();
@@ -309,7 +317,13 @@ mod tests {
         newer_bytes[8..12].copy_from_slice(&1002_u32.to_le_bytes());
         let newer = decode_input_packet(&newer_bytes).expect("newer packet");
         let accepted = ingress.ingest(&newer);
-        assert_eq!(accepted.iter().map(|sample| sample.tick).collect::<Vec<_>>(), vec![1001, 1002]);
+        assert_eq!(
+            accepted
+                .iter()
+                .map(|sample| sample.tick)
+                .collect::<Vec<_>>(),
+            vec![1001, 1002]
+        );
     }
 
     #[test]
