@@ -5,6 +5,7 @@ use myaso_server::{
     PROTOCOL_VERSION, TARGET_PLAYERS_PER_MAP,
 };
 use std::{
+    collections::VecDeque,
     env,
     net::SocketAddr,
     sync::{
@@ -21,6 +22,7 @@ const CLOSE_DATAGRAM_UNAVAILABLE: u32 = 0x11;
 const SNAPSHOT_INTERVAL: Duration = Duration::from_millis(50);
 const INPUT_ACK_PACKET_TYPE: u8 = 3;
 const INPUT_ACK_BYTES: usize = 16;
+const MAX_PENDING_INPUT_ACKS: usize = 256;
 
 struct SharedGame {
     world: Mutex<World>,
@@ -174,7 +176,7 @@ async fn handle_connection(
     let mut snapshots = SnapshotSession::default();
     let mut acknowledged_snapshot = u16::MAX;
     let mut last_input_sequence = None;
-    let mut pending_input_ack: Option<(u32, u32)> = None;
+    let mut pending_input_acks = VecDeque::with_capacity(MAX_PENDING_INPUT_ACKS);
     let mut snapshot_interval = tokio::time::interval(SNAPSHOT_INTERVAL);
     snapshot_interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
 
@@ -199,7 +201,7 @@ async fn handle_connection(
                 if let Some(newest) = accepted.last().copied() {
                     let mut world = game.world.lock().await;
                     world.set_input(player_id, newest.into());
-                    pending_input_ack = Some((newest.tick, world.tick));
+                    record_pending_input_ack(&mut pending_input_acks, newest.tick, world.tick);
                 }
 
                 let server_tick = game.world.lock().await.tick;
@@ -211,7 +213,7 @@ async fn handle_connection(
                 }
             }
             _ = snapshot_interval.tick() => {
-                let (snapshot, safe_input_ack) = {
+                let (snapshot, server_tick) = {
                     let world = game.world.lock().await;
                     let snapshot = snapshots.build(
                         acknowledged_snapshot,
@@ -220,23 +222,39 @@ async fn handle_connection(
                         world.fighters(),
                         CONSERVATIVE_DATAGRAM_BYTES,
                     );
-                    let safe_input_ack = pending_input_ack.filter(|(_, accepted_at_tick)| {
-                        is_tick_newer32(world.tick, *accepted_at_tick)
-                    }).map(|(client_tick, _)| (client_tick, world.tick));
-                    (snapshot, safe_input_ack)
+                    (snapshot, world.tick)
                 };
+                let safe_input_ack = take_safe_input_ack(&mut pending_input_acks, server_tick);
                 connection
                     .send_datagram(snapshot.bytes)
                     .context("send authoritative snapshot datagram")?;
-                if let Some((client_tick, server_tick)) = safe_input_ack {
+                if let Some(client_tick) = safe_input_ack {
                     connection
                         .send_datagram(encode_input_ack(client_tick, server_tick, player_id))
                         .context("send processed-input acknowledgement datagram")?;
-                    pending_input_ack = None;
                 }
             }
         }
     }
+}
+
+fn record_pending_input_ack(pending: &mut VecDeque<(u32, u32)>, client_tick: u32, server_tick: u32) {
+    if pending.len() == MAX_PENDING_INPUT_ACKS {
+        pending.pop_front();
+    }
+    pending.push_back((client_tick, server_tick));
+}
+
+fn take_safe_input_ack(pending: &mut VecDeque<(u32, u32)>, server_tick: u32) -> Option<u32> {
+    let mut newest_safe = None;
+    while let Some(&(client_tick, accepted_at_tick)) = pending.front() {
+        if !is_tick_newer32(server_tick, accepted_at_tick) {
+            break;
+        }
+        newest_safe = Some(client_tick);
+        pending.pop_front();
+    }
+    newest_safe
 }
 
 fn encode_input_ack(processed_client_tick: u32, server_tick: u32, player_net_id: u32) -> Vec<u8> {
@@ -249,4 +267,39 @@ fn encode_input_ack(processed_client_tick: u32, server_tick: u32, player_net_id:
     bytes.extend_from_slice(&player_net_id.to_le_bytes());
     debug_assert_eq!(bytes.len(), INPUT_ACK_BYTES);
     bytes
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn processed_input_ack_coalesces_safe_ticks_without_starvation() {
+        let mut pending = VecDeque::new();
+        record_pending_input_ack(&mut pending, 100, 10);
+        record_pending_input_ack(&mut pending, 101, 11);
+        record_pending_input_ack(&mut pending, 102, 12);
+
+        assert_eq!(take_safe_input_ack(&mut pending, 12), Some(101));
+        assert_eq!(pending.len(), 1);
+        assert_eq!(take_safe_input_ack(&mut pending, 13), Some(102));
+        assert!(pending.is_empty());
+    }
+
+    #[test]
+    fn processed_input_ack_safety_survives_server_tick_wrap() {
+        let mut pending = VecDeque::new();
+        record_pending_input_ack(&mut pending, 7, u32::MAX);
+        assert_eq!(take_safe_input_ack(&mut pending, 0), Some(7));
+    }
+
+    #[test]
+    fn processed_input_ack_queue_is_bounded() {
+        let mut pending = VecDeque::new();
+        for tick in 0..(MAX_PENDING_INPUT_ACKS as u32 + 4) {
+            record_pending_input_ack(&mut pending, tick, tick);
+        }
+        assert_eq!(pending.len(), MAX_PENDING_INPUT_ACKS);
+        assert_eq!(pending.front().copied(), Some((4, 4)));
+    }
 }
