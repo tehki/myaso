@@ -20,7 +20,7 @@ const GAME_PATH: &str = "/game";
 const CLOSE_DATAGRAM_UNAVAILABLE: u32 = 0x11;
 const SNAPSHOT_INTERVAL: Duration = Duration::from_millis(50);
 const INPUT_ACK_PACKET_TYPE: u8 = 3;
-const INPUT_ACK_BYTES: usize = 12;
+const INPUT_ACK_BYTES: usize = 16;
 
 struct SharedGame {
     world: Mutex<World>,
@@ -230,7 +230,7 @@ async fn handle_connection(
                     .context("send authoritative snapshot datagram")?;
                 if let Some((client_tick, server_tick)) = safe_input_ack {
                     connection
-                        .send_datagram(encode_input_ack(client_tick, server_tick))
+                        .send_datagram(encode_input_ack(client_tick, server_tick, player_id))
                         .context("send processed-input acknowledgement datagram")?;
                     pending_input_ack = None;
                 }
@@ -239,13 +239,14 @@ async fn handle_connection(
     }
 }
 
-fn encode_input_ack(processed_client_tick: u32, server_tick: u32) -> Vec<u8> {
+fn encode_input_ack(processed_client_tick: u32, server_tick: u32, player_net_id: u32) -> Vec<u8> {
     let mut bytes = Vec::with_capacity(INPUT_ACK_BYTES);
     bytes.push(PROTOCOL_VERSION);
     bytes.push(INPUT_ACK_PACKET_TYPE);
     bytes.extend_from_slice(&0_u16.to_le_bytes());
     bytes.extend_from_slice(&processed_client_tick.to_le_bytes());
     bytes.extend_from_slice(&server_tick.to_le_bytes());
+    bytes.extend_from_slice(&player_net_id.to_le_bytes());
     debug_assert_eq!(bytes.len(), INPUT_ACK_BYTES);
     bytes
 }
