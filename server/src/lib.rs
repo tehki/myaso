@@ -201,10 +201,16 @@ mod tests {
         assert_eq!(decode_input_packet(&[]), Err(DecodeError::Truncated));
         let mut packet = sample_packet();
         packet[0] = 99;
-        assert_eq!(decode_input_packet(&packet), Err(DecodeError::UnsupportedProtocol(99)));
+        assert_eq!(
+            decode_input_packet(&packet),
+            Err(DecodeError::UnsupportedProtocol(99))
+        );
         let mut packet = sample_packet();
         packet[2] = 4;
-        assert_eq!(decode_input_packet(&packet), Err(DecodeError::InvalidSampleCount(4)));
+        assert_eq!(
+            decode_input_packet(&packet),
+            Err(DecodeError::InvalidSampleCount(4))
+        );
     }
 
     #[test]
