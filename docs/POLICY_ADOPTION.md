@@ -1,6 +1,6 @@
 # myaso.io Policy Adoption
 
-**Repository:** `tehki/myaso`  
+**Repository:** `tehki/myaso`
 **Adopted policy stack:** Coding Agent Constitution v1.3 / Policy v1.3 / Repository Governance v1.2 / Development Principles v1.6
 
 ## Precedence
