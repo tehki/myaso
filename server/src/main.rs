@@ -92,12 +92,10 @@ async fn load_identity(bind: SocketAddr) -> Result<Identity> {
         (Ok(cert), Ok(key)) => Identity::load_pemfiles(cert, key)
             .await
             .context("load MYASO_CERT_PEM/MYASO_KEY_PEM"),
-        (Err(_), Err(_)) if bind.ip().is_loopback() => Identity::self_signed(&[
-            "localhost",
-            "127.0.0.1",
-            "::1",
-        ])
-        .context("generate loopback-only development identity"),
+        (Err(_), Err(_)) if bind.ip().is_loopback() => {
+            Identity::self_signed(&["localhost", "127.0.0.1", "::1"])
+                .context("generate loopback-only development identity")
+        }
         (Ok(_), Err(_)) | (Err(_), Ok(_)) => {
             bail!("MYASO_CERT_PEM and MYASO_KEY_PEM must be supplied together")
         }
@@ -134,7 +132,11 @@ async fn handle_connection(connection: Connection, tick_rx: watch::Receiver<u32>
         };
 
         let server_tick = *tick_rx.borrow();
-        let newest_sample_tick = packet.samples.first().map(|sample| sample.tick).unwrap_or(0);
+        let newest_sample_tick = packet
+            .samples
+            .first()
+            .map(|sample| sample.tick)
+            .unwrap_or(0);
         if server_tick.wrapping_sub(packet.ack_server_tick) > 600 {
             eprintln!(
                 "session {stable_id} stale server acknowledgement: client={} newest_input={} server={}",
