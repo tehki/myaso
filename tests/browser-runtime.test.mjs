@@ -176,3 +176,84 @@ test("owned WebTransport realtime sends avoid the defensive payload copy", async
     else globalThis.WebTransport = originalWebTransport;
   }
 });
+
+test("WebTransport close drains a pending realtime flush before releasing writer locks", async () => {
+  const originalWebTransport = globalThis.WebTransport;
+  let resolveDatagramReady;
+  const datagramReady = new Promise((resolve) => { resolveDatagramReady = resolve; });
+  let datagramReleased = false;
+  let reliableReleased = false;
+  let writeAttempted = false;
+
+  class FakeReader {
+    async read() {
+      return { value: undefined, done: true };
+    }
+
+    releaseLock() {}
+  }
+
+  class FakeWriter {
+    constructor({ delayed = false, onRelease }) {
+      this.ready = delayed ? datagramReady : Promise.resolve();
+      this.onRelease = onRelease;
+    }
+
+    async write() {
+      writeAttempted = true;
+      if (datagramReleased) throw new TypeError("Missing stream");
+    }
+
+    releaseLock() {
+      this.onRelease();
+    }
+  }
+
+  class FakeWebTransport {
+    constructor() {
+      this.ready = Promise.resolve();
+      this.closed = new Promise((resolve) => { this.resolveClosed = resolve; });
+      this.datagramWriter = new FakeWriter({
+        delayed: true,
+        onRelease: () => { datagramReleased = true; },
+      });
+      this.reliableWriter = new FakeWriter({
+        onRelease: () => { reliableReleased = true; },
+      });
+      this.datagrams = {
+        writable: { getWriter: () => this.datagramWriter },
+        readable: { getReader: () => new FakeReader() },
+      };
+    }
+
+    async createBidirectionalStream() {
+      return {
+        writable: { getWriter: () => this.reliableWriter },
+        readable: { getReader: () => new FakeReader() },
+      };
+    }
+
+    close() {
+      this.resolveClosed();
+    }
+  }
+
+  globalThis.WebTransport = FakeWebTransport;
+  try {
+    const connection = await connectGameTransport({ webTransportUrl: "https://example.test/game" });
+    const pendingSend = connection.sendRealtimeOwned(new Uint8Array([9, 8, 7]));
+    connection.close("test close");
+    await Promise.resolve();
+    assert.equal(datagramReleased, false, "pending writer must remain locked until the flush settles");
+
+    resolveDatagramReady();
+    await pendingSend;
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.equal(writeAttempted, false, "closed connection must not write after writer.ready resolves");
+    assert.equal(datagramReleased, true);
+    assert.equal(reliableReleased, true);
+  } finally {
+    if (originalWebTransport === undefined) delete globalThis.WebTransport;
+    else globalThis.WebTransport = originalWebTransport;
+  }
+});
