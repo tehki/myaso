@@ -62,13 +62,17 @@ jobs:
           node --check src/browser/snapshot-store.mjs
           node --check src/browser/reconciliation.mjs
           node --check src/browser/remote-interpolation.mjs
+          node --check src/browser/impairment.mjs
           node --check web/authoritative-client.mjs
           node --check web/bootstrap.mjs
           node --check web/online-game.mjs
+          node --check web/flight.mjs
+          node --check scripts/browser_hotpath_probe.mjs
+          node --check scripts/browser_flight_runner.mjs
           node --check tests/browser-runtime.test.mjs
           node --check tests/m6-browser-authority.test.mjs
-          node --check scripts/browser_hotpath_probe.mjs
-          node --test tests/browser-runtime.test.mjs tests/m6-browser-authority.test.mjs
+          node --check tests/m7-browser-flight.test.mjs
+          node --test tests/browser-runtime.test.mjs tests/m6-browser-authority.test.mjs tests/m7-browser-flight.test.mjs
           node scripts/browser_hotpath_probe.mjs
 
       - name: Validate authoritative Rust server
@@ -79,6 +83,17 @@ jobs:
           cargo check --locked --manifest-path server/Cargo.toml
           cargo clippy --locked --manifest-path server/Cargo.toml --all-targets -- -D warnings
           cargo test --locked --manifest-path server/Cargo.toml
+
+      - name: Validate real browser flight
+        env:
+          MYASO_FLIGHT_DURATION_MS: "4000"
+          MYASO_FLIGHT_STRESS_ENTITIES: "128"
+        run: |
+          google-chrome --version
+          firefox --version
+          chromedriver --version
+          geckodriver --version
+          node scripts/browser_flight_runner.mjs
 
       - name: Check whitespace
         env:

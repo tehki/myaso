@@ -65,10 +65,15 @@ class WebTransportGameConnection {
   }
 
   #queueRealtime(bytes, copy) {
+    if (this.closed) return Promise.resolve();
     const payload = toUint8Array(bytes);
     this.latestRealtime = copy ? payload.slice() : payload;
     if (!this.realtimeFlush) {
-      this.realtimeFlush = this.#flushRealtime().finally(() => { this.realtimeFlush = null; });
+      this.realtimeFlush = this.#flushRealtime()
+        .catch((error) => {
+          if (!this.closed) throw error;
+        })
+        .finally(() => { this.realtimeFlush = null; });
     }
     return this.realtimeFlush;
   }
@@ -76,6 +81,7 @@ class WebTransportGameConnection {
   async #flushRealtime() {
     while (!this.closed && this.latestRealtime) {
       await this.datagramWriter.ready;
+      if (this.closed) return;
       const payload = this.latestRealtime;
       this.latestRealtime = null;
       await this.datagramWriter.write(payload);
@@ -83,17 +89,25 @@ class WebTransportGameConnection {
   }
 
   async sendReliable(bytes) {
+    if (this.closed) throw new Error("WebTransport connection is closed");
     const payload = frameReliable(toUint8Array(bytes));
     await this.reliableWriter.ready;
+    if (this.closed) return;
     await this.reliableWriter.write(payload);
   }
 
   close(reason = "client close") {
+    if (this.closed) return;
     this.closed = true;
     this.latestRealtime = null;
-    this.datagramWriter.releaseLock();
-    this.reliableWriter.releaseLock();
+    const pendingFlush = this.realtimeFlush;
+    const transportClosed = this.transport.closed;
     this.transport.close({ closeCode: 0, reason });
+    const waits = [pendingFlush, transportClosed].filter(Boolean);
+    void Promise.allSettled(waits).finally(() => {
+      safeReleaseLock(this.datagramWriter);
+      safeReleaseLock(this.reliableWriter);
+    });
   }
 }
 
@@ -215,6 +229,14 @@ function concatBytes(a, b) {
   next.set(a);
   next.set(b, a.length);
   return next;
+}
+
+function safeReleaseLock(writer) {
+  try {
+    writer.releaseLock();
+  } catch {
+    // The transport may have already released/errored the stream during close.
+  }
 }
 
 function toUint8Array(value) {
