@@ -74,7 +74,10 @@ fn attack_preserves_windup_active_and_recovery_commitment() {
         },
     );
     world.step_by(5.0);
-    assert_eq!(world.fighter(1).expect("attacker").action, Action::AttackWindup);
+    assert_eq!(
+        world.fighter(1).expect("attacker").action,
+        Action::AttackWindup
+    );
 
     advance(
         &mut world,
@@ -82,7 +85,10 @@ fn attack_preserves_windup_active_and_recovery_commitment() {
         InputIntent::default(),
         InputIntent::default(),
     );
-    assert_eq!(world.fighter(1).expect("attacker").action, Action::AttackActive);
+    assert_eq!(
+        world.fighter(1).expect("attacker").action,
+        Action::AttackActive
+    );
 
     advance(
         &mut world,
@@ -90,7 +96,10 @@ fn attack_preserves_windup_active_and_recovery_commitment() {
         InputIntent::default(),
         InputIntent::default(),
     );
-    assert_eq!(world.fighter(1).expect("attacker").action, Action::AttackRecovery);
+    assert_eq!(
+        world.fighter(1).expect("attacker").action,
+        Action::AttackRecovery
+    );
 
     advance(
         &mut world,
@@ -172,7 +181,9 @@ fn timed_dodge_iframes_evade_an_otherwise_valid_hit() {
         },
     );
     assert_eq!(world.fighter(2).expect("target").hp.round() as u8, 100);
-    assert!(events.iter().any(|event| matches!(event, CombatEvent::Evade { .. })));
+    assert!(events
+        .iter()
+        .any(|event| matches!(event, CombatEvent::Evade { .. })));
 }
 
 #[test]
@@ -205,7 +216,9 @@ fn directional_block_absorbs_health_damage_and_consumes_guard() {
     let target = world.fighter(2).expect("target");
     assert_eq!(target.hp.round() as u8, 100);
     assert_eq!(target.guard.round() as u8, 62);
-    assert!(events.iter().any(|event| matches!(event, CombatEvent::Block { .. })));
+    assert!(events
+        .iter()
+        .any(|event| matches!(event, CombatEvent::Block { .. })));
 }
 
 #[test]
@@ -236,7 +249,9 @@ fn fresh_block_parries_and_stuns_the_attacker() {
     );
     assert_eq!(world.fighter(2).expect("target").hp.round() as u8, 100);
     assert_eq!(world.fighter(1).expect("attacker").action, Action::Stunned);
-    assert!(events.iter().any(|event| matches!(event, CombatEvent::Parry { .. })));
+    assert!(events
+        .iter()
+        .any(|event| matches!(event, CombatEvent::Parry { .. })));
 }
 
 #[test]
@@ -260,7 +275,10 @@ fn death_is_temporary_and_respawns_at_the_spawn_point() {
             break;
         }
     }
-    assert!(death_seen, "repeated committed attacks should eventually kill the target");
+    assert!(
+        death_seen,
+        "repeated committed attacks should eventually kill the target"
+    );
     assert_eq!(world.fighter(2).expect("target").action, Action::Dead);
 
     let events = advance(
@@ -274,7 +292,9 @@ fn death_is_temporary_and_respawns_at_the_spawn_point() {
     assert_eq!(target.hp.round() as u8, 100);
     assert!((target.x - target.spawn_x).abs() < 0.001);
     assert!((target.y - target.spawn_y).abs() < 0.001);
-    assert!(events.iter().any(|event| matches!(event, CombatEvent::Respawn { .. })));
+    assert!(events
+        .iter()
+        .any(|event| matches!(event, CombatEvent::Respawn { .. })));
 }
 
 #[test]
