@@ -10,10 +10,21 @@
  * transfers ownership of a fresh binary payload to the transport hot path and
  * avoids the extra browser-side copy for WebTransport datagrams.
  */
-export async function connectGameTransport({ webTransportUrl, webSocketUrl, onRealtime, onReliable }) {
+export async function connectGameTransport({
+  webTransportUrl,
+  webTransportOptions,
+  webSocketUrl,
+  onRealtime,
+  onReliable,
+}) {
   if (typeof WebTransport === "function" && webTransportUrl) {
     try {
-      return await WebTransportGameConnection.connect({ webTransportUrl, onRealtime, onReliable });
+      return await WebTransportGameConnection.connect({
+        webTransportUrl,
+        webTransportOptions,
+        onRealtime,
+        onReliable,
+      });
     } catch (error) {
       if (!webSocketUrl) throw error;
       console.warn("WebTransport connection failed; falling back to WebSocket", error);
@@ -34,8 +45,8 @@ class WebTransportGameConnection {
     this.closed = false;
   }
 
-  static async connect({ webTransportUrl, onRealtime, onReliable }) {
-    const transport = new WebTransport(webTransportUrl);
+  static async connect({ webTransportUrl, webTransportOptions, onRealtime, onReliable }) {
+    const transport = new WebTransport(webTransportUrl, webTransportOptions);
     await transport.ready;
     const datagramWriter = transport.datagrams.writable.getWriter();
     const reliable = await transport.createBidirectionalStream();
