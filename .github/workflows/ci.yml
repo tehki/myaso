@@ -63,9 +63,14 @@ jobs:
           cargo check --manifest-path server/Cargo.toml
           cargo clippy --manifest-path server/Cargo.toml --all-targets -- -D warnings
           cargo test --manifest-path server/Cargo.toml
-          printf 'MYASO_CARGO_LOCK_B64='
-          base64 -w0 server/Cargo.lock
-          printf '\n'
+
+      - name: Export resolved Rust lock graph
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: m3-cargo-lock
+          path: server/Cargo.lock
+          if-no-files-found: error
+          retention-days: 1
 
       - name: Check whitespace
         env:
