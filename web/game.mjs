@@ -176,7 +176,7 @@ function setMeter(cacheKey, bar, label, value) {
   const rounded = Math.max(0, Math.round(value));
   if (hudCache[cacheKey] === rounded) return;
   hudCache[cacheKey] = rounded;
-  bar.style.width = `${rounded}%`;
+  bar.style.transform = `scaleX(${rounded / 100})`;
   label.textContent = String(rounded);
 }
 
