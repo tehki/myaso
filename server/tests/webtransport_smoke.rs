@@ -21,7 +21,7 @@ fn input_datagram(sequence: u16) -> Vec<u8> {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn quic_webtransport_datagram_roundtrip() -> Result<()> {
-    let identity = Identity::self_signed(&["localhost", "127.0.0.1"])?;
+    let identity = Identity::self_signed(["localhost", "127.0.0.1"])?;
     let certificate_hash = identity.certificate_chain().as_slice()[0].hash();
     let server_config = ServerConfig::builder()
         .with_bind_address("127.0.0.1:0".parse()?)
