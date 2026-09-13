@@ -221,13 +221,13 @@ fn run_scenario(scenario: Scenario) -> Result<CapacityReport> {
     let measured_seconds = scenario.measured_ticks as f64 / SERVER_TICK_HZ as f64;
     let snapshot_bytes_per_player_second =
         totals.bytes as f64 / scenario.players as f64 / measured_seconds;
-    let estimated_payload_bytes_per_player_second =
-        snapshot_bytes_per_player_second + INPUT_PAYLOAD_BYTES_PER_SECOND + ACK_PAYLOAD_BYTES_PER_SECOND;
+    let estimated_payload_bytes_per_player_second = snapshot_bytes_per_player_second
+        + INPUT_PAYLOAD_BYTES_PER_SECOND
+        + ACK_PAYLOAD_BYTES_PER_SECOND;
     let tick_ms_p95 = percentile(&tick_samples, 0.95);
     let replication_batch_ms_p95 = percentile(&replication_samples, 0.95);
     let target_tick_ms = 1000.0 / SERVER_TICK_HZ as f64;
-    let target_replication_ms =
-        1000.0 / (SERVER_TICK_HZ as f64 / SNAPSHOT_EVERY_TICKS as f64);
+    let target_replication_ms = 1000.0 / (SERVER_TICK_HZ as f64 / SNAPSHOT_EVERY_TICKS as f64);
 
     Ok(CapacityReport {
         players: scenario.players,
