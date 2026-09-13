@@ -1,14 +1,48 @@
 use anyhow::{bail, Context, Result};
 use myaso_server::{
-    decode_input_packet, AdmissionGate, CONSERVATIVE_DATAGRAM_BYTES, TARGET_PLAYERS_PER_MAP,
+    decode_input_packet, is_sequence_newer16,
+    simulation::World,
+    snapshot::SnapshotSession,
+    AdmissionGate, InputIngressWindow, CONSERVATIVE_DATAGRAM_BYTES, TARGET_PLAYERS_PER_MAP,
 };
-use std::{env, net::SocketAddr, sync::Arc, time::Duration};
-use tokio::sync::watch;
+use std::{
+    env,
+    net::SocketAddr,
+    sync::{
+        atomic::{AtomicU32, Ordering},
+        Arc,
+    },
+    time::Duration,
+};
+use tokio::sync::Mutex;
 use wtransport::{Connection, Endpoint, Identity, ServerConfig, VarInt};
 
 const GAME_PATH: &str = "/game";
-const CLOSE_SERVER_FULL: u32 = 0x10;
 const CLOSE_DATAGRAM_UNAVAILABLE: u32 = 0x11;
+const SNAPSHOT_INTERVAL: Duration = Duration::from_millis(50);
+
+struct SharedGame {
+    world: Mutex<World>,
+    next_player_id: AtomicU32,
+}
+
+impl SharedGame {
+    fn new() -> Arc<Self> {
+        Arc::new(Self {
+            world: Mutex::new(World::default()),
+            next_player_id: AtomicU32::new(1),
+        })
+    }
+
+    fn allocate_player_id(&self) -> u32 {
+        loop {
+            let candidate = self.next_player_id.fetch_add(1, Ordering::Relaxed);
+            if candidate != 0 {
+                return candidate;
+            }
+        }
+    }
+}
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -32,19 +66,19 @@ async fn main() -> Result<()> {
     let endpoint = Arc::new(Endpoint::server(config).context("create WebTransport endpoint")?);
     let local_addr = endpoint.local_addr().context("read server address")?;
 
-    println!("myaso M3 WebTransport spike listening on https://{local_addr}{GAME_PATH}");
+    println!("myaso M4 authoritative server listening on https://{local_addr}{GAME_PATH}");
     if let Some(hash) = certificate_hash {
         println!("development certificate SHA-256: {hash}");
     }
 
     let gate = AdmissionGate::new(TARGET_PLAYERS_PER_MAP);
-    let (tick_tx, tick_rx) = watch::channel(0_u32);
-    tokio::spawn(run_authoritative_clock(tick_tx));
+    let game = SharedGame::new();
+    tokio::spawn(run_authoritative_clock(Arc::clone(&game)));
 
     loop {
         let incoming = endpoint.accept().await;
         let gate = Arc::clone(&gate);
-        let tick_rx = tick_rx.clone();
+        let game = Arc::clone(&game);
         tokio::spawn(async move {
             let request = match incoming.await {
                 Ok(request) => request,
@@ -80,8 +114,19 @@ async fn main() -> Result<()> {
                 return;
             }
 
-            if let Err(error) = handle_connection(connection, tick_rx).await {
-                eprintln!("session ended: {error:#}");
+            let player_id = game.allocate_player_id();
+            {
+                let mut world = game.world.lock().await;
+                if !world.add_player(player_id) {
+                    eprintln!("failed to add allocated player {player_id}");
+                    return;
+                }
+            }
+
+            let result = handle_connection(connection, player_id, Arc::clone(&game)).await;
+            game.world.lock().await.remove_player(player_id);
+            if let Err(error) = result {
+                eprintln!("player {player_id} session ended: {error:#}");
             }
         });
     }
@@ -105,51 +150,73 @@ async fn load_identity(bind: SocketAddr) -> Result<Identity> {
     }
 }
 
-async fn run_authoritative_clock(tick_tx: watch::Sender<u32>) {
+async fn run_authoritative_clock(game: Arc<SharedGame>) {
     let mut interval = tokio::time::interval(Duration::from_secs_f64(1.0 / 60.0));
     interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
-    let mut tick = 0_u32;
     loop {
         interval.tick().await;
-        tick = tick.wrapping_add(1);
-        let _ = tick_tx.send(tick);
+        let mut world = game.world.lock().await;
+        let _events = world.step();
     }
 }
 
-async fn handle_connection(connection: Connection, tick_rx: watch::Receiver<u32>) -> Result<()> {
+async fn handle_connection(connection: Connection, player_id: u32, game: Arc<SharedGame>) -> Result<()> {
     let stable_id = connection.stable_id();
     let remote = connection.remote_address();
-    println!("session {stable_id} connected from {remote}");
+    println!("session {stable_id} assigned player {player_id} from {remote}");
+
+    let mut ingress = InputIngressWindow::default();
+    let mut snapshots = SnapshotSession::default();
+    let mut acknowledged_snapshot = u16::MAX;
+    let mut last_input_sequence = None;
+    let mut snapshot_interval = tokio::time::interval(SNAPSHOT_INTERVAL);
+    snapshot_interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
 
     loop {
-        let datagram = connection.receive_datagram().await?;
-        let packet = match decode_input_packet(datagram.as_ref()) {
-            Ok(packet) => packet,
-            Err(error) => {
-                eprintln!("session {stable_id} invalid input datagram: {error:?}");
-                continue;
+        tokio::select! {
+            datagram = connection.receive_datagram() => {
+                let datagram = datagram?;
+                let packet = match decode_input_packet(datagram.as_ref()) {
+                    Ok(packet) => packet,
+                    Err(error) => {
+                        eprintln!("session {stable_id} invalid input datagram: {error:?}");
+                        continue;
+                    }
+                };
+
+                if last_input_sequence.is_none_or(|previous| is_sequence_newer16(packet.sequence, previous)) {
+                    last_input_sequence = Some(packet.sequence);
+                    acknowledged_snapshot = packet.ack_snapshot_sequence;
+                }
+
+                let accepted = ingress.ingest(&packet);
+                if let Some(newest) = accepted.last().copied() {
+                    game.world.lock().await.set_input(player_id, newest.into());
+                }
+
+                let server_tick = game.world.lock().await.tick;
+                if server_tick.wrapping_sub(packet.ack_server_tick) > 600 {
+                    eprintln!(
+                        "session {stable_id} stale server acknowledgement: client={} server={}",
+                        packet.ack_server_tick, server_tick
+                    );
+                }
             }
-        };
-
-        let server_tick = *tick_rx.borrow();
-        let newest_sample_tick = packet
-            .samples
-            .first()
-            .map(|sample| sample.tick)
-            .unwrap_or(0);
-        if server_tick.wrapping_sub(packet.ack_server_tick) > 600 {
-            eprintln!(
-                "session {stable_id} stale server acknowledgement: client={} newest_input={} server={}",
-                packet.ack_server_tick, newest_sample_tick, server_tick
-            );
+            _ = snapshot_interval.tick() => {
+                let snapshot = {
+                    let world = game.world.lock().await;
+                    snapshots.build(
+                        acknowledged_snapshot,
+                        world.tick,
+                        player_id,
+                        world.fighters(),
+                        CONSERVATIVE_DATAGRAM_BYTES,
+                    )
+                };
+                connection
+                    .send_datagram(snapshot.bytes)
+                    .context("send authoritative snapshot datagram")?;
+            }
         }
-
-        // M3 deliberately stops at validated authoritative ingress. M4 will feed these
-        // samples into the server-owned combat simulation and emit acknowledged snapshots.
     }
-}
-
-#[allow(dead_code)]
-fn close_server_full(connection: &Connection) {
-    connection.close(VarInt::from_u32(CLOSE_SERVER_FULL), b"server full");
 }
