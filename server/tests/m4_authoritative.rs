@@ -1,0 +1,456 @@
+use myaso_server::{
+    simulation::{Action, CombatEvent, InputIntent, World},
+    snapshot::{
+        apply_records, build_delta, decode_snapshot, encode_snapshot, SnapshotSession, WireEntity,
+    },
+    CONSERVATIVE_DATAGRAM_BYTES,
+};
+use std::collections::BTreeMap;
+
+fn duel(distance: f32) -> World {
+    let mut world = World::new(600.0, 400.0);
+    assert!(world.add_player_at(1, 200.0, 200.0, 0.0));
+    assert!(world.add_player_at(2, 200.0 + distance, 200.0, std::f32::consts::PI));
+    world
+}
+
+fn advance(
+    world: &mut World,
+    milliseconds: f32,
+    first: InputIntent,
+    second: InputIntent,
+) -> Vec<CombatEvent> {
+    let mut elapsed = 0.0_f32;
+    let mut events = Vec::new();
+    while elapsed < milliseconds {
+        let dt = (milliseconds - elapsed).min(5.0);
+        world.set_input(1, first);
+        world.set_input(2, second);
+        events.extend(world.step_by(dt));
+        elapsed += dt;
+    }
+    events
+}
+
+#[test]
+fn rust_snapshot_encoder_matches_the_js_wire_fixture() {
+    let state = WireEntity {
+        net_id: 1,
+        x: 400,
+        y: 800,
+        facing: 16384,
+        hp: 66,
+        guard: 75,
+        action: 1,
+        flags: 2,
+    };
+    let record = build_delta(state, None).expect("full record");
+    let encoded = encode_snapshot(7, 6, 1234, false, &[record], CONSERVATIVE_DATAGRAM_BYTES);
+    let expected_hex = include_str!("../../tests/fixtures/m4-snapshot-v1.hex").trim();
+    assert_eq!(hex(&encoded), expected_hex);
+
+    let decoded = decode_snapshot(&encoded).expect("decode fixture");
+    assert_eq!(decoded.sequence, 7);
+    assert_eq!(decoded.baseline_sequence, 6);
+    assert_eq!(decoded.server_tick, 1234);
+    assert!(!decoded.full);
+    assert_eq!(decoded.records.len(), 1);
+    assert_eq!(decoded.records[0].net_id, 1);
+    assert_eq!(decoded.records[0].x, 400);
+    assert_eq!(decoded.records[0].y, 800);
+    assert_eq!(decoded.records[0].hp, 66);
+    assert_eq!(decoded.records[0].action, 1);
+}
+
+#[test]
+fn attack_preserves_windup_active_and_recovery_commitment() {
+    let mut world = duel(200.0);
+    world.set_input(
+        1,
+        InputIntent {
+            attack: true,
+            facing_radians: 0.0,
+            ..InputIntent::default()
+        },
+    );
+    world.step_by(5.0);
+    assert_eq!(
+        world.fighter(1).expect("attacker").action,
+        Action::AttackWindup
+    );
+
+    advance(
+        &mut world,
+        135.0,
+        InputIntent::default(),
+        InputIntent::default(),
+    );
+    assert_eq!(
+        world.fighter(1).expect("attacker").action,
+        Action::AttackActive
+    );
+
+    advance(
+        &mut world,
+        80.0,
+        InputIntent::default(),
+        InputIntent::default(),
+    );
+    assert_eq!(
+        world.fighter(1).expect("attacker").action,
+        Action::AttackRecovery
+    );
+
+    advance(
+        &mut world,
+        255.0,
+        InputIntent::default(),
+        InputIntent::default(),
+    );
+    assert_eq!(world.fighter(1).expect("attacker").action, Action::Idle);
+}
+
+#[test]
+fn server_owned_attack_changes_authoritative_vitals_once() {
+    let mut world = duel(72.0);
+    let events = advance(
+        &mut world,
+        230.0,
+        InputIntent {
+            attack: true,
+            facing_radians: 0.0,
+            ..InputIntent::default()
+        },
+        InputIntent {
+            facing_radians: std::f32::consts::PI,
+            ..InputIntent::default()
+        },
+    );
+
+    assert_eq!(
+        events
+            .iter()
+            .filter(|event| matches!(event, CombatEvent::Hit { .. }))
+            .count(),
+        1
+    );
+    assert_eq!(world.fighter(2).expect("target").hp.round() as u8, 66);
+}
+
+#[test]
+fn attack_outside_the_facing_arc_misses() {
+    let mut world = duel(72.0);
+    advance(
+        &mut world,
+        230.0,
+        InputIntent {
+            attack: true,
+            facing_radians: std::f32::consts::PI,
+            ..InputIntent::default()
+        },
+        InputIntent::default(),
+    );
+    assert_eq!(world.fighter(2).expect("target").hp.round() as u8, 100);
+}
+
+#[test]
+fn timed_dodge_iframes_evade_an_otherwise_valid_hit() {
+    let mut world = duel(72.0);
+    advance(
+        &mut world,
+        115.0,
+        InputIntent {
+            attack: true,
+            facing_radians: 0.0,
+            ..InputIntent::default()
+        },
+        InputIntent::default(),
+    );
+    let events = advance(
+        &mut world,
+        45.0,
+        InputIntent {
+            facing_radians: 0.0,
+            ..InputIntent::default()
+        },
+        InputIntent {
+            move_y: 1.0,
+            facing_radians: std::f32::consts::PI,
+            dodge: true,
+            ..InputIntent::default()
+        },
+    );
+    assert_eq!(world.fighter(2).expect("target").hp.round() as u8, 100);
+    assert!(events
+        .iter()
+        .any(|event| matches!(event, CombatEvent::Evade { .. })));
+}
+
+#[test]
+fn directional_block_absorbs_health_damage_and_consumes_guard() {
+    let mut world = duel(72.0);
+    advance(
+        &mut world,
+        135.0,
+        InputIntent::default(),
+        InputIntent {
+            block: true,
+            facing_radians: std::f32::consts::PI,
+            ..InputIntent::default()
+        },
+    );
+    let events = advance(
+        &mut world,
+        230.0,
+        InputIntent {
+            attack: true,
+            facing_radians: 0.0,
+            ..InputIntent::default()
+        },
+        InputIntent {
+            block: true,
+            facing_radians: std::f32::consts::PI,
+            ..InputIntent::default()
+        },
+    );
+    let target = world.fighter(2).expect("target");
+    assert_eq!(target.hp.round() as u8, 100);
+    assert_eq!(target.guard.round() as u8, 62);
+    assert!(events
+        .iter()
+        .any(|event| matches!(event, CombatEvent::Block { .. })));
+}
+
+#[test]
+fn fresh_block_parries_and_stuns_the_attacker() {
+    let mut world = duel(72.0);
+    advance(
+        &mut world,
+        110.0,
+        InputIntent {
+            attack: true,
+            facing_radians: 0.0,
+            ..InputIntent::default()
+        },
+        InputIntent::default(),
+    );
+    let events = advance(
+        &mut world,
+        45.0,
+        InputIntent {
+            facing_radians: 0.0,
+            ..InputIntent::default()
+        },
+        InputIntent {
+            block: true,
+            facing_radians: std::f32::consts::PI,
+            ..InputIntent::default()
+        },
+    );
+    assert_eq!(world.fighter(2).expect("target").hp.round() as u8, 100);
+    assert_eq!(world.fighter(1).expect("attacker").action, Action::Stunned);
+    assert!(events
+        .iter()
+        .any(|event| matches!(event, CombatEvent::Parry { .. })));
+}
+
+#[test]
+fn death_is_temporary_and_respawns_at_the_spawn_point() {
+    let mut world = World::new(200.0, 300.0);
+    assert!(world.add_player_at(1, 100.0, 100.0, 0.0));
+    assert!(world.add_player_at(2, 160.0, 100.0, std::f32::consts::PI));
+    let attack = InputIntent {
+        attack: true,
+        facing_radians: 0.0,
+        ..InputIntent::default()
+    };
+    let mut death_seen = false;
+    for _ in 0..320 {
+        let events = advance(&mut world, 5.0, attack, InputIntent::default());
+        if events
+            .iter()
+            .any(|event| matches!(event, CombatEvent::Death { .. }))
+        {
+            death_seen = true;
+            break;
+        }
+    }
+    assert!(
+        death_seen,
+        "repeated committed attacks should eventually kill the target"
+    );
+    assert_eq!(world.fighter(2).expect("target").action, Action::Dead);
+
+    let events = advance(
+        &mut world,
+        1260.0,
+        InputIntent::default(),
+        InputIntent::default(),
+    );
+    let target = world.fighter(2).expect("target");
+    assert_eq!(target.action, Action::Idle);
+    assert_eq!(target.hp.round() as u8, 100);
+    assert!((target.x - target.spawn_x).abs() < 0.001);
+    assert!((target.y - target.spawn_y).abs() < 0.001);
+    assert!(events
+        .iter()
+        .any(|event| matches!(event, CombatEvent::Respawn { .. })));
+}
+
+#[test]
+fn fighter_bodies_remain_separated_under_movement_pressure() {
+    let mut world = duel(40.0);
+    advance(
+        &mut world,
+        300.0,
+        InputIntent {
+            move_x: 1.0,
+            facing_radians: 0.0,
+            ..InputIntent::default()
+        },
+        InputIntent {
+            move_x: -1.0,
+            facing_radians: std::f32::consts::PI,
+            ..InputIntent::default()
+        },
+    );
+    let first = world.fighter(1).expect("first");
+    let second = world.fighter(2).expect("second");
+    assert!((second.x - first.x).hypot(second.y - first.y) >= 36.0 - 1e-6);
+}
+
+#[test]
+fn block_only_protects_the_facing_side() {
+    let mut world = duel(72.0);
+    advance(
+        &mut world,
+        135.0,
+        InputIntent::default(),
+        InputIntent {
+            block: true,
+            facing_radians: 0.0,
+            ..InputIntent::default()
+        },
+    );
+    advance(
+        &mut world,
+        230.0,
+        InputIntent {
+            attack: true,
+            facing_radians: 0.0,
+            ..InputIntent::default()
+        },
+        InputIntent {
+            block: true,
+            facing_radians: 0.0,
+            ..InputIntent::default()
+        },
+    );
+    assert_eq!(world.fighter(2).expect("target").hp.round() as u8, 66);
+}
+
+#[test]
+fn acknowledged_baseline_recovers_after_snapshot_loss_and_unknown_ack_forces_full() {
+    let mut world = World::new(1000.0, 1000.0);
+    world.add_player_at(1, 100.0, 100.0, 0.0);
+    world.add_player_at(2, 130.0, 100.0, 0.0);
+    let mut session = SnapshotSession::default();
+    let mut client_state = BTreeMap::new();
+
+    let first = session.build(
+        u16::MAX,
+        world.tick,
+        1,
+        world.fighters(),
+        CONSERVATIVE_DATAGRAM_BYTES,
+    );
+    assert!(first.full);
+    assert_eq!(first.sequence, 0);
+    let decoded_first = decode_snapshot(&first.bytes).expect("first snapshot");
+    apply_records(&mut client_state, &decoded_first.records);
+
+    world.set_input(
+        1,
+        InputIntent {
+            move_x: 1.0,
+            ..InputIntent::default()
+        },
+    );
+    world.step();
+    let dropped = session.build(
+        0,
+        world.tick,
+        1,
+        world.fighters(),
+        CONSERVATIVE_DATAGRAM_BYTES,
+    );
+    assert!(!dropped.full);
+    assert_eq!(dropped.baseline_sequence, 0);
+
+    world.step();
+    let recovery = session.build(
+        0,
+        world.tick,
+        1,
+        world.fighters(),
+        CONSERVATIVE_DATAGRAM_BYTES,
+    );
+    assert!(!recovery.full);
+    assert_eq!(
+        recovery.baseline_sequence, 0,
+        "lost snapshot must not advance the acknowledged baseline"
+    );
+    let decoded_recovery = decode_snapshot(&recovery.bytes).expect("recovery snapshot");
+    apply_records(&mut client_state, &decoded_recovery.records);
+    let authoritative = WireEntity::from_fighter(world.fighter(1).expect("viewer"));
+    assert_eq!(client_state.get(&1), Some(&authoritative));
+
+    let resync = session.build(
+        500,
+        world.tick,
+        1,
+        world.fighters(),
+        CONSERVATIVE_DATAGRAM_BYTES,
+    );
+    assert!(
+        resync.full,
+        "unknown acknowledgement must fail closed into a full resync"
+    );
+    assert_eq!(resync.baseline_sequence, u16::MAX);
+}
+
+#[test]
+fn dense_512_player_snapshot_stays_within_one_datagram() {
+    let mut world = World::default();
+    for net_id in 1..=512 {
+        assert!(world.add_player(net_id));
+    }
+    let mut session = SnapshotSession::default();
+    let snapshot = session.build(
+        u16::MAX,
+        900,
+        1,
+        world.fighters(),
+        CONSERVATIVE_DATAGRAM_BYTES,
+    );
+    assert!(snapshot.bytes.len() <= CONSERVATIVE_DATAGRAM_BYTES);
+    assert!(
+        snapshot.omitted_due_to_budget > 0,
+        "dense full state should be priority-limited instead of fragmented"
+    );
+    let decoded = decode_snapshot(&snapshot.bytes).expect("bounded dense snapshot");
+    assert!(
+        decoded.records.iter().any(|record| record.net_id == 1),
+        "owner state must survive pressure"
+    );
+}
+
+fn hex(bytes: &[u8]) -> String {
+    const DIGITS: &[u8; 16] = b"0123456789abcdef";
+    let mut result = String::with_capacity(bytes.len() * 2);
+    for byte in bytes {
+        result.push(DIGITS[(byte >> 4) as usize] as char);
+        result.push(DIGITS[(byte & 0x0f) as usize] as char);
+    }
+    result
+}
