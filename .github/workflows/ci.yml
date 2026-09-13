@@ -55,6 +55,15 @@ jobs:
           node --check tests/m4-snapshot-compat.test.mjs
           node --test tests/networking.test.mjs tests/m4-snapshot-compat.test.mjs
 
+      - name: Validate browser runtime hot path
+        run: |
+          node --check src/browser/frame-budget.mjs
+          node --check src/browser/snapshot-store.mjs
+          node --check tests/browser-runtime.test.mjs
+          node --check scripts/browser_hotpath_probe.mjs
+          node --test tests/browser-runtime.test.mjs
+          node scripts/browser_hotpath_probe.mjs
+
       - name: Validate authoritative Rust server
         run: |
           rustc --version
