@@ -101,6 +101,7 @@ async fn multiple_webtransport_clients_receive_authoritative_snapshots() -> Resu
         .with_server_certificate_hashes([certificate_hash])
         .build();
     let client = Endpoint::client(client_config)?;
+    let mut live_connections = Vec::with_capacity(CLIENTS);
 
     for index in 0..CLIENTS {
         let connection = client
@@ -116,9 +117,11 @@ async fn multiple_webtransport_clients_receive_authoritative_snapshots() -> Resu
             .any(|record| record.net_id == index as u32 + 1));
         assert!(reply.len() <= CONSERVATIVE_DATAGRAM_BYTES);
         connection.send_datagram(b"m4-ack")?;
+        live_connections.push(connection);
     }
 
     server_task.await??;
     assert_eq!(world.lock().await.fighters().len(), CLIENTS);
+    drop(live_connections);
     Ok(())
 }
