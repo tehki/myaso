@@ -54,13 +54,23 @@ fn server_owned_attack_changes_authoritative_vitals_once() {
     let mut hit_count = 0;
     for _ in 0..40 {
         for event in world.step() {
-            if matches!(event, CombatEvent::Hit { attacker: 1, target: 2, .. }) {
+            if matches!(
+                event,
+                CombatEvent::Hit {
+                    attacker: 1,
+                    target: 2,
+                    ..
+                }
+            ) {
                 hit_count += 1;
             }
         }
     }
 
-    assert_eq!(hit_count, 1, "one committed attack must hit a target at most once");
+    assert_eq!(
+        hit_count, 1,
+        "one committed attack must hit a target at most once"
+    );
     assert_eq!(world.fighter(2).expect("target").hp.round() as u8, 66);
 }
 
@@ -72,7 +82,13 @@ fn acknowledged_baseline_recovers_after_snapshot_loss_and_unknown_ack_forces_ful
     let mut session = SnapshotSession::default();
     let mut client_state = BTreeMap::new();
 
-    let first = session.build(u16::MAX, world.tick, 1, world.fighters(), CONSERVATIVE_DATAGRAM_BYTES);
+    let first = session.build(
+        u16::MAX,
+        world.tick,
+        1,
+        world.fighters(),
+        CONSERVATIVE_DATAGRAM_BYTES,
+    );
     assert!(first.full);
     assert_eq!(first.sequence, 0);
     let decoded_first = decode_snapshot(&first.bytes).expect("first snapshot");
@@ -86,21 +102,45 @@ fn acknowledged_baseline_recovers_after_snapshot_loss_and_unknown_ack_forces_ful
         },
     );
     world.step();
-    let dropped = session.build(0, world.tick, 1, world.fighters(), CONSERVATIVE_DATAGRAM_BYTES);
+    let dropped = session.build(
+        0,
+        world.tick,
+        1,
+        world.fighters(),
+        CONSERVATIVE_DATAGRAM_BYTES,
+    );
     assert!(!dropped.full);
     assert_eq!(dropped.baseline_sequence, 0);
 
     world.step();
-    let recovery = session.build(0, world.tick, 1, world.fighters(), CONSERVATIVE_DATAGRAM_BYTES);
+    let recovery = session.build(
+        0,
+        world.tick,
+        1,
+        world.fighters(),
+        CONSERVATIVE_DATAGRAM_BYTES,
+    );
     assert!(!recovery.full);
-    assert_eq!(recovery.baseline_sequence, 0, "lost snapshot must not advance the acknowledged baseline");
+    assert_eq!(
+        recovery.baseline_sequence, 0,
+        "lost snapshot must not advance the acknowledged baseline"
+    );
     let decoded_recovery = decode_snapshot(&recovery.bytes).expect("recovery snapshot");
     apply_records(&mut client_state, &decoded_recovery.records);
     let authoritative = WireEntity::from_fighter(world.fighter(1).expect("viewer"));
     assert_eq!(client_state.get(&1), Some(&authoritative));
 
-    let resync = session.build(500, world.tick, 1, world.fighters(), CONSERVATIVE_DATAGRAM_BYTES);
-    assert!(resync.full, "unknown acknowledgement must fail closed into a full resync");
+    let resync = session.build(
+        500,
+        world.tick,
+        1,
+        world.fighters(),
+        CONSERVATIVE_DATAGRAM_BYTES,
+    );
+    assert!(
+        resync.full,
+        "unknown acknowledgement must fail closed into a full resync"
+    );
     assert_eq!(resync.baseline_sequence, u16::MAX);
 }
 
@@ -111,11 +151,23 @@ fn dense_512_player_snapshot_stays_within_one_datagram() {
         assert!(world.add_player(net_id));
     }
     let mut session = SnapshotSession::default();
-    let snapshot = session.build(u16::MAX, 900, 1, world.fighters(), CONSERVATIVE_DATAGRAM_BYTES);
+    let snapshot = session.build(
+        u16::MAX,
+        900,
+        1,
+        world.fighters(),
+        CONSERVATIVE_DATAGRAM_BYTES,
+    );
     assert!(snapshot.bytes.len() <= CONSERVATIVE_DATAGRAM_BYTES);
-    assert!(snapshot.omitted_due_to_budget > 0, "dense full state should be priority-limited instead of fragmented");
+    assert!(
+        snapshot.omitted_due_to_budget > 0,
+        "dense full state should be priority-limited instead of fragmented"
+    );
     let decoded = decode_snapshot(&snapshot.bytes).expect("bounded dense snapshot");
-    assert!(decoded.records.iter().any(|record| record.net_id == 1), "owner state must survive pressure");
+    assert!(
+        decoded.records.iter().any(|record| record.net_id == 1),
+        "owner state must survive pressure"
+    );
 }
 
 fn hex(bytes: &[u8]) -> String {
