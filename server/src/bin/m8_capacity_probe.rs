@@ -50,24 +50,24 @@ impl CapacityReport {
     fn to_json(&self) -> String {
         format!(
             concat!(
-                "{",
+                "{{",
                 "\"players\":{},",
                 "\"measured_ticks\":{},",
                 "\"snapshots_built\":{},",
-                "\"tick_ms\":{\"p50\":{:.3},\"p95\":{:.3},\"p99\":{:.3},\"max\":{:.3}},",
-                "\"replication_batch_ms\":{\"p50\":{:.3},\"p95\":{:.3},\"p99\":{:.3},\"max\":{:.3}},",
+                "\"tick_ms\":{{\"p50\":{:.3},\"p95\":{:.3},\"p99\":{:.3},\"max\":{:.3}}},",
+                "\"replication_batch_ms\":{{\"p50\":{:.3},\"p95\":{:.3},\"p99\":{:.3},\"max\":{:.3}}},",
                 "\"avg_snapshot_bytes\":{:.1},",
                 "\"max_snapshot_bytes\":{},",
                 "\"snapshot_bytes_per_player_second\":{:.1},",
                 "\"estimated_payload_bytes_per_player_second\":{:.1},",
                 "\"avg_records_per_snapshot\":{:.2},",
                 "\"omission_ratio\":{:.6},",
-                "\"reconnect\":{\"samples\":{},\"build_ms_p95\":{:.3},\"avg_snapshot_bytes\":{:.1},\"omission_ratio\":{:.6}},",
+                "\"reconnect\":{{\"samples\":{},\"build_ms_p95\":{:.3},\"avg_snapshot_bytes\":{:.1},\"omission_ratio\":{:.6}}},",
                 "\"rss_growth_bytes\":{},",
                 "\"rss_growth_bytes_per_session\":{},",
                 "\"target_60hz_tick_met\":{},",
                 "\"target_20hz_replication_batch_met\":{}",
-                "}"
+                "}}"
             ),
             self.players,
             self.measured_ticks,
