@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>myaso.io — Combat Kernel M1</title>
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <main class="shell">
+    <header class="masthead">
+      <div>
+        <p class="eyebrow">COMBAT KERNEL M1</p>
+        <h1>myaso.io</h1>
+        <p class="tagline">Skill first. Read the opponent. Commit. Punish.</p>
+      </div>
+      <div class="controls" aria-label="Controls">
+        <span><kbd>WASD</kbd> move</span>
+        <span><kbd>Mouse</kbd> aim</span>
+        <span><kbd>LMB</kbd> attack</span>
+        <span><kbd>RMB</kbd> block / parry</span>
+        <span><kbd>Space</kbd> dodge</span>
+      </div>
+    </header>
+
+    <section class="hud" aria-live="polite">
+      <div class="fighter-card">
+        <strong>You</strong>
+        <div class="meter"><span>HP</span><div><i id="player-hp"></i></div><b id="player-hp-value">100</b></div>
+        <div class="meter guard"><span>Guard</span><div><i id="player-guard"></i></div><b id="player-guard-value">100</b></div>
+      </div>
+      <p id="event-text" class="event-text">Enter the arena.</p>
+      <div class="fighter-card bot-card">
+        <strong>Sparring Bot</strong>
+        <div class="meter"><span>HP</span><div><i id="bot-hp"></i></div><b id="bot-hp-value">100</b></div>
+        <div class="meter guard"><span>Guard</span><div><i id="bot-guard"></i></div><b id="bot-guard-value">100</b></div>
+      </div>
+    </section>
+
+    <div class="arena-wrap">
+      <canvas id="arena" width="960" height="540" tabindex="0" aria-label="myaso.io combat arena"></canvas>
+      <p class="focus-hint">Click the arena once, then fight. The bot reacts, but it does not cheat.</p>
+    </div>
+  </main>
+  <script type="module" src="./game.mjs"></script>
+</body>
+</html>
