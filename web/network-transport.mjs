@@ -5,6 +5,10 @@
  * to QUIC datagrams; the WebSocket fallback still uses reliable frames, so the
  * caller must coalesce and discard stale snapshots instead of building a queue.
  * Reliable messages use a WebTransport bidirectional stream or WebSocket frames.
+ *
+ * sendRealtime() retains the historical copy-safe contract. sendRealtimeOwned()
+ * transfers ownership of a fresh binary payload to the transport hot path and
+ * avoids the extra browser-side copy for WebTransport datagrams.
  */
 export async function connectGameTransport({ webTransportUrl, webSocketUrl, onRealtime, onReliable }) {
   if (typeof WebTransport === "function" && webTransportUrl) {
@@ -42,7 +46,16 @@ class WebTransportGameConnection {
   }
 
   sendRealtime(bytes) {
-    this.latestRealtime = toUint8Array(bytes).slice();
+    return this.#queueRealtime(bytes, true);
+  }
+
+  sendRealtimeOwned(bytes) {
+    return this.#queueRealtime(bytes, false);
+  }
+
+  #queueRealtime(bytes, copy) {
+    const payload = toUint8Array(bytes);
+    this.latestRealtime = copy ? payload.slice() : payload;
     if (!this.realtimeFlush) {
       this.realtimeFlush = this.#flushRealtime().finally(() => { this.realtimeFlush = null; });
     }
@@ -104,19 +117,27 @@ class WebSocketGameConnection {
   }
 
   sendRealtime(bytes) {
-    // Do not let TCP/WebSocket backpressure turn stale snapshots into latency.
-    this.latestRealtime = toUint8Array(bytes).slice();
+    return this.#queueRealtime(bytes, true);
+  }
+
+  sendRealtimeOwned(bytes) {
+    return this.#queueRealtime(bytes, false);
+  }
+
+  #queueRealtime(bytes, copy) {
+    const payload = toUint8Array(bytes);
+    this.latestRealtime = copy ? payload.slice() : payload;
     if (this.flushScheduled) return;
     this.flushScheduled = true;
     queueMicrotask(() => {
       this.flushScheduled = false;
       if (!this.latestRealtime || this.socket.readyState !== WebSocket.OPEN) return;
       if (this.socket.bufferedAmount > 64 * 1024) return;
-      const payload = new Uint8Array(1 + this.latestRealtime.length);
-      payload[0] = 0;
-      payload.set(this.latestRealtime, 1);
+      const framed = new Uint8Array(1 + this.latestRealtime.length);
+      framed[0] = 0;
+      framed.set(this.latestRealtime, 1);
       this.latestRealtime = null;
-      this.socket.send(payload);
+      this.socket.send(framed);
     });
   }
 
