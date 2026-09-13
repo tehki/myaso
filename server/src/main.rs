@@ -238,7 +238,11 @@ async fn handle_connection(
     }
 }
 
-fn record_pending_input_ack(pending: &mut VecDeque<(u32, u32)>, client_tick: u32, server_tick: u32) {
+fn record_pending_input_ack(
+    pending: &mut VecDeque<(u32, u32)>,
+    client_tick: u32,
+    server_tick: u32,
+) {
     if pending.len() == MAX_PENDING_INPUT_ACKS {
         pending.pop_front();
     }
