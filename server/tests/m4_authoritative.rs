@@ -1,11 +1,36 @@
 use myaso_server::{
-    simulation::{CombatEvent, InputIntent, World},
+    simulation::{Action, CombatEvent, InputIntent, World},
     snapshot::{
         apply_records, build_delta, decode_snapshot, encode_snapshot, SnapshotSession, WireEntity,
     },
     CONSERVATIVE_DATAGRAM_BYTES,
 };
 use std::collections::BTreeMap;
+
+fn duel(distance: f32) -> World {
+    let mut world = World::new(600.0, 400.0);
+    assert!(world.add_player_at(1, 200.0, 200.0, 0.0));
+    assert!(world.add_player_at(2, 200.0 + distance, 200.0, std::f32::consts::PI));
+    world
+}
+
+fn advance(
+    world: &mut World,
+    milliseconds: f32,
+    first: InputIntent,
+    second: InputIntent,
+) -> Vec<CombatEvent> {
+    let mut elapsed = 0.0_f32;
+    let mut events = Vec::new();
+    while elapsed < milliseconds {
+        let dt = (milliseconds - elapsed).min(5.0);
+        world.set_input(1, first);
+        world.set_input(2, second);
+        events.extend(world.step_by(dt));
+        elapsed += dt;
+    }
+    events
+}
 
 #[test]
 fn rust_snapshot_encoder_matches_the_js_wire_fixture() {
@@ -38,10 +63,8 @@ fn rust_snapshot_encoder_matches_the_js_wire_fixture() {
 }
 
 #[test]
-fn server_owned_attack_changes_authoritative_vitals_once() {
-    let mut world = World::new(500.0, 300.0);
-    assert!(world.add_player_at(1, 100.0, 100.0, 0.0));
-    assert!(world.add_player_at(2, 180.0, 100.0, std::f32::consts::PI));
+fn attack_preserves_windup_active_and_recovery_commitment() {
+    let mut world = duel(200.0);
     world.set_input(
         1,
         InputIntent {
@@ -50,26 +73,258 @@ fn server_owned_attack_changes_authoritative_vitals_once() {
             ..InputIntent::default()
         },
     );
+    world.step_by(5.0);
+    assert_eq!(world.fighter(1).expect("attacker").action, Action::AttackWindup);
 
-    let mut hit_count = 0;
-    for _ in 0..40 {
-        for event in world.step() {
-            if matches!(
-                event,
-                CombatEvent::Hit {
-                    attacker: 1,
-                    target: 2,
-                    ..
-                }
-            ) {
-                hit_count += 1;
-            }
-        }
-    }
+    advance(
+        &mut world,
+        135.0,
+        InputIntent::default(),
+        InputIntent::default(),
+    );
+    assert_eq!(world.fighter(1).expect("attacker").action, Action::AttackActive);
+
+    advance(
+        &mut world,
+        80.0,
+        InputIntent::default(),
+        InputIntent::default(),
+    );
+    assert_eq!(world.fighter(1).expect("attacker").action, Action::AttackRecovery);
+
+    advance(
+        &mut world,
+        255.0,
+        InputIntent::default(),
+        InputIntent::default(),
+    );
+    assert_eq!(world.fighter(1).expect("attacker").action, Action::Idle);
+}
+
+#[test]
+fn server_owned_attack_changes_authoritative_vitals_once() {
+    let mut world = duel(72.0);
+    let events = advance(
+        &mut world,
+        230.0,
+        InputIntent {
+            attack: true,
+            facing_radians: 0.0,
+            ..InputIntent::default()
+        },
+        InputIntent {
+            facing_radians: std::f32::consts::PI,
+            ..InputIntent::default()
+        },
+    );
 
     assert_eq!(
-        hit_count, 1,
-        "one committed attack must hit a target at most once"
+        events
+            .iter()
+            .filter(|event| matches!(event, CombatEvent::Hit { .. }))
+            .count(),
+        1
+    );
+    assert_eq!(world.fighter(2).expect("target").hp.round() as u8, 66);
+}
+
+#[test]
+fn attack_outside_the_facing_arc_misses() {
+    let mut world = duel(72.0);
+    advance(
+        &mut world,
+        230.0,
+        InputIntent {
+            attack: true,
+            facing_radians: std::f32::consts::PI,
+            ..InputIntent::default()
+        },
+        InputIntent::default(),
+    );
+    assert_eq!(world.fighter(2).expect("target").hp.round() as u8, 100);
+}
+
+#[test]
+fn timed_dodge_iframes_evade_an_otherwise_valid_hit() {
+    let mut world = duel(72.0);
+    advance(
+        &mut world,
+        115.0,
+        InputIntent {
+            attack: true,
+            facing_radians: 0.0,
+            ..InputIntent::default()
+        },
+        InputIntent::default(),
+    );
+    let events = advance(
+        &mut world,
+        45.0,
+        InputIntent {
+            facing_radians: 0.0,
+            ..InputIntent::default()
+        },
+        InputIntent {
+            move_y: 1.0,
+            facing_radians: std::f32::consts::PI,
+            dodge: true,
+            ..InputIntent::default()
+        },
+    );
+    assert_eq!(world.fighter(2).expect("target").hp.round() as u8, 100);
+    assert!(events.iter().any(|event| matches!(event, CombatEvent::Evade { .. })));
+}
+
+#[test]
+fn directional_block_absorbs_health_damage_and_consumes_guard() {
+    let mut world = duel(72.0);
+    advance(
+        &mut world,
+        135.0,
+        InputIntent::default(),
+        InputIntent {
+            block: true,
+            facing_radians: std::f32::consts::PI,
+            ..InputIntent::default()
+        },
+    );
+    let events = advance(
+        &mut world,
+        230.0,
+        InputIntent {
+            attack: true,
+            facing_radians: 0.0,
+            ..InputIntent::default()
+        },
+        InputIntent {
+            block: true,
+            facing_radians: std::f32::consts::PI,
+            ..InputIntent::default()
+        },
+    );
+    let target = world.fighter(2).expect("target");
+    assert_eq!(target.hp.round() as u8, 100);
+    assert_eq!(target.guard.round() as u8, 62);
+    assert!(events.iter().any(|event| matches!(event, CombatEvent::Block { .. })));
+}
+
+#[test]
+fn fresh_block_parries_and_stuns_the_attacker() {
+    let mut world = duel(72.0);
+    advance(
+        &mut world,
+        110.0,
+        InputIntent {
+            attack: true,
+            facing_radians: 0.0,
+            ..InputIntent::default()
+        },
+        InputIntent::default(),
+    );
+    let events = advance(
+        &mut world,
+        45.0,
+        InputIntent {
+            facing_radians: 0.0,
+            ..InputIntent::default()
+        },
+        InputIntent {
+            block: true,
+            facing_radians: std::f32::consts::PI,
+            ..InputIntent::default()
+        },
+    );
+    assert_eq!(world.fighter(2).expect("target").hp.round() as u8, 100);
+    assert_eq!(world.fighter(1).expect("attacker").action, Action::Stunned);
+    assert!(events.iter().any(|event| matches!(event, CombatEvent::Parry { .. })));
+}
+
+#[test]
+fn death_is_temporary_and_respawns_at_the_spawn_point() {
+    let mut world = World::new(200.0, 300.0);
+    assert!(world.add_player_at(1, 100.0, 100.0, 0.0));
+    assert!(world.add_player_at(2, 160.0, 100.0, std::f32::consts::PI));
+    let attack = InputIntent {
+        attack: true,
+        facing_radians: 0.0,
+        ..InputIntent::default()
+    };
+    let mut death_seen = false;
+    for _ in 0..320 {
+        let events = advance(&mut world, 5.0, attack, InputIntent::default());
+        if events
+            .iter()
+            .any(|event| matches!(event, CombatEvent::Death { .. }))
+        {
+            death_seen = true;
+            break;
+        }
+    }
+    assert!(death_seen, "repeated committed attacks should eventually kill the target");
+    assert_eq!(world.fighter(2).expect("target").action, Action::Dead);
+
+    let events = advance(
+        &mut world,
+        1260.0,
+        InputIntent::default(),
+        InputIntent::default(),
+    );
+    let target = world.fighter(2).expect("target");
+    assert_eq!(target.action, Action::Idle);
+    assert_eq!(target.hp.round() as u8, 100);
+    assert!((target.x - target.spawn_x).abs() < 0.001);
+    assert!((target.y - target.spawn_y).abs() < 0.001);
+    assert!(events.iter().any(|event| matches!(event, CombatEvent::Respawn { .. })));
+}
+
+#[test]
+fn fighter_bodies_remain_separated_under_movement_pressure() {
+    let mut world = duel(40.0);
+    advance(
+        &mut world,
+        300.0,
+        InputIntent {
+            move_x: 1.0,
+            facing_radians: 0.0,
+            ..InputIntent::default()
+        },
+        InputIntent {
+            move_x: -1.0,
+            facing_radians: std::f32::consts::PI,
+            ..InputIntent::default()
+        },
+    );
+    let first = world.fighter(1).expect("first");
+    let second = world.fighter(2).expect("second");
+    assert!((second.x - first.x).hypot(second.y - first.y) >= 36.0 - 1e-6);
+}
+
+#[test]
+fn block_only_protects_the_facing_side() {
+    let mut world = duel(72.0);
+    advance(
+        &mut world,
+        135.0,
+        InputIntent::default(),
+        InputIntent {
+            block: true,
+            facing_radians: 0.0,
+            ..InputIntent::default()
+        },
+    );
+    advance(
+        &mut world,
+        230.0,
+        InputIntent {
+            attack: true,
+            facing_radians: 0.0,
+            ..InputIntent::default()
+        },
+        InputIntent {
+            block: true,
+            facing_radians: 0.0,
+            ..InputIntent::default()
+        },
     );
     assert_eq!(world.fighter(2).expect("target").hp.round() as u8, 66);
 }
