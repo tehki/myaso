@@ -1,0 +1,17 @@
+# Default ownership
+* @tehki
+
+# Security / policy / governance
+/CODING_AGENT_CONSTITUTION_v1.3.md @tehki
+/CODING_AGENT_DEVELOPMENT_PRINCIPLES_SYSTEM_PROMPT_v1.6.md @tehki
+/CODING_AGENT_POLICY_v1.3.yaml @tehki
+/REPOSITORY_GOVERNANCE_v1.2.yaml @tehki
+/.github/ @tehki
+/scripts/validate_coding_agent_policy.py @tehki
+/scripts/validate_repository_governance.py @tehki
+/scripts/verify_main_push_provenance.py @tehki
+/docs/POLICY_ADOPTION.md @tehki
+/docs/DEVELOPMENT_METHOD.md @tehki
+/docs/SECURITY_PRIVACY.md @tehki
+/docs/RETENTION_POLICY.md @tehki
+/docs/GITHUB_REPOSITORY_GOVERNANCE.md @tehki
