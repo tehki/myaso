@@ -10,6 +10,7 @@ import {
   encodeSnapshot,
   quantizeEntity,
 } from "../src/network/snapshot-codec.mjs";
+import { connectGameTransport } from "../web/network-transport.mjs";
 
 function fullRecord(entity) {
   return buildEntityDelta(quantizeEntity(entity));
@@ -109,5 +110,69 @@ test("repeated browser snapshot updates allocate no replacement entity objects",
     assert.equal(state.get(7), stableReference);
     assert.equal(result.created, 0);
     before = next;
+  }
+});
+
+test("owned WebTransport realtime sends avoid the defensive payload copy", async () => {
+  const originalWebTransport = globalThis.WebTransport;
+  const datagramWrites = [];
+
+  class FakeReader {
+    async read() {
+      return { value: undefined, done: true };
+    }
+
+    releaseLock() {}
+  }
+
+  class FakeWriter {
+    constructor(writes) {
+      this.writes = writes;
+      this.ready = Promise.resolve();
+    }
+
+    async write(value) {
+      this.writes.push(value);
+    }
+
+    releaseLock() {}
+  }
+
+  class FakeWebTransport {
+    constructor() {
+      this.ready = Promise.resolve();
+      this.datagramWriter = new FakeWriter(datagramWrites);
+      this.reliableWriter = new FakeWriter([]);
+      this.datagrams = {
+        writable: { getWriter: () => this.datagramWriter },
+        readable: { getReader: () => new FakeReader() },
+      };
+    }
+
+    async createBidirectionalStream() {
+      return {
+        writable: { getWriter: () => this.reliableWriter },
+        readable: { getReader: () => new FakeReader() },
+      };
+    }
+
+    close() {}
+  }
+
+  globalThis.WebTransport = FakeWebTransport;
+  try {
+    const connection = await connectGameTransport({ webTransportUrl: "https://example.test/game" });
+    const owned = new Uint8Array([1, 2, 3]);
+    await connection.sendRealtimeOwned(owned);
+    assert.equal(datagramWrites[0], owned, "owned payload should reach WebTransport without a copy");
+
+    const copySafe = new Uint8Array([4, 5, 6]);
+    await connection.sendRealtime(copySafe);
+    assert.notEqual(datagramWrites[1], copySafe, "copy-safe API must retain its defensive copy");
+    assert.deepEqual([...datagramWrites[1]], [4, 5, 6]);
+    connection.close();
+  } finally {
+    if (originalWebTransport === undefined) delete globalThis.WebTransport;
+    else globalThis.WebTransport = originalWebTransport;
   }
 });
