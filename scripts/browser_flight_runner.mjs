@@ -82,7 +82,7 @@ async function startStaticServer() {
 }
 
 async function startGameServer() {
-  const child = spawn("cargo", ["run", "--locked", "--manifest-path", "server/Cargo.toml", "--quiet"], {
+  const child = spawn("cargo", ["run", "--locked", "--manifest-path", "server/Cargo.toml", "--bin", "myaso-server", "--quiet"], {
     cwd: root,
     env: { ...process.env, MYASO_BIND: "127.0.0.1:0" },
     stdio: ["ignore", "pipe", "pipe"],
