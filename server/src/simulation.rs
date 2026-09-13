@@ -1,0 +1,594 @@
+use std::collections::BTreeSet;
+
+pub const DEFAULT_WORLD_WIDTH: f32 = 8192.0;
+pub const DEFAULT_WORLD_HEIGHT: f32 = 8192.0;
+pub const SERVER_TICK_HZ: f32 = 60.0;
+pub const SERVER_DT_MS: f32 = 1000.0 / SERVER_TICK_HZ;
+
+const FIGHTER_RADIUS: f32 = 18.0;
+const MOVE_SPEED: f32 = 215.0;
+const ATTACK_WINDUP_MS: f32 = 135.0;
+const ATTACK_ACTIVE_MS: f32 = 80.0;
+const ATTACK_RECOVERY_MS: f32 = 255.0;
+const ATTACK_REACH: f32 = 76.0;
+const ATTACK_ARC_RADIANS: f32 = std::f32::consts::PI * 0.78;
+const ATTACK_DAMAGE: f32 = 34.0;
+const ATTACK_KNOCKBACK: f32 = 18.0;
+const DODGE_DURATION_MS: f32 = 145.0;
+const DODGE_RECOVERY_MS: f32 = 165.0;
+const DODGE_SPEED: f32 = 610.0;
+const DODGE_IFRAME_MS: f32 = 118.0;
+const BLOCK_PARRY_WINDOW_MS: f32 = 115.0;
+const BLOCK_HALF_ANGLE_RADIANS: f32 = std::f32::consts::PI * 0.46;
+const BLOCK_GUARD_DAMAGE: f32 = 38.0;
+const BLOCK_GUARD_BREAK_STUN_MS: f32 = 520.0;
+const BLOCK_PARRY_STUN_MS: f32 = 430.0;
+const BLOCK_MOVE_MULTIPLIER: f32 = 0.42;
+const GUARD_MAX: f32 = 100.0;
+const GUARD_REGEN_PER_SECOND: f32 = 24.0;
+const GUARD_REGEN_DELAY_MS: f32 = 520.0;
+const RESPAWN_MS: f32 = 1250.0;
+const EPSILON: f32 = 1e-6;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Action {
+    Idle,
+    AttackWindup,
+    AttackActive,
+    AttackRecovery,
+    Dodge,
+    DodgeRecovery,
+    Block,
+    Stunned,
+    Dead,
+}
+
+impl Action {
+    pub fn wire_code(self) -> u8 {
+        match self {
+            Self::Idle => 0,
+            Self::AttackWindup => 1,
+            Self::AttackActive => 2,
+            Self::AttackRecovery => 3,
+            Self::Dodge => 4,
+            Self::DodgeRecovery => 5,
+            Self::Block => 6,
+            Self::Stunned => 7,
+            Self::Dead => 8,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct InputIntent {
+    pub move_x: f32,
+    pub move_y: f32,
+    pub facing_radians: f32,
+    pub attack: bool,
+    pub dodge: bool,
+    pub block: bool,
+}
+
+impl Default for InputIntent {
+    fn default() -> Self {
+        Self {
+            move_x: 0.0,
+            move_y: 0.0,
+            facing_radians: 0.0,
+            attack: false,
+            dodge: false,
+            block: false,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct Fighter {
+    pub net_id: u32,
+    pub x: f32,
+    pub y: f32,
+    pub spawn_x: f32,
+    pub spawn_y: f32,
+    pub facing: f32,
+    pub hp: f32,
+    pub guard: f32,
+    pub action: Action,
+    pub action_elapsed_ms: f32,
+    pub recently_interacted_with: Option<u32>,
+    latest_input: InputIntent,
+    action_duration_ms: f32,
+    dodge_dir_x: f32,
+    dodge_dir_y: f32,
+    attack_hit_targets: BTreeSet<u32>,
+    guard_regen_blocked_until_ms: f32,
+    respawn_at_ms: f32,
+}
+
+impl Fighter {
+    fn new(net_id: u32, x: f32, y: f32, facing: f32) -> Self {
+        Self {
+            net_id,
+            x,
+            y,
+            spawn_x: x,
+            spawn_y: y,
+            facing: normalize_angle(facing),
+            hp: 100.0,
+            guard: GUARD_MAX,
+            action: Action::Idle,
+            action_elapsed_ms: 0.0,
+            recently_interacted_with: None,
+            latest_input: InputIntent::default(),
+            action_duration_ms: 0.0,
+            dodge_dir_x: 0.0,
+            dodge_dir_y: 0.0,
+            attack_hit_targets: BTreeSet::new(),
+            guard_regen_blocked_until_ms: 0.0,
+            respawn_at_ms: 0.0,
+        }
+    }
+
+    pub fn input(&self) -> InputIntent {
+        self.latest_input
+    }
+
+    fn set_action(&mut self, action: Action, duration_ms: f32) {
+        self.action = action;
+        self.action_elapsed_ms = 0.0;
+        self.action_duration_ms = duration_ms;
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum CombatEvent {
+    Evade { attacker: u32, target: u32 },
+    Parry { attacker: u32, target: u32 },
+    Block { attacker: u32, target: u32 },
+    GuardBreak { attacker: u32, target: u32 },
+    Hit {
+        attacker: u32,
+        target: u32,
+        damage: u8,
+        hp: u8,
+    },
+    Death { fighter: u32, killer: u32 },
+    Respawn { fighter: u32 },
+}
+
+#[derive(Debug, Clone)]
+pub struct World {
+    pub width: f32,
+    pub height: f32,
+    pub now_ms: f32,
+    pub tick: u32,
+    fighters: Vec<Fighter>,
+}
+
+impl Default for World {
+    fn default() -> Self {
+        Self::new(DEFAULT_WORLD_WIDTH, DEFAULT_WORLD_HEIGHT)
+    }
+}
+
+impl World {
+    pub fn new(width: f32, height: f32) -> Self {
+        assert!(width > FIGHTER_RADIUS * 2.0);
+        assert!(height > FIGHTER_RADIUS * 2.0);
+        Self {
+            width,
+            height,
+            now_ms: 0.0,
+            tick: 0,
+            fighters: Vec::new(),
+        }
+    }
+
+    pub fn fighters(&self) -> &[Fighter] {
+        &self.fighters
+    }
+
+    pub fn fighter(&self, net_id: u32) -> Option<&Fighter> {
+        self.fighters.iter().find(|fighter| fighter.net_id == net_id)
+    }
+
+    pub fn add_player(&mut self, net_id: u32) -> bool {
+        let spacing = 96.0;
+        let usable_width = (self.width - 2.0 * FIGHTER_RADIUS).max(spacing);
+        let columns = (usable_width / spacing).floor().max(1.0) as u32;
+        let index = net_id.saturating_sub(1);
+        let x = FIGHTER_RADIUS + 24.0 + (index % columns) as f32 * spacing;
+        let row = (index / columns) % columns.max(1);
+        let y = FIGHTER_RADIUS + 24.0 + row as f32 * spacing;
+        self.add_player_at(net_id, x.min(self.width - FIGHTER_RADIUS), y.min(self.height - FIGHTER_RADIUS), 0.0)
+    }
+
+    pub fn add_player_at(&mut self, net_id: u32, x: f32, y: f32, facing: f32) -> bool {
+        if net_id == 0 || self.fighter(net_id).is_some() {
+            return false;
+        }
+        let fighter = Fighter::new(
+            net_id,
+            clamp(x, FIGHTER_RADIUS, self.width - FIGHTER_RADIUS),
+            clamp(y, FIGHTER_RADIUS, self.height - FIGHTER_RADIUS),
+            facing,
+        );
+        self.fighters.push(fighter);
+        self.fighters.sort_by_key(|fighter| fighter.net_id);
+        true
+    }
+
+    pub fn remove_player(&mut self, net_id: u32) -> bool {
+        let before = self.fighters.len();
+        self.fighters.retain(|fighter| fighter.net_id != net_id);
+        before != self.fighters.len()
+    }
+
+    pub fn set_input(&mut self, net_id: u32, input: InputIntent) -> bool {
+        let Some(fighter) = self.fighters.iter_mut().find(|fighter| fighter.net_id == net_id) else {
+            return false;
+        };
+        fighter.latest_input = normalize_input(input);
+        true
+    }
+
+    pub fn step(&mut self) -> Vec<CombatEvent> {
+        self.step_by(SERVER_DT_MS)
+    }
+
+    pub fn step_by(&mut self, dt_ms: f32) -> Vec<CombatEvent> {
+        assert!(dt_ms.is_finite() && dt_ms > 0.0 && dt_ms <= 100.0);
+        self.now_ms += dt_ms;
+        self.tick = self.tick.wrapping_add(1);
+        let mut events = Vec::new();
+
+        for fighter in &mut self.fighters {
+            if fighter.action == Action::Dead {
+                if self.now_ms >= fighter.respawn_at_ms {
+                    respawn_fighter(fighter);
+                    events.push(CombatEvent::Respawn {
+                        fighter: fighter.net_id,
+                    });
+                }
+                continue;
+            }
+
+            let input = normalize_input(fighter.latest_input);
+            fighter.facing = normalize_angle(input.facing_radians);
+            begin_requested_action(fighter, input);
+            move_fighter(self.width, self.height, fighter, input, dt_ms);
+            advance_action(fighter, input, dt_ms);
+
+            if fighter.action != Action::Block && self.now_ms >= fighter.guard_regen_blocked_until_ms {
+                fighter.guard = (fighter.guard + GUARD_REGEN_PER_SECOND * dt_ms / 1000.0).min(GUARD_MAX);
+            }
+        }
+
+        separate_fighters(self.width, self.height, &mut self.fighters);
+        resolve_attacks(
+            self.width,
+            self.height,
+            self.now_ms,
+            &mut self.fighters,
+            &mut events,
+        );
+        events
+    }
+}
+
+fn normalize_input(mut input: InputIntent) -> InputIntent {
+    if !input.move_x.is_finite() {
+        input.move_x = 0.0;
+    }
+    if !input.move_y.is_finite() {
+        input.move_y = 0.0;
+    }
+    if !input.facing_radians.is_finite() {
+        input.facing_radians = 0.0;
+    }
+    let length = input.move_x.hypot(input.move_y);
+    if length > 1.0 {
+        input.move_x /= length;
+        input.move_y /= length;
+    }
+    input
+}
+
+fn begin_requested_action(fighter: &mut Fighter, input: InputIntent) {
+    let can_interrupt = matches!(fighter.action, Action::Idle | Action::Block);
+    if !can_interrupt {
+        return;
+    }
+
+    if input.dodge {
+        let move_length = input.move_x.hypot(input.move_y);
+        if move_length > EPSILON {
+            fighter.dodge_dir_x = input.move_x / move_length;
+            fighter.dodge_dir_y = input.move_y / move_length;
+        } else {
+            fighter.dodge_dir_x = fighter.facing.cos();
+            fighter.dodge_dir_y = fighter.facing.sin();
+        }
+        fighter.set_action(Action::Dodge, DODGE_DURATION_MS);
+        return;
+    }
+
+    if input.attack && fighter.action == Action::Idle {
+        fighter.attack_hit_targets.clear();
+        fighter.set_action(Action::AttackWindup, ATTACK_WINDUP_MS);
+        return;
+    }
+
+    if input.block {
+        if fighter.action != Action::Block {
+            fighter.set_action(Action::Block, f32::INFINITY);
+        }
+    } else if fighter.action == Action::Block {
+        fighter.set_action(Action::Idle, 0.0);
+    }
+}
+
+fn move_fighter(width: f32, height: f32, fighter: &mut Fighter, input: InputIntent, dt_ms: f32) {
+    let mut velocity_x = input.move_x * MOVE_SPEED;
+    let mut velocity_y = input.move_y * MOVE_SPEED;
+
+    match fighter.action {
+        Action::Dodge => {
+            velocity_x = fighter.dodge_dir_x * DODGE_SPEED;
+            velocity_y = fighter.dodge_dir_y * DODGE_SPEED;
+        }
+        Action::Block => {
+            velocity_x *= BLOCK_MOVE_MULTIPLIER;
+            velocity_y *= BLOCK_MOVE_MULTIPLIER;
+        }
+        Action::AttackWindup => {
+            velocity_x *= 0.35;
+            velocity_y *= 0.35;
+        }
+        Action::AttackActive | Action::Stunned => {
+            velocity_x = 0.0;
+            velocity_y = 0.0;
+        }
+        Action::AttackRecovery | Action::DodgeRecovery => {
+            velocity_x *= 0.48;
+            velocity_y *= 0.48;
+        }
+        Action::Idle | Action::Dead => {}
+    }
+
+    let seconds = dt_ms / 1000.0;
+    fighter.x = clamp(
+        fighter.x + velocity_x * seconds,
+        FIGHTER_RADIUS,
+        width - FIGHTER_RADIUS,
+    );
+    fighter.y = clamp(
+        fighter.y + velocity_y * seconds,
+        FIGHTER_RADIUS,
+        height - FIGHTER_RADIUS,
+    );
+}
+
+fn advance_action(fighter: &mut Fighter, input: InputIntent, dt_ms: f32) {
+    if matches!(fighter.action, Action::Idle | Action::Dead) {
+        return;
+    }
+    fighter.action_elapsed_ms += dt_ms;
+
+    if fighter.action == Action::Block {
+        if !input.block {
+            fighter.set_action(Action::Idle, 0.0);
+        }
+        return;
+    }
+
+    if fighter.action_elapsed_ms + EPSILON < fighter.action_duration_ms {
+        return;
+    }
+
+    match fighter.action {
+        Action::AttackWindup => fighter.set_action(Action::AttackActive, ATTACK_ACTIVE_MS),
+        Action::AttackActive => fighter.set_action(Action::AttackRecovery, ATTACK_RECOVERY_MS),
+        Action::AttackRecovery => fighter.set_action(Action::Idle, 0.0),
+        Action::Dodge => fighter.set_action(Action::DodgeRecovery, DODGE_RECOVERY_MS),
+        Action::DodgeRecovery | Action::Stunned => fighter.set_action(Action::Idle, 0.0),
+        Action::Idle | Action::Block | Action::Dead => {}
+    }
+}
+
+fn separate_fighters(width: f32, height: f32, fighters: &mut [Fighter]) {
+    let minimum_distance = FIGHTER_RADIUS * 2.0;
+    for first_index in 0..fighters.len() {
+        for second_index in (first_index + 1)..fighters.len() {
+            let (first, second) = two_mut(fighters, first_index, second_index);
+            if first.action == Action::Dead || second.action == Action::Dead {
+                continue;
+            }
+            let mut dx = second.x - first.x;
+            let mut dy = second.y - first.y;
+            let mut distance = dx.hypot(dy);
+            if distance >= minimum_distance {
+                continue;
+            }
+            if distance <= EPSILON {
+                dx = first.facing.cos();
+                dy = first.facing.sin();
+                distance = 1.0;
+            }
+            let overlap = minimum_distance - distance;
+            let nx = dx / distance;
+            let ny = dy / distance;
+            let shift = overlap / 2.0;
+            first.x = clamp(first.x - nx * shift, FIGHTER_RADIUS, width - FIGHTER_RADIUS);
+            first.y = clamp(first.y - ny * shift, FIGHTER_RADIUS, height - FIGHTER_RADIUS);
+            second.x = clamp(second.x + nx * shift, FIGHTER_RADIUS, width - FIGHTER_RADIUS);
+            second.y = clamp(second.y + ny * shift, FIGHTER_RADIUS, height - FIGHTER_RADIUS);
+        }
+    }
+}
+
+fn resolve_attacks(
+    width: f32,
+    height: f32,
+    now_ms: f32,
+    fighters: &mut [Fighter],
+    events: &mut Vec<CombatEvent>,
+) {
+    for attacker_index in 0..fighters.len() {
+        if fighters[attacker_index].action != Action::AttackActive {
+            continue;
+        }
+
+        for target_index in 0..fighters.len() {
+            if attacker_index == target_index {
+                continue;
+            }
+            let target_id = fighters[target_index].net_id;
+            if fighters[target_index].action == Action::Dead
+                || fighters[attacker_index].attack_hit_targets.contains(&target_id)
+                || !is_target_in_attack_arc(&fighters[attacker_index], &fighters[target_index])
+            {
+                continue;
+            }
+
+            let (attacker, target) = two_mut(fighters, attacker_index, target_index);
+            attacker.attack_hit_targets.insert(target.net_id);
+            attacker.recently_interacted_with = Some(target.net_id);
+            target.recently_interacted_with = Some(attacker.net_id);
+
+            if is_invulnerable(target) {
+                events.push(CombatEvent::Evade {
+                    attacker: attacker.net_id,
+                    target: target.net_id,
+                });
+                continue;
+            }
+
+            if is_blocking_attack(target, attacker) {
+                target.guard_regen_blocked_until_ms = now_ms + GUARD_REGEN_DELAY_MS;
+                if target.action_elapsed_ms <= BLOCK_PARRY_WINDOW_MS {
+                    attacker.set_action(Action::Stunned, BLOCK_PARRY_STUN_MS);
+                    events.push(CombatEvent::Parry {
+                        attacker: attacker.net_id,
+                        target: target.net_id,
+                    });
+                    continue;
+                }
+
+                target.guard = (target.guard - BLOCK_GUARD_DAMAGE).max(0.0);
+                if target.guard <= EPSILON {
+                    target.set_action(Action::Stunned, BLOCK_GUARD_BREAK_STUN_MS);
+                    events.push(CombatEvent::GuardBreak {
+                        attacker: attacker.net_id,
+                        target: target.net_id,
+                    });
+                } else {
+                    events.push(CombatEvent::Block {
+                        attacker: attacker.net_id,
+                        target: target.net_id,
+                    });
+                }
+                continue;
+            }
+
+            target.hp = (target.hp - ATTACK_DAMAGE).max(0.0);
+            knock_back(width, height, attacker, target);
+            events.push(CombatEvent::Hit {
+                attacker: attacker.net_id,
+                target: target.net_id,
+                damage: ATTACK_DAMAGE.round() as u8,
+                hp: target.hp.round() as u8,
+            });
+
+            if target.hp <= EPSILON {
+                target.action = Action::Dead;
+                target.action_elapsed_ms = 0.0;
+                target.action_duration_ms = 0.0;
+                target.respawn_at_ms = now_ms + RESPAWN_MS;
+                events.push(CombatEvent::Death {
+                    fighter: target.net_id,
+                    killer: attacker.net_id,
+                });
+            }
+        }
+    }
+}
+
+fn is_target_in_attack_arc(attacker: &Fighter, target: &Fighter) -> bool {
+    let dx = target.x - attacker.x;
+    let dy = target.y - attacker.y;
+    let center_distance = dx.hypot(dy);
+    if center_distance > ATTACK_REACH + FIGHTER_RADIUS {
+        return false;
+    }
+    let angle_to_target = dy.atan2(dx);
+    angle_delta(angle_to_target, attacker.facing).abs() <= ATTACK_ARC_RADIANS / 2.0
+}
+
+fn is_invulnerable(target: &Fighter) -> bool {
+    target.action == Action::Dodge && target.action_elapsed_ms <= DODGE_IFRAME_MS
+}
+
+fn is_blocking_attack(target: &Fighter, attacker: &Fighter) -> bool {
+    if target.action != Action::Block {
+        return false;
+    }
+    let angle_to_attacker = (attacker.y - target.y).atan2(attacker.x - target.x);
+    angle_delta(angle_to_attacker, target.facing).abs() <= BLOCK_HALF_ANGLE_RADIANS
+}
+
+fn knock_back(width: f32, height: f32, attacker: &Fighter, target: &mut Fighter) {
+    let dx = target.x - attacker.x;
+    let dy = target.y - attacker.y;
+    let length = dx.hypot(dy).max(1.0);
+    target.x = clamp(
+        target.x + dx / length * ATTACK_KNOCKBACK,
+        FIGHTER_RADIUS,
+        width - FIGHTER_RADIUS,
+    );
+    target.y = clamp(
+        target.y + dy / length * ATTACK_KNOCKBACK,
+        FIGHTER_RADIUS,
+        height - FIGHTER_RADIUS,
+    );
+}
+
+fn respawn_fighter(fighter: &mut Fighter) {
+    fighter.x = fighter.spawn_x;
+    fighter.y = fighter.spawn_y;
+    fighter.hp = 100.0;
+    fighter.guard = GUARD_MAX;
+    fighter.respawn_at_ms = 0.0;
+    fighter.attack_hit_targets.clear();
+    fighter.recently_interacted_with = None;
+    fighter.set_action(Action::Idle, 0.0);
+}
+
+fn two_mut<T>(slice: &mut [T], first: usize, second: usize) -> (&mut T, &mut T) {
+    assert_ne!(first, second);
+    if first < second {
+        let (left, right) = slice.split_at_mut(second);
+        (&mut left[first], &mut right[0])
+    } else {
+        let (left, right) = slice.split_at_mut(first);
+        (&mut right[0], &mut left[second])
+    }
+}
+
+fn normalize_angle(value: f32) -> f32 {
+    value.rem_euclid(std::f32::consts::TAU)
+}
+
+pub fn angle_delta(a: f32, b: f32) -> f32 {
+    let mut delta = a - b;
+    while delta > std::f32::consts::PI {
+        delta -= std::f32::consts::TAU;
+    }
+    while delta < -std::f32::consts::PI {
+        delta += std::f32::consts::TAU;
+    }
+    delta
+}
+
+fn clamp(value: f32, min: f32, max: f32) -> f32 {
+    value.max(min).min(max)
+}
