@@ -7,7 +7,7 @@ on:
       - main
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   quality:
@@ -58,74 +58,10 @@ jobs:
         run: |
           rustc --version
           cargo --version
-          cargo generate-lockfile --manifest-path server/Cargo.toml
           cargo fmt --manifest-path server/Cargo.toml -- --check
-          cargo check --manifest-path server/Cargo.toml
-          cargo clippy --manifest-path server/Cargo.toml --all-targets -- -D warnings
-          cargo test --manifest-path server/Cargo.toml
-
-      - name: Promote exact resolved Rust lock graph
-        if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && github.head_ref == 'feature/authoritative-server-m3'
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha }}
-          TARGET_BRANCH: ${{ github.head_ref }}
-        run: |
-          python - <<'PY'
-          import base64
-          import json
-          import os
-          import urllib.parse
-          import urllib.request
-          from pathlib import Path
-
-          repo = os.environ["GITHUB_REPOSITORY"]
-          token = os.environ["GITHUB_TOKEN"]
-          expected = os.environ["EXPECTED_HEAD"]
-          branch = os.environ["TARGET_BRANCH"]
-          api = "https://api.github.com"
-          headers = {
-              "Accept": "application/vnd.github+json",
-              "Authorization": f"Bearer {token}",
-              "X-GitHub-Api-Version": "2022-11-28",
-          }
-
-          ref_url = f"{api}/repos/{repo}/git/ref/heads/{urllib.parse.quote(branch, safe='')}"
-          req = urllib.request.Request(ref_url, headers=headers)
-          with urllib.request.urlopen(req) as response:
-              current = json.load(response)["object"]["sha"]
-          if current != expected:
-              raise SystemExit(f"branch moved: expected {expected}, found {current}")
-
-          contents_url = f"{api}/repos/{repo}/contents/server/Cargo.lock?ref={urllib.parse.quote(branch, safe='')}"
-          try:
-              req = urllib.request.Request(contents_url, headers=headers)
-              with urllib.request.urlopen(req) as response:
-                  existing = json.load(response)
-          except urllib.error.HTTPError as exc:
-              if exc.code != 404:
-                  raise
-              existing = None
-          if existing is not None:
-              print("server/Cargo.lock already tracked; no promotion needed")
-              raise SystemExit(0)
-
-          lock = Path("server/Cargo.lock").read_bytes()
-          payload = json.dumps({
-              "message": "Lock M3 Rust dependency graph",
-              "content": base64.b64encode(lock).decode("ascii"),
-              "branch": branch,
-          }).encode("utf-8")
-          req = urllib.request.Request(
-              f"{api}/repos/{repo}/contents/server/Cargo.lock",
-              data=payload,
-              headers={**headers, "Content-Type": "application/json"},
-              method="PUT",
-          )
-          with urllib.request.urlopen(req) as response:
-              result = json.load(response)
-          print("created Cargo.lock commit", result["commit"]["sha"])
-          PY
+          cargo check --locked --manifest-path server/Cargo.toml
+          cargo clippy --locked --manifest-path server/Cargo.toml --all-targets -- -D warnings
+          cargo test --locked --manifest-path server/Cargo.toml
 
       - name: Check whitespace
         env:
