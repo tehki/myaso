@@ -58,11 +58,14 @@ async fn multiple_webtransport_clients_receive_authoritative_snapshots() -> Resu
                     let request = incoming.await?;
                     assert_eq!(request.path(), "/game");
                     let connection = request.accept().await?;
-                    assert!(connection.max_datagram_size().unwrap_or(0) >= CONSERVATIVE_DATAGRAM_BYTES);
+                    assert!(
+                        connection.max_datagram_size().unwrap_or(0) >= CONSERVATIVE_DATAGRAM_BYTES
+                    );
                     world.lock().await.add_player(player_id);
 
                     let datagram = connection.receive_datagram().await?;
-                    let packet = decode_input_packet(datagram.as_ref()).expect("valid M2 input datagram");
+                    let packet =
+                        decode_input_packet(datagram.as_ref()).expect("valid M2 input datagram");
                     let mut ingress = InputIngressWindow::default();
                     let accepted = ingress.ingest(&packet);
                     let newest = accepted.last().copied().expect("one accepted sample");
@@ -107,7 +110,10 @@ async fn multiple_webtransport_clients_receive_authoritative_snapshots() -> Resu
         let reply = connection.receive_datagram().await?;
         let snapshot = decode_snapshot(reply.as_ref()).expect("authoritative snapshot datagram");
         assert!(snapshot.full);
-        assert!(snapshot.records.iter().any(|record| record.net_id == index as u32 + 1));
+        assert!(snapshot
+            .records
+            .iter()
+            .any(|record| record.net_id == index as u32 + 1));
         assert!(reply.len() <= CONSERVATIVE_DATAGRAM_BYTES);
         connection.send_datagram(b"m4-ack")?;
     }
