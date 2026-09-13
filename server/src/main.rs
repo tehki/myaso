@@ -93,7 +93,7 @@ async fn load_identity(bind: SocketAddr) -> Result<Identity> {
             .await
             .context("load MYASO_CERT_PEM/MYASO_KEY_PEM"),
         (Err(_), Err(_)) if bind.ip().is_loopback() => {
-            Identity::self_signed(&["localhost", "127.0.0.1", "::1"])
+            Identity::self_signed(["localhost", "127.0.0.1", "::1"])
                 .context("generate loopback-only development identity")
         }
         (Ok(_), Err(_)) | (Err(_), Ok(_)) => {
