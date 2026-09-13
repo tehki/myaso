@@ -183,7 +183,11 @@ fn spawn_server(
             let incoming = server.accept().await;
             let world = Arc::clone(&world);
             let next_player = Arc::clone(&next_player);
-            let connection_rounds = if connection_index < clients { rounds } else { 1 };
+            let connection_rounds = if connection_index < clients {
+                rounds
+            } else {
+                1
+            };
             sessions.push(tokio::spawn(async move {
                 let request = incoming.await?;
                 if request.path() != GAME_PATH {
