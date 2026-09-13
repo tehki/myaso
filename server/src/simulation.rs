@@ -141,18 +141,35 @@ impl Fighter {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum CombatEvent {
-    Evade { attacker: u32, target: u32 },
-    Parry { attacker: u32, target: u32 },
-    Block { attacker: u32, target: u32 },
-    GuardBreak { attacker: u32, target: u32 },
+    Evade {
+        attacker: u32,
+        target: u32,
+    },
+    Parry {
+        attacker: u32,
+        target: u32,
+    },
+    Block {
+        attacker: u32,
+        target: u32,
+    },
+    GuardBreak {
+        attacker: u32,
+        target: u32,
+    },
     Hit {
         attacker: u32,
         target: u32,
         damage: u8,
         hp: u8,
     },
-    Death { fighter: u32, killer: u32 },
-    Respawn { fighter: u32 },
+    Death {
+        fighter: u32,
+        killer: u32,
+    },
+    Respawn {
+        fighter: u32,
+    },
 }
 
 #[derive(Debug, Clone)]
@@ -188,7 +205,9 @@ impl World {
     }
 
     pub fn fighter(&self, net_id: u32) -> Option<&Fighter> {
-        self.fighters.iter().find(|fighter| fighter.net_id == net_id)
+        self.fighters
+            .iter()
+            .find(|fighter| fighter.net_id == net_id)
     }
 
     pub fn add_player(&mut self, net_id: u32) -> bool {
@@ -199,7 +218,12 @@ impl World {
         let x = FIGHTER_RADIUS + 24.0 + (index % columns) as f32 * spacing;
         let row = (index / columns) % columns.max(1);
         let y = FIGHTER_RADIUS + 24.0 + row as f32 * spacing;
-        self.add_player_at(net_id, x.min(self.width - FIGHTER_RADIUS), y.min(self.height - FIGHTER_RADIUS), 0.0)
+        self.add_player_at(
+            net_id,
+            x.min(self.width - FIGHTER_RADIUS),
+            y.min(self.height - FIGHTER_RADIUS),
+            0.0,
+        )
     }
 
     pub fn add_player_at(&mut self, net_id: u32, x: f32, y: f32, facing: f32) -> bool {
@@ -224,7 +248,11 @@ impl World {
     }
 
     pub fn set_input(&mut self, net_id: u32, input: InputIntent) -> bool {
-        let Some(fighter) = self.fighters.iter_mut().find(|fighter| fighter.net_id == net_id) else {
+        let Some(fighter) = self
+            .fighters
+            .iter_mut()
+            .find(|fighter| fighter.net_id == net_id)
+        else {
             return false;
         };
         fighter.latest_input = normalize_input(input);
@@ -258,8 +286,11 @@ impl World {
             move_fighter(self.width, self.height, fighter, input, dt_ms);
             advance_action(fighter, input, dt_ms);
 
-            if fighter.action != Action::Block && self.now_ms >= fighter.guard_regen_blocked_until_ms {
-                fighter.guard = (fighter.guard + GUARD_REGEN_PER_SECOND * dt_ms / 1000.0).min(GUARD_MAX);
+            if fighter.action != Action::Block
+                && self.now_ms >= fighter.guard_regen_blocked_until_ms
+            {
+                fighter.guard =
+                    (fighter.guard + GUARD_REGEN_PER_SECOND * dt_ms / 1000.0).min(GUARD_MAX);
             }
         }
 
@@ -419,9 +450,21 @@ fn separate_fighters(width: f32, height: f32, fighters: &mut [Fighter]) {
             let ny = dy / distance;
             let shift = overlap / 2.0;
             first.x = clamp(first.x - nx * shift, FIGHTER_RADIUS, width - FIGHTER_RADIUS);
-            first.y = clamp(first.y - ny * shift, FIGHTER_RADIUS, height - FIGHTER_RADIUS);
-            second.x = clamp(second.x + nx * shift, FIGHTER_RADIUS, width - FIGHTER_RADIUS);
-            second.y = clamp(second.y + ny * shift, FIGHTER_RADIUS, height - FIGHTER_RADIUS);
+            first.y = clamp(
+                first.y - ny * shift,
+                FIGHTER_RADIUS,
+                height - FIGHTER_RADIUS,
+            );
+            second.x = clamp(
+                second.x + nx * shift,
+                FIGHTER_RADIUS,
+                width - FIGHTER_RADIUS,
+            );
+            second.y = clamp(
+                second.y + ny * shift,
+                FIGHTER_RADIUS,
+                height - FIGHTER_RADIUS,
+            );
         }
     }
 }
@@ -444,7 +487,9 @@ fn resolve_attacks(
             }
             let target_id = fighters[target_index].net_id;
             if fighters[target_index].action == Action::Dead
-                || fighters[attacker_index].attack_hit_targets.contains(&target_id)
+                || fighters[attacker_index]
+                    .attack_hit_targets
+                    .contains(&target_id)
                 || !is_target_in_attack_arc(&fighters[attacker_index], &fighters[target_index])
             {
                 continue;
