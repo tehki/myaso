@@ -17,6 +17,7 @@ const hud = {
   botGuard: document.querySelector("#bot-guard"),
   botGuardValue: document.querySelector("#bot-guard-value"),
 };
+const hudCache = { playerHp: null, playerGuard: null, botHp: null, botGuard: null, status: null };
 
 const params = new URLSearchParams(window.location.search);
 const server = params.get("server");
@@ -29,15 +30,7 @@ const webTransportOptions = cert
 
 const keys = new Set();
 const mouse = { x: canvas.width / 2, y: canvas.height / 2, block: false };
-const local = {
-  x: canvas.width / 2,
-  y: canvas.height / 2,
-  facing: 0,
-  hp: 100,
-  guard: 100,
-  action: 0,
-  initialized: false,
-};
+const local = { x: 0, y: 0, facing: 0, hp: 100, guard: 100, action: 0, initialized: false };
 const currentInput = { moveX: 0, moveY: 0, facing: 0, attack: false, dodge: false, block: false };
 const arenaLayer = createArenaLayer();
 const remoteScratch = new Map();
@@ -49,7 +42,6 @@ let predictionStep = 0;
 let clientTick = 0;
 let attackRequested = false;
 let dodgeRequested = false;
-let latestAuthoritativeOwn = null;
 
 canvas.addEventListener("contextmenu", (event) => event.preventDefault());
 canvas.addEventListener("pointerdown", (event) => {
@@ -77,21 +69,18 @@ networkClient = await connectAuthoritativeClient({
   webTransportOptions,
   onProtocolError(error) {
     console.warn("authoritative protocol error", error);
-    setStatus("Protocol error — connection kept fail-closed.");
+    setStatus("Protocol error — invalid realtime packet ignored.");
   },
   onSnapshot(_result, state) {
     const ownId = networkClient?.playerNetId;
     if (!ownId) return;
     const own = state.get(ownId);
-    if (!own) return;
-    latestAuthoritativeOwn = own;
-    if (!local.initialized) restoreAuthoritative(own);
+    if (own && !local.initialized) restoreAuthoritative(own);
   },
   onAck() {
     const ownId = networkClient?.playerNetId;
     const own = ownId ? networkClient.state.get(ownId) : null;
     if (!own) return;
-    latestAuthoritativeOwn = own;
     reconcilePrediction({
       history: networkClient.predictionHistory,
       processedClientTick: networkClient.processedClientTick,
@@ -119,7 +108,7 @@ function releaseInputs() {
 function sampleInput() {
   currentInput.moveX = (keys.has("KeyD") ? 1 : 0) - (keys.has("KeyA") ? 1 : 0);
   currentInput.moveY = (keys.has("KeyS") ? 1 : 0) - (keys.has("KeyW") ? 1 : 0);
-  currentInput.facing = Math.atan2(mouse.y - local.y, mouse.x - local.x);
+  currentInput.facing = Math.atan2(mouse.y - canvas.height / 2, mouse.x - canvas.width / 2);
   currentInput.attack = attackRequested;
   currentInput.dodge = dodgeRequested;
   currentInput.block = mouse.block;
@@ -127,13 +116,10 @@ function sampleInput() {
 
 function simulatePrediction(stepMs) {
   sampleInput();
-  predictMovement(currentInput, stepMs);
+  if (local.initialized) predictMovement(currentInput, stepMs);
   predictionStep += 1;
   if (predictionStep % 2 === 0 && networkClient) {
-    networkClient.sendInput({
-      tick: clientTick,
-      ...currentInput,
-    });
+    networkClient.sendInput({ tick: clientTick, ...currentInput });
     clientTick = (clientTick + 1) >>> 0;
     attackRequested = false;
     dodgeRequested = false;
@@ -156,8 +142,8 @@ function predictMovement(input, dtMs) {
   else if (local.action === 3 || local.action === 5) speed *= 0.48;
   else if (local.action === 4) speed = COMBAT.dodge.speed;
   const seconds = dtMs / 1000;
-  local.x = clamp(local.x + moveX * speed * seconds, COMBAT.fighterRadius, canvas.width - COMBAT.fighterRadius);
-  local.y = clamp(local.y + moveY * speed * seconds, COMBAT.fighterRadius, canvas.height - COMBAT.fighterRadius);
+  local.x = clamp(local.x + moveX * speed * seconds, COMBAT.fighterRadius, NETWORK.worldWidth - COMBAT.fighterRadius);
+  local.y = clamp(local.y + moveY * speed * seconds, COMBAT.fighterRadius, NETWORK.worldHeight - COMBAT.fighterRadius);
 }
 
 function restoreAuthoritative(own) {
@@ -174,10 +160,14 @@ function render() {
   ctx.drawImage(arenaLayer, 0, 0);
   if (!networkClient) return;
   const ownId = networkClient.playerNetId;
-  const interpolationTicks = Math.round(
-    (NETWORK.reconciliation.remoteInterpolationMs / 1000) * NETWORK.serverSimulationHz,
-  );
-  const renderServerTick = Math.max(0, networkClient.latestServerTick - interpolationTicks);
+  if (ownId && !local.initialized) {
+    const own = networkClient.state.get(ownId);
+    if (own) restoreAuthoritative(own);
+  }
+  const interpolationTicks = Math.round((NETWORK.reconciliation.remoteInterpolationMs / 1000) * NETWORK.serverSimulationHz);
+  const renderServerTick = networkClient.latestServerTick >= interpolationTicks
+    ? networkClient.latestServerTick - interpolationTicks
+    : 0;
 
   for (const entity of networkClient.state.values()) {
     if (entity.netId === ownId) continue;
@@ -187,28 +177,68 @@ function render() {
       remoteScratch.set(entity.netId, scratch);
     }
     const sampled = networkClient.remoteInterpolator.sample(entity.netId, renderServerTick, scratch) ?? entity;
-    drawFighter(sampled, "#b96350", "#47251f");
+    drawFighterWorld(sampled, "#b96350", "#47251f");
   }
-  if (ownId && local.initialized) drawFighter(local, "#e2d5b4", "#51452d");
+  if (ownId && local.initialized) drawFighterScreen(canvas.width / 2, canvas.height / 2, local, "#e2d5b4", "#51452d");
   updateHud(ownId);
+}
+
+function drawFighterWorld(fighter, body, shadow) {
+  if (!local.initialized) return;
+  const screenX = canvas.width / 2 + fighter.x - local.x;
+  const screenY = canvas.height / 2 + fighter.y - local.y;
+  if (screenX < -64 || screenX > canvas.width + 64 || screenY < -64 || screenY > canvas.height + 64) return;
+  drawFighterScreen(screenX, screenY, fighter, body, shadow);
+}
+
+function drawFighterScreen(x, y, fighter, body, shadow) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(fighter.facing ?? 0);
+  ctx.globalAlpha = fighter.action === 8 ? 0.28 : 1;
+  ctx.fillStyle = shadow;
+  ctx.beginPath();
+  ctx.ellipse(-2, 8, 20, 13, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = body;
+  ctx.beginPath();
+  ctx.arc(0, 0, COMBAT.fighterRadius, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = "#13110d";
+  ctx.beginPath();
+  ctx.arc(7, -5, 3, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = "#c8b684";
+  ctx.fillRect(12, -2, 26, 4);
+  ctx.restore();
 }
 
 function updateHud(ownId) {
   const own = ownId ? networkClient.state.get(ownId) : null;
-  const remote = [...networkClient.state.values()].find((entity) => entity.netId !== ownId);
-  setMeter(hud.playerHp, hud.playerHpValue, own?.hp ?? local.hp);
-  setMeter(hud.playerGuard, hud.playerGuardValue, own?.guard ?? local.guard);
-  setMeter(hud.botHp, hud.botHpValue, remote?.hp ?? 0);
-  setMeter(hud.botGuard, hud.botGuardValue, remote?.guard ?? 0);
+  let remote = null;
+  for (const entity of networkClient.state.values()) {
+    if (entity.netId !== ownId) {
+      remote = entity;
+      break;
+    }
+  }
+  setMeter("playerHp", hud.playerHp, hud.playerHpValue, own?.hp ?? local.hp);
+  setMeter("playerGuard", hud.playerGuard, hud.playerGuardValue, own?.guard ?? local.guard);
+  setMeter("botHp", hud.botHp, hud.botHpValue, remote?.hp ?? 0);
+  setMeter("botGuard", hud.botGuard, hud.botGuardValue, remote?.guard ?? 0);
 }
 
-function setMeter(bar, label, value) {
+function setMeter(cacheKey, bar, label, value) {
   const rounded = Math.max(0, Math.min(100, Math.round(value)));
+  if (hudCache[cacheKey] === rounded) return;
+  hudCache[cacheKey] = rounded;
   bar.style.transform = `scaleX(${rounded / 100})`;
   label.textContent = String(rounded);
 }
 
 function setStatus(text) {
+  if (hudCache.status === text) return;
+  hudCache.status = text;
   eventText.textContent = text;
 }
 
@@ -237,28 +267,6 @@ function createArenaLayer() {
   layerContext.lineWidth = 3;
   layerContext.strokeRect(12, 12, layer.width - 24, layer.height - 24);
   return layer;
-}
-
-function drawFighter(fighter, body, shadow) {
-  ctx.save();
-  ctx.translate(fighter.x, fighter.y);
-  ctx.rotate(fighter.facing ?? 0);
-  ctx.globalAlpha = fighter.action === 8 ? 0.28 : 1;
-  ctx.fillStyle = shadow;
-  ctx.beginPath();
-  ctx.ellipse(-2, 8, 20, 13, 0, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.fillStyle = body;
-  ctx.beginPath();
-  ctx.arc(0, 0, COMBAT.fighterRadius, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.fillStyle = "#13110d";
-  ctx.beginPath();
-  ctx.arc(7, -5, 3, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.fillStyle = "#c8b684";
-  ctx.fillRect(12, -2, 26, 4);
-  ctx.restore();
 }
 
 function frame(now) {
