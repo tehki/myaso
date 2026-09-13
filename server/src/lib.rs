@@ -1,17 +1,24 @@
-use std::sync::{
-    atomic::{AtomicUsize, Ordering},
-    Arc,
+use std::{
+    collections::HashSet,
+    sync::{
+        atomic::{AtomicUsize, Ordering},
+        Arc,
+    },
 };
+
+pub mod simulation;
+pub mod snapshot;
 
 pub const PROTOCOL_VERSION: u8 = 1;
 pub const INPUT_PACKET_TYPE: u8 = 1;
 pub const INPUT_HEADER_BYTES: usize = 16;
 pub const INPUT_SAMPLE_BYTES: usize = 6;
 pub const INPUT_REDUNDANCY_MAX: usize = 3;
+pub const INPUT_HISTORY_TICKS: u32 = 180;
 pub const TARGET_PLAYERS_PER_MAP: usize = 512;
 pub const CONSERVATIVE_DATAGRAM_BYTES: usize = 1100;
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct InputSample {
     pub tick: u32,
     pub move_x: f32,
@@ -20,6 +27,19 @@ pub struct InputSample {
     pub attack: bool,
     pub dodge: bool,
     pub block: bool,
+}
+
+impl From<InputSample> for simulation::InputIntent {
+    fn from(sample: InputSample) -> Self {
+        Self {
+            move_x: sample.move_x,
+            move_y: sample.move_y,
+            facing_radians: sample.facing_radians,
+            attack: sample.attack,
+            dodge: sample.dodge,
+            block: sample.block,
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -96,6 +116,69 @@ pub fn decode_input_packet(bytes: &[u8]) -> Result<InputPacket, DecodeError> {
         ack_server_tick,
         samples,
     })
+}
+
+#[derive(Debug)]
+pub struct InputIngressWindow {
+    history_ticks: u32,
+    newest_tick: Option<u32>,
+    seen: HashSet<u32>,
+}
+
+impl Default for InputIngressWindow {
+    fn default() -> Self {
+        Self::new(INPUT_HISTORY_TICKS)
+    }
+}
+
+impl InputIngressWindow {
+    pub fn new(history_ticks: u32) -> Self {
+        assert!((1..=4096).contains(&history_ticks));
+        Self {
+            history_ticks,
+            newest_tick: None,
+            seen: HashSet::new(),
+        }
+    }
+
+    pub fn ingest(&mut self, packet: &InputPacket) -> Vec<InputSample> {
+        let mut accepted = Vec::new();
+        for sample in &packet.samples {
+            if self
+                .newest_tick
+                .is_none_or(|newest| is_tick_newer32(sample.tick, newest))
+            {
+                self.newest_tick = Some(sample.tick);
+            }
+            let newest = self.newest_tick.expect("sample established newest tick");
+            if tick_distance32(newest, sample.tick) > self.history_ticks || self.seen.contains(&sample.tick) {
+                continue;
+            }
+            self.seen.insert(sample.tick);
+            accepted.push(*sample);
+        }
+
+        if let Some(newest) = self.newest_tick {
+            self.seen
+                .retain(|tick| tick_distance32(newest, *tick) <= self.history_ticks);
+            accepted.sort_by(|left, right| {
+                tick_distance32(newest, right.tick).cmp(&tick_distance32(newest, left.tick))
+            });
+        }
+        accepted
+    }
+}
+
+pub fn is_sequence_newer16(candidate: u16, reference: u16) -> bool {
+    candidate != reference && candidate.wrapping_sub(reference) < 0x8000
+}
+
+pub fn is_tick_newer32(candidate: u32, reference: u32) -> bool {
+    candidate != reference && candidate.wrapping_sub(reference) < 0x8000_0000
+}
+
+pub fn tick_distance32(newer: u32, older: u32) -> u32 {
+    newer.wrapping_sub(older)
 }
 
 #[derive(Debug)]
@@ -211,6 +294,28 @@ mod tests {
             decode_input_packet(&packet),
             Err(DecodeError::InvalidSampleCount(4))
         );
+    }
+
+    #[test]
+    fn ingress_deduplicates_redundant_samples_and_accepts_reordering() {
+        let first = decode_input_packet(&sample_packet()).expect("first packet");
+        let mut ingress = InputIngressWindow::new(10);
+        let accepted = ingress.ingest(&first);
+        assert_eq!(accepted.iter().map(|sample| sample.tick).collect::<Vec<_>>(), vec![998, 999, 1000]);
+        assert!(ingress.ingest(&first).is_empty());
+
+        let mut newer_bytes = sample_packet();
+        newer_bytes[4..6].copy_from_slice(&8_u16.to_le_bytes());
+        newer_bytes[8..12].copy_from_slice(&1002_u32.to_le_bytes());
+        let newer = decode_input_packet(&newer_bytes).expect("newer packet");
+        let accepted = ingress.ingest(&newer);
+        assert_eq!(accepted.iter().map(|sample| sample.tick).collect::<Vec<_>>(), vec![1001, 1002]);
+    }
+
+    #[test]
+    fn sequence_comparison_survives_wraparound() {
+        assert!(is_sequence_newer16(2, 65534));
+        assert!(!is_sequence_newer16(65534, 2));
     }
 
     #[test]
