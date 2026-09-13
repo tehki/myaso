@@ -34,6 +34,13 @@ jobs:
       - name: Compile governance scripts
         run: python -m py_compile scripts/*.py
 
+      - name: Validate combat JavaScript
+        run: |
+          node --version
+          node --check src/combat/model.mjs
+          node --check web/game.mjs
+          node --test tests/combat-model.test.mjs
+
       - name: Check whitespace
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
