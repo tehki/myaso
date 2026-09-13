@@ -15,11 +15,14 @@ use std::{
     time::{Duration, Instant},
 };
 use tokio::sync::Mutex;
-use wtransport::{endpoint::endpoint_side::Client, ClientConfig, Endpoint, Identity, ServerConfig};
+use wtransport::{
+    endpoint::endpoint_side::Client, ClientConfig, Endpoint, Identity, ServerConfig, VarInt,
+};
 
 const GAME_PATH: &str = "/game";
 const INPUT_ACK_PACKET_TYPE: u8 = 3;
 const INPUT_ACK_BYTES: usize = 16;
+const CLOSE_WAIT: Duration = Duration::from_secs(2);
 
 #[derive(Debug)]
 struct ClientMetrics {
@@ -115,73 +118,15 @@ async fn main() -> Result<()> {
     let world = Arc::new(Mutex::new(World::default()));
     let next_player = Arc::new(AtomicU32::new(1));
 
-    let clock_task = {
-        let world = Arc::clone(&world);
-        tokio::spawn(async move {
-            let mut interval =
-                tokio::time::interval(Duration::from_secs_f64(1.0 / SERVER_TICK_HZ as f64));
-            interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
-            loop {
-                interval.tick().await;
-                let mut world = world.lock().await;
-                let _events = world.step();
-            }
-        })
-    };
-
-    let expected_connections = clients + reconnect_clients;
-    let server_task = {
-        let server = Arc::clone(&server);
-        let world = Arc::clone(&world);
-        let next_player = Arc::clone(&next_player);
-        tokio::spawn(async move {
-            let mut sessions = Vec::with_capacity(expected_connections);
-            for connection_index in 0..expected_connections {
-                let incoming = server.accept().await;
-                let world = Arc::clone(&world);
-                let next_player = Arc::clone(&next_player);
-                let connection_rounds = if connection_index < clients {
-                    rounds
-                } else {
-                    1
-                };
-                sessions.push(tokio::spawn(async move {
-                    let request = incoming.await?;
-                    if request.path() != GAME_PATH {
-                        bail!(
-                            "transport probe received unexpected path {}",
-                            request.path()
-                        );
-                    }
-                    let connection = request.accept().await?;
-                    if connection.max_datagram_size().unwrap_or(0) < CONSERVATIVE_DATAGRAM_BYTES {
-                        bail!("transport probe connection lacks the conservative datagram budget");
-                    }
-                    let player_id = next_player.fetch_add(1, Ordering::Relaxed);
-                    {
-                        let mut world = world.lock().await;
-                        if !world.add_player(player_id) {
-                            bail!("failed to add transport probe player {player_id}");
-                        }
-                    }
-
-                    let result = serve_probe_connection(
-                        connection,
-                        player_id,
-                        Arc::clone(&world),
-                        connection_rounds,
-                    )
-                    .await;
-                    world.lock().await.remove_player(player_id);
-                    result
-                }));
-            }
-            for session in sessions {
-                session.await??;
-            }
-            Ok::<(), anyhow::Error>(())
-        })
-    };
+    let clock_task = spawn_clock(Arc::clone(&world));
+    let server_task = spawn_server(
+        Arc::clone(&server),
+        Arc::clone(&world),
+        Arc::clone(&next_player),
+        clients,
+        reconnect_clients,
+        rounds,
+    );
 
     let client_config = ClientConfig::builder()
         .with_bind_default()
@@ -191,20 +136,16 @@ async fn main() -> Result<()> {
 
     let initial = run_client_wave(Arc::clone(&client), port, clients, rounds, 10_000).await?;
     validate_wave(&initial, clients, rounds)?;
-
-    tokio::time::sleep(Duration::from_millis(50)).await;
+    wait_for_world_empty(&world).await?;
 
     let reconnect =
         run_client_wave(Arc::clone(&client), port, reconnect_clients, 1, 90_000).await?;
     validate_wave(&reconnect, reconnect_clients, 1)?;
+    wait_for_world_empty(&world).await?;
 
     server_task.await??;
     clock_task.abort();
     let _ = clock_task.await;
-
-    if !world.lock().await.fighters().is_empty() {
-        bail!("transport probe leaked authoritative fighters after disconnect");
-    }
 
     println!(
         "M8_WEBTRANSPORT_LOAD {}",
@@ -214,8 +155,77 @@ async fn main() -> Result<()> {
     Ok(())
 }
 
+fn spawn_clock(world: Arc<Mutex<World>>) -> tokio::task::JoinHandle<()> {
+    tokio::spawn(async move {
+        let mut interval =
+            tokio::time::interval(Duration::from_secs_f64(1.0 / SERVER_TICK_HZ as f64));
+        interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+        loop {
+            interval.tick().await;
+            let mut world = world.lock().await;
+            let _events = world.step();
+        }
+    })
+}
+
+fn spawn_server(
+    server: Arc<Endpoint<wtransport::endpoint::endpoint_side::Server>>,
+    world: Arc<Mutex<World>>,
+    next_player: Arc<AtomicU32>,
+    clients: usize,
+    reconnect_clients: usize,
+    rounds: usize,
+) -> tokio::task::JoinHandle<Result<()>> {
+    tokio::spawn(async move {
+        let expected_connections = clients + reconnect_clients;
+        let mut sessions = Vec::with_capacity(expected_connections);
+        for connection_index in 0..expected_connections {
+            let incoming = server.accept().await;
+            let world = Arc::clone(&world);
+            let next_player = Arc::clone(&next_player);
+            let connection_rounds = if connection_index < clients { rounds } else { 1 };
+            sessions.push(tokio::spawn(async move {
+                let request = incoming.await?;
+                if request.path() != GAME_PATH {
+                    bail!(
+                        "transport probe received unexpected path {}",
+                        request.path()
+                    );
+                }
+                let connection = request.accept().await?;
+                if connection.max_datagram_size().unwrap_or(0) < CONSERVATIVE_DATAGRAM_BYTES {
+                    bail!("transport probe connection lacks the conservative datagram budget");
+                }
+
+                let player_id = next_player.fetch_add(1, Ordering::Relaxed);
+                {
+                    let mut world = world.lock().await;
+                    if !world.add_player(player_id) {
+                        bail!("failed to add transport probe player {player_id}");
+                    }
+                }
+
+                let result = serve_probe_connection(
+                    &connection,
+                    player_id,
+                    Arc::clone(&world),
+                    connection_rounds,
+                )
+                .await;
+                world.lock().await.remove_player(player_id);
+                result
+            }));
+        }
+
+        for session in sessions {
+            session.await??;
+        }
+        Ok(())
+    })
+}
+
 async fn serve_probe_connection(
-    connection: wtransport::Connection,
+    connection: &wtransport::Connection,
     player_id: u32,
     world: Arc<Mutex<World>>,
     rounds: usize,
@@ -241,14 +251,7 @@ async fn serve_probe_connection(
             world.set_input(player_id, newest.into());
             world.tick
         };
-
-        let server_tick = loop {
-            let tick = world.lock().await.tick;
-            if is_tick_newer32(tick, accepted_at_tick) {
-                break tick;
-            }
-            tokio::time::sleep(Duration::from_millis(1)).await;
-        };
+        let server_tick = wait_for_newer_tick(&world, accepted_at_tick).await;
 
         let snapshot = {
             let world = world.lock().await;
@@ -267,6 +270,34 @@ async fn serve_probe_connection(
             .send_datagram(encode_input_ack(newest.tick, server_tick, player_id))
             .context("send probe processed-input acknowledgement")?;
     }
+
+    tokio::time::timeout(CLOSE_WAIT, connection.closed())
+        .await
+        .context("probe client did not confirm final reply delivery by closing")?;
+    Ok(())
+}
+
+async fn wait_for_newer_tick(world: &Arc<Mutex<World>>, accepted_at_tick: u32) -> u32 {
+    loop {
+        let tick = world.lock().await.tick;
+        if is_tick_newer32(tick, accepted_at_tick) {
+            return tick;
+        }
+        tokio::time::sleep(Duration::from_millis(1)).await;
+    }
+}
+
+async fn wait_for_world_empty(world: &Arc<Mutex<World>>) -> Result<()> {
+    tokio::time::timeout(CLOSE_WAIT, async {
+        loop {
+            if world.lock().await.fighters().is_empty() {
+                return;
+            }
+            tokio::time::sleep(Duration::from_millis(1)).await;
+        }
+    })
+    .await
+    .context("transport probe sessions did not drain from authoritative world")?;
     Ok(())
 }
 
@@ -366,6 +397,7 @@ async fn run_client_wave(
                 }
             }
 
+            connection.close(VarInt::from_u32(0), b"probe complete");
             Ok::<ClientMetrics, anyhow::Error>(metrics)
         }));
     }
