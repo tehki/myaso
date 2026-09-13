@@ -41,6 +41,19 @@ jobs:
           node --check web/game.mjs
           node --test tests/combat-model.test.mjs
 
+      - name: Validate realtime networking JavaScript
+        run: |
+          node --check src/network/constants.mjs
+          node --check src/network/sequence.mjs
+          node --check src/network/input-codec.mjs
+          node --check src/network/input-ingress.mjs
+          node --check src/network/snapshot-codec.mjs
+          node --check src/network/interest-grid.mjs
+          node --check src/network/replication-planner.mjs
+          node --check web/network-transport.mjs
+          node --check scripts/network_capacity_probe.mjs
+          node --test tests/networking.test.mjs
+
       - name: Check whitespace
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
