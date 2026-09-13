@@ -7,6 +7,8 @@ export const NETWORK = Object.freeze({
   inputRedundancy: 3,
   targetPlayersPerMap: 512,
   conservativeDatagramBytes: 1100,
+  worldWidth: 8192,
+  worldHeight: 8192,
   worldCoordinateScale: 4,
   maxWorldCoordinate: 0xffff / 4,
   interest: Object.freeze({
