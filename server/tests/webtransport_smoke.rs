@@ -38,7 +38,10 @@ async fn quic_webtransport_datagram_roundtrip() -> Result<()> {
         let datagram = connection.receive_datagram().await?;
         let decoded = decode_input_packet(datagram.as_ref()).expect("decode JS-compatible input");
         assert_eq!(decoded.sequence, 77);
+
         connection.send_datagram(b"m3-ok")?;
+        let acknowledgement = connection.receive_datagram().await?;
+        assert_eq!(acknowledgement.as_ref(), b"m3-ack");
         Ok::<(), anyhow::Error>(())
     });
 
@@ -53,6 +56,7 @@ async fn quic_webtransport_datagram_roundtrip() -> Result<()> {
     connection.send_datagram(input_datagram(77))?;
     let reply = connection.receive_datagram().await?;
     assert_eq!(reply.as_ref(), b"m3-ok");
+    connection.send_datagram(b"m3-ack")?;
 
     server_task.await??;
     Ok(())
