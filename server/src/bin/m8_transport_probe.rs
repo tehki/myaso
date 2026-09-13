@@ -57,7 +57,7 @@ impl WaveReport {
             self.snapshot_bytes as f64 / self.clients.max(1) as f64 / seconds;
         format!(
             concat!(
-                "{",
+                "{{",
                 "\"clients\":{},",
                 "\"rounds\":{},",
                 "\"elapsed_ms\":{:.2},",
@@ -65,12 +65,12 @@ impl WaveReport {
                 "\"snapshots\":{},",
                 "\"snapshot_bytes_per_player_second\":{:.1},",
                 "\"max_snapshot_bytes\":{},",
-                "\"ack_rtt_ms\":{\"p50\":{:.3},\"p95\":{:.3},\"p99\":{:.3},\"max\":{:.3}},",
+                "\"ack_rtt_ms\":{{\"p50\":{:.3},\"p95\":{:.3},\"p99\":{:.3},\"max\":{:.3}}},",
                 "\"first_round_ms_p95\":{:.3},",
                 "\"avg_first_snapshot_bytes\":{:.1},",
                 "\"full_first_snapshots\":{},",
                 "\"reconnect_clients\":{}",
-                "}"
+                "}}"
             ),
             self.clients,
             self.rounds,
