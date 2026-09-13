@@ -95,6 +95,13 @@ jobs:
           geckodriver --version
           node scripts/browser_flight_runner.mjs
 
+      - name: Measure M8 authoritative capacity
+        run: |
+          for players in 64 128 256 512; do
+            cargo run --locked --release --quiet --manifest-path server/Cargo.toml --bin m8_capacity_probe -- "$players" 15 60
+          done
+          cargo run --locked --release --quiet --manifest-path server/Cargo.toml --bin m8_transport_probe -- 64 6
+
       - name: Check whitespace
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
