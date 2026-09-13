@@ -10,10 +10,8 @@ pub const SNAPSHOT_FIELD_FACING: u8 = 1 << 1;
 pub const SNAPSHOT_FIELD_VITALS: u8 = 1 << 2;
 pub const SNAPSHOT_FIELD_ACTION: u8 = 1 << 3;
 pub const SNAPSHOT_FIELD_REMOVED: u8 = 1 << 7;
-pub const SNAPSHOT_FULL_FIELDS: u8 = SNAPSHOT_FIELD_POSITION
-    | SNAPSHOT_FIELD_FACING
-    | SNAPSHOT_FIELD_VITALS
-    | SNAPSHOT_FIELD_ACTION;
+pub const SNAPSHOT_FULL_FIELDS: u8 =
+    SNAPSHOT_FIELD_POSITION | SNAPSHOT_FIELD_FACING | SNAPSHOT_FIELD_VITALS | SNAPSHOT_FIELD_ACTION;
 pub const WORLD_COORDINATE_SCALE: f32 = 4.0;
 pub const MAX_WORLD_COORDINATE: f32 = u16::MAX as f32 / WORLD_COORDINATE_SCALE;
 pub const INTEREST_COMBAT_RADIUS: f32 = 420.0;
@@ -201,7 +199,9 @@ impl SnapshotSession {
     }
 
     pub fn has_sequence(&self, sequence: u16) -> bool {
-        self.history.iter().any(|(candidate, _)| *candidate == sequence)
+        self.history
+            .iter()
+            .any(|(candidate, _)| *candidate == sequence)
     }
 }
 
@@ -218,7 +218,10 @@ fn plan_records(
     max_bytes: usize,
 ) -> SnapshotPlan {
     assert!(max_bytes >= SNAPSHOT_HEADER_BYTES);
-    let current_map: BTreeMap<_, _> = current.iter().map(|entity| (entity.net_id, *entity)).collect();
+    let current_map: BTreeMap<_, _> = current
+        .iter()
+        .map(|entity| (entity.net_id, *entity))
+        .collect();
     let viewer = current_map.get(&viewer_net_id).copied();
     let mut buckets: [Vec<SnapshotRecord>; 6] = std::array::from_fn(|_| Vec::new());
     let mut visible = BTreeMap::new();
@@ -226,7 +229,9 @@ fn plan_records(
 
     if let Some(viewer_state) = viewer {
         for state in current_map.values().copied() {
-            if state.net_id != viewer_net_id && !within_interest(viewer_state, state, INTEREST_FAR_RADIUS) {
+            if state.net_id != viewer_net_id
+                && !within_interest(viewer_state, state, INTEREST_FAR_RADIUS)
+            {
                 continue;
             }
             visible.insert(state.net_id, state);
@@ -237,7 +242,9 @@ fn plan_records(
             due_count += 1;
             let bucket = if state.net_id == viewer_net_id {
                 0
-            } else if state.action != 0 || within_interest(viewer_state, state, INTEREST_COMBAT_RADIUS) {
+            } else if state.action != 0
+                || within_interest(viewer_state, state, INTEREST_COMBAT_RADIUS)
+            {
                 2
             } else if within_interest(viewer_state, state, INTEREST_NEAR_RADIUS) {
                 3
@@ -340,11 +347,8 @@ pub fn encode_snapshot(
     max_bytes: usize,
 ) -> Vec<u8> {
     assert!(records.len() <= u16::MAX as usize);
-    let total_bytes = SNAPSHOT_HEADER_BYTES
-        + records
-            .iter()
-            .map(snapshot_record_bytes)
-            .sum::<usize>();
+    let total_bytes =
+        SNAPSHOT_HEADER_BYTES + records.iter().map(snapshot_record_bytes).sum::<usize>();
     assert!(total_bytes <= max_bytes, "snapshot exceeds datagram budget");
 
     let mut bytes = Vec::with_capacity(total_bytes);
@@ -404,7 +408,11 @@ pub fn decode_snapshot(bytes: &[u8]) -> Result<DecodedSnapshot, SnapshotDecodeEr
         if offset + SNAPSHOT_RECORD_BASE_BYTES > bytes.len() {
             return Err(SnapshotDecodeError::TruncatedRecord);
         }
-        let net_id = u32::from_le_bytes(bytes[offset..offset + 4].try_into().expect("record length checked"));
+        let net_id = u32::from_le_bytes(
+            bytes[offset..offset + 4]
+                .try_into()
+                .expect("record length checked"),
+        );
         let mask = bytes[offset + 4];
         offset += SNAPSHOT_RECORD_BASE_BYTES;
         let mut record = SnapshotRecord {
