@@ -15,9 +15,7 @@ use std::{
     time::{Duration, Instant},
 };
 use tokio::sync::Mutex;
-use wtransport::{
-    endpoint::endpoint_side::Client, ClientConfig, Endpoint, Identity, ServerConfig,
-};
+use wtransport::{endpoint::endpoint_side::Client, ClientConfig, Endpoint, Identity, ServerConfig};
 
 const GAME_PATH: &str = "/game";
 const INPUT_ACK_PACKET_TYPE: u8 = 3;
@@ -142,11 +140,18 @@ async fn main() -> Result<()> {
                 let incoming = server.accept().await;
                 let world = Arc::clone(&world);
                 let next_player = Arc::clone(&next_player);
-                let connection_rounds = if connection_index < clients { rounds } else { 1 };
+                let connection_rounds = if connection_index < clients {
+                    rounds
+                } else {
+                    1
+                };
                 sessions.push(tokio::spawn(async move {
                     let request = incoming.await?;
                     if request.path() != GAME_PATH {
-                        bail!("transport probe received unexpected path {}", request.path());
+                        bail!(
+                            "transport probe received unexpected path {}",
+                            request.path()
+                        );
                     }
                     let connection = request.accept().await?;
                     if connection.max_datagram_size().unwrap_or(0) < CONSERVATIVE_DATAGRAM_BYTES {
@@ -201,7 +206,10 @@ async fn main() -> Result<()> {
         bail!("transport probe leaked authoritative fighters after disconnect");
     }
 
-    println!("M8_WEBTRANSPORT_LOAD {}", initial.to_json(reconnect_clients));
+    println!(
+        "M8_WEBTRANSPORT_LOAD {}",
+        initial.to_json(reconnect_clients)
+    );
     println!("M8_RECONNECT {}", reconnect.to_json(reconnect_clients));
     Ok(())
 }
