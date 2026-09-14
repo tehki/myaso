@@ -181,31 +181,25 @@ fn run_scenario(scenario: Scenario) -> Result<CapacityReport> {
             &mut world,
             &mut sessions,
             &mut acknowledged_snapshots,
-            false,
-            &mut Vec::new(),
-            &mut Vec::new(),
-            &mut Vec::new(),
-            &mut SnapshotTotals::default(),
+            None,
         );
     }
 
-    let mut tick_samples = Vec::with_capacity(scenario.measured_ticks as usize);
-    let mut replication_samples =
-        Vec::with_capacity((scenario.measured_ticks / SNAPSHOT_EVERY_TICKS + 1) as usize);
-    let mut frame_build_samples =
-        Vec::with_capacity((scenario.measured_ticks / SNAPSHOT_EVERY_TICKS + 1) as usize);
-    let mut totals = SnapshotTotals::default();
+    let snapshot_capacity =
+        (scenario.measured_ticks / SNAPSHOT_EVERY_TICKS + 1) as usize;
+    let mut measurements = ProbeMeasurements {
+        tick_samples: Vec::with_capacity(scenario.measured_ticks as usize),
+        replication_samples: Vec::with_capacity(snapshot_capacity),
+        frame_build_samples: Vec::with_capacity(snapshot_capacity),
+        totals: SnapshotTotals::default(),
+    };
 
     for _ in 0..scenario.measured_ticks {
         drive_tick(
             &mut world,
             &mut sessions,
             &mut acknowledged_snapshots,
-            true,
-            &mut tick_samples,
-            &mut replication_samples,
-            &mut frame_build_samples,
-            &mut totals,
+            Some(&mut measurements),
         );
     }
 
@@ -238,43 +232,43 @@ fn run_scenario(scenario: Scenario) -> Result<CapacityReport> {
 
     let measured_seconds = scenario.measured_ticks as f64 / SERVER_TICK_HZ as f64;
     let snapshot_bytes_per_player_second =
-        totals.bytes as f64 / scenario.players as f64 / measured_seconds;
+        measurements.totals.bytes as f64 / scenario.players as f64 / measured_seconds;
     let estimated_payload_bytes_per_player_second = snapshot_bytes_per_player_second
         + INPUT_PAYLOAD_BYTES_PER_SECOND
         + ACK_PAYLOAD_BYTES_PER_SECOND;
-    let tick_ms_p95 = percentile(&tick_samples, 0.95);
-    let replication_batch_ms_p95 = percentile(&replication_samples, 0.95);
+    let tick_ms_p95 = percentile(&measurements.tick_samples, 0.95);
+    let replication_batch_ms_p95 = percentile(&measurements.replication_samples, 0.95);
     let target_tick_ms = 1000.0 / SERVER_TICK_HZ as f64;
     let target_replication_ms = 1000.0 / (SERVER_TICK_HZ as f64 / SNAPSHOT_EVERY_TICKS as f64);
 
     Ok(CapacityReport {
         players: scenario.players,
         measured_ticks: scenario.measured_ticks,
-        snapshots_built: totals.snapshots,
-        tick_ms_p50: percentile(&tick_samples, 0.50),
+        snapshots_built: measurements.totals.snapshots,
+        tick_ms_p50: percentile(&measurements.tick_samples, 0.50),
         tick_ms_p95,
-        tick_ms_p99: percentile(&tick_samples, 0.99),
-        tick_ms_max: max_sample(&tick_samples),
-        replication_batch_ms_p50: percentile(&replication_samples, 0.50),
+        tick_ms_p99: percentile(&measurements.tick_samples, 0.99),
+        tick_ms_max: max_sample(&measurements.tick_samples),
+        replication_batch_ms_p50: percentile(&measurements.replication_samples, 0.50),
         replication_batch_ms_p95,
-        replication_batch_ms_p99: percentile(&replication_samples, 0.99),
-        replication_batch_ms_max: max_sample(&replication_samples),
-        avg_snapshot_bytes: totals.average_bytes(),
-        max_snapshot_bytes: totals.max_bytes,
+        replication_batch_ms_p99: percentile(&measurements.replication_samples, 0.99),
+        replication_batch_ms_max: max_sample(&measurements.replication_samples),
+        avg_snapshot_bytes: measurements.totals.average_bytes(),
+        max_snapshot_bytes: measurements.totals.max_bytes,
         snapshot_bytes_per_player_second,
         estimated_payload_bytes_per_player_second,
-        avg_records_per_snapshot: totals.average_records(),
-        omission_ratio: totals.omission_ratio(),
+        avg_records_per_snapshot: measurements.totals.average_records(),
+        omission_ratio: measurements.totals.omission_ratio(),
         reconnect_samples,
         reconnect_build_ms_p95: percentile(&reconnect_build_samples, 0.95),
-        reconnect_avg_snapshot_bytes: reconnect_totals.average_bytes(),
-        reconnect_omission_ratio: reconnect_totals.omission_ratio(),
-        frame_build_ms_p95: percentile(&frame_build_samples, 0.95),
-        avg_interest_candidates_checked: totals.average_interest_candidates_checked(),
-        avg_visible_entities: totals.average_visible_entities(),
-        candidate_scan_ratio: totals.average_interest_candidates_checked()
+        reconnect_avg_snapshot_bytes: reconnect_measurements.totals.average_bytes(),
+        reconnect_omission_ratio: reconnect_measurements.totals.omission_ratio(),
+        frame_build_ms_p95: percentile(&measurements.frame_build_samples, 0.95),
+        avg_interest_candidates_checked: measurements.totals.average_interest_candidates_checked(),
+        avg_visible_entities: measurements.totals.average_visible_entities(),
+        candidate_scan_ratio: measurements.totals.average_interest_candidates_checked()
             / scenario.players as f64,
-        freshness_max_due_age_ticks: totals.freshness_max_due_age_ticks,
+        freshness_max_due_age_ticks: measurements.totals.freshness_max_due_age_ticks,
         rss_growth_bytes,
         rss_growth_bytes_per_session,
         target_60hz_tick_met: tick_ms_p95 <= target_tick_ms,
@@ -286,11 +280,7 @@ fn drive_tick(
     world: &mut World,
     sessions: &mut [SnapshotSession],
     acknowledged_snapshots: &mut [u16],
-    record: bool,
-    tick_samples: &mut Vec<f64>,
-    replication_samples: &mut Vec<f64>,
-    frame_build_samples: &mut Vec<f64>,
-    totals: &mut SnapshotTotals,
+    mut measurements: Option<&mut ProbeMeasurements>,
 ) {
     let next_tick = world.tick.wrapping_add(1);
     for net_id in 1..=sessions.len() as u32 {
@@ -299,8 +289,8 @@ fn drive_tick(
 
     let tick_started = Instant::now();
     let _events = world.step();
-    if record {
-        tick_samples.push(elapsed_ms(tick_started));
+    if let Some(measurements) = measurements.as_deref_mut() {
+        measurements.tick_samples.push(elapsed_ms(tick_started));
     }
 
     if world.tick % SNAPSHOT_EVERY_TICKS != 0 {
@@ -310,8 +300,10 @@ fn drive_tick(
     let replication_started = Instant::now();
     let frame_started = Instant::now();
     let frame = ReplicationFrame::from_fighters(world.tick, world.fighters());
-    if record {
-        frame_build_samples.push(elapsed_ms(frame_started));
+    if let Some(measurements) = measurements.as_deref_mut() {
+        measurements
+            .frame_build_samples
+            .push(elapsed_ms(frame_started));
     }
     for (index, session) in sessions.iter_mut().enumerate() {
         let build = session.build_from_frame(
@@ -321,12 +313,14 @@ fn drive_tick(
             CONSERVATIVE_DATAGRAM_BYTES,
         );
         acknowledged_snapshots[index] = build.sequence;
-        if record {
-            totals.observe(&build);
+        if let Some(measurements) = measurements.as_deref_mut() {
+            measurements.totals.observe(&build);
         }
     }
-    if record {
-        replication_samples.push(elapsed_ms(replication_started));
+    if let Some(measurements) = measurements {
+        measurements
+            .replication_samples
+            .push(elapsed_ms(replication_started));
     }
 }
 
@@ -340,6 +334,14 @@ fn deterministic_input(net_id: u32, tick: u32) -> InputIntent {
         dodge: tick.wrapping_add(net_id.wrapping_mul(7)) % 181 == 0,
         block: tick.wrapping_add(net_id.wrapping_mul(13)) % 127 < 4,
     }
+}
+
+#[derive(Debug, Default)]
+struct ProbeMeasurements {
+    tick_samples: Vec<f64>,
+    replication_samples: Vec<f64>,
+    frame_build_samples: Vec<f64>,
+    totals: SnapshotTotals,
 }
 
 #[derive(Debug, Default)]
