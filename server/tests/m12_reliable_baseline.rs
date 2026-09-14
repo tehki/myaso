@@ -10,7 +10,15 @@ const RELIABLE_BYTES: usize = u16::MAX as usize;
 fn reliable_snapshot_converges_dense_state_omitted_by_realtime_datagram() {
     let mut world = World::default();
     for net_id in 1..=512_u32 {
-        assert!(world.add_player(net_id));
+        let index = net_id - 1;
+        let column = index % 32;
+        let row = index / 32;
+        assert!(world.add_player_at(
+            net_id,
+            3200.0 + column as f32 * 42.0,
+            3600.0 + row as f32 * 42.0,
+            0.0,
+        ));
     }
     let mut session = SnapshotSession::default();
     let frame = ReplicationFrame::from_fighters(world.tick, world.fighters());
