@@ -17,6 +17,17 @@ struct Scenario {
     measured_ticks: u32,
 }
 
+#[derive(Debug, Clone, Copy, Default)]
+struct ByteCompositionTotals {
+    header: u64,
+    net_ids: u64,
+    masks: u64,
+    position: u64,
+    facing: u64,
+    vitals: u64,
+    action: u64,
+}
+
 #[derive(Debug)]
 struct CapacityReport {
     players: usize,
@@ -52,6 +63,7 @@ struct CapacityReport {
     rss_growth_bytes_per_session: Option<u64>,
     target_60hz_tick_met: bool,
     target_20hz_replication_batch_met: bool,
+    byte_composition: ByteCompositionTotals,
 }
 
 impl CapacityReport {
@@ -136,6 +148,12 @@ fn main() -> Result<()> {
     let report = run_scenario(scenario)?;
     validate_report(&report)?;
     println!("M8_CAPACITY {}", report.to_json());
+    println!(
+        "M18_BYTE_COMPOSITION {}",
+        report
+            .byte_composition
+            .to_json(report.players, report.snapshots_built)
+    );
     Ok(())
 }
 
@@ -286,6 +304,7 @@ fn run_scenario(scenario: Scenario) -> Result<CapacityReport> {
         rss_growth_bytes_per_session,
         target_60hz_tick_met: tick_ms_p95 <= target_tick_ms,
         target_20hz_replication_batch_met: replication_batch_ms_p95 <= target_replication_ms,
+        byte_composition: measurements.totals.byte_composition,
     })
 }
 
@@ -369,6 +388,68 @@ struct SnapshotTotals {
     freshness_max_due_age_ticks: [u32; 4],
     freshness_max_omitted_age_ticks: [u32; 4],
     freshness_deadline_misses: [u64; 4],
+    byte_composition: ByteCompositionTotals,
+}
+
+impl ByteCompositionTotals {
+    fn observe(&mut self, c: myaso_server::snapshot::SnapshotByteComposition) {
+        self.header += c.header as u64;
+        self.net_ids += c.net_ids as u64;
+        self.masks += c.masks as u64;
+        self.position += c.position as u64;
+        self.facing += c.facing as u64;
+        self.vitals += c.vitals as u64;
+        self.action += c.action as u64;
+    }
+
+    fn total(self) -> u64 {
+        self.header
+            + self.net_ids
+            + self.masks
+            + self.position
+            + self.facing
+            + self.vitals
+            + self.action
+    }
+
+    fn average(value: u64, snapshots: usize) -> f64 {
+        if snapshots == 0 {
+            0.0
+        } else {
+            value as f64 / snapshots as f64
+        }
+    }
+
+    fn share(self, value: u64) -> f64 {
+        let total = self.total();
+        if total == 0 {
+            0.0
+        } else {
+            value as f64 / total as f64
+        }
+    }
+
+    fn to_json(self, players: usize, snapshots: usize) -> String {
+        format!(
+            r#"{{"players":{},"snapshots":{},"avg_bytes":{{"header":{:.3},"net_ids":{:.3},"masks":{:.3},"position":{:.3},"facing":{:.3},"vitals":{:.3},"action":{:.3}}},"share":{{"header":{:.6},"net_ids":{:.6},"masks":{:.6},"position":{:.6},"facing":{:.6},"vitals":{:.6},"action":{:.6}}}}}"#,
+            players,
+            snapshots,
+            Self::average(self.header, snapshots),
+            Self::average(self.net_ids, snapshots),
+            Self::average(self.masks, snapshots),
+            Self::average(self.position, snapshots),
+            Self::average(self.facing, snapshots),
+            Self::average(self.vitals, snapshots),
+            Self::average(self.action, snapshots),
+            self.share(self.header),
+            self.share(self.net_ids),
+            self.share(self.masks),
+            self.share(self.position),
+            self.share(self.facing),
+            self.share(self.vitals),
+            self.share(self.action),
+        )
+    }
 }
 
 impl SnapshotTotals {
@@ -380,6 +461,7 @@ impl SnapshotTotals {
         self.omitted += build.omitted_due_to_budget as u64;
         self.interest_candidates_checked += build.interest_candidates_checked as u64;
         self.visible_entities += build.visible_entity_count as u64;
+        self.byte_composition.observe(build.byte_composition);
         let freshness = [
             build.freshness.combat,
             build.freshness.near,

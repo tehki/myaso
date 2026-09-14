@@ -138,6 +138,29 @@ pub struct SnapshotFreshness {
     pub far: TierFreshness,
 }
 
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct SnapshotByteComposition {
+    pub header: usize,
+    pub net_ids: usize,
+    pub masks: usize,
+    pub position: usize,
+    pub facing: usize,
+    pub vitals: usize,
+    pub action: usize,
+}
+
+impl SnapshotByteComposition {
+    pub fn total_bytes(self) -> usize {
+        self.header
+            + self.net_ids
+            + self.masks
+            + self.position
+            + self.facing
+            + self.vitals
+            + self.action
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct SnapshotBuild {
     pub bytes: Vec<u8>,
@@ -145,6 +168,7 @@ pub struct SnapshotBuild {
     pub baseline_sequence: u16,
     pub full: bool,
     pub record_count: usize,
+    pub byte_composition: SnapshotByteComposition,
     pub omitted_due_to_budget: usize,
     pub interest_candidates_checked: usize,
     pub visible_entity_count: usize,
@@ -323,6 +347,8 @@ impl SnapshotSession {
             &plan.records,
             max_bytes,
         );
+        let byte_composition = snapshot_byte_composition(&plan.records);
+        debug_assert_eq!(byte_composition.total_bytes(), bytes.len());
 
         for record in &plan.records {
             if record.mask & SNAPSHOT_FIELD_REMOVED != 0 {
@@ -348,6 +374,7 @@ impl SnapshotSession {
             baseline_sequence,
             full,
             record_count,
+            byte_composition,
             omitted_due_to_budget: plan.omitted_due_to_budget,
             interest_candidates_checked: plan.interest_candidates_checked,
             visible_entity_count: plan.visible_entity_count,
@@ -827,6 +854,33 @@ pub fn decode_snapshot(bytes: &[u8]) -> Result<DecodedSnapshot, SnapshotDecodeEr
         full: bytes[2] & SNAPSHOT_FLAG_FULL != 0,
         records,
     })
+}
+
+pub fn snapshot_byte_composition(records: &[SnapshotRecord]) -> SnapshotByteComposition {
+    let mut composition = SnapshotByteComposition {
+        header: SNAPSHOT_HEADER_BYTES,
+        net_ids: records.len() * 4,
+        masks: records.len(),
+        ..SnapshotByteComposition::default()
+    };
+    for record in records {
+        if record.mask & SNAPSHOT_FIELD_REMOVED != 0 {
+            continue;
+        }
+        if record.mask & SNAPSHOT_FIELD_POSITION != 0 {
+            composition.position += 4;
+        }
+        if record.mask & SNAPSHOT_FIELD_FACING != 0 {
+            composition.facing += 2;
+        }
+        if record.mask & SNAPSHOT_FIELD_VITALS != 0 {
+            composition.vitals += 2;
+        }
+        if record.mask & SNAPSHOT_FIELD_ACTION != 0 {
+            composition.action += 2;
+        }
+    }
+    composition
 }
 
 pub fn snapshot_record_bytes(record: &SnapshotRecord) -> usize {
