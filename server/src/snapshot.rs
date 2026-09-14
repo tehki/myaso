@@ -272,19 +272,14 @@ fn plan_records(
                 || (before.is_some()
                     && record.mask & (SNAPSHOT_FIELD_VITALS | SNAPSHOT_FIELD_ACTION) != 0);
             let desired_interval = desired_interval_ticks(distance_sq, is_owner);
-            if !is_owner
-                && !unseen_in_baseline
-                && !urgent_state
-                && sent_age < desired_interval
-            {
+            if !is_owner && !unseen_in_baseline && !urgent_state && sent_age < desired_interval {
                 continue;
             }
 
             due_count += 1;
             let bucket = if is_owner {
                 0
-            } else if urgent_state
-                || distance_sq <= INTEREST_COMBAT_RADIUS * INTEREST_COMBAT_RADIUS
+            } else if urgent_state || distance_sq <= INTEREST_COMBAT_RADIUS * INTEREST_COMBAT_RADIUS
             {
                 2
             } else if distance_sq <= INTEREST_NEAR_RADIUS * INTEREST_NEAR_RADIUS {
@@ -352,8 +347,7 @@ fn rotating_bucket_offset(
     if length <= 1 {
         return 0;
     }
-    let mixed = viewer_net_id
-        .wrapping_mul(2_654_435_761)
+    let mixed = viewer_net_id.wrapping_mul(2_654_435_761)
         ^ server_tick.wrapping_mul(2_246_822_519)
         ^ (bucket_index as u32).wrapping_mul(3_266_489_917);
     mixed as usize % length
@@ -567,7 +561,6 @@ fn interest_distance_sq(viewer: WireEntity, candidate: WireEntity) -> f32 {
     let dy = (candidate.y as f32 - viewer.y as f32) / WORLD_COORDINATE_SCALE;
     dx * dx + dy * dy
 }
-
 
 fn quantize_position(value: f32) -> u16 {
     (value.clamp(0.0, MAX_WORLD_COORDINATE) * WORLD_COORDINATE_SCALE).round() as u16

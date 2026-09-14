@@ -44,9 +44,18 @@ fn distance_cadence_keeps_near_updates_hot_and_defers_background() {
         CONSERVATIVE_DATAGRAM_BYTES,
     );
     let near_ids = record_ids(&near_tick.bytes);
-    assert!(near_ids.contains(&2), "near state should update every snapshot");
-    assert!(!near_ids.contains(&3), "mid state should wait for its 6-tick cadence");
-    assert!(!near_ids.contains(&4), "far state should wait for its 30-tick cadence");
+    assert!(
+        near_ids.contains(&2),
+        "near state should update every snapshot"
+    );
+    assert!(
+        !near_ids.contains(&3),
+        "mid state should wait for its 6-tick cadence"
+    );
+    assert!(
+        !near_ids.contains(&4),
+        "far state should wait for its 30-tick cadence"
+    );
 
     for _ in 0..3 {
         world.step();
@@ -60,7 +69,10 @@ fn distance_cadence_keeps_near_updates_hot_and_defers_background() {
     );
     let mid_ids = record_ids(&mid_tick.bytes);
     assert!(mid_ids.contains(&2));
-    assert!(mid_ids.contains(&3), "mid state should become due at six ticks");
+    assert!(
+        mid_ids.contains(&3),
+        "mid state should become due at six ticks"
+    );
     assert!(!mid_ids.contains(&4));
 
     let mut ack = mid_tick.sequence;
@@ -79,7 +91,10 @@ fn distance_cadence_keeps_near_updates_hot_and_defers_background() {
         far_seen |= record_ids(&build.bytes).contains(&4);
         ack = build.sequence;
     }
-    assert!(far_seen, "far state must not starve beyond its 30-tick cadence");
+    assert!(
+        far_seen,
+        "far state must not starve beyond its 30-tick cadence"
+    );
 }
 
 #[test]
@@ -101,7 +116,10 @@ fn dense_fresh_session_resync_is_staged_and_near_first() {
     let first_decoded = decode_snapshot(&first.bytes).expect("decode first resync stage");
     assert!(first.full);
     assert!(first.omitted_due_to_budget > 0);
-    assert!(first_decoded.records.iter().any(|record| record.net_id == 1));
+    assert!(first_decoded
+        .records
+        .iter()
+        .any(|record| record.net_id == 1));
     assert!(
         first_decoded
             .records
