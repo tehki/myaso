@@ -177,16 +177,10 @@ fn run_scenario(scenario: Scenario) -> Result<CapacityReport> {
     let rss_before = current_rss_bytes();
 
     for _ in 0..scenario.warmup_ticks {
-        drive_tick(
-            &mut world,
-            &mut sessions,
-            &mut acknowledged_snapshots,
-            None,
-        );
+        drive_tick(&mut world, &mut sessions, &mut acknowledged_snapshots, None);
     }
 
-    let snapshot_capacity =
-        (scenario.measured_ticks / SNAPSHOT_EVERY_TICKS + 1) as usize;
+    let snapshot_capacity = (scenario.measured_ticks / SNAPSHOT_EVERY_TICKS + 1) as usize;
     let mut measurements = ProbeMeasurements {
         tick_samples: Vec::with_capacity(scenario.measured_ticks as usize),
         replication_samples: Vec::with_capacity(snapshot_capacity),
