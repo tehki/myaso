@@ -16,8 +16,8 @@ use std::{
     },
     time::Duration,
 };
-use tokio::sync::Mutex;
-use wtransport::{Connection, Endpoint, Identity, ServerConfig, VarInt};
+use tokio::sync::{mpsc, Mutex};
+use wtransport::{Connection, Endpoint, Identity, SendStream, ServerConfig, VarInt};
 
 const GAME_PATH: &str = "/game";
 const CLOSE_DATAGRAM_UNAVAILABLE: u32 = 0x11;
@@ -26,6 +26,8 @@ const SNAPSHOT_EVERY_SERVER_TICKS: u32 = 3;
 const INPUT_ACK_PACKET_TYPE: u8 = 3;
 const INPUT_ACK_BYTES: usize = 16;
 const MAX_PENDING_INPUT_ACKS: usize = 256;
+const MAX_RELIABLE_SNAPSHOT_BYTES: usize = u16::MAX as usize;
+const RELIABLE_BACKGROUND_COOLDOWN_TICKS: u32 = 60;
 
 struct GameState {
     world: World,
@@ -211,14 +213,50 @@ async fn handle_connection(
 
     let mut ingress = InputIngressWindow::default();
     let mut snapshots = SnapshotSession::default();
-    let mut acknowledged_snapshot = u16::MAX;
+    let mut reliable_snapshots = SnapshotSession::default();
     let mut last_input_sequence = None;
     let mut pending_input_acks = VecDeque::with_capacity(MAX_PENDING_INPUT_ACKS);
+    let (mut reliable_send, _reliable_recv) = connection
+        .accept_bi()
+        .await
+        .context("accept reliable game stream")?;
+    let initial_frame = {
+        let state = game.state.lock().await;
+        Arc::clone(&state.replication_frame)
+    };
+    let initial_baseline = snapshots.build_from_frame(
+        u16::MAX,
+        player_id,
+        &initial_frame,
+        MAX_RELIABLE_SNAPSHOT_BYTES,
+    );
+    if initial_baseline.omitted_due_to_budget != 0 {
+        bail!("initial reliable baseline exceeded reliable frame budget");
+    }
+    send_reliable_snapshot(&mut reliable_send, &initial_baseline.bytes).await?;
+    let initial_baseline_sequence = initial_baseline.sequence;
+    let mut acknowledged_snapshot = u16::MAX;
+    let mut realtime_ready = false;
+    let mut last_reliable_background_tick = initial_frame.server_tick();
+    let (reliable_tx, mut reliable_rx) = mpsc::channel::<Vec<u8>>(1);
+    let mut reliable_writer = tokio::spawn(async move {
+        while let Some(payload) = reliable_rx.recv().await {
+            send_reliable_snapshot(&mut reliable_send, &payload).await?;
+        }
+        Ok::<(), anyhow::Error>(())
+    });
     let mut snapshot_interval = tokio::time::interval(SNAPSHOT_INTERVAL);
     snapshot_interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
 
     loop {
         tokio::select! {
+            writer_result = &mut reliable_writer => {
+                match writer_result {
+                    Ok(Ok(())) => bail!("reliable writer ended unexpectedly"),
+                    Ok(Err(error)) => return Err(error),
+                    Err(error) => bail!("reliable writer task failed: {error}"),
+                }
+            }
             datagram = connection.receive_datagram() => {
                 let datagram = datagram?;
                 let packet = match decode_input_packet(datagram.as_ref()) {
@@ -231,7 +269,12 @@ async fn handle_connection(
 
                 if last_input_sequence.is_none_or(|previous| is_sequence_newer16(packet.sequence, previous)) {
                     last_input_sequence = Some(packet.sequence);
-                    acknowledged_snapshot = packet.ack_snapshot_sequence;
+                    advance_snapshot_ack(
+                        &mut acknowledged_snapshot,
+                        &mut realtime_ready,
+                        initial_baseline_sequence,
+                        packet.ack_snapshot_sequence,
+                    );
                 }
 
                 let accepted = ingress.ingest(&packet);
@@ -255,16 +298,41 @@ async fn handle_connection(
                     Arc::clone(&state.replication_frame)
                 };
                 let server_tick = frame.server_tick();
-                let snapshot = snapshots.build_from_frame(
-                    acknowledged_snapshot,
-                    player_id,
-                    &frame,
-                    CONSERVATIVE_DATAGRAM_BYTES,
-                );
                 let safe_input_ack = take_safe_input_ack(&mut pending_input_acks, server_tick);
-                connection
-                    .send_datagram(snapshot.bytes)
-                    .context("send authoritative snapshot datagram")?;
+                let snapshot = realtime_ready.then(|| {
+                    snapshots.build_from_frame(
+                        acknowledged_snapshot,
+                        player_id,
+                        &frame,
+                        CONSERVATIVE_DATAGRAM_BYTES,
+                    )
+                });
+                let background_deadline_misses = snapshot.as_ref().map_or(0, |snapshot| {
+                    snapshot.freshness.mid.deadline_misses + snapshot.freshness.far.deadline_misses
+                });
+                if let Some(snapshot) = snapshot {
+                    connection
+                        .send_datagram(snapshot.bytes)
+                        .context("send authoritative snapshot datagram")?;
+                }
+                if background_deadline_misses > 0
+                    && server_tick.wrapping_sub(last_reliable_background_tick)
+                        >= RELIABLE_BACKGROUND_COOLDOWN_TICKS
+                {
+                    let catch_up = reliable_snapshots.build_from_frame(
+                        u16::MAX,
+                        player_id,
+                        &frame,
+                        MAX_RELIABLE_SNAPSHOT_BYTES,
+                    );
+                    match reliable_tx.try_send(catch_up.bytes) {
+                        Ok(()) => last_reliable_background_tick = server_tick,
+                        Err(mpsc::error::TrySendError::Full(_)) => {}
+                        Err(mpsc::error::TrySendError::Closed(_)) => {
+                            bail!("reliable snapshot writer is unavailable")
+                        }
+                    }
+                }
                 if let Some(client_tick) = safe_input_ack {
                     connection
                         .send_datagram(encode_input_ack(client_tick, server_tick, player_id))
@@ -272,6 +340,40 @@ async fn handle_connection(
                 }
             }
         }
+    }
+}
+
+async fn send_reliable_snapshot(stream: &mut SendStream, payload: &[u8]) -> Result<()> {
+    if payload.len() > u16::MAX as usize {
+        bail!("reliable snapshot exceeds 65535-byte frame limit");
+    }
+    let mut framed = Vec::with_capacity(2 + payload.len());
+    framed.extend_from_slice(&(payload.len() as u16).to_le_bytes());
+    framed.extend_from_slice(payload);
+    stream
+        .write_all(&framed)
+        .await
+        .context("write reliable snapshot frame")
+}
+
+fn advance_snapshot_ack(
+    acknowledged_snapshot: &mut u16,
+    realtime_ready: &mut bool,
+    initial_baseline_sequence: u16,
+    candidate: u16,
+) {
+    if !*realtime_ready {
+        if candidate == initial_baseline_sequence {
+            *acknowledged_snapshot = initial_baseline_sequence;
+            *realtime_ready = true;
+        }
+        return;
+    }
+    if candidate != u16::MAX
+        && (candidate == *acknowledged_snapshot
+            || is_sequence_newer16(candidate, *acknowledged_snapshot))
+    {
+        *acknowledged_snapshot = candidate;
     }
 }
 
@@ -332,6 +434,24 @@ mod tests {
         let mut pending = VecDeque::new();
         record_pending_input_ack(&mut pending, 7, u32::MAX);
         assert_eq!(take_safe_input_ack(&mut pending, 0), Some(7));
+    }
+
+    #[test]
+    fn reliable_baseline_must_be_echoed_before_realtime_snapshot_ack_advances() {
+        let mut acknowledged = u16::MAX;
+        let mut ready = false;
+        advance_snapshot_ack(&mut acknowledged, &mut ready, 7, 6);
+        assert!(!ready);
+        assert_eq!(acknowledged, u16::MAX);
+
+        advance_snapshot_ack(&mut acknowledged, &mut ready, 7, 7);
+        assert!(ready);
+        assert_eq!(acknowledged, 7);
+
+        advance_snapshot_ack(&mut acknowledged, &mut ready, 7, 6);
+        assert_eq!(acknowledged, 7);
+        advance_snapshot_ack(&mut acknowledged, &mut ready, 7, 8);
+        assert_eq!(acknowledged, 8);
     }
 
     #[test]
