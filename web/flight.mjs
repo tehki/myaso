@@ -29,6 +29,11 @@ let firstBackgroundReliableMs = null;
 let reliableCatchups = 0;
 let reliableAdvancedEntities = 0;
 let maxReliableAdvancedEntities = 0;
+const reliableCatchupBytes = [];
+const reliableDeltaBytes = [];
+const reliableFullBytes = [];
+let reliableDeltaCatchups = 0;
+let reliableFullCatchups = 0;
 let maxAuthoritativeEntities = 0;
 let reliableBaselineEntities = 0;
 let client = null;
@@ -74,6 +79,15 @@ try {
         return;
       }
       reliableCatchups += 1;
+      const byteLength = Number(meta.byteLength);
+      if (Number.isFinite(byteLength)) reliableCatchupBytes.push(byteLength);
+      if (meta.full) {
+        reliableFullCatchups += 1;
+        if (Number.isFinite(byteLength)) reliableFullBytes.push(byteLength);
+      } else {
+        reliableDeltaCatchups += 1;
+        if (Number.isFinite(byteLength)) reliableDeltaBytes.push(byteLength);
+      }
       reliableAdvancedEntities += advanced;
       maxReliableAdvancedEntities = Math.max(maxReliableAdvancedEntities, advanced);
       if (firstBackgroundReliableMs === null && advanced > 0) firstBackgroundReliableMs = now - reliableBaselineAt;
@@ -241,6 +255,11 @@ function finish(elapsedMs) {
     reliableCatchups,
     reliableAdvancedEntities,
     maxReliableAdvancedEntities,
+    reliableDeltaCatchups,
+    reliableFullCatchups,
+    reliableCatchupBytes: summarizeBytes(reliableCatchupBytes),
+    reliableDeltaBytes: summarizeBytes(reliableDeltaBytes),
+    reliableFullBytes: summarizeBytes(reliableFullBytes),
     maxAuthoritativeEntities,
     reliableBaselineEntities,
     firstBackgroundReliableMs: firstBackgroundReliableMs === null ? null : round(firstBackgroundReliableMs),
@@ -264,6 +283,17 @@ function summarize(sorted) {
     p50: round(percentile(sorted, 0.50)),
     p95: round(percentile(sorted, 0.95)),
     p99: round(percentile(sorted, 0.99)),
+    max: round(sorted.at(-1)),
+  };
+}
+
+function summarizeBytes(values) {
+  if (!values.length) return { count: 0, avg: null, p95: null, max: null };
+  const sorted = [...values].sort((a, b) => a - b);
+  return {
+    count: sorted.length,
+    avg: round(sorted.reduce((sum, value) => sum + value, 0) / sorted.length),
+    p95: round(percentile(sorted, 0.95)),
     max: round(sorted.at(-1)),
   };
 }

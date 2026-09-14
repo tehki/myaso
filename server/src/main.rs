@@ -29,6 +29,7 @@ const INPUT_ACK_BYTES: usize = 16;
 const MAX_PENDING_INPUT_ACKS: usize = 256;
 const MAX_RELIABLE_SNAPSHOT_BYTES: usize = u16::MAX as usize;
 const RELIABLE_BACKGROUND_COOLDOWN_TICKS: u32 = 60;
+const RELIABLE_DELTA_CHECKPOINT_INTERVAL: u8 = 3;
 const MAX_FLIGHT_BACKGROUND_PLAYERS: usize = TARGET_PLAYERS_PER_MAP - 1;
 const FLIGHT_BACKGROUND_NET_ID_BASE: u32 = 10_000;
 const FLIGHT_NEAR_PRESSURE_PLAYERS: usize = 150;
@@ -307,14 +308,29 @@ async fn handle_connection(
         &initial_frame,
         MAX_RELIABLE_SNAPSHOT_BYTES,
     );
-    if initial_baseline.omitted_due_to_budget != 0 {
+    let initial_reliable_baseline = reliable_snapshots.build_from_frame(
+        u16::MAX,
+        player_id,
+        &initial_frame,
+        MAX_RELIABLE_SNAPSHOT_BYTES,
+    );
+    if initial_baseline.omitted_due_to_budget != 0
+        || initial_reliable_baseline.omitted_due_to_budget != 0
+    {
         bail!("initial reliable baseline exceeded reliable frame budget");
+    }
+    if initial_reliable_baseline.sequence != initial_baseline.sequence
+        || initial_reliable_baseline.bytes != initial_baseline.bytes
+    {
+        bail!("reliable and realtime baseline sessions diverged");
     }
     send_reliable_snapshot(&mut reliable_send, &initial_baseline.bytes).await?;
     let initial_baseline_sequence = initial_baseline.sequence;
     let mut acknowledged_snapshot = u16::MAX;
     let mut realtime_ready = false;
     let mut last_reliable_background_tick = initial_frame.server_tick();
+    let mut last_reliable_sequence = initial_reliable_baseline.sequence;
+    let mut reliable_deltas_since_checkpoint = 0_u8;
     let (reliable_tx, mut reliable_rx) = mpsc::channel::<Vec<u8>>(1);
     let reliable_write_delay = game.reliable_write_delay;
     let mut reliable_writer = tokio::spawn(async move {
@@ -416,20 +432,47 @@ async fn handle_connection(
                             omitted_due_to_budget,
                         );
                     }
+                    let force_full_checkpoint =
+                        reliable_deltas_since_checkpoint >= RELIABLE_DELTA_CHECKPOINT_INTERVAL;
+                    let reliable_ack = if force_full_checkpoint {
+                        u16::MAX
+                    } else {
+                        last_reliable_sequence
+                    };
+                    let mut built_reliable = None;
                     match try_enqueue_reliable(&reliable_tx, || {
-                        reliable_snapshots
-                            .build_from_frame(
-                                u16::MAX,
-                                player_id,
-                                &frame,
-                                MAX_RELIABLE_SNAPSHOT_BYTES,
-                            )
-                            .bytes
+                        let snapshot = reliable_snapshots.build_from_frame(
+                            reliable_ack,
+                            player_id,
+                            &frame,
+                            MAX_RELIABLE_SNAPSHOT_BYTES,
+                        );
+                        built_reliable = Some((
+                            snapshot.sequence,
+                            snapshot.baseline_sequence,
+                            snapshot.full,
+                            snapshot.record_count,
+                            snapshot.bytes.len(),
+                        ));
+                        snapshot.bytes
                     }) {
                         Ok(true) => {
                             last_reliable_background_tick = server_tick;
+                            let (sequence, baseline_sequence, full, records, bytes) =
+                                built_reliable.expect("reserved reliable enqueue must build payload");
+                            last_reliable_sequence = sequence;
+                            if full {
+                                reliable_deltas_since_checkpoint = 0;
+                            } else {
+                                reliable_deltas_since_checkpoint =
+                                    reliable_deltas_since_checkpoint.saturating_add(1);
+                            }
                             if !game.reliable_write_delay.is_zero() {
                                 println!("M15_RELIABLE_ENQUEUED tick={server_tick}");
+                                println!(
+                                    "M17_RELIABLE_ENQUEUED tick={server_tick} sequence={sequence} baseline={baseline_sequence} kind={} records={records} bytes={bytes}",
+                                    if full { "full" } else { "delta" },
+                                );
                             }
                         }
                         Ok(false) => {

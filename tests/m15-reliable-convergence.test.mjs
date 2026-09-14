@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mergeReliableSnapshotPacketInPlace } from "../web/authoritative-client.mjs";
+import { createReliableSnapshotMergeState, mergeReliableSnapshotPacketInPlace } from "../web/authoritative-client.mjs";
 import { encodeSnapshot, SNAPSHOT_FIELDS } from "../src/network/snapshot-codec.mjs";
 
 function record(netId, x) {
@@ -25,10 +25,11 @@ test("reliable convergence reports only browser-visible state advances", () => {
     [1, { netId: 1, x: 500, y: 100, facing: 0, hp: 100, guard: 100, action: 0, flags: 0, serverTick: 40 }],
     [2, { netId: 2, x: 200, y: 100, facing: 0, hp: 100, guard: 100, action: 0, flags: 0, serverTick: 10 }],
   ]);
-  const known = new Set([1, 2]);
+  const reliable = createReliableSnapshotMergeState();
+  reliable.knownIds.add(1); reliable.knownIds.add(2);
   const result = mergeReliableSnapshotPacketInPlace(
     state,
-    known,
+    reliable,
     packet(30, [record(1, 300), record(2, 330), record(3, 360)]),
   );
 

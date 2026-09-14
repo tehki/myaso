@@ -2,6 +2,7 @@ import { createPredictionHistory, isTickNewer32 } from "../src/browser/reconcili
 import { createRemoteInterpolator } from "../src/browser/remote-interpolation.mjs";
 import { applySnapshotPacketInPlace, createSnapshotApplyResult } from "../src/browser/snapshot-store.mjs";
 import { NETWORK, PACKET_TYPE } from "../src/network/constants.mjs";
+import { decodeSnapshot, SNAPSHOT_FIELDS } from "../src/network/snapshot-codec.mjs";
 import { decodeInputAck } from "../src/network/input-ack-codec.mjs";
 import { encodeInputPacket } from "../src/network/input-codec.mjs";
 import { isSequenceNewer16 } from "../src/network/sequence.mjs";
@@ -19,7 +20,7 @@ export async function connectAuthoritativeClient({
   const state = new Map();
   const snapshotResult = createSnapshotApplyResult();
   const reliableSnapshotResult = createSnapshotApplyResult();
-  const reliableKnownIds = new Set();
+  const reliableMergeState = createReliableSnapshotMergeState();
   const predictionHistory = createPredictionHistory({ maxEntries: 64 });
   const remoteInterpolator = createRemoteInterpolator();
   const inputSamples = [];
@@ -81,7 +82,7 @@ export async function connectAuthoritativeClient({
       if (bytes.length < 2 || bytes[1] !== PACKET_TYPE.SNAPSHOT) return;
       const { mergedIds, removedIds, advancedIds } = mergeReliableSnapshotPacketInPlace(
         state,
-        reliableKnownIds,
+        reliableMergeState,
         bytes,
         reliableSnapshotResult,
       );
@@ -98,7 +99,9 @@ export async function connectAuthoritativeClient({
         if (entity && entity.netId !== playerNetId) remoteInterpolator.push(entity, entity.serverTick);
       }
       flushPendingAck();
-      onReliableSnapshot?.(reliableSnapshotResult, state, { mergedIds, removedIds, advancedIds });
+      onReliableSnapshot?.(reliableSnapshotResult, state, {
+        mergedIds, removedIds, advancedIds, byteLength: bytes.byteLength, full: reliableSnapshotResult.full,
+      });
     } catch (error) {
       onProtocolError?.(error);
     }
@@ -156,22 +159,35 @@ export async function connectAuthoritativeClient({
   };
 }
 
+export function createReliableSnapshotMergeState() {
+  return { state: new Map(), knownIds: new Set(), sequence: 0xffff };
+}
+
 export function mergeReliableSnapshotPacketInPlace(
   stateMap,
-  reliableKnownIds,
+  reliableMergeState,
   packet,
   result = createSnapshotApplyResult(),
 ) {
   if (!(stateMap instanceof Map)) throw new TypeError("stateMap must be a Map");
-  if (!(reliableKnownIds instanceof Set)) throw new TypeError("reliableKnownIds must be a Set");
-  const staged = new Map();
-  applySnapshotPacketInPlace(staged, packet, result);
-  if (!result.full) throw new Error("reliable snapshot must be a full merge baseline");
+  if (!(reliableMergeState?.state instanceof Map) || !(reliableMergeState?.knownIds instanceof Set)) {
+    throw new TypeError("reliableMergeState must contain state Map and knownIds Set");
+  }
+  const bytes = asUint8Array(packet);
+  const decoded = decodeSnapshot(bytes);
+  if (!decoded.full) {
+    if (reliableMergeState.sequence === 0xffff) throw new Error("reliable delta arrived before a full baseline");
+    if (decoded.baselineSequence !== reliableMergeState.sequence) {
+      throw new Error(`reliable delta baseline ${decoded.baselineSequence} does not match ${reliableMergeState.sequence}`);
+    }
+  }
+  applySnapshotPacketInPlace(reliableMergeState.state, bytes, result);
+  reliableMergeState.sequence = result.sequence;
 
-  const incomingIds = new Set(staged.keys());
+  const incomingIds = new Set(reliableMergeState.state.keys());
   const nextKnownIds = new Set(incomingIds);
   const removedIds = [];
-  for (const netId of reliableKnownIds) {
+  for (const netId of reliableMergeState.knownIds) {
     if (incomingIds.has(netId)) continue;
     const current = stateMap.get(netId);
     if (!current) continue;
@@ -179,33 +195,41 @@ export function mergeReliableSnapshotPacketInPlace(
       nextKnownIds.add(netId);
       continue;
     }
-    if (current.serverTick === result.serverTick || isTickNewer32(result.serverTick, current.serverTick)) {
-      stateMap.delete(netId);
-      removedIds.push(netId);
-    }
+    stateMap.delete(netId);
+    removedIds.push(netId);
   }
 
   const mergedIds = [];
   const advancedIds = [];
-  for (const [netId, incoming] of staged) {
-    const current = stateMap.get(netId);
+  for (const record of decoded.records) {
+    if (record.mask & SNAPSHOT_FIELDS.REMOVED) continue;
+    const incoming = reliableMergeState.state.get(record.netId);
+    if (!incoming) continue;
+    const current = stateMap.get(record.netId);
     if (current
-      && current.serverTick !== incoming.serverTick
-      && isTickNewer32(current.serverTick, incoming.serverTick)) {
+      && current.serverTick !== result.serverTick
+      && isTickNewer32(current.serverTick, result.serverTick)) {
       continue;
     }
-    if (!current
-      || current.serverTick !== incoming.serverTick
-      && isTickNewer32(incoming.serverTick, current.serverTick)) {
-      advancedIds.push(netId);
+    if (!current) {
+      stateMap.set(record.netId, { ...incoming });
+      advancedIds.push(record.netId);
+      mergedIds.push(record.netId);
+      continue;
     }
-    if (current) Object.assign(current, incoming);
-    else stateMap.set(netId, { ...incoming });
-    mergedIds.push(netId);
+    if (current.serverTick !== result.serverTick && isTickNewer32(result.serverTick, current.serverTick)) {
+      advancedIds.push(record.netId);
+    }
+    if (record.mask & SNAPSHOT_FIELDS.POSITION) { current.x = incoming.x; current.y = incoming.y; }
+    if (record.mask & SNAPSHOT_FIELDS.FACING) current.facing = incoming.facing;
+    if (record.mask & SNAPSHOT_FIELDS.VITALS) { current.hp = incoming.hp; current.guard = incoming.guard; }
+    if (record.mask & SNAPSHOT_FIELDS.ACTION) { current.action = incoming.action; current.flags = incoming.flags; }
+    current.serverTick = result.serverTick;
+    mergedIds.push(record.netId);
   }
 
-  reliableKnownIds.clear();
-  for (const netId of nextKnownIds) reliableKnownIds.add(netId);
+  reliableMergeState.knownIds.clear();
+  for (const netId of nextKnownIds) reliableMergeState.knownIds.add(netId);
   return { mergedIds, removedIds, advancedIds };
 }
 
