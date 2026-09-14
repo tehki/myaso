@@ -1,5 +1,5 @@
 use myaso_server::snapshot::{
-    encode_snapshot, snapshot_byte_composition, SnapshotRecord, SNAPSHOT_FIELD_ACTION,
+    encode_snapshot_current, snapshot_byte_composition, SnapshotRecord, SNAPSHOT_FIELD_ACTION,
     SNAPSHOT_FIELD_FACING, SNAPSHOT_FIELD_POSITION, SNAPSHOT_FIELD_REMOVED, SNAPSHOT_FIELD_VITALS,
     SNAPSHOT_FULL_FIELDS, SNAPSHOT_HEADER_BYTES,
 };
@@ -27,16 +27,16 @@ fn byte_composition_exactly_matches_encoded_snapshot_length() {
         record(4, SNAPSHOT_FIELD_REMOVED),
     ];
     let composition = snapshot_byte_composition(&records);
-    let encoded = encode_snapshot(7, 6, 123, false, &records, 1100);
+    let encoded = encode_snapshot_current(7, 6, 123, false, &records, 1100);
 
     assert_eq!(composition.header, SNAPSHOT_HEADER_BYTES);
-    assert_eq!(composition.net_ids, 16);
+    assert_eq!(composition.net_ids, 4);
     assert_eq!(composition.masks, 4);
     assert_eq!(composition.position, 8);
     assert_eq!(composition.facing, 4);
     assert_eq!(composition.vitals, 4);
     assert_eq!(composition.action, 2);
-    assert_eq!(composition.total_bytes(), 52);
+    assert_eq!(composition.total_bytes(), 36);
     assert_eq!(composition.total_bytes(), encoded.len());
 
     assert_eq!(SNAPSHOT_FIELD_ACTION, 1 << 3);

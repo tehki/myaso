@@ -1,7 +1,8 @@
 import { NETWORK, PACKET_TYPE, SNAPSHOT_FLAG } from "../network/constants.mjs";
 
 const HEADER_BYTES = 14;
-const RECORD_BASE_BYTES = 5;
+const ENCODING_LEGACY_U32_IDS = 0;
+const ENCODING_VARINT_IDS = 1;
 const FIELD_POSITION = 1 << 0;
 const FIELD_FACING = 1 << 1;
 const FIELD_VITALS = 1 << 2;
@@ -11,6 +12,7 @@ const TAU = Math.PI * 2;
 
 export function createSnapshotApplyResult() {
   return {
+    encoding: ENCODING_LEGACY_U32_IDS,
     sequence: 0,
     baselineSequence: 0xffff,
     serverTick: 0,
@@ -29,6 +31,8 @@ export function applySnapshotPacketInPlace(stateMap, packet, result = createSnap
   if (view.getUint8(0) !== NETWORK.protocolVersion) throw new Error("unsupported protocol version");
   if (view.getUint8(1) !== PACKET_TYPE.SNAPSHOT) throw new Error("not a snapshot packet");
 
+  result.encoding = view.getUint8(3);
+  assertSnapshotEncoding(result.encoding);
   result.sequence = view.getUint16(4, true);
   result.baselineSequence = view.getUint16(6, true);
   result.serverTick = view.getUint32(8, true);
@@ -42,10 +46,19 @@ export function applySnapshotPacketInPlace(stateMap, packet, result = createSnap
   let offset = HEADER_BYTES;
 
   for (let index = 0; index < result.records; index += 1) {
-    requireBytes(view, offset, RECORD_BASE_BYTES);
-    const netId = view.getUint32(offset, true);
-    const mask = view.getUint8(offset + 4);
-    offset += RECORD_BASE_BYTES;
+    let netId;
+    if (result.encoding === ENCODING_LEGACY_U32_IDS) {
+      requireBytes(view, offset, 4);
+      netId = view.getUint32(offset, true);
+      offset += 4;
+    } else {
+      const decoded = readUint32Varint(view, offset);
+      netId = decoded.value;
+      offset = decoded.offset;
+    }
+    requireBytes(view, offset, 1);
+    const mask = view.getUint8(offset);
+    offset += 1;
     staleIds?.delete(netId);
 
     if (mask & FIELD_REMOVED) {
@@ -107,6 +120,41 @@ export function applySnapshotPacketInPlace(stateMap, packet, result = createSnap
   }
 
   return result;
+}
+
+function readUint32Varint(view, offset) {
+  const start = offset;
+  let value = 0;
+  for (let index = 0; index < 5; index += 1) {
+    requireBytes(view, offset, 1);
+    const byte = view.getUint8(offset);
+    offset += 1;
+    if (index === 4 && (byte & 0xf0) !== 0) throw new RangeError("invalid snapshot varint");
+    value = (value + ((byte & 0x7f) * (2 ** (index * 7)))) >>> 0;
+    if ((byte & 0x80) === 0) {
+      if (offset - start !== uint32VarintBytes(value)) {
+        throw new RangeError("non-canonical snapshot varint");
+      }
+      return { value, offset };
+    }
+  }
+  throw new RangeError("invalid snapshot varint");
+}
+
+function uint32VarintBytes(value) {
+  let nextValue = value >>> 0;
+  let bytes = 1;
+  while (nextValue >= 0x80) {
+    nextValue >>>= 7;
+    bytes += 1;
+  }
+  return bytes;
+}
+
+function assertSnapshotEncoding(encoding) {
+  if (encoding !== ENCODING_LEGACY_U32_IDS && encoding !== ENCODING_VARINT_IDS) {
+    throw new RangeError(`unsupported snapshot encoding ${encoding}`);
+  }
 }
 
 function requireBytes(view, offset, count) {
