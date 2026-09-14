@@ -23,14 +23,8 @@ fn hex(bytes: &[u8]) -> String {
 }
 #[test]
 fn compact_encoding_matches_the_cross_language_fixture() {
-    let encoded = encode_snapshot_current(
-        7,
-        6,
-        1234,
-        false,
-        &[record(1, SNAPSHOT_FULL_FIELDS)],
-        1100,
-    );
+    let encoded =
+        encode_snapshot_current(7, 6, 1234, false, &[record(1, SNAPSHOT_FULL_FIELDS)], 1100);
     let expected = include_str!("../../tests/fixtures/m19-snapshot-varint-v1.hex").trim();
     assert_eq!(hex(&encoded), expected);
 
@@ -94,14 +88,7 @@ fn compact_decoder_rejects_unknown_and_noncanonical_varints() {
         Err(SnapshotDecodeError::TruncatedRecord)
     );
 
-    let overflow = compact_packet(&[
-        0xff,
-        0xff,
-        0xff,
-        0xff,
-        0x10,
-        SNAPSHOT_FIELD_REMOVED,
-    ]);
+    let overflow = compact_packet(&[0xff, 0xff, 0xff, 0xff, 0x10, SNAPSHOT_FIELD_REMOVED]);
     assert_eq!(
         decode_snapshot(&overflow),
         Err(SnapshotDecodeError::InvalidVarint)

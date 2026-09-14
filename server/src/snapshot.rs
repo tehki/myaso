@@ -782,7 +782,10 @@ fn encode_snapshot_with_encoding(
     encoding: u8,
 ) -> Vec<u8> {
     assert!(records.len() <= u16::MAX as usize);
-    assert!(matches!(encoding, SNAPSHOT_ENCODING_LEGACY_U32_IDS | SNAPSHOT_ENCODING_VARINT_IDS));
+    assert!(matches!(
+        encoding,
+        SNAPSHOT_ENCODING_LEGACY_U32_IDS | SNAPSHOT_ENCODING_VARINT_IDS
+    ));
     let total_bytes = SNAPSHOT_HEADER_BYTES
         + records
             .iter()
@@ -802,7 +805,9 @@ fn encode_snapshot_with_encoding(
 
     for record in records {
         match encoding {
-            SNAPSHOT_ENCODING_LEGACY_U32_IDS => bytes.extend_from_slice(&record.net_id.to_le_bytes()),
+            SNAPSHOT_ENCODING_LEGACY_U32_IDS => {
+                bytes.extend_from_slice(&record.net_id.to_le_bytes())
+            }
             SNAPSHOT_ENCODING_VARINT_IDS => encode_u32_varint(record.net_id, &mut bytes),
             _ => unreachable!("encoding validated"),
         }
@@ -814,22 +819,41 @@ fn encode_snapshot_with_encoding(
 }
 
 fn encode_record_fields(record: &SnapshotRecord, bytes: &mut Vec<u8>) {
-    if record.mask & SNAPSHOT_FIELD_REMOVED != 0 { return; }
+    if record.mask & SNAPSHOT_FIELD_REMOVED != 0 {
+        return;
+    }
     if record.mask & SNAPSHOT_FIELD_POSITION != 0 {
         bytes.extend_from_slice(&record.x.to_le_bytes());
         bytes.extend_from_slice(&record.y.to_le_bytes());
     }
-    if record.mask & SNAPSHOT_FIELD_FACING != 0 { bytes.extend_from_slice(&record.facing.to_le_bytes()); }
-    if record.mask & SNAPSHOT_FIELD_VITALS != 0 { bytes.push(record.hp); bytes.push(record.guard); }
-    if record.mask & SNAPSHOT_FIELD_ACTION != 0 { bytes.push(record.action); bytes.push(record.flags); }
+    if record.mask & SNAPSHOT_FIELD_FACING != 0 {
+        bytes.extend_from_slice(&record.facing.to_le_bytes());
+    }
+    if record.mask & SNAPSHOT_FIELD_VITALS != 0 {
+        bytes.push(record.hp);
+        bytes.push(record.guard);
+    }
+    if record.mask & SNAPSHOT_FIELD_ACTION != 0 {
+        bytes.push(record.action);
+        bytes.push(record.flags);
+    }
 }
 
 pub fn decode_snapshot(bytes: &[u8]) -> Result<DecodedSnapshot, SnapshotDecodeError> {
-    if bytes.len() < SNAPSHOT_HEADER_BYTES { return Err(SnapshotDecodeError::Truncated); }
-    if bytes[0] != crate::PROTOCOL_VERSION { return Err(SnapshotDecodeError::UnsupportedProtocol(bytes[0])); }
-    if bytes[1] != SNAPSHOT_PACKET_TYPE { return Err(SnapshotDecodeError::WrongPacketType(bytes[1])); }
+    if bytes.len() < SNAPSHOT_HEADER_BYTES {
+        return Err(SnapshotDecodeError::Truncated);
+    }
+    if bytes[0] != crate::PROTOCOL_VERSION {
+        return Err(SnapshotDecodeError::UnsupportedProtocol(bytes[0]));
+    }
+    if bytes[1] != SNAPSHOT_PACKET_TYPE {
+        return Err(SnapshotDecodeError::WrongPacketType(bytes[1]));
+    }
     let encoding = bytes[3];
-    if !matches!(encoding, SNAPSHOT_ENCODING_LEGACY_U32_IDS | SNAPSHOT_ENCODING_VARINT_IDS) {
+    if !matches!(
+        encoding,
+        SNAPSHOT_ENCODING_LEGACY_U32_IDS | SNAPSHOT_ENCODING_VARINT_IDS
+    ) {
         return Err(SnapshotDecodeError::UnsupportedEncoding(encoding));
     }
     let sequence = u16::from_le_bytes([bytes[4], bytes[5]]);
@@ -843,7 +867,11 @@ pub fn decode_snapshot(bytes: &[u8]) -> Result<DecodedSnapshot, SnapshotDecodeEr
         let net_id = match encoding {
             SNAPSHOT_ENCODING_LEGACY_U32_IDS => {
                 require(bytes, offset, 4)?;
-                let value = u32::from_le_bytes(bytes[offset..offset + 4].try_into().expect("length checked"));
+                let value = u32::from_le_bytes(
+                    bytes[offset..offset + 4]
+                        .try_into()
+                        .expect("length checked"),
+                );
                 offset += 4;
                 value
             }
@@ -853,11 +881,23 @@ pub fn decode_snapshot(bytes: &[u8]) -> Result<DecodedSnapshot, SnapshotDecodeEr
         require(bytes, offset, 1)?;
         let mask = bytes[offset];
         offset += 1;
-        let mut record = SnapshotRecord { net_id, mask, x: 0, y: 0, facing: 0, hp: 0, guard: 0, action: 0, flags: 0 };
+        let mut record = SnapshotRecord {
+            net_id,
+            mask,
+            x: 0,
+            y: 0,
+            facing: 0,
+            hp: 0,
+            guard: 0,
+            action: 0,
+            flags: 0,
+        };
         decode_record_fields(bytes, &mut offset, &mut record)?;
         records.push(record);
     }
-    if offset != bytes.len() { return Err(SnapshotDecodeError::TrailingBytes); }
+    if offset != bytes.len() {
+        return Err(SnapshotDecodeError::TrailingBytes);
+    }
 
     Ok(DecodedSnapshot {
         encoding,
@@ -869,8 +909,14 @@ pub fn decode_snapshot(bytes: &[u8]) -> Result<DecodedSnapshot, SnapshotDecodeEr
     })
 }
 
-fn decode_record_fields(bytes: &[u8], offset: &mut usize, record: &mut SnapshotRecord) -> Result<(), SnapshotDecodeError> {
-    if record.mask & SNAPSHOT_FIELD_REMOVED != 0 { return Ok(()); }
+fn decode_record_fields(
+    bytes: &[u8],
+    offset: &mut usize,
+    record: &mut SnapshotRecord,
+) -> Result<(), SnapshotDecodeError> {
+    if record.mask & SNAPSHOT_FIELD_REMOVED != 0 {
+        return Ok(());
+    }
     if record.mask & SNAPSHOT_FIELD_POSITION != 0 {
         require(bytes, *offset, 4)?;
         record.x = u16::from_le_bytes([bytes[*offset], bytes[*offset + 1]]);
@@ -884,11 +930,15 @@ fn decode_record_fields(bytes: &[u8], offset: &mut usize, record: &mut SnapshotR
     }
     if record.mask & SNAPSHOT_FIELD_VITALS != 0 {
         require(bytes, *offset, 2)?;
-        record.hp = bytes[*offset]; record.guard = bytes[*offset + 1]; *offset += 2;
+        record.hp = bytes[*offset];
+        record.guard = bytes[*offset + 1];
+        *offset += 2;
     }
     if record.mask & SNAPSHOT_FIELD_ACTION != 0 {
         require(bytes, *offset, 2)?;
-        record.action = bytes[*offset]; record.flags = bytes[*offset + 1]; *offset += 2;
+        record.action = bytes[*offset];
+        record.flags = bytes[*offset + 1];
+        *offset += 2;
     }
     Ok(())
 }
@@ -912,11 +962,21 @@ fn snapshot_byte_composition_for_encoding(
             SNAPSHOT_ENCODING_VARINT_IDS => u32_varint_bytes(record.net_id),
             _ => unreachable!("encoding validated by caller"),
         };
-        if record.mask & SNAPSHOT_FIELD_REMOVED != 0 { continue; }
-        if record.mask & SNAPSHOT_FIELD_POSITION != 0 { composition.position += 4; }
-        if record.mask & SNAPSHOT_FIELD_FACING != 0 { composition.facing += 2; }
-        if record.mask & SNAPSHOT_FIELD_VITALS != 0 { composition.vitals += 2; }
-        if record.mask & SNAPSHOT_FIELD_ACTION != 0 { composition.action += 2; }
+        if record.mask & SNAPSHOT_FIELD_REMOVED != 0 {
+            continue;
+        }
+        if record.mask & SNAPSHOT_FIELD_POSITION != 0 {
+            composition.position += 4;
+        }
+        if record.mask & SNAPSHOT_FIELD_FACING != 0 {
+            composition.facing += 2;
+        }
+        if record.mask & SNAPSHOT_FIELD_VITALS != 0 {
+            composition.vitals += 2;
+        }
+        if record.mask & SNAPSHOT_FIELD_ACTION != 0 {
+            composition.action += 2;
+        }
     }
     composition
 }
@@ -932,17 +992,30 @@ fn snapshot_record_bytes_for_encoding(record: &SnapshotRecord, encoding: u8) -> 
         _ => unreachable!("encoding validated by caller"),
     };
     let mut bytes = id_bytes + 1;
-    if record.mask & SNAPSHOT_FIELD_REMOVED != 0 { return bytes; }
-    if record.mask & SNAPSHOT_FIELD_POSITION != 0 { bytes += 4; }
-    if record.mask & SNAPSHOT_FIELD_FACING != 0 { bytes += 2; }
-    if record.mask & SNAPSHOT_FIELD_VITALS != 0 { bytes += 2; }
-    if record.mask & SNAPSHOT_FIELD_ACTION != 0 { bytes += 2; }
+    if record.mask & SNAPSHOT_FIELD_REMOVED != 0 {
+        return bytes;
+    }
+    if record.mask & SNAPSHOT_FIELD_POSITION != 0 {
+        bytes += 4;
+    }
+    if record.mask & SNAPSHOT_FIELD_FACING != 0 {
+        bytes += 2;
+    }
+    if record.mask & SNAPSHOT_FIELD_VITALS != 0 {
+        bytes += 2;
+    }
+    if record.mask & SNAPSHOT_FIELD_ACTION != 0 {
+        bytes += 2;
+    }
     bytes
 }
 
 fn u32_varint_bytes(mut value: u32) -> usize {
     let mut bytes = 1;
-    while value >= 0x80 { value >>= 7; bytes += 1; }
+    while value >= 0x80 {
+        value >>= 7;
+        bytes += 1;
+    }
     bytes
 }
 
@@ -950,9 +1023,13 @@ fn encode_u32_varint(mut value: u32, bytes: &mut Vec<u8>) {
     loop {
         let mut next = (value & 0x7f) as u8;
         value >>= 7;
-        if value != 0 { next |= 0x80; }
+        if value != 0 {
+            next |= 0x80;
+        }
         bytes.push(next);
-        if value == 0 { break; }
+        if value == 0 {
+            break;
+        }
     }
 }
 
@@ -963,10 +1040,14 @@ fn decode_u32_varint(bytes: &[u8], offset: &mut usize) -> Result<u32, SnapshotDe
         require(bytes, *offset, 1)?;
         let byte = bytes[*offset];
         *offset += 1;
-        if index == 4 && byte & 0xf0 != 0 { return Err(SnapshotDecodeError::InvalidVarint); }
+        if index == 4 && byte & 0xf0 != 0 {
+            return Err(SnapshotDecodeError::InvalidVarint);
+        }
         value |= u32::from(byte & 0x7f) << (index * 7);
         if byte & 0x80 == 0 {
-            if *offset - start != u32_varint_bytes(value) { return Err(SnapshotDecodeError::InvalidVarint); }
+            if *offset - start != u32_varint_bytes(value) {
+                return Err(SnapshotDecodeError::InvalidVarint);
+            }
             return Ok(value);
         }
     }
