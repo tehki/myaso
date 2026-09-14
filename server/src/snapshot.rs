@@ -18,6 +18,10 @@ pub const INTEREST_COMBAT_RADIUS: f32 = 420.0;
 pub const INTEREST_NEAR_RADIUS: f32 = 700.0;
 pub const INTEREST_MID_RADIUS: f32 = 1500.0;
 pub const INTEREST_FAR_RADIUS: f32 = 2600.0;
+pub const INTEREST_NEAR_INTERVAL_TICKS: u32 = 3;
+pub const INTEREST_MID_INTERVAL_TICKS: u32 = 6;
+pub const INTEREST_FAR_INTERVAL_TICKS: u32 = 30;
+pub const REPLICATION_STARVATION_TICKS: u32 = 120;
 pub const DEFAULT_SNAPSHOT_HISTORY: usize = 64;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -127,6 +131,7 @@ pub struct SnapshotSession {
     next_sequence: u16,
     history_limit: usize,
     history: VecDeque<(u16, BTreeMap<u32, WireEntity>)>,
+    last_sent_tick: BTreeMap<u32, u32>,
 }
 
 impl Default for SnapshotSession {
@@ -142,6 +147,7 @@ impl SnapshotSession {
             next_sequence: 0,
             history_limit,
             history: VecDeque::with_capacity(history_limit),
+            last_sent_tick: BTreeMap::new(),
         }
     }
 
@@ -169,7 +175,14 @@ impl SnapshotSession {
         };
         let baseline = acknowledged.unwrap_or_default();
         let current: Vec<_> = fighters.iter().map(WireEntity::from_fighter).collect();
-        let plan = plan_records(viewer_net_id, &current, &baseline, max_bytes);
+        let plan = plan_records(
+            viewer_net_id,
+            server_tick,
+            &current,
+            &baseline,
+            &self.last_sent_tick,
+            max_bytes,
+        );
         let sequence = self.next_sequence;
         self.next_sequence = self.next_sequence.wrapping_add(1);
         let bytes = encode_snapshot(
@@ -183,6 +196,13 @@ impl SnapshotSession {
 
         let mut resulting_state = if full { BTreeMap::new() } else { baseline };
         apply_records(&mut resulting_state, &plan.records);
+        for record in &plan.records {
+            if record.mask & SNAPSHOT_FIELD_REMOVED != 0 {
+                self.last_sent_tick.remove(&record.net_id);
+            } else {
+                self.last_sent_tick.insert(record.net_id, server_tick);
+            }
+        }
         self.history.push_back((sequence, resulting_state));
         while self.history.len() > self.history_limit {
             self.history.pop_front();
@@ -213,8 +233,10 @@ struct SnapshotPlan {
 
 fn plan_records(
     viewer_net_id: u32,
+    server_tick: u32,
     current: &[WireEntity],
     baseline: &BTreeMap<u32, WireEntity>,
+    last_sent_tick: &BTreeMap<u32, u32>,
     max_bytes: usize,
 ) -> SnapshotPlan {
     assert!(max_bytes >= SNAPSHOT_HEADER_BYTES);
@@ -223,35 +245,53 @@ fn plan_records(
         .map(|entity| (entity.net_id, *entity))
         .collect();
     let viewer = current_map.get(&viewer_net_id).copied();
-    let mut buckets: [Vec<SnapshotRecord>; 6] = std::array::from_fn(|_| Vec::new());
+    let mut buckets: [Vec<SnapshotRecord>; 8] = std::array::from_fn(|_| Vec::new());
     let mut visible = BTreeMap::new();
     let mut due_count = 0_usize;
 
     if let Some(viewer_state) = viewer {
         for state in current_map.values().copied() {
-            if state.net_id != viewer_net_id
-                && !within_interest(viewer_state, state, INTEREST_FAR_RADIUS)
-            {
+            let is_owner = state.net_id == viewer_net_id;
+            let distance_sq = interest_distance_sq(viewer_state, state);
+            if !is_owner && distance_sq > INTEREST_FAR_RADIUS * INTEREST_FAR_RADIUS {
                 continue;
             }
+
             visible.insert(state.net_id, state);
-            let record = build_delta(state, baseline.get(&state.net_id).copied());
-            let Some(record) = record else {
+            let before = baseline.get(&state.net_id).copied();
+            let Some(record) = build_delta(state, before) else {
                 continue;
             };
+
+            let unseen_in_baseline = before.is_none();
+            let sent_age = last_sent_tick
+                .get(&state.net_id)
+                .map(|last| server_tick.wrapping_sub(*last))
+                .unwrap_or(u32::MAX);
+            let urgent_state = state.action != 0
+                || (before.is_some()
+                    && record.mask & (SNAPSHOT_FIELD_VITALS | SNAPSHOT_FIELD_ACTION) != 0);
+            let desired_interval = desired_interval_ticks(distance_sq, is_owner);
+            if !is_owner && !unseen_in_baseline && !urgent_state && sent_age < desired_interval {
+                continue;
+            }
+
             due_count += 1;
-            let bucket = if state.net_id == viewer_net_id {
+            let bucket = if is_owner {
                 0
-            } else if state.action != 0
-                || within_interest(viewer_state, state, INTEREST_COMBAT_RADIUS)
+            } else if urgent_state || distance_sq <= INTEREST_COMBAT_RADIUS * INTEREST_COMBAT_RADIUS
             {
                 2
-            } else if within_interest(viewer_state, state, INTEREST_NEAR_RADIUS) {
+            } else if distance_sq <= INTEREST_NEAR_RADIUS * INTEREST_NEAR_RADIUS {
                 3
-            } else if within_interest(viewer_state, state, INTEREST_MID_RADIUS) {
+            } else if unseen_in_baseline {
                 4
-            } else {
+            } else if sent_age >= REPLICATION_STARVATION_TICKS {
                 5
+            } else if distance_sq <= INTEREST_MID_RADIUS * INTEREST_MID_RADIUS {
+                6
+            } else {
+                7
             };
             buckets[bucket].push(record);
         }
@@ -266,8 +306,13 @@ fn plan_records(
 
     let mut bytes_used = SNAPSHOT_HEADER_BYTES;
     let mut records = Vec::new();
-    for bucket in buckets {
-        for record in bucket {
+    for (bucket_index, bucket) in buckets.into_iter().enumerate() {
+        if bucket.is_empty() {
+            continue;
+        }
+        let start = rotating_bucket_offset(viewer_net_id, server_tick, bucket_index, bucket.len());
+        for offset in 0..bucket.len() {
+            let record = bucket[(start + offset) % bucket.len()];
             let record_bytes = snapshot_record_bytes(&record);
             if bytes_used + record_bytes > max_bytes {
                 continue;
@@ -281,6 +326,31 @@ fn plan_records(
         omitted_due_to_budget: due_count.saturating_sub(records.len()),
         records,
     }
+}
+
+fn desired_interval_ticks(distance_sq: f32, is_owner: bool) -> u32 {
+    if is_owner || distance_sq <= INTEREST_NEAR_RADIUS * INTEREST_NEAR_RADIUS {
+        INTEREST_NEAR_INTERVAL_TICKS
+    } else if distance_sq <= INTEREST_MID_RADIUS * INTEREST_MID_RADIUS {
+        INTEREST_MID_INTERVAL_TICKS
+    } else {
+        INTEREST_FAR_INTERVAL_TICKS
+    }
+}
+
+fn rotating_bucket_offset(
+    viewer_net_id: u32,
+    server_tick: u32,
+    bucket_index: usize,
+    length: usize,
+) -> usize {
+    if length <= 1 {
+        return 0;
+    }
+    let mixed = viewer_net_id.wrapping_mul(2_654_435_761)
+        ^ server_tick.wrapping_mul(2_246_822_519)
+        ^ (bucket_index as u32).wrapping_mul(3_266_489_917);
+    mixed as usize % length
 }
 
 pub fn build_delta(state: WireEntity, before: Option<WireEntity>) -> Option<SnapshotRecord> {
@@ -486,10 +556,10 @@ pub fn snapshot_record_bytes(record: &SnapshotRecord) -> usize {
     bytes
 }
 
-fn within_interest(viewer: WireEntity, candidate: WireEntity, radius: f32) -> bool {
+fn interest_distance_sq(viewer: WireEntity, candidate: WireEntity) -> f32 {
     let dx = (candidate.x as f32 - viewer.x as f32) / WORLD_COORDINATE_SCALE;
     let dy = (candidate.y as f32 - viewer.y as f32) / WORLD_COORDINATE_SCALE;
-    dx * dx + dy * dy <= radius * radius
+    dx * dx + dy * dy
 }
 
 fn quantize_position(value: f32) -> u16 {
