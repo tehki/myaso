@@ -195,7 +195,9 @@ async fn run_reliable_stall() -> Result<()> {
     }
 
     connection.send_datagram(b"final-seen")?;
-    connection.close(VarInt::from_u32(0), b"m14 client complete");
+    let _closed = tokio::time::timeout(Duration::from_secs(2), connection.closed())
+        .await
+        .context("wait for M14 server close")?;
     server_task.await.context("join M14 server task")??;
     Ok(())
 }
