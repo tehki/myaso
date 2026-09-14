@@ -13,7 +13,11 @@ const backgroundPlayers = Number(process.env.MYASO_FLIGHT_BACKGROUND_PLAYERS ?? 
 const reliableDelayMs = Number(process.env.MYASO_FLIGHT_RELIABLE_DELAY_MS ?? 0);
 const requireBackgroundCatchup = process.env.MYASO_FLIGHT_REQUIRE_BACKGROUND_CATCHUP === "1";
 const convergenceBudgetMs = Number(process.env.MYASO_FLIGHT_CONVERGENCE_BUDGET_MS ?? 2500);
-const flightLabel = requireBackgroundCatchup ? "M15_BROWSER_CONVERGENCE" : "M7_BROWSER_FLIGHT";
+const expectedAuthoritativeEntities = Number(process.env.MYASO_FLIGHT_EXPECT_ENTITIES ?? 0);
+const frameP95BudgetMs = Number(process.env.MYASO_FLIGHT_FRAME_P95_BUDGET_MS ?? 100);
+const configuredFlightLabel = process.env.MYASO_FLIGHT_LABEL;
+const flightLabel = configuredFlightLabel || (requireBackgroundCatchup ? "M15_BROWSER_CONVERGENCE" : "M7_BROWSER_FLIGHT");
+if (!/^[A-Z0-9_]+$/.test(flightLabel)) throw new Error("MYASO_FLIGHT_LABEL must contain only A-Z, 0-9, and underscore");
 const browsers = [
   {
     name: "chrome",
@@ -208,12 +212,20 @@ function assertFlightResult(browser, result) {
   if (result.acknowledgements < 10) throw new Error(`${browser} received too few input acknowledgements: ${result.acknowledgements}`);
   if (result.sentInputs < 30) throw new Error(`${browser} sent too few inputs: ${result.sentInputs}`);
   if (result.frames < 60) throw new Error(`${browser} produced too few animation frames: ${result.frames}`);
-  if (!Number.isFinite(result.frameMs?.p95) || result.frameMs.p95 >= 100) {
-    throw new Error(`${browser} p95 frame interval is pathological: ${result.frameMs?.p95}`);
+  if (!Number.isFinite(result.frameMs?.p95) || result.frameMs.p95 >= frameP95BudgetMs) {
+    throw new Error(`${browser} p95 frame interval exceeded ${frameP95BudgetMs}ms: ${result.frameMs?.p95}`);
   }
   if (result.maxPredictionHistory > 64) throw new Error(`${browser} prediction history escaped its bound`);
   if (result.correctionPx?.max !== null && (!Number.isFinite(result.correctionPx.max) || result.correctionPx.max >= 512)) {
     throw new Error(`${browser} reconciliation correction escaped sanity bound: ${result.correctionPx.max}`);
+  }
+  if (expectedAuthoritativeEntities > 0) {
+    if (result.reliableBaselineEntities !== expectedAuthoritativeEntities) {
+      throw new Error(`${browser} reliable baseline entity count mismatch: ${result.reliableBaselineEntities} != ${expectedAuthoritativeEntities}`);
+    }
+    if (result.maxAuthoritativeEntities < expectedAuthoritativeEntities) {
+      throw new Error(`${browser} never held ${expectedAuthoritativeEntities} authoritative entities: ${result.maxAuthoritativeEntities}`);
+    }
   }
   if (requireBackgroundCatchup) {
     if (result.reliableSnapshots < 2 || result.reliableCatchups < 1) throw new Error(`${browser} did not receive a post-baseline reliable catch-up`);
