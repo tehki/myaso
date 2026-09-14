@@ -72,7 +72,8 @@ jobs:
           node --check tests/browser-runtime.test.mjs
           node --check tests/m6-browser-authority.test.mjs
           node --check tests/m7-browser-flight.test.mjs
-          node --test tests/browser-runtime.test.mjs tests/m6-browser-authority.test.mjs tests/m7-browser-flight.test.mjs
+          node --check tests/m12-reliable-baseline.test.mjs
+          node --test tests/browser-runtime.test.mjs tests/m6-browser-authority.test.mjs tests/m7-browser-flight.test.mjs tests/m12-reliable-baseline.test.mjs
           node scripts/browser_hotpath_probe.mjs
 
       - name: Validate authoritative Rust server

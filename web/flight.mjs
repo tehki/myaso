@@ -205,7 +205,7 @@ function finish(elapsedMs) {
   const sortedFrames = [...frameDeltas].sort((a, b) => a - b);
   const sortedCorrections = [...corrections].sort((a, b) => a - b);
   const result = {
-    ok: Boolean(local.initialized && snapshots > 0 && acknowledgements > 0),
+    ok: Boolean(local.initialized && snapshots > 0 && acknowledgements > 0 && (client?.reliableSnapshots ?? 0) > 0),
     userAgent: navigator.userAgent,
     webTransportAvailable: typeof WebTransport === "function",
     elapsedMs: round(elapsedMs),
@@ -215,6 +215,7 @@ function finish(elapsedMs) {
     framesOver50Ms: frameDeltas.filter((value) => value > 50).length,
     longTasks,
     snapshots,
+    reliableSnapshots: client?.reliableSnapshots ?? 0,
     acknowledgements,
     sentInputs,
     maxPredictionHistory,
