@@ -1,6 +1,7 @@
 use anyhow::{bail, Context, Result};
 use myaso_server::{
     decode_input_packet, is_sequence_newer16, is_tick_newer32,
+    reliable::{try_enqueue_reliable, ReliableQueueError},
     simulation::World,
     snapshot::{ReplicationFrame, SnapshotSession},
     AdmissionGate, InputIngressWindow, CONSERVATIVE_DATAGRAM_BYTES, PROTOCOL_VERSION,
@@ -319,16 +320,19 @@ async fn handle_connection(
                     && server_tick.wrapping_sub(last_reliable_background_tick)
                         >= RELIABLE_BACKGROUND_COOLDOWN_TICKS
                 {
-                    let catch_up = reliable_snapshots.build_from_frame(
-                        u16::MAX,
-                        player_id,
-                        &frame,
-                        MAX_RELIABLE_SNAPSHOT_BYTES,
-                    );
-                    match reliable_tx.try_send(catch_up.bytes) {
-                        Ok(()) => last_reliable_background_tick = server_tick,
-                        Err(mpsc::error::TrySendError::Full(_)) => {}
-                        Err(mpsc::error::TrySendError::Closed(_)) => {
+                    match try_enqueue_reliable(&reliable_tx, || {
+                        reliable_snapshots
+                            .build_from_frame(
+                                u16::MAX,
+                                player_id,
+                                &frame,
+                                MAX_RELIABLE_SNAPSHOT_BYTES,
+                            )
+                            .bytes
+                    }) {
+                        Ok(true) => last_reliable_background_tick = server_tick,
+                        Ok(false) => {}
+                        Err(ReliableQueueError::Closed) => {
                             bail!("reliable snapshot writer is unavailable")
                         }
                     }

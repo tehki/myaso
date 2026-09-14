@@ -6,6 +6,7 @@ use std::{
     },
 };
 
+pub mod reliable;
 pub mod simulation;
 pub mod snapshot;
 
