@@ -389,9 +389,8 @@ impl SnapshotTotals {
         for (index, tier) in freshness.into_iter().enumerate() {
             self.freshness_max_due_age_ticks[index] =
                 self.freshness_max_due_age_ticks[index].max(tier.max_due_age_ticks);
-            self.freshness_max_omitted_age_ticks[index] = self.freshness_max_omitted_age_ticks
-                [index]
-                .max(tier.max_omitted_age_ticks);
+            self.freshness_max_omitted_age_ticks[index] =
+                self.freshness_max_omitted_age_ticks[index].max(tier.max_omitted_age_ticks);
             self.freshness_over_budget_due[index] += tier.over_budget_due as u64;
         }
     }

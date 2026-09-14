@@ -112,7 +112,10 @@ fn dense_remote_urgency_cannot_crowd_out_local_combat_freshness() {
         let decoded = decode_snapshot(&build.bytes).expect("decode constrained combat snapshot");
         let ids: BTreeSet<_> = decoded.records.iter().map(|record| record.net_id).collect();
         let missing: Vec<_> = (1_u32..=31).filter(|id| !ids.contains(id)).collect();
-        assert!(missing.is_empty(), "local combat records were crowded out: {missing:?}");
+        assert!(
+            missing.is_empty(),
+            "local combat records were crowded out: {missing:?}"
+        );
         assert_eq!(build.freshness.combat.omitted, 0);
         assert_eq!(build.freshness.combat.over_budget_due, 0);
         assert!(

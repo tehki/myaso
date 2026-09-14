@@ -404,7 +404,6 @@ impl SnapshotSession {
         self.acknowledged_sequence = Some(candidate.sequence);
         true
     }
-
 }
 
 #[derive(Debug, Clone, Copy)]
