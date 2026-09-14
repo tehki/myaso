@@ -21,6 +21,8 @@ pub const INTEREST_FAR_RADIUS: f32 = 2600.0;
 pub const INTEREST_NEAR_INTERVAL_TICKS: u32 = 3;
 pub const INTEREST_MID_INTERVAL_TICKS: u32 = 6;
 pub const INTEREST_FAR_INTERVAL_TICKS: u32 = 30;
+pub const COMBAT_FRESHNESS_BUDGET_TICKS: u32 = 6;
+pub const NEAR_FRESHNESS_BUDGET_TICKS: u32 = 12;
 pub const REPLICATION_STARVATION_TICKS: u32 = 120;
 pub const REPLICATION_CELL_SIZE: f32 = 512.0;
 pub const DEFAULT_SNAPSHOT_HISTORY: usize = 64;
@@ -121,8 +123,11 @@ pub enum SnapshotDecodeError {
 pub struct TierFreshness {
     pub due: usize,
     pub sent: usize,
+    pub omitted: usize,
+    pub deadline_misses: usize,
     pub max_due_age_ticks: u32,
     pub max_sent_age_ticks: u32,
+    pub max_omitted_age_ticks: u32,
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
@@ -231,10 +236,20 @@ impl ReplicationFrame {
 }
 
 #[derive(Debug, Clone)]
+struct SnapshotHistoryEntry {
+    sequence: u16,
+    baseline_sequence: u16,
+    full: bool,
+    records: Vec<SnapshotRecord>,
+}
+
+#[derive(Debug, Clone)]
 pub struct SnapshotSession {
     next_sequence: u16,
     history_limit: usize,
-    history: VecDeque<(u16, BTreeMap<u32, WireEntity>)>,
+    history: VecDeque<SnapshotHistoryEntry>,
+    acknowledged_sequence: Option<u16>,
+    acknowledged_state: BTreeMap<u32, WireEntity>,
     last_sent_tick: BTreeMap<u32, u32>,
 }
 
@@ -251,6 +266,8 @@ impl SnapshotSession {
             next_sequence: 0,
             history_limit,
             history: VecDeque::with_capacity(history_limit),
+            acknowledged_sequence: None,
+            acknowledged_state: BTreeMap::new(),
             last_sent_tick: BTreeMap::new(),
         }
     }
@@ -275,26 +292,24 @@ impl SnapshotSession {
         max_bytes: usize,
     ) -> SnapshotBuild {
         let server_tick = frame.server_tick();
-        let acknowledged = if ack_snapshot_sequence == u16::MAX {
-            None
-        } else {
-            self.history
-                .iter()
-                .find(|(sequence, _)| *sequence == ack_snapshot_sequence)
-                .map(|(_, state)| state.clone())
-        };
-        let full = acknowledged.is_none();
+        let has_baseline = self.advance_acknowledged_state(ack_snapshot_sequence);
+        let full = !has_baseline;
         let baseline_sequence = if full {
             u16::MAX
         } else {
             ack_snapshot_sequence
         };
-        let baseline = acknowledged.unwrap_or_default();
+        let empty_baseline = BTreeMap::new();
+        let baseline = if full {
+            &empty_baseline
+        } else {
+            &self.acknowledged_state
+        };
         let plan = plan_records(
             viewer_net_id,
             server_tick,
             frame,
-            &baseline,
+            baseline,
             &self.last_sent_tick,
             max_bytes,
         );
@@ -309,8 +324,6 @@ impl SnapshotSession {
             max_bytes,
         );
 
-        let mut resulting_state = if full { BTreeMap::new() } else { baseline };
-        apply_records(&mut resulting_state, &plan.records);
         for record in &plan.records {
             if record.mask & SNAPSHOT_FIELD_REMOVED != 0 {
                 self.last_sent_tick.remove(&record.net_id);
@@ -318,7 +331,13 @@ impl SnapshotSession {
                 self.last_sent_tick.insert(record.net_id, server_tick);
             }
         }
-        self.history.push_back((sequence, resulting_state));
+        let record_count = plan.records.len();
+        self.history.push_back(SnapshotHistoryEntry {
+            sequence,
+            baseline_sequence,
+            full,
+            records: plan.records,
+        });
         while self.history.len() > self.history_limit {
             self.history.pop_front();
         }
@@ -328,7 +347,7 @@ impl SnapshotSession {
             sequence,
             baseline_sequence,
             full,
-            record_count: plan.records.len(),
+            record_count,
             omitted_due_to_budget: plan.omitted_due_to_budget,
             interest_candidates_checked: plan.interest_candidates_checked,
             visible_entity_count: plan.visible_entity_count,
@@ -337,9 +356,53 @@ impl SnapshotSession {
     }
 
     pub fn has_sequence(&self, sequence: u16) -> bool {
-        self.history
+        self.acknowledged_sequence == Some(sequence)
+            || self
+                .history
+                .iter()
+                .any(|candidate| candidate.sequence == sequence)
+    }
+
+    pub fn history_depth(&self) -> usize {
+        self.history.len()
+    }
+
+    pub fn acknowledged_entity_count(&self) -> usize {
+        self.acknowledged_state.len()
+    }
+
+    fn advance_acknowledged_state(&mut self, sequence: u16) -> bool {
+        if sequence == u16::MAX {
+            return false;
+        }
+        if self.acknowledged_sequence == Some(sequence) {
+            return true;
+        }
+        let Some(index) = self
+            .history
             .iter()
-            .any(|(candidate, _)| *candidate == sequence)
+            .position(|candidate| candidate.sequence == sequence)
+        else {
+            return false;
+        };
+        let candidate = &self.history[index];
+        if !candidate.full && self.acknowledged_sequence != Some(candidate.baseline_sequence) {
+            return false;
+        }
+
+        let mut newer = self.history.split_off(index + 1);
+        let candidate = self
+            .history
+            .pop_back()
+            .expect("located history entry must remain present");
+        self.history.clear();
+        self.history.append(&mut newer);
+        if candidate.full {
+            self.acknowledged_state.clear();
+        }
+        apply_records(&mut self.acknowledged_state, &candidate.records);
+        self.acknowledged_sequence = Some(candidate.sequence);
+        true
     }
 }
 
@@ -372,6 +435,16 @@ impl SnapshotFreshness {
         stats.sent += 1;
         stats.max_sent_age_ticks = stats.max_sent_age_ticks.max(age_ticks);
     }
+
+    fn observe_omitted(&mut self, tier: FreshnessTier, age_ticks: u32) {
+        let missed_deadline = age_ticks > freshness_budget_ticks(tier);
+        let stats = self.tier_mut(tier);
+        stats.omitted += 1;
+        stats.max_omitted_age_ticks = stats.max_omitted_age_ticks.max(age_ticks);
+        if missed_deadline {
+            stats.deadline_misses += 1;
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -379,6 +452,7 @@ struct PlannedRecord {
     record: SnapshotRecord,
     tier: Option<FreshnessTier>,
     age_ticks: u32,
+    priority_age_ticks: u32,
 }
 
 #[derive(Debug)]
@@ -403,7 +477,7 @@ fn plan_records(
     let query = frame.query_interest(viewer_net_id);
     let interest_candidates_checked = query.as_ref().map_or(0, |query| query.candidates_checked);
     let visible_entity_count = query.as_ref().map_or(0, |query| query.states.len());
-    let mut buckets: [Vec<PlannedRecord>; 8] = std::array::from_fn(|_| Vec::new());
+    let mut buckets: [Vec<PlannedRecord>; 9] = std::array::from_fn(|_| Vec::new());
     let mut visible = BTreeSet::new();
     let mut due_count = 0_usize;
     let mut freshness = SnapshotFreshness::default();
@@ -440,24 +514,30 @@ fn plan_records(
             freshness.observe_due(tier, freshness_age);
             let bucket = if is_owner {
                 0
-            } else if urgent_state || distance_sq <= INTEREST_COMBAT_RADIUS * INTEREST_COMBAT_RADIUS
-            {
+            } else if matches!(tier, FreshnessTier::Combat) {
+                1
+            } else if matches!(tier, FreshnessTier::Near) {
                 2
-            } else if distance_sq <= INTEREST_NEAR_RADIUS * INTEREST_NEAR_RADIUS {
+            } else if urgent_state {
                 3
             } else if unseen_in_baseline {
-                4
-            } else if sent_age >= REPLICATION_STARVATION_TICKS {
                 5
-            } else if distance_sq <= INTEREST_MID_RADIUS * INTEREST_MID_RADIUS {
+            } else if sent_age >= REPLICATION_STARVATION_TICKS {
                 6
-            } else {
+            } else if matches!(tier, FreshnessTier::Mid) {
                 7
+            } else {
+                8
             };
             buckets[bucket].push(PlannedRecord {
                 record,
                 tier: Some(tier),
                 age_ticks: freshness_age,
+                priority_age_ticks: if unseen_in_baseline {
+                    u32::MAX
+                } else {
+                    freshness_age
+                },
             });
         }
     }
@@ -465,25 +545,42 @@ fn plan_records(
     for net_id in baseline.keys().copied() {
         if !visible.contains(&net_id) {
             due_count += 1;
-            buckets[1].push(PlannedRecord {
+            buckets[4].push(PlannedRecord {
                 record: SnapshotRecord::removed(net_id),
                 tier: None,
                 age_ticks: 0,
+                priority_age_ticks: 0,
             });
         }
     }
 
     let mut bytes_used = SNAPSHOT_HEADER_BYTES;
     let mut records = Vec::new();
-    for (bucket_index, bucket) in buckets.into_iter().enumerate() {
+    for (bucket_index, mut bucket) in buckets.into_iter().enumerate() {
         if bucket.is_empty() {
             continue;
         }
-        let start = rotating_bucket_offset(viewer_net_id, server_tick, bucket_index, bucket.len());
+        let deadline_ordered = matches!(bucket_index, 1 | 2);
+        if deadline_ordered {
+            bucket.sort_unstable_by(|left, right| {
+                right
+                    .priority_age_ticks
+                    .cmp(&left.priority_age_ticks)
+                    .then_with(|| left.record.net_id.cmp(&right.record.net_id))
+            });
+        }
+        let start = if deadline_ordered {
+            0
+        } else {
+            rotating_bucket_offset(viewer_net_id, server_tick, bucket_index, bucket.len())
+        };
         for offset in 0..bucket.len() {
             let planned = bucket[(start + offset) % bucket.len()];
             let record_bytes = snapshot_record_bytes(&planned.record);
             if bytes_used + record_bytes > max_bytes {
+                if let Some(tier) = planned.tier {
+                    freshness.observe_omitted(tier, planned.age_ticks);
+                }
                 continue;
             }
             bytes_used += record_bytes;
@@ -512,6 +609,15 @@ fn freshness_tier(distance_sq: f32, is_owner: bool) -> FreshnessTier {
         FreshnessTier::Mid
     } else {
         FreshnessTier::Far
+    }
+}
+
+fn freshness_budget_ticks(tier: FreshnessTier) -> u32 {
+    match tier {
+        FreshnessTier::Combat => COMBAT_FRESHNESS_BUDGET_TICKS,
+        FreshnessTier::Near => NEAR_FRESHNESS_BUDGET_TICKS,
+        FreshnessTier::Mid => INTEREST_MID_INTERVAL_TICKS * 5,
+        FreshnessTier::Far => INTEREST_FAR_INTERVAL_TICKS * 2,
     }
 }
 
