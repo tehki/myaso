@@ -272,7 +272,8 @@ fn run_scenario(scenario: Scenario) -> Result<CapacityReport> {
         frame_build_ms_p95: percentile(&frame_build_samples, 0.95),
         avg_interest_candidates_checked: totals.average_interest_candidates_checked(),
         avg_visible_entities: totals.average_visible_entities(),
-        candidate_scan_ratio: totals.average_interest_candidates_checked() / scenario.players as f64,
+        candidate_scan_ratio: totals.average_interest_candidates_checked()
+            / scenario.players as f64,
         freshness_max_due_age_ticks: totals.freshness_max_due_age_ticks,
         rss_growth_bytes,
         rss_growth_bytes_per_session,

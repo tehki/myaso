@@ -1,8 +1,6 @@
 ﻿use myaso_server::{
     simulation::{InputIntent, World},
-    snapshot::{
-        ReplicationFrame, SnapshotSession, INTEREST_FAR_RADIUS, WORLD_COORDINATE_SCALE,
-    },
+    snapshot::{ReplicationFrame, SnapshotSession, INTEREST_FAR_RADIUS, WORLD_COORDINATE_SCALE},
     CONSERVATIVE_DATAGRAM_BYTES,
 };
 use std::collections::BTreeSet;
@@ -52,12 +50,7 @@ fn shared_replication_frame_preserves_snapshot_wire_semantics() {
         world.fighters(),
         CONSERVATIVE_DATAGRAM_BYTES,
     );
-    let shared_first = shared.build_from_frame(
-        u16::MAX,
-        1,
-        &frame,
-        CONSERVATIVE_DATAGRAM_BYTES,
-    );
+    let shared_first = shared.build_from_frame(u16::MAX, 1, &frame, CONSERVATIVE_DATAGRAM_BYTES);
     assert_eq!(legacy_first.bytes, shared_first.bytes);
 
     assert!(world.set_input(
@@ -96,12 +89,7 @@ fn planner_reports_distance_tier_freshness() {
     assert!(world.add_player_at(4, 3000.0, 1000.0, 0.0));
     let mut session = SnapshotSession::default();
     let first_frame = ReplicationFrame::from_fighters(world.tick, world.fighters());
-    let first = session.build_from_frame(
-        u16::MAX,
-        1,
-        &first_frame,
-        CONSERVATIVE_DATAGRAM_BYTES,
-    );
+    let first = session.build_from_frame(u16::MAX, 1, &first_frame, CONSERVATIVE_DATAGRAM_BYTES);
 
     for net_id in 2..=4 {
         assert!(world.set_input(
@@ -116,12 +104,7 @@ fn planner_reports_distance_tier_freshness() {
         world.step();
     }
     let frame = ReplicationFrame::from_fighters(world.tick, world.fighters());
-    let near = session.build_from_frame(
-        first.sequence,
-        1,
-        &frame,
-        CONSERVATIVE_DATAGRAM_BYTES,
-    );
+    let near = session.build_from_frame(first.sequence, 1, &frame, CONSERVATIVE_DATAGRAM_BYTES);
     assert!(near.freshness.near.due >= 1);
     assert_eq!(near.freshness.near.due, near.freshness.near.sent);
     assert!(near.freshness.near.max_due_age_ticks >= 3);
@@ -132,12 +115,7 @@ fn planner_reports_distance_tier_freshness() {
         world.step();
     }
     let frame = ReplicationFrame::from_fighters(world.tick, world.fighters());
-    let mid = session.build_from_frame(
-        near.sequence,
-        1,
-        &frame,
-        CONSERVATIVE_DATAGRAM_BYTES,
-    );
+    let mid = session.build_from_frame(near.sequence, 1, &frame, CONSERVATIVE_DATAGRAM_BYTES);
     assert!(mid.freshness.mid.due >= 1);
     assert_eq!(mid.freshness.mid.due, mid.freshness.mid.sent);
     assert!(mid.freshness.mid.max_due_age_ticks >= 6);

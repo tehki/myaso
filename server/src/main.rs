@@ -1,9 +1,10 @@
 use anyhow::{bail, Context, Result};
 use myaso_server::{
-    decode_input_packet, is_sequence_newer16, is_tick_newer32, simulation::World,
-    snapshot::{ReplicationFrame, SnapshotSession}, AdmissionGate, InputIngressWindow,
-    CONSERVATIVE_DATAGRAM_BYTES,
-    PROTOCOL_VERSION, TARGET_PLAYERS_PER_MAP,
+    decode_input_packet, is_sequence_newer16, is_tick_newer32,
+    simulation::World,
+    snapshot::{ReplicationFrame, SnapshotSession},
+    AdmissionGate, InputIngressWindow, CONSERVATIVE_DATAGRAM_BYTES, PROTOCOL_VERSION,
+    TARGET_PLAYERS_PER_MAP,
 };
 use std::{
     collections::VecDeque,
@@ -34,8 +35,14 @@ struct GameState {
 impl GameState {
     fn new() -> Self {
         let world = World::default();
-        let replication_frame = Arc::new(ReplicationFrame::from_fighters(world.tick, world.fighters()));
-        Self { world, replication_frame }
+        let replication_frame = Arc::new(ReplicationFrame::from_fighters(
+            world.tick,
+            world.fighters(),
+        ));
+        Self {
+            world,
+            replication_frame,
+        }
     }
 
     fn refresh_replication_frame(&mut self) {

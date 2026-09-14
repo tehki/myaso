@@ -167,9 +167,16 @@ impl ReplicationFrame {
         for fighter in fighters {
             let state = WireEntity::from_fighter(fighter);
             states.insert(state.net_id, state);
-            cells.entry(replication_cell(state)).or_default().push(state);
+            cells
+                .entry(replication_cell(state))
+                .or_default()
+                .push(state);
         }
-        Self { server_tick, states, cells }
+        Self {
+            server_tick,
+            states,
+            cells,
+        }
     }
 
     pub fn server_tick(&self) -> u32 {
@@ -215,7 +222,11 @@ impl ReplicationFrame {
             }
         }
 
-        Some(InterestQuery { states, candidates_checked, cells_visited })
+        Some(InterestQuery {
+            states,
+            candidates_checked,
+            cells_visited,
+        })
     }
 }
 
@@ -273,7 +284,11 @@ impl SnapshotSession {
                 .map(|(_, state)| state.clone())
         };
         let full = acknowledged.is_none();
-        let baseline_sequence = if full { u16::MAX } else { ack_snapshot_sequence };
+        let baseline_sequence = if full {
+            u16::MAX
+        } else {
+            ack_snapshot_sequence
+        };
         let baseline = acknowledged.unwrap_or_default();
         let plan = plan_records(
             viewer_net_id,
