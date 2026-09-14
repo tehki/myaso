@@ -1,5 +1,5 @@
 use crate::simulation::Fighter;
-use std::collections::{BTreeMap, VecDeque};
+use std::collections::{BTreeMap, BTreeSet, VecDeque};
 
 pub const SNAPSHOT_PACKET_TYPE: u8 = 2;
 pub const SNAPSHOT_HEADER_BYTES: usize = 14;
@@ -22,6 +22,7 @@ pub const INTEREST_NEAR_INTERVAL_TICKS: u32 = 3;
 pub const INTEREST_MID_INTERVAL_TICKS: u32 = 6;
 pub const INTEREST_FAR_INTERVAL_TICKS: u32 = 30;
 pub const REPLICATION_STARVATION_TICKS: u32 = 120;
+pub const REPLICATION_CELL_SIZE: f32 = 512.0;
 pub const DEFAULT_SNAPSHOT_HISTORY: usize = 64;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -116,6 +117,22 @@ pub enum SnapshotDecodeError {
     TrailingBytes,
 }
 
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct TierFreshness {
+    pub due: usize,
+    pub sent: usize,
+    pub max_due_age_ticks: u32,
+    pub max_sent_age_ticks: u32,
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct SnapshotFreshness {
+    pub combat: TierFreshness,
+    pub near: TierFreshness,
+    pub mid: TierFreshness,
+    pub far: TierFreshness,
+}
+
 #[derive(Debug, Clone)]
 pub struct SnapshotBuild {
     pub bytes: Vec<u8>,
@@ -124,6 +141,93 @@ pub struct SnapshotBuild {
     pub full: bool,
     pub record_count: usize,
     pub omitted_due_to_budget: usize,
+    pub interest_candidates_checked: usize,
+    pub visible_entity_count: usize,
+    pub freshness: SnapshotFreshness,
+}
+
+#[derive(Debug, Clone)]
+pub struct InterestQuery {
+    pub states: Vec<WireEntity>,
+    pub candidates_checked: usize,
+    pub cells_visited: usize,
+}
+
+#[derive(Debug, Clone)]
+pub struct ReplicationFrame {
+    server_tick: u32,
+    states: BTreeMap<u32, WireEntity>,
+    cells: BTreeMap<(i32, i32), Vec<WireEntity>>,
+}
+
+impl ReplicationFrame {
+    pub fn from_fighters(server_tick: u32, fighters: &[Fighter]) -> Self {
+        let mut states = BTreeMap::new();
+        let mut cells: BTreeMap<(i32, i32), Vec<WireEntity>> = BTreeMap::new();
+        for fighter in fighters {
+            let state = WireEntity::from_fighter(fighter);
+            states.insert(state.net_id, state);
+            cells
+                .entry(replication_cell(state))
+                .or_default()
+                .push(state);
+        }
+        Self {
+            server_tick,
+            states,
+            cells,
+        }
+    }
+
+    pub fn server_tick(&self) -> u32 {
+        self.server_tick
+    }
+
+    pub fn len(&self) -> usize {
+        self.states.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.states.is_empty()
+    }
+
+    pub fn get(&self, net_id: u32) -> Option<WireEntity> {
+        self.states.get(&net_id).copied()
+    }
+
+    pub fn query_interest(&self, viewer_net_id: u32) -> Option<InterestQuery> {
+        let viewer = self.get(viewer_net_id)?;
+        let center = replication_cell(viewer);
+        let cell_wire = replication_cell_wire();
+        let far_wire = INTEREST_FAR_RADIUS * WORLD_COORDINATE_SCALE;
+        let span = (far_wire / cell_wire as f32).ceil() as i32;
+        let mut states = Vec::new();
+        let mut candidates_checked = 0_usize;
+        let mut cells_visited = 0_usize;
+
+        for cell_y in center.1 - span..=center.1 + span {
+            for cell_x in center.0 - span..=center.0 + span {
+                cells_visited += 1;
+                let Some(cell) = self.cells.get(&(cell_x, cell_y)) else {
+                    continue;
+                };
+                for state in cell.iter().copied() {
+                    candidates_checked += 1;
+                    if interest_distance_sq(viewer, state)
+                        <= INTEREST_FAR_RADIUS * INTEREST_FAR_RADIUS
+                    {
+                        states.push(state);
+                    }
+                }
+            }
+        }
+
+        Some(InterestQuery {
+            states,
+            candidates_checked,
+            cells_visited,
+        })
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -159,6 +263,18 @@ impl SnapshotSession {
         fighters: &[Fighter],
         max_bytes: usize,
     ) -> SnapshotBuild {
+        let frame = ReplicationFrame::from_fighters(server_tick, fighters);
+        self.build_from_frame(ack_snapshot_sequence, viewer_net_id, &frame, max_bytes)
+    }
+
+    pub fn build_from_frame(
+        &mut self,
+        ack_snapshot_sequence: u16,
+        viewer_net_id: u32,
+        frame: &ReplicationFrame,
+        max_bytes: usize,
+    ) -> SnapshotBuild {
+        let server_tick = frame.server_tick();
         let acknowledged = if ack_snapshot_sequence == u16::MAX {
             None
         } else {
@@ -174,11 +290,10 @@ impl SnapshotSession {
             ack_snapshot_sequence
         };
         let baseline = acknowledged.unwrap_or_default();
-        let current: Vec<_> = fighters.iter().map(WireEntity::from_fighter).collect();
         let plan = plan_records(
             viewer_net_id,
             server_tick,
-            &current,
+            frame,
             &baseline,
             &self.last_sent_tick,
             max_bytes,
@@ -215,6 +330,9 @@ impl SnapshotSession {
             full,
             record_count: plan.records.len(),
             omitted_due_to_budget: plan.omitted_due_to_budget,
+            interest_candidates_checked: plan.interest_candidates_checked,
+            visible_entity_count: plan.visible_entity_count,
+            freshness: plan.freshness,
         }
     }
 
@@ -225,39 +343,76 @@ impl SnapshotSession {
     }
 }
 
+#[derive(Debug, Clone, Copy)]
+enum FreshnessTier {
+    Combat,
+    Near,
+    Mid,
+    Far,
+}
+
+impl SnapshotFreshness {
+    fn tier_mut(&mut self, tier: FreshnessTier) -> &mut TierFreshness {
+        match tier {
+            FreshnessTier::Combat => &mut self.combat,
+            FreshnessTier::Near => &mut self.near,
+            FreshnessTier::Mid => &mut self.mid,
+            FreshnessTier::Far => &mut self.far,
+        }
+    }
+
+    fn observe_due(&mut self, tier: FreshnessTier, age_ticks: u32) {
+        let stats = self.tier_mut(tier);
+        stats.due += 1;
+        stats.max_due_age_ticks = stats.max_due_age_ticks.max(age_ticks);
+    }
+
+    fn observe_sent(&mut self, tier: FreshnessTier, age_ticks: u32) {
+        let stats = self.tier_mut(tier);
+        stats.sent += 1;
+        stats.max_sent_age_ticks = stats.max_sent_age_ticks.max(age_ticks);
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+struct PlannedRecord {
+    record: SnapshotRecord,
+    tier: Option<FreshnessTier>,
+    age_ticks: u32,
+}
+
 #[derive(Debug)]
 struct SnapshotPlan {
     records: Vec<SnapshotRecord>,
     omitted_due_to_budget: usize,
+    interest_candidates_checked: usize,
+    visible_entity_count: usize,
+    freshness: SnapshotFreshness,
 }
 
 fn plan_records(
     viewer_net_id: u32,
     server_tick: u32,
-    current: &[WireEntity],
+    frame: &ReplicationFrame,
     baseline: &BTreeMap<u32, WireEntity>,
     last_sent_tick: &BTreeMap<u32, u32>,
     max_bytes: usize,
 ) -> SnapshotPlan {
     assert!(max_bytes >= SNAPSHOT_HEADER_BYTES);
-    let current_map: BTreeMap<_, _> = current
-        .iter()
-        .map(|entity| (entity.net_id, *entity))
-        .collect();
-    let viewer = current_map.get(&viewer_net_id).copied();
-    let mut buckets: [Vec<SnapshotRecord>; 8] = std::array::from_fn(|_| Vec::new());
-    let mut visible = BTreeMap::new();
+    let viewer = frame.get(viewer_net_id);
+    let query = frame.query_interest(viewer_net_id);
+    let interest_candidates_checked = query.as_ref().map_or(0, |query| query.candidates_checked);
+    let visible_entity_count = query.as_ref().map_or(0, |query| query.states.len());
+    let mut buckets: [Vec<PlannedRecord>; 8] = std::array::from_fn(|_| Vec::new());
+    let mut visible = BTreeSet::new();
     let mut due_count = 0_usize;
+    let mut freshness = SnapshotFreshness::default();
 
-    if let Some(viewer_state) = viewer {
-        for state in current_map.values().copied() {
+    if let (Some(viewer_state), Some(query)) = (viewer, query) {
+        for state in query.states {
             let is_owner = state.net_id == viewer_net_id;
             let distance_sq = interest_distance_sq(viewer_state, state);
-            if !is_owner && distance_sq > INTEREST_FAR_RADIUS * INTEREST_FAR_RADIUS {
-                continue;
-            }
-
-            visible.insert(state.net_id, state);
+            visible.insert(state.net_id);
             let before = baseline.get(&state.net_id).copied();
             let Some(record) = build_delta(state, before) else {
                 continue;
@@ -268,6 +423,10 @@ fn plan_records(
                 .get(&state.net_id)
                 .map(|last| server_tick.wrapping_sub(*last))
                 .unwrap_or(u32::MAX);
+            let freshness_age = last_sent_tick
+                .get(&state.net_id)
+                .map(|last| server_tick.wrapping_sub(*last))
+                .unwrap_or(0);
             let urgent_state = state.action != 0
                 || (before.is_some()
                     && record.mask & (SNAPSHOT_FIELD_VITALS | SNAPSHOT_FIELD_ACTION) != 0);
@@ -277,6 +436,8 @@ fn plan_records(
             }
 
             due_count += 1;
+            let tier = freshness_tier(distance_sq, is_owner);
+            freshness.observe_due(tier, freshness_age);
             let bucket = if is_owner {
                 0
             } else if urgent_state || distance_sq <= INTEREST_COMBAT_RADIUS * INTEREST_COMBAT_RADIUS
@@ -293,14 +454,22 @@ fn plan_records(
             } else {
                 7
             };
-            buckets[bucket].push(record);
+            buckets[bucket].push(PlannedRecord {
+                record,
+                tier: Some(tier),
+                age_ticks: freshness_age,
+            });
         }
     }
 
     for net_id in baseline.keys().copied() {
-        if !visible.contains_key(&net_id) {
+        if !visible.contains(&net_id) {
             due_count += 1;
-            buckets[1].push(SnapshotRecord::removed(net_id));
+            buckets[1].push(PlannedRecord {
+                record: SnapshotRecord::removed(net_id),
+                tier: None,
+                age_ticks: 0,
+            });
         }
     }
 
@@ -312,19 +481,37 @@ fn plan_records(
         }
         let start = rotating_bucket_offset(viewer_net_id, server_tick, bucket_index, bucket.len());
         for offset in 0..bucket.len() {
-            let record = bucket[(start + offset) % bucket.len()];
-            let record_bytes = snapshot_record_bytes(&record);
+            let planned = bucket[(start + offset) % bucket.len()];
+            let record_bytes = snapshot_record_bytes(&planned.record);
             if bytes_used + record_bytes > max_bytes {
                 continue;
             }
             bytes_used += record_bytes;
-            records.push(record);
+            records.push(planned.record);
+            if let Some(tier) = planned.tier {
+                freshness.observe_sent(tier, planned.age_ticks);
+            }
         }
     }
 
     SnapshotPlan {
         omitted_due_to_budget: due_count.saturating_sub(records.len()),
         records,
+        interest_candidates_checked,
+        visible_entity_count,
+        freshness,
+    }
+}
+
+fn freshness_tier(distance_sq: f32, is_owner: bool) -> FreshnessTier {
+    if is_owner || distance_sq <= INTEREST_COMBAT_RADIUS * INTEREST_COMBAT_RADIUS {
+        FreshnessTier::Combat
+    } else if distance_sq <= INTEREST_NEAR_RADIUS * INTEREST_NEAR_RADIUS {
+        FreshnessTier::Near
+    } else if distance_sq <= INTEREST_MID_RADIUS * INTEREST_MID_RADIUS {
+        FreshnessTier::Mid
+    } else {
+        FreshnessTier::Far
     }
 }
 
@@ -554,6 +741,15 @@ pub fn snapshot_record_bytes(record: &SnapshotRecord) -> usize {
         bytes += 2;
     }
     bytes
+}
+
+fn replication_cell_wire() -> i32 {
+    (REPLICATION_CELL_SIZE * WORLD_COORDINATE_SCALE) as i32
+}
+
+fn replication_cell(state: WireEntity) -> (i32, i32) {
+    let cell_wire = replication_cell_wire();
+    (state.x as i32 / cell_wire, state.y as i32 / cell_wire)
 }
 
 fn interest_distance_sq(viewer: WireEntity, candidate: WireEntity) -> f32 {
