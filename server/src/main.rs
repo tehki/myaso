@@ -2,7 +2,7 @@ use anyhow::{bail, Context, Result};
 use myaso_server::{
     decode_input_packet, is_sequence_newer16, is_tick_newer32,
     reliable::{try_enqueue_reliable, ReliableQueueError},
-    simulation::World,
+    simulation::{InputIntent, World},
     snapshot::{ReplicationFrame, SnapshotSession},
     AdmissionGate, InputIngressWindow, CONSERVATIVE_DATAGRAM_BYTES, PROTOCOL_VERSION,
     TARGET_PLAYERS_PER_MAP,
@@ -29,15 +29,34 @@ const INPUT_ACK_BYTES: usize = 16;
 const MAX_PENDING_INPUT_ACKS: usize = 256;
 const MAX_RELIABLE_SNAPSHOT_BYTES: usize = u16::MAX as usize;
 const RELIABLE_BACKGROUND_COOLDOWN_TICKS: u32 = 60;
+const MAX_FLIGHT_BACKGROUND_PLAYERS: usize = 256;
+const FLIGHT_BACKGROUND_NET_ID_BASE: u32 = 10_000;
+
+#[derive(Debug, Clone, Copy)]
+struct LoopbackFlightConfig {
+    background_players: usize,
+    reliable_write_delay: Duration,
+}
 
 struct GameState {
     world: World,
     replication_frame: Arc<ReplicationFrame>,
+    flight_background_ids: Vec<u32>,
 }
 
 impl GameState {
-    fn new() -> Self {
-        let world = World::default();
+    fn new(background_players: usize) -> Self {
+        let mut world = World::default();
+        let mut flight_background_ids = Vec::with_capacity(background_players);
+        for index in 0..background_players {
+            let net_id = FLIGHT_BACKGROUND_NET_ID_BASE + index as u32;
+            let column = (index % 16) as f32;
+            let row = (index / 16) as f32;
+            let x = 720.0 + column * 44.0;
+            let y = 80.0 + row * 44.0;
+            assert!(world.add_player_at(net_id, x, y, 0.0));
+            flight_background_ids.push(net_id);
+        }
         let replication_frame = Arc::new(ReplicationFrame::from_fighters(
             world.tick,
             world.fighters(),
@@ -45,6 +64,17 @@ impl GameState {
         Self {
             world,
             replication_frame,
+            flight_background_ids,
+        }
+    }
+
+    fn apply_flight_background_motion(&mut self) {
+        let base_facing = self.world.tick as f32 * 0.075;
+        for (index, net_id) in self.flight_background_ids.iter().copied().enumerate() {
+            self.world.set_input(net_id, InputIntent {
+                facing_radians: base_facing + index as f32 * 0.003,
+                ..InputIntent::default()
+            });
         }
     }
 
@@ -59,13 +89,15 @@ impl GameState {
 struct SharedGame {
     state: Mutex<GameState>,
     next_player_id: AtomicU32,
+    reliable_write_delay: Duration,
 }
 
 impl SharedGame {
-    fn new() -> Arc<Self> {
+    fn new(flight: LoopbackFlightConfig) -> Arc<Self> {
         Arc::new(Self {
-            state: Mutex::new(GameState::new()),
+            state: Mutex::new(GameState::new(flight.background_players)),
             next_player_id: AtomicU32::new(1),
+            reliable_write_delay: flight.reliable_write_delay,
         })
     }
 
@@ -86,6 +118,7 @@ async fn main() -> Result<()> {
         .parse()
         .context("MYASO_BIND must be a socket address")?;
 
+    let flight = load_loopback_flight_config(bind)?;
     let identity = load_identity(bind).await?;
     let certificate_hash = identity
         .certificate_chain()
@@ -106,8 +139,8 @@ async fn main() -> Result<()> {
         println!("development certificate SHA-256: {hash}");
     }
 
-    let gate = AdmissionGate::new(TARGET_PLAYERS_PER_MAP);
-    let game = SharedGame::new();
+    let gate = AdmissionGate::new(TARGET_PLAYERS_PER_MAP - flight.background_players);
+    let game = SharedGame::new(flight);
     tokio::spawn(run_authoritative_clock(Arc::clone(&game)));
 
     loop {
@@ -172,6 +205,37 @@ async fn main() -> Result<()> {
     }
 }
 
+fn load_loopback_flight_config(bind: SocketAddr) -> Result<LoopbackFlightConfig> {
+    let background_players = env::var("MYASO_FLIGHT_BACKGROUND_PLAYERS")
+        .ok()
+        .map(|value| {
+            value
+                .parse::<usize>()
+                .context("MYASO_FLIGHT_BACKGROUND_PLAYERS must be an integer")
+        })
+        .transpose()?
+        .unwrap_or(0);
+    let reliable_delay_ms = env::var("MYASO_FLIGHT_RELIABLE_DELAY_MS")
+        .ok()
+        .map(|value| {
+            value
+                .parse::<u64>()
+                .context("MYASO_FLIGHT_RELIABLE_DELAY_MS must be an integer")
+        })
+        .transpose()?
+        .unwrap_or(0);
+    if background_players > MAX_FLIGHT_BACKGROUND_PLAYERS {
+        bail!("MYASO_FLIGHT_BACKGROUND_PLAYERS exceeds bounded flight maximum");
+    }
+    if (background_players > 0 || reliable_delay_ms > 0) && !bind.ip().is_loopback() {
+        bail!("M15 flight fixture is permitted only on loopback binds");
+    }
+    Ok(LoopbackFlightConfig {
+        background_players,
+        reliable_write_delay: Duration::from_millis(reliable_delay_ms),
+    })
+}
+
 async fn load_identity(bind: SocketAddr) -> Result<Identity> {
     match (env::var("MYASO_CERT_PEM"), env::var("MYASO_KEY_PEM")) {
         (Ok(cert), Ok(key)) => Identity::load_pemfiles(cert, key)
@@ -196,6 +260,7 @@ async fn run_authoritative_clock(game: Arc<SharedGame>) {
     loop {
         interval.tick().await;
         let mut state = game.state.lock().await;
+        state.apply_flight_background_motion();
         let _events = state.world.step();
         if state.world.tick % SNAPSHOT_EVERY_SERVER_TICKS == 0 {
             state.refresh_replication_frame();
@@ -240,8 +305,12 @@ async fn handle_connection(
     let mut realtime_ready = false;
     let mut last_reliable_background_tick = initial_frame.server_tick();
     let (reliable_tx, mut reliable_rx) = mpsc::channel::<Vec<u8>>(1);
+    let reliable_write_delay = game.reliable_write_delay;
     let mut reliable_writer = tokio::spawn(async move {
         while let Some(payload) = reliable_rx.recv().await {
+            if !reliable_write_delay.is_zero() {
+                tokio::time::sleep(reliable_write_delay).await;
+            }
             send_reliable_snapshot(&mut reliable_send, &payload).await?;
         }
         Ok::<(), anyhow::Error>(())

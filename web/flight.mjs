@@ -24,6 +24,11 @@ let acknowledgements = 0;
 let sentInputs = 0;
 let maxPredictionHistory = 0;
 let latestAuthoritativeOwn = null;
+let reliableBaselineAt = null;
+let firstBackgroundReliableMs = null;
+let reliableCatchups = 0;
+let reliableAdvancedEntities = 0;
+let maxReliableAdvancedEntities = 0;
 let client = null;
 let clientTick = 1;
 let lastFrameAt = 0;
@@ -55,6 +60,18 @@ try {
       if (!own) return;
       latestAuthoritativeOwn = own;
       if (!local.initialized) restoreAuthoritative(own);
+    },
+    onReliableSnapshot(_result, _state, meta = {}) {
+      const now = performance.now();
+      const advanced = Array.isArray(meta.advancedIds) ? meta.advancedIds.length : 0;
+      if (reliableBaselineAt === null) {
+        reliableBaselineAt = now;
+        return;
+      }
+      reliableCatchups += 1;
+      reliableAdvancedEntities += advanced;
+      maxReliableAdvancedEntities = Math.max(maxReliableAdvancedEntities, advanced);
+      if (firstBackgroundReliableMs === null && advanced > 0) firstBackgroundReliableMs = now - reliableBaselineAt;
     },
     onAck() {
       acknowledgements += 1;
@@ -216,6 +233,10 @@ function finish(elapsedMs) {
     longTasks,
     snapshots,
     reliableSnapshots: client?.reliableSnapshots ?? 0,
+    reliableCatchups,
+    reliableAdvancedEntities,
+    maxReliableAdvancedEntities,
+    firstBackgroundReliableMs: firstBackgroundReliableMs === null ? null : round(firstBackgroundReliableMs),
     acknowledgements,
     sentInputs,
     maxPredictionHistory,

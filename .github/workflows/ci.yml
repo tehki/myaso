@@ -73,7 +73,8 @@ jobs:
           node --check tests/m6-browser-authority.test.mjs
           node --check tests/m7-browser-flight.test.mjs
           node --check tests/m12-reliable-baseline.test.mjs
-          node --test tests/browser-runtime.test.mjs tests/m6-browser-authority.test.mjs tests/m7-browser-flight.test.mjs tests/m12-reliable-baseline.test.mjs
+          node --check tests/m15-reliable-convergence.test.mjs
+          node --test tests/browser-runtime.test.mjs tests/m6-browser-authority.test.mjs tests/m7-browser-flight.test.mjs tests/m12-reliable-baseline.test.mjs tests/m15-reliable-convergence.test.mjs
           node scripts/browser_hotpath_probe.mjs
 
       - name: Validate authoritative Rust server
@@ -95,6 +96,16 @@ jobs:
           chromedriver --version
           geckodriver --version
           node scripts/browser_flight_runner.mjs
+
+      - name: Measure M15 browser background convergence
+        env:
+          MYASO_FLIGHT_DURATION_MS: "4500"
+          MYASO_FLIGHT_STRESS_ENTITIES: "64"
+          MYASO_FLIGHT_BACKGROUND_PLAYERS: "192"
+          MYASO_FLIGHT_RELIABLE_DELAY_MS: "250"
+          MYASO_FLIGHT_REQUIRE_BACKGROUND_CATCHUP: "1"
+          MYASO_FLIGHT_CONVERGENCE_BUDGET_MS: "2500"
+        run: node scripts/browser_flight_runner.mjs
 
       - name: Measure M8 authoritative capacity
         run: |

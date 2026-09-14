@@ -9,6 +9,11 @@ const root = process.cwd();
 const flightDurationMs = Number(process.env.MYASO_FLIGHT_DURATION_MS ?? 4000);
 const stressEntities = Number(process.env.MYASO_FLIGHT_STRESS_ENTITIES ?? 128);
 const staticPort = Number(process.env.MYASO_FLIGHT_HTTP_PORT ?? 4173);
+const backgroundPlayers = Number(process.env.MYASO_FLIGHT_BACKGROUND_PLAYERS ?? 0);
+const reliableDelayMs = Number(process.env.MYASO_FLIGHT_RELIABLE_DELAY_MS ?? 0);
+const requireBackgroundCatchup = process.env.MYASO_FLIGHT_REQUIRE_BACKGROUND_CATCHUP === "1";
+const convergenceBudgetMs = Number(process.env.MYASO_FLIGHT_CONVERGENCE_BUDGET_MS ?? 2500);
+const flightLabel = requireBackgroundCatchup ? "M15_BROWSER_CONVERGENCE" : "M7_BROWSER_FLIGHT";
 const browsers = [
   {
     name: "chrome",
@@ -47,9 +52,9 @@ try {
     const result = await runBrowser(browser, game.url, game.certificateHash);
     assertFlightResult(browser.name, result);
     results.push({ browser: browser.name, ...result });
-    console.log(`M7_BROWSER_FLIGHT ${JSON.stringify(results.at(-1))}`);
+    console.log(`${flightLabel} ${JSON.stringify(results.at(-1))}`);
   }
-  console.log(`M7_BROWSER_FLIGHT_SUMMARY ${JSON.stringify({ ok: true, results })}`);
+  console.log(`${flightLabel}_SUMMARY ${JSON.stringify({ ok: true, results })}`);
 } finally {
   for (const child of children) terminate(child);
   if (staticServer) await new Promise((resolve) => staticServer.close(resolve));
@@ -84,7 +89,12 @@ async function startStaticServer() {
 async function startGameServer() {
   const child = spawn("cargo", ["run", "--locked", "--manifest-path", "server/Cargo.toml", "--bin", "myaso-server", "--quiet"], {
     cwd: root,
-    env: { ...process.env, MYASO_BIND: "127.0.0.1:0" },
+    env: {
+      ...process.env,
+      MYASO_BIND: "127.0.0.1:0",
+      MYASO_FLIGHT_BACKGROUND_PLAYERS: String(backgroundPlayers),
+      MYASO_FLIGHT_RELIABLE_DELAY_MS: String(reliableDelayMs),
+    },
     stdio: ["ignore", "pipe", "pipe"],
   });
   children.add(child);
@@ -204,6 +214,13 @@ function assertFlightResult(browser, result) {
   if (result.maxPredictionHistory > 64) throw new Error(`${browser} prediction history escaped its bound`);
   if (result.correctionPx?.max !== null && (!Number.isFinite(result.correctionPx.max) || result.correctionPx.max >= 512)) {
     throw new Error(`${browser} reconciliation correction escaped sanity bound: ${result.correctionPx.max}`);
+  }
+  if (requireBackgroundCatchup) {
+    if (result.reliableSnapshots < 2 || result.reliableCatchups < 1) throw new Error(`${browser} did not receive a post-baseline reliable catch-up`);
+    if (result.reliableAdvancedEntities < 1 || result.maxReliableAdvancedEntities < 1) throw new Error(`${browser} reliable catch-up did not advance browser-visible entity state`);
+    if (!Number.isFinite(result.firstBackgroundReliableMs) || result.firstBackgroundReliableMs > convergenceBudgetMs) {
+      throw new Error(`${browser} reliable convergence exceeded ${convergenceBudgetMs}ms: ${result.firstBackgroundReliableMs}`);
+    }
   }
 }
 
