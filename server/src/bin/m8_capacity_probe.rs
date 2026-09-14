@@ -45,6 +45,9 @@ struct CapacityReport {
     avg_visible_entities: f64,
     candidate_scan_ratio: f64,
     freshness_max_due_age_ticks: [u32; 4],
+    freshness_max_omitted_age_ticks: [u32; 4],
+    freshness_over_budget_due: [u64; 4],
+    max_history_depth: usize,
     rss_growth_bytes: Option<u64>,
     rss_growth_bytes_per_session: Option<u64>,
     target_60hz_tick_met: bool,
@@ -68,7 +71,7 @@ impl CapacityReport {
                 "\"avg_records_per_snapshot\":{:.2},",
                 "\"omission_ratio\":{:.6},",
                 "\"reconnect\":{{\"samples\":{},\"build_ms_p95\":{:.3},\"avg_snapshot_bytes\":{:.1},\"omission_ratio\":{:.6}}},",
-                "\"planner\":{{\"frame_build_ms_p95\":{:.3},\"avg_interest_candidates_checked\":{:.2},\"avg_visible_entities\":{:.2},\"candidate_scan_ratio\":{:.6},\"freshness_max_due_age_ticks\":{{\"combat\":{},\"near\":{},\"mid\":{},\"far\":{}}}}},",
+                "\"planner\":{{\"frame_build_ms_p95\":{:.3},\"avg_interest_candidates_checked\":{:.2},\"avg_visible_entities\":{:.2},\"candidate_scan_ratio\":{:.6},\"freshness_max_due_age_ticks\":{{\"combat\":{},\"near\":{},\"mid\":{},\"far\":{}}},\"freshness_max_omitted_age_ticks\":{{\"combat\":{},\"near\":{},\"mid\":{},\"far\":{}}},\"freshness_over_budget_due\":{{\"combat\":{},\"near\":{},\"mid\":{},\"far\":{}}},\"max_history_depth\":{}}},",
                 "\"rss_growth_bytes\":{},",
                 "\"rss_growth_bytes_per_session\":{},",
                 "\"target_60hz_tick_met\":{},",
@@ -104,6 +107,15 @@ impl CapacityReport {
             self.freshness_max_due_age_ticks[1],
             self.freshness_max_due_age_ticks[2],
             self.freshness_max_due_age_ticks[3],
+            self.freshness_max_omitted_age_ticks[0],
+            self.freshness_max_omitted_age_ticks[1],
+            self.freshness_max_omitted_age_ticks[2],
+            self.freshness_max_omitted_age_ticks[3],
+            self.freshness_over_budget_due[0],
+            self.freshness_over_budget_due[1],
+            self.freshness_over_budget_due[2],
+            self.freshness_over_budget_due[3],
+            self.max_history_depth,
             json_optional_u64(self.rss_growth_bytes),
             json_optional_u64(self.rss_growth_bytes_per_session),
             self.target_60hz_tick_met,
@@ -263,6 +275,13 @@ fn run_scenario(scenario: Scenario) -> Result<CapacityReport> {
         candidate_scan_ratio: measurements.totals.average_interest_candidates_checked()
             / scenario.players as f64,
         freshness_max_due_age_ticks: measurements.totals.freshness_max_due_age_ticks,
+        freshness_max_omitted_age_ticks: measurements.totals.freshness_max_omitted_age_ticks,
+        freshness_over_budget_due: measurements.totals.freshness_over_budget_due,
+        max_history_depth: sessions
+            .iter()
+            .map(SnapshotSession::history_depth)
+            .max()
+            .unwrap_or(0),
         rss_growth_bytes,
         rss_growth_bytes_per_session,
         target_60hz_tick_met: tick_ms_p95 <= target_tick_ms,
@@ -348,6 +367,8 @@ struct SnapshotTotals {
     interest_candidates_checked: u64,
     visible_entities: u64,
     freshness_max_due_age_ticks: [u32; 4],
+    freshness_max_omitted_age_ticks: [u32; 4],
+    freshness_over_budget_due: [u64; 4],
 }
 
 impl SnapshotTotals {
@@ -360,14 +381,18 @@ impl SnapshotTotals {
         self.interest_candidates_checked += build.interest_candidates_checked as u64;
         self.visible_entities += build.visible_entity_count as u64;
         let freshness = [
-            build.freshness.combat.max_due_age_ticks,
-            build.freshness.near.max_due_age_ticks,
-            build.freshness.mid.max_due_age_ticks,
-            build.freshness.far.max_due_age_ticks,
+            build.freshness.combat,
+            build.freshness.near,
+            build.freshness.mid,
+            build.freshness.far,
         ];
-        for (index, age) in freshness.into_iter().enumerate() {
+        for (index, tier) in freshness.into_iter().enumerate() {
             self.freshness_max_due_age_ticks[index] =
-                self.freshness_max_due_age_ticks[index].max(age);
+                self.freshness_max_due_age_ticks[index].max(tier.max_due_age_ticks);
+            self.freshness_max_omitted_age_ticks[index] = self.freshness_max_omitted_age_ticks
+                [index]
+                .max(tier.max_omitted_age_ticks);
+            self.freshness_over_budget_due[index] += tier.over_budget_due as u64;
         }
     }
 
