@@ -124,7 +124,7 @@ pub struct TierFreshness {
     pub due: usize,
     pub sent: usize,
     pub omitted: usize,
-    pub over_budget_due: usize,
+    pub deadline_misses: usize,
     pub max_due_age_ticks: u32,
     pub max_sent_age_ticks: u32,
     pub max_omitted_age_ticks: u32,
@@ -425,13 +425,9 @@ impl SnapshotFreshness {
     }
 
     fn observe_due(&mut self, tier: FreshnessTier, age_ticks: u32) {
-        let over_budget = age_ticks > freshness_budget_ticks(tier);
         let stats = self.tier_mut(tier);
         stats.due += 1;
         stats.max_due_age_ticks = stats.max_due_age_ticks.max(age_ticks);
-        if over_budget {
-            stats.over_budget_due += 1;
-        }
     }
 
     fn observe_sent(&mut self, tier: FreshnessTier, age_ticks: u32) {
@@ -441,9 +437,13 @@ impl SnapshotFreshness {
     }
 
     fn observe_omitted(&mut self, tier: FreshnessTier, age_ticks: u32) {
+        let missed_deadline = age_ticks > freshness_budget_ticks(tier);
         let stats = self.tier_mut(tier);
         stats.omitted += 1;
         stats.max_omitted_age_ticks = stats.max_omitted_age_ticks.max(age_ticks);
+        if missed_deadline {
+            stats.deadline_misses += 1;
+        }
     }
 }
 
