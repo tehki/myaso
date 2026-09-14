@@ -31,6 +31,7 @@ const MAX_RELIABLE_SNAPSHOT_BYTES: usize = u16::MAX as usize;
 const RELIABLE_BACKGROUND_COOLDOWN_TICKS: u32 = 60;
 const MAX_FLIGHT_BACKGROUND_PLAYERS: usize = 256;
 const FLIGHT_BACKGROUND_NET_ID_BASE: u32 = 10_000;
+const FLIGHT_NEAR_PRESSURE_PLAYERS: usize = 150;
 
 #[derive(Debug, Clone, Copy)]
 struct LoopbackFlightConfig {
@@ -50,10 +51,16 @@ impl GameState {
         let mut flight_background_ids = Vec::with_capacity(background_players);
         for index in 0..background_players {
             let net_id = FLIGHT_BACKGROUND_NET_ID_BASE + index as u32;
-            let column = (index % 16) as f32;
-            let row = (index / 16) as f32;
-            let x = 720.0 + column * 44.0;
-            let y = 80.0 + row * 44.0;
+            let (x, y) = if index < FLIGHT_NEAR_PRESSURE_PLAYERS {
+                let column = (index % 15) as f32;
+                let row = (index / 15) as f32;
+                (90.0 + column * 38.0, 90.0 + row * 38.0)
+            } else {
+                let background_index = index - FLIGHT_NEAR_PRESSURE_PLAYERS;
+                let column = (background_index % 7) as f32;
+                let row = (background_index / 7) as f32;
+                (900.0 + column * 38.0, 100.0 + row * 38.0)
+            };
             assert!(world.add_player_at(net_id, x, y, 0.0));
             flight_background_ids.push(net_id);
         }
@@ -381,9 +388,17 @@ async fn handle_connection(
                         CONSERVATIVE_DATAGRAM_BYTES,
                     )
                 });
-                let background_deadline_misses = snapshot.as_ref().map_or(0, |snapshot| {
-                    snapshot.freshness.mid.deadline_misses + snapshot.freshness.far.deadline_misses
-                });
+                let background_mid_deadline_misses = snapshot
+                    .as_ref()
+                    .map_or(0, |snapshot| snapshot.freshness.mid.deadline_misses);
+                let background_far_deadline_misses = snapshot
+                    .as_ref()
+                    .map_or(0, |snapshot| snapshot.freshness.far.deadline_misses);
+                let background_deadline_misses =
+                    background_mid_deadline_misses + background_far_deadline_misses;
+                let omitted_due_to_budget = snapshot
+                    .as_ref()
+                    .map_or(0, |snapshot| snapshot.omitted_due_to_budget);
                 if let Some(snapshot) = snapshot {
                     connection
                         .send_datagram(snapshot.bytes)
@@ -393,6 +408,14 @@ async fn handle_connection(
                     && server_tick.wrapping_sub(last_reliable_background_tick)
                         >= RELIABLE_BACKGROUND_COOLDOWN_TICKS
                 {
+                    if !game.reliable_write_delay.is_zero() {
+                        println!(
+                            "M15_RELIABLE_TRIGGER tick={server_tick} mid_misses={} far_misses={} omitted={}",
+                            background_mid_deadline_misses,
+                            background_far_deadline_misses,
+                            omitted_due_to_budget,
+                        );
+                    }
                     match try_enqueue_reliable(&reliable_tx, || {
                         reliable_snapshots
                             .build_from_frame(
@@ -403,8 +426,17 @@ async fn handle_connection(
                             )
                             .bytes
                     }) {
-                        Ok(true) => last_reliable_background_tick = server_tick,
-                        Ok(false) => {}
+                        Ok(true) => {
+                            last_reliable_background_tick = server_tick;
+                            if !game.reliable_write_delay.is_zero() {
+                                println!("M15_RELIABLE_ENQUEUED tick={server_tick}");
+                            }
+                        }
+                        Ok(false) => {
+                            if !game.reliable_write_delay.is_zero() {
+                                println!("M15_RELIABLE_BACKPRESSURED tick={server_tick}");
+                            }
+                        }
                         Err(ReliableQueueError::Closed) => {
                             bail!("reliable snapshot writer is unavailable")
                         }
