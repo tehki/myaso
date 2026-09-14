@@ -15,6 +15,8 @@ const requireBackgroundCatchup = process.env.MYASO_FLIGHT_REQUIRE_BACKGROUND_CAT
 const convergenceBudgetMs = Number(process.env.MYASO_FLIGHT_CONVERGENCE_BUDGET_MS ?? 2500);
 const expectedAuthoritativeEntities = Number(process.env.MYASO_FLIGHT_EXPECT_ENTITIES ?? 0);
 const frameP95BudgetMs = Number(process.env.MYASO_FLIGHT_FRAME_P95_BUDGET_MS ?? 100);
+const requireReliableDelta = process.env.MYASO_FLIGHT_REQUIRE_RELIABLE_DELTA === "1";
+const maxAverageReliableCatchupBytes = Number(process.env.MYASO_FLIGHT_MAX_AVG_RELIABLE_CATCHUP_BYTES ?? Number.POSITIVE_INFINITY);
 const configuredFlightLabel = process.env.MYASO_FLIGHT_LABEL;
 const flightLabel = configuredFlightLabel || (requireBackgroundCatchup ? "M15_BROWSER_CONVERGENCE" : "M7_BROWSER_FLIGHT");
 if (!/^[A-Z0-9_]+$/.test(flightLabel)) throw new Error("MYASO_FLIGHT_LABEL must contain only A-Z, 0-9, and underscore");
@@ -232,6 +234,19 @@ function assertFlightResult(browser, result) {
     if (result.reliableAdvancedEntities < 1 || result.maxReliableAdvancedEntities < 1) throw new Error(`${browser} reliable catch-up did not advance browser-visible entity state`);
     if (!Number.isFinite(result.firstBackgroundReliableMs) || result.firstBackgroundReliableMs > convergenceBudgetMs) {
       throw new Error(`${browser} reliable convergence exceeded ${convergenceBudgetMs}ms: ${result.firstBackgroundReliableMs}`);
+    }
+  }
+  if (requireReliableDelta) {
+    if (result.reliableDeltaCatchups < 3 || result.reliableFullCatchups < 1) {
+      throw new Error(`${browser} did not observe the required 3-delta + full-checkpoint reliable cycle`);
+    }
+    if (!Number.isFinite(result.reliableCatchupBytes?.avg)
+      || result.reliableCatchupBytes.avg > maxAverageReliableCatchupBytes) {
+      throw new Error(`${browser} average reliable catch-up bytes exceeded ${maxAverageReliableCatchupBytes}: ${result.reliableCatchupBytes?.avg}`);
+    }
+    if (!Number.isFinite(result.reliableDeltaBytes?.max) || !Number.isFinite(result.reliableFullBytes?.max)
+      || result.reliableDeltaBytes.max >= result.reliableFullBytes.max) {
+      throw new Error(`${browser} reliable deltas were not smaller than the full checkpoint`);
     }
   }
 }

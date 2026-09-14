@@ -75,7 +75,8 @@ jobs:
           node --check tests/m12-reliable-baseline.test.mjs
           node --check tests/m15-reliable-convergence.test.mjs
           node --check tests/m16-browser-512.test.mjs
-          node --test tests/browser-runtime.test.mjs tests/m6-browser-authority.test.mjs tests/m7-browser-flight.test.mjs tests/m12-reliable-baseline.test.mjs tests/m15-reliable-convergence.test.mjs tests/m16-browser-512.test.mjs
+          node --check tests/m17-reliable-delta.test.mjs
+          node --test tests/browser-runtime.test.mjs tests/m6-browser-authority.test.mjs tests/m7-browser-flight.test.mjs tests/m12-reliable-baseline.test.mjs tests/m15-reliable-convergence.test.mjs tests/m16-browser-512.test.mjs tests/m17-reliable-delta.test.mjs
           node scripts/browser_hotpath_probe.mjs
 
       - name: Validate authoritative Rust server
@@ -119,6 +120,21 @@ jobs:
           MYASO_FLIGHT_EXPECT_ENTITIES: "512"
           MYASO_FLIGHT_FRAME_P95_BUDGET_MS: "25"
           MYASO_FLIGHT_LABEL: "M16_512_BROWSER_FLIGHT"
+        run: node scripts/browser_flight_runner.mjs
+
+      - name: Measure M17 reliable delta efficiency at 512 occupants
+        env:
+          MYASO_FLIGHT_DURATION_MS: "5500"
+          MYASO_FLIGHT_STRESS_ENTITIES: "64"
+          MYASO_FLIGHT_BACKGROUND_PLAYERS: "511"
+          MYASO_FLIGHT_RELIABLE_DELAY_MS: "250"
+          MYASO_FLIGHT_REQUIRE_BACKGROUND_CATCHUP: "1"
+          MYASO_FLIGHT_REQUIRE_RELIABLE_DELTA: "1"
+          MYASO_FLIGHT_MAX_AVG_RELIABLE_CATCHUP_BYTES: "5500"
+          MYASO_FLIGHT_CONVERGENCE_BUDGET_MS: "2500"
+          MYASO_FLIGHT_EXPECT_ENTITIES: "512"
+          MYASO_FLIGHT_FRAME_P95_BUDGET_MS: "25"
+          MYASO_FLIGHT_LABEL: "M17_RELIABLE_DELTA_FLIGHT"
         run: node scripts/browser_flight_runner.mjs
 
       - name: Measure M8 authoritative capacity
