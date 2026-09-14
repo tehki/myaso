@@ -29,6 +29,8 @@ let firstBackgroundReliableMs = null;
 let reliableCatchups = 0;
 let reliableAdvancedEntities = 0;
 let maxReliableAdvancedEntities = 0;
+let maxAuthoritativeEntities = 0;
+let reliableBaselineEntities = 0;
 let client = null;
 let clientTick = 1;
 let lastFrameAt = 0;
@@ -55,17 +57,20 @@ try {
     onProtocolError(error) { fail(error); },
     onSnapshot(_result, state) {
       snapshots += 1;
+      maxAuthoritativeEntities = Math.max(maxAuthoritativeEntities, state.size);
       const ownId = client?.playerNetId;
       const own = ownId ? state.get(ownId) : null;
       if (!own) return;
       latestAuthoritativeOwn = own;
       if (!local.initialized) restoreAuthoritative(own);
     },
-    onReliableSnapshot(_result, _state, meta = {}) {
+    onReliableSnapshot(_result, state, meta = {}) {
       const now = performance.now();
+      maxAuthoritativeEntities = Math.max(maxAuthoritativeEntities, state.size);
       const advanced = Array.isArray(meta.advancedIds) ? meta.advancedIds.length : 0;
       if (reliableBaselineAt === null) {
         reliableBaselineAt = now;
+        reliableBaselineEntities = state.size;
         return;
       }
       reliableCatchups += 1;
@@ -236,6 +241,8 @@ function finish(elapsedMs) {
     reliableCatchups,
     reliableAdvancedEntities,
     maxReliableAdvancedEntities,
+    maxAuthoritativeEntities,
+    reliableBaselineEntities,
     firstBackgroundReliableMs: firstBackgroundReliableMs === null ? null : round(firstBackgroundReliableMs),
     acknowledgements,
     sentInputs,
