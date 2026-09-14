@@ -71,10 +71,13 @@ impl GameState {
     fn apply_flight_background_motion(&mut self) {
         let base_facing = self.world.tick as f32 * 0.075;
         for (index, net_id) in self.flight_background_ids.iter().copied().enumerate() {
-            self.world.set_input(net_id, InputIntent {
-                facing_radians: base_facing + index as f32 * 0.003,
-                ..InputIntent::default()
-            });
+            self.world.set_input(
+                net_id,
+                InputIntent {
+                    facing_radians: base_facing + index as f32 * 0.003,
+                    ..InputIntent::default()
+                },
+            );
         }
     }
 
