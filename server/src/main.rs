@@ -75,6 +75,7 @@ impl GameState {
                 net_id,
                 InputIntent {
                     facing_radians: base_facing + index as f32 * 0.003,
+                    block: true,
                     ..InputIntent::default()
                 },
             );

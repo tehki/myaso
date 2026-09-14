@@ -15,7 +15,7 @@ The authoritative server accepts two optional test-only environment variables:
 
 They are rejected on non-loopback binds. The bounded population maximum is 256 synthetic fighters.
 
-The fixture rotates only synthetic fighter facing, creating persistent mid/far due state without positional drift or combat interaction.
+The fixture rotates synthetic fighter facing while holding Block, keeping all seeded mid-tier records persistently due without positional drift, attacks, damage, or combat interaction.
 ## CI profile
 
 - 192 loopback-only background fighters
