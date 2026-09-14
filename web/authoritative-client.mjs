@@ -79,7 +79,7 @@ export async function connectAuthoritativeClient({
     try {
       const bytes = asUint8Array(packet);
       if (bytes.length < 2 || bytes[1] !== PACKET_TYPE.SNAPSHOT) return;
-      const { mergedIds, removedIds } = mergeReliableSnapshotPacketInPlace(
+      const { mergedIds, removedIds, advancedIds } = mergeReliableSnapshotPacketInPlace(
         state,
         reliableKnownIds,
         bytes,
@@ -98,7 +98,7 @@ export async function connectAuthoritativeClient({
         if (entity && entity.netId !== playerNetId) remoteInterpolator.push(entity, entity.serverTick);
       }
       flushPendingAck();
-      onReliableSnapshot?.(reliableSnapshotResult, state);
+      onReliableSnapshot?.(reliableSnapshotResult, state, { mergedIds, removedIds, advancedIds });
     } catch (error) {
       onProtocolError?.(error);
     }
@@ -186,12 +186,18 @@ export function mergeReliableSnapshotPacketInPlace(
   }
 
   const mergedIds = [];
+  const advancedIds = [];
   for (const [netId, incoming] of staged) {
     const current = stateMap.get(netId);
     if (current
       && current.serverTick !== incoming.serverTick
       && isTickNewer32(current.serverTick, incoming.serverTick)) {
       continue;
+    }
+    if (!current
+      || current.serverTick !== incoming.serverTick
+      && isTickNewer32(incoming.serverTick, current.serverTick)) {
+      advancedIds.push(netId);
     }
     if (current) Object.assign(current, incoming);
     else stateMap.set(netId, { ...incoming });
@@ -200,7 +206,7 @@ export function mergeReliableSnapshotPacketInPlace(
 
   reliableKnownIds.clear();
   for (const netId of nextKnownIds) reliableKnownIds.add(netId);
-  return { mergedIds, removedIds };
+  return { mergedIds, removedIds, advancedIds };
 }
 
 export function parseSha256Hex(hex) {
