@@ -1,7 +1,8 @@
 use anyhow::{bail, Context, Result};
 use myaso_server::{
     decode_input_packet, is_sequence_newer16, is_tick_newer32, simulation::World,
-    snapshot::SnapshotSession, AdmissionGate, InputIngressWindow, CONSERVATIVE_DATAGRAM_BYTES,
+    snapshot::{ReplicationFrame, SnapshotSession}, AdmissionGate, InputIngressWindow,
+    CONSERVATIVE_DATAGRAM_BYTES,
     PROTOCOL_VERSION, TARGET_PLAYERS_PER_MAP,
 };
 use std::{
@@ -20,19 +21,40 @@ use wtransport::{Connection, Endpoint, Identity, ServerConfig, VarInt};
 const GAME_PATH: &str = "/game";
 const CLOSE_DATAGRAM_UNAVAILABLE: u32 = 0x11;
 const SNAPSHOT_INTERVAL: Duration = Duration::from_millis(50);
+const SNAPSHOT_EVERY_SERVER_TICKS: u32 = 3;
 const INPUT_ACK_PACKET_TYPE: u8 = 3;
 const INPUT_ACK_BYTES: usize = 16;
 const MAX_PENDING_INPUT_ACKS: usize = 256;
 
+struct GameState {
+    world: World,
+    replication_frame: Arc<ReplicationFrame>,
+}
+
+impl GameState {
+    fn new() -> Self {
+        let world = World::default();
+        let replication_frame = Arc::new(ReplicationFrame::from_fighters(world.tick, world.fighters()));
+        Self { world, replication_frame }
+    }
+
+    fn refresh_replication_frame(&mut self) {
+        self.replication_frame = Arc::new(ReplicationFrame::from_fighters(
+            self.world.tick,
+            self.world.fighters(),
+        ));
+    }
+}
+
 struct SharedGame {
-    world: Mutex<World>,
+    state: Mutex<GameState>,
     next_player_id: AtomicU32,
 }
 
 impl SharedGame {
     fn new() -> Arc<Self> {
         Arc::new(Self {
-            world: Mutex::new(World::default()),
+            state: Mutex::new(GameState::new()),
             next_player_id: AtomicU32::new(1),
         })
     }
@@ -119,15 +141,20 @@ async fn main() -> Result<()> {
 
             let player_id = game.allocate_player_id();
             {
-                let mut world = game.world.lock().await;
-                if !world.add_player(player_id) {
+                let mut state = game.state.lock().await;
+                if !state.world.add_player(player_id) {
                     eprintln!("failed to add allocated player {player_id}");
                     return;
                 }
+                state.refresh_replication_frame();
             }
 
             let result = handle_connection(connection, player_id, Arc::clone(&game)).await;
-            game.world.lock().await.remove_player(player_id);
+            {
+                let mut state = game.state.lock().await;
+                state.world.remove_player(player_id);
+                state.refresh_replication_frame();
+            }
             if let Err(error) = result {
                 eprintln!("player {player_id} session ended: {error:#}");
             }
@@ -158,8 +185,11 @@ async fn run_authoritative_clock(game: Arc<SharedGame>) {
     interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
     loop {
         interval.tick().await;
-        let mut world = game.world.lock().await;
-        let _events = world.step();
+        let mut state = game.state.lock().await;
+        let _events = state.world.step();
+        if state.world.tick % SNAPSHOT_EVERY_SERVER_TICKS == 0 {
+            state.refresh_replication_frame();
+        }
     }
 }
 
@@ -199,12 +229,12 @@ async fn handle_connection(
 
                 let accepted = ingress.ingest(&packet);
                 if let Some(newest) = accepted.last().copied() {
-                    let mut world = game.world.lock().await;
-                    world.set_input(player_id, newest.into());
-                    record_pending_input_ack(&mut pending_input_acks, newest.tick, world.tick);
+                    let mut state = game.state.lock().await;
+                    state.world.set_input(player_id, newest.into());
+                    record_pending_input_ack(&mut pending_input_acks, newest.tick, state.world.tick);
                 }
 
-                let server_tick = game.world.lock().await.tick;
+                let server_tick = game.state.lock().await.world.tick;
                 if server_tick.wrapping_sub(packet.ack_server_tick) > 600 {
                     eprintln!(
                         "session {stable_id} stale server acknowledgement: client={} server={}",
@@ -213,17 +243,17 @@ async fn handle_connection(
                 }
             }
             _ = snapshot_interval.tick() => {
-                let (snapshot, server_tick) = {
-                    let world = game.world.lock().await;
-                    let snapshot = snapshots.build(
-                        acknowledged_snapshot,
-                        world.tick,
-                        player_id,
-                        world.fighters(),
-                        CONSERVATIVE_DATAGRAM_BYTES,
-                    );
-                    (snapshot, world.tick)
+                let frame = {
+                    let state = game.state.lock().await;
+                    Arc::clone(&state.replication_frame)
                 };
+                let server_tick = frame.server_tick();
+                let snapshot = snapshots.build_from_frame(
+                    acknowledged_snapshot,
+                    player_id,
+                    &frame,
+                    CONSERVATIVE_DATAGRAM_BYTES,
+                );
                 let safe_input_ack = take_safe_input_ack(&mut pending_input_acks, server_tick);
                 connection
                     .send_datagram(snapshot.bytes)

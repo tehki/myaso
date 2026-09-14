@@ -1,7 +1,7 @@
 use anyhow::{bail, Context, Result};
 use myaso_server::{
     simulation::{InputIntent, World, SERVER_TICK_HZ},
-    snapshot::SnapshotSession,
+    snapshot::{ReplicationFrame, SnapshotSession},
     CONSERVATIVE_DATAGRAM_BYTES, TARGET_PLAYERS_PER_MAP,
 };
 use std::{env, fs, time::Instant};
@@ -40,6 +40,11 @@ struct CapacityReport {
     reconnect_build_ms_p95: f64,
     reconnect_avg_snapshot_bytes: f64,
     reconnect_omission_ratio: f64,
+    frame_build_ms_p95: f64,
+    avg_interest_candidates_checked: f64,
+    avg_visible_entities: f64,
+    candidate_scan_ratio: f64,
+    freshness_max_due_age_ticks: [u32; 4],
     rss_growth_bytes: Option<u64>,
     rss_growth_bytes_per_session: Option<u64>,
     target_60hz_tick_met: bool,
@@ -63,6 +68,7 @@ impl CapacityReport {
                 "\"avg_records_per_snapshot\":{:.2},",
                 "\"omission_ratio\":{:.6},",
                 "\"reconnect\":{{\"samples\":{},\"build_ms_p95\":{:.3},\"avg_snapshot_bytes\":{:.1},\"omission_ratio\":{:.6}}},",
+                "\"planner\":{{\"frame_build_ms_p95\":{:.3},\"avg_interest_candidates_checked\":{:.2},\"avg_visible_entities\":{:.2},\"candidate_scan_ratio\":{:.6},\"freshness_max_due_age_ticks\":{{\"combat\":{},\"near\":{},\"mid\":{},\"far\":{}}}}},",
                 "\"rss_growth_bytes\":{},",
                 "\"rss_growth_bytes_per_session\":{},",
                 "\"target_60hz_tick_met\":{},",
@@ -90,6 +96,14 @@ impl CapacityReport {
             self.reconnect_build_ms_p95,
             self.reconnect_avg_snapshot_bytes,
             self.reconnect_omission_ratio,
+            self.frame_build_ms_p95,
+            self.avg_interest_candidates_checked,
+            self.avg_visible_entities,
+            self.candidate_scan_ratio,
+            self.freshness_max_due_age_ticks[0],
+            self.freshness_max_due_age_ticks[1],
+            self.freshness_max_due_age_ticks[2],
+            self.freshness_max_due_age_ticks[3],
             json_optional_u64(self.rss_growth_bytes),
             json_optional_u64(self.rss_growth_bytes_per_session),
             self.target_60hz_tick_met,
@@ -170,12 +184,15 @@ fn run_scenario(scenario: Scenario) -> Result<CapacityReport> {
             false,
             &mut Vec::new(),
             &mut Vec::new(),
+            &mut Vec::new(),
             &mut SnapshotTotals::default(),
         );
     }
 
     let mut tick_samples = Vec::with_capacity(scenario.measured_ticks as usize);
     let mut replication_samples =
+        Vec::with_capacity((scenario.measured_ticks / SNAPSHOT_EVERY_TICKS + 1) as usize);
+    let mut frame_build_samples =
         Vec::with_capacity((scenario.measured_ticks / SNAPSHOT_EVERY_TICKS + 1) as usize);
     let mut totals = SnapshotTotals::default();
 
@@ -187,6 +204,7 @@ fn run_scenario(scenario: Scenario) -> Result<CapacityReport> {
             true,
             &mut tick_samples,
             &mut replication_samples,
+            &mut frame_build_samples,
             &mut totals,
         );
     }
@@ -200,6 +218,7 @@ fn run_scenario(scenario: Scenario) -> Result<CapacityReport> {
         rss_growth_bytes.map(|bytes| bytes / scenario.players.max(1) as u64);
 
     let reconnect_samples = scenario.players.min(32);
+    let reconnect_frame = ReplicationFrame::from_fighters(world.tick, world.fighters());
     let mut reconnect_build_samples = Vec::with_capacity(reconnect_samples);
     let mut reconnect_totals = SnapshotTotals::default();
     for sample in 0..reconnect_samples {
@@ -207,11 +226,10 @@ fn run_scenario(scenario: Scenario) -> Result<CapacityReport> {
         let viewer_net_id = viewer_index as u32 + 1;
         let mut session = SnapshotSession::default();
         let started = Instant::now();
-        let build = session.build(
+        let build = session.build_from_frame(
             u16::MAX,
-            world.tick,
             viewer_net_id,
-            world.fighters(),
+            &reconnect_frame,
             CONSERVATIVE_DATAGRAM_BYTES,
         );
         reconnect_build_samples.push(elapsed_ms(started));
@@ -251,6 +269,11 @@ fn run_scenario(scenario: Scenario) -> Result<CapacityReport> {
         reconnect_build_ms_p95: percentile(&reconnect_build_samples, 0.95),
         reconnect_avg_snapshot_bytes: reconnect_totals.average_bytes(),
         reconnect_omission_ratio: reconnect_totals.omission_ratio(),
+        frame_build_ms_p95: percentile(&frame_build_samples, 0.95),
+        avg_interest_candidates_checked: totals.average_interest_candidates_checked(),
+        avg_visible_entities: totals.average_visible_entities(),
+        candidate_scan_ratio: totals.average_interest_candidates_checked() / scenario.players as f64,
+        freshness_max_due_age_ticks: totals.freshness_max_due_age_ticks,
         rss_growth_bytes,
         rss_growth_bytes_per_session,
         target_60hz_tick_met: tick_ms_p95 <= target_tick_ms,
@@ -265,6 +288,7 @@ fn drive_tick(
     record: bool,
     tick_samples: &mut Vec<f64>,
     replication_samples: &mut Vec<f64>,
+    frame_build_samples: &mut Vec<f64>,
     totals: &mut SnapshotTotals,
 ) {
     let next_tick = world.tick.wrapping_add(1);
@@ -283,12 +307,16 @@ fn drive_tick(
     }
 
     let replication_started = Instant::now();
+    let frame_started = Instant::now();
+    let frame = ReplicationFrame::from_fighters(world.tick, world.fighters());
+    if record {
+        frame_build_samples.push(elapsed_ms(frame_started));
+    }
     for (index, session) in sessions.iter_mut().enumerate() {
-        let build = session.build(
+        let build = session.build_from_frame(
             acknowledged_snapshots[index],
-            world.tick,
             index as u32 + 1,
-            world.fighters(),
+            &frame,
             CONSERVATIVE_DATAGRAM_BYTES,
         );
         acknowledged_snapshots[index] = build.sequence;
@@ -320,6 +348,9 @@ struct SnapshotTotals {
     max_bytes: usize,
     records: u64,
     omitted: u64,
+    interest_candidates_checked: u64,
+    visible_entities: u64,
+    freshness_max_due_age_ticks: [u32; 4],
 }
 
 impl SnapshotTotals {
@@ -329,6 +360,18 @@ impl SnapshotTotals {
         self.max_bytes = self.max_bytes.max(build.bytes.len());
         self.records += build.record_count as u64;
         self.omitted += build.omitted_due_to_budget as u64;
+        self.interest_candidates_checked += build.interest_candidates_checked as u64;
+        self.visible_entities += build.visible_entity_count as u64;
+        let freshness = [
+            build.freshness.combat.max_due_age_ticks,
+            build.freshness.near.max_due_age_ticks,
+            build.freshness.mid.max_due_age_ticks,
+            build.freshness.far.max_due_age_ticks,
+        ];
+        for (index, age) in freshness.into_iter().enumerate() {
+            self.freshness_max_due_age_ticks[index] =
+                self.freshness_max_due_age_ticks[index].max(age);
+        }
     }
 
     fn average_bytes(&self) -> f64 {
@@ -336,6 +379,22 @@ impl SnapshotTotals {
             0.0
         } else {
             self.bytes as f64 / self.snapshots as f64
+        }
+    }
+
+    fn average_interest_candidates_checked(&self) -> f64 {
+        if self.snapshots == 0 {
+            0.0
+        } else {
+            self.interest_candidates_checked as f64 / self.snapshots as f64
+        }
+    }
+
+    fn average_visible_entities(&self) -> f64 {
+        if self.snapshots == 0 {
+            0.0
+        } else {
+            self.visible_entities as f64 / self.snapshots as f64
         }
     }
 
@@ -408,6 +467,10 @@ fn validate_report(report: &CapacityReport) -> Result<()> {
         report.omission_ratio,
         report.reconnect_build_ms_p95,
         report.reconnect_omission_ratio,
+        report.frame_build_ms_p95,
+        report.avg_interest_candidates_checked,
+        report.avg_visible_entities,
+        report.candidate_scan_ratio,
     ] {
         if !value.is_finite() || value < 0.0 {
             bail!("capacity report contains an invalid measurement");
@@ -415,6 +478,9 @@ fn validate_report(report: &CapacityReport) -> Result<()> {
     }
     if report.omission_ratio > 1.0 || report.reconnect_omission_ratio > 1.0 {
         bail!("omission ratio escaped [0, 1]");
+    }
+    if report.candidate_scan_ratio > 1.0 {
+        bail!("spatial candidate scan ratio escaped [0, 1]");
     }
     Ok(())
 }
