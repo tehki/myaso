@@ -150,7 +150,9 @@ fn main() -> Result<()> {
     println!("M8_CAPACITY {}", report.to_json());
     println!(
         "M18_BYTE_COMPOSITION {}",
-        report.byte_composition.to_json(report.players, report.snapshots_built)
+        report
+            .byte_composition
+            .to_json(report.players, report.snapshots_built)
     );
     Ok(())
 }
@@ -401,28 +403,51 @@ impl ByteCompositionTotals {
     }
 
     fn total(self) -> u64 {
-        self.header + self.net_ids + self.masks + self.position + self.facing + self.vitals + self.action
+        self.header
+            + self.net_ids
+            + self.masks
+            + self.position
+            + self.facing
+            + self.vitals
+            + self.action
     }
 
     fn average(value: u64, snapshots: usize) -> f64 {
-        if snapshots == 0 { 0.0 } else { value as f64 / snapshots as f64 }
+        if snapshots == 0 {
+            0.0
+        } else {
+            value as f64 / snapshots as f64
+        }
     }
 
     fn share(self, value: u64) -> f64 {
         let total = self.total();
-        if total == 0 { 0.0 } else { value as f64 / total as f64 }
+        if total == 0 {
+            0.0
+        } else {
+            value as f64 / total as f64
+        }
     }
 
     fn to_json(self, players: usize, snapshots: usize) -> String {
         format!(
             r#"{{"players":{},"snapshots":{},"avg_bytes":{{"header":{:.3},"net_ids":{:.3},"masks":{:.3},"position":{:.3},"facing":{:.3},"vitals":{:.3},"action":{:.3}}},"share":{{"header":{:.6},"net_ids":{:.6},"masks":{:.6},"position":{:.6},"facing":{:.6},"vitals":{:.6},"action":{:.6}}}}}"#,
-            players, snapshots,
-            Self::average(self.header, snapshots), Self::average(self.net_ids, snapshots),
-            Self::average(self.masks, snapshots), Self::average(self.position, snapshots),
-            Self::average(self.facing, snapshots), Self::average(self.vitals, snapshots),
-            Self::average(self.action, snapshots), self.share(self.header), self.share(self.net_ids),
-            self.share(self.masks), self.share(self.position), self.share(self.facing),
-            self.share(self.vitals), self.share(self.action),
+            players,
+            snapshots,
+            Self::average(self.header, snapshots),
+            Self::average(self.net_ids, snapshots),
+            Self::average(self.masks, snapshots),
+            Self::average(self.position, snapshots),
+            Self::average(self.facing, snapshots),
+            Self::average(self.vitals, snapshots),
+            Self::average(self.action, snapshots),
+            self.share(self.header),
+            self.share(self.net_ids),
+            self.share(self.masks),
+            self.share(self.position),
+            self.share(self.facing),
+            self.share(self.vitals),
+            self.share(self.action),
         )
     }
 }

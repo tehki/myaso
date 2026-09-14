@@ -151,7 +151,13 @@ pub struct SnapshotByteComposition {
 
 impl SnapshotByteComposition {
     pub fn total_bytes(self) -> usize {
-        self.header + self.net_ids + self.masks + self.position + self.facing + self.vitals + self.action
+        self.header
+            + self.net_ids
+            + self.masks
+            + self.position
+            + self.facing
+            + self.vitals
+            + self.action
     }
 }
 
@@ -858,11 +864,21 @@ pub fn snapshot_byte_composition(records: &[SnapshotRecord]) -> SnapshotByteComp
         ..SnapshotByteComposition::default()
     };
     for record in records {
-        if record.mask & SNAPSHOT_FIELD_REMOVED != 0 { continue; }
-        if record.mask & SNAPSHOT_FIELD_POSITION != 0 { composition.position += 4; }
-        if record.mask & SNAPSHOT_FIELD_FACING != 0 { composition.facing += 2; }
-        if record.mask & SNAPSHOT_FIELD_VITALS != 0 { composition.vitals += 2; }
-        if record.mask & SNAPSHOT_FIELD_ACTION != 0 { composition.action += 2; }
+        if record.mask & SNAPSHOT_FIELD_REMOVED != 0 {
+            continue;
+        }
+        if record.mask & SNAPSHOT_FIELD_POSITION != 0 {
+            composition.position += 4;
+        }
+        if record.mask & SNAPSHOT_FIELD_FACING != 0 {
+            composition.facing += 2;
+        }
+        if record.mask & SNAPSHOT_FIELD_VITALS != 0 {
+            composition.vitals += 2;
+        }
+        if record.mask & SNAPSHOT_FIELD_ACTION != 0 {
+            composition.action += 2;
+        }
     }
     composition
 }
