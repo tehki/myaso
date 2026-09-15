@@ -1,6 +1,6 @@
 use myaso_server::snapshot::{
     decode_snapshot, encode_snapshot_current, SnapshotDecodeError, SnapshotRecord,
-    SNAPSHOT_ENCODING_VARINT_IDS, SNAPSHOT_FIELD_REMOVED, SNAPSHOT_FULL_FIELDS,
+    SNAPSHOT_ENCODING_VARINT_IDS, SNAPSHOT_FIELD_REMOVED,
     SNAPSHOT_HEADER_BYTES, SNAPSHOT_PACKET_TYPE,
 };
 
