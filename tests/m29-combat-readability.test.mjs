@@ -41,7 +41,17 @@ test("cost-free block plus attacker stun is described as a parry", () => {
   tracker.observe(state(fighter(1, 100, 100, COMBAT_ACTION.block), fighter(2)), 1);
   const event = tracker.observe(state(fighter(1, 100, 100, COMBAT_ACTION.block), fighter(2, 100, 100, COMBAT_ACTION.stunned)), 1);
   assert.equal(event.kind, "parry");
+  assert.equal(event.feedback, "parry-success");
   assert.match(event.text, /Parry!/);
+});
+
+test("being parried emits a distinct authoritative feedback cue", () => {
+  const tracker = createCombatReadabilityTracker();
+  tracker.observe(state(fighter(1), fighter(2, 100, 100, COMBAT_ACTION.block)), 1);
+  const event = tracker.observe(state(fighter(1, 100, 100, COMBAT_ACTION.stunned), fighter(2, 100, 100, COMBAT_ACTION.block)), 1);
+  assert.equal(event.kind, "parry");
+  assert.equal(event.feedback, "parried");
+  assert.match(event.text, /Parried/);
 });
 
 test("zero-guard stun is prioritized as a guard break", () => {

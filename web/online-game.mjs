@@ -125,10 +125,11 @@ function showCombatFeedback(feedback) {
   delete arenaStage.dataset.combatFeedback;
   void arenaStage.offsetWidth;
   arenaStage.dataset.combatFeedback = feedback;
+  const durationMs = feedback === "parry-success" || feedback === "parried" ? 380 : 320;
   combatFeedbackTimer = window.setTimeout(() => {
     if (arenaStage.dataset.combatFeedback === feedback) delete arenaStage.dataset.combatFeedback;
     combatFeedbackTimer = 0;
-  }, 320);
+  }, durationMs);
 }
 
 function updateMouse(event) {

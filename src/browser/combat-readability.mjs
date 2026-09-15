@@ -125,11 +125,11 @@ function collectParryEvents(events, beforeOwn, own, beforePeer, peer) {
 
   if (beforePeer.action !== COMBAT_ACTION.stunned && peer.action === COMBAT_ACTION.stunned
     && ownBlocking && ownPaidNothing && peer.guard > 0) {
-    push(events, "parry", "Parry! Opponent stunned - punish now.", 980);
+    push(events, "parry", "Parry! Opponent stunned - punish now.", 980, "parry-success");
   }
   if (beforeOwn.action !== COMBAT_ACTION.stunned && own.action === COMBAT_ACTION.stunned
     && peerBlocking && peerPaidNothing && own.guard > 0) {
-    push(events, "parry", "Parried - your commitment was read.", 980);
+    push(events, "parry", "Parried - your commitment was read.", 980, "parried");
   }
 }
 

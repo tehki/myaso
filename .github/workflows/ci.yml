@@ -162,6 +162,11 @@ jobs:
           MYASO_PVP_SCENARIO: "uifeedback"
         run: node scripts/pvp_browser_flight_runner.mjs
 
+      - name: Validate M33 real online authoritative parry feedback
+        env:
+          MYASO_PVP_SCENARIO: "uiparry"
+        run: node scripts/pvp_browser_flight_runner.mjs
+
       - name: Measure M15 browser background convergence
         env:
           MYASO_FLIGHT_DURATION_MS: "4500"
