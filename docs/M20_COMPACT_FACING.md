@@ -54,3 +54,7 @@ M20 must preserve every inherited gate and additionally prove:
 - Validation: focused codec/accounting checks first, then FULL CI on the final head.
 - Rollback: close/discard M20; M19 remains unchanged.
 - Merge, deployment, public bind, and production runtime activation are not part of this work unit.
+
+## Flight-harness adjustment
+
+M20 can keep synthetic 256-player background pressure within the realtime freshness deadline even when some due records are still omitted by the 1100-byte datagram budget. For loopback flight runs only, the existing non-zero synthetic reliable-write delay therefore also permits an omitted record to trigger the reliable catch-up path. Non-loopback runtime cannot enable that delay, so production scheduling continues to require an actual background freshness deadline miss.
