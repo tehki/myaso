@@ -14,8 +14,9 @@ M30 deliberately uses `web/index.html` and `web/online-game.mjs`; it does not us
 - Select the lower network ID as the attacker because the normal spawn layout places that fighter to the left of its opponent.
 - Focus both real arena canvases.
 - Keep the lower-ID attacker moving toward the passive defender with an ordinary held `D` input while the exchange is attempted; release it immediately after success or failure.
-- Passively record the delivered `KeyD` down/up and primary-pointer events as browser-input provenance; the observers do not alter game state.
-- Perform up to five real WebDriver canvas clicks, each followed by a 700 ms observation window, stopping immediately when the first authoritative 34-HP exchange renders. Holding movement during the attempts lets the normal server-owned movement close the final spacing instead of relying on a fixed-duration position guess.
+- Passively record the delivered `KeyD` down/up and primary-pointer coordinates as browser-input provenance; the observers do not alter game state.
+- Aim each real WebDriver attack deliberately 200 CSS pixels to the right of the canvas center before primary down/up. This avoids the ambiguous zero-length aim vector produced by an element-center click while still exercising the normal pointer-input path.
+- Perform up to five real pointer attacks, each followed by a 700 ms observation window, stopping immediately when the first authoritative 34-HP exchange renders. Holding movement during the attempts lets normal server-owned movement close the final spacing instead of relying on a fixed-duration position guess.
 - Observe only rendered DOM text/HUD values; do not inject simulation state, combat actions, HP, guard, positions, or server events.
 
 ## Acceptance

@@ -176,7 +176,7 @@ async function runOnlineUiFlight(entries) {
     movementHeld = true;
     await sleep(120);
     for (let attempt = 0; attempt < 5 && !evidence; attempt += 1) {
-      await webdriver(attacker.base, "POST", `/session/${attacker.sessionId}/element/${elementId}/click`, {});
+      await performArenaAttack(attacker, elementId);
       evidence = await waitForUiCombatEvidence(entries, 700, false);
     }
     if (!evidence) evidence = await waitForUiCombatEvidence(entries, 1000, true);
@@ -191,8 +191,10 @@ async function runOnlineUiFlight(entries) {
   if (!attackerResult.keys.includes("keydown:KeyD") || !attackerResult.keys.includes("keyup:KeyD")) {
     throw new Error(`real attacker movement control was not delivered to the arena: ${JSON.stringify(attackerResult)}`);
   }
-  if (!attackerResult.pointers.includes("pointerdown:0") || !attackerResult.pointers.includes("pointerup:0")) {
-    throw new Error(`real attack click was not delivered to the attacker arena: ${JSON.stringify(attackerResult)}`);
+  const primaryDown = attackerResult.pointers.find((event) => event.type === "pointerdown" && event.button === 0);
+  const primaryUp = attackerResult.pointers.find((event) => event.type === "pointerup" && event.button === 0);
+  if (!primaryDown || !primaryUp || primaryDown.x < 0.6 || Math.abs(primaryDown.y - 0.5) > 0.15) {
+    throw new Error(`real rightward attack aim was not delivered to the attacker arena: ${JSON.stringify(attackerResult)}`);
   }
   if (attackerResult.playerHp !== 100 || attackerResult.opponentHp !== 66) {
     throw new Error(`attacker HUD did not render authoritative damage: ${JSON.stringify(attackerResult)}`);
@@ -222,6 +224,23 @@ async function setMovementKey(session, value, pressed) {
   });
 }
 
+async function performArenaAttack(session, elementId) {
+  const origin = { "element-6066-11e4-a52e-4f735466cecf": elementId };
+  await webdriver(session.base, "POST", `/session/${session.sessionId}/actions`, {
+    actions: [{
+      type: "pointer",
+      id: `mouse-${session.name}`,
+      parameters: { pointerType: "mouse" },
+      actions: [
+        { type: "pointerMove", duration: 0, origin, x: 200, y: 0 },
+        { type: "pointerDown", button: 0 },
+        { type: "pause", duration: 40 },
+        { type: "pointerUp", button: 0 },
+      ],
+    }],
+  });
+}
+
 async function installUiObserver(session) {
   await execute(session.base, session.sessionId, `
     const target = document.querySelector('#event-text');
@@ -237,7 +256,15 @@ async function installUiObserver(session) {
       arena.addEventListener(type, (event) => state.keys.push(type + ':' + event.code), { capture: true });
     }
     for (const type of ['pointerdown', 'pointerup']) {
-      arena.addEventListener(type, (event) => state.pointers.push(type + ':' + event.button), { capture: true });
+      arena.addEventListener(type, (event) => {
+        const rect = arena.getBoundingClientRect();
+        state.pointers.push({
+          type,
+          button: event.button,
+          x: Number(((event.clientX - rect.left) / rect.width).toFixed(3)),
+          y: Number(((event.clientY - rect.top) / rect.height).toFixed(3)),
+        });
+      }, { capture: true });
     }
     record();
     new MutationObserver(record).observe(target, { childList: true, subtree: true, characterData: true });
