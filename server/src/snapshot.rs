@@ -6,7 +6,8 @@ pub const SNAPSHOT_HEADER_BYTES: usize = 14;
 pub const SNAPSHOT_RECORD_BASE_BYTES: usize = 5;
 pub const SNAPSHOT_ENCODING_LEGACY_U32_IDS: u8 = 0;
 pub const SNAPSHOT_ENCODING_VARINT_IDS: u8 = 1;
-pub const SNAPSHOT_ENCODING_CURRENT: u8 = SNAPSHOT_ENCODING_VARINT_IDS;
+pub const SNAPSHOT_ENCODING_VARINT_IDS_U8_FACING: u8 = 2;
+pub const SNAPSHOT_ENCODING_CURRENT: u8 = SNAPSHOT_ENCODING_VARINT_IDS_U8_FACING;
 pub const SNAPSHOT_FLAG_FULL: u8 = 1;
 pub const SNAPSHOT_FIELD_POSITION: u8 = 1 << 0;
 pub const SNAPSHOT_FIELD_FACING: u8 = 1 << 1;
@@ -784,7 +785,9 @@ fn encode_snapshot_with_encoding(
     assert!(records.len() <= u16::MAX as usize);
     assert!(matches!(
         encoding,
-        SNAPSHOT_ENCODING_LEGACY_U32_IDS | SNAPSHOT_ENCODING_VARINT_IDS
+        SNAPSHOT_ENCODING_LEGACY_U32_IDS
+            | SNAPSHOT_ENCODING_VARINT_IDS
+            | SNAPSHOT_ENCODING_VARINT_IDS_U8_FACING
     ));
     let total_bytes = SNAPSHOT_HEADER_BYTES
         + records
@@ -808,17 +811,19 @@ fn encode_snapshot_with_encoding(
             SNAPSHOT_ENCODING_LEGACY_U32_IDS => {
                 bytes.extend_from_slice(&record.net_id.to_le_bytes())
             }
-            SNAPSHOT_ENCODING_VARINT_IDS => encode_u32_varint(record.net_id, &mut bytes),
+            SNAPSHOT_ENCODING_VARINT_IDS | SNAPSHOT_ENCODING_VARINT_IDS_U8_FACING => {
+                encode_u32_varint(record.net_id, &mut bytes)
+            }
             _ => unreachable!("encoding validated"),
         }
         bytes.push(record.mask);
-        encode_record_fields(record, &mut bytes);
+        encode_record_fields(record, &mut bytes, encoding);
     }
     debug_assert_eq!(bytes.len(), total_bytes);
     bytes
 }
 
-fn encode_record_fields(record: &SnapshotRecord, bytes: &mut Vec<u8>) {
+fn encode_record_fields(record: &SnapshotRecord, bytes: &mut Vec<u8>, encoding: u8) {
     if record.mask & SNAPSHOT_FIELD_REMOVED != 0 {
         return;
     }
@@ -827,7 +832,11 @@ fn encode_record_fields(record: &SnapshotRecord, bytes: &mut Vec<u8>) {
         bytes.extend_from_slice(&record.y.to_le_bytes());
     }
     if record.mask & SNAPSHOT_FIELD_FACING != 0 {
-        bytes.extend_from_slice(&record.facing.to_le_bytes());
+        if encoding == SNAPSHOT_ENCODING_VARINT_IDS_U8_FACING {
+            bytes.push(compact_facing_u8(record.facing));
+        } else {
+            bytes.extend_from_slice(&record.facing.to_le_bytes());
+        }
     }
     if record.mask & SNAPSHOT_FIELD_VITALS != 0 {
         bytes.push(record.hp);
@@ -852,7 +861,9 @@ pub fn decode_snapshot(bytes: &[u8]) -> Result<DecodedSnapshot, SnapshotDecodeEr
     let encoding = bytes[3];
     if !matches!(
         encoding,
-        SNAPSHOT_ENCODING_LEGACY_U32_IDS | SNAPSHOT_ENCODING_VARINT_IDS
+        SNAPSHOT_ENCODING_LEGACY_U32_IDS
+            | SNAPSHOT_ENCODING_VARINT_IDS
+            | SNAPSHOT_ENCODING_VARINT_IDS_U8_FACING
     ) {
         return Err(SnapshotDecodeError::UnsupportedEncoding(encoding));
     }
@@ -875,7 +886,9 @@ pub fn decode_snapshot(bytes: &[u8]) -> Result<DecodedSnapshot, SnapshotDecodeEr
                 offset += 4;
                 value
             }
-            SNAPSHOT_ENCODING_VARINT_IDS => decode_u32_varint(bytes, &mut offset)?,
+            SNAPSHOT_ENCODING_VARINT_IDS | SNAPSHOT_ENCODING_VARINT_IDS_U8_FACING => {
+                decode_u32_varint(bytes, &mut offset)?
+            }
             _ => unreachable!("encoding validated"),
         };
         require(bytes, offset, 1)?;
@@ -892,7 +905,7 @@ pub fn decode_snapshot(bytes: &[u8]) -> Result<DecodedSnapshot, SnapshotDecodeEr
             action: 0,
             flags: 0,
         };
-        decode_record_fields(bytes, &mut offset, &mut record)?;
+        decode_record_fields(bytes, &mut offset, &mut record, encoding)?;
         records.push(record);
     }
     if offset != bytes.len() {
@@ -913,6 +926,7 @@ fn decode_record_fields(
     bytes: &[u8],
     offset: &mut usize,
     record: &mut SnapshotRecord,
+    encoding: u8,
 ) -> Result<(), SnapshotDecodeError> {
     if record.mask & SNAPSHOT_FIELD_REMOVED != 0 {
         return Ok(());
@@ -924,9 +938,15 @@ fn decode_record_fields(
         *offset += 4;
     }
     if record.mask & SNAPSHOT_FIELD_FACING != 0 {
-        require(bytes, *offset, 2)?;
-        record.facing = u16::from_le_bytes([bytes[*offset], bytes[*offset + 1]]);
-        *offset += 2;
+        if encoding == SNAPSHOT_ENCODING_VARINT_IDS_U8_FACING {
+            require(bytes, *offset, 1)?;
+            record.facing = expand_facing_u8(bytes[*offset]);
+            *offset += 1;
+        } else {
+            require(bytes, *offset, 2)?;
+            record.facing = u16::from_le_bytes([bytes[*offset], bytes[*offset + 1]]);
+            *offset += 2;
+        }
     }
     if record.mask & SNAPSHOT_FIELD_VITALS != 0 {
         require(bytes, *offset, 2)?;
@@ -959,7 +979,9 @@ fn snapshot_byte_composition_for_encoding(
     for record in records {
         composition.net_ids += match encoding {
             SNAPSHOT_ENCODING_LEGACY_U32_IDS => 4,
-            SNAPSHOT_ENCODING_VARINT_IDS => u32_varint_bytes(record.net_id),
+            SNAPSHOT_ENCODING_VARINT_IDS | SNAPSHOT_ENCODING_VARINT_IDS_U8_FACING => {
+                u32_varint_bytes(record.net_id)
+            }
             _ => unreachable!("encoding validated by caller"),
         };
         if record.mask & SNAPSHOT_FIELD_REMOVED != 0 {
@@ -969,7 +991,7 @@ fn snapshot_byte_composition_for_encoding(
             composition.position += 4;
         }
         if record.mask & SNAPSHOT_FIELD_FACING != 0 {
-            composition.facing += 2;
+            composition.facing += facing_bytes_for_encoding(encoding);
         }
         if record.mask & SNAPSHOT_FIELD_VITALS != 0 {
             composition.vitals += 2;
@@ -988,7 +1010,9 @@ pub fn snapshot_record_bytes(record: &SnapshotRecord) -> usize {
 fn snapshot_record_bytes_for_encoding(record: &SnapshotRecord, encoding: u8) -> usize {
     let id_bytes = match encoding {
         SNAPSHOT_ENCODING_LEGACY_U32_IDS => 4,
-        SNAPSHOT_ENCODING_VARINT_IDS => u32_varint_bytes(record.net_id),
+        SNAPSHOT_ENCODING_VARINT_IDS | SNAPSHOT_ENCODING_VARINT_IDS_U8_FACING => {
+            u32_varint_bytes(record.net_id)
+        }
         _ => unreachable!("encoding validated by caller"),
     };
     let mut bytes = id_bytes + 1;
@@ -999,7 +1023,7 @@ fn snapshot_record_bytes_for_encoding(record: &SnapshotRecord, encoding: u8) -> 
         bytes += 4;
     }
     if record.mask & SNAPSHOT_FIELD_FACING != 0 {
-        bytes += 2;
+        bytes += facing_bytes_for_encoding(encoding);
     }
     if record.mask & SNAPSHOT_FIELD_VITALS != 0 {
         bytes += 2;
@@ -1008,6 +1032,22 @@ fn snapshot_record_bytes_for_encoding(record: &SnapshotRecord, encoding: u8) -> 
         bytes += 2;
     }
     bytes
+}
+
+fn facing_bytes_for_encoding(encoding: u8) -> usize {
+    if encoding == SNAPSHOT_ENCODING_VARINT_IDS_U8_FACING {
+        1
+    } else {
+        2
+    }
+}
+
+fn compact_facing_u8(facing: u16) -> u8 {
+    ((u32::from(facing) + 128) / 257).min(u32::from(u8::MAX)) as u8
+}
+
+fn expand_facing_u8(facing: u8) -> u16 {
+    u16::from(facing) * 257
 }
 
 fn u32_varint_bytes(mut value: u32) -> usize {

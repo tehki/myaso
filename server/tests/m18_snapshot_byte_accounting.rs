@@ -33,10 +33,10 @@ fn byte_composition_exactly_matches_encoded_snapshot_length() {
     assert_eq!(composition.net_ids, 4);
     assert_eq!(composition.masks, 4);
     assert_eq!(composition.position, 8);
-    assert_eq!(composition.facing, 4);
+    assert_eq!(composition.facing, 2);
     assert_eq!(composition.vitals, 4);
     assert_eq!(composition.action, 2);
-    assert_eq!(composition.total_bytes(), 40);
+    assert_eq!(composition.total_bytes(), 38);
     assert_eq!(composition.total_bytes(), encoded.len());
 
     assert_eq!(SNAPSHOT_FIELD_ACTION, 1 << 3);

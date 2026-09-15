@@ -127,6 +127,14 @@ impl SharedGame {
     }
 }
 
+fn should_enqueue_reliable_catchup(
+    background_deadline_misses: usize,
+    omitted_due_to_budget: usize,
+    reliable_write_delay: Duration,
+) -> bool {
+    background_deadline_misses > 0 || (!reliable_write_delay.is_zero() && omitted_due_to_budget > 0)
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
     let bind: SocketAddr = env::var("MYASO_BIND")
@@ -437,9 +445,12 @@ async fn handle_connection(
                         .send_datagram(snapshot.bytes)
                         .context("send authoritative snapshot datagram")?;
                 }
-                if background_deadline_misses > 0
-                    && server_tick.wrapping_sub(last_reliable_background_tick)
-                        >= RELIABLE_BACKGROUND_COOLDOWN_TICKS
+                if should_enqueue_reliable_catchup(
+                    background_deadline_misses,
+                    omitted_due_to_budget,
+                    game.reliable_write_delay,
+                ) && server_tick.wrapping_sub(last_reliable_background_tick)
+                    >= RELIABLE_BACKGROUND_COOLDOWN_TICKS
                 {
                     if !game.reliable_write_delay.is_zero() {
                         println!(
@@ -631,5 +642,16 @@ mod tests {
         }
         assert_eq!(pending.len(), MAX_PENDING_INPUT_ACKS);
         assert_eq!(pending.front().copied(), Some((4, 4)));
+    }
+
+    #[test]
+    fn loopback_reliable_pressure_uses_omission_without_weakening_production_trigger() {
+        assert!(!should_enqueue_reliable_catchup(0, 4, Duration::ZERO));
+        assert!(should_enqueue_reliable_catchup(1, 0, Duration::ZERO));
+        assert!(should_enqueue_reliable_catchup(
+            0,
+            4,
+            Duration::from_millis(250)
+        ));
     }
 }

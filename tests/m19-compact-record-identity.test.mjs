@@ -37,6 +37,7 @@ test("compact snapshot matches the Rust M19 fixture", () => {
     serverTick: 1234,
     records: [fullRecord(1)],
     maxBytes: 1100,
+    encoding: SNAPSHOT_ENCODINGS.VARINT_IDS,
   });
   assert.equal(Buffer.from(packet).toString("hex"), fixtureHex);
 

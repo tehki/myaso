@@ -3,6 +3,7 @@ import { NETWORK, PACKET_TYPE, SNAPSHOT_FLAG } from "../network/constants.mjs";
 const HEADER_BYTES = 14;
 const ENCODING_LEGACY_U32_IDS = 0;
 const ENCODING_VARINT_IDS = 1;
+const ENCODING_VARINT_IDS_U8_FACING = 2;
 const FIELD_POSITION = 1 << 0;
 const FIELD_FACING = 1 << 1;
 const FIELD_VITALS = 1 << 2;
@@ -92,9 +93,15 @@ export function applySnapshotPacketInPlace(stateMap, packet, result = createSnap
       offset += 4;
     }
     if (mask & FIELD_FACING) {
-      requireBytes(view, offset, 2);
-      entity.facing = (view.getUint16(offset, true) / 0xffff) * TAU;
-      offset += 2;
+      if (result.encoding === ENCODING_VARINT_IDS_U8_FACING) {
+        requireBytes(view, offset, 1);
+        entity.facing = (view.getUint8(offset) / 0xff) * TAU;
+        offset += 1;
+      } else {
+        requireBytes(view, offset, 2);
+        entity.facing = (view.getUint16(offset, true) / 0xffff) * TAU;
+        offset += 2;
+      }
     }
     if (mask & FIELD_VITALS) {
       requireBytes(view, offset, 2);
@@ -152,7 +159,9 @@ function uint32VarintBytes(value) {
 }
 
 function assertSnapshotEncoding(encoding) {
-  if (encoding !== ENCODING_LEGACY_U32_IDS && encoding !== ENCODING_VARINT_IDS) {
+  if (encoding !== ENCODING_LEGACY_U32_IDS
+    && encoding !== ENCODING_VARINT_IDS
+    && encoding !== ENCODING_VARINT_IDS_U8_FACING) {
     throw new RangeError(`unsupported snapshot encoding ${encoding}`);
   }
 }
