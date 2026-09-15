@@ -12,9 +12,10 @@ M30 deliberately uses `web/index.html` and `web/online-game.mjs`; it does not us
 - Open the real online game page concurrently in headless Chrome and Firefox.
 - Wait until both normal HUDs show two full-health fighters and expose their assigned player IDs through the normal online status text.
 - Select the lower network ID as the attacker because the normal spawn layout places that fighter to the left of its opponent.
-- Focus the real arena canvas.
-- Hold the real `D` key for 180 ms to close the default 96-unit spawn gap into the 94-unit authoritative attack envelope.
-- Release movement, then perform a real WebDriver canvas click for the attack.
+- Focus both real arena canvases.
+- Close spacing with ordinary controls: attacker holds `D` and defender holds `A` for 320 ms, then both release.
+- Passively record the delivered `KeyD`/`KeyA` and primary-pointer events as browser-input provenance; the observers do not alter game state.
+- Perform a real WebDriver canvas click for the attack.
 - Observe only rendered DOM text/HUD values; do not inject simulation state, combat actions, HP, guard, positions, or server events.
 
 ## Acceptance

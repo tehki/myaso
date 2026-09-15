@@ -157,20 +157,14 @@ async function runOnlineUiFlight(entries) {
   const ready = await waitForUiReady(entries);
   const ordered = ready.slice().sort((a, b) => a.playerNetId - b.playerNetId);
   const attacker = entries.find((entry) => entry.name === ordered[0].browser);
-  if (!attacker) throw new Error(`could not resolve UI attacker from ${JSON.stringify(ready)}`);
+  const defender = entries.find((entry) => entry.name === ordered[1].browser);
+  if (!attacker || !defender) throw new Error(`could not resolve UI roles from ${JSON.stringify(ready)}`);
 
-  await execute(attacker.base, attacker.sessionId, "document.querySelector('#arena').focus(); return document.activeElement?.id;");
-  await webdriver(attacker.base, "POST", `/session/${attacker.sessionId}/actions`, {
-    actions: [{
-      type: "key",
-      id: "keyboard",
-      actions: [
-        { type: "keyDown", value: "d" },
-        { type: "pause", duration: 180 },
-        { type: "keyUp", value: "d" },
-      ],
-    }],
-  });
+  await Promise.all(entries.map((entry) => execute(entry.base, entry.sessionId, "document.querySelector('#arena').focus(); return document.activeElement?.id;")));
+  await Promise.all([
+    holdMovementKey(attacker, "d", 320),
+    holdMovementKey(defender, "a", 320),
+  ]);
   await sleep(220);
 
   const arena = await webdriver(attacker.base, "POST", `/session/${attacker.sessionId}/element`, {
@@ -185,6 +179,13 @@ async function runOnlineUiFlight(entries) {
   const attackerResult = evidence.find((entry) => entry.browser === attacker.name);
   const defenderResult = evidence.find((entry) => entry.browser !== attacker.name);
   if (!attackerResult || !defenderResult) throw new Error(`incomplete UI evidence: ${JSON.stringify(evidence)}`);
+  if (!attackerResult.keys.includes("keydown:KeyD") || !attackerResult.keys.includes("keyup:KeyD")
+    || !defenderResult.keys.includes("keydown:KeyA") || !defenderResult.keys.includes("keyup:KeyA")) {
+    throw new Error(`real movement controls were not delivered to both arenas: ${JSON.stringify(evidence)}`);
+  }
+  if (!attackerResult.pointers.includes("pointerdown:0") || !attackerResult.pointers.includes("pointerup:0")) {
+    throw new Error(`real attack click was not delivered to the attacker arena: ${JSON.stringify(attackerResult)}`);
+  }
   if (attackerResult.playerHp !== 100 || attackerResult.opponentHp !== 66) {
     throw new Error(`attacker HUD did not render authoritative damage: ${JSON.stringify(attackerResult)}`);
   }
@@ -203,15 +204,37 @@ async function runOnlineUiFlight(entries) {
   return evidence;
 }
 
+async function holdMovementKey(session, value, duration) {
+  await webdriver(session.base, "POST", `/session/${session.sessionId}/actions`, {
+    actions: [{
+      type: "key",
+      id: `keyboard-${session.name}`,
+      actions: [
+        { type: "keyDown", value },
+        { type: "pause", duration },
+        { type: "keyUp", value },
+      ],
+    }],
+  });
+}
+
 async function installUiObserver(session) {
   await execute(session.base, session.sessionId, `
     const target = document.querySelector('#event-text');
-    if (!target) throw new Error('missing #event-text');
-    const state = { events: [], startedAt: performance.now() };
+    const arena = document.querySelector('#arena');
+    if (!target || !arena) throw new Error('missing M30 UI target');
+    const state = { events: [], keys: [], pointers: [], online: '', startedAt: performance.now() };
     const record = () => {
       const text = target.textContent?.trim() ?? '';
-      if (text && state.events.at(-1) !== text) state.events.push(text);
+      if (/^Online - player #\\d+ - server tick \\d+$/.test(text)) state.online = text;
+      else if (text && state.events.at(-1) !== text) state.events.push(text);
     };
+    for (const type of ['keydown', 'keyup']) {
+      arena.addEventListener(type, (event) => state.keys.push(type + ':' + event.code), { capture: true });
+    }
+    for (const type of ['pointerdown', 'pointerup']) {
+      arena.addEventListener(type, (event) => state.pointers.push(type + ':' + event.button), { capture: true });
+    }
     record();
     new MutationObserver(record).observe(target, { childList: true, subtree: true, characterData: true });
     window.__MYASO_M30_UI__ = state;
@@ -244,9 +267,8 @@ async function waitForUiCombatEvidence(entries) {
 
 async function readUiEvidence(session) {
   const value = await execute(session.base, session.sessionId, `
-    const events = window.__MYASO_M30_UI__?.events ?? [];
-    const online = [...events].reverse().find((text) => /^Online - player #\\d+ - server tick \\d+$/.test(text)) ?? '';
-    const match = online.match(/player #(\\d+)/);
+    const state = window.__MYASO_M30_UI__ ?? { events: [], keys: [], pointers: [], online: '' };
+    const match = state.online.match(/player #(\\d+)/);
     return {
       title: document.title,
       activeElement: document.activeElement?.id ?? null,
@@ -256,7 +278,9 @@ async function readUiEvidence(session) {
       playerGuard: Number(document.querySelector('#player-guard-value')?.textContent ?? NaN),
       opponentHp: Number(document.querySelector('#bot-hp-value')?.textContent ?? NaN),
       opponentGuard: Number(document.querySelector('#bot-guard-value')?.textContent ?? NaN),
-      events: events.slice(),
+      events: state.events.slice(),
+      keys: state.keys.slice(),
+      pointers: state.pointers.slice(),
     };
   `);
   return { browser: session.name, ...value };
