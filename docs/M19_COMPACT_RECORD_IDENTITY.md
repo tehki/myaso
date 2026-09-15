@@ -56,3 +56,7 @@ M19 must preserve all inherited gates and additionally prove:
 - 60 Hz tick and 20 Hz replication-batch targets remain green.
 
 M19 does not merge, deploy, bind publicly, or activate production runtime state.
+
+## Inherited M15 fixture adaptation
+
+Compact IDs reduce realtime record cost enough that the historical 192-player M15 fixture no longer forces a mid-tier deadline miss. M19 therefore makes the loopback-only near-pressure count configurable and runs M15 at 256 synthetic players with 220 in the near tier. Production scheduling and reliable-trigger thresholds are unchanged; M16/M17 retain their prior geometry.

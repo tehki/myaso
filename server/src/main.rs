@@ -32,11 +32,12 @@ const RELIABLE_BACKGROUND_COOLDOWN_TICKS: u32 = 60;
 const RELIABLE_DELTA_CHECKPOINT_INTERVAL: u8 = 3;
 const MAX_FLIGHT_BACKGROUND_PLAYERS: usize = TARGET_PLAYERS_PER_MAP - 1;
 const FLIGHT_BACKGROUND_NET_ID_BASE: u32 = 10_000;
-const FLIGHT_NEAR_PRESSURE_PLAYERS: usize = 150;
+const DEFAULT_FLIGHT_NEAR_PRESSURE_PLAYERS: usize = 150;
 
 #[derive(Debug, Clone, Copy)]
 struct LoopbackFlightConfig {
     background_players: usize,
+    near_pressure_players: usize,
     reliable_write_delay: Duration,
 }
 
@@ -47,17 +48,17 @@ struct GameState {
 }
 
 impl GameState {
-    fn new(background_players: usize) -> Self {
+    fn new(background_players: usize, near_pressure_players: usize) -> Self {
         let mut world = World::default();
         let mut flight_background_ids = Vec::with_capacity(background_players);
         for index in 0..background_players {
             let net_id = FLIGHT_BACKGROUND_NET_ID_BASE + index as u32;
-            let (x, y) = if index < FLIGHT_NEAR_PRESSURE_PLAYERS {
+            let (x, y) = if index < near_pressure_players {
                 let column = (index % 15) as f32;
                 let row = (index / 15) as f32;
                 (90.0 + column * 38.0, 90.0 + row * 38.0)
             } else {
-                let background_index = index - FLIGHT_NEAR_PRESSURE_PLAYERS;
+                let background_index = index - near_pressure_players;
                 let column = (background_index % 7) as f32;
                 let row = (background_index / 7) as f32;
                 (900.0 + column * 38.0, 100.0 + row * 38.0)
@@ -107,7 +108,7 @@ struct SharedGame {
 impl SharedGame {
     fn new(flight: LoopbackFlightConfig) -> Arc<Self> {
         Arc::new(Self {
-            state: Mutex::new(GameState::new(flight.background_players)),
+            state: Mutex::new(GameState::new(flight.background_players, flight.near_pressure_players)),
             next_player_id: AtomicU32::new(1),
             reliable_write_delay: flight.reliable_write_delay,
         })
@@ -227,6 +228,11 @@ fn load_loopback_flight_config(bind: SocketAddr) -> Result<LoopbackFlightConfig>
         })
         .transpose()?
         .unwrap_or(0);
+    let near_pressure_players = env::var("MYASO_FLIGHT_NEAR_PRESSURE_PLAYERS")
+        .ok()
+        .map(|value| value.parse::<usize>().context("MYASO_FLIGHT_NEAR_PRESSURE_PLAYERS must be an integer"))
+        .transpose()?
+        .unwrap_or(DEFAULT_FLIGHT_NEAR_PRESSURE_PLAYERS.min(background_players));
     let reliable_delay_ms = env::var("MYASO_FLIGHT_RELIABLE_DELAY_MS")
         .ok()
         .map(|value| {
@@ -239,11 +245,15 @@ fn load_loopback_flight_config(bind: SocketAddr) -> Result<LoopbackFlightConfig>
     if background_players > MAX_FLIGHT_BACKGROUND_PLAYERS {
         bail!("MYASO_FLIGHT_BACKGROUND_PLAYERS exceeds bounded flight maximum");
     }
+    if near_pressure_players > background_players {
+        bail!("MYASO_FLIGHT_NEAR_PRESSURE_PLAYERS exceeds background player count");
+    }
     if (background_players > 0 || reliable_delay_ms > 0) && !bind.ip().is_loopback() {
         bail!("M15 flight fixture is permitted only on loopback binds");
     }
     Ok(LoopbackFlightConfig {
         background_players,
+        near_pressure_players,
         reliable_write_delay: Duration::from_millis(reliable_delay_ms),
     })
 }
