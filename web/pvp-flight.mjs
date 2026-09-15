@@ -6,7 +6,7 @@ const server = params.get("server");
 const cert = params.get("cert");
 const durationMs = clamp(Number(params.get("duration") ?? 7000), 3000, 12000);
 const scenario = params.get("scenario") ?? "damage";
-if (!new Set(["damage", "parry", "dodge", "block", "guardbreak", "backblock"]).has(scenario)) throw new Error(`unsupported PvP scenario: ${scenario}`);
+if (!new Set(["damage", "parry", "dodge", "block", "guardbreak", "backblock", "respawn"]).has(scenario)) throw new Error(`unsupported PvP scenario: ${scenario}`);
 const canvas = document.querySelector("#arena");
 const ctx = canvas.getContext("2d", { alpha: false });
 const status = document.querySelector("#status");
@@ -61,6 +61,17 @@ let directionalBlockDistance = null;
 let directionalAttackArcDelta = null;
 let directionalBlockFacingDelta = null;
 let firstDirectionalBlockHitAt = null;
+let initialOwnPosition = null;
+let initialPeerPosition = null;
+let ownDeadSeen = false;
+let peerDeadSeen = false;
+let firstDeathAt = null;
+let firstRespawnAt = null;
+let deathPositionOffset = null;
+let respawnPositionError = null;
+let respawnHp = null;
+let respawnGuard = null;
+let respawnAction = null;
 let lastFrameAt = 0;
 let frameCount = 0;
 const frameDeltas = [];
@@ -109,6 +120,8 @@ function observeState(state) {
     peerSeenAt = performance.now();
     previousOwnHp = own.hp;
     previousPeerHp = peer.hp;
+    initialOwnPosition = { x: own.x, y: own.y };
+    initialPeerPosition = { x: peer.x, y: peer.y };
     status.textContent = `combat: #${ownId} vs #${peerNetId}`;
   }
 
@@ -126,6 +139,8 @@ function observeState(state) {
   peerStunnedSeen ||= peer.action === 7;
   ownDodgeSeen ||= own.action === 4;
   peerDodgeSeen ||= peer.action === 4;
+  ownDeadSeen ||= own.action === 8;
+  peerDeadSeen ||= peer.action === 8;
 
   if (firstDamageAt === null && (minOwnHp < 100 || minPeerHp < 100)) {
     firstDamageAt = performance.now();
@@ -192,6 +207,24 @@ function observeState(state) {
       firstDirectionalBlockHitAt = performance.now();
     }
   }
+  if (scenario === "respawn") {
+    const defenderSpawn = attackerIsOwn ? initialPeerPosition : initialOwnPosition;
+    if (firstDeathAt === null && defender.action === 8 && defender.hp === 0) {
+      firstDeathAt = performance.now();
+      if (defenderSpawn) {
+        deathPositionOffset = Math.hypot(defender.x - defenderSpawn.x, defender.y - defenderSpawn.y);
+      }
+    } else if (firstDeathAt !== null && firstRespawnAt === null
+      && defender.action === 0 && defender.hp === 100 && defender.guard === 100) {
+      firstRespawnAt = performance.now();
+      respawnHp = defender.hp;
+      respawnGuard = defender.guard;
+      respawnAction = defender.action;
+      if (defenderSpawn) {
+        respawnPositionError = Math.hypot(defender.x - defenderSpawn.x, defender.y - defenderSpawn.y);
+      }
+    }
+  }
   const scenarioSucceeded = scenario === "parry"
     ? firstParryAt !== null
     : scenario === "dodge"
@@ -202,7 +235,9 @@ function observeState(state) {
           ? firstGuardBreakAt !== null && blockOverlapSeen
           : scenario === "backblock"
             ? firstDirectionalBlockHitAt !== null && directionalBlockOverlapSeen
-            : minOwnHp < 100 && minPeerHp < 100;
+            : scenario === "respawn"
+              ? firstRespawnAt !== null
+              : minOwnHp < 100 && minPeerHp < 100;
   if (successAt === null && scenarioSucceeded) successAt = performance.now();
   if (successAt !== null && performance.now() - successAt >= 500) finish();
 }
@@ -225,7 +260,16 @@ function sendCombatInput() {
     const distance = Math.hypot(dx, dy);
     facing = Math.atan2(dy, dx);
 
-    if (scenario === "parry" || scenario === "dodge" || scenario === "block" || scenario === "guardbreak" || scenario === "backblock") {
+    if (scenario === "respawn") {
+      const isAttacker = ownId < peer.netId;
+      if (isAttacker && firstDeathAt === null) {
+        if (distance > 68 && distance > 0.001) {
+          moveX = dx / distance;
+          moveY = dy / distance;
+        }
+        attack = distance <= 74 && own.action === 0 && sentInputs % 12 === 0;
+      }
+    } else if (scenario === "parry" || scenario === "dodge" || scenario === "block" || scenario === "guardbreak" || scenario === "backblock") {
       const isAttacker = ownId < peer.netId;
       if (distance > 68 && distance > 0.001) {
         moveX = dx / distance;
@@ -333,6 +377,8 @@ function finish() {
   const defenderBlockSeen = isAttacker ? peerBlockSeen : ownBlockSeen;
   const defenderDodgeSeen = isAttacker ? peerDodgeSeen : ownDodgeSeen;
   const defenderStunnedSeen = isAttacker ? peerStunnedSeen : ownStunnedSeen;
+  const defenderDeadSeen = isAttacker ? peerDeadSeen : ownDeadSeen;
+  const defenderDamageTransitions = isAttacker ? peerDamageTransitions : ownDamageTransitions;
   const minDefenderHp = isAttacker ? minPeerHp : minOwnHp;
   const minDefenderGuard = isAttacker ? minPeerGuard : minOwnGuard;
   const commonOk = Boolean(
@@ -362,6 +408,17 @@ function finish() {
     && defenderBlockSeen && directionalBlockOverlapSeen
     && minDefenderHp < 100 && minDefenderGuard === 100
     && !defenderDodgeSeen && !attackerStunnedSeen;
+  const respawnDelayMs = firstDeathAt !== null && firstRespawnAt !== null
+    ? firstRespawnAt - firstDeathAt
+    : null;
+  const respawnOk = firstDeathAt !== null && firstRespawnAt !== null
+    && defenderDeadSeen && minDefenderHp === 0 && defenderDamageTransitions >= 3
+    && minDefenderGuard === 100
+    && respawnHp === 100 && respawnGuard === 100 && respawnAction === 0
+    && Number.isFinite(respawnDelayMs) && respawnDelayMs >= 1000 && respawnDelayMs <= 1750
+    && Number.isFinite(deathPositionOffset) && deathPositionOffset >= 10
+    && Number.isFinite(respawnPositionError) && respawnPositionError <= 2.5
+    && !defenderBlockSeen && !defenderDodgeSeen && !attackerStunnedSeen;
   const scenarioOk = scenario === "parry"
     ? parryOk
     : scenario === "dodge"
@@ -372,7 +429,9 @@ function finish() {
           ? guardBreakOk
           : scenario === "backblock"
             ? backBlockOk
-            : damageOk;
+            : scenario === "respawn"
+              ? respawnOk
+              : damageOk;
   const result = {
     ok: commonOk && scenarioOk,
     scenario,
@@ -399,6 +458,10 @@ function finish() {
     defenderBlockSeen,
     defenderDodgeSeen,
     defenderStunnedSeen,
+    defenderDeadSeen,
+    defenderDamageTransitions,
+    ownDeadSeen,
+    peerDeadSeen,
     dodgeOverlapSeen,
     dodgeOverlapDistance: round(dodgeOverlapDistance),
     dodgeOverlapArcDelta: round(dodgeOverlapArcDelta),
@@ -421,6 +484,14 @@ function finish() {
     firstGuardCostMs: firstGuardCostAt === null ? null : round(firstGuardCostAt - startedAt),
     firstGuardBreakMs: firstGuardBreakAt === null ? null : round(firstGuardBreakAt - startedAt),
     firstDirectionalBlockHitMs: firstDirectionalBlockHitAt === null ? null : round(firstDirectionalBlockHitAt - startedAt),
+    firstDeathMs: firstDeathAt === null ? null : round(firstDeathAt - startedAt),
+    firstRespawnMs: firstRespawnAt === null ? null : round(firstRespawnAt - startedAt),
+    respawnDelayMs: round(respawnDelayMs),
+    deathPositionOffset: round(deathPositionOffset),
+    respawnPositionError: round(respawnPositionError),
+    respawnHp,
+    respawnGuard,
+    respawnAction,
     elapsedMs: round(performance.now() - startedAt),
   };
   window.__MYASO_PVP_RESULT__ = result;
@@ -435,7 +506,9 @@ function finish() {
             ? "authoritative PvP guard break verified"
             : scenario === "backblock"
               ? "authoritative PvP directional block failure verified"
-              : "authoritative PvP damage verified")
+              : scenario === "respawn"
+                ? "authoritative PvP death and respawn verified"
+                : "authoritative PvP damage verified")
     : `PvP ${scenario} flight incomplete`;
   client?.close(`PvP ${scenario} flight complete`);
 }
