@@ -6,7 +6,7 @@ const server = params.get("server");
 const cert = params.get("cert");
 const durationMs = clamp(Number(params.get("duration") ?? 7000), 3000, 12000);
 const scenario = params.get("scenario") ?? "damage";
-if (!new Set(["damage", "parry"]).has(scenario)) throw new Error(`unsupported PvP scenario: ${scenario}`);
+if (!new Set(["damage", "parry", "dodge"]).has(scenario)) throw new Error(`unsupported PvP scenario: ${scenario}`);
 const canvas = document.querySelector("#arena");
 const ctx = canvas.getContext("2d", { alpha: false });
 const status = document.querySelector("#status");
@@ -41,6 +41,15 @@ let firstParryAt = null;
 let parryWindupSeenAt = null;
 let parryBlockArmed = false;
 let parryReactionMs = null;
+let ownDodgeSeen = false;
+let peerDodgeSeen = false;
+let dodgeWindupSeenAt = null;
+let dodgeTriggered = false;
+let dodgeReactionMs = null;
+let dodgeOverlapSeen = false;
+let dodgeOverlapDistance = null;
+let dodgeOverlapArcDelta = null;
+let firstDodgeEvadeAt = null;
 let lastFrameAt = 0;
 let frameCount = 0;
 const frameDeltas = [];
@@ -104,11 +113,15 @@ function observeState(state) {
   peerBlockSeen ||= peer.action === 6;
   ownStunnedSeen ||= own.action === 7;
   peerStunnedSeen ||= peer.action === 7;
+  ownDodgeSeen ||= own.action === 4;
+  peerDodgeSeen ||= peer.action === 4;
 
   if (firstDamageAt === null && (minOwnHp < 100 || minPeerHp < 100)) {
     firstDamageAt = performance.now();
   }
   const attackerIsOwn = ownId < peer.netId;
+  const attacker = attackerIsOwn ? own : peer;
+  const defender = attackerIsOwn ? peer : own;
   const attackerStunned = attackerIsOwn ? ownStunnedSeen : peerStunnedSeen;
   const defenderBlockSeen = attackerIsOwn ? peerBlockSeen : ownBlockSeen;
   const defenderHp = attackerIsOwn ? minPeerHp : minOwnHp;
@@ -116,9 +129,23 @@ function observeState(state) {
   if (firstParryAt === null && attackerStunned && defenderBlockSeen && defenderHp === 100 && defenderGuard === 100) {
     firstParryAt = performance.now();
   }
+  if (scenario === "dodge" && attacker.action === 2 && defender.action === 4) {
+    const dx = defender.x - attacker.x;
+    const dy = defender.y - attacker.y;
+    const distance = Math.hypot(dx, dy);
+    const arcDelta = Math.abs(normalizeAngle(Math.atan2(dy, dx) - attacker.facing));
+    if (distance <= 94 && arcDelta <= Math.PI * 0.39 && defender.hp === 100) {
+      dodgeOverlapSeen = true;
+      dodgeOverlapDistance = distance;
+      dodgeOverlapArcDelta = arcDelta;
+      if (firstDodgeEvadeAt === null) firstDodgeEvadeAt = performance.now();
+    }
+  }
   const scenarioSucceeded = scenario === "parry"
     ? firstParryAt !== null
-    : minOwnHp < 100 && minPeerHp < 100;
+    : scenario === "dodge"
+      ? firstDodgeEvadeAt !== null
+      : minOwnHp < 100 && minPeerHp < 100;
   if (successAt === null && scenarioSucceeded) successAt = performance.now();
   if (successAt !== null && performance.now() - successAt >= 500) finish();
 }
@@ -132,6 +159,7 @@ function sendCombatInput() {
   let moveY = 0;
   let facing = own?.facing ?? 0;
   let attack = false;
+  let dodge = false;
   let block = false;
 
   if (own && peer) {
@@ -140,7 +168,7 @@ function sendCombatInput() {
     const distance = Math.hypot(dx, dy);
     facing = Math.atan2(dy, dx);
 
-    if (scenario === "parry") {
+    if (scenario === "parry" || scenario === "dodge") {
       const isAttacker = ownId < peer.netId;
       if (distance > 68 && distance > 0.001) {
         moveX = dx / distance;
@@ -148,7 +176,7 @@ function sendCombatInput() {
       }
       if (isAttacker) {
         attack = distance <= 74 && own.action === 0 && sentInputs % 24 === 0;
-      } else {
+      } else if (scenario === "parry") {
         if (peer.action === 1) {
           if (parryWindupSeenAt === null) parryWindupSeenAt = performance.now();
           if (!parryBlockArmed && performance.now() - parryWindupSeenAt >= 35) {
@@ -160,6 +188,19 @@ function sendCombatInput() {
         if (![1, 2].includes(peer.action)) {
           parryWindupSeenAt = null;
           parryBlockArmed = false;
+        }
+      } else {
+        if (peer.action === 1) {
+          if (dodgeWindupSeenAt === null) dodgeWindupSeenAt = performance.now();
+          if (!dodgeTriggered && performance.now() - dodgeWindupSeenAt >= 35) {
+            dodge = true;
+            dodgeTriggered = true;
+            dodgeReactionMs = performance.now() - dodgeWindupSeenAt;
+          }
+        }
+        if (![1, 2].includes(peer.action)) {
+          dodgeWindupSeenAt = null;
+          dodgeTriggered = false;
         }
       }
     } else {
@@ -177,7 +218,7 @@ function sendCombatInput() {
     moveY,
     facing,
     attack,
-    dodge: false,
+    dodge,
     block,
   });
   clientTick = (clientTick + 1) >>> 0;
@@ -226,6 +267,7 @@ function finish() {
   const isAttacker = Boolean(ownId && peerNetId && ownId < peerNetId);
   const attackerStunnedSeen = isAttacker ? ownStunnedSeen : peerStunnedSeen;
   const defenderBlockSeen = isAttacker ? peerBlockSeen : ownBlockSeen;
+  const defenderDodgeSeen = isAttacker ? peerDodgeSeen : ownDodgeSeen;
   const minDefenderHp = isAttacker ? minPeerHp : minOwnHp;
   const minDefenderGuard = isAttacker ? minPeerGuard : minOwnGuard;
   const commonOk = Boolean(
@@ -239,8 +281,13 @@ function finish() {
   const parryOk = firstParryAt !== null
     && attackerStunnedSeen && defenderBlockSeen
     && minDefenderHp === 100 && minDefenderGuard === 100;
+  const dodgeOk = firstDodgeEvadeAt !== null
+    && defenderDodgeSeen && dodgeOverlapSeen
+    && minDefenderHp === 100 && minDefenderGuard === 100
+    && !defenderBlockSeen && !attackerStunnedSeen;
+  const scenarioOk = scenario === "parry" ? parryOk : scenario === "dodge" ? dodgeOk : damageOk;
   const result = {
-    ok: commonOk && (scenario === "parry" ? parryOk : damageOk),
+    ok: commonOk && scenarioOk,
     scenario,
     role: isAttacker ? "attacker" : "defender",
     playerNetId: ownId,
@@ -263,17 +310,27 @@ function finish() {
     peerStunnedSeen,
     attackerStunnedSeen,
     defenderBlockSeen,
+    defenderDodgeSeen,
+    dodgeOverlapSeen,
+    dodgeOverlapDistance: round(dodgeOverlapDistance),
+    dodgeOverlapArcDelta: round(dodgeOverlapArcDelta),
     minDefenderHp,
     minDefenderGuard,
     peerSeenMs: peerSeenAt === null ? null : round(peerSeenAt - startedAt),
     firstDamageMs: firstDamageAt === null ? null : round(firstDamageAt - startedAt),
     firstParryMs: firstParryAt === null ? null : round(firstParryAt - startedAt),
     parryReactionMs: round(parryReactionMs),
+    firstDodgeEvadeMs: firstDodgeEvadeAt === null ? null : round(firstDodgeEvadeAt - startedAt),
+    dodgeReactionMs: round(dodgeReactionMs),
     elapsedMs: round(performance.now() - startedAt),
   };
   window.__MYASO_PVP_RESULT__ = result;
   status.textContent = result.ok
-    ? (scenario === "parry" ? "authoritative PvP parry verified" : "authoritative PvP damage verified")
+    ? (scenario === "parry"
+      ? "authoritative PvP parry verified"
+      : scenario === "dodge"
+        ? "authoritative PvP dodge verified"
+        : "authoritative PvP damage verified")
     : `PvP ${scenario} flight incomplete`;
   client?.close(`PvP ${scenario} flight complete`);
 }
@@ -295,6 +352,13 @@ function percentile(sorted, fraction) {
 
 function clamp(value, min, max) {
   return Math.max(min, Math.min(max, value));
+}
+
+function normalizeAngle(value) {
+  let angle = value;
+  while (angle > Math.PI) angle -= Math.PI * 2;
+  while (angle < -Math.PI) angle += Math.PI * 2;
+  return angle;
 }
 
 function round(value) {
