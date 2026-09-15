@@ -8,7 +8,7 @@ import { setTimeout as sleep } from "node:timers/promises";
 const root = process.cwd();
 const durationMs = Number(process.env.MYASO_PVP_FLIGHT_DURATION_MS ?? 7000);
 const scenario = process.env.MYASO_PVP_SCENARIO ?? "damage";
-if (!new Set(["damage", "parry", "dodge", "block", "guardbreak", "backblock", "respawn"]).has(scenario)) throw new Error(`unsupported MYASO_PVP_SCENARIO: ${scenario}`);
+if (!new Set(["damage", "parry", "dodge", "block", "guardbreak", "backblock", "respawn", "ui"]).has(scenario)) throw new Error(`unsupported MYASO_PVP_SCENARIO: ${scenario}`);
 const staticPort = Number(process.env.MYASO_PVP_FLIGHT_HTTP_PORT ?? 4174);
 const browsers = [
   {
@@ -44,10 +44,15 @@ try {
   gameServer = game.child;
   for (const browser of browsers) sessions.push(await startBrowser(browser));
   await Promise.all(sessions.map((entry) => navigate(entry, game.url, game.certificateHash)));
-  const results = await Promise.all(sessions.map(waitForResult));
-  assertPairedResults(results);
-  const label = scenario === "parry" ? "M23_PVP_PARRY" : scenario === "dodge" ? "M24_PVP_DODGE" : scenario === "block" ? "M25_PVP_BLOCK" : scenario === "guardbreak" ? "M26_PVP_GUARD_BREAK" : scenario === "backblock" ? "M27_PVP_DIRECTIONAL_BLOCK" : scenario === "respawn" ? "M28_PVP_RESPAWN" : "M22_PVP_BROWSER_COMBAT";
-  console.log(`${label} ${JSON.stringify({ ok: true, results })}`);
+  if (scenario === "ui") {
+    const results = await runOnlineUiFlight(sessions);
+    console.log(`M30_ONLINE_UI_READABILITY ${JSON.stringify({ ok: true, results })}`);
+  } else {
+    const results = await Promise.all(sessions.map(waitForResult));
+    assertPairedResults(results);
+    const label = scenario === "parry" ? "M23_PVP_PARRY" : scenario === "dodge" ? "M24_PVP_DODGE" : scenario === "block" ? "M25_PVP_BLOCK" : scenario === "guardbreak" ? "M26_PVP_GUARD_BREAK" : scenario === "backblock" ? "M27_PVP_DIRECTIONAL_BLOCK" : scenario === "respawn" ? "M28_PVP_RESPAWN" : "M22_PVP_BROWSER_COMBAT";
+    console.log(`${label} ${JSON.stringify({ ok: true, results })}`);
+  }
 } finally {
   for (const session of sessions) {
     try { await webdriver(session.base, "DELETE", `/session/${session.sessionId}`); } catch {}
@@ -136,12 +141,181 @@ async function startBrowser(browser) {
 }
 
 async function navigate(session, gameUrl, certificateHash) {
-  const url = new URL(`http://127.0.0.1:${staticPort}/web/pvp-flight.html`);
+  const page = scenario === "ui" ? "index.html" : "pvp-flight.html";
+  const url = new URL(`http://127.0.0.1:${staticPort}/web/${page}`);
   url.searchParams.set("server", gameUrl);
   url.searchParams.set("cert", certificateHash);
-  url.searchParams.set("duration", String(durationMs));
-  url.searchParams.set("scenario", scenario);
+  if (scenario !== "ui") {
+    url.searchParams.set("duration", String(durationMs));
+    url.searchParams.set("scenario", scenario);
+  }
   await webdriver(session.base, "POST", `/session/${session.sessionId}/url`, { url: url.toString() });
+}
+
+async function runOnlineUiFlight(entries) {
+  await Promise.all(entries.map(installUiObserver));
+  const ready = await waitForUiReady(entries);
+  const ordered = ready.slice().sort((a, b) => a.playerNetId - b.playerNetId);
+  const attacker = entries.find((entry) => entry.name === ordered[0].browser);
+  const defender = entries.find((entry) => entry.name === ordered[1].browser);
+  if (!attacker || !defender) throw new Error(`could not resolve UI roles from ${JSON.stringify(ready)}`);
+
+  await Promise.all(entries.map((entry) => execute(entry.base, entry.sessionId, "document.querySelector('#arena').focus(); return document.activeElement?.id;")));
+
+  const arena = await webdriver(attacker.base, "POST", `/session/${attacker.sessionId}/element`, {
+    using: "css selector",
+    value: "#arena",
+  });
+  const elementId = arena?.["element-6066-11e4-a52e-4f735466cecf"];
+  if (!elementId) throw new Error(`${attacker.name} did not resolve the real arena canvas`);
+
+  let evidence = null;
+  let movementHeld = false;
+  try {
+    await setMovementKey(attacker, "d", true);
+    movementHeld = true;
+    await sleep(120);
+    for (let attempt = 0; attempt < 5 && !evidence; attempt += 1) {
+      await performArenaAttack(attacker, elementId);
+      evidence = await waitForUiCombatEvidence(entries, 700, false);
+    }
+    if (!evidence) evidence = await waitForUiCombatEvidence(entries, 1000, true);
+  } finally {
+    if (movementHeld) await setMovementKey(attacker, "d", false);
+  }
+  await sleep(100);
+  evidence = await Promise.all(entries.map(readUiEvidence));
+  const attackerResult = evidence.find((entry) => entry.browser === attacker.name);
+  const defenderResult = evidence.find((entry) => entry.browser !== attacker.name);
+  if (!attackerResult || !defenderResult) throw new Error(`incomplete UI evidence: ${JSON.stringify(evidence)}`);
+  if (!attackerResult.keys.includes("keydown:KeyD") || !attackerResult.keys.includes("keyup:KeyD")) {
+    throw new Error(`real attacker movement control was not delivered to the arena: ${JSON.stringify(attackerResult)}`);
+  }
+  const primaryDown = attackerResult.pointers.find((event) => event.type === "pointerdown" && event.button === 0);
+  const primaryUp = attackerResult.pointers.find((event) => event.type === "pointerup" && event.button === 0);
+  if (!primaryDown || !primaryUp || primaryDown.x < 0.6 || Math.abs(primaryDown.y - 0.5) > 0.15) {
+    throw new Error(`real rightward attack aim was not delivered to the attacker arena: ${JSON.stringify(attackerResult)}`);
+  }
+  if (attackerResult.playerHp !== 100 || attackerResult.opponentHp !== 66) {
+    throw new Error(`attacker HUD did not render authoritative damage: ${JSON.stringify(attackerResult)}`);
+  }
+  if (defenderResult.playerHp !== 66 || defenderResult.opponentHp !== 100) {
+    throw new Error(`defender HUD did not render authoritative damage: ${JSON.stringify(defenderResult)}`);
+  }
+  if (!attackerResult.events.includes("Opponent hit - 34 HP.")) {
+    throw new Error(`attacker never rendered the M29 hit message: ${JSON.stringify(attackerResult.events)}`);
+  }
+  if (!defenderResult.events.includes("Hit taken - 34 HP.")) {
+    throw new Error(`defender never rendered the M29 damage message: ${JSON.stringify(defenderResult.events)}`);
+  }
+  if (!attackerResult.events.some((text) => text.startsWith("Attack committed") || text.startsWith("Strike active") || text.startsWith("Recovery"))) {
+    throw new Error(`attacker never rendered an authoritative action commitment hint: ${JSON.stringify(attackerResult.events)}`);
+  }
+  return evidence;
+}
+
+async function setMovementKey(session, value, pressed) {
+  await webdriver(session.base, "POST", `/session/${session.sessionId}/actions`, {
+    actions: [{
+      type: "key",
+      id: `keyboard-${session.name}`,
+      actions: [{ type: pressed ? "keyDown" : "keyUp", value }],
+    }],
+  });
+}
+
+async function performArenaAttack(session, elementId) {
+  const origin = { "element-6066-11e4-a52e-4f735466cecf": elementId };
+  await webdriver(session.base, "POST", `/session/${session.sessionId}/actions`, {
+    actions: [{
+      type: "pointer",
+      id: `mouse-${session.name}`,
+      parameters: { pointerType: "mouse" },
+      actions: [
+        { type: "pointerMove", duration: 0, origin, x: 200, y: 0 },
+        { type: "pointerDown", button: 0 },
+        { type: "pause", duration: 40 },
+        { type: "pointerUp", button: 0 },
+      ],
+    }],
+  });
+}
+
+async function installUiObserver(session) {
+  await execute(session.base, session.sessionId, `
+    const target = document.querySelector('#event-text');
+    const arena = document.querySelector('#arena');
+    if (!target || !arena) throw new Error('missing M30 UI target');
+    const state = { events: [], keys: [], pointers: [], online: '', startedAt: performance.now() };
+    const record = () => {
+      const text = target.textContent?.trim() ?? '';
+      if (/^Online - player #\\d+ - server tick \\d+$/.test(text)) state.online = text;
+      else if (text && state.events.at(-1) !== text) state.events.push(text);
+    };
+    for (const type of ['keydown', 'keyup']) {
+      arena.addEventListener(type, (event) => state.keys.push(type + ':' + event.code), { capture: true });
+    }
+    for (const type of ['pointerdown', 'pointerup']) {
+      arena.addEventListener(type, (event) => {
+        const rect = arena.getBoundingClientRect();
+        state.pointers.push({
+          type,
+          button: event.button,
+          x: Number(((event.clientX - rect.left) / rect.width).toFixed(3)),
+          y: Number(((event.clientY - rect.top) / rect.height).toFixed(3)),
+        });
+      }, { capture: true });
+    }
+    record();
+    new MutationObserver(record).observe(target, { childList: true, subtree: true, characterData: true });
+    window.__MYASO_M30_UI__ = state;
+    return true;
+  `);
+}
+
+async function waitForUiReady(entries) {
+  const deadline = Date.now() + 15000;
+  while (Date.now() < deadline) {
+    const states = await Promise.all(entries.map(readUiEvidence));
+    if (states.every((state) => state.playerNetId > 0 && state.playerHp === 100 && state.opponentHp === 100)) return states;
+    await sleep(100);
+  }
+  throw new Error(`real online UI did not converge to two ready fighters: ${JSON.stringify(await Promise.all(entries.map(readUiEvidence)))}`);
+}
+
+async function waitForUiCombatEvidence(entries, timeoutMs = 3000, fail = true) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const states = await Promise.all(entries.map(readUiEvidence));
+    const hpValues = states.map((state) => state.playerHp).sort((a, b) => a - b);
+    const messagesReady = states.some((state) => state.events.includes("Opponent hit - 34 HP."))
+      && states.some((state) => state.events.includes("Hit taken - 34 HP."));
+    if (hpValues[0] === 66 && hpValues[1] === 100 && messagesReady) return states;
+    await sleep(50);
+  }
+  if (!fail) return null;
+  throw new Error(`real online UI never rendered the authoritative hit exchange: ${JSON.stringify(await Promise.all(entries.map(readUiEvidence)))}`);
+}
+
+async function readUiEvidence(session) {
+  const value = await execute(session.base, session.sessionId, `
+    const state = window.__MYASO_M30_UI__ ?? { events: [], keys: [], pointers: [], online: '' };
+    const match = state.online.match(/player #(\\d+)/);
+    return {
+      title: document.title,
+      activeElement: document.activeElement?.id ?? null,
+      playerNetId: match ? Number(match[1]) : 0,
+      eventText: document.querySelector('#event-text')?.textContent?.trim() ?? '',
+      playerHp: Number(document.querySelector('#player-hp-value')?.textContent ?? NaN),
+      playerGuard: Number(document.querySelector('#player-guard-value')?.textContent ?? NaN),
+      opponentHp: Number(document.querySelector('#bot-hp-value')?.textContent ?? NaN),
+      opponentGuard: Number(document.querySelector('#bot-guard-value')?.textContent ?? NaN),
+      events: state.events.slice(),
+      keys: state.keys.slice(),
+      pointers: state.pointers.slice(),
+    };
+  `);
+  return { browser: session.name, ...value };
 }
 
 async function waitForResult(session) {
