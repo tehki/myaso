@@ -38,7 +38,13 @@
     </section>
 
     <div class="arena-wrap">
-      <canvas id="arena" width="960" height="540" tabindex="0" aria-label="myaso.io combat arena"></canvas>
+      <div class="arena-stage">
+        <canvas id="arena" width="960" height="540" tabindex="0" aria-label="myaso.io combat arena"></canvas>
+        <div id="combat-overlay" class="combat-overlay" hidden aria-live="assertive">
+          <strong id="combat-overlay-title">DEFEATED</strong>
+          <span id="combat-overlay-detail">Respawning…</span>
+        </div>
+      </div>
       <p class="focus-hint">Click the arena once, then fight. Add <code>?server=https://host:port/game</code> for authoritative online mode.</p>
     </div>
   </main>

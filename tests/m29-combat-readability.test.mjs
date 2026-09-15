@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { COMBAT_ACTION, combatActionHint, createCombatReadabilityTracker } from "../src/browser/combat-readability.mjs";
+import { COMBAT_ACTION, combatActionHint, combatLifePresentation, createCombatReadabilityTracker } from "../src/browser/combat-readability.mjs";
 
 function fighter(netId, hp = 100, guard = 100, action = COMBAT_ACTION.idle) {
   return { netId, hp, guard, action };
@@ -55,4 +55,13 @@ test("authoritative action hints explain commitment windows", () => {
   assert.match(combatActionHint(fighter(1, 100, 100, COMBAT_ACTION.attackRecovery)), /Recovery/);
   assert.match(combatActionHint(fighter(1, 100, 100, COMBAT_ACTION.block)), /Blocking/);
   assert.equal(combatActionHint(fighter(1)), null);
+});
+
+test("authoritative death owns the persistent life presentation", () => {
+  assert.deepEqual(combatLifePresentation(fighter(1, 0, 100, COMBAT_ACTION.dead)), {
+    visible: true,
+    title: "DEFEATED",
+    detail: "Respawning…",
+  });
+  assert.deepEqual(combatLifePresentation(fighter(1)), { visible: false, title: "", detail: "" });
 });

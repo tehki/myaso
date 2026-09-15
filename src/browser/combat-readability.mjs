@@ -75,6 +75,17 @@ export function combatActionHint(entity) {
   }
 }
 
+export function combatLifePresentation(entity) {
+  if (!entity || entity.action !== COMBAT_ACTION.dead) {
+    return { visible: false, title: "", detail: "" };
+  }
+  return {
+    visible: true,
+    title: "DEFEATED",
+    detail: "Respawning…",
+  };
+}
+
 function collectEntityEvents(events, before, current, own) {
   if (before.action !== COMBAT_ACTION.dead && current.action === COMBAT_ACTION.dead) {
     push(events, "death", own ? "Defeated - read the exchange." : "Opponent down.", 1050);
