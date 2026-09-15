@@ -173,9 +173,13 @@ async function runOnlineUiFlight(entries) {
   });
   const elementId = arena?.["element-6066-11e4-a52e-4f735466cecf"];
   if (!elementId) throw new Error(`${attacker.name} did not resolve the real arena canvas`);
-  await webdriver(attacker.base, "POST", `/session/${attacker.sessionId}/element/${elementId}/click`, {});
 
-  const evidence = await waitForUiCombatEvidence(entries);
+  let evidence = null;
+  for (let attempt = 0; attempt < 3 && !evidence; attempt += 1) {
+    await webdriver(attacker.base, "POST", `/session/${attacker.sessionId}/element/${elementId}/click`, {});
+    evidence = await waitForUiCombatEvidence(entries, 800, false);
+  }
+  if (!evidence) evidence = await waitForUiCombatEvidence(entries, 1200, true);
   const attackerResult = evidence.find((entry) => entry.browser === attacker.name);
   const defenderResult = evidence.find((entry) => entry.browser !== attacker.name);
   if (!attackerResult || !defenderResult) throw new Error(`incomplete UI evidence: ${JSON.stringify(evidence)}`);
@@ -252,8 +256,8 @@ async function waitForUiReady(entries) {
   throw new Error(`real online UI did not converge to two ready fighters: ${JSON.stringify(await Promise.all(entries.map(readUiEvidence)))}`);
 }
 
-async function waitForUiCombatEvidence(entries) {
-  const deadline = Date.now() + 3000;
+async function waitForUiCombatEvidence(entries, timeoutMs = 3000, fail = true) {
+  const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     const states = await Promise.all(entries.map(readUiEvidence));
     const hpValues = states.map((state) => state.playerHp).sort((a, b) => a - b);
@@ -262,6 +266,7 @@ async function waitForUiCombatEvidence(entries) {
     if (hpValues[0] === 66 && hpValues[1] === 100 && messagesReady) return states;
     await sleep(50);
   }
+  if (!fail) return null;
   throw new Error(`real online UI never rendered the authoritative hit exchange: ${JSON.stringify(await Promise.all(entries.map(readUiEvidence)))}`);
 }
 

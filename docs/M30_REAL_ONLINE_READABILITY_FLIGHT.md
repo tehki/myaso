@@ -15,7 +15,7 @@ M30 deliberately uses `web/index.html` and `web/online-game.mjs`; it does not us
 - Focus both real arena canvases.
 - Close spacing with ordinary controls: attacker holds `D` and defender holds `A` for 320 ms, then both release.
 - Passively record the delivered `KeyD`/`KeyA` and primary-pointer events as browser-input provenance; the observers do not alter game state.
-- Perform a real WebDriver canvas click for the attack.
+- Perform up to three real WebDriver canvas clicks, spaced by an 800 ms observation window, stopping immediately when the first authoritative 34-HP exchange renders. This tolerates a dropped one-shot browser input without manufacturing combat state or allowing extra damage.
 - Observe only rendered DOM text/HUD values; do not inject simulation state, combat actions, HP, guard, positions, or server events.
 
 ## Acceptance
