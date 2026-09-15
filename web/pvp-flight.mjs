@@ -274,6 +274,19 @@ function sendCombatInput() {
           moveY = dy / distance;
         }
         attack = distance <= 74 && own.action === 0 && sentInputs % 12 === 0;
+      } else if (isAttacker && firstDeathAt !== null && initialPeerPosition) {
+        let retreatX = own.x - initialPeerPosition.x;
+        let retreatY = own.y - initialPeerPosition.y;
+        let retreatDistance = Math.hypot(retreatX, retreatY);
+        if (retreatDistance <= 0.001 && initialOwnPosition) {
+          retreatX = initialOwnPosition.x - initialPeerPosition.x;
+          retreatY = initialOwnPosition.y - initialPeerPosition.y;
+          retreatDistance = Math.hypot(retreatX, retreatY);
+        }
+        if (retreatDistance < 72 && retreatDistance > 0.001) {
+          moveX = retreatX / retreatDistance;
+          moveY = retreatY / retreatDistance;
+        }
       }
     } else if (scenario === "parry" || scenario === "dodge" || scenario === "block" || scenario === "guardbreak" || scenario === "backblock") {
       const isAttacker = ownId < peer.netId;

@@ -7,7 +7,7 @@ Prove the existing server-owned death and respawn loop end-to-end between two re
 - Lower authoritative net ID is the attacker; the other browser remains passive.
 - Attacker uses only ordinary production movement and committed attack inputs.
 - Three 34-damage hits must drive the defender to authoritative HP 0 / `Dead` (wire action 8).
-- After death, attacker stops attacking.
+- After death, attacker stops attacking and retreats from the defender's original spawn using ordinary movement input, so normal body-separation cannot displace the newly respawned fighter.
 - The existing server respawn timer remains unchanged at 1250 ms.
 
 ## Acceptance
