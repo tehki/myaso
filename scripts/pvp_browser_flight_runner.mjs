@@ -8,7 +8,7 @@ import { setTimeout as sleep } from "node:timers/promises";
 const root = process.cwd();
 const durationMs = Number(process.env.MYASO_PVP_FLIGHT_DURATION_MS ?? 7000);
 const scenario = process.env.MYASO_PVP_SCENARIO ?? "damage";
-if (!new Set(["damage", "parry", "dodge", "block", "guardbreak", "backblock", "respawn", "ui", "uirespawn", "uifeedback"]).has(scenario)) throw new Error(`unsupported MYASO_PVP_SCENARIO: ${scenario}`);
+if (!new Set(["damage", "parry", "dodge", "block", "guardbreak", "backblock", "respawn", "ui", "uirespawn", "uifeedback", "uiparry"]).has(scenario)) throw new Error(`unsupported MYASO_PVP_SCENARIO: ${scenario}`);
 const staticPort = Number(process.env.MYASO_PVP_FLIGHT_HTTP_PORT ?? 4174);
 const browsers = [
   {
@@ -53,6 +53,9 @@ try {
   } else if (scenario === "uifeedback") {
     const results = await runOnlineUiFeedbackFlight(sessions);
     console.log(`M32_ONLINE_HIT_FEEDBACK ${JSON.stringify({ ok: true, results })}`);
+  } else if (scenario === "uiparry") {
+    const results = await runOnlineUiParryFlight(sessions);
+    console.log(`M33_ONLINE_PARRY_FEEDBACK ${JSON.stringify({ ok: true, results })}`);
   } else {
     const results = await Promise.all(sessions.map(waitForResult));
     assertPairedResults(results);
@@ -147,7 +150,7 @@ async function startBrowser(browser) {
 }
 
 async function navigate(session, gameUrl, certificateHash) {
-  const page = scenario === "ui" || scenario === "uirespawn" || scenario === "uifeedback" ? "index.html" : "pvp-flight.html";
+  const page = scenario === "ui" || scenario === "uirespawn" || scenario === "uifeedback" || scenario === "uiparry" ? "index.html" : "pvp-flight.html";
   const url = new URL(`http://127.0.0.1:${staticPort}/web/${page}`);
   url.searchParams.set("server", gameUrl);
   url.searchParams.set("cert", certificateHash);
@@ -230,6 +233,49 @@ async function runOnlineUiFeedbackFlight(entries) {
   return evidence;
 }
 
+async function runOnlineUiParryFlight(entries) {
+  await Promise.all(entries.map(installUiObserver));
+  const ready = await waitForUiReady(entries);
+  const ordered = ready.slice().sort((a, b) => a.playerNetId - b.playerNetId);
+  const attacker = entries.find((entry) => entry.name === ordered[0].browser);
+  const defender = entries.find((entry) => entry.name === ordered[1].browser);
+  if (!attacker || !defender) throw new Error(`could not resolve M33 UI roles from ${JSON.stringify(ready)}`);
+
+  await Promise.all(entries.map((entry) => execute(entry.base, entry.sessionId, "document.querySelector('#arena').focus(); return document.activeElement?.id;")));
+  const attackerElementId = await resolveArenaElement(attacker, "M33 attacker");
+  const defenderElementId = await resolveArenaElement(defender, "M33 defender");
+
+  await pulseMovementKey(attacker, "d", 120);
+  let evidence;
+  let blockHeld = false;
+  try {
+    const attackAction = performArenaAttack(attacker, attackerElementId);
+    await sleep(55);
+    await setArenaBlock(defender, defenderElementId, true);
+    blockHeld = true;
+    await attackAction;
+    evidence = await waitForUiParryEvidence(entries, attacker, defender, 1000);
+  } finally {
+    if (blockHeld) await setArenaBlock(defender, defenderElementId, false);
+  }
+
+  await sleep(80);
+  evidence = await Promise.all(entries.map(readUiEvidence));
+  const attackerResult = evidence.find((entry) => entry.browser === attacker.name);
+  const defenderResult = evidence.find((entry) => entry.browser === defender.name);
+  if (!attackerResult || !defenderResult) throw new Error(`incomplete M33 UI evidence: ${JSON.stringify(evidence)}`);
+  const attackDown = attackerResult.pointers.find((event) => event.type === "pointerdown" && event.button === 0);
+  const blockDown = defenderResult.pointers.find((event) => event.type === "pointerdown" && event.button === 2);
+  const blockUp = defenderResult.pointers.find((event) => event.type === "pointerup" && event.button === 2);
+  if (!attackDown || attackDown.x < 0.6 || Math.abs(attackDown.y - 0.5) > 0.15) {
+    throw new Error(`M33 real attacker aim was not delivered: ${JSON.stringify(attackerResult)}`);
+  }
+  if (!blockDown || !blockUp || blockDown.x > 0.4 || Math.abs(blockDown.y - 0.5) > 0.15) {
+    throw new Error(`M33 real directional block input was not delivered: ${JSON.stringify(defenderResult)}`);
+  }
+  return evidence;
+}
+
 async function runOnlineUiRespawnFlight(entries) {
   await Promise.all(entries.map(installUiObserver));
   const ready = await waitForUiReady(entries);
@@ -294,6 +340,26 @@ async function pulseMovementKey(session, value, durationMs) {
   await setMovementKey(session, value, true);
   await sleep(durationMs);
   await setMovementKey(session, value, false);
+}
+
+async function resolveArenaElement(session, label) {
+  const arena = await webdriver(session.base, "POST", `/session/${session.sessionId}/element`, {
+    using: "css selector",
+    value: "#arena",
+  });
+  const elementId = arena?.["element-6066-11e4-a52e-4f735466cecf"];
+  if (!elementId) throw new Error(`${session.name} did not resolve the real arena canvas for ${label}`);
+  return elementId;
+}
+
+async function setArenaBlock(session, elementId, pressed) {
+  const origin = { "element-6066-11e4-a52e-4f735466cecf": elementId };
+  const actions = pressed
+    ? [{ type: "pointerMove", duration: 0, origin, x: -200, y: 0 }, { type: "pointerDown", button: 2 }]
+    : [{ type: "pointerUp", button: 2 }];
+  await webdriver(session.base, "POST", `/session/${session.sessionId}/actions`, {
+    actions: [{ type: "pointer", id: `mouse-${session.name}`, parameters: { pointerType: "mouse" }, actions }],
+  });
 }
 
 async function performArenaAttack(session, elementId) {
@@ -388,6 +454,24 @@ async function waitForUiCombatEvidence(entries, timeoutMs = 3000, fail = true) {
   }
   if (!fail) return null;
   throw new Error(`real online UI never rendered the authoritative hit exchange: ${JSON.stringify(await Promise.all(entries.map(readUiEvidence)))}`);
+}
+
+async function waitForUiParryEvidence(entries, attacker, defender, timeoutMs) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const states = await Promise.all(entries.map(readUiEvidence));
+    const attackerState = states.find((entry) => entry.browser === attacker.name);
+    const defenderState = states.find((entry) => entry.browser === defender.name);
+    const messagesReady = attackerState?.events.includes("Parried - your commitment was read.")
+      && defenderState?.events.includes("Parry! Opponent stunned - punish now.");
+    const feedbackReady = attackerState?.feedbackTransitions.includes("parried")
+      && defenderState?.feedbackTransitions.includes("parry-success");
+    const vitalsClean = attackerState?.playerHp === 100 && attackerState?.playerGuard === 100
+      && defenderState?.playerHp === 100 && defenderState?.playerGuard === 100;
+    if (messagesReady && feedbackReady && vitalsClean) return states;
+    await sleep(40);
+  }
+  throw new Error(`real online UI never rendered authoritative parry feedback: ${JSON.stringify(await Promise.all(entries.map(readUiEvidence)))}`);
 }
 
 async function waitForUiDeathEvidence(entries, attacker, defender, timeoutMs, fail = true) {

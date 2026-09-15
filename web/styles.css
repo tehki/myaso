@@ -28,6 +28,8 @@ kbd { border: 1px solid #575144; border-bottom-width: 2px; border-radius: 5px; b
 .arena-stage::after { content: ""; position: absolute; inset: 0; z-index: 1; pointer-events: none; opacity: 0; }
 .arena-stage[data-combat-feedback="hit-confirm"]::after { animation: hit-confirm .32s ease-out; }
 .arena-stage[data-combat-feedback="damage-taken"]::after { animation: damage-taken .32s ease-out; }
+.arena-stage[data-combat-feedback="parry-success"]::after { animation: parry-success .38s ease-out; }
+.arena-stage[data-combat-feedback="parried"]::after { animation: parried .38s ease-out; }
 canvas { display: block; width: 100%; height: auto; aspect-ratio: 16 / 9; outline: none; cursor: crosshair; touch-action: none; }
 canvas:focus-visible { box-shadow: inset 0 0 0 2px #c5a457; }
 .combat-overlay { position: absolute; inset: 0; z-index: 2; display: grid; place-content: center; gap: 8px; text-align: center; pointer-events: none; background: rgba(10, 9, 7, .56); backdrop-filter: blur(2px); }
@@ -36,6 +38,8 @@ canvas:focus-visible { box-shadow: inset 0 0 0 2px #c5a457; }
 .combat-overlay span { font-size: 14px; letter-spacing: .08em; color: #c9b77f; }
 @keyframes hit-confirm { from { opacity: .92; box-shadow: inset 0 0 0 5px rgba(214, 195, 148, .82); } to { opacity: 0; box-shadow: inset 0 0 0 12px rgba(214, 195, 148, 0); } }
 @keyframes damage-taken { from { opacity: .92; box-shadow: inset 0 0 0 6px rgba(164, 68, 55, .88); } to { opacity: 0; box-shadow: inset 0 0 0 16px rgba(164, 68, 55, 0); } }
+@keyframes parry-success { from { opacity: .96; box-shadow: inset 0 0 0 7px rgba(174, 209, 147, .9); } to { opacity: 0; box-shadow: inset 0 0 0 18px rgba(174, 209, 147, 0); } }
+@keyframes parried { from { opacity: .96; box-shadow: inset 0 0 0 7px rgba(126, 102, 159, .9); } to { opacity: 0; box-shadow: inset 0 0 0 18px rgba(126, 102, 159, 0); } }
 .focus-hint { margin: 0; padding: 9px 12px; border-top: 1px solid #342f26; color: #847c6e; font-size: 12px; text-align: center; }
 @media (max-width: 760px) {
   .hud { grid-template-columns: 1fr 1fr; }
