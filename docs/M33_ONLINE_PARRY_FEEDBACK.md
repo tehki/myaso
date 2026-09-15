@@ -18,14 +18,14 @@ M33 adds distinct presentation cues only after the existing authoritative readab
 
 The M33 `uiparry` scenario uses the production `index.html` client in concurrent Chrome and Firefox sessions against one loopback authoritative server.
 
-The defender first aims back toward the attacker without blocking. The lower-net-ID attacker then closes range with real `D` input. The flight submits concurrent real W3C pointer timelines: Chrome commits a rightward LMB attack immediately, while pre-aimed Firefox waits 60 ms inside its own action sequence and then presses RMB. This removes cross-browser WebDriver round-trip latency while keeping both controls genuine and leaving the server parry window unchanged.
+To avoid Firefox WebDriver latency controlling the parry result, M33 assigns the higher-net-ID Firefox client as attacker and the lower-net-ID Chrome client as defender. Firefox closes left with real `A` input and commits a leftward LMB attack. Chrome is pre-aimed right without blocking, then its concurrent W3C pointer timeline waits 120 ms before real RMB-down. Both timelines are submitted together, removing cross-browser command round trips while leaving the server parry window unchanged.
 
 The flight passes only when:
 
 - attacker and defender both remain at 100 HP and 100 guard;
 - attacker renders `Parried - your commitment was read.` plus `parried` feedback;
 - defender renders `Parry! Opponent stunned - punish now.` plus `parry-success` feedback;
-- real LMB and RMB pointer provenance confirms rightward attack and leftward directional block input.
+- real `A` movement plus LMB/RMB pointer provenance confirms leftward attack and rightward directional block input.
 
 The observer reads rendered DOM/HUD state only. It does not inject action, HP, guard, position, stun, parry, or server state.
 
