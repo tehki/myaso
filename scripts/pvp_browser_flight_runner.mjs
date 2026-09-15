@@ -253,15 +253,17 @@ async function runOnlineUiParryFlight(entries) {
   await aimArena(defender, defenderElementId, 200);
   await pulseMovementKey(attacker, "a", 120);
   let evidence;
+  let attackHeld = false;
   let blockHeld = false;
   try {
+    await setArenaAttack(attacker, true);
+    attackHeld = true;
+    await waitForUiMessage(attacker, "Attack committed - your windup is readable.", 700);
+    await setArenaBlock(defender, defenderElementId, true);
     blockHeld = true;
-    await Promise.all([
-      holdArenaAttack(attacker, 100),
-      pressArenaBlockAfterPause(defender, 60),
-    ]);
     evidence = await waitForUiParryEvidence(entries, attacker, defender, 1000);
   } finally {
+    if (attackHeld) await setArenaAttack(attacker, false);
     if (blockHeld) await setArenaBlock(defender, defenderElementId, false);
   }
 
@@ -387,24 +389,9 @@ async function centerArenaInViewport(session) {
   return geometry;
 }
 
-async function holdArenaAttack(session, holdMs) {
+async function setArenaAttack(session, pressed) {
   await webdriver(session.base, "POST", `/session/${session.sessionId}/actions`, {
-    actions: [{ type: "pointer", id: `mouse-${session.name}`, parameters: { pointerType: "mouse" }, actions: [{ type: "pointerDown", button: 0 }] }],
-  });
-  await sleep(holdMs);
-  await webdriver(session.base, "POST", `/session/${session.sessionId}/actions`, {
-    actions: [{ type: "pointer", id: `mouse-${session.name}`, parameters: { pointerType: "mouse" }, actions: [{ type: "pointerUp", button: 0 }] }],
-  });
-}
-
-async function pressArenaBlockAfterPause(session, delayMs) {
-  await webdriver(session.base, "POST", `/session/${session.sessionId}/actions`, {
-    actions: [{
-      type: "pointer",
-      id: `mouse-${session.name}`,
-      parameters: { pointerType: "mouse" },
-      actions: [{ type: "pause", duration: delayMs }, { type: "pointerDown", button: 2 }],
-    }],
+    actions: [{ type: "pointer", id: `mouse-${session.name}`, parameters: { pointerType: "mouse" }, actions: [{ type: pressed ? "pointerDown" : "pointerUp", button: 0 }] }],
   });
 }
 
