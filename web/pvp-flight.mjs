@@ -6,7 +6,7 @@ const server = params.get("server");
 const cert = params.get("cert");
 const durationMs = clamp(Number(params.get("duration") ?? 7000), 3000, 12000);
 const scenario = params.get("scenario") ?? "damage";
-if (!new Set(["damage", "parry", "dodge", "block"]).has(scenario)) throw new Error(`unsupported PvP scenario: ${scenario}`);
+if (!new Set(["damage", "parry", "dodge", "block", "guardbreak"]).has(scenario)) throw new Error(`unsupported PvP scenario: ${scenario}`);
 const canvas = document.querySelector("#arena");
 const ctx = canvas.getContext("2d", { alpha: false });
 const status = document.querySelector("#status");
@@ -55,6 +55,7 @@ let blockOverlapDistance = null;
 let blockOverlapArcDelta = null;
 let firstBlockAt = null;
 let firstGuardCostAt = null;
+let firstGuardBreakAt = null;
 let lastFrameAt = 0;
 let frameCount = 0;
 const frameDeltas = [];
@@ -146,7 +147,7 @@ function observeState(state) {
       if (firstDodgeEvadeAt === null) firstDodgeEvadeAt = performance.now();
     }
   }
-  if (scenario === "block") {
+  if (scenario === "block" || scenario === "guardbreak") {
     if (defender.action === 6 && firstBlockAt === null) firstBlockAt = performance.now();
     if (attacker.action === 2 && defender.action === 6) {
       const dx = defender.x - attacker.x;
@@ -162,6 +163,9 @@ function observeState(state) {
     if (firstGuardCostAt === null && defender.hp === 100 && defender.guard < 100) {
       firstGuardCostAt = performance.now();
     }
+    if (firstGuardBreakAt === null && defender.action === 7 && defender.hp === 100 && defender.guard <= 0) {
+      firstGuardBreakAt = performance.now();
+    }
   }
   const scenarioSucceeded = scenario === "parry"
     ? firstParryAt !== null
@@ -169,7 +173,9 @@ function observeState(state) {
       ? firstDodgeEvadeAt !== null
       : scenario === "block"
         ? firstGuardCostAt !== null && blockOverlapSeen
-        : minOwnHp < 100 && minPeerHp < 100;
+        : scenario === "guardbreak"
+          ? firstGuardBreakAt !== null && blockOverlapSeen
+          : minOwnHp < 100 && minPeerHp < 100;
   if (successAt === null && scenarioSucceeded) successAt = performance.now();
   if (successAt !== null && performance.now() - successAt >= 500) finish();
 }
@@ -192,15 +198,16 @@ function sendCombatInput() {
     const distance = Math.hypot(dx, dy);
     facing = Math.atan2(dy, dx);
 
-    if (scenario === "parry" || scenario === "dodge" || scenario === "block") {
+    if (scenario === "parry" || scenario === "dodge" || scenario === "block" || scenario === "guardbreak") {
       const isAttacker = ownId < peer.netId;
       if (distance > 68 && distance > 0.001) {
         moveX = dx / distance;
         moveY = dy / distance;
       }
       if (isAttacker) {
-        const defenderReady = scenario !== "block" || peer.action === 6;
-        attack = defenderReady && distance <= 74 && own.action === 0 && sentInputs % 24 === 0;
+        const defenderReady = !["block", "guardbreak"].includes(scenario) || peer.action === 6;
+        const attackModulo = scenario === "guardbreak" ? 12 : 24;
+        attack = defenderReady && distance <= 74 && own.action === 0 && sentInputs % attackModulo === 0;
       } else if (scenario === "parry") {
         if (peer.action === 1) {
           if (parryWindupSeenAt === null) parryWindupSeenAt = performance.now();
@@ -295,6 +302,7 @@ function finish() {
   const attackerStunnedSeen = isAttacker ? ownStunnedSeen : peerStunnedSeen;
   const defenderBlockSeen = isAttacker ? peerBlockSeen : ownBlockSeen;
   const defenderDodgeSeen = isAttacker ? peerDodgeSeen : ownDodgeSeen;
+  const defenderStunnedSeen = isAttacker ? peerStunnedSeen : ownStunnedSeen;
   const minDefenderHp = isAttacker ? minPeerHp : minOwnHp;
   const minDefenderGuard = isAttacker ? minPeerGuard : minOwnGuard;
   const commonOk = Boolean(
@@ -316,13 +324,19 @@ function finish() {
     && defenderBlockSeen && blockOverlapSeen
     && minDefenderHp === 100 && minDefenderGuard < 100
     && !defenderDodgeSeen && !attackerStunnedSeen;
+  const guardBreakOk = firstGuardBreakAt !== null
+    && defenderBlockSeen && blockOverlapSeen && defenderStunnedSeen
+    && minDefenderHp === 100 && minDefenderGuard === 0
+    && !defenderDodgeSeen && !attackerStunnedSeen;
   const scenarioOk = scenario === "parry"
     ? parryOk
     : scenario === "dodge"
       ? dodgeOk
       : scenario === "block"
         ? blockOk
-        : damageOk;
+        : scenario === "guardbreak"
+          ? guardBreakOk
+          : damageOk;
   const result = {
     ok: commonOk && scenarioOk,
     scenario,
@@ -348,6 +362,7 @@ function finish() {
     attackerStunnedSeen,
     defenderBlockSeen,
     defenderDodgeSeen,
+    defenderStunnedSeen,
     dodgeOverlapSeen,
     dodgeOverlapDistance: round(dodgeOverlapDistance),
     dodgeOverlapArcDelta: round(dodgeOverlapArcDelta),
@@ -364,6 +379,7 @@ function finish() {
     dodgeReactionMs: round(dodgeReactionMs),
     firstBlockMs: firstBlockAt === null ? null : round(firstBlockAt - startedAt),
     firstGuardCostMs: firstGuardCostAt === null ? null : round(firstGuardCostAt - startedAt),
+    firstGuardBreakMs: firstGuardBreakAt === null ? null : round(firstGuardBreakAt - startedAt),
     elapsedMs: round(performance.now() - startedAt),
   };
   window.__MYASO_PVP_RESULT__ = result;
@@ -374,7 +390,9 @@ function finish() {
         ? "authoritative PvP dodge verified"
         : scenario === "block"
           ? "authoritative PvP block verified"
-          : "authoritative PvP damage verified")
+          : scenario === "guardbreak"
+            ? "authoritative PvP guard break verified"
+            : "authoritative PvP damage verified")
     : `PvP ${scenario} flight incomplete`;
   client?.close(`PvP ${scenario} flight complete`);
 }
