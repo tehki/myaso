@@ -250,11 +250,11 @@ async function runOnlineUiParryFlight(entries) {
   let evidence;
   let blockHeld = false;
   try {
-    const attackAction = performArenaAttack(attacker, attackerElementId);
-    await waitForUiMessage(attacker, "Attack committed - your windup is readable.", 500);
-    await setArenaBlock(defender, defenderElementId, true);
     blockHeld = true;
-    await attackAction;
+    await Promise.all([
+      performArenaAttack(attacker, attackerElementId),
+      pressArenaBlockAfterPause(defender, 60),
+    ]);
     evidence = await waitForUiParryEvidence(entries, attacker, defender, 1000);
   } finally {
     if (blockHeld) await setArenaBlock(defender, defenderElementId, false);
@@ -361,6 +361,17 @@ async function aimArena(session, elementId, xOffset) {
       id: `mouse-${session.name}`,
       parameters: { pointerType: "mouse" },
       actions: [{ type: "pointerMove", duration: 0, origin, x: xOffset, y: 0 }],
+    }],
+  });
+}
+
+async function pressArenaBlockAfterPause(session, delayMs) {
+  await webdriver(session.base, "POST", `/session/${session.sessionId}/actions`, {
+    actions: [{
+      type: "pointer",
+      id: `mouse-${session.name}`,
+      parameters: { pointerType: "mouse" },
+      actions: [{ type: "pause", duration: delayMs }, { type: "pointerDown", button: 2 }],
     }],
   });
 }

@@ -18,7 +18,7 @@ M33 adds distinct presentation cues only after the existing authoritative readab
 
 The M33 `uiparry` scenario uses the production `index.html` client in concurrent Chrome and Firefox sessions against one loopback authoritative server.
 
-The defender first aims back toward the attacker without blocking. The lower-net-ID attacker then closes range with real `D` input and commits a rightward LMB attack. The flight waits until that client renders the authoritative windup tell, then sends only RMB-down immediately so pointer movement latency is outside the server parry window.
+The defender first aims back toward the attacker without blocking. The lower-net-ID attacker then closes range with real `D` input. The flight submits concurrent real W3C pointer timelines: Chrome commits a rightward LMB attack immediately, while pre-aimed Firefox waits 60 ms inside its own action sequence and then presses RMB. This removes cross-browser WebDriver round-trip latency while keeping both controls genuine and leaving the server parry window unchanged.
 
 The flight passes only when:
 
