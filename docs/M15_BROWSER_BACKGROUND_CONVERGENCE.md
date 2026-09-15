@@ -8,18 +8,19 @@ M15 does not change protocol v1, combat authority, realtime datagram size, or pr
 
 ## Flight fixture
 
-The authoritative server accepts two optional test-only environment variables:
+The authoritative server accepts three optional test-only environment variables:
 
 - `MYASO_FLIGHT_BACKGROUND_PLAYERS`
+- `MYASO_FLIGHT_NEAR_PRESSURE_PLAYERS`
 - `MYASO_FLIGHT_RELIABLE_DELAY_MS`
 
-They are rejected on non-loopback binds. The bounded population maximum is 256 synthetic fighters.
+They are rejected on non-loopback binds. The bounded population maximum is 511 synthetic fighters.
 
-The fixture rotates facing while holding Block. The first 150 synthetic fighters occupy the near tier and continuously consume realtime priority; the remaining fighters sit in the mid tier, creating deliberate background pressure without movement, attacks, damage, or combat interaction.
+The fixture rotates facing while holding Block. A configurable near-pressure subset continuously consumes realtime priority; remaining synthetic fighters stay outside that cluster so a reliable catch-up still proves convergence beyond the hottest tier.
 ## CI profile
 
-- 192 loopback-only background fighters
-- 250 ms reliable-writer delay
+- 320 loopback-only background fighters, including 256 near-pressure fighters
+- 25 ms reliable-writer delay
 - 4.5 second Chrome and Firefox flights
 - 2.5 second maximum first background convergence budget
 

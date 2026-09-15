@@ -94,11 +94,11 @@ test("snapshot delta encodes only changed fields and removals", () => {
   const fighter = dequantizeEntity(next.get(1));
   assert.equal(fighter.hp, 66);
   assert.equal(fighter.action, "attack_windup");
-  assert.ok(Math.abs(fighter.x - 101) <= 0.25);
+  assert.ok(Math.abs(fighter.x - 101) <= 1);
 });
 
 test("snapshot encoder refuses to fragment beyond the datagram budget", () => {
-  const current = Array.from({ length: 100 }, (_, index) => entity(index + 1, 10 + index, 10));
+  const current = Array.from({ length: 110 }, (_, index) => entity(index + 1, 10 + index, 10));
   const records = buildSnapshotDelta(current, []);
   assert.throws(() => encodeSnapshot({ sequence: 1, serverTick: 1, records, maxBytes: 1100 }), /exceeds datagram budget/);
 });

@@ -29,13 +29,14 @@ function fullRecord(netId, facing = 16384) {
   };
 }
 
-test("M20 current encoding matches the cross-language compact-facing fixture", () => {
+test("M20 encoding two matches the historical compact-facing fixture", () => {
   const packet = encodeSnapshot({
     sequence: 7,
     baselineSequence: 6,
     serverTick: 1234,
     records: [fullRecord(1)],
     maxBytes: 1100,
+    encoding: SNAPSHOT_ENCODINGS.VARINT_IDS_U8_FACING,
   });
   assert.equal(Buffer.from(packet).toString("hex"), fixtureHex);
   assert.equal(packet.byteLength, 25);
@@ -64,6 +65,7 @@ test("M20 compact facing stays within half-step error across uint16 boundaries",
       serverTick: 1,
       records: [{ netId: 1, mask: SNAPSHOT_FIELDS.FACING, facing }],
       maxBytes: 1100,
+    encoding: SNAPSHOT_ENCODINGS.VARINT_IDS_U8_FACING,
     });
     const decodedFacing = decodeSnapshot(packet).records[0].facing;
     assert.equal(packet.byteLength, 17);

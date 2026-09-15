@@ -4,11 +4,13 @@ const HEADER_BYTES = 14;
 const ENCODING_LEGACY_U32_IDS = 0;
 const ENCODING_VARINT_IDS = 1;
 const ENCODING_VARINT_IDS_U8_FACING = 2;
-const CURRENT_ENCODING = ENCODING_VARINT_IDS_U8_FACING;
+const ENCODING_VARINT_IDS_U8_FACING_U12_POSITION = 3;
+const CURRENT_ENCODING = ENCODING_VARINT_IDS_U8_FACING_U12_POSITION;
 const FIELD_POSITION = 1 << 0;
 const FIELD_FACING = 1 << 1;
 const FIELD_VITALS = 1 << 2;
 const FIELD_ACTION = 1 << 3;
+const FIELD_WIDE_POSITION = 1 << 4;
 const FIELD_REMOVED = 1 << 7;
 const FULL_FIELDS = FIELD_POSITION | FIELD_FACING | FIELD_VITALS | FIELD_ACTION;
 
@@ -114,7 +116,7 @@ export function encodeSnapshot({
   let offset = HEADER_BYTES;
   for (const record of records) {
     assertNetId(record.netId);
-    const mask = record.mask ?? FULL_FIELDS;
+    const mask = snapshotWireMask(record, encoding);
     if (encoding === ENCODING_LEGACY_U32_IDS) {
       view.setUint32(offset, record.netId >>> 0, true);
       offset += 4;
@@ -125,12 +127,16 @@ export function encodeSnapshot({
     offset += 1;
     if (mask & FIELD_REMOVED) continue;
     if (mask & FIELD_POSITION) {
-      view.setUint16(offset, record.x, true);
-      view.setUint16(offset + 2, record.y, true);
-      offset += 4;
+      if (usesCompactPosition(encoding) && !(mask & FIELD_WIDE_POSITION)) {
+        offset = writeCompactPosition(view, offset, record.x, record.y);
+      } else {
+        view.setUint16(offset, record.x, true);
+        view.setUint16(offset + 2, record.y, true);
+        offset += 4;
+      }
     }
     if (mask & FIELD_FACING) {
-      if (encoding === ENCODING_VARINT_IDS_U8_FACING) {
+      if (usesCompactFacing(encoding)) {
         view.setUint8(offset, compactFacingU8(record.facing));
         offset += 1;
       } else {
@@ -177,15 +183,20 @@ export function decodeSnapshot(buffer) {
     const mask = view.getUint8(offset);
     offset += 1;
     const record = { netId, mask };
+    const widePosition = Boolean(mask & FIELD_WIDE_POSITION);
+    if (widePosition && (!usesCompactPosition(encoding) || !(mask & FIELD_POSITION))) throw new RangeError("invalid compact-position marker");
     if (!(mask & FIELD_REMOVED)) {
       if (mask & FIELD_POSITION) {
-        requireBytes(view, offset, 4);
-        record.x = view.getUint16(offset, true);
-        record.y = view.getUint16(offset + 2, true);
-        offset += 4;
+        if (usesCompactPosition(encoding) && !widePosition) {
+          requireBytes(view, offset, 3);
+          const packed = view.getUint8(offset) | (view.getUint8(offset + 1) << 8) | (view.getUint8(offset + 2) << 16);
+          record.x = (packed & 0x0fff) << 3; record.y = ((packed >>> 12) & 0x0fff) << 3; offset += 3;
+        } else {
+          requireBytes(view, offset, 4); record.x = view.getUint16(offset, true); record.y = view.getUint16(offset + 2, true); offset += 4;
+        }
       }
       if (mask & FIELD_FACING) {
-        if (encoding === ENCODING_VARINT_IDS_U8_FACING) {
+        if (usesCompactFacing(encoding)) {
           requireBytes(view, offset, 1);
           record.facing = expandFacingU8(view.getUint8(offset));
           offset += 1;
@@ -258,7 +269,7 @@ export function snapshotRecordBytes(record, encoding = CURRENT_ENCODING) {
   const mask = record.mask ?? FULL_FIELDS;
   let bytes = snapshotNetIdBytes(record.netId, encoding) + 1;
   if (mask & FIELD_REMOVED) return bytes;
-  if (mask & FIELD_POSITION) bytes += 4;
+  if (mask & FIELD_POSITION) bytes += positionBytesForRecord(record, encoding);
   if (mask & FIELD_FACING) bytes += facingBytesForEncoding(encoding);
   if (mask & FIELD_VITALS) bytes += 2;
   if (mask & FIELD_ACTION) bytes += 2;
@@ -269,6 +280,7 @@ export const SNAPSHOT_ENCODINGS = Object.freeze({
   LEGACY_U32_IDS: ENCODING_LEGACY_U32_IDS,
   VARINT_IDS: ENCODING_VARINT_IDS,
   VARINT_IDS_U8_FACING: ENCODING_VARINT_IDS_U8_FACING,
+  VARINT_IDS_U8_FACING_U12_POSITION: ENCODING_VARINT_IDS_U8_FACING_U12_POSITION,
   CURRENT: CURRENT_ENCODING,
 });
 
@@ -277,6 +289,7 @@ export const SNAPSHOT_FIELDS = Object.freeze({
   FACING: FIELD_FACING,
   VITALS: FIELD_VITALS,
   ACTION: FIELD_ACTION,
+  WIDE_POSITION: FIELD_WIDE_POSITION,
   REMOVED: FIELD_REMOVED,
   FULL: FULL_FIELDS,
   HEADER_BYTES,
@@ -369,13 +382,29 @@ function readUint32Varint(view, offset) {
 function assertSnapshotEncoding(encoding) {
   if (encoding !== ENCODING_LEGACY_U32_IDS
     && encoding !== ENCODING_VARINT_IDS
-    && encoding !== ENCODING_VARINT_IDS_U8_FACING) {
+    && encoding !== ENCODING_VARINT_IDS_U8_FACING
+    && encoding !== ENCODING_VARINT_IDS_U8_FACING_U12_POSITION) {
     throw new RangeError(`unsupported snapshot encoding ${encoding}`);
   }
 }
 
+function snapshotWireMask(record, encoding) {
+  let mask = (record.mask ?? FULL_FIELDS) & ~FIELD_WIDE_POSITION;
+  if (usesCompactPosition(encoding) && (mask & FIELD_POSITION) && !positionIsCompact(record.x, record.y)) mask |= FIELD_WIDE_POSITION;
+  return mask;
+}
+function positionBytesForRecord(record, encoding) { return usesCompactPosition(encoding) && positionIsCompact(record.x, record.y) ? 3 : 4; }
+function positionIsCompact(x, y) { return x <= 0x7ffb && y <= 0x7ffb; }
+function writeCompactPosition(view, offset, x, y) {
+  const packedX = Math.floor((x + 4) / 8), packedY = Math.floor((y + 4) / 8);
+  const packed = packedX | (packedY << 12);
+  view.setUint8(offset, packed & 0xff); view.setUint8(offset + 1, (packed >>> 8) & 0xff); view.setUint8(offset + 2, (packed >>> 16) & 0xff); return offset + 3;
+}
+function usesCompactPosition(encoding) { return encoding === ENCODING_VARINT_IDS_U8_FACING_U12_POSITION; }
+function usesCompactFacing(encoding) { return encoding === ENCODING_VARINT_IDS_U8_FACING || encoding === ENCODING_VARINT_IDS_U8_FACING_U12_POSITION; }
+
 function facingBytesForEncoding(encoding) {
-  return encoding === ENCODING_VARINT_IDS_U8_FACING ? 1 : 2;
+  return usesCompactFacing(encoding) ? 1 : 2;
 }
 
 function compactFacingU8(facing) {

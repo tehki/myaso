@@ -1,6 +1,6 @@
 use myaso_server::snapshot::{
     decode_snapshot, encode_snapshot_current, SnapshotRecord,
-    SNAPSHOT_ENCODING_VARINT_IDS_U8_FACING, SNAPSHOT_FIELD_FACING, SNAPSHOT_FULL_FIELDS,
+    SNAPSHOT_ENCODING_VARINT_IDS_U8_FACING, SNAPSHOT_FIELD_FACING,
 };
 
 fn record(net_id: u32, mask: u8, facing: u16) -> SnapshotRecord {
@@ -17,25 +17,17 @@ fn record(net_id: u32, mask: u8, facing: u16) -> SnapshotRecord {
     }
 }
 
-fn hex(bytes: &[u8]) -> String {
-    bytes.iter().map(|byte| format!("{byte:02x}")).collect()
+fn fixture_bytes() -> Vec<u8> {
+    let hex = include_str!("../../tests/fixtures/m20-snapshot-u8-facing-v1.hex").trim();
+    (0..hex.len())
+        .step_by(2)
+        .map(|index| u8::from_str_radix(&hex[index..index + 2], 16).expect("valid fixture hex"))
+        .collect()
 }
 
 #[test]
-fn current_encoding_matches_cross_language_compact_facing_fixture() {
-    let encoded = encode_snapshot_current(
-        7,
-        6,
-        1234,
-        false,
-        &[record(1, SNAPSHOT_FULL_FIELDS, 16384)],
-        1100,
-    );
-    let expected = include_str!("../../tests/fixtures/m20-snapshot-u8-facing-v1.hex").trim();
-    assert_eq!(hex(&encoded), expected);
-    assert_eq!(encoded.len(), 25);
-
-    let decoded = decode_snapshot(&encoded).expect("M20 fixture must decode");
+fn historical_encoding_two_fixture_still_decodes() {
+    let decoded = decode_snapshot(&fixture_bytes()).expect("M20 fixture must decode");
     assert_eq!(decoded.encoding, SNAPSHOT_ENCODING_VARINT_IDS_U8_FACING);
     assert_eq!(decoded.records[0].facing, 16448);
     assert!(decoded.records[0].facing.abs_diff(16384) <= 128);

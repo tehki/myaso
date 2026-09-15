@@ -77,7 +77,7 @@ test("browser snapshot store mutates existing entities instead of cloning the ma
   assert.equal(state.has(2), false);
   assert.equal(entityTwo.netId, 2, "removed entity references are not mutated after removal");
   assert.equal(state.get(1).hp, 66);
-  assert.ok(Math.abs(state.get(1).x - 103) <= 0.25);
+  assert.ok(Math.abs(state.get(1).x - 103) <= 1);
   assert.equal(result.created, 0);
   assert.equal(result.updated, 1);
   assert.equal(result.removed, 1);

@@ -56,7 +56,8 @@ jobs:
           node --check tests/m4-snapshot-compat.test.mjs
           node --check tests/m19-compact-record-identity.test.mjs
           node --check tests/m20-compact-facing.test.mjs
-          node --test tests/networking.test.mjs tests/m4-snapshot-compat.test.mjs tests/m19-compact-record-identity.test.mjs tests/m20-compact-facing.test.mjs
+          node --check tests/m21-compact-position.test.mjs
+          node --test tests/networking.test.mjs tests/m4-snapshot-compat.test.mjs tests/m19-compact-record-identity.test.mjs tests/m20-compact-facing.test.mjs tests/m21-compact-position.test.mjs
 
       - name: Validate browser runtime hot path
         run: |
@@ -105,8 +106,8 @@ jobs:
         env:
           MYASO_FLIGHT_DURATION_MS: "4500"
           MYASO_FLIGHT_STRESS_ENTITIES: "64"
-          MYASO_FLIGHT_BACKGROUND_PLAYERS: "256"
-          MYASO_FLIGHT_NEAR_PRESSURE_PLAYERS: "220"
+          MYASO_FLIGHT_BACKGROUND_PLAYERS: "320"
+          MYASO_FLIGHT_NEAR_PRESSURE_PLAYERS: "256"
           MYASO_FLIGHT_RELIABLE_DELAY_MS: "25"
           MYASO_FLIGHT_REQUIRE_BACKGROUND_CATCHUP: "1"
           MYASO_FLIGHT_CONVERGENCE_BUDGET_MS: "2500"
