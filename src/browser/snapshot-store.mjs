@@ -4,10 +4,12 @@ const HEADER_BYTES = 14;
 const ENCODING_LEGACY_U32_IDS = 0;
 const ENCODING_VARINT_IDS = 1;
 const ENCODING_VARINT_IDS_U8_FACING = 2;
+const ENCODING_VARINT_IDS_U8_FACING_U12_POSITION = 3;
 const FIELD_POSITION = 1 << 0;
 const FIELD_FACING = 1 << 1;
 const FIELD_VITALS = 1 << 2;
 const FIELD_ACTION = 1 << 3;
+const FIELD_WIDE_POSITION = 1 << 4;
 const FIELD_REMOVED = 1 << 7;
 const TAU = Math.PI * 2;
 
@@ -61,6 +63,8 @@ export function applySnapshotPacketInPlace(stateMap, packet, result = createSnap
     const mask = view.getUint8(offset);
     offset += 1;
     staleIds?.delete(netId);
+    const widePosition = Boolean(mask & FIELD_WIDE_POSITION);
+    if (widePosition && (result.encoding !== ENCODING_VARINT_IDS_U8_FACING_U12_POSITION || !(mask & FIELD_POSITION))) throw new RangeError("invalid compact-position marker");
 
     if (mask & FIELD_REMOVED) {
       if (stateMap.delete(netId)) result.removed += 1;
@@ -87,13 +91,18 @@ export function applySnapshotPacketInPlace(stateMap, packet, result = createSnap
     }
 
     if (mask & FIELD_POSITION) {
-      requireBytes(view, offset, 4);
-      entity.x = view.getUint16(offset, true) / NETWORK.worldCoordinateScale;
-      entity.y = view.getUint16(offset + 2, true) / NETWORK.worldCoordinateScale;
-      offset += 4;
+      if (result.encoding === ENCODING_VARINT_IDS_U8_FACING_U12_POSITION && !widePosition) {
+        requireBytes(view, offset, 3);
+        const packed = view.getUint8(offset) | (view.getUint8(offset + 1) << 8) | (view.getUint8(offset + 2) << 16);
+        entity.x = ((packed & 0x0fff) << 3) / NETWORK.worldCoordinateScale;
+        entity.y = (((packed >>> 12) & 0x0fff) << 3) / NETWORK.worldCoordinateScale;
+        offset += 3;
+      } else {
+        requireBytes(view, offset, 4); entity.x = view.getUint16(offset, true) / NETWORK.worldCoordinateScale; entity.y = view.getUint16(offset + 2, true) / NETWORK.worldCoordinateScale; offset += 4;
+      }
     }
     if (mask & FIELD_FACING) {
-      if (result.encoding === ENCODING_VARINT_IDS_U8_FACING) {
+      if (result.encoding === ENCODING_VARINT_IDS_U8_FACING || result.encoding === ENCODING_VARINT_IDS_U8_FACING_U12_POSITION) {
         requireBytes(view, offset, 1);
         entity.facing = (view.getUint8(offset) / 0xff) * TAU;
         offset += 1;
@@ -161,7 +170,8 @@ function uint32VarintBytes(value) {
 function assertSnapshotEncoding(encoding) {
   if (encoding !== ENCODING_LEGACY_U32_IDS
     && encoding !== ENCODING_VARINT_IDS
-    && encoding !== ENCODING_VARINT_IDS_U8_FACING) {
+    && encoding !== ENCODING_VARINT_IDS_U8_FACING
+    && encoding !== ENCODING_VARINT_IDS_U8_FACING_U12_POSITION) {
     throw new RangeError(`unsupported snapshot encoding ${encoding}`);
   }
 }
