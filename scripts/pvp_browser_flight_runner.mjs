@@ -8,7 +8,7 @@ import { setTimeout as sleep } from "node:timers/promises";
 const root = process.cwd();
 const durationMs = Number(process.env.MYASO_PVP_FLIGHT_DURATION_MS ?? 7000);
 const scenario = process.env.MYASO_PVP_SCENARIO ?? "damage";
-if (!new Set(["damage", "parry"]).has(scenario)) throw new Error(`unsupported MYASO_PVP_SCENARIO: ${scenario}`);
+if (!new Set(["damage", "parry", "dodge"]).has(scenario)) throw new Error(`unsupported MYASO_PVP_SCENARIO: ${scenario}`);
 const staticPort = Number(process.env.MYASO_PVP_FLIGHT_HTTP_PORT ?? 4174);
 const browsers = [
   {
@@ -46,7 +46,7 @@ try {
   await Promise.all(sessions.map((entry) => navigate(entry, game.url, game.certificateHash)));
   const results = await Promise.all(sessions.map(waitForResult));
   assertPairedResults(results);
-  const label = scenario === "parry" ? "M23_PVP_PARRY" : "M22_PVP_BROWSER_COMBAT";
+  const label = scenario === "parry" ? "M23_PVP_PARRY" : scenario === "dodge" ? "M24_PVP_DODGE" : "M22_PVP_BROWSER_COMBAT";
   console.log(`${label} ${JSON.stringify({ ok: true, results })}`);
 } finally {
   for (const session of sessions) {
@@ -180,6 +180,22 @@ function assertPairedResults(results) {
         throw new Error(`${result.browser} defender paid HP/guard cost during parry: ${JSON.stringify(result)}`);
       }
       if (!Number.isFinite(result.firstParryMs)) throw new Error(`${result.browser} did not timestamp a verified parry`);
+    } else if (scenario === "dodge") {
+      if (!result.defenderDodgeSeen || !result.dodgeOverlapSeen) {
+        throw new Error(`${result.browser} did not observe an in-range authoritative dodge/attack overlap`);
+      }
+      if (result.minDefenderHp !== 100 || result.minDefenderGuard !== 100) {
+        throw new Error(`${result.browser} defender paid HP/guard cost during dodge: ${JSON.stringify(result)}`);
+      }
+      if (result.defenderBlockSeen || result.attackerStunnedSeen) {
+        throw new Error(`${result.browser} dodge scenario accidentally resolved as block/parry`);
+      }
+      if (!Number.isFinite(result.firstDodgeEvadeMs) || !Number.isFinite(result.dodgeOverlapDistance) || !Number.isFinite(result.dodgeOverlapArcDelta)) {
+        throw new Error(`${result.browser} did not record verified dodge geometry/timing`);
+      }
+      if (result.dodgeOverlapDistance > 94 || result.dodgeOverlapArcDelta > Math.PI * 0.39) {
+        throw new Error(`${result.browser} dodge overlap was outside authoritative hit geometry: ${JSON.stringify(result)}`);
+      }
     } else {
       if (result.minOwnHp >= 100 || result.minPeerHp >= 100) throw new Error(`${result.browser} did not observe both sides taking damage`);
       if (result.ownDamageTransitions < 1 || result.peerDamageTransitions < 1) throw new Error(`${result.browser} did not observe authoritative HP transitions`);
@@ -189,7 +205,7 @@ function assertPairedResults(results) {
   if (first.peerNetId !== second.playerNetId || second.peerNetId !== first.playerNetId) {
     throw new Error(`paired browsers disagree on opponent identity: ${JSON.stringify(results)}`);
   }
-  if (scenario === "parry") {
+  if (scenario !== "damage") {
     const roles = results.map((result) => result.role).sort().join(",");
     if (roles !== "attacker,defender") throw new Error(`paired browsers did not resolve attacker/defender roles: ${roles}`);
   }
