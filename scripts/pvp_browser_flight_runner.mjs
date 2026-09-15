@@ -8,7 +8,7 @@ import { setTimeout as sleep } from "node:timers/promises";
 const root = process.cwd();
 const durationMs = Number(process.env.MYASO_PVP_FLIGHT_DURATION_MS ?? 7000);
 const scenario = process.env.MYASO_PVP_SCENARIO ?? "damage";
-if (!new Set(["damage", "parry", "dodge"]).has(scenario)) throw new Error(`unsupported MYASO_PVP_SCENARIO: ${scenario}`);
+if (!new Set(["damage", "parry", "dodge", "block"]).has(scenario)) throw new Error(`unsupported MYASO_PVP_SCENARIO: ${scenario}`);
 const staticPort = Number(process.env.MYASO_PVP_FLIGHT_HTTP_PORT ?? 4174);
 const browsers = [
   {
@@ -46,7 +46,7 @@ try {
   await Promise.all(sessions.map((entry) => navigate(entry, game.url, game.certificateHash)));
   const results = await Promise.all(sessions.map(waitForResult));
   assertPairedResults(results);
-  const label = scenario === "parry" ? "M23_PVP_PARRY" : scenario === "dodge" ? "M24_PVP_DODGE" : "M22_PVP_BROWSER_COMBAT";
+  const label = scenario === "parry" ? "M23_PVP_PARRY" : scenario === "dodge" ? "M24_PVP_DODGE" : scenario === "block" ? "M25_PVP_BLOCK" : "M22_PVP_BROWSER_COMBAT";
   console.log(`${label} ${JSON.stringify({ ok: true, results })}`);
 } finally {
   for (const session of sessions) {
@@ -195,6 +195,22 @@ function assertPairedResults(results) {
       }
       if (result.dodgeOverlapDistance > 94 || result.dodgeOverlapArcDelta > Math.PI * 0.39) {
         throw new Error(`${result.browser} dodge overlap was outside authoritative hit geometry: ${JSON.stringify(result)}`);
+      }
+    } else if (scenario === "block") {
+      if (!result.defenderBlockSeen || !result.blockOverlapSeen) {
+        throw new Error(`${result.browser} did not observe an in-range authoritative block/attack overlap`);
+      }
+      if (result.minDefenderHp !== 100 || !(result.minDefenderGuard < 100)) {
+        throw new Error(`${result.browser} block did not preserve HP while consuming guard: ${JSON.stringify(result)}`);
+      }
+      if (result.defenderDodgeSeen || result.attackerStunnedSeen) {
+        throw new Error(`${result.browser} block scenario accidentally resolved as dodge/parry`);
+      }
+      if (!Number.isFinite(result.firstGuardCostMs) || !Number.isFinite(result.blockOverlapDistance) || !Number.isFinite(result.blockOverlapArcDelta)) {
+        throw new Error(`${result.browser} did not record verified block geometry/timing`);
+      }
+      if (result.blockOverlapDistance > 94 || result.blockOverlapArcDelta > Math.PI * 0.39) {
+        throw new Error(`${result.browser} block overlap was outside authoritative hit geometry: ${JSON.stringify(result)}`);
       }
     } else {
       if (result.minOwnHp >= 100 || result.minPeerHp >= 100) throw new Error(`${result.browser} did not observe both sides taking damage`);
