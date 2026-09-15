@@ -132,8 +132,7 @@ fn should_enqueue_reliable_catchup(
     omitted_due_to_budget: usize,
     reliable_write_delay: Duration,
 ) -> bool {
-    background_deadline_misses > 0
-        || (!reliable_write_delay.is_zero() && omitted_due_to_budget > 0)
+    background_deadline_misses > 0 || (!reliable_write_delay.is_zero() && omitted_due_to_budget > 0)
 }
 
 #[tokio::main]
@@ -649,7 +648,10 @@ mod tests {
     fn loopback_reliable_pressure_uses_omission_without_weakening_production_trigger() {
         assert!(!should_enqueue_reliable_catchup(0, 4, Duration::ZERO));
         assert!(should_enqueue_reliable_catchup(1, 0, Duration::ZERO));
-        assert!(should_enqueue_reliable_catchup(0, 4, Duration::from_millis(250)));
+        assert!(should_enqueue_reliable_catchup(
+            0,
+            4,
+            Duration::from_millis(250)
+        ));
     }
-
 }
