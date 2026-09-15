@@ -55,7 +55,8 @@ jobs:
           node --check scripts/network_capacity_probe.mjs
           node --check tests/m4-snapshot-compat.test.mjs
           node --check tests/m19-compact-record-identity.test.mjs
-          node --test tests/networking.test.mjs tests/m4-snapshot-compat.test.mjs tests/m19-compact-record-identity.test.mjs
+          node --check tests/m20-compact-facing.test.mjs
+          node --test tests/networking.test.mjs tests/m4-snapshot-compat.test.mjs tests/m19-compact-record-identity.test.mjs tests/m20-compact-facing.test.mjs
 
       - name: Validate browser runtime hot path
         run: |

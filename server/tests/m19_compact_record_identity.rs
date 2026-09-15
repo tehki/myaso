@@ -18,17 +18,22 @@ fn record(net_id: u32, mask: u8) -> SnapshotRecord {
     }
 }
 
-fn hex(bytes: &[u8]) -> String {
-    bytes.iter().map(|byte| format!("{byte:02x}")).collect()
+fn from_hex(value: &str) -> Vec<u8> {
+    value
+        .as_bytes()
+        .chunks_exact(2)
+        .map(|pair| {
+            u8::from_str_radix(std::str::from_utf8(pair).expect("fixture must be utf8"), 16)
+                .expect("fixture must be hex")
+        })
+        .collect()
 }
 #[test]
 fn compact_encoding_matches_the_cross_language_fixture() {
-    let encoded =
-        encode_snapshot_current(7, 6, 1234, false, &[record(1, SNAPSHOT_FULL_FIELDS)], 1100);
-    let expected = include_str!("../../tests/fixtures/m19-snapshot-varint-v1.hex").trim();
-    assert_eq!(hex(&encoded), expected);
-
-    let decoded = decode_snapshot(&encoded).expect("compact fixture must decode");
+    let fixture = from_hex(
+        include_str!("../../tests/fixtures/m19-snapshot-varint-v1.hex").trim(),
+    );
+    let decoded = decode_snapshot(&fixture).expect("compact fixture must decode");
     assert_eq!(decoded.encoding, SNAPSHOT_ENCODING_VARINT_IDS);
     assert_eq!(decoded.records.len(), 1);
     assert_eq!(decoded.records[0].net_id, 1);

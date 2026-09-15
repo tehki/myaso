@@ -3,7 +3,8 @@ import { NETWORK, PACKET_TYPE, SNAPSHOT_FLAG } from "./constants.mjs";
 const HEADER_BYTES = 14;
 const ENCODING_LEGACY_U32_IDS = 0;
 const ENCODING_VARINT_IDS = 1;
-const CURRENT_ENCODING = ENCODING_VARINT_IDS;
+const ENCODING_VARINT_IDS_U8_FACING = 2;
+const CURRENT_ENCODING = ENCODING_VARINT_IDS_U8_FACING;
 const FIELD_POSITION = 1 << 0;
 const FIELD_FACING = 1 << 1;
 const FIELD_VITALS = 1 << 2;
@@ -129,8 +130,13 @@ export function encodeSnapshot({
       offset += 4;
     }
     if (mask & FIELD_FACING) {
-      view.setUint16(offset, record.facing, true);
-      offset += 2;
+      if (encoding === ENCODING_VARINT_IDS_U8_FACING) {
+        view.setUint8(offset, compactFacingU8(record.facing));
+        offset += 1;
+      } else {
+        view.setUint16(offset, record.facing, true);
+        offset += 2;
+      }
     }
     if (mask & FIELD_VITALS) {
       view.setUint8(offset, record.hp);
@@ -179,9 +185,15 @@ export function decodeSnapshot(buffer) {
         offset += 4;
       }
       if (mask & FIELD_FACING) {
-        requireBytes(view, offset, 2);
-        record.facing = view.getUint16(offset, true);
-        offset += 2;
+        if (encoding === ENCODING_VARINT_IDS_U8_FACING) {
+          requireBytes(view, offset, 1);
+          record.facing = expandFacingU8(view.getUint8(offset));
+          offset += 1;
+        } else {
+          requireBytes(view, offset, 2);
+          record.facing = view.getUint16(offset, true);
+          offset += 2;
+        }
       }
       if (mask & FIELD_VITALS) {
         requireBytes(view, offset, 2);
@@ -247,7 +259,7 @@ export function snapshotRecordBytes(record, encoding = CURRENT_ENCODING) {
   let bytes = snapshotNetIdBytes(record.netId, encoding) + 1;
   if (mask & FIELD_REMOVED) return bytes;
   if (mask & FIELD_POSITION) bytes += 4;
-  if (mask & FIELD_FACING) bytes += 2;
+  if (mask & FIELD_FACING) bytes += facingBytesForEncoding(encoding);
   if (mask & FIELD_VITALS) bytes += 2;
   if (mask & FIELD_ACTION) bytes += 2;
   return bytes;
@@ -256,6 +268,7 @@ export function snapshotRecordBytes(record, encoding = CURRENT_ENCODING) {
 export const SNAPSHOT_ENCODINGS = Object.freeze({
   LEGACY_U32_IDS: ENCODING_LEGACY_U32_IDS,
   VARINT_IDS: ENCODING_VARINT_IDS,
+  VARINT_IDS_U8_FACING: ENCODING_VARINT_IDS_U8_FACING,
   CURRENT: CURRENT_ENCODING,
 });
 
@@ -354,9 +367,24 @@ function readUint32Varint(view, offset) {
 }
 
 function assertSnapshotEncoding(encoding) {
-  if (encoding !== ENCODING_LEGACY_U32_IDS && encoding !== ENCODING_VARINT_IDS) {
+  if (encoding !== ENCODING_LEGACY_U32_IDS
+    && encoding !== ENCODING_VARINT_IDS
+    && encoding !== ENCODING_VARINT_IDS_U8_FACING) {
     throw new RangeError(`unsupported snapshot encoding ${encoding}`);
   }
+}
+
+function facingBytesForEncoding(encoding) {
+  return encoding === ENCODING_VARINT_IDS_U8_FACING ? 1 : 2;
+}
+
+function compactFacingU8(facing) {
+  assertUint16(facing, "facing");
+  return Math.min(0xff, Math.floor((facing + 128) / 257));
+}
+
+function expandFacingU8(facing) {
+  return facing * 257;
 }
 
 function requireBytes(view, offset, count) {
