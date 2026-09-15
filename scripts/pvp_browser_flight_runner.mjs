@@ -254,7 +254,7 @@ function assertPairedResults(results) {
       if (result.defenderBlockSeen || result.defenderDodgeSeen || result.attackerStunnedSeen) {
         throw new Error(`${result.browser} respawn scenario accidentally resolved through a defensive mechanic`);
       }
-      if (!Number.isFinite(result.firstDeathMs) || !Number.isFinite(result.firstRespawnMs) || !Number.isFinite(result.respawnDelayMs)
+      if (!Number.isFinite(result.firstDeathMs) || !Number.isFinite(result.firstRespawnMs) || !Number.isFinite(result.respawnPositionRestoredMs) || !Number.isFinite(result.respawnDelayMs)
         || !Number.isFinite(result.deathPositionOffset) || !Number.isFinite(result.respawnPositionError)) {
         throw new Error(`${result.browser} did not record death/respawn timing and position evidence`);
       }

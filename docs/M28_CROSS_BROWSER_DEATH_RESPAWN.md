@@ -12,7 +12,7 @@ Prove the existing server-owned death and respawn loop end-to-end between two re
 
 ## Acceptance
 Both browsers must observe the same defender death, then an authoritative return to `Idle` with 100 HP and 100 guard.
-The respawn must restore the defender to its original spawn within compact-position tolerance, after death occurred measurably away from spawn.
+The respawn must restore the defender to its original spawn within compact-position tolerance, after death occurred measurably away from spawn. Full-vitals/Idle and the position field may arrive on adjacent snapshots, so acceptance waits for authoritative position convergence rather than weakening the spawn tolerance.
 No block, dodge, parry, server test hook, combat-constant change, or synthetic state injection is permitted.
 
 ## Boundaries

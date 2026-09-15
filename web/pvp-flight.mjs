@@ -67,6 +67,7 @@ let ownDeadSeen = false;
 let peerDeadSeen = false;
 let firstDeathAt = null;
 let firstRespawnAt = null;
+let respawnPositionRestoredAt = null;
 let deathPositionOffset = null;
 let respawnPositionError = null;
 let respawnHp = null;
@@ -214,14 +215,19 @@ function observeState(state) {
       if (defenderSpawn) {
         deathPositionOffset = Math.hypot(defender.x - defenderSpawn.x, defender.y - defenderSpawn.y);
       }
-    } else if (firstDeathAt !== null && firstRespawnAt === null
+    } else if (firstDeathAt !== null
       && defender.action === 0 && defender.hp === 100 && defender.guard === 100) {
-      firstRespawnAt = performance.now();
-      respawnHp = defender.hp;
-      respawnGuard = defender.guard;
-      respawnAction = defender.action;
+      if (firstRespawnAt === null) {
+        firstRespawnAt = performance.now();
+        respawnHp = defender.hp;
+        respawnGuard = defender.guard;
+        respawnAction = defender.action;
+      }
       if (defenderSpawn) {
         respawnPositionError = Math.hypot(defender.x - defenderSpawn.x, defender.y - defenderSpawn.y);
+        if (respawnPositionRestoredAt === null && respawnPositionError <= 2.5) {
+          respawnPositionRestoredAt = performance.now();
+        }
       }
     }
   }
@@ -236,7 +242,7 @@ function observeState(state) {
           : scenario === "backblock"
             ? firstDirectionalBlockHitAt !== null && directionalBlockOverlapSeen
             : scenario === "respawn"
-              ? firstRespawnAt !== null
+              ? firstRespawnAt !== null && respawnPositionRestoredAt !== null
               : minOwnHp < 100 && minPeerHp < 100;
   if (successAt === null && scenarioSucceeded) successAt = performance.now();
   if (successAt !== null && performance.now() - successAt >= 500) finish();
@@ -411,7 +417,7 @@ function finish() {
   const respawnDelayMs = firstDeathAt !== null && firstRespawnAt !== null
     ? firstRespawnAt - firstDeathAt
     : null;
-  const respawnOk = firstDeathAt !== null && firstRespawnAt !== null
+  const respawnOk = firstDeathAt !== null && firstRespawnAt !== null && respawnPositionRestoredAt !== null
     && defenderDeadSeen && minDefenderHp === 0 && defenderDamageTransitions >= 3
     && minDefenderGuard === 100
     && respawnHp === 100 && respawnGuard === 100 && respawnAction === 0
@@ -486,6 +492,7 @@ function finish() {
     firstDirectionalBlockHitMs: firstDirectionalBlockHitAt === null ? null : round(firstDirectionalBlockHitAt - startedAt),
     firstDeathMs: firstDeathAt === null ? null : round(firstDeathAt - startedAt),
     firstRespawnMs: firstRespawnAt === null ? null : round(firstRespawnAt - startedAt),
+    respawnPositionRestoredMs: respawnPositionRestoredAt === null ? null : round(respawnPositionRestoredAt - startedAt),
     respawnDelayMs: round(respawnDelayMs),
     deathPositionOffset: round(deathPositionOffset),
     respawnPositionError: round(respawnPositionError),
