@@ -13,9 +13,9 @@ M30 deliberately uses `web/index.html` and `web/online-game.mjs`; it does not us
 - Wait until both normal HUDs show two full-health fighters and expose their assigned player IDs through the normal online status text.
 - Select the lower network ID as the attacker because the normal spawn layout places that fighter to the left of its opponent.
 - Focus both real arena canvases.
-- Close spacing with ordinary controls: attacker holds `D` and defender holds `A` for 320 ms, then both release.
-- Passively record the delivered `KeyD`/`KeyA` and primary-pointer events as browser-input provenance; the observers do not alter game state.
-- Perform up to three real WebDriver canvas clicks, spaced by an 800 ms observation window, stopping immediately when the first authoritative 34-HP exchange renders. This tolerates a dropped one-shot browser input without manufacturing combat state or allowing extra damage.
+- Keep the lower-ID attacker moving toward the passive defender with an ordinary held `D` input while the exchange is attempted; release it immediately after success or failure.
+- Passively record the delivered `KeyD` down/up and primary-pointer events as browser-input provenance; the observers do not alter game state.
+- Perform up to five real WebDriver canvas clicks, each followed by a 700 ms observation window, stopping immediately when the first authoritative 34-HP exchange renders. Holding movement during the attempts lets the normal server-owned movement close the final spacing instead of relying on a fixed-duration position guess.
 - Observe only rendered DOM text/HUD values; do not inject simulation state, combat actions, HP, guard, positions, or server events.
 
 ## Acceptance

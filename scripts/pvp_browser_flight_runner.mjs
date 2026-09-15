@@ -161,11 +161,6 @@ async function runOnlineUiFlight(entries) {
   if (!attacker || !defender) throw new Error(`could not resolve UI roles from ${JSON.stringify(ready)}`);
 
   await Promise.all(entries.map((entry) => execute(entry.base, entry.sessionId, "document.querySelector('#arena').focus(); return document.activeElement?.id;")));
-  await Promise.all([
-    holdMovementKey(attacker, "d", 320),
-    holdMovementKey(defender, "a", 320),
-  ]);
-  await sleep(220);
 
   const arena = await webdriver(attacker.base, "POST", `/session/${attacker.sessionId}/element`, {
     using: "css selector",
@@ -175,17 +170,26 @@ async function runOnlineUiFlight(entries) {
   if (!elementId) throw new Error(`${attacker.name} did not resolve the real arena canvas`);
 
   let evidence = null;
-  for (let attempt = 0; attempt < 3 && !evidence; attempt += 1) {
-    await webdriver(attacker.base, "POST", `/session/${attacker.sessionId}/element/${elementId}/click`, {});
-    evidence = await waitForUiCombatEvidence(entries, 800, false);
+  let movementHeld = false;
+  try {
+    await setMovementKey(attacker, "d", true);
+    movementHeld = true;
+    await sleep(120);
+    for (let attempt = 0; attempt < 5 && !evidence; attempt += 1) {
+      await webdriver(attacker.base, "POST", `/session/${attacker.sessionId}/element/${elementId}/click`, {});
+      evidence = await waitForUiCombatEvidence(entries, 700, false);
+    }
+    if (!evidence) evidence = await waitForUiCombatEvidence(entries, 1000, true);
+  } finally {
+    if (movementHeld) await setMovementKey(attacker, "d", false);
   }
-  if (!evidence) evidence = await waitForUiCombatEvidence(entries, 1200, true);
+  await sleep(100);
+  evidence = await Promise.all(entries.map(readUiEvidence));
   const attackerResult = evidence.find((entry) => entry.browser === attacker.name);
   const defenderResult = evidence.find((entry) => entry.browser !== attacker.name);
   if (!attackerResult || !defenderResult) throw new Error(`incomplete UI evidence: ${JSON.stringify(evidence)}`);
-  if (!attackerResult.keys.includes("keydown:KeyD") || !attackerResult.keys.includes("keyup:KeyD")
-    || !defenderResult.keys.includes("keydown:KeyA") || !defenderResult.keys.includes("keyup:KeyA")) {
-    throw new Error(`real movement controls were not delivered to both arenas: ${JSON.stringify(evidence)}`);
+  if (!attackerResult.keys.includes("keydown:KeyD") || !attackerResult.keys.includes("keyup:KeyD")) {
+    throw new Error(`real attacker movement control was not delivered to the arena: ${JSON.stringify(attackerResult)}`);
   }
   if (!attackerResult.pointers.includes("pointerdown:0") || !attackerResult.pointers.includes("pointerup:0")) {
     throw new Error(`real attack click was not delivered to the attacker arena: ${JSON.stringify(attackerResult)}`);
@@ -208,16 +212,12 @@ async function runOnlineUiFlight(entries) {
   return evidence;
 }
 
-async function holdMovementKey(session, value, duration) {
+async function setMovementKey(session, value, pressed) {
   await webdriver(session.base, "POST", `/session/${session.sessionId}/actions`, {
     actions: [{
       type: "key",
       id: `keyboard-${session.name}`,
-      actions: [
-        { type: "keyDown", value },
-        { type: "pause", duration },
-        { type: "keyUp", value },
-      ],
+      actions: [{ type: pressed ? "keyDown" : "keyUp", value }],
     }],
   });
 }
