@@ -62,6 +62,7 @@ jobs:
       - name: Validate browser runtime hot path
         run: |
           node --check src/browser/frame-budget.mjs
+          node --check src/browser/combat-readability.mjs
           node --check src/browser/snapshot-store.mjs
           node --check src/browser/reconciliation.mjs
           node --check src/browser/remote-interpolation.mjs
@@ -75,13 +76,14 @@ jobs:
           node --check scripts/browser_flight_runner.mjs
           node --check scripts/pvp_browser_flight_runner.mjs
           node --check tests/browser-runtime.test.mjs
+          node --check tests/m29-combat-readability.test.mjs
           node --check tests/m6-browser-authority.test.mjs
           node --check tests/m7-browser-flight.test.mjs
           node --check tests/m12-reliable-baseline.test.mjs
           node --check tests/m15-reliable-convergence.test.mjs
           node --check tests/m16-browser-512.test.mjs
           node --check tests/m17-reliable-delta.test.mjs
-          node --test tests/browser-runtime.test.mjs tests/m6-browser-authority.test.mjs tests/m7-browser-flight.test.mjs tests/m12-reliable-baseline.test.mjs tests/m15-reliable-convergence.test.mjs tests/m16-browser-512.test.mjs tests/m17-reliable-delta.test.mjs
+          node --test tests/browser-runtime.test.mjs tests/m6-browser-authority.test.mjs tests/m7-browser-flight.test.mjs tests/m12-reliable-baseline.test.mjs tests/m15-reliable-convergence.test.mjs tests/m16-browser-512.test.mjs tests/m17-reliable-delta.test.mjs tests/m29-combat-readability.test.mjs
           node scripts/browser_hotpath_probe.mjs
 
       - name: Validate authoritative Rust server
