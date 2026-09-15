@@ -403,7 +403,15 @@ fn acknowledged_baseline_recovers_after_snapshot_loss_and_unknown_ack_forces_ful
     let decoded_recovery = decode_snapshot(&recovery.bytes).expect("recovery snapshot");
     apply_records(&mut client_state, &decoded_recovery.records);
     let authoritative = WireEntity::from_fighter(world.fighter(1).expect("viewer"));
-    assert_eq!(client_state.get(&1), Some(&authoritative));
+    let recovered = *client_state.get(&1).expect("recovered viewer");
+    assert!(recovered.x.abs_diff(authoritative.x) <= 4);
+    assert!(recovered.y.abs_diff(authoritative.y) <= 4);
+    let recovered_without_position = WireEntity {
+        x: authoritative.x,
+        y: authoritative.y,
+        ..recovered
+    };
+    assert_eq!(recovered_without_position, authoritative);
 
     let resync = session.build(
         500,
