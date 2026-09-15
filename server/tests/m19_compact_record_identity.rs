@@ -1,7 +1,7 @@
 use myaso_server::snapshot::{
     decode_snapshot, encode_snapshot_current, SnapshotDecodeError, SnapshotRecord,
-    SNAPSHOT_ENCODING_VARINT_IDS, SNAPSHOT_FIELD_REMOVED,
-    SNAPSHOT_HEADER_BYTES, SNAPSHOT_PACKET_TYPE,
+    SNAPSHOT_ENCODING_VARINT_IDS, SNAPSHOT_FIELD_REMOVED, SNAPSHOT_HEADER_BYTES,
+    SNAPSHOT_PACKET_TYPE,
 };
 
 fn record(net_id: u32, mask: u8) -> SnapshotRecord {
