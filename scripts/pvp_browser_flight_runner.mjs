@@ -146,6 +146,9 @@ async function startBrowser(browser) {
   });
   const sessionId = created.sessionId ?? created.value?.sessionId;
   if (!sessionId) throw new Error(`${browser.name} WebDriver did not return a session id: ${JSON.stringify(created)}`);
+  if (scenario === "uiparry") {
+    await webdriver(base, "POST", `/session/${sessionId}/window/rect`, { x: 0, y: 0, width: 1280, height: 900 });
+  }
   return { ...browser, child, base, sessionId };
 }
 
@@ -245,6 +248,8 @@ async function runOnlineUiParryFlight(entries) {
   const attackerElementId = await resolveArenaElement(attacker, "M33 attacker");
   const defenderElementId = await resolveArenaElement(defender, "M33 defender");
 
+  await Promise.all(entries.map(centerArenaInViewport));
+  await aimArena(attacker, attackerElementId, -200);
   await aimArena(defender, defenderElementId, 200);
   await pulseMovementKey(attacker, "a", 120);
   let evidence;
@@ -252,8 +257,8 @@ async function runOnlineUiParryFlight(entries) {
   try {
     blockHeld = true;
     await Promise.all([
-      performArenaAttack(attacker, attackerElementId, -200),
-      pressArenaBlockAfterPause(defender, 120),
+      holdArenaAttack(attacker, 100),
+      pressArenaBlockAfterPause(defender, 60),
     ]);
     evidence = await waitForUiParryEvidence(entries, attacker, defender, 1000);
   } finally {
@@ -365,6 +370,30 @@ async function aimArena(session, elementId, xOffset) {
       parameters: { pointerType: "mouse" },
       actions: [{ type: "pointerMove", duration: 0, origin, x: xOffset, y: 0 }],
     }],
+  });
+}
+
+
+async function centerArenaInViewport(session) {
+  const geometry = await execute(session.base, session.sessionId, `
+    const arena = document.querySelector('#arena');
+    arena.scrollIntoView({ block: 'center', inline: 'center' });
+    const rect = arena.getBoundingClientRect();
+    return { left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom, width: rect.width, height: rect.height, innerWidth, innerHeight };
+  `);
+  if (geometry.left < 0 || geometry.top < 0 || geometry.right > geometry.innerWidth || geometry.bottom > geometry.innerHeight) {
+    throw new Error(`${session.name} arena is not fully visible for M33 pointer geometry: ${JSON.stringify(geometry)}`);
+  }
+  return geometry;
+}
+
+async function holdArenaAttack(session, holdMs) {
+  await webdriver(session.base, "POST", `/session/${session.sessionId}/actions`, {
+    actions: [{ type: "pointer", id: `mouse-${session.name}`, parameters: { pointerType: "mouse" }, actions: [{ type: "pointerDown", button: 0 }] }],
+  });
+  await sleep(holdMs);
+  await webdriver(session.base, "POST", `/session/${session.sessionId}/actions`, {
+    actions: [{ type: "pointer", id: `mouse-${session.name}`, parameters: { pointerType: "mouse" }, actions: [{ type: "pointerUp", button: 0 }] }],
   });
 }
 
