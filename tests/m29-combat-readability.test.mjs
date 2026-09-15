@@ -15,7 +15,17 @@ test("authoritative HP loss becomes a readable hit message", () => {
   assert.equal(tracker.observe(state(fighter(1), fighter(2)), 1), null);
   const event = tracker.observe(state(fighter(1, 66), fighter(2)), 1);
   assert.equal(event.kind, "hit");
+  assert.equal(event.feedback, "damage-taken");
   assert.match(event.text, /Hit taken/);
+});
+
+test("authoritative opponent HP loss emits hit-confirm feedback", () => {
+  const tracker = createCombatReadabilityTracker();
+  tracker.observe(state(fighter(1), fighter(2)), 1);
+  const event = tracker.observe(state(fighter(1), fighter(2, 66)), 1);
+  assert.equal(event.kind, "hit");
+  assert.equal(event.feedback, "hit-confirm");
+  assert.match(event.text, /Opponent hit/);
 });
 
 test("guard-only loss is explained as a block instead of damage", () => {

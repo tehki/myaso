@@ -8,7 +8,7 @@ import { setTimeout as sleep } from "node:timers/promises";
 const root = process.cwd();
 const durationMs = Number(process.env.MYASO_PVP_FLIGHT_DURATION_MS ?? 7000);
 const scenario = process.env.MYASO_PVP_SCENARIO ?? "damage";
-if (!new Set(["damage", "parry", "dodge", "block", "guardbreak", "backblock", "respawn", "ui", "uirespawn"]).has(scenario)) throw new Error(`unsupported MYASO_PVP_SCENARIO: ${scenario}`);
+if (!new Set(["damage", "parry", "dodge", "block", "guardbreak", "backblock", "respawn", "ui", "uirespawn", "uifeedback"]).has(scenario)) throw new Error(`unsupported MYASO_PVP_SCENARIO: ${scenario}`);
 const staticPort = Number(process.env.MYASO_PVP_FLIGHT_HTTP_PORT ?? 4174);
 const browsers = [
   {
@@ -50,6 +50,9 @@ try {
   } else if (scenario === "uirespawn") {
     const results = await runOnlineUiRespawnFlight(sessions);
     console.log(`M31_ONLINE_UI_DEATH_RESPAWN ${JSON.stringify({ ok: true, results })}`);
+  } else if (scenario === "uifeedback") {
+    const results = await runOnlineUiFeedbackFlight(sessions);
+    console.log(`M32_ONLINE_HIT_FEEDBACK ${JSON.stringify({ ok: true, results })}`);
   } else {
     const results = await Promise.all(sessions.map(waitForResult));
     assertPairedResults(results);
@@ -144,7 +147,7 @@ async function startBrowser(browser) {
 }
 
 async function navigate(session, gameUrl, certificateHash) {
-  const page = scenario === "ui" || scenario === "uirespawn" ? "index.html" : "pvp-flight.html";
+  const page = scenario === "ui" || scenario === "uirespawn" || scenario === "uifeedback" ? "index.html" : "pvp-flight.html";
   const url = new URL(`http://127.0.0.1:${staticPort}/web/${page}`);
   url.searchParams.set("server", gameUrl);
   url.searchParams.set("cert", certificateHash);
@@ -213,6 +216,16 @@ async function runOnlineUiFlight(entries) {
   }
   if (!attackerResult.events.some((text) => text.startsWith("Attack committed") || text.startsWith("Strike active") || text.startsWith("Recovery"))) {
     throw new Error(`attacker never rendered an authoritative action commitment hint: ${JSON.stringify(attackerResult.events)}`);
+  }
+  return evidence;
+}
+
+async function runOnlineUiFeedbackFlight(entries) {
+  const evidence = await runOnlineUiFlight(entries);
+  const attacker = evidence.find((entry) => entry.feedbackTransitions.includes("hit-confirm"));
+  const defender = evidence.find((entry) => entry.feedbackTransitions.includes("damage-taken"));
+  if (!attacker || !defender || attacker.browser === defender.browser) {
+    throw new Error(`M32 authoritative hit feedback was not rendered on opposite clients: ${JSON.stringify(evidence)}`);
   }
   return evidence;
 }
@@ -304,9 +317,10 @@ async function installUiObserver(session) {
   await execute(session.base, session.sessionId, `
     const target = document.querySelector('#event-text');
     const arena = document.querySelector('#arena');
+    const arenaStage = document.querySelector('.arena-stage');
     const overlay = document.querySelector('#combat-overlay');
-    if (!target || !arena || !overlay) throw new Error('missing online UI flight target');
-    const state = { events: [], keys: [], pointers: [], overlayTransitions: [], online: '', startedAt: performance.now() };
+    if (!target || !arena || !arenaStage || !overlay) throw new Error('missing online UI flight target');
+    const state = { events: [], keys: [], pointers: [], overlayTransitions: [], feedbackTransitions: [], online: '', startedAt: performance.now() };
     const record = () => {
       const text = target.textContent?.trim() ?? '';
       if (/^Online - player #\\d+ - server tick \\d+$/.test(text)) state.online = text;
@@ -322,6 +336,10 @@ async function installUiObserver(session) {
       if (!previous || previous.visible !== entry.visible || previous.title !== entry.title || previous.detail !== entry.detail) {
         state.overlayTransitions.push(entry);
       }
+    };
+    const recordFeedback = () => {
+      const feedback = arenaStage.dataset.combatFeedback ?? '';
+      if (feedback && state.feedbackTransitions.at(-1) !== feedback) state.feedbackTransitions.push(feedback);
     };
     for (const type of ['keydown', 'keyup']) {
       arena.addEventListener(type, (event) => state.keys.push(type + ':' + event.code), { capture: true });
@@ -339,8 +357,10 @@ async function installUiObserver(session) {
     }
     record();
     recordOverlay();
+    recordFeedback();
     new MutationObserver(record).observe(target, { childList: true, subtree: true, characterData: true });
     new MutationObserver(recordOverlay).observe(overlay, { attributes: true, attributeFilter: ['hidden'], childList: true, subtree: true, characterData: true });
+    new MutationObserver(recordFeedback).observe(arenaStage, { attributes: true, attributeFilter: ['data-combat-feedback'] });
     window.__MYASO_M30_UI__ = state;
     return true;
   `);
@@ -405,7 +425,7 @@ async function waitForUiRespawnEvidence(entries, attacker, defender, timeoutMs) 
 
 async function readUiEvidence(session) {
   const value = await execute(session.base, session.sessionId, `
-    const state = window.__MYASO_M30_UI__ ?? { events: [], keys: [], pointers: [], overlayTransitions: [], online: '' };
+    const state = window.__MYASO_M30_UI__ ?? { events: [], keys: [], pointers: [], overlayTransitions: [], feedbackTransitions: [], online: '' };
     const match = state.online.match(/player #(\\d+)/);
     return {
       title: document.title,
@@ -420,6 +440,8 @@ async function readUiEvidence(session) {
       overlayTitle: document.querySelector('#combat-overlay-title')?.textContent?.trim() ?? '',
       overlayDetail: document.querySelector('#combat-overlay-detail')?.textContent?.trim() ?? '',
       overlayTransitions: (state.overlayTransitions ?? []).slice(),
+      combatFeedback: document.querySelector('.arena-stage')?.dataset.combatFeedback ?? '',
+      feedbackTransitions: (state.feedbackTransitions ?? []).slice(),
       events: state.events.slice(),
       keys: state.keys.slice(),
       pointers: state.pointers.slice(),
