@@ -70,8 +70,10 @@ jobs:
           node --check web/bootstrap.mjs
           node --check web/online-game.mjs
           node --check web/flight.mjs
+          node --check web/pvp-flight.mjs
           node --check scripts/browser_hotpath_probe.mjs
           node --check scripts/browser_flight_runner.mjs
+          node --check scripts/pvp_browser_flight_runner.mjs
           node --check tests/browser-runtime.test.mjs
           node --check tests/m6-browser-authority.test.mjs
           node --check tests/m7-browser-flight.test.mjs
@@ -101,6 +103,11 @@ jobs:
           chromedriver --version
           geckodriver --version
           node scripts/browser_flight_runner.mjs
+
+      - name: Validate M22 cross-browser authoritative PvP
+        env:
+          MYASO_PVP_FLIGHT_DURATION_MS: "7000"
+        run: node scripts/pvp_browser_flight_runner.mjs
 
       - name: Measure M15 browser background convergence
         env:
