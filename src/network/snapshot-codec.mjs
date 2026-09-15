@@ -1,7 +1,9 @@
 import { NETWORK, PACKET_TYPE, SNAPSHOT_FLAG } from "./constants.mjs";
 
 const HEADER_BYTES = 14;
-const RECORD_BASE_BYTES = 5;
+const ENCODING_LEGACY_U32_IDS = 0;
+const ENCODING_VARINT_IDS = 1;
+const CURRENT_ENCODING = ENCODING_VARINT_IDS;
 const FIELD_POSITION = 1 << 0;
 const FIELD_FACING = 1 << 1;
 const FIELD_VITALS = 1 << 2;
@@ -83,14 +85,16 @@ export function encodeSnapshot({
   records,
   full = false,
   maxBytes = NETWORK.conservativeDatagramBytes,
+  encoding = CURRENT_ENCODING,
 }) {
   assertUint16(sequence, "sequence");
   assertUint16(baselineSequence, "baselineSequence");
   assertUint32(serverTick, "serverTick");
   if (!Array.isArray(records)) throw new TypeError("records must be an array");
   if (records.length > 0xffff) throw new RangeError("too many snapshot records");
+  assertSnapshotEncoding(encoding);
 
-  const totalBytes = HEADER_BYTES + records.reduce((sum, record) => sum + snapshotRecordBytes(record), 0);
+  const totalBytes = HEADER_BYTES + records.reduce((sum, record) => sum + snapshotRecordBytes(record, encoding), 0);
   if (maxBytes !== null && totalBytes > maxBytes) {
     throw new RangeError(`snapshot ${totalBytes} bytes exceeds datagram budget ${maxBytes}`);
   }
@@ -100,7 +104,7 @@ export function encodeSnapshot({
   view.setUint8(0, NETWORK.protocolVersion);
   view.setUint8(1, PACKET_TYPE.SNAPSHOT);
   view.setUint8(2, full ? SNAPSHOT_FLAG.FULL : 0);
-  view.setUint8(3, 0);
+  view.setUint8(3, encoding);
   view.setUint16(4, sequence, true);
   view.setUint16(6, baselineSequence, true);
   view.setUint32(8, serverTick, true);
@@ -110,9 +114,14 @@ export function encodeSnapshot({
   for (const record of records) {
     assertNetId(record.netId);
     const mask = record.mask ?? FULL_FIELDS;
-    view.setUint32(offset, record.netId >>> 0, true);
-    view.setUint8(offset + 4, mask);
-    offset += RECORD_BASE_BYTES;
+    if (encoding === ENCODING_LEGACY_U32_IDS) {
+      view.setUint32(offset, record.netId >>> 0, true);
+      offset += 4;
+    } else {
+      offset = writeUint32Varint(view, offset, record.netId >>> 0);
+    }
+    view.setUint8(offset, mask);
+    offset += 1;
     if (mask & FIELD_REMOVED) continue;
     if (mask & FIELD_POSITION) {
       view.setUint16(offset, record.x, true);
@@ -142,14 +151,25 @@ export function decodeSnapshot(buffer) {
   if (view.byteLength < HEADER_BYTES) throw new RangeError("snapshot packet is truncated");
   if (view.getUint8(0) !== NETWORK.protocolVersion) throw new Error("unsupported protocol version");
   if (view.getUint8(1) !== PACKET_TYPE.SNAPSHOT) throw new Error("not a snapshot packet");
+  const encoding = view.getUint8(3);
+  assertSnapshotEncoding(encoding);
   const count = view.getUint16(12, true);
   const records = [];
   let offset = HEADER_BYTES;
   for (let index = 0; index < count; index += 1) {
-    if (offset + RECORD_BASE_BYTES > view.byteLength) throw new RangeError("snapshot record is truncated");
-    const netId = view.getUint32(offset, true);
-    const mask = view.getUint8(offset + 4);
-    offset += RECORD_BASE_BYTES;
+    let netId;
+    if (encoding === ENCODING_LEGACY_U32_IDS) {
+      requireBytes(view, offset, 4);
+      netId = view.getUint32(offset, true);
+      offset += 4;
+    } else {
+      const decoded = readUint32Varint(view, offset);
+      netId = decoded.value;
+      offset = decoded.offset;
+    }
+    requireBytes(view, offset, 1);
+    const mask = view.getUint8(offset);
+    offset += 1;
     const record = { netId, mask };
     if (!(mask & FIELD_REMOVED)) {
       if (mask & FIELD_POSITION) {
@@ -180,6 +200,7 @@ export function decodeSnapshot(buffer) {
   }
   if (offset !== view.byteLength) throw new RangeError("snapshot packet contains trailing bytes");
   return {
+    encoding,
     sequence: view.getUint16(4, true),
     baselineSequence: view.getUint16(6, true),
     serverTick: view.getUint32(8, true),
@@ -220,9 +241,10 @@ export function dequantizeEntity(state) {
   };
 }
 
-export function snapshotRecordBytes(record) {
+export function snapshotRecordBytes(record, encoding = CURRENT_ENCODING) {
+  assertSnapshotEncoding(encoding);
   const mask = record.mask ?? FULL_FIELDS;
-  let bytes = RECORD_BASE_BYTES;
+  let bytes = snapshotNetIdBytes(record.netId, encoding) + 1;
   if (mask & FIELD_REMOVED) return bytes;
   if (mask & FIELD_POSITION) bytes += 4;
   if (mask & FIELD_FACING) bytes += 2;
@@ -230,6 +252,12 @@ export function snapshotRecordBytes(record) {
   if (mask & FIELD_ACTION) bytes += 2;
   return bytes;
 }
+
+export const SNAPSHOT_ENCODINGS = Object.freeze({
+  LEGACY_U32_IDS: ENCODING_LEGACY_U32_IDS,
+  VARINT_IDS: ENCODING_VARINT_IDS,
+  CURRENT: CURRENT_ENCODING,
+});
 
 export const SNAPSHOT_FIELDS = Object.freeze({
   POSITION: FIELD_POSITION,
@@ -280,6 +308,55 @@ function encodeAction(action) {
   const code = ACTION_TO_CODE.get(action);
   if (code === undefined) throw new RangeError(`unsupported action ${action}`);
   return code;
+}
+
+function snapshotNetIdBytes(netId, encoding) {
+  assertNetId(netId);
+  if (encoding === ENCODING_LEGACY_U32_IDS) return 4;
+  let value = netId >>> 0;
+  let bytes = 1;
+  while (value >= 0x80) {
+    value >>>= 7;
+    bytes += 1;
+  }
+  return bytes;
+}
+
+function writeUint32Varint(view, offset, value) {
+  let nextValue = value >>> 0;
+  do {
+    let byte = nextValue & 0x7f;
+    nextValue >>>= 7;
+    if (nextValue !== 0) byte |= 0x80;
+    view.setUint8(offset, byte);
+    offset += 1;
+  } while (nextValue !== 0);
+  return offset;
+}
+
+function readUint32Varint(view, offset) {
+  const start = offset;
+  let value = 0;
+  for (let index = 0; index < 5; index += 1) {
+    requireBytes(view, offset, 1);
+    const byte = view.getUint8(offset);
+    offset += 1;
+    if (index === 4 && (byte & 0xf0) !== 0) throw new RangeError("invalid snapshot varint");
+    value = (value + ((byte & 0x7f) * (2 ** (index * 7)))) >>> 0;
+    if ((byte & 0x80) === 0) {
+      if (offset - start !== snapshotNetIdBytes(value, ENCODING_VARINT_IDS)) {
+        throw new RangeError("non-canonical snapshot varint");
+      }
+      return { value, offset };
+    }
+  }
+  throw new RangeError("invalid snapshot varint");
+}
+
+function assertSnapshotEncoding(encoding) {
+  if (encoding !== ENCODING_LEGACY_U32_IDS && encoding !== ENCODING_VARINT_IDS) {
+    throw new RangeError(`unsupported snapshot encoding ${encoding}`);
+  }
 }
 
 function requireBytes(view, offset, count) {

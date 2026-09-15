@@ -20,12 +20,15 @@ fn reliable_snapshot_converges_dense_state_omitted_by_realtime_datagram() {
             0.0,
         ));
     }
-    let mut session = SnapshotSession::default();
+    let mut realtime_session = SnapshotSession::default();
+    let mut reliable_session = SnapshotSession::default();
     let frame = ReplicationFrame::from_fighters(world.tick, world.fighters());
-    let baseline = session.build_from_frame(u16::MAX, 1, &frame, RELIABLE_BYTES);
-    assert!(baseline.full);
-    assert_eq!(baseline.omitted_due_to_budget, 0);
-    assert!(baseline.bytes.len() > REALTIME_BYTES);
+    let realtime_baseline = realtime_session.build_from_frame(u16::MAX, 1, &frame, RELIABLE_BYTES);
+    let reliable_baseline = reliable_session.build_from_frame(u16::MAX, 1, &frame, RELIABLE_BYTES);
+    assert!(realtime_baseline.full);
+    assert_eq!(realtime_baseline.omitted_due_to_budget, 0);
+    assert_eq!(realtime_baseline.bytes, reliable_baseline.bytes);
+    assert!(realtime_baseline.bytes.len() > REALTIME_BYTES);
 
     for net_id in 1..=512_u32 {
         assert!(world.set_input(
@@ -41,10 +44,12 @@ fn reliable_snapshot_converges_dense_state_omitted_by_realtime_datagram() {
         world.step();
     }
     let frame = ReplicationFrame::from_fighters(world.tick, world.fighters());
-    let realtime = session.build_from_frame(baseline.sequence, 1, &frame, REALTIME_BYTES);
+    let realtime =
+        realtime_session.build_from_frame(realtime_baseline.sequence, 1, &frame, REALTIME_BYTES);
     assert!(realtime.omitted_due_to_budget > 0);
 
-    let reliable = session.build_from_frame(baseline.sequence, 1, &frame, RELIABLE_BYTES);
+    let reliable =
+        reliable_session.build_from_frame(reliable_baseline.sequence, 1, &frame, RELIABLE_BYTES);
     assert!(!reliable.full);
     assert_eq!(reliable.omitted_due_to_budget, 0);
     assert!(reliable.record_count > realtime.record_count);
