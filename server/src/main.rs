@@ -108,7 +108,10 @@ struct SharedGame {
 impl SharedGame {
     fn new(flight: LoopbackFlightConfig) -> Arc<Self> {
         Arc::new(Self {
-            state: Mutex::new(GameState::new(flight.background_players, flight.near_pressure_players)),
+            state: Mutex::new(GameState::new(
+                flight.background_players,
+                flight.near_pressure_players,
+            )),
             next_player_id: AtomicU32::new(1),
             reliable_write_delay: flight.reliable_write_delay,
         })
@@ -230,7 +233,11 @@ fn load_loopback_flight_config(bind: SocketAddr) -> Result<LoopbackFlightConfig>
         .unwrap_or(0);
     let near_pressure_players = env::var("MYASO_FLIGHT_NEAR_PRESSURE_PLAYERS")
         .ok()
-        .map(|value| value.parse::<usize>().context("MYASO_FLIGHT_NEAR_PRESSURE_PLAYERS must be an integer"))
+        .map(|value| {
+            value
+                .parse::<usize>()
+                .context("MYASO_FLIGHT_NEAR_PRESSURE_PLAYERS must be an integer")
+        })
         .transpose()?
         .unwrap_or(DEFAULT_FLIGHT_NEAR_PRESSURE_PLAYERS.min(background_players));
     let reliable_delay_ms = env::var("MYASO_FLIGHT_RELIABLE_DELAY_MS")
