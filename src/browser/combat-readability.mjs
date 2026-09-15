@@ -104,7 +104,13 @@ function collectEntityEvents(events, before, current, own) {
   }
   if (current.hp < before.hp) {
     const damage = before.hp - current.hp;
-    push(events, "hit", own ? `Hit taken - ${damage} HP.` : `Opponent hit - ${damage} HP.`, 700);
+    push(
+      events,
+      "hit",
+      own ? `Hit taken - ${damage} HP.` : `Opponent hit - ${damage} HP.`,
+      700,
+      own ? "damage-taken" : "hit-confirm",
+    );
   }
   if (before.action !== COMBAT_ACTION.stunned && current.action === COMBAT_ACTION.stunned) {
     push(events, "stun", own ? "Stunned - the opponent earned a punish window." : "Opponent stunned - punish window open.", 760);
@@ -127,8 +133,8 @@ function collectParryEvents(events, beforeOwn, own, beforePeer, peer) {
   }
 }
 
-function push(events, kind, text, durationMs) {
-  events.push({ kind, text, durationMs, priority: PRIORITY[kind] });
+function push(events, kind, text, durationMs, feedback = null) {
+  events.push({ kind, text, durationMs, feedback, priority: PRIORITY[kind] });
 }
 
 function snapshot(entity) {

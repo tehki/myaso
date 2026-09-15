@@ -8,6 +8,7 @@ import { connectAuthoritativeClient, parseSha256Hex } from "./authoritative-clie
 const canvas = document.querySelector("#arena");
 const ctx = canvas.getContext("2d", { alpha: false });
 const eventText = document.querySelector("#event-text");
+const arenaStage = document.querySelector(".arena-stage");
 const hud = {
   playerHp: document.querySelector("#player-hp"),
   playerHpValue: document.querySelector("#player-hp-value"),
@@ -28,6 +29,7 @@ const combatReadability = createCombatReadabilityTracker();
 let networkStatus = "Connecting to authoritative server...";
 let combatMessage = null;
 let combatMessageUntil = 0;
+let combatFeedbackTimer = 0;
 
 const params = new URLSearchParams(window.location.search);
 const server = params.get("server");
@@ -114,6 +116,19 @@ function observeCombatState(state) {
   combatMessage = event.text;
   combatMessageUntil = performance.now() + event.durationMs;
   setStatus(combatMessage);
+  showCombatFeedback(event.feedback);
+}
+
+function showCombatFeedback(feedback) {
+  if (!feedback || !arenaStage) return;
+  if (combatFeedbackTimer) clearTimeout(combatFeedbackTimer);
+  delete arenaStage.dataset.combatFeedback;
+  void arenaStage.offsetWidth;
+  arenaStage.dataset.combatFeedback = feedback;
+  combatFeedbackTimer = window.setTimeout(() => {
+    if (arenaStage.dataset.combatFeedback === feedback) delete arenaStage.dataset.combatFeedback;
+    combatFeedbackTimer = 0;
+  }, 320);
 }
 
 function updateMouse(event) {
