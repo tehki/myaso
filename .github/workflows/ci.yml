@@ -147,6 +147,11 @@ jobs:
           MYASO_PVP_SCENARIO: "respawn"
         run: node scripts/pvp_browser_flight_runner.mjs
 
+      - name: Validate M30 real online combat readability UI
+        env:
+          MYASO_PVP_SCENARIO: "ui"
+        run: node scripts/pvp_browser_flight_runner.mjs
+
       - name: Measure M15 browser background convergence
         env:
           MYASO_FLIGHT_DURATION_MS: "4500"

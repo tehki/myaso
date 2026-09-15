@@ -8,7 +8,7 @@ import { setTimeout as sleep } from "node:timers/promises";
 const root = process.cwd();
 const durationMs = Number(process.env.MYASO_PVP_FLIGHT_DURATION_MS ?? 7000);
 const scenario = process.env.MYASO_PVP_SCENARIO ?? "damage";
-if (!new Set(["damage", "parry", "dodge", "block", "guardbreak", "backblock", "respawn"]).has(scenario)) throw new Error(`unsupported MYASO_PVP_SCENARIO: ${scenario}`);
+if (!new Set(["damage", "parry", "dodge", "block", "guardbreak", "backblock", "respawn", "ui"]).has(scenario)) throw new Error(`unsupported MYASO_PVP_SCENARIO: ${scenario}`);
 const staticPort = Number(process.env.MYASO_PVP_FLIGHT_HTTP_PORT ?? 4174);
 const browsers = [
   {
@@ -44,10 +44,15 @@ try {
   gameServer = game.child;
   for (const browser of browsers) sessions.push(await startBrowser(browser));
   await Promise.all(sessions.map((entry) => navigate(entry, game.url, game.certificateHash)));
-  const results = await Promise.all(sessions.map(waitForResult));
-  assertPairedResults(results);
-  const label = scenario === "parry" ? "M23_PVP_PARRY" : scenario === "dodge" ? "M24_PVP_DODGE" : scenario === "block" ? "M25_PVP_BLOCK" : scenario === "guardbreak" ? "M26_PVP_GUARD_BREAK" : scenario === "backblock" ? "M27_PVP_DIRECTIONAL_BLOCK" : scenario === "respawn" ? "M28_PVP_RESPAWN" : "M22_PVP_BROWSER_COMBAT";
-  console.log(`${label} ${JSON.stringify({ ok: true, results })}`);
+  if (scenario === "ui") {
+    const results = await runOnlineUiFlight(sessions);
+    console.log(`M30_ONLINE_UI_READABILITY ${JSON.stringify({ ok: true, results })}`);
+  } else {
+    const results = await Promise.all(sessions.map(waitForResult));
+    assertPairedResults(results);
+    const label = scenario === "parry" ? "M23_PVP_PARRY" : scenario === "dodge" ? "M24_PVP_DODGE" : scenario === "block" ? "M25_PVP_BLOCK" : scenario === "guardbreak" ? "M26_PVP_GUARD_BREAK" : scenario === "backblock" ? "M27_PVP_DIRECTIONAL_BLOCK" : scenario === "respawn" ? "M28_PVP_RESPAWN" : "M22_PVP_BROWSER_COMBAT";
+    console.log(`${label} ${JSON.stringify({ ok: true, results })}`);
+  }
 } finally {
   for (const session of sessions) {
     try { await webdriver(session.base, "DELETE", `/session/${session.sessionId}`); } catch {}
@@ -136,12 +141,125 @@ async function startBrowser(browser) {
 }
 
 async function navigate(session, gameUrl, certificateHash) {
-  const url = new URL(`http://127.0.0.1:${staticPort}/web/pvp-flight.html`);
+  const page = scenario === "ui" ? "index.html" : "pvp-flight.html";
+  const url = new URL(`http://127.0.0.1:${staticPort}/web/${page}`);
   url.searchParams.set("server", gameUrl);
   url.searchParams.set("cert", certificateHash);
-  url.searchParams.set("duration", String(durationMs));
-  url.searchParams.set("scenario", scenario);
+  if (scenario !== "ui") {
+    url.searchParams.set("duration", String(durationMs));
+    url.searchParams.set("scenario", scenario);
+  }
   await webdriver(session.base, "POST", `/session/${session.sessionId}/url`, { url: url.toString() });
+}
+
+async function runOnlineUiFlight(entries) {
+  await Promise.all(entries.map(installUiObserver));
+  const ready = await waitForUiReady(entries);
+  const ordered = ready.slice().sort((a, b) => a.playerNetId - b.playerNetId);
+  const attacker = entries.find((entry) => entry.name === ordered[0].browser);
+  if (!attacker) throw new Error(`could not resolve UI attacker from ${JSON.stringify(ready)}`);
+
+  await execute(attacker.base, attacker.sessionId, "document.querySelector('#arena').focus(); return document.activeElement?.id;");
+  await webdriver(attacker.base, "POST", `/session/${attacker.sessionId}/actions`, {
+    actions: [{
+      type: "key",
+      id: "keyboard",
+      actions: [
+        { type: "keyDown", value: "d" },
+        { type: "pause", duration: 180 },
+        { type: "keyUp", value: "d" },
+      ],
+    }],
+  });
+  await sleep(220);
+
+  const arena = await webdriver(attacker.base, "POST", `/session/${attacker.sessionId}/element`, {
+    using: "css selector",
+    value: "#arena",
+  });
+  const elementId = arena?.["element-6066-11e4-a52e-4f735466cecf"];
+  if (!elementId) throw new Error(`${attacker.name} did not resolve the real arena canvas`);
+  await webdriver(attacker.base, "POST", `/session/${attacker.sessionId}/element/${elementId}/click`, {});
+
+  const evidence = await waitForUiCombatEvidence(entries);
+  const attackerResult = evidence.find((entry) => entry.browser === attacker.name);
+  const defenderResult = evidence.find((entry) => entry.browser !== attacker.name);
+  if (!attackerResult || !defenderResult) throw new Error(`incomplete UI evidence: ${JSON.stringify(evidence)}`);
+  if (attackerResult.playerHp !== 100 || attackerResult.opponentHp !== 66) {
+    throw new Error(`attacker HUD did not render authoritative damage: ${JSON.stringify(attackerResult)}`);
+  }
+  if (defenderResult.playerHp !== 66 || defenderResult.opponentHp !== 100) {
+    throw new Error(`defender HUD did not render authoritative damage: ${JSON.stringify(defenderResult)}`);
+  }
+  if (!attackerResult.events.includes("Opponent hit - 34 HP.")) {
+    throw new Error(`attacker never rendered the M29 hit message: ${JSON.stringify(attackerResult.events)}`);
+  }
+  if (!defenderResult.events.includes("Hit taken - 34 HP.")) {
+    throw new Error(`defender never rendered the M29 damage message: ${JSON.stringify(defenderResult.events)}`);
+  }
+  if (!attackerResult.events.some((text) => text.startsWith("Attack committed") || text.startsWith("Strike active") || text.startsWith("Recovery"))) {
+    throw new Error(`attacker never rendered an authoritative action commitment hint: ${JSON.stringify(attackerResult.events)}`);
+  }
+  return evidence;
+}
+
+async function installUiObserver(session) {
+  await execute(session.base, session.sessionId, `
+    const target = document.querySelector('#event-text');
+    if (!target) throw new Error('missing #event-text');
+    const state = { events: [], startedAt: performance.now() };
+    const record = () => {
+      const text = target.textContent?.trim() ?? '';
+      if (text && state.events.at(-1) !== text) state.events.push(text);
+    };
+    record();
+    new MutationObserver(record).observe(target, { childList: true, subtree: true, characterData: true });
+    window.__MYASO_M30_UI__ = state;
+    return true;
+  `);
+}
+
+async function waitForUiReady(entries) {
+  const deadline = Date.now() + 15000;
+  while (Date.now() < deadline) {
+    const states = await Promise.all(entries.map(readUiEvidence));
+    if (states.every((state) => state.playerNetId > 0 && state.playerHp === 100 && state.opponentHp === 100)) return states;
+    await sleep(100);
+  }
+  throw new Error(`real online UI did not converge to two ready fighters: ${JSON.stringify(await Promise.all(entries.map(readUiEvidence)))}`);
+}
+
+async function waitForUiCombatEvidence(entries) {
+  const deadline = Date.now() + 3000;
+  while (Date.now() < deadline) {
+    const states = await Promise.all(entries.map(readUiEvidence));
+    const hpValues = states.map((state) => state.playerHp).sort((a, b) => a - b);
+    const messagesReady = states.some((state) => state.events.includes("Opponent hit - 34 HP."))
+      && states.some((state) => state.events.includes("Hit taken - 34 HP."));
+    if (hpValues[0] === 66 && hpValues[1] === 100 && messagesReady) return states;
+    await sleep(50);
+  }
+  throw new Error(`real online UI never rendered the authoritative hit exchange: ${JSON.stringify(await Promise.all(entries.map(readUiEvidence)))}`);
+}
+
+async function readUiEvidence(session) {
+  const value = await execute(session.base, session.sessionId, `
+    const events = window.__MYASO_M30_UI__?.events ?? [];
+    const online = [...events].reverse().find((text) => /^Online - player #\\d+ - server tick \\d+$/.test(text)) ?? '';
+    const match = online.match(/player #(\\d+)/);
+    return {
+      title: document.title,
+      activeElement: document.activeElement?.id ?? null,
+      playerNetId: match ? Number(match[1]) : 0,
+      eventText: document.querySelector('#event-text')?.textContent?.trim() ?? '',
+      playerHp: Number(document.querySelector('#player-hp-value')?.textContent ?? NaN),
+      playerGuard: Number(document.querySelector('#player-guard-value')?.textContent ?? NaN),
+      opponentHp: Number(document.querySelector('#bot-hp-value')?.textContent ?? NaN),
+      opponentGuard: Number(document.querySelector('#bot-guard-value')?.textContent ?? NaN),
+      events: events.slice(),
+    };
+  `);
+  return { browser: session.name, ...value };
 }
 
 async function waitForResult(session) {
