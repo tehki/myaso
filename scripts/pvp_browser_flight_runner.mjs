@@ -8,7 +8,7 @@ import { setTimeout as sleep } from "node:timers/promises";
 const root = process.cwd();
 const durationMs = Number(process.env.MYASO_PVP_FLIGHT_DURATION_MS ?? 7000);
 const scenario = process.env.MYASO_PVP_SCENARIO ?? "damage";
-if (!new Set(["damage", "parry", "dodge", "block", "guardbreak"]).has(scenario)) throw new Error(`unsupported MYASO_PVP_SCENARIO: ${scenario}`);
+if (!new Set(["damage", "parry", "dodge", "block", "guardbreak", "backblock"]).has(scenario)) throw new Error(`unsupported MYASO_PVP_SCENARIO: ${scenario}`);
 const staticPort = Number(process.env.MYASO_PVP_FLIGHT_HTTP_PORT ?? 4174);
 const browsers = [
   {
@@ -46,7 +46,7 @@ try {
   await Promise.all(sessions.map((entry) => navigate(entry, game.url, game.certificateHash)));
   const results = await Promise.all(sessions.map(waitForResult));
   assertPairedResults(results);
-  const label = scenario === "parry" ? "M23_PVP_PARRY" : scenario === "dodge" ? "M24_PVP_DODGE" : scenario === "block" ? "M25_PVP_BLOCK" : scenario === "guardbreak" ? "M26_PVP_GUARD_BREAK" : "M22_PVP_BROWSER_COMBAT";
+  const label = scenario === "parry" ? "M23_PVP_PARRY" : scenario === "dodge" ? "M24_PVP_DODGE" : scenario === "block" ? "M25_PVP_BLOCK" : scenario === "guardbreak" ? "M26_PVP_GUARD_BREAK" : scenario === "backblock" ? "M27_PVP_DIRECTIONAL_BLOCK" : "M22_PVP_BROWSER_COMBAT";
   console.log(`${label} ${JSON.stringify({ ok: true, results })}`);
 } finally {
   for (const session of sessions) {
@@ -227,6 +227,22 @@ function assertPairedResults(results) {
       }
       if (result.blockOverlapDistance > 94 || result.blockOverlapArcDelta > Math.PI * 0.39) {
         throw new Error(`${result.browser} guard-break overlap was outside authoritative hit geometry: ${JSON.stringify(result)}`);
+      }
+    } else if (scenario === "backblock") {
+      if (!result.defenderBlockSeen || !result.directionalBlockOverlapSeen) {
+        throw new Error(`${result.browser} did not observe directional-block failure geometry`);
+      }
+      if (!(result.minDefenderHp < 100) || result.minDefenderGuard !== 100) {
+        throw new Error(`${result.browser} rear-facing block did not allow HP damage with guard untouched: ${JSON.stringify(result)}`);
+      }
+      if (result.defenderDodgeSeen || result.attackerStunnedSeen) {
+        throw new Error(`${result.browser} directional-block scenario accidentally resolved as dodge/parry`);
+      }
+      if (!Number.isFinite(result.firstDirectionalBlockHitMs) || !Number.isFinite(result.directionalBlockDistance) || !Number.isFinite(result.directionalAttackArcDelta) || !Number.isFinite(result.directionalBlockFacingDelta)) {
+        throw new Error(`${result.browser} did not record directional-block timing/geometry`);
+      }
+      if (result.directionalBlockDistance > 94 || result.directionalAttackArcDelta > Math.PI * 0.39 || result.directionalBlockFacingDelta <= Math.PI * 0.46) {
+        throw new Error(`${result.browser} directional-block geometry was not authoritative: ${JSON.stringify(result)}`);
       }
     } else {
       if (result.minOwnHp >= 100 || result.minPeerHp >= 100) throw new Error(`${result.browser} did not observe both sides taking damage`);
