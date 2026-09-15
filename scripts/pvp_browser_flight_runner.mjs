@@ -240,30 +240,28 @@ async function runOnlineUiParryFlight(entries) {
   await Promise.all(entries.map(installUiObserver));
   const ready = await waitForUiReady(entries);
   const ordered = ready.slice().sort((a, b) => a.playerNetId - b.playerNetId);
-  const attacker = entries.find((entry) => entry.name === ordered[1].browser);
-  const defender = entries.find((entry) => entry.name === ordered[0].browser);
+  const attacker = entries.find((entry) => entry.name === ordered[0].browser);
+  const defender = entries.find((entry) => entry.name === ordered[1].browser);
   if (!attacker || !defender) throw new Error(`could not resolve M33 UI roles from ${JSON.stringify(ready)}`);
+  if (attacker.name !== "chrome" || defender.name !== "firefox") throw new Error(`M33 latency choreography requires Chrome attacker / Firefox defender: ${JSON.stringify(ready)}`);
 
   await Promise.all(entries.map((entry) => execute(entry.base, entry.sessionId, "document.querySelector('#arena').focus(); return document.activeElement?.id;")));
   const attackerElementId = await resolveArenaElement(attacker, "M33 attacker");
   const defenderElementId = await resolveArenaElement(defender, "M33 defender");
 
   await Promise.all(entries.map(centerArenaInViewport));
-  await aimArena(attacker, attackerElementId, -200);
-  await aimArena(defender, defenderElementId, 200);
-  await pulseMovementKey(attacker, "a", 120);
+  await aimArena(defender, defenderElementId, -200);
+  await pulseMovementKey(attacker, "d", 120);
   let evidence;
-  let attackHeld = false;
   let blockHeld = false;
   try {
-    await setArenaAttack(attacker, true);
-    attackHeld = true;
-    await waitForUiMessage(attacker, "Attack committed - your windup is readable.", 700);
-    await setArenaBlock(defender, defenderElementId, true);
     blockHeld = true;
+    const blockAction = pressArenaBlockAfterPause(defender, 120);
+    await sleep(60);
+    await performArenaAttack(attacker, attackerElementId, 200);
+    await blockAction;
     evidence = await waitForUiParryEvidence(entries, attacker, defender, 1000);
   } finally {
-    if (attackHeld) await setArenaAttack(attacker, false);
     if (blockHeld) await setArenaBlock(defender, defenderElementId, false);
   }
 
@@ -275,13 +273,13 @@ async function runOnlineUiParryFlight(entries) {
   const attackDown = attackerResult.pointers.find((event) => event.type === "pointerdown" && event.button === 0);
   const blockDown = defenderResult.pointers.find((event) => event.type === "pointerdown" && event.button === 2);
   const blockUp = defenderResult.pointers.find((event) => event.type === "pointerup" && event.button === 2);
-  if (!attackerResult.keys.includes("keydown:KeyA") || !attackerResult.keys.includes("keyup:KeyA")) {
+  if (!attackerResult.keys.includes("keydown:KeyD") || !attackerResult.keys.includes("keyup:KeyD")) {
     throw new Error(`M33 real attacker movement control was not delivered: ${JSON.stringify(attackerResult)}`);
   }
-  if (!attackDown || attackDown.x > 0.4 || Math.abs(attackDown.y - 0.5) > 0.15) {
+  if (!attackDown || attackDown.x < 0.6 || Math.abs(attackDown.y - 0.5) > 0.15) {
     throw new Error(`M33 real attacker aim was not delivered: ${JSON.stringify(attackerResult)}`);
   }
-  if (!blockDown || !blockUp || blockDown.x < 0.6 || Math.abs(blockDown.y - 0.5) > 0.15) {
+  if (!blockDown || !blockUp || blockDown.x > 0.4 || Math.abs(blockDown.y - 0.5) > 0.15) {
     throw new Error(`M33 real directional block input was not delivered: ${JSON.stringify(defenderResult)}`);
   }
   return evidence;
@@ -389,9 +387,14 @@ async function centerArenaInViewport(session) {
   return geometry;
 }
 
-async function setArenaAttack(session, pressed) {
+async function pressArenaBlockAfterPause(session, delayMs) {
   await webdriver(session.base, "POST", `/session/${session.sessionId}/actions`, {
-    actions: [{ type: "pointer", id: `mouse-${session.name}`, parameters: { pointerType: "mouse" }, actions: [{ type: pressed ? "pointerDown" : "pointerUp", button: 0 }] }],
+    actions: [{
+      type: "pointer",
+      id: `mouse-${session.name}`,
+      parameters: { pointerType: "mouse" },
+      actions: [{ type: "pause", duration: delayMs }, { type: "pointerDown", button: 2 }],
+    }],
   });
 }
 
