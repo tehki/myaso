@@ -31,8 +31,7 @@ fn current_encoding_matches_cross_language_compact_facing_fixture() {
         &[record(1, SNAPSHOT_FULL_FIELDS, 16384)],
         1100,
     );
-    let expected = include_str!("../../tests/fixtures/m20-snapshot-u8-facing-v1.hex")
-        .trim();
+    let expected = include_str!("../../tests/fixtures/m20-snapshot-u8-facing-v1.hex").trim();
     assert_eq!(hex(&encoded), expected);
     assert_eq!(encoded.len(), 25);
 

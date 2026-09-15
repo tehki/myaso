@@ -30,9 +30,7 @@ fn from_hex(value: &str) -> Vec<u8> {
 }
 #[test]
 fn compact_encoding_matches_the_cross_language_fixture() {
-    let fixture = from_hex(
-        include_str!("../../tests/fixtures/m19-snapshot-varint-v1.hex").trim(),
-    );
+    let fixture = from_hex(include_str!("../../tests/fixtures/m19-snapshot-varint-v1.hex").trim());
     let decoded = decode_snapshot(&fixture).expect("compact fixture must decode");
     assert_eq!(decoded.encoding, SNAPSHOT_ENCODING_VARINT_IDS);
     assert_eq!(decoded.records.len(), 1);
