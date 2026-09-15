@@ -832,12 +832,7 @@ fn encode_snapshot_with_encoding(
     bytes
 }
 
-fn encode_record_fields(
-    record: &SnapshotRecord,
-    wire_mask: u8,
-    bytes: &mut Vec<u8>,
-    encoding: u8,
-) {
+fn encode_record_fields(record: &SnapshotRecord, wire_mask: u8, bytes: &mut Vec<u8>, encoding: u8) {
     if wire_mask & SNAPSHOT_FIELD_REMOVED != 0 {
         return;
     }
@@ -950,7 +945,9 @@ fn decode_record_fields(
     encoding: u8,
 ) -> Result<(), SnapshotDecodeError> {
     let wide_position = record.mask & SNAPSHOT_FIELD_WIDE_POSITION != 0;
-    if wide_position && (!uses_compact_position(encoding) || record.mask & SNAPSHOT_FIELD_POSITION == 0) {
+    if wide_position
+        && (!uses_compact_position(encoding) || record.mask & SNAPSHOT_FIELD_POSITION == 0)
+    {
         return Err(SnapshotDecodeError::InvalidPositionEncoding);
     }
     if record.mask & SNAPSHOT_FIELD_REMOVED != 0 {
@@ -1048,10 +1045,8 @@ fn snapshot_record_bytes_for_encoding(record: &SnapshotRecord, encoding: u8) -> 
     let id_bytes = match encoding {
         SNAPSHOT_ENCODING_LEGACY_U32_IDS => 4,
         SNAPSHOT_ENCODING_VARINT_IDS
-            | SNAPSHOT_ENCODING_VARINT_IDS_U8_FACING
-            | SNAPSHOT_ENCODING_VARINT_IDS_U8_FACING_U12_POSITION => {
-            u32_varint_bytes(record.net_id)
-        }
+        | SNAPSHOT_ENCODING_VARINT_IDS_U8_FACING
+        | SNAPSHOT_ENCODING_VARINT_IDS_U8_FACING_U12_POSITION => u32_varint_bytes(record.net_id),
         _ => unreachable!("encoding validated by caller"),
     };
     let mut bytes = id_bytes + 1;

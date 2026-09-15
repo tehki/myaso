@@ -36,7 +36,10 @@ fn current_encoding_matches_cross_language_compact_position_fixture() {
     assert_eq!(hex(&encoded), expected);
     assert_eq!(encoded.len(), 24);
     let decoded = decode_snapshot(&encoded).expect("M21 fixture must decode");
-    assert_eq!(decoded.encoding, SNAPSHOT_ENCODING_VARINT_IDS_U8_FACING_U12_POSITION);
+    assert_eq!(
+        decoded.encoding,
+        SNAPSHOT_ENCODING_VARINT_IDS_U8_FACING_U12_POSITION
+    );
     assert_eq!(decoded.records[0].x, 400);
     assert_eq!(decoded.records[0].y, 800);
 }
