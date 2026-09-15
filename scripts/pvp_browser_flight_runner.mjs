@@ -245,12 +245,13 @@ async function runOnlineUiParryFlight(entries) {
   const attackerElementId = await resolveArenaElement(attacker, "M33 attacker");
   const defenderElementId = await resolveArenaElement(defender, "M33 defender");
 
+  await aimArena(defender, defenderElementId, -200);
   await pulseMovementKey(attacker, "d", 120);
   let evidence;
   let blockHeld = false;
   try {
     const attackAction = performArenaAttack(attacker, attackerElementId);
-    await sleep(55);
+    await waitForUiMessage(attacker, "Attack committed - your windup is readable.", 500);
     await setArenaBlock(defender, defenderElementId, true);
     blockHeld = true;
     await attackAction;
@@ -352,11 +353,20 @@ async function resolveArenaElement(session, label) {
   return elementId;
 }
 
-async function setArenaBlock(session, elementId, pressed) {
+async function aimArena(session, elementId, xOffset) {
   const origin = { "element-6066-11e4-a52e-4f735466cecf": elementId };
-  const actions = pressed
-    ? [{ type: "pointerMove", duration: 0, origin, x: -200, y: 0 }, { type: "pointerDown", button: 2 }]
-    : [{ type: "pointerUp", button: 2 }];
+  await webdriver(session.base, "POST", `/session/${session.sessionId}/actions`, {
+    actions: [{
+      type: "pointer",
+      id: `mouse-${session.name}`,
+      parameters: { pointerType: "mouse" },
+      actions: [{ type: "pointerMove", duration: 0, origin, x: xOffset, y: 0 }],
+    }],
+  });
+}
+
+async function setArenaBlock(session, elementId, pressed) {
+  const actions = [{ type: pressed ? "pointerDown" : "pointerUp", button: 2 }];
   await webdriver(session.base, "POST", `/session/${session.sessionId}/actions`, {
     actions: [{ type: "pointer", id: `mouse-${session.name}`, parameters: { pointerType: "mouse" }, actions }],
   });
@@ -454,6 +464,16 @@ async function waitForUiCombatEvidence(entries, timeoutMs = 3000, fail = true) {
   }
   if (!fail) return null;
   throw new Error(`real online UI never rendered the authoritative hit exchange: ${JSON.stringify(await Promise.all(entries.map(readUiEvidence)))}`);
+}
+
+async function waitForUiMessage(session, text, timeoutMs) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const state = await readUiEvidence(session);
+    if (state.events.includes(text)) return state;
+    await sleep(20);
+  }
+  throw new Error(`${session.name} never rendered expected online UI message ${text}: ${JSON.stringify(await readUiEvidence(session))}`);
 }
 
 async function waitForUiParryEvidence(entries, attacker, defender, timeoutMs) {
