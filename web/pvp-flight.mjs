@@ -6,7 +6,7 @@ const server = params.get("server");
 const cert = params.get("cert");
 const durationMs = clamp(Number(params.get("duration") ?? 7000), 3000, 12000);
 const scenario = params.get("scenario") ?? "damage";
-if (!new Set(["damage", "parry", "dodge", "block", "guardbreak"]).has(scenario)) throw new Error(`unsupported PvP scenario: ${scenario}`);
+if (!new Set(["damage", "parry", "dodge", "block", "guardbreak", "backblock"]).has(scenario)) throw new Error(`unsupported PvP scenario: ${scenario}`);
 const canvas = document.querySelector("#arena");
 const ctx = canvas.getContext("2d", { alpha: false });
 const status = document.querySelector("#status");
@@ -56,6 +56,11 @@ let blockOverlapArcDelta = null;
 let firstBlockAt = null;
 let firstGuardCostAt = null;
 let firstGuardBreakAt = null;
+let directionalBlockOverlapSeen = false;
+let directionalBlockDistance = null;
+let directionalAttackArcDelta = null;
+let directionalBlockFacingDelta = null;
+let firstDirectionalBlockHitAt = null;
 let lastFrameAt = 0;
 let frameCount = 0;
 const frameDeltas = [];
@@ -167,6 +172,26 @@ function observeState(state) {
       firstGuardBreakAt = performance.now();
     }
   }
+  if (scenario === "backblock") {
+    if (defender.action === 6 && firstBlockAt === null) firstBlockAt = performance.now();
+    if (attacker.action === 2 && defender.action === 6) {
+      const dx = defender.x - attacker.x;
+      const dy = defender.y - attacker.y;
+      const distance = Math.hypot(dx, dy);
+      const attackArcDelta = Math.abs(normalizeAngle(Math.atan2(dy, dx) - attacker.facing));
+      const angleToAttacker = Math.atan2(attacker.y - defender.y, attacker.x - defender.x);
+      const blockFacingDelta = Math.abs(normalizeAngle(angleToAttacker - defender.facing));
+      if (distance <= 94 && attackArcDelta <= Math.PI * 0.39 && blockFacingDelta > Math.PI * 0.46) {
+        directionalBlockOverlapSeen = true;
+        directionalBlockDistance = distance;
+        directionalAttackArcDelta = attackArcDelta;
+        directionalBlockFacingDelta = blockFacingDelta;
+      }
+    }
+    if (firstDirectionalBlockHitAt === null && defender.hp < 100 && defender.guard === 100) {
+      firstDirectionalBlockHitAt = performance.now();
+    }
+  }
   const scenarioSucceeded = scenario === "parry"
     ? firstParryAt !== null
     : scenario === "dodge"
@@ -175,7 +200,9 @@ function observeState(state) {
         ? firstGuardCostAt !== null && blockOverlapSeen
         : scenario === "guardbreak"
           ? firstGuardBreakAt !== null && blockOverlapSeen
-          : minOwnHp < 100 && minPeerHp < 100;
+          : scenario === "backblock"
+            ? firstDirectionalBlockHitAt !== null && directionalBlockOverlapSeen
+            : minOwnHp < 100 && minPeerHp < 100;
   if (successAt === null && scenarioSucceeded) successAt = performance.now();
   if (successAt !== null && performance.now() - successAt >= 500) finish();
 }
@@ -198,14 +225,14 @@ function sendCombatInput() {
     const distance = Math.hypot(dx, dy);
     facing = Math.atan2(dy, dx);
 
-    if (scenario === "parry" || scenario === "dodge" || scenario === "block" || scenario === "guardbreak") {
+    if (scenario === "parry" || scenario === "dodge" || scenario === "block" || scenario === "guardbreak" || scenario === "backblock") {
       const isAttacker = ownId < peer.netId;
       if (distance > 68 && distance > 0.001) {
         moveX = dx / distance;
         moveY = dy / distance;
       }
       if (isAttacker) {
-        const defenderReady = !["block", "guardbreak"].includes(scenario) || peer.action === 6;
+        const defenderReady = !["block", "guardbreak", "backblock"].includes(scenario) || peer.action === 6;
         const attackModulo = scenario === "guardbreak" ? 12 : 24;
         attack = defenderReady && distance <= 74 && own.action === 0 && sentInputs % attackModulo === 0;
       } else if (scenario === "parry") {
@@ -234,6 +261,9 @@ function sendCombatInput() {
           dodgeWindupSeenAt = null;
           dodgeTriggered = false;
         }
+      } else if (scenario === "backblock") {
+        block = true;
+        facing = normalizeAngle(facing + Math.PI);
       } else {
         block = true;
       }
@@ -328,6 +358,10 @@ function finish() {
     && defenderBlockSeen && blockOverlapSeen && defenderStunnedSeen
     && minDefenderHp === 100 && minDefenderGuard === 0
     && !defenderDodgeSeen && !attackerStunnedSeen;
+  const backBlockOk = firstDirectionalBlockHitAt !== null
+    && defenderBlockSeen && directionalBlockOverlapSeen
+    && minDefenderHp < 100 && minDefenderGuard === 100
+    && !defenderDodgeSeen && !attackerStunnedSeen;
   const scenarioOk = scenario === "parry"
     ? parryOk
     : scenario === "dodge"
@@ -336,7 +370,9 @@ function finish() {
         ? blockOk
         : scenario === "guardbreak"
           ? guardBreakOk
-          : damageOk;
+          : scenario === "backblock"
+            ? backBlockOk
+            : damageOk;
   const result = {
     ok: commonOk && scenarioOk,
     scenario,
@@ -369,6 +405,10 @@ function finish() {
     blockOverlapSeen,
     blockOverlapDistance: round(blockOverlapDistance),
     blockOverlapArcDelta: round(blockOverlapArcDelta),
+    directionalBlockOverlapSeen,
+    directionalBlockDistance: round(directionalBlockDistance),
+    directionalAttackArcDelta: round(directionalAttackArcDelta),
+    directionalBlockFacingDelta: round(directionalBlockFacingDelta),
     minDefenderHp,
     minDefenderGuard,
     peerSeenMs: peerSeenAt === null ? null : round(peerSeenAt - startedAt),
@@ -380,6 +420,7 @@ function finish() {
     firstBlockMs: firstBlockAt === null ? null : round(firstBlockAt - startedAt),
     firstGuardCostMs: firstGuardCostAt === null ? null : round(firstGuardCostAt - startedAt),
     firstGuardBreakMs: firstGuardBreakAt === null ? null : round(firstGuardBreakAt - startedAt),
+    firstDirectionalBlockHitMs: firstDirectionalBlockHitAt === null ? null : round(firstDirectionalBlockHitAt - startedAt),
     elapsedMs: round(performance.now() - startedAt),
   };
   window.__MYASO_PVP_RESULT__ = result;
@@ -392,7 +433,9 @@ function finish() {
           ? "authoritative PvP block verified"
           : scenario === "guardbreak"
             ? "authoritative PvP guard break verified"
-            : "authoritative PvP damage verified")
+            : scenario === "backblock"
+              ? "authoritative PvP directional block failure verified"
+              : "authoritative PvP damage verified")
     : `PvP ${scenario} flight incomplete`;
   client?.close(`PvP ${scenario} flight complete`);
 }
