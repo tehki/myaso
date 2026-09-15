@@ -1,4 +1,5 @@
 import { createFrameBudget } from "../src/browser/frame-budget.mjs";
+import { COMBAT_ACTION, combatActionHint, createCombatReadabilityTracker } from "../src/browser/combat-readability.mjs";
 import { COMBAT } from "../src/combat/model.mjs";
 import { reconcilePrediction } from "../src/browser/reconciliation.mjs";
 import { NETWORK } from "../src/network/constants.mjs";
@@ -18,6 +19,10 @@ const hud = {
   botGuardValue: document.querySelector("#bot-guard-value"),
 };
 const hudCache = { playerHp: null, playerGuard: null, botHp: null, botGuard: null, status: null };
+const combatReadability = createCombatReadabilityTracker();
+let networkStatus = "Connecting to authoritative server...";
+let combatMessage = null;
+let combatMessageUntil = 0;
 
 const params = new URLSearchParams(window.location.search);
 const server = params.get("server");
@@ -69,13 +74,17 @@ networkClient = await connectAuthoritativeClient({
   webTransportOptions,
   onProtocolError(error) {
     console.warn("authoritative protocol error", error);
-    setStatus("Protocol error — invalid realtime packet ignored.");
+    networkStatus = "Protocol error - invalid realtime packet ignored.";
   },
   onSnapshot(_result, state) {
     const ownId = networkClient?.playerNetId;
     if (!ownId) return;
     const own = state.get(ownId);
     if (own && !local.initialized) restoreAuthoritative(own);
+    observeCombatState(state);
+  },
+  onReliableSnapshot(_result, state) {
+    observeCombatState(state);
   },
   onAck() {
     const ownId = networkClient?.playerNetId;
@@ -88,9 +97,19 @@ networkClient = await connectAuthoritativeClient({
       restoreAuthoritative,
       replayInput(entry) { predictMovement(entry, 1000 / NETWORK.inputSendHz); },
     });
-    setStatus(`Online · player #${ownId} · server tick ${networkClient.latestServerTick}`);
+    networkStatus = `Online - player #${ownId} - server tick ${networkClient.latestServerTick}`;
   },
 });
+
+function observeCombatState(state) {
+  const ownId = networkClient?.playerNetId;
+  if (!ownId) return;
+  const event = combatReadability.observe(state, ownId);
+  if (!event) return;
+  combatMessage = event.text;
+  combatMessageUntil = performance.now() + event.durationMs;
+  setStatus(combatMessage);
+}
 
 function updateMouse(event) {
   const rect = canvas.getBoundingClientRect();
@@ -195,7 +214,12 @@ function drawFighterScreen(x, y, fighter, body, shadow) {
   ctx.save();
   ctx.translate(x, y);
   ctx.rotate(fighter.facing ?? 0);
-  ctx.globalAlpha = fighter.action === 8 ? 0.28 : 1;
+  const action = fighter.action ?? COMBAT_ACTION.idle;
+  ctx.globalAlpha = action === COMBAT_ACTION.dead ? 0.28 : 1;
+  if (action === COMBAT_ACTION.attackWindup || action === COMBAT_ACTION.attackActive) drawAttackTell(action);
+  if (action === COMBAT_ACTION.block) drawBlockTell();
+  if (action === COMBAT_ACTION.dodge) drawDodgeTell();
+  if (action === COMBAT_ACTION.stunned) drawStunTell();
   ctx.fillStyle = shadow;
   ctx.beginPath();
   ctx.ellipse(-2, 8, 20, 13, 0, 0, Math.PI * 2);
@@ -213,6 +237,40 @@ function drawFighterScreen(x, y, fighter, body, shadow) {
   ctx.restore();
 }
 
+function drawAttackTell(action) {
+  const alpha = action === COMBAT_ACTION.attackActive ? 0.34 : 0.14;
+  ctx.fillStyle = `rgba(214, 187, 112, ${alpha})`;
+  ctx.beginPath();
+  ctx.moveTo(0, 0);
+  ctx.arc(0, 0, COMBAT.attack.reach + COMBAT.fighterRadius, -COMBAT.attack.arcRadians / 2, COMBAT.attack.arcRadians / 2);
+  ctx.closePath();
+  ctx.fill();
+}
+
+function drawBlockTell() {
+  ctx.strokeStyle = "rgba(241, 218, 142, .72)";
+  ctx.lineWidth = 4;
+  ctx.beginPath();
+  ctx.arc(0, 0, 32, -COMBAT.block.halfAngleRadians, COMBAT.block.halfAngleRadians);
+  ctx.stroke();
+}
+
+function drawDodgeTell() {
+  ctx.strokeStyle = "rgba(216, 202, 160, .58)";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.arc(0, 0, 28, 0, Math.PI * 2);
+  ctx.stroke();
+}
+
+function drawStunTell() {
+  ctx.strokeStyle = "rgba(185, 99, 80, .9)";
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.arc(0, 0, 25, 0, Math.PI * 2);
+  ctx.stroke();
+}
+
 function updateHud(ownId) {
   const own = ownId ? networkClient.state.get(ownId) : null;
   let remote = null;
@@ -226,6 +284,13 @@ function updateHud(ownId) {
   setMeter("playerGuard", hud.playerGuard, hud.playerGuardValue, own?.guard ?? local.guard);
   setMeter("botHp", hud.botHp, hud.botHpValue, remote?.hp ?? 0);
   setMeter("botGuard", hud.botGuard, hud.botGuardValue, remote?.guard ?? 0);
+  const now = performance.now();
+  if (combatMessage && now <= combatMessageUntil) {
+    setStatus(combatMessage);
+  } else {
+    combatMessage = null;
+    setStatus(combatActionHint(own) ?? networkStatus);
+  }
 }
 
 function setMeter(cacheKey, bar, label, value) {
