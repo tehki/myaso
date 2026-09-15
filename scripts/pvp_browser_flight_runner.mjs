@@ -7,6 +7,8 @@ import { setTimeout as sleep } from "node:timers/promises";
 
 const root = process.cwd();
 const durationMs = Number(process.env.MYASO_PVP_FLIGHT_DURATION_MS ?? 7000);
+const scenario = process.env.MYASO_PVP_SCENARIO ?? "damage";
+if (!new Set(["damage", "parry"]).has(scenario)) throw new Error(`unsupported MYASO_PVP_SCENARIO: ${scenario}`);
 const staticPort = Number(process.env.MYASO_PVP_FLIGHT_HTTP_PORT ?? 4174);
 const browsers = [
   {
@@ -44,7 +46,8 @@ try {
   await Promise.all(sessions.map((entry) => navigate(entry, game.url, game.certificateHash)));
   const results = await Promise.all(sessions.map(waitForResult));
   assertPairedResults(results);
-  console.log(`M22_PVP_BROWSER_COMBAT ${JSON.stringify({ ok: true, results })}`);
+  const label = scenario === "parry" ? "M23_PVP_PARRY" : "M22_PVP_BROWSER_COMBAT";
+  console.log(`${label} ${JSON.stringify({ ok: true, results })}`);
 } finally {
   for (const session of sessions) {
     try { await webdriver(session.base, "DELETE", `/session/${session.sessionId}`); } catch {}
@@ -137,6 +140,7 @@ async function navigate(session, gameUrl, certificateHash) {
   url.searchParams.set("server", gameUrl);
   url.searchParams.set("cert", certificateHash);
   url.searchParams.set("duration", String(durationMs));
+  url.searchParams.set("scenario", scenario);
   await webdriver(session.base, "POST", `/session/${session.sessionId}/url`, { url: url.toString() });
 }
 
@@ -159,20 +163,35 @@ function assertPairedResults(results) {
   if (results.length !== 2) throw new Error(`expected two browser results, received ${results.length}`);
   const [first, second] = results;
   for (const result of results) {
-    if (!result.ok) throw new Error(`${result.browser} did not verify reciprocal authoritative PvP damage: ${JSON.stringify(result)}`);
+    if (result.scenario !== scenario) throw new Error(`${result.browser} reported scenario ${result.scenario} instead of ${scenario}`);
+    if (!result.ok) throw new Error(`${result.browser} did not verify authoritative PvP ${scenario}: ${JSON.stringify(result)}`);
     if (result.maxAuthoritativeEntities < 2) throw new Error(`${result.browser} never observed both players`);
-    if (result.minOwnHp >= 100 || result.minPeerHp >= 100) throw new Error(`${result.browser} did not observe both sides taking damage`);
-    if (result.ownDamageTransitions < 1 || result.peerDamageTransitions < 1) throw new Error(`${result.browser} did not observe authoritative HP transitions`);
     if (result.snapshots < 10 || result.acknowledgements < 10 || result.sentInputs < 20) {
       throw new Error(`${result.browser} did not sustain the PvP flight long enough`);
     }
     if (!Number.isFinite(result.frameP95) || result.frameP95 >= 25) {
       throw new Error(`${result.browser} p95 frame interval exceeded 25ms: ${result.frameP95}`);
     }
+    if (scenario === "parry") {
+      if (!result.attackerStunnedSeen || !result.defenderBlockSeen) {
+        throw new Error(`${result.browser} did not observe the authoritative parry state transition`);
+      }
+      if (result.minDefenderHp !== 100 || result.minDefenderGuard !== 100) {
+        throw new Error(`${result.browser} defender paid HP/guard cost during parry: ${JSON.stringify(result)}`);
+      }
+      if (!Number.isFinite(result.firstParryMs)) throw new Error(`${result.browser} did not timestamp a verified parry`);
+    } else {
+      if (result.minOwnHp >= 100 || result.minPeerHp >= 100) throw new Error(`${result.browser} did not observe both sides taking damage`);
+      if (result.ownDamageTransitions < 1 || result.peerDamageTransitions < 1) throw new Error(`${result.browser} did not observe authoritative HP transitions`);
+    }
   }
   if (first.playerNetId === second.playerNetId) throw new Error("paired browsers received the same player identity");
   if (first.peerNetId !== second.playerNetId || second.peerNetId !== first.playerNetId) {
     throw new Error(`paired browsers disagree on opponent identity: ${JSON.stringify(results)}`);
+  }
+  if (scenario === "parry") {
+    const roles = results.map((result) => result.role).sort().join(",");
+    if (roles !== "attacker,defender") throw new Error(`paired browsers did not resolve attacker/defender roles: ${roles}`);
   }
 }
 
