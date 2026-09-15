@@ -24,8 +24,13 @@ kbd { border: 1px solid #575144; border-bottom-width: 2px; border-radius: 5px; b
 .meter b { font-variant-numeric: tabular-nums; font-weight: 600; color: #ddd5c5; }
 .event-text { text-align: center; min-height: 20px; margin: 0; color: #d4c28c; font-size: 13px; }
 .arena-wrap { border: 1px solid #3c362b; border-radius: 14px; overflow: hidden; background: #17140f; box-shadow: 0 22px 60px rgba(0,0,0,.35); }
+.arena-stage { position: relative; }
 canvas { display: block; width: 100%; height: auto; aspect-ratio: 16 / 9; outline: none; cursor: crosshair; touch-action: none; }
 canvas:focus-visible { box-shadow: inset 0 0 0 2px #c5a457; }
+.combat-overlay { position: absolute; inset: 0; display: grid; place-content: center; gap: 8px; text-align: center; pointer-events: none; background: rgba(10, 9, 7, .56); backdrop-filter: blur(2px); }
+.combat-overlay[hidden] { display: none; }
+.combat-overlay strong { font-size: clamp(28px, 5vw, 54px); letter-spacing: .12em; color: #eee9dc; }
+.combat-overlay span { font-size: 14px; letter-spacing: .08em; color: #c9b77f; }
 .focus-hint { margin: 0; padding: 9px 12px; border-top: 1px solid #342f26; color: #847c6e; font-size: 12px; text-align: center; }
 @media (max-width: 760px) {
   .hud { grid-template-columns: 1fr 1fr; }

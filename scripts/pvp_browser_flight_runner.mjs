@@ -8,7 +8,7 @@ import { setTimeout as sleep } from "node:timers/promises";
 const root = process.cwd();
 const durationMs = Number(process.env.MYASO_PVP_FLIGHT_DURATION_MS ?? 7000);
 const scenario = process.env.MYASO_PVP_SCENARIO ?? "damage";
-if (!new Set(["damage", "parry", "dodge", "block", "guardbreak", "backblock", "respawn", "ui"]).has(scenario)) throw new Error(`unsupported MYASO_PVP_SCENARIO: ${scenario}`);
+if (!new Set(["damage", "parry", "dodge", "block", "guardbreak", "backblock", "respawn", "ui", "uirespawn"]).has(scenario)) throw new Error(`unsupported MYASO_PVP_SCENARIO: ${scenario}`);
 const staticPort = Number(process.env.MYASO_PVP_FLIGHT_HTTP_PORT ?? 4174);
 const browsers = [
   {
@@ -47,6 +47,9 @@ try {
   if (scenario === "ui") {
     const results = await runOnlineUiFlight(sessions);
     console.log(`M30_ONLINE_UI_READABILITY ${JSON.stringify({ ok: true, results })}`);
+  } else if (scenario === "uirespawn") {
+    const results = await runOnlineUiRespawnFlight(sessions);
+    console.log(`M31_ONLINE_UI_DEATH_RESPAWN ${JSON.stringify({ ok: true, results })}`);
   } else {
     const results = await Promise.all(sessions.map(waitForResult));
     assertPairedResults(results);
@@ -141,7 +144,7 @@ async function startBrowser(browser) {
 }
 
 async function navigate(session, gameUrl, certificateHash) {
-  const page = scenario === "ui" ? "index.html" : "pvp-flight.html";
+  const page = scenario === "ui" || scenario === "uirespawn" ? "index.html" : "pvp-flight.html";
   const url = new URL(`http://127.0.0.1:${staticPort}/web/${page}`);
   url.searchParams.set("server", gameUrl);
   url.searchParams.set("cert", certificateHash);
@@ -214,6 +217,56 @@ async function runOnlineUiFlight(entries) {
   return evidence;
 }
 
+async function runOnlineUiRespawnFlight(entries) {
+  await Promise.all(entries.map(installUiObserver));
+  const ready = await waitForUiReady(entries);
+  const ordered = ready.slice().sort((a, b) => a.playerNetId - b.playerNetId);
+  const attacker = entries.find((entry) => entry.name === ordered[0].browser);
+  const defender = entries.find((entry) => entry.name === ordered[1].browser);
+  if (!attacker || !defender) throw new Error(`could not resolve M31 UI roles from ${JSON.stringify(ready)}`);
+
+  await Promise.all(entries.map((entry) => execute(entry.base, entry.sessionId, "document.querySelector('#arena').focus(); return document.activeElement?.id;")));
+  const arena = await webdriver(attacker.base, "POST", `/session/${attacker.sessionId}/element`, {
+    using: "css selector",
+    value: "#arena",
+  });
+  const elementId = arena?.["element-6066-11e4-a52e-4f735466cecf"];
+  if (!elementId) throw new Error(`${attacker.name} did not resolve the real arena canvas for M31`);
+
+  let deathEvidence = null;
+  await pulseMovementKey(attacker, "d", 120);
+  for (let attempt = 0; attempt < 8 && !deathEvidence; attempt += 1) {
+    await performArenaAttack(attacker, elementId);
+    deathEvidence = await waitForUiDeathEvidence(entries, attacker, defender, 800, false);
+    if (!deathEvidence) await pulseMovementKey(attacker, "d", 80);
+  }
+  if (!deathEvidence) deathEvidence = await waitForUiDeathEvidence(entries, attacker, defender, 1200, true);
+
+  const respawnEvidence = await waitForUiRespawnEvidence(entries, attacker, defender, 3000);
+  const attackerResult = respawnEvidence.find((entry) => entry.browser === attacker.name);
+  const defenderResult = respawnEvidence.find((entry) => entry.browser === defender.name);
+  if (!attackerResult || !defenderResult) throw new Error(`incomplete M31 UI evidence: ${JSON.stringify(respawnEvidence)}`);
+  if (!attackerResult.keys.includes("keydown:KeyD") || !attackerResult.keys.includes("keyup:KeyD")) {
+    throw new Error(`M31 real attacker movement control was not delivered: ${JSON.stringify(attackerResult)}`);
+  }
+  const primaryDown = attackerResult.pointers.find((event) => event.type === "pointerdown" && event.button === 0);
+  if (!primaryDown || primaryDown.x < 0.6 || Math.abs(primaryDown.y - 0.5) > 0.15) {
+    throw new Error(`M31 real rightward attack aim was not delivered: ${JSON.stringify(attackerResult)}`);
+  }
+  if (!attackerResult.events.includes("Opponent down.") || !attackerResult.events.includes("Opponent respawned.")) {
+    throw new Error(`attacker never rendered the authoritative death/respawn lifecycle: ${JSON.stringify(attackerResult.events)}`);
+  }
+  if (!defenderResult.events.includes("Defeated - read the exchange.") || !defenderResult.events.includes("Respawned - back in the fight.")) {
+    throw new Error(`defender never rendered the authoritative death/respawn lifecycle: ${JSON.stringify(defenderResult.events)}`);
+  }
+  const showedDefeat = defenderResult.overlayTransitions.some((entry) => entry.visible && entry.title === "DEFEATED" && entry.detail === "Respawning…");
+  const clearedAfterDefeat = showedDefeat && defenderResult.overlayTransitions.at(-1)?.visible === false;
+  if (!clearedAfterDefeat) {
+    throw new Error(`defender overlay did not follow authoritative death through respawn: ${JSON.stringify(defenderResult.overlayTransitions)}`);
+  }
+  return respawnEvidence;
+}
+
 async function setMovementKey(session, value, pressed) {
   await webdriver(session.base, "POST", `/session/${session.sessionId}/actions`, {
     actions: [{
@@ -222,6 +275,12 @@ async function setMovementKey(session, value, pressed) {
       actions: [{ type: pressed ? "keyDown" : "keyUp", value }],
     }],
   });
+}
+
+async function pulseMovementKey(session, value, durationMs) {
+  await setMovementKey(session, value, true);
+  await sleep(durationMs);
+  await setMovementKey(session, value, false);
 }
 
 async function performArenaAttack(session, elementId) {
@@ -245,12 +304,24 @@ async function installUiObserver(session) {
   await execute(session.base, session.sessionId, `
     const target = document.querySelector('#event-text');
     const arena = document.querySelector('#arena');
-    if (!target || !arena) throw new Error('missing M30 UI target');
-    const state = { events: [], keys: [], pointers: [], online: '', startedAt: performance.now() };
+    const overlay = document.querySelector('#combat-overlay');
+    if (!target || !arena || !overlay) throw new Error('missing online UI flight target');
+    const state = { events: [], keys: [], pointers: [], overlayTransitions: [], online: '', startedAt: performance.now() };
     const record = () => {
       const text = target.textContent?.trim() ?? '';
       if (/^Online - player #\\d+ - server tick \\d+$/.test(text)) state.online = text;
       else if (text && state.events.at(-1) !== text) state.events.push(text);
+    };
+    const recordOverlay = () => {
+      const entry = {
+        visible: !overlay.hidden,
+        title: document.querySelector('#combat-overlay-title')?.textContent?.trim() ?? '',
+        detail: document.querySelector('#combat-overlay-detail')?.textContent?.trim() ?? '',
+      };
+      const previous = state.overlayTransitions.at(-1);
+      if (!previous || previous.visible !== entry.visible || previous.title !== entry.title || previous.detail !== entry.detail) {
+        state.overlayTransitions.push(entry);
+      }
     };
     for (const type of ['keydown', 'keyup']) {
       arena.addEventListener(type, (event) => state.keys.push(type + ':' + event.code), { capture: true });
@@ -267,7 +338,9 @@ async function installUiObserver(session) {
       }, { capture: true });
     }
     record();
+    recordOverlay();
     new MutationObserver(record).observe(target, { childList: true, subtree: true, characterData: true });
+    new MutationObserver(recordOverlay).observe(overlay, { attributes: true, attributeFilter: ['hidden'], childList: true, subtree: true, characterData: true });
     window.__MYASO_M30_UI__ = state;
     return true;
   `);
@@ -297,9 +370,42 @@ async function waitForUiCombatEvidence(entries, timeoutMs = 3000, fail = true) {
   throw new Error(`real online UI never rendered the authoritative hit exchange: ${JSON.stringify(await Promise.all(entries.map(readUiEvidence)))}`);
 }
 
+async function waitForUiDeathEvidence(entries, attacker, defender, timeoutMs, fail = true) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const states = await Promise.all(entries.map(readUiEvidence));
+    const attackerState = states.find((entry) => entry.browser === attacker.name);
+    const defenderState = states.find((entry) => entry.browser === defender.name);
+    const lifecycleReady = attackerState?.events.includes("Opponent down.")
+      && defenderState?.events.includes("Defeated - read the exchange.");
+    if (attackerState?.opponentHp === 0 && defenderState?.playerHp === 0
+      && defenderState.overlayVisible && defenderState.overlayTitle === "DEFEATED"
+      && defenderState.overlayDetail === "Respawning…" && lifecycleReady) return states;
+    await sleep(50);
+  }
+  if (!fail) return null;
+  throw new Error(`real online UI never rendered authoritative defeat: ${JSON.stringify(await Promise.all(entries.map(readUiEvidence)))}`);
+}
+
+async function waitForUiRespawnEvidence(entries, attacker, defender, timeoutMs) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const states = await Promise.all(entries.map(readUiEvidence));
+    const attackerState = states.find((entry) => entry.browser === attacker.name);
+    const defenderState = states.find((entry) => entry.browser === defender.name);
+    const lifecycleReady = attackerState?.events.includes("Opponent respawned.")
+      && defenderState?.events.includes("Respawned - back in the fight.");
+    if (attackerState?.opponentHp === 100 && attackerState?.opponentGuard === 100
+      && defenderState?.playerHp === 100 && defenderState?.playerGuard === 100
+      && !defenderState.overlayVisible && lifecycleReady) return states;
+    await sleep(50);
+  }
+  throw new Error(`real online UI never returned from authoritative defeat: ${JSON.stringify(await Promise.all(entries.map(readUiEvidence)))}`);
+}
+
 async function readUiEvidence(session) {
   const value = await execute(session.base, session.sessionId, `
-    const state = window.__MYASO_M30_UI__ ?? { events: [], keys: [], pointers: [], online: '' };
+    const state = window.__MYASO_M30_UI__ ?? { events: [], keys: [], pointers: [], overlayTransitions: [], online: '' };
     const match = state.online.match(/player #(\\d+)/);
     return {
       title: document.title,
@@ -310,6 +416,10 @@ async function readUiEvidence(session) {
       playerGuard: Number(document.querySelector('#player-guard-value')?.textContent ?? NaN),
       opponentHp: Number(document.querySelector('#bot-hp-value')?.textContent ?? NaN),
       opponentGuard: Number(document.querySelector('#bot-guard-value')?.textContent ?? NaN),
+      overlayVisible: !document.querySelector('#combat-overlay')?.hidden,
+      overlayTitle: document.querySelector('#combat-overlay-title')?.textContent?.trim() ?? '',
+      overlayDetail: document.querySelector('#combat-overlay-detail')?.textContent?.trim() ?? '',
+      overlayTransitions: (state.overlayTransitions ?? []).slice(),
       events: state.events.slice(),
       keys: state.keys.slice(),
       pointers: state.pointers.slice(),

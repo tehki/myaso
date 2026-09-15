@@ -1,5 +1,5 @@
 import { createFrameBudget } from "../src/browser/frame-budget.mjs";
-import { COMBAT_ACTION, combatActionHint, createCombatReadabilityTracker } from "../src/browser/combat-readability.mjs";
+import { COMBAT_ACTION, combatActionHint, combatLifePresentation, createCombatReadabilityTracker } from "../src/browser/combat-readability.mjs";
 import { COMBAT } from "../src/combat/model.mjs";
 import { reconcilePrediction } from "../src/browser/reconciliation.mjs";
 import { NETWORK } from "../src/network/constants.mjs";
@@ -19,6 +19,11 @@ const hud = {
   botGuardValue: document.querySelector("#bot-guard-value"),
 };
 const hudCache = { playerHp: null, playerGuard: null, botHp: null, botGuard: null, status: null };
+const combatOverlay = {
+  root: document.querySelector("#combat-overlay"),
+  title: document.querySelector("#combat-overlay-title"),
+  detail: document.querySelector("#combat-overlay-detail"),
+};
 const combatReadability = createCombatReadabilityTracker();
 let networkStatus = "Connecting to authoritative server...";
 let combatMessage = null;
@@ -284,6 +289,7 @@ function updateHud(ownId) {
   setMeter("playerGuard", hud.playerGuard, hud.playerGuardValue, own?.guard ?? local.guard);
   setMeter("botHp", hud.botHp, hud.botHpValue, remote?.hp ?? 0);
   setMeter("botGuard", hud.botGuard, hud.botGuardValue, remote?.guard ?? 0);
+  updateCombatOverlay(own);
   const now = performance.now();
   if (combatMessage && now <= combatMessageUntil) {
     setStatus(combatMessage);
@@ -291,6 +297,15 @@ function updateHud(ownId) {
     combatMessage = null;
     setStatus(combatActionHint(own) ?? networkStatus);
   }
+}
+
+function updateCombatOverlay(own) {
+  const presentation = combatLifePresentation(own);
+  const shouldHide = !presentation.visible;
+  if (combatOverlay.root.hidden !== shouldHide) combatOverlay.root.hidden = shouldHide;
+  if (!presentation.visible) return;
+  if (combatOverlay.title.textContent !== presentation.title) combatOverlay.title.textContent = presentation.title;
+  if (combatOverlay.detail.textContent !== presentation.detail) combatOverlay.detail.textContent = presentation.detail;
 }
 
 function setMeter(cacheKey, bar, label, value) {
