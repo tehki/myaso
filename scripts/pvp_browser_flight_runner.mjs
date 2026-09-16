@@ -364,9 +364,9 @@ async function runOnlineUiDodgeFeedbackFlight(entries) {
   try {
     attackHeld = true;
     await setArenaAttack(attacker, attackerElementId, true, attackOffset);
-    // Keep the one-shot attack latch alive for more than one 30 Hz send period,
-    // then dodge inside the authoritative 135 ms windup.
-    await sleep(60);
+    // Gate the dodge on the production UI observing the server-authoritative
+    // attack windup instead of guessing transport/snapshot timing with a fixed delay.
+    await waitForUiMessage(attacker, "Attack committed - your windup is readable.", 600);
     await pressArenaDodgeAfterPause(defender, 0);
     // Avoid cross-driver churn until the strike has resolved while the 118 ms iframe is active.
     await sleep(180);
