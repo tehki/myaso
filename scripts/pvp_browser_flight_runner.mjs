@@ -8,7 +8,7 @@ import { setTimeout as sleep } from "node:timers/promises";
 const root = process.cwd();
 const durationMs = Number(process.env.MYASO_PVP_FLIGHT_DURATION_MS ?? 7000);
 const scenario = process.env.MYASO_PVP_SCENARIO ?? "damage";
-if (!new Set(["damage", "parry", "dodge", "block", "guardbreak", "backblock", "respawn", "ui", "uirespawn", "uifeedback", "uiparry", "uistun", "uiguardbreak", "uidodge", "uirecovery", "uirecoverytell", "uiattackintent"]).has(scenario)) throw new Error(`unsupported MYASO_PVP_SCENARIO: ${scenario}`);
+if (!new Set(["damage", "parry", "dodge", "block", "guardbreak", "backblock", "respawn", "ui", "uirespawn", "uifeedback", "uiparry", "uistun", "uiguardbreak", "uidodge", "uirecovery", "uirecoverytell", "uiattackintent", "uiguardbreaktell"]).has(scenario)) throw new Error(`unsupported MYASO_PVP_SCENARIO: ${scenario}`);
 const staticPort = Number(process.env.MYASO_PVP_FLIGHT_HTTP_PORT ?? 4174);
 const browsers = [
   {
@@ -71,6 +71,9 @@ try {
   } else if (scenario === "uiattackintent") {
     const results = await runOnlineUiAttackIntentFlight(sessions);
     console.log(`M39_FFA_ATTACK_INTENT ${JSON.stringify({ ok: true, results })}`);
+  } else if (scenario === "uiguardbreaktell") {
+    const results = await runOnlineUiGuardBreakTellFlight(sessions);
+    console.log(`M40_FFA_GUARD_BREAK_TELL ${JSON.stringify({ ok: true, results })}`);
   } else if (scenario === "uiguardbreak") {
     const results = await runOnlineUiGuardBreakFlight(sessions);
     console.log(`M34_ONLINE_GUARD_BREAK_FEEDBACK ${JSON.stringify({ ok: true, results })}`);
@@ -164,14 +167,14 @@ async function startBrowser(browser) {
   });
   const sessionId = created.sessionId ?? created.value?.sessionId;
   if (!sessionId) throw new Error(`${browser.name} WebDriver did not return a session id: ${JSON.stringify(created)}`);
-  if (scenario === "uiparry" || scenario === "uistun" || scenario === "uiguardbreak" || scenario === "uidodge" || scenario === "uiattackintent") {
+  if (scenario === "uiparry" || scenario === "uistun" || scenario === "uiguardbreak" || scenario === "uidodge" || scenario === "uiattackintent" || scenario === "uiguardbreaktell") {
     await webdriver(base, "POST", `/session/${sessionId}/window/rect`, { x: 0, y: 0, width: 1280, height: 900 });
   }
   return { ...browser, child, base, sessionId };
 }
 
 async function navigate(session, gameUrl, certificateHash) {
-  const page = scenario === "ui" || scenario === "uirespawn" || scenario === "uifeedback" || scenario === "uiparry" || scenario === "uistun" || scenario === "uiguardbreak" || scenario === "uidodge" || scenario === "uirecovery" || scenario === "uirecoverytell" || scenario === "uiattackintent" ? "index.html" : "pvp-flight.html";
+  const page = scenario === "ui" || scenario === "uirespawn" || scenario === "uifeedback" || scenario === "uiparry" || scenario === "uistun" || scenario === "uiguardbreak" || scenario === "uidodge" || scenario === "uirecovery" || scenario === "uirecoverytell" || scenario === "uiattackintent" || scenario === "uiguardbreaktell" ? "index.html" : "pvp-flight.html";
   const url = new URL(`http://127.0.0.1:${staticPort}/web/${page}`);
   url.searchParams.set("server", gameUrl);
   url.searchParams.set("cert", certificateHash);
@@ -360,8 +363,11 @@ async function runOnlineUiDodgeFeedbackFlight(entries) {
   await pulseMovementKey(attacker, movementKey, 120);
 
   let evidence;
-  await commitAttackInsideObservableWindup(entries, attacker, attackerElementId, attackOffset);
-  await pressArenaDodgeAfterPause(defender, 0);
+  await pressAttackUntilObservableWindup(entries, attacker, attackerElementId, attackOffset);
+  await Promise.all([
+    pressArenaDodgeAfterPause(defender, 0),
+    setArenaAttack(attacker, attackerElementId, false, attackOffset),
+  ]);
   // Avoid cross-driver churn until the strike has resolved while the 118 ms iframe is active.
   await sleep(180);
   evidence = await waitForUiDodgeEvidence(entries, attacker, defender, 1200);
@@ -514,6 +520,21 @@ async function runOnlineUiGuardBreakFlight(entries) {
     throw new Error(`M34 stale block accidentally resolved as parry: ${JSON.stringify(evidence)}`);
   }
   return evidence;
+}
+
+async function runOnlineUiGuardBreakTellFlight(entries) {
+  const evidence = await runOnlineUiGuardBreakFlight(entries);
+  const attacker = evidence.find((entry) => entry.feedbackTransitions.includes("guard-break-confirm"));
+  const defender = evidence.find((entry) => entry.feedbackTransitions.includes("guard-broken"));
+  if (!attacker || !defender || attacker.browser === defender.browser) {
+    throw new Error(`M40 could not resolve guard-break roles: ${JSON.stringify(evidence)}`);
+  }
+  const observer = entries.find((entry) => entry.name === attacker.browser);
+  const brokenLocal = entries.find((entry) => entry.name === defender.browser);
+  if (!observer || !brokenLocal) throw new Error(`M40 could not resolve browser sessions`);
+  const tell = await waitForRemoteGuardBreakTell(observer, brokenLocal, 500);
+  await waitForGuardBreakTellClear(observer, 1600);
+  return evidence.map((entry) => ({ ...entry, guardBreakTellMaxPixels: entry.browser === observer.name ? tell.observerMax : tell.localMax }));
 }
 
 async function runOnlineUiRespawnFlight(entries) {
@@ -780,6 +801,46 @@ async function installUiObserver(session) {
   `);
 }
 
+async function sampleGuardBreakTellPixels(session) {
+  return execute(session.base, session.sessionId, `
+    const arena = document.querySelector('#arena');
+    const context = arena?.getContext('2d');
+    if (!context) return 0;
+    const pixels = context.getImageData(0, 0, arena.width, arena.height).data;
+    let count = 0;
+    for (let i = 0; i < pixels.length; i += 4) {
+      if (Math.abs(pixels[i] - 244) <= 2 && Math.abs(pixels[i + 1] - 127) <= 2 && Math.abs(pixels[i + 2] - 95) <= 2 && pixels[i + 3] >= 250) count += 1;
+    }
+    return count;
+  `);
+}
+
+async function waitForRemoteGuardBreakTell(observer, brokenLocal, timeoutMs) {
+  const deadline = Date.now() + timeoutMs;
+  let observerMax = 0;
+  let localMax = 0;
+  while (Date.now() < deadline) {
+    const [observerPixels, localPixels] = await Promise.all([sampleGuardBreakTellPixels(observer), sampleGuardBreakTellPixels(brokenLocal)]);
+    observerMax = Math.max(observerMax, observerPixels);
+    localMax = Math.max(localMax, localPixels);
+    if (observerMax >= 24) {
+      if (localMax !== 0) throw new Error(`M40 local guard-broken fighter painted the remote-only tell: ${localMax}`);
+      return { observerMax, localMax };
+    }
+    await sleep(20);
+  }
+  throw new Error(`M40 remote guard-break tell never appeared: observer=${observerMax} local=${localMax}`);
+}
+
+async function waitForGuardBreakTellClear(session, timeoutMs) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    if (await sampleGuardBreakTellPixels(session) === 0) return;
+    await sleep(20);
+  }
+  throw new Error(`M40 remote guard-break tell did not clear after stun`);
+}
+
 async function sampleWindupTellPixels(session) {
   return execute(session.base, session.sessionId, `
     const arena = document.querySelector('#arena');
@@ -855,18 +916,19 @@ async function waitForUiMessage(session, text, timeoutMs) {
   throw new Error(`${session.name} never rendered expected online UI message ${text}: ${JSON.stringify(await readUiEvidence(session))}`);
 }
 
-async function commitAttackInsideObservableWindup(entries, attacker, elementId, xOffset) {
+async function pressAttackUntilObservableWindup(entries, attacker, elementId, xOffset) {
   const text = "Attack committed - your windup is readable.";
   for (let attempt = 1; attempt <= 3; attempt += 1) {
     const before = await readUiEvidence(attacker);
     const baselineCount = before.events.filter((entry) => entry === text).length;
-    await performArenaAttack(attacker, elementId, xOffset);
+    await setArenaAttack(attacker, elementId, true, xOffset);
     const deadline = Date.now() + 90;
     while (Date.now() < deadline) {
       const state = await readUiEvidence(attacker);
       if (state.events.filter((entry) => entry === text).length > baselineCount) return;
       await sleep(10);
     }
+    await setArenaAttack(attacker, elementId, false, xOffset);
 
     // Let any delayed attempt fully settle before deciding whether a retry is safe.
     await sleep(430);

@@ -197,6 +197,11 @@ jobs:
           MYASO_PVP_SCENARIO: "uiattackintent"
         run: node scripts/pvp_browser_flight_runner.mjs
 
+      - name: Validate M40 spatial FFA guard-break tell
+        env:
+          MYASO_PVP_SCENARIO: "uiguardbreaktell"
+        run: node scripts/pvp_browser_flight_runner.mjs
+
       - name: Measure M15 browser background convergence
         env:
           MYASO_FLIGHT_DURATION_MS: "4500"

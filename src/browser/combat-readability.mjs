@@ -89,6 +89,13 @@ export function opponentRecoveryPresentation(entity) {
   return { visible: false, state: "", label: "", detail: "" };
 }
 
+export function guardBreakSpatialPresentation(entity) {
+  if (entity?.action === COMBAT_ACTION.stunned && entity.guard === 0) {
+    return { visible: true, state: "guard-broken" };
+  }
+  return { visible: false, state: "" };
+}
+
 export function combatOverlayPresentation(entity) {
   if (entity?.action === COMBAT_ACTION.dead) {
     return { visible: true, state: "dead", title: "DEFEATED", detail: "Respawning…" };
