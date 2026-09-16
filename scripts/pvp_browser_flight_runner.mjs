@@ -299,7 +299,7 @@ async function runOnlineUiParryFlight(entries) {
   let blockHeld = false;
   try {
     blockHeld = true;
-    const blockAction = pressArenaBlockAfterPause(defender, 120);
+    const blockAction = pressArenaBlockAfterPause(defender, 160);
     await sleep(60);
     await performArenaAttack(attacker, attackerElementId, 200);
     await blockAction;
