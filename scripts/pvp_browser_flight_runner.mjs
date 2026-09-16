@@ -363,8 +363,11 @@ async function runOnlineUiDodgeFeedbackFlight(entries) {
   await pulseMovementKey(attacker, movementKey, 120);
 
   let evidence;
-  await commitAttackInsideObservableWindup(entries, attacker, attackerElementId, attackOffset);
-  await pressArenaDodgeAfterPause(defender, 0);
+  await pressAttackUntilObservableWindup(entries, attacker, attackerElementId, attackOffset);
+  await Promise.all([
+    pressArenaDodgeAfterPause(defender, 0),
+    setArenaAttack(attacker, attackerElementId, false, attackOffset),
+  ]);
   // Avoid cross-driver churn until the strike has resolved while the 118 ms iframe is active.
   await sleep(180);
   evidence = await waitForUiDodgeEvidence(entries, attacker, defender, 1200);
@@ -913,18 +916,19 @@ async function waitForUiMessage(session, text, timeoutMs) {
   throw new Error(`${session.name} never rendered expected online UI message ${text}: ${JSON.stringify(await readUiEvidence(session))}`);
 }
 
-async function commitAttackInsideObservableWindup(entries, attacker, elementId, xOffset) {
+async function pressAttackUntilObservableWindup(entries, attacker, elementId, xOffset) {
   const text = "Attack committed - your windup is readable.";
   for (let attempt = 1; attempt <= 3; attempt += 1) {
     const before = await readUiEvidence(attacker);
     const baselineCount = before.events.filter((entry) => entry === text).length;
-    await performArenaAttack(attacker, elementId, xOffset);
+    await setArenaAttack(attacker, elementId, true, xOffset);
     const deadline = Date.now() + 90;
     while (Date.now() < deadline) {
       const state = await readUiEvidence(attacker);
       if (state.events.filter((entry) => entry === text).length > baselineCount) return;
       await sleep(10);
     }
+    await setArenaAttack(attacker, elementId, false, xOffset);
 
     // Let any delayed attempt fully settle before deciding whether a retry is safe.
     await sleep(430);
