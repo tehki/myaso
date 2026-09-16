@@ -296,13 +296,19 @@ async function runOnlineUiParryFlight(entries) {
   await aimArena(defender, defenderElementId, -200);
   await pulseMovementKey(attacker, "d", 120);
   let evidence;
+  let attackHeld = false;
   let blockHeld = false;
   try {
-    await performArenaAttack(attacker, attackerElementId, 200);
+    attackHeld = true;
+    await setArenaAttack(attacker, attackerElementId, true, 200);
+    await waitForUiMessage(attacker, "Attack committed - your windup is readable.", 160);
     blockHeld = true;
     await setArenaBlock(defender, defenderElementId, true);
+    await setArenaAttack(attacker, attackerElementId, false);
+    attackHeld = false;
     evidence = await waitForUiParryEvidence(entries, attacker, defender, 1000);
   } finally {
+    if (attackHeld) await setArenaAttack(attacker, attackerElementId, false);
     if (blockHeld) await setArenaBlock(defender, defenderElementId, false);
   }
 
@@ -523,6 +529,16 @@ async function pressArenaDodgeAfterPause(session, delayMs) {
 
 async function setArenaBlock(session, elementId, pressed) {
   const actions = [{ type: pressed ? "pointerDown" : "pointerUp", button: 2 }];
+  await webdriver(session.base, "POST", `/session/${session.sessionId}/actions`, {
+    actions: [{ type: "pointer", id: `mouse-${session.name}`, parameters: { pointerType: "mouse" }, actions }],
+  });
+}
+
+async function setArenaAttack(session, elementId, pressed, xOffset = 200) {
+  const origin = { "element-6066-11e4-a52e-4f735466cecf": elementId };
+  const actions = pressed
+    ? [{ type: "pointerMove", duration: 0, origin, x: xOffset, y: 0 }, { type: "pointerDown", button: 0 }]
+    : [{ type: "pointerUp", button: 0 }];
   await webdriver(session.base, "POST", `/session/${session.sessionId}/actions`, {
     actions: [{ type: "pointer", id: `mouse-${session.name}`, parameters: { pointerType: "mouse" }, actions }],
   });
