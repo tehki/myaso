@@ -33,7 +33,17 @@ test("guard-only loss is explained as a block instead of damage", () => {
   tracker.observe(state(fighter(1), fighter(2)), 1);
   const event = tracker.observe(state(fighter(1, 100, 62, COMBAT_ACTION.block), fighter(2)), 1);
   assert.equal(event.kind, "block");
+  assert.equal(event.feedback, "guard-pressure");
   assert.match(event.text, /guard -38/);
+});
+
+test("authoritative opponent block emits block-confirm feedback", () => {
+  const tracker = createCombatReadabilityTracker();
+  tracker.observe(state(fighter(1), fighter(2)), 1);
+  const event = tracker.observe(state(fighter(1), fighter(2, 100, 62, COMBAT_ACTION.block)), 1);
+  assert.equal(event.kind, "block");
+  assert.equal(event.feedback, "block-confirm");
+  assert.match(event.text, /Opponent blocked/);
 });
 
 test("cost-free block plus attacker stun is described as a parry", () => {
@@ -59,6 +69,16 @@ test("zero-guard stun is prioritized as a guard break", () => {
   tracker.observe(state(fighter(1, 100, 38, COMBAT_ACTION.block), fighter(2)), 1);
   const event = tracker.observe(state(fighter(1, 100, 0, COMBAT_ACTION.stunned), fighter(2)), 1);
   assert.equal(event.kind, "guardBreak");
+  assert.equal(event.feedback, "guard-broken");
+});
+
+test("authoritative opponent guard break emits punish confirmation", () => {
+  const tracker = createCombatReadabilityTracker();
+  tracker.observe(state(fighter(1), fighter(2, 100, 38, COMBAT_ACTION.block)), 1);
+  const event = tracker.observe(state(fighter(1), fighter(2, 100, 0, COMBAT_ACTION.stunned)), 1);
+  assert.equal(event.kind, "guardBreak");
+  assert.equal(event.feedback, "guard-break-confirm");
+  assert.match(event.text, /Opponent guard broken/);
 });
 
 test("death and full-vitals idle transition are readable", () => {
