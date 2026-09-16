@@ -264,11 +264,21 @@ async function runOnlineUiDodgeFeedbackFlight(entries) {
   await Promise.all(entries.map(centerArenaInViewport));
   await pulseMovementKey(attacker, movementKey, 120);
 
-  const dodgeAction = pressArenaDodgeAfterPause(defender, 120);
-  await sleep(60);
-  await performArenaAttack(attacker, attackerElementId, attackOffset);
-  await dodgeAction;
-  let evidence = await waitForUiDodgeEvidence(entries, attacker, defender, 1200);
+  let evidence;
+  let attackHeld = false;
+  try {
+    attackHeld = true;
+    await setArenaAttack(attacker, attackerElementId, true, attackOffset);
+    // Keep the one-shot attack latch alive for more than one 30 Hz send period,
+    // then dodge inside the authoritative 135 ms windup.
+    await sleep(60);
+    await pressArenaDodgeAfterPause(defender, 0);
+    // Avoid cross-driver churn until the strike has resolved while the 118 ms iframe is active.
+    await sleep(180);
+    evidence = await waitForUiDodgeEvidence(entries, attacker, defender, 1200);
+  } finally {
+    if (attackHeld) await setArenaAttack(attacker, attackerElementId, false);
+  }
   await sleep(80);
   evidence = await Promise.all(entries.map(readUiEvidence));
 
