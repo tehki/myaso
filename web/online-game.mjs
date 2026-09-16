@@ -1,5 +1,5 @@
 import { createFrameBudget } from "../src/browser/frame-budget.mjs";
-import { COMBAT_ACTION, combatActionHint, combatLifePresentation, createCombatReadabilityTracker } from "../src/browser/combat-readability.mjs";
+import { COMBAT_ACTION, combatActionHint, combatOverlayPresentation, createCombatReadabilityTracker } from "../src/browser/combat-readability.mjs";
 import { COMBAT } from "../src/combat/model.mjs";
 import { reconcilePrediction } from "../src/browser/reconciliation.mjs";
 import { NETWORK } from "../src/network/constants.mjs";
@@ -318,7 +318,7 @@ function updateHud(ownId) {
 }
 
 function updateCombatOverlay(own) {
-  const presentation = combatLifePresentation(own);
+  const presentation = combatOverlayPresentation(own);
   const shouldHide = !presentation.visible;
   if (combatOverlay.root.hidden !== shouldHide) combatOverlay.root.hidden = shouldHide;
   if (!presentation.visible) return;

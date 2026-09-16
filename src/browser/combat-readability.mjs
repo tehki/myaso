@@ -75,15 +75,20 @@ export function combatActionHint(entity) {
   }
 }
 
-export function combatLifePresentation(entity) {
-  if (!entity || entity.action !== COMBAT_ACTION.dead) {
-    return { visible: false, title: "", detail: "" };
+export function combatOverlayPresentation(entity) {
+  if (entity?.action === COMBAT_ACTION.dead) {
+    return { visible: true, state: "dead", title: "DEFEATED", detail: "Respawning…" };
   }
-  return {
-    visible: true,
-    title: "DEFEATED",
-    detail: "Respawning…",
-  };
+  if (entity?.action === COMBAT_ACTION.stunned) {
+    return { visible: true, state: "stunned", title: "STUNNED", detail: "Punish window open." };
+  }
+  return { visible: false, state: "", title: "", detail: "" };
+}
+
+export function combatLifePresentation(entity) {
+  const presentation = combatOverlayPresentation(entity);
+  if (presentation.state !== "dead") return { visible: false, title: "", detail: "" };
+  return { visible: true, title: presentation.title, detail: presentation.detail };
 }
 
 function collectEntityEvents(events, before, current, own) {
