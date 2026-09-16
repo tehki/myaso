@@ -2,8 +2,8 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { COMBAT_ACTION, combatActionHint, combatLifePresentation, combatOverlayPresentation, createCombatReadabilityTracker } from "../src/browser/combat-readability.mjs";
 
-function fighter(netId, hp = 100, guard = 100, action = COMBAT_ACTION.idle) {
-  return { netId, hp, guard, action };
+function fighter(netId, hp = 100, guard = 100, action = COMBAT_ACTION.idle, x = 0, y = 0, facing = 0) {
+  return { netId, hp, guard, action, x, y, facing };
 }
 
 function state(own, peer) {
@@ -62,6 +62,29 @@ test("being parried emits a distinct authoritative feedback cue", () => {
   assert.equal(event.kind, "parry");
   assert.equal(event.feedback, "parried");
   assert.match(event.text, /Parried/);
+});
+
+test("authoritative threatening strike avoided by own dodge emits dodge-success", () => {
+  const tracker = createCombatReadabilityTracker();
+  tracker.observe(state(fighter(2, 100, 100, COMBAT_ACTION.dodge, 80), fighter(1, 100, 100, COMBAT_ACTION.attackActive, 0, 0, 0)), 2);
+  const event = tracker.observe(state(fighter(2, 100, 100, COMBAT_ACTION.dodgeRecovery, 88), fighter(1, 100, 100, COMBAT_ACTION.attackRecovery, 0, 0, 0)), 2);
+  assert.equal(event.kind, "dodge");
+  assert.equal(event.feedback, "dodge-success");
+  assert.equal(event.text, "Dodge! Strike avoided.");
+});
+
+test("authoritative threatening strike evaded by opponent emits dodge-evaded", () => {
+  const tracker = createCombatReadabilityTracker();
+  tracker.observe(state(fighter(1, 100, 100, COMBAT_ACTION.attackActive, 0, 0, 0), fighter(2, 100, 100, COMBAT_ACTION.dodge, 80)), 1);
+  const event = tracker.observe(state(fighter(1, 100, 100, COMBAT_ACTION.attackRecovery, 0, 0, 0), fighter(2, 100, 100, COMBAT_ACTION.dodgeRecovery, 88)), 1);
+  assert.equal(event.kind, "dodge");
+  assert.equal(event.feedback, "dodge-evaded");
+});
+
+test("out-of-range attack recovery is not falsely credited to dodge", () => {
+  const tracker = createCombatReadabilityTracker();
+  tracker.observe(state(fighter(2, 100, 100, COMBAT_ACTION.dodge, 120), fighter(1, 100, 100, COMBAT_ACTION.attackActive, 0, 0, 0)), 2);
+  assert.equal(tracker.observe(state(fighter(2, 100, 100, COMBAT_ACTION.dodgeRecovery, 128), fighter(1, 100, 100, COMBAT_ACTION.attackRecovery, 0, 0, 0)), 2), null);
 });
 
 test("zero-guard stun is prioritized as a guard break", () => {
