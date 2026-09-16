@@ -8,7 +8,7 @@ import { setTimeout as sleep } from "node:timers/promises";
 const root = process.cwd();
 const durationMs = Number(process.env.MYASO_PVP_FLIGHT_DURATION_MS ?? 7000);
 const scenario = process.env.MYASO_PVP_SCENARIO ?? "damage";
-if (!new Set(["damage", "parry", "dodge", "block", "guardbreak", "backblock", "respawn", "ui", "uirespawn", "uifeedback", "uiparry", "uistun", "uiguardbreak", "uidodge", "uirecovery"]).has(scenario)) throw new Error(`unsupported MYASO_PVP_SCENARIO: ${scenario}`);
+if (!new Set(["damage", "parry", "dodge", "block", "guardbreak", "backblock", "respawn", "ui", "uirespawn", "uifeedback", "uiparry", "uistun", "uiguardbreak", "uidodge", "uirecovery", "uirecoverytell"]).has(scenario)) throw new Error(`unsupported MYASO_PVP_SCENARIO: ${scenario}`);
 const staticPort = Number(process.env.MYASO_PVP_FLIGHT_HTTP_PORT ?? 4174);
 const browsers = [
   {
@@ -65,6 +65,9 @@ try {
   } else if (scenario === "uirecovery") {
     const results = await runOnlineUiRecoveryReadabilityFlight(sessions);
     console.log(`M37_ONLINE_RECOVERY_READABILITY ${JSON.stringify({ ok: true, results })}`);
+  } else if (scenario === "uirecoverytell") {
+    const results = await runOnlineUiRecoveryTellFlight(sessions);
+    console.log(`M38_FFA_RECOVERY_TELL ${JSON.stringify({ ok: true, results })}`);
   } else if (scenario === "uiguardbreak") {
     const results = await runOnlineUiGuardBreakFlight(sessions);
     console.log(`M34_ONLINE_GUARD_BREAK_FEEDBACK ${JSON.stringify({ ok: true, results })}`);
@@ -165,7 +168,7 @@ async function startBrowser(browser) {
 }
 
 async function navigate(session, gameUrl, certificateHash) {
-  const page = scenario === "ui" || scenario === "uirespawn" || scenario === "uifeedback" || scenario === "uiparry" || scenario === "uistun" || scenario === "uiguardbreak" || scenario === "uidodge" || scenario === "uirecovery" ? "index.html" : "pvp-flight.html";
+  const page = scenario === "ui" || scenario === "uirespawn" || scenario === "uifeedback" || scenario === "uiparry" || scenario === "uistun" || scenario === "uiguardbreak" || scenario === "uidodge" || scenario === "uirecovery" || scenario === "uirecoverytell" ? "index.html" : "pvp-flight.html";
   const url = new URL(`http://127.0.0.1:${staticPort}/web/${page}`);
   url.searchParams.set("server", gameUrl);
   url.searchParams.set("cert", certificateHash);
@@ -278,6 +281,22 @@ async function runOnlineUiRecoveryReadabilityFlight(entries) {
   return evidence;
 }
 
+async function runOnlineUiRecoveryTellFlight(entries) {
+  const evidence = await runOnlineUiFeedbackFlight(entries);
+  const attacker = evidence.find((entry) => entry.feedbackTransitions.includes("hit-confirm"));
+  const defender = evidence.find((entry) => entry.feedbackTransitions.includes("damage-taken"));
+  if (!attacker || !defender || attacker.browser === defender.browser) {
+    throw new Error(`M38 could not resolve attacker / defender: ${JSON.stringify(evidence)}`);
+  }
+  if (defender.recoveryTellMaxPixels < 24) {
+    throw new Error(`M38 defender never painted the remote recovery ring: ${JSON.stringify(defender)}`);
+  }
+  if (attacker.recoveryTellMaxPixels !== 0) {
+    throw new Error(`M38 attacker painted a recovery ring around a non-recovering remote: ${JSON.stringify(attacker)}`);
+  }
+  return evidence;
+}
+
 async function runOnlineUiDodgeFeedbackFlight(entries) {
   await Promise.all(entries.map(installUiObserver));
   const ready = await waitForUiReady(entries);
@@ -332,37 +351,41 @@ async function runOnlineUiDodgeFeedbackFlight(entries) {
 async function runOnlineUiParryFlight(entries) {
   await Promise.all(entries.map(installUiObserver));
   const ready = await waitForUiReady(entries);
-  const ordered = ready.slice().sort((a, b) => a.playerNetId - b.playerNetId);
-  const attacker = entries.find((entry) => entry.name === ordered[0].browser);
-  const defender = entries.find((entry) => entry.name === ordered[1].browser);
-  if (!attacker || !defender) throw new Error(`could not resolve M33 UI roles from ${JSON.stringify(ready)}`);
-  if (attacker.name !== "chrome" || defender.name !== "firefox") throw new Error(`M33 latency choreography requires Chrome attacker / Firefox defender: ${JSON.stringify(ready)}`);
+  const attacker = entries.find((entry) => entry.name === "chrome");
+  const defender = entries.find((entry) => entry.name === "firefox");
+  const attackerReady = ready.find((entry) => entry.browser === attacker?.name);
+  const defenderReady = ready.find((entry) => entry.browser === defender?.name);
+  if (!attacker || !defender || !attackerReady || !defenderReady) throw new Error(`could not resolve M33 UI roles from ${JSON.stringify(ready)}`);
+  const attackRight = attackerReady.playerNetId < defenderReady.playerNetId;
+  const movementKey = attackRight ? "d" : "a";
+  const movementCode = attackRight ? "KeyD" : "KeyA";
+  const attackOffset = attackRight ? 200 : -200;
 
   await Promise.all(entries.map((entry) => execute(entry.base, entry.sessionId, "document.querySelector('#arena').focus(); return document.activeElement?.id;")));
   const attackerElementId = await resolveArenaElement(attacker, "M33 attacker");
   const defenderElementId = await resolveArenaElement(defender, "M33 defender");
-
   await Promise.all(entries.map(centerArenaInViewport));
-  await aimArena(defender, defenderElementId, -200);
-  await pulseMovementKey(attacker, "d", 120);
-  let evidence;
-  let attackHeld = false;
-  let blockHeld = false;
-  try {
-    attackHeld = true;
-    await setArenaAttack(attacker, attackerElementId, true, 200);
-    // Keep the one-shot attack latch alive for more than one 30 Hz send period,
-    // then arm a fresh block inside the authoritative 135 ms attack windup.
-    await sleep(60);
-    blockHeld = true;
-    await setArenaBlock(defender, defenderElementId, true);
-    // Do not churn either WebDriver session until the strike has resolved.
-    await sleep(180);
-    evidence = await waitForUiParryEvidence(entries, attacker, defender, 1000);
-  } finally {
-    if (attackHeld) await setArenaAttack(attacker, attackerElementId, false);
-    if (blockHeld) await setArenaBlock(defender, defenderElementId, false);
+  await aimArena(defender, defenderElementId, attackRight ? -200 : 200);
+  let evidence = null;
+  for (let attempt = 0; attempt < 4 && !evidence; attempt += 1) {
+    await pulseMovementKey(attacker, movementKey, attempt === 0 ? 120 : 80);
+    let attackHeld = false;
+    let blockHeld = false;
+    try {
+      attackHeld = true;
+      await setArenaAttack(attacker, attackerElementId, true, attackOffset);
+      await sleep(70);
+      blockHeld = true;
+      await setArenaBlock(defender, defenderElementId, true);
+      await sleep(190);
+      evidence = await waitForUiParryEvidence(entries, attacker, defender, 320, false);
+    } finally {
+      if (attackHeld) await setArenaAttack(attacker, attackerElementId, false, attackOffset);
+      if (blockHeld) await setArenaBlock(defender, defenderElementId, false);
+    }
+    if (!evidence) await sleep(260);
   }
+  if (!evidence) evidence = await waitForUiParryEvidence(entries, attacker, defender, 800, true);
 
   await sleep(80);
   evidence = await Promise.all(entries.map(readUiEvidence));
@@ -372,15 +395,13 @@ async function runOnlineUiParryFlight(entries) {
   const attackDown = attackerResult.pointers.find((event) => event.type === "pointerdown" && event.button === 0);
   const blockDown = defenderResult.pointers.find((event) => event.type === "pointerdown" && event.button === 2);
   const blockUp = defenderResult.pointers.find((event) => event.type === "pointerup" && event.button === 2);
-  if (!attackerResult.keys.includes("keydown:KeyD") || !attackerResult.keys.includes("keyup:KeyD")) {
+  if (!attackerResult.keys.includes(`keydown:${movementCode}`) || !attackerResult.keys.includes(`keyup:${movementCode}`)) {
     throw new Error(`M33 real attacker movement control was not delivered: ${JSON.stringify(attackerResult)}`);
   }
-  if (!attackDown || attackDown.x < 0.6 || Math.abs(attackDown.y - 0.5) > 0.15) {
-    throw new Error(`M33 real attacker aim was not delivered: ${JSON.stringify(attackerResult)}`);
-  }
-  if (!blockDown || !blockUp || blockDown.x > 0.4 || Math.abs(blockDown.y - 0.5) > 0.15) {
-    throw new Error(`M33 real directional block input was not delivered: ${JSON.stringify(defenderResult)}`);
-  }
+  const attackAimValid = attackDown && Math.abs(attackDown.y - 0.5) <= 0.15 && (attackRight ? attackDown.x >= 0.6 : attackDown.x <= 0.4);
+  if (!attackAimValid) throw new Error(`M33 real attacker aim was not delivered: ${JSON.stringify(attackerResult)}`);
+  const blockAimValid = blockDown && Math.abs(blockDown.y - 0.5) <= 0.15 && (attackRight ? blockDown.x <= 0.4 : blockDown.x >= 0.6);
+  if (!blockAimValid || !blockUp) throw new Error(`M33 real directional block input was not delivered: ${JSON.stringify(defenderResult)}`);
   return evidence;
 }
 
@@ -656,7 +677,7 @@ async function installUiObserver(session) {
     const overlay = document.querySelector('#combat-overlay');
     const recovery = document.querySelector('#opponent-recovery');
     if (!target || !arena || !arenaStage || !overlay || !recovery) throw new Error('missing online UI flight target');
-    const state = { events: [], keys: [], pointers: [], overlayTransitions: [], feedbackTransitions: [], recoveryTransitions: [], online: '', startedAt: performance.now() };
+    const state = { events: [], keys: [], pointers: [], overlayTransitions: [], feedbackTransitions: [], recoveryTransitions: [], recoveryTellMaxPixels: 0, online: '', startedAt: performance.now() };
     const record = () => {
       const text = target.textContent?.trim() ?? '';
       if (/^Online - player #\\d+ - server tick \\d+$/.test(text)) state.online = text;
@@ -677,6 +698,16 @@ async function installUiObserver(session) {
       const feedback = arenaStage.dataset.combatFeedback ?? '';
       if (feedback && state.feedbackTransitions.at(-1) !== feedback) state.feedbackTransitions.push(feedback);
     };
+    const sampleRecoveryTell = () => {
+      const context = arena.getContext('2d');
+      if (!context) return;
+      const pixels = context.getImageData(0, 0, arena.width, arena.height).data;
+      let count = 0;
+      for (let i = 0; i < pixels.length; i += 4) {
+        if (Math.abs(pixels[i] - 239) <= 2 && Math.abs(pixels[i + 1] - 207) <= 2 && Math.abs(pixels[i + 2] - 115) <= 2 && pixels[i + 3] >= 250) count += 1;
+      }
+      state.recoveryTellMaxPixels = Math.max(state.recoveryTellMaxPixels, count);
+    };
     const recordRecovery = () => {
       const entry = {
         visible: !recovery.hidden,
@@ -686,6 +717,7 @@ async function installUiObserver(session) {
       };
       const previous = state.recoveryTransitions.at(-1);
       if (!previous || Object.keys(entry).some((key) => previous[key] !== entry[key])) state.recoveryTransitions.push(entry);
+      if (entry.visible) sampleRecoveryTell();
     };
     for (const type of ['keydown', 'keyup']) {
       arena.addEventListener(type, (event) => state.keys.push(type + ':' + event.code), { capture: true });
@@ -788,7 +820,7 @@ async function waitForUiGuardBreakEvidence(entries, attacker, defender, timeoutM
   throw new Error(`real online UI never rendered authoritative guard break feedback: ${JSON.stringify(await Promise.all(entries.map(readUiEvidence)))}`);
 }
 
-async function waitForUiParryEvidence(entries, attacker, defender, timeoutMs) {
+async function waitForUiParryEvidence(entries, attacker, defender, timeoutMs, fail = true) {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     const states = await Promise.all(entries.map(readUiEvidence));
@@ -803,6 +835,7 @@ async function waitForUiParryEvidence(entries, attacker, defender, timeoutMs) {
     if (messagesReady && feedbackReady && vitalsClean) return states;
     await sleep(40);
   }
+  if (!fail) return null;
   throw new Error(`real online UI never rendered authoritative parry feedback: ${JSON.stringify(await Promise.all(entries.map(readUiEvidence)))}`);
 }
 
@@ -841,7 +874,7 @@ async function waitForUiRespawnEvidence(entries, attacker, defender, timeoutMs) 
 
 async function readUiEvidence(session) {
   const value = await execute(session.base, session.sessionId, `
-    const state = window.__MYASO_M30_UI__ ?? { events: [], keys: [], pointers: [], overlayTransitions: [], feedbackTransitions: [], recoveryTransitions: [], online: '' };
+    const state = window.__MYASO_M30_UI__ ?? { events: [], keys: [], pointers: [], overlayTransitions: [], feedbackTransitions: [], recoveryTransitions: [], recoveryTellMaxPixels: 0, online: '' };
     const match = state.online.match(/player #(\\d+)/);
     return {
       title: document.title,
@@ -863,6 +896,7 @@ async function readUiEvidence(session) {
       recoveryLabel: document.querySelector('#opponent-recovery-label')?.textContent?.trim() ?? '',
       recoveryDetail: document.querySelector('#opponent-recovery-detail')?.textContent?.trim() ?? '',
       recoveryTransitions: (state.recoveryTransitions ?? []).slice(),
+      recoveryTellMaxPixels: Number(state.recoveryTellMaxPixels ?? 0),
       events: state.events.slice(),
       keys: state.keys.slice(),
       pointers: state.pointers.slice(),

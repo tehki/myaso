@@ -235,10 +235,10 @@ function drawFighterWorld(fighter, body, shadow) {
   const screenX = canvas.width / 2 + fighter.x - local.x;
   const screenY = canvas.height / 2 + fighter.y - local.y;
   if (screenX < -64 || screenX > canvas.width + 64 || screenY < -64 || screenY > canvas.height + 64) return;
-  drawFighterScreen(screenX, screenY, fighter, body, shadow);
+  drawFighterScreen(screenX, screenY, fighter, body, shadow, true);
 }
 
-function drawFighterScreen(x, y, fighter, body, shadow) {
+function drawFighterScreen(x, y, fighter, body, shadow, remote = false) {
   ctx.save();
   ctx.translate(x, y);
   ctx.rotate(fighter.facing ?? 0);
@@ -248,6 +248,7 @@ function drawFighterScreen(x, y, fighter, body, shadow) {
   if (action === COMBAT_ACTION.block) drawBlockTell();
   if (action === COMBAT_ACTION.dodge) drawDodgeTell();
   if (action === COMBAT_ACTION.stunned) drawStunTell();
+  if (remote && opponentRecoveryPresentation(fighter).visible) drawRecoveryTell();
   ctx.fillStyle = shadow;
   ctx.beginPath();
   ctx.ellipse(-2, 8, 20, 13, 0, 0, Math.PI * 2);
@@ -296,6 +297,14 @@ function drawStunTell() {
   ctx.lineWidth = 3;
   ctx.beginPath();
   ctx.arc(0, 0, 25, 0, Math.PI * 2);
+  ctx.stroke();
+}
+
+function drawRecoveryTell() {
+  ctx.strokeStyle = "#efcf73";
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.arc(0, 0, 36, 0, Math.PI * 2);
   ctx.stroke();
 }
 
