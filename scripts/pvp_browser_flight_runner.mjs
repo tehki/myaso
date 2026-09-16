@@ -260,8 +260,9 @@ async function runOnlineUiDodgeFeedbackFlight(entries) {
 
   await Promise.all(entries.map((entry) => execute(entry.base, entry.sessionId, "document.querySelector('#arena').focus(); return document.activeElement?.id;")));
   const attackerElementId = await resolveArenaElement(attacker, "M36 attacker");
-  await resolveArenaElement(defender, "M36 defender");
+  const defenderElementId = await resolveArenaElement(defender, "M36 defender");
   await Promise.all(entries.map(centerArenaInViewport));
+  await aimArena(defender, defenderElementId, attackRight ? -200 : 200);
   await pulseMovementKey(attacker, movementKey, 120);
 
   let evidence;
