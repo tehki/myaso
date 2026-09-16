@@ -89,6 +89,13 @@ export function opponentRecoveryPresentation(entity) {
   return { visible: false, state: "", label: "", detail: "" };
 }
 
+export function parrySpatialPresentation(entity) {
+  if (entity?.action === COMBAT_ACTION.stunned && entity.guard > 0) {
+    return { visible: true, state: "parried" };
+  }
+  return { visible: false, state: "" };
+}
+
 export function guardBreakSpatialPresentation(entity) {
   if (entity?.action === COMBAT_ACTION.stunned && entity.guard === 0) {
     return { visible: true, state: "guard-broken" };

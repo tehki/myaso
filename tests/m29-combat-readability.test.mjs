@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { COMBAT_ACTION, combatActionHint, combatLifePresentation, combatOverlayPresentation, createCombatReadabilityTracker, guardBreakSpatialPresentation, opponentRecoveryPresentation } from "../src/browser/combat-readability.mjs";
+import { COMBAT_ACTION, combatActionHint, combatLifePresentation, combatOverlayPresentation, createCombatReadabilityTracker, guardBreakSpatialPresentation, opponentRecoveryPresentation, parrySpatialPresentation } from "../src/browser/combat-readability.mjs";
 
 function fighter(netId, hp = 100, guard = 100, action = COMBAT_ACTION.idle, x = 0, y = 0, facing = 0) {
   return { netId, hp, guard, action, x, y, facing };
@@ -108,6 +108,14 @@ test("zero-guard stun exposes a spatial guard-break tell", () => {
   assert.deepEqual(guardBreakSpatialPresentation(fighter(2, 100, 0, COMBAT_ACTION.stunned)), { visible: true, state: "guard-broken" });
   assert.deepEqual(guardBreakSpatialPresentation(fighter(2, 100, 100, COMBAT_ACTION.stunned)), { visible: false, state: "" });
   assert.deepEqual(guardBreakSpatialPresentation(fighter(2, 100, 0, COMBAT_ACTION.block)), { visible: false, state: "" });
+});
+
+test("positive-guard stun exposes a mutually exclusive spatial parry tell", () => {
+  assert.deepEqual(parrySpatialPresentation(fighter(2, 100, 100, COMBAT_ACTION.stunned)), { visible: true, state: "parried" });
+  assert.deepEqual(parrySpatialPresentation(fighter(2, 100, 1, COMBAT_ACTION.stunned)), { visible: true, state: "parried" });
+  assert.deepEqual(parrySpatialPresentation(fighter(2, 100, 0, COMBAT_ACTION.stunned)), { visible: false, state: "" });
+  assert.deepEqual(parrySpatialPresentation(fighter(2, 100, 100, COMBAT_ACTION.block)), { visible: false, state: "" });
+  assert.equal(guardBreakSpatialPresentation(fighter(2, 100, 100, COMBAT_ACTION.stunned)).visible, false);
 });
 
 test("death and full-vitals idle transition are readable", () => {
