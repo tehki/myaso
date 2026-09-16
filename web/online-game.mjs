@@ -244,7 +244,7 @@ function drawFighterScreen(x, y, fighter, body, shadow, remote = false) {
   ctx.rotate(fighter.facing ?? 0);
   const action = fighter.action ?? COMBAT_ACTION.idle;
   ctx.globalAlpha = action === COMBAT_ACTION.dead ? 0.28 : 1;
-  if (action === COMBAT_ACTION.attackWindup || action === COMBAT_ACTION.attackActive) drawAttackTell(action);
+  if (action === COMBAT_ACTION.attackWindup || action === COMBAT_ACTION.attackActive) drawAttackTell(action, remote);
   if (action === COMBAT_ACTION.block) drawBlockTell();
   if (action === COMBAT_ACTION.dodge) drawDodgeTell();
   if (action === COMBAT_ACTION.stunned) drawStunTell();
@@ -266,14 +266,22 @@ function drawFighterScreen(x, y, fighter, body, shadow, remote = false) {
   ctx.restore();
 }
 
-function drawAttackTell(action) {
+function drawAttackTell(action, remote) {
+  const radius = COMBAT.attack.reach + COMBAT.fighterRadius;
+  const halfArc = COMBAT.attack.arcRadians / 2;
   const alpha = action === COMBAT_ACTION.attackActive ? 0.34 : 0.14;
   ctx.fillStyle = `rgba(214, 187, 112, ${alpha})`;
   ctx.beginPath();
   ctx.moveTo(0, 0);
-  ctx.arc(0, 0, COMBAT.attack.reach + COMBAT.fighterRadius, -COMBAT.attack.arcRadians / 2, COMBAT.attack.arcRadians / 2);
+  ctx.arc(0, 0, radius, -halfArc, halfArc);
   ctx.closePath();
   ctx.fill();
+  if (remote && action === COMBAT_ACTION.attackWindup) {
+    ctx.strokeStyle = "#f3d68f";
+    ctx.lineWidth = 3;
+    ctx.setLineDash([8, 5]);
+    ctx.stroke();
+  }
 }
 
 function drawBlockTell() {
