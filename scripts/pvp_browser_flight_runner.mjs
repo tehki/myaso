@@ -8,7 +8,7 @@ import { setTimeout as sleep } from "node:timers/promises";
 const root = process.cwd();
 const durationMs = Number(process.env.MYASO_PVP_FLIGHT_DURATION_MS ?? 7000);
 const scenario = process.env.MYASO_PVP_SCENARIO ?? "damage";
-if (!new Set(["damage", "parry", "dodge", "block", "guardbreak", "backblock", "respawn", "ui", "uirespawn", "uifeedback", "uiparry", "uistun", "uiguardbreak"]).has(scenario)) throw new Error(`unsupported MYASO_PVP_SCENARIO: ${scenario}`);
+if (!new Set(["damage", "parry", "dodge", "block", "guardbreak", "backblock", "respawn", "ui", "uirespawn", "uifeedback", "uiparry", "uistun", "uiguardbreak", "uidodge"]).has(scenario)) throw new Error(`unsupported MYASO_PVP_SCENARIO: ${scenario}`);
 const staticPort = Number(process.env.MYASO_PVP_FLIGHT_HTTP_PORT ?? 4174);
 const browsers = [
   {
@@ -59,6 +59,9 @@ try {
   } else if (scenario === "uistun") {
     const results = await runOnlineUiStunOverlayFlight(sessions);
     console.log(`M35_ONLINE_STUN_OVERLAY ${JSON.stringify({ ok: true, results })}`);
+  } else if (scenario === "uidodge") {
+    const results = await runOnlineUiDodgeFeedbackFlight(sessions);
+    console.log(`M36_ONLINE_DODGE_FEEDBACK ${JSON.stringify({ ok: true, results })}`);
   } else if (scenario === "uiguardbreak") {
     const results = await runOnlineUiGuardBreakFlight(sessions);
     console.log(`M34_ONLINE_GUARD_BREAK_FEEDBACK ${JSON.stringify({ ok: true, results })}`);
@@ -152,14 +155,14 @@ async function startBrowser(browser) {
   });
   const sessionId = created.sessionId ?? created.value?.sessionId;
   if (!sessionId) throw new Error(`${browser.name} WebDriver did not return a session id: ${JSON.stringify(created)}`);
-  if (scenario === "uiparry" || scenario === "uistun" || scenario === "uiguardbreak") {
+  if (scenario === "uiparry" || scenario === "uistun" || scenario === "uiguardbreak" || scenario === "uidodge") {
     await webdriver(base, "POST", `/session/${sessionId}/window/rect`, { x: 0, y: 0, width: 1280, height: 900 });
   }
   return { ...browser, child, base, sessionId };
 }
 
 async function navigate(session, gameUrl, certificateHash) {
-  const page = scenario === "ui" || scenario === "uirespawn" || scenario === "uifeedback" || scenario === "uiparry" || scenario === "uistun" || scenario === "uiguardbreak" ? "index.html" : "pvp-flight.html";
+  const page = scenario === "ui" || scenario === "uirespawn" || scenario === "uifeedback" || scenario === "uiparry" || scenario === "uistun" || scenario === "uiguardbreak" || scenario === "uidodge" ? "index.html" : "pvp-flight.html";
   const url = new URL(`http://127.0.0.1:${staticPort}/web/${page}`);
   url.searchParams.set("server", gameUrl);
   url.searchParams.set("cert", certificateHash);
@@ -239,6 +242,40 @@ async function runOnlineUiFeedbackFlight(entries) {
   if (!attacker || !defender || attacker.browser === defender.browser) {
     throw new Error(`M32 authoritative hit feedback was not rendered on opposite clients: ${JSON.stringify(evidence)}`);
   }
+  return evidence;
+}
+
+async function runOnlineUiDodgeFeedbackFlight(entries) {
+  await Promise.all(entries.map(installUiObserver));
+  const ready = await waitForUiReady(entries);
+  const ordered = ready.slice().sort((a, b) => a.playerNetId - b.playerNetId);
+  const attacker = entries.find((entry) => entry.name === ordered[0].browser);
+  const defender = entries.find((entry) => entry.name === ordered[1].browser);
+  if (!attacker || !defender) throw new Error(`could not resolve M36 UI roles from ${JSON.stringify(ready)}`);
+  if (attacker.name !== "chrome" || defender.name !== "firefox") throw new Error(`M36 latency choreography requires Chrome attacker / Firefox defender: ${JSON.stringify(ready)}`);
+
+  await Promise.all(entries.map((entry) => execute(entry.base, entry.sessionId, "document.querySelector('#arena').focus(); return document.activeElement?.id;")));
+  const attackerElementId = await resolveArenaElement(attacker, "M36 attacker");
+  await resolveArenaElement(defender, "M36 defender");
+  await Promise.all(entries.map(centerArenaInViewport));
+  await pulseMovementKey(attacker, "d", 120);
+
+  const dodgeAction = pressArenaDodgeAfterPause(defender, 120);
+  await sleep(60);
+  await performArenaAttack(attacker, attackerElementId, 200);
+  await dodgeAction;
+  let evidence = await waitForUiDodgeEvidence(entries, attacker, defender, 1200);
+  await sleep(80);
+  evidence = await Promise.all(entries.map(readUiEvidence));
+
+  const attackerResult = evidence.find((entry) => entry.browser === attacker.name);
+  const defenderResult = evidence.find((entry) => entry.browser === defender.name);
+  if (!attackerResult || !defenderResult) throw new Error(`incomplete M36 UI evidence: ${JSON.stringify(evidence)}`);
+  const attackDown = attackerResult.pointers.find((event) => event.type === "pointerdown" && event.button === 0);
+  if (!attackDown || attackDown.x < 0.6 || Math.abs(attackDown.y - 0.5) > 0.15) throw new Error(`M36 real attacker aim was not delivered: ${JSON.stringify(attackerResult)}`);
+  if (!defenderResult.keys.includes("keydown:Space") || !defenderResult.keys.includes("keyup:Space")) throw new Error(`M36 real dodge key was not delivered: ${JSON.stringify(defenderResult)}`);
+  if (attackerResult.playerHp !== 100 || attackerResult.playerGuard !== 100 || defenderResult.playerHp !== 100 || defenderResult.playerGuard !== 100) throw new Error(`M36 dodge exchange changed authoritative vitals: ${JSON.stringify(evidence)}`);
+  if (attackerResult.feedbackTransitions.includes("parried") || defenderResult.feedbackTransitions.includes("parry-success")) throw new Error(`M36 dodge exchange accidentally resolved as parry: ${JSON.stringify(evidence)}`);
   return evidence;
 }
 
@@ -471,6 +508,21 @@ async function centerArenaInViewport(session) {
   return geometry;
 }
 
+async function pressArenaDodgeAfterPause(session, delayMs) {
+  await webdriver(session.base, "POST", `/session/${session.sessionId}/actions`, {
+    actions: [{
+      type: "key",
+      id: `keyboard-${session.name}`,
+      actions: [
+        { type: "pause", duration: delayMs },
+        { type: "keyDown", value: "\uE00D" },
+        { type: "pause", duration: 40 },
+        { type: "keyUp", value: "\uE00D" },
+      ],
+    }],
+  });
+}
+
 async function pressArenaBlockAfterPause(session, delayMs) {
   await webdriver(session.base, "POST", `/session/${session.sessionId}/actions`, {
     actions: [{
@@ -627,6 +679,24 @@ async function waitForUiMessage(session, text, timeoutMs) {
     await sleep(20);
   }
   throw new Error(`${session.name} never rendered expected online UI message ${text}: ${JSON.stringify(await readUiEvidence(session))}`);
+}
+
+async function waitForUiDodgeEvidence(entries, attacker, defender, timeoutMs) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const states = await Promise.all(entries.map(readUiEvidence));
+    const attackerState = states.find((entry) => entry.browser === attacker.name);
+    const defenderState = states.find((entry) => entry.browser === defender.name);
+    const messagesReady = attackerState?.events.includes("Attack evaded - opponent dodged.")
+      && defenderState?.events.includes("Dodge! Strike avoided.");
+    const feedbackReady = attackerState?.feedbackTransitions.includes("dodge-evaded")
+      && defenderState?.feedbackTransitions.includes("dodge-success");
+    const vitalsClean = attackerState?.playerHp === 100 && attackerState?.playerGuard === 100
+      && defenderState?.playerHp === 100 && defenderState?.playerGuard === 100;
+    if (messagesReady && feedbackReady && vitalsClean) return states;
+    await sleep(40);
+  }
+  throw new Error(`real online UI never rendered authoritative dodge feedback: ${JSON.stringify(await Promise.all(entries.map(readUiEvidence)))}`);
 }
 
 async function waitForUiGuardBreakEvidence(entries, attacker, defender, timeoutMs) {

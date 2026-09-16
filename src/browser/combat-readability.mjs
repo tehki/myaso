@@ -1,3 +1,5 @@
+import { COMBAT } from "../combat/model.mjs";
+
 export const COMBAT_ACTION = Object.freeze({
   idle: 0,
   attackWindup: 1,
@@ -15,6 +17,7 @@ const PRIORITY = Object.freeze({
   respawn: 90,
   guardBreak: 80,
   parry: 70,
+  dodge: 65,
   block: 60,
   hit: 50,
   stun: 40,
@@ -42,6 +45,7 @@ export function createCombatReadabilityTracker() {
       }
       if (own && beforeOwn && peer && beforePeer) {
         collectParryEvents(candidates, beforeOwn, own, beforePeer, peer);
+        collectDodgeEvents(candidates, beforeOwn, own, beforePeer, peer);
       }
 
       previous.clear();
@@ -138,6 +142,36 @@ function collectParryEvents(events, beforeOwn, own, beforePeer, peer) {
   }
 }
 
+function collectDodgeEvents(events, beforeOwn, own, beforePeer, peer) {
+  const ownDodgedThreat = beforePeer.action === COMBAT_ACTION.attackActive
+    && peer.action === COMBAT_ACTION.attackRecovery
+    && beforeOwn.action === COMBAT_ACTION.dodge
+    && own.hp === beforeOwn.hp && own.guard === beforeOwn.guard
+    && attackThreatens(beforePeer, beforeOwn);
+  const peerDodgedThreat = beforeOwn.action === COMBAT_ACTION.attackActive
+    && own.action === COMBAT_ACTION.attackRecovery
+    && beforePeer.action === COMBAT_ACTION.dodge
+    && peer.hp === beforePeer.hp && peer.guard === beforePeer.guard
+    && attackThreatens(beforeOwn, beforePeer);
+
+  if (ownDodgedThreat) push(events, "dodge", "Dodge! Strike avoided.", 820, "dodge-success");
+  if (peerDodgedThreat) push(events, "dodge", "Attack evaded - opponent dodged.", 820, "dodge-evaded");
+}
+
+function attackThreatens(attacker, defender) {
+  if (![attacker.x, attacker.y, attacker.facing, defender.x, defender.y].every(Number.isFinite)) return false;
+  const dx = defender.x - attacker.x;
+  const dy = defender.y - attacker.y;
+  if (Math.hypot(dx, dy) > COMBAT.attack.reach + COMBAT.fighterRadius) return false;
+  return Math.abs(normalizeAngle(Math.atan2(dy, dx) - attacker.facing)) <= COMBAT.attack.arcRadians / 2;
+}
+
+function normalizeAngle(angle) {
+  while (angle > Math.PI) angle -= Math.PI * 2;
+  while (angle < -Math.PI) angle += Math.PI * 2;
+  return angle;
+}
+
 function push(events, kind, text, durationMs, feedback = null) {
   events.push({ kind, text, durationMs, feedback, priority: PRIORITY[kind] });
 }
@@ -148,5 +182,8 @@ function snapshot(entity) {
     hp: entity.hp,
     guard: entity.guard,
     action: entity.action,
+    x: entity.x,
+    y: entity.y,
+    facing: entity.facing,
   };
 }

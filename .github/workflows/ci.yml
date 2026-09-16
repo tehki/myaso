@@ -177,6 +177,11 @@ jobs:
           MYASO_PVP_SCENARIO: "uistun"
         run: node scripts/pvp_browser_flight_runner.mjs
 
+      - name: Validate M36 real online authoritative dodge feedback
+        env:
+          MYASO_PVP_SCENARIO: "uidodge"
+        run: node scripts/pvp_browser_flight_runner.mjs
+
       - name: Measure M15 browser background convergence
         env:
           MYASO_FLIGHT_DURATION_MS: "4500"

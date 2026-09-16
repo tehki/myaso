@@ -1,0 +1,34 @@
+# M36 Real Online Dodge Feedback
+
+## Objective
+
+Make a successful authoritative dodge readable on the normal online arena without predicting iframe state or changing combat rules.
+
+## Product behavior
+
+In an exactly two-fighter state, dodge success is inferred only after a completed authoritative exchange:
+
+- the attacker was `AttackActive` and becomes `AttackRecovery`;
+- the defender was authoritatively `Dodge` during the threatening active snapshot;
+- defender HP and guard remain unchanged;
+- the defender was inside the authoritative attack range and arc at that active snapshot.
+
+The defender receives `Dodge! Strike avoided.` plus `dodge-success`. The attacker receives `Attack evaded - opponent dodged.` plus `dodge-evaded`.
+
+Out-of-range or out-of-arc attack recovery is not credited as a successful dodge. Multi-opponent states do not receive causal dodge attribution.
+## Real-browser acceptance
+
+The dedicated `uidodge` flight opens the production `index.html` path in real headless Chrome and Firefox against the authoritative loopback server.
+
+- Chrome/player 1 uses ordinary `KeyD` movement and a real rightward LMB attack.
+- Firefox/player 2 receives a real Space key press through W3C actions.
+- The flight requires opposite-client `dodge-evaded` / `dodge-success` feedback and both semantic messages.
+- Both fighters must remain at 100 HP / 100 guard.
+- No parry feedback may appear.
+- Input provenance must show the real Space key and real pointer attack.
+
+No state, HP, guard, action, position, server event, iframe timer, or combat result is injected by the harness.
+
+## Risk / rollback
+
+Presentation-only inference and feedback styling. No server simulation, dodge duration, 118 ms iframe window, attack timing, combat constants, wire protocol, persistence, networking, public bind, deployment, or production activation changes. Rollback is to close/discard M36; frozen M35 remains unchanged.
