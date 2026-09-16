@@ -299,7 +299,7 @@ async function runOnlineUiParryFlight(entries) {
   let blockHeld = false;
   try {
     blockHeld = true;
-    const blockAction = pressArenaBlockAfterPause(defender, 160);
+    const blockAction = pressArenaBlockAfterPause(defender, 120);
     await sleep(60);
     await performArenaAttack(attacker, attackerElementId, 200);
     await blockAction;
@@ -529,7 +529,14 @@ async function pressArenaBlockAfterPause(session, delayMs) {
       type: "pointer",
       id: `mouse-${session.name}`,
       parameters: { pointerType: "mouse" },
-      actions: [{ type: "pause", duration: delayMs }, { type: "pointerDown", button: 2 }],
+      actions: [
+        { type: "pause", duration: delayMs },
+        { type: "pointerDown", button: 2 },
+        { type: "pause", duration: 20 },
+        { type: "pointerUp", button: 2 },
+        { type: "pause", duration: 20 },
+        { type: "pointerDown", button: 2 },
+      ],
     }],
   });
 }
