@@ -248,21 +248,25 @@ async function runOnlineUiFeedbackFlight(entries) {
 async function runOnlineUiDodgeFeedbackFlight(entries) {
   await Promise.all(entries.map(installUiObserver));
   const ready = await waitForUiReady(entries);
-  const ordered = ready.slice().sort((a, b) => a.playerNetId - b.playerNetId);
-  const attacker = entries.find((entry) => entry.name === ordered[0].browser);
-  const defender = entries.find((entry) => entry.name === ordered[1].browser);
-  if (!attacker || !defender) throw new Error(`could not resolve M36 UI roles from ${JSON.stringify(ready)}`);
-  if (attacker.name !== "chrome" || defender.name !== "firefox") throw new Error(`M36 latency choreography requires Chrome attacker / Firefox defender: ${JSON.stringify(ready)}`);
+  const attacker = entries.find((entry) => entry.name === "chrome");
+  const defender = entries.find((entry) => entry.name === "firefox");
+  const attackerReady = ready.find((entry) => entry.browser === attacker?.name);
+  const defenderReady = ready.find((entry) => entry.browser === defender?.name);
+  if (!attacker || !defender || !attackerReady || !defenderReady) throw new Error(`could not resolve M36 UI roles from ${JSON.stringify(ready)}`);
+  const attackRight = attackerReady.playerNetId < defenderReady.playerNetId;
+  const movementKey = attackRight ? "d" : "a";
+  const movementCode = attackRight ? "KeyD" : "KeyA";
+  const attackOffset = attackRight ? 200 : -200;
 
   await Promise.all(entries.map((entry) => execute(entry.base, entry.sessionId, "document.querySelector('#arena').focus(); return document.activeElement?.id;")));
   const attackerElementId = await resolveArenaElement(attacker, "M36 attacker");
   await resolveArenaElement(defender, "M36 defender");
   await Promise.all(entries.map(centerArenaInViewport));
-  await pulseMovementKey(attacker, "d", 120);
+  await pulseMovementKey(attacker, movementKey, 120);
 
   const dodgeAction = pressArenaDodgeAfterPause(defender, 120);
   await sleep(60);
-  await performArenaAttack(attacker, attackerElementId, 200);
+  await performArenaAttack(attacker, attackerElementId, attackOffset);
   await dodgeAction;
   let evidence = await waitForUiDodgeEvidence(entries, attacker, defender, 1200);
   await sleep(80);
@@ -272,7 +276,9 @@ async function runOnlineUiDodgeFeedbackFlight(entries) {
   const defenderResult = evidence.find((entry) => entry.browser === defender.name);
   if (!attackerResult || !defenderResult) throw new Error(`incomplete M36 UI evidence: ${JSON.stringify(evidence)}`);
   const attackDown = attackerResult.pointers.find((event) => event.type === "pointerdown" && event.button === 0);
-  if (!attackDown || attackDown.x < 0.6 || Math.abs(attackDown.y - 0.5) > 0.15) throw new Error(`M36 real attacker aim was not delivered: ${JSON.stringify(attackerResult)}`);
+  const movementDelivered = attackerResult.keys.includes(`keydown:${movementCode}`) && attackerResult.keys.includes(`keyup:${movementCode}`);
+  const aimDelivered = attackDown && Math.abs(attackDown.y - 0.5) <= 0.15 && (attackRight ? attackDown.x >= 0.6 : attackDown.x <= 0.4);
+  if (!movementDelivered || !aimDelivered) throw new Error(`M36 real attacker movement/aim was not delivered: ${JSON.stringify(attackerResult)}`);
   if (!defenderResult.keys.includes("keydown:Space") || !defenderResult.keys.includes("keyup:Space")) throw new Error(`M36 real dodge key was not delivered: ${JSON.stringify(defenderResult)}`);
   if (attackerResult.playerHp !== 100 || attackerResult.playerGuard !== 100 || defenderResult.playerHp !== 100 || defenderResult.playerGuard !== 100) throw new Error(`M36 dodge exchange changed authoritative vitals: ${JSON.stringify(evidence)}`);
   if (attackerResult.feedbackTransitions.includes("parried") || defenderResult.feedbackTransitions.includes("parry-success")) throw new Error(`M36 dodge exchange accidentally resolved as parry: ${JSON.stringify(evidence)}`);

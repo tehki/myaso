@@ -20,8 +20,9 @@ Out-of-range or out-of-arc attack recovery is not credited as a successful dodge
 
 The dedicated `uidodge` flight opens the production `index.html` path in real headless Chrome and Firefox against the authoritative loopback server.
 
-- Chrome/player 1 uses ordinary `KeyD` movement and a real rightward LMB attack.
-- Firefox/player 2 receives a real Space key press through W3C actions.
+- Chrome is the attacker regardless of connection order: it uses ordinary `KeyD` + rightward LMB when spawned left, or `KeyA` + leftward LMB when spawned right.
+- Firefox is the defender regardless of connection order and receives a real Space key press through W3C actions.
+- The flight derives left/right attack geometry from the assigned authoritative player IDs instead of assuming a browser always receives player 1 or player 2.
 - The flight requires opposite-client `dodge-evaded` / `dodge-success` feedback and both semantic messages.
 - Both fighters must remain at 100 HP / 100 guard.
 - No parry feedback may appear.
