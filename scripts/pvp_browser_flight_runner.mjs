@@ -8,7 +8,7 @@ import { setTimeout as sleep } from "node:timers/promises";
 const root = process.cwd();
 const durationMs = Number(process.env.MYASO_PVP_FLIGHT_DURATION_MS ?? 7000);
 const scenario = process.env.MYASO_PVP_SCENARIO ?? "damage";
-if (!new Set(["damage", "parry", "dodge", "block", "guardbreak", "backblock", "respawn", "ui", "uirespawn", "uifeedback", "uiparry", "uistun", "uiguardbreak", "uidodge", "uirecovery"]).has(scenario)) throw new Error(`unsupported MYASO_PVP_SCENARIO: ${scenario}`);
+if (!new Set(["damage", "parry", "dodge", "block", "guardbreak", "backblock", "respawn", "ui", "uirespawn", "uifeedback", "uiparry", "uistun", "uiguardbreak", "uidodge", "uirecovery", "uirecoverytell"]).has(scenario)) throw new Error(`unsupported MYASO_PVP_SCENARIO: ${scenario}`);
 const staticPort = Number(process.env.MYASO_PVP_FLIGHT_HTTP_PORT ?? 4174);
 const browsers = [
   {
@@ -65,6 +65,9 @@ try {
   } else if (scenario === "uirecovery") {
     const results = await runOnlineUiRecoveryReadabilityFlight(sessions);
     console.log(`M37_ONLINE_RECOVERY_READABILITY ${JSON.stringify({ ok: true, results })}`);
+  } else if (scenario === "uirecoverytell") {
+    const results = await runOnlineUiRecoveryTellFlight(sessions);
+    console.log(`M38_FFA_RECOVERY_TELL ${JSON.stringify({ ok: true, results })}`);
   } else if (scenario === "uiguardbreak") {
     const results = await runOnlineUiGuardBreakFlight(sessions);
     console.log(`M34_ONLINE_GUARD_BREAK_FEEDBACK ${JSON.stringify({ ok: true, results })}`);
@@ -165,7 +168,7 @@ async function startBrowser(browser) {
 }
 
 async function navigate(session, gameUrl, certificateHash) {
-  const page = scenario === "ui" || scenario === "uirespawn" || scenario === "uifeedback" || scenario === "uiparry" || scenario === "uistun" || scenario === "uiguardbreak" || scenario === "uidodge" || scenario === "uirecovery" ? "index.html" : "pvp-flight.html";
+  const page = scenario === "ui" || scenario === "uirespawn" || scenario === "uifeedback" || scenario === "uiparry" || scenario === "uistun" || scenario === "uiguardbreak" || scenario === "uidodge" || scenario === "uirecovery" || scenario === "uirecoverytell" ? "index.html" : "pvp-flight.html";
   const url = new URL(`http://127.0.0.1:${staticPort}/web/${page}`);
   url.searchParams.set("server", gameUrl);
   url.searchParams.set("cert", certificateHash);
@@ -274,6 +277,22 @@ async function runOnlineUiRecoveryReadabilityFlight(entries) {
   defender = evidence.find((entry) => entry.feedbackTransitions.includes("damage-taken"));
   if (!defender || defender.recoveryVisible || defender.recoveryTransitions.at(-1)?.visible !== false) {
     throw new Error(`M37 recovery cue did not clear after authoritative recovery: ${JSON.stringify(defender)}`);
+  }
+  return evidence;
+}
+
+async function runOnlineUiRecoveryTellFlight(entries) {
+  const evidence = await runOnlineUiFeedbackFlight(entries);
+  const attacker = evidence.find((entry) => entry.feedbackTransitions.includes("hit-confirm"));
+  const defender = evidence.find((entry) => entry.feedbackTransitions.includes("damage-taken"));
+  if (!attacker || !defender || attacker.browser === defender.browser) {
+    throw new Error(`M38 could not resolve attacker / defender: ${JSON.stringify(evidence)}`);
+  }
+  if (defender.recoveryTellMaxPixels < 24) {
+    throw new Error(`M38 defender never painted the remote recovery ring: ${JSON.stringify(defender)}`);
+  }
+  if (attacker.recoveryTellMaxPixels !== 0) {
+    throw new Error(`M38 attacker painted a recovery ring around a non-recovering remote: ${JSON.stringify(attacker)}`);
   }
   return evidence;
 }
@@ -656,7 +675,7 @@ async function installUiObserver(session) {
     const overlay = document.querySelector('#combat-overlay');
     const recovery = document.querySelector('#opponent-recovery');
     if (!target || !arena || !arenaStage || !overlay || !recovery) throw new Error('missing online UI flight target');
-    const state = { events: [], keys: [], pointers: [], overlayTransitions: [], feedbackTransitions: [], recoveryTransitions: [], online: '', startedAt: performance.now() };
+    const state = { events: [], keys: [], pointers: [], overlayTransitions: [], feedbackTransitions: [], recoveryTransitions: [], recoveryTellMaxPixels: 0, online: '', startedAt: performance.now() };
     const record = () => {
       const text = target.textContent?.trim() ?? '';
       if (/^Online - player #\\d+ - server tick \\d+$/.test(text)) state.online = text;
@@ -677,6 +696,16 @@ async function installUiObserver(session) {
       const feedback = arenaStage.dataset.combatFeedback ?? '';
       if (feedback && state.feedbackTransitions.at(-1) !== feedback) state.feedbackTransitions.push(feedback);
     };
+    const sampleRecoveryTell = () => {
+      const context = arena.getContext('2d');
+      if (!context) return;
+      const pixels = context.getImageData(0, 0, arena.width, arena.height).data;
+      let count = 0;
+      for (let i = 0; i < pixels.length; i += 4) {
+        if (Math.abs(pixels[i] - 239) <= 2 && Math.abs(pixels[i + 1] - 207) <= 2 && Math.abs(pixels[i + 2] - 115) <= 2 && pixels[i + 3] >= 250) count += 1;
+      }
+      state.recoveryTellMaxPixels = Math.max(state.recoveryTellMaxPixels, count);
+    };
     const recordRecovery = () => {
       const entry = {
         visible: !recovery.hidden,
@@ -686,6 +715,7 @@ async function installUiObserver(session) {
       };
       const previous = state.recoveryTransitions.at(-1);
       if (!previous || Object.keys(entry).some((key) => previous[key] !== entry[key])) state.recoveryTransitions.push(entry);
+      if (entry.visible) sampleRecoveryTell();
     };
     for (const type of ['keydown', 'keyup']) {
       arena.addEventListener(type, (event) => state.keys.push(type + ':' + event.code), { capture: true });
@@ -841,7 +871,7 @@ async function waitForUiRespawnEvidence(entries, attacker, defender, timeoutMs) 
 
 async function readUiEvidence(session) {
   const value = await execute(session.base, session.sessionId, `
-    const state = window.__MYASO_M30_UI__ ?? { events: [], keys: [], pointers: [], overlayTransitions: [], feedbackTransitions: [], recoveryTransitions: [], online: '' };
+    const state = window.__MYASO_M30_UI__ ?? { events: [], keys: [], pointers: [], overlayTransitions: [], feedbackTransitions: [], recoveryTransitions: [], recoveryTellMaxPixels: 0, online: '' };
     const match = state.online.match(/player #(\\d+)/);
     return {
       title: document.title,
@@ -863,6 +893,7 @@ async function readUiEvidence(session) {
       recoveryLabel: document.querySelector('#opponent-recovery-label')?.textContent?.trim() ?? '',
       recoveryDetail: document.querySelector('#opponent-recovery-detail')?.textContent?.trim() ?? '',
       recoveryTransitions: (state.recoveryTransitions ?? []).slice(),
+      recoveryTellMaxPixels: Number(state.recoveryTellMaxPixels ?? 0),
       events: state.events.slice(),
       keys: state.keys.slice(),
       pointers: state.pointers.slice(),
