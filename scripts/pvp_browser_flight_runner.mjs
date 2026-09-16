@@ -351,37 +351,41 @@ async function runOnlineUiDodgeFeedbackFlight(entries) {
 async function runOnlineUiParryFlight(entries) {
   await Promise.all(entries.map(installUiObserver));
   const ready = await waitForUiReady(entries);
-  const ordered = ready.slice().sort((a, b) => a.playerNetId - b.playerNetId);
-  const attacker = entries.find((entry) => entry.name === ordered[0].browser);
-  const defender = entries.find((entry) => entry.name === ordered[1].browser);
-  if (!attacker || !defender) throw new Error(`could not resolve M33 UI roles from ${JSON.stringify(ready)}`);
-  if (attacker.name !== "chrome" || defender.name !== "firefox") throw new Error(`M33 latency choreography requires Chrome attacker / Firefox defender: ${JSON.stringify(ready)}`);
+  const attacker = entries.find((entry) => entry.name === "chrome");
+  const defender = entries.find((entry) => entry.name === "firefox");
+  const attackerReady = ready.find((entry) => entry.browser === attacker?.name);
+  const defenderReady = ready.find((entry) => entry.browser === defender?.name);
+  if (!attacker || !defender || !attackerReady || !defenderReady) throw new Error(`could not resolve M33 UI roles from ${JSON.stringify(ready)}`);
+  const attackRight = attackerReady.playerNetId < defenderReady.playerNetId;
+  const movementKey = attackRight ? "d" : "a";
+  const movementCode = attackRight ? "KeyD" : "KeyA";
+  const attackOffset = attackRight ? 200 : -200;
 
   await Promise.all(entries.map((entry) => execute(entry.base, entry.sessionId, "document.querySelector('#arena').focus(); return document.activeElement?.id;")));
   const attackerElementId = await resolveArenaElement(attacker, "M33 attacker");
   const defenderElementId = await resolveArenaElement(defender, "M33 defender");
-
   await Promise.all(entries.map(centerArenaInViewport));
-  await aimArena(defender, defenderElementId, -200);
-  await pulseMovementKey(attacker, "d", 120);
-  let evidence;
-  let attackHeld = false;
-  let blockHeld = false;
-  try {
-    attackHeld = true;
-    await setArenaAttack(attacker, attackerElementId, true, 200);
-    // Keep the one-shot attack latch alive for more than one 30 Hz send period,
-    // then arm a fresh block inside the authoritative 135 ms attack windup.
-    await sleep(60);
-    blockHeld = true;
-    await setArenaBlock(defender, defenderElementId, true);
-    // Do not churn either WebDriver session until the strike has resolved.
-    await sleep(180);
-    evidence = await waitForUiParryEvidence(entries, attacker, defender, 1000);
-  } finally {
-    if (attackHeld) await setArenaAttack(attacker, attackerElementId, false);
-    if (blockHeld) await setArenaBlock(defender, defenderElementId, false);
+  await aimArena(defender, defenderElementId, attackRight ? -200 : 200);
+  let evidence = null;
+  for (let attempt = 0; attempt < 4 && !evidence; attempt += 1) {
+    await pulseMovementKey(attacker, movementKey, attempt === 0 ? 120 : 80);
+    let attackHeld = false;
+    let blockHeld = false;
+    try {
+      attackHeld = true;
+      await setArenaAttack(attacker, attackerElementId, true, attackOffset);
+      await sleep(70);
+      blockHeld = true;
+      await setArenaBlock(defender, defenderElementId, true);
+      await sleep(190);
+      evidence = await waitForUiParryEvidence(entries, attacker, defender, 320, false);
+    } finally {
+      if (attackHeld) await setArenaAttack(attacker, attackerElementId, false, attackOffset);
+      if (blockHeld) await setArenaBlock(defender, defenderElementId, false);
+    }
+    if (!evidence) await sleep(260);
   }
+  if (!evidence) evidence = await waitForUiParryEvidence(entries, attacker, defender, 800, true);
 
   await sleep(80);
   evidence = await Promise.all(entries.map(readUiEvidence));
@@ -391,15 +395,13 @@ async function runOnlineUiParryFlight(entries) {
   const attackDown = attackerResult.pointers.find((event) => event.type === "pointerdown" && event.button === 0);
   const blockDown = defenderResult.pointers.find((event) => event.type === "pointerdown" && event.button === 2);
   const blockUp = defenderResult.pointers.find((event) => event.type === "pointerup" && event.button === 2);
-  if (!attackerResult.keys.includes("keydown:KeyD") || !attackerResult.keys.includes("keyup:KeyD")) {
+  if (!attackerResult.keys.includes(`keydown:${movementCode}`) || !attackerResult.keys.includes(`keyup:${movementCode}`)) {
     throw new Error(`M33 real attacker movement control was not delivered: ${JSON.stringify(attackerResult)}`);
   }
-  if (!attackDown || attackDown.x < 0.6 || Math.abs(attackDown.y - 0.5) > 0.15) {
-    throw new Error(`M33 real attacker aim was not delivered: ${JSON.stringify(attackerResult)}`);
-  }
-  if (!blockDown || !blockUp || blockDown.x > 0.4 || Math.abs(blockDown.y - 0.5) > 0.15) {
-    throw new Error(`M33 real directional block input was not delivered: ${JSON.stringify(defenderResult)}`);
-  }
+  const attackAimValid = attackDown && Math.abs(attackDown.y - 0.5) <= 0.15 && (attackRight ? attackDown.x >= 0.6 : attackDown.x <= 0.4);
+  if (!attackAimValid) throw new Error(`M33 real attacker aim was not delivered: ${JSON.stringify(attackerResult)}`);
+  const blockAimValid = blockDown && Math.abs(blockDown.y - 0.5) <= 0.15 && (attackRight ? blockDown.x <= 0.4 : blockDown.x >= 0.6);
+  if (!blockAimValid || !blockUp) throw new Error(`M33 real directional block input was not delivered: ${JSON.stringify(defenderResult)}`);
   return evidence;
 }
 
@@ -818,7 +820,7 @@ async function waitForUiGuardBreakEvidence(entries, attacker, defender, timeoutM
   throw new Error(`real online UI never rendered authoritative guard break feedback: ${JSON.stringify(await Promise.all(entries.map(readUiEvidence)))}`);
 }
 
-async function waitForUiParryEvidence(entries, attacker, defender, timeoutMs) {
+async function waitForUiParryEvidence(entries, attacker, defender, timeoutMs, fail = true) {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     const states = await Promise.all(entries.map(readUiEvidence));
@@ -833,6 +835,7 @@ async function waitForUiParryEvidence(entries, attacker, defender, timeoutMs) {
     if (messagesReady && feedbackReady && vitalsClean) return states;
     await sleep(40);
   }
+  if (!fail) return null;
   throw new Error(`real online UI never rendered authoritative parry feedback: ${JSON.stringify(await Promise.all(entries.map(readUiEvidence)))}`);
 }
 
