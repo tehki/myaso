@@ -96,11 +96,11 @@ function collectEntityEvents(events, before, current, own) {
     push(events, "respawn", own ? "Respawned - back in the fight." : "Opponent respawned.", 720);
   }
   if (current.action === COMBAT_ACTION.stunned && current.guard === 0 && before.guard > 0) {
-    push(events, "guardBreak", own ? "Guard broken - you are vulnerable." : "Opponent guard broken - punish.", 900);
+    push(events, "guardBreak", own ? "Guard broken - you are vulnerable." : "Opponent guard broken - punish.", 900, own ? "guard-broken" : "guard-break-confirm");
   }
   if (current.guard < before.guard && current.hp === before.hp) {
     const spent = before.guard - current.guard;
-    push(events, "block", own ? `Block held - guard -${spent}.` : `Opponent blocked - guard -${spent}.`, 700);
+    push(events, "block", own ? `Block held - guard -${spent}.` : `Opponent blocked - guard -${spent}.`, 700, own ? "guard-pressure" : "block-confirm");
   }
   if (current.hp < before.hp) {
     const damage = before.hp - current.hp;

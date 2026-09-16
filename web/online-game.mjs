@@ -125,7 +125,9 @@ function showCombatFeedback(feedback) {
   delete arenaStage.dataset.combatFeedback;
   void arenaStage.offsetWidth;
   arenaStage.dataset.combatFeedback = feedback;
-  const durationMs = feedback === "parry-success" || feedback === "parried" ? 380 : 320;
+  const durationMs = feedback === "guard-broken" || feedback === "guard-break-confirm" ? 420
+    : feedback === "parry-success" || feedback === "parried" ? 380
+      : 320;
   combatFeedbackTimer = window.setTimeout(() => {
     if (arenaStage.dataset.combatFeedback === feedback) delete arenaStage.dataset.combatFeedback;
     combatFeedbackTimer = 0;
