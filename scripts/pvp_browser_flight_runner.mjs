@@ -809,7 +809,7 @@ async function installUiObserver(session) {
       };
       const previous = state.recoveryTransitions.at(-1);
       if (!previous || Object.keys(entry).some((key) => previous[key] !== entry[key])) state.recoveryTransitions.push(entry);
-      if (entry.visible) sampleRecoveryTell();
+      if (entry.visible) requestAnimationFrame(() => requestAnimationFrame(sampleRecoveryTell));
     };
     for (const type of ['keydown', 'keyup']) {
       arena.addEventListener(type, (event) => state.keys.push(type + ':' + event.code), { capture: true });

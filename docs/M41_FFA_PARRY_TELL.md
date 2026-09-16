@@ -22,6 +22,10 @@ A passive canvas observer samples the unique cyan ring after authoritative `parr
 
 The exact M41 head also removes an inherited M36 cross-driver synchronization race. M24 remains the dedicated authoritative dodge reaction/overlap proof. M36 now issues the real WebDriver attack and dodge actions concurrently, with the dodge key delayed 70 ms inside the existing 135 ms attack windup, then requires authoritative `dodge-evaded` / `dodge-success` feedback and unchanged HP/guard. No combat timing or server behavior changes.
 
+## Inherited M38 acceptance stabilization
+
+CI #137 showed authoritative attack recovery correctly reached the production UI, but M38 sampled the recovery-ring canvas inside the same MutationObserver turn before the next render frame painted the ring. The observer now defers only the passive pixel sample by two `requestAnimationFrame` callbacks. It still requires the same replicated recovery state and unique production-canvas ring; no gameplay state, rendering rule, or combat timing changes.
+
 ## Local evidence
 
 - Coding-agent policy sentinel: PASS.
