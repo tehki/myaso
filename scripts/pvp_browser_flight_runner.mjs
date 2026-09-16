@@ -301,11 +301,13 @@ async function runOnlineUiParryFlight(entries) {
   try {
     attackHeld = true;
     await setArenaAttack(attacker, attackerElementId, true, 200);
-    await waitForUiMessage(attacker, "Attack committed - your windup is readable.", 160);
+    // Keep the one-shot attack latch alive for more than one 30 Hz send period,
+    // then arm a fresh block inside the authoritative 135 ms attack windup.
+    await sleep(60);
     blockHeld = true;
     await setArenaBlock(defender, defenderElementId, true);
-    await setArenaAttack(attacker, attackerElementId, false);
-    attackHeld = false;
+    // Do not churn either WebDriver session until the strike has resolved.
+    await sleep(180);
     evidence = await waitForUiParryEvidence(entries, attacker, defender, 1000);
   } finally {
     if (attackHeld) await setArenaAttack(attacker, attackerElementId, false);
