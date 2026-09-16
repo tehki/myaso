@@ -8,7 +8,7 @@ import { setTimeout as sleep } from "node:timers/promises";
 const root = process.cwd();
 const durationMs = Number(process.env.MYASO_PVP_FLIGHT_DURATION_MS ?? 7000);
 const scenario = process.env.MYASO_PVP_SCENARIO ?? "damage";
-if (!new Set(["damage", "parry", "dodge", "block", "guardbreak", "backblock", "respawn", "ui", "uirespawn", "uifeedback", "uiparry", "uistun", "uiguardbreak", "uidodge"]).has(scenario)) throw new Error(`unsupported MYASO_PVP_SCENARIO: ${scenario}`);
+if (!new Set(["damage", "parry", "dodge", "block", "guardbreak", "backblock", "respawn", "ui", "uirespawn", "uifeedback", "uiparry", "uistun", "uiguardbreak", "uidodge", "uirecovery"]).has(scenario)) throw new Error(`unsupported MYASO_PVP_SCENARIO: ${scenario}`);
 const staticPort = Number(process.env.MYASO_PVP_FLIGHT_HTTP_PORT ?? 4174);
 const browsers = [
   {
@@ -62,6 +62,9 @@ try {
   } else if (scenario === "uidodge") {
     const results = await runOnlineUiDodgeFeedbackFlight(sessions);
     console.log(`M36_ONLINE_DODGE_FEEDBACK ${JSON.stringify({ ok: true, results })}`);
+  } else if (scenario === "uirecovery") {
+    const results = await runOnlineUiRecoveryReadabilityFlight(sessions);
+    console.log(`M37_ONLINE_RECOVERY_READABILITY ${JSON.stringify({ ok: true, results })}`);
   } else if (scenario === "uiguardbreak") {
     const results = await runOnlineUiGuardBreakFlight(sessions);
     console.log(`M34_ONLINE_GUARD_BREAK_FEEDBACK ${JSON.stringify({ ok: true, results })}`);
@@ -162,7 +165,7 @@ async function startBrowser(browser) {
 }
 
 async function navigate(session, gameUrl, certificateHash) {
-  const page = scenario === "ui" || scenario === "uirespawn" || scenario === "uifeedback" || scenario === "uiparry" || scenario === "uistun" || scenario === "uiguardbreak" || scenario === "uidodge" ? "index.html" : "pvp-flight.html";
+  const page = scenario === "ui" || scenario === "uirespawn" || scenario === "uifeedback" || scenario === "uiparry" || scenario === "uistun" || scenario === "uiguardbreak" || scenario === "uidodge" || scenario === "uirecovery" ? "index.html" : "pvp-flight.html";
   const url = new URL(`http://127.0.0.1:${staticPort}/web/${page}`);
   url.searchParams.set("server", gameUrl);
   url.searchParams.set("cert", certificateHash);
@@ -241,6 +244,36 @@ async function runOnlineUiFeedbackFlight(entries) {
   const defender = evidence.find((entry) => entry.feedbackTransitions.includes("damage-taken"));
   if (!attacker || !defender || attacker.browser === defender.browser) {
     throw new Error(`M32 authoritative hit feedback was not rendered on opposite clients: ${JSON.stringify(evidence)}`);
+  }
+  return evidence;
+}
+
+async function runOnlineUiRecoveryReadabilityFlight(entries) {
+  let evidence = await runOnlineUiFeedbackFlight(entries);
+  const attacker = evidence.find((entry) => entry.feedbackTransitions.includes("hit-confirm"));
+  let defender = evidence.find((entry) => entry.feedbackTransitions.includes("damage-taken"));
+  if (!attacker || !defender || attacker.browser === defender.browser) {
+    throw new Error(`M37 could not resolve attacker / defender: ${JSON.stringify(evidence)}`);
+  }
+  const defenderBrowser = defender.browser;
+  const showedRecovery = defender.recoveryTransitions.some((entry) => entry.visible
+    && entry.state === "attack-recovery" && entry.label === "PUNISH" && entry.detail === "Attack recovery");
+  if (!showedRecovery) throw new Error(`M37 defender never rendered opponent attack recovery: ${JSON.stringify(defender.recoveryTransitions)}`);
+  if (attacker.recoveryTransitions.some((entry) => entry.visible && entry.state === "attack-recovery")) {
+    throw new Error(`M37 attacker incorrectly rendered its own recovery as opponent recovery: ${JSON.stringify(attacker.recoveryTransitions)}`);
+  }
+
+  const deadline = Date.now() + 1200;
+  while (Date.now() < deadline) {
+    evidence = await Promise.all(entries.map(readUiEvidence));
+    defender = evidence.find((entry) => entry.browser === defenderBrowser);
+    if (defender && !defender.recoveryVisible) break;
+    await sleep(30);
+  }
+  evidence = await Promise.all(entries.map(readUiEvidence));
+  defender = evidence.find((entry) => entry.feedbackTransitions.includes("damage-taken"));
+  if (!defender || defender.recoveryVisible || defender.recoveryTransitions.at(-1)?.visible !== false) {
+    throw new Error(`M37 recovery cue did not clear after authoritative recovery: ${JSON.stringify(defender)}`);
   }
   return evidence;
 }
@@ -621,8 +654,9 @@ async function installUiObserver(session) {
     const arena = document.querySelector('#arena');
     const arenaStage = document.querySelector('.arena-stage');
     const overlay = document.querySelector('#combat-overlay');
-    if (!target || !arena || !arenaStage || !overlay) throw new Error('missing online UI flight target');
-    const state = { events: [], keys: [], pointers: [], overlayTransitions: [], feedbackTransitions: [], online: '', startedAt: performance.now() };
+    const recovery = document.querySelector('#opponent-recovery');
+    if (!target || !arena || !arenaStage || !overlay || !recovery) throw new Error('missing online UI flight target');
+    const state = { events: [], keys: [], pointers: [], overlayTransitions: [], feedbackTransitions: [], recoveryTransitions: [], online: '', startedAt: performance.now() };
     const record = () => {
       const text = target.textContent?.trim() ?? '';
       if (/^Online - player #\\d+ - server tick \\d+$/.test(text)) state.online = text;
@@ -643,6 +677,16 @@ async function installUiObserver(session) {
       const feedback = arenaStage.dataset.combatFeedback ?? '';
       if (feedback && state.feedbackTransitions.at(-1) !== feedback) state.feedbackTransitions.push(feedback);
     };
+    const recordRecovery = () => {
+      const entry = {
+        visible: !recovery.hidden,
+        state: recovery.dataset.state ?? '',
+        label: document.querySelector('#opponent-recovery-label')?.textContent?.trim() ?? '',
+        detail: document.querySelector('#opponent-recovery-detail')?.textContent?.trim() ?? '',
+      };
+      const previous = state.recoveryTransitions.at(-1);
+      if (!previous || Object.keys(entry).some((key) => previous[key] !== entry[key])) state.recoveryTransitions.push(entry);
+    };
     for (const type of ['keydown', 'keyup']) {
       arena.addEventListener(type, (event) => state.keys.push(type + ':' + event.code), { capture: true });
     }
@@ -661,9 +705,11 @@ async function installUiObserver(session) {
     record();
     recordOverlay();
     recordFeedback();
+    recordRecovery();
     new MutationObserver(record).observe(target, { childList: true, subtree: true, characterData: true });
     new MutationObserver(recordOverlay).observe(overlay, { attributes: true, attributeFilter: ['hidden'], childList: true, subtree: true, characterData: true });
     new MutationObserver(recordFeedback).observe(arenaStage, { attributes: true, attributeFilter: ['data-combat-feedback'] });
+    new MutationObserver(recordRecovery).observe(recovery, { attributes: true, attributeFilter: ['hidden', 'data-state'], childList: true, subtree: true, characterData: true });
     window.__MYASO_M30_UI__ = state;
     return true;
   `);
@@ -795,7 +841,7 @@ async function waitForUiRespawnEvidence(entries, attacker, defender, timeoutMs) 
 
 async function readUiEvidence(session) {
   const value = await execute(session.base, session.sessionId, `
-    const state = window.__MYASO_M30_UI__ ?? { events: [], keys: [], pointers: [], overlayTransitions: [], feedbackTransitions: [], online: '' };
+    const state = window.__MYASO_M30_UI__ ?? { events: [], keys: [], pointers: [], overlayTransitions: [], feedbackTransitions: [], recoveryTransitions: [], online: '' };
     const match = state.online.match(/player #(\\d+)/);
     return {
       title: document.title,
@@ -812,6 +858,11 @@ async function readUiEvidence(session) {
       overlayTransitions: (state.overlayTransitions ?? []).slice(),
       combatFeedback: document.querySelector('.arena-stage')?.dataset.combatFeedback ?? '',
       feedbackTransitions: (state.feedbackTransitions ?? []).slice(),
+      recoveryVisible: !document.querySelector('#opponent-recovery')?.hidden,
+      recoveryState: document.querySelector('#opponent-recovery')?.dataset.state ?? '',
+      recoveryLabel: document.querySelector('#opponent-recovery-label')?.textContent?.trim() ?? '',
+      recoveryDetail: document.querySelector('#opponent-recovery-detail')?.textContent?.trim() ?? '',
+      recoveryTransitions: (state.recoveryTransitions ?? []).slice(),
       events: state.events.slice(),
       keys: state.keys.slice(),
       pointers: state.pointers.slice(),

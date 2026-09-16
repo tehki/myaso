@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { COMBAT_ACTION, combatActionHint, combatLifePresentation, combatOverlayPresentation, createCombatReadabilityTracker } from "../src/browser/combat-readability.mjs";
+import { COMBAT_ACTION, combatActionHint, combatLifePresentation, combatOverlayPresentation, createCombatReadabilityTracker, opponentRecoveryPresentation } from "../src/browser/combat-readability.mjs";
 
 function fighter(netId, hp = 100, guard = 100, action = COMBAT_ACTION.idle, x = 0, y = 0, facing = 0) {
   return { netId, hp, guard, action, x, y, facing };
@@ -118,6 +118,16 @@ test("authoritative action hints explain commitment windows", () => {
   assert.match(combatActionHint(fighter(1, 100, 100, COMBAT_ACTION.attackRecovery)), /Recovery/);
   assert.match(combatActionHint(fighter(1, 100, 100, COMBAT_ACTION.block)), /Blocking/);
   assert.equal(combatActionHint(fighter(1)), null);
+});
+
+test("authoritative opponent recovery exposes a bounded punish cue", () => {
+  assert.deepEqual(opponentRecoveryPresentation(fighter(2, 100, 100, COMBAT_ACTION.attackRecovery)), {
+    visible: true, state: "attack-recovery", label: "PUNISH", detail: "Attack recovery",
+  });
+  assert.deepEqual(opponentRecoveryPresentation(fighter(2, 100, 100, COMBAT_ACTION.dodgeRecovery)), {
+    visible: true, state: "dodge-recovery", label: "PUNISH", detail: "Dodge recovery",
+  });
+  assert.deepEqual(opponentRecoveryPresentation(fighter(2)), { visible: false, state: "", label: "", detail: "" });
 });
 
 test("authoritative stun owns a temporary punish overlay", () => {

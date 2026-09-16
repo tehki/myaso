@@ -1,5 +1,5 @@
 import { createFrameBudget } from "../src/browser/frame-budget.mjs";
-import { COMBAT_ACTION, combatActionHint, combatOverlayPresentation, createCombatReadabilityTracker } from "../src/browser/combat-readability.mjs";
+import { COMBAT_ACTION, combatActionHint, combatOverlayPresentation, createCombatReadabilityTracker, opponentRecoveryPresentation } from "../src/browser/combat-readability.mjs";
 import { COMBAT } from "../src/combat/model.mjs";
 import { reconcilePrediction } from "../src/browser/reconciliation.mjs";
 import { NETWORK } from "../src/network/constants.mjs";
@@ -24,6 +24,11 @@ const combatOverlay = {
   root: document.querySelector("#combat-overlay"),
   title: document.querySelector("#combat-overlay-title"),
   detail: document.querySelector("#combat-overlay-detail"),
+};
+const opponentRecovery = {
+  root: document.querySelector("#opponent-recovery"),
+  label: document.querySelector("#opponent-recovery-label"),
+  detail: document.querySelector("#opponent-recovery-detail"),
 };
 const combatReadability = createCombatReadabilityTracker();
 let networkStatus = "Connecting to authoritative server...";
@@ -308,6 +313,7 @@ function updateHud(ownId) {
   setMeter("botHp", hud.botHp, hud.botHpValue, remote?.hp ?? 0);
   setMeter("botGuard", hud.botGuard, hud.botGuardValue, remote?.guard ?? 0);
   updateCombatOverlay(own);
+  updateOpponentRecovery(networkClient.state.size === 2 ? remote : null);
   const now = performance.now();
   if (combatMessage && now <= combatMessageUntil) {
     setStatus(combatMessage);
@@ -324,6 +330,19 @@ function updateCombatOverlay(own) {
   if (!presentation.visible) return;
   if (combatOverlay.title.textContent !== presentation.title) combatOverlay.title.textContent = presentation.title;
   if (combatOverlay.detail.textContent !== presentation.detail) combatOverlay.detail.textContent = presentation.detail;
+}
+
+function updateOpponentRecovery(remote) {
+  const presentation = opponentRecoveryPresentation(remote);
+  const shouldHide = !presentation.visible;
+  if (opponentRecovery.root.hidden !== shouldHide) opponentRecovery.root.hidden = shouldHide;
+  if (!presentation.visible) {
+    delete opponentRecovery.root.dataset.state;
+    return;
+  }
+  opponentRecovery.root.dataset.state = presentation.state;
+  if (opponentRecovery.label.textContent !== presentation.label) opponentRecovery.label.textContent = presentation.label;
+  if (opponentRecovery.detail.textContent !== presentation.detail) opponentRecovery.detail.textContent = presentation.detail;
 }
 
 function setMeter(cacheKey, bar, label, value) {
