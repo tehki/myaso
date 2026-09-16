@@ -172,6 +172,11 @@ jobs:
           MYASO_PVP_SCENARIO: "uiguardbreak"
         run: node scripts/pvp_browser_flight_runner.mjs
 
+      - name: Validate M35 real online authoritative stun overlay
+        env:
+          MYASO_PVP_SCENARIO: "uistun"
+        run: node scripts/pvp_browser_flight_runner.mjs
+
       - name: Measure M15 browser background convergence
         env:
           MYASO_FLIGHT_DURATION_MS: "4500"
