@@ -400,8 +400,10 @@ async function runOnlineUiParryFlight(entries) {
   await Promise.all(entries.map(centerArenaInViewport));
   await aimArena(defender, defenderElementId, attackRight ? -200 : 200);
   let evidence = null;
+  let lastAttemptBaseline = null;
   for (let attempt = 0; attempt < 4 && !evidence; attempt += 1) {
     await pulseMovementKey(attacker, movementKey, attempt === 0 ? 120 : 80);
+    lastAttemptBaseline = await Promise.all(entries.map(readUiEvidence));
     let attackHeld = false;
     let blockHeld = false;
     try {
@@ -411,14 +413,14 @@ async function runOnlineUiParryFlight(entries) {
       blockHeld = true;
       await setArenaBlock(defender, defenderElementId, true);
       await sleep(190);
-      evidence = await waitForUiParryEvidence(entries, attacker, defender, 320, false);
+      evidence = await waitForUiParryEvidence(entries, attacker, defender, 320, false, lastAttemptBaseline);
     } finally {
       if (attackHeld) await setArenaAttack(attacker, attackerElementId, false, attackOffset);
       if (blockHeld) await setArenaBlock(defender, defenderElementId, false);
     }
     if (!evidence) await sleep(260);
   }
-  if (!evidence) evidence = await waitForUiParryEvidence(entries, attacker, defender, 800, true);
+  if (!evidence) evidence = await waitForUiParryEvidence(entries, attacker, defender, 800, true, lastAttemptBaseline);
 
   await sleep(80);
   evidence = await Promise.all(entries.map(readUiEvidence));
@@ -918,7 +920,11 @@ async function waitForUiGuardBreakEvidence(entries, attacker, defender, timeoutM
   throw new Error(`real online UI never rendered authoritative guard break feedback: ${JSON.stringify(await Promise.all(entries.map(readUiEvidence)))}`);
 }
 
-async function waitForUiParryEvidence(entries, attacker, defender, timeoutMs, fail = true) {
+async function waitForUiParryEvidence(entries, attacker, defender, timeoutMs, fail = true, baselineStates = null) {
+  const baselineAttacker = baselineStates?.find((entry) => entry.browser === attacker.name);
+  const baselineDefender = baselineStates?.find((entry) => entry.browser === defender.name);
+  const baselineParried = baselineAttacker?.feedbackTransitions.filter((entry) => entry === "parried").length ?? 0;
+  const baselineParrySuccess = baselineDefender?.feedbackTransitions.filter((entry) => entry === "parry-success").length ?? 0;
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     const states = await Promise.all(entries.map(readUiEvidence));
@@ -926,10 +932,13 @@ async function waitForUiParryEvidence(entries, attacker, defender, timeoutMs, fa
     const defenderState = states.find((entry) => entry.browser === defender.name);
     const messagesReady = attackerState?.events.includes("Parried - your commitment was read.")
       && defenderState?.events.includes("Parry! Opponent stunned - punish now.");
-    const feedbackReady = attackerState?.feedbackTransitions.includes("parried")
-      && defenderState?.feedbackTransitions.includes("parry-success");
-    const vitalsClean = attackerState?.playerHp === 100 && attackerState?.playerGuard === 100
-      && defenderState?.playerHp === 100 && defenderState?.playerGuard === 100;
+    const feedbackReady = (attackerState?.feedbackTransitions.filter((entry) => entry === "parried").length ?? 0) > baselineParried
+      && (defenderState?.feedbackTransitions.filter((entry) => entry === "parry-success").length ?? 0) > baselineParrySuccess;
+    const vitalsClean = baselineAttacker && baselineDefender
+      ? attackerState?.playerHp === baselineAttacker.playerHp && attackerState?.playerGuard === baselineAttacker.playerGuard
+        && defenderState?.playerHp === baselineDefender.playerHp && defenderState?.playerGuard === baselineDefender.playerGuard
+      : attackerState?.playerHp === 100 && attackerState?.playerGuard === 100
+        && defenderState?.playerHp === 100 && defenderState?.playerGuard === 100;
     if (messagesReady && feedbackReady && vitalsClean) return states;
     await sleep(40);
   }
