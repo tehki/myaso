@@ -488,9 +488,7 @@ async function runOnlineUiGuardBreakFlight(entries) {
   await sleep(30);
   const blockAction = holdArenaBlock(defender, 1800);
   await Promise.all([attackAction, blockAction]);
-  let evidence = await waitForUiGuardBreakEvidence(entries, attacker, defender, 1200);
-  await sleep(80);
-  evidence = await Promise.all(entries.map(readUiEvidence));
+  const evidence = await waitForUiGuardBreakEvidence(entries, attacker, defender, 1200);
 
   const attackerResult = evidence.find((entry) => entry.browser === attacker.name);
   const defenderResult = evidence.find((entry) => entry.browser === defender.name);
