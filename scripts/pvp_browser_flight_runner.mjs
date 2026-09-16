@@ -8,7 +8,7 @@ import { setTimeout as sleep } from "node:timers/promises";
 const root = process.cwd();
 const durationMs = Number(process.env.MYASO_PVP_FLIGHT_DURATION_MS ?? 7000);
 const scenario = process.env.MYASO_PVP_SCENARIO ?? "damage";
-if (!new Set(["damage", "parry", "dodge", "block", "guardbreak", "backblock", "respawn", "ui", "uirespawn", "uifeedback", "uiparry", "uistun", "uiguardbreak", "uidodge", "uirecovery", "uirecoverytell"]).has(scenario)) throw new Error(`unsupported MYASO_PVP_SCENARIO: ${scenario}`);
+if (!new Set(["damage", "parry", "dodge", "block", "guardbreak", "backblock", "respawn", "ui", "uirespawn", "uifeedback", "uiparry", "uistun", "uiguardbreak", "uidodge", "uirecovery", "uirecoverytell", "uiattackintent"]).has(scenario)) throw new Error(`unsupported MYASO_PVP_SCENARIO: ${scenario}`);
 const staticPort = Number(process.env.MYASO_PVP_FLIGHT_HTTP_PORT ?? 4174);
 const browsers = [
   {
@@ -68,6 +68,9 @@ try {
   } else if (scenario === "uirecoverytell") {
     const results = await runOnlineUiRecoveryTellFlight(sessions);
     console.log(`M38_FFA_RECOVERY_TELL ${JSON.stringify({ ok: true, results })}`);
+  } else if (scenario === "uiattackintent") {
+    const results = await runOnlineUiAttackIntentFlight(sessions);
+    console.log(`M39_FFA_ATTACK_INTENT ${JSON.stringify({ ok: true, results })}`);
   } else if (scenario === "uiguardbreak") {
     const results = await runOnlineUiGuardBreakFlight(sessions);
     console.log(`M34_ONLINE_GUARD_BREAK_FEEDBACK ${JSON.stringify({ ok: true, results })}`);
@@ -161,14 +164,14 @@ async function startBrowser(browser) {
   });
   const sessionId = created.sessionId ?? created.value?.sessionId;
   if (!sessionId) throw new Error(`${browser.name} WebDriver did not return a session id: ${JSON.stringify(created)}`);
-  if (scenario === "uiparry" || scenario === "uistun" || scenario === "uiguardbreak" || scenario === "uidodge") {
+  if (scenario === "uiparry" || scenario === "uistun" || scenario === "uiguardbreak" || scenario === "uidodge" || scenario === "uiattackintent") {
     await webdriver(base, "POST", `/session/${sessionId}/window/rect`, { x: 0, y: 0, width: 1280, height: 900 });
   }
   return { ...browser, child, base, sessionId };
 }
 
 async function navigate(session, gameUrl, certificateHash) {
-  const page = scenario === "ui" || scenario === "uirespawn" || scenario === "uifeedback" || scenario === "uiparry" || scenario === "uistun" || scenario === "uiguardbreak" || scenario === "uidodge" || scenario === "uirecovery" || scenario === "uirecoverytell" ? "index.html" : "pvp-flight.html";
+  const page = scenario === "ui" || scenario === "uirespawn" || scenario === "uifeedback" || scenario === "uiparry" || scenario === "uistun" || scenario === "uiguardbreak" || scenario === "uidodge" || scenario === "uirecovery" || scenario === "uirecoverytell" || scenario === "uiattackintent" ? "index.html" : "pvp-flight.html";
   const url = new URL(`http://127.0.0.1:${staticPort}/web/${page}`);
   url.searchParams.set("server", gameUrl);
   url.searchParams.set("cert", certificateHash);
@@ -294,6 +297,45 @@ async function runOnlineUiRecoveryTellFlight(entries) {
   if (attacker.recoveryTellMaxPixels !== 0) {
     throw new Error(`M38 attacker painted a recovery ring around a non-recovering remote: ${JSON.stringify(attacker)}`);
   }
+  return evidence;
+}
+
+async function runOnlineUiAttackIntentFlight(entries) {
+  await Promise.all(entries.map(installUiObserver));
+  const ready = await waitForUiReady(entries);
+  const attacker = entries.find((entry) => entry.name === "chrome");
+  const defender = entries.find((entry) => entry.name === "firefox");
+  const attackerReady = ready.find((entry) => entry.browser === attacker?.name);
+  const defenderReady = ready.find((entry) => entry.browser === defender?.name);
+  if (!attacker || !defender || !attackerReady || !defenderReady) throw new Error(`could not resolve M39 UI roles from ${JSON.stringify(ready)}`);
+  const attackRight = attackerReady.playerNetId < defenderReady.playerNetId;
+  const movementKey = attackRight ? "d" : "a";
+  const movementCode = attackRight ? "KeyD" : "KeyA";
+  const attackOffset = attackRight ? 200 : -200;
+
+  await Promise.all(entries.map((entry) => execute(entry.base, entry.sessionId, "document.querySelector('#arena').focus(); return document.activeElement?.id;")));
+  const attackerElementId = await resolveArenaElement(attacker, "M39 attacker");
+  await Promise.all(entries.map(centerArenaInViewport));
+  await pulseMovementKey(attacker, movementKey, 120);
+  let evidence;
+  let attackHeld = false;
+  try {
+    attackHeld = true;
+    await setArenaAttack(attacker, attackerElementId, true, attackOffset);
+    evidence = await waitForRemoteWindupTell(entries, attacker, defender, 500);
+  } finally {
+    if (attackHeld) await setArenaAttack(attacker, attackerElementId, false, attackOffset);
+  }
+  await waitForWindupTellClear(defender, 500);
+  const attackerResult = evidence.find((entry) => entry.browser === attacker.name);
+  const defenderResult = evidence.find((entry) => entry.browser === defender.name);
+  if (!attackerResult || !defenderResult) throw new Error(`incomplete M39 UI evidence: ${JSON.stringify(evidence)}`);
+  if (!attackerResult.keys.includes(`keydown:${movementCode}`) || !attackerResult.keys.includes(`keyup:${movementCode}`)) {
+    throw new Error(`M39 real attacker movement was not delivered: ${JSON.stringify(attackerResult)}`);
+  }
+  const attackDown = attackerResult.pointers.find((event) => event.type === "pointerdown" && event.button === 0);
+  const aimValid = attackDown && Math.abs(attackDown.y - 0.5) <= 0.15 && (attackRight ? attackDown.x >= 0.6 : attackDown.x <= 0.4);
+  if (!aimValid) throw new Error(`M39 real attacker aim was not delivered: ${JSON.stringify(attackerResult)}`);
   return evidence;
 }
 
@@ -745,6 +787,47 @@ async function installUiObserver(session) {
     window.__MYASO_M30_UI__ = state;
     return true;
   `);
+}
+
+async function sampleWindupTellPixels(session) {
+  return execute(session.base, session.sessionId, `
+    const arena = document.querySelector('#arena');
+    const context = arena?.getContext('2d');
+    if (!context) return 0;
+    const pixels = context.getImageData(0, 0, arena.width, arena.height).data;
+    let count = 0;
+    for (let i = 0; i < pixels.length; i += 4) {
+      if (Math.abs(pixels[i] - 243) <= 2 && Math.abs(pixels[i + 1] - 214) <= 2 && Math.abs(pixels[i + 2] - 143) <= 2 && pixels[i + 3] >= 250) count += 1;
+    }
+    return count;
+  `);
+}
+
+async function waitForRemoteWindupTell(entries, attacker, defender, timeoutMs) {
+  const deadline = Date.now() + timeoutMs;
+  let attackerMax = 0;
+  let defenderMax = 0;
+  while (Date.now() < deadline) {
+    const [attackerPixels, defenderPixels] = await Promise.all([sampleWindupTellPixels(attacker), sampleWindupTellPixels(defender)]);
+    attackerMax = Math.max(attackerMax, attackerPixels);
+    defenderMax = Math.max(defenderMax, defenderPixels);
+    if (defenderMax >= 24) {
+      if (attackerMax !== 0) throw new Error(`M39 local fighter painted the remote-only windup boundary: ${attackerMax}`);
+      const evidence = await Promise.all(entries.map(readUiEvidence));
+      return evidence.map((entry) => ({ ...entry, windupTellMaxPixels: entry.browser === attacker.name ? attackerMax : defenderMax }));
+    }
+    await sleep(20);
+  }
+  throw new Error(`M39 remote windup boundary never appeared: attacker=${attackerMax} defender=${defenderMax}`);
+}
+
+async function waitForWindupTellClear(session, timeoutMs) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    if (await sampleWindupTellPixels(session) === 0) return;
+    await sleep(20);
+  }
+  throw new Error(`M39 remote windup boundary did not clear after windup`);
 }
 
 async function waitForUiReady(entries) {
