@@ -298,11 +298,9 @@ async function runOnlineUiParryFlight(entries) {
   let evidence;
   let blockHeld = false;
   try {
-    blockHeld = true;
-    const blockAction = pressArenaBlockAfterPause(defender, 120);
-    await sleep(60);
     await performArenaAttack(attacker, attackerElementId, 200);
-    await blockAction;
+    blockHeld = true;
+    await setArenaBlock(defender, defenderElementId, true);
     evidence = await waitForUiParryEvidence(entries, attacker, defender, 1000);
   } finally {
     if (blockHeld) await setArenaBlock(defender, defenderElementId, false);
@@ -518,24 +516,6 @@ async function pressArenaDodgeAfterPause(session, delayMs) {
         { type: "keyDown", value: "\uE00D" },
         { type: "pause", duration: 40 },
         { type: "keyUp", value: "\uE00D" },
-      ],
-    }],
-  });
-}
-
-async function pressArenaBlockAfterPause(session, delayMs) {
-  await webdriver(session.base, "POST", `/session/${session.sessionId}/actions`, {
-    actions: [{
-      type: "pointer",
-      id: `mouse-${session.name}`,
-      parameters: { pointerType: "mouse" },
-      actions: [
-        { type: "pause", duration: delayMs },
-        { type: "pointerDown", button: 2 },
-        { type: "pause", duration: 20 },
-        { type: "pointerUp", button: 2 },
-        { type: "pause", duration: 20 },
-        { type: "pointerDown", button: 2 },
       ],
     }],
   });
