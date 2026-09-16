@@ -366,10 +366,11 @@ async function runOnlineUiDodgeFeedbackFlight(entries) {
   await pulseMovementKey(attacker, movementKey, 120);
 
   let evidence;
-  await pressAttackUntilObservableWindup(entries, attacker, attackerElementId, attackOffset);
+  // M24 owns reaction-timing proof. M36 uses concurrent real WebDriver inputs so it can
+  // verify authoritative dodge feedback without a second cross-driver synchronization race.
   await Promise.all([
-    pressArenaDodgeAfterPause(defender, 0),
-    setArenaAttack(attacker, attackerElementId, false, attackOffset),
+    performArenaAttack(attacker, attackerElementId, attackOffset),
+    pressArenaDodgeAfterPause(defender, 70),
   ]);
   // Avoid cross-driver churn until the strike has resolved while the 118 ms iframe is active.
   await sleep(180);
@@ -974,33 +975,6 @@ async function waitForUiMessage(session, text, timeoutMs) {
     await sleep(20);
   }
   throw new Error(`${session.name} never rendered expected online UI message ${text}: ${JSON.stringify(await readUiEvidence(session))}`);
-}
-
-async function pressAttackUntilObservableWindup(entries, attacker, elementId, xOffset) {
-  const text = "Attack committed - your windup is readable.";
-  for (let attempt = 1; attempt <= 3; attempt += 1) {
-    const before = await readUiEvidence(attacker);
-    const baselineCount = before.events.filter((entry) => entry === text).length;
-    await setArenaAttack(attacker, elementId, true, xOffset);
-    const deadline = Date.now() + 90;
-    while (Date.now() < deadline) {
-      const state = await readUiEvidence(attacker);
-      if (state.events.filter((entry) => entry === text).length > baselineCount) return;
-      await sleep(10);
-    }
-    await setArenaAttack(attacker, elementId, false, xOffset);
-
-    // Let any delayed attempt fully settle before deciding whether a retry is safe.
-    await sleep(430);
-    const states = await Promise.all(entries.map(readUiEvidence));
-    const attackerState = states.find((entry) => entry.browser === attacker.name);
-    const commitCount = attackerState?.events.filter((entry) => entry === text).length ?? baselineCount;
-    const vitalsClean = states.every((entry) => entry.playerHp === 100 && entry.playerGuard === 100);
-    if (commitCount > baselineCount || !vitalsClean) {
-      throw new Error(`M36 attack commitment arrived outside the safe dodge window on attempt ${attempt}: ${JSON.stringify(states)}`);
-    }
-  }
-  throw new Error(`M36 real attack input was not authoritatively committed after bounded retries: ${JSON.stringify(await Promise.all(entries.map(readUiEvidence)))}`);
 }
 
 async function waitForUiDodgeEvidence(entries, attacker, defender, timeoutMs) {
