@@ -79,6 +79,16 @@ export function combatActionHint(entity) {
   }
 }
 
+export function opponentRecoveryPresentation(entity) {
+  if (entity?.action === COMBAT_ACTION.attackRecovery) {
+    return { visible: true, state: "attack-recovery", label: "PUNISH", detail: "Attack recovery" };
+  }
+  if (entity?.action === COMBAT_ACTION.dodgeRecovery) {
+    return { visible: true, state: "dodge-recovery", label: "PUNISH", detail: "Dodge recovery" };
+  }
+  return { visible: false, state: "", label: "", detail: "" };
+}
+
 export function combatOverlayPresentation(entity) {
   if (entity?.action === COMBAT_ACTION.dead) {
     return { visible: true, state: "dead", title: "DEFEATED", detail: "Respawning…" };
