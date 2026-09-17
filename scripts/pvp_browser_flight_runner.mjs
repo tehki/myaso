@@ -366,12 +366,14 @@ async function runOnlineUiDodgeFeedbackFlight(entries) {
   await pulseMovementKey(attacker, movementKey, 120);
 
   let evidence;
-  // M24 owns reaction-timing proof. M36 uses concurrent real WebDriver inputs so it can
-  // verify authoritative dodge feedback without a second cross-driver synchronization race.
-  await Promise.all([
-    performArenaAttack(attacker, attackerElementId, attackOffset),
-    pressArenaDodgeAfterPause(defender, 70),
-  ]);
+  // M24 owns reaction-timing proof. M36 delivers the real attack first, then places the
+  // dodge late in the 135 ms windup so authoritative active-frame overlap is preserved.
+  await setArenaAttack(attacker, attackerElementId, true, attackOffset);
+  try {
+    await pressArenaDodgeAfterPause(defender, 100);
+  } finally {
+    await setArenaAttack(attacker, attackerElementId, false, attackOffset);
+  }
   // Avoid cross-driver churn until the strike has resolved while the 118 ms iframe is active.
   await sleep(180);
   evidence = await waitForUiDodgeEvidence(entries, attacker, defender, 1200);

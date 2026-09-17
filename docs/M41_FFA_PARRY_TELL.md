@@ -20,7 +20,7 @@ After authoritative `parried` / `parry-success` feedback, the dedicated M41 flig
 
 ## Inherited M36 acceptance stabilization
 
-The exact M41 head also removes an inherited M36 cross-driver synchronization race. M24 remains the dedicated authoritative dodge reaction/overlap proof. M36 now issues the real WebDriver attack and dodge actions concurrently, with the dodge key delayed 70 ms inside the existing 135 ms attack windup, then requires authoritative `dodge-evaded` / `dodge-success` feedback and unchanged HP/guard. No combat timing or server behavior changes.
+The exact M41 head also removes an inherited M36 cross-driver synchronization race. M24 remains the dedicated authoritative dodge reaction/overlap proof. M36 now delivers the real WebDriver attack first, then sends the dodge key 100 ms later inside the existing 135 ms attack windup, keeping the dodge close to the model-proven late-windup evade timing while preserving authoritative active-frame overlap. It still requires `dodge-evaded` / `dodge-success` feedback and unchanged HP/guard. No combat timing or server behavior changes.
 
 ## Inherited M38 acceptance stabilization
 
