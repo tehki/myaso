@@ -535,19 +535,12 @@ async function runOnlineUiDodgeTellFlight(entries) {
   await Promise.all(entries.map(centerArenaInViewport));
   await Promise.all([armDodgeTellSampler(observer, true), armDodgeTellSampler(dodger, false)]);
   let tell;
-  let dodgePressed = false;
   try {
-    await setArenaDodge(dodger, true);
-    dodgePressed = true;
-    // Keep Firefox free of Marionette commands long enough for the real one-shot Dodge
-    // request to reach prediction and the authoritative server; passive RAF samplers
-    // remain armed in both browsers throughout this quiet window.
-    await sleep(180);
-    await setArenaDodge(dodger, false);
-    dodgePressed = false;
+    // Reuse the exact real-input choreography already proven by M36: the only M43
+    // difference is passive pixel evidence, not how Dodge is requested.
+    await pressArenaPerpendicularDodgeAfterPause(dodger, 0);
     tell = await waitForRemoteDodgeTell(entries, observer, dodger, 700);
   } finally {
-    if (dodgePressed) await setArenaDodge(dodger, false);
     await Promise.all(entries.map(stopDodgeTellSampler));
   }
   await waitForDodgeTellClear(observer, 1000);
@@ -791,15 +784,6 @@ async function pressArenaPerpendicularDodgeAfterPause(session, delayMs) {
   });
 }
 
-async function setArenaDodge(session, pressed) {
-  const actions = pressed
-    ? [{ type: "keyDown", value: "s" }, { type: "keyDown", value: "\uE00D" }]
-    : [{ type: "keyUp", value: "\uE00D" }, { type: "keyUp", value: "s" }];
-  await webdriver(session.base, "POST", `/session/${session.sessionId}/actions`, {
-    actions: [{ type: "key", id: `keyboard-${session.name}`, actions }],
-  });
-}
-
 async function setArenaBlock(session, elementId, pressed) {
   const actions = [{ type: pressed ? "pointerDown" : "pointerUp", button: 2 }];
   await webdriver(session.base, "POST", `/session/${session.sessionId}/actions`, {
@@ -950,7 +934,7 @@ async function armDodgeTellSampler(session, fullCanvas) {
     const state = { active: true, frame: 0, maxPixels: 0 };
     const sample = () => {
       if (!state.active) return;
-      const half = 160;
+      const half = ${fullCanvas ? '160' : '48'};
       const x = ${fullCanvas ? '0' : 'Math.max(0, Math.floor(arena.width / 2 - half))'};
       const y = ${fullCanvas ? '0' : 'Math.max(0, Math.floor(arena.height / 2 - half))'};
       const width = ${fullCanvas ? 'arena.width' : 'Math.min(half * 2, arena.width - x)'};
