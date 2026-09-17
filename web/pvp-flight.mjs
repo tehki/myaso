@@ -312,17 +312,18 @@ function sendCombatInput() {
           parryBlockArmed = false;
         }
       } else if (scenario === "dodge") {
-        if (peer.action === 1) {
-          if (dodgeWindupSeenAt === null) dodgeWindupSeenAt = performance.now();
-          if (!dodgeTriggered && performance.now() - dodgeWindupSeenAt >= 35) {
-            if (distance > 0.001) {
-              moveX = -dy / distance;
-              moveY = dx / distance;
-            }
-            dodge = true;
-            dodgeTriggered = true;
-            dodgeReactionMs = performance.now() - dodgeWindupSeenAt;
+        if (peer.action === 1 && dodgeWindupSeenAt === null) dodgeWindupSeenAt = performance.now();
+        if (dodgeWindupSeenAt !== null && !dodgeTriggered && own.action === 0
+          && [1, 2].includes(peer.action) && performance.now() - dodgeWindupSeenAt >= 35) {
+          dodgeTriggered = true;
+          dodgeReactionMs = performance.now() - dodgeWindupSeenAt;
+        }
+        if (dodgeTriggered && own.action === 0 && [1, 2].includes(peer.action)) {
+          if (distance > 0.001) {
+            moveX = -dy / distance;
+            moveY = dx / distance;
           }
+          dodge = true;
         }
         if (![1, 2].includes(peer.action)) {
           dodgeWindupSeenAt = null;

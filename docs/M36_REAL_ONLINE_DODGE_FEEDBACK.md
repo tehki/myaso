@@ -25,7 +25,7 @@ The dedicated `uidodge` flight opens the production `index.html` path in real he
 - Firefox is the defender regardless of connection order and receives real `KeyS` + Space controls through W3C actions.
 - The flight derives left/right attack geometry from the assigned authoritative player IDs instead of assuming a browser always receives player 1 or player 2.
 - Firefox is first aimed toward Chrome through a real W3C pointer move. Its dodge then uses `KeyS` to travel perpendicular to the attack line, avoiding the unstable no-movement case where facing sends the defender through the attacker and out of the tracked threat arc.
-- Firefox first receives a genuine W3C dodge sequence with a 90 ms internal pause; Chrome starts the genuine attack about 50 ms later, leaving roughly a 40 ms attack-to-dodge offset. That timing already produced a clean authoritative 100/100 dodge in real CI; the readability tracker now buffers the threatening Windup sample through later evasive movement until Active and Recovery are observed.
+- Each bounded attempt gives Firefox a genuine W3C dodge sequence with a 90 ms internal pause; Chrome starts the genuine attack about 50 ms later, leaving roughly a 40 ms attack-to-dodge offset. The critical iframe/strike window contains no evidence polling. A timing miss may retry only while both fighters remain at 100 HP / 100 guard and no parry feedback appears; any resolved damage or parry fails closed. Fresh attack-commit and opposite-client dodge feedback are scoped to the successful attempt, so stale evidence cannot satisfy a retry.
 - The flight requires opposite-client `dodge-evaded` / `dodge-success` feedback and both semantic messages.
 - Both fighters must remain at 100 HP / 100 guard.
 - No parry feedback may appear.
@@ -36,3 +36,5 @@ No state, HP, guard, action, position, server event, iframe timer, or combat res
 ## Risk / rollback
 
 Presentation-only inference and feedback styling. No server simulation, dodge duration, 118 ms iframe window, attack timing, combat constants, wire protocol, persistence, networking, public bind, deployment, or production activation changes. Rollback is to close/discard M36; frozen M35 remains unchanged.
+
+CI #169 first attempt exposed the complementary M36 timing case: Firefox authoritatively Dodged with full real-key provenance, but the Chrome attack did not produce fresh dodge feedback. M36 therefore uses up to three bounded genuine-input attempts with attempt-scoped evidence and ordinary-input repositioning between clean misses; product combat behavior and feedback thresholds are unchanged.
