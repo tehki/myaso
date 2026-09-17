@@ -301,7 +301,7 @@ function sendCombatInput() {
       } else if (scenario === "parry") {
         if (peer.action === 1) {
           if (parryWindupSeenAt === null) parryWindupSeenAt = performance.now();
-          if (!parryBlockArmed && performance.now() - parryWindupSeenAt >= 15) {
+          if (!parryBlockArmed && performance.now() - parryWindupSeenAt >= 25) {
             parryBlockArmed = true;
             parryReactionMs = performance.now() - parryWindupSeenAt;
           }
