@@ -362,14 +362,15 @@ async function runOnlineUiDodgeFeedbackFlight(entries) {
   await pulseMovementKey(attacker, movementKey, 120);
 
   let evidence;
-  // M24 owns reaction-timing proof. M36 waits for the production UI to observe the
-  // committed windup before issuing the real dodge, avoiding cross-driver launch skew.
+  // M24 owns reaction-timing proof. M36 pre-arms a genuine delayed Firefox dodge,
+  // then starts the real Chrome attack inside that known delay to avoid driver launch skew.
+  const dodgeAction = pressArenaPerpendicularDodgeAfterPause(defender, 100);
+  await sleep(40);
   let attackHeld = false;
   try {
     attackHeld = true;
     await setArenaAttack(attacker, attackerElementId, true, attackOffset);
-    await waitForUiMessage(attacker, "Attack committed - your windup is readable.", 500);
-    await pressArenaPerpendicularDodgeAfterPause(defender, 20);
+    await dodgeAction;
   } finally {
     if (attackHeld) await setArenaAttack(attacker, attackerElementId, false, attackOffset);
   }
