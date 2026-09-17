@@ -8,11 +8,11 @@ Make a successful authoritative dodge readable on the normal online arena withou
 
 In an exactly two-fighter state, dodge success is inferred only after a completed authoritative exchange:
 
-- the attacker was `AttackActive` and becomes `AttackRecovery`;
-- the defender was authoritatively `Dodge` during the threatening active snapshot;
-- that verified threat sample remains eligible through later `DodgeRecovery` snapshots until the attacker reaches `AttackRecovery`;
-- defender HP and guard remain unchanged throughout that buffered evidence;
-- the defender was inside the authoritative attack range and arc at that active snapshot.
+- the defender is authoritatively `Dodge` while a committed attacker is `AttackWindup` or `AttackActive` and the defender is inside that attack's authoritative range/arc;
+- the committed strike must subsequently be observed in `AttackActive`, so a windup-only sequence cannot earn dodge credit;
+- once that threat is verified, the evidence remains eligible through later `DodgeRecovery` and evasive movement until the attacker reaches `AttackRecovery`;
+- defender HP and guard must remain unchanged throughout the buffered evidence;
+- out-of-range/out-of-arc windup or active samples never arm the evidence.
 
 The defender receives `Dodge! Strike avoided.` plus `dodge-success`. The attacker receives `Attack evaded - opponent dodged.` plus `dodge-evaded`.
 

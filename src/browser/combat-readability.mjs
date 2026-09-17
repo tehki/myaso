@@ -184,25 +184,43 @@ function collectDodgeEvents(events, own, peer, ownId, pending) {
     if (!attacker || !vitalsStable) {
       pending = null;
     } else if (attacker.action === COMBAT_ACTION.attackRecovery) {
-      const ownDefended = defender.netId === ownId;
-      push(
-        events,
-        "dodge",
-        ownDefended ? "Dodge! Strike avoided." : "Attack evaded - opponent dodged.",
-        820,
-        ownDefended ? "dodge-success" : "dodge-evaded",
-      );
+      if (pending.activeSeen) {
+        const ownDefended = defender.netId === ownId;
+        push(
+          events,
+          "dodge",
+          ownDefended ? "Dodge! Strike avoided." : "Attack evaded - opponent dodged.",
+          820,
+          ownDefended ? "dodge-success" : "dodge-evaded",
+        );
+      }
       pending = null;
-    } else if (attacker.action !== COMBAT_ACTION.attackActive) {
+    } else if (attacker.action === COMBAT_ACTION.attackActive) {
+      pending.activeSeen = true;
+    } else if (attacker.action !== COMBAT_ACTION.attackWindup) {
       pending = null;
     }
   }
 
-  if (peer.action === COMBAT_ACTION.attackActive && own.action === COMBAT_ACTION.dodge && attackThreatens(peer, own)) {
-    return { attackerId: peer.netId, defenderId: own.netId, hp: own.hp, guard: own.guard };
+  const ownThreat = peer.action === COMBAT_ACTION.attackWindup || peer.action === COMBAT_ACTION.attackActive;
+  if (ownThreat && own.action === COMBAT_ACTION.dodge && attackThreatens(peer, own)) {
+    return {
+      attackerId: peer.netId,
+      defenderId: own.netId,
+      hp: own.hp,
+      guard: own.guard,
+      activeSeen: peer.action === COMBAT_ACTION.attackActive,
+    };
   }
-  if (own.action === COMBAT_ACTION.attackActive && peer.action === COMBAT_ACTION.dodge && attackThreatens(own, peer)) {
-    return { attackerId: own.netId, defenderId: peer.netId, hp: peer.hp, guard: peer.guard };
+  const peerThreat = own.action === COMBAT_ACTION.attackWindup || own.action === COMBAT_ACTION.attackActive;
+  if (peerThreat && peer.action === COMBAT_ACTION.dodge && attackThreatens(own, peer)) {
+    return {
+      attackerId: own.netId,
+      defenderId: peer.netId,
+      hp: peer.hp,
+      guard: peer.guard,
+      activeSeen: own.action === COMBAT_ACTION.attackActive,
+    };
   }
   return pending;
 }

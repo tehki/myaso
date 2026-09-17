@@ -89,6 +89,20 @@ test("dodge evidence survives dodge recovery until authoritative attack recovery
   assert.equal(event.kind, "dodge");
   assert.equal(event.feedback, "dodge-success");
 });
+test("threatening windup dodge remains credited after movement escapes active range", () => {
+  const tracker = createCombatReadabilityTracker();
+  assert.equal(tracker.observe(state(fighter(2, 100, 100, COMBAT_ACTION.dodge, 80), fighter(1, 100, 100, COMBAT_ACTION.attackWindup, 0, 0, 0)), 2), null);
+  assert.equal(tracker.observe(state(fighter(2, 100, 100, COMBAT_ACTION.dodgeRecovery, 120), fighter(1, 100, 100, COMBAT_ACTION.attackActive, 0, 0, 0)), 2), null);
+  const event = tracker.observe(state(fighter(2, 100, 100, COMBAT_ACTION.dodgeRecovery, 128), fighter(1, 100, 100, COMBAT_ACTION.attackRecovery, 0, 0, 0)), 2);
+  assert.equal(event.kind, "dodge");
+  assert.equal(event.feedback, "dodge-success");
+});
+
+test("windup dodge is not credited unless the committed strike is observed active", () => {
+  const tracker = createCombatReadabilityTracker();
+  assert.equal(tracker.observe(state(fighter(2, 100, 100, COMBAT_ACTION.dodge, 80), fighter(1, 100, 100, COMBAT_ACTION.attackWindup, 0, 0, 0)), 2), null);
+  assert.equal(tracker.observe(state(fighter(2, 100, 100, COMBAT_ACTION.dodgeRecovery, 120), fighter(1, 100, 100, COMBAT_ACTION.attackRecovery, 0, 0, 0)), 2), null);
+});
 
 test("buffered dodge evidence is invalidated by authoritative damage", () => {
   const tracker = createCombatReadabilityTracker();
