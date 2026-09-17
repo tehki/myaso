@@ -539,7 +539,12 @@ async function runOnlineUiDodgeTellFlight(entries) {
   try {
     await setArenaDodge(dodger, true);
     dodgePressed = true;
-    await waitForDodgeInputSampled(dodger, 500);
+    // Keep Firefox free of Marionette commands long enough for the real one-shot Dodge
+    // request to reach prediction and the authoritative server; passive RAF samplers
+    // remain armed in both browsers throughout this quiet window.
+    await sleep(180);
+    await setArenaDodge(dodger, false);
+    dodgePressed = false;
     tell = await waitForRemoteDodgeTell(entries, observer, dodger, 700);
   } finally {
     if (dodgePressed) await setArenaDodge(dodger, false);
@@ -933,19 +938,6 @@ async function waitForRemoteRecoveryTell(observer, localAttacker, timeoutMs) {
     await sleep(20);
   }
   throw new Error(`M38 remote recovery ring never appeared: observer=${observerMax} local=${localMax}`);
-}
-
-async function waitForDodgeInputSampled(session, timeoutMs) {
-  const deadline = Date.now() + timeoutMs;
-  while (Date.now() < deadline) {
-    const sampled = await execute(session.base, session.sessionId, `
-      return window.__MYASO_M30_UI__?.events?.includes('Dodging - use the movement to reset spacing.') ?? false;
-    `);
-    if (sampled) return;
-    await sleep(20);
-  }
-  const evidence = await readUiEvidence(session);
-  throw new Error(`M43 game loop never sampled the real Dodge input: ${JSON.stringify(evidence)}`);
 }
 
 async function armDodgeTellSampler(session, fullCanvas) {
