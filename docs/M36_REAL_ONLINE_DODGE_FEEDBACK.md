@@ -25,7 +25,7 @@ The dedicated `uidodge` flight opens the production `index.html` path in real he
 - Firefox is the defender regardless of connection order and receives real `KeyS` + Space controls through W3C actions.
 - The flight derives left/right attack geometry from the assigned authoritative player IDs instead of assuming a browser always receives player 1 or player 2.
 - Firefox is first aimed toward Chrome through a real W3C pointer move. Its dodge then uses `KeyS` to travel perpendicular to the attack line, avoiding the unstable no-movement case where facing sends the defender through the attacker and out of the tracked threat arc.
-- Firefox first receives a genuine W3C dodge sequence with a 100 ms internal pause; Chrome starts the genuine attack about 40 ms later, leaving roughly a 60 ms attack-to-dodge offset and a broad authoritative overlap without injected state.
+- Firefox first receives a genuine W3C dodge sequence with a 90 ms internal pause; Chrome starts the genuine attack about 50 ms later, leaving roughly a 40 ms attack-to-dodge offset and a broad authoritative overlap without injected state.
 - The flight requires opposite-client `dodge-evaded` / `dodge-success` feedback and both semantic messages.
 - Both fighters must remain at 100 HP / 100 guard.
 - No parry feedback may appear.

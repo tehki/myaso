@@ -377,8 +377,8 @@ async function runOnlineUiDodgeFeedbackFlight(entries) {
   let evidence;
   // M24 owns reaction-timing proof. M36 pre-arms a genuine delayed Firefox dodge,
   // then starts the real Chrome attack inside that known delay to avoid driver launch skew.
-  const dodgeAction = pressArenaPerpendicularDodgeAfterPause(defender, 100);
-  await sleep(40);
+  const dodgeAction = pressArenaPerpendicularDodgeAfterPause(defender, 90);
+  await sleep(50);
   let attackHeld = false;
   try {
     attackHeld = true;
@@ -720,7 +720,7 @@ async function pressArenaPerpendicularDodgeAfterPause(session, delayMs) {
         { type: "pause", duration: delayMs },
         { type: "keyDown", value: "s" },
         { type: "keyDown", value: "\uE00D" },
-        { type: "pause", duration: 100 },
+        { type: "pause", duration: 40 },
         { type: "keyUp", value: "\uE00D" },
         { type: "keyUp", value: "s" },
       ],
