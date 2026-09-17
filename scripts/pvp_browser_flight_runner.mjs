@@ -533,12 +533,16 @@ async function runOnlineUiDodgeTellFlight(entries) {
 
   await Promise.all(entries.map((entry) => execute(entry.base, entry.sessionId, "document.querySelector('#arena').focus(); return document.activeElement?.id;")));
   await Promise.all(entries.map(centerArenaInViewport));
-  await Promise.all(entries.map(armDodgeTellSampler));
+  await Promise.all([armDodgeTellSampler(observer, true), armDodgeTellSampler(dodger, false)]);
   let tell;
+  let dodgePressed = false;
   try {
-    await pressArenaPerpendicularDodgeAfterPause(dodger, 0);
+    await setArenaDodge(dodger, true);
+    dodgePressed = true;
+    await waitForDodgeInputSampled(dodger, 500);
     tell = await waitForRemoteDodgeTell(entries, observer, dodger, 700);
   } finally {
+    if (dodgePressed) await setArenaDodge(dodger, false);
     await Promise.all(entries.map(stopDodgeTellSampler));
   }
   await waitForDodgeTellClear(observer, 1000);
@@ -782,6 +786,15 @@ async function pressArenaPerpendicularDodgeAfterPause(session, delayMs) {
   });
 }
 
+async function setArenaDodge(session, pressed) {
+  const actions = pressed
+    ? [{ type: "keyDown", value: "s" }, { type: "keyDown", value: "\uE00D" }]
+    : [{ type: "keyUp", value: "\uE00D" }, { type: "keyUp", value: "s" }];
+  await webdriver(session.base, "POST", `/session/${session.sessionId}/actions`, {
+    actions: [{ type: "key", id: `keyboard-${session.name}`, actions }],
+  });
+}
+
 async function setArenaBlock(session, elementId, pressed) {
   const actions = [{ type: pressed ? "pointerDown" : "pointerUp", button: 2 }];
   await webdriver(session.base, "POST", `/session/${session.sessionId}/actions`, {
@@ -922,7 +935,20 @@ async function waitForRemoteRecoveryTell(observer, localAttacker, timeoutMs) {
   throw new Error(`M38 remote recovery ring never appeared: observer=${observerMax} local=${localMax}`);
 }
 
-async function armDodgeTellSampler(session) {
+async function waitForDodgeInputSampled(session, timeoutMs) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const sampled = await execute(session.base, session.sessionId, `
+      return window.__MYASO_M30_UI__?.events?.includes('Dodging - use the movement to reset spacing.') ?? false;
+    `);
+    if (sampled) return;
+    await sleep(20);
+  }
+  const evidence = await readUiEvidence(session);
+  throw new Error(`M43 game loop never sampled the real Dodge input: ${JSON.stringify(evidence)}`);
+}
+
+async function armDodgeTellSampler(session, fullCanvas) {
   return execute(session.base, session.sessionId, `
     const arena = document.querySelector('#arena');
     const context = arena?.getContext('2d');
@@ -932,7 +958,12 @@ async function armDodgeTellSampler(session) {
     const state = { active: true, frame: 0, maxPixels: 0 };
     const sample = () => {
       if (!state.active) return;
-      const pixels = context.getImageData(0, 0, arena.width, arena.height).data;
+      const half = 160;
+      const x = ${fullCanvas ? '0' : 'Math.max(0, Math.floor(arena.width / 2 - half))'};
+      const y = ${fullCanvas ? '0' : 'Math.max(0, Math.floor(arena.height / 2 - half))'};
+      const width = ${fullCanvas ? 'arena.width' : 'Math.min(half * 2, arena.width - x)'};
+      const height = ${fullCanvas ? 'arena.height' : 'Math.min(half * 2, arena.height - y)'};
+      const pixels = context.getImageData(x, y, width, height).data;
       let count = 0;
       for (let i = 0; i < pixels.length; i += 4) {
         if (Math.abs(pixels[i] - 199) <= 2 && Math.abs(pixels[i + 1] - 181) <= 2 && Math.abs(pixels[i + 2] - 255) <= 2 && pixels[i + 3] >= 250) count += 1;
