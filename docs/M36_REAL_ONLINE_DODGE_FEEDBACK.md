@@ -21,14 +21,14 @@ Out-of-range or out-of-arc attack recovery is not credited as a successful dodge
 The dedicated `uidodge` flight opens the production `index.html` path in real headless Chrome and Firefox against the authoritative loopback server.
 
 - Chrome is the attacker regardless of connection order: it uses ordinary `KeyD` + rightward LMB when spawned left, or `KeyA` + leftward LMB when spawned right.
-- Firefox is the defender regardless of connection order and receives a real Space key press through W3C actions.
+- Firefox is the defender regardless of connection order and receives real `KeyS` + Space controls through W3C actions.
 - The flight derives left/right attack geometry from the assigned authoritative player IDs instead of assuming a browser always receives player 1 or player 2.
-- Firefox is first aimed toward Chrome through a real W3C pointer move so its no-movement Space dodge follows authoritative facing and remains inside the threatening strike geometry.
-- The real LMB is held long enough to cross one 30 Hz input-send period; 60 ms later Firefox receives Space, placing the authoritative dodge inside the 135 ms windup and 118 ms iframe overlap without injected state.
+- Firefox is first aimed toward Chrome through a real W3C pointer move. Its dodge then uses `KeyS` to travel perpendicular to the attack line, avoiding the unstable no-movement case where facing sends the defender through the attacker and out of the tracked threat arc.
+- Chrome attack-down and Firefox dodge actions start concurrently. Firefox waits 70 ms inside its W3C sequence before `KeyS` + Space, leaving a broad authoritative overlap between the 135 ms windup, 118 ms iframe, and the 94-unit center-distance attack envelope without injected state.
 - The flight requires opposite-client `dodge-evaded` / `dodge-success` feedback and both semantic messages.
 - Both fighters must remain at 100 HP / 100 guard.
 - No parry feedback may appear.
-- Input provenance must show the real Space key and real pointer attack.
+- Input provenance must show the real `KeyS` + Space dodge controls and real pointer attack.
 
 No state, HP, guard, action, position, server event, iframe timer, or combat result is injected by the harness.
 

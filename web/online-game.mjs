@@ -1,5 +1,5 @@
 import { createFrameBudget } from "../src/browser/frame-budget.mjs";
-import { COMBAT_ACTION, combatActionHint, combatOverlayPresentation, createCombatReadabilityTracker, guardBreakSpatialPresentation, opponentRecoveryPresentation } from "../src/browser/combat-readability.mjs";
+import { COMBAT_ACTION, combatActionHint, combatOverlayPresentation, createCombatReadabilityTracker, guardBreakSpatialPresentation, opponentRecoveryPresentation, parrySpatialPresentation } from "../src/browser/combat-readability.mjs";
 import { COMBAT } from "../src/combat/model.mjs";
 import { reconcilePrediction } from "../src/browser/reconciliation.mjs";
 import { NETWORK } from "../src/network/constants.mjs";
@@ -248,6 +248,7 @@ function drawFighterScreen(x, y, fighter, body, shadow, remote = false) {
   if (action === COMBAT_ACTION.block) drawBlockTell();
   if (action === COMBAT_ACTION.dodge) drawDodgeTell();
   if (action === COMBAT_ACTION.stunned) drawStunTell();
+  if (remote && parrySpatialPresentation(fighter).visible) drawParryTell();
   if (remote && guardBreakSpatialPresentation(fighter).visible) drawGuardBreakTell();
   if (remote && opponentRecoveryPresentation(fighter).visible) drawRecoveryTell();
   ctx.fillStyle = shadow;
@@ -307,6 +308,16 @@ function drawStunTell() {
   ctx.beginPath();
   ctx.arc(0, 0, 25, 0, Math.PI * 2);
   ctx.stroke();
+}
+
+function drawParryTell() {
+  ctx.strokeStyle = "#7fcff4";
+  ctx.lineWidth = 3;
+  ctx.setLineDash([3, 4]);
+  ctx.beginPath();
+  ctx.arc(0, 0, 32, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.setLineDash([]);
 }
 
 function drawGuardBreakTell() {
