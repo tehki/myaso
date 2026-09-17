@@ -14,7 +14,7 @@ The ring is presentation-only. It consumes existing replicated authoritative act
 
 ## Acceptance
 
-The dedicated `uirecoverytell` Chrome+Firefox flight reuses the production `index.html` authoritative hit choreography. A passive canvas probe records the exact amber recovery-ring pixels while the remote attacker is authoritatively recovering. The observing defender must paint the ring; the attacker must not paint a ring around the non-recovering defender.
+The dedicated `uirecoverytell` Chrome+Firefox flight reuses the production `index.html` authoritative hit choreography. A passive external canvas probe polls a bounded 320x320 combat envelope around the local fighter and records the exact amber recovery-ring pixels while the remote attacker is authoritatively recovering. The bound safely contains a just-hit opponent plus knockback and the 29-pixel ring, while avoiding a synchronous full-canvas read inside the render callback. The observing defender must paint the ring; the attacker must not paint a ring around the non-recovering defender.
 
 Existing deterministic M37 coverage already proves both `AttackRecovery` and `DodgeRecovery` map to visible recovery presentation while idle remains hidden. The renderer applies that same presentation predicate independently to every remote entity in the normal FFA render loop.
 
@@ -22,8 +22,8 @@ Existing deterministic M37 coverage already proves both `AttackRecovery` and `Do
 
 - Coding-agent policy sentinel: PASS.
 - Repository governance sentinel: PASS.
-- Focused readability tests: 16/16 PASS.
-- Browser/runtime suite: 34/34 PASS.
+- Focused readability tests: 21/21 PASS.
+- Browser/runtime suite: 39/39 PASS.
 - Combat model: 9/9 PASS.
 - Networking/compact snapshot suite: 24/24 PASS.
 - Browser hot-path probe: replacement entity objects = 0.

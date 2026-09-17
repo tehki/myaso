@@ -287,17 +287,30 @@ async function runOnlineUiRecoveryReadabilityFlight(entries) {
 }
 
 async function runOnlineUiRecoveryTellFlight(entries) {
-  const evidence = await runOnlineUiFeedbackFlight(entries);
+  let evidence = await runOnlineUiFeedbackFlight(entries);
   const attacker = evidence.find((entry) => entry.feedbackTransitions.includes("hit-confirm"));
   const defender = evidence.find((entry) => entry.feedbackTransitions.includes("damage-taken"));
   if (!attacker || !defender || attacker.browser === defender.browser) {
     throw new Error(`M38 could not resolve attacker / defender: ${JSON.stringify(evidence)}`);
   }
-  if (defender.recoveryTellMaxPixels < 24) {
-    throw new Error(`M38 defender never painted the remote recovery ring: ${JSON.stringify(defender)}`);
+  const attackerSession = entries.find((entry) => entry.name === attacker.browser);
+  const defenderSession = entries.find((entry) => entry.name === defender.browser);
+  if (!attackerSession || !defenderSession) throw new Error(`M38 could not resolve browser sessions`);
+
+  const tell = await waitForRemoteRecoveryTell(defenderSession, attackerSession, 700);
+  evidence = await Promise.all(entries.map(readUiEvidence));
+  evidence = evidence.map((entry) => ({
+    ...entry,
+    recoveryTellMaxPixels: entry.browser === defender.browser ? tell.observerMax : tell.localMax,
+  }));
+  const finalAttacker = evidence.find((entry) => entry.browser === attacker.browser);
+  const finalDefender = evidence.find((entry) => entry.browser === defender.browser);
+  if (!finalAttacker || !finalDefender) throw new Error(`M38 incomplete final evidence: ${JSON.stringify(evidence)}`);
+  if (finalDefender.recoveryTellMaxPixels < 24) {
+    throw new Error(`M38 defender never painted the remote recovery ring: ${JSON.stringify(finalDefender)}`);
   }
-  if (attacker.recoveryTellMaxPixels !== 0) {
-    throw new Error(`M38 attacker painted a recovery ring around a non-recovering remote: ${JSON.stringify(attacker)}`);
+  if (finalAttacker.recoveryTellMaxPixels !== 0) {
+    throw new Error(`M38 attacker painted a recovery ring around a non-recovering remote: ${JSON.stringify(finalAttacker)}`);
   }
   return evidence;
 }
@@ -813,16 +826,6 @@ async function installUiObserver(session) {
       const feedback = arenaStage.dataset.combatFeedback ?? '';
       if (feedback && state.feedbackTransitions.at(-1) !== feedback) state.feedbackTransitions.push(feedback);
     };
-    const sampleRecoveryTell = () => {
-      const context = arena.getContext('2d');
-      if (!context) return;
-      const pixels = context.getImageData(0, 0, arena.width, arena.height).data;
-      let count = 0;
-      for (let i = 0; i < pixels.length; i += 4) {
-        if (Math.abs(pixels[i] - 239) <= 2 && Math.abs(pixels[i + 1] - 207) <= 2 && Math.abs(pixels[i + 2] - 115) <= 2 && pixels[i + 3] >= 250) count += 1;
-      }
-      state.recoveryTellMaxPixels = Math.max(state.recoveryTellMaxPixels, count);
-    };
     const recordRecovery = () => {
       const entry = {
         visible: !recovery.hidden,
@@ -832,7 +835,6 @@ async function installUiObserver(session) {
       };
       const previous = state.recoveryTransitions.at(-1);
       if (!previous || Object.keys(entry).some((key) => previous[key] !== entry[key])) state.recoveryTransitions.push(entry);
-      if (entry.visible) requestAnimationFrame(() => requestAnimationFrame(sampleRecoveryTell));
     };
     for (const type of ['keydown', 'keyup']) {
       arena.addEventListener(type, (event) => state.keys.push(type + ':' + event.code), { capture: true });
@@ -860,6 +862,45 @@ async function installUiObserver(session) {
     window.__MYASO_M30_UI__ = state;
     return true;
   `);
+}
+
+async function sampleRecoveryTellPixels(session) {
+  return execute(session.base, session.sessionId, `
+    const arena = document.querySelector('#arena');
+    const context = arena?.getContext('2d');
+    if (!context) return 0;
+    const half = 160;
+    const x = Math.max(0, Math.floor(arena.width / 2 - half));
+    const y = Math.max(0, Math.floor(arena.height / 2 - half));
+    const width = Math.min(half * 2, arena.width - x);
+    const height = Math.min(half * 2, arena.height - y);
+    const pixels = context.getImageData(x, y, width, height).data;
+    let count = 0;
+    for (let i = 0; i < pixels.length; i += 4) {
+      if (Math.abs(pixels[i] - 239) <= 2 && Math.abs(pixels[i + 1] - 207) <= 2 && Math.abs(pixels[i + 2] - 115) <= 2 && pixels[i + 3] >= 250) count += 1;
+    }
+    return count;
+  `);
+}
+
+async function waitForRemoteRecoveryTell(observer, localAttacker, timeoutMs) {
+  const deadline = Date.now() + timeoutMs;
+  let observerMax = 0;
+  let localMax = 0;
+  while (Date.now() < deadline) {
+    const [observerPixels, localPixels] = await Promise.all([
+      sampleRecoveryTellPixels(observer),
+      sampleRecoveryTellPixels(localAttacker),
+    ]);
+    observerMax = Math.max(observerMax, observerPixels);
+    localMax = Math.max(localMax, localPixels);
+    if (observerMax >= 24) {
+      if (localMax !== 0) throw new Error(`M38 local attacker painted the remote-only recovery ring: ${localMax}`);
+      return { observerMax, localMax };
+    }
+    await sleep(20);
+  }
+  throw new Error(`M38 remote recovery ring never appeared: observer=${observerMax} local=${localMax}`);
 }
 
 async function sampleBlockFacingTellPixels(session) {
