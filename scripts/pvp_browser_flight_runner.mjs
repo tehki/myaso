@@ -566,7 +566,7 @@ async function runOnlineUiGuardBreakFlight(entries) {
   const attackAction = performGuardBreakAttackSeries(attacker, attackerElementId, 350);
   await sleep(30);
   // Keep the genuine stale block held across three complete 470 ms attack commitments.
-  const blockAction = holdArenaBlock(defender, 2200);
+  const blockAction = holdArenaBlock(defender, 2600);
   await Promise.all([attackAction, blockAction]);
   const evidence = await waitForUiGuardBreakEvidence(entries, attacker, defender, 1200);
 
@@ -772,11 +772,11 @@ async function performGuardBreakAttackSeries(session, elementId, initialDelayMs)
       actions: [
         { type: "pause", duration: initialDelayMs },
         { type: "pointerMove", duration: 0, origin, x: 200, y: 0 },
-        { type: "pointerDown", button: 0 }, { type: "pause", duration: 100 }, { type: "pointerUp", button: 0 },
-        { type: "pause", duration: 560 },
-        { type: "pointerDown", button: 0 }, { type: "pause", duration: 100 }, { type: "pointerUp", button: 0 },
-        { type: "pause", duration: 560 },
-        { type: "pointerDown", button: 0 }, { type: "pause", duration: 100 }, { type: "pointerUp", button: 0 },
+        { type: "pointerDown", button: 0 }, { type: "pause", duration: 40 }, { type: "pointerUp", button: 0 },
+        { type: "pause", duration: 760 },
+        { type: "pointerDown", button: 0 }, { type: "pause", duration: 40 }, { type: "pointerUp", button: 0 },
+        { type: "pause", duration: 760 },
+        { type: "pointerDown", button: 0 }, { type: "pause", duration: 40 }, { type: "pointerUp", button: 0 },
       ],
     }],
   });
