@@ -173,14 +173,14 @@ async function startBrowser(browser) {
   });
   const sessionId = created.sessionId ?? created.value?.sessionId;
   if (!sessionId) throw new Error(`${browser.name} WebDriver did not return a session id: ${JSON.stringify(created)}`);
-  if (scenario === "uiparry" || scenario === "uistun" || scenario === "uiguardbreak" || scenario === "uidodge" || scenario === "uiattackintent" || scenario === "uiguardbreaktell" || scenario === "uiparrytell") {
+  if (scenario === "uiparry" || scenario === "uistun" || scenario === "uiguardbreak" || scenario === "uidodge" || scenario === "uiattackintent" || scenario === "uiguardbreaktell" || scenario === "uiparrytell" || scenario === "uiblockfacingtell") {
     await webdriver(base, "POST", `/session/${sessionId}/window/rect`, { x: 0, y: 0, width: 1280, height: 900 });
   }
   return { ...browser, child, base, sessionId };
 }
 
 async function navigate(session, gameUrl, certificateHash) {
-  const page = scenario === "ui" || scenario === "uirespawn" || scenario === "uifeedback" || scenario === "uiparry" || scenario === "uistun" || scenario === "uiguardbreak" || scenario === "uidodge" || scenario === "uirecovery" || scenario === "uirecoverytell" || scenario === "uiattackintent" || scenario === "uiguardbreaktell" || scenario === "uiparrytell" ? "index.html" : "pvp-flight.html";
+  const page = scenario === "ui" || scenario === "uirespawn" || scenario === "uifeedback" || scenario === "uiparry" || scenario === "uistun" || scenario === "uiguardbreak" || scenario === "uidodge" || scenario === "uirecovery" || scenario === "uirecoverytell" || scenario === "uiattackintent" || scenario === "uiguardbreaktell" || scenario === "uiparrytell" || scenario === "uiblockfacingtell" ? "index.html" : "pvp-flight.html";
   const url = new URL(`http://127.0.0.1:${staticPort}/web/${page}`);
   url.searchParams.set("server", gameUrl);
   url.searchParams.set("cert", certificateHash);
