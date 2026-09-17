@@ -16,7 +16,7 @@ This makes a successful parry and its punish window readable to nearby third-par
 
 The dedicated `uiparrytell` Chrome+Firefox flight reuses the production M33 real-WebDriver parry choreography.
 
-A passive canvas observer samples the unique cyan ring after authoritative `parried` / `parry-success` feedback. The parrying browser must record the remote parry-stun marker, while the browser controlling the parried fighter must record zero remote-only parry pixels. The marker must clear after authoritative parry-stun recovery.
+After authoritative `parried` / `parry-success` feedback, the dedicated M41 flight polls the two relevant production canvases for a bounded 500 ms window. The parrying browser must paint the unique cyan remote parry-stun ring, while the browser controlling the parried fighter must paint exactly zero remote-only parry pixels. The marker must then clear after authoritative parry-stun recovery. This avoids relying on one animation-frame sample while adding no game state or authority.
 
 ## Inherited M36 acceptance stabilization
 

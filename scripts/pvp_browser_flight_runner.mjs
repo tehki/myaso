@@ -457,16 +457,15 @@ async function runOnlineUiParryTellFlight(entries) {
   if (!parried || !parrier || parried.browser === parrier.browser) {
     throw new Error(`M41 could not resolve parried fighter / parrier: ${JSON.stringify(evidence)}`);
   }
-  if (parrier.parryTellMaxPixels < 24) {
-    throw new Error(`M41 parrier never painted the remote parry-stun tell: ${JSON.stringify(parrier)}`);
-  }
-  if (parried.parryTellMaxPixels !== 0) {
-    throw new Error(`M41 local parried fighter painted the remote-only tell: ${JSON.stringify(parried)}`);
-  }
   const observer = entries.find((entry) => entry.name === parrier.browser);
-  if (!observer) throw new Error(`M41 could not resolve parry observer session`);
+  const parriedLocal = entries.find((entry) => entry.name === parried.browser);
+  if (!observer || !parriedLocal) throw new Error(`M41 could not resolve parry browser sessions`);
+  const tell = await waitForRemoteParryTell(observer, parriedLocal, 500);
   await waitForParryTellClear(observer, 1200);
-  return evidence;
+  return evidence.map((entry) => ({
+    ...entry,
+    parryTellMaxPixels: entry.browser === observer.name ? tell.observerMax : tell.localMax,
+  }));
 }
 
 async function runOnlineUiStunOverlayFlight(entries) {
@@ -771,24 +770,9 @@ async function installUiObserver(session) {
         state.overlayTransitions.push(entry);
       }
     };
-    const sampleParryTell = () => {
-      const context = arena.getContext('2d');
-      if (!context) return;
-      const pixels = context.getImageData(0, 0, arena.width, arena.height).data;
-      let count = 0;
-      for (let i = 0; i < pixels.length; i += 4) {
-        if (Math.abs(pixels[i] - 127) <= 2 && Math.abs(pixels[i + 1] - 207) <= 2 && Math.abs(pixels[i + 2] - 244) <= 2 && pixels[i + 3] >= 250) count += 1;
-      }
-      state.parryTellMaxPixels = Math.max(state.parryTellMaxPixels, count);
-    };
     const recordFeedback = () => {
       const feedback = arenaStage.dataset.combatFeedback ?? '';
-      if (feedback && state.feedbackTransitions.at(-1) !== feedback) {
-        state.feedbackTransitions.push(feedback);
-        if (feedback === 'parried' || feedback === 'parry-success') {
-          requestAnimationFrame(() => requestAnimationFrame(sampleParryTell));
-        }
-      }
+      if (feedback && state.feedbackTransitions.at(-1) !== feedback) state.feedbackTransitions.push(feedback);
     };
     const sampleRecoveryTell = () => {
       const context = arena.getContext('2d');
@@ -851,6 +835,26 @@ async function sampleParryTellPixels(session) {
     }
     return count;
   `);
+}
+
+async function waitForRemoteParryTell(observer, parriedLocal, timeoutMs) {
+  const deadline = Date.now() + timeoutMs;
+  let observerMax = 0;
+  let localMax = 0;
+  while (Date.now() < deadline) {
+    const [observerPixels, localPixels] = await Promise.all([
+      sampleParryTellPixels(observer),
+      sampleParryTellPixels(parriedLocal),
+    ]);
+    observerMax = Math.max(observerMax, observerPixels);
+    localMax = Math.max(localMax, localPixels);
+    if (observerMax >= 24) {
+      if (localMax !== 0) throw new Error(`M41 local parried fighter painted the remote-only tell: ${localMax}`);
+      return { observerMax, localMax };
+    }
+    await sleep(20);
+  }
+  throw new Error(`M41 remote parry-stun tell never appeared: observer=${observerMax} local=${localMax}`);
 }
 
 async function waitForParryTellClear(session, timeoutMs) {
