@@ -366,11 +366,12 @@ async function runOnlineUiDodgeFeedbackFlight(entries) {
   await pulseMovementKey(attacker, movementKey, 120);
 
   let evidence;
-  // M24 owns reaction-timing proof. M36 delivers the real attack first, then places the
-  // dodge late in the 135 ms windup so authoritative active-frame overlap is preserved.
-  await setArenaAttack(attacker, attackerElementId, true, attackOffset);
+  // M24 owns reaction-timing proof. M36 starts genuine cross-driver inputs together and
+  // dodges perpendicular to the attack line so the iframe remains inside the active arc.
+  const attackAction = setArenaAttack(attacker, attackerElementId, true, attackOffset);
+  const dodgeAction = pressArenaPerpendicularDodgeAfterPause(defender, 70);
   try {
-    await pressArenaDodgeAfterPause(defender, 100);
+    await Promise.all([attackAction, dodgeAction]);
   } finally {
     await setArenaAttack(attacker, attackerElementId, false, attackOffset);
   }
@@ -387,7 +388,7 @@ async function runOnlineUiDodgeFeedbackFlight(entries) {
   const movementDelivered = attackerResult.keys.includes(`keydown:${movementCode}`) && attackerResult.keys.includes(`keyup:${movementCode}`);
   const aimDelivered = attackDown && Math.abs(attackDown.y - 0.5) <= 0.15 && (attackRight ? attackDown.x >= 0.6 : attackDown.x <= 0.4);
   if (!movementDelivered || !aimDelivered) throw new Error(`M36 real attacker movement/aim was not delivered: ${JSON.stringify(attackerResult)}`);
-  if (!defenderResult.keys.includes("keydown:Space") || !defenderResult.keys.includes("keyup:Space")) throw new Error(`M36 real dodge key was not delivered: ${JSON.stringify(defenderResult)}`);
+  if (!defenderResult.keys.includes("keydown:KeyS") || !defenderResult.keys.includes("keyup:KeyS") || !defenderResult.keys.includes("keydown:Space") || !defenderResult.keys.includes("keyup:Space")) throw new Error(`M36 real perpendicular dodge controls were not delivered: ${JSON.stringify(defenderResult)}`);
   if (attackerResult.playerHp !== 100 || attackerResult.playerGuard !== 100 || defenderResult.playerHp !== 100 || defenderResult.playerGuard !== 100) throw new Error(`M36 dodge exchange changed authoritative vitals: ${JSON.stringify(evidence)}`);
   if (attackerResult.feedbackTransitions.includes("parried") || defenderResult.feedbackTransitions.includes("parry-success")) throw new Error(`M36 dodge exchange accidentally resolved as parry: ${JSON.stringify(evidence)}`);
   return evidence;
@@ -663,16 +664,18 @@ async function centerArenaInViewport(session) {
   return geometry;
 }
 
-async function pressArenaDodgeAfterPause(session, delayMs) {
+async function pressArenaPerpendicularDodgeAfterPause(session, delayMs) {
   await webdriver(session.base, "POST", `/session/${session.sessionId}/actions`, {
     actions: [{
       type: "key",
       id: `keyboard-${session.name}`,
       actions: [
         { type: "pause", duration: delayMs },
+        { type: "keyDown", value: "s" },
         { type: "keyDown", value: "\uE00D" },
         { type: "pause", duration: 40 },
         { type: "keyUp", value: "\uE00D" },
+        { type: "keyUp", value: "s" },
       ],
     }],
   });
