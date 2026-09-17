@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { COMBAT_ACTION, combatActionHint, combatLifePresentation, combatOverlayPresentation, createCombatReadabilityTracker, guardBreakSpatialPresentation, opponentRecoveryPresentation, parrySpatialPresentation } from "../src/browser/combat-readability.mjs";
+import { COMBAT_ACTION, blockSpatialPresentation, combatActionHint, combatLifePresentation, combatOverlayPresentation, createCombatReadabilityTracker, guardBreakSpatialPresentation, opponentRecoveryPresentation, parrySpatialPresentation } from "../src/browser/combat-readability.mjs";
 
 function fighter(netId, hp = 100, guard = 100, action = COMBAT_ACTION.idle, x = 0, y = 0, facing = 0) {
   return { netId, hp, guard, action, x, y, facing };
@@ -108,6 +108,12 @@ test("zero-guard stun exposes a spatial guard-break tell", () => {
   assert.deepEqual(guardBreakSpatialPresentation(fighter(2, 100, 0, COMBAT_ACTION.stunned)), { visible: true, state: "guard-broken" });
   assert.deepEqual(guardBreakSpatialPresentation(fighter(2, 100, 100, COMBAT_ACTION.stunned)), { visible: false, state: "" });
   assert.deepEqual(guardBreakSpatialPresentation(fighter(2, 100, 0, COMBAT_ACTION.block)), { visible: false, state: "" });
+});
+
+test("authoritative block exposes its replicated facing as a spatial tell", () => {
+  assert.deepEqual(blockSpatialPresentation(fighter(2, 100, 100, COMBAT_ACTION.block, 0, 0, 1.25)), { visible: true, state: "blocking", facing: 1.25 });
+  assert.deepEqual(blockSpatialPresentation(fighter(2, 100, 100, COMBAT_ACTION.idle, 0, 0, 1.25)), { visible: false, state: "", facing: 0 });
+  assert.deepEqual(blockSpatialPresentation({ ...fighter(2, 100, 100, COMBAT_ACTION.block), facing: Number.NaN }), { visible: false, state: "", facing: 0 });
 });
 
 test("positive-guard stun exposes a mutually exclusive spatial parry tell", () => {

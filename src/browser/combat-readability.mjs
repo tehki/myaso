@@ -96,6 +96,13 @@ export function parrySpatialPresentation(entity) {
   return { visible: false, state: "" };
 }
 
+export function blockSpatialPresentation(entity) {
+  if (entity?.action === COMBAT_ACTION.block && Number.isFinite(entity.facing)) {
+    return { visible: true, state: "blocking", facing: entity.facing };
+  }
+  return { visible: false, state: "", facing: 0 };
+}
+
 export function guardBreakSpatialPresentation(entity) {
   if (entity?.action === COMBAT_ACTION.stunned && entity.guard === 0) {
     return { visible: true, state: "guard-broken" };

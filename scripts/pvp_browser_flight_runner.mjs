@@ -8,7 +8,7 @@ import { setTimeout as sleep } from "node:timers/promises";
 const root = process.cwd();
 const durationMs = Number(process.env.MYASO_PVP_FLIGHT_DURATION_MS ?? 7000);
 const scenario = process.env.MYASO_PVP_SCENARIO ?? "damage";
-if (!new Set(["damage", "parry", "dodge", "block", "guardbreak", "backblock", "respawn", "ui", "uirespawn", "uifeedback", "uiparry", "uistun", "uiguardbreak", "uidodge", "uirecovery", "uirecoverytell", "uiattackintent", "uiguardbreaktell", "uiparrytell"]).has(scenario)) throw new Error(`unsupported MYASO_PVP_SCENARIO: ${scenario}`);
+if (!new Set(["damage", "parry", "dodge", "block", "guardbreak", "backblock", "respawn", "ui", "uirespawn", "uifeedback", "uiparry", "uistun", "uiguardbreak", "uidodge", "uirecovery", "uirecoverytell", "uiattackintent", "uiguardbreaktell", "uiparrytell", "uiblockfacingtell"]).has(scenario)) throw new Error(`unsupported MYASO_PVP_SCENARIO: ${scenario}`);
 const staticPort = Number(process.env.MYASO_PVP_FLIGHT_HTTP_PORT ?? 4174);
 const browsers = [
   {
@@ -59,6 +59,9 @@ try {
   } else if (scenario === "uiparrytell") {
     const results = await runOnlineUiParryTellFlight(sessions);
     console.log(`M41_FFA_PARRY_TELL ${JSON.stringify({ ok: true, results })}`);
+  } else if (scenario === "uiblockfacingtell") {
+    const results = await runOnlineUiBlockFacingTellFlight(sessions);
+    console.log(`M42_FFA_BLOCK_FACING_TELL ${JSON.stringify({ ok: true, results })}`);
   } else if (scenario === "uistun") {
     const results = await runOnlineUiStunOverlayFlight(sessions);
     console.log(`M35_ONLINE_STUN_OVERLAY ${JSON.stringify({ ok: true, results })}`);
@@ -471,6 +474,40 @@ async function runOnlineUiParryTellFlight(entries) {
   }));
 }
 
+async function runOnlineUiBlockFacingTellFlight(entries) {
+  await Promise.all(entries.map(installUiObserver));
+  const ready = await waitForUiReady(entries);
+  const observer = entries.find((entry) => entry.name === "chrome");
+  const defender = entries.find((entry) => entry.name === "firefox");
+  const observerReady = ready.find((entry) => entry.browser === observer?.name);
+  const defenderReady = ready.find((entry) => entry.browser === defender?.name);
+  if (!observer || !defender || !observerReady || !defenderReady) throw new Error(`M42 could not resolve Chrome observer / Firefox blocker: ${JSON.stringify(ready)}`);
+
+  await Promise.all(entries.map((entry) => execute(entry.base, entry.sessionId, "document.querySelector('#arena').focus(); return document.activeElement?.id;")));
+  const defenderElementId = await resolveArenaElement(defender, "M42 defender");
+  await Promise.all(entries.map(centerArenaInViewport));
+  const aimOffset = defenderReady.playerNetId > observerReady.playerNetId ? -200 : 200;
+  await aimArena(defender, defenderElementId, aimOffset);
+
+  let tell;
+  await setArenaBlock(defender, defenderElementId, true);
+  try {
+    tell = await waitForRemoteBlockFacingTell(observer, defender, 900);
+  } finally {
+    await setArenaBlock(defender, defenderElementId, false);
+  }
+  await waitForBlockFacingTellClear(observer, 1000);
+
+  const evidence = await Promise.all(entries.map(readUiEvidence));
+  const defenderResult = evidence.find((entry) => entry.browser === defender.name);
+  const blockDown = defenderResult?.pointers.find((event) => event.type === "pointerdown" && event.button === 2);
+  const blockUp = defenderResult?.pointers.find((event) => event.type === "pointerup" && event.button === 2);
+  const aimedTowardObserver = blockDown && Math.abs(blockDown.y - 0.5) <= 0.15
+    && (aimOffset < 0 ? blockDown.x <= 0.4 : blockDown.x >= 0.6);
+  if (!aimedTowardObserver || !blockUp) throw new Error(`M42 real directional block input was not delivered: ${JSON.stringify(defenderResult)}`);
+  return evidence.map((entry) => ({ ...entry, blockFacingTellMaxPixels: entry.browser === observer.name ? tell.observerMax : tell.localMax }));
+}
+
 async function runOnlineUiStunOverlayFlight(entries) {
   let evidence = await runOnlineUiParryFlight(entries);
   let attacker = evidence.find((entry) => entry.feedbackTransitions.includes("parried"));
@@ -826,6 +863,46 @@ async function installUiObserver(session) {
     window.__MYASO_M30_UI__ = state;
     return true;
   `);
+}
+
+async function sampleBlockFacingTellPixels(session) {
+  return execute(session.base, session.sessionId, `
+    const arena = document.querySelector('#arena');
+    const context = arena?.getContext('2d');
+    if (!context) return 0;
+    const pixels = context.getImageData(0, 0, arena.width, arena.height).data;
+    let count = 0;
+    for (let i = 0; i < pixels.length; i += 4) {
+      if (Math.abs(pixels[i] - 154) <= 2 && Math.abs(pixels[i + 1] - 215) <= 2 && Math.abs(pixels[i + 2] - 167) <= 2 && pixels[i + 3] > 0) count += 1;
+    }
+    return count;
+  `);
+}
+
+async function waitForRemoteBlockFacingTell(observer, localBlocker, timeoutMs) {
+  const deadline = Date.now() + timeoutMs;
+  let observerMax = 0;
+  let localMax = 0;
+  while (Date.now() < deadline) {
+    const [observerPixels, localPixels] = await Promise.all([sampleBlockFacingTellPixels(observer), sampleBlockFacingTellPixels(localBlocker)]);
+    observerMax = Math.max(observerMax, observerPixels);
+    localMax = Math.max(localMax, localPixels);
+    if (observerMax >= 24) {
+      if (localMax !== 0) throw new Error(`M42 local blocker painted the remote-only facing tell: ${localMax}`);
+      return { observerMax, localMax };
+    }
+    await sleep(20);
+  }
+  throw new Error(`M42 remote block-facing tell never appeared: observer=${observerMax} local=${localMax}`);
+}
+
+async function waitForBlockFacingTellClear(session, timeoutMs) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    if (await sampleBlockFacingTellPixels(session) === 0) return;
+    await sleep(20);
+  }
+  throw new Error(`M42 remote block-facing tell did not clear after block release`);
 }
 
 async function sampleParryTellPixels(session) {

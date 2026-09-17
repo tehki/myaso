@@ -1,5 +1,5 @@
 import { createFrameBudget } from "../src/browser/frame-budget.mjs";
-import { COMBAT_ACTION, combatActionHint, combatOverlayPresentation, createCombatReadabilityTracker, guardBreakSpatialPresentation, opponentRecoveryPresentation, parrySpatialPresentation } from "../src/browser/combat-readability.mjs";
+import { COMBAT_ACTION, blockSpatialPresentation, combatActionHint, combatOverlayPresentation, createCombatReadabilityTracker, guardBreakSpatialPresentation, opponentRecoveryPresentation, parrySpatialPresentation } from "../src/browser/combat-readability.mjs";
 import { COMBAT } from "../src/combat/model.mjs";
 import { reconcilePrediction } from "../src/browser/reconciliation.mjs";
 import { NETWORK } from "../src/network/constants.mjs";
@@ -245,7 +245,7 @@ function drawFighterScreen(x, y, fighter, body, shadow, remote = false) {
   const action = fighter.action ?? COMBAT_ACTION.idle;
   ctx.globalAlpha = action === COMBAT_ACTION.dead ? 0.28 : 1;
   if (action === COMBAT_ACTION.attackWindup || action === COMBAT_ACTION.attackActive) drawAttackTell(action, remote);
-  if (action === COMBAT_ACTION.block) drawBlockTell();
+  if (action === COMBAT_ACTION.block) drawBlockTell(remote, fighter);
   if (action === COMBAT_ACTION.dodge) drawDodgeTell();
   if (action === COMBAT_ACTION.stunned) drawStunTell();
   if (remote && parrySpatialPresentation(fighter).visible) drawParryTell();
@@ -286,12 +286,20 @@ function drawAttackTell(action, remote) {
   }
 }
 
-function drawBlockTell() {
+function drawBlockTell(remote, fighter) {
   ctx.strokeStyle = "rgba(241, 218, 142, .72)";
   ctx.lineWidth = 4;
   ctx.beginPath();
   ctx.arc(0, 0, 32, -COMBAT.block.halfAngleRadians, COMBAT.block.halfAngleRadians);
   ctx.stroke();
+  if (!remote || !blockSpatialPresentation(fighter).visible) return;
+  ctx.strokeStyle = "#9ad7a7";
+  ctx.lineWidth = 3;
+  ctx.setLineDash([7, 4]);
+  ctx.beginPath();
+  ctx.arc(0, 0, 42, -COMBAT.block.halfAngleRadians, COMBAT.block.halfAngleRadians);
+  ctx.stroke();
+  ctx.setLineDash([]);
 }
 
 function drawDodgeTell() {
