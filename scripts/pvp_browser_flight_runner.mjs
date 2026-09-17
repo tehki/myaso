@@ -8,7 +8,7 @@ import { setTimeout as sleep } from "node:timers/promises";
 const root = process.cwd();
 const durationMs = Number(process.env.MYASO_PVP_FLIGHT_DURATION_MS ?? 7000);
 const scenario = process.env.MYASO_PVP_SCENARIO ?? "damage";
-if (!new Set(["damage", "parry", "dodge", "block", "guardbreak", "backblock", "respawn", "ui", "uirespawn", "uifeedback", "uiparry", "uistun", "uiguardbreak", "uidodge", "uirecovery", "uirecoverytell", "uiattackintent", "uiguardbreaktell", "uiparrytell", "uiblockfacingtell", "uidodgetell"]).has(scenario)) throw new Error(`unsupported MYASO_PVP_SCENARIO: ${scenario}`);
+if (!new Set(["damage", "parry", "dodge", "block", "guardbreak", "backblock", "respawn", "ui", "uirespawn", "uifeedback", "uiparry", "uistun", "uiguardbreak", "uidodge", "uirecovery", "uirecoverytell", "uiattackintent", "uiguardbreaktell", "uiparrytell", "uiblockfacingtell", "uidodgetell", "uideathtell"]).has(scenario)) throw new Error(`unsupported MYASO_PVP_SCENARIO: ${scenario}`);
 const staticPort = Number(process.env.MYASO_PVP_FLIGHT_HTTP_PORT ?? 4174);
 const browsers = [
   {
@@ -65,6 +65,9 @@ try {
   } else if (scenario === "uidodgetell") {
     const results = await runOnlineUiDodgeTellFlight(sessions);
     console.log(`M43_FFA_DODGE_TELL ${JSON.stringify({ ok: true, results })}`);
+  } else if (scenario === "uideathtell") {
+    const results = await runOnlineUiDeathTellFlight(sessions);
+    console.log(`M44_FFA_DEATH_TELL ${JSON.stringify({ ok: true, results })}`);
   } else if (scenario === "uistun") {
     const results = await runOnlineUiStunOverlayFlight(sessions);
     console.log(`M35_ONLINE_STUN_OVERLAY ${JSON.stringify({ ok: true, results })}`);
@@ -183,7 +186,7 @@ async function startBrowser(browser) {
 }
 
 async function navigate(session, gameUrl, certificateHash) {
-  const page = scenario === "ui" || scenario === "uirespawn" || scenario === "uifeedback" || scenario === "uiparry" || scenario === "uistun" || scenario === "uiguardbreak" || scenario === "uidodge" || scenario === "uirecovery" || scenario === "uirecoverytell" || scenario === "uiattackintent" || scenario === "uiguardbreaktell" || scenario === "uiparrytell" || scenario === "uiblockfacingtell" || scenario === "uidodgetell" ? "index.html" : "pvp-flight.html";
+  const page = scenario === "ui" || scenario === "uirespawn" || scenario === "uifeedback" || scenario === "uiparry" || scenario === "uistun" || scenario === "uiguardbreak" || scenario === "uidodge" || scenario === "uirecovery" || scenario === "uirecoverytell" || scenario === "uiattackintent" || scenario === "uiguardbreaktell" || scenario === "uiparrytell" || scenario === "uiblockfacingtell" || scenario === "uidodgetell" || scenario === "uideathtell" ? "index.html" : "pvp-flight.html";
   const url = new URL(`http://127.0.0.1:${staticPort}/web/${page}`);
   url.searchParams.set("server", gameUrl);
   url.searchParams.set("cert", certificateHash);
@@ -665,7 +668,7 @@ async function runOnlineUiGuardBreakTellFlight(entries) {
   return evidence.map((entry) => ({ ...entry, guardBreakTellMaxPixels: entry.browser === observer.name ? tell.observerMax : tell.localMax }));
 }
 
-async function runOnlineUiRespawnFlight(entries) {
+async function runOnlineUiRespawnFlight(entries, onDeath = null) {
   await Promise.all(entries.map(installUiObserver));
   const ready = await waitForUiReady(entries);
   const ordered = ready.slice().sort((a, b) => a.playerNetId - b.playerNetId);
@@ -689,6 +692,7 @@ async function runOnlineUiRespawnFlight(entries) {
     if (!deathEvidence) await pulseMovementKey(attacker, "d", 80);
   }
   if (!deathEvidence) deathEvidence = await waitForUiDeathEvidence(entries, attacker, defender, 1200, true);
+  if (onDeath) await onDeath({ attacker, defender, deathEvidence });
 
   const respawnEvidence = await waitForUiRespawnEvidence(entries, attacker, defender, 3000);
   const attackerResult = respawnEvidence.find((entry) => entry.browser === attacker.name);
@@ -713,6 +717,21 @@ async function runOnlineUiRespawnFlight(entries) {
     throw new Error(`defender overlay did not follow authoritative death through respawn: ${JSON.stringify(defenderResult.overlayTransitions)}`);
   }
   return respawnEvidence;
+}
+
+async function runOnlineUiDeathTellFlight(entries) {
+  let tell = null;
+  let observer = null;
+  const evidence = await runOnlineUiRespawnFlight(entries, async ({ attacker, defender }) => {
+    observer = attacker;
+    tell = await waitForRemoteDeathTell(attacker, defender, 700);
+  });
+  if (!tell || !observer) throw new Error(`M44 death tell was not sampled during authoritative Dead`);
+  await waitForDeathTellClear(observer, 1000);
+  return evidence.map((entry) => ({
+    ...entry,
+    deathTellMaxPixels: entry.browser === observer.name ? tell.observerMax : tell.localMax,
+  }));
 }
 
 async function setMovementKey(session, value, pressed) {
@@ -883,6 +902,49 @@ async function installUiObserver(session) {
     window.__MYASO_M30_UI__ = state;
     return true;
   `);
+}
+
+async function sampleDeathTellPixels(session) {
+  return execute(session.base, session.sessionId, `
+    const arena = document.querySelector('#arena');
+    const context = arena?.getContext('2d');
+    if (!context) return 0;
+    const pixels = context.getImageData(0, 0, arena.width, arena.height).data;
+    let count = 0;
+    for (let i = 0; i < pixels.length; i += 4) {
+      if (Math.abs(pixels[i] - 255) <= 2 && Math.abs(pixels[i + 1] - 111) <= 2 && Math.abs(pixels[i + 2] - 145) <= 2 && pixels[i + 3] >= 250) count += 1;
+    }
+    return count;
+  `);
+}
+
+async function waitForRemoteDeathTell(observer, localDefeated, timeoutMs) {
+  const deadline = Date.now() + timeoutMs;
+  let observerMax = 0;
+  let localMax = 0;
+  while (Date.now() < deadline) {
+    const [observerPixels, localPixels] = await Promise.all([
+      sampleDeathTellPixels(observer),
+      sampleDeathTellPixels(localDefeated),
+    ]);
+    observerMax = Math.max(observerMax, observerPixels);
+    localMax = Math.max(localMax, localPixels);
+    if (observerMax >= 24) {
+      if (localMax !== 0) throw new Error(`M44 local defeated fighter painted the remote-only death tell: ${localMax}`);
+      return { observerMax, localMax };
+    }
+    await sleep(20);
+  }
+  throw new Error(`M44 remote death tell never appeared: observer=${observerMax} local=${localMax}`);
+}
+
+async function waitForDeathTellClear(session, timeoutMs) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    if (await sampleDeathTellPixels(session) === 0) return;
+    await sleep(20);
+  }
+  throw new Error(`M44 remote death tell did not clear after authoritative respawn`);
 }
 
 async function sampleRecoveryTellPixels(session) {

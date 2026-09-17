@@ -265,6 +265,10 @@ function drawFighterScreen(x, y, fighter, body, shadow, remote = false) {
   ctx.fill();
   ctx.fillStyle = "#c8b684";
   ctx.fillRect(12, -2, 26, 4);
+  if (remote && action === COMBAT_ACTION.dead) {
+    ctx.globalAlpha = 1;
+    drawDeathTell();
+  }
   ctx.restore();
 }
 
@@ -351,6 +355,20 @@ function drawRecoveryTell() {
   ctx.lineWidth = 3;
   ctx.beginPath();
   ctx.arc(0, 0, 36, 0, Math.PI * 2);
+  ctx.stroke();
+}
+
+function drawDeathTell() {
+  ctx.strokeStyle = "#ff6f91";
+  ctx.lineWidth = 4;
+  ctx.beginPath();
+  ctx.arc(0, 0, 31, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(-10, -10);
+  ctx.lineTo(10, 10);
+  ctx.moveTo(10, -10);
+  ctx.lineTo(-10, 10);
   ctx.stroke();
 }
 
