@@ -332,6 +332,7 @@ async function runOnlineUiAttackIntentFlight(entries) {
   const attackerElementId = await resolveArenaElement(attacker, "M39 attacker");
   await Promise.all(entries.map(centerArenaInViewport));
   await pulseMovementKey(attacker, movementKey, 120);
+  await Promise.all(entries.map(armWindupTellSampler));
   let evidence;
   let attackHeld = false;
   try {
@@ -340,6 +341,7 @@ async function runOnlineUiAttackIntentFlight(entries) {
     evidence = await waitForRemoteWindupTell(entries, attacker, defender, 500);
   } finally {
     if (attackHeld) await setArenaAttack(attacker, attackerElementId, false, attackOffset);
+    await Promise.all(entries.map(stopWindupTellSampler));
   }
   await waitForWindupTellClear(defender, 500);
   const attackerResult = evidence.find((entry) => entry.browser === attacker.name);
@@ -1025,12 +1027,55 @@ async function sampleWindupTellPixels(session) {
   `);
 }
 
+async function armWindupTellSampler(session) {
+  return execute(session.base, session.sessionId, `
+    const arena = document.querySelector('#arena');
+    const context = arena?.getContext('2d');
+    if (!context) return false;
+    const prior = window.__MYASO_M39_WINDUP_SAMPLER__;
+    if (prior?.frame) cancelAnimationFrame(prior.frame);
+    const state = { active: true, frame: 0, maxPixels: 0 };
+    const sample = () => {
+      if (!state.active) return;
+      const half = 160;
+      const x = Math.max(0, Math.floor(arena.width / 2 - half));
+      const y = Math.max(0, Math.floor(arena.height / 2 - half));
+      const width = Math.min(half * 2, arena.width - x);
+      const height = Math.min(half * 2, arena.height - y);
+      const pixels = context.getImageData(x, y, width, height).data;
+      let count = 0;
+      for (let i = 0; i < pixels.length; i += 4) {
+        if (Math.abs(pixels[i] - 243) <= 2 && Math.abs(pixels[i + 1] - 214) <= 2 && Math.abs(pixels[i + 2] - 143) <= 2 && pixels[i + 3] >= 250) count += 1;
+      }
+      state.maxPixels = Math.max(state.maxPixels, count);
+      state.frame = requestAnimationFrame(sample);
+    };
+    window.__MYASO_M39_WINDUP_SAMPLER__ = state;
+    state.frame = requestAnimationFrame(sample);
+    return true;
+  `);
+}
+
+async function readWindupTellSampler(session) {
+  return execute(session.base, session.sessionId, `return window.__MYASO_M39_WINDUP_SAMPLER__?.maxPixels ?? 0;`);
+}
+
+async function stopWindupTellSampler(session) {
+  return execute(session.base, session.sessionId, `
+    const state = window.__MYASO_M39_WINDUP_SAMPLER__;
+    if (!state) return 0;
+    state.active = false;
+    if (state.frame) cancelAnimationFrame(state.frame);
+    return state.maxPixels;
+  `);
+}
+
 async function waitForRemoteWindupTell(entries, attacker, defender, timeoutMs) {
   const deadline = Date.now() + timeoutMs;
   let attackerMax = 0;
   let defenderMax = 0;
   while (Date.now() < deadline) {
-    const [attackerPixels, defenderPixels] = await Promise.all([sampleWindupTellPixels(attacker), sampleWindupTellPixels(defender)]);
+    const [attackerPixels, defenderPixels] = await Promise.all([readWindupTellSampler(attacker), readWindupTellSampler(defender)]);
     attackerMax = Math.max(attackerMax, attackerPixels);
     defenderMax = Math.max(defenderMax, defenderPixels);
     if (defenderMax >= 24) {
