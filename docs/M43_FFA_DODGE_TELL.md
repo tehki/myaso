@@ -1,0 +1,35 @@
+# M43 - Spatial FFA Dodge Tell
+
+## Objective
+
+Make an authoritative remote Dodge unmistakably readable in free-for-all combat without adding client combat authority or exposing hidden iframe timing.
+
+## Player presentation
+
+- The existing neutral 28 px Dodge ring remains unchanged for every fighter.
+- A remote fighter whose replicated authoritative action is `Dodge` gains a unique violet dashed 36 px outer ring.
+- The local fighter never paints the remote-only violet ring around itself.
+- The violet ring clears when replicated state leaves `Dodge`; `DodgeRecovery` continues to use the existing M38 recovery presentation where applicable.
+- The tell does not expose the 118 ms iframe duration or make a local dodge-success decision. It is a direct presentation of the already-replicated action.
+
+## Real-browser acceptance
+
+The dedicated `uidodgetell` Chrome+Firefox flight opens the production `index.html` path against one loopback authoritative server. Chrome is the passive observer and Firefox is the dodger. Firefox receives genuine W3C `KeyS` + Space input.
+
+Because authoritative Dodge is brief, both browsers arm a passive `requestAnimationFrame` pixel sampler before the genuine input. The sampler tracks only the unique violet tell color in a bounded central combat envelope; it never injects or mutates fighter state.
+
+The flight passes only when:
+
+- Chrome paints at least 24 exact-color pixels from the remote-only violet Dodge boundary;
+- Firefox paints zero pixels of that remote-only color around its own local fighter;
+- genuine Firefox `KeyS` and Space key-down/up provenance is present;
+- both fighters remain at 100 HP / 100 guard;
+- Chrome observes the tell clear after authoritative state leaves `Dodge`.
+
+## Scope / risk
+
+Base is frozen M42 exact head `df6274a50072a8f53ec6c18854096ebc1ddae586`.
+
+M43 is presentation/test/CI/docs only. It does not change server simulation, dodge speed, iframe duration, recovery duration, combat geometry, HP/guard rules, wire protocol, networking, persistence, public bind, deployment, or runtime activation.
+
+Rollback is to close/discard M43; frozen M42 remains unchanged.

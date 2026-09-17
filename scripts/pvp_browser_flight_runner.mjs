@@ -8,7 +8,7 @@ import { setTimeout as sleep } from "node:timers/promises";
 const root = process.cwd();
 const durationMs = Number(process.env.MYASO_PVP_FLIGHT_DURATION_MS ?? 7000);
 const scenario = process.env.MYASO_PVP_SCENARIO ?? "damage";
-if (!new Set(["damage", "parry", "dodge", "block", "guardbreak", "backblock", "respawn", "ui", "uirespawn", "uifeedback", "uiparry", "uistun", "uiguardbreak", "uidodge", "uirecovery", "uirecoverytell", "uiattackintent", "uiguardbreaktell", "uiparrytell", "uiblockfacingtell"]).has(scenario)) throw new Error(`unsupported MYASO_PVP_SCENARIO: ${scenario}`);
+if (!new Set(["damage", "parry", "dodge", "block", "guardbreak", "backblock", "respawn", "ui", "uirespawn", "uifeedback", "uiparry", "uistun", "uiguardbreak", "uidodge", "uirecovery", "uirecoverytell", "uiattackintent", "uiguardbreaktell", "uiparrytell", "uiblockfacingtell", "uidodgetell"]).has(scenario)) throw new Error(`unsupported MYASO_PVP_SCENARIO: ${scenario}`);
 const staticPort = Number(process.env.MYASO_PVP_FLIGHT_HTTP_PORT ?? 4174);
 const browsers = [
   {
@@ -62,6 +62,9 @@ try {
   } else if (scenario === "uiblockfacingtell") {
     const results = await runOnlineUiBlockFacingTellFlight(sessions);
     console.log(`M42_FFA_BLOCK_FACING_TELL ${JSON.stringify({ ok: true, results })}`);
+  } else if (scenario === "uidodgetell") {
+    const results = await runOnlineUiDodgeTellFlight(sessions);
+    console.log(`M43_FFA_DODGE_TELL ${JSON.stringify({ ok: true, results })}`);
   } else if (scenario === "uistun") {
     const results = await runOnlineUiStunOverlayFlight(sessions);
     console.log(`M35_ONLINE_STUN_OVERLAY ${JSON.stringify({ ok: true, results })}`);
@@ -173,14 +176,14 @@ async function startBrowser(browser) {
   });
   const sessionId = created.sessionId ?? created.value?.sessionId;
   if (!sessionId) throw new Error(`${browser.name} WebDriver did not return a session id: ${JSON.stringify(created)}`);
-  if (scenario === "uiparry" || scenario === "uistun" || scenario === "uiguardbreak" || scenario === "uidodge" || scenario === "uiattackintent" || scenario === "uiguardbreaktell" || scenario === "uiparrytell" || scenario === "uiblockfacingtell") {
+  if (scenario === "uiparry" || scenario === "uistun" || scenario === "uiguardbreak" || scenario === "uidodge" || scenario === "uiattackintent" || scenario === "uiguardbreaktell" || scenario === "uiparrytell" || scenario === "uiblockfacingtell" || scenario === "uidodgetell") {
     await webdriver(base, "POST", `/session/${sessionId}/window/rect`, { x: 0, y: 0, width: 1280, height: 900 });
   }
   return { ...browser, child, base, sessionId };
 }
 
 async function navigate(session, gameUrl, certificateHash) {
-  const page = scenario === "ui" || scenario === "uirespawn" || scenario === "uifeedback" || scenario === "uiparry" || scenario === "uistun" || scenario === "uiguardbreak" || scenario === "uidodge" || scenario === "uirecovery" || scenario === "uirecoverytell" || scenario === "uiattackintent" || scenario === "uiguardbreaktell" || scenario === "uiparrytell" || scenario === "uiblockfacingtell" ? "index.html" : "pvp-flight.html";
+  const page = scenario === "ui" || scenario === "uirespawn" || scenario === "uifeedback" || scenario === "uiparry" || scenario === "uistun" || scenario === "uiguardbreak" || scenario === "uidodge" || scenario === "uirecovery" || scenario === "uirecoverytell" || scenario === "uiattackintent" || scenario === "uiguardbreaktell" || scenario === "uiparrytell" || scenario === "uiblockfacingtell" || scenario === "uidodgetell" ? "index.html" : "pvp-flight.html";
   const url = new URL(`http://127.0.0.1:${staticPort}/web/${page}`);
   url.searchParams.set("server", gameUrl);
   url.searchParams.set("cert", certificateHash);
@@ -517,6 +520,40 @@ async function runOnlineUiBlockFacingTellFlight(entries) {
     && (aimOffset < 0 ? blockDown.x <= 0.4 : blockDown.x >= 0.6);
   if (!aimedTowardObserver || !blockUp) throw new Error(`M42 real directional block input was not delivered: ${JSON.stringify(defenderResult)}`);
   return evidence.map((entry) => ({ ...entry, blockFacingTellMaxPixels: entry.browser === observer.name ? tell.observerMax : tell.localMax }));
+}
+
+async function runOnlineUiDodgeTellFlight(entries) {
+  await Promise.all(entries.map(installUiObserver));
+  const ready = await waitForUiReady(entries);
+  const observer = entries.find((entry) => entry.name === "chrome");
+  const dodger = entries.find((entry) => entry.name === "firefox");
+  const observerReady = ready.find((entry) => entry.browser === observer?.name);
+  const dodgerReady = ready.find((entry) => entry.browser === dodger?.name);
+  if (!observer || !dodger || !observerReady || !dodgerReady) throw new Error(`M43 could not resolve Chrome observer / Firefox dodger: ${JSON.stringify(ready)}`);
+
+  await Promise.all(entries.map((entry) => execute(entry.base, entry.sessionId, "document.querySelector('#arena').focus(); return document.activeElement?.id;")));
+  await Promise.all(entries.map(centerArenaInViewport));
+  await Promise.all(entries.map(armDodgeTellSampler));
+  let tell;
+  try {
+    await pressArenaPerpendicularDodgeAfterPause(dodger, 0);
+    tell = await waitForRemoteDodgeTell(observer, dodger, 700);
+  } finally {
+    await Promise.all(entries.map(stopDodgeTellSampler));
+  }
+  await waitForDodgeTellClear(observer, 1000);
+
+  const evidence = await Promise.all(entries.map(readUiEvidence));
+  const observerResult = evidence.find((entry) => entry.browser === observer.name);
+  const dodgerResult = evidence.find((entry) => entry.browser === dodger.name);
+  if (!observerResult || !dodgerResult) throw new Error(`M43 incomplete UI evidence: ${JSON.stringify(evidence)}`);
+  const controlsDelivered = dodgerResult.keys.includes("keydown:KeyS") && dodgerResult.keys.includes("keyup:KeyS")
+    && dodgerResult.keys.includes("keydown:Space") && dodgerResult.keys.includes("keyup:Space");
+  if (!controlsDelivered) throw new Error(`M43 real dodge controls were not delivered: ${JSON.stringify(dodgerResult)}`);
+  if (observerResult.playerHp !== 100 || observerResult.playerGuard !== 100 || dodgerResult.playerHp !== 100 || dodgerResult.playerGuard !== 100) {
+    throw new Error(`M43 dodge tell flight changed authoritative vitals: ${JSON.stringify(evidence)}`);
+  }
+  return evidence.map((entry) => ({ ...entry, dodgeTellMaxPixels: entry.browser === observer.name ? tell.observerMax : tell.localMax }));
 }
 
 async function runOnlineUiStunOverlayFlight(entries) {
@@ -883,6 +920,89 @@ async function waitForRemoteRecoveryTell(observer, localAttacker, timeoutMs) {
     await sleep(20);
   }
   throw new Error(`M38 remote recovery ring never appeared: observer=${observerMax} local=${localMax}`);
+}
+
+async function armDodgeTellSampler(session) {
+  return execute(session.base, session.sessionId, `
+    const arena = document.querySelector('#arena');
+    const context = arena?.getContext('2d');
+    if (!context) return false;
+    const prior = window.__MYASO_M43_DODGE_SAMPLER__;
+    if (prior?.frame) cancelAnimationFrame(prior.frame);
+    const state = { active: true, frame: 0, maxPixels: 0 };
+    const sample = () => {
+      if (!state.active) return;
+      const half = 160;
+      const x = Math.max(0, Math.floor(arena.width / 2 - half));
+      const y = Math.max(0, Math.floor(arena.height / 2 - half));
+      const width = Math.min(half * 2, arena.width - x);
+      const height = Math.min(half * 2, arena.height - y);
+      const pixels = context.getImageData(x, y, width, height).data;
+      let count = 0;
+      for (let i = 0; i < pixels.length; i += 4) {
+        if (Math.abs(pixels[i] - 199) <= 2 && Math.abs(pixels[i + 1] - 181) <= 2 && Math.abs(pixels[i + 2] - 255) <= 2 && pixels[i + 3] >= 250) count += 1;
+      }
+      state.maxPixels = Math.max(state.maxPixels, count);
+      state.frame = requestAnimationFrame(sample);
+    };
+    window.__MYASO_M43_DODGE_SAMPLER__ = state;
+    state.frame = requestAnimationFrame(sample);
+    return true;
+  `);
+}
+
+async function readDodgeTellSampler(session) {
+  return execute(session.base, session.sessionId, `return window.__MYASO_M43_DODGE_SAMPLER__?.maxPixels ?? 0;`);
+}
+
+async function stopDodgeTellSampler(session) {
+  return execute(session.base, session.sessionId, `
+    const state = window.__MYASO_M43_DODGE_SAMPLER__;
+    if (!state) return 0;
+    state.active = false;
+    if (state.frame) cancelAnimationFrame(state.frame);
+    return state.maxPixels;
+  `);
+}
+
+async function sampleDodgeTellPixels(session) {
+  return execute(session.base, session.sessionId, `
+    const arena = document.querySelector('#arena');
+    const context = arena?.getContext('2d');
+    if (!context) return 0;
+    const pixels = context.getImageData(0, 0, arena.width, arena.height).data;
+    let count = 0;
+    for (let i = 0; i < pixels.length; i += 4) {
+      if (Math.abs(pixels[i] - 199) <= 2 && Math.abs(pixels[i + 1] - 181) <= 2 && Math.abs(pixels[i + 2] - 255) <= 2 && pixels[i + 3] >= 250) count += 1;
+    }
+    return count;
+  `);
+}
+
+async function waitForRemoteDodgeTell(observer, localDodger, timeoutMs) {
+  const deadline = Date.now() + timeoutMs;
+  let observerMax = 0;
+  let localMax = 0;
+  while (Date.now() < deadline) {
+    const [observerPixels, localPixels] = await Promise.all([readDodgeTellSampler(observer), readDodgeTellSampler(localDodger)]);
+    observerMax = Math.max(observerMax, observerPixels);
+    localMax = Math.max(localMax, localPixels);
+    if (observerMax >= 24) {
+      if (localMax !== 0) throw new Error(`M43 local dodger painted the remote-only dodge tell: ${localMax}`);
+      return { observerMax, localMax };
+    }
+    await sleep(20);
+  }
+  throw new Error(`M43 remote dodge tell never appeared: observer=${observerMax} local=${localMax}`);
+}
+
+async function waitForDodgeTellClear(session, timeoutMs) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    if (await sampleDodgeTellPixels(session) === 0) return;
+    await sleep(20);
+  }
+  throw new Error(`M43 remote dodge tell did not clear after authoritative Dodge ended`);
 }
 
 async function sampleBlockFacingTellPixels(session) {

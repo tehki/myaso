@@ -246,7 +246,7 @@ function drawFighterScreen(x, y, fighter, body, shadow, remote = false) {
   ctx.globalAlpha = action === COMBAT_ACTION.dead ? 0.28 : 1;
   if (action === COMBAT_ACTION.attackWindup || action === COMBAT_ACTION.attackActive) drawAttackTell(action, remote);
   if (action === COMBAT_ACTION.block) drawBlockTell(remote, fighter);
-  if (action === COMBAT_ACTION.dodge) drawDodgeTell();
+  if (action === COMBAT_ACTION.dodge) drawDodgeTell(remote);
   if (action === COMBAT_ACTION.stunned) drawStunTell();
   if (remote && parrySpatialPresentation(fighter).visible) drawParryTell();
   if (remote && guardBreakSpatialPresentation(fighter).visible) drawGuardBreakTell();
@@ -302,12 +302,20 @@ function drawBlockTell(remote, fighter) {
   ctx.setLineDash([]);
 }
 
-function drawDodgeTell() {
+function drawDodgeTell(remote) {
   ctx.strokeStyle = "rgba(216, 202, 160, .58)";
   ctx.lineWidth = 2;
   ctx.beginPath();
   ctx.arc(0, 0, 28, 0, Math.PI * 2);
   ctx.stroke();
+  if (!remote) return;
+  ctx.strokeStyle = "#c7b5ff";
+  ctx.lineWidth = 3;
+  ctx.setLineDash([4, 4]);
+  ctx.beginPath();
+  ctx.arc(0, 0, 36, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.setLineDash([]);
 }
 
 function drawStunTell() {
