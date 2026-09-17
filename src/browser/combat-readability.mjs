@@ -25,6 +25,7 @@ const PRIORITY = Object.freeze({
 
 export function createCombatReadabilityTracker() {
   const previous = new Map();
+  let pendingDodge = null;
   return {
     observe(state, ownId) {
       if (!(state instanceof Map) || !ownId) return null;
@@ -45,15 +46,17 @@ export function createCombatReadabilityTracker() {
       }
       if (own && beforeOwn && peer && beforePeer) {
         collectParryEvents(candidates, beforeOwn, own, beforePeer, peer);
-        collectDodgeEvents(candidates, beforeOwn, own, beforePeer, peer);
       }
+      pendingDodge = own && peer
+        ? collectDodgeEvents(candidates, own, peer, ownId, pendingDodge)
+        : null;
 
       previous.clear();
       for (const [netId, entity] of current) previous.set(netId, entity);
       candidates.sort((a, b) => b.priority - a.priority);
       return candidates[0] ?? null;
     },
-    reset() { previous.clear(); },
+    reset() { previous.clear(); pendingDodge = null; },
   };
 }
 
@@ -173,20 +176,35 @@ function collectParryEvents(events, beforeOwn, own, beforePeer, peer) {
   }
 }
 
-function collectDodgeEvents(events, beforeOwn, own, beforePeer, peer) {
-  const ownDodgedThreat = beforePeer.action === COMBAT_ACTION.attackActive
-    && peer.action === COMBAT_ACTION.attackRecovery
-    && beforeOwn.action === COMBAT_ACTION.dodge
-    && own.hp === beforeOwn.hp && own.guard === beforeOwn.guard
-    && attackThreatens(beforePeer, beforeOwn);
-  const peerDodgedThreat = beforeOwn.action === COMBAT_ACTION.attackActive
-    && own.action === COMBAT_ACTION.attackRecovery
-    && beforePeer.action === COMBAT_ACTION.dodge
-    && peer.hp === beforePeer.hp && peer.guard === beforePeer.guard
-    && attackThreatens(beforeOwn, beforePeer);
+function collectDodgeEvents(events, own, peer, ownId, pending) {
+  if (pending) {
+    const attacker = pending.attackerId === own.netId ? own : pending.attackerId === peer.netId ? peer : null;
+    const defender = pending.defenderId === own.netId ? own : pending.defenderId === peer.netId ? peer : null;
+    const vitalsStable = defender && defender.hp === pending.hp && defender.guard === pending.guard;
+    if (!attacker || !vitalsStable) {
+      pending = null;
+    } else if (attacker.action === COMBAT_ACTION.attackRecovery) {
+      const ownDefended = defender.netId === ownId;
+      push(
+        events,
+        "dodge",
+        ownDefended ? "Dodge! Strike avoided." : "Attack evaded - opponent dodged.",
+        820,
+        ownDefended ? "dodge-success" : "dodge-evaded",
+      );
+      pending = null;
+    } else if (attacker.action !== COMBAT_ACTION.attackActive) {
+      pending = null;
+    }
+  }
 
-  if (ownDodgedThreat) push(events, "dodge", "Dodge! Strike avoided.", 820, "dodge-success");
-  if (peerDodgedThreat) push(events, "dodge", "Attack evaded - opponent dodged.", 820, "dodge-evaded");
+  if (peer.action === COMBAT_ACTION.attackActive && own.action === COMBAT_ACTION.dodge && attackThreatens(peer, own)) {
+    return { attackerId: peer.netId, defenderId: own.netId, hp: own.hp, guard: own.guard };
+  }
+  if (own.action === COMBAT_ACTION.attackActive && peer.action === COMBAT_ACTION.dodge && attackThreatens(own, peer)) {
+    return { attackerId: own.netId, defenderId: peer.netId, hp: peer.hp, guard: peer.guard };
+  }
+  return pending;
 }
 
 function attackThreatens(attacker, defender) {

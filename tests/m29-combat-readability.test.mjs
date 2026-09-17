@@ -81,6 +81,22 @@ test("authoritative threatening strike evaded by opponent emits dodge-evaded", (
   assert.equal(event.feedback, "dodge-evaded");
 });
 
+test("dodge evidence survives dodge recovery until authoritative attack recovery", () => {
+  const tracker = createCombatReadabilityTracker();
+  tracker.observe(state(fighter(2, 100, 100, COMBAT_ACTION.dodge, 80), fighter(1, 100, 100, COMBAT_ACTION.attackActive, 0, 0, 0)), 2);
+  assert.equal(tracker.observe(state(fighter(2, 100, 100, COMBAT_ACTION.dodgeRecovery, 88), fighter(1, 100, 100, COMBAT_ACTION.attackActive, 0, 0, 0)), 2), null);
+  const event = tracker.observe(state(fighter(2, 100, 100, COMBAT_ACTION.dodgeRecovery, 92), fighter(1, 100, 100, COMBAT_ACTION.attackRecovery, 0, 0, 0)), 2);
+  assert.equal(event.kind, "dodge");
+  assert.equal(event.feedback, "dodge-success");
+});
+
+test("buffered dodge evidence is invalidated by authoritative damage", () => {
+  const tracker = createCombatReadabilityTracker();
+  tracker.observe(state(fighter(2, 100, 100, COMBAT_ACTION.dodge, 80), fighter(1, 100, 100, COMBAT_ACTION.attackActive, 0, 0, 0)), 2);
+  tracker.observe(state(fighter(2, 66, 100, COMBAT_ACTION.dodgeRecovery, 88), fighter(1, 100, 100, COMBAT_ACTION.attackActive, 0, 0, 0)), 2);
+  assert.equal(tracker.observe(state(fighter(2, 66, 100, COMBAT_ACTION.dodgeRecovery, 92), fighter(1, 100, 100, COMBAT_ACTION.attackRecovery, 0, 0, 0)), 2), null);
+});
+
 test("out-of-range attack recovery is not falsely credited to dodge", () => {
   const tracker = createCombatReadabilityTracker();
   tracker.observe(state(fighter(2, 100, 100, COMBAT_ACTION.dodge, 120), fighter(1, 100, 100, COMBAT_ACTION.attackActive, 0, 0, 0)), 2);
