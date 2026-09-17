@@ -314,7 +314,11 @@ function sendCombatInput() {
       } else if (scenario === "dodge") {
         if (peer.action === 1) {
           if (dodgeWindupSeenAt === null) dodgeWindupSeenAt = performance.now();
-          if (!dodgeTriggered && performance.now() - dodgeWindupSeenAt >= 15) {
+          if (!dodgeTriggered && performance.now() - dodgeWindupSeenAt >= 35) {
+            if (distance > 0.001) {
+              moveX = -dy / distance;
+              moveY = dx / distance;
+            }
             dodge = true;
             dodgeTriggered = true;
             dodgeReactionMs = performance.now() - dodgeWindupSeenAt;

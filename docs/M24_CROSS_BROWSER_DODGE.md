@@ -11,7 +11,7 @@ Prove that a real browser defender can evade an authoritative attack through the
 - Both clients approach through ordinary movement input.
 - The attacker starts a normal attack from inside authoritative hit reach.
 - The defender reacts only after its browser observes authoritative `AttackWindup`.
-- The defender sends ordinary dodge input after a short reaction delay; no block input is used.
+- The defender sends ordinary dodge input 35 ms after first observing windup, with its movement vector rotated perpendicular to the attacker line so the real dodge remains inside the authoritative threat geometry; no block input is used.
 
 ## Acceptance
 
