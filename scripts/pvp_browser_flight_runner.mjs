@@ -209,19 +209,12 @@ async function runOnlineUiFlight(entries) {
   if (!elementId) throw new Error(`${attacker.name} did not resolve the real arena canvas`);
 
   let evidence = null;
-  let movementHeld = false;
-  try {
-    await setMovementKey(attacker, "d", true);
-    movementHeld = true;
-    await sleep(120);
-    for (let attempt = 0; attempt < 5 && !evidence; attempt += 1) {
-      await performArenaAttack(attacker, elementId);
-      evidence = await waitForUiCombatEvidence(entries, 700, false);
-    }
-    if (!evidence) evidence = await waitForUiCombatEvidence(entries, 1000, true);
-  } finally {
-    if (movementHeld) await setMovementKey(attacker, "d", false);
+  await pulseMovementKey(attacker, "d", 120);
+  for (let attempt = 0; attempt < 5 && !evidence; attempt += 1) {
+    await performArenaAttack(attacker, elementId);
+    evidence = await waitForUiCombatEvidence(entries, 700, false);
   }
+  if (!evidence) evidence = await waitForUiCombatEvidence(entries, 1000, true);
   await sleep(100);
   evidence = await Promise.all(entries.map(readUiEvidence));
   const attackerResult = evidence.find((entry) => entry.browser === attacker.name);
