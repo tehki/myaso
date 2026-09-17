@@ -720,7 +720,7 @@ async function pressArenaPerpendicularDodgeAfterPause(session, delayMs) {
         { type: "pause", duration: delayMs },
         { type: "keyDown", value: "s" },
         { type: "keyDown", value: "\uE00D" },
-        { type: "pause", duration: 40 },
+        { type: "pause", duration: 100 },
         { type: "keyUp", value: "\uE00D" },
         { type: "keyUp", value: "s" },
       ],
