@@ -537,7 +537,7 @@ async function runOnlineUiDodgeTellFlight(entries) {
   let tell;
   try {
     await pressArenaPerpendicularDodgeAfterPause(dodger, 0);
-    tell = await waitForRemoteDodgeTell(observer, dodger, 700);
+    tell = await waitForRemoteDodgeTell(entries, observer, dodger, 700);
   } finally {
     await Promise.all(entries.map(stopDodgeTellSampler));
   }
@@ -932,12 +932,7 @@ async function armDodgeTellSampler(session) {
     const state = { active: true, frame: 0, maxPixels: 0 };
     const sample = () => {
       if (!state.active) return;
-      const half = 160;
-      const x = Math.max(0, Math.floor(arena.width / 2 - half));
-      const y = Math.max(0, Math.floor(arena.height / 2 - half));
-      const width = Math.min(half * 2, arena.width - x);
-      const height = Math.min(half * 2, arena.height - y);
-      const pixels = context.getImageData(x, y, width, height).data;
+      const pixels = context.getImageData(0, 0, arena.width, arena.height).data;
       let count = 0;
       for (let i = 0; i < pixels.length; i += 4) {
         if (Math.abs(pixels[i] - 199) <= 2 && Math.abs(pixels[i + 1] - 181) <= 2 && Math.abs(pixels[i + 2] - 255) <= 2 && pixels[i + 3] >= 250) count += 1;
@@ -979,7 +974,7 @@ async function sampleDodgeTellPixels(session) {
   `);
 }
 
-async function waitForRemoteDodgeTell(observer, localDodger, timeoutMs) {
+async function waitForRemoteDodgeTell(entries, observer, localDodger, timeoutMs) {
   const deadline = Date.now() + timeoutMs;
   let observerMax = 0;
   let localMax = 0;
@@ -993,7 +988,8 @@ async function waitForRemoteDodgeTell(observer, localDodger, timeoutMs) {
     }
     await sleep(20);
   }
-  throw new Error(`M43 remote dodge tell never appeared: observer=${observerMax} local=${localMax}`);
+  const evidence = await Promise.all(entries.map(readUiEvidence));
+  throw new Error(`M43 remote dodge tell never appeared: observer=${observerMax} local=${localMax} evidence=${JSON.stringify(evidence)}`);
 }
 
 async function waitForDodgeTellClear(session, timeoutMs) {

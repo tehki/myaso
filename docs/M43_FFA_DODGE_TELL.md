@@ -16,7 +16,9 @@ Make an authoritative remote Dodge unmistakably readable in free-for-all combat 
 
 The dedicated `uidodgetell` Chrome+Firefox flight opens the production `index.html` path against one loopback authoritative server. Chrome is the passive observer and Firefox is the dodger. Firefox receives genuine W3C `KeyS` + Space input.
 
-Because authoritative Dodge is brief, both browsers arm a passive `requestAnimationFrame` pixel sampler before the genuine input. The sampler tracks only the unique violet tell color in a bounded central combat envelope; it never injects or mutates fighter state.
+Because authoritative Dodge is brief, both browsers arm a passive `requestAnimationFrame` pixel sampler before the genuine input. The sampler tracks only the unique violet tell color across the rendered canvas; it never injects or mutates fighter state. Full-canvas sampling is intentional because M43 does not move the fighters together before Dodge, so a valid visible remote fighter is not guaranteed to lie inside M39's smaller central attack-intent envelope.
+
+On timeout, the acceptance reports the normal UI/key evidence from both browsers so a missing tell can be distinguished from missing input or state convergence.
 
 The flight passes only when:
 
