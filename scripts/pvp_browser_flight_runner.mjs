@@ -563,12 +563,27 @@ async function runOnlineUiGuardBreakFlight(entries) {
   await Promise.all(entries.map(centerArenaInViewport));
   await pulseMovementKey(attacker, "d", 120);
   await aimArena(defender, defenderElementId, -200);
-  const attackAction = performGuardBreakAttackSeries(attacker, attackerElementId, 350);
-  await sleep(30);
-  // Keep the genuine stale block held across three complete 470 ms attack commitments.
-  const blockAction = holdArenaBlock(defender, 2600);
-  await Promise.all([attackAction, blockAction]);
-  const evidence = await waitForUiGuardBreakEvidence(entries, attacker, defender, 1200);
+  let evidence = null;
+  let blockHeld = false;
+  try {
+    await setArenaBlock(defender, defenderElementId, true);
+    blockHeld = true;
+    await sleep(180);
+    let guardBroken = false;
+    for (let attempt = 0; attempt < 4 && !guardBroken; attempt += 1) {
+      await performArenaAttack(attacker, attackerElementId);
+      await sleep(230);
+      const states = await Promise.all(entries.map(readUiEvidence));
+      const defenderState = states.find((entry) => entry.browser === defender.name);
+      guardBroken = defenderState?.playerGuard === 0;
+      if (!guardBroken) await sleep(300);
+    }
+    evidence = await waitForUiGuardBreakEvidence(entries, attacker, defender, guardBroken ? 500 : 300);
+  } finally {
+    if (blockHeld) await setArenaBlock(defender, defenderElementId, false);
+  }
+  await sleep(20);
+  evidence = await Promise.all(entries.map(readUiEvidence));
 
   const attackerResult = evidence.find((entry) => entry.browser === attacker.name);
   const defenderResult = evidence.find((entry) => entry.browser === defender.name);
@@ -757,41 +772,6 @@ async function performArenaAttack(session, elementId, xOffset = 200) {
         { type: "pointerDown", button: 0 },
         { type: "pause", duration: 40 },
         { type: "pointerUp", button: 0 },
-      ],
-    }],
-  });
-}
-
-async function performGuardBreakAttackSeries(session, elementId, initialDelayMs) {
-  const origin = { "element-6066-11e4-a52e-4f735466cecf": elementId };
-  await webdriver(session.base, "POST", `/session/${session.sessionId}/actions`, {
-    actions: [{
-      type: "pointer",
-      id: `mouse-${session.name}`,
-      parameters: { pointerType: "mouse" },
-      actions: [
-        { type: "pause", duration: initialDelayMs },
-        { type: "pointerMove", duration: 0, origin, x: 200, y: 0 },
-        { type: "pointerDown", button: 0 }, { type: "pause", duration: 40 }, { type: "pointerUp", button: 0 },
-        { type: "pause", duration: 760 },
-        { type: "pointerDown", button: 0 }, { type: "pause", duration: 40 }, { type: "pointerUp", button: 0 },
-        { type: "pause", duration: 760 },
-        { type: "pointerDown", button: 0 }, { type: "pause", duration: 40 }, { type: "pointerUp", button: 0 },
-      ],
-    }],
-  });
-}
-
-async function holdArenaBlock(session, durationMs) {
-  await webdriver(session.base, "POST", `/session/${session.sessionId}/actions`, {
-    actions: [{
-      type: "pointer",
-      id: `mouse-${session.name}`,
-      parameters: { pointerType: "mouse" },
-      actions: [
-        { type: "pointerDown", button: 2 },
-        { type: "pause", duration: durationMs },
-        { type: "pointerUp", button: 2 },
       ],
     }],
   });
