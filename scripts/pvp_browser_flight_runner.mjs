@@ -1031,7 +1031,12 @@ async function sampleWindupTellPixels(session) {
     const arena = document.querySelector('#arena');
     const context = arena?.getContext('2d');
     if (!context) return 0;
-    const pixels = context.getImageData(0, 0, arena.width, arena.height).data;
+    const half = 160;
+    const x = Math.max(0, Math.floor(arena.width / 2 - half));
+    const y = Math.max(0, Math.floor(arena.height / 2 - half));
+    const width = Math.min(half * 2, arena.width - x);
+    const height = Math.min(half * 2, arena.height - y);
+    const pixels = context.getImageData(x, y, width, height).data;
     let count = 0;
     for (let i = 0; i < pixels.length; i += 4) {
       if (Math.abs(pixels[i] - 243) <= 2 && Math.abs(pixels[i + 1] - 214) <= 2 && Math.abs(pixels[i + 2] - 143) <= 2 && pixels[i + 3] >= 250) count += 1;
