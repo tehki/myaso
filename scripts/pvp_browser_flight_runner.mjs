@@ -369,14 +369,16 @@ async function runOnlineUiDodgeFeedbackFlight(entries) {
   await pulseMovementKey(attacker, movementKey, 120);
 
   let evidence;
-  // M24 owns reaction-timing proof. M36 starts genuine cross-driver inputs together and
-  // dodges perpendicular to the attack line so the iframe remains inside the active arc.
-  const attackAction = setArenaAttack(attacker, attackerElementId, true, attackOffset);
-  const dodgeAction = pressArenaPerpendicularDodgeAfterPause(defender, 70);
+  // M24 owns reaction-timing proof. M36 waits for the production UI to observe the
+  // committed windup before issuing the real dodge, avoiding cross-driver launch skew.
+  let attackHeld = false;
   try {
-    await Promise.all([attackAction, dodgeAction]);
+    attackHeld = true;
+    await setArenaAttack(attacker, attackerElementId, true, attackOffset);
+    await waitForUiMessage(attacker, "Attack committed - your windup is readable.", 500);
+    await pressArenaPerpendicularDodgeAfterPause(defender, 20);
   } finally {
-    await setArenaAttack(attacker, attackerElementId, false, attackOffset);
+    if (attackHeld) await setArenaAttack(attacker, attackerElementId, false, attackOffset);
   }
   // Avoid cross-driver churn until the strike has resolved while the 118 ms iframe is active.
   await sleep(180);
