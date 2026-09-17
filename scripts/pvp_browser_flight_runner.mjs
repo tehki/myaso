@@ -772,11 +772,11 @@ async function performGuardBreakAttackSeries(session, elementId, initialDelayMs)
       actions: [
         { type: "pause", duration: initialDelayMs },
         { type: "pointerMove", duration: 0, origin, x: 200, y: 0 },
-        { type: "pointerDown", button: 0 }, { type: "pause", duration: 40 }, { type: "pointerUp", button: 0 },
+        { type: "pointerDown", button: 0 }, { type: "pause", duration: 100 }, { type: "pointerUp", button: 0 },
         { type: "pause", duration: 560 },
-        { type: "pointerDown", button: 0 }, { type: "pause", duration: 40 }, { type: "pointerUp", button: 0 },
+        { type: "pointerDown", button: 0 }, { type: "pause", duration: 100 }, { type: "pointerUp", button: 0 },
         { type: "pause", duration: 560 },
-        { type: "pointerDown", button: 0 }, { type: "pause", duration: 40 }, { type: "pointerUp", button: 0 },
+        { type: "pointerDown", button: 0 }, { type: "pause", duration: 100 }, { type: "pointerUp", button: 0 },
       ],
     }],
   });
