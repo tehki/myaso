@@ -8,10 +8,11 @@ Make a successful authoritative dodge readable on the normal online arena withou
 
 In an exactly two-fighter state, dodge success is inferred only after a completed authoritative exchange:
 
-- the attacker was `AttackActive` and becomes `AttackRecovery`;
-- the defender was authoritatively `Dodge` during the threatening active snapshot;
-- defender HP and guard remain unchanged;
-- the defender was inside the authoritative attack range and arc at that active snapshot.
+- the defender is authoritatively `Dodge` while a committed attacker is `AttackWindup` or `AttackActive` and the defender is inside that attack's authoritative range/arc;
+- the committed strike must subsequently be observed in `AttackActive`, so a windup-only sequence cannot earn dodge credit;
+- once that threat is verified, the evidence remains eligible through later `DodgeRecovery` and evasive movement until the attacker reaches `AttackRecovery`;
+- defender HP and guard must remain unchanged throughout the buffered evidence;
+- out-of-range/out-of-arc windup or active samples never arm the evidence.
 
 The defender receives `Dodge! Strike avoided.` plus `dodge-success`. The attacker receives `Attack evaded - opponent dodged.` plus `dodge-evaded`.
 
@@ -24,7 +25,7 @@ The dedicated `uidodge` flight opens the production `index.html` path in real he
 - Firefox is the defender regardless of connection order and receives real `KeyS` + Space controls through W3C actions.
 - The flight derives left/right attack geometry from the assigned authoritative player IDs instead of assuming a browser always receives player 1 or player 2.
 - Firefox is first aimed toward Chrome through a real W3C pointer move. Its dodge then uses `KeyS` to travel perpendicular to the attack line, avoiding the unstable no-movement case where facing sends the defender through the attacker and out of the tracked threat arc.
-- Chrome attack-down and Firefox dodge actions start concurrently. Firefox waits 70 ms inside its W3C sequence before `KeyS` + Space, leaving a broad authoritative overlap between the 135 ms windup, 118 ms iframe, and the 94-unit center-distance attack envelope without injected state.
+- Firefox first receives a genuine W3C dodge sequence with a 90 ms internal pause; Chrome starts the genuine attack about 50 ms later, leaving roughly a 40 ms attack-to-dodge offset. That timing already produced a clean authoritative 100/100 dodge in real CI; the readability tracker now buffers the threatening Windup sample through later evasive movement until Active and Recovery are observed.
 - The flight requires opposite-client `dodge-evaded` / `dodge-success` feedback and both semantic messages.
 - Both fighters must remain at 100 HP / 100 guard.
 - No parry feedback may appear.

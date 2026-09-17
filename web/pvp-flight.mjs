@@ -301,7 +301,7 @@ function sendCombatInput() {
       } else if (scenario === "parry") {
         if (peer.action === 1) {
           if (parryWindupSeenAt === null) parryWindupSeenAt = performance.now();
-          if (!parryBlockArmed && performance.now() - parryWindupSeenAt >= 35) {
+          if (!parryBlockArmed && performance.now() - parryWindupSeenAt >= 25) {
             parryBlockArmed = true;
             parryReactionMs = performance.now() - parryWindupSeenAt;
           }
@@ -315,6 +315,10 @@ function sendCombatInput() {
         if (peer.action === 1) {
           if (dodgeWindupSeenAt === null) dodgeWindupSeenAt = performance.now();
           if (!dodgeTriggered && performance.now() - dodgeWindupSeenAt >= 35) {
+            if (distance > 0.001) {
+              moveX = -dy / distance;
+              moveY = dx / distance;
+            }
             dodge = true;
             dodgeTriggered = true;
             dodgeReactionMs = performance.now() - dodgeWindupSeenAt;

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { COMBAT_ACTION, combatActionHint, combatLifePresentation, combatOverlayPresentation, createCombatReadabilityTracker, guardBreakSpatialPresentation, opponentRecoveryPresentation, parrySpatialPresentation } from "../src/browser/combat-readability.mjs";
+import { COMBAT_ACTION, blockSpatialPresentation, combatActionHint, combatLifePresentation, combatOverlayPresentation, createCombatReadabilityTracker, guardBreakSpatialPresentation, opponentRecoveryPresentation, parrySpatialPresentation } from "../src/browser/combat-readability.mjs";
 
 function fighter(netId, hp = 100, guard = 100, action = COMBAT_ACTION.idle, x = 0, y = 0, facing = 0) {
   return { netId, hp, guard, action, x, y, facing };
@@ -81,6 +81,36 @@ test("authoritative threatening strike evaded by opponent emits dodge-evaded", (
   assert.equal(event.feedback, "dodge-evaded");
 });
 
+test("dodge evidence survives dodge recovery until authoritative attack recovery", () => {
+  const tracker = createCombatReadabilityTracker();
+  tracker.observe(state(fighter(2, 100, 100, COMBAT_ACTION.dodge, 80), fighter(1, 100, 100, COMBAT_ACTION.attackActive, 0, 0, 0)), 2);
+  assert.equal(tracker.observe(state(fighter(2, 100, 100, COMBAT_ACTION.dodgeRecovery, 88), fighter(1, 100, 100, COMBAT_ACTION.attackActive, 0, 0, 0)), 2), null);
+  const event = tracker.observe(state(fighter(2, 100, 100, COMBAT_ACTION.dodgeRecovery, 92), fighter(1, 100, 100, COMBAT_ACTION.attackRecovery, 0, 0, 0)), 2);
+  assert.equal(event.kind, "dodge");
+  assert.equal(event.feedback, "dodge-success");
+});
+test("threatening windup dodge remains credited after movement escapes active range", () => {
+  const tracker = createCombatReadabilityTracker();
+  assert.equal(tracker.observe(state(fighter(2, 100, 100, COMBAT_ACTION.dodge, 80), fighter(1, 100, 100, COMBAT_ACTION.attackWindup, 0, 0, 0)), 2), null);
+  assert.equal(tracker.observe(state(fighter(2, 100, 100, COMBAT_ACTION.dodgeRecovery, 120), fighter(1, 100, 100, COMBAT_ACTION.attackActive, 0, 0, 0)), 2), null);
+  const event = tracker.observe(state(fighter(2, 100, 100, COMBAT_ACTION.dodgeRecovery, 128), fighter(1, 100, 100, COMBAT_ACTION.attackRecovery, 0, 0, 0)), 2);
+  assert.equal(event.kind, "dodge");
+  assert.equal(event.feedback, "dodge-success");
+});
+
+test("windup dodge is not credited unless the committed strike is observed active", () => {
+  const tracker = createCombatReadabilityTracker();
+  assert.equal(tracker.observe(state(fighter(2, 100, 100, COMBAT_ACTION.dodge, 80), fighter(1, 100, 100, COMBAT_ACTION.attackWindup, 0, 0, 0)), 2), null);
+  assert.equal(tracker.observe(state(fighter(2, 100, 100, COMBAT_ACTION.dodgeRecovery, 120), fighter(1, 100, 100, COMBAT_ACTION.attackRecovery, 0, 0, 0)), 2), null);
+});
+
+test("buffered dodge evidence is invalidated by authoritative damage", () => {
+  const tracker = createCombatReadabilityTracker();
+  tracker.observe(state(fighter(2, 100, 100, COMBAT_ACTION.dodge, 80), fighter(1, 100, 100, COMBAT_ACTION.attackActive, 0, 0, 0)), 2);
+  tracker.observe(state(fighter(2, 66, 100, COMBAT_ACTION.dodgeRecovery, 88), fighter(1, 100, 100, COMBAT_ACTION.attackActive, 0, 0, 0)), 2);
+  assert.equal(tracker.observe(state(fighter(2, 66, 100, COMBAT_ACTION.dodgeRecovery, 92), fighter(1, 100, 100, COMBAT_ACTION.attackRecovery, 0, 0, 0)), 2), null);
+});
+
 test("out-of-range attack recovery is not falsely credited to dodge", () => {
   const tracker = createCombatReadabilityTracker();
   tracker.observe(state(fighter(2, 100, 100, COMBAT_ACTION.dodge, 120), fighter(1, 100, 100, COMBAT_ACTION.attackActive, 0, 0, 0)), 2);
@@ -108,6 +138,12 @@ test("zero-guard stun exposes a spatial guard-break tell", () => {
   assert.deepEqual(guardBreakSpatialPresentation(fighter(2, 100, 0, COMBAT_ACTION.stunned)), { visible: true, state: "guard-broken" });
   assert.deepEqual(guardBreakSpatialPresentation(fighter(2, 100, 100, COMBAT_ACTION.stunned)), { visible: false, state: "" });
   assert.deepEqual(guardBreakSpatialPresentation(fighter(2, 100, 0, COMBAT_ACTION.block)), { visible: false, state: "" });
+});
+
+test("authoritative block exposes its replicated facing as a spatial tell", () => {
+  assert.deepEqual(blockSpatialPresentation(fighter(2, 100, 100, COMBAT_ACTION.block, 0, 0, 1.25)), { visible: true, state: "blocking", facing: 1.25 });
+  assert.deepEqual(blockSpatialPresentation(fighter(2, 100, 100, COMBAT_ACTION.idle, 0, 0, 1.25)), { visible: false, state: "", facing: 0 });
+  assert.deepEqual(blockSpatialPresentation({ ...fighter(2, 100, 100, COMBAT_ACTION.block), facing: Number.NaN }), { visible: false, state: "", facing: 0 });
 });
 
 test("positive-guard stun exposes a mutually exclusive spatial parry tell", () => {

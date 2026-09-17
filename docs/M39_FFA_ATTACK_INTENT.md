@@ -14,7 +14,7 @@ M39 consumes only existing replicated authoritative action/facing state. It does
 
 ## Acceptance
 
-The dedicated `uiattackintent` Chrome+Firefox flight opens the production `index.html`, drives a genuine pointer attack through WebDriver, and samples the rendered canvas without injecting combat state.
+The dedicated `uiattackintent` Chrome+Firefox flight opens the production `index.html`, drives a genuine pointer attack through WebDriver, and arms a passive `requestAnimationFrame` sampler before that input. The sampler tracks the maximum matching pixels in a bounded 320×320 combat envelope throughout the brief authoritative windup without injecting or mutating combat state. The bound contains the remote fighter plus the 94-unit windup cone while avoiding Firefox full-canvas script timeouts and WebDriver round-trip gaps.
 
 Chrome is the attacker and Firefox is the observer. Spawn ordering determines left/right movement and aim. Firefox must observe the unique remote-windup boundary pixels, while Chrome must never paint that remote-only boundary around its local fighter. The boundary must clear after the authoritative windup ends.
 

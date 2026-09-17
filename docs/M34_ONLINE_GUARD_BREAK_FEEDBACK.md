@@ -18,7 +18,7 @@ M34 adds presentation cues only after the existing authoritative readability tra
 ## Real-browser flight
 
 The `uiguardbreak` scenario uses the production `index.html` client in Chrome and Firefox against one loopback authoritative server.
-Chrome is the attacker and uses real `D` movement plus the proven rightward LMB sequence. Firefox pre-aims left, holds real RMB continuously, waits beyond the 115 ms parry-entry window, and then receives three authoritative blocked attacks.
+Chrome is the attacker and uses real `D` movement plus separate genuine rightward LMB requests. Firefox pre-aims left and holds real RMB continuously beyond the 115 ms parry-entry window. Each LMB request is issued only after the prior 470 ms attack commitment can finish, while guard is sampled before RMB release; a bounded fourth browser edge is allowed only if one request is dropped before becoming an authoritative attack.
 
 The flight passes only when:
 
