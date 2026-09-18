@@ -8,7 +8,7 @@ import { setTimeout as sleep } from "node:timers/promises";
 const root = process.cwd();
 const durationMs = Number(process.env.MYASO_PVP_FLIGHT_DURATION_MS ?? 7000);
 const scenario = process.env.MYASO_PVP_SCENARIO ?? "damage";
-if (!new Set(["damage", "parry", "dodge", "block", "guardbreak", "backblock", "respawn", "ui", "uirespawn", "uifeedback", "uihittell", "uivitals", "uiidentity", "uiscore", "uimatch", "uiparry", "uistun", "uiguardbreak", "uidodge", "uirecovery", "uirecoverytell", "uiattackintent", "uiguardbreaktell", "uiparrytell", "uiblockfacingtell", "uidodgetell", "uideathtell"]).has(scenario)) throw new Error(`unsupported MYASO_PVP_SCENARIO: ${scenario}`);
+if (!new Set(["damage", "parry", "dodge", "block", "guardbreak", "backblock", "respawn", "ui", "uirespawn", "uifeedback", "uihittell", "uivitals", "uiidentity", "uiscore", "uimatch", "uirematch", "uiparry", "uistun", "uiguardbreak", "uidodge", "uirecovery", "uirecoverytell", "uiattackintent", "uiguardbreaktell", "uiparrytell", "uiblockfacingtell", "uidodgetell", "uideathtell"]).has(scenario)) throw new Error(`unsupported MYASO_PVP_SCENARIO: ${scenario}`);
 const staticPort = Number(process.env.MYASO_PVP_FLIGHT_HTTP_PORT ?? 4174);
 const browsers = [
   {
@@ -68,6 +68,9 @@ try {
   } else if (scenario === "uimatch") {
     const results = await runOnlineUiMatchFlight(sessions);
     console.log(`M49_FFA_MATCH_WINNER ${JSON.stringify({ ok: true, results })}`);
+  } else if (scenario === "uirematch") {
+    const results = await runOnlineUiRematchFlight(sessions);
+    console.log(`M50_FFA_REMATCH_LIFECYCLE ${JSON.stringify({ ok: true, results })}`);
   } else if (scenario === "uiparry") {
     const results = await runOnlineUiParryFlight(sessions);
     console.log(`M33_ONLINE_PARRY_FEEDBACK ${JSON.stringify({ ok: true, results })}`);
@@ -201,7 +204,7 @@ async function startBrowser(browser) {
 }
 
 async function navigate(session, gameUrl, certificateHash) {
-  const page = scenario === "ui" || scenario === "uirespawn" || scenario === "uifeedback" || scenario === "uihittell" || scenario === "uivitals" || scenario === "uiidentity" || scenario === "uiscore" || scenario === "uimatch" || scenario === "uiparry" || scenario === "uistun" || scenario === "uiguardbreak" || scenario === "uidodge" || scenario === "uirecovery" || scenario === "uirecoverytell" || scenario === "uiattackintent" || scenario === "uiguardbreaktell" || scenario === "uiparrytell" || scenario === "uiblockfacingtell" || scenario === "uidodgetell" || scenario === "uideathtell" ? "index.html" : "pvp-flight.html";
+  const page = scenario === "ui" || scenario === "uirespawn" || scenario === "uifeedback" || scenario === "uihittell" || scenario === "uivitals" || scenario === "uiidentity" || scenario === "uiscore" || scenario === "uimatch" || scenario === "uirematch" || scenario === "uiparry" || scenario === "uistun" || scenario === "uiguardbreak" || scenario === "uidodge" || scenario === "uirecovery" || scenario === "uirecoverytell" || scenario === "uiattackintent" || scenario === "uiguardbreaktell" || scenario === "uiparrytell" || scenario === "uiblockfacingtell" || scenario === "uidodgetell" || scenario === "uideathtell" ? "index.html" : "pvp-flight.html";
   const url = new URL(`http://127.0.0.1:${staticPort}/web/${page}`);
   url.searchParams.set("server", gameUrl);
   url.searchParams.set("cert", certificateHash);
@@ -922,6 +925,35 @@ async function runOnlineUiMatchFlight(entries) {
     throw new Error(`M49 authoritative match state did not remain frozen past respawn time: ${JSON.stringify(frozen)}`);
   }
   return frozen;
+}
+
+async function runOnlineUiRematchFlight(entries) {
+  const finished = await runOnlineUiMatchFlight(entries);
+  const ordered = finished.slice().sort((a, b) => a.playerNetId - b.playerNetId);
+  const attacker = entries.find((entry) => entry.name === ordered[0]?.browser);
+  const defender = entries.find((entry) => entry.name === ordered[1]?.browser);
+  if (!attacker || !defender) throw new Error(`M50 could not resolve rematch roles: ${JSON.stringify(finished)}`);
+
+  const reset = await waitForUiMatchResetEvidence(entries, 2200);
+  const attackerReady = reset.find((entry) => entry.browser === attacker.name);
+  const defenderReady = reset.find((entry) => entry.browser === defender.name);
+  if (!attackerReady || !defenderReady) throw new Error(`M50 incomplete reset evidence: ${JSON.stringify(reset)}`);
+
+  const attackRight = attackerReady.playerNetId < defenderReady.playerNetId;
+  const movementKey = attackRight ? "d" : "a";
+  const attackOffset = attackRight ? 200 : -200;
+  await Promise.all(entries.map((entry) => execute(entry.base, entry.sessionId, "document.querySelector('#arena').focus(); return document.activeElement?.id;")));
+  const elementId = await resolveArenaElement(attacker, "M50");
+  await pulseMovementKey(attacker, movementKey, 120);
+
+  let damageEvidence = null;
+  for (let attempt = 0; attempt < 3 && !damageEvidence; attempt += 1) {
+    await performArenaAttack(attacker, elementId, attackOffset);
+    damageEvidence = await waitForUiPostResetDamageEvidence(entries, attacker, defender, 800, false);
+    if (!damageEvidence) await pulseMovementKey(attacker, movementKey, 60);
+  }
+  if (!damageEvidence) damageEvidence = await waitForUiPostResetDamageEvidence(entries, attacker, defender, 1200, true);
+  return damageEvidence;
 }
 
 async function runOnlineUiDeathTellFlight(entries) {
@@ -1690,6 +1722,39 @@ async function waitForUiDeathEvidence(entries, attacker, defender, timeoutMs, fa
   }
   if (!fail) return null;
   throw new Error(`real online UI never rendered authoritative defeat: ${JSON.stringify(await Promise.all(entries.map(readUiEvidence)))}`);
+}
+
+async function waitForUiMatchResetEvidence(entries, timeoutMs) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const states = await Promise.all(entries.map(readUiEvidence));
+    const ready = states.every((entry) => entry.scoreboardRows?.length === 2
+      && entry.scoreboardRows.every((row) => row.kills === 0)
+      && entry.playerHp === 100 && entry.playerGuard === 100
+      && entry.opponentHp === 100 && entry.opponentGuard === 100
+      && !entry.overlayVisible);
+    if (ready) return states;
+    await sleep(50);
+  }
+  throw new Error(`real online UI never returned to authoritative 0-0 rematch state: ${JSON.stringify(await Promise.all(entries.map(readUiEvidence)))}`);
+}
+
+async function waitForUiPostResetDamageEvidence(entries, attacker, defender, timeoutMs, fail = true) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const states = await Promise.all(entries.map(readUiEvidence));
+    const attackerState = states.find((entry) => entry.browser === attacker.name);
+    const defenderState = states.find((entry) => entry.browser === defender.name);
+    const scoreClean = states.every((entry) => entry.scoreboardRows?.length === 2
+      && entry.scoreboardRows.every((row) => row.kills === 0));
+    const damageReady = attackerState?.opponentHp < 100 && attackerState?.opponentHp > 0
+      && defenderState?.playerHp === attackerState?.opponentHp
+      && defenderState?.playerHp > 0;
+    if (scoreClean && damageReady && !attackerState?.overlayVisible && !defenderState?.overlayVisible) return states;
+    await sleep(50);
+  }
+  if (!fail) return null;
+  throw new Error(`real online UI rematch never accepted fresh authoritative damage: ${JSON.stringify(await Promise.all(entries.map(readUiEvidence)))}`);
 }
 
 async function waitForUiMatchEndEvidence(entries, attacker, defender, timeoutMs, fail = true) {
