@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { COMBAT_ACTION, blockSpatialPresentation, combatActionHint, combatLifePresentation, combatOverlayPresentation, createCombatReadabilityTracker, createRemoteDamageTracker, fighterIdentityPresentation, fighterVitalsPresentation, guardBreakSpatialPresentation, opponentRecoveryPresentation, parrySpatialPresentation } from "../src/browser/combat-readability.mjs";
+import { COMBAT_ACTION, blockSpatialPresentation, combatActionHint, combatLifePresentation, combatOverlayPresentation, createCombatReadabilityTracker, createRemoteDamageTracker, fighterIdentityPresentation, fighterScoreboardPresentation, fighterVitalsPresentation, guardBreakSpatialPresentation, opponentRecoveryPresentation, parrySpatialPresentation } from "../src/browser/combat-readability.mjs";
 
 function fighter(netId, hp = 100, guard = 100, action = COMBAT_ACTION.idle, x = 0, y = 0, facing = 0) {
   return { netId, hp, guard, action, x, y, facing };
@@ -78,6 +78,21 @@ test("fighter identity presentation exposes only valid authoritative network ids
   assert.deepEqual(fighterIdentityPresentation(512), { visible: true, label: "#512" });
   assert.deepEqual(fighterIdentityPresentation(0), { visible: false, label: "" });
   assert.deepEqual(fighterIdentityPresentation(2.5), { visible: false, label: "" });
+});
+
+test("FFA scoreboard presentation ranks authoritative kill scores with stable identity", () => {
+  assert.deepEqual(fighterScoreboardPresentation([
+    { netId: 3, flags: 1 },
+    { netId: 1, flags: 2 },
+    { netId: 2, flags: 2 },
+  ], 2), [
+    { netId: 1, kills: 2, own: false, label: "#1" },
+    { netId: 2, kills: 2, own: true, label: "#2" },
+    { netId: 3, kills: 1, own: false, label: "#3" },
+  ]);
+  assert.deepEqual(fighterScoreboardPresentation([{ netId: 4, flags: 999 }], 0), [
+    { netId: 4, kills: 255, own: false, label: "#4" },
+  ]);
 });
 
 test("guard-only loss is explained as a block instead of damage", () => {

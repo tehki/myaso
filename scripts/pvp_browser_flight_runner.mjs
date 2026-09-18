@@ -8,7 +8,7 @@ import { setTimeout as sleep } from "node:timers/promises";
 const root = process.cwd();
 const durationMs = Number(process.env.MYASO_PVP_FLIGHT_DURATION_MS ?? 7000);
 const scenario = process.env.MYASO_PVP_SCENARIO ?? "damage";
-if (!new Set(["damage", "parry", "dodge", "block", "guardbreak", "backblock", "respawn", "ui", "uirespawn", "uifeedback", "uihittell", "uivitals", "uiidentity", "uiparry", "uistun", "uiguardbreak", "uidodge", "uirecovery", "uirecoverytell", "uiattackintent", "uiguardbreaktell", "uiparrytell", "uiblockfacingtell", "uidodgetell", "uideathtell"]).has(scenario)) throw new Error(`unsupported MYASO_PVP_SCENARIO: ${scenario}`);
+if (!new Set(["damage", "parry", "dodge", "block", "guardbreak", "backblock", "respawn", "ui", "uirespawn", "uifeedback", "uihittell", "uivitals", "uiidentity", "uiscore", "uiparry", "uistun", "uiguardbreak", "uidodge", "uirecovery", "uirecoverytell", "uiattackintent", "uiguardbreaktell", "uiparrytell", "uiblockfacingtell", "uidodgetell", "uideathtell"]).has(scenario)) throw new Error(`unsupported MYASO_PVP_SCENARIO: ${scenario}`);
 const staticPort = Number(process.env.MYASO_PVP_FLIGHT_HTTP_PORT ?? 4174);
 const browsers = [
   {
@@ -62,6 +62,9 @@ try {
   } else if (scenario === "uiidentity") {
     const results = await runOnlineUiIdentityFlight(sessions);
     console.log(`M47_FFA_PLAYER_IDENTITY ${JSON.stringify({ ok: true, results })}`);
+  } else if (scenario === "uiscore") {
+    const results = await runOnlineUiScoreFlight(sessions);
+    console.log(`M48_FFA_KILL_SCORE ${JSON.stringify({ ok: true, results })}`);
   } else if (scenario === "uiparry") {
     const results = await runOnlineUiParryFlight(sessions);
     console.log(`M33_ONLINE_PARRY_FEEDBACK ${JSON.stringify({ ok: true, results })}`);
@@ -195,7 +198,7 @@ async function startBrowser(browser) {
 }
 
 async function navigate(session, gameUrl, certificateHash) {
-  const page = scenario === "ui" || scenario === "uirespawn" || scenario === "uifeedback" || scenario === "uihittell" || scenario === "uivitals" || scenario === "uiidentity" || scenario === "uiparry" || scenario === "uistun" || scenario === "uiguardbreak" || scenario === "uidodge" || scenario === "uirecovery" || scenario === "uirecoverytell" || scenario === "uiattackintent" || scenario === "uiguardbreaktell" || scenario === "uiparrytell" || scenario === "uiblockfacingtell" || scenario === "uidodgetell" || scenario === "uideathtell" ? "index.html" : "pvp-flight.html";
+  const page = scenario === "ui" || scenario === "uirespawn" || scenario === "uifeedback" || scenario === "uihittell" || scenario === "uivitals" || scenario === "uiidentity" || scenario === "uiscore" || scenario === "uiparry" || scenario === "uistun" || scenario === "uiguardbreak" || scenario === "uidodge" || scenario === "uirecovery" || scenario === "uirecoverytell" || scenario === "uiattackintent" || scenario === "uiguardbreaktell" || scenario === "uiparrytell" || scenario === "uiblockfacingtell" || scenario === "uidodgetell" || scenario === "uideathtell" ? "index.html" : "pvp-flight.html";
   const url = new URL(`http://127.0.0.1:${staticPort}/web/${page}`);
   url.searchParams.set("server", gameUrl);
   url.searchParams.set("cert", certificateHash);
@@ -861,6 +864,27 @@ async function runOnlineUiRespawnFlight(entries, onDeath = null) {
     throw new Error(`defender overlay did not follow authoritative death through respawn: ${JSON.stringify(defenderResult.overlayTransitions)}`);
   }
   return respawnEvidence;
+}
+
+async function runOnlineUiScoreFlight(entries) {
+  const evidence = await runOnlineUiRespawnFlight(entries);
+  const ordered = evidence.slice().sort((a, b) => a.playerNetId - b.playerNetId);
+  const attackerId = ordered[0]?.playerNetId ?? 0;
+  const defenderId = ordered[1]?.playerNetId ?? 0;
+  if (!attackerId || !defenderId) throw new Error(`M48 could not resolve authoritative score identities: ${JSON.stringify(evidence)}`);
+  for (const entry of evidence) {
+    const rows = entry.scoreboardRows ?? [];
+    if (rows.length !== 2
+      || rows[0]?.label !== `#${attackerId}` || rows[0]?.kills !== 1
+      || rows[1]?.label !== `#${defenderId}` || rows[1]?.kills !== 0) {
+      throw new Error(`M48 scoreboard did not converge to authoritative 1-0 kill score: ${JSON.stringify(entry)}`);
+    }
+    const ownRows = rows.filter((row) => row.own);
+    if (ownRows.length !== 1 || ownRows[0].label !== `#${entry.playerNetId}`) {
+      throw new Error(`M48 scoreboard local identity marker was incorrect: ${JSON.stringify(entry)}`);
+    }
+  }
+  return evidence;
 }
 
 async function runOnlineUiDeathTellFlight(entries) {
@@ -1660,6 +1684,11 @@ async function readUiEvidence(session) {
       playerGuard: Number(document.querySelector('#player-guard-value')?.textContent ?? NaN),
       opponentHp: Number(document.querySelector('#bot-hp-value')?.textContent ?? NaN),
       opponentGuard: Number(document.querySelector('#bot-guard-value')?.textContent ?? NaN),
+      scoreboardRows: [...document.querySelectorAll('#scoreboard-list li')].map((row) => ({
+        label: row.querySelector('span')?.textContent?.trim() ?? '',
+        kills: Number(row.querySelector('b')?.textContent ?? NaN),
+        own: row.dataset.own === 'true',
+      })),
       overlayVisible: !document.querySelector('#combat-overlay')?.hidden,
       overlayTitle: document.querySelector('#combat-overlay-title')?.textContent?.trim() ?? '',
       overlayDetail: document.querySelector('#combat-overlay-detail')?.textContent?.trim() ?? '',

@@ -92,6 +92,7 @@ pub struct Fighter {
     pub facing: f32,
     pub hp: f32,
     pub guard: f32,
+    pub kills: u16,
     pub action: Action,
     pub action_elapsed_ms: f32,
     pub recently_interacted_with: Option<u32>,
@@ -115,6 +116,7 @@ impl Fighter {
             facing: normalize_angle(facing),
             hp: 100.0,
             guard: GUARD_MAX,
+            kills: 0,
             action: Action::Idle,
             action_elapsed_ms: 0.0,
             recently_interacted_with: None,
@@ -545,6 +547,7 @@ fn resolve_attacks(
             });
 
             if target.hp <= EPSILON {
+                attacker.kills = attacker.kills.saturating_add(1);
                 target.action = Action::Dead;
                 target.action_elapsed_ms = 0.0;
                 target.action_duration_ms = 0.0;
