@@ -8,7 +8,7 @@ import { setTimeout as sleep } from "node:timers/promises";
 const root = process.cwd();
 const durationMs = Number(process.env.MYASO_PVP_FLIGHT_DURATION_MS ?? 7000);
 const scenario = process.env.MYASO_PVP_SCENARIO ?? "damage";
-if (!new Set(["damage", "parry", "dodge", "block", "guardbreak", "backblock", "respawn", "ui", "uirespawn", "uifeedback", "uiparry", "uistun", "uiguardbreak", "uidodge", "uirecovery", "uirecoverytell", "uiattackintent", "uiguardbreaktell", "uiparrytell", "uiblockfacingtell", "uidodgetell"]).has(scenario)) throw new Error(`unsupported MYASO_PVP_SCENARIO: ${scenario}`);
+if (!new Set(["damage", "parry", "dodge", "block", "guardbreak", "backblock", "respawn", "ui", "uirespawn", "uifeedback", "uiparry", "uistun", "uiguardbreak", "uidodge", "uirecovery", "uirecoverytell", "uiattackintent", "uiguardbreaktell", "uiparrytell", "uiblockfacingtell", "uidodgetell", "uideathtell"]).has(scenario)) throw new Error(`unsupported MYASO_PVP_SCENARIO: ${scenario}`);
 const staticPort = Number(process.env.MYASO_PVP_FLIGHT_HTTP_PORT ?? 4174);
 const browsers = [
   {
@@ -65,6 +65,9 @@ try {
   } else if (scenario === "uidodgetell") {
     const results = await runOnlineUiDodgeTellFlight(sessions);
     console.log(`M43_FFA_DODGE_TELL ${JSON.stringify({ ok: true, results })}`);
+  } else if (scenario === "uideathtell") {
+    const results = await runOnlineUiDeathTellFlight(sessions);
+    console.log(`M44_FFA_DEATH_TELL ${JSON.stringify({ ok: true, results })}`);
   } else if (scenario === "uistun") {
     const results = await runOnlineUiStunOverlayFlight(sessions);
     console.log(`M35_ONLINE_STUN_OVERLAY ${JSON.stringify({ ok: true, results })}`);
@@ -183,7 +186,7 @@ async function startBrowser(browser) {
 }
 
 async function navigate(session, gameUrl, certificateHash) {
-  const page = scenario === "ui" || scenario === "uirespawn" || scenario === "uifeedback" || scenario === "uiparry" || scenario === "uistun" || scenario === "uiguardbreak" || scenario === "uidodge" || scenario === "uirecovery" || scenario === "uirecoverytell" || scenario === "uiattackintent" || scenario === "uiguardbreaktell" || scenario === "uiparrytell" || scenario === "uiblockfacingtell" || scenario === "uidodgetell" ? "index.html" : "pvp-flight.html";
+  const page = scenario === "ui" || scenario === "uirespawn" || scenario === "uifeedback" || scenario === "uiparry" || scenario === "uistun" || scenario === "uiguardbreak" || scenario === "uidodge" || scenario === "uirecovery" || scenario === "uirecoverytell" || scenario === "uiattackintent" || scenario === "uiguardbreaktell" || scenario === "uiparrytell" || scenario === "uiblockfacingtell" || scenario === "uidodgetell" || scenario === "uideathtell" ? "index.html" : "pvp-flight.html";
   const url = new URL(`http://127.0.0.1:${staticPort}/web/${page}`);
   url.searchParams.set("server", gameUrl);
   url.searchParams.set("cert", certificateHash);
@@ -379,22 +382,49 @@ async function runOnlineUiDodgeFeedbackFlight(entries) {
   await aimArena(defender, defenderElementId, attackRight ? -200 : 200);
   await pulseMovementKey(attacker, movementKey, 120);
 
-  let evidence;
-  // M24 owns reaction-timing proof. M36 pre-arms a genuine delayed Firefox dodge,
-  // then starts the real Chrome attack inside that known delay to avoid driver launch skew.
-  const dodgeAction = pressArenaPerpendicularDodgeAfterPause(defender, 90);
-  await sleep(50);
-  let attackHeld = false;
-  try {
-    attackHeld = true;
-    await setArenaAttack(attacker, attackerElementId, true, attackOffset);
-    await dodgeAction;
-  } finally {
-    if (attackHeld) await setArenaAttack(attacker, attackerElementId, false, attackOffset);
+  let evidence = null;
+  let lastAttemptBaseline = null;
+  // M24 owns reaction-timing proof. M36 uses the already-proven real W3C timing, but
+  // treats a timing miss as retryable only while both fighters remain untouched and no
+  // parry occurs. No WebDriver polling runs during the attack/Dodge resolution window.
+  for (let attempt = 1; attempt <= 3 && !evidence; attempt += 1) {
+    lastAttemptBaseline = await Promise.all(entries.map(readUiEvidence));
+    if (!lastAttemptBaseline.every((entry) => entry.playerHp === 100 && entry.playerGuard === 100)) {
+      throw new Error(`M36 retry ${attempt} did not start from clean authoritative vitals: ${JSON.stringify(lastAttemptBaseline)}`);
+    }
+
+    const dodgeAction = pressArenaPerpendicularDodgeAfterPause(defender, 90);
+    await sleep(50);
+    let attackHeld = false;
+    try {
+      attackHeld = true;
+      await setArenaAttack(attacker, attackerElementId, true, attackOffset);
+      await dodgeAction;
+    } finally {
+      if (attackHeld) await setArenaAttack(attacker, attackerElementId, false, attackOffset);
+    }
+    // Keep the critical 118 ms iframe/strike window free of cross-driver evidence reads.
+    await sleep(180);
+    evidence = await waitForUiDodgeEvidence(entries, attacker, defender, 520, false, lastAttemptBaseline);
+    if (evidence) break;
+
+    const missed = await Promise.all(entries.map(readUiEvidence));
+    const vitalsClean = missed.every((entry) => entry.playerHp === 100 && entry.playerGuard === 100);
+    const parrySeen = missed.some((entry) => entry.feedbackTransitions.includes("parried") || entry.feedbackTransitions.includes("parry-success"));
+    if (!vitalsClean || parrySeen) {
+      throw new Error(`M36 retry ${attempt} failed closed after a resolved exchange: ${JSON.stringify(missed)}`);
+    }
+    if (attempt < 3) {
+      // Let both authoritative recovery windows settle, then approximately unwind the full
+      // perpendicular Dodge displacement with ordinary opposite movement. A 145 ms Dodge at
+      // 610 units/s can move about 88 units; 410 ms at the normal 215 units/s restores that
+      // spacing closely enough that each retry starts inside the same authoritative threat geometry.
+      await sleep(430);
+      await pulseMovementKey(defender, "w", 410);
+      await aimArena(defender, defenderElementId, attackRight ? -200 : 200);
+    }
   }
-  // Avoid cross-driver churn until the strike has resolved while the 118 ms iframe is active.
-  await sleep(180);
-  evidence = await waitForUiDodgeEvidence(entries, attacker, defender, 1200);
+  if (!evidence) evidence = await waitForUiDodgeEvidence(entries, attacker, defender, 600, true, lastAttemptBaseline);
   await sleep(80);
   evidence = await Promise.all(entries.map(readUiEvidence));
 
@@ -665,7 +695,7 @@ async function runOnlineUiGuardBreakTellFlight(entries) {
   return evidence.map((entry) => ({ ...entry, guardBreakTellMaxPixels: entry.browser === observer.name ? tell.observerMax : tell.localMax }));
 }
 
-async function runOnlineUiRespawnFlight(entries) {
+async function runOnlineUiRespawnFlight(entries, onDeath = null) {
   await Promise.all(entries.map(installUiObserver));
   const ready = await waitForUiReady(entries);
   const ordered = ready.slice().sort((a, b) => a.playerNetId - b.playerNetId);
@@ -689,6 +719,7 @@ async function runOnlineUiRespawnFlight(entries) {
     if (!deathEvidence) await pulseMovementKey(attacker, "d", 80);
   }
   if (!deathEvidence) deathEvidence = await waitForUiDeathEvidence(entries, attacker, defender, 1200, true);
+  if (onDeath) await onDeath({ attacker, defender, deathEvidence });
 
   const respawnEvidence = await waitForUiRespawnEvidence(entries, attacker, defender, 3000);
   const attackerResult = respawnEvidence.find((entry) => entry.browser === attacker.name);
@@ -713,6 +744,21 @@ async function runOnlineUiRespawnFlight(entries) {
     throw new Error(`defender overlay did not follow authoritative death through respawn: ${JSON.stringify(defenderResult.overlayTransitions)}`);
   }
   return respawnEvidence;
+}
+
+async function runOnlineUiDeathTellFlight(entries) {
+  let tell = null;
+  let observer = null;
+  const evidence = await runOnlineUiRespawnFlight(entries, async ({ attacker, defender }) => {
+    observer = attacker;
+    tell = await waitForRemoteDeathTell(attacker, defender, 700);
+  });
+  if (!tell || !observer) throw new Error(`M44 death tell was not sampled during authoritative Dead`);
+  await waitForDeathTellClear(observer, 1000);
+  return evidence.map((entry) => ({
+    ...entry,
+    deathTellMaxPixels: entry.browser === observer.name ? tell.observerMax : tell.localMax,
+  }));
 }
 
 async function setMovementKey(session, value, pressed) {
@@ -883,6 +929,49 @@ async function installUiObserver(session) {
     window.__MYASO_M30_UI__ = state;
     return true;
   `);
+}
+
+async function sampleDeathTellPixels(session) {
+  return execute(session.base, session.sessionId, `
+    const arena = document.querySelector('#arena');
+    const context = arena?.getContext('2d');
+    if (!context) return 0;
+    const pixels = context.getImageData(0, 0, arena.width, arena.height).data;
+    let count = 0;
+    for (let i = 0; i < pixels.length; i += 4) {
+      if (Math.abs(pixels[i] - 255) <= 2 && Math.abs(pixels[i + 1] - 111) <= 2 && Math.abs(pixels[i + 2] - 145) <= 2 && pixels[i + 3] >= 250) count += 1;
+    }
+    return count;
+  `);
+}
+
+async function waitForRemoteDeathTell(observer, localDefeated, timeoutMs) {
+  const deadline = Date.now() + timeoutMs;
+  let observerMax = 0;
+  let localMax = 0;
+  while (Date.now() < deadline) {
+    const [observerPixels, localPixels] = await Promise.all([
+      sampleDeathTellPixels(observer),
+      sampleDeathTellPixels(localDefeated),
+    ]);
+    observerMax = Math.max(observerMax, observerPixels);
+    localMax = Math.max(localMax, localPixels);
+    if (observerMax >= 24) {
+      if (localMax !== 0) throw new Error(`M44 local defeated fighter painted the remote-only death tell: ${localMax}`);
+      return { observerMax, localMax };
+    }
+    await sleep(20);
+  }
+  throw new Error(`M44 remote death tell never appeared: observer=${observerMax} local=${localMax}`);
+}
+
+async function waitForDeathTellClear(session, timeoutMs) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    if (await sampleDeathTellPixels(session) === 0) return;
+    await sleep(20);
+  }
+  throw new Error(`M44 remote death tell did not clear after authoritative respawn`);
 }
 
 async function sampleRecoveryTellPixels(session) {
@@ -1254,22 +1343,32 @@ async function waitForUiMessage(session, text, timeoutMs) {
   throw new Error(`${session.name} never rendered expected online UI message ${text}: ${JSON.stringify(await readUiEvidence(session))}`);
 }
 
-async function waitForUiDodgeEvidence(entries, attacker, defender, timeoutMs) {
+async function waitForUiDodgeEvidence(entries, attacker, defender, timeoutMs, fail = true, baselineStates = null) {
+  const baselineAttacker = baselineStates?.find((entry) => entry.browser === attacker.name);
+  const baselineDefender = baselineStates?.find((entry) => entry.browser === defender.name);
+  const count = (items, value) => items?.filter((entry) => entry === value).length ?? 0;
+  const baselineAttackCommit = count(baselineAttacker?.events, "Attack committed - your windup is readable.");
+  const baselineEvadedMessage = count(baselineAttacker?.events, "Attack evaded - opponent dodged.");
+  const baselineSuccessMessage = count(baselineDefender?.events, "Dodge! Strike avoided.");
+  const baselineEvadedFeedback = count(baselineAttacker?.feedbackTransitions, "dodge-evaded");
+  const baselineSuccessFeedback = count(baselineDefender?.feedbackTransitions, "dodge-success");
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     const states = await Promise.all(entries.map(readUiEvidence));
     const attackerState = states.find((entry) => entry.browser === attacker.name);
     const defenderState = states.find((entry) => entry.browser === defender.name);
-    const messagesReady = attackerState?.events.includes("Attack evaded - opponent dodged.")
-      && defenderState?.events.includes("Dodge! Strike avoided.");
-    const feedbackReady = attackerState?.feedbackTransitions.includes("dodge-evaded")
-      && defenderState?.feedbackTransitions.includes("dodge-success");
+    const attackCommitted = count(attackerState?.events, "Attack committed - your windup is readable.") > baselineAttackCommit;
+    const messagesReady = count(attackerState?.events, "Attack evaded - opponent dodged.") > baselineEvadedMessage
+      && count(defenderState?.events, "Dodge! Strike avoided.") > baselineSuccessMessage;
+    const feedbackReady = count(attackerState?.feedbackTransitions, "dodge-evaded") > baselineEvadedFeedback
+      && count(defenderState?.feedbackTransitions, "dodge-success") > baselineSuccessFeedback;
     const vitalsClean = attackerState?.playerHp === 100 && attackerState?.playerGuard === 100
       && defenderState?.playerHp === 100 && defenderState?.playerGuard === 100;
-    if (messagesReady && feedbackReady && vitalsClean) return states;
+    if (attackCommitted && messagesReady && feedbackReady && vitalsClean) return states;
     await sleep(40);
   }
-  throw new Error(`real online UI never rendered authoritative dodge feedback: ${JSON.stringify(await Promise.all(entries.map(readUiEvidence)))}`);
+  if (!fail) return null;
+  throw new Error(`real online UI never rendered fresh authoritative dodge feedback: ${JSON.stringify(await Promise.all(entries.map(readUiEvidence)))}`);
 }
 
 async function waitForUiGuardBreakEvidence(entries, attacker, defender, timeoutMs) {

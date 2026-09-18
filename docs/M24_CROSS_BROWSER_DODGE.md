@@ -11,7 +11,7 @@ Prove that a real browser defender can evade an authoritative attack through the
 - Both clients approach through ordinary movement input.
 - The attacker starts a normal attack from inside authoritative hit reach.
 - The defender reacts only after its browser observes authoritative `AttackWindup`.
-- The defender sends ordinary dodge input 35 ms after first observing windup, with its movement vector rotated perpendicular to the attacker line so the real dodge remains inside the authoritative threat geometry; no block input is used.
+- The defender starts ordinary dodge input no earlier than 35 ms after first observing windup, with its movement vector rotated perpendicular to the attacker line. Until authoritative `Dodge` is observed (or the attack window ends), the same request may be carried by subsequent normal input samples so a single transport sample cannot decide the proof; no block input is used.
 
 ## Acceptance
 
@@ -26,3 +26,7 @@ Both browsers must independently observe:
 - no defender block and no attacker parry stun;
 - sustained snapshots, acknowledgements and inputs;
 - p95 browser frame interval below 25 ms.
+
+## Acceptance stabilization
+
+CI #169 exact-head retry exposed a transport/timing flake in which the defender eventually entered authoritative `Dodge`, but the single request sample did not overlap `AttackActive` and the first strike landed. The harness now preserves the >=35 ms reaction threshold while carrying the already-triggered ordinary dodge request until authoritative Dodge confirmation or the attack window ends. Acceptance remains unchanged: active-frame overlap inside the real hit geometry and untouched 100/100 defender vitals are still mandatory.
