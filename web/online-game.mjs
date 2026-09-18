@@ -1,5 +1,5 @@
 import { createFrameBudget } from "../src/browser/frame-budget.mjs";
-import { COMBAT_ACTION, blockSpatialPresentation, combatActionHint, combatOverlayPresentation, createCombatReadabilityTracker, createRemoteDamageTracker, fighterIdentityPresentation, fighterScoreboardPresentation, fighterVitalsPresentation, guardBreakSpatialPresentation, opponentRecoveryPresentation, parrySpatialPresentation } from "../src/browser/combat-readability.mjs";
+import { COMBAT_ACTION, blockSpatialPresentation, combatActionHint, combatOverlayPresentation, createCombatReadabilityTracker, createRemoteDamageTracker, fighterIdentityPresentation, fighterMatchPresentation, fighterScoreboardPresentation, fighterVitalsPresentation, guardBreakSpatialPresentation, opponentRecoveryPresentation, parrySpatialPresentation } from "../src/browser/combat-readability.mjs";
 import { COMBAT } from "../src/combat/model.mjs";
 import { reconcilePrediction } from "../src/browser/reconciliation.mjs";
 import { NETWORK } from "../src/network/constants.mjs";
@@ -37,6 +37,7 @@ let networkStatus = "Connecting to authoritative server...";
 let combatMessage = null;
 let combatMessageUntil = 0;
 let combatFeedbackTimer = 0;
+let matchOver = false;
 
 const params = new URLSearchParams(window.location.search);
 const server = params.get("server");
@@ -118,6 +119,11 @@ networkClient = await connectAuthoritativeClient({
 function observeCombatState(state) {
   const ownId = networkClient?.playerNetId;
   if (!ownId) return;
+  const match = fighterMatchPresentation(state.values(), ownId);
+  if (match.visible && !matchOver) {
+    matchOver = true;
+    releaseInputs();
+  }
   const now = performance.now();
   remoteDamage.observe(state, ownId, now);
   const event = combatReadability.observe(state, ownId);
@@ -157,6 +163,14 @@ function releaseInputs() {
 }
 
 function sampleInput() {
+  if (matchOver) {
+    currentInput.moveX = 0;
+    currentInput.moveY = 0;
+    currentInput.attack = false;
+    currentInput.dodge = false;
+    currentInput.block = false;
+    return;
+  }
   currentInput.moveX = (keys.has("KeyD") ? 1 : 0) - (keys.has("KeyA") ? 1 : 0);
   currentInput.moveY = (keys.has("KeyS") ? 1 : 0) - (keys.has("KeyW") ? 1 : 0);
   currentInput.facing = Math.atan2(mouse.y - canvas.height / 2, mouse.x - canvas.width / 2);
@@ -167,7 +181,7 @@ function sampleInput() {
 
 function simulatePrediction(stepMs) {
   sampleInput();
-  if (local.initialized) predictMovement(currentInput, stepMs);
+  if (!matchOver && local.initialized) predictMovement(currentInput, stepMs);
   predictionStep += 1;
   if (predictionStep % 2 === 0 && networkClient) {
     networkClient.sendInput({ tick: clientTick, ...currentInput });
@@ -443,7 +457,7 @@ function updateHud(ownId) {
   setMeter("playerGuard", hud.playerGuard, hud.playerGuardValue, own?.guard ?? local.guard);
   setMeter("botHp", hud.botHp, hud.botHpValue, remote?.hp ?? 0);
   setMeter("botGuard", hud.botGuard, hud.botGuardValue, remote?.guard ?? 0);
-  updateCombatOverlay(own);
+  updateCombatOverlay(own, ownId);
   updateOpponentRecovery(networkClient.state.size === 2 ? remote : null);
   updateScoreboard(ownId);
   const now = performance.now();
@@ -455,8 +469,9 @@ function updateHud(ownId) {
   }
 }
 
-function updateCombatOverlay(own) {
-  const presentation = combatOverlayPresentation(own);
+function updateCombatOverlay(own, ownId) {
+  const matchPresentation = networkClient ? fighterMatchPresentation(networkClient.state.values(), ownId) : null;
+  const presentation = matchPresentation?.visible ? matchPresentation : combatOverlayPresentation(own);
   const shouldHide = !presentation.visible;
   if (combatOverlay.root.hidden !== shouldHide) combatOverlay.root.hidden = shouldHide;
   if (!presentation.visible) return;

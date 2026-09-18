@@ -167,6 +167,8 @@ export function fighterIdentityPresentation(netId) {
   return { visible: true, label: `#${netId}` };
 }
 
+export const FFA_KILL_TARGET = 2;
+
 export function fighterScoreboardPresentation(entities, ownId = 0) {
   if (!entities || typeof entities[Symbol.iterator] !== "function") return [];
   const rows = [];
@@ -177,6 +179,20 @@ export function fighterScoreboardPresentation(entities, ownId = 0) {
   }
   rows.sort((a, b) => b.kills - a.kills || a.netId - b.netId);
   return rows;
+}
+
+export function fighterMatchPresentation(entities, ownId = 0, killTarget = FFA_KILL_TARGET) {
+  if (!Number.isInteger(killTarget) || killTarget <= 0) return { visible: false, winnerId: 0, ownVictory: false, title: "", detail: "" };
+  const winner = fighterScoreboardPresentation(entities, ownId).find((row) => row.kills >= killTarget);
+  if (!winner) return { visible: false, winnerId: 0, ownVictory: false, title: "", detail: "" };
+  const ownVictory = winner.netId === ownId;
+  return {
+    visible: true,
+    winnerId: winner.netId,
+    ownVictory,
+    title: ownVictory ? "VICTORY" : "MATCH OVER",
+    detail: `${winner.label} wins · ${winner.kills} KILLS`,
+  };
 }
 
 export function combatOverlayPresentation(entity) {

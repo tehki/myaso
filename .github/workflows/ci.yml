@@ -242,6 +242,11 @@ jobs:
           MYASO_PVP_SCENARIO: "uiscore"
         run: node scripts/pvp_browser_flight_runner.mjs
 
+      - name: Validate M49 authoritative FFA match winner
+        env:
+          MYASO_PVP_SCENARIO: "uimatch"
+        run: node scripts/pvp_browser_flight_runner.mjs
+
       - name: Measure M15 browser background convergence
         env:
           MYASO_FLIGHT_DURATION_MS: "4500"

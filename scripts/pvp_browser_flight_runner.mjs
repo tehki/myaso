@@ -8,7 +8,7 @@ import { setTimeout as sleep } from "node:timers/promises";
 const root = process.cwd();
 const durationMs = Number(process.env.MYASO_PVP_FLIGHT_DURATION_MS ?? 7000);
 const scenario = process.env.MYASO_PVP_SCENARIO ?? "damage";
-if (!new Set(["damage", "parry", "dodge", "block", "guardbreak", "backblock", "respawn", "ui", "uirespawn", "uifeedback", "uihittell", "uivitals", "uiidentity", "uiscore", "uiparry", "uistun", "uiguardbreak", "uidodge", "uirecovery", "uirecoverytell", "uiattackintent", "uiguardbreaktell", "uiparrytell", "uiblockfacingtell", "uidodgetell", "uideathtell"]).has(scenario)) throw new Error(`unsupported MYASO_PVP_SCENARIO: ${scenario}`);
+if (!new Set(["damage", "parry", "dodge", "block", "guardbreak", "backblock", "respawn", "ui", "uirespawn", "uifeedback", "uihittell", "uivitals", "uiidentity", "uiscore", "uimatch", "uiparry", "uistun", "uiguardbreak", "uidodge", "uirecovery", "uirecoverytell", "uiattackintent", "uiguardbreaktell", "uiparrytell", "uiblockfacingtell", "uidodgetell", "uideathtell"]).has(scenario)) throw new Error(`unsupported MYASO_PVP_SCENARIO: ${scenario}`);
 const staticPort = Number(process.env.MYASO_PVP_FLIGHT_HTTP_PORT ?? 4174);
 const browsers = [
   {
@@ -65,6 +65,9 @@ try {
   } else if (scenario === "uiscore") {
     const results = await runOnlineUiScoreFlight(sessions);
     console.log(`M48_FFA_KILL_SCORE ${JSON.stringify({ ok: true, results })}`);
+  } else if (scenario === "uimatch") {
+    const results = await runOnlineUiMatchFlight(sessions);
+    console.log(`M49_FFA_MATCH_WINNER ${JSON.stringify({ ok: true, results })}`);
   } else if (scenario === "uiparry") {
     const results = await runOnlineUiParryFlight(sessions);
     console.log(`M33_ONLINE_PARRY_FEEDBACK ${JSON.stringify({ ok: true, results })}`);
@@ -198,7 +201,7 @@ async function startBrowser(browser) {
 }
 
 async function navigate(session, gameUrl, certificateHash) {
-  const page = scenario === "ui" || scenario === "uirespawn" || scenario === "uifeedback" || scenario === "uihittell" || scenario === "uivitals" || scenario === "uiidentity" || scenario === "uiscore" || scenario === "uiparry" || scenario === "uistun" || scenario === "uiguardbreak" || scenario === "uidodge" || scenario === "uirecovery" || scenario === "uirecoverytell" || scenario === "uiattackintent" || scenario === "uiguardbreaktell" || scenario === "uiparrytell" || scenario === "uiblockfacingtell" || scenario === "uidodgetell" || scenario === "uideathtell" ? "index.html" : "pvp-flight.html";
+  const page = scenario === "ui" || scenario === "uirespawn" || scenario === "uifeedback" || scenario === "uihittell" || scenario === "uivitals" || scenario === "uiidentity" || scenario === "uiscore" || scenario === "uimatch" || scenario === "uiparry" || scenario === "uistun" || scenario === "uiguardbreak" || scenario === "uidodge" || scenario === "uirecovery" || scenario === "uirecoverytell" || scenario === "uiattackintent" || scenario === "uiguardbreaktell" || scenario === "uiparrytell" || scenario === "uiblockfacingtell" || scenario === "uidodgetell" || scenario === "uideathtell" ? "index.html" : "pvp-flight.html";
   const url = new URL(`http://127.0.0.1:${staticPort}/web/${page}`);
   url.searchParams.set("server", gameUrl);
   url.searchParams.set("cert", certificateHash);
@@ -885,6 +888,40 @@ async function runOnlineUiScoreFlight(entries) {
     }
   }
   return evidence;
+}
+
+async function runOnlineUiMatchFlight(entries) {
+  const firstScore = await runOnlineUiScoreFlight(entries);
+  const ordered = firstScore.slice().sort((a, b) => a.playerNetId - b.playerNetId);
+  const attacker = entries.find((entry) => entry.name === ordered[0]?.browser);
+  const defender = entries.find((entry) => entry.name === ordered[1]?.browser);
+  if (!attacker || !defender) throw new Error(`M49 could not resolve match roles: ${JSON.stringify(firstScore)}`);
+
+  await Promise.all(entries.map(installUiObserver));
+  await waitForUiReady(entries);
+  await Promise.all(entries.map((entry) => execute(entry.base, entry.sessionId, "document.querySelector('#arena').focus(); return document.activeElement?.id;")));
+  const elementId = await resolveArenaElement(attacker, "M49");
+
+  let matchEvidence = null;
+  await pulseMovementKey(attacker, "d", 120);
+  for (let attempt = 0; attempt < 8 && !matchEvidence; attempt += 1) {
+    await performArenaAttack(attacker, elementId);
+    matchEvidence = await waitForUiMatchEndEvidence(entries, attacker, defender, 850, false);
+    if (!matchEvidence) await pulseMovementKey(attacker, "d", 80);
+  }
+  if (!matchEvidence) matchEvidence = await waitForUiMatchEndEvidence(entries, attacker, defender, 1400, true);
+
+  await sleep(1500);
+  const frozen = await Promise.all(entries.map(readUiEvidence));
+  const winner = frozen.find((entry) => entry.browser === attacker.name);
+  const loser = frozen.find((entry) => entry.browser === defender.name);
+  if (!winner || !loser) throw new Error(`M49 incomplete frozen match evidence: ${JSON.stringify(frozen)}`);
+  if (winner.scoreboardRows[0]?.kills !== 2 || loser.scoreboardRows[0]?.kills !== 2
+    || winner.opponentHp !== 0 || loser.playerHp !== 0
+    || winner.overlayTitle !== "VICTORY" || loser.overlayTitle !== "MATCH OVER") {
+    throw new Error(`M49 authoritative match state did not remain frozen past respawn time: ${JSON.stringify(frozen)}`);
+  }
+  return frozen;
 }
 
 async function runOnlineUiDeathTellFlight(entries) {
@@ -1653,6 +1690,30 @@ async function waitForUiDeathEvidence(entries, attacker, defender, timeoutMs, fa
   }
   if (!fail) return null;
   throw new Error(`real online UI never rendered authoritative defeat: ${JSON.stringify(await Promise.all(entries.map(readUiEvidence)))}`);
+}
+
+async function waitForUiMatchEndEvidence(entries, attacker, defender, timeoutMs, fail = true) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const states = await Promise.all(entries.map(readUiEvidence));
+    const attackerState = states.find((entry) => entry.browser === attacker.name);
+    const defenderState = states.find((entry) => entry.browser === defender.name);
+    const winnerId = attackerState?.playerNetId ?? 0;
+    const loserId = defenderState?.playerNetId ?? 0;
+    const expectedDetail = `#${winnerId} wins · 2 KILLS`;
+    const scoreReady = attackerState?.scoreboardRows?.length === 2 && defenderState?.scoreboardRows?.length === 2
+      && attackerState.scoreboardRows[0]?.label === `#${winnerId}` && attackerState.scoreboardRows[0]?.kills === 2
+      && attackerState.scoreboardRows[1]?.label === `#${loserId}` && attackerState.scoreboardRows[1]?.kills === 0
+      && defenderState.scoreboardRows[0]?.label === `#${winnerId}` && defenderState.scoreboardRows[0]?.kills === 2
+      && defenderState.scoreboardRows[1]?.label === `#${loserId}` && defenderState.scoreboardRows[1]?.kills === 0;
+    const overlaysReady = attackerState?.overlayVisible && attackerState.overlayTitle === "VICTORY" && attackerState.overlayDetail === expectedDetail
+      && defenderState?.overlayVisible && defenderState.overlayTitle === "MATCH OVER" && defenderState.overlayDetail === expectedDetail;
+    const deathReady = attackerState?.opponentHp === 0 && defenderState?.playerHp === 0;
+    if (winnerId && loserId && scoreReady && overlaysReady && deathReady) return states;
+    await sleep(50);
+  }
+  if (!fail) return null;
+  throw new Error(`real online UI never rendered authoritative match winner: ${JSON.stringify(await Promise.all(entries.map(readUiEvidence)))}`);
 }
 
 async function waitForUiRespawnEvidence(entries, attacker, defender, timeoutMs) {
