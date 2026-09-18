@@ -151,6 +151,17 @@ export function guardBreakSpatialPresentation(entity) {
   return { visible: false, state: "" };
 }
 
+export function fighterVitalsPresentation(entity) {
+  if (!entity || entity.action === COMBAT_ACTION.dead || !Number.isFinite(entity.hp) || !Number.isFinite(entity.guard)) {
+    return { visible: false, hp: 0, guard: 0 };
+  }
+  return {
+    visible: true,
+    hp: Math.max(0, Math.min(100, entity.hp)),
+    guard: Math.max(0, Math.min(100, entity.guard)),
+  };
+}
+
 export function combatOverlayPresentation(entity) {
   if (entity?.action === COMBAT_ACTION.dead) {
     return { visible: true, state: "dead", title: "DEFEATED", detail: "Respawning…" };

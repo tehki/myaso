@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { COMBAT_ACTION, blockSpatialPresentation, combatActionHint, combatLifePresentation, combatOverlayPresentation, createCombatReadabilityTracker, createRemoteDamageTracker, guardBreakSpatialPresentation, opponentRecoveryPresentation, parrySpatialPresentation } from "../src/browser/combat-readability.mjs";
+import { COMBAT_ACTION, blockSpatialPresentation, combatActionHint, combatLifePresentation, combatOverlayPresentation, createCombatReadabilityTracker, createRemoteDamageTracker, fighterVitalsPresentation, guardBreakSpatialPresentation, opponentRecoveryPresentation, parrySpatialPresentation } from "../src/browser/combat-readability.mjs";
 
 function fighter(netId, hp = 100, guard = 100, action = COMBAT_ACTION.idle, x = 0, y = 0, facing = 0) {
   return { netId, hp, guard, action, x, y, facing };
@@ -65,6 +65,12 @@ test("spatial damage tracking identifies every damaged remote without marking lo
   assert.equal(tracker.visible(1, 20), false);
   assert.equal(tracker.visible(2, 20), true);
   assert.equal(tracker.visible(3, 20), true);
+});
+
+test("fighter vitals presentation exposes bounded authoritative HP and guard while alive", () => {
+  assert.deepEqual(fighterVitalsPresentation(fighter(2, 66, 62)), { visible: true, hp: 66, guard: 62 });
+  assert.deepEqual(fighterVitalsPresentation(fighter(2, 120, -5)), { visible: true, hp: 100, guard: 0 });
+  assert.deepEqual(fighterVitalsPresentation(fighter(2, 0, 100, COMBAT_ACTION.dead)), { visible: false, hp: 0, guard: 0 });
 });
 
 test("guard-only loss is explained as a block instead of damage", () => {
