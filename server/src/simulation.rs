@@ -5,6 +5,7 @@ pub const DEFAULT_WORLD_HEIGHT: f32 = 8192.0;
 pub const SERVER_TICK_HZ: f32 = 60.0;
 pub const SERVER_DT_MS: f32 = 1000.0 / SERVER_TICK_HZ;
 pub const FFA_KILL_TARGET: u16 = 2;
+pub const FFA_MATCH_RESET_MS: f32 = 2500.0;
 
 const FIGHTER_RADIUS: f32 = 18.0;
 const MOVE_SPEED: f32 = 215.0;
@@ -177,6 +178,7 @@ pub enum CombatEvent {
         winner: u32,
         kills: u16,
     },
+    MatchReset,
 }
 
 #[derive(Debug, Clone)]
@@ -186,6 +188,7 @@ pub struct World {
     pub now_ms: f32,
     pub tick: u32,
     winner: Option<u32>,
+    reset_at_ms: f32,
     fighters: Vec<Fighter>,
 }
 
@@ -205,6 +208,7 @@ impl World {
             now_ms: 0.0,
             tick: 0,
             winner: None,
+            reset_at_ms: 0.0,
             fighters: Vec::new(),
         }
     }
@@ -289,6 +293,10 @@ impl World {
         self.tick = self.tick.wrapping_add(1);
         let mut events = Vec::new();
         if self.winner.is_some() {
+            if self.now_ms + EPSILON >= self.reset_at_ms {
+                self.reset_match();
+                events.push(CombatEvent::MatchReset);
+            }
             return events;
         }
 
@@ -318,14 +326,28 @@ impl World {
         }
 
         separate_fighters(self.width, self.height, &mut self.fighters);
-        self.winner = resolve_attacks(
+        if let Some(winner) = resolve_attacks(
             self.width,
             self.height,
             self.now_ms,
             &mut self.fighters,
             &mut events,
-        );
+        ) {
+            self.winner = Some(winner);
+            self.reset_at_ms = self.now_ms + FFA_MATCH_RESET_MS;
+        }
         events
+    }
+
+    fn reset_match(&mut self) {
+        self.winner = None;
+        self.reset_at_ms = 0.0;
+        for fighter in &mut self.fighters {
+            fighter.kills = 0;
+            fighter.latest_input = InputIntent::default();
+            fighter.guard_regen_blocked_until_ms = 0.0;
+            respawn_fighter(fighter);
+        }
     }
 }
 

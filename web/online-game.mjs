@@ -123,6 +123,9 @@ function observeCombatState(state) {
   if (match.visible && !matchOver) {
     matchOver = true;
     releaseInputs();
+  } else if (!match.visible && matchOver) {
+    const rows = fighterScoreboardPresentation(state.values(), ownId);
+    if (rows.length > 0 && rows.every((row) => row.kills === 0)) matchOver = false;
   }
   const now = performance.now();
   remoteDamage.observe(state, ownId, now);

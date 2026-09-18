@@ -1,5 +1,5 @@
 use myaso_server::{
-    simulation::{Action, CombatEvent, InputIntent, World, FFA_KILL_TARGET},
+    simulation::{Action, CombatEvent, InputIntent, World, FFA_KILL_TARGET, FFA_MATCH_RESET_MS},
     snapshot::{
         apply_records, build_delta, decode_snapshot, encode_snapshot, SnapshotSession, WireEntity,
     },
@@ -368,6 +368,64 @@ fn first_to_kill_target_declares_winner_and_freezes_match_state() {
     assert!(frozen_events.is_empty());
     assert_eq!(world.fighter(1).expect("winner"), &winner_before);
     assert_eq!(world.fighter(2).expect("loser"), &loser_before);
+}
+
+#[test]
+fn finished_match_resets_atomically_and_reopens_play() {
+    let mut world = World::new(200.0, 300.0);
+    assert!(world.add_player_at(1, 100.0, 100.0, 0.0));
+    assert!(world.add_player_at(2, 160.0, 100.0, std::f32::consts::PI));
+    let attack = InputIntent {
+        attack: true,
+        facing_radians: 0.0,
+        ..InputIntent::default()
+    };
+
+    for _ in 0..1200 {
+        let events = advance(&mut world, 5.0, attack, InputIntent::default());
+        if events
+            .iter()
+            .any(|event| matches!(event, CombatEvent::MatchWon { .. }))
+        {
+            break;
+        }
+    }
+    assert!(world.match_over());
+    assert_eq!(world.fighter(1).expect("winner").kills, FFA_KILL_TARGET);
+
+    let mut reset_events = Vec::new();
+    let mut elapsed = 0.0_f32;
+    while elapsed < FFA_MATCH_RESET_MS + 5.0 {
+        let dt = (FFA_MATCH_RESET_MS + 5.0 - elapsed).min(100.0);
+        reset_events.extend(world.step_by(dt));
+        elapsed += dt;
+    }
+
+    assert_eq!(
+        reset_events
+            .iter()
+            .filter(|event| matches!(event, CombatEvent::MatchReset))
+            .count(),
+        1
+    );
+    assert_eq!(world.match_winner(), None);
+    assert!(!world.match_over());
+    for fighter in world.fighters() {
+        assert_eq!(fighter.kills, 0);
+        assert_eq!(fighter.hp.round() as u8, 100);
+        assert_eq!(fighter.guard.round() as u8, 100);
+        assert_eq!(fighter.action, Action::Idle);
+        assert!((fighter.x - fighter.spawn_x).abs() < 0.001);
+        assert!((fighter.y - fighter.spawn_y).abs() < 0.001);
+    }
+    assert!(world.set_input(
+        1,
+        InputIntent {
+            move_x: 1.0,
+            ..InputIntent::default()
+        }
+    ));
+    assert!(world.add_player_at(3, 120.0, 160.0, 0.0));
 }
 
 #[test]

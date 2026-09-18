@@ -106,6 +106,9 @@ test("FFA match presentation declares the authoritative score-target winner", ()
   assert.deepEqual(fighterMatchPresentation([{ netId: 1, flags: 2 }, { netId: 2, flags: 0 }], 2), {
     visible: true, winnerId: 1, ownVictory: false, title: "MATCH OVER", detail: "#1 wins · 2 KILLS",
   });
+  assert.deepEqual(fighterMatchPresentation([{ netId: 1, flags: 0 }, { netId: 2, flags: 0 }], 1), {
+    visible: false, winnerId: 0, ownVictory: false, title: "", detail: "",
+  });
 });
 
 test("guard-only loss is explained as a block instead of damage", () => {
