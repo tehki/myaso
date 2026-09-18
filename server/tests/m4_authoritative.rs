@@ -1,7 +1,5 @@
 use myaso_server::{
-    simulation::{
-        Action, CombatEvent, InputIntent, World, FFA_KILL_TARGET, FFA_MATCH_RESET_MS,
-    },
+    simulation::{Action, CombatEvent, InputIntent, World, FFA_KILL_TARGET, FFA_MATCH_RESET_MS},
     snapshot::{
         apply_records, build_delta, decode_snapshot, encode_snapshot, SnapshotSession, WireEntity,
     },
