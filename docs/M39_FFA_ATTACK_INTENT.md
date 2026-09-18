@@ -20,7 +20,7 @@ Chrome is the attacker and Firefox is the observer. Spawn ordering determines le
 
 ### Acceptance stabilization
 
-FULL CI #179 cleared M34-M38 and then reproduced an inherited M39 scheduling case where both passive windup samplers stayed at 0. M39 now permits up to three bounded repetitions of the same genuine pointer attack while the samplers remain armed, with a full attack-cycle recovery gap between attempts. The acceptance still requires the original remote-only 24-pixel windup boundary and still rejects any local rendering of that boundary. No attack state is injected and no gameplay timing or threshold is changed.
+FULL CI #179 cleared M34-M38 and then reproduced an inherited M39 scheduling case where both passive windup samplers stayed at 0. M39 already had up to three bounded repetitions of the same genuine pointer attack, so adding more retries would not address the underlying contention. The attacker-side continuous `getImageData()` sampler has therefore been removed: Firefox keeps the passive remote observer sampler, and the instant Firefox observes at least 24 authoritative windup pixels the harness takes one synchronous Chrome negative-control sample while that same windup is still live. This preserves the original remote-only 24-pixel requirement and still rejects any local rendering of that boundary, while removing continuous canvas readback from the browser that must deliver the one-shot attack input. No attack state is injected and no gameplay timing or threshold is changed.
 
 ## Local evidence
 

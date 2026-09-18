@@ -406,7 +406,7 @@ async function runOnlineUiAttackIntentFlight(entries) {
   const attackerElementId = await resolveArenaElement(attacker, "M39 attacker");
   await Promise.all(entries.map(centerArenaInViewport));
   await pulseMovementKey(attacker, movementKey, 120);
-  await Promise.all(entries.map(armWindupTellSampler));
+  await armWindupTellSampler(defender);
   let evidence = null;
   try {
     for (let attempt = 0; attempt < 3 && !evidence; attempt += 1) {
@@ -420,7 +420,7 @@ async function runOnlineUiAttackIntentFlight(entries) {
     }
     if (!evidence) evidence = await waitForRemoteWindupTell(entries, attacker, defender, 300, true);
   } finally {
-    await Promise.all(entries.map(stopWindupTellSampler));
+    await stopWindupTellSampler(defender);
   }
   await waitForWindupTellClear(defender, 500);
   const attackerResult = evidence.find((entry) => entry.browser === attacker.name);
@@ -1439,21 +1439,20 @@ async function stopWindupTellSampler(session) {
 
 async function waitForRemoteWindupTell(entries, attacker, defender, timeoutMs, fail = true) {
   const deadline = Date.now() + timeoutMs;
-  let attackerMax = 0;
   let defenderMax = 0;
   while (Date.now() < deadline) {
-    const [attackerPixels, defenderPixels] = await Promise.all([readWindupTellSampler(attacker), readWindupTellSampler(defender)]);
-    attackerMax = Math.max(attackerMax, attackerPixels);
+    const defenderPixels = await readWindupTellSampler(defender);
     defenderMax = Math.max(defenderMax, defenderPixels);
     if (defenderMax >= 24) {
-      if (attackerMax !== 0) throw new Error(`M39 local fighter painted the remote-only windup boundary: ${attackerMax}`);
+      const attackerPixels = await sampleWindupTellPixels(attacker);
+      if (attackerPixels !== 0) throw new Error(`M39 local fighter painted the remote-only windup boundary: ${attackerPixels}`);
       const evidence = await Promise.all(entries.map(readUiEvidence));
-      return evidence.map((entry) => ({ ...entry, windupTellMaxPixels: entry.browser === attacker.name ? attackerMax : defenderMax }));
+      return evidence.map((entry) => ({ ...entry, windupTellMaxPixels: entry.browser === attacker.name ? attackerPixels : defenderMax }));
     }
     await sleep(20);
   }
   if (!fail) return null;
-  throw new Error(`M39 remote windup boundary never appeared: attacker=${attackerMax} defender=${defenderMax}`);
+  throw new Error(`M39 remote windup boundary never appeared: defender=${defenderMax}`);
 }
 
 async function waitForWindupTellClear(session, timeoutMs) {
