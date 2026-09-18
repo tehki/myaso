@@ -415,11 +415,12 @@ async function runOnlineUiDodgeFeedbackFlight(entries) {
       throw new Error(`M36 retry ${attempt} failed closed after a resolved exchange: ${JSON.stringify(missed)}`);
     }
     if (attempt < 3) {
-      // Let both authoritative recovery windows settle, then undo the bounded perpendicular
-      // movement with ordinary input before the next genuine exchange.
+      // Let both authoritative recovery windows settle, then approximately unwind the full
+      // perpendicular Dodge displacement with ordinary opposite movement. A 145 ms Dodge at
+      // 610 units/s can move about 88 units; 410 ms at the normal 215 units/s restores that
+      // spacing closely enough that each retry starts inside the same authoritative threat geometry.
       await sleep(430);
-      await pulseMovementKey(defender, "w", 45);
-      await pulseMovementKey(attacker, movementKey, 60);
+      await pulseMovementKey(defender, "w", 410);
       await aimArena(defender, defenderElementId, attackRight ? -200 : 200);
     }
   }
