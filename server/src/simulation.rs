@@ -4,6 +4,7 @@ pub const DEFAULT_WORLD_WIDTH: f32 = 8192.0;
 pub const DEFAULT_WORLD_HEIGHT: f32 = 8192.0;
 pub const SERVER_TICK_HZ: f32 = 60.0;
 pub const SERVER_DT_MS: f32 = 1000.0 / SERVER_TICK_HZ;
+pub const FFA_KILL_TARGET: u16 = 2;
 
 const FIGHTER_RADIUS: f32 = 18.0;
 const MOVE_SPEED: f32 = 215.0;
@@ -172,6 +173,10 @@ pub enum CombatEvent {
     Respawn {
         fighter: u32,
     },
+    MatchWon {
+        winner: u32,
+        kills: u16,
+    },
 }
 
 #[derive(Debug, Clone)]
@@ -180,6 +185,7 @@ pub struct World {
     pub height: f32,
     pub now_ms: f32,
     pub tick: u32,
+    winner: Option<u32>,
     fighters: Vec<Fighter>,
 }
 
@@ -198,6 +204,7 @@ impl World {
             height,
             now_ms: 0.0,
             tick: 0,
+            winner: None,
             fighters: Vec::new(),
         }
     }
@@ -210,6 +217,14 @@ impl World {
         self.fighters
             .iter()
             .find(|fighter| fighter.net_id == net_id)
+    }
+
+    pub fn match_winner(&self) -> Option<u32> {
+        self.winner
+    }
+
+    pub fn match_over(&self) -> bool {
+        self.winner.is_some()
     }
 
     pub fn add_player(&mut self, net_id: u32) -> bool {
@@ -229,7 +244,7 @@ impl World {
     }
 
     pub fn add_player_at(&mut self, net_id: u32, x: f32, y: f32, facing: f32) -> bool {
-        if net_id == 0 || self.fighter(net_id).is_some() {
+        if self.winner.is_some() || net_id == 0 || self.fighter(net_id).is_some() {
             return false;
         }
         let fighter = Fighter::new(
@@ -250,6 +265,9 @@ impl World {
     }
 
     pub fn set_input(&mut self, net_id: u32, input: InputIntent) -> bool {
+        if self.winner.is_some() {
+            return false;
+        }
         let Some(fighter) = self
             .fighters
             .iter_mut()
@@ -270,6 +288,9 @@ impl World {
         self.now_ms += dt_ms;
         self.tick = self.tick.wrapping_add(1);
         let mut events = Vec::new();
+        if self.winner.is_some() {
+            return events;
+        }
 
         for fighter in &mut self.fighters {
             if fighter.action == Action::Dead {
@@ -297,7 +318,7 @@ impl World {
         }
 
         separate_fighters(self.width, self.height, &mut self.fighters);
-        resolve_attacks(
+        self.winner = resolve_attacks(
             self.width,
             self.height,
             self.now_ms,
@@ -477,7 +498,7 @@ fn resolve_attacks(
     now_ms: f32,
     fighters: &mut [Fighter],
     events: &mut Vec<CombatEvent>,
-) {
+) -> Option<u32> {
     for attacker_index in 0..fighters.len() {
         if fighters[attacker_index].action != Action::AttackActive {
             continue;
@@ -556,9 +577,17 @@ fn resolve_attacks(
                     fighter: target.net_id,
                     killer: attacker.net_id,
                 });
+                if attacker.kills >= FFA_KILL_TARGET {
+                    events.push(CombatEvent::MatchWon {
+                        winner: attacker.net_id,
+                        kills: attacker.kills,
+                    });
+                    return Some(attacker.net_id);
+                }
             }
         }
     }
+    None
 }
 
 fn is_target_in_attack_arc(attacker: &Fighter, target: &Fighter) -> bool {

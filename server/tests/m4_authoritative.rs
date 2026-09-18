@@ -1,5 +1,5 @@
 use myaso_server::{
-    simulation::{Action, CombatEvent, InputIntent, World},
+    simulation::{Action, CombatEvent, InputIntent, World, FFA_KILL_TARGET},
     snapshot::{
         apply_records, build_delta, decode_snapshot, encode_snapshot, SnapshotSession, WireEntity,
     },
@@ -311,6 +311,63 @@ fn death_is_temporary_and_respawns_at_the_spawn_point() {
     assert!(events
         .iter()
         .any(|event| matches!(event, CombatEvent::Respawn { .. })));
+}
+
+#[test]
+fn first_to_kill_target_declares_winner_and_freezes_match_state() {
+    let mut world = World::new(200.0, 300.0);
+    assert!(world.add_player_at(1, 100.0, 100.0, 0.0));
+    assert!(world.add_player_at(2, 160.0, 100.0, std::f32::consts::PI));
+    let attack = InputIntent {
+        attack: true,
+        facing_radians: 0.0,
+        ..InputIntent::default()
+    };
+    let mut winning_event = None;
+    for _ in 0..1200 {
+        let events = advance(&mut world, 5.0, attack, InputIntent::default());
+        if let Some(event) = events
+            .iter()
+            .find(|event| matches!(event, CombatEvent::MatchWon { .. }))
+        {
+            winning_event = Some(event.clone());
+            break;
+        }
+    }
+
+    assert_eq!(FFA_KILL_TARGET, 2);
+    assert_eq!(world.match_winner(), Some(1));
+    assert!(world.match_over());
+    assert_eq!(world.fighter(1).expect("winner").kills, FFA_KILL_TARGET);
+    assert_eq!(world.fighter(2).expect("loser").action, Action::Dead);
+    assert!(matches!(
+        winning_event,
+        Some(CombatEvent::MatchWon { winner: 1, kills }) if kills == FFA_KILL_TARGET
+    ));
+
+    let winner_before = world.fighter(1).expect("winner").clone();
+    let loser_before = world.fighter(2).expect("loser").clone();
+    assert!(!world.set_input(1, attack));
+    assert!(!world.add_player_at(3, 120.0, 160.0, 0.0));
+    let frozen_events = advance(
+        &mut world,
+        2000.0,
+        InputIntent {
+            move_x: 1.0,
+            attack: true,
+            facing_radians: 0.0,
+            ..InputIntent::default()
+        },
+        InputIntent {
+            move_x: -1.0,
+            dodge: true,
+            facing_radians: std::f32::consts::PI,
+            ..InputIntent::default()
+        },
+    );
+    assert!(frozen_events.is_empty());
+    assert_eq!(world.fighter(1).expect("winner"), &winner_before);
+    assert_eq!(world.fighter(2).expect("loser"), &loser_before);
 }
 
 #[test]

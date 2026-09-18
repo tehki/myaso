@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { COMBAT_ACTION, blockSpatialPresentation, combatActionHint, combatLifePresentation, combatOverlayPresentation, createCombatReadabilityTracker, createRemoteDamageTracker, fighterIdentityPresentation, fighterScoreboardPresentation, fighterVitalsPresentation, guardBreakSpatialPresentation, opponentRecoveryPresentation, parrySpatialPresentation } from "../src/browser/combat-readability.mjs";
+import { COMBAT_ACTION, FFA_KILL_TARGET, blockSpatialPresentation, combatActionHint, combatLifePresentation, combatOverlayPresentation, createCombatReadabilityTracker, createRemoteDamageTracker, fighterIdentityPresentation, fighterMatchPresentation, fighterScoreboardPresentation, fighterVitalsPresentation, guardBreakSpatialPresentation, opponentRecoveryPresentation, parrySpatialPresentation } from "../src/browser/combat-readability.mjs";
 
 function fighter(netId, hp = 100, guard = 100, action = COMBAT_ACTION.idle, x = 0, y = 0, facing = 0) {
   return { netId, hp, guard, action, x, y, facing };
@@ -93,6 +93,19 @@ test("FFA scoreboard presentation ranks authoritative kill scores with stable id
   assert.deepEqual(fighterScoreboardPresentation([{ netId: 4, flags: 999 }], 0), [
     { netId: 4, kills: 255, own: false, label: "#4" },
   ]);
+});
+
+test("FFA match presentation declares the authoritative score-target winner", () => {
+  assert.equal(FFA_KILL_TARGET, 2);
+  assert.deepEqual(fighterMatchPresentation([{ netId: 1, flags: 1 }, { netId: 2, flags: 0 }], 1), {
+    visible: false, winnerId: 0, ownVictory: false, title: "", detail: "",
+  });
+  assert.deepEqual(fighterMatchPresentation([{ netId: 1, flags: 2 }, { netId: 2, flags: 0 }], 1), {
+    visible: true, winnerId: 1, ownVictory: true, title: "VICTORY", detail: "#1 wins · 2 KILLS",
+  });
+  assert.deepEqual(fighterMatchPresentation([{ netId: 1, flags: 2 }, { netId: 2, flags: 0 }], 2), {
+    visible: true, winnerId: 1, ownVictory: false, title: "MATCH OVER", detail: "#1 wins · 2 KILLS",
+  });
 });
 
 test("guard-only loss is explained as a block instead of damage", () => {
