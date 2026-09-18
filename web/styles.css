@@ -28,6 +28,12 @@ kbd { border: 1px solid #575144; border-bottom-width: 2px; border-radius: 5px; b
 .event-text { text-align: center; min-height: 20px; margin: 0; color: #d4c28c; font-size: 13px; }
 .arena-wrap { border: 1px solid #3c362b; border-radius: 14px; overflow: hidden; background: #17140f; box-shadow: 0 22px 60px rgba(0,0,0,.35); }
 .arena-stage { position: relative; }
+.scoreboard { position: absolute; top: 14px; right: 14px; z-index: 2; min-width: 116px; padding: 8px 10px; border: 1px solid rgba(214, 195, 148, .24); border-radius: 8px; background: rgba(15, 14, 12, .78); pointer-events: none; }
+.scoreboard strong { display: block; margin-bottom: 5px; color: #c9b77f; font-size: 10px; letter-spacing: .14em; }
+.scoreboard ol { list-style: none; margin: 0; padding: 0; }
+.scoreboard li { display: flex; justify-content: space-between; gap: 16px; color: #bdb6a6; font: 11px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+.scoreboard li + li { margin-top: 3px; }
+.scoreboard li[data-own="true"] { color: #f7f1de; font-weight: 700; }
 .arena-stage::after { content: ""; position: absolute; inset: 0; z-index: 1; pointer-events: none; opacity: 0; }
 .arena-stage[data-combat-feedback="hit-confirm"]::after { animation: hit-confirm .32s ease-out; }
 .arena-stage[data-combat-feedback="damage-taken"]::after { animation: damage-taken .32s ease-out; }

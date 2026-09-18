@@ -57,7 +57,7 @@ impl WireEntity {
             hp: quantize_vital(fighter.hp),
             guard: quantize_vital(fighter.guard),
             action: fighter.action.wire_code(),
-            flags: 0,
+            flags: fighter.kills.min(u8::MAX as u16) as u8,
         }
     }
 }

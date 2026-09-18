@@ -280,6 +280,10 @@ fn death_is_temporary_and_respawns_at_the_spawn_point() {
         "repeated committed attacks should eventually kill the target"
     );
     assert_eq!(world.fighter(2).expect("target").action, Action::Dead);
+    assert_eq!(world.fighter(1).expect("killer").kills, 1);
+    assert_eq!(world.fighter(2).expect("target").kills, 0);
+    assert_eq!(WireEntity::from_fighter(world.fighter(1).expect("killer")).flags, 1);
+    assert_eq!(WireEntity::from_fighter(world.fighter(2).expect("target")).flags, 0);
 
     let events = advance(
         &mut world,
@@ -290,6 +294,9 @@ fn death_is_temporary_and_respawns_at_the_spawn_point() {
     let target = world.fighter(2).expect("target");
     assert_eq!(target.action, Action::Idle);
     assert_eq!(target.hp.round() as u8, 100);
+    assert_eq!(target.kills, 0);
+    assert_eq!(world.fighter(1).expect("killer").kills, 1);
+    assert_eq!(WireEntity::from_fighter(world.fighter(1).expect("killer")).flags, 1);
     assert!((target.x - target.spawn_x).abs() < 0.001);
     assert!((target.y - target.spawn_y).abs() < 0.001);
     assert!(events

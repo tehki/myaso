@@ -1,5 +1,5 @@
 import { createFrameBudget } from "../src/browser/frame-budget.mjs";
-import { COMBAT_ACTION, blockSpatialPresentation, combatActionHint, combatOverlayPresentation, createCombatReadabilityTracker, createRemoteDamageTracker, fighterIdentityPresentation, fighterVitalsPresentation, guardBreakSpatialPresentation, opponentRecoveryPresentation, parrySpatialPresentation } from "../src/browser/combat-readability.mjs";
+import { COMBAT_ACTION, blockSpatialPresentation, combatActionHint, combatOverlayPresentation, createCombatReadabilityTracker, createRemoteDamageTracker, fighterIdentityPresentation, fighterScoreboardPresentation, fighterVitalsPresentation, guardBreakSpatialPresentation, opponentRecoveryPresentation, parrySpatialPresentation } from "../src/browser/combat-readability.mjs";
 import { COMBAT } from "../src/combat/model.mjs";
 import { reconcilePrediction } from "../src/browser/reconciliation.mjs";
 import { NETWORK } from "../src/network/constants.mjs";
@@ -9,6 +9,7 @@ const canvas = document.querySelector("#arena");
 const ctx = canvas.getContext("2d", { alpha: false });
 const eventText = document.querySelector("#event-text");
 const arenaStage = document.querySelector(".arena-stage");
+const scoreboardList = document.querySelector("#scoreboard-list");
 const hud = {
   playerHp: document.querySelector("#player-hp"),
   playerHpValue: document.querySelector("#player-hp-value"),
@@ -19,7 +20,7 @@ const hud = {
   botGuard: document.querySelector("#bot-guard"),
   botGuardValue: document.querySelector("#bot-guard-value"),
 };
-const hudCache = { playerHp: null, playerGuard: null, botHp: null, botGuard: null, status: null };
+const hudCache = { playerHp: null, playerGuard: null, botHp: null, botGuard: null, status: null, scoreboard: null };
 const combatOverlay = {
   root: document.querySelector("#combat-overlay"),
   title: document.querySelector("#combat-overlay-title"),
@@ -444,6 +445,7 @@ function updateHud(ownId) {
   setMeter("botGuard", hud.botGuard, hud.botGuardValue, remote?.guard ?? 0);
   updateCombatOverlay(own);
   updateOpponentRecovery(networkClient.state.size === 2 ? remote : null);
+  updateScoreboard(ownId);
   const now = performance.now();
   if (combatMessage && now <= combatMessageUntil) {
     setStatus(combatMessage);
@@ -473,6 +475,24 @@ function updateOpponentRecovery(remote) {
   opponentRecovery.root.dataset.state = presentation.state;
   if (opponentRecovery.label.textContent !== presentation.label) opponentRecovery.label.textContent = presentation.label;
   if (opponentRecovery.detail.textContent !== presentation.detail) opponentRecovery.detail.textContent = presentation.detail;
+}
+
+function updateScoreboard(ownId) {
+  if (!scoreboardList || !networkClient) return;
+  const rows = fighterScoreboardPresentation(networkClient.state.values(), ownId);
+  const signature = rows.map((row) => `${row.netId}:${row.kills}:${row.own ? 1 : 0}`).join("|");
+  if (hudCache.scoreboard === signature) return;
+  hudCache.scoreboard = signature;
+  scoreboardList.replaceChildren(...rows.map((row) => {
+    const item = document.createElement("li");
+    item.dataset.own = String(row.own);
+    const label = document.createElement("span");
+    label.textContent = row.label;
+    const score = document.createElement("b");
+    score.textContent = String(row.kills);
+    item.append(label, score);
+    return item;
+  }));
 }
 
 function setMeter(cacheKey, bar, label, value) {

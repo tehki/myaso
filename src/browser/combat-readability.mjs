@@ -167,6 +167,18 @@ export function fighterIdentityPresentation(netId) {
   return { visible: true, label: `#${netId}` };
 }
 
+export function fighterScoreboardPresentation(entities, ownId = 0) {
+  if (!entities || typeof entities[Symbol.iterator] !== "function") return [];
+  const rows = [];
+  for (const entity of entities) {
+    if (!entity || !Number.isInteger(entity.netId) || entity.netId <= 0) continue;
+    const kills = Number.isInteger(entity.flags) ? Math.max(0, Math.min(255, entity.flags)) : 0;
+    rows.push({ netId: entity.netId, kills, own: entity.netId === ownId, label: `#${entity.netId}` });
+  }
+  rows.sort((a, b) => b.kills - a.kills || a.netId - b.netId);
+  return rows;
+}
+
 export function combatOverlayPresentation(entity) {
   if (entity?.action === COMBAT_ACTION.dead) {
     return { visible: true, state: "dead", title: "DEFEATED", detail: "Respawning…" };
