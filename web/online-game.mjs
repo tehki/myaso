@@ -1,5 +1,5 @@
 import { createFrameBudget } from "../src/browser/frame-budget.mjs";
-import { COMBAT_ACTION, blockSpatialPresentation, combatActionHint, combatOverlayPresentation, createCombatReadabilityTracker, createRemoteDamageTracker, fighterVitalsPresentation, guardBreakSpatialPresentation, opponentRecoveryPresentation, parrySpatialPresentation } from "../src/browser/combat-readability.mjs";
+import { COMBAT_ACTION, blockSpatialPresentation, combatActionHint, combatOverlayPresentation, createCombatReadabilityTracker, createRemoteDamageTracker, fighterIdentityPresentation, fighterVitalsPresentation, guardBreakSpatialPresentation, opponentRecoveryPresentation, parrySpatialPresentation } from "../src/browser/combat-readability.mjs";
 import { COMBAT } from "../src/combat/model.mjs";
 import { reconcilePrediction } from "../src/browser/reconciliation.mjs";
 import { NETWORK } from "../src/network/constants.mjs";
@@ -228,19 +228,20 @@ function render(nowMs = performance.now()) {
     }
     const sampled = networkClient.remoteInterpolator.sample(entity.netId, renderServerTick, scratch) ?? entity;
     const damageTell = remoteDamage.visible(entity.netId, nowMs);
-    drawFighterWorld(sampled, "#b96350", "#47251f", damageTell);
+    drawFighterWorld(sampled, "#b96350", "#47251f", damageTell, entity.netId);
   }
   if (ownId && local.initialized) drawFighterScreen(canvas.width / 2, canvas.height / 2, local, "#e2d5b4", "#51452d");
   updateHud(ownId);
 }
 
-function drawFighterWorld(fighter, body, shadow, damageTell = false) {
+function drawFighterWorld(fighter, body, shadow, damageTell = false, netId = 0) {
   if (!local.initialized) return;
   const screenX = canvas.width / 2 + fighter.x - local.x;
   const screenY = canvas.height / 2 + fighter.y - local.y;
   if (screenX < -64 || screenX > canvas.width + 64 || screenY < -64 || screenY > canvas.height + 64) return;
   drawFighterScreen(screenX, screenY, fighter, body, shadow, true, damageTell);
   drawRemoteVitals(screenX, screenY, fighter);
+  drawRemoteIdentity(screenX, screenY, netId);
 }
 
 function drawFighterScreen(x, y, fighter, body, shadow, remote = false, damageTell = false) {
@@ -294,6 +295,22 @@ function drawRemoteVitals(x, y, fighter) {
   ctx.fillRect(left, hpTop, Math.round(width * presentation.hp / 100), 3);
   ctx.fillStyle = "#59c98b";
   ctx.fillRect(left, guardTop, Math.round(width * presentation.guard / 100), 3);
+}
+
+function drawRemoteIdentity(x, y, netId) {
+  const presentation = fighterIdentityPresentation(netId);
+  if (!presentation.visible) return;
+  const width = 34;
+  const height = 14;
+  const left = Math.round(x - width / 2);
+  const top = Math.round(y - 58);
+  ctx.fillStyle = "#34445c";
+  ctx.fillRect(left, top, width, height);
+  ctx.fillStyle = "#f7f1de";
+  ctx.font = "10px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText(presentation.label, Math.round(x), top + height / 2 + 0.5);
 }
 
 function drawAttackTell(action, remote) {
