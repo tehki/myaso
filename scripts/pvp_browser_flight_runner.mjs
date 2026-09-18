@@ -658,18 +658,25 @@ async function runOnlineUiStunOverlayFlight(entries) {
 async function runOnlineUiGuardBreakFlight(entries) {
   await Promise.all(entries.map(installUiObserver));
   const ready = await waitForUiReady(entries);
-  const ordered = ready.slice().sort((a, b) => a.playerNetId - b.playerNetId);
-  const attacker = entries.find((entry) => entry.name === ordered[0].browser);
-  const defender = entries.find((entry) => entry.name === ordered[1].browser);
-  if (!attacker || !defender) throw new Error(`could not resolve M34 UI roles from ${JSON.stringify(ready)}`);
-  if (attacker.name !== "chrome" || defender.name !== "firefox") throw new Error(`M34 choreography requires Chrome attacker / Firefox defender: ${JSON.stringify(ready)}`);
+  const attacker = entries.find((entry) => entry.name === "chrome");
+  const defender = entries.find((entry) => entry.name === "firefox");
+  const attackerReady = ready.find((entry) => entry.browser === attacker?.name);
+  const defenderReady = ready.find((entry) => entry.browser === defender?.name);
+  if (!attacker || !defender || !attackerReady || !defenderReady) {
+    throw new Error(`could not resolve M34 UI roles from ${JSON.stringify(ready)}`);
+  }
+  const attackRight = attackerReady.playerNetId < defenderReady.playerNetId;
+  const movementKey = attackRight ? "d" : "a";
+  const movementCode = attackRight ? "KeyD" : "KeyA";
+  const attackOffset = attackRight ? 200 : -200;
+  const blockOffset = attackRight ? -200 : 200;
 
   await Promise.all(entries.map((entry) => execute(entry.base, entry.sessionId, "document.querySelector('#arena').focus(); return document.activeElement?.id;")));
   const attackerElementId = await resolveArenaElement(attacker, "M34 attacker");
   const defenderElementId = await resolveArenaElement(defender, "M34 defender");
   await Promise.all(entries.map(centerArenaInViewport));
-  await pulseMovementKey(attacker, "d", 120);
-  await aimArena(defender, defenderElementId, -200);
+  await pulseMovementKey(attacker, movementKey, 120);
+  await aimArena(defender, defenderElementId, blockOffset);
   let evidence = null;
   let blockHeld = false;
   try {
@@ -678,7 +685,7 @@ async function runOnlineUiGuardBreakFlight(entries) {
     await sleep(180);
     let guardBroken = false;
     for (let attempt = 0; attempt < 4 && !guardBroken; attempt += 1) {
-      await performArenaAttack(attacker, attackerElementId);
+      await performArenaAttack(attacker, attackerElementId, attackOffset);
       await sleep(230);
       const states = await Promise.all(entries.map(readUiEvidence));
       const defenderState = states.find((entry) => entry.browser === defender.name);
@@ -695,16 +702,20 @@ async function runOnlineUiGuardBreakFlight(entries) {
   const attackerResult = evidence.find((entry) => entry.browser === attacker.name);
   const defenderResult = evidence.find((entry) => entry.browser === defender.name);
   if (!attackerResult || !defenderResult) throw new Error(`incomplete M34 UI evidence: ${JSON.stringify(evidence)}`);
-  if (!attackerResult.keys.includes("keydown:KeyD") || !attackerResult.keys.includes("keyup:KeyD")) {
+  if (!attackerResult.keys.includes(`keydown:${movementCode}`) || !attackerResult.keys.includes(`keyup:${movementCode}`)) {
     throw new Error(`M34 real attacker movement control was not delivered: ${JSON.stringify(attackerResult)}`);
   }
   const attackDowns = attackerResult.pointers.filter((event) => event.type === "pointerdown" && event.button === 0);
   const blockDown = defenderResult.pointers.find((event) => event.type === "pointerdown" && event.button === 2);
   const blockUp = defenderResult.pointers.find((event) => event.type === "pointerup" && event.button === 2);
-  if (attackDowns.length < 3 || attackDowns.some((event) => event.x < 0.6 || Math.abs(event.y - 0.5) > 0.15)) {
-    throw new Error(`M34 real repeated rightward attacks were not delivered: ${JSON.stringify(attackerResult)}`);
+  const attacksAimed = attackDowns.length >= 3 && attackDowns.every((event) =>
+    Math.abs(event.y - 0.5) <= 0.15 && (attackRight ? event.x >= 0.6 : event.x <= 0.4));
+  if (!attacksAimed) {
+    throw new Error(`M34 real repeated directional attacks were not delivered: ${JSON.stringify(attackerResult)}`);
   }
-  if (!blockDown || !blockUp || blockDown.x > 0.4 || Math.abs(blockDown.y - 0.5) > 0.15) {
+  const blockAimed = blockDown && blockUp && Math.abs(blockDown.y - 0.5) <= 0.15
+    && (attackRight ? blockDown.x <= 0.4 : blockDown.x >= 0.6);
+  if (!blockAimed) {
     throw new Error(`M34 real held directional block was not delivered: ${JSON.stringify(defenderResult)}`);
   }
   if (attackerResult.playerHp !== 100 || defenderResult.playerHp !== 100 || defenderResult.playerGuard !== 0) {

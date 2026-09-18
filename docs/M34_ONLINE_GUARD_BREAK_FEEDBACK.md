@@ -18,7 +18,9 @@ M34 adds presentation cues only after the existing authoritative readability tra
 ## Real-browser flight
 
 The `uiguardbreak` scenario uses the production `index.html` client in Chrome and Firefox against one loopback authoritative server.
-Chrome is the attacker and uses real `D` movement plus separate genuine rightward LMB requests. Firefox pre-aims left and holds real RMB continuously beyond the 115 ms parry-entry window. Each LMB request is issued only after the prior 470 ms attack commitment can finish, while guard is sampled before RMB release; a bounded fourth browser edge is allowed only if one request is dropped before becoming an authoritative attack.
+Chrome is the attacker and Firefox is the defender regardless of connection order. Their assigned authoritative player IDs determine whether Chrome moves/attacks left or right and whether Firefox pre-aims the held RMB block in the opposite direction. Firefox holds real RMB continuously beyond the 115 ms parry-entry window. Each LMB request is issued only after the prior 470 ms attack commitment can finish, while guard is sampled before RMB release; a bounded fourth browser edge is allowed only if one request is dropped before becoming an authoritative attack.
+
+CI #173 exposed an inherited acceptance-only ordering race: Firefox received the lower network ID, but the old flight incorrectly required the lower-ID fighter to be Chrome. M34 now keeps the intended browser roles fixed and derives only spatial direction from the authoritative IDs. Combat behavior and pass criteria are unchanged.
 
 The flight passes only when:
 
