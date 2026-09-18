@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { COMBAT_ACTION, blockSpatialPresentation, combatActionHint, combatLifePresentation, combatOverlayPresentation, createCombatReadabilityTracker, guardBreakSpatialPresentation, opponentRecoveryPresentation, parrySpatialPresentation } from "../src/browser/combat-readability.mjs";
+import { COMBAT_ACTION, blockSpatialPresentation, combatActionHint, combatLifePresentation, combatOverlayPresentation, createCombatReadabilityTracker, createRemoteDamageTracker, guardBreakSpatialPresentation, opponentRecoveryPresentation, parrySpatialPresentation } from "../src/browser/combat-readability.mjs";
 
 function fighter(netId, hp = 100, guard = 100, action = COMBAT_ACTION.idle, x = 0, y = 0, facing = 0) {
   return { netId, hp, guard, action, x, y, facing };
@@ -26,6 +26,45 @@ test("authoritative opponent HP loss emits hit-confirm feedback", () => {
   assert.equal(event.kind, "hit");
   assert.equal(event.feedback, "hit-confirm");
   assert.match(event.text, /Opponent hit/);
+});
+
+test("remote authoritative HP loss owns a bounded spatial damage tell", () => {
+  const tracker = createRemoteDamageTracker({ durationMs: 320 });
+  const initial = new Map([
+    [1, fighter(1)],
+    [2, fighter(2)],
+    [3, fighter(3)],
+  ]);
+  tracker.observe(initial, 1, 100);
+  tracker.observe(new Map([
+    [1, fighter(1)],
+    [2, fighter(2, 66)],
+    [3, fighter(3)],
+  ]), 1, 140);
+
+  assert.equal(tracker.visible(1, 140), false);
+  assert.equal(tracker.visible(2, 140), true);
+  assert.equal(tracker.visible(3, 140), false);
+  assert.equal(tracker.visible(2, 459), true);
+  assert.equal(tracker.visible(2, 460), false);
+});
+
+test("spatial damage tracking identifies every damaged remote without marking local damage", () => {
+  const tracker = createRemoteDamageTracker({ durationMs: 320 });
+  tracker.observe(new Map([
+    [1, fighter(1)],
+    [2, fighter(2)],
+    [3, fighter(3)],
+  ]), 1, 0);
+  tracker.observe(new Map([
+    [1, fighter(1, 66)],
+    [2, fighter(2, 66)],
+    [3, fighter(3, 66)],
+  ]), 1, 20);
+
+  assert.equal(tracker.visible(1, 20), false);
+  assert.equal(tracker.visible(2, 20), true);
+  assert.equal(tracker.visible(3, 20), true);
 });
 
 test("guard-only loss is explained as a block instead of damage", () => {
