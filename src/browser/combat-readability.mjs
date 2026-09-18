@@ -162,6 +162,11 @@ export function fighterVitalsPresentation(entity) {
   };
 }
 
+export function fighterIdentityPresentation(netId) {
+  if (!Number.isInteger(netId) || netId <= 0) return { visible: false, label: "" };
+  return { visible: true, label: `#${netId}` };
+}
+
 export function combatOverlayPresentation(entity) {
   if (entity?.action === COMBAT_ACTION.dead) {
     return { visible: true, state: "dead", title: "DEFEATED", detail: "Respawning…" };
