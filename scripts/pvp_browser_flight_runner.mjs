@@ -483,22 +483,23 @@ async function runOnlineUiDodgeFeedbackFlight(entries) {
 
   let evidence = null;
   let lastAttemptBaseline = null;
-  // M24 owns reaction-timing proof. M36 uses the already-proven real W3C timing, but
-  // treats a timing miss as retryable only while both fighters remain untouched and no
-  // parry occurs. No WebDriver polling runs during the attack/Dodge resolution window.
+  // M24 owns reaction-timing proof. M36 starts the genuine attack first, then sends
+  // the genuine Firefox Dodge early inside windup so headless-driver scheduling cannot
+  // consume most of the 135 ms commitment window. A miss remains retryable only while
+  // both fighters stay untouched and no parry occurs. No WebDriver evidence polling runs
+  // during the attack/Dodge resolution window.
   for (let attempt = 1; attempt <= 3 && !evidence; attempt += 1) {
     lastAttemptBaseline = await Promise.all(entries.map(readUiEvidence));
     if (!lastAttemptBaseline.every((entry) => entry.playerHp === 100 && entry.playerGuard === 100)) {
       throw new Error(`M36 retry ${attempt} did not start from clean authoritative vitals: ${JSON.stringify(lastAttemptBaseline)}`);
     }
 
-    const dodgeAction = pressArenaPerpendicularDodgeAfterPause(defender, 90);
-    await sleep(50);
     let attackHeld = false;
     try {
       attackHeld = true;
       await setArenaAttack(attacker, attackerElementId, true, attackOffset);
-      await dodgeAction;
+      await sleep(35);
+      await pressArenaPerpendicularDodgeAfterPause(defender, 0);
     } finally {
       if (attackHeld) await setArenaAttack(attacker, attackerElementId, false, attackOffset);
     }
