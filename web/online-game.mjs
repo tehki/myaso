@@ -1,5 +1,5 @@
 import { createFrameBudget } from "../src/browser/frame-budget.mjs";
-import { COMBAT_ACTION, blockSpatialPresentation, combatActionHint, combatOverlayPresentation, createCombatReadabilityTracker, guardBreakSpatialPresentation, opponentRecoveryPresentation, parrySpatialPresentation } from "../src/browser/combat-readability.mjs";
+import { COMBAT_ACTION, blockSpatialPresentation, combatActionHint, combatOverlayPresentation, createCombatReadabilityTracker, createRemoteHitTellTracker, guardBreakSpatialPresentation, opponentRecoveryPresentation, parrySpatialPresentation } from "../src/browser/combat-readability.mjs";
 import { COMBAT } from "../src/combat/model.mjs";
 import { reconcilePrediction } from "../src/browser/reconciliation.mjs";
 import { NETWORK } from "../src/network/constants.mjs";
@@ -31,6 +31,8 @@ const opponentRecovery = {
   detail: document.querySelector("#opponent-recovery-detail"),
 };
 const combatReadability = createCombatReadabilityTracker();
+const remoteHitTell = createRemoteHitTellTracker();
+let remoteHitTellServerTick = -1;
 let networkStatus = "Connecting to authoritative server...";
 let combatMessage = null;
 let combatMessageUntil = 0;
@@ -215,6 +217,11 @@ function render() {
   const renderServerTick = networkClient.latestServerTick >= interpolationTicks
     ? networkClient.latestServerTick - interpolationTicks
     : 0;
+  const now = performance.now();
+  if (ownId && networkClient.latestServerTick !== remoteHitTellServerTick) {
+    remoteHitTell.observe(networkClient.state, ownId, now);
+    remoteHitTellServerTick = networkClient.latestServerTick;
+  }
 
   for (const entity of networkClient.state.values()) {
     if (entity.netId === ownId) continue;
@@ -224,21 +231,21 @@ function render() {
       remoteScratch.set(entity.netId, scratch);
     }
     const sampled = networkClient.remoteInterpolator.sample(entity.netId, renderServerTick, scratch) ?? entity;
-    drawFighterWorld(sampled, "#b96350", "#47251f");
+    drawFighterWorld(sampled, "#b96350", "#47251f", remoteHitTell.isVisible(entity.netId, now));
   }
   if (ownId && local.initialized) drawFighterScreen(canvas.width / 2, canvas.height / 2, local, "#e2d5b4", "#51452d");
   updateHud(ownId);
 }
 
-function drawFighterWorld(fighter, body, shadow) {
+function drawFighterWorld(fighter, body, shadow, hitTell = false) {
   if (!local.initialized) return;
   const screenX = canvas.width / 2 + fighter.x - local.x;
   const screenY = canvas.height / 2 + fighter.y - local.y;
   if (screenX < -64 || screenX > canvas.width + 64 || screenY < -64 || screenY > canvas.height + 64) return;
-  drawFighterScreen(screenX, screenY, fighter, body, shadow, true);
+  drawFighterScreen(screenX, screenY, fighter, body, shadow, true, hitTell);
 }
 
-function drawFighterScreen(x, y, fighter, body, shadow, remote = false) {
+function drawFighterScreen(x, y, fighter, body, shadow, remote = false, hitTell = false) {
   ctx.save();
   ctx.translate(x, y);
   ctx.rotate(fighter.facing ?? 0);
@@ -268,6 +275,8 @@ function drawFighterScreen(x, y, fighter, body, shadow, remote = false) {
   if (remote && action === COMBAT_ACTION.dead) {
     ctx.globalAlpha = 1;
     drawDeathTell();
+  } else if (remote && hitTell) {
+    drawHitTell();
   }
   ctx.restore();
 }
@@ -370,6 +379,23 @@ function drawDeathTell() {
   ctx.moveTo(10, -10);
   ctx.lineTo(-10, 10);
   ctx.stroke();
+}
+
+function drawHitTell() {
+  ctx.strokeStyle = "#ff9d66";
+  ctx.lineWidth = 4;
+  ctx.beginPath();
+  ctx.arc(0, 0, 34, 0, Math.PI * 2);
+  ctx.stroke();
+  for (let index = 0; index < 4; index += 1) {
+    const angle = index * Math.PI / 2;
+    const x = Math.cos(angle);
+    const y = Math.sin(angle);
+    ctx.beginPath();
+    ctx.moveTo(x * 38, y * 38);
+    ctx.lineTo(x * 46, y * 46);
+    ctx.stroke();
+  }
 }
 
 function updateHud(ownId) {

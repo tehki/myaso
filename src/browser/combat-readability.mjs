@@ -113,6 +113,46 @@ export function guardBreakSpatialPresentation(entity) {
   return { visible: false, state: "" };
 }
 
+export function createRemoteHitTellTracker(durationMs = 280) {
+  const previousHp = new Map();
+  const visibleUntil = new Map();
+  const duration = Number.isFinite(durationMs) && durationMs > 0 ? durationMs : 280;
+
+  return {
+    observe(state, ownId, nowMs) {
+      if (!(state instanceof Map) || !ownId || !Number.isFinite(nowMs)) return;
+      for (const entity of state.values()) {
+        if (entity.netId === ownId) continue;
+        const beforeHp = previousHp.get(entity.netId);
+        if (Number.isFinite(beforeHp) && Number.isFinite(entity.hp) && entity.hp < beforeHp && entity.hp > 0
+          && entity.action !== COMBAT_ACTION.dead) {
+          visibleUntil.set(entity.netId, nowMs + duration);
+        } else if (entity.hp <= 0 || entity.action === COMBAT_ACTION.dead) {
+          visibleUntil.delete(entity.netId);
+        }
+        previousHp.set(entity.netId, entity.hp);
+      }
+      for (const netId of previousHp.keys()) {
+        if (netId === ownId || !state.has(netId)) {
+          previousHp.delete(netId);
+          visibleUntil.delete(netId);
+        }
+      }
+      for (const [netId, until] of visibleUntil) {
+        if (until <= nowMs || !state.has(netId)) visibleUntil.delete(netId);
+      }
+    },
+    isVisible(netId, nowMs) {
+      const until = visibleUntil.get(netId);
+      return Number.isFinite(until) && Number.isFinite(nowMs) && until > nowMs;
+    },
+    reset() {
+      previousHp.clear();
+      visibleUntil.clear();
+    },
+  };
+}
+
 export function combatOverlayPresentation(entity) {
   if (entity?.action === COMBAT_ACTION.dead) {
     return { visible: true, state: "dead", title: "DEFEATED", detail: "Respawning…" };

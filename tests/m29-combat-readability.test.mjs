@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { COMBAT_ACTION, blockSpatialPresentation, combatActionHint, combatLifePresentation, combatOverlayPresentation, createCombatReadabilityTracker, guardBreakSpatialPresentation, opponentRecoveryPresentation, parrySpatialPresentation } from "../src/browser/combat-readability.mjs";
+import { COMBAT_ACTION, blockSpatialPresentation, combatActionHint, combatLifePresentation, combatOverlayPresentation, createCombatReadabilityTracker, createRemoteHitTellTracker, guardBreakSpatialPresentation, opponentRecoveryPresentation, parrySpatialPresentation } from "../src/browser/combat-readability.mjs";
 
 function fighter(netId, hp = 100, guard = 100, action = COMBAT_ACTION.idle, x = 0, y = 0, facing = 0) {
   return { netId, hp, guard, action, x, y, facing };
@@ -26,6 +26,36 @@ test("authoritative opponent HP loss emits hit-confirm feedback", () => {
   assert.equal(event.kind, "hit");
   assert.equal(event.feedback, "hit-confirm");
   assert.match(event.text, /Opponent hit/);
+});
+
+test("remote non-lethal HP loss owns a bounded spatial hit tell", () => {
+  const tracker = createRemoteHitTellTracker(280);
+  const initial = new Map([[1, fighter(1)], [2, fighter(2)], [3, fighter(3)]]);
+  tracker.observe(initial, 1, 1000);
+  assert.equal(tracker.isVisible(2, 1000), false);
+  assert.equal(tracker.isVisible(3, 1000), false);
+
+  const damaged = new Map([[1, fighter(1)], [2, fighter(2, 66)], [3, fighter(3)]]);
+  tracker.observe(damaged, 1, 1050);
+  assert.equal(tracker.isVisible(2, 1050), true);
+  assert.equal(tracker.isVisible(3, 1050), false);
+  assert.equal(tracker.isVisible(2, 1329), true);
+  assert.equal(tracker.isVisible(2, 1330), false);
+});
+
+test("remote hit tell ignores local damage, guard loss, respawn, and lethal death", () => {
+  const tracker = createRemoteHitTellTracker(280);
+  tracker.observe(new Map([[1, fighter(1)], [2, fighter(2)]]), 1, 1000);
+  tracker.observe(new Map([[1, fighter(1, 66)], [2, fighter(2, 100, 62, COMBAT_ACTION.block)]]), 1, 1050);
+  assert.equal(tracker.isVisible(1, 1050), false);
+  assert.equal(tracker.isVisible(2, 1050), false);
+
+  tracker.observe(new Map([[1, fighter(1, 66)], [2, fighter(2, 66)]]), 1, 1100);
+  assert.equal(tracker.isVisible(2, 1100), true);
+  tracker.observe(new Map([[1, fighter(1, 66)], [2, fighter(2, 0, 100, COMBAT_ACTION.dead)]]), 1, 1150);
+  assert.equal(tracker.isVisible(2, 1150), false);
+  tracker.observe(new Map([[1, fighter(1, 66)], [2, fighter(2, 100, 100, COMBAT_ACTION.idle)]]), 1, 1200);
+  assert.equal(tracker.isVisible(2, 1200), false);
 });
 
 test("guard-only loss is explained as a block instead of damage", () => {

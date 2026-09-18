@@ -8,7 +8,7 @@ import { setTimeout as sleep } from "node:timers/promises";
 const root = process.cwd();
 const durationMs = Number(process.env.MYASO_PVP_FLIGHT_DURATION_MS ?? 7000);
 const scenario = process.env.MYASO_PVP_SCENARIO ?? "damage";
-if (!new Set(["damage", "parry", "dodge", "block", "guardbreak", "backblock", "respawn", "ui", "uirespawn", "uifeedback", "uiparry", "uistun", "uiguardbreak", "uidodge", "uirecovery", "uirecoverytell", "uiattackintent", "uiguardbreaktell", "uiparrytell", "uiblockfacingtell", "uidodgetell", "uideathtell"]).has(scenario)) throw new Error(`unsupported MYASO_PVP_SCENARIO: ${scenario}`);
+if (!new Set(["damage", "parry", "dodge", "block", "guardbreak", "backblock", "respawn", "ui", "uirespawn", "uifeedback", "uiparry", "uistun", "uiguardbreak", "uidodge", "uirecovery", "uirecoverytell", "uiattackintent", "uiguardbreaktell", "uiparrytell", "uiblockfacingtell", "uidodgetell", "uideathtell", "uihittell"]).has(scenario)) throw new Error(`unsupported MYASO_PVP_SCENARIO: ${scenario}`);
 const staticPort = Number(process.env.MYASO_PVP_FLIGHT_HTTP_PORT ?? 4174);
 const browsers = [
   {
@@ -68,6 +68,9 @@ try {
   } else if (scenario === "uideathtell") {
     const results = await runOnlineUiDeathTellFlight(sessions);
     console.log(`M44_FFA_DEATH_TELL ${JSON.stringify({ ok: true, results })}`);
+  } else if (scenario === "uihittell") {
+    const results = await runOnlineUiHitTellFlight(sessions);
+    console.log(`M45_FFA_HIT_TELL ${JSON.stringify({ ok: true, results })}`);
   } else if (scenario === "uistun") {
     const results = await runOnlineUiStunOverlayFlight(sessions);
     console.log(`M35_ONLINE_STUN_OVERLAY ${JSON.stringify({ ok: true, results })}`);
@@ -179,14 +182,14 @@ async function startBrowser(browser) {
   });
   const sessionId = created.sessionId ?? created.value?.sessionId;
   if (!sessionId) throw new Error(`${browser.name} WebDriver did not return a session id: ${JSON.stringify(created)}`);
-  if (scenario === "uiparry" || scenario === "uistun" || scenario === "uiguardbreak" || scenario === "uidodge" || scenario === "uiattackintent" || scenario === "uiguardbreaktell" || scenario === "uiparrytell" || scenario === "uiblockfacingtell" || scenario === "uidodgetell") {
+  if (scenario === "uiparry" || scenario === "uistun" || scenario === "uiguardbreak" || scenario === "uidodge" || scenario === "uiattackintent" || scenario === "uiguardbreaktell" || scenario === "uiparrytell" || scenario === "uiblockfacingtell" || scenario === "uidodgetell" || scenario === "uihittell") {
     await webdriver(base, "POST", `/session/${sessionId}/window/rect`, { x: 0, y: 0, width: 1280, height: 900 });
   }
   return { ...browser, child, base, sessionId };
 }
 
 async function navigate(session, gameUrl, certificateHash) {
-  const page = scenario === "ui" || scenario === "uirespawn" || scenario === "uifeedback" || scenario === "uiparry" || scenario === "uistun" || scenario === "uiguardbreak" || scenario === "uidodge" || scenario === "uirecovery" || scenario === "uirecoverytell" || scenario === "uiattackintent" || scenario === "uiguardbreaktell" || scenario === "uiparrytell" || scenario === "uiblockfacingtell" || scenario === "uidodgetell" || scenario === "uideathtell" ? "index.html" : "pvp-flight.html";
+  const page = scenario === "ui" || scenario === "uirespawn" || scenario === "uifeedback" || scenario === "uiparry" || scenario === "uistun" || scenario === "uiguardbreak" || scenario === "uidodge" || scenario === "uirecovery" || scenario === "uirecoverytell" || scenario === "uiattackintent" || scenario === "uiguardbreaktell" || scenario === "uiparrytell" || scenario === "uiblockfacingtell" || scenario === "uidodgetell" || scenario === "uideathtell" || scenario === "uihittell" ? "index.html" : "pvp-flight.html";
   const url = new URL(`http://127.0.0.1:${staticPort}/web/${page}`);
   url.searchParams.set("server", gameUrl);
   url.searchParams.set("cert", certificateHash);
@@ -260,6 +263,37 @@ async function runOnlineUiFeedbackFlight(entries) {
     throw new Error(`M32 authoritative hit feedback was not rendered on opposite clients: ${JSON.stringify(evidence)}`);
   }
   return evidence;
+}
+
+async function runOnlineUiHitTellFlight(entries) {
+  await Promise.all(entries.map(armHitTellSampler));
+  try {
+    let evidence = await runOnlineUiFeedbackFlight(entries);
+    const attackerResult = evidence.find((entry) => entry.feedbackTransitions.includes("hit-confirm"));
+    const defenderResult = evidence.find((entry) => entry.feedbackTransitions.includes("damage-taken"));
+    if (!attackerResult || !defenderResult || attackerResult.browser === defenderResult.browser) {
+      throw new Error(`M45 could not resolve hit-tell roles: ${JSON.stringify(evidence)}`);
+    }
+    const attacker = entries.find((entry) => entry.name === attackerResult.browser);
+    const defender = entries.find((entry) => entry.name === defenderResult.browser);
+    if (!attacker || !defender) throw new Error("M45 could not resolve hit-tell browser sessions");
+
+    const [observerMax, localMax] = await Promise.all([
+      readHitTellSampler(attacker),
+      readHitTellSampler(defender),
+    ]);
+    if (observerMax < 24) throw new Error(`M45 remote hit tell never appeared: observer=${observerMax} local=${localMax}`);
+    if (localMax !== 0) throw new Error(`M45 local damaged fighter painted the remote-only hit tell: ${localMax}`);
+    await waitForHitTellClear(attacker, 900);
+
+    evidence = evidence.map((entry) => ({
+      ...entry,
+      hitTellMaxPixels: entry.browser === attacker.name ? observerMax : localMax,
+    }));
+    return evidence;
+  } finally {
+    await Promise.all(entries.map(stopHitTellSampler));
+  }
 }
 
 async function runOnlineUiRecoveryReadabilityFlight(entries) {
@@ -1218,6 +1252,77 @@ async function waitForGuardBreakTellClear(session, timeoutMs) {
     await sleep(20);
   }
   throw new Error(`M40 remote guard-break tell did not clear after stun`);
+}
+
+async function sampleHitTellPixels(session) {
+  return execute(session.base, session.sessionId, `
+    const arena = document.querySelector('#arena');
+    const context = arena?.getContext('2d');
+    if (!context) return 0;
+    const half = 160;
+    const x = Math.max(0, Math.floor(arena.width / 2 - half));
+    const y = Math.max(0, Math.floor(arena.height / 2 - half));
+    const width = Math.min(half * 2, arena.width - x);
+    const height = Math.min(half * 2, arena.height - y);
+    const pixels = context.getImageData(x, y, width, height).data;
+    let count = 0;
+    for (let i = 0; i < pixels.length; i += 4) {
+      if (Math.abs(pixels[i] - 255) <= 2 && Math.abs(pixels[i + 1] - 157) <= 2 && Math.abs(pixels[i + 2] - 102) <= 2 && pixels[i + 3] >= 250) count += 1;
+    }
+    return count;
+  `);
+}
+
+async function armHitTellSampler(session) {
+  return execute(session.base, session.sessionId, `
+    const arena = document.querySelector('#arena');
+    const context = arena?.getContext('2d');
+    if (!context) return false;
+    const prior = window.__MYASO_M45_HIT_SAMPLER__;
+    if (prior?.frame) cancelAnimationFrame(prior.frame);
+    const state = { active: true, frame: 0, maxPixels: 0 };
+    const sample = () => {
+      if (!state.active) return;
+      const half = 160;
+      const x = Math.max(0, Math.floor(arena.width / 2 - half));
+      const y = Math.max(0, Math.floor(arena.height / 2 - half));
+      const width = Math.min(half * 2, arena.width - x);
+      const height = Math.min(half * 2, arena.height - y);
+      const pixels = context.getImageData(x, y, width, height).data;
+      let count = 0;
+      for (let i = 0; i < pixels.length; i += 4) {
+        if (Math.abs(pixels[i] - 255) <= 2 && Math.abs(pixels[i + 1] - 157) <= 2 && Math.abs(pixels[i + 2] - 102) <= 2 && pixels[i + 3] >= 250) count += 1;
+      }
+      state.maxPixels = Math.max(state.maxPixels, count);
+      state.frame = requestAnimationFrame(sample);
+    };
+    window.__MYASO_M45_HIT_SAMPLER__ = state;
+    state.frame = requestAnimationFrame(sample);
+    return true;
+  `);
+}
+
+async function readHitTellSampler(session) {
+  return execute(session.base, session.sessionId, `return window.__MYASO_M45_HIT_SAMPLER__?.maxPixels ?? 0;`);
+}
+
+async function stopHitTellSampler(session) {
+  return execute(session.base, session.sessionId, `
+    const state = window.__MYASO_M45_HIT_SAMPLER__;
+    if (!state) return 0;
+    state.active = false;
+    if (state.frame) cancelAnimationFrame(state.frame);
+    return state.maxPixels;
+  `);
+}
+
+async function waitForHitTellClear(session, timeoutMs) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    if (await sampleHitTellPixels(session) === 0) return;
+    await sleep(20);
+  }
+  throw new Error("M45 remote hit tell did not clear after its bounded presentation window");
 }
 
 async function sampleWindupTellPixels(session) {
