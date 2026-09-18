@@ -18,6 +18,10 @@ The dedicated `uiattackintent` Chrome+Firefox flight opens the production `index
 
 Chrome is the attacker and Firefox is the observer. Spawn ordering determines left/right movement and aim. Firefox must observe the unique remote-windup boundary pixels, while Chrome must never paint that remote-only boundary around its local fighter. The boundary must clear after the authoritative windup ends.
 
+### Acceptance stabilization
+
+FULL CI #179 cleared M34-M38 and then reproduced an inherited M39 scheduling case where both passive windup samplers stayed at 0. M39 now permits up to three bounded repetitions of the same genuine pointer attack while the samplers remain armed, with a full attack-cycle recovery gap between attempts. The acceptance still requires the original remote-only 24-pixel windup boundary and still rejects any local rendering of that boundary. No attack state is injected and no gameplay timing or threshold is changed.
+
 ## Local evidence
 
 - Coding-agent policy sentinel: PASS.

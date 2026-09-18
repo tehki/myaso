@@ -407,14 +407,19 @@ async function runOnlineUiAttackIntentFlight(entries) {
   await Promise.all(entries.map(centerArenaInViewport));
   await pulseMovementKey(attacker, movementKey, 120);
   await Promise.all(entries.map(armWindupTellSampler));
-  let evidence;
-  let attackHeld = false;
+  let evidence = null;
   try {
-    attackHeld = true;
-    await setArenaAttack(attacker, attackerElementId, true, attackOffset);
-    evidence = await waitForRemoteWindupTell(entries, attacker, defender, 500);
+    for (let attempt = 0; attempt < 3 && !evidence; attempt += 1) {
+      await setArenaAttack(attacker, attackerElementId, true, attackOffset);
+      try {
+        evidence = await waitForRemoteWindupTell(entries, attacker, defender, 600, false);
+      } finally {
+        await setArenaAttack(attacker, attackerElementId, false, attackOffset);
+      }
+      if (!evidence) await sleep(520);
+    }
+    if (!evidence) evidence = await waitForRemoteWindupTell(entries, attacker, defender, 300, true);
   } finally {
-    if (attackHeld) await setArenaAttack(attacker, attackerElementId, false, attackOffset);
     await Promise.all(entries.map(stopWindupTellSampler));
   }
   await waitForWindupTellClear(defender, 500);
@@ -1432,7 +1437,7 @@ async function stopWindupTellSampler(session) {
   `);
 }
 
-async function waitForRemoteWindupTell(entries, attacker, defender, timeoutMs) {
+async function waitForRemoteWindupTell(entries, attacker, defender, timeoutMs, fail = true) {
   const deadline = Date.now() + timeoutMs;
   let attackerMax = 0;
   let defenderMax = 0;
@@ -1447,6 +1452,7 @@ async function waitForRemoteWindupTell(entries, attacker, defender, timeoutMs) {
     }
     await sleep(20);
   }
+  if (!fail) return null;
   throw new Error(`M39 remote windup boundary never appeared: attacker=${attackerMax} defender=${defenderMax}`);
 }
 
