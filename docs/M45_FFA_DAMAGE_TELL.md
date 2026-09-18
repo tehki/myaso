@@ -35,3 +35,7 @@ No state, HP, target identity, server event, or combat result is injected by the
 Presentation-only browser state derived from authoritative snapshots. No server simulation, attack timing, damage, knockback, dodge/block/parry rules, wire protocol, persistence, networking, public bind, deployment, or production activation changes.
 
 Rollback is to close/discard M45; frozen M44 exact head `7f8361a5ff1b9a6ce7653549fe53aa88447876da` remains unchanged.
+
+## Acceptance stabilization
+
+FULL CI #176 reached the dedicated M45 gate and proved the exact tell color sampler was correct, but measured zero pixels. The remote interpolation hot path intentionally reuses identity-free scratch samples, so the first renderer implementation attempted the damage-track lookup with `sampled.netId` and always queried `undefined`. The renderer now resolves damage-tell visibility from the authoritative loop entity's `netId` before interpolation and passes only that presentation boolean into the scratch render path. Interpolation, networking, HP authority, damage semantics, and the M45 pixel threshold are unchanged.

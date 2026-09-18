@@ -227,21 +227,22 @@ function render(nowMs = performance.now()) {
       remoteScratch.set(entity.netId, scratch);
     }
     const sampled = networkClient.remoteInterpolator.sample(entity.netId, renderServerTick, scratch) ?? entity;
-    drawFighterWorld(sampled, "#b96350", "#47251f", nowMs);
+    const damageTell = remoteDamage.visible(entity.netId, nowMs);
+    drawFighterWorld(sampled, "#b96350", "#47251f", damageTell);
   }
-  if (ownId && local.initialized) drawFighterScreen(canvas.width / 2, canvas.height / 2, local, "#e2d5b4", "#51452d", false, nowMs);
+  if (ownId && local.initialized) drawFighterScreen(canvas.width / 2, canvas.height / 2, local, "#e2d5b4", "#51452d");
   updateHud(ownId);
 }
 
-function drawFighterWorld(fighter, body, shadow, nowMs) {
+function drawFighterWorld(fighter, body, shadow, damageTell = false) {
   if (!local.initialized) return;
   const screenX = canvas.width / 2 + fighter.x - local.x;
   const screenY = canvas.height / 2 + fighter.y - local.y;
   if (screenX < -64 || screenX > canvas.width + 64 || screenY < -64 || screenY > canvas.height + 64) return;
-  drawFighterScreen(screenX, screenY, fighter, body, shadow, true, nowMs);
+  drawFighterScreen(screenX, screenY, fighter, body, shadow, true, damageTell);
 }
 
-function drawFighterScreen(x, y, fighter, body, shadow, remote = false, nowMs = performance.now()) {
+function drawFighterScreen(x, y, fighter, body, shadow, remote = false, damageTell = false) {
   ctx.save();
   ctx.translate(x, y);
   ctx.rotate(fighter.facing ?? 0);
@@ -268,7 +269,7 @@ function drawFighterScreen(x, y, fighter, body, shadow, remote = false, nowMs = 
   ctx.fill();
   ctx.fillStyle = "#c8b684";
   ctx.fillRect(12, -2, 26, 4);
-  if (remote && action !== COMBAT_ACTION.dead && remoteDamage.visible(fighter.netId, nowMs)) {
+  if (remote && action !== COMBAT_ACTION.dead && damageTell) {
     drawDamageTell();
   }
   if (remote && action === COMBAT_ACTION.dead) {
