@@ -22,6 +22,10 @@ CI #165 ruled out a pixel-crop-only explanation. CI #166 retry passed M36-M42 bu
 
 On timeout, the acceptance reports the normal UI/key evidence from both browsers so a missing tell can be distinguished from missing input or state convergence.
 
+### Acceptance stabilization
+
+FULL CI #178 first rerun cleared the earlier inherited M34 failure, then reproduced an M43 scheduling case: Firefox recorded genuine `KeyS` + Space down/up provenance but never entered authoritative `Dodge`; Chrome consequently observed 0 violet pixels. The same M43 gate had passed in FULL CI #177 with authoritative Dodge and 163 observer pixels. M43 therefore now permits up to three bounded repetitions of the same genuine W3C Dodge input while the passive samplers remain armed. It does not inject Dodge state, alter product timing, lower the 24-pixel threshold, or accept key provenance alone; an authoritative remote Dodge still has to render the original spatial tell.
+
 The flight passes only when:
 
 - Chrome paints at least 24 exact-color pixels from the remote-only violet Dodge boundary;

@@ -632,12 +632,18 @@ async function runOnlineUiDodgeTellFlight(entries) {
   await Promise.all(entries.map((entry) => execute(entry.base, entry.sessionId, "document.querySelector('#arena').focus(); return document.activeElement?.id;")));
   await Promise.all(entries.map(centerArenaInViewport));
   await Promise.all([armDodgeTellSampler(observer, true), armDodgeTellSampler(dodger, false)]);
-  let tell;
+  let tell = null;
   try {
-    // Reuse the exact real-input choreography already proven by M36: the only M43
-    // difference is passive pixel evidence, not how Dodge is requested.
-    await pressArenaPerpendicularDodgeAfterPause(dodger, 0);
-    tell = await waitForRemoteDodgeTell(entries, observer, dodger, 700);
+    // Reuse the exact real-input choreography already proven by M36. Headless
+    // Firefox can occasionally deliver the DOM key events while its animation
+    // frame is stalled, so retry the real Dodge request rather than injecting
+    // state or weakening the spatial-pixel requirement.
+    for (let attempt = 0; attempt < 3 && !tell; attempt += 1) {
+      await pressArenaPerpendicularDodgeAfterPause(dodger, 0);
+      tell = await waitForRemoteDodgeTell(entries, observer, dodger, 700, false);
+      if (!tell) await sleep(120);
+    }
+    if (!tell) tell = await waitForRemoteDodgeTell(entries, observer, dodger, 300, true);
   } finally {
     await Promise.all(entries.map(stopDodgeTellSampler));
   }
@@ -1149,7 +1155,7 @@ async function sampleDodgeTellPixels(session) {
   `);
 }
 
-async function waitForRemoteDodgeTell(entries, observer, localDodger, timeoutMs) {
+async function waitForRemoteDodgeTell(entries, observer, localDodger, timeoutMs, fail = true) {
   const deadline = Date.now() + timeoutMs;
   let observerMax = 0;
   let localMax = 0;
@@ -1163,6 +1169,7 @@ async function waitForRemoteDodgeTell(entries, observer, localDodger, timeoutMs)
     }
     await sleep(20);
   }
+  if (!fail) return null;
   const evidence = await Promise.all(entries.map(readUiEvidence));
   throw new Error(`M43 remote dodge tell never appeared: observer=${observerMax} local=${localMax} evidence=${JSON.stringify(evidence)}`);
 }
