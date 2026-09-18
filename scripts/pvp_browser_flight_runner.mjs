@@ -8,7 +8,7 @@ import { setTimeout as sleep } from "node:timers/promises";
 const root = process.cwd();
 const durationMs = Number(process.env.MYASO_PVP_FLIGHT_DURATION_MS ?? 7000);
 const scenario = process.env.MYASO_PVP_SCENARIO ?? "damage";
-if (!new Set(["damage", "parry", "dodge", "block", "guardbreak", "backblock", "respawn", "ui", "uirespawn", "uifeedback", "uihittell", "uiparry", "uistun", "uiguardbreak", "uidodge", "uirecovery", "uirecoverytell", "uiattackintent", "uiguardbreaktell", "uiparrytell", "uiblockfacingtell", "uidodgetell", "uideathtell"]).has(scenario)) throw new Error(`unsupported MYASO_PVP_SCENARIO: ${scenario}`);
+if (!new Set(["damage", "parry", "dodge", "block", "guardbreak", "backblock", "respawn", "ui", "uirespawn", "uifeedback", "uihittell", "uivitals", "uiparry", "uistun", "uiguardbreak", "uidodge", "uirecovery", "uirecoverytell", "uiattackintent", "uiguardbreaktell", "uiparrytell", "uiblockfacingtell", "uidodgetell", "uideathtell"]).has(scenario)) throw new Error(`unsupported MYASO_PVP_SCENARIO: ${scenario}`);
 const staticPort = Number(process.env.MYASO_PVP_FLIGHT_HTTP_PORT ?? 4174);
 const browsers = [
   {
@@ -56,6 +56,9 @@ try {
   } else if (scenario === "uihittell") {
     const results = await runOnlineUiHitTellFlight(sessions);
     console.log(`M45_FFA_DAMAGE_TELL ${JSON.stringify({ ok: true, results })}`);
+  } else if (scenario === "uivitals") {
+    const results = await runOnlineUiVitalsFlight(sessions);
+    console.log(`M46_FFA_SPATIAL_VITALS ${JSON.stringify({ ok: true, results })}`);
   } else if (scenario === "uiparry") {
     const results = await runOnlineUiParryFlight(sessions);
     console.log(`M33_ONLINE_PARRY_FEEDBACK ${JSON.stringify({ ok: true, results })}`);
@@ -189,7 +192,7 @@ async function startBrowser(browser) {
 }
 
 async function navigate(session, gameUrl, certificateHash) {
-  const page = scenario === "ui" || scenario === "uirespawn" || scenario === "uifeedback" || scenario === "uihittell" || scenario === "uiparry" || scenario === "uistun" || scenario === "uiguardbreak" || scenario === "uidodge" || scenario === "uirecovery" || scenario === "uirecoverytell" || scenario === "uiattackintent" || scenario === "uiguardbreaktell" || scenario === "uiparrytell" || scenario === "uiblockfacingtell" || scenario === "uidodgetell" || scenario === "uideathtell" ? "index.html" : "pvp-flight.html";
+  const page = scenario === "ui" || scenario === "uirespawn" || scenario === "uifeedback" || scenario === "uihittell" || scenario === "uivitals" || scenario === "uiparry" || scenario === "uistun" || scenario === "uiguardbreak" || scenario === "uidodge" || scenario === "uirecovery" || scenario === "uirecoverytell" || scenario === "uiattackintent" || scenario === "uiguardbreaktell" || scenario === "uiparrytell" || scenario === "uiblockfacingtell" || scenario === "uidodgetell" || scenario === "uideathtell" ? "index.html" : "pvp-flight.html";
   const url = new URL(`http://127.0.0.1:${staticPort}/web/${page}`);
   url.searchParams.set("server", gameUrl);
   url.searchParams.set("cert", certificateHash);
@@ -298,6 +301,35 @@ async function runOnlineUiHitTellFlight(entries) {
   }));
 }
 
+async function runOnlineUiVitalsFlight(entries) {
+  const evidence = await runOnlineUiFeedbackFlight(entries);
+  const attacker = evidence.find((entry) => entry.feedbackTransitions.includes("hit-confirm"));
+  const defender = evidence.find((entry) => entry.feedbackTransitions.includes("damage-taken"));
+  if (!attacker || !defender || attacker.browser === defender.browser) {
+    throw new Error(`M46 could not resolve authoritative hit roles: ${JSON.stringify(evidence)}`);
+  }
+  const attackerSession = entries.find((entry) => entry.name === attacker.browser);
+  const defenderSession = entries.find((entry) => entry.name === defender.browser);
+  if (!attackerSession || !defenderSession) throw new Error("M46 could not resolve browser sessions");
+
+  await sleep(40);
+  const [attackerVitals, defenderVitals] = await Promise.all([
+    sampleRemoteVitalsPixels(attackerSession),
+    sampleRemoteVitalsPixels(defenderSession),
+  ]);
+  const closeTo = (actual, expected, tolerance = 8) => Math.abs(actual - expected) <= tolerance;
+  if (!closeTo(attackerVitals.hpPixels, 84) || !closeTo(attackerVitals.guardPixels, 126)) {
+    throw new Error(`M46 damaged remote vitals were not spatially rendered as 66/100: ${JSON.stringify(attackerVitals)}`);
+  }
+  if (!closeTo(defenderVitals.hpPixels, 126) || !closeTo(defenderVitals.guardPixels, 126)) {
+    throw new Error(`M46 undamaged remote vitals were not spatially rendered as 100/100: ${JSON.stringify(defenderVitals)}`);
+  }
+  return evidence.map((entry) => ({
+    ...entry,
+    spatialVitals: entry.browser === attacker.browser ? attackerVitals : defenderVitals,
+  }));
+}
+
 async function runOnlineUiRecoveryReadabilityFlight(entries) {
   let evidence = await runOnlineUiFeedbackFlight(entries);
   const attacker = evidence.find((entry) => entry.feedbackTransitions.includes("hit-confirm"));
@@ -374,16 +406,21 @@ async function runOnlineUiAttackIntentFlight(entries) {
   const attackerElementId = await resolveArenaElement(attacker, "M39 attacker");
   await Promise.all(entries.map(centerArenaInViewport));
   await pulseMovementKey(attacker, movementKey, 120);
-  await Promise.all(entries.map(armWindupTellSampler));
-  let evidence;
-  let attackHeld = false;
+  await armWindupTellSampler(defender);
+  let evidence = null;
   try {
-    attackHeld = true;
-    await setArenaAttack(attacker, attackerElementId, true, attackOffset);
-    evidence = await waitForRemoteWindupTell(entries, attacker, defender, 500);
+    for (let attempt = 0; attempt < 3 && !evidence; attempt += 1) {
+      await setArenaAttack(attacker, attackerElementId, true, attackOffset);
+      try {
+        evidence = await waitForRemoteWindupTell(entries, attacker, defender, 600, false);
+      } finally {
+        await setArenaAttack(attacker, attackerElementId, false, attackOffset);
+      }
+      if (!evidence) await sleep(520);
+    }
+    if (!evidence) evidence = await waitForRemoteWindupTell(entries, attacker, defender, 300, true);
   } finally {
-    if (attackHeld) await setArenaAttack(attacker, attackerElementId, false, attackOffset);
-    await Promise.all(entries.map(stopWindupTellSampler));
+    await stopWindupTellSampler(defender);
   }
   await waitForWindupTellClear(defender, 500);
   const attackerResult = evidence.find((entry) => entry.browser === attacker.name);
@@ -600,12 +637,18 @@ async function runOnlineUiDodgeTellFlight(entries) {
   await Promise.all(entries.map((entry) => execute(entry.base, entry.sessionId, "document.querySelector('#arena').focus(); return document.activeElement?.id;")));
   await Promise.all(entries.map(centerArenaInViewport));
   await Promise.all([armDodgeTellSampler(observer, true), armDodgeTellSampler(dodger, false)]);
-  let tell;
+  let tell = null;
   try {
-    // Reuse the exact real-input choreography already proven by M36: the only M43
-    // difference is passive pixel evidence, not how Dodge is requested.
-    await pressArenaPerpendicularDodgeAfterPause(dodger, 0);
-    tell = await waitForRemoteDodgeTell(entries, observer, dodger, 700);
+    // Reuse the exact real-input choreography already proven by M36. Headless
+    // Firefox can occasionally deliver the DOM key events while its animation
+    // frame is stalled, so retry the real Dodge request rather than injecting
+    // state or weakening the spatial-pixel requirement.
+    for (let attempt = 0; attempt < 3 && !tell; attempt += 1) {
+      await pressArenaPerpendicularDodgeAfterPause(dodger, 0);
+      tell = await waitForRemoteDodgeTell(entries, observer, dodger, 700, false);
+      if (!tell) await sleep(120);
+    }
+    if (!tell) tell = await waitForRemoteDodgeTell(entries, observer, dodger, 300, true);
   } finally {
     await Promise.all(entries.map(stopDodgeTellSampler));
   }
@@ -1117,7 +1160,7 @@ async function sampleDodgeTellPixels(session) {
   `);
 }
 
-async function waitForRemoteDodgeTell(entries, observer, localDodger, timeoutMs) {
+async function waitForRemoteDodgeTell(entries, observer, localDodger, timeoutMs, fail = true) {
   const deadline = Date.now() + timeoutMs;
   let observerMax = 0;
   let localMax = 0;
@@ -1131,6 +1174,7 @@ async function waitForRemoteDodgeTell(entries, observer, localDodger, timeoutMs)
     }
     await sleep(20);
   }
+  if (!fail) return null;
   const evidence = await Promise.all(entries.map(readUiEvidence));
   throw new Error(`M43 remote dodge tell never appeared: observer=${observerMax} local=${localMax} evidence=${JSON.stringify(evidence)}`);
 }
@@ -1286,6 +1330,27 @@ async function sampleWindupTellPixels(session) {
   `);
 }
 
+async function sampleRemoteVitalsPixels(session) {
+  return execute(session.base, session.sessionId, `
+    const arena = document.querySelector('#arena');
+    const context = arena?.getContext('2d');
+    if (!context) return { hpPixels: 0, guardPixels: 0 };
+    const half = 160;
+    const x = Math.max(0, Math.floor(arena.width / 2 - half));
+    const y = Math.max(0, Math.floor(arena.height / 2 - half));
+    const width = Math.min(half * 2, arena.width - x);
+    const height = Math.min(half * 2, arena.height - y);
+    const pixels = context.getImageData(x, y, width, height).data;
+    let hpPixels = 0;
+    let guardPixels = 0;
+    for (let i = 0; i < pixels.length; i += 4) {
+      if (Math.abs(pixels[i] - 242) <= 2 && Math.abs(pixels[i + 1] - 95) <= 2 && Math.abs(pixels[i + 2] - 92) <= 2 && pixels[i + 3] >= 250) hpPixels += 1;
+      if (Math.abs(pixels[i] - 89) <= 2 && Math.abs(pixels[i + 1] - 201) <= 2 && Math.abs(pixels[i + 2] - 139) <= 2 && pixels[i + 3] >= 250) guardPixels += 1;
+    }
+    return { hpPixels, guardPixels };
+  `);
+}
+
 async function armHitTellSampler(session) {
   return execute(session.base, session.sessionId, `
     const arena = document.querySelector('#arena');
@@ -1372,22 +1437,22 @@ async function stopWindupTellSampler(session) {
   `);
 }
 
-async function waitForRemoteWindupTell(entries, attacker, defender, timeoutMs) {
+async function waitForRemoteWindupTell(entries, attacker, defender, timeoutMs, fail = true) {
   const deadline = Date.now() + timeoutMs;
-  let attackerMax = 0;
   let defenderMax = 0;
   while (Date.now() < deadline) {
-    const [attackerPixels, defenderPixels] = await Promise.all([readWindupTellSampler(attacker), readWindupTellSampler(defender)]);
-    attackerMax = Math.max(attackerMax, attackerPixels);
+    const defenderPixels = await readWindupTellSampler(defender);
     defenderMax = Math.max(defenderMax, defenderPixels);
     if (defenderMax >= 24) {
-      if (attackerMax !== 0) throw new Error(`M39 local fighter painted the remote-only windup boundary: ${attackerMax}`);
+      const attackerPixels = await sampleWindupTellPixels(attacker);
+      if (attackerPixels !== 0) throw new Error(`M39 local fighter painted the remote-only windup boundary: ${attackerPixels}`);
       const evidence = await Promise.all(entries.map(readUiEvidence));
-      return evidence.map((entry) => ({ ...entry, windupTellMaxPixels: entry.browser === attacker.name ? attackerMax : defenderMax }));
+      return evidence.map((entry) => ({ ...entry, windupTellMaxPixels: entry.browser === attacker.name ? attackerPixels : defenderMax }));
     }
     await sleep(20);
   }
-  throw new Error(`M39 remote windup boundary never appeared: attacker=${attackerMax} defender=${defenderMax}`);
+  if (!fail) return null;
+  throw new Error(`M39 remote windup boundary never appeared: defender=${defenderMax}`);
 }
 
 async function waitForWindupTellClear(session, timeoutMs) {

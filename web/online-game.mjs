@@ -1,5 +1,5 @@
 import { createFrameBudget } from "../src/browser/frame-budget.mjs";
-import { COMBAT_ACTION, blockSpatialPresentation, combatActionHint, combatOverlayPresentation, createCombatReadabilityTracker, createRemoteDamageTracker, guardBreakSpatialPresentation, opponentRecoveryPresentation, parrySpatialPresentation } from "../src/browser/combat-readability.mjs";
+import { COMBAT_ACTION, blockSpatialPresentation, combatActionHint, combatOverlayPresentation, createCombatReadabilityTracker, createRemoteDamageTracker, fighterVitalsPresentation, guardBreakSpatialPresentation, opponentRecoveryPresentation, parrySpatialPresentation } from "../src/browser/combat-readability.mjs";
 import { COMBAT } from "../src/combat/model.mjs";
 import { reconcilePrediction } from "../src/browser/reconciliation.mjs";
 import { NETWORK } from "../src/network/constants.mjs";
@@ -240,6 +240,7 @@ function drawFighterWorld(fighter, body, shadow, damageTell = false) {
   const screenY = canvas.height / 2 + fighter.y - local.y;
   if (screenX < -64 || screenX > canvas.width + 64 || screenY < -64 || screenY > canvas.height + 64) return;
   drawFighterScreen(screenX, screenY, fighter, body, shadow, true, damageTell);
+  drawRemoteVitals(screenX, screenY, fighter);
 }
 
 function drawFighterScreen(x, y, fighter, body, shadow, remote = false, damageTell = false) {
@@ -277,6 +278,22 @@ function drawFighterScreen(x, y, fighter, body, shadow, remote = false, damageTe
     drawDeathTell();
   }
   ctx.restore();
+}
+
+function drawRemoteVitals(x, y, fighter) {
+  const presentation = fighterVitalsPresentation(fighter);
+  if (!presentation.visible) return;
+  const width = 42;
+  const left = Math.round(x - width / 2);
+  const hpTop = Math.round(y - 38);
+  const guardTop = hpTop + 6;
+  ctx.fillStyle = "#231b19";
+  ctx.fillRect(left - 1, hpTop - 1, width + 2, 5);
+  ctx.fillRect(left - 1, guardTop - 1, width + 2, 5);
+  ctx.fillStyle = "#f25f5c";
+  ctx.fillRect(left, hpTop, Math.round(width * presentation.hp / 100), 3);
+  ctx.fillStyle = "#59c98b";
+  ctx.fillRect(left, guardTop, Math.round(width * presentation.guard / 100), 3);
 }
 
 function drawAttackTell(action, remote) {
