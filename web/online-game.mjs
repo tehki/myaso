@@ -1,5 +1,5 @@
 import { createFrameBudget } from "../src/browser/frame-budget.mjs";
-import { COMBAT_ACTION, blockSpatialPresentation, combatActionHint, combatOverlayPresentation, createCombatReadabilityTracker, guardBreakSpatialPresentation, opponentRecoveryPresentation, parrySpatialPresentation } from "../src/browser/combat-readability.mjs";
+import { COMBAT_ACTION, blockSpatialPresentation, combatActionHint, combatOverlayPresentation, createCombatReadabilityTracker, createRemoteDamageTracker, guardBreakSpatialPresentation, opponentRecoveryPresentation, parrySpatialPresentation } from "../src/browser/combat-readability.mjs";
 import { COMBAT } from "../src/combat/model.mjs";
 import { reconcilePrediction } from "../src/browser/reconciliation.mjs";
 import { NETWORK } from "../src/network/constants.mjs";
@@ -31,6 +31,7 @@ const opponentRecovery = {
   detail: document.querySelector("#opponent-recovery-detail"),
 };
 const combatReadability = createCombatReadabilityTracker();
+const remoteDamage = createRemoteDamageTracker();
 let networkStatus = "Connecting to authoritative server...";
 let combatMessage = null;
 let combatMessageUntil = 0;
@@ -116,10 +117,12 @@ networkClient = await connectAuthoritativeClient({
 function observeCombatState(state) {
   const ownId = networkClient?.playerNetId;
   if (!ownId) return;
+  const now = performance.now();
+  remoteDamage.observe(state, ownId, now);
   const event = combatReadability.observe(state, ownId);
   if (!event) return;
   combatMessage = event.text;
-  combatMessageUntil = performance.now() + event.durationMs;
+  combatMessageUntil = now + event.durationMs;
   setStatus(combatMessage);
   showCombatFeedback(event.feedback);
 }
@@ -203,7 +206,7 @@ function restoreAuthoritative(own) {
   local.initialized = true;
 }
 
-function render() {
+function render(nowMs = performance.now()) {
   ctx.drawImage(arenaLayer, 0, 0);
   if (!networkClient) return;
   const ownId = networkClient.playerNetId;
@@ -224,21 +227,21 @@ function render() {
       remoteScratch.set(entity.netId, scratch);
     }
     const sampled = networkClient.remoteInterpolator.sample(entity.netId, renderServerTick, scratch) ?? entity;
-    drawFighterWorld(sampled, "#b96350", "#47251f");
+    drawFighterWorld(sampled, "#b96350", "#47251f", nowMs);
   }
-  if (ownId && local.initialized) drawFighterScreen(canvas.width / 2, canvas.height / 2, local, "#e2d5b4", "#51452d");
+  if (ownId && local.initialized) drawFighterScreen(canvas.width / 2, canvas.height / 2, local, "#e2d5b4", "#51452d", false, nowMs);
   updateHud(ownId);
 }
 
-function drawFighterWorld(fighter, body, shadow) {
+function drawFighterWorld(fighter, body, shadow, nowMs) {
   if (!local.initialized) return;
   const screenX = canvas.width / 2 + fighter.x - local.x;
   const screenY = canvas.height / 2 + fighter.y - local.y;
   if (screenX < -64 || screenX > canvas.width + 64 || screenY < -64 || screenY > canvas.height + 64) return;
-  drawFighterScreen(screenX, screenY, fighter, body, shadow, true);
+  drawFighterScreen(screenX, screenY, fighter, body, shadow, true, nowMs);
 }
 
-function drawFighterScreen(x, y, fighter, body, shadow, remote = false) {
+function drawFighterScreen(x, y, fighter, body, shadow, remote = false, nowMs = performance.now()) {
   ctx.save();
   ctx.translate(x, y);
   ctx.rotate(fighter.facing ?? 0);
@@ -265,6 +268,9 @@ function drawFighterScreen(x, y, fighter, body, shadow, remote = false) {
   ctx.fill();
   ctx.fillStyle = "#c8b684";
   ctx.fillRect(12, -2, 26, 4);
+  if (remote && action !== COMBAT_ACTION.dead && remoteDamage.visible(fighter.netId, nowMs)) {
+    drawDamageTell();
+  }
   if (remote && action === COMBAT_ACTION.dead) {
     ctx.globalAlpha = 1;
     drawDeathTell();
@@ -356,6 +362,22 @@ function drawRecoveryTell() {
   ctx.beginPath();
   ctx.arc(0, 0, 36, 0, Math.PI * 2);
   ctx.stroke();
+}
+
+function drawDamageTell() {
+  ctx.strokeStyle = "#ffad66";
+  ctx.lineWidth = 4;
+  ctx.beginPath();
+  ctx.arc(0, 0, 30, 0, Math.PI * 2);
+  ctx.stroke();
+  for (const angle of [0, Math.PI / 2, Math.PI, Math.PI * 1.5]) {
+    const inner = 34;
+    const outer = 42;
+    ctx.beginPath();
+    ctx.moveTo(Math.cos(angle) * inner, Math.sin(angle) * inner);
+    ctx.lineTo(Math.cos(angle) * outer, Math.sin(angle) * outer);
+    ctx.stroke();
+  }
 }
 
 function drawDeathTell() {
@@ -462,7 +484,7 @@ function createArenaLayer() {
 function frame(now) {
   if (document.hidden) return;
   frameBudget.advance(now, simulatePrediction);
-  render();
+  render(now);
   animationFrameId = requestAnimationFrame(frame);
 }
 
