@@ -222,6 +222,11 @@ jobs:
           MYASO_PVP_SCENARIO: "uideathtell"
         run: node scripts/pvp_browser_flight_runner.mjs
 
+      - name: Validate M45 spatial FFA damage tell
+        env:
+          MYASO_PVP_SCENARIO: "uihittell"
+        run: node scripts/pvp_browser_flight_runner.mjs
+
       - name: Measure M15 browser background convergence
         env:
           MYASO_FLIGHT_DURATION_MS: "4500"
