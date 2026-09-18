@@ -41,3 +41,5 @@ CI #169 first attempt exposed the complementary M36 timing case: Firefox authori
 
 
 CI #170 exact-head retry exposed that the first retry implementation restored only 45 ms of ordinary movement after a perpendicular Dodge that can displace the defender by about 88 world units. That recovered only about 10 units and let later attempts drift outside the 94-unit authoritative hit envelope while remaining clean 100/100 misses. The harness now uses 410 ms of ordinary opposite movement after recovery, approximately matching the Dodge displacement at normal movement speed. Combat constants, server authority, iframe timing, feedback rules, and pass thresholds remain unchanged.
+
+CI #175 exposed an observer-only freshness bug after genuine successful retries: repeated identical `dodge-evaded` / `dodge-success` feedback values were de-duplicated forever, so later real feedback could not increase the attempt-scoped count. The UI observer now records each non-empty feedback mutation occurrence instead of suppressing adjacent identical values. The authoritative exchange, retry choreography, combat rules, and acceptance thresholds are unchanged.

@@ -8,7 +8,7 @@ import { setTimeout as sleep } from "node:timers/promises";
 const root = process.cwd();
 const durationMs = Number(process.env.MYASO_PVP_FLIGHT_DURATION_MS ?? 7000);
 const scenario = process.env.MYASO_PVP_SCENARIO ?? "damage";
-if (!new Set(["damage", "parry", "dodge", "block", "guardbreak", "backblock", "respawn", "ui", "uirespawn", "uifeedback", "uiparry", "uistun", "uiguardbreak", "uidodge", "uirecovery", "uirecoverytell", "uiattackintent", "uiguardbreaktell", "uiparrytell", "uiblockfacingtell", "uidodgetell", "uideathtell"]).has(scenario)) throw new Error(`unsupported MYASO_PVP_SCENARIO: ${scenario}`);
+if (!new Set(["damage", "parry", "dodge", "block", "guardbreak", "backblock", "respawn", "ui", "uirespawn", "uifeedback", "uihittell", "uiparry", "uistun", "uiguardbreak", "uidodge", "uirecovery", "uirecoverytell", "uiattackintent", "uiguardbreaktell", "uiparrytell", "uiblockfacingtell", "uidodgetell", "uideathtell"]).has(scenario)) throw new Error(`unsupported MYASO_PVP_SCENARIO: ${scenario}`);
 const staticPort = Number(process.env.MYASO_PVP_FLIGHT_HTTP_PORT ?? 4174);
 const browsers = [
   {
@@ -53,6 +53,9 @@ try {
   } else if (scenario === "uifeedback") {
     const results = await runOnlineUiFeedbackFlight(sessions);
     console.log(`M32_ONLINE_HIT_FEEDBACK ${JSON.stringify({ ok: true, results })}`);
+  } else if (scenario === "uihittell") {
+    const results = await runOnlineUiHitTellFlight(sessions);
+    console.log(`M45_FFA_DAMAGE_TELL ${JSON.stringify({ ok: true, results })}`);
   } else if (scenario === "uiparry") {
     const results = await runOnlineUiParryFlight(sessions);
     console.log(`M33_ONLINE_PARRY_FEEDBACK ${JSON.stringify({ ok: true, results })}`);
@@ -186,7 +189,7 @@ async function startBrowser(browser) {
 }
 
 async function navigate(session, gameUrl, certificateHash) {
-  const page = scenario === "ui" || scenario === "uirespawn" || scenario === "uifeedback" || scenario === "uiparry" || scenario === "uistun" || scenario === "uiguardbreak" || scenario === "uidodge" || scenario === "uirecovery" || scenario === "uirecoverytell" || scenario === "uiattackintent" || scenario === "uiguardbreaktell" || scenario === "uiparrytell" || scenario === "uiblockfacingtell" || scenario === "uidodgetell" || scenario === "uideathtell" ? "index.html" : "pvp-flight.html";
+  const page = scenario === "ui" || scenario === "uirespawn" || scenario === "uifeedback" || scenario === "uihittell" || scenario === "uiparry" || scenario === "uistun" || scenario === "uiguardbreak" || scenario === "uidodge" || scenario === "uirecovery" || scenario === "uirecoverytell" || scenario === "uiattackintent" || scenario === "uiguardbreaktell" || scenario === "uiparrytell" || scenario === "uiblockfacingtell" || scenario === "uidodgetell" || scenario === "uideathtell" ? "index.html" : "pvp-flight.html";
   const url = new URL(`http://127.0.0.1:${staticPort}/web/${page}`);
   url.searchParams.set("server", gameUrl);
   url.searchParams.set("cert", certificateHash);
@@ -260,6 +263,39 @@ async function runOnlineUiFeedbackFlight(entries) {
     throw new Error(`M32 authoritative hit feedback was not rendered on opposite clients: ${JSON.stringify(evidence)}`);
   }
   return evidence;
+}
+
+async function runOnlineUiHitTellFlight(entries) {
+  await Promise.all(entries.map(armHitTellSampler));
+  let evidence;
+  let maxima;
+  try {
+    evidence = await runOnlineUiFeedbackFlight(entries);
+    maxima = await Promise.all(entries.map(async (entry) => ({
+      browser: entry.name,
+      pixels: await readHitTellSampler(entry),
+    })));
+  } finally {
+    await Promise.allSettled(entries.map(stopHitTellSampler));
+  }
+
+  const attacker = evidence.find((entry) => entry.feedbackTransitions.includes("hit-confirm"));
+  const defender = evidence.find((entry) => entry.feedbackTransitions.includes("damage-taken"));
+  if (!attacker || !defender || attacker.browser === defender.browser) {
+    throw new Error(`M45 could not resolve authoritative hit roles: ${JSON.stringify(evidence)}`);
+  }
+  const attackerPixels = maxima.find((entry) => entry.browser === attacker.browser)?.pixels ?? 0;
+  const defenderPixels = maxima.find((entry) => entry.browser === defender.browser)?.pixels ?? 0;
+  if (attackerPixels < 24) {
+    throw new Error(`M45 attacker never painted the damaged remote fighter tell: ${attackerPixels}`);
+  }
+  if (defenderPixels !== 0) {
+    throw new Error(`M45 defender painted the remote-only damage tell around local damage: ${defenderPixels}`);
+  }
+  return evidence.map((entry) => ({
+    ...entry,
+    hitTellMaxPixels: entry.browser === attacker.browser ? attackerPixels : defenderPixels,
+  }));
 }
 
 async function runOnlineUiRecoveryReadabilityFlight(entries) {
@@ -622,18 +658,25 @@ async function runOnlineUiStunOverlayFlight(entries) {
 async function runOnlineUiGuardBreakFlight(entries) {
   await Promise.all(entries.map(installUiObserver));
   const ready = await waitForUiReady(entries);
-  const ordered = ready.slice().sort((a, b) => a.playerNetId - b.playerNetId);
-  const attacker = entries.find((entry) => entry.name === ordered[0].browser);
-  const defender = entries.find((entry) => entry.name === ordered[1].browser);
-  if (!attacker || !defender) throw new Error(`could not resolve M34 UI roles from ${JSON.stringify(ready)}`);
-  if (attacker.name !== "chrome" || defender.name !== "firefox") throw new Error(`M34 choreography requires Chrome attacker / Firefox defender: ${JSON.stringify(ready)}`);
+  const attacker = entries.find((entry) => entry.name === "chrome");
+  const defender = entries.find((entry) => entry.name === "firefox");
+  const attackerReady = ready.find((entry) => entry.browser === attacker?.name);
+  const defenderReady = ready.find((entry) => entry.browser === defender?.name);
+  if (!attacker || !defender || !attackerReady || !defenderReady) {
+    throw new Error(`could not resolve M34 UI roles from ${JSON.stringify(ready)}`);
+  }
+  const attackRight = attackerReady.playerNetId < defenderReady.playerNetId;
+  const movementKey = attackRight ? "d" : "a";
+  const movementCode = attackRight ? "KeyD" : "KeyA";
+  const attackOffset = attackRight ? 200 : -200;
+  const blockOffset = attackRight ? -200 : 200;
 
   await Promise.all(entries.map((entry) => execute(entry.base, entry.sessionId, "document.querySelector('#arena').focus(); return document.activeElement?.id;")));
   const attackerElementId = await resolveArenaElement(attacker, "M34 attacker");
   const defenderElementId = await resolveArenaElement(defender, "M34 defender");
   await Promise.all(entries.map(centerArenaInViewport));
-  await pulseMovementKey(attacker, "d", 120);
-  await aimArena(defender, defenderElementId, -200);
+  await pulseMovementKey(attacker, movementKey, 120);
+  await aimArena(defender, defenderElementId, blockOffset);
   let evidence = null;
   let blockHeld = false;
   try {
@@ -642,7 +685,7 @@ async function runOnlineUiGuardBreakFlight(entries) {
     await sleep(180);
     let guardBroken = false;
     for (let attempt = 0; attempt < 4 && !guardBroken; attempt += 1) {
-      await performArenaAttack(attacker, attackerElementId);
+      await performArenaAttack(attacker, attackerElementId, attackOffset);
       await sleep(230);
       const states = await Promise.all(entries.map(readUiEvidence));
       const defenderState = states.find((entry) => entry.browser === defender.name);
@@ -659,16 +702,20 @@ async function runOnlineUiGuardBreakFlight(entries) {
   const attackerResult = evidence.find((entry) => entry.browser === attacker.name);
   const defenderResult = evidence.find((entry) => entry.browser === defender.name);
   if (!attackerResult || !defenderResult) throw new Error(`incomplete M34 UI evidence: ${JSON.stringify(evidence)}`);
-  if (!attackerResult.keys.includes("keydown:KeyD") || !attackerResult.keys.includes("keyup:KeyD")) {
+  if (!attackerResult.keys.includes(`keydown:${movementCode}`) || !attackerResult.keys.includes(`keyup:${movementCode}`)) {
     throw new Error(`M34 real attacker movement control was not delivered: ${JSON.stringify(attackerResult)}`);
   }
   const attackDowns = attackerResult.pointers.filter((event) => event.type === "pointerdown" && event.button === 0);
   const blockDown = defenderResult.pointers.find((event) => event.type === "pointerdown" && event.button === 2);
   const blockUp = defenderResult.pointers.find((event) => event.type === "pointerup" && event.button === 2);
-  if (attackDowns.length < 3 || attackDowns.some((event) => event.x < 0.6 || Math.abs(event.y - 0.5) > 0.15)) {
-    throw new Error(`M34 real repeated rightward attacks were not delivered: ${JSON.stringify(attackerResult)}`);
+  const attacksAimed = attackDowns.length >= 3 && attackDowns.every((event) =>
+    Math.abs(event.y - 0.5) <= 0.15 && (attackRight ? event.x >= 0.6 : event.x <= 0.4));
+  if (!attacksAimed) {
+    throw new Error(`M34 real repeated directional attacks were not delivered: ${JSON.stringify(attackerResult)}`);
   }
-  if (!blockDown || !blockUp || blockDown.x > 0.4 || Math.abs(blockDown.y - 0.5) > 0.15) {
+  const blockAimed = blockDown && blockUp && Math.abs(blockDown.y - 0.5) <= 0.15
+    && (attackRight ? blockDown.x <= 0.4 : blockDown.x >= 0.6);
+  if (!blockAimed) {
     throw new Error(`M34 real held directional block was not delivered: ${JSON.stringify(defenderResult)}`);
   }
   if (attackerResult.playerHp !== 100 || defenderResult.playerHp !== 100 || defenderResult.playerGuard !== 0) {
@@ -891,7 +938,7 @@ async function installUiObserver(session) {
     };
     const recordFeedback = () => {
       const feedback = arenaStage.dataset.combatFeedback ?? '';
-      if (feedback && state.feedbackTransitions.at(-1) !== feedback) state.feedbackTransitions.push(feedback);
+      if (feedback) state.feedbackTransitions.push(feedback);
     };
     const recordRecovery = () => {
       const entry = {
@@ -1236,6 +1283,49 @@ async function sampleWindupTellPixels(session) {
       if (Math.abs(pixels[i] - 243) <= 2 && Math.abs(pixels[i + 1] - 214) <= 2 && Math.abs(pixels[i + 2] - 143) <= 2 && pixels[i + 3] >= 250) count += 1;
     }
     return count;
+  `);
+}
+
+async function armHitTellSampler(session) {
+  return execute(session.base, session.sessionId, `
+    const arena = document.querySelector('#arena');
+    const context = arena?.getContext('2d');
+    if (!context) return false;
+    const prior = window.__MYASO_M45_HIT_SAMPLER__;
+    if (prior?.frame) cancelAnimationFrame(prior.frame);
+    const state = { active: true, frame: 0, maxPixels: 0 };
+    const sample = () => {
+      if (!state.active) return;
+      const half = 160;
+      const x = Math.max(0, Math.floor(arena.width / 2 - half));
+      const y = Math.max(0, Math.floor(arena.height / 2 - half));
+      const width = Math.min(half * 2, arena.width - x);
+      const height = Math.min(half * 2, arena.height - y);
+      const pixels = context.getImageData(x, y, width, height).data;
+      let count = 0;
+      for (let i = 0; i < pixels.length; i += 4) {
+        if (Math.abs(pixels[i] - 255) <= 2 && Math.abs(pixels[i + 1] - 173) <= 2 && Math.abs(pixels[i + 2] - 102) <= 2 && pixels[i + 3] >= 250) count += 1;
+      }
+      state.maxPixels = Math.max(state.maxPixels, count);
+      state.frame = requestAnimationFrame(sample);
+    };
+    window.__MYASO_M45_HIT_SAMPLER__ = state;
+    state.frame = requestAnimationFrame(sample);
+    return true;
+  `);
+}
+
+async function readHitTellSampler(session) {
+  return execute(session.base, session.sessionId, `return window.__MYASO_M45_HIT_SAMPLER__?.maxPixels ?? 0;`);
+}
+
+async function stopHitTellSampler(session) {
+  return execute(session.base, session.sessionId, `
+    const state = window.__MYASO_M45_HIT_SAMPLER__;
+    if (!state) return 0;
+    state.active = false;
+    if (state.frame) cancelAnimationFrame(state.frame);
+    return state.maxPixels;
   `);
 }
 
