@@ -60,6 +60,44 @@ export function createCombatReadabilityTracker() {
   };
 }
 
+export function createRemoteDamageTracker({ durationMs = 320 } = {}) {
+  if (!Number.isFinite(durationMs) || durationMs <= 0) {
+    throw new RangeError("durationMs must be a positive finite number");
+  }
+  const previousHp = new Map();
+  const activeUntil = new Map();
+
+  return {
+    observe(state, ownId, nowMs) {
+      if (!(state instanceof Map) || !Number.isFinite(nowMs)) return;
+      for (const entity of state.values()) {
+        if (!entity || !Number.isFinite(entity.netId) || !Number.isFinite(entity.hp)) continue;
+        const beforeHp = previousHp.get(entity.netId);
+        if (entity.netId !== ownId && Number.isFinite(beforeHp) && entity.hp < beforeHp) {
+          activeUntil.set(entity.netId, nowMs + durationMs);
+        }
+        previousHp.set(entity.netId, entity.hp);
+      }
+      for (const netId of previousHp.keys()) {
+        if (!state.has(netId)) {
+          previousHp.delete(netId);
+          activeUntil.delete(netId);
+        }
+      }
+      for (const [netId, until] of activeUntil) {
+        if (until <= nowMs) activeUntil.delete(netId);
+      }
+    },
+    visible(netId, nowMs) {
+      return Number.isFinite(nowMs) && (activeUntil.get(netId) ?? Number.NEGATIVE_INFINITY) > nowMs;
+    },
+    reset() {
+      previousHp.clear();
+      activeUntil.clear();
+    },
+  };
+}
+
 export function combatActionHint(entity) {
   if (!entity) return null;
   switch (entity.action) {
