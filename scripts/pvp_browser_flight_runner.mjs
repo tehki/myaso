@@ -938,7 +938,7 @@ async function installUiObserver(session) {
     };
     const recordFeedback = () => {
       const feedback = arenaStage.dataset.combatFeedback ?? '';
-      if (feedback && state.feedbackTransitions.at(-1) !== feedback) state.feedbackTransitions.push(feedback);
+      if (feedback) state.feedbackTransitions.push(feedback);
     };
     const recordRecovery = () => {
       const entry = {
