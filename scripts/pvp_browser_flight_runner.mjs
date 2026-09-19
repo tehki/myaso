@@ -8,7 +8,7 @@ import { setTimeout as sleep } from "node:timers/promises";
 const root = process.cwd();
 const durationMs = Number(process.env.MYASO_PVP_FLIGHT_DURATION_MS ?? 7000);
 const scenario = process.env.MYASO_PVP_SCENARIO ?? "damage";
-if (!new Set(["damage", "parry", "dodge", "block", "guardbreak", "backblock", "respawn", "ui", "uirespawn", "uifeedback", "uihittell", "uivitals", "uiidentity", "uiscore", "uimatch", "uirematch", "uiffa3", "uikillfeed", "uifocus", "uiparry", "uistun", "uiguardbreak", "uidodge", "uirecovery", "uirecoverytell", "uiattackintent", "uiguardbreaktell", "uiparrytell", "uiblockfacingtell", "uidodgetell", "uideathtell"]).has(scenario)) throw new Error(`unsupported MYASO_PVP_SCENARIO: ${scenario}`);
+if (!new Set(["damage", "parry", "dodge", "block", "guardbreak", "backblock", "respawn", "ui", "uirespawn", "uifeedback", "uihittell", "uivitals", "uiidentity", "uiscore", "uimatch", "uirematch", "uiffa3", "uikillfeed", "uifocus", "uithreat", "uiparry", "uistun", "uiguardbreak", "uidodge", "uirecovery", "uirecoverytell", "uiattackintent", "uiguardbreaktell", "uiparrytell", "uiblockfacingtell", "uidodgetell", "uideathtell"]).has(scenario)) throw new Error(`unsupported MYASO_PVP_SCENARIO: ${scenario}`);
 const staticPort = Number(process.env.MYASO_PVP_FLIGHT_HTTP_PORT ?? 4174);
 const browsers = [
   {
@@ -32,7 +32,7 @@ const browsers = [
     },
   },
 ];
-if (scenario === "uiffa3" || scenario === "uikillfeed" || scenario === "uifocus") {
+if (scenario === "uiffa3" || scenario === "uikillfeed" || scenario === "uifocus" || scenario === "uithreat") {
   browsers.push({
     name: "chrome2",
     port: 9517,
@@ -92,6 +92,9 @@ try {
   } else if (scenario === "uifocus") {
     const results = await runOnlineUiFocusHudFlight(sessions);
     console.log(`M53_FFA_FOCUS_HUD ${JSON.stringify({ ok: true, results })}`);
+  } else if (scenario === "uithreat") {
+    const results = await runOnlineUiThreatAwarenessFlight(sessions);
+    console.log(`M54_FFA_INCOMING_THREAT ${JSON.stringify({ ok: true, results })}`);
   } else if (scenario === "uiparry") {
     const results = await runOnlineUiParryFlight(sessions);
     console.log(`M33_ONLINE_PARRY_FEEDBACK ${JSON.stringify({ ok: true, results })}`);
@@ -225,7 +228,7 @@ async function startBrowser(browser) {
 }
 
 async function navigate(session, gameUrl, certificateHash) {
-  const page = scenario === "ui" || scenario === "uirespawn" || scenario === "uifeedback" || scenario === "uihittell" || scenario === "uivitals" || scenario === "uiidentity" || scenario === "uiscore" || scenario === "uimatch" || scenario === "uirematch" || scenario === "uiffa3" || scenario === "uikillfeed" || scenario === "uifocus" || scenario === "uiparry" || scenario === "uistun" || scenario === "uiguardbreak" || scenario === "uidodge" || scenario === "uirecovery" || scenario === "uirecoverytell" || scenario === "uiattackintent" || scenario === "uiguardbreaktell" || scenario === "uiparrytell" || scenario === "uiblockfacingtell" || scenario === "uidodgetell" || scenario === "uideathtell" ? "index.html" : "pvp-flight.html";
+  const page = scenario === "ui" || scenario === "uirespawn" || scenario === "uifeedback" || scenario === "uihittell" || scenario === "uivitals" || scenario === "uiidentity" || scenario === "uiscore" || scenario === "uimatch" || scenario === "uirematch" || scenario === "uiffa3" || scenario === "uikillfeed" || scenario === "uifocus" || scenario === "uithreat" || scenario === "uiparry" || scenario === "uistun" || scenario === "uiguardbreak" || scenario === "uidodge" || scenario === "uirecovery" || scenario === "uirecoverytell" || scenario === "uiattackintent" || scenario === "uiguardbreaktell" || scenario === "uiparrytell" || scenario === "uiblockfacingtell" || scenario === "uidodgetell" || scenario === "uideathtell" ? "index.html" : "pvp-flight.html";
   const url = new URL(`http://127.0.0.1:${staticPort}/web/${page}`);
   url.searchParams.set("server", gameUrl);
   url.searchParams.set("cert", certificateHash);
@@ -1078,6 +1081,71 @@ async function runOnlineUiFocusHudFlight(entries) {
   return evidence;
 }
 
+async function runOnlineUiThreatAwarenessFlight(entries) {
+  if (entries.length !== 3) throw new Error(`M54 expected three real browser clients, received ${entries.length}`);
+  await Promise.all(entries.map(installUiObserver));
+  const ready = await waitForUiReady(entries);
+  const ordered = ready.slice().sort((a, b) => a.playerNetId - b.playerNetId);
+  const ids = ordered.map((entry) => entry.playerNetId);
+  if (ids.length !== 3 || new Set(ids).size !== 3) {
+    throw new Error(`M54 did not resolve three authoritative identities: ${JSON.stringify(ready)}`);
+  }
+  const left = entries.find((entry) => entry.name === ordered[0].browser);
+  const center = entries.find((entry) => entry.name === ordered[1].browser);
+  const right = entries.find((entry) => entry.name === ordered[2].browser);
+  if (!left || !center || !right) throw new Error(`M54 could not map three FFA roles: ${JSON.stringify(ready)}`);
+
+  await waitForUiThreePlayerReady(entries, ids, 2500);
+  await Promise.all(entries.map((entry) => execute(entry.base, entry.sessionId, "document.querySelector('#arena').focus(); return document.activeElement?.id;")));
+  const leftArena = await resolveArenaElement(left, "M54 threat attacker");
+  await pulseMovementKey(left, "d", 120);
+
+  const leftId = ordered[0].playerNetId;
+  let evidence = null;
+  for (let attempt = 0; attempt < 3 && !evidence; attempt += 1) {
+    await performArenaAttack(left, leftArena, 200);
+    await sleep(420);
+    const states = await Promise.all(entries.map(readUiEvidence));
+    const leftState = states.find((entry) => entry.browser === left.name);
+    const centerState = states.find((entry) => entry.browser === center.name);
+    const rightState = states.find((entry) => entry.browser === right.name);
+    if (!leftState || !centerState || !rightState) {
+      throw new Error(`M54 incomplete threat evidence: ${JSON.stringify(states)}`);
+    }
+    const visibleCenter = centerState.threatTransitions.filter((event) => event.visible && event.label === `#${leftId}`);
+    const sawWindup = visibleCenter.some((event) => event.state === "windup" && event.phase === "WINDUP");
+    const sawStrike = visibleCenter.some((event) => event.state === "strike" && event.phase === "STRIKE");
+    const leftFalsePositive = leftState.threatTransitions.some((event) => event.visible);
+    const rightFalsePositive = rightState.threatTransitions.some((event) => event.visible);
+    if (leftFalsePositive || rightFalsePositive) {
+      throw new Error(`M54 threat cue leaked to non-target clients: ${JSON.stringify(states)}`);
+    }
+    if (centerState.playerHp === 66) {
+      if (!sawWindup || !sawStrike) {
+        throw new Error(`M54 authoritative hit resolved without complete incoming-threat phases: ${JSON.stringify(states)}`);
+      }
+      if (leftState.playerHp !== 100 || rightState.playerHp !== 100) {
+        throw new Error(`M54 threat exchange damaged a non-target fighter: ${JSON.stringify(states)}`);
+      }
+      evidence = states;
+      break;
+    }
+    if (states.some((entry) => entry.playerHp !== 100 || entry.playerGuard !== 100)) {
+      throw new Error(`M54 retry ${attempt + 1} resolved an unexpected exchange: ${JSON.stringify(states)}`);
+    }
+    await sleep(520);
+    if (attempt < 2) await pulseMovementKey(left, "d", 40);
+  }
+  if (!evidence) {
+    throw new Error(`M54 real attack never produced authoritative target damage: ${JSON.stringify(await Promise.all(entries.map(readUiEvidence)))}`);
+  }
+  const attackerState = evidence.find((entry) => entry.browser === left.name);
+  if (!attackerState?.pointers.some((event) => event.type === "pointerdown" && event.button === 0)) {
+    throw new Error(`M54 threat attack lacked real pointer provenance: ${JSON.stringify(attackerState)}`);
+  }
+  return evidence;
+}
+
 async function runOnlineUiKillFeedFlight(entries) {
   if (entries.length !== 3) throw new Error(`M52 expected three real browser clients, received ${entries.length}`);
   await Promise.all(entries.map(installUiObserver));
@@ -1310,8 +1378,9 @@ async function installUiObserver(session) {
     const arenaStage = document.querySelector('.arena-stage');
     const overlay = document.querySelector('#combat-overlay');
     const recovery = document.querySelector('#opponent-recovery');
-    if (!target || !arena || !arenaStage || !overlay || !recovery) throw new Error('missing online UI flight target');
-    const state = { events: [], keys: [], pointers: [], overlayTransitions: [], feedbackTransitions: [], recoveryTransitions: [], recoveryTellMaxPixels: 0, parryTellMaxPixels: 0, online: '', startedAt: performance.now() };
+    const threat = document.querySelector('#threat-cue');
+    if (!target || !arena || !arenaStage || !overlay || !recovery || !threat) throw new Error('missing online UI flight target');
+    const state = { events: [], keys: [], pointers: [], overlayTransitions: [], feedbackTransitions: [], recoveryTransitions: [], threatTransitions: [], recoveryTellMaxPixels: 0, parryTellMaxPixels: 0, online: '', startedAt: performance.now() };
     const record = () => {
       const text = target.textContent?.trim() ?? '';
       if (/^Online - player #\\d+ - server tick \\d+$/.test(text)) state.online = text;
@@ -1342,6 +1411,16 @@ async function installUiObserver(session) {
       const previous = state.recoveryTransitions.at(-1);
       if (!previous || Object.keys(entry).some((key) => previous[key] !== entry[key])) state.recoveryTransitions.push(entry);
     };
+    const recordThreat = () => {
+      const entry = {
+        visible: !threat.hidden,
+        state: threat.dataset.state ?? '',
+        label: document.querySelector('#threat-label')?.textContent?.trim() ?? '',
+        phase: document.querySelector('#threat-phase')?.textContent?.trim() ?? '',
+      };
+      const previous = state.threatTransitions.at(-1);
+      if (!previous || Object.keys(entry).some((key) => previous[key] !== entry[key])) state.threatTransitions.push(entry);
+    };
     for (const type of ['keydown', 'keyup']) {
       arena.addEventListener(type, (event) => state.keys.push(type + ':' + event.code), { capture: true });
     }
@@ -1361,10 +1440,12 @@ async function installUiObserver(session) {
     recordOverlay();
     recordFeedback();
     recordRecovery();
+    recordThreat();
     new MutationObserver(record).observe(target, { childList: true, subtree: true, characterData: true });
     new MutationObserver(recordOverlay).observe(overlay, { attributes: true, attributeFilter: ['hidden'], childList: true, subtree: true, characterData: true });
     new MutationObserver(recordFeedback).observe(arenaStage, { attributes: true, attributeFilter: ['data-combat-feedback'] });
     new MutationObserver(recordRecovery).observe(recovery, { attributes: true, attributeFilter: ['hidden', 'data-state'], childList: true, subtree: true, characterData: true });
+    new MutationObserver(recordThreat).observe(threat, { attributes: true, attributeFilter: ['hidden', 'data-state'], childList: true, subtree: true, characterData: true });
     window.__MYASO_M30_UI__ = state;
     return true;
   `);
@@ -2118,7 +2199,7 @@ async function waitForUiRespawnEvidence(entries, attacker, defender, timeoutMs) 
 
 async function readUiEvidence(session) {
   const value = await execute(session.base, session.sessionId, `
-    const state = window.__MYASO_M30_UI__ ?? { events: [], keys: [], pointers: [], overlayTransitions: [], feedbackTransitions: [], recoveryTransitions: [], recoveryTellMaxPixels: 0, parryTellMaxPixels: 0, online: '' };
+    const state = window.__MYASO_M30_UI__ ?? { events: [], keys: [], pointers: [], overlayTransitions: [], feedbackTransitions: [], recoveryTransitions: [], threatTransitions: [], recoveryTellMaxPixels: 0, parryTellMaxPixels: 0, online: '' };
     const match = state.online.match(/player #(\\d+)/);
     return {
       title: document.title,
@@ -2152,6 +2233,11 @@ async function readUiEvidence(session) {
       recoveryLabel: document.querySelector('#opponent-recovery-label')?.textContent?.trim() ?? '',
       recoveryDetail: document.querySelector('#opponent-recovery-detail')?.textContent?.trim() ?? '',
       recoveryTransitions: (state.recoveryTransitions ?? []).slice(),
+      threatVisible: !document.querySelector('#threat-cue')?.hidden,
+      threatState: document.querySelector('#threat-cue')?.dataset.state ?? '',
+      threatLabel: document.querySelector('#threat-label')?.textContent?.trim() ?? '',
+      threatPhase: document.querySelector('#threat-phase')?.textContent?.trim() ?? '',
+      threatTransitions: (state.threatTransitions ?? []).slice(),
       recoveryTellMaxPixels: Number(state.recoveryTellMaxPixels ?? 0),
       parryTellMaxPixels: Number(state.parryTellMaxPixels ?? 0),
       events: state.events.slice(),

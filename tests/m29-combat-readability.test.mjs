@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { COMBAT_ACTION, FFA_KILL_TARGET, blockSpatialPresentation, combatActionHint, combatLifePresentation, combatOverlayPresentation, createCombatReadabilityTracker, createRemoteDamageTracker, fighterFocusNetId, fighterIdentityPresentation, fighterMatchPresentation, fighterScoreboardPresentation, fighterVitalsPresentation, guardBreakSpatialPresentation, killFeedPresentation, opponentRecoveryPresentation, parrySpatialPresentation } from "../src/browser/combat-readability.mjs";
+import { COMBAT_ACTION, FFA_KILL_TARGET, blockSpatialPresentation, combatActionHint, combatLifePresentation, combatOverlayPresentation, createCombatReadabilityTracker, createRemoteDamageTracker, fighterFocusNetId, fighterIdentityPresentation, fighterThreatNetId, fighterMatchPresentation, fighterScoreboardPresentation, fighterVitalsPresentation, guardBreakSpatialPresentation, killFeedPresentation, opponentRecoveryPresentation, parrySpatialPresentation } from "../src/browser/combat-readability.mjs";
 
 function fighter(netId, hp = 100, guard = 100, action = COMBAT_ACTION.idle, x = 0, y = 0, facing = 0) {
   return { netId, hp, guard, action, x, y, facing };
@@ -92,6 +92,25 @@ test("FFA focus presentation chooses the nearest living rival with stable tie-br
   entities.get(3).action = COMBAT_ACTION.dead;
   assert.equal(fighterFocusNetId(entities, 1), 0);
   assert.equal(fighterFocusNetId(entities, 99), 0);
+});
+
+test("FFA threat presentation identifies the most immediate attacker inside authoritative reach and arc", () => {
+  const entities = new Map([
+    [1, fighter(1, 100, 100, COMBAT_ACTION.idle, 100, 100)],
+    [2, fighter(2, 100, 100, COMBAT_ACTION.attackWindup, 60, 100, 0)],
+    [3, fighter(3, 100, 100, COMBAT_ACTION.attackActive, 20, 100, 0)],
+    [4, fighter(4, 100, 100, COMBAT_ACTION.attackActive, 180, 100, 0)],
+  ]);
+  assert.equal(fighterThreatNetId(entities, 1), 3);
+  entities.get(3).facing = Math.PI;
+  assert.equal(fighterThreatNetId(entities, 1), 2);
+  entities.get(2).x = 0;
+  assert.equal(fighterThreatNetId(entities, 1), 0);
+  entities.set(2, fighter(2, 100, 100, COMBAT_ACTION.attackWindup, 60, 100, 0));
+  entities.set(5, fighter(5, 100, 100, COMBAT_ACTION.attackWindup, 140, 100, Math.PI));
+  assert.equal(fighterThreatNetId(entities, 1), 2);
+  entities.get(1).action = COMBAT_ACTION.dead;
+  assert.equal(fighterThreatNetId(entities, 1), 0);
 });
 
 test("kill feed presentation preserves authoritative killer and victim identity", () => {
