@@ -107,3 +107,17 @@ The M54 branch stabilizes only that acceptance control flow:
 - retain the strict expected killer/victim rows, consecutive event sequence check, 1-0-1 score state, local identity markers, and no-match-overlay requirement.
 
 No kill, score, HP, death, feed row, or event is injected. Combat damage, movement, action timing, respawn timing, reliable transport, match rules, and acceptance thresholds are unchanged.
+
+### M36 cross-driver timing correction
+
+Fresh CI #197 on corrected M54 head `bee62357c4a092447d002a3536480068221d98a4` failed inherited M36 again before reaching M52/M54. Unlike the earlier one-off miss, the third retry still delivered all three real Firefox `KeyS + Space` sequences but the final authoritative strike landed for 34 HP. The same job also logged a Firefox render-script timeout, confirming that serial cross-driver command latency can consume the 135 ms attack windup even when input provenance is correct.
+
+M36 therefore now coordinates its two genuine inputs without serial WebDriver round trips:
+
+- attacker pointer-down and defender W3C dodge sequence are dispatched concurrently;
+- the defender sequence itself carries a 70 ms WebDriver pause before `KeyS + Space`;
+- this places dodge start inside the existing 135 ms windup while the 118 ms authoritative iframe overlaps attack activation;
+- no browser-state polling occurs during the critical resolution window;
+- the existing three-attempt fail-closed behavior and clean-vitals/parry guards remain unchanged.
+
+This is harness timing only. Dodge duration, iframe duration, attack windup/active/recovery, movement, hit detection, and acceptance criteria are unchanged.
