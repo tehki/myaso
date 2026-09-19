@@ -1,5 +1,5 @@
 import { createFrameBudget } from "../src/browser/frame-budget.mjs";
-import { COMBAT_ACTION, blockSpatialPresentation, combatActionHint, combatOverlayPresentation, createCombatReadabilityTracker, createRemoteDamageTracker, fighterFocusNetId, fighterIdentityPresentation, fighterMatchPresentation, fighterScoreboardPresentation, fighterVitalsPresentation, guardBreakSpatialPresentation, killFeedPresentation, opponentRecoveryPresentation, parrySpatialPresentation } from "../src/browser/combat-readability.mjs";
+import { COMBAT_ACTION, blockSpatialPresentation, combatActionHint, combatOverlayPresentation, createCombatReadabilityTracker, createRemoteDamageTracker, fighterFocusNetId, fighterIdentityPresentation, fighterThreatNetId, fighterMatchPresentation, fighterScoreboardPresentation, fighterVitalsPresentation, guardBreakSpatialPresentation, killFeedPresentation, opponentRecoveryPresentation, parrySpatialPresentation } from "../src/browser/combat-readability.mjs";
 import { COMBAT } from "../src/combat/model.mjs";
 import { reconcilePrediction } from "../src/browser/reconciliation.mjs";
 import { NETWORK } from "../src/network/constants.mjs";
@@ -32,6 +32,13 @@ const opponentRecovery = {
   root: document.querySelector("#opponent-recovery"),
   label: document.querySelector("#opponent-recovery-label"),
   detail: document.querySelector("#opponent-recovery-detail"),
+};
+const threatCue = {
+  root: document.querySelector("#threat-cue"),
+  label: document.querySelector("#threat-label"),
+  phase: document.querySelector("#threat-phase"),
+  netId: 0,
+  state: "",
 };
 const combatReadability = createCombatReadabilityTracker();
 const remoteDamage = createRemoteDamageTracker();
@@ -498,6 +505,7 @@ function updateHud(ownId) {
   setMeter("botHp", hud.botHp, hud.botHpValue, remote?.hp ?? 0);
   setMeter("botGuard", hud.botGuard, hud.botGuardValue, remote?.guard ?? 0);
   setFocusTarget(focusNetId);
+  updateThreatCue(ownId);
   updateCombatOverlay(own, ownId);
   updateOpponentRecovery(remote);
   updateScoreboard(ownId);
@@ -507,6 +515,32 @@ function updateHud(ownId) {
   } else {
     combatMessage = null;
     setStatus(combatActionHint(own) ?? networkStatus);
+  }
+}
+
+function updateThreatCue(ownId) {
+  if (!threatCue.root || !networkClient) return;
+  const netId = fighterThreatNetId(networkClient.state, ownId);
+  const attacker = netId ? networkClient.state.get(netId) : null;
+  const state = attacker?.action === COMBAT_ACTION.attackActive ? "strike"
+    : attacker?.action === COMBAT_ACTION.attackWindup ? "windup"
+      : "";
+  const shouldHide = netId === 0 || !state;
+  if (threatCue.root.hidden !== shouldHide) threatCue.root.hidden = shouldHide;
+  if (shouldHide) {
+    threatCue.netId = 0;
+    threatCue.state = "";
+    delete threatCue.root.dataset.state;
+    return;
+  }
+  threatCue.root.dataset.state = state;
+  if (threatCue.netId !== netId) {
+    threatCue.netId = netId;
+    threatCue.label.textContent = `#${netId}`;
+  }
+  if (threatCue.state !== state) {
+    threatCue.state = state;
+    threatCue.phase.textContent = state === "strike" ? "STRIKE" : "WINDUP";
   }
 }
 

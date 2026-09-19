@@ -71,10 +71,12 @@ Fighter #1 then performs real movement + pointer attack input against #2.
 After the authoritative 34 HP hit:
 
 - #1 still focuses #2 and sees focused HP 66;
-- #2 still focuses healthy #1 and sees focused HP 100;
 - #3 still focuses #2 and independently sees focused HP 66;
+- #2 focuses one of the two healthy non-self rivals (#1 or #3) and sees focused HP 100;
 - only #2 has local HP 66;
 - scores remain 0-0-0 and no match overlay appears.
+
+The exact post-hit rival chosen by #2 is not fixed by the acceptance because successive authoritative snapshots can place #1 or #3 marginally nearer after movement/knockback. The selector itself remains deterministic for every snapshot, and exact lower-ID tie-breaking is already proven by deterministic JavaScript coverage plus the strict initial spawn check.
 
 This proves the HUD is derived from each client's authoritative FFA geometry rather than from connection order.
 

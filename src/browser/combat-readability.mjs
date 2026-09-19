@@ -167,6 +167,42 @@ export function fighterIdentityPresentation(netId) {
   return { visible: true, label: `#${netId}` };
 }
 
+export function fighterThreatNetId(state, ownId = 0) {
+  if (!(state instanceof Map) || !Number.isInteger(ownId) || ownId <= 0) return 0;
+  const own = state.get(ownId);
+  if (!own || own.action === COMBAT_ACTION.dead || !Number.isFinite(own.x) || !Number.isFinite(own.y)) return 0;
+  const maxDistance = COMBAT.attack.reach + COMBAT.fighterRadius;
+  const maxDistanceSquared = maxDistance * maxDistance;
+  const halfArc = COMBAT.attack.arcRadians / 2;
+  let bestNetId = 0;
+  let bestPriority = Infinity;
+  let bestDistanceSquared = Infinity;
+  for (const entity of state.values()) {
+    const priority = entity?.action === COMBAT_ACTION.attackActive ? 0
+      : entity?.action === COMBAT_ACTION.attackWindup ? 1
+        : Infinity;
+    if (!Number.isFinite(priority) || entity.netId === ownId || !Number.isInteger(entity.netId) || entity.netId <= 0
+      || !Number.isFinite(entity.x) || !Number.isFinite(entity.y) || !Number.isFinite(entity.facing)) continue;
+    const dx = own.x - entity.x;
+    const dy = own.y - entity.y;
+    const distanceSquared = dx * dx + dy * dy;
+    if (distanceSquared > maxDistanceSquared) continue;
+    const angleToOwn = Math.atan2(dy, dx);
+    let delta = angleToOwn - entity.facing;
+    while (delta > Math.PI) delta -= Math.PI * 2;
+    while (delta < -Math.PI) delta += Math.PI * 2;
+    if (Math.abs(delta) > halfArc) continue;
+    if (priority < bestPriority
+      || (priority === bestPriority && (distanceSquared < bestDistanceSquared
+        || (distanceSquared === bestDistanceSquared && (bestNetId === 0 || entity.netId < bestNetId))))) {
+      bestNetId = entity.netId;
+      bestPriority = priority;
+      bestDistanceSquared = distanceSquared;
+    }
+  }
+  return bestNetId;
+}
+
 export function fighterFocusNetId(state, ownId = 0) {
   if (!(state instanceof Map) || !Number.isInteger(ownId) || ownId <= 0) return 0;
   const own = state.get(ownId);
