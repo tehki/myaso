@@ -1054,7 +1054,6 @@ async function runOnlineUiFocusHudFlight(entries) {
 
   const leftId = ordered[0].playerNetId;
   const centerId = ordered[1].playerNetId;
-  const rightId = ordered[2].playerNetId;
   const expectedReady = new Map([
     [left.name, { label: `NEAREST #${centerId}`, hp: 100, playerHp: 100 }],
     [center.name, { label: `NEAREST #${leftId}`, hp: 100, playerHp: 100 }],
@@ -1068,7 +1067,7 @@ async function runOnlineUiFocusHudFlight(entries) {
 
   const expectedDamage = new Map([
     [left.name, { label: `NEAREST #${centerId}`, hp: 66, playerHp: 100 }],
-    [center.name, { label: `NEAREST #${rightId}`, hp: 100, playerHp: 66 }],
+    [center.name, { label: `NEAREST #${leftId}`, hp: 100, playerHp: 66 }],
     [right.name, { label: `NEAREST #${centerId}`, hp: 66, playerHp: 100 }],
   ]);
   let evidence = null;

@@ -122,17 +122,17 @@ M36 therefore now coordinates its two genuine inputs without serial WebDriver ro
 
 This is harness timing only. Dodge duration, iframe duration, attack windup/active/recovery, movement, hit detection, and acceptance criteria are unchanged.
 
-### M53 post-hit focus correction
+### M53 post-hit retry correction
 
-CI #198 validated the new concurrent M36 timing and the M52 death-first convergence fix, then exposed an inherited M53 expectation bug.
+CI #198 validated the new concurrent M36 timing and the M52 death-first convergence fix, then exposed inherited M53 retry amplification: once #1 had already landed the authoritative 34 HP hit on #2, the harness could continue attacking while waiting for the complete focus-HUD state and eventually kill #2.
 
-After fighter #1 moves toward #2 and lands the authoritative 34 HP strike, combat knockback moves #2 18 world units toward #3. At that converged geometry #3 is closer to #2 than #1 is, so #2 correctly changes its nearest-rival focus from #1 to #3. The old M53 harness expected #2 to remain focused on #1; while waiting for that impossible state it kept attacking until #2 died.
+An initial interpretation attributed the remaining focus mismatch to post-hit knockback. Fresh CI #199 disproved that hypothesis: after the first 34 HP hit, #2 still correctly reported NEAREST #1, while #1 and #3 both reported damaged #2 at 66 HP. The product focus selector was already correct.
 
-The corrected acceptance now:
+The final acceptance correction therefore keeps the original M53 focus expectation and changes only retry control:
 
-- expects #2 to focus #3 after the authoritative knockback;
-- still requires #1 and #3 to focus damaged #2 at 66 HP;
-- stops issuing attacks as soon as the first authoritative 66 HP state is proven;
-- then waits separately for focus-HUD convergence.
+- #2 remains expected to focus #1 after the first hit;
+- #1 and #3 still must focus damaged #2 at 66 HP;
+- if the complete focus state has not converged yet, the harness checks the authoritative three-player HP state;
+- once #2 = 66 HP is proven with both other fighters healthy, it stops issuing attacks and waits separately for focus-HUD convergence.
 
-No focus algorithm, knockback, damage, movement, or gameplay state is changed. The correction aligns the acceptance with the already-authoritative post-hit geometry and prevents retry amplification.
+No focus algorithm, knockback, damage, movement, or gameplay state is changed. The correction prevents a UI-convergence delay from generating extra combat.
