@@ -1,5 +1,5 @@
 import { createFrameBudget } from "../src/browser/frame-budget.mjs";
-import { COMBAT_ACTION, blockSpatialPresentation, combatActionHint, combatOverlayPresentation, createCombatReadabilityTracker, createRemoteDamageTracker, fighterIdentityPresentation, fighterMatchPresentation, fighterScoreboardPresentation, fighterVitalsPresentation, guardBreakSpatialPresentation, killFeedPresentation, opponentRecoveryPresentation, parrySpatialPresentation } from "../src/browser/combat-readability.mjs";
+import { COMBAT_ACTION, blockSpatialPresentation, combatActionHint, combatOverlayPresentation, createCombatReadabilityTracker, createRemoteDamageTracker, fighterFocusNetId, fighterIdentityPresentation, fighterMatchPresentation, fighterScoreboardPresentation, fighterVitalsPresentation, guardBreakSpatialPresentation, killFeedPresentation, opponentRecoveryPresentation, parrySpatialPresentation } from "../src/browser/combat-readability.mjs";
 import { COMBAT } from "../src/combat/model.mjs";
 import { reconcilePrediction } from "../src/browser/reconciliation.mjs";
 import { NETWORK } from "../src/network/constants.mjs";
@@ -20,8 +20,9 @@ const hud = {
   botHpValue: document.querySelector("#bot-hp-value"),
   botGuard: document.querySelector("#bot-guard"),
   botGuardValue: document.querySelector("#bot-guard-value"),
+  focusLabel: document.querySelector("#focus-label"),
 };
-const hudCache = { playerHp: null, playerGuard: null, botHp: null, botGuard: null, status: null, scoreboard: null };
+const hudCache = { playerHp: null, playerGuard: null, botHp: null, botGuard: null, focusNetId: null, status: null, scoreboard: null };
 const combatOverlay = {
   root: document.querySelector("#combat-overlay"),
   title: document.querySelector("#combat-overlay-title"),
@@ -490,19 +491,15 @@ function drawDeathTell() {
 
 function updateHud(ownId) {
   const own = ownId ? networkClient.state.get(ownId) : null;
-  let remote = null;
-  for (const entity of networkClient.state.values()) {
-    if (entity.netId !== ownId) {
-      remote = entity;
-      break;
-    }
-  }
+  const focusNetId = fighterFocusNetId(networkClient.state, ownId);
+  const remote = focusNetId ? networkClient.state.get(focusNetId) : null;
   setMeter("playerHp", hud.playerHp, hud.playerHpValue, own?.hp ?? local.hp);
   setMeter("playerGuard", hud.playerGuard, hud.playerGuardValue, own?.guard ?? local.guard);
   setMeter("botHp", hud.botHp, hud.botHpValue, remote?.hp ?? 0);
   setMeter("botGuard", hud.botGuard, hud.botGuardValue, remote?.guard ?? 0);
+  setFocusTarget(focusNetId);
   updateCombatOverlay(own, ownId);
-  updateOpponentRecovery(networkClient.state.size === 2 ? remote : null);
+  updateOpponentRecovery(remote);
   updateScoreboard(ownId);
   const now = performance.now();
   if (combatMessage && now <= combatMessageUntil) {
@@ -552,6 +549,12 @@ function updateScoreboard(ownId) {
     item.append(label, score);
     return item;
   }));
+}
+
+function setFocusTarget(netId) {
+  if (!hud.focusLabel || hudCache.focusNetId === netId) return;
+  hudCache.focusNetId = netId;
+  hud.focusLabel.textContent = netId ? `NEAREST #${netId}` : "NO RIVAL";
 }
 
 function setMeter(cacheKey, bar, label, value) {
