@@ -87,3 +87,18 @@ M53 passes the authoritative state `Map` directly to the focus selector and retu
 Base is M52 exact head `263bedefedf269834ddd8d902b66cfec50800327`, validated by FULL quality CI #193 / run `35433271830`.
 
 M53 changes browser presentation, deterministic JS coverage, real-browser acceptance, CI, and documentation only. It does not change server simulation, combat rules, match rules, networking protocol, snapshot size, persistence, deployment, public bind, or runtime activation.
+
+## Inherited acceptance stabilization
+
+CI #194 first attempt failed at inherited M36 because Firefox delivered the real dodge keys but no authoritative dodge occurred; the same exact head passed M36 on one rerun.
+
+That rerun later exposed a separate inherited M49 harness geometry issue: after the first kill/respawn, the attacker could already be near or beyond the defender, while the retry loop kept moving right and aiming right. Eight genuine attacks then committed without a hit.
+
+The M53 branch stabilizes that acceptance geometry without changing gameplay:
+
+- retreat the M49 attacker left for 500 ms to a deterministic boundary;
+- approach right for 140 ms;
+- retain the same real pointer attacks;
+- use only 40 ms rightward correction between misses.
+
+With 215 px/s movement and the existing authoritative attack reach, this keeps retries on the intended side of the respawned defender. No hit state is injected, no damage/range/timing rule changes, and no acceptance threshold is weakened.

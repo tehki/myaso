@@ -927,11 +927,12 @@ async function runOnlineUiMatchFlight(entries) {
   const elementId = await resolveArenaElement(attacker, "M49");
 
   let matchEvidence = null;
-  await pulseMovementKey(attacker, "d", 120);
+  await pulseMovementKey(attacker, "a", 500);
+  await pulseMovementKey(attacker, "d", 140);
   for (let attempt = 0; attempt < 8 && !matchEvidence; attempt += 1) {
     await performArenaAttack(attacker, elementId);
     matchEvidence = await waitForUiMatchEndEvidence(entries, attacker, defender, 850, false);
-    if (!matchEvidence) await pulseMovementKey(attacker, "d", 80);
+    if (!matchEvidence) await pulseMovementKey(attacker, "d", 40);
   }
   if (!matchEvidence) matchEvidence = await waitForUiMatchEndEvidence(entries, attacker, defender, 1400, true);
 
