@@ -478,9 +478,18 @@ fn three_player_ffa_keeps_multi_attacker_damage_targeted() {
         InputIntent::default(),
         InputIntent::default(),
     );
-    assert_eq!(world.fighter(1).expect("left attacker").hp.round() as u8, 100);
-    assert_eq!(world.fighter(2).expect("center target").hp.round() as u8, 66);
-    assert_eq!(world.fighter(3).expect("right attacker").hp.round() as u8, 100);
+    assert_eq!(
+        world.fighter(1).expect("left attacker").hp.round() as u8,
+        100
+    );
+    assert_eq!(
+        world.fighter(2).expect("center target").hp.round() as u8,
+        66
+    );
+    assert_eq!(
+        world.fighter(3).expect("right attacker").hp.round() as u8,
+        100
+    );
 
     let attack_left = InputIntent {
         attack: true,
@@ -505,9 +514,18 @@ fn three_player_ffa_keeps_multi_attacker_damage_targeted() {
         InputIntent::default(),
         face_left,
     );
-    assert_eq!(world.fighter(1).expect("left attacker").hp.round() as u8, 100);
-    assert_eq!(world.fighter(2).expect("center target").hp.round() as u8, 32);
-    assert_eq!(world.fighter(3).expect("right attacker").hp.round() as u8, 100);
+    assert_eq!(
+        world.fighter(1).expect("left attacker").hp.round() as u8,
+        100
+    );
+    assert_eq!(
+        world.fighter(2).expect("center target").hp.round() as u8,
+        32
+    );
+    assert_eq!(
+        world.fighter(3).expect("right attacker").hp.round() as u8,
+        100
+    );
     assert!(world.fighters().iter().all(|fighter| fighter.kills == 0));
     assert!(!world.match_over());
 }
