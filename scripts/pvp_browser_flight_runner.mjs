@@ -1169,8 +1169,10 @@ async function runOnlineUiKillFeedFlight(entries) {
   const rightId = ordered[2].playerNetId;
 
   await pulseMovementKey(left, "d", 120);
+  const firstDeathBaseline = await readDefeatTransitionCount(center);
   let firstKill = null;
-  for (let attempt = 0; attempt < 8 && !firstKill; attempt += 1) {
+  let firstDeath = null;
+  for (let attempt = 0; attempt < 8 && !firstKill && !firstDeath; attempt += 1) {
     await performArenaAttack(left, leftArena, 200);
     firstKill = await waitForUiKillFeedEvidence(
       entries,
@@ -1179,20 +1181,24 @@ async function runOnlineUiKillFeedFlight(entries) {
       0,
       [{ killer: leftId, victim: centerId }],
       new Map([[leftId, 1], [centerId, 0], [rightId, 0]]),
-      850,
+      650,
       false,
     );
-    if (!firstKill) await pulseMovementKey(left, "d", 60);
+    if (!firstKill) {
+      firstDeath = await waitForUiTargetDeath(entries, center, firstDeathBaseline, 300, false);
+      if (!firstDeath) await pulseMovementKey(left, "d", 60);
+    }
   }
   if (!firstKill) {
+    if (!firstDeath) firstDeath = await waitForUiTargetDeath(entries, center, firstDeathBaseline, 1000, true);
     firstKill = await waitForUiKillFeedEvidence(
       entries,
       ids,
       center,
-      0,
+      null,
       [{ killer: leftId, victim: centerId }],
       new Map([[leftId, 1], [centerId, 0], [rightId, 0]]),
-      1400,
+      1800,
       true,
     );
   }
@@ -1210,8 +1216,10 @@ async function runOnlineUiKillFeedFlight(entries) {
 
   await pulseMovementKey(left, "a", 260);
   await pulseMovementKey(right, "a", 120);
+  const secondDeathBaseline = await readDefeatTransitionCount(center);
   let secondKill = null;
-  for (let attempt = 0; attempt < 8 && !secondKill; attempt += 1) {
+  let secondDeath = null;
+  for (let attempt = 0; attempt < 8 && !secondKill && !secondDeath; attempt += 1) {
     await performArenaAttack(right, rightArena, -200);
     secondKill = await waitForUiKillFeedEvidence(
       entries,
@@ -1220,20 +1228,24 @@ async function runOnlineUiKillFeedFlight(entries) {
       0,
       [{ killer: rightId, victim: centerId }, { killer: leftId, victim: centerId }],
       new Map([[leftId, 1], [centerId, 0], [rightId, 1]]),
-      850,
+      650,
       false,
     );
-    if (!secondKill) await pulseMovementKey(right, "a", 60);
+    if (!secondKill) {
+      secondDeath = await waitForUiTargetDeath(entries, center, secondDeathBaseline, 300, false);
+      if (!secondDeath) await pulseMovementKey(right, "a", 60);
+    }
   }
   if (!secondKill) {
+    if (!secondDeath) secondDeath = await waitForUiTargetDeath(entries, center, secondDeathBaseline, 1000, true);
     secondKill = await waitForUiKillFeedEvidence(
       entries,
       ids,
       center,
-      0,
+      null,
       [{ killer: rightId, victim: centerId }, { killer: leftId, victim: centerId }],
       new Map([[leftId, 1], [centerId, 0], [rightId, 1]]),
-      1400,
+      1800,
       true,
     );
   }
@@ -2092,6 +2104,24 @@ async function waitForUiThreePlayerDamage(entries, target, expectedHp, ids, time
   throw new Error(`M51 target did not reach authoritative HP ${expectedHp}: ${JSON.stringify(await Promise.all(entries.map(readUiEvidence)))}`);
 }
 
+async function readDefeatTransitionCount(session) {
+  const state = await readUiEvidence(session);
+  return state.overlayTransitions.filter((entry) => entry.visible && entry.title === "DEFEATED").length;
+}
+
+async function waitForUiTargetDeath(entries, target, baselineDefeats, timeoutMs, fail = true) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const states = await Promise.all(entries.map(readUiEvidence));
+    const targetState = states.find((entry) => entry.browser === target.name);
+    const defeats = targetState?.overlayTransitions.filter((entry) => entry.visible && entry.title === "DEFEATED").length ?? 0;
+    if (targetState?.playerHp === 0 || defeats > baselineDefeats) return states;
+    await sleep(50);
+  }
+  if (!fail) return null;
+  throw new Error(`M52 target death was not observed: ${JSON.stringify(await Promise.all(entries.map(readUiEvidence)))}`);
+}
+
 async function waitForUiKillFeedEvidence(
   entries,
   ids,
@@ -2114,8 +2144,9 @@ async function waitForUiKillFeedEvidence(
     const scoreReady = states.every((entry) => entry.scoreboardRows?.length === expectedScoreRows.length
       && expectedScoreRows.every((expected, index) => entry.scoreboardRows[index]?.label === expected.label
         && entry.scoreboardRows[index]?.kills === expected.kills));
-    const targetReady = targetState?.playerHp === expectedTargetHp
-      && (expectedTargetHp === 0 || !targetState.overlayVisible);
+    const targetReady = expectedTargetHp === null
+      || (targetState?.playerHp === expectedTargetHp
+        && (expectedTargetHp === 0 || !targetState.overlayVisible));
     const noMatchOverlay = states.every((entry) => entry.overlayTitle !== "VICTORY" && entry.overlayTitle !== "MATCH OVER");
     if (feedReady && scoreReady && targetReady && noMatchOverlay) return states;
     await sleep(50);

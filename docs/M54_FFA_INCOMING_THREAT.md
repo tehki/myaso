@@ -91,3 +91,19 @@ The browser computes threat from the existing authoritative state `Map` with sca
 Base is M53 frozen exact head `d4099ff65f33ae4796b25a20ef0275e3aacd0210`, validated by FULL quality CI #195 / run `35435924914`.
 
 M54 changes browser presentation, deterministic JS coverage, real-browser acceptance, CI, and documentation only. It does not change server simulation, combat rules, match rules, networking protocol, snapshot size, persistence, deployment, public bind, or runtime activation.
+
+## Inherited acceptance stabilization
+
+M54 CI #196 first attempt stopped at inherited M36. Firefox delivered the genuine `KeyS + Space` sequence, but no authoritative dodge action occurred and the ordinary 34 HP strike landed. One exact-head rerun cleared M36 without any code change, confirming the established headless-input timing class.
+
+That same rerun then exposed an inherited M52 acceptance issue under slower reliable/UI convergence. The intended first kill (#1 -> #2) completed. During the second-killer phase, #3 killed #2, but the harness continued issuing attacks while waiting for the two-row kill feed and 1-0-1 scoreboard to converge. That allowed #3 to kill the respawned #2 again, reach the M49 two-kill target, and trigger match-over/reset. The reset correctly cleared the kill feed, so the acceptance eventually failed with empty rows.
+
+The M54 branch stabilizes only that acceptance control flow:
+
+- capture the target's authoritative `DEFEATED` transition count before each kill stage;
+- stop issuing attacks immediately when HP reaches 0 or a new `DEFEATED` transition appears;
+- after death is proven, wait separately for reliable kill-feed and score convergence;
+- allow the target to respawn while waiting for reliable evidence, because the death itself was already captured;
+- retain the strict expected killer/victim rows, consecutive event sequence check, 1-0-1 score state, local identity markers, and no-match-overlay requirement.
+
+No kill, score, HP, death, feed row, or event is injected. Combat damage, movement, action timing, respawn timing, reliable transport, match rules, and acceptance thresholds are unchanged.
