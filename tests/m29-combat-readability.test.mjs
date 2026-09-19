@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { COMBAT_ACTION, FFA_KILL_TARGET, blockSpatialPresentation, combatActionHint, combatLifePresentation, combatOverlayPresentation, createCombatReadabilityTracker, createRemoteDamageTracker, fighterIdentityPresentation, fighterMatchPresentation, fighterScoreboardPresentation, fighterVitalsPresentation, guardBreakSpatialPresentation, killFeedPresentation, opponentRecoveryPresentation, parrySpatialPresentation } from "../src/browser/combat-readability.mjs";
+import { COMBAT_ACTION, FFA_KILL_TARGET, blockSpatialPresentation, combatActionHint, combatLifePresentation, combatOverlayPresentation, createCombatReadabilityTracker, createRemoteDamageTracker, fighterFocusNetId, fighterIdentityPresentation, fighterMatchPresentation, fighterScoreboardPresentation, fighterVitalsPresentation, guardBreakSpatialPresentation, killFeedPresentation, opponentRecoveryPresentation, parrySpatialPresentation } from "../src/browser/combat-readability.mjs";
 
 function fighter(netId, hp = 100, guard = 100, action = COMBAT_ACTION.idle, x = 0, y = 0, facing = 0) {
   return { netId, hp, guard, action, x, y, facing };
@@ -78,6 +78,20 @@ test("fighter identity presentation exposes only valid authoritative network ids
   assert.deepEqual(fighterIdentityPresentation(512), { visible: true, label: "#512" });
   assert.deepEqual(fighterIdentityPresentation(0), { visible: false, label: "" });
   assert.deepEqual(fighterIdentityPresentation(2.5), { visible: false, label: "" });
+});
+
+test("FFA focus presentation chooses the nearest living rival with stable tie-breaking", () => {
+  const entities = new Map([
+    [1, fighter(1, 100, 100, COMBAT_ACTION.idle, 100, 100)],
+    [2, fighter(2, 100, 100, COMBAT_ACTION.idle, 196, 100)],
+    [3, fighter(3, 100, 100, COMBAT_ACTION.idle, 4, 100)],
+  ]);
+  assert.equal(fighterFocusNetId(entities, 1), 2);
+  entities.get(2).action = COMBAT_ACTION.dead;
+  assert.equal(fighterFocusNetId(entities, 1), 3);
+  entities.get(3).action = COMBAT_ACTION.dead;
+  assert.equal(fighterFocusNetId(entities, 1), 0);
+  assert.equal(fighterFocusNetId(entities, 99), 0);
 });
 
 test("kill feed presentation preserves authoritative killer and victim identity", () => {
