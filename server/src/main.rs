@@ -365,7 +365,10 @@ async fn handle_connection(
         .context("accept reliable game stream")?;
     let (initial_frame, mut next_kill_event_sequence) = {
         let state = game.state.lock().await;
-        (Arc::clone(&state.replication_frame), state.next_kill_event_sequence)
+        (
+            Arc::clone(&state.replication_frame),
+            state.next_kill_event_sequence,
+        )
     };
     let initial_baseline = snapshots.build_from_frame(
         u16::MAX,

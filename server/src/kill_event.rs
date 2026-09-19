@@ -13,7 +13,10 @@ pub struct KillEventPacket {
 pub fn encode_kill_event(packet: KillEventPacket) -> [u8; KILL_EVENT_BYTES] {
     assert!(packet.killer != 0, "killer must be non-zero");
     assert!(packet.victim != 0, "victim must be non-zero");
-    assert!(packet.killer != packet.victim, "killer and victim must differ");
+    assert!(
+        packet.killer != packet.victim,
+        "killer and victim must differ"
+    );
 
     let mut bytes = [0_u8; KILL_EVENT_BYTES];
     bytes[0] = PROTOCOL_VERSION;
@@ -35,9 +38,6 @@ mod tests {
             killer: 17,
             victim: 23,
         });
-        assert_eq!(
-            bytes,
-            [1, 4, 0, 0, 4, 3, 2, 1, 17, 0, 0, 0, 23, 0, 0, 0]
-        );
+        assert_eq!(bytes, [1, 4, 0, 0, 4, 3, 2, 1, 17, 0, 0, 0, 23, 0, 0, 0]);
     }
 }
