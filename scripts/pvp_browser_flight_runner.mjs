@@ -8,7 +8,7 @@ import { setTimeout as sleep } from "node:timers/promises";
 const root = process.cwd();
 const durationMs = Number(process.env.MYASO_PVP_FLIGHT_DURATION_MS ?? 7000);
 const scenario = process.env.MYASO_PVP_SCENARIO ?? "damage";
-if (!new Set(["damage", "parry", "dodge", "block", "guardbreak", "backblock", "respawn", "ui", "uirespawn", "uifeedback", "uihittell", "uivitals", "uiidentity", "uiscore", "uimatch", "uirematch", "uiparry", "uistun", "uiguardbreak", "uidodge", "uirecovery", "uirecoverytell", "uiattackintent", "uiguardbreaktell", "uiparrytell", "uiblockfacingtell", "uidodgetell", "uideathtell"]).has(scenario)) throw new Error(`unsupported MYASO_PVP_SCENARIO: ${scenario}`);
+if (!new Set(["damage", "parry", "dodge", "block", "guardbreak", "backblock", "respawn", "ui", "uirespawn", "uifeedback", "uihittell", "uivitals", "uiidentity", "uiscore", "uimatch", "uirematch", "uiffa3", "uiparry", "uistun", "uiguardbreak", "uidodge", "uirecovery", "uirecoverytell", "uiattackintent", "uiguardbreaktell", "uiparrytell", "uiblockfacingtell", "uidodgetell", "uideathtell"]).has(scenario)) throw new Error(`unsupported MYASO_PVP_SCENARIO: ${scenario}`);
 const staticPort = Number(process.env.MYASO_PVP_FLIGHT_HTTP_PORT ?? 4174);
 const browsers = [
   {
@@ -32,6 +32,18 @@ const browsers = [
     },
   },
 ];
+if (scenario === "uiffa3") {
+  browsers.push({
+    name: "chrome2",
+    port: 9517,
+    executable: process.env.CHROMEWEBDRIVER ? path.join(process.env.CHROMEWEBDRIVER, "chromedriver") : "chromedriver",
+    args: ["--port=9517"],
+    capabilities: {
+      browserName: "chrome",
+      "goog:chromeOptions": { args: ["--headless=new", "--no-sandbox", "--disable-dev-shm-usage", "--window-size=1280,720"] },
+    },
+  });
+}
 
 const children = new Set();
 const sessions = [];
@@ -71,6 +83,9 @@ try {
   } else if (scenario === "uirematch") {
     const results = await runOnlineUiRematchFlight(sessions);
     console.log(`M50_FFA_REMATCH_LIFECYCLE ${JSON.stringify({ ok: true, results })}`);
+  } else if (scenario === "uiffa3") {
+    const results = await runOnlineUiThreePlayerFfaFlight(sessions);
+    console.log(`M51_THREE_PLAYER_FFA ${JSON.stringify({ ok: true, results })}`);
   } else if (scenario === "uiparry") {
     const results = await runOnlineUiParryFlight(sessions);
     console.log(`M33_ONLINE_PARRY_FEEDBACK ${JSON.stringify({ ok: true, results })}`);
@@ -204,7 +219,7 @@ async function startBrowser(browser) {
 }
 
 async function navigate(session, gameUrl, certificateHash) {
-  const page = scenario === "ui" || scenario === "uirespawn" || scenario === "uifeedback" || scenario === "uihittell" || scenario === "uivitals" || scenario === "uiidentity" || scenario === "uiscore" || scenario === "uimatch" || scenario === "uirematch" || scenario === "uiparry" || scenario === "uistun" || scenario === "uiguardbreak" || scenario === "uidodge" || scenario === "uirecovery" || scenario === "uirecoverytell" || scenario === "uiattackintent" || scenario === "uiguardbreaktell" || scenario === "uiparrytell" || scenario === "uiblockfacingtell" || scenario === "uidodgetell" || scenario === "uideathtell" ? "index.html" : "pvp-flight.html";
+  const page = scenario === "ui" || scenario === "uirespawn" || scenario === "uifeedback" || scenario === "uihittell" || scenario === "uivitals" || scenario === "uiidentity" || scenario === "uiscore" || scenario === "uimatch" || scenario === "uirematch" || scenario === "uiffa3" || scenario === "uiparry" || scenario === "uistun" || scenario === "uiguardbreak" || scenario === "uidodge" || scenario === "uirecovery" || scenario === "uirecoverytell" || scenario === "uiattackintent" || scenario === "uiguardbreaktell" || scenario === "uiparrytell" || scenario === "uiblockfacingtell" || scenario === "uidodgetell" || scenario === "uideathtell" ? "index.html" : "pvp-flight.html";
   const url = new URL(`http://127.0.0.1:${staticPort}/web/${page}`);
   url.searchParams.set("server", gameUrl);
   url.searchParams.set("cert", certificateHash);
@@ -956,6 +971,59 @@ async function runOnlineUiRematchFlight(entries) {
   return damageEvidence;
 }
 
+async function runOnlineUiThreePlayerFfaFlight(entries) {
+  if (entries.length !== 3) throw new Error(`M51 expected three real browser clients, received ${entries.length}`);
+  await Promise.all(entries.map(installUiObserver));
+  const ready = await waitForUiReady(entries);
+  if (ready.length !== 3 || ready.some((entry) => !entry.playerNetId)) {
+    throw new Error(`M51 did not resolve three authoritative player identities: ${JSON.stringify(ready)}`);
+  }
+  const ordered = ready.slice().sort((a, b) => a.playerNetId - b.playerNetId);
+  const ids = ordered.map((entry) => entry.playerNetId);
+  if (new Set(ids).size !== 3) throw new Error(`M51 duplicate authoritative identities: ${JSON.stringify(ready)}`);
+  const left = entries.find((entry) => entry.name === ordered[0].browser);
+  const center = entries.find((entry) => entry.name === ordered[1].browser);
+  const right = entries.find((entry) => entry.name === ordered[2].browser);
+  if (!left || !center || !right) throw new Error(`M51 could not map three FFA roles: ${JSON.stringify(ready)}`);
+
+  await waitForUiThreePlayerReady(entries, ids, 2500);
+  await Promise.all(entries.map((entry) => execute(entry.base, entry.sessionId, "document.querySelector('#arena').focus(); return document.activeElement?.id;")));
+  const leftArena = await resolveArenaElement(left, "M51 left attacker");
+  const rightArena = await resolveArenaElement(right, "M51 right attacker");
+
+  await pulseMovementKey(left, "d", 120);
+  let firstHit = null;
+  for (let attempt = 0; attempt < 3 && !firstHit; attempt += 1) {
+    await performArenaAttack(left, leftArena, 200);
+    firstHit = await waitForUiThreePlayerDamage(entries, center, 66, ids, 850, false);
+    if (!firstHit) await pulseMovementKey(left, "d", 60);
+  }
+  if (!firstHit) firstHit = await waitForUiThreePlayerDamage(entries, center, 66, ids, 1200, true);
+
+  await pulseMovementKey(left, "a", 220);
+  await pulseMovementKey(right, "a", 120);
+  let secondHit = null;
+  for (let attempt = 0; attempt < 3 && !secondHit; attempt += 1) {
+    await performArenaAttack(right, rightArena, -200);
+    secondHit = await waitForUiThreePlayerDamage(entries, center, 32, ids, 850, false);
+    if (!secondHit) await pulseMovementKey(right, "a", 60);
+  }
+  if (!secondHit) secondHit = await waitForUiThreePlayerDamage(entries, center, 32, ids, 1200, true);
+
+  const leftState = secondHit.find((entry) => entry.browser === left.name);
+  const centerState = secondHit.find((entry) => entry.browser === center.name);
+  const rightState = secondHit.find((entry) => entry.browser === right.name);
+  if (!leftState || !centerState || !rightState) throw new Error(`M51 incomplete final FFA evidence: ${JSON.stringify(secondHit)}`);
+  if (!leftState.pointers.some((event) => event.type === "pointerdown" && event.button === 0)
+    || !rightState.pointers.some((event) => event.type === "pointerdown" && event.button === 0)) {
+    throw new Error(`M51 did not preserve real pointer provenance for both attackers: ${JSON.stringify(secondHit)}`);
+  }
+  if (leftState.playerHp !== 100 || centerState.playerHp !== 32 || rightState.playerHp !== 100) {
+    throw new Error(`M51 damage was not isolated to the middle fighter: ${JSON.stringify(secondHit)}`);
+  }
+  return secondHit;
+}
+
 async function runOnlineUiDeathTellFlight(entries) {
   let tell = null;
   let observer = null;
@@ -1605,7 +1673,7 @@ async function waitForUiReady(entries) {
     if (states.every((state) => state.playerNetId > 0 && state.playerHp === 100 && state.opponentHp === 100)) return states;
     await sleep(100);
   }
-  throw new Error(`real online UI did not converge to two ready fighters: ${JSON.stringify(await Promise.all(entries.map(readUiEvidence)))}`);
+  throw new Error(`real online UI did not converge to ready fighters: ${JSON.stringify(await Promise.all(entries.map(readUiEvidence)))}`);
 }
 
 async function waitForUiCombatEvidence(entries, timeoutMs = 3000, fail = true) {
@@ -1722,6 +1790,41 @@ async function waitForUiDeathEvidence(entries, attacker, defender, timeoutMs, fa
   }
   if (!fail) return null;
   throw new Error(`real online UI never rendered authoritative defeat: ${JSON.stringify(await Promise.all(entries.map(readUiEvidence)))}`);
+}
+
+async function waitForUiThreePlayerReady(entries, ids, timeoutMs) {
+  const deadline = Date.now() + timeoutMs;
+  const labels = ids.map((id) => `#${id}`);
+  while (Date.now() < deadline) {
+    const states = await Promise.all(entries.map(readUiEvidence));
+    const ready = states.every((entry) => entry.playerHp === 100 && entry.playerGuard === 100
+      && entry.scoreboardRows?.length === 3
+      && entry.scoreboardRows.every((row, index) => row.label === labels[index] && row.kills === 0)
+      && entry.scoreboardRows.filter((row) => row.own).length === 1
+      && !entry.overlayVisible);
+    if (ready) return states;
+    await sleep(50);
+  }
+  throw new Error(`M51 three-player FFA never converged to shared ready state: ${JSON.stringify(await Promise.all(entries.map(readUiEvidence)))}`);
+}
+
+async function waitForUiThreePlayerDamage(entries, target, expectedHp, ids, timeoutMs, fail = true) {
+  const deadline = Date.now() + timeoutMs;
+  const labels = ids.map((id) => `#${id}`);
+  while (Date.now() < deadline) {
+    const states = await Promise.all(entries.map(readUiEvidence));
+    const targetState = states.find((entry) => entry.browser === target.name);
+    const othersHealthy = states
+      .filter((entry) => entry.browser !== target.name)
+      .every((entry) => entry.playerHp === 100);
+    const scoreboardReady = states.every((entry) => entry.scoreboardRows?.length === 3
+      && entry.scoreboardRows.every((row, index) => row.label === labels[index] && row.kills === 0));
+    if (targetState?.playerHp === expectedHp && othersHealthy && scoreboardReady
+      && states.every((entry) => !entry.overlayVisible)) return states;
+    await sleep(50);
+  }
+  if (!fail) return null;
+  throw new Error(`M51 target did not reach authoritative HP ${expectedHp}: ${JSON.stringify(await Promise.all(entries.map(readUiEvidence)))}`);
 }
 
 async function waitForUiMatchResetEvidence(entries, timeoutMs) {

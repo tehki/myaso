@@ -32,6 +32,26 @@ fn advance(
     events
 }
 
+fn advance_three(
+    world: &mut World,
+    milliseconds: f32,
+    first: InputIntent,
+    second: InputIntent,
+    third: InputIntent,
+) -> Vec<CombatEvent> {
+    let mut elapsed = 0.0_f32;
+    let mut events = Vec::new();
+    while elapsed < milliseconds {
+        let dt = (milliseconds - elapsed).min(5.0);
+        world.set_input(1, first);
+        world.set_input(2, second);
+        world.set_input(3, third);
+        events.extend(world.step_by(dt));
+        elapsed += dt;
+    }
+    events
+}
+
 #[test]
 fn rust_snapshot_encoder_matches_the_js_wire_fixture() {
     let state = WireEntity {
@@ -426,6 +446,70 @@ fn finished_match_resets_atomically_and_reopens_play() {
         }
     ));
     assert!(world.add_player_at(3, 120.0, 160.0, 0.0));
+}
+
+#[test]
+fn three_player_ffa_keeps_multi_attacker_damage_targeted() {
+    let mut world = World::new(400.0, 300.0);
+    assert!(world.add_player_at(1, 100.0, 100.0, 0.0));
+    assert!(world.add_player_at(2, 160.0, 100.0, 0.0));
+    assert!(world.add_player_at(3, 220.0, 100.0, std::f32::consts::PI));
+
+    let attack_right = InputIntent {
+        attack: true,
+        facing_radians: 0.0,
+        ..InputIntent::default()
+    };
+    let face_right = InputIntent {
+        facing_radians: 0.0,
+        ..InputIntent::default()
+    };
+    advance_three(
+        &mut world,
+        5.0,
+        attack_right,
+        InputIntent::default(),
+        InputIntent::default(),
+    );
+    advance_three(
+        &mut world,
+        500.0,
+        face_right,
+        InputIntent::default(),
+        InputIntent::default(),
+    );
+    assert_eq!(world.fighter(1).expect("left attacker").hp.round() as u8, 100);
+    assert_eq!(world.fighter(2).expect("center target").hp.round() as u8, 66);
+    assert_eq!(world.fighter(3).expect("right attacker").hp.round() as u8, 100);
+
+    let attack_left = InputIntent {
+        attack: true,
+        facing_radians: std::f32::consts::PI,
+        ..InputIntent::default()
+    };
+    let face_left = InputIntent {
+        facing_radians: std::f32::consts::PI,
+        ..InputIntent::default()
+    };
+    advance_three(
+        &mut world,
+        5.0,
+        InputIntent::default(),
+        InputIntent::default(),
+        attack_left,
+    );
+    advance_three(
+        &mut world,
+        500.0,
+        InputIntent::default(),
+        InputIntent::default(),
+        face_left,
+    );
+    assert_eq!(world.fighter(1).expect("left attacker").hp.round() as u8, 100);
+    assert_eq!(world.fighter(2).expect("center target").hp.round() as u8, 32);
+    assert_eq!(world.fighter(3).expect("right attacker").hp.round() as u8, 100);
+    assert!(world.fighters().iter().all(|fighter| fighter.kills == 0));
+    assert!(!world.match_over());
 }
 
 #[test]
