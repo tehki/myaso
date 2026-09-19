@@ -112,16 +112,17 @@ No kill, score, HP, death, feed row, or event is injected. Combat damage, moveme
 
 Fresh CI #197 on corrected M54 head `bee62357c4a092447d002a3536480068221d98a4` failed inherited M36 again before reaching M52/M54. Unlike the earlier one-off miss, the third retry still delivered all three real Firefox `KeyS + Space` sequences but the final authoritative strike landed for 34 HP. The same job also logged a Firefox render-script timeout, confirming that serial cross-driver command latency can consume the 135 ms attack windup even when input provenance is correct.
 
-M36 therefore now coordinates its two genuine inputs without serial WebDriver round trips:
+M36 first moved to concurrent cross-driver dispatch, but CI #200 and its same-head rerun showed that a 70 ms pause inside Firefox's W3C action sequence still inherited Firefox command-start jitter. Both failures preserved genuine KeyS + Space provenance while the ordinary 34 HP strike landed.
 
-- attacker pointer-down and defender W3C dodge sequence are dispatched concurrently;
-- the defender sequence itself carries a 70 ms WebDriver pause before `KeyS + Space`;
-- this places dodge start inside the existing 135 ms windup while the 118 ms authoritative iframe overlaps attack activation;
-- no browser-state polling occurs during the critical resolution window;
-- the existing three-attempt fail-closed behavior and clean-vitals/parry guards remain unchanged.
+The final M36 choreography anchors the offset on the harness clock instead:
+
+- start Chrome's genuine pointer-down request first;
+- wait 50 ms in Node;
+- dispatch Firefox's genuine KeyS + Space sequence with zero driver-local pre-delay;
+- keep the critical iframe/strike window free of browser-state polling;
+- retain the existing three-attempt fail-closed behavior and clean-vitals/parry guards.
 
 This is harness timing only. Dodge duration, iframe duration, attack windup/active/recovery, movement, hit detection, and acceptance criteria are unchanged.
-
 ### M53 post-hit retry correction
 
 CI #198 validated the new concurrent M36 timing and the M52 death-first convergence fix, then exposed inherited M53 retry amplification: once #1 had already landed the authoritative 34 HP hit on #2, the harness could continue attacking while waiting for the complete focus-HUD state and eventually kill #2.
