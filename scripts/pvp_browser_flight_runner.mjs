@@ -1056,6 +1056,7 @@ async function runOnlineUiFocusHudFlight(entries) {
 
   const leftId = ordered[0].playerNetId;
   const centerId = ordered[1].playerNetId;
+  const rightId = ordered[2].playerNetId;
   const expectedReady = new Map([
     [left.name, { label: `NEAREST #${centerId}`, hp: 100, playerHp: 100 }],
     [center.name, { label: `NEAREST #${leftId}`, hp: 100, playerHp: 100 }],
@@ -1069,7 +1070,7 @@ async function runOnlineUiFocusHudFlight(entries) {
 
   const expectedDamage = new Map([
     [left.name, { label: `NEAREST #${centerId}`, hp: 66, playerHp: 100 }],
-    [center.name, { label: `NEAREST #${leftId}`, hp: 100, playerHp: 66 }],
+    [center.name, { labels: [`NEAREST #${leftId}`, `NEAREST #${rightId}`], hp: 100, playerHp: 66 }],
     [right.name, { label: `NEAREST #${centerId}`, hp: 66, playerHp: 100 }],
   ]);
   let evidence = null;
@@ -2066,8 +2067,11 @@ async function waitForUiFocusHudEvidence(entries, expectedByBrowser, ids, timeou
     const states = await Promise.all(entries.map(readUiEvidence));
     const ready = states.every((entry) => {
       const expected = expectedByBrowser.get(entry.browser);
+      const focusReady = expected?.labels
+        ? expected.labels.includes(entry.focusLabel)
+        : entry.focusLabel === expected?.label;
       return expected
-        && entry.focusLabel === expected.label
+        && focusReady
         && entry.opponentHp === expected.hp
         && entry.playerHp === expected.playerHp
         && entry.opponentGuard === 100

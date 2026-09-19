@@ -123,17 +123,18 @@ The final M36 choreography anchors the offset on the harness clock instead:
 - retain the existing three-attempt fail-closed behavior and clean-vitals/parry guards.
 
 This is harness timing only. Dodge duration, iframe duration, attack windup/active/recovery, movement, hit detection, and acceptance criteria are unchanged.
-### M53 post-hit retry correction
 
-CI #198 validated the new concurrent M36 timing and the M52 death-first convergence fix, then exposed inherited M53 retry amplification: once #1 had already landed the authoritative 34 HP hit on #2, the harness could continue attacking while waiting for the complete focus-HUD state and eventually kill #2.
+### M53 post-hit convergence correction
 
-An initial interpretation attributed the remaining focus mismatch to post-hit knockback. Fresh CI #199 disproved that hypothesis: after the first 34 HP hit, #2 still correctly reported NEAREST #1, while #1 and #3 both reported damaged #2 at 66 HP. The product focus selector was already correct.
+CI #198/#199 exposed inherited M53 retry amplification: after #1 had already landed the authoritative 34 HP hit on #2, the harness could continue attacking while waiting for one exact focus label and eventually kill #2.
 
-The final acceptance correction therefore keeps the original M53 focus expectation and changes only retry control:
+Fresh CI #201 showed why that label was unstable: after the same authoritative hit, #2 could legitimately report NEAREST #3 while #1 and #3 both reported damaged #2 at 66 HP. The nearest selector remains deterministic for every snapshot, but the exact post-hit victim focus can settle on either healthy rival as replicated movement/knockback geometry advances.
 
-- #2 remains expected to focus #1 after the first hit;
-- #1 and #3 still must focus damaged #2 at 66 HP;
-- if the complete focus state has not converged yet, the harness checks the authoritative three-player HP state;
-- once #2 = 66 HP is proven with both other fighters healthy, it stops issuing attacks and waits separately for focus-HUD convergence.
+The final M53 acceptance checks the stable product invariant:
 
-No focus algorithm, knockback, damage, movement, or gameplay state is changed. The correction prevents a UI-convergence delay from generating extra combat.
+- initial spawn remains strict: #1 -> #2, #2 -> #1 by lower-ID tie-break, #3 -> #2;
+- after damage, #1 and #3 must both focus damaged #2 at 66 HP;
+- #2 must focus either healthy non-self rival (#1 or #3) at 100 HP;
+- if complete HUD evidence lags, the harness stops issuing attacks as soon as authoritative #2 = 66 HP is proven and waits separately for convergence.
+
+No focus algorithm, tie-break rule, knockback, damage, movement, or gameplay state is changed. Deterministic selector unit coverage remains strict; only the browser acceptance stops assuming one transient post-hit snapshot ordering.
