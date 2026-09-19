@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { COMBAT_ACTION, FFA_KILL_TARGET, blockSpatialPresentation, combatActionHint, combatLifePresentation, combatOverlayPresentation, createCombatReadabilityTracker, createRemoteDamageTracker, fighterIdentityPresentation, fighterMatchPresentation, fighterScoreboardPresentation, fighterVitalsPresentation, guardBreakSpatialPresentation, opponentRecoveryPresentation, parrySpatialPresentation } from "../src/browser/combat-readability.mjs";
+import { COMBAT_ACTION, FFA_KILL_TARGET, blockSpatialPresentation, combatActionHint, combatLifePresentation, combatOverlayPresentation, createCombatReadabilityTracker, createRemoteDamageTracker, fighterIdentityPresentation, fighterMatchPresentation, fighterScoreboardPresentation, fighterVitalsPresentation, guardBreakSpatialPresentation, killFeedPresentation, opponentRecoveryPresentation, parrySpatialPresentation } from "../src/browser/combat-readability.mjs";
 
 function fighter(netId, hp = 100, guard = 100, action = COMBAT_ACTION.idle, x = 0, y = 0, facing = 0) {
   return { netId, hp, guard, action, x, y, facing };
@@ -78,6 +78,21 @@ test("fighter identity presentation exposes only valid authoritative network ids
   assert.deepEqual(fighterIdentityPresentation(512), { visible: true, label: "#512" });
   assert.deepEqual(fighterIdentityPresentation(0), { visible: false, label: "" });
   assert.deepEqual(fighterIdentityPresentation(2.5), { visible: false, label: "" });
+});
+
+test("kill feed presentation preserves authoritative killer and victim identity", () => {
+  assert.deepEqual(killFeedPresentation({ killer: 3, victim: 2 }, 3), {
+    visible: true, text: "#3 defeated #2", killerOwn: true, victimOwn: false,
+  });
+  assert.deepEqual(killFeedPresentation({ killer: 3, victim: 2 }, 2), {
+    visible: true, text: "#3 defeated #2", killerOwn: false, victimOwn: true,
+  });
+  assert.deepEqual(killFeedPresentation({ killer: 0, victim: 2 }, 2), {
+    visible: false, text: "", killerOwn: false, victimOwn: false,
+  });
+  assert.deepEqual(killFeedPresentation({ killer: 2, victim: 2 }, 2), {
+    visible: false, text: "", killerOwn: false, victimOwn: false,
+  });
 });
 
 test("FFA scoreboard presentation ranks authoritative kill scores with stable identity", () => {

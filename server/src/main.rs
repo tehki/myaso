@@ -1,8 +1,9 @@
 use anyhow::{bail, Context, Result};
 use myaso_server::{
     decode_input_packet, is_sequence_newer16, is_tick_newer32,
+    kill_event::{encode_kill_event, KillEventPacket},
     reliable::{try_enqueue_reliable, ReliableQueueError},
-    simulation::{InputIntent, World},
+    simulation::{CombatEvent, InputIntent, World},
     snapshot::{ReplicationFrame, SnapshotSession},
     AdmissionGate, InputIngressWindow, CONSERVATIVE_DATAGRAM_BYTES, PROTOCOL_VERSION,
     TARGET_PLAYERS_PER_MAP,
@@ -33,6 +34,7 @@ const RELIABLE_DELTA_CHECKPOINT_INTERVAL: u8 = 3;
 const MAX_FLIGHT_BACKGROUND_PLAYERS: usize = TARGET_PLAYERS_PER_MAP - 1;
 const FLIGHT_BACKGROUND_NET_ID_BASE: u32 = 10_000;
 const DEFAULT_FLIGHT_NEAR_PRESSURE_PLAYERS: usize = 150;
+const MAX_KILL_EVENT_HISTORY: usize = 256;
 
 #[derive(Debug, Clone, Copy)]
 struct LoopbackFlightConfig {
@@ -45,6 +47,8 @@ struct GameState {
     world: World,
     replication_frame: Arc<ReplicationFrame>,
     flight_background_ids: Vec<u32>,
+    kill_events: VecDeque<KillEventPacket>,
+    next_kill_event_sequence: u32,
 }
 
 impl GameState {
@@ -74,6 +78,8 @@ impl GameState {
             world,
             replication_frame,
             flight_background_ids,
+            kill_events: VecDeque::with_capacity(MAX_KILL_EVENT_HISTORY),
+            next_kill_event_sequence: 0,
         }
     }
 
@@ -96,6 +102,39 @@ impl GameState {
             self.world.tick,
             self.world.fighters(),
         ));
+    }
+
+    fn record_combat_events(&mut self, events: &[CombatEvent]) {
+        for event in events {
+            let CombatEvent::Death { fighter, killer } = event else {
+                continue;
+            };
+            let packet = KillEventPacket {
+                sequence: self.next_kill_event_sequence,
+                killer: *killer,
+                victim: *fighter,
+            };
+            self.next_kill_event_sequence = self.next_kill_event_sequence.wrapping_add(1);
+            self.kill_events.push_back(packet);
+            while self.kill_events.len() > MAX_KILL_EVENT_HISTORY {
+                self.kill_events.pop_front();
+            }
+        }
+    }
+
+    fn kill_event_for_cursor(&self, cursor: u32) -> Option<KillEventPacket> {
+        if let Some(event) = self
+            .kill_events
+            .iter()
+            .copied()
+            .find(|event| event.sequence == cursor)
+        {
+            return Some(event);
+        }
+        if cursor != self.next_kill_event_sequence {
+            return self.kill_events.front().copied();
+        }
+        None
     }
 }
 
@@ -298,7 +337,8 @@ async fn run_authoritative_clock(game: Arc<SharedGame>) {
         interval.tick().await;
         let mut state = game.state.lock().await;
         state.apply_flight_background_motion();
-        let _events = state.world.step();
+        let events = state.world.step();
+        state.record_combat_events(&events);
         if state.world.tick % SNAPSHOT_EVERY_SERVER_TICKS == 0 {
             state.refresh_replication_frame();
         }
@@ -323,9 +363,9 @@ async fn handle_connection(
         .accept_bi()
         .await
         .context("accept reliable game stream")?;
-    let initial_frame = {
+    let (initial_frame, mut next_kill_event_sequence) = {
         let state = game.state.lock().await;
-        Arc::clone(&state.replication_frame)
+        (Arc::clone(&state.replication_frame), state.next_kill_event_sequence)
     };
     let initial_baseline = snapshots.build_from_frame(
         u16::MAX,
@@ -349,7 +389,7 @@ async fn handle_connection(
     {
         bail!("reliable and realtime baseline sessions diverged");
     }
-    send_reliable_snapshot(&mut reliable_send, &initial_baseline.bytes).await?;
+    send_reliable_frame(&mut reliable_send, &initial_baseline.bytes).await?;
     let initial_baseline_sequence = initial_baseline.sequence;
     let mut acknowledged_snapshot = u16::MAX;
     let mut realtime_ready = false;
@@ -363,7 +403,7 @@ async fn handle_connection(
             if !reliable_write_delay.is_zero() {
                 tokio::time::sleep(reliable_write_delay).await;
             }
-            send_reliable_snapshot(&mut reliable_send, &payload).await?;
+            send_reliable_frame(&mut reliable_send, &payload).await?;
         }
         Ok::<(), anyhow::Error>(())
     });
@@ -415,9 +455,12 @@ async fn handle_connection(
                 }
             }
             _ = snapshot_interval.tick() => {
-                let frame = {
+                let (frame, pending_kill_event) = {
                     let state = game.state.lock().await;
-                    Arc::clone(&state.replication_frame)
+                    (
+                        Arc::clone(&state.replication_frame),
+                        state.kill_event_for_cursor(next_kill_event_sequence),
+                    )
                 };
                 let server_tick = frame.server_tick();
                 let safe_input_ack = take_safe_input_ack(&mut pending_input_acks, server_tick);
@@ -445,7 +488,20 @@ async fn handle_connection(
                         .send_datagram(snapshot.bytes)
                         .context("send authoritative snapshot datagram")?;
                 }
-                if should_enqueue_reliable_catchup(
+                let mut kill_event_queued = false;
+                if let Some(event) = pending_kill_event {
+                    match try_enqueue_reliable(&reliable_tx, || encode_kill_event(event).to_vec()) {
+                        Ok(true) => {
+                            next_kill_event_sequence = event.sequence.wrapping_add(1);
+                            kill_event_queued = true;
+                        }
+                        Ok(false) => {}
+                        Err(ReliableQueueError::Closed) => {
+                            bail!("reliable frame writer is unavailable")
+                        }
+                    }
+                }
+                if !kill_event_queued && should_enqueue_reliable_catchup(
                     background_deadline_misses,
                     omitted_due_to_budget,
                     game.reliable_write_delay,
@@ -523,9 +579,9 @@ async fn handle_connection(
     }
 }
 
-async fn send_reliable_snapshot(stream: &mut SendStream, payload: &[u8]) -> Result<()> {
+async fn send_reliable_frame(stream: &mut SendStream, payload: &[u8]) -> Result<()> {
     if payload.len() > u16::MAX as usize {
-        bail!("reliable snapshot exceeds 65535-byte frame limit");
+        bail!("reliable payload exceeds 65535-byte frame limit");
     }
     let mut framed = Vec::with_capacity(2 + payload.len());
     framed.extend_from_slice(&(payload.len() as u16).to_le_bytes());
@@ -533,7 +589,7 @@ async fn send_reliable_snapshot(stream: &mut SendStream, payload: &[u8]) -> Resu
     stream
         .write_all(&framed)
         .await
-        .context("write reliable snapshot frame")
+        .context("write reliable frame")
 }
 
 fn advance_snapshot_ack(
@@ -642,6 +698,53 @@ mod tests {
         }
         assert_eq!(pending.len(), MAX_PENDING_INPUT_ACKS);
         assert_eq!(pending.front().copied(), Some((4, 4)));
+    }
+
+    #[test]
+    fn kill_event_history_is_join_scoped_ordered_and_bounded() {
+        let mut state = GameState::new(0, 0);
+        let first_join_cursor = state.next_kill_event_sequence;
+        state.record_combat_events(&[
+            CombatEvent::Death {
+                fighter: 2,
+                killer: 1,
+            },
+            CombatEvent::Death {
+                fighter: 2,
+                killer: 3,
+            },
+        ]);
+
+        assert_eq!(
+            state.kill_event_for_cursor(first_join_cursor),
+            Some(KillEventPacket {
+                sequence: 0,
+                killer: 1,
+                victim: 2,
+            })
+        );
+        assert_eq!(
+            state.kill_event_for_cursor(1),
+            Some(KillEventPacket {
+                sequence: 1,
+                killer: 3,
+                victim: 2,
+            })
+        );
+        let late_join_cursor = state.next_kill_event_sequence;
+        assert_eq!(state.kill_event_for_cursor(late_join_cursor), None);
+
+        for sequence in 0..(MAX_KILL_EVENT_HISTORY as u32 + 2) {
+            state.record_combat_events(&[CombatEvent::Death {
+                fighter: 10 + sequence,
+                killer: 9,
+            }]);
+        }
+        assert_eq!(state.kill_events.len(), MAX_KILL_EVENT_HISTORY);
+        assert_eq!(
+            state.kill_event_for_cursor(late_join_cursor),
+            state.kill_events.front().copied()
+        );
     }
 
     #[test]

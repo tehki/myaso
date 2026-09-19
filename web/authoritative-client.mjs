@@ -4,6 +4,7 @@ import { applySnapshotPacketInPlace, createSnapshotApplyResult } from "../src/br
 import { NETWORK, PACKET_TYPE } from "../src/network/constants.mjs";
 import { decodeSnapshot, SNAPSHOT_FIELDS } from "../src/network/snapshot-codec.mjs";
 import { decodeInputAck } from "../src/network/input-ack-codec.mjs";
+import { decodeKillEvent } from "../src/network/kill-event-codec.mjs";
 import { encodeInputPacket } from "../src/network/input-codec.mjs";
 import { isSequenceNewer16 } from "../src/network/sequence.mjs";
 import { connectGameTransport } from "./network-transport.mjs";
@@ -15,6 +16,7 @@ export async function connectAuthoritativeClient({
   onSnapshot,
   onAck,
   onReliableSnapshot,
+  onKillEvent,
   onProtocolError,
 } = {}) {
   const state = new Map();
@@ -79,7 +81,12 @@ export async function connectAuthoritativeClient({
   function handleReliablePacket(packet) {
     try {
       const bytes = asUint8Array(packet);
-      if (bytes.length < 2 || bytes[1] !== PACKET_TYPE.SNAPSHOT) return;
+      if (bytes.length < 2) return;
+      if (bytes[1] === PACKET_TYPE.KILL_EVENT) {
+        onKillEvent?.(decodeKillEvent(bytes));
+        return;
+      }
+      if (bytes[1] !== PACKET_TYPE.SNAPSHOT) return;
       const { mergedIds, removedIds, advancedIds } = mergeReliableSnapshotPacketInPlace(
         state,
         reliableMergeState,

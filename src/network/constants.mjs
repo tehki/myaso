@@ -35,6 +35,7 @@ export const PACKET_TYPE = Object.freeze({
   INPUT: 1,
   SNAPSHOT: 2,
   INPUT_ACK: 3,
+  KILL_EVENT: 4,
 });
 
 export const SNAPSHOT_FLAG = Object.freeze({

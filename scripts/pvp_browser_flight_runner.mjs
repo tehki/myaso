@@ -8,7 +8,7 @@ import { setTimeout as sleep } from "node:timers/promises";
 const root = process.cwd();
 const durationMs = Number(process.env.MYASO_PVP_FLIGHT_DURATION_MS ?? 7000);
 const scenario = process.env.MYASO_PVP_SCENARIO ?? "damage";
-if (!new Set(["damage", "parry", "dodge", "block", "guardbreak", "backblock", "respawn", "ui", "uirespawn", "uifeedback", "uihittell", "uivitals", "uiidentity", "uiscore", "uimatch", "uirematch", "uiffa3", "uiparry", "uistun", "uiguardbreak", "uidodge", "uirecovery", "uirecoverytell", "uiattackintent", "uiguardbreaktell", "uiparrytell", "uiblockfacingtell", "uidodgetell", "uideathtell"]).has(scenario)) throw new Error(`unsupported MYASO_PVP_SCENARIO: ${scenario}`);
+if (!new Set(["damage", "parry", "dodge", "block", "guardbreak", "backblock", "respawn", "ui", "uirespawn", "uifeedback", "uihittell", "uivitals", "uiidentity", "uiscore", "uimatch", "uirematch", "uiffa3", "uikillfeed", "uiparry", "uistun", "uiguardbreak", "uidodge", "uirecovery", "uirecoverytell", "uiattackintent", "uiguardbreaktell", "uiparrytell", "uiblockfacingtell", "uidodgetell", "uideathtell"]).has(scenario)) throw new Error(`unsupported MYASO_PVP_SCENARIO: ${scenario}`);
 const staticPort = Number(process.env.MYASO_PVP_FLIGHT_HTTP_PORT ?? 4174);
 const browsers = [
   {
@@ -32,7 +32,7 @@ const browsers = [
     },
   },
 ];
-if (scenario === "uiffa3") {
+if (scenario === "uiffa3" || scenario === "uikillfeed") {
   browsers.push({
     name: "chrome2",
     port: 9517,
@@ -86,6 +86,9 @@ try {
   } else if (scenario === "uiffa3") {
     const results = await runOnlineUiThreePlayerFfaFlight(sessions);
     console.log(`M51_THREE_PLAYER_FFA ${JSON.stringify({ ok: true, results })}`);
+  } else if (scenario === "uikillfeed") {
+    const results = await runOnlineUiKillFeedFlight(sessions);
+    console.log(`M52_AUTHORITATIVE_KILL_FEED ${JSON.stringify({ ok: true, results })}`);
   } else if (scenario === "uiparry") {
     const results = await runOnlineUiParryFlight(sessions);
     console.log(`M33_ONLINE_PARRY_FEEDBACK ${JSON.stringify({ ok: true, results })}`);
@@ -219,7 +222,7 @@ async function startBrowser(browser) {
 }
 
 async function navigate(session, gameUrl, certificateHash) {
-  const page = scenario === "ui" || scenario === "uirespawn" || scenario === "uifeedback" || scenario === "uihittell" || scenario === "uivitals" || scenario === "uiidentity" || scenario === "uiscore" || scenario === "uimatch" || scenario === "uirematch" || scenario === "uiffa3" || scenario === "uiparry" || scenario === "uistun" || scenario === "uiguardbreak" || scenario === "uidodge" || scenario === "uirecovery" || scenario === "uirecoverytell" || scenario === "uiattackintent" || scenario === "uiguardbreaktell" || scenario === "uiparrytell" || scenario === "uiblockfacingtell" || scenario === "uidodgetell" || scenario === "uideathtell" ? "index.html" : "pvp-flight.html";
+  const page = scenario === "ui" || scenario === "uirespawn" || scenario === "uifeedback" || scenario === "uihittell" || scenario === "uivitals" || scenario === "uiidentity" || scenario === "uiscore" || scenario === "uimatch" || scenario === "uirematch" || scenario === "uiffa3" || scenario === "uikillfeed" || scenario === "uiparry" || scenario === "uistun" || scenario === "uiguardbreak" || scenario === "uidodge" || scenario === "uirecovery" || scenario === "uirecoverytell" || scenario === "uiattackintent" || scenario === "uiguardbreaktell" || scenario === "uiparrytell" || scenario === "uiblockfacingtell" || scenario === "uidodgetell" || scenario === "uideathtell" ? "index.html" : "pvp-flight.html";
   const url = new URL(`http://127.0.0.1:${staticPort}/web/${page}`);
   url.searchParams.set("server", gameUrl);
   url.searchParams.set("cert", certificateHash);
@@ -1022,6 +1025,113 @@ async function runOnlineUiThreePlayerFfaFlight(entries) {
     throw new Error(`M51 damage was not isolated to the middle fighter: ${JSON.stringify(secondHit)}`);
   }
   return secondHit;
+}
+
+async function runOnlineUiKillFeedFlight(entries) {
+  if (entries.length !== 3) throw new Error(`M52 expected three real browser clients, received ${entries.length}`);
+  await Promise.all(entries.map(installUiObserver));
+  const ready = await waitForUiReady(entries);
+  const ordered = ready.slice().sort((a, b) => a.playerNetId - b.playerNetId);
+  const ids = ordered.map((entry) => entry.playerNetId);
+  if (ids.length !== 3 || new Set(ids).size !== 3) {
+    throw new Error(`M52 did not resolve three authoritative identities: ${JSON.stringify(ready)}`);
+  }
+  const left = entries.find((entry) => entry.name === ordered[0].browser);
+  const center = entries.find((entry) => entry.name === ordered[1].browser);
+  const right = entries.find((entry) => entry.name === ordered[2].browser);
+  if (!left || !center || !right) throw new Error(`M52 could not map three FFA roles: ${JSON.stringify(ready)}`);
+
+  await waitForUiThreePlayerReady(entries, ids, 2500);
+  await Promise.all(entries.map((entry) => execute(entry.base, entry.sessionId, "document.querySelector('#arena').focus(); return document.activeElement?.id;")));
+  const leftArena = await resolveArenaElement(left, "M52 left killer");
+  const rightArena = await resolveArenaElement(right, "M52 right killer");
+  const leftId = ordered[0].playerNetId;
+  const centerId = ordered[1].playerNetId;
+  const rightId = ordered[2].playerNetId;
+
+  await pulseMovementKey(left, "d", 120);
+  let firstKill = null;
+  for (let attempt = 0; attempt < 8 && !firstKill; attempt += 1) {
+    await performArenaAttack(left, leftArena, 200);
+    firstKill = await waitForUiKillFeedEvidence(
+      entries,
+      ids,
+      center,
+      0,
+      [{ killer: leftId, victim: centerId }],
+      new Map([[leftId, 1], [centerId, 0], [rightId, 0]]),
+      850,
+      false,
+    );
+    if (!firstKill) await pulseMovementKey(left, "d", 60);
+  }
+  if (!firstKill) {
+    firstKill = await waitForUiKillFeedEvidence(
+      entries,
+      ids,
+      center,
+      0,
+      [{ killer: leftId, victim: centerId }],
+      new Map([[leftId, 1], [centerId, 0], [rightId, 0]]),
+      1400,
+      true,
+    );
+  }
+
+  await waitForUiKillFeedEvidence(
+    entries,
+    ids,
+    center,
+    100,
+    [{ killer: leftId, victim: centerId }],
+    new Map([[leftId, 1], [centerId, 0], [rightId, 0]]),
+    3000,
+    true,
+  );
+
+  await pulseMovementKey(left, "a", 260);
+  await pulseMovementKey(right, "a", 120);
+  let secondKill = null;
+  for (let attempt = 0; attempt < 8 && !secondKill; attempt += 1) {
+    await performArenaAttack(right, rightArena, -200);
+    secondKill = await waitForUiKillFeedEvidence(
+      entries,
+      ids,
+      center,
+      0,
+      [{ killer: rightId, victim: centerId }, { killer: leftId, victim: centerId }],
+      new Map([[leftId, 1], [centerId, 0], [rightId, 1]]),
+      850,
+      false,
+    );
+    if (!secondKill) await pulseMovementKey(right, "a", 60);
+  }
+  if (!secondKill) {
+    secondKill = await waitForUiKillFeedEvidence(
+      entries,
+      ids,
+      center,
+      0,
+      [{ killer: rightId, victim: centerId }, { killer: leftId, victim: centerId }],
+      new Map([[leftId, 1], [centerId, 0], [rightId, 1]]),
+      1400,
+      true,
+    );
+  }
+
+  for (const state of secondKill) {
+    const rows = state.killFeedRows;
+    if (rows.length !== 2 || rows[0].sequence !== ((rows[1].sequence + 1) >>> 0)) {
+      throw new Error(`M52 reliable kill-event ordering was not consecutive: ${JSON.stringify(state)}`);
+    }
+    if (rows[0].killerOwn !== (state.playerNetId === rightId)
+      || rows[0].victimOwn !== (state.playerNetId === centerId)
+      || rows[1].killerOwn !== (state.playerNetId === leftId)
+      || rows[1].victimOwn !== (state.playerNetId === centerId)) {
+      throw new Error(`M52 kill-feed local identity markers were incorrect: ${JSON.stringify(state)}`);
+    }
+  }
+  return secondKill;
 }
 
 async function runOnlineUiDeathTellFlight(entries) {
@@ -1827,6 +1937,38 @@ async function waitForUiThreePlayerDamage(entries, target, expectedHp, ids, time
   throw new Error(`M51 target did not reach authoritative HP ${expectedHp}: ${JSON.stringify(await Promise.all(entries.map(readUiEvidence)))}`);
 }
 
+async function waitForUiKillFeedEvidence(
+  entries,
+  ids,
+  target,
+  expectedTargetHp,
+  expectedFeed,
+  expectedScores,
+  timeoutMs,
+  fail = true,
+) {
+  const deadline = Date.now() + timeoutMs;
+  const expectedScoreRows = ids
+    .map((id) => ({ label: `#${id}`, kills: expectedScores.get(id) ?? 0 }))
+    .sort((a, b) => b.kills - a.kills || Number(a.label.slice(1)) - Number(b.label.slice(1)));
+  while (Date.now() < deadline) {
+    const states = await Promise.all(entries.map(readUiEvidence));
+    const targetState = states.find((entry) => entry.browser === target.name);
+    const feedReady = states.every((entry) => entry.killFeedRows?.length === expectedFeed.length
+      && expectedFeed.every((expected, index) => entry.killFeedRows[index]?.text === `#${expected.killer} defeated #${expected.victim}`));
+    const scoreReady = states.every((entry) => entry.scoreboardRows?.length === expectedScoreRows.length
+      && expectedScoreRows.every((expected, index) => entry.scoreboardRows[index]?.label === expected.label
+        && entry.scoreboardRows[index]?.kills === expected.kills));
+    const targetReady = targetState?.playerHp === expectedTargetHp
+      && (expectedTargetHp === 0 || !targetState.overlayVisible);
+    const noMatchOverlay = states.every((entry) => entry.overlayTitle !== "VICTORY" && entry.overlayTitle !== "MATCH OVER");
+    if (feedReady && scoreReady && targetReady && noMatchOverlay) return states;
+    await sleep(50);
+  }
+  if (!fail) return null;
+  throw new Error(`M52 kill feed did not converge with authoritative score/death state: ${JSON.stringify(await Promise.all(entries.map(readUiEvidence)))}`);
+}
+
 async function waitForUiMatchResetEvidence(entries, timeoutMs) {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
@@ -1917,6 +2059,12 @@ async function readUiEvidence(session) {
         label: row.querySelector('span')?.textContent?.trim() ?? '',
         kills: Number(row.querySelector('b')?.textContent ?? NaN),
         own: row.dataset.own === 'true',
+      })),
+      killFeedRows: [...document.querySelectorAll('#kill-feed-list li')].map((row) => ({
+        sequence: Number(row.dataset.sequence ?? NaN),
+        text: row.textContent?.trim() ?? '',
+        killerOwn: row.dataset.killerOwn === 'true',
+        victimOwn: row.dataset.victimOwn === 'true',
       })),
       overlayVisible: !document.querySelector('#combat-overlay')?.hidden,
       overlayTitle: document.querySelector('#combat-overlay-title')?.textContent?.trim() ?? '',

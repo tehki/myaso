@@ -1,5 +1,5 @@
 import { createFrameBudget } from "../src/browser/frame-budget.mjs";
-import { COMBAT_ACTION, blockSpatialPresentation, combatActionHint, combatOverlayPresentation, createCombatReadabilityTracker, createRemoteDamageTracker, fighterIdentityPresentation, fighterMatchPresentation, fighterScoreboardPresentation, fighterVitalsPresentation, guardBreakSpatialPresentation, opponentRecoveryPresentation, parrySpatialPresentation } from "../src/browser/combat-readability.mjs";
+import { COMBAT_ACTION, blockSpatialPresentation, combatActionHint, combatOverlayPresentation, createCombatReadabilityTracker, createRemoteDamageTracker, fighterIdentityPresentation, fighterMatchPresentation, fighterScoreboardPresentation, fighterVitalsPresentation, guardBreakSpatialPresentation, killFeedPresentation, opponentRecoveryPresentation, parrySpatialPresentation } from "../src/browser/combat-readability.mjs";
 import { COMBAT } from "../src/combat/model.mjs";
 import { reconcilePrediction } from "../src/browser/reconciliation.mjs";
 import { NETWORK } from "../src/network/constants.mjs";
@@ -10,6 +10,7 @@ const ctx = canvas.getContext("2d", { alpha: false });
 const eventText = document.querySelector("#event-text");
 const arenaStage = document.querySelector(".arena-stage");
 const scoreboardList = document.querySelector("#scoreboard-list");
+const killFeedList = document.querySelector("#kill-feed-list");
 const hud = {
   playerHp: document.querySelector("#player-hp"),
   playerHpValue: document.querySelector("#player-hp-value"),
@@ -38,6 +39,8 @@ let combatMessage = null;
 let combatMessageUntil = 0;
 let combatFeedbackTimer = 0;
 let matchOver = false;
+const killFeedEntries = [];
+const killFeedSequences = new Set();
 
 const params = new URLSearchParams(window.location.search);
 const server = params.get("server");
@@ -101,6 +104,9 @@ networkClient = await connectAuthoritativeClient({
   onReliableSnapshot(_result, state) {
     observeCombatState(state);
   },
+  onKillEvent(event) {
+    recordKillEvent(event);
+  },
   onAck() {
     const ownId = networkClient?.playerNetId;
     const own = ownId ? networkClient.state.get(ownId) : null;
@@ -125,7 +131,10 @@ function observeCombatState(state) {
     releaseInputs();
   } else if (!match.visible && matchOver) {
     const rows = fighterScoreboardPresentation(state.values(), ownId);
-    if (rows.length > 0 && rows.every((row) => row.kills === 0)) matchOver = false;
+    if (rows.length > 0 && rows.every((row) => row.kills === 0)) {
+      matchOver = false;
+      clearKillFeed();
+    }
   }
   const now = performance.now();
   remoteDamage.observe(state, ownId, now);
@@ -135,6 +144,38 @@ function observeCombatState(state) {
   combatMessageUntil = now + event.durationMs;
   setStatus(combatMessage);
   showCombatFeedback(event.feedback);
+}
+
+function recordKillEvent(event) {
+  if (!killFeedList || killFeedSequences.has(event?.sequence)) return;
+  const ownId = networkClient?.playerNetId ?? 0;
+  const presentation = killFeedPresentation(event, ownId);
+  if (!presentation.visible) return;
+  killFeedSequences.add(event.sequence);
+  killFeedEntries.unshift({ sequence: event.sequence, ...presentation });
+  while (killFeedEntries.length > 4) {
+    const removed = killFeedEntries.pop();
+    killFeedSequences.delete(removed.sequence);
+  }
+  renderKillFeed();
+}
+
+function renderKillFeed() {
+  if (!killFeedList) return;
+  killFeedList.replaceChildren(...killFeedEntries.map((entry) => {
+    const item = document.createElement("li");
+    item.dataset.sequence = String(entry.sequence);
+    item.dataset.killerOwn = String(entry.killerOwn);
+    item.dataset.victimOwn = String(entry.victimOwn);
+    item.textContent = entry.text;
+    return item;
+  }));
+}
+
+function clearKillFeed() {
+  killFeedEntries.length = 0;
+  killFeedSequences.clear();
+  renderKillFeed();
 }
 
 function showCombatFeedback(feedback) {
