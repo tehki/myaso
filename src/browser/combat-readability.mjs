@@ -167,6 +167,20 @@ export function fighterIdentityPresentation(netId) {
   return { visible: true, label: `#${netId}` };
 }
 
+export function killFeedPresentation(event, ownId = 0) {
+  const killer = event?.killer;
+  const victim = event?.victim;
+  if (!Number.isInteger(killer) || killer <= 0 || !Number.isInteger(victim) || victim <= 0 || killer === victim) {
+    return { visible: false, text: "", killerOwn: false, victimOwn: false };
+  }
+  return {
+    visible: true,
+    text: `#${killer} defeated #${victim}`,
+    killerOwn: killer === ownId,
+    victimOwn: victim === ownId,
+  };
+}
+
 export const FFA_KILL_TARGET = 2;
 
 export function fighterScoreboardPresentation(entities, ownId = 0) {
