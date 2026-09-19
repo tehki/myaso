@@ -121,3 +121,18 @@ M36 therefore now coordinates its two genuine inputs without serial WebDriver ro
 - the existing three-attempt fail-closed behavior and clean-vitals/parry guards remain unchanged.
 
 This is harness timing only. Dodge duration, iframe duration, attack windup/active/recovery, movement, hit detection, and acceptance criteria are unchanged.
+
+### M53 post-hit focus correction
+
+CI #198 validated the new concurrent M36 timing and the M52 death-first convergence fix, then exposed an inherited M53 expectation bug.
+
+After fighter #1 moves toward #2 and lands the authoritative 34 HP strike, combat knockback moves #2 18 world units toward #3. At that converged geometry #3 is closer to #2 than #1 is, so #2 correctly changes its nearest-rival focus from #1 to #3. The old M53 harness expected #2 to remain focused on #1; while waiting for that impossible state it kept attacking until #2 died.
+
+The corrected acceptance now:
+
+- expects #2 to focus #3 after the authoritative knockback;
+- still requires #1 and #3 to focus damaged #2 at 66 HP;
+- stops issuing attacks as soon as the first authoritative 66 HP state is proven;
+- then waits separately for focus-HUD convergence.
+
+No focus algorithm, knockback, damage, movement, or gameplay state is changed. The correction aligns the acceptance with the already-authoritative post-hit geometry and prevents retry amplification.

@@ -1054,6 +1054,7 @@ async function runOnlineUiFocusHudFlight(entries) {
 
   const leftId = ordered[0].playerNetId;
   const centerId = ordered[1].playerNetId;
+  const rightId = ordered[2].playerNetId;
   const expectedReady = new Map([
     [left.name, { label: `NEAREST #${centerId}`, hp: 100, playerHp: 100 }],
     [center.name, { label: `NEAREST #${leftId}`, hp: 100, playerHp: 100 }],
@@ -1067,14 +1068,21 @@ async function runOnlineUiFocusHudFlight(entries) {
 
   const expectedDamage = new Map([
     [left.name, { label: `NEAREST #${centerId}`, hp: 66, playerHp: 100 }],
-    [center.name, { label: `NEAREST #${leftId}`, hp: 100, playerHp: 66 }],
+    [center.name, { label: `NEAREST #${rightId}`, hp: 100, playerHp: 66 }],
     [right.name, { label: `NEAREST #${centerId}`, hp: 66, playerHp: 100 }],
   ]);
   let evidence = null;
   for (let attempt = 0; attempt < 3 && !evidence; attempt += 1) {
     await performArenaAttack(left, leftArena, 200);
-    evidence = await waitForUiFocusHudEvidence(entries, expectedDamage, ids, 850, false);
-    if (!evidence) await pulseMovementKey(left, "d", 60);
+    evidence = await waitForUiFocusHudEvidence(entries, expectedDamage, ids, 650, false);
+    if (!evidence) {
+      const damage = await waitForUiThreePlayerDamage(entries, center, 66, ids, 300, false);
+      if (damage) {
+        evidence = await waitForUiFocusHudEvidence(entries, expectedDamage, ids, 1200, true);
+        break;
+      }
+      await pulseMovementKey(left, "d", 60);
+    }
   }
   if (!evidence) evidence = await waitForUiFocusHudEvidence(entries, expectedDamage, ids, 1200, true);
 
