@@ -8,7 +8,7 @@ import { setTimeout as sleep } from "node:timers/promises";
 const root = process.cwd();
 const durationMs = Number(process.env.MYASO_PVP_FLIGHT_DURATION_MS ?? 7000);
 const scenario = process.env.MYASO_PVP_SCENARIO ?? "damage";
-if (!new Set(["damage", "parry", "dodge", "block", "guardbreak", "backblock", "respawn", "ui", "uirespawn", "uifeedback", "uihittell", "uivitals", "uiidentity", "uiscore", "uimatch", "uirematch", "uiffa3", "uikillfeed", "uifocus", "uithreat", "uiparry", "uistun", "uiguardbreak", "uidodge", "uirecovery", "uirecoverytell", "uiattackintent", "uiguardbreaktell", "uiparrytell", "uiblockfacingtell", "uidodgetell", "uideathtell"]).has(scenario)) throw new Error(`unsupported MYASO_PVP_SCENARIO: ${scenario}`);
+if (!new Set(["damage", "parry", "dodge", "block", "guardbreak", "backblock", "respawn", "ui", "uirespawn", "uifeedback", "uihittell", "uivitals", "uiidentity", "uiscore", "uimatch", "uirematch", "uiffa3", "uikillfeed", "uifocus", "uithreat", "uimultithreat", "uiparry", "uistun", "uiguardbreak", "uidodge", "uirecovery", "uirecoverytell", "uiattackintent", "uiguardbreaktell", "uiparrytell", "uiblockfacingtell", "uidodgetell", "uideathtell"]).has(scenario)) throw new Error(`unsupported MYASO_PVP_SCENARIO: ${scenario}`);
 const staticPort = Number(process.env.MYASO_PVP_FLIGHT_HTTP_PORT ?? 4174);
 const browsers = [
   {
@@ -32,7 +32,7 @@ const browsers = [
     },
   },
 ];
-if (scenario === "uiffa3" || scenario === "uikillfeed" || scenario === "uifocus" || scenario === "uithreat") {
+if (scenario === "uiffa3" || scenario === "uikillfeed" || scenario === "uifocus" || scenario === "uithreat" || scenario === "uimultithreat") {
   browsers.push({
     name: "chrome2",
     port: 9517,
@@ -95,6 +95,9 @@ try {
   } else if (scenario === "uithreat") {
     const results = await runOnlineUiThreatAwarenessFlight(sessions);
     console.log(`M54_FFA_INCOMING_THREAT ${JSON.stringify({ ok: true, results })}`);
+  } else if (scenario === "uimultithreat") {
+    const results = await runOnlineUiMultiThreatFlight(sessions);
+    console.log(`M55_FFA_MULTI_THREAT ${JSON.stringify({ ok: true, results })}`);
   } else if (scenario === "uiparry") {
     const results = await runOnlineUiParryFlight(sessions);
     console.log(`M33_ONLINE_PARRY_FEEDBACK ${JSON.stringify({ ok: true, results })}`);
@@ -228,7 +231,7 @@ async function startBrowser(browser) {
 }
 
 async function navigate(session, gameUrl, certificateHash) {
-  const page = scenario === "ui" || scenario === "uirespawn" || scenario === "uifeedback" || scenario === "uihittell" || scenario === "uivitals" || scenario === "uiidentity" || scenario === "uiscore" || scenario === "uimatch" || scenario === "uirematch" || scenario === "uiffa3" || scenario === "uikillfeed" || scenario === "uifocus" || scenario === "uithreat" || scenario === "uiparry" || scenario === "uistun" || scenario === "uiguardbreak" || scenario === "uidodge" || scenario === "uirecovery" || scenario === "uirecoverytell" || scenario === "uiattackintent" || scenario === "uiguardbreaktell" || scenario === "uiparrytell" || scenario === "uiblockfacingtell" || scenario === "uidodgetell" || scenario === "uideathtell" ? "index.html" : "pvp-flight.html";
+  const page = scenario === "ui" || scenario === "uirespawn" || scenario === "uifeedback" || scenario === "uihittell" || scenario === "uivitals" || scenario === "uiidentity" || scenario === "uiscore" || scenario === "uimatch" || scenario === "uirematch" || scenario === "uiffa3" || scenario === "uikillfeed" || scenario === "uifocus" || scenario === "uithreat" || scenario === "uimultithreat" || scenario === "uiparry" || scenario === "uistun" || scenario === "uiguardbreak" || scenario === "uidodge" || scenario === "uirecovery" || scenario === "uirecoverytell" || scenario === "uiattackintent" || scenario === "uiguardbreaktell" || scenario === "uiparrytell" || scenario === "uiblockfacingtell" || scenario === "uidodgetell" || scenario === "uideathtell" ? "index.html" : "pvp-flight.html";
   const url = new URL(`http://127.0.0.1:${staticPort}/web/${page}`);
   url.searchParams.set("server", gameUrl);
   url.searchParams.set("cert", certificateHash);
@@ -1158,6 +1161,89 @@ async function runOnlineUiThreatAwarenessFlight(entries) {
   return evidence;
 }
 
+async function runOnlineUiMultiThreatFlight(entries) {
+  if (entries.length !== 3) throw new Error(`M55 expected three real browser clients, received ${entries.length}`);
+  await Promise.all(entries.map(installUiObserver));
+  const ready = await waitForUiReady(entries);
+  const ordered = ready.slice().sort((a, b) => a.playerNetId - b.playerNetId);
+  const ids = ordered.map((entry) => entry.playerNetId);
+  if (ids.length !== 3 || new Set(ids).size !== 3) {
+    throw new Error(`M55 did not resolve three authoritative identities: ${JSON.stringify(ready)}`);
+  }
+  const left = entries.find((entry) => entry.name === ordered[0].browser);
+  const center = entries.find((entry) => entry.name === ordered[1].browser);
+  const right = entries.find((entry) => entry.name === ordered[2].browser);
+  if (!left || !center || !right) throw new Error(`M55 could not map three FFA roles: ${JSON.stringify(ready)}`);
+
+  await waitForUiThreePlayerReady(entries, ids, 2500);
+  await Promise.all(entries.map((entry) => execute(entry.base, entry.sessionId, "document.querySelector('#arena').focus(); return document.activeElement?.id;")));
+  const [leftArena, rightArena] = await Promise.all([
+    resolveArenaElement(left, "M55 left threat attacker"),
+    resolveArenaElement(right, "M55 right threat attacker"),
+  ]);
+  await Promise.all([
+    pulseMovementKey(left, "d", 120),
+    pulseMovementKey(right, "a", 120),
+  ]);
+
+  const leftId = ordered[0].playerNetId;
+  const rightId = ordered[2].playerNetId;
+  let evidence = null;
+  for (let attempt = 0; attempt < 3 && !evidence; attempt += 1) {
+    await Promise.all([
+      performArenaAttack(left, leftArena, 200),
+      performArenaAttack(right, rightArena, -200),
+    ]);
+    await sleep(280);
+    const states = await Promise.all(entries.map(readUiEvidence));
+    const leftState = states.find((entry) => entry.browser === left.name);
+    const centerState = states.find((entry) => entry.browser === center.name);
+    const rightState = states.find((entry) => entry.browser === right.name);
+    if (!leftState || !centerState || !rightState) {
+      throw new Error(`M55 incomplete multi-threat evidence: ${JSON.stringify(states)}`);
+    }
+
+    const multiThreat = centerState.threatTransitions.find((event) =>
+      event.visible
+      && event.count === "2 THREATS"
+      && (event.label === `#${leftId}` || event.label === `#${rightId}`)
+      && (event.state === "windup" || event.state === "strike"));
+    const leakedMultiThreat = [leftState, rightState].some((state) =>
+      state.threatTransitions.some((event) => event.visible && event.count === "2 THREATS"));
+    if (leakedMultiThreat) {
+      throw new Error(`M55 multi-threat count leaked to an attacker client: ${JSON.stringify(states)}`);
+    }
+    if (multiThreat) {
+      const leftPointer = leftState.pointers.some((event) => event.type === "pointerdown" && event.button === 0);
+      const rightPointer = rightState.pointers.some((event) => event.type === "pointerdown" && event.button === 0);
+      if (!leftPointer || !rightPointer) {
+        throw new Error(`M55 multi-threat proof lacked two real pointer commits: ${JSON.stringify(states)}`);
+      }
+      evidence = states;
+      break;
+    }
+
+    if (centerState.playerHp < 100) {
+      throw new Error(`M55 authoritative attacks resolved without simultaneous-threat UI evidence: ${JSON.stringify(states)}`);
+    }
+    if (leftState.playerHp !== 100 || rightState.playerHp !== 100) {
+      throw new Error(`M55 retry ${attempt + 1} damaged a non-target fighter: ${JSON.stringify(states)}`);
+    }
+    await sleep(520);
+    if (attempt < 2) {
+      await Promise.all([
+        pulseMovementKey(left, "d", 35),
+        pulseMovementKey(right, "a", 35),
+      ]);
+    }
+  }
+
+  if (!evidence) {
+    throw new Error(`M55 never observed two simultaneous authoritative threats: ${JSON.stringify(await Promise.all(entries.map(readUiEvidence)))}`);
+  }
+  return evidence;
+}
+
 async function runOnlineUiKillFeedFlight(entries) {
   if (entries.length !== 3) throw new Error(`M52 expected three real browser clients, received ${entries.length}`);
   await Promise.all(entries.map(installUiObserver));
@@ -1403,7 +1489,8 @@ async function installUiObserver(session) {
     const overlay = document.querySelector('#combat-overlay');
     const recovery = document.querySelector('#opponent-recovery');
     const threat = document.querySelector('#threat-cue');
-    if (!target || !arena || !arenaStage || !overlay || !recovery || !threat) throw new Error('missing online UI flight target');
+    const threatCount = document.querySelector('#threat-count');
+    if (!target || !arena || !arenaStage || !overlay || !recovery || !threat || !threatCount) throw new Error('missing online UI flight target');
     const state = { events: [], keys: [], pointers: [], overlayTransitions: [], feedbackTransitions: [], recoveryTransitions: [], threatTransitions: [], recoveryTellMaxPixels: 0, parryTellMaxPixels: 0, online: '', startedAt: performance.now() };
     const record = () => {
       const text = target.textContent?.trim() ?? '';
@@ -1441,6 +1528,7 @@ async function installUiObserver(session) {
         state: threat.dataset.state ?? '',
         label: document.querySelector('#threat-label')?.textContent?.trim() ?? '',
         phase: document.querySelector('#threat-phase')?.textContent?.trim() ?? '',
+        count: threatCount.hidden ? '' : (threatCount.textContent?.trim() ?? ''),
       };
       const previous = state.threatTransitions.at(-1);
       if (!previous || Object.keys(entry).some((key) => previous[key] !== entry[key])) state.threatTransitions.push(entry);
@@ -2283,6 +2371,7 @@ async function readUiEvidence(session) {
       threatState: document.querySelector('#threat-cue')?.dataset.state ?? '',
       threatLabel: document.querySelector('#threat-label')?.textContent?.trim() ?? '',
       threatPhase: document.querySelector('#threat-phase')?.textContent?.trim() ?? '',
+      threatCount: document.querySelector('#threat-count')?.hidden ? '' : (document.querySelector('#threat-count')?.textContent?.trim() ?? ''),
       threatTransitions: (state.threatTransitions ?? []).slice(),
       recoveryTellMaxPixels: Number(state.recoveryTellMaxPixels ?? 0),
       parryTellMaxPixels: Number(state.parryTellMaxPixels ?? 0),
