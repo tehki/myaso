@@ -76,6 +76,23 @@ If authoritative damage resolves before the required simultaneous-threat evidenc
 
 No position, action, damage, or combat state is injected.
 
+## Inherited M36 acceptance stabilization
+
+Quality run #210 / `35515631025` stopped twice at inherited M36 before M58 executed.
+
+Both failures had the same fail-closed signature:
+
+- M24 authoritative dodge acceptance had already passed on the same exact head;
+- Firefox recorded genuine `KeyS` + `Space` down/up controls;
+- Chrome recorded a genuine left-mouse attack;
+- the authoritative strike still landed for 34 HP before the M36 dodge overlap was established.
+
+The previous M36 choreography launched the Chrome pointer-down and Firefox dodge command concurrently with a 20 ms Firefox driver-side pause. That leaves cross-driver command-start ordering uncontrolled: the dodge can begin too early relative to the attack and exhaust its 118 ms iframe before the 135 ms strike.
+
+The stabilization confirms the attacker pointer-down first, waits 35 ms, then issues the genuine Firefox dodge sequence with no additional driver pause. With both clients sending inputs at 60 Hz, each input can wait at most about 16.7 ms for its next send. The resulting authoritative dodge request is therefore expected roughly 18-52 ms after the attack request: after attack commitment, before the strike, and with the unchanged 118 ms iframe covering the unchanged 135 ms strike.
+
+No server code, attack timing, dodge timing, iframe duration, damage, geometry, feedback threshold, or real-input provenance requirement is changed.
+
 ## Authority / performance boundary
 
 M58 changes browser presentation, deterministic tests, browser acceptance, CI, and documentation only.
