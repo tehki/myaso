@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { COMBAT_ACTION, FFA_KILL_TARGET, blockSpatialPresentation, combatActionHint, combatLifePresentation, combatOverlayPresentation, createCombatReadabilityTracker, createRemoteDamageTracker, fighterFocusNetId, fighterIdentityPresentation, fighterThreatNetId, fighterMatchPresentation, fighterScoreboardPresentation, fighterVitalsPresentation, guardBreakSpatialPresentation, killFeedPresentation, opponentRecoveryPresentation, parrySpatialPresentation } from "../src/browser/combat-readability.mjs";
+import { COMBAT_ACTION, FFA_KILL_TARGET, blockSpatialPresentation, combatActionHint, combatLifePresentation, combatOverlayPresentation, createCombatReadabilityTracker, createRemoteDamageTracker, fighterFocusNetId, fighterIdentityPresentation, fighterThreatBearingLabel, fighterThreatNetId, fighterMatchPresentation, fighterScoreboardPresentation, fighterVitalsPresentation, guardBreakSpatialPresentation, killFeedPresentation, opponentRecoveryPresentation, parrySpatialPresentation } from "../src/browser/combat-readability.mjs";
 
 function fighter(netId, hp = 100, guard = 100, action = COMBAT_ACTION.idle, x = 0, y = 0, facing = 0) {
   return { netId, hp, guard, action, x, y, facing };
@@ -92,6 +92,18 @@ test("FFA focus presentation chooses the nearest living rival with stable tie-br
   entities.get(3).action = COMBAT_ACTION.dead;
   assert.equal(fighterFocusNetId(entities, 1), 0);
   assert.equal(fighterFocusNetId(entities, 99), 0);
+});
+
+test("FFA primary threat bearing uses authoritative replicated positions", () => {
+  const own = fighter(1, 100, 100, COMBAT_ACTION.idle, 100, 100);
+  assert.equal(fighterThreatBearingLabel(own, fighter(2, 100, 100, COMBAT_ACTION.attackWindup, 60, 100)), "FROM LEFT");
+  assert.equal(fighterThreatBearingLabel(own, fighter(2, 100, 100, COMBAT_ACTION.attackWindup, 140, 100)), "FROM RIGHT");
+  assert.equal(fighterThreatBearingLabel(own, fighter(2, 100, 100, COMBAT_ACTION.attackWindup, 100, 60)), "FROM ABOVE");
+  assert.equal(fighterThreatBearingLabel(own, fighter(2, 100, 100, COMBAT_ACTION.attackWindup, 100, 140)), "FROM BELOW");
+  assert.equal(fighterThreatBearingLabel(own, fighter(2, 100, 100, COMBAT_ACTION.attackWindup, 60, 80)), "FROM LEFT");
+  assert.equal(fighterThreatBearingLabel(own, fighter(2, 100, 100, COMBAT_ACTION.attackWindup, 120, 60)), "FROM ABOVE");
+  assert.equal(fighterThreatBearingLabel(own, fighter(2, 100, 100, COMBAT_ACTION.attackWindup, 100, 100)), "");
+  assert.equal(fighterThreatBearingLabel(null, fighter(2)), "");
 });
 
 test("FFA threat presentation identifies the most immediate attacker inside authoritative reach and arc", () => {
