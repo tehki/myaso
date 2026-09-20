@@ -102,7 +102,9 @@ test("FFA primary threat bearing uses authoritative replicated positions", () =>
   assert.equal(fighterThreatBearingLabel(own, fighter(2, 100, 100, COMBAT_ACTION.attackWindup, 100, 140)), "FROM BELOW");
   assert.equal(fighterThreatBearingLabel(own, fighter(2, 100, 100, COMBAT_ACTION.attackWindup, 60, 80)), "FROM LEFT");
   assert.equal(fighterThreatBearingLabel(own, fighter(2, 100, 100, COMBAT_ACTION.attackWindup, 120, 60)), "FROM ABOVE");
+  assert.equal(fighterThreatBearingLabel(own, fighter(2, 100, 100, COMBAT_ACTION.attackWindup, 60, 60)), "FROM LEFT");
   assert.equal(fighterThreatBearingLabel(own, fighter(2, 100, 100, COMBAT_ACTION.attackWindup, 100, 100)), "");
+  assert.equal(fighterThreatBearingLabel(own, { ...fighter(2), x: Number.NaN }), "");
   assert.equal(fighterThreatBearingLabel(null, fighter(2)), "");
 });
 
