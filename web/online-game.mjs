@@ -1,5 +1,5 @@
 import { createFrameBudget } from "../src/browser/frame-budget.mjs";
-import { COMBAT_ACTION, blockSpatialPresentation, combatActionHint, combatOverlayPresentation, createCombatReadabilityTracker, createRemoteDamageTracker, fighterFocusNetId, fighterIdentityPresentation, fighterThreatNetId, fighterMatchPresentation, fighterScoreboardPresentation, fighterVitalsPresentation, guardBreakSpatialPresentation, killFeedPresentation, opponentRecoveryPresentation, parrySpatialPresentation } from "../src/browser/combat-readability.mjs";
+import { COMBAT_ACTION, blockSpatialPresentation, combatActionHint, combatOverlayPresentation, createCombatReadabilityTracker, createRemoteDamageTracker, fighterFocusNetId, fighterIdentityPresentation, fighterThreatBearingLabel, fighterThreatNetId, fighterMatchPresentation, fighterScoreboardPresentation, fighterVitalsPresentation, guardBreakSpatialPresentation, killFeedPresentation, opponentRecoveryPresentation, parrySpatialPresentation } from "../src/browser/combat-readability.mjs";
 import { COMBAT } from "../src/combat/model.mjs";
 import { reconcilePrediction } from "../src/browser/reconciliation.mjs";
 import { NETWORK } from "../src/network/constants.mjs";
@@ -39,10 +39,12 @@ const threatCue = {
   phase: document.querySelector("#threat-phase"),
   countLabel: document.querySelector("#threat-count"),
   secondaryLabel: document.querySelector("#threat-secondary"),
+  bearingLabel: document.querySelector("#threat-bearing"),
   netId: 0,
   state: "",
   count: 0,
   secondaryNetId: 0,
+  bearing: "",
 };
 const threatScan = { count: 0, secondaryNetId: 0 };
 const combatReadability = createCombatReadabilityTracker();
@@ -529,6 +531,8 @@ function updateThreatCue(ownId) {
   const threatCount = threatScan.count;
   const secondaryNetId = threatScan.secondaryNetId;
   const attacker = netId ? networkClient.state.get(netId) : null;
+  const own = ownId ? networkClient.state.get(ownId) : null;
+  const bearing = fighterThreatBearingLabel(own, attacker);
   const state = attacker?.action === COMBAT_ACTION.attackActive ? "strike"
     : attacker?.action === COMBAT_ACTION.attackWindup ? "windup"
       : "";
@@ -539,8 +543,10 @@ function updateThreatCue(ownId) {
     threatCue.state = "";
     threatCue.count = 0;
     threatCue.secondaryNetId = 0;
+    threatCue.bearing = "";
     if (threatCue.countLabel) threatCue.countLabel.hidden = true;
     if (threatCue.secondaryLabel) threatCue.secondaryLabel.hidden = true;
+    if (threatCue.bearingLabel) threatCue.bearingLabel.hidden = true;
     delete threatCue.root.dataset.state;
     return;
   }
@@ -565,8 +571,14 @@ function updateThreatCue(ownId) {
       threatCue.secondaryLabel.textContent = `NEXT #${secondaryNetId}`;
     }
   }
+  if (threatCue.bearingLabel) {
+    const showBearing = Boolean(bearing);
+    if (threatCue.bearingLabel.hidden === showBearing) threatCue.bearingLabel.hidden = !showBearing;
+    if (showBearing && threatCue.bearing !== bearing) threatCue.bearingLabel.textContent = bearing;
+  }
   threatCue.count = threatCount;
   threatCue.secondaryNetId = secondaryNetId;
+  threatCue.bearing = bearing;
 }
 
 function updateCombatOverlay(own, ownId) {
