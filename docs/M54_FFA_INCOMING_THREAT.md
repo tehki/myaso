@@ -114,15 +114,16 @@ Fresh CI #197 on corrected M54 head `bee62357c4a092447d002a3536480068221d98a4` f
 
 M36 first moved to concurrent cross-driver dispatch, but CI #200 and its same-head rerun showed that a 70 ms pause inside Firefox's W3C action sequence still inherited Firefox command-start jitter. Both failures preserved genuine KeyS + Space provenance while the ordinary 34 HP strike landed.
 
-The final M36 choreography anchors the offset on the harness clock instead:
+CI #202 showed that the 50 ms Node-side stagger still left too little margin when Firefox command startup was slow: the exact real KeyS + Space events were delivered, but the strike resolved for 34 HP before authoritative Dodge.
 
-- start Chrome's genuine pointer-down request first;
-- wait 50 ms in Node;
-- dispatch Firefox's genuine KeyS + Space sequence with zero driver-local pre-delay;
+The current M36 choreography therefore maximizes the real-input scheduling margin:
+
+- dispatch Chrome's genuine pointer-down request and Firefox's genuine W3C KeyS + Space sequence concurrently;
+- keep only a 20 ms driver-side pause before the Firefox Dodge keys;
 - keep the critical iframe/strike window free of browser-state polling;
 - retain the existing three-attempt fail-closed behavior and clean-vitals/parry guards.
 
-This is harness timing only. Dodge duration, iframe duration, attack windup/active/recovery, movement, hit detection, and acceptance criteria are unchanged.
+Fresh CI #203 on exact head f812fee18598b2c07330a4a2265d766d49d17ae7 passed M36 with this choreography. This is harness timing only. Dodge duration, 118 ms iframe duration, 135 ms attack windup, attack active/recovery, movement, hit detection, and acceptance criteria are unchanged.
 
 ### M53 post-hit convergence correction
 
