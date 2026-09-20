@@ -528,14 +528,13 @@ async function runOnlineUiDodgeFeedbackFlight(entries) {
 
   let evidence = null;
   let lastAttemptBaseline = null;
-  // M24 owns reaction-timing proof. M36 only needs a deterministic real-input
-  // dodge exchange. Confirm the genuine Chrome pointer-down first, then wait 35 ms before
-  // issuing the genuine Firefox KeyS+Space sequence. At the 60 Hz input cadence each
-  // client can wait at most ~16.7 ms for its next send, so the authoritative Dodge request
-  // arrives roughly 18-52 ms after the attack request: after attack commitment, before the
-  // 135 ms strike, and with the 118 ms Dodge iframe still covering that strike. This
-  // removes cross-driver command-start ordering as a source of flakes without changing
-  // combat timing or acceptance thresholds. No evidence polling runs during the critical
+  // M24 owns reaction-timing proof. M36 dispatches the genuine Chrome pointer-down
+  // and Firefox KeyS+Space W3C sequence concurrently. Firefox carries only a 20 ms
+  // driver-side pause before the Dodge keys: with the 135 ms attack windup and 118 ms
+  // Dodge iframe, this leaves substantially more command-start jitter margin than a
+  // sequential cross-driver stagger while still placing the ordinary Dodge request inside
+  // the authoritative threat window. A miss remains retryable only while both fighters
+  // stay untouched and no parry occurs. No evidence polling runs during the
   // attack/Dodge resolution window.
   for (let attempt = 1; attempt <= 3 && !evidence; attempt += 1) {
     lastAttemptBaseline = await Promise.all(entries.map(readUiEvidence));
@@ -546,9 +545,10 @@ async function runOnlineUiDodgeFeedbackFlight(entries) {
     let attackHeld = false;
     try {
       attackHeld = true;
-      await setArenaAttack(attacker, attackerElementId, true, attackOffset);
-      await sleep(35);
-      await pressArenaPerpendicularDodgeAfterPause(defender, 0);
+      await Promise.all([
+        setArenaAttack(attacker, attackerElementId, true, attackOffset),
+        pressArenaPerpendicularDodgeAfterPause(defender, 20),
+      ]);
     } finally {
       if (attackHeld) await setArenaAttack(attacker, attackerElementId, false, attackOffset);
     }
