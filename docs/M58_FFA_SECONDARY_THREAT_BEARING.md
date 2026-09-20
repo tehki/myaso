@@ -87,11 +87,27 @@ Both failures had the same fail-closed signature:
 - Chrome recorded a genuine left-mouse attack;
 - the authoritative strike still landed for 34 HP before the M36 dodge overlap was established.
 
-The previous M36 choreography launched the Chrome pointer-down and Firefox dodge command concurrently with a 20 ms Firefox driver-side pause. That leaves cross-driver command-start ordering uncontrolled: the dodge can begin too early relative to the attack and exhaust its 118 ms iframe before the 135 ms strike.
+The failing inherited choreography confirmed Chrome pointer-down, then introduced a 35 ms Node-side delay before starting the Firefox WebDriver command. Cross-driver command startup added unbounded latency after that delay.
 
-The stabilization confirms the attacker pointer-down first, waits 35 ms, then issues the genuine Firefox dodge sequence with no additional driver pause. With both clients sending inputs at 60 Hz, each input can wait at most about 16.7 ms for its next send. The resulting authoritative dodge request is therefore expected roughly 18-52 ms after the attack request: after attack commitment, before the strike, and with the unchanged 118 ms iframe covering the unchanged 135 ms strike.
+M58 restores the exact choreography used by the previously green M54 head: launch the genuine Chrome pointer-down and Firefox KeyS+Space WebDriver commands concurrently, with a 20 ms pause inside Firefox's W3C action sequence. This removes the Node-side cross-driver round-trip from the critical timing path while retaining a deliberate offset so the unchanged 118 ms dodge iframe overlaps the unchanged 135 ms strike.
+
+On the restored ordering, quality run #213 / `35527645041` passed M36 on the exact code before later stopping at M55 choreography.
 
 No server code, attack timing, dodge timing, iframe duration, damage, geometry, feedback threshold, or real-input provenance requirement is changed.
+
+## Inherited M55/M56 multi-threat choreography stabilization
+
+Quality run #213 reached M55 after M36 passed but failed closed before M56-M58. Both real attackers delivered pointer input, but the Firefox attacker pointer-down occurred about 223 ms after the Chrome attacker pointer-down. The 135 ms attack windups therefore did not overlap, so the center client correctly observed only one authoritative threat.
+
+The shared M55/M56/M58 harness now coordinates genuine pointer input rather than launching cross-driver commands blindly:
+
+- if Firefox is one of the two attackers, its pointer-down is confirmed first;
+- the second attacker commits immediately afterward;
+- both pointer inputs are briefly held, then released;
+- acceptance still requires two real pointer-down provenance records and overlapping authoritative threat state;
+- if damage resolves before simultaneous-threat evidence, the flight still fails closed.
+
+This changes only browser-test choreography. No threat eligibility, ranking, combat state, timing, geometry, or production behavior is changed.
 
 ## Authority / performance boundary
 
