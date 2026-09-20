@@ -167,7 +167,8 @@ export function fighterIdentityPresentation(netId) {
   return { visible: true, label: `#${netId}` };
 }
 
-export function fighterThreatNetId(state, ownId = 0) {
+export function fighterThreatNetId(state, ownId = 0, summary = null) {
+  if (summary && typeof summary === "object") summary.count = 0;
   if (!(state instanceof Map) || !Number.isInteger(ownId) || ownId <= 0) return 0;
   const own = state.get(ownId);
   if (!own || own.action === COMBAT_ACTION.dead || !Number.isFinite(own.x) || !Number.isFinite(own.y)) return 0;
@@ -177,6 +178,7 @@ export function fighterThreatNetId(state, ownId = 0) {
   let bestNetId = 0;
   let bestPriority = Infinity;
   let bestDistanceSquared = Infinity;
+  let threatCount = 0;
   for (const entity of state.values()) {
     const priority = entity?.action === COMBAT_ACTION.attackActive ? 0
       : entity?.action === COMBAT_ACTION.attackWindup ? 1
@@ -192,6 +194,7 @@ export function fighterThreatNetId(state, ownId = 0) {
     while (delta > Math.PI) delta -= Math.PI * 2;
     while (delta < -Math.PI) delta += Math.PI * 2;
     if (Math.abs(delta) > halfArc) continue;
+    threatCount += 1;
     if (priority < bestPriority
       || (priority === bestPriority && (distanceSquared < bestDistanceSquared
         || (distanceSquared === bestDistanceSquared && (bestNetId === 0 || entity.netId < bestNetId))))) {
@@ -200,6 +203,7 @@ export function fighterThreatNetId(state, ownId = 0) {
       bestDistanceSquared = distanceSquared;
     }
   }
+  if (summary && typeof summary === "object") summary.count = threatCount;
   return bestNetId;
 }
 

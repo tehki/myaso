@@ -101,16 +101,43 @@ test("FFA threat presentation identifies the most immediate attacker inside auth
     [3, fighter(3, 100, 100, COMBAT_ACTION.attackActive, 20, 100, 0)],
     [4, fighter(4, 100, 100, COMBAT_ACTION.attackActive, 180, 100, 0)],
   ]);
-  assert.equal(fighterThreatNetId(entities, 1), 3);
+  const summary = { count: -1 };
+  assert.equal(fighterThreatNetId(entities, 1, summary), 3);
+  assert.equal(summary.count, 2);
   entities.get(3).facing = Math.PI;
-  assert.equal(fighterThreatNetId(entities, 1), 2);
+  assert.equal(fighterThreatNetId(entities, 1, summary), 2);
+  assert.equal(summary.count, 1);
   entities.get(2).x = 0;
-  assert.equal(fighterThreatNetId(entities, 1), 0);
+  assert.equal(fighterThreatNetId(entities, 1, summary), 0);
+  assert.equal(summary.count, 0);
   entities.set(2, fighter(2, 100, 100, COMBAT_ACTION.attackWindup, 60, 100, 0));
   entities.set(5, fighter(5, 100, 100, COMBAT_ACTION.attackWindup, 140, 100, Math.PI));
-  assert.equal(fighterThreatNetId(entities, 1), 2);
+  assert.equal(fighterThreatNetId(entities, 1, summary), 2);
+  assert.equal(summary.count, 2);
   entities.get(1).action = COMBAT_ACTION.dead;
-  assert.equal(fighterThreatNetId(entities, 1), 0);
+  assert.equal(fighterThreatNetId(entities, 1, summary), 0);
+  assert.equal(summary.count, 0);
+});
+
+test("FFA threat summary counts simultaneous valid attackers without changing primary selection", () => {
+  const entities = new Map([
+    [1, fighter(1, 100, 100, COMBAT_ACTION.idle, 100, 100)],
+    [2, fighter(2, 100, 100, COMBAT_ACTION.attackWindup, 60, 100, 0)],
+    [3, fighter(3, 100, 100, COMBAT_ACTION.attackActive, 140, 100, Math.PI)],
+    [4, fighter(4, 100, 100, COMBAT_ACTION.attackWindup, 100, 60, Math.PI / 2)],
+    [5, fighter(5, 100, 100, COMBAT_ACTION.attackActive, 100, 220, -Math.PI / 2)],
+  ]);
+  const summary = { count: 99 };
+
+  assert.equal(fighterThreatNetId(entities, 1, summary), 3);
+  assert.equal(summary.count, 3);
+
+  entities.get(3).action = COMBAT_ACTION.idle;
+  assert.equal(fighterThreatNetId(entities, 1, summary), 2);
+  assert.equal(summary.count, 2);
+
+  assert.equal(fighterThreatNetId(new Map(), 1, summary), 0);
+  assert.equal(summary.count, 0);
 });
 
 test("kill feed presentation preserves authoritative killer and victim identity", () => {

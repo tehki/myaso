@@ -32,6 +32,8 @@ kbd { border: 1px solid #575144; border-bottom-width: 2px; border-radius: 5px; b
 .threat-cue[hidden] { display: none; }
 .threat-cue strong { color: #ff8f72; font-size: 10px; letter-spacing: .14em; }
 .threat-cue b { color: #f4c36e; font-size: 10px; }
+.threat-count { padding-left: 7px; border-left: 1px solid rgba(244, 214, 204, .24); color: #f0b3a3; font-size: 10px; font-weight: 700; }
+.threat-count[hidden] { display: none; }
 .kill-feed { position: absolute; top: 14px; left: 14px; z-index: 2; min-width: 154px; padding: 8px 10px; border: 1px solid rgba(214, 195, 148, .18); border-radius: 8px; background: rgba(15, 14, 12, .72); pointer-events: none; }
 .kill-feed strong { display: block; margin-bottom: 5px; color: #c9b77f; font-size: 10px; letter-spacing: .14em; }
 .kill-feed ol { list-style: none; margin: 0; padding: 0; }
