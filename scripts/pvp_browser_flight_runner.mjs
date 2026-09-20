@@ -8,7 +8,7 @@ import { setTimeout as sleep } from "node:timers/promises";
 const root = process.cwd();
 const durationMs = Number(process.env.MYASO_PVP_FLIGHT_DURATION_MS ?? 7000);
 const scenario = process.env.MYASO_PVP_SCENARIO ?? "damage";
-if (!new Set(["damage", "parry", "dodge", "block", "guardbreak", "backblock", "respawn", "ui", "uirespawn", "uifeedback", "uihittell", "uivitals", "uiidentity", "uiscore", "uimatch", "uirematch", "uiffa3", "uikillfeed", "uifocus", "uithreat", "uimultithreat", "uisecondarythreat", "uiparry", "uistun", "uiguardbreak", "uidodge", "uirecovery", "uirecoverytell", "uiattackintent", "uiguardbreaktell", "uiparrytell", "uiblockfacingtell", "uidodgetell", "uideathtell"]).has(scenario)) throw new Error(`unsupported MYASO_PVP_SCENARIO: ${scenario}`);
+if (!new Set(["damage", "parry", "dodge", "block", "guardbreak", "backblock", "respawn", "ui", "uirespawn", "uifeedback", "uihittell", "uivitals", "uiidentity", "uiscore", "uimatch", "uirematch", "uiffa3", "uikillfeed", "uifocus", "uithreat", "uithreatbearing", "uimultithreat", "uisecondarythreat", "uiparry", "uistun", "uiguardbreak", "uidodge", "uirecovery", "uirecoverytell", "uiattackintent", "uiguardbreaktell", "uiparrytell", "uiblockfacingtell", "uidodgetell", "uideathtell"]).has(scenario)) throw new Error(`unsupported MYASO_PVP_SCENARIO: ${scenario}`);
 const staticPort = Number(process.env.MYASO_PVP_FLIGHT_HTTP_PORT ?? 4174);
 const browsers = [
   {
@@ -32,7 +32,7 @@ const browsers = [
     },
   },
 ];
-if (scenario === "uiffa3" || scenario === "uikillfeed" || scenario === "uifocus" || scenario === "uithreat" || scenario === "uimultithreat" || scenario === "uisecondarythreat") {
+if (scenario === "uiffa3" || scenario === "uikillfeed" || scenario === "uifocus" || scenario === "uithreat" || scenario === "uithreatbearing" || scenario === "uimultithreat" || scenario === "uisecondarythreat") {
   browsers.push({
     name: "chrome2",
     port: 9517,
@@ -95,6 +95,9 @@ try {
   } else if (scenario === "uithreat") {
     const results = await runOnlineUiThreatAwarenessFlight(sessions);
     console.log(`M54_FFA_INCOMING_THREAT ${JSON.stringify({ ok: true, results })}`);
+  } else if (scenario === "uithreatbearing") {
+    const results = await runOnlineUiThreatAwarenessFlight(sessions, true);
+    console.log(`M57_FFA_THREAT_BEARING ${JSON.stringify({ ok: true, results })}`);
   } else if (scenario === "uimultithreat") {
     const results = await runOnlineUiMultiThreatFlight(sessions);
     console.log(`M55_FFA_MULTI_THREAT ${JSON.stringify({ ok: true, results })}`);
@@ -234,7 +237,7 @@ async function startBrowser(browser) {
 }
 
 async function navigate(session, gameUrl, certificateHash) {
-  const page = scenario === "ui" || scenario === "uirespawn" || scenario === "uifeedback" || scenario === "uihittell" || scenario === "uivitals" || scenario === "uiidentity" || scenario === "uiscore" || scenario === "uimatch" || scenario === "uirematch" || scenario === "uiffa3" || scenario === "uikillfeed" || scenario === "uifocus" || scenario === "uithreat" || scenario === "uimultithreat" || scenario === "uisecondarythreat" || scenario === "uiparry" || scenario === "uistun" || scenario === "uiguardbreak" || scenario === "uidodge" || scenario === "uirecovery" || scenario === "uirecoverytell" || scenario === "uiattackintent" || scenario === "uiguardbreaktell" || scenario === "uiparrytell" || scenario === "uiblockfacingtell" || scenario === "uidodgetell" || scenario === "uideathtell" ? "index.html" : "pvp-flight.html";
+  const page = scenario === "ui" || scenario === "uirespawn" || scenario === "uifeedback" || scenario === "uihittell" || scenario === "uivitals" || scenario === "uiidentity" || scenario === "uiscore" || scenario === "uimatch" || scenario === "uirematch" || scenario === "uiffa3" || scenario === "uikillfeed" || scenario === "uifocus" || scenario === "uithreat" || scenario === "uithreatbearing" || scenario === "uimultithreat" || scenario === "uisecondarythreat" || scenario === "uiparry" || scenario === "uistun" || scenario === "uiguardbreak" || scenario === "uidodge" || scenario === "uirecovery" || scenario === "uirecoverytell" || scenario === "uiattackintent" || scenario === "uiguardbreaktell" || scenario === "uiparrytell" || scenario === "uiblockfacingtell" || scenario === "uidodgetell" || scenario === "uideathtell" ? "index.html" : "pvp-flight.html";
   const url = new URL(`http://127.0.0.1:${staticPort}/web/${page}`);
   url.searchParams.set("server", gameUrl);
   url.searchParams.set("cert", certificateHash);
@@ -1099,23 +1102,24 @@ async function runOnlineUiFocusHudFlight(entries) {
   return evidence;
 }
 
-async function runOnlineUiThreatAwarenessFlight(entries) {
-  if (entries.length !== 3) throw new Error(`M54 expected three real browser clients, received ${entries.length}`);
+async function runOnlineUiThreatAwarenessFlight(entries, requireBearing = false) {
+  const milestone = requireBearing ? "M57" : "M54";
+  if (entries.length !== 3) throw new Error(`${milestone} expected three real browser clients, received ${entries.length}`);
   await Promise.all(entries.map(installUiObserver));
   const ready = await waitForUiReady(entries);
   const ordered = ready.slice().sort((a, b) => a.playerNetId - b.playerNetId);
   const ids = ordered.map((entry) => entry.playerNetId);
   if (ids.length !== 3 || new Set(ids).size !== 3) {
-    throw new Error(`M54 did not resolve three authoritative identities: ${JSON.stringify(ready)}`);
+    throw new Error(`${milestone} did not resolve three authoritative identities: ${JSON.stringify(ready)}`);
   }
   const left = entries.find((entry) => entry.name === ordered[0].browser);
   const center = entries.find((entry) => entry.name === ordered[1].browser);
   const right = entries.find((entry) => entry.name === ordered[2].browser);
-  if (!left || !center || !right) throw new Error(`M54 could not map three FFA roles: ${JSON.stringify(ready)}`);
+  if (!left || !center || !right) throw new Error(`${milestone} could not map three FFA roles: ${JSON.stringify(ready)}`);
 
   await waitForUiThreePlayerReady(entries, ids, 2500);
   await Promise.all(entries.map((entry) => execute(entry.base, entry.sessionId, "document.querySelector('#arena').focus(); return document.activeElement?.id;")));
-  const leftArena = await resolveArenaElement(left, "M54 threat attacker");
+  const leftArena = await resolveArenaElement(left, `${milestone} threat attacker`);
   await pulseMovementKey(left, "d", 120);
 
   const leftId = ordered[0].playerNetId;
@@ -1128,7 +1132,7 @@ async function runOnlineUiThreatAwarenessFlight(entries) {
     const centerState = states.find((entry) => entry.browser === center.name);
     const rightState = states.find((entry) => entry.browser === right.name);
     if (!leftState || !centerState || !rightState) {
-      throw new Error(`M54 incomplete threat evidence: ${JSON.stringify(states)}`);
+      throw new Error(`${milestone} incomplete threat evidence: ${JSON.stringify(states)}`);
     }
     const visibleCenter = centerState.threatTransitions.filter((event) => event.visible && event.label === `#${leftId}`);
     const sawWindup = visibleCenter.some((event) => event.state === "windup" && event.phase === "WINDUP");
@@ -1136,30 +1140,33 @@ async function runOnlineUiThreatAwarenessFlight(entries) {
     const leftFalsePositive = leftState.threatTransitions.some((event) => event.visible);
     const rightFalsePositive = rightState.threatTransitions.some((event) => event.visible);
     if (leftFalsePositive || rightFalsePositive) {
-      throw new Error(`M54 threat cue leaked to non-target clients: ${JSON.stringify(states)}`);
+      throw new Error(`${milestone} threat cue leaked to non-target clients: ${JSON.stringify(states)}`);
     }
     if (centerState.playerHp === 66) {
       if (!sawWindup || !sawStrike) {
-        throw new Error(`M54 authoritative hit resolved without complete incoming-threat phases: ${JSON.stringify(states)}`);
+        throw new Error(`${milestone} authoritative hit resolved without complete incoming-threat phases: ${JSON.stringify(states)}`);
+      }
+      if (requireBearing && !visibleCenter.some((event) => event.bearing === "FROM LEFT")) {
+        throw new Error(`M57 primary threat bearing did not identify the real left-side attacker: ${JSON.stringify(states)}`);
       }
       if (leftState.playerHp !== 100 || rightState.playerHp !== 100) {
-        throw new Error(`M54 threat exchange damaged a non-target fighter: ${JSON.stringify(states)}`);
+        throw new Error(`${milestone} threat exchange damaged a non-target fighter: ${JSON.stringify(states)}`);
       }
       evidence = states;
       break;
     }
     if (states.some((entry) => entry.playerHp !== 100 || entry.playerGuard !== 100)) {
-      throw new Error(`M54 retry ${attempt + 1} resolved an unexpected exchange: ${JSON.stringify(states)}`);
+      throw new Error(`${milestone} retry ${attempt + 1} resolved an unexpected exchange: ${JSON.stringify(states)}`);
     }
     await sleep(520);
     if (attempt < 2) await pulseMovementKey(left, "d", 40);
   }
   if (!evidence) {
-    throw new Error(`M54 real attack never produced authoritative target damage: ${JSON.stringify(await Promise.all(entries.map(readUiEvidence)))}`);
+    throw new Error(`${milestone} real attack never produced authoritative target damage: ${JSON.stringify(await Promise.all(entries.map(readUiEvidence)))}`);
   }
   const attackerState = evidence.find((entry) => entry.browser === left.name);
   if (!attackerState?.pointers.some((event) => event.type === "pointerdown" && event.button === 0)) {
-    throw new Error(`M54 threat attack lacked real pointer provenance: ${JSON.stringify(attackerState)}`);
+    throw new Error(`${milestone} threat attack lacked real pointer provenance: ${JSON.stringify(attackerState)}`);
   }
   return evidence;
 }
@@ -1506,7 +1513,8 @@ async function installUiObserver(session) {
     const threat = document.querySelector('#threat-cue');
     const threatCount = document.querySelector('#threat-count');
     const threatSecondary = document.querySelector('#threat-secondary');
-    if (!target || !arena || !arenaStage || !overlay || !recovery || !threat || !threatCount || !threatSecondary) throw new Error('missing online UI flight target');
+    const threatBearing = document.querySelector('#threat-bearing');
+    if (!target || !arena || !arenaStage || !overlay || !recovery || !threat || !threatCount || !threatSecondary || !threatBearing) throw new Error('missing online UI flight target');
     const state = { events: [], keys: [], pointers: [], overlayTransitions: [], feedbackTransitions: [], recoveryTransitions: [], threatTransitions: [], recoveryTellMaxPixels: 0, parryTellMaxPixels: 0, online: '', startedAt: performance.now() };
     const record = () => {
       const text = target.textContent?.trim() ?? '';
@@ -1546,6 +1554,7 @@ async function installUiObserver(session) {
         phase: document.querySelector('#threat-phase')?.textContent?.trim() ?? '',
         count: threatCount.hidden ? '' : (threatCount.textContent?.trim() ?? ''),
         secondary: threatSecondary.hidden ? '' : (threatSecondary.textContent?.trim() ?? ''),
+        bearing: threatBearing.hidden ? '' : (threatBearing.textContent?.trim() ?? ''),
       };
       const previous = state.threatTransitions.at(-1);
       if (!previous || Object.keys(entry).some((key) => previous[key] !== entry[key])) state.threatTransitions.push(entry);
@@ -2390,6 +2399,7 @@ async function readUiEvidence(session) {
       threatPhase: document.querySelector('#threat-phase')?.textContent?.trim() ?? '',
       threatCount: document.querySelector('#threat-count')?.hidden ? '' : (document.querySelector('#threat-count')?.textContent?.trim() ?? ''),
       threatSecondary: document.querySelector('#threat-secondary')?.hidden ? '' : (document.querySelector('#threat-secondary')?.textContent?.trim() ?? ''),
+      threatBearing: document.querySelector('#threat-bearing')?.hidden ? '' : (document.querySelector('#threat-bearing')?.textContent?.trim() ?? ''),
       threatTransitions: (state.threatTransitions ?? []).slice(),
       recoveryTellMaxPixels: Number(state.recoveryTellMaxPixels ?? 0),
       parryTellMaxPixels: Number(state.parryTellMaxPixels ?? 0),
