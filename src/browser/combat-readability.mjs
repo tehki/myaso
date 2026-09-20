@@ -167,6 +167,16 @@ export function fighterIdentityPresentation(netId) {
   return { visible: true, label: `#${netId}` };
 }
 
+export function fighterThreatBearingLabel(own, attacker) {
+  if (!own || !attacker || !Number.isFinite(own.x) || !Number.isFinite(own.y)
+    || !Number.isFinite(attacker.x) || !Number.isFinite(attacker.y)) return "";
+  const dx = attacker.x - own.x;
+  const dy = attacker.y - own.y;
+  if (dx === 0 && dy === 0) return "";
+  if (Math.abs(dx) >= Math.abs(dy)) return dx < 0 ? "FROM LEFT" : "FROM RIGHT";
+  return dy < 0 ? "FROM ABOVE" : "FROM BELOW";
+}
+
 export function fighterThreatNetId(state, ownId = 0, summary = null) {
   if (summary && typeof summary === "object") {
     summary.count = 0;
