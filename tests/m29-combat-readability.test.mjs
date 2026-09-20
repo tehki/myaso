@@ -125,7 +125,7 @@ test("FFA threat summary counts simultaneous valid attackers without changing pr
     [2, fighter(2, 100, 100, COMBAT_ACTION.attackWindup, 60, 100, 0)],
     [3, fighter(3, 100, 100, COMBAT_ACTION.attackActive, 140, 100, Math.PI)],
     [4, fighter(4, 100, 100, COMBAT_ACTION.attackWindup, 100, 60, Math.PI / 2)],
-    [5, fighter(5, 100, 100, COMBAT_ACTION.attackActive, 100, 180, -Math.PI / 2)],
+    [5, fighter(5, 100, 100, COMBAT_ACTION.attackActive, 100, 220, -Math.PI / 2)],
   ]);
   const summary = { count: 99 };
 
