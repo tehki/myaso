@@ -37,9 +37,12 @@ const threatCue = {
   root: document.querySelector("#threat-cue"),
   label: document.querySelector("#threat-label"),
   phase: document.querySelector("#threat-phase"),
+  countLabel: document.querySelector("#threat-count"),
   netId: 0,
   state: "",
+  count: 0,
 };
+const threatScan = { count: 0 };
 const combatReadability = createCombatReadabilityTracker();
 const remoteDamage = createRemoteDamageTracker();
 let networkStatus = "Connecting to authoritative server...";
@@ -520,7 +523,8 @@ function updateHud(ownId) {
 
 function updateThreatCue(ownId) {
   if (!threatCue.root || !networkClient) return;
-  const netId = fighterThreatNetId(networkClient.state, ownId);
+  const netId = fighterThreatNetId(networkClient.state, ownId, threatScan);
+  const threatCount = threatScan.count;
   const attacker = netId ? networkClient.state.get(netId) : null;
   const state = attacker?.action === COMBAT_ACTION.attackActive ? "strike"
     : attacker?.action === COMBAT_ACTION.attackWindup ? "windup"
@@ -530,6 +534,8 @@ function updateThreatCue(ownId) {
   if (shouldHide) {
     threatCue.netId = 0;
     threatCue.state = "";
+    threatCue.count = 0;
+    if (threatCue.countLabel) threatCue.countLabel.hidden = true;
     delete threatCue.root.dataset.state;
     return;
   }
@@ -542,6 +548,12 @@ function updateThreatCue(ownId) {
     threatCue.state = state;
     threatCue.phase.textContent = state === "strike" ? "STRIKE" : "WINDUP";
   }
+  if (threatCue.countLabel) {
+    const showCount = threatCount > 1;
+    if (threatCue.countLabel.hidden === showCount) threatCue.countLabel.hidden = !showCount;
+    if (showCount && threatCue.count !== threatCount) threatCue.countLabel.textContent = `${threatCount} THREATS`;
+  }
+  threatCue.count = threatCount;
 }
 
 function updateCombatOverlay(own, ownId) {
