@@ -60,7 +60,7 @@ The existing M57 cardinal/dominant-axis edge-case coverage remains unchanged.
 
 The dedicated `uisecondarybearing` flight reuses the proven M55/M56 three-browser simultaneous-threat choreography.
 
-Two real attackers move toward the center fighter with genuine keyboard input and commit genuine left-mouse attacks concurrently from opposite sides.
+Two real attackers move toward the center fighter with genuine keyboard input and commit coordinated genuine left-mouse attacks from opposite sides. If Firefox is an attacker, its pointer-down is confirmed first, then the faster second browser commits immediately so the authoritative windups overlap despite cross-driver startup jitter.
 
 Acceptance requires:
 
@@ -108,6 +108,8 @@ It does not change:
 - deployment, public bind, or runtime activation.
 
 The render path retains the existing single threat scan. M58 adds one `Map.get(secondaryNetId)`, scalar bearing math, and cached DOM updates only when the bearing changes.
+
+Validation also restores the previously proven M36 concurrent Chrome/Firefox dodge-command ordering and coordinates M55/M56/M58 dual-attacker pointer-downs to remove cross-driver startup races. These are harness-only changes; combat timing and acceptance thresholds remain unchanged.
 
 ## Base / rollback
 
