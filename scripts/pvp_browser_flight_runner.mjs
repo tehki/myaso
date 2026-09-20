@@ -1202,13 +1202,29 @@ async function runOnlineUiMultiThreatFlight(entries, requireSecondary = false, r
 
   const leftId = ordered[0].playerNetId;
   const rightId = ordered[2].playerNetId;
+  const firstAttacker = left.name === "firefox" ? { session: left, elementId: leftArena, offset: 200 }
+    : right.name === "firefox" ? { session: right, elementId: rightArena, offset: -200 }
+      : { session: left, elementId: leftArena, offset: 200 };
+  const secondAttacker = firstAttacker.session === left
+    ? { session: right, elementId: rightArena, offset: -200 }
+    : { session: left, elementId: leftArena, offset: 200 };
   let evidence = null;
   for (let attempt = 0; attempt < 3 && !evidence; attempt += 1) {
-    await Promise.all([
-      performArenaAttack(left, leftArena, 200),
-      performArenaAttack(right, rightArena, -200),
-    ]);
-    await sleep(280);
+    let firstHeld = false;
+    let secondHeld = false;
+    try {
+      await setArenaAttack(firstAttacker.session, firstAttacker.elementId, true, firstAttacker.offset);
+      firstHeld = true;
+      await setArenaAttack(secondAttacker.session, secondAttacker.elementId, true, secondAttacker.offset);
+      secondHeld = true;
+      await sleep(40);
+    } finally {
+      const releases = [];
+      if (firstHeld) releases.push(setArenaAttack(firstAttacker.session, firstAttacker.elementId, false, firstAttacker.offset));
+      if (secondHeld) releases.push(setArenaAttack(secondAttacker.session, secondAttacker.elementId, false, secondAttacker.offset));
+      if (releases.length > 0) await Promise.all(releases);
+    }
+    await sleep(240);
     const states = await Promise.all(entries.map(readUiEvidence));
     const leftState = states.find((entry) => entry.browser === left.name);
     const centerState = states.find((entry) => entry.browser === center.name);
