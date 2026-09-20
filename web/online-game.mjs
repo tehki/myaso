@@ -38,11 +38,13 @@ const threatCue = {
   label: document.querySelector("#threat-label"),
   phase: document.querySelector("#threat-phase"),
   countLabel: document.querySelector("#threat-count"),
+  secondaryLabel: document.querySelector("#threat-secondary"),
   netId: 0,
   state: "",
   count: 0,
+  secondaryNetId: 0,
 };
-const threatScan = { count: 0 };
+const threatScan = { count: 0, secondaryNetId: 0 };
 const combatReadability = createCombatReadabilityTracker();
 const remoteDamage = createRemoteDamageTracker();
 let networkStatus = "Connecting to authoritative server...";
@@ -525,6 +527,7 @@ function updateThreatCue(ownId) {
   if (!threatCue.root || !networkClient) return;
   const netId = fighterThreatNetId(networkClient.state, ownId, threatScan);
   const threatCount = threatScan.count;
+  const secondaryNetId = threatScan.secondaryNetId;
   const attacker = netId ? networkClient.state.get(netId) : null;
   const state = attacker?.action === COMBAT_ACTION.attackActive ? "strike"
     : attacker?.action === COMBAT_ACTION.attackWindup ? "windup"
@@ -535,7 +538,9 @@ function updateThreatCue(ownId) {
     threatCue.netId = 0;
     threatCue.state = "";
     threatCue.count = 0;
+    threatCue.secondaryNetId = 0;
     if (threatCue.countLabel) threatCue.countLabel.hidden = true;
+    if (threatCue.secondaryLabel) threatCue.secondaryLabel.hidden = true;
     delete threatCue.root.dataset.state;
     return;
   }
@@ -553,7 +558,15 @@ function updateThreatCue(ownId) {
     if (threatCue.countLabel.hidden === showCount) threatCue.countLabel.hidden = !showCount;
     if (showCount && threatCue.count !== threatCount) threatCue.countLabel.textContent = `${threatCount} THREATS`;
   }
+  if (threatCue.secondaryLabel) {
+    const showSecondary = threatCount > 1 && secondaryNetId > 0;
+    if (threatCue.secondaryLabel.hidden === showSecondary) threatCue.secondaryLabel.hidden = !showSecondary;
+    if (showSecondary && threatCue.secondaryNetId !== secondaryNetId) {
+      threatCue.secondaryLabel.textContent = `NEXT #${secondaryNetId}`;
+    }
+  }
   threatCue.count = threatCount;
+  threatCue.secondaryNetId = secondaryNetId;
 }
 
 function updateCombatOverlay(own, ownId) {
