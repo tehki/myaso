@@ -2262,13 +2262,6 @@ async function armThreatMarkerSampler(session) {
   `);
 }
 
-async function readThreatMarkerSampler(session) {
-  return execute(session.base, session.sessionId, `
-    const state = window.__MYASO_M62_THREAT_MARKER_SAMPLER__;
-    return { primaryMax: state?.primaryMax ?? 0, secondaryMax: state?.secondaryMax ?? 0 };
-  `);
-}
-
 async function stopThreatMarkerSampler(session) {
   return execute(session.base, session.sessionId, `
     const state = window.__MYASO_M62_THREAT_MARKER_SAMPLER__;
