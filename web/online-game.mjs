@@ -1,5 +1,5 @@
 import { createFrameBudget } from "../src/browser/frame-budget.mjs";
-import { COMBAT_ACTION, blockSpatialPresentation, combatActionHint, combatOverlayPresentation, createCombatReadabilityTracker, createRemoteDamageTracker, fighterFocusNetId, fighterIdentityPresentation, fighterThreatBearingLabel, fighterThreatNetId, fighterThreatPhaseLabel, fighterMatchPresentation, fighterScoreboardPresentation, fighterVitalsPresentation, guardBreakSpatialPresentation, killFeedPresentation, opponentRecoveryPresentation, parrySpatialPresentation } from "../src/browser/combat-readability.mjs";
+import { COMBAT_ACTION, blockSpatialPresentation, combatActionHint, combatOverlayPresentation, createCombatReadabilityTracker, createRemoteDamageTracker, fighterFocusNetId, fighterIdentityPresentation, fighterThreatBearingLabel, fighterThreatGuardArcLabel, fighterThreatNetId, fighterThreatPhaseLabel, fighterMatchPresentation, fighterScoreboardPresentation, fighterVitalsPresentation, guardBreakSpatialPresentation, killFeedPresentation, opponentRecoveryPresentation, parrySpatialPresentation } from "../src/browser/combat-readability.mjs";
 import { COMBAT } from "../src/combat/model.mjs";
 import { reconcilePrediction } from "../src/browser/reconciliation.mjs";
 import { NETWORK } from "../src/network/constants.mjs";
@@ -42,6 +42,7 @@ const threatCue = {
   secondaryBearingLabel: document.querySelector("#threat-secondary-bearing"),
   secondaryPhaseLabel: document.querySelector("#threat-secondary-phase"),
   bearingLabel: document.querySelector("#threat-bearing"),
+  guardArcLabel: document.querySelector("#threat-guard-arc"),
   netId: 0,
   state: "",
   count: 0,
@@ -49,6 +50,7 @@ const threatCue = {
   secondaryBearing: "",
   secondaryPhase: "",
   bearing: "",
+  guardArc: "",
 };
 const threatScan = { count: 0, secondaryNetId: 0 };
 const combatReadability = createCombatReadabilityTracker();
@@ -538,6 +540,7 @@ function updateThreatCue(ownId) {
   const secondaryAttacker = secondaryNetId ? networkClient.state.get(secondaryNetId) : null;
   const own = ownId ? networkClient.state.get(ownId) : null;
   const bearing = fighterThreatBearingLabel(own, attacker);
+  const guardArc = fighterThreatGuardArcLabel(own, attacker);
   const secondaryBearing = fighterThreatBearingLabel(own, secondaryAttacker);
   const phase = fighterThreatPhaseLabel(attacker);
   const secondaryPhase = fighterThreatPhaseLabel(secondaryAttacker);
@@ -552,11 +555,13 @@ function updateThreatCue(ownId) {
     threatCue.secondaryBearing = "";
     threatCue.secondaryPhase = "";
     threatCue.bearing = "";
+    threatCue.guardArc = "";
     if (threatCue.countLabel) threatCue.countLabel.hidden = true;
     if (threatCue.secondaryLabel) threatCue.secondaryLabel.hidden = true;
     if (threatCue.secondaryBearingLabel) threatCue.secondaryBearingLabel.hidden = true;
     if (threatCue.secondaryPhaseLabel) threatCue.secondaryPhaseLabel.hidden = true;
     if (threatCue.bearingLabel) threatCue.bearingLabel.hidden = true;
+    if (threatCue.guardArcLabel) threatCue.guardArcLabel.hidden = true;
     delete threatCue.root.dataset.state;
     return;
   }
@@ -595,6 +600,11 @@ function updateThreatCue(ownId) {
       threatCue.secondaryBearingLabel.textContent = secondaryBearing;
     }
   }
+  if (threatCue.guardArcLabel) {
+    const showGuardArc = Boolean(guardArc);
+    if (threatCue.guardArcLabel.hidden === showGuardArc) threatCue.guardArcLabel.hidden = !showGuardArc;
+    if (showGuardArc && threatCue.guardArc !== guardArc) threatCue.guardArcLabel.textContent = guardArc;
+  }
   if (threatCue.bearingLabel) {
     const showBearing = Boolean(bearing);
     if (threatCue.bearingLabel.hidden === showBearing) threatCue.bearingLabel.hidden = !showBearing;
@@ -605,6 +615,7 @@ function updateThreatCue(ownId) {
   threatCue.secondaryBearing = secondaryBearing;
   threatCue.secondaryPhase = secondaryPhase;
   threatCue.bearing = bearing;
+  threatCue.guardArc = guardArc;
 }
 
 function updateCombatOverlay(own, ownId) {

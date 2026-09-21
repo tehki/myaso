@@ -1,4 +1,4 @@
-import { COMBAT } from "../combat/model.mjs";
+import { COMBAT, angleDelta } from "../combat/model.mjs";
 
 export const COMBAT_ACTION = Object.freeze({
   idle: 0,
@@ -171,6 +171,16 @@ export function fighterThreatPhaseLabel(attacker) {
   if (attacker?.action === COMBAT_ACTION.attackActive) return "STRIKE";
   if (attacker?.action === COMBAT_ACTION.attackWindup) return "WINDUP";
   return "";
+}
+
+export function fighterThreatGuardArcLabel(own, attacker) {
+  if (!own || !attacker || !Number.isFinite(own.x) || !Number.isFinite(own.y)
+    || !Number.isFinite(own.facing) || !Number.isFinite(attacker.x) || !Number.isFinite(attacker.y)) return "";
+  const dx = attacker.x - own.x;
+  const dy = attacker.y - own.y;
+  if (dx === 0 && dy === 0) return "";
+  const angleToAttacker = Math.atan2(dy, dx);
+  return Math.abs(angleDelta(angleToAttacker, own.facing)) <= COMBAT.block.halfAngleRadians ? "FRONT" : "FLANK";
 }
 
 export function fighterThreatBearingLabel(own, attacker) {

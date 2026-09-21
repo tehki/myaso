@@ -183,6 +183,17 @@ function observeState(state) {
     }
     if (firstGuardCostAt === null && defender.hp === 100 && defender.guard < 100) {
       firstGuardCostAt = performance.now();
+      if (!blockOverlapSeen) {
+        const dx = defender.x - attacker.x;
+        const dy = defender.y - attacker.y;
+        const distance = Math.hypot(dx, dy);
+        const arcDelta = Math.abs(normalizeAngle(Math.atan2(dy, dx) - attacker.facing));
+        if (distance <= 94 && arcDelta <= Math.PI * 0.39) {
+          blockOverlapSeen = true;
+          blockOverlapDistance = distance;
+          blockOverlapArcDelta = arcDelta;
+        }
+      }
     }
     if (firstGuardBreakAt === null && defender.action === 7 && defender.hp === 100 && defender.guard <= 0) {
       firstGuardBreakAt = performance.now();

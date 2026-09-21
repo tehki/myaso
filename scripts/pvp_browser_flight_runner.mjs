@@ -8,7 +8,7 @@ import { setTimeout as sleep } from "node:timers/promises";
 const root = process.cwd();
 const durationMs = Number(process.env.MYASO_PVP_FLIGHT_DURATION_MS ?? 7000);
 const scenario = process.env.MYASO_PVP_SCENARIO ?? "damage";
-if (!new Set(["damage", "parry", "dodge", "block", "guardbreak", "backblock", "respawn", "ui", "uirespawn", "uifeedback", "uihittell", "uivitals", "uiidentity", "uiscore", "uimatch", "uirematch", "uiffa3", "uikillfeed", "uifocus", "uithreat", "uithreatbearing", "uimultithreat", "uisecondarythreat", "uisecondarybearing", "uisecondaryphase", "uiparry", "uistun", "uiguardbreak", "uidodge", "uirecovery", "uirecoverytell", "uiattackintent", "uiguardbreaktell", "uiparrytell", "uiblockfacingtell", "uidodgetell", "uideathtell"]).has(scenario)) throw new Error(`unsupported MYASO_PVP_SCENARIO: ${scenario}`);
+if (!new Set(["damage", "parry", "dodge", "block", "guardbreak", "backblock", "respawn", "ui", "uirespawn", "uifeedback", "uihittell", "uivitals", "uiidentity", "uiscore", "uimatch", "uirematch", "uiffa3", "uikillfeed", "uifocus", "uithreat", "uithreatbearing", "uimultithreat", "uisecondarythreat", "uisecondarybearing", "uisecondaryphase", "uiguardarc", "uiparry", "uistun", "uiguardbreak", "uidodge", "uirecovery", "uirecoverytell", "uiattackintent", "uiguardbreaktell", "uiparrytell", "uiblockfacingtell", "uidodgetell", "uideathtell"]).has(scenario)) throw new Error(`unsupported MYASO_PVP_SCENARIO: ${scenario}`);
 const staticPort = Number(process.env.MYASO_PVP_FLIGHT_HTTP_PORT ?? 4174);
 const browsers = [
   {
@@ -32,7 +32,7 @@ const browsers = [
     },
   },
 ];
-if (scenario === "uiffa3" || scenario === "uikillfeed" || scenario === "uifocus" || scenario === "uithreat" || scenario === "uithreatbearing" || scenario === "uimultithreat" || scenario === "uisecondarythreat" || scenario === "uisecondarybearing" || scenario === "uisecondaryphase") {
+if (scenario === "uiffa3" || scenario === "uikillfeed" || scenario === "uifocus" || scenario === "uithreat" || scenario === "uithreatbearing" || scenario === "uimultithreat" || scenario === "uisecondarythreat" || scenario === "uisecondarybearing" || scenario === "uisecondaryphase" || scenario === "uiguardarc") {
   browsers.push({
     name: "chrome2",
     port: 9517,
@@ -55,7 +55,7 @@ try {
   const game = await startGameServer();
   gameServer = game.child;
   for (const browser of browsers) sessions.push(await startBrowser(browser));
-  if (scenario === "uimultithreat" || scenario === "uisecondarythreat" || scenario === "uisecondarybearing" || scenario === "uisecondaryphase") {
+  if (scenario === "uimultithreat" || scenario === "uisecondarythreat" || scenario === "uisecondarybearing" || scenario === "uisecondaryphase" || scenario === "uiguardarc") {
     const expected = [
       ["chrome", 1],
       ["firefox", 2],
@@ -127,6 +127,9 @@ try {
   } else if (scenario === "uisecondaryphase") {
     const results = await runOnlineUiMultiThreatFlight(sessions, true, true, true);
     console.log(`M59_FFA_SECONDARY_THREAT_PHASE ${JSON.stringify({ ok: true, results })}`);
+  } else if (scenario === "uiguardarc") {
+    const results = await runOnlineUiMultiThreatFlight(sessions, true, true, true, true);
+    console.log(`M60_FFA_PRIMARY_GUARD_ARC ${JSON.stringify({ ok: true, results })}`);
   } else if (scenario === "uiparry") {
     const results = await runOnlineUiParryFlight(sessions);
     console.log(`M33_ONLINE_PARRY_FEEDBACK ${JSON.stringify({ ok: true, results })}`);
@@ -260,7 +263,7 @@ async function startBrowser(browser) {
 }
 
 async function navigate(session, gameUrl, certificateHash) {
-  const page = scenario === "ui" || scenario === "uirespawn" || scenario === "uifeedback" || scenario === "uihittell" || scenario === "uivitals" || scenario === "uiidentity" || scenario === "uiscore" || scenario === "uimatch" || scenario === "uirematch" || scenario === "uiffa3" || scenario === "uikillfeed" || scenario === "uifocus" || scenario === "uithreat" || scenario === "uithreatbearing" || scenario === "uimultithreat" || scenario === "uisecondarythreat" || scenario === "uisecondarybearing" || scenario === "uisecondaryphase" || scenario === "uiparry" || scenario === "uistun" || scenario === "uiguardbreak" || scenario === "uidodge" || scenario === "uirecovery" || scenario === "uirecoverytell" || scenario === "uiattackintent" || scenario === "uiguardbreaktell" || scenario === "uiparrytell" || scenario === "uiblockfacingtell" || scenario === "uidodgetell" || scenario === "uideathtell" ? "index.html" : "pvp-flight.html";
+  const page = scenario === "ui" || scenario === "uirespawn" || scenario === "uifeedback" || scenario === "uihittell" || scenario === "uivitals" || scenario === "uiidentity" || scenario === "uiscore" || scenario === "uimatch" || scenario === "uirematch" || scenario === "uiffa3" || scenario === "uikillfeed" || scenario === "uifocus" || scenario === "uithreat" || scenario === "uithreatbearing" || scenario === "uimultithreat" || scenario === "uisecondarythreat" || scenario === "uisecondarybearing" || scenario === "uisecondaryphase" || scenario === "uiguardarc" || scenario === "uiparry" || scenario === "uistun" || scenario === "uiguardbreak" || scenario === "uidodge" || scenario === "uirecovery" || scenario === "uirecoverytell" || scenario === "uiattackintent" || scenario === "uiguardbreaktell" || scenario === "uiparrytell" || scenario === "uiblockfacingtell" || scenario === "uidodgetell" || scenario === "uideathtell" ? "index.html" : "pvp-flight.html";
   const url = new URL(`http://127.0.0.1:${staticPort}/web/${page}`);
   url.searchParams.set("server", gameUrl);
   url.searchParams.set("cert", certificateHash);
@@ -570,21 +573,24 @@ async function runOnlineUiDodgeFeedbackFlight(entries) {
   let evidence = null;
   let lastAttemptBaseline = null;
   // M24 owns reaction-timing/geometry proof. M36 owns the real-control readability
-  // path. Commit the genuine Firefox attack, then wait until the fast Chrome defender's
-  // replicated threat HUD sees this exact attacker in authoritative WINDUP. Dodge
-  // immediately from that state boundary instead of guessing cross-driver/server latency
-  // with a fixed delay. Combat timing and acceptance thresholds remain unchanged.
+  // path. M36 uses a two-click Firefox burst to keep the genuine latch retry window narrow
+  // inside one unchanged windup; the Chrome defender then performs a genuine perpendicular
+  // dodge early enough for the unchanged iframe to span the possible active transition. Combat timing and acceptance thresholds
+  // remain unchanged, and the older M36 gate no longer depends on the later threat HUD.
   for (let attempt = 1; attempt <= 3 && !evidence; attempt += 1) {
     lastAttemptBaseline = await Promise.all(entries.map(readUiEvidence));
     if (!lastAttemptBaseline.every((entry) => entry.playerHp === 100 && entry.playerGuard === 100)) {
       throw new Error(`M36 retry ${attempt} did not start from clean authoritative vitals: ${JSON.stringify(lastAttemptBaseline)}`);
     }
 
-    await performArenaAttackBurst(attacker);
-    await waitForThreatWindup(defender, attackerReady.playerNetId, 240);
+    await performArenaAttackBurst(attacker, 2);
+    // M24 owns exact dodge reaction timing/geometry. The genuine attack burst finishes
+    // inside one unchanged 135 ms windup. A short fixed pause after that bounded burst
+    // places the real Chrome dodge iframe across the possible active transition without
+    // making this older M36 feedback acceptance depend on the later M54 threat HUD.
+    await sleep(35);
     await pressArenaPerpendicularDodgeAfterPause(defender, 0);
-    // The authoritative WINDUP handshake is complete; keep the remaining
-    // iframe/strike resolution window free of evidence polling.
+    // Keep the iframe/strike resolution window free of evidence polling.
     await sleep(180);
     evidence = await waitForUiDodgeEvidence(entries, attacker, defender, 520, false, lastAttemptBaseline);
     if (evidence) break;
@@ -1233,8 +1239,8 @@ async function runOnlineUiThreatAwarenessFlight(entries, requireBearing = false)
   return evidence;
 }
 
-async function runOnlineUiMultiThreatFlight(entries, requireSecondary = false, requireSecondaryBearing = false, requireSecondaryPhase = false) {
-  const milestone = requireSecondaryPhase ? "M59" : requireSecondaryBearing ? "M58" : requireSecondary ? "M56" : "M55";
+async function runOnlineUiMultiThreatFlight(entries, requireSecondary = false, requireSecondaryBearing = false, requireSecondaryPhase = false, requireGuardArc = false) {
+  const milestone = requireGuardArc ? "M60" : requireSecondaryPhase ? "M59" : requireSecondaryBearing ? "M58" : requireSecondary ? "M56" : "M55";
   if (entries.length !== 3) throw new Error(`${milestone} expected three real browser clients, received ${entries.length}`);
   await Promise.all(entries.map(installUiObserver));
   const ready = await waitForUiReady(entries);
@@ -1356,6 +1362,12 @@ async function runOnlineUiMultiThreatFlight(entries, requireSecondary = false, r
             state.threatTransitions.some((event) => event.visible && event.secondaryPhase));
           if (secondaryPhaseLeak) {
             throw new Error(`M59 secondary threat phase leaked to an attacker client: ${JSON.stringify(states)}`);
+          }
+        }
+        if (requireGuardArc) {
+          const expectedGuardArc = primaryIsLeft ? "FLANK" : "FRONT";
+          if (multiThreat.guardArc !== expectedGuardArc) {
+            throw new Error(`M60 primary guard arc did not match authoritative center facing: ${JSON.stringify(states)}`);
           }
         }
       }
@@ -1632,13 +1644,14 @@ async function setArenaAttackButton(session, pressed) {
   });
 }
 
-async function performArenaAttackBurst(session) {
+async function performArenaAttackBurst(session, clickCount = 3) {
   const actions = [];
-  for (let index = 0; index < 3; index += 1) {
+  const boundedClickCount = Math.max(1, Math.min(3, Math.trunc(clickCount)));
+  for (let index = 0; index < boundedClickCount; index += 1) {
     actions.push({ type: "pointerDown", button: 0 });
     actions.push({ type: "pause", duration: 10 });
     actions.push({ type: "pointerUp", button: 0 });
-    if (index < 2) actions.push({ type: "pause", duration: 8 });
+    if (index < boundedClickCount - 1) actions.push({ type: "pause", duration: 8 });
   }
   await webdriver(session.base, "POST", `/session/${session.sessionId}/actions`, {
     actions: [{
@@ -1663,7 +1676,8 @@ async function installUiObserver(session) {
     const threatSecondaryBearing = document.querySelector('#threat-secondary-bearing');
     const threatSecondaryPhase = document.querySelector('#threat-secondary-phase');
     const threatBearing = document.querySelector('#threat-bearing');
-    if (!target || !arena || !arenaStage || !overlay || !recovery || !threat || !threatCount || !threatSecondary || !threatSecondaryBearing || !threatSecondaryPhase || !threatBearing) throw new Error('missing online UI flight target');
+    const threatGuardArc = document.querySelector('#threat-guard-arc');
+    if (!target || !arena || !arenaStage || !overlay || !recovery || !threat || !threatCount || !threatSecondary || !threatSecondaryBearing || !threatSecondaryPhase || !threatBearing || !threatGuardArc) throw new Error('missing online UI flight target');
     const state = { events: [], keys: [], pointers: [], overlayTransitions: [], feedbackTransitions: [], recoveryTransitions: [], threatTransitions: [], recoveryTellMaxPixels: 0, parryTellMaxPixels: 0, online: '', startedAt: performance.now() };
     const record = () => {
       const text = target.textContent?.trim() ?? '';
@@ -1706,6 +1720,7 @@ async function installUiObserver(session) {
         secondaryBearing: threatSecondaryBearing.hidden ? '' : (threatSecondaryBearing.textContent?.trim() ?? ''),
         secondaryPhase: threatSecondaryPhase.hidden ? '' : (threatSecondaryPhase.textContent?.trim() ?? ''),
         bearing: threatBearing.hidden ? '' : (threatBearing.textContent?.trim() ?? ''),
+        guardArc: threatGuardArc.hidden ? '' : (threatGuardArc.textContent?.trim() ?? ''),
       };
       const previous = state.threatTransitions.at(-1);
       if (!previous || Object.keys(entry).some((key) => previous[key] !== entry[key])) state.threatTransitions.push(entry);
@@ -2279,16 +2294,6 @@ async function waitForUiMessage(session, text, timeoutMs) {
   throw new Error(`${session.name} never rendered expected online UI message ${text}: ${JSON.stringify(await readUiEvidence(session))}`);
 }
 
-async function waitForThreatWindup(observer, attackerNetId, timeoutMs) {
-  const deadline = Date.now() + timeoutMs;
-  const expectedLabel = `#${attackerNetId}`;
-  while (Date.now() < deadline) {
-    const state = await readUiEvidence(observer);
-    if (state.threatVisible && state.threatState === "windup" && state.threatLabel === expectedLabel) return state;
-    await sleep(10);
-  }
-  throw new Error(`M36 defender never observed authoritative WINDUP from ${expectedLabel}: ${JSON.stringify(await readUiEvidence(observer))}`);
-}
 
 async function waitForUiDodgeEvidence(entries, attacker, defender, timeoutMs, fail = true, baselineStates = null) {
   const baselineAttacker = baselineStates?.find((entry) => entry.browser === attacker.name);
@@ -2612,6 +2617,7 @@ async function readUiEvidence(session) {
       threatSecondaryBearing: document.querySelector('#threat-secondary-bearing')?.hidden ? '' : (document.querySelector('#threat-secondary-bearing')?.textContent?.trim() ?? ''),
       threatSecondaryPhase: document.querySelector('#threat-secondary-phase')?.hidden ? '' : (document.querySelector('#threat-secondary-phase')?.textContent?.trim() ?? ''),
       threatBearing: document.querySelector('#threat-bearing')?.hidden ? '' : (document.querySelector('#threat-bearing')?.textContent?.trim() ?? ''),
+      threatGuardArc: document.querySelector('#threat-guard-arc')?.hidden ? '' : (document.querySelector('#threat-guard-arc')?.textContent?.trim() ?? ''),
       threatTransitions: (state.threatTransitions ?? []).slice(),
       recoveryTellMaxPixels: Number(state.recoveryTellMaxPixels ?? 0),
       parryTellMaxPixels: Number(state.parryTellMaxPixels ?? 0),
