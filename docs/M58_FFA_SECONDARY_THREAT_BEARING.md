@@ -115,9 +115,10 @@ The shared M55/M56/M58 harness now removes both sources of cross-driver ambiguit
 - authoritative players spawn 96 units apart while unchanged attack reach plus fighter radius is 94 units;
 - both edge attackers then use a 260 ms genuine inward movement pulse while that aim remains active, continuously carrying the intended facing through the unchanged 60 Hz input/server path and staging both fighters decisively inside unchanged threat geometry;
 - after movement release, another 60 ms settle window lets the persisted facing/movement state reach the server before either attack commits;
-- the synchronized attack phase then uses concurrent button-only pointer-down/up actions on the two Chrome drivers, so pointer-move/facing latency and Firefox WebDriver startup latency are outside the unchanged 135 ms overlap window;
-- both pointer inputs are held for 100 ms—long enough to cross multiple 60 Hz client samples but still shorter than the unchanged 135 ms windup—then released;
-- acceptance still requires two real pointer-down provenance records and overlapping authoritative threat state;
+- the online client treats primary attack as a one-shot pointer-down latch that is cleared after the next outbound input sample, so merely holding a button does not refresh an unconsumed request;
+- the synchronized attack phase therefore sends each already-aimed Chrome attacker a three-click genuine pointer burst over about 60 ms;
+- the complete burst fits inside the unchanged 135 ms windup: if an early pulse starts the attack, later pulses arrive while the fighter is non-Idle and cannot start another attack; if an early latch misses an input sample, a later genuine pulse provides another bounded sampling opportunity;
+- acceptance still requires real pointer-down provenance from both attackers and overlapping authoritative threat state;
 - if damage resolves before simultaneous-threat evidence, the flight still fails closed.
 
 This changes only browser-test choreography. No threat eligibility, ranking, combat state, timing, geometry, or production behavior is changed.
