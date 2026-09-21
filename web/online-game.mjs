@@ -39,11 +39,13 @@ const threatCue = {
   phase: document.querySelector("#threat-phase"),
   countLabel: document.querySelector("#threat-count"),
   secondaryLabel: document.querySelector("#threat-secondary"),
+  secondaryBearingLabel: document.querySelector("#threat-secondary-bearing"),
   bearingLabel: document.querySelector("#threat-bearing"),
   netId: 0,
   state: "",
   count: 0,
   secondaryNetId: 0,
+  secondaryBearing: "",
   bearing: "",
 };
 const threatScan = { count: 0, secondaryNetId: 0 };
@@ -531,8 +533,10 @@ function updateThreatCue(ownId) {
   const threatCount = threatScan.count;
   const secondaryNetId = threatScan.secondaryNetId;
   const attacker = netId ? networkClient.state.get(netId) : null;
+  const secondaryAttacker = secondaryNetId ? networkClient.state.get(secondaryNetId) : null;
   const own = ownId ? networkClient.state.get(ownId) : null;
   const bearing = fighterThreatBearingLabel(own, attacker);
+  const secondaryBearing = fighterThreatBearingLabel(own, secondaryAttacker);
   const state = attacker?.action === COMBAT_ACTION.attackActive ? "strike"
     : attacker?.action === COMBAT_ACTION.attackWindup ? "windup"
       : "";
@@ -543,9 +547,11 @@ function updateThreatCue(ownId) {
     threatCue.state = "";
     threatCue.count = 0;
     threatCue.secondaryNetId = 0;
+    threatCue.secondaryBearing = "";
     threatCue.bearing = "";
     if (threatCue.countLabel) threatCue.countLabel.hidden = true;
     if (threatCue.secondaryLabel) threatCue.secondaryLabel.hidden = true;
+    if (threatCue.secondaryBearingLabel) threatCue.secondaryBearingLabel.hidden = true;
     if (threatCue.bearingLabel) threatCue.bearingLabel.hidden = true;
     delete threatCue.root.dataset.state;
     return;
@@ -571,6 +577,13 @@ function updateThreatCue(ownId) {
       threatCue.secondaryLabel.textContent = `NEXT #${secondaryNetId}`;
     }
   }
+  if (threatCue.secondaryBearingLabel) {
+    const showSecondaryBearing = threatCount > 1 && secondaryNetId > 0 && Boolean(secondaryBearing);
+    if (threatCue.secondaryBearingLabel.hidden === showSecondaryBearing) threatCue.secondaryBearingLabel.hidden = !showSecondaryBearing;
+    if (showSecondaryBearing && threatCue.secondaryBearing !== secondaryBearing) {
+      threatCue.secondaryBearingLabel.textContent = secondaryBearing;
+    }
+  }
   if (threatCue.bearingLabel) {
     const showBearing = Boolean(bearing);
     if (threatCue.bearingLabel.hidden === showBearing) threatCue.bearingLabel.hidden = !showBearing;
@@ -578,6 +591,7 @@ function updateThreatCue(ownId) {
   }
   threatCue.count = threatCount;
   threatCue.secondaryNetId = secondaryNetId;
+  threatCue.secondaryBearing = secondaryBearing;
   threatCue.bearing = bearing;
 }
 

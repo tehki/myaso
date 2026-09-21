@@ -162,6 +162,27 @@ test("FFA threat summary counts simultaneous valid attackers without changing pr
   assert.equal(summary.secondaryNetId, 0);
 });
 
+test("FFA secondary threat bearing follows the deterministic runner-up identity", () => {
+  const own = fighter(1, 100, 100, COMBAT_ACTION.idle, 100, 100);
+  const entities = new Map([
+    [1, own],
+    [2, fighter(2, 100, 100, COMBAT_ACTION.attackActive, 60, 100, 0)],
+    [3, fighter(3, 100, 100, COMBAT_ACTION.attackWindup, 140, 100, Math.PI)],
+  ]);
+  const summary = { count: 0, secondaryNetId: 0 };
+
+  assert.equal(fighterThreatNetId(entities, 1, summary), 2);
+  assert.equal(summary.count, 2);
+  assert.equal(summary.secondaryNetId, 3);
+  assert.equal(fighterThreatBearingLabel(own, entities.get(summary.secondaryNetId)), "FROM RIGHT");
+
+  entities.get(2).action = COMBAT_ACTION.idle;
+  assert.equal(fighterThreatNetId(entities, 1, summary), 3);
+  assert.equal(summary.count, 1);
+  assert.equal(summary.secondaryNetId, 0);
+  assert.equal(fighterThreatBearingLabel(own, entities.get(summary.secondaryNetId)), "");
+});
+
 test("kill feed presentation preserves authoritative killer and victim identity", () => {
   assert.deepEqual(killFeedPresentation({ killer: 3, victim: 2 }, 3), {
     visible: true, text: "#3 defeated #2", killerOwn: true, victimOwn: false,
