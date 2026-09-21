@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { COMBAT_ACTION, FFA_KILL_TARGET, blockSpatialPresentation, combatActionHint, combatLifePresentation, combatOverlayPresentation, createCombatReadabilityTracker, createRemoteDamageTracker, fighterFocusNetId, fighterIdentityPresentation, fighterThreatBearingLabel, fighterThreatNetId, fighterMatchPresentation, fighterScoreboardPresentation, fighterVitalsPresentation, guardBreakSpatialPresentation, killFeedPresentation, opponentRecoveryPresentation, parrySpatialPresentation } from "../src/browser/combat-readability.mjs";
+import { COMBAT_ACTION, FFA_KILL_TARGET, blockSpatialPresentation, combatActionHint, combatLifePresentation, combatOverlayPresentation, createCombatReadabilityTracker, createRemoteDamageTracker, fighterFocusNetId, fighterIdentityPresentation, fighterThreatBearingLabel, fighterThreatNetId, fighterThreatPhaseLabel, fighterMatchPresentation, fighterScoreboardPresentation, fighterVitalsPresentation, guardBreakSpatialPresentation, killFeedPresentation, opponentRecoveryPresentation, parrySpatialPresentation } from "../src/browser/combat-readability.mjs";
 
 function fighter(netId, hp = 100, guard = 100, action = COMBAT_ACTION.idle, x = 0, y = 0, facing = 0) {
   return { netId, hp, guard, action, x, y, facing };
@@ -181,6 +181,40 @@ test("FFA secondary threat bearing follows the deterministic runner-up identity"
   assert.equal(summary.count, 1);
   assert.equal(summary.secondaryNetId, 0);
   assert.equal(fighterThreatBearingLabel(own, entities.get(summary.secondaryNetId)), "");
+});
+
+test("FFA secondary threat phase follows the deterministic runner-up identity", () => {
+  const own = fighter(1, 100, 100, COMBAT_ACTION.idle, 100, 100);
+  const secondary = fighter(3, 100, 100, COMBAT_ACTION.attackWindup, 140, 100, Math.PI);
+  const entities = new Map([
+    [1, own],
+    [2, fighter(2, 100, 100, COMBAT_ACTION.attackActive, 60, 100, 0)],
+    [3, secondary],
+  ]);
+  const summary = { count: 0, secondaryNetId: 0 };
+
+  assert.equal(fighterThreatNetId(entities, 1, summary), 2);
+  assert.equal(summary.secondaryNetId, 3);
+  assert.equal(fighterThreatPhaseLabel(entities.get(summary.secondaryNetId)), "WINDUP");
+
+  secondary.action = COMBAT_ACTION.attackActive;
+  assert.equal(fighterThreatNetId(entities, 1, summary), 2);
+  assert.equal(summary.secondaryNetId, 3);
+  assert.equal(fighterThreatPhaseLabel(entities.get(summary.secondaryNetId)), "STRIKE");
+
+  secondary.action = COMBAT_ACTION.idle;
+  assert.equal(fighterThreatNetId(entities, 1, summary), 2);
+  assert.equal(summary.count, 1);
+  assert.equal(summary.secondaryNetId, 0);
+  assert.equal(fighterThreatPhaseLabel(entities.get(summary.secondaryNetId)), "");
+});
+
+test("threat phase label exposes only authoritative attack phases", () => {
+  assert.equal(fighterThreatPhaseLabel({ action: COMBAT_ACTION.attackWindup }), "WINDUP");
+  assert.equal(fighterThreatPhaseLabel({ action: COMBAT_ACTION.attackActive }), "STRIKE");
+  assert.equal(fighterThreatPhaseLabel({ action: COMBAT_ACTION.attackRecovery }), "");
+  assert.equal(fighterThreatPhaseLabel({ action: COMBAT_ACTION.idle }), "");
+  assert.equal(fighterThreatPhaseLabel(null), "");
 });
 
 test("kill feed presentation preserves authoritative killer and victim identity", () => {
