@@ -1230,6 +1230,15 @@ async function runOnlineUiMultiThreatFlight(entries, requireSecondary = false, r
     resolveArenaElement(left, `${milestone} left threat attacker`),
     resolveArenaElement(right, `${milestone} right threat attacker`),
   ]);
+  // The left spawn's default facing already points toward center, but the right spawn
+  // must replicate a ~PI facing change before its attack can threaten center. Aim both real
+  // attackers first, then keep that aim active throughout the inward movement pulse so the
+  // unchanged 60 Hz input/server path has many samples to establish both facings.
+  await Promise.all([
+    aimArena(left, leftArena, 200),
+    aimArena(right, rightArena, -200),
+  ]);
+  await sleep(60);
   // Authoritative spawns are 96 units apart while attack reach plus fighter radius is 94.
   // Stage both genuine attackers well inside unchanged threat geometry before synchronizing
   // their attacks so runner/input jitter cannot leave one edge attacker just outside reach.
@@ -1237,13 +1246,8 @@ async function runOnlineUiMultiThreatFlight(entries, requireSecondary = false, r
     pulseMovementKey(left, "d", 260),
     pulseMovementKey(right, "a", 260),
   ]);
-  await Promise.all([
-    aimArena(left, leftArena, 200),
-    aimArena(right, rightArena, -200),
-  ]);
-  // Let the genuine pointer-move aim reach the 60 Hz input/server path before
-  // either attack commits. This keeps facing setup outside the 135 ms overlap window.
-  await sleep(50);
+  // Let movement release and the persisted facing propagate before either attack commits.
+  await sleep(60);
 
   const leftId = ordered[0].playerNetId;
   const rightId = ordered[2].playerNetId;
