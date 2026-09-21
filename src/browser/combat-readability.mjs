@@ -167,6 +167,12 @@ export function fighterIdentityPresentation(netId) {
   return { visible: true, label: `#${netId}` };
 }
 
+export function fighterThreatPhaseLabel(attacker) {
+  if (attacker?.action === COMBAT_ACTION.attackActive) return "STRIKE";
+  if (attacker?.action === COMBAT_ACTION.attackWindup) return "WINDUP";
+  return "";
+}
+
 export function fighterThreatBearingLabel(own, attacker) {
   if (!own || !attacker || !Number.isFinite(own.x) || !Number.isFinite(own.y)
     || !Number.isFinite(attacker.x) || !Number.isFinite(attacker.y)) return "";
