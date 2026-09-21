@@ -80,7 +80,7 @@ No combat state, facing, action, damage, or position is injected.
 
 Exact-head FULL validation exposed two pre-M60 sampling flakes before the M60 gate:
 
-- M36 could miss the short authoritative WINDUP observation when a genuine Firefox attack burst was not latched on that attempt. The existing three-attempt loop now treats a clean no-WINDUP attempt as a bounded retry instead of throwing before the retry loop can operate. Any resolved damage/parry still fails closed. No dodge or combat timing changes.
+- M36 had become dependent on the later M54 threat HUD to time its real dodge, and cross-driver delay could consume too much of the unchanged 135 ms windup before Chrome received the dodge controls. M36 now returns to its own responsibility: after the bounded genuine Firefox click burst, it waits 45 ms and sends the genuine Chrome perpendicular dodge. Because the burst itself completes inside one windup, the unchanged 118 ms iframe spans the possible active transition. M24 remains the exact dodge timing/geometry authority; resolved damage/parry still fails closed.
 - M25 could observe the authoritative blocked guard cost while missing the narrower simultaneous client sample of attacker-active plus defender-block. When the authoritative guard drop is first observed with HP unchanged, the flight now samples the same unchanged distance/attack-arc geometry from that replicated frame. It still requires the exact reach/arc bounds and does not infer success from guard loss alone when geometry is invalid.
 
 Both changes are browser-acceptance instrumentation only. Production combat, networking, constants, and runtime behavior are unchanged.
