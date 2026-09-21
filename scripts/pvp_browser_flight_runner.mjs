@@ -584,7 +584,20 @@ async function runOnlineUiDodgeFeedbackFlight(entries) {
     }
 
     await performArenaAttackBurst(attacker);
-    await waitForThreatWindup(defender, attackerReady.playerNetId, 240);
+    const windup = await waitForThreatWindup(defender, attackerReady.playerNetId, 240, false);
+    if (!windup) {
+      const missedWindup = await Promise.all(entries.map(readUiEvidence));
+      const vitalsClean = missedWindup.every((entry) => entry.playerHp === 100 && entry.playerGuard === 100);
+      const parrySeen = missedWindup.some((entry) => entry.feedbackTransitions.includes("parried") || entry.feedbackTransitions.includes("parry-success"));
+      if (!vitalsClean || parrySeen) {
+        throw new Error(`M36 retry ${attempt} missed WINDUP after a resolved exchange: ${JSON.stringify(missedWindup)}`);
+      }
+      if (attempt < 3) {
+        await sleep(430);
+        await aimArena(attacker, attackerElementId, attackOffset);
+      }
+      continue;
+    }
     await pressArenaPerpendicularDodgeAfterPause(defender, 0);
     // The authoritative WINDUP handshake is complete; keep the remaining
     // iframe/strike resolution window free of evidence polling.
@@ -2290,7 +2303,7 @@ async function waitForUiMessage(session, text, timeoutMs) {
   throw new Error(`${session.name} never rendered expected online UI message ${text}: ${JSON.stringify(await readUiEvidence(session))}`);
 }
 
-async function waitForThreatWindup(observer, attackerNetId, timeoutMs) {
+async function waitForThreatWindup(observer, attackerNetId, timeoutMs, required = true) {
   const deadline = Date.now() + timeoutMs;
   const expectedLabel = `#${attackerNetId}`;
   while (Date.now() < deadline) {
@@ -2298,6 +2311,7 @@ async function waitForThreatWindup(observer, attackerNetId, timeoutMs) {
     if (state.threatVisible && state.threatState === "windup" && state.threatLabel === expectedLabel) return state;
     await sleep(10);
   }
+  if (!required) return null;
   throw new Error(`M36 defender never observed authoritative WINDUP from ${expectedLabel}: ${JSON.stringify(await readUiEvidence(observer))}`);
 }
 
