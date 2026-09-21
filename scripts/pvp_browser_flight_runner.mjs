@@ -1251,39 +1251,17 @@ async function runOnlineUiMultiThreatFlight(entries, requireSecondary = false, r
 
   const leftId = ordered[0].playerNetId;
   const rightId = ordered[2].playerNetId;
-  const firstAttacker = left.name === "firefox" ? { session: left, elementId: leftArena, offset: 200 }
-    : right.name === "firefox" ? { session: right, elementId: rightArena, offset: -200 }
-      : { session: left, elementId: leftArena, offset: 200 };
-  const secondAttacker = firstAttacker.session === left
-    ? { session: right, elementId: rightArena, offset: -200 }
-    : { session: left, elementId: leftArena, offset: 200 };
   let evidence = null;
   for (let attempt = 0; attempt < 3 && !evidence; attempt += 1) {
-    let firstHeld = false;
-    let secondHeld = false;
-    try {
-      if (firstAttacker.session.name !== "firefox" && secondAttacker.session.name !== "firefox") {
-        await Promise.all([
-          setArenaAttackButton(firstAttacker.session, true),
-          setArenaAttackButton(secondAttacker.session, true),
-        ]);
-        firstHeld = true;
-        secondHeld = true;
-      } else {
-        await setArenaAttackButton(firstAttacker.session, true);
-        firstHeld = true;
-        await setArenaAttackButton(secondAttacker.session, true);
-        secondHeld = true;
-      }
-      // Keep the genuine button state across multiple 60 Hz client samples. 100 ms
-      // remains below the unchanged 135 ms windup, so it cannot create a second attack.
-      await sleep(100);
-    } finally {
-      const releases = [];
-      if (firstHeld) releases.push(setArenaAttackButton(firstAttacker.session, false));
-      if (secondHeld) releases.push(setArenaAttackButton(secondAttacker.session, false));
-      if (releases.length > 0) await Promise.all(releases);
-    }
+    // Online attacks are one-shot pointerdown latches that are cleared after the
+    // next outbound input sample. Holding the button does not refresh that latch.
+    // Send a short burst of genuine clicks to both already-aimed Chrome attackers.
+    // The burst finishes inside one unchanged 135 ms windup, so once an attack is
+    // accepted, later pulses are ignored while the fighter is non-Idle.
+    await Promise.all([
+      performArenaAttackBurst(left),
+      performArenaAttackBurst(right),
+    ]);
     await sleep(240);
     const states = await Promise.all(entries.map(readUiEvidence));
     const leftState = states.find((entry) => entry.browser === left.name);
@@ -1602,6 +1580,24 @@ async function setArenaAttackButton(session, pressed) {
       id: `mouse-${session.name}`,
       parameters: { pointerType: "mouse" },
       actions: [{ type: pressed ? "pointerDown" : "pointerUp", button: 0 }],
+    }],
+  });
+}
+
+async function performArenaAttackBurst(session) {
+  const actions = [];
+  for (let index = 0; index < 3; index += 1) {
+    actions.push({ type: "pointerDown", button: 0 });
+    actions.push({ type: "pause", duration: 12 });
+    actions.push({ type: "pointerUp", button: 0 });
+    if (index < 2) actions.push({ type: "pause", duration: 12 });
+  }
+  await webdriver(session.base, "POST", `/session/${session.sessionId}/actions`, {
+    actions: [{
+      type: "pointer",
+      id: `mouse-${session.name}`,
+      parameters: { pointerType: "mouse" },
+      actions,
     }],
   });
 }
