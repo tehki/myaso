@@ -509,8 +509,8 @@ async function runOnlineUiAttackIntentFlight(entries) {
 async function runOnlineUiDodgeFeedbackFlight(entries) {
   await Promise.all(entries.map(installUiObserver));
   const ready = await waitForUiReady(entries);
-  const attacker = entries.find((entry) => entry.name === "chrome");
-  const defender = entries.find((entry) => entry.name === "firefox");
+  const attacker = entries.find((entry) => entry.name === "firefox");
+  const defender = entries.find((entry) => entry.name === "chrome");
   const attackerReady = ready.find((entry) => entry.browser === attacker?.name);
   const defenderReady = ready.find((entry) => entry.browser === defender?.name);
   if (!attacker || !defender || !attackerReady || !defenderReady) throw new Error(`could not resolve M36 UI roles from ${JSON.stringify(ready)}`);
@@ -535,13 +535,12 @@ async function runOnlineUiDodgeFeedbackFlight(entries) {
 
   let evidence = null;
   let lastAttemptBaseline = null;
-  // M24 owns reaction-timing proof. M36 dispatches genuine Chrome attack-button
-  // and Firefox KeyS+Space W3C sequences concurrently after aim has already propagated.
-  // Firefox carries the proven 20 ms driver-side pause before Dodge. Keeping pointer-move
-  // setup outside this window reduces command work, while the deeper real-input spacing
-  // keeps an early valid Dodge inside potential strike geometry. A miss remains retryable
-  // only while both fighters stay untouched and no parry occurs. No evidence polling runs
-  // during the attack/Dodge resolution window.
+  // M24 owns reaction-timing/geometry proof. M36 owns the real-control readability
+  // path. Use Firefox as the attacker and Chrome as the KeyS+Space defender so the slow
+  // WebDriver commits the genuine attack first; only then wait 20 ms and issue the fast
+  // Chrome dodge controls. This keeps cross-browser real input while removing Firefox
+  // command-start latency from the 118 ms iframe timing path. Combat timing and acceptance
+  // thresholds remain unchanged. No evidence polling runs during the critical window.
   for (let attempt = 1; attempt <= 3 && !evidence; attempt += 1) {
     lastAttemptBaseline = await Promise.all(entries.map(readUiEvidence));
     if (!lastAttemptBaseline.every((entry) => entry.playerHp === 100 && entry.playerGuard === 100)) {
@@ -551,10 +550,9 @@ async function runOnlineUiDodgeFeedbackFlight(entries) {
     let attackHeld = false;
     try {
       attackHeld = true;
-      await Promise.all([
-        setArenaAttackButton(attacker, true),
-        pressArenaPerpendicularDodgeAfterPause(defender, 20),
-      ]);
+      await setArenaAttackButton(attacker, true);
+      await sleep(20);
+      await pressArenaPerpendicularDodgeAfterPause(defender, 0);
     } finally {
       if (attackHeld) await setArenaAttackButton(attacker, false);
     }
