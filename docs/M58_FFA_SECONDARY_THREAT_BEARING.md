@@ -109,7 +109,9 @@ The shared M55/M56/M58 harness now removes both sources of cross-driver ambiguit
 
 - these three multi-threat scenarios navigate clients sequentially and verify authoritative IDs: Chrome #1, Firefox #2, Chrome2 #3;
 - Firefox is therefore deterministically the center observer, while the two Chrome clients are the opposite-side attackers;
-- both attackers first receive genuine pointer-move aim toward the center fighter;
+- authoritative players spawn 96 units apart while unchanged attack reach plus fighter radius is 94 units;
+- both edge attackers therefore use a 260 ms genuine inward movement pulse before the synchronized exchange, staging them decisively inside unchanged threat geometry despite runner/input jitter;
+- both attackers then receive genuine pointer-move aim toward the center fighter;
 - the harness gives that facing input 50 ms to propagate through the unchanged 60 Hz input/server path before either attack commits;
 - the synchronized attack phase then uses concurrent button-only pointer-down/up actions on the two Chrome drivers, so pointer-move/facing latency and Firefox WebDriver startup latency are outside the unchanged 135 ms overlap window;
 - both pointer inputs are briefly held, then released;
