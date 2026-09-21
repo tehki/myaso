@@ -78,31 +78,28 @@ No position, action, damage, or combat state is injected.
 
 ## Inherited M36 acceptance stabilization
 
-Quality run #210 / `35515631025` stopped twice at inherited M36 before M58 executed.
+M36 is a real-control UI/readability acceptance; M24 remains the authoritative dodge timing/geometry proof.
 
-Both failures had the same fail-closed signature:
+Several exact-head quality runs exposed headless cross-driver timing variance when M36 used Chrome as the attacker and Firefox as the real `KeyS + Space` defender. The repeated fail-closed signature was consistent:
 
-- M24 authoritative dodge acceptance had already passed on the same exact head;
-- Firefox recorded genuine `KeyS` + `Space` down/up controls;
-- Chrome recorded a genuine left-mouse attack;
-- the authoritative strike still landed for 34 HP before the M36 dodge overlap was established.
+- M24 authoritative dodge acceptance passed on the same code;
+- both browsers delivered genuine controls;
+- Firefox recorded real `KeyS` + `Space` down/up events;
+- Chrome recorded a real left-mouse attack;
+- the unchanged 34 HP strike sometimes resolved before Firefox's WebDriver command established the unchanged 118 ms dodge iframe.
 
-The failing inherited choreography confirmed Chrome pointer-down, then introduced a 35 ms Node-side delay before starting the Firefox WebDriver command. Cross-driver command startup added unbounded latency after that delay.
+Changing Node-side delays or launching the two WebDriver requests together did not remove Firefox command-start jitter reliably.
 
-M58 restores the exact choreography used by the previously green M54 head: launch the genuine Chrome pointer-down and Firefox KeyS+Space WebDriver commands concurrently, with a 20 ms pause inside Firefox's W3C action sequence. This removes the Node-side cross-driver round-trip from the critical timing path while retaining a deliberate offset so the unchanged 118 ms dodge iframe overlaps the unchanged 135 ms strike.
+M58 therefore keeps M36 cross-browser and real-input, but assigns the timing-sensitive defender role to Chrome:
 
-On the restored ordering, quality run #213 / `35527645041` passed M36 on the exact code before later stopping at M55 choreography.
+- Firefox is the genuine mouse attacker;
+- Chrome is the genuine `KeyS + Space` defender;
+- both fighters are positioned and aimed using ordinary real controls before the critical exchange;
+- Firefox's slower WebDriver commits the real attack button first;
+- after a fixed 20 ms offset, the faster Chrome WebDriver issues the real perpendicular dodge;
+- the existing fail-closed requirements remain unchanged: both fighters must keep untouched authoritative vitals/guard, no parry may resolve, and the genuine movement/aim/dodge input provenance must be present.
 
-A later exact-head quality run #218 / `35557960905` exposed the opposite runner edge: M24 again passed, M36 delivered three genuine Firefox dodges with untouched 100/100 vitals and no parry, but the staged perpendicular movement turned each strike into a spatial miss before the dedicated dodge-evade feedback could be emitted.
-
-M36 now keeps its acceptance strict while making that UI proof deterministic:
-
-- the Chrome attacker approaches farther using ordinary real keyboard movement, placing the defender deeper inside unchanged authoritative reach;
-- Chrome aim is delivered with a genuine pointer move and given 50 ms to propagate before the timing-critical exchange;
-- the timing-critical Chrome action is then button-only, while Firefox retains the genuine KeyS+Space W3C dodge with the proven 20 ms internal pause;
-- the existing fail-closed requirements for untouched vitals, no parry, genuine input provenance, and actual dodge feedback remain unchanged.
-
-M24 remains the authoritative exact dodge timing/geometry proof. No server code, attack timing, dodge timing, iframe duration, damage, reach/arc rule, feedback threshold, or production behavior is changed.
+This changes only browser-test choreography. No server code, attack timing, dodge timing, iframe duration, damage, reach/arc rule, feedback threshold, or production behavior is changed.
 
 ## Inherited M55/M56 multi-threat choreography stabilization
 
