@@ -567,12 +567,10 @@ async function runOnlineUiDodgeFeedbackFlight(entries) {
   let evidence = null;
   let lastAttemptBaseline = null;
   // M24 owns reaction-timing/geometry proof. M36 owns the real-control readability
-  // path. Use Firefox as the attacker and Chrome as the KeyS+Space defender so the slow
-  // WebDriver commits the genuine attack first; then wait 45 ms before issuing the fast
-  // Chrome dodge controls. With the unchanged 135 ms windup and 118 ms iframe, that
-  // preserves overlap while leaving practical 60 Hz/server-command jitter margin.
-  // Combat timing and acceptance thresholds remain unchanged. No evidence polling runs
-  // during the critical window.
+  // path. Commit the genuine Firefox attack, then wait until the fast Chrome defender's
+  // replicated threat HUD sees this exact attacker in authoritative WINDUP. Dodge
+  // immediately from that state boundary instead of guessing cross-driver/server latency
+  // with a fixed delay. Combat timing and acceptance thresholds remain unchanged.
   for (let attempt = 1; attempt <= 3 && !evidence; attempt += 1) {
     lastAttemptBaseline = await Promise.all(entries.map(readUiEvidence));
     if (!lastAttemptBaseline.every((entry) => entry.playerHp === 100 && entry.playerGuard === 100)) {
@@ -583,12 +581,13 @@ async function runOnlineUiDodgeFeedbackFlight(entries) {
     try {
       attackHeld = true;
       await setArenaAttackButton(attacker, true);
-      await sleep(45);
+      await waitForThreatWindup(defender, attackerReady.playerNetId, 240);
       await pressArenaPerpendicularDodgeAfterPause(defender, 0);
     } finally {
       if (attackHeld) await setArenaAttackButton(attacker, false);
     }
-    // Keep the critical 118 ms iframe/strike window free of cross-driver evidence reads.
+    // The authoritative WINDUP handshake is complete; keep the remaining
+    // iframe/strike resolution window free of evidence polling.
     await sleep(180);
     evidence = await waitForUiDodgeEvidence(entries, attacker, defender, 520, false, lastAttemptBaseline);
     if (evidence) break;
@@ -2184,6 +2183,17 @@ async function waitForUiMessage(session, text, timeoutMs) {
     await sleep(20);
   }
   throw new Error(`${session.name} never rendered expected online UI message ${text}: ${JSON.stringify(await readUiEvidence(session))}`);
+}
+
+async function waitForThreatWindup(observer, attackerNetId, timeoutMs) {
+  const deadline = Date.now() + timeoutMs;
+  const expectedLabel = `#${attackerNetId}`;
+  while (Date.now() < deadline) {
+    const state = await readUiEvidence(observer);
+    if (state.threatVisible && state.threatState === "windup" && state.threatLabel === expectedLabel) return state;
+    await sleep(10);
+  }
+  throw new Error(`M36 defender never observed authoritative WINDUP from ${expectedLabel}: ${JSON.stringify(await readUiEvidence(observer))}`);
 }
 
 async function waitForUiDodgeEvidence(entries, attacker, defender, timeoutMs, fail = true, baselineStates = null) {
