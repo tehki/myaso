@@ -55,7 +55,24 @@ try {
   const game = await startGameServer();
   gameServer = game.child;
   for (const browser of browsers) sessions.push(await startBrowser(browser));
-  await Promise.all(sessions.map((entry) => navigate(entry, game.url, game.certificateHash)));
+  if (scenario === "uimultithreat" || scenario === "uisecondarythreat" || scenario === "uisecondarybearing") {
+    const expected = [
+      ["chrome", 1],
+      ["firefox", 2],
+      ["chrome2", 3],
+    ];
+    for (const [name, expectedNetId] of expected) {
+      const entry = sessions.find((candidate) => candidate.name === name);
+      if (!entry) throw new Error(`${scenario} missing deterministic browser role ${name}`);
+      await navigate(entry, game.url, game.certificateHash);
+      const actualNetId = await waitForOnlinePlayerNetId(entry, 5000);
+      if (actualNetId !== expectedNetId) {
+        throw new Error(`${scenario} expected ${name} as authoritative #${expectedNetId}, received #${actualNetId}`);
+      }
+    }
+  } else {
+    await Promise.all(sessions.map((entry) => navigate(entry, game.url, game.certificateHash)));
+  }
   if (scenario === "ui") {
     const results = await runOnlineUiFlight(sessions);
     console.log(`M30_ONLINE_UI_READABILITY ${JSON.stringify({ ok: true, results })}`);
@@ -249,6 +266,20 @@ async function navigate(session, gameUrl, certificateHash) {
     url.searchParams.set("scenario", scenario);
   }
   await webdriver(session.base, "POST", `/session/${session.sessionId}/url`, { url: url.toString() });
+}
+
+async function waitForOnlinePlayerNetId(session, timeoutMs) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const value = await execute(session.base, session.sessionId, `
+      const text = document.querySelector('#event-text')?.textContent?.trim() ?? '';
+      const match = text.match(/^Online - player #(\\d+) - server tick \\d+$/);
+      return match ? Number(match[1]) : 0;
+    `);
+    if (value > 0) return value;
+    await sleep(25);
+  }
+  throw new Error(`${session.name} did not publish an authoritative player id after navigation`);
 }
 
 async function runOnlineUiFlight(entries) {
@@ -1224,10 +1255,19 @@ async function runOnlineUiMultiThreatFlight(entries, requireSecondary = false, r
     let firstHeld = false;
     let secondHeld = false;
     try {
-      await setArenaAttackButton(firstAttacker.session, true);
-      firstHeld = true;
-      await setArenaAttackButton(secondAttacker.session, true);
-      secondHeld = true;
+      if (firstAttacker.session.name !== "firefox" && secondAttacker.session.name !== "firefox") {
+        await Promise.all([
+          setArenaAttackButton(firstAttacker.session, true),
+          setArenaAttackButton(secondAttacker.session, true),
+        ]);
+        firstHeld = true;
+        secondHeld = true;
+      } else {
+        await setArenaAttackButton(firstAttacker.session, true);
+        firstHeld = true;
+        await setArenaAttackButton(secondAttacker.session, true);
+        secondHeld = true;
+      }
       await sleep(40);
     } finally {
       const releases = [];
