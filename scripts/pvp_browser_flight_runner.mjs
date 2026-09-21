@@ -1199,6 +1199,13 @@ async function runOnlineUiMultiThreatFlight(entries, requireSecondary = false, r
     pulseMovementKey(left, "d", 120),
     pulseMovementKey(right, "a", 120),
   ]);
+  await Promise.all([
+    aimArena(left, leftArena, 200),
+    aimArena(right, rightArena, -200),
+  ]);
+  // Let the genuine pointer-move aim reach the 60 Hz input/server path before
+  // either attack commits. This keeps facing setup outside the 135 ms overlap window.
+  await sleep(50);
 
   const leftId = ordered[0].playerNetId;
   const rightId = ordered[2].playerNetId;
@@ -1213,15 +1220,15 @@ async function runOnlineUiMultiThreatFlight(entries, requireSecondary = false, r
     let firstHeld = false;
     let secondHeld = false;
     try {
-      await setArenaAttack(firstAttacker.session, firstAttacker.elementId, true, firstAttacker.offset);
+      await setArenaAttackButton(firstAttacker.session, true);
       firstHeld = true;
-      await setArenaAttack(secondAttacker.session, secondAttacker.elementId, true, secondAttacker.offset);
+      await setArenaAttackButton(secondAttacker.session, true);
       secondHeld = true;
       await sleep(40);
     } finally {
       const releases = [];
-      if (firstHeld) releases.push(setArenaAttack(firstAttacker.session, firstAttacker.elementId, false, firstAttacker.offset));
-      if (secondHeld) releases.push(setArenaAttack(secondAttacker.session, secondAttacker.elementId, false, secondAttacker.offset));
+      if (firstHeld) releases.push(setArenaAttackButton(firstAttacker.session, false));
+      if (secondHeld) releases.push(setArenaAttackButton(secondAttacker.session, false));
       if (releases.length > 0) await Promise.all(releases);
     }
     await sleep(240);
@@ -1531,6 +1538,17 @@ async function performArenaAttack(session, elementId, xOffset = 200) {
         { type: "pause", duration: 40 },
         { type: "pointerUp", button: 0 },
       ],
+    }],
+  });
+}
+
+async function setArenaAttackButton(session, pressed) {
+  await webdriver(session.base, "POST", `/session/${session.sessionId}/actions`, {
+    actions: [{
+      type: "pointer",
+      id: `mouse-${session.name}`,
+      parameters: { pointerType: "mouse" },
+      actions: [{ type: pressed ? "pointerDown" : "pointerUp", button: 0 }],
     }],
   });
 }
