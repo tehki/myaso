@@ -615,6 +615,7 @@ function updateThreatCue(ownId) {
   threatCue.secondaryBearing = secondaryBearing;
   threatCue.secondaryPhase = secondaryPhase;
   threatCue.bearing = bearing;
+  threatCue.guardArc = guardArc;
 }
 
 function updateCombatOverlay(own, ownId) {
