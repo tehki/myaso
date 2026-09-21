@@ -93,7 +93,16 @@ M58 restores the exact choreography used by the previously green M54 head: launc
 
 On the restored ordering, quality run #213 / `35527645041` passed M36 on the exact code before later stopping at M55 choreography.
 
-No server code, attack timing, dodge timing, iframe duration, damage, geometry, feedback threshold, or real-input provenance requirement is changed.
+A later exact-head quality run #218 / `35557960905` exposed the opposite runner edge: M24 again passed, M36 delivered three genuine Firefox dodges with untouched 100/100 vitals and no parry, but the staged perpendicular movement turned each strike into a spatial miss before the dedicated dodge-evade feedback could be emitted.
+
+M36 now keeps its acceptance strict while making that UI proof deterministic:
+
+- the Chrome attacker approaches farther using ordinary real keyboard movement, placing the defender deeper inside unchanged authoritative reach;
+- Chrome aim is delivered with a genuine pointer move and given 50 ms to propagate before the timing-critical exchange;
+- the timing-critical Chrome action is then button-only, while Firefox retains the genuine KeyS+Space W3C dodge with the proven 20 ms internal pause;
+- the existing fail-closed requirements for untouched vitals, no parry, genuine input provenance, and actual dodge feedback remain unchanged.
+
+M24 remains the authoritative exact dodge timing/geometry proof. No server code, attack timing, dodge timing, iframe duration, damage, reach/arc rule, feedback threshold, or production behavior is changed.
 
 ## Inherited M55/M56 multi-threat choreography stabilization
 
