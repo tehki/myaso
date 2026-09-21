@@ -95,12 +95,24 @@ M58 therefore keeps M36 cross-browser and real-input, but assigns the timing-sen
 - Firefox is the genuine mouse attacker;
 - Chrome is the genuine `KeyS + Space` defender;
 - both fighters are positioned and aimed using ordinary real controls before the critical exchange;
-- Firefox's slower WebDriver commits the real attack button first;
+- Firefox first receives the same bounded three-click genuine attack burst used by the multi-threat harness, refreshing the client's one-shot attack latch without extending beyond one windup;
 - the harness then waits on the Chrome defender's replicated threat HUD until that exact Firefox attacker is observed in authoritative `WINDUP`, proving both attack state and threat geometry without relying on a guessed cross-driver delay;
 - Chrome immediately issues the real perpendicular dodge from that authoritative state boundary;
 - the existing fail-closed requirements remain unchanged: the exchange must resolve as a real authoritative evade with untouched vitals/guard, no parry may resolve, and the genuine movement/aim/dodge input provenance must be present.
 
 This changes only browser-test choreography. No server code, attack timing, dodge timing, iframe duration, damage, reach/arc rule, feedback threshold, or production behavior is changed.
+
+## Inherited M41 parry-tell sampling stabilization
+
+M41 validates a short-lived remote-only spatial tell during the unchanged 430 ms authoritative parry stun. Its prior harness started polling pixels only after the full parry acceptance returned, so headless render/driver latency could allow the tell to disappear before the first sample even though the real parry had succeeded.
+
+The harness now arms frame-based pixel samplers on both browsers before the genuine parry exchange begins, records the maximum matching pixels throughout the exchange, and preserves the same acceptance rule:
+
+- the remote observer must record at least 24 parry-tell pixels;
+- the locally parried fighter must record zero remote-only tell pixels;
+- the tell must clear after authoritative stun recovery.
+
+This changes sampling timing only. Parry timing, stun duration, rendering rules, combat authority, and production behavior are unchanged.
 
 ## Inherited M55/M56 multi-threat choreography stabilization
 
@@ -116,7 +128,7 @@ The shared M55/M56/M58 harness now removes both sources of cross-driver ambiguit
 - both edge attackers then use a 260 ms genuine inward movement pulse while that aim remains active, continuously carrying the intended facing through the unchanged 60 Hz input/server path and staging both fighters decisively inside unchanged threat geometry;
 - after movement release, another 60 ms settle window lets the persisted facing/movement state reach the server before either attack commits;
 - the online client treats primary attack as a one-shot pointer-down latch that is cleared after the next outbound input sample, so merely holding a button does not refresh an unconsumed request;
-- the synchronized attack phase therefore sends each already-aimed Chrome attacker a three-click genuine pointer burst over about 60 ms;
+- the synchronized attack phase therefore sends each already-aimed Chrome attacker a three-click genuine pointer burst over about 46 ms;
 - the complete burst fits inside the unchanged 135 ms windup: if an early pulse starts the attack, later pulses arrive while the fighter is non-Idle and cannot start another attack; if an early latch misses an input sample, a later genuine pulse provides another bounded sampling opportunity;
 - acceptance still requires real pointer-down provenance from both attackers and overlapping authoritative threat state;
 - if damage resolves before simultaneous-threat evidence, the flight still fails closed.
