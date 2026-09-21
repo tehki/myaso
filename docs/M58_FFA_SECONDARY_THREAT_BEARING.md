@@ -60,7 +60,7 @@ The existing M57 cardinal/dominant-axis edge-case coverage remains unchanged.
 
 The dedicated `uisecondarybearing` flight reuses the proven M55/M56 three-browser simultaneous-threat choreography.
 
-Two real attackers move toward the center fighter with genuine keyboard input and commit coordinated genuine left-mouse attacks from opposite sides. If Firefox is an attacker, its pointer-down is confirmed first, then the faster second browser commits immediately so the authoritative windups overlap despite cross-driver startup jitter.
+Two real Chrome attackers move toward a real Firefox center fighter with genuine keyboard input and commit coordinated genuine left-mouse attacks from opposite sides. The harness establishes authoritative roles deterministically before the flight: Chrome connects as #1, Firefox as #2, and Chrome2 as #3, and fails closed if any assigned ID differs.
 
 Acceptance requires:
 
@@ -105,13 +105,13 @@ This changes only browser-test choreography. No server code, attack timing, dodg
 
 Quality run #213 reached M55 after M36 passed but failed closed before M56-M58. Both real attackers delivered pointer input, but the Firefox attacker pointer-down occurred about 223 ms after the Chrome attacker pointer-down. The 135 ms attack windups therefore did not overlap, so the center client correctly observed only one authoritative threat.
 
-The shared M55/M56/M58 harness now coordinates genuine pointer input rather than launching cross-driver commands blindly:
+The shared M55/M56/M58 harness now removes both sources of cross-driver ambiguity while preserving genuine browser input:
 
+- these three multi-threat scenarios navigate clients sequentially and verify authoritative IDs: Chrome #1, Firefox #2, Chrome2 #3;
+- Firefox is therefore deterministically the center observer, while the two Chrome clients are the opposite-side attackers;
 - both attackers first receive genuine pointer-move aim toward the center fighter;
 - the harness gives that facing input 50 ms to propagate through the unchanged 60 Hz input/server path before either attack commits;
-- the synchronized attack phase then uses button-only pointer-down/up actions, so pointer-move/facing latency is outside the unchanged 135 ms overlap window;
-- if Firefox is one of the two attackers, its pointer-down is confirmed first;
-- the second attacker commits immediately afterward;
+- the synchronized attack phase then uses concurrent button-only pointer-down/up actions on the two Chrome drivers, so pointer-move/facing latency and Firefox WebDriver startup latency are outside the unchanged 135 ms overlap window;
 - both pointer inputs are briefly held, then released;
 - acceptance still requires two real pointer-down provenance records and overlapping authoritative threat state;
 - if damage resolves before simultaneous-threat evidence, the flight still fails closed.
@@ -134,7 +134,7 @@ It does not change:
 
 The render path retains the existing single threat scan. M58 adds one `Map.get(secondaryNetId)`, scalar bearing math, and cached DOM updates only when the bearing changes.
 
-Validation also restores the previously proven M36 concurrent Chrome/Firefox dodge-command ordering and coordinates M55/M56/M58 dual-attacker pointer-downs to remove cross-driver startup races. These are harness-only changes; combat timing and acceptance thresholds remain unchanged.
+Validation also stabilizes M36 with deterministic cross-browser control roles and gives M55/M56/M58 deterministic authoritative browser roles plus concurrent same-driver-family attacker commits. These are harness-only changes; combat timing and acceptance thresholds remain unchanged.
 
 ## Base / rollback
 
