@@ -582,7 +582,7 @@ async function runOnlineUiDodgeFeedbackFlight(entries) {
     try {
       attackHeld = true;
       await setArenaAttackButton(attacker, true);
-      await sleep(20);
+      await sleep(45);
       await pressArenaPerpendicularDodgeAfterPause(defender, 0);
     } finally {
       if (attackHeld) await setArenaAttackButton(attacker, false);
@@ -1275,7 +1275,9 @@ async function runOnlineUiMultiThreatFlight(entries, requireSecondary = false, r
         await setArenaAttackButton(secondAttacker.session, true);
         secondHeld = true;
       }
-      await sleep(40);
+      // Keep the genuine button state across multiple 60 Hz client samples. 100 ms
+      // remains below the unchanged 135 ms windup, so it cannot create a second attack.
+      await sleep(100);
     } finally {
       const releases = [];
       if (firstHeld) releases.push(setArenaAttackButton(firstAttacker.session, false));
