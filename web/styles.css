@@ -40,6 +40,8 @@ kbd { border: 1px solid #575144; border-bottom-width: 2px; border-radius: 5px; b
 .threat-secondary-phase[hidden] { display: none; }
 .threat-secondary-bearing { color: #e8c995; font-size: 10px; font-weight: 700; letter-spacing: .04em; }
 .threat-secondary-bearing[hidden] { display: none; }
+.threat-secondary-guard-arc { color: #ead9aa; font-size: 10px; font-weight: 700; letter-spacing: .04em; }
+.threat-secondary-guard-arc[hidden] { display: none; }
 .threat-bearing { color: #f3c78f; font-size: 10px; font-weight: 700; letter-spacing: .06em; }
 .threat-bearing[hidden] { display: none; }
 .threat-guard-arc { color: #f0dca0; font-size: 10px; font-weight: 700; letter-spacing: .04em; }
