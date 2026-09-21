@@ -568,10 +568,11 @@ async function runOnlineUiDodgeFeedbackFlight(entries) {
   let lastAttemptBaseline = null;
   // M24 owns reaction-timing/geometry proof. M36 owns the real-control readability
   // path. Use Firefox as the attacker and Chrome as the KeyS+Space defender so the slow
-  // WebDriver commits the genuine attack first; only then wait 20 ms and issue the fast
-  // Chrome dodge controls. This keeps cross-browser real input while removing Firefox
-  // command-start latency from the 118 ms iframe timing path. Combat timing and acceptance
-  // thresholds remain unchanged. No evidence polling runs during the critical window.
+  // WebDriver commits the genuine attack first; then wait 45 ms before issuing the fast
+  // Chrome dodge controls. With the unchanged 135 ms windup and 118 ms iframe, that
+  // preserves overlap while leaving practical 60 Hz/server-command jitter margin.
+  // Combat timing and acceptance thresholds remain unchanged. No evidence polling runs
+  // during the critical window.
   for (let attempt = 1; attempt <= 3 && !evidence; attempt += 1) {
     lastAttemptBaseline = await Promise.all(entries.map(readUiEvidence));
     if (!lastAttemptBaseline.every((entry) => entry.playerHp === 100 && entry.playerGuard === 100)) {
