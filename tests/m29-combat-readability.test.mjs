@@ -234,6 +234,19 @@ test("primary FFA threat guard arc follows authoritative defender facing", () =>
   assert.equal(fighterThreatGuardArcLabel(null, front), "");
 });
 
+test("secondary FFA threat guard arc is independent of primary threat relation", () => {
+  const own = fighter(2, 100, 100, COMBAT_ACTION.idle, 100, 100, 0);
+  const primaryLeft = fighter(1, 100, 100, COMBAT_ACTION.attackActive, 60, 100, 0);
+  const secondaryRight = fighter(3, 100, 100, COMBAT_ACTION.attackWindup, 140, 100, Math.PI);
+
+  assert.equal(fighterThreatGuardArcLabel(own, primaryLeft), "FLANK");
+  assert.equal(fighterThreatGuardArcLabel(own, secondaryRight), "FRONT");
+
+  own.facing = Math.PI;
+  assert.equal(fighterThreatGuardArcLabel(own, primaryLeft), "FRONT");
+  assert.equal(fighterThreatGuardArcLabel(own, secondaryRight), "FLANK");
+});
+
 test("kill feed presentation preserves authoritative killer and victim identity", () => {
   assert.deepEqual(killFeedPresentation({ killer: 3, victim: 2 }, 3), {
     visible: true, text: "#3 defeated #2", killerOwn: true, victimOwn: false,
