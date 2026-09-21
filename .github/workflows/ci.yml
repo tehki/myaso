@@ -313,6 +313,12 @@ jobs:
           MYASO_PVP_FLIGHT_DURATION_MS: "10000"
         run: node scripts/pvp_browser_flight_runner.mjs
 
+      - name: Validate M61 secondary FFA guard arc
+        env:
+          MYASO_PVP_SCENARIO: "uisecondaryguardarc"
+          MYASO_PVP_FLIGHT_DURATION_MS: "10000"
+        run: node scripts/pvp_browser_flight_runner.mjs
+
       - name: Measure M15 browser background convergence
         env:
           MYASO_FLIGHT_DURATION_MS: "4500"
