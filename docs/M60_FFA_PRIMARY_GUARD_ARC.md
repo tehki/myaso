@@ -76,6 +76,15 @@ The flight also preserves M55-M59 simultaneous count, secondary identity, opposi
 
 No combat state, facing, action, damage, or position is injected.
 
+## Inherited acceptance stabilization
+
+Exact-head FULL validation exposed two pre-M60 sampling flakes before the M60 gate:
+
+- M36 could miss the short authoritative WINDUP observation when a genuine Firefox attack burst was not latched on that attempt. The existing three-attempt loop now treats a clean no-WINDUP attempt as a bounded retry instead of throwing before the retry loop can operate. Any resolved damage/parry still fails closed. No dodge or combat timing changes.
+- M25 could observe the authoritative blocked guard cost while missing the narrower simultaneous client sample of attacker-active plus defender-block. When the authoritative guard drop is first observed with HP unchanged, the flight now samples the same unchanged distance/attack-arc geometry from that replicated frame. It still requires the exact reach/arc bounds and does not infer success from guard loss alone when geometry is invalid.
+
+Both changes are browser-acceptance instrumentation only. Production combat, networking, constants, and runtime behavior are unchanged.
+
 ## Performance boundary
 
 M60 adds only scalar angle math for the already-fetched primary attacker and one cached DOM token.
