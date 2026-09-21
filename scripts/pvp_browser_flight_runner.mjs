@@ -1230,9 +1230,12 @@ async function runOnlineUiMultiThreatFlight(entries, requireSecondary = false, r
     resolveArenaElement(left, `${milestone} left threat attacker`),
     resolveArenaElement(right, `${milestone} right threat attacker`),
   ]);
+  // Authoritative spawns are 96 units apart while attack reach plus fighter radius is 94.
+  // Stage both genuine attackers well inside unchanged threat geometry before synchronizing
+  // their attacks so runner/input jitter cannot leave one edge attacker just outside reach.
   await Promise.all([
-    pulseMovementKey(left, "d", 120),
-    pulseMovementKey(right, "a", 120),
+    pulseMovementKey(left, "d", 260),
+    pulseMovementKey(right, "a", 260),
   ]);
   await Promise.all([
     aimArena(left, leftArena, 200),
