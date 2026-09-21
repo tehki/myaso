@@ -96,8 +96,9 @@ M58 therefore keeps M36 cross-browser and real-input, but assigns the timing-sen
 - Chrome is the genuine `KeyS + Space` defender;
 - both fighters are positioned and aimed using ordinary real controls before the critical exchange;
 - Firefox's slower WebDriver commits the real attack button first;
-- after a fixed 45 ms offset, the faster Chrome WebDriver issues the real perpendicular dodge, leaving practical 60 Hz/server-command jitter margin while the unchanged 118 ms iframe still overlaps the unchanged 135 ms strike;
-- the existing fail-closed requirements remain unchanged: both fighters must keep untouched authoritative vitals/guard, no parry may resolve, and the genuine movement/aim/dodge input provenance must be present.
+- the harness then waits on the Chrome defender's replicated threat HUD until that exact Firefox attacker is observed in authoritative `WINDUP`, proving both attack state and threat geometry without relying on a guessed cross-driver delay;
+- Chrome immediately issues the real perpendicular dodge from that authoritative state boundary;
+- the existing fail-closed requirements remain unchanged: the exchange must resolve as a real authoritative evade with untouched vitals/guard, no parry may resolve, and the genuine movement/aim/dodge input provenance must be present.
 
 This changes only browser-test choreography. No server code, attack timing, dodge timing, iframe duration, damage, reach/arc rule, feedback threshold, or production behavior is changed.
 
