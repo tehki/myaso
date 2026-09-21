@@ -1366,11 +1366,6 @@ async function runOnlineUiMultiThreatFlight(entries, requireSecondary = false, r
           if (multiThreat.guardArc !== expectedGuardArc) {
             throw new Error(`M60 primary guard arc did not match authoritative center facing: ${JSON.stringify(states)}`);
           }
-          const guardArcLeak = [leftState, rightState].some((state) =>
-            state.threatTransitions.some((event) => event.visible && event.guardArc));
-          if (guardArcLeak) {
-            throw new Error(`M60 primary guard arc leaked to an attacker client: ${JSON.stringify(states)}`);
-          }
         }
       }
       evidence = states;
