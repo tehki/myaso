@@ -118,15 +118,19 @@ This changes only browser-test choreography. No server code, attack timing, dodg
 
 ## Inherited M41 parry-tell sampling stabilization
 
-M41 validates a short-lived remote-only spatial tell during the unchanged 430 ms authoritative parry stun. Its prior harness started polling pixels only after the full parry acceptance returned, so headless render/driver latency could allow the tell to disappear before the first sample even though the real parry had succeeded.
+M41 validates a short-lived remote-only spatial tell during the unchanged 430 ms authoritative parry stun. Its original post-exchange polling could miss the tell after it had already cleared. An initial fix armed full-canvas `getImageData()` sampling on every animation frame before the exchange; repeated exact-head failures then showed that this observer was intrusive enough to perturb Firefox while it was also the real parrying defender. M33 passed the same core parry choreography on those runs without the sampler, isolating the failure to test observation overhead.
 
-The harness now arms frame-based pixel samplers on both browsers before the genuine parry exchange begins, records the maximum matching pixels throughout the exchange, and preserves the same acceptance rule:
+The harness now uses a bounded sampler on both browsers:
 
-- the remote observer must record at least 24 parry-tell pixels;
-- the locally parried fighter must record zero remote-only tell pixels;
-- the tell must clear after authoritative stun recovery.
+- sample only a 360×360 region centered on the combat viewport rather than the full 960×540 canvas;
+- sample every 40 ms, with the first sample after 20 ms, rather than every animation frame;
+- the unchanged 430 ms stun therefore still provides roughly ten observation opportunities;
+- record the maximum matching pixels throughout the exchange;
+- require the remote observer to record at least 24 parry-tell pixels;
+- require the locally parried fighter to record zero remote-only tell pixels;
+- require the tell to clear after authoritative stun recovery.
 
-This changes sampling timing only. Parry timing, stun duration, rendering rules, combat authority, and production behavior are unchanged.
+The standalone clear/sample helper uses the same bounded center region. This changes observation cost and cadence only. Parry timing, stun duration, rendering rules, combat authority, and production behavior are unchanged.
 
 ## Inherited M55/M56 multi-threat choreography stabilization
 
