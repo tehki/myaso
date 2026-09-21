@@ -72,7 +72,7 @@ Therefore:
 - if the selected primary is left-side #1, the center must report `FLANK`;
 - if the selected primary is right-side #3, the center must report `FRONT`.
 
-The flight also preserves M55-M59 simultaneous count, secondary identity, opposite bearings, and secondary phase evidence, and rejects a guard-arc cue leaking to either attacker client.
+The flight also preserves M55-M59 simultaneous count, secondary identity, opposite bearings, and secondary phase evidence. It validates the center observer's primary guard relation without suppressing legitimate primary-threat cues that another client may independently have.
 
 No combat state, facing, action, damage, or position is injected.
 
