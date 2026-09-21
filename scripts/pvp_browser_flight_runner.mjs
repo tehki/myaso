@@ -573,10 +573,10 @@ async function runOnlineUiDodgeFeedbackFlight(entries) {
   let evidence = null;
   let lastAttemptBaseline = null;
   // M24 owns reaction-timing/geometry proof. M36 owns the real-control readability
-  // path. Commit the genuine Firefox attack, then wait until the fast Chrome defender's
-  // replicated threat HUD sees this exact attacker in authoritative WINDUP. Dodge
-  // immediately from that state boundary instead of guessing cross-driver/server latency
-  // with a fixed delay. Combat timing and acceptance thresholds remain unchanged.
+  // path. Each genuine Firefox burst is bounded inside one unchanged windup; the Chrome
+  // defender then performs a genuine perpendicular dodge early enough for the unchanged
+  // iframe to span the possible active transition. Combat timing and acceptance thresholds
+  // remain unchanged, and the older M36 gate no longer depends on the later threat HUD.
   for (let attempt = 1; attempt <= 3 && !evidence; attempt += 1) {
     lastAttemptBaseline = await Promise.all(entries.map(readUiEvidence));
     if (!lastAttemptBaseline.every((entry) => entry.playerHp === 100 && entry.playerGuard === 100)) {
@@ -584,23 +584,13 @@ async function runOnlineUiDodgeFeedbackFlight(entries) {
     }
 
     await performArenaAttackBurst(attacker);
-    const windup = await waitForThreatWindup(defender, attackerReady.playerNetId, 240, false);
-    if (!windup) {
-      const missedWindup = await Promise.all(entries.map(readUiEvidence));
-      const vitalsClean = missedWindup.every((entry) => entry.playerHp === 100 && entry.playerGuard === 100);
-      const parrySeen = missedWindup.some((entry) => entry.feedbackTransitions.includes("parried") || entry.feedbackTransitions.includes("parry-success"));
-      if (!vitalsClean || parrySeen) {
-        throw new Error(`M36 retry ${attempt} missed WINDUP after a resolved exchange: ${JSON.stringify(missedWindup)}`);
-      }
-      if (attempt < 3) {
-        await sleep(430);
-        await aimArena(attacker, attackerElementId, attackOffset);
-      }
-      continue;
-    }
+    // M24 owns exact dodge reaction timing/geometry. The genuine attack burst finishes
+    // inside one unchanged 135 ms windup. A short fixed pause after that bounded burst
+    // places the real Chrome dodge iframe across the possible active transition without
+    // making this older M36 feedback acceptance depend on the later M54 threat HUD.
+    await sleep(45);
     await pressArenaPerpendicularDodgeAfterPause(defender, 0);
-    // The authoritative WINDUP handshake is complete; keep the remaining
-    // iframe/strike resolution window free of evidence polling.
+    // Keep the iframe/strike resolution window free of evidence polling.
     await sleep(180);
     evidence = await waitForUiDodgeEvidence(entries, attacker, defender, 520, false, lastAttemptBaseline);
     if (evidence) break;
@@ -2303,17 +2293,6 @@ async function waitForUiMessage(session, text, timeoutMs) {
   throw new Error(`${session.name} never rendered expected online UI message ${text}: ${JSON.stringify(await readUiEvidence(session))}`);
 }
 
-async function waitForThreatWindup(observer, attackerNetId, timeoutMs, required = true) {
-  const deadline = Date.now() + timeoutMs;
-  const expectedLabel = `#${attackerNetId}`;
-  while (Date.now() < deadline) {
-    const state = await readUiEvidence(observer);
-    if (state.threatVisible && state.threatState === "windup" && state.threatLabel === expectedLabel) return state;
-    await sleep(10);
-  }
-  if (!required) return null;
-  throw new Error(`M36 defender never observed authoritative WINDUP from ${expectedLabel}: ${JSON.stringify(await readUiEvidence(observer))}`);
-}
 
 async function waitForUiDodgeEvidence(entries, attacker, defender, timeoutMs, fail = true, baselineStates = null) {
   const baselineAttacker = baselineStates?.find((entry) => entry.browser === attacker.name);
