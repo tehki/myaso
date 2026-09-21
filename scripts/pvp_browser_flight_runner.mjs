@@ -1284,6 +1284,7 @@ async function runOnlineUiMultiThreatFlight(entries, requireSecondary = false, r
   ]);
   // Let movement release and the persisted facing propagate before either attack commits.
   await sleep(60);
+  if (requireSpatialMarkers) await Promise.all(entries.map(armThreatMarkerSampler));
 
   const leftId = ordered[0].playerNetId;
   const rightId = ordered[2].playerNetId;
@@ -1408,7 +1409,27 @@ async function runOnlineUiMultiThreatFlight(entries, requireSecondary = false, r
   }
 
   if (!evidence) {
+    if (requireSpatialMarkers) await Promise.all(entries.map(stopThreatMarkerSampler));
     throw new Error(`${milestone} never observed two simultaneous authoritative threats: ${JSON.stringify(await Promise.all(entries.map(readUiEvidence)))}`);
+  }
+  if (requireSpatialMarkers) {
+    const samples = await Promise.all(entries.map(async (entry) => ({
+      browser: entry.name,
+      ...(await stopThreatMarkerSampler(entry)),
+    })));
+    const centerSample = samples.find((entry) => entry.browser === center.name);
+    const attackerSamples = samples.filter((entry) => entry.browser === left.name || entry.browser === right.name);
+    if (!centerSample || centerSample.primaryMax < 8 || centerSample.secondaryMax < 8) {
+      throw new Error(`M62 center observer never painted both spatial threat markers: ${JSON.stringify(samples)}`);
+    }
+    if (attackerSamples.some((entry) => entry.primaryMax !== 0 || entry.secondaryMax !== 0)) {
+      throw new Error(`M62 spatial threat markers leaked to non-threatened attacker clients: ${JSON.stringify(samples)}`);
+    }
+    return evidence.map((entry) => ({
+      ...entry,
+      threatMarkerPrimaryMaxPixels: samples.find((sample) => sample.browser === entry.browser)?.primaryMax ?? 0,
+      threatMarkerSecondaryMaxPixels: samples.find((sample) => sample.browser === entry.browser)?.secondaryMax ?? 0,
+    }));
   }
   return evidence;
 }
