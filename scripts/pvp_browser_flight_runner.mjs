@@ -577,15 +577,9 @@ async function runOnlineUiDodgeFeedbackFlight(entries) {
       throw new Error(`M36 retry ${attempt} did not start from clean authoritative vitals: ${JSON.stringify(lastAttemptBaseline)}`);
     }
 
-    let attackHeld = false;
-    try {
-      attackHeld = true;
-      await setArenaAttackButton(attacker, true);
-      await waitForThreatWindup(defender, attackerReady.playerNetId, 240);
-      await pressArenaPerpendicularDodgeAfterPause(defender, 0);
-    } finally {
-      if (attackHeld) await setArenaAttackButton(attacker, false);
-    }
+    await performArenaAttackBurst(attacker);
+    await waitForThreatWindup(defender, attackerReady.playerNetId, 240);
+    await pressArenaPerpendicularDodgeAfterPause(defender, 0);
     // The authoritative WINDUP handshake is complete; keep the remaining
     // iframe/strike resolution window free of evidence polling.
     await sleep(180);
@@ -685,16 +679,32 @@ async function runOnlineUiParryFlight(entries) {
 }
 
 async function runOnlineUiParryTellFlight(entries) {
-  const evidence = await runOnlineUiParryFlight(entries);
-  const parried = evidence.find((entry) => entry.feedbackTransitions.includes("parried"));
-  const parrier = evidence.find((entry) => entry.feedbackTransitions.includes("parry-success"));
-  if (!parried || !parrier || parried.browser === parrier.browser) {
-    throw new Error(`M41 could not resolve parried fighter / parrier: ${JSON.stringify(evidence)}`);
+  const observer = entries.find((entry) => entry.name === "firefox");
+  const parriedLocal = entries.find((entry) => entry.name === "chrome");
+  if (!observer || !parriedLocal) throw new Error("M41 could not resolve Firefox observer / Chrome parried fighter");
+
+  await Promise.all([
+    armParryTellSampler(observer),
+    armParryTellSampler(parriedLocal),
+  ]);
+  let evidence;
+  let tell;
+  try {
+    evidence = await runOnlineUiParryFlight(entries);
+    const [observerMax, localMax] = await Promise.all([
+      readParryTellSampler(observer),
+      readParryTellSampler(parriedLocal),
+    ]);
+    if (observerMax < 24) {
+      throw new Error(`M41 remote parry-stun tell never appeared: observer=${observerMax} local=${localMax}`);
+    }
+    if (localMax !== 0) {
+      throw new Error(`M41 local parried fighter painted the remote-only tell: ${localMax}`);
+    }
+    tell = { observerMax, localMax };
+  } finally {
+    await Promise.all(entries.map(stopParryTellSampler));
   }
-  const observer = entries.find((entry) => entry.name === parrier.browser);
-  const parriedLocal = entries.find((entry) => entry.name === parried.browser);
-  if (!observer || !parriedLocal) throw new Error(`M41 could not resolve parry browser sessions`);
-  const tell = await waitForRemoteParryTell(observer, parriedLocal, 500);
   await waitForParryTellClear(observer, 1200);
   return evidence.map((entry) => ({
     ...entry,
@@ -1588,9 +1598,9 @@ async function performArenaAttackBurst(session) {
   const actions = [];
   for (let index = 0; index < 3; index += 1) {
     actions.push({ type: "pointerDown", button: 0 });
-    actions.push({ type: "pause", duration: 12 });
+    actions.push({ type: "pause", duration: 10 });
     actions.push({ type: "pointerUp", button: 0 });
-    if (index < 2) actions.push({ type: "pause", duration: 12 });
+    if (index < 2) actions.push({ type: "pause", duration: 8 });
   }
   await webdriver(session.base, "POST", `/session/${session.sessionId}/actions`, {
     actions: [{
@@ -1895,6 +1905,44 @@ async function waitForBlockFacingTellClear(session, timeoutMs) {
     await sleep(20);
   }
   throw new Error(`M42 remote block-facing tell did not clear after block release`);
+}
+
+async function armParryTellSampler(session) {
+  return execute(session.base, session.sessionId, `
+    const arena = document.querySelector('#arena');
+    const context = arena?.getContext('2d');
+    if (!context) return false;
+    const prior = window.__MYASO_M41_PARRY_SAMPLER__;
+    if (prior?.frame) cancelAnimationFrame(prior.frame);
+    const state = { active: true, frame: 0, maxPixels: 0 };
+    const sample = () => {
+      if (!state.active) return;
+      const pixels = context.getImageData(0, 0, arena.width, arena.height).data;
+      let count = 0;
+      for (let i = 0; i < pixels.length; i += 4) {
+        if (Math.abs(pixels[i] - 127) <= 2 && Math.abs(pixels[i + 1] - 207) <= 2 && Math.abs(pixels[i + 2] - 244) <= 2 && pixels[i + 3] >= 250) count += 1;
+      }
+      state.maxPixels = Math.max(state.maxPixels, count);
+      state.frame = requestAnimationFrame(sample);
+    };
+    window.__MYASO_M41_PARRY_SAMPLER__ = state;
+    state.frame = requestAnimationFrame(sample);
+    return true;
+  `);
+}
+
+async function readParryTellSampler(session) {
+  return execute(session.base, session.sessionId, `return window.__MYASO_M41_PARRY_SAMPLER__?.maxPixels ?? 0;`);
+}
+
+async function stopParryTellSampler(session) {
+  return execute(session.base, session.sessionId, `
+    const state = window.__MYASO_M41_PARRY_SAMPLER__;
+    if (!state) return 0;
+    state.active = false;
+    if (state.frame) cancelAnimationFrame(state.frame);
+    return state.maxPixels;
+  `);
 }
 
 async function sampleParryTellPixels(session) {
