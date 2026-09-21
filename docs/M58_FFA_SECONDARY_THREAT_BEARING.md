@@ -96,7 +96,7 @@ M58 therefore keeps M36 cross-browser and real-input, but assigns the timing-sen
 - Chrome is the genuine `KeyS + Space` defender;
 - both fighters are positioned and aimed using ordinary real controls before the critical exchange;
 - Firefox's slower WebDriver commits the real attack button first;
-- after a fixed 20 ms offset, the faster Chrome WebDriver issues the real perpendicular dodge;
+- after a fixed 45 ms offset, the faster Chrome WebDriver issues the real perpendicular dodge, leaving practical 60 Hz/server-command jitter margin while the unchanged 118 ms iframe still overlaps the unchanged 135 ms strike;
 - the existing fail-closed requirements remain unchanged: both fighters must keep untouched authoritative vitals/guard, no parry may resolve, and the genuine movement/aim/dodge input provenance must be present.
 
 This changes only browser-test choreography. No server code, attack timing, dodge timing, iframe duration, damage, reach/arc rule, feedback threshold, or production behavior is changed.
@@ -115,7 +115,7 @@ The shared M55/M56/M58 harness now removes both sources of cross-driver ambiguit
 - both edge attackers then use a 260 ms genuine inward movement pulse while that aim remains active, continuously carrying the intended facing through the unchanged 60 Hz input/server path and staging both fighters decisively inside unchanged threat geometry;
 - after movement release, another 60 ms settle window lets the persisted facing/movement state reach the server before either attack commits;
 - the synchronized attack phase then uses concurrent button-only pointer-down/up actions on the two Chrome drivers, so pointer-move/facing latency and Firefox WebDriver startup latency are outside the unchanged 135 ms overlap window;
-- both pointer inputs are briefly held, then released;
+- both pointer inputs are held for 100 ms—long enough to cross multiple 60 Hz client samples but still shorter than the unchanged 135 ms windup—then released;
 - acceptance still requires two real pointer-down provenance records and overlapping authoritative threat state;
 - if damage resolves before simultaneous-threat evidence, the flight still fails closed.
 
