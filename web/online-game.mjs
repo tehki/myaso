@@ -41,6 +41,7 @@ const threatCue = {
   secondaryLabel: document.querySelector("#threat-secondary"),
   secondaryBearingLabel: document.querySelector("#threat-secondary-bearing"),
   secondaryPhaseLabel: document.querySelector("#threat-secondary-phase"),
+  secondaryGuardArcLabel: document.querySelector("#threat-secondary-guard-arc"),
   bearingLabel: document.querySelector("#threat-bearing"),
   guardArcLabel: document.querySelector("#threat-guard-arc"),
   netId: 0,
@@ -49,6 +50,7 @@ const threatCue = {
   secondaryNetId: 0,
   secondaryBearing: "",
   secondaryPhase: "",
+  secondaryGuardArc: "",
   bearing: "",
   guardArc: "",
 };
@@ -542,6 +544,7 @@ function updateThreatCue(ownId) {
   const bearing = fighterThreatBearingLabel(own, attacker);
   const guardArc = fighterThreatGuardArcLabel(own, attacker);
   const secondaryBearing = fighterThreatBearingLabel(own, secondaryAttacker);
+  const secondaryGuardArc = fighterThreatGuardArcLabel(own, secondaryAttacker);
   const phase = fighterThreatPhaseLabel(attacker);
   const secondaryPhase = fighterThreatPhaseLabel(secondaryAttacker);
   const state = phase === "STRIKE" ? "strike" : phase === "WINDUP" ? "windup" : "";
@@ -554,12 +557,14 @@ function updateThreatCue(ownId) {
     threatCue.secondaryNetId = 0;
     threatCue.secondaryBearing = "";
     threatCue.secondaryPhase = "";
+    threatCue.secondaryGuardArc = "";
     threatCue.bearing = "";
     threatCue.guardArc = "";
     if (threatCue.countLabel) threatCue.countLabel.hidden = true;
     if (threatCue.secondaryLabel) threatCue.secondaryLabel.hidden = true;
     if (threatCue.secondaryBearingLabel) threatCue.secondaryBearingLabel.hidden = true;
     if (threatCue.secondaryPhaseLabel) threatCue.secondaryPhaseLabel.hidden = true;
+    if (threatCue.secondaryGuardArcLabel) threatCue.secondaryGuardArcLabel.hidden = true;
     if (threatCue.bearingLabel) threatCue.bearingLabel.hidden = true;
     if (threatCue.guardArcLabel) threatCue.guardArcLabel.hidden = true;
     delete threatCue.root.dataset.state;
@@ -600,6 +605,13 @@ function updateThreatCue(ownId) {
       threatCue.secondaryBearingLabel.textContent = secondaryBearing;
     }
   }
+  if (threatCue.secondaryGuardArcLabel) {
+    const showSecondaryGuardArc = threatCount > 1 && secondaryNetId > 0 && Boolean(secondaryGuardArc);
+    if (threatCue.secondaryGuardArcLabel.hidden === showSecondaryGuardArc) threatCue.secondaryGuardArcLabel.hidden = !showSecondaryGuardArc;
+    if (showSecondaryGuardArc && threatCue.secondaryGuardArc !== secondaryGuardArc) {
+      threatCue.secondaryGuardArcLabel.textContent = secondaryGuardArc;
+    }
+  }
   if (threatCue.guardArcLabel) {
     const showGuardArc = Boolean(guardArc);
     if (threatCue.guardArcLabel.hidden === showGuardArc) threatCue.guardArcLabel.hidden = !showGuardArc;
@@ -614,6 +626,7 @@ function updateThreatCue(ownId) {
   threatCue.secondaryNetId = secondaryNetId;
   threatCue.secondaryBearing = secondaryBearing;
   threatCue.secondaryPhase = secondaryPhase;
+  threatCue.secondaryGuardArc = secondaryGuardArc;
   threatCue.bearing = bearing;
   threatCue.guardArc = guardArc;
 }
