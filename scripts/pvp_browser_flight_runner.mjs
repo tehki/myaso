@@ -1924,20 +1924,25 @@ async function armParryTellSampler(session) {
     const context = arena?.getContext('2d');
     if (!context) return false;
     const prior = window.__MYASO_M41_PARRY_SAMPLER__;
-    if (prior?.frame) cancelAnimationFrame(prior.frame);
-    const state = { active: true, frame: 0, maxPixels: 0 };
+    if (prior?.timer) clearTimeout(prior.timer);
+    const half = 180;
+    const x = Math.max(0, Math.floor(arena.width / 2 - half));
+    const y = Math.max(0, Math.floor(arena.height / 2 - half));
+    const width = Math.min(half * 2, arena.width - x);
+    const height = Math.min(half * 2, arena.height - y);
+    const state = { active: true, timer: 0, maxPixels: 0 };
     const sample = () => {
       if (!state.active) return;
-      const pixels = context.getImageData(0, 0, arena.width, arena.height).data;
+      const pixels = context.getImageData(x, y, width, height).data;
       let count = 0;
       for (let i = 0; i < pixels.length; i += 4) {
         if (Math.abs(pixels[i] - 127) <= 2 && Math.abs(pixels[i + 1] - 207) <= 2 && Math.abs(pixels[i + 2] - 244) <= 2 && pixels[i + 3] >= 250) count += 1;
       }
       state.maxPixels = Math.max(state.maxPixels, count);
-      state.frame = requestAnimationFrame(sample);
+      state.timer = setTimeout(sample, 40);
     };
     window.__MYASO_M41_PARRY_SAMPLER__ = state;
-    state.frame = requestAnimationFrame(sample);
+    state.timer = setTimeout(sample, 20);
     return true;
   `);
 }
@@ -1951,7 +1956,7 @@ async function stopParryTellSampler(session) {
     const state = window.__MYASO_M41_PARRY_SAMPLER__;
     if (!state) return 0;
     state.active = false;
-    if (state.frame) cancelAnimationFrame(state.frame);
+    if (state.timer) clearTimeout(state.timer);
     return state.maxPixels;
   `);
 }
@@ -1961,7 +1966,12 @@ async function sampleParryTellPixels(session) {
     const arena = document.querySelector('#arena');
     const context = arena?.getContext('2d');
     if (!context) return 0;
-    const pixels = context.getImageData(0, 0, arena.width, arena.height).data;
+    const half = 180;
+    const x = Math.max(0, Math.floor(arena.width / 2 - half));
+    const y = Math.max(0, Math.floor(arena.height / 2 - half));
+    const width = Math.min(half * 2, arena.width - x);
+    const height = Math.min(half * 2, arena.height - y);
+    const pixels = context.getImageData(x, y, width, height).data;
     let count = 0;
     for (let i = 0; i < pixels.length; i += 4) {
       if (Math.abs(pixels[i] - 127) <= 2 && Math.abs(pixels[i + 1] - 207) <= 2 && Math.abs(pixels[i + 2] - 244) <= 2 && pixels[i + 3] >= 250) count += 1;
