@@ -840,7 +840,13 @@ async function runOnlineUiGuardBreakFlight(entries) {
   const defenderElementId = await resolveArenaElement(defender, "M34 defender");
   await Promise.all(entries.map(centerArenaInViewport));
   await pulseMovementKey(attacker, movementKey, 120);
-  await aimArena(defender, defenderElementId, blockOffset);
+  await Promise.all([
+    aimArena(attacker, attackerElementId, attackOffset),
+    aimArena(defender, defenderElementId, blockOffset),
+  ]);
+  // Keep both directional inputs on the normal 60 Hz path before the held-block
+  // exchange. Subsequent attack bursts are button-only and preserve this aim.
+  await sleep(60);
   let evidence = null;
   let blockHeld = false;
   try {
@@ -849,7 +855,12 @@ async function runOnlineUiGuardBreakFlight(entries) {
     await sleep(180);
     let guardBroken = false;
     for (let attempt = 0; attempt < 4 && !guardBroken; attempt += 1) {
-      await performArenaAttack(attacker, attackerElementId, attackOffset);
+      // Primary attack is a one-shot pointerdown latch cleared after an outbound
+      // input sample. Use the same bounded genuine-click burst as M55 so each
+      // intended guard-pressure strike survives client/network sampling jitter.
+      // The burst completes inside one 135 ms windup; the 530 ms total spacing
+      // below still keeps accepted strikes in separate combat cycles.
+      await performArenaAttackBurst(attacker);
       await sleep(230);
       const states = await Promise.all(entries.map(readUiEvidence));
       const defenderState = states.find((entry) => entry.browser === defender.name);
