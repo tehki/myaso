@@ -524,18 +524,24 @@ async function runOnlineUiDodgeFeedbackFlight(entries) {
   const defenderElementId = await resolveArenaElement(defender, "M36 defender");
   await Promise.all(entries.map(centerArenaInViewport));
   await aimArena(defender, defenderElementId, attackRight ? -200 : 200);
-  await pulseMovementKey(attacker, movementKey, 120);
+  // M24 owns exact dodge timing/geometry proof. M36 needs a deterministic
+  // authoritative dodge-evade UI exchange, so stage the attacker deeper inside
+  // unchanged attack reach. That keeps a correctly early perpendicular dodge in
+  // potential hit geometry through the strike instead of letting movement alone
+  // turn the exchange into a clean spatial miss.
+  await pulseMovementKey(attacker, movementKey, 260);
+  await aimArena(attacker, attackerElementId, attackOffset);
+  await sleep(50);
 
   let evidence = null;
   let lastAttemptBaseline = null;
-  // M24 owns reaction-timing proof. M36 dispatches the genuine Chrome pointer-down
-  // and Firefox KeyS+Space W3C sequence concurrently. Firefox carries only a 20 ms
-  // driver-side pause before the Dodge keys: with the 135 ms attack windup and 118 ms
-  // Dodge iframe, this leaves substantially more command-start jitter margin than a
-  // sequential cross-driver stagger while still placing the ordinary Dodge request inside
-  // the authoritative threat window. A miss remains retryable only while both fighters
-  // stay untouched and no parry occurs. No evidence polling runs during the
-  // attack/Dodge resolution window.
+  // M24 owns reaction-timing proof. M36 dispatches genuine Chrome attack-button
+  // and Firefox KeyS+Space W3C sequences concurrently after aim has already propagated.
+  // Firefox carries the proven 20 ms driver-side pause before Dodge. Keeping pointer-move
+  // setup outside this window reduces command work, while the deeper real-input spacing
+  // keeps an early valid Dodge inside potential strike geometry. A miss remains retryable
+  // only while both fighters stay untouched and no parry occurs. No evidence polling runs
+  // during the attack/Dodge resolution window.
   for (let attempt = 1; attempt <= 3 && !evidence; attempt += 1) {
     lastAttemptBaseline = await Promise.all(entries.map(readUiEvidence));
     if (!lastAttemptBaseline.every((entry) => entry.playerHp === 100 && entry.playerGuard === 100)) {
@@ -546,11 +552,11 @@ async function runOnlineUiDodgeFeedbackFlight(entries) {
     try {
       attackHeld = true;
       await Promise.all([
-        setArenaAttack(attacker, attackerElementId, true, attackOffset),
+        setArenaAttackButton(attacker, true),
         pressArenaPerpendicularDodgeAfterPause(defender, 20),
       ]);
     } finally {
-      if (attackHeld) await setArenaAttack(attacker, attackerElementId, false, attackOffset);
+      if (attackHeld) await setArenaAttackButton(attacker, false);
     }
     // Keep the critical 118 ms iframe/strike window free of cross-driver evidence reads.
     await sleep(180);
