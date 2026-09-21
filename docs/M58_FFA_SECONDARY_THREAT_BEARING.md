@@ -101,6 +101,9 @@ Quality run #213 reached M55 after M36 passed but failed closed before M56-M58. 
 
 The shared M55/M56/M58 harness now coordinates genuine pointer input rather than launching cross-driver commands blindly:
 
+- both attackers first receive genuine pointer-move aim toward the center fighter;
+- the harness gives that facing input 50 ms to propagate through the unchanged 60 Hz input/server path before either attack commits;
+- the synchronized attack phase then uses button-only pointer-down/up actions, so pointer-move/facing latency is outside the unchanged 135 ms overlap window;
 - if Firefox is one of the two attackers, its pointer-down is confirmed first;
 - the second attacker commits immediately afterward;
 - both pointer inputs are briefly held, then released;
