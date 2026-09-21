@@ -2209,6 +2209,55 @@ async function stopHitTellSampler(session) {
   `);
 }
 
+async function armThreatMarkerSampler(session) {
+  return execute(session.base, session.sessionId, `
+    const arena = document.querySelector('#arena');
+    const context = arena?.getContext('2d');
+    if (!context) return false;
+    const prior = window.__MYASO_M62_THREAT_MARKER_SAMPLER__;
+    if (prior?.frame) cancelAnimationFrame(prior.frame);
+    const state = { active: true, frame: 0, primaryMax: 0, secondaryMax: 0 };
+    const sample = () => {
+      if (!state.active) return;
+      const half = 110;
+      const x = Math.max(0, Math.floor(arena.width / 2 - half));
+      const y = Math.max(0, Math.floor(arena.height / 2 - half));
+      const width = Math.min(half * 2, arena.width - x);
+      const height = Math.min(half * 2, arena.height - y);
+      const pixels = context.getImageData(x, y, width, height).data;
+      let primary = 0;
+      let secondary = 0;
+      for (let i = 0; i < pixels.length; i += 4) {
+        if (Math.abs(pixels[i] - 255) <= 2 && Math.abs(pixels[i + 1] - 143) <= 2 && Math.abs(pixels[i + 2] - 114) <= 2 && pixels[i + 3] >= 250) primary += 1;
+        if (Math.abs(pixels[i] - 247) <= 2 && Math.abs(pixels[i + 1] - 225) <= 2 && Math.abs(pixels[i + 2] - 176) <= 2 && pixels[i + 3] >= 250) secondary += 1;
+      }
+      state.primaryMax = Math.max(state.primaryMax, primary);
+      state.secondaryMax = Math.max(state.secondaryMax, secondary);
+      state.frame = requestAnimationFrame(sample);
+    };
+    window.__MYASO_M62_THREAT_MARKER_SAMPLER__ = state;
+    state.frame = requestAnimationFrame(sample);
+    return true;
+  `);
+}
+
+async function readThreatMarkerSampler(session) {
+  return execute(session.base, session.sessionId, `
+    const state = window.__MYASO_M62_THREAT_MARKER_SAMPLER__;
+    return { primaryMax: state?.primaryMax ?? 0, secondaryMax: state?.secondaryMax ?? 0 };
+  `);
+}
+
+async function stopThreatMarkerSampler(session) {
+  return execute(session.base, session.sessionId, `
+    const state = window.__MYASO_M62_THREAT_MARKER_SAMPLER__;
+    if (!state) return { primaryMax: 0, secondaryMax: 0 };
+    state.active = false;
+    if (state.frame) cancelAnimationFrame(state.frame);
+    return { primaryMax: state.primaryMax, secondaryMax: state.secondaryMax };
+  `);
+}
+
 async function armWindupTellSampler(session) {
   return execute(session.base, session.sessionId, `
     const arena = document.querySelector('#arena');
