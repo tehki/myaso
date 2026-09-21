@@ -76,6 +76,20 @@ If authoritative damage resolves before the required simultaneous-threat evidenc
 
 No position, action, damage, or combat state is injected.
 
+## Inherited M34 guard-break sampling stabilization
+
+On exact-head quality attempt 2, M34 delivered four genuine Chrome pointer clicks while Firefox held a genuine directional block, but only the first attack reached authoritative simulation: guard moved from 100 to 62 and never advanced to the expected 24/0 sequence. The pointer provenance showed the later clicks existed in the browser, isolating the failure to the client's one-shot attack latch / outbound sampling boundary rather than guard-break combat logic.
+
+M34 now uses the same bounded real-input burst already adopted for M55:
+
+- attacker and defender are aimed once through genuine pointer movement and given 60 ms to propagate that direction;
+- Firefox keeps the existing genuine held directional block;
+- each intended guard-pressure strike uses a three-click genuine attack burst that completes inside one unchanged 135 ms windup;
+- accepted strikes remain separated by the existing approximately 530 ms cycle, longer than the unchanged windup/active/recovery sequence, so one burst cannot create multiple accepted attacks;
+- acceptance still requires guard to reach exactly 0, HP to remain unchanged, no accidental parry, genuine directional attack provenance, and genuine block down/up provenance.
+
+This changes only browser-test input sampling. Guard damage, parry window, attack timing, recovery, geometry, authority, and production behavior are unchanged.
+
 ## Inherited M36 acceptance stabilization
 
 M36 is a real-control UI/readability acceptance; M24 remains the authoritative dodge timing/geometry proof.
