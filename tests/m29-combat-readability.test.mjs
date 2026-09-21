@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { COMBAT_ACTION, FFA_KILL_TARGET, blockSpatialPresentation, combatActionHint, combatLifePresentation, combatOverlayPresentation, createCombatReadabilityTracker, createRemoteDamageTracker, fighterFocusNetId, fighterIdentityPresentation, fighterThreatBearingLabel, fighterThreatNetId, fighterThreatPhaseLabel, fighterMatchPresentation, fighterScoreboardPresentation, fighterVitalsPresentation, guardBreakSpatialPresentation, killFeedPresentation, opponentRecoveryPresentation, parrySpatialPresentation } from "../src/browser/combat-readability.mjs";
+import { COMBAT_ACTION, FFA_KILL_TARGET, blockSpatialPresentation, combatActionHint, combatLifePresentation, combatOverlayPresentation, createCombatReadabilityTracker, createRemoteDamageTracker, fighterFocusNetId, fighterIdentityPresentation, fighterThreatBearingLabel, fighterThreatGuardArcLabel, fighterThreatNetId, fighterThreatPhaseLabel, fighterMatchPresentation, fighterScoreboardPresentation, fighterVitalsPresentation, guardBreakSpatialPresentation, killFeedPresentation, opponentRecoveryPresentation, parrySpatialPresentation } from "../src/browser/combat-readability.mjs";
 
 function fighter(netId, hp = 100, guard = 100, action = COMBAT_ACTION.idle, x = 0, y = 0, facing = 0) {
   return { netId, hp, guard, action, x, y, facing };
@@ -215,6 +215,23 @@ test("threat phase label exposes only authoritative attack phases", () => {
   assert.equal(fighterThreatPhaseLabel({ action: COMBAT_ACTION.attackRecovery }), "");
   assert.equal(fighterThreatPhaseLabel({ action: COMBAT_ACTION.idle }), "");
   assert.equal(fighterThreatPhaseLabel(null), "");
+});
+
+test("primary FFA threat guard arc follows authoritative defender facing", () => {
+  const own = fighter(1, 100, 100, COMBAT_ACTION.idle, 100, 100, 0);
+  const front = fighter(2, 100, 100, COMBAT_ACTION.attackWindup, 140, 100, Math.PI);
+  const flank = fighter(3, 100, 100, COMBAT_ACTION.attackWindup, 60, 100, 0);
+
+  assert.equal(fighterThreatGuardArcLabel(own, front), "FRONT");
+  assert.equal(fighterThreatGuardArcLabel(own, flank), "FLANK");
+
+  own.facing = Math.PI;
+  assert.equal(fighterThreatGuardArcLabel(own, front), "FLANK");
+  assert.equal(fighterThreatGuardArcLabel(own, flank), "FRONT");
+
+  assert.equal(fighterThreatGuardArcLabel({ ...own, facing: Number.NaN }, front), "");
+  assert.equal(fighterThreatGuardArcLabel(own, { ...front, x: own.x, y: own.y }), "");
+  assert.equal(fighterThreatGuardArcLabel(null, front), "");
 });
 
 test("kill feed presentation preserves authoritative killer and victim identity", () => {
