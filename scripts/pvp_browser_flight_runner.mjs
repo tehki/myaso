@@ -573,9 +573,9 @@ async function runOnlineUiDodgeFeedbackFlight(entries) {
   let evidence = null;
   let lastAttemptBaseline = null;
   // M24 owns reaction-timing/geometry proof. M36 owns the real-control readability
-  // path. Each genuine Firefox burst is bounded inside one unchanged windup; the Chrome
-  // defender then performs a genuine perpendicular dodge early enough for the unchanged
-  // iframe to span the possible active transition. Combat timing and acceptance thresholds
+  // path. M36 uses a two-click Firefox burst to keep the genuine latch retry window narrow
+  // inside one unchanged windup; the Chrome defender then performs a genuine perpendicular
+  // dodge early enough for the unchanged iframe to span the possible active transition. Combat timing and acceptance thresholds
   // remain unchanged, and the older M36 gate no longer depends on the later threat HUD.
   for (let attempt = 1; attempt <= 3 && !evidence; attempt += 1) {
     lastAttemptBaseline = await Promise.all(entries.map(readUiEvidence));
@@ -583,12 +583,12 @@ async function runOnlineUiDodgeFeedbackFlight(entries) {
       throw new Error(`M36 retry ${attempt} did not start from clean authoritative vitals: ${JSON.stringify(lastAttemptBaseline)}`);
     }
 
-    await performArenaAttackBurst(attacker);
+    await performArenaAttackBurst(attacker, 2);
     // M24 owns exact dodge reaction timing/geometry. The genuine attack burst finishes
     // inside one unchanged 135 ms windup. A short fixed pause after that bounded burst
     // places the real Chrome dodge iframe across the possible active transition without
     // making this older M36 feedback acceptance depend on the later M54 threat HUD.
-    await sleep(45);
+    await sleep(35);
     await pressArenaPerpendicularDodgeAfterPause(defender, 0);
     // Keep the iframe/strike resolution window free of evidence polling.
     await sleep(180);
@@ -1644,13 +1644,14 @@ async function setArenaAttackButton(session, pressed) {
   });
 }
 
-async function performArenaAttackBurst(session) {
+async function performArenaAttackBurst(session, clickCount = 3) {
   const actions = [];
-  for (let index = 0; index < 3; index += 1) {
+  const boundedClickCount = Math.max(1, Math.min(3, Math.trunc(clickCount)));
+  for (let index = 0; index < boundedClickCount; index += 1) {
     actions.push({ type: "pointerDown", button: 0 });
     actions.push({ type: "pause", duration: 10 });
     actions.push({ type: "pointerUp", button: 0 });
-    if (index < 2) actions.push({ type: "pause", duration: 8 });
+    if (index < boundedClickCount - 1) actions.push({ type: "pause", duration: 8 });
   }
   await webdriver(session.base, "POST", `/session/${session.sessionId}/actions`, {
     actions: [{
