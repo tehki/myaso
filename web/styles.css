@@ -36,6 +36,8 @@ kbd { border: 1px solid #575144; border-bottom-width: 2px; border-radius: 5px; b
 .threat-count[hidden] { display: none; }
 .threat-secondary { color: #f7e1b0; font-size: 10px; font-weight: 700; }
 .threat-secondary[hidden] { display: none; }
+.threat-secondary-phase { color: #f4c36e; font-size: 10px; font-weight: 700; letter-spacing: .04em; }
+.threat-secondary-phase[hidden] { display: none; }
 .threat-secondary-bearing { color: #e8c995; font-size: 10px; font-weight: 700; letter-spacing: .04em; }
 .threat-secondary-bearing[hidden] { display: none; }
 .threat-bearing { color: #f3c78f; font-size: 10px; font-weight: 700; letter-spacing: .06em; }

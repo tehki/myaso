@@ -1,5 +1,5 @@
 import { createFrameBudget } from "../src/browser/frame-budget.mjs";
-import { COMBAT_ACTION, blockSpatialPresentation, combatActionHint, combatOverlayPresentation, createCombatReadabilityTracker, createRemoteDamageTracker, fighterFocusNetId, fighterIdentityPresentation, fighterThreatBearingLabel, fighterThreatNetId, fighterMatchPresentation, fighterScoreboardPresentation, fighterVitalsPresentation, guardBreakSpatialPresentation, killFeedPresentation, opponentRecoveryPresentation, parrySpatialPresentation } from "../src/browser/combat-readability.mjs";
+import { COMBAT_ACTION, blockSpatialPresentation, combatActionHint, combatOverlayPresentation, createCombatReadabilityTracker, createRemoteDamageTracker, fighterFocusNetId, fighterIdentityPresentation, fighterThreatBearingLabel, fighterThreatNetId, fighterThreatPhaseLabel, fighterMatchPresentation, fighterScoreboardPresentation, fighterVitalsPresentation, guardBreakSpatialPresentation, killFeedPresentation, opponentRecoveryPresentation, parrySpatialPresentation } from "../src/browser/combat-readability.mjs";
 import { COMBAT } from "../src/combat/model.mjs";
 import { reconcilePrediction } from "../src/browser/reconciliation.mjs";
 import { NETWORK } from "../src/network/constants.mjs";
@@ -40,12 +40,14 @@ const threatCue = {
   countLabel: document.querySelector("#threat-count"),
   secondaryLabel: document.querySelector("#threat-secondary"),
   secondaryBearingLabel: document.querySelector("#threat-secondary-bearing"),
+  secondaryPhaseLabel: document.querySelector("#threat-secondary-phase"),
   bearingLabel: document.querySelector("#threat-bearing"),
   netId: 0,
   state: "",
   count: 0,
   secondaryNetId: 0,
   secondaryBearing: "",
+  secondaryPhase: "",
   bearing: "",
 };
 const threatScan = { count: 0, secondaryNetId: 0 };
@@ -537,9 +539,9 @@ function updateThreatCue(ownId) {
   const own = ownId ? networkClient.state.get(ownId) : null;
   const bearing = fighterThreatBearingLabel(own, attacker);
   const secondaryBearing = fighterThreatBearingLabel(own, secondaryAttacker);
-  const state = attacker?.action === COMBAT_ACTION.attackActive ? "strike"
-    : attacker?.action === COMBAT_ACTION.attackWindup ? "windup"
-      : "";
+  const phase = fighterThreatPhaseLabel(attacker);
+  const secondaryPhase = fighterThreatPhaseLabel(secondaryAttacker);
+  const state = phase === "STRIKE" ? "strike" : phase === "WINDUP" ? "windup" : "";
   const shouldHide = netId === 0 || !state;
   if (threatCue.root.hidden !== shouldHide) threatCue.root.hidden = shouldHide;
   if (shouldHide) {
@@ -548,10 +550,12 @@ function updateThreatCue(ownId) {
     threatCue.count = 0;
     threatCue.secondaryNetId = 0;
     threatCue.secondaryBearing = "";
+    threatCue.secondaryPhase = "";
     threatCue.bearing = "";
     if (threatCue.countLabel) threatCue.countLabel.hidden = true;
     if (threatCue.secondaryLabel) threatCue.secondaryLabel.hidden = true;
     if (threatCue.secondaryBearingLabel) threatCue.secondaryBearingLabel.hidden = true;
+    if (threatCue.secondaryPhaseLabel) threatCue.secondaryPhaseLabel.hidden = true;
     if (threatCue.bearingLabel) threatCue.bearingLabel.hidden = true;
     delete threatCue.root.dataset.state;
     return;
@@ -563,7 +567,7 @@ function updateThreatCue(ownId) {
   }
   if (threatCue.state !== state) {
     threatCue.state = state;
-    threatCue.phase.textContent = state === "strike" ? "STRIKE" : "WINDUP";
+    threatCue.phase.textContent = phase;
   }
   if (threatCue.countLabel) {
     const showCount = threatCount > 1;
@@ -575,6 +579,13 @@ function updateThreatCue(ownId) {
     if (threatCue.secondaryLabel.hidden === showSecondary) threatCue.secondaryLabel.hidden = !showSecondary;
     if (showSecondary && threatCue.secondaryNetId !== secondaryNetId) {
       threatCue.secondaryLabel.textContent = `NEXT #${secondaryNetId}`;
+    }
+  }
+  if (threatCue.secondaryPhaseLabel) {
+    const showSecondaryPhase = threatCount > 1 && secondaryNetId > 0 && Boolean(secondaryPhase);
+    if (threatCue.secondaryPhaseLabel.hidden === showSecondaryPhase) threatCue.secondaryPhaseLabel.hidden = !showSecondaryPhase;
+    if (showSecondaryPhase && threatCue.secondaryPhase !== secondaryPhase) {
+      threatCue.secondaryPhaseLabel.textContent = secondaryPhase;
     }
   }
   if (threatCue.secondaryBearingLabel) {
@@ -592,6 +603,7 @@ function updateThreatCue(ownId) {
   threatCue.count = threatCount;
   threatCue.secondaryNetId = secondaryNetId;
   threatCue.secondaryBearing = secondaryBearing;
+  threatCue.secondaryPhase = secondaryPhase;
   threatCue.bearing = bearing;
 }
 
