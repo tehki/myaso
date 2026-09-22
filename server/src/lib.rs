@@ -185,6 +185,11 @@ pub fn coalesce_accepted_input_samples(
     {
         intent.attack = edge.attack;
         intent.dodge = edge.dodge;
+        intent.facing_radians = edge.facing_radians;
+        if edge.dodge {
+            intent.move_x = edge.move_x;
+            intent.move_y = edge.move_y;
+        }
     }
     Some((newest.tick, intent))
 }
@@ -371,7 +376,7 @@ mod tests {
         assert_eq!(tick, 101);
         assert_eq!(intent.move_x, 0.5);
         assert_eq!(intent.move_y, -0.25);
-        assert_eq!(intent.facing_radians, 1.5);
+        assert_eq!(intent.facing_radians, 0.25);
         assert!(intent.block);
         assert!(intent.attack);
         assert!(!intent.dodge);
@@ -411,9 +416,9 @@ mod tests {
 
         let (tick, intent) = coalesce_accepted_input_samples(&accepted).expect("accepted samples");
         assert_eq!(tick, 202);
-        assert_eq!(intent.move_x, 1.0);
-        assert_eq!(intent.move_y, 0.0);
-        assert_eq!(intent.facing_radians, 3.0);
+        assert_eq!(intent.move_x, 0.0);
+        assert_eq!(intent.move_y, 1.0);
+        assert_eq!(intent.facing_radians, 2.0);
         assert!(!intent.attack);
         assert!(intent.dodge);
         assert!(!intent.block);
