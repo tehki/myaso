@@ -2754,7 +2754,7 @@ function assertPairedResults(results) {
       if (result.defenderBlockSeen || result.defenderDodgeSeen || result.attackerStunnedSeen) {
         throw new Error(`${result.browser} input-loss scenario resolved through an unintended defensive mechanic`);
       }
-    } else     if (scenario === "parry") {
+    } else if (scenario === "parry") {
       if (!result.attackerStunnedSeen || !result.defenderBlockSeen) {
         throw new Error(`${result.browser} did not observe the authoritative parry state transition`);
       }
