@@ -367,8 +367,7 @@ mod tests {
             },
         ];
 
-        let (tick, intent) =
-            coalesce_accepted_input_samples(&accepted).expect("accepted samples");
+        let (tick, intent) = coalesce_accepted_input_samples(&accepted).expect("accepted samples");
         assert_eq!(tick, 101);
         assert_eq!(intent.move_x, 0.5);
         assert_eq!(intent.move_y, -0.25);
@@ -410,8 +409,7 @@ mod tests {
             },
         ];
 
-        let (tick, intent) =
-            coalesce_accepted_input_samples(&accepted).expect("accepted samples");
+        let (tick, intent) = coalesce_accepted_input_samples(&accepted).expect("accepted samples");
         assert_eq!(tick, 202);
         assert_eq!(intent.move_x, 1.0);
         assert_eq!(intent.move_y, 0.0);
