@@ -437,7 +437,7 @@ mod tests {
             "dedup storage must cover the full history window plus one ingress batch"
         );
 
-        for client_tick in 1000_u32..1400 {
+        for client_tick in (1000_u32..2200).step_by(INPUT_REDUNDANCY_MAX) {
             let mut bytes = sample_packet();
             bytes[8..12].copy_from_slice(&client_tick.to_le_bytes());
             let packet = decode_input_packet(&bytes).expect("valid rolling packet");
