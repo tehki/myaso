@@ -72,13 +72,15 @@ const EMPTY_INPUT_SAMPLE: InputSample = InputSample {
     block: false,
 };
 
-#[derive(Debug, Clone, Copy)]
-pub struct AcceptedInputBatch {
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct FixedInputBatch {
     samples: [InputSample; INPUT_REDUNDANCY_MAX],
     len: usize,
 }
 
-impl Default for AcceptedInputBatch {
+pub type AcceptedInputBatch = FixedInputBatch;
+
+impl Default for FixedInputBatch {
     fn default() -> Self {
         Self {
             samples: [EMPTY_INPUT_SAMPLE; INPUT_REDUNDANCY_MAX],
@@ -87,7 +89,7 @@ impl Default for AcceptedInputBatch {
     }
 }
 
-impl AcceptedInputBatch {
+impl FixedInputBatch {
     pub fn len(&self) -> usize {
         self.len
     }
@@ -96,12 +98,20 @@ impl AcceptedInputBatch {
         self.len == 0
     }
 
+    pub const fn capacity(&self) -> usize {
+        INPUT_REDUNDANCY_MAX
+    }
+
     pub fn as_slice(&self) -> &[InputSample] {
         &self.samples[..self.len]
     }
 
     pub fn iter(&self) -> std::slice::Iter<'_, InputSample> {
         self.as_slice().iter()
+    }
+
+    pub fn first(&self) -> Option<&InputSample> {
+        self.as_slice().first()
     }
 
     pub fn last(&self) -> Option<&InputSample> {
@@ -121,13 +131,21 @@ impl AcceptedInputBatch {
     }
 }
 
+impl std::ops::Index<usize> for FixedInputBatch {
+    type Output = InputSample;
+
+    fn index(&self, index: usize) -> &Self::Output {
+        &self.as_slice()[index]
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct InputPacket {
     pub sequence: u16,
     pub ack_snapshot_sequence: u16,
     pub client_tick: u32,
     pub ack_server_tick: u32,
-    pub samples: Vec<InputSample>,
+    pub samples: FixedInputBatch,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -168,7 +186,7 @@ pub fn decode_input_packet(bytes: &[u8]) -> Result<InputPacket, DecodeError> {
     let client_tick = u32::from_le_bytes(bytes[8..12].try_into().expect("length checked"));
     let ack_server_tick = u32::from_le_bytes(bytes[12..16].try_into().expect("length checked"));
 
-    let mut samples = Vec::with_capacity(sample_count);
+    let mut samples = FixedInputBatch::default();
     let mut offset = INPUT_HEADER_BYTES;
     for _ in 0..sample_count {
         let tick_delta = bytes[offset] as u32;
@@ -222,7 +240,7 @@ impl InputIngressWindow {
 
     pub fn ingest(&mut self, packet: &InputPacket) -> AcceptedInputBatch {
         let mut accepted = AcceptedInputBatch::default();
-        for sample in &packet.samples {
+        for sample in packet.samples.iter() {
             if self
                 .newest_tick
                 .is_none_or(|newest| is_tick_newer32(sample.tick, newest))
@@ -350,6 +368,7 @@ mod tests {
         assert_eq!(packet.client_tick, 1000);
         assert_eq!(packet.ack_server_tick, 990);
         assert_eq!(packet.samples.len(), 3);
+        assert_eq!(packet.samples.capacity(), INPUT_REDUNDANCY_MAX);
         assert_eq!(packet.samples[0].tick, 1000);
         assert!(packet.samples[0].attack);
         assert!(packet.samples[1].dodge);
