@@ -221,10 +221,11 @@ impl Default for InputIngressWindow {
 impl InputIngressWindow {
     pub fn new(history_ticks: u32) -> Self {
         assert!((1..=4096).contains(&history_ticks));
+        let dedup_capacity = history_ticks as usize + 1 + INPUT_REDUNDANCY_MAX;
         Self {
             history_ticks,
             newest_tick: None,
-            seen: HashSet::new(),
+            seen: HashSet::with_capacity(dedup_capacity),
         }
     }
 
@@ -425,6 +426,28 @@ mod tests {
                 .collect::<Vec<_>>(),
             vec![1001, 1002]
         );
+    }
+
+    #[test]
+    fn ingress_preallocates_the_bounded_replay_window() {
+        let mut ingress = InputIngressWindow::new(10);
+        let initial_capacity = ingress.seen.capacity();
+        assert!(
+            initial_capacity >= 10 + 1 + INPUT_REDUNDANCY_MAX,
+            "dedup storage must cover the full history window plus one ingress batch"
+        );
+
+        for client_tick in 1000_u32..1400 {
+            let mut bytes = sample_packet();
+            bytes[8..12].copy_from_slice(&client_tick.to_le_bytes());
+            let packet = decode_input_packet(&bytes).expect("valid rolling packet");
+            let _ = ingress.ingest(&packet);
+            assert_eq!(
+                ingress.seen.capacity(),
+                initial_capacity,
+                "valid bounded ingress must not grow the dedup allocation"
+            );
+        }
     }
 
     #[test]
