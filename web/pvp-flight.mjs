@@ -6,7 +6,7 @@ const server = params.get("server");
 const cert = params.get("cert");
 const durationMs = clamp(Number(params.get("duration") ?? 7000), 3000, 12000);
 const scenario = params.get("scenario") ?? "damage";
-if (!new Set(["damage", "parry", "dodge", "block", "guardbreak", "backblock", "respawn"]).has(scenario)) throw new Error(`unsupported PvP scenario: ${scenario}`);
+if (!new Set(["damage", "parry", "dodge", "block", "guardbreak", "backblock", "respawn", "inputloss"]).has(scenario)) throw new Error(`unsupported PvP scenario: ${scenario}`);
 const canvas = document.querySelector("#arena");
 const ctx = canvas.getContext("2d", { alpha: false });
 const status = document.querySelector("#status");
@@ -50,6 +50,7 @@ let dodgeOverlapSeen = false;
 let dodgeOverlapDistance = null;
 let dodgeOverlapArcDelta = null;
 let firstDodgeEvadeAt = null;
+let inputLossAttackSent = false;
 let blockOverlapSeen = false;
 let blockOverlapDistance = null;
 let blockOverlapArcDelta = null;
@@ -242,9 +243,11 @@ function observeState(state) {
       }
     }
   }
-  const scenarioSucceeded = scenario === "parry"
-    ? firstParryAt !== null
-    : scenario === "dodge"
+  const scenarioSucceeded = scenario === "inputloss"
+    ? firstDamageAt !== null
+    : scenario === "parry"
+      ? firstParryAt !== null
+      : scenario === "dodge"
       ? firstDodgeEvadeAt !== null
       : scenario === "block"
         ? firstGuardCostAt !== null && blockOverlapSeen
@@ -346,6 +349,16 @@ function sendCombatInput() {
       } else {
         block = true;
       }
+    } else if (scenario === "inputloss") {
+      const isAttacker = ownId < peer.netId;
+      if (distance > 68 && distance > 0.001) {
+        moveX = dx / distance;
+        moveY = dy / distance;
+      }
+      if (isAttacker && !inputLossAttackSent && distance <= 74 && own.action === 0) {
+        attack = true;
+        inputLossAttackSent = true;
+      }
     } else {
       if (distance > 68 && distance > 0.001) {
         moveX = dx / distance;
@@ -424,6 +437,10 @@ function finish() {
   );
   const damageOk = minOwnHp < 100 && minPeerHp < 100
     && ownDamageTransitions > 0 && peerDamageTransitions > 0;
+  const inputLossOk = firstDamageAt !== null
+    && minDefenderHp === 66 && minDefenderGuard === 100
+    && defenderDamageTransitions === 1
+    && !defenderBlockSeen && !defenderDodgeSeen && !attackerStunnedSeen;
   const parryOk = firstParryAt !== null
     && attackerStunnedSeen && defenderBlockSeen
     && minDefenderHp === 100 && minDefenderGuard === 100;
@@ -454,9 +471,11 @@ function finish() {
     && Number.isFinite(deathPositionOffset) && deathPositionOffset >= 10
     && Number.isFinite(respawnPositionError) && respawnPositionError <= 2.5
     && !defenderBlockSeen && !defenderDodgeSeen && !attackerStunnedSeen;
-  const scenarioOk = scenario === "parry"
-    ? parryOk
-    : scenario === "dodge"
+  const scenarioOk = scenario === "inputloss"
+    ? inputLossOk
+    : scenario === "parry"
+      ? parryOk
+      : scenario === "dodge"
       ? dodgeOk
       : scenario === "block"
         ? blockOk
@@ -532,8 +551,10 @@ function finish() {
   };
   window.__MYASO_PVP_RESULT__ = result;
   status.textContent = result.ok
-    ? (scenario === "parry"
-      ? "authoritative PvP parry verified"
+    ? (scenario === "inputloss"
+      ? "authoritative input-loss attack recovery verified"
+      : scenario === "parry"
+        ? "authoritative PvP parry verified"
       : scenario === "dodge"
         ? "authoritative PvP dodge verified"
         : scenario === "block"
