@@ -98,6 +98,9 @@ jobs:
       - name: Validate M64 fixed input ingress batch
         run: cargo test --locked --manifest-path server/Cargo.toml ingress_uses_a_fixed_three_sample_batch
 
+      - name: Validate M65 recovered action context
+        run: cargo test --locked --manifest-path server/Cargo.toml coalesc
+
       - name: Validate real browser flight
         env:
           MYASO_FLIGHT_DURATION_MS: "4000"
