@@ -1,6 +1,6 @@
 use anyhow::{bail, Context, Result};
 use myaso_server::{
-    decode_input_packet, is_sequence_newer16, is_tick_newer32,
+    coalesce_accepted_input_samples, decode_input_packet, is_sequence_newer16, is_tick_newer32,
     kill_event::{encode_kill_event, KillEventPacket},
     reliable::{try_enqueue_reliable, ReliableQueueError},
     simulation::{CombatEvent, InputIntent, World},
@@ -41,6 +41,7 @@ struct LoopbackFlightConfig {
     background_players: usize,
     near_pressure_players: usize,
     reliable_write_delay: Duration,
+    drop_first_attack_input: bool,
 }
 
 struct GameState {
@@ -142,6 +143,7 @@ struct SharedGame {
     state: Mutex<GameState>,
     next_player_id: AtomicU32,
     reliable_write_delay: Duration,
+    drop_first_attack_input: bool,
 }
 
 impl SharedGame {
@@ -153,6 +155,7 @@ impl SharedGame {
             )),
             next_player_id: AtomicU32::new(1),
             reliable_write_delay: flight.reliable_write_delay,
+            drop_first_attack_input: flight.drop_first_attack_input,
         })
     }
 
@@ -296,19 +299,28 @@ fn load_loopback_flight_config(bind: SocketAddr) -> Result<LoopbackFlightConfig>
         })
         .transpose()?
         .unwrap_or(0);
+    let drop_first_attack_input = match env::var("MYASO_FLIGHT_DROP_FIRST_ATTACK_INPUT") {
+        Ok(value) if value == "1" => true,
+        Ok(value) if value == "0" => false,
+        Ok(_) => bail!("MYASO_FLIGHT_DROP_FIRST_ATTACK_INPUT must be 0 or 1"),
+        Err(_) => false,
+    };
     if background_players > MAX_FLIGHT_BACKGROUND_PLAYERS {
         bail!("MYASO_FLIGHT_BACKGROUND_PLAYERS exceeds bounded flight maximum");
     }
     if near_pressure_players > background_players {
         bail!("MYASO_FLIGHT_NEAR_PRESSURE_PLAYERS exceeds background player count");
     }
-    if (background_players > 0 || reliable_delay_ms > 0) && !bind.ip().is_loopback() {
-        bail!("M15 flight fixture is permitted only on loopback binds");
+    if (background_players > 0 || reliable_delay_ms > 0 || drop_first_attack_input)
+        && !bind.ip().is_loopback()
+    {
+        bail!("flight fixtures are permitted only on loopback binds");
     }
     Ok(LoopbackFlightConfig {
         background_players,
         near_pressure_players,
         reliable_write_delay: Duration::from_millis(reliable_delay_ms),
+        drop_first_attack_input,
     })
 }
 
@@ -358,6 +370,7 @@ async fn handle_connection(
     let mut snapshots = SnapshotSession::default();
     let mut reliable_snapshots = SnapshotSession::default();
     let mut last_input_sequence = None;
+    let mut dropped_attack_input = false;
     let mut pending_input_acks = VecDeque::with_capacity(MAX_PENDING_INPUT_ACKS);
     let (mut reliable_send, _reliable_recv) = connection
         .accept_bi()
@@ -432,6 +445,18 @@ async fn handle_connection(
                     }
                 };
 
+                if game.drop_first_attack_input
+                    && !dropped_attack_input
+                    && packet.samples.first().is_some_and(|sample| sample.attack)
+                {
+                    dropped_attack_input = true;
+                    println!(
+                        "M63_INPUT_DROP player={player_id} sequence={} tick={}",
+                        packet.sequence, packet.client_tick
+                    );
+                    continue;
+                }
+
                 if last_input_sequence.is_none_or(|previous| is_sequence_newer16(packet.sequence, previous)) {
                     last_input_sequence = Some(packet.sequence);
                     advance_snapshot_ack(
@@ -443,10 +468,14 @@ async fn handle_connection(
                 }
 
                 let accepted = ingress.ingest(&packet);
-                if let Some(newest) = accepted.last().copied() {
+                if let Some((newest_tick, intent)) = coalesce_accepted_input_samples(&accepted) {
                     let mut state = game.state.lock().await;
-                    state.world.set_input(player_id, newest.into());
-                    record_pending_input_ack(&mut pending_input_acks, newest.tick, state.world.tick);
+                    state.world.set_input(player_id, intent);
+                    record_pending_input_ack(
+                        &mut pending_input_acks,
+                        newest_tick,
+                        state.world.tick,
+                    );
                 }
 
                 let server_tick = game.state.lock().await.world.tick;
