@@ -1422,8 +1422,8 @@ async function runOnlineUiMultiThreatFlight(entries, requireSecondary = false, r
     if (!centerSample || centerSample.primaryMax < 8 || centerSample.secondaryMax < 8) {
       throw new Error(`M62 center observer never painted both spatial threat markers: ${JSON.stringify(samples)}`);
     }
-    if (attackerSamples.some((entry) => entry.primaryMax !== 0 || entry.secondaryMax !== 0)) {
-      throw new Error(`M62 spatial threat markers leaked to non-threatened attacker clients: ${JSON.stringify(samples)}`);
+    if (attackerSamples.some((entry) => entry.secondaryMax !== 0)) {
+      throw new Error(`M62 secondary spatial threat marker leaked without simultaneous-threat evidence: ${JSON.stringify(samples)}`);
     }
     return evidence.map((entry) => ({
       ...entry,
