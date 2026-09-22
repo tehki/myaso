@@ -369,7 +369,10 @@ mod tests {
         assert_eq!(coalesced.move_y, -0.25);
         assert_eq!(coalesced.facing_radians, 1.5);
         assert!(!coalesced.block, "held block must follow the newest sample");
-        assert!(coalesced.attack, "accepted redundant attack edge must survive first-send loss");
+        assert!(
+            coalesced.attack,
+            "accepted redundant attack edge must survive first-send loss"
+        );
         assert!(!coalesced.dodge);
     }
 
@@ -406,9 +409,15 @@ mod tests {
         let coalesced = coalesce_accepted_input_batch(&[older_attack, newer_dodge, newest_idle])
             .expect("non-empty batch");
         assert_eq!(coalesced.tick, 202);
-        assert!(!coalesced.attack, "older attack must not override a newer accepted dodge edge");
+        assert!(
+            !coalesced.attack,
+            "older attack must not override a newer accepted dodge edge"
+        );
         assert!(coalesced.dodge);
-        assert!(coalesced.block, "continuous block state must remain the newest sample");
+        assert!(
+            coalesced.block,
+            "continuous block state must remain the newest sample"
+        );
     }
 
     #[test]
