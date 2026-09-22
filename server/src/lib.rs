@@ -57,6 +57,66 @@ pub fn coalesce_accepted_input_batch(samples: &[InputSample]) -> Option<InputSam
     Some(newest)
 }
 
+const EMPTY_INPUT_SAMPLE: InputSample = InputSample {
+    tick: 0,
+    move_x: 0.0,
+    move_y: 0.0,
+    facing_radians: 0.0,
+    attack: false,
+    dodge: false,
+    block: false,
+};
+
+#[derive(Debug, Clone, Copy)]
+pub struct AcceptedInputBatch {
+    samples: [InputSample; INPUT_REDUNDANCY_MAX],
+    len: usize,
+}
+
+impl Default for AcceptedInputBatch {
+    fn default() -> Self {
+        Self {
+            samples: [EMPTY_INPUT_SAMPLE; INPUT_REDUNDANCY_MAX],
+            len: 0,
+        }
+    }
+}
+
+impl AcceptedInputBatch {
+    pub fn len(&self) -> usize {
+        self.len
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.len == 0
+    }
+
+    pub fn as_slice(&self) -> &[InputSample] {
+        &self.samples[..self.len]
+    }
+
+    pub fn iter(&self) -> std::slice::Iter<'_, InputSample> {
+        self.as_slice().iter()
+    }
+
+    pub fn last(&self) -> Option<&InputSample> {
+        self.as_slice().last()
+    }
+
+    fn push(&mut self, sample: InputSample) {
+        debug_assert!(self.len < INPUT_REDUNDANCY_MAX);
+        self.samples[self.len] = sample;
+        self.len += 1;
+    }
+
+    fn sort_oldest_to_newest(&mut self, newest_tick: u32) {
+        self.samples[..self.len].sort_by(|left, right| {
+            tick_distance32(newest_tick, right.tick)
+                .cmp(&tick_distance32(newest_tick, left.tick))
+        });
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct InputPacket {
     pub sequence: u16,
@@ -156,8 +216,8 @@ impl InputIngressWindow {
         }
     }
 
-    pub fn ingest(&mut self, packet: &InputPacket) -> Vec<InputSample> {
-        let mut accepted = Vec::new();
+    pub fn ingest(&mut self, packet: &InputPacket) -> AcceptedInputBatch {
+        let mut accepted = AcceptedInputBatch::default();
         for sample in &packet.samples {
             if self
                 .newest_tick
@@ -178,9 +238,7 @@ impl InputIngressWindow {
         if let Some(newest) = self.newest_tick {
             self.seen
                 .retain(|tick| tick_distance32(newest, *tick) <= self.history_ticks);
-            accepted.sort_by(|left, right| {
-                tick_distance32(newest, right.tick).cmp(&tick_distance32(newest, left.tick))
-            });
+            accepted.sort_oldest_to_newest(newest);
         }
         accepted
     }
@@ -338,6 +396,20 @@ mod tests {
                 .map(|sample| sample.tick)
                 .collect::<Vec<_>>(),
             vec![1001, 1002]
+        );
+    }
+
+    #[test]
+    fn ingress_uses_a_fixed_three_sample_batch() {
+        let first = decode_input_packet(&sample_packet()).expect("first packet");
+        let mut ingress = InputIngressWindow::new(10);
+        let accepted = ingress.ingest(&first);
+
+        assert_eq!(accepted.len(), INPUT_REDUNDANCY_MAX);
+        assert_eq!(accepted.as_slice().len(), INPUT_REDUNDANCY_MAX);
+        assert_eq!(
+            accepted.iter().map(|sample| sample.tick).collect::<Vec<_>>(),
+            vec![998, 999, 1000]
         );
     }
 
