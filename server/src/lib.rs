@@ -111,8 +111,7 @@ impl AcceptedInputBatch {
 
     fn sort_oldest_to_newest(&mut self, newest_tick: u32) {
         self.samples[..self.len].sort_by(|left, right| {
-            tick_distance32(newest_tick, right.tick)
-                .cmp(&tick_distance32(newest_tick, left.tick))
+            tick_distance32(newest_tick, right.tick).cmp(&tick_distance32(newest_tick, left.tick))
         });
     }
 }
@@ -408,7 +407,10 @@ mod tests {
         assert_eq!(accepted.len(), INPUT_REDUNDANCY_MAX);
         assert_eq!(accepted.as_slice().len(), INPUT_REDUNDANCY_MAX);
         assert_eq!(
-            accepted.iter().map(|sample| sample.tick).collect::<Vec<_>>(),
+            accepted
+                .iter()
+                .map(|sample| sample.tick)
+                .collect::<Vec<_>>(),
             vec![998, 999, 1000]
         );
     }
