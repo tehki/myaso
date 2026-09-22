@@ -127,7 +127,14 @@ pub struct InputPacket {
     pub ack_snapshot_sequence: u16,
     pub client_tick: u32,
     pub ack_server_tick: u32,
-    pub samples: Vec<InputSample>,
+    sample_count: u8,
+    samples: [InputSample; INPUT_REDUNDANCY_MAX],
+}
+
+impl InputPacket {
+    pub fn samples(&self) -> &[InputSample] {
+        &self.samples[..self.sample_count as usize]
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -168,15 +175,15 @@ pub fn decode_input_packet(bytes: &[u8]) -> Result<InputPacket, DecodeError> {
     let client_tick = u32::from_le_bytes(bytes[8..12].try_into().expect("length checked"));
     let ack_server_tick = u32::from_le_bytes(bytes[12..16].try_into().expect("length checked"));
 
-    let mut samples = Vec::with_capacity(sample_count);
+    let mut samples = [EMPTY_INPUT_SAMPLE; INPUT_REDUNDANCY_MAX];
     let mut offset = INPUT_HEADER_BYTES;
-    for _ in 0..sample_count {
+    for sample in samples.iter_mut().take(sample_count) {
         let tick_delta = bytes[offset] as u32;
         let move_x = (bytes[offset + 1] as i8) as f32 / 127.0;
         let move_y = (bytes[offset + 2] as i8) as f32 / 127.0;
         let facing_wire = u16::from_le_bytes([bytes[offset + 3], bytes[offset + 4]]);
         let buttons = bytes[offset + 5];
-        samples.push(InputSample {
+        *sample = InputSample {
             tick: client_tick.wrapping_sub(tick_delta),
             move_x,
             move_y,
@@ -184,7 +191,7 @@ pub fn decode_input_packet(bytes: &[u8]) -> Result<InputPacket, DecodeError> {
             attack: buttons & 0b001 != 0,
             dodge: buttons & 0b010 != 0,
             block: buttons & 0b100 != 0,
-        });
+        };
         offset += INPUT_SAMPLE_BYTES;
     }
 
@@ -193,6 +200,7 @@ pub fn decode_input_packet(bytes: &[u8]) -> Result<InputPacket, DecodeError> {
         ack_snapshot_sequence,
         client_tick,
         ack_server_tick,
+        sample_count: sample_count as u8,
         samples,
     })
 }
@@ -222,7 +230,7 @@ impl InputIngressWindow {
 
     pub fn ingest(&mut self, packet: &InputPacket) -> AcceptedInputBatch {
         let mut accepted = AcceptedInputBatch::default();
-        for sample in &packet.samples {
+        for sample in packet.samples() {
             if self
                 .newest_tick
                 .is_none_or(|newest| is_tick_newer32(sample.tick, newest))
@@ -349,13 +357,29 @@ mod tests {
         assert_eq!(packet.ack_snapshot_sequence, 9);
         assert_eq!(packet.client_tick, 1000);
         assert_eq!(packet.ack_server_tick, 990);
-        assert_eq!(packet.samples.len(), 3);
-        assert_eq!(packet.samples[0].tick, 1000);
-        assert!(packet.samples[0].attack);
-        assert!(packet.samples[1].dodge);
-        assert!(packet.samples[2].block);
-        assert!((packet.samples[0].move_x - 1.0).abs() < 0.001);
-        assert!((packet.samples[1].move_y + 1.0).abs() < 0.001);
+        assert_eq!(packet.samples().len(), 3);
+        assert_eq!(packet.samples()[0].tick, 1000);
+        assert!(packet.samples()[0].attack);
+        assert!(packet.samples()[1].dodge);
+        assert!(packet.samples()[2].block);
+        assert!((packet.samples()[0].move_x - 1.0).abs() < 0.001);
+        assert!((packet.samples()[1].move_y + 1.0).abs() < 0.001);
+    }
+
+    #[test]
+    fn decodes_input_samples_into_fixed_inline_storage() {
+        let mut single = sample_packet();
+        single[2] = 1;
+        single.truncate(INPUT_HEADER_BYTES + INPUT_SAMPLE_BYTES);
+
+        let packet = decode_input_packet(&single).expect("single-sample packet");
+        assert_eq!(packet.samples().len(), 1);
+        assert_eq!(packet.samples()[0].tick, 1000);
+        assert!(packet.samples()[0].attack);
+
+        let full = decode_input_packet(&sample_packet()).expect("three-sample packet");
+        assert_eq!(full.samples().len(), INPUT_REDUNDANCY_MAX);
+        assert_eq!(full.samples()[2].tick, 998);
     }
 
     #[test]
