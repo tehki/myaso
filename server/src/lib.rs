@@ -53,6 +53,11 @@ pub fn coalesce_accepted_input_batch(samples: &[InputSample]) -> Option<InputSam
     {
         newest.attack = action_sample.attack;
         newest.dodge = action_sample.dodge;
+        newest.facing_radians = action_sample.facing_radians;
+        if action_sample.dodge {
+            newest.move_x = action_sample.move_x;
+            newest.move_y = action_sample.move_y;
+        }
     }
     Some(newest)
 }
@@ -441,7 +446,10 @@ mod tests {
         assert_eq!(coalesced.tick, 101);
         assert_eq!(coalesced.move_x, 0.75);
         assert_eq!(coalesced.move_y, -0.25);
-        assert_eq!(coalesced.facing_radians, 1.5);
+        assert_eq!(
+            coalesced.facing_radians, 0.25,
+            "recovered attack must keep its original committed facing"
+        );
         assert!(!coalesced.block, "held block must follow the newest sample");
         assert!(
             coalesced.attack,
@@ -488,6 +496,15 @@ mod tests {
             "older attack must not override a newer accepted dodge edge"
         );
         assert!(coalesced.dodge);
+        assert_eq!(
+            coalesced.move_x, 1.0,
+            "recovered dodge must keep its original movement direction"
+        );
+        assert_eq!(coalesced.move_y, 0.0);
+        assert_eq!(
+            coalesced.facing_radians, 0.5,
+            "recovered dodge must keep its original facing"
+        );
         assert!(
             coalesced.block,
             "continuous block state must remain the newest sample"
