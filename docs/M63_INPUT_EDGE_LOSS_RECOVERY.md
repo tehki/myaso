@@ -13,13 +13,15 @@ M63 closes that gap without making combat client-authoritative.
 The server still:
 
 - deduplicates accepted input ticks through the bounded `InputIngressWindow`;
-- uses the newest accepted sample for continuous `move_x`, `move_y`, facing, and block state;
+- uses the newest accepted sample for continuous movement and block state;
 - acknowledges the newest accepted client tick.
 
 For one-shot actions only:
 
 - scan the already-accepted redundant batch from newest to oldest;
-- if an accepted sample carries `attack` or `dodge`, copy that newest action edge onto the newest continuous input;
+- if an accepted sample carries `attack` or `dodge`, recover that newest unseen action edge once;
+- recover the action sample's original facing so a delayed attack/dodge is not redirected by the following idle sample;
+- for dodge, also recover the action sample's original movement vector because it defines dodge direction;
 - preserve existing dodge-over-attack priority when both action bits are present on one sample;
 - never recover an already-seen tick because ingress deduplication remains authoritative.
 
@@ -35,7 +37,7 @@ Example:
 2. that datagram is lost;
 3. tick 101 arrives and redundantly includes tick 100 plus the new continuous state;
 4. ingress accepts both unseen ticks;
-5. M63 applies tick 101 movement/facing/block while recovering the tick 100 attack edge once.
+5. M63 applies tick 101 continuous movement/block while recovering the tick 100 attack edge and its original attack facing once.
 
 Without M63, step 5 applied only tick 101 and silently lost the attack intent.
 
@@ -43,7 +45,8 @@ Without M63, step 5 applied only tick 101 and silently lost the attack intent.
 
 Rust unit coverage proves:
 
-- an older accepted attack edge is recovered onto newer continuous movement/facing/block state;
+- an older accepted attack edge is recovered with its original facing while newer continuous movement/block state is preserved;
+- a recovered dodge keeps its original movement direction and facing;
 - when multiple unseen action edges are present, the newest accepted action edge wins;
 - the newest accepted tick remains the acknowledgement target.
 
