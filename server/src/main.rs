@@ -1,6 +1,6 @@
 use anyhow::{bail, Context, Result};
 use myaso_server::{
-    decode_input_packet, is_sequence_newer16, is_tick_newer32,
+    coalesce_accepted_input_batch, decode_input_packet, is_sequence_newer16, is_tick_newer32,
     kill_event::{encode_kill_event, KillEventPacket},
     reliable::{try_enqueue_reliable, ReliableQueueError},
     simulation::{CombatEvent, InputIntent, World},
@@ -41,6 +41,7 @@ struct LoopbackFlightConfig {
     background_players: usize,
     near_pressure_players: usize,
     reliable_write_delay: Duration,
+    drop_new_action_datagrams: bool,
 }
 
 struct GameState {
@@ -142,6 +143,7 @@ struct SharedGame {
     state: Mutex<GameState>,
     next_player_id: AtomicU32,
     reliable_write_delay: Duration,
+    drop_new_action_datagrams: bool,
 }
 
 impl SharedGame {
@@ -153,6 +155,7 @@ impl SharedGame {
             )),
             next_player_id: AtomicU32::new(1),
             reliable_write_delay: flight.reliable_write_delay,
+            drop_new_action_datagrams: flight.drop_new_action_datagrams,
         })
     }
 
@@ -296,19 +299,31 @@ fn load_loopback_flight_config(bind: SocketAddr) -> Result<LoopbackFlightConfig>
         })
         .transpose()?
         .unwrap_or(0);
+    let drop_new_action_datagrams = env::var("MYASO_FLIGHT_DROP_NEW_ACTION_DATAGRAMS")
+        .ok()
+        .map(|value| match value.as_str() {
+            "0" => Ok(false),
+            "1" => Ok(true),
+            _ => bail!("MYASO_FLIGHT_DROP_NEW_ACTION_DATAGRAMS must be 0 or 1"),
+        })
+        .transpose()?
+        .unwrap_or(false);
     if background_players > MAX_FLIGHT_BACKGROUND_PLAYERS {
         bail!("MYASO_FLIGHT_BACKGROUND_PLAYERS exceeds bounded flight maximum");
     }
     if near_pressure_players > background_players {
         bail!("MYASO_FLIGHT_NEAR_PRESSURE_PLAYERS exceeds background player count");
     }
-    if (background_players > 0 || reliable_delay_ms > 0) && !bind.ip().is_loopback() {
-        bail!("M15 flight fixture is permitted only on loopback binds");
+    if (background_players > 0 || reliable_delay_ms > 0 || drop_new_action_datagrams)
+        && !bind.ip().is_loopback()
+    {
+        bail!("flight impairment fixtures are permitted only on loopback binds");
     }
     Ok(LoopbackFlightConfig {
         background_players,
         near_pressure_players,
         reliable_write_delay: Duration::from_millis(reliable_delay_ms),
+        drop_new_action_datagrams,
     })
 }
 
@@ -432,6 +447,19 @@ async fn handle_connection(
                     }
                 };
 
+                if game.drop_new_action_datagrams
+                    && packet
+                        .samples
+                        .first()
+                        .is_some_and(|sample| sample.attack || sample.dodge)
+                {
+                    println!(
+                        "M63_INPUT_ACTION_PACKET_DROPPED session={stable_id} tick={}",
+                        packet.client_tick
+                    );
+                    continue;
+                }
+
                 if last_input_sequence.is_none_or(|previous| is_sequence_newer16(packet.sequence, previous)) {
                     last_input_sequence = Some(packet.sequence);
                     advance_snapshot_ack(
@@ -443,10 +471,14 @@ async fn handle_connection(
                 }
 
                 let accepted = ingress.ingest(&packet);
-                if let Some(newest) = accepted.last().copied() {
+                if let Some(coalesced) = coalesce_accepted_input_batch(&accepted) {
                     let mut state = game.state.lock().await;
-                    state.world.set_input(player_id, newest.into());
-                    record_pending_input_ack(&mut pending_input_acks, newest.tick, state.world.tick);
+                    state.world.set_input(player_id, coalesced.into());
+                    record_pending_input_ack(
+                        &mut pending_input_acks,
+                        coalesced.tick,
+                        state.world.tick,
+                    );
                 }
 
                 let server_tick = game.state.lock().await.world.tick;
