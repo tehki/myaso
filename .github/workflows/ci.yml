@@ -95,6 +95,9 @@ jobs:
           cargo clippy --locked --manifest-path server/Cargo.toml --all-targets -- -D warnings
           cargo test --locked --manifest-path server/Cargo.toml
 
+      - name: Validate M64 fixed input ingress batch
+        run: cargo test --locked --manifest-path server/Cargo.toml ingress_uses_a_fixed_three_sample_batch
+
       - name: Validate real browser flight
         env:
           MYASO_FLIGHT_DURATION_MS: "4000"

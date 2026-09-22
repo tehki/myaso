@@ -471,7 +471,7 @@ async fn handle_connection(
                 }
 
                 let accepted = ingress.ingest(&packet);
-                if let Some(coalesced) = coalesce_accepted_input_batch(&accepted) {
+                if let Some(coalesced) = coalesce_accepted_input_batch(accepted.as_slice()) {
                     let mut state = game.state.lock().await;
                     state.world.set_input(player_id, coalesced.into());
                     record_pending_input_ack(
