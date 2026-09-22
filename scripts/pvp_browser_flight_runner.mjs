@@ -8,7 +8,7 @@ import { setTimeout as sleep } from "node:timers/promises";
 const root = process.cwd();
 const durationMs = Number(process.env.MYASO_PVP_FLIGHT_DURATION_MS ?? 7000);
 const scenario = process.env.MYASO_PVP_SCENARIO ?? "damage";
-if (!new Set(["damage", "parry", "dodge", "block", "guardbreak", "backblock", "respawn", "ui", "uirespawn", "uifeedback", "uihittell", "uivitals", "uiidentity", "uiscore", "uimatch", "uirematch", "uiffa3", "uikillfeed", "uifocus", "uithreat", "uithreatbearing", "uimultithreat", "uisecondarythreat", "uisecondarybearing", "uisecondaryphase", "uiguardarc", "uisecondaryguardarc", "uithreatmarkers", "uiparry", "uistun", "uiguardbreak", "uidodge", "uirecovery", "uirecoverytell", "uiattackintent", "uiguardbreaktell", "uiparrytell", "uiblockfacingtell", "uidodgetell", "uideathtell"]).has(scenario)) throw new Error(`unsupported MYASO_PVP_SCENARIO: ${scenario}`);
+if (!new Set(["damage", "inputloss", "parry", "dodge", "block", "guardbreak", "backblock", "respawn", "ui", "uirespawn", "uifeedback", "uihittell", "uivitals", "uiidentity", "uiscore", "uimatch", "uirematch", "uiffa3", "uikillfeed", "uifocus", "uithreat", "uithreatbearing", "uimultithreat", "uisecondarythreat", "uisecondarybearing", "uisecondaryphase", "uiguardarc", "uisecondaryguardarc", "uithreatmarkers", "uiparry", "uistun", "uiguardbreak", "uidodge", "uirecovery", "uirecoverytell", "uiattackintent", "uiguardbreaktell", "uiparrytell", "uiblockfacingtell", "uidodgetell", "uideathtell"]).has(scenario)) throw new Error(`unsupported MYASO_PVP_SCENARIO: ${scenario}`);
 const staticPort = Number(process.env.MYASO_PVP_FLIGHT_HTTP_PORT ?? 4174);
 const browsers = [
   {
@@ -175,8 +175,15 @@ try {
   } else {
     const results = await Promise.all(sessions.map(waitForResult));
     assertPairedResults(results);
-    const label = scenario === "parry" ? "M23_PVP_PARRY" : scenario === "dodge" ? "M24_PVP_DODGE" : scenario === "block" ? "M25_PVP_BLOCK" : scenario === "guardbreak" ? "M26_PVP_GUARD_BREAK" : scenario === "backblock" ? "M27_PVP_DIRECTIONAL_BLOCK" : scenario === "respawn" ? "M28_PVP_RESPAWN" : "M22_PVP_BROWSER_COMBAT";
-    console.log(`${label} ${JSON.stringify({ ok: true, results })}`);
+    let droppedActionDatagrams = 0;
+    if (scenario === "inputloss") {
+      droppedActionDatagrams = (game.output().match(/M63_INPUT_ACTION_PACKET_DROPPED/g) ?? []).length;
+      if (droppedActionDatagrams < 2) {
+        throw new Error(`M63 expected first-send action datagram loss on both real clients, observed ${droppedActionDatagrams}`);
+      }
+    }
+    const label = scenario === "inputloss" ? "M63_PVP_REDUNDANT_ACTION_RECOVERY" : scenario === "parry" ? "M23_PVP_PARRY" : scenario === "dodge" ? "M24_PVP_DODGE" : scenario === "block" ? "M25_PVP_BLOCK" : scenario === "guardbreak" ? "M26_PVP_GUARD_BREAK" : scenario === "backblock" ? "M27_PVP_DIRECTIONAL_BLOCK" : scenario === "respawn" ? "M28_PVP_RESPAWN" : "M22_PVP_BROWSER_COMBAT";
+    console.log(`${label} ${JSON.stringify({ ok: true, droppedActionDatagrams, results })}`);
   }
 } finally {
   for (const session of sessions) {
@@ -215,7 +222,11 @@ async function startStaticServer() {
 async function startGameServer() {
   const child = spawn("cargo", ["run", "--locked", "--manifest-path", "server/Cargo.toml", "--bin", "myaso-server", "--quiet"], {
     cwd: root,
-    env: { ...process.env, MYASO_BIND: "127.0.0.1:0" },
+    env: {
+      ...process.env,
+      MYASO_BIND: "127.0.0.1:0",
+      MYASO_FLIGHT_DROP_NEW_ACTION_DATAGRAMS: scenario === "inputloss" ? "1" : "0",
+    },
     stdio: ["ignore", "pipe", "pipe"],
   });
   children.add(child);
@@ -247,7 +258,7 @@ async function startGameServer() {
   if (!listeningUrl || !certificateHash) {
     throw new Error(`game server did not publish flight endpoint/hash: ${buffer}\n${stderr}`);
   }
-  return { child, url: listeningUrl, certificateHash };
+  return { child, url: listeningUrl, certificateHash, output: () => buffer };
 }
 
 async function startBrowser(browser) {

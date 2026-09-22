@@ -44,6 +44,19 @@ impl From<InputSample> for simulation::InputIntent {
     }
 }
 
+pub fn coalesce_accepted_input_batch(samples: &[InputSample]) -> Option<InputSample> {
+    let mut newest = *samples.last()?;
+    if let Some(action_sample) = samples
+        .iter()
+        .rev()
+        .find(|sample| sample.attack || sample.dodge)
+    {
+        newest.attack = action_sample.attack;
+        newest.dodge = action_sample.dodge;
+    }
+    Some(newest)
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct InputPacket {
     pub sequence: u16,
@@ -325,6 +338,85 @@ mod tests {
                 .map(|sample| sample.tick)
                 .collect::<Vec<_>>(),
             vec![1001, 1002]
+        );
+    }
+
+    #[test]
+    fn coalesces_redundant_action_edge_onto_newest_continuous_input() {
+        let older_attack = InputSample {
+            tick: 100,
+            move_x: 0.0,
+            move_y: 0.0,
+            facing_radians: 0.25,
+            attack: true,
+            dodge: false,
+            block: true,
+        };
+        let newest_idle = InputSample {
+            tick: 101,
+            move_x: 0.75,
+            move_y: -0.25,
+            facing_radians: 1.5,
+            attack: false,
+            dodge: false,
+            block: false,
+        };
+
+        let coalesced =
+            coalesce_accepted_input_batch(&[older_attack, newest_idle]).expect("non-empty batch");
+        assert_eq!(coalesced.tick, 101);
+        assert_eq!(coalesced.move_x, 0.75);
+        assert_eq!(coalesced.move_y, -0.25);
+        assert_eq!(coalesced.facing_radians, 1.5);
+        assert!(!coalesced.block, "held block must follow the newest sample");
+        assert!(
+            coalesced.attack,
+            "accepted redundant attack edge must survive first-send loss"
+        );
+        assert!(!coalesced.dodge);
+    }
+
+    #[test]
+    fn coalescing_prefers_the_newest_accepted_one_shot_action() {
+        let older_attack = InputSample {
+            tick: 200,
+            move_x: 0.0,
+            move_y: 0.0,
+            facing_radians: 0.0,
+            attack: true,
+            dodge: false,
+            block: false,
+        };
+        let newer_dodge = InputSample {
+            tick: 201,
+            move_x: 1.0,
+            move_y: 0.0,
+            facing_radians: 0.5,
+            attack: false,
+            dodge: true,
+            block: false,
+        };
+        let newest_idle = InputSample {
+            tick: 202,
+            move_x: 0.5,
+            move_y: 0.5,
+            facing_radians: 1.0,
+            attack: false,
+            dodge: false,
+            block: true,
+        };
+
+        let coalesced = coalesce_accepted_input_batch(&[older_attack, newer_dodge, newest_idle])
+            .expect("non-empty batch");
+        assert_eq!(coalesced.tick, 202);
+        assert!(
+            !coalesced.attack,
+            "older attack must not override a newer accepted dodge edge"
+        );
+        assert!(coalesced.dodge);
+        assert!(
+            coalesced.block,
+            "continuous block state must remain the newest sample"
         );
     }
 
