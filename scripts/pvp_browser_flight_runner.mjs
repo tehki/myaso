@@ -8,7 +8,7 @@ import { setTimeout as sleep } from "node:timers/promises";
 const root = process.cwd();
 const durationMs = Number(process.env.MYASO_PVP_FLIGHT_DURATION_MS ?? 7000);
 const scenario = process.env.MYASO_PVP_SCENARIO ?? "damage";
-if (!new Set(["damage", "parry", "dodge", "block", "guardbreak", "backblock", "respawn", "ui", "uirespawn", "uifeedback", "uihittell", "uivitals", "uiidentity", "uiscore", "uimatch", "uirematch", "uiffa3", "uikillfeed", "uifocus", "uithreat", "uithreatbearing", "uimultithreat", "uisecondarythreat", "uisecondarybearing", "uisecondaryphase", "uiguardarc", "uisecondaryguardarc", "uithreatmarkers", "uiparry", "uistun", "uiguardbreak", "uidodge", "uirecovery", "uirecoverytell", "uiattackintent", "uiguardbreaktell", "uiparrytell", "uiblockfacingtell", "uidodgetell", "uideathtell"]).has(scenario)) throw new Error(`unsupported MYASO_PVP_SCENARIO: ${scenario}`);
+if (!new Set(["damage", "parry", "dodge", "block", "guardbreak", "backblock", "respawn", "inputloss", "ui", "uirespawn", "uifeedback", "uihittell", "uivitals", "uiidentity", "uiscore", "uimatch", "uirematch", "uiffa3", "uikillfeed", "uifocus", "uithreat", "uithreatbearing", "uimultithreat", "uisecondarythreat", "uisecondarybearing", "uisecondaryphase", "uiguardarc", "uisecondaryguardarc", "uithreatmarkers", "uiparry", "uistun", "uiguardbreak", "uidodge", "uirecovery", "uirecoverytell", "uiattackintent", "uiguardbreaktell", "uiparrytell", "uiblockfacingtell", "uidodgetell", "uideathtell"]).has(scenario)) throw new Error(`unsupported MYASO_PVP_SCENARIO: ${scenario}`);
 const staticPort = Number(process.env.MYASO_PVP_FLIGHT_HTTP_PORT ?? 4174);
 const browsers = [
   {
@@ -175,7 +175,10 @@ try {
   } else {
     const results = await Promise.all(sessions.map(waitForResult));
     assertPairedResults(results);
-    const label = scenario === "parry" ? "M23_PVP_PARRY" : scenario === "dodge" ? "M24_PVP_DODGE" : scenario === "block" ? "M25_PVP_BLOCK" : scenario === "guardbreak" ? "M26_PVP_GUARD_BREAK" : scenario === "backblock" ? "M27_PVP_DIRECTIONAL_BLOCK" : scenario === "respawn" ? "M28_PVP_RESPAWN" : "M22_PVP_BROWSER_COMBAT";
+    if (scenario === "inputloss" && !game.output().includes("M63_INPUT_DROP")) {
+      throw new Error("M63 loopback server did not prove the first attack datagram was dropped");
+    }
+    const label = scenario === "inputloss" ? "M63_INPUT_EDGE_LOSS_RECOVERY" : scenario === "parry" ? "M23_PVP_PARRY" : scenario === "dodge" ? "M24_PVP_DODGE" : scenario === "block" ? "M25_PVP_BLOCK" : scenario === "guardbreak" ? "M26_PVP_GUARD_BREAK" : scenario === "backblock" ? "M27_PVP_DIRECTIONAL_BLOCK" : scenario === "respawn" ? "M28_PVP_RESPAWN" : "M22_PVP_BROWSER_COMBAT";
     console.log(`${label} ${JSON.stringify({ ok: true, results })}`);
   }
 } finally {
@@ -215,7 +218,11 @@ async function startStaticServer() {
 async function startGameServer() {
   const child = spawn("cargo", ["run", "--locked", "--manifest-path", "server/Cargo.toml", "--bin", "myaso-server", "--quiet"], {
     cwd: root,
-    env: { ...process.env, MYASO_BIND: "127.0.0.1:0" },
+    env: {
+      ...process.env,
+      MYASO_BIND: "127.0.0.1:0",
+      MYASO_FLIGHT_DROP_FIRST_ATTACK_INPUT: scenario === "inputloss" ? "1" : "0",
+    },
     stdio: ["ignore", "pipe", "pipe"],
   });
   children.add(child);
@@ -247,7 +254,7 @@ async function startGameServer() {
   if (!listeningUrl || !certificateHash) {
     throw new Error(`game server did not publish flight endpoint/hash: ${buffer}\n${stderr}`);
   }
-  return { child, url: listeningUrl, certificateHash };
+  return { child, url: listeningUrl, certificateHash, output: () => buffer };
 }
 
 async function startBrowser(browser) {
@@ -2740,7 +2747,14 @@ function assertPairedResults(results) {
     if (!Number.isFinite(result.frameP95) || result.frameP95 >= 25) {
       throw new Error(`${result.browser} p95 frame interval exceeded 25ms: ${result.frameP95}`);
     }
-    if (scenario === "parry") {
+    if (scenario === "inputloss") {
+      if (result.minDefenderHp !== 66 || result.minDefenderGuard !== 100 || result.defenderDamageTransitions !== 1) {
+        throw new Error(`${result.browser} did not recover exactly one authoritative attack after dropped input: ${JSON.stringify(result)}`);
+      }
+      if (result.defenderBlockSeen || result.defenderDodgeSeen || result.attackerStunnedSeen) {
+        throw new Error(`${result.browser} input-loss scenario resolved through an unintended defensive mechanic`);
+      }
+    } else     if (scenario === "parry") {
       if (!result.attackerStunnedSeen || !result.defenderBlockSeen) {
         throw new Error(`${result.browser} did not observe the authoritative parry state transition`);
       }
