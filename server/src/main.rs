@@ -449,7 +449,7 @@ async fn handle_connection(
 
                 if game.drop_new_action_datagrams
                     && packet
-                        .samples
+                        .samples()
                         .first()
                         .is_some_and(|sample| sample.attack || sample.dodge)
                 {
