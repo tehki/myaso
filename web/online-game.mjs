@@ -314,6 +314,52 @@ function render(nowMs = performance.now()) {
   }
   if (ownId && local.initialized) drawFighterScreen(canvas.width / 2, canvas.height / 2, local, "#e2d5b4", "#51452d");
   updateHud(ownId);
+  drawThreatMarkers();
+}
+
+function drawThreatMarkers() {
+  if (!threatCue.netId || !threatCue.bearing) return;
+  drawThreatMarker(threatCue.bearing, false);
+  if (threatCue.count > 1 && threatCue.secondaryNetId > 0 && threatCue.secondaryBearing) {
+    drawThreatMarker(threatCue.secondaryBearing, true);
+  }
+}
+
+function drawThreatMarker(bearing, secondary) {
+  let dx = 0;
+  let dy = 0;
+  if (bearing === "FROM LEFT") dx = -1;
+  else if (bearing === "FROM RIGHT") dx = 1;
+  else if (bearing === "FROM ABOVE") dy = -1;
+  else if (bearing === "FROM BELOW") dy = 1;
+  else return;
+
+  const radius = secondary ? 78 : 62;
+  const x = canvas.width / 2 + dx * radius;
+  const y = canvas.height / 2 + dy * radius;
+  ctx.save();
+  ctx.strokeStyle = secondary ? "#f7e1b0" : "#ff8f72";
+  ctx.lineWidth = secondary ? 3 : 4;
+  ctx.beginPath();
+  if (dx < 0) {
+    ctx.moveTo(x - 6, y - 7);
+    ctx.lineTo(x + 3, y);
+    ctx.lineTo(x - 6, y + 7);
+  } else if (dx > 0) {
+    ctx.moveTo(x + 6, y - 7);
+    ctx.lineTo(x - 3, y);
+    ctx.lineTo(x + 6, y + 7);
+  } else if (dy < 0) {
+    ctx.moveTo(x - 7, y - 6);
+    ctx.lineTo(x, y + 3);
+    ctx.lineTo(x + 7, y - 6);
+  } else {
+    ctx.moveTo(x - 7, y + 6);
+    ctx.lineTo(x, y - 3);
+    ctx.lineTo(x + 7, y + 6);
+  }
+  ctx.stroke();
+  ctx.restore();
 }
 
 function drawFighterWorld(fighter, body, shadow, damageTell = false, netId = 0) {
