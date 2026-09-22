@@ -173,6 +173,22 @@ impl InputIngressWindow {
     }
 }
 
+pub fn coalesce_accepted_input_samples(
+    samples: &[InputSample],
+) -> Option<(u32, simulation::InputIntent)> {
+    let newest = *samples.last()?;
+    let mut intent: simulation::InputIntent = newest.into();
+    if let Some(edge) = samples
+        .iter()
+        .rev()
+        .find(|sample| sample.attack || sample.dodge)
+    {
+        intent.attack = edge.attack;
+        intent.dodge = edge.dodge;
+    }
+    Some((newest.tick, intent))
+}
+
 pub fn is_sequence_newer16(candidate: u16, reference: u16) -> bool {
     candidate != reference && candidate.wrapping_sub(reference) < 0x8000
 }
@@ -326,6 +342,83 @@ mod tests {
                 .collect::<Vec<_>>(),
             vec![1001, 1002]
         );
+    }
+
+    #[test]
+    fn coalesces_redundant_action_edge_onto_newest_continuous_input() {
+        let accepted = vec![
+            InputSample {
+                tick: 100,
+                move_x: -1.0,
+                move_y: 0.0,
+                facing_radians: 0.25,
+                attack: true,
+                dodge: false,
+                block: false,
+            },
+            InputSample {
+                tick: 101,
+                move_x: 0.5,
+                move_y: -0.25,
+                facing_radians: 1.5,
+                attack: false,
+                dodge: false,
+                block: true,
+            },
+        ];
+
+        let (tick, intent) =
+            coalesce_accepted_input_samples(&accepted).expect("accepted samples");
+        assert_eq!(tick, 101);
+        assert_eq!(intent.move_x, 0.5);
+        assert_eq!(intent.move_y, -0.25);
+        assert_eq!(intent.facing_radians, 1.5);
+        assert!(intent.block);
+        assert!(intent.attack);
+        assert!(!intent.dodge);
+    }
+
+    #[test]
+    fn newest_recovered_action_edge_wins_within_one_redundant_batch() {
+        let accepted = vec![
+            InputSample {
+                tick: 200,
+                move_x: 0.0,
+                move_y: 0.0,
+                facing_radians: 0.0,
+                attack: true,
+                dodge: false,
+                block: false,
+            },
+            InputSample {
+                tick: 201,
+                move_x: 0.0,
+                move_y: 1.0,
+                facing_radians: 2.0,
+                attack: false,
+                dodge: true,
+                block: false,
+            },
+            InputSample {
+                tick: 202,
+                move_x: 1.0,
+                move_y: 0.0,
+                facing_radians: 3.0,
+                attack: false,
+                dodge: false,
+                block: false,
+            },
+        ];
+
+        let (tick, intent) =
+            coalesce_accepted_input_samples(&accepted).expect("accepted samples");
+        assert_eq!(tick, 202);
+        assert_eq!(intent.move_x, 1.0);
+        assert_eq!(intent.move_y, 0.0);
+        assert_eq!(intent.facing_radians, 3.0);
+        assert!(!intent.attack);
+        assert!(intent.dodge);
+        assert!(!intent.block);
     }
 
     #[test]
