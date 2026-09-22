@@ -59,7 +59,9 @@ Required evidence:
 - the center observer paints the primary marker color;
 - the center observer paints the secondary marker color;
 - each marker reaches at least 8 exact-color pixels;
-- neither attacking client paints either threat-marker color;
+- the center observer is the only client required to paint both primary and secondary markers;
+- edge attackers may legitimately paint their own primary marker if another fighter threatens them during the FFA exchange;
+- an edge attacker must not paint a secondary marker without simultaneous-threat evidence;
 - two genuine pointer commits and authoritative simultaneous-threat evidence remain mandatory.
 
 The sampler does not inject state or alter timing, combat, facing, positions, or browser inputs.
