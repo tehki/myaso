@@ -1,9 +1,6 @@
-use std::{
-    collections::HashSet,
-    sync::{
-        atomic::{AtomicUsize, Ordering},
-        Arc,
-    },
+use std::sync::{
+    atomic::{AtomicUsize, Ordering},
+    Arc,
 };
 
 pub mod kill_event;
@@ -209,7 +206,7 @@ pub fn decode_input_packet(bytes: &[u8]) -> Result<InputPacket, DecodeError> {
 pub struct InputIngressWindow {
     history_ticks: u32,
     newest_tick: Option<u32>,
-    seen: HashSet<u32>,
+    seen_slots: Vec<bool>,
 }
 
 impl Default for InputIngressWindow {
@@ -221,12 +218,36 @@ impl Default for InputIngressWindow {
 impl InputIngressWindow {
     pub fn new(history_ticks: u32) -> Self {
         assert!((1..=4096).contains(&history_ticks));
-        let dedup_capacity = history_ticks as usize + 1 + INPUT_REDUNDANCY_MAX;
+        let slot_count = (history_ticks as usize + 1).next_power_of_two();
         Self {
             history_ticks,
             newest_tick: None,
-            seen: HashSet::with_capacity(dedup_capacity),
+            seen_slots: vec![false; slot_count],
         }
+    }
+
+    fn slot_index(&self, tick: u32) -> usize {
+        (tick as usize) & (self.seen_slots.len() - 1)
+    }
+
+    fn advance_newest(&mut self, new_tick: u32) {
+        if let Some(previous) = self.newest_tick {
+            let delta = tick_distance32(new_tick, previous);
+            debug_assert!(delta > 0 && delta < 0x8000_0000);
+            let slot_count = self.seen_slots.len();
+            if delta as usize >= slot_count {
+                self.seen_slots.fill(false);
+            } else {
+                // Power-of-two indexing stays aligned across u32 wraparound. Each
+                // entering tick clears only the older tick that shares its slot.
+                for offset in 1..=delta {
+                    let entering_tick = previous.wrapping_add(offset);
+                    let slot = (entering_tick as usize) & (slot_count - 1);
+                    self.seen_slots[slot] = false;
+                }
+            }
+        }
+        self.newest_tick = Some(new_tick);
     }
 
     pub fn ingest(&mut self, packet: &InputPacket) -> AcceptedInputBatch {
@@ -236,21 +257,21 @@ impl InputIngressWindow {
                 .newest_tick
                 .is_none_or(|newest| is_tick_newer32(sample.tick, newest))
             {
-                self.newest_tick = Some(sample.tick);
+                self.advance_newest(sample.tick);
             }
             let newest = self.newest_tick.expect("sample established newest tick");
-            if tick_distance32(newest, sample.tick) > self.history_ticks
-                || self.seen.contains(&sample.tick)
-            {
+            if tick_distance32(newest, sample.tick) > self.history_ticks {
                 continue;
             }
-            self.seen.insert(sample.tick);
+            let slot = self.slot_index(sample.tick);
+            if self.seen_slots[slot] {
+                continue;
+            }
+            self.seen_slots[slot] = true;
             accepted.push(*sample);
         }
 
         if let Some(newest) = self.newest_tick {
-            self.seen
-                .retain(|tick| tick_distance32(newest, *tick) <= self.history_ticks);
             accepted.sort_oldest_to_newest(newest);
         }
         accepted
@@ -431,10 +452,12 @@ mod tests {
     #[test]
     fn ingress_preallocates_the_bounded_replay_window() {
         let mut ingress = InputIngressWindow::new(10);
-        let initial_capacity = ingress.seen.capacity();
+        let initial_capacity = ingress.seen_slots.capacity();
+        let expected_slots = (10_usize + 1).next_power_of_two();
+        assert_eq!(ingress.seen_slots.len(), expected_slots);
         assert!(
-            initial_capacity >= 10 + 1 + INPUT_REDUNDANCY_MAX,
-            "dedup storage must cover the full history window plus one ingress batch"
+            initial_capacity >= ingress.seen_slots.len(),
+            "dedup storage must cover the full inclusive history window"
         );
 
         for client_tick in (1000_u32..2200).step_by(INPUT_REDUNDANCY_MAX) {
@@ -442,12 +465,85 @@ mod tests {
             bytes[8..12].copy_from_slice(&client_tick.to_le_bytes());
             let packet = decode_input_packet(&bytes).expect("valid rolling packet");
             let _ = ingress.ingest(&packet);
+            assert_eq!(ingress.seen_slots.len(), expected_slots);
             assert_eq!(
-                ingress.seen.capacity(),
+                ingress.seen_slots.capacity(),
                 initial_capacity,
                 "valid bounded ingress must not grow the dedup allocation"
             );
         }
+    }
+
+    #[test]
+    fn ingress_reuses_fixed_dedup_ring_across_wraparound_and_jumps() {
+        let mut ingress = InputIngressWindow::new(2);
+        let initial_capacity = ingress.seen_slots.capacity();
+
+        let mut bytes = sample_packet();
+        bytes[8..12].copy_from_slice(&10_u32.to_le_bytes());
+        let first = decode_input_packet(&bytes).expect("initial packet");
+        assert_eq!(
+            ingress
+                .ingest(&first)
+                .iter()
+                .map(|sample| sample.tick)
+                .collect::<Vec<_>>(),
+            vec![8, 9, 10]
+        );
+
+        bytes[8..12].copy_from_slice(&11_u32.to_le_bytes());
+        let one_step = decode_input_packet(&bytes).expect("one-step packet");
+        assert_eq!(
+            ingress
+                .ingest(&one_step)
+                .iter()
+                .map(|sample| sample.tick)
+                .collect::<Vec<_>>(),
+            vec![11]
+        );
+
+        bytes[8..12].copy_from_slice(&13_u32.to_le_bytes());
+        let two_step = decode_input_packet(&bytes).expect("two-step packet");
+        assert_eq!(
+            ingress
+                .ingest(&two_step)
+                .iter()
+                .map(|sample| sample.tick)
+                .collect::<Vec<_>>(),
+            vec![12, 13]
+        );
+        assert_eq!(ingress.seen_slots.len(), 4);
+        assert_eq!(ingress.seen_slots.capacity(), initial_capacity);
+
+        let mut wrapped = InputIngressWindow::new(2);
+        bytes[8..12].copy_from_slice(&u32::MAX.to_le_bytes());
+        let before_wrap = decode_input_packet(&bytes).expect("pre-wrap packet");
+        assert_eq!(wrapped.ingest(&before_wrap).len(), 3);
+        bytes[8..12].copy_from_slice(&1_u32.to_le_bytes());
+        let after_wrap = decode_input_packet(&bytes).expect("post-wrap packet");
+        assert_eq!(
+            wrapped
+                .ingest(&after_wrap)
+                .iter()
+                .map(|sample| sample.tick)
+                .collect::<Vec<_>>(),
+            vec![0, 1]
+        );
+
+        let mut jumped = InputIngressWindow::new(2);
+        bytes[8..12].copy_from_slice(&10_u32.to_le_bytes());
+        let before_jump = decode_input_packet(&bytes).expect("pre-jump packet");
+        assert_eq!(jumped.ingest(&before_jump).len(), 3);
+        bytes[8..12].copy_from_slice(&100_u32.to_le_bytes());
+        let after_jump = decode_input_packet(&bytes).expect("post-jump packet");
+        assert_eq!(
+            jumped
+                .ingest(&after_jump)
+                .iter()
+                .map(|sample| sample.tick)
+                .collect::<Vec<_>>(),
+            vec![98, 99, 100]
+        );
     }
 
     #[test]
