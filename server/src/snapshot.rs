@@ -204,13 +204,13 @@ pub struct InterestQueryStats {
 pub struct ReplicationFrame {
     server_tick: u32,
     states: Vec<WireEntity>,
-    cells: BTreeMap<(i32, i32), Vec<WireEntity>>,
+    cells: BTreeMap<(i32, i32), Vec<usize>>,
 }
 
 impl ReplicationFrame {
     pub fn from_fighters(server_tick: u32, fighters: &[Fighter]) -> Self {
         let mut states = Vec::with_capacity(fighters.len());
-        let mut cells: BTreeMap<(i32, i32), Vec<WireEntity>> = BTreeMap::new();
+        let mut cells: BTreeMap<(i32, i32), Vec<usize>> = BTreeMap::new();
         for fighter in fighters {
             let state = WireEntity::from_fighter(fighter);
             debug_assert!(
@@ -219,11 +219,12 @@ impl ReplicationFrame {
                     .is_none_or(|previous: &WireEntity| previous.net_id < state.net_id),
                 "fighters must remain sorted by authoritative network ID"
             );
+            let state_index = states.len();
             states.push(state);
             cells
                 .entry(replication_cell(state))
                 .or_default()
-                .push(state);
+                .push(state_index);
         }
         Self {
             server_tick,
@@ -281,8 +282,9 @@ impl ReplicationFrame {
                 let Some(cell) = self.cells.get(&(cell_x, cell_y)) else {
                     continue;
                 };
-                for state in cell.iter().copied() {
+                for state_index in cell.iter().copied() {
                     candidates_checked += 1;
+                    let state = self.states[state_index];
                     if interest_distance_sq(viewer, state)
                         <= INTEREST_FAR_RADIUS * INTEREST_FAR_RADIUS
                     {
@@ -1266,6 +1268,54 @@ fn require(bytes: &[u8], offset: usize, count: usize) -> Result<(), SnapshotDeco
 mod tests {
     use super::*;
     use crate::simulation::World;
+
+    #[test]
+    fn indexed_replication_cells_preserve_legacy_query_order() {
+        let mut world = World::new(6000.0, 6000.0);
+        for (net_id, x, y) in [
+            (9, 900.0, 900.0),
+            (1, 1000.0, 1000.0),
+            (7, 1700.0, 1100.0),
+            (3, 2400.0, 900.0),
+            (5, 3100.0, 1400.0),
+            (11, 3800.0, 1700.0),
+        ] {
+            assert!(world.add_player_at(net_id, x, y, 0.0));
+        }
+
+        let frame = ReplicationFrame::from_fighters(world.tick, world.fighters());
+        for (cell_key, indexes) in &frame.cells {
+            assert!(indexes.windows(2).all(|pair| pair[0] < pair[1]));
+            for index in indexes {
+                let state = frame.states[*index];
+                assert_eq!(replication_cell(state), *cell_key);
+            }
+        }
+
+        let viewer_net_id = 3;
+        let viewer = frame.get(viewer_net_id).expect("viewer exists");
+        let center = replication_cell(viewer);
+        let cell_wire = replication_cell_wire();
+        let far_wire = INTEREST_FAR_RADIUS * WORLD_COORDINATE_SCALE;
+        let span = (far_wire / cell_wire as f32).ceil() as i32;
+        let mut expected = Vec::new();
+
+        for cell_y in center.1 - span..=center.1 + span {
+            for cell_x in center.0 - span..=center.0 + span {
+                for state in frame.states.iter().copied() {
+                    if replication_cell(state) == (cell_x, cell_y)
+                        && interest_distance_sq(viewer, state)
+                            <= INTEREST_FAR_RADIUS * INTEREST_FAR_RADIUS
+                    {
+                        expected.push(state);
+                    }
+                }
+            }
+        }
+
+        let actual = frame.query_interest(viewer_net_id).expect("viewer exists");
+        assert_eq!(actual.states, expected);
+    }
 
     #[test]
     fn snapshot_planner_reuses_priority_bucket_capacity() {
