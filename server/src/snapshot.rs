@@ -1318,6 +1318,45 @@ mod tests {
     }
 
     #[test]
+    fn acknowledged_history_advances_in_place_and_preserves_newer_entries() {
+        let mut world = World::new(1200.0, 800.0);
+        for net_id in 1..=3 {
+            assert!(world.add_player_at(
+                net_id,
+                300.0 + net_id as f32 * 50.0,
+                300.0,
+                0.0,
+            ));
+        }
+
+        let frame = ReplicationFrame::from_fighters(world.tick, world.fighters());
+        let mut session = SnapshotSession::new(8);
+        let first =
+            session.build_from_frame(u16::MAX, 1, &frame, crate::CONSERVATIVE_DATAGRAM_BYTES);
+        let second =
+            session.build_from_frame(u16::MAX, 1, &frame, crate::CONSERVATIVE_DATAGRAM_BYTES);
+        let third =
+            session.build_from_frame(u16::MAX, 1, &frame, crate::CONSERVATIVE_DATAGRAM_BYTES);
+
+        assert_eq!(session.history_depth(), 3);
+        let capacity = session.history.capacity();
+
+        assert!(session.advance_acknowledged_state(second.sequence));
+        assert_eq!(session.acknowledged_sequence, Some(second.sequence));
+        assert_eq!(session.acknowledged_entity_count(), 3);
+        assert_eq!(session.history_depth(), 1);
+        assert_eq!(session.history.front().map(|entry| entry.sequence), Some(third.sequence));
+        assert!(!session.has_sequence(first.sequence));
+        assert!(session.has_sequence(second.sequence));
+        assert!(session.has_sequence(third.sequence));
+        assert_eq!(session.history.capacity(), capacity);
+
+        assert!(session.advance_acknowledged_state(second.sequence));
+        assert_eq!(session.history_depth(), 1);
+        assert_eq!(session.history.capacity(), capacity);
+    }
+
+    #[test]
     fn snapshot_planner_reuses_priority_bucket_capacity() {
         let mut world = World::new(6000.0, 6000.0);
         assert!(world.add_player_at(1, 2500.0, 2500.0, 0.0));
