@@ -1352,6 +1352,48 @@ mod tests {
     }
 
     #[test]
+    fn single_freshness_lookup_preserves_present_and_missing_age_semantics() {
+        let mut world = World::new(1200.0, 800.0);
+        assert!(world.add_player_at(1, 400.0, 300.0, 0.0));
+
+        let initial_frame = ReplicationFrame::from_fighters(0, world.fighters());
+        let mut session = SnapshotSession::default();
+        let first = session.build_from_frame(
+            u16::MAX,
+            1,
+            &initial_frame,
+            crate::CONSERVATIVE_DATAGRAM_BYTES,
+        );
+
+        let mut changed_frame = initial_frame.clone();
+        changed_frame.server_tick = 5;
+        changed_frame.states[0].x += 1;
+        let second = session.build_from_frame(
+            first.sequence,
+            1,
+            &changed_frame,
+            crate::CONSERVATIVE_DATAGRAM_BYTES,
+        );
+        assert_eq!(second.record_count, 1);
+        assert_eq!(second.freshness.combat.max_due_age_ticks, 5);
+        assert_eq!(second.freshness.combat.max_sent_age_ticks, 5);
+
+        session.last_sent_tick.remove(&1);
+        let mut changed_again_frame = changed_frame.clone();
+        changed_again_frame.server_tick = 6;
+        changed_again_frame.states[0].x += 1;
+        let third = session.build_from_frame(
+            second.sequence,
+            1,
+            &changed_again_frame,
+            crate::CONSERVATIVE_DATAGRAM_BYTES,
+        );
+        assert_eq!(third.record_count, 1);
+        assert_eq!(third.freshness.combat.max_due_age_ticks, 0);
+        assert_eq!(third.freshness.combat.max_sent_age_ticks, 0);
+    }
+
+    #[test]
     fn snapshot_planner_reuses_priority_bucket_capacity() {
         let mut world = World::new(6000.0, 6000.0);
         assert!(world.add_player_at(1, 2500.0, 2500.0, 0.0));
