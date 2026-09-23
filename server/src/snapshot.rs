@@ -318,6 +318,7 @@ pub struct SnapshotSession {
     acknowledged_state: BTreeMap<u32, WireEntity>,
     last_sent_tick: BTreeMap<u32, u32>,
     planner_scratch: SnapshotPlannerScratch,
+    recycled_records: Vec<SnapshotRecord>,
 }
 
 impl Default for SnapshotSession {
@@ -337,6 +338,7 @@ impl SnapshotSession {
             acknowledged_state: BTreeMap::new(),
             last_sent_tick: BTreeMap::new(),
             planner_scratch: SnapshotPlannerScratch::default(),
+            recycled_records: Vec::new(),
         }
     }
 
@@ -373,6 +375,7 @@ impl SnapshotSession {
         } else {
             &self.acknowledged_state
         };
+        let record_buffer = std::mem::take(&mut self.recycled_records);
         let plan = plan_records(
             viewer_net_id,
             server_tick,
@@ -381,6 +384,7 @@ impl SnapshotSession {
             &self.last_sent_tick,
             max_bytes,
             &mut self.planner_scratch,
+            record_buffer,
         );
         let sequence = self.next_sequence;
         self.next_sequence = self.next_sequence.wrapping_add(1);
@@ -410,7 +414,9 @@ impl SnapshotSession {
             records: plan.records,
         });
         while self.history.len() > self.history_limit {
-            self.history.pop_front();
+            if let Some(evicted) = self.history.pop_front() {
+                self.recycled_records = evicted.records;
+            }
         }
 
         SnapshotBuild {
@@ -550,6 +556,7 @@ fn plan_records(
     last_sent_tick: &BTreeMap<u32, u32>,
     max_bytes: usize,
     scratch: &mut SnapshotPlannerScratch,
+    mut records: Vec<SnapshotRecord>,
 ) -> SnapshotPlan {
     assert!(max_bytes >= SNAPSHOT_HEADER_BYTES);
     let viewer = frame.get(viewer_net_id);
@@ -621,7 +628,7 @@ fn plan_records(
     due_count += collect_baseline_removals(frame, viewer, baseline, &mut scratch.buckets[4]);
 
     let mut bytes_used = SNAPSHOT_HEADER_BYTES;
-    let mut records = Vec::new();
+    records.clear();
     for (bucket_index, bucket) in scratch.buckets.iter_mut().enumerate() {
         if bucket.is_empty() {
             continue;
