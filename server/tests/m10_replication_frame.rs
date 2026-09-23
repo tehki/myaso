@@ -48,7 +48,6 @@ fn reusable_interest_query_matches_allocating_query_without_capacity_churn() {
     assert_eq!(first_stats.cells_visited, expected.cells_visited);
 
     let capacity = scratch.capacity();
-    scratch.push(frame.get(1).expect("state exists"));
     let second_stats = frame
         .query_interest_into(256, &mut scratch)
         .expect("viewer exists");
@@ -59,6 +58,7 @@ fn reusable_interest_query_matches_allocating_query_without_capacity_churn() {
 
     assert_eq!(frame.query_interest_into(9999, &mut scratch), None);
     assert!(scratch.is_empty());
+    assert_eq!(scratch.capacity(), capacity);
 }
 
 #[test]
