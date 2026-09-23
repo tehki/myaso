@@ -110,6 +110,9 @@ jobs:
       - name: Validate M68 fixed input dedup ring
         run: cargo test --locked --manifest-path server/Cargo.toml ingress_reuses_fixed_dedup_ring_across_wraparound_and_jumps
 
+      - name: Validate M69 single input state lock
+        run: cargo test --locked --manifest-path server/Cargo.toml --bin myaso-server input_state_access_applies_and_reads_tick_in_one_scope
+
       - name: Validate real browser flight
         env:
           MYASO_FLIGHT_DURATION_MS: "4000"
