@@ -1260,7 +1260,6 @@ fn require(bytes: &[u8], offset: usize, count: usize) -> Result<(), SnapshotDeco
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1283,15 +1282,29 @@ mod tests {
 
         let frame = ReplicationFrame::from_fighters(world.tick, world.fighters());
         let mut session = SnapshotSession::default();
-        let first =
-            session.build_from_frame(u16::MAX, 1, &frame, crate::CONSERVATIVE_DATAGRAM_BYTES);
-        let capacities = session.plan_buckets.each_ref().map(|bucket| bucket.capacity());
+        let first = session.build_from_frame(
+            u16::MAX,
+            1,
+            &frame,
+            crate::CONSERVATIVE_DATAGRAM_BYTES,
+        );
+        let capacities = session
+            .plan_buckets
+            .each_ref()
+            .map(|bucket| bucket.capacity());
 
         assert!(capacities.iter().any(|capacity| *capacity > 0));
 
-        let second =
-            session.build_from_frame(u16::MAX, 1, &frame, CONSERVATIVE_DATAGRAM_BYTES);
-        let reused_capacities = session.plan_buckets.each_ref().map(|bucket| bucket.capacity());
+        let second = session.build_from_frame(
+            u16::MAX,
+            1,
+            &frame,
+            crate::CONSERVATIVE_DATAGRAM_BYTES,
+        );
+        let reused_capacities = session
+            .plan_buckets
+            .each_ref()
+            .map(|bucket| bucket.capacity());
 
         assert_eq!(reused_capacities, capacities);
         assert_eq!(second.record_count, first.record_count);
