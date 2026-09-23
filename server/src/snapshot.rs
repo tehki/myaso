@@ -316,6 +316,7 @@ pub struct SnapshotSession {
     acknowledged_state: BTreeMap<u32, WireEntity>,
     last_sent_tick: BTreeMap<u32, u32>,
     interest_states: Vec<WireEntity>,
+    plan_buckets: [Vec<PlannedRecord>; 9],
 }
 
 impl Default for SnapshotSession {
@@ -335,6 +336,7 @@ impl SnapshotSession {
             acknowledged_state: BTreeMap::new(),
             last_sent_tick: BTreeMap::new(),
             interest_states: Vec::new(),
+            plan_buckets: std::array::from_fn(|_| Vec::new()),
         }
     }
 
@@ -379,6 +381,7 @@ impl SnapshotSession {
             &self.last_sent_tick,
             max_bytes,
             &mut self.interest_states,
+            &mut self.plan_buckets,
         );
         let sequence = self.next_sequence;
         self.next_sequence = self.next_sequence.wrapping_add(1);
@@ -542,13 +545,16 @@ fn plan_records(
     last_sent_tick: &BTreeMap<u32, u32>,
     max_bytes: usize,
     interest_states: &mut Vec<WireEntity>,
+    buckets: &mut [Vec<PlannedRecord>; 9],
 ) -> SnapshotPlan {
     assert!(max_bytes >= SNAPSHOT_HEADER_BYTES);
     let viewer = frame.get(viewer_net_id);
     let query_stats = frame.query_interest_into(viewer_net_id, interest_states);
     let interest_candidates_checked = query_stats.map_or(0, |stats| stats.candidates_checked);
     let visible_entity_count = query_stats.map_or(0, |_| interest_states.len());
-    let mut buckets: [Vec<PlannedRecord>; 9] = std::array::from_fn(|_| Vec::new());
+    for bucket in buckets.iter_mut() {
+        bucket.clear();
+    }
     let mut due_count = 0_usize;
     let mut freshness = SnapshotFreshness::default();
 
@@ -632,7 +638,7 @@ fn plan_records(
 
     let mut bytes_used = SNAPSHOT_HEADER_BYTES;
     let mut records = Vec::new();
-    for (bucket_index, mut bucket) in buckets.into_iter().enumerate() {
+    for (bucket_index, bucket) in buckets.iter_mut().enumerate() {
         if bucket.is_empty() {
             continue;
         }
