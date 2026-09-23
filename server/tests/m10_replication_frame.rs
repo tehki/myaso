@@ -1,7 +1,8 @@
 ﻿use myaso_server::{
     simulation::{InputIntent, World},
     snapshot::{
-        ReplicationFrame, SnapshotSession, WireEntity, INTEREST_FAR_RADIUS, WORLD_COORDINATE_SCALE,
+        decode_snapshot, ReplicationFrame, SnapshotSession, WireEntity, INTEREST_FAR_RADIUS,
+        SNAPSHOT_FIELD_REMOVED, WORLD_COORDINATE_SCALE,
     },
     CONSERVATIVE_DATAGRAM_BYTES,
 };
@@ -86,6 +87,49 @@ fn spatial_frame_query_matches_naive_visibility_for_512_players() {
         assert!(query.candidates_checked < frame.len());
         assert!(query.cells_visited > 0);
     }
+}
+
+#[test]
+fn baseline_entity_leaving_interest_emits_removal_without_visibility_index() {
+    let mut initial_world = World::new(5000.0, 5000.0);
+    assert!(initial_world.add_player_at(1, 1000.0, 1000.0, 0.0));
+    assert!(initial_world.add_player_at(2, 1100.0, 1000.0, 0.0));
+
+    let mut session = SnapshotSession::default();
+    let initial_frame =
+        ReplicationFrame::from_fighters(initial_world.tick, initial_world.fighters());
+    let first = session.build_from_frame(u16::MAX, 1, &initial_frame, CONSERVATIVE_DATAGRAM_BYTES);
+    assert!(decode_snapshot(&first.bytes)
+        .expect("decode initial snapshot")
+        .records
+        .iter()
+        .any(|record| record.net_id == 2));
+
+    let mut distant_world = World::new(5000.0, 5000.0);
+    assert!(distant_world.add_player_at(1, 1000.0, 1000.0, 0.0));
+    assert!(distant_world.add_player_at(2, 4000.0, 1000.0, 0.0));
+    let distant_frame =
+        ReplicationFrame::from_fighters(distant_world.tick, distant_world.fighters());
+    assert!(!distant_frame
+        .query_interest(1)
+        .expect("viewer exists")
+        .states
+        .iter()
+        .any(|state| state.net_id == 2));
+
+    let next = session.build_from_frame(
+        first.sequence,
+        1,
+        &distant_frame,
+        CONSERVATIVE_DATAGRAM_BYTES,
+    );
+    let decoded = decode_snapshot(&next.bytes).expect("decode removal snapshot");
+    let removal = decoded
+        .records
+        .iter()
+        .find(|record| record.net_id == 2)
+        .expect("entity leaving interest must be removed");
+    assert_ne!(removal.mask & SNAPSHOT_FIELD_REMOVED, 0);
 }
 
 #[test]

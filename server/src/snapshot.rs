@@ -1,5 +1,5 @@
 use crate::simulation::Fighter;
-use std::collections::{BTreeMap, BTreeSet, VecDeque};
+use std::collections::{BTreeMap, VecDeque};
 
 pub const SNAPSHOT_PACKET_TYPE: u8 = 2;
 pub const SNAPSHOT_HEADER_BYTES: usize = 14;
@@ -549,7 +549,6 @@ fn plan_records(
     let interest_candidates_checked = query_stats.map_or(0, |stats| stats.candidates_checked);
     let visible_entity_count = query_stats.map_or(0, |_| interest_states.len());
     let mut buckets: [Vec<PlannedRecord>; 9] = std::array::from_fn(|_| Vec::new());
-    let mut visible = BTreeSet::new();
     let mut due_count = 0_usize;
     let mut freshness = SnapshotFreshness::default();
 
@@ -557,7 +556,6 @@ fn plan_records(
         for state in interest_states.iter().copied() {
             let is_owner = state.net_id == viewer_net_id;
             let distance_sq = interest_distance_sq(viewer_state, state);
-            visible.insert(state.net_id);
             let before = baseline.get(&state.net_id).copied();
             let Some(record) = build_delta(state, before) else {
                 continue;
@@ -614,15 +612,22 @@ fn plan_records(
     }
 
     for net_id in baseline.keys().copied() {
-        if !visible.contains(&net_id) {
-            due_count += 1;
-            buckets[4].push(PlannedRecord {
-                record: SnapshotRecord::removed(net_id),
-                tier: None,
-                age_ticks: 0,
-                priority_age_ticks: 0,
-            });
+        let still_visible = viewer.is_some_and(|viewer_state| {
+            frame.get(net_id).is_some_and(|state| {
+                interest_distance_sq(viewer_state, state)
+                    <= INTEREST_FAR_RADIUS * INTEREST_FAR_RADIUS
+            })
+        });
+        if still_visible {
+            continue;
         }
+        due_count += 1;
+        buckets[4].push(PlannedRecord {
+            record: SnapshotRecord::removed(net_id),
+            tier: None,
+            age_ticks: 0,
+            priority_age_ticks: 0,
+        });
     }
 
     let mut bytes_used = SNAPSHOT_HEADER_BYTES;
