@@ -1284,7 +1284,7 @@ mod tests {
         let frame = ReplicationFrame::from_fighters(world.tick, world.fighters());
         let mut session = SnapshotSession::default();
         let first =
-            session.build_from_frame(u16::MAX, 1, &frame, CONSERVATIVE_DATAGRAM_BYTES);
+            session.build_from_frame(u16::MAX, 1, &frame, crate::CONSERVATIVE_DATAGRAM_BYTES);
         let capacities = session.plan_buckets.each_ref().map(|bucket| bucket.capacity());
 
         assert!(capacities.iter().any(|capacity| *capacity > 0));
