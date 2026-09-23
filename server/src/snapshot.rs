@@ -1258,7 +1258,6 @@ fn require(bytes: &[u8], offset: usize, count: usize) -> Result<(), SnapshotDeco
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::{prepare_visible_net_ids, WireEntity};
