@@ -318,6 +318,7 @@ pub struct SnapshotSession {
     acknowledged_state: BTreeMap<u32, WireEntity>,
     last_sent_tick: BTreeMap<u32, u32>,
     planner_scratch: SnapshotPlannerScratch,
+    recycled_records: Vec<SnapshotRecord>,
 }
 
 impl Default for SnapshotSession {
@@ -337,6 +338,7 @@ impl SnapshotSession {
             acknowledged_state: BTreeMap::new(),
             last_sent_tick: BTreeMap::new(),
             planner_scratch: SnapshotPlannerScratch::default(),
+            recycled_records: Vec::new(),
         }
     }
 
@@ -373,6 +375,8 @@ impl SnapshotSession {
         } else {
             &self.acknowledged_state
         };
+        debug_assert!(self.planner_scratch.records.is_empty());
+        self.planner_scratch.records = std::mem::take(&mut self.recycled_records);
         let plan = plan_records(
             viewer_net_id,
             server_tick,
@@ -410,7 +414,9 @@ impl SnapshotSession {
             records: plan.records,
         });
         while self.history.len() > self.history_limit {
-            self.history.pop_front();
+            if let Some(evicted) = self.history.pop_front() {
+                self.recycled_records = evicted.records;
+            }
         }
 
         SnapshotBuild {
@@ -531,6 +537,7 @@ struct PlannedRecord {
 struct SnapshotPlannerScratch {
     interest_states: Vec<WireEntity>,
     buckets: [Vec<PlannedRecord>; 9],
+    records: Vec<SnapshotRecord>,
 }
 
 #[derive(Debug)]
@@ -621,8 +628,9 @@ fn plan_records(
     due_count += collect_baseline_removals(frame, viewer, baseline, &mut scratch.buckets[4]);
 
     let mut bytes_used = SNAPSHOT_HEADER_BYTES;
-    let mut records = Vec::new();
-    for (bucket_index, bucket) in scratch.buckets.iter_mut().enumerate() {
+    scratch.records.clear();
+    let (buckets, records) = (&mut scratch.buckets, &mut scratch.records);
+    for (bucket_index, bucket) in buckets.iter_mut().enumerate() {
         if bucket.is_empty() {
             continue;
         }
@@ -659,7 +667,7 @@ fn plan_records(
 
     SnapshotPlan {
         omitted_due_to_budget: due_count.saturating_sub(records.len()),
-        records,
+        records: std::mem::take(records),
         interest_candidates_checked,
         visible_entity_count,
         freshness,
@@ -1485,6 +1493,43 @@ mod tests {
         assert_eq!(third.record_count, 1);
         assert_eq!(third.freshness.combat.max_due_age_ticks, 0);
         assert_eq!(third.freshness.combat.max_sent_age_ticks, 0);
+    }
+
+    #[test]
+    fn snapshot_history_reuses_evicted_record_capacity() {
+        let mut world = World::new(1200.0, 800.0);
+        for net_id in 1..=8 {
+            assert!(world.add_player_at(net_id, 300.0 + net_id as f32 * 25.0, 300.0, 0.0));
+        }
+
+        let frame = ReplicationFrame::from_fighters(world.tick, world.fighters());
+        let mut session = SnapshotSession::new(2);
+        let first =
+            session.build_from_frame(u16::MAX, 1, &frame, crate::CONSERVATIVE_DATAGRAM_BYTES);
+        let second =
+            session.build_from_frame(u16::MAX, 1, &frame, crate::CONSERVATIVE_DATAGRAM_BYTES);
+        let third =
+            session.build_from_frame(u16::MAX, 1, &frame, crate::CONSERVATIVE_DATAGRAM_BYTES);
+
+        assert_eq!(session.history_depth(), 2);
+        assert_eq!(third.record_count, first.record_count);
+        assert_eq!(third.byte_composition, first.byte_composition);
+        assert!(!session.recycled_records.is_empty());
+
+        let recycled_ptr = session.recycled_records.as_ptr();
+        let recycled_capacity = session.recycled_records.capacity();
+        assert!(recycled_capacity >= first.record_count);
+
+        let fourth =
+            session.build_from_frame(u16::MAX, 1, &frame, crate::CONSERVATIVE_DATAGRAM_BYTES);
+        let newest = session.history.back().expect("new snapshot history entry");
+
+        assert_eq!(session.history_depth(), 2);
+        assert_eq!(fourth.record_count, first.record_count);
+        assert_eq!(fourth.byte_composition, first.byte_composition);
+        assert_eq!(newest.records.as_ptr(), recycled_ptr);
+        assert_eq!(newest.records.capacity(), recycled_capacity);
+        assert_eq!(session.recycled_records.len(), second.record_count);
     }
 
     #[test]
