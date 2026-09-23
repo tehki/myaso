@@ -1259,3 +1259,43 @@ fn require(bytes: &[u8], offset: usize, count: usize) -> Result<(), SnapshotDeco
         Ok(())
     }
 }
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::simulation::World;
+
+    #[test]
+    fn snapshot_planner_reuses_priority_bucket_capacity() {
+        let mut world = World::new(6000.0, 6000.0);
+        assert!(world.add_player_at(1, 2500.0, 2500.0, 0.0));
+        for net_id in 2..=64 {
+            let ring = (net_id - 2) % 3;
+            let offset = ((net_id - 2) / 3) as f32 * 4.0;
+            let x = match ring {
+                0 => 2600.0 + offset,
+                1 => 3100.0 + offset,
+                _ => 4300.0 + offset,
+            };
+            assert!(world.add_player_at(net_id, x, 2500.0, 0.0));
+        }
+
+        let frame = ReplicationFrame::from_fighters(world.tick, world.fighters());
+        let mut session = SnapshotSession::default();
+        let first =
+            session.build_from_frame(u16::MAX, 1, &frame, CONSERVATIVE_DATAGRAM_BYTES);
+        let capacities = session.plan_buckets.each_ref().map(|bucket| bucket.capacity());
+
+        assert!(capacities.iter().any(|capacity| *capacity > 0));
+
+        let second =
+            session.build_from_frame(u16::MAX, 1, &frame, CONSERVATIVE_DATAGRAM_BYTES);
+        let reused_capacities = session.plan_buckets.each_ref().map(|bucket| bucket.capacity());
+
+        assert_eq!(reused_capacities, capacities);
+        assert_eq!(second.record_count, first.record_count);
+        assert_eq!(second.byte_composition, first.byte_composition);
+        assert_eq!(second.freshness, first.freshness);
+    }
+}
