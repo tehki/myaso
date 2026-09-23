@@ -173,6 +173,12 @@ impl SnapshotByteComposition {
     }
 }
 
+#[derive(Debug)]
+struct EncodedSnapshot {
+    bytes: Vec<u8>,
+    composition: SnapshotByteComposition,
+}
+
 #[derive(Debug, Clone)]
 pub struct SnapshotBuild {
     pub bytes: Vec<u8>,
@@ -388,7 +394,7 @@ impl SnapshotSession {
         );
         let sequence = self.next_sequence;
         self.next_sequence = self.next_sequence.wrapping_add(1);
-        let bytes = encode_snapshot_current(
+        let encoded = encode_snapshot_current_with_composition(
             sequence,
             baseline_sequence,
             server_tick,
@@ -396,7 +402,8 @@ impl SnapshotSession {
             &plan.records,
             max_bytes,
         );
-        let byte_composition = snapshot_byte_composition(&plan.records);
+        let bytes = encoded.bytes;
+        let byte_composition = encoded.composition;
         debug_assert_eq!(byte_composition.total_bytes(), bytes.len());
 
         for record in &plan.records {
@@ -837,6 +844,7 @@ pub fn encode_snapshot(
         max_bytes,
         SNAPSHOT_ENCODING_LEGACY_U32_IDS,
     )
+    .bytes
 }
 
 pub fn encode_snapshot_current(
@@ -847,6 +855,25 @@ pub fn encode_snapshot_current(
     records: &[SnapshotRecord],
     max_bytes: usize,
 ) -> Vec<u8> {
+    encode_snapshot_current_with_composition(
+        sequence,
+        baseline_sequence,
+        server_tick,
+        full,
+        records,
+        max_bytes,
+    )
+    .bytes
+}
+
+fn encode_snapshot_current_with_composition(
+    sequence: u16,
+    baseline_sequence: u16,
+    server_tick: u32,
+    full: bool,
+    records: &[SnapshotRecord],
+    max_bytes: usize,
+) -> EncodedSnapshot {
     encode_snapshot_with_encoding(
         sequence,
         baseline_sequence,
@@ -866,7 +893,7 @@ fn encode_snapshot_with_encoding(
     records: &[SnapshotRecord],
     max_bytes: usize,
     encoding: u8,
-) -> Vec<u8> {
+) -> EncodedSnapshot {
     assert!(records.len() <= u16::MAX as usize);
     assert!(matches!(
         encoding,
@@ -875,11 +902,8 @@ fn encode_snapshot_with_encoding(
             | SNAPSHOT_ENCODING_VARINT_IDS_U8_FACING
             | SNAPSHOT_ENCODING_VARINT_IDS_U8_FACING_U12_POSITION
     ));
-    let total_bytes = SNAPSHOT_HEADER_BYTES
-        + records
-            .iter()
-            .map(|record| snapshot_record_bytes_for_encoding(record, encoding))
-            .sum::<usize>();
+    let composition = snapshot_byte_composition_for_encoding(records, encoding);
+    let total_bytes = composition.total_bytes();
     assert!(total_bytes <= max_bytes, "snapshot exceeds datagram budget");
 
     let mut bytes = Vec::with_capacity(total_bytes);
@@ -909,7 +933,7 @@ fn encode_snapshot_with_encoding(
         encode_record_fields(record, wire_mask, &mut bytes, encoding);
     }
     debug_assert_eq!(bytes.len(), total_bytes);
-    bytes
+    EncodedSnapshot { bytes, composition }
 }
 
 fn encode_record_fields(record: &SnapshotRecord, wire_mask: u8, bytes: &mut Vec<u8>, encoding: u8) {
@@ -1493,6 +1517,65 @@ mod tests {
         assert_eq!(third.record_count, 1);
         assert_eq!(third.freshness.combat.max_due_age_ticks, 0);
         assert_eq!(third.freshness.combat.max_sent_age_ticks, 0);
+    }
+
+    #[test]
+    fn inline_byte_composition_matches_standalone_accounting() {
+        let records = vec![
+            SnapshotRecord::full(WireEntity {
+                net_id: 1,
+                x: 1024,
+                y: 2048,
+                facing: 4096,
+                hp: 90,
+                guard: 80,
+                action: 2,
+                flags: 1,
+            }),
+            SnapshotRecord::from_state(
+                WireEntity {
+                    net_id: 300,
+                    x: COMPACT_POSITION_MAX + 1,
+                    y: 512,
+                    facing: 8192,
+                    hp: 70,
+                    guard: 60,
+                    action: 3,
+                    flags: 2,
+                },
+                SNAPSHOT_FIELD_POSITION | SNAPSHOT_FIELD_FACING | SNAPSHOT_FIELD_ACTION,
+            ),
+            SnapshotRecord::removed(70_000),
+        ];
+
+        let encoded = encode_snapshot_current_with_composition(
+            7,
+            6,
+            123,
+            false,
+            &records,
+            crate::CONSERVATIVE_DATAGRAM_BYTES,
+        );
+        let standalone = snapshot_byte_composition(&records);
+        let public_bytes = encode_snapshot_current(
+            7,
+            6,
+            123,
+            false,
+            &records,
+            crate::CONSERVATIVE_DATAGRAM_BYTES,
+        );
+
+        assert_eq!(encoded.composition, standalone);
+        assert_eq!(encoded.composition.total_bytes(), encoded.bytes.len());
+        assert_eq!(encoded.bytes, public_bytes);
+
+        let decoded = decode_snapshot(&encoded.bytes).expect("encoded snapshot must decode");
+        assert_eq!(decoded.sequence, 7);
+        assert_eq!(decoded.baseline_sequence, 6);
+        assert_eq!(decoded.server_tick, 123);
+        assert!(!decoded.full);
+        assert_eq!(decoded.records.len(), records.len());
     }
 
     #[test]
