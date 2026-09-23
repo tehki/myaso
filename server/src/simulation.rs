@@ -217,10 +217,15 @@ impl World {
         &self.fighters
     }
 
-    pub fn fighter(&self, net_id: u32) -> Option<&Fighter> {
+    fn fighter_index(&self, net_id: u32) -> Result<usize, usize> {
         self.fighters
-            .iter()
-            .find(|fighter| fighter.net_id == net_id)
+            .binary_search_by_key(&net_id, |fighter| fighter.net_id)
+    }
+
+    pub fn fighter(&self, net_id: u32) -> Option<&Fighter> {
+        self.fighter_index(net_id)
+            .ok()
+            .map(|index| &self.fighters[index])
     }
 
     pub fn match_winner(&self) -> Option<u32> {
@@ -248,38 +253,39 @@ impl World {
     }
 
     pub fn add_player_at(&mut self, net_id: u32, x: f32, y: f32, facing: f32) -> bool {
-        if self.winner.is_some() || net_id == 0 || self.fighter(net_id).is_some() {
+        if self.winner.is_some() || net_id == 0 {
             return false;
         }
+        let insertion_index = match self.fighter_index(net_id) {
+            Ok(_) => return false,
+            Err(index) => index,
+        };
         let fighter = Fighter::new(
             net_id,
             clamp(x, FIGHTER_RADIUS, self.width - FIGHTER_RADIUS),
             clamp(y, FIGHTER_RADIUS, self.height - FIGHTER_RADIUS),
             facing,
         );
-        self.fighters.push(fighter);
-        self.fighters.sort_by_key(|fighter| fighter.net_id);
+        self.fighters.insert(insertion_index, fighter);
         true
     }
 
     pub fn remove_player(&mut self, net_id: u32) -> bool {
-        let before = self.fighters.len();
-        self.fighters.retain(|fighter| fighter.net_id != net_id);
-        before != self.fighters.len()
+        let Ok(index) = self.fighter_index(net_id) else {
+            return false;
+        };
+        self.fighters.remove(index);
+        true
     }
 
     pub fn set_input(&mut self, net_id: u32, input: InputIntent) -> bool {
         if self.winner.is_some() {
             return false;
         }
-        let Some(fighter) = self
-            .fighters
-            .iter_mut()
-            .find(|fighter| fighter.net_id == net_id)
-        else {
+        let Ok(index) = self.fighter_index(net_id) else {
             return false;
         };
-        fighter.latest_input = normalize_input(input);
+        self.fighters[index].latest_input = normalize_input(input);
         true
     }
 

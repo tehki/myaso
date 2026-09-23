@@ -113,6 +113,9 @@ jobs:
       - name: Validate M69 single input state lock
         run: cargo test --locked --manifest-path server/Cargo.toml --bin myaso-server input_state_access_applies_and_reads_tick_in_one_scope
 
+      - name: Validate M70 binary fighter lookup
+        run: cargo test --locked --manifest-path server/Cargo.toml fighter_identity_operations_preserve_sorted_binary_lookup
+
       - name: Validate real browser flight
         env:
           MYASO_FLIGHT_DURATION_MS: "4000"
