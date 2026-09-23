@@ -471,17 +471,17 @@ async fn handle_connection(
                 }
 
                 let accepted = ingress.ingest(&packet);
-                if let Some(coalesced) = coalesce_accepted_input_batch(accepted.as_slice()) {
+                let coalesced = coalesce_accepted_input_batch(accepted.as_slice())
+                    .map(|sample| (sample.tick, sample.into()));
+                let server_tick = {
                     let mut state = game.state.lock().await;
-                    state.world.set_input(player_id, coalesced.into());
-                    record_pending_input_ack(
+                    apply_coalesced_input_and_read_tick(
+                        &mut state,
+                        player_id,
+                        coalesced,
                         &mut pending_input_acks,
-                        coalesced.tick,
-                        state.world.tick,
-                    );
-                }
-
-                let server_tick = game.state.lock().await.world.tick;
+                    )
+                };
                 if server_tick.wrapping_sub(packet.ack_server_tick) > 600 {
                     eprintln!(
                         "session {stable_id} stale server acknowledgement: client={} server={}",
@@ -659,6 +659,19 @@ fn record_pending_input_ack(
     pending.push_back((client_tick, server_tick));
 }
 
+fn apply_coalesced_input_and_read_tick(
+    state: &mut GameState,
+    player_id: u32,
+    coalesced: Option<(u32, InputIntent)>,
+    pending_input_acks: &mut VecDeque<(u32, u32)>,
+) -> u32 {
+    if let Some((client_tick, input)) = coalesced {
+        state.world.set_input(player_id, input);
+        record_pending_input_ack(pending_input_acks, client_tick, state.world.tick);
+    }
+    state.world.tick
+}
+
 fn take_safe_input_ack(pending: &mut VecDeque<(u32, u32)>, server_tick: u32) -> Option<u32> {
     let mut newest_safe = None;
     while let Some(&(client_tick, accepted_at_tick)) = pending.front() {
@@ -686,6 +699,39 @@ fn encode_input_ack(processed_client_tick: u32, server_tick: u32, player_net_id:
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn input_state_access_applies_and_reads_tick_in_one_scope() {
+        let mut state = GameState::new(0, 0);
+        assert!(state.world.add_player(1));
+        let mut pending = VecDeque::new();
+        let input = InputIntent {
+            move_x: 0.5,
+            move_y: -0.25,
+            facing_radians: 1.0,
+            attack: true,
+            dodge: false,
+            block: false,
+        };
+
+        let server_tick = apply_coalesced_input_and_read_tick(
+            &mut state,
+            1,
+            Some((77, input)),
+            &mut pending,
+        );
+
+        assert_eq!(server_tick, state.world.tick);
+        assert_eq!(pending.front().copied(), Some((77, server_tick)));
+        assert_eq!(state.world.fighter(1).expect("player exists").input(), input);
+
+        let pending_len = pending.len();
+        assert_eq!(
+            apply_coalesced_input_and_read_tick(&mut state, 1, None, &mut pending),
+            server_tick
+        );
+        assert_eq!(pending.len(), pending_len);
+    }
 
     #[test]
     fn processed_input_ack_coalesces_safe_ticks_without_starvation() {
