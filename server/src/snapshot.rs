@@ -1271,3 +1271,40 @@ fn require(bytes: &[u8], offset: usize, count: usize) -> Result<(), SnapshotDeco
         Ok(())
     }
 }
+
+
+#[cfg(test)]
+mod tests {
+    use super::{PlannedRecord, SnapshotPlanScratch, SnapshotRecord};
+
+    fn planned_record(net_id: u32) -> PlannedRecord {
+        PlannedRecord {
+            record: SnapshotRecord::removed(net_id),
+            tier: None,
+            age_ticks: 0,
+            priority_age_ticks: 0,
+        }
+    }
+
+    #[test]
+    fn reusable_snapshot_buckets_retain_capacity_after_clear() {
+        let mut scratch = SnapshotPlanScratch::default();
+        scratch.buckets[2].reserve(16);
+        scratch.buckets[2].push(planned_record(7));
+        scratch.buckets[5].reserve(8);
+        scratch.buckets[5].push(planned_record(9));
+
+        let near_capacity = scratch.buckets[2].capacity();
+        let unseen_capacity = scratch.buckets[5].capacity();
+        scratch.clear_buckets();
+
+        assert!(scratch.buckets.iter().all(Vec::is_empty));
+        assert_eq!(scratch.buckets[2].capacity(), near_capacity);
+        assert_eq!(scratch.buckets[5].capacity(), unseen_capacity);
+
+        scratch.buckets[2].push(planned_record(11));
+        scratch.buckets[5].push(planned_record(13));
+        assert_eq!(scratch.buckets[2].capacity(), near_capacity);
+        assert_eq!(scratch.buckets[5].capacity(), unseen_capacity);
+    }
+}
