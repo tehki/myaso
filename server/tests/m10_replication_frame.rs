@@ -1,9 +1,33 @@
 ﻿use myaso_server::{
     simulation::{InputIntent, World},
-    snapshot::{ReplicationFrame, SnapshotSession, INTEREST_FAR_RADIUS, WORLD_COORDINATE_SCALE},
+    snapshot::{
+        ReplicationFrame, SnapshotSession, WireEntity, INTEREST_FAR_RADIUS, WORLD_COORDINATE_SCALE,
+    },
     CONSERVATIVE_DATAGRAM_BYTES,
 };
 use std::collections::BTreeSet;
+
+#[test]
+fn packed_replication_frame_preserves_binary_identity_lookup() {
+    let mut world = World::new(600.0, 400.0);
+    for net_id in [9, 1, 5, 3, 7] {
+        assert!(world.add_player_at(net_id, 100.0 + net_id as f32, 100.0, 0.0));
+    }
+
+    let frame = ReplicationFrame::from_fighters(77, world.fighters());
+    assert_eq!(frame.server_tick(), 77);
+    assert_eq!(frame.len(), world.fighters().len());
+
+    for fighter in world.fighters() {
+        assert_eq!(
+            frame.get(fighter.net_id),
+            Some(WireEntity::from_fighter(fighter))
+        );
+    }
+    assert_eq!(frame.get(0), None);
+    assert_eq!(frame.get(4), None);
+    assert_eq!(frame.get(10), None);
+}
 
 #[test]
 fn spatial_frame_query_matches_naive_visibility_for_512_players() {
