@@ -1287,7 +1287,8 @@ mod tests {
         let first =
             session.build_from_frame(u16::MAX, 1, &frame, crate::CONSERVATIVE_DATAGRAM_BYTES);
         let capacities = session
-            .plan_buckets
+            .planner_scratch
+            .buckets
             .each_ref()
             .map(|bucket| bucket.capacity());
 
@@ -1296,7 +1297,8 @@ mod tests {
         let second =
             session.build_from_frame(u16::MAX, 1, &frame, crate::CONSERVATIVE_DATAGRAM_BYTES);
         let reused_capacities = session
-            .plan_buckets
+            .planner_scratch
+            .buckets
             .each_ref()
             .map(|bucket| bucket.capacity());
 
