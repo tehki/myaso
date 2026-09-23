@@ -125,6 +125,9 @@ jobs:
       - name: Validate M73 allocation-free visibility removal
         run: cargo test --locked --manifest-path server/Cargo.toml baseline_entity_leaving_interest_emits_removal_without_visibility_index
 
+      - name: Validate M74 reusable snapshot buckets
+        run: cargo test --locked --manifest-path server/Cargo.toml reusable_snapshot_buckets_retain_capacity_after_clear
+
       - name: Validate real browser flight
         env:
           MYASO_FLIGHT_DURATION_MS: "4000"
