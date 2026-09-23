@@ -714,16 +714,15 @@ mod tests {
             block: false,
         };
 
-        let server_tick = apply_coalesced_input_and_read_tick(
-            &mut state,
-            1,
-            Some((77, input)),
-            &mut pending,
-        );
+        let server_tick =
+            apply_coalesced_input_and_read_tick(&mut state, 1, Some((77, input)), &mut pending);
 
         assert_eq!(server_tick, state.world.tick);
         assert_eq!(pending.front().copied(), Some((77, server_tick)));
-        assert_eq!(state.world.fighter(1).expect("player exists").input(), input);
+        assert_eq!(
+            state.world.fighter(1).expect("player exists").input(),
+            input
+        );
 
         let pending_len = pending.len();
         assert_eq!(
