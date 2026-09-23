@@ -122,6 +122,9 @@ jobs:
       - name: Validate M72 reusable interest scratch
         run: cargo test --locked --manifest-path server/Cargo.toml reusable_interest_query_matches_allocating_query_without_capacity_churn
 
+      - name: Validate M73 reusable visibility index
+        run: cargo test --locked --manifest-path server/Cargo.toml reusable_visibility_index_reuses_capacity_and_sorts_ids
+
       - name: Validate real browser flight
         env:
           MYASO_FLIGHT_DURATION_MS: "4000"
