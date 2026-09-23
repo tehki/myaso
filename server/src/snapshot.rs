@@ -572,14 +572,11 @@ fn plan_records(
             };
 
             let unseen_in_baseline = before.is_none();
-            let sent_age = last_sent_tick
+            let last_sent_age = last_sent_tick
                 .get(&state.net_id)
-                .map(|last| server_tick.wrapping_sub(*last))
-                .unwrap_or(u32::MAX);
-            let freshness_age = last_sent_tick
-                .get(&state.net_id)
-                .map(|last| server_tick.wrapping_sub(*last))
-                .unwrap_or(0);
+                .map(|last| server_tick.wrapping_sub(*last));
+            let sent_age = last_sent_age.unwrap_or(u32::MAX);
+            let freshness_age = last_sent_age.unwrap_or(0);
             let urgent_state = state.action != 0
                 || (before.is_some()
                     && record.mask & (SNAPSHOT_FIELD_VITALS | SNAPSHOT_FIELD_ACTION) != 0);
