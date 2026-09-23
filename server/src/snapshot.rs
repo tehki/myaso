@@ -1,5 +1,5 @@
 use crate::simulation::Fighter;
-use std::collections::{BTreeMap, BTreeSet, VecDeque};
+use std::collections::{BTreeMap, VecDeque};
 
 pub const SNAPSHOT_PACKET_TYPE: u8 = 2;
 pub const SNAPSHOT_HEADER_BYTES: usize = 14;
@@ -316,6 +316,7 @@ pub struct SnapshotSession {
     acknowledged_state: BTreeMap<u32, WireEntity>,
     last_sent_tick: BTreeMap<u32, u32>,
     interest_states: Vec<WireEntity>,
+    visible_net_ids: Vec<u32>,
 }
 
 impl Default for SnapshotSession {
@@ -335,6 +336,7 @@ impl SnapshotSession {
             acknowledged_state: BTreeMap::new(),
             last_sent_tick: BTreeMap::new(),
             interest_states: Vec::new(),
+            visible_net_ids: Vec::new(),
         }
     }
 
@@ -379,6 +381,7 @@ impl SnapshotSession {
             &self.last_sent_tick,
             max_bytes,
             &mut self.interest_states,
+            &mut self.visible_net_ids,
         );
         let sequence = self.next_sequence;
         self.next_sequence = self.next_sequence.wrapping_add(1);
@@ -542,14 +545,15 @@ fn plan_records(
     last_sent_tick: &BTreeMap<u32, u32>,
     max_bytes: usize,
     interest_states: &mut Vec<WireEntity>,
+    visible_net_ids: &mut Vec<u32>,
 ) -> SnapshotPlan {
     assert!(max_bytes >= SNAPSHOT_HEADER_BYTES);
     let viewer = frame.get(viewer_net_id);
     let query_stats = frame.query_interest_into(viewer_net_id, interest_states);
     let interest_candidates_checked = query_stats.map_or(0, |stats| stats.candidates_checked);
     let visible_entity_count = query_stats.map_or(0, |_| interest_states.len());
+    prepare_visible_net_ids(interest_states, visible_net_ids);
     let mut buckets: [Vec<PlannedRecord>; 9] = std::array::from_fn(|_| Vec::new());
-    let mut visible = BTreeSet::new();
     let mut due_count = 0_usize;
     let mut freshness = SnapshotFreshness::default();
 
@@ -557,7 +561,6 @@ fn plan_records(
         for state in interest_states.iter().copied() {
             let is_owner = state.net_id == viewer_net_id;
             let distance_sq = interest_distance_sq(viewer_state, state);
-            visible.insert(state.net_id);
             let before = baseline.get(&state.net_id).copied();
             let Some(record) = build_delta(state, before) else {
                 continue;
@@ -614,7 +617,7 @@ fn plan_records(
     }
 
     for net_id in baseline.keys().copied() {
-        if !visible.contains(&net_id) {
+        if visible_net_ids.binary_search(&net_id).is_err() {
             due_count += 1;
             buckets[4].push(PlannedRecord {
                 record: SnapshotRecord::removed(net_id),
@@ -669,6 +672,12 @@ fn plan_records(
         visible_entity_count,
         freshness,
     }
+}
+
+fn prepare_visible_net_ids(states: &[WireEntity], visible_net_ids: &mut Vec<u32>) {
+    visible_net_ids.clear();
+    visible_net_ids.extend(states.iter().map(|state| state.net_id));
+    visible_net_ids.sort_unstable();
 }
 
 fn freshness_tier(distance_sq: f32, is_owner: bool) -> FreshnessTier {
