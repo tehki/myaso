@@ -1257,3 +1257,43 @@ fn require(bytes: &[u8], offset: usize, count: usize) -> Result<(), SnapshotDeco
         Ok(())
     }
 }
+
+
+#[cfg(test)]
+mod tests {
+    use super::{prepare_visible_net_ids, WireEntity};
+
+    fn wire_entity(net_id: u32) -> WireEntity {
+        WireEntity {
+            net_id,
+            x: 0,
+            y: 0,
+            facing: 0,
+            hp: 100,
+            guard: 100,
+            action: 0,
+            flags: 0,
+        }
+    }
+
+    #[test]
+    fn reusable_visibility_index_reuses_capacity_and_sorts_ids() {
+        let states = [9, 1, 7, 3, 5]
+            .into_iter()
+            .map(wire_entity)
+            .collect::<Vec<_>>();
+        let mut visible_net_ids = Vec::new();
+
+        prepare_visible_net_ids(&states, &mut visible_net_ids);
+        assert_eq!(visible_net_ids, vec![1, 3, 5, 7, 9]);
+        let capacity = visible_net_ids.capacity();
+
+        prepare_visible_net_ids(&states[..3], &mut visible_net_ids);
+        assert_eq!(visible_net_ids, vec![1, 7, 9]);
+        assert_eq!(visible_net_ids.capacity(), capacity);
+
+        prepare_visible_net_ids(&[], &mut visible_net_ids);
+        assert!(visible_net_ids.is_empty());
+        assert_eq!(visible_net_ids.capacity(), capacity);
+    }
+}
