@@ -134,6 +134,9 @@ jobs:
       - name: Validate M76 in-place ACK history
         run: cargo test --locked --manifest-path server/Cargo.toml acknowledged_history_advances_in_place_and_preserves_newer_entries
 
+      - name: Validate M77 single freshness lookup
+        run: cargo test --locked --manifest-path server/Cargo.toml single_freshness_lookup_preserves_present_and_missing_age_semantics
+
       - name: Validate real browser flight
         env:
           MYASO_FLIGHT_DURATION_MS: "4000"
