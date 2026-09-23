@@ -1272,7 +1272,6 @@ fn require(bytes: &[u8], offset: usize, count: usize) -> Result<(), SnapshotDeco
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::{PlannedRecord, SnapshotPlanScratch, SnapshotRecord};
