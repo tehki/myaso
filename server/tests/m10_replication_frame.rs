@@ -30,6 +30,38 @@ fn packed_replication_frame_preserves_binary_identity_lookup() {
 }
 
 #[test]
+fn reusable_interest_query_matches_allocating_query_without_capacity_churn() {
+    let mut world = World::default();
+    for net_id in 1..=512 {
+        assert!(world.add_player(net_id));
+    }
+    let frame = ReplicationFrame::from_fighters(world.tick, world.fighters());
+
+    let expected = frame.query_interest(256).expect("viewer exists");
+    let mut scratch = Vec::new();
+    let first_stats = frame
+        .query_interest_into(256, &mut scratch)
+        .expect("viewer exists");
+
+    assert_eq!(scratch, expected.states);
+    assert_eq!(first_stats.candidates_checked, expected.candidates_checked);
+    assert_eq!(first_stats.cells_visited, expected.cells_visited);
+
+    let capacity = scratch.capacity();
+    let second_stats = frame
+        .query_interest_into(256, &mut scratch)
+        .expect("viewer exists");
+
+    assert_eq!(scratch, expected.states);
+    assert_eq!(scratch.capacity(), capacity);
+    assert_eq!(second_stats, first_stats);
+
+    assert_eq!(frame.query_interest_into(9999, &mut scratch), None);
+    assert!(scratch.is_empty());
+    assert_eq!(scratch.capacity(), capacity);
+}
+
+#[test]
 fn spatial_frame_query_matches_naive_visibility_for_512_players() {
     let mut world = World::default();
     for net_id in 1..=512 {
