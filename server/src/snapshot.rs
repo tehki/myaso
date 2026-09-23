@@ -375,7 +375,8 @@ impl SnapshotSession {
         } else {
             &self.acknowledged_state
         };
-        let record_buffer = std::mem::take(&mut self.recycled_records);
+        debug_assert!(self.planner_scratch.records.is_empty());
+        self.planner_scratch.records = std::mem::take(&mut self.recycled_records);
         let plan = plan_records(
             viewer_net_id,
             server_tick,
@@ -384,7 +385,6 @@ impl SnapshotSession {
             &self.last_sent_tick,
             max_bytes,
             &mut self.planner_scratch,
-            record_buffer,
         );
         let sequence = self.next_sequence;
         self.next_sequence = self.next_sequence.wrapping_add(1);
@@ -537,6 +537,7 @@ struct PlannedRecord {
 struct SnapshotPlannerScratch {
     interest_states: Vec<WireEntity>,
     buckets: [Vec<PlannedRecord>; 9],
+    records: Vec<SnapshotRecord>,
 }
 
 #[derive(Debug)]
@@ -556,7 +557,6 @@ fn plan_records(
     last_sent_tick: &BTreeMap<u32, u32>,
     max_bytes: usize,
     scratch: &mut SnapshotPlannerScratch,
-    mut records: Vec<SnapshotRecord>,
 ) -> SnapshotPlan {
     assert!(max_bytes >= SNAPSHOT_HEADER_BYTES);
     let viewer = frame.get(viewer_net_id);
@@ -628,8 +628,9 @@ fn plan_records(
     due_count += collect_baseline_removals(frame, viewer, baseline, &mut scratch.buckets[4]);
 
     let mut bytes_used = SNAPSHOT_HEADER_BYTES;
-    records.clear();
-    for (bucket_index, bucket) in scratch.buckets.iter_mut().enumerate() {
+    scratch.records.clear();
+    let (buckets, records) = (&mut scratch.buckets, &mut scratch.records);
+    for (bucket_index, bucket) in buckets.iter_mut().enumerate() {
         if bucket.is_empty() {
             continue;
         }
@@ -666,7 +667,7 @@ fn plan_records(
 
     SnapshotPlan {
         omitted_due_to_budget: due_count.saturating_sub(records.len()),
-        records,
+        records: std::mem::take(records),
         interest_candidates_checked,
         visible_entity_count,
         freshness,
