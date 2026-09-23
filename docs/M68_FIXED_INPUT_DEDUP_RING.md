@@ -6,9 +6,9 @@ Remove hashing and replay-window scans from authoritative input deduplication wh
 
 ## Change
 
-Each input session now owns a fixed circular `Vec<bool>` with exactly `history_ticks + 1` logical slots.
+Each input session now owns a fixed circular `Vec<bool>` whose slot count is the smallest power of two that covers the inclusive `history_ticks + 1` replay window.
 
-A tick maps to `tick % slot_count`. When the authoritative newest tick advances, only slots entering the new replay window are cleared. If the jump spans the full window, all slots are cleared once.
+A tick maps through a power-of-two mask. This keeps slot identity stable across the `u32::MAX -> 0` wrap. When the authoritative newest tick advances, only slots entering the new replay window are cleared. If the jump spans the full ring, all slots are cleared once.
 
 This replaces the per-session `HashSet<u32>` and removes the per-packet `retain()` scan.
 

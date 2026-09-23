@@ -218,7 +218,7 @@ impl Default for InputIngressWindow {
 impl InputIngressWindow {
     pub fn new(history_ticks: u32) -> Self {
         assert!((1..=4096).contains(&history_ticks));
-        let slot_count = history_ticks as usize + 1;
+        let slot_count = (history_ticks as usize + 1).next_power_of_two();
         Self {
             history_ticks,
             newest_tick: None,
@@ -227,22 +227,22 @@ impl InputIngressWindow {
     }
 
     fn slot_index(&self, tick: u32) -> usize {
-        (tick % self.seen_slots.len() as u32) as usize
+        (tick as usize) & (self.seen_slots.len() - 1)
     }
 
     fn advance_newest(&mut self, new_tick: u32) {
         if let Some(previous) = self.newest_tick {
             let delta = tick_distance32(new_tick, previous);
             debug_assert!(delta > 0 && delta < 0x8000_0000);
-            let slot_count = self.seen_slots.len() as u32;
-            if delta >= slot_count {
+            let slot_count = self.seen_slots.len();
+            if delta as usize >= slot_count {
                 self.seen_slots.fill(false);
             } else {
-                // Each entering tick reuses the modulo slot of the tick that just
-                // expired one full replay window behind it.
+                // Power-of-two indexing stays aligned across u32 wraparound. Each
+                // entering tick clears only the older tick that shares its slot.
                 for offset in 1..=delta {
                     let entering_tick = previous.wrapping_add(offset);
-                    let slot = (entering_tick % slot_count) as usize;
+                    let slot = (entering_tick as usize) & (slot_count - 1);
                     self.seen_slots[slot] = false;
                 }
             }
@@ -453,7 +453,8 @@ mod tests {
     fn ingress_preallocates_the_bounded_replay_window() {
         let mut ingress = InputIngressWindow::new(10);
         let initial_capacity = ingress.seen_slots.capacity();
-        assert_eq!(ingress.seen_slots.len(), 11);
+        let expected_slots = (10_usize + 1).next_power_of_two();
+        assert_eq!(ingress.seen_slots.len(), expected_slots);
         assert!(
             initial_capacity >= ingress.seen_slots.len(),
             "dedup storage must cover the full inclusive history window"
@@ -464,7 +465,7 @@ mod tests {
             bytes[8..12].copy_from_slice(&client_tick.to_le_bytes());
             let packet = decode_input_packet(&bytes).expect("valid rolling packet");
             let _ = ingress.ingest(&packet);
-            assert_eq!(ingress.seen_slots.len(), 11);
+            assert_eq!(ingress.seen_slots.len(), expected_slots);
             assert_eq!(
                 ingress.seen_slots.capacity(),
                 initial_capacity,
@@ -511,7 +512,7 @@ mod tests {
                 .collect::<Vec<_>>(),
             vec![12, 13]
         );
-        assert_eq!(ingress.seen_slots.len(), 3);
+        assert_eq!(ingress.seen_slots.len(), 4);
         assert_eq!(ingress.seen_slots.capacity(), initial_capacity);
 
         let mut wrapped = InputIngressWindow::new(2);
