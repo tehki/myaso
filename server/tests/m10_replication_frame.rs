@@ -98,8 +98,7 @@ fn baseline_entity_leaving_interest_emits_removal_without_visibility_index() {
     let mut session = SnapshotSession::default();
     let initial_frame =
         ReplicationFrame::from_fighters(initial_world.tick, initial_world.fighters());
-    let first =
-        session.build_from_frame(u16::MAX, 1, &initial_frame, CONSERVATIVE_DATAGRAM_BYTES);
+    let first = session.build_from_frame(u16::MAX, 1, &initial_frame, CONSERVATIVE_DATAGRAM_BYTES);
     assert!(decode_snapshot(&first.bytes)
         .expect("decode initial snapshot")
         .records
