@@ -140,6 +140,9 @@ jobs:
       - name: Validate M78 linear baseline removals
         run: cargo test --locked --manifest-path server/Cargo.toml linear_baseline_removals_match_binary_lookup_semantics
 
+      - name: Validate M79 recycled snapshot record buffers
+        run: cargo test --locked --manifest-path server/Cargo.toml snapshot_history_reuses_evicted_record_capacity
+
       - name: Validate real browser flight
         env:
           MYASO_FLIGHT_DURATION_MS: "4000"
