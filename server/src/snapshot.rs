@@ -197,17 +197,23 @@ pub struct InterestQuery {
 #[derive(Debug, Clone)]
 pub struct ReplicationFrame {
     server_tick: u32,
-    states: BTreeMap<u32, WireEntity>,
+    states: Vec<WireEntity>,
     cells: BTreeMap<(i32, i32), Vec<WireEntity>>,
 }
 
 impl ReplicationFrame {
     pub fn from_fighters(server_tick: u32, fighters: &[Fighter]) -> Self {
-        let mut states = BTreeMap::new();
+        let mut states = Vec::with_capacity(fighters.len());
         let mut cells: BTreeMap<(i32, i32), Vec<WireEntity>> = BTreeMap::new();
         for fighter in fighters {
             let state = WireEntity::from_fighter(fighter);
-            states.insert(state.net_id, state);
+            debug_assert!(
+                states
+                    .last()
+                    .is_none_or(|previous: &WireEntity| previous.net_id < state.net_id),
+                "fighters must remain sorted by authoritative network ID"
+            );
+            states.push(state);
             cells
                 .entry(replication_cell(state))
                 .or_default()
@@ -233,7 +239,10 @@ impl ReplicationFrame {
     }
 
     pub fn get(&self, net_id: u32) -> Option<WireEntity> {
-        self.states.get(&net_id).copied()
+        self.states
+            .binary_search_by_key(&net_id, |state| state.net_id)
+            .ok()
+            .map(|index| self.states[index])
     }
 
     pub fn query_interest(&self, viewer_net_id: u32) -> Option<InterestQuery> {
