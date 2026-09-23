@@ -618,12 +618,7 @@ fn plan_records(
         }
     }
 
-    due_count += collect_baseline_removals(
-        frame,
-        viewer,
-        baseline,
-        &mut scratch.buckets[4],
-    );
+    due_count += collect_baseline_removals(frame, viewer, baseline, &mut scratch.buckets[4]);
 
     let mut bytes_used = SNAPSHOT_HEADER_BYTES;
     let mut records = Vec::new();
@@ -679,17 +674,12 @@ fn collect_baseline_removals(
 ) -> usize {
     let Some(viewer_state) = viewer else {
         let start_len = removals.len();
-        removals.extend(
-            baseline
-                .keys()
-                .copied()
-                .map(|net_id| PlannedRecord {
-                    record: SnapshotRecord::removed(net_id),
-                    tier: None,
-                    age_ticks: 0,
-                    priority_age_ticks: 0,
-                }),
-        );
+        removals.extend(baseline.keys().copied().map(|net_id| PlannedRecord {
+            record: SnapshotRecord::removed(net_id),
+            tier: None,
+            age_ticks: 0,
+            priority_age_ticks: 0,
+        }));
         return removals.len() - start_len;
     };
 
