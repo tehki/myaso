@@ -1390,6 +1390,72 @@ mod tests {
     }
 
     #[test]
+    fn linear_baseline_removals_match_binary_lookup_semantics() {
+        let mut world = World::new(6000.0, 6000.0);
+        assert!(world.add_player_at(1, 1000.0, 1000.0, 0.0));
+        assert!(world.add_player_at(2, 1200.0, 1000.0, 0.0));
+        assert!(world.add_player_at(4, 4000.0, 1000.0, 0.0));
+        assert!(world.add_player_at(5, 1400.0, 1000.0, 0.0));
+
+        let frame = ReplicationFrame::from_fighters(world.tick, world.fighters());
+        let viewer = frame.get(1);
+
+        let mut baseline = BTreeMap::new();
+        for net_id in [1_u32, 2, 4] {
+            baseline.insert(net_id, frame.get(net_id).expect("baseline state exists"));
+        }
+        for net_id in [3_u32, 6] {
+            baseline.insert(
+                net_id,
+                WireEntity {
+                    net_id,
+                    x: 0,
+                    y: 0,
+                    facing: 0,
+                    hp: 100,
+                    guard: 100,
+                    action: 0,
+                    flags: 0,
+                },
+            );
+        }
+
+        let expected: Vec<_> = baseline
+            .keys()
+            .copied()
+            .filter(|net_id| {
+                !viewer.is_some_and(|viewer_state| {
+                    frame.get(*net_id).is_some_and(|state| {
+                        interest_distance_sq(viewer_state, state)
+                            <= INTEREST_FAR_RADIUS * INTEREST_FAR_RADIUS
+                    })
+                })
+            })
+            .collect();
+
+        let mut removals = Vec::new();
+        let count = collect_baseline_removals(&frame, viewer, &baseline, &mut removals);
+        let actual: Vec<_> = removals
+            .iter()
+            .map(|planned| planned.record.net_id)
+            .collect();
+
+        assert_eq!(count, expected.len());
+        assert_eq!(actual, expected);
+
+        removals.clear();
+        let no_viewer_count = collect_baseline_removals(&frame, None, &baseline, &mut removals);
+        assert_eq!(no_viewer_count, baseline.len());
+        assert_eq!(
+            removals
+                .iter()
+                .map(|planned| planned.record.net_id)
+                .collect::<Vec<_>>(),
+            baseline.keys().copied().collect::<Vec<_>>()
+        );
+    }
+
+    #[test]
     fn single_freshness_lookup_preserves_present_and_missing_age_semantics() {
         let mut world = World::new(1200.0, 800.0);
         assert!(world.add_player_at(1, 400.0, 300.0, 0.0));
