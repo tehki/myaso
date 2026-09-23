@@ -462,13 +462,13 @@ impl SnapshotSession {
             return false;
         }
 
-        let mut newer = self.history.split_off(index + 1);
+        for _ in 0..index {
+            self.history.pop_front();
+        }
         let candidate = self
             .history
-            .pop_back()
+            .pop_front()
             .expect("located history entry must remain present");
-        self.history.clear();
-        self.history.append(&mut newer);
         if candidate.full {
             self.acknowledged_state.clear();
         }
