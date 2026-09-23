@@ -194,6 +194,12 @@ pub struct InterestQuery {
     pub cells_visited: usize,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct InterestQueryStats {
+    pub candidates_checked: usize,
+    pub cells_visited: usize,
+}
+
 #[derive(Debug, Clone)]
 pub struct ReplicationFrame {
     server_tick: u32,
@@ -246,12 +252,26 @@ impl ReplicationFrame {
     }
 
     pub fn query_interest(&self, viewer_net_id: u32) -> Option<InterestQuery> {
+        let mut states = Vec::new();
+        let stats = self.query_interest_into(viewer_net_id, &mut states)?;
+        Some(InterestQuery {
+            states,
+            candidates_checked: stats.candidates_checked,
+            cells_visited: stats.cells_visited,
+        })
+    }
+
+    pub fn query_interest_into(
+        &self,
+        viewer_net_id: u32,
+        states: &mut Vec<WireEntity>,
+    ) -> Option<InterestQueryStats> {
+        states.clear();
         let viewer = self.get(viewer_net_id)?;
         let center = replication_cell(viewer);
         let cell_wire = replication_cell_wire();
         let far_wire = INTEREST_FAR_RADIUS * WORLD_COORDINATE_SCALE;
         let span = (far_wire / cell_wire as f32).ceil() as i32;
-        let mut states = Vec::new();
         let mut candidates_checked = 0_usize;
         let mut cells_visited = 0_usize;
 
@@ -272,8 +292,7 @@ impl ReplicationFrame {
             }
         }
 
-        Some(InterestQuery {
-            states,
+        Some(InterestQueryStats {
             candidates_checked,
             cells_visited,
         })
@@ -296,6 +315,7 @@ pub struct SnapshotSession {
     acknowledged_sequence: Option<u16>,
     acknowledged_state: BTreeMap<u32, WireEntity>,
     last_sent_tick: BTreeMap<u32, u32>,
+    interest_states: Vec<WireEntity>,
 }
 
 impl Default for SnapshotSession {
@@ -314,6 +334,7 @@ impl SnapshotSession {
             acknowledged_sequence: None,
             acknowledged_state: BTreeMap::new(),
             last_sent_tick: BTreeMap::new(),
+            interest_states: Vec::new(),
         }
     }
 
@@ -357,6 +378,7 @@ impl SnapshotSession {
             baseline,
             &self.last_sent_tick,
             max_bytes,
+            &mut self.interest_states,
         );
         let sequence = self.next_sequence;
         self.next_sequence = self.next_sequence.wrapping_add(1);
@@ -519,19 +541,20 @@ fn plan_records(
     baseline: &BTreeMap<u32, WireEntity>,
     last_sent_tick: &BTreeMap<u32, u32>,
     max_bytes: usize,
+    interest_states: &mut Vec<WireEntity>,
 ) -> SnapshotPlan {
     assert!(max_bytes >= SNAPSHOT_HEADER_BYTES);
     let viewer = frame.get(viewer_net_id);
-    let query = frame.query_interest(viewer_net_id);
-    let interest_candidates_checked = query.as_ref().map_or(0, |query| query.candidates_checked);
-    let visible_entity_count = query.as_ref().map_or(0, |query| query.states.len());
+    let query_stats = frame.query_interest_into(viewer_net_id, interest_states);
+    let interest_candidates_checked = query_stats.map_or(0, |stats| stats.candidates_checked);
+    let visible_entity_count = query_stats.map_or(0, |_| interest_states.len());
     let mut buckets: [Vec<PlannedRecord>; 9] = std::array::from_fn(|_| Vec::new());
     let mut visible = BTreeSet::new();
     let mut due_count = 0_usize;
     let mut freshness = SnapshotFreshness::default();
 
-    if let (Some(viewer_state), Some(query)) = (viewer, query) {
-        for state in query.states {
+    if let (Some(viewer_state), Some(_)) = (viewer, query_stats) {
+        for state in interest_states.iter().copied() {
             let is_owner = state.net_id == viewer_net_id;
             let distance_sq = interest_distance_sq(viewer_state, state);
             visible.insert(state.net_id);
