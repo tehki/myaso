@@ -618,24 +618,7 @@ fn plan_records(
         }
     }
 
-    for net_id in baseline.keys().copied() {
-        let still_visible = viewer.is_some_and(|viewer_state| {
-            frame.get(net_id).is_some_and(|state| {
-                interest_distance_sq(viewer_state, state)
-                    <= INTEREST_FAR_RADIUS * INTEREST_FAR_RADIUS
-            })
-        });
-        if still_visible {
-            continue;
-        }
-        due_count += 1;
-        scratch.buckets[4].push(PlannedRecord {
-            record: SnapshotRecord::removed(net_id),
-            tier: None,
-            age_ticks: 0,
-            priority_age_ticks: 0,
-        });
-    }
+    due_count += collect_baseline_removals(frame, viewer, baseline, &mut scratch.buckets[4]);
 
     let mut bytes_used = SNAPSHOT_HEADER_BYTES;
     let mut records = Vec::new();
@@ -681,6 +664,51 @@ fn plan_records(
         visible_entity_count,
         freshness,
     }
+}
+
+fn collect_baseline_removals(
+    frame: &ReplicationFrame,
+    viewer: Option<WireEntity>,
+    baseline: &BTreeMap<u32, WireEntity>,
+    removals: &mut Vec<PlannedRecord>,
+) -> usize {
+    let Some(viewer_state) = viewer else {
+        let start_len = removals.len();
+        removals.extend(baseline.keys().copied().map(|net_id| PlannedRecord {
+            record: SnapshotRecord::removed(net_id),
+            tier: None,
+            age_ticks: 0,
+            priority_age_ticks: 0,
+        }));
+        return removals.len() - start_len;
+    };
+
+    let start_len = removals.len();
+    let mut state_index = 0_usize;
+    for net_id in baseline.keys().copied() {
+        while state_index < frame.states.len() && frame.states[state_index].net_id < net_id {
+            state_index += 1;
+        }
+        let still_visible = frame
+            .states
+            .get(state_index)
+            .copied()
+            .filter(|state| state.net_id == net_id)
+            .is_some_and(|state| {
+                interest_distance_sq(viewer_state, state)
+                    <= INTEREST_FAR_RADIUS * INTEREST_FAR_RADIUS
+            });
+        if still_visible {
+            continue;
+        }
+        removals.push(PlannedRecord {
+            record: SnapshotRecord::removed(net_id),
+            tier: None,
+            age_ticks: 0,
+            priority_age_ticks: 0,
+        });
+    }
+    removals.len() - start_len
 }
 
 fn freshness_tier(distance_sq: f32, is_owner: bool) -> FreshnessTier {
@@ -1349,6 +1377,72 @@ mod tests {
         assert!(session.advance_acknowledged_state(second.sequence));
         assert_eq!(session.history_depth(), 1);
         assert_eq!(session.history.capacity(), capacity);
+    }
+
+    #[test]
+    fn linear_baseline_removals_match_binary_lookup_semantics() {
+        let mut world = World::new(6000.0, 6000.0);
+        assert!(world.add_player_at(1, 1000.0, 1000.0, 0.0));
+        assert!(world.add_player_at(2, 1200.0, 1000.0, 0.0));
+        assert!(world.add_player_at(4, 4000.0, 1000.0, 0.0));
+        assert!(world.add_player_at(5, 1400.0, 1000.0, 0.0));
+
+        let frame = ReplicationFrame::from_fighters(world.tick, world.fighters());
+        let viewer = frame.get(1);
+
+        let mut baseline = BTreeMap::new();
+        for net_id in [1_u32, 2, 4] {
+            baseline.insert(net_id, frame.get(net_id).expect("baseline state exists"));
+        }
+        for net_id in [3_u32, 6] {
+            baseline.insert(
+                net_id,
+                WireEntity {
+                    net_id,
+                    x: 0,
+                    y: 0,
+                    facing: 0,
+                    hp: 100,
+                    guard: 100,
+                    action: 0,
+                    flags: 0,
+                },
+            );
+        }
+
+        let expected: Vec<_> = baseline
+            .keys()
+            .copied()
+            .filter(|net_id| {
+                !viewer.is_some_and(|viewer_state| {
+                    frame.get(*net_id).is_some_and(|state| {
+                        interest_distance_sq(viewer_state, state)
+                            <= INTEREST_FAR_RADIUS * INTEREST_FAR_RADIUS
+                    })
+                })
+            })
+            .collect();
+
+        let mut removals = Vec::new();
+        let count = collect_baseline_removals(&frame, viewer, &baseline, &mut removals);
+        let actual: Vec<_> = removals
+            .iter()
+            .map(|planned| planned.record.net_id)
+            .collect();
+
+        assert_eq!(count, expected.len());
+        assert_eq!(actual, expected);
+
+        removals.clear();
+        let no_viewer_count = collect_baseline_removals(&frame, None, &baseline, &mut removals);
+        assert_eq!(no_viewer_count, baseline.len());
+        assert_eq!(
+            removals
+                .iter()
+                .map(|planned| planned.record.net_id)
+                .collect::<Vec<_>>(),
+            baseline.keys().copied().collect::<Vec<_>>()
+        );
     }
 
     #[test]
