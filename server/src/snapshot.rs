@@ -315,7 +315,7 @@ pub struct SnapshotSession {
     acknowledged_sequence: Option<u16>,
     acknowledged_state: BTreeMap<u32, WireEntity>,
     last_sent_tick: BTreeMap<u32, u32>,
-    interest_states: Vec<WireEntity>,
+    planner_scratch: SnapshotPlannerScratch,
 }
 
 impl Default for SnapshotSession {
@@ -334,7 +334,7 @@ impl SnapshotSession {
             acknowledged_sequence: None,
             acknowledged_state: BTreeMap::new(),
             last_sent_tick: BTreeMap::new(),
-            interest_states: Vec::new(),
+            planner_scratch: SnapshotPlannerScratch::default(),
         }
     }
 
@@ -378,7 +378,7 @@ impl SnapshotSession {
             baseline,
             &self.last_sent_tick,
             max_bytes,
-            &mut self.interest_states,
+            &mut self.planner_scratch,
         );
         let sequence = self.next_sequence;
         self.next_sequence = self.next_sequence.wrapping_add(1);
@@ -525,6 +525,12 @@ struct PlannedRecord {
     priority_age_ticks: u32,
 }
 
+#[derive(Debug, Clone, Default)]
+struct SnapshotPlannerScratch {
+    interest_states: Vec<WireEntity>,
+    buckets: [Vec<PlannedRecord>; 9],
+}
+
 #[derive(Debug)]
 struct SnapshotPlan {
     records: Vec<SnapshotRecord>,
@@ -541,19 +547,21 @@ fn plan_records(
     baseline: &BTreeMap<u32, WireEntity>,
     last_sent_tick: &BTreeMap<u32, u32>,
     max_bytes: usize,
-    interest_states: &mut Vec<WireEntity>,
+    scratch: &mut SnapshotPlannerScratch,
 ) -> SnapshotPlan {
     assert!(max_bytes >= SNAPSHOT_HEADER_BYTES);
     let viewer = frame.get(viewer_net_id);
-    let query_stats = frame.query_interest_into(viewer_net_id, interest_states);
+    let query_stats = frame.query_interest_into(viewer_net_id, &mut scratch.interest_states);
     let interest_candidates_checked = query_stats.map_or(0, |stats| stats.candidates_checked);
-    let visible_entity_count = query_stats.map_or(0, |_| interest_states.len());
-    let mut buckets: [Vec<PlannedRecord>; 9] = std::array::from_fn(|_| Vec::new());
+    let visible_entity_count = query_stats.map_or(0, |_| scratch.interest_states.len());
+    for bucket in scratch.buckets.iter_mut() {
+        bucket.clear();
+    }
     let mut due_count = 0_usize;
     let mut freshness = SnapshotFreshness::default();
 
     if let (Some(viewer_state), Some(_)) = (viewer, query_stats) {
-        for state in interest_states.iter().copied() {
+        for state in scratch.interest_states.iter().copied() {
             let is_owner = state.net_id == viewer_net_id;
             let distance_sq = interest_distance_sq(viewer_state, state);
             let before = baseline.get(&state.net_id).copied();
@@ -598,7 +606,7 @@ fn plan_records(
             } else {
                 8
             };
-            buckets[bucket].push(PlannedRecord {
+            scratch.buckets[bucket].push(PlannedRecord {
                 record,
                 tier: Some(tier),
                 age_ticks: freshness_age,
@@ -622,7 +630,7 @@ fn plan_records(
             continue;
         }
         due_count += 1;
-        buckets[4].push(PlannedRecord {
+        scratch.buckets[4].push(PlannedRecord {
             record: SnapshotRecord::removed(net_id),
             tier: None,
             age_ticks: 0,
@@ -632,7 +640,7 @@ fn plan_records(
 
     let mut bytes_used = SNAPSHOT_HEADER_BYTES;
     let mut records = Vec::new();
-    for (bucket_index, mut bucket) in buckets.into_iter().enumerate() {
+    for (bucket_index, bucket) in scratch.buckets.iter_mut().enumerate() {
         if bucket.is_empty() {
             continue;
         }
@@ -1251,5 +1259,52 @@ fn require(bytes: &[u8], offset: usize, count: usize) -> Result<(), SnapshotDeco
         Err(SnapshotDecodeError::TruncatedRecord)
     } else {
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::simulation::World;
+
+    #[test]
+    fn snapshot_planner_reuses_priority_bucket_capacity() {
+        let mut world = World::new(6000.0, 6000.0);
+        assert!(world.add_player_at(1, 2500.0, 2500.0, 0.0));
+        for net_id in 2..=64 {
+            let ring = (net_id - 2) % 3;
+            let offset = ((net_id - 2) / 3) as f32 * 4.0;
+            let x = match ring {
+                0 => 2600.0 + offset,
+                1 => 3100.0 + offset,
+                _ => 4300.0 + offset,
+            };
+            assert!(world.add_player_at(net_id, x, 2500.0, 0.0));
+        }
+
+        let frame = ReplicationFrame::from_fighters(world.tick, world.fighters());
+        let mut session = SnapshotSession::default();
+        let first =
+            session.build_from_frame(u16::MAX, 1, &frame, crate::CONSERVATIVE_DATAGRAM_BYTES);
+        let capacities = session
+            .planner_scratch
+            .buckets
+            .each_ref()
+            .map(|bucket| bucket.capacity());
+
+        assert!(capacities.iter().any(|capacity| *capacity > 0));
+
+        let second =
+            session.build_from_frame(u16::MAX, 1, &frame, crate::CONSERVATIVE_DATAGRAM_BYTES);
+        let reused_capacities = session
+            .planner_scratch
+            .buckets
+            .each_ref()
+            .map(|bucket| bucket.capacity());
+
+        assert_eq!(reused_capacities, capacities);
+        assert_eq!(second.record_count, first.record_count);
+        assert_eq!(second.byte_composition, first.byte_composition);
+        assert_eq!(second.freshness, first.freshness);
     }
 }
