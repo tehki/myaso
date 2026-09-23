@@ -572,14 +572,11 @@ fn plan_records(
             };
 
             let unseen_in_baseline = before.is_none();
-            let sent_age = last_sent_tick
+            let last_sent_age = last_sent_tick
                 .get(&state.net_id)
-                .map(|last| server_tick.wrapping_sub(*last))
-                .unwrap_or(u32::MAX);
-            let freshness_age = last_sent_tick
-                .get(&state.net_id)
-                .map(|last| server_tick.wrapping_sub(*last))
-                .unwrap_or(0);
+                .map(|last| server_tick.wrapping_sub(*last));
+            let sent_age = last_sent_age.unwrap_or(u32::MAX);
+            let freshness_age = last_sent_age.unwrap_or(0);
             let urgent_state = state.action != 0
                 || (before.is_some()
                     && record.mask & (SNAPSHOT_FIELD_VITALS | SNAPSHOT_FIELD_ACTION) != 0);
@@ -1352,6 +1349,48 @@ mod tests {
         assert!(session.advance_acknowledged_state(second.sequence));
         assert_eq!(session.history_depth(), 1);
         assert_eq!(session.history.capacity(), capacity);
+    }
+
+    #[test]
+    fn single_freshness_lookup_preserves_present_and_missing_age_semantics() {
+        let mut world = World::new(1200.0, 800.0);
+        assert!(world.add_player_at(1, 400.0, 300.0, 0.0));
+
+        let initial_frame = ReplicationFrame::from_fighters(0, world.fighters());
+        let mut session = SnapshotSession::default();
+        let first = session.build_from_frame(
+            u16::MAX,
+            1,
+            &initial_frame,
+            crate::CONSERVATIVE_DATAGRAM_BYTES,
+        );
+
+        let mut changed_frame = initial_frame.clone();
+        changed_frame.server_tick = 5;
+        changed_frame.states[0].x += 1;
+        let second = session.build_from_frame(
+            first.sequence,
+            1,
+            &changed_frame,
+            crate::CONSERVATIVE_DATAGRAM_BYTES,
+        );
+        assert_eq!(second.record_count, 1);
+        assert_eq!(second.freshness.combat.max_due_age_ticks, 5);
+        assert_eq!(second.freshness.combat.max_sent_age_ticks, 5);
+
+        session.last_sent_tick.remove(&1);
+        let mut changed_again_frame = changed_frame.clone();
+        changed_again_frame.server_tick = 6;
+        changed_again_frame.states[0].x += 1;
+        let third = session.build_from_frame(
+            second.sequence,
+            1,
+            &changed_again_frame,
+            crate::CONSERVATIVE_DATAGRAM_BYTES,
+        );
+        assert_eq!(third.record_count, 1);
+        assert_eq!(third.freshness.combat.max_due_age_ticks, 0);
+        assert_eq!(third.freshness.combat.max_sent_age_ticks, 0);
     }
 
     #[test]
