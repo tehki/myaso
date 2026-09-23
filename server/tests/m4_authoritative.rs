@@ -83,6 +83,56 @@ fn rust_snapshot_encoder_matches_the_js_wire_fixture() {
 }
 
 #[test]
+fn fighter_identity_operations_preserve_sorted_binary_lookup() {
+    let mut world = World::new(600.0, 400.0);
+    for net_id in [9, 1, 5, 3, 7] {
+        assert!(world.add_player_at(
+            net_id,
+            100.0 + net_id as f32,
+            100.0,
+            0.0
+        ));
+    }
+
+    assert_eq!(
+        world
+            .fighters()
+            .iter()
+            .map(|fighter| fighter.net_id)
+            .collect::<Vec<_>>(),
+        vec![1, 3, 5, 7, 9]
+    );
+    assert!(!world.add_player_at(5, 200.0, 100.0, 0.0));
+    assert!(world.fighter(5).is_some());
+    assert!(world.fighter(6).is_none());
+
+    let input = InputIntent {
+        move_x: 0.5,
+        facing_radians: 1.0,
+        ..InputIntent::default()
+    };
+    assert!(world.set_input(7, input));
+    assert_eq!(world.fighter(7).expect("fighter 7").input(), input);
+    assert_eq!(
+        world.fighter(5).expect("fighter 5").input(),
+        InputIntent::default()
+    );
+    assert!(!world.set_input(6, input));
+
+    assert!(world.remove_player(5));
+    assert!(!world.remove_player(5));
+    assert_eq!(
+        world
+            .fighters()
+            .iter()
+            .map(|fighter| fighter.net_id)
+            .collect::<Vec<_>>(),
+        vec![1, 3, 7, 9]
+    );
+    assert!(world.fighter(7).is_some());
+}
+
+#[test]
 fn attack_preserves_windup_active_and_recovery_commitment() {
     let mut world = duel(200.0);
     world.set_input(
