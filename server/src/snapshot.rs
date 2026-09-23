@@ -1520,6 +1520,65 @@ mod tests {
     }
 
     #[test]
+    fn inline_byte_composition_matches_standalone_accounting() {
+        let records = vec![
+            SnapshotRecord::full(WireEntity {
+                net_id: 1,
+                x: 1024,
+                y: 2048,
+                facing: 4096,
+                hp: 90,
+                guard: 80,
+                action: 2,
+                flags: 1,
+            }),
+            SnapshotRecord::from_state(
+                WireEntity {
+                    net_id: 300,
+                    x: COMPACT_POSITION_MAX + 1,
+                    y: 512,
+                    facing: 8192,
+                    hp: 70,
+                    guard: 60,
+                    action: 3,
+                    flags: 2,
+                },
+                SNAPSHOT_FIELD_POSITION | SNAPSHOT_FIELD_FACING | SNAPSHOT_FIELD_ACTION,
+            ),
+            SnapshotRecord::removed(70_000),
+        ];
+
+        let encoded = encode_snapshot_current_with_composition(
+            7,
+            6,
+            123,
+            false,
+            &records,
+            crate::CONSERVATIVE_DATAGRAM_BYTES,
+        );
+        let standalone = snapshot_byte_composition(&records);
+        let public_bytes = encode_snapshot_current(
+            7,
+            6,
+            123,
+            false,
+            &records,
+            crate::CONSERVATIVE_DATAGRAM_BYTES,
+        );
+
+        assert_eq!(encoded.composition, standalone);
+        assert_eq!(encoded.composition.total_bytes(), encoded.bytes.len());
+        assert_eq!(encoded.bytes, public_bytes);
+
+        let decoded = decode_snapshot(&encoded.bytes).expect("encoded snapshot must decode");
+        assert_eq!(decoded.sequence, 7);
+        assert_eq!(decoded.baseline_sequence, 6);
+        assert_eq!(decoded.server_tick, 123);
+        assert!(!decoded.full);
+        assert_eq!(decoded.records.len(), records.len());
+    }
+
+    #[test]
     fn snapshot_history_reuses_evicted_record_capacity() {
         let mut world = World::new(1200.0, 800.0);
         for net_id in 1..=8 {
