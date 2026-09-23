@@ -315,8 +315,7 @@ pub struct SnapshotSession {
     acknowledged_sequence: Option<u16>,
     acknowledged_state: BTreeMap<u32, WireEntity>,
     last_sent_tick: BTreeMap<u32, u32>,
-    interest_states: Vec<WireEntity>,
-    plan_buckets: [Vec<PlannedRecord>; 9],
+    planner_scratch: SnapshotPlannerScratch,
 }
 
 impl Default for SnapshotSession {
@@ -335,8 +334,7 @@ impl SnapshotSession {
             acknowledged_sequence: None,
             acknowledged_state: BTreeMap::new(),
             last_sent_tick: BTreeMap::new(),
-            interest_states: Vec::new(),
-            plan_buckets: std::array::from_fn(|_| Vec::new()),
+            planner_scratch: SnapshotPlannerScratch::default(),
         }
     }
 
@@ -380,8 +378,7 @@ impl SnapshotSession {
             baseline,
             &self.last_sent_tick,
             max_bytes,
-            &mut self.interest_states,
-            &mut self.plan_buckets,
+            &mut self.planner_scratch,
         );
         let sequence = self.next_sequence;
         self.next_sequence = self.next_sequence.wrapping_add(1);
@@ -528,6 +525,12 @@ struct PlannedRecord {
     priority_age_ticks: u32,
 }
 
+#[derive(Debug, Clone, Default)]
+struct SnapshotPlannerScratch {
+    interest_states: Vec<WireEntity>,
+    buckets: [Vec<PlannedRecord>; 9],
+}
+
 #[derive(Debug)]
 struct SnapshotPlan {
     records: Vec<SnapshotRecord>,
@@ -544,22 +547,21 @@ fn plan_records(
     baseline: &BTreeMap<u32, WireEntity>,
     last_sent_tick: &BTreeMap<u32, u32>,
     max_bytes: usize,
-    interest_states: &mut Vec<WireEntity>,
-    buckets: &mut [Vec<PlannedRecord>; 9],
+    scratch: &mut SnapshotPlannerScratch,
 ) -> SnapshotPlan {
     assert!(max_bytes >= SNAPSHOT_HEADER_BYTES);
     let viewer = frame.get(viewer_net_id);
-    let query_stats = frame.query_interest_into(viewer_net_id, interest_states);
+    let query_stats = frame.query_interest_into(viewer_net_id, &mut scratch.interest_states);
     let interest_candidates_checked = query_stats.map_or(0, |stats| stats.candidates_checked);
-    let visible_entity_count = query_stats.map_or(0, |_| interest_states.len());
-    for bucket in buckets.iter_mut() {
+    let visible_entity_count = query_stats.map_or(0, |_| scratch.interest_states.len());
+    for bucket in scratch.buckets.iter_mut() {
         bucket.clear();
     }
     let mut due_count = 0_usize;
     let mut freshness = SnapshotFreshness::default();
 
     if let (Some(viewer_state), Some(_)) = (viewer, query_stats) {
-        for state in interest_states.iter().copied() {
+        for state in scratch.interest_states.iter().copied() {
             let is_owner = state.net_id == viewer_net_id;
             let distance_sq = interest_distance_sq(viewer_state, state);
             let before = baseline.get(&state.net_id).copied();
@@ -604,7 +606,7 @@ fn plan_records(
             } else {
                 8
             };
-            buckets[bucket].push(PlannedRecord {
+            scratch.buckets[bucket].push(PlannedRecord {
                 record,
                 tier: Some(tier),
                 age_ticks: freshness_age,
@@ -628,7 +630,7 @@ fn plan_records(
             continue;
         }
         due_count += 1;
-        buckets[4].push(PlannedRecord {
+        scratch.buckets[4].push(PlannedRecord {
             record: SnapshotRecord::removed(net_id),
             tier: None,
             age_ticks: 0,
@@ -638,7 +640,7 @@ fn plan_records(
 
     let mut bytes_used = SNAPSHOT_HEADER_BYTES;
     let mut records = Vec::new();
-    for (bucket_index, bucket) in buckets.iter_mut().enumerate() {
+    for (bucket_index, bucket) in scratch.buckets.iter_mut().enumerate() {
         if bucket.is_empty() {
             continue;
         }
