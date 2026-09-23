@@ -1495,6 +1495,43 @@ mod tests {
     }
 
     #[test]
+    fn snapshot_history_reuses_evicted_record_capacity() {
+        let mut world = World::new(1200.0, 800.0);
+        for net_id in 1..=8 {
+            assert!(world.add_player_at(net_id, 300.0 + net_id as f32 * 25.0, 300.0, 0.0));
+        }
+
+        let frame = ReplicationFrame::from_fighters(world.tick, world.fighters());
+        let mut session = SnapshotSession::new(2);
+        let first =
+            session.build_from_frame(u16::MAX, 1, &frame, crate::CONSERVATIVE_DATAGRAM_BYTES);
+        let second =
+            session.build_from_frame(u16::MAX, 1, &frame, crate::CONSERVATIVE_DATAGRAM_BYTES);
+        let third =
+            session.build_from_frame(u16::MAX, 1, &frame, crate::CONSERVATIVE_DATAGRAM_BYTES);
+
+        assert_eq!(session.history_depth(), 2);
+        assert_eq!(third.record_count, first.record_count);
+        assert_eq!(third.byte_composition, first.byte_composition);
+        assert!(!session.recycled_records.is_empty());
+
+        let recycled_ptr = session.recycled_records.as_ptr();
+        let recycled_capacity = session.recycled_records.capacity();
+        assert!(recycled_capacity >= first.record_count);
+
+        let fourth =
+            session.build_from_frame(u16::MAX, 1, &frame, crate::CONSERVATIVE_DATAGRAM_BYTES);
+        let newest = session.history.back().expect("new snapshot history entry");
+
+        assert_eq!(session.history_depth(), 2);
+        assert_eq!(fourth.record_count, first.record_count);
+        assert_eq!(fourth.byte_composition, first.byte_composition);
+        assert_eq!(newest.records.as_ptr(), recycled_ptr);
+        assert_eq!(newest.records.capacity(), recycled_capacity);
+        assert_eq!(session.recycled_records.len(), second.record_count);
+    }
+
+    #[test]
     fn snapshot_planner_reuses_priority_bucket_capacity() {
         let mut world = World::new(6000.0, 6000.0);
         assert!(world.add_player_at(1, 2500.0, 2500.0, 0.0));
