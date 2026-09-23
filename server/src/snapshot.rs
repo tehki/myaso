@@ -618,24 +618,12 @@ fn plan_records(
         }
     }
 
-    for net_id in baseline.keys().copied() {
-        let still_visible = viewer.is_some_and(|viewer_state| {
-            frame.get(net_id).is_some_and(|state| {
-                interest_distance_sq(viewer_state, state)
-                    <= INTEREST_FAR_RADIUS * INTEREST_FAR_RADIUS
-            })
-        });
-        if still_visible {
-            continue;
-        }
-        due_count += 1;
-        scratch.buckets[4].push(PlannedRecord {
-            record: SnapshotRecord::removed(net_id),
-            tier: None,
-            age_ticks: 0,
-            priority_age_ticks: 0,
-        });
-    }
+    due_count += collect_baseline_removals(
+        frame,
+        viewer,
+        baseline,
+        &mut scratch.buckets[4],
+    );
 
     let mut bytes_used = SNAPSHOT_HEADER_BYTES;
     let mut records = Vec::new();
@@ -681,6 +669,56 @@ fn plan_records(
         visible_entity_count,
         freshness,
     }
+}
+
+fn collect_baseline_removals(
+    frame: &ReplicationFrame,
+    viewer: Option<WireEntity>,
+    baseline: &BTreeMap<u32, WireEntity>,
+    removals: &mut Vec<PlannedRecord>,
+) -> usize {
+    let Some(viewer_state) = viewer else {
+        let start_len = removals.len();
+        removals.extend(
+            baseline
+                .keys()
+                .copied()
+                .map(|net_id| PlannedRecord {
+                    record: SnapshotRecord::removed(net_id),
+                    tier: None,
+                    age_ticks: 0,
+                    priority_age_ticks: 0,
+                }),
+        );
+        return removals.len() - start_len;
+    };
+
+    let start_len = removals.len();
+    let mut state_index = 0_usize;
+    for net_id in baseline.keys().copied() {
+        while state_index < frame.states.len() && frame.states[state_index].net_id < net_id {
+            state_index += 1;
+        }
+        let still_visible = frame
+            .states
+            .get(state_index)
+            .copied()
+            .filter(|state| state.net_id == net_id)
+            .is_some_and(|state| {
+                interest_distance_sq(viewer_state, state)
+                    <= INTEREST_FAR_RADIUS * INTEREST_FAR_RADIUS
+            });
+        if still_visible {
+            continue;
+        }
+        removals.push(PlannedRecord {
+            record: SnapshotRecord::removed(net_id),
+            tier: None,
+            age_ticks: 0,
+            priority_age_ticks: 0,
+        });
+    }
+    removals.len() - start_len
 }
 
 fn freshness_tier(distance_sq: f32, is_owner: bool) -> FreshnessTier {
