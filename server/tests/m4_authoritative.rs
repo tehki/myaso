@@ -86,12 +86,7 @@ fn rust_snapshot_encoder_matches_the_js_wire_fixture() {
 fn fighter_identity_operations_preserve_sorted_binary_lookup() {
     let mut world = World::new(600.0, 400.0);
     for net_id in [9, 1, 5, 3, 7] {
-        assert!(world.add_player_at(
-            net_id,
-            100.0 + net_id as f32,
-            100.0,
-            0.0
-        ));
+        assert!(world.add_player_at(net_id, 100.0 + net_id as f32, 100.0, 0.0));
     }
 
     assert_eq!(
