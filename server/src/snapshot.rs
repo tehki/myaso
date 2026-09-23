@@ -307,6 +307,12 @@ struct SnapshotHistoryEntry {
     records: Vec<SnapshotRecord>,
 }
 
+#[derive(Debug, Clone, Default)]
+struct SnapshotPlanScratch {
+    interest_states: Vec<WireEntity>,
+    visible_net_ids: Vec<u32>,
+}
+
 #[derive(Debug, Clone)]
 pub struct SnapshotSession {
     next_sequence: u16,
@@ -315,8 +321,7 @@ pub struct SnapshotSession {
     acknowledged_sequence: Option<u16>,
     acknowledged_state: BTreeMap<u32, WireEntity>,
     last_sent_tick: BTreeMap<u32, u32>,
-    interest_states: Vec<WireEntity>,
-    visible_net_ids: Vec<u32>,
+    plan_scratch: SnapshotPlanScratch,
 }
 
 impl Default for SnapshotSession {
@@ -335,8 +340,7 @@ impl SnapshotSession {
             acknowledged_sequence: None,
             acknowledged_state: BTreeMap::new(),
             last_sent_tick: BTreeMap::new(),
-            interest_states: Vec::new(),
-            visible_net_ids: Vec::new(),
+            plan_scratch: SnapshotPlanScratch::default(),
         }
     }
 
@@ -380,8 +384,7 @@ impl SnapshotSession {
             baseline,
             &self.last_sent_tick,
             max_bytes,
-            &mut self.interest_states,
-            &mut self.visible_net_ids,
+            &mut self.plan_scratch,
         );
         let sequence = self.next_sequence;
         self.next_sequence = self.next_sequence.wrapping_add(1);
@@ -544,10 +547,13 @@ fn plan_records(
     baseline: &BTreeMap<u32, WireEntity>,
     last_sent_tick: &BTreeMap<u32, u32>,
     max_bytes: usize,
-    interest_states: &mut Vec<WireEntity>,
-    visible_net_ids: &mut Vec<u32>,
+    scratch: &mut SnapshotPlanScratch,
 ) -> SnapshotPlan {
     assert!(max_bytes >= SNAPSHOT_HEADER_BYTES);
+    let SnapshotPlanScratch {
+        interest_states,
+        visible_net_ids,
+    } = scratch;
     let viewer = frame.get(viewer_net_id);
     let query_stats = frame.query_interest_into(viewer_net_id, interest_states);
     let interest_candidates_checked = query_stats.map_or(0, |stats| stats.candidates_checked);
