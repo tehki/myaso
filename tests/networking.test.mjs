@@ -194,7 +194,9 @@ test("local-cell snapshot positions save a byte without changing compact coordin
 });
 
 test("snapshot encoder refuses to fragment beyond the datagram budget", () => {
-  const current = Array.from({ length: 110 }, (_, index) => entity(index + 1, 10 + index, 10));
+  // Keep this fixture well beyond the budget even as record encodings become
+  // more compact; the contract under test is fail-closed fragmentation.
+  const current = Array.from({ length: 220 }, (_, index) => entity(index + 1, 10 + index, 10));
   const records = buildSnapshotDelta(current, []);
   assert.throws(() => encodeSnapshot({ sequence: 1, serverTick: 1, records, maxBytes: 1100 }), /exceeds datagram budget/);
 });
