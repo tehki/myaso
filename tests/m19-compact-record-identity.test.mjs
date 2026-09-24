@@ -66,6 +66,7 @@ test("compact IDs round-trip uint32 varint boundaries", () => {
     serverTick: 456,
     records,
     maxBytes: 1100,
+    encoding: SNAPSHOT_ENCODINGS.VARINT_IDS,
   });
   assert.equal(packet.byteLength, 39);
   assert.deepEqual(decodeSnapshot(packet).records.map((record) => record.netId), ids);
