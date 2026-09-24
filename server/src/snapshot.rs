@@ -2466,6 +2466,92 @@ mod tests {
     }
 
     #[test]
+    fn compact_action_flags_roundtrip_common_and_wide_values() {
+        let records = vec![
+            SnapshotRecord {
+                net_id: 10,
+                mask: SNAPSHOT_FIELD_ACTION,
+                x: 0,
+                y: 0,
+                facing: 0,
+                hp: 0,
+                guard: 0,
+                action: 2,
+                flags: 1,
+            },
+            SnapshotRecord {
+                net_id: 11,
+                mask: SNAPSHOT_FIELD_ACTION,
+                x: 0,
+                y: 0,
+                facing: 0,
+                hp: 0,
+                guard: 0,
+                action: 8,
+                flags: 2,
+            },
+            SnapshotRecord {
+                net_id: 12,
+                mask: SNAPSHOT_FIELD_ACTION,
+                x: 0,
+                y: 0,
+                facing: 0,
+                hp: 0,
+                guard: 0,
+                action: 0,
+                flags: 0,
+            },
+            SnapshotRecord {
+                net_id: 13,
+                mask: SNAPSHOT_FIELD_ACTION,
+                x: 0,
+                y: 0,
+                facing: 0,
+                hp: 0,
+                guard: 0,
+                action: 200,
+                flags: 240,
+            },
+        ];
+
+        let compact = encode_snapshot_with_encoding(
+            10,
+            9,
+            789,
+            false,
+            &records,
+            crate::CONSERVATIVE_DATAGRAM_BYTES,
+            SNAPSHOT_ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_LOCAL_U12_POSITION_U4_ACTION_FLAGS,
+        );
+        let previous = encode_snapshot_with_encoding(
+            10,
+            9,
+            789,
+            false,
+            &records,
+            crate::CONSERVATIVE_DATAGRAM_BYTES,
+            SNAPSHOT_ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_LOCAL_U12_POSITION,
+        );
+
+        assert_eq!(compact.bytes.len() + 2, previous.bytes.len());
+        assert_eq!(compact.composition.action, 6);
+        assert_eq!(compact.composition.total_bytes(), compact.bytes.len());
+        let decoded = decode_snapshot(&compact.bytes).expect("compact action snapshot decodes");
+        assert_eq!(
+            decoded.encoding,
+            SNAPSHOT_ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_LOCAL_U12_POSITION_U4_ACTION_FLAGS
+        );
+        assert_eq!(decoded.records, records);
+
+        let mut invalid_record = SnapshotRecord::removed(99);
+        let mut offset = 0;
+        assert_eq!(
+            decode_compact_action_flags(&[COMPACT_ACTION_ESCAPE, 2, 1], &mut offset, &mut invalid_record),
+            Err(SnapshotDecodeError::InvalidActionEncoding)
+        );
+    }
+
+    #[test]
     fn snapshot_sequence_wrap_skips_reserved_no_ack_sentinel() {
         let mut world = World::new(1200.0, 800.0);
         assert!(world.add_player_at(1, 400.0, 300.0, 0.0));
