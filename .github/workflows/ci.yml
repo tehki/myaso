@@ -206,6 +206,11 @@ jobs:
       - name: Validate M100 reused interest visibility
         run: cargo test --locked --manifest-path server/Cargo.toml baseline_removals_reuse_interest_visibility_bits
 
+      - name: Validate M101 packed snapshot record headers
+        run: |
+          cargo test --locked --manifest-path server/Cargo.toml packed_record_headers_roundtrip_inline_and_escaped_net_ids
+          node --test tests/networking.test.mjs --test-name-pattern="packed snapshot record headers"
+
       - name: Validate real browser flight
         env:
           MYASO_FLIGHT_DURATION_MS: "4000"
