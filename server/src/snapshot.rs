@@ -1834,6 +1834,107 @@ mod tests {
     }
 
     #[test]
+    fn baseline_removals_reuse_interest_visibility_bits() {
+        let mut world = World::new(8192.0, 8192.0);
+        for (net_id, x, y) in [
+            (1, 3328.0, 3328.0),
+            (2, 3500.0, 3400.0),
+            (3, 4800.0, 3500.0),
+            (4, 5820.0, 3328.0),
+            (5, 5700.0, 5700.0),
+            (6, 900.0, 900.0),
+        ] {
+            assert!(world.add_player_at(net_id, x, y, 0.0));
+        }
+
+        let frame = ReplicationFrame::from_fighters(world.tick, world.fighters());
+        let viewer = frame.get(1).expect("viewer exists");
+        let mut states = Vec::new();
+        let mut distances_sq = Vec::new();
+        let mut visible_state_bits = Vec::new();
+
+        frame.query_interest_from_viewer_into_with_scratch(
+            viewer,
+            &mut states,
+            Some(&mut distances_sq),
+            Some(&mut visible_state_bits),
+        );
+
+        let allocation = visible_state_bits.as_ptr();
+        let capacity = visible_state_bits.capacity();
+        assert_eq!(
+            visible_state_bits.len(),
+            frame.states.len().div_ceil(u64::BITS as usize)
+        );
+
+        for (index, state) in frame.states.iter().copied().enumerate() {
+            let expected_visible =
+                interest_distance_sq(viewer, state) <= INTEREST_FAR_RADIUS * INTEREST_FAR_RADIUS;
+            assert_eq!(
+                state_index_is_visible(&visible_state_bits, index),
+                expected_visible
+            );
+        }
+
+        let mut baseline: BTreeMap<_, _> = frame
+            .states
+            .iter()
+            .copied()
+            .map(|state| (state.net_id, state))
+            .collect();
+        baseline.insert(
+            7,
+            WireEntity {
+                net_id: 7,
+                x: 0,
+                y: 0,
+                facing: 0,
+                hp: 100,
+                guard: 100,
+                action: 0,
+                flags: 0,
+            },
+        );
+
+        let expected_removals: Vec<_> = baseline
+            .keys()
+            .copied()
+            .filter(|net_id| {
+                !frame.get(*net_id).is_some_and(|state| {
+                    interest_distance_sq(viewer, state)
+                        <= INTEREST_FAR_RADIUS * INTEREST_FAR_RADIUS
+                })
+            })
+            .collect();
+
+        let mut removals = Vec::new();
+        let count = collect_baseline_removals(
+            &frame,
+            true,
+            &visible_state_bits,
+            &baseline,
+            &mut removals,
+        );
+        assert_eq!(count, expected_removals.len());
+        assert_eq!(
+            removals
+                .iter()
+                .map(|planned| planned.record.net_id)
+                .collect::<Vec<_>>(),
+            expected_removals
+        );
+
+        frame.query_interest_from_viewer_into_with_scratch(
+            viewer,
+            &mut states,
+            Some(&mut distances_sq),
+            Some(&mut visible_state_bits),
+        );
+        assert_eq!(visible_state_bits.as_ptr(), allocation);
+        assert_eq!(visible_state_bits.capacity(), capacity);
+    }
+
+    #[test]
     fn snapshot_sequence_wrap_skips_reserved_no_ack_sentinel() {
         let mut world = World::new(1200.0, 800.0);
         assert!(world.add_player_at(1, 400.0, 300.0, 0.0));
@@ -2002,8 +2103,25 @@ mod tests {
             })
             .collect();
 
+        let mut visible_states = Vec::new();
+        let mut visible_state_bits = Vec::new();
+        if let Some(viewer_state) = viewer {
+            frame.query_interest_from_viewer_into_with_scratch(
+                viewer_state,
+                &mut visible_states,
+                None,
+                Some(&mut visible_state_bits),
+            );
+        }
+
         let mut removals = Vec::new();
-        let count = collect_baseline_removals(&frame, viewer, &baseline, &mut removals);
+        let count = collect_baseline_removals(
+            &frame,
+            viewer.is_some(),
+            &visible_state_bits,
+            &baseline,
+            &mut removals,
+        );
         let actual: Vec<_> = removals
             .iter()
             .map(|planned| planned.record.net_id)
@@ -2013,7 +2131,8 @@ mod tests {
         assert_eq!(actual, expected);
 
         removals.clear();
-        let no_viewer_count = collect_baseline_removals(&frame, None, &baseline, &mut removals);
+        let no_viewer_count =
+            collect_baseline_removals(&frame, false, &[], &baseline, &mut removals);
         assert_eq!(no_viewer_count, baseline.len());
         assert_eq!(
             removals
