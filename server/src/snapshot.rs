@@ -1348,10 +1348,7 @@ fn snapshot_record_composition_for_encoding(
         }
         SNAPSHOT_ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_U12_POSITION => {
             let escaped = record.net_id >= u32::from(PACKED_RECORD_NET_ID_ESCAPE);
-            (
-                1 + (escaped as usize) * u32_varint_bytes(record.net_id),
-                1,
-            )
+            (1 + (escaped as usize) * u32_varint_bytes(record.net_id), 1)
         }
         _ => unreachable!("encoding validated by caller"),
     };
@@ -1470,8 +1467,8 @@ fn encode_packed_record_header(net_id: u32, wire_mask: u8, bytes: &mut Vec<u8>) 
     } else {
         PACKED_RECORD_NET_ID_ESCAPE
     };
-    let packed = inline_net_id
-        | (u16::from(compact_wire_mask(wire_mask)) << PACKED_RECORD_NET_ID_BITS);
+    let packed =
+        inline_net_id | (u16::from(compact_wire_mask(wire_mask)) << PACKED_RECORD_NET_ID_BITS);
     bytes.extend_from_slice(&packed.to_le_bytes());
     if inline_net_id == PACKED_RECORD_NET_ID_ESCAPE {
         encode_u32_varint(net_id, bytes);
