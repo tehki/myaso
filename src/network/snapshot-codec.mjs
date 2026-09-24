@@ -603,7 +603,7 @@ function decodedPositionForRecord(record, positionEncoding) {
 }
 
 function replicationCellWire() {
-  return NETWORK.interest.cellSize * NETWORK.worldCoordinateScale;
+  return NETWORK.snapshotPositionCellSize * NETWORK.worldCoordinateScale;
 }
 
 function positionCell(position) {
