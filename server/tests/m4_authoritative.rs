@@ -256,6 +256,53 @@ fn attack_outside_the_facing_arc_misses() {
 }
 
 #[test]
+fn squared_distance_rejection_preserves_collision_and_attack_boundaries() {
+    let mut touching = duel(36.0);
+    let touching_before = touching.fighters().to_vec();
+    touching.step_by(5.0);
+    assert_eq!(touching.fighters(), touching_before.as_slice());
+
+    let mut overlapping = duel(35.0);
+    overlapping.step_by(5.0);
+    let first = overlapping.fighter(1).expect("first");
+    let second = overlapping.fighter(2).expect("second");
+    assert!((second.x - first.x).hypot(second.y - first.y) >= 36.0 - 1e-6);
+
+    let attack = InputIntent {
+        attack: true,
+        facing_radians: 0.0,
+        ..InputIntent::default()
+    };
+
+    let mut at_reach = duel(94.0);
+    advance(
+        &mut at_reach,
+        230.0,
+        attack,
+        InputIntent {
+            facing_radians: std::f32::consts::PI,
+            ..InputIntent::default()
+        },
+    );
+    assert_eq!(at_reach.fighter(2).expect("target").hp.round() as u8, 66);
+
+    let mut outside_reach = duel(94.25);
+    advance(
+        &mut outside_reach,
+        230.0,
+        attack,
+        InputIntent {
+            facing_radians: std::f32::consts::PI,
+            ..InputIntent::default()
+        },
+    );
+    assert_eq!(
+        outside_reach.fighter(2).expect("target").hp.round() as u8,
+        100
+    );
+}
+
+#[test]
 fn timed_dodge_iframes_evade_an_otherwise_valid_hit() {
     let mut world = duel(72.0);
     advance(
