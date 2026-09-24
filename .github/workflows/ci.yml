@@ -194,6 +194,9 @@ jobs:
       - name: Validate M96 squared-distance hot path
         run: cargo test --locked --manifest-path server/Cargo.toml --test m4_authoritative squared_distance_rejection_preserves_collision_and_attack_boundaries
 
+      - name: Validate M97 axis combat prefilter
+        run: cargo test --locked --manifest-path server/Cargo.toml --test m4_authoritative axis_prefilter_preserves_diagonal_collision_and_attack_ranges
+
       - name: Validate real browser flight
         env:
           MYASO_FLIGHT_DURATION_MS: "4000"
