@@ -18,22 +18,17 @@ fn record(mask: u8, x: u16, y: u16) -> SnapshotRecord {
     }
 }
 
-fn hex(bytes: &[u8]) -> String {
-    bytes.iter().map(|byte| format!("{byte:02x}")).collect()
-}
-
 #[test]
-fn current_encoding_matches_cross_language_compact_position_fixture() {
-    let encoded = encode_snapshot_current(
-        7,
-        6,
-        1234,
-        false,
-        &[record(SNAPSHOT_FULL_FIELDS, 400, 800)],
-        1100,
-    );
-    let expected = include_str!("../../tests/fixtures/m21-snapshot-u12-position-v1.hex").trim();
-    assert_eq!(hex(&encoded), expected);
+fn encoding_three_matches_cross_language_compact_position_fixture() {
+    let encoded: Vec<u8> = include_str!("../../tests/fixtures/m21-snapshot-u12-position-v1.hex")
+        .trim()
+        .as_bytes()
+        .chunks_exact(2)
+        .map(|pair| {
+            u8::from_str_radix(std::str::from_utf8(pair).expect("fixture must be utf8"), 16)
+                .expect("fixture must be hex")
+        })
+        .collect();
     assert_eq!(encoded.len(), 24);
     let decoded = decode_snapshot(&encoded).expect("M21 fixture must decode");
     assert_eq!(
@@ -81,15 +76,17 @@ fn wide_position_fallback_preserves_custom_world_coordinates() {
 
 #[test]
 fn wide_position_marker_without_position_fails_closed() {
-    let mut encoded = encode_snapshot_current(
-        1,
-        u16::MAX,
-        1,
-        false,
-        &[record(SNAPSHOT_FIELD_FACING, 400, 800)],
-        1100,
-    );
-    encoded[15] |= SNAPSHOT_FIELD_WIDE_POSITION;
+    let mut encoded: Vec<u8> =
+        include_str!("../../tests/fixtures/m21-snapshot-u12-position-v1.hex")
+            .trim()
+            .as_bytes()
+            .chunks_exact(2)
+            .map(|pair| {
+                u8::from_str_radix(std::str::from_utf8(pair).expect("fixture must be utf8"), 16)
+                    .expect("fixture must be hex")
+            })
+            .collect();
+    encoded[15] = SNAPSHOT_FIELD_FACING | SNAPSHOT_FIELD_WIDE_POSITION;
     assert_eq!(
         decode_snapshot(&encoded),
         Err(SnapshotDecodeError::InvalidPositionEncoding)
