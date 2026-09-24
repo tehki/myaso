@@ -1456,8 +1456,7 @@ fn snapshot_record_composition_for_encoding_with_context(
     }
 
     let wire_mask = encoded_record_mask(record, encoding);
-    let position_encoding =
-        position_wire_encoding(record, wire_mask, encoding, previous_position);
+    let position_encoding = position_wire_encoding(record, wire_mask, encoding, previous_position);
     let mut next_position = previous_position;
 
     if record.mask & SNAPSHOT_FIELD_POSITION != 0 {
@@ -1509,9 +1508,9 @@ fn position_wire_encoding(
     }
     if encoding == SNAPSHOT_ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_LOCAL_U12_POSITION {
         let current = compact_position_pair(record.x, record.y);
-        if previous_position
-            .is_some_and(|previous| position_cell_from_wire(previous) == position_cell_from_wire(current))
-        {
+        if previous_position.is_some_and(|previous| {
+            position_cell_from_wire(previous) == position_cell_from_wire(current)
+        }) {
             return PositionWireEncoding::LocalCell;
         }
     }
@@ -1573,12 +1572,7 @@ fn encode_compact_position(x: u16, y: u16, bytes: &mut Vec<u8>) {
     bytes.push(((packed >> 16) & 0xff) as u8);
 }
 
-fn encode_local_cell_position(
-    x: u16,
-    y: u16,
-    previous_position: (u16, u16),
-    bytes: &mut Vec<u8>,
-) {
+fn encode_local_cell_position(x: u16, y: u16, previous_position: (u16, u16), bytes: &mut Vec<u8>) {
     let current = compact_position_pair(x, y);
     let cell = position_cell_from_wire(previous_position);
     debug_assert_eq!(position_cell_from_wire(current), cell);
@@ -2367,7 +2361,10 @@ mod tests {
         );
 
         assert_eq!(local.bytes.len() + 1, absolute.bytes.len());
-        assert_eq!(local.composition.position + 1, absolute.composition.position);
+        assert_eq!(
+            local.composition.position + 1,
+            absolute.composition.position
+        );
         assert_eq!(local.composition.total_bytes(), local.bytes.len());
 
         let decoded = decode_snapshot(&local.bytes).expect("local-cell snapshot decodes");
