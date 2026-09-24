@@ -17,6 +17,7 @@ import {
   SNAPSHOT_FIELDS,
 } from "../src/network/snapshot-codec.mjs";
 import { isSequenceNewer16, sequenceDistance16 } from "../src/network/sequence.mjs";
+import { applySnapshotPacketInPlace } from "../src/browser/snapshot-store.mjs";
 
 function entity(netId, x, y, extra = {}) {
   return { netId, x, y, facing: 0, hp: 100, guard: 100, action: "idle", ...extra };
@@ -146,6 +147,50 @@ test("packed snapshot record headers shrink 512-range IDs and preserve escaped I
     SNAPSHOT_ENCODINGS.PACKED_U10_IDS_U6_MASK_U8_FACING_U12_POSITION,
   );
   assert.deepEqual(decoded.records, records);
+});
+
+test("local-cell snapshot positions save a byte without changing compact coordinates", () => {
+  const records = [
+    { netId: 10, mask: SNAPSHOT_FIELDS.POSITION, x: 800, y: 1600 },
+    { netId: 11, mask: SNAPSHOT_FIELDS.POSITION, x: 1000, y: 1800 },
+    { netId: 12, mask: SNAPSHOT_FIELDS.FACING, facing: 0 },
+    { netId: 13, mask: SNAPSHOT_FIELDS.POSITION, x: 2400, y: 1800 },
+  ];
+
+  const local = encodeSnapshot({
+    sequence: 9,
+    baselineSequence: 8,
+    serverTick: 456,
+    records,
+    maxBytes: 1100,
+    encoding: SNAPSHOT_ENCODINGS.PACKED_U10_IDS_U6_MASK_U8_FACING_LOCAL_U12_POSITION,
+  });
+  const absolute = encodeSnapshot({
+    sequence: 9,
+    baselineSequence: 8,
+    serverTick: 456,
+    records,
+    maxBytes: 1100,
+    encoding: SNAPSHOT_ENCODINGS.PACKED_U10_IDS_U6_MASK_U8_FACING_U12_POSITION,
+  });
+
+  assert.equal(local.byteLength + 1, absolute.byteLength);
+  const decoded = decodeSnapshot(local);
+  assert.equal(
+    decoded.encoding,
+    SNAPSHOT_ENCODINGS.PACKED_U10_IDS_U6_MASK_U8_FACING_LOCAL_U12_POSITION,
+  );
+  assert.deepEqual(decoded.records, records);
+
+  const state = new Map();
+  const result = applySnapshotPacketInPlace(state, local);
+  assert.equal(result.encoding, SNAPSHOT_ENCODINGS.PACKED_U10_IDS_U6_MASK_U8_FACING_LOCAL_U12_POSITION);
+  assert.equal(state.get(10).x, 200);
+  assert.equal(state.get(10).y, 400);
+  assert.equal(state.get(11).x, 250);
+  assert.equal(state.get(11).y, 450);
+  assert.equal(state.get(13).x, 600);
+  assert.equal(state.get(13).y, 450);
 });
 
 test("snapshot encoder refuses to fragment beyond the datagram budget", () => {
