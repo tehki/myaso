@@ -1542,8 +1542,14 @@ async function runOnlineUiKillFeedFlight(entries) {
     true,
   );
 
-  await pulseMovementKey(left, "a", 260);
-  await pulseMovementKey(right, "a", 120);
+  // Keep the first killer well clear of the second exchange. The first kill may
+  // require retry movement toward center, so a fixed 260 ms retreat can leave the
+  // left fighter inside the right attacker's authoritative strike geometry.
+  await pulseMovementKey(left, "a", 520);
+  await aimArena(right, rightArena, -200);
+  await sleep(60);
+  await pulseMovementKey(right, "a", 260);
+  await sleep(60);
   const secondDeathBaseline = await readDefeatTransitionCount(center);
   let secondKill = null;
   let secondDeath = null;
