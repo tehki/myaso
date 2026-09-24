@@ -1735,7 +1735,7 @@ mod tests {
         assert!(actual
             .states
             .iter()
-            .all(|state| !matches!(state.net_id, 4 | 5 | 6)));
+            .all(|state| !matches!(state.net_id, 4..=6)));
     }
 
     #[test]
