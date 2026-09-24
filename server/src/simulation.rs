@@ -293,17 +293,27 @@ impl World {
         self.step_by(SERVER_DT_MS)
     }
 
+    pub fn step_into(&mut self, events: &mut Vec<CombatEvent>) {
+        self.step_by_into(SERVER_DT_MS, events);
+    }
+
     pub fn step_by(&mut self, dt_ms: f32) -> Vec<CombatEvent> {
+        let mut events = Vec::new();
+        self.step_by_into(dt_ms, &mut events);
+        events
+    }
+
+    pub fn step_by_into(&mut self, dt_ms: f32, events: &mut Vec<CombatEvent>) {
         assert!(dt_ms.is_finite() && dt_ms > 0.0 && dt_ms <= 100.0);
+        events.clear();
         self.now_ms += dt_ms;
         self.tick = self.tick.wrapping_add(1);
-        let mut events = Vec::new();
         if self.winner.is_some() {
             if self.now_ms + EPSILON >= self.reset_at_ms {
                 self.reset_match();
                 events.push(CombatEvent::MatchReset);
             }
-            return events;
+            return;
         }
 
         for fighter in &mut self.fighters {
@@ -337,12 +347,11 @@ impl World {
             self.height,
             self.now_ms,
             &mut self.fighters,
-            &mut events,
+            events,
         ) {
             self.winner = Some(winner);
             self.reset_at_ms = self.now_ms + FFA_MATCH_RESET_MS;
         }
-        events
     }
 
     fn reset_match(&mut self) {

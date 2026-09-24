@@ -357,11 +357,12 @@ async fn load_identity(bind: SocketAddr) -> Result<Identity> {
 async fn run_authoritative_clock(game: Arc<SharedGame>) {
     let mut interval = tokio::time::interval(Duration::from_secs_f64(1.0 / 60.0));
     interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+    let mut events = Vec::new();
     loop {
         interval.tick().await;
         let mut state = game.state.lock().await;
         state.apply_flight_background_motion();
-        let events = state.world.step();
+        state.world.step_into(&mut events);
         state.record_combat_events(&events);
         if state.world.tick % SNAPSHOT_EVERY_SERVER_TICKS == 0 {
             state.refresh_replication_frame();
