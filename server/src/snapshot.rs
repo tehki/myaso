@@ -221,6 +221,7 @@ pub struct ReplicationFrame {
     server_tick: u32,
     states: Vec<WireEntity>,
     cells: HashMap<(i32, i32), Vec<usize>>,
+    recycled_cell_buckets: Vec<Vec<usize>>,
 }
 
 impl ReplicationFrame {
@@ -229,6 +230,7 @@ impl ReplicationFrame {
             server_tick,
             states: Vec::with_capacity(fighters.len()),
             cells: HashMap::with_capacity(fighters.len()),
+            recycled_cell_buckets: Vec::new(),
         };
         frame.refresh_from_fighters(server_tick, fighters);
         frame
@@ -237,7 +239,10 @@ impl ReplicationFrame {
     pub fn refresh_from_fighters(&mut self, server_tick: u32, fighters: &[Fighter]) {
         self.server_tick = server_tick;
         self.states.clear();
-        self.cells.clear();
+        for (_, mut bucket) in self.cells.drain() {
+            bucket.clear();
+            self.recycled_cell_buckets.push(bucket);
+        }
         if self.states.capacity() < fighters.len() {
             self.states.reserve(fighters.len());
         }
@@ -254,9 +259,11 @@ impl ReplicationFrame {
             );
             let state_index = self.states.len();
             self.states.push(state);
-            self.cells
+            let cells = &mut self.cells;
+            let recycled_cell_buckets = &mut self.recycled_cell_buckets;
+            cells
                 .entry(replication_cell(state))
-                .or_default()
+                .or_insert_with(|| recycled_cell_buckets.pop().unwrap_or_default())
                 .push(state_index);
         }
     }
@@ -1434,6 +1441,39 @@ mod tests {
             frame.cells.capacity() >= fighter_count,
             "cell index should be preallocated for the known fighter upper bound"
         );
+    }
+
+    #[test]
+    fn replication_frame_refresh_reuses_cell_bucket_capacity() {
+        let mut world = World::new(6000.0, 6000.0);
+        for net_id in 1..=8 {
+            assert!(world.add_player_at(net_id, 600.0 + net_id as f32 * 10.0, 600.0, 0.0));
+        }
+
+        let mut frame = ReplicationFrame::from_fighters(world.tick, world.fighters());
+        let viewer_net_id = 1;
+        let before_query = frame.query_interest(viewer_net_id).expect("viewer exists");
+        let cell_key = replication_cell(frame.get(viewer_net_id).expect("viewer exists"));
+        let before_bucket = frame.cells.get(&cell_key).expect("occupied cell exists");
+        let bucket_ptr = before_bucket.as_ptr();
+        let bucket_capacity = before_bucket.capacity();
+        assert_eq!(before_bucket.len(), world.fighters().len());
+
+        frame.refresh_from_fighters(world.tick.wrapping_add(1), world.fighters());
+
+        let after_bucket = frame.cells.get(&cell_key).expect("occupied cell remains");
+        assert_eq!(after_bucket.as_ptr(), bucket_ptr);
+        assert_eq!(after_bucket.capacity(), bucket_capacity);
+        assert_eq!(after_bucket.len(), world.fighters().len());
+        assert!(frame.recycled_cell_buckets.is_empty());
+
+        let after_query = frame.query_interest(viewer_net_id).expect("viewer exists");
+        assert_eq!(after_query.states, before_query.states);
+        assert_eq!(
+            after_query.candidates_checked,
+            before_query.candidates_checked
+        );
+        assert_eq!(after_query.cells_visited, before_query.cells_visited);
     }
 
     #[test]
