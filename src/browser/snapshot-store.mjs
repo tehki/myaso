@@ -53,15 +53,23 @@ export function applySnapshotPacketInPlace(stateMap, packet, result = createSnap
 
   const staleIds = result.full ? new Set(stateMap.keys()) : null;
   let offset = HEADER_BYTES;
+  let previousPositionX = null;
+  let previousPositionY = null;
 
   for (let index = 0; index < result.records; index += 1) {
     let netId;
     let mask;
-    if (result.encoding === ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_U12_POSITION) {
+    let localPosition = false;
+    if (
+      result.encoding === ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_U12_POSITION
+      || result.encoding === ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_LOCAL_U12_POSITION
+    ) {
       const decoded = readPackedRecordHeader(view, offset);
       netId = decoded.netId;
-      mask = decoded.mask;
       offset = decoded.offset;
+      const expanded = expandPackedWireMask(decoded.compactMask, result.encoding);
+      mask = expanded.mask;
+      localPosition = expanded.localPosition;
     } else {
       if (result.encoding === ENCODING_LEGACY_U32_IDS) {
         requireBytes(view, offset, 4);
@@ -78,7 +86,17 @@ export function applySnapshotPacketInPlace(stateMap, packet, result = createSnap
     }
     staleIds?.delete(netId);
     const widePosition = Boolean(mask & FIELD_WIDE_POSITION);
-    if (widePosition && (!usesCompactPosition(result.encoding) || !(mask & FIELD_POSITION))) throw new RangeError("invalid compact-position marker");
+    if (widePosition && (!usesCompactPosition(result.encoding) || !(mask & FIELD_POSITION))) {
+      throw new RangeError("invalid compact-position marker");
+    }
+    if (localPosition && (
+      result.encoding !== ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_LOCAL_U12_POSITION
+      || !(mask & FIELD_POSITION)
+      || widePosition
+      || (mask & FIELD_REMOVED)
+    )) {
+      throw new RangeError("invalid local-position marker");
+    }
 
     if (mask & FIELD_REMOVED) {
       if (stateMap.delete(netId)) result.removed += 1;
@@ -105,15 +123,35 @@ export function applySnapshotPacketInPlace(stateMap, packet, result = createSnap
     }
 
     if (mask & FIELD_POSITION) {
-      if (usesCompactPosition(result.encoding) && !widePosition) {
+      let wireX;
+      let wireY;
+      if (localPosition) {
+        if (previousPositionX === null || previousPositionY === null) {
+          throw new RangeError("local snapshot position has no previous position");
+        }
+        requireBytes(view, offset, 2);
+        const cellWire = replicationCellWire();
+        const cellX = Math.floor(previousPositionX / cellWire);
+        const cellY = Math.floor(previousPositionY / cellWire);
+        wireX = cellX * cellWire + view.getUint8(offset) * 8;
+        wireY = cellY * cellWire + view.getUint8(offset + 1) * 8;
+        offset += 2;
+      } else if (usesCompactPosition(result.encoding) && !widePosition) {
         requireBytes(view, offset, 3);
         const packed = view.getUint8(offset) | (view.getUint8(offset + 1) << 8) | (view.getUint8(offset + 2) << 16);
-        entity.x = ((packed & 0x0fff) << 3) / NETWORK.worldCoordinateScale;
-        entity.y = (((packed >>> 12) & 0x0fff) << 3) / NETWORK.worldCoordinateScale;
+        wireX = (packed & 0x0fff) << 3;
+        wireY = ((packed >>> 12) & 0x0fff) << 3;
         offset += 3;
       } else {
-        requireBytes(view, offset, 4); entity.x = view.getUint16(offset, true) / NETWORK.worldCoordinateScale; entity.y = view.getUint16(offset + 2, true) / NETWORK.worldCoordinateScale; offset += 4;
+        requireBytes(view, offset, 4);
+        wireX = view.getUint16(offset, true);
+        wireY = view.getUint16(offset + 2, true);
+        offset += 4;
       }
+      previousPositionX = wireX;
+      previousPositionY = wireY;
+      entity.x = wireX / NETWORK.worldCoordinateScale;
+      entity.y = wireY / NETWORK.worldCoordinateScale;
     }
     if (mask & FIELD_FACING) {
       if (usesCompactFacing(result.encoding)) {
