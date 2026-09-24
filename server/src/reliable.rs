@@ -5,12 +5,12 @@ pub enum ReliableQueueError {
     Closed,
 }
 
-pub fn try_enqueue_reliable<F>(
-    sender: &mpsc::Sender<Vec<u8>>,
+pub fn try_enqueue_reliable<T, F>(
+    sender: &mpsc::Sender<T>,
     build: F,
 ) -> Result<bool, ReliableQueueError>
 where
-    F: FnOnce() -> Vec<u8>,
+    F: FnOnce() -> T,
 {
     match sender.try_reserve() {
         Ok(permit) => {
