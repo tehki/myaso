@@ -486,11 +486,24 @@ impl SnapshotSession {
     }
 
     pub fn has_sequence(&self, sequence: u16) -> bool {
-        self.acknowledged_sequence == Some(sequence)
-            || self
-                .history
-                .iter()
-                .any(|candidate| candidate.sequence == sequence)
+        self.acknowledged_sequence == Some(sequence) || self.history_index(sequence).is_some()
+    }
+
+    fn history_index(&self, sequence: u16) -> Option<usize> {
+        if sequence == u16::MAX {
+            return None;
+        }
+        let first = self.history.front()?.sequence;
+        debug_assert_ne!(first, u16::MAX);
+        let index = if sequence >= first {
+            usize::from(sequence - first)
+        } else {
+            usize::from(u16::MAX - first) + usize::from(sequence)
+        };
+        self.history
+            .get(index)
+            .is_some_and(|candidate| candidate.sequence == sequence)
+            .then_some(index)
     }
 
     pub fn history_depth(&self) -> usize {
@@ -508,11 +521,7 @@ impl SnapshotSession {
         if self.acknowledged_sequence == Some(sequence) {
             return true;
         }
-        let Some(index) = self
-            .history
-            .iter()
-            .position(|candidate| candidate.sequence == sequence)
-        else {
+        let Some(index) = self.history_index(sequence) else {
             return false;
         };
         let candidate = &self.history[index];
@@ -1663,6 +1672,52 @@ mod tests {
         }
         assert!(session.has_sequence(after_wrap.sequence));
         assert!(session.has_sequence(next.sequence));
+    }
+
+    #[test]
+    fn snapshot_history_sequence_offset_lookup_spans_reserved_wrap() {
+        let mut world = World::new(1200.0, 800.0);
+        assert!(world.add_player_at(1, 400.0, 300.0, 0.0));
+
+        let frame = ReplicationFrame::from_fighters(world.tick, world.fighters());
+        let mut session = SnapshotSession::new(8);
+        session.next_sequence = u16::MAX - 2;
+
+        let first =
+            session.build_from_frame(u16::MAX, 1, &frame, crate::CONSERVATIVE_DATAGRAM_BYTES);
+        let second =
+            session.build_from_frame(u16::MAX, 1, &frame, crate::CONSERVATIVE_DATAGRAM_BYTES);
+        let third =
+            session.build_from_frame(u16::MAX, 1, &frame, crate::CONSERVATIVE_DATAGRAM_BYTES);
+        let fourth =
+            session.build_from_frame(u16::MAX, 1, &frame, crate::CONSERVATIVE_DATAGRAM_BYTES);
+
+        assert_eq!(
+            [
+                first.sequence,
+                second.sequence,
+                third.sequence,
+                fourth.sequence
+            ],
+            [u16::MAX - 2, u16::MAX - 1, 0, 1]
+        );
+        assert_eq!(session.history_index(first.sequence), Some(0));
+        assert_eq!(session.history_index(second.sequence), Some(1));
+        assert_eq!(session.history_index(third.sequence), Some(2));
+        assert_eq!(session.history_index(fourth.sequence), Some(3));
+        assert_eq!(session.history_index(u16::MAX), None);
+        assert_eq!(session.history_index(2), None);
+
+        assert!(session.advance_acknowledged_state(third.sequence));
+        assert_eq!(session.acknowledged_sequence, Some(third.sequence));
+        assert_eq!(
+            session.history.front().map(|entry| entry.sequence),
+            Some(fourth.sequence)
+        );
+        assert!(!session.has_sequence(first.sequence));
+        assert!(!session.has_sequence(second.sequence));
+        assert!(session.has_sequence(third.sequence));
+        assert!(session.has_sequence(fourth.sequence));
     }
 
     #[test]
