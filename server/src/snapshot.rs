@@ -782,6 +782,7 @@ fn plan_records(
         ..SnapshotByteComposition::default()
     };
     scratch.records.clear();
+    let mut previous_position = None;
     let (buckets, records) = (&mut scratch.buckets, &mut scratch.records);
     for (bucket_index, bucket) in buckets.iter_mut().enumerate() {
         if bucket.is_empty() {
@@ -803,10 +804,12 @@ fn plan_records(
         };
         for offset in 0..bucket.len() {
             let planned = bucket[(start + offset) % bucket.len()];
-            let record_composition = snapshot_record_composition_for_encoding(
-                &planned.record,
-                SNAPSHOT_ENCODING_CURRENT,
-            );
+            let (record_composition, next_position) =
+                snapshot_record_composition_for_encoding_with_context(
+                    &planned.record,
+                    SNAPSHOT_ENCODING_CURRENT,
+                    previous_position,
+                );
             let record_bytes = record_composition.total_bytes();
             if bytes_used + record_bytes > max_bytes {
                 if let Some(tier) = planned.tier {
@@ -816,6 +819,7 @@ fn plan_records(
             }
             bytes_used += record_bytes;
             byte_composition.add(record_composition);
+            previous_position = next_position;
             records.push(planned.record);
             if planned.record.mask & SNAPSHOT_FIELD_REMOVED != 0 {
                 last_sent_tick.remove(&planned.record.net_id);
