@@ -1469,7 +1469,10 @@ mod tests {
 
         let after_query = frame.query_interest(viewer_net_id).expect("viewer exists");
         assert_eq!(after_query.states, before_query.states);
-        assert_eq!(after_query.candidates_checked, before_query.candidates_checked);
+        assert_eq!(
+            after_query.candidates_checked,
+            before_query.candidates_checked
+        );
         assert_eq!(after_query.cells_visited, before_query.cells_visited);
     }
 
