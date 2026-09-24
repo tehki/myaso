@@ -496,11 +496,12 @@ fn separate_fighters(width: f32, height: f32, fighters: &mut [Fighter]) {
             }
             let mut dx = second.x - first.x;
             let mut dy = second.y - first.y;
-            let mut distance = dx.hypot(dy);
-            if distance >= minimum_distance {
+            let distance_sq = dx * dx + dy * dy;
+            if distance_sq >= minimum_distance * minimum_distance {
                 continue;
             }
-            if distance <= EPSILON {
+            let mut distance = distance_sq.sqrt();
+            if distance_sq <= EPSILON * EPSILON {
                 dx = first.facing.cos();
                 dy = first.facing.sin();
                 distance = 1.0;
@@ -630,8 +631,9 @@ fn resolve_attacks(
 fn is_target_in_attack_arc(attacker: &Fighter, target: &Fighter) -> bool {
     let dx = target.x - attacker.x;
     let dy = target.y - attacker.y;
-    let center_distance = dx.hypot(dy);
-    if center_distance > ATTACK_REACH + FIGHTER_RADIUS {
+    let center_distance_sq = dx * dx + dy * dy;
+    let maximum_distance = ATTACK_REACH + FIGHTER_RADIUS;
+    if center_distance_sq > maximum_distance * maximum_distance {
         return false;
     }
     let angle_to_target = dy.atan2(dx);
