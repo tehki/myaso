@@ -1335,8 +1335,11 @@ fn decode_record_fields(
         return Err(SnapshotDecodeError::InvalidPositionEncoding);
     }
     if local_position
-        && (encoding != SNAPSHOT_ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_LOCAL_U12_POSITION
-            || record.mask & SNAPSHOT_FIELD_POSITION == 0
+        && (!matches!(
+            encoding,
+            SNAPSHOT_ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_LOCAL_U12_POSITION
+                | SNAPSHOT_ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_LOCAL_U12_POSITION_U4_ACTION_FLAGS
+        ) || record.mask & SNAPSHOT_FIELD_POSITION == 0
             || wide_position
             || record.mask & SNAPSHOT_FIELD_REMOVED != 0)
     {
