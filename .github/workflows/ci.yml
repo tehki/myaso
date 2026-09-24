@@ -149,6 +149,9 @@ jobs:
       - name: Validate M81 hashed replication cells
         run: cargo test --locked --manifest-path server/Cargo.toml hashed_replication_cells_match_ordered_cell_lookup_semantics
 
+      - name: Validate M82 reused viewer interest query
+        run: cargo test --locked --manifest-path server/Cargo.toml reused_viewer_interest_query_matches_public_lookup_semantics
+
       - name: Validate real browser flight
         env:
           MYASO_FLIGHT_DURATION_MS: "4000"
