@@ -65,6 +65,7 @@ export function applySnapshotPacketInPlace(stateMap, packet, result = createSnap
     if (
       result.encoding === ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_U12_POSITION
       || result.encoding === ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_LOCAL_U12_POSITION
+      || result.encoding === ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_LOCAL_U12_POSITION_U4_ACTION_FLAGS
     ) {
       const decoded = readPackedRecordHeader(view, offset);
       netId = decoded.netId;
