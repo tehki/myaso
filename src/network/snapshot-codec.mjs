@@ -415,6 +415,7 @@ function readPackedRecordHeader(view, offset) {
     return { netId: inlineNetId, mask, offset };
   }
   const decoded = readUint32Varint(view, offset);
+  if (decoded.value < PACKED_RECORD_NET_ID_ESCAPE) throw new RangeError("non-canonical packed snapshot netId");
   return { netId: decoded.value, mask, offset: decoded.offset };
 }
 
