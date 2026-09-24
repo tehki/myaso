@@ -806,32 +806,43 @@ fn plan_records(
         } else {
             rotating_bucket_offset(viewer_net_id, server_tick, bucket_index, bucket.len())
         };
-        for offset in 0..bucket.len() {
-            let planned = bucket[(start + offset) % bucket.len()];
-            let (record_composition, next_position) =
-                snapshot_record_composition_for_encoding_with_context(
-                    &planned.record,
-                    SNAPSHOT_ENCODING_CURRENT,
-                    previous_position,
-                );
-            let record_bytes = record_composition.total_bytes();
-            if bytes_used + record_bytes > max_bytes {
-                if let Some(tier) = planned.tier {
-                    freshness.observe_omitted(tier, planned.age_ticks);
+        let admission_passes = if bucket_index == 7 { 2 } else { 1 };
+        for admission_pass in 0..admission_passes {
+            for offset in 0..bucket.len() {
+                let planned = bucket[(start + offset) % bucket.len()];
+                if bucket_index == 7 {
+                    let deadline_due =
+                        planned.age_ticks >= freshness_budget_ticks(FreshnessTier::Mid);
+                    if deadline_due != (admission_pass == 0) {
+                        continue;
+                    }
                 }
-                continue;
-            }
-            bytes_used += record_bytes;
-            byte_composition.add(record_composition);
-            previous_position = next_position;
-            records.push(planned.record);
-            if planned.record.mask & SNAPSHOT_FIELD_REMOVED != 0 {
-                last_sent_tick.remove(&planned.record.net_id);
-            } else {
-                last_sent_tick.insert(planned.record.net_id, server_tick);
-            }
-            if let Some(tier) = planned.tier {
-                freshness.observe_sent(tier, planned.age_ticks);
+
+                let (record_composition, next_position) =
+                    snapshot_record_composition_for_encoding_with_context(
+                        &planned.record,
+                        SNAPSHOT_ENCODING_CURRENT,
+                        previous_position,
+                    );
+                let record_bytes = record_composition.total_bytes();
+                if bytes_used + record_bytes > max_bytes {
+                    if let Some(tier) = planned.tier {
+                        freshness.observe_omitted(tier, planned.age_ticks);
+                    }
+                    continue;
+                }
+                bytes_used += record_bytes;
+                byte_composition.add(record_composition);
+                previous_position = next_position;
+                records.push(planned.record);
+                if planned.record.mask & SNAPSHOT_FIELD_REMOVED != 0 {
+                    last_sent_tick.remove(&planned.record.net_id);
+                } else {
+                    last_sent_tick.insert(planned.record.net_id, server_tick);
+                }
+                if let Some(tier) = planned.tier {
+                    freshness.observe_sent(tier, planned.age_ticks);
+                }
             }
         }
     }
@@ -2806,6 +2817,106 @@ mod tests {
         assert_eq!(third.record_count, 1);
         assert_eq!(third.freshness.combat.max_due_age_ticks, 0);
         assert_eq!(third.freshness.combat.max_sent_age_ticks, 0);
+    }
+
+    #[test]
+    fn deadline_due_mid_records_precede_rotating_fresh_mid_under_budget() {
+        let mut world = World::new(6000.0, 6000.0);
+        for (net_id, x) in [
+            (1_u32, 1000.0),
+            (2, 1800.0),
+            (3, 2000.0),
+            (4, 2200.0),
+            (5, 2400.0),
+        ] {
+            assert!(world.add_player_at(net_id, x, 1000.0, 0.0));
+        }
+
+        let baseline_frame = ReplicationFrame::from_fighters(0, world.fighters());
+        let baseline: BTreeMap<_, _> = baseline_frame
+            .states
+            .iter()
+            .copied()
+            .map(|state| (state.net_id, state))
+            .collect();
+        let mut changed_frame = baseline_frame.clone();
+        changed_frame.server_tick = 60;
+        for state in changed_frame.states.iter_mut().filter(|state| state.net_id != 1) {
+            state.facing = state.facing.wrapping_add(257);
+        }
+
+        let seed_last_sent: HashMap<_, _> =
+            [(2_u32, 54_u32), (3, 30), (4, 27), (5, 48)]
+                .into_iter()
+                .collect();
+
+        let mut full_last_sent = seed_last_sent.clone();
+        let mut full_scratch = SnapshotPlannerScratch::default();
+        let full_plan = plan_records(
+            1,
+            60,
+            &changed_frame,
+            &baseline,
+            &mut full_last_sent,
+            crate::CONSERVATIVE_DATAGRAM_BYTES,
+            &mut full_scratch,
+        );
+
+        let mid_bucket = &full_scratch.buckets[7];
+        assert_eq!(mid_bucket.len(), 4);
+        let start = rotating_bucket_offset(1, 60, 7, mid_bucket.len());
+        let rotated: Vec<_> = (0..mid_bucket.len())
+            .map(|offset| mid_bucket[(start + offset) % mid_bucket.len()])
+            .collect();
+        let mid_budget = freshness_budget_ticks(FreshnessTier::Mid);
+        let expected: Vec<_> = rotated
+            .iter()
+            .filter(|planned| planned.age_ticks >= mid_budget)
+            .chain(
+                rotated
+                    .iter()
+                    .filter(|planned| planned.age_ticks < mid_budget),
+            )
+            .map(|planned| planned.record.net_id)
+            .collect();
+        assert_eq!(
+            full_plan
+                .records
+                .iter()
+                .map(|record| record.net_id)
+                .collect::<Vec<_>>(),
+            expected
+        );
+        assert!(rotated.iter().any(|planned| planned.age_ticks < mid_budget));
+        assert!(rotated.iter().any(|planned| planned.age_ticks >= mid_budget));
+
+        let first_record = full_plan.records[0];
+        let max_bytes = SNAPSHOT_HEADER_BYTES + snapshot_record_bytes(&first_record);
+        let mut constrained_last_sent = seed_last_sent;
+        let mut constrained_scratch = SnapshotPlannerScratch::default();
+        let constrained = plan_records(
+            1,
+            60,
+            &changed_frame,
+            &baseline,
+            &mut constrained_last_sent,
+            max_bytes,
+            &mut constrained_scratch,
+        );
+
+        assert_eq!(constrained.records.len(), 1);
+        assert_eq!(constrained.records[0].net_id, expected[0]);
+        assert!(
+            constrained_scratch.buckets[7]
+                .iter()
+                .find(|planned| planned.record.net_id == expected[0])
+                .expect("admitted mid record remains in planner scratch")
+                .age_ticks
+                >= mid_budget
+        );
+        assert_eq!(constrained.freshness.mid.due, 4);
+        assert_eq!(constrained.freshness.mid.sent, 1);
+        assert_eq!(constrained.freshness.mid.omitted, 3);
     }
 
     #[test]
