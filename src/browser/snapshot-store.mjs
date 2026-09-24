@@ -7,10 +7,12 @@ const ENCODING_VARINT_IDS_U8_FACING = 2;
 const ENCODING_VARINT_IDS_U8_FACING_U12_POSITION = 3;
 const ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_U12_POSITION = 4;
 const ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_LOCAL_U12_POSITION = 5;
+const ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_LOCAL_U12_POSITION_U4_ACTION_FLAGS = 6;
 const PACKED_RECORD_NET_ID_BITS = 10;
 const PACKED_RECORD_NET_ID_MASK = (1 << PACKED_RECORD_NET_ID_BITS) - 1;
 const PACKED_RECORD_NET_ID_ESCAPE = PACKED_RECORD_NET_ID_MASK;
 const PACKED_MASK_LOCAL_POSITION_FLAG = 1 << 5;
+const COMPACT_ACTION_ESCAPE = 0xff;
 const FIELD_POSITION = 1 << 0;
 const FIELD_FACING = 1 << 1;
 const FIELD_VITALS = 1 << 2;
@@ -63,6 +65,7 @@ export function applySnapshotPacketInPlace(stateMap, packet, result = createSnap
     if (
       result.encoding === ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_U12_POSITION
       || result.encoding === ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_LOCAL_U12_POSITION
+      || result.encoding === ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_LOCAL_U12_POSITION_U4_ACTION_FLAGS
     ) {
       const decoded = readPackedRecordHeader(view, offset);
       netId = decoded.netId;
@@ -90,7 +93,8 @@ export function applySnapshotPacketInPlace(stateMap, packet, result = createSnap
       throw new RangeError("invalid compact-position marker");
     }
     if (localPosition && (
-      result.encoding !== ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_LOCAL_U12_POSITION
+      (result.encoding !== ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_LOCAL_U12_POSITION
+        && result.encoding !== ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_LOCAL_U12_POSITION_U4_ACTION_FLAGS)
       || !(mask & FIELD_POSITION)
       || widePosition
       || (mask & FIELD_REMOVED)
@@ -171,10 +175,17 @@ export function applySnapshotPacketInPlace(stateMap, packet, result = createSnap
       offset += 2;
     }
     if (mask & FIELD_ACTION) {
-      requireBytes(view, offset, 2);
-      entity.action = view.getUint8(offset);
-      entity.flags = view.getUint8(offset + 1);
-      offset += 2;
+      if (usesCompactActionFlags(result.encoding)) {
+        const decoded = readCompactActionFlags(view, offset);
+        entity.action = decoded.action;
+        entity.flags = decoded.flags;
+        offset = decoded.offset;
+      } else {
+        requireBytes(view, offset, 2);
+        entity.action = view.getUint8(offset);
+        entity.flags = view.getUint8(offset + 1);
+        offset += 2;
+      }
     }
     entity.serverTick = result.serverTick;
   }
@@ -196,7 +207,8 @@ function expandCompactWireMask(mask) {
 
 function expandPackedWireMask(compactMask, encoding) {
   if (
-    encoding === ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_LOCAL_U12_POSITION
+    (encoding === ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_LOCAL_U12_POSITION
+      || encoding === ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_LOCAL_U12_POSITION_U4_ACTION_FLAGS)
     && (compactMask & PACKED_MASK_LOCAL_POSITION_FLAG)
     && compactMask !== PACKED_MASK_LOCAL_POSITION_FLAG
   ) {
@@ -231,14 +243,41 @@ function replicationCellWire() {
 function usesCompactPosition(encoding) {
   return encoding === ENCODING_VARINT_IDS_U8_FACING_U12_POSITION
     || encoding === ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_U12_POSITION
-    || encoding === ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_LOCAL_U12_POSITION;
+    || encoding === ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_LOCAL_U12_POSITION
+    || encoding === ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_LOCAL_U12_POSITION_U4_ACTION_FLAGS;
 }
 
 function usesCompactFacing(encoding) {
   return encoding === ENCODING_VARINT_IDS_U8_FACING
     || encoding === ENCODING_VARINT_IDS_U8_FACING_U12_POSITION
     || encoding === ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_U12_POSITION
-    || encoding === ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_LOCAL_U12_POSITION;
+    || encoding === ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_LOCAL_U12_POSITION
+    || encoding === ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_LOCAL_U12_POSITION_U4_ACTION_FLAGS;
+}
+
+function usesCompactActionFlags(encoding) {
+  return encoding === ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_LOCAL_U12_POSITION_U4_ACTION_FLAGS;
+}
+
+function actionFlagsAreCompact(action, flags) {
+  return action <= 0x0f && flags <= 0x0f && (action !== 0x0f || flags !== 0x0f);
+}
+
+function readCompactActionFlags(view, offset) {
+  requireBytes(view, offset, 1);
+  const packed = view.getUint8(offset);
+  offset += 1;
+  if (packed !== COMPACT_ACTION_ESCAPE) {
+    return { action: packed & 0x0f, flags: packed >>> 4, offset };
+  }
+  requireBytes(view, offset, 2);
+  const action = view.getUint8(offset);
+  const flags = view.getUint8(offset + 1);
+  offset += 2;
+  if (actionFlagsAreCompact(action, flags)) {
+    throw new RangeError("non-canonical compact snapshot action flags");
+  }
+  return { action, flags, offset };
 }
 
 function readUint32Varint(view, offset) {
@@ -276,7 +315,8 @@ function assertSnapshotEncoding(encoding) {
     && encoding !== ENCODING_VARINT_IDS_U8_FACING
     && encoding !== ENCODING_VARINT_IDS_U8_FACING_U12_POSITION
     && encoding !== ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_U12_POSITION
-    && encoding !== ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_LOCAL_U12_POSITION) {
+    && encoding !== ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_LOCAL_U12_POSITION
+    && encoding !== ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_LOCAL_U12_POSITION_U4_ACTION_FLAGS) {
     throw new RangeError(`unsupported snapshot encoding ${encoding}`);
   }
 }

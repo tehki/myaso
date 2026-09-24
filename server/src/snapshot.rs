@@ -10,8 +10,10 @@ pub const SNAPSHOT_ENCODING_VARINT_IDS_U8_FACING: u8 = 2;
 pub const SNAPSHOT_ENCODING_VARINT_IDS_U8_FACING_U12_POSITION: u8 = 3;
 pub const SNAPSHOT_ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_U12_POSITION: u8 = 4;
 pub const SNAPSHOT_ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_LOCAL_U12_POSITION: u8 = 5;
+pub const SNAPSHOT_ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_LOCAL_U12_POSITION_U4_ACTION_FLAGS:
+    u8 = 6;
 pub const SNAPSHOT_ENCODING_CURRENT: u8 =
-    SNAPSHOT_ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_LOCAL_U12_POSITION;
+    SNAPSHOT_ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_LOCAL_U12_POSITION_U4_ACTION_FLAGS;
 pub const SNAPSHOT_FLAG_FULL: u8 = 1;
 pub const SNAPSHOT_FIELD_POSITION: u8 = 1 << 0;
 pub const SNAPSHOT_FIELD_FACING: u8 = 1 << 1;
@@ -29,6 +31,7 @@ const PACKED_RECORD_NET_ID_BITS: u16 = 10;
 const PACKED_RECORD_NET_ID_MASK: u16 = (1_u16 << PACKED_RECORD_NET_ID_BITS) - 1;
 const PACKED_RECORD_NET_ID_ESCAPE: u16 = PACKED_RECORD_NET_ID_MASK;
 const PACKED_MASK_LOCAL_POSITION_FLAG: u8 = 1 << 5;
+const COMPACT_ACTION_ESCAPE: u8 = 0xff;
 pub const INTEREST_COMBAT_RADIUS: f32 = 420.0;
 pub const INTEREST_NEAR_RADIUS: f32 = 700.0;
 pub const INTEREST_MID_RADIUS: f32 = 1500.0;
@@ -136,6 +139,7 @@ pub enum SnapshotDecodeError {
     UnsupportedEncoding(u8),
     InvalidVarint,
     InvalidPositionEncoding,
+    InvalidActionEncoding,
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
@@ -1118,6 +1122,7 @@ fn encode_snapshot_with_composition(
             | SNAPSHOT_ENCODING_VARINT_IDS_U8_FACING_U12_POSITION
             | SNAPSHOT_ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_U12_POSITION
             | SNAPSHOT_ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_LOCAL_U12_POSITION
+            | SNAPSHOT_ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_LOCAL_U12_POSITION_U4_ACTION_FLAGS
     ));
     let total_bytes = composition.total_bytes();
 
@@ -1212,8 +1217,12 @@ fn encode_record_fields(
         bytes.push(record.guard);
     }
     if record.mask & SNAPSHOT_FIELD_ACTION != 0 {
-        bytes.push(record.action);
-        bytes.push(record.flags);
+        if uses_compact_action_flags(encoding) {
+            encode_compact_action_flags(record.action, record.flags, bytes);
+        } else {
+            bytes.push(record.action);
+            bytes.push(record.flags);
+        }
     }
 }
 
@@ -1236,6 +1245,7 @@ pub fn decode_snapshot(bytes: &[u8]) -> Result<DecodedSnapshot, SnapshotDecodeEr
             | SNAPSHOT_ENCODING_VARINT_IDS_U8_FACING_U12_POSITION
             | SNAPSHOT_ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_U12_POSITION
             | SNAPSHOT_ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_LOCAL_U12_POSITION
+            | SNAPSHOT_ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_LOCAL_U12_POSITION_U4_ACTION_FLAGS
     ) {
         return Err(SnapshotDecodeError::UnsupportedEncoding(encoding));
     }
@@ -1326,8 +1336,11 @@ fn decode_record_fields(
         return Err(SnapshotDecodeError::InvalidPositionEncoding);
     }
     if local_position
-        && (encoding != SNAPSHOT_ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_LOCAL_U12_POSITION
-            || record.mask & SNAPSHOT_FIELD_POSITION == 0
+        && (!matches!(
+            encoding,
+            SNAPSHOT_ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_LOCAL_U12_POSITION
+                | SNAPSHOT_ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_LOCAL_U12_POSITION_U4_ACTION_FLAGS
+        ) || record.mask & SNAPSHOT_FIELD_POSITION == 0
             || wide_position
             || record.mask & SNAPSHOT_FIELD_REMOVED != 0)
     {
@@ -1378,10 +1391,14 @@ fn decode_record_fields(
         *offset += 2;
     }
     if record.mask & SNAPSHOT_FIELD_ACTION != 0 {
-        require(bytes, *offset, 2)?;
-        record.action = bytes[*offset];
-        record.flags = bytes[*offset + 1];
-        *offset += 2;
+        if uses_compact_action_flags(encoding) {
+            decode_compact_action_flags(bytes, offset, record)?;
+        } else {
+            require(bytes, *offset, 2)?;
+            record.action = bytes[*offset];
+            record.flags = bytes[*offset + 1];
+            *offset += 2;
+        }
     }
     Ok(())
 }
@@ -1440,7 +1457,8 @@ fn snapshot_record_composition_for_encoding_with_context(
             (u32_varint_bytes(record.net_id), 1)
         }
         SNAPSHOT_ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_U12_POSITION
-        | SNAPSHOT_ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_LOCAL_U12_POSITION => {
+        | SNAPSHOT_ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_LOCAL_U12_POSITION
+        | SNAPSHOT_ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_LOCAL_U12_POSITION_U4_ACTION_FLAGS => {
             let escaped = record.net_id >= u32::from(PACKED_RECORD_NET_ID_ESCAPE);
             (1 + (escaped as usize) * u32_varint_bytes(record.net_id), 1)
         }
@@ -1470,7 +1488,7 @@ fn snapshot_record_composition_for_encoding_with_context(
         composition.vitals = 2;
     }
     if record.mask & SNAPSHOT_FIELD_ACTION != 0 {
-        composition.action = 2;
+        composition.action = action_bytes_for_record(record, encoding);
     }
     (composition, next_position)
 }
@@ -1506,7 +1524,11 @@ fn position_wire_encoding(
     if !uses_compact_position(encoding) || wire_mask & SNAPSHOT_FIELD_WIDE_POSITION != 0 {
         return PositionWireEncoding::ExactU16Pair;
     }
-    if encoding == SNAPSHOT_ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_LOCAL_U12_POSITION {
+    if matches!(
+        encoding,
+        SNAPSHOT_ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_LOCAL_U12_POSITION
+            | SNAPSHOT_ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_LOCAL_U12_POSITION_U4_ACTION_FLAGS
+    ) {
         let current = compact_position_pair(record.x, record.y);
         if previous_position.is_some_and(|previous| {
             position_cell_from_wire(previous) == position_cell_from_wire(current)
@@ -1610,6 +1632,7 @@ fn uses_compact_position(encoding: u8) -> bool {
         SNAPSHOT_ENCODING_VARINT_IDS_U8_FACING_U12_POSITION
             | SNAPSHOT_ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_U12_POSITION
             | SNAPSHOT_ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_LOCAL_U12_POSITION
+            | SNAPSHOT_ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_LOCAL_U12_POSITION_U4_ACTION_FLAGS
     )
 }
 
@@ -1620,6 +1643,7 @@ fn uses_compact_facing(encoding: u8) -> bool {
             | SNAPSHOT_ENCODING_VARINT_IDS_U8_FACING_U12_POSITION
             | SNAPSHOT_ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_U12_POSITION
             | SNAPSHOT_ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_LOCAL_U12_POSITION
+            | SNAPSHOT_ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_LOCAL_U12_POSITION_U4_ACTION_FLAGS
     )
 }
 
@@ -1631,11 +1655,68 @@ fn facing_bytes_for_encoding(encoding: u8) -> usize {
     }
 }
 
+fn uses_compact_action_flags(encoding: u8) -> bool {
+    encoding
+        == SNAPSHOT_ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_LOCAL_U12_POSITION_U4_ACTION_FLAGS
+}
+
+fn action_flags_are_compact(action: u8, flags: u8) -> bool {
+    action <= 0x0f && flags <= 0x0f && (action != 0x0f || flags != 0x0f)
+}
+
+fn action_bytes_for_record(record: &SnapshotRecord, encoding: u8) -> usize {
+    if !uses_compact_action_flags(encoding) {
+        return 2;
+    }
+    if action_flags_are_compact(record.action, record.flags) {
+        1
+    } else {
+        3
+    }
+}
+
+fn encode_compact_action_flags(action: u8, flags: u8, bytes: &mut Vec<u8>) {
+    if action_flags_are_compact(action, flags) {
+        bytes.push(action | (flags << 4));
+    } else {
+        bytes.push(COMPACT_ACTION_ESCAPE);
+        bytes.push(action);
+        bytes.push(flags);
+    }
+}
+
+fn decode_compact_action_flags(
+    bytes: &[u8],
+    offset: &mut usize,
+    record: &mut SnapshotRecord,
+) -> Result<(), SnapshotDecodeError> {
+    require(bytes, *offset, 1)?;
+    let packed = bytes[*offset];
+    *offset += 1;
+    if packed != COMPACT_ACTION_ESCAPE {
+        record.action = packed & 0x0f;
+        record.flags = packed >> 4;
+        return Ok(());
+    }
+
+    require(bytes, *offset, 2)?;
+    let action = bytes[*offset];
+    let flags = bytes[*offset + 1];
+    *offset += 2;
+    if action_flags_are_compact(action, flags) {
+        return Err(SnapshotDecodeError::InvalidActionEncoding);
+    }
+    record.action = action;
+    record.flags = flags;
+    Ok(())
+}
+
 fn uses_packed_record_header(encoding: u8) -> bool {
     matches!(
         encoding,
         SNAPSHOT_ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_U12_POSITION
             | SNAPSHOT_ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_LOCAL_U12_POSITION
+            | SNAPSHOT_ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_LOCAL_U12_POSITION_U4_ACTION_FLAGS
     )
 }
 
@@ -1652,8 +1733,11 @@ fn packed_wire_mask_code(
     encoding: u8,
     position_encoding: PositionWireEncoding,
 ) -> u8 {
-    if encoding == SNAPSHOT_ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_LOCAL_U12_POSITION
-        && position_encoding == PositionWireEncoding::LocalCell
+    if matches!(
+        encoding,
+        SNAPSHOT_ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_LOCAL_U12_POSITION
+            | SNAPSHOT_ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_LOCAL_U12_POSITION_U4_ACTION_FLAGS
+    ) && position_encoding == PositionWireEncoding::LocalCell
     {
         debug_assert!(wire_mask & SNAPSHOT_FIELD_POSITION != 0);
         debug_assert_eq!(wire_mask & SNAPSHOT_FIELD_WIDE_POSITION, 0);
@@ -1667,8 +1751,11 @@ fn expand_packed_wire_mask(
     compact_mask: u8,
     encoding: u8,
 ) -> Result<(u8, bool), SnapshotDecodeError> {
-    if encoding == SNAPSHOT_ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_LOCAL_U12_POSITION
-        && compact_mask & PACKED_MASK_LOCAL_POSITION_FLAG != 0
+    if matches!(
+        encoding,
+        SNAPSHOT_ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_LOCAL_U12_POSITION
+            | SNAPSHOT_ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_LOCAL_U12_POSITION_U4_ACTION_FLAGS
+    ) && compact_mask & PACKED_MASK_LOCAL_POSITION_FLAG != 0
         && compact_mask != PACKED_MASK_LOCAL_POSITION_FLAG
     {
         if compact_mask & SNAPSHOT_FIELD_POSITION == 0
@@ -2377,6 +2464,96 @@ mod tests {
         assert_ne!(
             position_cell_from_wire(compact_position_pair(2400, 1800)),
             same_cell
+        );
+    }
+
+    #[test]
+    fn compact_action_flags_roundtrip_common_and_wide_values() {
+        let records = vec![
+            SnapshotRecord {
+                net_id: 10,
+                mask: SNAPSHOT_FIELD_ACTION,
+                x: 0,
+                y: 0,
+                facing: 0,
+                hp: 0,
+                guard: 0,
+                action: 2,
+                flags: 1,
+            },
+            SnapshotRecord {
+                net_id: 11,
+                mask: SNAPSHOT_FIELD_ACTION,
+                x: 0,
+                y: 0,
+                facing: 0,
+                hp: 0,
+                guard: 0,
+                action: 8,
+                flags: 2,
+            },
+            SnapshotRecord {
+                net_id: 12,
+                mask: SNAPSHOT_FIELD_ACTION,
+                x: 0,
+                y: 0,
+                facing: 0,
+                hp: 0,
+                guard: 0,
+                action: 0,
+                flags: 0,
+            },
+            SnapshotRecord {
+                net_id: 13,
+                mask: SNAPSHOT_FIELD_ACTION,
+                x: 0,
+                y: 0,
+                facing: 0,
+                hp: 0,
+                guard: 0,
+                action: 200,
+                flags: 240,
+            },
+        ];
+
+        let compact = encode_snapshot_with_encoding(
+            10,
+            9,
+            789,
+            false,
+            &records,
+            crate::CONSERVATIVE_DATAGRAM_BYTES,
+            SNAPSHOT_ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_LOCAL_U12_POSITION_U4_ACTION_FLAGS,
+        );
+        let previous = encode_snapshot_with_encoding(
+            10,
+            9,
+            789,
+            false,
+            &records,
+            crate::CONSERVATIVE_DATAGRAM_BYTES,
+            SNAPSHOT_ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_LOCAL_U12_POSITION,
+        );
+
+        assert_eq!(compact.bytes.len() + 2, previous.bytes.len());
+        assert_eq!(compact.composition.action, 6);
+        assert_eq!(compact.composition.total_bytes(), compact.bytes.len());
+        let decoded = decode_snapshot(&compact.bytes).expect("compact action snapshot decodes");
+        assert_eq!(
+            decoded.encoding,
+            SNAPSHOT_ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_LOCAL_U12_POSITION_U4_ACTION_FLAGS
+        );
+        assert_eq!(decoded.records, records);
+
+        let mut invalid_record = SnapshotRecord::removed(99);
+        let mut offset = 0;
+        assert_eq!(
+            decode_compact_action_flags(
+                &[COMPACT_ACTION_ESCAPE, 2, 1],
+                &mut offset,
+                &mut invalid_record
+            ),
+            Err(SnapshotDecodeError::InvalidActionEncoding)
         );
     }
 

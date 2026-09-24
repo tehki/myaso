@@ -2,6 +2,7 @@ use myaso_server::snapshot::{
     decode_snapshot, encode_snapshot_current, SnapshotDecodeError, SnapshotRecord,
     SNAPSHOT_ENCODING_VARINT_IDS_U8_FACING_U12_POSITION, SNAPSHOT_FIELD_FACING,
     SNAPSHOT_FIELD_POSITION, SNAPSHOT_FIELD_WIDE_POSITION, SNAPSHOT_FULL_FIELDS,
+    SNAPSHOT_PACKET_TYPE,
 };
 
 fn record(mask: u8, x: u16, y: u16) -> SnapshotRecord {
@@ -59,16 +60,32 @@ fn compact_positions_stay_within_four_wire_units() {
 
 #[test]
 fn wide_position_fallback_preserves_custom_world_coordinates() {
-    let encoded = encode_snapshot_current(
-        8,
-        7,
-        1235,
-        false,
-        &[record(SNAPSHOT_FULL_FIELDS, 40000, 800)],
-        1100,
-    );
+    let source = record(SNAPSHOT_FULL_FIELDS, 40000, 800);
+    let mut encoded = Vec::with_capacity(25);
+    encoded.push(myaso_server::PROTOCOL_VERSION);
+    encoded.push(SNAPSHOT_PACKET_TYPE);
+    encoded.push(0);
+    encoded.push(SNAPSHOT_ENCODING_VARINT_IDS_U8_FACING_U12_POSITION);
+    encoded.extend_from_slice(&8_u16.to_le_bytes());
+    encoded.extend_from_slice(&7_u16.to_le_bytes());
+    encoded.extend_from_slice(&1235_u32.to_le_bytes());
+    encoded.extend_from_slice(&1_u16.to_le_bytes());
+    encoded.push(source.net_id as u8);
+    encoded.push(SNAPSHOT_FULL_FIELDS | SNAPSHOT_FIELD_WIDE_POSITION);
+    encoded.extend_from_slice(&source.x.to_le_bytes());
+    encoded.extend_from_slice(&source.y.to_le_bytes());
+    encoded.push(((u32::from(source.facing) + 128) / 257) as u8);
+    encoded.push(source.hp);
+    encoded.push(source.guard);
+    encoded.push(source.action);
+    encoded.push(source.flags);
+
     assert_eq!(encoded.len(), 25);
     let decoded = decode_snapshot(&encoded).expect("wide position packet must decode");
+    assert_eq!(
+        decoded.encoding,
+        SNAPSHOT_ENCODING_VARINT_IDS_U8_FACING_U12_POSITION
+    );
     assert_ne!(decoded.records[0].mask & SNAPSHOT_FIELD_WIDE_POSITION, 0);
     assert_eq!(decoded.records[0].x, 40000);
     assert_eq!(decoded.records[0].y, 800);

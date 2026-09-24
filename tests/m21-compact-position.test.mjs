@@ -68,6 +68,7 @@ test("M21 falls back to exact wide positions outside the default arena envelope"
     serverTick: 1235,
     records: [fullRecord({ x: 40000 })],
     maxBytes: 1100,
+    encoding: SNAPSHOT_ENCODINGS.VARINT_IDS_U8_FACING_U12_POSITION,
   });
   const decoded = decodeSnapshot(packet);
   assert.equal(packet.byteLength, 25);
