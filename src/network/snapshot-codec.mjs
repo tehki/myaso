@@ -333,19 +333,7 @@ export function dequantizeEntity(state) {
 
 export function snapshotRecordBytes(record, encoding = CURRENT_ENCODING) {
   assertSnapshotEncoding(encoding);
-  const mask = record.mask ?? FULL_FIELDS;
-  let bytes;
-  if (usesPackedRecordHeader(encoding)) {
-    bytes = 2 + (record.netId >= PACKED_RECORD_NET_ID_ESCAPE ? uint32VarintBytes(record.netId) : 0);
-  } else {
-    bytes = snapshotNetIdBytes(record.netId, encoding) + 1;
-  }
-  if (mask & FIELD_REMOVED) return bytes;
-  if (mask & FIELD_POSITION) bytes += positionBytesForRecord(record, encoding);
-  if (mask & FIELD_FACING) bytes += facingBytesForEncoding(encoding);
-  if (mask & FIELD_VITALS) bytes += 2;
-  if (mask & FIELD_ACTION) bytes += 2;
-  return bytes;
+  return snapshotRecordBytesWithContext(record, encoding, null).bytes;
 }
 
 export const SNAPSHOT_ENCODINGS = Object.freeze({
@@ -354,6 +342,7 @@ export const SNAPSHOT_ENCODINGS = Object.freeze({
   VARINT_IDS_U8_FACING: ENCODING_VARINT_IDS_U8_FACING,
   VARINT_IDS_U8_FACING_U12_POSITION: ENCODING_VARINT_IDS_U8_FACING_U12_POSITION,
   PACKED_U10_IDS_U6_MASK_U8_FACING_U12_POSITION: ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_U12_POSITION,
+  PACKED_U10_IDS_U6_MASK_U8_FACING_LOCAL_U12_POSITION: ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_LOCAL_U12_POSITION,
   CURRENT: CURRENT_ENCODING,
 });
 
