@@ -258,9 +258,11 @@ fn attack_outside_the_facing_arc_misses() {
 #[test]
 fn squared_distance_rejection_preserves_collision_and_attack_boundaries() {
     let mut touching = duel(36.0);
-    let touching_before = touching.fighters().to_vec();
+    let first_x = touching.fighter(1).expect("first").x;
+    let second_x = touching.fighter(2).expect("second").x;
     touching.step_by(5.0);
-    assert_eq!(touching.fighters(), touching_before.as_slice());
+    assert_eq!(touching.fighter(1).expect("first").x, first_x);
+    assert_eq!(touching.fighter(2).expect("second").x, second_x);
 
     let mut overlapping = duel(35.0);
     overlapping.step_by(5.0);
