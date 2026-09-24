@@ -185,6 +185,9 @@ jobs:
       - name: Validate M93 indexed kill-event history
         run: cargo test --locked --manifest-path server/Cargo.toml --bin myaso-server kill_event_cursor_lookup_spans_sequence_wrap
 
+      - name: Validate M94 fixed kill-event reliable payload
+        run: cargo test --locked --manifest-path server/Cargo.toml --bin myaso-server reliable_kill_event_payload_reuses_frame_buffer_without_owned_byte_payload
+
       - name: Validate real browser flight
         env:
           MYASO_FLIGHT_DURATION_MS: "4000"
