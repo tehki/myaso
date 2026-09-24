@@ -6,6 +6,7 @@ const ENCODING_VARINT_IDS = 1;
 const ENCODING_VARINT_IDS_U8_FACING = 2;
 const ENCODING_VARINT_IDS_U8_FACING_U12_POSITION = 3;
 const ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_U12_POSITION = 4;
+const ENCODING_PACKED_ACTION_FLAGS = 5;
 const PACKED_RECORD_NET_ID_BITS = 10;
 const PACKED_RECORD_NET_ID_MASK = (1 << PACKED_RECORD_NET_ID_BITS) - 1;
 const PACKED_RECORD_NET_ID_ESCAPE = PACKED_RECORD_NET_ID_MASK;
@@ -55,7 +56,7 @@ export function applySnapshotPacketInPlace(stateMap, packet, result = createSnap
   for (let index = 0; index < result.records; index += 1) {
     let netId;
     let mask;
-    if (result.encoding === ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_U12_POSITION) {
+    if (usesPackedRecordHeader(result.encoding)) {
       const decoded = readPackedRecordHeader(view, offset);
       netId = decoded.netId;
       mask = decoded.mask;
@@ -131,10 +132,17 @@ export function applySnapshotPacketInPlace(stateMap, packet, result = createSnap
       offset += 2;
     }
     if (mask & FIELD_ACTION) {
-      requireBytes(view, offset, 2);
-      entity.action = view.getUint8(offset);
-      entity.flags = view.getUint8(offset + 1);
-      offset += 2;
+      if (usesCompactActionFlags(result.encoding)) {
+        const decoded = readCompactActionFlags(view, offset);
+        entity.action = decoded.action;
+        entity.flags = decoded.flags;
+        offset = decoded.offset;
+      } else {
+        requireBytes(view, offset, 2);
+        entity.action = view.getUint8(offset);
+        entity.flags = view.getUint8(offset + 1);
+        offset += 2;
+      }
     }
     entity.serverTick = result.serverTick;
   }
@@ -148,6 +156,40 @@ export function applySnapshotPacketInPlace(stateMap, packet, result = createSnap
   }
 
   return result;
+}
+
+function usesPackedRecordHeader(encoding) {
+  return encoding === ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_U12_POSITION
+    || encoding === ENCODING_PACKED_ACTION_FLAGS;
+}
+
+function usesCompactActionFlags(encoding) {
+  return encoding === ENCODING_PACKED_ACTION_FLAGS;
+}
+
+function readCompactActionFlags(view, offset) {
+  requireBytes(view, offset, 1);
+  const packed = view.getUint8(offset);
+  offset += 1;
+  const actionNibble = packed & 0x0f;
+  const flagsNibble = packed >>> 4;
+
+  let action = actionNibble;
+  if (actionNibble === 15) {
+    requireBytes(view, offset, 1);
+    action = view.getUint8(offset);
+    offset += 1;
+    if (action < 15) throw new RangeError("non-canonical packed snapshot action");
+  }
+
+  let flags = flagsNibble;
+  if (flagsNibble === 15) {
+    requireBytes(view, offset, 1);
+    flags = view.getUint8(offset);
+    offset += 1;
+    if (flags < 15) throw new RangeError("non-canonical packed snapshot flags");
+  }
+  return { action, flags, offset };
 }
 
 function expandCompactWireMask(mask) {
@@ -172,13 +214,15 @@ function readPackedRecordHeader(view, offset) {
 
 function usesCompactPosition(encoding) {
   return encoding === ENCODING_VARINT_IDS_U8_FACING_U12_POSITION
-    || encoding === ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_U12_POSITION;
+    || encoding === ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_U12_POSITION
+    || encoding === ENCODING_PACKED_ACTION_FLAGS;
 }
 
 function usesCompactFacing(encoding) {
   return encoding === ENCODING_VARINT_IDS_U8_FACING
     || encoding === ENCODING_VARINT_IDS_U8_FACING_U12_POSITION
-    || encoding === ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_U12_POSITION;
+    || encoding === ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_U12_POSITION
+    || encoding === ENCODING_PACKED_ACTION_FLAGS;
 }
 
 function readUint32Varint(view, offset) {
@@ -215,7 +259,8 @@ function assertSnapshotEncoding(encoding) {
     && encoding !== ENCODING_VARINT_IDS
     && encoding !== ENCODING_VARINT_IDS_U8_FACING
     && encoding !== ENCODING_VARINT_IDS_U8_FACING_U12_POSITION
-    && encoding !== ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_U12_POSITION) {
+    && encoding !== ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_U12_POSITION
+    && encoding !== ENCODING_PACKED_ACTION_FLAGS) {
     throw new RangeError(`unsupported snapshot encoding ${encoding}`);
   }
 }
