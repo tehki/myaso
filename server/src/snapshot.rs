@@ -10,7 +10,8 @@ pub const SNAPSHOT_ENCODING_VARINT_IDS_U8_FACING: u8 = 2;
 pub const SNAPSHOT_ENCODING_VARINT_IDS_U8_FACING_U12_POSITION: u8 = 3;
 pub const SNAPSHOT_ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_U12_POSITION: u8 = 4;
 pub const SNAPSHOT_ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_LOCAL_U12_POSITION: u8 = 5;
-pub const SNAPSHOT_ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_LOCAL_U12_POSITION_U4_ACTION_FLAGS: u8 = 6;
+pub const SNAPSHOT_ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_LOCAL_U12_POSITION_U4_ACTION_FLAGS:
+    u8 = 6;
 pub const SNAPSHOT_ENCODING_CURRENT: u8 =
     SNAPSHOT_ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_LOCAL_U12_POSITION_U4_ACTION_FLAGS;
 pub const SNAPSHOT_FLAG_FULL: u8 = 1;
@@ -1733,11 +1734,10 @@ fn packed_wire_mask_code(
     position_encoding: PositionWireEncoding,
 ) -> u8 {
     if matches!(
-            encoding,
-            SNAPSHOT_ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_LOCAL_U12_POSITION
-                | SNAPSHOT_ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_LOCAL_U12_POSITION_U4_ACTION_FLAGS
-        )
-        && position_encoding == PositionWireEncoding::LocalCell
+        encoding,
+        SNAPSHOT_ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_LOCAL_U12_POSITION
+            | SNAPSHOT_ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_LOCAL_U12_POSITION_U4_ACTION_FLAGS
+    ) && position_encoding == PositionWireEncoding::LocalCell
     {
         debug_assert!(wire_mask & SNAPSHOT_FIELD_POSITION != 0);
         debug_assert_eq!(wire_mask & SNAPSHOT_FIELD_WIDE_POSITION, 0);
@@ -1752,11 +1752,10 @@ fn expand_packed_wire_mask(
     encoding: u8,
 ) -> Result<(u8, bool), SnapshotDecodeError> {
     if matches!(
-            encoding,
-            SNAPSHOT_ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_LOCAL_U12_POSITION
-                | SNAPSHOT_ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_LOCAL_U12_POSITION_U4_ACTION_FLAGS
-        )
-        && compact_mask & PACKED_MASK_LOCAL_POSITION_FLAG != 0
+        encoding,
+        SNAPSHOT_ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_LOCAL_U12_POSITION
+            | SNAPSHOT_ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_LOCAL_U12_POSITION_U4_ACTION_FLAGS
+    ) && compact_mask & PACKED_MASK_LOCAL_POSITION_FLAG != 0
         && compact_mask != PACKED_MASK_LOCAL_POSITION_FLAG
     {
         if compact_mask & SNAPSHOT_FIELD_POSITION == 0
@@ -2549,7 +2548,11 @@ mod tests {
         let mut invalid_record = SnapshotRecord::removed(99);
         let mut offset = 0;
         assert_eq!(
-            decode_compact_action_flags(&[COMPACT_ACTION_ESCAPE, 2, 1], &mut offset, &mut invalid_record),
+            decode_compact_action_flags(
+                &[COMPACT_ACTION_ESCAPE, 2, 1],
+                &mut offset,
+                &mut invalid_record
+            ),
             Err(SnapshotDecodeError::InvalidActionEncoding)
         );
     }
