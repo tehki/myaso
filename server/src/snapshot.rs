@@ -689,8 +689,10 @@ fn plan_records(
         };
         for offset in 0..bucket.len() {
             let planned = bucket[(start + offset) % bucket.len()];
-            let record_composition =
-                snapshot_record_composition_for_encoding(&planned.record, SNAPSHOT_ENCODING_CURRENT);
+            let record_composition = snapshot_record_composition_for_encoding(
+                &planned.record,
+                SNAPSHOT_ENCODING_CURRENT,
+            );
             let record_bytes = record_composition.total_bytes();
             if bytes_used + record_bytes > max_bytes {
                 if let Some(tier) = planned.tier {
