@@ -1391,6 +1391,35 @@ mod tests {
     }
 
     #[test]
+    fn reused_viewer_interest_query_matches_public_lookup_semantics() {
+        let mut world = World::new(6000.0, 6000.0);
+        for (net_id, x, y) in [
+            (1, 1000.0, 1000.0),
+            (2, 1300.0, 1050.0),
+            (3, 1800.0, 1200.0),
+            (4, 2600.0, 1600.0),
+            (5, 4200.0, 2100.0),
+        ] {
+            assert!(world.add_player_at(net_id, x, y, 0.0));
+        }
+
+        let frame = ReplicationFrame::from_fighters(world.tick, world.fighters());
+        let public = frame.query_interest(3).expect("viewer exists");
+        let viewer = frame.get(3).expect("viewer exists");
+
+        let mut reused_states = vec![viewer];
+        let reused = frame.query_interest_from_viewer_into(viewer, &mut reused_states);
+
+        assert_eq!(reused_states, public.states);
+        assert_eq!(reused.candidates_checked, public.candidates_checked);
+        assert_eq!(reused.cells_visited, public.cells_visited);
+
+        reused_states.push(viewer);
+        assert!(frame.query_interest_into(u32::MAX, &mut reused_states).is_none());
+        assert!(reused_states.is_empty());
+    }
+
+    #[test]
     fn hashed_replication_cells_match_ordered_cell_lookup_semantics() {
         let mut world = World::new(6000.0, 6000.0);
         for (net_id, x, y) in [
