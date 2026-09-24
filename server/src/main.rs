@@ -44,6 +44,12 @@ struct LoopbackFlightConfig {
     drop_new_action_datagrams: bool,
 }
 
+#[derive(Debug)]
+enum ReliablePayload {
+    Bytes(Vec<u8>),
+    KillEvent(KillEventPacket),
+}
+
 struct GameState {
     world: World,
     replication_frame: Arc<ReplicationFrame>,
@@ -423,14 +429,18 @@ async fn handle_connection(
     let mut last_reliable_background_tick = initial_frame.server_tick();
     let mut last_reliable_sequence = initial_reliable_baseline.sequence;
     let mut reliable_deltas_since_checkpoint = 0_u8;
-    let (reliable_tx, mut reliable_rx) = mpsc::channel::<Vec<u8>>(1);
+    let (reliable_tx, mut reliable_rx) = mpsc::channel::<ReliablePayload>(1);
     let reliable_write_delay = game.reliable_write_delay;
     let mut reliable_writer = tokio::spawn(async move {
         while let Some(payload) = reliable_rx.recv().await {
             if !reliable_write_delay.is_zero() {
                 tokio::time::sleep(reliable_write_delay).await;
             }
-            send_reliable_frame(&mut reliable_send, &mut reliable_frame_buffer, &payload).await?;
+            prepare_reliable_payload(&mut reliable_frame_buffer, &payload)?;
+            reliable_send
+                .write_all(&reliable_frame_buffer)
+                .await
+                .context("write reliable frame")?;
         }
         Ok::<(), anyhow::Error>(())
     });
@@ -534,7 +544,7 @@ async fn handle_connection(
                 }
                 let mut kill_event_queued = false;
                 if let Some(event) = pending_kill_event {
-                    match try_enqueue_reliable(&reliable_tx, || encode_kill_event(event).to_vec()) {
+                    match try_enqueue_reliable(&reliable_tx, || ReliablePayload::KillEvent(event)) {
                         Ok(true) => {
                             next_kill_event_sequence = event.sequence.wrapping_add(1);
                             kill_event_queued = true;
@@ -582,7 +592,7 @@ async fn handle_connection(
                             snapshot.record_count,
                             snapshot.bytes.len(),
                         ));
-                        snapshot.bytes
+                        ReliablePayload::Bytes(snapshot.bytes)
                     }) {
                         Ok(true) => {
                             last_reliable_background_tick = server_tick;
@@ -635,6 +645,16 @@ fn prepare_reliable_frame(framed: &mut Vec<u8>, payload: &[u8]) -> Result<()> {
     framed.extend_from_slice(&(payload.len() as u16).to_le_bytes());
     framed.extend_from_slice(payload);
     Ok(())
+}
+
+fn prepare_reliable_payload(framed: &mut Vec<u8>, payload: &ReliablePayload) -> Result<()> {
+    match payload {
+        ReliablePayload::Bytes(bytes) => prepare_reliable_frame(framed, bytes),
+        ReliablePayload::KillEvent(event) => {
+            let bytes = encode_kill_event(*event);
+            prepare_reliable_frame(framed, &bytes)
+        }
+    }
 }
 
 async fn send_reliable_frame(
@@ -721,6 +741,27 @@ fn encode_input_ack(processed_client_tick: u32, server_tick: u32, player_net_id:
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn reliable_kill_event_payload_reuses_frame_buffer_without_owned_byte_payload() {
+        let event = KillEventPacket {
+            sequence: 7,
+            killer: 11,
+            victim: 23,
+        };
+        let payload = ReliablePayload::KillEvent(event);
+        let mut framed = Vec::with_capacity(64);
+        let allocation = framed.as_ptr();
+        let capacity = framed.capacity();
+
+        prepare_reliable_payload(&mut framed, &payload).expect("kill event frame");
+
+        let encoded = encode_kill_event(event);
+        assert_eq!(framed.as_ptr(), allocation);
+        assert_eq!(framed.capacity(), capacity);
+        assert_eq!(&framed[..2], &(encoded.len() as u16).to_le_bytes());
+        assert_eq!(&framed[2..], encoded.as_slice());
+    }
 
     #[test]
     fn kill_event_cursor_lookup_spans_sequence_wrap() {
