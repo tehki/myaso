@@ -1678,6 +1678,58 @@ mod tests {
     }
 
     #[test]
+    fn planned_byte_composition_matches_encoder_sizing() {
+        let mut world = World::new(6000.0, 6000.0);
+        for (net_id, x, y) in [
+            (1, 1000.0, 1000.0),
+            (2, 1300.0, 1000.0),
+            (300, 1700.0, 1200.0),
+            (70_000, 2200.0, 1500.0),
+        ] {
+            assert!(world.add_player_at(net_id, x, y, 0.0));
+        }
+
+        let frame = ReplicationFrame::from_fighters(12, world.fighters());
+        let baseline = BTreeMap::new();
+        let last_sent_tick = HashMap::new();
+        let mut scratch = SnapshotPlannerScratch::default();
+        let plan = plan_records(
+            1,
+            frame.server_tick(),
+            &frame,
+            &baseline,
+            &last_sent_tick,
+            crate::CONSERVATIVE_DATAGRAM_BYTES,
+            &mut scratch,
+        );
+
+        let standalone = snapshot_byte_composition(&plan.records);
+        assert_eq!(plan.byte_composition, standalone);
+
+        let planned = encode_snapshot_current_with_planned_composition(
+            9,
+            u16::MAX,
+            frame.server_tick(),
+            true,
+            &plan.records,
+            crate::CONSERVATIVE_DATAGRAM_BYTES,
+            plan.byte_composition,
+        );
+        let regular = encode_snapshot_current(
+            9,
+            u16::MAX,
+            frame.server_tick(),
+            true,
+            &plan.records,
+            crate::CONSERVATIVE_DATAGRAM_BYTES,
+        );
+
+        assert_eq!(planned.composition, standalone);
+        assert_eq!(planned.composition.total_bytes(), planned.bytes.len());
+        assert_eq!(planned.bytes, regular);
+    }
+
+    #[test]
     fn hashed_last_sent_ticks_preserve_planner_results_across_insertion_order() {
         let mut world = World::new(6000.0, 6000.0);
         for (net_id, x, y) in [
