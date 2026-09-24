@@ -173,6 +173,9 @@ jobs:
       - name: Validate M89 recycled replication cell buckets
         run: cargo test --locked --manifest-path server/Cargo.toml replication_frame_refresh_reuses_cell_bucket_capacity
 
+      - name: Validate M90 reused reliable frame buffer
+        run: cargo test --locked --manifest-path server/Cargo.toml --bin myaso-server reliable_frame_buffer_
+
       - name: Validate real browser flight
         env:
           MYASO_FLIGHT_DURATION_MS: "4000"

@@ -411,7 +411,13 @@ async fn handle_connection(
     {
         bail!("reliable and realtime baseline sessions diverged");
     }
-    send_reliable_frame(&mut reliable_send, &initial_baseline.bytes).await?;
+    let mut reliable_frame_buffer = Vec::new();
+    send_reliable_frame(
+        &mut reliable_send,
+        &mut reliable_frame_buffer,
+        &initial_baseline.bytes,
+    )
+    .await?;
     let initial_baseline_sequence = initial_baseline.sequence;
     let mut acknowledged_snapshot = u16::MAX;
     let mut realtime_ready = false;
@@ -425,7 +431,7 @@ async fn handle_connection(
             if !reliable_write_delay.is_zero() {
                 tokio::time::sleep(reliable_write_delay).await;
             }
-            send_reliable_frame(&mut reliable_send, &payload).await?;
+            send_reliable_frame(&mut reliable_send, &mut reliable_frame_buffer, &payload).await?;
         }
         Ok::<(), anyhow::Error>(())
     });
@@ -618,15 +624,28 @@ async fn handle_connection(
     }
 }
 
-async fn send_reliable_frame(stream: &mut SendStream, payload: &[u8]) -> Result<()> {
+fn prepare_reliable_frame(framed: &mut Vec<u8>, payload: &[u8]) -> Result<()> {
     if payload.len() > u16::MAX as usize {
         bail!("reliable payload exceeds 65535-byte frame limit");
     }
-    let mut framed = Vec::with_capacity(2 + payload.len());
+    framed.clear();
+    let required = 2 + payload.len();
+    if framed.capacity() < required {
+        framed.reserve(required);
+    }
     framed.extend_from_slice(&(payload.len() as u16).to_le_bytes());
     framed.extend_from_slice(payload);
+    Ok(())
+}
+
+async fn send_reliable_frame(
+    stream: &mut SendStream,
+    framed: &mut Vec<u8>,
+    payload: &[u8],
+) -> Result<()> {
+    prepare_reliable_frame(framed, payload)?;
     stream
-        .write_all(&framed)
+        .write_all(framed)
         .await
         .context("write reliable frame")
 }
@@ -734,6 +753,35 @@ mod tests {
 
         assert_eq!(Arc::as_ptr(&state.replication_frame), unique_ptr);
         assert_eq!(state.replication_frame.server_tick(), state.world.tick);
+    }
+
+    #[test]
+    fn reliable_frame_buffer_reuses_capacity_without_changing_wire_bytes() {
+        let mut framed = Vec::new();
+        let first_payload = vec![0x5a; 64];
+        prepare_reliable_frame(&mut framed, &first_payload).expect("first frame");
+        assert_eq!(&framed[..2], &(64_u16).to_le_bytes());
+        assert_eq!(&framed[2..], first_payload.as_slice());
+
+        let allocation = framed.as_ptr();
+        let capacity = framed.capacity();
+        let second_payload = [1_u8, 2, 3, 4, 5];
+        prepare_reliable_frame(&mut framed, &second_payload).expect("second frame");
+
+        assert_eq!(framed.as_ptr(), allocation);
+        assert_eq!(framed.capacity(), capacity);
+        assert_eq!(&framed[..2], &(second_payload.len() as u16).to_le_bytes());
+        assert_eq!(&framed[2..], second_payload.as_slice());
+    }
+
+    #[test]
+    fn reliable_frame_buffer_rejects_oversized_payload() {
+        let mut framed = Vec::new();
+        let oversized = vec![0_u8; u16::MAX as usize + 1];
+        let error = prepare_reliable_frame(&mut framed, &oversized)
+            .expect_err("oversized reliable frame must be rejected");
+        assert!(error.to_string().contains("65535-byte frame limit"));
+        assert!(framed.is_empty());
     }
 
     #[test]
