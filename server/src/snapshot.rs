@@ -8,7 +8,9 @@ pub const SNAPSHOT_ENCODING_LEGACY_U32_IDS: u8 = 0;
 pub const SNAPSHOT_ENCODING_VARINT_IDS: u8 = 1;
 pub const SNAPSHOT_ENCODING_VARINT_IDS_U8_FACING: u8 = 2;
 pub const SNAPSHOT_ENCODING_VARINT_IDS_U8_FACING_U12_POSITION: u8 = 3;
-pub const SNAPSHOT_ENCODING_CURRENT: u8 = SNAPSHOT_ENCODING_VARINT_IDS_U8_FACING_U12_POSITION;
+pub const SNAPSHOT_ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_U12_POSITION: u8 = 4;
+pub const SNAPSHOT_ENCODING_CURRENT: u8 =
+    SNAPSHOT_ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_U12_POSITION;
 pub const SNAPSHOT_FLAG_FULL: u8 = 1;
 pub const SNAPSHOT_FIELD_POSITION: u8 = 1 << 0;
 pub const SNAPSHOT_FIELD_FACING: u8 = 1 << 1;
@@ -22,6 +24,9 @@ pub const WORLD_COORDINATE_SCALE: f32 = 4.0;
 pub const MAX_WORLD_COORDINATE: f32 = u16::MAX as f32 / WORLD_COORDINATE_SCALE;
 const COMPACT_POSITION_SHIFT: u32 = 3;
 const COMPACT_POSITION_MAX: u16 = (0x0fff_u16 << COMPACT_POSITION_SHIFT) + 3;
+const PACKED_RECORD_NET_ID_BITS: u16 = 10;
+const PACKED_RECORD_NET_ID_MASK: u16 = (1_u16 << PACKED_RECORD_NET_ID_BITS) - 1;
+const PACKED_RECORD_NET_ID_ESCAPE: u16 = PACKED_RECORD_NET_ID_MASK;
 pub const INTEREST_COMBAT_RADIUS: f32 = 420.0;
 pub const INTEREST_NEAR_RADIUS: f32 = 700.0;
 pub const INTEREST_MID_RADIUS: f32 = 1500.0;
@@ -1105,6 +1110,7 @@ fn encode_snapshot_with_composition(
             | SNAPSHOT_ENCODING_VARINT_IDS
             | SNAPSHOT_ENCODING_VARINT_IDS_U8_FACING
             | SNAPSHOT_ENCODING_VARINT_IDS_U8_FACING_U12_POSITION
+            | SNAPSHOT_ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_U12_POSITION
     ));
     let total_bytes = composition.total_bytes();
 
@@ -1119,19 +1125,23 @@ fn encode_snapshot_with_composition(
     bytes.extend_from_slice(&(records.len() as u16).to_le_bytes());
 
     for record in records {
-        match encoding {
-            SNAPSHOT_ENCODING_LEGACY_U32_IDS => {
-                bytes.extend_from_slice(&record.net_id.to_le_bytes())
-            }
-            SNAPSHOT_ENCODING_VARINT_IDS
-            | SNAPSHOT_ENCODING_VARINT_IDS_U8_FACING
-            | SNAPSHOT_ENCODING_VARINT_IDS_U8_FACING_U12_POSITION => {
-                encode_u32_varint(record.net_id, &mut bytes)
-            }
-            _ => unreachable!("encoding validated"),
-        }
         let wire_mask = encoded_record_mask(record, encoding);
-        bytes.push(wire_mask);
+        if uses_packed_record_header(encoding) {
+            encode_packed_record_header(record.net_id, wire_mask, &mut bytes);
+        } else {
+            match encoding {
+                SNAPSHOT_ENCODING_LEGACY_U32_IDS => {
+                    bytes.extend_from_slice(&record.net_id.to_le_bytes())
+                }
+                SNAPSHOT_ENCODING_VARINT_IDS
+                | SNAPSHOT_ENCODING_VARINT_IDS_U8_FACING
+                | SNAPSHOT_ENCODING_VARINT_IDS_U8_FACING_U12_POSITION => {
+                    encode_u32_varint(record.net_id, &mut bytes)
+                }
+                _ => unreachable!("encoding validated"),
+            }
+            bytes.push(wire_mask);
+        }
         encode_record_fields(record, wire_mask, &mut bytes, encoding);
     }
     debug_assert_eq!(bytes.len(), total_bytes);
@@ -1184,6 +1194,7 @@ pub fn decode_snapshot(bytes: &[u8]) -> Result<DecodedSnapshot, SnapshotDecodeEr
             | SNAPSHOT_ENCODING_VARINT_IDS
             | SNAPSHOT_ENCODING_VARINT_IDS_U8_FACING
             | SNAPSHOT_ENCODING_VARINT_IDS_U8_FACING_U12_POSITION
+            | SNAPSHOT_ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_U12_POSITION
     ) {
         return Err(SnapshotDecodeError::UnsupportedEncoding(encoding));
     }
@@ -1195,27 +1206,32 @@ pub fn decode_snapshot(bytes: &[u8]) -> Result<DecodedSnapshot, SnapshotDecodeEr
     let mut records = Vec::with_capacity(count);
 
     for _ in 0..count {
-        let net_id = match encoding {
-            SNAPSHOT_ENCODING_LEGACY_U32_IDS => {
-                require(bytes, offset, 4)?;
-                let value = u32::from_le_bytes(
-                    bytes[offset..offset + 4]
-                        .try_into()
-                        .expect("length checked"),
-                );
-                offset += 4;
-                value
-            }
-            SNAPSHOT_ENCODING_VARINT_IDS
-            | SNAPSHOT_ENCODING_VARINT_IDS_U8_FACING
-            | SNAPSHOT_ENCODING_VARINT_IDS_U8_FACING_U12_POSITION => {
-                decode_u32_varint(bytes, &mut offset)?
-            }
-            _ => unreachable!("encoding validated"),
+        let (net_id, mask) = if uses_packed_record_header(encoding) {
+            decode_packed_record_header(bytes, &mut offset)?
+        } else {
+            let net_id = match encoding {
+                SNAPSHOT_ENCODING_LEGACY_U32_IDS => {
+                    require(bytes, offset, 4)?;
+                    let value = u32::from_le_bytes(
+                        bytes[offset..offset + 4]
+                            .try_into()
+                            .expect("length checked"),
+                    );
+                    offset += 4;
+                    value
+                }
+                SNAPSHOT_ENCODING_VARINT_IDS
+                | SNAPSHOT_ENCODING_VARINT_IDS_U8_FACING
+                | SNAPSHOT_ENCODING_VARINT_IDS_U8_FACING_U12_POSITION => {
+                    decode_u32_varint(bytes, &mut offset)?
+                }
+                _ => unreachable!("encoding validated"),
+            };
+            require(bytes, offset, 1)?;
+            let mask = bytes[offset];
+            offset += 1;
+            (net_id, mask)
         };
-        require(bytes, offset, 1)?;
-        let mask = bytes[offset];
-        offset += 1;
         let mut record = SnapshotRecord {
             net_id,
             mask,
@@ -1323,16 +1339,22 @@ fn snapshot_record_composition_for_encoding(
     record: &SnapshotRecord,
     encoding: u8,
 ) -> SnapshotByteComposition {
-    let net_ids = match encoding {
-        SNAPSHOT_ENCODING_LEGACY_U32_IDS => 4,
+    let (net_ids, masks) = match encoding {
+        SNAPSHOT_ENCODING_LEGACY_U32_IDS => (4, 1),
         SNAPSHOT_ENCODING_VARINT_IDS
         | SNAPSHOT_ENCODING_VARINT_IDS_U8_FACING
-        | SNAPSHOT_ENCODING_VARINT_IDS_U8_FACING_U12_POSITION => u32_varint_bytes(record.net_id),
+        | SNAPSHOT_ENCODING_VARINT_IDS_U8_FACING_U12_POSITION => {
+            (u32_varint_bytes(record.net_id), 1)
+        }
+        SNAPSHOT_ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_U12_POSITION => {
+            let escaped = record.net_id >= u32::from(PACKED_RECORD_NET_ID_ESCAPE);
+            (1 + (escaped as usize) * u32_varint_bytes(record.net_id), 1)
+        }
         _ => unreachable!("encoding validated by caller"),
     };
     let mut composition = SnapshotByteComposition {
         net_ids,
-        masks: 1,
+        masks,
         ..SnapshotByteComposition::default()
     };
     if record.mask & SNAPSHOT_FIELD_REMOVED != 0 {
@@ -1403,7 +1425,11 @@ fn expand_compact_position_u12(value: u16) -> u16 {
 }
 
 fn uses_compact_position(encoding: u8) -> bool {
-    encoding == SNAPSHOT_ENCODING_VARINT_IDS_U8_FACING_U12_POSITION
+    matches!(
+        encoding,
+        SNAPSHOT_ENCODING_VARINT_IDS_U8_FACING_U12_POSITION
+            | SNAPSHOT_ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_U12_POSITION
+    )
 }
 
 fn uses_compact_facing(encoding: u8) -> bool {
@@ -1411,6 +1437,7 @@ fn uses_compact_facing(encoding: u8) -> bool {
         encoding,
         SNAPSHOT_ENCODING_VARINT_IDS_U8_FACING
             | SNAPSHOT_ENCODING_VARINT_IDS_U8_FACING_U12_POSITION
+            | SNAPSHOT_ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_U12_POSITION
     )
 }
 
@@ -1420,6 +1447,53 @@ fn facing_bytes_for_encoding(encoding: u8) -> usize {
     } else {
         2
     }
+}
+
+fn uses_packed_record_header(encoding: u8) -> bool {
+    encoding == SNAPSHOT_ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_U12_POSITION
+}
+
+fn compact_wire_mask(mask: u8) -> u8 {
+    (mask & 0x1f) | ((mask & SNAPSHOT_FIELD_REMOVED) >> 2)
+}
+
+fn expand_compact_wire_mask(mask: u8) -> u8 {
+    (mask & 0x1f) | ((mask & (1 << 5)) << 2)
+}
+
+fn encode_packed_record_header(net_id: u32, wire_mask: u8, bytes: &mut Vec<u8>) {
+    let inline_net_id = if net_id < u32::from(PACKED_RECORD_NET_ID_ESCAPE) {
+        net_id as u16
+    } else {
+        PACKED_RECORD_NET_ID_ESCAPE
+    };
+    let packed =
+        inline_net_id | (u16::from(compact_wire_mask(wire_mask)) << PACKED_RECORD_NET_ID_BITS);
+    bytes.extend_from_slice(&packed.to_le_bytes());
+    if inline_net_id == PACKED_RECORD_NET_ID_ESCAPE {
+        encode_u32_varint(net_id, bytes);
+    }
+}
+
+fn decode_packed_record_header(
+    bytes: &[u8],
+    offset: &mut usize,
+) -> Result<(u32, u8), SnapshotDecodeError> {
+    require(bytes, *offset, 2)?;
+    let packed = u16::from_le_bytes([bytes[*offset], bytes[*offset + 1]]);
+    *offset += 2;
+    let inline_net_id = packed & PACKED_RECORD_NET_ID_MASK;
+    let compact_mask = (packed >> PACKED_RECORD_NET_ID_BITS) as u8;
+    let net_id = if inline_net_id == PACKED_RECORD_NET_ID_ESCAPE {
+        let escaped = decode_u32_varint(bytes, offset)?;
+        if escaped < u32::from(PACKED_RECORD_NET_ID_ESCAPE) {
+            return Err(SnapshotDecodeError::InvalidVarint);
+        }
+        escaped
+    } else {
+        u32::from(inline_net_id)
+    };
+    Ok((net_id, expand_compact_wire_mask(compact_mask)))
 }
 
 fn compact_facing_u8(facing: u16) -> u8 {
@@ -1926,6 +2000,72 @@ mod tests {
         );
         assert_eq!(visible_state_bits.as_ptr(), allocation);
         assert_eq!(visible_state_bits.capacity(), capacity);
+    }
+
+    #[test]
+    fn packed_record_headers_roundtrip_inline_and_escaped_net_ids() {
+        let records = vec![
+            SnapshotRecord {
+                net_id: 200,
+                mask: SNAPSHOT_FULL_FIELDS,
+                x: 800,
+                y: 1600,
+                facing: 2570,
+                hp: 91,
+                guard: 73,
+                action: 2,
+                flags: 1,
+            },
+            SnapshotRecord {
+                net_id: 512,
+                mask: SNAPSHOT_FIELD_POSITION | SNAPSHOT_FIELD_FACING,
+                x: 2400,
+                y: 3200,
+                facing: 5140,
+                hp: 0,
+                guard: 0,
+                action: 0,
+                flags: 0,
+            },
+            SnapshotRecord::removed(70_000),
+        ];
+
+        let packed = encode_snapshot_with_encoding(
+            7,
+            6,
+            1234,
+            false,
+            &records,
+            crate::CONSERVATIVE_DATAGRAM_BYTES,
+            SNAPSHOT_ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_U12_POSITION,
+        );
+        let previous = encode_snapshot_with_encoding(
+            7,
+            6,
+            1234,
+            false,
+            &records,
+            crate::CONSERVATIVE_DATAGRAM_BYTES,
+            SNAPSHOT_ENCODING_VARINT_IDS_U8_FACING_U12_POSITION,
+        );
+
+        assert!(packed.bytes.len() < previous.bytes.len());
+        let decoded = decode_snapshot(&packed.bytes).expect("packed snapshot decodes");
+        assert_eq!(
+            decoded.encoding,
+            SNAPSHOT_ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_U12_POSITION
+        );
+        assert_eq!(decoded.records, records);
+
+        let wide_mask = SNAPSHOT_FULL_FIELDS | SNAPSHOT_FIELD_WIDE_POSITION;
+        assert_eq!(
+            expand_compact_wire_mask(compact_wire_mask(wide_mask)),
+            wide_mask
+        );
+        assert_eq!(
+            expand_compact_wire_mask(compact_wire_mask(SNAPSHOT_FIELD_REMOVED)),
+            SNAPSHOT_FIELD_REMOVED
+        );
     }
 
     #[test]

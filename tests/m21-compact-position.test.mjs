@@ -30,13 +30,14 @@ function fullRecord(overrides = {}) {
   };
 }
 
-test("M21 current encoding matches the compact-position fixture", () => {
+test("M21 encoding three matches the compact-position fixture", () => {
   const packet = encodeSnapshot({
     sequence: 7,
     baselineSequence: 6,
     serverTick: 1234,
     records: [fullRecord()],
     maxBytes: 1100,
+    encoding: SNAPSHOT_ENCODINGS.VARINT_IDS_U8_FACING_U12_POSITION,
   });
   assert.equal(Buffer.from(packet).toString("hex"), fixtureHex);
   assert.equal(packet.byteLength, 24);
@@ -83,13 +84,19 @@ test("M21 falls back to exact wide positions outside the default arena envelope"
 test("M21 browser hot path decodes packed positions in place", () => {
   const state = new Map();
   const result = applySnapshotPacketInPlace(state, fixture);
-  assert.equal(result.encoding, SNAPSHOT_ENCODINGS.CURRENT);
+  assert.equal(result.encoding, SNAPSHOT_ENCODINGS.VARINT_IDS_U8_FACING_U12_POSITION);
   assert.equal(state.get(1).x, 100);
   assert.equal(state.get(1).y, 200);
 });
 
 test("M21 rejects a wide-position marker without a position field", () => {
-  const packet = new Uint8Array(encodeSnapshot({ sequence: 1, serverTick: 1, records: [fullRecord({ mask: SNAPSHOT_FIELDS.FACING })], maxBytes: 1100 }));
+  const packet = new Uint8Array(encodeSnapshot({
+    sequence: 1,
+    serverTick: 1,
+    records: [fullRecord({ mask: SNAPSHOT_FIELDS.FACING })],
+    maxBytes: 1100,
+    encoding: SNAPSHOT_ENCODINGS.VARINT_IDS_U8_FACING_U12_POSITION,
+  }));
   packet[15] |= SNAPSHOT_FIELDS.WIDE_POSITION;
   assert.throws(() => decodeSnapshot(packet), /invalid compact-position marker/);
   assert.throws(() => applySnapshotPacketInPlace(new Map(), packet), /invalid compact-position marker/);

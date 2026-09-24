@@ -5,7 +5,8 @@ const ENCODING_LEGACY_U32_IDS = 0;
 const ENCODING_VARINT_IDS = 1;
 const ENCODING_VARINT_IDS_U8_FACING = 2;
 const ENCODING_VARINT_IDS_U8_FACING_U12_POSITION = 3;
-const CURRENT_ENCODING = ENCODING_VARINT_IDS_U8_FACING_U12_POSITION;
+const ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_U12_POSITION = 4;
+const CURRENT_ENCODING = ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_U12_POSITION;
 const FIELD_POSITION = 1 << 0;
 const FIELD_FACING = 1 << 1;
 const FIELD_VITALS = 1 << 2;
@@ -13,6 +14,9 @@ const FIELD_ACTION = 1 << 3;
 const FIELD_WIDE_POSITION = 1 << 4;
 const FIELD_REMOVED = 1 << 7;
 const FULL_FIELDS = FIELD_POSITION | FIELD_FACING | FIELD_VITALS | FIELD_ACTION;
+const PACKED_RECORD_NET_ID_BITS = 10;
+const PACKED_RECORD_NET_ID_MASK = (1 << PACKED_RECORD_NET_ID_BITS) - 1;
+const PACKED_RECORD_NET_ID_ESCAPE = PACKED_RECORD_NET_ID_MASK;
 
 const ACTION_TO_CODE = new Map([
   ["idle", 0],
@@ -117,14 +121,18 @@ export function encodeSnapshot({
   for (const record of records) {
     assertNetId(record.netId);
     const mask = snapshotWireMask(record, encoding);
-    if (encoding === ENCODING_LEGACY_U32_IDS) {
-      view.setUint32(offset, record.netId >>> 0, true);
-      offset += 4;
+    if (usesPackedRecordHeader(encoding)) {
+      offset = writePackedRecordHeader(view, offset, record.netId >>> 0, mask);
     } else {
-      offset = writeUint32Varint(view, offset, record.netId >>> 0);
+      if (encoding === ENCODING_LEGACY_U32_IDS) {
+        view.setUint32(offset, record.netId >>> 0, true);
+        offset += 4;
+      } else {
+        offset = writeUint32Varint(view, offset, record.netId >>> 0);
+      }
+      view.setUint8(offset, mask);
+      offset += 1;
     }
-    view.setUint8(offset, mask);
-    offset += 1;
     if (mask & FIELD_REMOVED) continue;
     if (mask & FIELD_POSITION) {
       if (usesCompactPosition(encoding) && !(mask & FIELD_WIDE_POSITION)) {
@@ -170,18 +178,26 @@ export function decodeSnapshot(buffer) {
   let offset = HEADER_BYTES;
   for (let index = 0; index < count; index += 1) {
     let netId;
-    if (encoding === ENCODING_LEGACY_U32_IDS) {
-      requireBytes(view, offset, 4);
-      netId = view.getUint32(offset, true);
-      offset += 4;
-    } else {
-      const decoded = readUint32Varint(view, offset);
-      netId = decoded.value;
+    let mask;
+    if (usesPackedRecordHeader(encoding)) {
+      const decoded = readPackedRecordHeader(view, offset);
+      netId = decoded.netId;
+      mask = decoded.mask;
       offset = decoded.offset;
+    } else {
+      if (encoding === ENCODING_LEGACY_U32_IDS) {
+        requireBytes(view, offset, 4);
+        netId = view.getUint32(offset, true);
+        offset += 4;
+      } else {
+        const decoded = readUint32Varint(view, offset);
+        netId = decoded.value;
+        offset = decoded.offset;
+      }
+      requireBytes(view, offset, 1);
+      mask = view.getUint8(offset);
+      offset += 1;
     }
-    requireBytes(view, offset, 1);
-    const mask = view.getUint8(offset);
-    offset += 1;
     const record = { netId, mask };
     const widePosition = Boolean(mask & FIELD_WIDE_POSITION);
     if (widePosition && (!usesCompactPosition(encoding) || !(mask & FIELD_POSITION))) throw new RangeError("invalid compact-position marker");
@@ -267,7 +283,12 @@ export function dequantizeEntity(state) {
 export function snapshotRecordBytes(record, encoding = CURRENT_ENCODING) {
   assertSnapshotEncoding(encoding);
   const mask = record.mask ?? FULL_FIELDS;
-  let bytes = snapshotNetIdBytes(record.netId, encoding) + 1;
+  let bytes;
+  if (usesPackedRecordHeader(encoding)) {
+    bytes = 2 + (record.netId >= PACKED_RECORD_NET_ID_ESCAPE ? uint32VarintBytes(record.netId) : 0);
+  } else {
+    bytes = snapshotNetIdBytes(record.netId, encoding) + 1;
+  }
   if (mask & FIELD_REMOVED) return bytes;
   if (mask & FIELD_POSITION) bytes += positionBytesForRecord(record, encoding);
   if (mask & FIELD_FACING) bytes += facingBytesForEncoding(encoding);
@@ -281,6 +302,7 @@ export const SNAPSHOT_ENCODINGS = Object.freeze({
   VARINT_IDS: ENCODING_VARINT_IDS,
   VARINT_IDS_U8_FACING: ENCODING_VARINT_IDS_U8_FACING,
   VARINT_IDS_U8_FACING_U12_POSITION: ENCODING_VARINT_IDS_U8_FACING_U12_POSITION,
+  PACKED_U10_IDS_U6_MASK_U8_FACING_U12_POSITION: ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_U12_POSITION,
   CURRENT: CURRENT_ENCODING,
 });
 
@@ -339,6 +361,10 @@ function encodeAction(action) {
 function snapshotNetIdBytes(netId, encoding) {
   assertNetId(netId);
   if (encoding === ENCODING_LEGACY_U32_IDS) return 4;
+  return uint32VarintBytes(netId);
+}
+
+function uint32VarintBytes(netId) {
   let value = netId >>> 0;
   let bytes = 1;
   while (value >= 0x80) {
@@ -358,6 +384,39 @@ function writeUint32Varint(view, offset, value) {
     offset += 1;
   } while (nextValue !== 0);
   return offset;
+}
+
+function compactWireMask(mask) {
+  return (mask & 0x0f) | (mask & FIELD_WIDE_POSITION) | ((mask & FIELD_REMOVED) >>> 2);
+}
+
+function expandCompactWireMask(mask) {
+  return (mask & 0x0f) | (mask & (1 << 4)) | ((mask & (1 << 5)) << 2);
+}
+
+function writePackedRecordHeader(view, offset, netId, mask) {
+  const inlineNetId = netId < PACKED_RECORD_NET_ID_ESCAPE ? netId : PACKED_RECORD_NET_ID_ESCAPE;
+  const packed = inlineNetId | (compactWireMask(mask) << PACKED_RECORD_NET_ID_BITS);
+  view.setUint16(offset, packed, true);
+  offset += 2;
+  if (inlineNetId === PACKED_RECORD_NET_ID_ESCAPE) {
+    offset = writeUint32Varint(view, offset, netId);
+  }
+  return offset;
+}
+
+function readPackedRecordHeader(view, offset) {
+  requireBytes(view, offset, 2);
+  const packed = view.getUint16(offset, true);
+  offset += 2;
+  const inlineNetId = packed & PACKED_RECORD_NET_ID_MASK;
+  const mask = expandCompactWireMask(packed >>> PACKED_RECORD_NET_ID_BITS);
+  if (inlineNetId !== PACKED_RECORD_NET_ID_ESCAPE) {
+    return { netId: inlineNetId, mask, offset };
+  }
+  const decoded = readUint32Varint(view, offset);
+  if (decoded.value < PACKED_RECORD_NET_ID_ESCAPE) throw new RangeError("non-canonical packed snapshot netId");
+  return { netId: decoded.value, mask, offset: decoded.offset };
 }
 
 function readUint32Varint(view, offset) {
@@ -383,7 +442,8 @@ function assertSnapshotEncoding(encoding) {
   if (encoding !== ENCODING_LEGACY_U32_IDS
     && encoding !== ENCODING_VARINT_IDS
     && encoding !== ENCODING_VARINT_IDS_U8_FACING
-    && encoding !== ENCODING_VARINT_IDS_U8_FACING_U12_POSITION) {
+    && encoding !== ENCODING_VARINT_IDS_U8_FACING_U12_POSITION
+    && encoding !== ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_U12_POSITION) {
     throw new RangeError(`unsupported snapshot encoding ${encoding}`);
   }
 }
@@ -400,8 +460,18 @@ function writeCompactPosition(view, offset, x, y) {
   const packed = packedX | (packedY << 12);
   view.setUint8(offset, packed & 0xff); view.setUint8(offset + 1, (packed >>> 8) & 0xff); view.setUint8(offset + 2, (packed >>> 16) & 0xff); return offset + 3;
 }
-function usesCompactPosition(encoding) { return encoding === ENCODING_VARINT_IDS_U8_FACING_U12_POSITION; }
-function usesCompactFacing(encoding) { return encoding === ENCODING_VARINT_IDS_U8_FACING || encoding === ENCODING_VARINT_IDS_U8_FACING_U12_POSITION; }
+function usesCompactPosition(encoding) {
+  return encoding === ENCODING_VARINT_IDS_U8_FACING_U12_POSITION
+    || encoding === ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_U12_POSITION;
+}
+function usesCompactFacing(encoding) {
+  return encoding === ENCODING_VARINT_IDS_U8_FACING
+    || encoding === ENCODING_VARINT_IDS_U8_FACING_U12_POSITION
+    || encoding === ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_U12_POSITION;
+}
+function usesPackedRecordHeader(encoding) {
+  return encoding === ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_U12_POSITION;
+}
 
 function facingBytesForEncoding(encoding) {
   return usesCompactFacing(encoding) ? 1 : 2;

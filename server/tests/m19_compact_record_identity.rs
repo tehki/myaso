@@ -1,7 +1,6 @@
 use myaso_server::snapshot::{
-    decode_snapshot, encode_snapshot_current, SnapshotDecodeError, SnapshotRecord,
-    SNAPSHOT_ENCODING_VARINT_IDS, SNAPSHOT_FIELD_REMOVED, SNAPSHOT_HEADER_BYTES,
-    SNAPSHOT_PACKET_TYPE,
+    decode_snapshot, SnapshotDecodeError, SnapshotRecord, SNAPSHOT_ENCODING_VARINT_IDS,
+    SNAPSHOT_FIELD_REMOVED, SNAPSHOT_HEADER_BYTES, SNAPSHOT_PACKET_TYPE,
 };
 
 fn record(net_id: u32, mask: u8) -> SnapshotRecord {
@@ -45,7 +44,29 @@ fn compact_encoding_round_trips_uint32_varint_boundaries() {
         .into_iter()
         .map(|net_id| record(net_id, SNAPSHOT_FIELD_REMOVED))
         .collect();
-    let encoded = encode_snapshot_current(9, 8, 456, false, &records, 1100);
+    let mut encoded = vec![0; SNAPSHOT_HEADER_BYTES];
+    encoded[0] = myaso_server::PROTOCOL_VERSION;
+    encoded[1] = SNAPSHOT_PACKET_TYPE;
+    encoded[3] = SNAPSHOT_ENCODING_VARINT_IDS;
+    encoded[4..6].copy_from_slice(&9_u16.to_le_bytes());
+    encoded[6..8].copy_from_slice(&8_u16.to_le_bytes());
+    encoded[8..12].copy_from_slice(&456_u32.to_le_bytes());
+    encoded[12..14].copy_from_slice(&(records.len() as u16).to_le_bytes());
+    for record in &records {
+        let mut value = record.net_id;
+        loop {
+            let mut byte = (value & 0x7f) as u8;
+            value >>= 7;
+            if value != 0 {
+                byte |= 0x80;
+            }
+            encoded.push(byte);
+            if value == 0 {
+                break;
+            }
+        }
+        encoded.push(record.mask);
+    }
     assert_eq!(encoded.len(), 39);
 
     let decoded = decode_snapshot(&encoded).expect("boundary packet must decode");

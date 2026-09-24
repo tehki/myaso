@@ -13,6 +13,8 @@ import {
   dequantizeEntity,
   encodeSnapshot,
   quantizeEntity,
+  SNAPSHOT_ENCODINGS,
+  SNAPSHOT_FIELDS,
 } from "../src/network/snapshot-codec.mjs";
 import { isSequenceNewer16, sequenceDistance16 } from "../src/network/sequence.mjs";
 
@@ -95,6 +97,55 @@ test("snapshot delta encodes only changed fields and removals", () => {
   assert.equal(fighter.hp, 66);
   assert.equal(fighter.action, "attack_windup");
   assert.ok(Math.abs(fighter.x - 101) <= 1);
+});
+
+test("packed snapshot record headers shrink 512-range IDs and preserve escaped IDs", () => {
+  const records = [
+    {
+      netId: 200,
+      mask: SNAPSHOT_FIELDS.FULL,
+      x: 800,
+      y: 1600,
+      facing: 2570,
+      hp: 91,
+      guard: 73,
+      action: 2,
+      flags: 1,
+    },
+    {
+      netId: 512,
+      mask: SNAPSHOT_FIELDS.POSITION | SNAPSHOT_FIELDS.FACING,
+      x: 2400,
+      y: 3200,
+      facing: 5140,
+    },
+    { netId: 70_000, mask: SNAPSHOT_FIELDS.REMOVED },
+  ];
+
+  const packed = encodeSnapshot({
+    sequence: 7,
+    baselineSequence: 6,
+    serverTick: 1234,
+    records,
+    maxBytes: 1100,
+    encoding: SNAPSHOT_ENCODINGS.PACKED_U10_IDS_U6_MASK_U8_FACING_U12_POSITION,
+  });
+  const previous = encodeSnapshot({
+    sequence: 7,
+    baselineSequence: 6,
+    serverTick: 1234,
+    records,
+    maxBytes: 1100,
+    encoding: SNAPSHOT_ENCODINGS.VARINT_IDS_U8_FACING_U12_POSITION,
+  });
+
+  assert.ok(packed.byteLength < previous.byteLength);
+  const decoded = decodeSnapshot(packed);
+  assert.equal(
+    decoded.encoding,
+    SNAPSHOT_ENCODINGS.PACKED_U10_IDS_U6_MASK_U8_FACING_U12_POSITION,
+  );
+  assert.deepEqual(decoded.records, records);
 });
 
 test("snapshot encoder refuses to fragment beyond the datagram budget", () => {
