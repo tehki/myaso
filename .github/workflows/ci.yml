@@ -167,6 +167,9 @@ jobs:
       - name: Validate M87 preallocated replication cells
         run: cargo test --locked --manifest-path server/Cargo.toml replication_frame_preallocates_cell_index_capacity
 
+      - name: Validate M88 reused replication frame
+        run: cargo test --locked --manifest-path server/Cargo.toml --bin myaso-server replication_frame_refresh_reuses_unique_arc_without_mutating_shared_snapshot
+
       - name: Validate real browser flight
         env:
           MYASO_FLIGHT_DURATION_MS: "4000"
