@@ -1415,7 +1415,9 @@ mod tests {
         assert_eq!(reused.cells_visited, public.cells_visited);
 
         reused_states.push(viewer);
-        assert!(frame.query_interest_into(u32::MAX, &mut reused_states).is_none());
+        assert!(frame
+            .query_interest_into(u32::MAX, &mut reused_states)
+            .is_none());
         assert!(reused_states.is_empty());
     }
 
