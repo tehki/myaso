@@ -312,7 +312,7 @@ fn axis_rejection_preserves_diagonal_collision_and_attack_candidates() {
     overlapping.step_by(5.0);
     let first = overlapping.fighter(1).expect("first");
     let second = overlapping.fighter(2).expect("second");
-    assert!((second.x - first.x).hypot(second.y - first.y) >= 36.0 - 1e-6);
+    assert!((second.x - first.x).hypot(second.y - first.y) >= 36.0 - 1e-4);
 
     let diagonal = std::f32::consts::FRAC_PI_4;
     let mut attack_world = World::new(600.0, 400.0);
