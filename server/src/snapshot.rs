@@ -2841,14 +2841,17 @@ mod tests {
             .collect();
         let mut changed_frame = baseline_frame.clone();
         changed_frame.server_tick = 60;
-        for state in changed_frame.states.iter_mut().filter(|state| state.net_id != 1) {
+        for state in changed_frame
+            .states
+            .iter_mut()
+            .filter(|state| state.net_id != 1)
+        {
             state.facing = state.facing.wrapping_add(257);
         }
 
-        let seed_last_sent: HashMap<_, _> =
-            [(2_u32, 54_u32), (3, 30), (4, 27), (5, 48)]
-                .into_iter()
-                .collect();
+        let seed_last_sent: HashMap<_, _> = [(2_u32, 54_u32), (3, 30), (4, 27), (5, 48)]
+            .into_iter()
+            .collect();
 
         let mut full_last_sent = seed_last_sent.clone();
         let mut full_scratch = SnapshotPlannerScratch::default();
@@ -2888,7 +2891,9 @@ mod tests {
             expected
         );
         assert!(rotated.iter().any(|planned| planned.age_ticks < mid_budget));
-        assert!(rotated.iter().any(|planned| planned.age_ticks >= mid_budget));
+        assert!(rotated
+            .iter()
+            .any(|planned| planned.age_ticks >= mid_budget));
 
         let first_record = full_plan.records[0];
         let max_bytes = SNAPSHOT_HEADER_BYTES + snapshot_record_bytes(&first_record);
