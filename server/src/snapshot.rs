@@ -225,27 +225,39 @@ pub struct ReplicationFrame {
 
 impl ReplicationFrame {
     pub fn from_fighters(server_tick: u32, fighters: &[Fighter]) -> Self {
-        let mut states = Vec::with_capacity(fighters.len());
-        let mut cells: HashMap<(i32, i32), Vec<usize>> = HashMap::with_capacity(fighters.len());
+        let mut frame = Self {
+            server_tick,
+            states: Vec::with_capacity(fighters.len()),
+            cells: HashMap::with_capacity(fighters.len()),
+        };
+        frame.refresh_from_fighters(server_tick, fighters);
+        frame
+    }
+
+    pub fn refresh_from_fighters(&mut self, server_tick: u32, fighters: &[Fighter]) {
+        self.server_tick = server_tick;
+        self.states.clear();
+        self.cells.clear();
+        if self.states.capacity() < fighters.len() {
+            self.states.reserve(fighters.len());
+        }
+        if self.cells.capacity() < fighters.len() {
+            self.cells.reserve(fighters.len());
+        }
         for fighter in fighters {
             let state = WireEntity::from_fighter(fighter);
             debug_assert!(
-                states
+                self.states
                     .last()
                     .is_none_or(|previous: &WireEntity| previous.net_id < state.net_id),
                 "fighters must remain sorted by authoritative network ID"
             );
-            let state_index = states.len();
-            states.push(state);
-            cells
+            let state_index = self.states.len();
+            self.states.push(state);
+            self.cells
                 .entry(replication_cell(state))
                 .or_default()
                 .push(state_index);
-        }
-        Self {
-            server_tick,
-            states,
-            cells,
         }
     }
 

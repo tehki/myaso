@@ -99,10 +99,14 @@ impl GameState {
     }
 
     fn refresh_replication_frame(&mut self) {
-        self.replication_frame = Arc::new(ReplicationFrame::from_fighters(
-            self.world.tick,
-            self.world.fighters(),
-        ));
+        if let Some(frame) = Arc::get_mut(&mut self.replication_frame) {
+            frame.refresh_from_fighters(self.world.tick, self.world.fighters());
+        } else {
+            self.replication_frame = Arc::new(ReplicationFrame::from_fighters(
+                self.world.tick,
+                self.world.fighters(),
+            ));
+        }
     }
 
     fn record_combat_events(&mut self, events: &[CombatEvent]) {
@@ -699,6 +703,38 @@ fn encode_input_ack(processed_client_tick: u32, server_tick: u32, player_net_id:
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn replication_frame_refresh_reuses_unique_arc_without_mutating_shared_snapshot() {
+        let mut state = GameState::new(0, 0);
+        assert!(state.world.add_player_at(1, 100.0, 100.0, 0.0));
+
+        let initial_ptr = Arc::as_ptr(&state.replication_frame);
+        state.refresh_replication_frame();
+        assert_eq!(Arc::as_ptr(&state.replication_frame), initial_ptr);
+        assert_eq!(state.replication_frame.server_tick(), state.world.tick);
+        assert_eq!(state.replication_frame.len(), 1);
+
+        let shared = Arc::clone(&state.replication_frame);
+        let shared_ptr = Arc::as_ptr(&shared);
+        let shared_tick = shared.server_tick();
+        state.world.step();
+        state.refresh_replication_frame();
+
+        assert_ne!(Arc::as_ptr(&state.replication_frame), shared_ptr);
+        assert_eq!(shared.server_tick(), shared_tick);
+        assert_eq!(shared.len(), 1);
+        assert_eq!(state.replication_frame.server_tick(), state.world.tick);
+        assert_eq!(state.replication_frame.len(), 1);
+
+        drop(shared);
+        let unique_ptr = Arc::as_ptr(&state.replication_frame);
+        state.world.step();
+        state.refresh_replication_frame();
+
+        assert_eq!(Arc::as_ptr(&state.replication_frame), unique_ptr);
+        assert_eq!(state.replication_frame.server_tick(), state.world.tick);
+    }
 
     #[test]
     fn input_state_access_applies_and_reads_tick_in_one_scope() {

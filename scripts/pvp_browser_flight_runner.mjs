@@ -1205,7 +1205,13 @@ async function runOnlineUiThreatAwarenessFlight(entries, requireBearing = false)
   await waitForUiThreePlayerReady(entries, ids, 2500);
   await Promise.all(entries.map((entry) => execute(entry.base, entry.sessionId, "document.querySelector('#arena').focus(); return document.activeElement?.id;")));
   const leftArena = await resolveArenaElement(left, `${milestone} threat attacker`);
-  await pulseMovementKey(left, "d", 120);
+  // Authoritative spawns are 96 units apart while attack reach plus fighter radius is 94.
+  // Mirror the proven multi-threat staging: establish the real rightward aim, move well
+  // inside reach, then let the released movement/facing sample propagate before attacking.
+  await aimArena(left, leftArena, 200);
+  await sleep(60);
+  await pulseMovementKey(left, "d", 260);
+  await sleep(60);
 
   const leftId = ordered[0].playerNetId;
   let evidence = null;
@@ -1311,7 +1317,30 @@ async function runOnlineUiMultiThreatFlight(entries, requireSecondary = false, r
       performArenaAttackBurst(right),
     ]);
     await sleep(240);
-    const states = await Promise.all(entries.map(readUiEvidence));
+    let states = await Promise.all(entries.map(readUiEvidence));
+    if (requireSecondaryPhase) {
+      // A secondary WINDUP transition can arrive one browser sample before STRIKE under
+      // headless runner jitter. Once simultaneous-threat evidence exists, allow only a
+      // short bounded observation window for the already-committed STRIKE transition.
+      const phaseDeadline = Date.now() + 320;
+      while (true) {
+        const centerSample = states.find((entry) => entry.browser === center.name);
+        const phaseEvents = centerSample?.threatTransitions.filter((event) => {
+          if (!event.visible || event.count !== "2 THREATS") return false;
+          const eventPrimaryIsLeft = event.label === `#${leftId}`;
+          const eventPrimaryIsRight = event.label === `#${rightId}`;
+          if (!eventPrimaryIsLeft && !eventPrimaryIsRight) return false;
+          const expectedSecondary = eventPrimaryIsLeft ? `NEXT #${rightId}` : `NEXT #${leftId}`;
+          return event.secondary === expectedSecondary;
+        }) ?? [];
+        const phases = new Set(phaseEvents.map((event) => event.secondaryPhase).filter(Boolean));
+        if (phaseEvents.length === 0 || (phases.has("WINDUP") && phases.has("STRIKE")) || Date.now() >= phaseDeadline) {
+          break;
+        }
+        await sleep(40);
+        states = await Promise.all(entries.map(readUiEvidence));
+      }
+    }
     const leftState = states.find((entry) => entry.browser === left.name);
     const centerState = states.find((entry) => entry.browser === center.name);
     const rightState = states.find((entry) => entry.browser === right.name);
