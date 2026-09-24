@@ -322,9 +322,18 @@ impl ReplicationFrame {
         let mut candidates_checked = 0_usize;
         let mut cells_visited = 0_usize;
 
+        let far_wire_i32 = far_wire as i32;
         for cell_y in center.1 - span..=center.1 + span {
             for cell_x in center.0 - span..=center.0 + span {
                 cells_visited += 1;
+                if !interest_cell_intersects_far_radius(
+                    viewer,
+                    (cell_x, cell_y),
+                    cell_wire,
+                    far_wire_i32,
+                ) {
+                    continue;
+                }
                 let Some(cell) = self.cells.get(&(cell_x, cell_y)) else {
                     continue;
                 };
@@ -1412,6 +1421,38 @@ fn replication_cell(state: WireEntity) -> (i32, i32) {
     (state.x as i32 / cell_wire, state.y as i32 / cell_wire)
 }
 
+fn interest_cell_intersects_far_radius(
+    viewer: WireEntity,
+    cell: (i32, i32),
+    cell_wire: i32,
+    far_wire: i32,
+) -> bool {
+    fn axis_distance_to_cell(coordinate: i32, cell_index: i32, cell_wire: i32) -> i32 {
+        let cell_min = cell_index * cell_wire;
+        let cell_max = cell_min + cell_wire - 1;
+        if coordinate < cell_min {
+            cell_min - coordinate
+        } else if coordinate > cell_max {
+            coordinate - cell_max
+        } else {
+            0
+        }
+    }
+
+    let dx = i64::from(axis_distance_to_cell(
+        i32::from(viewer.x),
+        cell.0,
+        cell_wire,
+    ));
+    let dy = i64::from(axis_distance_to_cell(
+        i32::from(viewer.y),
+        cell.1,
+        cell_wire,
+    ));
+    let radius = i64::from(far_wire);
+    dx * dx + dy * dy <= radius * radius
+}
+
 fn interest_distance_sq(viewer: WireEntity, candidate: WireEntity) -> f32 {
     let dx = (candidate.x as f32 - viewer.x as f32) / WORLD_COORDINATE_SCALE;
     let dy = (candidate.y as f32 - viewer.y as f32) / WORLD_COORDINATE_SCALE;
@@ -1608,9 +1649,18 @@ mod tests {
         let mut expected_states = Vec::new();
         let mut expected_candidates = 0_usize;
         let mut expected_cells = 0_usize;
+        let far_wire_i32 = far_wire as i32;
         for cell_y in center.1 - span..=center.1 + span {
             for cell_x in center.0 - span..=center.0 + span {
                 expected_cells += 1;
+                if !interest_cell_intersects_far_radius(
+                    viewer,
+                    (cell_x, cell_y),
+                    cell_wire,
+                    far_wire_i32,
+                ) {
+                    continue;
+                }
                 let Some(cell) = legacy_cells.get(&(cell_x, cell_y)) else {
                     continue;
                 };
@@ -1630,6 +1680,59 @@ mod tests {
         assert_eq!(actual.states, expected_states);
         assert_eq!(actual.candidates_checked, expected_candidates);
         assert_eq!(actual.cells_visited, expected_cells);
+    }
+
+    #[test]
+    fn pruned_interest_cells_preserve_visibility_and_reduce_candidates() {
+        let mut world = World::new(8192.0, 8192.0);
+        for (net_id, x, y) in [
+            (1, 3328.0, 3328.0),
+            (2, 3500.0, 3400.0),
+            (3, 5820.0, 3328.0),
+            (4, 5700.0, 5700.0),
+            (5, 5750.0, 5750.0),
+            (6, 900.0, 900.0),
+        ] {
+            assert!(world.add_player_at(net_id, x, y, 0.0));
+        }
+
+        let frame = ReplicationFrame::from_fighters(world.tick, world.fighters());
+        let viewer = frame.get(1).expect("viewer exists");
+        let center = replication_cell(viewer);
+        let cell_wire = replication_cell_wire();
+        let far_wire = INTEREST_FAR_RADIUS * WORLD_COORDINATE_SCALE;
+        let span = (far_wire / cell_wire as f32).ceil() as i32;
+
+        let mut expected_states = Vec::new();
+        let mut unpruned_candidates = 0_usize;
+        let mut expected_cells = 0_usize;
+        for cell_y in center.1 - span..=center.1 + span {
+            for cell_x in center.0 - span..=center.0 + span {
+                expected_cells += 1;
+                let Some(cell) = frame.cells.get(&(cell_x, cell_y)) else {
+                    continue;
+                };
+                for state_index in cell.iter().copied() {
+                    unpruned_candidates += 1;
+                    let state = frame.states[state_index];
+                    if interest_distance_sq(viewer, state)
+                        <= INTEREST_FAR_RADIUS * INTEREST_FAR_RADIUS
+                    {
+                        expected_states.push(state);
+                    }
+                }
+            }
+        }
+
+        let actual = frame.query_interest(1).expect("viewer exists");
+        assert_eq!(actual.states, expected_states);
+        assert_eq!(actual.cells_visited, expected_cells);
+        assert!(
+            actual.candidates_checked < unpruned_candidates,
+            "corner-cell pruning should reduce candidate checks"
+        );
+        assert!(actual.states.iter().any(|state| state.net_id == 3));
+        assert!(actual.states.iter().all(|state| !matches!(state.net_id, 4 | 5 | 6)));
     }
 
     #[test]
