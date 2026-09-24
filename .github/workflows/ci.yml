@@ -221,6 +221,9 @@ jobs:
           cargo test --locked --manifest-path server/Cargo.toml compact_action_flags_roundtrip_common_and_wide_values
           node --test --test-name-pattern="compact snapshot action flags" tests/networking.test.mjs
 
+      - name: Validate M104 deadline-aware mid admission
+        run: cargo test --locked --manifest-path server/Cargo.toml deadline_due_mid_records_precede_rotating_fresh_mid_under_budget
+
       - name: Validate real browser flight
         env:
           MYASO_FLIGHT_DURATION_MS: "4000"
