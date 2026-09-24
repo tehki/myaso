@@ -388,6 +388,18 @@ impl SnapshotSession {
         }
     }
 
+    fn take_next_sequence(&mut self) -> u16 {
+        if self.next_sequence == u16::MAX {
+            self.next_sequence = 0;
+        }
+        let sequence = self.next_sequence;
+        self.next_sequence = self.next_sequence.wrapping_add(1);
+        if self.next_sequence == u16::MAX {
+            self.next_sequence = 0;
+        }
+        sequence
+    }
+
     pub fn build(
         &mut self,
         ack_snapshot_sequence: u16,
@@ -432,8 +444,7 @@ impl SnapshotSession {
             max_bytes,
             &mut self.planner_scratch,
         );
-        let sequence = self.next_sequence;
-        self.next_sequence = self.next_sequence.wrapping_add(1);
+        let sequence = self.take_next_sequence();
         let encoded = encode_snapshot_current_with_planned_composition(
             sequence,
             baseline_sequence,
@@ -1610,6 +1621,48 @@ mod tests {
         assert_eq!(actual.states, expected_states);
         assert_eq!(actual.candidates_checked, expected_candidates);
         assert_eq!(actual.cells_visited, expected_cells);
+    }
+
+    #[test]
+    fn snapshot_sequence_wrap_skips_reserved_no_ack_sentinel() {
+        let mut world = World::new(1200.0, 800.0);
+        assert!(world.add_player_at(1, 400.0, 300.0, 0.0));
+
+        let frame = ReplicationFrame::from_fighters(world.tick, world.fighters());
+        let mut session = SnapshotSession::new(8);
+        session.next_sequence = u16::MAX - 1;
+
+        let before_wrap =
+            session.build_from_frame(u16::MAX, 1, &frame, crate::CONSERVATIVE_DATAGRAM_BYTES);
+        assert_eq!(before_wrap.sequence, u16::MAX - 1);
+        assert_eq!(before_wrap.baseline_sequence, u16::MAX);
+        assert!(before_wrap.full);
+
+        let after_wrap = session.build_from_frame(
+            before_wrap.sequence,
+            1,
+            &frame,
+            crate::CONSERVATIVE_DATAGRAM_BYTES,
+        );
+        assert_eq!(after_wrap.sequence, 0);
+        assert_eq!(after_wrap.baseline_sequence, before_wrap.sequence);
+        assert!(!after_wrap.full);
+
+        let next = session.build_from_frame(
+            after_wrap.sequence,
+            1,
+            &frame,
+            crate::CONSERVATIVE_DATAGRAM_BYTES,
+        );
+        assert_eq!(next.sequence, 1);
+        assert_eq!(next.baseline_sequence, after_wrap.sequence);
+        assert!(!next.full);
+
+        for sequence in [before_wrap.sequence, after_wrap.sequence, next.sequence] {
+            assert_ne!(sequence, u16::MAX);
+        }
+        assert!(session.has_sequence(after_wrap.sequence));
+        assert!(session.has_sequence(next.sequence));
     }
 
     #[test]
