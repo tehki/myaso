@@ -333,7 +333,7 @@ pub struct SnapshotSession {
     history: VecDeque<SnapshotHistoryEntry>,
     acknowledged_sequence: Option<u16>,
     acknowledged_state: BTreeMap<u32, WireEntity>,
-    last_sent_tick: BTreeMap<u32, u32>,
+    last_sent_tick: HashMap<u32, u32>,
     planner_scratch: SnapshotPlannerScratch,
     recycled_records: Vec<SnapshotRecord>,
 }
@@ -353,7 +353,7 @@ impl SnapshotSession {
             history: VecDeque::with_capacity(history_limit),
             acknowledged_sequence: None,
             acknowledged_state: BTreeMap::new(),
-            last_sent_tick: BTreeMap::new(),
+            last_sent_tick: HashMap::new(),
             planner_scratch: SnapshotPlannerScratch::default(),
             recycled_records: Vec::new(),
         }
@@ -572,7 +572,7 @@ fn plan_records(
     server_tick: u32,
     frame: &ReplicationFrame,
     baseline: &BTreeMap<u32, WireEntity>,
-    last_sent_tick: &BTreeMap<u32, u32>,
+    last_sent_tick: &HashMap<u32, u32>,
     max_bytes: usize,
     scratch: &mut SnapshotPlannerScratch,
 ) -> SnapshotPlan {
@@ -1621,6 +1621,79 @@ mod tests {
         assert_eq!(third.record_count, 1);
         assert_eq!(third.freshness.combat.max_due_age_ticks, 0);
         assert_eq!(third.freshness.combat.max_sent_age_ticks, 0);
+    }
+
+    #[test]
+    fn hashed_last_sent_ticks_preserve_planner_results_across_insertion_order() {
+        let mut world = World::new(6000.0, 6000.0);
+        for (net_id, x, y) in [
+            (1, 1000.0, 1000.0),
+            (2, 1200.0, 1000.0),
+            (3, 1500.0, 1000.0),
+            (4, 1800.0, 1000.0),
+        ] {
+            assert!(world.add_player_at(net_id, x, y, 0.0));
+        }
+
+        let baseline_frame = ReplicationFrame::from_fighters(0, world.fighters());
+        let baseline: BTreeMap<_, _> = baseline_frame
+            .states
+            .iter()
+            .copied()
+            .map(|state| (state.net_id, state))
+            .collect();
+
+        let mut changed_frame = baseline_frame.clone();
+        changed_frame.server_tick = 20;
+        for state in &mut changed_frame.states {
+            state.x += 1;
+        }
+
+        let mut forward = HashMap::new();
+        forward.insert(1, 19);
+        forward.insert(2, 5);
+        forward.insert(3, 18);
+
+        let mut reverse = HashMap::new();
+        reverse.insert(3, 18);
+        reverse.insert(2, 5);
+        reverse.insert(1, 19);
+
+        let mut forward_scratch = SnapshotPlannerScratch::default();
+        let mut reverse_scratch = SnapshotPlannerScratch::default();
+        let forward_plan = plan_records(
+            1,
+            20,
+            &changed_frame,
+            &baseline,
+            &forward,
+            crate::CONSERVATIVE_DATAGRAM_BYTES,
+            &mut forward_scratch,
+        );
+        let reverse_plan = plan_records(
+            1,
+            20,
+            &changed_frame,
+            &baseline,
+            &reverse,
+            crate::CONSERVATIVE_DATAGRAM_BYTES,
+            &mut reverse_scratch,
+        );
+
+        assert_eq!(forward_plan.records, reverse_plan.records);
+        assert_eq!(
+            forward_plan.omitted_due_to_budget,
+            reverse_plan.omitted_due_to_budget
+        );
+        assert_eq!(
+            forward_plan.interest_candidates_checked,
+            reverse_plan.interest_candidates_checked
+        );
+        assert_eq!(
+            forward_plan.visible_entity_count,
+            reverse_plan.visible_entity_count
+        );
+        assert_eq!(forward_plan.freshness, reverse_plan.freshness);
     }
 
     #[test]

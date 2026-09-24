@@ -152,6 +152,9 @@ jobs:
       - name: Validate M82 reused viewer interest query
         run: cargo test --locked --manifest-path server/Cargo.toml reused_viewer_interest_query_matches_public_lookup_semantics
 
+      - name: Validate M83 hashed last-sent timestamps
+        run: cargo test --locked --manifest-path server/Cargo.toml hashed_last_sent_ticks_preserve_planner_results_across_insertion_order
+
       - name: Validate real browser flight
         env:
           MYASO_FLIGHT_DURATION_MS: "4000"
