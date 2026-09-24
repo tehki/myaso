@@ -6,7 +6,8 @@ const ENCODING_VARINT_IDS = 1;
 const ENCODING_VARINT_IDS_U8_FACING = 2;
 const ENCODING_VARINT_IDS_U8_FACING_U12_POSITION = 3;
 const ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_U12_POSITION = 4;
-const CURRENT_ENCODING = ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_U12_POSITION;
+const ENCODING_PACKED_ACTION_FLAGS = 5;
+const CURRENT_ENCODING = ENCODING_PACKED_ACTION_FLAGS;
 const FIELD_POSITION = 1 << 0;
 const FIELD_FACING = 1 << 1;
 const FIELD_VITALS = 1 << 2;
@@ -158,9 +159,18 @@ export function encodeSnapshot({
       offset += 2;
     }
     if (mask & FIELD_ACTION) {
-      view.setUint8(offset, record.action);
-      view.setUint8(offset + 1, record.flags ?? 0);
-      offset += 2;
+      if (usesCompactActionFlags(encoding)) {
+        offset = writeCompactActionFlags(
+          view,
+          offset,
+          record.action,
+          record.flags ?? 0,
+        );
+      } else {
+        view.setUint8(offset, record.action);
+        view.setUint8(offset + 1, record.flags ?? 0);
+        offset += 2;
+      }
     }
   }
   return buffer;
@@ -229,10 +239,17 @@ export function decodeSnapshot(buffer) {
         offset += 2;
       }
       if (mask & FIELD_ACTION) {
-        requireBytes(view, offset, 2);
-        record.action = view.getUint8(offset);
-        record.flags = view.getUint8(offset + 1);
-        offset += 2;
+        if (usesCompactActionFlags(encoding)) {
+          const decoded = readCompactActionFlags(view, offset);
+          record.action = decoded.action;
+          record.flags = decoded.flags;
+          offset = decoded.offset;
+        } else {
+          requireBytes(view, offset, 2);
+          record.action = view.getUint8(offset);
+          record.flags = view.getUint8(offset + 1);
+          offset += 2;
+        }
       }
     }
     records.push(record);
@@ -293,7 +310,7 @@ export function snapshotRecordBytes(record, encoding = CURRENT_ENCODING) {
   if (mask & FIELD_POSITION) bytes += positionBytesForRecord(record, encoding);
   if (mask & FIELD_FACING) bytes += facingBytesForEncoding(encoding);
   if (mask & FIELD_VITALS) bytes += 2;
-  if (mask & FIELD_ACTION) bytes += 2;
+  if (mask & FIELD_ACTION) bytes += actionBytesForRecord(record, encoding);
   return bytes;
 }
 
@@ -303,6 +320,7 @@ export const SNAPSHOT_ENCODINGS = Object.freeze({
   VARINT_IDS_U8_FACING: ENCODING_VARINT_IDS_U8_FACING,
   VARINT_IDS_U8_FACING_U12_POSITION: ENCODING_VARINT_IDS_U8_FACING_U12_POSITION,
   PACKED_U10_IDS_U6_MASK_U8_FACING_U12_POSITION: ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_U12_POSITION,
+  PACKED_ACTION_FLAGS: ENCODING_PACKED_ACTION_FLAGS,
   CURRENT: CURRENT_ENCODING,
 });
 
@@ -386,6 +404,47 @@ function writeUint32Varint(view, offset, value) {
   return offset;
 }
 
+function writeCompactActionFlags(view, offset, action, flags) {
+  const actionNibble = action < 15 ? action : 15;
+  const flagsNibble = flags < 15 ? flags : 15;
+  view.setUint8(offset, actionNibble | (flagsNibble << 4));
+  offset += 1;
+  if (actionNibble === 15) {
+    view.setUint8(offset, action);
+    offset += 1;
+  }
+  if (flagsNibble === 15) {
+    view.setUint8(offset, flags);
+    offset += 1;
+  }
+  return offset;
+}
+
+function readCompactActionFlags(view, offset) {
+  requireBytes(view, offset, 1);
+  const packed = view.getUint8(offset);
+  offset += 1;
+  const actionNibble = packed & 0x0f;
+  const flagsNibble = packed >>> 4;
+
+  let action = actionNibble;
+  if (actionNibble === 15) {
+    requireBytes(view, offset, 1);
+    action = view.getUint8(offset);
+    offset += 1;
+    if (action < 15) throw new RangeError("non-canonical packed snapshot action");
+  }
+
+  let flags = flagsNibble;
+  if (flagsNibble === 15) {
+    requireBytes(view, offset, 1);
+    flags = view.getUint8(offset);
+    offset += 1;
+    if (flags < 15) throw new RangeError("non-canonical packed snapshot flags");
+  }
+  return { action, flags, offset };
+}
+
 function compactWireMask(mask) {
   return (mask & 0x0f) | (mask & FIELD_WIDE_POSITION) | ((mask & FIELD_REMOVED) >>> 2);
 }
@@ -443,7 +502,8 @@ function assertSnapshotEncoding(encoding) {
     && encoding !== ENCODING_VARINT_IDS
     && encoding !== ENCODING_VARINT_IDS_U8_FACING
     && encoding !== ENCODING_VARINT_IDS_U8_FACING_U12_POSITION
-    && encoding !== ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_U12_POSITION) {
+    && encoding !== ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_U12_POSITION
+    && encoding !== ENCODING_PACKED_ACTION_FLAGS) {
     throw new RangeError(`unsupported snapshot encoding ${encoding}`);
   }
 }
@@ -462,15 +522,28 @@ function writeCompactPosition(view, offset, x, y) {
 }
 function usesCompactPosition(encoding) {
   return encoding === ENCODING_VARINT_IDS_U8_FACING_U12_POSITION
-    || encoding === ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_U12_POSITION;
+    || encoding === ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_U12_POSITION
+    || encoding === ENCODING_PACKED_ACTION_FLAGS;
 }
 function usesCompactFacing(encoding) {
   return encoding === ENCODING_VARINT_IDS_U8_FACING
     || encoding === ENCODING_VARINT_IDS_U8_FACING_U12_POSITION
-    || encoding === ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_U12_POSITION;
+    || encoding === ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_U12_POSITION
+    || encoding === ENCODING_PACKED_ACTION_FLAGS;
 }
 function usesPackedRecordHeader(encoding) {
-  return encoding === ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_U12_POSITION;
+  return encoding === ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_U12_POSITION
+    || encoding === ENCODING_PACKED_ACTION_FLAGS;
+}
+
+function usesCompactActionFlags(encoding) {
+  return encoding === ENCODING_PACKED_ACTION_FLAGS;
+}
+
+function actionBytesForRecord(record, encoding) {
+  if (!usesCompactActionFlags(encoding)) return 2;
+  const flags = record.flags ?? 0;
+  return 1 + Number(record.action >= 15) + Number(flags >= 15);
 }
 
 function facingBytesForEncoding(encoding) {
