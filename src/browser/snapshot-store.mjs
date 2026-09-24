@@ -225,7 +225,7 @@ function readPackedRecordHeader(view, offset) {
 }
 
 function replicationCellWire() {
-  return NETWORK.interest.cellSize * NETWORK.worldCoordinateScale;
+  return NETWORK.snapshotPositionCellSize * NETWORK.worldCoordinateScale;
 }
 
 function usesCompactPosition(encoding) {
