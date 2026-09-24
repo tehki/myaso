@@ -107,7 +107,7 @@ export function encodeSnapshot({
   if (records.length > 0xffff) throw new RangeError("too many snapshot records");
   assertSnapshotEncoding(encoding);
 
-  const totalBytes = HEADER_BYTES + records.reduce((sum, record) => sum + snapshotRecordBytes(record, encoding), 0);
+  const totalBytes = HEADER_BYTES + snapshotRecordsBytes(records, encoding);
   if (maxBytes !== null && totalBytes > maxBytes) {
     throw new RangeError(`snapshot ${totalBytes} bytes exceeds datagram budget ${maxBytes}`);
   }
@@ -124,11 +124,18 @@ export function encodeSnapshot({
   view.setUint16(12, records.length, true);
 
   let offset = HEADER_BYTES;
+  let previousPosition = null;
   for (const record of records) {
     assertNetId(record.netId);
     const mask = snapshotWireMask(record, encoding);
+    const positionEncoding = positionWireEncoding(record, mask, encoding, previousPosition);
     if (usesPackedRecordHeader(encoding)) {
-      offset = writePackedRecordHeader(view, offset, record.netId >>> 0, mask);
+      offset = writePackedRecordHeader(
+        view,
+        offset,
+        record.netId >>> 0,
+        packedWireMaskCode(mask, encoding, positionEncoding),
+      );
     } else {
       if (encoding === ENCODING_LEGACY_U32_IDS) {
         view.setUint32(offset, record.netId >>> 0, true);
@@ -141,13 +148,16 @@ export function encodeSnapshot({
     }
     if (mask & FIELD_REMOVED) continue;
     if (mask & FIELD_POSITION) {
-      if (usesCompactPosition(encoding) && !(mask & FIELD_WIDE_POSITION)) {
+      if (positionEncoding === POSITION_ENCODING_LOCAL) {
+        offset = writeLocalCellPosition(view, offset, record.x, record.y, previousPosition);
+      } else if (positionEncoding === POSITION_ENCODING_COMPACT) {
         offset = writeCompactPosition(view, offset, record.x, record.y);
       } else {
         view.setUint16(offset, record.x, true);
         view.setUint16(offset + 2, record.y, true);
         offset += 4;
       }
+      previousPosition = decodedPositionForRecord(record, positionEncoding);
     }
     if (mask & FIELD_FACING) {
       if (usesCompactFacing(encoding)) {
@@ -169,6 +179,7 @@ export function encodeSnapshot({
       offset += 2;
     }
   }
+  if (offset !== totalBytes) throw new Error("snapshot byte accounting mismatch");
   return buffer;
 }
 
@@ -182,14 +193,19 @@ export function decodeSnapshot(buffer) {
   const count = view.getUint16(12, true);
   const records = [];
   let offset = HEADER_BYTES;
+  let previousPosition = null;
+
   for (let index = 0; index < count; index += 1) {
     let netId;
     let mask;
+    let localPosition = false;
     if (usesPackedRecordHeader(encoding)) {
       const decoded = readPackedRecordHeader(view, offset);
       netId = decoded.netId;
-      mask = decoded.mask;
       offset = decoded.offset;
+      const expanded = expandPackedWireMask(decoded.compactMask, encoding);
+      mask = expanded.mask;
+      localPosition = expanded.localPosition;
     } else {
       if (encoding === ENCODING_LEGACY_U32_IDS) {
         requireBytes(view, offset, 4);
@@ -204,18 +220,47 @@ export function decodeSnapshot(buffer) {
       mask = view.getUint8(offset);
       offset += 1;
     }
+
     const record = { netId, mask };
     const widePosition = Boolean(mask & FIELD_WIDE_POSITION);
-    if (widePosition && (!usesCompactPosition(encoding) || !(mask & FIELD_POSITION))) throw new RangeError("invalid compact-position marker");
+    if (widePosition && (!usesCompactPosition(encoding) || !(mask & FIELD_POSITION))) {
+      throw new RangeError("invalid compact-position marker");
+    }
+    if (localPosition && (
+      encoding !== ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_LOCAL_U12_POSITION
+      || !(mask & FIELD_POSITION)
+      || widePosition
+      || (mask & FIELD_REMOVED)
+    )) {
+      throw new RangeError("invalid local-position marker");
+    }
+
     if (!(mask & FIELD_REMOVED)) {
       if (mask & FIELD_POSITION) {
-        if (usesCompactPosition(encoding) && !widePosition) {
+        if (localPosition) {
+          if (!previousPosition) throw new RangeError("local snapshot position has no previous position");
+          requireBytes(view, offset, 2);
+          [record.x, record.y] = decodeLocalCellPosition(
+            previousPosition,
+            view.getUint8(offset),
+            view.getUint8(offset + 1),
+          );
+          offset += 2;
+        } else if (usesCompactPosition(encoding) && !widePosition) {
           requireBytes(view, offset, 3);
-          const packed = view.getUint8(offset) | (view.getUint8(offset + 1) << 8) | (view.getUint8(offset + 2) << 16);
-          record.x = (packed & 0x0fff) << 3; record.y = ((packed >>> 12) & 0x0fff) << 3; offset += 3;
+          const packed = view.getUint8(offset)
+            | (view.getUint8(offset + 1) << 8)
+            | (view.getUint8(offset + 2) << 16);
+          record.x = (packed & 0x0fff) << 3;
+          record.y = ((packed >>> 12) & 0x0fff) << 3;
+          offset += 3;
         } else {
-          requireBytes(view, offset, 4); record.x = view.getUint16(offset, true); record.y = view.getUint16(offset + 2, true); offset += 4;
+          requireBytes(view, offset, 4);
+          record.x = view.getUint16(offset, true);
+          record.y = view.getUint16(offset + 2, true);
+          offset += 4;
         }
+        previousPosition = [record.x, record.y];
       }
       if (mask & FIELD_FACING) {
         if (usesCompactFacing(encoding)) {
