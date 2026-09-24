@@ -305,6 +305,36 @@ fn squared_distance_rejection_preserves_collision_and_attack_boundaries() {
 }
 
 #[test]
+fn axis_rejection_preserves_diagonal_collision_and_attack_candidates() {
+    let mut overlapping = World::new(600.0, 400.0);
+    assert!(overlapping.add_player_at(1, 200.0, 200.0, 0.0));
+    assert!(overlapping.add_player_at(2, 225.0, 225.0, std::f32::consts::PI));
+    overlapping.step_by(5.0);
+    let first = overlapping.fighter(1).expect("first");
+    let second = overlapping.fighter(2).expect("second");
+    assert!((second.x - first.x).hypot(second.y - first.y) >= 36.0 - 1e-6);
+
+    let diagonal = std::f32::consts::FRAC_PI_4;
+    let mut attack_world = World::new(600.0, 400.0);
+    assert!(attack_world.add_player_at(1, 200.0, 200.0, diagonal));
+    assert!(attack_world.add_player_at(2, 266.0, 266.0, diagonal + std::f32::consts::PI));
+    advance(
+        &mut attack_world,
+        230.0,
+        InputIntent {
+            attack: true,
+            facing_radians: diagonal,
+            ..InputIntent::default()
+        },
+        InputIntent::default(),
+    );
+    assert_eq!(
+        attack_world.fighter(2).expect("target").hp.round() as u8,
+        66
+    );
+}
+
+#[test]
 fn timed_dodge_iframes_evade_an_otherwise_valid_hit() {
     let mut world = duel(72.0);
     advance(
