@@ -1382,6 +1382,14 @@ fn decode_record_fields(
     Ok(())
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum PositionWireEncoding {
+    None,
+    ExactU16Pair,
+    CompactAbsolute,
+    LocalCell,
+}
+
 pub fn snapshot_byte_composition(records: &[SnapshotRecord]) -> SnapshotByteComposition {
     snapshot_byte_composition_for_encoding(records, SNAPSHOT_ENCODING_CURRENT)
 }
@@ -1394,8 +1402,16 @@ fn snapshot_byte_composition_for_encoding(
         header: SNAPSHOT_HEADER_BYTES,
         ..SnapshotByteComposition::default()
     };
+    let mut previous_position = None;
     for record in records {
-        composition.add(snapshot_record_composition_for_encoding(record, encoding));
+        let (record_composition, next_position) =
+            snapshot_record_composition_for_encoding_with_context(
+                record,
+                encoding,
+                previous_position,
+            );
+        composition.add(record_composition);
+        previous_position = next_position;
     }
     composition
 }
@@ -1404,6 +1420,14 @@ fn snapshot_record_composition_for_encoding(
     record: &SnapshotRecord,
     encoding: u8,
 ) -> SnapshotByteComposition {
+    snapshot_record_composition_for_encoding_with_context(record, encoding, None).0
+}
+
+fn snapshot_record_composition_for_encoding_with_context(
+    record: &SnapshotRecord,
+    encoding: u8,
+    previous_position: Option<(u16, u16)>,
+) -> (SnapshotByteComposition, Option<(u16, u16)>) {
     let (net_ids, masks) = match encoding {
         SNAPSHOT_ENCODING_LEGACY_U32_IDS => (4, 1),
         SNAPSHOT_ENCODING_VARINT_IDS
@@ -1424,10 +1448,17 @@ fn snapshot_record_composition_for_encoding(
         ..SnapshotByteComposition::default()
     };
     if record.mask & SNAPSHOT_FIELD_REMOVED != 0 {
-        return composition;
+        return (composition, previous_position);
     }
+
+    let wire_mask = encoded_record_mask(record, encoding);
+    let position_encoding =
+        position_wire_encoding(record, wire_mask, encoding, previous_position);
+    let mut next_position = previous_position;
+
     if record.mask & SNAPSHOT_FIELD_POSITION != 0 {
-        composition.position = position_bytes_for_record(record, encoding);
+        composition.position = position_bytes_for_encoding(position_encoding);
+        next_position = Some(decoded_position_for_record(record, position_encoding));
     }
     if record.mask & SNAPSHOT_FIELD_FACING != 0 {
         composition.facing = facing_bytes_for_encoding(encoding);
@@ -1438,7 +1469,7 @@ fn snapshot_record_composition_for_encoding(
     if record.mask & SNAPSHOT_FIELD_ACTION != 0 {
         composition.action = 2;
     }
-    composition
+    (composition, next_position)
 }
 
 pub fn snapshot_record_bytes(record: &SnapshotRecord) -> usize {
@@ -1460,16 +1491,73 @@ fn encoded_record_mask(record: &SnapshotRecord, encoding: u8) -> u8 {
     mask
 }
 
-fn position_bytes_for_record(record: &SnapshotRecord, encoding: u8) -> usize {
-    if uses_compact_position(encoding) && position_is_compact(record.x, record.y) {
-        3
-    } else {
-        4
+fn position_wire_encoding(
+    record: &SnapshotRecord,
+    wire_mask: u8,
+    encoding: u8,
+    previous_position: Option<(u16, u16)>,
+) -> PositionWireEncoding {
+    if wire_mask & SNAPSHOT_FIELD_POSITION == 0 {
+        return PositionWireEncoding::None;
     }
+    if !uses_compact_position(encoding) || wire_mask & SNAPSHOT_FIELD_WIDE_POSITION != 0 {
+        return PositionWireEncoding::ExactU16Pair;
+    }
+    if encoding == SNAPSHOT_ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_LOCAL_U12_POSITION {
+        let current = compact_position_pair(record.x, record.y);
+        if previous_position
+            .is_some_and(|previous| position_cell_from_wire(previous) == position_cell_from_wire(current))
+        {
+            return PositionWireEncoding::LocalCell;
+        }
+    }
+    PositionWireEncoding::CompactAbsolute
+}
+
+fn position_bytes_for_encoding(position_encoding: PositionWireEncoding) -> usize {
+    match position_encoding {
+        PositionWireEncoding::None => 0,
+        PositionWireEncoding::LocalCell => 2,
+        PositionWireEncoding::CompactAbsolute => 3,
+        PositionWireEncoding::ExactU16Pair => 4,
+    }
+}
+
+fn position_bytes_for_record(record: &SnapshotRecord, encoding: u8) -> usize {
+    let wire_mask = encoded_record_mask(record, encoding);
+    position_bytes_for_encoding(position_wire_encoding(record, wire_mask, encoding, None))
 }
 
 fn position_is_compact(x: u16, y: u16) -> bool {
     x <= COMPACT_POSITION_MAX && y <= COMPACT_POSITION_MAX
+}
+
+fn compact_position_pair(x: u16, y: u16) -> (u16, u16) {
+    (
+        expand_compact_position_u12(compact_position_u12(x)),
+        expand_compact_position_u12(compact_position_u12(y)),
+    )
+}
+
+fn decoded_position_for_record(
+    record: &SnapshotRecord,
+    position_encoding: PositionWireEncoding,
+) -> (u16, u16) {
+    match position_encoding {
+        PositionWireEncoding::CompactAbsolute | PositionWireEncoding::LocalCell => {
+            compact_position_pair(record.x, record.y)
+        }
+        PositionWireEncoding::ExactU16Pair => (record.x, record.y),
+        PositionWireEncoding::None => unreachable!("position context requires a position field"),
+    }
+}
+
+fn position_cell_from_wire(position: (u16, u16)) -> (i32, i32) {
+    let cell_wire = replication_cell_wire();
+    (
+        i32::from(position.0) / cell_wire,
+        i32::from(position.1) / cell_wire,
+    )
 }
 
 fn encode_compact_position(x: u16, y: u16, bytes: &mut Vec<u8>) {
@@ -1479,6 +1567,39 @@ fn encode_compact_position(x: u16, y: u16, bytes: &mut Vec<u8>) {
     bytes.push((packed & 0xff) as u8);
     bytes.push(((packed >> 8) & 0xff) as u8);
     bytes.push(((packed >> 16) & 0xff) as u8);
+}
+
+fn encode_local_cell_position(
+    x: u16,
+    y: u16,
+    previous_position: (u16, u16),
+    bytes: &mut Vec<u8>,
+) {
+    let current = compact_position_pair(x, y);
+    let cell = position_cell_from_wire(previous_position);
+    debug_assert_eq!(position_cell_from_wire(current), cell);
+    let cell_wire = replication_cell_wire();
+    let step = 1_i32 << COMPACT_POSITION_SHIFT;
+    let local_x = (i32::from(current.0) - cell.0 * cell_wire) / step;
+    let local_y = (i32::from(current.1) - cell.1 * cell_wire) / step;
+    debug_assert!((0..=u8::MAX as i32).contains(&local_x));
+    debug_assert!((0..=u8::MAX as i32).contains(&local_y));
+    bytes.push(local_x as u8);
+    bytes.push(local_y as u8);
+}
+
+fn decode_local_cell_position(
+    previous_position: (u16, u16),
+    local_x: u8,
+    local_y: u8,
+) -> (u16, u16) {
+    let cell = position_cell_from_wire(previous_position);
+    let cell_wire = replication_cell_wire();
+    let step = 1_i32 << COMPACT_POSITION_SHIFT;
+    (
+        (cell.0 * cell_wire + i32::from(local_x) * step) as u16,
+        (cell.1 * cell_wire + i32::from(local_y) * step) as u16,
+    )
 }
 
 fn compact_position_u12(value: u16) -> u16 {
@@ -1533,14 +1654,47 @@ fn expand_compact_wire_mask(mask: u8) -> u8 {
     (mask & 0x1f) | ((mask & (1 << 5)) << 2)
 }
 
-fn encode_packed_record_header(net_id: u32, wire_mask: u8, bytes: &mut Vec<u8>) {
+fn packed_wire_mask_code(
+    wire_mask: u8,
+    encoding: u8,
+    position_encoding: PositionWireEncoding,
+) -> u8 {
+    if encoding == SNAPSHOT_ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_LOCAL_U12_POSITION
+        && position_encoding == PositionWireEncoding::LocalCell
+    {
+        debug_assert!(wire_mask & SNAPSHOT_FIELD_POSITION != 0);
+        debug_assert_eq!(wire_mask & SNAPSHOT_FIELD_WIDE_POSITION, 0);
+        debug_assert_eq!(wire_mask & SNAPSHOT_FIELD_REMOVED, 0);
+        return PACKED_MASK_LOCAL_POSITION_FLAG | (wire_mask & 0x0f);
+    }
+    compact_wire_mask(wire_mask)
+}
+
+fn expand_packed_wire_mask(
+    compact_mask: u8,
+    encoding: u8,
+) -> Result<(u8, bool), SnapshotDecodeError> {
+    if encoding == SNAPSHOT_ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_LOCAL_U12_POSITION
+        && compact_mask & PACKED_MASK_LOCAL_POSITION_FLAG != 0
+        && compact_mask != PACKED_MASK_LOCAL_POSITION_FLAG
+    {
+        if compact_mask & SNAPSHOT_FIELD_POSITION == 0
+            || compact_mask & SNAPSHOT_FIELD_WIDE_POSITION != 0
+        {
+            return Err(SnapshotDecodeError::InvalidPositionEncoding);
+        }
+        return Ok((compact_mask & 0x0f, true));
+    }
+    Ok((expand_compact_wire_mask(compact_mask), false))
+}
+
+fn encode_packed_record_header(net_id: u32, compact_mask: u8, bytes: &mut Vec<u8>) {
     let inline_net_id = if net_id < u32::from(PACKED_RECORD_NET_ID_ESCAPE) {
         net_id as u16
     } else {
         PACKED_RECORD_NET_ID_ESCAPE
     };
-    let packed =
-        inline_net_id | (u16::from(compact_wire_mask(wire_mask)) << PACKED_RECORD_NET_ID_BITS);
+    let packed = inline_net_id | (u16::from(compact_mask) << PACKED_RECORD_NET_ID_BITS);
     bytes.extend_from_slice(&packed.to_le_bytes());
     if inline_net_id == PACKED_RECORD_NET_ID_ESCAPE {
         encode_u32_varint(net_id, bytes);
@@ -1565,7 +1719,7 @@ fn decode_packed_record_header(
     } else {
         u32::from(inline_net_id)
     };
-    Ok((net_id, expand_compact_wire_mask(compact_mask)))
+    Ok((net_id, compact_mask))
 }
 
 fn compact_facing_u8(facing: u16) -> u8 {
