@@ -128,18 +128,17 @@ impl GameState {
     }
 
     fn kill_event_for_cursor(&self, cursor: u32) -> Option<KillEventPacket> {
-        if let Some(event) = self
-            .kill_events
-            .iter()
-            .copied()
-            .find(|event| event.sequence == cursor)
-        {
-            return Some(event);
+        if cursor == self.next_kill_event_sequence {
+            return None;
         }
-        if cursor != self.next_kill_event_sequence {
-            return self.kill_events.front().copied();
+        let first = self.kill_events.front()?;
+        let offset = cursor.wrapping_sub(first.sequence) as usize;
+        if let Some(event) = self.kill_events.get(offset).copied() {
+            if event.sequence == cursor {
+                return Some(event);
+            }
         }
-        None
+        self.kill_events.front().copied()
     }
 }
 
@@ -722,6 +721,59 @@ fn encode_input_ack(processed_client_tick: u32, server_tick: u32, player_net_id:
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn kill_event_cursor_lookup_spans_sequence_wrap() {
+        let mut state = GameState::new(0, 0);
+        state.kill_events = VecDeque::from([
+            KillEventPacket {
+                sequence: u32::MAX - 1,
+                killer: 1,
+                victim: 2,
+            },
+            KillEventPacket {
+                sequence: u32::MAX,
+                killer: 2,
+                victim: 3,
+            },
+            KillEventPacket {
+                sequence: 0,
+                killer: 3,
+                victim: 4,
+            },
+            KillEventPacket {
+                sequence: 1,
+                killer: 4,
+                victim: 5,
+            },
+        ]);
+        state.next_kill_event_sequence = 2;
+
+        for sequence in [u32::MAX - 1, u32::MAX, 0, 1] {
+            assert_eq!(
+                state
+                    .kill_event_for_cursor(sequence)
+                    .expect("retained cursor must resolve")
+                    .sequence,
+                sequence
+            );
+        }
+        assert!(state.kill_event_for_cursor(2).is_none());
+        assert_eq!(
+            state
+                .kill_event_for_cursor(u32::MAX - 2)
+                .expect("stale cursor should restart from oldest retained event")
+                .sequence,
+            u32::MAX - 1
+        );
+        assert_eq!(
+            state
+                .kill_event_for_cursor(99)
+                .expect("unknown future cursor should restart from oldest retained event")
+                .sequence,
+            u32::MAX - 1
+        );
+    }
 
     #[test]
     fn replication_frame_refresh_reuses_unique_arc_without_mutating_shared_snapshot() {
