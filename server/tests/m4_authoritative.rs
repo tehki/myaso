@@ -128,6 +128,43 @@ fn fighter_identity_operations_preserve_sorted_binary_lookup() {
 }
 
 #[test]
+fn reusable_combat_event_buffer_matches_allocating_step_semantics() {
+    let mut allocating = duel(72.0);
+    let mut reusable = allocating.clone();
+    let mut reused_events = Vec::with_capacity(16);
+    let allocation = reused_events.as_ptr();
+    let capacity = reused_events.capacity();
+    let first = InputIntent {
+        attack: true,
+        facing_radians: 0.0,
+        ..InputIntent::default()
+    };
+    let second = InputIntent::default();
+
+    let mut observed_event = false;
+    for _ in 0..60 {
+        allocating.set_input(1, first);
+        allocating.set_input(2, second);
+        reusable.set_input(1, first);
+        reusable.set_input(2, second);
+
+        let allocated_events = allocating.step_by(5.0);
+        reusable.step_by_into(5.0, &mut reused_events);
+
+        observed_event |= !allocated_events.is_empty();
+        assert_eq!(reused_events, allocated_events);
+        assert_eq!(reusable.tick, allocating.tick);
+        assert_eq!(reusable.now_ms, allocating.now_ms);
+        assert_eq!(reusable.match_winner(), allocating.match_winner());
+        assert_eq!(reusable.fighters(), allocating.fighters());
+        assert_eq!(reused_events.as_ptr(), allocation);
+        assert_eq!(reused_events.capacity(), capacity);
+    }
+
+    assert!(observed_event, "combat exchange must exercise event writes");
+}
+
+#[test]
 fn attack_preserves_windup_active_and_recovery_commitment() {
     let mut world = duel(200.0);
     world.set_input(
