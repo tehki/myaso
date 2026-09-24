@@ -1716,8 +1716,7 @@ mod tests {
 
         let mut viewer_only_world = World::new(6000.0, 6000.0);
         assert!(viewer_only_world.add_player_at(1, 1000.0, 1000.0, 0.0));
-        let viewer_only =
-            ReplicationFrame::from_fighters(43, viewer_only_world.fighters());
+        let viewer_only = ReplicationFrame::from_fighters(43, viewer_only_world.fighters());
         let mut removal_scratch = SnapshotPlannerScratch::default();
 
         let removal_plan = plan_records(
@@ -1732,10 +1731,7 @@ mod tests {
 
         assert_eq!(removal_plan.records.len(), 1);
         assert_eq!(removal_plan.records[0].net_id, 2);
-        assert_ne!(
-            removal_plan.records[0].mask & SNAPSHOT_FIELD_REMOVED,
-            0
-        );
+        assert_ne!(removal_plan.records[0].mask & SNAPSHOT_FIELD_REMOVED, 0);
         assert!(!last_sent_tick.contains_key(&2));
     }
 
