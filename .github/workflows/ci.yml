@@ -164,6 +164,9 @@ jobs:
       - name: Validate M86 recycled acknowledged history
         run: cargo test --locked --manifest-path server/Cargo.toml acknowledged_history_reuses_record_capacity_on_next_snapshot
 
+      - name: Validate M87 preallocated replication cells
+        run: cargo test --locked --manifest-path server/Cargo.toml replication_frame_preallocates_cell_index_capacity
+
       - name: Validate real browser flight
         env:
           MYASO_FLIGHT_DURATION_MS: "4000"

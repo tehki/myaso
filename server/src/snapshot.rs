@@ -226,7 +226,7 @@ pub struct ReplicationFrame {
 impl ReplicationFrame {
     pub fn from_fighters(server_tick: u32, fighters: &[Fighter]) -> Self {
         let mut states = Vec::with_capacity(fighters.len());
-        let mut cells: HashMap<(i32, i32), Vec<usize>> = HashMap::new();
+        let mut cells: HashMap<(i32, i32), Vec<usize>> = HashMap::with_capacity(fighters.len());
         for fighter in fighters {
             let state = WireEntity::from_fighter(fighter);
             debug_assert!(
@@ -1404,6 +1404,25 @@ fn require(bytes: &[u8], offset: usize, count: usize) -> Result<(), SnapshotDeco
 mod tests {
     use super::*;
     use crate::simulation::World;
+
+    #[test]
+    fn replication_frame_preallocates_cell_index_capacity() {
+        let mut world = World::new(6000.0, 6000.0);
+        for net_id in 1..=64 {
+            let column = ((net_id - 1) % 8) as f32;
+            let row = ((net_id - 1) / 8) as f32;
+            assert!(world.add_player_at(net_id, 600.0 + column * 550.0, 600.0 + row * 550.0, 0.0,));
+        }
+
+        let fighter_count = world.fighters().len();
+        let frame = ReplicationFrame::from_fighters(world.tick, world.fighters());
+
+        assert_eq!(frame.states.len(), fighter_count);
+        assert!(
+            frame.cells.capacity() >= fighter_count,
+            "cell index should be preallocated for the known fighter upper bound"
+        );
+    }
 
     #[test]
     fn indexed_replication_cells_preserve_legacy_query_order() {
