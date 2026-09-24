@@ -491,7 +491,9 @@ impl SnapshotSession {
         }
 
         for _ in 0..index {
-            self.history.pop_front();
+            if let Some(discarded) = self.history.pop_front() {
+                self.recycle_history_records(discarded.records);
+            }
         }
         let candidate = self
             .history
@@ -502,7 +504,14 @@ impl SnapshotSession {
         }
         apply_records(&mut self.acknowledged_state, &candidate.records);
         self.acknowledged_sequence = Some(candidate.sequence);
+        self.recycle_history_records(candidate.records);
         true
+    }
+
+    fn recycle_history_records(&mut self, records: Vec<SnapshotRecord>) {
+        if records.capacity() >= self.recycled_records.capacity() {
+            self.recycled_records = records;
+        }
     }
 }
 
@@ -1917,6 +1926,42 @@ mod tests {
         assert_eq!(decoded.server_tick, 123);
         assert!(!decoded.full);
         assert_eq!(decoded.records.len(), records.len());
+    }
+
+    #[test]
+    fn acknowledged_history_reuses_record_capacity_on_next_snapshot() {
+        let mut world = World::new(1200.0, 800.0);
+        for net_id in 1..=8 {
+            assert!(world.add_player_at(net_id, 300.0 + net_id as f32 * 25.0, 300.0, 0.0));
+        }
+
+        let frame = ReplicationFrame::from_fighters(world.tick, world.fighters());
+        let mut session = SnapshotSession::new(64);
+        let first =
+            session.build_from_frame(u16::MAX, 1, &frame, crate::CONSERVATIVE_DATAGRAM_BYTES);
+        let first_history = session.history.back().expect("first snapshot history entry");
+        let first_ptr = first_history.records.as_ptr();
+        let first_capacity = first_history.records.capacity();
+        assert!(first_capacity >= first.record_count);
+
+        let mut changed_frame = frame.clone();
+        changed_frame.server_tick = frame.server_tick().wrapping_add(1);
+        changed_frame.states[0].x += 1;
+
+        let second = session.build_from_frame(
+            first.sequence,
+            1,
+            &changed_frame,
+            crate::CONSERVATIVE_DATAGRAM_BYTES,
+        );
+        let newest = session.history.back().expect("second snapshot history entry");
+
+        assert!(!second.full);
+        assert_eq!(second.baseline_sequence, first.sequence);
+        assert_eq!(second.record_count, 1);
+        assert_eq!(newest.records.as_ptr(), first_ptr);
+        assert_eq!(newest.records.capacity(), first_capacity);
+        assert!(session.recycled_records.is_empty());
     }
 
     #[test]
