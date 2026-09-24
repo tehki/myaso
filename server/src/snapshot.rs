@@ -273,8 +273,19 @@ impl ReplicationFrame {
         viewer_net_id: u32,
         states: &mut Vec<WireEntity>,
     ) -> Option<InterestQueryStats> {
+        let Some(viewer) = self.get(viewer_net_id) else {
+            states.clear();
+            return None;
+        };
+        Some(self.query_interest_from_viewer_into(viewer, states))
+    }
+
+    fn query_interest_from_viewer_into(
+        &self,
+        viewer: WireEntity,
+        states: &mut Vec<WireEntity>,
+    ) -> InterestQueryStats {
         states.clear();
-        let viewer = self.get(viewer_net_id)?;
         let center = replication_cell(viewer);
         let cell_wire = replication_cell_wire();
         let far_wire = INTEREST_FAR_RADIUS * WORLD_COORDINATE_SCALE;
@@ -300,10 +311,10 @@ impl ReplicationFrame {
             }
         }
 
-        Some(InterestQueryStats {
+        InterestQueryStats {
             candidates_checked,
             cells_visited,
-        })
+        }
     }
 }
 
@@ -567,7 +578,12 @@ fn plan_records(
 ) -> SnapshotPlan {
     assert!(max_bytes >= SNAPSHOT_HEADER_BYTES);
     let viewer = frame.get(viewer_net_id);
-    let query_stats = frame.query_interest_into(viewer_net_id, &mut scratch.interest_states);
+    let query_stats = viewer.map(|viewer_state| {
+        frame.query_interest_from_viewer_into(viewer_state, &mut scratch.interest_states)
+    });
+    if viewer.is_none() {
+        scratch.interest_states.clear();
+    }
     let interest_candidates_checked = query_stats.map_or(0, |stats| stats.candidates_checked);
     let visible_entity_count = query_stats.map_or(0, |_| scratch.interest_states.len());
     for bucket in scratch.buckets.iter_mut() {
@@ -1372,6 +1388,37 @@ mod tests {
 
         let actual = frame.query_interest(viewer_net_id).expect("viewer exists");
         assert_eq!(actual.states, expected);
+    }
+
+    #[test]
+    fn reused_viewer_interest_query_matches_public_lookup_semantics() {
+        let mut world = World::new(6000.0, 6000.0);
+        for (net_id, x, y) in [
+            (1, 1000.0, 1000.0),
+            (2, 1300.0, 1050.0),
+            (3, 1800.0, 1200.0),
+            (4, 2600.0, 1600.0),
+            (5, 4200.0, 2100.0),
+        ] {
+            assert!(world.add_player_at(net_id, x, y, 0.0));
+        }
+
+        let frame = ReplicationFrame::from_fighters(world.tick, world.fighters());
+        let public = frame.query_interest(3).expect("viewer exists");
+        let viewer = frame.get(3).expect("viewer exists");
+
+        let mut reused_states = vec![viewer];
+        let reused = frame.query_interest_from_viewer_into(viewer, &mut reused_states);
+
+        assert_eq!(reused_states, public.states);
+        assert_eq!(reused.candidates_checked, public.candidates_checked);
+        assert_eq!(reused.cells_visited, public.cells_visited);
+
+        reused_states.push(viewer);
+        assert!(frame
+            .query_interest_into(u32::MAX, &mut reused_states)
+            .is_none());
+        assert!(reused_states.is_empty());
     }
 
     #[test]
