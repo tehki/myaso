@@ -1,5 +1,5 @@
 use crate::simulation::Fighter;
-use std::collections::{BTreeMap, VecDeque};
+use std::collections::{BTreeMap, HashMap, VecDeque};
 
 pub const SNAPSHOT_PACKET_TYPE: u8 = 2;
 pub const SNAPSHOT_HEADER_BYTES: usize = 14;
@@ -210,13 +210,13 @@ pub struct InterestQueryStats {
 pub struct ReplicationFrame {
     server_tick: u32,
     states: Vec<WireEntity>,
-    cells: BTreeMap<(i32, i32), Vec<usize>>,
+    cells: HashMap<(i32, i32), Vec<usize>>,
 }
 
 impl ReplicationFrame {
     pub fn from_fighters(server_tick: u32, fighters: &[Fighter]) -> Self {
         let mut states = Vec::with_capacity(fighters.len());
-        let mut cells: BTreeMap<(i32, i32), Vec<usize>> = BTreeMap::new();
+        let mut cells: HashMap<(i32, i32), Vec<usize>> = HashMap::new();
         for fighter in fighters {
             let state = WireEntity::from_fighter(fighter);
             debug_assert!(
