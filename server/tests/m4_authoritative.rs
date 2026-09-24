@@ -305,6 +305,48 @@ fn squared_distance_rejection_preserves_collision_and_attack_boundaries() {
 }
 
 #[test]
+fn axis_prefilter_preserves_diagonal_collision_and_attack_ranges() {
+    let mut separated = World::new(600.0, 400.0);
+    assert!(separated.add_player_at(1, 200.0, 200.0, 0.0));
+    assert!(separated.add_player_at(2, 230.0, 230.0, 0.0));
+    separated.step_by(5.0);
+    let first = separated.fighter(1).expect("first");
+    let second = separated.fighter(2).expect("second");
+    assert_eq!((first.x, first.y), (200.0, 200.0));
+    assert_eq!((second.x, second.y), (230.0, 230.0));
+
+    let mut overlapping = World::new(600.0, 400.0);
+    assert!(overlapping.add_player_at(1, 200.0, 200.0, 0.0));
+    assert!(overlapping.add_player_at(2, 225.0, 225.0, 0.0));
+    overlapping.step_by(5.0);
+    let first = overlapping.fighter(1).expect("first");
+    let second = overlapping.fighter(2).expect("second");
+    assert!((second.x - first.x).hypot(second.y - first.y) >= 36.0 - 1e-4);
+
+    let attack = InputIntent {
+        attack: true,
+        facing_radians: 0.0,
+        ..InputIntent::default()
+    };
+    let target_input = InputIntent {
+        facing_radians: std::f32::consts::PI,
+        ..InputIntent::default()
+    };
+
+    let mut inside = World::new(600.0, 400.0);
+    assert!(inside.add_player_at(1, 200.0, 200.0, 0.0));
+    assert!(inside.add_player_at(2, 290.0, 220.0, std::f32::consts::PI));
+    advance(&mut inside, 230.0, attack, target_input);
+    assert_eq!(inside.fighter(2).expect("target").hp.round() as u8, 66);
+
+    let mut outside = World::new(600.0, 400.0);
+    assert!(outside.add_player_at(1, 200.0, 200.0, 0.0));
+    assert!(outside.add_player_at(2, 290.0, 230.0, std::f32::consts::PI));
+    advance(&mut outside, 230.0, attack, target_input);
+    assert_eq!(outside.fighter(2).expect("target").hp.round() as u8, 100);
+}
+
+#[test]
 fn timed_dodge_iframes_evade_an_otherwise_valid_hit() {
     let mut world = duel(72.0);
     advance(
