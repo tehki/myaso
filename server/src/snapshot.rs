@@ -1901,20 +1901,14 @@ mod tests {
             .copied()
             .filter(|net_id| {
                 !frame.get(*net_id).is_some_and(|state| {
-                    interest_distance_sq(viewer, state)
-                        <= INTEREST_FAR_RADIUS * INTEREST_FAR_RADIUS
+                    interest_distance_sq(viewer, state) <= INTEREST_FAR_RADIUS * INTEREST_FAR_RADIUS
                 })
             })
             .collect();
 
         let mut removals = Vec::new();
-        let count = collect_baseline_removals(
-            &frame,
-            true,
-            &visible_state_bits,
-            &baseline,
-            &mut removals,
-        );
+        let count =
+            collect_baseline_removals(&frame, true, &visible_state_bits, &baseline, &mut removals);
         assert_eq!(count, expected_removals.len());
         assert_eq!(
             removals
