@@ -1457,14 +1457,11 @@ fn uses_packed_record_header(encoding: u8) -> bool {
 }
 
 fn compact_wire_mask(mask: u8) -> u8 {
-    (mask & 0x0f) | ((mask & SNAPSHOT_FIELD_WIDE_POSITION) >> 0)
-        | ((mask & SNAPSHOT_FIELD_REMOVED) >> 2)
+    (mask & 0x1f) | ((mask & SNAPSHOT_FIELD_REMOVED) >> 2)
 }
 
 fn expand_compact_wire_mask(mask: u8) -> u8 {
-    (mask & 0x0f)
-        | ((mask & (1 << 4)) << 0)
-        | ((mask & (1 << 5)) << 2)
+    (mask & 0x1f) | ((mask & (1 << 5)) << 2)
 }
 
 fn encode_packed_record_header(net_id: u32, wire_mask: u8, bytes: &mut Vec<u8>) {
@@ -2002,6 +1999,72 @@ mod tests {
         );
         assert_eq!(visible_state_bits.as_ptr(), allocation);
         assert_eq!(visible_state_bits.capacity(), capacity);
+    }
+
+    #[test]
+    fn packed_record_headers_roundtrip_inline_and_escaped_net_ids() {
+        let records = vec![
+            SnapshotRecord {
+                net_id: 200,
+                mask: SNAPSHOT_FULL_FIELDS,
+                x: 800,
+                y: 1600,
+                facing: 2570,
+                hp: 91,
+                guard: 73,
+                action: 2,
+                flags: 1,
+            },
+            SnapshotRecord {
+                net_id: 512,
+                mask: SNAPSHOT_FIELD_POSITION | SNAPSHOT_FIELD_FACING,
+                x: 2400,
+                y: 3200,
+                facing: 5140,
+                hp: 0,
+                guard: 0,
+                action: 0,
+                flags: 0,
+            },
+            SnapshotRecord::removed(70_000),
+        ];
+
+        let packed = encode_snapshot_with_encoding(
+            7,
+            6,
+            1234,
+            false,
+            &records,
+            crate::CONSERVATIVE_DATAGRAM_BYTES,
+            SNAPSHOT_ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_U12_POSITION,
+        );
+        let previous = encode_snapshot_with_encoding(
+            7,
+            6,
+            1234,
+            false,
+            &records,
+            crate::CONSERVATIVE_DATAGRAM_BYTES,
+            SNAPSHOT_ENCODING_VARINT_IDS_U8_FACING_U12_POSITION,
+        );
+
+        assert!(packed.bytes.len() < previous.bytes.len());
+        let decoded = decode_snapshot(&packed.bytes).expect("packed snapshot decodes");
+        assert_eq!(
+            decoded.encoding,
+            SNAPSHOT_ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_U12_POSITION
+        );
+        assert_eq!(decoded.records, records);
+
+        let wide_mask = SNAPSHOT_FULL_FIELDS | SNAPSHOT_FIELD_WIDE_POSITION;
+        assert_eq!(
+            expand_compact_wire_mask(compact_wire_mask(wide_mask)),
+            wide_mask
+        );
+        assert_eq!(
+            expand_compact_wire_mask(compact_wire_mask(SNAPSHOT_FIELD_REMOVED)),
+            SNAPSHOT_FIELD_REMOVED
+        );
     }
 
     #[test]
