@@ -158,6 +158,9 @@ jobs:
       - name: Validate M84 planned byte composition
         run: cargo test --locked --manifest-path server/Cargo.toml planned_byte_composition_matches_encoder_sizing
 
+      - name: Validate M85 planner-owned last-sent updates
+        run: cargo test --locked --manifest-path server/Cargo.toml planner_updates_last_sent_only_for_admitted_records
+
       - name: Validate real browser flight
         env:
           MYASO_FLIGHT_DURATION_MS: "4000"
