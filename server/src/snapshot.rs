@@ -1939,7 +1939,10 @@ mod tests {
         let mut session = SnapshotSession::new(64);
         let first =
             session.build_from_frame(u16::MAX, 1, &frame, crate::CONSERVATIVE_DATAGRAM_BYTES);
-        let first_history = session.history.back().expect("first snapshot history entry");
+        let first_history = session
+            .history
+            .back()
+            .expect("first snapshot history entry");
         let first_ptr = first_history.records.as_ptr();
         let first_capacity = first_history.records.capacity();
         assert!(first_capacity >= first.record_count);
@@ -1954,7 +1957,10 @@ mod tests {
             &changed_frame,
             crate::CONSERVATIVE_DATAGRAM_BYTES,
         );
-        let newest = session.history.back().expect("second snapshot history entry");
+        let newest = session
+            .history
+            .back()
+            .expect("second snapshot history entry");
 
         assert!(!second.full);
         assert_eq!(second.baseline_sequence, first.sequence);
