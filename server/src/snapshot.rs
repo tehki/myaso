@@ -1526,11 +1526,6 @@ fn position_bytes_for_encoding(position_encoding: PositionWireEncoding) -> usize
     }
 }
 
-fn position_bytes_for_record(record: &SnapshotRecord, encoding: u8) -> usize {
-    let wire_mask = encoded_record_mask(record, encoding);
-    position_bytes_for_encoding(position_wire_encoding(record, wire_mask, encoding, None))
-}
-
 fn position_is_compact(x: u16, y: u16) -> bool {
     x <= COMPACT_POSITION_MAX && y <= COMPACT_POSITION_MAX
 }
