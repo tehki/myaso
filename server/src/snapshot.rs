@@ -333,7 +333,7 @@ pub struct SnapshotSession {
     history: VecDeque<SnapshotHistoryEntry>,
     acknowledged_sequence: Option<u16>,
     acknowledged_state: BTreeMap<u32, WireEntity>,
-    last_sent_tick: BTreeMap<u32, u32>,
+    last_sent_tick: HashMap<u32, u32>,
     planner_scratch: SnapshotPlannerScratch,
     recycled_records: Vec<SnapshotRecord>,
 }
@@ -353,7 +353,7 @@ impl SnapshotSession {
             history: VecDeque::with_capacity(history_limit),
             acknowledged_sequence: None,
             acknowledged_state: BTreeMap::new(),
-            last_sent_tick: BTreeMap::new(),
+            last_sent_tick: HashMap::new(),
             planner_scratch: SnapshotPlannerScratch::default(),
             recycled_records: Vec::new(),
         }
@@ -572,7 +572,7 @@ fn plan_records(
     server_tick: u32,
     frame: &ReplicationFrame,
     baseline: &BTreeMap<u32, WireEntity>,
-    last_sent_tick: &BTreeMap<u32, u32>,
+    last_sent_tick: &HashMap<u32, u32>,
     max_bytes: usize,
     scratch: &mut SnapshotPlannerScratch,
 ) -> SnapshotPlan {
