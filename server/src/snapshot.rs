@@ -9,8 +9,8 @@ pub const SNAPSHOT_ENCODING_VARINT_IDS: u8 = 1;
 pub const SNAPSHOT_ENCODING_VARINT_IDS_U8_FACING: u8 = 2;
 pub const SNAPSHOT_ENCODING_VARINT_IDS_U8_FACING_U12_POSITION: u8 = 3;
 pub const SNAPSHOT_ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_U12_POSITION: u8 = 4;
-pub const SNAPSHOT_ENCODING_CURRENT: u8 =
-    SNAPSHOT_ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_U12_POSITION;
+pub const SNAPSHOT_ENCODING_PACKED_ACTION_FLAGS: u8 = 5;
+pub const SNAPSHOT_ENCODING_CURRENT: u8 = SNAPSHOT_ENCODING_PACKED_ACTION_FLAGS;
 pub const SNAPSHOT_FLAG_FULL: u8 = 1;
 pub const SNAPSHOT_FIELD_POSITION: u8 = 1 << 0;
 pub const SNAPSHOT_FIELD_FACING: u8 = 1 << 1;
@@ -134,6 +134,7 @@ pub enum SnapshotDecodeError {
     UnsupportedEncoding(u8),
     InvalidVarint,
     InvalidPositionEncoding,
+    InvalidActionEncoding,
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
@@ -1111,6 +1112,7 @@ fn encode_snapshot_with_composition(
             | SNAPSHOT_ENCODING_VARINT_IDS_U8_FACING
             | SNAPSHOT_ENCODING_VARINT_IDS_U8_FACING_U12_POSITION
             | SNAPSHOT_ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_U12_POSITION
+            | SNAPSHOT_ENCODING_PACKED_ACTION_FLAGS
     ));
     let total_bytes = composition.total_bytes();
 
@@ -1172,8 +1174,12 @@ fn encode_record_fields(record: &SnapshotRecord, wire_mask: u8, bytes: &mut Vec<
         bytes.push(record.guard);
     }
     if record.mask & SNAPSHOT_FIELD_ACTION != 0 {
-        bytes.push(record.action);
-        bytes.push(record.flags);
+        if uses_compact_action_flags(encoding) {
+            encode_compact_action_flags(record.action, record.flags, bytes);
+        } else {
+            bytes.push(record.action);
+            bytes.push(record.flags);
+        }
     }
 }
 
@@ -1195,6 +1201,7 @@ pub fn decode_snapshot(bytes: &[u8]) -> Result<DecodedSnapshot, SnapshotDecodeEr
             | SNAPSHOT_ENCODING_VARINT_IDS_U8_FACING
             | SNAPSHOT_ENCODING_VARINT_IDS_U8_FACING_U12_POSITION
             | SNAPSHOT_ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_U12_POSITION
+            | SNAPSHOT_ENCODING_PACKED_ACTION_FLAGS
     ) {
         return Err(SnapshotDecodeError::UnsupportedEncoding(encoding));
     }
@@ -1309,10 +1316,14 @@ fn decode_record_fields(
         *offset += 2;
     }
     if record.mask & SNAPSHOT_FIELD_ACTION != 0 {
-        require(bytes, *offset, 2)?;
-        record.action = bytes[*offset];
-        record.flags = bytes[*offset + 1];
-        *offset += 2;
+        if uses_compact_action_flags(encoding) {
+            (record.action, record.flags) = decode_compact_action_flags(bytes, offset)?;
+        } else {
+            require(bytes, *offset, 2)?;
+            record.action = bytes[*offset];
+            record.flags = bytes[*offset + 1];
+            *offset += 2;
+        }
     }
     Ok(())
 }
@@ -1346,7 +1357,8 @@ fn snapshot_record_composition_for_encoding(
         | SNAPSHOT_ENCODING_VARINT_IDS_U8_FACING_U12_POSITION => {
             (u32_varint_bytes(record.net_id), 1)
         }
-        SNAPSHOT_ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_U12_POSITION => {
+        SNAPSHOT_ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_U12_POSITION
+        | SNAPSHOT_ENCODING_PACKED_ACTION_FLAGS => {
             let escaped = record.net_id >= u32::from(PACKED_RECORD_NET_ID_ESCAPE);
             (1 + (escaped as usize) * u32_varint_bytes(record.net_id), 1)
         }
@@ -1370,7 +1382,7 @@ fn snapshot_record_composition_for_encoding(
         composition.vitals = 2;
     }
     if record.mask & SNAPSHOT_FIELD_ACTION != 0 {
-        composition.action = 2;
+        composition.action = action_bytes_for_record(record, encoding);
     }
     composition
 }
@@ -1429,6 +1441,7 @@ fn uses_compact_position(encoding: u8) -> bool {
         encoding,
         SNAPSHOT_ENCODING_VARINT_IDS_U8_FACING_U12_POSITION
             | SNAPSHOT_ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_U12_POSITION
+            | SNAPSHOT_ENCODING_PACKED_ACTION_FLAGS
     )
 }
 
@@ -1438,6 +1451,7 @@ fn uses_compact_facing(encoding: u8) -> bool {
         SNAPSHOT_ENCODING_VARINT_IDS_U8_FACING
             | SNAPSHOT_ENCODING_VARINT_IDS_U8_FACING_U12_POSITION
             | SNAPSHOT_ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_U12_POSITION
+            | SNAPSHOT_ENCODING_PACKED_ACTION_FLAGS
     )
 }
 
@@ -1450,7 +1464,70 @@ fn facing_bytes_for_encoding(encoding: u8) -> usize {
 }
 
 fn uses_packed_record_header(encoding: u8) -> bool {
-    encoding == SNAPSHOT_ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_U12_POSITION
+    matches!(
+        encoding,
+        SNAPSHOT_ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_U12_POSITION
+            | SNAPSHOT_ENCODING_PACKED_ACTION_FLAGS
+    )
+}
+
+fn uses_compact_action_flags(encoding: u8) -> bool {
+    encoding == SNAPSHOT_ENCODING_PACKED_ACTION_FLAGS
+}
+
+fn action_bytes_for_record(record: &SnapshotRecord, encoding: u8) -> usize {
+    if uses_compact_action_flags(encoding) {
+        1 + usize::from(record.action >= 15) + usize::from(record.flags >= 15)
+    } else {
+        2
+    }
+}
+
+fn encode_compact_action_flags(action: u8, flags: u8, bytes: &mut Vec<u8>) {
+    let action_nibble = if action < 15 { action } else { 15 };
+    let flags_nibble = if flags < 15 { flags } else { 15 };
+    bytes.push(action_nibble | (flags_nibble << 4));
+    if action_nibble == 15 {
+        bytes.push(action);
+    }
+    if flags_nibble == 15 {
+        bytes.push(flags);
+    }
+}
+
+fn decode_compact_action_flags(
+    bytes: &[u8],
+    offset: &mut usize,
+) -> Result<(u8, u8), SnapshotDecodeError> {
+    require(bytes, *offset, 1)?;
+    let packed = bytes[*offset];
+    *offset += 1;
+    let action_nibble = packed & 0x0f;
+    let flags_nibble = packed >> 4;
+
+    let action = if action_nibble == 15 {
+        require(bytes, *offset, 1)?;
+        let escaped = bytes[*offset];
+        *offset += 1;
+        if escaped < 15 {
+            return Err(SnapshotDecodeError::InvalidActionEncoding);
+        }
+        escaped
+    } else {
+        action_nibble
+    };
+    let flags = if flags_nibble == 15 {
+        require(bytes, *offset, 1)?;
+        let escaped = bytes[*offset];
+        *offset += 1;
+        if escaped < 15 {
+            return Err(SnapshotDecodeError::InvalidActionEncoding);
+        }
+        escaped
+    } else {
+        flags_nibble
+    };
+    Ok((action, flags))
 }
 
 fn compact_wire_mask(mask: u8) -> u8 {
