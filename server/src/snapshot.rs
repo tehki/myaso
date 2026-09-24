@@ -321,11 +321,26 @@ impl ReplicationFrame {
         &self,
         viewer: WireEntity,
         states: &mut Vec<WireEntity>,
+        distances_sq: Option<&mut Vec<f32>>,
+    ) -> InterestQueryStats {
+        self.query_interest_from_viewer_into_with_scratch(viewer, states, distances_sq, None)
+    }
+
+    fn query_interest_from_viewer_into_with_scratch(
+        &self,
+        viewer: WireEntity,
+        states: &mut Vec<WireEntity>,
         mut distances_sq: Option<&mut Vec<f32>>,
+        mut visible_state_bits: Option<&mut Vec<u64>>,
     ) -> InterestQueryStats {
         states.clear();
         if let Some(distances_sq) = distances_sq.as_deref_mut() {
             distances_sq.clear();
+        }
+        if let Some(visible_state_bits) = visible_state_bits.as_deref_mut() {
+            let word_count = self.states.len().div_ceil(u64::BITS as usize);
+            visible_state_bits.resize(word_count, 0);
+            visible_state_bits.fill(0);
         }
         let center = replication_cell(viewer);
         let cell_wire = replication_cell_wire();
@@ -357,6 +372,11 @@ impl ReplicationFrame {
                         states.push(state);
                         if let Some(distances_sq) = distances_sq.as_deref_mut() {
                             distances_sq.push(distance_sq);
+                        }
+                        if let Some(visible_state_bits) = visible_state_bits.as_deref_mut() {
+                            let word = state_index / u64::BITS as usize;
+                            let bit = state_index % u64::BITS as usize;
+                            visible_state_bits[word] |= 1_u64 << bit;
                         }
                     }
                 }
@@ -630,6 +650,7 @@ struct PlannedRecord {
 struct SnapshotPlannerScratch {
     interest_states: Vec<WireEntity>,
     interest_distances_sq: Vec<f32>,
+    visible_state_bits: Vec<u64>,
     buckets: [Vec<PlannedRecord>; 9],
     records: Vec<SnapshotRecord>,
 }
@@ -656,15 +677,17 @@ fn plan_records(
     assert!(max_bytes >= SNAPSHOT_HEADER_BYTES);
     let viewer = frame.get(viewer_net_id);
     let query_stats = viewer.map(|viewer_state| {
-        frame.query_interest_from_viewer_into_with_distances(
+        frame.query_interest_from_viewer_into_with_scratch(
             viewer_state,
             &mut scratch.interest_states,
             Some(&mut scratch.interest_distances_sq),
+            Some(&mut scratch.visible_state_bits),
         )
     });
     if viewer.is_none() {
         scratch.interest_states.clear();
         scratch.interest_distances_sq.clear();
+        scratch.visible_state_bits.clear();
     }
     let interest_candidates_checked = query_stats.map_or(0, |stats| stats.candidates_checked);
     let visible_entity_count = query_stats.map_or(0, |_| scratch.interest_states.len());
@@ -738,7 +761,13 @@ fn plan_records(
         }
     }
 
-    due_count += collect_baseline_removals(frame, viewer, baseline, &mut scratch.buckets[4]);
+    due_count += collect_baseline_removals(
+        frame,
+        viewer.is_some(),
+        &scratch.visible_state_bits,
+        baseline,
+        &mut scratch.buckets[4],
+    );
 
     let mut bytes_used = SNAPSHOT_HEADER_BYTES;
     let mut byte_composition = SnapshotByteComposition {
@@ -804,11 +833,12 @@ fn plan_records(
 
 fn collect_baseline_removals(
     frame: &ReplicationFrame,
-    viewer: Option<WireEntity>,
+    viewer_present: bool,
+    visible_state_bits: &[u64],
     baseline: &BTreeMap<u32, WireEntity>,
     removals: &mut Vec<PlannedRecord>,
 ) -> usize {
-    let Some(viewer_state) = viewer else {
+    if !viewer_present {
         let start_len = removals.len();
         removals.extend(baseline.keys().copied().map(|net_id| PlannedRecord {
             record: SnapshotRecord::removed(net_id),
@@ -817,7 +847,7 @@ fn collect_baseline_removals(
             priority_age_ticks: 0,
         }));
         return removals.len() - start_len;
-    };
+    }
 
     let start_len = removals.len();
     let mut state_index = 0_usize;
@@ -828,12 +858,8 @@ fn collect_baseline_removals(
         let still_visible = frame
             .states
             .get(state_index)
-            .copied()
             .filter(|state| state.net_id == net_id)
-            .is_some_and(|state| {
-                interest_distance_sq(viewer_state, state)
-                    <= INTEREST_FAR_RADIUS * INTEREST_FAR_RADIUS
-            });
+            .is_some_and(|_| state_index_is_visible(visible_state_bits, state_index));
         if still_visible {
             continue;
         }
@@ -845,6 +871,14 @@ fn collect_baseline_removals(
         });
     }
     removals.len() - start_len
+}
+
+fn state_index_is_visible(visible_state_bits: &[u64], state_index: usize) -> bool {
+    let word = state_index / u64::BITS as usize;
+    let bit = state_index % u64::BITS as usize;
+    visible_state_bits
+        .get(word)
+        .is_some_and(|bits| bits & (1_u64 << bit) != 0)
 }
 
 fn freshness_tier(distance_sq: f32, is_owner: bool) -> FreshnessTier {
