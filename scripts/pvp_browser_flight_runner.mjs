@@ -1542,10 +1542,11 @@ async function runOnlineUiKillFeedFlight(entries) {
     true,
   );
 
-  // Keep the first killer well clear of the second exchange. The first kill may
-  // require retry movement toward center, so a fixed 260 ms retreat can leave the
-  // left fighter inside the right attacker's authoritative strike geometry.
-  await pulseMovementKey(left, "a", 520);
+  // Keep the first killer completely outside the second exchange. Authoritative
+  // attacks can hit every fighter inside the 94-unit reach/arc, so horizontal
+  // ordering alone cannot isolate center. Move the first killer perpendicular to
+  // the spawn lane far beyond strike radius before staging the right attacker.
+  await pulseMovementKey(left, "s", 650);
   await aimArena(right, rightArena, -200);
   await sleep(60);
   await pulseMovementKey(right, "a", 260);
