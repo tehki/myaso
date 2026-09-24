@@ -273,8 +273,19 @@ impl ReplicationFrame {
         viewer_net_id: u32,
         states: &mut Vec<WireEntity>,
     ) -> Option<InterestQueryStats> {
+        let Some(viewer) = self.get(viewer_net_id) else {
+            states.clear();
+            return None;
+        };
+        Some(self.query_interest_from_viewer_into(viewer, states))
+    }
+
+    fn query_interest_from_viewer_into(
+        &self,
+        viewer: WireEntity,
+        states: &mut Vec<WireEntity>,
+    ) -> InterestQueryStats {
         states.clear();
-        let viewer = self.get(viewer_net_id)?;
         let center = replication_cell(viewer);
         let cell_wire = replication_cell_wire();
         let far_wire = INTEREST_FAR_RADIUS * WORLD_COORDINATE_SCALE;
@@ -300,10 +311,10 @@ impl ReplicationFrame {
             }
         }
 
-        Some(InterestQueryStats {
+        InterestQueryStats {
             candidates_checked,
             cells_visited,
-        })
+        }
     }
 }
 
@@ -567,7 +578,12 @@ fn plan_records(
 ) -> SnapshotPlan {
     assert!(max_bytes >= SNAPSHOT_HEADER_BYTES);
     let viewer = frame.get(viewer_net_id);
-    let query_stats = frame.query_interest_into(viewer_net_id, &mut scratch.interest_states);
+    let query_stats = viewer.map(|viewer_state| {
+        frame.query_interest_from_viewer_into(viewer_state, &mut scratch.interest_states)
+    });
+    if viewer.is_none() {
+        scratch.interest_states.clear();
+    }
     let interest_candidates_checked = query_stats.map_or(0, |stats| stats.candidates_checked);
     let visible_entity_count = query_stats.map_or(0, |_| scratch.interest_states.len());
     for bucket in scratch.buckets.iter_mut() {
