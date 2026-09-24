@@ -211,6 +211,11 @@ jobs:
           cargo test --locked --manifest-path server/Cargo.toml packed_record_headers_roundtrip_inline_and_escaped_net_ids
           node --test --test-name-pattern="packed snapshot record headers" tests/networking.test.mjs
 
+      - name: Validate M102 local-cell snapshot positions
+        run: |
+          cargo test --locked --manifest-path server/Cargo.toml local_cell_positions_preserve_compact_coordinates_and_exact_budgeting
+          node --test --test-name-pattern="local-cell snapshot positions" tests/networking.test.mjs
+
       - name: Validate real browser flight
         env:
           MYASO_FLIGHT_DURATION_MS: "4000"
