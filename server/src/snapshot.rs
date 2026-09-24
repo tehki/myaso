@@ -321,11 +321,26 @@ impl ReplicationFrame {
         &self,
         viewer: WireEntity,
         states: &mut Vec<WireEntity>,
+        distances_sq: Option<&mut Vec<f32>>,
+    ) -> InterestQueryStats {
+        self.query_interest_from_viewer_into_with_scratch(viewer, states, distances_sq, None)
+    }
+
+    fn query_interest_from_viewer_into_with_scratch(
+        &self,
+        viewer: WireEntity,
+        states: &mut Vec<WireEntity>,
         mut distances_sq: Option<&mut Vec<f32>>,
+        mut visible_state_bits: Option<&mut Vec<u64>>,
     ) -> InterestQueryStats {
         states.clear();
         if let Some(distances_sq) = distances_sq.as_deref_mut() {
             distances_sq.clear();
+        }
+        if let Some(visible_state_bits) = visible_state_bits.as_deref_mut() {
+            let word_count = self.states.len().div_ceil(u64::BITS as usize);
+            visible_state_bits.resize(word_count, 0);
+            visible_state_bits.fill(0);
         }
         let center = replication_cell(viewer);
         let cell_wire = replication_cell_wire();
@@ -357,6 +372,11 @@ impl ReplicationFrame {
                         states.push(state);
                         if let Some(distances_sq) = distances_sq.as_deref_mut() {
                             distances_sq.push(distance_sq);
+                        }
+                        if let Some(visible_state_bits) = visible_state_bits.as_deref_mut() {
+                            let word = state_index / u64::BITS as usize;
+                            let bit = state_index % u64::BITS as usize;
+                            visible_state_bits[word] |= 1_u64 << bit;
                         }
                     }
                 }
@@ -630,6 +650,7 @@ struct PlannedRecord {
 struct SnapshotPlannerScratch {
     interest_states: Vec<WireEntity>,
     interest_distances_sq: Vec<f32>,
+    visible_state_bits: Vec<u64>,
     buckets: [Vec<PlannedRecord>; 9],
     records: Vec<SnapshotRecord>,
 }
@@ -656,15 +677,17 @@ fn plan_records(
     assert!(max_bytes >= SNAPSHOT_HEADER_BYTES);
     let viewer = frame.get(viewer_net_id);
     let query_stats = viewer.map(|viewer_state| {
-        frame.query_interest_from_viewer_into_with_distances(
+        frame.query_interest_from_viewer_into_with_scratch(
             viewer_state,
             &mut scratch.interest_states,
             Some(&mut scratch.interest_distances_sq),
+            Some(&mut scratch.visible_state_bits),
         )
     });
     if viewer.is_none() {
         scratch.interest_states.clear();
         scratch.interest_distances_sq.clear();
+        scratch.visible_state_bits.clear();
     }
     let interest_candidates_checked = query_stats.map_or(0, |stats| stats.candidates_checked);
     let visible_entity_count = query_stats.map_or(0, |_| scratch.interest_states.len());
@@ -738,7 +761,13 @@ fn plan_records(
         }
     }
 
-    due_count += collect_baseline_removals(frame, viewer, baseline, &mut scratch.buckets[4]);
+    due_count += collect_baseline_removals(
+        frame,
+        viewer.is_some(),
+        &scratch.visible_state_bits,
+        baseline,
+        &mut scratch.buckets[4],
+    );
 
     let mut bytes_used = SNAPSHOT_HEADER_BYTES;
     let mut byte_composition = SnapshotByteComposition {
@@ -804,11 +833,12 @@ fn plan_records(
 
 fn collect_baseline_removals(
     frame: &ReplicationFrame,
-    viewer: Option<WireEntity>,
+    viewer_present: bool,
+    visible_state_bits: &[u64],
     baseline: &BTreeMap<u32, WireEntity>,
     removals: &mut Vec<PlannedRecord>,
 ) -> usize {
-    let Some(viewer_state) = viewer else {
+    if !viewer_present {
         let start_len = removals.len();
         removals.extend(baseline.keys().copied().map(|net_id| PlannedRecord {
             record: SnapshotRecord::removed(net_id),
@@ -817,7 +847,7 @@ fn collect_baseline_removals(
             priority_age_ticks: 0,
         }));
         return removals.len() - start_len;
-    };
+    }
 
     let start_len = removals.len();
     let mut state_index = 0_usize;
@@ -828,12 +858,8 @@ fn collect_baseline_removals(
         let still_visible = frame
             .states
             .get(state_index)
-            .copied()
             .filter(|state| state.net_id == net_id)
-            .is_some_and(|state| {
-                interest_distance_sq(viewer_state, state)
-                    <= INTEREST_FAR_RADIUS * INTEREST_FAR_RADIUS
-            });
+            .is_some_and(|_| state_index_is_visible(visible_state_bits, state_index));
         if still_visible {
             continue;
         }
@@ -845,6 +871,14 @@ fn collect_baseline_removals(
         });
     }
     removals.len() - start_len
+}
+
+fn state_index_is_visible(visible_state_bits: &[u64], state_index: usize) -> bool {
+    let word = state_index / u64::BITS as usize;
+    let bit = state_index % u64::BITS as usize;
+    visible_state_bits
+        .get(word)
+        .is_some_and(|bits| bits & (1_u64 << bit) != 0)
 }
 
 fn freshness_tier(distance_sq: f32, is_owner: bool) -> FreshnessTier {
@@ -1800,6 +1834,101 @@ mod tests {
     }
 
     #[test]
+    fn baseline_removals_reuse_interest_visibility_bits() {
+        let mut world = World::new(8192.0, 8192.0);
+        for (net_id, x, y) in [
+            (1, 3328.0, 3328.0),
+            (2, 3500.0, 3400.0),
+            (3, 4800.0, 3500.0),
+            (4, 5820.0, 3328.0),
+            (5, 5700.0, 5700.0),
+            (6, 900.0, 900.0),
+        ] {
+            assert!(world.add_player_at(net_id, x, y, 0.0));
+        }
+
+        let frame = ReplicationFrame::from_fighters(world.tick, world.fighters());
+        let viewer = frame.get(1).expect("viewer exists");
+        let mut states = Vec::new();
+        let mut distances_sq = Vec::new();
+        let mut visible_state_bits = Vec::new();
+
+        frame.query_interest_from_viewer_into_with_scratch(
+            viewer,
+            &mut states,
+            Some(&mut distances_sq),
+            Some(&mut visible_state_bits),
+        );
+
+        let allocation = visible_state_bits.as_ptr();
+        let capacity = visible_state_bits.capacity();
+        assert_eq!(
+            visible_state_bits.len(),
+            frame.states.len().div_ceil(u64::BITS as usize)
+        );
+
+        for (index, state) in frame.states.iter().copied().enumerate() {
+            let expected_visible =
+                interest_distance_sq(viewer, state) <= INTEREST_FAR_RADIUS * INTEREST_FAR_RADIUS;
+            assert_eq!(
+                state_index_is_visible(&visible_state_bits, index),
+                expected_visible
+            );
+        }
+
+        let mut baseline: BTreeMap<_, _> = frame
+            .states
+            .iter()
+            .copied()
+            .map(|state| (state.net_id, state))
+            .collect();
+        baseline.insert(
+            7,
+            WireEntity {
+                net_id: 7,
+                x: 0,
+                y: 0,
+                facing: 0,
+                hp: 100,
+                guard: 100,
+                action: 0,
+                flags: 0,
+            },
+        );
+
+        let expected_removals: Vec<_> = baseline
+            .keys()
+            .copied()
+            .filter(|net_id| {
+                !frame.get(*net_id).is_some_and(|state| {
+                    interest_distance_sq(viewer, state) <= INTEREST_FAR_RADIUS * INTEREST_FAR_RADIUS
+                })
+            })
+            .collect();
+
+        let mut removals = Vec::new();
+        let count =
+            collect_baseline_removals(&frame, true, &visible_state_bits, &baseline, &mut removals);
+        assert_eq!(count, expected_removals.len());
+        assert_eq!(
+            removals
+                .iter()
+                .map(|planned| planned.record.net_id)
+                .collect::<Vec<_>>(),
+            expected_removals
+        );
+
+        frame.query_interest_from_viewer_into_with_scratch(
+            viewer,
+            &mut states,
+            Some(&mut distances_sq),
+            Some(&mut visible_state_bits),
+        );
+        assert_eq!(visible_state_bits.as_ptr(), allocation);
+        assert_eq!(visible_state_bits.capacity(), capacity);
+    }
+
+    #[test]
     fn snapshot_sequence_wrap_skips_reserved_no_ack_sentinel() {
         let mut world = World::new(1200.0, 800.0);
         assert!(world.add_player_at(1, 400.0, 300.0, 0.0));
@@ -1968,8 +2097,25 @@ mod tests {
             })
             .collect();
 
+        let mut visible_states = Vec::new();
+        let mut visible_state_bits = Vec::new();
+        if let Some(viewer_state) = viewer {
+            frame.query_interest_from_viewer_into_with_scratch(
+                viewer_state,
+                &mut visible_states,
+                None,
+                Some(&mut visible_state_bits),
+            );
+        }
+
         let mut removals = Vec::new();
-        let count = collect_baseline_removals(&frame, viewer, &baseline, &mut removals);
+        let count = collect_baseline_removals(
+            &frame,
+            viewer.is_some(),
+            &visible_state_bits,
+            &baseline,
+            &mut removals,
+        );
         let actual: Vec<_> = removals
             .iter()
             .map(|planned| planned.record.net_id)
@@ -1979,7 +2125,8 @@ mod tests {
         assert_eq!(actual, expected);
 
         removals.clear();
-        let no_viewer_count = collect_baseline_removals(&frame, None, &baseline, &mut removals);
+        let no_viewer_count =
+            collect_baseline_removals(&frame, false, &[], &baseline, &mut removals);
         assert_eq!(no_viewer_count, baseline.len());
         assert_eq!(
             removals
