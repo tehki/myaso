@@ -194,31 +194,51 @@ function expandCompactWireMask(mask) {
   return (mask & 0x1f) | ((mask & (1 << 5)) << 2);
 }
 
+function expandPackedWireMask(compactMask, encoding) {
+  if (
+    encoding === ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_LOCAL_U12_POSITION
+    && (compactMask & PACKED_MASK_LOCAL_POSITION_FLAG)
+    && compactMask !== PACKED_MASK_LOCAL_POSITION_FLAG
+  ) {
+    if (!(compactMask & FIELD_POSITION) || (compactMask & FIELD_WIDE_POSITION)) {
+      throw new RangeError("invalid local-position marker");
+    }
+    return { mask: compactMask & 0x0f, localPosition: true };
+  }
+  return { mask: expandCompactWireMask(compactMask), localPosition: false };
+}
+
 function readPackedRecordHeader(view, offset) {
   requireBytes(view, offset, 2);
   const packed = view.getUint16(offset, true);
   offset += 2;
   const inlineNetId = packed & PACKED_RECORD_NET_ID_MASK;
-  const mask = expandCompactWireMask(packed >>> PACKED_RECORD_NET_ID_BITS);
+  const compactMask = packed >>> PACKED_RECORD_NET_ID_BITS;
   if (inlineNetId !== PACKED_RECORD_NET_ID_ESCAPE) {
-    return { netId: inlineNetId, mask, offset };
+    return { netId: inlineNetId, compactMask, offset };
   }
   const decoded = readUint32Varint(view, offset);
   if (decoded.value < PACKED_RECORD_NET_ID_ESCAPE) {
     throw new RangeError("non-canonical packed snapshot netId");
   }
-  return { netId: decoded.value, mask, offset: decoded.offset };
+  return { netId: decoded.value, compactMask, offset: decoded.offset };
+}
+
+function replicationCellWire() {
+  return NETWORK.interest.cellSize * NETWORK.worldCoordinateScale;
 }
 
 function usesCompactPosition(encoding) {
   return encoding === ENCODING_VARINT_IDS_U8_FACING_U12_POSITION
-    || encoding === ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_U12_POSITION;
+    || encoding === ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_U12_POSITION
+    || encoding === ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_LOCAL_U12_POSITION;
 }
 
 function usesCompactFacing(encoding) {
   return encoding === ENCODING_VARINT_IDS_U8_FACING
     || encoding === ENCODING_VARINT_IDS_U8_FACING_U12_POSITION
-    || encoding === ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_U12_POSITION;
+    || encoding === ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_U12_POSITION
+    || encoding === ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_LOCAL_U12_POSITION;
 }
 
 function readUint32Varint(view, offset) {
@@ -255,7 +275,8 @@ function assertSnapshotEncoding(encoding) {
     && encoding !== ENCODING_VARINT_IDS
     && encoding !== ENCODING_VARINT_IDS_U8_FACING
     && encoding !== ENCODING_VARINT_IDS_U8_FACING_U12_POSITION
-    && encoding !== ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_U12_POSITION) {
+    && encoding !== ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_U12_POSITION
+    && encoding !== ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_LOCAL_U12_POSITION) {
     throw new RangeError(`unsupported snapshot encoding ${encoding}`);
   }
 }
