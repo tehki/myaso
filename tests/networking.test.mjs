@@ -193,6 +193,67 @@ test("local-cell snapshot positions save a byte without changing compact coordin
   assert.equal(state.get(13).y, 450);
 });
 
+test("compact snapshot action flags shrink common values and preserve wide escapes", () => {
+  const records = [
+    { netId: 10, mask: SNAPSHOT_FIELDS.ACTION, action: 2, flags: 1 },
+    { netId: 11, mask: SNAPSHOT_FIELDS.ACTION, action: 8, flags: 2 },
+    { netId: 12, mask: SNAPSHOT_FIELDS.ACTION, action: 0, flags: 0 },
+    { netId: 13, mask: SNAPSHOT_FIELDS.ACTION, action: 200, flags: 240 },
+  ];
+
+  const compact = encodeSnapshot({
+    sequence: 10,
+    baselineSequence: 9,
+    serverTick: 789,
+    records,
+    maxBytes: 1100,
+    encoding: SNAPSHOT_ENCODINGS.PACKED_U10_IDS_U6_MASK_U8_FACING_LOCAL_U12_POSITION_U4_ACTION_FLAGS,
+  });
+  const previous = encodeSnapshot({
+    sequence: 10,
+    baselineSequence: 9,
+    serverTick: 789,
+    records,
+    maxBytes: 1100,
+    encoding: SNAPSHOT_ENCODINGS.PACKED_U10_IDS_U6_MASK_U8_FACING_LOCAL_U12_POSITION,
+  });
+
+  assert.equal(compact.byteLength + 2, previous.byteLength);
+  assert.deepEqual(decodeSnapshot(compact).records, records);
+
+  const state = new Map();
+  const applied = applySnapshotPacketInPlace(state, compact);
+  assert.equal(
+    applied.encoding,
+    SNAPSHOT_ENCODINGS.PACKED_U10_IDS_U6_MASK_U8_FACING_LOCAL_U12_POSITION_U4_ACTION_FLAGS,
+  );
+  assert.equal(state.get(10).action, 2);
+  assert.equal(state.get(10).flags, 1);
+  assert.equal(state.get(13).action, 200);
+  assert.equal(state.get(13).flags, 240);
+
+  const malformed = new Uint8Array(encodeSnapshot({
+    sequence: 11,
+    baselineSequence: 10,
+    serverTick: 790,
+    records: [{ netId: 10, mask: SNAPSHOT_FIELDS.ACTION, action: 16, flags: 0 }],
+    maxBytes: 1100,
+    encoding: SNAPSHOT_ENCODINGS.PACKED_U10_IDS_U6_MASK_U8_FACING_LOCAL_U12_POSITION_U4_ACTION_FLAGS,
+  }));
+  const actionOffset = 14 + 2;
+  assert.equal(malformed[actionOffset], 0xff);
+  malformed[actionOffset + 1] = 2;
+  malformed[actionOffset + 2] = 1;
+  assert.throws(
+    () => decodeSnapshot(malformed),
+    /non-canonical compact snapshot action flags/,
+  );
+  assert.throws(
+    () => applySnapshotPacketInPlace(new Map(), malformed),
+    /non-canonical compact snapshot action flags/,
+  );
+});
+
 test("snapshot encoder refuses to fragment beyond the datagram budget", () => {
   // Keep this fixture well beyond the budget even as record encodings become
   // more compact; the contract under test is fail-closed fragmentation.
