@@ -314,7 +314,19 @@ impl ReplicationFrame {
         viewer: WireEntity,
         states: &mut Vec<WireEntity>,
     ) -> InterestQueryStats {
+        self.query_interest_from_viewer_into_with_distances(viewer, states, None)
+    }
+
+    fn query_interest_from_viewer_into_with_distances(
+        &self,
+        viewer: WireEntity,
+        states: &mut Vec<WireEntity>,
+        mut distances_sq: Option<&mut Vec<f32>>,
+    ) -> InterestQueryStats {
         states.clear();
+        if let Some(distances_sq) = distances_sq.as_deref_mut() {
+            distances_sq.clear();
+        }
         let center = replication_cell(viewer);
         let cell_wire = replication_cell_wire();
         let far_wire = INTEREST_FAR_RADIUS * WORLD_COORDINATE_SCALE;
@@ -340,10 +352,12 @@ impl ReplicationFrame {
                 for state_index in cell.iter().copied() {
                     candidates_checked += 1;
                     let state = self.states[state_index];
-                    if interest_distance_sq(viewer, state)
-                        <= INTEREST_FAR_RADIUS * INTEREST_FAR_RADIUS
-                    {
+                    let distance_sq = interest_distance_sq(viewer, state);
+                    if distance_sq <= INTEREST_FAR_RADIUS * INTEREST_FAR_RADIUS {
                         states.push(state);
+                        if let Some(distances_sq) = distances_sq.as_deref_mut() {
+                            distances_sq.push(distance_sq);
+                        }
                     }
                 }
             }
@@ -615,6 +629,7 @@ struct PlannedRecord {
 #[derive(Debug, Clone, Default)]
 struct SnapshotPlannerScratch {
     interest_states: Vec<WireEntity>,
+    interest_distances_sq: Vec<f32>,
     buckets: [Vec<PlannedRecord>; 9],
     records: Vec<SnapshotRecord>,
 }
@@ -641,10 +656,15 @@ fn plan_records(
     assert!(max_bytes >= SNAPSHOT_HEADER_BYTES);
     let viewer = frame.get(viewer_net_id);
     let query_stats = viewer.map(|viewer_state| {
-        frame.query_interest_from_viewer_into(viewer_state, &mut scratch.interest_states)
+        frame.query_interest_from_viewer_into_with_distances(
+            viewer_state,
+            &mut scratch.interest_states,
+            Some(&mut scratch.interest_distances_sq),
+        )
     });
     if viewer.is_none() {
         scratch.interest_states.clear();
+        scratch.interest_distances_sq.clear();
     }
     let interest_candidates_checked = query_stats.map_or(0, |stats| stats.candidates_checked);
     let visible_entity_count = query_stats.map_or(0, |_| scratch.interest_states.len());
@@ -654,10 +674,18 @@ fn plan_records(
     let mut due_count = 0_usize;
     let mut freshness = SnapshotFreshness::default();
 
-    if let (Some(viewer_state), Some(_)) = (viewer, query_stats) {
-        for state in scratch.interest_states.iter().copied() {
+    if let (Some(_), Some(_)) = (viewer, query_stats) {
+        debug_assert_eq!(
+            scratch.interest_states.len(),
+            scratch.interest_distances_sq.len()
+        );
+        for (state, distance_sq) in scratch
+            .interest_states
+            .iter()
+            .copied()
+            .zip(scratch.interest_distances_sq.iter().copied())
+        {
             let is_owner = state.net_id == viewer_net_id;
-            let distance_sq = interest_distance_sq(viewer_state, state);
             let before = baseline.get(&state.net_id).copied();
             let Some(record) = build_delta(state, before) else {
                 continue;
@@ -1736,6 +1764,39 @@ mod tests {
             .states
             .iter()
             .all(|state| !matches!(state.net_id, 4..=6)));
+    }
+
+    #[test]
+    fn interest_query_carries_distances_in_visible_state_order() {
+        let mut world = World::new(8192.0, 8192.0);
+        for (net_id, x, y) in [
+            (1, 3328.0, 3328.0),
+            (2, 3500.0, 3400.0),
+            (3, 4800.0, 3500.0),
+            (4, 5820.0, 3328.0),
+            (5, 5700.0, 5700.0),
+        ] {
+            assert!(world.add_player_at(net_id, x, y, 0.0));
+        }
+
+        let frame = ReplicationFrame::from_fighters(world.tick, world.fighters());
+        let viewer = frame.get(1).expect("viewer exists");
+        let public = frame.query_interest(1).expect("viewer exists");
+        let mut states = Vec::new();
+        let mut distances_sq = Vec::new();
+        let stats = frame.query_interest_from_viewer_into_with_distances(
+            viewer,
+            &mut states,
+            Some(&mut distances_sq),
+        );
+
+        assert_eq!(states, public.states);
+        assert_eq!(stats.candidates_checked, public.candidates_checked);
+        assert_eq!(stats.cells_visited, public.cells_visited);
+        assert_eq!(distances_sq.len(), states.len());
+        for (state, distance_sq) in states.iter().copied().zip(distances_sq.iter().copied()) {
+            assert_eq!(distance_sq, interest_distance_sq(viewer, state));
+        }
     }
 
     #[test]

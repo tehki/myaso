@@ -200,6 +200,9 @@ jobs:
       - name: Validate M98 pruned interest cells
         run: cargo test --locked --manifest-path server/Cargo.toml pruned_interest_cells_preserve_visibility_and_reduce_candidates
 
+      - name: Validate M99 reused interest distances
+        run: cargo test --locked --manifest-path server/Cargo.toml interest_query_carries_distances_in_visible_state_order
+
       - name: Validate real browser flight
         env:
           MYASO_FLIGHT_DURATION_MS: "4000"
