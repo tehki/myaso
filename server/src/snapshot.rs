@@ -2299,6 +2299,96 @@ mod tests {
     }
 
     #[test]
+    fn local_cell_positions_preserve_compact_coordinates_and_exact_budgeting() {
+        let records = vec![
+            SnapshotRecord {
+                net_id: 10,
+                mask: SNAPSHOT_FIELD_POSITION,
+                x: 800,
+                y: 1600,
+                facing: 0,
+                hp: 0,
+                guard: 0,
+                action: 0,
+                flags: 0,
+            },
+            SnapshotRecord {
+                net_id: 11,
+                mask: SNAPSHOT_FIELD_POSITION,
+                x: 1000,
+                y: 1800,
+                facing: 0,
+                hp: 0,
+                guard: 0,
+                action: 0,
+                flags: 0,
+            },
+            SnapshotRecord {
+                net_id: 12,
+                mask: SNAPSHOT_FIELD_FACING,
+                x: 0,
+                y: 0,
+                facing: 0,
+                hp: 0,
+                guard: 0,
+                action: 0,
+                flags: 0,
+            },
+            SnapshotRecord {
+                net_id: 13,
+                mask: SNAPSHOT_FIELD_POSITION,
+                x: 2400,
+                y: 1800,
+                facing: 0,
+                hp: 0,
+                guard: 0,
+                action: 0,
+                flags: 0,
+            },
+        ];
+
+        let local = encode_snapshot_with_encoding(
+            9,
+            8,
+            456,
+            false,
+            &records,
+            crate::CONSERVATIVE_DATAGRAM_BYTES,
+            SNAPSHOT_ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_LOCAL_U12_POSITION,
+        );
+        let absolute = encode_snapshot_with_encoding(
+            9,
+            8,
+            456,
+            false,
+            &records,
+            crate::CONSERVATIVE_DATAGRAM_BYTES,
+            SNAPSHOT_ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_U12_POSITION,
+        );
+
+        assert_eq!(local.bytes.len() + 1, absolute.bytes.len());
+        assert_eq!(local.composition.position + 1, absolute.composition.position);
+        assert_eq!(local.composition.total_bytes(), local.bytes.len());
+
+        let decoded = decode_snapshot(&local.bytes).expect("local-cell snapshot decodes");
+        assert_eq!(
+            decoded.encoding,
+            SNAPSHOT_ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_LOCAL_U12_POSITION
+        );
+        assert_eq!(decoded.records, records);
+
+        let same_cell = position_cell_from_wire(compact_position_pair(800, 1600));
+        assert_eq!(
+            position_cell_from_wire(compact_position_pair(1000, 1800)),
+            same_cell
+        );
+        assert_ne!(
+            position_cell_from_wire(compact_position_pair(2400, 1800)),
+            same_cell
+        );
+    }
+
+    #[test]
     fn snapshot_sequence_wrap_skips_reserved_no_ack_sentinel() {
         let mut world = World::new(1200.0, 800.0);
         assert!(world.add_player_at(1, 400.0, 300.0, 0.0));
