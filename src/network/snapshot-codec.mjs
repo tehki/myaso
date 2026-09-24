@@ -233,7 +233,8 @@ export function decodeSnapshot(buffer) {
       throw new RangeError("invalid compact-position marker");
     }
     if (localPosition && (
-      encoding !== ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_LOCAL_U12_POSITION
+      (encoding !== ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_LOCAL_U12_POSITION
+        && encoding !== ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_LOCAL_U12_POSITION_U4_ACTION_FLAGS)
       || !(mask & FIELD_POSITION)
       || widePosition
       || (mask & FIELD_REMOVED)
