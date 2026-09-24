@@ -171,6 +171,16 @@ impl SnapshotByteComposition {
             + self.vitals
             + self.action
     }
+
+    fn add(&mut self, other: Self) {
+        self.header += other.header;
+        self.net_ids += other.net_ids;
+        self.masks += other.masks;
+        self.position += other.position;
+        self.facing += other.facing;
+        self.vitals += other.vitals;
+        self.action += other.action;
+    }
 }
 
 #[derive(Debug)]
@@ -405,13 +415,14 @@ impl SnapshotSession {
         );
         let sequence = self.next_sequence;
         self.next_sequence = self.next_sequence.wrapping_add(1);
-        let encoded = encode_snapshot_current_with_composition(
+        let encoded = encode_snapshot_current_with_planned_composition(
             sequence,
             baseline_sequence,
             server_tick,
             full,
             &plan.records,
             max_bytes,
+            plan.byte_composition,
         );
         let bytes = encoded.bytes;
         let byte_composition = encoded.composition;
@@ -561,6 +572,7 @@ struct SnapshotPlannerScratch {
 #[derive(Debug)]
 struct SnapshotPlan {
     records: Vec<SnapshotRecord>,
+    byte_composition: SnapshotByteComposition,
     omitted_due_to_budget: usize,
     interest_candidates_checked: usize,
     visible_entity_count: usize,
@@ -651,6 +663,10 @@ fn plan_records(
     due_count += collect_baseline_removals(frame, viewer, baseline, &mut scratch.buckets[4]);
 
     let mut bytes_used = SNAPSHOT_HEADER_BYTES;
+    let mut byte_composition = SnapshotByteComposition {
+        header: SNAPSHOT_HEADER_BYTES,
+        ..SnapshotByteComposition::default()
+    };
     scratch.records.clear();
     let (buckets, records) = (&mut scratch.buckets, &mut scratch.records);
     for (bucket_index, bucket) in buckets.iter_mut().enumerate() {
@@ -673,7 +689,11 @@ fn plan_records(
         };
         for offset in 0..bucket.len() {
             let planned = bucket[(start + offset) % bucket.len()];
-            let record_bytes = snapshot_record_bytes(&planned.record);
+            let record_composition = snapshot_record_composition_for_encoding(
+                &planned.record,
+                SNAPSHOT_ENCODING_CURRENT,
+            );
+            let record_bytes = record_composition.total_bytes();
             if bytes_used + record_bytes > max_bytes {
                 if let Some(tier) = planned.tier {
                     freshness.observe_omitted(tier, planned.age_ticks);
@@ -681,6 +701,7 @@ fn plan_records(
                 continue;
             }
             bytes_used += record_bytes;
+            byte_composition.add(record_composition);
             records.push(planned.record);
             if let Some(tier) = planned.tier {
                 freshness.observe_sent(tier, planned.age_ticks);
@@ -691,6 +712,7 @@ fn plan_records(
     SnapshotPlan {
         omitted_due_to_budget: due_count.saturating_sub(records.len()),
         records: std::mem::take(records),
+        byte_composition,
         interest_candidates_checked,
         visible_entity_count,
         freshness,
@@ -901,6 +923,30 @@ fn encode_snapshot_current_with_composition(
     )
 }
 
+fn encode_snapshot_current_with_planned_composition(
+    sequence: u16,
+    baseline_sequence: u16,
+    server_tick: u32,
+    full: bool,
+    records: &[SnapshotRecord],
+    max_bytes: usize,
+    composition: SnapshotByteComposition,
+) -> EncodedSnapshot {
+    assert!(
+        composition.total_bytes() <= max_bytes,
+        "snapshot exceeds datagram budget"
+    );
+    encode_snapshot_with_composition(
+        sequence,
+        baseline_sequence,
+        server_tick,
+        full,
+        records,
+        SNAPSHOT_ENCODING_CURRENT,
+        composition,
+    )
+}
+
 fn encode_snapshot_with_encoding(
     sequence: u16,
     baseline_sequence: u16,
@@ -910,6 +956,31 @@ fn encode_snapshot_with_encoding(
     max_bytes: usize,
     encoding: u8,
 ) -> EncodedSnapshot {
+    let composition = snapshot_byte_composition_for_encoding(records, encoding);
+    assert!(
+        composition.total_bytes() <= max_bytes,
+        "snapshot exceeds datagram budget"
+    );
+    encode_snapshot_with_composition(
+        sequence,
+        baseline_sequence,
+        server_tick,
+        full,
+        records,
+        encoding,
+        composition,
+    )
+}
+
+fn encode_snapshot_with_composition(
+    sequence: u16,
+    baseline_sequence: u16,
+    server_tick: u32,
+    full: bool,
+    records: &[SnapshotRecord],
+    encoding: u8,
+    composition: SnapshotByteComposition,
+) -> EncodedSnapshot {
     assert!(records.len() <= u16::MAX as usize);
     assert!(matches!(
         encoding,
@@ -918,9 +989,7 @@ fn encode_snapshot_with_encoding(
             | SNAPSHOT_ENCODING_VARINT_IDS_U8_FACING
             | SNAPSHOT_ENCODING_VARINT_IDS_U8_FACING_U12_POSITION
     ));
-    let composition = snapshot_byte_composition_for_encoding(records, encoding);
     let total_bytes = composition.total_bytes();
-    assert!(total_bytes <= max_bytes, "snapshot exceeds datagram budget");
 
     let mut bytes = Vec::with_capacity(total_bytes);
     bytes.push(crate::PROTOCOL_VERSION);
@@ -1125,34 +1194,44 @@ fn snapshot_byte_composition_for_encoding(
 ) -> SnapshotByteComposition {
     let mut composition = SnapshotByteComposition {
         header: SNAPSHOT_HEADER_BYTES,
-        masks: records.len(),
         ..SnapshotByteComposition::default()
     };
     for record in records {
-        composition.net_ids += match encoding {
-            SNAPSHOT_ENCODING_LEGACY_U32_IDS => 4,
-            SNAPSHOT_ENCODING_VARINT_IDS
-            | SNAPSHOT_ENCODING_VARINT_IDS_U8_FACING
-            | SNAPSHOT_ENCODING_VARINT_IDS_U8_FACING_U12_POSITION => {
-                u32_varint_bytes(record.net_id)
-            }
-            _ => unreachable!("encoding validated by caller"),
-        };
-        if record.mask & SNAPSHOT_FIELD_REMOVED != 0 {
-            continue;
-        }
-        if record.mask & SNAPSHOT_FIELD_POSITION != 0 {
-            composition.position += position_bytes_for_record(record, encoding);
-        }
-        if record.mask & SNAPSHOT_FIELD_FACING != 0 {
-            composition.facing += facing_bytes_for_encoding(encoding);
-        }
-        if record.mask & SNAPSHOT_FIELD_VITALS != 0 {
-            composition.vitals += 2;
-        }
-        if record.mask & SNAPSHOT_FIELD_ACTION != 0 {
-            composition.action += 2;
-        }
+        composition.add(snapshot_record_composition_for_encoding(record, encoding));
+    }
+    composition
+}
+
+fn snapshot_record_composition_for_encoding(
+    record: &SnapshotRecord,
+    encoding: u8,
+) -> SnapshotByteComposition {
+    let net_ids = match encoding {
+        SNAPSHOT_ENCODING_LEGACY_U32_IDS => 4,
+        SNAPSHOT_ENCODING_VARINT_IDS
+        | SNAPSHOT_ENCODING_VARINT_IDS_U8_FACING
+        | SNAPSHOT_ENCODING_VARINT_IDS_U8_FACING_U12_POSITION => u32_varint_bytes(record.net_id),
+        _ => unreachable!("encoding validated by caller"),
+    };
+    let mut composition = SnapshotByteComposition {
+        net_ids,
+        masks: 1,
+        ..SnapshotByteComposition::default()
+    };
+    if record.mask & SNAPSHOT_FIELD_REMOVED != 0 {
+        return composition;
+    }
+    if record.mask & SNAPSHOT_FIELD_POSITION != 0 {
+        composition.position = position_bytes_for_record(record, encoding);
+    }
+    if record.mask & SNAPSHOT_FIELD_FACING != 0 {
+        composition.facing = facing_bytes_for_encoding(encoding);
+    }
+    if record.mask & SNAPSHOT_FIELD_VITALS != 0 {
+        composition.vitals = 2;
+    }
+    if record.mask & SNAPSHOT_FIELD_ACTION != 0 {
+        composition.action = 2;
     }
     composition
 }
@@ -1162,30 +1241,7 @@ pub fn snapshot_record_bytes(record: &SnapshotRecord) -> usize {
 }
 
 fn snapshot_record_bytes_for_encoding(record: &SnapshotRecord, encoding: u8) -> usize {
-    let id_bytes = match encoding {
-        SNAPSHOT_ENCODING_LEGACY_U32_IDS => 4,
-        SNAPSHOT_ENCODING_VARINT_IDS
-        | SNAPSHOT_ENCODING_VARINT_IDS_U8_FACING
-        | SNAPSHOT_ENCODING_VARINT_IDS_U8_FACING_U12_POSITION => u32_varint_bytes(record.net_id),
-        _ => unreachable!("encoding validated by caller"),
-    };
-    let mut bytes = id_bytes + 1;
-    if record.mask & SNAPSHOT_FIELD_REMOVED != 0 {
-        return bytes;
-    }
-    if record.mask & SNAPSHOT_FIELD_POSITION != 0 {
-        bytes += position_bytes_for_record(record, encoding);
-    }
-    if record.mask & SNAPSHOT_FIELD_FACING != 0 {
-        bytes += facing_bytes_for_encoding(encoding);
-    }
-    if record.mask & SNAPSHOT_FIELD_VITALS != 0 {
-        bytes += 2;
-    }
-    if record.mask & SNAPSHOT_FIELD_ACTION != 0 {
-        bytes += 2;
-    }
-    bytes
+    snapshot_record_composition_for_encoding(record, encoding).total_bytes()
 }
 
 fn encoded_record_mask(record: &SnapshotRecord, encoding: u8) -> u8 {
@@ -1621,6 +1677,58 @@ mod tests {
         assert_eq!(third.record_count, 1);
         assert_eq!(third.freshness.combat.max_due_age_ticks, 0);
         assert_eq!(third.freshness.combat.max_sent_age_ticks, 0);
+    }
+
+    #[test]
+    fn planned_byte_composition_matches_encoder_sizing() {
+        let mut world = World::new(6000.0, 6000.0);
+        for (net_id, x, y) in [
+            (1, 1000.0, 1000.0),
+            (2, 1300.0, 1000.0),
+            (300, 1700.0, 1200.0),
+            (70_000, 2200.0, 1500.0),
+        ] {
+            assert!(world.add_player_at(net_id, x, y, 0.0));
+        }
+
+        let frame = ReplicationFrame::from_fighters(12, world.fighters());
+        let baseline = BTreeMap::new();
+        let last_sent_tick = HashMap::new();
+        let mut scratch = SnapshotPlannerScratch::default();
+        let plan = plan_records(
+            1,
+            frame.server_tick(),
+            &frame,
+            &baseline,
+            &last_sent_tick,
+            crate::CONSERVATIVE_DATAGRAM_BYTES,
+            &mut scratch,
+        );
+
+        let standalone = snapshot_byte_composition(&plan.records);
+        assert_eq!(plan.byte_composition, standalone);
+
+        let planned = encode_snapshot_current_with_planned_composition(
+            9,
+            u16::MAX,
+            frame.server_tick(),
+            true,
+            &plan.records,
+            crate::CONSERVATIVE_DATAGRAM_BYTES,
+            plan.byte_composition,
+        );
+        let regular = encode_snapshot_current(
+            9,
+            u16::MAX,
+            frame.server_tick(),
+            true,
+            &plan.records,
+            crate::CONSERVATIVE_DATAGRAM_BYTES,
+        );
+
+        assert_eq!(planned.composition, standalone);
+        assert_eq!(planned.composition.total_bytes(), planned.bytes.len());
+        assert_eq!(planned.bytes, regular);
     }
 
     #[test]
