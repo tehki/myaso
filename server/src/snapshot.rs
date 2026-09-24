@@ -1693,7 +1693,12 @@ mod tests {
             session.build_from_frame(u16::MAX, 1, &frame, crate::CONSERVATIVE_DATAGRAM_BYTES);
 
         assert_eq!(
-            [first.sequence, second.sequence, third.sequence, fourth.sequence],
+            [
+                first.sequence,
+                second.sequence,
+                third.sequence,
+                fourth.sequence
+            ],
             [u16::MAX - 2, u16::MAX - 1, 0, 1]
         );
         assert_eq!(session.history_index(first.sequence), Some(0));
