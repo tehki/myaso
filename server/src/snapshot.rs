@@ -1349,7 +1349,7 @@ fn snapshot_record_composition_for_encoding(
         SNAPSHOT_ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_U12_POSITION => {
             let escaped = record.net_id >= u32::from(PACKED_RECORD_NET_ID_ESCAPE);
             (
-                1 + usize::from(escaped) * u32_varint_bytes(record.net_id),
+                1 + (escaped as usize) * u32_varint_bytes(record.net_id),
                 1,
             )
         }
@@ -1488,7 +1488,11 @@ fn decode_packed_record_header(
     let inline_net_id = packed & PACKED_RECORD_NET_ID_MASK;
     let compact_mask = (packed >> PACKED_RECORD_NET_ID_BITS) as u8;
     let net_id = if inline_net_id == PACKED_RECORD_NET_ID_ESCAPE {
-        decode_u32_varint(bytes, offset)?
+        let escaped = decode_u32_varint(bytes, offset)?;
+        if escaped < u32::from(PACKED_RECORD_NET_ID_ESCAPE) {
+            return Err(SnapshotDecodeError::InvalidVarint);
+        }
+        escaped
     } else {
         u32::from(inline_net_id)
     };
