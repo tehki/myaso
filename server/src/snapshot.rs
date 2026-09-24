@@ -1,5 +1,5 @@
 use crate::simulation::Fighter;
-use std::collections::{BTreeMap, VecDeque};
+use std::collections::{BTreeMap, HashMap, VecDeque};
 
 pub const SNAPSHOT_PACKET_TYPE: u8 = 2;
 pub const SNAPSHOT_HEADER_BYTES: usize = 14;
@@ -210,13 +210,13 @@ pub struct InterestQueryStats {
 pub struct ReplicationFrame {
     server_tick: u32,
     states: Vec<WireEntity>,
-    cells: BTreeMap<(i32, i32), Vec<usize>>,
+    cells: HashMap<(i32, i32), Vec<usize>>,
 }
 
 impl ReplicationFrame {
     pub fn from_fighters(server_tick: u32, fighters: &[Fighter]) -> Self {
         let mut states = Vec::with_capacity(fighters.len());
-        let mut cells: BTreeMap<(i32, i32), Vec<usize>> = BTreeMap::new();
+        let mut cells: HashMap<(i32, i32), Vec<usize>> = HashMap::new();
         for fighter in fighters {
             let state = WireEntity::from_fighter(fighter);
             debug_assert!(
@@ -1372,6 +1372,63 @@ mod tests {
 
         let actual = frame.query_interest(viewer_net_id).expect("viewer exists");
         assert_eq!(actual.states, expected);
+    }
+
+    #[test]
+    fn hashed_replication_cells_match_ordered_cell_lookup_semantics() {
+        let mut world = World::new(6000.0, 6000.0);
+        for (net_id, x, y) in [
+            (1, 1000.0, 1000.0),
+            (2, 1250.0, 1000.0),
+            (3, 1700.0, 1200.0),
+            (4, 2300.0, 1400.0),
+            (5, 3100.0, 1700.0),
+            (6, 4300.0, 2000.0),
+        ] {
+            assert!(world.add_player_at(net_id, x, y, 0.0));
+        }
+
+        let frame = ReplicationFrame::from_fighters(world.tick, world.fighters());
+        let viewer_net_id = 3;
+        let viewer = frame.get(viewer_net_id).expect("viewer exists");
+        let center = replication_cell(viewer);
+        let cell_wire = replication_cell_wire();
+        let far_wire = INTEREST_FAR_RADIUS * WORLD_COORDINATE_SCALE;
+        let span = (far_wire / cell_wire as f32).ceil() as i32;
+
+        let mut legacy_cells: BTreeMap<(i32, i32), Vec<usize>> = BTreeMap::new();
+        for (index, state) in frame.states.iter().copied().enumerate() {
+            legacy_cells
+                .entry(replication_cell(state))
+                .or_default()
+                .push(index);
+        }
+
+        let mut expected_states = Vec::new();
+        let mut expected_candidates = 0_usize;
+        let mut expected_cells = 0_usize;
+        for cell_y in center.1 - span..=center.1 + span {
+            for cell_x in center.0 - span..=center.0 + span {
+                expected_cells += 1;
+                let Some(cell) = legacy_cells.get(&(cell_x, cell_y)) else {
+                    continue;
+                };
+                for state_index in cell.iter().copied() {
+                    expected_candidates += 1;
+                    let state = frame.states[state_index];
+                    if interest_distance_sq(viewer, state)
+                        <= INTEREST_FAR_RADIUS * INTEREST_FAR_RADIUS
+                    {
+                        expected_states.push(state);
+                    }
+                }
+            }
+        }
+
+        let actual = frame.query_interest(viewer_net_id).expect("viewer exists");
+        assert_eq!(actual.states, expected_states);
+        assert_eq!(actual.candidates_checked, expected_candidates);
+        assert_eq!(actual.cells_visited, expected_cells);
     }
 
     #[test]
