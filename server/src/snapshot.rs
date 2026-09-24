@@ -409,7 +409,7 @@ impl SnapshotSession {
             server_tick,
             frame,
             baseline,
-            &self.last_sent_tick,
+            &mut self.last_sent_tick,
             max_bytes,
             &mut self.planner_scratch,
         );
@@ -428,13 +428,6 @@ impl SnapshotSession {
         let byte_composition = encoded.composition;
         debug_assert_eq!(byte_composition.total_bytes(), bytes.len());
 
-        for record in &plan.records {
-            if record.mask & SNAPSHOT_FIELD_REMOVED != 0 {
-                self.last_sent_tick.remove(&record.net_id);
-            } else {
-                self.last_sent_tick.insert(record.net_id, server_tick);
-            }
-        }
         let record_count = plan.records.len();
         self.history.push_back(SnapshotHistoryEntry {
             sequence,
@@ -584,7 +577,7 @@ fn plan_records(
     server_tick: u32,
     frame: &ReplicationFrame,
     baseline: &BTreeMap<u32, WireEntity>,
-    last_sent_tick: &HashMap<u32, u32>,
+    last_sent_tick: &mut HashMap<u32, u32>,
     max_bytes: usize,
     scratch: &mut SnapshotPlannerScratch,
 ) -> SnapshotPlan {
@@ -703,6 +696,11 @@ fn plan_records(
             bytes_used += record_bytes;
             byte_composition.add(record_composition);
             records.push(planned.record);
+            if planned.record.mask & SNAPSHOT_FIELD_REMOVED != 0 {
+                last_sent_tick.remove(&planned.record.net_id);
+            } else {
+                last_sent_tick.insert(planned.record.net_id, server_tick);
+            }
             if let Some(tier) = planned.tier {
                 freshness.observe_sent(tier, planned.age_ticks);
             }
@@ -1680,6 +1678,64 @@ mod tests {
     }
 
     #[test]
+    fn planner_updates_last_sent_only_for_admitted_records() {
+        let mut world = World::new(6000.0, 6000.0);
+        assert!(world.add_player_at(1, 1000.0, 1000.0, 0.0));
+        assert!(world.add_player_at(2, 1200.0, 1000.0, 0.0));
+
+        let frame = ReplicationFrame::from_fighters(42, world.fighters());
+        let baseline = BTreeMap::new();
+        let mut last_sent_tick = HashMap::new();
+        let mut scratch = SnapshotPlannerScratch::default();
+        let owner_record = SnapshotRecord::full(frame.get(1).expect("viewer must exist"));
+        let max_bytes = SNAPSHOT_HEADER_BYTES + snapshot_record_bytes(&owner_record);
+
+        let plan = plan_records(
+            1,
+            frame.server_tick(),
+            &frame,
+            &baseline,
+            &mut last_sent_tick,
+            max_bytes,
+            &mut scratch,
+        );
+
+        assert_eq!(plan.records.len(), 1);
+        assert_eq!(plan.records[0].net_id, 1);
+        assert_eq!(plan.omitted_due_to_budget, 1);
+        assert_eq!(last_sent_tick.get(&1), Some(&42));
+        assert!(!last_sent_tick.contains_key(&2));
+
+        let acknowledged: BTreeMap<_, _> = frame
+            .states
+            .iter()
+            .copied()
+            .map(|state| (state.net_id, state))
+            .collect();
+        last_sent_tick.insert(2, 41);
+
+        let mut viewer_only_world = World::new(6000.0, 6000.0);
+        assert!(viewer_only_world.add_player_at(1, 1000.0, 1000.0, 0.0));
+        let viewer_only = ReplicationFrame::from_fighters(43, viewer_only_world.fighters());
+        let mut removal_scratch = SnapshotPlannerScratch::default();
+
+        let removal_plan = plan_records(
+            1,
+            viewer_only.server_tick(),
+            &viewer_only,
+            &acknowledged,
+            &mut last_sent_tick,
+            crate::CONSERVATIVE_DATAGRAM_BYTES,
+            &mut removal_scratch,
+        );
+
+        assert_eq!(removal_plan.records.len(), 1);
+        assert_eq!(removal_plan.records[0].net_id, 2);
+        assert_ne!(removal_plan.records[0].mask & SNAPSHOT_FIELD_REMOVED, 0);
+        assert!(!last_sent_tick.contains_key(&2));
+    }
+
+    #[test]
     fn planned_byte_composition_matches_encoder_sizing() {
         let mut world = World::new(6000.0, 6000.0);
         for (net_id, x, y) in [
@@ -1693,14 +1749,14 @@ mod tests {
 
         let frame = ReplicationFrame::from_fighters(12, world.fighters());
         let baseline = BTreeMap::new();
-        let last_sent_tick = HashMap::new();
+        let mut last_sent_tick = HashMap::new();
         let mut scratch = SnapshotPlannerScratch::default();
         let plan = plan_records(
             1,
             frame.server_tick(),
             &frame,
             &baseline,
-            &last_sent_tick,
+            &mut last_sent_tick,
             crate::CONSERVATIVE_DATAGRAM_BYTES,
             &mut scratch,
         );
@@ -1774,7 +1830,7 @@ mod tests {
             20,
             &changed_frame,
             &baseline,
-            &forward,
+            &mut forward,
             crate::CONSERVATIVE_DATAGRAM_BYTES,
             &mut forward_scratch,
         );
@@ -1783,7 +1839,7 @@ mod tests {
             20,
             &changed_frame,
             &baseline,
-            &reverse,
+            &mut reverse,
             crate::CONSERVATIVE_DATAGRAM_BYTES,
             &mut reverse_scratch,
         );
