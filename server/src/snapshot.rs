@@ -9,8 +9,9 @@ pub const SNAPSHOT_ENCODING_VARINT_IDS: u8 = 1;
 pub const SNAPSHOT_ENCODING_VARINT_IDS_U8_FACING: u8 = 2;
 pub const SNAPSHOT_ENCODING_VARINT_IDS_U8_FACING_U12_POSITION: u8 = 3;
 pub const SNAPSHOT_ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_U12_POSITION: u8 = 4;
+pub const SNAPSHOT_ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_LOCAL_U12_POSITION: u8 = 5;
 pub const SNAPSHOT_ENCODING_CURRENT: u8 =
-    SNAPSHOT_ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_U12_POSITION;
+    SNAPSHOT_ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_LOCAL_U12_POSITION;
 pub const SNAPSHOT_FLAG_FULL: u8 = 1;
 pub const SNAPSHOT_FIELD_POSITION: u8 = 1 << 0;
 pub const SNAPSHOT_FIELD_FACING: u8 = 1 << 1;
@@ -27,6 +28,7 @@ const COMPACT_POSITION_MAX: u16 = (0x0fff_u16 << COMPACT_POSITION_SHIFT) + 3;
 const PACKED_RECORD_NET_ID_BITS: u16 = 10;
 const PACKED_RECORD_NET_ID_MASK: u16 = (1_u16 << PACKED_RECORD_NET_ID_BITS) - 1;
 const PACKED_RECORD_NET_ID_ESCAPE: u16 = PACKED_RECORD_NET_ID_MASK;
+const PACKED_MASK_LOCAL_POSITION_FLAG: u8 = 1 << 5;
 pub const INTEREST_COMBAT_RADIUS: f32 = 420.0;
 pub const INTEREST_NEAR_RADIUS: f32 = 700.0;
 pub const INTEREST_MID_RADIUS: f32 = 1500.0;
@@ -1111,6 +1113,7 @@ fn encode_snapshot_with_composition(
             | SNAPSHOT_ENCODING_VARINT_IDS_U8_FACING
             | SNAPSHOT_ENCODING_VARINT_IDS_U8_FACING_U12_POSITION
             | SNAPSHOT_ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_U12_POSITION
+            | SNAPSHOT_ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_LOCAL_U12_POSITION
     ));
     let total_bytes = composition.total_bytes();
 
@@ -1195,6 +1198,7 @@ pub fn decode_snapshot(bytes: &[u8]) -> Result<DecodedSnapshot, SnapshotDecodeEr
             | SNAPSHOT_ENCODING_VARINT_IDS_U8_FACING
             | SNAPSHOT_ENCODING_VARINT_IDS_U8_FACING_U12_POSITION
             | SNAPSHOT_ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_U12_POSITION
+            | SNAPSHOT_ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_LOCAL_U12_POSITION
     ) {
         return Err(SnapshotDecodeError::UnsupportedEncoding(encoding));
     }
@@ -1346,7 +1350,8 @@ fn snapshot_record_composition_for_encoding(
         | SNAPSHOT_ENCODING_VARINT_IDS_U8_FACING_U12_POSITION => {
             (u32_varint_bytes(record.net_id), 1)
         }
-        SNAPSHOT_ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_U12_POSITION => {
+        SNAPSHOT_ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_U12_POSITION
+        | SNAPSHOT_ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_LOCAL_U12_POSITION => {
             let escaped = record.net_id >= u32::from(PACKED_RECORD_NET_ID_ESCAPE);
             (1 + (escaped as usize) * u32_varint_bytes(record.net_id), 1)
         }
@@ -1429,6 +1434,7 @@ fn uses_compact_position(encoding: u8) -> bool {
         encoding,
         SNAPSHOT_ENCODING_VARINT_IDS_U8_FACING_U12_POSITION
             | SNAPSHOT_ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_U12_POSITION
+            | SNAPSHOT_ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_LOCAL_U12_POSITION
     )
 }
 
@@ -1438,6 +1444,7 @@ fn uses_compact_facing(encoding: u8) -> bool {
         SNAPSHOT_ENCODING_VARINT_IDS_U8_FACING
             | SNAPSHOT_ENCODING_VARINT_IDS_U8_FACING_U12_POSITION
             | SNAPSHOT_ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_U12_POSITION
+            | SNAPSHOT_ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_LOCAL_U12_POSITION
     )
 }
 
@@ -1450,7 +1457,11 @@ fn facing_bytes_for_encoding(encoding: u8) -> usize {
 }
 
 fn uses_packed_record_header(encoding: u8) -> bool {
-    encoding == SNAPSHOT_ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_U12_POSITION
+    matches!(
+        encoding,
+        SNAPSHOT_ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_U12_POSITION
+            | SNAPSHOT_ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_LOCAL_U12_POSITION
+    )
 }
 
 fn compact_wire_mask(mask: u8) -> u8 {
