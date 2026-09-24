@@ -11,6 +11,7 @@ export const NETWORK = Object.freeze({
   worldHeight: 8192,
   worldCoordinateScale: 4,
   maxWorldCoordinate: 0xffff / 4,
+  snapshotPositionCellSize: 512,
   interest: Object.freeze({
     cellSize: 256,
     combatRadius: 420,

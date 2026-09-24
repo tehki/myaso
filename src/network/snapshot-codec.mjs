@@ -6,7 +6,8 @@ const ENCODING_VARINT_IDS = 1;
 const ENCODING_VARINT_IDS_U8_FACING = 2;
 const ENCODING_VARINT_IDS_U8_FACING_U12_POSITION = 3;
 const ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_U12_POSITION = 4;
-const CURRENT_ENCODING = ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_U12_POSITION;
+const ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_LOCAL_U12_POSITION = 5;
+const CURRENT_ENCODING = ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_LOCAL_U12_POSITION;
 const FIELD_POSITION = 1 << 0;
 const FIELD_FACING = 1 << 1;
 const FIELD_VITALS = 1 << 2;
@@ -17,6 +18,11 @@ const FULL_FIELDS = FIELD_POSITION | FIELD_FACING | FIELD_VITALS | FIELD_ACTION;
 const PACKED_RECORD_NET_ID_BITS = 10;
 const PACKED_RECORD_NET_ID_MASK = (1 << PACKED_RECORD_NET_ID_BITS) - 1;
 const PACKED_RECORD_NET_ID_ESCAPE = PACKED_RECORD_NET_ID_MASK;
+const PACKED_MASK_LOCAL_POSITION_FLAG = 1 << 5;
+const POSITION_ENCODING_NONE = 0;
+const POSITION_ENCODING_EXACT = 1;
+const POSITION_ENCODING_COMPACT = 2;
+const POSITION_ENCODING_LOCAL = 3;
 
 const ACTION_TO_CODE = new Map([
   ["idle", 0],
@@ -101,7 +107,7 @@ export function encodeSnapshot({
   if (records.length > 0xffff) throw new RangeError("too many snapshot records");
   assertSnapshotEncoding(encoding);
 
-  const totalBytes = HEADER_BYTES + records.reduce((sum, record) => sum + snapshotRecordBytes(record, encoding), 0);
+  const totalBytes = HEADER_BYTES + snapshotRecordsBytes(records, encoding);
   if (maxBytes !== null && totalBytes > maxBytes) {
     throw new RangeError(`snapshot ${totalBytes} bytes exceeds datagram budget ${maxBytes}`);
   }
@@ -118,11 +124,18 @@ export function encodeSnapshot({
   view.setUint16(12, records.length, true);
 
   let offset = HEADER_BYTES;
+  let previousPosition = null;
   for (const record of records) {
     assertNetId(record.netId);
     const mask = snapshotWireMask(record, encoding);
+    const positionEncoding = positionWireEncoding(record, mask, encoding, previousPosition);
     if (usesPackedRecordHeader(encoding)) {
-      offset = writePackedRecordHeader(view, offset, record.netId >>> 0, mask);
+      offset = writePackedRecordHeader(
+        view,
+        offset,
+        record.netId >>> 0,
+        packedWireMaskCode(mask, encoding, positionEncoding),
+      );
     } else {
       if (encoding === ENCODING_LEGACY_U32_IDS) {
         view.setUint32(offset, record.netId >>> 0, true);
@@ -135,13 +148,16 @@ export function encodeSnapshot({
     }
     if (mask & FIELD_REMOVED) continue;
     if (mask & FIELD_POSITION) {
-      if (usesCompactPosition(encoding) && !(mask & FIELD_WIDE_POSITION)) {
+      if (positionEncoding === POSITION_ENCODING_LOCAL) {
+        offset = writeLocalCellPosition(view, offset, record.x, record.y, previousPosition);
+      } else if (positionEncoding === POSITION_ENCODING_COMPACT) {
         offset = writeCompactPosition(view, offset, record.x, record.y);
       } else {
         view.setUint16(offset, record.x, true);
         view.setUint16(offset + 2, record.y, true);
         offset += 4;
       }
+      previousPosition = decodedPositionForRecord(record, positionEncoding);
     }
     if (mask & FIELD_FACING) {
       if (usesCompactFacing(encoding)) {
@@ -163,6 +179,7 @@ export function encodeSnapshot({
       offset += 2;
     }
   }
+  if (offset !== totalBytes) throw new Error("snapshot byte accounting mismatch");
   return buffer;
 }
 
@@ -176,14 +193,19 @@ export function decodeSnapshot(buffer) {
   const count = view.getUint16(12, true);
   const records = [];
   let offset = HEADER_BYTES;
+  let previousPosition = null;
+
   for (let index = 0; index < count; index += 1) {
     let netId;
     let mask;
+    let localPosition = false;
     if (usesPackedRecordHeader(encoding)) {
       const decoded = readPackedRecordHeader(view, offset);
       netId = decoded.netId;
-      mask = decoded.mask;
       offset = decoded.offset;
+      const expanded = expandPackedWireMask(decoded.compactMask, encoding);
+      mask = expanded.mask;
+      localPosition = expanded.localPosition;
     } else {
       if (encoding === ENCODING_LEGACY_U32_IDS) {
         requireBytes(view, offset, 4);
@@ -198,18 +220,47 @@ export function decodeSnapshot(buffer) {
       mask = view.getUint8(offset);
       offset += 1;
     }
+
     const record = { netId, mask };
     const widePosition = Boolean(mask & FIELD_WIDE_POSITION);
-    if (widePosition && (!usesCompactPosition(encoding) || !(mask & FIELD_POSITION))) throw new RangeError("invalid compact-position marker");
+    if (widePosition && (!usesCompactPosition(encoding) || !(mask & FIELD_POSITION))) {
+      throw new RangeError("invalid compact-position marker");
+    }
+    if (localPosition && (
+      encoding !== ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_LOCAL_U12_POSITION
+      || !(mask & FIELD_POSITION)
+      || widePosition
+      || (mask & FIELD_REMOVED)
+    )) {
+      throw new RangeError("invalid local-position marker");
+    }
+
     if (!(mask & FIELD_REMOVED)) {
       if (mask & FIELD_POSITION) {
-        if (usesCompactPosition(encoding) && !widePosition) {
+        if (localPosition) {
+          if (!previousPosition) throw new RangeError("local snapshot position has no previous position");
+          requireBytes(view, offset, 2);
+          [record.x, record.y] = decodeLocalCellPosition(
+            previousPosition,
+            view.getUint8(offset),
+            view.getUint8(offset + 1),
+          );
+          offset += 2;
+        } else if (usesCompactPosition(encoding) && !widePosition) {
           requireBytes(view, offset, 3);
-          const packed = view.getUint8(offset) | (view.getUint8(offset + 1) << 8) | (view.getUint8(offset + 2) << 16);
-          record.x = (packed & 0x0fff) << 3; record.y = ((packed >>> 12) & 0x0fff) << 3; offset += 3;
+          const packed = view.getUint8(offset)
+            | (view.getUint8(offset + 1) << 8)
+            | (view.getUint8(offset + 2) << 16);
+          record.x = (packed & 0x0fff) << 3;
+          record.y = ((packed >>> 12) & 0x0fff) << 3;
+          offset += 3;
         } else {
-          requireBytes(view, offset, 4); record.x = view.getUint16(offset, true); record.y = view.getUint16(offset + 2, true); offset += 4;
+          requireBytes(view, offset, 4);
+          record.x = view.getUint16(offset, true);
+          record.y = view.getUint16(offset + 2, true);
+          offset += 4;
         }
+        previousPosition = [record.x, record.y];
       }
       if (mask & FIELD_FACING) {
         if (usesCompactFacing(encoding)) {
@@ -282,19 +333,7 @@ export function dequantizeEntity(state) {
 
 export function snapshotRecordBytes(record, encoding = CURRENT_ENCODING) {
   assertSnapshotEncoding(encoding);
-  const mask = record.mask ?? FULL_FIELDS;
-  let bytes;
-  if (usesPackedRecordHeader(encoding)) {
-    bytes = 2 + (record.netId >= PACKED_RECORD_NET_ID_ESCAPE ? uint32VarintBytes(record.netId) : 0);
-  } else {
-    bytes = snapshotNetIdBytes(record.netId, encoding) + 1;
-  }
-  if (mask & FIELD_REMOVED) return bytes;
-  if (mask & FIELD_POSITION) bytes += positionBytesForRecord(record, encoding);
-  if (mask & FIELD_FACING) bytes += facingBytesForEncoding(encoding);
-  if (mask & FIELD_VITALS) bytes += 2;
-  if (mask & FIELD_ACTION) bytes += 2;
-  return bytes;
+  return snapshotRecordBytesWithContext(record, encoding, null).bytes;
 }
 
 export const SNAPSHOT_ENCODINGS = Object.freeze({
@@ -303,6 +342,7 @@ export const SNAPSHOT_ENCODINGS = Object.freeze({
   VARINT_IDS_U8_FACING: ENCODING_VARINT_IDS_U8_FACING,
   VARINT_IDS_U8_FACING_U12_POSITION: ENCODING_VARINT_IDS_U8_FACING_U12_POSITION,
   PACKED_U10_IDS_U6_MASK_U8_FACING_U12_POSITION: ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_U12_POSITION,
+  PACKED_U10_IDS_U6_MASK_U8_FACING_LOCAL_U12_POSITION: ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_LOCAL_U12_POSITION,
   CURRENT: CURRENT_ENCODING,
 });
 
@@ -364,6 +404,42 @@ function snapshotNetIdBytes(netId, encoding) {
   return uint32VarintBytes(netId);
 }
 
+function snapshotRecordsBytes(records, encoding) {
+  let bytes = 0;
+  let previousPosition = null;
+  for (const record of records) {
+    const measured = snapshotRecordBytesWithContext(record, encoding, previousPosition);
+    bytes += measured.bytes;
+    previousPosition = measured.nextPosition;
+  }
+  return bytes;
+}
+
+function snapshotRecordBytesWithContext(record, encoding, previousPosition) {
+  const mask = record.mask ?? FULL_FIELDS;
+  let bytes;
+  if (usesPackedRecordHeader(encoding)) {
+    bytes = 2 + (record.netId >= PACKED_RECORD_NET_ID_ESCAPE ? uint32VarintBytes(record.netId) : 0);
+  } else {
+    bytes = snapshotNetIdBytes(record.netId, encoding) + 1;
+  }
+  if (mask & FIELD_REMOVED) {
+    return { bytes, nextPosition: previousPosition };
+  }
+
+  const wireMask = snapshotWireMask(record, encoding);
+  const positionEncoding = positionWireEncoding(record, wireMask, encoding, previousPosition);
+  let nextPosition = previousPosition;
+  if (mask & FIELD_POSITION) {
+    bytes += positionBytesForEncoding(positionEncoding);
+    nextPosition = decodedPositionForRecord(record, positionEncoding);
+  }
+  if (mask & FIELD_FACING) bytes += facingBytesForEncoding(encoding);
+  if (mask & FIELD_VITALS) bytes += 2;
+  if (mask & FIELD_ACTION) bytes += 2;
+  return { bytes, nextPosition };
+}
+
 function uint32VarintBytes(netId) {
   let value = netId >>> 0;
   let bytes = 1;
@@ -394,9 +470,36 @@ function expandCompactWireMask(mask) {
   return (mask & 0x0f) | (mask & (1 << 4)) | ((mask & (1 << 5)) << 2);
 }
 
-function writePackedRecordHeader(view, offset, netId, mask) {
+function packedWireMaskCode(mask, encoding, positionEncoding) {
+  if (
+    encoding === ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_LOCAL_U12_POSITION
+    && positionEncoding === POSITION_ENCODING_LOCAL
+  ) {
+    if (!(mask & FIELD_POSITION) || (mask & FIELD_WIDE_POSITION) || (mask & FIELD_REMOVED)) {
+      throw new RangeError("invalid local-position record mask");
+    }
+    return PACKED_MASK_LOCAL_POSITION_FLAG | (mask & 0x0f);
+  }
+  return compactWireMask(mask);
+}
+
+function expandPackedWireMask(compactMask, encoding) {
+  if (
+    encoding === ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_LOCAL_U12_POSITION
+    && (compactMask & PACKED_MASK_LOCAL_POSITION_FLAG)
+    && compactMask !== PACKED_MASK_LOCAL_POSITION_FLAG
+  ) {
+    if (!(compactMask & FIELD_POSITION) || (compactMask & FIELD_WIDE_POSITION)) {
+      throw new RangeError("invalid local-position marker");
+    }
+    return { mask: compactMask & 0x0f, localPosition: true };
+  }
+  return { mask: expandCompactWireMask(compactMask), localPosition: false };
+}
+
+function writePackedRecordHeader(view, offset, netId, compactMask) {
   const inlineNetId = netId < PACKED_RECORD_NET_ID_ESCAPE ? netId : PACKED_RECORD_NET_ID_ESCAPE;
-  const packed = inlineNetId | (compactWireMask(mask) << PACKED_RECORD_NET_ID_BITS);
+  const packed = inlineNetId | (compactMask << PACKED_RECORD_NET_ID_BITS);
   view.setUint16(offset, packed, true);
   offset += 2;
   if (inlineNetId === PACKED_RECORD_NET_ID_ESCAPE) {
@@ -410,13 +513,13 @@ function readPackedRecordHeader(view, offset) {
   const packed = view.getUint16(offset, true);
   offset += 2;
   const inlineNetId = packed & PACKED_RECORD_NET_ID_MASK;
-  const mask = expandCompactWireMask(packed >>> PACKED_RECORD_NET_ID_BITS);
+  const compactMask = packed >>> PACKED_RECORD_NET_ID_BITS;
   if (inlineNetId !== PACKED_RECORD_NET_ID_ESCAPE) {
-    return { netId: inlineNetId, mask, offset };
+    return { netId: inlineNetId, compactMask, offset };
   }
   const decoded = readUint32Varint(view, offset);
   if (decoded.value < PACKED_RECORD_NET_ID_ESCAPE) throw new RangeError("non-canonical packed snapshot netId");
-  return { netId: decoded.value, mask, offset: decoded.offset };
+  return { netId: decoded.value, compactMask, offset: decoded.offset };
 }
 
 function readUint32Varint(view, offset) {
@@ -443,34 +546,122 @@ function assertSnapshotEncoding(encoding) {
     && encoding !== ENCODING_VARINT_IDS
     && encoding !== ENCODING_VARINT_IDS_U8_FACING
     && encoding !== ENCODING_VARINT_IDS_U8_FACING_U12_POSITION
-    && encoding !== ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_U12_POSITION) {
+    && encoding !== ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_U12_POSITION
+    && encoding !== ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_LOCAL_U12_POSITION) {
     throw new RangeError(`unsupported snapshot encoding ${encoding}`);
   }
 }
 
 function snapshotWireMask(record, encoding) {
   let mask = (record.mask ?? FULL_FIELDS) & ~FIELD_WIDE_POSITION;
-  if (usesCompactPosition(encoding) && (mask & FIELD_POSITION) && !positionIsCompact(record.x, record.y)) mask |= FIELD_WIDE_POSITION;
+  if (usesCompactPosition(encoding) && (mask & FIELD_POSITION) && !positionIsCompact(record.x, record.y)) {
+    mask |= FIELD_WIDE_POSITION;
+  }
   return mask;
 }
-function positionBytesForRecord(record, encoding) { return usesCompactPosition(encoding) && positionIsCompact(record.x, record.y) ? 3 : 4; }
-function positionIsCompact(x, y) { return x <= 0x7ffb && y <= 0x7ffb; }
-function writeCompactPosition(view, offset, x, y) {
-  const packedX = Math.floor((x + 4) / 8), packedY = Math.floor((y + 4) / 8);
-  const packed = packedX | (packedY << 12);
-  view.setUint8(offset, packed & 0xff); view.setUint8(offset + 1, (packed >>> 8) & 0xff); view.setUint8(offset + 2, (packed >>> 16) & 0xff); return offset + 3;
+
+function positionWireEncoding(record, mask, encoding, previousPosition) {
+  if (!(mask & FIELD_POSITION)) return POSITION_ENCODING_NONE;
+  if (!usesCompactPosition(encoding) || (mask & FIELD_WIDE_POSITION)) return POSITION_ENCODING_EXACT;
+  if (encoding === ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_LOCAL_U12_POSITION && previousPosition) {
+    const current = compactPositionPair(record.x, record.y);
+    if (samePositionCell(previousPosition, current)) return POSITION_ENCODING_LOCAL;
+  }
+  return POSITION_ENCODING_COMPACT;
 }
+
+function positionBytesForEncoding(positionEncoding) {
+  if (positionEncoding === POSITION_ENCODING_NONE) return 0;
+  if (positionEncoding === POSITION_ENCODING_LOCAL) return 2;
+  if (positionEncoding === POSITION_ENCODING_COMPACT) return 3;
+  return 4;
+}
+
+function positionBytesForRecord(record, encoding) {
+  const mask = snapshotWireMask(record, encoding);
+  return positionBytesForEncoding(positionWireEncoding(record, mask, encoding, null));
+}
+
+function positionIsCompact(x, y) {
+  return x <= 0x7ffb && y <= 0x7ffb;
+}
+
+function compactPositionValue(value) {
+  return (Math.floor((value + 4) / 8) & 0x0fff) << 3;
+}
+
+function compactPositionPair(x, y) {
+  return [compactPositionValue(x), compactPositionValue(y)];
+}
+
+function decodedPositionForRecord(record, positionEncoding) {
+  if (positionEncoding === POSITION_ENCODING_COMPACT || positionEncoding === POSITION_ENCODING_LOCAL) {
+    return compactPositionPair(record.x, record.y);
+  }
+  if (positionEncoding === POSITION_ENCODING_EXACT) return [record.x, record.y];
+  throw new RangeError("position record has no wire encoding");
+}
+
+function replicationCellWire() {
+  return NETWORK.snapshotPositionCellSize * NETWORK.worldCoordinateScale;
+}
+
+function positionCell(position) {
+  const cellWire = replicationCellWire();
+  return [Math.floor(position[0] / cellWire), Math.floor(position[1] / cellWire)];
+}
+
+function samePositionCell(left, right) {
+  const a = positionCell(left);
+  const b = positionCell(right);
+  return a[0] === b[0] && a[1] === b[1];
+}
+
+function writeCompactPosition(view, offset, x, y) {
+  const packedX = Math.floor((x + 4) / 8);
+  const packedY = Math.floor((y + 4) / 8);
+  const packed = packedX | (packedY << 12);
+  view.setUint8(offset, packed & 0xff);
+  view.setUint8(offset + 1, (packed >>> 8) & 0xff);
+  view.setUint8(offset + 2, (packed >>> 16) & 0xff);
+  return offset + 3;
+}
+
+function writeLocalCellPosition(view, offset, x, y, previousPosition) {
+  const current = compactPositionPair(x, y);
+  if (!samePositionCell(previousPosition, current)) throw new RangeError("local snapshot position crossed cell");
+  const cellWire = replicationCellWire();
+  const [cellX, cellY] = positionCell(previousPosition);
+  view.setUint8(offset, (current[0] - cellX * cellWire) / 8);
+  view.setUint8(offset + 1, (current[1] - cellY * cellWire) / 8);
+  return offset + 2;
+}
+
+function decodeLocalCellPosition(previousPosition, localX, localY) {
+  const cellWire = replicationCellWire();
+  const [cellX, cellY] = positionCell(previousPosition);
+  return [
+    cellX * cellWire + localX * 8,
+    cellY * cellWire + localY * 8,
+  ];
+}
+
 function usesCompactPosition(encoding) {
   return encoding === ENCODING_VARINT_IDS_U8_FACING_U12_POSITION
-    || encoding === ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_U12_POSITION;
+    || encoding === ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_U12_POSITION
+    || encoding === ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_LOCAL_U12_POSITION;
 }
+
 function usesCompactFacing(encoding) {
   return encoding === ENCODING_VARINT_IDS_U8_FACING
     || encoding === ENCODING_VARINT_IDS_U8_FACING_U12_POSITION
-    || encoding === ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_U12_POSITION;
+    || encoding === ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_U12_POSITION
+    || encoding === ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_LOCAL_U12_POSITION;
 }
+
 function usesPackedRecordHeader(encoding) {
-  return encoding === ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_U12_POSITION;
+  return encoding === ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_U12_POSITION
+    || encoding === ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_LOCAL_U12_POSITION;
 }
 
 function facingBytesForEncoding(encoding) {

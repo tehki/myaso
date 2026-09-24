@@ -6,9 +6,11 @@ const ENCODING_VARINT_IDS = 1;
 const ENCODING_VARINT_IDS_U8_FACING = 2;
 const ENCODING_VARINT_IDS_U8_FACING_U12_POSITION = 3;
 const ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_U12_POSITION = 4;
+const ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_LOCAL_U12_POSITION = 5;
 const PACKED_RECORD_NET_ID_BITS = 10;
 const PACKED_RECORD_NET_ID_MASK = (1 << PACKED_RECORD_NET_ID_BITS) - 1;
 const PACKED_RECORD_NET_ID_ESCAPE = PACKED_RECORD_NET_ID_MASK;
+const PACKED_MASK_LOCAL_POSITION_FLAG = 1 << 5;
 const FIELD_POSITION = 1 << 0;
 const FIELD_FACING = 1 << 1;
 const FIELD_VITALS = 1 << 2;
@@ -51,15 +53,23 @@ export function applySnapshotPacketInPlace(stateMap, packet, result = createSnap
 
   const staleIds = result.full ? new Set(stateMap.keys()) : null;
   let offset = HEADER_BYTES;
+  let previousPositionX = null;
+  let previousPositionY = null;
 
   for (let index = 0; index < result.records; index += 1) {
     let netId;
     let mask;
-    if (result.encoding === ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_U12_POSITION) {
+    let localPosition = false;
+    if (
+      result.encoding === ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_U12_POSITION
+      || result.encoding === ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_LOCAL_U12_POSITION
+    ) {
       const decoded = readPackedRecordHeader(view, offset);
       netId = decoded.netId;
-      mask = decoded.mask;
       offset = decoded.offset;
+      const expanded = expandPackedWireMask(decoded.compactMask, result.encoding);
+      mask = expanded.mask;
+      localPosition = expanded.localPosition;
     } else {
       if (result.encoding === ENCODING_LEGACY_U32_IDS) {
         requireBytes(view, offset, 4);
@@ -76,7 +86,17 @@ export function applySnapshotPacketInPlace(stateMap, packet, result = createSnap
     }
     staleIds?.delete(netId);
     const widePosition = Boolean(mask & FIELD_WIDE_POSITION);
-    if (widePosition && (!usesCompactPosition(result.encoding) || !(mask & FIELD_POSITION))) throw new RangeError("invalid compact-position marker");
+    if (widePosition && (!usesCompactPosition(result.encoding) || !(mask & FIELD_POSITION))) {
+      throw new RangeError("invalid compact-position marker");
+    }
+    if (localPosition && (
+      result.encoding !== ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_LOCAL_U12_POSITION
+      || !(mask & FIELD_POSITION)
+      || widePosition
+      || (mask & FIELD_REMOVED)
+    )) {
+      throw new RangeError("invalid local-position marker");
+    }
 
     if (mask & FIELD_REMOVED) {
       if (stateMap.delete(netId)) result.removed += 1;
@@ -103,15 +123,35 @@ export function applySnapshotPacketInPlace(stateMap, packet, result = createSnap
     }
 
     if (mask & FIELD_POSITION) {
-      if (usesCompactPosition(result.encoding) && !widePosition) {
+      let wireX;
+      let wireY;
+      if (localPosition) {
+        if (previousPositionX === null || previousPositionY === null) {
+          throw new RangeError("local snapshot position has no previous position");
+        }
+        requireBytes(view, offset, 2);
+        const cellWire = replicationCellWire();
+        const cellX = Math.floor(previousPositionX / cellWire);
+        const cellY = Math.floor(previousPositionY / cellWire);
+        wireX = cellX * cellWire + view.getUint8(offset) * 8;
+        wireY = cellY * cellWire + view.getUint8(offset + 1) * 8;
+        offset += 2;
+      } else if (usesCompactPosition(result.encoding) && !widePosition) {
         requireBytes(view, offset, 3);
         const packed = view.getUint8(offset) | (view.getUint8(offset + 1) << 8) | (view.getUint8(offset + 2) << 16);
-        entity.x = ((packed & 0x0fff) << 3) / NETWORK.worldCoordinateScale;
-        entity.y = (((packed >>> 12) & 0x0fff) << 3) / NETWORK.worldCoordinateScale;
+        wireX = (packed & 0x0fff) << 3;
+        wireY = ((packed >>> 12) & 0x0fff) << 3;
         offset += 3;
       } else {
-        requireBytes(view, offset, 4); entity.x = view.getUint16(offset, true) / NETWORK.worldCoordinateScale; entity.y = view.getUint16(offset + 2, true) / NETWORK.worldCoordinateScale; offset += 4;
+        requireBytes(view, offset, 4);
+        wireX = view.getUint16(offset, true);
+        wireY = view.getUint16(offset + 2, true);
+        offset += 4;
       }
+      previousPositionX = wireX;
+      previousPositionY = wireY;
+      entity.x = wireX / NETWORK.worldCoordinateScale;
+      entity.y = wireY / NETWORK.worldCoordinateScale;
     }
     if (mask & FIELD_FACING) {
       if (usesCompactFacing(result.encoding)) {
@@ -154,31 +194,51 @@ function expandCompactWireMask(mask) {
   return (mask & 0x1f) | ((mask & (1 << 5)) << 2);
 }
 
+function expandPackedWireMask(compactMask, encoding) {
+  if (
+    encoding === ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_LOCAL_U12_POSITION
+    && (compactMask & PACKED_MASK_LOCAL_POSITION_FLAG)
+    && compactMask !== PACKED_MASK_LOCAL_POSITION_FLAG
+  ) {
+    if (!(compactMask & FIELD_POSITION) || (compactMask & FIELD_WIDE_POSITION)) {
+      throw new RangeError("invalid local-position marker");
+    }
+    return { mask: compactMask & 0x0f, localPosition: true };
+  }
+  return { mask: expandCompactWireMask(compactMask), localPosition: false };
+}
+
 function readPackedRecordHeader(view, offset) {
   requireBytes(view, offset, 2);
   const packed = view.getUint16(offset, true);
   offset += 2;
   const inlineNetId = packed & PACKED_RECORD_NET_ID_MASK;
-  const mask = expandCompactWireMask(packed >>> PACKED_RECORD_NET_ID_BITS);
+  const compactMask = packed >>> PACKED_RECORD_NET_ID_BITS;
   if (inlineNetId !== PACKED_RECORD_NET_ID_ESCAPE) {
-    return { netId: inlineNetId, mask, offset };
+    return { netId: inlineNetId, compactMask, offset };
   }
   const decoded = readUint32Varint(view, offset);
   if (decoded.value < PACKED_RECORD_NET_ID_ESCAPE) {
     throw new RangeError("non-canonical packed snapshot netId");
   }
-  return { netId: decoded.value, mask, offset: decoded.offset };
+  return { netId: decoded.value, compactMask, offset: decoded.offset };
+}
+
+function replicationCellWire() {
+  return NETWORK.snapshotPositionCellSize * NETWORK.worldCoordinateScale;
 }
 
 function usesCompactPosition(encoding) {
   return encoding === ENCODING_VARINT_IDS_U8_FACING_U12_POSITION
-    || encoding === ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_U12_POSITION;
+    || encoding === ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_U12_POSITION
+    || encoding === ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_LOCAL_U12_POSITION;
 }
 
 function usesCompactFacing(encoding) {
   return encoding === ENCODING_VARINT_IDS_U8_FACING
     || encoding === ENCODING_VARINT_IDS_U8_FACING_U12_POSITION
-    || encoding === ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_U12_POSITION;
+    || encoding === ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_U12_POSITION
+    || encoding === ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_LOCAL_U12_POSITION;
 }
 
 function readUint32Varint(view, offset) {
@@ -215,7 +275,8 @@ function assertSnapshotEncoding(encoding) {
     && encoding !== ENCODING_VARINT_IDS
     && encoding !== ENCODING_VARINT_IDS_U8_FACING
     && encoding !== ENCODING_VARINT_IDS_U8_FACING_U12_POSITION
-    && encoding !== ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_U12_POSITION) {
+    && encoding !== ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_U12_POSITION
+    && encoding !== ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_LOCAL_U12_POSITION) {
     throw new RangeError(`unsupported snapshot encoding ${encoding}`);
   }
 }

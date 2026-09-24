@@ -32,11 +32,13 @@ fn byte_composition_exactly_matches_encoded_snapshot_length() {
     assert_eq!(composition.header, SNAPSHOT_HEADER_BYTES);
     assert_eq!(composition.net_ids, 4);
     assert_eq!(composition.masks, 4);
-    assert_eq!(composition.position, 6);
+    // V5 keeps the first compact position absolute (3 bytes) and encodes
+    // the second same-cell compact position locally (2 bytes).
+    assert_eq!(composition.position, 5);
     assert_eq!(composition.facing, 2);
     assert_eq!(composition.vitals, 4);
     assert_eq!(composition.action, 2);
-    assert_eq!(composition.total_bytes(), 36);
+    assert_eq!(composition.total_bytes(), 35);
     assert_eq!(composition.total_bytes(), encoded.len());
 
     assert_eq!(SNAPSHOT_FIELD_ACTION, 1 << 3);
