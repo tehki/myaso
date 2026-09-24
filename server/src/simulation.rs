@@ -488,6 +488,7 @@ fn advance_action(fighter: &mut Fighter, input: InputIntent, dt_ms: f32) {
 
 fn separate_fighters(width: f32, height: f32, fighters: &mut [Fighter]) {
     let minimum_distance = FIGHTER_RADIUS * 2.0;
+    let minimum_distance_sq = minimum_distance * minimum_distance;
     for first_index in 0..fighters.len() {
         for second_index in (first_index + 1)..fighters.len() {
             let (first, second) = two_mut(fighters, first_index, second_index);
@@ -495,9 +496,15 @@ fn separate_fighters(width: f32, height: f32, fighters: &mut [Fighter]) {
                 continue;
             }
             let mut dx = second.x - first.x;
+            if dx.abs() >= minimum_distance {
+                continue;
+            }
             let mut dy = second.y - first.y;
+            if dy.abs() >= minimum_distance {
+                continue;
+            }
             let distance_sq = dx * dx + dy * dy;
-            if distance_sq >= minimum_distance * minimum_distance {
+            if distance_sq >= minimum_distance_sq {
                 continue;
             }
             let mut distance = distance_sq.sqrt();
@@ -630,9 +637,15 @@ fn resolve_attacks(
 
 fn is_target_in_attack_arc(attacker: &Fighter, target: &Fighter) -> bool {
     let dx = target.x - attacker.x;
-    let dy = target.y - attacker.y;
-    let center_distance_sq = dx * dx + dy * dy;
     let maximum_distance = ATTACK_REACH + FIGHTER_RADIUS;
+    if dx.abs() > maximum_distance {
+        return false;
+    }
+    let dy = target.y - attacker.y;
+    if dy.abs() > maximum_distance {
+        return false;
+    }
+    let center_distance_sq = dx * dx + dy * dy;
     if center_distance_sq > maximum_distance * maximum_distance {
         return false;
     }
