@@ -1732,7 +1732,10 @@ mod tests {
             "corner-cell pruning should reduce candidate checks"
         );
         assert!(actual.states.iter().any(|state| state.net_id == 3));
-        assert!(actual.states.iter().all(|state| !matches!(state.net_id, 4 | 5 | 6)));
+        assert!(actual
+            .states
+            .iter()
+            .all(|state| !matches!(state.net_id, 4 | 5 | 6)));
     }
 
     #[test]
