@@ -161,6 +161,9 @@ jobs:
       - name: Validate M85 planner-owned last-sent updates
         run: cargo test --locked --manifest-path server/Cargo.toml planner_updates_last_sent_only_for_admitted_records
 
+      - name: Validate M86 recycled acknowledged history
+        run: cargo test --locked --manifest-path server/Cargo.toml acknowledged_history_reuses_record_capacity_on_next_snapshot
+
       - name: Validate real browser flight
         env:
           MYASO_FLIGHT_DURATION_MS: "4000"
