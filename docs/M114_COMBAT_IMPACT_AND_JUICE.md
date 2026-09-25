@@ -37,6 +37,12 @@ The simulation, input sampling, prediction history, networking, reconciliation, 
 
 This provides contact weight without changing gameplay timing or granting hidden advantage.
 
+## Weapon motion trails
+
+Light, heavy, and jumping attacks now render distinct short weapon trails during windup/active phases. Heavy trails are wider and hotter; jumping attacks keep the new narrow attack language; light attacks remain visually lighter.
+
+The trails do not alter authoritative reach or arc. They are presentation only.
+
 ## Camera impulse and impact bursts
 
 After hit-stop, the arena receives a deterministic decaying camera impulse. A bounded radial burst is drawn at:
