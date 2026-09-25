@@ -29,14 +29,14 @@ const DODGE_RECOVERY_MS: f32 = 180.0;
 const DODGE_SPEED: f32 = 690.0;
 const DODGE_IFRAME_MS: f32 = 125.0;
 const DODGE_STAMINA_COST: f32 = 28.0;
-const ROLL_COLLISION_STUN_MS: f32 = 260.0;
+const ROLL_COLLISION_KNOCKDOWN_MS: f32 = 260.0;
 const ROLL_COLLISION_KNOCKBACK: f32 = 34.0;
 const KICK_WINDUP_MS: f32 = 90.0;
 const KICK_ACTIVE_MS: f32 = 70.0;
 const KICK_RECOVERY_MS: f32 = 220.0;
 const KICK_REACH: f32 = 48.0;
 const KICK_ARC_RADIANS: f32 = std::f32::consts::PI * 0.62;
-const KICK_STUN_MS: f32 = 360.0;
+const KICK_KNOCKDOWN_MS: f32 = 360.0;
 const KICK_KNOCKBACK: f32 = 52.0;
 const KICK_BLOCK_GUARD_DAMAGE: f32 = 30.0;
 const KICK_STAMINA_COST: f32 = 18.0;
@@ -93,6 +93,7 @@ pub enum Action {
     JumpAttackRecovery,
     Block,
     Stunned,
+    Knockdown,
     Dead,
 }
 
@@ -118,6 +119,7 @@ impl Action {
             Self::JumpAttackWindup => 16,
             Self::JumpAttackActive => 17,
             Self::JumpAttackRecovery => 18,
+            Self::Knockdown => 19,
         }
     }
 }
@@ -568,7 +570,7 @@ fn move_fighter(width: f32, height: f32, fighter: &mut Fighter, input: InputInte
             velocity_x *= 0.20;
             velocity_y *= 0.20;
         }
-        Action::AttackActive | Action::HeavyAttackActive | Action::Stunned => {
+        Action::AttackActive | Action::HeavyAttackActive | Action::Stunned | Action::Knockdown => {
             velocity_x = 0.0;
             velocity_y = 0.0;
         }
@@ -639,7 +641,9 @@ fn advance_action(fighter: &mut Fighter, input: InputIntent, dt_ms: f32) {
         Action::JumpAttackActive => {
             fighter.set_action(Action::JumpAttackRecovery, JUMP_ATTACK_RECOVERY_MS)
         }
-        Action::JumpAttackRecovery | Action::Stunned => fighter.set_action(Action::Idle, 0.0),
+        Action::JumpAttackRecovery | Action::Stunned | Action::Knockdown => {
+            fighter.set_action(Action::Idle, 0.0)
+        }
         Action::Idle | Action::Block | Action::Dead => {}
     }
 }
@@ -692,7 +696,7 @@ fn resolve_roll_collisions(width: f32, height: f32, fighters: &mut [Fighter]) {
             let (roller, target) = two_mut(fighters, roller_index, target_index);
             roller.roll_hit_targets.insert(target.net_id);
             knock_back(width, height, roller, target, ROLL_COLLISION_KNOCKBACK);
-            target.set_action(Action::Stunned, ROLL_COLLISION_STUN_MS);
+            target.set_action(Action::Knockdown, ROLL_COLLISION_KNOCKDOWN_MS);
         }
     }
 }
@@ -870,7 +874,7 @@ fn resolve_attacks(
 
             if profile.kick {
                 knock_back(width, height, attacker, target, profile.knockback);
-                target.set_action(Action::Stunned, KICK_STUN_MS);
+                target.set_action(Action::Knockdown, KICK_KNOCKDOWN_MS);
                 continue;
             }
 
