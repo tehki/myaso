@@ -797,29 +797,80 @@ async function runOnlineUiHeavyBlockFlight(entries) {
 
 async function runOnlineUiHeavyParryFlight(entries) {
   const staged = await prepareHeavyCounterplayFlight(entries, "M107 heavy parry");
-  const { attacker, defender, defenderElementId, movementCode } = staged;
+  const { attacker, defender, attackerElementId, defenderElementId, movementCode } = staged;
+  const attackRight = movementCode === "KeyD";
+  const attackOffset = attackRight ? 200 : -200;
+  const blockOffset = attackRight ? -200 : 200;
+  let evidence = null;
+  let lastObserved = null;
 
-  await pulseMovementKey(attacker, "e", 40);
-  // The heavy active transition starts at 320 ms. Arm block at roughly 245 ms
-  // from the real E keydown, leaving about 75 ms of parry age at impact and
-  // enough margin for moderate Chrome/Firefox delivery skew.
-  await sleep(205);
-  let blockHeld = false;
-  try {
-    await setArenaBlock(defender, defenderElementId, true);
-    blockHeld = true;
-    await sleep(180);
-  } finally {
-    if (blockHeld) await setArenaBlock(defender, defenderElementId, false);
+  // As with the heavy-block flight, WebDriver can deliver the E edge while the
+  // browser input latch misses the outbound sample. Retry only that completely
+  // pristine case. Any evidence that a heavy actually committed, hit, blocked,
+  // or otherwise resolved makes the attempt terminal and therefore fail-closed.
+  for (let attempt = 1; attempt <= 3 && !evidence; attempt += 1) {
+    await pulseMovementKey(attacker, "e", 40);
+    // The heavy active transition starts at 320 ms. Arm block at roughly 245 ms
+    // from the real E keydown, leaving about 75 ms of parry age at impact and
+    // enough margin for moderate Chrome/Firefox delivery skew.
+    await sleep(205);
+    let blockHeld = false;
+    try {
+      await setArenaBlock(defender, defenderElementId, true);
+      blockHeld = true;
+      await sleep(180);
+    } finally {
+      if (blockHeld) await setArenaBlock(defender, defenderElementId, false);
+    }
+    await sleep(80);
+
+    lastObserved = await Promise.all(entries.map(readUiEvidence));
+    const attackerResult = lastObserved.find((entry) => entry.browser === attacker.name);
+    const defenderResult = lastObserved.find((entry) => entry.browser === defender.name);
+    if (!attackerResult || !defenderResult) {
+      throw new Error(`M107 heavy parry incomplete evidence on attempt ${attempt}: ${JSON.stringify(lastObserved)}`);
+    }
+
+    const resolvedParry = attackerResult.playerHp === 100 && attackerResult.playerGuard === 100
+      && defenderResult.playerHp === 100 && defenderResult.playerGuard === 100
+      && attackerResult.feedbackTransitions.includes("parried")
+      && defenderResult.feedbackTransitions.includes("parry-success");
+    if (resolvedParry) {
+      evidence = lastObserved;
+      break;
+    }
+
+    const heavyCommitted = attackerResult.events.some((text) =>
+      text.startsWith("Heavy strike committed") || text.startsWith("Heavy strike active")
+        || text.startsWith("Heavy recovery"))
+      || defenderResult.threatTransitions.some((entry) =>
+        entry.visible && (entry.phase === "HEAVY WINDUP" || entry.phase === "HEAVY STRIKE"))
+      || defenderResult.recoveryTransitions.some((entry) =>
+        entry.visible && entry.state === "heavy-attack-recovery");
+    const cleanLatchMiss = attackerResult.playerHp === 100 && attackerResult.playerGuard === 100
+      && attackerResult.opponentHp === 100 && attackerResult.opponentGuard === 100
+      && defenderResult.playerHp === 100 && defenderResult.playerGuard === 100
+      && !heavyCommitted
+      && !attackerResult.feedbackTransitions.includes("parried")
+      && !defenderResult.feedbackTransitions.includes("parry-success");
+    if (!cleanLatchMiss) {
+      throw new Error(`M107 heavy parry attempt ${attempt} resolved unexpectedly: ${JSON.stringify(lastObserved)}`);
+    }
+    if (attempt < 3) {
+      await sleep(380);
+      await Promise.all([
+        aimArena(attacker, attackerElementId, attackOffset),
+        aimArena(defender, defenderElementId, blockOffset),
+      ]);
+      await sleep(40);
+    }
   }
-  await sleep(80);
 
-  const evidence = await Promise.all(entries.map(readUiEvidence));
+  if (!evidence) {
+    throw new Error(`M107 heavy parry did not resolve after bounded clean latch retries: ${JSON.stringify(lastObserved)}`);
+  }
   const attackerResult = evidence.find((entry) => entry.browser === attacker.name);
   const defenderResult = evidence.find((entry) => entry.browser === defender.name);
-  if (!attackerResult || !defenderResult) {
-    throw new Error(`M107 heavy parry incomplete evidence: ${JSON.stringify(evidence)}`);
-  }
   assertHeavyControlDelivered(attackerResult, movementCode, "M107 heavy parry");
   const blockDown = defenderResult.pointers.find((event) => event.type === "pointerdown" && event.button === 2);
   const blockUp = defenderResult.pointers.find((event) => event.type === "pointerup" && event.button === 2);
@@ -830,10 +881,6 @@ async function runOnlineUiHeavyParryFlight(entries) {
     || defenderResult.playerHp !== 100 || defenderResult.playerGuard !== 100) {
     throw new Error(`M107 heavy parry changed authoritative vitals: ${JSON.stringify(evidence)}`);
   }
-  if (!attackerResult.feedbackTransitions.includes("parried")
-    || !defenderResult.feedbackTransitions.includes("parry-success")) {
-    throw new Error(`M107 heavy parry feedback never resolved: ${JSON.stringify(evidence)}`);
-  }
   const stunned = attackerResult.overlayTransitions.some((entry) =>
     entry.visible && entry.title === "STUNNED");
   if (!stunned) {
@@ -841,7 +888,6 @@ async function runOnlineUiHeavyParryFlight(entries) {
   }
   return evidence;
 }
-
 async function runOnlineUiHeavyDodgeFlight(entries) {
   // Match the already-stable M36 browser roles: Firefox attacks, Chrome dodges.
   const staged = await prepareHeavyCounterplayFlight(
