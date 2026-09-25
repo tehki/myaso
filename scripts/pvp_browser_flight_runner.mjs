@@ -1589,10 +1589,10 @@ async function runOnlineUiHeavyGuardBreakPunishFlight(entries) {
     const states = await Promise.all(entries.map(readUiEvidence));
     const attackerState = states.find((entry) => entry.browser === attacker.name);
     const defenderState = states.find((entry) => entry.browser === defender.name);
-    const heavyRecovery = attackerState?.recoveryVisible
-      && attackerState.recoveryState === "heavy-attack-recovery"
-      && attackerState.recoveryLabel === "PUNISH"
-      && attackerState.recoveryDetail === "Heavy recovery";
+    const heavyRecovery = defenderState?.recoveryVisible
+      && defenderState.recoveryState === "heavy-attack-recovery"
+      && defenderState.recoveryLabel === "PUNISH"
+      && defenderState.recoveryDetail === "Heavy recovery";
     const defenderStunned = defenderState?.overlayVisible
       && defenderState.overlayTitle === "STUNNED"
       && defenderState.playerHp === 100
@@ -1620,7 +1620,7 @@ async function runOnlineUiHeavyGuardBreakPunishFlight(entries) {
   // recovery. At least one real click lands after control returns, while the
   // derived heavy guard-break stun still preserves the same 185 ms post-
   // recovery punish margin as the existing light guard-break path.
-  await performArenaAttackBurst(attacker, 3, 400);
+  await performArenaAttackBurst(attacker, 3, 385);
 
   const hitDeadline = Date.now() + 260;
   let hitEvidence = null;
