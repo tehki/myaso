@@ -3587,7 +3587,7 @@ async function waitForUiRespawnEvidence(entries, attacker, defender, timeoutMs) 
 
 async function readUiEvidence(session) {
   const value = await execute(session.base, session.sessionId, `
-    const state = window.__MYASO_M30_UI__ ?? { events: [], eventTransitions: [], keys: [], pointers: [], overlayTransitions: [], feedbackTransitions: [], recoveryTransitions: [], threatTransitions: [], recoveryTellMaxPixels: 0, parryTellMaxPixels: 0, online: '' };
+    const state = window.__MYASO_M30_UI__ ?? { events: [], eventTransitions: [], keys: [], pointers: [], wheels: [], overlayTransitions: [], feedbackTransitions: [], recoveryTransitions: [], threatTransitions: [], recoveryTellMaxPixels: 0, parryTellMaxPixels: 0, online: '' };
     const match = state.online.match(/player #(\\d+)/);
     return {
       title: document.title,
@@ -3639,6 +3639,7 @@ async function readUiEvidence(session) {
       eventTransitions: (state.eventTransitions ?? []).slice(),
       keys: state.keys.slice(),
       pointers: state.pointers.slice(),
+      wheels: (state.wheels ?? []).slice(),
     };
   `);
   return { browser: session.name, ...value };
