@@ -249,6 +249,13 @@ jobs:
             MYASO_PVP_SCENARIO="$scenario" node scripts/pvp_browser_flight_runner.mjs
           done
 
+      - name: Validate M108 heavy recovery under first-send input loss
+        env:
+          MYASO_PVP_SCENARIO: "uiheavyinputloss"
+        run: |
+          node --check scripts/pvp_browser_flight_runner.mjs
+          node scripts/pvp_browser_flight_runner.mjs
+
       - name: Validate real browser flight
         env:
           MYASO_FLIGHT_DURATION_MS: "4000"
