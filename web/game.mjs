@@ -1,9 +1,11 @@
 import { createFrameBudget } from "../src/browser/frame-budget.mjs";
+import { createCombatImpactController } from "../src/browser/combat-impact.mjs";
 import { COMBAT, createFighter, createWorld, stepWorld } from "../src/combat/model.mjs";
 
 const canvas = document.querySelector("#arena");
 const ctx = canvas.getContext("2d", { alpha: false });
 const eventText = document.querySelector("#event-text");
+const arenaStage = document.querySelector(".arena-stage");
 const hud = {
   playerHp: document.querySelector("#player-hp"),
   playerHpValue: document.querySelector("#player-hp-value"),
@@ -59,6 +61,8 @@ const frameBudget = createFrameBudget({
   maxStepsPerFrame: 6,
 });
 const arenaLayer = createArenaLayer();
+const combatImpact = createCombatImpactController();
+let combatFeedbackTimer = 0;
 
 canvas.addEventListener("contextmenu", (event) => event.preventDefault());
 canvas.addEventListener("pointerdown", (event) => {
@@ -189,16 +193,53 @@ function botInput() {
 function handleEvents(events) {
   for (const event of events) {
     const names = { player: "You", bot: "Bot" };
-    if (event.type === "hit") say(`${names[event.attackerId]} hit ${names[event.targetId]} for ${event.damage}.`, 560);
-    if (event.type === "block") say(`${names[event.targetId]} blocked.`, 480);
-    if (event.type === "parry") say(`${names[event.targetId]} PARRIED ${names[event.attackerId]} — punish now!`, 920);
-    if (event.type === "kick") say(`${names[event.attackerId]} shoved ${names[event.targetId]} down.`, 620);
-    if (event.type === "roll_hit") say(`${names[event.attackerId]} rolled through ${names[event.targetId]}.`, 560);
-    if (event.type === "guard_break") say(`${names[event.targetId]}'s guard broke. Punish!`, 760);
-    if (event.type === "evade") say(`${names[event.targetId]} dodged through the strike.`, 520);
+    if (event.type === "hit") {
+      say(`${names[event.attackerId]} hit ${names[event.targetId]} for ${event.damage}.`, 560);
+      showCombatFeedback(event.targetId === "player" ? "damage-taken" : "hit-confirm");
+    }
+    if (event.type === "block") {
+      say(`${names[event.targetId]} blocked.`, 480);
+      showCombatFeedback(event.targetId === "player" ? "guard-pressure" : "block-confirm");
+    }
+    if (event.type === "parry") {
+      say(`${names[event.targetId]} PARRIED ${names[event.attackerId]} — punish now!`, 920);
+      showCombatFeedback(event.targetId === "player" ? "parry-success" : "parried");
+    }
+    if (event.type === "kick") {
+      say(`${names[event.attackerId]} shoved ${names[event.targetId]} down.`, 620);
+      showCombatFeedback(event.attackerId === "player" ? "kick-confirm" : "shoved");
+    }
+    if (event.type === "roll_hit") {
+      say(`${names[event.attackerId]} rolled through ${names[event.targetId]}.`, 560);
+      showCombatFeedback(event.attackerId === "player" ? "roll-impact" : "rolled-over");
+    }
+    if (event.type === "guard_break") {
+      say(`${names[event.targetId]}'s guard broke. Punish!`, 760);
+      showCombatFeedback(event.targetId === "player" ? "guard-broken" : "guard-break-confirm");
+    }
+    if (event.type === "evade") {
+      say(`${names[event.targetId]} dodged through the strike.`, 520);
+      showCombatFeedback(event.targetId === "player" ? "dodge-success" : "dodge-evaded");
+    }
     if (event.type === "death") say(`${names[event.killerId]} wins the exchange.`, 980);
     if (event.type === "respawn") say(`${names[event.fighterId]} re-enters the arena.`, 620);
   }
+}
+
+function showCombatFeedback(feedback) {
+  if (!feedback || !arenaStage) return;
+  combatImpact.trigger(feedback, performance.now());
+  if (combatFeedbackTimer) clearTimeout(combatFeedbackTimer);
+  delete arenaStage.dataset.combatFeedback;
+  void arenaStage.offsetWidth;
+  arenaStage.dataset.combatFeedback = feedback;
+  const durationMs = feedback === "guard-broken" || feedback === "guard-break-confirm" ? 420
+    : feedback === "parry-success" || feedback === "parried" ? 380
+      : 320;
+  combatFeedbackTimer = window.setTimeout(() => {
+    if (arenaStage.dataset.combatFeedback === feedback) delete arenaStage.dataset.combatFeedback;
+    combatFeedbackTimer = 0;
+  }, durationMs);
 }
 
 function say(text, durationMs) {
@@ -245,10 +286,51 @@ function actionHint() {
   return "Wheel up roll · wheel down parry · RMB tap shove · hold RMB run · Space jump.";
 }
 
-function render() {
+function render(impact = combatImpact.sample(performance.now())) {
+  ctx.save();
+  ctx.translate(impact.shakeX, impact.shakeY);
   ctx.drawImage(arenaLayer, 0, 0);
   drawFighter(player, "#e2d5b4", "#51452d");
   drawFighter(bot, "#b96350", "#47251f");
+  ctx.restore();
+  drawImpactBurst(impact);
+}
+
+function drawImpactBurst(impact) {
+  if (!impact?.active || impact.rays <= 0) return;
+  const remoteOwned = impact.feedback === "hit-confirm"
+    || impact.feedback === "block-confirm"
+    || impact.feedback === "guard-break-confirm"
+    || impact.feedback === "kick-confirm"
+    || impact.feedback === "roll-impact"
+    || impact.feedback === "dodge-evaded";
+  const target = remoteOwned ? bot : player;
+  const x = target.x;
+  const y = target.y;
+  const radius = 18 + impact.progress * 42;
+  const alpha = Math.max(0, (1 - impact.progress) * 0.9);
+  const parry = impact.feedback === "parry-success" || impact.feedback === "parried";
+  const guard = impact.feedback === "guard-pressure" || impact.feedback === "block-confirm"
+    || impact.feedback === "guard-broken" || impact.feedback === "guard-break-confirm";
+  const roll = impact.feedback === "roll-impact" || impact.feedback === "rolled-over"
+    || impact.feedback === "dodge-success" || impact.feedback === "dodge-evaded";
+  const tone = parry ? "174, 209, 147" : guard ? "224, 187, 91" : roll ? "150, 194, 190" : "255, 170, 104";
+
+  ctx.save();
+  ctx.strokeStyle = `rgba(${tone}, ${alpha})`;
+  ctx.lineWidth = 2.5;
+  for (let i = 0; i < impact.rays; i += 1) {
+    const angle = (i / impact.rays) * Math.PI * 2 + impact.progress * 0.45;
+    ctx.beginPath();
+    ctx.moveTo(x + Math.cos(angle) * radius * 0.42, y + Math.sin(angle) * radius * 0.42);
+    ctx.lineTo(x + Math.cos(angle) * radius, y + Math.sin(angle) * radius);
+    ctx.stroke();
+  }
+  ctx.fillStyle = `rgba(${tone}, ${impact.flashAlpha})`;
+  ctx.beginPath();
+  ctx.arc(x, y, Math.max(4, radius * 0.34), 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
 }
 
 function createArenaLayer() {
@@ -401,7 +483,8 @@ function frame(now) {
   if (document.hidden) return;
   frameBudget.advance(now, simulateStep);
   updateHud();
-  render();
+  const impact = combatImpact.sample(now);
+  if (!impact.freeze) render(impact);
   animationFrameId = requestAnimationFrame(frame);
 }
 
