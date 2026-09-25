@@ -16,6 +16,14 @@ const ATTACK_REACH: f32 = 76.0;
 const ATTACK_ARC_RADIANS: f32 = std::f32::consts::PI * 0.78;
 const ATTACK_DAMAGE: f32 = 34.0;
 const ATTACK_KNOCKBACK: f32 = 18.0;
+const THRUST_WINDUP_MS: f32 = 120.0;
+const THRUST_ACTIVE_MS: f32 = 70.0;
+const THRUST_RECOVERY_MS: f32 = 235.0;
+const THRUST_REACH: f32 = 94.0;
+const THRUST_ARC_RADIANS: f32 = std::f32::consts::PI * 0.20;
+const THRUST_DAMAGE: f32 = 30.0;
+const THRUST_KNOCKBACK: f32 = 16.0;
+const THRUST_GUARD_DAMAGE: f32 = 32.0;
 const HEAVY_ATTACK_WINDUP_MS: f32 = 320.0;
 const HEAVY_ATTACK_ACTIVE_MS: f32 = 100.0;
 const HEAVY_ATTACK_RECOVERY_MS: f32 = 420.0;
@@ -79,6 +87,9 @@ pub enum Action {
     AttackWindup,
     AttackActive,
     AttackRecovery,
+    ThrustWindup,
+    ThrustActive,
+    ThrustRecovery,
     HeavyAttackWindup,
     HeavyAttackActive,
     HeavyAttackRecovery,
@@ -120,6 +131,9 @@ impl Action {
             Self::JumpAttackActive => 17,
             Self::JumpAttackRecovery => 18,
             Self::Knockdown => 19,
+            Self::ThrustWindup => 20,
+            Self::ThrustActive => 21,
+            Self::ThrustRecovery => 22,
         }
     }
 }
@@ -514,7 +528,11 @@ fn begin_requested_action(now_ms: f32, fighter: &mut Fighter, input: InputIntent
 
     if input.attack && fighter.action == Action::Idle {
         fighter.attack_hit_targets.clear();
-        fighter.set_action(Action::AttackWindup, ATTACK_WINDUP_MS);
+        if is_forward_attack_input(fighter, input) {
+            fighter.set_action(Action::ThrustWindup, THRUST_WINDUP_MS);
+        } else {
+            fighter.set_action(Action::AttackWindup, ATTACK_WINDUP_MS);
+        }
         return;
     }
 
@@ -525,6 +543,17 @@ fn begin_requested_action(now_ms: f32, fighter: &mut Fighter, input: InputIntent
     } else if fighter.action == Action::Block {
         fighter.set_action(Action::Idle, 0.0);
     }
+}
+
+fn is_forward_attack_input(fighter: &Fighter, input: InputIntent) -> bool {
+    let move_length = input.move_x.hypot(input.move_y);
+    if move_length <= EPSILON {
+        return false;
+    }
+    let forward_x = fighter.facing.cos();
+    let forward_y = fighter.facing.sin();
+    let dot = input.move_x / move_length * forward_x + input.move_y / move_length * forward_y;
+    dot >= 0.65
 }
 
 fn move_fighter(width: f32, height: f32, fighter: &mut Fighter, input: InputIntent, dt_ms: f32) {
@@ -564,6 +593,14 @@ fn move_fighter(width: f32, height: f32, fighter: &mut Fighter, input: InputInte
             velocity_x *= 0.2;
             velocity_y *= 0.2;
         }
+        Action::ThrustWindup => {
+            velocity_x *= 0.62;
+            velocity_y *= 0.62;
+        }
+        Action::ThrustActive => {
+            velocity_x *= 0.28;
+            velocity_y *= 0.28;
+        }
         Action::AttackWindup => {
             velocity_x *= 0.35;
             velocity_y *= 0.35;
@@ -575,6 +612,10 @@ fn move_fighter(width: f32, height: f32, fighter: &mut Fighter, input: InputInte
         Action::AttackActive | Action::HeavyAttackActive | Action::Stunned | Action::Knockdown => {
             velocity_x = 0.0;
             velocity_y = 0.0;
+        }
+        Action::ThrustRecovery => {
+            velocity_x *= 0.52;
+            velocity_y *= 0.52;
         }
         Action::AttackRecovery | Action::DodgeRecovery => {
             velocity_x *= 0.48;
@@ -625,6 +666,9 @@ fn advance_action(fighter: &mut Fighter, input: InputIntent, dt_ms: f32) {
         Action::AttackWindup => fighter.set_action(Action::AttackActive, ATTACK_ACTIVE_MS),
         Action::AttackActive => fighter.set_action(Action::AttackRecovery, ATTACK_RECOVERY_MS),
         Action::AttackRecovery => fighter.set_action(Action::Idle, 0.0),
+        Action::ThrustWindup => fighter.set_action(Action::ThrustActive, THRUST_ACTIVE_MS),
+        Action::ThrustActive => fighter.set_action(Action::ThrustRecovery, THRUST_RECOVERY_MS),
+        Action::ThrustRecovery => fighter.set_action(Action::Idle, 0.0),
         Action::HeavyAttackWindup => {
             fighter.set_action(Action::HeavyAttackActive, HEAVY_ATTACK_ACTIVE_MS)
         }
@@ -770,6 +814,15 @@ fn attack_profile(action: Action) -> Option<AttackProfile> {
             damage: ATTACK_DAMAGE,
             knockback: ATTACK_KNOCKBACK,
             guard_damage: BLOCK_GUARD_DAMAGE,
+            guard_break_stun_ms: BLOCK_GUARD_BREAK_STUN_MS,
+            kick: false,
+        }),
+        Action::ThrustActive => Some(AttackProfile {
+            reach: THRUST_REACH,
+            arc_radians: THRUST_ARC_RADIANS,
+            damage: THRUST_DAMAGE,
+            knockback: THRUST_KNOCKBACK,
+            guard_damage: THRUST_GUARD_DAMAGE,
             guard_break_stun_ms: BLOCK_GUARD_BREAK_STUN_MS,
             kick: false,
         }),
