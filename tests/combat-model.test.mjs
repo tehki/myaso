@@ -33,6 +33,69 @@ test("attack has windup, active, and recovery commitment", () => {
   assert.equal(a.action, "idle");
 });
 
+test("heavy attack has longer windup active and recovery commitment", () => {
+  const world = duel({ distance: 200 });
+  const a = world.fighters[0];
+  stepWorld(world, { a: { heavyAttack: true, aimX: 400, aimY: 200 } }, 5);
+  assert.equal(a.action, "heavy_attack_windup");
+
+  advance(world, COMBAT.heavyAttack.windupMs, { a: { aimX: 400, aimY: 200 } });
+  assert.equal(a.action, "heavy_attack_active");
+
+  advance(world, COMBAT.heavyAttack.activeMs, { a: { aimX: 400, aimY: 200 } });
+  assert.equal(a.action, "heavy_attack_recovery");
+
+  advance(world, COMBAT.heavyAttack.recoveryMs, { a: { aimX: 400, aimY: 200 } });
+  assert.equal(a.action, "idle");
+});
+
+test("heavy attack deals 46 damage once and applies stronger guard pressure", () => {
+  const hitWorld = duel();
+  const [attacker, target] = hitWorld.fighters;
+  const hitEvents = advance(
+    hitWorld,
+    COMBAT.heavyAttack.windupMs + COMBAT.heavyAttack.activeMs + 15,
+    { a: { heavyAttack: true, aimX: target.x, aimY: target.y } },
+  );
+  assert.equal(target.hp, 54);
+  assert.equal(hitEvents.filter((event) => event.type === "hit").length, 1);
+  assert.equal(hitEvents.find((event) => event.type === "hit")?.damage, 46);
+
+  const blockWorld = duel();
+  const [blockAttacker, blocker] = blockWorld.fighters;
+  advance(blockWorld, COMBAT.block.parryWindowMs + 20, {
+    b: { block: true, aimX: blockAttacker.x, aimY: blockAttacker.y },
+  });
+  const blockEvents = advance(
+    blockWorld,
+    COMBAT.heavyAttack.windupMs + COMBAT.heavyAttack.activeMs + 15,
+    {
+      a: { heavyAttack: true, aimX: blocker.x, aimY: blocker.y },
+      b: { block: true, aimX: blockAttacker.x, aimY: blockAttacker.y },
+    },
+  );
+  assert.equal(blocker.hp, 100);
+  assert.equal(blocker.guard, 100 - COMBAT.heavyAttack.guardDamage);
+  assert.ok(blockEvents.some((event) => event.type === "block"));
+});
+
+test("fresh block still parries a heavy committed strike", () => {
+  const world = duel();
+  const [a, b] = world.fighters;
+
+  advance(world, COMBAT.heavyAttack.windupMs - 25, {
+    a: { heavyAttack: true, aimX: b.x, aimY: b.y },
+  });
+  const events = advance(world, 45, {
+    a: { aimX: b.x, aimY: b.y },
+    b: { block: true, aimX: a.x, aimY: a.y },
+  });
+
+  assert.equal(b.hp, 100);
+  assert.equal(a.action, "stunned");
+  assert.ok(events.some((event) => event.type === "parry"));
+});
+
 test("front-facing attack deals damage once", () => {
   const world = duel();
   const [a, b] = world.fighters;

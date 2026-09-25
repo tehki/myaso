@@ -5,6 +5,7 @@ const SAMPLE_BYTES = 6;
 const BUTTON_ATTACK = 1 << 0;
 const BUTTON_DODGE = 1 << 1;
 const BUTTON_BLOCK = 1 << 2;
+const BUTTON_HEAVY_ATTACK = 1 << 3;
 
 export function encodeInputPacket({
   sequence,
@@ -72,6 +73,7 @@ export function decodeInputPacket(buffer) {
       moveY: view.getInt8(offset + 2) / 127,
       facing: dequantizeAngle(view.getUint16(offset + 3, true)),
       attack: Boolean(buttons & BUTTON_ATTACK),
+      heavyAttack: Boolean(buttons & BUTTON_HEAVY_ATTACK),
       dodge: Boolean(buttons & BUTTON_DODGE),
       block: Boolean(buttons & BUTTON_BLOCK),
     });
@@ -97,7 +99,8 @@ export function inputPacketBytes(sampleCount = NETWORK.inputRedundancy) {
 function encodeButtons(sample) {
   return (sample.attack ? BUTTON_ATTACK : 0)
     | (sample.dodge ? BUTTON_DODGE : 0)
-    | (sample.block ? BUTTON_BLOCK : 0);
+    | (sample.block ? BUTTON_BLOCK : 0)
+    | (sample.heavyAttack ? BUTTON_HEAVY_ATTACK : 0);
 }
 
 function quantizeAxis(value) {

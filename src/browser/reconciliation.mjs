@@ -83,6 +83,7 @@ function copyInput(tick, input = {}) {
     moveY: finiteOrZero(input.moveY),
     facing: Number.isFinite(input.facing) ? input.facing : 0,
     attack: Boolean(input.attack),
+    heavyAttack: Boolean(input.heavyAttack),
     dodge: Boolean(input.dodge),
     block: Boolean(input.block),
   };

@@ -363,6 +363,7 @@ fn deterministic_input(net_id: u32, tick: u32) -> InputIntent {
         move_y: phase.sin() * 0.82,
         facing_radians: phase + 0.4,
         attack: tick.wrapping_add(net_id.wrapping_mul(11)) % 97 == 0,
+        heavy_attack: false,
         dodge: tick.wrapping_add(net_id.wrapping_mul(7)) % 181 == 0,
         block: tick.wrapping_add(net_id.wrapping_mul(13)) % 127 < 4,
     }

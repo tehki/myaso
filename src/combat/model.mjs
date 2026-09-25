@@ -9,6 +9,17 @@ export const COMBAT = Object.freeze({
     arcRadians: Math.PI * 0.78,
     damage: 34,
     knockback: 18,
+    guardDamage: 38,
+  }),
+  heavyAttack: Object.freeze({
+    windupMs: 320,
+    activeMs: 100,
+    recoveryMs: 420,
+    reach: 82,
+    arcRadians: Math.PI * 0.68,
+    damage: 46,
+    knockback: 28,
+    guardDamage: 64,
   }),
   dodge: Object.freeze({
     durationMs: 145,
@@ -105,6 +116,7 @@ function normalizeInput(input = {}) {
     aimX: Number.isFinite(input.aimX) ? input.aimX : null,
     aimY: Number.isFinite(input.aimY) ? input.aimY : null,
     attack: Boolean(input.attack),
+    heavyAttack: Boolean(input.heavyAttack),
     dodge: Boolean(input.dodge),
     block: Boolean(input.block),
   };
@@ -126,6 +138,12 @@ function beginRequestedAction(fighter, input) {
     fighter.dodgeDirX = moveLength > EPSILON ? input.moveX / moveLength : Math.cos(fighter.facing);
     fighter.dodgeDirY = moveLength > EPSILON ? input.moveY / moveLength : Math.sin(fighter.facing);
     setAction(fighter, "dodge", COMBAT.dodge.durationMs);
+    return;
+  }
+
+  if (input.heavyAttack && fighter.action === "idle") {
+    fighter.attackHitTargets.clear();
+    setAction(fighter, "heavy_attack_windup", COMBAT.heavyAttack.windupMs);
     return;
   }
 
@@ -155,12 +173,18 @@ function moveFighter(world, fighter, input, dtMs) {
   } else if (fighter.action === "attack_windup") {
     velocityX *= 0.35;
     velocityY *= 0.35;
-  } else if (fighter.action === "attack_active") {
+  } else if (fighter.action === "heavy_attack_windup") {
+    velocityX *= 0.20;
+    velocityY *= 0.20;
+  } else if (fighter.action === "attack_active" || fighter.action === "heavy_attack_active") {
     velocityX = 0;
     velocityY = 0;
   } else if (fighter.action === "attack_recovery" || fighter.action === "dodge_recovery") {
     velocityX *= 0.48;
     velocityY *= 0.48;
+  } else if (fighter.action === "heavy_attack_recovery") {
+    velocityX *= 0.35;
+    velocityY *= 0.35;
   } else if (fighter.action === "stunned") {
     velocityX = 0;
     velocityY = 0;
@@ -191,6 +215,15 @@ function advanceAction(fighter, input, dtMs) {
       setAction(fighter, "attack_recovery", COMBAT.attack.recoveryMs);
       break;
     case "attack_recovery":
+      setAction(fighter, "idle", 0);
+      break;
+    case "heavy_attack_windup":
+      setAction(fighter, "heavy_attack_active", COMBAT.heavyAttack.activeMs);
+      break;
+    case "heavy_attack_active":
+      setAction(fighter, "heavy_attack_recovery", COMBAT.heavyAttack.recoveryMs);
+      break;
+    case "heavy_attack_recovery":
       setAction(fighter, "idle", 0);
       break;
     case "dodge":
@@ -235,13 +268,20 @@ function separateFighters(world) {
   }
 }
 
+function attackProfile(action) {
+  if (action === "attack_active") return COMBAT.attack;
+  if (action === "heavy_attack_active") return COMBAT.heavyAttack;
+  return null;
+}
+
 function resolveAttacks(world, events) {
   for (const attacker of world.fighters) {
-    if (attacker.action !== "attack_active" || attacker.action === "dead") continue;
+    const profile = attackProfile(attacker.action);
+    if (!profile || attacker.action === "dead") continue;
 
     for (const target of world.fighters) {
       if (target.id === attacker.id || target.action === "dead" || attacker.attackHitTargets.has(target.id)) continue;
-      if (!isTargetInAttackArc(attacker, target)) continue;
+      if (!isTargetInAttackArc(attacker, target, profile)) continue;
 
       attacker.attackHitTargets.add(target.id);
 
@@ -259,7 +299,7 @@ function resolveAttacks(world, events) {
           continue;
         }
 
-        target.guard = Math.max(0, target.guard - COMBAT.block.guardDamage);
+        target.guard = Math.max(0, target.guard - profile.guardDamage);
         if (target.guard <= EPSILON) {
           setAction(target, "stunned", COMBAT.block.guardBreakStunMs);
           events.push({ type: "guard_break", attackerId: attacker.id, targetId: target.id });
@@ -269,13 +309,13 @@ function resolveAttacks(world, events) {
         continue;
       }
 
-      target.hp = Math.max(0, target.hp - COMBAT.attack.damage);
-      knockBack(world, attacker, target);
+      target.hp = Math.max(0, target.hp - profile.damage);
+      knockBack(world, attacker, target, profile.knockback);
       events.push({
         type: "hit",
         attackerId: attacker.id,
         targetId: target.id,
-        damage: COMBAT.attack.damage,
+        damage: profile.damage,
         hp: target.hp,
       });
 
@@ -290,14 +330,14 @@ function resolveAttacks(world, events) {
   }
 }
 
-function isTargetInAttackArc(attacker, target) {
+function isTargetInAttackArc(attacker, target, profile) {
   const dx = target.x - attacker.x;
   const dy = target.y - attacker.y;
   const centerDistance = Math.hypot(dx, dy);
-  const maxDistance = COMBAT.attack.reach + COMBAT.fighterRadius;
+  const maxDistance = profile.reach + COMBAT.fighterRadius;
   if (centerDistance > maxDistance) return false;
   const angleToTarget = Math.atan2(dy, dx);
-  return Math.abs(angleDelta(angleToTarget, attacker.facing)) <= COMBAT.attack.arcRadians / 2;
+  return Math.abs(angleDelta(angleToTarget, attacker.facing)) <= profile.arcRadians / 2;
 }
 
 function isInvulnerable(target) {
@@ -310,13 +350,13 @@ function isBlockingAttack(target, attacker) {
   return Math.abs(angleDelta(angleToAttacker, target.facing)) <= COMBAT.block.halfAngleRadians;
 }
 
-function knockBack(world, attacker, target) {
+function knockBack(world, attacker, target, distance) {
   const dx = target.x - attacker.x;
   const dy = target.y - attacker.y;
   const length = Math.hypot(dx, dy) || 1;
   const radius = COMBAT.fighterRadius;
-  target.x = clamp(target.x + (dx / length) * COMBAT.attack.knockback, radius, world.width - radius);
-  target.y = clamp(target.y + (dy / length) * COMBAT.attack.knockback, radius, world.height - radius);
+  target.x = clamp(target.x + (dx / length) * distance, radius, world.width - radius);
+  target.y = clamp(target.y + (dy / length) * distance, radius, world.height - radius);
 }
 
 function respawnFighter(fighter) {
