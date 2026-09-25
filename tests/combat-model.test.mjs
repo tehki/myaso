@@ -370,8 +370,10 @@ test("knockdown ignores player movement input until recovery", () => {
   assert.equal(b.action, "knockdown");
   const fallenX = b.x;
   const fallenY = b.y;
-  advance(world, 100, { b: { moveX: 1, moveY: 1, aimX: a.x, aimY: a.y } });
+  const fallenFacing = b.facing;
+  advance(world, 100, { b: { moveX: 1, moveY: 1, aimX: b.x + 200, aimY: b.y } });
   assert.equal(b.action, "knockdown");
   assert.equal(b.x, fallenX);
   assert.equal(b.y, fallenY);
+  assert.equal(b.facing, fallenFacing);
 });
