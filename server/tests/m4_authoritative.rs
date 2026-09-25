@@ -228,6 +228,10 @@ fn heavy_attack_preserves_long_commitment_and_deals_46_once() {
         commitment.fighter(1).expect("attacker").action,
         Action::HeavyAttackWindup
     );
+    assert_eq!(
+        WireEntity::from_fighter(commitment.fighter(1).expect("attacker")).action,
+        9
+    );
 
     advance(
         &mut commitment,
@@ -239,6 +243,10 @@ fn heavy_attack_preserves_long_commitment_and_deals_46_once() {
         commitment.fighter(1).expect("attacker").action,
         Action::HeavyAttackActive
     );
+    assert_eq!(
+        WireEntity::from_fighter(commitment.fighter(1).expect("attacker")).action,
+        10
+    );
     advance(
         &mut commitment,
         100.0,
@@ -248,6 +256,10 @@ fn heavy_attack_preserves_long_commitment_and_deals_46_once() {
     assert_eq!(
         commitment.fighter(1).expect("attacker").action,
         Action::HeavyAttackRecovery
+    );
+    assert_eq!(
+        WireEntity::from_fighter(commitment.fighter(1).expect("attacker")).action,
+        11
     );
     advance(
         &mut commitment,
