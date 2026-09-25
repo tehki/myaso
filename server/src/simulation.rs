@@ -417,7 +417,7 @@ impl World {
             }
         }
 
-        resolve_roll_collisions(self.width, self.height, &mut self.fighters, events);
+        resolve_roll_collisions(self.width, self.height, &mut self.fighters);
         separate_fighters(self.width, self.height, &mut self.fighters);
         if let Some(winner) = resolve_attacks(
             self.width,
@@ -674,12 +674,7 @@ fn update_stamina(now_ms: f32, fighter: &mut Fighter, input: InputIntent, dt_ms:
     }
 }
 
-fn resolve_roll_collisions(
-    width: f32,
-    height: f32,
-    fighters: &mut [Fighter],
-    _events: &mut Vec<CombatEvent>,
-) {
+fn resolve_roll_collisions(width: f32, height: f32, fighters: &mut [Fighter]) {
     let contact = FIGHTER_RADIUS * 2.0 + 8.0;
     for roller_index in 0..fighters.len() {
         if fighters[roller_index].action != Action::Dodge {
