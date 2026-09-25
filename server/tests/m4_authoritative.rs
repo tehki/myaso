@@ -372,6 +372,88 @@ fn heavy_attack_applies_64_guard_pressure_and_remains_parryable() {
 }
 
 #[test]
+fn heavy_guard_break_preserves_a_real_light_punish_window_after_recovery() {
+    let mut world = duel(72.0);
+    let blocking = InputIntent {
+        block: true,
+        facing_radians: std::f32::consts::PI,
+        ..InputIntent::default()
+    };
+    let heavy = InputIntent {
+        heavy_attack: true,
+        facing_radians: 0.0,
+        ..InputIntent::default()
+    };
+
+    // Enter ordinary held Block outside the 115 ms fresh-parry window.
+    advance(&mut world, 135.0, InputIntent::default(), blocking);
+
+    let first_events = advance(&mut world, 435.0, heavy, blocking);
+    assert_eq!(world.fighter(2).expect("target").hp.round() as u8, 100);
+    assert_eq!(world.fighter(2).expect("target").guard.round() as u8, 36);
+    assert!(first_events
+        .iter()
+        .any(|event| matches!(event, CombatEvent::Block { .. })));
+
+    // Finish the first heavy commitment while Block remains held.
+    advance(&mut world, 405.0, InputIntent::default(), blocking);
+    assert_eq!(world.fighter(1).expect("attacker").action, Action::Idle);
+    assert_eq!(world.fighter(2).expect("target").action, Action::Block);
+
+    // The second heavy exhausts guard at the start of its active phase.
+    let break_events = advance(&mut world, 325.0, heavy, blocking);
+    assert_eq!(world.fighter(2).expect("target").hp.round() as u8, 100);
+    assert_eq!(world.fighter(2).expect("target").guard.round() as u8, 0);
+    assert_eq!(world.fighter(2).expect("target").action, Action::Stunned);
+    assert!(break_events
+        .iter()
+        .any(|event| matches!(event, CombatEvent::GuardBreak { .. })));
+
+    // From this snapshot the attacker has 95 ms active + 420 ms recovery left.
+    // When that exact commitment is over, the defender must still be stunned.
+    advance(
+        &mut world,
+        515.0,
+        InputIntent::default(),
+        InputIntent::default(),
+    );
+    assert_eq!(world.fighter(1).expect("attacker").action, Action::Idle);
+    assert_eq!(world.fighter(2).expect("target").action, Action::Stunned);
+
+    // A normal 135 ms light windup must fit inside that post-recovery opening.
+    advance(
+        &mut world,
+        5.0,
+        InputIntent {
+            attack: true,
+            facing_radians: 0.0,
+            ..InputIntent::default()
+        },
+        InputIntent::default(),
+    );
+    assert_eq!(
+        world.fighter(1).expect("attacker").action,
+        Action::AttackWindup
+    );
+    let punish_events = advance(
+        &mut world,
+        130.0,
+        InputIntent::default(),
+        InputIntent::default(),
+    );
+    assert!(punish_events.iter().any(|event| matches!(
+        event,
+        CombatEvent::Hit {
+            damage: 34,
+            hp: 66,
+            ..
+        }
+    )));
+    assert_eq!(world.fighter(2).expect("target").hp.round() as u8, 66);
+    assert_eq!(world.fighter(2).expect("target").action, Action::Stunned);
+}
+
+#[test]
 fn server_owned_attack_changes_authoritative_vitals_once() {
     let mut world = duel(72.0);
     let events = advance(
