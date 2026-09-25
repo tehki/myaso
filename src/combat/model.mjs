@@ -218,7 +218,7 @@ function beginRequestedAction(world, fighter, input) {
   }
 
   if (input.block) {
-    if (fighter.action !== "block") setAction(fighter, "block", COMBAT.block.shortBlockMs);
+    if (fighter.action !== "block") setAction(fighter, "block", Number.POSITIVE_INFINITY);
   } else if (fighter.action === "block") {
     setAction(fighter, "idle", 0);
   }
@@ -287,7 +287,7 @@ function advanceAction(fighter, input, dtMs) {
   fighter.actionElapsedMs += dtMs;
 
   if (fighter.action === "block") {
-    if (!input.block || fighter.actionElapsedMs + EPSILON >= fighter.actionDurationMs) setAction(fighter, "idle", 0);
+    if (!input.block) setAction(fighter, "idle", 0);
     return;
   }
 
