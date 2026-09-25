@@ -55,6 +55,49 @@ test("input packet keeps three redundant samples in 34 self-contained bytes", ()
   assert.ok(Math.abs(decoded.samples[1].moveX - 0.5) < 0.01);
 });
 
+test("heavy attack uses a spare input bit without expanding the packet", () => {
+  const packet = encodeInputPacket({
+    sequence: 42,
+    clientTick: 903,
+    samples: [
+      { tick: 903, facing: 0.75, heavyAttack: true },
+      { tick: 902, facing: 0.75 },
+      { tick: 901, facing: 0.75 },
+    ],
+  });
+  assert.equal(packet.byteLength, 34);
+  const decoded = decodeInputPacket(packet);
+  assert.equal(decoded.samples[0].attack, false);
+  assert.equal(decoded.samples[0].heavyAttack, true);
+  assert.equal(decoded.samples[0].dodge, false);
+  assert.equal(decoded.samples[0].block, false);
+  assert.equal(decoded.samples[1].heavyAttack, false);
+});
+
+test("heavy strike action states remain compact snapshot values", () => {
+  const names = [
+    ["heavy_attack_windup", 9],
+    ["heavy_attack_active", 10],
+    ["heavy_attack_recovery", 11],
+  ];
+  for (const [action, expectedCode] of names) {
+    const state = quantizeEntity(entity(77, 400, 400, { action }));
+    assert.equal(state.action, expectedCode);
+    const packet = encodeSnapshot({
+      sequence: expectedCode,
+      baselineSequence: expectedCode - 1,
+      serverTick: 1000 + expectedCode,
+      full: true,
+      records: [buildEntityDelta(state)],
+      maxBytes: 1100,
+    });
+    const decoded = decodeSnapshot(packet);
+    const applied = applySnapshotRecords(new Map(), decoded.records);
+    assert.equal(applied.get(77).action, expectedCode);
+    assert.equal(dequantizeEntity(applied.get(77)).action, action);
+  }
+});
+
 test("server input ingress deduplicates redundant and reordered samples", () => {
   const ingress = new InputIngressWindow({ historyTicks: 10 });
   const packetA = encodeInputPacket({
