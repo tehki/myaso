@@ -16,6 +16,14 @@ const ATTACK_REACH: f32 = 76.0;
 const ATTACK_ARC_RADIANS: f32 = std::f32::consts::PI * 0.78;
 const ATTACK_DAMAGE: f32 = 34.0;
 const ATTACK_KNOCKBACK: f32 = 18.0;
+const HEAVY_ATTACK_WINDUP_MS: f32 = 320.0;
+const HEAVY_ATTACK_ACTIVE_MS: f32 = 100.0;
+const HEAVY_ATTACK_RECOVERY_MS: f32 = 420.0;
+const HEAVY_ATTACK_REACH: f32 = 82.0;
+const HEAVY_ATTACK_ARC_RADIANS: f32 = std::f32::consts::PI * 0.68;
+const HEAVY_ATTACK_DAMAGE: f32 = 46.0;
+const HEAVY_ATTACK_KNOCKBACK: f32 = 28.0;
+const HEAVY_ATTACK_GUARD_DAMAGE: f32 = 64.0;
 const DODGE_DURATION_MS: f32 = 145.0;
 const DODGE_RECOVERY_MS: f32 = 165.0;
 const DODGE_SPEED: f32 = 610.0;
@@ -38,6 +46,9 @@ pub enum Action {
     AttackWindup,
     AttackActive,
     AttackRecovery,
+    HeavyAttackWindup,
+    HeavyAttackActive,
+    HeavyAttackRecovery,
     Dodge,
     DodgeRecovery,
     Block,
@@ -57,6 +68,9 @@ impl Action {
             Self::Block => 6,
             Self::Stunned => 7,
             Self::Dead => 8,
+            Self::HeavyAttackWindup => 9,
+            Self::HeavyAttackActive => 10,
+            Self::HeavyAttackRecovery => 11,
         }
     }
 }
@@ -67,6 +81,7 @@ pub struct InputIntent {
     pub move_y: f32,
     pub facing_radians: f32,
     pub attack: bool,
+    pub heavy_attack: bool,
     pub dodge: bool,
     pub block: bool,
 }
@@ -78,6 +93,7 @@ impl Default for InputIntent {
             move_y: 0.0,
             facing_radians: 0.0,
             attack: false,
+            heavy_attack: false,
             dodge: false,
             block: false,
         }
@@ -403,6 +419,12 @@ fn begin_requested_action(fighter: &mut Fighter, input: InputIntent) {
         return;
     }
 
+    if input.heavy_attack && fighter.action == Action::Idle {
+        fighter.attack_hit_targets.clear();
+        fighter.set_action(Action::HeavyAttackWindup, HEAVY_ATTACK_WINDUP_MS);
+        return;
+    }
+
     if input.attack && fighter.action == Action::Idle {
         fighter.attack_hit_targets.clear();
         fighter.set_action(Action::AttackWindup, ATTACK_WINDUP_MS);
@@ -435,13 +457,21 @@ fn move_fighter(width: f32, height: f32, fighter: &mut Fighter, input: InputInte
             velocity_x *= 0.35;
             velocity_y *= 0.35;
         }
-        Action::AttackActive | Action::Stunned => {
+        Action::HeavyAttackWindup => {
+            velocity_x *= 0.20;
+            velocity_y *= 0.20;
+        }
+        Action::AttackActive | Action::HeavyAttackActive | Action::Stunned => {
             velocity_x = 0.0;
             velocity_y = 0.0;
         }
         Action::AttackRecovery | Action::DodgeRecovery => {
             velocity_x *= 0.48;
             velocity_y *= 0.48;
+        }
+        Action::HeavyAttackRecovery => {
+            velocity_x *= 0.35;
+            velocity_y *= 0.35;
         }
         Action::Idle | Action::Dead => {}
     }
@@ -480,6 +510,13 @@ fn advance_action(fighter: &mut Fighter, input: InputIntent, dt_ms: f32) {
         Action::AttackWindup => fighter.set_action(Action::AttackActive, ATTACK_ACTIVE_MS),
         Action::AttackActive => fighter.set_action(Action::AttackRecovery, ATTACK_RECOVERY_MS),
         Action::AttackRecovery => fighter.set_action(Action::Idle, 0.0),
+        Action::HeavyAttackWindup => {
+            fighter.set_action(Action::HeavyAttackActive, HEAVY_ATTACK_ACTIVE_MS)
+        }
+        Action::HeavyAttackActive => {
+            fighter.set_action(Action::HeavyAttackRecovery, HEAVY_ATTACK_RECOVERY_MS)
+        }
+        Action::HeavyAttackRecovery => fighter.set_action(Action::Idle, 0.0),
         Action::Dodge => fighter.set_action(Action::DodgeRecovery, DODGE_RECOVERY_MS),
         Action::DodgeRecovery | Action::Stunned => fighter.set_action(Action::Idle, 0.0),
         Action::Idle | Action::Block | Action::Dead => {}
@@ -534,6 +571,35 @@ fn separate_fighters(width: f32, height: f32, fighters: &mut [Fighter]) {
     }
 }
 
+#[derive(Debug, Clone, Copy)]
+struct AttackProfile {
+    reach: f32,
+    arc_radians: f32,
+    damage: f32,
+    knockback: f32,
+    guard_damage: f32,
+}
+
+fn attack_profile(action: Action) -> Option<AttackProfile> {
+    match action {
+        Action::AttackActive => Some(AttackProfile {
+            reach: ATTACK_REACH,
+            arc_radians: ATTACK_ARC_RADIANS,
+            damage: ATTACK_DAMAGE,
+            knockback: ATTACK_KNOCKBACK,
+            guard_damage: BLOCK_GUARD_DAMAGE,
+        }),
+        Action::HeavyAttackActive => Some(AttackProfile {
+            reach: HEAVY_ATTACK_REACH,
+            arc_radians: HEAVY_ATTACK_ARC_RADIANS,
+            damage: HEAVY_ATTACK_DAMAGE,
+            knockback: HEAVY_ATTACK_KNOCKBACK,
+            guard_damage: HEAVY_ATTACK_GUARD_DAMAGE,
+        }),
+        _ => None,
+    }
+}
+
 fn resolve_attacks(
     width: f32,
     height: f32,
@@ -542,9 +608,9 @@ fn resolve_attacks(
     events: &mut Vec<CombatEvent>,
 ) -> Option<u32> {
     for attacker_index in 0..fighters.len() {
-        if fighters[attacker_index].action != Action::AttackActive {
+        let Some(profile) = attack_profile(fighters[attacker_index].action) else {
             continue;
-        }
+        };
 
         for target_index in 0..fighters.len() {
             if attacker_index == target_index {
@@ -555,7 +621,11 @@ fn resolve_attacks(
                 || fighters[attacker_index]
                     .attack_hit_targets
                     .contains(&target_id)
-                || !is_target_in_attack_arc(&fighters[attacker_index], &fighters[target_index])
+                || !is_target_in_attack_arc(
+                    &fighters[attacker_index],
+                    &fighters[target_index],
+                    profile,
+                )
             {
                 continue;
             }
@@ -584,7 +654,7 @@ fn resolve_attacks(
                     continue;
                 }
 
-                target.guard = (target.guard - BLOCK_GUARD_DAMAGE).max(0.0);
+                target.guard = (target.guard - profile.guard_damage).max(0.0);
                 if target.guard <= EPSILON {
                     target.set_action(Action::Stunned, BLOCK_GUARD_BREAK_STUN_MS);
                     events.push(CombatEvent::GuardBreak {
@@ -600,12 +670,12 @@ fn resolve_attacks(
                 continue;
             }
 
-            target.hp = (target.hp - ATTACK_DAMAGE).max(0.0);
-            knock_back(width, height, attacker, target);
+            target.hp = (target.hp - profile.damage).max(0.0);
+            knock_back(width, height, attacker, target, profile.knockback);
             events.push(CombatEvent::Hit {
                 attacker: attacker.net_id,
                 target: target.net_id,
-                damage: ATTACK_DAMAGE.round() as u8,
+                damage: profile.damage.round() as u8,
                 hp: target.hp.round() as u8,
             });
 
@@ -632,10 +702,10 @@ fn resolve_attacks(
     None
 }
 
-fn is_target_in_attack_arc(attacker: &Fighter, target: &Fighter) -> bool {
+fn is_target_in_attack_arc(attacker: &Fighter, target: &Fighter, profile: AttackProfile) -> bool {
     let dx = target.x - attacker.x;
     let dy = target.y - attacker.y;
-    let maximum_distance = ATTACK_REACH + FIGHTER_RADIUS;
+    let maximum_distance = profile.reach + FIGHTER_RADIUS;
     if dx.abs() > maximum_distance || dy.abs() > maximum_distance {
         return false;
     }
@@ -644,7 +714,7 @@ fn is_target_in_attack_arc(attacker: &Fighter, target: &Fighter) -> bool {
         return false;
     }
     let angle_to_target = dy.atan2(dx);
-    angle_delta(angle_to_target, attacker.facing).abs() <= ATTACK_ARC_RADIANS / 2.0
+    angle_delta(angle_to_target, attacker.facing).abs() <= profile.arc_radians / 2.0
 }
 
 fn is_invulnerable(target: &Fighter) -> bool {
@@ -659,17 +729,23 @@ fn is_blocking_attack(target: &Fighter, attacker: &Fighter) -> bool {
     angle_delta(angle_to_attacker, target.facing).abs() <= BLOCK_HALF_ANGLE_RADIANS
 }
 
-fn knock_back(width: f32, height: f32, attacker: &Fighter, target: &mut Fighter) {
+fn knock_back(
+    width: f32,
+    height: f32,
+    attacker: &Fighter,
+    target: &mut Fighter,
+    distance: f32,
+) {
     let dx = target.x - attacker.x;
     let dy = target.y - attacker.y;
     let length = dx.hypot(dy).max(1.0);
     target.x = clamp(
-        target.x + dx / length * ATTACK_KNOCKBACK,
+        target.x + dx / length * distance,
         FIGHTER_RADIUS,
         width - FIGHTER_RADIUS,
     );
     target.y = clamp(
-        target.y + dy / length * ATTACK_KNOCKBACK,
+        target.y + dy / length * distance,
         FIGHTER_RADIUS,
         height - FIGHTER_RADIUS,
     );
