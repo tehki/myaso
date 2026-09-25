@@ -252,12 +252,18 @@ export function fighterThreatNetId(state, ownId = 0, summary = null) {
   let secondDistanceSquared = Infinity;
   let threatCount = 0;
   for (const entity of state.values()) {
-    const active = entity?.action === COMBAT_ACTION.attackActive || entity?.action === COMBAT_ACTION.heavyAttackActive;
-    const windup = entity?.action === COMBAT_ACTION.attackWindup || entity?.action === COMBAT_ACTION.heavyAttackWindup;
+    const active = entity?.action === COMBAT_ACTION.attackActive
+      || entity?.action === COMBAT_ACTION.thrustActive
+      || entity?.action === COMBAT_ACTION.heavyAttackActive;
+    const windup = entity?.action === COMBAT_ACTION.attackWindup
+      || entity?.action === COMBAT_ACTION.thrustWindup
+      || entity?.action === COMBAT_ACTION.heavyAttackWindup;
     const priority = active ? 0 : windup ? 1 : Infinity;
-    const profile = entity?.action === COMBAT_ACTION.heavyAttackActive || entity?.action === COMBAT_ACTION.heavyAttackWindup
-      ? COMBAT.heavyAttack
-      : COMBAT.attack;
+    const thrust = entity?.action === COMBAT_ACTION.thrustActive
+      || entity?.action === COMBAT_ACTION.thrustWindup;
+    const heavy = entity?.action === COMBAT_ACTION.heavyAttackActive
+      || entity?.action === COMBAT_ACTION.heavyAttackWindup;
+    const profile = thrust ? COMBAT.thrust : heavy ? COMBAT.heavyAttack : COMBAT.attack;
     if (!Number.isFinite(priority) || entity.netId === ownId || !Number.isInteger(entity.netId) || entity.netId <= 0
       || !Number.isFinite(entity.x) || !Number.isFinite(entity.y) || !Number.isFinite(entity.facing)) continue;
     const dx = own.x - entity.x;
