@@ -733,12 +733,14 @@ async function runOnlineUiHeavyBlockFlight(entries) {
     try {
       await setArenaBlock(defender, defenderElementId, true);
       blockHeld = true;
-      // Start block well before the heavy edge so the 115 ms fresh-parry window
-      // is expired by the 320 ms active transition. This must resolve as a normal
-      // directional block, not a parry.
-      await sleep(160);
+      // Wheel-back is a short block now. Start the heavy immediately, then
+      // refresh the same directional block pulse at 150 ms. The impact at
+      // ~320 ms is covered, while the refreshed block is already older than
+      // the 125 ms parry window and therefore resolves as a normal block.
       await pulseMovementKey(attacker, "e", 40);
-      await sleep(500);
+      await sleep(150);
+      await setArenaBlock(defender, defenderElementId, true);
+      await sleep(350);
     } finally {
       if (blockHeld) await setArenaBlock(defender, defenderElementId, false);
     }
@@ -1388,7 +1390,9 @@ async function runOnlineUiHeavyGuardBreakFlight(entries, { returnTiming = false 
       const commitsBefore = heavyCommitCount(beforeAttacker);
 
       await pulseMovementKey(attacker, "e", 40);
-      await sleep(390);
+      await sleep(150);
+      await setArenaBlock(defender, defenderElementId, true);
+      await sleep(240);
       const states = await Promise.all(entries.map(readUiEvidence));
       const attackerState = states.find((entry) => entry.browser === attacker.name);
       const defenderState = states.find((entry) => entry.browser === defender.name);
@@ -1450,14 +1454,18 @@ async function runOnlineUiHeavyGuardBreakFlight(entries, { returnTiming = false 
       const before = await Promise.all(entries.map(readUiEvidence));
       const beforeAttacker = before.find((entry) => entry.browser === attacker.name);
       const beforeDefender = before.find((entry) => entry.browser === defender.name);
-      if (!beforeAttacker || !beforeDefender || beforeDefender.playerGuard !== 36) {
-        throw new Error(`M110 held block did not preserve 36 guard before second heavy: ${JSON.stringify(before)}`);
+      if (!beforeAttacker || !beforeDefender
+        || beforeDefender.playerGuard < 36 || beforeDefender.playerGuard > 45) {
+        throw new Error(`M110 short-block sequence did not preserve bounded guard pressure before second heavy: ${JSON.stringify(before)}`);
       }
+      const guardBeforeSecond = beforeDefender.playerGuard;
       const commitsBefore = heavyCommitCount(beforeAttacker);
 
       const attemptIssuedAt = Date.now();
       await pulseMovementKey(attacker, "e", 40);
-      await sleep(390);
+      await sleep(150);
+      await setArenaBlock(defender, defenderElementId, true);
+      await sleep(240);
       const states = await Promise.all(entries.map(readUiEvidence));
       const attackerState = states.find((entry) => entry.browser === attacker.name);
       const defenderState = states.find((entry) => entry.browser === defender.name);
@@ -1476,8 +1484,8 @@ async function runOnlineUiHeavyGuardBreakFlight(entries, { returnTiming = false 
       }
 
       const cleanLatchMiss = attackerState.playerHp === 100 && attackerState.playerGuard === 100
-        && defenderState.playerHp === 100 && defenderState.playerGuard === 36
-        && attackerState.opponentHp === 100 && attackerState.opponentGuard === 36
+        && defenderState.playerHp === 100 && defenderState.playerGuard >= guardBeforeSecond
+        && attackerState.opponentHp === 100 && attackerState.opponentGuard >= guardBeforeSecond
         && commitsAfter === commitsBefore
         && !attackerState.feedbackTransitions.includes("parried")
         && !defenderState.feedbackTransitions.includes("parry-success");
@@ -1729,11 +1737,14 @@ async function runOnlineUiGuardBreakFlight(entries) {
   let evidence = null;
   let blockHeld = false;
   try {
-    await setArenaBlock(defender, defenderElementId, true);
     blockHeld = true;
-    await sleep(180);
     let guardBroken = false;
     for (let attempt = 0; attempt < 4 && !guardBroken; attempt += 1) {
+      // Two wheel-back pulses keep the short directional block continuous long
+      // enough to cover a light impact while aging beyond the parry window.
+      await setArenaBlock(defender, defenderElementId, true);
+      await sleep(150);
+      await setArenaBlock(defender, defenderElementId, true);
       // Primary attack is a one-shot pointerdown latch cleared after an outbound
       // input sample. Use the same bounded genuine-click burst as M55 so each
       // intended guard-pressure strike survives client/network sampling jitter.
