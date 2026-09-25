@@ -338,7 +338,7 @@ test("authoritative opponent block emits block-confirm feedback", () => {
 test("cost-free block plus attacker stun is described as a parry", () => {
   const tracker = createCombatReadabilityTracker();
   tracker.observe(state(fighter(1, 100, 100, COMBAT_ACTION.block), fighter(2)), 1);
-  const event = tracker.observe(state(fighter(1, 100, 100, COMBAT_ACTION.block), fighter(2, 100, 100, COMBAT_ACTION.knockdown)), 1);
+  const event = tracker.observe(state(fighter(1, 100, 100, COMBAT_ACTION.block), fighter(2, 100, 100, COMBAT_ACTION.stunned)), 1);
   assert.equal(event.kind, "parry");
   assert.equal(event.feedback, "parry-success");
   assert.match(event.text, /Parry!/);
@@ -347,7 +347,7 @@ test("cost-free block plus attacker stun is described as a parry", () => {
 test("being parried emits a distinct authoritative feedback cue", () => {
   const tracker = createCombatReadabilityTracker();
   tracker.observe(state(fighter(1), fighter(2, 100, 100, COMBAT_ACTION.block)), 1);
-  const event = tracker.observe(state(fighter(1, 100, 100, COMBAT_ACTION.knockdown), fighter(2, 100, 100, COMBAT_ACTION.block)), 1);
+  const event = tracker.observe(state(fighter(1, 100, 100, COMBAT_ACTION.stunned), fighter(2, 100, 100, COMBAT_ACTION.block)), 1);
   assert.equal(event.kind, "parry");
   assert.equal(event.feedback, "parried");
   assert.match(event.text, /Parried/);
@@ -580,7 +580,7 @@ test("authoritative block exposes its replicated facing as a spatial tell", () =
 });
 
 test("positive-guard stun exposes a mutually exclusive spatial parry tell", () => {
-  assert.deepEqual(parrySpatialPresentation(fighter(2, 100, 100, COMBAT_ACTION.knockdown)), { visible: true, state: "parried" });
+  assert.deepEqual(parrySpatialPresentation(fighter(2, 100, 100, COMBAT_ACTION.stunned)), { visible: true, state: "parried" });
   assert.deepEqual(parrySpatialPresentation(fighter(2, 100, 1, COMBAT_ACTION.stunned)), { visible: true, state: "parried" });
   assert.deepEqual(parrySpatialPresentation(fighter(2, 100, 0, COMBAT_ACTION.stunned)), { visible: false, state: "" });
   assert.deepEqual(parrySpatialPresentation(fighter(2, 100, 100, COMBAT_ACTION.block)), { visible: false, state: "" });
@@ -619,7 +619,7 @@ test("authoritative opponent recovery exposes a bounded punish cue", () => {
 });
 
 test("authoritative stun owns a temporary punish overlay", () => {
-  assert.deepEqual(combatOverlayPresentation(fighter(1, 100, 100, COMBAT_ACTION.knockdown)), {
+  assert.deepEqual(combatOverlayPresentation(fighter(1, 100, 100, COMBAT_ACTION.stunned)), {
     visible: true,
     state: "stunned",
     title: "STUNNED",
