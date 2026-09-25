@@ -77,7 +77,7 @@ const webTransportOptions = cert
 const keys = new Set();
 const mouse = { x: canvas.width / 2, y: canvas.height / 2, block: false };
 const local = { x: 0, y: 0, facing: 0, hp: 100, guard: 100, action: 0, initialized: false };
-const currentInput = { moveX: 0, moveY: 0, facing: 0, attack: false, dodge: false, block: false };
+const currentInput = { moveX: 0, moveY: 0, facing: 0, attack: false, heavyAttack: false, dodge: false, block: false };
 const arenaLayer = createArenaLayer();
 const remoteScratch = new Map();
 const fixedStepMs = 1000 / NETWORK.clientPredictionHz;
@@ -87,6 +87,7 @@ let animationFrameId = 0;
 let predictionStep = 0;
 let clientTick = 0;
 let attackRequested = false;
+let heavyAttackRequested = false;
 let dodgeRequested = false;
 
 canvas.addEventListener("contextmenu", (event) => event.preventDefault());
@@ -101,8 +102,9 @@ canvas.addEventListener("pointerup", (event) => {
 });
 canvas.addEventListener("pointermove", updateMouse);
 canvas.addEventListener("keydown", (event) => {
-  if (["KeyW", "KeyA", "KeyS", "KeyD", "Space"].includes(event.code)) event.preventDefault();
+  if (["KeyW", "KeyA", "KeyS", "KeyD", "KeyE", "Space"].includes(event.code)) event.preventDefault();
   keys.add(event.code);
+  if (event.code === "KeyE" && !event.repeat) heavyAttackRequested = true;
   if (event.code === "Space" && !event.repeat) dodgeRequested = true;
 });
 canvas.addEventListener("keyup", (event) => keys.delete(event.code));
@@ -225,6 +227,7 @@ function updateMouse(event) {
 function releaseInputs() {
   keys.clear();
   attackRequested = false;
+  heavyAttackRequested = false;
   dodgeRequested = false;
   mouse.block = false;
 }
@@ -234,6 +237,7 @@ function sampleInput() {
     currentInput.moveX = 0;
     currentInput.moveY = 0;
     currentInput.attack = false;
+    currentInput.heavyAttack = false;
     currentInput.dodge = false;
     currentInput.block = false;
     return;
@@ -242,6 +246,7 @@ function sampleInput() {
   currentInput.moveY = (keys.has("KeyS") ? 1 : 0) - (keys.has("KeyW") ? 1 : 0);
   currentInput.facing = Math.atan2(mouse.y - canvas.height / 2, mouse.x - canvas.width / 2);
   currentInput.attack = attackRequested;
+  currentInput.heavyAttack = heavyAttackRequested;
   currentInput.dodge = dodgeRequested;
   currentInput.block = mouse.block;
 }
@@ -254,6 +259,7 @@ function simulatePrediction(stepMs) {
     networkClient.sendInput({ tick: clientTick, ...currentInput });
     clientTick = (clientTick + 1) >>> 0;
     attackRequested = false;
+    heavyAttackRequested = false;
     dodgeRequested = false;
   }
 }
@@ -270,8 +276,10 @@ function predictMovement(input, dtMs) {
   let speed = COMBAT.moveSpeed;
   if (local.action === 6 || input.block) speed *= COMBAT.block.moveMultiplier;
   else if (local.action === 1) speed *= 0.35;
-  else if (local.action === 2 || local.action === 7 || local.action === 8) speed = 0;
+  else if (local.action === COMBAT_ACTION.heavyAttackWindup) speed *= 0.20;
+  else if (local.action === 2 || local.action === COMBAT_ACTION.heavyAttackActive || local.action === 7 || local.action === 8) speed = 0;
   else if (local.action === 3 || local.action === 5) speed *= 0.48;
+  else if (local.action === COMBAT_ACTION.heavyAttackRecovery) speed *= 0.35;
   else if (local.action === 4) speed = COMBAT.dodge.speed;
   const seconds = dtMs / 1000;
   local.x = clamp(local.x + moveX * speed * seconds, COMBAT.fighterRadius, NETWORK.worldWidth - COMBAT.fighterRadius);
@@ -379,6 +387,7 @@ function drawFighterScreen(x, y, fighter, body, shadow, remote = false, damageTe
   const action = fighter.action ?? COMBAT_ACTION.idle;
   ctx.globalAlpha = action === COMBAT_ACTION.dead ? 0.28 : 1;
   if (action === COMBAT_ACTION.attackWindup || action === COMBAT_ACTION.attackActive) drawAttackTell(action, remote);
+  if (action === COMBAT_ACTION.heavyAttackWindup || action === COMBAT_ACTION.heavyAttackActive) drawHeavyAttackTell(action, remote);
   if (action === COMBAT_ACTION.block) drawBlockTell(remote, fighter);
   if (action === COMBAT_ACTION.dodge) drawDodgeTell(remote);
   if (action === COMBAT_ACTION.stunned) drawStunTell();
@@ -457,6 +466,25 @@ function drawAttackTell(action, remote) {
     ctx.setLineDash([8, 5]);
     ctx.stroke();
   }
+}
+
+function drawHeavyAttackTell(action, remote) {
+  const active = action === COMBAT_ACTION.heavyAttackActive;
+  ctx.save();
+  ctx.strokeStyle = active ? "#ff4d2e" : "#ffad5c";
+  ctx.fillStyle = active ? "rgba(255, 77, 46, 0.20)" : "rgba(255, 173, 92, 0.13)";
+  ctx.lineWidth = remote ? 4 : 3;
+  ctx.beginPath();
+  ctx.moveTo(12, 0);
+  ctx.arc(0, 0, COMBAT.heavyAttack.reach, -COMBAT.heavyAttack.arcRadians / 2, COMBAT.heavyAttack.arcRadians / 2);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+  ctx.setLineDash([5, 5]);
+  ctx.beginPath();
+  ctx.arc(0, 0, COMBAT.fighterRadius + 8, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.restore();
 }
 
 function drawBlockTell(remote, fighter) {
