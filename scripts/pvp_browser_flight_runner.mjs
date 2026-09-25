@@ -871,7 +871,7 @@ async function runOnlineUiHeavyWhiffPunishFlight(entries) {
   await pulseMovementKey(defender, punishMoveKey, 160);
   await sleep(20);
   await aimArena(defender, defenderElementId, punishOffset);
-  await performArenaAttack(defender, defenderElementId, punishOffset);
+  await performArenaAttackBurst(defender, 2);
   await sleep(320);
 
   const evidence = await Promise.all(entries.map(readUiEvidence));

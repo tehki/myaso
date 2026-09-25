@@ -35,7 +35,7 @@ During authoritative heavy recovery, Chrome:
 
 - closes distance with a real horizontal movement key;
 - aims back toward the recovering attacker;
-- delivers a real left-mouse light attack.
+- delivers a bounded two-click real left-mouse latch burst; authoritative recovery/cooldown still permits exactly one light attack.
 
 The light active frame lands while the attacker's unchanged 420 ms heavy recovery is still in force.
 
