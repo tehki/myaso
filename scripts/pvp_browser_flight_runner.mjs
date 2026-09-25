@@ -785,10 +785,9 @@ async function runOnlineUiHeavyBlockFlight(entries) {
   const attackerResult = evidence.find((entry) => entry.browser === attacker.name);
   const defenderResult = evidence.find((entry) => entry.browser === defender.name);
   assertHeavyControlDelivered(attackerResult, movementCode, "M107 heavy block");
-  const blockDown = defenderResult.pointers.find((event) => event.type === "pointerdown" && event.button === 2);
-  const blockUp = defenderResult.pointers.find((event) => event.type === "pointerup" && event.button === 2);
-  if (!blockDown || !blockUp) {
-    throw new Error(`M107 heavy block real RMB control was not delivered: ${JSON.stringify(defenderResult)}`);
+  const blockWheel = defenderResult.wheels.find((event) => event.deltaY > 0);
+  if (!blockWheel) {
+    throw new Error(`M107 heavy block real wheel-back block/parry control was not delivered: ${JSON.stringify(defenderResult)}`);
   }
   if (!attackerResult.events.includes("Opponent blocked - guard -64.")
     || !defenderResult.events.includes("Block held - guard -64.")) {
@@ -878,10 +877,9 @@ async function runOnlineUiHeavyParryFlight(entries) {
   const attackerResult = evidence.find((entry) => entry.browser === attacker.name);
   const defenderResult = evidence.find((entry) => entry.browser === defender.name);
   assertHeavyControlDelivered(attackerResult, movementCode, "M107 heavy parry");
-  const blockDown = defenderResult.pointers.find((event) => event.type === "pointerdown" && event.button === 2);
-  const blockUp = defenderResult.pointers.find((event) => event.type === "pointerup" && event.button === 2);
-  if (!blockDown || !blockUp) {
-    throw new Error(`M107 heavy parry real RMB control was not delivered: ${JSON.stringify(defenderResult)}`);
+  const blockWheel = defenderResult.wheels.find((event) => event.deltaY > 0);
+  if (!blockWheel) {
+    throw new Error(`M107 heavy parry real wheel-back block/parry control was not delivered: ${JSON.stringify(defenderResult)}`);
   }
   if (attackerResult.playerHp !== 100 || attackerResult.playerGuard !== 100
     || defenderResult.playerHp !== 100 || defenderResult.playerGuard !== 100) {
@@ -923,7 +921,7 @@ async function runOnlineUiHeavyDodgeFlight(entries) {
   assertHeavyControlDelivered(attackerResult, movementCode, "M107 heavy dodge");
   if (!defenderResult.keys.includes("keydown:KeyS") || !defenderResult.keys.includes("keyup:KeyS")
     || !defenderResult.keys.includes("keydown:Space") || !defenderResult.keys.includes("keyup:Space")) {
-    throw new Error(`M107 heavy dodge real Space/perpendicular controls were not delivered: ${JSON.stringify(defenderResult)}`);
+    throw new Error(`M107 heavy dodge real wheel-forward/perpendicular controls were not delivered: ${JSON.stringify(defenderResult)}`);
   }
   if (attackerResult.playerHp !== 100 || attackerResult.playerGuard !== 100
     || defenderResult.playerHp !== 100 || defenderResult.playerGuard !== 100) {
@@ -1156,7 +1154,7 @@ async function runOnlineUiDodgeFeedbackFlight(entries) {
   const movementDelivered = attackerResult.keys.includes(`keydown:${movementCode}`) && attackerResult.keys.includes(`keyup:${movementCode}`);
   const aimDelivered = attackDown && Math.abs(attackDown.y - 0.5) <= 0.15 && (attackRight ? attackDown.x >= 0.6 : attackDown.x <= 0.4);
   if (!movementDelivered || !aimDelivered) throw new Error(`M36 real attacker movement/aim was not delivered: ${JSON.stringify(attackerResult)}`);
-  if (!defenderResult.keys.includes("keydown:KeyS") || !defenderResult.keys.includes("keyup:KeyS") || !defenderResult.keys.includes("keydown:Space") || !defenderResult.keys.includes("keyup:Space")) throw new Error(`M36 real perpendicular dodge controls were not delivered: ${JSON.stringify(defenderResult)}`);
+  if (!defenderResult.keys.includes("keydown:KeyS") || !defenderResult.keys.includes("keyup:KeyS") || !defenderResult.keys.includes("keydown:Space") || !defenderResult.keys.includes("keyup:Space")) throw new Error(`M36 real perpendicular wheel-roll controls were not delivered: ${JSON.stringify(defenderResult)}`);
   if (attackerResult.playerHp !== 100 || attackerResult.playerGuard !== 100 || defenderResult.playerHp !== 100 || defenderResult.playerGuard !== 100) throw new Error(`M36 dodge exchange changed authoritative vitals: ${JSON.stringify(evidence)}`);
   if (attackerResult.feedbackTransitions.includes("parried") || defenderResult.feedbackTransitions.includes("parry-success")) throw new Error(`M36 dodge exchange accidentally resolved as parry: ${JSON.stringify(evidence)}`);
   return evidence;
@@ -1209,15 +1207,13 @@ async function runOnlineUiParryFlight(entries) {
   const defenderResult = evidence.find((entry) => entry.browser === defender.name);
   if (!attackerResult || !defenderResult) throw new Error(`incomplete M33 UI evidence: ${JSON.stringify(evidence)}`);
   const attackDown = attackerResult.pointers.find((event) => event.type === "pointerdown" && event.button === 0);
-  const blockDown = defenderResult.pointers.find((event) => event.type === "pointerdown" && event.button === 2);
-  const blockUp = defenderResult.pointers.find((event) => event.type === "pointerup" && event.button === 2);
+  const blockWheel = defenderResult.wheels.find((event) => event.deltaY > 0);
   if (!attackerResult.keys.includes(`keydown:${movementCode}`) || !attackerResult.keys.includes(`keyup:${movementCode}`)) {
     throw new Error(`M33 real attacker movement control was not delivered: ${JSON.stringify(attackerResult)}`);
   }
   const attackAimValid = attackDown && Math.abs(attackDown.y - 0.5) <= 0.15 && (attackRight ? attackDown.x >= 0.6 : attackDown.x <= 0.4);
   if (!attackAimValid) throw new Error(`M33 real attacker aim was not delivered: ${JSON.stringify(attackerResult)}`);
-  const blockAimValid = blockDown && Math.abs(blockDown.y - 0.5) <= 0.15 && (attackRight ? blockDown.x <= 0.4 : blockDown.x >= 0.6);
-  if (!blockAimValid || !blockUp) throw new Error(`M33 real directional block input was not delivered: ${JSON.stringify(defenderResult)}`);
+  if (!blockWheel) throw new Error(`M33 real wheel-back directional parry input was not delivered: ${JSON.stringify(defenderResult)}`);
   return evidence;
 }
 
@@ -1281,11 +1277,8 @@ async function runOnlineUiBlockFacingTellFlight(entries) {
 
   const evidence = await Promise.all(entries.map(readUiEvidence));
   const defenderResult = evidence.find((entry) => entry.browser === defender.name);
-  const blockDown = defenderResult?.pointers.find((event) => event.type === "pointerdown" && event.button === 2);
-  const blockUp = defenderResult?.pointers.find((event) => event.type === "pointerup" && event.button === 2);
-  const aimedTowardObserver = blockDown && Math.abs(blockDown.y - 0.5) <= 0.15
-    && (aimOffset < 0 ? blockDown.x <= 0.4 : blockDown.x >= 0.6);
-  if (!aimedTowardObserver || !blockUp) throw new Error(`M42 real directional block input was not delivered: ${JSON.stringify(defenderResult)}`);
+  const blockWheel = defenderResult?.wheels.find((event) => event.deltaY > 0);
+  if (!blockWheel) throw new Error(`M42 real wheel-back directional block input was not delivered: ${JSON.stringify(defenderResult)}`);
   return evidence.map((entry) => ({ ...entry, blockFacingTellMaxPixels: entry.browser === observer.name ? tell.observerMax : tell.localMax }));
 }
 
@@ -1323,8 +1316,8 @@ async function runOnlineUiDodgeTellFlight(entries) {
   const dodgerResult = evidence.find((entry) => entry.browser === dodger.name);
   if (!observerResult || !dodgerResult) throw new Error(`M43 incomplete UI evidence: ${JSON.stringify(evidence)}`);
   const controlsDelivered = dodgerResult.keys.includes("keydown:KeyS") && dodgerResult.keys.includes("keyup:KeyS")
-    && dodgerResult.keys.includes("keydown:Space") && dodgerResult.keys.includes("keyup:Space");
-  if (!controlsDelivered) throw new Error(`M43 real dodge controls were not delivered: ${JSON.stringify(dodgerResult)}`);
+    && dodgerResult.wheels.some((event) => event.deltaY < 0);
+  if (!controlsDelivered) throw new Error(`M43 real wheel-roll controls were not delivered: ${JSON.stringify(dodgerResult)}`);
   if (observerResult.playerHp !== 100 || observerResult.playerGuard !== 100 || dodgerResult.playerHp !== 100 || dodgerResult.playerGuard !== 100) {
     throw new Error(`M43 dodge tell flight changed authoritative vitals: ${JSON.stringify(evidence)}`);
   }
@@ -1536,10 +1529,9 @@ async function runOnlineUiHeavyGuardBreakFlight(entries, { returnTiming = false 
   assertHeavyControlDelivered(attackerResult, movementCode, "M110 heavy guard break");
   const heavyDowns = attackerResult.keys.filter((entry) => entry === "keydown:KeyE").length;
   const authoritativeCommits = heavyCommitCount(attackerResult);
-  const blockDown = defenderResult.pointers.find((event) => event.type === "pointerdown" && event.button === 2);
-  const blockUp = defenderResult.pointers.find((event) => event.type === "pointerup" && event.button === 2);
-  if (heavyDowns < 2 || authoritativeCommits !== 2 || !blockDown || !blockUp) {
-    throw new Error(`M110 did not prove two real heavies into one held RMB block: ${JSON.stringify(evidence)}`);
+  const blockWheels = defenderResult.wheels.filter((event) => event.deltaY > 0);
+  if (heavyDowns < 2 || authoritativeCommits !== 2 || blockWheels.length < 2) {
+    throw new Error(`M110 did not prove two real heavies into timed wheel-back blocks: ${JSON.stringify(evidence)}`);
   }
   if (attackerResult.playerHp !== 100 || attackerResult.playerGuard !== 100
     || defenderResult.playerHp !== 100 || defenderResult.playerGuard !== 0) {
@@ -1768,17 +1760,14 @@ async function runOnlineUiGuardBreakFlight(entries) {
     throw new Error(`M34 real attacker movement control was not delivered: ${JSON.stringify(attackerResult)}`);
   }
   const attackDowns = attackerResult.pointers.filter((event) => event.type === "pointerdown" && event.button === 0);
-  const blockDown = defenderResult.pointers.find((event) => event.type === "pointerdown" && event.button === 2);
-  const blockUp = defenderResult.pointers.find((event) => event.type === "pointerup" && event.button === 2);
+  const blockWheels = defenderResult.wheels.filter((event) => event.deltaY > 0);
   const attacksAimed = attackDowns.length >= 3 && attackDowns.every((event) =>
     Math.abs(event.y - 0.5) <= 0.15 && (attackRight ? event.x >= 0.6 : event.x <= 0.4));
   if (!attacksAimed) {
     throw new Error(`M34 real repeated directional attacks were not delivered: ${JSON.stringify(attackerResult)}`);
   }
-  const blockAimed = blockDown && blockUp && Math.abs(blockDown.y - 0.5) <= 0.15
-    && (attackRight ? blockDown.x <= 0.4 : blockDown.x >= 0.6);
-  if (!blockAimed) {
-    throw new Error(`M34 real held directional block was not delivered: ${JSON.stringify(defenderResult)}`);
+  if (blockWheels.length < 3) {
+    throw new Error(`M34 repeated wheel-back directional blocks were not delivered: ${JSON.stringify(defenderResult)}`);
   }
   if (attackerResult.playerHp !== 100 || defenderResult.playerHp !== 100 || defenderResult.playerGuard !== 0) {
     throw new Error(`M34 guard break did not preserve HP and exhaust guard: ${JSON.stringify(evidence)}`);
