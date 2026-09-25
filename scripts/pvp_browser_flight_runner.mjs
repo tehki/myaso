@@ -1630,11 +1630,28 @@ async function runOnlineUiHeavyGuardBreakPunishFlight(entries) {
     throw new Error(`M111 attacker never confirmed exactly one real 34 HP light punish: ${JSON.stringify(await readUiEvidence(attacker))}`);
   }
 
-  // Timestamp ordering is captured immediately, before waiting for the defender
-  // HUD to catch the same authoritative snapshot. This keeps the "hit happened
-  // during STUNNED" proof independent from cross-browser replication latency.
+  // Let the defender receive the same authoritative damage snapshot before
+  // evaluating its persistent transition history. The observer timestamps are
+  // recorded in-page when each UI mutation occurs, so this bounded wait does
+  // not blur the ordering between the hit and the STUNNED interval.
+  const defenderConvergenceDeadline = Date.now() + 260;
+  while (Date.now() < defenderConvergenceDeadline) {
+    const damageCount = defenderResult.events.filter((text) =>
+      text === "Hit taken - 34 HP.").length;
+    const damageTransitionReady = defenderResult.eventTransitions.some((entry) =>
+      entry.text === "Hit taken - 34 HP." && Number.isFinite(entry.t) && entry.t > 0);
+    if (damageCount === damageBefore + 1 && defenderResult.playerHp === 66 && damageTransitionReady) break;
+    await sleep(5);
+    defenderResult = await readUiEvidence(defender);
+  }
+  const defenderDamageCount = defenderResult.events.filter((text) =>
+    text === "Hit taken - 34 HP.").length;
   const damageTransition = [...defenderResult.eventTransitions].reverse().find((entry) =>
-    entry.text === "Hit taken - 34 HP." && entry.t > 0);
+    entry.text === "Hit taken - 34 HP." && Number.isFinite(entry.t) && entry.t > 0);
+  if (defenderDamageCount !== damageBefore + 1 || defenderResult.playerHp !== 66 || !damageTransition) {
+    throw new Error(`M111 defender did not converge to one timestamped 34 HP punish: ${JSON.stringify(defenderResult)}`);
+  }
+
   const stunStarts = defenderResult.overlayTransitions.filter((entry) =>
     entry.visible && entry.title === "STUNNED" && Number.isFinite(entry.t));
   const stunStart = stunStarts.at(-1);
@@ -1642,25 +1659,11 @@ async function runOnlineUiHeavyGuardBreakPunishFlight(entries) {
     ? defenderResult.overlayTransitions.find((entry) =>
       !entry.visible && entry.title === "STUNNED" && Number.isFinite(entry.t) && entry.t >= stunStart.t)
     : null;
-  const hitDuringStun = Boolean(damageTransition && stunStart
+  const hitDuringStun = Boolean(stunStart
     && damageTransition.t >= stunStart.t
     && (!stunEnd || damageTransition.t <= stunEnd.t));
   if (!hitDuringStun) {
     throw new Error(`M111 timestamped browser evidence placed the 34 HP punish outside STUNNED: ${JSON.stringify({ damageTransition, stunStart, stunEnd, eventTransitions: defenderResult.eventTransitions, overlayTransitions: defenderResult.overlayTransitions })}`);
-  }
-
-  const defenderConvergenceDeadline = Date.now() + 220;
-  while (Date.now() < defenderConvergenceDeadline) {
-    const damageCount = defenderResult.events.filter((text) =>
-      text === "Hit taken - 34 HP.").length;
-    if (damageCount === damageBefore + 1 && defenderResult.playerHp === 66) break;
-    await sleep(5);
-    defenderResult = await readUiEvidence(defender);
-  }
-  const defenderDamageCount = defenderResult.events.filter((text) =>
-    text === "Hit taken - 34 HP.").length;
-  if (defenderDamageCount !== damageBefore + 1 || defenderResult.playerHp !== 66) {
-    throw new Error(`M111 defender HUD did not converge to exactly one 34 HP punish: ${JSON.stringify(defenderResult)}`);
   }
 
   const lightThreatsAfter = defenderResult.threatTransitions.filter((entry) =>
