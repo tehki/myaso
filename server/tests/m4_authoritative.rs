@@ -1444,7 +1444,7 @@ fn wilds_knockdown_is_distinct_from_parry_and_guard_break_stun() {
     let mut parry_world = duel(72.0);
     advance(
         &mut parry_world,
-        ATTACK_WINDUP_MS - 25.0,
+        110.0,
         InputIntent {
             attack: true,
             facing_radians: 0.0,
