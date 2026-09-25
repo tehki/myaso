@@ -362,7 +362,10 @@ fn heavy_attack_applies_64_guard_pressure_and_remains_parryable() {
         },
     );
     assert_eq!(parried.fighter(2).expect("target").hp.round() as u8, 100);
-    assert_eq!(parried.fighter(1).expect("attacker").action, Action::Stunned);
+    assert_eq!(
+        parried.fighter(1).expect("attacker").action,
+        Action::Stunned
+    );
     assert!(parry_events
         .iter()
         .any(|event| matches!(event, CombatEvent::Parry { .. })));
