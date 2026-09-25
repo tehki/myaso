@@ -46,8 +46,8 @@ const JUMP_MOVE_MULTIPLIER: f32 = 1.08;
 const JUMP_ATTACK_WINDUP_MS: f32 = 105.0;
 const JUMP_ATTACK_ACTIVE_MS: f32 = 105.0;
 const JUMP_ATTACK_RECOVERY_MS: f32 = 290.0;
-const JUMP_ATTACK_REACH: f32 = 88.0;
-const JUMP_ATTACK_ARC_RADIANS: f32 = std::f32::consts::PI * 0.82;
+const JUMP_ATTACK_REACH: f32 = 48.0;
+const JUMP_ATTACK_ARC_RADIANS: f32 = std::f32::consts::PI * 0.24;
 const JUMP_ATTACK_DAMAGE: f32 = 42.0;
 const JUMP_ATTACK_KNOCKBACK: f32 = 34.0;
 const JUMP_ATTACK_GUARD_DAMAGE: f32 = 52.0;
@@ -478,14 +478,8 @@ fn begin_requested_action(now_ms: f32, fighter: &mut Fighter, input: InputIntent
     }
 
     if input.dodge && spend_stamina(now_ms, fighter, DODGE_STAMINA_COST) {
-        let move_length = input.move_x.hypot(input.move_y);
-        if move_length > EPSILON {
-            fighter.dodge_dir_x = input.move_x / move_length;
-            fighter.dodge_dir_y = input.move_y / move_length;
-        } else {
-            fighter.dodge_dir_x = fighter.facing.cos();
-            fighter.dodge_dir_y = fighter.facing.sin();
-        }
+        fighter.dodge_dir_x = fighter.facing.cos();
+        fighter.dodge_dir_y = fighter.facing.sin();
         fighter.roll_hit_targets.clear();
         fighter.set_action(Action::Dodge, DODGE_DURATION_MS);
         return;
