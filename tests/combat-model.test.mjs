@@ -261,7 +261,7 @@ test("running is faster and drains stamina", () => {
 });
 
 test("space-style jump can convert into a jumping attack", () => {
-  const world = duel({ distance: 72 });
+  const world = duel({ distance: 60 });
   const [a, b] = world.fighters;
   stepWorld(world, { a: { jump: true, aimX: b.x, aimY: b.y } }, 5);
   assert.equal(a.action, "jump");
@@ -272,6 +272,55 @@ test("space-style jump can convert into a jumping attack", () => {
   });
   assert.equal(b.hp, 100 - COMBAT.jumpAttack.damage);
   assert.ok(events.some((event) => event.type === "hit" && event.attackKind === "jump_attack"));
+});
+
+
+
+test("roll direction always follows pointer facing, not movement keys", () => {
+  const fighter = createFighter({ id: "roller", x: 300, y: 200, facing: 0 });
+  const world = createWorld({ width: 800, height: 500, fighters: [fighter] });
+  const startX = fighter.x;
+  const startY = fighter.y;
+  advance(world, 50, {
+    roller: {
+      moveX: -1,
+      moveY: 0,
+      dodge: true,
+      aimX: 300,
+      aimY: 400,
+    },
+  });
+  assert.ok(fighter.y > startY, "roll must travel toward the mouse pointer");
+  assert.ok(Math.abs(fighter.x - startX) < 2, "opposite movement key must not steer the roll");
+});
+
+test("jump attack uses a deliberately narrow short-range cone", () => {
+  assert.equal(COMBAT.jumpAttack.reach, 48);
+  assert.equal(COMBAT.jumpAttack.arcRadians, Math.PI * 0.24);
+
+  const farWorld = duel({ distance: 70 });
+  const [farAttacker, farTarget] = farWorld.fighters;
+  stepWorld(farWorld, { a: { jump: true, aimX: farTarget.x, aimY: farTarget.y } }, 5);
+  stepWorld(farWorld, { a: { attack: true, aimX: farTarget.x, aimY: farTarget.y } }, 5);
+  advance(farWorld, COMBAT.jumpAttack.windupMs + COMBAT.jumpAttack.activeMs + 10, {
+    a: { aimX: farTarget.x, aimY: farTarget.y },
+  });
+  assert.equal(farTarget.hp, 100, "target just outside the short jump-attack reach must be safe");
+
+  const angledAttacker = createFighter({ id: "a", x: 200, y: 200, facing: 0 });
+  const angledTarget = createFighter({
+    id: "b",
+    x: 200 + Math.cos(Math.PI / 6) * 60,
+    y: 200 + Math.sin(Math.PI / 6) * 60,
+    facing: Math.PI,
+  });
+  const angledWorld = createWorld({ width: 600, height: 400, fighters: [angledAttacker, angledTarget] });
+  stepWorld(angledWorld, { a: { jump: true, aimX: 400, aimY: 200 } }, 5);
+  stepWorld(angledWorld, { a: { attack: true, aimX: 400, aimY: 200 } }, 5);
+  advance(angledWorld, COMBAT.jumpAttack.windupMs + COMBAT.jumpAttack.activeMs + 10, {
+    a: { aimX: 400, aimY: 200 },
+  });
+  assert.equal(angledTarget.hp, 100, "30-degree offset must miss the narrow jump-attack cone");
 });
 
 test("successful parry leaves a comfortable real light punish window", () => {
