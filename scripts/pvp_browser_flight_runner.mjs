@@ -3713,8 +3713,8 @@ function assertPairedResults(results) {
       if (result.minDefenderHp !== 100 || result.minDefenderGuard !== 100) {
         throw new Error(`${result.browser} defender paid HP/guard cost during dodge: ${JSON.stringify(result)}`);
       }
-      if (result.defenderBlockSeen || result.attackerStunnedSeen) {
-        throw new Error(`${result.browser} dodge scenario accidentally resolved as block/parry`);
+      if (result.defenderBlockSeen || result.attackerStunnedSeen || result.attackerKnockdownSeen) {
+        throw new Error(`${result.browser} dodge scenario accidentally resolved as block/parry/roll-collision knockdown`);
       }
       if (!Number.isFinite(result.firstDodgeEvadeMs) || !Number.isFinite(result.dodgeOverlapDistance) || !Number.isFinite(result.dodgeOverlapArcDelta)) {
         throw new Error(`${result.browser} did not record verified dodge geometry/timing`);
