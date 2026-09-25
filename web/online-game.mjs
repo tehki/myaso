@@ -475,7 +475,7 @@ function drawHeavyAttackTell(action, remote) {
   ctx.fillStyle = active ? "rgba(255, 77, 46, 0.20)" : "rgba(255, 173, 92, 0.13)";
   ctx.lineWidth = remote ? 4 : 3;
   ctx.beginPath();
-  ctx.moveTo(12, 0);
+  ctx.moveTo(0, 0);
   ctx.arc(
     0,
     0,
@@ -627,7 +627,11 @@ function updateThreatCue(ownId) {
   const secondaryGuardArc = fighterThreatGuardArcLabel(own, secondaryAttacker);
   const phase = fighterThreatPhaseLabel(attacker);
   const secondaryPhase = fighterThreatPhaseLabel(secondaryAttacker);
-  const state = phase === "STRIKE" ? "strike" : phase === "WINDUP" ? "windup" : "";
+  const state = phase === "STRIKE" || phase === "HEAVY STRIKE"
+    ? "strike"
+    : phase === "WINDUP" || phase === "HEAVY WINDUP"
+      ? "windup"
+      : "";
   const shouldHide = netId === 0 || !state;
   if (threatCue.root.hidden !== shouldHide) threatCue.root.hidden = shouldHide;
   if (shouldHide) {
