@@ -1592,12 +1592,12 @@ async function runOnlineUiHeavyGuardBreakPunishFlight(entries) {
     throw new Error(`M111 did not inherit a live clean M110 guard break: ${JSON.stringify(guardBreakEvidence)}`);
   }
 
-  const lightCommitsBefore = baselineAttacker.events.filter((text) =>
-    text === "Attack committed - your windup is readable.").length;
   const lightHitsBefore = baselineAttacker.events.filter((text) =>
     text === "Opponent hit - 34 HP.").length;
   const damageBefore = baselineDefender.events.filter((text) =>
     text === "Hit taken - 34 HP.").length;
+  const lightThreatsBefore = baselineDefender.threatTransitions.filter((entry) =>
+    entry.visible && (entry.phase === "WINDUP" || entry.phase === "STRIKE")).length;
 
   // Time genuine clicks from the accepted second-heavy request rather than from
   // a remote recovery snapshot. Downs are centered tightly around the unchanged
@@ -1631,11 +1631,9 @@ async function runOnlineUiHeavyGuardBreakPunishFlight(entries) {
   let attackerResult = null;
   while (Date.now() < attackerDeadline) {
     const state = await readUiEvidence(attacker);
-    const committed = state.events.filter((text) =>
-      text === "Attack committed - your windup is readable.").length === lightCommitsBefore + 1;
     const hit = state.events.filter((text) =>
       text === "Opponent hit - 34 HP.").length === lightHitsBefore + 1;
-    if (committed && hit && state.opponentHp === 66) {
+    if (hit && state.opponentHp === 66) {
       attackerResult = state;
       break;
     }
@@ -1643,11 +1641,16 @@ async function runOnlineUiHeavyGuardBreakPunishFlight(entries) {
   }
 
   const defenderResult = await readUiEvidence(defender);
+  if (!defenderHitWhileStunned) {
+    throw new Error(`M111 defender never observed the 34 HP punish while still authoritatively STUNNED: ${JSON.stringify({ lastDefenderState, defenderResult })}`);
+  }
   if (!attackerResult) {
     throw new Error(`M111 attacker never confirmed exactly one real 34 HP light punish: ${JSON.stringify(await readUiEvidence(attacker))}`);
   }
-  if (!defenderHitWhileStunned) {
-    throw new Error(`M111 defender never observed the 34 HP punish while still authoritatively STUNNED: ${JSON.stringify({ lastDefenderState, defenderResult })}`);
+  const lightThreatsAfter = defenderHitWhileStunned.threatTransitions.filter((entry) =>
+    entry.visible && (entry.phase === "WINDUP" || entry.phase === "STRIKE")).length;
+  if (lightThreatsAfter <= lightThreatsBefore) {
+    throw new Error(`M111 defender never observed the real light threat before the punish: ${JSON.stringify(defenderHitWhileStunned.threatTransitions)}`);
   }
   if (attackerResult.playerHp !== 100 || attackerResult.playerGuard !== 100
     || attackerResult.opponentHp !== 66 || defenderResult.playerHp !== 66) {
@@ -1678,6 +1681,7 @@ async function runOnlineUiHeavyGuardBreakPunishFlight(entries) {
       punishObservedWhileStunned: true,
       punishObservedHp: defenderHitWhileStunned.playerHp,
       punishObservedGuard: defenderHitWhileStunned.playerGuard,
+      punishLightThreatTransitions: lightThreatsAfter - lightThreatsBefore,
     },
   ];
 }
