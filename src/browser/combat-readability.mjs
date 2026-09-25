@@ -20,6 +20,7 @@ export const COMBAT_ACTION = Object.freeze({
   jumpAttackWindup: 16,
   jumpAttackActive: 17,
   jumpAttackRecovery: 18,
+  knockdown: 19,
 });
 
 const PRIORITY = Object.freeze({
@@ -131,6 +132,8 @@ export function combatActionHint(entity) {
       return "Blocking - keep the threat in front of you.";
     case COMBAT_ACTION.stunned:
       return "Stunned - defend when control returns.";
+    case COMBAT_ACTION.knockdown:
+      return "Knocked down - recover before re-engaging.";
     case COMBAT_ACTION.dead:
       return "Down - read the exchange before you respawn.";
     default:
@@ -348,6 +351,9 @@ export function combatOverlayPresentation(entity) {
   if (entity?.action === COMBAT_ACTION.stunned) {
     return { visible: true, state: "stunned", title: "STUNNED", detail: "Punish window open." };
   }
+  if (entity?.action === COMBAT_ACTION.knockdown) {
+    return { visible: true, state: "knockdown", title: "KNOCKED DOWN", detail: "Short recovery window." };
+  }
   return { visible: false, state: "", title: "", detail: "" };
 }
 
@@ -389,12 +395,12 @@ function collectEntityEvents(events, before, current, own) {
 }
 
 function collectControlImpactEvents(events, beforeOwn, own, beforePeer, peer) {
-  const ownJustStunned = beforeOwn.action !== COMBAT_ACTION.stunned
-    && own.action === COMBAT_ACTION.stunned
+  const ownJustKnockedDown = beforeOwn.action !== COMBAT_ACTION.knockdown
+    && own.action === COMBAT_ACTION.knockdown
     && own.hp === beforeOwn.hp
     && own.guard === beforeOwn.guard;
-  const peerJustStunned = beforePeer.action !== COMBAT_ACTION.stunned
-    && peer.action === COMBAT_ACTION.stunned
+  const peerJustKnockedDown = beforePeer.action !== COMBAT_ACTION.knockdown
+    && peer.action === COMBAT_ACTION.knockdown
     && peer.hp === beforePeer.hp
     && peer.guard === beforePeer.guard;
 
@@ -403,15 +409,15 @@ function collectControlImpactEvents(events, beforeOwn, own, beforePeer, peer) {
   const ownRoll = isRollAction(own.action) || isRollAction(beforeOwn.action);
   const peerRoll = isRollAction(peer.action) || isRollAction(beforePeer.action);
 
-  if (ownJustStunned && peerKick) {
+  if (ownJustKnockedDown && peerKick) {
     push(events, "controlImpact", "Shoved - knocked down.", 760, "shoved");
-  } else if (ownJustStunned && peerRoll) {
+  } else if (ownJustKnockedDown && peerRoll) {
     push(events, "controlImpact", "Rolled over - knocked down.", 720, "rolled-over");
   }
 
-  if (peerJustStunned && ownKick) {
+  if (peerJustKnockedDown && ownKick) {
     push(events, "controlImpact", "Shove landed - punish the knockdown.", 760, "kick-confirm");
-  } else if (peerJustStunned && ownRoll) {
+  } else if (peerJustKnockedDown && ownRoll) {
     push(events, "controlImpact", "Roll collision - opponent knocked down.", 720, "roll-impact");
   }
 }
