@@ -868,7 +868,8 @@ async function runOnlineUiHeavyWhiffPunishFlight(entries) {
   // the short real close keeps the light attack comfortably in range while its
   // active frame still lands inside the unchanged 420 ms heavy recovery.
   await sleep(390);
-  await pulseMovementKey(defender, punishMoveKey, 60);
+  await pulseMovementKey(defender, punishMoveKey, 160);
+  await sleep(20);
   await aimArena(defender, defenderElementId, punishOffset);
   await performArenaAttack(defender, defenderElementId, punishOffset);
   await sleep(320);
