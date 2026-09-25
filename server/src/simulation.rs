@@ -729,13 +729,7 @@ fn is_blocking_attack(target: &Fighter, attacker: &Fighter) -> bool {
     angle_delta(angle_to_attacker, target.facing).abs() <= BLOCK_HALF_ANGLE_RADIANS
 }
 
-fn knock_back(
-    width: f32,
-    height: f32,
-    attacker: &Fighter,
-    target: &mut Fighter,
-    distance: f32,
-) {
+fn knock_back(width: f32, height: f32, attacker: &Fighter, target: &mut Fighter, distance: f32) {
     let dx = target.x - attacker.x;
     let dy = target.y - attacker.y;
     let length = dx.hypot(dy).max(1.0);
