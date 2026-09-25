@@ -404,7 +404,7 @@ fn heavy_guard_break_preserves_a_real_light_punish_window_after_recovery() {
     let break_events = advance(&mut world, 325.0, heavy, blocking);
     assert_eq!(world.fighter(2).expect("target").hp.round() as u8, 100);
     assert_eq!(world.fighter(2).expect("target").guard.round() as u8, 0);
-    assert_eq!(world.fighter(2).expect("target").action, Action::Knockdown);
+    assert_eq!(world.fighter(2).expect("target").action, Action::Stunned);
     assert!(break_events
         .iter()
         .any(|event| matches!(event, CombatEvent::GuardBreak { .. })));
@@ -1111,7 +1111,7 @@ fn hex(bytes: &[u8]) -> String {
 }
 
 #[test]
-fn wilds_kick_stuns_unblocked_target_without_hp_damage() {
+fn wilds_kick_knocks_down_unblocked_target_without_hp_damage() {
     let mut world = duel(54.0);
     advance(
         &mut world,
@@ -1124,7 +1124,10 @@ fn wilds_kick_stuns_unblocked_target_without_hp_damage() {
         InputIntent::default(),
     );
     assert_eq!(world.fighter(2).expect("target").hp.round() as u8, 100);
-    assert_eq!(world.fighter(2).expect("target").action, Action::Stunned);
+    assert_eq!(
+        world.fighter(2).expect("target").action,
+        Action::Knockdown
+    );
     assert_eq!(
         world.fighter(1).expect("attacker").stamina.round() as u8,
         82
