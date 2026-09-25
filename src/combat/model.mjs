@@ -11,6 +11,16 @@ export const COMBAT = Object.freeze({
     knockback: 18,
     guardDamage: 38,
   }),
+  thrust: Object.freeze({
+    windupMs: 120,
+    activeMs: 70,
+    recoveryMs: 235,
+    reach: 94,
+    arcRadians: Math.PI * 0.20,
+    damage: 30,
+    knockback: 16,
+    guardDamage: 32,
+  }),
   heavyAttack: Object.freeze({
     windupMs: 320,
     activeMs: 100,
@@ -213,7 +223,11 @@ function beginRequestedAction(world, fighter, input) {
 
   if (input.attack && fighter.action === "idle") {
     fighter.attackHitTargets.clear();
-    setAction(fighter, "attack_windup", COMBAT.attack.windupMs);
+    if (isForwardAttackInput(fighter, input)) {
+      setAction(fighter, "thrust_windup", COMBAT.thrust.windupMs);
+    } else {
+      setAction(fighter, "attack_windup", COMBAT.attack.windupMs);
+    }
     return;
   }
 
@@ -222,6 +236,15 @@ function beginRequestedAction(world, fighter, input) {
   } else if (fighter.action === "block") {
     setAction(fighter, "idle", 0);
   }
+}
+
+function isForwardAttackInput(fighter, input) {
+  const moveLength = Math.hypot(input.moveX, input.moveY);
+  if (moveLength <= EPSILON) return false;
+  const forwardX = Math.cos(fighter.facing);
+  const forwardY = Math.sin(fighter.facing);
+  const dot = (input.moveX / moveLength) * forwardX + (input.moveY / moveLength) * forwardY;
+  return dot >= 0.65;
 }
 
 function moveFighter(world, fighter, input, dtMs) {
@@ -253,6 +276,12 @@ function moveFighter(world, fighter, input, dtMs) {
   } else if (fighter.action === "kick_active") {
     velocityX *= 0.2;
     velocityY *= 0.2;
+  } else if (fighter.action === "thrust_windup") {
+    velocityX *= 0.62;
+    velocityY *= 0.62;
+  } else if (fighter.action === "thrust_active") {
+    velocityX *= 0.28;
+    velocityY *= 0.28;
   } else if (fighter.action === "attack_windup") {
     velocityX *= 0.35;
     velocityY *= 0.35;
@@ -262,6 +291,9 @@ function moveFighter(world, fighter, input, dtMs) {
   } else if (fighter.action === "attack_active" || fighter.action === "heavy_attack_active") {
     velocityX = 0;
     velocityY = 0;
+  } else if (fighter.action === "thrust_recovery") {
+    velocityX *= 0.52;
+    velocityY *= 0.52;
   } else if (fighter.action === "attack_recovery" || fighter.action === "dodge_recovery") {
     velocityX *= 0.48;
     velocityY *= 0.48;
@@ -301,6 +333,15 @@ function advanceAction(fighter, input, dtMs) {
       setAction(fighter, "attack_recovery", COMBAT.attack.recoveryMs);
       break;
     case "attack_recovery":
+      setAction(fighter, "idle", 0);
+      break;
+    case "thrust_windup":
+      setAction(fighter, "thrust_active", COMBAT.thrust.activeMs);
+      break;
+    case "thrust_active":
+      setAction(fighter, "thrust_recovery", COMBAT.thrust.recoveryMs);
+      break;
+    case "thrust_recovery":
       setAction(fighter, "idle", 0);
       break;
     case "heavy_attack_windup":
@@ -376,6 +417,7 @@ function separateFighters(world) {
 
 function attackProfile(action) {
   if (action === "attack_active") return { ...COMBAT.attack, kind: "attack" };
+  if (action === "thrust_active") return { ...COMBAT.thrust, kind: "thrust" };
   if (action === "heavy_attack_active") return { ...COMBAT.heavyAttack, kind: "heavy" };
   if (action === "jump_attack_active") return { ...COMBAT.jumpAttack, kind: "jump_attack" };
   if (action === "kick_active") return { ...COMBAT.kick, kind: "kick" };
