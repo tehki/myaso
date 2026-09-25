@@ -210,3 +210,138 @@ test("block only protects the facing side", () => {
   });
   assert.equal(b.hp, 66);
 });
+
+
+test("unblocked kick shoves and stuns without health damage", () => {
+  const world = duel({ distance: 54 });
+  const [a, b] = world.fighters;
+  const events = advance(world, COMBAT.kick.windupMs + COMBAT.kick.activeMs + 10, {
+    a: { kick: true, aimX: b.x, aimY: b.y },
+  });
+  assert.equal(b.hp, 100);
+  assert.equal(b.action, "stunned");
+  assert.ok(events.some((event) => event.type === "kick"));
+  assert.equal(a.stamina, COMBAT.stamina.max - COMBAT.kick.staminaCost);
+});
+
+test("blocked kick pressures guard but does not stun blocker", () => {
+  const world = duel({ distance: 54 });
+  const [a, b] = world.fighters;
+  advance(world, COMBAT.block.parryWindowMs + 10, {
+    b: { block: true, aimX: a.x, aimY: a.y },
+  });
+  const events = advance(world, COMBAT.kick.windupMs + COMBAT.kick.activeMs + 10, {
+    a: { kick: true, aimX: b.x, aimY: b.y },
+    b: { block: true, aimX: a.x, aimY: a.y },
+  });
+  assert.equal(b.hp, 100);
+  assert.equal(b.action, "block");
+  assert.equal(b.guard, 100 - COMBAT.kick.blockedGuardDamage);
+  assert.ok(events.some((event) => event.type === "block"));
+});
+
+test("roll collision knocks rival down and consumes stamina", () => {
+  const world = duel({ distance: 44 });
+  const [a, b] = world.fighters;
+  const events = advance(world, 35, {
+    a: { dodge: true, moveX: 1, aimX: b.x, aimY: b.y },
+  });
+  assert.equal(a.action, "dodge");
+  assert.equal(b.action, "stunned");
+  assert.ok(events.some((event) => event.type === "roll_hit"));
+  assert.equal(a.stamina, COMBAT.stamina.max - COMBAT.dodge.staminaCost);
+});
+
+test("running is faster and drains stamina", () => {
+  const runner = createFighter({ id: "runner", x: 100, y: 100, facing: 0 });
+  const world = createWorld({ width: 800, height: 400, fighters: [runner] });
+  advance(world, 200, { runner: { moveX: 1, run: true, aimX: 500, aimY: 100 } });
+  assert.ok(runner.x > 100 + COMBAT.moveSpeed * 0.2);
+  assert.ok(runner.stamina < COMBAT.stamina.max);
+});
+
+test("space-style jump can convert into a jumping attack", () => {
+  const world = duel({ distance: 60 });
+  const [a, b] = world.fighters;
+  stepWorld(world, { a: { jump: true, aimX: b.x, aimY: b.y } }, 5);
+  assert.equal(a.action, "jump");
+  stepWorld(world, { a: { attack: true, aimX: b.x, aimY: b.y } }, 5);
+  assert.equal(a.action, "jump_attack_windup");
+  const events = advance(world, COMBAT.jumpAttack.windupMs + COMBAT.jumpAttack.activeMs + 10, {
+    a: { aimX: b.x, aimY: b.y },
+  });
+  assert.equal(b.hp, 100 - COMBAT.jumpAttack.damage);
+  assert.ok(events.some((event) => event.type === "hit" && event.attackKind === "jump_attack"));
+});
+
+
+
+test("roll direction always follows pointer facing, not movement keys", () => {
+  const fighter = createFighter({ id: "roller", x: 300, y: 200, facing: 0 });
+  const world = createWorld({ width: 800, height: 500, fighters: [fighter] });
+  const startX = fighter.x;
+  const startY = fighter.y;
+  advance(world, 50, {
+    roller: {
+      moveX: -1,
+      moveY: 0,
+      dodge: true,
+      aimX: 300,
+      aimY: 400,
+    },
+  });
+  assert.ok(fighter.y > startY, "roll must travel toward the mouse pointer");
+  assert.ok(Math.abs(fighter.x - startX) < 2, "opposite movement key must not steer the roll");
+});
+
+test("jump attack uses a deliberately narrow short-range cone", () => {
+  assert.equal(COMBAT.jumpAttack.reach, 48);
+  assert.equal(COMBAT.jumpAttack.arcRadians, Math.PI * 0.24);
+
+  const farWorld = duel({ distance: 70 });
+  const [farAttacker, farTarget] = farWorld.fighters;
+  stepWorld(farWorld, { a: { jump: true, aimX: farTarget.x, aimY: farTarget.y } }, 5);
+  stepWorld(farWorld, { a: { attack: true, aimX: farTarget.x, aimY: farTarget.y } }, 5);
+  advance(farWorld, COMBAT.jumpAttack.windupMs + COMBAT.jumpAttack.activeMs + 10, {
+    a: { aimX: farTarget.x, aimY: farTarget.y },
+  });
+  assert.equal(farTarget.hp, 100, "target just outside the short jump-attack reach must be safe");
+
+  const angledAttacker = createFighter({ id: "a", x: 200, y: 200, facing: 0 });
+  const angledTarget = createFighter({
+    id: "b",
+    x: 200 + Math.cos(Math.PI / 6) * 60,
+    y: 200 + Math.sin(Math.PI / 6) * 60,
+    facing: Math.PI,
+  });
+  const angledWorld = createWorld({ width: 600, height: 400, fighters: [angledAttacker, angledTarget] });
+  stepWorld(angledWorld, { a: { jump: true, aimX: 400, aimY: 200 } }, 5);
+  stepWorld(angledWorld, { a: { attack: true, aimX: 400, aimY: 200 } }, 5);
+  advance(angledWorld, COMBAT.jumpAttack.windupMs + COMBAT.jumpAttack.activeMs + 10, {
+    a: { aimX: 400, aimY: 200 },
+  });
+  assert.equal(angledTarget.hp, 100, "30-degree offset must miss the narrow jump-attack cone");
+});
+
+test("successful parry leaves a comfortable real light punish window", () => {
+  const world = duel();
+  const [a, b] = world.fighters;
+  advance(world, COMBAT.attack.windupMs - 25, {
+    a: { attack: true, aimX: b.x, aimY: b.y },
+  });
+  const parryEvents = advance(world, 45, {
+    a: { aimX: b.x, aimY: b.y },
+    b: { block: true, aimX: a.x, aimY: a.y },
+  });
+  assert.ok(parryEvents.some((event) => event.type === "parry"));
+  assert.equal(a.action, "stunned");
+
+  stepWorld(world, { b: { aimX: a.x, aimY: a.y } }, 5);
+  stepWorld(world, { b: { attack: true, aimX: a.x, aimY: a.y } }, 5);
+  const punishEvents = advance(world, COMBAT.attack.windupMs + COMBAT.attack.activeMs + 10, {
+    b: { aimX: a.x, aimY: a.y },
+  });
+  assert.equal(a.hp, 66);
+  assert.ok(punishEvents.some((event) => event.type === "hit"));
+  assert.equal(a.action, "stunned");
+});

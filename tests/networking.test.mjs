@@ -75,6 +75,35 @@ test("heavy attack uses a spare input bit without expanding the packet", () => {
   assert.equal(decoded.samples[1].heavyAttack, false);
 });
 
+
+test("Wilds kick run and jump fit the existing one-byte input button field", () => {
+  const packet = encodeInputPacket({
+    sequence: 12,
+    clientTick: 90,
+    samples: [{
+      tick: 90,
+      moveX: 0.25,
+      moveY: -0.5,
+      facing: 1.2,
+      attack: false,
+      heavyAttack: false,
+      dodge: false,
+      block: false,
+      kick: true,
+      run: true,
+      jump: true,
+    }],
+  });
+  assert.equal(packet.byteLength, inputPacketBytes(1));
+  const decoded = decodeInputPacket(packet).samples[0];
+  assert.equal(decoded.kick, true);
+  assert.equal(decoded.run, true);
+  assert.equal(decoded.jump, true);
+  assert.equal(decoded.attack, false);
+  assert.equal(decoded.dodge, false);
+  assert.equal(decoded.block, false);
+});
+
 test("heavy strike action states remain compact snapshot values", () => {
   const names = [
     ["heavy_attack_windup", 9],

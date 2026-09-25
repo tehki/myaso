@@ -49,7 +49,7 @@ python -m http.server 8000
 
 Then open `http://localhost:8000/web/`.
 
-Controls: **WASD** move, **mouse** aim, **left mouse** light attack, **E** heavy attack, **right mouse** block/parry, **Space** dodge.
+Controls: **WASD** move, **mouse** aim, **left mouse** attack, **E** heavy attack, **mouse wheel forward** roll, **mouse wheel backward** parry/short block, **right-click tap** kick/shove, **right-click hold** run, **Space** jump, and **Space + left mouse** jumping attack. Running, rolling, kicking, and jumping consume stamina.
 
 ## Tests
 

@@ -16,13 +16,15 @@ const hud = {
   playerHpValue: document.querySelector("#player-hp-value"),
   playerGuard: document.querySelector("#player-guard"),
   playerGuardValue: document.querySelector("#player-guard-value"),
+  playerStamina: document.querySelector("#player-stamina"),
+  playerStaminaValue: document.querySelector("#player-stamina-value"),
   botHp: document.querySelector("#bot-hp"),
   botHpValue: document.querySelector("#bot-hp-value"),
   botGuard: document.querySelector("#bot-guard"),
   botGuardValue: document.querySelector("#bot-guard-value"),
   focusLabel: document.querySelector("#focus-label"),
 };
-const hudCache = { playerHp: null, playerGuard: null, botHp: null, botGuard: null, focusNetId: null, status: null, scoreboard: null };
+const hudCache = { playerHp: null, playerGuard: null, playerStamina: null, botHp: null, botGuard: null, focusNetId: null, status: null, scoreboard: null };
 const combatOverlay = {
   root: document.querySelector("#combat-overlay"),
   title: document.querySelector("#combat-overlay-title"),
@@ -75,9 +77,12 @@ const webTransportOptions = cert
   : undefined;
 
 const keys = new Set();
-const mouse = { x: canvas.width / 2, y: canvas.height / 2, block: false };
-const local = { x: 0, y: 0, facing: 0, hp: 100, guard: 100, action: 0, initialized: false };
-const currentInput = { moveX: 0, moveY: 0, facing: 0, attack: false, heavyAttack: false, dodge: false, block: false };
+const mouse = { x: canvas.width / 2, y: canvas.height / 2 };
+const local = { x: 0, y: 0, facing: 0, hp: 100, guard: 100, stamina: 100, action: 0, initialized: false };
+const currentInput = {
+  moveX: 0, moveY: 0, facing: 0, attack: false, heavyAttack: false,
+  dodge: false, block: false, kick: false, run: false, jump: false,
+};
 const arenaLayer = createArenaLayer();
 const remoteScratch = new Map();
 const fixedStepMs = 1000 / NETWORK.clientPredictionHz;
@@ -88,24 +93,44 @@ let predictionStep = 0;
 let clientTick = 0;
 let attackRequested = false;
 let heavyAttackRequested = false;
-let dodgeRequested = false;
+let rollRequested = false;
+let kickRequested = false;
+let jumpRequested = false;
+let shortBlockUntil = 0;
+let rightButtonDown = false;
+let rightButtonDownAt = 0;
+const runHoldThresholdMs = 180;
+let staminaRegenBlockedUntil = 0;
 
 canvas.addEventListener("contextmenu", (event) => event.preventDefault());
 canvas.addEventListener("pointerdown", (event) => {
   canvas.focus();
   if (event.button === 0) attackRequested = true;
-  if (event.button === 2) mouse.block = true;
+  if (event.button === 2) {
+    rightButtonDown = true;
+    rightButtonDownAt = performance.now();
+  }
   updateMouse(event);
 });
 canvas.addEventListener("pointerup", (event) => {
-  if (event.button === 2) mouse.block = false;
+  if (event.button === 2) {
+    const heldMs = performance.now() - rightButtonDownAt;
+    rightButtonDown = false;
+    if (heldMs < runHoldThresholdMs) kickRequested = true;
+  }
 });
+canvas.addEventListener("wheel", (event) => {
+  event.preventDefault();
+  canvas.focus();
+  if (event.deltaY < 0) rollRequested = true;
+  else if (event.deltaY > 0) shortBlockUntil = Math.max(shortBlockUntil, performance.now() + COMBAT.block.shortBlockMs);
+}, { passive: false });
 canvas.addEventListener("pointermove", updateMouse);
 canvas.addEventListener("keydown", (event) => {
   if (["KeyW", "KeyA", "KeyS", "KeyD", "KeyE", "Space"].includes(event.code)) event.preventDefault();
   keys.add(event.code);
   if (event.code === "KeyE" && !event.repeat) heavyAttackRequested = true;
-  if (event.code === "Space" && !event.repeat) dodgeRequested = true;
+  if (event.code === "Space" && !event.repeat) jumpRequested = true;
 });
 canvas.addEventListener("keyup", (event) => keys.delete(event.code));
 window.addEventListener("blur", releaseInputs);
@@ -228,8 +253,11 @@ function releaseInputs() {
   keys.clear();
   attackRequested = false;
   heavyAttackRequested = false;
-  dodgeRequested = false;
-  mouse.block = false;
+  rollRequested = false;
+  kickRequested = false;
+  jumpRequested = false;
+  shortBlockUntil = 0;
+  rightButtonDown = false;
 }
 
 function sampleInput() {
@@ -240,6 +268,9 @@ function sampleInput() {
     currentInput.heavyAttack = false;
     currentInput.dodge = false;
     currentInput.block = false;
+    currentInput.kick = false;
+    currentInput.run = false;
+    currentInput.jump = false;
     return;
   }
   currentInput.moveX = (keys.has("KeyD") ? 1 : 0) - (keys.has("KeyA") ? 1 : 0);
@@ -247,8 +278,11 @@ function sampleInput() {
   currentInput.facing = Math.atan2(mouse.y - canvas.height / 2, mouse.x - canvas.width / 2);
   currentInput.attack = attackRequested;
   currentInput.heavyAttack = heavyAttackRequested;
-  currentInput.dodge = dodgeRequested;
-  currentInput.block = mouse.block;
+  currentInput.dodge = rollRequested;
+  currentInput.block = performance.now() < shortBlockUntil;
+  currentInput.kick = kickRequested;
+  currentInput.run = rightButtonDown && performance.now() - rightButtonDownAt >= runHoldThresholdMs;
+  currentInput.jump = jumpRequested;
 }
 
 function simulatePrediction(stepMs) {
@@ -260,7 +294,9 @@ function simulatePrediction(stepMs) {
     clientTick = (clientTick + 1) >>> 0;
     attackRequested = false;
     heavyAttackRequested = false;
-    dodgeRequested = false;
+    rollRequested = false;
+    kickRequested = false;
+    jumpRequested = false;
   }
 }
 
@@ -274,13 +310,31 @@ function predictMovement(input, dtMs) {
   }
   local.facing = Number.isFinite(input.facing) ? input.facing : local.facing;
   let speed = COMBAT.moveSpeed;
-  if (local.action === 6 || input.block) speed *= COMBAT.block.moveMultiplier;
+  const now = performance.now();
+  const moving = Math.hypot(moveX, moveY) > 1e-6;
+  if (input.run && local.action === COMBAT_ACTION.idle && moving && local.stamina > 0) {
+    speed *= COMBAT.stamina.runMoveMultiplier;
+    local.stamina = Math.max(0, local.stamina - COMBAT.stamina.runDrainPerSecond * dtMs / 1000);
+    staminaRegenBlockedUntil = now + COMBAT.stamina.regenDelayMs;
+  } else if (now >= staminaRegenBlockedUntil) {
+    local.stamina = Math.min(COMBAT.stamina.max, local.stamina + COMBAT.stamina.regenPerSecond * dtMs / 1000);
+  }
+  if (input.dodge || local.action === COMBAT_ACTION.dodge) {
+    moveX = Math.cos(local.facing);
+    moveY = Math.sin(local.facing);
+    speed = COMBAT.dodge.speed;
+  } else if (local.action === 6 || input.block) speed *= COMBAT.block.moveMultiplier;
   else if (local.action === 1) speed *= 0.35;
   else if (local.action === COMBAT_ACTION.heavyAttackWindup) speed *= 0.20;
   else if (local.action === 2 || local.action === COMBAT_ACTION.heavyAttackActive || local.action === 7 || local.action === 8) speed = 0;
   else if (local.action === 3 || local.action === 5) speed *= 0.48;
   else if (local.action === COMBAT_ACTION.heavyAttackRecovery) speed *= 0.35;
-  else if (local.action === 4) speed = COMBAT.dodge.speed;
+  else if (local.action === COMBAT_ACTION.jump) speed *= COMBAT.jump.moveMultiplier;
+  else if (local.action === COMBAT_ACTION.jumpAttackWindup) speed *= 0.9;
+  else if (local.action === COMBAT_ACTION.jumpAttackActive) speed *= 0.55;
+  else if (local.action === COMBAT_ACTION.kickWindup) speed *= 0.45;
+  else if (local.action === COMBAT_ACTION.kickActive) speed *= 0.2;
+  else if (local.action === COMBAT_ACTION.kickRecovery || local.action === COMBAT_ACTION.jumpAttackRecovery) speed *= 0.42;
   const seconds = dtMs / 1000;
   local.x = clamp(local.x + moveX * speed * seconds, COMBAT.fighterRadius, NETWORK.worldWidth - COMBAT.fighterRadius);
   local.y = clamp(local.y + moveY * speed * seconds, COMBAT.fighterRadius, NETWORK.worldHeight - COMBAT.fighterRadius);
@@ -382,12 +436,19 @@ function drawFighterWorld(fighter, body, shadow, damageTell = false, netId = 0) 
 
 function drawFighterScreen(x, y, fighter, body, shadow, remote = false, damageTell = false) {
   ctx.save();
-  ctx.translate(x, y);
-  ctx.rotate(fighter.facing ?? 0);
   const action = fighter.action ?? COMBAT_ACTION.idle;
+  const airborne = action === COMBAT_ACTION.jump
+    || action === COMBAT_ACTION.jumpAttackWindup
+    || action === COMBAT_ACTION.jumpAttackActive
+    || action === COMBAT_ACTION.jumpAttackRecovery;
+  const lift = airborne ? 18 : 0;
+  ctx.translate(x, y - lift);
+  ctx.rotate((fighter.facing ?? 0) + (action === COMBAT_ACTION.dodge ? Math.PI * 0.35 : 0));
   ctx.globalAlpha = action === COMBAT_ACTION.dead ? 0.28 : 1;
   if (action === COMBAT_ACTION.attackWindup || action === COMBAT_ACTION.attackActive) drawAttackTell(action, remote);
   if (action === COMBAT_ACTION.heavyAttackWindup || action === COMBAT_ACTION.heavyAttackActive) drawHeavyAttackTell(action, remote);
+  if (action === COMBAT_ACTION.jumpAttackWindup || action === COMBAT_ACTION.jumpAttackActive) drawJumpAttackTell(action, remote);
+  if (action === COMBAT_ACTION.kickWindup || action === COMBAT_ACTION.kickActive) drawKickTell(action);
   if (action === COMBAT_ACTION.block) drawBlockTell(remote, fighter);
   if (action === COMBAT_ACTION.dodge) drawDodgeTell(remote);
   if (action === COMBAT_ACTION.stunned) drawStunTell();
@@ -509,6 +570,35 @@ function drawBlockTell(remote, fighter) {
   ctx.setLineDash([]);
 }
 
+function drawJumpAttackTell(action, remote) {
+  const active = action === COMBAT_ACTION.jumpAttackActive;
+  ctx.save();
+  ctx.strokeStyle = active ? "#ff7040" : "#ffc06a";
+  ctx.fillStyle = active ? "rgba(255, 112, 64, 0.24)" : "rgba(255, 192, 106, 0.12)";
+  ctx.lineWidth = remote ? 4 : 3;
+  ctx.beginPath();
+  ctx.moveTo(0, 0);
+  ctx.arc(
+    0,
+    0,
+    COMBAT.jumpAttack.reach + COMBAT.fighterRadius,
+    -COMBAT.jumpAttack.arcRadians / 2,
+    COMBAT.jumpAttack.arcRadians / 2,
+  );
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+  ctx.restore();
+}
+
+function drawKickTell(action) {
+  ctx.strokeStyle = action === COMBAT_ACTION.kickActive ? "rgba(255, 214, 120, .95)" : "rgba(255, 214, 120, .48)";
+  ctx.lineWidth = action === COMBAT_ACTION.kickActive ? 6 : 3;
+  ctx.beginPath();
+  ctx.arc(0, 0, COMBAT.kick.reach + COMBAT.fighterRadius, -COMBAT.kick.arcRadians / 2, COMBAT.kick.arcRadians / 2);
+  ctx.stroke();
+}
+
 function drawDodgeTell(remote) {
   ctx.strokeStyle = "rgba(216, 202, 160, .58)";
   ctx.lineWidth = 2;
@@ -597,6 +687,7 @@ function updateHud(ownId) {
   const remote = focusNetId ? networkClient.state.get(focusNetId) : null;
   setMeter("playerHp", hud.playerHp, hud.playerHpValue, own?.hp ?? local.hp);
   setMeter("playerGuard", hud.playerGuard, hud.playerGuardValue, own?.guard ?? local.guard);
+  setMeter("playerStamina", hud.playerStamina, hud.playerStaminaValue, local.stamina);
   setMeter("botHp", hud.botHp, hud.botHpValue, remote?.hp ?? 0);
   setMeter("botGuard", hud.botGuard, hud.botGuardValue, remote?.guard ?? 0);
   setFocusTarget(focusNetId);

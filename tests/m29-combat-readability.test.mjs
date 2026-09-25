@@ -387,6 +387,39 @@ test("threatening windup dodge remains credited after movement escapes active ra
   assert.equal(event.feedback, "dodge-success");
 });
 
+test("pointer roll is credited when its first observed dodge state already escaped the threat arc", () => {
+  const tracker = createCombatReadabilityTracker();
+  assert.equal(
+    tracker.observe(
+      state(
+        fighter(2, 100, 100, COMBAT_ACTION.idle, 80),
+        fighter(1, 100, 100, COMBAT_ACTION.heavyAttackWindup, 0, 0, 0),
+      ),
+      2,
+    ),
+    null,
+  );
+  assert.equal(
+    tracker.observe(
+      state(
+        fighter(2, 100, 100, COMBAT_ACTION.dodge, 140),
+        fighter(1, 100, 100, COMBAT_ACTION.heavyAttackActive, 0, 0, 0),
+      ),
+      2,
+    ),
+    null,
+  );
+  const event = tracker.observe(
+    state(
+      fighter(2, 100, 100, COMBAT_ACTION.dodgeRecovery, 150),
+      fighter(1, 100, 100, COMBAT_ACTION.heavyAttackRecovery, 0, 0, 0),
+    ),
+    2,
+  );
+  assert.equal(event.kind, "dodge");
+  assert.equal(event.feedback, "dodge-success");
+});
+
 test("heavy windup dodge is credited after authoritative heavy active and recovery", () => {
   const tracker = createCombatReadabilityTracker();
   assert.equal(

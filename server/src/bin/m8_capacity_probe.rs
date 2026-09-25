@@ -366,6 +366,9 @@ fn deterministic_input(net_id: u32, tick: u32) -> InputIntent {
         heavy_attack: false,
         dodge: tick.wrapping_add(net_id.wrapping_mul(7)) % 181 == 0,
         block: tick.wrapping_add(net_id.wrapping_mul(13)) % 127 < 4,
+        kick: false,
+        run: false,
+        jump: false,
     }
 }
 

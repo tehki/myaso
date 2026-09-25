@@ -733,12 +733,14 @@ async function runOnlineUiHeavyBlockFlight(entries) {
     try {
       await setArenaBlock(defender, defenderElementId, true);
       blockHeld = true;
-      // Start block well before the heavy edge so the 115 ms fresh-parry window
-      // is expired by the 320 ms active transition. This must resolve as a normal
-      // directional block, not a parry.
-      await sleep(160);
+      // Wheel-back is a short block now. Start the heavy immediately, then
+      // refresh the same directional block pulse at 150 ms. The impact at
+      // ~320 ms is covered, while the refreshed block is already older than
+      // the 125 ms parry window and therefore resolves as a normal block.
       await pulseMovementKey(attacker, "e", 40);
-      await sleep(500);
+      await sleep(50);
+      await setArenaBlock(defender, defenderElementId, true);
+      await sleep(450);
     } finally {
       if (blockHeld) await setArenaBlock(defender, defenderElementId, false);
     }
@@ -785,10 +787,9 @@ async function runOnlineUiHeavyBlockFlight(entries) {
   const attackerResult = evidence.find((entry) => entry.browser === attacker.name);
   const defenderResult = evidence.find((entry) => entry.browser === defender.name);
   assertHeavyControlDelivered(attackerResult, movementCode, "M107 heavy block");
-  const blockDown = defenderResult.pointers.find((event) => event.type === "pointerdown" && event.button === 2);
-  const blockUp = defenderResult.pointers.find((event) => event.type === "pointerup" && event.button === 2);
-  if (!blockDown || !blockUp) {
-    throw new Error(`M107 heavy block real RMB control was not delivered: ${JSON.stringify(defenderResult)}`);
+  const blockWheel = defenderResult.wheels.find((event) => event.deltaY > 0);
+  if (!blockWheel) {
+    throw new Error(`M107 heavy block real wheel-back block/parry control was not delivered: ${JSON.stringify(defenderResult)}`);
   }
   if (!attackerResult.events.includes("Opponent blocked - guard -64.")
     || !defenderResult.events.includes("Block held - guard -64.")) {
@@ -878,10 +879,9 @@ async function runOnlineUiHeavyParryFlight(entries) {
   const attackerResult = evidence.find((entry) => entry.browser === attacker.name);
   const defenderResult = evidence.find((entry) => entry.browser === defender.name);
   assertHeavyControlDelivered(attackerResult, movementCode, "M107 heavy parry");
-  const blockDown = defenderResult.pointers.find((event) => event.type === "pointerdown" && event.button === 2);
-  const blockUp = defenderResult.pointers.find((event) => event.type === "pointerup" && event.button === 2);
-  if (!blockDown || !blockUp) {
-    throw new Error(`M107 heavy parry real RMB control was not delivered: ${JSON.stringify(defenderResult)}`);
+  const blockWheel = defenderResult.wheels.find((event) => event.deltaY > 0);
+  if (!blockWheel) {
+    throw new Error(`M107 heavy parry real wheel-back block/parry control was not delivered: ${JSON.stringify(defenderResult)}`);
   }
   if (attackerResult.playerHp !== 100 || attackerResult.playerGuard !== 100
     || defenderResult.playerHp !== 100 || defenderResult.playerGuard !== 100) {
@@ -904,12 +904,13 @@ async function runOnlineUiHeavyDodgeFlight(entries) {
   const { attacker, defender, movementCode } = staged;
 
   // Submit both browser action sequences together. The defender's WebDriver
-  // sequence carries its own pause, so cross-browser command latency cannot
-  // accumulate after the real E pulse and push the 118 ms iframe past the
-  // authoritative 320 ms heavy active transition.
+  // sequence carries the pointer aim and wheel-forward in the same real action
+  // batch. Cross-browser WebDriver dispatch already contributes substantial
+  // latency, so add no synthetic pause: the 125 ms iframe must overlap the
+  // authoritative 320 ms heavy active transition rather than arrive in recovery.
   await Promise.all([
     pulseMovementKey(attacker, "e", 40),
-    pressArenaPerpendicularDodgeAfterPause(defender, 225),
+    pressArenaPerpendicularDodgeAfterPause(defender, 0),
   ]);
   // Let active -> recovery resolve without evidence polling inside the iframe.
   await sleep(360);
@@ -921,9 +922,10 @@ async function runOnlineUiHeavyDodgeFlight(entries) {
     throw new Error(`M107 heavy dodge incomplete evidence: ${JSON.stringify(evidence)}`);
   }
   assertHeavyControlDelivered(attackerResult, movementCode, "M107 heavy dodge");
+  const rollWheel = defenderResult.wheels.find((event) => event.deltaY < 0);
   if (!defenderResult.keys.includes("keydown:KeyS") || !defenderResult.keys.includes("keyup:KeyS")
-    || !defenderResult.keys.includes("keydown:Space") || !defenderResult.keys.includes("keyup:Space")) {
-    throw new Error(`M107 heavy dodge real Space/perpendicular controls were not delivered: ${JSON.stringify(defenderResult)}`);
+    || !rollWheel) {
+    throw new Error(`M107 heavy dodge real wheel-forward/perpendicular controls were not delivered: ${JSON.stringify(defenderResult)}`);
   }
   if (attackerResult.playerHp !== 100 || attackerResult.playerGuard !== 100
     || defenderResult.playerHp !== 100 || defenderResult.playerGuard !== 100) {
@@ -1156,7 +1158,8 @@ async function runOnlineUiDodgeFeedbackFlight(entries) {
   const movementDelivered = attackerResult.keys.includes(`keydown:${movementCode}`) && attackerResult.keys.includes(`keyup:${movementCode}`);
   const aimDelivered = attackDown && Math.abs(attackDown.y - 0.5) <= 0.15 && (attackRight ? attackDown.x >= 0.6 : attackDown.x <= 0.4);
   if (!movementDelivered || !aimDelivered) throw new Error(`M36 real attacker movement/aim was not delivered: ${JSON.stringify(attackerResult)}`);
-  if (!defenderResult.keys.includes("keydown:KeyS") || !defenderResult.keys.includes("keyup:KeyS") || !defenderResult.keys.includes("keydown:Space") || !defenderResult.keys.includes("keyup:Space")) throw new Error(`M36 real perpendicular dodge controls were not delivered: ${JSON.stringify(defenderResult)}`);
+  const rollWheel = defenderResult.wheels.find((event) => event.deltaY < 0);
+  if (!defenderResult.keys.includes("keydown:KeyS") || !defenderResult.keys.includes("keyup:KeyS") || !rollWheel) throw new Error(`M36 real pointer-directed wheel-roll controls were not delivered: ${JSON.stringify(defenderResult)}`);
   if (attackerResult.playerHp !== 100 || attackerResult.playerGuard !== 100 || defenderResult.playerHp !== 100 || defenderResult.playerGuard !== 100) throw new Error(`M36 dodge exchange changed authoritative vitals: ${JSON.stringify(evidence)}`);
   if (attackerResult.feedbackTransitions.includes("parried") || defenderResult.feedbackTransitions.includes("parry-success")) throw new Error(`M36 dodge exchange accidentally resolved as parry: ${JSON.stringify(evidence)}`);
   return evidence;
@@ -1209,15 +1212,13 @@ async function runOnlineUiParryFlight(entries) {
   const defenderResult = evidence.find((entry) => entry.browser === defender.name);
   if (!attackerResult || !defenderResult) throw new Error(`incomplete M33 UI evidence: ${JSON.stringify(evidence)}`);
   const attackDown = attackerResult.pointers.find((event) => event.type === "pointerdown" && event.button === 0);
-  const blockDown = defenderResult.pointers.find((event) => event.type === "pointerdown" && event.button === 2);
-  const blockUp = defenderResult.pointers.find((event) => event.type === "pointerup" && event.button === 2);
+  const blockWheel = defenderResult.wheels.find((event) => event.deltaY > 0);
   if (!attackerResult.keys.includes(`keydown:${movementCode}`) || !attackerResult.keys.includes(`keyup:${movementCode}`)) {
     throw new Error(`M33 real attacker movement control was not delivered: ${JSON.stringify(attackerResult)}`);
   }
   const attackAimValid = attackDown && Math.abs(attackDown.y - 0.5) <= 0.15 && (attackRight ? attackDown.x >= 0.6 : attackDown.x <= 0.4);
   if (!attackAimValid) throw new Error(`M33 real attacker aim was not delivered: ${JSON.stringify(attackerResult)}`);
-  const blockAimValid = blockDown && Math.abs(blockDown.y - 0.5) <= 0.15 && (attackRight ? blockDown.x <= 0.4 : blockDown.x >= 0.6);
-  if (!blockAimValid || !blockUp) throw new Error(`M33 real directional block input was not delivered: ${JSON.stringify(defenderResult)}`);
+  if (!blockWheel) throw new Error(`M33 real wheel-back directional parry input was not delivered: ${JSON.stringify(defenderResult)}`);
   return evidence;
 }
 
@@ -1281,11 +1282,8 @@ async function runOnlineUiBlockFacingTellFlight(entries) {
 
   const evidence = await Promise.all(entries.map(readUiEvidence));
   const defenderResult = evidence.find((entry) => entry.browser === defender.name);
-  const blockDown = defenderResult?.pointers.find((event) => event.type === "pointerdown" && event.button === 2);
-  const blockUp = defenderResult?.pointers.find((event) => event.type === "pointerup" && event.button === 2);
-  const aimedTowardObserver = blockDown && Math.abs(blockDown.y - 0.5) <= 0.15
-    && (aimOffset < 0 ? blockDown.x <= 0.4 : blockDown.x >= 0.6);
-  if (!aimedTowardObserver || !blockUp) throw new Error(`M42 real directional block input was not delivered: ${JSON.stringify(defenderResult)}`);
+  const blockWheel = defenderResult?.wheels.find((event) => event.deltaY > 0);
+  if (!blockWheel) throw new Error(`M42 real wheel-back directional block input was not delivered: ${JSON.stringify(defenderResult)}`);
   return evidence.map((entry) => ({ ...entry, blockFacingTellMaxPixels: entry.browser === observer.name ? tell.observerMax : tell.localMax }));
 }
 
@@ -1323,8 +1321,8 @@ async function runOnlineUiDodgeTellFlight(entries) {
   const dodgerResult = evidence.find((entry) => entry.browser === dodger.name);
   if (!observerResult || !dodgerResult) throw new Error(`M43 incomplete UI evidence: ${JSON.stringify(evidence)}`);
   const controlsDelivered = dodgerResult.keys.includes("keydown:KeyS") && dodgerResult.keys.includes("keyup:KeyS")
-    && dodgerResult.keys.includes("keydown:Space") && dodgerResult.keys.includes("keyup:Space");
-  if (!controlsDelivered) throw new Error(`M43 real dodge controls were not delivered: ${JSON.stringify(dodgerResult)}`);
+    && dodgerResult.wheels.some((event) => event.deltaY < 0);
+  if (!controlsDelivered) throw new Error(`M43 real wheel-roll controls were not delivered: ${JSON.stringify(dodgerResult)}`);
   if (observerResult.playerHp !== 100 || observerResult.playerGuard !== 100 || dodgerResult.playerHp !== 100 || dodgerResult.playerGuard !== 100) {
     throw new Error(`M43 dodge tell flight changed authoritative vitals: ${JSON.stringify(evidence)}`);
   }
@@ -1381,12 +1379,7 @@ async function runOnlineUiHeavyGuardBreakFlight(entries, { returnTiming = false 
     text.startsWith("Heavy strike committed")).length;
 
   try {
-    await setArenaBlock(defender, defenderElementId, true);
     blockHeld = true;
-    // Expire the 115 ms parry-entry window before either 320 ms heavy impact.
-    // Keeping Block held also intentionally suppresses guard regeneration, so
-    // the real pressure sequence must read 100 -> 36 -> 0.
-    await sleep(160);
 
     for (let attempt = 1; attempt <= 3 && !firstEvidence; attempt += 1) {
       const before = await Promise.all(entries.map(readUiEvidence));
@@ -1394,8 +1387,11 @@ async function runOnlineUiHeavyGuardBreakFlight(entries, { returnTiming = false 
       if (!beforeAttacker) throw new Error(`M110 first heavy missing attacker baseline: ${JSON.stringify(before)}`);
       const commitsBefore = heavyCommitCount(beforeAttacker);
 
+      await setArenaBlock(defender, defenderElementId, true);
       await pulseMovementKey(attacker, "e", 40);
-      await sleep(390);
+      await sleep(50);
+      await setArenaBlock(defender, defenderElementId, true);
+      await sleep(340);
       const states = await Promise.all(entries.map(readUiEvidence));
       const attackerState = states.find((entry) => entry.browser === attacker.name);
       const defenderState = states.find((entry) => entry.browser === defender.name);
@@ -1457,14 +1453,19 @@ async function runOnlineUiHeavyGuardBreakFlight(entries, { returnTiming = false 
       const before = await Promise.all(entries.map(readUiEvidence));
       const beforeAttacker = before.find((entry) => entry.browser === attacker.name);
       const beforeDefender = before.find((entry) => entry.browser === defender.name);
-      if (!beforeAttacker || !beforeDefender || beforeDefender.playerGuard !== 36) {
-        throw new Error(`M110 held block did not preserve 36 guard before second heavy: ${JSON.stringify(before)}`);
+      if (!beforeAttacker || !beforeDefender
+        || beforeDefender.playerGuard < 36 || beforeDefender.playerGuard > 45) {
+        throw new Error(`M110 short-block sequence did not preserve bounded guard pressure before second heavy: ${JSON.stringify(before)}`);
       }
+      const guardBeforeSecond = beforeDefender.playerGuard;
       const commitsBefore = heavyCommitCount(beforeAttacker);
 
       const attemptIssuedAt = Date.now();
+      await setArenaBlock(defender, defenderElementId, true);
       await pulseMovementKey(attacker, "e", 40);
-      await sleep(390);
+      await sleep(50);
+      await setArenaBlock(defender, defenderElementId, true);
+      await sleep(340);
       const states = await Promise.all(entries.map(readUiEvidence));
       const attackerState = states.find((entry) => entry.browser === attacker.name);
       const defenderState = states.find((entry) => entry.browser === defender.name);
@@ -1483,8 +1484,8 @@ async function runOnlineUiHeavyGuardBreakFlight(entries, { returnTiming = false 
       }
 
       const cleanLatchMiss = attackerState.playerHp === 100 && attackerState.playerGuard === 100
-        && defenderState.playerHp === 100 && defenderState.playerGuard === 36
-        && attackerState.opponentHp === 100 && attackerState.opponentGuard === 36
+        && defenderState.playerHp === 100 && defenderState.playerGuard >= guardBeforeSecond
+        && attackerState.opponentHp === 100 && attackerState.opponentGuard >= guardBeforeSecond
         && commitsAfter === commitsBefore
         && !attackerState.feedbackTransitions.includes("parried")
         && !defenderState.feedbackTransitions.includes("parry-success");
@@ -1536,10 +1537,9 @@ async function runOnlineUiHeavyGuardBreakFlight(entries, { returnTiming = false 
   assertHeavyControlDelivered(attackerResult, movementCode, "M110 heavy guard break");
   const heavyDowns = attackerResult.keys.filter((entry) => entry === "keydown:KeyE").length;
   const authoritativeCommits = heavyCommitCount(attackerResult);
-  const blockDown = defenderResult.pointers.find((event) => event.type === "pointerdown" && event.button === 2);
-  const blockUp = defenderResult.pointers.find((event) => event.type === "pointerup" && event.button === 2);
-  if (heavyDowns < 2 || authoritativeCommits !== 2 || !blockDown || !blockUp) {
-    throw new Error(`M110 did not prove two real heavies into one held RMB block: ${JSON.stringify(evidence)}`);
+  const blockWheels = defenderResult.wheels.filter((event) => event.deltaY > 0);
+  if (heavyDowns < 2 || authoritativeCommits !== 2 || blockWheels.length < 2) {
+    throw new Error(`M110 did not prove two real heavies into timed wheel-back blocks: ${JSON.stringify(evidence)}`);
   }
   if (attackerResult.playerHp !== 100 || attackerResult.playerGuard !== 100
     || defenderResult.playerHp !== 100 || defenderResult.playerGuard !== 0) {
@@ -1737,11 +1737,14 @@ async function runOnlineUiGuardBreakFlight(entries) {
   let evidence = null;
   let blockHeld = false;
   try {
-    await setArenaBlock(defender, defenderElementId, true);
     blockHeld = true;
-    await sleep(180);
     let guardBroken = false;
     for (let attempt = 0; attempt < 4 && !guardBroken; attempt += 1) {
+      // Two wheel-back pulses keep the short directional block continuous long
+      // enough to cover a light impact while aging beyond the parry window.
+      await setArenaBlock(defender, defenderElementId, true);
+      await sleep(150);
+      await setArenaBlock(defender, defenderElementId, true);
       // Primary attack is a one-shot pointerdown latch cleared after an outbound
       // input sample. Use the same bounded genuine-click burst as M55 so each
       // intended guard-pressure strike survives client/network sampling jitter.
@@ -1768,17 +1771,14 @@ async function runOnlineUiGuardBreakFlight(entries) {
     throw new Error(`M34 real attacker movement control was not delivered: ${JSON.stringify(attackerResult)}`);
   }
   const attackDowns = attackerResult.pointers.filter((event) => event.type === "pointerdown" && event.button === 0);
-  const blockDown = defenderResult.pointers.find((event) => event.type === "pointerdown" && event.button === 2);
-  const blockUp = defenderResult.pointers.find((event) => event.type === "pointerup" && event.button === 2);
+  const blockWheels = defenderResult.wheels.filter((event) => event.deltaY > 0);
   const attacksAimed = attackDowns.length >= 3 && attackDowns.every((event) =>
     Math.abs(event.y - 0.5) <= 0.15 && (attackRight ? event.x >= 0.6 : event.x <= 0.4));
   if (!attacksAimed) {
     throw new Error(`M34 real repeated directional attacks were not delivered: ${JSON.stringify(attackerResult)}`);
   }
-  const blockAimed = blockDown && blockUp && Math.abs(blockDown.y - 0.5) <= 0.15
-    && (attackRight ? blockDown.x <= 0.4 : blockDown.x >= 0.6);
-  if (!blockAimed) {
-    throw new Error(`M34 real held directional block was not delivered: ${JSON.stringify(defenderResult)}`);
+  if (blockWheels.length < 3) {
+    throw new Error(`M34 repeated wheel-back directional blocks were not delivered: ${JSON.stringify(defenderResult)}`);
   }
   if (attackerResult.playerHp !== 100 || defenderResult.playerHp !== 100 || defenderResult.playerGuard !== 0) {
     throw new Error(`M34 guard break did not preserve HP and exhaust guard: ${JSON.stringify(evidence)}`);
@@ -2528,28 +2528,60 @@ async function centerArenaInViewport(session) {
   return geometry;
 }
 
-async function pressArenaPerpendicularDodgeAfterPause(session, delayMs) {
+async function scrollArenaWheel(session, elementId, deltaY, delayMs = 0) {
+  const origin = { "element-6066-11e4-a52e-4f735466cecf": elementId };
+  const actions = [];
+  if (delayMs > 0) actions.push({ type: "pause", duration: delayMs });
+  actions.push({ type: "scroll", x: 0, y: 0, deltaX: 0, deltaY, duration: 0, origin });
   await webdriver(session.base, "POST", `/session/${session.sessionId}/actions`, {
-    actions: [{
-      type: "key",
-      id: `keyboard-${session.name}`,
-      actions: [
-        { type: "pause", duration: delayMs },
-        { type: "keyDown", value: "s" },
-        { type: "keyDown", value: "\uE00D" },
-        { type: "pause", duration: 40 },
-        { type: "keyUp", value: "\uE00D" },
-        { type: "keyUp", value: "s" },
-      ],
-    }],
+    actions: [{ type: "wheel", id: `wheel-${session.name}`, actions }],
+  });
+}
+
+async function pressArenaPerpendicularDodgeAfterPause(session, delayMs) {
+  const elementId = await resolveArenaElement(session, "wheel-roll");
+  const origin = { "element-6066-11e4-a52e-4f735466cecf": elementId };
+  // Roll direction is pointer-owned. Aim below arena center immediately before
+  // wheel-forward; the simultaneous S key is intentionally redundant evidence
+  // that movement keys no longer steer the roll.
+  await webdriver(session.base, "POST", `/session/${session.sessionId}/actions`, {
+    actions: [
+      {
+        type: "key",
+        id: `keyboard-${session.name}`,
+        actions: [
+          { type: "keyDown", value: "s" },
+          { type: "pause", duration: delayMs },
+          { type: "pause", duration: 60 },
+          { type: "keyUp", value: "s" },
+        ],
+      },
+      {
+        type: "pointer",
+        id: `mouse-${session.name}`,
+        parameters: { pointerType: "mouse" },
+        actions: [
+          { type: "pause", duration: delayMs },
+          { type: "pointerMove", duration: 0, origin, x: 0, y: 180 },
+          { type: "pause", duration: 15 },
+        ],
+      },
+      {
+        type: "wheel",
+        id: `wheel-${session.name}`,
+        actions: [
+          { type: "pause", duration: delayMs },
+          { type: "pause", duration: 15 },
+          { type: "scroll", x: 0, y: 0, deltaX: 0, deltaY: -120, duration: 0, origin },
+        ],
+      },
+    ],
   });
 }
 
 async function setArenaBlock(session, elementId, pressed) {
-  const actions = [{ type: pressed ? "pointerDown" : "pointerUp", button: 2 }];
-  await webdriver(session.base, "POST", `/session/${session.sessionId}/actions`, {
-    actions: [{ type: "pointer", id: `mouse-${session.name}`, parameters: { pointerType: "mouse" }, actions }],
-  });
+  if (!pressed) return;
+  await scrollArenaWheel(session, elementId, 120);
 }
 
 async function setArenaAttack(session, elementId, pressed, xOffset = 200) {
@@ -2628,7 +2660,7 @@ async function installUiObserver(session) {
     const threatBearing = document.querySelector('#threat-bearing');
     const threatGuardArc = document.querySelector('#threat-guard-arc');
     if (!target || !arena || !arenaStage || !overlay || !recovery || !threat || !threatCount || !threatSecondary || !threatSecondaryBearing || !threatSecondaryPhase || !threatSecondaryGuardArc || !threatBearing || !threatGuardArc) throw new Error('missing online UI flight target');
-    const state = { events: [], eventTransitions: [], keys: [], pointers: [], overlayTransitions: [], feedbackTransitions: [], recoveryTransitions: [], threatTransitions: [], recoveryTellMaxPixels: 0, parryTellMaxPixels: 0, online: '', startedAt: performance.now() };
+    const state = { events: [], eventTransitions: [], keys: [], pointers: [], wheels: [], overlayTransitions: [], feedbackTransitions: [], recoveryTransitions: [], threatTransitions: [], recoveryTellMaxPixels: 0, parryTellMaxPixels: 0, online: '', startedAt: performance.now() };
     const record = () => {
       const text = target.textContent?.trim() ?? '';
       if (/^Online - player #\\d+ - server tick \\d+$/.test(text)) state.online = text;
@@ -2698,6 +2730,12 @@ async function installUiObserver(session) {
         });
       }, { capture: true });
     }
+    arena.addEventListener('wheel', (event) => {
+      state.wheels.push({
+        deltaY: event.deltaY,
+        t: Number((performance.now() - state.startedAt).toFixed(1)),
+      });
+    }, { capture: true });
     record();
     recordOverlay();
     recordFeedback();
@@ -3574,7 +3612,7 @@ async function waitForUiRespawnEvidence(entries, attacker, defender, timeoutMs) 
 
 async function readUiEvidence(session) {
   const value = await execute(session.base, session.sessionId, `
-    const state = window.__MYASO_M30_UI__ ?? { events: [], eventTransitions: [], keys: [], pointers: [], overlayTransitions: [], feedbackTransitions: [], recoveryTransitions: [], threatTransitions: [], recoveryTellMaxPixels: 0, parryTellMaxPixels: 0, online: '' };
+    const state = window.__MYASO_M30_UI__ ?? { events: [], eventTransitions: [], keys: [], pointers: [], wheels: [], overlayTransitions: [], feedbackTransitions: [], recoveryTransitions: [], threatTransitions: [], recoveryTellMaxPixels: 0, parryTellMaxPixels: 0, online: '' };
     const match = state.online.match(/player #(\\d+)/);
     return {
       title: document.title,
@@ -3626,6 +3664,7 @@ async function readUiEvidence(session) {
       eventTransitions: (state.eventTransitions ?? []).slice(),
       keys: state.keys.slice(),
       pointers: state.pointers.slice(),
+      wheels: (state.wheels ?? []).slice(),
     };
   `);
   return { browser: session.name, ...value };

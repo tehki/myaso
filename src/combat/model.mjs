@@ -22,18 +22,56 @@ export const COMBAT = Object.freeze({
     guardDamage: 64,
   }),
   dodge: Object.freeze({
-    durationMs: 145,
-    recoveryMs: 165,
-    speed: 610,
-    iframeMs: 118,
+    durationMs: 170,
+    recoveryMs: 180,
+    speed: 690,
+    iframeMs: 125,
+    staminaCost: 28,
+    collisionStunMs: 260,
+    collisionKnockback: 34,
+  }),
+  kick: Object.freeze({
+    windupMs: 90,
+    activeMs: 70,
+    recoveryMs: 220,
+    reach: 48,
+    arcRadians: Math.PI * 0.62,
+    stunMs: 360,
+    knockback: 52,
+    blockedGuardDamage: 30,
+    staminaCost: 18,
+  }),
+  jump: Object.freeze({
+    durationMs: 430,
+    staminaCost: 14,
+    moveMultiplier: 1.08,
+  }),
+  jumpAttack: Object.freeze({
+    windupMs: 105,
+    activeMs: 105,
+    recoveryMs: 290,
+    reach: 48,
+    arcRadians: Math.PI * 0.24,
+    damage: 42,
+    knockback: 34,
+    guardDamage: 52,
+    staminaCost: 12,
   }),
   block: Object.freeze({
-    parryWindowMs: 115,
+    parryWindowMs: 125,
+    shortBlockMs: 240,
     halfAngleRadians: Math.PI * 0.46,
     guardDamage: 38,
     guardBreakStunMs: 520,
-    parryStunMs: 430,
+    parryStunMs: 650,
     moveMultiplier: 0.42,
+  }),
+  stamina: Object.freeze({
+    max: 100,
+    regenPerSecond: 30,
+    regenDelayMs: 360,
+    runDrainPerSecond: 24,
+    runMoveMultiplier: 1.55,
   }),
   guard: Object.freeze({
     max: 100,
@@ -55,13 +93,16 @@ export function createFighter({ id, x, y, facing = 0, spawnX = x, spawnY = y }) 
     facing,
     hp: 100,
     guard: COMBAT.guard.max,
+    stamina: COMBAT.stamina.max,
     action: "idle",
     actionElapsedMs: 0,
     actionDurationMs: 0,
     dodgeDirX: 0,
     dodgeDirY: 0,
     attackHitTargets: new Set(),
+    rollHitTargets: new Set(),
     guardRegenBlockedUntilMs: 0,
+    staminaRegenBlockedUntilMs: 0,
     respawnAtMs: 0,
   };
 }
@@ -89,9 +130,10 @@ export function stepWorld(world, inputs = {}, dtMs = 1000 / 120) {
 
     const input = normalizeInput(inputs[fighter.id]);
     updateFacing(fighter, input);
-    beginRequestedAction(fighter, input);
+    beginRequestedAction(world, fighter, input);
     moveFighter(world, fighter, input, dtMs);
     advanceAction(fighter, input, dtMs);
+    updateStamina(world, fighter, input, dtMs);
 
     if (fighter.action !== "block" && world.nowMs >= fighter.guardRegenBlockedUntilMs) {
       fighter.guard = Math.min(
@@ -101,6 +143,7 @@ export function stepWorld(world, inputs = {}, dtMs = 1000 / 120) {
     }
   }
 
+  resolveRollCollisions(world, events);
   separateFighters(world);
   resolveAttacks(world, events);
   return events;
@@ -117,8 +160,11 @@ function normalizeInput(input = {}) {
     aimY: Number.isFinite(input.aimY) ? input.aimY : null,
     attack: Boolean(input.attack),
     heavyAttack: Boolean(input.heavyAttack),
-    dodge: Boolean(input.dodge),
-    block: Boolean(input.block),
+    dodge: Boolean(input.dodge || input.roll),
+    block: Boolean(input.block || input.parry),
+    kick: Boolean(input.kick),
+    run: Boolean(input.run),
+    jump: Boolean(input.jump),
   };
 }
 
@@ -129,15 +175,32 @@ function updateFacing(fighter, input) {
   if (Math.hypot(dx, dy) > EPSILON) fighter.facing = Math.atan2(dy, dx);
 }
 
-function beginRequestedAction(fighter, input) {
+function beginRequestedAction(world, fighter, input) {
+  if (fighter.action === "jump" && input.attack && spendStamina(world, fighter, COMBAT.jumpAttack.staminaCost)) {
+    fighter.attackHitTargets.clear();
+    setAction(fighter, "jump_attack_windup", COMBAT.jumpAttack.windupMs);
+    return;
+  }
+
   const canInterrupt = fighter.action === "idle" || fighter.action === "block";
   if (!canInterrupt) return;
 
-  if (input.dodge) {
-    const moveLength = Math.hypot(input.moveX, input.moveY);
-    fighter.dodgeDirX = moveLength > EPSILON ? input.moveX / moveLength : Math.cos(fighter.facing);
-    fighter.dodgeDirY = moveLength > EPSILON ? input.moveY / moveLength : Math.sin(fighter.facing);
+  if (input.dodge && spendStamina(world, fighter, COMBAT.dodge.staminaCost)) {
+    fighter.dodgeDirX = Math.cos(fighter.facing);
+    fighter.dodgeDirY = Math.sin(fighter.facing);
+    fighter.rollHitTargets.clear();
     setAction(fighter, "dodge", COMBAT.dodge.durationMs);
+    return;
+  }
+
+  if (input.kick && fighter.action === "idle" && spendStamina(world, fighter, COMBAT.kick.staminaCost)) {
+    fighter.attackHitTargets.clear();
+    setAction(fighter, "kick_windup", COMBAT.kick.windupMs);
+    return;
+  }
+
+  if (input.jump && fighter.action === "idle" && spendStamina(world, fighter, COMBAT.jump.staminaCost)) {
+    setAction(fighter, "jump", COMBAT.jump.durationMs);
     return;
   }
 
@@ -163,6 +226,10 @@ function beginRequestedAction(fighter, input) {
 function moveFighter(world, fighter, input, dtMs) {
   let velocityX = input.moveX * COMBAT.moveSpeed;
   let velocityY = input.moveY * COMBAT.moveSpeed;
+  if (input.run && fighter.action === "idle" && fighter.stamina > EPSILON) {
+    velocityX *= COMBAT.stamina.runMoveMultiplier;
+    velocityY *= COMBAT.stamina.runMoveMultiplier;
+  }
 
   if (fighter.action === "dodge") {
     velocityX = fighter.dodgeDirX * COMBAT.dodge.speed;
@@ -170,6 +237,21 @@ function moveFighter(world, fighter, input, dtMs) {
   } else if (fighter.action === "block") {
     velocityX *= COMBAT.block.moveMultiplier;
     velocityY *= COMBAT.block.moveMultiplier;
+  } else if (fighter.action === "jump") {
+    velocityX *= COMBAT.jump.moveMultiplier;
+    velocityY *= COMBAT.jump.moveMultiplier;
+  } else if (fighter.action === "jump_attack_windup") {
+    velocityX *= 0.9;
+    velocityY *= 0.9;
+  } else if (fighter.action === "jump_attack_active") {
+    velocityX *= 0.55;
+    velocityY *= 0.55;
+  } else if (fighter.action === "kick_windup") {
+    velocityX *= 0.45;
+    velocityY *= 0.45;
+  } else if (fighter.action === "kick_active") {
+    velocityX *= 0.2;
+    velocityY *= 0.2;
   } else if (fighter.action === "attack_windup") {
     velocityX *= 0.35;
     velocityY *= 0.35;
@@ -185,6 +267,9 @@ function moveFighter(world, fighter, input, dtMs) {
   } else if (fighter.action === "heavy_attack_recovery") {
     velocityX *= 0.35;
     velocityY *= 0.35;
+  } else if (fighter.action === "kick_recovery" || fighter.action === "jump_attack_recovery") {
+    velocityX *= 0.42;
+    velocityY *= 0.42;
   } else if (fighter.action === "stunned") {
     velocityX = 0;
     velocityY = 0;
@@ -230,6 +315,25 @@ function advanceAction(fighter, input, dtMs) {
       setAction(fighter, "dodge_recovery", COMBAT.dodge.recoveryMs);
       break;
     case "dodge_recovery":
+    case "jump":
+      setAction(fighter, "idle", 0);
+      break;
+    case "kick_windup":
+      setAction(fighter, "kick_active", COMBAT.kick.activeMs);
+      break;
+    case "kick_active":
+      setAction(fighter, "kick_recovery", COMBAT.kick.recoveryMs);
+      break;
+    case "kick_recovery":
+      setAction(fighter, "idle", 0);
+      break;
+    case "jump_attack_windup":
+      setAction(fighter, "jump_attack_active", COMBAT.jumpAttack.activeMs);
+      break;
+    case "jump_attack_active":
+      setAction(fighter, "jump_attack_recovery", COMBAT.jumpAttack.recoveryMs);
+      break;
+    case "jump_attack_recovery":
     case "stunned":
       setAction(fighter, "idle", 0);
       break;
@@ -269,8 +373,10 @@ function separateFighters(world) {
 }
 
 function attackProfile(action) {
-  if (action === "attack_active") return COMBAT.attack;
-  if (action === "heavy_attack_active") return COMBAT.heavyAttack;
+  if (action === "attack_active") return { ...COMBAT.attack, kind: "attack" };
+  if (action === "heavy_attack_active") return { ...COMBAT.heavyAttack, kind: "heavy" };
+  if (action === "jump_attack_active") return { ...COMBAT.jumpAttack, kind: "jump_attack" };
+  if (action === "kick_active") return { ...COMBAT.kick, kind: "kick" };
   return null;
 }
 
@@ -299,13 +405,21 @@ function resolveAttacks(world, events) {
           continue;
         }
 
-        target.guard = Math.max(0, target.guard - profile.guardDamage);
+        const guardDamage = profile.kind === "kick" ? COMBAT.kick.blockedGuardDamage : profile.guardDamage;
+        target.guard = Math.max(0, target.guard - guardDamage);
         if (target.guard <= EPSILON) {
           setAction(target, "stunned", COMBAT.block.guardBreakStunMs);
           events.push({ type: "guard_break", attackerId: attacker.id, targetId: target.id });
         } else {
           events.push({ type: "block", attackerId: attacker.id, targetId: target.id });
         }
+        continue;
+      }
+
+      if (profile.kind === "kick") {
+        knockBack(world, attacker, target, profile.knockback);
+        setAction(target, "stunned", COMBAT.kick.stunMs);
+        events.push({ type: "kick", attackerId: attacker.id, targetId: target.id });
         continue;
       }
 
@@ -317,6 +431,7 @@ function resolveAttacks(world, events) {
         targetId: target.id,
         damage: profile.damage,
         hp: target.hp,
+        attackKind: profile.kind,
       });
 
       if (target.hp <= EPSILON) {
@@ -326,6 +441,40 @@ function resolveAttacks(world, events) {
         target.respawnAtMs = world.nowMs + COMBAT.respawnMs;
         events.push({ type: "death", fighterId: target.id, killerId: attacker.id });
       }
+    }
+  }
+}
+
+function spendStamina(world, fighter, amount) {
+  if (fighter.stamina + EPSILON < amount) return false;
+  fighter.stamina = Math.max(0, fighter.stamina - amount);
+  fighter.staminaRegenBlockedUntilMs = world.nowMs + COMBAT.stamina.regenDelayMs;
+  return true;
+}
+
+function updateStamina(world, fighter, input, dtMs) {
+  if (input.run && fighter.action === "idle" && Math.hypot(input.moveX, input.moveY) > EPSILON && fighter.stamina > EPSILON) {
+    fighter.stamina = Math.max(0, fighter.stamina - COMBAT.stamina.runDrainPerSecond * dtMs / 1000);
+    fighter.staminaRegenBlockedUntilMs = world.nowMs + COMBAT.stamina.regenDelayMs;
+    return;
+  }
+  if (world.nowMs >= fighter.staminaRegenBlockedUntilMs) {
+    fighter.stamina = Math.min(COMBAT.stamina.max, fighter.stamina + COMBAT.stamina.regenPerSecond * dtMs / 1000);
+  }
+}
+
+function resolveRollCollisions(world, events) {
+  for (const roller of world.fighters) {
+    if (roller.action !== "dodge") continue;
+    for (const target of world.fighters) {
+      if (target.id === roller.id || target.action === "dead" || roller.rollHitTargets.has(target.id)) continue;
+      const dx = target.x - roller.x;
+      const dy = target.y - roller.y;
+      if (Math.hypot(dx, dy) > COMBAT.fighterRadius * 2 + 8) continue;
+      roller.rollHitTargets.add(target.id);
+      knockBack(world, roller, target, COMBAT.dodge.collisionKnockback);
+      setAction(target, "stunned", COMBAT.dodge.collisionStunMs);
+      events.push({ type: "roll_hit", attackerId: roller.id, targetId: target.id });
     }
   }
 }
@@ -364,8 +513,11 @@ function respawnFighter(fighter) {
   fighter.y = fighter.spawnY;
   fighter.hp = 100;
   fighter.guard = COMBAT.guard.max;
+  fighter.stamina = COMBAT.stamina.max;
   fighter.respawnAtMs = 0;
   fighter.attackHitTargets.clear();
+  fighter.rollHitTargets.clear();
+  fighter.staminaRegenBlockedUntilMs = 0;
   setAction(fighter, "idle", 0);
 }
 

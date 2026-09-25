@@ -13,6 +13,13 @@ export const COMBAT_ACTION = Object.freeze({
   heavyAttackWindup: 9,
   heavyAttackActive: 10,
   heavyAttackRecovery: 11,
+  kickWindup: 12,
+  kickActive: 13,
+  kickRecovery: 14,
+  jump: 15,
+  jumpAttackWindup: 16,
+  jumpAttackActive: 17,
+  jumpAttackRecovery: 18,
 });
 
 const PRIORITY = Object.freeze({
@@ -51,7 +58,7 @@ export function createCombatReadabilityTracker() {
         collectParryEvents(candidates, beforeOwn, own, beforePeer, peer);
       }
       pendingDodge = own && peer
-        ? collectDodgeEvents(candidates, own, peer, ownId, pendingDodge)
+        ? collectDodgeEvents(candidates, own, peer, ownId, pendingDodge, beforeOwn, beforePeer)
         : null;
 
       previous.clear();
@@ -395,7 +402,7 @@ function collectParryEvents(events, beforeOwn, own, beforePeer, peer) {
   }
 }
 
-function collectDodgeEvents(events, own, peer, ownId, pending) {
+function collectDodgeEvents(events, own, peer, ownId, pending, beforeOwn = null, beforePeer = null) {
   if (pending) {
     const attacker = pending.attackerId === own.netId ? own : pending.attackerId === peer.netId ? peer : null;
     const defender = pending.defenderId === own.netId ? own : pending.defenderId === peer.netId ? peer : null;
@@ -422,23 +429,36 @@ function collectDodgeEvents(events, own, peer, ownId, pending) {
   }
 
   const ownThreat = isAttackWindup(peer.action) || isAttackActive(peer.action);
-  if (ownThreat && own.action === COMBAT_ACTION.dodge && attackThreatens(peer, own)) {
+  const ownThreatenedNow = ownThreat && attackThreatens(peer, own);
+  const ownThreatenedBefore = beforeOwn && beforePeer
+    && (isAttackWindup(beforePeer.action) || isAttackActive(beforePeer.action))
+    && attackThreatens(beforePeer, beforeOwn);
+  const ownJustRolled = own.action === COMBAT_ACTION.dodge
+    && beforeOwn?.action !== COMBAT_ACTION.dodge;
+  if (own.action === COMBAT_ACTION.dodge && (ownThreatenedNow || (ownJustRolled && ownThreatenedBefore))) {
     return {
       attackerId: peer.netId,
       defenderId: own.netId,
       hp: own.hp,
       guard: own.guard,
-      activeSeen: isAttackActive(peer.action),
+      activeSeen: isAttackActive(peer.action) || isAttackActive(beforePeer?.action),
     };
   }
+
   const peerThreat = isAttackWindup(own.action) || isAttackActive(own.action);
-  if (peerThreat && peer.action === COMBAT_ACTION.dodge && attackThreatens(own, peer)) {
+  const peerThreatenedNow = peerThreat && attackThreatens(own, peer);
+  const peerThreatenedBefore = beforeOwn && beforePeer
+    && (isAttackWindup(beforeOwn.action) || isAttackActive(beforeOwn.action))
+    && attackThreatens(beforeOwn, beforePeer);
+  const peerJustRolled = peer.action === COMBAT_ACTION.dodge
+    && beforePeer?.action !== COMBAT_ACTION.dodge;
+  if (peer.action === COMBAT_ACTION.dodge && (peerThreatenedNow || (peerJustRolled && peerThreatenedBefore))) {
     return {
       attackerId: own.netId,
       defenderId: peer.netId,
       hp: peer.hp,
       guard: peer.guard,
-      activeSeen: isAttackActive(own.action),
+      activeSeen: isAttackActive(own.action) || isAttackActive(beforeOwn?.action),
     };
   }
   return pending;

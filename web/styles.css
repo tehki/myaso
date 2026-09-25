@@ -24,6 +24,7 @@ kbd { border: 1px solid #575144; border-bottom-width: 2px; border-radius: 5px; b
 .meter > div { height: 7px; overflow: hidden; border-radius: 999px; background: #302b23; }
 .meter i { display: block; height: 100%; width: 100%; transform: scaleX(1); transform-origin: left center; background: #a44437; transition: transform .09s linear; }
 .meter.guard i { background: #8d793f; }
+.meter.stamina i { background: #4f8f74; }
 .meter b { font-variant-numeric: tabular-nums; font-weight: 600; color: #ddd5c5; }
 .event-text { text-align: center; min-height: 20px; margin: 0; color: #d4c28c; font-size: 13px; }
 .arena-wrap { border: 1px solid #3c362b; border-radius: 14px; overflow: hidden; background: #17140f; box-shadow: 0 22px 60px rgba(0,0,0,.35); }

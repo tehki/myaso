@@ -24,11 +24,40 @@ const HEAVY_ATTACK_ARC_RADIANS: f32 = std::f32::consts::PI * 0.68;
 const HEAVY_ATTACK_DAMAGE: f32 = 46.0;
 const HEAVY_ATTACK_KNOCKBACK: f32 = 28.0;
 const HEAVY_ATTACK_GUARD_DAMAGE: f32 = 64.0;
-const DODGE_DURATION_MS: f32 = 145.0;
-const DODGE_RECOVERY_MS: f32 = 165.0;
-const DODGE_SPEED: f32 = 610.0;
-const DODGE_IFRAME_MS: f32 = 118.0;
-const BLOCK_PARRY_WINDOW_MS: f32 = 115.0;
+const DODGE_DURATION_MS: f32 = 170.0;
+const DODGE_RECOVERY_MS: f32 = 180.0;
+const DODGE_SPEED: f32 = 690.0;
+const DODGE_IFRAME_MS: f32 = 125.0;
+const DODGE_STAMINA_COST: f32 = 28.0;
+const ROLL_COLLISION_STUN_MS: f32 = 260.0;
+const ROLL_COLLISION_KNOCKBACK: f32 = 34.0;
+const KICK_WINDUP_MS: f32 = 90.0;
+const KICK_ACTIVE_MS: f32 = 70.0;
+const KICK_RECOVERY_MS: f32 = 220.0;
+const KICK_REACH: f32 = 48.0;
+const KICK_ARC_RADIANS: f32 = std::f32::consts::PI * 0.62;
+const KICK_STUN_MS: f32 = 360.0;
+const KICK_KNOCKBACK: f32 = 52.0;
+const KICK_BLOCK_GUARD_DAMAGE: f32 = 30.0;
+const KICK_STAMINA_COST: f32 = 18.0;
+const JUMP_DURATION_MS: f32 = 430.0;
+const JUMP_STAMINA_COST: f32 = 14.0;
+const JUMP_MOVE_MULTIPLIER: f32 = 1.08;
+const JUMP_ATTACK_WINDUP_MS: f32 = 105.0;
+const JUMP_ATTACK_ACTIVE_MS: f32 = 105.0;
+const JUMP_ATTACK_RECOVERY_MS: f32 = 290.0;
+const JUMP_ATTACK_REACH: f32 = 48.0;
+const JUMP_ATTACK_ARC_RADIANS: f32 = std::f32::consts::PI * 0.24;
+const JUMP_ATTACK_DAMAGE: f32 = 42.0;
+const JUMP_ATTACK_KNOCKBACK: f32 = 34.0;
+const JUMP_ATTACK_GUARD_DAMAGE: f32 = 52.0;
+const JUMP_ATTACK_STAMINA_COST: f32 = 12.0;
+const STAMINA_MAX: f32 = 100.0;
+const STAMINA_REGEN_PER_SECOND: f32 = 30.0;
+const STAMINA_REGEN_DELAY_MS: f32 = 360.0;
+const RUN_STAMINA_DRAIN_PER_SECOND: f32 = 24.0;
+const RUN_MOVE_MULTIPLIER: f32 = 1.55;
+const BLOCK_PARRY_WINDOW_MS: f32 = 125.0;
 const BLOCK_HALF_ANGLE_RADIANS: f32 = std::f32::consts::PI * 0.46;
 const BLOCK_GUARD_DAMAGE: f32 = 38.0;
 const BLOCK_GUARD_BREAK_STUN_MS: f32 = 520.0;
@@ -36,7 +65,7 @@ const GUARD_BREAK_POST_RECOVERY_PUNISH_MS: f32 =
     BLOCK_GUARD_BREAK_STUN_MS - ATTACK_ACTIVE_MS - ATTACK_RECOVERY_MS;
 const HEAVY_GUARD_BREAK_STUN_MS: f32 =
     HEAVY_ATTACK_ACTIVE_MS + HEAVY_ATTACK_RECOVERY_MS + GUARD_BREAK_POST_RECOVERY_PUNISH_MS;
-const BLOCK_PARRY_STUN_MS: f32 = 430.0;
+const BLOCK_PARRY_STUN_MS: f32 = 650.0;
 const BLOCK_MOVE_MULTIPLIER: f32 = 0.42;
 const GUARD_MAX: f32 = 100.0;
 const GUARD_REGEN_PER_SECOND: f32 = 24.0;
@@ -55,6 +84,13 @@ pub enum Action {
     HeavyAttackRecovery,
     Dodge,
     DodgeRecovery,
+    KickWindup,
+    KickActive,
+    KickRecovery,
+    Jump,
+    JumpAttackWindup,
+    JumpAttackActive,
+    JumpAttackRecovery,
     Block,
     Stunned,
     Dead,
@@ -75,6 +111,13 @@ impl Action {
             Self::HeavyAttackWindup => 9,
             Self::HeavyAttackActive => 10,
             Self::HeavyAttackRecovery => 11,
+            Self::KickWindup => 12,
+            Self::KickActive => 13,
+            Self::KickRecovery => 14,
+            Self::Jump => 15,
+            Self::JumpAttackWindup => 16,
+            Self::JumpAttackActive => 17,
+            Self::JumpAttackRecovery => 18,
         }
     }
 }
@@ -88,6 +131,9 @@ pub struct InputIntent {
     pub heavy_attack: bool,
     pub dodge: bool,
     pub block: bool,
+    pub kick: bool,
+    pub run: bool,
+    pub jump: bool,
 }
 
 impl Default for InputIntent {
@@ -100,6 +146,9 @@ impl Default for InputIntent {
             heavy_attack: false,
             dodge: false,
             block: false,
+            kick: false,
+            run: false,
+            jump: false,
         }
     }
 }
@@ -114,6 +163,7 @@ pub struct Fighter {
     pub facing: f32,
     pub hp: f32,
     pub guard: f32,
+    pub stamina: f32,
     pub kills: u16,
     pub action: Action,
     pub action_elapsed_ms: f32,
@@ -123,7 +173,9 @@ pub struct Fighter {
     dodge_dir_x: f32,
     dodge_dir_y: f32,
     attack_hit_targets: BTreeSet<u32>,
+    roll_hit_targets: BTreeSet<u32>,
     guard_regen_blocked_until_ms: f32,
+    stamina_regen_blocked_until_ms: f32,
     respawn_at_ms: f32,
 }
 
@@ -138,6 +190,7 @@ impl Fighter {
             facing: normalize_angle(facing),
             hp: 100.0,
             guard: GUARD_MAX,
+            stamina: STAMINA_MAX,
             kills: 0,
             action: Action::Idle,
             action_elapsed_ms: 0.0,
@@ -147,7 +200,9 @@ impl Fighter {
             dodge_dir_x: 0.0,
             dodge_dir_y: 0.0,
             attack_hit_targets: BTreeSet::new(),
+            roll_hit_targets: BTreeSet::new(),
             guard_regen_blocked_until_ms: 0.0,
+            stamina_regen_blocked_until_ms: 0.0,
             respawn_at_ms: 0.0,
         }
     }
@@ -349,9 +404,10 @@ impl World {
 
             let input = normalize_input(fighter.latest_input);
             fighter.facing = normalize_angle(input.facing_radians);
-            begin_requested_action(fighter, input);
+            begin_requested_action(self.now_ms, fighter, input);
             move_fighter(self.width, self.height, fighter, input, dt_ms);
             advance_action(fighter, input, dt_ms);
+            update_stamina(self.now_ms, fighter, input, dt_ms);
 
             if fighter.action != Action::Block
                 && self.now_ms >= fighter.guard_regen_blocked_until_ms
@@ -361,6 +417,7 @@ impl World {
             }
         }
 
+        resolve_roll_collisions(self.width, self.height, &mut self.fighters);
         separate_fighters(self.width, self.height, &mut self.fighters);
         if let Some(winner) = resolve_attacks(
             self.width,
@@ -381,6 +438,7 @@ impl World {
             fighter.kills = 0;
             fighter.latest_input = InputIntent::default();
             fighter.guard_regen_blocked_until_ms = 0.0;
+            fighter.stamina_regen_blocked_until_ms = 0.0;
             respawn_fighter(fighter);
         }
     }
@@ -404,22 +462,43 @@ fn normalize_input(mut input: InputIntent) -> InputIntent {
     input
 }
 
-fn begin_requested_action(fighter: &mut Fighter, input: InputIntent) {
+fn begin_requested_action(now_ms: f32, fighter: &mut Fighter, input: InputIntent) {
+    if fighter.action == Action::Jump
+        && input.attack
+        && spend_stamina(now_ms, fighter, JUMP_ATTACK_STAMINA_COST)
+    {
+        fighter.attack_hit_targets.clear();
+        fighter.set_action(Action::JumpAttackWindup, JUMP_ATTACK_WINDUP_MS);
+        return;
+    }
+
     let can_interrupt = matches!(fighter.action, Action::Idle | Action::Block);
     if !can_interrupt {
         return;
     }
 
-    if input.dodge {
-        let move_length = input.move_x.hypot(input.move_y);
-        if move_length > EPSILON {
-            fighter.dodge_dir_x = input.move_x / move_length;
-            fighter.dodge_dir_y = input.move_y / move_length;
-        } else {
-            fighter.dodge_dir_x = fighter.facing.cos();
-            fighter.dodge_dir_y = fighter.facing.sin();
-        }
+    if input.dodge && spend_stamina(now_ms, fighter, DODGE_STAMINA_COST) {
+        fighter.dodge_dir_x = fighter.facing.cos();
+        fighter.dodge_dir_y = fighter.facing.sin();
+        fighter.roll_hit_targets.clear();
         fighter.set_action(Action::Dodge, DODGE_DURATION_MS);
+        return;
+    }
+
+    if input.kick
+        && fighter.action == Action::Idle
+        && spend_stamina(now_ms, fighter, KICK_STAMINA_COST)
+    {
+        fighter.attack_hit_targets.clear();
+        fighter.set_action(Action::KickWindup, KICK_WINDUP_MS);
+        return;
+    }
+
+    if input.jump
+        && fighter.action == Action::Idle
+        && spend_stamina(now_ms, fighter, JUMP_STAMINA_COST)
+    {
+        fighter.set_action(Action::Jump, JUMP_DURATION_MS);
         return;
     }
 
@@ -447,6 +526,10 @@ fn begin_requested_action(fighter: &mut Fighter, input: InputIntent) {
 fn move_fighter(width: f32, height: f32, fighter: &mut Fighter, input: InputIntent, dt_ms: f32) {
     let mut velocity_x = input.move_x * MOVE_SPEED;
     let mut velocity_y = input.move_y * MOVE_SPEED;
+    if input.run && fighter.action == Action::Idle && fighter.stamina > EPSILON {
+        velocity_x *= RUN_MOVE_MULTIPLIER;
+        velocity_y *= RUN_MOVE_MULTIPLIER;
+    }
 
     match fighter.action {
         Action::Dodge => {
@@ -456,6 +539,26 @@ fn move_fighter(width: f32, height: f32, fighter: &mut Fighter, input: InputInte
         Action::Block => {
             velocity_x *= BLOCK_MOVE_MULTIPLIER;
             velocity_y *= BLOCK_MOVE_MULTIPLIER;
+        }
+        Action::Jump => {
+            velocity_x *= JUMP_MOVE_MULTIPLIER;
+            velocity_y *= JUMP_MOVE_MULTIPLIER;
+        }
+        Action::JumpAttackWindup => {
+            velocity_x *= 0.9;
+            velocity_y *= 0.9;
+        }
+        Action::JumpAttackActive => {
+            velocity_x *= 0.55;
+            velocity_y *= 0.55;
+        }
+        Action::KickWindup => {
+            velocity_x *= 0.45;
+            velocity_y *= 0.45;
+        }
+        Action::KickActive => {
+            velocity_x *= 0.2;
+            velocity_y *= 0.2;
         }
         Action::AttackWindup => {
             velocity_x *= 0.35;
@@ -476,6 +579,10 @@ fn move_fighter(width: f32, height: f32, fighter: &mut Fighter, input: InputInte
         Action::HeavyAttackRecovery => {
             velocity_x *= 0.35;
             velocity_y *= 0.35;
+        }
+        Action::KickRecovery | Action::JumpAttackRecovery => {
+            velocity_x *= 0.42;
+            velocity_y *= 0.42;
         }
         Action::Idle | Action::Dead => {}
     }
@@ -522,8 +629,71 @@ fn advance_action(fighter: &mut Fighter, input: InputIntent, dt_ms: f32) {
         }
         Action::HeavyAttackRecovery => fighter.set_action(Action::Idle, 0.0),
         Action::Dodge => fighter.set_action(Action::DodgeRecovery, DODGE_RECOVERY_MS),
-        Action::DodgeRecovery | Action::Stunned => fighter.set_action(Action::Idle, 0.0),
+        Action::DodgeRecovery | Action::Jump => fighter.set_action(Action::Idle, 0.0),
+        Action::KickWindup => fighter.set_action(Action::KickActive, KICK_ACTIVE_MS),
+        Action::KickActive => fighter.set_action(Action::KickRecovery, KICK_RECOVERY_MS),
+        Action::KickRecovery => fighter.set_action(Action::Idle, 0.0),
+        Action::JumpAttackWindup => {
+            fighter.set_action(Action::JumpAttackActive, JUMP_ATTACK_ACTIVE_MS)
+        }
+        Action::JumpAttackActive => {
+            fighter.set_action(Action::JumpAttackRecovery, JUMP_ATTACK_RECOVERY_MS)
+        }
+        Action::JumpAttackRecovery | Action::Stunned => fighter.set_action(Action::Idle, 0.0),
         Action::Idle | Action::Block | Action::Dead => {}
+    }
+}
+
+fn spend_stamina(now_ms: f32, fighter: &mut Fighter, amount: f32) -> bool {
+    if fighter.stamina + EPSILON < amount {
+        return false;
+    }
+    fighter.stamina = (fighter.stamina - amount).max(0.0);
+    fighter.stamina_regen_blocked_until_ms = now_ms + STAMINA_REGEN_DELAY_MS;
+    true
+}
+
+fn update_stamina(now_ms: f32, fighter: &mut Fighter, input: InputIntent, dt_ms: f32) {
+    if input.run
+        && fighter.action == Action::Idle
+        && input.move_x.hypot(input.move_y) > EPSILON
+        && fighter.stamina > EPSILON
+    {
+        fighter.stamina =
+            (fighter.stamina - RUN_STAMINA_DRAIN_PER_SECOND * dt_ms / 1000.0).max(0.0);
+        fighter.stamina_regen_blocked_until_ms = now_ms + STAMINA_REGEN_DELAY_MS;
+    } else if now_ms >= fighter.stamina_regen_blocked_until_ms {
+        fighter.stamina =
+            (fighter.stamina + STAMINA_REGEN_PER_SECOND * dt_ms / 1000.0).min(STAMINA_MAX);
+    }
+}
+
+fn resolve_roll_collisions(width: f32, height: f32, fighters: &mut [Fighter]) {
+    let contact = FIGHTER_RADIUS * 2.0 + 8.0;
+    for roller_index in 0..fighters.len() {
+        if fighters[roller_index].action != Action::Dodge {
+            continue;
+        }
+        for target_index in 0..fighters.len() {
+            if roller_index == target_index {
+                continue;
+            }
+            let target_id = fighters[target_index].net_id;
+            if fighters[target_index].action == Action::Dead
+                || fighters[roller_index].roll_hit_targets.contains(&target_id)
+            {
+                continue;
+            }
+            let dx = fighters[target_index].x - fighters[roller_index].x;
+            let dy = fighters[target_index].y - fighters[roller_index].y;
+            if dx.hypot(dy) > contact {
+                continue;
+            }
+            let (roller, target) = two_mut(fighters, roller_index, target_index);
+            roller.roll_hit_targets.insert(target.net_id);
+            knock_back(width, height, roller, target, ROLL_COLLISION_KNOCKBACK);
+            target.set_action(Action::Stunned, ROLL_COLLISION_STUN_MS);
+        }
     }
 }
 
@@ -583,6 +753,7 @@ struct AttackProfile {
     knockback: f32,
     guard_damage: f32,
     guard_break_stun_ms: f32,
+    kick: bool,
 }
 
 fn attack_profile(action: Action) -> Option<AttackProfile> {
@@ -594,6 +765,7 @@ fn attack_profile(action: Action) -> Option<AttackProfile> {
             knockback: ATTACK_KNOCKBACK,
             guard_damage: BLOCK_GUARD_DAMAGE,
             guard_break_stun_ms: BLOCK_GUARD_BREAK_STUN_MS,
+            kick: false,
         }),
         Action::HeavyAttackActive => Some(AttackProfile {
             reach: HEAVY_ATTACK_REACH,
@@ -602,6 +774,25 @@ fn attack_profile(action: Action) -> Option<AttackProfile> {
             knockback: HEAVY_ATTACK_KNOCKBACK,
             guard_damage: HEAVY_ATTACK_GUARD_DAMAGE,
             guard_break_stun_ms: HEAVY_GUARD_BREAK_STUN_MS,
+            kick: false,
+        }),
+        Action::JumpAttackActive => Some(AttackProfile {
+            reach: JUMP_ATTACK_REACH,
+            arc_radians: JUMP_ATTACK_ARC_RADIANS,
+            damage: JUMP_ATTACK_DAMAGE,
+            knockback: JUMP_ATTACK_KNOCKBACK,
+            guard_damage: JUMP_ATTACK_GUARD_DAMAGE,
+            guard_break_stun_ms: BLOCK_GUARD_BREAK_STUN_MS,
+            kick: false,
+        }),
+        Action::KickActive => Some(AttackProfile {
+            reach: KICK_REACH,
+            arc_radians: KICK_ARC_RADIANS,
+            damage: 0.0,
+            knockback: KICK_KNOCKBACK,
+            guard_damage: KICK_BLOCK_GUARD_DAMAGE,
+            guard_break_stun_ms: BLOCK_GUARD_BREAK_STUN_MS,
+            kick: true,
         }),
         _ => None,
     }
@@ -674,6 +865,12 @@ fn resolve_attacks(
                         target: target.net_id,
                     });
                 }
+                continue;
+            }
+
+            if profile.kick {
+                knock_back(width, height, attacker, target, profile.knockback);
+                target.set_action(Action::Stunned, KICK_STUN_MS);
                 continue;
             }
 
@@ -757,8 +954,11 @@ fn respawn_fighter(fighter: &mut Fighter) {
     fighter.y = fighter.spawn_y;
     fighter.hp = 100.0;
     fighter.guard = GUARD_MAX;
+    fighter.stamina = STAMINA_MAX;
     fighter.respawn_at_ms = 0.0;
     fighter.attack_hit_targets.clear();
+    fighter.roll_hit_targets.clear();
+    fighter.stamina_regen_blocked_until_ms = 0.0;
     fighter.recently_interacted_with = None;
     fighter.set_action(Action::Idle, 0.0);
 }

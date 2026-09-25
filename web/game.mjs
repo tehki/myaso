@@ -9,6 +9,8 @@ const hud = {
   playerHpValue: document.querySelector("#player-hp-value"),
   playerGuard: document.querySelector("#player-guard"),
   playerGuardValue: document.querySelector("#player-guard-value"),
+  playerStamina: document.querySelector("#player-stamina"),
+  playerStaminaValue: document.querySelector("#player-stamina-value"),
   botHp: document.querySelector("#bot-hp"),
   botHpValue: document.querySelector("#bot-hp-value"),
   botGuard: document.querySelector("#bot-guard"),
@@ -17,6 +19,7 @@ const hud = {
 const hudCache = {
   playerHp: null,
   playerGuard: null,
+  playerStamina: null,
   botHp: null,
   botGuard: null,
   eventText: null,
@@ -27,13 +30,23 @@ const bot = createFighter({ id: "bot", x: 690, y: 270, facing: Math.PI });
 const world = createWorld({ width: canvas.width, height: canvas.height, fighters: [player, bot] });
 
 const keys = new Set();
-const mouse = { x: 700, y: 270, block: false };
-const playerInputState = { moveX: 0, moveY: 0, aimX: mouse.x, aimY: mouse.y, attack: false, heavyAttack: false, block: false, dodge: false };
+const mouse = { x: 700, y: 270 };
+const playerInputState = {
+  moveX: 0, moveY: 0, aimX: mouse.x, aimY: mouse.y,
+  attack: false, heavyAttack: false, block: false, dodge: false,
+  kick: false, run: false, jump: false,
+};
 const botInputState = { moveX: 0, moveY: 0, aimX: player.x, aimY: player.y, attack: false, heavyAttack: false, block: false, dodge: false };
 const inputs = { player: playerInputState, bot: botInputState };
 let attackRequested = false;
 let heavyAttackRequested = false;
-let dodgeRequested = false;
+let rollRequested = false;
+let kickRequested = false;
+let jumpRequested = false;
+let shortBlockUntil = 0;
+let rightButtonDown = false;
+let rightButtonDownAt = 0;
+const runHoldThresholdMs = 180;
 let lastBotAttackAt = -1000;
 let botBlockUntil = 0;
 let botDodgeUntil = 0;
@@ -51,19 +64,32 @@ canvas.addEventListener("contextmenu", (event) => event.preventDefault());
 canvas.addEventListener("pointerdown", (event) => {
   canvas.focus();
   if (event.button === 0) attackRequested = true;
-  if (event.button === 2) mouse.block = true;
+  if (event.button === 2) {
+    rightButtonDown = true;
+    rightButtonDownAt = performance.now();
+  }
   updateMouse(event);
 });
 canvas.addEventListener("pointerup", (event) => {
-  if (event.button === 2) mouse.block = false;
+  if (event.button === 2) {
+    const heldMs = performance.now() - rightButtonDownAt;
+    rightButtonDown = false;
+    if (heldMs < runHoldThresholdMs) kickRequested = true;
+  }
 });
+canvas.addEventListener("wheel", (event) => {
+  event.preventDefault();
+  canvas.focus();
+  if (event.deltaY < 0) rollRequested = true;
+  else if (event.deltaY > 0) shortBlockUntil = Math.max(shortBlockUntil, world.nowMs + COMBAT.block.shortBlockMs);
+}, { passive: false });
 canvas.addEventListener("pointermove", updateMouse);
 window.addEventListener("blur", releaseInputs);
 canvas.addEventListener("keydown", (event) => {
   if (["KeyW", "KeyA", "KeyS", "KeyD", "KeyE", "Space"].includes(event.code)) event.preventDefault();
   keys.add(event.code);
   if (event.code === "KeyE" && !event.repeat) heavyAttackRequested = true;
-  if (event.code === "Space" && !event.repeat) dodgeRequested = true;
+  if (event.code === "Space" && !event.repeat) jumpRequested = true;
 });
 canvas.addEventListener("keyup", (event) => keys.delete(event.code));
 document.addEventListener("visibilitychange", handleVisibilityChange);
@@ -72,8 +98,11 @@ function releaseInputs() {
   keys.clear();
   attackRequested = false;
   heavyAttackRequested = false;
-  dodgeRequested = false;
-  mouse.block = false;
+  rollRequested = false;
+  kickRequested = false;
+  jumpRequested = false;
+  shortBlockUntil = 0;
+  rightButtonDown = false;
 }
 
 function updateMouse(event) {
@@ -89,11 +118,16 @@ function playerInput() {
   playerInputState.aimY = mouse.y;
   playerInputState.attack = attackRequested;
   playerInputState.heavyAttack = heavyAttackRequested;
-  playerInputState.block = mouse.block;
-  playerInputState.dodge = dodgeRequested;
+  playerInputState.block = world.nowMs < shortBlockUntil;
+  playerInputState.dodge = rollRequested;
+  playerInputState.kick = kickRequested;
+  playerInputState.run = rightButtonDown && performance.now() - rightButtonDownAt >= runHoldThresholdMs;
+  playerInputState.jump = jumpRequested;
   attackRequested = false;
   heavyAttackRequested = false;
-  dodgeRequested = false;
+  rollRequested = false;
+  kickRequested = false;
+  jumpRequested = false;
   return playerInputState;
 }
 
@@ -157,7 +191,9 @@ function handleEvents(events) {
     const names = { player: "You", bot: "Bot" };
     if (event.type === "hit") say(`${names[event.attackerId]} hit ${names[event.targetId]} for ${event.damage}.`, 560);
     if (event.type === "block") say(`${names[event.targetId]} blocked.`, 480);
-    if (event.type === "parry") say(`${names[event.targetId]} PARRIED ${names[event.attackerId]}.`, 720);
+    if (event.type === "parry") say(`${names[event.targetId]} PARRIED ${names[event.attackerId]} — punish now!`, 920);
+    if (event.type === "kick") say(`${names[event.attackerId]} shoved ${names[event.targetId]} down.`, 620);
+    if (event.type === "roll_hit") say(`${names[event.attackerId]} rolled through ${names[event.targetId]}.`, 560);
     if (event.type === "guard_break") say(`${names[event.targetId]}'s guard broke. Punish!`, 760);
     if (event.type === "evade") say(`${names[event.targetId]} dodged through the strike.`, 520);
     if (event.type === "death") say(`${names[event.killerId]} wins the exchange.`, 980);
@@ -173,6 +209,7 @@ function say(text, durationMs) {
 function updateHud() {
   setMeter("playerHp", hud.playerHp, hud.playerHpValue, player.hp);
   setMeter("playerGuard", hud.playerGuard, hud.playerGuardValue, player.guard);
+  setMeter("playerStamina", hud.playerStamina, hud.playerStaminaValue, player.stamina);
   setMeter("botHp", hud.botHp, hud.botHpValue, bot.hp);
   setMeter("botGuard", hud.botGuard, hud.botGuardValue, bot.guard);
   if (world.nowMs > messageUntil) setEventText(actionHint());
@@ -198,10 +235,14 @@ function actionHint() {
   if (player.action === "heavy_attack_windup") return "Heavy committed — the long tell can be dodged or parried.";
   if (player.action === "attack_recovery") return "Recovery — this is where careless attacks get punished.";
   if (player.action === "heavy_attack_recovery") return "Heavy recovery — you are very punishable now.";
-  if (player.action === "block" && player.actionElapsedMs <= COMBAT.block.parryWindowMs) return "Parry window active.";
-  if (player.action === "block") return "Blocking — keep your opponent in front of you.";
-  if (player.action === "dodge") return "Dodge i-frames — reposition, don't spam.";
-  return "Spacing decides the next exchange.";
+  if (player.action === "kick_windup" || player.action === "kick_active") return "SHOVE — unblocked contact knocks them down.";
+  if (player.action === "jump") return "AIRBORNE — LMB now for a jumping attack.";
+  if (player.action.startsWith("jump_attack")) return "JUMP ATTACK — committed aerial pressure.";
+  if (player.action === "block" && player.actionElapsedMs <= COMBAT.block.parryWindowMs) return "PARRY — punish window opened.";
+  if (player.action === "block") return "Short block — wheel back again to re-time the parry.";
+  if (player.action === "dodge") return "ROLL — i-frames plus collision knockdown.";
+  if (rightButtonDown && performance.now() - rightButtonDownAt >= runHoldThresholdMs) return "RUNNING — stamina drains while sprinting.";
+  return "Wheel up roll · wheel down parry · RMB tap shove · hold RMB run · Space jump.";
 }
 
 function render() {
@@ -240,12 +281,17 @@ function createArenaLayer() {
 function drawFighter(fighter, body, shadow) {
   const dead = fighter.action === "dead";
   ctx.save();
-  ctx.translate(fighter.x, fighter.y);
-  ctx.rotate(fighter.facing);
+  const airborne = fighter.action === "jump" || fighter.action.startsWith("jump_attack");
+  const jumpProgress = airborne ? Math.min(1, fighter.actionElapsedMs / Math.max(1, fighter.actionDurationMs)) : 0;
+  const lift = airborne ? Math.sin(jumpProgress * Math.PI) * 22 : 0;
+  ctx.translate(fighter.x, fighter.y - lift);
+  ctx.rotate(fighter.facing + (fighter.action === "dodge" ? fighter.actionElapsedMs / COMBAT.dodge.durationMs * Math.PI * 2 : 0));
   ctx.globalAlpha = dead ? 0.28 : 1;
 
   if (fighter.action === "attack_windup" || fighter.action === "attack_active") drawAttackArc(fighter);
   if (fighter.action === "heavy_attack_windup" || fighter.action === "heavy_attack_active") drawHeavyAttackArc(fighter);
+  if (fighter.action === "jump_attack_windup" || fighter.action === "jump_attack_active") drawJumpAttackArc(fighter);
+  if (fighter.action === "kick_windup" || fighter.action === "kick_active") drawKickArc(fighter);
   if (fighter.action === "block") drawBlockArc(fighter);
   if (fighter.action === "dodge" && fighter.actionElapsedMs <= COMBAT.dodge.iframeMs) {
     ctx.strokeStyle = "rgba(216, 202, 160, .5)";
@@ -312,6 +358,28 @@ function drawHeavyAttackArc(fighter) {
   ctx.arc(0, 0, COMBAT.fighterRadius + 8, 0, Math.PI * 2);
   ctx.stroke();
   ctx.setLineDash([]);
+}
+
+function drawKickArc(fighter) {
+  const active = fighter.action === "kick_active";
+  ctx.strokeStyle = active ? "rgba(255, 214, 120, .95)" : "rgba(255, 214, 120, .45)";
+  ctx.lineWidth = active ? 6 : 3;
+  ctx.beginPath();
+  ctx.arc(0, 0, COMBAT.kick.reach + COMBAT.fighterRadius, -COMBAT.kick.arcRadians / 2, COMBAT.kick.arcRadians / 2);
+  ctx.stroke();
+}
+
+function drawJumpAttackArc(fighter) {
+  const active = fighter.action === "jump_attack_active";
+  ctx.fillStyle = active ? "rgba(255, 128, 72, .32)" : "rgba(255, 190, 92, .16)";
+  ctx.strokeStyle = active ? "rgba(255, 112, 58, .95)" : "rgba(255, 190, 92, .65)";
+  ctx.lineWidth = 4;
+  ctx.beginPath();
+  ctx.moveTo(0, 0);
+  ctx.arc(0, 0, COMBAT.jumpAttack.reach + COMBAT.fighterRadius, -COMBAT.jumpAttack.arcRadians / 2, COMBAT.jumpAttack.arcRadians / 2);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
 }
 
 function drawBlockArc(fighter) {
