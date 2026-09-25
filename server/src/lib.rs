@@ -606,6 +606,9 @@ mod tests {
             heavy_attack: false,
             dodge: false,
             block: true,
+            kick: false,
+            run: false,
+            jump: false,
         };
         let newest_idle = InputSample {
             tick: 101,
@@ -616,6 +619,9 @@ mod tests {
             heavy_attack: false,
             dodge: false,
             block: false,
+            kick: false,
+            run: false,
+            jump: false,
         };
 
         let coalesced =
@@ -647,6 +653,9 @@ mod tests {
             heavy_attack: false,
             dodge: false,
             block: false,
+            kick: false,
+            run: false,
+            jump: false,
         };
         let newer_heavy = InputSample {
             tick: 301,
@@ -657,6 +666,9 @@ mod tests {
             heavy_attack: true,
             dodge: false,
             block: false,
+            kick: false,
+            run: false,
+            jump: false,
         };
         let newest_idle = InputSample {
             tick: 302,
@@ -667,6 +679,9 @@ mod tests {
             heavy_attack: false,
             dodge: false,
             block: true,
+            kick: false,
+            run: false,
+            jump: false,
         };
 
         let coalesced = coalesce_accepted_input_batch(&[older_attack, newer_heavy, newest_idle])
@@ -692,6 +707,9 @@ mod tests {
             heavy_attack: false,
             dodge: false,
             block: false,
+            kick: false,
+            run: false,
+            jump: false,
         };
         let newer_dodge = InputSample {
             tick: 201,
@@ -702,6 +720,9 @@ mod tests {
             heavy_attack: false,
             dodge: true,
             block: false,
+            kick: false,
+            run: false,
+            jump: false,
         };
         let newest_idle = InputSample {
             tick: 202,
@@ -712,6 +733,9 @@ mod tests {
             heavy_attack: false,
             dodge: false,
             block: true,
+            kick: false,
+            run: false,
+            jump: false,
         };
 
         let coalesced = coalesce_accepted_input_batch(&[older_attack, newer_dodge, newest_idle])
