@@ -2539,6 +2539,9 @@ async function scrollArenaWheel(session, elementId, deltaY, delayMs = 0) {
 async function pressArenaPerpendicularDodgeAfterPause(session, delayMs) {
   const elementId = await resolveArenaElement(session, "wheel-roll");
   const origin = { "element-6066-11e4-a52e-4f735466cecf": elementId };
+  // Roll direction is pointer-owned. Aim below arena center immediately before
+  // wheel-forward; the simultaneous S key is intentionally redundant evidence
+  // that movement keys no longer steer the roll.
   await webdriver(session.base, "POST", `/session/${session.sessionId}/actions`, {
     actions: [
       {
@@ -2547,18 +2550,27 @@ async function pressArenaPerpendicularDodgeAfterPause(session, delayMs) {
         actions: [
           { type: "keyDown", value: "s" },
           { type: "pause", duration: delayMs },
-          { type: "pause", duration: 45 },
+          { type: "pause", duration: 60 },
           { type: "keyUp", value: "s" },
+        ],
+      },
+      {
+        type: "pointer",
+        id: `mouse-${session.name}`,
+        parameters: { pointerType: "mouse" },
+        actions: [
+          { type: "pause", duration: delayMs },
+          { type: "pointerMove", duration: 0, origin, x: 0, y: 180 },
+          { type: "pause", duration: 15 },
         ],
       },
       {
         type: "wheel",
         id: `wheel-${session.name}`,
         actions: [
-          { type: "pause", duration: 0 },
           { type: "pause", duration: delayMs },
+          { type: "pause", duration: 15 },
           { type: "scroll", x: 0, y: 0, deltaX: 0, deltaY: -120, duration: 0, origin },
-          { type: "pause", duration: 0 },
         ],
       },
     ],
