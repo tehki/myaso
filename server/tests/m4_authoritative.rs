@@ -213,6 +213,150 @@ fn attack_preserves_windup_active_and_recovery_commitment() {
 }
 
 #[test]
+fn heavy_attack_preserves_long_commitment_and_deals_46_once() {
+    let mut commitment = duel(200.0);
+    commitment.set_input(
+        1,
+        InputIntent {
+            heavy_attack: true,
+            facing_radians: 0.0,
+            ..InputIntent::default()
+        },
+    );
+    commitment.step_by(5.0);
+    assert_eq!(
+        commitment.fighter(1).expect("attacker").action,
+        Action::HeavyAttackWindup
+    );
+
+    advance(
+        &mut commitment,
+        320.0,
+        InputIntent::default(),
+        InputIntent::default(),
+    );
+    assert_eq!(
+        commitment.fighter(1).expect("attacker").action,
+        Action::HeavyAttackActive
+    );
+    advance(
+        &mut commitment,
+        100.0,
+        InputIntent::default(),
+        InputIntent::default(),
+    );
+    assert_eq!(
+        commitment.fighter(1).expect("attacker").action,
+        Action::HeavyAttackRecovery
+    );
+    advance(
+        &mut commitment,
+        420.0,
+        InputIntent::default(),
+        InputIntent::default(),
+    );
+    assert_eq!(
+        commitment.fighter(1).expect("attacker").action,
+        Action::Idle
+    );
+
+    let mut hit_world = duel(72.0);
+    let events = advance(
+        &mut hit_world,
+        435.0,
+        InputIntent {
+            heavy_attack: true,
+            facing_radians: 0.0,
+            ..InputIntent::default()
+        },
+        InputIntent {
+            facing_radians: std::f32::consts::PI,
+            ..InputIntent::default()
+        },
+    );
+    assert_eq!(
+        events
+            .iter()
+            .filter(|event| matches!(event, CombatEvent::Hit { .. }))
+            .count(),
+        1
+    );
+    assert!(events.iter().any(|event| matches!(
+        event,
+        CombatEvent::Hit {
+            damage: 46,
+            hp: 54,
+            ..
+        }
+    )));
+    assert_eq!(hit_world.fighter(2).expect("target").hp.round() as u8, 54);
+}
+
+#[test]
+fn heavy_attack_applies_64_guard_pressure_and_remains_parryable() {
+    let mut blocked = duel(72.0);
+    advance(
+        &mut blocked,
+        135.0,
+        InputIntent::default(),
+        InputIntent {
+            block: true,
+            facing_radians: std::f32::consts::PI,
+            ..InputIntent::default()
+        },
+    );
+    let events = advance(
+        &mut blocked,
+        435.0,
+        InputIntent {
+            heavy_attack: true,
+            facing_radians: 0.0,
+            ..InputIntent::default()
+        },
+        InputIntent {
+            block: true,
+            facing_radians: std::f32::consts::PI,
+            ..InputIntent::default()
+        },
+    );
+    assert_eq!(blocked.fighter(2).expect("target").hp.round() as u8, 100);
+    assert_eq!(blocked.fighter(2).expect("target").guard.round() as u8, 36);
+    assert!(events
+        .iter()
+        .any(|event| matches!(event, CombatEvent::Block { .. })));
+
+    let mut parried = duel(72.0);
+    advance(
+        &mut parried,
+        295.0,
+        InputIntent {
+            heavy_attack: true,
+            facing_radians: 0.0,
+            ..InputIntent::default()
+        },
+        InputIntent::default(),
+    );
+    let parry_events = advance(
+        &mut parried,
+        45.0,
+        InputIntent {
+            facing_radians: 0.0,
+            ..InputIntent::default()
+        },
+        InputIntent {
+            block: true,
+            facing_radians: std::f32::consts::PI,
+            ..InputIntent::default()
+        },
+    );
+    assert_eq!(parried.fighter(2).expect("target").hp.round() as u8, 100);
+    assert_eq!(parried.fighter(1).expect("attacker").action, Action::Stunned);
+    assert!(parry_events
+        .iter()
+        .any(|event| matches!(event, CombatEvent::Parry { .. })));
+}
+
+#[test]
 fn server_owned_attack_changes_authoritative_vitals_once() {
     let mut world = duel(72.0);
     let events = advance(
