@@ -8,7 +8,7 @@ import { setTimeout as sleep } from "node:timers/promises";
 const root = process.cwd();
 const durationMs = Number(process.env.MYASO_PVP_FLIGHT_DURATION_MS ?? 7000);
 const scenario = process.env.MYASO_PVP_SCENARIO ?? "damage";
-if (!new Set(["damage", "inputloss", "parry", "dodge", "block", "guardbreak", "backblock", "respawn", "ui", "uirespawn", "uifeedback", "uihittell", "uivitals", "uiidentity", "uiscore", "uimatch", "uirematch", "uiffa3", "uikillfeed", "uifocus", "uithreat", "uithreatbearing", "uimultithreat", "uisecondarythreat", "uisecondarybearing", "uisecondaryphase", "uiguardarc", "uisecondaryguardarc", "uithreatmarkers", "uiparry", "uistun", "uiguardbreak", "uidodge", "uirecovery", "uirecoverytell", "uiattackintent", "uiheavy", "uiheavyinputloss", "uiheavyblock", "uiheavyparry", "uiheavydodge", "uiheavypunish", "uiheavyguardbreak", "uiguardbreaktell", "uiparrytell", "uiblockfacingtell", "uidodgetell", "uideathtell"]).has(scenario)) throw new Error(`unsupported MYASO_PVP_SCENARIO: ${scenario}`);
+if (!new Set(["damage", "inputloss", "parry", "dodge", "block", "guardbreak", "backblock", "respawn", "ui", "uirespawn", "uifeedback", "uihittell", "uivitals", "uiidentity", "uiscore", "uimatch", "uirematch", "uiffa3", "uikillfeed", "uifocus", "uithreat", "uithreatbearing", "uimultithreat", "uisecondarythreat", "uisecondarybearing", "uisecondaryphase", "uiguardarc", "uisecondaryguardarc", "uithreatmarkers", "uiparry", "uistun", "uiguardbreak", "uidodge", "uirecovery", "uirecoverytell", "uiattackintent", "uiheavy", "uiheavyinputloss", "uiheavyblock", "uiheavyparry", "uiheavydodge", "uiheavypunish", "uiheavyguardbreak", "uiheavyguardbreakpunish", "uiguardbreaktell", "uiparrytell", "uiblockfacingtell", "uidodgetell", "uideathtell"]).has(scenario)) throw new Error(`unsupported MYASO_PVP_SCENARIO: ${scenario}`);
 const staticPort = Number(process.env.MYASO_PVP_FLIGHT_HTTP_PORT ?? 4174);
 const browsers = [
   {
@@ -191,6 +191,9 @@ try {
   } else if (scenario === "uiheavyguardbreak") {
     const results = await runOnlineUiHeavyGuardBreakFlight(sessions);
     console.log(`M110_HEAVY_GUARD_BREAK ${JSON.stringify({ ok: true, results })}`);
+  } else if (scenario === "uiheavyguardbreakpunish") {
+    const results = await runOnlineUiHeavyGuardBreakPunishFlight(sessions);
+    console.log(`M111_HEAVY_GUARD_BREAK_PUNISH ${JSON.stringify({ ok: true, results })}`);
   } else if (scenario === "uiguardbreaktell") {
     const results = await runOnlineUiGuardBreakTellFlight(sessions);
     console.log(`M40_FFA_GUARD_BREAK_TELL ${JSON.stringify({ ok: true, results })}`);
@@ -299,14 +302,14 @@ async function startBrowser(browser) {
   });
   const sessionId = created.sessionId ?? created.value?.sessionId;
   if (!sessionId) throw new Error(`${browser.name} WebDriver did not return a session id: ${JSON.stringify(created)}`);
-  if (scenario === "uiparry" || scenario === "uistun" || scenario === "uiguardbreak" || scenario === "uidodge" || scenario === "uiattackintent" || scenario === "uiheavy" || scenario === "uiheavyinputloss" || scenario === "uiheavyblock" || scenario === "uiheavyparry" || scenario === "uiheavydodge" || scenario === "uiheavypunish" || scenario === "uiheavyguardbreak" || scenario === "uiguardbreaktell" || scenario === "uiparrytell" || scenario === "uiblockfacingtell" || scenario === "uidodgetell") {
+  if (scenario === "uiparry" || scenario === "uistun" || scenario === "uiguardbreak" || scenario === "uidodge" || scenario === "uiattackintent" || scenario === "uiheavy" || scenario === "uiheavyinputloss" || scenario === "uiheavyblock" || scenario === "uiheavyparry" || scenario === "uiheavydodge" || scenario === "uiheavypunish" || scenario === "uiheavyguardbreak" || scenario === "uiheavyguardbreakpunish" || scenario === "uiguardbreaktell" || scenario === "uiparrytell" || scenario === "uiblockfacingtell" || scenario === "uidodgetell") {
     await webdriver(base, "POST", `/session/${sessionId}/window/rect`, { x: 0, y: 0, width: 1280, height: 900 });
   }
   return { ...browser, child, base, sessionId };
 }
 
 async function navigate(session, gameUrl, certificateHash) {
-  const page = scenario === "ui" || scenario === "uirespawn" || scenario === "uifeedback" || scenario === "uihittell" || scenario === "uivitals" || scenario === "uiidentity" || scenario === "uiscore" || scenario === "uimatch" || scenario === "uirematch" || scenario === "uiffa3" || scenario === "uikillfeed" || scenario === "uifocus" || scenario === "uithreat" || scenario === "uithreatbearing" || scenario === "uimultithreat" || scenario === "uisecondarythreat" || scenario === "uisecondarybearing" || scenario === "uisecondaryphase" || scenario === "uiguardarc" || scenario === "uisecondaryguardarc" || scenario === "uithreatmarkers" || scenario === "uiparry" || scenario === "uistun" || scenario === "uiguardbreak" || scenario === "uidodge" || scenario === "uirecovery" || scenario === "uirecoverytell" || scenario === "uiattackintent" || scenario === "uiheavy" || scenario === "uiheavyinputloss" || scenario === "uiheavyblock" || scenario === "uiheavyparry" || scenario === "uiheavydodge" || scenario === "uiheavypunish" || scenario === "uiheavyguardbreak" || scenario === "uiguardbreaktell" || scenario === "uiparrytell" || scenario === "uiblockfacingtell" || scenario === "uidodgetell" || scenario === "uideathtell" ? "index.html" : "pvp-flight.html";
+  const page = scenario === "ui" || scenario === "uirespawn" || scenario === "uifeedback" || scenario === "uihittell" || scenario === "uivitals" || scenario === "uiidentity" || scenario === "uiscore" || scenario === "uimatch" || scenario === "uirematch" || scenario === "uiffa3" || scenario === "uikillfeed" || scenario === "uifocus" || scenario === "uithreat" || scenario === "uithreatbearing" || scenario === "uimultithreat" || scenario === "uisecondarythreat" || scenario === "uisecondarybearing" || scenario === "uisecondaryphase" || scenario === "uiguardarc" || scenario === "uisecondaryguardarc" || scenario === "uithreatmarkers" || scenario === "uiparry" || scenario === "uistun" || scenario === "uiguardbreak" || scenario === "uidodge" || scenario === "uirecovery" || scenario === "uirecoverytell" || scenario === "uiattackintent" || scenario === "uiheavy" || scenario === "uiheavyinputloss" || scenario === "uiheavyblock" || scenario === "uiheavyparry" || scenario === "uiheavydodge" || scenario === "uiheavypunish" || scenario === "uiheavyguardbreak" || scenario === "uiheavyguardbreakpunish" || scenario === "uiguardbreaktell" || scenario === "uiparrytell" || scenario === "uiblockfacingtell" || scenario === "uidodgetell" || scenario === "uideathtell" ? "index.html" : "pvp-flight.html";
   const url = new URL(`http://127.0.0.1:${staticPort}/web/${page}`);
   url.searchParams.set("server", gameUrl);
   url.searchParams.set("cert", certificateHash);
@@ -956,24 +959,63 @@ async function runOnlineUiHeavyWhiffPunishFlight(entries) {
   // the acceptance depend on sub-frame distance thresholds.
   await aimArena(attacker, attackerElementId, whiffOffset);
   await sleep(40);
-  await pulseMovementKey(attacker, "e", 40);
-  // React to the actual remote recovery cue instead of a wall-clock guess.
-  // This both proves the punish window was readable to the defender and avoids
-  // coupling the counter to cross-browser snapshot/WebDriver delivery skew.
-  const recoveryDeadline = Date.now() + 600;
+
+  // A genuine WebDriver E edge can occasionally miss the client's one-shot
+  // outbound action latch. Retry only when the entire authoritative exchange
+  // proves that no heavy ever committed. Any threat/recovery/commit evidence or
+  // any vital change makes the attempt terminal and fail-closed.
   let recoveryObserved = false;
-  while (Date.now() < recoveryDeadline) {
-    const state = await readUiEvidence(defender);
-    recoveryObserved = state.recoveryVisible
-      && state.recoveryState === "heavy-attack-recovery"
-      && state.recoveryLabel === "PUNISH"
-      && state.recoveryDetail === "Heavy recovery";
+  let lastMiss = null;
+  for (let attempt = 1; attempt <= 3 && !recoveryObserved; attempt += 1) {
+    const before = await Promise.all(entries.map(readUiEvidence));
+    const beforeAttacker = before.find((entry) => entry.browser === attacker.name);
+    if (!beforeAttacker) throw new Error(`M109 missing attacker baseline on attempt ${attempt}: ${JSON.stringify(before)}`);
+    const commitsBefore = beforeAttacker.events.filter((text) =>
+      text.startsWith("Heavy strike committed")).length;
+
+    await pulseMovementKey(attacker, "e", 40);
+    // React to the actual remote recovery cue instead of a wall-clock guess.
+    // This both proves the punish window was readable to the defender and avoids
+    // coupling the counter to cross-browser snapshot/WebDriver delivery skew.
+    const recoveryDeadline = Date.now() + 600;
+    while (Date.now() < recoveryDeadline) {
+      const state = await readUiEvidence(defender);
+      recoveryObserved = state.recoveryVisible
+        && state.recoveryState === "heavy-attack-recovery"
+        && state.recoveryLabel === "PUNISH"
+        && state.recoveryDetail === "Heavy recovery";
+      if (recoveryObserved) break;
+      await sleep(20);
+    }
     if (recoveryObserved) break;
-    await sleep(20);
+
+    lastMiss = await Promise.all(entries.map(readUiEvidence));
+    const attackerState = lastMiss.find((entry) => entry.browser === attacker.name);
+    const defenderState = lastMiss.find((entry) => entry.browser === defender.name);
+    if (!attackerState || !defenderState) {
+      throw new Error(`M109 incomplete retry evidence on attempt ${attempt}: ${JSON.stringify(lastMiss)}`);
+    }
+    const commitsAfter = attackerState.events.filter((text) =>
+      text.startsWith("Heavy strike committed")).length;
+    const heavyCommitted = commitsAfter > commitsBefore
+      || defenderState.threatTransitions.some((entry) =>
+        entry.visible && (entry.phase === "HEAVY WINDUP" || entry.phase === "HEAVY STRIKE"))
+      || defenderState.recoveryTransitions.some((entry) =>
+        entry.visible && entry.state === "heavy-attack-recovery");
+    const cleanVitals = attackerState.playerHp === 100 && attackerState.playerGuard === 100
+      && attackerState.opponentHp === 100 && attackerState.opponentGuard === 100
+      && defenderState.playerHp === 100 && defenderState.playerGuard === 100
+      && defenderState.opponentHp === 100 && defenderState.opponentGuard === 100;
+    if (heavyCommitted || !cleanVitals) {
+      throw new Error(`M109 heavy attempt ${attempt} committed without a readable recovery or resolved unexpectedly: ${JSON.stringify(lastMiss)}`);
+    }
+    if (attempt < 3) {
+      await aimArena(attacker, attackerElementId, whiffOffset);
+      await sleep(80);
+    }
   }
   if (!recoveryObserved) {
-    const state = await readUiEvidence(defender);
-    throw new Error(`M109 defender never observed live punishable heavy recovery: ${JSON.stringify(state.recoveryTransitions)}`);
+    throw new Error(`M109 defender never observed live punishable heavy recovery after bounded clean latch retries: ${JSON.stringify(lastMiss)}`);
   }
   // Once the tell is visible, the short real close plus light windup still lands
   // inside the unchanged 420 ms heavy recovery.
@@ -991,6 +1033,11 @@ async function runOnlineUiHeavyWhiffPunishFlight(entries) {
   }
 
   assertHeavyControlDelivered(attackerResult, movementCode, "M109 heavy whiff punish");
+  const authoritativeHeavyCommits = attackerResult.events.filter((text) =>
+    text.startsWith("Heavy strike committed")).length;
+  if (authoritativeHeavyCommits !== 1) {
+    throw new Error(`M109 expected exactly one authoritative heavy commitment: ${JSON.stringify(attackerResult)}`);
+  }
   if (!defenderResult.keys.includes(`keydown:${punishMoveCode}`)
     || !defenderResult.keys.includes(`keyup:${punishMoveCode}`)) {
     throw new Error(`M109 punish closing movement was not delivered: ${JSON.stringify(defenderResult)}`);
@@ -1315,7 +1362,7 @@ async function runOnlineUiStunOverlayFlight(entries) {
   return evidence;
 }
 
-async function runOnlineUiHeavyGuardBreakFlight(entries) {
+async function runOnlineUiHeavyGuardBreakFlight(entries, { returnTiming = false } = {}) {
   const staged = await prepareHeavyCounterplayFlight(
     entries,
     "M110 heavy guard break",
@@ -1328,6 +1375,7 @@ async function runOnlineUiHeavyGuardBreakFlight(entries) {
   let firstEvidence = null;
   let finalEvidence = null;
   let blockHeld = false;
+  let secondHeavyIssuedAt = null;
 
   const heavyCommitCount = (state) => state.events.filter((text) =>
     text.startsWith("Heavy strike committed")).length;
@@ -1414,6 +1462,7 @@ async function runOnlineUiHeavyGuardBreakFlight(entries) {
       }
       const commitsBefore = heavyCommitCount(beforeAttacker);
 
+      const attemptIssuedAt = Date.now();
       await pulseMovementKey(attacker, "e", 40);
       await sleep(390);
       const states = await Promise.all(entries.map(readUiEvidence));
@@ -1428,6 +1477,7 @@ async function runOnlineUiHeavyGuardBreakFlight(entries) {
         && attackerState.opponentHp === 100 && attackerState.opponentGuard === 0
         && commitsAfter === commitsBefore + 1;
       if (guardBroken) {
+        secondHeavyIssuedAt = attemptIssuedAt;
         finalEvidence = states;
         break;
       }
@@ -1454,8 +1504,8 @@ async function runOnlineUiHeavyGuardBreakFlight(entries) {
       throw new Error("M110 second blocked heavy did not break guard after bounded clean latch retries");
     }
 
-    // Keep sampling while the authoritative 520 ms guard-break stun is live so
-    // both the feedback and visible STUNNED transition are captured.
+    // Keep sampling while the authoritative guard-break stun is live so both
+    // the feedback and visible STUNNED transition are captured.
     const deadline = Date.now() + 260;
     while (Date.now() < deadline) {
       const states = await Promise.all(entries.map(readUiEvidence));
@@ -1518,7 +1568,142 @@ async function runOnlineUiHeavyGuardBreakFlight(entries) {
     || defenderResult.feedbackTransitions.includes("parry-success")) {
     throw new Error(`M110 held block accidentally resolved as parry: ${JSON.stringify(evidence)}`);
   }
+  if (returnTiming) {
+    if (!Number.isFinite(secondHeavyIssuedAt)) {
+      throw new Error("M110 timing metadata missing accepted second-heavy issuance");
+    }
+    return { evidence, secondHeavyIssuedAt };
+  }
   return evidence;
+}
+
+async function runOnlineUiHeavyGuardBreakPunishFlight(entries) {
+  const guardBreakResult = await runOnlineUiHeavyGuardBreakFlight(entries, { returnTiming: true });
+  const { evidence: guardBreakEvidence, secondHeavyIssuedAt } = guardBreakResult;
+  const attacker = entries.find((entry) => entry.name === "chrome");
+  const defender = entries.find((entry) => entry.name === "firefox");
+  if (!attacker || !defender) throw new Error("M111 could not resolve fixed heavy guard-break roles");
+
+  const baselineAttacker = guardBreakEvidence.find((entry) => entry.browser === attacker.name);
+  const baselineDefender = guardBreakEvidence.find((entry) => entry.browser === defender.name);
+  if (!baselineAttacker || !baselineDefender
+    || baselineDefender.playerHp !== 100 || baselineDefender.playerGuard !== 0
+    || !baselineDefender.overlayVisible || baselineDefender.overlayTitle !== "STUNNED") {
+    throw new Error(`M111 did not inherit a live clean M110 guard break: ${JSON.stringify(guardBreakEvidence)}`);
+  }
+
+  const lightHitsBefore = baselineAttacker.events.filter((text) =>
+    text === "Opponent hit - 34 HP.").length;
+  const damageBefore = baselineDefender.events.filter((text) =>
+    text === "Hit taken - 34 HP.").length;
+  const lightThreatsBefore = baselineDefender.threatTransitions.filter((entry) =>
+    entry.visible && (entry.phase === "WINDUP" || entry.phase === "STRIKE")).length;
+
+  // Time genuine clicks from the accepted second-heavy request rather than from
+  // a remote recovery snapshot. Downs are centered tightly around the unchanged
+  // 840 ms heavy commitment boundary. The first may be ignored just before Idle;
+  // the following downs cross that boundary without spending the 185 ms punish
+  // margin on WebDriver/snapshot observation latency.
+  const elapsedSinceHeavyIssue = Date.now() - secondHeavyIssuedAt;
+  const firstClickTargetMs = 835;
+  const initialPauseMs = Math.max(0, firstClickTargetMs - elapsedSinceHeavyIssue);
+  // The in-page observer timestamps both event-text and overlay mutations. That
+  // provides stronger ordering evidence than repeated WebDriver reads and does
+  // not perturb Firefox while the real Chrome action sequence is executing.
+  await performArenaAttackBurst(attacker, 3, initialPauseMs, 12);
+
+  const attackerDeadline = Date.now() + 260;
+  let attackerResult = null;
+  while (Date.now() < attackerDeadline) {
+    const state = await readUiEvidence(attacker);
+    const hit = state.events.filter((text) =>
+      text === "Opponent hit - 34 HP.").length === lightHitsBefore + 1;
+    if (hit && state.opponentHp === 66) {
+      attackerResult = state;
+      break;
+    }
+    await sleep(5);
+  }
+
+  let defenderResult = await readUiEvidence(defender);
+  if (!attackerResult) {
+    throw new Error(`M111 attacker never confirmed exactly one real 34 HP light punish: ${JSON.stringify(await readUiEvidence(attacker))}`);
+  }
+
+  // Let the defender receive the same authoritative damage snapshot before
+  // evaluating its persistent transition history. The observer timestamps are
+  // recorded in-page when each UI mutation occurs, so this bounded wait does
+  // not blur the ordering between the hit and the STUNNED interval.
+  const defenderConvergenceDeadline = Date.now() + 260;
+  while (Date.now() < defenderConvergenceDeadline) {
+    const damageCount = defenderResult.events.filter((text) =>
+      text === "Hit taken - 34 HP.").length;
+    const damageTransitionReady = defenderResult.eventTransitions.some((entry) =>
+      entry.text === "Hit taken - 34 HP." && Number.isFinite(entry.t) && entry.t > 0);
+    if (damageCount === damageBefore + 1 && defenderResult.playerHp === 66 && damageTransitionReady) break;
+    await sleep(5);
+    defenderResult = await readUiEvidence(defender);
+  }
+  const defenderDamageCount = defenderResult.events.filter((text) =>
+    text === "Hit taken - 34 HP.").length;
+  const damageTransition = [...defenderResult.eventTransitions].reverse().find((entry) =>
+    entry.text === "Hit taken - 34 HP." && Number.isFinite(entry.t) && entry.t > 0);
+  if (defenderDamageCount !== damageBefore + 1 || defenderResult.playerHp !== 66 || !damageTransition) {
+    throw new Error(`M111 defender did not converge to one timestamped 34 HP punish: ${JSON.stringify(defenderResult)}`);
+  }
+
+  const stunStarts = defenderResult.overlayTransitions.filter((entry) =>
+    entry.visible && entry.title === "STUNNED" && Number.isFinite(entry.t));
+  const stunStart = stunStarts.at(-1);
+  const stunEnd = stunStart
+    ? defenderResult.overlayTransitions.find((entry) =>
+      !entry.visible && entry.title === "STUNNED" && Number.isFinite(entry.t) && entry.t >= stunStart.t)
+    : null;
+  const hitDuringStun = Boolean(stunStart
+    && damageTransition.t >= stunStart.t
+    && (!stunEnd || damageTransition.t <= stunEnd.t));
+  if (!hitDuringStun) {
+    throw new Error(`M111 timestamped browser evidence placed the 34 HP punish outside STUNNED: ${JSON.stringify({ damageTransition, stunStart, stunEnd, eventTransitions: defenderResult.eventTransitions, overlayTransitions: defenderResult.overlayTransitions })}`);
+  }
+
+  const lightThreatsAfter = defenderResult.threatTransitions.filter((entry) =>
+    entry.visible && (entry.phase === "WINDUP" || entry.phase === "STRIKE")).length;
+  if (lightThreatsAfter <= lightThreatsBefore) {
+    throw new Error(`M111 defender never observed the real light threat before the punish: ${JSON.stringify(defenderResult.threatTransitions)}`);
+  }
+  if (attackerResult.playerHp !== 100 || attackerResult.playerGuard !== 100
+    || attackerResult.opponentHp !== 66 || defenderResult.playerHp !== 66) {
+    throw new Error(`M111 post-break punish did not preserve exact HP ownership: ${JSON.stringify([attackerResult, defenderResult])}`);
+  }
+
+  const lightDowns = attackerResult.pointers.filter((event) =>
+    event.type === "pointerdown" && event.button === 0);
+  if (lightDowns.length < 1) {
+    throw new Error(`M111 real light pointer control was not delivered: ${JSON.stringify(attackerResult)}`);
+  }
+  const heavyRecoverySeen = defenderResult.recoveryTransitions.some((entry) =>
+    entry.visible && entry.state === "heavy-attack-recovery"
+      && entry.label === "PUNISH" && entry.detail === "Heavy recovery");
+  if (!heavyRecoverySeen) {
+    throw new Error(`M111 defender never observed the second heavy recovery: ${JSON.stringify(defenderResult.recoveryTransitions)}`);
+  }
+  if (attackerResult.feedbackTransitions.includes("parried")
+    || defenderResult.feedbackTransitions.includes("parry-success")
+    || defenderResult.feedbackTransitions.includes("dodge-success")) {
+    throw new Error(`M111 punish resolved through an unintended defensive fallback: ${JSON.stringify([attackerResult, defenderResult])}`);
+  }
+
+  return [
+    attackerResult,
+    {
+      ...defenderResult,
+      punishObservedWhileStunned: true,
+      punishDamageAtMs: damageTransition.t,
+      punishStunStartedAtMs: stunStart.t,
+      punishStunClearedAtMs: stunEnd?.t ?? null,
+      punishLightThreatTransitions: lightThreatsAfter - lightThreatsBefore,
+    },
+  ];
 }
 
 async function runOnlineUiGuardBreakFlight(entries) {
@@ -2405,14 +2590,17 @@ async function setArenaAttackButton(session, pressed) {
   });
 }
 
-async function performArenaAttackBurst(session, clickCount = 3) {
+async function performArenaAttackBurst(session, clickCount = 3, initialPauseMs = 0, interClickPauseMs = 8) {
   const actions = [];
+  const boundedPauseMs = Math.max(0, Math.min(1000, Math.trunc(initialPauseMs)));
+  const boundedInterClickPauseMs = Math.max(0, Math.min(100, Math.trunc(interClickPauseMs)));
+  if (boundedPauseMs > 0) actions.push({ type: "pause", duration: boundedPauseMs });
   const boundedClickCount = Math.max(1, Math.min(3, Math.trunc(clickCount)));
   for (let index = 0; index < boundedClickCount; index += 1) {
     actions.push({ type: "pointerDown", button: 0 });
     actions.push({ type: "pause", duration: 10 });
     actions.push({ type: "pointerUp", button: 0 });
-    if (index < boundedClickCount - 1) actions.push({ type: "pause", duration: 8 });
+    if (index < boundedClickCount - 1) actions.push({ type: "pause", duration: boundedInterClickPauseMs });
   }
   await webdriver(session.base, "POST", `/session/${session.sessionId}/actions`, {
     actions: [{
@@ -2440,17 +2628,24 @@ async function installUiObserver(session) {
     const threatBearing = document.querySelector('#threat-bearing');
     const threatGuardArc = document.querySelector('#threat-guard-arc');
     if (!target || !arena || !arenaStage || !overlay || !recovery || !threat || !threatCount || !threatSecondary || !threatSecondaryBearing || !threatSecondaryPhase || !threatSecondaryGuardArc || !threatBearing || !threatGuardArc) throw new Error('missing online UI flight target');
-    const state = { events: [], keys: [], pointers: [], overlayTransitions: [], feedbackTransitions: [], recoveryTransitions: [], threatTransitions: [], recoveryTellMaxPixels: 0, parryTellMaxPixels: 0, online: '', startedAt: performance.now() };
+    const state = { events: [], eventTransitions: [], keys: [], pointers: [], overlayTransitions: [], feedbackTransitions: [], recoveryTransitions: [], threatTransitions: [], recoveryTellMaxPixels: 0, parryTellMaxPixels: 0, online: '', startedAt: performance.now() };
     const record = () => {
       const text = target.textContent?.trim() ?? '';
       if (/^Online - player #\\d+ - server tick \\d+$/.test(text)) state.online = text;
-      else if (text && state.events.at(-1) !== text) state.events.push(text);
+      else if (text && state.events.at(-1) !== text) {
+        state.events.push(text);
+        state.eventTransitions.push({
+          text,
+          t: Number((performance.now() - state.startedAt).toFixed(1)),
+        });
+      }
     };
     const recordOverlay = () => {
       const entry = {
         visible: !overlay.hidden,
         title: document.querySelector('#combat-overlay-title')?.textContent?.trim() ?? '',
         detail: document.querySelector('#combat-overlay-detail')?.textContent?.trim() ?? '',
+        t: Number((performance.now() - state.startedAt).toFixed(1)),
       };
       const previous = state.overlayTransitions.at(-1);
       if (!previous || previous.visible !== entry.visible || previous.title !== entry.title || previous.detail !== entry.detail) {
@@ -3379,7 +3574,7 @@ async function waitForUiRespawnEvidence(entries, attacker, defender, timeoutMs) 
 
 async function readUiEvidence(session) {
   const value = await execute(session.base, session.sessionId, `
-    const state = window.__MYASO_M30_UI__ ?? { events: [], keys: [], pointers: [], overlayTransitions: [], feedbackTransitions: [], recoveryTransitions: [], threatTransitions: [], recoveryTellMaxPixels: 0, parryTellMaxPixels: 0, online: '' };
+    const state = window.__MYASO_M30_UI__ ?? { events: [], eventTransitions: [], keys: [], pointers: [], overlayTransitions: [], feedbackTransitions: [], recoveryTransitions: [], threatTransitions: [], recoveryTellMaxPixels: 0, parryTellMaxPixels: 0, online: '' };
     const match = state.online.match(/player #(\\d+)/);
     return {
       title: document.title,
@@ -3428,6 +3623,7 @@ async function readUiEvidence(session) {
       recoveryTellMaxPixels: Number(state.recoveryTellMaxPixels ?? 0),
       parryTellMaxPixels: Number(state.parryTellMaxPixels ?? 0),
       events: state.events.slice(),
+      eventTransitions: (state.eventTransitions ?? []).slice(),
       keys: state.keys.slice(),
       pointers: state.pointers.slice(),
     };

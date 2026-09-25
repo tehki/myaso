@@ -32,6 +32,10 @@ const BLOCK_PARRY_WINDOW_MS: f32 = 115.0;
 const BLOCK_HALF_ANGLE_RADIANS: f32 = std::f32::consts::PI * 0.46;
 const BLOCK_GUARD_DAMAGE: f32 = 38.0;
 const BLOCK_GUARD_BREAK_STUN_MS: f32 = 520.0;
+const GUARD_BREAK_POST_RECOVERY_PUNISH_MS: f32 =
+    BLOCK_GUARD_BREAK_STUN_MS - ATTACK_ACTIVE_MS - ATTACK_RECOVERY_MS;
+const HEAVY_GUARD_BREAK_STUN_MS: f32 =
+    HEAVY_ATTACK_ACTIVE_MS + HEAVY_ATTACK_RECOVERY_MS + GUARD_BREAK_POST_RECOVERY_PUNISH_MS;
 const BLOCK_PARRY_STUN_MS: f32 = 430.0;
 const BLOCK_MOVE_MULTIPLIER: f32 = 0.42;
 const GUARD_MAX: f32 = 100.0;
@@ -578,6 +582,7 @@ struct AttackProfile {
     damage: f32,
     knockback: f32,
     guard_damage: f32,
+    guard_break_stun_ms: f32,
 }
 
 fn attack_profile(action: Action) -> Option<AttackProfile> {
@@ -588,6 +593,7 @@ fn attack_profile(action: Action) -> Option<AttackProfile> {
             damage: ATTACK_DAMAGE,
             knockback: ATTACK_KNOCKBACK,
             guard_damage: BLOCK_GUARD_DAMAGE,
+            guard_break_stun_ms: BLOCK_GUARD_BREAK_STUN_MS,
         }),
         Action::HeavyAttackActive => Some(AttackProfile {
             reach: HEAVY_ATTACK_REACH,
@@ -595,6 +601,7 @@ fn attack_profile(action: Action) -> Option<AttackProfile> {
             damage: HEAVY_ATTACK_DAMAGE,
             knockback: HEAVY_ATTACK_KNOCKBACK,
             guard_damage: HEAVY_ATTACK_GUARD_DAMAGE,
+            guard_break_stun_ms: HEAVY_GUARD_BREAK_STUN_MS,
         }),
         _ => None,
     }
@@ -656,7 +663,7 @@ fn resolve_attacks(
 
                 target.guard = (target.guard - profile.guard_damage).max(0.0);
                 if target.guard <= EPSILON {
-                    target.set_action(Action::Stunned, BLOCK_GUARD_BREAK_STUN_MS);
+                    target.set_action(Action::Stunned, profile.guard_break_stun_ms);
                     events.push(CombatEvent::GuardBreak {
                         attacker: attacker.net_id,
                         target: target.net_id,
