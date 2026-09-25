@@ -1362,7 +1362,7 @@ async function runOnlineUiStunOverlayFlight(entries) {
   return evidence;
 }
 
-async function runOnlineUiHeavyGuardBreakFlight(entries) {
+async function runOnlineUiHeavyGuardBreakFlight(entries, { returnTiming = false } = {}) {
   const staged = await prepareHeavyCounterplayFlight(
     entries,
     "M110 heavy guard break",
@@ -1375,6 +1375,7 @@ async function runOnlineUiHeavyGuardBreakFlight(entries) {
   let firstEvidence = null;
   let finalEvidence = null;
   let blockHeld = false;
+  let secondHeavyIssuedAt = null;
 
   const heavyCommitCount = (state) => state.events.filter((text) =>
     text.startsWith("Heavy strike committed")).length;
@@ -1461,6 +1462,7 @@ async function runOnlineUiHeavyGuardBreakFlight(entries) {
       }
       const commitsBefore = heavyCommitCount(beforeAttacker);
 
+      const attemptIssuedAt = Date.now();
       await pulseMovementKey(attacker, "e", 40);
       await sleep(390);
       const states = await Promise.all(entries.map(readUiEvidence));
@@ -1475,6 +1477,7 @@ async function runOnlineUiHeavyGuardBreakFlight(entries) {
         && attackerState.opponentHp === 100 && attackerState.opponentGuard === 0
         && commitsAfter === commitsBefore + 1;
       if (guardBroken) {
+        secondHeavyIssuedAt = attemptIssuedAt;
         finalEvidence = states;
         break;
       }
@@ -1565,11 +1568,18 @@ async function runOnlineUiHeavyGuardBreakFlight(entries) {
     || defenderResult.feedbackTransitions.includes("parry-success")) {
     throw new Error(`M110 held block accidentally resolved as parry: ${JSON.stringify(evidence)}`);
   }
+  if (returnTiming) {
+    if (!Number.isFinite(secondHeavyIssuedAt)) {
+      throw new Error("M110 timing metadata missing accepted second-heavy issuance");
+    }
+    return { evidence, secondHeavyIssuedAt };
+  }
   return evidence;
 }
 
 async function runOnlineUiHeavyGuardBreakPunishFlight(entries) {
-  const guardBreakEvidence = await runOnlineUiHeavyGuardBreakFlight(entries);
+  const guardBreakResult = await runOnlineUiHeavyGuardBreakFlight(entries, { returnTiming: true });
+  const { evidence: guardBreakEvidence, secondHeavyIssuedAt } = guardBreakResult;
   const attacker = entries.find((entry) => entry.name === "chrome");
   const defender = entries.find((entry) => entry.name === "firefox");
   if (!attacker || !defender) throw new Error("M111 could not resolve fixed heavy guard-break roles");
@@ -1577,52 +1587,30 @@ async function runOnlineUiHeavyGuardBreakPunishFlight(entries) {
   const baselineAttacker = guardBreakEvidence.find((entry) => entry.browser === attacker.name);
   const baselineDefender = guardBreakEvidence.find((entry) => entry.browser === defender.name);
   if (!baselineAttacker || !baselineDefender
-    || baselineDefender.playerHp !== 100 || baselineDefender.playerGuard !== 0) {
-    throw new Error(`M111 did not inherit a clean M110 guard break: ${JSON.stringify(guardBreakEvidence)}`);
+    || baselineDefender.playerHp !== 100 || baselineDefender.playerGuard !== 0
+    || !baselineDefender.overlayVisible || baselineDefender.overlayTitle !== "STUNNED") {
+    throw new Error(`M111 did not inherit a live clean M110 guard break: ${JSON.stringify(guardBreakEvidence)}`);
   }
 
-  // M110 returns shortly after the break while the second heavy is still
-  // committed. Observe its real recovery cue before scheduling the punish.
-  let recoveryEvidence = null;
-  const recoveryDeadline = Date.now() + 300;
-  while (Date.now() < recoveryDeadline) {
-    const states = await Promise.all(entries.map(readUiEvidence));
-    const attackerState = states.find((entry) => entry.browser === attacker.name);
-    const defenderState = states.find((entry) => entry.browser === defender.name);
-    const heavyRecovery = defenderState?.recoveryVisible
-      && defenderState.recoveryState === "heavy-attack-recovery"
-      && defenderState.recoveryLabel === "PUNISH"
-      && defenderState.recoveryDetail === "Heavy recovery";
-    const defenderStunned = defenderState?.overlayVisible
-      && defenderState.overlayTitle === "STUNNED"
-      && defenderState.playerHp === 100
-      && defenderState.playerGuard === 0;
-    if (heavyRecovery && defenderStunned) {
-      recoveryEvidence = states;
-      break;
-    }
-    await sleep(10);
-  }
-  if (!recoveryEvidence) {
-    throw new Error(`M111 never observed heavy recovery overlapping guard-break stun: ${JSON.stringify(await Promise.all(entries.map(readUiEvidence)))}`);
-  }
-
-  const attackerBefore = recoveryEvidence.find((entry) => entry.browser === attacker.name);
-  const defenderBefore = recoveryEvidence.find((entry) => entry.browser === defender.name);
-  const lightCommitsBefore = attackerBefore.events.filter((text) =>
+  const lightCommitsBefore = baselineAttacker.events.filter((text) =>
     text === "Attack committed - your windup is readable.").length;
-  const lightHitsBefore = attackerBefore.events.filter((text) =>
+  const lightHitsBefore = baselineAttacker.events.filter((text) =>
     text === "Opponent hit - 34 HP.").length;
-  const damageBefore = defenderBefore.events.filter((text) =>
+  const damageBefore = baselineDefender.events.filter((text) =>
     text === "Hit taken - 34 HP.").length;
 
-  // Start a bounded genuine-click burst near the tail of the 420 ms heavy
-  // recovery. At least one real click lands after control returns, while the
-  // derived heavy guard-break stun still preserves the same 185 ms post-
-  // recovery punish margin as the existing light guard-break path.
-  await performArenaAttackBurst(attacker, 3, 385);
+  // Time the real click burst from the second E issuance rather than from a
+  // remote recovery snapshot. The three downs are spaced at roughly 845, 875,
+  // and 905 ms after E, straddling the 840 ms heavy commitment plus normal
+  // input-sampling/server-tick skew. At least one click therefore lands just
+  // after control returns without spending the 185 ms punish margin on
+  // WebDriver/snapshot observation latency.
+  const elapsedSinceHeavyIssue = Date.now() - secondHeavyIssuedAt;
+  const firstClickTargetMs = 845;
+  const initialPauseMs = Math.max(0, firstClickTargetMs - elapsedSinceHeavyIssue);
+  await performArenaAttackBurst(attacker, 3, initialPauseMs, 20);
 
-  const hitDeadline = Date.now() + 260;
+  const hitDeadline = Date.now() + 300;
   let hitEvidence = null;
   while (Date.now() < hitDeadline) {
     const states = await Promise.all(entries.map(readUiEvidence));
@@ -1640,11 +1628,15 @@ async function runOnlineUiHeavyGuardBreakPunishFlight(entries) {
         text === "Hit taken - 34 HP.").length > damageBefore;
     const defenderStillStunned = defenderState.overlayVisible
       && defenderState.overlayTitle === "STUNNED";
-    const exactVitals = attackerState.playerHp === 100 && attackerState.playerGuard === 100
-      && defenderState.playerHp === 66 && defenderState.playerGuard === 0
-      && attackerState.opponentHp === 66 && attackerState.opponentGuard === 0;
+    // Guard regeneration remains unchanged and begins after its existing 520 ms
+    // delay even while the longer heavy-break stun is still active. The punish
+    // therefore owns HP/stun correctness, not an artificial frozen guard value.
+    const guardStillNearBroken = defenderState.playerGuard >= 0 && defenderState.playerGuard <= 6
+      && attackerState.opponentGuard >= 0 && attackerState.opponentGuard <= 6;
+    const exactHp = attackerState.playerHp === 100 && attackerState.playerGuard === 100
+      && defenderState.playerHp === 66 && attackerState.opponentHp === 66;
 
-    if (lightCommitted && lightHit && defenderStillStunned && exactVitals) {
+    if (lightCommitted && lightHit && defenderStillStunned && guardStillNearBroken && exactHp) {
       hitEvidence = states;
       break;
     }
@@ -1663,6 +1655,12 @@ async function runOnlineUiHeavyGuardBreakPunishFlight(entries) {
   const lightDown = attackerResult.pointers.find((event) => event.type === "pointerdown" && event.button === 0);
   if (!lightDown) {
     throw new Error(`M111 real light pointer control was not delivered: ${JSON.stringify(attackerResult)}`);
+  }
+  const heavyRecoverySeen = defenderResult.recoveryTransitions.some((entry) =>
+    entry.visible && entry.state === "heavy-attack-recovery"
+      && entry.label === "PUNISH" && entry.detail === "Heavy recovery");
+  if (!heavyRecoverySeen) {
+    throw new Error(`M111 defender never observed the second heavy recovery: ${JSON.stringify(defenderResult.recoveryTransitions)}`);
   }
   if (attackerResult.feedbackTransitions.includes("parried")
     || defenderResult.feedbackTransitions.includes("parry-success")
@@ -2556,16 +2554,17 @@ async function setArenaAttackButton(session, pressed) {
   });
 }
 
-async function performArenaAttackBurst(session, clickCount = 3, initialPauseMs = 0) {
+async function performArenaAttackBurst(session, clickCount = 3, initialPauseMs = 0, interClickPauseMs = 8) {
   const actions = [];
   const boundedPauseMs = Math.max(0, Math.min(1000, Math.trunc(initialPauseMs)));
+  const boundedInterClickPauseMs = Math.max(0, Math.min(100, Math.trunc(interClickPauseMs)));
   if (boundedPauseMs > 0) actions.push({ type: "pause", duration: boundedPauseMs });
   const boundedClickCount = Math.max(1, Math.min(3, Math.trunc(clickCount)));
   for (let index = 0; index < boundedClickCount; index += 1) {
     actions.push({ type: "pointerDown", button: 0 });
     actions.push({ type: "pause", duration: 10 });
     actions.push({ type: "pointerUp", button: 0 });
-    if (index < boundedClickCount - 1) actions.push({ type: "pause", duration: 8 });
+    if (index < boundedClickCount - 1) actions.push({ type: "pause", duration: boundedInterClickPauseMs });
   }
   await webdriver(session.base, "POST", `/session/${session.sessionId}/actions`, {
     actions: [{
