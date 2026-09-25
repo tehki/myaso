@@ -1109,3 +1109,205 @@ fn hex(bytes: &[u8]) -> String {
     }
     result
 }
+
+
+#[test]
+fn wilds_kick_stuns_unblocked_target_without_hp_damage() {
+    let mut world = duel(54.0);
+    advance(
+        &mut world,
+        170.0,
+        InputIntent {
+            kick: true,
+            facing_radians: 0.0,
+            ..InputIntent::default()
+        },
+        InputIntent::default(),
+    );
+    assert_eq!(world.fighter(2).expect("target").hp.round() as u8, 100);
+    assert_eq!(world.fighter(2).expect("target").action, Action::Stunned);
+    assert_eq!(world.fighter(1).expect("attacker").stamina.round() as u8, 82);
+}
+
+#[test]
+fn wilds_blocked_kick_becomes_guard_pressure_without_stun() {
+    let mut world = duel(54.0);
+    let blocking = InputIntent {
+        block: true,
+        facing_radians: std::f32::consts::PI,
+        ..InputIntent::default()
+    };
+    advance(&mut world, 150.0, InputIntent::default(), blocking);
+    advance(
+        &mut world,
+        170.0,
+        InputIntent {
+            kick: true,
+            facing_radians: 0.0,
+            ..InputIntent::default()
+        },
+        blocking,
+    );
+    let target = world.fighter(2).expect("target");
+    assert_eq!(target.hp.round() as u8, 100);
+    assert_eq!(target.guard.round() as u8, 70);
+    assert_eq!(target.action, Action::Block);
+}
+
+#[test]
+fn wilds_roll_collision_knocks_target_down_and_costs_stamina() {
+    let mut world = duel(44.0);
+    let events = advance(
+        &mut world,
+        35.0,
+        InputIntent {
+            move_x: 1.0,
+            facing_radians: 0.0,
+            dodge: true,
+            ..InputIntent::default()
+        },
+        InputIntent::default(),
+    );
+    assert!(events.iter().all(|event| !matches!(event, CombatEvent::Hit { .. })));
+    assert_eq!(world.fighter(1).expect("roller").action, Action::Dodge);
+    assert_eq!(world.fighter(1).expect("roller").stamina.round() as u8, 72);
+    assert_eq!(world.fighter(2).expect("target").action, Action::Stunned);
+}
+
+#[test]
+fn wilds_run_is_faster_and_drains_authoritative_stamina() {
+    let mut world = World::new(800.0, 400.0);
+    assert!(world.add_player_at(1, 100.0, 100.0, 0.0));
+    advance(
+        &mut world,
+        200.0,
+        InputIntent {
+            move_x: 1.0,
+            run: true,
+            facing_radians: 0.0,
+            ..InputIntent::default()
+        },
+        InputIntent::default(),
+    );
+    let runner = world.fighter(1).expect("runner");
+    assert!(runner.x > 100.0 + 215.0 * 0.2);
+    assert!(runner.stamina < 100.0);
+}
+
+#[test]
+fn wilds_jump_converts_into_authoritative_jumping_attack() {
+    let mut world = duel(72.0);
+    advance(
+        &mut world,
+        5.0,
+        InputIntent {
+            jump: true,
+            facing_radians: 0.0,
+            ..InputIntent::default()
+        },
+        InputIntent::default(),
+    );
+    assert_eq!(world.fighter(1).expect("attacker").action, Action::Jump);
+    advance(
+        &mut world,
+        5.0,
+        InputIntent {
+            attack: true,
+            facing_radians: 0.0,
+            ..InputIntent::default()
+        },
+        InputIntent::default(),
+    );
+    assert_eq!(
+        world.fighter(1).expect("attacker").action,
+        Action::JumpAttackWindup
+    );
+    let events = advance(
+        &mut world,
+        220.0,
+        InputIntent {
+            facing_radians: 0.0,
+            ..InputIntent::default()
+        },
+        InputIntent::default(),
+    );
+    assert!(events.iter().any(|event| matches!(
+        event,
+        CombatEvent::Hit {
+            damage: 42,
+            hp: 58,
+            ..
+        }
+    )));
+    assert_eq!(world.fighter(2).expect("target").hp.round() as u8, 58);
+}
+
+#[test]
+fn wilds_parry_stun_preserves_a_comfortable_light_punish_window() {
+    let mut world = duel(72.0);
+    advance(
+        &mut world,
+        110.0,
+        InputIntent {
+            attack: true,
+            facing_radians: 0.0,
+            ..InputIntent::default()
+        },
+        InputIntent::default(),
+    );
+    let parry = advance(
+        &mut world,
+        45.0,
+        InputIntent {
+            facing_radians: 0.0,
+            ..InputIntent::default()
+        },
+        InputIntent {
+            block: true,
+            facing_radians: std::f32::consts::PI,
+            ..InputIntent::default()
+        },
+    );
+    assert!(parry.iter().any(|event| matches!(event, CombatEvent::Parry { .. })));
+    assert_eq!(world.fighter(1).expect("attacker").action, Action::Stunned);
+
+    advance(
+        &mut world,
+        5.0,
+        InputIntent::default(),
+        InputIntent {
+            facing_radians: std::f32::consts::PI,
+            ..InputIntent::default()
+        },
+    );
+    advance(
+        &mut world,
+        5.0,
+        InputIntent::default(),
+        InputIntent {
+            attack: true,
+            facing_radians: std::f32::consts::PI,
+            ..InputIntent::default()
+        },
+    );
+    let punish = advance(
+        &mut world,
+        220.0,
+        InputIntent::default(),
+        InputIntent {
+            facing_radians: std::f32::consts::PI,
+            ..InputIntent::default()
+        },
+    );
+    assert!(punish.iter().any(|event| matches!(
+        event,
+        CombatEvent::Hit {
+            attacker: 2,
+            target: 1,
+            damage: 34,
+            ..
+        }
+    )));
+    assert_eq!(world.fighter(1).expect("attacker").hp.round() as u8, 66);
+    assert_eq!(world.fighter(1).expect("attacker").action, Action::Stunned);
+}
