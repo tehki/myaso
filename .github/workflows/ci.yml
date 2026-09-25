@@ -242,6 +242,13 @@ jobs:
           node --test --test-name-pattern="heavy" tests/m29-combat-readability.test.mjs tests/combat-model.test.mjs
           node scripts/pvp_browser_flight_runner.mjs
 
+      - name: Validate M107 real heavy counterplay
+        run: |
+          node --check scripts/pvp_browser_flight_runner.mjs
+          for scenario in uiheavyblock uiheavyparry uiheavydodge; do
+            MYASO_PVP_SCENARIO="$scenario" node scripts/pvp_browser_flight_runner.mjs
+          done
+
       - name: Validate real browser flight
         env:
           MYASO_FLIGHT_DURATION_MS: "4000"
