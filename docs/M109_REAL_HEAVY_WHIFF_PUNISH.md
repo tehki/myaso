@@ -27,9 +27,9 @@ Browser roles are fixed for repeatability:
 
 ## Exchange
 
-The Firefox attacker first performs the normal shallow role-staging tap, then makes a real 160 ms retreat away from Chrome before pressing real `E`.
+The Firefox attacker first performs the normal shallow role-staging tap, then makes a real 120 ms retreat away from Chrome before pressing real `E`.
 
-The retreat deliberately moves the heavy beyond its contact envelope. Chrome begins closing only as the 320 ms windup plus 100 ms active window expires, so those first closing frames cannot turn the spaced heavy into a late hit.
+The retreat deliberately moves the heavy beyond its contact envelope. Chrome begins closing only near the end of the 320 ms windup plus 100 ms active window; the remaining spacing keeps those first closing frames outside heavy contact while allowing the counterattack to reach during recovery.
 
 During authoritative heavy recovery, Chrome:
 

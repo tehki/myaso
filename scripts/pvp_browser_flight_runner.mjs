@@ -861,13 +861,13 @@ async function runOnlineUiHeavyWhiffPunishFlight(entries) {
   // First create a genuine spacing whiff with real movement away from the
   // defender. The small inherited approach tap keeps role/direction evidence,
   // while this retreat moves the heavy safely beyond its contact envelope.
-  await pulseMovementKey(attacker, retreatMoveKey, 160);
+  await pulseMovementKey(attacker, retreatMoveKey, 120);
   await pulseMovementKey(attacker, "e", 40);
-  // Start closing only as heavy active expires. The attacker is still far enough
-  // away that these first few movement frames cannot turn the whiff into a hit,
-  // while the light active frame still lands inside the 420 ms heavy recovery.
-  await sleep(370);
-  await pulseMovementKey(defender, punishMoveKey, 230);
+  // Begin closing late in heavy active while the retreat still leaves more than
+  // the full heavy contact envelope between fighters. The longer close then
+  // brings the light active frame into range inside the 420 ms recovery.
+  await sleep(340);
+  await pulseMovementKey(defender, punishMoveKey, 270);
   await aimArena(defender, defenderElementId, punishOffset);
   await performArenaAttack(defender, defenderElementId, punishOffset);
   await sleep(320);
