@@ -508,6 +508,7 @@ function drawFighterScreen(x, y, fighter, body, shadow, remote = false, damageTe
   if (action === COMBAT_ACTION.heavyAttackWindup || action === COMBAT_ACTION.heavyAttackActive) drawHeavyAttackTell(action, remote);
   if (action === COMBAT_ACTION.jumpAttackWindup || action === COMBAT_ACTION.jumpAttackActive) drawJumpAttackTell(action, remote);
   if (action === COMBAT_ACTION.kickWindup || action === COMBAT_ACTION.kickActive) drawKickTell(action);
+  drawWeaponTrail(action);
   if (action === COMBAT_ACTION.block) drawBlockTell(remote, fighter);
   if (action === COMBAT_ACTION.dodge) drawDodgeTell(remote);
   if (action === COMBAT_ACTION.stunned) drawStunTell();
@@ -586,6 +587,37 @@ function drawAttackTell(action, remote) {
     ctx.setLineDash([8, 5]);
     ctx.stroke();
   }
+}
+
+function drawWeaponTrail(action) {
+  const light = action === COMBAT_ACTION.attackWindup || action === COMBAT_ACTION.attackActive;
+  const heavy = action === COMBAT_ACTION.heavyAttackWindup || action === COMBAT_ACTION.heavyAttackActive;
+  const jump = action === COMBAT_ACTION.jumpAttackWindup || action === COMBAT_ACTION.jumpAttackActive;
+  if (!light && !heavy && !jump) return;
+
+  const active = action === COMBAT_ACTION.attackActive
+    || action === COMBAT_ACTION.heavyAttackActive
+    || action === COMBAT_ACTION.jumpAttackActive;
+  const radius = heavy ? 44 : jump ? 40 : 36;
+  const start = heavy ? -1.05 : jump ? -0.34 : -0.72;
+  const end = heavy ? 0.72 : jump ? 0.30 : 0.48;
+  ctx.save();
+  ctx.strokeStyle = heavy
+    ? (active ? "rgba(255, 105, 58, .88)" : "rgba(255, 173, 92, .42)")
+    : jump
+      ? (active ? "rgba(255, 150, 72, .9)" : "rgba(255, 195, 102, .42)")
+      : (active ? "rgba(238, 219, 160, .82)" : "rgba(214, 195, 148, .34)");
+  ctx.lineWidth = heavy ? 8 : jump ? 6 : 5;
+  ctx.lineCap = "round";
+  ctx.beginPath();
+  ctx.arc(0, 0, radius, start, end);
+  ctx.stroke();
+  ctx.globalAlpha = 0.34;
+  ctx.lineWidth *= 1.75;
+  ctx.beginPath();
+  ctx.arc(0, 0, radius - 4, start + 0.10, end - 0.08);
+  ctx.stroke();
+  ctx.restore();
 }
 
 function drawHeavyAttackTell(action, remote) {
