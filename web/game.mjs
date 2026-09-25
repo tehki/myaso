@@ -28,10 +28,11 @@ const world = createWorld({ width: canvas.width, height: canvas.height, fighters
 
 const keys = new Set();
 const mouse = { x: 700, y: 270, block: false };
-const playerInputState = { moveX: 0, moveY: 0, aimX: mouse.x, aimY: mouse.y, attack: false, block: false, dodge: false };
-const botInputState = { moveX: 0, moveY: 0, aimX: player.x, aimY: player.y, attack: false, block: false, dodge: false };
+const playerInputState = { moveX: 0, moveY: 0, aimX: mouse.x, aimY: mouse.y, attack: false, heavyAttack: false, block: false, dodge: false };
+const botInputState = { moveX: 0, moveY: 0, aimX: player.x, aimY: player.y, attack: false, heavyAttack: false, block: false, dodge: false };
 const inputs = { player: playerInputState, bot: botInputState };
 let attackRequested = false;
+let heavyAttackRequested = false;
 let dodgeRequested = false;
 let lastBotAttackAt = -1000;
 let botBlockUntil = 0;
@@ -59,8 +60,9 @@ canvas.addEventListener("pointerup", (event) => {
 canvas.addEventListener("pointermove", updateMouse);
 window.addEventListener("blur", releaseInputs);
 canvas.addEventListener("keydown", (event) => {
-  if (["KeyW", "KeyA", "KeyS", "KeyD", "Space"].includes(event.code)) event.preventDefault();
+  if (["KeyW", "KeyA", "KeyS", "KeyD", "KeyE", "Space"].includes(event.code)) event.preventDefault();
   keys.add(event.code);
+  if (event.code === "KeyE" && !event.repeat) heavyAttackRequested = true;
   if (event.code === "Space" && !event.repeat) dodgeRequested = true;
 });
 canvas.addEventListener("keyup", (event) => keys.delete(event.code));
@@ -69,6 +71,7 @@ document.addEventListener("visibilitychange", handleVisibilityChange);
 function releaseInputs() {
   keys.clear();
   attackRequested = false;
+  heavyAttackRequested = false;
   dodgeRequested = false;
   mouse.block = false;
 }
@@ -85,9 +88,11 @@ function playerInput() {
   playerInputState.aimX = mouse.x;
   playerInputState.aimY = mouse.y;
   playerInputState.attack = attackRequested;
+  playerInputState.heavyAttack = heavyAttackRequested;
   playerInputState.block = mouse.block;
   playerInputState.dodge = dodgeRequested;
   attackRequested = false;
+  heavyAttackRequested = false;
   dodgeRequested = false;
   return playerInputState;
 }
@@ -104,10 +109,11 @@ function botInput() {
   botInputState.moveX = 0;
   botInputState.moveY = 0;
   botInputState.attack = false;
+  botInputState.heavyAttack = false;
   botInputState.block = false;
   botInputState.dodge = false;
 
-  if (player.action === "attack_windup" && distance < 118) {
+  if ((player.action === "attack_windup" || player.action === "heavy_attack_windup") && distance < 124) {
     const observedWindup = player.actionElapsedMs;
     if (observedWindup > 72 && botBlockUntil < world.nowMs && botDodgeUntil < world.nowMs) {
       const decision = Math.floor(world.nowMs / 900) % 3;
@@ -189,7 +195,9 @@ function setEventText(text) {
 function actionHint() {
   if (player.action === "dead") return "Down. Read the exchange and reset.";
   if (player.action === "attack_windup") return "Committed — your strike is readable now.";
+  if (player.action === "heavy_attack_windup") return "Heavy committed — the long tell can be dodged or parried.";
   if (player.action === "attack_recovery") return "Recovery — this is where careless attacks get punished.";
+  if (player.action === "heavy_attack_recovery") return "Heavy recovery — you are very punishable now.";
   if (player.action === "block" && player.actionElapsedMs <= COMBAT.block.parryWindowMs) return "Parry window active.";
   if (player.action === "block") return "Blocking — keep your opponent in front of you.";
   if (player.action === "dodge") return "Dodge i-frames — reposition, don't spam.";
@@ -237,6 +245,7 @@ function drawFighter(fighter, body, shadow) {
   ctx.globalAlpha = dead ? 0.28 : 1;
 
   if (fighter.action === "attack_windup" || fighter.action === "attack_active") drawAttackArc(fighter);
+  if (fighter.action === "heavy_attack_windup" || fighter.action === "heavy_attack_active") drawHeavyAttackArc(fighter);
   if (fighter.action === "block") drawBlockArc(fighter);
   if (fighter.action === "dodge" && fighter.actionElapsedMs <= COMBAT.dodge.iframeMs) {
     ctx.strokeStyle = "rgba(216, 202, 160, .5)";
@@ -274,6 +283,35 @@ function drawAttackArc(fighter) {
   ctx.arc(0, 0, COMBAT.attack.reach + COMBAT.fighterRadius, -COMBAT.attack.arcRadians / 2, COMBAT.attack.arcRadians / 2);
   ctx.closePath();
   ctx.fill();
+}
+
+function drawHeavyAttackArc(fighter) {
+  const progress = fighter.action === "heavy_attack_windup"
+    ? fighter.actionElapsedMs / COMBAT.heavyAttack.windupMs
+    : 1;
+  const alpha = fighter.action === "heavy_attack_active" ? 0.32 : 0.10 + Math.min(1, progress) * 0.16;
+  ctx.fillStyle = `rgba(255, 112, 64, ${alpha})`;
+  ctx.strokeStyle = fighter.action === "heavy_attack_active"
+    ? "rgba(255, 72, 42, .95)"
+    : "rgba(255, 174, 92, .82)";
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.moveTo(0, 0);
+  ctx.arc(
+    0,
+    0,
+    COMBAT.heavyAttack.reach + COMBAT.fighterRadius,
+    -COMBAT.heavyAttack.arcRadians / 2,
+    COMBAT.heavyAttack.arcRadians / 2,
+  );
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+  ctx.setLineDash([5, 5]);
+  ctx.beginPath();
+  ctx.arc(0, 0, COMBAT.fighterRadius + 8, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.setLineDash([]);
 }
 
 function drawBlockArc(fighter) {

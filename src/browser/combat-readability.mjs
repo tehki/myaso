@@ -10,6 +10,9 @@ export const COMBAT_ACTION = Object.freeze({
   block: 6,
   stunned: 7,
   dead: 8,
+  heavyAttackWindup: 9,
+  heavyAttackActive: 10,
+  heavyAttackRecovery: 11,
 });
 
 const PRIORITY = Object.freeze({
@@ -107,6 +110,12 @@ export function combatActionHint(entity) {
       return "Strike active - finish the commitment.";
     case COMBAT_ACTION.attackRecovery:
       return "Recovery - you can be punished now.";
+    case COMBAT_ACTION.heavyAttackWindup:
+      return "Heavy strike committed - the long windup is readable.";
+    case COMBAT_ACTION.heavyAttackActive:
+      return "Heavy strike active - finish the commitment.";
+    case COMBAT_ACTION.heavyAttackRecovery:
+      return "Heavy recovery - you are highly punishable now.";
     case COMBAT_ACTION.dodge:
       return "Dodging - use the movement to reset spacing.";
     case COMBAT_ACTION.block:
@@ -123,6 +132,9 @@ export function combatActionHint(entity) {
 export function opponentRecoveryPresentation(entity) {
   if (entity?.action === COMBAT_ACTION.attackRecovery) {
     return { visible: true, state: "attack-recovery", label: "PUNISH", detail: "Attack recovery" };
+  }
+  if (entity?.action === COMBAT_ACTION.heavyAttackRecovery) {
+    return { visible: true, state: "heavy-attack-recovery", label: "PUNISH", detail: "Heavy recovery" };
   }
   if (entity?.action === COMBAT_ACTION.dodgeRecovery) {
     return { visible: true, state: "dodge-recovery", label: "PUNISH", detail: "Dodge recovery" };
@@ -168,6 +180,8 @@ export function fighterIdentityPresentation(netId) {
 }
 
 export function fighterThreatPhaseLabel(attacker) {
+  if (attacker?.action === COMBAT_ACTION.heavyAttackActive) return "HEAVY STRIKE";
+  if (attacker?.action === COMBAT_ACTION.heavyAttackWindup) return "HEAVY WINDUP";
   if (attacker?.action === COMBAT_ACTION.attackActive) return "STRIKE";
   if (attacker?.action === COMBAT_ACTION.attackWindup) return "WINDUP";
   return "";
@@ -201,9 +215,6 @@ export function fighterThreatNetId(state, ownId = 0, summary = null) {
   if (!(state instanceof Map) || !Number.isInteger(ownId) || ownId <= 0) return 0;
   const own = state.get(ownId);
   if (!own || own.action === COMBAT_ACTION.dead || !Number.isFinite(own.x) || !Number.isFinite(own.y)) return 0;
-  const maxDistance = COMBAT.attack.reach + COMBAT.fighterRadius;
-  const maxDistanceSquared = maxDistance * maxDistance;
-  const halfArc = COMBAT.attack.arcRadians / 2;
   let bestNetId = 0;
   let bestPriority = Infinity;
   let bestDistanceSquared = Infinity;
@@ -212,20 +223,24 @@ export function fighterThreatNetId(state, ownId = 0, summary = null) {
   let secondDistanceSquared = Infinity;
   let threatCount = 0;
   for (const entity of state.values()) {
-    const priority = entity?.action === COMBAT_ACTION.attackActive ? 0
-      : entity?.action === COMBAT_ACTION.attackWindup ? 1
-        : Infinity;
+    const active = entity?.action === COMBAT_ACTION.attackActive || entity?.action === COMBAT_ACTION.heavyAttackActive;
+    const windup = entity?.action === COMBAT_ACTION.attackWindup || entity?.action === COMBAT_ACTION.heavyAttackWindup;
+    const priority = active ? 0 : windup ? 1 : Infinity;
+    const profile = entity?.action === COMBAT_ACTION.heavyAttackActive || entity?.action === COMBAT_ACTION.heavyAttackWindup
+      ? COMBAT.heavyAttack
+      : COMBAT.attack;
     if (!Number.isFinite(priority) || entity.netId === ownId || !Number.isInteger(entity.netId) || entity.netId <= 0
       || !Number.isFinite(entity.x) || !Number.isFinite(entity.y) || !Number.isFinite(entity.facing)) continue;
     const dx = own.x - entity.x;
     const dy = own.y - entity.y;
     const distanceSquared = dx * dx + dy * dy;
-    if (distanceSquared > maxDistanceSquared) continue;
+    const maxDistance = profile.reach + COMBAT.fighterRadius;
+    if (distanceSquared > maxDistance * maxDistance) continue;
     const angleToOwn = Math.atan2(dy, dx);
     let delta = angleToOwn - entity.facing;
     while (delta > Math.PI) delta -= Math.PI * 2;
     while (delta < -Math.PI) delta += Math.PI * 2;
-    if (Math.abs(delta) > halfArc) continue;
+    if (Math.abs(delta) > profile.arcRadians / 2) continue;
     threatCount += 1;
     const betterThanBest = priority < bestPriority
       || (priority === bestPriority && (distanceSquared < bestDistanceSquared
@@ -387,7 +402,7 @@ function collectDodgeEvents(events, own, peer, ownId, pending) {
     const vitalsStable = defender && defender.hp === pending.hp && defender.guard === pending.guard;
     if (!attacker || !vitalsStable) {
       pending = null;
-    } else if (attacker.action === COMBAT_ACTION.attackRecovery) {
+    } else if (isAttackRecovery(attacker.action)) {
       if (pending.activeSeen) {
         const ownDefended = defender.netId === ownId;
         push(
@@ -399,42 +414,63 @@ function collectDodgeEvents(events, own, peer, ownId, pending) {
         );
       }
       pending = null;
-    } else if (attacker.action === COMBAT_ACTION.attackActive) {
+    } else if (isAttackActive(attacker.action)) {
       pending.activeSeen = true;
-    } else if (attacker.action !== COMBAT_ACTION.attackWindup) {
+    } else if (!isAttackWindup(attacker.action)) {
       pending = null;
     }
   }
 
-  const ownThreat = peer.action === COMBAT_ACTION.attackWindup || peer.action === COMBAT_ACTION.attackActive;
+  const ownThreat = isAttackWindup(peer.action) || isAttackActive(peer.action);
   if (ownThreat && own.action === COMBAT_ACTION.dodge && attackThreatens(peer, own)) {
     return {
       attackerId: peer.netId,
       defenderId: own.netId,
       hp: own.hp,
       guard: own.guard,
-      activeSeen: peer.action === COMBAT_ACTION.attackActive,
+      activeSeen: isAttackActive(peer.action),
     };
   }
-  const peerThreat = own.action === COMBAT_ACTION.attackWindup || own.action === COMBAT_ACTION.attackActive;
+  const peerThreat = isAttackWindup(own.action) || isAttackActive(own.action);
   if (peerThreat && peer.action === COMBAT_ACTION.dodge && attackThreatens(own, peer)) {
     return {
       attackerId: own.netId,
       defenderId: peer.netId,
       hp: peer.hp,
       guard: peer.guard,
-      activeSeen: own.action === COMBAT_ACTION.attackActive,
+      activeSeen: isAttackActive(own.action),
     };
   }
   return pending;
 }
 
+function isAttackWindup(action) {
+  return action === COMBAT_ACTION.attackWindup || action === COMBAT_ACTION.heavyAttackWindup;
+}
+
+function isAttackActive(action) {
+  return action === COMBAT_ACTION.attackActive || action === COMBAT_ACTION.heavyAttackActive;
+}
+
+function isAttackRecovery(action) {
+  return action === COMBAT_ACTION.attackRecovery || action === COMBAT_ACTION.heavyAttackRecovery;
+}
+
+function attackProfileForAction(action) {
+  return action === COMBAT_ACTION.heavyAttackWindup
+    || action === COMBAT_ACTION.heavyAttackActive
+    || action === COMBAT_ACTION.heavyAttackRecovery
+    ? COMBAT.heavyAttack
+    : COMBAT.attack;
+}
+
 function attackThreatens(attacker, defender) {
   if (![attacker.x, attacker.y, attacker.facing, defender.x, defender.y].every(Number.isFinite)) return false;
+  const profile = attackProfileForAction(attacker.action);
   const dx = defender.x - attacker.x;
   const dy = defender.y - attacker.y;
-  if (Math.hypot(dx, dy) > COMBAT.attack.reach + COMBAT.fighterRadius) return false;
-  return Math.abs(normalizeAngle(Math.atan2(dy, dx) - attacker.facing)) <= COMBAT.attack.arcRadians / 2;
+  if (Math.hypot(dx, dy) > profile.reach + COMBAT.fighterRadius) return false;
+  return Math.abs(normalizeAngle(Math.atan2(dy, dx) - attacker.facing)) <= profile.arcRadians / 2;
 }
 
 function normalizeAngle(angle) {

@@ -231,6 +231,17 @@ jobs:
           cargo test --locked --manifest-path server/Cargo.toml coalesces_redundant_heavy_attack_edge_with_committed_facing
           node --test --test-name-pattern="heavy attack|heavy strike" tests/combat-model.test.mjs tests/networking.test.mjs tests/m6-browser-authority.test.mjs
 
+      - name: Validate M106 heavy strike control and readability
+        env:
+          MYASO_PVP_SCENARIO: "uiheavy"
+        run: |
+          node --check web/game.mjs
+          node --check web/online-game.mjs
+          node --check src/browser/combat-readability.mjs
+          node --check scripts/pvp_browser_flight_runner.mjs
+          node --test --test-name-pattern="heavy" tests/m29-combat-readability.test.mjs tests/combat-model.test.mjs
+          node scripts/pvp_browser_flight_runner.mjs
+
       - name: Validate real browser flight
         env:
           MYASO_FLIGHT_DURATION_MS: "4000"
