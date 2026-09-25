@@ -848,26 +848,27 @@ async function runOnlineUiHeavyWhiffPunishFlight(entries) {
   const staged = await prepareHeavyCounterplayFlight(
     entries,
     "M109 heavy whiff punish",
-    { attackerName: "firefox", defenderName: "chrome", movementMs: 20 },
+    { attackerName: "firefox", defenderName: "chrome", movementMs: 160 },
   );
-  const { attacker, defender, defenderElementId, movementCode } = staged;
+  const { attacker, defender, attackerElementId, defenderElementId, movementCode } = staged;
   const attackRight = movementCode === "KeyD";
-  const retreatMoveKey = attackRight ? "a" : "d";
-  const retreatMoveCode = attackRight ? "KeyA" : "KeyD";
+  const attackOffset = attackRight ? 200 : -200;
+  const whiffOffset = -attackOffset;
   const punishMoveKey = attackRight ? "a" : "d";
   const punishMoveCode = attackRight ? "KeyA" : "KeyD";
   const punishOffset = attackRight ? -200 : 200;
 
-  // First create a genuine spacing whiff with real movement away from the
-  // defender. The small inherited approach tap keeps role/direction evidence,
-  // while this retreat moves the heavy safely beyond its contact envelope.
-  await pulseMovementKey(attacker, retreatMoveKey, 120);
+  // Stage inside punish range, then deliberately face the heavy away from
+  // the defender. This creates a deterministic directional whiff without making
+  // the acceptance depend on sub-frame distance thresholds.
+  await aimArena(attacker, attackerElementId, whiffOffset);
+  await sleep(40);
   await pulseMovementKey(attacker, "e", 40);
-  // Begin closing late in heavy active while the retreat still leaves more than
-  // the full heavy contact envelope between fighters. The longer close then
-  // brings the light active frame into range inside the 420 ms recovery.
-  await sleep(340);
-  await pulseMovementKey(defender, punishMoveKey, 270);
+  // Heavy active ends at 420 ms. Begin the counter just after that transition;
+  // the short real close keeps the light attack comfortably in range while its
+  // active frame still lands inside the unchanged 420 ms heavy recovery.
+  await sleep(390);
+  await pulseMovementKey(defender, punishMoveKey, 60);
   await aimArena(defender, defenderElementId, punishOffset);
   await performArenaAttack(defender, defenderElementId, punishOffset);
   await sleep(320);
@@ -880,10 +881,6 @@ async function runOnlineUiHeavyWhiffPunishFlight(entries) {
   }
 
   assertHeavyControlDelivered(attackerResult, movementCode, "M109 heavy whiff punish");
-  if (!attackerResult.keys.includes(`keydown:${retreatMoveCode}`)
-    || !attackerResult.keys.includes(`keyup:${retreatMoveCode}`)) {
-    throw new Error(`M109 real heavy-spacing retreat was not delivered: ${JSON.stringify(attackerResult)}`);
-  }
   if (!defenderResult.keys.includes(`keydown:${punishMoveCode}`)
     || !defenderResult.keys.includes(`keyup:${punishMoveCode}`)) {
     throw new Error(`M109 punish closing movement was not delivered: ${JSON.stringify(defenderResult)}`);
@@ -904,7 +901,7 @@ async function runOnlineUiHeavyWhiffPunishFlight(entries) {
   }
   if (attackerResult.events.includes("Opponent hit - 46 HP.")
     || defenderResult.events.includes("Hit taken - 46 HP.")) {
-    throw new Error(`M109 spacing whiff unexpectedly connected the heavy strike: ${JSON.stringify(evidence)}`);
+    throw new Error(`M109 directional whiff unexpectedly connected the heavy strike: ${JSON.stringify(evidence)}`);
   }
   if (!defenderResult.events.includes("Opponent hit - 34 HP.")
     || !attackerResult.events.includes("Hit taken - 34 HP.")) {

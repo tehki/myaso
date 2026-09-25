@@ -2,7 +2,7 @@
 
 ## Objective
 
-Prove with genuine Chrome/Firefox controls that heavy commitment creates a real punish window after a spacing whiff.
+Prove with genuine Chrome/Firefox controls that heavy commitment creates a real punish window after a deliberate directional whiff.
 
 M109 exercises the combat north-star rule that recovery must reward spacing, timing, and counter-commitment. It changes no production combat or protocol behavior.
 
@@ -12,7 +12,7 @@ M108 exact green head `a053d2af22d4a1fb65a847dcefde2b6508bb8ee9`.
 
 Quality run `36117355555`: PASS.
 
-M108 already proves the heavy edge survives deliberate first-send input loss. M109 proves the resulting playable heavy can be whiff-punished by a real opponent.
+M108 already proves the heavy edge survives deliberate first-send input loss. M109 proves the resulting playable heavy can be whiff-punished by a real opponent after committing in the wrong direction.
 
 ## Scenario
 
@@ -23,13 +23,13 @@ New scenario:
 Browser roles are fixed for repeatability:
 
 - Firefox: heavy attacker;
-- Chrome: spacing defender / light punisher.
+- Chrome: defender / light punisher.
 
 ## Exchange
 
-The Firefox attacker first performs the normal shallow role-staging tap, then makes a real 120 ms retreat away from Chrome before pressing real `E`.
+Firefox first stages inside punish range with real movement, then deliberately aims the heavy away from Chrome before pressing real `E`.
 
-The retreat deliberately moves the heavy beyond its contact envelope. Chrome begins closing only near the end of the 320 ms windup plus 100 ms active window; the remaining spacing keeps those first closing frames outside heavy contact while allowing the counterattack to reach during recovery.
+The wrong-facing heavy remains fully committed through its unchanged 320 ms windup and 100 ms active window but cannot connect through the authoritative directional arc. Chrome waits for heavy active to end, then uses a short real closing movement before counterattacking.
 
 During authoritative heavy recovery, Chrome:
 
@@ -43,7 +43,7 @@ The light active frame lands while the attacker's unchanged 420 ms heavy recover
 
 The flight requires:
 
-- real heavy role-staging movement, retreat movement, and `KeyE` down/up delivery;
+- real heavy role-staging movement and `KeyE` down/up delivery;
 - no 46-damage heavy hit;
 - visible `PUNISH · Heavy recovery`;
 - real defender closing movement;
