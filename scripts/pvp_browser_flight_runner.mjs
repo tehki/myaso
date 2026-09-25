@@ -1607,25 +1607,10 @@ async function runOnlineUiHeavyGuardBreakPunishFlight(entries) {
   const elapsedSinceHeavyIssue = Date.now() - secondHeavyIssuedAt;
   const firstClickTargetMs = 835;
   const initialPauseMs = Math.max(0, firstClickTargetMs - elapsedSinceHeavyIssue);
-  const attackPromise = performArenaAttackBurst(attacker, 3, initialPauseMs, 12);
-
-  // Observe the defender concurrently while Chrome executes its delayed real
-  // pointer sequence. This avoids serializing the proof behind the WebDriver
-  // action call: the acceptance records the authoritative 34 HP transition at
-  // the moment Firefox still renders the server-owned STUNNED state.
-  const observeDeadline = Date.now() + initialPauseMs + 360;
-  let defenderHitWhileStunned = null;
-  let lastDefenderState = baselineDefender;
-  while (Date.now() < observeDeadline && !defenderHitWhileStunned) {
-    const defenderState = await readUiEvidence(defender);
-    lastDefenderState = defenderState;
-    const damageSeen = defenderState.playerHp === 66
-      && defenderState.events.filter((text) => text === "Hit taken - 34 HP.").length > damageBefore;
-    const stillStunned = defenderState.overlayVisible && defenderState.overlayTitle === "STUNNED";
-    if (damageSeen && stillStunned) defenderHitWhileStunned = defenderState;
-    await sleep(5);
-  }
-  await attackPromise;
+  // The in-page observer timestamps both event-text and overlay mutations. That
+  // provides stronger ordering evidence than repeated WebDriver reads and does
+  // not perturb Firefox while the real Chrome action sequence is executing.
+  await performArenaAttackBurst(attacker, 3, initialPauseMs, 12);
 
   const attackerDeadline = Date.now() + 260;
   let attackerResult = null;
@@ -1641,16 +1626,30 @@ async function runOnlineUiHeavyGuardBreakPunishFlight(entries) {
   }
 
   const defenderResult = await readUiEvidence(defender);
-  if (!defenderHitWhileStunned) {
-    throw new Error(`M111 defender never observed the 34 HP punish while still authoritatively STUNNED: ${JSON.stringify({ lastDefenderState, defenderResult })}`);
-  }
   if (!attackerResult) {
     throw new Error(`M111 attacker never confirmed exactly one real 34 HP light punish: ${JSON.stringify(await readUiEvidence(attacker))}`);
   }
-  const lightThreatsAfter = defenderHitWhileStunned.threatTransitions.filter((entry) =>
+
+  const damageTransition = [...defenderResult.eventTransitions].reverse().find((entry) =>
+    entry.text === "Hit taken - 34 HP." && entry.t > 0);
+  const stunStarts = defenderResult.overlayTransitions.filter((entry) =>
+    entry.visible && entry.title === "STUNNED" && Number.isFinite(entry.t));
+  const stunStart = stunStarts.at(-1);
+  const stunEnd = stunStart
+    ? defenderResult.overlayTransitions.find((entry) =>
+      !entry.visible && entry.title === "STUNNED" && Number.isFinite(entry.t) && entry.t >= stunStart.t)
+    : null;
+  const hitDuringStun = Boolean(damageTransition && stunStart
+    && damageTransition.t >= stunStart.t
+    && (!stunEnd || damageTransition.t <= stunEnd.t));
+  if (!hitDuringStun) {
+    throw new Error(`M111 timestamped browser evidence placed the 34 HP punish outside STUNNED: ${JSON.stringify({ damageTransition, stunStart, stunEnd, eventTransitions: defenderResult.eventTransitions, overlayTransitions: defenderResult.overlayTransitions })}`);
+  }
+
+  const lightThreatsAfter = defenderResult.threatTransitions.filter((entry) =>
     entry.visible && (entry.phase === "WINDUP" || entry.phase === "STRIKE")).length;
   if (lightThreatsAfter <= lightThreatsBefore) {
-    throw new Error(`M111 defender never observed the real light threat before the punish: ${JSON.stringify(defenderHitWhileStunned.threatTransitions)}`);
+    throw new Error(`M111 defender never observed the real light threat before the punish: ${JSON.stringify(defenderResult.threatTransitions)}`);
   }
   if (attackerResult.playerHp !== 100 || attackerResult.playerGuard !== 100
     || attackerResult.opponentHp !== 66 || defenderResult.playerHp !== 66) {
@@ -1679,8 +1678,9 @@ async function runOnlineUiHeavyGuardBreakPunishFlight(entries) {
     {
       ...defenderResult,
       punishObservedWhileStunned: true,
-      punishObservedHp: defenderHitWhileStunned.playerHp,
-      punishObservedGuard: defenderHitWhileStunned.playerGuard,
+      punishDamageAtMs: damageTransition.t,
+      punishStunStartedAtMs: stunStart.t,
+      punishStunClearedAtMs: stunEnd?.t ?? null,
       punishLightThreatTransitions: lightThreatsAfter - lightThreatsBefore,
     },
   ];
@@ -2608,17 +2608,24 @@ async function installUiObserver(session) {
     const threatBearing = document.querySelector('#threat-bearing');
     const threatGuardArc = document.querySelector('#threat-guard-arc');
     if (!target || !arena || !arenaStage || !overlay || !recovery || !threat || !threatCount || !threatSecondary || !threatSecondaryBearing || !threatSecondaryPhase || !threatSecondaryGuardArc || !threatBearing || !threatGuardArc) throw new Error('missing online UI flight target');
-    const state = { events: [], keys: [], pointers: [], overlayTransitions: [], feedbackTransitions: [], recoveryTransitions: [], threatTransitions: [], recoveryTellMaxPixels: 0, parryTellMaxPixels: 0, online: '', startedAt: performance.now() };
+    const state = { events: [], eventTransitions: [], keys: [], pointers: [], overlayTransitions: [], feedbackTransitions: [], recoveryTransitions: [], threatTransitions: [], recoveryTellMaxPixels: 0, parryTellMaxPixels: 0, online: '', startedAt: performance.now() };
     const record = () => {
       const text = target.textContent?.trim() ?? '';
       if (/^Online - player #\\d+ - server tick \\d+$/.test(text)) state.online = text;
-      else if (text && state.events.at(-1) !== text) state.events.push(text);
+      else if (text && state.events.at(-1) !== text) {
+        state.events.push(text);
+        state.eventTransitions.push({
+          text,
+          t: Number((performance.now() - state.startedAt).toFixed(1)),
+        });
+      }
     };
     const recordOverlay = () => {
       const entry = {
         visible: !overlay.hidden,
         title: document.querySelector('#combat-overlay-title')?.textContent?.trim() ?? '',
         detail: document.querySelector('#combat-overlay-detail')?.textContent?.trim() ?? '',
+        t: Number((performance.now() - state.startedAt).toFixed(1)),
       };
       const previous = state.overlayTransitions.at(-1);
       if (!previous || previous.visible !== entry.visible || previous.title !== entry.title || previous.detail !== entry.detail) {
@@ -3547,7 +3554,7 @@ async function waitForUiRespawnEvidence(entries, attacker, defender, timeoutMs) 
 
 async function readUiEvidence(session) {
   const value = await execute(session.base, session.sessionId, `
-    const state = window.__MYASO_M30_UI__ ?? { events: [], keys: [], pointers: [], overlayTransitions: [], feedbackTransitions: [], recoveryTransitions: [], threatTransitions: [], recoveryTellMaxPixels: 0, parryTellMaxPixels: 0, online: '' };
+    const state = window.__MYASO_M30_UI__ ?? { events: [], eventTransitions: [], keys: [], pointers: [], overlayTransitions: [], feedbackTransitions: [], recoveryTransitions: [], threatTransitions: [], recoveryTellMaxPixels: 0, parryTellMaxPixels: 0, online: '' };
     const match = state.online.match(/player #(\\d+)/);
     return {
       title: document.title,
@@ -3596,6 +3603,7 @@ async function readUiEvidence(session) {
       recoveryTellMaxPixels: Number(state.recoveryTellMaxPixels ?? 0),
       parryTellMaxPixels: Number(state.parryTellMaxPixels ?? 0),
       events: state.events.slice(),
+      eventTransitions: (state.eventTransitions ?? []).slice(),
       keys: state.keys.slice(),
       pointers: state.pointers.slice(),
     };
