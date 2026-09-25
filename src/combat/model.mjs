@@ -169,6 +169,7 @@ function normalizeInput(input = {}) {
 }
 
 function updateFacing(fighter, input) {
+  if (fighter.action === "knockdown") return;
   if (input.aimX === null || input.aimY === null) return;
   const dx = input.aimX - fighter.x;
   const dy = input.aimY - fighter.y;
