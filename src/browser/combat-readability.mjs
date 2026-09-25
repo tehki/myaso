@@ -13,6 +13,13 @@ export const COMBAT_ACTION = Object.freeze({
   heavyAttackWindup: 9,
   heavyAttackActive: 10,
   heavyAttackRecovery: 11,
+  kickWindup: 12,
+  kickActive: 13,
+  kickRecovery: 14,
+  jump: 15,
+  jumpAttackWindup: 16,
+  jumpAttackActive: 17,
+  jumpAttackRecovery: 18,
 });
 
 const PRIORITY = Object.freeze({
