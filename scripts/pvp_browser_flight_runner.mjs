@@ -1599,61 +1599,64 @@ async function runOnlineUiHeavyGuardBreakPunishFlight(entries) {
   const damageBefore = baselineDefender.events.filter((text) =>
     text === "Hit taken - 34 HP.").length;
 
-  // Time the real click burst from the second E issuance rather than from a
-  // remote recovery snapshot. The three downs are spaced at roughly 845, 875,
-  // and 905 ms after E, straddling the 840 ms heavy commitment plus normal
-  // input-sampling/server-tick skew. At least one click therefore lands just
-  // after control returns without spending the 185 ms punish margin on
-  // WebDriver/snapshot observation latency.
+  // Time genuine clicks from the accepted second-heavy request rather than from
+  // a remote recovery snapshot. Downs are centered tightly around the unchanged
+  // 840 ms heavy commitment boundary. The first may be ignored just before Idle;
+  // the following downs cross that boundary without spending the 185 ms punish
+  // margin on WebDriver/snapshot observation latency.
   const elapsedSinceHeavyIssue = Date.now() - secondHeavyIssuedAt;
-  const firstClickTargetMs = 845;
+  const firstClickTargetMs = 835;
   const initialPauseMs = Math.max(0, firstClickTargetMs - elapsedSinceHeavyIssue);
-  await performArenaAttackBurst(attacker, 3, initialPauseMs, 20);
+  const attackPromise = performArenaAttackBurst(attacker, 3, initialPauseMs, 12);
 
-  const hitDeadline = Date.now() + 300;
-  let hitEvidence = null;
-  while (Date.now() < hitDeadline) {
-    const states = await Promise.all(entries.map(readUiEvidence));
-    const attackerState = states.find((entry) => entry.browser === attacker.name);
-    const defenderState = states.find((entry) => entry.browser === defender.name);
-    if (!attackerState || !defenderState) {
-      throw new Error(`M111 incomplete punish evidence: ${JSON.stringify(states)}`);
-    }
+  // Observe the defender concurrently while Chrome executes its delayed real
+  // pointer sequence. This avoids serializing the proof behind the WebDriver
+  // action call: the acceptance records the authoritative 34 HP transition at
+  // the moment Firefox still renders the server-owned STUNNED state.
+  const observeDeadline = Date.now() + initialPauseMs + 360;
+  let defenderHitWhileStunned = null;
+  let lastDefenderState = baselineDefender;
+  while (Date.now() < observeDeadline && !defenderHitWhileStunned) {
+    const defenderState = await readUiEvidence(defender);
+    lastDefenderState = defenderState;
+    const damageSeen = defenderState.playerHp === 66
+      && defenderState.events.filter((text) => text === "Hit taken - 34 HP.").length > damageBefore;
+    const stillStunned = defenderState.overlayVisible && defenderState.overlayTitle === "STUNNED";
+    if (damageSeen && stillStunned) defenderHitWhileStunned = defenderState;
+    await sleep(5);
+  }
+  await attackPromise;
 
-    const lightCommitted = attackerState.events.filter((text) =>
-      text === "Attack committed - your windup is readable.").length > lightCommitsBefore;
-    const lightHit = attackerState.events.filter((text) =>
-      text === "Opponent hit - 34 HP.").length > lightHitsBefore
-      && defenderState.events.filter((text) =>
-        text === "Hit taken - 34 HP.").length > damageBefore;
-    const defenderStillStunned = defenderState.overlayVisible
-      && defenderState.overlayTitle === "STUNNED";
-    // Guard regeneration remains unchanged and begins after its existing 520 ms
-    // delay even while the longer heavy-break stun is still active. The punish
-    // therefore owns HP/stun correctness, not an artificial frozen guard value.
-    const guardStillNearBroken = defenderState.playerGuard >= 0 && defenderState.playerGuard <= 6
-      && attackerState.opponentGuard >= 0 && attackerState.opponentGuard <= 6;
-    const exactHp = attackerState.playerHp === 100 && attackerState.playerGuard === 100
-      && defenderState.playerHp === 66 && attackerState.opponentHp === 66;
-
-    if (lightCommitted && lightHit && defenderStillStunned && guardStillNearBroken && exactHp) {
-      hitEvidence = states;
+  const attackerDeadline = Date.now() + 260;
+  let attackerResult = null;
+  while (Date.now() < attackerDeadline) {
+    const state = await readUiEvidence(attacker);
+    const committed = state.events.filter((text) =>
+      text === "Attack committed - your windup is readable.").length === lightCommitsBefore + 1;
+    const hit = state.events.filter((text) =>
+      text === "Opponent hit - 34 HP.").length === lightHitsBefore + 1;
+    if (committed && hit && state.opponentHp === 66) {
+      attackerResult = state;
       break;
-    }
-    if (!defenderStillStunned && defenderState.playerHp === 100) {
-      throw new Error(`M111 guard-break stun expired before the real light punish landed: ${JSON.stringify(states)}`);
     }
     await sleep(5);
   }
 
-  if (!hitEvidence) {
-    throw new Error(`M111 real post-recovery light punish did not resolve inside stun: ${JSON.stringify(await Promise.all(entries.map(readUiEvidence)))}`);
+  const defenderResult = await readUiEvidence(defender);
+  if (!attackerResult) {
+    throw new Error(`M111 attacker never confirmed exactly one real 34 HP light punish: ${JSON.stringify(await readUiEvidence(attacker))}`);
+  }
+  if (!defenderHitWhileStunned) {
+    throw new Error(`M111 defender never observed the 34 HP punish while still authoritatively STUNNED: ${JSON.stringify({ lastDefenderState, defenderResult })}`);
+  }
+  if (attackerResult.playerHp !== 100 || attackerResult.playerGuard !== 100
+    || attackerResult.opponentHp !== 66 || defenderResult.playerHp !== 66) {
+    throw new Error(`M111 post-break punish did not preserve exact HP ownership: ${JSON.stringify([attackerResult, defenderResult])}`);
   }
 
-  const attackerResult = hitEvidence.find((entry) => entry.browser === attacker.name);
-  const defenderResult = hitEvidence.find((entry) => entry.browser === defender.name);
-  const lightDown = attackerResult.pointers.find((event) => event.type === "pointerdown" && event.button === 0);
-  if (!lightDown) {
+  const lightDowns = attackerResult.pointers.filter((event) =>
+    event.type === "pointerdown" && event.button === 0);
+  if (lightDowns.length < 1) {
     throw new Error(`M111 real light pointer control was not delivered: ${JSON.stringify(attackerResult)}`);
   }
   const heavyRecoverySeen = defenderResult.recoveryTransitions.some((entry) =>
@@ -1665,9 +1668,18 @@ async function runOnlineUiHeavyGuardBreakPunishFlight(entries) {
   if (attackerResult.feedbackTransitions.includes("parried")
     || defenderResult.feedbackTransitions.includes("parry-success")
     || defenderResult.feedbackTransitions.includes("dodge-success")) {
-    throw new Error(`M111 punish resolved through an unintended defensive fallback: ${JSON.stringify(hitEvidence)}`);
+    throw new Error(`M111 punish resolved through an unintended defensive fallback: ${JSON.stringify([attackerResult, defenderResult])}`);
   }
-  return hitEvidence;
+
+  return [
+    attackerResult,
+    {
+      ...defenderResult,
+      punishObservedWhileStunned: true,
+      punishObservedHp: defenderHitWhileStunned.playerHp,
+      punishObservedGuard: defenderHitWhileStunned.playerGuard,
+    },
+  ];
 }
 
 async function runOnlineUiGuardBreakFlight(entries) {
