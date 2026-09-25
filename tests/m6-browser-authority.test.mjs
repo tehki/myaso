@@ -46,6 +46,24 @@ test("prediction history discards acknowledged ticks across uint32 wrap", () => 
   assert.deepEqual(history.snapshot().map((entry) => entry.tick), [1]);
 });
 
+test("prediction history preserves heavy attack one-shot intent", () => {
+  const history = createPredictionHistory({ maxEntries: 4 });
+  history.push(50, {
+    moveX: 0.25,
+    moveY: -0.5,
+    facing: 1.25,
+    heavyAttack: true,
+    block: true,
+  });
+  const [entry] = history.snapshot();
+  assert.equal(entry.tick, 50);
+  assert.equal(entry.heavyAttack, true);
+  assert.equal(entry.attack, false);
+  assert.equal(entry.dodge, false);
+  assert.equal(entry.block, true);
+  assert.equal(entry.facing, 1.25);
+});
+
 test("reconciliation restores authority then replays only still-unacknowledged inputs", () => {
   const history = createPredictionHistory({ maxEntries: 8 });
   history.push(10, { moveX: 1 });
