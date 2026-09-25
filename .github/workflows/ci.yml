@@ -252,6 +252,13 @@ jobs:
           node --check scripts/pvp_browser_flight_runner.mjs
           node scripts/pvp_browser_flight_runner.mjs
 
+      - name: Validate M112 real heavy lethal lifecycle
+        env:
+          MYASO_PVP_SCENARIO: "uiheavydeath"
+        run: |
+          node --check scripts/pvp_browser_flight_runner.mjs
+          node scripts/pvp_browser_flight_runner.mjs
+
       - name: Validate M106 heavy strike control and readability
         env:
           MYASO_PVP_SCENARIO: "uiheavy"
