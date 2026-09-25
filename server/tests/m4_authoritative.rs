@@ -1110,7 +1110,6 @@ fn hex(bytes: &[u8]) -> String {
     result
 }
 
-
 #[test]
 fn wilds_kick_stuns_unblocked_target_without_hp_damage() {
     let mut world = duel(54.0);
@@ -1126,7 +1125,10 @@ fn wilds_kick_stuns_unblocked_target_without_hp_damage() {
     );
     assert_eq!(world.fighter(2).expect("target").hp.round() as u8, 100);
     assert_eq!(world.fighter(2).expect("target").action, Action::Stunned);
-    assert_eq!(world.fighter(1).expect("attacker").stamina.round() as u8, 82);
+    assert_eq!(
+        world.fighter(1).expect("attacker").stamina.round() as u8,
+        82
+    );
 }
 
 #[test]
@@ -1168,7 +1170,9 @@ fn wilds_roll_collision_knocks_target_down_and_costs_stamina() {
         },
         InputIntent::default(),
     );
-    assert!(events.iter().all(|event| !matches!(event, CombatEvent::Hit { .. })));
+    assert!(events
+        .iter()
+        .all(|event| !matches!(event, CombatEvent::Hit { .. })));
     assert_eq!(world.fighter(1).expect("roller").action, Action::Dodge);
     assert_eq!(world.fighter(1).expect("roller").stamina.round() as u8, 72);
     assert_eq!(world.fighter(2).expect("target").action, Action::Stunned);
@@ -1268,7 +1272,9 @@ fn wilds_parry_stun_preserves_a_comfortable_light_punish_window() {
             ..InputIntent::default()
         },
     );
-    assert!(parry.iter().any(|event| matches!(event, CombatEvent::Parry { .. })));
+    assert!(parry
+        .iter()
+        .any(|event| matches!(event, CombatEvent::Parry { .. })));
     assert_eq!(world.fighter(1).expect("attacker").action, Action::Stunned);
 
     advance(
