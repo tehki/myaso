@@ -471,7 +471,7 @@ async fn handle_connection(
                     && packet
                         .samples()
                         .first()
-                        .is_some_and(|sample| sample.attack || sample.dodge)
+                        .is_some_and(|sample| sample.attack || sample.heavy_attack || sample.dodge)
                 {
                     println!(
                         "M63_INPUT_ACTION_PACKET_DROPPED session={stable_id} tick={}",
@@ -888,6 +888,7 @@ mod tests {
             move_y: -0.25,
             facing_radians: 1.0,
             attack: true,
+            heavy_attack: false,
             dodge: false,
             block: false,
         };
