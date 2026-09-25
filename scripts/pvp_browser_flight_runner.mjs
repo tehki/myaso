@@ -8,7 +8,7 @@ import { setTimeout as sleep } from "node:timers/promises";
 const root = process.cwd();
 const durationMs = Number(process.env.MYASO_PVP_FLIGHT_DURATION_MS ?? 7000);
 const scenario = process.env.MYASO_PVP_SCENARIO ?? "damage";
-if (!new Set(["damage", "inputloss", "parry", "dodge", "block", "guardbreak", "backblock", "respawn", "ui", "uirespawn", "uifeedback", "uihittell", "uivitals", "uiidentity", "uiscore", "uimatch", "uirematch", "uiffa3", "uikillfeed", "uifocus", "uithreat", "uithreatbearing", "uimultithreat", "uisecondarythreat", "uisecondarybearing", "uisecondaryphase", "uiguardarc", "uisecondaryguardarc", "uithreatmarkers", "uiparry", "uistun", "uiguardbreak", "uidodge", "uirecovery", "uirecoverytell", "uiattackintent", "uiheavy", "uiguardbreaktell", "uiparrytell", "uiblockfacingtell", "uidodgetell", "uideathtell"]).has(scenario)) throw new Error(`unsupported MYASO_PVP_SCENARIO: ${scenario}`);
+if (!new Set(["damage", "inputloss", "parry", "dodge", "block", "guardbreak", "backblock", "respawn", "ui", "uirespawn", "uifeedback", "uihittell", "uivitals", "uiidentity", "uiscore", "uimatch", "uirematch", "uiffa3", "uikillfeed", "uifocus", "uithreat", "uithreatbearing", "uimultithreat", "uisecondarythreat", "uisecondarybearing", "uisecondaryphase", "uiguardarc", "uisecondaryguardarc", "uithreatmarkers", "uiparry", "uistun", "uiguardbreak", "uidodge", "uirecovery", "uirecoverytell", "uiattackintent", "uiheavy", "uiheavyblock", "uiheavyparry", "uiheavydodge", "uiguardbreaktell", "uiparrytell", "uiblockfacingtell", "uidodgetell", "uideathtell"]).has(scenario)) throw new Error(`unsupported MYASO_PVP_SCENARIO: ${scenario}`);
 const staticPort = Number(process.env.MYASO_PVP_FLIGHT_HTTP_PORT ?? 4174);
 const browsers = [
   {
@@ -169,6 +169,15 @@ try {
   } else if (scenario === "uiheavy") {
     const results = await runOnlineUiHeavyStrikeFlight(sessions);
     console.log(`M106_ONLINE_HEAVY_STRIKE ${JSON.stringify({ ok: true, results })}`);
+  } else if (scenario === "uiheavyblock") {
+    const results = await runOnlineUiHeavyBlockFlight(sessions);
+    console.log(`M107_HEAVY_BLOCK ${JSON.stringify({ ok: true, results })}`);
+  } else if (scenario === "uiheavyparry") {
+    const results = await runOnlineUiHeavyParryFlight(sessions);
+    console.log(`M107_HEAVY_PARRY ${JSON.stringify({ ok: true, results })}`);
+  } else if (scenario === "uiheavydodge") {
+    const results = await runOnlineUiHeavyDodgeFlight(sessions);
+    console.log(`M107_HEAVY_DODGE ${JSON.stringify({ ok: true, results })}`);
   } else if (scenario === "uiguardbreaktell") {
     const results = await runOnlineUiGuardBreakTellFlight(sessions);
     console.log(`M40_FFA_GUARD_BREAK_TELL ${JSON.stringify({ ok: true, results })}`);
@@ -276,14 +285,14 @@ async function startBrowser(browser) {
   });
   const sessionId = created.sessionId ?? created.value?.sessionId;
   if (!sessionId) throw new Error(`${browser.name} WebDriver did not return a session id: ${JSON.stringify(created)}`);
-  if (scenario === "uiparry" || scenario === "uistun" || scenario === "uiguardbreak" || scenario === "uidodge" || scenario === "uiattackintent" || scenario === "uiheavy" || scenario === "uiguardbreaktell" || scenario === "uiparrytell" || scenario === "uiblockfacingtell" || scenario === "uidodgetell") {
+  if (scenario === "uiparry" || scenario === "uistun" || scenario === "uiguardbreak" || scenario === "uidodge" || scenario === "uiattackintent" || scenario === "uiheavy" || scenario === "uiheavyblock" || scenario === "uiheavyparry" || scenario === "uiheavydodge" || scenario === "uiguardbreaktell" || scenario === "uiparrytell" || scenario === "uiblockfacingtell" || scenario === "uidodgetell") {
     await webdriver(base, "POST", `/session/${sessionId}/window/rect`, { x: 0, y: 0, width: 1280, height: 900 });
   }
   return { ...browser, child, base, sessionId };
 }
 
 async function navigate(session, gameUrl, certificateHash) {
-  const page = scenario === "ui" || scenario === "uirespawn" || scenario === "uifeedback" || scenario === "uihittell" || scenario === "uivitals" || scenario === "uiidentity" || scenario === "uiscore" || scenario === "uimatch" || scenario === "uirematch" || scenario === "uiffa3" || scenario === "uikillfeed" || scenario === "uifocus" || scenario === "uithreat" || scenario === "uithreatbearing" || scenario === "uimultithreat" || scenario === "uisecondarythreat" || scenario === "uisecondarybearing" || scenario === "uisecondaryphase" || scenario === "uiguardarc" || scenario === "uisecondaryguardarc" || scenario === "uithreatmarkers" || scenario === "uiparry" || scenario === "uistun" || scenario === "uiguardbreak" || scenario === "uidodge" || scenario === "uirecovery" || scenario === "uirecoverytell" || scenario === "uiattackintent" || scenario === "uiheavy" || scenario === "uiguardbreaktell" || scenario === "uiparrytell" || scenario === "uiblockfacingtell" || scenario === "uidodgetell" || scenario === "uideathtell" ? "index.html" : "pvp-flight.html";
+  const page = scenario === "ui" || scenario === "uirespawn" || scenario === "uifeedback" || scenario === "uihittell" || scenario === "uivitals" || scenario === "uiidentity" || scenario === "uiscore" || scenario === "uimatch" || scenario === "uirematch" || scenario === "uiffa3" || scenario === "uikillfeed" || scenario === "uifocus" || scenario === "uithreat" || scenario === "uithreatbearing" || scenario === "uimultithreat" || scenario === "uisecondarythreat" || scenario === "uisecondarybearing" || scenario === "uisecondaryphase" || scenario === "uiguardarc" || scenario === "uisecondaryguardarc" || scenario === "uithreatmarkers" || scenario === "uiparry" || scenario === "uistun" || scenario === "uiguardbreak" || scenario === "uidodge" || scenario === "uirecovery" || scenario === "uirecoverytell" || scenario === "uiattackintent" || scenario === "uiheavy" || scenario === "uiheavyblock" || scenario === "uiheavyparry" || scenario === "uiheavydodge" || scenario === "uiguardbreaktell" || scenario === "uiparrytell" || scenario === "uiblockfacingtell" || scenario === "uidodgetell" || scenario === "uideathtell" ? "index.html" : "pvp-flight.html";
   const url = new URL(`http://127.0.0.1:${staticPort}/web/${page}`);
   url.searchParams.set("server", gameUrl);
   url.searchParams.set("cert", certificateHash);
@@ -632,6 +641,194 @@ async function runOnlineUiHeavyStrikeFlight(entries) {
   if (!attackerResult.events.some((text) => text.startsWith("Heavy strike committed")
     || text.startsWith("Heavy strike active") || text.startsWith("Heavy recovery"))) {
     throw new Error(`M106 attacker never rendered a heavy commitment hint: ${JSON.stringify(attackerResult.events)}`);
+  }
+  return evidence;
+}
+
+async function prepareHeavyCounterplayFlight(
+  entries,
+  label,
+  { attackerName = "chrome", defenderName = "firefox", movementMs = 180 } = {},
+) {
+  await Promise.all(entries.map(installUiObserver));
+  const ready = await waitForUiReady(entries);
+  const attacker = entries.find((entry) => entry.name === attackerName);
+  const defender = entries.find((entry) => entry.name === defenderName);
+  const attackerReady = ready.find((entry) => entry.browser === attacker?.name);
+  const defenderReady = ready.find((entry) => entry.browser === defender?.name);
+  if (!attacker || !defender || !attackerReady || !defenderReady) {
+    throw new Error(`${label} could not resolve browser roles from ${JSON.stringify(ready)}`);
+  }
+  const attackRight = attackerReady.playerNetId < defenderReady.playerNetId;
+  const movementKey = attackRight ? "d" : "a";
+  const movementCode = attackRight ? "KeyD" : "KeyA";
+  const attackOffset = attackRight ? 200 : -200;
+  const blockOffset = attackRight ? -200 : 200;
+
+  await Promise.all(entries.map((entry) => execute(
+    entry.base,
+    entry.sessionId,
+    "document.querySelector('#arena').focus(); return document.activeElement?.id;",
+  )));
+  const attackerElementId = await resolveArenaElement(attacker, `${label} attacker`);
+  const defenderElementId = await resolveArenaElement(defender, `${label} defender`);
+  await Promise.all(entries.map(centerArenaInViewport));
+  await pulseMovementKey(attacker, movementKey, movementMs);
+  await Promise.all([
+    aimArena(attacker, attackerElementId, attackOffset),
+    aimArena(defender, defenderElementId, blockOffset),
+  ]);
+  await sleep(60);
+  return {
+    attacker,
+    defender,
+    attackerElementId,
+    defenderElementId,
+    movementCode,
+  };
+}
+
+function assertHeavyControlDelivered(attackerResult, movementCode, label) {
+  if (!attackerResult.keys.includes(`keydown:${movementCode}`)
+    || !attackerResult.keys.includes(`keyup:${movementCode}`)) {
+    throw new Error(`${label} real attacker movement was not delivered: ${JSON.stringify(attackerResult)}`);
+  }
+  if (!attackerResult.keys.includes("keydown:KeyE") || !attackerResult.keys.includes("keyup:KeyE")) {
+    throw new Error(`${label} real heavy-strike E control was not delivered: ${JSON.stringify(attackerResult)}`);
+  }
+}
+
+async function runOnlineUiHeavyBlockFlight(entries) {
+  const staged = await prepareHeavyCounterplayFlight(entries, "M107 heavy block");
+  const { attacker, defender, defenderElementId, movementCode } = staged;
+  let blockHeld = false;
+  try {
+    await setArenaBlock(defender, defenderElementId, true);
+    blockHeld = true;
+    // Start block well before the heavy edge so the 115 ms fresh-parry window
+    // is expired by the 320 ms active transition. This must resolve as a normal
+    // directional block, not a parry.
+    await sleep(160);
+    await pulseMovementKey(attacker, "e", 40);
+    await sleep(500);
+  } finally {
+    if (blockHeld) await setArenaBlock(defender, defenderElementId, false);
+  }
+  await sleep(20);
+
+  const evidence = await Promise.all(entries.map(readUiEvidence));
+  const attackerResult = evidence.find((entry) => entry.browser === attacker.name);
+  const defenderResult = evidence.find((entry) => entry.browser === defender.name);
+  if (!attackerResult || !defenderResult) {
+    throw new Error(`M107 heavy block incomplete evidence: ${JSON.stringify(evidence)}`);
+  }
+  assertHeavyControlDelivered(attackerResult, movementCode, "M107 heavy block");
+  const blockDown = defenderResult.pointers.find((event) => event.type === "pointerdown" && event.button === 2);
+  const blockUp = defenderResult.pointers.find((event) => event.type === "pointerup" && event.button === 2);
+  if (!blockDown || !blockUp) {
+    throw new Error(`M107 heavy block real RMB control was not delivered: ${JSON.stringify(defenderResult)}`);
+  }
+  if (attackerResult.playerHp !== 100 || attackerResult.playerGuard !== 100
+    || attackerResult.opponentHp !== 100 || attackerResult.opponentGuard !== 36
+    || defenderResult.playerHp !== 100 || defenderResult.playerGuard !== 36) {
+    throw new Error(`M107 heavy block did not preserve HP / apply exactly 64 guard pressure: ${JSON.stringify(evidence)}`);
+  }
+  if (!attackerResult.events.includes("Opponent blocked - guard -64.")
+    || !defenderResult.events.includes("Block held - guard -64.")) {
+    throw new Error(`M107 heavy block feedback was not authoritative 64 guard pressure: ${JSON.stringify(evidence)}`);
+  }
+  if (attackerResult.feedbackTransitions.includes("parried")
+    || defenderResult.feedbackTransitions.includes("parry-success")) {
+    throw new Error(`M107 heavy block accidentally resolved as parry: ${JSON.stringify(evidence)}`);
+  }
+  return evidence;
+}
+
+async function runOnlineUiHeavyParryFlight(entries) {
+  const staged = await prepareHeavyCounterplayFlight(entries, "M107 heavy parry");
+  const { attacker, defender, defenderElementId, movementCode } = staged;
+
+  await pulseMovementKey(attacker, "e", 40);
+  // The heavy active transition starts at 320 ms. Arm block at roughly 245 ms
+  // from the real E keydown, leaving about 75 ms of parry age at impact and
+  // enough margin for moderate Chrome/Firefox delivery skew.
+  await sleep(205);
+  let blockHeld = false;
+  try {
+    await setArenaBlock(defender, defenderElementId, true);
+    blockHeld = true;
+    await sleep(180);
+  } finally {
+    if (blockHeld) await setArenaBlock(defender, defenderElementId, false);
+  }
+  await sleep(80);
+
+  const evidence = await Promise.all(entries.map(readUiEvidence));
+  const attackerResult = evidence.find((entry) => entry.browser === attacker.name);
+  const defenderResult = evidence.find((entry) => entry.browser === defender.name);
+  if (!attackerResult || !defenderResult) {
+    throw new Error(`M107 heavy parry incomplete evidence: ${JSON.stringify(evidence)}`);
+  }
+  assertHeavyControlDelivered(attackerResult, movementCode, "M107 heavy parry");
+  const blockDown = defenderResult.pointers.find((event) => event.type === "pointerdown" && event.button === 2);
+  const blockUp = defenderResult.pointers.find((event) => event.type === "pointerup" && event.button === 2);
+  if (!blockDown || !blockUp) {
+    throw new Error(`M107 heavy parry real RMB control was not delivered: ${JSON.stringify(defenderResult)}`);
+  }
+  if (attackerResult.playerHp !== 100 || attackerResult.playerGuard !== 100
+    || defenderResult.playerHp !== 100 || defenderResult.playerGuard !== 100) {
+    throw new Error(`M107 heavy parry changed authoritative vitals: ${JSON.stringify(evidence)}`);
+  }
+  if (!attackerResult.feedbackTransitions.includes("parried")
+    || !defenderResult.feedbackTransitions.includes("parry-success")) {
+    throw new Error(`M107 heavy parry feedback never resolved: ${JSON.stringify(evidence)}`);
+  }
+  const stunned = attackerResult.overlayTransitions.some((entry) =>
+    entry.visible && entry.title === "STUNNED");
+  if (!stunned) {
+    throw new Error(`M107 heavy parry never exposed attacker stun: ${JSON.stringify(attackerResult.overlayTransitions)}`);
+  }
+  return evidence;
+}
+
+async function runOnlineUiHeavyDodgeFlight(entries) {
+  // Match the already-stable M36 browser roles: Firefox attacks, Chrome dodges.
+  const staged = await prepareHeavyCounterplayFlight(
+    entries,
+    "M107 heavy dodge",
+    { attackerName: "firefox", defenderName: "chrome", movementMs: 260 },
+  );
+  const { attacker, defender, movementCode } = staged;
+
+  await pulseMovementKey(attacker, "e", 40);
+  // Arm the 118 ms iframe around the 320 ms heavy active transition.
+  await sleep(230);
+  await pressArenaPerpendicularDodgeAfterPause(defender, 0);
+  // Let active -> recovery resolve without evidence polling inside the iframe.
+  await sleep(360);
+
+  const evidence = await Promise.all(entries.map(readUiEvidence));
+  const attackerResult = evidence.find((entry) => entry.browser === attacker.name);
+  const defenderResult = evidence.find((entry) => entry.browser === defender.name);
+  if (!attackerResult || !defenderResult) {
+    throw new Error(`M107 heavy dodge incomplete evidence: ${JSON.stringify(evidence)}`);
+  }
+  assertHeavyControlDelivered(attackerResult, movementCode, "M107 heavy dodge");
+  if (!defenderResult.keys.includes("keydown:KeyS") || !defenderResult.keys.includes("keyup:KeyS")
+    || !defenderResult.keys.includes("keydown:Space") || !defenderResult.keys.includes("keyup:Space")) {
+    throw new Error(`M107 heavy dodge real Space/perpendicular controls were not delivered: ${JSON.stringify(defenderResult)}`);
+  }
+  if (attackerResult.playerHp !== 100 || attackerResult.playerGuard !== 100
+    || defenderResult.playerHp !== 100 || defenderResult.playerGuard !== 100) {
+    throw new Error(`M107 heavy dodge changed authoritative vitals: ${JSON.stringify(evidence)}`);
+  }
+  if (!attackerResult.feedbackTransitions.includes("dodge-evaded")
+    || !defenderResult.feedbackTransitions.includes("dodge-success")) {
+    throw new Error(`M107 heavy dodge feedback never resolved: ${JSON.stringify(evidence)}`);
+  }
+  if (attackerResult.feedbackTransitions.includes("parried")
+    || defenderResult.feedbackTransitions.includes("parry-success")) {
+    throw new Error(`M107 heavy dodge accidentally resolved as parry: ${JSON.stringify(evidence)}`);
   }
   return evidence;
 }
