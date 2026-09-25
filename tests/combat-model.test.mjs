@@ -287,6 +287,7 @@ test("successful parry leaves a comfortable real light punish window", () => {
   assert.ok(parryEvents.some((event) => event.type === "parry"));
   assert.equal(a.action, "stunned");
 
+  stepWorld(world, { b: { aimX: a.x, aimY: a.y } }, 5);
   stepWorld(world, { b: { attack: true, aimX: a.x, aimY: a.y } }, 5);
   const punishEvents = advance(world, COMBAT.attack.windupMs + COMBAT.attack.activeMs + 10, {
     b: { aimX: a.x, aimY: a.y },
