@@ -8,7 +8,7 @@ import { setTimeout as sleep } from "node:timers/promises";
 const root = process.cwd();
 const durationMs = Number(process.env.MYASO_PVP_FLIGHT_DURATION_MS ?? 7000);
 const scenario = process.env.MYASO_PVP_SCENARIO ?? "damage";
-if (!new Set(["damage", "inputloss", "parry", "dodge", "block", "guardbreak", "backblock", "respawn", "ui", "uirespawn", "uifeedback", "uihittell", "uivitals", "uiidentity", "uiscore", "uimatch", "uirematch", "uiffa3", "uikillfeed", "uifocus", "uithreat", "uithreatbearing", "uimultithreat", "uisecondarythreat", "uisecondarybearing", "uisecondaryphase", "uiguardarc", "uisecondaryguardarc", "uithreatmarkers", "uiparry", "uistun", "uiguardbreak", "uidodge", "uirecovery", "uirecoverytell", "uiattackintent", "uiheavy", "uiheavyinputloss", "uiheavyblock", "uiheavyparry", "uiheavydodge", "uiheavypunish", "uiheavyguardbreak", "uiguardbreaktell", "uiparrytell", "uiblockfacingtell", "uidodgetell", "uideathtell"]).has(scenario)) throw new Error(`unsupported MYASO_PVP_SCENARIO: ${scenario}`);
+if (!new Set(["damage", "inputloss", "parry", "dodge", "block", "guardbreak", "backblock", "respawn", "ui", "uirespawn", "uifeedback", "uihittell", "uivitals", "uiidentity", "uiscore", "uimatch", "uirematch", "uiffa3", "uikillfeed", "uifocus", "uithreat", "uithreatbearing", "uimultithreat", "uisecondarythreat", "uisecondarybearing", "uisecondaryphase", "uiguardarc", "uisecondaryguardarc", "uithreatmarkers", "uiparry", "uistun", "uiguardbreak", "uidodge", "uirecovery", "uirecoverytell", "uiattackintent", "uiheavy", "uiheavyinputloss", "uiheavyblock", "uiheavyparry", "uiheavydodge", "uiheavypunish", "uiheavyguardbreak", "uiheavyguardbreakpunish", "uiguardbreaktell", "uiparrytell", "uiblockfacingtell", "uidodgetell", "uideathtell"]).has(scenario)) throw new Error(`unsupported MYASO_PVP_SCENARIO: ${scenario}`);
 const staticPort = Number(process.env.MYASO_PVP_FLIGHT_HTTP_PORT ?? 4174);
 const browsers = [
   {
@@ -191,6 +191,9 @@ try {
   } else if (scenario === "uiheavyguardbreak") {
     const results = await runOnlineUiHeavyGuardBreakFlight(sessions);
     console.log(`M110_HEAVY_GUARD_BREAK ${JSON.stringify({ ok: true, results })}`);
+  } else if (scenario === "uiheavyguardbreakpunish") {
+    const results = await runOnlineUiHeavyGuardBreakPunishFlight(sessions);
+    console.log(`M111_HEAVY_GUARD_BREAK_PUNISH ${JSON.stringify({ ok: true, results })}`);
   } else if (scenario === "uiguardbreaktell") {
     const results = await runOnlineUiGuardBreakTellFlight(sessions);
     console.log(`M40_FFA_GUARD_BREAK_TELL ${JSON.stringify({ ok: true, results })}`);
@@ -306,7 +309,7 @@ async function startBrowser(browser) {
 }
 
 async function navigate(session, gameUrl, certificateHash) {
-  const page = scenario === "ui" || scenario === "uirespawn" || scenario === "uifeedback" || scenario === "uihittell" || scenario === "uivitals" || scenario === "uiidentity" || scenario === "uiscore" || scenario === "uimatch" || scenario === "uirematch" || scenario === "uiffa3" || scenario === "uikillfeed" || scenario === "uifocus" || scenario === "uithreat" || scenario === "uithreatbearing" || scenario === "uimultithreat" || scenario === "uisecondarythreat" || scenario === "uisecondarybearing" || scenario === "uisecondaryphase" || scenario === "uiguardarc" || scenario === "uisecondaryguardarc" || scenario === "uithreatmarkers" || scenario === "uiparry" || scenario === "uistun" || scenario === "uiguardbreak" || scenario === "uidodge" || scenario === "uirecovery" || scenario === "uirecoverytell" || scenario === "uiattackintent" || scenario === "uiheavy" || scenario === "uiheavyinputloss" || scenario === "uiheavyblock" || scenario === "uiheavyparry" || scenario === "uiheavydodge" || scenario === "uiheavypunish" || scenario === "uiheavyguardbreak" || scenario === "uiguardbreaktell" || scenario === "uiparrytell" || scenario === "uiblockfacingtell" || scenario === "uidodgetell" || scenario === "uideathtell" ? "index.html" : "pvp-flight.html";
+  const page = scenario === "ui" || scenario === "uirespawn" || scenario === "uifeedback" || scenario === "uihittell" || scenario === "uivitals" || scenario === "uiidentity" || scenario === "uiscore" || scenario === "uimatch" || scenario === "uirematch" || scenario === "uiffa3" || scenario === "uikillfeed" || scenario === "uifocus" || scenario === "uithreat" || scenario === "uithreatbearing" || scenario === "uimultithreat" || scenario === "uisecondarythreat" || scenario === "uisecondarybearing" || scenario === "uisecondaryphase" || scenario === "uiguardarc" || scenario === "uisecondaryguardarc" || scenario === "uithreatmarkers" || scenario === "uiparry" || scenario === "uistun" || scenario === "uiguardbreak" || scenario === "uidodge" || scenario === "uirecovery" || scenario === "uirecoverytell" || scenario === "uiattackintent" || scenario === "uiheavy" || scenario === "uiheavyinputloss" || scenario === "uiheavyblock" || scenario === "uiheavyparry" || scenario === "uiheavydodge" || scenario === "uiheavypunish" || scenario === "uiheavyguardbreak" || scenario === "uiheavyguardbreakpunish" || scenario === "uiguardbreaktell" || scenario === "uiparrytell" || scenario === "uiblockfacingtell" || scenario === "uidodgetell" || scenario === "uideathtell" ? "index.html" : "pvp-flight.html";
   const url = new URL(`http://127.0.0.1:${staticPort}/web/${page}`);
   url.searchParams.set("server", gameUrl);
   url.searchParams.set("cert", certificateHash);
@@ -1454,8 +1457,8 @@ async function runOnlineUiHeavyGuardBreakFlight(entries) {
       throw new Error("M110 second blocked heavy did not break guard after bounded clean latch retries");
     }
 
-    // Keep sampling while the authoritative 520 ms guard-break stun is live so
-    // both the feedback and visible STUNNED transition are captured.
+    // Keep sampling while the authoritative guard-break stun is live so both
+    // the feedback and visible STUNNED transition are captured.
     const deadline = Date.now() + 260;
     while (Date.now() < deadline) {
       const states = await Promise.all(entries.map(readUiEvidence));
@@ -1519,6 +1522,110 @@ async function runOnlineUiHeavyGuardBreakFlight(entries) {
     throw new Error(`M110 held block accidentally resolved as parry: ${JSON.stringify(evidence)}`);
   }
   return evidence;
+}
+
+async function runOnlineUiHeavyGuardBreakPunishFlight(entries) {
+  const guardBreakEvidence = await runOnlineUiHeavyGuardBreakFlight(entries);
+  const attacker = entries.find((entry) => entry.name === "chrome");
+  const defender = entries.find((entry) => entry.name === "firefox");
+  if (!attacker || !defender) throw new Error("M111 could not resolve fixed heavy guard-break roles");
+
+  const baselineAttacker = guardBreakEvidence.find((entry) => entry.browser === attacker.name);
+  const baselineDefender = guardBreakEvidence.find((entry) => entry.browser === defender.name);
+  if (!baselineAttacker || !baselineDefender
+    || baselineDefender.playerHp !== 100 || baselineDefender.playerGuard !== 0) {
+    throw new Error(`M111 did not inherit a clean M110 guard break: ${JSON.stringify(guardBreakEvidence)}`);
+  }
+
+  // M110 returns shortly after the break while the second heavy is still
+  // committed. Observe its real recovery cue before scheduling the punish.
+  let recoveryEvidence = null;
+  const recoveryDeadline = Date.now() + 300;
+  while (Date.now() < recoveryDeadline) {
+    const states = await Promise.all(entries.map(readUiEvidence));
+    const attackerState = states.find((entry) => entry.browser === attacker.name);
+    const defenderState = states.find((entry) => entry.browser === defender.name);
+    const heavyRecovery = attackerState?.recoveryVisible
+      && attackerState.recoveryState === "heavy-attack-recovery"
+      && attackerState.recoveryLabel === "PUNISH"
+      && attackerState.recoveryDetail === "Heavy recovery";
+    const defenderStunned = defenderState?.overlayVisible
+      && defenderState.overlayTitle === "STUNNED"
+      && defenderState.playerHp === 100
+      && defenderState.playerGuard === 0;
+    if (heavyRecovery && defenderStunned) {
+      recoveryEvidence = states;
+      break;
+    }
+    await sleep(10);
+  }
+  if (!recoveryEvidence) {
+    throw new Error(`M111 never observed heavy recovery overlapping guard-break stun: ${JSON.stringify(await Promise.all(entries.map(readUiEvidence)))}`);
+  }
+
+  const attackerBefore = recoveryEvidence.find((entry) => entry.browser === attacker.name);
+  const defenderBefore = recoveryEvidence.find((entry) => entry.browser === defender.name);
+  const lightCommitsBefore = attackerBefore.events.filter((text) =>
+    text === "Attack committed - your windup is readable.").length;
+  const lightHitsBefore = attackerBefore.events.filter((text) =>
+    text === "Opponent hit - 34 HP.").length;
+  const damageBefore = defenderBefore.events.filter((text) =>
+    text === "Hit taken - 34 HP.").length;
+
+  // Start a bounded genuine-click burst near the tail of the 420 ms heavy
+  // recovery. At least one real click lands after control returns, while the
+  // derived heavy guard-break stun still preserves the same 185 ms post-
+  // recovery punish margin as the existing light guard-break path.
+  await performArenaAttackBurst(attacker, 3, 400);
+
+  const hitDeadline = Date.now() + 260;
+  let hitEvidence = null;
+  while (Date.now() < hitDeadline) {
+    const states = await Promise.all(entries.map(readUiEvidence));
+    const attackerState = states.find((entry) => entry.browser === attacker.name);
+    const defenderState = states.find((entry) => entry.browser === defender.name);
+    if (!attackerState || !defenderState) {
+      throw new Error(`M111 incomplete punish evidence: ${JSON.stringify(states)}`);
+    }
+
+    const lightCommitted = attackerState.events.filter((text) =>
+      text === "Attack committed - your windup is readable.").length > lightCommitsBefore;
+    const lightHit = attackerState.events.filter((text) =>
+      text === "Opponent hit - 34 HP.").length > lightHitsBefore
+      && defenderState.events.filter((text) =>
+        text === "Hit taken - 34 HP.").length > damageBefore;
+    const defenderStillStunned = defenderState.overlayVisible
+      && defenderState.overlayTitle === "STUNNED";
+    const exactVitals = attackerState.playerHp === 100 && attackerState.playerGuard === 100
+      && defenderState.playerHp === 66 && defenderState.playerGuard === 0
+      && attackerState.opponentHp === 66 && attackerState.opponentGuard === 0;
+
+    if (lightCommitted && lightHit && defenderStillStunned && exactVitals) {
+      hitEvidence = states;
+      break;
+    }
+    if (!defenderStillStunned && defenderState.playerHp === 100) {
+      throw new Error(`M111 guard-break stun expired before the real light punish landed: ${JSON.stringify(states)}`);
+    }
+    await sleep(5);
+  }
+
+  if (!hitEvidence) {
+    throw new Error(`M111 real post-recovery light punish did not resolve inside stun: ${JSON.stringify(await Promise.all(entries.map(readUiEvidence)))}`);
+  }
+
+  const attackerResult = hitEvidence.find((entry) => entry.browser === attacker.name);
+  const defenderResult = hitEvidence.find((entry) => entry.browser === defender.name);
+  const lightDown = attackerResult.pointers.find((event) => event.type === "pointerdown" && event.button === 0);
+  if (!lightDown) {
+    throw new Error(`M111 real light pointer control was not delivered: ${JSON.stringify(attackerResult)}`);
+  }
+  if (attackerResult.feedbackTransitions.includes("parried")
+    || defenderResult.feedbackTransitions.includes("parry-success")
+    || defenderResult.feedbackTransitions.includes("dodge-success")) {
+    throw new Error(`M111 punish resolved through an unintended defensive fallback: ${JSON.stringify(hitEvidence)}`);
+  }
+  return hitEvidence;
 }
 
 async function runOnlineUiGuardBreakFlight(entries) {
@@ -2405,8 +2512,10 @@ async function setArenaAttackButton(session, pressed) {
   });
 }
 
-async function performArenaAttackBurst(session, clickCount = 3) {
+async function performArenaAttackBurst(session, clickCount = 3, initialPauseMs = 0) {
   const actions = [];
+  const boundedPauseMs = Math.max(0, Math.min(1000, Math.trunc(initialPauseMs)));
+  if (boundedPauseMs > 0) actions.push({ type: "pause", duration: boundedPauseMs });
   const boundedClickCount = Math.max(1, Math.min(3, Math.trunc(clickCount)));
   for (let index = 0; index < boundedClickCount; index += 1) {
     actions.push({ type: "pointerDown", button: 0 });
