@@ -329,7 +329,7 @@ function predictMovement(input, dtMs) {
   } else if (local.action === 6 || input.block) speed *= COMBAT.block.moveMultiplier;
   else if (local.action === 1) speed *= 0.35;
   else if (local.action === COMBAT_ACTION.heavyAttackWindup) speed *= 0.20;
-  else if (local.action === 2 || local.action === COMBAT_ACTION.heavyAttackActive || local.action === 7 || local.action === 8) speed = 0;
+  else if (local.action === 2 || local.action === COMBAT_ACTION.heavyAttackActive || local.action === COMBAT_ACTION.stunned || local.action === COMBAT_ACTION.knockdown || local.action === COMBAT_ACTION.dead) speed = 0;
   else if (local.action === 3 || local.action === 5) speed *= 0.48;
   else if (local.action === COMBAT_ACTION.heavyAttackRecovery) speed *= 0.35;
   else if (local.action === COMBAT_ACTION.jump) speed *= COMBAT.jump.moveMultiplier;
