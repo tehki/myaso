@@ -402,7 +402,7 @@ function collectDodgeEvents(events, own, peer, ownId, pending) {
     const vitalsStable = defender && defender.hp === pending.hp && defender.guard === pending.guard;
     if (!attacker || !vitalsStable) {
       pending = null;
-    } else if (attacker.action === COMBAT_ACTION.attackRecovery) {
+    } else if (isAttackRecovery(attacker.action)) {
       if (pending.activeSeen) {
         const ownDefended = defender.netId === ownId;
         push(
@@ -414,42 +414,63 @@ function collectDodgeEvents(events, own, peer, ownId, pending) {
         );
       }
       pending = null;
-    } else if (attacker.action === COMBAT_ACTION.attackActive) {
+    } else if (isAttackActive(attacker.action)) {
       pending.activeSeen = true;
-    } else if (attacker.action !== COMBAT_ACTION.attackWindup) {
+    } else if (!isAttackWindup(attacker.action)) {
       pending = null;
     }
   }
 
-  const ownThreat = peer.action === COMBAT_ACTION.attackWindup || peer.action === COMBAT_ACTION.attackActive;
+  const ownThreat = isAttackWindup(peer.action) || isAttackActive(peer.action);
   if (ownThreat && own.action === COMBAT_ACTION.dodge && attackThreatens(peer, own)) {
     return {
       attackerId: peer.netId,
       defenderId: own.netId,
       hp: own.hp,
       guard: own.guard,
-      activeSeen: peer.action === COMBAT_ACTION.attackActive,
+      activeSeen: isAttackActive(peer.action),
     };
   }
-  const peerThreat = own.action === COMBAT_ACTION.attackWindup || own.action === COMBAT_ACTION.attackActive;
+  const peerThreat = isAttackWindup(own.action) || isAttackActive(own.action);
   if (peerThreat && peer.action === COMBAT_ACTION.dodge && attackThreatens(own, peer)) {
     return {
       attackerId: own.netId,
       defenderId: peer.netId,
       hp: peer.hp,
       guard: peer.guard,
-      activeSeen: own.action === COMBAT_ACTION.attackActive,
+      activeSeen: isAttackActive(own.action),
     };
   }
   return pending;
 }
 
+function isAttackWindup(action) {
+  return action === COMBAT_ACTION.attackWindup || action === COMBAT_ACTION.heavyAttackWindup;
+}
+
+function isAttackActive(action) {
+  return action === COMBAT_ACTION.attackActive || action === COMBAT_ACTION.heavyAttackActive;
+}
+
+function isAttackRecovery(action) {
+  return action === COMBAT_ACTION.attackRecovery || action === COMBAT_ACTION.heavyAttackRecovery;
+}
+
+function attackProfileForAction(action) {
+  return action === COMBAT_ACTION.heavyAttackWindup
+    || action === COMBAT_ACTION.heavyAttackActive
+    || action === COMBAT_ACTION.heavyAttackRecovery
+    ? COMBAT.heavyAttack
+    : COMBAT.attack;
+}
+
 function attackThreatens(attacker, defender) {
   if (![attacker.x, attacker.y, attacker.facing, defender.x, defender.y].every(Number.isFinite)) return false;
+  const profile = attackProfileForAction(attacker.action);
   const dx = defender.x - attacker.x;
   const dy = defender.y - attacker.y;
-  if (Math.hypot(dx, dy) > COMBAT.attack.reach + COMBAT.fighterRadius) return false;
-  return Math.abs(normalizeAngle(Math.atan2(dy, dx) - attacker.facing)) <= COMBAT.attack.arcRadians / 2;
+  if (Math.hypot(dx, dy) > profile.reach + COMBAT.fighterRadius) return false;
+  return Math.abs(normalizeAngle(Math.atan2(dy, dx) - attacker.facing)) <= profile.arcRadians / 2;
 }
 
 function normalizeAngle(angle) {
