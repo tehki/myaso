@@ -375,6 +375,7 @@ function drawFighter(fighter, body, shadow) {
   if (fighter.action === "jump_attack_windup" || fighter.action === "jump_attack_active") drawJumpAttackArc(fighter);
   if (fighter.action === "kick_windup" || fighter.action === "kick_active") drawKickArc(fighter);
   if (fighter.action === "block") drawBlockArc(fighter);
+  drawWeaponTrail(fighter.action);
   if (fighter.action === "dodge" && fighter.actionElapsedMs <= COMBAT.dodge.iframeMs) {
     ctx.strokeStyle = "rgba(216, 202, 160, .5)";
     ctx.lineWidth = 2;
@@ -397,6 +398,35 @@ function drawFighter(fighter, body, shadow) {
   ctx.fill();
   ctx.fillStyle = "#c8b684";
   ctx.fillRect(12, -2, 26, 4);
+  ctx.restore();
+}
+
+function drawWeaponTrail(action) {
+  const light = action === "attack_windup" || action === "attack_active";
+  const heavy = action === "heavy_attack_windup" || action === "heavy_attack_active";
+  const jump = action === "jump_attack_windup" || action === "jump_attack_active";
+  if (!light && !heavy && !jump) return;
+
+  const active = action.endsWith("_active");
+  const radius = heavy ? 44 : jump ? 40 : 36;
+  const start = heavy ? -1.05 : jump ? -0.34 : -0.72;
+  const end = heavy ? 0.72 : jump ? 0.30 : 0.48;
+  ctx.save();
+  ctx.strokeStyle = heavy
+    ? (active ? "rgba(255, 105, 58, .88)" : "rgba(255, 173, 92, .42)")
+    : jump
+      ? (active ? "rgba(255, 150, 72, .9)" : "rgba(255, 195, 102, .42)")
+      : (active ? "rgba(238, 219, 160, .82)" : "rgba(214, 195, 148, .34)");
+  ctx.lineWidth = heavy ? 8 : jump ? 6 : 5;
+  ctx.lineCap = "round";
+  ctx.beginPath();
+  ctx.arc(0, 0, radius, start, end);
+  ctx.stroke();
+  ctx.globalAlpha = 0.34;
+  ctx.lineWidth *= 1.75;
+  ctx.beginPath();
+  ctx.arc(0, 0, radius - 4, start + 0.10, end - 0.08);
+  ctx.stroke();
   ctx.restore();
 }
 
