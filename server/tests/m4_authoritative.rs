@@ -1470,3 +1470,123 @@ fn wilds_knockdown_is_distinct_from_parry_and_guard_break_stun() {
         Action::Stunned
     );
 }
+
+
+#[test]
+fn forward_light_input_selects_authoritative_thrust_while_neutral_remains_slash() {
+    let mut thrust_world = duel(104.0);
+    advance(
+        &mut thrust_world,
+        5.0,
+        InputIntent {
+            move_x: 1.0,
+            attack: true,
+            facing_radians: 0.0,
+            ..InputIntent::default()
+        },
+        InputIntent::default(),
+    );
+    assert_eq!(
+        thrust_world.fighter(1).expect("thrust attacker").action,
+        Action::ThrustWindup
+    );
+
+    let mut slash_world = duel(72.0);
+    advance(
+        &mut slash_world,
+        5.0,
+        InputIntent {
+            attack: true,
+            facing_radians: 0.0,
+            ..InputIntent::default()
+        },
+        InputIntent::default(),
+    );
+    assert_eq!(
+        slash_world.fighter(1).expect("slash attacker").action,
+        Action::AttackWindup
+    );
+}
+
+#[test]
+fn forward_thrust_reaches_beyond_slash_and_deals_30_once() {
+    let mut world = duel(104.0);
+    let events = advance(
+        &mut world,
+        205.0,
+        InputIntent {
+            move_x: 1.0,
+            attack: true,
+            facing_radians: 0.0,
+            ..InputIntent::default()
+        },
+        InputIntent::default(),
+    );
+    assert_eq!(world.fighter(2).expect("target").hp.round() as u8, 70);
+    assert_eq!(
+        events
+            .iter()
+            .filter(|event| matches!(event, CombatEvent::Hit { .. }))
+            .count(),
+        1
+    );
+    assert!(events.iter().any(|event| matches!(
+        event,
+        CombatEvent::Hit {
+            damage: 30,
+            hp: 70,
+            ..
+        }
+    )));
+}
+
+#[test]
+fn forward_thrust_preserves_windup_active_and_recovery_commitment() {
+    let mut world = duel(180.0);
+    let thrust = InputIntent {
+        move_x: 1.0,
+        attack: true,
+        facing_radians: 0.0,
+        ..InputIntent::default()
+    };
+    advance(&mut world, 5.0, thrust, InputIntent::default());
+    assert_eq!(world.fighter(1).expect("attacker").action, Action::ThrustWindup);
+
+    advance(
+        &mut world,
+        120.0,
+        InputIntent {
+            move_x: 1.0,
+            facing_radians: 0.0,
+            ..InputIntent::default()
+        },
+        InputIntent::default(),
+    );
+    assert_eq!(world.fighter(1).expect("attacker").action, Action::ThrustActive);
+
+    advance(
+        &mut world,
+        70.0,
+        InputIntent {
+            move_x: 1.0,
+            facing_radians: 0.0,
+            ..InputIntent::default()
+        },
+        InputIntent::default(),
+    );
+    assert_eq!(
+        world.fighter(1).expect("attacker").action,
+        Action::ThrustRecovery
+    );
+
+    advance(
+        &mut world,
+        235.0,
+        InputIntent {
+            facing_radians: 0.0,
+            ..InputIntent::default()
+        },
+        InputIntent::default(),
+    );
+    assert_eq!(world.fighter(1).expect("attacker").action, Action::Idle);
+}

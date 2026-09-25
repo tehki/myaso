@@ -104,6 +104,32 @@ test("Wilds kick run and jump fit the existing one-byte input button field", () 
   assert.equal(decoded.block, false);
 });
 
+test("thrust action phases survive snapshot encoding", () => {
+  for (const [action, expected] of [
+    ["thrust_windup", 20],
+    ["thrust_active", 21],
+    ["thrust_recovery", 22],
+  ]) {
+    const entityState = quantizeEntity({
+      netId: expected,
+      x: 100,
+      y: 120,
+      facing: 0,
+      hp: 100,
+      guard: 100,
+      action,
+    });
+    assert.equal(entityState.action, expected);
+    const packet = encodeSnapshot({
+      sequence: expected,
+      serverTick: expected,
+      records: [{ ...entityState, mask: 0x0f }],
+      full: true,
+    });
+    assert.equal(decodeSnapshot(packet).records[0].action, expected);
+  }
+});
+
 test("knockdown action survives snapshot encoding as a distinct state", () => {
   const entity = quantizeEntity({
     netId: 7,

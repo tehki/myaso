@@ -33,6 +33,60 @@ test("attack has windup, active, and recovery commitment", () => {
   assert.equal(a.action, "idle");
 });
 
+test("forward-moving light input selects a narrow thrust while neutral light remains slash", () => {
+  const thrustWorld = duel({ distance: 104 });
+  const [thrustAttacker, thrustTarget] = thrustWorld.fighters;
+  stepWorld(thrustWorld, {
+    a: { moveX: 1, attack: true, aimX: thrustTarget.x, aimY: thrustTarget.y },
+  }, 5);
+  assert.equal(thrustAttacker.action, "thrust_windup");
+
+  const slashWorld = duel({ distance: 72 });
+  const [slashAttacker, slashTarget] = slashWorld.fighters;
+  stepWorld(slashWorld, {
+    a: { attack: true, aimX: slashTarget.x, aimY: slashTarget.y },
+  }, 5);
+  assert.equal(slashAttacker.action, "attack_windup");
+});
+
+test("forward thrust trades slash width for reach and deals its profile once", () => {
+  const world = duel({ distance: 104 });
+  const [a, b] = world.fighters;
+  const events = advance(world, COMBAT.thrust.windupMs + COMBAT.thrust.activeMs + 15, {
+    a: { moveX: 1, attack: true, aimX: b.x, aimY: b.y },
+  });
+  assert.equal(b.hp, 100 - COMBAT.thrust.damage);
+  assert.equal(events.filter((event) => event.type === "hit").length, 1);
+  assert.equal(events.find((event) => event.type === "hit")?.attackKind, "thrust");
+
+  const angledAttacker = createFighter({ id: "a", x: 200, y: 200, facing: 0 });
+  const angle = Math.PI * 0.12;
+  const angledTarget = createFighter({
+    id: "b",
+    x: 200 + Math.cos(angle) * 90,
+    y: 200 + Math.sin(angle) * 90,
+    facing: Math.PI,
+  });
+  const angled = createWorld({ width: 600, height: 400, fighters: [angledAttacker, angledTarget] });
+  advance(angled, COMBAT.thrust.windupMs + COMBAT.thrust.activeMs + 15, {
+    a: { moveX: 1, attack: true, aimX: 400, aimY: 200 },
+  });
+  assert.equal(angledTarget.hp, 100, "target outside the 18-degree half cone must miss");
+});
+
+test("thrust preserves committed windup active and recovery phases", () => {
+  const world = duel({ distance: 180 });
+  const a = world.fighters[0];
+  stepWorld(world, { a: { moveX: 1, attack: true, aimX: 400, aimY: 200 } }, 5);
+  assert.equal(a.action, "thrust_windup");
+  advance(world, COMBAT.thrust.windupMs, { a: { moveX: 1, aimX: 400, aimY: 200 } });
+  assert.equal(a.action, "thrust_active");
+  advance(world, COMBAT.thrust.activeMs, { a: { moveX: 1, aimX: 400, aimY: 200 } });
+  assert.equal(a.action, "thrust_recovery");
+  advance(world, COMBAT.thrust.recoveryMs, { a: { aimX: 400, aimY: 200 } });
+  assert.equal(a.action, "idle");
+});
+
 test("heavy attack has longer windup active and recovery commitment", () => {
   const world = duel({ distance: 200 });
   const a = world.fighters[0];

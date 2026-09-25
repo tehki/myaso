@@ -21,6 +21,9 @@ export const COMBAT_ACTION = Object.freeze({
   jumpAttackActive: 17,
   jumpAttackRecovery: 18,
   knockdown: 19,
+  thrustWindup: 20,
+  thrustActive: 21,
+  thrustRecovery: 22,
 });
 
 const PRIORITY = Object.freeze({
@@ -120,6 +123,12 @@ export function combatActionHint(entity) {
       return "Strike active - finish the commitment.";
     case COMBAT_ACTION.attackRecovery:
       return "Recovery - you can be punished now.";
+    case COMBAT_ACTION.thrustWindup:
+      return "Thrust committed - narrow line, longer reach.";
+    case COMBAT_ACTION.thrustActive:
+      return "Thrust active - finish the line.";
+    case COMBAT_ACTION.thrustRecovery:
+      return "Thrust recovery - reposition before they punish.";
     case COMBAT_ACTION.heavyAttackWindup:
       return "Heavy strike committed - the long windup is readable.";
     case COMBAT_ACTION.heavyAttackActive:
@@ -147,6 +156,9 @@ export function opponentRecoveryPresentation(entity) {
   }
   if (entity?.action === COMBAT_ACTION.heavyAttackRecovery) {
     return { visible: true, state: "heavy-attack-recovery", label: "PUNISH", detail: "Heavy recovery" };
+  }
+  if (entity?.action === COMBAT_ACTION.thrustRecovery) {
+    return { visible: true, state: "thrust-recovery", label: "PUNISH", detail: "Thrust recovery" };
   }
   if (entity?.action === COMBAT_ACTION.dodgeRecovery) {
     return { visible: true, state: "dodge-recovery", label: "PUNISH", detail: "Dodge recovery" };
@@ -195,6 +207,8 @@ export function fighterIdentityPresentation(netId) {
 }
 
 export function fighterThreatPhaseLabel(attacker) {
+  if (attacker?.action === COMBAT_ACTION.thrustActive) return "THRUST";
+  if (attacker?.action === COMBAT_ACTION.thrustWindup) return "THRUST WINDUP";
   if (attacker?.action === COMBAT_ACTION.heavyAttackActive) return "HEAVY STRIKE";
   if (attacker?.action === COMBAT_ACTION.heavyAttackWindup) return "HEAVY WINDUP";
   if (attacker?.action === COMBAT_ACTION.attackActive) return "STRIKE";
@@ -238,12 +252,18 @@ export function fighterThreatNetId(state, ownId = 0, summary = null) {
   let secondDistanceSquared = Infinity;
   let threatCount = 0;
   for (const entity of state.values()) {
-    const active = entity?.action === COMBAT_ACTION.attackActive || entity?.action === COMBAT_ACTION.heavyAttackActive;
-    const windup = entity?.action === COMBAT_ACTION.attackWindup || entity?.action === COMBAT_ACTION.heavyAttackWindup;
+    const active = entity?.action === COMBAT_ACTION.attackActive
+      || entity?.action === COMBAT_ACTION.thrustActive
+      || entity?.action === COMBAT_ACTION.heavyAttackActive;
+    const windup = entity?.action === COMBAT_ACTION.attackWindup
+      || entity?.action === COMBAT_ACTION.thrustWindup
+      || entity?.action === COMBAT_ACTION.heavyAttackWindup;
     const priority = active ? 0 : windup ? 1 : Infinity;
-    const profile = entity?.action === COMBAT_ACTION.heavyAttackActive || entity?.action === COMBAT_ACTION.heavyAttackWindup
-      ? COMBAT.heavyAttack
-      : COMBAT.attack;
+    const thrust = entity?.action === COMBAT_ACTION.thrustActive
+      || entity?.action === COMBAT_ACTION.thrustWindup;
+    const heavy = entity?.action === COMBAT_ACTION.heavyAttackActive
+      || entity?.action === COMBAT_ACTION.heavyAttackWindup;
+    const profile = thrust ? COMBAT.thrust : heavy ? COMBAT.heavyAttack : COMBAT.attack;
     if (!Number.isFinite(priority) || entity.netId === ownId || !Number.isInteger(entity.netId) || entity.netId <= 0
       || !Number.isFinite(entity.x) || !Number.isFinite(entity.y) || !Number.isFinite(entity.facing)) continue;
     const dx = own.x - entity.x;
@@ -514,18 +534,27 @@ function collectDodgeEvents(events, own, peer, ownId, pending, beforeOwn = null,
 }
 
 function isAttackWindup(action) {
-  return action === COMBAT_ACTION.attackWindup || action === COMBAT_ACTION.heavyAttackWindup;
+  return action === COMBAT_ACTION.attackWindup
+    || action === COMBAT_ACTION.thrustWindup
+    || action === COMBAT_ACTION.heavyAttackWindup;
 }
 
 function isAttackActive(action) {
-  return action === COMBAT_ACTION.attackActive || action === COMBAT_ACTION.heavyAttackActive;
+  return action === COMBAT_ACTION.attackActive
+    || action === COMBAT_ACTION.thrustActive
+    || action === COMBAT_ACTION.heavyAttackActive;
 }
 
 function isAttackRecovery(action) {
-  return action === COMBAT_ACTION.attackRecovery || action === COMBAT_ACTION.heavyAttackRecovery;
+  return action === COMBAT_ACTION.attackRecovery
+    || action === COMBAT_ACTION.thrustRecovery
+    || action === COMBAT_ACTION.heavyAttackRecovery;
 }
 
 function attackProfileForAction(action) {
+  if (action === COMBAT_ACTION.thrustWindup
+    || action === COMBAT_ACTION.thrustActive
+    || action === COMBAT_ACTION.thrustRecovery) return COMBAT.thrust;
   return action === COMBAT_ACTION.heavyAttackWindup
     || action === COMBAT_ACTION.heavyAttackActive
     || action === COMBAT_ACTION.heavyAttackRecovery
