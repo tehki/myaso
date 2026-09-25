@@ -29,6 +29,7 @@ Roll replaces the old Space dodge binding.
 - 125 ms i-frame window
 - committed 180 ms recovery
 - costs 28 stamina
+- roll direction is always the current mouse-pointer/facing direction; WASD does not steer the roll
 - collision with a rival knocks them away and applies a short 260 ms stun
 
 ### Parry / short block
@@ -67,6 +68,8 @@ Pressing LMB while airborne converts it into a committed jumping attack:
 
 - 105 ms windup / 105 ms active / 290 ms recovery
 - 42 HP damage
+- deliberately short 48-unit reach
+- deliberately narrow 0.24π attack cone (about 43° total)
 - 52 guard pressure
 - stronger 34-unit knockback
 - costs an additional 12 stamina
