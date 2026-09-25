@@ -500,9 +500,11 @@ function drawFighterScreen(x, y, fighter, body, shadow, remote = false, damageTe
     || action === COMBAT_ACTION.jumpAttackWindup
     || action === COMBAT_ACTION.jumpAttackActive
     || action === COMBAT_ACTION.jumpAttackRecovery;
+  const knockedDown = action === COMBAT_ACTION.knockdown;
   const lift = airborne ? 18 : 0;
   ctx.translate(x, y - lift);
-  ctx.rotate((fighter.facing ?? 0) + (action === COMBAT_ACTION.dodge ? Math.PI * 0.35 : 0));
+  ctx.rotate((fighter.facing ?? 0) + (action === COMBAT_ACTION.dodge ? Math.PI * 0.35 : 0) + (knockedDown ? Math.PI / 2 : 0));
+  if (knockedDown) ctx.scale(1.38, 0.62);
   ctx.globalAlpha = action === COMBAT_ACTION.dead ? 0.28 : 1;
   if (action === COMBAT_ACTION.attackWindup || action === COMBAT_ACTION.attackActive) drawAttackTell(action, remote);
   if (action === COMBAT_ACTION.heavyAttackWindup || action === COMBAT_ACTION.heavyAttackActive) drawHeavyAttackTell(action, remote);
@@ -512,6 +514,7 @@ function drawFighterScreen(x, y, fighter, body, shadow, remote = false, damageTe
   if (action === COMBAT_ACTION.block) drawBlockTell(remote, fighter);
   if (action === COMBAT_ACTION.dodge) drawDodgeTell(remote);
   if (action === COMBAT_ACTION.stunned) drawStunTell();
+  if (action === COMBAT_ACTION.knockdown) drawKnockdownTell();
   if (remote && parrySpatialPresentation(fighter).visible) drawParryTell();
   if (remote && guardBreakSpatialPresentation(fighter).visible) drawGuardBreakTell();
   if (remote && opponentRecoveryPresentation(fighter).visible) drawRecoveryTell();
@@ -702,6 +705,16 @@ function drawDodgeTell(remote) {
   ctx.setLineDash([4, 4]);
   ctx.beginPath();
   ctx.arc(0, 0, 36, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.setLineDash([]);
+}
+
+function drawKnockdownTell() {
+  ctx.strokeStyle = "rgba(224, 163, 89, .92)";
+  ctx.lineWidth = 4;
+  ctx.setLineDash([6, 4]);
+  ctx.beginPath();
+  ctx.ellipse(0, 0, 30, 18, 0, 0, Math.PI * 2);
   ctx.stroke();
   ctx.setLineDash([]);
 }
