@@ -738,9 +738,9 @@ async function runOnlineUiHeavyBlockFlight(entries) {
       // ~320 ms is covered, while the refreshed block is already older than
       // the 125 ms parry window and therefore resolves as a normal block.
       await pulseMovementKey(attacker, "e", 40);
-      await sleep(150);
+      await sleep(50);
       await setArenaBlock(defender, defenderElementId, true);
-      await sleep(350);
+      await sleep(450);
     } finally {
       if (blockHeld) await setArenaBlock(defender, defenderElementId, false);
     }
@@ -1386,9 +1386,9 @@ async function runOnlineUiHeavyGuardBreakFlight(entries, { returnTiming = false 
 
       await setArenaBlock(defender, defenderElementId, true);
       await pulseMovementKey(attacker, "e", 40);
-      await sleep(180);
+      await sleep(50);
       await setArenaBlock(defender, defenderElementId, true);
-      await sleep(210);
+      await sleep(340);
       const states = await Promise.all(entries.map(readUiEvidence));
       const attackerState = states.find((entry) => entry.browser === attacker.name);
       const defenderState = states.find((entry) => entry.browser === defender.name);
@@ -1460,9 +1460,9 @@ async function runOnlineUiHeavyGuardBreakFlight(entries, { returnTiming = false 
       const attemptIssuedAt = Date.now();
       await setArenaBlock(defender, defenderElementId, true);
       await pulseMovementKey(attacker, "e", 40);
-      await sleep(180);
+      await sleep(50);
       await setArenaBlock(defender, defenderElementId, true);
-      await sleep(210);
+      await sleep(340);
       const states = await Promise.all(entries.map(readUiEvidence));
       const attackerState = states.find((entry) => entry.browser === attacker.name);
       const defenderState = states.find((entry) => entry.browser === defender.name);
