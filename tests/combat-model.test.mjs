@@ -219,7 +219,7 @@ test("unblocked kick shoves and stuns without health damage", () => {
     a: { kick: true, aimX: b.x, aimY: b.y },
   });
   assert.equal(b.hp, 100);
-  assert.equal(b.action, "stunned");
+  assert.equal(b.action, "knockdown");
   assert.ok(events.some((event) => event.type === "kick"));
   assert.equal(a.stamina, COMBAT.stamina.max - COMBAT.kick.staminaCost);
 });
@@ -247,7 +247,7 @@ test("roll collision knocks rival down and consumes stamina", () => {
     a: { dodge: true, moveX: 1, aimX: b.x, aimY: b.y },
   });
   assert.equal(a.action, "dodge");
-  assert.equal(b.action, "stunned");
+  assert.equal(b.action, "knockdown");
   assert.ok(events.some((event) => event.type === "roll_hit"));
   assert.equal(a.stamina, COMBAT.stamina.max - COMBAT.dodge.staminaCost);
 });
@@ -344,4 +344,32 @@ test("successful parry leaves a comfortable real light punish window", () => {
   assert.equal(a.hp, 66);
   assert.ok(punishEvents.some((event) => event.type === "hit"));
   assert.equal(a.action, "stunned");
+});
+
+
+test("kick knockdown is a bounded fallen state that restores control", () => {
+  const world = duel({ distance: 54 });
+  const [a, b] = world.fighters;
+  advance(world, COMBAT.kick.windupMs + COMBAT.kick.activeMs + 10, {
+    a: { kick: true, aimX: b.x, aimY: b.y },
+  });
+  assert.equal(b.action, "knockdown");
+  advance(world, COMBAT.kick.knockdownMs - 30);
+  assert.equal(b.action, "knockdown");
+  advance(world, 40);
+  assert.equal(b.action, "idle");
+  assert.equal(b.hp, 100);
+});
+
+test("roll knockdown blocks movement until its short recovery ends", () => {
+  const world = duel({ distance: 44 });
+  const [a, b] = world.fighters;
+  advance(world, 35, {
+    a: { dodge: true, aimX: b.x, aimY: b.y },
+  });
+  assert.equal(b.action, "knockdown");
+  const fallenX = b.x;
+  advance(world, 120, { b: { moveX: 1, aimX: a.x, aimY: a.y } });
+  assert.equal(b.action, "knockdown");
+  assert.equal(b.x, fallenX);
 });
