@@ -49,3 +49,8 @@ CI #182 and its exact-head rerun both reproduced a different scheduling failure:
 CI #197/#200 later showed that placing a 70 ms pause inside Firefox's W3C action sequence was still sensitive to Firefox command-start latency: genuine controls were delivered, yet the ordinary 34 HP strike could resolve before authoritative Dodge. M36 now anchors ordering on the harness clock instead. The Chrome pointer-down request is started first; 50 ms later the Firefox dodge command is dispatched with zero internal pre-delay. No combat constants, iframe duration, damage rules, feedback rules, or fail-closed vitals checks are changed.
 
 CI #202 showed the 50 ms Node-side stagger still left too little margin when Firefox command startup was slow: the exact real keys were delivered, but the strike resolved for 34 HP before authoritative Dodge. The harness now starts both WebDriver commands concurrently and keeps only a 20 ms pause inside the Firefox sequence. This changes no combat constant, input provenance requirement, iframe duration, damage rule, feedback rule, or fail-closed vitals check.
+
+
+## M113 control-schema adaptation
+
+The real-browser dodge control is now **wheel-forward** after a real pointer aim. M36 no longer requires the historical Space key; it requires the wheel event plus the redundant movement-key evidence and preserves the same authoritative no-damage / non-parry outcome checks.
