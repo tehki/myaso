@@ -891,6 +891,9 @@ mod tests {
             heavy_attack: false,
             dodge: false,
             block: false,
+            kick: false,
+            run: false,
+            jump: false,
         };
 
         let server_tick =
