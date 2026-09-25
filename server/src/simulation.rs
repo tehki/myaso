@@ -463,7 +463,10 @@ fn normalize_input(mut input: InputIntent) -> InputIntent {
 }
 
 fn begin_requested_action(now_ms: f32, fighter: &mut Fighter, input: InputIntent) {
-    if fighter.action == Action::Jump && input.attack && spend_stamina(now_ms, fighter, JUMP_ATTACK_STAMINA_COST) {
+    if fighter.action == Action::Jump
+        && input.attack
+        && spend_stamina(now_ms, fighter, JUMP_ATTACK_STAMINA_COST)
+    {
         fighter.attack_hit_targets.clear();
         fighter.set_action(Action::JumpAttackWindup, JUMP_ATTACK_WINDUP_MS);
         return;
@@ -488,13 +491,19 @@ fn begin_requested_action(now_ms: f32, fighter: &mut Fighter, input: InputIntent
         return;
     }
 
-    if input.kick && fighter.action == Action::Idle && spend_stamina(now_ms, fighter, KICK_STAMINA_COST) {
+    if input.kick
+        && fighter.action == Action::Idle
+        && spend_stamina(now_ms, fighter, KICK_STAMINA_COST)
+    {
         fighter.attack_hit_targets.clear();
         fighter.set_action(Action::KickWindup, KICK_WINDUP_MS);
         return;
     }
 
-    if input.jump && fighter.action == Action::Idle && spend_stamina(now_ms, fighter, JUMP_STAMINA_COST) {
+    if input.jump
+        && fighter.action == Action::Idle
+        && spend_stamina(now_ms, fighter, JUMP_STAMINA_COST)
+    {
         fighter.set_action(Action::Jump, JUMP_DURATION_MS);
         return;
     }
@@ -630,8 +639,12 @@ fn advance_action(fighter: &mut Fighter, input: InputIntent, dt_ms: f32) {
         Action::KickWindup => fighter.set_action(Action::KickActive, KICK_ACTIVE_MS),
         Action::KickActive => fighter.set_action(Action::KickRecovery, KICK_RECOVERY_MS),
         Action::KickRecovery => fighter.set_action(Action::Idle, 0.0),
-        Action::JumpAttackWindup => fighter.set_action(Action::JumpAttackActive, JUMP_ATTACK_ACTIVE_MS),
-        Action::JumpAttackActive => fighter.set_action(Action::JumpAttackRecovery, JUMP_ATTACK_RECOVERY_MS),
+        Action::JumpAttackWindup => {
+            fighter.set_action(Action::JumpAttackActive, JUMP_ATTACK_ACTIVE_MS)
+        }
+        Action::JumpAttackActive => {
+            fighter.set_action(Action::JumpAttackRecovery, JUMP_ATTACK_RECOVERY_MS)
+        }
         Action::JumpAttackRecovery | Action::Stunned => fighter.set_action(Action::Idle, 0.0),
         Action::Idle | Action::Block | Action::Dead => {}
     }
