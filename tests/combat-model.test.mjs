@@ -354,22 +354,24 @@ test("kick knockdown is a bounded fallen state that restores control", () => {
     a: { kick: true, aimX: b.x, aimY: b.y },
   });
   assert.equal(b.action, "knockdown");
-  advance(world, COMBAT.kick.knockdownMs - 30);
+  advance(world, 250);
   assert.equal(b.action, "knockdown");
-  advance(world, 40);
+  advance(world, 70);
   assert.equal(b.action, "idle");
   assert.equal(b.hp, 100);
 });
 
-test("roll knockdown blocks movement until its short recovery ends", () => {
-  const world = duel({ distance: 44 });
+test("knockdown ignores player movement input until recovery", () => {
+  const world = duel({ distance: 54 });
   const [a, b] = world.fighters;
-  advance(world, 35, {
-    a: { dodge: true, aimX: b.x, aimY: b.y },
+  advance(world, COMBAT.kick.windupMs + COMBAT.kick.activeMs + 10, {
+    a: { kick: true, aimX: b.x, aimY: b.y },
   });
   assert.equal(b.action, "knockdown");
   const fallenX = b.x;
-  advance(world, 120, { b: { moveX: 1, aimX: a.x, aimY: a.y } });
+  const fallenY = b.y;
+  advance(world, 100, { b: { moveX: 1, moveY: 1, aimX: a.x, aimY: a.y } });
   assert.equal(b.action, "knockdown");
   assert.equal(b.x, fallenX);
+  assert.equal(b.y, fallenY);
 });
