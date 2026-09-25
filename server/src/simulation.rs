@@ -405,7 +405,9 @@ impl World {
             }
 
             let input = normalize_input(fighter.latest_input);
-            fighter.facing = normalize_angle(input.facing_radians);
+            if fighter.action != Action::Knockdown {
+                fighter.facing = normalize_angle(input.facing_radians);
+            }
             begin_requested_action(self.now_ms, fighter, input);
             move_fighter(self.width, self.height, fighter, input, dt_ms);
             advance_action(fighter, input, dt_ms);
