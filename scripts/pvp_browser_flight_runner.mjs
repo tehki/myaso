@@ -2540,18 +2540,31 @@ async function scrollArenaWheel(session, elementId, deltaY, delayMs = 0) {
 
 async function pressArenaPerpendicularDodgeAfterPause(session, delayMs) {
   const elementId = await resolveArenaElement(session, "wheel-roll");
+  const origin = { "element-6066-11e4-a52e-4f735466cecf": elementId };
   await webdriver(session.base, "POST", `/session/${session.sessionId}/actions`, {
-    actions: [{
-      type: "key",
-      id: `keyboard-${session.name}`,
-      actions: [
-        { type: "keyDown", value: "s" },
-        { type: "pause", duration: delayMs + 45 },
-        { type: "keyUp", value: "s" },
-      ],
-    }],
+    actions: [
+      {
+        type: "key",
+        id: `keyboard-${session.name}`,
+        actions: [
+          { type: "keyDown", value: "s" },
+          { type: "pause", duration: delayMs },
+          { type: "pause", duration: 45 },
+          { type: "keyUp", value: "s" },
+        ],
+      },
+      {
+        type: "wheel",
+        id: `wheel-${session.name}`,
+        actions: [
+          { type: "pause", duration: 0 },
+          { type: "pause", duration: delayMs },
+          { type: "scroll", x: 0, y: 0, deltaX: 0, deltaY: -120, duration: 0, origin },
+          { type: "pause", duration: 0 },
+        ],
+      },
+    ],
   });
-  await scrollArenaWheel(session, elementId, -120, delayMs);
 }
 
 async function setArenaBlock(session, elementId, pressed) {
