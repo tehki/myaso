@@ -39,6 +39,13 @@ const ACTION_TO_CODE = new Map([
   ["heavy_attack_windup", 9],
   ["heavy_attack_active", 10],
   ["heavy_attack_recovery", 11],
+  ["kick_windup", 12],
+  ["kick_active", 13],
+  ["kick_recovery", 14],
+  ["jump", 15],
+  ["jump_attack_windup", 16],
+  ["jump_attack_active", 17],
+  ["jump_attack_recovery", 18],
 ]);
 const CODE_TO_ACTION = [...ACTION_TO_CODE.entries()].reduce((result, [name, code]) => {
   result[code] = name;
