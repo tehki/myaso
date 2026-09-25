@@ -8,7 +8,7 @@ import { setTimeout as sleep } from "node:timers/promises";
 const root = process.cwd();
 const durationMs = Number(process.env.MYASO_PVP_FLIGHT_DURATION_MS ?? 7000);
 const scenario = process.env.MYASO_PVP_SCENARIO ?? "damage";
-if (!new Set(["damage", "inputloss", "parry", "dodge", "block", "guardbreak", "backblock", "respawn", "ui", "uirespawn", "uifeedback", "uihittell", "uivitals", "uiidentity", "uiscore", "uimatch", "uirematch", "uiffa3", "uikillfeed", "uifocus", "uithreat", "uithreatbearing", "uimultithreat", "uisecondarythreat", "uisecondarybearing", "uisecondaryphase", "uiguardarc", "uisecondaryguardarc", "uithreatmarkers", "uiparry", "uistun", "uiguardbreak", "uidodge", "uirecovery", "uirecoverytell", "uiattackintent", "uiheavy", "uiheavyinputloss", "uiheavyblock", "uiheavyparry", "uiheavydodge", "uiheavypunish", "uiguardbreaktell", "uiparrytell", "uiblockfacingtell", "uidodgetell", "uideathtell"]).has(scenario)) throw new Error(`unsupported MYASO_PVP_SCENARIO: ${scenario}`);
+if (!new Set(["damage", "inputloss", "parry", "dodge", "block", "guardbreak", "backblock", "respawn", "ui", "uirespawn", "uifeedback", "uihittell", "uivitals", "uiidentity", "uiscore", "uimatch", "uirematch", "uiffa3", "uikillfeed", "uifocus", "uithreat", "uithreatbearing", "uimultithreat", "uisecondarythreat", "uisecondarybearing", "uisecondaryphase", "uiguardarc", "uisecondaryguardarc", "uithreatmarkers", "uiparry", "uistun", "uiguardbreak", "uidodge", "uirecovery", "uirecoverytell", "uiattackintent", "uiheavy", "uiheavyinputloss", "uiheavyblock", "uiheavyparry", "uiheavydodge", "uiheavypunish", "uiheavyguardbreak", "uiguardbreaktell", "uiparrytell", "uiblockfacingtell", "uidodgetell", "uideathtell"]).has(scenario)) throw new Error(`unsupported MYASO_PVP_SCENARIO: ${scenario}`);
 const staticPort = Number(process.env.MYASO_PVP_FLIGHT_HTTP_PORT ?? 4174);
 const browsers = [
   {
@@ -188,6 +188,9 @@ try {
   } else if (scenario === "uiheavypunish") {
     const results = await runOnlineUiHeavyWhiffPunishFlight(sessions);
     console.log(`M109_HEAVY_WHIFF_PUNISH ${JSON.stringify({ ok: true, results })}`);
+  } else if (scenario === "uiheavyguardbreak") {
+    const results = await runOnlineUiHeavyGuardBreakFlight(sessions);
+    console.log(`M110_HEAVY_GUARD_BREAK ${JSON.stringify({ ok: true, results })}`);
   } else if (scenario === "uiguardbreaktell") {
     const results = await runOnlineUiGuardBreakTellFlight(sessions);
     console.log(`M40_FFA_GUARD_BREAK_TELL ${JSON.stringify({ ok: true, results })}`);
@@ -1308,6 +1311,212 @@ async function runOnlineUiStunOverlayFlight(entries) {
   attacker = evidence.find((entry) => entry.feedbackTransitions.includes("parried"));
   if (!attacker || attacker.overlayVisible || attacker.overlayTransitions.at(-1)?.visible !== false) {
     throw new Error(`M35 stunned overlay did not clear on authoritative recovery: ${JSON.stringify(attacker)}`);
+  }
+  return evidence;
+}
+
+async function runOnlineUiHeavyGuardBreakFlight(entries) {
+  const staged = await prepareHeavyCounterplayFlight(
+    entries,
+    "M110 heavy guard break",
+    { attackerName: "chrome", defenderName: "firefox", movementMs: 180 },
+  );
+  const { attacker, defender, attackerElementId, defenderElementId, movementCode } = staged;
+  const attackRight = movementCode === "KeyD";
+  const attackOffset = attackRight ? 200 : -200;
+  const blockOffset = attackRight ? -200 : 200;
+  let firstEvidence = null;
+  let finalEvidence = null;
+  let blockHeld = false;
+
+  const heavyCommitCount = (state) => state.events.filter((text) =>
+    text.startsWith("Heavy strike committed")).length;
+
+  try {
+    await setArenaBlock(defender, defenderElementId, true);
+    blockHeld = true;
+    // Expire the 115 ms parry-entry window before either 320 ms heavy impact.
+    // Keeping Block held also intentionally suppresses guard regeneration, so
+    // the real pressure sequence must read 100 -> 36 -> 0.
+    await sleep(160);
+
+    for (let attempt = 1; attempt <= 3 && !firstEvidence; attempt += 1) {
+      const before = await Promise.all(entries.map(readUiEvidence));
+      const beforeAttacker = before.find((entry) => entry.browser === attacker.name);
+      if (!beforeAttacker) throw new Error(`M110 first heavy missing attacker baseline: ${JSON.stringify(before)}`);
+      const commitsBefore = heavyCommitCount(beforeAttacker);
+
+      await pulseMovementKey(attacker, "e", 40);
+      await sleep(390);
+      const states = await Promise.all(entries.map(readUiEvidence));
+      const attackerState = states.find((entry) => entry.browser === attacker.name);
+      const defenderState = states.find((entry) => entry.browser === defender.name);
+      if (!attackerState || !defenderState) {
+        throw new Error(`M110 first heavy incomplete evidence on attempt ${attempt}: ${JSON.stringify(states)}`);
+      }
+      const commitsAfter = heavyCommitCount(attackerState);
+      const firstBlocked = attackerState.playerHp === 100 && attackerState.playerGuard === 100
+        && defenderState.playerHp === 100 && defenderState.playerGuard === 36
+        && attackerState.opponentHp === 100 && attackerState.opponentGuard === 36
+        && commitsAfter === commitsBefore + 1;
+      if (firstBlocked) {
+        firstEvidence = states;
+        break;
+      }
+
+      const cleanLatchMiss = attackerState.playerHp === 100 && attackerState.playerGuard === 100
+        && defenderState.playerHp === 100 && defenderState.playerGuard === 100
+        && attackerState.opponentHp === 100 && attackerState.opponentGuard === 100
+        && commitsAfter === commitsBefore
+        && !attackerState.feedbackTransitions.includes("parried")
+        && !defenderState.feedbackTransitions.includes("parry-success");
+      if (!cleanLatchMiss) {
+        throw new Error(`M110 first heavy attempt ${attempt} resolved unexpectedly: ${JSON.stringify(states)}`);
+      }
+      if (attempt < 3) {
+        await Promise.all([
+          aimArena(attacker, attackerElementId, attackOffset),
+          aimArena(defender, defenderElementId, blockOffset),
+        ]);
+        await sleep(60);
+      }
+    }
+
+    if (!firstEvidence) {
+      throw new Error("M110 first blocked heavy did not resolve after bounded clean latch retries");
+    }
+    const firstAttacker = firstEvidence.find((entry) => entry.browser === attacker.name);
+    const firstDefender = firstEvidence.find((entry) => entry.browser === defender.name);
+    if (!firstAttacker?.events.includes("Opponent blocked - guard -64.")
+      || !firstDefender?.events.includes("Block held - guard -64.")) {
+      throw new Error(`M110 first heavy was not authoritative 64 guard pressure: ${JSON.stringify(firstEvidence)}`);
+    }
+    if (firstAttacker.feedbackTransitions.includes("parried")
+      || firstDefender.feedbackTransitions.includes("parry-success")) {
+      throw new Error(`M110 first heavy accidentally resolved as parry: ${JSON.stringify(firstEvidence)}`);
+    }
+
+    // First evidence is sampled around 390 ms after E; finish the unchanged
+    // 840 ms heavy commitment before the second genuine heavy request.
+    await sleep(500);
+    await Promise.all([
+      aimArena(attacker, attackerElementId, attackOffset),
+      aimArena(defender, defenderElementId, blockOffset),
+    ]);
+    await sleep(40);
+
+    for (let attempt = 1; attempt <= 3 && !finalEvidence; attempt += 1) {
+      const before = await Promise.all(entries.map(readUiEvidence));
+      const beforeAttacker = before.find((entry) => entry.browser === attacker.name);
+      const beforeDefender = before.find((entry) => entry.browser === defender.name);
+      if (!beforeAttacker || !beforeDefender || beforeDefender.playerGuard !== 36) {
+        throw new Error(`M110 held block did not preserve 36 guard before second heavy: ${JSON.stringify(before)}`);
+      }
+      const commitsBefore = heavyCommitCount(beforeAttacker);
+
+      await pulseMovementKey(attacker, "e", 40);
+      await sleep(390);
+      const states = await Promise.all(entries.map(readUiEvidence));
+      const attackerState = states.find((entry) => entry.browser === attacker.name);
+      const defenderState = states.find((entry) => entry.browser === defender.name);
+      if (!attackerState || !defenderState) {
+        throw new Error(`M110 second heavy incomplete evidence on attempt ${attempt}: ${JSON.stringify(states)}`);
+      }
+      const commitsAfter = heavyCommitCount(attackerState);
+      const guardBroken = attackerState.playerHp === 100 && attackerState.playerGuard === 100
+        && defenderState.playerHp === 100 && defenderState.playerGuard === 0
+        && attackerState.opponentHp === 100 && attackerState.opponentGuard === 0
+        && commitsAfter === commitsBefore + 1;
+      if (guardBroken) {
+        finalEvidence = states;
+        break;
+      }
+
+      const cleanLatchMiss = attackerState.playerHp === 100 && attackerState.playerGuard === 100
+        && defenderState.playerHp === 100 && defenderState.playerGuard === 36
+        && attackerState.opponentHp === 100 && attackerState.opponentGuard === 36
+        && commitsAfter === commitsBefore
+        && !attackerState.feedbackTransitions.includes("parried")
+        && !defenderState.feedbackTransitions.includes("parry-success");
+      if (!cleanLatchMiss) {
+        throw new Error(`M110 second heavy attempt ${attempt} resolved unexpectedly: ${JSON.stringify(states)}`);
+      }
+      if (attempt < 3) {
+        await Promise.all([
+          aimArena(attacker, attackerElementId, attackOffset),
+          aimArena(defender, defenderElementId, blockOffset),
+        ]);
+        await sleep(60);
+      }
+    }
+
+    if (!finalEvidence) {
+      throw new Error("M110 second blocked heavy did not break guard after bounded clean latch retries");
+    }
+
+    // Keep sampling while the authoritative 520 ms guard-break stun is live so
+    // both the feedback and visible STUNNED transition are captured.
+    const deadline = Date.now() + 260;
+    while (Date.now() < deadline) {
+      const states = await Promise.all(entries.map(readUiEvidence));
+      const attackerState = states.find((entry) => entry.browser === attacker.name);
+      const defenderState = states.find((entry) => entry.browser === defender.name);
+      const feedbackReady = attackerState?.events.includes("Opponent guard broken - punish.")
+        && defenderState?.events.includes("Guard broken - you are vulnerable.")
+        && attackerState?.feedbackTransitions.includes("guard-break-confirm")
+        && defenderState?.feedbackTransitions.includes("guard-broken");
+      const defenderStunned = defenderState?.overlayTransitions.some((entry) =>
+        entry.visible && entry.title === "STUNNED");
+      if (feedbackReady && defenderStunned) {
+        finalEvidence = states;
+        break;
+      }
+      await sleep(20);
+    }
+  } finally {
+    if (blockHeld) await setArenaBlock(defender, defenderElementId, false);
+  }
+
+  const evidence = await Promise.all(entries.map(readUiEvidence));
+  const attackerResult = evidence.find((entry) => entry.browser === attacker.name);
+  const defenderResult = evidence.find((entry) => entry.browser === defender.name);
+  if (!attackerResult || !defenderResult) {
+    throw new Error(`M110 heavy guard break incomplete final evidence: ${JSON.stringify(evidence)}`);
+  }
+  assertHeavyControlDelivered(attackerResult, movementCode, "M110 heavy guard break");
+  const heavyDowns = attackerResult.keys.filter((entry) => entry === "keydown:KeyE").length;
+  const authoritativeCommits = heavyCommitCount(attackerResult);
+  const blockDown = defenderResult.pointers.find((event) => event.type === "pointerdown" && event.button === 2);
+  const blockUp = defenderResult.pointers.find((event) => event.type === "pointerup" && event.button === 2);
+  if (heavyDowns < 2 || authoritativeCommits !== 2 || !blockDown || !blockUp) {
+    throw new Error(`M110 did not prove two real heavies into one held RMB block: ${JSON.stringify(evidence)}`);
+  }
+  if (attackerResult.playerHp !== 100 || attackerResult.playerGuard !== 100
+    || defenderResult.playerHp !== 100 || defenderResult.playerGuard !== 0) {
+    throw new Error(`M110 guard break did not preserve HP and exhaust guard: ${JSON.stringify(evidence)}`);
+  }
+  if (!attackerResult.events.includes("Opponent blocked - guard -64.")
+    || !defenderResult.events.includes("Block held - guard -64.")
+    || !attackerResult.events.includes("Opponent guard broken - punish.")
+    || !defenderResult.events.includes("Guard broken - you are vulnerable.")) {
+    throw new Error(`M110 authoritative heavy guard-pressure feedback was incomplete: ${JSON.stringify(evidence)}`);
+  }
+  if (!attackerResult.feedbackTransitions.includes("block-confirm")
+    || !defenderResult.feedbackTransitions.includes("guard-pressure")
+    || !attackerResult.feedbackTransitions.includes("guard-break-confirm")
+    || !defenderResult.feedbackTransitions.includes("guard-broken")) {
+    throw new Error(`M110 heavy guard-break readability was incomplete: ${JSON.stringify(evidence)}`);
+  }
+  const defenderStunned = defenderResult.overlayTransitions.some((entry) =>
+    entry.visible && entry.title === "STUNNED");
+  const attackerStunned = attackerResult.overlayTransitions.some((entry) =>
+    entry.visible && entry.title === "STUNNED");
+  if (!defenderStunned || attackerStunned) {
+    throw new Error(`M110 authoritative stun ownership was wrong: ${JSON.stringify(evidence)}`);
+  }
+  if (attackerResult.feedbackTransitions.includes("parried")
+    || defenderResult.feedbackTransitions.includes("parry-success")) {
+    throw new Error(`M110 held block accidentally resolved as parry: ${JSON.stringify(evidence)}`);
   }
   return evidence;
 }
