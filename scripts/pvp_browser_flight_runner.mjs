@@ -811,10 +811,14 @@ async function runOnlineUiHeavyDodgeFlight(entries) {
   );
   const { attacker, defender, movementCode } = staged;
 
-  await pulseMovementKey(attacker, "e", 40);
-  // Arm the 118 ms iframe around the 320 ms heavy active transition.
-  await sleep(230);
-  await pressArenaPerpendicularDodgeAfterPause(defender, 0);
+  // Submit both browser action sequences together. The defender's WebDriver
+  // sequence carries its own pause, so cross-browser command latency cannot
+  // accumulate after the real E pulse and push the 118 ms iframe past the
+  // authoritative 320 ms heavy active transition.
+  await Promise.all([
+    pulseMovementKey(attacker, "e", 40),
+    pressArenaPerpendicularDodgeAfterPause(defender, 225),
+  ]);
   // Let active -> recovery resolve without evidence polling inside the iframe.
   await sleep(360);
 
