@@ -1179,6 +1179,27 @@ fn wilds_roll_collision_knocks_target_down_and_costs_stamina() {
 }
 
 #[test]
+fn wilds_roll_direction_follows_pointer_facing_not_movement_input() {
+    let mut world = World::new(800.0, 500.0);
+    assert!(world.add_player_at(1, 300.0, 200.0, 0.0));
+    let start = world.fighter(1).expect("roller").clone();
+    advance(
+        &mut world,
+        50.0,
+        InputIntent {
+            move_x: -1.0,
+            facing_radians: std::f32::consts::FRAC_PI_2,
+            dodge: true,
+            ..InputIntent::default()
+        },
+        InputIntent::default(),
+    );
+    let roller = world.fighter(1).expect("roller");
+    assert!(roller.y > start.y);
+    assert!((roller.x - start.x).abs() < 2.0);
+}
+
+#[test]
 fn wilds_run_is_faster_and_drains_authoritative_stamina() {
     let mut world = World::new(800.0, 400.0);
     assert!(world.add_player_at(1, 100.0, 100.0, 0.0));
@@ -1200,7 +1221,7 @@ fn wilds_run_is_faster_and_drains_authoritative_stamina() {
 
 #[test]
 fn wilds_jump_converts_into_authoritative_jumping_attack() {
-    let mut world = duel(72.0);
+    let mut world = duel(60.0);
     advance(
         &mut world,
         5.0,
@@ -1244,6 +1265,80 @@ fn wilds_jump_converts_into_authoritative_jumping_attack() {
         }
     )));
     assert_eq!(world.fighter(2).expect("target").hp.round() as u8, 58);
+}
+
+#[test]
+fn wilds_jump_attack_has_a_narrow_short_range_cone() {
+    let mut far_world = duel(70.0);
+    advance(
+        &mut far_world,
+        5.0,
+        InputIntent {
+            jump: true,
+            facing_radians: 0.0,
+            ..InputIntent::default()
+        },
+        InputIntent::default(),
+    );
+    advance(
+        &mut far_world,
+        5.0,
+        InputIntent {
+            attack: true,
+            facing_radians: 0.0,
+            ..InputIntent::default()
+        },
+        InputIntent::default(),
+    );
+    advance(
+        &mut far_world,
+        220.0,
+        InputIntent {
+            facing_radians: 0.0,
+            ..InputIntent::default()
+        },
+        InputIntent::default(),
+    );
+    assert_eq!(far_world.fighter(2).expect("far target").hp.round() as u8, 100);
+
+    let mut angled = World::new(600.0, 400.0);
+    assert!(angled.add_player_at(1, 200.0, 200.0, 0.0));
+    assert!(angled.add_player_at(
+        2,
+        200.0 + (std::f32::consts::PI / 6.0).cos() * 60.0,
+        200.0 + (std::f32::consts::PI / 6.0).sin() * 60.0,
+        std::f32::consts::PI,
+    ));
+    advance(
+        &mut angled,
+        5.0,
+        InputIntent {
+            jump: true,
+            facing_radians: 0.0,
+            ..InputIntent::default()
+        },
+        InputIntent::default(),
+    );
+    advance(
+        &mut angled,
+        5.0,
+        InputIntent {
+            attack: true,
+            facing_radians: 0.0,
+            ..InputIntent::default()
+        },
+        InputIntent::default(),
+    );
+    advance(
+        &mut angled,
+        220.0,
+        InputIntent {
+            facing_radians: 0.0,
+            ..InputIntent::default()
+        },
+        InputIntent::default(),
+    );
+    assert_eq!(angled.fighter(2).expect("angled target").hp.round() as u8, 100);
 }
 
 #[test]
