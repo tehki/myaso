@@ -908,10 +908,26 @@ async function runOnlineUiHeavyWhiffPunishFlight(entries) {
   await aimArena(attacker, attackerElementId, whiffOffset);
   await sleep(40);
   await pulseMovementKey(attacker, "e", 40);
-  // Heavy active ends at 420 ms. Begin the counter just after that transition;
-  // the short real close keeps the light attack comfortably in range while its
-  // active frame still lands inside the unchanged 420 ms heavy recovery.
-  await sleep(390);
+  // React to the actual remote recovery cue instead of a wall-clock guess.
+  // This both proves the punish window was readable to the defender and avoids
+  // coupling the counter to cross-browser snapshot/WebDriver delivery skew.
+  const recoveryDeadline = Date.now() + 600;
+  let recoveryObserved = false;
+  while (Date.now() < recoveryDeadline) {
+    const state = await readUiEvidence(defender);
+    recoveryObserved = state.recoveryVisible
+      && state.recoveryState === "heavy-attack-recovery"
+      && state.recoveryLabel === "PUNISH"
+      && state.recoveryDetail === "Heavy recovery";
+    if (recoveryObserved) break;
+    await sleep(20);
+  }
+  if (!recoveryObserved) {
+    const state = await readUiEvidence(defender);
+    throw new Error(`M109 defender never observed live punishable heavy recovery: ${JSON.stringify(state.recoveryTransitions)}`);
+  }
+  // Once the tell is visible, the short real close plus light windup still lands
+  // inside the unchanged 420 ms heavy recovery.
   await pulseMovementKey(defender, punishMoveKey, 160);
   await sleep(20);
   await aimArena(defender, defenderElementId, punishOffset);
