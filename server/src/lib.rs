@@ -24,6 +24,7 @@ pub struct InputSample {
     pub move_y: f32,
     pub facing_radians: f32,
     pub attack: bool,
+    pub heavy_attack: bool,
     pub dodge: bool,
     pub block: bool,
 }
@@ -35,6 +36,7 @@ impl From<InputSample> for simulation::InputIntent {
             move_y: sample.move_y,
             facing_radians: sample.facing_radians,
             attack: sample.attack,
+            heavy_attack: sample.heavy_attack,
             dodge: sample.dodge,
             block: sample.block,
         }
@@ -46,9 +48,10 @@ pub fn coalesce_accepted_input_batch(samples: &[InputSample]) -> Option<InputSam
     if let Some(action_sample) = samples
         .iter()
         .rev()
-        .find(|sample| sample.attack || sample.dodge)
+        .find(|sample| sample.attack || sample.heavy_attack || sample.dodge)
     {
         newest.attack = action_sample.attack;
+        newest.heavy_attack = action_sample.heavy_attack;
         newest.dodge = action_sample.dodge;
         newest.facing_radians = action_sample.facing_radians;
         if action_sample.dodge {
@@ -65,6 +68,7 @@ const EMPTY_INPUT_SAMPLE: InputSample = InputSample {
     move_y: 0.0,
     facing_radians: 0.0,
     attack: false,
+    heavy_attack: false,
     dodge: false,
     block: false,
 };
@@ -185,9 +189,10 @@ pub fn decode_input_packet(bytes: &[u8]) -> Result<InputPacket, DecodeError> {
             move_x,
             move_y,
             facing_radians: (facing_wire as f32 / u16::MAX as f32) * std::f32::consts::TAU,
-            attack: buttons & 0b001 != 0,
-            dodge: buttons & 0b010 != 0,
-            block: buttons & 0b100 != 0,
+            attack: buttons & 0b0001 != 0,
+            heavy_attack: buttons & 0b1000 != 0,
+            dodge: buttons & 0b0010 != 0,
+            block: buttons & 0b0100 != 0,
         };
         offset += INPUT_SAMPLE_BYTES;
     }
@@ -382,10 +387,23 @@ mod tests {
         assert_eq!(packet.samples().len(), 3);
         assert_eq!(packet.samples()[0].tick, 1000);
         assert!(packet.samples()[0].attack);
+        assert!(!packet.samples()[0].heavy_attack);
         assert!(packet.samples()[1].dodge);
         assert!(packet.samples()[2].block);
         assert!((packet.samples()[0].move_x - 1.0).abs() < 0.001);
         assert!((packet.samples()[1].move_y + 1.0).abs() < 0.001);
+    }
+
+    #[test]
+    fn decodes_heavy_attack_from_spare_input_button_bit() {
+        let mut bytes = sample_packet();
+        bytes[INPUT_HEADER_BYTES + 5] |= 0b1000;
+        let packet = decode_input_packet(&bytes).expect("heavy-action packet");
+        let newest = packet.samples()[0];
+        assert!(newest.attack);
+        assert!(newest.heavy_attack);
+        assert!(!newest.dodge);
+        assert_eq!(INPUT_SAMPLE_BYTES, 6);
     }
 
     #[test]
@@ -571,6 +589,7 @@ mod tests {
             move_y: 0.0,
             facing_radians: 0.25,
             attack: true,
+            heavy_attack: false,
             dodge: false,
             block: true,
         };
@@ -580,6 +599,7 @@ mod tests {
             move_y: -0.25,
             facing_radians: 1.5,
             attack: false,
+            heavy_attack: false,
             dodge: false,
             block: false,
         };
@@ -598,7 +618,54 @@ mod tests {
             coalesced.attack,
             "accepted redundant attack edge must survive first-send loss"
         );
+        assert!(!coalesced.heavy_attack);
         assert!(!coalesced.dodge);
+    }
+
+    #[test]
+    fn coalesces_redundant_heavy_attack_edge_with_committed_facing() {
+        let older_attack = InputSample {
+            tick: 300,
+            move_x: 0.0,
+            move_y: 0.0,
+            facing_radians: 0.1,
+            attack: true,
+            heavy_attack: false,
+            dodge: false,
+            block: false,
+        };
+        let newer_heavy = InputSample {
+            tick: 301,
+            move_x: 0.25,
+            move_y: 0.0,
+            facing_radians: 0.75,
+            attack: false,
+            heavy_attack: true,
+            dodge: false,
+            block: false,
+        };
+        let newest_idle = InputSample {
+            tick: 302,
+            move_x: 0.5,
+            move_y: -0.5,
+            facing_radians: 1.5,
+            attack: false,
+            heavy_attack: false,
+            dodge: false,
+            block: true,
+        };
+
+        let coalesced =
+            coalesce_accepted_input_batch(&[older_attack, newer_heavy, newest_idle])
+                .expect("non-empty batch");
+        assert_eq!(coalesced.tick, 302);
+        assert!(!coalesced.attack);
+        assert!(coalesced.heavy_attack);
+        assert!(!coalesced.dodge);
+        assert_eq!(coalesced.facing_radians, 0.75);
+        assert_eq!(coalesced.move_x, 0.5);
+        assert_eq!(coalesced.move_y, -0.5);
+        assert!(coalesced.block);
     }
 
     #[test]
@@ -609,6 +676,7 @@ mod tests {
             move_y: 0.0,
             facing_radians: 0.0,
             attack: true,
+            heavy_attack: false,
             dodge: false,
             block: false,
         };
@@ -618,6 +686,7 @@ mod tests {
             move_y: 0.0,
             facing_radians: 0.5,
             attack: false,
+            heavy_attack: false,
             dodge: true,
             block: false,
         };
@@ -627,6 +696,7 @@ mod tests {
             move_y: 0.5,
             facing_radians: 1.0,
             attack: false,
+            heavy_attack: false,
             dodge: false,
             block: true,
         };
@@ -638,6 +708,7 @@ mod tests {
             !coalesced.attack,
             "older attack must not override a newer accepted dodge edge"
         );
+        assert!(!coalesced.heavy_attack);
         assert!(coalesced.dodge);
         assert_eq!(
             coalesced.move_x, 1.0,
