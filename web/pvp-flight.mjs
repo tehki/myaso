@@ -333,6 +333,9 @@ function sendCombatInput() {
           if (distance > 0.001) {
             moveX = -dy / distance;
             moveY = dx / distance;
+            // M113 rolls are pointer/facing-owned. Point the committed roll
+            // perpendicular to the incoming strike; WASD/movement is redundant.
+            facing = Math.atan2(moveY, moveX);
           }
           dodge = true;
         }
