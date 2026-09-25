@@ -905,7 +905,7 @@ async function runOnlineUiHeavyDodgeFlight(entries) {
 
   // Submit both browser action sequences together. The defender's WebDriver
   // sequence carries its own pause, so cross-browser command latency cannot
-  // accumulate after the real E pulse and push the 118 ms iframe past the
+  // accumulate after the real E pulse and push the 125 ms iframe past the
   // authoritative 320 ms heavy active transition.
   await Promise.all([
     pulseMovementKey(attacker, "e", 40),
@@ -921,8 +921,9 @@ async function runOnlineUiHeavyDodgeFlight(entries) {
     throw new Error(`M107 heavy dodge incomplete evidence: ${JSON.stringify(evidence)}`);
   }
   assertHeavyControlDelivered(attackerResult, movementCode, "M107 heavy dodge");
+  const rollWheel = defenderResult.wheels.find((event) => event.deltaY < 0);
   if (!defenderResult.keys.includes("keydown:KeyS") || !defenderResult.keys.includes("keyup:KeyS")
-    || !defenderResult.keys.includes("keydown:Space") || !defenderResult.keys.includes("keyup:Space")) {
+    || !rollWheel) {
     throw new Error(`M107 heavy dodge real wheel-forward/perpendicular controls were not delivered: ${JSON.stringify(defenderResult)}`);
   }
   if (attackerResult.playerHp !== 100 || attackerResult.playerGuard !== 100
