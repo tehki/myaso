@@ -49,7 +49,7 @@ python -m http.server 8000
 
 Then open `http://localhost:8000/web/`.
 
-Controls: **WASD** move, **mouse** aim, **left mouse** attack, **right mouse** block/parry, **Space** dodge.
+Controls: **WASD** move, **mouse** aim, **left mouse** light attack, **E** heavy attack, **right mouse** block/parry, **Space** dodge.
 
 ## Tests
 
