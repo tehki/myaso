@@ -136,6 +136,9 @@ export async function connectAuthoritativeClient({
       heavyAttack: Boolean(sample.heavyAttack),
       dodge: Boolean(sample.dodge),
       block: Boolean(sample.block),
+      kick: Boolean(sample.kick),
+      run: Boolean(sample.run),
+      jump: Boolean(sample.jump),
     };
     predictionHistory.push(normalized.tick, normalized);
     inputSamples.push(normalized);
