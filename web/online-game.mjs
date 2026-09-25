@@ -311,7 +311,9 @@ function predictMovement(input, dtMs) {
     moveX /= length;
     moveY /= length;
   }
-  local.facing = Number.isFinite(input.facing) ? input.facing : local.facing;
+  if (local.action !== COMBAT_ACTION.knockdown) {
+    local.facing = Number.isFinite(input.facing) ? input.facing : local.facing;
+  }
   let speed = COMBAT.moveSpeed;
   const now = performance.now();
   const moving = Math.hypot(moveX, moveY) > 1e-6;
