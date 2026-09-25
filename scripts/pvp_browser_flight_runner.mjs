@@ -959,24 +959,63 @@ async function runOnlineUiHeavyWhiffPunishFlight(entries) {
   // the acceptance depend on sub-frame distance thresholds.
   await aimArena(attacker, attackerElementId, whiffOffset);
   await sleep(40);
-  await pulseMovementKey(attacker, "e", 40);
-  // React to the actual remote recovery cue instead of a wall-clock guess.
-  // This both proves the punish window was readable to the defender and avoids
-  // coupling the counter to cross-browser snapshot/WebDriver delivery skew.
-  const recoveryDeadline = Date.now() + 600;
+
+  // A genuine WebDriver E edge can occasionally miss the client's one-shot
+  // outbound action latch. Retry only when the entire authoritative exchange
+  // proves that no heavy ever committed. Any threat/recovery/commit evidence or
+  // any vital change makes the attempt terminal and fail-closed.
   let recoveryObserved = false;
-  while (Date.now() < recoveryDeadline) {
-    const state = await readUiEvidence(defender);
-    recoveryObserved = state.recoveryVisible
-      && state.recoveryState === "heavy-attack-recovery"
-      && state.recoveryLabel === "PUNISH"
-      && state.recoveryDetail === "Heavy recovery";
+  let lastMiss = null;
+  for (let attempt = 1; attempt <= 3 && !recoveryObserved; attempt += 1) {
+    const before = await Promise.all(entries.map(readUiEvidence));
+    const beforeAttacker = before.find((entry) => entry.browser === attacker.name);
+    if (!beforeAttacker) throw new Error(`M109 missing attacker baseline on attempt ${attempt}: ${JSON.stringify(before)}`);
+    const commitsBefore = beforeAttacker.events.filter((text) =>
+      text.startsWith("Heavy strike committed")).length;
+
+    await pulseMovementKey(attacker, "e", 40);
+    // React to the actual remote recovery cue instead of a wall-clock guess.
+    // This both proves the punish window was readable to the defender and avoids
+    // coupling the counter to cross-browser snapshot/WebDriver delivery skew.
+    const recoveryDeadline = Date.now() + 600;
+    while (Date.now() < recoveryDeadline) {
+      const state = await readUiEvidence(defender);
+      recoveryObserved = state.recoveryVisible
+        && state.recoveryState === "heavy-attack-recovery"
+        && state.recoveryLabel === "PUNISH"
+        && state.recoveryDetail === "Heavy recovery";
+      if (recoveryObserved) break;
+      await sleep(20);
+    }
     if (recoveryObserved) break;
-    await sleep(20);
+
+    lastMiss = await Promise.all(entries.map(readUiEvidence));
+    const attackerState = lastMiss.find((entry) => entry.browser === attacker.name);
+    const defenderState = lastMiss.find((entry) => entry.browser === defender.name);
+    if (!attackerState || !defenderState) {
+      throw new Error(`M109 incomplete retry evidence on attempt ${attempt}: ${JSON.stringify(lastMiss)}`);
+    }
+    const commitsAfter = attackerState.events.filter((text) =>
+      text.startsWith("Heavy strike committed")).length;
+    const heavyCommitted = commitsAfter > commitsBefore
+      || defenderState.threatTransitions.some((entry) =>
+        entry.visible && (entry.phase === "HEAVY WINDUP" || entry.phase === "HEAVY STRIKE"))
+      || defenderState.recoveryTransitions.some((entry) =>
+        entry.visible && entry.state === "heavy-attack-recovery");
+    const cleanVitals = attackerState.playerHp === 100 && attackerState.playerGuard === 100
+      && attackerState.opponentHp === 100 && attackerState.opponentGuard === 100
+      && defenderState.playerHp === 100 && defenderState.playerGuard === 100
+      && defenderState.opponentHp === 100 && defenderState.opponentGuard === 100;
+    if (heavyCommitted || !cleanVitals) {
+      throw new Error(`M109 heavy attempt ${attempt} committed without a readable recovery or resolved unexpectedly: ${JSON.stringify(lastMiss)}`);
+    }
+    if (attempt < 3) {
+      await aimArena(attacker, attackerElementId, whiffOffset);
+      await sleep(80);
+    }
   }
   if (!recoveryObserved) {
-    const state = await readUiEvidence(defender);
-    throw new Error(`M109 defender never observed live punishable heavy recovery: ${JSON.stringify(state.recoveryTransitions)}`);
+    throw new Error(`M109 defender never observed live punishable heavy recovery after bounded clean latch retries: ${JSON.stringify(lastMiss)}`);
   }
   // Once the tell is visible, the short real close plus light windup still lands
   // inside the unchanged 420 ms heavy recovery.
@@ -994,6 +1033,11 @@ async function runOnlineUiHeavyWhiffPunishFlight(entries) {
   }
 
   assertHeavyControlDelivered(attackerResult, movementCode, "M109 heavy whiff punish");
+  const authoritativeHeavyCommits = attackerResult.events.filter((text) =>
+    text.startsWith("Heavy strike committed")).length;
+  if (authoritativeHeavyCommits !== 1) {
+    throw new Error(`M109 expected exactly one authoritative heavy commitment: ${JSON.stringify(attackerResult)}`);
+  }
   if (!defenderResult.keys.includes(`keydown:${punishMoveCode}`)
     || !defenderResult.keys.includes(`keyup:${punishMoveCode}`)) {
     throw new Error(`M109 punish closing movement was not delivered: ${JSON.stringify(defenderResult)}`);
