@@ -50,8 +50,8 @@ export const COMBAT = Object.freeze({
     windupMs: 105,
     activeMs: 105,
     recoveryMs: 290,
-    reach: 88,
-    arcRadians: Math.PI * 0.82,
+    reach: 48,
+    arcRadians: Math.PI * 0.24,
     damage: 42,
     knockback: 34,
     guardDamage: 52,
@@ -186,9 +186,8 @@ function beginRequestedAction(world, fighter, input) {
   if (!canInterrupt) return;
 
   if (input.dodge && spendStamina(world, fighter, COMBAT.dodge.staminaCost)) {
-    const moveLength = Math.hypot(input.moveX, input.moveY);
-    fighter.dodgeDirX = moveLength > EPSILON ? input.moveX / moveLength : Math.cos(fighter.facing);
-    fighter.dodgeDirY = moveLength > EPSILON ? input.moveY / moveLength : Math.sin(fighter.facing);
+    fighter.dodgeDirX = Math.cos(fighter.facing);
+    fighter.dodgeDirY = Math.sin(fighter.facing);
     fighter.rollHitTargets.clear();
     setAction(fighter, "dodge", COMBAT.dodge.durationMs);
     return;
