@@ -27,6 +27,9 @@ pub struct InputSample {
     pub heavy_attack: bool,
     pub dodge: bool,
     pub block: bool,
+    pub kick: bool,
+    pub run: bool,
+    pub jump: bool,
 }
 
 impl From<InputSample> for simulation::InputIntent {
@@ -39,6 +42,9 @@ impl From<InputSample> for simulation::InputIntent {
             heavy_attack: sample.heavy_attack,
             dodge: sample.dodge,
             block: sample.block,
+            kick: sample.kick,
+            run: sample.run,
+            jump: sample.jump,
         }
     }
 }
@@ -48,13 +54,15 @@ pub fn coalesce_accepted_input_batch(samples: &[InputSample]) -> Option<InputSam
     if let Some(action_sample) = samples
         .iter()
         .rev()
-        .find(|sample| sample.attack || sample.heavy_attack || sample.dodge)
+        .find(|sample| sample.attack || sample.heavy_attack || sample.dodge || sample.kick || sample.jump)
     {
         newest.attack = action_sample.attack;
         newest.heavy_attack = action_sample.heavy_attack;
         newest.dodge = action_sample.dodge;
+        newest.kick = action_sample.kick;
+        newest.jump = action_sample.jump;
         newest.facing_radians = action_sample.facing_radians;
-        if action_sample.dodge {
+        if action_sample.dodge || action_sample.jump {
             newest.move_x = action_sample.move_x;
             newest.move_y = action_sample.move_y;
         }
@@ -71,6 +79,9 @@ const EMPTY_INPUT_SAMPLE: InputSample = InputSample {
     heavy_attack: false,
     dodge: false,
     block: false,
+    kick: false,
+    run: false,
+    jump: false,
 };
 
 #[derive(Debug, Clone, Copy)]
@@ -191,8 +202,11 @@ pub fn decode_input_packet(bytes: &[u8]) -> Result<InputPacket, DecodeError> {
             facing_radians: (facing_wire as f32 / u16::MAX as f32) * std::f32::consts::TAU,
             attack: buttons & 0b0001 != 0,
             heavy_attack: buttons & 0b1000 != 0,
-            dodge: buttons & 0b0010 != 0,
-            block: buttons & 0b0100 != 0,
+            dodge: buttons & 0b0000_0010 != 0,
+            block: buttons & 0b0000_0100 != 0,
+            kick: buttons & 0b0001_0000 != 0,
+            run: buttons & 0b0010_0000 != 0,
+            jump: buttons & 0b0100_0000 != 0,
         };
         offset += INPUT_SAMPLE_BYTES;
     }
