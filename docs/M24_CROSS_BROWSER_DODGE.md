@@ -30,3 +30,10 @@ Both browsers must independently observe:
 ## Acceptance stabilization
 
 CI #169 exact-head retry exposed a transport/timing flake in which the defender eventually entered authoritative `Dodge`, but the single request sample did not overlap `AttackActive` and the first strike landed. The harness now preserves the >=35 ms reaction threshold while carrying the already-triggered ordinary dodge request until authoritative Dodge confirmation or the attack window ends. Acceptance remains unchanged: active-frame overlap inside the real hit geometry and untouched 100/100 defender vitals are still mandatory.
+
+
+## M113 control-schema adaptation
+
+M24 now preserves its original authoritative iframe/geometry proof under the Wilds control schema. The defender commits the dodge primitive with its **facing vector set perpendicular to the incoming strike**, matching the player-facing rule that a wheel-forward roll always travels toward the mouse pointer. The movement vector is deliberately redundant and cannot steer the committed roll.
+
+The acceptance still requires a live in-range attack-active/roll overlap, unchanged HP/guard, verified geometry, and no accidental block/parry or roll-collision stun.
