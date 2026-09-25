@@ -338,7 +338,7 @@ test("authoritative opponent block emits block-confirm feedback", () => {
 test("cost-free block plus attacker stun is described as a parry", () => {
   const tracker = createCombatReadabilityTracker();
   tracker.observe(state(fighter(1, 100, 100, COMBAT_ACTION.block), fighter(2)), 1);
-  const event = tracker.observe(state(fighter(1, 100, 100, COMBAT_ACTION.block), fighter(2, 100, 100, COMBAT_ACTION.stunned)), 1);
+  const event = tracker.observe(state(fighter(1, 100, 100, COMBAT_ACTION.block), fighter(2, 100, 100, COMBAT_ACTION.knockdown)), 1);
   assert.equal(event.kind, "parry");
   assert.equal(event.feedback, "parry-success");
   assert.match(event.text, /Parry!/);
@@ -347,7 +347,7 @@ test("cost-free block plus attacker stun is described as a parry", () => {
 test("being parried emits a distinct authoritative feedback cue", () => {
   const tracker = createCombatReadabilityTracker();
   tracker.observe(state(fighter(1), fighter(2, 100, 100, COMBAT_ACTION.block)), 1);
-  const event = tracker.observe(state(fighter(1, 100, 100, COMBAT_ACTION.stunned), fighter(2, 100, 100, COMBAT_ACTION.block)), 1);
+  const event = tracker.observe(state(fighter(1, 100, 100, COMBAT_ACTION.knockdown), fighter(2, 100, 100, COMBAT_ACTION.block)), 1);
   assert.equal(event.kind, "parry");
   assert.equal(event.feedback, "parried");
   assert.match(event.text, /Parried/);
@@ -365,7 +365,7 @@ test("authoritative kick stun emits distinct shove impact feedback", () => {
   const event = tracker.observe(
     state(
       fighter(1, 100, 100, COMBAT_ACTION.kickRecovery),
-      fighter(2, 100, 100, COMBAT_ACTION.stunned),
+      fighter(2, 100, 100, COMBAT_ACTION.knockdown),
     ),
     1,
   );
@@ -386,7 +386,7 @@ test("authoritative roll collision emits distinct knockdown impact feedback", ()
   const event = tracker.observe(
     state(
       fighter(1, 100, 100, COMBAT_ACTION.dodgeRecovery),
-      fighter(2, 100, 100, COMBAT_ACTION.stunned),
+      fighter(2, 100, 100, COMBAT_ACTION.knockdown),
     ),
     1,
   );
@@ -406,7 +406,7 @@ test("being shoved or rolled over has distinct local impact feedback", () => {
   );
   const shoved = kickTracker.observe(
     state(
-      fighter(1, 100, 100, COMBAT_ACTION.stunned),
+      fighter(1, 100, 100, COMBAT_ACTION.knockdown),
       fighter(2, 100, 100, COMBAT_ACTION.kickRecovery),
     ),
     1,
@@ -423,7 +423,7 @@ test("being shoved or rolled over has distinct local impact feedback", () => {
   );
   const rolled = rollTracker.observe(
     state(
-      fighter(1, 100, 100, COMBAT_ACTION.stunned),
+      fighter(1, 100, 100, COMBAT_ACTION.knockdown),
       fighter(2, 100, 100, COMBAT_ACTION.dodgeRecovery),
     ),
     1,
@@ -569,7 +569,7 @@ test("authoritative opponent guard break emits punish confirmation", () => {
 
 test("zero-guard stun exposes a spatial guard-break tell", () => {
   assert.deepEqual(guardBreakSpatialPresentation(fighter(2, 100, 0, COMBAT_ACTION.stunned)), { visible: true, state: "guard-broken" });
-  assert.deepEqual(guardBreakSpatialPresentation(fighter(2, 100, 100, COMBAT_ACTION.stunned)), { visible: false, state: "" });
+  assert.deepEqual(guardBreakSpatialPresentation(fighter(2, 100, 100, COMBAT_ACTION.knockdown)), { visible: false, state: "" });
   assert.deepEqual(guardBreakSpatialPresentation(fighter(2, 100, 0, COMBAT_ACTION.block)), { visible: false, state: "" });
 });
 
@@ -580,11 +580,11 @@ test("authoritative block exposes its replicated facing as a spatial tell", () =
 });
 
 test("positive-guard stun exposes a mutually exclusive spatial parry tell", () => {
-  assert.deepEqual(parrySpatialPresentation(fighter(2, 100, 100, COMBAT_ACTION.stunned)), { visible: true, state: "parried" });
+  assert.deepEqual(parrySpatialPresentation(fighter(2, 100, 100, COMBAT_ACTION.knockdown)), { visible: true, state: "parried" });
   assert.deepEqual(parrySpatialPresentation(fighter(2, 100, 1, COMBAT_ACTION.stunned)), { visible: true, state: "parried" });
   assert.deepEqual(parrySpatialPresentation(fighter(2, 100, 0, COMBAT_ACTION.stunned)), { visible: false, state: "" });
   assert.deepEqual(parrySpatialPresentation(fighter(2, 100, 100, COMBAT_ACTION.block)), { visible: false, state: "" });
-  assert.equal(guardBreakSpatialPresentation(fighter(2, 100, 100, COMBAT_ACTION.stunned)).visible, false);
+  assert.equal(guardBreakSpatialPresentation(fighter(2, 100, 100, COMBAT_ACTION.knockdown)).visible, false);
 });
 
 test("death and full-vitals idle transition are readable", () => {
@@ -619,7 +619,7 @@ test("authoritative opponent recovery exposes a bounded punish cue", () => {
 });
 
 test("authoritative stun owns a temporary punish overlay", () => {
-  assert.deepEqual(combatOverlayPresentation(fighter(1, 100, 100, COMBAT_ACTION.stunned)), {
+  assert.deepEqual(combatOverlayPresentation(fighter(1, 100, 100, COMBAT_ACTION.knockdown)), {
     visible: true,
     state: "stunned",
     title: "STUNNED",
@@ -635,4 +635,21 @@ test("authoritative death owns the persistent life presentation", () => {
     detail: "Respawning…",
   });
   assert.deepEqual(combatLifePresentation(fighter(1)), { visible: false, title: "", detail: "" });
+});
+
+
+test("knockdown owns a distinct overlay and punish recovery cue", () => {
+  const knocked = fighter(2, 100, 100, COMBAT_ACTION.knockdown);
+  assert.deepEqual(combatOverlayPresentation(knocked), {
+    visible: true,
+    state: "knockdown",
+    title: "KNOCKED DOWN",
+    detail: "Short recovery window.",
+  });
+  assert.deepEqual(opponentRecoveryPresentation(knocked), {
+    visible: true,
+    state: "knockdown",
+    label: "PUNISH",
+    detail: "Knockdown recovery",
+  });
 });
