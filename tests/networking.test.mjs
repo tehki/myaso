@@ -7,6 +7,7 @@ import { InputIngressWindow } from "../src/network/input-ingress.mjs";
 import { planReplication } from "../src/network/replication-planner.mjs";
 import {
   applySnapshotRecords,
+  buildEntityDelta,
   buildSnapshotDelta,
   buildWireStateMap,
   decodeSnapshot,
