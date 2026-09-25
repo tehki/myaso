@@ -29,7 +29,7 @@ Browser roles are fixed for repeatability:
 
 Firefox first stages inside punish range with real movement, then deliberately aims the heavy away from Chrome before pressing real `E`.
 
-The wrong-facing heavy remains fully committed through its unchanged 320 ms windup and 100 ms active window but cannot connect through the authoritative directional arc. Chrome waits for heavy active to end, then uses a short real closing movement before counterattacking.
+The wrong-facing heavy remains fully committed through its unchanged 320 ms windup and 100 ms active window but cannot connect through the authoritative directional arc. Chrome waits until it actually observes the remote `PUNISH · Heavy recovery` cue, then uses a short real closing movement before counterattacking. The acceptance therefore reacts to authoritative readability rather than a wall-clock guess.
 
 During authoritative heavy recovery, Chrome:
 
