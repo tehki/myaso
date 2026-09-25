@@ -2528,28 +2528,35 @@ async function centerArenaInViewport(session) {
   return geometry;
 }
 
+async function scrollArenaWheel(session, elementId, deltaY, delayMs = 0) {
+  const origin = { "element-6066-11e4-a52e-4f735466cecf": elementId };
+  const actions = [];
+  if (delayMs > 0) actions.push({ type: "pause", duration: delayMs });
+  actions.push({ type: "scroll", x: 0, y: 0, deltaX: 0, deltaY, duration: 0, origin });
+  await webdriver(session.base, "POST", `/session/${session.sessionId}/actions`, {
+    actions: [{ type: "wheel", id: `wheel-${session.name}`, actions }],
+  });
+}
+
 async function pressArenaPerpendicularDodgeAfterPause(session, delayMs) {
+  const elementId = await resolveArenaElement(session, "wheel-roll");
   await webdriver(session.base, "POST", `/session/${session.sessionId}/actions`, {
     actions: [{
       type: "key",
       id: `keyboard-${session.name}`,
       actions: [
-        { type: "pause", duration: delayMs },
         { type: "keyDown", value: "s" },
-        { type: "keyDown", value: "\uE00D" },
-        { type: "pause", duration: 40 },
-        { type: "keyUp", value: "\uE00D" },
+        { type: "pause", duration: delayMs + 45 },
         { type: "keyUp", value: "s" },
       ],
     }],
   });
+  await scrollArenaWheel(session, elementId, -120, delayMs);
 }
 
 async function setArenaBlock(session, elementId, pressed) {
-  const actions = [{ type: pressed ? "pointerDown" : "pointerUp", button: 2 }];
-  await webdriver(session.base, "POST", `/session/${session.sessionId}/actions`, {
-    actions: [{ type: "pointer", id: `mouse-${session.name}`, parameters: { pointerType: "mouse" }, actions }],
-  });
+  if (!pressed) return;
+  await scrollArenaWheel(session, elementId, 120);
 }
 
 async function setArenaAttack(session, elementId, pressed, xOffset = 200) {
@@ -2628,7 +2635,7 @@ async function installUiObserver(session) {
     const threatBearing = document.querySelector('#threat-bearing');
     const threatGuardArc = document.querySelector('#threat-guard-arc');
     if (!target || !arena || !arenaStage || !overlay || !recovery || !threat || !threatCount || !threatSecondary || !threatSecondaryBearing || !threatSecondaryPhase || !threatSecondaryGuardArc || !threatBearing || !threatGuardArc) throw new Error('missing online UI flight target');
-    const state = { events: [], eventTransitions: [], keys: [], pointers: [], overlayTransitions: [], feedbackTransitions: [], recoveryTransitions: [], threatTransitions: [], recoveryTellMaxPixels: 0, parryTellMaxPixels: 0, online: '', startedAt: performance.now() };
+    const state = { events: [], eventTransitions: [], keys: [], pointers: [], wheels: [], overlayTransitions: [], feedbackTransitions: [], recoveryTransitions: [], threatTransitions: [], recoveryTellMaxPixels: 0, parryTellMaxPixels: 0, online: '', startedAt: performance.now() };
     const record = () => {
       const text = target.textContent?.trim() ?? '';
       if (/^Online - player #\\d+ - server tick \\d+$/.test(text)) state.online = text;
@@ -2698,6 +2705,12 @@ async function installUiObserver(session) {
         });
       }, { capture: true });
     }
+    arena.addEventListener('wheel', (event) => {
+      state.wheels.push({
+        deltaY: event.deltaY,
+        t: Number((performance.now() - state.startedAt).toFixed(1)),
+      });
+    }, { capture: true });
     record();
     recordOverlay();
     recordFeedback();
