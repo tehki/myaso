@@ -17,10 +17,14 @@
       <div class="controls" aria-label="Controls">
         <span><kbd>WASD</kbd> move</span>
         <span><kbd>Mouse</kbd> aim</span>
-        <span><kbd>LMB</kbd> light attack</span>
+        <span><kbd>LMB</kbd> attack</span>
         <span><kbd>E</kbd> heavy attack</span>
-        <span><kbd>RMB</kbd> block / parry</span>
-        <span><kbd>Space</kbd> dodge</span>
+        <span><kbd>Wheel ↑</kbd> roll</span>
+        <span><kbd>Wheel ↓</kbd> parry / short block</span>
+        <span><kbd>RMB tap</kbd> kick / shove</span>
+        <span><kbd>RMB hold</kbd> run</span>
+        <span><kbd>Space</kbd> jump</span>
+        <span><kbd>Space + LMB</kbd> jumping attack</span>
       </div>
     </header>
 
@@ -29,6 +33,7 @@
         <strong>You</strong>
         <div class="meter"><span>HP</span><div><i id="player-hp"></i></div><b id="player-hp-value">100</b></div>
         <div class="meter guard"><span>Guard</span><div><i id="player-guard"></i></div><b id="player-guard-value">100</b></div>
+        <div class="meter stamina"><span>Stamina</span><div><i id="player-stamina"></i></div><b id="player-stamina-value">100</b></div>
       </div>
       <p id="event-text" class="event-text">Enter the arena.</p>
       <div class="fighter-card bot-card">
