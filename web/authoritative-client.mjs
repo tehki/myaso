@@ -133,6 +133,7 @@ export async function connectAuthoritativeClient({
       moveY: sample.moveY ?? 0,
       facing: sample.facing ?? 0,
       attack: Boolean(sample.attack),
+      heavyAttack: Boolean(sample.heavyAttack),
       dodge: Boolean(sample.dodge),
       block: Boolean(sample.block),
     };
