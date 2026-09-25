@@ -852,16 +852,22 @@ async function runOnlineUiHeavyWhiffPunishFlight(entries) {
   );
   const { attacker, defender, defenderElementId, movementCode } = staged;
   const attackRight = movementCode === "KeyD";
+  const retreatMoveKey = attackRight ? "a" : "d";
+  const retreatMoveCode = attackRight ? "KeyA" : "KeyD";
   const punishMoveKey = attackRight ? "a" : "d";
   const punishMoveCode = attackRight ? "KeyA" : "KeyD";
   const punishOffset = attackRight ? -200 : 200;
 
+  // First create a genuine spacing whiff with real movement away from the
+  // defender. The small inherited approach tap keeps role/direction evidence,
+  // while this retreat moves the heavy safely beyond its contact envelope.
+  await pulseMovementKey(attacker, retreatMoveKey, 160);
   await pulseMovementKey(attacker, "e", 40);
-  // The intentionally shallow 20 ms staging move leaves the heavy outside
-  // contact range. Wait through windup+active so closing movement cannot turn
-  // the whiff into a late heavy hit, then use the 420 ms recovery as the punish window.
-  await sleep(390);
-  await pulseMovementKey(defender, punishMoveKey, 180);
+  // Start closing only as heavy active expires. The attacker is still far enough
+  // away that these first few movement frames cannot turn the whiff into a hit,
+  // while the light active frame still lands inside the 420 ms heavy recovery.
+  await sleep(370);
+  await pulseMovementKey(defender, punishMoveKey, 230);
   await aimArena(defender, defenderElementId, punishOffset);
   await performArenaAttack(defender, defenderElementId, punishOffset);
   await sleep(320);
@@ -874,6 +880,10 @@ async function runOnlineUiHeavyWhiffPunishFlight(entries) {
   }
 
   assertHeavyControlDelivered(attackerResult, movementCode, "M109 heavy whiff punish");
+  if (!attackerResult.keys.includes(`keydown:${retreatMoveCode}`)
+    || !attackerResult.keys.includes(`keyup:${retreatMoveCode}`)) {
+    throw new Error(`M109 real heavy-spacing retreat was not delivered: ${JSON.stringify(attackerResult)}`);
+  }
   if (!defenderResult.keys.includes(`keydown:${punishMoveCode}`)
     || !defenderResult.keys.includes(`keyup:${punishMoveCode}`)) {
     throw new Error(`M109 punish closing movement was not delivered: ${JSON.stringify(defenderResult)}`);

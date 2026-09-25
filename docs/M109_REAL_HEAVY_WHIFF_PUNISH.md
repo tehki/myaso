@@ -27,11 +27,11 @@ Browser roles are fixed for repeatability:
 
 ## Exchange
 
-The Firefox attacker performs only a shallow real movement tap before pressing real `E`.
+The Firefox attacker first performs the normal shallow role-staging tap, then makes a real 160 ms retreat away from Chrome before pressing real `E`.
 
-That staging intentionally leaves the heavy outside contact range. The defender does not move until the 320 ms windup plus 100 ms active window has elapsed.
+The retreat deliberately moves the heavy beyond its contact envelope. Chrome begins closing only as the 320 ms windup plus 100 ms active window expires, so those first closing frames cannot turn the spaced heavy into a late hit.
 
-Once authoritative heavy recovery has begun, Chrome:
+During authoritative heavy recovery, Chrome:
 
 - closes distance with a real horizontal movement key;
 - aims back toward the recovering attacker;
@@ -43,7 +43,7 @@ The light active frame lands while the attacker's unchanged 420 ms heavy recover
 
 The flight requires:
 
-- real heavy movement and `KeyE` down/up delivery;
+- real heavy role-staging movement, retreat movement, and `KeyE` down/up delivery;
 - no 46-damage heavy hit;
 - visible `PUNISH · Heavy recovery`;
 - real defender closing movement;
