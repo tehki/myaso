@@ -711,38 +711,78 @@ function assertHeavyControlDelivered(attackerResult, movementCode, label) {
 
 async function runOnlineUiHeavyBlockFlight(entries) {
   const staged = await prepareHeavyCounterplayFlight(entries, "M107 heavy block");
-  const { attacker, defender, defenderElementId, movementCode } = staged;
-  let blockHeld = false;
-  try {
-    await setArenaBlock(defender, defenderElementId, true);
-    blockHeld = true;
-    // Start block well before the heavy edge so the 115 ms fresh-parry window
-    // is expired by the 320 ms active transition. This must resolve as a normal
-    // directional block, not a parry.
-    await sleep(160);
-    await pulseMovementKey(attacker, "e", 40);
-    await sleep(500);
-  } finally {
-    if (blockHeld) await setArenaBlock(defender, defenderElementId, false);
-  }
-  await sleep(20);
+  const { attacker, defender, attackerElementId, defenderElementId, movementCode } = staged;
+  const attackRight = movementCode === "KeyD";
+  const attackOffset = attackRight ? 200 : -200;
+  const blockOffset = attackRight ? -200 : 200;
+  let evidence = null;
+  let lastObserved = null;
 
-  const evidence = await Promise.all(entries.map(readUiEvidence));
+  // Browser action edges can occasionally miss the real input latch even though
+  // WebDriver delivered the key. Retry only when the authoritative exchange is
+  // completely unresolved: pristine HP/guard and no parry feedback. Any resolved
+  // or partially resolved exchange fails closed instead of being retried.
+  for (let attempt = 1; attempt <= 3 && !evidence; attempt += 1) {
+    let blockHeld = false;
+    try {
+      await setArenaBlock(defender, defenderElementId, true);
+      blockHeld = true;
+      // Start block well before the heavy edge so the 115 ms fresh-parry window
+      // is expired by the 320 ms active transition. This must resolve as a normal
+      // directional block, not a parry.
+      await sleep(160);
+      await pulseMovementKey(attacker, "e", 40);
+      await sleep(500);
+    } finally {
+      if (blockHeld) await setArenaBlock(defender, defenderElementId, false);
+    }
+    await sleep(20);
+
+    lastObserved = await Promise.all(entries.map(readUiEvidence));
+    const attackerResult = lastObserved.find((entry) => entry.browser === attacker.name);
+    const defenderResult = lastObserved.find((entry) => entry.browser === defender.name);
+    if (!attackerResult || !defenderResult) {
+      throw new Error(`M107 heavy block incomplete evidence on attempt ${attempt}: ${JSON.stringify(lastObserved)}`);
+    }
+
+    const resolvedBlock = attackerResult.playerHp === 100 && attackerResult.playerGuard === 100
+      && attackerResult.opponentHp === 100 && attackerResult.opponentGuard === 36
+      && defenderResult.playerHp === 100 && defenderResult.playerGuard === 36;
+    if (resolvedBlock) {
+      evidence = lastObserved;
+      break;
+    }
+
+    const cleanMiss = attackerResult.playerHp === 100 && attackerResult.playerGuard === 100
+      && attackerResult.opponentHp === 100 && attackerResult.opponentGuard === 100
+      && defenderResult.playerHp === 100 && defenderResult.playerGuard === 100
+      && !attackerResult.feedbackTransitions.includes("parried")
+      && !defenderResult.feedbackTransitions.includes("parry-success");
+    if (!cleanMiss) {
+      throw new Error(`M107 heavy block attempt ${attempt} resolved unexpectedly: ${JSON.stringify(lastObserved)}`);
+    }
+    if (attempt < 3) {
+      // A delivered-but-unresolved heavy may still be in recovery. Let the full
+      // commitment settle, then restore exact aim before the next genuine edge.
+      await sleep(380);
+      await Promise.all([
+        aimArena(attacker, attackerElementId, attackOffset),
+        aimArena(defender, defenderElementId, blockOffset),
+      ]);
+      await sleep(40);
+    }
+  }
+
+  if (!evidence) {
+    throw new Error(`M107 heavy block did not resolve after bounded clean retries: ${JSON.stringify(lastObserved)}`);
+  }
   const attackerResult = evidence.find((entry) => entry.browser === attacker.name);
   const defenderResult = evidence.find((entry) => entry.browser === defender.name);
-  if (!attackerResult || !defenderResult) {
-    throw new Error(`M107 heavy block incomplete evidence: ${JSON.stringify(evidence)}`);
-  }
   assertHeavyControlDelivered(attackerResult, movementCode, "M107 heavy block");
   const blockDown = defenderResult.pointers.find((event) => event.type === "pointerdown" && event.button === 2);
   const blockUp = defenderResult.pointers.find((event) => event.type === "pointerup" && event.button === 2);
   if (!blockDown || !blockUp) {
     throw new Error(`M107 heavy block real RMB control was not delivered: ${JSON.stringify(defenderResult)}`);
-  }
-  if (attackerResult.playerHp !== 100 || attackerResult.playerGuard !== 100
-    || attackerResult.opponentHp !== 100 || attackerResult.opponentGuard !== 36
-    || defenderResult.playerHp !== 100 || defenderResult.playerGuard !== 36) {
-    throw new Error(`M107 heavy block did not preserve HP / apply exactly 64 guard pressure: ${JSON.stringify(evidence)}`);
   }
   if (!attackerResult.events.includes("Opponent blocked - guard -64.")
     || !defenderResult.events.includes("Block held - guard -64.")) {
