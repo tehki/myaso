@@ -655,9 +655,8 @@ mod tests {
             block: true,
         };
 
-        let coalesced =
-            coalesce_accepted_input_batch(&[older_attack, newer_heavy, newest_idle])
-                .expect("non-empty batch");
+        let coalesced = coalesce_accepted_input_batch(&[older_attack, newer_heavy, newest_idle])
+            .expect("non-empty batch");
         assert_eq!(coalesced.tick, 302);
         assert!(!coalesced.attack);
         assert!(coalesced.heavy_attack);
