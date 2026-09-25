@@ -319,7 +319,11 @@ function predictMovement(input, dtMs) {
   } else if (now >= staminaRegenBlockedUntil) {
     local.stamina = Math.min(COMBAT.stamina.max, local.stamina + COMBAT.stamina.regenPerSecond * dtMs / 1000);
   }
-  if (local.action === 6 || input.block) speed *= COMBAT.block.moveMultiplier;
+  if (input.dodge || local.action === COMBAT_ACTION.dodge) {
+    moveX = Math.cos(local.facing);
+    moveY = Math.sin(local.facing);
+    speed = COMBAT.dodge.speed;
+  } else if (local.action === 6 || input.block) speed *= COMBAT.block.moveMultiplier;
   else if (local.action === 1) speed *= 0.35;
   else if (local.action === COMBAT_ACTION.heavyAttackWindup) speed *= 0.20;
   else if (local.action === 2 || local.action === COMBAT_ACTION.heavyAttackActive || local.action === 7 || local.action === 8) speed = 0;
@@ -331,7 +335,6 @@ function predictMovement(input, dtMs) {
   else if (local.action === COMBAT_ACTION.kickWindup) speed *= 0.45;
   else if (local.action === COMBAT_ACTION.kickActive) speed *= 0.2;
   else if (local.action === COMBAT_ACTION.kickRecovery || local.action === COMBAT_ACTION.jumpAttackRecovery) speed *= 0.42;
-  else if (local.action === 4) speed = COMBAT.dodge.speed;
   const seconds = dtMs / 1000;
   local.x = clamp(local.x + moveX * speed * seconds, COMBAT.fighterRadius, NETWORK.worldWidth - COMBAT.fighterRadius);
   local.y = clamp(local.y + moveY * speed * seconds, COMBAT.fighterRadius, NETWORK.worldHeight - COMBAT.fighterRadius);
@@ -444,7 +447,7 @@ function drawFighterScreen(x, y, fighter, body, shadow, remote = false, damageTe
   ctx.globalAlpha = action === COMBAT_ACTION.dead ? 0.28 : 1;
   if (action === COMBAT_ACTION.attackWindup || action === COMBAT_ACTION.attackActive) drawAttackTell(action, remote);
   if (action === COMBAT_ACTION.heavyAttackWindup || action === COMBAT_ACTION.heavyAttackActive) drawHeavyAttackTell(action, remote);
-  if (action === COMBAT_ACTION.jumpAttackWindup || action === COMBAT_ACTION.jumpAttackActive) drawHeavyAttackTell(action, remote);
+  if (action === COMBAT_ACTION.jumpAttackWindup || action === COMBAT_ACTION.jumpAttackActive) drawJumpAttackTell(action, remote);
   if (action === COMBAT_ACTION.kickWindup || action === COMBAT_ACTION.kickActive) drawKickTell(action);
   if (action === COMBAT_ACTION.block) drawBlockTell(remote, fighter);
   if (action === COMBAT_ACTION.dodge) drawDodgeTell(remote);
@@ -565,6 +568,27 @@ function drawBlockTell(remote, fighter) {
   ctx.arc(0, 0, 42, -COMBAT.block.halfAngleRadians, COMBAT.block.halfAngleRadians);
   ctx.stroke();
   ctx.setLineDash([]);
+}
+
+function drawJumpAttackTell(action, remote) {
+  const active = action === COMBAT_ACTION.jumpAttackActive;
+  ctx.save();
+  ctx.strokeStyle = active ? "#ff7040" : "#ffc06a";
+  ctx.fillStyle = active ? "rgba(255, 112, 64, 0.24)" : "rgba(255, 192, 106, 0.12)";
+  ctx.lineWidth = remote ? 4 : 3;
+  ctx.beginPath();
+  ctx.moveTo(0, 0);
+  ctx.arc(
+    0,
+    0,
+    COMBAT.jumpAttack.reach + COMBAT.fighterRadius,
+    -COMBAT.jumpAttack.arcRadians / 2,
+    COMBAT.jumpAttack.arcRadians / 2,
+  );
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+  ctx.restore();
 }
 
 function drawKickTell(action) {
