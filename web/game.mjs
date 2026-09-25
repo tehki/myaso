@@ -1,6 +1,7 @@
 import { createFrameBudget } from "../src/browser/frame-budget.mjs";
 import { createCombatImpactController } from "../src/browser/combat-impact.mjs";
 import { COMBAT, createFighter, createWorld, stepWorld } from "../src/combat/model.mjs";
+import { createSparringAi } from "../src/combat/sparring-ai.mjs";
 
 const canvas = document.querySelector("#arena");
 const ctx = canvas.getContext("2d", { alpha: false });
@@ -38,8 +39,8 @@ const playerInputState = {
   attack: false, heavyAttack: false, block: false, dodge: false,
   kick: false, run: false, jump: false,
 };
-const botInputState = { moveX: 0, moveY: 0, aimX: player.x, aimY: player.y, attack: false, heavyAttack: false, block: false, dodge: false };
-const inputs = { player: playerInputState, bot: botInputState };
+const inputs = { player: playerInputState, bot: null };
+const sparringAi = createSparringAi();
 let attackRequested = false;
 let heavyAttackRequested = false;
 let rollRequested = false;
@@ -49,9 +50,6 @@ let shortBlockUntil = 0;
 let rightButtonDown = false;
 let rightButtonDownAt = 0;
 const runHoldThresholdMs = 180;
-let lastBotAttackAt = -1000;
-let botBlockUntil = 0;
-let botDodgeUntil = 0;
 let messageUntil = 0;
 let animationFrameId = 0;
 const fixedStepMs = 1000 / 120;
@@ -136,58 +134,11 @@ function playerInput() {
 }
 
 function botInput() {
-  const dx = player.x - bot.x;
-  const dy = player.y - bot.y;
-  const distance = Math.hypot(dx, dy) || 1;
-  const nx = dx / distance;
-  const ny = dy / distance;
-  const side = Math.sin(world.nowMs / 650) >= 0 ? 1 : -1;
-  botInputState.aimX = player.x;
-  botInputState.aimY = player.y;
-  botInputState.moveX = 0;
-  botInputState.moveY = 0;
-  botInputState.attack = false;
-  botInputState.heavyAttack = false;
-  botInputState.block = false;
-  botInputState.dodge = false;
-
-  if ((player.action === "attack_windup" || player.action === "heavy_attack_windup") && distance < 124) {
-    const observedWindup = player.actionElapsedMs;
-    if (observedWindup > 72 && botBlockUntil < world.nowMs && botDodgeUntil < world.nowMs) {
-      const decision = Math.floor(world.nowMs / 900) % 3;
-      if (decision === 0) botDodgeUntil = world.nowMs + 80;
-      else botBlockUntil = world.nowMs + 210;
-    }
-  }
-
-  if (botDodgeUntil > world.nowMs) {
-    botInputState.dodge = true;
-    botInputState.moveX = -ny * side;
-    botInputState.moveY = nx * side;
-    return botInputState;
-  }
-
-  if (botBlockUntil > world.nowMs) {
-    botInputState.block = true;
-    return botInputState;
-  }
-
-  if (distance > 118) {
-    botInputState.moveX = nx;
-    botInputState.moveY = ny;
-  } else if (distance < 64) {
-    botInputState.moveX = -nx * 0.7 - ny * side * 0.3;
-    botInputState.moveY = -ny * 0.7 + nx * side * 0.3;
-  } else {
-    botInputState.moveX = -ny * side * 0.55;
-    botInputState.moveY = nx * side * 0.55;
-  }
-
-  if (distance < 94 && world.nowMs - lastBotAttackAt > 760 && bot.action === "idle") {
-    botInputState.attack = true;
-    lastBotAttackAt = world.nowMs;
-  }
-  return botInputState;
+  return sparringAi.sample({
+    nowMs: world.nowMs,
+    self: bot,
+    opponent: player,
+  });
 }
 
 function handleEvents(events) {

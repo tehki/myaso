@@ -1,0 +1,102 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+import { createSparringAi } from "../src/combat/sparring-ai.mjs";
+
+function fighter({
+  x = 100,
+  y = 100,
+  action = "idle",
+  stamina = 100,
+} = {}) {
+  return { x, y, action, stamina };
+}
+
+test("sparring AI runs to close long distance but conserves low stamina", () => {
+  const ai = createSparringAi();
+  const opponent = fighter({ x: 400, y: 100 });
+
+  const fresh = ai.sample({
+    nowMs: 1000,
+    self: fighter(),
+    opponent,
+  });
+  assert.ok(fresh.moveX > 0.9);
+  assert.equal(fresh.run, true);
+
+  ai.reset();
+  const tired = ai.sample({
+    nowMs: 1000,
+    self: fighter({ stamina: 18 }),
+    opponent,
+  });
+  assert.ok(tired.moveX > 0.9);
+  assert.equal(tired.run, false);
+});
+
+test("sparring AI can answer readable windup with pointer-directed roll", () => {
+  const ai = createSparringAi();
+  const input = ai.sample({
+    nowMs: 500,
+    self: fighter({ x: 100, y: 100, stamina: 100 }),
+    opponent: fighter({ x: 180, y: 100, action: "heavy_attack_windup" }),
+  });
+  assert.equal(input.dodge, true);
+  assert.equal(input.aimX, 180);
+  assert.equal(input.aimY, 100);
+  assert.equal(input.block, false);
+});
+
+test("sparring AI can choose a short block read and keep it bounded", () => {
+  const ai = createSparringAi();
+  const threat = fighter({ x: 180, y: 100, action: "attack_windup" });
+  const first = ai.sample({ nowMs: 100, self: fighter(), opponent: threat });
+  assert.equal(first.block, true);
+
+  const held = ai.sample({ nowMs: 250, self: fighter({ action: "block" }), opponent: threat });
+  assert.equal(held.block, true);
+
+  const released = ai.sample({ nowMs: 330, self: fighter({ action: "idle" }), opponent: threat });
+  assert.equal(released.block, false);
+});
+
+test("sparring AI shoves a nearby blocker instead of feeding guard", () => {
+  const ai = createSparringAi();
+  const input = ai.sample({
+    nowMs: 900,
+    self: fighter({ x: 100, y: 100 }),
+    opponent: fighter({ x: 160, y: 100, action: "block" }),
+  });
+  assert.equal(input.kick, true);
+  assert.equal(input.attack, false);
+  assert.equal(input.heavyAttack, false);
+});
+
+test("sparring AI chains jump into a real jumping attack", () => {
+  const ai = createSparringAi();
+  const opponent = fighter({ x: 160, y: 100 });
+  const jump = ai.sample({
+    nowMs: 1600,
+    self: fighter({ x: 100, y: 100 }),
+    opponent,
+  });
+  assert.equal(jump.jump, true);
+
+  const airborne = ai.sample({
+    nowMs: 1610,
+    self: fighter({ x: 100, y: 100, action: "jump" }),
+    opponent,
+  });
+  assert.equal(airborne.attack, true);
+  assert.equal(airborne.jump, false);
+});
+
+test("sparring AI retains committed heavy variation at close range", () => {
+  const ai = createSparringAi();
+  const input = ai.sample({
+    nowMs: 2300,
+    self: fighter({ x: 100, y: 100 }),
+    opponent: fighter({ x: 160, y: 100 }),
+  });
+  assert.equal(input.heavyAttack, true);
+  assert.equal(input.attack, false);
+});
