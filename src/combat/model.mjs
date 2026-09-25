@@ -27,7 +27,7 @@ export const COMBAT = Object.freeze({
     speed: 690,
     iframeMs: 125,
     staminaCost: 28,
-    collisionStunMs: 260,
+    collisionKnockdownMs: 260,
     collisionKnockback: 34,
   }),
   kick: Object.freeze({
@@ -36,7 +36,7 @@ export const COMBAT = Object.freeze({
     recoveryMs: 220,
     reach: 48,
     arcRadians: Math.PI * 0.62,
-    stunMs: 360,
+    knockdownMs: 360,
     knockback: 52,
     blockedGuardDamage: 30,
     staminaCost: 18,
@@ -169,6 +169,7 @@ function normalizeInput(input = {}) {
 }
 
 function updateFacing(fighter, input) {
+  if (fighter.action === "knockdown") return;
   if (input.aimX === null || input.aimY === null) return;
   const dx = input.aimX - fighter.x;
   const dy = input.aimY - fighter.y;
@@ -270,7 +271,7 @@ function moveFighter(world, fighter, input, dtMs) {
   } else if (fighter.action === "kick_recovery" || fighter.action === "jump_attack_recovery") {
     velocityX *= 0.42;
     velocityY *= 0.42;
-  } else if (fighter.action === "stunned") {
+  } else if (fighter.action === "stunned" || fighter.action === "knockdown") {
     velocityX = 0;
     velocityY = 0;
   }
@@ -335,6 +336,7 @@ function advanceAction(fighter, input, dtMs) {
       break;
     case "jump_attack_recovery":
     case "stunned":
+    case "knockdown":
       setAction(fighter, "idle", 0);
       break;
     default:
@@ -418,7 +420,7 @@ function resolveAttacks(world, events) {
 
       if (profile.kind === "kick") {
         knockBack(world, attacker, target, profile.knockback);
-        setAction(target, "stunned", COMBAT.kick.stunMs);
+        setAction(target, "knockdown", COMBAT.kick.knockdownMs);
         events.push({ type: "kick", attackerId: attacker.id, targetId: target.id });
         continue;
       }
@@ -473,7 +475,7 @@ function resolveRollCollisions(world, events) {
       if (Math.hypot(dx, dy) > COMBAT.fighterRadius * 2 + 8) continue;
       roller.rollHitTargets.add(target.id);
       knockBack(world, roller, target, COMBAT.dodge.collisionKnockback);
-      setAction(target, "stunned", COMBAT.dodge.collisionStunMs);
+      setAction(target, "knockdown", COMBAT.dodge.collisionKnockdownMs);
       events.push({ type: "roll_hit", attackerId: roller.id, targetId: target.id });
     }
   }
