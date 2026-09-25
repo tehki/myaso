@@ -1376,12 +1376,7 @@ async function runOnlineUiHeavyGuardBreakFlight(entries, { returnTiming = false 
     text.startsWith("Heavy strike committed")).length;
 
   try {
-    await setArenaBlock(defender, defenderElementId, true);
     blockHeld = true;
-    // Expire the 115 ms parry-entry window before either 320 ms heavy impact.
-    // Keeping Block held also intentionally suppresses guard regeneration, so
-    // the real pressure sequence must read 100 -> 36 -> 0.
-    await sleep(160);
 
     for (let attempt = 1; attempt <= 3 && !firstEvidence; attempt += 1) {
       const before = await Promise.all(entries.map(readUiEvidence));
@@ -1389,10 +1384,11 @@ async function runOnlineUiHeavyGuardBreakFlight(entries, { returnTiming = false 
       if (!beforeAttacker) throw new Error(`M110 first heavy missing attacker baseline: ${JSON.stringify(before)}`);
       const commitsBefore = heavyCommitCount(beforeAttacker);
 
-      await pulseMovementKey(attacker, "e", 40);
-      await sleep(150);
       await setArenaBlock(defender, defenderElementId, true);
-      await sleep(240);
+      await pulseMovementKey(attacker, "e", 40);
+      await sleep(180);
+      await setArenaBlock(defender, defenderElementId, true);
+      await sleep(210);
       const states = await Promise.all(entries.map(readUiEvidence));
       const attackerState = states.find((entry) => entry.browser === attacker.name);
       const defenderState = states.find((entry) => entry.browser === defender.name);
@@ -1462,10 +1458,11 @@ async function runOnlineUiHeavyGuardBreakFlight(entries, { returnTiming = false 
       const commitsBefore = heavyCommitCount(beforeAttacker);
 
       const attemptIssuedAt = Date.now();
-      await pulseMovementKey(attacker, "e", 40);
-      await sleep(150);
       await setArenaBlock(defender, defenderElementId, true);
-      await sleep(240);
+      await pulseMovementKey(attacker, "e", 40);
+      await sleep(180);
+      await setArenaBlock(defender, defenderElementId, true);
+      await sleep(210);
       const states = await Promise.all(entries.map(readUiEvidence));
       const attackerState = states.find((entry) => entry.browser === attacker.name);
       const defenderState = states.find((entry) => entry.browser === defender.name);
