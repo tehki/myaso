@@ -330,6 +330,9 @@ function predictMovement(input, dtMs) {
     speed = COMBAT.dodge.speed;
   } else if (local.action === 6 || input.block) speed *= COMBAT.block.moveMultiplier;
   else if (local.action === 1) speed *= 0.35;
+  else if (local.action === COMBAT_ACTION.thrustWindup) speed *= 0.62;
+  else if (local.action === COMBAT_ACTION.thrustActive) speed *= 0.28;
+  else if (local.action === COMBAT_ACTION.thrustRecovery) speed *= 0.52;
   else if (local.action === COMBAT_ACTION.heavyAttackWindup) speed *= 0.20;
   else if (local.action === 2 || local.action === COMBAT_ACTION.heavyAttackActive || local.action === COMBAT_ACTION.stunned || local.action === COMBAT_ACTION.knockdown || local.action === COMBAT_ACTION.dead) speed = 0;
   else if (local.action === 3 || local.action === 5) speed *= 0.48;
@@ -509,6 +512,7 @@ function drawFighterScreen(x, y, fighter, body, shadow, remote = false, damageTe
   if (knockedDown) ctx.scale(1.38, 0.62);
   ctx.globalAlpha = action === COMBAT_ACTION.dead ? 0.28 : 1;
   if (action === COMBAT_ACTION.attackWindup || action === COMBAT_ACTION.attackActive) drawAttackTell(action, remote);
+  if (action === COMBAT_ACTION.thrustWindup || action === COMBAT_ACTION.thrustActive) drawThrustTell(action, remote);
   if (action === COMBAT_ACTION.heavyAttackWindup || action === COMBAT_ACTION.heavyAttackActive) drawHeavyAttackTell(action, remote);
   if (action === COMBAT_ACTION.jumpAttackWindup || action === COMBAT_ACTION.jumpAttackActive) drawJumpAttackTell(action, remote);
   if (action === COMBAT_ACTION.kickWindup || action === COMBAT_ACTION.kickActive) drawKickTell(action);
@@ -596,23 +600,27 @@ function drawAttackTell(action, remote) {
 
 function drawWeaponTrail(action) {
   const light = action === COMBAT_ACTION.attackWindup || action === COMBAT_ACTION.attackActive;
+  const thrust = action === COMBAT_ACTION.thrustWindup || action === COMBAT_ACTION.thrustActive;
   const heavy = action === COMBAT_ACTION.heavyAttackWindup || action === COMBAT_ACTION.heavyAttackActive;
   const jump = action === COMBAT_ACTION.jumpAttackWindup || action === COMBAT_ACTION.jumpAttackActive;
-  if (!light && !heavy && !jump) return;
+  if (!light && !thrust && !heavy && !jump) return;
 
   const active = action === COMBAT_ACTION.attackActive
+    || action === COMBAT_ACTION.thrustActive
     || action === COMBAT_ACTION.heavyAttackActive
     || action === COMBAT_ACTION.jumpAttackActive;
-  const radius = heavy ? 44 : jump ? 40 : 36;
-  const start = heavy ? -1.05 : jump ? -0.34 : -0.72;
-  const end = heavy ? 0.72 : jump ? 0.30 : 0.48;
+  const radius = heavy ? 44 : jump ? 40 : thrust ? 42 : 36;
+  const start = thrust ? -0.10 : heavy ? -1.05 : jump ? -0.34 : -0.72;
+  const end = thrust ? 0.10 : heavy ? 0.72 : jump ? 0.30 : 0.48;
   ctx.save();
-  ctx.strokeStyle = heavy
+  ctx.strokeStyle = thrust
+    ? (active ? "rgba(143, 218, 255, .92)" : "rgba(143, 218, 255, .40)")
+    : heavy
     ? (active ? "rgba(255, 105, 58, .88)" : "rgba(255, 173, 92, .42)")
     : jump
       ? (active ? "rgba(255, 150, 72, .9)" : "rgba(255, 195, 102, .42)")
       : (active ? "rgba(238, 219, 160, .82)" : "rgba(214, 195, 148, .34)");
-  ctx.lineWidth = heavy ? 8 : jump ? 6 : 5;
+  ctx.lineWidth = thrust ? 4 : heavy ? 8 : jump ? 6 : 5;
   ctx.lineCap = "round";
   ctx.beginPath();
   ctx.arc(0, 0, radius, start, end);
@@ -621,6 +629,27 @@ function drawWeaponTrail(action) {
   ctx.lineWidth *= 1.75;
   ctx.beginPath();
   ctx.arc(0, 0, radius - 4, start + 0.10, end - 0.08);
+  ctx.stroke();
+  ctx.restore();
+}
+
+function drawThrustTell(action, remote) {
+  const active = action === COMBAT_ACTION.thrustActive;
+  ctx.save();
+  ctx.strokeStyle = active ? "#8fdaff" : "#80bedb";
+  ctx.fillStyle = active ? "rgba(105, 196, 245, .22)" : "rgba(105, 196, 245, .10)";
+  ctx.lineWidth = remote ? 4 : 3;
+  ctx.beginPath();
+  ctx.moveTo(0, 0);
+  ctx.arc(
+    0,
+    0,
+    COMBAT.thrust.reach + COMBAT.fighterRadius,
+    -COMBAT.thrust.arcRadians / 2,
+    COMBAT.thrust.arcRadians / 2,
+  );
+  ctx.closePath();
+  ctx.fill();
   ctx.stroke();
   ctx.restore();
 }
