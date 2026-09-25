@@ -1299,7 +1299,10 @@ fn wilds_jump_attack_has_a_narrow_short_range_cone() {
         },
         InputIntent::default(),
     );
-    assert_eq!(far_world.fighter(2).expect("far target").hp.round() as u8, 100);
+    assert_eq!(
+        far_world.fighter(2).expect("far target").hp.round() as u8,
+        100
+    );
 
     let mut angled = World::new(600.0, 400.0);
     assert!(angled.add_player_at(1, 200.0, 200.0, 0.0));
@@ -1338,7 +1341,10 @@ fn wilds_jump_attack_has_a_narrow_short_range_cone() {
         },
         InputIntent::default(),
     );
-    assert_eq!(angled.fighter(2).expect("angled target").hp.round() as u8, 100);
+    assert_eq!(
+        angled.fighter(2).expect("angled target").hp.round() as u8,
+        100
+    );
 }
 
 #[test]
