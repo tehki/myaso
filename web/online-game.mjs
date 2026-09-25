@@ -476,7 +476,13 @@ function drawHeavyAttackTell(action, remote) {
   ctx.lineWidth = remote ? 4 : 3;
   ctx.beginPath();
   ctx.moveTo(12, 0);
-  ctx.arc(0, 0, COMBAT.heavyAttack.reach, -COMBAT.heavyAttack.arcRadians / 2, COMBAT.heavyAttack.arcRadians / 2);
+  ctx.arc(
+    0,
+    0,
+    COMBAT.heavyAttack.reach + COMBAT.fighterRadius,
+    -COMBAT.heavyAttack.arcRadians / 2,
+    COMBAT.heavyAttack.arcRadians / 2,
+  );
   ctx.closePath();
   ctx.fill();
   ctx.stroke();
