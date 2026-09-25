@@ -749,9 +749,10 @@ async function runOnlineUiHeavyParryFlight(entries) {
   const { attacker, defender, defenderElementId, movementCode } = staged;
 
   await pulseMovementKey(attacker, "e", 40);
-  // The heavy active transition starts at 320 ms. Arm block late enough that it
-  // is still inside the 115 ms parry freshness window when the active frame lands.
-  await sleep(250);
+  // The heavy active transition starts at 320 ms. Arm block at roughly 245 ms
+  // from the real E keydown, leaving about 75 ms of parry age at impact and
+  // enough margin for moderate Chrome/Firefox delivery skew.
+  await sleep(205);
   let blockHeld = false;
   try {
     await setArenaBlock(defender, defenderElementId, true);
