@@ -151,6 +151,9 @@ export function opponentRecoveryPresentation(entity) {
   if (entity?.action === COMBAT_ACTION.dodgeRecovery) {
     return { visible: true, state: "dodge-recovery", label: "PUNISH", detail: "Dodge recovery" };
   }
+  if (entity?.action === COMBAT_ACTION.knockdown) {
+    return { visible: true, state: "knockdown", label: "PUNISH", detail: "Knockdown recovery" };
+  }
   return { visible: false, state: "", label: "", detail: "" };
 }
 
