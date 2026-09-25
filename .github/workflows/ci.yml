@@ -256,6 +256,13 @@ jobs:
           node --check scripts/pvp_browser_flight_runner.mjs
           node scripts/pvp_browser_flight_runner.mjs
 
+      - name: Validate M109 real heavy whiff punish
+        env:
+          MYASO_PVP_SCENARIO: "uiheavypunish"
+        run: |
+          node --check scripts/pvp_browser_flight_runner.mjs
+          node scripts/pvp_browser_flight_runner.mjs
+
       - name: Validate real browser flight
         env:
           MYASO_FLIGHT_DURATION_MS: "4000"
