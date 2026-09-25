@@ -138,6 +138,27 @@ test("FFA threat presentation identifies the most immediate attacker inside auth
   assert.equal(summary.secondaryNetId, 0);
 });
 
+test("heavy threat selection uses heavy reach and narrower authoritative arc", () => {
+  const own = fighter(1, 100, 100, COMBAT_ACTION.idle, 100, 100);
+  const entities = new Map([
+    [1, own],
+    [2, fighter(2, 100, 100, COMBAT_ACTION.heavyAttackWindup, 0, 100, 0)],
+  ]);
+  const summary = { count: 0, secondaryNetId: 0 };
+
+  assert.equal(fighterThreatNetId(entities, 1, summary), 2);
+  assert.equal(summary.count, 1);
+
+  entities.get(2).facing = Math.PI / 2;
+  assert.equal(fighterThreatNetId(entities, 1, summary), 0);
+  assert.equal(summary.count, 0);
+
+  entities.set(2, fighter(2, 100, 100, COMBAT_ACTION.attackWindup, 0, 100, 0));
+  assert.equal(fighterThreatNetId(entities, 1, summary), 0);
+  assert.equal(summary.count, 0);
+});
+
+
 test("FFA threat summary counts simultaneous valid attackers without changing primary selection", () => {
   const entities = new Map([
     [1, fighter(1, 100, 100, COMBAT_ACTION.idle, 100, 100)],
@@ -209,10 +230,13 @@ test("FFA secondary threat phase follows the deterministic runner-up identity", 
   assert.equal(fighterThreatPhaseLabel(entities.get(summary.secondaryNetId)), "");
 });
 
-test("threat phase label exposes only authoritative attack phases", () => {
+test("threat phase label exposes light and heavy authoritative attack phases", () => {
   assert.equal(fighterThreatPhaseLabel({ action: COMBAT_ACTION.attackWindup }), "WINDUP");
   assert.equal(fighterThreatPhaseLabel({ action: COMBAT_ACTION.attackActive }), "STRIKE");
+  assert.equal(fighterThreatPhaseLabel({ action: COMBAT_ACTION.heavyAttackWindup }), "HEAVY WINDUP");
+  assert.equal(fighterThreatPhaseLabel({ action: COMBAT_ACTION.heavyAttackActive }), "HEAVY STRIKE");
   assert.equal(fighterThreatPhaseLabel({ action: COMBAT_ACTION.attackRecovery }), "");
+  assert.equal(fighterThreatPhaseLabel({ action: COMBAT_ACTION.heavyAttackRecovery }), "");
   assert.equal(fighterThreatPhaseLabel({ action: COMBAT_ACTION.idle }), "");
   assert.equal(fighterThreatPhaseLabel(null), "");
 });
@@ -428,9 +452,11 @@ test("death and full-vitals idle transition are readable", () => {
   assert.equal(respawn.kind, "respawn");
 });
 
-test("authoritative action hints explain commitment windows", () => {
+test("authoritative action hints explain light and heavy commitment windows", () => {
   assert.match(combatActionHint(fighter(1, 100, 100, COMBAT_ACTION.attackWindup)), /windup/);
   assert.match(combatActionHint(fighter(1, 100, 100, COMBAT_ACTION.attackRecovery)), /Recovery/);
+  assert.match(combatActionHint(fighter(1, 100, 100, COMBAT_ACTION.heavyAttackWindup)), /Heavy strike committed/);
+  assert.match(combatActionHint(fighter(1, 100, 100, COMBAT_ACTION.heavyAttackRecovery)), /Heavy recovery/);
   assert.match(combatActionHint(fighter(1, 100, 100, COMBAT_ACTION.block)), /Blocking/);
   assert.equal(combatActionHint(fighter(1)), null);
 });
@@ -438,6 +464,9 @@ test("authoritative action hints explain commitment windows", () => {
 test("authoritative opponent recovery exposes a bounded punish cue", () => {
   assert.deepEqual(opponentRecoveryPresentation(fighter(2, 100, 100, COMBAT_ACTION.attackRecovery)), {
     visible: true, state: "attack-recovery", label: "PUNISH", detail: "Attack recovery",
+  });
+  assert.deepEqual(opponentRecoveryPresentation(fighter(2, 100, 100, COMBAT_ACTION.heavyAttackRecovery)), {
+    visible: true, state: "heavy-attack-recovery", label: "PUNISH", detail: "Heavy recovery",
   });
   assert.deepEqual(opponentRecoveryPresentation(fighter(2, 100, 100, COMBAT_ACTION.dodgeRecovery)), {
     visible: true, state: "dodge-recovery", label: "PUNISH", detail: "Dodge recovery",
