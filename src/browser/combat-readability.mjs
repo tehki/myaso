@@ -20,6 +20,7 @@ export const COMBAT_ACTION = Object.freeze({
   jumpAttackWindup: 16,
   jumpAttackActive: 17,
   jumpAttackRecovery: 18,
+  feintRecovery: 19,
 });
 
 const PRIORITY = Object.freeze({
@@ -125,6 +126,8 @@ export function combatActionHint(entity) {
       return "Heavy strike active - finish the commitment.";
     case COMBAT_ACTION.heavyAttackRecovery:
       return "Heavy recovery - you are highly punishable now.";
+    case COMBAT_ACTION.feintRecovery:
+      return "Feint recovery - bait landed or failed; reset before committing again.";
     case COMBAT_ACTION.dodge:
       return "Dodging - use the movement to reset spacing.";
     case COMBAT_ACTION.block:
@@ -147,6 +150,9 @@ export function opponentRecoveryPresentation(entity) {
   }
   if (entity?.action === COMBAT_ACTION.dodgeRecovery) {
     return { visible: true, state: "dodge-recovery", label: "PUNISH", detail: "Dodge recovery" };
+  }
+  if (entity?.action === COMBAT_ACTION.feintRecovery) {
+    return { visible: true, state: "feint-recovery", label: "PUNISH", detail: "Feint recovery" };
   }
   return { visible: false, state: "", label: "", detail: "" };
 }
