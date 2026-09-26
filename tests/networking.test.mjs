@@ -166,6 +166,30 @@ test("feint recovery remains a compact replicated action state", () => {
   assert.equal(dequantizeEntity(applied.get(78)).action, "feint_recovery");
 });
 
+test("running strike action states round-trip through snapshots", () => {
+  const names = [
+    ["running_attack_windup", 21],
+    ["running_attack_active", 22],
+    ["running_attack_recovery", 23],
+  ];
+  for (const [action, expectedCode] of names) {
+    const state = quantizeEntity(entity(79, 440, 400, { action }));
+    assert.equal(state.action, expectedCode);
+    const packet = encodeSnapshot({
+      sequence: expectedCode,
+      baselineSequence: expectedCode - 1,
+      serverTick: 1100 + expectedCode,
+      full: true,
+      records: [buildEntityDelta(state)],
+      maxBytes: 1100,
+    });
+    const decoded = decodeSnapshot(packet);
+    const applied = applySnapshotRecords(new Map(), decoded.records);
+    assert.equal(applied.get(79).action, expectedCode);
+    assert.equal(dequantizeEntity(applied.get(79)).action, action);
+  }
+});
+
 test("server input ingress deduplicates redundant and reordered samples", () => {
   const ingress = new InputIngressWindow({ historyTicks: 10 });
   const packetA = encodeInputPacket({
