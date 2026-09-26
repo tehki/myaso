@@ -163,3 +163,25 @@ test("sparring AI recognizes running strike windup as readable threat", () => {
   });
   assert.equal(input.dodge, true);
 });
+
+
+test("sparring AI can read directional light windup as a normal threat", () => {
+  const ai = createSparringAi();
+  const input = ai.sample({
+    nowMs: 500,
+    self: fighter({ x: 100, y: 100, stamina: 100 }),
+    opponent: fighter({ x: 180, y: 100, action: "attack_left_windup" }),
+  });
+  assert.equal(input.dodge, true);
+});
+
+test("sparring AI uses lateral movement when choosing its light sweep", () => {
+  const ai = createSparringAi();
+  const input = ai.sample({
+    nowMs: 3040,
+    self: fighter({ x: 100, y: 100, stamina: 100 }),
+    opponent: fighter({ x: 160, y: 100 }),
+  });
+  assert.equal(input.attack, true);
+  assert.ok(Math.hypot(input.moveX, input.moveY) >= 0.6);
+});
