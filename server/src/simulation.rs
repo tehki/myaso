@@ -16,6 +16,13 @@ const ATTACK_REACH: f32 = 76.0;
 const ATTACK_ARC_RADIANS: f32 = std::f32::consts::PI * 0.78;
 const ATTACK_DAMAGE: f32 = 34.0;
 const ATTACK_KNOCKBACK: f32 = 18.0;
+const DIRECTIONAL_ATTACK_WINDUP_MS: f32 = 135.0;
+const DIRECTIONAL_ATTACK_ACTIVE_MS: f32 = 80.0;
+const DIRECTIONAL_ATTACK_RECOVERY_MS: f32 = 255.0;
+const DIRECTIONAL_ATTACK_REACH: f32 = 76.0;
+const DIRECTIONAL_ATTACK_ARC_RADIANS: f32 = std::f32::consts::PI * 0.62;
+const DIRECTIONAL_ATTACK_ARC_OFFSET_RADIANS: f32 = std::f32::consts::PI * 0.16;
+const DIRECTIONAL_ATTACK_LATERAL_THRESHOLD: f32 = 0.45;
 const RUNNING_ATTACK_WINDUP_MS: f32 = 160.0;
 const RUNNING_ATTACK_ACTIVE_MS: f32 = 90.0;
 const RUNNING_ATTACK_RECOVERY_MS: f32 = 310.0;
@@ -96,6 +103,12 @@ pub enum Action {
     AttackWindup,
     AttackActive,
     AttackRecovery,
+    AttackLeftWindup,
+    AttackLeftActive,
+    AttackLeftRecovery,
+    AttackRightWindup,
+    AttackRightActive,
+    AttackRightRecovery,
     HeavyAttackWindup,
     HeavyAttackActive,
     HeavyAttackRecovery,
@@ -145,6 +158,12 @@ impl Action {
             Self::RunningAttackWindup => 21,
             Self::RunningAttackActive => 22,
             Self::RunningAttackRecovery => 23,
+            Self::AttackLeftWindup => 24,
+            Self::AttackLeftActive => 25,
+            Self::AttackLeftRecovery => 26,
+            Self::AttackRightWindup => 27,
+            Self::AttackRightActive => 28,
+            Self::AttackRightRecovery => 29,
         }
     }
 }
@@ -493,7 +512,9 @@ fn normalize_input(mut input: InputIntent) -> InputIntent {
 
 fn begin_requested_action(now_ms: f32, fighter: &mut Fighter, input: InputIntent) {
     let feint_window_ms = match fighter.action {
-        Action::AttackWindup => FEINT_LIGHT_WINDOW_MS,
+        Action::AttackWindup | Action::AttackLeftWindup | Action::AttackRightWindup => {
+            FEINT_LIGHT_WINDOW_MS
+        }
         Action::HeavyAttackWindup => FEINT_HEAVY_WINDOW_MS,
         _ => 0.0,
     };
@@ -566,7 +587,14 @@ fn begin_requested_action(now_ms: f32, fighter: &mut Fighter, input: InputIntent
 
     if input.attack && fighter.action == Action::Idle {
         fighter.attack_hit_targets.clear();
-        fighter.set_action(Action::AttackWindup, ATTACK_WINDUP_MS);
+        let lateral = -fighter.facing.sin() * input.move_x + fighter.facing.cos() * input.move_y;
+        if lateral >= DIRECTIONAL_ATTACK_LATERAL_THRESHOLD {
+            fighter.set_action(Action::AttackLeftWindup, DIRECTIONAL_ATTACK_WINDUP_MS);
+        } else if lateral <= -DIRECTIONAL_ATTACK_LATERAL_THRESHOLD {
+            fighter.set_action(Action::AttackRightWindup, DIRECTIONAL_ATTACK_WINDUP_MS);
+        } else {
+            fighter.set_action(Action::AttackWindup, ATTACK_WINDUP_MS);
+        }
         return;
     }
 
@@ -616,7 +644,7 @@ fn move_fighter(width: f32, height: f32, fighter: &mut Fighter, input: InputInte
             velocity_x *= 0.2;
             velocity_y *= 0.2;
         }
-        Action::AttackWindup => {
+        Action::AttackWindup | Action::AttackLeftWindup | Action::AttackRightWindup => {
             velocity_x *= 0.35;
             velocity_y *= 0.35;
         }
@@ -632,11 +660,19 @@ fn move_fighter(width: f32, height: f32, fighter: &mut Fighter, input: InputInte
             velocity_x *= 0.20;
             velocity_y *= 0.20;
         }
-        Action::AttackActive | Action::HeavyAttackActive | Action::Stunned | Action::Knockdown => {
+        Action::AttackActive
+        | Action::AttackLeftActive
+        | Action::AttackRightActive
+        | Action::HeavyAttackActive
+        | Action::Stunned
+        | Action::Knockdown => {
             velocity_x = 0.0;
             velocity_y = 0.0;
         }
-        Action::AttackRecovery | Action::DodgeRecovery => {
+        Action::AttackRecovery
+        | Action::AttackLeftRecovery
+        | Action::AttackRightRecovery
+        | Action::DodgeRecovery => {
             velocity_x *= 0.48;
             velocity_y *= 0.48;
         }
@@ -693,6 +729,20 @@ fn advance_action(fighter: &mut Fighter, input: InputIntent, dt_ms: f32) {
         Action::AttackWindup => fighter.set_action(Action::AttackActive, ATTACK_ACTIVE_MS),
         Action::AttackActive => fighter.set_action(Action::AttackRecovery, ATTACK_RECOVERY_MS),
         Action::AttackRecovery => fighter.set_action(Action::Idle, 0.0),
+        Action::AttackLeftWindup => {
+            fighter.set_action(Action::AttackLeftActive, DIRECTIONAL_ATTACK_ACTIVE_MS)
+        }
+        Action::AttackLeftActive => {
+            fighter.set_action(Action::AttackLeftRecovery, DIRECTIONAL_ATTACK_RECOVERY_MS)
+        }
+        Action::AttackLeftRecovery => fighter.set_action(Action::Idle, 0.0),
+        Action::AttackRightWindup => {
+            fighter.set_action(Action::AttackRightActive, DIRECTIONAL_ATTACK_ACTIVE_MS)
+        }
+        Action::AttackRightActive => {
+            fighter.set_action(Action::AttackRightRecovery, DIRECTIONAL_ATTACK_RECOVERY_MS)
+        }
+        Action::AttackRightRecovery => fighter.set_action(Action::Idle, 0.0),
         Action::RunningAttackWindup => {
             fighter.set_action(Action::RunningAttackActive, RUNNING_ATTACK_ACTIVE_MS)
         }
@@ -831,6 +881,7 @@ fn separate_fighters(width: f32, height: f32, fighters: &mut [Fighter]) {
 struct AttackProfile {
     reach: f32,
     arc_radians: f32,
+    arc_offset_radians: f32,
     damage: f32,
     knockback: f32,
     guard_damage: f32,
@@ -843,6 +894,27 @@ fn attack_profile(action: Action) -> Option<AttackProfile> {
         Action::AttackActive => Some(AttackProfile {
             reach: ATTACK_REACH,
             arc_radians: ATTACK_ARC_RADIANS,
+            arc_offset_radians: 0.0,
+            damage: ATTACK_DAMAGE,
+            knockback: ATTACK_KNOCKBACK,
+            guard_damage: BLOCK_GUARD_DAMAGE,
+            guard_break_stun_ms: BLOCK_GUARD_BREAK_STUN_MS,
+            kick: false,
+        }),
+        Action::AttackLeftActive => Some(AttackProfile {
+            reach: DIRECTIONAL_ATTACK_REACH,
+            arc_radians: DIRECTIONAL_ATTACK_ARC_RADIANS,
+            arc_offset_radians: DIRECTIONAL_ATTACK_ARC_OFFSET_RADIANS,
+            damage: ATTACK_DAMAGE,
+            knockback: ATTACK_KNOCKBACK,
+            guard_damage: BLOCK_GUARD_DAMAGE,
+            guard_break_stun_ms: BLOCK_GUARD_BREAK_STUN_MS,
+            kick: false,
+        }),
+        Action::AttackRightActive => Some(AttackProfile {
+            reach: DIRECTIONAL_ATTACK_REACH,
+            arc_radians: DIRECTIONAL_ATTACK_ARC_RADIANS,
+            arc_offset_radians: -DIRECTIONAL_ATTACK_ARC_OFFSET_RADIANS,
             damage: ATTACK_DAMAGE,
             knockback: ATTACK_KNOCKBACK,
             guard_damage: BLOCK_GUARD_DAMAGE,
@@ -852,6 +924,7 @@ fn attack_profile(action: Action) -> Option<AttackProfile> {
         Action::RunningAttackActive => Some(AttackProfile {
             reach: RUNNING_ATTACK_REACH,
             arc_radians: RUNNING_ATTACK_ARC_RADIANS,
+            arc_offset_radians: 0.0,
             damage: RUNNING_ATTACK_DAMAGE,
             knockback: RUNNING_ATTACK_KNOCKBACK,
             guard_damage: RUNNING_ATTACK_GUARD_DAMAGE,
@@ -861,6 +934,7 @@ fn attack_profile(action: Action) -> Option<AttackProfile> {
         Action::HeavyAttackActive => Some(AttackProfile {
             reach: HEAVY_ATTACK_REACH,
             arc_radians: HEAVY_ATTACK_ARC_RADIANS,
+            arc_offset_radians: 0.0,
             damage: HEAVY_ATTACK_DAMAGE,
             knockback: HEAVY_ATTACK_KNOCKBACK,
             guard_damage: HEAVY_ATTACK_GUARD_DAMAGE,
@@ -870,6 +944,7 @@ fn attack_profile(action: Action) -> Option<AttackProfile> {
         Action::JumpAttackActive => Some(AttackProfile {
             reach: JUMP_ATTACK_REACH,
             arc_radians: JUMP_ATTACK_ARC_RADIANS,
+            arc_offset_radians: 0.0,
             damage: JUMP_ATTACK_DAMAGE,
             knockback: JUMP_ATTACK_KNOCKBACK,
             guard_damage: JUMP_ATTACK_GUARD_DAMAGE,
@@ -879,6 +954,7 @@ fn attack_profile(action: Action) -> Option<AttackProfile> {
         Action::KickActive => Some(AttackProfile {
             reach: KICK_REACH,
             arc_radians: KICK_ARC_RADIANS,
+            arc_offset_radians: 0.0,
             damage: 0.0,
             knockback: KICK_KNOCKBACK,
             guard_damage: KICK_BLOCK_GUARD_DAMAGE,
@@ -1009,7 +1085,8 @@ fn is_target_in_attack_arc(attacker: &Fighter, target: &Fighter, profile: Attack
         return false;
     }
     let angle_to_target = dy.atan2(dx);
-    angle_delta(angle_to_target, attacker.facing).abs() <= profile.arc_radians / 2.0
+    let attack_facing = attacker.facing + profile.arc_offset_radians;
+    angle_delta(angle_to_target, attack_facing).abs() <= profile.arc_radians / 2.0
 }
 
 fn is_invulnerable(target: &Fighter) -> bool {
