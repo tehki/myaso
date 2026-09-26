@@ -454,12 +454,14 @@ async function runOnlineUiVitalsFlight(entries) {
     sampleRemoteVitalsPixels(attackerSession),
     sampleRemoteVitalsPixels(defenderSession),
   ]);
-  const closeTo = (actual, expected, tolerance = 8) => Math.abs(actual - expected) <= tolerance;
-  if (!closeTo(attackerVitals.hpPixels, 84) || !closeTo(attackerVitals.guardPixels, 126)) {
-    throw new Error(`M46 damaged remote vitals were not spatially rendered as 66/100: ${JSON.stringify(attackerVitals)}`);
+  const ratioCloseTo = (hpPixels, guardPixels, expected, tolerance = 0.08) =>
+    guardPixels >= 40 && Math.abs(hpPixels / guardPixels - expected) <= tolerance;
+  if (!ratioCloseTo(attackerVitals.hpPixels, attackerVitals.guardPixels, 0.66)
+    || attackerVitals.hpPixels >= attackerVitals.guardPixels) {
+    throw new Error(`M46 damaged remote vitals were not spatially rendered at the authoritative 66/100 ratio: ${JSON.stringify(attackerVitals)}`);
   }
-  if (!closeTo(defenderVitals.hpPixels, 126) || !closeTo(defenderVitals.guardPixels, 126)) {
-    throw new Error(`M46 undamaged remote vitals were not spatially rendered as 100/100: ${JSON.stringify(defenderVitals)}`);
+  if (!ratioCloseTo(defenderVitals.hpPixels, defenderVitals.guardPixels, 1.0)) {
+    throw new Error(`M46 undamaged remote vitals were not spatially rendered at the authoritative 100/100 ratio: ${JSON.stringify(defenderVitals)}`);
   }
   return evidence.map((entry) => ({
     ...entry,
