@@ -57,6 +57,11 @@ const STAMINA_REGEN_PER_SECOND: f32 = 30.0;
 const STAMINA_REGEN_DELAY_MS: f32 = 360.0;
 const RUN_STAMINA_DRAIN_PER_SECOND: f32 = 24.0;
 const RUN_MOVE_MULTIPLIER: f32 = 1.55;
+const FEINT_LIGHT_WINDOW_MS: f32 = 70.0;
+const FEINT_HEAVY_WINDOW_MS: f32 = 160.0;
+const FEINT_RECOVERY_MS: f32 = 270.0;
+const FEINT_STAMINA_COST: f32 = 12.0;
+const FEINT_MOVE_MULTIPLIER: f32 = 0.5;
 const BLOCK_PARRY_WINDOW_MS: f32 = 125.0;
 const BLOCK_HALF_ANGLE_RADIANS: f32 = std::f32::consts::PI * 0.46;
 const BLOCK_GUARD_DAMAGE: f32 = 38.0;
@@ -91,6 +96,7 @@ pub enum Action {
     JumpAttackWindup,
     JumpAttackActive,
     JumpAttackRecovery,
+    FeintRecovery,
     Block,
     Stunned,
     Dead,
@@ -118,6 +124,7 @@ impl Action {
             Self::JumpAttackWindup => 16,
             Self::JumpAttackActive => 17,
             Self::JumpAttackRecovery => 18,
+            Self::FeintRecovery => 19,
         }
     }
 }
@@ -463,6 +470,21 @@ fn normalize_input(mut input: InputIntent) -> InputIntent {
 }
 
 fn begin_requested_action(now_ms: f32, fighter: &mut Fighter, input: InputIntent) {
+    let feint_window_ms = match fighter.action {
+        Action::AttackWindup => FEINT_LIGHT_WINDOW_MS,
+        Action::HeavyAttackWindup => FEINT_HEAVY_WINDOW_MS,
+        _ => 0.0,
+    };
+    if feint_window_ms > 0.0
+        && input.block
+        && fighter.action_elapsed_ms <= feint_window_ms
+        && spend_stamina(now_ms, fighter, FEINT_STAMINA_COST)
+    {
+        fighter.attack_hit_targets.clear();
+        fighter.set_action(Action::FeintRecovery, FEINT_RECOVERY_MS);
+        return;
+    }
+
     if fighter.action == Action::Jump
         && input.attack
         && spend_stamina(now_ms, fighter, JUMP_ATTACK_STAMINA_COST)
@@ -584,6 +606,10 @@ fn move_fighter(width: f32, height: f32, fighter: &mut Fighter, input: InputInte
             velocity_x *= 0.42;
             velocity_y *= 0.42;
         }
+        Action::FeintRecovery => {
+            velocity_x *= FEINT_MOVE_MULTIPLIER;
+            velocity_y *= FEINT_MOVE_MULTIPLIER;
+        }
         Action::Idle | Action::Dead => {}
     }
 
@@ -639,7 +665,9 @@ fn advance_action(fighter: &mut Fighter, input: InputIntent, dt_ms: f32) {
         Action::JumpAttackActive => {
             fighter.set_action(Action::JumpAttackRecovery, JUMP_ATTACK_RECOVERY_MS)
         }
-        Action::JumpAttackRecovery | Action::Stunned => fighter.set_action(Action::Idle, 0.0),
+        Action::JumpAttackRecovery | Action::FeintRecovery | Action::Stunned => {
+            fighter.set_action(Action::Idle, 0.0)
+        }
         Action::Idle | Action::Block | Action::Dead => {}
     }
 }
