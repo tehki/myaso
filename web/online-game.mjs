@@ -338,6 +338,7 @@ function predictMovement(input, dtMs) {
   else if (local.action === COMBAT_ACTION.kickWindup) speed *= 0.45;
   else if (local.action === COMBAT_ACTION.kickActive) speed *= 0.2;
   else if (local.action === COMBAT_ACTION.kickRecovery || local.action === COMBAT_ACTION.jumpAttackRecovery) speed *= 0.42;
+  else if (local.action === COMBAT_ACTION.feintRecovery) speed *= COMBAT.feint.moveMultiplier;
   const seconds = dtMs / 1000;
   local.x = clamp(local.x + moveX * speed * seconds, COMBAT.fighterRadius, NETWORK.worldWidth - COMBAT.fighterRadius);
   local.y = clamp(local.y + moveY * speed * seconds, COMBAT.fighterRadius, NETWORK.worldHeight - COMBAT.fighterRadius);
