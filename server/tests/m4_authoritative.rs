@@ -1723,7 +1723,10 @@ fn directional_left_light_uses_shifted_authoritative_lane_without_damage_upgrade
         },
         InputIntent::default(),
     );
-    assert_eq!(neutral.fighter(2).expect("neutral target").hp.round() as u8, 100);
+    assert_eq!(
+        neutral.fighter(2).expect("neutral target").hp.round() as u8,
+        100
+    );
 }
 
 #[test]
@@ -1793,5 +1796,8 @@ fn directional_light_uses_the_existing_early_feint_contract() {
         world.fighter(1).expect("attacker").action,
         Action::FeintRecovery
     );
-    assert_eq!(world.fighter(1).expect("attacker").stamina.round() as u8, 88);
+    assert_eq!(
+        world.fighter(1).expect("attacker").stamina.round() as u8,
+        88
+    );
 }
