@@ -822,45 +822,16 @@ async function runOnlineUiHeavyParryFlight(entries) {
   // pristine case. Any evidence that a heavy actually committed, hit, blocked,
   // or otherwise resolved makes the attempt terminal and therefore fail-closed.
   for (let attempt = 1; attempt <= 3 && !evidence; attempt += 1) {
-    const beforeCommit = await readUiEvidence(attacker);
-    const commitsBefore = beforeCommit.events.filter((text) =>
-      text.startsWith("Heavy strike committed")).length;
-    await pulseMovementKey(attacker, "e", 40);
-
-    // Anchor the parry pulse to the authoritative heavy commitment instead of
-    // WebDriver keydown time. Key-to-authority latency varies substantially
-    // across browsers; the combat timing itself remains the unchanged 320 ms
-    // heavy windup and 125 ms parry window.
-    let committedObserved = false;
-    const commitDeadline = Date.now() + 360;
-    while (Date.now() < commitDeadline) {
-      const state = await readUiEvidence(attacker);
-      const commits = state.events.filter((text) =>
-        text.startsWith("Heavy strike committed")).length;
-      if (commits > commitsBefore) {
-        committedObserved = true;
-        break;
-      }
-      await sleep(10);
-    }
-
-    let blockHeld = false;
-    if (committedObserved) {
-      // Start the short block about 220 ms after the observed commitment. That
-      // leaves roughly 100 ms of parry age at the 320 ms active transition while
-      // retaining margin for snapshot/input delivery skew.
-      await sleep(220);
-      try {
-        await setArenaBlock(defender, defenderElementId, true);
-        blockHeld = true;
-        await sleep(150);
-      } finally {
-        if (blockHeld) await setArenaBlock(defender, defenderElementId, false);
-      }
-      await sleep(60);
-    } else {
-      await sleep(20);
-    }
+    // Launch the attacker E edge and defender wheel-back from separate browser
+    // sessions at the same time. The delayed wheel is therefore relative to the
+    // same WebDriver dispatch boundary instead of a later UI/snapshot observation.
+    // At 230 ms, the unchanged 240 ms short block covers the 320 ms heavy active
+    // transition and its unchanged 125 ms opening parry window.
+    await Promise.all([
+      pulseMovementKey(attacker, "e", 40),
+      scrollArenaWheel(defender, defenderElementId, 120, 230),
+    ]);
+    await sleep(220);
 
     lastObserved = await Promise.all(entries.map(readUiEvidence));
     const attackerResult = lastObserved.find((entry) => entry.browser === attacker.name);
