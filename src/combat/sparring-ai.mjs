@@ -2,12 +2,14 @@ const EPSILON = 1e-9;
 
 const THREAT_WINDUPS = new Set([
   "attack_windup",
+  "running_attack_windup",
   "heavy_attack_windup",
   "jump_attack_windup",
 ]);
 
 const PUNISHABLE_ACTIONS = new Set([
   "attack_recovery",
+  "running_attack_recovery",
   "heavy_attack_recovery",
   "kick_recovery",
   "jump_attack_recovery",
@@ -99,6 +101,15 @@ export function createSparringAi() {
     if (PUNISHABLE_ACTIONS.has(opponent.action) && distance <= 72 && nowMs >= nextActionAtMs) {
       output.attack = true;
       nextActionAtMs = nowMs + 520;
+      return output;
+    }
+
+    if (distance > 84 && distance <= 132 && stamina >= 24 && nowMs >= nextActionAtMs) {
+      output.moveX = nx;
+      output.moveY = ny;
+      output.run = true;
+      output.attack = true;
+      nextActionAtMs = nowMs + 760;
       return output;
     }
 
