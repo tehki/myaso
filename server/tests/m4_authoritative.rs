@@ -1348,6 +1348,131 @@ fn wilds_jump_attack_has_a_narrow_short_range_cone() {
 }
 
 #[test]
+fn early_wheel_back_feints_light_into_authoritative_recovery() {
+    let mut world = duel(60.0);
+    advance(
+        &mut world,
+        5.0,
+        InputIntent {
+            attack: true,
+            facing_radians: 0.0,
+            ..InputIntent::default()
+        },
+        InputIntent::default(),
+    );
+    advance(
+        &mut world,
+        40.0,
+        InputIntent {
+            facing_radians: 0.0,
+            ..InputIntent::default()
+        },
+        InputIntent::default(),
+    );
+    assert_eq!(
+        world.fighter(1).expect("attacker").action,
+        Action::AttackWindup
+    );
+
+    advance(
+        &mut world,
+        5.0,
+        InputIntent {
+            block: true,
+            facing_radians: 0.0,
+            ..InputIntent::default()
+        },
+        InputIntent::default(),
+    );
+    let attacker = world.fighter(1).expect("attacker");
+    assert_eq!(attacker.action, Action::FeintRecovery);
+    assert_eq!(attacker.stamina.round() as u8, 88);
+    assert_eq!(world.fighter(2).expect("target").hp.round() as u8, 100);
+
+    advance(
+        &mut world,
+        290.0,
+        InputIntent {
+            facing_radians: 0.0,
+            ..InputIntent::default()
+        },
+        InputIntent::default(),
+    );
+    assert_eq!(world.fighter(1).expect("attacker").action, Action::Idle);
+}
+
+#[test]
+fn late_wheel_back_cannot_cancel_committed_heavy() {
+    let mut world = duel(60.0);
+    advance(
+        &mut world,
+        5.0,
+        InputIntent {
+            heavy_attack: true,
+            facing_radians: 0.0,
+            ..InputIntent::default()
+        },
+        InputIntent::default(),
+    );
+    advance(
+        &mut world,
+        185.0,
+        InputIntent {
+            facing_radians: 0.0,
+            ..InputIntent::default()
+        },
+        InputIntent::default(),
+    );
+    assert_eq!(
+        world.fighter(1).expect("attacker").action,
+        Action::HeavyAttackWindup
+    );
+
+    advance(
+        &mut world,
+        5.0,
+        InputIntent {
+            block: true,
+            facing_radians: 0.0,
+            ..InputIntent::default()
+        },
+        InputIntent::default(),
+    );
+    let attacker = world.fighter(1).expect("attacker");
+    assert_eq!(attacker.action, Action::HeavyAttackWindup);
+    assert_eq!(attacker.stamina.round() as u8, 100);
+}
+
+#[test]
+fn exhausted_attacker_cannot_feint() {
+    let mut world = duel(60.0);
+    world.fighter_mut(1).expect("attacker").stamina = 11.0;
+    advance(
+        &mut world,
+        5.0,
+        InputIntent {
+            attack: true,
+            facing_radians: 0.0,
+            ..InputIntent::default()
+        },
+        InputIntent::default(),
+    );
+    advance(
+        &mut world,
+        5.0,
+        InputIntent {
+            block: true,
+            facing_radians: 0.0,
+            ..InputIntent::default()
+        },
+        InputIntent::default(),
+    );
+    let attacker = world.fighter(1).expect("attacker");
+    assert_eq!(attacker.action, Action::AttackWindup);
+    assert_eq!(attacker.stamina.round() as u8, 11);
+}
+
+#[test]
 fn wilds_parry_stun_preserves_a_comfortable_light_punish_window() {
     let mut world = duel(72.0);
     advance(
