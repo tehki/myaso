@@ -758,7 +758,7 @@ fn first_to_kill_target_declares_winner_and_freezes_match_state() {
         ..InputIntent::default()
     };
     let mut winning_event = None;
-    for _ in 0..1200 {
+    for _ in 0..4000 {
         let events = advance(&mut world, 5.0, attack, InputIntent::default());
         if let Some(event) = events
             .iter()
@@ -769,7 +769,7 @@ fn first_to_kill_target_declares_winner_and_freezes_match_state() {
         }
     }
 
-    assert_eq!(FFA_KILL_TARGET, 2);
+    assert_eq!(FFA_KILL_TARGET, 5);
     assert_eq!(world.match_winner(), Some(1));
     assert!(world.match_over());
     assert_eq!(world.fighter(1).expect("winner").kills, FFA_KILL_TARGET);
@@ -815,7 +815,7 @@ fn finished_match_resets_atomically_and_reopens_play() {
         ..InputIntent::default()
     };
 
-    for _ in 0..1200 {
+    for _ in 0..4000 {
         let events = advance(&mut world, 5.0, attack, InputIntent::default());
         if events
             .iter()
