@@ -948,6 +948,89 @@ async function runOnlineUiHeavyDodgeFlight(entries) {
   return evidence;
 }
 
+async function runOnlineUiRunningAttackFlight(entries) {
+  const staged = await prepareHeavyCounterplayFlight(
+    entries,
+    "M119 running strike",
+    { attackerName: "chrome", defenderName: "firefox", movementMs: 0 },
+  );
+  const { attacker, defender, attackerElementId, movementCode } = staged;
+  const movementKey = movementCode === "KeyD" ? "d" : "a";
+  const attackOffset = movementCode === "KeyD" ? 200 : -200;
+
+  await performArenaRunningAttack(attacker, attackerElementId, movementKey, attackOffset);
+
+  const deadline = Date.now() + 1200;
+  let evidence = null;
+  while (Date.now() < deadline) {
+    const current = await Promise.all(entries.map(readUiEvidence));
+    const attackerResult = current.find((entry) => entry.browser === attacker.name);
+    const defenderResult = current.find((entry) => entry.browser === defender.name);
+    const hit = attackerResult?.events.includes("Opponent hit - 30 HP.")
+      && defenderResult?.events.includes("Hit taken - 30 HP.")
+      && attackerResult?.opponentHp === 70
+      && defenderResult?.playerHp === 70;
+    const recovery = defenderResult?.recoveryTransitions.some((entry) =>
+      entry.visible
+      && entry.state === "running-attack-recovery"
+      && entry.label === "PUNISH"
+      && entry.detail === "Running recovery");
+    if (hit && recovery) {
+      evidence = current;
+      break;
+    }
+    await sleep(20);
+  }
+  if (!evidence) evidence = await Promise.all(entries.map(readUiEvidence));
+
+  const attackerResult = evidence.find((entry) => entry.browser === attacker.name);
+  const defenderResult = evidence.find((entry) => entry.browser === defender.name);
+  if (!attackerResult || !defenderResult) {
+    throw new Error(`M119 running strike incomplete evidence: ${JSON.stringify(evidence)}`);
+  }
+
+  const rightDown = attackerResult.pointers.find((event) =>
+    event.type === "pointerdown" && event.button === 2);
+  const rightUp = attackerResult.pointers.find((event) =>
+    event.type === "pointerup" && event.button === 2);
+  const lightDown = attackerResult.pointers.find((event) =>
+    event.type === "pointerdown" && event.button === 0);
+  const lightUp = attackerResult.pointers.find((event) =>
+    event.type === "pointerup" && event.button === 0);
+  if (!rightDown || !rightUp || !lightDown || !lightUp
+    || !attackerResult.keys.includes(`keydown:${movementCode}`)
+    || !attackerResult.keys.includes(`keyup:${movementCode}`)) {
+    throw new Error(`M119 real run + movement + LMB controls were not delivered: ${JSON.stringify(attackerResult)}`);
+  }
+  if (lightDown.t - rightDown.t < 180) {
+    throw new Error(`M119 LMB arrived before the real sprint hold threshold: ${JSON.stringify(attackerResult.pointers)}`);
+  }
+  if (attackerResult.playerHp !== 100 || attackerResult.playerGuard !== 100
+    || attackerResult.opponentHp !== 70
+    || defenderResult.playerHp !== 70 || defenderResult.playerGuard !== 100) {
+    throw new Error(`M119 running strike did not resolve as one 30 HP hit: ${JSON.stringify(evidence)}`);
+  }
+  if (!attackerResult.events.includes("Opponent hit - 30 HP.")
+    || !defenderResult.events.includes("Hit taken - 30 HP.")) {
+    throw new Error(`M119 running strike damage feedback was incomplete: ${JSON.stringify(evidence)}`);
+  }
+  const runningThreat = defenderResult.threatTransitions.some((entry) =>
+    entry.visible && (entry.phase === "RUNNING WINDUP" || entry.phase === "RUNNING STRIKE"));
+  const runningRecovery = defenderResult.recoveryTransitions.some((entry) =>
+    entry.visible && entry.state === "running-attack-recovery"
+      && entry.label === "PUNISH" && entry.detail === "Running recovery");
+  if (!runningThreat || !runningRecovery) {
+    throw new Error(`M119 running strike readability was incomplete: ${JSON.stringify(defenderResult)}`);
+  }
+  if (!attackerResult.events.some((text) =>
+    text.startsWith("Running strike committed")
+    || text.startsWith("Running strike active")
+    || text.startsWith("Running strike recovery"))) {
+    throw new Error(`M119 attacker never rendered running-strike commitment: ${JSON.stringify(attackerResult.events)}`);
+  }
+  return evidence;
+}
+
 async function runOnlineUiFeintFlight(entries) {
   const staged = await prepareHeavyCounterplayFlight(
     entries,
