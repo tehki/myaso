@@ -304,9 +304,9 @@ export function fighterThreatNetId(state, ownId = 0, summary = null) {
           ? COMBAT.directionalAttack
           : COMBAT.attack;
     const arcOffset = directionalLeft
-      ? COMBAT.directionalAttack.arcOffsetRadians
+      ? -COMBAT.directionalAttack.arcOffsetRadians
       : directionalRight
-        ? -COMBAT.directionalAttack.arcOffsetRadians
+        ? COMBAT.directionalAttack.arcOffsetRadians
         : 0;
     if (!Number.isFinite(priority) || entity.netId === ownId || !Number.isInteger(entity.netId) || entity.netId <= 0
       || !Number.isFinite(entity.x) || !Number.isFinite(entity.y) || !Number.isFinite(entity.facing)) continue;
