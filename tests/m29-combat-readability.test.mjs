@@ -599,6 +599,8 @@ test("death and full-vitals idle transition are readable", () => {
 test("authoritative action hints explain light and heavy commitment windows", () => {
   assert.match(combatActionHint(fighter(1, 100, 100, COMBAT_ACTION.attackWindup)), /windup/);
   assert.match(combatActionHint(fighter(1, 100, 100, COMBAT_ACTION.attackRecovery)), /Recovery/);
+  assert.match(combatActionHint(fighter(1, 100, 100, COMBAT_ACTION.runningAttackWindup)), /Running strike committed/);
+  assert.match(combatActionHint(fighter(1, 100, 100, COMBAT_ACTION.runningAttackRecovery)), /Running strike recovery/);
   assert.match(combatActionHint(fighter(1, 100, 100, COMBAT_ACTION.heavyAttackWindup)), /Heavy strike committed/);
   assert.match(combatActionHint(fighter(1, 100, 100, COMBAT_ACTION.heavyAttackRecovery)), /Heavy recovery/);
   assert.match(combatActionHint(fighter(1, 100, 100, COMBAT_ACTION.feintRecovery)), /Feint recovery/);
@@ -612,6 +614,9 @@ test("authoritative opponent recovery exposes a bounded punish cue", () => {
   });
   assert.deepEqual(opponentRecoveryPresentation(fighter(2, 100, 100, COMBAT_ACTION.heavyAttackRecovery)), {
     visible: true, state: "heavy-attack-recovery", label: "PUNISH", detail: "Heavy recovery",
+  });
+  assert.deepEqual(opponentRecoveryPresentation(fighter(2, 100, 100, COMBAT_ACTION.runningAttackRecovery)), {
+    visible: true, state: "running-attack-recovery", label: "PUNISH", detail: "Running recovery",
   });
   assert.deepEqual(opponentRecoveryPresentation(fighter(2, 100, 100, COMBAT_ACTION.dodgeRecovery)), {
     visible: true, state: "dodge-recovery", label: "PUNISH", detail: "Dodge recovery",
@@ -656,4 +661,16 @@ test("knockdown owns a distinct overlay and punish recovery cue", () => {
     label: "PUNISH",
     detail: "Knockdown recovery",
   });
+});
+
+
+test("running strike threat phases remain distinct from standing light attack", () => {
+  assert.equal(
+    fighterThreatPhaseLabel(fighter(2, 100, 100, COMBAT_ACTION.runningAttackWindup)),
+    "RUNNING WINDUP",
+  );
+  assert.equal(
+    fighterThreatPhaseLabel(fighter(2, 100, 100, COMBAT_ACTION.runningAttackActive)),
+    "RUNNING STRIKE",
+  );
 });
