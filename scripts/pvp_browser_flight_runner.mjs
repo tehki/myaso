@@ -2861,7 +2861,6 @@ async function setArenaAttack(session, elementId, pressed, xOffset = 200) {
 async function performArenaRunningAttack(session, elementId, movementKey, xOffset = 200) {
   const origin = { "element-6066-11e4-a52e-4f735466cecf": elementId };
   const pointerId = `mouse-${session.name}`;
-  const attackPointerId = `mouse-attack-${session.name}`;
   const keyboardId = `keyboard-${session.name}`;
   let rightHeld = false;
   let movementHeld = false;
@@ -2899,7 +2898,7 @@ async function performArenaRunningAttack(session, elementId, movementKey, xOffse
     await webdriver(session.base, "POST", `/session/${session.sessionId}/actions`, {
       actions: [{
         type: "pointer",
-        id: attackPointerId,
+        id: pointerId,
         parameters: { pointerType: "mouse" },
         actions: [
           { type: "pointerMove", duration: 0, origin, x: xOffset, y: 0 },
@@ -2919,7 +2918,7 @@ async function performArenaRunningAttack(session, elementId, movementKey, xOffse
       await webdriver(session.base, "POST", `/session/${session.sessionId}/actions`, {
         actions: [{
           type: "pointer",
-          id: attackPointerId,
+          id: pointerId,
           parameters: { pointerType: "mouse" },
           actions: [{ type: "pointerUp", button: 0 }],
         }],
