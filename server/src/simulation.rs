@@ -587,7 +587,7 @@ fn begin_requested_action(now_ms: f32, fighter: &mut Fighter, input: InputIntent
 
     if input.attack && fighter.action == Action::Idle {
         fighter.attack_hit_targets.clear();
-        let lateral = -fighter.facing.sin() * input.move_x + fighter.facing.cos() * input.move_y;
+        let lateral = fighter.facing.sin() * input.move_x - fighter.facing.cos() * input.move_y;
         if lateral >= DIRECTIONAL_ATTACK_LATERAL_THRESHOLD {
             fighter.set_action(Action::AttackLeftWindup, DIRECTIONAL_ATTACK_WINDUP_MS);
         } else if lateral <= -DIRECTIONAL_ATTACK_LATERAL_THRESHOLD {
@@ -904,7 +904,7 @@ fn attack_profile(action: Action) -> Option<AttackProfile> {
         Action::AttackLeftActive => Some(AttackProfile {
             reach: DIRECTIONAL_ATTACK_REACH,
             arc_radians: DIRECTIONAL_ATTACK_ARC_RADIANS,
-            arc_offset_radians: DIRECTIONAL_ATTACK_ARC_OFFSET_RADIANS,
+            arc_offset_radians: -DIRECTIONAL_ATTACK_ARC_OFFSET_RADIANS,
             damage: ATTACK_DAMAGE,
             knockback: ATTACK_KNOCKBACK,
             guard_damage: BLOCK_GUARD_DAMAGE,
@@ -914,7 +914,7 @@ fn attack_profile(action: Action) -> Option<AttackProfile> {
         Action::AttackRightActive => Some(AttackProfile {
             reach: DIRECTIONAL_ATTACK_REACH,
             arc_radians: DIRECTIONAL_ATTACK_ARC_RADIANS,
-            arc_offset_radians: -DIRECTIONAL_ATTACK_ARC_OFFSET_RADIANS,
+            arc_offset_radians: DIRECTIONAL_ATTACK_ARC_OFFSET_RADIANS,
             damage: ATTACK_DAMAGE,
             knockback: ATTACK_KNOCKBACK,
             guard_damage: BLOCK_GUARD_DAMAGE,
