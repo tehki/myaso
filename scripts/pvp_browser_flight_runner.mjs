@@ -929,7 +929,10 @@ async function runOnlineUiHeavyDodgeFlight(entries) {
   // Begin the genuine pointer-directed roll late enough that the unchanged
   // 125 ms iframe spans the ~320 ms heavy active transition, but early enough
   // to move off the strike lane. No combat constants are altered.
-  await sleep(170);
+  // UI observation plus WebDriver dispatch already costs roughly 120-140 ms
+  // on CI. Add only a small bounded delay so wheel-forward lands around 180-210 ms
+  // after the observed heavy commitment and its 125 ms iframe spans impact.
+  await sleep(55);
   await pressArenaPerpendicularDodgeAfterPause(defender, 0);
   // Let active -> recovery resolve without evidence polling inside the iframe.
   await sleep(360);
@@ -1552,12 +1555,32 @@ async function runOnlineUiHeavyGuardBreakFlight(entries, { returnTiming = false 
       await sleep(50);
       await setArenaBlock(defender, defenderElementId, true);
       await sleep(340);
-      const states = await Promise.all(entries.map(readUiEvidence));
-      const attackerState = states.find((entry) => entry.browser === attacker.name);
-      const defenderState = states.find((entry) => entry.browser === defender.name);
+      let states = await Promise.all(entries.map(readUiEvidence));
+      let attackerState = states.find((entry) => entry.browser === attacker.name);
+      let defenderState = states.find((entry) => entry.browser === defender.name);
       if (!attackerState || !defenderState) {
         throw new Error(`M110 second heavy incomplete evidence on attempt ${attempt}: ${JSON.stringify(states)}`);
       }
+
+      // The defender can render authoritative guard break one snapshot before the
+      // attacker's remote view converges to guard 0. Once the local defender is
+      // already broken, wait a bounded interval for the opposite client rather
+      // than misclassifying that mixed snapshot as an impossible resolution.
+      if (defenderState.playerGuard === 0 && attackerState.opponentGuard !== 0) {
+        const convergenceDeadline = Date.now() + 240;
+        while (Date.now() < convergenceDeadline) {
+          await sleep(20);
+          const converged = await Promise.all(entries.map(readUiEvidence));
+          const nextAttacker = converged.find((entry) => entry.browser === attacker.name);
+          const nextDefender = converged.find((entry) => entry.browser === defender.name);
+          if (!nextAttacker || !nextDefender) break;
+          states = converged;
+          attackerState = nextAttacker;
+          defenderState = nextDefender;
+          if (attackerState.opponentGuard === 0 && defenderState.playerGuard === 0) break;
+        }
+      }
+
       const commitsAfter = heavyCommitCount(attackerState);
       const guardBroken = attackerState.playerHp === 100 && attackerState.playerGuard === 100
         && defenderState.playerHp === 100 && defenderState.playerGuard === 0
