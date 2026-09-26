@@ -709,20 +709,6 @@ fn move_fighter(width: f32, height: f32, fighter: &mut Fighter, input: InputInte
             velocity_x *= OVERHEAD_ATTACK_ACTIVE_MOVE_MULTIPLIER;
             velocity_y *= OVERHEAD_ATTACK_ACTIVE_MOVE_MULTIPLIER;
         }
-        Action::AttackThrustWindup => {
-            fighter.set_action(Action::AttackThrustActive, THRUST_ATTACK_ACTIVE_MS)
-        }
-        Action::AttackThrustActive => {
-            fighter.set_action(Action::AttackThrustRecovery, THRUST_ATTACK_RECOVERY_MS)
-        }
-        Action::AttackThrustRecovery => fighter.set_action(Action::Idle, 0.0),
-        Action::AttackOverheadWindup => {
-            fighter.set_action(Action::AttackOverheadActive, OVERHEAD_ATTACK_ACTIVE_MS)
-        }
-        Action::AttackOverheadActive => {
-            fighter.set_action(Action::AttackOverheadRecovery, OVERHEAD_ATTACK_RECOVERY_MS)
-        }
-        Action::AttackOverheadRecovery => fighter.set_action(Action::Idle, 0.0),
         Action::RunningAttackWindup => {
             velocity_x *= RUNNING_ATTACK_WINDUP_MOVE_MULTIPLIER;
             velocity_y *= RUNNING_ATTACK_WINDUP_MOVE_MULTIPLIER;
@@ -826,6 +812,20 @@ fn advance_action(fighter: &mut Fighter, input: InputIntent, dt_ms: f32) {
             fighter.set_action(Action::AttackRightRecovery, DIRECTIONAL_ATTACK_RECOVERY_MS)
         }
         Action::AttackRightRecovery => fighter.set_action(Action::Idle, 0.0),
+        Action::AttackThrustWindup => {
+            fighter.set_action(Action::AttackThrustActive, THRUST_ATTACK_ACTIVE_MS)
+        }
+        Action::AttackThrustActive => {
+            fighter.set_action(Action::AttackThrustRecovery, THRUST_ATTACK_RECOVERY_MS)
+        }
+        Action::AttackThrustRecovery => fighter.set_action(Action::Idle, 0.0),
+        Action::AttackOverheadWindup => {
+            fighter.set_action(Action::AttackOverheadActive, OVERHEAD_ATTACK_ACTIVE_MS)
+        }
+        Action::AttackOverheadActive => {
+            fighter.set_action(Action::AttackOverheadRecovery, OVERHEAD_ATTACK_RECOVERY_MS)
+        }
+        Action::AttackOverheadRecovery => fighter.set_action(Action::Idle, 0.0),
         Action::RunningAttackWindup => {
             fighter.set_action(Action::RunningAttackActive, RUNNING_ATTACK_ACTIVE_MS)
         }
