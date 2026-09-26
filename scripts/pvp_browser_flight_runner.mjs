@@ -2881,7 +2881,10 @@ async function performArenaFeint(session, elementId, xOffset = 200) {
         actions: [
           { type: "pointerMove", duration: 0, origin, x: xOffset, y: 0 },
           { type: "pointerDown", button: 0 },
-          { type: "pause", duration: 30 },
+          // Give the real LMB edge enough time to cross one additional browser
+          // input sample before wheel-back. This remains safely inside the
+          // unchanged 70 ms authoritative light-feint window.
+          { type: "pause", duration: 50 },
           { type: "pointerUp", button: 0 },
           { type: "pause", duration: 0 },
         ],
@@ -2892,7 +2895,7 @@ async function performArenaFeint(session, elementId, xOffset = 200) {
         actions: [
           { type: "pause", duration: 0 },
           { type: "pause", duration: 0 },
-          { type: "pause", duration: 30 },
+          { type: "pause", duration: 50 },
           { type: "scroll", x: 0, y: 0, deltaX: 0, deltaY: 120, duration: 0, origin },
           { type: "pause", duration: 0 },
         ],
