@@ -822,21 +822,45 @@ async function runOnlineUiHeavyParryFlight(entries) {
   // pristine case. Any evidence that a heavy actually committed, hit, blocked,
   // or otherwise resolved makes the attempt terminal and therefore fail-closed.
   for (let attempt = 1; attempt <= 3 && !evidence; attempt += 1) {
+    const beforeCommit = await readUiEvidence(attacker);
+    const commitsBefore = beforeCommit.events.filter((text) =>
+      text.startsWith("Heavy strike committed")).length;
     await pulseMovementKey(attacker, "e", 40);
-    // The heavy active transition starts at 320 ms. Arm wheel-back earlier so
-    // the short-block sample reaches authority before the active transition even
-    // under WebDriver/browser delivery skew, while remaining inside the unchanged
-    // 125 ms parry window at impact.
-    await sleep(150);
-    let blockHeld = false;
-    try {
-      await setArenaBlock(defender, defenderElementId, true);
-      blockHeld = true;
-      await sleep(180);
-    } finally {
-      if (blockHeld) await setArenaBlock(defender, defenderElementId, false);
+
+    // Anchor the parry pulse to the authoritative heavy commitment instead of
+    // WebDriver keydown time. Key-to-authority latency varies substantially
+    // across browsers; the combat timing itself remains the unchanged 320 ms
+    // heavy windup and 125 ms parry window.
+    let committedObserved = false;
+    const commitDeadline = Date.now() + 360;
+    while (Date.now() < commitDeadline) {
+      const state = await readUiEvidence(attacker);
+      const commits = state.events.filter((text) =>
+        text.startsWith("Heavy strike committed")).length;
+      if (commits > commitsBefore) {
+        committedObserved = true;
+        break;
+      }
+      await sleep(10);
     }
-    await sleep(80);
+
+    let blockHeld = false;
+    if (committedObserved) {
+      // Start the short block about 220 ms after the observed commitment. That
+      // leaves roughly 100 ms of parry age at the 320 ms active transition while
+      // retaining margin for snapshot/input delivery skew.
+      await sleep(220);
+      try {
+        await setArenaBlock(defender, defenderElementId, true);
+        blockHeld = true;
+        await sleep(150);
+      } finally {
+        if (blockHeld) await setArenaBlock(defender, defenderElementId, false);
+      }
+      await sleep(60);
+    } else {
+      await sleep(20);
+    }
 
     lastObserved = await Promise.all(entries.map(readUiEvidence));
     const attackerResult = lastObserved.find((entry) => entry.browser === attacker.name);
@@ -902,23 +926,41 @@ async function runOnlineUiHeavyParryFlight(entries) {
   return evidence;
 }
 async function runOnlineUiHeavyDodgeFlight(entries) {
-  // Match the already-stable M36 browser roles: Firefox attacks, Chrome dodges.
+  // Match the M36 browser roles but preserve enough starting separation that
+  // the Wilds roll does not immediately trigger its own collision knockdown.
   const staged = await prepareHeavyCounterplayFlight(
     entries,
     "M107 heavy dodge",
-    { attackerName: "firefox", defenderName: "chrome", movementMs: 260 },
+    { attackerName: "firefox", defenderName: "chrome", movementMs: 200 },
   );
   const { attacker, defender, movementCode } = staged;
 
-  // Submit both browser action sequences together. The defender's WebDriver
-  // sequence carries the pointer aim and wheel-forward in the same real action
-  // batch. Cross-browser WebDriver dispatch already contributes substantial
-  // latency, so add no synthetic pause: the 125 ms iframe must overlap the
-  // authoritative 320 ms heavy active transition rather than arrive in recovery.
-  await Promise.all([
-    pulseMovementKey(attacker, "e", 40),
-    pressArenaPerpendicularDodgeAfterPause(defender, 0),
-  ]);
+  const beforeCommit = await readUiEvidence(attacker);
+  const commitsBefore = beforeCommit.events.filter((text) =>
+    text.startsWith("Heavy strike committed")).length;
+  await pulseMovementKey(attacker, "e", 40);
+
+  let committedObserved = false;
+  const commitDeadline = Date.now() + 360;
+  while (Date.now() < commitDeadline) {
+    const state = await readUiEvidence(attacker);
+    const commits = state.events.filter((text) =>
+      text.startsWith("Heavy strike committed")).length;
+    if (commits > commitsBefore) {
+      committedObserved = true;
+      break;
+    }
+    await sleep(10);
+  }
+  if (!committedObserved) {
+    throw new Error(`M107 heavy dodge never observed authoritative heavy commitment: ${JSON.stringify(await readUiEvidence(attacker))}`);
+  }
+
+  // Begin the genuine pointer-directed roll late enough that the unchanged
+  // 125 ms iframe spans the ~320 ms heavy active transition, but early enough
+  // to move off the strike lane. No combat constants are altered.
+  await sleep(170);
+  await pressArenaPerpendicularDodgeAfterPause(defender, 0);
   // Let active -> recovery resolve without evidence polling inside the iframe.
   await sleep(360);
 
