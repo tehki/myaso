@@ -31,6 +31,12 @@ export const COMBAT_ACTION = Object.freeze({
   attackRightWindup: 27,
   attackRightActive: 28,
   attackRightRecovery: 29,
+  attackThrustWindup: 30,
+  attackThrustActive: 31,
+  attackThrustRecovery: 32,
+  attackOverheadWindup: 33,
+  attackOverheadActive: 34,
+  attackOverheadRecovery: 35,
 });
 
 const PRIORITY = Object.freeze({
@@ -142,6 +148,18 @@ export function combatActionHint(entity) {
       return "Right sweep active - finish the commitment.";
     case COMBAT_ACTION.attackRightRecovery:
       return "Right sweep recovery - reset before attacking again.";
+    case COMBAT_ACTION.attackThrustWindup:
+      return "Thrust committed - long narrow lane is readable.";
+    case COMBAT_ACTION.attackThrustActive:
+      return "Thrust active - finish the line.";
+    case COMBAT_ACTION.attackThrustRecovery:
+      return "Thrust recovery - missed reach can be punished.";
+    case COMBAT_ACTION.attackOverheadWindup:
+      return "Overhead committed - slower high-pressure strike is readable.";
+    case COMBAT_ACTION.attackOverheadActive:
+      return "Overhead active - finish the commitment.";
+    case COMBAT_ACTION.attackOverheadRecovery:
+      return "Overhead recovery - the high-pressure swing can be punished.";
     case COMBAT_ACTION.runningAttackWindup:
       return "Running strike committed - forward pressure is readable.";
     case COMBAT_ACTION.runningAttackActive:
@@ -177,6 +195,12 @@ export function opponentRecoveryPresentation(entity) {
   }
   if (entity?.action === COMBAT_ACTION.attackLeftRecovery || entity?.action === COMBAT_ACTION.attackRightRecovery) {
     return { visible: true, state: "directional-attack-recovery", label: "PUNISH", detail: "Sweep recovery" };
+  }
+  if (entity?.action === COMBAT_ACTION.attackThrustRecovery) {
+    return { visible: true, state: "thrust-recovery", label: "PUNISH", detail: "Thrust recovery" };
+  }
+  if (entity?.action === COMBAT_ACTION.attackOverheadRecovery) {
+    return { visible: true, state: "overhead-recovery", label: "PUNISH", detail: "Overhead recovery" };
   }
   if (entity?.action === COMBAT_ACTION.heavyAttackRecovery) {
     return { visible: true, state: "heavy-attack-recovery", label: "PUNISH", detail: "Heavy recovery" };
@@ -234,6 +258,10 @@ export function fighterIdentityPresentation(netId) {
 }
 
 export function fighterThreatPhaseLabel(attacker) {
+  if (attacker?.action === COMBAT_ACTION.attackThrustActive) return "THRUST";
+  if (attacker?.action === COMBAT_ACTION.attackThrustWindup) return "THRUST WINDUP";
+  if (attacker?.action === COMBAT_ACTION.attackOverheadActive) return "OVERHEAD";
+  if (attacker?.action === COMBAT_ACTION.attackOverheadWindup) return "OVERHEAD WINDUP";
   if (attacker?.action === COMBAT_ACTION.attackLeftActive) return "LEFT SWEEP";
   if (attacker?.action === COMBAT_ACTION.attackLeftWindup) return "LEFT WINDUP";
   if (attacker?.action === COMBAT_ACTION.attackRightActive) return "RIGHT SWEEP";
@@ -286,11 +314,15 @@ export function fighterThreatNetId(state, ownId = 0, summary = null) {
     const active = entity?.action === COMBAT_ACTION.attackActive
       || entity?.action === COMBAT_ACTION.attackLeftActive
       || entity?.action === COMBAT_ACTION.attackRightActive
+      || entity?.action === COMBAT_ACTION.attackThrustActive
+      || entity?.action === COMBAT_ACTION.attackOverheadActive
       || entity?.action === COMBAT_ACTION.heavyAttackActive
       || entity?.action === COMBAT_ACTION.runningAttackActive;
     const windup = entity?.action === COMBAT_ACTION.attackWindup
       || entity?.action === COMBAT_ACTION.attackLeftWindup
       || entity?.action === COMBAT_ACTION.attackRightWindup
+      || entity?.action === COMBAT_ACTION.attackThrustWindup
+      || entity?.action === COMBAT_ACTION.attackOverheadWindup
       || entity?.action === COMBAT_ACTION.heavyAttackWindup
       || entity?.action === COMBAT_ACTION.runningAttackWindup;
     const priority = active ? 0 : windup ? 1 : Infinity;
@@ -300,9 +332,13 @@ export function fighterThreatNetId(state, ownId = 0, summary = null) {
       ? COMBAT.heavyAttack
       : entity?.action === COMBAT_ACTION.runningAttackActive || entity?.action === COMBAT_ACTION.runningAttackWindup
         ? COMBAT.runningAttack
-        : directionalLeft || directionalRight
-          ? COMBAT.directionalAttack
-          : COMBAT.attack;
+        : entity?.action === COMBAT_ACTION.attackThrustActive || entity?.action === COMBAT_ACTION.attackThrustWindup
+          ? COMBAT.thrustAttack
+          : entity?.action === COMBAT_ACTION.attackOverheadActive || entity?.action === COMBAT_ACTION.attackOverheadWindup
+            ? COMBAT.overheadAttack
+            : directionalLeft || directionalRight
+              ? COMBAT.directionalAttack
+              : COMBAT.attack;
     const arcOffset = directionalLeft
       ? -COMBAT.directionalAttack.arcOffsetRadians
       : directionalRight
