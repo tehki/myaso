@@ -311,7 +311,9 @@ function predictMovement(input, dtMs) {
     moveX /= length;
     moveY /= length;
   }
-  local.facing = Number.isFinite(input.facing) ? input.facing : local.facing;
+  if (local.action !== COMBAT_ACTION.knockdown) {
+    local.facing = Number.isFinite(input.facing) ? input.facing : local.facing;
+  }
   let speed = COMBAT.moveSpeed;
   const now = performance.now();
   const moving = Math.hypot(moveX, moveY) > 1e-6;
@@ -329,7 +331,7 @@ function predictMovement(input, dtMs) {
   } else if (local.action === 6 || input.block) speed *= COMBAT.block.moveMultiplier;
   else if (local.action === 1) speed *= 0.35;
   else if (local.action === COMBAT_ACTION.heavyAttackWindup) speed *= 0.20;
-  else if (local.action === 2 || local.action === COMBAT_ACTION.heavyAttackActive || local.action === 7 || local.action === 8) speed = 0;
+  else if (local.action === 2 || local.action === COMBAT_ACTION.heavyAttackActive || local.action === COMBAT_ACTION.stunned || local.action === COMBAT_ACTION.knockdown || local.action === COMBAT_ACTION.dead) speed = 0;
   else if (local.action === 3 || local.action === 5) speed *= 0.48;
   else if (local.action === COMBAT_ACTION.heavyAttackRecovery) speed *= 0.35;
   else if (local.action === COMBAT_ACTION.jump) speed *= COMBAT.jump.moveMultiplier;
@@ -501,9 +503,11 @@ function drawFighterScreen(x, y, fighter, body, shadow, remote = false, damageTe
     || action === COMBAT_ACTION.jumpAttackWindup
     || action === COMBAT_ACTION.jumpAttackActive
     || action === COMBAT_ACTION.jumpAttackRecovery;
+  const knockedDown = action === COMBAT_ACTION.knockdown;
   const lift = airborne ? 18 : 0;
   ctx.translate(x, y - lift);
-  ctx.rotate((fighter.facing ?? 0) + (action === COMBAT_ACTION.dodge ? Math.PI * 0.35 : 0));
+  ctx.rotate((fighter.facing ?? 0) + (action === COMBAT_ACTION.dodge ? Math.PI * 0.35 : 0) + (knockedDown ? Math.PI / 2 : 0));
+  if (knockedDown) ctx.scale(1.38, 0.62);
   ctx.globalAlpha = action === COMBAT_ACTION.dead ? 0.28 : 1;
   if (action === COMBAT_ACTION.attackWindup || action === COMBAT_ACTION.attackActive) drawAttackTell(action, remote);
   if (action === COMBAT_ACTION.heavyAttackWindup || action === COMBAT_ACTION.heavyAttackActive) drawHeavyAttackTell(action, remote);
@@ -513,6 +517,7 @@ function drawFighterScreen(x, y, fighter, body, shadow, remote = false, damageTe
   if (action === COMBAT_ACTION.block) drawBlockTell(remote, fighter);
   if (action === COMBAT_ACTION.dodge) drawDodgeTell(remote);
   if (action === COMBAT_ACTION.stunned) drawStunTell();
+  if (action === COMBAT_ACTION.knockdown) drawKnockdownTell();
   if (remote && parrySpatialPresentation(fighter).visible) drawParryTell();
   if (remote && guardBreakSpatialPresentation(fighter).visible) drawGuardBreakTell();
   if (remote && opponentRecoveryPresentation(fighter).visible) drawRecoveryTell();
@@ -703,6 +708,16 @@ function drawDodgeTell(remote) {
   ctx.setLineDash([4, 4]);
   ctx.beginPath();
   ctx.arc(0, 0, 36, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.setLineDash([]);
+}
+
+function drawKnockdownTell() {
+  ctx.strokeStyle = "rgba(224, 163, 89, .92)";
+  ctx.lineWidth = 4;
+  ctx.setLineDash([6, 4]);
+  ctx.beginPath();
+  ctx.ellipse(0, 0, 30, 18, 0, 0, Math.PI * 2);
   ctx.stroke();
   ctx.setLineDash([]);
 }

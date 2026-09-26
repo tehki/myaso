@@ -219,7 +219,7 @@ test("unblocked kick shoves and stuns without health damage", () => {
     a: { kick: true, aimX: b.x, aimY: b.y },
   });
   assert.equal(b.hp, 100);
-  assert.equal(b.action, "stunned");
+  assert.equal(b.action, "knockdown");
   assert.ok(events.some((event) => event.type === "kick"));
   assert.equal(a.stamina, COMBAT.stamina.max - COMBAT.kick.staminaCost);
 });
@@ -247,7 +247,7 @@ test("roll collision knocks rival down and consumes stamina", () => {
     a: { dodge: true, moveX: 1, aimX: b.x, aimY: b.y },
   });
   assert.equal(a.action, "dodge");
-  assert.equal(b.action, "stunned");
+  assert.equal(b.action, "knockdown");
   assert.ok(events.some((event) => event.type === "roll_hit"));
   assert.equal(a.stamina, COMBAT.stamina.max - COMBAT.dodge.staminaCost);
 });
@@ -347,6 +347,7 @@ test("successful parry leaves a comfortable real light punish window", () => {
 });
 
 
+
 test("early wheel-back feints a light attack into stamina-costing recovery", () => {
   const world = duel({ distance: 60 });
   const [a, b] = world.fighters;
@@ -382,4 +383,36 @@ test("feint is unavailable when stamina cannot pay its cost", () => {
   stepWorld(world, { a: { attack: true, aimX: b.x, aimY: b.y } }, 5);
   stepWorld(world, { a: { block: true, aimX: b.x, aimY: b.y } }, 5);
   assert.equal(a.action, "attack_windup");
+});
+
+test("kick knockdown is a bounded fallen state that restores control", () => {
+  const world = duel({ distance: 54 });
+  const [a, b] = world.fighters;
+  advance(world, COMBAT.kick.windupMs + COMBAT.kick.activeMs + 10, {
+    a: { kick: true, aimX: b.x, aimY: b.y },
+  });
+  assert.equal(b.action, "knockdown");
+  advance(world, 250);
+  assert.equal(b.action, "knockdown");
+  advance(world, 70);
+  assert.equal(b.action, "idle");
+  assert.equal(b.hp, 100);
+});
+
+test("knockdown ignores player movement input until recovery", () => {
+  const world = duel({ distance: 54 });
+  const [a, b] = world.fighters;
+  advance(world, COMBAT.kick.windupMs + COMBAT.kick.activeMs + 10, {
+    a: { kick: true, aimX: b.x, aimY: b.y },
+  });
+  assert.equal(b.action, "knockdown");
+  const fallenX = b.x;
+  const fallenY = b.y;
+  const fallenFacing = b.facing;
+  advance(world, 100, { b: { moveX: 1, moveY: 1, aimX: b.x + 200, aimY: b.y } });
+  assert.equal(b.action, "knockdown");
+  assert.equal(b.x, fallenX);
+  assert.equal(b.y, fallenY);
+  assert.equal(b.facing, fallenFacing);
+
 });

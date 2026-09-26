@@ -234,6 +234,7 @@ function actionHint() {
   if (player.action === "block" && player.actionElapsedMs <= COMBAT.block.parryWindowMs) return "PARRY — punish window opened.";
   if (player.action === "block") return "Short block — wheel back again to re-time the parry.";
   if (player.action === "dodge") return "ROLL — i-frames plus collision knockdown.";
+  if (player.action === "knockdown") return "KNOCKED DOWN — short recovery before control returns.";
   if (rightButtonDown && performance.now() - rightButtonDownAt >= runHoldThresholdMs) return "RUNNING — stamina drains while sprinting.";
   return "Wheel up roll · wheel down parry · RMB tap shove · hold RMB run · Space jump.";
 }
@@ -316,10 +317,13 @@ function drawFighter(fighter, body, shadow) {
   const dead = fighter.action === "dead";
   ctx.save();
   const airborne = fighter.action === "jump" || fighter.action.startsWith("jump_attack");
+  const knockedDown = fighter.action === "knockdown";
   const jumpProgress = airborne ? Math.min(1, fighter.actionElapsedMs / Math.max(1, fighter.actionDurationMs)) : 0;
   const lift = airborne ? Math.sin(jumpProgress * Math.PI) * 22 : 0;
   ctx.translate(fighter.x, fighter.y - lift);
-  ctx.rotate(fighter.facing + (fighter.action === "dodge" ? fighter.actionElapsedMs / COMBAT.dodge.durationMs * Math.PI * 2 : 0));
+  const rollSpin = fighter.action === "dodge" ? fighter.actionElapsedMs / COMBAT.dodge.durationMs * Math.PI * 2 : 0;
+  ctx.rotate(fighter.facing + rollSpin + (knockedDown ? Math.PI / 2 : 0));
+  if (knockedDown) ctx.scale(1.38, 0.62);
   ctx.globalAlpha = dead ? 0.28 : 1;
 
   if (fighter.action === "attack_windup" || fighter.action === "attack_active") drawAttackArc(fighter);

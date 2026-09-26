@@ -37,6 +37,8 @@ let ownBlockSeen = false;
 let peerBlockSeen = false;
 let ownStunnedSeen = false;
 let peerStunnedSeen = false;
+let ownKnockdownSeen = false;
+let peerKnockdownSeen = false;
 let firstParryAt = null;
 let parryWindupSeenAt = null;
 let parryBlockArmed = false;
@@ -138,6 +140,8 @@ function observeState(state) {
   peerBlockSeen ||= peer.action === 6;
   ownStunnedSeen ||= own.action === 7;
   peerStunnedSeen ||= peer.action === 7;
+  ownKnockdownSeen ||= own.action === 19;
+  peerKnockdownSeen ||= peer.action === 19;
   ownDodgeSeen ||= own.action === 4;
   peerDodgeSeen ||= peer.action === 4;
   ownDeadSeen ||= own.action === 8;
@@ -412,6 +416,8 @@ function finish() {
   const frameP95 = percentile(sortedFrames, 0.95);
   const isAttacker = Boolean(ownId && peerNetId && ownId < peerNetId);
   const attackerStunnedSeen = isAttacker ? ownStunnedSeen : peerStunnedSeen;
+  const attackerKnockdownSeen = isAttacker ? ownKnockdownSeen : peerKnockdownSeen;
+  const defenderKnockdownSeen = isAttacker ? peerKnockdownSeen : ownKnockdownSeen;
   const defenderBlockSeen = isAttacker ? peerBlockSeen : ownBlockSeen;
   const defenderDodgeSeen = isAttacker ? peerDodgeSeen : ownDodgeSeen;
   const defenderStunnedSeen = isAttacker ? peerStunnedSeen : ownStunnedSeen;
@@ -433,7 +439,7 @@ function finish() {
   const dodgeOk = firstDodgeEvadeAt !== null
     && defenderDodgeSeen && dodgeOverlapSeen
     && minDefenderHp === 100 && minDefenderGuard === 100
-    && !defenderBlockSeen && !attackerStunnedSeen;
+    && !defenderBlockSeen && !attackerStunnedSeen && !attackerKnockdownSeen;
   const blockOk = firstGuardCostAt !== null
     && defenderBlockSeen && blockOverlapSeen
     && minDefenderHp === 100 && minDefenderGuard < 100
@@ -493,6 +499,8 @@ function finish() {
     ownStunnedSeen,
     peerStunnedSeen,
     attackerStunnedSeen,
+    attackerKnockdownSeen,
+    defenderKnockdownSeen,
     defenderBlockSeen,
     defenderDodgeSeen,
     defenderStunnedSeen,

@@ -1111,7 +1111,7 @@ fn hex(bytes: &[u8]) -> String {
 }
 
 #[test]
-fn wilds_kick_stuns_unblocked_target_without_hp_damage() {
+fn wilds_kick_knocks_down_unblocked_target_without_hp_damage() {
     let mut world = duel(54.0);
     advance(
         &mut world,
@@ -1124,7 +1124,10 @@ fn wilds_kick_stuns_unblocked_target_without_hp_damage() {
         InputIntent::default(),
     );
     assert_eq!(world.fighter(2).expect("target").hp.round() as u8, 100);
-    assert_eq!(world.fighter(2).expect("target").action, Action::Stunned);
+    assert_eq!(
+        world.fighter(2).expect("target").action,
+        Action::Knockdown
+    );
     assert_eq!(
         world.fighter(1).expect("attacker").stamina.round() as u8,
         82
@@ -1175,7 +1178,7 @@ fn wilds_roll_collision_knocks_target_down_and_costs_stamina() {
         .all(|event| !matches!(event, CombatEvent::Hit { .. })));
     assert_eq!(world.fighter(1).expect("roller").action, Action::Dodge);
     assert_eq!(world.fighter(1).expect("roller").stamina.round() as u8, 72);
-    assert_eq!(world.fighter(2).expect("target").action, Action::Stunned);
+    assert_eq!(world.fighter(2).expect("target").action, Action::Knockdown);
 }
 
 #[test]
@@ -1553,4 +1556,53 @@ fn wilds_parry_stun_preserves_a_comfortable_light_punish_window() {
     )));
     assert_eq!(world.fighter(1).expect("attacker").hp.round() as u8, 66);
     assert_eq!(world.fighter(1).expect("attacker").action, Action::Stunned);
+}
+
+
+#[test]
+fn wilds_knockdown_is_distinct_from_parry_and_guard_break_stun() {
+    let mut kick_world = duel(54.0);
+    advance(
+        &mut kick_world,
+        170.0,
+        InputIntent {
+            kick: true,
+            facing_radians: 0.0,
+            ..InputIntent::default()
+        },
+        InputIntent::default(),
+    );
+    assert_eq!(
+        kick_world.fighter(2).expect("kick target").action,
+        Action::Knockdown
+    );
+
+    let mut parry_world = duel(72.0);
+    advance(
+        &mut parry_world,
+        110.0,
+        InputIntent {
+            attack: true,
+            facing_radians: 0.0,
+            ..InputIntent::default()
+        },
+        InputIntent::default(),
+    );
+    advance(
+        &mut parry_world,
+        45.0,
+        InputIntent {
+            facing_radians: 0.0,
+            ..InputIntent::default()
+        },
+        InputIntent {
+            block: true,
+            facing_radians: std::f32::consts::PI,
+            ..InputIntent::default()
+        },
+    );
+    assert_eq!(
+        parry_world.fighter(1).expect("parried attacker").action,
+        Action::Stunned
+    );
 }
