@@ -8,7 +8,7 @@ import { setTimeout as sleep } from "node:timers/promises";
 const root = process.cwd();
 const durationMs = Number(process.env.MYASO_PVP_FLIGHT_DURATION_MS ?? 7000);
 const scenario = process.env.MYASO_PVP_SCENARIO ?? "damage";
-if (!new Set(["damage", "inputloss", "parry", "dodge", "block", "guardbreak", "backblock", "respawn", "ui", "uirespawn", "uifeedback", "uihittell", "uivitals", "uiidentity", "uiscore", "uimatch", "uirematch", "uiffa3", "uikillfeed", "uifocus", "uithreat", "uithreatbearing", "uimultithreat", "uisecondarythreat", "uisecondarybearing", "uisecondaryphase", "uiguardarc", "uisecondaryguardarc", "uithreatmarkers", "uiparry", "uistun", "uiguardbreak", "uidodge", "uirecovery", "uirecoverytell", "uiattackintent", "uiheavy", "uiheavyinputloss", "uiheavyblock", "uiheavyparry", "uiheavydodge", "uiheavypunish", "uiheavyguardbreak", "uiheavyguardbreakpunish", "uifeint", "uirunningattack", "uiguardbreaktell", "uiparrytell", "uiblockfacingtell", "uidodgetell", "uideathtell"]).has(scenario)) throw new Error(`unsupported MYASO_PVP_SCENARIO: ${scenario}`);
+if (!new Set(["damage", "inputloss", "parry", "dodge", "block", "guardbreak", "backblock", "respawn", "ui", "uirespawn", "uifeedback", "uihittell", "uivitals", "uiidentity", "uiscore", "uimatch", "uirematch", "uiffa3", "uikillfeed", "uifocus", "uithreat", "uithreatbearing", "uimultithreat", "uisecondarythreat", "uisecondarybearing", "uisecondaryphase", "uiguardarc", "uisecondaryguardarc", "uithreatmarkers", "uiparry", "uistun", "uiguardbreak", "uidodge", "uirecovery", "uirecoverytell", "uiattackintent", "uiheavy", "uiheavyinputloss", "uiheavyblock", "uiheavyparry", "uiheavydodge", "uiheavypunish", "uiheavyguardbreak", "uiheavyguardbreakpunish", "uifeint", "uirunningattack", "uidirectionallight", "uiguardbreaktell", "uiparrytell", "uiblockfacingtell", "uidodgetell", "uideathtell"]).has(scenario)) throw new Error(`unsupported MYASO_PVP_SCENARIO: ${scenario}`);
 const staticPort = Number(process.env.MYASO_PVP_FLIGHT_HTTP_PORT ?? 4174);
 const browsers = [
   {
@@ -200,6 +200,9 @@ try {
   } else if (scenario === "uirunningattack") {
     const results = await runOnlineUiRunningAttackFlight(sessions);
     console.log(`M119_REAL_RUNNING_STRIKE ${JSON.stringify({ ok: true, results })}`);
+  } else if (scenario === "uidirectionallight") {
+    const results = await runOnlineUiDirectionalLightFlight(sessions);
+    console.log(`M121_REAL_DIRECTIONAL_LIGHT ${JSON.stringify({ ok: true, results })}`);
   } else if (scenario === "uiguardbreaktell") {
     const results = await runOnlineUiGuardBreakTellFlight(sessions);
     console.log(`M40_FFA_GUARD_BREAK_TELL ${JSON.stringify({ ok: true, results })}`);
@@ -308,14 +311,14 @@ async function startBrowser(browser) {
   });
   const sessionId = created.sessionId ?? created.value?.sessionId;
   if (!sessionId) throw new Error(`${browser.name} WebDriver did not return a session id: ${JSON.stringify(created)}`);
-  if (scenario === "uiparry" || scenario === "uistun" || scenario === "uiguardbreak" || scenario === "uidodge" || scenario === "uiattackintent" || scenario === "uiheavy" || scenario === "uiheavyinputloss" || scenario === "uiheavyblock" || scenario === "uiheavyparry" || scenario === "uiheavydodge" || scenario === "uiheavypunish" || scenario === "uiheavyguardbreak" || scenario === "uiheavyguardbreakpunish" || scenario === "uifeint" || scenario === "uirunningattack" || scenario === "uiguardbreaktell" || scenario === "uiparrytell" || scenario === "uiblockfacingtell" || scenario === "uidodgetell") {
+  if (scenario === "uiparry" || scenario === "uistun" || scenario === "uiguardbreak" || scenario === "uidodge" || scenario === "uiattackintent" || scenario === "uiheavy" || scenario === "uiheavyinputloss" || scenario === "uiheavyblock" || scenario === "uiheavyparry" || scenario === "uiheavydodge" || scenario === "uiheavypunish" || scenario === "uiheavyguardbreak" || scenario === "uiheavyguardbreakpunish" || scenario === "uifeint" || scenario === "uirunningattack" || scenario === "uidirectionallight" || scenario === "uiguardbreaktell" || scenario === "uiparrytell" || scenario === "uiblockfacingtell" || scenario === "uidodgetell") {
     await webdriver(base, "POST", `/session/${sessionId}/window/rect`, { x: 0, y: 0, width: 1280, height: 900 });
   }
   return { ...browser, child, base, sessionId };
 }
 
 async function navigate(session, gameUrl, certificateHash) {
-  const page = scenario === "ui" || scenario === "uirespawn" || scenario === "uifeedback" || scenario === "uihittell" || scenario === "uivitals" || scenario === "uiidentity" || scenario === "uiscore" || scenario === "uimatch" || scenario === "uirematch" || scenario === "uiffa3" || scenario === "uikillfeed" || scenario === "uifocus" || scenario === "uithreat" || scenario === "uithreatbearing" || scenario === "uimultithreat" || scenario === "uisecondarythreat" || scenario === "uisecondarybearing" || scenario === "uisecondaryphase" || scenario === "uiguardarc" || scenario === "uisecondaryguardarc" || scenario === "uithreatmarkers" || scenario === "uiparry" || scenario === "uistun" || scenario === "uiguardbreak" || scenario === "uidodge" || scenario === "uirecovery" || scenario === "uirecoverytell" || scenario === "uiattackintent" || scenario === "uiheavy" || scenario === "uiheavyinputloss" || scenario === "uiheavyblock" || scenario === "uiheavyparry" || scenario === "uiheavydodge" || scenario === "uiheavypunish" || scenario === "uiheavyguardbreak" || scenario === "uiheavyguardbreakpunish" || scenario === "uifeint" || scenario === "uirunningattack" || scenario === "uiguardbreaktell" || scenario === "uiparrytell" || scenario === "uiblockfacingtell" || scenario === "uidodgetell" || scenario === "uideathtell" ? "index.html" : "pvp-flight.html";
+  const page = scenario === "ui" || scenario === "uirespawn" || scenario === "uifeedback" || scenario === "uihittell" || scenario === "uivitals" || scenario === "uiidentity" || scenario === "uiscore" || scenario === "uimatch" || scenario === "uirematch" || scenario === "uiffa3" || scenario === "uikillfeed" || scenario === "uifocus" || scenario === "uithreat" || scenario === "uithreatbearing" || scenario === "uimultithreat" || scenario === "uisecondarythreat" || scenario === "uisecondarybearing" || scenario === "uisecondaryphase" || scenario === "uiguardarc" || scenario === "uisecondaryguardarc" || scenario === "uithreatmarkers" || scenario === "uiparry" || scenario === "uistun" || scenario === "uiguardbreak" || scenario === "uidodge" || scenario === "uirecovery" || scenario === "uirecoverytell" || scenario === "uiattackintent" || scenario === "uiheavy" || scenario === "uiheavyinputloss" || scenario === "uiheavyblock" || scenario === "uiheavyparry" || scenario === "uiheavydodge" || scenario === "uiheavypunish" || scenario === "uiheavyguardbreak" || scenario === "uiheavyguardbreakpunish" || scenario === "uifeint" || scenario === "uirunningattack" || scenario === "uidirectionallight" || scenario === "uiguardbreaktell" || scenario === "uiparrytell" || scenario === "uiblockfacingtell" || scenario === "uidodgetell" || scenario === "uideathtell" ? "index.html" : "pvp-flight.html";
   const url = new URL(`http://127.0.0.1:${staticPort}/web/${page}`);
   url.searchParams.set("server", gameUrl);
   url.searchParams.set("cert", certificateHash);
@@ -958,6 +961,88 @@ async function runOnlineUiHeavyDodgeFlight(entries) {
   if (attackerResult.feedbackTransitions.includes("parried")
     || defenderResult.feedbackTransitions.includes("parry-success")) {
     throw new Error(`M107 heavy dodge accidentally resolved as parry: ${JSON.stringify(evidence)}`);
+  }
+  return evidence;
+}
+
+async function runOnlineUiDirectionalLightFlight(entries) {
+  const staged = await prepareHeavyCounterplayFlight(
+    entries,
+    "M121 directional light",
+    { attackerName: "chrome", defenderName: "firefox", movementMs: 150 },
+  );
+  const { attacker, defender, attackerElementId, movementCode } = staged;
+  const attackRight = movementCode === "KeyD";
+  // In screen-space coordinates, left of a right-facing fighter is W/up; left
+  // of a left-facing fighter is S/down.
+  const strafeKey = attackRight ? "w" : "s";
+  const strafeCode = attackRight ? "KeyW" : "KeyS";
+  const attackOffset = attackRight ? 200 : -200;
+
+  await performArenaDirectionalLight(attacker, attackerElementId, strafeKey, attackOffset);
+
+  const deadline = Date.now() + 900;
+  let evidence = null;
+  while (Date.now() < deadline) {
+    const current = await Promise.all(entries.map(readUiEvidence));
+    const attackerResult = current.find((entry) => entry.browser === attacker.name);
+    const defenderResult = current.find((entry) => entry.browser === defender.name);
+    const hit = attackerResult?.events.includes("Opponent hit - 34 HP.")
+      && defenderResult?.events.includes("Hit taken - 34 HP.")
+      && attackerResult?.opponentHp === 66
+      && defenderResult?.playerHp === 66;
+    const sideThreat = defenderResult?.threatTransitions.some((entry) =>
+      entry.visible && (entry.phase === "LEFT WINDUP" || entry.phase === "LEFT SWEEP"));
+    const recovery = defenderResult?.recoveryTransitions.some((entry) =>
+      entry.visible
+      && entry.state === "directional-attack-recovery"
+      && entry.label === "PUNISH"
+      && entry.detail === "Sweep recovery");
+    if (hit && sideThreat && recovery) {
+      evidence = current;
+      break;
+    }
+    await sleep(20);
+  }
+  if (!evidence) evidence = await Promise.all(entries.map(readUiEvidence));
+
+  const attackerResult = evidence.find((entry) => entry.browser === attacker.name);
+  const defenderResult = evidence.find((entry) => entry.browser === defender.name);
+  if (!attackerResult || !defenderResult) {
+    throw new Error(`M121 directional light incomplete evidence: ${JSON.stringify(evidence)}`);
+  }
+
+  const lightDown = attackerResult.pointers.find((event) =>
+    event.type === "pointerdown" && event.button === 0);
+  const lightUp = attackerResult.pointers.find((event) =>
+    event.type === "pointerup" && event.button === 0);
+  if (!lightDown || !lightUp
+    || !attackerResult.keys.includes(`keydown:${strafeCode}`)
+    || !attackerResult.keys.includes(`keyup:${strafeCode}`)) {
+    throw new Error(`M121 real strafe + LMB controls were not delivered: ${JSON.stringify(attackerResult)}`);
+  }
+  if (attackerResult.playerHp !== 100 || attackerResult.playerGuard !== 100
+    || attackerResult.opponentHp !== 66
+    || defenderResult.playerHp !== 66 || defenderResult.playerGuard !== 100) {
+    throw new Error(`M121 directional light did not resolve as one 34 HP hit: ${JSON.stringify(evidence)}`);
+  }
+  if (!attackerResult.events.includes("Opponent hit - 34 HP.")
+    || !defenderResult.events.includes("Hit taken - 34 HP.")) {
+    throw new Error(`M121 directional light damage feedback was incomplete: ${JSON.stringify(evidence)}`);
+  }
+  const leftThreat = defenderResult.threatTransitions.some((entry) =>
+    entry.visible && (entry.phase === "LEFT WINDUP" || entry.phase === "LEFT SWEEP"));
+  const sweepRecovery = defenderResult.recoveryTransitions.some((entry) =>
+    entry.visible && entry.state === "directional-attack-recovery"
+      && entry.label === "PUNISH" && entry.detail === "Sweep recovery");
+  if (!leftThreat || !sweepRecovery) {
+    throw new Error(`M121 left-sweep readability was incomplete: ${JSON.stringify(defenderResult)}`);
+  }
+  if (!attackerResult.events.some((text) =>
+    text.startsWith("Left sweep committed")
+    || text.startsWith("Left sweep active")
+    || text.startsWith("Left sweep recovery"))) {
+    throw new Error(`M121 attacker never rendered left-sweep commitment: ${JSON.stringify(attackerResult.events)}`);
   }
   return evidence;
 }
@@ -2763,6 +2848,36 @@ async function setArenaAttack(session, elementId, pressed, xOffset = 200) {
     : [{ type: "pointerUp", button: 0 }];
   await webdriver(session.base, "POST", `/session/${session.sessionId}/actions`, {
     actions: [{ type: "pointer", id: `mouse-${session.name}`, parameters: { pointerType: "mouse" }, actions }],
+  });
+}
+
+async function performArenaDirectionalLight(session, elementId, strafeKey, xOffset = 200) {
+  const origin = { "element-6066-11e4-a52e-4f735466cecf": elementId };
+  await webdriver(session.base, "POST", `/session/${session.sessionId}/actions`, {
+    actions: [
+      {
+        type: "key",
+        id: `keyboard-${session.name}`,
+        actions: [
+          { type: "keyDown", value: strafeKey },
+          { type: "pause", duration: 220 },
+          { type: "keyUp", value: strafeKey },
+        ],
+      },
+      {
+        type: "pointer",
+        id: `mouse-${session.name}`,
+        parameters: { pointerType: "mouse" },
+        actions: [
+          { type: "pointerMove", duration: 0, origin, x: xOffset, y: 0 },
+          { type: "pause", duration: 30 },
+          { type: "pointerDown", button: 0 },
+          { type: "pause", duration: 40 },
+          { type: "pointerUp", button: 0 },
+          { type: "pause", duration: 150 },
+        ],
+      },
+    ],
   });
 }
 
