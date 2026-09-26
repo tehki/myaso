@@ -49,7 +49,7 @@ python -m http.server 8000
 
 Then open `http://localhost:8000/web/`.
 
-Controls: **WASD** move, **mouse** aim, **left mouse** attack (**strafe + left mouse** selects a left/right sweep lane), **E** heavy attack, **mouse wheel forward** roll, **mouse wheel backward** parry/short block (or early attack feint), **right-click tap** kick/shove, **right-click hold** run, **right-click hold + WASD + left mouse** running attack, **Space** jump, and **Space + left mouse** jumping attack. Running, running attacks, rolling, kicking, and jumping consume stamina.
+Controls: **WASD** move, **mouse** aim, **left mouse** attack (**strafe** = side sweep, **move toward pointer** = thrust, **move away from pointer** = overhead), **E** heavy attack, **mouse wheel forward** roll, **mouse wheel backward** parry/short block (or early attack feint), **right-click tap** kick/shove, **right-click hold** run, **right-click hold + WASD + left mouse** running attack, **Space** jump, and **Space + left mouse** jumping attack. Running, running attacks, rolling, kicking, and jumping consume stamina.
 
 ## Tests
 
