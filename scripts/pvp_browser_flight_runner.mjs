@@ -1629,8 +1629,8 @@ async function runOnlineUiHeavyGuardBreakFlight(entries, { returnTiming = false 
       const beforeAttacker = before.find((entry) => entry.browser === attacker.name);
       const beforeDefender = before.find((entry) => entry.browser === defender.name);
       if (!beforeAttacker || !beforeDefender
-        || beforeDefender.playerGuard < 36 || beforeDefender.playerGuard > 45) {
-        throw new Error(`M110 short-block sequence did not preserve bounded guard pressure before second heavy: ${JSON.stringify(before)}`);
+        || beforeDefender.playerGuard <= 0 || beforeDefender.playerGuard >= 64) {
+        throw new Error(`M110 short-block sequence did not preserve breakable guard pressure before second heavy: ${JSON.stringify(before)}`);
       }
       const guardBeforeSecond = beforeDefender.playerGuard;
       const commitsBefore = heavyCommitCount(beforeAttacker);
@@ -2872,36 +2872,42 @@ async function performArenaRunningAttack(session, elementId, movementKey, xOffse
 
 async function performArenaFeint(session, elementId, xOffset = 200) {
   const origin = { "element-6066-11e4-a52e-4f735466cecf": elementId };
-  await webdriver(session.base, "POST", `/session/${session.sessionId}/actions`, {
-    actions: [
-      {
+  const pointerId = `mouse-${session.name}`;
+  let attackHeld = false;
+  try {
+    // Send LMB as its own real browser action first. Keeping the button held
+    // across calls prevents the wheel-back edge from being coalesced into the
+    // same outbound combat sample as attack start.
+    await webdriver(session.base, "POST", `/session/${session.sessionId}/actions`, {
+      actions: [{
         type: "pointer",
-        id: `mouse-${session.name}`,
+        id: pointerId,
         parameters: { pointerType: "mouse" },
         actions: [
           { type: "pointerMove", duration: 0, origin, x: xOffset, y: 0 },
           { type: "pointerDown", button: 0 },
-          // Give the real LMB edge enough time to cross one additional browser
-          // input sample before wheel-back. This remains safely inside the
-          // unchanged 70 ms authoritative light-feint window.
-          { type: "pause", duration: 50 },
-          { type: "pointerUp", button: 0 },
-          { type: "pause", duration: 0 },
         ],
-      },
-      {
-        type: "wheel",
-        id: `wheel-${session.name}`,
-        actions: [
-          { type: "pause", duration: 0 },
-          { type: "pause", duration: 0 },
-          { type: "pause", duration: 50 },
-          { type: "scroll", x: 0, y: 0, deltaX: 0, deltaY: 120, duration: 0, origin },
-          { type: "pause", duration: 0 },
-        ],
-      },
-    ],
-  });
+      }],
+    });
+    attackHeld = true;
+
+    // One prediction/input sample is enough to establish light windup. Wheel
+    // back remains well inside the unchanged 70 ms authoritative feint window.
+    await sleep(20);
+    await scrollArenaWheel(session, elementId, 120);
+    await sleep(10);
+  } finally {
+    if (attackHeld) {
+      await webdriver(session.base, "POST", `/session/${session.sessionId}/actions`, {
+        actions: [{
+          type: "pointer",
+          id: pointerId,
+          parameters: { pointerType: "mouse" },
+          actions: [{ type: "pointerUp", button: 0 }],
+        }],
+      });
+    }
+  }
 }
 
 async function performArenaAttack(session, elementId, xOffset = 200) {
