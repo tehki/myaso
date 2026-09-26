@@ -217,6 +217,33 @@ test("directional light action states round-trip through snapshots", () => {
   }
 });
 
+test("thrust and overhead action states round-trip through snapshots", () => {
+  const names = [
+    ["attack_thrust_windup", 30],
+    ["attack_thrust_active", 31],
+    ["attack_thrust_recovery", 32],
+    ["attack_overhead_windup", 33],
+    ["attack_overhead_active", 34],
+    ["attack_overhead_recovery", 35],
+  ];
+  for (const [action, expectedCode] of names) {
+    const state = quantizeEntity(entity(81, 480, 400, { action }));
+    assert.equal(state.action, expectedCode);
+    const packet = encodeSnapshot({
+      sequence: expectedCode,
+      baselineSequence: expectedCode - 1,
+      serverTick: 1300 + expectedCode,
+      full: true,
+      records: [buildEntityDelta(state)],
+      maxBytes: 1100,
+    });
+    const decoded = decodeSnapshot(packet);
+    const applied = applySnapshotRecords(new Map(), decoded.records);
+    assert.equal(applied.get(81).action, expectedCode);
+    assert.equal(dequantizeEntity(applied.get(81)).action, action);
+  }
+});
+
 test("server input ingress deduplicates redundant and reordered samples", () => {
   const ingress = new InputIngressWindow({ historyTicks: 10 });
   const packetA = encodeInputPacket({
