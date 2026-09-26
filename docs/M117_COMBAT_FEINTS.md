@@ -47,6 +47,7 @@ The milestone proves:
 - an early light wheel-back enters feint recovery and spends stamina;
 - a late heavy wheel-back cannot cancel the committed strike;
 - an exhausted attacker cannot feint;
-- feint recovery round-trips through snapshot action code 19;
+- feint recovery round-trips through snapshot action code 20;
 - recovery is presented as punishable;
-- the sparring AI punishes exposed feint recovery.
+- the sparring AI punishes exposed feint recovery;
+- a real Chrome/Firefox flight sends genuine LMB + wheel-back controls and requires the remote client to observe authoritative `Feint recovery` without HP/guard contact.

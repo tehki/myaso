@@ -8,7 +8,7 @@ import { setTimeout as sleep } from "node:timers/promises";
 const root = process.cwd();
 const durationMs = Number(process.env.MYASO_PVP_FLIGHT_DURATION_MS ?? 7000);
 const scenario = process.env.MYASO_PVP_SCENARIO ?? "damage";
-if (!new Set(["damage", "inputloss", "parry", "dodge", "block", "guardbreak", "backblock", "respawn", "ui", "uirespawn", "uifeedback", "uihittell", "uivitals", "uiidentity", "uiscore", "uimatch", "uirematch", "uiffa3", "uikillfeed", "uifocus", "uithreat", "uithreatbearing", "uimultithreat", "uisecondarythreat", "uisecondarybearing", "uisecondaryphase", "uiguardarc", "uisecondaryguardarc", "uithreatmarkers", "uiparry", "uistun", "uiguardbreak", "uidodge", "uirecovery", "uirecoverytell", "uiattackintent", "uiheavy", "uiheavyinputloss", "uiheavyblock", "uiheavyparry", "uiheavydodge", "uiheavypunish", "uiheavyguardbreak", "uiheavyguardbreakpunish", "uiguardbreaktell", "uiparrytell", "uiblockfacingtell", "uidodgetell", "uideathtell"]).has(scenario)) throw new Error(`unsupported MYASO_PVP_SCENARIO: ${scenario}`);
+if (!new Set(["damage", "inputloss", "parry", "dodge", "block", "guardbreak", "backblock", "respawn", "ui", "uirespawn", "uifeedback", "uihittell", "uivitals", "uiidentity", "uiscore", "uimatch", "uirematch", "uiffa3", "uikillfeed", "uifocus", "uithreat", "uithreatbearing", "uimultithreat", "uisecondarythreat", "uisecondarybearing", "uisecondaryphase", "uiguardarc", "uisecondaryguardarc", "uithreatmarkers", "uiparry", "uistun", "uiguardbreak", "uidodge", "uirecovery", "uirecoverytell", "uiattackintent", "uiheavy", "uiheavyinputloss", "uiheavyblock", "uiheavyparry", "uiheavydodge", "uiheavypunish", "uiheavyguardbreak", "uiheavyguardbreakpunish", "uifeint", "uiguardbreaktell", "uiparrytell", "uiblockfacingtell", "uidodgetell", "uideathtell"]).has(scenario)) throw new Error(`unsupported MYASO_PVP_SCENARIO: ${scenario}`);
 const staticPort = Number(process.env.MYASO_PVP_FLIGHT_HTTP_PORT ?? 4174);
 const browsers = [
   {
@@ -194,6 +194,9 @@ try {
   } else if (scenario === "uiheavyguardbreakpunish") {
     const results = await runOnlineUiHeavyGuardBreakPunishFlight(sessions);
     console.log(`M111_HEAVY_GUARD_BREAK_PUNISH ${JSON.stringify({ ok: true, results })}`);
+  } else if (scenario === "uifeint") {
+    const results = await runOnlineUiFeintFlight(sessions);
+    console.log(`M117_REAL_WHEEL_FEINT ${JSON.stringify({ ok: true, results })}`);
   } else if (scenario === "uiguardbreaktell") {
     const results = await runOnlineUiGuardBreakTellFlight(sessions);
     console.log(`M40_FFA_GUARD_BREAK_TELL ${JSON.stringify({ ok: true, results })}`);
@@ -938,6 +941,66 @@ async function runOnlineUiHeavyDodgeFlight(entries) {
   if (attackerResult.feedbackTransitions.includes("parried")
     || defenderResult.feedbackTransitions.includes("parry-success")) {
     throw new Error(`M107 heavy dodge accidentally resolved as parry: ${JSON.stringify(evidence)}`);
+  }
+  return evidence;
+}
+
+async function runOnlineUiFeintFlight(entries) {
+  const staged = await prepareHeavyCounterplayFlight(
+    entries,
+    "M117 wheel-back feint",
+    { attackerName: "chrome", defenderName: "firefox", movementMs: 150 },
+  );
+  const { attacker, defender, attackerElementId, movementCode } = staged;
+  const attackRight = movementCode === "KeyD";
+  const attackOffset = attackRight ? 200 : -200;
+
+  await performArenaFeint(attacker, attackerElementId, attackOffset);
+
+  const deadline = Date.now() + 900;
+  let defenderObservedRecovery = false;
+  while (Date.now() < deadline) {
+    const state = await readUiEvidence(defender);
+    defenderObservedRecovery = state.recoveryTransitions.some((entry) =>
+      entry.visible
+      && entry.state === "feint-recovery"
+      && entry.label === "PUNISH"
+      && entry.detail === "Feint recovery");
+    if (defenderObservedRecovery) break;
+    await sleep(20);
+  }
+
+  const evidence = await Promise.all(entries.map(readUiEvidence));
+  const attackerResult = evidence.find((entry) => entry.browser === attacker.name);
+  const defenderResult = evidence.find((entry) => entry.browser === defender.name);
+  if (!attackerResult || !defenderResult) {
+    throw new Error(`M117 feint incomplete evidence: ${JSON.stringify(evidence)}`);
+  }
+
+  const lightDown = attackerResult.pointers.find((event) =>
+    event.type === "pointerdown" && event.button === 0);
+  const lightUp = attackerResult.pointers.find((event) =>
+    event.type === "pointerup" && event.button === 0);
+  const wheelBack = attackerResult.wheels.find((event) => event.deltaY > 0);
+  if (!lightDown || !lightUp || !wheelBack) {
+    throw new Error(`M117 real LMB + wheel-back controls were not delivered: ${JSON.stringify(attackerResult)}`);
+  }
+  if (!defenderObservedRecovery) {
+    throw new Error(`M117 defender never observed authoritative feint recovery: ${JSON.stringify(defenderResult)}`);
+  }
+  if (attackerResult.playerHp !== 100 || attackerResult.playerGuard !== 100
+    || attackerResult.opponentHp !== 100 || attackerResult.opponentGuard !== 100
+    || defenderResult.playerHp !== 100 || defenderResult.playerGuard !== 100) {
+    throw new Error(`M117 feint changed authoritative vitals: ${JSON.stringify(evidence)}`);
+  }
+  if (!attackerResult.events.some((text) => text.startsWith("Feint recovery"))) {
+    throw new Error(`M117 attacker never rendered feint recovery readability: ${JSON.stringify(attackerResult)}`);
+  }
+  if (attackerResult.feedbackTransitions.includes("hit-confirm")
+    || defenderResult.feedbackTransitions.includes("damage-taken")
+    || attackerResult.feedbackTransitions.includes("block-confirm")
+    || defenderResult.feedbackTransitions.includes("parry-success")) {
+    throw new Error(`M117 feint accidentally resolved combat contact: ${JSON.stringify(evidence)}`);
   }
   return evidence;
 }
@@ -2591,6 +2654,37 @@ async function setArenaAttack(session, elementId, pressed, xOffset = 200) {
     : [{ type: "pointerUp", button: 0 }];
   await webdriver(session.base, "POST", `/session/${session.sessionId}/actions`, {
     actions: [{ type: "pointer", id: `mouse-${session.name}`, parameters: { pointerType: "mouse" }, actions }],
+  });
+}
+
+async function performArenaFeint(session, elementId, xOffset = 200) {
+  const origin = { "element-6066-11e4-a52e-4f735466cecf": elementId };
+  await webdriver(session.base, "POST", `/session/${session.sessionId}/actions`, {
+    actions: [
+      {
+        type: "pointer",
+        id: `mouse-${session.name}`,
+        parameters: { pointerType: "mouse" },
+        actions: [
+          { type: "pointerMove", duration: 0, origin, x: xOffset, y: 0 },
+          { type: "pointerDown", button: 0 },
+          { type: "pause", duration: 30 },
+          { type: "pointerUp", button: 0 },
+          { type: "pause", duration: 0 },
+        ],
+      },
+      {
+        type: "wheel",
+        id: `wheel-${session.name}`,
+        actions: [
+          { type: "pause", duration: 0 },
+          { type: "pause", duration: 0 },
+          { type: "pause", duration: 30 },
+          { type: "scroll", x: 0, y: 0, deltaX: 0, deltaY: 120, duration: 0, origin },
+          { type: "pause", duration: 0 },
+        ],
+      },
+    ],
   });
 }
 
