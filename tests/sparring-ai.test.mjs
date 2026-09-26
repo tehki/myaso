@@ -140,3 +140,26 @@ test("sparring AI does not arm narrow jump attack outside its practical landing 
   });
   assert.equal(input.jump, false);
 });
+
+
+test("sparring AI converts medium-range pursuit into a running strike", () => {
+  const ai = createSparringAi();
+  const input = ai.sample({
+    nowMs: 1500,
+    self: fighter({ x: 100, y: 100, stamina: 100 }),
+    opponent: fighter({ x: 205, y: 100 }),
+  });
+  assert.ok(input.moveX > 0.9);
+  assert.equal(input.run, true);
+  assert.equal(input.attack, true);
+});
+
+test("sparring AI recognizes running strike windup as readable threat", () => {
+  const ai = createSparringAi();
+  const input = ai.sample({
+    nowMs: 500,
+    self: fighter({ x: 100, y: 100, stamina: 100 }),
+    opponent: fighter({ x: 180, y: 100, action: "running_attack_windup" }),
+  });
+  assert.equal(input.dodge, true);
+});
