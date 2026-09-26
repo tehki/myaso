@@ -118,7 +118,7 @@ test("sparring AI backs off to recover when stamina is critically low", () => {
 });
 
 test("sparring AI takes a real light punish on recovery or stun", () => {
-  for (const action of ["heavy_attack_recovery", "kick_recovery", "jump_attack_recovery", "stunned"]) {
+  for (const action of ["heavy_attack_recovery", "kick_recovery", "jump_attack_recovery", "feint_recovery", "stunned"]) {
     const ai = createSparringAi();
     const input = ai.sample({
       nowMs: 1300,
