@@ -23,6 +23,28 @@ const DIRECTIONAL_ATTACK_REACH: f32 = 76.0;
 const DIRECTIONAL_ATTACK_ARC_RADIANS: f32 = std::f32::consts::PI * 0.62;
 const DIRECTIONAL_ATTACK_ARC_OFFSET_RADIANS: f32 = std::f32::consts::PI * 0.16;
 const DIRECTIONAL_ATTACK_LATERAL_THRESHOLD: f32 = 0.45;
+const THRUST_ATTACK_WINDUP_MS: f32 = 150.0;
+const THRUST_ATTACK_ACTIVE_MS: f32 = 70.0;
+const THRUST_ATTACK_RECOVERY_MS: f32 = 270.0;
+const THRUST_ATTACK_REACH: f32 = 96.0;
+const THRUST_ATTACK_ARC_RADIANS: f32 = std::f32::consts::PI * 0.22;
+const THRUST_ATTACK_DAMAGE: f32 = 30.0;
+const THRUST_ATTACK_KNOCKBACK: f32 = 16.0;
+const THRUST_ATTACK_GUARD_DAMAGE: f32 = 30.0;
+const THRUST_ATTACK_WINDUP_MOVE_MULTIPLIER: f32 = 0.55;
+const THRUST_ATTACK_ACTIVE_MOVE_MULTIPLIER: f32 = 0.25;
+const THRUST_ATTACK_RECOVERY_MOVE_MULTIPLIER: f32 = 0.45;
+const OVERHEAD_ATTACK_WINDUP_MS: f32 = 185.0;
+const OVERHEAD_ATTACK_ACTIVE_MS: f32 = 85.0;
+const OVERHEAD_ATTACK_RECOVERY_MS: f32 = 300.0;
+const OVERHEAD_ATTACK_REACH: f32 = 72.0;
+const OVERHEAD_ATTACK_ARC_RADIANS: f32 = std::f32::consts::PI * 0.36;
+const OVERHEAD_ATTACK_DAMAGE: f32 = 38.0;
+const OVERHEAD_ATTACK_KNOCKBACK: f32 = 24.0;
+const OVERHEAD_ATTACK_GUARD_DAMAGE: f32 = 46.0;
+const OVERHEAD_ATTACK_WINDUP_MOVE_MULTIPLIER: f32 = 0.25;
+const OVERHEAD_ATTACK_ACTIVE_MOVE_MULTIPLIER: f32 = 0.0;
+const OVERHEAD_ATTACK_RECOVERY_MOVE_MULTIPLIER: f32 = 0.38;
 const RUNNING_ATTACK_WINDUP_MS: f32 = 160.0;
 const RUNNING_ATTACK_ACTIVE_MS: f32 = 90.0;
 const RUNNING_ATTACK_RECOVERY_MS: f32 = 310.0;
@@ -109,6 +131,12 @@ pub enum Action {
     AttackRightWindup,
     AttackRightActive,
     AttackRightRecovery,
+    AttackThrustWindup,
+    AttackThrustActive,
+    AttackThrustRecovery,
+    AttackOverheadWindup,
+    AttackOverheadActive,
+    AttackOverheadRecovery,
     HeavyAttackWindup,
     HeavyAttackActive,
     HeavyAttackRecovery,
@@ -164,6 +192,12 @@ impl Action {
             Self::AttackRightWindup => 27,
             Self::AttackRightActive => 28,
             Self::AttackRightRecovery => 29,
+            Self::AttackThrustWindup => 30,
+            Self::AttackThrustActive => 31,
+            Self::AttackThrustRecovery => 32,
+            Self::AttackOverheadWindup => 33,
+            Self::AttackOverheadActive => 34,
+            Self::AttackOverheadRecovery => 35,
         }
     }
 }
@@ -512,9 +546,11 @@ fn normalize_input(mut input: InputIntent) -> InputIntent {
 
 fn begin_requested_action(now_ms: f32, fighter: &mut Fighter, input: InputIntent) {
     let feint_window_ms = match fighter.action {
-        Action::AttackWindup | Action::AttackLeftWindup | Action::AttackRightWindup => {
-            FEINT_LIGHT_WINDOW_MS
-        }
+        Action::AttackWindup
+        | Action::AttackLeftWindup
+        | Action::AttackRightWindup
+        | Action::AttackThrustWindup
+        | Action::AttackOverheadWindup => FEINT_LIGHT_WINDOW_MS
         Action::HeavyAttackWindup => FEINT_HEAVY_WINDOW_MS,
         _ => 0.0,
     };
@@ -588,10 +624,19 @@ fn begin_requested_action(now_ms: f32, fighter: &mut Fighter, input: InputIntent
     if input.attack && fighter.action == Action::Idle {
         fighter.attack_hit_targets.clear();
         let lateral = fighter.facing.sin() * input.move_x - fighter.facing.cos() * input.move_y;
-        if lateral >= DIRECTIONAL_ATTACK_LATERAL_THRESHOLD {
-            fighter.set_action(Action::AttackLeftWindup, DIRECTIONAL_ATTACK_WINDUP_MS);
-        } else if lateral <= -DIRECTIONAL_ATTACK_LATERAL_THRESHOLD {
-            fighter.set_action(Action::AttackRightWindup, DIRECTIONAL_ATTACK_WINDUP_MS);
+        let forward = fighter.facing.cos() * input.move_x + fighter.facing.sin() * input.move_y;
+        let abs_lateral = lateral.abs();
+        let abs_forward = forward.abs();
+        if abs_lateral >= DIRECTIONAL_ATTACK_LATERAL_THRESHOLD && abs_lateral >= abs_forward {
+            if lateral >= 0.0 {
+                fighter.set_action(Action::AttackLeftWindup, DIRECTIONAL_ATTACK_WINDUP_MS);
+            } else {
+                fighter.set_action(Action::AttackRightWindup, DIRECTIONAL_ATTACK_WINDUP_MS);
+            }
+        } else if forward >= DIRECTIONAL_ATTACK_LATERAL_THRESHOLD {
+            fighter.set_action(Action::AttackThrustWindup, THRUST_ATTACK_WINDUP_MS);
+        } else if forward <= -DIRECTIONAL_ATTACK_LATERAL_THRESHOLD {
+            fighter.set_action(Action::AttackOverheadWindup, OVERHEAD_ATTACK_WINDUP_MS);
         } else {
             fighter.set_action(Action::AttackWindup, ATTACK_WINDUP_MS);
         }
@@ -648,6 +693,36 @@ fn move_fighter(width: f32, height: f32, fighter: &mut Fighter, input: InputInte
             velocity_x *= 0.35;
             velocity_y *= 0.35;
         }
+        Action::AttackThrustWindup => {
+            velocity_x *= THRUST_ATTACK_WINDUP_MOVE_MULTIPLIER;
+            velocity_y *= THRUST_ATTACK_WINDUP_MOVE_MULTIPLIER;
+        }
+        Action::AttackThrustActive => {
+            velocity_x *= THRUST_ATTACK_ACTIVE_MOVE_MULTIPLIER;
+            velocity_y *= THRUST_ATTACK_ACTIVE_MOVE_MULTIPLIER;
+        }
+        Action::AttackOverheadWindup => {
+            velocity_x *= OVERHEAD_ATTACK_WINDUP_MOVE_MULTIPLIER;
+            velocity_y *= OVERHEAD_ATTACK_WINDUP_MOVE_MULTIPLIER;
+        }
+        Action::AttackOverheadActive => {
+            velocity_x *= OVERHEAD_ATTACK_ACTIVE_MOVE_MULTIPLIER;
+            velocity_y *= OVERHEAD_ATTACK_ACTIVE_MOVE_MULTIPLIER;
+        }
+        Action::AttackThrustWindup => {
+            fighter.set_action(Action::AttackThrustActive, THRUST_ATTACK_ACTIVE_MS)
+        }
+        Action::AttackThrustActive => {
+            fighter.set_action(Action::AttackThrustRecovery, THRUST_ATTACK_RECOVERY_MS)
+        }
+        Action::AttackThrustRecovery => fighter.set_action(Action::Idle, 0.0),
+        Action::AttackOverheadWindup => {
+            fighter.set_action(Action::AttackOverheadActive, OVERHEAD_ATTACK_ACTIVE_MS)
+        }
+        Action::AttackOverheadActive => {
+            fighter.set_action(Action::AttackOverheadRecovery, OVERHEAD_ATTACK_RECOVERY_MS)
+        }
+        Action::AttackOverheadRecovery => fighter.set_action(Action::Idle, 0.0),
         Action::RunningAttackWindup => {
             velocity_x *= RUNNING_ATTACK_WINDUP_MOVE_MULTIPLIER;
             velocity_y *= RUNNING_ATTACK_WINDUP_MOVE_MULTIPLIER;
@@ -675,6 +750,14 @@ fn move_fighter(width: f32, height: f32, fighter: &mut Fighter, input: InputInte
         | Action::DodgeRecovery => {
             velocity_x *= 0.48;
             velocity_y *= 0.48;
+        }
+        Action::AttackThrustRecovery => {
+            velocity_x *= THRUST_ATTACK_RECOVERY_MOVE_MULTIPLIER;
+            velocity_y *= THRUST_ATTACK_RECOVERY_MOVE_MULTIPLIER;
+        }
+        Action::AttackOverheadRecovery => {
+            velocity_x *= OVERHEAD_ATTACK_RECOVERY_MOVE_MULTIPLIER;
+            velocity_y *= OVERHEAD_ATTACK_RECOVERY_MOVE_MULTIPLIER;
         }
         Action::HeavyAttackRecovery => {
             velocity_x *= 0.35;
@@ -918,6 +1001,26 @@ fn attack_profile(action: Action) -> Option<AttackProfile> {
             damage: ATTACK_DAMAGE,
             knockback: ATTACK_KNOCKBACK,
             guard_damage: BLOCK_GUARD_DAMAGE,
+            guard_break_stun_ms: BLOCK_GUARD_BREAK_STUN_MS,
+            kick: false,
+        }),
+        Action::AttackThrustActive => Some(AttackProfile {
+            reach: THRUST_ATTACK_REACH,
+            arc_radians: THRUST_ATTACK_ARC_RADIANS,
+            arc_offset_radians: 0.0,
+            damage: THRUST_ATTACK_DAMAGE,
+            knockback: THRUST_ATTACK_KNOCKBACK,
+            guard_damage: THRUST_ATTACK_GUARD_DAMAGE,
+            guard_break_stun_ms: BLOCK_GUARD_BREAK_STUN_MS,
+            kick: false,
+        }),
+        Action::AttackOverheadActive => Some(AttackProfile {
+            reach: OVERHEAD_ATTACK_REACH,
+            arc_radians: OVERHEAD_ATTACK_ARC_RADIANS,
+            arc_offset_radians: 0.0,
+            damage: OVERHEAD_ATTACK_DAMAGE,
+            knockback: OVERHEAD_ATTACK_KNOCKBACK,
+            guard_damage: OVERHEAD_ATTACK_GUARD_DAMAGE,
             guard_break_stun_ms: BLOCK_GUARD_BREAK_STUN_MS,
             kick: false,
         }),
