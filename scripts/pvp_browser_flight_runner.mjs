@@ -2745,6 +2745,39 @@ async function setArenaAttack(session, elementId, pressed, xOffset = 200) {
   });
 }
 
+async function performArenaRunningAttack(session, elementId, movementKey, xOffset = 200) {
+  const origin = { "element-6066-11e4-a52e-4f735466cecf": elementId };
+  await webdriver(session.base, "POST", `/session/${session.sessionId}/actions`, {
+    actions: [
+      {
+        type: "key",
+        id: `keyboard-${session.name}`,
+        actions: [
+          { type: "keyDown", value: movementKey },
+          { type: "pause", duration: 620 },
+          { type: "keyUp", value: movementKey },
+        ],
+      },
+      {
+        type: "pointer",
+        id: `mouse-${session.name}`,
+        parameters: { pointerType: "mouse" },
+        actions: [
+          { type: "pointerMove", duration: 0, origin, x: xOffset, y: 0 },
+          { type: "pointerDown", button: 2 },
+          { type: "pause", duration: 220 },
+          { type: "pointerDown", button: 0 },
+          { type: "pause", duration: 40 },
+          { type: "pointerUp", button: 0 },
+          { type: "pause", duration: 320 },
+          { type: "pointerUp", button: 2 },
+          { type: "pause", duration: 40 },
+        ],
+      },
+    ],
+  });
+}
+
 async function performArenaFeint(session, elementId, xOffset = 200) {
   const origin = { "element-6066-11e4-a52e-4f735466cecf": elementId };
   await webdriver(session.base, "POST", `/session/${session.sessionId}/actions`, {
