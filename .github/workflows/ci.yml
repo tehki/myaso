@@ -266,6 +266,17 @@ jobs:
           node --check scripts/pvp_browser_flight_runner.mjs
           node scripts/pvp_browser_flight_runner.mjs
 
+      - name: Validate M120 directional light kernel
+        run: |
+          cargo test --locked --manifest-path server/Cargo.toml directional_
+          node --check src/combat/model.mjs
+          node --check src/combat/sparring-ai.mjs
+          node --check src/browser/combat-readability.mjs
+          node --check src/network/snapshot-codec.mjs
+          node --check web/game.mjs
+          node --check web/online-game.mjs
+          node --test --test-name-pattern="directional|left sweep|right sweep" tests/combat-model.test.mjs tests/sparring-ai.test.mjs tests/networking.test.mjs tests/m29-combat-readability.test.mjs
+
       - name: Validate M106 heavy strike control and readability
         env:
           MYASO_PVP_SCENARIO: "uiheavy"
