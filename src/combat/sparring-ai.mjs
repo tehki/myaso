@@ -4,6 +4,8 @@ const THREAT_WINDUPS = new Set([
   "attack_windup",
   "attack_left_windup",
   "attack_right_windup",
+  "attack_thrust_windup",
+  "attack_overhead_windup",
   "running_attack_windup",
   "heavy_attack_windup",
   "jump_attack_windup",
@@ -13,6 +15,8 @@ const PUNISHABLE_ACTIONS = new Set([
   "attack_recovery",
   "attack_left_recovery",
   "attack_right_recovery",
+  "attack_thrust_recovery",
+  "attack_overhead_recovery",
   "running_attack_recovery",
   "heavy_attack_recovery",
   "kick_recovery",
@@ -139,7 +143,7 @@ export function createSparringAi() {
       return output;
     }
 
-    const cycle = Math.floor(nowMs / 760) % 4;
+    const cycle = Math.floor(nowMs / 760) % 6;
     if (cycle === 0) {
       // Keep a real lateral strafe active while pressing light so the shared
       // combat model/server selects the matching directional sweep.
@@ -154,6 +158,18 @@ export function createSparringAi() {
       output.jump = true;
       jumpAttackArmed = true;
       nextActionAtMs = nowMs + 780;
+    } else if (cycle === 3) {
+      // Move toward current aim to select the long narrow thrust.
+      output.moveX = nx * 0.72;
+      output.moveY = ny * 0.72;
+      output.attack = true;
+      nextActionAtMs = nowMs + 620;
+    } else if (cycle === 4) {
+      // Move opposite current aim to select the slower overhead strike.
+      output.moveX = -nx * 0.72;
+      output.moveY = -ny * 0.72;
+      output.attack = true;
+      nextActionAtMs = nowMs + 720;
     } else {
       output.heavyAttack = true;
       nextActionAtMs = nowMs + 920;
