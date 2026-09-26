@@ -73,6 +73,13 @@ export const COMBAT = Object.freeze({
     runDrainPerSecond: 24,
     runMoveMultiplier: 1.55,
   }),
+  feint: Object.freeze({
+    lightWindowMs: 70,
+    heavyWindowMs: 160,
+    recoveryMs: 270,
+    staminaCost: 12,
+    moveMultiplier: 0.5,
+  }),
   guard: Object.freeze({
     max: 100,
     regenPerSecond: 24,
@@ -176,6 +183,20 @@ function updateFacing(fighter, input) {
 }
 
 function beginRequestedAction(world, fighter, input) {
+  const feintWindowMs = fighter.action === "attack_windup"
+    ? COMBAT.feint.lightWindowMs
+    : fighter.action === "heavy_attack_windup"
+      ? COMBAT.feint.heavyWindowMs
+      : 0;
+  if (feintWindowMs > 0
+    && input.block
+    && fighter.actionElapsedMs <= feintWindowMs
+    && spendStamina(world, fighter, COMBAT.feint.staminaCost)) {
+    fighter.attackHitTargets.clear();
+    setAction(fighter, "feint_recovery", COMBAT.feint.recoveryMs);
+    return;
+  }
+
   if (fighter.action === "jump" && input.attack && spendStamina(world, fighter, COMBAT.jumpAttack.staminaCost)) {
     fighter.attackHitTargets.clear();
     setAction(fighter, "jump_attack_windup", COMBAT.jumpAttack.windupMs);
@@ -270,6 +291,9 @@ function moveFighter(world, fighter, input, dtMs) {
   } else if (fighter.action === "kick_recovery" || fighter.action === "jump_attack_recovery") {
     velocityX *= 0.42;
     velocityY *= 0.42;
+  } else if (fighter.action === "feint_recovery") {
+    velocityX *= COMBAT.feint.moveMultiplier;
+    velocityY *= COMBAT.feint.moveMultiplier;
   } else if (fighter.action === "stunned") {
     velocityX = 0;
     velocityY = 0;
@@ -334,6 +358,7 @@ function advanceAction(fighter, input, dtMs) {
       setAction(fighter, "jump_attack_recovery", COMBAT.jumpAttack.recoveryMs);
       break;
     case "jump_attack_recovery":
+    case "feint_recovery":
     case "stunned":
       setAction(fighter, "idle", 0);
       break;
