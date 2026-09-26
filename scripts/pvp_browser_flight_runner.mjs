@@ -823,10 +823,11 @@ async function runOnlineUiHeavyParryFlight(entries) {
   // or otherwise resolved makes the attempt terminal and therefore fail-closed.
   for (let attempt = 1; attempt <= 3 && !evidence; attempt += 1) {
     await pulseMovementKey(attacker, "e", 40);
-    // The heavy active transition starts at 320 ms. Arm block at roughly 245 ms
-    // from the real E keydown, leaving about 75 ms of parry age at impact and
-    // enough margin for moderate Chrome/Firefox delivery skew.
-    await sleep(205);
+    // The heavy active transition starts at 320 ms. Arm wheel-back earlier so
+    // the short-block sample reaches authority before the active transition even
+    // under WebDriver/browser delivery skew, while remaining inside the unchanged
+    // 125 ms parry window at impact.
+    await sleep(150);
     let blockHeld = false;
     try {
       await setArenaBlock(defender, defenderElementId, true);
@@ -1268,13 +1269,20 @@ async function runOnlineUiDodgeFeedbackFlight(entries) {
       throw new Error(`M36 retry ${attempt} did not start from clean authoritative vitals: ${JSON.stringify(lastAttemptBaseline)}`);
     }
 
-    await performArenaAttackBurst(attacker, 2);
-    // M24 owns exact dodge reaction timing/geometry. The genuine attack burst finishes
-    // inside one unchanged 135 ms windup. A short fixed pause after that bounded burst
-    // places the real Chrome dodge iframe across the possible active transition without
-    // making this older M36 feedback acceptance depend on the later M54 threat HUD.
-    await sleep(35);
-    await pressArenaPerpendicularDodgeAfterPause(defender, 0);
+    // Deliver one genuine held LMB edge, then start the real wheel-forward roll
+    // early in the unchanged 135 ms windup. Keeping LMB held until after the roll
+    // gesture avoids spending most of the windup inside a multi-click WebDriver burst.
+    // M24 still owns exact reaction geometry; M36 only proves clean authoritative
+    // evade feedback with real browser controls.
+    let attackHeld = false;
+    try {
+      attackHeld = true;
+      await setArenaAttack(attacker, attackerElementId, true, attackOffset);
+      await sleep(20);
+      await pressArenaPerpendicularDodgeAfterPause(defender, 0);
+    } finally {
+      if (attackHeld) await setArenaAttack(attacker, attackerElementId, false, attackOffset);
+    }
     // Keep the iframe/strike resolution window free of evidence polling.
     await sleep(180);
     evidence = await waitForUiDodgeEvidence(entries, attacker, defender, 520, false, lastAttemptBaseline);
