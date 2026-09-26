@@ -629,9 +629,9 @@ function drawWeaponTrail(action) {
     || action === COMBAT_ACTION.jumpAttackActive;
   const radius = heavy ? 44 : running ? 42 : jump ? 40 : 36;
   const sweepOffset = leftSweep
-    ? COMBAT.directionalAttack.arcOffsetRadians
+    ? -COMBAT.directionalAttack.arcOffsetRadians
     : rightSweep
-      ? -COMBAT.directionalAttack.arcOffsetRadians
+      ? COMBAT.directionalAttack.arcOffsetRadians
       : 0;
   const start = (heavy ? -1.05 : running ? -0.54 : jump ? -0.34 : -0.72) + sweepOffset;
   const end = (heavy ? 0.72 : running ? 0.34 : jump ? 0.30 : 0.48) + sweepOffset;
@@ -659,7 +659,7 @@ function drawWeaponTrail(action) {
 function drawDirectionalAttackTell(action, remote) {
   const left = action === COMBAT_ACTION.attackLeftWindup || action === COMBAT_ACTION.attackLeftActive;
   const active = action === COMBAT_ACTION.attackLeftActive || action === COMBAT_ACTION.attackRightActive;
-  const offset = left ? COMBAT.directionalAttack.arcOffsetRadians : -COMBAT.directionalAttack.arcOffsetRadians;
+  const offset = left ? -COMBAT.directionalAttack.arcOffsetRadians : COMBAT.directionalAttack.arcOffsetRadians;
   ctx.save();
   ctx.strokeStyle = active ? "#fae29a" : "#dec67a";
   ctx.fillStyle = active ? "rgba(224, 198, 122, 0.24)" : "rgba(224, 198, 122, 0.11)";
