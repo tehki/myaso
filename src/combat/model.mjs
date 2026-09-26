@@ -23,6 +23,32 @@ export const COMBAT = Object.freeze({
     knockback: 18,
     guardDamage: 38,
   }),
+  thrustAttack: Object.freeze({
+    windupMs: 150,
+    activeMs: 70,
+    recoveryMs: 270,
+    reach: 96,
+    arcRadians: Math.PI * 0.22,
+    damage: 30,
+    knockback: 16,
+    guardDamage: 30,
+    windupMoveMultiplier: 0.55,
+    activeMoveMultiplier: 0.25,
+    recoveryMoveMultiplier: 0.45,
+  }),
+  overheadAttack: Object.freeze({
+    windupMs: 185,
+    activeMs: 85,
+    recoveryMs: 300,
+    reach: 72,
+    arcRadians: Math.PI * 0.36,
+    damage: 38,
+    knockback: 24,
+    guardDamage: 46,
+    windupMoveMultiplier: 0.25,
+    activeMoveMultiplier: 0,
+    recoveryMoveMultiplier: 0.38,
+  }),
   runningAttack: Object.freeze({
     windupMs: 160,
     activeMs: 90,
@@ -213,6 +239,8 @@ function beginRequestedAction(world, fighter, input) {
   const feintWindowMs = fighter.action === "attack_windup"
     || fighter.action === "attack_left_windup"
     || fighter.action === "attack_right_windup"
+    || fighter.action === "attack_thrust_windup"
+    || fighter.action === "attack_overhead_windup"
     ? COMBAT.feint.lightWindowMs
     : fighter.action === "heavy_attack_windup"
       ? COMBAT.feint.heavyWindowMs
@@ -271,10 +299,19 @@ function beginRequestedAction(world, fighter, input) {
   if (input.attack && fighter.action === "idle") {
     fighter.attackHitTargets.clear();
     const lateral = Math.sin(fighter.facing) * input.moveX - Math.cos(fighter.facing) * input.moveY;
-    if (lateral >= COMBAT.directionalAttack.lateralThreshold) {
-      setAction(fighter, "attack_left_windup", COMBAT.directionalAttack.windupMs);
-    } else if (lateral <= -COMBAT.directionalAttack.lateralThreshold) {
-      setAction(fighter, "attack_right_windup", COMBAT.directionalAttack.windupMs);
+    const forward = Math.cos(fighter.facing) * input.moveX + Math.sin(fighter.facing) * input.moveY;
+    const absLateral = Math.abs(lateral);
+    const absForward = Math.abs(forward);
+    if (absLateral >= COMBAT.directionalAttack.lateralThreshold && absLateral >= absForward) {
+      if (lateral >= 0) {
+        setAction(fighter, "attack_left_windup", COMBAT.directionalAttack.windupMs);
+      } else {
+        setAction(fighter, "attack_right_windup", COMBAT.directionalAttack.windupMs);
+      }
+    } else if (forward >= COMBAT.directionalAttack.lateralThreshold) {
+      setAction(fighter, "attack_thrust_windup", COMBAT.thrustAttack.windupMs);
+    } else if (forward <= -COMBAT.directionalAttack.lateralThreshold) {
+      setAction(fighter, "attack_overhead_windup", COMBAT.overheadAttack.windupMs);
     } else {
       setAction(fighter, "attack_windup", COMBAT.attack.windupMs);
     }
@@ -322,6 +359,18 @@ function moveFighter(world, fighter, input, dtMs) {
     || fighter.action === "attack_right_windup") {
     velocityX *= 0.35;
     velocityY *= 0.35;
+  } else if (fighter.action === "attack_thrust_windup") {
+    velocityX *= COMBAT.thrustAttack.windupMoveMultiplier;
+    velocityY *= COMBAT.thrustAttack.windupMoveMultiplier;
+  } else if (fighter.action === "attack_thrust_active") {
+    velocityX *= COMBAT.thrustAttack.activeMoveMultiplier;
+    velocityY *= COMBAT.thrustAttack.activeMoveMultiplier;
+  } else if (fighter.action === "attack_overhead_windup") {
+    velocityX *= COMBAT.overheadAttack.windupMoveMultiplier;
+    velocityY *= COMBAT.overheadAttack.windupMoveMultiplier;
+  } else if (fighter.action === "attack_overhead_active") {
+    velocityX *= COMBAT.overheadAttack.activeMoveMultiplier;
+    velocityY *= COMBAT.overheadAttack.activeMoveMultiplier;
   } else if (fighter.action === "heavy_attack_windup") {
     velocityX *= 0.20;
     velocityY *= 0.20;
@@ -343,6 +392,12 @@ function moveFighter(world, fighter, input, dtMs) {
     || fighter.action === "dodge_recovery") {
     velocityX *= 0.48;
     velocityY *= 0.48;
+  } else if (fighter.action === "attack_thrust_recovery") {
+    velocityX *= COMBAT.thrustAttack.recoveryMoveMultiplier;
+    velocityY *= COMBAT.thrustAttack.recoveryMoveMultiplier;
+  } else if (fighter.action === "attack_overhead_recovery") {
+    velocityX *= COMBAT.overheadAttack.recoveryMoveMultiplier;
+    velocityY *= COMBAT.overheadAttack.recoveryMoveMultiplier;
   } else if (fighter.action === "heavy_attack_recovery") {
     velocityX *= 0.35;
     velocityY *= 0.35;
@@ -403,6 +458,24 @@ function advanceAction(fighter, input, dtMs) {
       setAction(fighter, "attack_right_recovery", COMBAT.directionalAttack.recoveryMs);
       break;
     case "attack_right_recovery":
+      setAction(fighter, "idle", 0);
+      break;
+    case "attack_thrust_windup":
+      setAction(fighter, "attack_thrust_active", COMBAT.thrustAttack.activeMs);
+      break;
+    case "attack_thrust_active":
+      setAction(fighter, "attack_thrust_recovery", COMBAT.thrustAttack.recoveryMs);
+      break;
+    case "attack_thrust_recovery":
+      setAction(fighter, "idle", 0);
+      break;
+    case "attack_overhead_windup":
+      setAction(fighter, "attack_overhead_active", COMBAT.overheadAttack.activeMs);
+      break;
+    case "attack_overhead_active":
+      setAction(fighter, "attack_overhead_recovery", COMBAT.overheadAttack.recoveryMs);
+      break;
+    case "attack_overhead_recovery":
       setAction(fighter, "idle", 0);
       break;
     case "running_attack_windup":
@@ -493,6 +566,12 @@ function attackProfile(action) {
   }
   if (action === "attack_right_active") {
     return { ...COMBAT.directionalAttack, kind: "attack_right", arcOffsetRadians: COMBAT.directionalAttack.arcOffsetRadians };
+  }
+  if (action === "attack_thrust_active") {
+    return { ...COMBAT.thrustAttack, kind: "attack_thrust", arcOffsetRadians: 0 };
+  }
+  if (action === "attack_overhead_active") {
+    return { ...COMBAT.overheadAttack, kind: "attack_overhead", arcOffsetRadians: 0 };
   }
   if (action === "running_attack_active") return { ...COMBAT.runningAttack, kind: "running_attack", arcOffsetRadians: 0 };
   if (action === "heavy_attack_active") return { ...COMBAT.heavyAttack, kind: "heavy", arcOffsetRadians: 0 };
