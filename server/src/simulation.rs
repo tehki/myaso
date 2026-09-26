@@ -124,7 +124,7 @@ impl Action {
             Self::JumpAttackWindup => 16,
             Self::JumpAttackActive => 17,
             Self::JumpAttackRecovery => 18,
-            Self::FeintRecovery => 19,
+            Self::FeintRecovery => 20,
         }
     }
 }
