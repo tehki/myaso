@@ -416,3 +416,61 @@ test("knockdown ignores player movement input until recovery", () => {
   assert.equal(b.facing, fallenFacing);
 
 });
+
+
+test("sprint plus movement plus light attack becomes a stamina-costing running strike", () => {
+  const world = duel({ distance: 200 });
+  const [a] = world.fighters;
+  stepWorld(world, {
+    a: { moveX: 1, run: true, attack: true, aimX: 400, aimY: 200 },
+  }, 5);
+  assert.equal(a.action, "running_attack_windup");
+  assert.equal(a.stamina, COMBAT.stamina.max - COMBAT.runningAttack.staminaCost);
+
+  advance(world, COMBAT.runningAttack.windupMs, {
+    a: { moveX: 1, run: true, aimX: 400, aimY: 200 },
+  });
+  assert.equal(a.action, "running_attack_active");
+
+  advance(world, COMBAT.runningAttack.activeMs, {
+    a: { moveX: 1, run: true, aimX: 400, aimY: 200 },
+  });
+  assert.equal(a.action, "running_attack_recovery");
+
+  advance(world, COMBAT.runningAttack.recoveryMs, {
+    a: { moveX: 1, run: true, aimX: 400, aimY: 200 },
+  });
+  assert.equal(a.action, "idle");
+});
+
+test("running strike converts sprint momentum into longer-range pressure", () => {
+  const runWorld = duel({ distance: 120 });
+  const [runner, runTarget] = runWorld.fighters;
+  const runEvents = advance(
+    runWorld,
+    COMBAT.runningAttack.windupMs + COMBAT.runningAttack.activeMs + 10,
+    { a: { moveX: 1, run: true, attack: true, aimX: runTarget.x, aimY: runTarget.y } },
+  );
+  assert.equal(runTarget.hp, 70);
+  assert.equal(runEvents.find((event) => event.type === "hit")?.damage, 30);
+  assert.ok(runner.x > runner.spawnX);
+
+  const lightWorld = duel({ distance: 120 });
+  const [, lightTarget] = lightWorld.fighters;
+  advance(
+    lightWorld,
+    COMBAT.attack.windupMs + COMBAT.attack.activeMs + 10,
+    { a: { attack: true, aimX: lightTarget.x, aimY: lightTarget.y } },
+  );
+  assert.equal(lightTarget.hp, 100);
+});
+
+test("run without meaningful movement keeps light attack semantics", () => {
+  const world = duel({ distance: 72 });
+  const [a, b] = world.fighters;
+  stepWorld(world, {
+    a: { run: true, attack: true, aimX: b.x, aimY: b.y },
+  }, 5);
+  assert.equal(a.action, "attack_windup");
+  assert.equal(a.stamina, COMBAT.stamina.max);
+});
