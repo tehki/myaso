@@ -20,7 +20,7 @@ export const COMBAT_ACTION = Object.freeze({
   jumpAttackWindup: 16,
   jumpAttackActive: 17,
   jumpAttackRecovery: 18,
-  feintRecovery: 19,
+  feintRecovery: 20,
 });
 
 const PRIORITY = Object.freeze({
