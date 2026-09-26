@@ -277,6 +277,13 @@ jobs:
           node --check web/online-game.mjs
           node --test --test-name-pattern="directional|left sweep|right sweep" tests/combat-model.test.mjs tests/sparring-ai.test.mjs tests/networking.test.mjs tests/m29-combat-readability.test.mjs
 
+      - name: Validate M121 real directional light
+        env:
+          MYASO_PVP_SCENARIO: "uidirectionallight"
+        run: |
+          node --check scripts/pvp_browser_flight_runner.mjs
+          node scripts/pvp_browser_flight_runner.mjs
+
       - name: Validate M106 heavy strike control and readability
         env:
           MYASO_PVP_SCENARIO: "uiheavy"
