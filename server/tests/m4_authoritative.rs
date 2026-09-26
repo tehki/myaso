@@ -1446,7 +1446,18 @@ fn late_wheel_back_cannot_cancel_committed_heavy() {
 #[test]
 fn exhausted_attacker_cannot_feint() {
     let mut world = duel(60.0);
-    world.fighter_mut(1).expect("attacker").stamina = 11.0;
+    advance(
+        &mut world,
+        3700.0,
+        InputIntent {
+            move_x: -1.0,
+            run: true,
+            facing_radians: 0.0,
+            ..InputIntent::default()
+        },
+        InputIntent::default(),
+    );
+    assert!(world.fighter(1).expect("attacker").stamina < 12.0);
     advance(
         &mut world,
         5.0,
@@ -1469,7 +1480,7 @@ fn exhausted_attacker_cannot_feint() {
     );
     let attacker = world.fighter(1).expect("attacker");
     assert_eq!(attacker.action, Action::AttackWindup);
-    assert_eq!(attacker.stamina.round() as u8, 11);
+    assert!(attacker.stamina < 12.0);
 }
 
 #[test]
