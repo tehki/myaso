@@ -22,6 +22,9 @@ export const COMBAT_ACTION = Object.freeze({
   jumpAttackRecovery: 18,
   knockdown: 19,
   feintRecovery: 20,
+  runningAttackWindup: 21,
+  runningAttackActive: 22,
+  runningAttackRecovery: 23,
 });
 
 const PRIORITY = Object.freeze({
@@ -121,6 +124,12 @@ export function combatActionHint(entity) {
       return "Strike active - finish the commitment.";
     case COMBAT_ACTION.attackRecovery:
       return "Recovery - you can be punished now.";
+    case COMBAT_ACTION.runningAttackWindup:
+      return "Running strike committed - forward pressure is readable.";
+    case COMBAT_ACTION.runningAttackActive:
+      return "Running strike active - carry momentum through the hit.";
+    case COMBAT_ACTION.runningAttackRecovery:
+      return "Running strike recovery - the lunge can be punished now.";
     case COMBAT_ACTION.heavyAttackWindup:
       return "Heavy strike committed - the long windup is readable.";
     case COMBAT_ACTION.heavyAttackActive:
@@ -150,6 +159,9 @@ export function opponentRecoveryPresentation(entity) {
   }
   if (entity?.action === COMBAT_ACTION.heavyAttackRecovery) {
     return { visible: true, state: "heavy-attack-recovery", label: "PUNISH", detail: "Heavy recovery" };
+  }
+  if (entity?.action === COMBAT_ACTION.runningAttackRecovery) {
+    return { visible: true, state: "running-attack-recovery", label: "PUNISH", detail: "Running recovery" };
   }
   if (entity?.action === COMBAT_ACTION.dodgeRecovery) {
     return { visible: true, state: "dodge-recovery", label: "PUNISH", detail: "Dodge recovery" };
@@ -201,6 +213,8 @@ export function fighterIdentityPresentation(netId) {
 }
 
 export function fighterThreatPhaseLabel(attacker) {
+  if (attacker?.action === COMBAT_ACTION.runningAttackActive) return "RUNNING STRIKE";
+  if (attacker?.action === COMBAT_ACTION.runningAttackWindup) return "RUNNING WINDUP";
   if (attacker?.action === COMBAT_ACTION.heavyAttackActive) return "HEAVY STRIKE";
   if (attacker?.action === COMBAT_ACTION.heavyAttackWindup) return "HEAVY WINDUP";
   if (attacker?.action === COMBAT_ACTION.attackActive) return "STRIKE";
@@ -244,12 +258,18 @@ export function fighterThreatNetId(state, ownId = 0, summary = null) {
   let secondDistanceSquared = Infinity;
   let threatCount = 0;
   for (const entity of state.values()) {
-    const active = entity?.action === COMBAT_ACTION.attackActive || entity?.action === COMBAT_ACTION.heavyAttackActive;
-    const windup = entity?.action === COMBAT_ACTION.attackWindup || entity?.action === COMBAT_ACTION.heavyAttackWindup;
+    const active = entity?.action === COMBAT_ACTION.attackActive
+      || entity?.action === COMBAT_ACTION.heavyAttackActive
+      || entity?.action === COMBAT_ACTION.runningAttackActive;
+    const windup = entity?.action === COMBAT_ACTION.attackWindup
+      || entity?.action === COMBAT_ACTION.heavyAttackWindup
+      || entity?.action === COMBAT_ACTION.runningAttackWindup;
     const priority = active ? 0 : windup ? 1 : Infinity;
     const profile = entity?.action === COMBAT_ACTION.heavyAttackActive || entity?.action === COMBAT_ACTION.heavyAttackWindup
       ? COMBAT.heavyAttack
-      : COMBAT.attack;
+      : entity?.action === COMBAT_ACTION.runningAttackActive || entity?.action === COMBAT_ACTION.runningAttackWindup
+        ? COMBAT.runningAttack
+        : COMBAT.attack;
     if (!Number.isFinite(priority) || entity.netId === ownId || !Number.isInteger(entity.netId) || entity.netId <= 0
       || !Number.isFinite(entity.x) || !Number.isFinite(entity.y) || !Number.isFinite(entity.facing)) continue;
     const dx = own.x - entity.x;

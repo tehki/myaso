@@ -224,6 +224,9 @@ function setEventText(text) {
 function actionHint() {
   if (player.action === "dead") return "Down. Read the exchange and reset.";
   if (player.action === "attack_windup") return "Committed — your strike is readable now.";
+  if (player.action === "running_attack_windup") return "RUNNING STRIKE — momentum committed; opponents can read the lane.";
+  if (player.action === "running_attack_active") return "RUNNING STRIKE — carry the lunge through contact.";
+  if (player.action === "running_attack_recovery") return "RUNNING RECOVERY — missed lunges are punishable.";
   if (player.action === "heavy_attack_windup") return "Heavy committed — the long tell can be dodged or parried.";
   if (player.action === "attack_recovery") return "Recovery — this is where careless attacks get punished.";
   if (player.action === "heavy_attack_recovery") return "Heavy recovery — you are very punishable now.";
@@ -327,6 +330,7 @@ function drawFighter(fighter, body, shadow) {
   ctx.globalAlpha = dead ? 0.28 : 1;
 
   if (fighter.action === "attack_windup" || fighter.action === "attack_active") drawAttackArc(fighter);
+  if (fighter.action === "running_attack_windup" || fighter.action === "running_attack_active") drawRunningAttackArc(fighter);
   if (fighter.action === "heavy_attack_windup" || fighter.action === "heavy_attack_active") drawHeavyAttackArc(fighter);
   if (fighter.action === "jump_attack_windup" || fighter.action === "jump_attack_active") drawJumpAttackArc(fighter);
   if (fighter.action === "kick_windup" || fighter.action === "kick_active") drawKickArc(fighter);
@@ -359,21 +363,24 @@ function drawFighter(fighter, body, shadow) {
 
 function drawWeaponTrail(action) {
   const light = action === "attack_windup" || action === "attack_active";
+  const running = action === "running_attack_windup" || action === "running_attack_active";
   const heavy = action === "heavy_attack_windup" || action === "heavy_attack_active";
   const jump = action === "jump_attack_windup" || action === "jump_attack_active";
-  if (!light && !heavy && !jump) return;
+  if (!light && !running && !heavy && !jump) return;
 
   const active = action.endsWith("_active");
-  const radius = heavy ? 44 : jump ? 40 : 36;
-  const start = heavy ? -1.05 : jump ? -0.34 : -0.72;
-  const end = heavy ? 0.72 : jump ? 0.30 : 0.48;
+  const radius = heavy ? 44 : running ? 42 : jump ? 40 : 36;
+  const start = heavy ? -1.05 : running ? -0.54 : jump ? -0.34 : -0.72;
+  const end = heavy ? 0.72 : running ? 0.34 : jump ? 0.30 : 0.48;
   ctx.save();
   ctx.strokeStyle = heavy
     ? (active ? "rgba(255, 105, 58, .88)" : "rgba(255, 173, 92, .42)")
+    : running
+      ? (active ? "rgba(113, 214, 255, .92)" : "rgba(126, 193, 222, .42)")
     : jump
       ? (active ? "rgba(255, 150, 72, .9)" : "rgba(255, 195, 102, .42)")
       : (active ? "rgba(238, 219, 160, .82)" : "rgba(214, 195, 148, .34)");
-  ctx.lineWidth = heavy ? 8 : jump ? 6 : 5;
+  ctx.lineWidth = heavy ? 8 : running ? 6 : jump ? 6 : 5;
   ctx.lineCap = "round";
   ctx.beginPath();
   ctx.arc(0, 0, radius, start, end);
@@ -397,6 +404,29 @@ function drawAttackArc(fighter) {
   ctx.arc(0, 0, COMBAT.attack.reach + COMBAT.fighterRadius, -COMBAT.attack.arcRadians / 2, COMBAT.attack.arcRadians / 2);
   ctx.closePath();
   ctx.fill();
+}
+
+function drawRunningAttackArc(fighter) {
+  const progress = fighter.action === "running_attack_windup"
+    ? fighter.actionElapsedMs / COMBAT.runningAttack.windupMs
+    : 1;
+  const active = fighter.action === "running_attack_active";
+  const alpha = active ? 0.28 : 0.08 + Math.min(1, progress) * 0.14;
+  ctx.fillStyle = `rgba(92, 190, 228, ${alpha})`;
+  ctx.strokeStyle = active ? "rgba(113, 214, 255, .95)" : "rgba(126, 193, 222, .72)";
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.moveTo(0, 0);
+  ctx.arc(
+    0,
+    0,
+    COMBAT.runningAttack.reach + COMBAT.fighterRadius,
+    -COMBAT.runningAttack.arcRadians / 2,
+    COMBAT.runningAttack.arcRadians / 2,
+  );
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
 }
 
 function drawHeavyAttackArc(fighter) {

@@ -1602,3 +1602,57 @@ fn wilds_knockdown_is_distinct_from_parry_and_guard_break_stun() {
         Action::Stunned
     );
 }
+
+#[test]
+fn running_attack_converts_sprint_momentum_into_authoritative_pressure() {
+    let mut world = duel(120.0);
+    let events = advance(
+        &mut world,
+        270.0,
+        InputIntent {
+            move_x: 1.0,
+            attack: true,
+            run: true,
+            facing_radians: 0.0,
+            ..InputIntent::default()
+        },
+        InputIntent::default(),
+    );
+    let attacker = world.fighter(1).expect("attacker");
+    let target = world.fighter(2).expect("target");
+    assert!(attacker.x > 200.0);
+    assert_eq!(attacker.stamina.round() as u8, 90);
+    assert_eq!(target.hp.round() as u8, 70);
+    assert!(events.iter().any(|event| matches!(
+        event,
+        CombatEvent::Hit {
+            attacker: 1,
+            target: 2,
+            damage: 30,
+            hp: 70,
+        }
+    )));
+}
+
+#[test]
+fn running_attack_requires_meaningful_movement_and_uses_distinct_wire_states() {
+    let mut world = duel(72.0);
+    advance(
+        &mut world,
+        5.0,
+        InputIntent {
+            attack: true,
+            run: true,
+            facing_radians: 0.0,
+            ..InputIntent::default()
+        },
+        InputIntent::default(),
+    );
+    assert_eq!(
+        world.fighter(1).expect("attacker").action,
+        Action::AttackWindup
+    );
+    assert_eq!(Action::RunningAttackWindup.wire_code(), 21);
+    assert_eq!(Action::RunningAttackActive.wire_code(), 22);
+    assert_eq!(Action::RunningAttackRecovery.wire_code(), 23);
+}

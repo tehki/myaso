@@ -16,6 +16,18 @@ const ATTACK_REACH: f32 = 76.0;
 const ATTACK_ARC_RADIANS: f32 = std::f32::consts::PI * 0.78;
 const ATTACK_DAMAGE: f32 = 34.0;
 const ATTACK_KNOCKBACK: f32 = 18.0;
+const RUNNING_ATTACK_WINDUP_MS: f32 = 160.0;
+const RUNNING_ATTACK_ACTIVE_MS: f32 = 90.0;
+const RUNNING_ATTACK_RECOVERY_MS: f32 = 310.0;
+const RUNNING_ATTACK_REACH: f32 = 92.0;
+const RUNNING_ATTACK_ARC_RADIANS: f32 = std::f32::consts::PI * 0.58;
+const RUNNING_ATTACK_DAMAGE: f32 = 30.0;
+const RUNNING_ATTACK_KNOCKBACK: f32 = 22.0;
+const RUNNING_ATTACK_GUARD_DAMAGE: f32 = 34.0;
+const RUNNING_ATTACK_STAMINA_COST: f32 = 10.0;
+const RUNNING_ATTACK_WINDUP_MOVE_MULTIPLIER: f32 = 0.9;
+const RUNNING_ATTACK_ACTIVE_MOVE_MULTIPLIER: f32 = 0.6;
+const RUNNING_ATTACK_RECOVERY_MOVE_MULTIPLIER: f32 = 0.42;
 const HEAVY_ATTACK_WINDUP_MS: f32 = 320.0;
 const HEAVY_ATTACK_ACTIVE_MS: f32 = 100.0;
 const HEAVY_ATTACK_RECOVERY_MS: f32 = 420.0;
@@ -97,6 +109,9 @@ pub enum Action {
     JumpAttackActive,
     JumpAttackRecovery,
     FeintRecovery,
+    RunningAttackWindup,
+    RunningAttackActive,
+    RunningAttackRecovery,
     Block,
     Stunned,
     Knockdown,
@@ -127,6 +142,9 @@ impl Action {
             Self::JumpAttackRecovery => 18,
             Self::Knockdown => 19,
             Self::FeintRecovery => 20,
+            Self::RunningAttackWindup => 21,
+            Self::RunningAttackActive => 22,
+            Self::RunningAttackRecovery => 23,
         }
     }
 }
@@ -528,6 +546,18 @@ fn begin_requested_action(now_ms: f32, fighter: &mut Fighter, input: InputIntent
         return;
     }
 
+    let moving = input.move_x.hypot(input.move_y) >= 0.5;
+    if input.attack
+        && input.run
+        && moving
+        && fighter.action == Action::Idle
+        && spend_stamina(now_ms, fighter, RUNNING_ATTACK_STAMINA_COST)
+    {
+        fighter.attack_hit_targets.clear();
+        fighter.set_action(Action::RunningAttackWindup, RUNNING_ATTACK_WINDUP_MS);
+        return;
+    }
+
     if input.heavy_attack && fighter.action == Action::Idle {
         fighter.attack_hit_targets.clear();
         fighter.set_action(Action::HeavyAttackWindup, HEAVY_ATTACK_WINDUP_MS);
@@ -590,6 +620,14 @@ fn move_fighter(width: f32, height: f32, fighter: &mut Fighter, input: InputInte
             velocity_x *= 0.35;
             velocity_y *= 0.35;
         }
+        Action::RunningAttackWindup => {
+            velocity_x *= RUNNING_ATTACK_WINDUP_MOVE_MULTIPLIER;
+            velocity_y *= RUNNING_ATTACK_WINDUP_MOVE_MULTIPLIER;
+        }
+        Action::RunningAttackActive => {
+            velocity_x *= RUNNING_ATTACK_ACTIVE_MOVE_MULTIPLIER;
+            velocity_y *= RUNNING_ATTACK_ACTIVE_MOVE_MULTIPLIER;
+        }
         Action::HeavyAttackWindup => {
             velocity_x *= 0.20;
             velocity_y *= 0.20;
@@ -605,6 +643,10 @@ fn move_fighter(width: f32, height: f32, fighter: &mut Fighter, input: InputInte
         Action::HeavyAttackRecovery => {
             velocity_x *= 0.35;
             velocity_y *= 0.35;
+        }
+        Action::RunningAttackRecovery => {
+            velocity_x *= RUNNING_ATTACK_RECOVERY_MOVE_MULTIPLIER;
+            velocity_y *= RUNNING_ATTACK_RECOVERY_MOVE_MULTIPLIER;
         }
         Action::KickRecovery | Action::JumpAttackRecovery => {
             velocity_x *= 0.42;
@@ -651,6 +693,13 @@ fn advance_action(fighter: &mut Fighter, input: InputIntent, dt_ms: f32) {
         Action::AttackWindup => fighter.set_action(Action::AttackActive, ATTACK_ACTIVE_MS),
         Action::AttackActive => fighter.set_action(Action::AttackRecovery, ATTACK_RECOVERY_MS),
         Action::AttackRecovery => fighter.set_action(Action::Idle, 0.0),
+        Action::RunningAttackWindup => {
+            fighter.set_action(Action::RunningAttackActive, RUNNING_ATTACK_ACTIVE_MS)
+        }
+        Action::RunningAttackActive => {
+            fighter.set_action(Action::RunningAttackRecovery, RUNNING_ATTACK_RECOVERY_MS)
+        }
+        Action::RunningAttackRecovery => fighter.set_action(Action::Idle, 0.0),
         Action::HeavyAttackWindup => {
             fighter.set_action(Action::HeavyAttackActive, HEAVY_ATTACK_ACTIVE_MS)
         }
@@ -797,6 +846,15 @@ fn attack_profile(action: Action) -> Option<AttackProfile> {
             damage: ATTACK_DAMAGE,
             knockback: ATTACK_KNOCKBACK,
             guard_damage: BLOCK_GUARD_DAMAGE,
+            guard_break_stun_ms: BLOCK_GUARD_BREAK_STUN_MS,
+            kick: false,
+        }),
+        Action::RunningAttackActive => Some(AttackProfile {
+            reach: RUNNING_ATTACK_REACH,
+            arc_radians: RUNNING_ATTACK_ARC_RADIANS,
+            damage: RUNNING_ATTACK_DAMAGE,
+            knockback: RUNNING_ATTACK_KNOCKBACK,
+            guard_damage: RUNNING_ATTACK_GUARD_DAMAGE,
             guard_break_stun_ms: BLOCK_GUARD_BREAK_STUN_MS,
             kick: false,
         }),
