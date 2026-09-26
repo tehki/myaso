@@ -353,6 +353,84 @@ test("being parried emits a distinct authoritative feedback cue", () => {
   assert.match(event.text, /Parried/);
 });
 
+test("authoritative kick stun emits distinct shove impact feedback", () => {
+  const tracker = createCombatReadabilityTracker();
+  tracker.observe(
+    state(
+      fighter(1, 100, 100, COMBAT_ACTION.kickActive),
+      fighter(2, 100, 100, COMBAT_ACTION.idle),
+    ),
+    1,
+  );
+  const event = tracker.observe(
+    state(
+      fighter(1, 100, 100, COMBAT_ACTION.kickRecovery),
+      fighter(2, 100, 100, COMBAT_ACTION.stunned),
+    ),
+    1,
+  );
+  assert.equal(event.kind, "controlImpact");
+  assert.equal(event.feedback, "kick-confirm");
+  assert.match(event.text, /Shove landed/);
+});
+
+test("authoritative roll collision emits distinct knockdown impact feedback", () => {
+  const tracker = createCombatReadabilityTracker();
+  tracker.observe(
+    state(
+      fighter(1, 100, 100, COMBAT_ACTION.dodge),
+      fighter(2, 100, 100, COMBAT_ACTION.idle),
+    ),
+    1,
+  );
+  const event = tracker.observe(
+    state(
+      fighter(1, 100, 100, COMBAT_ACTION.dodgeRecovery),
+      fighter(2, 100, 100, COMBAT_ACTION.stunned),
+    ),
+    1,
+  );
+  assert.equal(event.kind, "controlImpact");
+  assert.equal(event.feedback, "roll-impact");
+  assert.match(event.text, /Roll collision/);
+});
+
+test("being shoved or rolled over has distinct local impact feedback", () => {
+  const kickTracker = createCombatReadabilityTracker();
+  kickTracker.observe(
+    state(
+      fighter(1, 100, 100, COMBAT_ACTION.idle),
+      fighter(2, 100, 100, COMBAT_ACTION.kickActive),
+    ),
+    1,
+  );
+  const shoved = kickTracker.observe(
+    state(
+      fighter(1, 100, 100, COMBAT_ACTION.stunned),
+      fighter(2, 100, 100, COMBAT_ACTION.kickRecovery),
+    ),
+    1,
+  );
+  assert.equal(shoved.feedback, "shoved");
+
+  const rollTracker = createCombatReadabilityTracker();
+  rollTracker.observe(
+    state(
+      fighter(1, 100, 100, COMBAT_ACTION.idle),
+      fighter(2, 100, 100, COMBAT_ACTION.dodge),
+    ),
+    1,
+  );
+  const rolled = rollTracker.observe(
+    state(
+      fighter(1, 100, 100, COMBAT_ACTION.stunned),
+      fighter(2, 100, 100, COMBAT_ACTION.dodgeRecovery),
+    ),
+    1,
+  );
+  assert.equal(rolled.feedback, "rolled-over");
+});
+
 test("authoritative threatening strike avoided by own dodge emits dodge-success", () => {
   const tracker = createCombatReadabilityTracker();
   tracker.observe(state(fighter(2, 100, 100, COMBAT_ACTION.dodge, 80), fighter(1, 100, 100, COMBAT_ACTION.attackActive, 0, 0, 0)), 2);

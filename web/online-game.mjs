@@ -1,4 +1,5 @@
 import { createFrameBudget } from "../src/browser/frame-budget.mjs";
+import { createCombatImpactController } from "../src/browser/combat-impact.mjs";
 import { COMBAT_ACTION, blockSpatialPresentation, combatActionHint, combatOverlayPresentation, createCombatReadabilityTracker, createRemoteDamageTracker, fighterFocusNetId, fighterIdentityPresentation, fighterThreatBearingLabel, fighterThreatGuardArcLabel, fighterThreatNetId, fighterThreatPhaseLabel, fighterMatchPresentation, fighterScoreboardPresentation, fighterVitalsPresentation, guardBreakSpatialPresentation, killFeedPresentation, opponentRecoveryPresentation, parrySpatialPresentation } from "../src/browser/combat-readability.mjs";
 import { COMBAT } from "../src/combat/model.mjs";
 import { reconcilePrediction } from "../src/browser/reconciliation.mjs";
@@ -58,6 +59,7 @@ const threatCue = {
 };
 const threatScan = { count: 0, secondaryNetId: 0 };
 const combatReadability = createCombatReadabilityTracker();
+const combatImpact = createCombatImpactController();
 const remoteDamage = createRemoteDamageTracker();
 let networkStatus = "Connecting to authoritative server...";
 let combatMessage = null;
@@ -230,6 +232,7 @@ function clearKillFeed() {
 
 function showCombatFeedback(feedback) {
   if (!feedback || !arenaStage) return;
+  combatImpact.trigger(feedback, performance.now());
   if (combatFeedbackTimer) clearTimeout(combatFeedbackTimer);
   delete arenaStage.dataset.combatFeedback;
   void arenaStage.offsetWidth;
@@ -350,9 +353,15 @@ function restoreAuthoritative(own) {
   local.initialized = true;
 }
 
-function render(nowMs = performance.now()) {
+function render(nowMs = performance.now(), impact = combatImpact.sample(nowMs)) {
+  ctx.save();
+  ctx.translate(impact.shakeX, impact.shakeY);
   ctx.drawImage(arenaLayer, 0, 0);
-  if (!networkClient) return;
+  if (!networkClient) {
+    ctx.restore();
+    drawImpactBurst(impact);
+    return;
+  }
   const ownId = networkClient.playerNetId;
   if (ownId && !local.initialized) {
     const own = networkClient.state.get(ownId);
@@ -377,6 +386,56 @@ function render(nowMs = performance.now()) {
   if (ownId && local.initialized) drawFighterScreen(canvas.width / 2, canvas.height / 2, local, "#e2d5b4", "#51452d");
   updateHud(ownId);
   drawThreatMarkers();
+  ctx.restore();
+  drawImpactBurst(impact);
+}
+
+function drawImpactBurst(impact) {
+  if (!impact?.active || impact.rays <= 0) return;
+  const feedback = impact.feedback;
+  const remoteOwned = feedback === "hit-confirm"
+    || feedback === "block-confirm"
+    || feedback === "guard-break-confirm"
+    || feedback === "kick-confirm"
+    || feedback === "roll-impact"
+    || feedback === "dodge-evaded";
+  let x = canvas.width / 2;
+  let y = canvas.height / 2;
+  if (remoteOwned && networkClient?.playerNetId) {
+    const focusNetId = fighterFocusNetId(networkClient.state, networkClient.playerNetId);
+    const focus = focusNetId ? networkClient.state.get(focusNetId) : null;
+    if (focus && local.initialized) {
+      x += focus.x - local.x;
+      y += focus.y - local.y;
+    }
+  }
+
+  const radius = 18 + impact.progress * 42;
+  const alpha = Math.max(0, (1 - impact.progress) * 0.9);
+  const parry = feedback === "parry-success" || feedback === "parried";
+  const guard = feedback === "guard-pressure" || feedback === "block-confirm"
+    || feedback === "guard-broken" || feedback === "guard-break-confirm";
+  const roll = feedback === "roll-impact" || feedback === "rolled-over"
+    || feedback === "dodge-success" || feedback === "dodge-evaded";
+  const tone = parry ? "174, 209, 147" : guard ? "224, 187, 91" : roll ? "150, 194, 190" : "255, 170, 104";
+
+  ctx.save();
+  ctx.strokeStyle = `rgba(${tone}, ${alpha})`;
+  ctx.lineWidth = 2.5;
+  for (let i = 0; i < impact.rays; i += 1) {
+    const angle = (i / impact.rays) * Math.PI * 2 + impact.progress * 0.45;
+    const inner = radius * 0.42;
+    const outer = radius;
+    ctx.beginPath();
+    ctx.moveTo(x + Math.cos(angle) * inner, y + Math.sin(angle) * inner);
+    ctx.lineTo(x + Math.cos(angle) * outer, y + Math.sin(angle) * outer);
+    ctx.stroke();
+  }
+  ctx.fillStyle = `rgba(${tone}, ${impact.flashAlpha})`;
+  ctx.beginPath();
+  ctx.arc(x, y, Math.max(4, radius * 0.34), 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
 }
 
 function drawThreatMarkers() {
@@ -449,6 +508,7 @@ function drawFighterScreen(x, y, fighter, body, shadow, remote = false, damageTe
   if (action === COMBAT_ACTION.heavyAttackWindup || action === COMBAT_ACTION.heavyAttackActive) drawHeavyAttackTell(action, remote);
   if (action === COMBAT_ACTION.jumpAttackWindup || action === COMBAT_ACTION.jumpAttackActive) drawJumpAttackTell(action, remote);
   if (action === COMBAT_ACTION.kickWindup || action === COMBAT_ACTION.kickActive) drawKickTell(action);
+  drawWeaponTrail(action);
   if (action === COMBAT_ACTION.block) drawBlockTell(remote, fighter);
   if (action === COMBAT_ACTION.dodge) drawDodgeTell(remote);
   if (action === COMBAT_ACTION.stunned) drawStunTell();
@@ -527,6 +587,37 @@ function drawAttackTell(action, remote) {
     ctx.setLineDash([8, 5]);
     ctx.stroke();
   }
+}
+
+function drawWeaponTrail(action) {
+  const light = action === COMBAT_ACTION.attackWindup || action === COMBAT_ACTION.attackActive;
+  const heavy = action === COMBAT_ACTION.heavyAttackWindup || action === COMBAT_ACTION.heavyAttackActive;
+  const jump = action === COMBAT_ACTION.jumpAttackWindup || action === COMBAT_ACTION.jumpAttackActive;
+  if (!light && !heavy && !jump) return;
+
+  const active = action === COMBAT_ACTION.attackActive
+    || action === COMBAT_ACTION.heavyAttackActive
+    || action === COMBAT_ACTION.jumpAttackActive;
+  const radius = heavy ? 44 : jump ? 40 : 36;
+  const start = heavy ? -1.05 : jump ? -0.34 : -0.72;
+  const end = heavy ? 0.72 : jump ? 0.30 : 0.48;
+  ctx.save();
+  ctx.strokeStyle = heavy
+    ? (active ? "rgba(255, 105, 58, .88)" : "rgba(255, 173, 92, .42)")
+    : jump
+      ? (active ? "rgba(255, 150, 72, .9)" : "rgba(255, 195, 102, .42)")
+      : (active ? "rgba(238, 219, 160, .82)" : "rgba(214, 195, 148, .34)");
+  ctx.lineWidth = heavy ? 8 : jump ? 6 : 5;
+  ctx.lineCap = "round";
+  ctx.beginPath();
+  ctx.arc(0, 0, radius, start, end);
+  ctx.stroke();
+  ctx.globalAlpha = 0.34;
+  ctx.lineWidth *= 1.75;
+  ctx.beginPath();
+  ctx.arc(0, 0, radius - 4, start + 0.10, end - 0.08);
+  ctx.stroke();
+  ctx.restore();
 }
 
 function drawHeavyAttackTell(action, remote) {
@@ -897,7 +988,13 @@ function createArenaLayer() {
 function frame(now) {
   if (document.hidden) return;
   frameBudget.advance(now, simulatePrediction);
-  render(now);
+  const impact = combatImpact.sample(now);
+  if (impact.freeze) {
+    const ownId = networkClient?.playerNetId;
+    if (ownId) updateHud(ownId);
+  } else {
+    render(now, impact);
+  }
   animationFrameId = requestAnimationFrame(frame);
 }
 

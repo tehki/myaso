@@ -26,6 +26,7 @@ const PRIORITY = Object.freeze({
   death: 100,
   respawn: 90,
   guardBreak: 80,
+  controlImpact: 75,
   parry: 70,
   dodge: 65,
   block: 60,
@@ -55,6 +56,7 @@ export function createCombatReadabilityTracker() {
         if (before) collectEntityEvents(candidates, before, entity, false);
       }
       if (own && beforeOwn && peer && beforePeer) {
+        collectControlImpactEvents(candidates, beforeOwn, own, beforePeer, peer);
         collectParryEvents(candidates, beforeOwn, own, beforePeer, peer);
       }
       pendingDodge = own && peer
@@ -384,6 +386,44 @@ function collectEntityEvents(events, before, current, own) {
   if (before.action !== COMBAT_ACTION.stunned && current.action === COMBAT_ACTION.stunned) {
     push(events, "stun", own ? "Stunned - the opponent earned a punish window." : "Opponent stunned - punish window open.", 760);
   }
+}
+
+function collectControlImpactEvents(events, beforeOwn, own, beforePeer, peer) {
+  const ownJustStunned = beforeOwn.action !== COMBAT_ACTION.stunned
+    && own.action === COMBAT_ACTION.stunned
+    && own.hp === beforeOwn.hp
+    && own.guard === beforeOwn.guard;
+  const peerJustStunned = beforePeer.action !== COMBAT_ACTION.stunned
+    && peer.action === COMBAT_ACTION.stunned
+    && peer.hp === beforePeer.hp
+    && peer.guard === beforePeer.guard;
+
+  const ownKick = isKickAction(own.action) || isKickAction(beforeOwn.action);
+  const peerKick = isKickAction(peer.action) || isKickAction(beforePeer.action);
+  const ownRoll = isRollAction(own.action) || isRollAction(beforeOwn.action);
+  const peerRoll = isRollAction(peer.action) || isRollAction(beforePeer.action);
+
+  if (ownJustStunned && peerKick) {
+    push(events, "controlImpact", "Shoved - knocked down.", 760, "shoved");
+  } else if (ownJustStunned && peerRoll) {
+    push(events, "controlImpact", "Rolled over - knocked down.", 720, "rolled-over");
+  }
+
+  if (peerJustStunned && ownKick) {
+    push(events, "controlImpact", "Shove landed - punish the knockdown.", 760, "kick-confirm");
+  } else if (peerJustStunned && ownRoll) {
+    push(events, "controlImpact", "Roll collision - opponent knocked down.", 720, "roll-impact");
+  }
+}
+
+function isKickAction(action) {
+  return action === COMBAT_ACTION.kickWindup
+    || action === COMBAT_ACTION.kickActive
+    || action === COMBAT_ACTION.kickRecovery;
+}
+
+function isRollAction(action) {
+  return action === COMBAT_ACTION.dodge || action === COMBAT_ACTION.dodgeRecovery;
 }
 
 function collectParryEvents(events, beforeOwn, own, beforePeer, peer) {

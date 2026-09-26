@@ -3713,9 +3713,13 @@ function assertPairedResults(results) {
       if (result.minDefenderHp !== 100 || result.minDefenderGuard !== 100) {
         throw new Error(`${result.browser} defender paid HP/guard cost during dodge: ${JSON.stringify(result)}`);
       }
-      if (result.defenderBlockSeen || result.attackerStunnedSeen) {
-        throw new Error(`${result.browser} dodge scenario accidentally resolved as block/parry`);
+      if (result.defenderBlockSeen || Number.isFinite(result.firstParryMs)) {
+        throw new Error(`${result.browser} roll scenario accidentally resolved as block/parry`);
       }
+      // A pointer-directed roll may now collide with the attacker and apply the
+      // intended short knockdown stun. Do not treat attackerStunnedSeen as a
+      // parry signal; the verified dodge overlap and zero defender HP/guard cost
+      // remain the authoritative success conditions.
       if (!Number.isFinite(result.firstDodgeEvadeMs) || !Number.isFinite(result.dodgeOverlapDistance) || !Number.isFinite(result.dodgeOverlapArcDelta)) {
         throw new Error(`${result.browser} did not record verified dodge geometry/timing`);
       }
