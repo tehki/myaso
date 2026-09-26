@@ -270,7 +270,7 @@ function beginRequestedAction(world, fighter, input) {
 
   if (input.attack && fighter.action === "idle") {
     fighter.attackHitTargets.clear();
-    const lateral = -Math.sin(fighter.facing) * input.moveX + Math.cos(fighter.facing) * input.moveY;
+    const lateral = Math.sin(fighter.facing) * input.moveX - Math.cos(fighter.facing) * input.moveY;
     if (lateral >= COMBAT.directionalAttack.lateralThreshold) {
       setAction(fighter, "attack_left_windup", COMBAT.directionalAttack.windupMs);
     } else if (lateral <= -COMBAT.directionalAttack.lateralThreshold) {
@@ -489,10 +489,10 @@ function separateFighters(world) {
 function attackProfile(action) {
   if (action === "attack_active") return { ...COMBAT.attack, kind: "attack", arcOffsetRadians: 0 };
   if (action === "attack_left_active") {
-    return { ...COMBAT.directionalAttack, kind: "attack_left", arcOffsetRadians: COMBAT.directionalAttack.arcOffsetRadians };
+    return { ...COMBAT.directionalAttack, kind: "attack_left", arcOffsetRadians: -COMBAT.directionalAttack.arcOffsetRadians };
   }
   if (action === "attack_right_active") {
-    return { ...COMBAT.directionalAttack, kind: "attack_right", arcOffsetRadians: -COMBAT.directionalAttack.arcOffsetRadians };
+    return { ...COMBAT.directionalAttack, kind: "attack_right", arcOffsetRadians: COMBAT.directionalAttack.arcOffsetRadians };
   }
   if (action === "running_attack_active") return { ...COMBAT.runningAttack, kind: "running_attack", arcOffsetRadians: 0 };
   if (action === "heavy_attack_active") return { ...COMBAT.heavyAttack, kind: "heavy", arcOffsetRadians: 0 };
