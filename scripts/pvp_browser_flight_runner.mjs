@@ -2860,7 +2860,10 @@ async function performArenaDirectionalLight(session, elementId, strafeKey, xOffs
         id: `keyboard-${session.name}`,
         actions: [
           { type: "keyDown", value: strafeKey },
-          { type: "pause", duration: 220 },
+          { type: "pause", duration: 0 },
+          { type: "pause", duration: 0 },
+          { type: "pause", duration: 0 },
+          { type: "pause", duration: 0 },
           { type: "keyUp", value: strafeKey },
         ],
       },
@@ -2890,8 +2893,14 @@ async function performArenaRunningAttack(session, elementId, movementKey, xOffse
         id: `keyboard-${session.name}`,
         actions: [
           { type: "keyDown", value: movementKey },
-          { type: "pause", duration: 620 },
+          { type: "pause", duration: 0 },
+          { type: "pause", duration: 0 },
+          { type: "pause", duration: 0 },
+          { type: "pause", duration: 0 },
+          { type: "pause", duration: 0 },
+          { type: "pause", duration: 0 },
           { type: "keyUp", value: movementKey },
+          { type: "pause", duration: 0 },
         ],
       },
       {
