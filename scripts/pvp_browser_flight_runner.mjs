@@ -930,9 +930,11 @@ async function runOnlineUiHeavyDodgeFlight(entries) {
   // 125 ms iframe spans the ~320 ms heavy active transition, but early enough
   // to move off the strike lane. No combat constants are altered.
   // UI observation plus WebDriver dispatch already costs substantial time on
-  // CI. Dispatch wheel-forward immediately after the observed commitment so the
-  // pointer-directed roll has enough spatial travel to clear the heavy strike
-  // lane; the unchanged 125 ms authoritative iframe still owns hit avoidance.
+  // CI. Current evidence places an immediate wheel about 130 ms after commit,
+  // which makes the unchanged 125 ms iframe expire before the ~320 ms heavy
+  // active transition. Add a bounded 100 ms pause after observation so the real
+  // wheel-forward roll overlaps contact while preserving all combat constants.
+  await sleep(100);
   await pressArenaPerpendicularDodgeAfterPause(defender, 0);
   // Let active -> recovery resolve without evidence polling inside the iframe.
   await sleep(360);
