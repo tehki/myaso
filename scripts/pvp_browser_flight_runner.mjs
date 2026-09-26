@@ -1663,17 +1663,19 @@ async function runOnlineUiHeavyGuardBreakPunishFlight(entries) {
     entry.visible && (entry.phase === "WINDUP" || entry.phase === "STRIKE")).length;
 
   // Time genuine clicks from the accepted second-heavy request rather than from
-  // a remote recovery snapshot. Downs are centered tightly around the unchanged
-  // 840 ms heavy commitment boundary. The first may be ignored just before Idle;
-  // the following downs cross that boundary without spending the 185 ms punish
-  // margin on WebDriver/snapshot observation latency.
+  // a remote recovery snapshot. Authoritative input ingress and browser scheduling
+  // can shift the actual Idle boundary relative to the local issuance timestamp,
+  // so sample a bounded ~300 ms window around the unchanged 840 ms commitment.
+  // Only the first accepted click can start the light; subsequent clicks occur
+  // during its own commitment and are ignored. Exact-one-hit validation below
+  // remains fail-closed.
   const elapsedSinceHeavyIssue = Date.now() - secondHeavyIssuedAt;
-  const firstClickTargetMs = 835;
+  const firstClickTargetMs = 800;
   const initialPauseMs = Math.max(0, firstClickTargetMs - elapsedSinceHeavyIssue);
   // The in-page observer timestamps both event-text and overlay mutations. That
   // provides stronger ordering evidence than repeated WebDriver reads and does
   // not perturb Firefox while the real Chrome action sequence is executing.
-  await performArenaAttackBurst(attacker, 3, initialPauseMs, 12);
+  await performArenaAttackBurst(attacker, 9, initialPauseMs, 20);
 
   const attackerDeadline = Date.now() + 260;
   let attackerResult = null;
@@ -2721,7 +2723,7 @@ async function performArenaAttackBurst(session, clickCount = 3, initialPauseMs =
   const boundedPauseMs = Math.max(0, Math.min(1000, Math.trunc(initialPauseMs)));
   const boundedInterClickPauseMs = Math.max(0, Math.min(100, Math.trunc(interClickPauseMs)));
   if (boundedPauseMs > 0) actions.push({ type: "pause", duration: boundedPauseMs });
-  const boundedClickCount = Math.max(1, Math.min(3, Math.trunc(clickCount)));
+  const boundedClickCount = Math.max(1, Math.min(9, Math.trunc(clickCount)));
   for (let index = 0; index < boundedClickCount; index += 1) {
     actions.push({ type: "pointerDown", button: 0 });
     actions.push({ type: "pause", duration: 10 });
