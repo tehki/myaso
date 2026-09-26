@@ -1232,13 +1232,33 @@ async function runOnlineUiHeavyWhiffPunishFlight(entries) {
   if (!recoveryObserved) {
     throw new Error(`M109 defender never observed live punishable heavy recovery after bounded clean latch retries: ${JSON.stringify(lastMiss)}`);
   }
-  // Once the tell is visible, the short real close plus light windup still lands
-  // inside the unchanged 420 ms heavy recovery.
-  await pulseMovementKey(defender, punishMoveKey, 160);
-  await sleep(20);
-  await aimArena(defender, defenderElementId, punishOffset);
-  await performArenaAttackBurst(defender, 2);
-  await sleep(320);
+  // Start the genuine light while the closing movement is still held instead
+  // of serializing 160 ms of movement before LMB. The old sequence could spend
+  // ~320 ms of the unchanged 420 ms recovery on WebDriver calls before the
+  // 135 ms light windup even began. This keeps the same real movement + LMB
+  // proof while starting the punish near the observed recovery edge.
+  let punishMoveHeld = false;
+  let punishAttackHeld = false;
+  try {
+    await setMovementKey(defender, punishMoveKey, true);
+    punishMoveHeld = true;
+    await aimArena(defender, defenderElementId, punishOffset);
+    await sleep(35);
+    await setArenaAttack(defender, defenderElementId, true, punishOffset);
+    punishAttackHeld = true;
+    await sleep(35);
+    await setArenaAttack(defender, defenderElementId, false, punishOffset);
+    punishAttackHeld = false;
+    await sleep(80);
+  } finally {
+    if (punishAttackHeld) {
+      await setArenaAttack(defender, defenderElementId, false, punishOffset);
+    }
+    if (punishMoveHeld) {
+      await setMovementKey(defender, punishMoveKey, false);
+    }
+  }
+  await sleep(260);
 
   const evidence = await Promise.all(entries.map(readUiEvidence));
   const attackerResult = evidence.find((entry) => entry.browser === attacker.name);
