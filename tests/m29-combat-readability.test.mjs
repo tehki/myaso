@@ -601,6 +601,7 @@ test("authoritative action hints explain light and heavy commitment windows", ()
   assert.match(combatActionHint(fighter(1, 100, 100, COMBAT_ACTION.attackRecovery)), /Recovery/);
   assert.match(combatActionHint(fighter(1, 100, 100, COMBAT_ACTION.heavyAttackWindup)), /Heavy strike committed/);
   assert.match(combatActionHint(fighter(1, 100, 100, COMBAT_ACTION.heavyAttackRecovery)), /Heavy recovery/);
+  assert.match(combatActionHint(fighter(1, 100, 100, COMBAT_ACTION.feintRecovery)), /Feint recovery/);
   assert.match(combatActionHint(fighter(1, 100, 100, COMBAT_ACTION.block)), /Blocking/);
   assert.equal(combatActionHint(fighter(1)), null);
 });
@@ -614,6 +615,9 @@ test("authoritative opponent recovery exposes a bounded punish cue", () => {
   });
   assert.deepEqual(opponentRecoveryPresentation(fighter(2, 100, 100, COMBAT_ACTION.dodgeRecovery)), {
     visible: true, state: "dodge-recovery", label: "PUNISH", detail: "Dodge recovery",
+  });
+  assert.deepEqual(opponentRecoveryPresentation(fighter(2, 100, 100, COMBAT_ACTION.feintRecovery)), {
+    visible: true, state: "feint-recovery", label: "PUNISH", detail: "Feint recovery",
   });
   assert.deepEqual(opponentRecoveryPresentation(fighter(2)), { visible: false, state: "", label: "", detail: "" });
 });
