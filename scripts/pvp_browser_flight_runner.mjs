@@ -973,7 +973,9 @@ async function runOnlineUiRunningAttackFlight(entries) {
   const staged = await prepareHeavyCounterplayFlight(
     entries,
     "M119 running strike",
-    { attackerName: "chrome", defenderName: "firefox", movementMs: 0 },
+    // Enter the running-strike threat radius through genuine movement first so
+    // Firefox has time to render the authoritative windup before the lunge hits.
+    { attackerName: "chrome", defenderName: "firefox", movementMs: 150 },
   );
   const { attacker, defender, attackerElementId, movementCode } = staged;
   const movementKey = movementCode === "KeyD" ? "d" : "a";
