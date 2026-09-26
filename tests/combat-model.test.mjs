@@ -474,3 +474,67 @@ test("run without meaningful movement keeps light attack semantics", () => {
   assert.equal(a.action, "attack_windup");
   assert.equal(a.stamina, COMBAT.stamina.max);
 });
+
+
+test("strafe-selected left sweep trades center coverage for a shifted attack lane", () => {
+  const attacker = createFighter({ id: "a", x: 200, y: 200, facing: 0 });
+  const angle = 80 * Math.PI / 180;
+  const target = createFighter({
+    id: "b",
+    x: 200 + Math.cos(angle) * 70,
+    y: 200 + Math.sin(angle) * 70,
+    facing: Math.PI,
+  });
+  const world = createWorld({ width: 600, height: 400, fighters: [attacker, target] });
+
+  stepWorld(world, {
+    a: { moveY: 1, attack: true, aimX: 400, aimY: 200 },
+  }, 5);
+  assert.equal(attacker.action, "attack_left_windup");
+
+  const events = advance(
+    world,
+    COMBAT.directionalAttack.windupMs + COMBAT.directionalAttack.activeMs + 10,
+    { a: { aimX: 400, aimY: 200 } },
+  );
+  assert.equal(target.hp, 66);
+  assert.equal(events.find((event) => event.type === "hit")?.damage, 34);
+
+  const neutralAttacker = createFighter({ id: "a", x: 200, y: 200, facing: 0 });
+  const neutralTarget = createFighter({
+    id: "b",
+    x: 200 + Math.cos(angle) * 70,
+    y: 200 + Math.sin(angle) * 70,
+    facing: Math.PI,
+  });
+  const neutralWorld = createWorld({ width: 600, height: 400, fighters: [neutralAttacker, neutralTarget] });
+  advance(
+    neutralWorld,
+    COMBAT.attack.windupMs + COMBAT.attack.activeMs + 15,
+    { a: { attack: true, aimX: 400, aimY: 200 } },
+  );
+  assert.equal(neutralTarget.hp, 100);
+});
+
+test("opposite strafe selects the mirrored right sweep", () => {
+  const world = duel({ distance: 200 });
+  const [attacker] = world.fighters;
+  stepWorld(world, {
+    a: { moveY: -1, attack: true, aimX: 400, aimY: 200 },
+  }, 5);
+  assert.equal(attacker.action, "attack_right_windup");
+});
+
+test("directional light remains feintable only through the normal early light window", () => {
+  const world = duel({ distance: 200 });
+  const [attacker] = world.fighters;
+  stepWorld(world, {
+    a: { moveY: 1, attack: true, aimX: 400, aimY: 200 },
+  }, 5);
+  assert.equal(attacker.action, "attack_left_windup");
+
+  advance(world, 30, { a: { aimX: 400, aimY: 200 } });
+  stepWorld(world, { a: { block: true, aimX: 400, aimY: 200 } }, 5);
+  assert.equal(attacker.action, "feint_recovery");
+  assert.equal(attacker.stamina, COMBAT.stamina.max - COMBAT.feint.staminaCost);
+});
