@@ -3713,9 +3713,12 @@ function assertPairedResults(results) {
       if (result.minDefenderHp !== 100 || result.minDefenderGuard !== 100) {
         throw new Error(`${result.browser} defender paid HP/guard cost during dodge: ${JSON.stringify(result)}`);
       }
-      if (result.defenderBlockSeen || result.attackerStunnedSeen) {
-        throw new Error(`${result.browser} dodge scenario accidentally resolved as block/parry`);
+      if (result.defenderBlockSeen || Number.isFinite(result.firstParryMs)) {
+        throw new Error(`${result.browser} roll scenario accidentally resolved as block/parry`);
       }
+      // Pointer-directed roll collisions may intentionally stun the attacker.
+      // Verified in-range dodge overlap and untouched defender vitals remain the
+      // authoritative evade proof; attacker stun is no longer a parry proxy.
       if (!Number.isFinite(result.firstDodgeEvadeMs) || !Number.isFinite(result.dodgeOverlapDistance) || !Number.isFinite(result.dodgeOverlapArcDelta)) {
         throw new Error(`${result.browser} did not record verified dodge geometry/timing`);
       }
