@@ -259,6 +259,13 @@ jobs:
           node --check scripts/pvp_browser_flight_runner.mjs
           node scripts/pvp_browser_flight_runner.mjs
 
+      - name: Validate M119 real running strike
+        env:
+          MYASO_PVP_SCENARIO: "uirunningattack"
+        run: |
+          node --check scripts/pvp_browser_flight_runner.mjs
+          node scripts/pvp_browser_flight_runner.mjs
+
       - name: Validate M106 heavy strike control and readability
         env:
           MYASO_PVP_SCENARIO: "uiheavy"
