@@ -672,9 +672,7 @@ fn advance_action(fighter: &mut Fighter, input: InputIntent, dt_ms: f32) {
         Action::JumpAttackRecovery
         | Action::FeintRecovery
         | Action::Stunned
-        | Action::Knockdown => {
-            fighter.set_action(Action::Idle, 0.0)
-        }
+        | Action::Knockdown => fighter.set_action(Action::Idle, 0.0),
         Action::Idle | Action::Block | Action::Dead => {}
     }
 }
