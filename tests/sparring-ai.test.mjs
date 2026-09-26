@@ -93,7 +93,7 @@ test("sparring AI chains jump into a real jumping attack", () => {
 test("sparring AI retains committed heavy variation at close range", () => {
   const ai = createSparringAi();
   const input = ai.sample({
-    nowMs: 2300,
+    nowMs: 3800,
     self: fighter({ x: 100, y: 100 }),
     opponent: fighter({ x: 160, y: 100 }),
   });
@@ -118,7 +118,18 @@ test("sparring AI backs off to recover when stamina is critically low", () => {
 });
 
 test("sparring AI takes a real light punish on recovery or stun", () => {
-  for (const action of ["heavy_attack_recovery", "kick_recovery", "jump_attack_recovery", "feint_recovery", "stunned"]) {
+  for (const action of [
+    "attack_left_recovery",
+    "attack_right_recovery",
+    "attack_thrust_recovery",
+    "attack_overhead_recovery",
+    "running_attack_recovery",
+    "heavy_attack_recovery",
+    "kick_recovery",
+    "jump_attack_recovery",
+    "feint_recovery",
+    "stunned",
+  ]) {
     const ai = createSparringAi();
     const input = ai.sample({
       nowMs: 1300,
@@ -178,10 +189,47 @@ test("sparring AI can read directional light windup as a normal threat", () => {
 test("sparring AI uses lateral movement when choosing its light sweep", () => {
   const ai = createSparringAi();
   const input = ai.sample({
-    nowMs: 3040,
+    nowMs: 4560,
     self: fighter({ x: 100, y: 100, stamina: 100 }),
     opponent: fighter({ x: 160, y: 100 }),
   });
   assert.equal(input.attack, true);
   assert.ok(Math.hypot(input.moveX, input.moveY) >= 0.6);
+});
+
+
+test("sparring AI recognizes thrust and overhead windups as readable threats", () => {
+  for (const action of ["attack_thrust_windup", "attack_overhead_windup"]) {
+    const ai = createSparringAi();
+    const input = ai.sample({
+      nowMs: 500,
+      self: fighter({ x: 100, y: 100, stamina: 100 }),
+      opponent: fighter({ x: 180, y: 100, action }),
+    });
+    assert.equal(input.dodge, true, action);
+  }
+});
+
+test("sparring AI deliberately selects forward thrust in its directional cycle", () => {
+  const ai = createSparringAi();
+  const input = ai.sample({
+    nowMs: 2300,
+    self: fighter({ x: 100, y: 100, stamina: 100 }),
+    opponent: fighter({ x: 160, y: 100 }),
+  });
+  assert.equal(input.attack, true);
+  assert.ok(input.moveX > 0.6);
+  assert.ok(Math.abs(input.moveY) < 0.01);
+});
+
+test("sparring AI deliberately selects backward overhead in its directional cycle", () => {
+  const ai = createSparringAi();
+  const input = ai.sample({
+    nowMs: 3040,
+    self: fighter({ x: 100, y: 100, stamina: 100 }),
+    opponent: fighter({ x: 160, y: 100 }),
+  });
+  assert.equal(input.attack, true);
+  assert.ok(input.moveX < -0.6);
+  assert.ok(Math.abs(input.moveY) < 0.01);
 });
