@@ -330,10 +330,13 @@ function predictMovement(input, dtMs) {
     speed = COMBAT.dodge.speed;
   } else if (local.action === 6 || input.block) speed *= COMBAT.block.moveMultiplier;
   else if (local.action === 1) speed *= 0.35;
+  else if (local.action === COMBAT_ACTION.runningAttackWindup) speed *= COMBAT.runningAttack.windupMoveMultiplier;
+  else if (local.action === COMBAT_ACTION.runningAttackActive) speed *= COMBAT.runningAttack.activeMoveMultiplier;
   else if (local.action === COMBAT_ACTION.heavyAttackWindup) speed *= 0.20;
   else if (local.action === 2 || local.action === COMBAT_ACTION.heavyAttackActive || local.action === COMBAT_ACTION.stunned || local.action === COMBAT_ACTION.knockdown || local.action === COMBAT_ACTION.dead) speed = 0;
   else if (local.action === 3 || local.action === 5) speed *= 0.48;
   else if (local.action === COMBAT_ACTION.heavyAttackRecovery) speed *= 0.35;
+  else if (local.action === COMBAT_ACTION.runningAttackRecovery) speed *= COMBAT.runningAttack.recoveryMoveMultiplier;
   else if (local.action === COMBAT_ACTION.jump) speed *= COMBAT.jump.moveMultiplier;
   else if (local.action === COMBAT_ACTION.jumpAttackWindup) speed *= 0.9;
   else if (local.action === COMBAT_ACTION.jumpAttackActive) speed *= 0.55;
@@ -510,6 +513,7 @@ function drawFighterScreen(x, y, fighter, body, shadow, remote = false, damageTe
   if (knockedDown) ctx.scale(1.38, 0.62);
   ctx.globalAlpha = action === COMBAT_ACTION.dead ? 0.28 : 1;
   if (action === COMBAT_ACTION.attackWindup || action === COMBAT_ACTION.attackActive) drawAttackTell(action, remote);
+  if (action === COMBAT_ACTION.runningAttackWindup || action === COMBAT_ACTION.runningAttackActive) drawRunningAttackTell(action, remote);
   if (action === COMBAT_ACTION.heavyAttackWindup || action === COMBAT_ACTION.heavyAttackActive) drawHeavyAttackTell(action, remote);
   if (action === COMBAT_ACTION.jumpAttackWindup || action === COMBAT_ACTION.jumpAttackActive) drawJumpAttackTell(action, remote);
   if (action === COMBAT_ACTION.kickWindup || action === COMBAT_ACTION.kickActive) drawKickTell(action);
@@ -597,23 +601,27 @@ function drawAttackTell(action, remote) {
 
 function drawWeaponTrail(action) {
   const light = action === COMBAT_ACTION.attackWindup || action === COMBAT_ACTION.attackActive;
+  const running = action === COMBAT_ACTION.runningAttackWindup || action === COMBAT_ACTION.runningAttackActive;
   const heavy = action === COMBAT_ACTION.heavyAttackWindup || action === COMBAT_ACTION.heavyAttackActive;
   const jump = action === COMBAT_ACTION.jumpAttackWindup || action === COMBAT_ACTION.jumpAttackActive;
-  if (!light && !heavy && !jump) return;
+  if (!light && !running && !heavy && !jump) return;
 
   const active = action === COMBAT_ACTION.attackActive
+    || action === COMBAT_ACTION.runningAttackActive
     || action === COMBAT_ACTION.heavyAttackActive
     || action === COMBAT_ACTION.jumpAttackActive;
-  const radius = heavy ? 44 : jump ? 40 : 36;
-  const start = heavy ? -1.05 : jump ? -0.34 : -0.72;
-  const end = heavy ? 0.72 : jump ? 0.30 : 0.48;
+  const radius = heavy ? 44 : running ? 42 : jump ? 40 : 36;
+  const start = heavy ? -1.05 : running ? -0.54 : jump ? -0.34 : -0.72;
+  const end = heavy ? 0.72 : running ? 0.34 : jump ? 0.30 : 0.48;
   ctx.save();
   ctx.strokeStyle = heavy
     ? (active ? "rgba(255, 105, 58, .88)" : "rgba(255, 173, 92, .42)")
+    : running
+      ? (active ? "rgba(113, 214, 255, .92)" : "rgba(126, 193, 222, .42)")
     : jump
       ? (active ? "rgba(255, 150, 72, .9)" : "rgba(255, 195, 102, .42)")
       : (active ? "rgba(238, 219, 160, .82)" : "rgba(214, 195, 148, .34)");
-  ctx.lineWidth = heavy ? 8 : jump ? 6 : 5;
+  ctx.lineWidth = heavy ? 8 : running ? 6 : jump ? 6 : 5;
   ctx.lineCap = "round";
   ctx.beginPath();
   ctx.arc(0, 0, radius, start, end);
@@ -622,6 +630,27 @@ function drawWeaponTrail(action) {
   ctx.lineWidth *= 1.75;
   ctx.beginPath();
   ctx.arc(0, 0, radius - 4, start + 0.10, end - 0.08);
+  ctx.stroke();
+  ctx.restore();
+}
+
+function drawRunningAttackTell(action, remote) {
+  const active = action === COMBAT_ACTION.runningAttackActive;
+  ctx.save();
+  ctx.strokeStyle = active ? "#71d6ff" : "#7ec1de";
+  ctx.fillStyle = active ? "rgba(92, 190, 228, 0.24)" : "rgba(92, 190, 228, 0.12)";
+  ctx.lineWidth = remote ? 4 : 3;
+  ctx.beginPath();
+  ctx.moveTo(0, 0);
+  ctx.arc(
+    0,
+    0,
+    COMBAT.runningAttack.reach + COMBAT.fighterRadius,
+    -COMBAT.runningAttack.arcRadians / 2,
+    COMBAT.runningAttack.arcRadians / 2,
+  );
+  ctx.closePath();
+  ctx.fill();
   ctx.stroke();
   ctx.restore();
 }
