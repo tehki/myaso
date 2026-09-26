@@ -1,6 +1,6 @@
 import { createFrameBudget } from "../src/browser/frame-budget.mjs";
 import { createCombatImpactController } from "../src/browser/combat-impact.mjs";
-import { COMBAT_ACTION, blockSpatialPresentation, combatActionHint, combatOverlayPresentation, createCombatReadabilityTracker, createRemoteDamageTracker, fighterFocusNetId, fighterIdentityPresentation, fighterThreatBearingLabel, fighterThreatGuardArcLabel, fighterThreatNetId, fighterThreatPhaseLabel, fighterMatchPresentation, fighterScoreboardPresentation, fighterVitalsPresentation, guardBreakSpatialPresentation, killFeedPresentation, opponentRecoveryPresentation, parrySpatialPresentation } from "../src/browser/combat-readability.mjs";
+import { COMBAT_ACTION, blockSpatialPresentation, combatActionHint, combatOverlayPresentation, createCombatReadabilityTracker, createRemoteDamageTracker, fighterFocusNetId, fighterIdentityPresentation, fighterThreatBearingLabel, fighterThreatGuardArcLabel, fighterThreatNetId, fighterThreatPhaseLabel, fighterMatchPointPresentation, fighterMatchPresentation, fighterScoreboardPresentation, FFA_KILL_TARGET, fighterVitalsPresentation, guardBreakSpatialPresentation, killFeedPresentation, opponentRecoveryPresentation, parrySpatialPresentation } from "../src/browser/combat-readability.mjs";
 import { COMBAT } from "../src/combat/model.mjs";
 import { reconcilePrediction } from "../src/browser/reconciliation.mjs";
 import { NETWORK } from "../src/network/constants.mjs";
@@ -11,6 +11,8 @@ const ctx = canvas.getContext("2d", { alpha: false });
 const eventText = document.querySelector("#event-text");
 const arenaStage = document.querySelector(".arena-stage");
 const scoreboardList = document.querySelector("#scoreboard-list");
+const scoreboardTitle = document.querySelector("#scoreboard-title");
+const matchPoint = document.querySelector("#match-point");
 const killFeedList = document.querySelector("#kill-feed-list");
 const hud = {
   playerHp: document.querySelector("#player-hp"),
@@ -25,7 +27,7 @@ const hud = {
   botGuardValue: document.querySelector("#bot-guard-value"),
   focusLabel: document.querySelector("#focus-label"),
 };
-const hudCache = { playerHp: null, playerGuard: null, playerStamina: null, botHp: null, botGuard: null, focusNetId: null, status: null, scoreboard: null };
+const hudCache = { playerHp: null, playerGuard: null, playerStamina: null, botHp: null, botGuard: null, focusNetId: null, status: null, scoreboard: null, matchPoint: null };
 const combatOverlay = {
   root: document.querySelector("#combat-overlay"),
   title: document.querySelector("#combat-overlay-title"),
@@ -1013,7 +1015,17 @@ function updateOpponentRecovery(remote) {
 function updateScoreboard(ownId) {
   if (!scoreboardList || !networkClient) return;
   const rows = fighterScoreboardPresentation(networkClient.state.values(), ownId);
+  const point = fighterMatchPointPresentation(networkClient.state.values(), ownId);
   const signature = rows.map((row) => `${row.netId}:${row.kills}:${row.own ? 1 : 0}`).join("|");
+  if (scoreboardTitle && scoreboardTitle.textContent !== `FIRST TO ${FFA_KILL_TARGET}`) {
+    scoreboardTitle.textContent = `FIRST TO ${FFA_KILL_TARGET}`;
+  }
+  const pointSignature = point.visible ? `${point.leaderId}:${point.detail}` : "";
+  if (matchPoint && hudCache.matchPoint !== pointSignature) {
+    hudCache.matchPoint = pointSignature;
+    matchPoint.hidden = !point.visible;
+    if (point.visible) matchPoint.textContent = `${point.title} · ${point.detail}`;
+  }
   if (hudCache.scoreboard === signature) return;
   hudCache.scoreboard = signature;
   scoreboardList.replaceChildren(...rows.map((row) => {
