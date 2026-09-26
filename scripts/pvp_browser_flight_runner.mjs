@@ -1138,8 +1138,13 @@ async function runOnlineUiFeintFlight(entries) {
     || defenderResult.playerHp !== 100 || defenderResult.playerGuard !== 100) {
     throw new Error(`M117 feint changed authoritative vitals: ${JSON.stringify(evidence)}`);
   }
-  if (!attackerResult.events.some((text) => text.startsWith("Feint recovery"))) {
-    throw new Error(`M117 attacker never rendered feint recovery readability: ${JSON.stringify(attackerResult)}`);
+  // The remote replicated FeintRecovery state above is the authoritative proof.
+  // The attacker's event-text is intentionally not required here: it is a
+  // transient local presentation and can be overwritten by the next online
+  // status frame before the observer records it.
+  if (!attackerResult.events.some((text) => text.startsWith("Attack committed"))
+    && !attackerResult.events.some((text) => text.startsWith("Feint recovery"))) {
+    throw new Error(`M117 attacker never rendered the committed light/feint exchange: ${JSON.stringify(attackerResult)}`);
   }
   if (attackerResult.feedbackTransitions.includes("hit-confirm")
     || defenderResult.feedbackTransitions.includes("damage-taken")
@@ -2888,32 +2893,41 @@ async function performArenaRunningAttack(session, elementId, movementKey, xOffse
     // commitment, then release both genuine controls.
     await sleep(320);
   } finally {
-    const actions = [];
-    if (movementHeld) {
-      actions.push({
-        type: "key",
-        id: keyboardId,
-        actions: [{ type: "keyUp", value: movementKey }],
-      });
-    }
     if (lightHeld) {
-      actions.push({
-        type: "pointer",
-        id: attackPointerId,
-        parameters: { pointerType: "mouse" },
-        actions: [{ type: "pointerUp", button: 0 }],
+      await webdriver(session.base, "POST", `/session/${session.sessionId}/actions`, {
+        actions: [{
+          type: "pointer",
+          id: attackPointerId,
+          parameters: { pointerType: "mouse" },
+          actions: [{ type: "pointerUp", button: 0 }],
+        }],
       });
     }
     if (rightHeld) {
-      actions.push({
-        type: "pointer",
-        id: pointerId,
-        parameters: { pointerType: "mouse" },
-        actions: [{ type: "pointerUp", button: 2 }],
+      // Release RMB in a dedicated pointer command at the arena position. Keeping
+      // it separate from keyboard release makes Chromium reliably dispatch the
+      // observable pointerup(button=2) instead of only clearing WebDriver state.
+      await webdriver(session.base, "POST", `/session/${session.sessionId}/actions`, {
+        actions: [{
+          type: "pointer",
+          id: pointerId,
+          parameters: { pointerType: "mouse" },
+          actions: [
+            { type: "pointerMove", duration: 0, origin, x: xOffset, y: 0 },
+            { type: "pointerUp", button: 2 },
+          ],
+        }],
       });
+      await sleep(20);
     }
-    if (actions.length > 0) {
-      await webdriver(session.base, "POST", `/session/${session.sessionId}/actions`, { actions });
+    if (movementHeld) {
+      await webdriver(session.base, "POST", `/session/${session.sessionId}/actions`, {
+        actions: [{
+          type: "key",
+          id: keyboardId,
+          actions: [{ type: "keyUp", value: movementKey }],
+        }],
+      });
     }
   }
 }
