@@ -25,6 +25,12 @@ export const COMBAT_ACTION = Object.freeze({
   runningAttackWindup: 21,
   runningAttackActive: 22,
   runningAttackRecovery: 23,
+  attackLeftWindup: 24,
+  attackLeftActive: 25,
+  attackLeftRecovery: 26,
+  attackRightWindup: 27,
+  attackRightActive: 28,
+  attackRightRecovery: 29,
 });
 
 const PRIORITY = Object.freeze({
@@ -124,6 +130,18 @@ export function combatActionHint(entity) {
       return "Strike active - finish the commitment.";
     case COMBAT_ACTION.attackRecovery:
       return "Recovery - you can be punished now.";
+    case COMBAT_ACTION.attackLeftWindup:
+      return "Left sweep committed - the lane is readable.";
+    case COMBAT_ACTION.attackLeftActive:
+      return "Left sweep active - finish the commitment.";
+    case COMBAT_ACTION.attackLeftRecovery:
+      return "Left sweep recovery - reset before attacking again.";
+    case COMBAT_ACTION.attackRightWindup:
+      return "Right sweep committed - the lane is readable.";
+    case COMBAT_ACTION.attackRightActive:
+      return "Right sweep active - finish the commitment.";
+    case COMBAT_ACTION.attackRightRecovery:
+      return "Right sweep recovery - reset before attacking again.";
     case COMBAT_ACTION.runningAttackWindup:
       return "Running strike committed - forward pressure is readable.";
     case COMBAT_ACTION.runningAttackActive:
@@ -156,6 +174,9 @@ export function combatActionHint(entity) {
 export function opponentRecoveryPresentation(entity) {
   if (entity?.action === COMBAT_ACTION.attackRecovery) {
     return { visible: true, state: "attack-recovery", label: "PUNISH", detail: "Attack recovery" };
+  }
+  if (entity?.action === COMBAT_ACTION.attackLeftRecovery || entity?.action === COMBAT_ACTION.attackRightRecovery) {
+    return { visible: true, state: "directional-attack-recovery", label: "PUNISH", detail: "Sweep recovery" };
   }
   if (entity?.action === COMBAT_ACTION.heavyAttackRecovery) {
     return { visible: true, state: "heavy-attack-recovery", label: "PUNISH", detail: "Heavy recovery" };
@@ -213,6 +234,10 @@ export function fighterIdentityPresentation(netId) {
 }
 
 export function fighterThreatPhaseLabel(attacker) {
+  if (attacker?.action === COMBAT_ACTION.attackLeftActive) return "LEFT SWEEP";
+  if (attacker?.action === COMBAT_ACTION.attackLeftWindup) return "LEFT WINDUP";
+  if (attacker?.action === COMBAT_ACTION.attackRightActive) return "RIGHT SWEEP";
+  if (attacker?.action === COMBAT_ACTION.attackRightWindup) return "RIGHT WINDUP";
   if (attacker?.action === COMBAT_ACTION.runningAttackActive) return "RUNNING STRIKE";
   if (attacker?.action === COMBAT_ACTION.runningAttackWindup) return "RUNNING WINDUP";
   if (attacker?.action === COMBAT_ACTION.heavyAttackActive) return "HEAVY STRIKE";
@@ -259,17 +284,30 @@ export function fighterThreatNetId(state, ownId = 0, summary = null) {
   let threatCount = 0;
   for (const entity of state.values()) {
     const active = entity?.action === COMBAT_ACTION.attackActive
+      || entity?.action === COMBAT_ACTION.attackLeftActive
+      || entity?.action === COMBAT_ACTION.attackRightActive
       || entity?.action === COMBAT_ACTION.heavyAttackActive
       || entity?.action === COMBAT_ACTION.runningAttackActive;
     const windup = entity?.action === COMBAT_ACTION.attackWindup
+      || entity?.action === COMBAT_ACTION.attackLeftWindup
+      || entity?.action === COMBAT_ACTION.attackRightWindup
       || entity?.action === COMBAT_ACTION.heavyAttackWindup
       || entity?.action === COMBAT_ACTION.runningAttackWindup;
     const priority = active ? 0 : windup ? 1 : Infinity;
+    const directionalLeft = entity?.action === COMBAT_ACTION.attackLeftActive || entity?.action === COMBAT_ACTION.attackLeftWindup;
+    const directionalRight = entity?.action === COMBAT_ACTION.attackRightActive || entity?.action === COMBAT_ACTION.attackRightWindup;
     const profile = entity?.action === COMBAT_ACTION.heavyAttackActive || entity?.action === COMBAT_ACTION.heavyAttackWindup
       ? COMBAT.heavyAttack
       : entity?.action === COMBAT_ACTION.runningAttackActive || entity?.action === COMBAT_ACTION.runningAttackWindup
         ? COMBAT.runningAttack
-        : COMBAT.attack;
+        : directionalLeft || directionalRight
+          ? COMBAT.directionalAttack
+          : COMBAT.attack;
+    const arcOffset = directionalLeft
+      ? -COMBAT.directionalAttack.arcOffsetRadians
+      : directionalRight
+        ? COMBAT.directionalAttack.arcOffsetRadians
+        : 0;
     if (!Number.isFinite(priority) || entity.netId === ownId || !Number.isInteger(entity.netId) || entity.netId <= 0
       || !Number.isFinite(entity.x) || !Number.isFinite(entity.y) || !Number.isFinite(entity.facing)) continue;
     const dx = own.x - entity.x;
@@ -278,7 +316,7 @@ export function fighterThreatNetId(state, ownId = 0, summary = null) {
     const maxDistance = profile.reach + COMBAT.fighterRadius;
     if (distanceSquared > maxDistance * maxDistance) continue;
     const angleToOwn = Math.atan2(dy, dx);
-    let delta = angleToOwn - entity.facing;
+    let delta = angleToOwn - (entity.facing + arcOffset);
     while (delta > Math.PI) delta -= Math.PI * 2;
     while (delta < -Math.PI) delta += Math.PI * 2;
     if (Math.abs(delta) > profile.arcRadians / 2) continue;

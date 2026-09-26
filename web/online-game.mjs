@@ -329,12 +329,23 @@ function predictMovement(input, dtMs) {
     moveY = Math.sin(local.facing);
     speed = COMBAT.dodge.speed;
   } else if (local.action === 6 || input.block) speed *= COMBAT.block.moveMultiplier;
-  else if (local.action === 1) speed *= 0.35;
+  else if (local.action === COMBAT_ACTION.attackWindup
+    || local.action === COMBAT_ACTION.attackLeftWindup
+    || local.action === COMBAT_ACTION.attackRightWindup) speed *= 0.35;
   else if (local.action === COMBAT_ACTION.runningAttackWindup) speed *= COMBAT.runningAttack.windupMoveMultiplier;
   else if (local.action === COMBAT_ACTION.runningAttackActive) speed *= COMBAT.runningAttack.activeMoveMultiplier;
   else if (local.action === COMBAT_ACTION.heavyAttackWindup) speed *= 0.20;
-  else if (local.action === 2 || local.action === COMBAT_ACTION.heavyAttackActive || local.action === COMBAT_ACTION.stunned || local.action === COMBAT_ACTION.knockdown || local.action === COMBAT_ACTION.dead) speed = 0;
-  else if (local.action === 3 || local.action === 5) speed *= 0.48;
+  else if (local.action === COMBAT_ACTION.attackActive
+    || local.action === COMBAT_ACTION.attackLeftActive
+    || local.action === COMBAT_ACTION.attackRightActive
+    || local.action === COMBAT_ACTION.heavyAttackActive
+    || local.action === COMBAT_ACTION.stunned
+    || local.action === COMBAT_ACTION.knockdown
+    || local.action === COMBAT_ACTION.dead) speed = 0;
+  else if (local.action === COMBAT_ACTION.attackRecovery
+    || local.action === COMBAT_ACTION.attackLeftRecovery
+    || local.action === COMBAT_ACTION.attackRightRecovery
+    || local.action === COMBAT_ACTION.dodgeRecovery) speed *= 0.48;
   else if (local.action === COMBAT_ACTION.heavyAttackRecovery) speed *= 0.35;
   else if (local.action === COMBAT_ACTION.runningAttackRecovery) speed *= COMBAT.runningAttack.recoveryMoveMultiplier;
   else if (local.action === COMBAT_ACTION.jump) speed *= COMBAT.jump.moveMultiplier;
@@ -513,6 +524,8 @@ function drawFighterScreen(x, y, fighter, body, shadow, remote = false, damageTe
   if (knockedDown) ctx.scale(1.38, 0.62);
   ctx.globalAlpha = action === COMBAT_ACTION.dead ? 0.28 : 1;
   if (action === COMBAT_ACTION.attackWindup || action === COMBAT_ACTION.attackActive) drawAttackTell(action, remote);
+  if (action === COMBAT_ACTION.attackLeftWindup || action === COMBAT_ACTION.attackLeftActive
+    || action === COMBAT_ACTION.attackRightWindup || action === COMBAT_ACTION.attackRightActive) drawDirectionalAttackTell(action, remote);
   if (action === COMBAT_ACTION.runningAttackWindup || action === COMBAT_ACTION.runningAttackActive) drawRunningAttackTell(action, remote);
   if (action === COMBAT_ACTION.heavyAttackWindup || action === COMBAT_ACTION.heavyAttackActive) drawHeavyAttackTell(action, remote);
   if (action === COMBAT_ACTION.jumpAttackWindup || action === COMBAT_ACTION.jumpAttackActive) drawJumpAttackTell(action, remote);
@@ -601,18 +614,27 @@ function drawAttackTell(action, remote) {
 
 function drawWeaponTrail(action) {
   const light = action === COMBAT_ACTION.attackWindup || action === COMBAT_ACTION.attackActive;
+  const leftSweep = action === COMBAT_ACTION.attackLeftWindup || action === COMBAT_ACTION.attackLeftActive;
+  const rightSweep = action === COMBAT_ACTION.attackRightWindup || action === COMBAT_ACTION.attackRightActive;
   const running = action === COMBAT_ACTION.runningAttackWindup || action === COMBAT_ACTION.runningAttackActive;
   const heavy = action === COMBAT_ACTION.heavyAttackWindup || action === COMBAT_ACTION.heavyAttackActive;
   const jump = action === COMBAT_ACTION.jumpAttackWindup || action === COMBAT_ACTION.jumpAttackActive;
-  if (!light && !running && !heavy && !jump) return;
+  if (!light && !leftSweep && !rightSweep && !running && !heavy && !jump) return;
 
   const active = action === COMBAT_ACTION.attackActive
+    || action === COMBAT_ACTION.attackLeftActive
+    || action === COMBAT_ACTION.attackRightActive
     || action === COMBAT_ACTION.runningAttackActive
     || action === COMBAT_ACTION.heavyAttackActive
     || action === COMBAT_ACTION.jumpAttackActive;
   const radius = heavy ? 44 : running ? 42 : jump ? 40 : 36;
-  const start = heavy ? -1.05 : running ? -0.54 : jump ? -0.34 : -0.72;
-  const end = heavy ? 0.72 : running ? 0.34 : jump ? 0.30 : 0.48;
+  const sweepOffset = leftSweep
+    ? -COMBAT.directionalAttack.arcOffsetRadians
+    : rightSweep
+      ? COMBAT.directionalAttack.arcOffsetRadians
+      : 0;
+  const start = (heavy ? -1.05 : running ? -0.54 : jump ? -0.34 : -0.72) + sweepOffset;
+  const end = (heavy ? 0.72 : running ? 0.34 : jump ? 0.30 : 0.48) + sweepOffset;
   ctx.save();
   ctx.strokeStyle = heavy
     ? (active ? "rgba(255, 105, 58, .88)" : "rgba(255, 173, 92, .42)")
@@ -630,6 +652,29 @@ function drawWeaponTrail(action) {
   ctx.lineWidth *= 1.75;
   ctx.beginPath();
   ctx.arc(0, 0, radius - 4, start + 0.10, end - 0.08);
+  ctx.stroke();
+  ctx.restore();
+}
+
+function drawDirectionalAttackTell(action, remote) {
+  const left = action === COMBAT_ACTION.attackLeftWindup || action === COMBAT_ACTION.attackLeftActive;
+  const active = action === COMBAT_ACTION.attackLeftActive || action === COMBAT_ACTION.attackRightActive;
+  const offset = left ? -COMBAT.directionalAttack.arcOffsetRadians : COMBAT.directionalAttack.arcOffsetRadians;
+  ctx.save();
+  ctx.strokeStyle = active ? "#fae29a" : "#dec67a";
+  ctx.fillStyle = active ? "rgba(224, 198, 122, 0.24)" : "rgba(224, 198, 122, 0.11)";
+  ctx.lineWidth = remote ? 4 : 3;
+  ctx.beginPath();
+  ctx.moveTo(0, 0);
+  ctx.arc(
+    0,
+    0,
+    COMBAT.directionalAttack.reach + COMBAT.fighterRadius,
+    offset - COMBAT.directionalAttack.arcRadians / 2,
+    offset + COMBAT.directionalAttack.arcRadians / 2,
+  );
+  ctx.closePath();
+  ctx.fill();
   ctx.stroke();
   ctx.restore();
 }

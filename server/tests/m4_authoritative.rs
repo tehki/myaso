@@ -1656,3 +1656,148 @@ fn running_attack_requires_meaningful_movement_and_uses_distinct_wire_states() {
     assert_eq!(Action::RunningAttackActive.wire_code(), 22);
     assert_eq!(Action::RunningAttackRecovery.wire_code(), 23);
 }
+
+#[test]
+fn directional_left_light_uses_shifted_authoritative_lane_without_damage_upgrade() {
+    let angle = (-80.0_f32).to_radians();
+    let mut world = World::new(600.0, 400.0);
+    assert!(world.add_player_at(1, 200.0, 200.0, 0.0));
+    assert!(world.add_player_at(
+        2,
+        200.0 + angle.cos() * 70.0,
+        200.0 + angle.sin() * 70.0,
+        std::f32::consts::PI,
+    ));
+
+    advance(
+        &mut world,
+        5.0,
+        InputIntent {
+            move_y: -1.0,
+            attack: true,
+            facing_radians: 0.0,
+            ..InputIntent::default()
+        },
+        InputIntent::default(),
+    );
+    assert_eq!(
+        world.fighter(1).expect("attacker").action,
+        Action::AttackLeftWindup
+    );
+
+    let events = advance(
+        &mut world,
+        225.0,
+        InputIntent {
+            facing_radians: 0.0,
+            ..InputIntent::default()
+        },
+        InputIntent::default(),
+    );
+    assert_eq!(world.fighter(2).expect("target").hp.round() as u8, 66);
+    assert!(events.iter().any(|event| matches!(
+        event,
+        CombatEvent::Hit {
+            attacker: 1,
+            target: 2,
+            damage: 34,
+            hp: 66,
+        }
+    )));
+
+    let mut neutral = World::new(600.0, 400.0);
+    assert!(neutral.add_player_at(1, 200.0, 200.0, 0.0));
+    assert!(neutral.add_player_at(
+        2,
+        200.0 + angle.cos() * 70.0,
+        200.0 + angle.sin() * 70.0,
+        std::f32::consts::PI,
+    ));
+    advance(
+        &mut neutral,
+        230.0,
+        InputIntent {
+            attack: true,
+            facing_radians: 0.0,
+            ..InputIntent::default()
+        },
+        InputIntent::default(),
+    );
+    assert_eq!(
+        neutral.fighter(2).expect("neutral target").hp.round() as u8,
+        100
+    );
+}
+
+#[test]
+fn opposite_strafe_selects_right_directional_light_and_wire_states_are_distinct() {
+    let mut world = duel(200.0);
+    advance(
+        &mut world,
+        5.0,
+        InputIntent {
+            move_y: 1.0,
+            attack: true,
+            facing_radians: 0.0,
+            ..InputIntent::default()
+        },
+        InputIntent::default(),
+    );
+    assert_eq!(
+        world.fighter(1).expect("attacker").action,
+        Action::AttackRightWindup
+    );
+    assert_eq!(Action::AttackLeftWindup.wire_code(), 24);
+    assert_eq!(Action::AttackLeftActive.wire_code(), 25);
+    assert_eq!(Action::AttackLeftRecovery.wire_code(), 26);
+    assert_eq!(Action::AttackRightWindup.wire_code(), 27);
+    assert_eq!(Action::AttackRightActive.wire_code(), 28);
+    assert_eq!(Action::AttackRightRecovery.wire_code(), 29);
+}
+
+#[test]
+fn directional_light_uses_the_existing_early_feint_contract() {
+    let mut world = duel(200.0);
+    advance(
+        &mut world,
+        5.0,
+        InputIntent {
+            move_y: -1.0,
+            attack: true,
+            facing_radians: 0.0,
+            ..InputIntent::default()
+        },
+        InputIntent::default(),
+    );
+    assert_eq!(
+        world.fighter(1).expect("attacker").action,
+        Action::AttackLeftWindup
+    );
+    advance(
+        &mut world,
+        30.0,
+        InputIntent {
+            facing_radians: 0.0,
+            ..InputIntent::default()
+        },
+        InputIntent::default(),
+    );
+    advance(
+        &mut world,
+        5.0,
+        InputIntent {
+            block: true,
+            facing_radians: 0.0,
+            ..InputIntent::default()
+        },
+        InputIntent::default(),
+    );
+    assert_eq!(
+        world.fighter(1).expect("attacker").action,
+        Action::FeintRecovery
+    );
+    assert_eq!(
+        world.fighter(1).expect("attacker").stamina.round() as u8,
+        88
+    );
+}

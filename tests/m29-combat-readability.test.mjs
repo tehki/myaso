@@ -599,6 +599,8 @@ test("death and full-vitals idle transition are readable", () => {
 test("authoritative action hints explain light and heavy commitment windows", () => {
   assert.match(combatActionHint(fighter(1, 100, 100, COMBAT_ACTION.attackWindup)), /windup/);
   assert.match(combatActionHint(fighter(1, 100, 100, COMBAT_ACTION.attackRecovery)), /Recovery/);
+  assert.match(combatActionHint(fighter(1, 100, 100, COMBAT_ACTION.attackLeftWindup)), /Left sweep committed/);
+  assert.match(combatActionHint(fighter(1, 100, 100, COMBAT_ACTION.attackRightWindup)), /Right sweep committed/);
   assert.match(combatActionHint(fighter(1, 100, 100, COMBAT_ACTION.runningAttackWindup)), /Running strike committed/);
   assert.match(combatActionHint(fighter(1, 100, 100, COMBAT_ACTION.runningAttackRecovery)), /Running strike recovery/);
   assert.match(combatActionHint(fighter(1, 100, 100, COMBAT_ACTION.heavyAttackWindup)), /Heavy strike committed/);
@@ -611,6 +613,12 @@ test("authoritative action hints explain light and heavy commitment windows", ()
 test("authoritative opponent recovery exposes a bounded punish cue", () => {
   assert.deepEqual(opponentRecoveryPresentation(fighter(2, 100, 100, COMBAT_ACTION.attackRecovery)), {
     visible: true, state: "attack-recovery", label: "PUNISH", detail: "Attack recovery",
+  });
+  assert.deepEqual(opponentRecoveryPresentation(fighter(2, 100, 100, COMBAT_ACTION.attackLeftRecovery)), {
+    visible: true, state: "directional-attack-recovery", label: "PUNISH", detail: "Sweep recovery",
+  });
+  assert.deepEqual(opponentRecoveryPresentation(fighter(2, 100, 100, COMBAT_ACTION.attackRightRecovery)), {
+    visible: true, state: "directional-attack-recovery", label: "PUNISH", detail: "Sweep recovery",
   });
   assert.deepEqual(opponentRecoveryPresentation(fighter(2, 100, 100, COMBAT_ACTION.heavyAttackRecovery)), {
     visible: true, state: "heavy-attack-recovery", label: "PUNISH", detail: "Heavy recovery",
@@ -673,4 +681,12 @@ test("running strike threat phases remain distinct from standing light attack", 
     fighterThreatPhaseLabel(fighter(2, 100, 100, COMBAT_ACTION.runningAttackActive)),
     "RUNNING STRIKE",
   );
+});
+
+
+test("directional light threat labels expose the committed side", () => {
+  assert.equal(fighterThreatPhaseLabel(fighter(2, 100, 100, COMBAT_ACTION.attackLeftWindup)), "LEFT WINDUP");
+  assert.equal(fighterThreatPhaseLabel(fighter(2, 100, 100, COMBAT_ACTION.attackLeftActive)), "LEFT SWEEP");
+  assert.equal(fighterThreatPhaseLabel(fighter(2, 100, 100, COMBAT_ACTION.attackRightWindup)), "RIGHT WINDUP");
+  assert.equal(fighterThreatPhaseLabel(fighter(2, 100, 100, COMBAT_ACTION.attackRightActive)), "RIGHT SWEEP");
 });
