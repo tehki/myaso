@@ -932,10 +932,10 @@ async function runOnlineUiHeavyDodgeFlight(entries) {
   // Begin the genuine pointer-directed roll late enough that the unchanged
   // 125 ms iframe spans the ~320 ms heavy active transition, but early enough
   // to move off the strike lane. No combat constants are altered.
-  // UI observation plus WebDriver dispatch already costs roughly 120-140 ms
-  // on CI. Add only a small bounded delay so wheel-forward lands around 180-210 ms
-  // after the observed heavy commitment and its 125 ms iframe spans impact.
-  await sleep(55);
+  // UI observation plus WebDriver dispatch already costs substantial time on
+  // CI. Dispatch wheel-forward immediately after the observed commitment so the
+  // pointer-directed roll has enough spatial travel to clear the heavy strike
+  // lane; the unchanged 125 ms authoritative iframe still owns hit avoidance.
   await pressArenaPerpendicularDodgeAfterPause(defender, 0);
   // Let active -> recovery resolve without evidence polling inside the iframe.
   await sleep(360);
@@ -1060,22 +1060,62 @@ async function runOnlineUiFeintFlight(entries) {
   const attackRight = movementCode === "KeyD";
   const attackOffset = attackRight ? 200 : -200;
 
-  await performArenaFeint(attacker, attackerElementId, attackOffset);
-
-  const deadline = Date.now() + 900;
   let defenderObservedRecovery = false;
-  while (Date.now() < deadline) {
-    const state = await readUiEvidence(defender);
-    defenderObservedRecovery = state.recoveryTransitions.some((entry) =>
-      entry.visible
-      && entry.state === "feint-recovery"
-      && entry.label === "PUNISH"
-      && entry.detail === "Feint recovery");
+  let evidence = null;
+  for (let attempt = 1; attempt <= 3 && !defenderObservedRecovery; attempt += 1) {
+    const before = await Promise.all(entries.map(readUiEvidence));
+    const beforeAttacker = before.find((entry) => entry.browser === attacker.name);
+    const beforeDefender = before.find((entry) => entry.browser === defender.name);
+    if (!beforeAttacker || !beforeDefender) {
+      throw new Error(`M117 feint missing baseline evidence on attempt ${attempt}: ${JSON.stringify(before)}`);
+    }
+    const feintsBefore = beforeAttacker.events.filter((text) =>
+      text.startsWith("Feint recovery")).length;
+    const remoteRecoveriesBefore = beforeDefender.recoveryTransitions.filter((entry) =>
+      entry.visible && entry.state === "feint-recovery").length;
+
+    await performArenaFeint(attacker, attackerElementId, attackOffset);
+
+    const deadline = Date.now() + 900;
+    while (Date.now() < deadline) {
+      const state = await readUiEvidence(defender);
+      const remoteRecoveries = state.recoveryTransitions.filter((entry) =>
+        entry.visible
+        && entry.state === "feint-recovery"
+        && entry.label === "PUNISH"
+        && entry.detail === "Feint recovery").length;
+      if (remoteRecoveries > remoteRecoveriesBefore) {
+        defenderObservedRecovery = true;
+        break;
+      }
+      await sleep(20);
+    }
+
+    evidence = await Promise.all(entries.map(readUiEvidence));
+    const attemptAttacker = evidence.find((entry) => entry.browser === attacker.name);
+    const attemptDefender = evidence.find((entry) => entry.browser === defender.name);
+    if (!attemptAttacker || !attemptDefender) {
+      throw new Error(`M117 feint incomplete evidence on attempt ${attempt}: ${JSON.stringify(evidence)}`);
+    }
     if (defenderObservedRecovery) break;
-    await sleep(20);
+
+    const feintsAfter = attemptAttacker.events.filter((text) =>
+      text.startsWith("Feint recovery")).length;
+    const cleanRemoteObservationMiss = feintsAfter > feintsBefore
+      && attemptAttacker.playerHp === 100 && attemptAttacker.playerGuard === 100
+      && attemptAttacker.opponentHp === 100 && attemptAttacker.opponentGuard === 100
+      && attemptDefender.playerHp === 100 && attemptDefender.playerGuard === 100
+      && !attemptAttacker.feedbackTransitions.includes("hit-confirm")
+      && !attemptDefender.feedbackTransitions.includes("damage-taken")
+      && !attemptAttacker.feedbackTransitions.includes("block-confirm")
+      && !attemptDefender.feedbackTransitions.includes("parry-success");
+    if (!cleanRemoteObservationMiss) {
+      throw new Error(`M117 feint attempt ${attempt} did not qualify for clean observation retry: ${JSON.stringify(evidence)}`);
+    }
+    if (attempt < 3) await sleep(340);
   }
 
-  const evidence = await Promise.all(entries.map(readUiEvidence));
+  if (!evidence) evidence = await Promise.all(entries.map(readUiEvidence));
   const attackerResult = evidence.find((entry) => entry.browser === attacker.name);
   const defenderResult = evidence.find((entry) => entry.browser === defender.name);
   if (!attackerResult || !defenderResult) {
@@ -2794,6 +2834,7 @@ async function setArenaAttack(session, elementId, pressed, xOffset = 200) {
 async function performArenaRunningAttack(session, elementId, movementKey, xOffset = 200) {
   const origin = { "element-6066-11e4-a52e-4f735466cecf": elementId };
   const pointerId = `mouse-${session.name}`;
+  const attackPointerId = `mouse-attack-${session.name}`;
   const keyboardId = `keyboard-${session.name}`;
   let rightHeld = false;
   let movementHeld = false;
@@ -2827,12 +2868,14 @@ async function performArenaRunningAttack(session, elementId, movementKey, xOffse
     // button transition when it is embedded inside one long multi-button action
     // sequence, which means the real page never receives pointerdown(button=0).
     await sleep(220);
+    lightHeld = true;
     await webdriver(session.base, "POST", `/session/${session.sessionId}/actions`, {
       actions: [{
         type: "pointer",
-        id: pointerId,
+        id: attackPointerId,
         parameters: { pointerType: "mouse" },
         actions: [
+          { type: "pointerMove", duration: 0, origin, x: xOffset, y: 0 },
           { type: "pointerDown", button: 0 },
           { type: "pause", duration: 40 },
           { type: "pointerUp", button: 0 },
@@ -2853,15 +2896,20 @@ async function performArenaRunningAttack(session, elementId, movementKey, xOffse
         actions: [{ type: "keyUp", value: movementKey }],
       });
     }
-    if (rightHeld || lightHeld) {
-      const pointerActions = [];
-      if (lightHeld) pointerActions.push({ type: "pointerUp", button: 0 });
-      if (rightHeld) pointerActions.push({ type: "pointerUp", button: 2 });
+    if (lightHeld) {
+      actions.push({
+        type: "pointer",
+        id: attackPointerId,
+        parameters: { pointerType: "mouse" },
+        actions: [{ type: "pointerUp", button: 0 }],
+      });
+    }
+    if (rightHeld) {
       actions.push({
         type: "pointer",
         id: pointerId,
         parameters: { pointerType: "mouse" },
-        actions: pointerActions,
+        actions: [{ type: "pointerUp", button: 2 }],
       });
     }
     if (actions.length > 0) {
