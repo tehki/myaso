@@ -2861,6 +2861,7 @@ async function setArenaAttack(session, elementId, pressed, xOffset = 200) {
 async function performArenaRunningAttack(session, elementId, movementKey, xOffset = 200) {
   const origin = { "element-6066-11e4-a52e-4f735466cecf": elementId };
   const pointerId = `mouse-${session.name}`;
+  const attackPointerId = `mouse-attack-${session.name}`;
   const keyboardId = `keyboard-${session.name}`;
   let rightHeld = false;
   let movementHeld = false;
@@ -2898,7 +2899,7 @@ async function performArenaRunningAttack(session, elementId, movementKey, xOffse
     await webdriver(session.base, "POST", `/session/${session.sessionId}/actions`, {
       actions: [{
         type: "pointer",
-        id: pointerId,
+        id: attackPointerId,
         parameters: { pointerType: "mouse" },
         actions: [
           { type: "pointerMove", duration: 0, origin, x: xOffset, y: 0 },
@@ -2918,37 +2919,18 @@ async function performArenaRunningAttack(session, elementId, movementKey, xOffse
       await webdriver(session.base, "POST", `/session/${session.sessionId}/actions`, {
         actions: [{
           type: "pointer",
-          id: pointerId,
+          id: attackPointerId,
           parameters: { pointerType: "mouse" },
           actions: [{ type: "pointerUp", button: 0 }],
         }],
       });
     }
-    if (rightHeld) {
-      // Release RMB in a dedicated pointer command at the arena position. Keeping
-      // it separate from keyboard release makes Chromium reliably dispatch the
-      // observable pointerup(button=2) instead of only clearing WebDriver state.
-      await webdriver(session.base, "POST", `/session/${session.sessionId}/actions`, {
-        actions: [{
-          type: "pointer",
-          id: pointerId,
-          parameters: { pointerType: "mouse" },
-          actions: [
-            { type: "pointerMove", duration: 0, origin, x: xOffset, y: 0 },
-            { type: "pointerUp", button: 2 },
-          ],
-        }],
-      });
+    if (rightHeld || movementHeld) {
+      // W3C Release Actions releases every depressed real WebDriver input in
+      // reverse order. Chromium then dispatches the held RMB and movement-key
+      // releases to the page even though LMB used a separate pointer source.
+      await webdriver(session.base, "DELETE", `/session/${session.sessionId}/actions`);
       await sleep(20);
-    }
-    if (movementHeld) {
-      await webdriver(session.base, "POST", `/session/${session.sessionId}/actions`, {
-        actions: [{
-          type: "key",
-          id: keyboardId,
-          actions: [{ type: "keyUp", value: movementKey }],
-        }],
-      });
     }
   }
 }
