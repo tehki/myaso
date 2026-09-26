@@ -538,3 +538,76 @@ test("directional light remains feintable only through the normal early light wi
   assert.equal(attacker.action, "feint_recovery");
   assert.equal(attacker.stamina, COMBAT.stamina.max - COMBAT.feint.staminaCost);
 });
+
+
+test("forward-relative light selects a long narrow thrust without sprinting", () => {
+  const world = duel({ distance: 108 });
+  const [attacker, target] = world.fighters;
+  stepWorld(world, {
+    a: { moveX: 1, attack: true, aimX: target.x, aimY: target.y },
+  }, 5);
+  assert.equal(attacker.action, "attack_thrust_windup");
+
+  const events = advance(
+    world,
+    COMBAT.thrustAttack.windupMs + COMBAT.thrustAttack.activeMs + 10,
+    { a: { aimX: target.x, aimY: target.y } },
+  );
+  assert.equal(target.hp, 70);
+  assert.equal(events.find((event) => event.type === "hit")?.damage, 30);
+
+  const neutral = duel({ distance: 108 });
+  const [, neutralTarget] = neutral.fighters;
+  advance(
+    neutral,
+    COMBAT.attack.windupMs + COMBAT.attack.activeMs + 10,
+    { a: { attack: true, aimX: neutralTarget.x, aimY: neutralTarget.y } },
+  );
+  assert.equal(neutralTarget.hp, 100);
+});
+
+test("backward-relative light selects slower higher-pressure overhead", () => {
+  const world = duel({ distance: 78 });
+  const [attacker, target] = world.fighters;
+  stepWorld(world, {
+    a: { moveX: -1, attack: true, aimX: target.x, aimY: target.y },
+  }, 5);
+  assert.equal(attacker.action, "attack_overhead_windup");
+  assert.ok(COMBAT.overheadAttack.windupMs > COMBAT.attack.windupMs);
+
+  const events = advance(
+    world,
+    COMBAT.overheadAttack.windupMs + COMBAT.overheadAttack.activeMs + 10,
+    { a: { aimX: target.x, aimY: target.y } },
+  );
+  assert.equal(target.hp, 62);
+  assert.equal(events.find((event) => event.type === "hit")?.damage, 38);
+  assert.ok(COMBAT.overheadAttack.guardDamage > COMBAT.attack.guardDamage);
+});
+
+test("dominant movement axis chooses side sweep over diagonal thrust", () => {
+  const world = duel({ distance: 160 });
+  const [attacker, target] = world.fighters;
+  stepWorld(world, {
+    a: { moveX: 0.6, moveY: -0.8, attack: true, aimX: target.x, aimY: target.y },
+  }, 5);
+  assert.equal(attacker.action, "attack_left_windup");
+});
+
+test("thrust and overhead share the ordinary early light feint contract", () => {
+  for (const moveX of [1, -1]) {
+    const world = duel({ distance: 160 });
+    const [attacker, target] = world.fighters;
+    stepWorld(world, {
+      a: { moveX, attack: true, aimX: target.x, aimY: target.y },
+    }, 5);
+    assert.ok(
+      attacker.action === "attack_thrust_windup" || attacker.action === "attack_overhead_windup",
+      attacker.action,
+    );
+    advance(world, 30, { a: { aimX: target.x, aimY: target.y } });
+    stepWorld(world, { a: { block: true, aimX: target.x, aimY: target.y } }, 5);
+    assert.equal(attacker.action, "feint_recovery");
+    assert.equal(attacker.stamina, COMBAT.stamina.max - COMBAT.feint.staminaCost);
+  }
+});
