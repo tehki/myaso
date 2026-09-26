@@ -227,6 +227,7 @@ function actionHint() {
   if (player.action === "heavy_attack_windup") return "Heavy committed — the long tell can be dodged or parried.";
   if (player.action === "attack_recovery") return "Recovery — this is where careless attacks get punished.";
   if (player.action === "heavy_attack_recovery") return "Heavy recovery — you are very punishable now.";
+  if (player.action === "feint_recovery") return "FEINT — attack cancelled; short recovery before you can act again.";
   if (player.action === "kick_windup" || player.action === "kick_active") return "SHOVE — unblocked contact knocks them down.";
   if (player.action === "jump") return "AIRBORNE — LMB now for a jumping attack.";
   if (player.action.startsWith("jump_attack")) return "JUMP ATTACK — committed aerial pressure.";

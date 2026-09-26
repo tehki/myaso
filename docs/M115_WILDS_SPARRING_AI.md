@@ -26,6 +26,14 @@ This makes the new counterplay mechanics appear naturally during sparring.
 
 When the player is visibly blocking inside shove range, the bot prefers kick/shove rather than repeatedly feeding the guard.
 
+### Punish discipline
+
+When the player is visibly stunned or in attack/kick/jump-attack recovery inside light range, the bot takes a normal light punish instead of continuing its generic offense cycle. This makes successful rolls, shoves, parries, and whiffs lead into readable follow-up pressure.
+
+### Stamina discipline
+
+Below 16 stamina the bot stops spending stamina and backs away/circles until it can recover. It does not sprint, roll, kick, or jump while critically exhausted.
+
 ### Offensive variation
 
 At close range the bot cycles deterministically through:
@@ -59,6 +67,9 @@ Dedicated tests prove:
 - short block remains bounded
 - blocking player triggers shove
 - jump chains into jumping attack
+- narrow jump attacks are not armed outside practical landing range
+- recovery/stun windows trigger a real light punish
+- critically low stamina causes a non-spending retreat
 - heavy attack remains part of the offensive rotation
 
 The combined combat, impact, readability, networking, and sparring-AI local suite is green.

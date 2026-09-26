@@ -347,6 +347,44 @@ test("successful parry leaves a comfortable real light punish window", () => {
 });
 
 
+
+test("early wheel-back feints a light attack into stamina-costing recovery", () => {
+  const world = duel({ distance: 60 });
+  const [a, b] = world.fighters;
+  stepWorld(world, { a: { attack: true, aimX: b.x, aimY: b.y } }, 5);
+  advance(world, 40, { a: { aimX: b.x, aimY: b.y } });
+  assert.equal(a.action, "attack_windup");
+
+  stepWorld(world, { a: { block: true, aimX: b.x, aimY: b.y } }, 5);
+  assert.equal(a.action, "feint_recovery");
+  assert.equal(a.stamina, COMBAT.stamina.max - COMBAT.feint.staminaCost);
+
+  advance(world, COMBAT.feint.recoveryMs + 20, { a: { aimX: b.x, aimY: b.y } });
+  assert.equal(a.action, "idle");
+  assert.equal(b.hp, 100);
+});
+
+test("late wheel-back cannot cancel a committed heavy strike", () => {
+  const world = duel({ distance: 60 });
+  const [a, b] = world.fighters;
+  stepWorld(world, { a: { heavyAttack: true, aimX: b.x, aimY: b.y } }, 5);
+  advance(world, COMBAT.feint.heavyWindowMs + 25, { a: { aimX: b.x, aimY: b.y } });
+  assert.equal(a.action, "heavy_attack_windup");
+
+  stepWorld(world, { a: { block: true, aimX: b.x, aimY: b.y } }, 5);
+  assert.equal(a.action, "heavy_attack_windup");
+  assert.equal(a.stamina, COMBAT.stamina.max);
+});
+
+test("feint is unavailable when stamina cannot pay its cost", () => {
+  const world = duel({ distance: 60 });
+  const [a, b] = world.fighters;
+  a.stamina = COMBAT.feint.staminaCost - 1;
+  stepWorld(world, { a: { attack: true, aimX: b.x, aimY: b.y } }, 5);
+  stepWorld(world, { a: { block: true, aimX: b.x, aimY: b.y } }, 5);
+  assert.equal(a.action, "attack_windup");
+});
+
 test("kick knockdown is a bounded fallen state that restores control", () => {
   const world = duel({ distance: 54 });
   const [a, b] = world.fighters;
@@ -376,4 +414,5 @@ test("knockdown ignores player movement input until recovery", () => {
   assert.equal(b.x, fallenX);
   assert.equal(b.y, fallenY);
   assert.equal(b.facing, fallenFacing);
+
 });

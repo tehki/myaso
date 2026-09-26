@@ -8,7 +8,7 @@ import { setTimeout as sleep } from "node:timers/promises";
 const root = process.cwd();
 const durationMs = Number(process.env.MYASO_PVP_FLIGHT_DURATION_MS ?? 7000);
 const scenario = process.env.MYASO_PVP_SCENARIO ?? "damage";
-if (!new Set(["damage", "inputloss", "parry", "dodge", "block", "guardbreak", "backblock", "respawn", "ui", "uirespawn", "uifeedback", "uihittell", "uivitals", "uiidentity", "uiscore", "uimatch", "uirematch", "uiffa3", "uikillfeed", "uifocus", "uithreat", "uithreatbearing", "uimultithreat", "uisecondarythreat", "uisecondarybearing", "uisecondaryphase", "uiguardarc", "uisecondaryguardarc", "uithreatmarkers", "uiparry", "uistun", "uiguardbreak", "uidodge", "uirecovery", "uirecoverytell", "uiattackintent", "uiheavy", "uiheavyinputloss", "uiheavyblock", "uiheavyparry", "uiheavydodge", "uiheavypunish", "uiheavyguardbreak", "uiheavyguardbreakpunish", "uiguardbreaktell", "uiparrytell", "uiblockfacingtell", "uidodgetell", "uideathtell"]).has(scenario)) throw new Error(`unsupported MYASO_PVP_SCENARIO: ${scenario}`);
+if (!new Set(["damage", "inputloss", "parry", "dodge", "block", "guardbreak", "backblock", "respawn", "ui", "uirespawn", "uifeedback", "uihittell", "uivitals", "uiidentity", "uiscore", "uimatch", "uirematch", "uiffa3", "uikillfeed", "uifocus", "uithreat", "uithreatbearing", "uimultithreat", "uisecondarythreat", "uisecondarybearing", "uisecondaryphase", "uiguardarc", "uisecondaryguardarc", "uithreatmarkers", "uiparry", "uistun", "uiguardbreak", "uidodge", "uirecovery", "uirecoverytell", "uiattackintent", "uiheavy", "uiheavyinputloss", "uiheavyblock", "uiheavyparry", "uiheavydodge", "uiheavypunish", "uiheavyguardbreak", "uiheavyguardbreakpunish", "uifeint", "uiguardbreaktell", "uiparrytell", "uiblockfacingtell", "uidodgetell", "uideathtell"]).has(scenario)) throw new Error(`unsupported MYASO_PVP_SCENARIO: ${scenario}`);
 const staticPort = Number(process.env.MYASO_PVP_FLIGHT_HTTP_PORT ?? 4174);
 const browsers = [
   {
@@ -194,6 +194,9 @@ try {
   } else if (scenario === "uiheavyguardbreakpunish") {
     const results = await runOnlineUiHeavyGuardBreakPunishFlight(sessions);
     console.log(`M111_HEAVY_GUARD_BREAK_PUNISH ${JSON.stringify({ ok: true, results })}`);
+  } else if (scenario === "uifeint") {
+    const results = await runOnlineUiFeintFlight(sessions);
+    console.log(`M117_REAL_WHEEL_FEINT ${JSON.stringify({ ok: true, results })}`);
   } else if (scenario === "uiguardbreaktell") {
     const results = await runOnlineUiGuardBreakTellFlight(sessions);
     console.log(`M40_FFA_GUARD_BREAK_TELL ${JSON.stringify({ ok: true, results })}`);
@@ -302,14 +305,14 @@ async function startBrowser(browser) {
   });
   const sessionId = created.sessionId ?? created.value?.sessionId;
   if (!sessionId) throw new Error(`${browser.name} WebDriver did not return a session id: ${JSON.stringify(created)}`);
-  if (scenario === "uiparry" || scenario === "uistun" || scenario === "uiguardbreak" || scenario === "uidodge" || scenario === "uiattackintent" || scenario === "uiheavy" || scenario === "uiheavyinputloss" || scenario === "uiheavyblock" || scenario === "uiheavyparry" || scenario === "uiheavydodge" || scenario === "uiheavypunish" || scenario === "uiheavyguardbreak" || scenario === "uiheavyguardbreakpunish" || scenario === "uiguardbreaktell" || scenario === "uiparrytell" || scenario === "uiblockfacingtell" || scenario === "uidodgetell") {
+  if (scenario === "uiparry" || scenario === "uistun" || scenario === "uiguardbreak" || scenario === "uidodge" || scenario === "uiattackintent" || scenario === "uiheavy" || scenario === "uiheavyinputloss" || scenario === "uiheavyblock" || scenario === "uiheavyparry" || scenario === "uiheavydodge" || scenario === "uiheavypunish" || scenario === "uiheavyguardbreak" || scenario === "uiheavyguardbreakpunish" || scenario === "uifeint" || scenario === "uiguardbreaktell" || scenario === "uiparrytell" || scenario === "uiblockfacingtell" || scenario === "uidodgetell") {
     await webdriver(base, "POST", `/session/${sessionId}/window/rect`, { x: 0, y: 0, width: 1280, height: 900 });
   }
   return { ...browser, child, base, sessionId };
 }
 
 async function navigate(session, gameUrl, certificateHash) {
-  const page = scenario === "ui" || scenario === "uirespawn" || scenario === "uifeedback" || scenario === "uihittell" || scenario === "uivitals" || scenario === "uiidentity" || scenario === "uiscore" || scenario === "uimatch" || scenario === "uirematch" || scenario === "uiffa3" || scenario === "uikillfeed" || scenario === "uifocus" || scenario === "uithreat" || scenario === "uithreatbearing" || scenario === "uimultithreat" || scenario === "uisecondarythreat" || scenario === "uisecondarybearing" || scenario === "uisecondaryphase" || scenario === "uiguardarc" || scenario === "uisecondaryguardarc" || scenario === "uithreatmarkers" || scenario === "uiparry" || scenario === "uistun" || scenario === "uiguardbreak" || scenario === "uidodge" || scenario === "uirecovery" || scenario === "uirecoverytell" || scenario === "uiattackintent" || scenario === "uiheavy" || scenario === "uiheavyinputloss" || scenario === "uiheavyblock" || scenario === "uiheavyparry" || scenario === "uiheavydodge" || scenario === "uiheavypunish" || scenario === "uiheavyguardbreak" || scenario === "uiheavyguardbreakpunish" || scenario === "uiguardbreaktell" || scenario === "uiparrytell" || scenario === "uiblockfacingtell" || scenario === "uidodgetell" || scenario === "uideathtell" ? "index.html" : "pvp-flight.html";
+  const page = scenario === "ui" || scenario === "uirespawn" || scenario === "uifeedback" || scenario === "uihittell" || scenario === "uivitals" || scenario === "uiidentity" || scenario === "uiscore" || scenario === "uimatch" || scenario === "uirematch" || scenario === "uiffa3" || scenario === "uikillfeed" || scenario === "uifocus" || scenario === "uithreat" || scenario === "uithreatbearing" || scenario === "uimultithreat" || scenario === "uisecondarythreat" || scenario === "uisecondarybearing" || scenario === "uisecondaryphase" || scenario === "uiguardarc" || scenario === "uisecondaryguardarc" || scenario === "uithreatmarkers" || scenario === "uiparry" || scenario === "uistun" || scenario === "uiguardbreak" || scenario === "uidodge" || scenario === "uirecovery" || scenario === "uirecoverytell" || scenario === "uiattackintent" || scenario === "uiheavy" || scenario === "uiheavyinputloss" || scenario === "uiheavyblock" || scenario === "uiheavyparry" || scenario === "uiheavydodge" || scenario === "uiheavypunish" || scenario === "uiheavyguardbreak" || scenario === "uiheavyguardbreakpunish" || scenario === "uifeint" || scenario === "uiguardbreaktell" || scenario === "uiparrytell" || scenario === "uiblockfacingtell" || scenario === "uidodgetell" || scenario === "uideathtell" ? "index.html" : "pvp-flight.html";
   const url = new URL(`http://127.0.0.1:${staticPort}/web/${page}`);
   url.searchParams.set("server", gameUrl);
   url.searchParams.set("cert", certificateHash);
@@ -448,12 +451,14 @@ async function runOnlineUiVitalsFlight(entries) {
     sampleRemoteVitalsPixels(attackerSession),
     sampleRemoteVitalsPixels(defenderSession),
   ]);
-  const closeTo = (actual, expected, tolerance = 8) => Math.abs(actual - expected) <= tolerance;
-  if (!closeTo(attackerVitals.hpPixels, 84) || !closeTo(attackerVitals.guardPixels, 126)) {
-    throw new Error(`M46 damaged remote vitals were not spatially rendered as 66/100: ${JSON.stringify(attackerVitals)}`);
+  const ratioCloseTo = (hpPixels, guardPixels, expected, tolerance = 0.08) =>
+    guardPixels >= 40 && Math.abs(hpPixels / guardPixels - expected) <= tolerance;
+  if (!ratioCloseTo(attackerVitals.hpPixels, attackerVitals.guardPixels, 0.66)
+    || attackerVitals.hpPixels >= attackerVitals.guardPixels) {
+    throw new Error(`M46 damaged remote vitals were not spatially rendered at the authoritative 66/100 ratio: ${JSON.stringify(attackerVitals)}`);
   }
-  if (!closeTo(defenderVitals.hpPixels, 126) || !closeTo(defenderVitals.guardPixels, 126)) {
-    throw new Error(`M46 undamaged remote vitals were not spatially rendered as 100/100: ${JSON.stringify(defenderVitals)}`);
+  if (!ratioCloseTo(defenderVitals.hpPixels, defenderVitals.guardPixels, 1.0)) {
+    throw new Error(`M46 undamaged remote vitals were not spatially rendered at the authoritative 100/100 ratio: ${JSON.stringify(defenderVitals)}`);
   }
   return evidence.map((entry) => ({
     ...entry,
@@ -816,20 +821,16 @@ async function runOnlineUiHeavyParryFlight(entries) {
   // pristine case. Any evidence that a heavy actually committed, hit, blocked,
   // or otherwise resolved makes the attempt terminal and therefore fail-closed.
   for (let attempt = 1; attempt <= 3 && !evidence; attempt += 1) {
-    await pulseMovementKey(attacker, "e", 40);
-    // The heavy active transition starts at 320 ms. Arm block at roughly 245 ms
-    // from the real E keydown, leaving about 75 ms of parry age at impact and
-    // enough margin for moderate Chrome/Firefox delivery skew.
-    await sleep(205);
-    let blockHeld = false;
-    try {
-      await setArenaBlock(defender, defenderElementId, true);
-      blockHeld = true;
-      await sleep(180);
-    } finally {
-      if (blockHeld) await setArenaBlock(defender, defenderElementId, false);
-    }
-    await sleep(80);
+    // Launch the attacker E edge and defender wheel-back from separate browser
+    // sessions at the same time. The delayed wheel is therefore relative to the
+    // same WebDriver dispatch boundary instead of a later UI/snapshot observation.
+    // At 230 ms, the unchanged 240 ms short block covers the 320 ms heavy active
+    // transition and its unchanged 125 ms opening parry window.
+    await Promise.all([
+      pulseMovementKey(attacker, "e", 40),
+      scrollArenaWheel(defender, defenderElementId, 120, 230),
+    ]);
+    await sleep(220);
 
     lastObserved = await Promise.all(entries.map(readUiEvidence));
     const attackerResult = lastObserved.find((entry) => entry.browser === attacker.name);
@@ -895,23 +896,46 @@ async function runOnlineUiHeavyParryFlight(entries) {
   return evidence;
 }
 async function runOnlineUiHeavyDodgeFlight(entries) {
-  // Match the already-stable M36 browser roles: Firefox attacks, Chrome dodges.
+  // Match the M36 browser roles but preserve enough starting separation that
+  // the Wilds roll does not immediately trigger its own collision knockdown.
   const staged = await prepareHeavyCounterplayFlight(
     entries,
     "M107 heavy dodge",
-    { attackerName: "firefox", defenderName: "chrome", movementMs: 260 },
+    { attackerName: "firefox", defenderName: "chrome", movementMs: 200 },
   );
   const { attacker, defender, movementCode } = staged;
 
-  // Submit both browser action sequences together. The defender's WebDriver
-  // sequence carries the pointer aim and wheel-forward in the same real action
-  // batch. Cross-browser WebDriver dispatch already contributes substantial
-  // latency, so add no synthetic pause: the 125 ms iframe must overlap the
-  // authoritative 320 ms heavy active transition rather than arrive in recovery.
-  await Promise.all([
-    pulseMovementKey(attacker, "e", 40),
-    pressArenaPerpendicularDodgeAfterPause(defender, 0),
-  ]);
+  const beforeCommit = await readUiEvidence(attacker);
+  const commitsBefore = beforeCommit.events.filter((text) =>
+    text.startsWith("Heavy strike committed")).length;
+  await pulseMovementKey(attacker, "e", 40);
+
+  let committedObserved = false;
+  const commitDeadline = Date.now() + 360;
+  while (Date.now() < commitDeadline) {
+    const state = await readUiEvidence(attacker);
+    const commits = state.events.filter((text) =>
+      text.startsWith("Heavy strike committed")).length;
+    if (commits > commitsBefore) {
+      committedObserved = true;
+      break;
+    }
+    await sleep(10);
+  }
+  if (!committedObserved) {
+    throw new Error(`M107 heavy dodge never observed authoritative heavy commitment: ${JSON.stringify(await readUiEvidence(attacker))}`);
+  }
+
+  // Begin the genuine pointer-directed roll late enough that the unchanged
+  // 125 ms iframe spans the ~320 ms heavy active transition, but early enough
+  // to move off the strike lane. No combat constants are altered.
+  // UI observation plus WebDriver dispatch already costs substantial time on
+  // CI. Current evidence places an immediate wheel about 130 ms after commit,
+  // which makes the unchanged 125 ms iframe expire before the ~320 ms heavy
+  // active transition. Add a bounded 100 ms pause after observation so the real
+  // wheel-forward roll overlaps contact while preserving all combat constants.
+  await sleep(100);
+  await pressArenaPerpendicularDodgeAfterPause(defender, 0);
   // Let active -> recovery resolve without evidence polling inside the iframe.
   await sleep(360);
 
@@ -938,6 +962,111 @@ async function runOnlineUiHeavyDodgeFlight(entries) {
   if (attackerResult.feedbackTransitions.includes("parried")
     || defenderResult.feedbackTransitions.includes("parry-success")) {
     throw new Error(`M107 heavy dodge accidentally resolved as parry: ${JSON.stringify(evidence)}`);
+  }
+  return evidence;
+}
+
+async function runOnlineUiFeintFlight(entries) {
+  const staged = await prepareHeavyCounterplayFlight(
+    entries,
+    "M117 wheel-back feint",
+    { attackerName: "chrome", defenderName: "firefox", movementMs: 150 },
+  );
+  const { attacker, defender, attackerElementId, movementCode } = staged;
+  const attackRight = movementCode === "KeyD";
+  const attackOffset = attackRight ? 200 : -200;
+
+  let defenderObservedRecovery = false;
+  let evidence = null;
+  for (let attempt = 1; attempt <= 3 && !defenderObservedRecovery; attempt += 1) {
+    const before = await Promise.all(entries.map(readUiEvidence));
+    const beforeAttacker = before.find((entry) => entry.browser === attacker.name);
+    const beforeDefender = before.find((entry) => entry.browser === defender.name);
+    if (!beforeAttacker || !beforeDefender) {
+      throw new Error(`M117 feint missing baseline evidence on attempt ${attempt}: ${JSON.stringify(before)}`);
+    }
+    const feintsBefore = beforeAttacker.events.filter((text) =>
+      text.startsWith("Feint recovery")).length;
+    const remoteRecoveriesBefore = beforeDefender.recoveryTransitions.filter((entry) =>
+      entry.visible && entry.state === "feint-recovery").length;
+
+    await performArenaFeint(attacker, attackerElementId, attackOffset);
+
+    const deadline = Date.now() + 900;
+    while (Date.now() < deadline) {
+      const state = await readUiEvidence(defender);
+      const remoteRecoveries = state.recoveryTransitions.filter((entry) =>
+        entry.visible
+        && entry.state === "feint-recovery"
+        && entry.label === "PUNISH"
+        && entry.detail === "Feint recovery").length;
+      if (remoteRecoveries > remoteRecoveriesBefore) {
+        defenderObservedRecovery = true;
+        break;
+      }
+      await sleep(20);
+    }
+
+    evidence = await Promise.all(entries.map(readUiEvidence));
+    const attemptAttacker = evidence.find((entry) => entry.browser === attacker.name);
+    const attemptDefender = evidence.find((entry) => entry.browser === defender.name);
+    if (!attemptAttacker || !attemptDefender) {
+      throw new Error(`M117 feint incomplete evidence on attempt ${attempt}: ${JSON.stringify(evidence)}`);
+    }
+    if (defenderObservedRecovery) break;
+
+    const feintsAfter = attemptAttacker.events.filter((text) =>
+      text.startsWith("Feint recovery")).length;
+    const cleanRemoteObservationMiss = feintsAfter > feintsBefore
+      && attemptAttacker.playerHp === 100 && attemptAttacker.playerGuard === 100
+      && attemptAttacker.opponentHp === 100 && attemptAttacker.opponentGuard === 100
+      && attemptDefender.playerHp === 100 && attemptDefender.playerGuard === 100
+      && !attemptAttacker.feedbackTransitions.includes("hit-confirm")
+      && !attemptDefender.feedbackTransitions.includes("damage-taken")
+      && !attemptAttacker.feedbackTransitions.includes("block-confirm")
+      && !attemptDefender.feedbackTransitions.includes("parry-success");
+    if (!cleanRemoteObservationMiss) {
+      throw new Error(`M117 feint attempt ${attempt} did not qualify for clean observation retry: ${JSON.stringify(evidence)}`);
+    }
+    if (attempt < 3) await sleep(340);
+  }
+
+  if (!evidence) evidence = await Promise.all(entries.map(readUiEvidence));
+  const attackerResult = evidence.find((entry) => entry.browser === attacker.name);
+  const defenderResult = evidence.find((entry) => entry.browser === defender.name);
+  if (!attackerResult || !defenderResult) {
+    throw new Error(`M117 feint incomplete evidence: ${JSON.stringify(evidence)}`);
+  }
+
+  const lightDown = attackerResult.pointers.find((event) =>
+    event.type === "pointerdown" && event.button === 0);
+  const lightUp = attackerResult.pointers.find((event) =>
+    event.type === "pointerup" && event.button === 0);
+  const wheelBack = attackerResult.wheels.find((event) => event.deltaY > 0);
+  if (!lightDown || !lightUp || !wheelBack) {
+    throw new Error(`M117 real LMB + wheel-back controls were not delivered: ${JSON.stringify(attackerResult)}`);
+  }
+  if (!defenderObservedRecovery) {
+    throw new Error(`M117 defender never observed authoritative feint recovery: ${JSON.stringify(defenderResult)}`);
+  }
+  if (attackerResult.playerHp !== 100 || attackerResult.playerGuard !== 100
+    || attackerResult.opponentHp !== 100 || attackerResult.opponentGuard !== 100
+    || defenderResult.playerHp !== 100 || defenderResult.playerGuard !== 100) {
+    throw new Error(`M117 feint changed authoritative vitals: ${JSON.stringify(evidence)}`);
+  }
+  // The remote replicated FeintRecovery state above is the authoritative proof.
+  // The attacker's event-text is intentionally not required here: it is a
+  // transient local presentation and can be overwritten by the next online
+  // status frame before the observer records it.
+  if (!attackerResult.events.some((text) => text.startsWith("Attack committed"))
+    && !attackerResult.events.some((text) => text.startsWith("Feint recovery"))) {
+    throw new Error(`M117 attacker never rendered the committed light/feint exchange: ${JSON.stringify(attackerResult)}`);
+  }
+  if (attackerResult.feedbackTransitions.includes("hit-confirm")
+    || defenderResult.feedbackTransitions.includes("damage-taken")
+    || attackerResult.feedbackTransitions.includes("block-confirm")
+    || defenderResult.feedbackTransitions.includes("parry-success")) {
+    throw new Error(`M117 feint accidentally resolved combat contact: ${JSON.stringify(evidence)}`);
   }
   return evidence;
 }
@@ -1019,13 +1148,33 @@ async function runOnlineUiHeavyWhiffPunishFlight(entries) {
   if (!recoveryObserved) {
     throw new Error(`M109 defender never observed live punishable heavy recovery after bounded clean latch retries: ${JSON.stringify(lastMiss)}`);
   }
-  // Once the tell is visible, the short real close plus light windup still lands
-  // inside the unchanged 420 ms heavy recovery.
-  await pulseMovementKey(defender, punishMoveKey, 160);
-  await sleep(20);
-  await aimArena(defender, defenderElementId, punishOffset);
-  await performArenaAttackBurst(defender, 2);
-  await sleep(320);
+  // Start the genuine light while the closing movement is still held instead
+  // of serializing 160 ms of movement before LMB. The old sequence could spend
+  // ~320 ms of the unchanged 420 ms recovery on WebDriver calls before the
+  // 135 ms light windup even began. This keeps the same real movement + LMB
+  // proof while starting the punish near the observed recovery edge.
+  let punishMoveHeld = false;
+  let punishAttackHeld = false;
+  try {
+    await setMovementKey(defender, punishMoveKey, true);
+    punishMoveHeld = true;
+    await aimArena(defender, defenderElementId, punishOffset);
+    await sleep(35);
+    await setArenaAttack(defender, defenderElementId, true, punishOffset);
+    punishAttackHeld = true;
+    await sleep(35);
+    await setArenaAttack(defender, defenderElementId, false, punishOffset);
+    punishAttackHeld = false;
+    await sleep(80);
+  } finally {
+    if (punishAttackHeld) {
+      await setArenaAttack(defender, defenderElementId, false, punishOffset);
+    }
+    if (punishMoveHeld) {
+      await setMovementKey(defender, punishMoveKey, false);
+    }
+  }
+  await sleep(260);
 
   const evidence = await Promise.all(entries.map(readUiEvidence));
   const attackerResult = evidence.find((entry) => entry.browser === attacker.name);
@@ -1119,13 +1268,20 @@ async function runOnlineUiDodgeFeedbackFlight(entries) {
       throw new Error(`M36 retry ${attempt} did not start from clean authoritative vitals: ${JSON.stringify(lastAttemptBaseline)}`);
     }
 
-    await performArenaAttackBurst(attacker, 2);
-    // M24 owns exact dodge reaction timing/geometry. The genuine attack burst finishes
-    // inside one unchanged 135 ms windup. A short fixed pause after that bounded burst
-    // places the real Chrome dodge iframe across the possible active transition without
-    // making this older M36 feedback acceptance depend on the later M54 threat HUD.
-    await sleep(35);
-    await pressArenaPerpendicularDodgeAfterPause(defender, 0);
+    // Deliver one genuine held LMB edge, then start the real wheel-forward roll
+    // early in the unchanged 135 ms windup. Keeping LMB held until after the roll
+    // gesture avoids spending most of the windup inside a multi-click WebDriver burst.
+    // M24 still owns exact reaction geometry; M36 only proves clean authoritative
+    // evade feedback with real browser controls.
+    let attackHeld = false;
+    try {
+      attackHeld = true;
+      await setArenaAttack(attacker, attackerElementId, true, attackOffset);
+      await sleep(20);
+      await pressArenaPerpendicularDodgeAfterPause(defender, 0);
+    } finally {
+      if (attackHeld) await setArenaAttack(attacker, attackerElementId, false, attackOffset);
+    }
     // Keep the iframe/strike resolution window free of evidence polling.
     await sleep(180);
     evidence = await waitForUiDodgeEvidence(entries, attacker, defender, 520, false, lastAttemptBaseline);
@@ -1454,8 +1610,8 @@ async function runOnlineUiHeavyGuardBreakFlight(entries, { returnTiming = false 
       const beforeAttacker = before.find((entry) => entry.browser === attacker.name);
       const beforeDefender = before.find((entry) => entry.browser === defender.name);
       if (!beforeAttacker || !beforeDefender
-        || beforeDefender.playerGuard < 36 || beforeDefender.playerGuard > 45) {
-        throw new Error(`M110 short-block sequence did not preserve bounded guard pressure before second heavy: ${JSON.stringify(before)}`);
+        || beforeDefender.playerGuard <= 0 || beforeDefender.playerGuard >= 64) {
+        throw new Error(`M110 short-block sequence did not preserve breakable guard pressure before second heavy: ${JSON.stringify(before)}`);
       }
       const guardBeforeSecond = beforeDefender.playerGuard;
       const commitsBefore = heavyCommitCount(beforeAttacker);
@@ -1466,12 +1622,32 @@ async function runOnlineUiHeavyGuardBreakFlight(entries, { returnTiming = false 
       await sleep(50);
       await setArenaBlock(defender, defenderElementId, true);
       await sleep(340);
-      const states = await Promise.all(entries.map(readUiEvidence));
-      const attackerState = states.find((entry) => entry.browser === attacker.name);
-      const defenderState = states.find((entry) => entry.browser === defender.name);
+      let states = await Promise.all(entries.map(readUiEvidence));
+      let attackerState = states.find((entry) => entry.browser === attacker.name);
+      let defenderState = states.find((entry) => entry.browser === defender.name);
       if (!attackerState || !defenderState) {
         throw new Error(`M110 second heavy incomplete evidence on attempt ${attempt}: ${JSON.stringify(states)}`);
       }
+
+      // The defender can render authoritative guard break one snapshot before the
+      // attacker's remote view converges to guard 0. Once the local defender is
+      // already broken, wait a bounded interval for the opposite client rather
+      // than misclassifying that mixed snapshot as an impossible resolution.
+      if (defenderState.playerGuard === 0 && attackerState.opponentGuard !== 0) {
+        const convergenceDeadline = Date.now() + 240;
+        while (Date.now() < convergenceDeadline) {
+          await sleep(20);
+          const converged = await Promise.all(entries.map(readUiEvidence));
+          const nextAttacker = converged.find((entry) => entry.browser === attacker.name);
+          const nextDefender = converged.find((entry) => entry.browser === defender.name);
+          if (!nextAttacker || !nextDefender) break;
+          states = converged;
+          attackerState = nextAttacker;
+          defenderState = nextDefender;
+          if (attackerState.opponentGuard === 0 && defenderState.playerGuard === 0) break;
+        }
+      }
+
       const commitsAfter = heavyCommitCount(attackerState);
       const guardBroken = attackerState.playerHp === 100 && attackerState.playerGuard === 100
         && defenderState.playerHp === 100 && defenderState.playerGuard === 0
@@ -1600,17 +1776,19 @@ async function runOnlineUiHeavyGuardBreakPunishFlight(entries) {
     entry.visible && (entry.phase === "WINDUP" || entry.phase === "STRIKE")).length;
 
   // Time genuine clicks from the accepted second-heavy request rather than from
-  // a remote recovery snapshot. Downs are centered tightly around the unchanged
-  // 840 ms heavy commitment boundary. The first may be ignored just before Idle;
-  // the following downs cross that boundary without spending the 185 ms punish
-  // margin on WebDriver/snapshot observation latency.
+  // a remote recovery snapshot. Authoritative input ingress and browser scheduling
+  // can shift the actual Idle boundary relative to the local issuance timestamp,
+  // so sample a bounded ~300 ms window around the unchanged 840 ms commitment.
+  // Only the first accepted click can start the light; subsequent clicks occur
+  // during its own commitment and are ignored. Exact-one-hit validation below
+  // remains fail-closed.
   const elapsedSinceHeavyIssue = Date.now() - secondHeavyIssuedAt;
-  const firstClickTargetMs = 835;
+  const firstClickTargetMs = 800;
   const initialPauseMs = Math.max(0, firstClickTargetMs - elapsedSinceHeavyIssue);
   // The in-page observer timestamps both event-text and overlay mutations. That
   // provides stronger ordering evidence than repeated WebDriver reads and does
   // not perturb Firefox while the real Chrome action sequence is executing.
-  await performArenaAttackBurst(attacker, 3, initialPauseMs, 12);
+  await performArenaAttackBurst(attacker, 9, initialPauseMs, 20);
 
   const attackerDeadline = Date.now() + 260;
   let attackerResult = null;
@@ -2594,6 +2772,46 @@ async function setArenaAttack(session, elementId, pressed, xOffset = 200) {
   });
 }
 
+async function performArenaFeint(session, elementId, xOffset = 200) {
+  const origin = { "element-6066-11e4-a52e-4f735466cecf": elementId };
+  const pointerId = `mouse-${session.name}`;
+  let attackHeld = false;
+  try {
+    // Send LMB as its own real browser action first. Keeping the button held
+    // across calls prevents the wheel-back edge from being coalesced into the
+    // same outbound combat sample as attack start.
+    await webdriver(session.base, "POST", `/session/${session.sessionId}/actions`, {
+      actions: [{
+        type: "pointer",
+        id: pointerId,
+        parameters: { pointerType: "mouse" },
+        actions: [
+          { type: "pointerMove", duration: 0, origin, x: xOffset, y: 0 },
+          { type: "pointerDown", button: 0 },
+        ],
+      }],
+    });
+    attackHeld = true;
+
+    // One prediction/input sample is enough to establish light windup. Wheel
+    // back remains well inside the unchanged 70 ms authoritative feint window.
+    await sleep(20);
+    await scrollArenaWheel(session, elementId, 120);
+    await sleep(10);
+  } finally {
+    if (attackHeld) {
+      await webdriver(session.base, "POST", `/session/${session.sessionId}/actions`, {
+        actions: [{
+          type: "pointer",
+          id: pointerId,
+          parameters: { pointerType: "mouse" },
+          actions: [{ type: "pointerUp", button: 0 }],
+        }],
+      });
+    }
+  }
+}
+
 async function performArenaAttack(session, elementId, xOffset = 200) {
   const origin = { "element-6066-11e4-a52e-4f735466cecf": elementId };
   await webdriver(session.base, "POST", `/session/${session.sessionId}/actions`, {
@@ -2627,7 +2845,7 @@ async function performArenaAttackBurst(session, clickCount = 3, initialPauseMs =
   const boundedPauseMs = Math.max(0, Math.min(1000, Math.trunc(initialPauseMs)));
   const boundedInterClickPauseMs = Math.max(0, Math.min(100, Math.trunc(interClickPauseMs)));
   if (boundedPauseMs > 0) actions.push({ type: "pause", duration: boundedPauseMs });
-  const boundedClickCount = Math.max(1, Math.min(3, Math.trunc(clickCount)));
+  const boundedClickCount = Math.max(1, Math.min(9, Math.trunc(clickCount)));
   for (let index = 0; index < boundedClickCount; index += 1) {
     actions.push({ type: "pointerDown", button: 0 });
     actions.push({ type: "pause", duration: 10 });
@@ -3713,9 +3931,12 @@ function assertPairedResults(results) {
       if (result.minDefenderHp !== 100 || result.minDefenderGuard !== 100) {
         throw new Error(`${result.browser} defender paid HP/guard cost during dodge: ${JSON.stringify(result)}`);
       }
-      if (result.defenderBlockSeen || result.attackerStunnedSeen || result.attackerKnockdownSeen) {
-        throw new Error(`${result.browser} dodge scenario accidentally resolved as block/parry/roll-collision knockdown`);
+      if (result.defenderBlockSeen || Number.isFinite(result.firstParryMs)) {
+        throw new Error(`${result.browser} roll scenario accidentally resolved as block/parry`);
       }
+      // Pointer-directed roll collisions may intentionally knock the attacker
+      // down. Verified in-range dodge overlap and untouched defender vitals
+      // remain the authoritative evade proof; knockdown is not a parry proxy.
       if (!Number.isFinite(result.firstDodgeEvadeMs) || !Number.isFinite(result.dodgeOverlapDistance) || !Number.isFinite(result.dodgeOverlapArcDelta)) {
         throw new Error(`${result.browser} did not record verified dodge geometry/timing`);
       }

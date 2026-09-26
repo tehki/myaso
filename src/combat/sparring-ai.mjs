@@ -6,6 +6,15 @@ const THREAT_WINDUPS = new Set([
   "jump_attack_windup",
 ]);
 
+const PUNISHABLE_ACTIONS = new Set([
+  "attack_recovery",
+  "heavy_attack_recovery",
+  "kick_recovery",
+  "jump_attack_recovery",
+  "feint_recovery",
+  "stunned",
+]);
+
 export function createSparringAi() {
   let blockUntilMs = 0;
   let nextActionAtMs = 0;
@@ -81,6 +90,18 @@ export function createSparringAi() {
       return output;
     }
 
+    if (stamina < 16) {
+      output.moveX = -nx * 0.62 - ny * side * 0.34;
+      output.moveY = -ny * 0.62 + nx * side * 0.34;
+      return output;
+    }
+
+    if (PUNISHABLE_ACTIONS.has(opponent.action) && distance <= 72 && nowMs >= nextActionAtMs) {
+      output.attack = true;
+      nextActionAtMs = nowMs + 520;
+      return output;
+    }
+
     if (distance > 76) {
       output.moveX = nx * 0.58 - ny * side * 0.42;
       output.moveY = ny * 0.58 + nx * side * 0.42;
@@ -110,7 +131,7 @@ export function createSparringAi() {
     } else if (cycle === 1 && stamina >= 20) {
       output.kick = true;
       nextActionAtMs = nowMs + 620;
-    } else if (cycle === 2 && stamina >= 32) {
+    } else if (cycle === 2 && stamina >= 32 && distance <= 64) {
       output.jump = true;
       jumpAttackArmed = true;
       nextActionAtMs = nowMs + 780;

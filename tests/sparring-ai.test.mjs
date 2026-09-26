@@ -100,3 +100,43 @@ test("sparring AI retains committed heavy variation at close range", () => {
   assert.equal(input.heavyAttack, true);
   assert.equal(input.attack, false);
 });
+
+
+test("sparring AI backs off to recover when stamina is critically low", () => {
+  const ai = createSparringAi();
+  const input = ai.sample({
+    nowMs: 1200,
+    self: fighter({ x: 100, y: 100, stamina: 10 }),
+    opponent: fighter({ x: 160, y: 100 }),
+  });
+  assert.ok(input.moveX < 0);
+  assert.equal(input.run, false);
+  assert.equal(input.attack, false);
+  assert.equal(input.heavyAttack, false);
+  assert.equal(input.kick, false);
+  assert.equal(input.jump, false);
+});
+
+test("sparring AI takes a real light punish on recovery or stun", () => {
+  for (const action of ["heavy_attack_recovery", "kick_recovery", "jump_attack_recovery", "feint_recovery", "stunned"]) {
+    const ai = createSparringAi();
+    const input = ai.sample({
+      nowMs: 1300,
+      self: fighter({ x: 100, y: 100, stamina: 100 }),
+      opponent: fighter({ x: 160, y: 100, action }),
+    });
+    assert.equal(input.attack, true, action);
+    assert.equal(input.heavyAttack, false, action);
+    assert.equal(input.kick, false, action);
+  }
+});
+
+test("sparring AI does not arm narrow jump attack outside its practical landing range", () => {
+  const ai = createSparringAi();
+  const input = ai.sample({
+    nowMs: 1600,
+    self: fighter({ x: 100, y: 100, stamina: 100 }),
+    opponent: fighter({ x: 170, y: 100 }),
+  });
+  assert.equal(input.jump, false);
+});
