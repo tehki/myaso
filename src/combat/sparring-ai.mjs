@@ -11,6 +11,7 @@ const PUNISHABLE_ACTIONS = new Set([
   "heavy_attack_recovery",
   "kick_recovery",
   "jump_attack_recovery",
+  "feint_recovery",
   "stunned",
 ]);
 
