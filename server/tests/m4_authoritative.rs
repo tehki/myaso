@@ -1124,10 +1124,7 @@ fn wilds_kick_knocks_down_unblocked_target_without_hp_damage() {
         InputIntent::default(),
     );
     assert_eq!(world.fighter(2).expect("target").hp.round() as u8, 100);
-    assert_eq!(
-        world.fighter(2).expect("target").action,
-        Action::Knockdown
-    );
+    assert_eq!(world.fighter(2).expect("target").action, Action::Knockdown);
     assert_eq!(
         world.fighter(1).expect("attacker").stamina.round() as u8,
         82
@@ -1557,7 +1554,6 @@ fn wilds_parry_stun_preserves_a_comfortable_light_punish_window() {
     assert_eq!(world.fighter(1).expect("attacker").hp.round() as u8, 66);
     assert_eq!(world.fighter(1).expect("attacker").action, Action::Stunned);
 }
-
 
 #[test]
 fn wilds_knockdown_is_distinct_from_parry_and_guard_break_stun() {
