@@ -1801,3 +1801,170 @@ fn directional_light_uses_the_existing_early_feint_contract() {
         88
     );
 }
+
+#[test]
+fn forward_relative_light_selects_authoritative_thrust_and_long_reach() {
+    let mut world = duel(108.0);
+    advance(
+        &mut world,
+        5.0,
+        InputIntent {
+            move_x: 1.0,
+            attack: true,
+            facing_radians: 0.0,
+            ..InputIntent::default()
+        },
+        InputIntent::default(),
+    );
+    assert_eq!(
+        world.fighter(1).expect("attacker").action,
+        Action::AttackThrustWindup
+    );
+
+    let events = advance(
+        &mut world,
+        230.0,
+        InputIntent {
+            facing_radians: 0.0,
+            ..InputIntent::default()
+        },
+        InputIntent::default(),
+    );
+    assert_eq!(world.fighter(2).expect("target").hp.round() as u8, 70);
+    assert!(events.iter().any(|event| matches!(
+        event,
+        CombatEvent::Hit {
+            attacker: 1,
+            target: 2,
+            damage: 30,
+            hp: 70,
+        }
+    )));
+
+    let mut neutral = duel(108.0);
+    advance(
+        &mut neutral,
+        230.0,
+        InputIntent {
+            attack: true,
+            facing_radians: 0.0,
+            ..InputIntent::default()
+        },
+        InputIntent::default(),
+    );
+    assert_eq!(neutral.fighter(2).expect("neutral target").hp.round() as u8, 100);
+}
+
+#[test]
+fn backward_relative_light_selects_authoritative_overhead_pressure() {
+    let mut world = duel(78.0);
+    advance(
+        &mut world,
+        5.0,
+        InputIntent {
+            move_x: -1.0,
+            attack: true,
+            facing_radians: 0.0,
+            ..InputIntent::default()
+        },
+        InputIntent::default(),
+    );
+    assert_eq!(
+        world.fighter(1).expect("attacker").action,
+        Action::AttackOverheadWindup
+    );
+
+    let events = advance(
+        &mut world,
+        280.0,
+        InputIntent {
+            facing_radians: 0.0,
+            ..InputIntent::default()
+        },
+        InputIntent::default(),
+    );
+    assert_eq!(world.fighter(2).expect("target").hp.round() as u8, 62);
+    assert!(events.iter().any(|event| matches!(
+        event,
+        CombatEvent::Hit {
+            attacker: 1,
+            target: 2,
+            damage: 38,
+            hp: 62,
+        }
+    )));
+}
+
+#[test]
+fn dominant_axis_keeps_diagonal_directional_selection_deterministic() {
+    let mut world = duel(160.0);
+    advance(
+        &mut world,
+        5.0,
+        InputIntent {
+            move_x: 0.6,
+            move_y: -0.8,
+            attack: true,
+            facing_radians: 0.0,
+            ..InputIntent::default()
+        },
+        InputIntent::default(),
+    );
+    assert_eq!(
+        world.fighter(1).expect("attacker").action,
+        Action::AttackLeftWindup
+    );
+}
+
+#[test]
+fn thrust_and_overhead_share_light_feint_contract_and_wire_codes() {
+    for move_x in [1.0_f32, -1.0_f32] {
+        let mut world = duel(160.0);
+        advance(
+            &mut world,
+            5.0,
+            InputIntent {
+                move_x,
+                attack: true,
+                facing_radians: 0.0,
+                ..InputIntent::default()
+            },
+            InputIntent::default(),
+        );
+        assert!(matches!(
+            world.fighter(1).expect("attacker").action,
+            Action::AttackThrustWindup | Action::AttackOverheadWindup
+        ));
+        advance(
+            &mut world,
+            30.0,
+            InputIntent {
+                facing_radians: 0.0,
+                ..InputIntent::default()
+            },
+            InputIntent::default(),
+        );
+        advance(
+            &mut world,
+            5.0,
+            InputIntent {
+                block: true,
+                facing_radians: 0.0,
+                ..InputIntent::default()
+            },
+            InputIntent::default(),
+        );
+        assert_eq!(
+            world.fighter(1).expect("attacker").action,
+            Action::FeintRecovery
+        );
+        assert_eq!(world.fighter(1).expect("attacker").stamina.round() as u8, 88);
+    }
+
+    assert_eq!(Action::AttackThrustWindup.wire_code(), 30);
+    assert_eq!(Action::AttackThrustActive.wire_code(), 31);
+    assert_eq!(Action::AttackThrustRecovery.wire_code(), 32);
+    assert_eq!(Action::AttackOverheadWindup.wire_code(), 33);
+    assert_eq!(Action::AttackOverheadActive.wire_code(), 34);
+    assert_eq!(Action::AttackOverheadRecovery.wire_code(), 35);
+}
