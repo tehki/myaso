@@ -478,7 +478,7 @@ test("run without meaningful movement keeps light attack semantics", () => {
 
 test("strafe-selected left sweep trades center coverage for a shifted attack lane", () => {
   const attacker = createFighter({ id: "a", x: 200, y: 200, facing: 0 });
-  const angle = 80 * Math.PI / 180;
+  const angle = -80 * Math.PI / 180;
   const target = createFighter({
     id: "b",
     x: 200 + Math.cos(angle) * 70,
@@ -488,7 +488,7 @@ test("strafe-selected left sweep trades center coverage for a shifted attack lan
   const world = createWorld({ width: 600, height: 400, fighters: [attacker, target] });
 
   stepWorld(world, {
-    a: { moveY: 1, attack: true, aimX: 400, aimY: 200 },
+    a: { moveY: -1, attack: true, aimX: 400, aimY: 200 },
   }, 5);
   assert.equal(attacker.action, "attack_left_windup");
 
@@ -520,7 +520,7 @@ test("opposite strafe selects the mirrored right sweep", () => {
   const world = duel({ distance: 200 });
   const [attacker] = world.fighters;
   stepWorld(world, {
-    a: { moveY: -1, attack: true, aimX: 400, aimY: 200 },
+    a: { moveY: 1, attack: true, aimX: 400, aimY: 200 },
   }, 5);
   assert.equal(attacker.action, "attack_right_windup");
 });
@@ -529,7 +529,7 @@ test("directional light remains feintable only through the normal early light wi
   const world = duel({ distance: 200 });
   const [attacker] = world.fighters;
   stepWorld(world, {
-    a: { moveY: 1, attack: true, aimX: 400, aimY: 200 },
+    a: { moveY: -1, attack: true, aimX: 400, aimY: 200 },
   }, 5);
   assert.equal(attacker.action, "attack_left_windup");
 
