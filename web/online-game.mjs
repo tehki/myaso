@@ -332,6 +332,10 @@ function predictMovement(input, dtMs) {
   else if (local.action === COMBAT_ACTION.attackWindup
     || local.action === COMBAT_ACTION.attackLeftWindup
     || local.action === COMBAT_ACTION.attackRightWindup) speed *= 0.35;
+  else if (local.action === COMBAT_ACTION.attackThrustWindup) speed *= COMBAT.thrustAttack.windupMoveMultiplier;
+  else if (local.action === COMBAT_ACTION.attackThrustActive) speed *= COMBAT.thrustAttack.activeMoveMultiplier;
+  else if (local.action === COMBAT_ACTION.attackOverheadWindup) speed *= COMBAT.overheadAttack.windupMoveMultiplier;
+  else if (local.action === COMBAT_ACTION.attackOverheadActive) speed *= COMBAT.overheadAttack.activeMoveMultiplier;
   else if (local.action === COMBAT_ACTION.runningAttackWindup) speed *= COMBAT.runningAttack.windupMoveMultiplier;
   else if (local.action === COMBAT_ACTION.runningAttackActive) speed *= COMBAT.runningAttack.activeMoveMultiplier;
   else if (local.action === COMBAT_ACTION.heavyAttackWindup) speed *= 0.20;
@@ -346,6 +350,8 @@ function predictMovement(input, dtMs) {
     || local.action === COMBAT_ACTION.attackLeftRecovery
     || local.action === COMBAT_ACTION.attackRightRecovery
     || local.action === COMBAT_ACTION.dodgeRecovery) speed *= 0.48;
+  else if (local.action === COMBAT_ACTION.attackThrustRecovery) speed *= COMBAT.thrustAttack.recoveryMoveMultiplier;
+  else if (local.action === COMBAT_ACTION.attackOverheadRecovery) speed *= COMBAT.overheadAttack.recoveryMoveMultiplier;
   else if (local.action === COMBAT_ACTION.heavyAttackRecovery) speed *= 0.35;
   else if (local.action === COMBAT_ACTION.runningAttackRecovery) speed *= COMBAT.runningAttack.recoveryMoveMultiplier;
   else if (local.action === COMBAT_ACTION.jump) speed *= COMBAT.jump.moveMultiplier;
@@ -526,6 +532,8 @@ function drawFighterScreen(x, y, fighter, body, shadow, remote = false, damageTe
   if (action === COMBAT_ACTION.attackWindup || action === COMBAT_ACTION.attackActive) drawAttackTell(action, remote);
   if (action === COMBAT_ACTION.attackLeftWindup || action === COMBAT_ACTION.attackLeftActive
     || action === COMBAT_ACTION.attackRightWindup || action === COMBAT_ACTION.attackRightActive) drawDirectionalAttackTell(action, remote);
+  if (action === COMBAT_ACTION.attackThrustWindup || action === COMBAT_ACTION.attackThrustActive) drawThrustAttackTell(action, remote);
+  if (action === COMBAT_ACTION.attackOverheadWindup || action === COMBAT_ACTION.attackOverheadActive) drawOverheadAttackTell(action, remote);
   if (action === COMBAT_ACTION.runningAttackWindup || action === COMBAT_ACTION.runningAttackActive) drawRunningAttackTell(action, remote);
   if (action === COMBAT_ACTION.heavyAttackWindup || action === COMBAT_ACTION.heavyAttackActive) drawHeavyAttackTell(action, remote);
   if (action === COMBAT_ACTION.jumpAttackWindup || action === COMBAT_ACTION.jumpAttackActive) drawJumpAttackTell(action, remote);
@@ -616,34 +624,42 @@ function drawWeaponTrail(action) {
   const light = action === COMBAT_ACTION.attackWindup || action === COMBAT_ACTION.attackActive;
   const leftSweep = action === COMBAT_ACTION.attackLeftWindup || action === COMBAT_ACTION.attackLeftActive;
   const rightSweep = action === COMBAT_ACTION.attackRightWindup || action === COMBAT_ACTION.attackRightActive;
+  const thrust = action === COMBAT_ACTION.attackThrustWindup || action === COMBAT_ACTION.attackThrustActive;
+  const overhead = action === COMBAT_ACTION.attackOverheadWindup || action === COMBAT_ACTION.attackOverheadActive;
   const running = action === COMBAT_ACTION.runningAttackWindup || action === COMBAT_ACTION.runningAttackActive;
   const heavy = action === COMBAT_ACTION.heavyAttackWindup || action === COMBAT_ACTION.heavyAttackActive;
   const jump = action === COMBAT_ACTION.jumpAttackWindup || action === COMBAT_ACTION.jumpAttackActive;
-  if (!light && !leftSweep && !rightSweep && !running && !heavy && !jump) return;
+  if (!light && !leftSweep && !rightSweep && !thrust && !overhead && !running && !heavy && !jump) return;
 
   const active = action === COMBAT_ACTION.attackActive
     || action === COMBAT_ACTION.attackLeftActive
     || action === COMBAT_ACTION.attackRightActive
+    || action === COMBAT_ACTION.attackThrustActive
+    || action === COMBAT_ACTION.attackOverheadActive
     || action === COMBAT_ACTION.runningAttackActive
     || action === COMBAT_ACTION.heavyAttackActive
     || action === COMBAT_ACTION.jumpAttackActive;
-  const radius = heavy ? 44 : running ? 42 : jump ? 40 : 36;
+  const radius = heavy ? 44 : thrust ? 46 : overhead ? 38 : running ? 42 : jump ? 40 : 36;
   const sweepOffset = leftSweep
     ? -COMBAT.directionalAttack.arcOffsetRadians
     : rightSweep
       ? COMBAT.directionalAttack.arcOffsetRadians
       : 0;
-  const start = (heavy ? -1.05 : running ? -0.54 : jump ? -0.34 : -0.72) + sweepOffset;
-  const end = (heavy ? 0.72 : running ? 0.34 : jump ? 0.30 : 0.48) + sweepOffset;
+  const start = (heavy ? -1.05 : thrust ? -0.14 : overhead ? -0.46 : running ? -0.54 : jump ? -0.34 : -0.72) + sweepOffset;
+  const end = (heavy ? 0.72 : thrust ? 0.14 : overhead ? 0.46 : running ? 0.34 : jump ? 0.30 : 0.48) + sweepOffset;
   ctx.save();
   ctx.strokeStyle = heavy
     ? (active ? "rgba(255, 105, 58, .88)" : "rgba(255, 173, 92, .42)")
+    : thrust
+      ? (active ? "rgba(117, 229, 199, .95)" : "rgba(111, 187, 168, .44)")
+    : overhead
+      ? (active ? "rgba(255, 177, 90, .95)" : "rgba(222, 142, 72, .44)")
     : running
       ? (active ? "rgba(113, 214, 255, .92)" : "rgba(126, 193, 222, .42)")
     : jump
       ? (active ? "rgba(255, 150, 72, .9)" : "rgba(255, 195, 102, .42)")
       : (active ? "rgba(238, 219, 160, .82)" : "rgba(214, 195, 148, .34)");
-  ctx.lineWidth = heavy ? 8 : running ? 6 : jump ? 6 : 5;
+  ctx.lineWidth = heavy ? 8 : overhead ? 7 : thrust ? 4 : running ? 6 : jump ? 6 : 5;
   ctx.lineCap = "round";
   ctx.beginPath();
   ctx.arc(0, 0, radius, start, end);
@@ -672,6 +688,48 @@ function drawDirectionalAttackTell(action, remote) {
     COMBAT.directionalAttack.reach + COMBAT.fighterRadius,
     offset - COMBAT.directionalAttack.arcRadians / 2,
     offset + COMBAT.directionalAttack.arcRadians / 2,
+  );
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+  ctx.restore();
+}
+
+function drawThrustAttackTell(action, remote) {
+  const active = action === COMBAT_ACTION.attackThrustActive;
+  ctx.save();
+  ctx.strokeStyle = active ? "#75e5c7" : "#6fbba8";
+  ctx.fillStyle = active ? "rgba(85, 196, 168, 0.24)" : "rgba(85, 196, 168, 0.11)";
+  ctx.lineWidth = remote ? 4 : 3;
+  ctx.beginPath();
+  ctx.moveTo(0, 0);
+  ctx.arc(
+    0,
+    0,
+    COMBAT.thrustAttack.reach + COMBAT.fighterRadius,
+    -COMBAT.thrustAttack.arcRadians / 2,
+    COMBAT.thrustAttack.arcRadians / 2,
+  );
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+  ctx.restore();
+}
+
+function drawOverheadAttackTell(action, remote) {
+  const active = action === COMBAT_ACTION.attackOverheadActive;
+  ctx.save();
+  ctx.strokeStyle = active ? "#ffb15a" : "#de8e48";
+  ctx.fillStyle = active ? "rgba(232, 139, 65, 0.26)" : "rgba(232, 139, 65, 0.12)";
+  ctx.lineWidth = remote ? 5 : 4;
+  ctx.beginPath();
+  ctx.moveTo(0, 0);
+  ctx.arc(
+    0,
+    0,
+    COMBAT.overheadAttack.reach + COMBAT.fighterRadius,
+    -COMBAT.overheadAttack.arcRadians / 2,
+    COMBAT.overheadAttack.arcRadians / 2,
   );
   ctx.closePath();
   ctx.fill();
