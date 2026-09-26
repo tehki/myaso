@@ -302,15 +302,15 @@ test("FFA scoreboard presentation ranks authoritative kill scores with stable id
 });
 
 test("FFA match presentation declares the authoritative score-target winner", () => {
-  assert.equal(FFA_KILL_TARGET, 2);
-  assert.deepEqual(fighterMatchPresentation([{ netId: 1, flags: 1 }, { netId: 2, flags: 0 }], 1), {
+  assert.equal(FFA_KILL_TARGET, 5);
+  assert.deepEqual(fighterMatchPresentation([{ netId: 1, flags: 4 }, { netId: 2, flags: 0 }], 1), {
     visible: false, winnerId: 0, ownVictory: false, title: "", detail: "",
   });
-  assert.deepEqual(fighterMatchPresentation([{ netId: 1, flags: 2 }, { netId: 2, flags: 0 }], 1), {
-    visible: true, winnerId: 1, ownVictory: true, title: "VICTORY", detail: "#1 wins · 2 KILLS",
+  assert.deepEqual(fighterMatchPresentation([{ netId: 1, flags: 5 }, { netId: 2, flags: 0 }], 1), {
+    visible: true, winnerId: 1, ownVictory: true, title: "VICTORY", detail: "#1 wins · 5 KILLS",
   });
-  assert.deepEqual(fighterMatchPresentation([{ netId: 1, flags: 2 }, { netId: 2, flags: 0 }], 2), {
-    visible: true, winnerId: 1, ownVictory: false, title: "MATCH OVER", detail: "#1 wins · 2 KILLS",
+  assert.deepEqual(fighterMatchPresentation([{ netId: 1, flags: 5 }, { netId: 2, flags: 0 }], 2), {
+    visible: true, winnerId: 1, ownVictory: false, title: "MATCH OVER", detail: "#1 wins · 5 KILLS",
   });
   assert.deepEqual(fighterMatchPresentation([{ netId: 1, flags: 0 }, { netId: 2, flags: 0 }], 1), {
     visible: false, winnerId: 0, ownVictory: false, title: "", detail: "",
