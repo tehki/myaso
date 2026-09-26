@@ -378,9 +378,9 @@ function drawWeaponTrail(action) {
   const active = action.endsWith("_active");
   const radius = heavy ? 44 : running ? 42 : jump ? 40 : 36;
   const sweepOffset = leftSweep
-    ? COMBAT.directionalAttack.arcOffsetRadians
+    ? -COMBAT.directionalAttack.arcOffsetRadians
     : rightSweep
-      ? -COMBAT.directionalAttack.arcOffsetRadians
+      ? COMBAT.directionalAttack.arcOffsetRadians
       : 0;
   const start = (heavy ? -1.05 : running ? -0.54 : jump ? -0.34 : -0.72) + sweepOffset;
   const end = (heavy ? 0.72 : running ? 0.34 : jump ? 0.30 : 0.48) + sweepOffset;
@@ -421,7 +421,7 @@ function drawAttackArc(fighter) {
 function drawDirectionalAttackArc(fighter) {
   const left = fighter.action === "attack_left_windup" || fighter.action === "attack_left_active";
   const active = fighter.action === "attack_left_active" || fighter.action === "attack_right_active";
-  const offset = left ? COMBAT.directionalAttack.arcOffsetRadians : -COMBAT.directionalAttack.arcOffsetRadians;
+  const offset = left ? -COMBAT.directionalAttack.arcOffsetRadians : COMBAT.directionalAttack.arcOffsetRadians;
   const progress = fighter.action.endsWith("_windup")
     ? fighter.actionElapsedMs / COMBAT.directionalAttack.windupMs
     : 1;
