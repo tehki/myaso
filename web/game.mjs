@@ -227,6 +227,12 @@ function actionHint() {
   if (player.action === "attack_left_windup") return "LEFT SWEEP — strafe-selected lane committed.";
   if (player.action === "attack_right_windup") return "RIGHT SWEEP — strafe-selected lane committed.";
   if (player.action === "attack_left_recovery" || player.action === "attack_right_recovery") return "SWEEP RECOVERY — the lane choice is punishable.";
+  if (player.action === "attack_thrust_windup") return "THRUST — long narrow lane committed.";
+  if (player.action === "attack_thrust_active") return "THRUST — finish the line.";
+  if (player.action === "attack_thrust_recovery") return "THRUST RECOVERY — missed reach is punishable.";
+  if (player.action === "attack_overhead_windup") return "OVERHEAD — slow high-pressure strike committed.";
+  if (player.action === "attack_overhead_active") return "OVERHEAD — finish the commitment.";
+  if (player.action === "attack_overhead_recovery") return "OVERHEAD RECOVERY — punishable after the swing.";
   if (player.action === "running_attack_windup") return "RUNNING STRIKE — momentum committed; opponents can read the lane.";
   if (player.action === "running_attack_active") return "RUNNING STRIKE — carry the lunge through contact.";
   if (player.action === "running_attack_recovery") return "RUNNING RECOVERY — missed lunges are punishable.";
@@ -335,6 +341,8 @@ function drawFighter(fighter, body, shadow) {
   if (fighter.action === "attack_windup" || fighter.action === "attack_active") drawAttackArc(fighter);
   if (fighter.action === "attack_left_windup" || fighter.action === "attack_left_active"
     || fighter.action === "attack_right_windup" || fighter.action === "attack_right_active") drawDirectionalAttackArc(fighter);
+  if (fighter.action === "attack_thrust_windup" || fighter.action === "attack_thrust_active") drawThrustAttackArc(fighter);
+  if (fighter.action === "attack_overhead_windup" || fighter.action === "attack_overhead_active") drawOverheadAttackArc(fighter);
   if (fighter.action === "running_attack_windup" || fighter.action === "running_attack_active") drawRunningAttackArc(fighter);
   if (fighter.action === "heavy_attack_windup" || fighter.action === "heavy_attack_active") drawHeavyAttackArc(fighter);
   if (fighter.action === "jump_attack_windup" || fighter.action === "jump_attack_active") drawJumpAttackArc(fighter);
@@ -370,29 +378,35 @@ function drawWeaponTrail(action) {
   const light = action === "attack_windup" || action === "attack_active";
   const leftSweep = action === "attack_left_windup" || action === "attack_left_active";
   const rightSweep = action === "attack_right_windup" || action === "attack_right_active";
+  const thrust = action === "attack_thrust_windup" || action === "attack_thrust_active";
+  const overhead = action === "attack_overhead_windup" || action === "attack_overhead_active";
   const running = action === "running_attack_windup" || action === "running_attack_active";
   const heavy = action === "heavy_attack_windup" || action === "heavy_attack_active";
   const jump = action === "jump_attack_windup" || action === "jump_attack_active";
-  if (!light && !leftSweep && !rightSweep && !running && !heavy && !jump) return;
+  if (!light && !leftSweep && !rightSweep && !thrust && !overhead && !running && !heavy && !jump) return;
 
   const active = action.endsWith("_active");
-  const radius = heavy ? 44 : running ? 42 : jump ? 40 : 36;
+  const radius = heavy ? 44 : thrust ? 46 : overhead ? 38 : running ? 42 : jump ? 40 : 36;
   const sweepOffset = leftSweep
     ? -COMBAT.directionalAttack.arcOffsetRadians
     : rightSweep
       ? COMBAT.directionalAttack.arcOffsetRadians
       : 0;
-  const start = (heavy ? -1.05 : running ? -0.54 : jump ? -0.34 : -0.72) + sweepOffset;
-  const end = (heavy ? 0.72 : running ? 0.34 : jump ? 0.30 : 0.48) + sweepOffset;
+  const start = (heavy ? -1.05 : thrust ? -0.14 : overhead ? -0.46 : running ? -0.54 : jump ? -0.34 : -0.72) + sweepOffset;
+  const end = (heavy ? 0.72 : thrust ? 0.14 : overhead ? 0.46 : running ? 0.34 : jump ? 0.30 : 0.48) + sweepOffset;
   ctx.save();
   ctx.strokeStyle = heavy
     ? (active ? "rgba(255, 105, 58, .88)" : "rgba(255, 173, 92, .42)")
+    : thrust
+      ? (active ? "rgba(117, 229, 199, .95)" : "rgba(111, 187, 168, .44)")
+    : overhead
+      ? (active ? "rgba(255, 177, 90, .95)" : "rgba(222, 142, 72, .44)")
     : running
       ? (active ? "rgba(113, 214, 255, .92)" : "rgba(126, 193, 222, .42)")
     : jump
       ? (active ? "rgba(255, 150, 72, .9)" : "rgba(255, 195, 102, .42)")
       : (active ? "rgba(238, 219, 160, .82)" : "rgba(214, 195, 148, .34)");
-  ctx.lineWidth = heavy ? 8 : running ? 6 : jump ? 6 : 5;
+  ctx.lineWidth = heavy ? 8 : overhead ? 7 : thrust ? 4 : running ? 6 : jump ? 6 : 5;
   ctx.lineCap = "round";
   ctx.beginPath();
   ctx.arc(0, 0, radius, start, end);
@@ -437,6 +451,52 @@ function drawDirectionalAttackArc(fighter) {
     COMBAT.directionalAttack.reach + COMBAT.fighterRadius,
     offset - COMBAT.directionalAttack.arcRadians / 2,
     offset + COMBAT.directionalAttack.arcRadians / 2,
+  );
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+}
+
+function drawThrustAttackArc(fighter) {
+  const active = fighter.action === "attack_thrust_active";
+  const progress = fighter.action === "attack_thrust_windup"
+    ? fighter.actionElapsedMs / COMBAT.thrustAttack.windupMs
+    : 1;
+  const alpha = active ? 0.28 : 0.08 + Math.min(1, progress) * 0.12;
+  ctx.fillStyle = `rgba(85, 196, 168, ${alpha})`;
+  ctx.strokeStyle = active ? "rgba(117, 229, 199, .96)" : "rgba(111, 187, 168, .7)";
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.moveTo(0, 0);
+  ctx.arc(
+    0,
+    0,
+    COMBAT.thrustAttack.reach + COMBAT.fighterRadius,
+    -COMBAT.thrustAttack.arcRadians / 2,
+    COMBAT.thrustAttack.arcRadians / 2,
+  );
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+}
+
+function drawOverheadAttackArc(fighter) {
+  const active = fighter.action === "attack_overhead_active";
+  const progress = fighter.action === "attack_overhead_windup"
+    ? fighter.actionElapsedMs / COMBAT.overheadAttack.windupMs
+    : 1;
+  const alpha = active ? 0.30 : 0.08 + Math.min(1, progress) * 0.16;
+  ctx.fillStyle = `rgba(232, 139, 65, ${alpha})`;
+  ctx.strokeStyle = active ? "rgba(255, 177, 90, .96)" : "rgba(222, 142, 72, .72)";
+  ctx.lineWidth = 4;
+  ctx.beginPath();
+  ctx.moveTo(0, 0);
+  ctx.arc(
+    0,
+    0,
+    COMBAT.overheadAttack.reach + COMBAT.fighterRadius,
+    -COMBAT.overheadAttack.arcRadians / 2,
+    COMBAT.overheadAttack.arcRadians / 2,
   );
   ctx.closePath();
   ctx.fill();
