@@ -1659,7 +1659,7 @@ fn running_attack_requires_meaningful_movement_and_uses_distinct_wire_states() {
 
 #[test]
 fn directional_left_light_uses_shifted_authoritative_lane_without_damage_upgrade() {
-    let angle = 80.0_f32.to_radians();
+    let angle = (-80.0_f32).to_radians();
     let mut world = World::new(600.0, 400.0);
     assert!(world.add_player_at(1, 200.0, 200.0, 0.0));
     assert!(world.add_player_at(
@@ -1673,7 +1673,7 @@ fn directional_left_light_uses_shifted_authoritative_lane_without_damage_upgrade
         &mut world,
         5.0,
         InputIntent {
-            move_y: 1.0,
+            move_y: -1.0,
             attack: true,
             facing_radians: 0.0,
             ..InputIntent::default()
@@ -1733,7 +1733,7 @@ fn opposite_strafe_selects_right_directional_light_and_wire_states_are_distinct(
         &mut world,
         5.0,
         InputIntent {
-            move_y: -1.0,
+            move_y: 1.0,
             attack: true,
             facing_radians: 0.0,
             ..InputIntent::default()
@@ -1759,7 +1759,7 @@ fn directional_light_uses_the_existing_early_feint_contract() {
         &mut world,
         5.0,
         InputIntent {
-            move_y: 1.0,
+            move_y: -1.0,
             attack: true,
             facing_radians: 0.0,
             ..InputIntent::default()
