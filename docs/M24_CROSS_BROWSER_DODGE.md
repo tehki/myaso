@@ -36,4 +36,4 @@ CI #169 exact-head retry exposed a transport/timing flake in which the defender 
 
 M24 now preserves its original authoritative iframe/geometry proof under the Wilds control schema. The defender commits the dodge primitive with its **facing vector set perpendicular to the incoming strike**, matching the player-facing rule that a wheel-forward roll always travels toward the mouse pointer. The movement vector is deliberately redundant and cannot steer the committed roll.
 
-The acceptance still requires a live in-range attack-active/roll overlap, unchanged HP/guard, verified geometry, and no accidental block/parry or roll-collision stun.
+The acceptance still requires a live in-range attack-active/roll overlap, unchanged HP/guard, verified geometry, and no accidental block/parry. A short attacker stun is valid when the roll physically collides, because roll collision knockdown is now an intentional combat outcome rather than a parry signal.
