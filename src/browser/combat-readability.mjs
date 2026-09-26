@@ -383,7 +383,7 @@ export function killFeedPresentation(event, ownId = 0) {
   };
 }
 
-export const FFA_KILL_TARGET = 2;
+export const FFA_KILL_TARGET = 5;
 
 export function fighterScoreboardPresentation(entities, ownId = 0) {
   if (!entities || typeof entities[Symbol.iterator] !== "function") return [];
