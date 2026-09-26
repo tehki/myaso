@@ -4,6 +4,7 @@ import { readFile, stat } from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
 import { setTimeout as sleep } from "node:timers/promises";
+import { FFA_KILL_TARGET } from "../src/browser/combat-readability.mjs";
 
 const root = process.cwd();
 const durationMs = Number(process.env.MYASO_PVP_FLIGHT_DURATION_MS ?? 7000);
@@ -2080,30 +2081,66 @@ async function runOnlineUiMatchFlight(entries) {
   const defender = entries.find((entry) => entry.name === ordered[1]?.browser);
   if (!attacker || !defender) throw new Error(`M49 could not resolve match roles: ${JSON.stringify(firstScore)}`);
 
+  const winnerId = ordered[0]?.playerNetId ?? 0;
+  if (!winnerId) throw new Error(`M121 could not resolve first-to-five leader identity: ${JSON.stringify(firstScore)}`);
+
   await Promise.all(entries.map(installUiObserver));
   await waitForUiReady(entries);
   await Promise.all(entries.map((entry) => execute(entry.base, entry.sessionId, "document.querySelector('#arena').focus(); return document.activeElement?.id;")));
-  const elementId = await resolveArenaElement(attacker, "M49");
+  const elementId = await resolveArenaElement(attacker, "M121 first-to-five");
 
   let matchEvidence = null;
-  await pulseMovementKey(attacker, "a", 500);
-  await pulseMovementKey(attacker, "d", 140);
-  for (let attempt = 0; attempt < 8 && !matchEvidence; attempt += 1) {
-    await performArenaAttack(attacker, elementId);
-    matchEvidence = await waitForUiMatchEndEvidence(entries, attacker, defender, 850, false);
-    if (!matchEvidence) await pulseMovementKey(attacker, "d", 40);
+  for (let expectedKills = 2; expectedKills <= FFA_KILL_TARGET; expectedKills += 1) {
+    // Reset the attacker to a repeatable approach lane using only ordinary
+    // movement. The defeated rival already respawns at the authoritative spawn.
+    await pulseMovementKey(attacker, "a", 500);
+    await pulseMovementKey(attacker, "d", 140);
+
+    let pointEvidence = null;
+    for (let attempt = 0; attempt < 8 && !pointEvidence; attempt += 1) {
+      await performArenaAttack(attacker, elementId);
+      pointEvidence = expectedKills === FFA_KILL_TARGET
+        ? await waitForUiMatchEndEvidence(entries, attacker, defender, 850, false)
+        : await waitForUiKillScoreEvidence(entries, attacker, defender, expectedKills, 850, false);
+      if (!pointEvidence) await pulseMovementKey(attacker, "d", 40);
+    }
+    if (!pointEvidence) {
+      pointEvidence = expectedKills === FFA_KILL_TARGET
+        ? await waitForUiMatchEndEvidence(entries, attacker, defender, 1500, true)
+        : await waitForUiKillScoreEvidence(entries, attacker, defender, expectedKills, 1500, true);
+    }
+
+    if (expectedKills === FFA_KILL_TARGET) {
+      matchEvidence = pointEvidence;
+      break;
+    }
+
+    const respawned = await waitForUiRespawnEvidence(entries, attacker, defender, 2300);
+    if (expectedKills === FFA_KILL_TARGET - 1) {
+      const expectedPoint = `MATCH POINT · #${winnerId} · ${expectedKills}/${FFA_KILL_TARGET} KILLS`;
+      for (const entry of respawned) {
+        if (entry.scoreboardTitle !== `FIRST TO ${FFA_KILL_TARGET}`
+          || !entry.matchPointVisible
+          || entry.matchPointText !== expectedPoint) {
+          throw new Error(`M121 4/5 match-point HUD did not converge: ${JSON.stringify(respawned)}`);
+        }
+      }
+    }
   }
-  if (!matchEvidence) matchEvidence = await waitForUiMatchEndEvidence(entries, attacker, defender, 1400, true);
+
+  if (!matchEvidence) throw new Error("M121 first-to-five match never reached authoritative victory");
 
   await sleep(1500);
   const frozen = await Promise.all(entries.map(readUiEvidence));
   const winner = frozen.find((entry) => entry.browser === attacker.name);
   const loser = frozen.find((entry) => entry.browser === defender.name);
-  if (!winner || !loser) throw new Error(`M49 incomplete frozen match evidence: ${JSON.stringify(frozen)}`);
-  if (winner.scoreboardRows[0]?.kills !== 2 || loser.scoreboardRows[0]?.kills !== 2
+  if (!winner || !loser) throw new Error(`M121 incomplete frozen match evidence: ${JSON.stringify(frozen)}`);
+  if (winner.scoreboardRows[0]?.kills !== FFA_KILL_TARGET
+    || loser.scoreboardRows[0]?.kills !== FFA_KILL_TARGET
     || winner.opponentHp !== 0 || loser.playerHp !== 0
-    || winner.overlayTitle !== "VICTORY" || loser.overlayTitle !== "MATCH OVER") {
-    throw new Error(`M49 authoritative match state did not remain frozen past respawn time: ${JSON.stringify(frozen)}`);
+    || winner.overlayTitle !== "VICTORY" || loser.overlayTitle !== "MATCH OVER"
+    || winner.matchPointVisible || loser.matchPointVisible) {
+    throw new Error(`M121 authoritative first-to-five state did not remain frozen past respawn time: ${JSON.stringify(frozen)}`);
   }
   return frozen;
 }
@@ -3886,6 +3923,27 @@ async function waitForUiPostResetDamageEvidence(entries, attacker, defender, tim
   throw new Error(`real online UI rematch never accepted fresh authoritative damage: ${JSON.stringify(await Promise.all(entries.map(readUiEvidence)))}`);
 }
 
+async function waitForUiKillScoreEvidence(entries, attacker, defender, expectedKills, timeoutMs, fail = true) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const states = await Promise.all(entries.map(readUiEvidence));
+    const attackerState = states.find((entry) => entry.browser === attacker.name);
+    const defenderState = states.find((entry) => entry.browser === defender.name);
+    const winnerId = attackerState?.playerNetId ?? 0;
+    const loserId = defenderState?.playerNetId ?? 0;
+    const scoreReady = attackerState?.scoreboardRows?.length === 2 && defenderState?.scoreboardRows?.length === 2
+      && attackerState.scoreboardRows[0]?.label === `#${winnerId}` && attackerState.scoreboardRows[0]?.kills === expectedKills
+      && attackerState.scoreboardRows[1]?.label === `#${loserId}` && attackerState.scoreboardRows[1]?.kills === 0
+      && defenderState.scoreboardRows[0]?.label === `#${winnerId}` && defenderState.scoreboardRows[0]?.kills === expectedKills
+      && defenderState.scoreboardRows[1]?.label === `#${loserId}` && defenderState.scoreboardRows[1]?.kills === 0;
+    const deathReady = attackerState?.opponentHp === 0 && defenderState?.playerHp === 0;
+    if (winnerId && loserId && scoreReady && deathReady) return states;
+    await sleep(50);
+  }
+  if (!fail) return null;
+  throw new Error(`real online UI never converged to authoritative ${expectedKills}-0 score: ${JSON.stringify(await Promise.all(entries.map(readUiEvidence)))}`);
+}
+
 async function waitForUiMatchEndEvidence(entries, attacker, defender, timeoutMs, fail = true) {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
@@ -3894,11 +3952,11 @@ async function waitForUiMatchEndEvidence(entries, attacker, defender, timeoutMs,
     const defenderState = states.find((entry) => entry.browser === defender.name);
     const winnerId = attackerState?.playerNetId ?? 0;
     const loserId = defenderState?.playerNetId ?? 0;
-    const expectedDetail = `#${winnerId} wins · 2 KILLS`;
+    const expectedDetail = `#${winnerId} wins · ${FFA_KILL_TARGET} KILLS`;
     const scoreReady = attackerState?.scoreboardRows?.length === 2 && defenderState?.scoreboardRows?.length === 2
-      && attackerState.scoreboardRows[0]?.label === `#${winnerId}` && attackerState.scoreboardRows[0]?.kills === 2
+      && attackerState.scoreboardRows[0]?.label === `#${winnerId}` && attackerState.scoreboardRows[0]?.kills === FFA_KILL_TARGET
       && attackerState.scoreboardRows[1]?.label === `#${loserId}` && attackerState.scoreboardRows[1]?.kills === 0
-      && defenderState.scoreboardRows[0]?.label === `#${winnerId}` && defenderState.scoreboardRows[0]?.kills === 2
+      && defenderState.scoreboardRows[0]?.label === `#${winnerId}` && defenderState.scoreboardRows[0]?.kills === FFA_KILL_TARGET
       && defenderState.scoreboardRows[1]?.label === `#${loserId}` && defenderState.scoreboardRows[1]?.kills === 0;
     const overlaysReady = attackerState?.overlayVisible && attackerState.overlayTitle === "VICTORY" && attackerState.overlayDetail === expectedDetail
       && defenderState?.overlayVisible && defenderState.overlayTitle === "MATCH OVER" && defenderState.overlayDetail === expectedDetail;
@@ -3907,7 +3965,7 @@ async function waitForUiMatchEndEvidence(entries, attacker, defender, timeoutMs,
     await sleep(50);
   }
   if (!fail) return null;
-  throw new Error(`real online UI never rendered authoritative match winner: ${JSON.stringify(await Promise.all(entries.map(readUiEvidence)))}`);
+  throw new Error(`real online UI never rendered authoritative first-to-${FFA_KILL_TARGET} winner: ${JSON.stringify(await Promise.all(entries.map(readUiEvidence)))}`);
 }
 
 async function waitForUiRespawnEvidence(entries, attacker, defender, timeoutMs) {
@@ -3940,6 +3998,9 @@ async function readUiEvidence(session) {
       opponentHp: Number(document.querySelector('#bot-hp-value')?.textContent ?? NaN),
       opponentGuard: Number(document.querySelector('#bot-guard-value')?.textContent ?? NaN),
       focusLabel: document.querySelector('#focus-label')?.textContent?.trim() ?? '',
+      scoreboardTitle: document.querySelector('#scoreboard-title')?.textContent?.trim() ?? '',
+      matchPointVisible: !document.querySelector('#match-point')?.hidden,
+      matchPointText: document.querySelector('#match-point')?.textContent?.trim() ?? '',
       scoreboardRows: [...document.querySelectorAll('#scoreboard-list li')].map((row) => ({
         label: row.querySelector('span')?.textContent?.trim() ?? '',
         kills: Number(row.querySelector('b')?.textContent ?? NaN),
