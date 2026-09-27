@@ -1009,30 +1009,82 @@ async function runOnlineUiRunningAttackFlight(entries) {
   const movementKey = movementCode === "KeyD" ? "d" : "a";
   const attackOffset = movementCode === "KeyD" ? 200 : -200;
 
-  await performArenaRunningAttack(attacker, attackerElementId, movementKey, attackOffset);
-
-  const deadline = Date.now() + 1200;
   let evidence = null;
-  while (Date.now() < deadline) {
-    const current = await Promise.all(entries.map(readUiEvidence));
-    const attackerResult = current.find((entry) => entry.browser === attacker.name);
-    const defenderResult = current.find((entry) => entry.browser === defender.name);
-    const hit = attackerResult?.events.includes("Opponent hit - 30 HP.")
-      && defenderResult?.events.includes("Hit taken - 30 HP.")
-      && attackerResult?.opponentHp === 70
-      && defenderResult?.playerHp === 70;
-    const recovery = defenderResult?.recoveryTransitions.some((entry) =>
-      entry.visible
-      && entry.state === "running-attack-recovery"
-      && entry.label === "PUNISH"
-      && entry.detail === "Running recovery");
-    if (hit && recovery) {
-      evidence = current;
-      break;
+  let lastObserved = null;
+  let successfulPointerOffset = 0;
+  let successfulKeyOffset = 0;
+  for (let attempt = 1; attempt <= 3 && !evidence; attempt += 1) {
+    const beforeAttempt = await readUiEvidence(attacker);
+    const attemptPointerOffset = beforeAttempt.pointers.length;
+    const attemptKeyOffset = beforeAttempt.keys.length;
+    await performArenaRunningAttack(attacker, attackerElementId, movementKey, attackOffset);
+
+    const deadline = Date.now() + 1200;
+    while (Date.now() < deadline) {
+      const current = await Promise.all(entries.map(readUiEvidence));
+      const attackerResult = current.find((entry) => entry.browser === attacker.name);
+      const defenderResult = current.find((entry) => entry.browser === defender.name);
+      const hit = attackerResult?.events.includes("Opponent hit - 30 HP.")
+        && defenderResult?.events.includes("Hit taken - 30 HP.")
+        && attackerResult?.opponentHp === 70
+        && defenderResult?.playerHp === 70;
+      const recovery = defenderResult?.recoveryTransitions.some((entry) =>
+        entry.visible
+        && entry.state === "running-attack-recovery"
+        && entry.label === "PUNISH"
+        && entry.detail === "Running recovery");
+      if (hit && recovery) {
+        successfulPointerOffset = attemptPointerOffset;
+        successfulKeyOffset = attemptKeyOffset;
+        evidence = current;
+        break;
+      }
+      await sleep(20);
     }
-    await sleep(20);
+    if (evidence) break;
+
+    lastObserved = await Promise.all(entries.map(readUiEvidence));
+    const attemptAttacker = lastObserved.find((entry) => entry.browser === attacker.name);
+    const attemptDefender = lastObserved.find((entry) => entry.browser === defender.name);
+    if (!attemptAttacker || !attemptDefender) {
+      throw new Error(`M119 running strike incomplete latch evidence on attempt ${attempt}: ${JSON.stringify(lastObserved)}`);
+    }
+    const attemptPointers = attemptAttacker.pointers.slice(attemptPointerOffset);
+    const attemptKeys = attemptAttacker.keys.slice(attemptKeyOffset);
+    const attemptRightDown = attemptPointers.find((event) => event.type === "pointerdown" && event.button === 2);
+    const attemptRightUp = attemptPointers.find((event) => event.type === "pointerup" && event.button === 2);
+    const attemptLightDown = attemptPointers.find((event) => event.type === "pointerdown" && event.button === 0);
+    const attemptLightUp = attemptPointers.find((event) => event.type === "pointerup" && event.button === 0);
+    const completeGesture = Boolean(attemptRightDown && attemptRightUp && attemptLightDown && attemptLightUp)
+      && attemptKeys.includes(`keydown:${movementCode}`)
+      && attemptKeys.includes(`keyup:${movementCode}`)
+      && attemptLightDown.t - attemptRightDown.t >= 180
+      && attemptLightUp.t > attemptLightDown.t
+      && attemptRightUp.t > attemptLightUp.t;
+    if (!completeGesture) {
+      throw new Error(`M119 retry attempt ${attempt} lacked a complete real running gesture: ${JSON.stringify(attemptAttacker)}`);
+    }
+    const runningCommitted = attemptAttacker.events.some((text) =>
+      text.startsWith("Running strike committed") || text.startsWith("Running strike active")
+        || text.startsWith("Running strike recovery"))
+      || attemptDefender.threatTransitions.some((entry) =>
+        entry.visible && (entry.phase === "RUNNING WINDUP" || entry.phase === "RUNNING STRIKE"))
+      || attemptDefender.recoveryTransitions.some((entry) =>
+        entry.visible && entry.state === "running-attack-recovery");
+    const cleanLatchMiss = attemptAttacker.playerHp === 100 && attemptAttacker.playerGuard === 100
+      && attemptAttacker.opponentHp === 100 && attemptAttacker.opponentGuard === 100
+      && attemptDefender.playerHp === 100 && attemptDefender.playerGuard === 100
+      && !runningCommitted
+      && !attemptAttacker.feedbackTransitions.includes("hit-confirm")
+      && !attemptDefender.feedbackTransitions.includes("damage-taken");
+    if (!cleanLatchMiss) {
+      throw new Error(`M119 running strike attempt ${attempt} resolved unexpectedly: ${JSON.stringify(lastObserved)}`);
+    }
+    if (attempt < 3) await sleep(500);
   }
-  if (!evidence) evidence = await Promise.all(entries.map(readUiEvidence));
+  if (!evidence) {
+    throw new Error(`M119 running strike did not latch after bounded clean retries: ${JSON.stringify(lastObserved)}`);
+  }
 
   const attackerResult = evidence.find((entry) => entry.browser === attacker.name);
   const defenderResult = evidence.find((entry) => entry.browser === defender.name);
@@ -1040,21 +1092,19 @@ async function runOnlineUiRunningAttackFlight(entries) {
     throw new Error(`M119 running strike incomplete evidence: ${JSON.stringify(evidence)}`);
   }
 
-  const rightDown = attackerResult.pointers.find((event) =>
-    event.type === "pointerdown" && event.button === 2);
-  const rightUp = attackerResult.pointers.find((event) =>
-    event.type === "pointerup" && event.button === 2);
-  const lightDown = attackerResult.pointers.find((event) =>
-    event.type === "pointerdown" && event.button === 0);
-  const lightUp = attackerResult.pointers.find((event) =>
-    event.type === "pointerup" && event.button === 0);
+  const committedPointers = attackerResult.pointers.slice(successfulPointerOffset);
+  const committedKeys = attackerResult.keys.slice(successfulKeyOffset);
+  const rightDown = committedPointers.find((event) => event.type === "pointerdown" && event.button === 2);
+  const rightUp = committedPointers.find((event) => event.type === "pointerup" && event.button === 2);
+  const lightDown = committedPointers.find((event) => event.type === "pointerdown" && event.button === 0);
+  const lightUp = committedPointers.find((event) => event.type === "pointerup" && event.button === 0);
   if (!rightDown || !rightUp || !lightDown || !lightUp
-    || !attackerResult.keys.includes(`keydown:${movementCode}`)
-    || !attackerResult.keys.includes(`keyup:${movementCode}`)) {
-    throw new Error(`M119 real run + movement + LMB controls were not delivered: ${JSON.stringify(attackerResult)}`);
+    || !committedKeys.includes(`keydown:${movementCode}`)
+    || !committedKeys.includes(`keyup:${movementCode}`)) {
+    throw new Error(`M119 committed attempt lacked real run + movement + LMB controls: ${JSON.stringify({ committedPointers, committedKeys })}`);
   }
-  if (lightDown.t - rightDown.t < 180) {
-    throw new Error(`M119 LMB arrived before the real sprint hold threshold: ${JSON.stringify(attackerResult.pointers)}`);
+  if (lightDown.t - rightDown.t < 180 || lightUp.t <= lightDown.t || rightUp.t <= lightUp.t) {
+    throw new Error(`M119 committed running gesture violated hold/release ordering: ${JSON.stringify(committedPointers)}`);
   }
   if (attackerResult.playerHp !== 100 || attackerResult.playerGuard !== 100
     || attackerResult.opponentHp !== 70
