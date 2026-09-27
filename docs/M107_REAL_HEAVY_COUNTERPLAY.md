@@ -68,7 +68,7 @@ The browser roles match the already-stable M36 setup:
 - Firefox attacks;
 - Chrome dodges.
 
-The attacker is staged deeper inside heavy reach, then sends real `E`. If the browser delivers the real `KeyE` edges but authority remains completely idle, the harness permits up to three bounded clean-latch attempts; any heavy-action evidence or vital change makes the retry path fail closed. Chrome then aims the pointer perpendicular to the strike and performs a real wheel-forward roll, with simultaneous `S` input retained as redundant proof that movement keys do not steer the committed roll.
+The attacker is staged deeper inside heavy reach, then sends real `E`. If the browser delivers the real `KeyE` edges but authority remains completely idle, the harness permits up to three bounded clean-latch attempts; any heavy-action evidence or vital change makes the retry path fail closed. Once authoritative heavy commitment is observed, Chrome immediately aims the pointer perpendicular to the strike and performs a real wheel-forward roll. The sample-safe 120 ms `E` hold already provides the needed timing margin, so no extra post-observation delay is added. Simultaneous `S` input remains redundant proof that movement keys do not steer the committed roll.
 
 That places the unchanged roll iframe across the 320 ms heavy active transition.
 
