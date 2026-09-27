@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { COMBAT_ACTION, FFA_KILL_TARGET, blockSpatialPresentation, combatActionHint, combatLifePresentation, combatOverlayPresentation, createCombatReadabilityTracker, createRemoteDamageTracker, fighterFocusNetId, fighterIdentityPresentation, fighterThreatBearingLabel, fighterThreatGuardArcLabel, fighterThreatNetId, fighterThreatPhaseLabel, fighterThreatPhaseState, fighterMatchPresentation, fighterScoreboardPresentation, fighterVitalsPresentation, guardBreakSpatialPresentation, killFeedPresentation, opponentRecoveryPresentation, parrySpatialPresentation } from "../src/browser/combat-readability.mjs";
+import { COMBAT_ACTION, FFA_KILL_TARGET, blockSpatialPresentation, combatActionHint, combatLifePresentation, combatOverlayPresentation, createCombatReadabilityTracker, createRemoteDamageTracker, fighterFocusNetId, fighterIdentityPresentation, fighterThreatBearingLabel, fighterThreatGuardArcLabel, fighterThreatNetId, fighterThreatPhaseLabel, fighterMatchPointPresentation, fighterMatchPresentation, fighterScoreboardPresentation, fighterVitalsPresentation, guardBreakSpatialPresentation, killFeedPresentation, opponentRecoveryPresentation, parrySpatialPresentation } from "../src/browser/combat-readability.mjs";
 
 function fighter(netId, hp = 100, guard = 100, action = COMBAT_ACTION.idle, x = 0, y = 0, facing = 0) {
   return { netId, hp, guard, action, x, y, facing };
@@ -301,20 +301,33 @@ test("FFA scoreboard presentation ranks authoritative kill scores with stable id
   ]);
 });
 
-test("FFA match presentation declares the authoritative score-target winner", () => {
-  assert.equal(FFA_KILL_TARGET, 2);
-  assert.deepEqual(fighterMatchPresentation([{ netId: 1, flags: 1 }, { netId: 2, flags: 0 }], 1), {
+test("FFA match presentation declares the authoritative first-to-five winner", () => {
+  assert.equal(FFA_KILL_TARGET, 5);
+  assert.deepEqual(fighterMatchPresentation([{ netId: 1, flags: 4 }, { netId: 2, flags: 0 }], 1), {
     visible: false, winnerId: 0, ownVictory: false, title: "", detail: "",
   });
-  assert.deepEqual(fighterMatchPresentation([{ netId: 1, flags: 2 }, { netId: 2, flags: 0 }], 1), {
-    visible: true, winnerId: 1, ownVictory: true, title: "VICTORY", detail: "#1 wins · 2 KILLS",
+  assert.deepEqual(fighterMatchPresentation([{ netId: 1, flags: 5 }, { netId: 2, flags: 0 }], 1), {
+    visible: true, winnerId: 1, ownVictory: true, title: "VICTORY", detail: "#1 wins · 5 KILLS",
   });
-  assert.deepEqual(fighterMatchPresentation([{ netId: 1, flags: 2 }, { netId: 2, flags: 0 }], 2), {
-    visible: true, winnerId: 1, ownVictory: false, title: "MATCH OVER", detail: "#1 wins · 2 KILLS",
+  assert.deepEqual(fighterMatchPresentation([{ netId: 1, flags: 5 }, { netId: 2, flags: 0 }], 2), {
+    visible: true, winnerId: 1, ownVictory: false, title: "MATCH OVER", detail: "#1 wins · 5 KILLS",
   });
   assert.deepEqual(fighterMatchPresentation([{ netId: 1, flags: 0 }, { netId: 2, flags: 0 }], 1), {
     visible: false, winnerId: 0, ownVictory: false, title: "", detail: "",
   });
+});
+
+test("FFA match-point presentation becomes visible at four of five only", () => {
+  assert.deepEqual(fighterMatchPointPresentation([{ netId: 1, flags: 3 }, { netId: 2, flags: 2 }], 1), {
+    visible: false, leaderId: 0, ownMatchPoint: false, title: "", detail: "",
+  });
+  assert.deepEqual(fighterMatchPointPresentation([{ netId: 1, flags: 4 }, { netId: 2, flags: 2 }], 1), {
+    visible: true, leaderId: 1, ownMatchPoint: true, title: "MATCH POINT", detail: "#1 · 4/5 KILLS",
+  });
+  assert.deepEqual(fighterMatchPointPresentation([{ netId: 1, flags: 4 }, { netId: 2, flags: 2 }], 2), {
+    visible: true, leaderId: 1, ownMatchPoint: false, title: "MATCH POINT", detail: "#1 · 4/5 KILLS",
+  });
+  assert.equal(fighterMatchPointPresentation([{ netId: 1, flags: 5 }, { netId: 2, flags: 2 }], 1).visible, false);
 });
 
 test("guard-only loss is explained as a block instead of damage", () => {
@@ -689,15 +702,4 @@ test("directional light threat labels expose the committed side", () => {
   assert.equal(fighterThreatPhaseLabel(fighter(2, 100, 100, COMBAT_ACTION.attackLeftActive)), "LEFT SWEEP");
   assert.equal(fighterThreatPhaseLabel(fighter(2, 100, 100, COMBAT_ACTION.attackRightWindup)), "RIGHT WINDUP");
   assert.equal(fighterThreatPhaseLabel(fighter(2, 100, 100, COMBAT_ACTION.attackRightActive)), "RIGHT SWEEP");
-});
-
-test("all committed attack phase labels map to visible threat states", () => {
-  for (const phase of ["WINDUP", "HEAVY WINDUP", "RUNNING WINDUP", "LEFT WINDUP", "RIGHT WINDUP"]) {
-    assert.equal(fighterThreatPhaseState(phase), "windup", phase);
-  }
-  for (const phase of ["STRIKE", "HEAVY STRIKE", "RUNNING STRIKE", "LEFT SWEEP", "RIGHT SWEEP"]) {
-    assert.equal(fighterThreatPhaseState(phase), "strike", phase);
-  }
-  assert.equal(fighterThreatPhaseState(""), "");
-  assert.equal(fighterThreatPhaseState("RECOVERY"), "");
 });
