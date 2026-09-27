@@ -2,19 +2,19 @@
 
 ## Objective
 
-Prove the anti-turtling consequence of the M105 heavy strike through two real browser clients: a defender that simply holds ordinary directional Block cannot absorb repeated heavy commitments for free.
+Prove the anti-turtling consequence of the M105 heavy strike through two real browser clients: a defender that repeatedly answers with ordinary directional short Block cannot absorb repeated heavy commitments for free.
 
 ## Real-browser acceptance
 
 The `uiheavyguardbreak` flight runs the production client in Chrome and Firefox against one loopback authoritative server.
 
 - Chrome moves into heavy range and Firefox faces the threat.
-- Firefox holds one genuine RMB directional Block continuously beyond the 115 ms fresh-parry window.
-- Chrome submits genuine `E` heavy-strike controls.
+- Firefox uses genuine wheel-back short directional Block pulses, refreshed so each heavy active frame is covered while the block is already outside the fresh-parry window.
+- Chrome submits genuine `E` heavy-strike controls. The acceptance harness keeps each real `E` depressed for 120 ms so headless browsers have multiple input frames to sample it; this does not change the production heavy timing or binding.
 - The first authoritative blocked heavy must preserve both fighters at 100 HP and spend exactly 64 guard, producing `100 -> 36`.
-- The held Block intentionally prevents guard regeneration between strikes, matching the existing server rule that guard regenerates only while the fighter is not in `Block`.
-- After the unchanged 840 ms heavy commitment finishes, Chrome submits the second genuine heavy.
-- The second authoritative blocked heavy must spend the remaining guard, producing `36 -> 0` while defender HP remains 100.
+- After the unchanged 840 ms heavy commitment finishes, Chrome submits the second genuine heavy while Firefox refreshes the short Block.
+- Guard may recover slightly between short-block windows under the production regeneration rule, but it must remain below the 64-point break threshold before the second heavy.
+- The second authoritative blocked heavy must exhaust that remaining guard to `0` while defender HP remains 100.
 - The defender must expose the authoritative `STUNNED` guard-break transition and `guard-broken` feedback.
 - The attacker must expose `guard-break-confirm`, remain unstunned, and retain 100 HP / 100 guard.
 - The sequence must not resolve as a parry.
@@ -22,7 +22,7 @@ The `uiheavyguardbreak` flight runs the production client in Chrome and Firefox 
 
 ## Why this matters
 
-M107 proves that one heavy can be blocked, parried, or dodged. M109 proves that a whiffed heavy can be punished during its long recovery. M110 closes the other side of the commitment loop: passive held Block survives a heavy without taking HP damage, but two committed heavies break full guard and create a real punishable stun.
+M107 proves that one heavy can be blocked, parried, or dodged. M109 proves that a whiffed heavy can be punished during its long recovery. M110 closes the other side of the commitment loop: repeated short Blocks can survive one heavy without taking HP damage, but sustained heavy pressure still breaks guard and creates a real punishable stun.
 
 This keeps the combat north star intact: active defense is valuable, but there is no free turtling.
 
