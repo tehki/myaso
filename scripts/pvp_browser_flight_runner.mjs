@@ -8,6 +8,10 @@ import { setTimeout as sleep } from "node:timers/promises";
 const root = process.cwd();
 const durationMs = Number(process.env.MYASO_PVP_FLIGHT_DURATION_MS ?? 7000);
 const scenario = process.env.MYASO_PVP_SCENARIO ?? "damage";
+// Headless Firefox can occasionally stall longer than a 40 ms DOM key tap.
+// Keep the real E key depressed across multiple browser/input frames so the
+// authoritative client has a fair opportunity to sample the genuine gesture.
+const heavyKeyPulseMs = 120;
 if (!new Set(["damage", "inputloss", "parry", "dodge", "block", "guardbreak", "backblock", "respawn", "ui", "uirespawn", "uifeedback", "uihittell", "uivitals", "uiidentity", "uiscore", "uimatch", "uirematch", "uiffa3", "uikillfeed", "uifocus", "uithreat", "uithreatbearing", "uimultithreat", "uisecondarythreat", "uisecondarybearing", "uisecondaryphase", "uiguardarc", "uisecondaryguardarc", "uithreatmarkers", "uiparry", "uistun", "uiguardbreak", "uidodge", "uirecovery", "uirecoverytell", "uiattackintent", "uiheavy", "uiheavyinputloss", "uiheavyblock", "uiheavyparry", "uiheavydodge", "uiheavypunish", "uiheavyguardbreak", "uiheavyguardbreakpunish", "uifeint", "uirunningattack", "uiguardbreaktell", "uiparrytell", "uiblockfacingtell", "uidodgetell", "uideathtell"]).has(scenario)) throw new Error(`unsupported MYASO_PVP_SCENARIO: ${scenario}`);
 const staticPort = Number(process.env.MYASO_PVP_FLIGHT_HTTP_PORT ?? 4174);
 const browsers = [
@@ -626,7 +630,7 @@ async function runOnlineUiHeavyStrikeFlight(entries) {
   await aimArena(attacker, attackerElementId, attackOffset);
   await sleep(60);
 
-  await pulseMovementKey(attacker, "e", 40);
+  await pulseMovementKey(attacker, "e", heavyKeyPulseMs);
   await sleep(1100);
 
   const evidence = await Promise.all(entries.map(readUiEvidence));
@@ -745,10 +749,10 @@ async function runOnlineUiHeavyBlockFlight(entries) {
       await setArenaBlock(defender, defenderElementId, true);
       blockHeld = true;
       // Wheel-back is a short block now. Start the heavy immediately, then
-      // refresh the same directional block pulse at 150 ms. The impact at
-      // ~320 ms is covered, while the refreshed block is already older than
-      // the 125 ms parry window and therefore resolves as a normal block.
-      await pulseMovementKey(attacker, "e", 40);
+      // refresh the same directional block after the sample-safe E hold plus
+      // 50 ms (~170 ms from keydown). The ~320 ms impact stays covered while
+      // block age is already beyond the 125 ms parry window.
+      await pulseMovementKey(attacker, "e", heavyKeyPulseMs);
       await sleep(50);
       await setArenaBlock(defender, defenderElementId, true);
       await sleep(450);
@@ -833,7 +837,7 @@ async function runOnlineUiHeavyParryFlight(entries) {
     // At 230 ms, the unchanged 240 ms short block covers the 320 ms heavy active
     // transition and its unchanged 125 ms opening parry window.
     await Promise.all([
-      pulseMovementKey(attacker, "e", 40),
+      pulseMovementKey(attacker, "e", heavyKeyPulseMs),
       scrollArenaWheel(defender, defenderElementId, 120, 230),
     ]);
     await sleep(220);
@@ -919,7 +923,7 @@ async function runOnlineUiHeavyDodgeFlight(entries) {
     const commitsBefore = beforeAttacker?.events.filter((text) =>
       text.startsWith("Heavy strike committed")).length ?? 0;
 
-    await pulseMovementKey(attacker, "e", 40);
+    await pulseMovementKey(attacker, "e", heavyKeyPulseMs);
     const commitDeadline = Date.now() + 360;
     while (Date.now() < commitDeadline) {
       const state = await readUiEvidence(attacker);
@@ -1270,7 +1274,7 @@ async function runOnlineUiHeavyWhiffPunishFlight(entries) {
     const commitsBefore = beforeAttacker.events.filter((text) =>
       text.startsWith("Heavy strike committed")).length;
 
-    await pulseMovementKey(attacker, "e", 40);
+    await pulseMovementKey(attacker, "e", heavyKeyPulseMs);
     // React to the actual remote recovery cue instead of a wall-clock guess.
     // This both proves the punish window was readable to the defender and avoids
     // coupling the counter to cross-browser snapshot/WebDriver delivery skew.
@@ -1781,7 +1785,7 @@ async function runOnlineUiHeavyGuardBreakFlight(entries, { returnTiming = false 
       const commitsBefore = heavyCommitCount(beforeAttacker);
 
       await setArenaBlock(defender, defenderElementId, true);
-      await pulseMovementKey(attacker, "e", 40);
+      await pulseMovementKey(attacker, "e", heavyKeyPulseMs);
       await sleep(50);
       await setArenaBlock(defender, defenderElementId, true);
       await sleep(340);
@@ -1855,7 +1859,7 @@ async function runOnlineUiHeavyGuardBreakFlight(entries, { returnTiming = false 
 
       const attemptIssuedAt = Date.now();
       await setArenaBlock(defender, defenderElementId, true);
-      await pulseMovementKey(attacker, "e", 40);
+      await pulseMovementKey(attacker, "e", heavyKeyPulseMs);
       await sleep(50);
       await setArenaBlock(defender, defenderElementId, true);
       await sleep(340);
