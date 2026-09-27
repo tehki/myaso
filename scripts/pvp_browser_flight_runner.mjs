@@ -134,7 +134,10 @@ try {
     const results = await runOnlineUiMultiThreatFlight(sessions, true, true, true, true, true);
     console.log(`M61_FFA_SECONDARY_GUARD_ARC ${JSON.stringify({ ok: true, results })}`);
   } else if (scenario === "uithreatmarkers") {
-    const results = await runOnlineUiMultiThreatFlight(sessions, true, true, true, true, true, true);
+    // M59 has its own fail-closed secondary-phase gate immediately before this
+    // scenario in CI. M62 proves the spatial rendering contract without requiring
+    // both secondary phase transitions to fit inside the same two-threat overlap.
+    const results = await runOnlineUiMultiThreatFlight(sessions, true, true, false, true, true, true);
     console.log(`M62_FFA_SPATIAL_THREAT_MARKERS ${JSON.stringify({ ok: true, results })}`);
   } else if (scenario === "uiparry") {
     const results = await runOnlineUiParryFlight(sessions);
