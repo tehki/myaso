@@ -68,14 +68,14 @@ The browser roles match the already-stable M36 setup:
 - Firefox attacks;
 - Chrome dodges.
 
-The attacker is staged deeper inside heavy reach, then sends real `E`. Chrome performs a real perpendicular `S + Space` dodge at approximately 270 ms from the E keydown.
+The attacker is staged deeper inside heavy reach, then sends real `E`. If the browser delivers the real `KeyE` edges but authority remains completely idle, the harness permits up to three bounded clean-latch attempts; any heavy-action evidence or vital change makes the retry path fail closed. Chrome then aims the pointer perpendicular to the strike and performs a real wheel-forward roll, with simultaneous `S` input retained as redundant proof that movement keys do not steer the committed roll.
 
-That places the unchanged 118 ms dodge iframe across the 320 ms heavy active transition.
+That places the unchanged roll iframe across the 320 ms heavy active transition.
 
 Acceptance:
 
 - real attacker movement and `KeyE`;
-- real defender `KeyS` and `Space` down/up;
+- real defender `KeyS` down/up and wheel-forward input;
 - both fighters remain 100 HP / 100 guard;
 - attacker receives `dodge-evaded`;
 - defender receives `dodge-success`;

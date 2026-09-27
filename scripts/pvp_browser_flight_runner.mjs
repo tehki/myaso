@@ -911,25 +911,52 @@ async function runOnlineUiHeavyDodgeFlight(entries) {
   );
   const { attacker, defender, movementCode } = staged;
 
-  const beforeCommit = await readUiEvidence(attacker);
-  const commitsBefore = beforeCommit.events.filter((text) =>
-    text.startsWith("Heavy strike committed")).length;
-  await pulseMovementKey(attacker, "e", 40);
-
   let committedObserved = false;
-  const commitDeadline = Date.now() + 360;
-  while (Date.now() < commitDeadline) {
-    const state = await readUiEvidence(attacker);
-    const commits = state.events.filter((text) =>
-      text.startsWith("Heavy strike committed")).length;
-    if (commits > commitsBefore) {
-      committedObserved = true;
-      break;
+  let lastCommitEvidence = null;
+  for (let attempt = 1; attempt <= 3 && !committedObserved; attempt += 1) {
+    const before = await Promise.all(entries.map(readUiEvidence));
+    const beforeAttacker = before.find((entry) => entry.browser === attacker.name);
+    const commitsBefore = beforeAttacker?.events.filter((text) =>
+      text.startsWith("Heavy strike committed")).length ?? 0;
+
+    await pulseMovementKey(attacker, "e", 40);
+    const commitDeadline = Date.now() + 360;
+    while (Date.now() < commitDeadline) {
+      const state = await readUiEvidence(attacker);
+      const commits = state.events.filter((text) =>
+        text.startsWith("Heavy strike committed")).length;
+      if (commits > commitsBefore) {
+        committedObserved = true;
+        break;
+      }
+      await sleep(10);
     }
-    await sleep(10);
+    if (committedObserved) break;
+
+    lastCommitEvidence = await Promise.all(entries.map(readUiEvidence));
+    const attackerState = lastCommitEvidence.find((entry) => entry.browser === attacker.name);
+    const defenderState = lastCommitEvidence.find((entry) => entry.browser === defender.name);
+    if (!attackerState || !defenderState) {
+      throw new Error(`M107 heavy dodge incomplete latch evidence on attempt ${attempt}: ${JSON.stringify(lastCommitEvidence)}`);
+    }
+    const heavyCommitted = attackerState.events.some((text) =>
+      text.startsWith("Heavy strike committed") || text.startsWith("Heavy strike active")
+        || text.startsWith("Heavy recovery"))
+      || defenderState.threatTransitions.some((entry) =>
+        entry.visible && (entry.phase === "HEAVY WINDUP" || entry.phase === "HEAVY STRIKE"))
+      || defenderState.recoveryTransitions.some((entry) =>
+        entry.visible && entry.state === "heavy-attack-recovery");
+    const cleanLatchMiss = attackerState.playerHp === 100 && attackerState.playerGuard === 100
+      && attackerState.opponentHp === 100 && attackerState.opponentGuard === 100
+      && defenderState.playerHp === 100 && defenderState.playerGuard === 100
+      && !heavyCommitted;
+    if (!cleanLatchMiss) {
+      throw new Error(`M107 heavy dodge attempt ${attempt} resolved unexpectedly before dodge: ${JSON.stringify(lastCommitEvidence)}`);
+    }
+    if (attempt < 3) await sleep(900);
   }
   if (!committedObserved) {
-    throw new Error(`M107 heavy dodge never observed authoritative heavy commitment: ${JSON.stringify(await readUiEvidence(attacker))}`);
+    throw new Error(`M107 heavy dodge did not latch after bounded clean retries: ${JSON.stringify(lastCommitEvidence)}`);
   }
 
   // Begin the genuine pointer-directed roll late enough that the unchanged
