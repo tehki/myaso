@@ -1,6 +1,6 @@
 import { createFrameBudget } from "../src/browser/frame-budget.mjs";
 import { createCombatImpactController } from "../src/browser/combat-impact.mjs";
-import { COMBAT_ACTION, blockSpatialPresentation, combatActionHint, combatOverlayPresentation, createCombatReadabilityTracker, createRemoteDamageTracker, fighterFocusNetId, fighterIdentityPresentation, fighterThreatBearingLabel, fighterThreatGuardArcLabel, fighterThreatNetId, fighterThreatPhaseLabel, fighterMatchPointPresentation, fighterMatchPresentation, fighterScoreboardPresentation, FFA_KILL_TARGET, fighterVitalsPresentation, guardBreakSpatialPresentation, killFeedPresentation, opponentRecoveryPresentation, parrySpatialPresentation } from "../src/browser/combat-readability.mjs";
+import { COMBAT_ACTION, blockSpatialPresentation, combatActionHint, combatOverlayPresentation, createCombatReadabilityTracker, createRemoteDamageTracker, fighterFocusNetId, fighterIdentityPresentation, fighterThreatBearingLabel, fighterThreatGuardArcLabel, fighterThreatNetId, fighterThreatPhaseLabel, fighterThreatPhaseState, fighterMatchPointPresentation, fighterMatchPresentation, fighterScoreboardPresentation, FFA_KILL_TARGET, fighterVitalsPresentation, guardBreakSpatialPresentation, killFeedPresentation, opponentRecoveryPresentation, parrySpatialPresentation } from "../src/browser/combat-readability.mjs";
 import { COMBAT } from "../src/combat/model.mjs";
 import { reconcilePrediction } from "../src/browser/reconciliation.mjs";
 import { NETWORK } from "../src/network/constants.mjs";
@@ -901,11 +901,7 @@ function updateThreatCue(ownId) {
   const secondaryGuardArc = fighterThreatGuardArcLabel(own, secondaryAttacker);
   const phase = fighterThreatPhaseLabel(attacker);
   const secondaryPhase = fighterThreatPhaseLabel(secondaryAttacker);
-  const state = phase === "STRIKE" || phase === "HEAVY STRIKE"
-    ? "strike"
-    : phase === "WINDUP" || phase === "HEAVY WINDUP"
-      ? "windup"
-      : "";
+  const state = fighterThreatPhaseState(phase);
   const shouldHide = netId === 0 || !state;
   if (threatCue.root.hidden !== shouldHide) threatCue.root.hidden = shouldHide;
   if (shouldHide) {
