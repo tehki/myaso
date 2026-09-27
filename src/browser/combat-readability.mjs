@@ -247,14 +247,6 @@ export function fighterThreatPhaseLabel(attacker) {
   return "";
 }
 
-export function fighterThreatPhaseState(phase) {
-  if (phase === "STRIKE" || phase === "HEAVY STRIKE" || phase === "RUNNING STRIKE"
-    || phase === "LEFT SWEEP" || phase === "RIGHT SWEEP") return "strike";
-  if (phase === "WINDUP" || phase === "HEAVY WINDUP" || phase === "RUNNING WINDUP"
-    || phase === "LEFT WINDUP" || phase === "RIGHT WINDUP") return "windup";
-  return "";
-}
-
 export function fighterThreatGuardArcLabel(own, attacker) {
   if (!own || !attacker || !Number.isFinite(own.x) || !Number.isFinite(own.y)
     || !Number.isFinite(own.facing) || !Number.isFinite(attacker.x) || !Number.isFinite(attacker.y)) return "";
@@ -391,7 +383,7 @@ export function killFeedPresentation(event, ownId = 0) {
   };
 }
 
-export const FFA_KILL_TARGET = 2;
+export const FFA_KILL_TARGET = 5;
 
 export function fighterScoreboardPresentation(entities, ownId = 0) {
   if (!entities || typeof entities[Symbol.iterator] !== "function") return [];
@@ -403,6 +395,23 @@ export function fighterScoreboardPresentation(entities, ownId = 0) {
   }
   rows.sort((a, b) => b.kills - a.kills || a.netId - b.netId);
   return rows;
+}
+
+export function fighterMatchPointPresentation(entities, ownId = 0, killTarget = FFA_KILL_TARGET) {
+  if (!Number.isInteger(killTarget) || killTarget <= 1) {
+    return { visible: false, leaderId: 0, ownMatchPoint: false, title: "", detail: "" };
+  }
+  const leader = fighterScoreboardPresentation(entities, ownId)[0];
+  if (!leader || leader.kills !== killTarget - 1) {
+    return { visible: false, leaderId: 0, ownMatchPoint: false, title: "", detail: "" };
+  }
+  return {
+    visible: true,
+    leaderId: leader.netId,
+    ownMatchPoint: leader.netId === ownId,
+    title: "MATCH POINT",
+    detail: `${leader.label} · ${leader.kills}/${killTarget} KILLS`,
+  };
 }
 
 export function fighterMatchPresentation(entities, ownId = 0, killTarget = FFA_KILL_TARGET) {
