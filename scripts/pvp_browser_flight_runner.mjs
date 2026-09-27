@@ -963,15 +963,10 @@ async function runOnlineUiHeavyDodgeFlight(entries) {
     throw new Error(`M107 heavy dodge did not latch after bounded clean retries: ${JSON.stringify(lastCommitEvidence)}`);
   }
 
-  // Begin the genuine pointer-directed roll late enough that the unchanged
-  // 125 ms iframe spans the ~320 ms heavy active transition, but early enough
-  // to move off the strike lane. No combat constants are altered.
-  // UI observation plus WebDriver dispatch already costs substantial time on
-  // CI. Current evidence places an immediate wheel about 130 ms after commit,
-  // which makes the unchanged 125 ms iframe expire before the ~320 ms heavy
-  // active transition. Add a bounded 100 ms pause after observation so the real
-  // wheel-forward roll overlaps contact while preserving all combat constants.
-  await sleep(100);
+  // The sample-safe 120 ms real E hold now contributes the timing margin that
+  // used to come from an extra post-observation sleep. Roll immediately after
+  // authoritative heavy commitment is observed so the unchanged 125 ms iframe
+  // overlaps the ~320 ms heavy active transition instead of landing after it.
   await pressArenaPerpendicularDodgeAfterPause(defender, 0);
   // Let active -> recovery resolve without evidence polling inside the iframe.
   await sleep(360);
