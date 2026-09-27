@@ -1321,16 +1321,86 @@ async function runOnlineUiHeavyWhiffPunishFlight(entries) {
   // proof while starting the punish near the observed recovery edge.
   let punishMoveHeld = false;
   let punishAttackHeld = false;
+  let punishCommitted = false;
+  let successfulPunishPointerOffset = 0;
+  let lastPunishMiss = null;
+  const lightCommitCount = (state) => state?.events.filter((text) =>
+    text.startsWith("Attack committed")
+      || text.startsWith("Left sweep committed")
+      || text.startsWith("Right sweep committed")).length ?? 0;
+  const lightThreatCount = (state) => state?.threatTransitions.filter((entry) =>
+    entry.visible && (entry.phase === "WINDUP" || entry.phase === "STRIKE"
+      || entry.phase === "LEFT WINDUP" || entry.phase === "LEFT SWEEP"
+      || entry.phase === "RIGHT WINDUP" || entry.phase === "RIGHT SWEEP")).length ?? 0;
   try {
     await setMovementKey(defender, punishMoveKey, true);
     punishMoveHeld = true;
     await aimArena(defender, defenderElementId, punishOffset);
     await sleep(35);
-    await setArenaAttack(defender, defenderElementId, true, punishOffset);
-    punishAttackHeld = true;
-    await sleep(35);
-    await setArenaAttack(defender, defenderElementId, false, punishOffset);
-    punishAttackHeld = false;
+
+    for (let attempt = 1; attempt <= 3 && !punishCommitted; attempt += 1) {
+      const before = await Promise.all(entries.map(readUiEvidence));
+      const beforeAttacker = before.find((entry) => entry.browser === attacker.name);
+      const beforeDefender = before.find((entry) => entry.browser === defender.name);
+      if (!beforeAttacker || !beforeDefender) {
+        throw new Error(`M109 punish missing baseline evidence on attempt ${attempt}: ${JSON.stringify(before)}`);
+      }
+      const pointerOffset = beforeDefender.pointers.length;
+      const commitsBefore = lightCommitCount(beforeDefender);
+      const threatsBefore = lightThreatCount(beforeAttacker);
+
+      await setArenaAttack(defender, defenderElementId, true, punishOffset);
+      punishAttackHeld = true;
+      await sleep(35);
+      await setArenaAttack(defender, defenderElementId, false, punishOffset);
+      punishAttackHeld = false;
+
+      const commitDeadline = Date.now() + 105;
+      while (Date.now() < commitDeadline) {
+        const current = await Promise.all(entries.map(readUiEvidence));
+        const currentAttacker = current.find((entry) => entry.browser === attacker.name);
+        const currentDefender = current.find((entry) => entry.browser === defender.name);
+        const committed = lightCommitCount(currentDefender) > commitsBefore
+          || lightThreatCount(currentAttacker) > threatsBefore
+          || (currentAttacker?.playerHp ?? 100) < 100
+          || (currentDefender?.opponentHp ?? 100) < 100;
+        if (committed) {
+          successfulPunishPointerOffset = pointerOffset;
+          punishCommitted = true;
+          break;
+        }
+        await sleep(10);
+      }
+      if (punishCommitted) break;
+
+      lastPunishMiss = await Promise.all(entries.map(readUiEvidence));
+      const missAttacker = lastPunishMiss.find((entry) => entry.browser === attacker.name);
+      const missDefender = lastPunishMiss.find((entry) => entry.browser === defender.name);
+      if (!missAttacker || !missDefender) {
+        throw new Error(`M109 punish incomplete latch evidence on attempt ${attempt}: ${JSON.stringify(lastPunishMiss)}`);
+      }
+      const attemptPointers = missDefender.pointers.slice(pointerOffset);
+      const down = attemptPointers.find((event) => event.type === "pointerdown" && event.button === 0);
+      const up = attemptPointers.find((event) => event.type === "pointerup" && event.button === 0);
+      if (!down || !up || up.t <= down.t) {
+        throw new Error(`M109 punish retry ${attempt} lacked a complete real LMB gesture: ${JSON.stringify(missDefender)}`);
+      }
+      const cleanLatchMiss = missAttacker.playerHp === 100 && missAttacker.playerGuard === 100
+        && missAttacker.opponentHp === 100 && missAttacker.opponentGuard === 100
+        && missDefender.playerHp === 100 && missDefender.playerGuard === 100
+        && missDefender.opponentHp === 100 && missDefender.opponentGuard === 100
+        && lightCommitCount(missDefender) === commitsBefore
+        && lightThreatCount(missAttacker) === threatsBefore
+        && !missDefender.feedbackTransitions.includes("hit-confirm")
+        && !missAttacker.feedbackTransitions.includes("damage-taken");
+      if (!cleanLatchMiss) {
+        throw new Error(`M109 punish attempt ${attempt} resolved unexpectedly: ${JSON.stringify(lastPunishMiss)}`);
+      }
+      if (attempt < 3) await sleep(20);
+    }
+    if (!punishCommitted) {
+      throw new Error(`M109 punish did not latch after bounded complete LMB retries: ${JSON.stringify(lastPunishMiss)}`);
+    }
     await sleep(80);
   } finally {
     if (punishAttackHeld) {
@@ -1359,8 +1429,9 @@ async function runOnlineUiHeavyWhiffPunishFlight(entries) {
     || !defenderResult.keys.includes(`keyup:${punishMoveCode}`)) {
     throw new Error(`M109 punish closing movement was not delivered: ${JSON.stringify(defenderResult)}`);
   }
-  const punishDown = defenderResult.pointers.find((event) => event.type === "pointerdown" && event.button === 0);
-  const punishUp = defenderResult.pointers.find((event) => event.type === "pointerup" && event.button === 0);
+  const committedPunishPointers = defenderResult.pointers.slice(successfulPunishPointerOffset);
+  const punishDown = committedPunishPointers.find((event) => event.type === "pointerdown" && event.button === 0);
+  const punishUp = committedPunishPointers.find((event) => event.type === "pointerup" && event.button === 0);
   const punishAimValid = punishDown && Math.abs(punishDown.y - 0.5) <= 0.15
     && (attackRight ? punishDown.x <= 0.4 : punishDown.x >= 0.6);
   if (!punishDown || !punishUp || !punishAimValid) {
