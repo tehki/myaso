@@ -23,6 +23,7 @@ const DIRECTIONAL_ATTACK_REACH: f32 = 76.0;
 const DIRECTIONAL_ATTACK_ARC_RADIANS: f32 = std::f32::consts::PI * 0.62;
 const DIRECTIONAL_ATTACK_ARC_OFFSET_RADIANS: f32 = std::f32::consts::PI * 0.16;
 const DIRECTIONAL_ATTACK_LATERAL_THRESHOLD: f32 = 0.45;
+const LIGHT_ATTACK_BUFFER_WINDOW_MS: f32 = 90.0;
 const RUNNING_ATTACK_WINDUP_MS: f32 = 160.0;
 const RUNNING_ATTACK_ACTIVE_MS: f32 = 90.0;
 const RUNNING_ATTACK_RECOVERY_MS: f32 = 310.0;
@@ -216,6 +217,9 @@ pub struct Fighter {
     pub recently_interacted_with: Option<u32>,
     latest_input: InputIntent,
     action_duration_ms: f32,
+    attack_input_was_down: bool,
+    buffered_light_attack: bool,
+    buffered_attack_lateral: f32,
     dodge_dir_x: f32,
     dodge_dir_y: f32,
     attack_hit_targets: BTreeSet<u32>,
@@ -243,6 +247,9 @@ impl Fighter {
             recently_interacted_with: None,
             latest_input: InputIntent::default(),
             action_duration_ms: 0.0,
+            attack_input_was_down: false,
+            buffered_light_attack: false,
+            buffered_attack_lateral: 0.0,
             dodge_dir_x: 0.0,
             dodge_dir_y: 0.0,
             attack_hit_targets: BTreeSet::new(),
@@ -257,7 +264,39 @@ impl Fighter {
         self.latest_input
     }
 
+    fn clear_light_attack_buffer(&mut self) {
+        self.buffered_light_attack = false;
+        self.buffered_attack_lateral = 0.0;
+    }
+
+    fn begin_light_attack(&mut self, lateral: f32) {
+        self.clear_light_attack_buffer();
+        self.attack_hit_targets.clear();
+        if lateral >= DIRECTIONAL_ATTACK_LATERAL_THRESHOLD {
+            self.set_action(Action::AttackLeftWindup, DIRECTIONAL_ATTACK_WINDUP_MS);
+        } else if lateral <= -DIRECTIONAL_ATTACK_LATERAL_THRESHOLD {
+            self.set_action(Action::AttackRightWindup, DIRECTIONAL_ATTACK_WINDUP_MS);
+        } else {
+            self.set_action(Action::AttackWindup, ATTACK_WINDUP_MS);
+        }
+    }
+
+    fn finish_light_recovery(&mut self) {
+        if !self.buffered_light_attack {
+            self.set_action(Action::Idle, 0.0);
+            return;
+        }
+        let lateral = self.buffered_attack_lateral;
+        self.begin_light_attack(lateral);
+    }
+
     fn set_action(&mut self, action: Action, duration_ms: f32) {
+        if !matches!(
+            action,
+            Action::AttackRecovery | Action::AttackLeftRecovery | Action::AttackRightRecovery
+        ) {
+            self.clear_light_attack_buffer();
+        }
         self.action = action;
         self.action_elapsed_ms = 0.0;
         self.action_duration_ms = duration_ms;
@@ -449,13 +488,15 @@ impl World {
             }
 
             let input = normalize_input(fighter.latest_input);
+            let attack_pressed = input.attack && !fighter.attack_input_was_down;
             if fighter.action != Action::Knockdown {
                 fighter.facing = normalize_angle(input.facing_radians);
             }
-            begin_requested_action(self.now_ms, fighter, input);
+            begin_requested_action(self.now_ms, fighter, input, attack_pressed);
             move_fighter(self.width, self.height, fighter, input, dt_ms);
             advance_action(fighter, input, dt_ms);
             update_stamina(self.now_ms, fighter, input, dt_ms);
+            fighter.attack_input_was_down = input.attack;
 
             if fighter.action != Action::Block
                 && self.now_ms >= fighter.guard_regen_blocked_until_ms
@@ -510,7 +551,26 @@ fn normalize_input(mut input: InputIntent) -> InputIntent {
     input
 }
 
-fn begin_requested_action(now_ms: f32, fighter: &mut Fighter, input: InputIntent) {
+fn begin_requested_action(
+    now_ms: f32,
+    fighter: &mut Fighter,
+    input: InputIntent,
+    attack_pressed: bool,
+) {
+    let light_recovery = matches!(
+        fighter.action,
+        Action::AttackRecovery | Action::AttackLeftRecovery | Action::AttackRightRecovery
+    );
+    if light_recovery && attack_pressed {
+        let remaining_ms = fighter.action_duration_ms - fighter.action_elapsed_ms;
+        if remaining_ms <= LIGHT_ATTACK_BUFFER_WINDOW_MS + EPSILON {
+            fighter.buffered_light_attack = true;
+            fighter.buffered_attack_lateral = fighter.facing.sin() * input.move_x
+                - fighter.facing.cos() * input.move_y;
+        }
+        return;
+    }
+
     let feint_window_ms = match fighter.action {
         Action::AttackWindup | Action::AttackLeftWindup | Action::AttackRightWindup => {
             FEINT_LIGHT_WINDOW_MS
@@ -529,7 +589,7 @@ fn begin_requested_action(now_ms: f32, fighter: &mut Fighter, input: InputIntent
     }
 
     if fighter.action == Action::Jump
-        && input.attack
+        && attack_pressed
         && spend_stamina(now_ms, fighter, JUMP_ATTACK_STAMINA_COST)
     {
         fighter.attack_hit_targets.clear();
@@ -568,7 +628,7 @@ fn begin_requested_action(now_ms: f32, fighter: &mut Fighter, input: InputIntent
     }
 
     let moving = input.move_x.hypot(input.move_y) >= 0.5;
-    if input.attack
+    if attack_pressed
         && input.run
         && moving
         && fighter.action == Action::Idle
@@ -585,16 +645,9 @@ fn begin_requested_action(now_ms: f32, fighter: &mut Fighter, input: InputIntent
         return;
     }
 
-    if input.attack && fighter.action == Action::Idle {
-        fighter.attack_hit_targets.clear();
+    if attack_pressed && fighter.action == Action::Idle {
         let lateral = fighter.facing.sin() * input.move_x - fighter.facing.cos() * input.move_y;
-        if lateral >= DIRECTIONAL_ATTACK_LATERAL_THRESHOLD {
-            fighter.set_action(Action::AttackLeftWindup, DIRECTIONAL_ATTACK_WINDUP_MS);
-        } else if lateral <= -DIRECTIONAL_ATTACK_LATERAL_THRESHOLD {
-            fighter.set_action(Action::AttackRightWindup, DIRECTIONAL_ATTACK_WINDUP_MS);
-        } else {
-            fighter.set_action(Action::AttackWindup, ATTACK_WINDUP_MS);
-        }
+        fighter.begin_light_attack(lateral);
         return;
     }
 
@@ -728,21 +781,21 @@ fn advance_action(fighter: &mut Fighter, input: InputIntent, dt_ms: f32) {
     match fighter.action {
         Action::AttackWindup => fighter.set_action(Action::AttackActive, ATTACK_ACTIVE_MS),
         Action::AttackActive => fighter.set_action(Action::AttackRecovery, ATTACK_RECOVERY_MS),
-        Action::AttackRecovery => fighter.set_action(Action::Idle, 0.0),
+        Action::AttackRecovery => fighter.finish_light_recovery(),
         Action::AttackLeftWindup => {
             fighter.set_action(Action::AttackLeftActive, DIRECTIONAL_ATTACK_ACTIVE_MS)
         }
         Action::AttackLeftActive => {
             fighter.set_action(Action::AttackLeftRecovery, DIRECTIONAL_ATTACK_RECOVERY_MS)
         }
-        Action::AttackLeftRecovery => fighter.set_action(Action::Idle, 0.0),
+        Action::AttackLeftRecovery => fighter.finish_light_recovery(),
         Action::AttackRightWindup => {
             fighter.set_action(Action::AttackRightActive, DIRECTIONAL_ATTACK_ACTIVE_MS)
         }
         Action::AttackRightActive => {
             fighter.set_action(Action::AttackRightRecovery, DIRECTIONAL_ATTACK_RECOVERY_MS)
         }
-        Action::AttackRightRecovery => fighter.set_action(Action::Idle, 0.0),
+        Action::AttackRightRecovery => fighter.finish_light_recovery(),
         Action::RunningAttackWindup => {
             fighter.set_action(Action::RunningAttackActive, RUNNING_ATTACK_ACTIVE_MS)
         }
@@ -1052,6 +1105,7 @@ fn resolve_attacks(
 
             if target.hp <= EPSILON {
                 attacker.kills = attacker.kills.saturating_add(1);
+                target.clear_light_attack_buffer();
                 target.action = Action::Dead;
                 target.action_elapsed_ms = 0.0;
                 target.action_duration_ms = 0.0;
@@ -1128,6 +1182,8 @@ fn respawn_fighter(fighter: &mut Fighter) {
     fighter.roll_hit_targets.clear();
     fighter.stamina_regen_blocked_until_ms = 0.0;
     fighter.recently_interacted_with = None;
+    fighter.attack_input_was_down = false;
+    fighter.clear_light_attack_buffer();
     fighter.set_action(Action::Idle, 0.0);
 }
 

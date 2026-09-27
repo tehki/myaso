@@ -106,6 +106,9 @@ export const COMBAT = Object.freeze({
     staminaCost: 12,
     moveMultiplier: 0.5,
   }),
+  inputBuffer: Object.freeze({
+    lightAttackWindowMs: 90,
+  }),
   guard: Object.freeze({
     max: 100,
     regenPerSecond: 24,
@@ -130,6 +133,9 @@ export function createFighter({ id, x, y, facing = 0, spawnX = x, spawnY = y }) 
     action: "idle",
     actionElapsedMs: 0,
     actionDurationMs: 0,
+    attackInputWasDown: false,
+    bufferedLightAttack: false,
+    bufferedAttackLateral: 0,
     dodgeDirX: 0,
     dodgeDirY: 0,
     attackHitTargets: new Set(),
@@ -162,11 +168,13 @@ export function stepWorld(world, inputs = {}, dtMs = 1000 / 120) {
     }
 
     const input = normalizeInput(inputs[fighter.id]);
+    const attackPressed = input.attack && !fighter.attackInputWasDown;
     updateFacing(fighter, input);
-    beginRequestedAction(world, fighter, input);
+    beginRequestedAction(world, fighter, input, attackPressed);
     moveFighter(world, fighter, input, dtMs);
     advanceAction(fighter, input, dtMs);
     updateStamina(world, fighter, input, dtMs);
+    fighter.attackInputWasDown = input.attack;
 
     if (fighter.action !== "block" && world.nowMs >= fighter.guardRegenBlockedUntilMs) {
       fighter.guard = Math.min(
@@ -209,7 +217,49 @@ function updateFacing(fighter, input) {
   if (Math.hypot(dx, dy) > EPSILON) fighter.facing = Math.atan2(dy, dx);
 }
 
-function beginRequestedAction(world, fighter, input) {
+function lightAttackLateral(fighter, moveX, moveY) {
+  return Math.sin(fighter.facing) * moveX - Math.cos(fighter.facing) * moveY;
+}
+
+function clearLightAttackBuffer(fighter) {
+  fighter.bufferedLightAttack = false;
+  fighter.bufferedAttackLateral = 0;
+}
+
+function beginLightAttack(fighter, lateral) {
+  clearLightAttackBuffer(fighter);
+  fighter.attackHitTargets.clear();
+  if (lateral >= COMBAT.directionalAttack.lateralThreshold) {
+    setAction(fighter, "attack_left_windup", COMBAT.directionalAttack.windupMs);
+  } else if (lateral <= -COMBAT.directionalAttack.lateralThreshold) {
+    setAction(fighter, "attack_right_windup", COMBAT.directionalAttack.windupMs);
+  } else {
+    setAction(fighter, "attack_windup", COMBAT.attack.windupMs);
+  }
+}
+
+function finishLightRecovery(fighter) {
+  if (!fighter.bufferedLightAttack) {
+    setAction(fighter, "idle", 0);
+    return;
+  }
+  const lateral = fighter.bufferedAttackLateral;
+  beginLightAttack(fighter, lateral);
+}
+
+function beginRequestedAction(world, fighter, input, attackPressed) {
+  const lightRecovery = fighter.action === "attack_recovery"
+    || fighter.action === "attack_left_recovery"
+    || fighter.action === "attack_right_recovery";
+  if (lightRecovery && attackPressed) {
+    const remainingMs = fighter.actionDurationMs - fighter.actionElapsedMs;
+    if (remainingMs <= COMBAT.inputBuffer.lightAttackWindowMs + EPSILON) {
+      fighter.bufferedLightAttack = true;
+      fighter.bufferedAttackLateral = lightAttackLateral(fighter, input.moveX, input.moveY);
+    }
+    return;
+  }
+
   const feintWindowMs = fighter.action === "attack_windup"
     || fighter.action === "attack_left_windup"
     || fighter.action === "attack_right_windup"
@@ -226,7 +276,7 @@ function beginRequestedAction(world, fighter, input) {
     return;
   }
 
-  if (fighter.action === "jump" && input.attack && spendStamina(world, fighter, COMBAT.jumpAttack.staminaCost)) {
+  if (fighter.action === "jump" && attackPressed && spendStamina(world, fighter, COMBAT.jumpAttack.staminaCost)) {
     fighter.attackHitTargets.clear();
     setAction(fighter, "jump_attack_windup", COMBAT.jumpAttack.windupMs);
     return;
@@ -255,7 +305,7 @@ function beginRequestedAction(world, fighter, input) {
   }
 
   const moving = Math.hypot(input.moveX, input.moveY) >= 0.5;
-  if (input.attack && input.run && moving && fighter.action === "idle"
+  if (attackPressed && input.run && moving && fighter.action === "idle"
     && spendStamina(world, fighter, COMBAT.runningAttack.staminaCost)) {
     fighter.attackHitTargets.clear();
     setAction(fighter, "running_attack_windup", COMBAT.runningAttack.windupMs);
@@ -268,16 +318,8 @@ function beginRequestedAction(world, fighter, input) {
     return;
   }
 
-  if (input.attack && fighter.action === "idle") {
-    fighter.attackHitTargets.clear();
-    const lateral = Math.sin(fighter.facing) * input.moveX - Math.cos(fighter.facing) * input.moveY;
-    if (lateral >= COMBAT.directionalAttack.lateralThreshold) {
-      setAction(fighter, "attack_left_windup", COMBAT.directionalAttack.windupMs);
-    } else if (lateral <= -COMBAT.directionalAttack.lateralThreshold) {
-      setAction(fighter, "attack_right_windup", COMBAT.directionalAttack.windupMs);
-    } else {
-      setAction(fighter, "attack_windup", COMBAT.attack.windupMs);
-    }
+  if (attackPressed && fighter.action === "idle") {
+    beginLightAttack(fighter, lightAttackLateral(fighter, input.moveX, input.moveY));
     return;
   }
 
@@ -385,7 +427,7 @@ function advanceAction(fighter, input, dtMs) {
       setAction(fighter, "attack_recovery", COMBAT.attack.recoveryMs);
       break;
     case "attack_recovery":
-      setAction(fighter, "idle", 0);
+      finishLightRecovery(fighter);
       break;
     case "attack_left_windup":
       setAction(fighter, "attack_left_active", COMBAT.directionalAttack.activeMs);
@@ -394,7 +436,7 @@ function advanceAction(fighter, input, dtMs) {
       setAction(fighter, "attack_left_recovery", COMBAT.directionalAttack.recoveryMs);
       break;
     case "attack_left_recovery":
-      setAction(fighter, "idle", 0);
+      finishLightRecovery(fighter);
       break;
     case "attack_right_windup":
       setAction(fighter, "attack_right_active", COMBAT.directionalAttack.activeMs);
@@ -403,7 +445,7 @@ function advanceAction(fighter, input, dtMs) {
       setAction(fighter, "attack_right_recovery", COMBAT.directionalAttack.recoveryMs);
       break;
     case "attack_right_recovery":
-      setAction(fighter, "idle", 0);
+      finishLightRecovery(fighter);
       break;
     case "running_attack_windup":
       setAction(fighter, "running_attack_active", COMBAT.runningAttack.activeMs);
@@ -556,6 +598,7 @@ function resolveAttacks(world, events) {
       });
 
       if (target.hp <= EPSILON) {
+        clearLightAttackBuffer(target);
         target.action = "dead";
         target.actionElapsedMs = 0;
         target.actionDurationMs = 0;
@@ -640,10 +683,15 @@ function respawnFighter(fighter) {
   fighter.attackHitTargets.clear();
   fighter.rollHitTargets.clear();
   fighter.staminaRegenBlockedUntilMs = 0;
+  fighter.attackInputWasDown = false;
+  clearLightAttackBuffer(fighter);
   setAction(fighter, "idle", 0);
 }
 
 function setAction(fighter, action, durationMs) {
+  if (action !== "attack_recovery" && action !== "attack_left_recovery" && action !== "attack_right_recovery") {
+    clearLightAttackBuffer(fighter);
+  }
   fighter.action = action;
   fighter.actionElapsedMs = 0;
   fighter.actionDurationMs = durationMs;

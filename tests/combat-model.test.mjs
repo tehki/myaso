@@ -17,6 +17,16 @@ function advance(world, ms, inputs = {}) {
   return events;
 }
 
+function enterLightRecovery(world) {
+  const [attacker, target] = world.fighters;
+  stepWorld(world, { a: { attack: true, aimX: target.x, aimY: target.y } }, 5);
+  advance(world, COMBAT.attack.windupMs - 5, { a: { aimX: target.x, aimY: target.y } });
+  advance(world, COMBAT.attack.activeMs, { a: { aimX: target.x, aimY: target.y } });
+  assert.equal(attacker.action, "attack_recovery");
+  assert.equal(attacker.actionElapsedMs, 0);
+  return { attacker, target };
+}
+
 test("attack has windup, active, and recovery commitment", () => {
   const world = duel({ distance: 200 });
   const a = world.fighters[0];
@@ -537,4 +547,68 @@ test("directional light remains feintable only through the normal early light wi
   stepWorld(world, { a: { block: true, aimX: 400, aimY: 200 } }, 5);
   assert.equal(attacker.action, "feint_recovery");
   assert.equal(attacker.stamina, COMBAT.stamina.max - COMBAT.feint.staminaCost);
+});
+
+
+test("late light tap buffers through the full recovery", () => {
+  const world = duel({ distance: 200 });
+  const { attacker, target } = enterLightRecovery(world);
+
+  advance(world, COMBAT.attack.recoveryMs - 85, { a: { aimX: target.x, aimY: target.y } });
+  assert.equal(attacker.action, "attack_recovery");
+  assert.equal(attacker.actionElapsedMs, COMBAT.attack.recoveryMs - 85);
+
+  stepWorld(world, { a: { attack: true, aimX: target.x, aimY: target.y } }, 5);
+  assert.equal(attacker.action, "attack_recovery");
+  assert.equal(attacker.bufferedLightAttack, true);
+
+  stepWorld(world, { a: { aimX: target.x, aimY: target.y } }, 5);
+  advance(world, 75, { a: { aimX: target.x, aimY: target.y } });
+  assert.equal(attacker.action, "attack_windup");
+  assert.equal(attacker.actionElapsedMs, 0);
+  assert.equal(attacker.bufferedLightAttack, false);
+});
+test("early recovery tap is not buffered", () => {
+  const world = duel({ distance: 200 });
+  const { attacker, target } = enterLightRecovery(world);
+
+  advance(world, 100, { a: { aimX: target.x, aimY: target.y } });
+  stepWorld(world, { a: { attack: true, aimX: target.x, aimY: target.y } }, 5);
+  assert.equal(attacker.bufferedLightAttack, false);
+
+  stepWorld(world, { a: { aimX: target.x, aimY: target.y } }, 5);
+  advance(world, COMBAT.attack.recoveryMs - 110, { a: { aimX: target.x, aimY: target.y } });
+  assert.equal(attacker.action, "idle");
+});
+
+test("buffered light preserves the directional lane chosen on tap", () => {
+  const world = duel({ distance: 200 });
+  const { attacker, target } = enterLightRecovery(world);
+
+  advance(world, COMBAT.attack.recoveryMs - 85, { a: { aimX: target.x, aimY: target.y } });
+  stepWorld(world, { a: { attack: true, moveY: -1, aimX: target.x, aimY: target.y } }, 5);
+  assert.equal(attacker.bufferedAttackLateral, 1);
+  stepWorld(world, { a: { moveY: 1, aimX: target.x, aimY: target.y } }, 5);
+  advance(world, 75, { a: { moveY: 1, aimX: target.x, aimY: target.y } });
+  assert.equal(attacker.action, "attack_left_windup");
+});
+
+test("holding light does not auto-chain after recovery", () => {
+  const world = duel({ distance: 200 });
+  const [attacker, target] = world.fighters;
+
+  stepWorld(world, { a: { attack: true, aimX: target.x, aimY: target.y } }, 5);
+  advance(
+    world,
+    COMBAT.attack.windupMs - 5 + COMBAT.attack.activeMs + COMBAT.attack.recoveryMs,
+    { a: { attack: true, aimX: target.x, aimY: target.y } },
+  );
+  assert.equal(attacker.action, "idle");
+
+  stepWorld(world, { a: { attack: true, aimX: target.x, aimY: target.y } }, 5);
+  assert.equal(attacker.action, "idle");
+
+  stepWorld(world, { a: { aimX: target.x, aimY: target.y } }, 5);
+  stepWorld(world, { a: { attack: true, aimX: target.x, aimY: target.y } }, 5);
+  assert.equal(attacker.action, "attack_windup");
 });

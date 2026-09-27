@@ -1801,3 +1801,102 @@ fn directional_light_uses_the_existing_early_feint_contract() {
         88
     );
 }
+
+
+#[test]
+fn late_light_tap_buffers_through_full_authoritative_recovery() {
+    let mut world = duel(200.0);
+    advance(
+        &mut world,
+        5.0,
+        InputIntent { attack: true, facing_radians: 0.0, ..InputIntent::default() },
+        InputIntent::default(),
+    );
+    advance(&mut world, 130.0, InputIntent::default(), InputIntent::default());
+    advance(&mut world, 80.0, InputIntent::default(), InputIntent::default());
+    assert_eq!(world.fighter(1).expect("attacker").action, Action::AttackRecovery);
+
+    advance(&mut world, 170.0, InputIntent::default(), InputIntent::default());
+    advance(
+        &mut world,
+        5.0,
+        InputIntent { attack: true, facing_radians: 0.0, ..InputIntent::default() },
+        InputIntent::default(),
+    );
+    assert_eq!(world.fighter(1).expect("attacker").action, Action::AttackRecovery);
+    advance(&mut world, 80.0, InputIntent::default(), InputIntent::default());
+    assert_eq!(world.fighter(1).expect("attacker").action, Action::AttackWindup);
+}
+
+#[test]
+fn early_recovery_light_tap_is_not_buffered_authoritatively() {
+    let mut world = duel(200.0);
+    advance(
+        &mut world,
+        5.0,
+        InputIntent { attack: true, facing_radians: 0.0, ..InputIntent::default() },
+        InputIntent::default(),
+    );
+    advance(&mut world, 130.0, InputIntent::default(), InputIntent::default());
+    advance(&mut world, 80.0, InputIntent::default(), InputIntent::default());
+    advance(&mut world, 100.0, InputIntent::default(), InputIntent::default());
+    advance(
+        &mut world,
+        5.0,
+        InputIntent { attack: true, facing_radians: 0.0, ..InputIntent::default() },
+        InputIntent::default(),
+    );
+    advance(&mut world, 150.0, InputIntent::default(), InputIntent::default());
+    assert_eq!(world.fighter(1).expect("attacker").action, Action::Idle);
+}
+#[test]
+fn buffered_light_preserves_authoritative_directional_lane() {
+    let mut world = duel(200.0);
+    advance(
+        &mut world,
+        5.0,
+        InputIntent { attack: true, facing_radians: 0.0, ..InputIntent::default() },
+        InputIntent::default(),
+    );
+    advance(&mut world, 130.0, InputIntent::default(), InputIntent::default());
+    advance(&mut world, 80.0, InputIntent::default(), InputIntent::default());
+    advance(&mut world, 170.0, InputIntent::default(), InputIntent::default());
+    advance(
+        &mut world,
+        5.0,
+        InputIntent {
+            move_y: -1.0,
+            attack: true,
+            facing_radians: 0.0,
+            ..InputIntent::default()
+        },
+        InputIntent::default(),
+    );
+    advance(&mut world, 80.0, InputIntent::default(), InputIntent::default());
+    assert_eq!(
+        world.fighter(1).expect("attacker").action,
+        Action::AttackLeftWindup
+    );
+}
+#[test]
+fn held_light_does_not_auto_chain_authoritatively() {
+    let mut world = duel(200.0);
+    let held = InputIntent {
+        attack: true,
+        facing_radians: 0.0,
+        ..InputIntent::default()
+    };
+    advance(&mut world, 5.0, held, InputIntent::default());
+    advance(&mut world, 465.0, held, InputIntent::default());
+    assert_eq!(world.fighter(1).expect("attacker").action, Action::Idle);
+
+    advance(&mut world, 5.0, held, InputIntent::default());
+    assert_eq!(world.fighter(1).expect("attacker").action, Action::Idle);
+
+    advance(&mut world, 5.0, InputIntent::default(), InputIntent::default());
+    advance(&mut world, 5.0, held, InputIntent::default());
+    assert_eq!(
+        world.fighter(1).expect("attacker").action,
+        Action::AttackWindup
+    );
+}
