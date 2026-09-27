@@ -247,6 +247,14 @@ export function fighterThreatPhaseLabel(attacker) {
   return "";
 }
 
+export function fighterThreatPhaseState(phase) {
+  if (phase === "STRIKE" || phase === "HEAVY STRIKE" || phase === "RUNNING STRIKE"
+    || phase === "LEFT SWEEP" || phase === "RIGHT SWEEP") return "strike";
+  if (phase === "WINDUP" || phase === "HEAVY WINDUP" || phase === "RUNNING WINDUP"
+    || phase === "LEFT WINDUP" || phase === "RIGHT WINDUP") return "windup";
+  return "";
+}
+
 export function fighterThreatGuardArcLabel(own, attacker) {
   if (!own || !attacker || !Number.isFinite(own.x) || !Number.isFinite(own.y)
     || !Number.isFinite(own.facing) || !Number.isFinite(attacker.x) || !Number.isFinite(attacker.y)) return "";
