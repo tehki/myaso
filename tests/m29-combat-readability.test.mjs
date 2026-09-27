@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { COMBAT_ACTION, FFA_KILL_TARGET, blockSpatialPresentation, combatActionHint, combatLifePresentation, combatOverlayPresentation, createCombatReadabilityTracker, createRemoteDamageTracker, fighterFocusNetId, fighterIdentityPresentation, fighterThreatBearingLabel, fighterThreatGuardArcLabel, fighterThreatNetId, fighterThreatPhaseLabel, fighterMatchPointPresentation, fighterMatchPresentation, fighterScoreboardPresentation, fighterVitalsPresentation, guardBreakSpatialPresentation, killFeedPresentation, opponentRecoveryPresentation, parrySpatialPresentation } from "../src/browser/combat-readability.mjs";
+import { COMBAT_ACTION, FFA_KILL_TARGET, blockSpatialPresentation, combatActionHint, combatLifePresentation, combatOverlayPresentation, createCombatReadabilityTracker, createRemoteDamageTracker, fighterFocusNetId, fighterIdentityPresentation, fighterThreatBearingLabel, fighterThreatGuardArcLabel, fighterThreatNetId, fighterThreatPhaseLabel, fighterThreatPhaseState, fighterMatchPointPresentation, fighterMatchPresentation, fighterScoreboardPresentation, fighterVitalsPresentation, guardBreakSpatialPresentation, killFeedPresentation, opponentRecoveryPresentation, parrySpatialPresentation } from "../src/browser/combat-readability.mjs";
 
 function fighter(netId, hp = 100, guard = 100, action = COMBAT_ACTION.idle, x = 0, y = 0, facing = 0) {
   return { netId, hp, guard, action, x, y, facing };
@@ -702,4 +702,15 @@ test("directional light threat labels expose the committed side", () => {
   assert.equal(fighterThreatPhaseLabel(fighter(2, 100, 100, COMBAT_ACTION.attackLeftActive)), "LEFT SWEEP");
   assert.equal(fighterThreatPhaseLabel(fighter(2, 100, 100, COMBAT_ACTION.attackRightWindup)), "RIGHT WINDUP");
   assert.equal(fighterThreatPhaseLabel(fighter(2, 100, 100, COMBAT_ACTION.attackRightActive)), "RIGHT SWEEP");
+});
+
+test("all committed attack phase labels map to visible threat states", () => {
+  for (const phase of ["WINDUP", "HEAVY WINDUP", "RUNNING WINDUP", "LEFT WINDUP", "RIGHT WINDUP"]) {
+    assert.equal(fighterThreatPhaseState(phase), "windup", phase);
+  }
+  for (const phase of ["STRIKE", "HEAVY STRIKE", "RUNNING STRIKE", "LEFT SWEEP", "RIGHT SWEEP"]) {
+    assert.equal(fighterThreatPhaseState(phase), "strike", phase);
+  }
+  assert.equal(fighterThreatPhaseState(""), "");
+  assert.equal(fighterThreatPhaseState("RECOVERY"), "");
 });
