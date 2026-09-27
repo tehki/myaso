@@ -565,8 +565,8 @@ fn begin_requested_action(
         let remaining_ms = fighter.action_duration_ms - fighter.action_elapsed_ms;
         if remaining_ms <= LIGHT_ATTACK_BUFFER_WINDOW_MS + EPSILON {
             fighter.buffered_light_attack = true;
-            fighter.buffered_attack_lateral = fighter.facing.sin() * input.move_x
-                - fighter.facing.cos() * input.move_y;
+            fighter.buffered_attack_lateral =
+                fighter.facing.sin() * input.move_x - fighter.facing.cos() * input.move_y;
         }
         return;
     }
