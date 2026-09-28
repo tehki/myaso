@@ -3092,41 +3092,41 @@ async function performArenaRunningAttack(session, elementId, movementKey, xOffse
 
 async function performArenaFeint(session, elementId, xOffset = 200) {
   const origin = { "element-6066-11e4-a52e-4f735466cecf": elementId };
-  const pointerId = `mouse-${session.name}`;
-  let attackHeld = false;
+  // Keep LMB and wheel-back in one W3C action command so browser-internal
+  // timing, not WebDriver round-trip latency, owns the unchanged 70 ms feint
+  // window. The 35 ms hold spans multiple input frames, then wheel-back lands
+  // before a final 10 ms hold and real LMB release.
   try {
-    // Send LMB as its own real browser action first. Keeping the button held
-    // across calls prevents the wheel-back edge from being coalesced into the
-    // same outbound combat sample as attack start.
     await webdriver(session.base, "POST", `/session/${session.sessionId}/actions`, {
-      actions: [{
-        type: "pointer",
-        id: pointerId,
-        parameters: { pointerType: "mouse" },
-        actions: [
-          { type: "pointerMove", duration: 0, origin, x: xOffset, y: 0 },
-          { type: "pointerDown", button: 0 },
-        ],
-      }],
-    });
-    attackHeld = true;
-
-    // One prediction/input sample is enough to establish light windup. Wheel
-    // back remains well inside the unchanged 70 ms authoritative feint window.
-    await sleep(20);
-    await scrollArenaWheel(session, elementId, 120);
-    await sleep(10);
-  } finally {
-    if (attackHeld) {
-      await webdriver(session.base, "POST", `/session/${session.sessionId}/actions`, {
-        actions: [{
+      actions: [
+        {
           type: "pointer",
-          id: pointerId,
+          id: `mouse-${session.name}`,
           parameters: { pointerType: "mouse" },
-          actions: [{ type: "pointerUp", button: 0 }],
-        }],
-      });
-    }
+          actions: [
+            { type: "pointerMove", duration: 0, origin, x: xOffset, y: 0 },
+            { type: "pointerDown", button: 0 },
+            { type: "pause", duration: 35 },
+            { type: "pause", duration: 10 },
+            { type: "pointerUp", button: 0 },
+          ],
+        },
+        {
+          type: "wheel",
+          id: `wheel-${session.name}`,
+          actions: [
+            { type: "pause", duration: 0 },
+            { type: "pause", duration: 0 },
+            { type: "pause", duration: 35 },
+            { type: "scroll", x: 0, y: 0, deltaX: 0, deltaY: 120, duration: 0, origin },
+            { type: "pause", duration: 10 },
+          ],
+        },
+      ],
+    });
+  } catch (error) {
+    await webdriver(session.base, "DELETE", `/session/${session.sessionId}/actions`);
+    throw error;
   }
 }
 
