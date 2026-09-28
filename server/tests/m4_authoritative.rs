@@ -32,18 +32,24 @@ fn advance(
     events
 }
 
-fn fresh_attack_when_idle(world: &World, attack: InputIntent) -> InputIntent {
+fn fresh_attack_when_idle(world: &mut World, attack: InputIntent) -> Vec<CombatEvent> {
+    let release = InputIntent {
+        facing_radians: attack.facing_radians,
+        ..InputIntent::default()
+    };
     if world
         .fighter(1)
         .map(|fighter| fighter.action == Action::Idle)
         .unwrap_or(false)
     {
-        attack
+        // M123 makes light attacks edge-triggered so holding LMB cannot auto-chain.
+        // Give legacy kill/match loops one explicit release frame before each
+        // synthetic click, then deliver a fresh attack edge.
+        let mut events = advance(world, 5.0, release, InputIntent::default());
+        events.extend(advance(world, 5.0, attack, InputIntent::default()));
+        events
     } else {
-        InputIntent {
-            facing_radians: attack.facing_radians,
-            ..InputIntent::default()
-        }
+        advance(world, 5.0, release, InputIntent::default())
     }
 }
 
@@ -715,8 +721,7 @@ fn death_is_temporary_and_respawns_at_the_spawn_point() {
     };
     let mut death_seen = false;
     for _ in 0..320 {
-        let first = fresh_attack_when_idle(&world, attack);
-        let events = advance(&mut world, 5.0, first, InputIntent::default());
+        let events = fresh_attack_when_idle(&mut world, attack);
         if events
             .iter()
             .any(|event| matches!(event, CombatEvent::Death { .. }))
@@ -775,8 +780,7 @@ fn first_to_kill_target_declares_winner_and_freezes_match_state() {
     };
     let mut winning_event = None;
     for _ in 0..4000 {
-        let first = fresh_attack_when_idle(&world, attack);
-        let events = advance(&mut world, 5.0, first, InputIntent::default());
+        let events = fresh_attack_when_idle(&mut world, attack);
         if let Some(event) = events
             .iter()
             .find(|event| matches!(event, CombatEvent::MatchWon { .. }))
@@ -833,8 +837,7 @@ fn finished_match_resets_atomically_and_reopens_play() {
     };
 
     for _ in 0..4000 {
-        let first = fresh_attack_when_idle(&world, attack);
-        let events = advance(&mut world, 5.0, first, InputIntent::default());
+        let events = fresh_attack_when_idle(&mut world, attack);
         if events
             .iter()
             .any(|event| matches!(event, CombatEvent::MatchWon { .. }))
