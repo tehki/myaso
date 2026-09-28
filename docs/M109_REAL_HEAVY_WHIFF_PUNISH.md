@@ -27,7 +27,7 @@ Browser roles are fixed for repeatability:
 
 ## Exchange
 
-Firefox first stages inside punish range with real movement, then deliberately aims the heavy away from Chrome before pressing real `E`.
+Firefox first stages inside punish range with real movement, then deliberately aims the heavy away from Chrome before pressing real `E`. In this whiff-only acceptance flight, `E` stays held for 240 ms so headless Firefox has multiple input frames to sample the genuine key; this does not change the production binding or any combat timing.
 
 The wrong-facing heavy remains fully committed through its unchanged 320 ms windup and 100 ms active window but cannot connect through the authoritative directional arc. Chrome waits until it actually observes the remote `PUNISH · Heavy recovery` cue, then uses a short real closing movement before counterattacking. The acceptance therefore reacts to authoritative readability rather than a wall-clock guess.
 
