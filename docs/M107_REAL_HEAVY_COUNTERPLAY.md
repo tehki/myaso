@@ -22,9 +22,9 @@ M106 already proves real `E` delivery, one authoritative 46-damage heavy hit, ex
 
 Scenario: `uiheavyblock`.
 
-Chrome attacks with the real `E` key. Firefox aims toward the attacker and holds real RMB well before the heavy edge.
+Chrome attacks with the real `E` key. Firefox aims toward the attacker and sends two genuine wheel-back short-Block pulses at 70 ms and 220 ms from the shared WebDriver dispatch boundary.
 
-The block starts early enough that the 115 ms parry freshness window is expired by the 320 ms heavy active transition.
+The two 240 ms short-Block windows overlap continuously through the 320 ms heavy active transition, while authoritative Block age passes the unchanged 125 ms parry freshness window.
 
 Acceptance:
 
@@ -44,9 +44,9 @@ This proves the heavy strike applies exactly the M105 64 guard pressure through 
 
 Scenario: `uiheavyparry`.
 
-Chrome attacks with real `E`. Firefox begins real RMB at approximately 245 ms from the E keydown.
+Chrome attacks with real `E`. Firefox sends one genuine wheel-back short Block at approximately 230 ms from the E keydown.
 
-The target timing leaves roughly 75 ms of block age at the 320 ms heavy active frame, inside the unchanged 115 ms parry window while leaving margin for browser/network skew.
+The target timing leaves roughly 90 ms of Block age at the 320 ms heavy active frame, inside the unchanged 125 ms parry window while leaving margin for browser/network skew.
 
 Acceptance:
 

@@ -747,22 +747,15 @@ async function runOnlineUiHeavyBlockFlight(entries) {
   // completely unresolved: pristine HP/guard and no parry feedback. Any resolved
   // or partially resolved exchange fails closed instead of being retried.
   for (let attempt = 1; attempt <= 3 && !evidence; attempt += 1) {
-    let blockHeld = false;
-    try {
-      await setArenaBlock(defender, defenderElementId, true);
-      blockHeld = true;
-      // Wheel-back is a short block now. Start the heavy immediately, then
-      // refresh the same directional block after the sample-safe E hold plus
-      // 50 ms (~170 ms from keydown). The ~320 ms impact stays covered while
-      // block age is already beyond the 125 ms parry window.
-      await pulseMovementKey(attacker, "e", heavyKeyPulseMs);
-      await sleep(50);
-      await setArenaBlock(defender, defenderElementId, true);
-      await sleep(450);
-    } finally {
-      if (blockHeld) await setArenaBlock(defender, defenderElementId, false);
-    }
-    await sleep(20);
+    // Start the genuine E edge and schedule two genuine wheel-back pulses from
+    // the defender's own WebDriver clock at 70 ms and 220 ms. Their 240 ms
+    // short-block windows overlap continuously, so authority never re-enters a
+    // fresh parry window before the ~320 ms heavy impact.
+    await Promise.all([
+      pulseMovementKey(attacker, "e", heavyKeyPulseMs),
+      scrollArenaWheelPair(defender, defenderElementId, 120, 70, 150),
+    ]);
+    await sleep(470);
 
     lastObserved = await Promise.all(entries.map(readUiEvidence));
     const attackerResult = lastObserved.find((entry) => entry.browser === attacker.name);
