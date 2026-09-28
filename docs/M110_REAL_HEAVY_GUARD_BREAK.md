@@ -9,10 +9,10 @@ Prove the anti-turtling consequence of the M105 heavy strike through two real br
 The `uiheavyguardbreak` flight runs the production client in Chrome and Firefox against one loopback authoritative server.
 
 - Chrome moves into heavy range and Firefox faces the threat.
-- Firefox uses genuine wheel-back short directional Block pulses. Chrome starts the real `E` gesture first; Firefox sends one early wheel-back 70 ms into that real gesture, then refreshes wheel-back as soon as the new replicated authoritative `HEAVY WINDUP` is observed. The two 240 ms local short-block windows overlap, so the authoritative Block action remains continuous: its parry age keeps increasing while coverage is extended through heavy impact.
+- Firefox uses genuine wheel-back short directional Block pulses. Chrome starts the real `E` gesture first; Firefox schedules two browser-owned wheel-back pulses at 70 ms and 220 ms. Their 240 ms local short-block windows overlap, so the authoritative Block action remains continuous: its parry age keeps increasing while coverage extends beyond heavy impact. The harness still requires the replicated authoritative `HEAVY WINDUP` to be observed; timing no longer depends on when that snapshot reaches WebDriver.
 - Chrome submits genuine `E` heavy-strike controls. The acceptance harness keeps each real `E` depressed for 120 ms so headless browsers have multiple input frames to sample it; this does not change the production heavy timing or binding.
 - The first authoritative blocked heavy must preserve both fighters at 100 HP and spend exactly 64 guard, producing `100 -> 36`.
-- After the unchanged 840 ms heavy commitment finishes, Chrome submits the second genuine heavy and Firefox repeats the same early-plus-windup-refresh short Block.
+- After the unchanged 840 ms heavy commitment finishes, Chrome submits the second genuine heavy and Firefox repeats the same paired short-Block pulse.
 - Guard may recover slightly between short-block windows under the production regeneration rule, but it must remain below the 64-point break threshold before the second heavy.
 - The second authoritative blocked heavy must exhaust that remaining guard to `0` while defender HP remains 100.
 - The defender must expose the authoritative `STUNNED` guard-break transition and `guard-broken` feedback.
