@@ -1234,6 +1234,8 @@ async function runOnlineUiFeintFlight(entries) {
     }
     const feintsBefore = beforeAttacker.events.filter((text) =>
       text.startsWith("Feint recovery")).length;
+    const pointerOffset = beforeAttacker.pointers.length;
+    const wheelOffset = beforeAttacker.wheels.length;
     const remoteRecoveriesBefore = beforeDefender.recoveryTransitions.filter((entry) =>
       entry.visible && entry.state === "feint-recovery").length;
 
@@ -1264,15 +1266,25 @@ async function runOnlineUiFeintFlight(entries) {
 
     const feintsAfter = attemptAttacker.events.filter((text) =>
       text.startsWith("Feint recovery")).length;
-    const cleanRemoteObservationMiss = feintsAfter > feintsBefore
-      && attemptAttacker.playerHp === 100 && attemptAttacker.playerGuard === 100
+    const attemptPointers = attemptAttacker.pointers.slice(pointerOffset);
+    const attemptWheels = attemptAttacker.wheels.slice(wheelOffset);
+    const lightDown = attemptPointers.find((event) => event.type === "pointerdown" && event.button === 0);
+    const lightUp = attemptPointers.find((event) => event.type === "pointerup" && event.button === 0);
+    const wheelBack = attemptWheels.find((event) => event.deltaY > 0);
+    const completeGesture = Boolean(lightDown && lightUp && wheelBack && lightUp.t > lightDown.t);
+    const pristine = attemptAttacker.playerHp === 100 && attemptAttacker.playerGuard === 100
       && attemptAttacker.opponentHp === 100 && attemptAttacker.opponentGuard === 100
-      && attemptDefender.playerHp === 100 && attemptDefender.playerGuard === 100
-      && !attemptAttacker.feedbackTransitions.includes("hit-confirm")
+      && attemptDefender.playerHp === 100 && attemptDefender.playerGuard === 100;
+    const noContact = !attemptAttacker.feedbackTransitions.includes("hit-confirm")
       && !attemptDefender.feedbackTransitions.includes("damage-taken")
       && !attemptAttacker.feedbackTransitions.includes("block-confirm")
       && !attemptDefender.feedbackTransitions.includes("parry-success");
-    if (!cleanRemoteObservationMiss) {
+    const cleanRemoteObservationMiss = feintsAfter > feintsBefore && pristine && noContact;
+    const cleanGestureLatchMiss = completeGesture
+      && feintsAfter === feintsBefore
+      && pristine
+      && noContact;
+    if (!cleanRemoteObservationMiss && !cleanGestureLatchMiss) {
       throw new Error(`M117 feint attempt ${attempt} did not qualify for clean observation retry: ${JSON.stringify(evidence)}`);
     }
     if (attempt < 3) await sleep(340);
