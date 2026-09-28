@@ -29,7 +29,7 @@ Both browsers must independently observe:
 
 ## Acceptance stabilization
 
-CI #169 exact-head retry exposed a transport/timing flake in which the defender eventually entered authoritative `Dodge`, but the single request sample did not overlap `AttackActive` and the first strike landed. The harness now preserves the >=35 ms reaction threshold while carrying the already-triggered ordinary dodge request until authoritative Dodge confirmation or the attack window ends. Acceptance remains unchanged: active-frame overlap inside the real hit geometry and untouched 100/100 defender vitals are still mandatory.
+CI #169 exact-head retry exposed a transport/timing flake in which the defender eventually entered authoritative `Dodge`, but the single request sample did not overlap `AttackActive` and the first strike landed. The harness carries the already-triggered ordinary dodge request until authoritative Dodge confirmation or the attack window ends. Under the later M113 Wilds roll (170 ms at 690 u/s), reacting at the original 35 ms minimum can move the defender outside the 94-unit hit envelope before `AttackActive`; the flight therefore targets 60 ms after observed windup while still satisfying the original >=35 ms reaction requirement. Acceptance remains unchanged: active-frame overlap inside the real hit geometry and untouched 100/100 defender vitals are still mandatory.
 
 
 ## M113 control-schema adaptation
