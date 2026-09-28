@@ -1347,6 +1347,10 @@ async function runOnlineUiHeavyWhiffPunishFlight(entries) {
   const punishMoveKey = attackRight ? "a" : "d";
   const punishMoveCode = attackRight ? "KeyA" : "KeyD";
   const punishOffset = attackRight ? -200 : 200;
+  // This whiff-only gate does not couple defender timing to E key-up, so it can
+  // keep the genuine key depressed longer than block/parry/dodge gates. The
+  // longer hold gives headless Firefox multiple input frames to sample it.
+  const heavyWhiffPulseMs = 240;
 
   // Stage inside punish range, then deliberately face the heavy away from
   // the defender. This creates a deterministic directional whiff without making
@@ -1367,7 +1371,7 @@ async function runOnlineUiHeavyWhiffPunishFlight(entries) {
     const commitsBefore = beforeAttacker.events.filter((text) =>
       text.startsWith("Heavy strike committed")).length;
 
-    await pulseMovementKey(attacker, "e", heavyKeyPulseMs);
+    await pulseMovementKey(attacker, "e", heavyWhiffPulseMs);
     // React to the actual remote recovery cue instead of a wall-clock guess.
     // This both proves the punish window was readable to the defender and avoids
     // coupling the counter to cross-browser snapshot/WebDriver delivery skew.
