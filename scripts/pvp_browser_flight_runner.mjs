@@ -768,9 +768,18 @@ async function runOnlineUiHeavyBlockFlight(entries) {
       throw new Error(`M107 heavy block incomplete evidence on attempt ${attempt}: ${JSON.stringify(lastObserved)}`);
     }
 
+    const blockPressureObserved = attackerResult.events.includes("Opponent blocked - guard -64.")
+      && defenderResult.events.includes("Block held - guard -64.");
+    const attackerReplicaGuardInWindow = attackerResult.opponentGuard >= 36
+      && attackerResult.opponentGuard <= 40;
+    const defenderGuardInWindow = defenderResult.playerGuard >= 36
+      && defenderResult.playerGuard <= 40;
     const resolvedBlock = attackerResult.playerHp === 100 && attackerResult.playerGuard === 100
-      && attackerResult.opponentHp === 100 && attackerResult.opponentGuard === 36
-      && defenderResult.playerHp === 100 && defenderResult.playerGuard === 36;
+      && attackerResult.opponentHp === 100
+      && defenderResult.playerHp === 100
+      && blockPressureObserved
+      && attackerReplicaGuardInWindow
+      && defenderGuardInWindow;
     if (resolvedBlock) {
       evidence = lastObserved;
       break;
