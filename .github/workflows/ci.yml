@@ -277,6 +277,15 @@ jobs:
           node --check web/online-game.mjs
           node --test --test-name-pattern="directional|left sweep|right sweep" tests/combat-model.test.mjs tests/sparring-ai.test.mjs tests/networking.test.mjs tests/m29-combat-readability.test.mjs
 
+      - name: Validate M121 first-to-five duel kernel
+        run: |
+          cargo test --locked --manifest-path server/Cargo.toml first_to_kill_target_declares_winner_and_freezes_match_state
+          cargo test --locked --manifest-path server/Cargo.toml finished_match_resets_atomically_and_reopens_play
+          node --check src/browser/combat-readability.mjs
+          node --check web/online-game.mjs
+          node --check scripts/pvp_browser_flight_runner.mjs
+          node --test --test-name-pattern="first-to-five|match-point" tests/m29-combat-readability.test.mjs
+
       - name: Validate M106 heavy strike control and readability
         env:
           MYASO_PVP_SCENARIO: "uiheavy"
@@ -449,15 +458,16 @@ jobs:
           MYASO_PVP_SCENARIO: "uiscore"
         run: node scripts/pvp_browser_flight_runner.mjs
 
-      - name: Validate M49 authoritative FFA match winner
+      - name: Validate M49/M121 authoritative first-to-five match winner
         env:
           MYASO_PVP_SCENARIO: "uimatch"
+          MYASO_PVP_FLIGHT_DURATION_MS: "30000"
         run: node scripts/pvp_browser_flight_runner.mjs
 
-      - name: Validate M50 authoritative FFA rematch lifecycle
+      - name: Validate M50/M121 authoritative first-to-five rematch lifecycle
         env:
           MYASO_PVP_SCENARIO: "uirematch"
-          MYASO_PVP_FLIGHT_DURATION_MS: "10000"
+          MYASO_PVP_FLIGHT_DURATION_MS: "40000"
         run: node scripts/pvp_browser_flight_runner.mjs
 
       - name: Validate M51 three-player authoritative FFA
