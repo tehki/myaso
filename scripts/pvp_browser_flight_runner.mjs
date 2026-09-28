@@ -12,6 +12,9 @@ const scenario = process.env.MYASO_PVP_SCENARIO ?? "damage";
 // Keep the real E key depressed across multiple browser/input frames so the
 // authoritative client has a fair opportunity to sample the genuine gesture.
 const heavyKeyPulseMs = 120;
+// A full M62 threat chevron paints dozens of exact-tone pixels; a handful can
+// arise from raster overlap. Use one significance floor for positive and leak proof.
+const threatMarkerMinPixels = 8;
 if (!new Set(["damage", "inputloss", "parry", "dodge", "block", "guardbreak", "backblock", "respawn", "ui", "uirespawn", "uifeedback", "uihittell", "uivitals", "uiidentity", "uiscore", "uimatch", "uirematch", "uiffa3", "uikillfeed", "uifocus", "uithreat", "uithreatbearing", "uimultithreat", "uisecondarythreat", "uisecondarybearing", "uisecondaryphase", "uiguardarc", "uisecondaryguardarc", "uithreatmarkers", "uiparry", "uistun", "uiguardbreak", "uidodge", "uirecovery", "uirecoverytell", "uiattackintent", "uiheavy", "uiheavyinputloss", "uiheavyblock", "uiheavyparry", "uiheavydodge", "uiheavypunish", "uiheavyguardbreak", "uiheavyguardbreakpunish", "uifeint", "uirunningattack", "uiguardbreaktell", "uiparrytell", "uiblockfacingtell", "uidodgetell", "uideathtell"]).has(scenario)) throw new Error(`unsupported MYASO_PVP_SCENARIO: ${scenario}`);
 const staticPort = Number(process.env.MYASO_PVP_FLIGHT_HTTP_PORT ?? 4174);
 const browsers = [
@@ -2734,10 +2737,12 @@ async function runOnlineUiMultiThreatFlight(entries, requireSecondary = false, r
     })));
     const centerSample = samples.find((entry) => entry.browser === center.name);
     const attackerSamples = samples.filter((entry) => entry.browser === left.name || entry.browser === right.name);
-    if (!centerSample || centerSample.primaryMax < 8 || centerSample.secondaryMax < 8) {
+    if (!centerSample
+      || centerSample.primaryMax < threatMarkerMinPixels
+      || centerSample.secondaryMax < threatMarkerMinPixels) {
       throw new Error(`M62 center observer never painted both spatial threat markers: ${JSON.stringify(samples)}`);
     }
-    if (attackerSamples.some((entry) => entry.secondaryMax !== 0)) {
+    if (attackerSamples.some((entry) => entry.secondaryMax >= threatMarkerMinPixels)) {
       throw new Error(`M62 secondary spatial threat marker leaked without simultaneous-threat evidence: ${JSON.stringify(samples)}`);
     }
     return evidence.map((entry) => ({
