@@ -1507,20 +1507,16 @@ async function runOnlineUiDodgeFeedbackFlight(entries) {
       throw new Error(`M36 retry ${attempt} did not start from clean authoritative vitals: ${JSON.stringify(lastAttemptBaseline)}`);
     }
 
-    // Deliver one genuine held LMB edge, then start the real wheel-forward roll
-    // early in the unchanged 135 ms windup. Keeping LMB held until after the roll
-    // gesture avoids spending most of the windup inside a multi-click WebDriver burst.
-    // M24 still owns exact reaction geometry; M36 only proves clean authoritative
-    // evade feedback with real browser controls.
-    let attackHeld = false;
-    try {
-      attackHeld = true;
-      await setArenaAttack(attacker, attackerElementId, true, attackOffset);
-      await sleep(20);
-      await pressArenaPerpendicularDodgeAfterPause(defender, 0);
-    } finally {
-      if (attackHeld) await setArenaAttack(attacker, attackerElementId, false, attackOffset);
-    }
+    // Launch the genuine held LMB and pointer-directed roll concurrently so
+    // cross-session WebDriver round-trip latency cannot consume the 135 ms light
+    // windup. Firefox owns a 180 ms real LMB hold; Chrome schedules wheel-forward
+    // from its own WebDriver clock 45 ms later. The unchanged 125 ms iframe then
+    // spans the authoritative light active transition with comfortable margin.
+    // M24 still owns exact reaction geometry; M36 proves the readable evade path.
+    await Promise.all([
+      performArenaAttackHold(attacker, attackerElementId, attackOffset, 180),
+      pressArenaPerpendicularDodgeAfterPause(defender, 45),
+    ]);
     // Keep the iframe/strike resolution window free of evidence polling.
     await sleep(180);
     evidence = await waitForUiDodgeEvidence(entries, attacker, defender, 520, false, lastAttemptBaseline);
@@ -3182,6 +3178,24 @@ async function performArenaAttack(session, elementId, xOffset = 200) {
         { type: "pointerMove", duration: 0, origin, x: xOffset, y: 0 },
         { type: "pointerDown", button: 0 },
         { type: "pause", duration: 40 },
+        { type: "pointerUp", button: 0 },
+      ],
+    }],
+  });
+}
+
+async function performArenaAttackHold(session, elementId, xOffset = 200, holdMs = 180) {
+  const origin = { "element-6066-11e4-a52e-4f735466cecf": elementId };
+  const boundedHoldMs = Math.max(40, Math.min(500, Math.trunc(holdMs)));
+  await webdriver(session.base, "POST", `/session/${session.sessionId}/actions`, {
+    actions: [{
+      type: "pointer",
+      id: `mouse-${session.name}`,
+      parameters: { pointerType: "mouse" },
+      actions: [
+        { type: "pointerMove", duration: 0, origin, x: xOffset, y: 0 },
+        { type: "pointerDown", button: 0 },
+        { type: "pause", duration: boundedHoldMs },
         { type: "pointerUp", button: 0 },
       ],
     }],
