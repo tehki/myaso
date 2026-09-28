@@ -1606,17 +1606,29 @@ async function runOnlineUiDodgeFeedbackFlight(entries) {
       throw new Error(`M36 retry ${attempt} did not start from clean authoritative vitals: ${JSON.stringify(lastAttemptBaseline)}`);
     }
 
-    // Launch the genuine held LMB and pointer-directed roll concurrently so
-    // cross-session WebDriver round-trip latency cannot consume the 135 ms light
-    // windup. Firefox owns a 180 ms real LMB hold; Chrome schedules wheel-forward
-    // from its own WebDriver clock 45 ms later. The unchanged 125 ms iframe then
-    // spans the authoritative light active transition with comfortable margin.
-    // M24 still owns exact reaction geometry; M36 proves the readable evade path.
-    await Promise.all([
-      performArenaAttackHold(attacker, attackerElementId, attackOffset, 180),
-      pressArenaPerpendicularDodgeAfterPause(defender, 45),
-    ]);
-    // Keep the iframe/strike resolution window free of evidence polling.
+    const baselineDefender = lastAttemptBaseline.find((entry) => entry.browser === defender.name);
+    const baselineWindups = baselineDefender?.threatTransitions.filter((entry) =>
+      entry.visible && entry.state === "windup" && entry.phase === "WINDUP").length ?? 0;
+    let rollIssued = false;
+
+    // Arm a browser-local observer on Chrome before Firefox starts the genuine
+    // held LMB. As soon as Chrome observes a fresh replicated WINDUP, dispatch
+    // the real pointer-directed wheel roll immediately. This removes cross-session
+    // WebDriver launch skew from the 135 ms light windup while preserving the
+    // actual authoritative reaction path. The observer stops before the roll,
+    // leaving the iframe/strike resolution window free of evidence polling.
+    const windupPromise = waitForFreshUiThreatWindup(defender, baselineWindups, 320);
+    await sleep(15);
+    const attackPromise = performArenaAttackHold(attacker, attackerElementId, attackOffset, 180);
+    try {
+      const windup = await windupPromise;
+      if (windup) {
+        await pressArenaPerpendicularDodgeAfterPause(defender, 0, defenderElementId);
+        rollIssued = true;
+      }
+    } finally {
+      await attackPromise;
+    }
     await sleep(180);
     evidence = await waitForUiDodgeEvidence(entries, attacker, defender, 520, false, lastAttemptBaseline);
     if (evidence) break;
@@ -1628,12 +1640,14 @@ async function runOnlineUiDodgeFeedbackFlight(entries) {
       throw new Error(`M36 retry ${attempt} failed closed after a resolved exchange: ${JSON.stringify(missed)}`);
     }
     if (attempt < 3) {
-      // Let both authoritative recovery windows settle, then unwind the current
-      // perpendicular roll displacement with ordinary opposite movement. A 170 ms
-      // roll at 690 units/s can travel about 117.3 units; 550 ms at the normal
-      // 215 units/s restores about 118.3 units so retries do not drift off-line.
+      // Let authoritative recovery settle. Only unwind geometry when a real roll
+      // was actually issued; a clean missed attack latch must not move the defender.
       await sleep(430);
-      await pulseMovementKey(defender, "w", 550);
+      if (rollIssued) {
+        // A 170 ms roll at 690 units/s can travel about 117.3 units; 550 ms at
+        // the normal 215 units/s restores about 118.3 units.
+        await pulseMovementKey(defender, "w", 550);
+      }
       await aimArena(defender, defenderElementId, attackRight ? -200 : 200);
     }
   }
@@ -3129,8 +3143,34 @@ async function scrollArenaWheelPair(session, elementId, deltaY, firstDelayMs, be
   });
 }
 
-async function pressArenaPerpendicularDodgeAfterPause(session, delayMs) {
-  const elementId = await resolveArenaElement(session, "wheel-roll");
+async function waitForFreshUiThreatWindup(session, baselineCount, timeoutMs = 320) {
+  const result = await webdriver(session.base, "POST", `/session/${session.sessionId}/execute/async`, {
+    script: `
+      const baseline = arguments[0];
+      const timeoutMs = arguments[1];
+      const done = arguments[arguments.length - 1];
+      const startedAt = performance.now();
+      const countWindups = () => (window.__MYASO_M30_UI__?.threatTransitions ?? []).filter((entry) =>
+        entry.visible
+        && entry.state === 'windup'
+        && (entry.phase === 'WINDUP' || entry.phase === 'LEFT WINDUP' || entry.phase === 'RIGHT WINDUP')
+      ).length;
+      const poll = () => {
+        const count = countWindups();
+        const elapsedMs = performance.now() - startedAt;
+        if (count > baseline) return done({ ok: true, count, elapsedMs });
+        if (elapsedMs >= timeoutMs) return done({ ok: false, count, elapsedMs });
+        setTimeout(poll, 4);
+      };
+      poll();
+    `,
+    args: [baselineCount, timeoutMs],
+  });
+  return result?.ok ? result : null;
+}
+
+async function pressArenaPerpendicularDodgeAfterPause(session, delayMs, knownElementId = null) {
+  const elementId = knownElementId ?? await resolveArenaElement(session, "wheel-roll");
   const origin = { "element-6066-11e4-a52e-4f735466cecf": elementId };
   // Roll direction is pointer-owned. Aim below arena center immediately before
   // wheel-forward; the simultaneous S key is intentionally redundant evidence
