@@ -32,6 +32,21 @@ fn advance(
     events
 }
 
+fn fresh_attack_when_idle(world: &World, attack: InputIntent) -> InputIntent {
+    if world
+        .fighter(1)
+        .map(|fighter| fighter.action == Action::Idle)
+        .unwrap_or(false)
+    {
+        attack
+    } else {
+        InputIntent {
+            facing_radians: attack.facing_radians,
+            ..InputIntent::default()
+        }
+    }
+}
+
 fn advance_three(
     world: &mut World,
     milliseconds: f32,
@@ -700,7 +715,8 @@ fn death_is_temporary_and_respawns_at_the_spawn_point() {
     };
     let mut death_seen = false;
     for _ in 0..320 {
-        let events = advance(&mut world, 5.0, attack, InputIntent::default());
+        let first = fresh_attack_when_idle(&world, attack);
+        let events = advance(&mut world, 5.0, first, InputIntent::default());
         if events
             .iter()
             .any(|event| matches!(event, CombatEvent::Death { .. }))
@@ -759,7 +775,8 @@ fn first_to_kill_target_declares_winner_and_freezes_match_state() {
     };
     let mut winning_event = None;
     for _ in 0..4000 {
-        let events = advance(&mut world, 5.0, attack, InputIntent::default());
+        let first = fresh_attack_when_idle(&world, attack);
+        let events = advance(&mut world, 5.0, first, InputIntent::default());
         if let Some(event) = events
             .iter()
             .find(|event| matches!(event, CombatEvent::MatchWon { .. }))
@@ -816,7 +833,8 @@ fn finished_match_resets_atomically_and_reopens_play() {
     };
 
     for _ in 0..4000 {
-        let events = advance(&mut world, 5.0, attack, InputIntent::default());
+        let first = fresh_attack_when_idle(&world, attack);
+        let events = advance(&mut world, 5.0, first, InputIntent::default());
         if events
             .iter()
             .any(|event| matches!(event, CombatEvent::MatchWon { .. }))
