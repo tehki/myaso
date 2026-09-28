@@ -3120,8 +3120,10 @@ async function performArenaFeint(session, elementId, xOffset = 200) {
   const origin = { "element-6066-11e4-a52e-4f735466cecf": elementId };
   // Keep LMB and wheel-back in one W3C action command so browser-internal
   // timing, not WebDriver round-trip latency, owns the unchanged 70 ms feint
-  // window. The 35 ms hold spans multiple input frames, then wheel-back lands
-  // before a final 10 ms hold and real LMB release.
+  // window. Dispatch wheel-back in the same action tick as LMB-down: the first
+  // sampled frame starts the light, and the still-live short Block feints it on
+  // the next frame. Keep LMB held for 45 ms so the real attack edge spans
+  // multiple browser/input frames before release.
   try {
     await webdriver(session.base, "POST", `/session/${session.sessionId}/actions`, {
       actions: [
@@ -3132,8 +3134,7 @@ async function performArenaFeint(session, elementId, xOffset = 200) {
           actions: [
             { type: "pointerMove", duration: 0, origin, x: xOffset, y: 0 },
             { type: "pointerDown", button: 0 },
-            { type: "pause", duration: 35 },
-            { type: "pause", duration: 10 },
+            { type: "pause", duration: 45 },
             { type: "pointerUp", button: 0 },
           ],
         },
@@ -3142,10 +3143,9 @@ async function performArenaFeint(session, elementId, xOffset = 200) {
           id: `wheel-${session.name}`,
           actions: [
             { type: "pause", duration: 0 },
-            { type: "pause", duration: 0 },
-            { type: "pause", duration: 35 },
             { type: "scroll", x: 0, y: 0, deltaX: 0, deltaY: 120, duration: 0, origin },
-            { type: "pause", duration: 10 },
+            { type: "pause", duration: 45 },
+            { type: "pause", duration: 0 },
           ],
         },
       ],
