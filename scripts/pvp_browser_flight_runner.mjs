@@ -1775,9 +1775,13 @@ async function runOnlineUiHeavyGuardBreakFlight(entries, { returnTiming = false 
   const heavyWindupCount = (state) => state.threatTransitions.filter((entry) =>
     entry.visible && entry.phase === "HEAVY WINDUP").length;
   const performHeavyIntoObservedShortBlock = async (windupsBefore) => {
-    // Start genuine E first, then anchor wheel-back to the newly replicated
-    // authoritative heavy windup instead of browser wall-clock/key-down time.
+    // Start genuine E, then arm an early real wheel-back short Block while the
+    // heavy is still winding up. A second real wheel-back refresh is anchored
+    // to the replicated HEAVY WINDUP cue. Because the local short-block windows
+    // overlap, authority stays in one continuous Block action: the parry age is
+    // not reset, while the 240 ms window is extended safely through impact.
     const heavyPulse = pulseMovementKey(attacker, "e", heavyKeyPulseMs);
+    await scrollArenaWheel(defender, defenderElementId, 120, 70);
     let observed = false;
     try {
       const deadline = Date.now() + 420;
@@ -1785,10 +1789,6 @@ async function runOnlineUiHeavyGuardBreakFlight(entries, { returnTiming = false 
         const state = await readUiEvidence(defender);
         if (heavyWindupCount(state) > windupsBefore) {
           observed = true;
-          // Snapshot/WebDriver transport has already aged the authoritative
-          // windup. A small browser-independent delay centers short Block
-          // between the 125 ms parry edge and 240 ms expiry.
-          await sleep(55);
           await scrollArenaWheel(defender, defenderElementId, 120);
           break;
         }
