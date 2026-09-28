@@ -51,7 +51,9 @@ It reuses the stabilized three-browser authoritative FFA choreography:
 - Firefox #2 is the center observer;
 - Chrome2 #3 attacks from the right using genuine pointer input.
 
-The M62 gate preserves all M55-M61 semantic requirements and adds passive rendered-canvas proof.
+The quality job preserves the dedicated M55-M61 semantic gates before M62 and then adds passive rendered-canvas proof. The M62 scenario itself reuses the already-proven primary/secondary identities, bearings and guard arcs, but does not redundantly require both M59 secondary phase transitions to occur inside the same short two-threat overlap.
+
+Rendered-marker evidence uses an 8-pixel significance floor. The actual 3 px threat chevrons paint dozens of exact-tone pixels, while isolated one-pixel matches from canvas raster overlap are not treated as a rendered marker. The same threshold is used for required center markers and forbidden attacker-side secondary-marker leaks.
 
 A requestAnimationFrame sampler reads actual canvas pixels around the local fighter while the authoritative threat window is live.
 

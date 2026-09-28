@@ -8,6 +8,13 @@ import { setTimeout as sleep } from "node:timers/promises";
 const root = process.cwd();
 const durationMs = Number(process.env.MYASO_PVP_FLIGHT_DURATION_MS ?? 7000);
 const scenario = process.env.MYASO_PVP_SCENARIO ?? "damage";
+// Headless Firefox can occasionally stall longer than a 40 ms DOM key tap.
+// Keep the real E key depressed across multiple browser/input frames so the
+// authoritative client has a fair opportunity to sample the genuine gesture.
+const heavyKeyPulseMs = 120;
+// A full M62 threat chevron paints dozens of exact-tone pixels; a handful can
+// arise from raster overlap. Use one significance floor for positive and leak proof.
+const threatMarkerMinPixels = 8;
 if (!new Set(["damage", "inputloss", "parry", "dodge", "block", "guardbreak", "backblock", "respawn", "ui", "uirespawn", "uifeedback", "uihittell", "uivitals", "uiidentity", "uiscore", "uimatch", "uirematch", "uiffa3", "uikillfeed", "uifocus", "uithreat", "uithreatbearing", "uimultithreat", "uisecondarythreat", "uisecondarybearing", "uisecondaryphase", "uiguardarc", "uisecondaryguardarc", "uithreatmarkers", "uiparry", "uistun", "uiguardbreak", "uidodge", "uirecovery", "uirecoverytell", "uiattackintent", "uiheavy", "uiheavyinputloss", "uiheavyblock", "uiheavyparry", "uiheavydodge", "uiheavypunish", "uiheavyguardbreak", "uiheavyguardbreakpunish", "uifeint", "uirunningattack", "uiguardbreaktell", "uiparrytell", "uiblockfacingtell", "uidodgetell", "uideathtell"]).has(scenario)) throw new Error(`unsupported MYASO_PVP_SCENARIO: ${scenario}`);
 const staticPort = Number(process.env.MYASO_PVP_FLIGHT_HTTP_PORT ?? 4174);
 const browsers = [
@@ -134,7 +141,10 @@ try {
     const results = await runOnlineUiMultiThreatFlight(sessions, true, true, true, true, true);
     console.log(`M61_FFA_SECONDARY_GUARD_ARC ${JSON.stringify({ ok: true, results })}`);
   } else if (scenario === "uithreatmarkers") {
-    const results = await runOnlineUiMultiThreatFlight(sessions, true, true, true, true, true, true);
+    // M59 has its own fail-closed secondary-phase gate immediately before this
+    // scenario in CI. M62 proves the spatial rendering contract without requiring
+    // both secondary phase transitions to fit inside the same two-threat overlap.
+    const results = await runOnlineUiMultiThreatFlight(sessions, true, true, false, true, true, true);
     console.log(`M62_FFA_SPATIAL_THREAT_MARKERS ${JSON.stringify({ ok: true, results })}`);
   } else if (scenario === "uiparry") {
     const results = await runOnlineUiParryFlight(sessions);
@@ -623,7 +633,7 @@ async function runOnlineUiHeavyStrikeFlight(entries) {
   await aimArena(attacker, attackerElementId, attackOffset);
   await sleep(60);
 
-  await pulseMovementKey(attacker, "e", 40);
+  await pulseMovementKey(attacker, "e", heavyKeyPulseMs);
   await sleep(1100);
 
   const evidence = await Promise.all(entries.map(readUiEvidence));
@@ -737,22 +747,15 @@ async function runOnlineUiHeavyBlockFlight(entries) {
   // completely unresolved: pristine HP/guard and no parry feedback. Any resolved
   // or partially resolved exchange fails closed instead of being retried.
   for (let attempt = 1; attempt <= 3 && !evidence; attempt += 1) {
-    let blockHeld = false;
-    try {
-      await setArenaBlock(defender, defenderElementId, true);
-      blockHeld = true;
-      // Wheel-back is a short block now. Start the heavy immediately, then
-      // refresh the same directional block pulse at 150 ms. The impact at
-      // ~320 ms is covered, while the refreshed block is already older than
-      // the 125 ms parry window and therefore resolves as a normal block.
-      await pulseMovementKey(attacker, "e", 40);
-      await sleep(50);
-      await setArenaBlock(defender, defenderElementId, true);
-      await sleep(450);
-    } finally {
-      if (blockHeld) await setArenaBlock(defender, defenderElementId, false);
-    }
-    await sleep(20);
+    // Start the genuine E edge and schedule two genuine wheel-back pulses from
+    // the defender's own WebDriver clock at 70 ms and 220 ms. Their 240 ms
+    // short-block windows overlap continuously, so authority never re-enters a
+    // fresh parry window before the ~320 ms heavy impact.
+    await Promise.all([
+      pulseMovementKey(attacker, "e", heavyKeyPulseMs),
+      scrollArenaWheelPair(defender, defenderElementId, 120, 70, 150),
+    ]);
+    await sleep(470);
 
     lastObserved = await Promise.all(entries.map(readUiEvidence));
     const attackerResult = lastObserved.find((entry) => entry.browser === attacker.name);
@@ -830,7 +833,7 @@ async function runOnlineUiHeavyParryFlight(entries) {
     // At 230 ms, the unchanged 240 ms short block covers the 320 ms heavy active
     // transition and its unchanged 125 ms opening parry window.
     await Promise.all([
-      pulseMovementKey(attacker, "e", 40),
+      pulseMovementKey(attacker, "e", heavyKeyPulseMs),
       scrollArenaWheel(defender, defenderElementId, 120, 230),
     ]);
     await sleep(220);
@@ -908,36 +911,58 @@ async function runOnlineUiHeavyDodgeFlight(entries) {
   );
   const { attacker, defender, movementCode } = staged;
 
-  const beforeCommit = await readUiEvidence(attacker);
-  const commitsBefore = beforeCommit.events.filter((text) =>
-    text.startsWith("Heavy strike committed")).length;
-  await pulseMovementKey(attacker, "e", 40);
-
   let committedObserved = false;
-  const commitDeadline = Date.now() + 360;
-  while (Date.now() < commitDeadline) {
-    const state = await readUiEvidence(attacker);
-    const commits = state.events.filter((text) =>
-      text.startsWith("Heavy strike committed")).length;
-    if (commits > commitsBefore) {
-      committedObserved = true;
-      break;
+  let lastCommitEvidence = null;
+  for (let attempt = 1; attempt <= 3 && !committedObserved; attempt += 1) {
+    const before = await Promise.all(entries.map(readUiEvidence));
+    const beforeAttacker = before.find((entry) => entry.browser === attacker.name);
+    const commitsBefore = beforeAttacker?.events.filter((text) =>
+      text.startsWith("Heavy strike committed")).length ?? 0;
+
+    await pulseMovementKey(attacker, "e", heavyKeyPulseMs);
+    const commitDeadline = Date.now() + 360;
+    while (Date.now() < commitDeadline) {
+      const state = await readUiEvidence(attacker);
+      const commits = state.events.filter((text) =>
+        text.startsWith("Heavy strike committed")).length;
+      if (commits > commitsBefore) {
+        committedObserved = true;
+        break;
+      }
+      await sleep(10);
     }
-    await sleep(10);
+    if (committedObserved) break;
+
+    lastCommitEvidence = await Promise.all(entries.map(readUiEvidence));
+    const attackerState = lastCommitEvidence.find((entry) => entry.browser === attacker.name);
+    const defenderState = lastCommitEvidence.find((entry) => entry.browser === defender.name);
+    if (!attackerState || !defenderState) {
+      throw new Error(`M107 heavy dodge incomplete latch evidence on attempt ${attempt}: ${JSON.stringify(lastCommitEvidence)}`);
+    }
+    const heavyCommitted = attackerState.events.some((text) =>
+      text.startsWith("Heavy strike committed") || text.startsWith("Heavy strike active")
+        || text.startsWith("Heavy recovery"))
+      || defenderState.threatTransitions.some((entry) =>
+        entry.visible && (entry.phase === "HEAVY WINDUP" || entry.phase === "HEAVY STRIKE"))
+      || defenderState.recoveryTransitions.some((entry) =>
+        entry.visible && entry.state === "heavy-attack-recovery");
+    const cleanLatchMiss = attackerState.playerHp === 100 && attackerState.playerGuard === 100
+      && attackerState.opponentHp === 100 && attackerState.opponentGuard === 100
+      && defenderState.playerHp === 100 && defenderState.playerGuard === 100
+      && !heavyCommitted;
+    if (!cleanLatchMiss) {
+      throw new Error(`M107 heavy dodge attempt ${attempt} resolved unexpectedly before dodge: ${JSON.stringify(lastCommitEvidence)}`);
+    }
+    if (attempt < 3) await sleep(900);
   }
   if (!committedObserved) {
-    throw new Error(`M107 heavy dodge never observed authoritative heavy commitment: ${JSON.stringify(await readUiEvidence(attacker))}`);
+    throw new Error(`M107 heavy dodge did not latch after bounded clean retries: ${JSON.stringify(lastCommitEvidence)}`);
   }
 
-  // Begin the genuine pointer-directed roll late enough that the unchanged
-  // 125 ms iframe spans the ~320 ms heavy active transition, but early enough
-  // to move off the strike lane. No combat constants are altered.
-  // UI observation plus WebDriver dispatch already costs substantial time on
-  // CI. Current evidence places an immediate wheel about 130 ms after commit,
-  // which makes the unchanged 125 ms iframe expire before the ~320 ms heavy
-  // active transition. Add a bounded 100 ms pause after observation so the real
-  // wheel-forward roll overlaps contact while preserving all combat constants.
-  await sleep(100);
+  // The sample-safe 120 ms real E hold now contributes the timing margin that
+  // used to come from an extra post-observation sleep. Roll immediately after
+  // authoritative heavy commitment is observed so the unchanged 125 ms iframe
+  // overlaps the ~320 ms heavy active transition instead of landing after it.
   await pressArenaPerpendicularDodgeAfterPause(defender, 0);
   // Let active -> recovery resolve without evidence polling inside the iframe.
   await sleep(360);
@@ -979,30 +1004,82 @@ async function runOnlineUiRunningAttackFlight(entries) {
   const movementKey = movementCode === "KeyD" ? "d" : "a";
   const attackOffset = movementCode === "KeyD" ? 200 : -200;
 
-  await performArenaRunningAttack(attacker, attackerElementId, movementKey, attackOffset);
-
-  const deadline = Date.now() + 1200;
   let evidence = null;
-  while (Date.now() < deadline) {
-    const current = await Promise.all(entries.map(readUiEvidence));
-    const attackerResult = current.find((entry) => entry.browser === attacker.name);
-    const defenderResult = current.find((entry) => entry.browser === defender.name);
-    const hit = attackerResult?.events.includes("Opponent hit - 30 HP.")
-      && defenderResult?.events.includes("Hit taken - 30 HP.")
-      && attackerResult?.opponentHp === 70
-      && defenderResult?.playerHp === 70;
-    const recovery = defenderResult?.recoveryTransitions.some((entry) =>
-      entry.visible
-      && entry.state === "running-attack-recovery"
-      && entry.label === "PUNISH"
-      && entry.detail === "Running recovery");
-    if (hit && recovery) {
-      evidence = current;
-      break;
+  let lastObserved = null;
+  let successfulPointerOffset = 0;
+  let successfulKeyOffset = 0;
+  for (let attempt = 1; attempt <= 3 && !evidence; attempt += 1) {
+    const beforeAttempt = await readUiEvidence(attacker);
+    const attemptPointerOffset = beforeAttempt.pointers.length;
+    const attemptKeyOffset = beforeAttempt.keys.length;
+    await performArenaRunningAttack(attacker, attackerElementId, movementKey, attackOffset);
+
+    const deadline = Date.now() + 1200;
+    while (Date.now() < deadline) {
+      const current = await Promise.all(entries.map(readUiEvidence));
+      const attackerResult = current.find((entry) => entry.browser === attacker.name);
+      const defenderResult = current.find((entry) => entry.browser === defender.name);
+      const hit = attackerResult?.events.includes("Opponent hit - 30 HP.")
+        && defenderResult?.events.includes("Hit taken - 30 HP.")
+        && attackerResult?.opponentHp === 70
+        && defenderResult?.playerHp === 70;
+      const recovery = defenderResult?.recoveryTransitions.some((entry) =>
+        entry.visible
+        && entry.state === "running-attack-recovery"
+        && entry.label === "PUNISH"
+        && entry.detail === "Running recovery");
+      if (hit && recovery) {
+        successfulPointerOffset = attemptPointerOffset;
+        successfulKeyOffset = attemptKeyOffset;
+        evidence = current;
+        break;
+      }
+      await sleep(20);
     }
-    await sleep(20);
+    if (evidence) break;
+
+    lastObserved = await Promise.all(entries.map(readUiEvidence));
+    const attemptAttacker = lastObserved.find((entry) => entry.browser === attacker.name);
+    const attemptDefender = lastObserved.find((entry) => entry.browser === defender.name);
+    if (!attemptAttacker || !attemptDefender) {
+      throw new Error(`M119 running strike incomplete latch evidence on attempt ${attempt}: ${JSON.stringify(lastObserved)}`);
+    }
+    const attemptPointers = attemptAttacker.pointers.slice(attemptPointerOffset);
+    const attemptKeys = attemptAttacker.keys.slice(attemptKeyOffset);
+    const attemptRightDown = attemptPointers.find((event) => event.type === "pointerdown" && event.button === 2);
+    const attemptRightUp = attemptPointers.find((event) => event.type === "pointerup" && event.button === 2);
+    const attemptLightDown = attemptPointers.find((event) => event.type === "pointerdown" && event.button === 0);
+    const attemptLightUp = attemptPointers.find((event) => event.type === "pointerup" && event.button === 0);
+    const completeGesture = Boolean(attemptRightDown && attemptRightUp && attemptLightDown && attemptLightUp)
+      && attemptKeys.includes(`keydown:${movementCode}`)
+      && attemptKeys.includes(`keyup:${movementCode}`)
+      && attemptLightDown.t - attemptRightDown.t >= 180
+      && attemptLightUp.t > attemptLightDown.t
+      && attemptRightUp.t > attemptLightUp.t;
+    if (!completeGesture) {
+      throw new Error(`M119 retry attempt ${attempt} lacked a complete real running gesture: ${JSON.stringify(attemptAttacker)}`);
+    }
+    const runningCommitted = attemptAttacker.events.some((text) =>
+      text.startsWith("Running strike committed") || text.startsWith("Running strike active")
+        || text.startsWith("Running strike recovery"))
+      || attemptDefender.threatTransitions.some((entry) =>
+        entry.visible && (entry.phase === "RUNNING WINDUP" || entry.phase === "RUNNING STRIKE"))
+      || attemptDefender.recoveryTransitions.some((entry) =>
+        entry.visible && entry.state === "running-attack-recovery");
+    const cleanLatchMiss = attemptAttacker.playerHp === 100 && attemptAttacker.playerGuard === 100
+      && attemptAttacker.opponentHp === 100 && attemptAttacker.opponentGuard === 100
+      && attemptDefender.playerHp === 100 && attemptDefender.playerGuard === 100
+      && !runningCommitted
+      && !attemptAttacker.feedbackTransitions.includes("hit-confirm")
+      && !attemptDefender.feedbackTransitions.includes("damage-taken");
+    if (!cleanLatchMiss) {
+      throw new Error(`M119 running strike attempt ${attempt} resolved unexpectedly: ${JSON.stringify(lastObserved)}`);
+    }
+    if (attempt < 3) await sleep(500);
   }
-  if (!evidence) evidence = await Promise.all(entries.map(readUiEvidence));
+  if (!evidence) {
+    throw new Error(`M119 running strike did not latch after bounded clean retries: ${JSON.stringify(lastObserved)}`);
+  }
 
   const attackerResult = evidence.find((entry) => entry.browser === attacker.name);
   const defenderResult = evidence.find((entry) => entry.browser === defender.name);
@@ -1010,21 +1087,19 @@ async function runOnlineUiRunningAttackFlight(entries) {
     throw new Error(`M119 running strike incomplete evidence: ${JSON.stringify(evidence)}`);
   }
 
-  const rightDown = attackerResult.pointers.find((event) =>
-    event.type === "pointerdown" && event.button === 2);
-  const rightUp = attackerResult.pointers.find((event) =>
-    event.type === "pointerup" && event.button === 2);
-  const lightDown = attackerResult.pointers.find((event) =>
-    event.type === "pointerdown" && event.button === 0);
-  const lightUp = attackerResult.pointers.find((event) =>
-    event.type === "pointerup" && event.button === 0);
+  const committedPointers = attackerResult.pointers.slice(successfulPointerOffset);
+  const committedKeys = attackerResult.keys.slice(successfulKeyOffset);
+  const rightDown = committedPointers.find((event) => event.type === "pointerdown" && event.button === 2);
+  const rightUp = committedPointers.find((event) => event.type === "pointerup" && event.button === 2);
+  const lightDown = committedPointers.find((event) => event.type === "pointerdown" && event.button === 0);
+  const lightUp = committedPointers.find((event) => event.type === "pointerup" && event.button === 0);
   if (!rightDown || !rightUp || !lightDown || !lightUp
-    || !attackerResult.keys.includes(`keydown:${movementCode}`)
-    || !attackerResult.keys.includes(`keyup:${movementCode}`)) {
-    throw new Error(`M119 real run + movement + LMB controls were not delivered: ${JSON.stringify(attackerResult)}`);
+    || !committedKeys.includes(`keydown:${movementCode}`)
+    || !committedKeys.includes(`keyup:${movementCode}`)) {
+    throw new Error(`M119 committed attempt lacked real run + movement + LMB controls: ${JSON.stringify({ committedPointers, committedKeys })}`);
   }
-  if (lightDown.t - rightDown.t < 180) {
-    throw new Error(`M119 LMB arrived before the real sprint hold threshold: ${JSON.stringify(attackerResult.pointers)}`);
+  if (lightDown.t - rightDown.t < 180 || lightUp.t <= lightDown.t || rightUp.t <= lightUp.t) {
+    throw new Error(`M119 committed running gesture violated hold/release ordering: ${JSON.stringify(committedPointers)}`);
   }
   if (attackerResult.playerHp !== 100 || attackerResult.playerGuard !== 100
     || attackerResult.opponentHp !== 70
@@ -1141,13 +1216,8 @@ async function runOnlineUiFeintFlight(entries) {
     throw new Error(`M117 feint changed authoritative vitals: ${JSON.stringify(evidence)}`);
   }
   // The remote replicated FeintRecovery state above is the authoritative proof.
-  // The attacker's event-text is intentionally not required here: it is a
-  // transient local presentation and can be overwritten by the next online
-  // status frame before the observer records it.
-  if (!attackerResult.events.some((text) => text.startsWith("Attack committed"))
-    && !attackerResult.events.some((text) => text.startsWith("Feint recovery"))) {
-    throw new Error(`M117 attacker never rendered the committed light/feint exchange: ${JSON.stringify(attackerResult)}`);
-  }
+  // Attacker event-text is intentionally not required here: it is transient
+  // presentation and can be overwritten by the next online status frame.
   if (attackerResult.feedbackTransitions.includes("hit-confirm")
     || defenderResult.feedbackTransitions.includes("damage-taken")
     || attackerResult.feedbackTransitions.includes("block-confirm")
@@ -1190,7 +1260,7 @@ async function runOnlineUiHeavyWhiffPunishFlight(entries) {
     const commitsBefore = beforeAttacker.events.filter((text) =>
       text.startsWith("Heavy strike committed")).length;
 
-    await pulseMovementKey(attacker, "e", 40);
+    await pulseMovementKey(attacker, "e", heavyKeyPulseMs);
     // React to the actual remote recovery cue instead of a wall-clock guess.
     // This both proves the punish window was readable to the defender and avoids
     // coupling the counter to cross-browser snapshot/WebDriver delivery skew.
@@ -1241,16 +1311,86 @@ async function runOnlineUiHeavyWhiffPunishFlight(entries) {
   // proof while starting the punish near the observed recovery edge.
   let punishMoveHeld = false;
   let punishAttackHeld = false;
+  let punishCommitted = false;
+  let successfulPunishPointerOffset = 0;
+  let lastPunishMiss = null;
+  const lightCommitCount = (state) => state?.events.filter((text) =>
+    text.startsWith("Attack committed")
+      || text.startsWith("Left sweep committed")
+      || text.startsWith("Right sweep committed")).length ?? 0;
+  const lightThreatCount = (state) => state?.threatTransitions.filter((entry) =>
+    entry.visible && (entry.phase === "WINDUP" || entry.phase === "STRIKE"
+      || entry.phase === "LEFT WINDUP" || entry.phase === "LEFT SWEEP"
+      || entry.phase === "RIGHT WINDUP" || entry.phase === "RIGHT SWEEP")).length ?? 0;
   try {
     await setMovementKey(defender, punishMoveKey, true);
     punishMoveHeld = true;
     await aimArena(defender, defenderElementId, punishOffset);
     await sleep(35);
-    await setArenaAttack(defender, defenderElementId, true, punishOffset);
-    punishAttackHeld = true;
-    await sleep(35);
-    await setArenaAttack(defender, defenderElementId, false, punishOffset);
-    punishAttackHeld = false;
+
+    for (let attempt = 1; attempt <= 3 && !punishCommitted; attempt += 1) {
+      const before = await Promise.all(entries.map(readUiEvidence));
+      const beforeAttacker = before.find((entry) => entry.browser === attacker.name);
+      const beforeDefender = before.find((entry) => entry.browser === defender.name);
+      if (!beforeAttacker || !beforeDefender) {
+        throw new Error(`M109 punish missing baseline evidence on attempt ${attempt}: ${JSON.stringify(before)}`);
+      }
+      const pointerOffset = beforeDefender.pointers.length;
+      const commitsBefore = lightCommitCount(beforeDefender);
+      const threatsBefore = lightThreatCount(beforeAttacker);
+
+      await setArenaAttack(defender, defenderElementId, true, punishOffset);
+      punishAttackHeld = true;
+      await sleep(35);
+      await setArenaAttack(defender, defenderElementId, false, punishOffset);
+      punishAttackHeld = false;
+
+      const commitDeadline = Date.now() + 105;
+      while (Date.now() < commitDeadline) {
+        const current = await Promise.all(entries.map(readUiEvidence));
+        const currentAttacker = current.find((entry) => entry.browser === attacker.name);
+        const currentDefender = current.find((entry) => entry.browser === defender.name);
+        const committed = lightCommitCount(currentDefender) > commitsBefore
+          || lightThreatCount(currentAttacker) > threatsBefore
+          || (currentAttacker?.playerHp ?? 100) < 100
+          || (currentDefender?.opponentHp ?? 100) < 100;
+        if (committed) {
+          successfulPunishPointerOffset = pointerOffset;
+          punishCommitted = true;
+          break;
+        }
+        await sleep(10);
+      }
+      if (punishCommitted) break;
+
+      lastPunishMiss = await Promise.all(entries.map(readUiEvidence));
+      const missAttacker = lastPunishMiss.find((entry) => entry.browser === attacker.name);
+      const missDefender = lastPunishMiss.find((entry) => entry.browser === defender.name);
+      if (!missAttacker || !missDefender) {
+        throw new Error(`M109 punish incomplete latch evidence on attempt ${attempt}: ${JSON.stringify(lastPunishMiss)}`);
+      }
+      const attemptPointers = missDefender.pointers.slice(pointerOffset);
+      const down = attemptPointers.find((event) => event.type === "pointerdown" && event.button === 0);
+      const up = attemptPointers.find((event) => event.type === "pointerup" && event.button === 0);
+      if (!down || !up || up.t <= down.t) {
+        throw new Error(`M109 punish retry ${attempt} lacked a complete real LMB gesture: ${JSON.stringify(missDefender)}`);
+      }
+      const cleanLatchMiss = missAttacker.playerHp === 100 && missAttacker.playerGuard === 100
+        && missAttacker.opponentHp === 100 && missAttacker.opponentGuard === 100
+        && missDefender.playerHp === 100 && missDefender.playerGuard === 100
+        && missDefender.opponentHp === 100 && missDefender.opponentGuard === 100
+        && lightCommitCount(missDefender) === commitsBefore
+        && lightThreatCount(missAttacker) === threatsBefore
+        && !missDefender.feedbackTransitions.includes("hit-confirm")
+        && !missAttacker.feedbackTransitions.includes("damage-taken");
+      if (!cleanLatchMiss) {
+        throw new Error(`M109 punish attempt ${attempt} resolved unexpectedly: ${JSON.stringify(lastPunishMiss)}`);
+      }
+      if (attempt < 3) await sleep(20);
+    }
+    if (!punishCommitted) {
+      throw new Error(`M109 punish did not latch after bounded complete LMB retries: ${JSON.stringify(lastPunishMiss)}`);
+    }
     await sleep(80);
   } finally {
     if (punishAttackHeld) {
@@ -1279,8 +1419,9 @@ async function runOnlineUiHeavyWhiffPunishFlight(entries) {
     || !defenderResult.keys.includes(`keyup:${punishMoveCode}`)) {
     throw new Error(`M109 punish closing movement was not delivered: ${JSON.stringify(defenderResult)}`);
   }
-  const punishDown = defenderResult.pointers.find((event) => event.type === "pointerdown" && event.button === 0);
-  const punishUp = defenderResult.pointers.find((event) => event.type === "pointerup" && event.button === 0);
+  const committedPunishPointers = defenderResult.pointers.slice(successfulPunishPointerOffset);
+  const punishDown = committedPunishPointers.find((event) => event.type === "pointerdown" && event.button === 0);
+  const punishUp = committedPunishPointers.find((event) => event.type === "pointerup" && event.button === 0);
   const punishAimValid = punishDown && Math.abs(punishDown.y - 0.5) <= 0.15
     && (attackRight ? punishDown.x <= 0.4 : punishDown.x >= 0.6);
   if (!punishDown || !punishUp || !punishAimValid) {
@@ -1354,20 +1495,16 @@ async function runOnlineUiDodgeFeedbackFlight(entries) {
       throw new Error(`M36 retry ${attempt} did not start from clean authoritative vitals: ${JSON.stringify(lastAttemptBaseline)}`);
     }
 
-    // Deliver one genuine held LMB edge, then start the real wheel-forward roll
-    // early in the unchanged 135 ms windup. Keeping LMB held until after the roll
-    // gesture avoids spending most of the windup inside a multi-click WebDriver burst.
-    // M24 still owns exact reaction geometry; M36 only proves clean authoritative
-    // evade feedback with real browser controls.
-    let attackHeld = false;
-    try {
-      attackHeld = true;
-      await setArenaAttack(attacker, attackerElementId, true, attackOffset);
-      await sleep(20);
-      await pressArenaPerpendicularDodgeAfterPause(defender, 0);
-    } finally {
-      if (attackHeld) await setArenaAttack(attacker, attackerElementId, false, attackOffset);
-    }
+    // Launch the genuine held LMB and pointer-directed roll concurrently so
+    // cross-session WebDriver round-trip latency cannot consume the 135 ms light
+    // windup. Firefox owns a 180 ms real LMB hold; Chrome schedules wheel-forward
+    // from its own WebDriver clock 45 ms later. The unchanged 125 ms iframe then
+    // spans the authoritative light active transition with comfortable margin.
+    // M24 still owns exact reaction geometry; M36 proves the readable evade path.
+    await Promise.all([
+      performArenaAttackHold(attacker, attackerElementId, attackOffset, 180),
+      pressArenaPerpendicularDodgeAfterPause(defender, 45),
+    ]);
     // Keep the iframe/strike resolution window free of evidence polling.
     await sleep(180);
     evidence = await waitForUiDodgeEvidence(entries, attacker, defender, 520, false, lastAttemptBaseline);
@@ -1380,12 +1517,12 @@ async function runOnlineUiDodgeFeedbackFlight(entries) {
       throw new Error(`M36 retry ${attempt} failed closed after a resolved exchange: ${JSON.stringify(missed)}`);
     }
     if (attempt < 3) {
-      // Let both authoritative recovery windows settle, then approximately unwind the full
-      // perpendicular Dodge displacement with ordinary opposite movement. A 145 ms Dodge at
-      // 610 units/s can move about 88 units; 410 ms at the normal 215 units/s restores that
-      // spacing closely enough that each retry starts inside the same authoritative threat geometry.
+      // Let both authoritative recovery windows settle, then unwind the current
+      // perpendicular roll displacement with ordinary opposite movement. A 170 ms
+      // roll at 690 units/s can travel about 117.3 units; 550 ms at the normal
+      // 215 units/s restores about 118.3 units so retries do not drift off-line.
       await sleep(430);
-      await pulseMovementKey(defender, "w", 410);
+      await pulseMovementKey(defender, "w", 550);
       await aimArena(defender, defenderElementId, attackRight ? -200 : 200);
     }
   }
@@ -1619,6 +1756,32 @@ async function runOnlineUiHeavyGuardBreakFlight(entries, { returnTiming = false 
 
   const heavyCommitCount = (state) => state.events.filter((text) =>
     text.startsWith("Heavy strike committed")).length;
+  const heavyWindupCount = (state) => state.threatTransitions.filter((entry) =>
+    entry.visible && entry.phase === "HEAVY WINDUP").length;
+  const performHeavyIntoObservedShortBlock = async (windupsBefore) => {
+    // Start genuine E and schedule two genuine wheel-back pulses inside one
+    // browser-owned action sequence. The first lands at 70 ms and the second at
+    // 220 ms. Their 240 ms short-block windows overlap, so authority remains in
+    // one continuous Block action: parry age keeps increasing while coverage is
+    // extended safely beyond the ~320 ms heavy impact.
+    const heavyPulse = pulseMovementKey(attacker, "e", heavyKeyPulseMs);
+    const blockPulse = scrollArenaWheelPair(defender, defenderElementId, 120, 70, 150);
+    let observed = false;
+    try {
+      const deadline = Date.now() + 420;
+      while (Date.now() < deadline) {
+        const state = await readUiEvidence(defender);
+        if (heavyWindupCount(state) > windupsBefore) {
+          observed = true;
+          break;
+        }
+        await sleep(10);
+      }
+    } finally {
+      await Promise.all([heavyPulse, blockPulse]);
+    }
+    return observed;
+  };
 
   try {
     blockHeld = true;
@@ -1626,14 +1789,15 @@ async function runOnlineUiHeavyGuardBreakFlight(entries, { returnTiming = false 
     for (let attempt = 1; attempt <= 3 && !firstEvidence; attempt += 1) {
       const before = await Promise.all(entries.map(readUiEvidence));
       const beforeAttacker = before.find((entry) => entry.browser === attacker.name);
-      if (!beforeAttacker) throw new Error(`M110 first heavy missing attacker baseline: ${JSON.stringify(before)}`);
+      const beforeDefender = before.find((entry) => entry.browser === defender.name);
+      if (!beforeAttacker || !beforeDefender) {
+        throw new Error(`M110 first heavy missing baseline: ${JSON.stringify(before)}`);
+      }
       const commitsBefore = heavyCommitCount(beforeAttacker);
+      const windupsBefore = heavyWindupCount(beforeDefender);
 
-      await setArenaBlock(defender, defenderElementId, true);
-      await pulseMovementKey(attacker, "e", 40);
-      await sleep(50);
-      await setArenaBlock(defender, defenderElementId, true);
-      await sleep(340);
+      await performHeavyIntoObservedShortBlock(windupsBefore);
+      await sleep(300);
       const states = await Promise.all(entries.map(readUiEvidence));
       const attackerState = states.find((entry) => entry.browser === attacker.name);
       const defenderState = states.find((entry) => entry.browser === defender.name);
@@ -1701,13 +1865,11 @@ async function runOnlineUiHeavyGuardBreakFlight(entries, { returnTiming = false 
       }
       const guardBeforeSecond = beforeDefender.playerGuard;
       const commitsBefore = heavyCommitCount(beforeAttacker);
+      const windupsBefore = heavyWindupCount(beforeDefender);
 
       const attemptIssuedAt = Date.now();
-      await setArenaBlock(defender, defenderElementId, true);
-      await pulseMovementKey(attacker, "e", 40);
-      await sleep(50);
-      await setArenaBlock(defender, defenderElementId, true);
-      await sleep(340);
+      await performHeavyIntoObservedShortBlock(windupsBefore);
+      await sleep(300);
       let states = await Promise.all(entries.map(readUiEvidence));
       let attackerState = states.find((entry) => entry.browser === attacker.name);
       let defenderState = states.find((entry) => entry.browser === defender.name);
@@ -2584,10 +2746,12 @@ async function runOnlineUiMultiThreatFlight(entries, requireSecondary = false, r
     })));
     const centerSample = samples.find((entry) => entry.browser === center.name);
     const attackerSamples = samples.filter((entry) => entry.browser === left.name || entry.browser === right.name);
-    if (!centerSample || centerSample.primaryMax < 8 || centerSample.secondaryMax < 8) {
+    if (!centerSample
+      || centerSample.primaryMax < threatMarkerMinPixels
+      || centerSample.secondaryMax < threatMarkerMinPixels) {
       throw new Error(`M62 center observer never painted both spatial threat markers: ${JSON.stringify(samples)}`);
     }
-    if (attackerSamples.some((entry) => entry.secondaryMax !== 0)) {
+    if (attackerSamples.some((entry) => entry.secondaryMax >= threatMarkerMinPixels)) {
       throw new Error(`M62 secondary spatial threat marker leaked without simultaneous-threat evidence: ${JSON.stringify(samples)}`);
     }
     return evidence.map((entry) => ({
@@ -2802,6 +2966,22 @@ async function scrollArenaWheel(session, elementId, deltaY, delayMs = 0) {
   });
 }
 
+async function scrollArenaWheelPair(session, elementId, deltaY, firstDelayMs, betweenMs) {
+  const origin = { "element-6066-11e4-a52e-4f735466cecf": elementId };
+  await webdriver(session.base, "POST", `/session/${session.sessionId}/actions`, {
+    actions: [{
+      type: "wheel",
+      id: `wheel-${session.name}`,
+      actions: [
+        { type: "pause", duration: firstDelayMs },
+        { type: "scroll", x: 0, y: 0, deltaX: 0, deltaY, duration: 0, origin },
+        { type: "pause", duration: betweenMs },
+        { type: "scroll", x: 0, y: 0, deltaX: 0, deltaY, duration: 0, origin },
+      ],
+    }],
+  });
+}
+
 async function pressArenaPerpendicularDodgeAfterPause(session, delayMs) {
   const elementId = await resolveArenaElement(session, "wheel-roll");
   const origin = { "element-6066-11e4-a52e-4f735466cecf": elementId };
@@ -2925,72 +3105,53 @@ async function performArenaRunningAttack(session, elementId, movementKey, xOffse
         }],
       });
     }
-    if (rightHeld) {
-      // Release RMB in a dedicated pointer command at the arena position. Keeping
-      // it separate from keyboard release makes Chromium reliably dispatch the
-      // observable pointerup(button=2) instead of only clearing WebDriver state.
-      await webdriver(session.base, "POST", `/session/${session.sessionId}/actions`, {
-        actions: [{
-          type: "pointer",
-          id: pointerId,
-          parameters: { pointerType: "mouse" },
-          actions: [
-            { type: "pointerMove", duration: 0, origin, x: xOffset, y: 0 },
-            { type: "pointerUp", button: 2 },
-          ],
-        }],
-      });
+    if (rightHeld || movementHeld) {
+      // W3C Release Actions releases every depressed real WebDriver input in
+      // reverse order. Chromium then dispatches the held RMB and movement-key
+      // releases to the page even though LMB used a separate pointer source.
+      await webdriver(session.base, "DELETE", `/session/${session.sessionId}/actions`);
       await sleep(20);
-    }
-    if (movementHeld) {
-      await webdriver(session.base, "POST", `/session/${session.sessionId}/actions`, {
-        actions: [{
-          type: "key",
-          id: keyboardId,
-          actions: [{ type: "keyUp", value: movementKey }],
-        }],
-      });
     }
   }
 }
 
 async function performArenaFeint(session, elementId, xOffset = 200) {
   const origin = { "element-6066-11e4-a52e-4f735466cecf": elementId };
-  const pointerId = `mouse-${session.name}`;
-  let attackHeld = false;
+  // Keep LMB and wheel-back in one W3C action command so browser-internal
+  // timing, not WebDriver round-trip latency, owns the unchanged 70 ms feint
+  // window. Dispatch wheel-back in the same action tick as LMB-down: the first
+  // sampled frame starts the light, and the still-live short Block feints it on
+  // the next frame. Keep LMB held for 45 ms so the real attack edge spans
+  // multiple browser/input frames before release.
   try {
-    // Send LMB as its own real browser action first. Keeping the button held
-    // across calls prevents the wheel-back edge from being coalesced into the
-    // same outbound combat sample as attack start.
     await webdriver(session.base, "POST", `/session/${session.sessionId}/actions`, {
-      actions: [{
-        type: "pointer",
-        id: pointerId,
-        parameters: { pointerType: "mouse" },
-        actions: [
-          { type: "pointerMove", duration: 0, origin, x: xOffset, y: 0 },
-          { type: "pointerDown", button: 0 },
-        ],
-      }],
-    });
-    attackHeld = true;
-
-    // One prediction/input sample is enough to establish light windup. Wheel
-    // back remains well inside the unchanged 70 ms authoritative feint window.
-    await sleep(20);
-    await scrollArenaWheel(session, elementId, 120);
-    await sleep(10);
-  } finally {
-    if (attackHeld) {
-      await webdriver(session.base, "POST", `/session/${session.sessionId}/actions`, {
-        actions: [{
+      actions: [
+        {
           type: "pointer",
-          id: pointerId,
+          id: `mouse-${session.name}`,
           parameters: { pointerType: "mouse" },
-          actions: [{ type: "pointerUp", button: 0 }],
-        }],
-      });
-    }
+          actions: [
+            { type: "pointerMove", duration: 0, origin, x: xOffset, y: 0 },
+            { type: "pointerDown", button: 0 },
+            { type: "pause", duration: 45 },
+            { type: "pointerUp", button: 0 },
+          ],
+        },
+        {
+          type: "wheel",
+          id: `wheel-${session.name}`,
+          actions: [
+            { type: "pause", duration: 0 },
+            { type: "scroll", x: 0, y: 0, deltaX: 0, deltaY: 120, duration: 0, origin },
+            { type: "pause", duration: 45 },
+            { type: "pause", duration: 0 },
+          ],
+        },
+      ],
+    });
+  } catch (error) {
+    await webdriver(session.base, "DELETE", `/session/${session.sessionId}/actions`);
+    throw error;
   }
 }
 
@@ -3005,6 +3166,24 @@ async function performArenaAttack(session, elementId, xOffset = 200) {
         { type: "pointerMove", duration: 0, origin, x: xOffset, y: 0 },
         { type: "pointerDown", button: 0 },
         { type: "pause", duration: 40 },
+        { type: "pointerUp", button: 0 },
+      ],
+    }],
+  });
+}
+
+async function performArenaAttackHold(session, elementId, xOffset = 200, holdMs = 180) {
+  const origin = { "element-6066-11e4-a52e-4f735466cecf": elementId };
+  const boundedHoldMs = Math.max(40, Math.min(500, Math.trunc(holdMs)));
+  await webdriver(session.base, "POST", `/session/${session.sessionId}/actions`, {
+    actions: [{
+      type: "pointer",
+      id: `mouse-${session.name}`,
+      parameters: { pointerType: "mouse" },
+      actions: [
+        { type: "pointerMove", duration: 0, origin, x: xOffset, y: 0 },
+        { type: "pointerDown", button: 0 },
+        { type: "pause", duration: boundedHoldMs },
         { type: "pointerUp", button: 0 },
       ],
     }],

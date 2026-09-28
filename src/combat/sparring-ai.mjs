@@ -2,6 +2,8 @@ const EPSILON = 1e-9;
 
 const THREAT_WINDUPS = new Set([
   "attack_windup",
+  "attack_left_windup",
+  "attack_right_windup",
   "running_attack_windup",
   "heavy_attack_windup",
   "jump_attack_windup",
@@ -9,6 +11,8 @@ const THREAT_WINDUPS = new Set([
 
 const PUNISHABLE_ACTIONS = new Set([
   "attack_recovery",
+  "attack_left_recovery",
+  "attack_right_recovery",
   "running_attack_recovery",
   "heavy_attack_recovery",
   "kick_recovery",
@@ -137,6 +141,10 @@ export function createSparringAi() {
 
     const cycle = Math.floor(nowMs / 760) % 4;
     if (cycle === 0) {
+      // Keep a real lateral strafe active while pressing light so the shared
+      // combat model/server selects the matching directional sweep.
+      output.moveX = -ny * side * 0.65;
+      output.moveY = nx * side * 0.65;
       output.attack = true;
       nextActionAtMs = nowMs + 560;
     } else if (cycle === 1 && stamina >= 20) {

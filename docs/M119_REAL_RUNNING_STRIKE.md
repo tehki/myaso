@@ -16,6 +16,8 @@ The Chrome attacker performs one genuine WebDriver action sequence:
 
 No direct input-state mutation, simulation mutation, teleport, or synthetic server action is allowed.
 
+If a complete real RMB/movement/LMB gesture is observed but authority remains entirely idle — no running phase, no recovery, no damage, no feedback, and unchanged 100/100 vitals — the flight may retry the complete real gesture up to three times. Any evidence that a running strike actually committed makes the retry path fail closed. When a retry succeeds, control provenance is checked against the latest complete gesture, not an earlier missed attempt.
+
 ## Required authoritative result
 
 The flight must prove:

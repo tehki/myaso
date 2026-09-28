@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { COMBAT_ACTION, FFA_KILL_TARGET, blockSpatialPresentation, combatActionHint, combatLifePresentation, combatOverlayPresentation, createCombatReadabilityTracker, createRemoteDamageTracker, fighterFocusNetId, fighterIdentityPresentation, fighterThreatBearingLabel, fighterThreatGuardArcLabel, fighterThreatNetId, fighterThreatPhaseLabel, fighterMatchPresentation, fighterScoreboardPresentation, fighterVitalsPresentation, guardBreakSpatialPresentation, killFeedPresentation, opponentRecoveryPresentation, parrySpatialPresentation } from "../src/browser/combat-readability.mjs";
+import { COMBAT_ACTION, FFA_KILL_TARGET, blockSpatialPresentation, combatActionHint, combatLifePresentation, combatOverlayPresentation, createCombatReadabilityTracker, createRemoteDamageTracker, fighterFocusNetId, fighterIdentityPresentation, fighterThreatBearingLabel, fighterThreatGuardArcLabel, fighterThreatNetId, fighterThreatPhaseLabel, fighterThreatPhaseState, fighterMatchPresentation, fighterScoreboardPresentation, fighterVitalsPresentation, guardBreakSpatialPresentation, killFeedPresentation, opponentRecoveryPresentation, parrySpatialPresentation } from "../src/browser/combat-readability.mjs";
 
 function fighter(netId, hp = 100, guard = 100, action = COMBAT_ACTION.idle, x = 0, y = 0, facing = 0) {
   return { netId, hp, guard, action, x, y, facing };
@@ -599,6 +599,8 @@ test("death and full-vitals idle transition are readable", () => {
 test("authoritative action hints explain light and heavy commitment windows", () => {
   assert.match(combatActionHint(fighter(1, 100, 100, COMBAT_ACTION.attackWindup)), /windup/);
   assert.match(combatActionHint(fighter(1, 100, 100, COMBAT_ACTION.attackRecovery)), /Recovery/);
+  assert.match(combatActionHint(fighter(1, 100, 100, COMBAT_ACTION.attackLeftWindup)), /Left sweep committed/);
+  assert.match(combatActionHint(fighter(1, 100, 100, COMBAT_ACTION.attackRightWindup)), /Right sweep committed/);
   assert.match(combatActionHint(fighter(1, 100, 100, COMBAT_ACTION.runningAttackWindup)), /Running strike committed/);
   assert.match(combatActionHint(fighter(1, 100, 100, COMBAT_ACTION.runningAttackRecovery)), /Running strike recovery/);
   assert.match(combatActionHint(fighter(1, 100, 100, COMBAT_ACTION.heavyAttackWindup)), /Heavy strike committed/);
@@ -611,6 +613,12 @@ test("authoritative action hints explain light and heavy commitment windows", ()
 test("authoritative opponent recovery exposes a bounded punish cue", () => {
   assert.deepEqual(opponentRecoveryPresentation(fighter(2, 100, 100, COMBAT_ACTION.attackRecovery)), {
     visible: true, state: "attack-recovery", label: "PUNISH", detail: "Attack recovery",
+  });
+  assert.deepEqual(opponentRecoveryPresentation(fighter(2, 100, 100, COMBAT_ACTION.attackLeftRecovery)), {
+    visible: true, state: "directional-attack-recovery", label: "PUNISH", detail: "Sweep recovery",
+  });
+  assert.deepEqual(opponentRecoveryPresentation(fighter(2, 100, 100, COMBAT_ACTION.attackRightRecovery)), {
+    visible: true, state: "directional-attack-recovery", label: "PUNISH", detail: "Sweep recovery",
   });
   assert.deepEqual(opponentRecoveryPresentation(fighter(2, 100, 100, COMBAT_ACTION.heavyAttackRecovery)), {
     visible: true, state: "heavy-attack-recovery", label: "PUNISH", detail: "Heavy recovery",
@@ -673,4 +681,23 @@ test("running strike threat phases remain distinct from standing light attack", 
     fighterThreatPhaseLabel(fighter(2, 100, 100, COMBAT_ACTION.runningAttackActive)),
     "RUNNING STRIKE",
   );
+});
+
+
+test("directional light threat labels expose the committed side", () => {
+  assert.equal(fighterThreatPhaseLabel(fighter(2, 100, 100, COMBAT_ACTION.attackLeftWindup)), "LEFT WINDUP");
+  assert.equal(fighterThreatPhaseLabel(fighter(2, 100, 100, COMBAT_ACTION.attackLeftActive)), "LEFT SWEEP");
+  assert.equal(fighterThreatPhaseLabel(fighter(2, 100, 100, COMBAT_ACTION.attackRightWindup)), "RIGHT WINDUP");
+  assert.equal(fighterThreatPhaseLabel(fighter(2, 100, 100, COMBAT_ACTION.attackRightActive)), "RIGHT SWEEP");
+});
+
+test("all committed attack phase labels map to visible threat states", () => {
+  for (const phase of ["WINDUP", "HEAVY WINDUP", "RUNNING WINDUP", "LEFT WINDUP", "RIGHT WINDUP"]) {
+    assert.equal(fighterThreatPhaseState(phase), "windup", phase);
+  }
+  for (const phase of ["STRIKE", "HEAVY STRIKE", "RUNNING STRIKE", "LEFT SWEEP", "RIGHT SWEEP"]) {
+    assert.equal(fighterThreatPhaseState(phase), "strike", phase);
+  }
+  assert.equal(fighterThreatPhaseState(""), "");
+  assert.equal(fighterThreatPhaseState("RECOVERY"), "");
 });

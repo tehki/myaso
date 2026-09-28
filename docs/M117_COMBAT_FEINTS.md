@@ -50,4 +50,4 @@ The milestone proves:
 - feint recovery round-trips through snapshot action code 20;
 - recovery is presented as punishable;
 - the sparring AI punishes exposed feint recovery;
-- a real Chrome/Firefox flight sends genuine LMB + wheel-back controls and requires the remote client to observe authoritative `Feint recovery` without HP/guard contact.
+- a real Chrome/Firefox flight sends genuine LMB + wheel-back controls in one W3C multi-input action sequence: LMB down and wheel-back share the same browser action tick, then LMB remains held for 45 ms before release. On the first sampled frame the light can start; on the next frame the still-live short Block converts that early windup into the feint. This keeps the unchanged 70 ms gameplay window independent of headless/WebDriver scheduling jitter and requires the remote client to observe authoritative `Feint recovery` without HP/guard contact.

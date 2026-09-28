@@ -35,9 +35,9 @@ During authoritative heavy recovery, Chrome:
 
 - closes distance with a real horizontal movement key;
 - aims back toward the recovering attacker;
-- delivers a bounded two-click real left-mouse latch burst; authoritative recovery/cooldown still permits exactly one light attack.
+- delivers a complete real left-mouse down/up attempt. If that DOM gesture is observed but no authoritative light/sweep commitment, threat, contact, feedback, or vital change follows, the harness may retry the complete LMB gesture up to three times while the closing movement stays held. Any real commitment makes the retry path fail closed, and final pointer provenance is bound to the attempt that actually committed.
 
-The light active frame lands while the attacker's unchanged 420 ms heavy recovery is still in force.
+The successful light active frame lands while the attacker's unchanged 420 ms heavy recovery is still in force; authoritative attack commitment still permits exactly one 34-damage punish.
 
 ## Acceptance
 

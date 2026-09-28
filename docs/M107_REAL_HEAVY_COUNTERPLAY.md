@@ -22,9 +22,9 @@ M106 already proves real `E` delivery, one authoritative 46-damage heavy hit, ex
 
 Scenario: `uiheavyblock`.
 
-Chrome attacks with the real `E` key. Firefox aims toward the attacker and holds real RMB well before the heavy edge.
+Chrome attacks with the real `E` key. Firefox aims toward the attacker and sends two genuine wheel-back short-Block pulses at 70 ms and 220 ms from the shared WebDriver dispatch boundary.
 
-The block starts early enough that the 115 ms parry freshness window is expired by the 320 ms heavy active transition.
+The two 240 ms short-Block windows overlap continuously through the 320 ms heavy active transition, while authoritative Block age passes the unchanged 125 ms parry freshness window.
 
 Acceptance:
 
@@ -44,9 +44,9 @@ This proves the heavy strike applies exactly the M105 64 guard pressure through 
 
 Scenario: `uiheavyparry`.
 
-Chrome attacks with real `E`. Firefox begins real RMB at approximately 245 ms from the E keydown.
+Chrome attacks with real `E`. Firefox sends one genuine wheel-back short Block at approximately 230 ms from the E keydown.
 
-The target timing leaves roughly 75 ms of block age at the 320 ms heavy active frame, inside the unchanged 115 ms parry window while leaving margin for browser/network skew.
+The target timing leaves roughly 90 ms of Block age at the 320 ms heavy active frame, inside the unchanged 125 ms parry window while leaving margin for browser/network skew.
 
 Acceptance:
 
@@ -68,14 +68,14 @@ The browser roles match the already-stable M36 setup:
 - Firefox attacks;
 - Chrome dodges.
 
-The attacker is staged deeper inside heavy reach, then sends real `E`. Chrome performs a real perpendicular `S + Space` dodge at approximately 270 ms from the E keydown.
+The attacker is staged deeper inside heavy reach, then sends real `E`. If the browser delivers the real `KeyE` edges but authority remains completely idle, the harness permits up to three bounded clean-latch attempts; any heavy-action evidence or vital change makes the retry path fail closed. Once authoritative heavy commitment is observed, Chrome immediately aims the pointer perpendicular to the strike and performs a real wheel-forward roll. The sample-safe 120 ms `E` hold already provides the needed timing margin, so no extra post-observation delay is added. Simultaneous `S` input remains redundant proof that movement keys do not steer the committed roll.
 
-That places the unchanged 118 ms dodge iframe across the 320 ms heavy active transition.
+That places the unchanged roll iframe across the 320 ms heavy active transition.
 
 Acceptance:
 
 - real attacker movement and `KeyE`;
-- real defender `KeyS` and `Space` down/up;
+- real defender `KeyS` down/up and wheel-forward input;
 - both fighters remain 100 HP / 100 guard;
 - attacker receives `dodge-evaded`;
 - defender receives `dodge-success`;
