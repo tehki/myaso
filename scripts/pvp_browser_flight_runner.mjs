@@ -1772,6 +1772,33 @@ async function runOnlineUiHeavyGuardBreakFlight(entries, { returnTiming = false 
 
   const heavyCommitCount = (state) => state.events.filter((text) =>
     text.startsWith("Heavy strike committed")).length;
+  const heavyWindupCount = (state) => state.threatTransitions.filter((entry) =>
+    entry.visible && entry.phase === "HEAVY WINDUP").length;
+  const performHeavyIntoObservedShortBlock = async (windupsBefore) => {
+    // Start genuine E first, then anchor wheel-back to the newly replicated
+    // authoritative heavy windup instead of browser wall-clock/key-down time.
+    const heavyPulse = pulseMovementKey(attacker, "e", heavyKeyPulseMs);
+    let observed = false;
+    try {
+      const deadline = Date.now() + 420;
+      while (Date.now() < deadline) {
+        const state = await readUiEvidence(defender);
+        if (heavyWindupCount(state) > windupsBefore) {
+          observed = true;
+          // Snapshot/WebDriver transport has already aged the authoritative
+          // windup. A small browser-independent delay centers short Block
+          // between the 125 ms parry edge and 240 ms expiry.
+          await sleep(55);
+          await scrollArenaWheel(defender, defenderElementId, 120);
+          break;
+        }
+        await sleep(10);
+      }
+    } finally {
+      await heavyPulse;
+    }
+    return observed;
+  };
 
   try {
     blockHeld = true;
@@ -1779,16 +1806,14 @@ async function runOnlineUiHeavyGuardBreakFlight(entries, { returnTiming = false 
     for (let attempt = 1; attempt <= 3 && !firstEvidence; attempt += 1) {
       const before = await Promise.all(entries.map(readUiEvidence));
       const beforeAttacker = before.find((entry) => entry.browser === attacker.name);
-      if (!beforeAttacker) throw new Error(`M110 first heavy missing attacker baseline: ${JSON.stringify(before)}`);
+      const beforeDefender = before.find((entry) => entry.browser === defender.name);
+      if (!beforeAttacker || !beforeDefender) {
+        throw new Error(`M110 first heavy missing baseline: ${JSON.stringify(before)}`);
+      }
       const commitsBefore = heavyCommitCount(beforeAttacker);
+      const windupsBefore = heavyWindupCount(beforeDefender);
 
-      // Run the real heavy and short-block gesture concurrently. The wheel
-      // source waits inside Firefox for 190 ms, so browser/network round trips
-      // cannot accidentally refresh block inside the 125 ms parry window.
-      await Promise.all([
-        pulseMovementKey(attacker, "e", heavyKeyPulseMs),
-        scrollArenaWheel(defender, defenderElementId, 120, 190),
-      ]);
+      await performHeavyIntoObservedShortBlock(windupsBefore);
       await sleep(300);
       const states = await Promise.all(entries.map(readUiEvidence));
       const attackerState = states.find((entry) => entry.browser === attacker.name);
@@ -1857,15 +1882,10 @@ async function runOnlineUiHeavyGuardBreakFlight(entries, { returnTiming = false 
       }
       const guardBeforeSecond = beforeDefender.playerGuard;
       const commitsBefore = heavyCommitCount(beforeAttacker);
+      const windupsBefore = heavyWindupCount(beforeDefender);
 
       const attemptIssuedAt = Date.now();
-      // Run the real heavy and short-block gesture concurrently. The wheel
-      // source waits inside Firefox for 190 ms, so browser/network round trips
-      // cannot accidentally refresh block inside the 125 ms parry window.
-      await Promise.all([
-        pulseMovementKey(attacker, "e", heavyKeyPulseMs),
-        scrollArenaWheel(defender, defenderElementId, 120, 190),
-      ]);
+      await performHeavyIntoObservedShortBlock(windupsBefore);
       await sleep(300);
       let states = await Promise.all(entries.map(readUiEvidence));
       let attackerState = states.find((entry) => entry.browser === attacker.name);
