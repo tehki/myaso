@@ -593,6 +593,49 @@ test("buffered light preserves the directional lane chosen on tap", () => {
   assert.equal(attacker.action, "attack_left_windup");
 });
 
+test("late fresh block buffers through light recovery and starts parry on completion", () => {
+  const world = duel({ distance: 200 });
+  const { attacker, target } = enterLightRecovery(world);
+
+  advance(world, COMBAT.attack.recoveryMs - 85, { a: { aimX: target.x, aimY: target.y } });
+  stepWorld(world, { a: { block: true, aimX: target.x, aimY: target.y } }, 5);
+  assert.equal(attacker.action, "attack_recovery");
+  assert.equal(attacker.bufferedBlock, true);
+
+  advance(world, 80, { a: { block: true, aimX: target.x, aimY: target.y } });
+  assert.equal(attacker.action, "block");
+  assert.equal(attacker.actionElapsedMs, 0);
+  assert.equal(attacker.bufferedBlock, false);
+});
+
+test("block pressed too early is not promoted into a free recovery parry", () => {
+  const world = duel({ distance: 200 });
+  const { attacker, target } = enterLightRecovery(world);
+
+  advance(world, 100, { a: { aimX: target.x, aimY: target.y } });
+  stepWorld(world, { a: { block: true, aimX: target.x, aimY: target.y } }, 5);
+  assert.equal(attacker.bufferedBlock, false);
+
+  advance(world, 150, { a: { block: true, aimX: target.x, aimY: target.y } });
+  assert.equal(attacker.action, "idle");
+});
+
+test("later defensive intent overrides a buffered light attack", () => {
+  const world = duel({ distance: 200 });
+  const { attacker, target } = enterLightRecovery(world);
+
+  advance(world, COMBAT.attack.recoveryMs - 85, { a: { aimX: target.x, aimY: target.y } });
+  stepWorld(world, { a: { attack: true, aimX: target.x, aimY: target.y } }, 5);
+  assert.equal(attacker.bufferedLightAttack, true);
+  stepWorld(world, { a: { aimX: target.x, aimY: target.y } }, 5);
+  stepWorld(world, { a: { block: true, aimX: target.x, aimY: target.y } }, 5);
+  assert.equal(attacker.bufferedLightAttack, false);
+  assert.equal(attacker.bufferedBlock, true);
+
+  advance(world, 70, { a: { block: true, aimX: target.x, aimY: target.y } });
+  assert.equal(attacker.action, "block");
+});
+
 test("holding light does not auto-chain after recovery", () => {
   const world = duel({ distance: 200 });
   const [attacker, target] = world.fighters;

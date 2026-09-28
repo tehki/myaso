@@ -24,6 +24,7 @@ const DIRECTIONAL_ATTACK_ARC_RADIANS: f32 = std::f32::consts::PI * 0.62;
 const DIRECTIONAL_ATTACK_ARC_OFFSET_RADIANS: f32 = std::f32::consts::PI * 0.16;
 const DIRECTIONAL_ATTACK_LATERAL_THRESHOLD: f32 = 0.45;
 const LIGHT_ATTACK_BUFFER_WINDOW_MS: f32 = 90.0;
+const BLOCK_BUFFER_WINDOW_MS: f32 = 90.0;
 const RUNNING_ATTACK_WINDUP_MS: f32 = 160.0;
 const RUNNING_ATTACK_ACTIVE_MS: f32 = 90.0;
 const RUNNING_ATTACK_RECOVERY_MS: f32 = 310.0;
@@ -218,8 +219,10 @@ pub struct Fighter {
     latest_input: InputIntent,
     action_duration_ms: f32,
     attack_input_was_down: bool,
+    block_input_was_down: bool,
     buffered_light_attack: bool,
     buffered_attack_lateral: f32,
+    buffered_block: bool,
     dodge_dir_x: f32,
     dodge_dir_y: f32,
     attack_hit_targets: BTreeSet<u32>,
@@ -248,8 +251,10 @@ impl Fighter {
             latest_input: InputIntent::default(),
             action_duration_ms: 0.0,
             attack_input_was_down: false,
+            block_input_was_down: false,
             buffered_light_attack: false,
             buffered_attack_lateral: 0.0,
+            buffered_block: false,
             dodge_dir_x: 0.0,
             dodge_dir_y: 0.0,
             attack_hit_targets: BTreeSet::new(),
@@ -269,8 +274,13 @@ impl Fighter {
         self.buffered_attack_lateral = 0.0;
     }
 
-    fn begin_light_attack(&mut self, lateral: f32) {
+    fn clear_recovery_input_buffer(&mut self) {
         self.clear_light_attack_buffer();
+        self.buffered_block = false;
+    }
+
+    fn begin_light_attack(&mut self, lateral: f32) {
+        self.clear_recovery_input_buffer();
         self.attack_hit_targets.clear();
         if lateral >= DIRECTIONAL_ATTACK_LATERAL_THRESHOLD {
             self.set_action(Action::AttackLeftWindup, DIRECTIONAL_ATTACK_WINDUP_MS);
@@ -282,6 +292,11 @@ impl Fighter {
     }
 
     fn finish_light_recovery(&mut self) {
+        if self.buffered_block {
+            self.clear_recovery_input_buffer();
+            self.set_action(Action::Block, f32::INFINITY);
+            return;
+        }
         if !self.buffered_light_attack {
             self.set_action(Action::Idle, 0.0);
             return;
@@ -295,7 +310,7 @@ impl Fighter {
             action,
             Action::AttackRecovery | Action::AttackLeftRecovery | Action::AttackRightRecovery
         ) {
-            self.clear_light_attack_buffer();
+            self.clear_recovery_input_buffer();
         }
         self.action = action;
         self.action_elapsed_ms = 0.0;
@@ -489,14 +504,16 @@ impl World {
 
             let input = normalize_input(fighter.latest_input);
             let attack_pressed = input.attack && !fighter.attack_input_was_down;
+            let block_pressed = input.block && !fighter.block_input_was_down;
             if fighter.action != Action::Knockdown {
                 fighter.facing = normalize_angle(input.facing_radians);
             }
-            begin_requested_action(self.now_ms, fighter, input, attack_pressed);
+            begin_requested_action(self.now_ms, fighter, input, attack_pressed, block_pressed);
             move_fighter(self.width, self.height, fighter, input, dt_ms);
             advance_action(fighter, input, dt_ms);
             update_stamina(self.now_ms, fighter, input, dt_ms);
             fighter.attack_input_was_down = input.attack;
+            fighter.block_input_was_down = input.block;
 
             if fighter.action != Action::Block
                 && self.now_ms >= fighter.guard_regen_blocked_until_ms
@@ -556,14 +573,19 @@ fn begin_requested_action(
     fighter: &mut Fighter,
     input: InputIntent,
     attack_pressed: bool,
+    block_pressed: bool,
 ) {
     let light_recovery = matches!(
         fighter.action,
         Action::AttackRecovery | Action::AttackLeftRecovery | Action::AttackRightRecovery
     );
-    if light_recovery && attack_pressed {
+    if light_recovery && (attack_pressed || block_pressed) {
         let remaining_ms = fighter.action_duration_ms - fighter.action_elapsed_ms;
-        if remaining_ms <= LIGHT_ATTACK_BUFFER_WINDOW_MS + EPSILON {
+        if block_pressed && remaining_ms <= BLOCK_BUFFER_WINDOW_MS + EPSILON {
+            fighter.clear_light_attack_buffer();
+            fighter.buffered_block = true;
+        } else if attack_pressed && remaining_ms <= LIGHT_ATTACK_BUFFER_WINDOW_MS + EPSILON {
+            fighter.buffered_block = false;
             fighter.buffered_light_attack = true;
             fighter.buffered_attack_lateral =
                 fighter.facing.sin() * input.move_x - fighter.facing.cos() * input.move_y;
@@ -1183,7 +1205,8 @@ fn respawn_fighter(fighter: &mut Fighter) {
     fighter.stamina_regen_blocked_until_ms = 0.0;
     fighter.recently_interacted_with = None;
     fighter.attack_input_was_down = false;
-    fighter.clear_light_attack_buffer();
+    fighter.block_input_was_down = false;
+    fighter.clear_recovery_input_buffer();
     fighter.set_action(Action::Idle, 0.0);
 }
 
