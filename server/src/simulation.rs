@@ -4,7 +4,7 @@ pub const DEFAULT_WORLD_WIDTH: f32 = 8192.0;
 pub const DEFAULT_WORLD_HEIGHT: f32 = 8192.0;
 pub const SERVER_TICK_HZ: f32 = 60.0;
 pub const SERVER_DT_MS: f32 = 1000.0 / SERVER_TICK_HZ;
-pub const FFA_KILL_TARGET: u16 = 2;
+pub const FFA_KILL_TARGET: u16 = 5;
 pub const FFA_MATCH_RESET_MS: f32 = 2500.0;
 
 const FIGHTER_RADIUS: f32 = 18.0;
