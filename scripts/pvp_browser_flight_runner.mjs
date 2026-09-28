@@ -1782,11 +1782,14 @@ async function runOnlineUiHeavyGuardBreakFlight(entries, { returnTiming = false 
       if (!beforeAttacker) throw new Error(`M110 first heavy missing attacker baseline: ${JSON.stringify(before)}`);
       const commitsBefore = heavyCommitCount(beforeAttacker);
 
-      await setArenaBlock(defender, defenderElementId, true);
-      await pulseMovementKey(attacker, "e", heavyKeyPulseMs);
-      await sleep(50);
-      await setArenaBlock(defender, defenderElementId, true);
-      await sleep(340);
+      // Run the real heavy and short-block gesture concurrently. The wheel
+      // source waits inside Firefox for 190 ms, so browser/network round trips
+      // cannot accidentally refresh block inside the 125 ms parry window.
+      await Promise.all([
+        pulseMovementKey(attacker, "e", heavyKeyPulseMs),
+        scrollArenaWheel(defender, defenderElementId, 120, 190),
+      ]);
+      await sleep(300);
       const states = await Promise.all(entries.map(readUiEvidence));
       const attackerState = states.find((entry) => entry.browser === attacker.name);
       const defenderState = states.find((entry) => entry.browser === defender.name);
@@ -1856,11 +1859,14 @@ async function runOnlineUiHeavyGuardBreakFlight(entries, { returnTiming = false 
       const commitsBefore = heavyCommitCount(beforeAttacker);
 
       const attemptIssuedAt = Date.now();
-      await setArenaBlock(defender, defenderElementId, true);
-      await pulseMovementKey(attacker, "e", heavyKeyPulseMs);
-      await sleep(50);
-      await setArenaBlock(defender, defenderElementId, true);
-      await sleep(340);
+      // Run the real heavy and short-block gesture concurrently. The wheel
+      // source waits inside Firefox for 190 ms, so browser/network round trips
+      // cannot accidentally refresh block inside the 125 ms parry window.
+      await Promise.all([
+        pulseMovementKey(attacker, "e", heavyKeyPulseMs),
+        scrollArenaWheel(defender, defenderElementId, 120, 190),
+      ]);
+      await sleep(300);
       let states = await Promise.all(entries.map(readUiEvidence));
       let attackerState = states.find((entry) => entry.browser === attacker.name);
       let defenderState = states.find((entry) => entry.browser === defender.name);
