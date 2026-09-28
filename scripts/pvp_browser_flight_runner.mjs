@@ -1529,12 +1529,12 @@ async function runOnlineUiDodgeFeedbackFlight(entries) {
       throw new Error(`M36 retry ${attempt} failed closed after a resolved exchange: ${JSON.stringify(missed)}`);
     }
     if (attempt < 3) {
-      // Let both authoritative recovery windows settle, then approximately unwind the full
-      // perpendicular Dodge displacement with ordinary opposite movement. A 145 ms Dodge at
-      // 610 units/s can move about 88 units; 410 ms at the normal 215 units/s restores that
-      // spacing closely enough that each retry starts inside the same authoritative threat geometry.
+      // Let both authoritative recovery windows settle, then unwind the current
+      // perpendicular roll displacement with ordinary opposite movement. A 170 ms
+      // roll at 690 units/s can travel about 117.3 units; 550 ms at the normal
+      // 215 units/s restores about 118.3 units so retries do not drift off-line.
       await sleep(430);
-      await pulseMovementKey(defender, "w", 410);
+      await pulseMovementKey(defender, "w", 550);
       await aimArena(defender, defenderElementId, attackRight ? -200 : 200);
     }
   }
