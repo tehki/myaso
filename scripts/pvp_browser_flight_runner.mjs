@@ -1775,13 +1775,13 @@ async function runOnlineUiHeavyGuardBreakFlight(entries, { returnTiming = false 
   const heavyWindupCount = (state) => state.threatTransitions.filter((entry) =>
     entry.visible && entry.phase === "HEAVY WINDUP").length;
   const performHeavyIntoObservedShortBlock = async (windupsBefore) => {
-    // Start genuine E, then arm an early real wheel-back short Block while the
-    // heavy is still winding up. A second real wheel-back refresh is anchored
-    // to the replicated HEAVY WINDUP cue. Because the local short-block windows
-    // overlap, authority stays in one continuous Block action: the parry age is
-    // not reset, while the 240 ms window is extended safely through impact.
+    // Start genuine E and schedule two genuine wheel-back pulses inside one
+    // browser-owned action sequence. The first lands at 70 ms and the second at
+    // 220 ms. Their 240 ms short-block windows overlap, so authority remains in
+    // one continuous Block action: parry age keeps increasing while coverage is
+    // extended safely beyond the ~320 ms heavy impact.
     const heavyPulse = pulseMovementKey(attacker, "e", heavyKeyPulseMs);
-    await scrollArenaWheel(defender, defenderElementId, 120, 70);
+    const blockPulse = scrollArenaWheelPair(defender, defenderElementId, 120, 70, 150);
     let observed = false;
     try {
       const deadline = Date.now() + 420;
@@ -1789,13 +1789,12 @@ async function runOnlineUiHeavyGuardBreakFlight(entries, { returnTiming = false 
         const state = await readUiEvidence(defender);
         if (heavyWindupCount(state) > windupsBefore) {
           observed = true;
-          await scrollArenaWheel(defender, defenderElementId, 120);
           break;
         }
         await sleep(10);
       }
     } finally {
-      await heavyPulse;
+      await Promise.all([heavyPulse, blockPulse]);
     }
     return observed;
   };
@@ -2980,6 +2979,22 @@ async function scrollArenaWheel(session, elementId, deltaY, delayMs = 0) {
   actions.push({ type: "scroll", x: 0, y: 0, deltaX: 0, deltaY, duration: 0, origin });
   await webdriver(session.base, "POST", `/session/${session.sessionId}/actions`, {
     actions: [{ type: "wheel", id: `wheel-${session.name}`, actions }],
+  });
+}
+
+async function scrollArenaWheelPair(session, elementId, deltaY, firstDelayMs, betweenMs) {
+  const origin = { "element-6066-11e4-a52e-4f735466cecf": elementId };
+  await webdriver(session.base, "POST", `/session/${session.sessionId}/actions`, {
+    actions: [{
+      type: "wheel",
+      id: `wheel-${session.name}`,
+      actions: [
+        { type: "pause", duration: firstDelayMs },
+        { type: "scroll", x: 0, y: 0, deltaX: 0, deltaY, duration: 0, origin },
+        { type: "pause", duration: betweenMs },
+        { type: "scroll", x: 0, y: 0, deltaX: 0, deltaY, duration: 0, origin },
+      ],
+    }],
   });
 }
 
