@@ -2002,9 +2002,24 @@ fn late_fresh_block_buffers_through_authoritative_light_recovery() {
         },
         InputIntent::default(),
     );
-    advance(&mut world, 130.0, InputIntent::default(), InputIntent::default());
-    advance(&mut world, 80.0, InputIntent::default(), InputIntent::default());
-    advance(&mut world, 170.0, InputIntent::default(), InputIntent::default());
+    advance(
+        &mut world,
+        130.0,
+        InputIntent::default(),
+        InputIntent::default(),
+    );
+    advance(
+        &mut world,
+        80.0,
+        InputIntent::default(),
+        InputIntent::default(),
+    );
+    advance(
+        &mut world,
+        170.0,
+        InputIntent::default(),
+        InputIntent::default(),
+    );
 
     let held_block = InputIntent {
         block: true,
@@ -2033,9 +2048,24 @@ fn early_held_block_is_not_promoted_into_authoritative_recovery_parry() {
         },
         InputIntent::default(),
     );
-    advance(&mut world, 130.0, InputIntent::default(), InputIntent::default());
-    advance(&mut world, 80.0, InputIntent::default(), InputIntent::default());
-    advance(&mut world, 100.0, InputIntent::default(), InputIntent::default());
+    advance(
+        &mut world,
+        130.0,
+        InputIntent::default(),
+        InputIntent::default(),
+    );
+    advance(
+        &mut world,
+        80.0,
+        InputIntent::default(),
+        InputIntent::default(),
+    );
+    advance(
+        &mut world,
+        100.0,
+        InputIntent::default(),
+        InputIntent::default(),
+    );
 
     let held_block = InputIntent {
         block: true,
@@ -2060,9 +2090,24 @@ fn later_authoritative_block_overrides_buffered_light() {
         },
         InputIntent::default(),
     );
-    advance(&mut world, 130.0, InputIntent::default(), InputIntent::default());
-    advance(&mut world, 80.0, InputIntent::default(), InputIntent::default());
-    advance(&mut world, 170.0, InputIntent::default(), InputIntent::default());
+    advance(
+        &mut world,
+        130.0,
+        InputIntent::default(),
+        InputIntent::default(),
+    );
+    advance(
+        &mut world,
+        80.0,
+        InputIntent::default(),
+        InputIntent::default(),
+    );
+    advance(
+        &mut world,
+        170.0,
+        InputIntent::default(),
+        InputIntent::default(),
+    );
     advance(
         &mut world,
         5.0,
@@ -2073,7 +2118,12 @@ fn later_authoritative_block_overrides_buffered_light() {
         },
         InputIntent::default(),
     );
-    advance(&mut world, 5.0, InputIntent::default(), InputIntent::default());
+    advance(
+        &mut world,
+        5.0,
+        InputIntent::default(),
+        InputIntent::default(),
+    );
     let held_block = InputIntent {
         block: true,
         facing_radians: 0.0,
