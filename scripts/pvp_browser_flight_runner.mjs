@@ -3267,34 +3267,35 @@ async function performArenaRunningAttack(session, elementId, movementKey, xOffse
   let movementHeld = false;
   let lightHeld = false;
   try {
-    // Start the genuine movement + RMB hold first and keep both remote input
-    // states pressed across subsequent WebDriver action commands.
+    // Arm the genuine RMB hold first. Keeping movement out of this threshold
+    // wait avoids drifting the staged fighters while still proving the actual
+    // production hold-to-run gesture.
     await webdriver(session.base, "POST", `/session/${session.sessionId}/actions`, {
-      actions: [
-        {
-          type: "key",
-          id: keyboardId,
-          actions: [{ type: "keyDown", value: movementKey }, { type: "pause", duration: 0 }],
-        },
-        {
-          type: "pointer",
-          id: pointerId,
-          parameters: { pointerType: "mouse" },
-          actions: [
-            { type: "pointerMove", duration: 0, origin, x: xOffset, y: 0 },
-            { type: "pointerDown", button: 2 },
-          ],
-        },
-      ],
+      actions: [{
+        type: "pointer",
+        id: pointerId,
+        parameters: { pointerType: "mouse" },
+        actions: [
+          { type: "pointerMove", duration: 0, origin, x: xOffset, y: 0 },
+          { type: "pointerDown", button: 2 },
+        ],
+      }],
     });
-    movementHeld = true;
     rightHeld = true;
 
-    // Cross the production 180 ms hold threshold before issuing LMB. A separate
-    // WebDriver command is intentional: Chrome otherwise suppresses the second
-    // button transition when it is embedded inside one long multi-button action
-    // sequence, which means the real page never receives pointerdown(button=0).
+    // Cross the production 180 ms hold threshold, then arm genuine movement
+    // long enough for multiple client input samples to carry run + movement
+    // before LMB. This removes scheduler dependence without changing gameplay.
     await sleep(220);
+    await webdriver(session.base, "POST", `/session/${session.sessionId}/actions`, {
+      actions: [{
+        type: "key",
+        id: keyboardId,
+        actions: [{ type: "keyDown", value: movementKey }],
+      }],
+    });
+    movementHeld = true;
+    await sleep(80);
     lightHeld = true;
     await webdriver(session.base, "POST", `/session/${session.sessionId}/actions`, {
       actions: [{
@@ -3304,7 +3305,7 @@ async function performArenaRunningAttack(session, elementId, movementKey, xOffse
         actions: [
           { type: "pointerMove", duration: 0, origin, x: xOffset, y: 0 },
           { type: "pointerDown", button: 0 },
-          { type: "pause", duration: 40 },
+          { type: "pause", duration: 90 },
           { type: "pointerUp", button: 0 },
         ],
       }],
