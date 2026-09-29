@@ -11,7 +11,7 @@ Prove that a real browser defender can evade an authoritative attack through the
 - Both clients approach through ordinary movement input.
 - The attacker starts a normal attack from inside authoritative hit reach.
 - The defender reacts only after its browser observes authoritative `AttackWindup`.
-- The defender starts ordinary dodge input no earlier than 35 ms after first observing windup, with its movement vector rotated perpendicular to the attacker line. Until authoritative `Dodge` is observed (or the attack window ends), the same request may be carried by subsequent normal input samples so a single transport sample cannot decide the proof; no block input is used.
+- The defender starts ordinary dodge input on the next ordinary input sample after first observing authoritative windup, with its movement vector rotated perpendicular to the attacker line. Until authoritative `Dodge` is observed (or the attack window ends), the same request may be carried by subsequent normal input samples so a single transport sample cannot decide the proof; no block input is used.
 
 ## Acceptance
 
@@ -31,7 +31,7 @@ Both browsers must independently observe:
 
 CI #169 exact-head retry exposed a transport/timing flake in which the defender eventually entered authoritative `Dodge`, but the single request sample did not overlap `AttackActive` and the first strike landed. The harness carries the already-triggered ordinary dodge request until authoritative Dodge confirmation or the attack window ends.
 
-CI #584 and its bounded exact-head rerun #585 reproduced the inverse Wilds-roll timing failure: delaying the reaction to 60 ms preserved the 94-unit geometry but left too little authoritative delivery margin, so earlier strikes could resolve before the dodge even though a later exchange eventually proved the iframe. M24 now stages the pair closer, stopping approach at about 54 world units and allowing attack commitment at 60 units, then restores the original earliest-valid 35 ms post-windup reaction. Even if the full 100 ms between that reaction threshold and light `AttackActive` becomes roll travel, the perpendicular 690 u/s roll remains inside the unchanged 94-unit hit envelope. Acceptance is not weakened: the proof still requires live `AttackActive`/`Dodge` overlap inside real hit geometry with untouched 100 HP / 100 guard throughout.
+CI #584 and its bounded exact-head rerun #585 reproduced the inverse Wilds-roll timing failure: delaying the reaction to 60 ms preserved the 94-unit geometry but left too little authoritative delivery margin, so earlier strikes could resolve before the dodge even though a later exchange eventually proved the iframe. M24 now stages the pair closer, stopping approach at about 54 world units and allowing attack commitment at 60 units. M125 removes the remaining artificial 35 ms wall-clock delay after authoritative windup observation: the browser requests the perpendicular roll on its next ordinary input sample. Acceptance is not weakened: the proof still requires live `AttackActive`/`Dodge` overlap inside the unchanged 94-unit hit geometry with untouched 100 HP / 100 guard throughout, so early roll travel that leaves the hit envelope cannot pass.
 
 
 ## M113 control-schema adaptation

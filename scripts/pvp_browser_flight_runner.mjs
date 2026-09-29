@@ -26,7 +26,17 @@ const browsers = [
     args: ["--port=9515"],
     capabilities: {
       browserName: "chrome",
-      "goog:chromeOptions": { args: ["--headless=new", "--no-sandbox", "--disable-dev-shm-usage", "--window-size=1280,720"] },
+      "goog:chromeOptions": {
+        args: [
+          "--headless=new",
+          "--no-sandbox",
+          "--disable-dev-shm-usage",
+          "--window-size=1280,720",
+          "--disable-background-timer-throttling",
+          "--disable-backgrounding-occluded-windows",
+          "--disable-renderer-backgrounding",
+        ],
+      },
     },
   },
   {
@@ -36,7 +46,14 @@ const browsers = [
     args: ["--host", "127.0.0.1", "--port", "9516"],
     capabilities: {
       browserName: "firefox",
-      "moz:firefoxOptions": { args: ["-headless"] },
+      "moz:firefoxOptions": {
+        args: ["-headless"],
+        prefs: {
+          "dom.min_background_timeout_value": 4,
+          "dom.timeout.enable_budget_timer_throttling": false,
+          "layout.frame_rate": 60,
+        },
+      },
     },
   },
 ];
@@ -48,7 +65,17 @@ if (scenario === "uiffa3" || scenario === "uikillfeed" || scenario === "uifocus"
     args: ["--port=9517"],
     capabilities: {
       browserName: "chrome",
-      "goog:chromeOptions": { args: ["--headless=new", "--no-sandbox", "--disable-dev-shm-usage", "--window-size=1280,720"] },
+      "goog:chromeOptions": {
+        args: [
+          "--headless=new",
+          "--no-sandbox",
+          "--disable-dev-shm-usage",
+          "--window-size=1280,720",
+          "--disable-background-timer-throttling",
+          "--disable-backgrounding-occluded-windows",
+          "--disable-renderer-backgrounding",
+        ],
+      },
     },
   });
 }
@@ -322,6 +349,13 @@ async function startBrowser(browser) {
   });
   const sessionId = created.sessionId ?? created.value?.sessionId;
   if (!sessionId) throw new Error(`${browser.name} WebDriver did not return a session id: ${JSON.stringify(created)}`);
+  // Make runner timing explicit across Chrome/Firefox instead of inheriting
+  // driver-specific defaults. This changes only WebDriver command tolerance.
+  await webdriver(base, "POST", `/session/${sessionId}/timeouts`, {
+    script: 15_000,
+    pageLoad: 30_000,
+    implicit: 0,
+  });
   if (scenario === "uiparry" || scenario === "uistun" || scenario === "uiguardbreak" || scenario === "uidodge" || scenario === "uiattackintent" || scenario === "uiheavy" || scenario === "uiheavyinputloss" || scenario === "uiheavyblock" || scenario === "uiheavyparry" || scenario === "uiheavydodge" || scenario === "uiheavypunish" || scenario === "uiheavyguardbreak" || scenario === "uiheavyguardbreakpunish" || scenario === "uifeint" || scenario === "uirunningattack" || scenario === "uidirectionallight" || scenario === "uiguardbreaktell" || scenario === "uiparrytell" || scenario === "uiblockfacingtell" || scenario === "uidodgetell") {
     await webdriver(base, "POST", `/session/${sessionId}/window/rect`, { x: 0, y: 0, width: 1280, height: 900 });
   }
@@ -752,12 +786,12 @@ async function runOnlineUiHeavyBlockFlight(entries) {
   // or partially resolved exchange fails closed instead of being retried.
   for (let attempt = 1; attempt <= 3 && !evidence; attempt += 1) {
     // Start the genuine E edge and schedule two genuine wheel-back pulses from
-    // the defender's own WebDriver clock at 70 ms and 220 ms. Their 240 ms
-    // short-block windows overlap continuously, so authority never re-enters a
-    // fresh parry window before the ~320 ms heavy impact.
+    // the defender's own WebDriver clock at 70 ms and 170 ms. Their unchanged
+    // 240 ms short-block windows overlap by 140 ms, leaving enough scheduler
+    // margin that authority stays in one Block action through the ~320 ms impact.
     await Promise.all([
       pulseMovementKey(attacker, "e", heavyKeyPulseMs),
-      scrollArenaWheelPair(defender, defenderElementId, 120, 70, 150),
+      scrollArenaWheelPair(defender, defenderElementId, 120, 70, 100),
     ]);
     await sleep(470);
 
@@ -1886,11 +1920,11 @@ async function runOnlineUiHeavyGuardBreakFlight(entries, { returnTiming = false 
   const performHeavyIntoObservedShortBlock = async (windupsBefore) => {
     // Start genuine E and schedule two genuine wheel-back pulses inside one
     // browser-owned action sequence. The first lands at 70 ms and the second at
-    // 220 ms. Their 240 ms short-block windows overlap, so authority remains in
-    // one continuous Block action: parry age keeps increasing while coverage is
-    // extended safely beyond the ~320 ms heavy impact.
+    // 170 ms. Their unchanged 240 ms short-block windows overlap by 140 ms, so
+    // scheduler jitter cannot create a false fresh Block/parry edge before the
+    // ~320 ms heavy impact.
     const heavyPulse = pulseMovementKey(attacker, "e", heavyKeyPulseMs);
-    const blockPulse = scrollArenaWheelPair(defender, defenderElementId, 120, 70, 150);
+    const blockPulse = scrollArenaWheelPair(defender, defenderElementId, 120, 70, 100);
     let observed = false;
     try {
       const deadline = Date.now() + 420;
@@ -3267,34 +3301,35 @@ async function performArenaRunningAttack(session, elementId, movementKey, xOffse
   let movementHeld = false;
   let lightHeld = false;
   try {
-    // Start the genuine movement + RMB hold first and keep both remote input
-    // states pressed across subsequent WebDriver action commands.
+    // Arm the genuine RMB hold first. Keeping movement out of this threshold
+    // wait avoids drifting the staged fighters while still proving the actual
+    // production hold-to-run gesture.
     await webdriver(session.base, "POST", `/session/${session.sessionId}/actions`, {
-      actions: [
-        {
-          type: "key",
-          id: keyboardId,
-          actions: [{ type: "keyDown", value: movementKey }, { type: "pause", duration: 0 }],
-        },
-        {
-          type: "pointer",
-          id: pointerId,
-          parameters: { pointerType: "mouse" },
-          actions: [
-            { type: "pointerMove", duration: 0, origin, x: xOffset, y: 0 },
-            { type: "pointerDown", button: 2 },
-          ],
-        },
-      ],
+      actions: [{
+        type: "pointer",
+        id: pointerId,
+        parameters: { pointerType: "mouse" },
+        actions: [
+          { type: "pointerMove", duration: 0, origin, x: xOffset, y: 0 },
+          { type: "pointerDown", button: 2 },
+        ],
+      }],
     });
-    movementHeld = true;
     rightHeld = true;
 
-    // Cross the production 180 ms hold threshold before issuing LMB. A separate
-    // WebDriver command is intentional: Chrome otherwise suppresses the second
-    // button transition when it is embedded inside one long multi-button action
-    // sequence, which means the real page never receives pointerdown(button=0).
+    // Cross the production 180 ms hold threshold, then arm genuine movement
+    // long enough for multiple client input samples to carry run + movement
+    // before LMB. This removes scheduler dependence without changing gameplay.
     await sleep(220);
+    await webdriver(session.base, "POST", `/session/${session.sessionId}/actions`, {
+      actions: [{
+        type: "key",
+        id: keyboardId,
+        actions: [{ type: "keyDown", value: movementKey }],
+      }],
+    });
+    movementHeld = true;
+    await sleep(80);
     lightHeld = true;
     await webdriver(session.base, "POST", `/session/${session.sessionId}/actions`, {
       actions: [{
@@ -3304,7 +3339,7 @@ async function performArenaRunningAttack(session, elementId, movementKey, xOffse
         actions: [
           { type: "pointerMove", duration: 0, origin, x: xOffset, y: 0 },
           { type: "pointerDown", button: 0 },
-          { type: "pause", duration: 40 },
+          { type: "pause", duration: 90 },
           { type: "pointerUp", button: 0 },
         ],
       }],

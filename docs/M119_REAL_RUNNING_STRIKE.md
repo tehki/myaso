@@ -39,3 +39,12 @@ The test stays fail-closed: any different damage, guard interaction, missing con
 ## Why this matters
 
 M118 says movement is combat. M119 verifies that claim through the same production browser path a player uses: sprinting into a committed attack is not merely a model state or test fixture.
+
+
+## M125 CI stabilization
+
+Post-merge main run #588 reproduced a bounded clean-latch failure twice even though Chrome delivered the full real RMB, movement, and LMB gesture.
+
+The acceptance gesture now arms RMB first, waits beyond the unchanged 180 ms production run threshold, then arms movement for 80 ms before LMB. LMB stays down for 90 ms so multiple client input-send frames can sample run + movement + attack together.
+
+This changes only WebDriver acceptance scheduling. Production run timing, running-strike timing, stamina, reach, damage, guard interaction, and all authoritative result checks remain unchanged.

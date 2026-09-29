@@ -330,8 +330,12 @@ function sendCombatInput() {
         }
       } else if (scenario === "dodge") {
         if (peer.action === 1 && dodgeWindupSeenAt === null) dodgeWindupSeenAt = performance.now();
+        // Once this browser has actually observed authoritative windup, react on
+        // the next ordinary input sample. The geometry assertions below remain
+        // the proof; an extra wall-clock delay only makes CI transport jitter
+        // decide whether the roll reaches authority before AttackActive.
         if (dodgeWindupSeenAt !== null && !dodgeTriggered && own.action === 0
-          && [1, 2].includes(peer.action) && performance.now() - dodgeWindupSeenAt >= 35) {
+          && [1, 2].includes(peer.action)) {
           dodgeTriggered = true;
           dodgeReactionMs = performance.now() - dodgeWindupSeenAt;
         }
