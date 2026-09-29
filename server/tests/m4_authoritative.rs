@@ -2176,7 +2176,10 @@ fn late_authoritative_roll_buffers_through_recovery_and_preserves_direction() {
         world.fighter(1).expect("attacker").action,
         Action::AttackRecovery
     );
-    assert_eq!(world.fighter(1).expect("attacker").stamina.round() as u8, 100);
+    assert_eq!(
+        world.fighter(1).expect("attacker").stamina.round() as u8,
+        100
+    );
 
     let release = InputIntent {
         facing_radians: 0.0,
@@ -2236,7 +2239,10 @@ fn early_held_authoritative_roll_is_not_promoted_after_recovery() {
     advance(&mut world, 5.0, held_roll, InputIntent::default());
     advance(&mut world, 150.0, held_roll, InputIntent::default());
     assert_eq!(world.fighter(1).expect("attacker").action, Action::Idle);
-    assert_eq!(world.fighter(1).expect("attacker").stamina.round() as u8, 100);
+    assert_eq!(
+        world.fighter(1).expect("attacker").stamina.round() as u8,
+        100
+    );
 
     advance(&mut world, 5.0, held_roll, InputIntent::default());
     assert_eq!(world.fighter(1).expect("attacker").action, Action::Idle);
@@ -2314,7 +2320,10 @@ fn later_authoritative_roll_overrides_buffered_light() {
         InputIntent::default(),
     );
     assert_eq!(world.fighter(1).expect("attacker").action, Action::Dodge);
-    assert_eq!(world.fighter(1).expect("attacker").stamina.round() as u8, 72);
+    assert_eq!(
+        world.fighter(1).expect("attacker").stamina.round() as u8,
+        72
+    );
 }
 
 #[test]
