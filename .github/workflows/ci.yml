@@ -1,0 +1,617 @@
+name: quality
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  quality:
+    name: quality
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Validate coding-agent policy
+        run: python scripts/validate_coding_agent_policy.py
+
+      - name: Validate repository governance
+        run: python scripts/validate_repository_governance.py
+
+      - name: Compile governance scripts
+        run: python -m py_compile scripts/*.py
+
+      - name: Validate combat JavaScript
+        run: |
+          node --version
+          node --check src/combat/model.mjs
+          node --check web/game.mjs
+          node --test tests/combat-model.test.mjs
+
+      - name: Validate realtime networking JavaScript
+        run: |
+          node --check src/network/constants.mjs
+          node --check src/network/sequence.mjs
+          node --check src/network/input-codec.mjs
+          node --check src/network/input-ack-codec.mjs
+          node --check src/network/input-ingress.mjs
+          node --check src/network/snapshot-codec.mjs
+          node --check src/network/interest-grid.mjs
+          node --check src/network/replication-planner.mjs
+          node --check web/network-transport.mjs
+          node --check scripts/network_capacity_probe.mjs
+          node --check tests/m4-snapshot-compat.test.mjs
+          node --check tests/m19-compact-record-identity.test.mjs
+          node --check tests/m20-compact-facing.test.mjs
+          node --check tests/m21-compact-position.test.mjs
+          node --test tests/networking.test.mjs tests/m4-snapshot-compat.test.mjs tests/m19-compact-record-identity.test.mjs tests/m20-compact-facing.test.mjs tests/m21-compact-position.test.mjs
+
+      - name: Validate browser runtime hot path
+        run: |
+          node --check src/browser/frame-budget.mjs
+          node --check src/browser/combat-readability.mjs
+          node --check src/browser/snapshot-store.mjs
+          node --check src/browser/reconciliation.mjs
+          node --check src/browser/remote-interpolation.mjs
+          node --check src/browser/impairment.mjs
+          node --check web/authoritative-client.mjs
+          node --check web/bootstrap.mjs
+          node --check web/online-game.mjs
+          node --check web/flight.mjs
+          node --check web/pvp-flight.mjs
+          node --check scripts/browser_hotpath_probe.mjs
+          node --check scripts/browser_flight_runner.mjs
+          node --check scripts/pvp_browser_flight_runner.mjs
+          node --check tests/browser-runtime.test.mjs
+          node --check tests/m29-combat-readability.test.mjs
+          node --check tests/m6-browser-authority.test.mjs
+          node --check tests/m7-browser-flight.test.mjs
+          node --check tests/m12-reliable-baseline.test.mjs
+          node --check tests/m15-reliable-convergence.test.mjs
+          node --check tests/m16-browser-512.test.mjs
+          node --check tests/m17-reliable-delta.test.mjs
+          node --test tests/browser-runtime.test.mjs tests/m6-browser-authority.test.mjs tests/m7-browser-flight.test.mjs tests/m12-reliable-baseline.test.mjs tests/m15-reliable-convergence.test.mjs tests/m16-browser-512.test.mjs tests/m17-reliable-delta.test.mjs tests/m29-combat-readability.test.mjs
+          node scripts/browser_hotpath_probe.mjs
+
+      - name: Validate authoritative Rust server
+        run: |
+          rustc --version
+          cargo --version
+          cargo fmt --manifest-path server/Cargo.toml -- --check
+          cargo check --locked --manifest-path server/Cargo.toml
+          cargo clippy --locked --manifest-path server/Cargo.toml --all-targets -- -D warnings
+          cargo test --locked --manifest-path server/Cargo.toml
+
+      - name: Validate M64 fixed input ingress batch
+        run: cargo test --locked --manifest-path server/Cargo.toml ingress_uses_a_fixed_three_sample_batch
+
+      - name: Validate M65 recovered action context
+        run: cargo test --locked --manifest-path server/Cargo.toml coalesc
+
+      - name: Validate M66 fixed input decode storage
+        run: cargo test --locked --manifest-path server/Cargo.toml decodes_input_samples_into_fixed_inline_storage
+
+      - name: Validate M67 preallocated ingress dedup window
+        run: cargo test --locked --manifest-path server/Cargo.toml ingress_preallocates_the_bounded_replay_window
+
+      - name: Validate M68 fixed input dedup ring
+        run: cargo test --locked --manifest-path server/Cargo.toml ingress_reuses_fixed_dedup_ring_across_wraparound_and_jumps
+
+      - name: Validate M69 single input state lock
+        run: cargo test --locked --manifest-path server/Cargo.toml --bin myaso-server input_state_access_applies_and_reads_tick_in_one_scope
+
+      - name: Validate M70 binary fighter lookup
+        run: cargo test --locked --manifest-path server/Cargo.toml fighter_identity_operations_preserve_sorted_binary_lookup
+
+      - name: Validate M71 packed replication frame
+        run: cargo test --locked --manifest-path server/Cargo.toml packed_replication_frame_preserves_binary_identity_lookup
+
+      - name: Validate M72 reusable interest scratch
+        run: cargo test --locked --manifest-path server/Cargo.toml reusable_interest_query_matches_allocating_query_without_capacity_churn
+
+      - name: Validate M73 allocation-free visibility removal
+        run: cargo test --locked --manifest-path server/Cargo.toml baseline_entity_leaving_interest_emits_removal_without_visibility_index
+
+      - name: Validate M74 reused snapshot planner buckets
+        run: cargo test --locked --manifest-path server/Cargo.toml snapshot_planner_reuses_priority_bucket_capacity
+
+      - name: Validate M75 indexed replication cells
+        run: cargo test --locked --manifest-path server/Cargo.toml indexed_replication_cells_preserve_legacy_query_order
+
+      - name: Validate M76 in-place ACK history
+        run: cargo test --locked --manifest-path server/Cargo.toml acknowledged_history_advances_in_place_and_preserves_newer_entries
+
+      - name: Validate M77 single freshness lookup
+        run: cargo test --locked --manifest-path server/Cargo.toml single_freshness_lookup_preserves_present_and_missing_age_semantics
+
+      - name: Validate M78 linear baseline removals
+        run: cargo test --locked --manifest-path server/Cargo.toml linear_baseline_removals_match_binary_lookup_semantics
+
+      - name: Validate M79 recycled snapshot record buffers
+        run: cargo test --locked --manifest-path server/Cargo.toml snapshot_history_reuses_evicted_record_capacity
+
+      - name: Validate M80 inline snapshot byte composition
+        run: cargo test --locked --manifest-path server/Cargo.toml inline_byte_composition_matches_standalone_accounting
+
+      - name: Validate M81 hashed replication cells
+        run: cargo test --locked --manifest-path server/Cargo.toml hashed_replication_cells_match_ordered_cell_lookup_semantics
+
+      - name: Validate M82 reused viewer interest query
+        run: cargo test --locked --manifest-path server/Cargo.toml reused_viewer_interest_query_matches_public_lookup_semantics
+
+      - name: Validate M83 hashed last-sent timestamps
+        run: cargo test --locked --manifest-path server/Cargo.toml hashed_last_sent_ticks_preserve_planner_results_across_insertion_order
+
+      - name: Validate M84 planned byte composition
+        run: cargo test --locked --manifest-path server/Cargo.toml planned_byte_composition_matches_encoder_sizing
+
+      - name: Validate M85 planner-owned last-sent updates
+        run: cargo test --locked --manifest-path server/Cargo.toml planner_updates_last_sent_only_for_admitted_records
+
+      - name: Validate M86 recycled acknowledged history
+        run: cargo test --locked --manifest-path server/Cargo.toml acknowledged_history_reuses_record_capacity_on_next_snapshot
+
+      - name: Validate M87 preallocated replication cells
+        run: cargo test --locked --manifest-path server/Cargo.toml replication_frame_preallocates_cell_index_capacity
+
+      - name: Validate M88 reused replication frame
+        run: cargo test --locked --manifest-path server/Cargo.toml --bin myaso-server replication_frame_refresh_reuses_unique_arc_without_mutating_shared_snapshot
+
+      - name: Validate M89 recycled replication cell buckets
+        run: cargo test --locked --manifest-path server/Cargo.toml replication_frame_refresh_reuses_cell_bucket_capacity
+
+      - name: Validate M90 reused reliable frame buffer
+        run: cargo test --locked --manifest-path server/Cargo.toml --bin myaso-server reliable_frame_buffer_
+
+      - name: Validate M91 reserved snapshot sequence
+        run: cargo test --locked --manifest-path server/Cargo.toml snapshot_sequence_wrap_skips_reserved_no_ack_sentinel
+
+      - name: Validate M92 indexed snapshot history
+        run: cargo test --locked --manifest-path server/Cargo.toml snapshot_history_sequence_offset_lookup_spans_reserved_wrap
+
+      - name: Validate M93 indexed kill-event history
+        run: cargo test --locked --manifest-path server/Cargo.toml --bin myaso-server kill_event_cursor_lookup_spans_sequence_wrap
+
+      - name: Validate M94 fixed kill-event reliable payload
+        run: cargo test --locked --manifest-path server/Cargo.toml --bin myaso-server reliable_kill_event_payload_reuses_frame_buffer_without_owned_byte_payload
+
+      - name: Validate M95 reused combat event buffer
+        run: cargo test --locked --manifest-path server/Cargo.toml --test m4_authoritative reusable_combat_event_buffer_matches_allocating_step_semantics
+
+      - name: Validate M96 squared-distance hot path
+        run: cargo test --locked --manifest-path server/Cargo.toml --test m4_authoritative squared_distance_rejection_preserves_collision_and_attack_boundaries
+
+      - name: Validate M97 axis combat prefilter
+        run: cargo test --locked --manifest-path server/Cargo.toml --test m4_authoritative axis_prefilter_preserves_diagonal_collision_and_attack_ranges
+
+      - name: Validate M98 pruned interest cells
+        run: cargo test --locked --manifest-path server/Cargo.toml pruned_interest_cells_preserve_visibility_and_reduce_candidates
+
+      - name: Validate M99 reused interest distances
+        run: cargo test --locked --manifest-path server/Cargo.toml interest_query_carries_distances_in_visible_state_order
+
+      - name: Validate M100 reused interest visibility
+        run: cargo test --locked --manifest-path server/Cargo.toml baseline_removals_reuse_interest_visibility_bits
+
+      - name: Validate M101 packed snapshot record headers
+        run: |
+          cargo test --locked --manifest-path server/Cargo.toml packed_record_headers_roundtrip_inline_and_escaped_net_ids
+          node --test --test-name-pattern="packed snapshot record headers" tests/networking.test.mjs
+
+      - name: Validate M102 local-cell snapshot positions
+        run: |
+          cargo test --locked --manifest-path server/Cargo.toml local_cell_positions_preserve_compact_coordinates_and_exact_budgeting
+          node --test --test-name-pattern="local-cell snapshot positions" tests/networking.test.mjs
+
+      - name: Validate M103 compact snapshot action flags
+        run: |
+          cargo test --locked --manifest-path server/Cargo.toml compact_action_flags_roundtrip_common_and_wide_values
+          node --test --test-name-pattern="compact snapshot action flags" tests/networking.test.mjs
+
+      - name: Validate M104 deadline-aware mid admission
+        run: cargo test --locked --manifest-path server/Cargo.toml deadline_due_mid_records_precede_rotating_fresh_mid_under_budget
+
+      - name: Validate M105 heavy committed strike kernel
+        run: |
+          cargo test --locked --manifest-path server/Cargo.toml --test m4_authoritative heavy_attack_
+          cargo test --locked --manifest-path server/Cargo.toml decodes_heavy_attack_from_spare_input_button_bit
+          cargo test --locked --manifest-path server/Cargo.toml coalesces_redundant_heavy_attack_edge_with_committed_facing
+          node --test --test-name-pattern="heavy attack|heavy strike" tests/combat-model.test.mjs tests/networking.test.mjs tests/m6-browser-authority.test.mjs
+
+      - name: Validate M109 real heavy whiff punish
+        env:
+          MYASO_PVP_SCENARIO: "uiheavypunish"
+        run: |
+          node --check scripts/pvp_browser_flight_runner.mjs
+          node scripts/pvp_browser_flight_runner.mjs
+
+      - name: Validate M110 real heavy guard-break pressure
+        env:
+          MYASO_PVP_SCENARIO: "uiheavyguardbreak"
+        run: |
+          node --check scripts/pvp_browser_flight_runner.mjs
+          node scripts/pvp_browser_flight_runner.mjs
+
+      - name: Validate M111 real post-heavy guard-break punish
+        env:
+          MYASO_PVP_SCENARIO: "uiheavyguardbreakpunish"
+        run: |
+          node --check scripts/pvp_browser_flight_runner.mjs
+          node scripts/pvp_browser_flight_runner.mjs
+
+      - name: Validate M117 real wheel-back combat feint
+        env:
+          MYASO_PVP_SCENARIO: "uifeint"
+        run: |
+          node --check scripts/pvp_browser_flight_runner.mjs
+          node scripts/pvp_browser_flight_runner.mjs
+
+      - name: Validate M119 real running strike
+        env:
+          MYASO_PVP_SCENARIO: "uirunningattack"
+        run: |
+          node --check scripts/pvp_browser_flight_runner.mjs
+          node scripts/pvp_browser_flight_runner.mjs
+
+      - name: Validate M120 directional light kernel
+        run: |
+          cargo test --locked --manifest-path server/Cargo.toml directional_
+          node --check src/combat/model.mjs
+          node --check src/combat/sparring-ai.mjs
+          node --check src/browser/combat-readability.mjs
+          node --check src/network/snapshot-codec.mjs
+          node --check web/game.mjs
+          node --check web/online-game.mjs
+          node --test --test-name-pattern="directional|left sweep|right sweep" tests/combat-model.test.mjs tests/sparring-ai.test.mjs tests/networking.test.mjs tests/m29-combat-readability.test.mjs
+
+      - name: Validate M121 real directional light
+        env:
+          MYASO_PVP_SCENARIO: "uidirectionallight"
+        run: |
+          node --check scripts/pvp_browser_flight_runner.mjs
+          node scripts/pvp_browser_flight_runner.mjs
+
+      - name: Validate M121 first-to-five duel kernel
+        run: |
+          cargo test --locked --manifest-path server/Cargo.toml first_to_kill_target_declares_winner_and_freezes_match_state
+          cargo test --locked --manifest-path server/Cargo.toml finished_match_resets_atomically_and_reopens_play
+          node --check src/browser/combat-readability.mjs
+          node --check web/online-game.mjs
+          node --check scripts/pvp_browser_flight_runner.mjs
+          node --test --test-name-pattern="first-to-five|match-point" tests/m29-combat-readability.test.mjs
+
+      - name: Validate M106 heavy strike control and readability
+        env:
+          MYASO_PVP_SCENARIO: "uiheavy"
+        run: |
+          node --check web/game.mjs
+          node --check web/online-game.mjs
+          node --check src/browser/combat-readability.mjs
+          node --check scripts/pvp_browser_flight_runner.mjs
+          node --test --test-name-pattern="heavy" tests/m29-combat-readability.test.mjs tests/combat-model.test.mjs
+          node scripts/pvp_browser_flight_runner.mjs
+
+      - name: Validate M107 real heavy counterplay
+        run: |
+          node --check scripts/pvp_browser_flight_runner.mjs
+          for scenario in uiheavyblock uiheavyparry uiheavydodge; do
+            MYASO_PVP_SCENARIO="$scenario" node scripts/pvp_browser_flight_runner.mjs
+          done
+
+      - name: Validate M108 heavy recovery under first-send input loss
+        env:
+          MYASO_PVP_SCENARIO: "uiheavyinputloss"
+        run: |
+          node --check scripts/pvp_browser_flight_runner.mjs
+          node scripts/pvp_browser_flight_runner.mjs
+
+      - name: Validate real browser flight
+        env:
+          MYASO_FLIGHT_DURATION_MS: "4000"
+          MYASO_FLIGHT_STRESS_ENTITIES: "128"
+        run: |
+          google-chrome --version
+          firefox --version
+          chromedriver --version
+          geckodriver --version
+          node scripts/browser_flight_runner.mjs
+
+      - name: Validate M22 cross-browser authoritative PvP
+        env:
+          MYASO_PVP_FLIGHT_DURATION_MS: "7000"
+        run: node scripts/pvp_browser_flight_runner.mjs
+
+      - name: Validate M23 cross-browser authoritative parry
+        env:
+          MYASO_PVP_FLIGHT_DURATION_MS: "7000"
+          MYASO_PVP_SCENARIO: "parry"
+        run: node scripts/pvp_browser_flight_runner.mjs
+
+      - name: Validate M24 cross-browser authoritative dodge
+        env:
+          MYASO_PVP_FLIGHT_DURATION_MS: "7000"
+          MYASO_PVP_SCENARIO: "dodge"
+        run: node scripts/pvp_browser_flight_runner.mjs
+
+      - name: Validate M25 cross-browser authoritative block
+        env:
+          MYASO_PVP_FLIGHT_DURATION_MS: "7000"
+          MYASO_PVP_SCENARIO: "block"
+        run: node scripts/pvp_browser_flight_runner.mjs
+
+      - name: Validate M26 cross-browser authoritative guard break
+        env:
+          MYASO_PVP_FLIGHT_DURATION_MS: "9000"
+          MYASO_PVP_SCENARIO: "guardbreak"
+        run: node scripts/pvp_browser_flight_runner.mjs
+
+      - name: Validate M27 cross-browser directional block failure
+        env:
+          MYASO_PVP_FLIGHT_DURATION_MS: "7000"
+          MYASO_PVP_SCENARIO: "backblock"
+        run: node scripts/pvp_browser_flight_runner.mjs
+
+      - name: Validate M28 cross-browser authoritative death and respawn
+        env:
+          MYASO_PVP_FLIGHT_DURATION_MS: "8000"
+          MYASO_PVP_SCENARIO: "respawn"
+        run: node scripts/pvp_browser_flight_runner.mjs
+
+      - name: Validate M30 real online combat readability UI
+        env:
+          MYASO_PVP_SCENARIO: "ui"
+        run: node scripts/pvp_browser_flight_runner.mjs
+
+      - name: Validate M31 real online death and respawn readability
+        env:
+          MYASO_PVP_SCENARIO: "uirespawn"
+        run: node scripts/pvp_browser_flight_runner.mjs
+
+      - name: Validate M32 real online authoritative hit feedback
+        env:
+          MYASO_PVP_SCENARIO: "uifeedback"
+        run: node scripts/pvp_browser_flight_runner.mjs
+
+      - name: Validate M33 real online authoritative parry feedback
+        env:
+          MYASO_PVP_SCENARIO: "uiparry"
+        run: node scripts/pvp_browser_flight_runner.mjs
+
+      - name: Validate M34 real online authoritative guard-break feedback
+        env:
+          MYASO_PVP_SCENARIO: "uiguardbreak"
+        run: node scripts/pvp_browser_flight_runner.mjs
+
+      - name: Validate M35 real online authoritative stun overlay
+        env:
+          MYASO_PVP_SCENARIO: "uistun"
+        run: node scripts/pvp_browser_flight_runner.mjs
+
+      - name: Validate M36 real online authoritative dodge feedback
+        env:
+          MYASO_PVP_SCENARIO: "uidodge"
+        run: node scripts/pvp_browser_flight_runner.mjs
+
+      - name: Validate M37 authoritative opponent recovery readability
+        env:
+          MYASO_PVP_SCENARIO: "uirecovery"
+        run: node scripts/pvp_browser_flight_runner.mjs
+
+      - name: Validate M38 spatial FFA recovery tell
+        env:
+          MYASO_PVP_SCENARIO: "uirecoverytell"
+        run: node scripts/pvp_browser_flight_runner.mjs
+
+      - name: Validate M39 spatial FFA attack intent
+        env:
+          MYASO_PVP_SCENARIO: "uiattackintent"
+        run: node scripts/pvp_browser_flight_runner.mjs
+
+      - name: Validate M40 spatial FFA guard-break tell
+        env:
+          MYASO_PVP_SCENARIO: "uiguardbreaktell"
+        run: node scripts/pvp_browser_flight_runner.mjs
+
+      - name: Validate M41 spatial FFA parry tell
+        env:
+          MYASO_PVP_SCENARIO: "uiparrytell"
+        run: node scripts/pvp_browser_flight_runner.mjs
+
+      - name: Validate M42 spatial FFA directional block facing
+        env:
+          MYASO_PVP_SCENARIO: "uiblockfacingtell"
+        run: node scripts/pvp_browser_flight_runner.mjs
+
+      - name: Validate M43 spatial FFA dodge tell
+        env:
+          MYASO_PVP_SCENARIO: "uidodgetell"
+        run: node scripts/pvp_browser_flight_runner.mjs
+
+      - name: Validate M44 spatial FFA defeat tell
+        env:
+          MYASO_PVP_SCENARIO: "uideathtell"
+        run: node scripts/pvp_browser_flight_runner.mjs
+
+      - name: Validate M45 spatial FFA damage tell
+        env:
+          MYASO_PVP_SCENARIO: "uihittell"
+        run: node scripts/pvp_browser_flight_runner.mjs
+
+      - name: Validate M46 spatial FFA vitals
+        env:
+          MYASO_PVP_SCENARIO: "uivitals"
+        run: node scripts/pvp_browser_flight_runner.mjs
+
+      - name: Validate M47 spatial FFA player identity
+        env:
+          MYASO_PVP_SCENARIO: "uiidentity"
+        run: node scripts/pvp_browser_flight_runner.mjs
+
+      - name: Validate M48 authoritative FFA kill score
+        env:
+          MYASO_PVP_SCENARIO: "uiscore"
+        run: node scripts/pvp_browser_flight_runner.mjs
+
+      - name: Validate M49/M121 authoritative first-to-five match winner
+        env:
+          MYASO_PVP_SCENARIO: "uimatch"
+          MYASO_PVP_FLIGHT_DURATION_MS: "30000"
+        run: node scripts/pvp_browser_flight_runner.mjs
+
+      - name: Validate M50/M121 authoritative first-to-five rematch lifecycle
+        env:
+          MYASO_PVP_SCENARIO: "uirematch"
+          MYASO_PVP_FLIGHT_DURATION_MS: "40000"
+        run: node scripts/pvp_browser_flight_runner.mjs
+
+      - name: Validate M51 three-player authoritative FFA
+        env:
+          MYASO_PVP_SCENARIO: "uiffa3"
+          MYASO_PVP_FLIGHT_DURATION_MS: "10000"
+        run: node scripts/pvp_browser_flight_runner.mjs
+
+      - name: Validate M52 authoritative FFA kill feed
+        env:
+          MYASO_PVP_SCENARIO: "uikillfeed"
+          MYASO_PVP_FLIGHT_DURATION_MS: "18000"
+        run: node scripts/pvp_browser_flight_runner.mjs
+
+      - name: Validate M53 FFA focus HUD
+        env:
+          MYASO_PVP_SCENARIO: "uifocus"
+          MYASO_PVP_FLIGHT_DURATION_MS: "10000"
+        run: node scripts/pvp_browser_flight_runner.mjs
+
+      - name: Validate M54 FFA incoming threat awareness
+        env:
+          MYASO_PVP_SCENARIO: "uithreat"
+          MYASO_PVP_FLIGHT_DURATION_MS: "10000"
+        run: node scripts/pvp_browser_flight_runner.mjs
+
+      - name: Validate M55 simultaneous FFA threat awareness
+        env:
+          MYASO_PVP_SCENARIO: "uimultithreat"
+          MYASO_PVP_FLIGHT_DURATION_MS: "10000"
+        run: node scripts/pvp_browser_flight_runner.mjs
+
+      - name: Validate M56 secondary FFA threat identity
+        env:
+          MYASO_PVP_SCENARIO: "uisecondarythreat"
+          MYASO_PVP_FLIGHT_DURATION_MS: "10000"
+        run: node scripts/pvp_browser_flight_runner.mjs
+
+      - name: Validate M57 primary FFA threat bearing
+        env:
+          MYASO_PVP_SCENARIO: "uithreatbearing"
+          MYASO_PVP_FLIGHT_DURATION_MS: "10000"
+        run: node scripts/pvp_browser_flight_runner.mjs
+
+      - name: Validate M58 secondary FFA threat bearing
+        env:
+          MYASO_PVP_SCENARIO: "uisecondarybearing"
+          MYASO_PVP_FLIGHT_DURATION_MS: "10000"
+        run: node scripts/pvp_browser_flight_runner.mjs
+
+      - name: Validate M59 secondary FFA threat phase
+        env:
+          MYASO_PVP_SCENARIO: "uisecondaryphase"
+          MYASO_PVP_FLIGHT_DURATION_MS: "10000"
+        run: node scripts/pvp_browser_flight_runner.mjs
+
+      - name: Validate M60 primary FFA guard arc
+        env:
+          MYASO_PVP_SCENARIO: "uiguardarc"
+          MYASO_PVP_FLIGHT_DURATION_MS: "10000"
+        run: node scripts/pvp_browser_flight_runner.mjs
+
+      - name: Validate M61 secondary FFA guard arc
+        env:
+          MYASO_PVP_SCENARIO: "uisecondaryguardarc"
+          MYASO_PVP_FLIGHT_DURATION_MS: "10000"
+        run: node scripts/pvp_browser_flight_runner.mjs
+
+      - name: Validate M62 spatial FFA threat markers
+        env:
+          MYASO_PVP_SCENARIO: "uithreatmarkers"
+          MYASO_PVP_FLIGHT_DURATION_MS: "10000"
+        run: node scripts/pvp_browser_flight_runner.mjs
+
+      - name: Validate M63 redundant action recovery under input loss
+        env:
+          MYASO_PVP_SCENARIO: "inputloss"
+          MYASO_PVP_FLIGHT_DURATION_MS: "7000"
+        run: node scripts/pvp_browser_flight_runner.mjs
+
+      - name: Measure M15 browser background convergence
+        env:
+          MYASO_FLIGHT_DURATION_MS: "4500"
+          MYASO_FLIGHT_STRESS_ENTITIES: "64"
+          MYASO_FLIGHT_BACKGROUND_PLAYERS: "320"
+          MYASO_FLIGHT_NEAR_PRESSURE_PLAYERS: "256"
+          MYASO_FLIGHT_RELIABLE_DELAY_MS: "25"
+          MYASO_FLIGHT_REQUIRE_BACKGROUND_CATCHUP: "1"
+          MYASO_FLIGHT_CONVERGENCE_BUDGET_MS: "2500"
+        run: node scripts/browser_flight_runner.mjs
+
+      - name: Measure M16 512-occupant browser flight
+        env:
+          MYASO_FLIGHT_DURATION_MS: "5000"
+          MYASO_FLIGHT_STRESS_ENTITIES: "64"
+          MYASO_FLIGHT_BACKGROUND_PLAYERS: "511"
+          MYASO_FLIGHT_RELIABLE_DELAY_MS: "250"
+          MYASO_FLIGHT_REQUIRE_BACKGROUND_CATCHUP: "1"
+          MYASO_FLIGHT_CONVERGENCE_BUDGET_MS: "2500"
+          MYASO_FLIGHT_EXPECT_ENTITIES: "512"
+          MYASO_FLIGHT_FRAME_P95_BUDGET_MS: "25"
+          MYASO_FLIGHT_LABEL: "M16_512_BROWSER_FLIGHT"
+        run: node scripts/browser_flight_runner.mjs
+
+      - name: Measure M17 reliable delta efficiency at 512 occupants
+        env:
+          MYASO_FLIGHT_DURATION_MS: "5500"
+          MYASO_FLIGHT_STRESS_ENTITIES: "64"
+          MYASO_FLIGHT_BACKGROUND_PLAYERS: "511"
+          MYASO_FLIGHT_RELIABLE_DELAY_MS: "250"
+          MYASO_FLIGHT_REQUIRE_BACKGROUND_CATCHUP: "1"
+          MYASO_FLIGHT_REQUIRE_RELIABLE_DELTA: "1"
+          MYASO_FLIGHT_MAX_AVG_RELIABLE_CATCHUP_BYTES: "5500"
+          MYASO_FLIGHT_CONVERGENCE_BUDGET_MS: "2500"
+          MYASO_FLIGHT_EXPECT_ENTITIES: "512"
+          MYASO_FLIGHT_FRAME_P95_BUDGET_MS: "25"
+          MYASO_FLIGHT_LABEL: "M17_RELIABLE_DELTA_FLIGHT"
+        run: node scripts/browser_flight_runner.mjs
+
+      - name: Measure M8 authoritative capacity
+        run: |
+          for players in 64 128 256 512; do
+            cargo run --locked --release --quiet --manifest-path server/Cargo.toml --bin m8_capacity_probe -- "$players" 15 60
+          done
+          cargo run --locked --release --quiet --manifest-path server/Cargo.toml --bin m8_transport_probe -- 64 6
+
+      - name: Check whitespace
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+          HEAD_SHA: ${{ github.sha }}
+        run: |
+          git diff --check "$BASE_SHA" "$HEAD_SHA" -- . \
+            ':(exclude)CODING_AGENT_CONSTITUTION_v1.3.md' \
+            ':(exclude)CODING_AGENT_DEVELOPMENT_PRINCIPLES_SYSTEM_PROMPT_v1.6.md'
+
+      - name: Verify main-push provenance
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: python scripts/verify_main_push_provenance.py

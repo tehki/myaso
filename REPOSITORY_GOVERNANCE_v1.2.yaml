@@ -1,0 +1,159 @@
+governance:
+  name: myaso-repository-governance
+  version: '1.2'
+  handbook_version: '1.6'
+  constitution_version: '1.3'
+  policy_version: '1.3'
+  default_branch: main
+  repository_specific_profile: true
+  cross_repository_copy_requires_path_and_control_review: true
+main_branch:
+  protection_required: true
+  pull_request_required: true
+  direct_push_allowed: false
+  force_push_allowed: false
+  branch_deletion_allowed: false
+  required_approvals: 1
+  require_code_owner_review: true
+  dismiss_stale_approvals: true
+  require_conversation_resolution: true
+  require_linear_history: true
+  require_up_to_date_before_merge: true
+  required_status_checks:
+  - quality
+security_sensitive_paths:
+  require_code_owner_review: true
+  paths:
+  - /CODING_AGENT_CONSTITUTION_v1.3.md
+  - /REPOSITORY_GOVERNANCE_v1.2.yaml
+  - /CODING_AGENT_DEVELOPMENT_PRINCIPLES_SYSTEM_PROMPT_v1.6.md
+  - /CODING_AGENT_POLICY_v1.3.yaml
+  - /.github/workflows/
+  - /.github/CODEOWNERS
+  - /.github/pull_request_template.md
+  - /scripts/validate_coding_agent_policy.py
+  - /scripts/validate_repository_governance.py
+  - /scripts/verify_main_push_provenance.py
+  - /docs/POLICY_ADOPTION.md
+  - /docs/DEVELOPMENT_METHOD.md
+  - /docs/SECURITY_PRIVACY.md
+  - /docs/RETENTION_POLICY.md
+  - /docs/GITHUB_REPOSITORY_GOVERNANCE.md
+development_flow:
+  one_pull_request_per_commit_required: false
+  coherent_work_unit_pull_requests_allowed: true
+  draft_pr_accumulation_allowed: true
+  mixed_risk_batch_uses_highest_risk: true
+  separate_pull_request_required_for_unrelated_objectives: true
+  separate_pull_request_required_for_independent_privileged_or_destructive_authorization_boundary: true
+  cross_project_batching_default_allowed: false
+  prefer_one_reviewable_milestone_slice_over_multiple_micro_prs: true
+  bounded_authorization_reuse_allowed: true
+  merge_and_runtime_activation_separate_by_default: true
+  preauthorized_rollback_allowed_when_exact_condition_and_method_are_authorized: true
+  evidence_reuse_allowed_when_validity_inputs_are_unchanged: true
+  batch_independent_read_only_and_validation_work_preferred: true
+  delta_first_validation_preferred: true
+  full_validation_once_on_final_review_head_preferred: true
+  continue_independent_safe_work_while_ci_runs: true
+risk_review:
+  LOW:
+    pull_request_required: true
+    minimum_approvals: 1
+    code_owner_required_when_path_matches: true
+  MODERATE:
+    pull_request_required: true
+    minimum_approvals: 1
+    code_owner_required_when_path_matches: true
+    security_retention_review: true
+  HIGH:
+    pull_request_required: true
+    minimum_approvals: 1
+    explicit_owner_review: true
+    required_status_checks: true
+    target_reverification: true
+    rollback_or_recovery_plan: true
+  CRITICAL:
+    pull_request_required: true
+    minimum_approvals: 2
+    explicit_owner_review: true
+    independent_human_review_when_supported: true
+    required_status_checks: true
+    target_reverification: true
+    rollback_or_recovery_plan: true
+    post_action_verification: true
+emergency_changes:
+  allowed: true
+  require_explicit_exception: true
+  require_owner: true
+  require_reason: true
+  require_scope: true
+  require_expiry: true
+  require_compensating_controls: true
+  require_post_change_review: true
+  prohibit_silent_direct_push_exception: true
+ci:
+  workflow: .github/workflows/ci.yml
+  validation_lanes:
+    FAST:
+      allowed_on_intermediate_pr_pushes: true
+      change_aware_selection_allowed: true
+      unknown_relevance_falls_back_to_full: true
+    FULL:
+      required_on_final_ready_for_review_head: true
+      required_for_security_sensitive_paths: true
+      required_for_dependency_or_lockfile_changes: true
+      required_for_ci_or_governance_changes: true
+      required_for_high_or_critical_risk: true
+      required_when_change_impact_is_ambiguous: true
+    RELEASE:
+      required_for_release_candidate_or_deployment_boundary: true
+  acceleration:
+    cancel_superseded_non_deployment_runs: true
+    rerun_failed_jobs_only_preferred: true
+    deterministic_test_partitioning_allowed: true
+    lockfile_keyed_dependency_cache_allowed: true
+    verified_toolchain_or_build_cache_allowed: true
+    same_source_validation_reuse_allowed: true
+    same_source_validation_reuse_requires_input_and_artifact_integrity_binding: true
+    full_gate_semantics_must_not_be_reduced: true
+  merge_queue:
+    preferred_when_supported_and_verified: true
+    full_gate_required_on_merge_group: true
+    post_merge_full_duplicate_may_be_replaced_by_provenance_plus_smoke_only_if_merged_tree_equals_validated_merge_group_tree: true
+  required_job: quality
+  required_local_targets:
+  - policy
+  - governance
+  - lint
+  - typecheck
+  - test
+  policy_validator: scripts/validate_coding_agent_policy.py
+  governance_validator: scripts/validate_repository_governance.py
+  main_push_provenance_detection_required: true
+  main_push_provenance_script: scripts/verify_main_push_provenance.py
+  main_push_provenance_require_github_signed_merge: true
+  main_push_provenance_require_previous_main_parent: true
+  main_push_provenance_reject_forced_push: true
+external_control_plane:
+  provider: github
+  branch_protection_or_ruleset_required: true
+  repository_admin_configuration_required: true
+  current_connector_can_write_branch_rules: false
+  verification_required_after_admin_configuration: true
+  compensating_main_push_detection_required_while_unprotected: true
+  documentation: docs/GITHUB_REPOSITORY_GOVERNANCE.md
+truthfulness:
+  never_claim_remote_branch_protection_without_verification: true
+  local_ci_manifest_does_not_equal_remote_enforcement: true
+authorization_boundaries:
+  merge_authorization_implies_runtime_activation: false
+  runtime_activation_authorization_implies_deployment: false
+  authorization_reuse_requires_unchanged_scope_target_risk_capability_side_effect_and_rollback: true
+  exact_head_change_invalidates_exact_head_authorization: true
+  privileged_or_destructive_target_reverification_required_immediately_before_execution: true
+rollback:
+  preauthorized_rollback_may_execute_without_second_approval: true
+  exact_target_and_method_required: true
+  post_rollback_verification_required: true
+  silent_infinite_retry_prohibited: true
