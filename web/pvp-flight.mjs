@@ -305,14 +305,16 @@ function sendCombatInput() {
       }
     } else if (scenario === "parry" || scenario === "dodge" || scenario === "block" || scenario === "guardbreak" || scenario === "backblock") {
       const isAttacker = ownId < peer.netId;
-      if (distance > 68 && distance > 0.001) {
+      const approachStopDistance = scenario === "dodge" ? 54 : 68;
+      if (distance > approachStopDistance && distance > 0.001) {
         moveX = dx / distance;
         moveY = dy / distance;
       }
       if (isAttacker) {
         const defenderReady = !["block", "guardbreak", "backblock"].includes(scenario) || peer.action === 6;
         const attackModulo = scenario === "guardbreak" ? 12 : 24;
-        attack = defenderReady && distance <= 74 && own.action === 0 && sentInputs % attackModulo === 0;
+        const attackStartDistance = scenario === "dodge" ? 60 : 74;
+        attack = defenderReady && distance <= attackStartDistance && own.action === 0 && sentInputs % attackModulo === 0;
       } else if (scenario === "parry") {
         if (peer.action === 1) {
           if (parryWindupSeenAt === null) parryWindupSeenAt = performance.now();
@@ -329,7 +331,7 @@ function sendCombatInput() {
       } else if (scenario === "dodge") {
         if (peer.action === 1 && dodgeWindupSeenAt === null) dodgeWindupSeenAt = performance.now();
         if (dodgeWindupSeenAt !== null && !dodgeTriggered && own.action === 0
-          && [1, 2].includes(peer.action) && performance.now() - dodgeWindupSeenAt >= 60) {
+          && [1, 2].includes(peer.action) && performance.now() - dodgeWindupSeenAt >= 35) {
           dodgeTriggered = true;
           dodgeReactionMs = performance.now() - dodgeWindupSeenAt;
         }

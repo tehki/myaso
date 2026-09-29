@@ -29,7 +29,9 @@ Both browsers must independently observe:
 
 ## Acceptance stabilization
 
-CI #169 exact-head retry exposed a transport/timing flake in which the defender eventually entered authoritative `Dodge`, but the single request sample did not overlap `AttackActive` and the first strike landed. The harness carries the already-triggered ordinary dodge request until authoritative Dodge confirmation or the attack window ends. Under the later M113 Wilds roll (170 ms at 690 u/s), reacting at the original 35 ms minimum can move the defender outside the 94-unit hit envelope before `AttackActive`; the flight therefore targets 60 ms after observed windup while still satisfying the original >=35 ms reaction requirement. Acceptance remains unchanged: active-frame overlap inside the real hit geometry and untouched 100/100 defender vitals are still mandatory.
+CI #169 exact-head retry exposed a transport/timing flake in which the defender eventually entered authoritative `Dodge`, but the single request sample did not overlap `AttackActive` and the first strike landed. The harness carries the already-triggered ordinary dodge request until authoritative Dodge confirmation or the attack window ends.
+
+CI #584 and its bounded exact-head rerun #585 reproduced the inverse Wilds-roll timing failure: delaying the reaction to 60 ms preserved the 94-unit geometry but left too little authoritative delivery margin, so earlier strikes could resolve before the dodge even though a later exchange eventually proved the iframe. M24 now stages the pair closer, stopping approach at about 54 world units and allowing attack commitment at 60 units, then restores the original earliest-valid 35 ms post-windup reaction. Even if the full 100 ms between that reaction threshold and light `AttackActive` becomes roll travel, the perpendicular 690 u/s roll remains inside the unchanged 94-unit hit envelope. Acceptance is not weakened: the proof still requires live `AttackActive`/`Dodge` overlap inside real hit geometry with untouched 100 HP / 100 guard throughout.
 
 
 ## M113 control-schema adaptation
