@@ -5,8 +5,8 @@ use myaso_server::{
     reliable::{try_enqueue_reliable, ReliableQueueError},
     simulation::{CombatEvent, InputIntent, World},
     snapshot::{ReplicationFrame, SnapshotSession},
-    AdmissionGate, InputIngressWindow, InputSample, CONSERVATIVE_DATAGRAM_BYTES,
-    PROTOCOL_VERSION, TARGET_PLAYERS_PER_MAP,
+    AdmissionGate, InputIngressWindow, InputSample, CONSERVATIVE_DATAGRAM_BYTES, PROTOCOL_VERSION,
+    TARGET_PLAYERS_PER_MAP,
 };
 use std::{
     collections::VecDeque,
@@ -803,7 +803,11 @@ mod tests {
         ];
         assert_eq!(register_new_action_datagram(&redundant, &mut dropped), None);
 
-        let next = [action_sample(14, true), action_sample(13, false), action_sample(12, false)];
+        let next = [
+            action_sample(14, true),
+            action_sample(13, false),
+            action_sample(12, false),
+        ];
         assert_eq!(register_new_action_datagram(&next, &mut dropped), Some(14));
         assert_eq!(dropped, VecDeque::from([11, 14]));
     }
