@@ -38,7 +38,7 @@ The normal Chrome + Firefox authoritative PvP flight runs against a loopback-onl
 
 `MYASO_FLIGHT_DROP_NEW_ACTION_DATAGRAMS=1`
 
-For this scenario only, the server deliberately discards every decoded input datagram whose **newest** sample contains attack or dodge. The following packet may still carry that action tick in its ordinary two-sample redundancy history.
+For this scenario only, the server deliberately discards the first decoded input datagram that contains each previously unseen one-shot action tick. The fixture remembers that dropped tick in bounded loopback-only state, so the following packet can carry the same action tick in its ordinary redundancy history without being dropped again. This makes the first-send loss deterministic even when browser scheduling causes the action to first appear in a redundancy slot rather than the newest slot.
 
 Acceptance requires:
 

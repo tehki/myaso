@@ -5,8 +5,8 @@ use myaso_server::{
     reliable::{try_enqueue_reliable, ReliableQueueError},
     simulation::{CombatEvent, InputIntent, World},
     snapshot::{ReplicationFrame, SnapshotSession},
-    AdmissionGate, InputIngressWindow, CONSERVATIVE_DATAGRAM_BYTES, PROTOCOL_VERSION,
-    TARGET_PLAYERS_PER_MAP,
+    AdmissionGate, InputIngressWindow, InputSample, CONSERVATIVE_DATAGRAM_BYTES,
+    PROTOCOL_VERSION, TARGET_PLAYERS_PER_MAP,
 };
 use std::{
     collections::VecDeque,
@@ -35,6 +35,32 @@ const MAX_FLIGHT_BACKGROUND_PLAYERS: usize = TARGET_PLAYERS_PER_MAP - 1;
 const FLIGHT_BACKGROUND_NET_ID_BASE: u32 = 10_000;
 const DEFAULT_FLIGHT_NEAR_PRESSURE_PLAYERS: usize = 150;
 const MAX_KILL_EVENT_HISTORY: usize = 256;
+const MAX_DROPPED_ACTION_TICKS: usize = 64;
+
+fn one_shot_action(sample: &InputSample) -> bool {
+    sample.attack || sample.heavy_attack || sample.dodge || sample.kick || sample.jump
+}
+
+fn register_new_action_datagram(
+    samples: &[InputSample],
+    dropped_action_ticks: &mut VecDeque<u32>,
+) -> Option<u32> {
+    let first_unseen = samples
+        .iter()
+        .find(|sample| one_shot_action(sample) && !dropped_action_ticks.contains(&sample.tick))
+        .map(|sample| sample.tick)?;
+
+    for sample in samples.iter().filter(|sample| one_shot_action(sample)) {
+        if dropped_action_ticks.contains(&sample.tick) {
+            continue;
+        }
+        if dropped_action_ticks.len() == MAX_DROPPED_ACTION_TICKS {
+            dropped_action_ticks.pop_front();
+        }
+        dropped_action_ticks.push_back(sample.tick);
+    }
+    Some(first_unseen)
+}
 
 #[derive(Debug, Clone, Copy)]
 struct LoopbackFlightConfig {
@@ -383,6 +409,7 @@ async fn handle_connection(
     let mut snapshots = SnapshotSession::default();
     let mut reliable_snapshots = SnapshotSession::default();
     let mut last_input_sequence = None;
+    let mut dropped_action_ticks = VecDeque::with_capacity(MAX_DROPPED_ACTION_TICKS);
     let mut pending_input_acks = VecDeque::with_capacity(MAX_PENDING_INPUT_ACKS);
     let (mut reliable_send, _reliable_recv) = connection
         .accept_bi()
@@ -467,17 +494,16 @@ async fn handle_connection(
                     }
                 };
 
-                if game.drop_new_action_datagrams
-                    && packet
-                        .samples()
-                        .first()
-                        .is_some_and(|sample| sample.attack || sample.heavy_attack || sample.dodge || sample.kick || sample.jump)
-                {
-                    println!(
-                        "M63_INPUT_ACTION_PACKET_DROPPED session={stable_id} tick={}",
-                        packet.client_tick
-                    );
-                    continue;
+                if game.drop_new_action_datagrams {
+                    if let Some(action_tick) =
+                        register_new_action_datagram(packet.samples(), &mut dropped_action_ticks)
+                    {
+                        println!(
+                            "M63_INPUT_ACTION_PACKET_DROPPED session={stable_id} tick={action_tick} packet_tick={}",
+                            packet.client_tick
+                        );
+                        continue;
+                    }
                 }
 
                 if last_input_sequence.is_none_or(|previous| is_sequence_newer16(packet.sequence, previous)) {
@@ -742,6 +768,45 @@ fn encode_input_ack(processed_client_tick: u32, server_tick: u32, player_net_id:
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn action_sample(tick: u32, heavy_attack: bool) -> InputSample {
+        InputSample {
+            tick,
+            move_x: 0.0,
+            move_y: 0.0,
+            facing_radians: 0.0,
+            attack: false,
+            heavy_attack,
+            dodge: false,
+            block: false,
+            kick: false,
+            run: false,
+            jump: false,
+        }
+    }
+
+    #[test]
+    fn loopback_action_loss_drops_first_datagram_then_accepts_redundant_tick() {
+        let mut dropped = VecDeque::new();
+        let first = [
+            action_sample(12, false),
+            action_sample(11, true),
+            action_sample(10, false),
+        ];
+        assert_eq!(register_new_action_datagram(&first, &mut dropped), Some(11));
+        assert_eq!(dropped, VecDeque::from([11]));
+
+        let redundant = [
+            action_sample(13, false),
+            action_sample(12, false),
+            action_sample(11, true),
+        ];
+        assert_eq!(register_new_action_datagram(&redundant, &mut dropped), None);
+
+        let next = [action_sample(14, true), action_sample(13, false), action_sample(12, false)];
+        assert_eq!(register_new_action_datagram(&next, &mut dropped), Some(14));
+        assert_eq!(dropped, VecDeque::from([11, 14]));
+    }
 
     #[test]
     fn reliable_kill_event_payload_reuses_frame_buffer_without_owned_byte_payload() {

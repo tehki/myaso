@@ -38,9 +38,9 @@ For this scenario only the existing loopback-only server fixture runs with:
 
 `MYASO_FLIGHT_DROP_NEW_ACTION_DATAGRAMS=1`
 
-The fixture discards decoded input datagrams whose newest sample carries a one-shot action, including the M105 heavy-attack bit.
+The loopback-only fixture deterministically discards the first datagram that contains each previously unseen one-shot action tick, including the M105 heavy-attack bit. It remembers a bounded set of action ticks it has already dropped, so browser scheduling cannot bypass the impairment merely because the action first reaches the server in a redundancy slot rather than the newest slot.
 
-The next ordinary client packet may still carry that heavy tick in its two-sample redundancy history. Existing ingress deduplication plus M63/M105 coalescing then recover the one-shot exactly once.
+The next ordinary client packet may carry that same heavy tick in its redundancy history. Because the tick is already recorded as deliberately dropped, the fixture accepts the redundant copy; existing ingress deduplication plus M63/M105 coalescing then recover the one-shot exactly once.
 
 Acceptance additionally requires at least one server marker:
 
@@ -60,10 +60,12 @@ M108 changes no production gameplay, protocol, rendering, input cadence, packet 
 
 The delta is limited to:
 
-- browser acceptance harness scenario registration;
-- enabling the pre-existing loopback-only loss fixture for that scenario;
+- browser acceptance harness scenario registration and scheduler-stability controls;
+- deterministic bookkeeping inside the pre-existing loopback-only loss fixture;
 - one focused CI gate;
 - milestone documentation.
+
+The impairment remains rejected on non-loopback binds and is disabled by default.
 
 Default/production runtime still receives every input datagram offered by transport.
 
