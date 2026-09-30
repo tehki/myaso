@@ -2191,6 +2191,198 @@ fn later_authoritative_block_overrides_buffered_light() {
 }
 
 #[test]
+fn late_authoritative_roll_buffers_through_recovery_and_preserves_direction() {
+    let mut world = duel(200.0);
+    advance(
+        &mut world,
+        5.0,
+        InputIntent {
+            attack: true,
+            facing_radians: 0.0,
+            ..InputIntent::default()
+        },
+        InputIntent::default(),
+    );
+    advance(
+        &mut world,
+        130.0,
+        InputIntent::default(),
+        InputIntent::default(),
+    );
+    advance(
+        &mut world,
+        80.0,
+        InputIntent::default(),
+        InputIntent::default(),
+    );
+    advance(
+        &mut world,
+        170.0,
+        InputIntent::default(),
+        InputIntent::default(),
+    );
+
+    let queued_roll = InputIntent {
+        dodge: true,
+        facing_radians: std::f32::consts::FRAC_PI_2,
+        ..InputIntent::default()
+    };
+    advance(&mut world, 5.0, queued_roll, InputIntent::default());
+    assert_eq!(
+        world.fighter(1).expect("attacker").action,
+        Action::AttackRecovery
+    );
+    assert_eq!(
+        world.fighter(1).expect("attacker").stamina.round() as u8,
+        100
+    );
+
+    let release = InputIntent {
+        facing_radians: 0.0,
+        ..InputIntent::default()
+    };
+    advance(&mut world, 5.0, release, InputIntent::default());
+    advance(&mut world, 75.0, release, InputIntent::default());
+    let attacker = world.fighter(1).expect("attacker");
+    assert_eq!(attacker.action, Action::Dodge);
+    assert_eq!(attacker.stamina.round() as u8, 72);
+    let before_x = attacker.x;
+    let before_y = attacker.y;
+
+    advance(&mut world, 20.0, release, InputIntent::default());
+    let attacker = world.fighter(1).expect("attacker");
+    assert!((attacker.x - before_x).abs() < 0.01);
+    assert!(attacker.y > before_y + 5.0);
+}
+
+#[test]
+fn early_held_authoritative_roll_is_not_promoted_after_recovery() {
+    let mut world = duel(200.0);
+    advance(
+        &mut world,
+        5.0,
+        InputIntent {
+            attack: true,
+            facing_radians: 0.0,
+            ..InputIntent::default()
+        },
+        InputIntent::default(),
+    );
+    advance(
+        &mut world,
+        130.0,
+        InputIntent::default(),
+        InputIntent::default(),
+    );
+    advance(
+        &mut world,
+        80.0,
+        InputIntent::default(),
+        InputIntent::default(),
+    );
+    advance(
+        &mut world,
+        100.0,
+        InputIntent::default(),
+        InputIntent::default(),
+    );
+
+    let held_roll = InputIntent {
+        dodge: true,
+        facing_radians: std::f32::consts::FRAC_PI_2,
+        ..InputIntent::default()
+    };
+    advance(&mut world, 5.0, held_roll, InputIntent::default());
+    advance(&mut world, 150.0, held_roll, InputIntent::default());
+    assert_eq!(world.fighter(1).expect("attacker").action, Action::Idle);
+    assert_eq!(
+        world.fighter(1).expect("attacker").stamina.round() as u8,
+        100
+    );
+
+    advance(&mut world, 5.0, held_roll, InputIntent::default());
+    assert_eq!(world.fighter(1).expect("attacker").action, Action::Idle);
+    advance(
+        &mut world,
+        5.0,
+        InputIntent::default(),
+        InputIntent::default(),
+    );
+    advance(&mut world, 5.0, held_roll, InputIntent::default());
+    assert_eq!(world.fighter(1).expect("attacker").action, Action::Dodge);
+}
+
+#[test]
+fn later_authoritative_roll_overrides_buffered_light() {
+    let mut world = duel(200.0);
+    advance(
+        &mut world,
+        5.0,
+        InputIntent {
+            attack: true,
+            facing_radians: 0.0,
+            ..InputIntent::default()
+        },
+        InputIntent::default(),
+    );
+    advance(
+        &mut world,
+        130.0,
+        InputIntent::default(),
+        InputIntent::default(),
+    );
+    advance(
+        &mut world,
+        80.0,
+        InputIntent::default(),
+        InputIntent::default(),
+    );
+    advance(
+        &mut world,
+        170.0,
+        InputIntent::default(),
+        InputIntent::default(),
+    );
+    advance(
+        &mut world,
+        5.0,
+        InputIntent {
+            attack: true,
+            facing_radians: 0.0,
+            ..InputIntent::default()
+        },
+        InputIntent::default(),
+    );
+    advance(
+        &mut world,
+        5.0,
+        InputIntent::default(),
+        InputIntent::default(),
+    );
+    advance(
+        &mut world,
+        5.0,
+        InputIntent {
+            dodge: true,
+            facing_radians: std::f32::consts::FRAC_PI_2,
+            ..InputIntent::default()
+        },
+        InputIntent::default(),
+    );
+    advance(
+        &mut world,
+        70.0,
+        InputIntent::default(),
+        InputIntent::default(),
+    );
+    assert_eq!(world.fighter(1).expect("attacker").action, Action::Dodge);
+    assert_eq!(
+        world.fighter(1).expect("attacker").stamina.round() as u8,
+        72
+    );
+}
+
+#[test]
 fn held_light_does_not_auto_chain_authoritatively() {
     let mut world = duel(200.0);
     let held = InputIntent {

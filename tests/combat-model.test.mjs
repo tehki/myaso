@@ -636,6 +636,71 @@ test("later defensive intent overrides a buffered light attack", () => {
   assert.equal(attacker.action, "block");
 });
 
+test("late wheel-forward buffers through full light recovery and preserves pointer direction", () => {
+  const world = duel({ distance: 200 });
+  const { attacker, target } = enterLightRecovery(world);
+
+  advance(world, COMBAT.attack.recoveryMs - 85, { a: { aimX: target.x, aimY: target.y } });
+  stepWorld(world, {
+    a: { dodge: true, aimX: attacker.x, aimY: attacker.y + 100 },
+  }, 5);
+  assert.equal(attacker.action, "attack_recovery");
+  assert.equal(attacker.bufferedDodge, true);
+  assert.equal(attacker.stamina, COMBAT.stamina.max);
+  assert.ok(Math.abs(attacker.bufferedDodgeDirX) < 1e-9);
+  assert.ok(Math.abs(attacker.bufferedDodgeDirY - 1) < 1e-9);
+
+  stepWorld(world, { a: { aimX: target.x, aimY: target.y } }, 5);
+  advance(world, 75, { a: { aimX: target.x, aimY: target.y } });
+  assert.equal(attacker.action, "dodge");
+  assert.equal(attacker.stamina, COMBAT.stamina.max - COMBAT.dodge.staminaCost);
+  assert.ok(Math.abs(attacker.dodgeDirX) < 1e-9);
+  assert.ok(Math.abs(attacker.dodgeDirY - 1) < 1e-9);
+
+  const beforeY = attacker.y;
+  advance(world, 20, { a: { aimX: target.x, aimY: target.y } });
+  assert.ok(attacker.y > beforeY);
+});
+
+test("early held wheel-forward is not promoted into a free recovery roll", () => {
+  const world = duel({ distance: 200 });
+  const { attacker, target } = enterLightRecovery(world);
+
+  advance(world, 100, { a: { aimX: target.x, aimY: target.y } });
+  const heldRoll = { a: { dodge: true, aimX: attacker.x, aimY: attacker.y + 100 } };
+  stepWorld(world, heldRoll, 5);
+  assert.equal(attacker.bufferedDodge, false);
+
+  advance(world, 150, heldRoll);
+  assert.equal(attacker.action, "idle");
+  assert.equal(attacker.stamina, COMBAT.stamina.max);
+
+  stepWorld(world, heldRoll, 5);
+  assert.equal(attacker.action, "idle");
+  stepWorld(world, { a: { aimX: target.x, aimY: target.y } }, 5);
+  stepWorld(world, heldRoll, 5);
+  assert.equal(attacker.action, "dodge");
+});
+
+test("later roll intent overrides a buffered light attack", () => {
+  const world = duel({ distance: 200 });
+  const { attacker, target } = enterLightRecovery(world);
+
+  advance(world, COMBAT.attack.recoveryMs - 85, { a: { aimX: target.x, aimY: target.y } });
+  stepWorld(world, { a: { attack: true, aimX: target.x, aimY: target.y } }, 5);
+  assert.equal(attacker.bufferedLightAttack, true);
+  stepWorld(world, { a: { aimX: target.x, aimY: target.y } }, 5);
+  stepWorld(world, {
+    a: { dodge: true, aimX: attacker.x, aimY: attacker.y + 100 },
+  }, 5);
+  assert.equal(attacker.bufferedLightAttack, false);
+  assert.equal(attacker.bufferedDodge, true);
+
+  advance(world, 70, { a: { aimX: target.x, aimY: target.y } });
+  assert.equal(attacker.action, "dodge");
+  assert.equal(attacker.stamina, COMBAT.stamina.max - COMBAT.dodge.staminaCost);
+});
+
 test("holding light does not auto-chain after recovery", () => {
   const world = duel({ distance: 200 });
   const [attacker, target] = world.fighters;

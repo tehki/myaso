@@ -25,6 +25,7 @@ const DIRECTIONAL_ATTACK_ARC_OFFSET_RADIANS: f32 = std::f32::consts::PI * 0.16;
 const DIRECTIONAL_ATTACK_LATERAL_THRESHOLD: f32 = 0.45;
 const LIGHT_ATTACK_BUFFER_WINDOW_MS: f32 = 90.0;
 const BLOCK_BUFFER_WINDOW_MS: f32 = 90.0;
+const DODGE_BUFFER_WINDOW_MS: f32 = 90.0;
 const RUNNING_ATTACK_WINDUP_MS: f32 = 160.0;
 const RUNNING_ATTACK_ACTIVE_MS: f32 = 90.0;
 const RUNNING_ATTACK_RECOVERY_MS: f32 = 310.0;
@@ -225,9 +226,13 @@ pub struct Fighter {
     action_duration_ms: f32,
     attack_input_was_down: bool,
     block_input_was_down: bool,
+    dodge_input_was_down: bool,
     buffered_light_attack: bool,
     buffered_attack_lateral: f32,
     buffered_block: bool,
+    buffered_dodge: bool,
+    buffered_dodge_dir_x: f32,
+    buffered_dodge_dir_y: f32,
     dodge_dir_x: f32,
     dodge_dir_y: f32,
     attack_hit_targets: BTreeSet<u32>,
@@ -262,9 +267,13 @@ impl Fighter {
             action_duration_ms: 0.0,
             attack_input_was_down: false,
             block_input_was_down: false,
+            dodge_input_was_down: false,
             buffered_light_attack: false,
             buffered_attack_lateral: 0.0,
             buffered_block: false,
+            buffered_dodge: false,
+            buffered_dodge_dir_x: 0.0,
+            buffered_dodge_dir_y: 0.0,
             dodge_dir_x: 0.0,
             dodge_dir_y: 0.0,
             attack_hit_targets: BTreeSet::new(),
@@ -310,9 +319,24 @@ impl Fighter {
         self.buffered_attack_lateral = 0.0;
     }
 
+    fn clear_buffered_dodge(&mut self) {
+        self.buffered_dodge = false;
+        self.buffered_dodge_dir_x = 0.0;
+        self.buffered_dodge_dir_y = 0.0;
+    }
+
     fn clear_recovery_input_buffer(&mut self) {
         self.clear_light_attack_buffer();
         self.buffered_block = false;
+        self.clear_buffered_dodge();
+    }
+
+    fn begin_dodge(&mut self, dir_x: f32, dir_y: f32) {
+        self.clear_recovery_input_buffer();
+        self.dodge_dir_x = dir_x;
+        self.dodge_dir_y = dir_y;
+        self.roll_hit_targets.clear();
+        self.set_action(Action::Dodge, DODGE_DURATION_MS);
     }
 
     fn begin_light_attack(&mut self, lateral: f32) {
@@ -327,7 +351,17 @@ impl Fighter {
         }
     }
 
-    fn finish_light_recovery(&mut self) {
+    fn finish_light_recovery(&mut self, now_ms: f32) {
+        if self.buffered_dodge {
+            let dir_x = self.buffered_dodge_dir_x;
+            let dir_y = self.buffered_dodge_dir_y;
+            if spend_stamina(now_ms, self, DODGE_STAMINA_COST) {
+                self.begin_dodge(dir_x, dir_y);
+            } else {
+                self.set_action(Action::Idle, 0.0);
+            }
+            return;
+        }
         if self.buffered_block {
             self.clear_recovery_input_buffer();
             self.set_action(Action::Block, f32::INFINITY);
@@ -543,15 +577,24 @@ impl World {
             let input = normalize_input(fighter.input_with_pending_actions());
             let attack_pressed = input.attack && !fighter.attack_input_was_down;
             let block_pressed = input.block && !fighter.block_input_was_down;
+            let dodge_pressed = input.dodge && !fighter.dodge_input_was_down;
             if fighter.action != Action::Knockdown {
                 fighter.facing = normalize_angle(input.facing_radians);
             }
-            begin_requested_action(self.now_ms, fighter, input, attack_pressed, block_pressed);
+            begin_requested_action(
+                self.now_ms,
+                fighter,
+                input,
+                attack_pressed,
+                block_pressed,
+                dodge_pressed,
+            );
             move_fighter(self.width, self.height, fighter, input, dt_ms);
-            advance_action(fighter, input, dt_ms);
+            advance_action(self.now_ms, fighter, input, dt_ms);
             update_stamina(self.now_ms, fighter, input, dt_ms);
             fighter.attack_input_was_down = input.attack;
             fighter.block_input_was_down = input.block;
+            fighter.dodge_input_was_down = input.dodge;
             fighter.clear_pending_actions();
 
             if fighter.action != Action::Block
@@ -614,18 +657,30 @@ fn begin_requested_action(
     input: InputIntent,
     attack_pressed: bool,
     block_pressed: bool,
+    dodge_pressed: bool,
 ) {
     let light_recovery = matches!(
         fighter.action,
         Action::AttackRecovery | Action::AttackLeftRecovery | Action::AttackRightRecovery
     );
-    if light_recovery && (attack_pressed || block_pressed) {
+    if light_recovery && (attack_pressed || block_pressed || dodge_pressed) {
         let remaining_ms = fighter.action_duration_ms - fighter.action_elapsed_ms;
         if block_pressed && remaining_ms <= BLOCK_BUFFER_WINDOW_MS + EPSILON {
             fighter.clear_light_attack_buffer();
+            fighter.clear_buffered_dodge();
             fighter.buffered_block = true;
+        } else if dodge_pressed
+            && remaining_ms <= DODGE_BUFFER_WINDOW_MS + EPSILON
+            && fighter.stamina + EPSILON >= DODGE_STAMINA_COST
+        {
+            fighter.clear_light_attack_buffer();
+            fighter.buffered_block = false;
+            fighter.buffered_dodge = true;
+            fighter.buffered_dodge_dir_x = fighter.facing.cos();
+            fighter.buffered_dodge_dir_y = fighter.facing.sin();
         } else if attack_pressed && remaining_ms <= LIGHT_ATTACK_BUFFER_WINDOW_MS + EPSILON {
             fighter.buffered_block = false;
+            fighter.clear_buffered_dodge();
             fighter.buffered_light_attack = true;
             fighter.buffered_attack_lateral =
                 fighter.facing.sin() * input.move_x - fighter.facing.cos() * input.move_y;
@@ -664,11 +719,8 @@ fn begin_requested_action(
         return;
     }
 
-    if input.dodge && spend_stamina(now_ms, fighter, DODGE_STAMINA_COST) {
-        fighter.dodge_dir_x = fighter.facing.cos();
-        fighter.dodge_dir_y = fighter.facing.sin();
-        fighter.roll_hit_targets.clear();
-        fighter.set_action(Action::Dodge, DODGE_DURATION_MS);
+    if dodge_pressed && spend_stamina(now_ms, fighter, DODGE_STAMINA_COST) {
+        fighter.begin_dodge(fighter.facing.cos(), fighter.facing.sin());
         return;
     }
 
@@ -823,7 +875,7 @@ fn move_fighter(width: f32, height: f32, fighter: &mut Fighter, input: InputInte
     );
 }
 
-fn advance_action(fighter: &mut Fighter, input: InputIntent, dt_ms: f32) {
+fn advance_action(now_ms: f32, fighter: &mut Fighter, input: InputIntent, dt_ms: f32) {
     if matches!(fighter.action, Action::Idle | Action::Dead) {
         return;
     }
@@ -843,21 +895,21 @@ fn advance_action(fighter: &mut Fighter, input: InputIntent, dt_ms: f32) {
     match fighter.action {
         Action::AttackWindup => fighter.set_action(Action::AttackActive, ATTACK_ACTIVE_MS),
         Action::AttackActive => fighter.set_action(Action::AttackRecovery, ATTACK_RECOVERY_MS),
-        Action::AttackRecovery => fighter.finish_light_recovery(),
+        Action::AttackRecovery => fighter.finish_light_recovery(now_ms),
         Action::AttackLeftWindup => {
             fighter.set_action(Action::AttackLeftActive, DIRECTIONAL_ATTACK_ACTIVE_MS)
         }
         Action::AttackLeftActive => {
             fighter.set_action(Action::AttackLeftRecovery, DIRECTIONAL_ATTACK_RECOVERY_MS)
         }
-        Action::AttackLeftRecovery => fighter.finish_light_recovery(),
+        Action::AttackLeftRecovery => fighter.finish_light_recovery(now_ms),
         Action::AttackRightWindup => {
             fighter.set_action(Action::AttackRightActive, DIRECTIONAL_ATTACK_ACTIVE_MS)
         }
         Action::AttackRightActive => {
             fighter.set_action(Action::AttackRightRecovery, DIRECTIONAL_ATTACK_RECOVERY_MS)
         }
-        Action::AttackRightRecovery => fighter.finish_light_recovery(),
+        Action::AttackRightRecovery => fighter.finish_light_recovery(now_ms),
         Action::RunningAttackWindup => {
             fighter.set_action(Action::RunningAttackActive, RUNNING_ATTACK_ACTIVE_MS)
         }
@@ -1246,6 +1298,7 @@ fn respawn_fighter(fighter: &mut Fighter) {
     fighter.recently_interacted_with = None;
     fighter.attack_input_was_down = false;
     fighter.block_input_was_down = false;
+    fighter.dodge_input_was_down = false;
     fighter.clear_pending_actions();
     fighter.clear_recovery_input_buffer();
     fighter.set_action(Action::Idle, 0.0);
