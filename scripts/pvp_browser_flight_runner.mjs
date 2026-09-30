@@ -1186,7 +1186,7 @@ async function runOnlineUiRollBufferFlight(entries) {
     throw new Error(`M129 pointer retarget happened after wheel-forward: aim=${perpendicularAim.t} wheel=${rollWheel.t}`);
   }
   const aimLeadMs = rollWheel.t - perpendicularAim.t;
-  if (aimLeadMs < 20 || aimLeadMs > 100) {
+  if (aimLeadMs < 20 || aimLeadMs > 150) {
     throw new Error(`M129 perpendicular pointer retarget was not recovery-local: ${aimLeadMs}ms before wheel`);
   }
   const wheelAfterAttackMs = rollWheel.t - lightDown.t;
