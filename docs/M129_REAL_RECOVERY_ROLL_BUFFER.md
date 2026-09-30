@@ -6,26 +6,29 @@ Prove M128's late light-recovery roll buffer through real Chrome controls and an
 
 ## Real-control choreography
 
-Chrome performs one W3C action sequence:
+1. Chrome performs one genuine LMB light attack aimed at the staged Firefox fighter.
+2. Firefox independently observes the replicated authoritative `attack-recovery` state.
+3. Only after that observation, Chrome performs a second real W3C action sequence:
+   - retarget the pointer perpendicular to the original attack line;
+   - wait 145 ms on the browser-owned action clock;
+   - emit exactly one genuine wheel-forward event.
+4. Firefox must later observe authoritative `dodge-recovery`.
 
-- genuine LMB light attack aimed at the staged opponent;
-- 40 ms LMB hold, then release;
-- pointer stays on the attack line through windup/active, then the W3C sequence retargets perpendicular during recovery at about 320 ms requested time;
-- the W3C sequence requests one genuine wheel-forward at about 370 ms after LMB-down.
+The proof no longer infers the buffer window from the original LMB timestamp. For the M129 scenario only, browser evidence records epoch timestamps for recovery-state transitions, pointer movement, and wheel input. The real Chrome wheel must occur after Firefox entered authoritative attack recovery and before Firefox left that recovery.
 
-The unchanged light timeline is 135 ms windup + 80 ms active + 255 ms recovery. Therefore the final 90 ms buffer window opens at about 380 ms and full recovery ends at about 470 ms. Chrome's measured CI action-dispatch overhead adds roughly 42–58 ms, so acceptance uses the actual DOM event timestamps and requires the real wheel itself to land inside the late-recovery window.
+Because an ordinary wheel pressed outside light recovery either starts immediately from idle or is ignored before the M128 buffer opens, the required causal sequence — wheel physically inside attack recovery followed by later authoritative dodge recovery — proves the recovery buffer end to end.
 
 ## Acceptance
 
 The flight fails closed unless:
 
 - the real LMB down/up pair is observed;
-- a real perpendicular pointer move is observed before the wheel;
+- the original light resolves as exactly one 34 HP hit with 100 guard preserved;
+- Firefox timestamps authoritative `attack-recovery`;
+- the perpendicular pointer retarget occurs after that recovery began;
 - exactly one real wheel-forward is observed;
-- the wheel lands inside the intended late-recovery schedule;
-- Firefox observes authoritative attack recovery before authoritative dodge recovery;
-- Chrome observes the authoritative dodge only after the wheel and after a non-zero remaining-recovery delay;
-- the original light still resolves as exactly one 34 HP hit with 100 guard preserved;
+- the wheel epoch falls inside Firefox's observed authoritative attack-recovery interval;
+- Firefox later observes authoritative `dodge-recovery`;
 - no parry result appears.
 
 M128's deterministic browser and Rust tests remain the proof that the queued roll captures pointer-facing direction, does not charge stamina until execution, does not cancel recovery, rejects early-held input, and respects latest buffered intent.
@@ -34,4 +37,4 @@ M128's deterministic browser and Rust tests remain the proof that the queued rol
 
 No combat constants, packet format, client input cadence, stamina cost, roll duration, iframe duration, movement speed, damage, attack timing, recovery timing, collision behavior, or production UI behavior changes.
 
-This milestone adds only real-browser acceptance coverage. The playable build is not opened.
+This milestone adds only real-browser acceptance evidence. The playable build is not opened.

@@ -1137,25 +1137,48 @@ async function runOnlineUiRollBufferFlight(entries) {
   const beforeAttacker = await readUiEvidence(attacker);
   const pointerOffset = beforeAttacker.pointers.length;
   const wheelOffset = beforeAttacker.wheels.length;
-  const eventOffset = beforeAttacker.eventTransitions.length;
 
-  await performArenaAttackThenBufferedRoll(attacker, attackerElementId, attackOffset);
+  // First prove a normal committed light with genuine LMB. Do not retarget the
+  // pointer until Firefox has independently observed the authoritative recovery.
+  await performArenaAttack(attacker, attackerElementId, attackOffset);
 
-  const deadline = Date.now() + 1400;
+  const recoveryDeadline = Date.now() + 900;
+  let recoveryWitness = null;
+  while (Date.now() < recoveryDeadline) {
+    const current = await readUiEvidence(defender);
+    const attackRecoveryIndex = current.recoveryTransitions.findIndex((entry) =>
+      entry.visible && entry.state === "attack-recovery"
+        && entry.label === "PUNISH" && entry.detail === "Attack recovery"
+        && Number.isFinite(entry.epochMs));
+    if (attackRecoveryIndex >= 0) {
+      recoveryWitness = { evidence: current, attackRecoveryIndex };
+      break;
+    }
+    await sleep(10);
+  }
+  if (!recoveryWitness) {
+    throw new Error("M129 Firefox never observed authoritative light recovery before the real wheel");
+  }
+
+  // Once recovery is real, retarget the pointer and send one genuine
+  // wheel-forward after a browser-owned pause. Whether it was truly bufferable
+  // is proved below from cross-browser epoch timestamps, not requested timings.
+  await performArenaRecoveryBufferedRoll(attacker, attackerElementId);
+
+  const deadline = Date.now() + 1200;
   let evidence = null;
   while (Date.now() < deadline) {
     const current = await Promise.all(entries.map(readUiEvidence));
-    const attackerResult = current.find((entry) => entry.browser === attacker.name);
     const defenderResult = current.find((entry) => entry.browser === defender.name);
-    const attackRecovery = defenderResult?.recoveryTransitions.findIndex((entry) =>
+    const attackRecoveryIndex = defenderResult?.recoveryTransitions.findIndex((entry) =>
       entry.visible && entry.state === "attack-recovery"
-        && entry.label === "PUNISH" && entry.detail === "Attack recovery") ?? -1;
-    const dodgeRecovery = defenderResult?.recoveryTransitions.findIndex((entry, index) =>
-      index > attackRecovery && entry.visible && entry.state === "dodge-recovery"
-        && entry.label === "PUNISH" && entry.detail === "Dodge recovery") ?? -1;
-    const localDodge = attackerResult?.eventTransitions.slice(eventOffset).some((entry) =>
-      entry.text.startsWith("Dodging"));
-    if (attackRecovery >= 0 && dodgeRecovery > attackRecovery && localDodge) {
+        && entry.label === "PUNISH" && entry.detail === "Attack recovery"
+        && Number.isFinite(entry.epochMs)) ?? -1;
+    const dodgeRecoveryIndex = defenderResult?.recoveryTransitions.findIndex((entry, index) =>
+      index > attackRecoveryIndex && entry.visible && entry.state === "dodge-recovery"
+        && entry.label === "PUNISH" && entry.detail === "Dodge recovery"
+        && Number.isFinite(entry.epochMs)) ?? -1;
+    if (attackRecoveryIndex >= 0 && dodgeRecoveryIndex > attackRecoveryIndex) {
       evidence = current;
       break;
     }
@@ -1171,46 +1194,49 @@ async function runOnlineUiRollBufferFlight(entries) {
 
   const pointers = attackerResult.pointers.slice(pointerOffset);
   const wheels = attackerResult.wheels.slice(wheelOffset);
-  const events = attackerResult.eventTransitions.slice(eventOffset);
   const lightDown = pointers.find((entry) => entry.type === "pointerdown" && entry.button === 0);
   const lightUp = pointers.find((entry) => entry.type === "pointerup" && entry.button === 0);
   const perpendicularAim = pointers.find((entry) =>
-    entry.type === "pointermove" && entry.t >= (lightUp?.t ?? Number.POSITIVE_INFINITY)
+    entry.type === "pointermove" && Number.isFinite(entry.epochMs)
       && Math.abs(entry.x - 0.5) <= 0.12 && entry.y >= 0.68);
   const rollWheels = wheels.filter((entry) => entry.deltaY < 0);
   const rollWheel = rollWheels[0];
-  if (!lightDown || !lightUp || !perpendicularAim || rollWheels.length !== 1 || !rollWheel) {
+  if (!lightDown || !lightUp || !perpendicularAim || rollWheels.length !== 1
+    || !rollWheel || !Number.isFinite(rollWheel.epochMs)) {
     throw new Error(`M129 real LMB + perpendicular pointer aim + single wheel-forward controls were not delivered: ${JSON.stringify(attackerResult)}`);
   }
-  if (perpendicularAim.t > rollWheel.t) {
-    throw new Error(`M129 pointer retarget happened after wheel-forward: aim=${perpendicularAim.t} wheel=${rollWheel.t}`);
-  }
-  const aimLeadMs = rollWheel.t - perpendicularAim.t;
-  if (aimLeadMs < 20 || aimLeadMs > 150) {
-    throw new Error(`M129 perpendicular pointer retarget was not recovery-local: ${aimLeadMs}ms before wheel`);
-  }
-  const wheelAfterAttackMs = rollWheel.t - lightDown.t;
-  if (wheelAfterAttackMs < 385 || wheelAfterAttackMs > 465) {
-    throw new Error(`M129 wheel-forward was outside the intended late-recovery schedule: ${wheelAfterAttackMs}ms`);
-  }
-
-  const dodgeEvent = events.find((entry) => entry.t >= rollWheel.t && entry.text.startsWith("Dodging"));
-  if (!dodgeEvent) {
-    throw new Error(`M129 buffered wheel-forward never became an authoritative dodge: ${JSON.stringify(events)}`);
-  }
-  const bufferedDelayMs = dodgeEvent.t - rollWheel.t;
-  if (bufferedDelayMs < 20 || bufferedDelayMs > 220) {
-    throw new Error(`M129 dodge did not wait for the remaining light recovery: ${bufferedDelayMs}ms`);
+  if (perpendicularAim.epochMs > rollWheel.epochMs) {
+    throw new Error(`M129 pointer retarget happened after wheel-forward: aim=${perpendicularAim.epochMs} wheel=${rollWheel.epochMs}`);
   }
 
   const attackRecoveryIndex = defenderResult.recoveryTransitions.findIndex((entry) =>
     entry.visible && entry.state === "attack-recovery"
-      && entry.label === "PUNISH" && entry.detail === "Attack recovery");
+      && entry.label === "PUNISH" && entry.detail === "Attack recovery"
+      && Number.isFinite(entry.epochMs));
+  const attackRecoveryExitIndex = defenderResult.recoveryTransitions.findIndex((entry, index) =>
+    index > attackRecoveryIndex
+      && Number.isFinite(entry.epochMs)
+      && !(entry.visible && entry.state === "attack-recovery"));
   const dodgeRecoveryIndex = defenderResult.recoveryTransitions.findIndex((entry, index) =>
     index > attackRecoveryIndex && entry.visible && entry.state === "dodge-recovery"
-      && entry.label === "PUNISH" && entry.detail === "Dodge recovery");
-  if (attackRecoveryIndex < 0 || dodgeRecoveryIndex <= attackRecoveryIndex) {
-    throw new Error(`M129 remote authority did not show attack recovery before dodge recovery: ${JSON.stringify(defenderResult.recoveryTransitions)}`);
+      && entry.label === "PUNISH" && entry.detail === "Dodge recovery"
+      && Number.isFinite(entry.epochMs));
+  if (attackRecoveryIndex < 0 || attackRecoveryExitIndex <= attackRecoveryIndex
+    || dodgeRecoveryIndex <= attackRecoveryIndex) {
+    throw new Error(`M129 remote authority did not show a complete attack-recovery -> dodge-recovery sequence: ${JSON.stringify(defenderResult.recoveryTransitions)}`);
+  }
+
+  const attackRecovery = defenderResult.recoveryTransitions[attackRecoveryIndex];
+  const attackRecoveryExit = defenderResult.recoveryTransitions[attackRecoveryExitIndex];
+  if (perpendicularAim.epochMs < attackRecovery.epochMs
+    || rollWheel.epochMs < attackRecovery.epochMs
+    || rollWheel.epochMs >= attackRecoveryExit.epochMs) {
+    throw new Error(`M129 genuine wheel was not inside Firefox's authoritative attack-recovery interval: ${JSON.stringify({
+      attackRecovery,
+      attackRecoveryExit,
+      perpendicularAim,
+      rollWheel,
+    })}`);
   }
 
   if (attackerResult.playerHp !== 100 || attackerResult.playerGuard !== 100
@@ -1225,8 +1251,9 @@ async function runOnlineUiRollBufferFlight(entries) {
 
   return evidence.map((entry) => ({
     ...entry,
-    rollBufferWheelAfterAttackMs: entry.browser === attacker.name ? Number(wheelAfterAttackMs.toFixed(1)) : null,
-    rollBufferDelayMs: entry.browser === attacker.name ? Number(bufferedDelayMs.toFixed(1)) : null,
+    rollBufferWheelEpochMs: entry.browser === attacker.name ? rollWheel.epochMs : null,
+    rollBufferRecoveryStartEpochMs: entry.browser === defender.name ? attackRecovery.epochMs : null,
+    rollBufferRecoveryExitEpochMs: entry.browser === defender.name ? attackRecoveryExit.epochMs : null,
   }));
 }
 
@@ -3499,15 +3526,12 @@ async function performArenaFeint(session, elementId, xOffset = 200) {
   }
 }
 
-async function performArenaAttackThenBufferedRoll(session, elementId, xOffset = 200) {
+async function performArenaRecoveryBufferedRoll(session, elementId) {
   const origin = { "element-6066-11e4-a52e-4f735466cecf": elementId };
-  // Keep the light press, perpendicular pointer retarget, and wheel-forward in
-  // one W3C action command so browser-internal time owns the buffer proof.
-  // Ask WebDriver to schedule the roll ~370 ms after LMB-down. Chrome's
-  // measured action-dispatch overhead on CI adds roughly 42-58 ms, and the
-  // acceptance below uses the actual DOM wheel timestamp. The real wheel must
-  // therefore land inside M128's final 90 ms recovery window, not merely match
-  // the requested W3C duration.
+  // This command is issued only after Firefox has independently observed the
+  // authoritative light recovery. Pointer retarget and the real wheel share one
+  // W3C timeline; the browser-owned pause moves the wheel toward the final 90 ms
+  // without relying on the original LMB timestamp.
   await webdriver(session.base, "POST", `/session/${session.sessionId}/actions`, {
     actions: [
       {
@@ -3515,13 +3539,8 @@ async function performArenaAttackThenBufferedRoll(session, elementId, xOffset = 
         id: `mouse-${session.name}`,
         parameters: { pointerType: "mouse" },
         actions: [
-          { type: "pointerMove", duration: 0, origin, x: xOffset, y: 0 },
-          { type: "pointerDown", button: 0 },
-          { type: "pause", duration: 40 },
-          { type: "pointerUp", button: 0 },
-          { type: "pause", duration: 280 },
           { type: "pointerMove", duration: 0, origin, x: 0, y: 180 },
-          { type: "pause", duration: 50 },
+          { type: "pause", duration: 145 },
           { type: "pause", duration: 0 },
         ],
       },
@@ -3530,12 +3549,7 @@ async function performArenaAttackThenBufferedRoll(session, elementId, xOffset = 
         id: `wheel-${session.name}`,
         actions: [
           { type: "pause", duration: 0 },
-          { type: "pause", duration: 0 },
-          { type: "pause", duration: 0 },
-          { type: "pause", duration: 0 },
-          { type: "pause", duration: 280 },
-          { type: "pause", duration: 0 },
-          { type: "pause", duration: 50 },
+          { type: "pause", duration: 145 },
           { type: "scroll", x: 0, y: 0, deltaX: 0, deltaY: -120, duration: 0, origin },
         ],
       },
@@ -3628,6 +3642,7 @@ async function installUiObserver(session) {
     const threatGuardArc = document.querySelector('#threat-guard-arc');
     if (!target || !arena || !arenaStage || !overlay || !recovery || !threat || !threatCount || !threatSecondary || !threatSecondaryBearing || !threatSecondaryPhase || !threatSecondaryGuardArc || !threatBearing || !threatGuardArc) throw new Error('missing online UI flight target');
     const state = { events: [], eventTransitions: [], keys: [], pointers: [], wheels: [], overlayTransitions: [], feedbackTransitions: [], recoveryTransitions: [], threatTransitions: [], recoveryTellMaxPixels: 0, parryTellMaxPixels: 0, online: '', startedAt: performance.now() };
+    const epochEvidence = new URLSearchParams(location.search).get('scenario') === 'uirollbuffer';
     const record = () => {
       const text = target.textContent?.trim() ?? '';
       if (/^Online - player #\\d+ - server tick \\d+$/.test(text)) state.online = text;
@@ -3663,7 +3678,11 @@ async function installUiObserver(session) {
         detail: document.querySelector('#opponent-recovery-detail')?.textContent?.trim() ?? '',
       };
       const previous = state.recoveryTransitions.at(-1);
-      if (!previous || Object.keys(entry).some((key) => previous[key] !== entry[key])) state.recoveryTransitions.push(entry);
+      const changed = !previous || ['visible', 'state', 'label', 'detail'].some((key) => previous[key] !== entry[key]);
+      if (changed) {
+        if (epochEvidence) entry.epochMs = Date.now();
+        state.recoveryTransitions.push(entry);
+      }
     };
     const recordThreat = () => {
       const entry = {
@@ -3691,20 +3710,24 @@ async function installUiObserver(session) {
     for (const type of pointerTypes) {
       arena.addEventListener(type, (event) => {
         const rect = arena.getBoundingClientRect();
-        state.pointers.push({
+        const entry = {
           type,
           button: event.button,
           x: Number(((event.clientX - rect.left) / rect.width).toFixed(3)),
           y: Number(((event.clientY - rect.top) / rect.height).toFixed(3)),
           t: Number((performance.now() - state.startedAt).toFixed(1)),
-        });
+        };
+        if (epochEvidence) entry.epochMs = Date.now();
+        state.pointers.push(entry);
       }, { capture: true });
     }
     arena.addEventListener('wheel', (event) => {
-      state.wheels.push({
+      const entry = {
         deltaY: event.deltaY,
         t: Number((performance.now() - state.startedAt).toFixed(1)),
-      });
+      };
+      if (epochEvidence) entry.epochMs = Date.now();
+      state.wheels.push(entry);
     }, { capture: true });
     record();
     recordOverlay();
