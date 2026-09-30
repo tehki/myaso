@@ -1630,39 +1630,28 @@ async function runOnlineUiDodgeFeedbackFlight(entries) {
   let evidence = null;
   let lastAttemptBaseline = null;
   // M24 owns reaction-timing/geometry proof. M36 owns the real-control readability
-  // path. M36 uses a two-click Firefox burst to keep the genuine latch retry window narrow
-  // inside one unchanged windup; the Chrome defender then performs a genuine perpendicular
-  // dodge early enough for the unchanged iframe to span the possible active transition. Combat timing and acceptance thresholds
-  // remain unchanged, and the older M36 gate no longer depends on the later threat HUD.
+  // path. Each attempt uses one genuine Firefox LMB hold and one genuine Chrome
+  // pointer-directed roll, while the browser-owned pause keeps their ordering
+  // deterministic without changing combat timing or acceptance thresholds.
   for (let attempt = 1; attempt <= 3 && !evidence; attempt += 1) {
     lastAttemptBaseline = await Promise.all(entries.map(readUiEvidence));
     if (!lastAttemptBaseline.every((entry) => entry.playerHp === 100 && entry.playerGuard === 100)) {
       throw new Error(`M36 retry ${attempt} did not start from clean authoritative vitals: ${JSON.stringify(lastAttemptBaseline)}`);
     }
 
-    const baselineDefender = lastAttemptBaseline.find((entry) => entry.browser === defender.name);
-    const baselineWindups = baselineDefender?.threatTransitions.filter((entry) =>
-      entry.visible && entry.state === "windup" && entry.phase === "WINDUP").length ?? 0;
     let rollIssued = false;
 
-    // Arm a browser-local observer on Chrome before Firefox starts the genuine
-    // held LMB. As soon as Chrome observes a fresh replicated WINDUP, dispatch
-    // the real pointer-directed wheel roll immediately. This removes cross-session
-    // WebDriver launch skew from the 135 ms light windup while preserving the
-    // actual authoritative reaction path. The observer stops before the roll,
-    // leaving the iframe/strike resolution window free of evidence polling.
-    const windupPromise = waitForFreshUiThreatWindup(defender, baselineWindups, 320);
-    await sleep(15);
+    // M24 owns post-windup reaction timing. M36 needs a deterministic real-control
+    // evade so it can verify the production feedback path. Pre-arm Chrome's W3C
+    // roll sequence first, with a browser-owned pause, then start Firefox's real
+    // LMB while that pause is already counting down. This removes the second
+    // cross-session WebDriver round-trip that could consume most of the 135 ms
+    // light windup on a busy runner.
+    const dodgePromise = pressArenaPerpendicularDodgeAfterPause(defender, 60, defenderElementId);
+    rollIssued = true;
+    await sleep(20);
     const attackPromise = performArenaAttackHold(attacker, attackerElementId, attackOffset, 180);
-    try {
-      const windup = await windupPromise;
-      if (windup) {
-        await pressArenaPerpendicularDodgeAfterPause(defender, 0, defenderElementId);
-        rollIssued = true;
-      }
-    } finally {
-      await attackPromise;
-    }
+    await Promise.all([dodgePromise, attackPromise]);
     await sleep(180);
     evidence = await waitForUiDodgeEvidence(entries, attacker, defender, 520, false, lastAttemptBaseline);
     if (evidence) break;
@@ -3175,32 +3164,6 @@ async function scrollArenaWheelPair(session, elementId, deltaY, firstDelayMs, be
       ],
     }],
   });
-}
-
-async function waitForFreshUiThreatWindup(session, baselineCount, timeoutMs = 320) {
-  const result = await webdriver(session.base, "POST", `/session/${session.sessionId}/execute/async`, {
-    script: `
-      const baseline = arguments[0];
-      const timeoutMs = arguments[1];
-      const done = arguments[arguments.length - 1];
-      const startedAt = performance.now();
-      const countWindups = () => (window.__MYASO_M30_UI__?.threatTransitions ?? []).filter((entry) =>
-        entry.visible
-        && entry.state === 'windup'
-        && (entry.phase === 'WINDUP' || entry.phase === 'LEFT WINDUP' || entry.phase === 'RIGHT WINDUP')
-      ).length;
-      const poll = () => {
-        const count = countWindups();
-        const elapsedMs = performance.now() - startedAt;
-        if (count > baseline) return done({ ok: true, count, elapsedMs });
-        if (elapsedMs >= timeoutMs) return done({ ok: false, count, elapsedMs });
-        setTimeout(poll, 4);
-      };
-      poll();
-    `,
-    args: [baselineCount, timeoutMs],
-  });
-  return result?.ok ? result : null;
 }
 
 async function pressArenaPerpendicularDodgeAfterPause(session, delayMs, knownElementId = null) {
