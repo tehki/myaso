@@ -1185,6 +1185,10 @@ async function runOnlineUiRollBufferFlight(entries) {
   if (perpendicularAim.t > rollWheel.t) {
     throw new Error(`M129 pointer retarget happened after wheel-forward: aim=${perpendicularAim.t} wheel=${rollWheel.t}`);
   }
+  const aimLeadMs = rollWheel.t - perpendicularAim.t;
+  if (aimLeadMs < 20 || aimLeadMs > 100) {
+    throw new Error(`M129 perpendicular pointer retarget was not recovery-local: ${aimLeadMs}ms before wheel`);
+  }
   const wheelAfterAttackMs = rollWheel.t - lightDown.t;
   if (wheelAfterAttackMs < 385 || wheelAfterAttackMs > 465) {
     throw new Error(`M129 wheel-forward was outside the intended late-recovery schedule: ${wheelAfterAttackMs}ms`);
@@ -3514,8 +3518,9 @@ async function performArenaAttackThenBufferedRoll(session, elementId, xOffset = 
           { type: "pointerDown", button: 0 },
           { type: "pause", duration: 40 },
           { type: "pointerUp", button: 0 },
+          { type: "pause", duration: 325 },
           { type: "pointerMove", duration: 0, origin, x: 0, y: 180 },
-          { type: "pause", duration: 375 },
+          { type: "pause", duration: 50 },
           { type: "pause", duration: 0 },
         ],
       },
@@ -3527,8 +3532,9 @@ async function performArenaAttackThenBufferedRoll(session, elementId, xOffset = 
           { type: "pause", duration: 0 },
           { type: "pause", duration: 0 },
           { type: "pause", duration: 0 },
+          { type: "pause", duration: 325 },
           { type: "pause", duration: 0 },
-          { type: "pause", duration: 375 },
+          { type: "pause", duration: 50 },
           { type: "scroll", x: 0, y: 0, deltaX: 0, deltaY: -120, duration: 0, origin },
         ],
       },

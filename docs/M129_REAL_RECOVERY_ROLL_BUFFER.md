@@ -10,7 +10,7 @@ Chrome performs one W3C action sequence:
 
 - genuine LMB light attack aimed at the staged opponent;
 - 40 ms LMB hold, then release;
-- pointer retargets perpendicular to the attack line;
+- pointer stays on the attack line through windup/active, then retargets perpendicular during recovery at about 365 ms;
 - one genuine wheel-forward event approximately 415 ms after LMB-down.
 
 The unchanged light timeline is 135 ms windup + 80 ms active + 255 ms recovery. Therefore the final 90 ms buffer window opens at about 380 ms and full recovery ends at about 470 ms. The wheel is deliberately scheduled inside that window.
