@@ -1631,8 +1631,8 @@ async function runOnlineUiDodgeFeedbackFlight(entries) {
   let lastAttemptBaseline = null;
   // M24 owns reaction-timing/geometry proof. M36 owns the real-control readability
   // path. Each attempt uses one genuine Firefox LMB hold and one genuine Chrome
-  // pointer-directed roll, while the browser-owned pause keeps their ordering
-  // deterministic without changing combat timing or acceptance thresholds.
+  // pointer-directed roll with explicit delivered-edge ordering; combat timing and
+  // acceptance thresholds stay unchanged.
   for (let attempt = 1; attempt <= 3 && !evidence; attempt += 1) {
     lastAttemptBaseline = await Promise.all(entries.map(readUiEvidence));
     if (!lastAttemptBaseline.every((entry) => entry.playerHp === 100 && entry.playerGuard === 100)) {
@@ -1640,18 +1640,37 @@ async function runOnlineUiDodgeFeedbackFlight(entries) {
     }
 
     let rollIssued = false;
+    let defenderMovementHeld = false;
+    let attackHeld = false;
 
-    // M24 owns post-windup reaction timing. M36 needs a deterministic real-control
-    // evade so it can verify the production feedback path. Pre-arm Chrome's W3C
-    // roll sequence first, with a browser-owned pause, then start Firefox's real
-    // LMB while that pause is already counting down. This removes the second
-    // cross-session WebDriver round-trip that could consume most of the 135 ms
-    // light windup on a busy runner.
-    const dodgePromise = pressArenaPerpendicularDodgeAfterPause(defender, 60, defenderElementId);
-    rollIssued = true;
-    await sleep(20);
-    const attackPromise = performArenaAttackHold(attacker, attackerElementId, attackOffset, 180);
-    await Promise.all([dodgePromise, attackPromise]);
+    // Anchor ordering on completed real W3C input edges instead of cross-driver
+    // promise timing. KeyS is held first as redundant provenance, Firefox LMB is
+    // then delivered and acknowledged, and one normal input tick later Chrome
+    // sends a short wheel-only command while KeyS remains down. Keeping the wheel
+    // out of a multi-device action avoids W3C tick alignment delaying it.
+    try {
+      await aimArena(defender, defenderElementId, 0, 180);
+      defenderMovementHeld = true;
+      await setMovementKey(defender, "s", true);
+
+      attackHeld = true;
+      await setArenaAttack(attacker, attackerElementId, true, attackOffset);
+      const attackPressedAt = Date.now();
+
+      await sleep(20);
+      await scrollArenaWheel(defender, defenderElementId, -120);
+      rollIssued = true;
+
+      await sleep(60);
+      defenderMovementHeld = false;
+      await setMovementKey(defender, "s", false);
+
+      const remainingAttackHoldMs = Math.max(0, 180 - (Date.now() - attackPressedAt));
+      if (remainingAttackHoldMs > 0) await sleep(remainingAttackHoldMs);
+    } finally {
+      if (attackHeld) await setArenaAttack(attacker, attackerElementId, false, attackOffset);
+      if (defenderMovementHeld) await setMovementKey(defender, "s", false);
+    }
     await sleep(180);
     evidence = await waitForUiDodgeEvidence(entries, attacker, defender, 520, false, lastAttemptBaseline);
     if (evidence) break;
@@ -3114,14 +3133,14 @@ async function resolveArenaElement(session, label) {
   return elementId;
 }
 
-async function aimArena(session, elementId, xOffset) {
+async function aimArena(session, elementId, xOffset, yOffset = 0) {
   const origin = { "element-6066-11e4-a52e-4f735466cecf": elementId };
   await webdriver(session.base, "POST", `/session/${session.sessionId}/actions`, {
     actions: [{
       type: "pointer",
       id: `mouse-${session.name}`,
       parameters: { pointerType: "mouse" },
-      actions: [{ type: "pointerMove", duration: 0, origin, x: xOffset, y: 0 }],
+      actions: [{ type: "pointerMove", duration: 0, origin, x: xOffset, y: yOffset }],
     }],
   });
 }
