@@ -1630,38 +1630,46 @@ async function runOnlineUiDodgeFeedbackFlight(entries) {
   let evidence = null;
   let lastAttemptBaseline = null;
   // M24 owns reaction-timing/geometry proof. M36 owns the real-control readability
-  // path. M36 uses a two-click Firefox burst to keep the genuine latch retry window narrow
-  // inside one unchanged windup; the Chrome defender then performs a genuine perpendicular
-  // dodge early enough for the unchanged iframe to span the possible active transition. Combat timing and acceptance thresholds
-  // remain unchanged, and the older M36 gate no longer depends on the later threat HUD.
+  // path. Each attempt uses one genuine Firefox LMB hold and one genuine Chrome
+  // pointer-directed roll with explicit delivered-edge ordering; combat timing and
+  // acceptance thresholds stay unchanged.
   for (let attempt = 1; attempt <= 3 && !evidence; attempt += 1) {
     lastAttemptBaseline = await Promise.all(entries.map(readUiEvidence));
     if (!lastAttemptBaseline.every((entry) => entry.playerHp === 100 && entry.playerGuard === 100)) {
       throw new Error(`M36 retry ${attempt} did not start from clean authoritative vitals: ${JSON.stringify(lastAttemptBaseline)}`);
     }
 
-    const baselineDefender = lastAttemptBaseline.find((entry) => entry.browser === defender.name);
-    const baselineWindups = baselineDefender?.threatTransitions.filter((entry) =>
-      entry.visible && entry.state === "windup" && entry.phase === "WINDUP").length ?? 0;
     let rollIssued = false;
+    let defenderMovementHeld = false;
+    let attackHeld = false;
 
-    // Arm a browser-local observer on Chrome before Firefox starts the genuine
-    // held LMB. As soon as Chrome observes a fresh replicated WINDUP, dispatch
-    // the real pointer-directed wheel roll immediately. This removes cross-session
-    // WebDriver launch skew from the 135 ms light windup while preserving the
-    // actual authoritative reaction path. The observer stops before the roll,
-    // leaving the iframe/strike resolution window free of evidence polling.
-    const windupPromise = waitForFreshUiThreatWindup(defender, baselineWindups, 320);
-    await sleep(15);
-    const attackPromise = performArenaAttackHold(attacker, attackerElementId, attackOffset, 180);
+    // Anchor ordering on completed real W3C input edges instead of cross-driver
+    // promise timing. KeyS is held first as redundant provenance, Firefox LMB is
+    // then delivered and acknowledged, and one normal input tick later Chrome
+    // sends a short wheel-only command while KeyS remains down. Keeping the wheel
+    // out of a multi-device action avoids W3C tick alignment delaying it.
     try {
-      const windup = await windupPromise;
-      if (windup) {
-        await pressArenaPerpendicularDodgeAfterPause(defender, 0, defenderElementId);
-        rollIssued = true;
-      }
+      await aimArena(defender, defenderElementId, 0, 180);
+      defenderMovementHeld = true;
+      await setMovementKey(defender, "s", true);
+
+      attackHeld = true;
+      await setArenaAttack(attacker, attackerElementId, true, attackOffset);
+      const attackPressedAt = Date.now();
+
+      await sleep(20);
+      await scrollArenaWheel(defender, defenderElementId, -120);
+      rollIssued = true;
+
+      await sleep(60);
+      defenderMovementHeld = false;
+      await setMovementKey(defender, "s", false);
+
+      const remainingAttackHoldMs = Math.max(0, 180 - (Date.now() - attackPressedAt));
+      if (remainingAttackHoldMs > 0) await sleep(remainingAttackHoldMs);
     } finally {
-      await attackPromise;
+      if (attackHeld) await setArenaAttack(attacker, attackerElementId, false, attackOffset);
+      if (defenderMovementHeld) await setMovementKey(defender, "s", false);
     }
     await sleep(180);
     evidence = await waitForUiDodgeEvidence(entries, attacker, defender, 520, false, lastAttemptBaseline);
@@ -3125,14 +3133,14 @@ async function resolveArenaElement(session, label) {
   return elementId;
 }
 
-async function aimArena(session, elementId, xOffset) {
+async function aimArena(session, elementId, xOffset, yOffset = 0) {
   const origin = { "element-6066-11e4-a52e-4f735466cecf": elementId };
   await webdriver(session.base, "POST", `/session/${session.sessionId}/actions`, {
     actions: [{
       type: "pointer",
       id: `mouse-${session.name}`,
       parameters: { pointerType: "mouse" },
-      actions: [{ type: "pointerMove", duration: 0, origin, x: xOffset, y: 0 }],
+      actions: [{ type: "pointerMove", duration: 0, origin, x: xOffset, y: yOffset }],
     }],
   });
 }
@@ -3175,32 +3183,6 @@ async function scrollArenaWheelPair(session, elementId, deltaY, firstDelayMs, be
       ],
     }],
   });
-}
-
-async function waitForFreshUiThreatWindup(session, baselineCount, timeoutMs = 320) {
-  const result = await webdriver(session.base, "POST", `/session/${session.sessionId}/execute/async`, {
-    script: `
-      const baseline = arguments[0];
-      const timeoutMs = arguments[1];
-      const done = arguments[arguments.length - 1];
-      const startedAt = performance.now();
-      const countWindups = () => (window.__MYASO_M30_UI__?.threatTransitions ?? []).filter((entry) =>
-        entry.visible
-        && entry.state === 'windup'
-        && (entry.phase === 'WINDUP' || entry.phase === 'LEFT WINDUP' || entry.phase === 'RIGHT WINDUP')
-      ).length;
-      const poll = () => {
-        const count = countWindups();
-        const elapsedMs = performance.now() - startedAt;
-        if (count > baseline) return done({ ok: true, count, elapsedMs });
-        if (elapsedMs >= timeoutMs) return done({ ok: false, count, elapsedMs });
-        setTimeout(poll, 4);
-      };
-      poll();
-    `,
-    args: [baselineCount, timeoutMs],
-  });
-  return result?.ok ? result : null;
 }
 
 async function pressArenaPerpendicularDodgeAfterPause(session, delayMs, knownElementId = null) {

@@ -330,12 +330,12 @@ function sendCombatInput() {
         }
       } else if (scenario === "dodge") {
         if (peer.action === 1 && dodgeWindupSeenAt === null) dodgeWindupSeenAt = performance.now();
-        // Once this browser has actually observed authoritative windup, react on
-        // the next ordinary input sample. The geometry assertions below remain
-        // the proof; an extra wall-clock delay only makes CI transport jitter
-        // decide whether the roll reaches authority before AttackActive.
+        // React after a bounded 20 ms observed-windup threshold. At the normal
+        // input cadence this avoids same-sample roll overtravel while preserving
+        // substantially more authoritative delivery margin than the historical
+        // 35 ms threshold. The unchanged active-frame geometry remains the proof.
         if (dodgeWindupSeenAt !== null && !dodgeTriggered && own.action === 0
-          && [1, 2].includes(peer.action)) {
+          && [1, 2].includes(peer.action) && performance.now() - dodgeWindupSeenAt >= 20) {
           dodgeTriggered = true;
           dodgeReactionMs = performance.now() - dodgeWindupSeenAt;
         }
