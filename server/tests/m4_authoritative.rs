@@ -186,6 +186,62 @@ fn reusable_combat_event_buffer_matches_allocating_step_semantics() {
 }
 
 #[test]
+fn recovered_light_edge_survives_newer_idle_input_before_authoritative_step() {
+    let mut world = duel(200.0);
+    assert!(world.set_input(
+        1,
+        InputIntent {
+            attack: true,
+            facing_radians: 0.0,
+            ..InputIntent::default()
+        },
+    ));
+    assert!(world.set_input(
+        1,
+        InputIntent {
+            move_x: 0.25,
+            facing_radians: 0.0,
+            ..InputIntent::default()
+        },
+    ));
+
+    world.step_by(5.0);
+
+    let attacker = world.fighter(1).expect("attacker");
+    assert_eq!(attacker.action, Action::AttackWindup);
+    assert_eq!(attacker.input().move_x, 0.25);
+    assert!(!attacker.input().attack);
+}
+
+#[test]
+fn recovered_heavy_edge_survives_newer_idle_input_before_authoritative_step() {
+    let mut world = duel(200.0);
+    assert!(world.set_input(
+        1,
+        InputIntent {
+            heavy_attack: true,
+            facing_radians: 0.0,
+            ..InputIntent::default()
+        },
+    ));
+    assert!(world.set_input(
+        1,
+        InputIntent {
+            move_x: 0.25,
+            facing_radians: 0.0,
+            ..InputIntent::default()
+        },
+    ));
+
+    world.step_by(5.0);
+
+    let attacker = world.fighter(1).expect("attacker");
+    assert_eq!(attacker.action, Action::HeavyAttackWindup);
+    assert_eq!(attacker.input().move_x, 0.25);
+    assert!(!attacker.input().heavy_attack);
+}
+
+#[test]
 fn attack_preserves_windup_active_and_recovery_commitment() {
     let mut world = duel(200.0);
     world.set_input(

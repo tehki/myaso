@@ -217,6 +217,11 @@ pub struct Fighter {
     pub action_elapsed_ms: f32,
     pub recently_interacted_with: Option<u32>,
     latest_input: InputIntent,
+    pending_attack: bool,
+    pending_heavy_attack: bool,
+    pending_dodge: bool,
+    pending_kick: bool,
+    pending_jump: bool,
     action_duration_ms: f32,
     attack_input_was_down: bool,
     block_input_was_down: bool,
@@ -249,6 +254,11 @@ impl Fighter {
             action_elapsed_ms: 0.0,
             recently_interacted_with: None,
             latest_input: InputIntent::default(),
+            pending_attack: false,
+            pending_heavy_attack: false,
+            pending_dodge: false,
+            pending_kick: false,
+            pending_jump: false,
             action_duration_ms: 0.0,
             attack_input_was_down: false,
             block_input_was_down: false,
@@ -267,6 +277,32 @@ impl Fighter {
 
     pub fn input(&self) -> InputIntent {
         self.latest_input
+    }
+
+    fn latch_action_edges(&mut self, input: InputIntent) {
+        self.pending_attack |= input.attack && !self.latest_input.attack;
+        self.pending_heavy_attack |= input.heavy_attack && !self.latest_input.heavy_attack;
+        self.pending_dodge |= input.dodge && !self.latest_input.dodge;
+        self.pending_kick |= input.kick && !self.latest_input.kick;
+        self.pending_jump |= input.jump && !self.latest_input.jump;
+    }
+
+    fn input_with_pending_actions(&self) -> InputIntent {
+        let mut input = self.latest_input;
+        input.attack |= self.pending_attack;
+        input.heavy_attack |= self.pending_heavy_attack;
+        input.dodge |= self.pending_dodge;
+        input.kick |= self.pending_kick;
+        input.jump |= self.pending_jump;
+        input
+    }
+
+    fn clear_pending_actions(&mut self) {
+        self.pending_attack = false;
+        self.pending_heavy_attack = false;
+        self.pending_dodge = false;
+        self.pending_kick = false;
+        self.pending_jump = false;
     }
 
     fn clear_light_attack_buffer(&mut self) {
@@ -460,7 +496,9 @@ impl World {
         let Ok(index) = self.fighter_index(net_id) else {
             return false;
         };
-        self.fighters[index].latest_input = normalize_input(input);
+        let input = normalize_input(input);
+        self.fighters[index].latch_action_edges(input);
+        self.fighters[index].latest_input = input;
         true
     }
 
@@ -502,7 +540,7 @@ impl World {
                 continue;
             }
 
-            let input = normalize_input(fighter.latest_input);
+            let input = normalize_input(fighter.input_with_pending_actions());
             let attack_pressed = input.attack && !fighter.attack_input_was_down;
             let block_pressed = input.block && !fighter.block_input_was_down;
             if fighter.action != Action::Knockdown {
@@ -514,6 +552,7 @@ impl World {
             update_stamina(self.now_ms, fighter, input, dt_ms);
             fighter.attack_input_was_down = input.attack;
             fighter.block_input_was_down = input.block;
+            fighter.clear_pending_actions();
 
             if fighter.action != Action::Block
                 && self.now_ms >= fighter.guard_regen_blocked_until_ms
@@ -543,6 +582,7 @@ impl World {
         for fighter in &mut self.fighters {
             fighter.kills = 0;
             fighter.latest_input = InputIntent::default();
+            fighter.clear_pending_actions();
             fighter.guard_regen_blocked_until_ms = 0.0;
             fighter.stamina_regen_blocked_until_ms = 0.0;
             respawn_fighter(fighter);
@@ -1206,6 +1246,7 @@ fn respawn_fighter(fighter: &mut Fighter) {
     fighter.recently_interacted_with = None;
     fighter.attack_input_was_down = false;
     fighter.block_input_was_down = false;
+    fighter.clear_pending_actions();
     fighter.clear_recovery_input_buffer();
     fighter.set_action(Action::Idle, 0.0);
 }
