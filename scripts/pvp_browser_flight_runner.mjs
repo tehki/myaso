@@ -3503,10 +3503,11 @@ async function performArenaAttackThenBufferedRoll(session, elementId, xOffset = 
   const origin = { "element-6066-11e4-a52e-4f735466cecf": elementId };
   // Keep the light press, perpendicular pointer retarget, and wheel-forward in
   // one W3C action command so browser-internal time owns the buffer proof.
-  // The roll arrives ~415 ms after LMB-down:
-  //   135 ms windup + 80 ms active + 165 ms recovery = 380 ms buffer-open,
-  //   full light recovery ends at 470 ms.
-  // This puts the real wheel comfortably inside M128's final 90 ms window.
+  // Ask WebDriver to schedule the roll ~370 ms after LMB-down. Chrome's
+  // measured action-dispatch overhead on CI adds roughly 42-58 ms, and the
+  // acceptance below uses the actual DOM wheel timestamp. The real wheel must
+  // therefore land inside M128's final 90 ms recovery window, not merely match
+  // the requested W3C duration.
   await webdriver(session.base, "POST", `/session/${session.sessionId}/actions`, {
     actions: [
       {
@@ -3518,7 +3519,7 @@ async function performArenaAttackThenBufferedRoll(session, elementId, xOffset = 
           { type: "pointerDown", button: 0 },
           { type: "pause", duration: 40 },
           { type: "pointerUp", button: 0 },
-          { type: "pause", duration: 325 },
+          { type: "pause", duration: 280 },
           { type: "pointerMove", duration: 0, origin, x: 0, y: 180 },
           { type: "pause", duration: 50 },
           { type: "pause", duration: 0 },
@@ -3532,7 +3533,7 @@ async function performArenaAttackThenBufferedRoll(session, elementId, xOffset = 
           { type: "pause", duration: 0 },
           { type: "pause", duration: 0 },
           { type: "pause", duration: 0 },
-          { type: "pause", duration: 325 },
+          { type: "pause", duration: 280 },
           { type: "pause", duration: 0 },
           { type: "pause", duration: 50 },
           { type: "scroll", x: 0, y: 0, deltaX: 0, deltaY: -120, duration: 0, origin },
