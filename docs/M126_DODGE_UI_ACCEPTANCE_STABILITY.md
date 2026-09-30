@@ -14,6 +14,8 @@ M24 remains the authoritative post-windup reaction and geometry proof. M36 conti
 
 The obsolete browser-local windup polling helper is removed.
 
+M24 also receives a bounded 20 ms observed-windup threshold. M125's zero-delay reaction could overtravel the perpendicular 690 u/s roll outside the unchanged 94-unit hit envelope before `AttackActive`; the historical 35 ms threshold could be too late under CI transport jitter. The 20 ms threshold preserves both the active-frame geometry proof and authoritative delivery margin.
+
 ## Boundaries
 
 No combat constants, iframe duration, attack timing, roll speed, roll direction, damage, stamina, reach, guard, parry, protocol, replication, persistence, deployment, or production transport behavior changes.
