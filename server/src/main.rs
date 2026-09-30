@@ -37,29 +37,55 @@ const DEFAULT_FLIGHT_NEAR_PRESSURE_PLAYERS: usize = 150;
 const MAX_KILL_EVENT_HISTORY: usize = 256;
 const MAX_DROPPED_ACTION_TICKS: usize = 64;
 
-fn one_shot_action(sample: &InputSample) -> bool {
-    sample.attack || sample.heavy_attack || sample.dodge || sample.kick || sample.jump
+fn one_shot_action_mask(sample: &InputSample) -> u8 {
+    u8::from(sample.attack)
+        | (u8::from(sample.heavy_attack) << 1)
+        | (u8::from(sample.dodge) << 2)
+        | (u8::from(sample.kick) << 3)
+        | (u8::from(sample.jump) << 4)
+}
+
+fn remember_dropped_action_tick(dropped_action_ticks: &mut VecDeque<u32>, tick: u32) {
+    if dropped_action_ticks.contains(&tick) {
+        return;
+    }
+    if dropped_action_ticks.len() == MAX_DROPPED_ACTION_TICKS {
+        dropped_action_ticks.pop_front();
+    }
+    dropped_action_ticks.push_back(tick);
 }
 
 fn register_new_action_datagram(
     samples: &[InputSample],
     dropped_action_ticks: &mut VecDeque<u32>,
 ) -> Option<u32> {
-    let first_unseen = samples
-        .iter()
-        .find(|sample| one_shot_action(sample) && !dropped_action_ticks.contains(&sample.tick))
-        .map(|sample| sample.tick)?;
+    let mut first_unseen = None;
 
-    for sample in samples.iter().filter(|sample| one_shot_action(sample)) {
-        if dropped_action_ticks.contains(&sample.tick) {
+    // Samples are newest -> oldest. Only a false->true transition is a new
+    // one-shot action. A held button must not make every subsequent tick look
+    // like a fresh action or the impairment fixture would drop the entire hold.
+    for pair in samples.windows(2) {
+        let newer = &pair[0];
+        let older = &pair[1];
+        let rising = one_shot_action_mask(newer) & !one_shot_action_mask(older);
+        if rising == 0 || dropped_action_ticks.contains(&newer.tick) {
             continue;
         }
-        if dropped_action_ticks.len() == MAX_DROPPED_ACTION_TICKS {
-            dropped_action_ticks.pop_front();
-        }
-        dropped_action_ticks.push_back(sample.tick);
+        first_unseen.get_or_insert(newer.tick);
+        remember_dropped_action_tick(dropped_action_ticks, newer.tick);
     }
-    Some(first_unseen)
+
+    // A one-sample packet has no older state to compare. Treat it as an edge
+    // once; the remembered tick prevents the same action from being re-dropped.
+    if samples.len() == 1 && one_shot_action_mask(&samples[0]) != 0 {
+        let tick = samples[0].tick;
+        if !dropped_action_ticks.contains(&tick) {
+            first_unseen = Some(tick);
+            remember_dropped_action_tick(dropped_action_ticks, tick);
+        }
+    }
+
+    first_unseen
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -810,6 +836,45 @@ mod tests {
         ];
         assert_eq!(register_new_action_datagram(&next, &mut dropped), Some(14));
         assert_eq!(dropped, VecDeque::from([11, 14]));
+    }
+
+    #[test]
+    fn loopback_action_loss_does_not_redrop_sustained_action_hold() {
+        let mut dropped = VecDeque::new();
+        let first = [
+            action_sample(38, true),
+            action_sample(37, false),
+            action_sample(36, false),
+        ];
+        assert_eq!(register_new_action_datagram(&first, &mut dropped), Some(38));
+
+        let held_redundant = [
+            action_sample(39, true),
+            action_sample(38, true),
+            action_sample(37, false),
+        ];
+        assert_eq!(
+            register_new_action_datagram(&held_redundant, &mut dropped),
+            None
+        );
+
+        let held = [
+            action_sample(40, true),
+            action_sample(39, true),
+            action_sample(38, true),
+        ];
+        assert_eq!(register_new_action_datagram(&held, &mut dropped), None);
+
+        let repressed = [
+            action_sample(42, true),
+            action_sample(41, false),
+            action_sample(40, true),
+        ];
+        assert_eq!(
+            register_new_action_datagram(&repressed, &mut dropped),
+            Some(42)
+        );
+        assert_eq!(dropped, VecDeque::from([38, 42]));
     }
 
     #[test]

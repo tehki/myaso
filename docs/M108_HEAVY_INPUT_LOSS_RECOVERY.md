@@ -38,9 +38,9 @@ For this scenario only the existing loopback-only server fixture runs with:
 
 `MYASO_FLIGHT_DROP_NEW_ACTION_DATAGRAMS=1`
 
-The loopback-only fixture deterministically discards the first datagram that contains each previously unseen one-shot action tick, including the M105 heavy-attack bit. It remembers a bounded set of action ticks it has already dropped, so browser scheduling cannot bypass the impairment merely because the action first reaches the server in a redundancy slot rather than the newest slot.
+The loopback-only fixture deterministically discards the first datagram that contains each previously unseen **rising edge** for a one-shot action, including the M105 heavy-attack bit. It remembers a bounded set of action-edge ticks it has already dropped, so browser scheduling cannot bypass the impairment merely because the edge first reaches the server in a redundancy slot rather than the newest slot. Holding the same physical action across later input ticks is not treated as a sequence of fresh actions.
 
-The next ordinary client packet may carry that same heavy tick in its redundancy history. Because the tick is already recorded as deliberately dropped, the fixture accepts the redundant copy; existing ingress deduplication plus M63/M105 coalescing then recover the one-shot exactly once.
+The next ordinary client packet may carry that same action edge in its redundancy history. Because the edge tick is already recorded as deliberately dropped, the fixture accepts the redundant copy; existing ingress deduplication plus M63/M105 coalescing then recover the one-shot exactly once. A sustained `KeyE` hold therefore exercises first-send loss without causing the fixture to discard every heavy-bearing packet in the hold.
 
 Acceptance additionally requires at least one server marker:
 
