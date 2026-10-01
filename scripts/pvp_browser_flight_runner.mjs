@@ -4,7 +4,8 @@ import { readFile, stat } from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
 import { setTimeout as sleep } from "node:timers/promises";
-import { FFA_KILL_TARGET } from "../src/browser/combat-readability.mjs";
+import { COMBAT_ACTION, FFA_KILL_TARGET } from "../src/browser/combat-readability.mjs";
+import { COMBAT } from "../src/combat/model.mjs";
 
 const root = process.cwd();
 const durationMs = Number(process.env.MYASO_PVP_FLIGHT_DURATION_MS ?? 7000);
@@ -16,7 +17,7 @@ const heavyKeyPulseMs = 120;
 // A full M62 threat chevron paints dozens of exact-tone pixels; a handful can
 // arise from raster overlap. Use one significance floor for positive and leak proof.
 const threatMarkerMinPixels = 8;
-if (!new Set(["damage", "inputloss", "parry", "dodge", "block", "guardbreak", "backblock", "respawn", "ui", "uirespawn", "uifeedback", "uihittell", "uivitals", "uiidentity", "uiscore", "uimatch", "uirematch", "uiffa3", "uikillfeed", "uifocus", "uithreat", "uithreatbearing", "uimultithreat", "uisecondarythreat", "uisecondarybearing", "uisecondaryphase", "uiguardarc", "uisecondaryguardarc", "uithreatmarkers", "uiparry", "uistun", "uiguardbreak", "uidodge", "uirecovery", "uirecoverytell", "uiattackintent", "uiheavy", "uiheavyinputloss", "uiheavyblock", "uiheavyparry", "uiheavydodge", "uiheavypunish", "uiheavyguardbreak", "uiheavyguardbreakpunish", "uifeint", "uirunningattack", "uidirectionallight", "uirollbuffer", "uiguardbreaktell", "uiparrytell", "uiblockfacingtell", "uidodgetell", "uideathtell"]).has(scenario)) throw new Error(`unsupported MYASO_PVP_SCENARIO: ${scenario}`);
+if (!new Set(["damage", "inputloss", "parry", "dodge", "block", "guardbreak", "backblock", "respawn", "ui", "uirespawn", "uifeedback", "uihittell", "uivitals", "uiidentity", "uiscore", "uimatch", "uirematch", "uiffa3", "uikillfeed", "uifocus", "uithreat", "uithreatbearing", "uimultithreat", "uisecondarythreat", "uisecondarybearing", "uisecondaryphase", "uiguardarc", "uisecondaryguardarc", "uithreatmarkers", "uiparry", "uistun", "uiguardbreak", "uidodge", "uirecovery", "uirecoverytell", "uiattackintent", "uiheavy", "uiheavyinputloss", "uiheavyblock", "uiheavyparry", "uiheavydodge", "uiheavypunish", "uiheavyguardbreak", "uiheavyguardbreakpunish", "uifeint", "uirunningattack", "uidirectionallight", "uirollbuffer", "uijumpbuffer", "uiguardbreaktell", "uiparrytell", "uiblockfacingtell", "uidodgetell", "uideathtell"]).has(scenario)) throw new Error(`unsupported MYASO_PVP_SCENARIO: ${scenario}`);
 const staticPort = Number(process.env.MYASO_PVP_FLIGHT_HTTP_PORT ?? 4174);
 const browsers = [
   {
@@ -244,6 +245,9 @@ try {
   } else if (scenario === "uirollbuffer") {
     const results = await runOnlineUiRollBufferFlight(sessions);
     console.log(`M129_REAL_RECOVERY_ROLL_BUFFER ${JSON.stringify({ ok: true, results })}`);
+  } else if (scenario === "uijumpbuffer") {
+    const results = await runOnlineUiJumpBufferFlight(sessions);
+    console.log(`M131_REAL_RECOVERY_JUMP_BUFFER ${JSON.stringify({ ok: true, results })}`);
   } else if (scenario === "uiguardbreaktell") {
     const results = await runOnlineUiGuardBreakTellFlight(sessions);
     console.log(`M40_FFA_GUARD_BREAK_TELL ${JSON.stringify({ ok: true, results })}`);
@@ -359,14 +363,14 @@ async function startBrowser(browser) {
     pageLoad: 30_000,
     implicit: 0,
   });
-  if (scenario === "uiparry" || scenario === "uistun" || scenario === "uiguardbreak" || scenario === "uidodge" || scenario === "uiattackintent" || scenario === "uiheavy" || scenario === "uiheavyinputloss" || scenario === "uiheavyblock" || scenario === "uiheavyparry" || scenario === "uiheavydodge" || scenario === "uiheavypunish" || scenario === "uiheavyguardbreak" || scenario === "uiheavyguardbreakpunish" || scenario === "uifeint" || scenario === "uirunningattack" || scenario === "uidirectionallight" || scenario === "uirollbuffer" || scenario === "uiguardbreaktell" || scenario === "uiparrytell" || scenario === "uiblockfacingtell" || scenario === "uidodgetell") {
+  if (scenario === "uiparry" || scenario === "uistun" || scenario === "uiguardbreak" || scenario === "uidodge" || scenario === "uiattackintent" || scenario === "uiheavy" || scenario === "uiheavyinputloss" || scenario === "uiheavyblock" || scenario === "uiheavyparry" || scenario === "uiheavydodge" || scenario === "uiheavypunish" || scenario === "uiheavyguardbreak" || scenario === "uiheavyguardbreakpunish" || scenario === "uifeint" || scenario === "uirunningattack" || scenario === "uidirectionallight" || scenario === "uirollbuffer" || scenario === "uijumpbuffer" || scenario === "uiguardbreaktell" || scenario === "uiparrytell" || scenario === "uiblockfacingtell" || scenario === "uidodgetell") {
     await webdriver(base, "POST", `/session/${sessionId}/window/rect`, { x: 0, y: 0, width: 1280, height: 900 });
   }
   return { ...browser, child, base, sessionId };
 }
 
 async function navigate(session, gameUrl, certificateHash) {
-  const page = scenario === "ui" || scenario === "uirespawn" || scenario === "uifeedback" || scenario === "uihittell" || scenario === "uivitals" || scenario === "uiidentity" || scenario === "uiscore" || scenario === "uimatch" || scenario === "uirematch" || scenario === "uiffa3" || scenario === "uikillfeed" || scenario === "uifocus" || scenario === "uithreat" || scenario === "uithreatbearing" || scenario === "uimultithreat" || scenario === "uisecondarythreat" || scenario === "uisecondarybearing" || scenario === "uisecondaryphase" || scenario === "uiguardarc" || scenario === "uisecondaryguardarc" || scenario === "uithreatmarkers" || scenario === "uiparry" || scenario === "uistun" || scenario === "uiguardbreak" || scenario === "uidodge" || scenario === "uirecovery" || scenario === "uirecoverytell" || scenario === "uiattackintent" || scenario === "uiheavy" || scenario === "uiheavyinputloss" || scenario === "uiheavyblock" || scenario === "uiheavyparry" || scenario === "uiheavydodge" || scenario === "uiheavypunish" || scenario === "uiheavyguardbreak" || scenario === "uiheavyguardbreakpunish" || scenario === "uifeint" || scenario === "uirunningattack" || scenario === "uidirectionallight" || scenario === "uirollbuffer" || scenario === "uiguardbreaktell" || scenario === "uiparrytell" || scenario === "uiblockfacingtell" || scenario === "uidodgetell" || scenario === "uideathtell" ? "index.html" : "pvp-flight.html";
+  const page = scenario === "ui" || scenario === "uirespawn" || scenario === "uifeedback" || scenario === "uihittell" || scenario === "uivitals" || scenario === "uiidentity" || scenario === "uiscore" || scenario === "uimatch" || scenario === "uirematch" || scenario === "uiffa3" || scenario === "uikillfeed" || scenario === "uifocus" || scenario === "uithreat" || scenario === "uithreatbearing" || scenario === "uimultithreat" || scenario === "uisecondarythreat" || scenario === "uisecondarybearing" || scenario === "uisecondaryphase" || scenario === "uiguardarc" || scenario === "uisecondaryguardarc" || scenario === "uithreatmarkers" || scenario === "uiparry" || scenario === "uistun" || scenario === "uiguardbreak" || scenario === "uidodge" || scenario === "uirecovery" || scenario === "uirecoverytell" || scenario === "uiattackintent" || scenario === "uiheavy" || scenario === "uiheavyinputloss" || scenario === "uiheavyblock" || scenario === "uiheavyparry" || scenario === "uiheavydodge" || scenario === "uiheavypunish" || scenario === "uiheavyguardbreak" || scenario === "uiheavyguardbreakpunish" || scenario === "uifeint" || scenario === "uirunningattack" || scenario === "uidirectionallight" || scenario === "uirollbuffer" || scenario === "uijumpbuffer" || scenario === "uiguardbreaktell" || scenario === "uiparrytell" || scenario === "uiblockfacingtell" || scenario === "uidodgetell" || scenario === "uideathtell" ? "index.html" : "pvp-flight.html";
   const url = new URL(`http://127.0.0.1:${staticPort}/web/${page}`);
   url.searchParams.set("server", gameUrl);
   url.searchParams.set("cert", certificateHash);
@@ -1272,6 +1276,149 @@ async function runOnlineUiRollBufferFlight(entries) {
     rollBufferWheelEpochMs: entry.browser === attacker.name ? rollWheel.epochMs : null,
     rollBufferRecoveryStartEpochMs: entry.browser === defender.name ? attackRecovery.epochMs : null,
     rollBufferRecoveryExitEpochMs: entry.browser === defender.name ? attackRecoveryExit.epochMs : null,
+  }));
+}
+
+async function runOnlineUiJumpBufferFlight(entries) {
+  const staged = await prepareHeavyCounterplayFlight(
+    entries,
+    "M131 recovery jump buffer",
+    { attackerName: "chrome", defenderName: "firefox", movementMs: 150 },
+  );
+  const { attacker, defender, attackerElementId, movementCode } = staged;
+  const attackOffset = movementCode === "KeyD" ? 200 : -200;
+  const beforeAttacker = await readUiEvidence(attacker);
+  const keyTransitionOffset = beforeAttacker.keyTransitions.length;
+
+  // Commit one genuine light first. The acceptance hook below is fed only from
+  // authoritative snapshots; it does not observe local prediction.
+  await performArenaAttack(attacker, attackerElementId, attackOffset);
+
+  const recoveryDeadline = Date.now() + 900;
+  let recoveryStart = null;
+  while (Date.now() < recoveryDeadline) {
+    const current = await readUiEvidence(attacker);
+    const transitions = current.acceptance?.ownActionTransitions ?? [];
+    recoveryStart = transitions.find((entry) =>
+      entry.action === COMBAT_ACTION.attackRecovery && Number.isFinite(entry.epochMs)) ?? null;
+    if (recoveryStart) break;
+    await sleep(10);
+  }
+  if (!recoveryStart) {
+    throw new Error("M131 Chrome never observed its authoritative light recovery before Space");
+  }
+
+  // Aim for the late part of the 255 ms recovery. The deterministic JS/Rust
+  // kernels pin the exact 90 ms rule; this real-browser flight proves a genuine
+  // Space edge traverses WebDriver -> DOM -> client input -> authority without
+  // cancelling recovery. Leave driver/snapshot scheduling margin on both sides.
+  const targetOffsetMs = Math.max(
+    0,
+    COMBAT.attack.recoveryMs - COMBAT.inputBuffer.jumpWindowMs - 20,
+  );
+  const waitMs = Math.max(0, recoveryStart.epochMs + targetOffsetMs - Date.now());
+  if (waitMs > 0) await sleep(waitMs);
+  await performArenaRecoveryBufferedJump(attacker, 760);
+  await sleep(220);
+
+  const evidence = await Promise.all(entries.map(readUiEvidence));
+  const attackerResult = evidence.find((entry) => entry.browser === attacker.name);
+  const defenderResult = evidence.find((entry) => entry.browser === defender.name);
+  if (!attackerResult || !defenderResult) {
+    throw new Error(`M131 incomplete jump-buffer evidence: ${JSON.stringify(evidence)}`);
+  }
+  if (attackerResult.acceptance?.scenario !== "uijumpbuffer"
+    || defenderResult.acceptance?.scenario !== "uijumpbuffer") {
+    throw new Error(`M131 authoritative acceptance hook was not active: ${JSON.stringify(evidence)}`);
+  }
+
+  const keyTransitions = attackerResult.keyTransitions.slice(keyTransitionOffset);
+  const jumpDowns = keyTransitions.filter((entry) => entry.type === "keydown" && entry.code === "Space");
+  const jumpUps = keyTransitions.filter((entry) => entry.type === "keyup" && entry.code === "Space");
+  const jumpDown = jumpDowns[0];
+  const jumpUp = jumpUps[0];
+  if (jumpDowns.length !== 1 || jumpUps.length !== 1
+    || !Number.isFinite(jumpDown?.epochMs) || !Number.isFinite(jumpUp?.epochMs)
+    || jumpUp.epochMs <= jumpDown.epochMs) {
+    throw new Error(`M131 genuine held Space controls were not delivered exactly once: ${JSON.stringify(attackerResult.keyTransitions)}`);
+  }
+
+  const ownTransitions = attackerResult.acceptance.ownActionTransitions;
+  const ownRecoveryIndex = ownTransitions.findIndex((entry) =>
+    entry.action === COMBAT_ACTION.attackRecovery && Number.isFinite(entry.epochMs));
+  const ownJumpIndex = ownTransitions.findIndex((entry, index) =>
+    index > ownRecoveryIndex && entry.action === COMBAT_ACTION.jump && Number.isFinite(entry.epochMs));
+  const ownIdleIndex = ownTransitions.findIndex((entry, index) =>
+    index > ownJumpIndex && entry.action === COMBAT_ACTION.idle && Number.isFinite(entry.epochMs));
+  if (ownRecoveryIndex < 0 || ownJumpIndex <= ownRecoveryIndex || ownIdleIndex <= ownJumpIndex) {
+    throw new Error(`M131 authority did not show attack-recovery -> jump -> idle: ${JSON.stringify(ownTransitions)}`);
+  }
+  const ownRecovery = ownTransitions[ownRecoveryIndex];
+  const ownJump = ownTransitions[ownJumpIndex];
+  const ownIdle = ownTransitions[ownIdleIndex];
+  const ownJumpCount = ownTransitions.slice(ownRecoveryIndex + 1)
+    .filter((entry) => entry.action === COMBAT_ACTION.jump).length;
+  if (ownJumpCount !== 1) {
+    throw new Error(`M131 held Space repeated authoritative jump: ${JSON.stringify(ownTransitions)}`);
+  }
+
+  const observedRecoveryBeforeKeyMs = jumpDown.epochMs - ownRecovery.epochMs;
+  const observedKeyToJumpMs = ownJump.epochMs - jumpDown.epochMs;
+  const lateRecoveryFloorMs = Math.max(
+    0,
+    COMBAT.attack.recoveryMs - COMBAT.inputBuffer.jumpWindowMs - 55,
+  );
+  if (observedRecoveryBeforeKeyMs < lateRecoveryFloorMs
+    || observedKeyToJumpMs <= 0
+    || observedKeyToJumpMs > COMBAT.inputBuffer.jumpWindowMs + 110) {
+    throw new Error(`M131 Space was not a late recovery input before authoritative jump: ${JSON.stringify({
+      ownRecovery,
+      jumpDown,
+      ownJump,
+      observedRecoveryBeforeKeyMs,
+      observedKeyToJumpMs,
+    })}`);
+  }
+  if (ownIdle.epochMs >= jumpUp.epochMs) {
+    throw new Error(`M131 Space was released before authoritative jump finished, so no-repeat proof is invalid: ${JSON.stringify({
+      ownJump,
+      ownIdle,
+      jumpUp,
+    })}`);
+  }
+
+  const focusTransitions = defenderResult.acceptance.focusActionTransitions;
+  const focusRecoveryIndex = focusTransitions.findIndex((entry) =>
+    entry.action === COMBAT_ACTION.attackRecovery && Number.isFinite(entry.epochMs));
+  const focusJumpIndex = focusTransitions.findIndex((entry, index) =>
+    index > focusRecoveryIndex && entry.action === COMBAT_ACTION.jump && Number.isFinite(entry.epochMs));
+  const focusIdleIndex = focusTransitions.findIndex((entry, index) =>
+    index > focusJumpIndex && entry.action === COMBAT_ACTION.idle && Number.isFinite(entry.epochMs));
+  if (focusRecoveryIndex < 0 || focusJumpIndex <= focusRecoveryIndex || focusIdleIndex <= focusJumpIndex) {
+    throw new Error(`M131 Firefox did not replicate attack-recovery -> jump -> idle for Chrome: ${JSON.stringify(focusTransitions)}`);
+  }
+  const focusJumpCount = focusTransitions.slice(focusRecoveryIndex + 1)
+    .filter((entry) => entry.action === COMBAT_ACTION.jump).length;
+  if (focusJumpCount !== 1) {
+    throw new Error(`M131 Firefox observed repeated jump while Space remained held: ${JSON.stringify(focusTransitions)}`);
+  }
+
+  if (attackerResult.playerHp !== 100 || attackerResult.playerGuard !== 100
+    || attackerResult.opponentHp !== 66
+    || defenderResult.playerHp !== 66 || defenderResult.playerGuard !== 100) {
+    throw new Error(`M131 buffered jump changed the one-hit authoritative exchange: ${JSON.stringify(evidence)}`);
+  }
+  if (attackerResult.feedbackTransitions.includes("parried")
+    || defenderResult.feedbackTransitions.includes("parry-success")) {
+    throw new Error(`M131 jump-buffer flight accidentally resolved as parry: ${JSON.stringify(evidence)}`);
+  }
+
+  return evidence.map((entry) => ({
+    ...entry,
+    jumpBufferKeyDownEpochMs: entry.browser === attacker.name ? jumpDown.epochMs : null,
+    jumpBufferRecoveryEpochMs: entry.browser === attacker.name ? ownRecovery.epochMs : null,
+    jumpBufferJumpEpochMs: entry.browser === attacker.name ? ownJump.epochMs : null,
+    jumpBufferIdleEpochMs: entry.browser === attacker.name ? ownIdle.epochMs : null,
   }));
 }
 
@@ -3575,6 +3722,21 @@ async function performArenaRecoveryBufferedRoll(session, elementId) {
   });
 }
 
+async function performArenaRecoveryBufferedJump(session, holdMs = 760) {
+  const boundedHoldMs = Math.max(520, Math.min(1200, Math.trunc(holdMs)));
+  await webdriver(session.base, "POST", `/session/${session.sessionId}/actions`, {
+    actions: [{
+      type: "key",
+      id: `keyboard-${session.name}`,
+      actions: [
+        { type: "keyDown", value: " " },
+        { type: "pause", duration: boundedHoldMs },
+        { type: "keyUp", value: " " },
+      ],
+    }],
+  });
+}
+
 async function performArenaAttack(session, elementId, xOffset = 200) {
   const origin = { "element-6066-11e4-a52e-4f735466cecf": elementId };
   await webdriver(session.base, "POST", `/session/${session.sessionId}/actions`, {
@@ -3659,8 +3821,8 @@ async function installUiObserver(session) {
     const threatBearing = document.querySelector('#threat-bearing');
     const threatGuardArc = document.querySelector('#threat-guard-arc');
     if (!target || !arena || !arenaStage || !overlay || !recovery || !threat || !threatCount || !threatSecondary || !threatSecondaryBearing || !threatSecondaryPhase || !threatSecondaryGuardArc || !threatBearing || !threatGuardArc) throw new Error('missing online UI flight target');
-    const state = { events: [], eventTransitions: [], keys: [], pointers: [], wheels: [], overlayTransitions: [], feedbackTransitions: [], recoveryTransitions: [], threatTransitions: [], recoveryTellMaxPixels: 0, parryTellMaxPixels: 0, online: '', startedAt: performance.now() };
-    const epochEvidence = new URLSearchParams(location.search).get('scenario') === 'uirollbuffer';
+    const state = { events: [], eventTransitions: [], keys: [], keyTransitions: [], pointers: [], wheels: [], overlayTransitions: [], feedbackTransitions: [], recoveryTransitions: [], threatTransitions: [], recoveryTellMaxPixels: 0, parryTellMaxPixels: 0, online: '', startedAt: performance.now() };
+    const epochEvidence = ['uirollbuffer', 'uijumpbuffer'].includes(new URLSearchParams(location.search).get('scenario'));
     const record = () => {
       const text = target.textContent?.trim() ?? '';
       if (/^Online - player #\\d+ - server tick \\d+$/.test(text)) state.online = text;
@@ -3720,7 +3882,16 @@ async function installUiObserver(session) {
       if (!previous || Object.keys(entry).some((key) => previous[key] !== entry[key])) state.threatTransitions.push(entry);
     };
     for (const type of ['keydown', 'keyup']) {
-      arena.addEventListener(type, (event) => state.keys.push(type + ':' + event.code), { capture: true });
+      arena.addEventListener(type, (event) => {
+        state.keys.push(type + ':' + event.code);
+        const entry = {
+          type,
+          code: event.code,
+          t: Number((performance.now() - state.startedAt).toFixed(1)),
+        };
+        if (epochEvidence) entry.epochMs = Date.now();
+        state.keyTransitions.push(entry);
+      }, { capture: true });
     }
     const pointerTypes = new URLSearchParams(location.search).get('scenario') === 'uirollbuffer'
       ? ['pointerdown', 'pointerup', 'pointermove']
@@ -4644,7 +4815,7 @@ async function waitForUiRespawnEvidence(entries, attacker, defender, timeoutMs) 
 
 async function readUiEvidence(session) {
   const value = await execute(session.base, session.sessionId, `
-    const state = window.__MYASO_M30_UI__ ?? { events: [], eventTransitions: [], keys: [], pointers: [], wheels: [], overlayTransitions: [], feedbackTransitions: [], recoveryTransitions: [], threatTransitions: [], recoveryTellMaxPixels: 0, parryTellMaxPixels: 0, online: '' };
+    const state = window.__MYASO_M30_UI__ ?? { events: [], eventTransitions: [], keys: [], keyTransitions: [], pointers: [], wheels: [], overlayTransitions: [], feedbackTransitions: [], recoveryTransitions: [], threatTransitions: [], recoveryTellMaxPixels: 0, parryTellMaxPixels: 0, online: '' };
     const match = state.online.match(/player #(\\d+)/);
     return {
       title: document.title,
@@ -4698,8 +4869,17 @@ async function readUiEvidence(session) {
       events: state.events.slice(),
       eventTransitions: (state.eventTransitions ?? []).slice(),
       keys: state.keys.slice(),
+      keyTransitions: (state.keyTransitions ?? []).slice(),
       pointers: state.pointers.slice(),
       wheels: (state.wheels ?? []).slice(),
+      acceptance: window.__MYASO_ACCEPTANCE_STATE__ ? {
+        scenario: window.__MYASO_ACCEPTANCE_STATE__.scenario ?? '',
+        playerNetId: Number(window.__MYASO_ACCEPTANCE_STATE__.playerNetId ?? 0),
+        focusNetId: Number(window.__MYASO_ACCEPTANCE_STATE__.focusNetId ?? 0),
+        serverTick: Number(window.__MYASO_ACCEPTANCE_STATE__.serverTick ?? 0),
+        ownActionTransitions: (window.__MYASO_ACCEPTANCE_STATE__.ownActionTransitions ?? []).map((entry) => ({ ...entry })),
+        focusActionTransitions: (window.__MYASO_ACCEPTANCE_STATE__.focusActionTransitions ?? []).map((entry) => ({ ...entry })),
+      } : null,
     };
   `);
   return { browser: session.name, ...value };
