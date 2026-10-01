@@ -16,7 +16,7 @@ const heavyKeyPulseMs = 120;
 // A full M62 threat chevron paints dozens of exact-tone pixels; a handful can
 // arise from raster overlap. Use one significance floor for positive and leak proof.
 const threatMarkerMinPixels = 8;
-if (!new Set(["damage", "inputloss", "parry", "dodge", "block", "guardbreak", "backblock", "respawn", "ui", "uirespawn", "uifeedback", "uihittell", "uivitals", "uiidentity", "uiscore", "uimatch", "uirematch", "uiffa3", "uikillfeed", "uifocus", "uithreat", "uithreatbearing", "uimultithreat", "uisecondarythreat", "uisecondarybearing", "uisecondaryphase", "uiguardarc", "uisecondaryguardarc", "uithreatmarkers", "uiparry", "uistun", "uiguardbreak", "uidodge", "uirecovery", "uirecoverytell", "uiattackintent", "uiheavy", "uiheavyinputloss", "uiheavyblock", "uiheavyparry", "uiheavydodge", "uiheavypunish", "uiheavyguardbreak", "uiheavyguardbreakpunish", "uifeint", "uirunningattack", "uidirectionallight", "uiguardbreaktell", "uiparrytell", "uiblockfacingtell", "uidodgetell", "uideathtell"]).has(scenario)) throw new Error(`unsupported MYASO_PVP_SCENARIO: ${scenario}`);
+if (!new Set(["damage", "inputloss", "parry", "dodge", "block", "guardbreak", "backblock", "respawn", "ui", "uirespawn", "uifeedback", "uihittell", "uivitals", "uiidentity", "uiscore", "uimatch", "uirematch", "uiffa3", "uikillfeed", "uifocus", "uithreat", "uithreatbearing", "uimultithreat", "uisecondarythreat", "uisecondarybearing", "uisecondaryphase", "uiguardarc", "uisecondaryguardarc", "uithreatmarkers", "uiparry", "uistun", "uiguardbreak", "uidodge", "uirecovery", "uirecoverytell", "uiattackintent", "uiheavy", "uiheavyinputloss", "uiheavyblock", "uiheavyparry", "uiheavydodge", "uiheavypunish", "uiheavyguardbreak", "uiheavyguardbreakpunish", "uifeint", "uirunningattack", "uidirectionallight", "uirollbuffer", "uiguardbreaktell", "uiparrytell", "uiblockfacingtell", "uidodgetell", "uideathtell"]).has(scenario)) throw new Error(`unsupported MYASO_PVP_SCENARIO: ${scenario}`);
 const staticPort = Number(process.env.MYASO_PVP_FLIGHT_HTTP_PORT ?? 4174);
 const browsers = [
   {
@@ -241,6 +241,9 @@ try {
   } else if (scenario === "uidirectionallight") {
     const results = await runOnlineUiDirectionalLightFlight(sessions);
     console.log(`M121_REAL_DIRECTIONAL_LIGHT ${JSON.stringify({ ok: true, results })}`);
+  } else if (scenario === "uirollbuffer") {
+    const results = await runOnlineUiRollBufferFlight(sessions);
+    console.log(`M129_REAL_RECOVERY_ROLL_BUFFER ${JSON.stringify({ ok: true, results })}`);
   } else if (scenario === "uiguardbreaktell") {
     const results = await runOnlineUiGuardBreakTellFlight(sessions);
     console.log(`M40_FFA_GUARD_BREAK_TELL ${JSON.stringify({ ok: true, results })}`);
@@ -356,14 +359,14 @@ async function startBrowser(browser) {
     pageLoad: 30_000,
     implicit: 0,
   });
-  if (scenario === "uiparry" || scenario === "uistun" || scenario === "uiguardbreak" || scenario === "uidodge" || scenario === "uiattackintent" || scenario === "uiheavy" || scenario === "uiheavyinputloss" || scenario === "uiheavyblock" || scenario === "uiheavyparry" || scenario === "uiheavydodge" || scenario === "uiheavypunish" || scenario === "uiheavyguardbreak" || scenario === "uiheavyguardbreakpunish" || scenario === "uifeint" || scenario === "uirunningattack" || scenario === "uidirectionallight" || scenario === "uiguardbreaktell" || scenario === "uiparrytell" || scenario === "uiblockfacingtell" || scenario === "uidodgetell") {
+  if (scenario === "uiparry" || scenario === "uistun" || scenario === "uiguardbreak" || scenario === "uidodge" || scenario === "uiattackintent" || scenario === "uiheavy" || scenario === "uiheavyinputloss" || scenario === "uiheavyblock" || scenario === "uiheavyparry" || scenario === "uiheavydodge" || scenario === "uiheavypunish" || scenario === "uiheavyguardbreak" || scenario === "uiheavyguardbreakpunish" || scenario === "uifeint" || scenario === "uirunningattack" || scenario === "uidirectionallight" || scenario === "uirollbuffer" || scenario === "uiguardbreaktell" || scenario === "uiparrytell" || scenario === "uiblockfacingtell" || scenario === "uidodgetell") {
     await webdriver(base, "POST", `/session/${sessionId}/window/rect`, { x: 0, y: 0, width: 1280, height: 900 });
   }
   return { ...browser, child, base, sessionId };
 }
 
 async function navigate(session, gameUrl, certificateHash) {
-  const page = scenario === "ui" || scenario === "uirespawn" || scenario === "uifeedback" || scenario === "uihittell" || scenario === "uivitals" || scenario === "uiidentity" || scenario === "uiscore" || scenario === "uimatch" || scenario === "uirematch" || scenario === "uiffa3" || scenario === "uikillfeed" || scenario === "uifocus" || scenario === "uithreat" || scenario === "uithreatbearing" || scenario === "uimultithreat" || scenario === "uisecondarythreat" || scenario === "uisecondarybearing" || scenario === "uisecondaryphase" || scenario === "uiguardarc" || scenario === "uisecondaryguardarc" || scenario === "uithreatmarkers" || scenario === "uiparry" || scenario === "uistun" || scenario === "uiguardbreak" || scenario === "uidodge" || scenario === "uirecovery" || scenario === "uirecoverytell" || scenario === "uiattackintent" || scenario === "uiheavy" || scenario === "uiheavyinputloss" || scenario === "uiheavyblock" || scenario === "uiheavyparry" || scenario === "uiheavydodge" || scenario === "uiheavypunish" || scenario === "uiheavyguardbreak" || scenario === "uiheavyguardbreakpunish" || scenario === "uifeint" || scenario === "uirunningattack" || scenario === "uidirectionallight" || scenario === "uiguardbreaktell" || scenario === "uiparrytell" || scenario === "uiblockfacingtell" || scenario === "uidodgetell" || scenario === "uideathtell" ? "index.html" : "pvp-flight.html";
+  const page = scenario === "ui" || scenario === "uirespawn" || scenario === "uifeedback" || scenario === "uihittell" || scenario === "uivitals" || scenario === "uiidentity" || scenario === "uiscore" || scenario === "uimatch" || scenario === "uirematch" || scenario === "uiffa3" || scenario === "uikillfeed" || scenario === "uifocus" || scenario === "uithreat" || scenario === "uithreatbearing" || scenario === "uimultithreat" || scenario === "uisecondarythreat" || scenario === "uisecondarybearing" || scenario === "uisecondaryphase" || scenario === "uiguardarc" || scenario === "uisecondaryguardarc" || scenario === "uithreatmarkers" || scenario === "uiparry" || scenario === "uistun" || scenario === "uiguardbreak" || scenario === "uidodge" || scenario === "uirecovery" || scenario === "uirecoverytell" || scenario === "uiattackintent" || scenario === "uiheavy" || scenario === "uiheavyinputloss" || scenario === "uiheavyblock" || scenario === "uiheavyparry" || scenario === "uiheavydodge" || scenario === "uiheavypunish" || scenario === "uiheavyguardbreak" || scenario === "uiheavyguardbreakpunish" || scenario === "uifeint" || scenario === "uirunningattack" || scenario === "uidirectionallight" || scenario === "uirollbuffer" || scenario === "uiguardbreaktell" || scenario === "uiparrytell" || scenario === "uiblockfacingtell" || scenario === "uidodgetell" || scenario === "uideathtell" ? "index.html" : "pvp-flight.html";
   const url = new URL(`http://127.0.0.1:${staticPort}/web/${page}`);
   url.searchParams.set("server", gameUrl);
   url.searchParams.set("cert", certificateHash);
@@ -1121,6 +1124,137 @@ async function runOnlineUiDirectionalLightFlight(entries) {
     throw new Error(`M121 attacker never rendered left-sweep commitment: ${JSON.stringify(attackerResult.events)}`);
   }
   return evidence;
+}
+
+async function runOnlineUiRollBufferFlight(entries) {
+  const staged = await prepareHeavyCounterplayFlight(
+    entries,
+    "M129 recovery roll buffer",
+    { attackerName: "chrome", defenderName: "firefox", movementMs: 150 },
+  );
+  const { attacker, defender, attackerElementId, movementCode } = staged;
+  const attackOffset = movementCode === "KeyD" ? 200 : -200;
+  const beforeAttacker = await readUiEvidence(attacker);
+  const pointerOffset = beforeAttacker.pointers.length;
+  const wheelOffset = beforeAttacker.wheels.length;
+
+  // First prove a normal committed light with genuine LMB. Do not retarget the
+  // pointer until Firefox has independently observed the authoritative recovery.
+  await performArenaAttack(attacker, attackerElementId, attackOffset);
+
+  const recoveryDeadline = Date.now() + 900;
+  let recoveryWitness = null;
+  while (Date.now() < recoveryDeadline) {
+    const current = await readUiEvidence(defender);
+    const attackRecoveryIndex = current.recoveryTransitions.findIndex((entry) =>
+      entry.visible && entry.state === "attack-recovery"
+        && entry.label === "PUNISH" && entry.detail === "Attack recovery"
+        && Number.isFinite(entry.epochMs));
+    if (attackRecoveryIndex >= 0) {
+      recoveryWitness = { evidence: current, attackRecoveryIndex };
+      break;
+    }
+    await sleep(10);
+  }
+  if (!recoveryWitness) {
+    throw new Error("M129 Firefox never observed authoritative light recovery before the real wheel");
+  }
+
+  // Once recovery is real, retarget the pointer and send one genuine
+  // wheel-forward after a browser-owned pause. Whether it was truly bufferable
+  // is proved below from cross-browser epoch timestamps, not requested timings.
+  await performArenaRecoveryBufferedRoll(attacker, attackerElementId);
+
+  const deadline = Date.now() + 1200;
+  let evidence = null;
+  while (Date.now() < deadline) {
+    const current = await Promise.all(entries.map(readUiEvidence));
+    const defenderResult = current.find((entry) => entry.browser === defender.name);
+    const attackRecoveryIndex = defenderResult?.recoveryTransitions.findIndex((entry) =>
+      entry.visible && entry.state === "attack-recovery"
+        && entry.label === "PUNISH" && entry.detail === "Attack recovery"
+        && Number.isFinite(entry.epochMs)) ?? -1;
+    const dodgeRecoveryIndex = defenderResult?.recoveryTransitions.findIndex((entry, index) =>
+      index > attackRecoveryIndex && entry.visible && entry.state === "dodge-recovery"
+        && entry.label === "PUNISH" && entry.detail === "Dodge recovery"
+        && Number.isFinite(entry.epochMs)) ?? -1;
+    if (attackRecoveryIndex >= 0 && dodgeRecoveryIndex > attackRecoveryIndex) {
+      evidence = current;
+      break;
+    }
+    await sleep(20);
+  }
+  if (!evidence) evidence = await Promise.all(entries.map(readUiEvidence));
+
+  const attackerResult = evidence.find((entry) => entry.browser === attacker.name);
+  const defenderResult = evidence.find((entry) => entry.browser === defender.name);
+  if (!attackerResult || !defenderResult) {
+    throw new Error(`M129 incomplete roll-buffer evidence: ${JSON.stringify(evidence)}`);
+  }
+
+  const pointers = attackerResult.pointers.slice(pointerOffset);
+  const wheels = attackerResult.wheels.slice(wheelOffset);
+  const lightDown = pointers.find((entry) => entry.type === "pointerdown" && entry.button === 0);
+  const lightUp = pointers.find((entry) => entry.type === "pointerup" && entry.button === 0);
+  const perpendicularAim = pointers.find((entry) =>
+    entry.type === "pointermove" && Number.isFinite(entry.epochMs)
+      && Math.abs(entry.x - 0.5) <= 0.12 && entry.y >= 0.68);
+  const rollWheels = wheels.filter((entry) => entry.deltaY < 0);
+  const rollWheel = rollWheels[0];
+  if (!lightDown || !lightUp || !perpendicularAim || rollWheels.length !== 1
+    || !rollWheel || !Number.isFinite(rollWheel.epochMs)) {
+    throw new Error(`M129 real LMB + perpendicular pointer aim + single wheel-forward controls were not delivered: ${JSON.stringify(attackerResult)}`);
+  }
+  if (perpendicularAim.epochMs > rollWheel.epochMs) {
+    throw new Error(`M129 pointer retarget happened after wheel-forward: aim=${perpendicularAim.epochMs} wheel=${rollWheel.epochMs}`);
+  }
+
+  const attackRecoveryIndex = defenderResult.recoveryTransitions.findIndex((entry) =>
+    entry.visible && entry.state === "attack-recovery"
+      && entry.label === "PUNISH" && entry.detail === "Attack recovery"
+      && Number.isFinite(entry.epochMs));
+  const attackRecoveryExitIndex = defenderResult.recoveryTransitions.findIndex((entry, index) =>
+    index > attackRecoveryIndex
+      && Number.isFinite(entry.epochMs)
+      && !(entry.visible && entry.state === "attack-recovery"));
+  const dodgeRecoveryIndex = defenderResult.recoveryTransitions.findIndex((entry, index) =>
+    index > attackRecoveryIndex && entry.visible && entry.state === "dodge-recovery"
+      && entry.label === "PUNISH" && entry.detail === "Dodge recovery"
+      && Number.isFinite(entry.epochMs));
+  if (attackRecoveryIndex < 0 || attackRecoveryExitIndex <= attackRecoveryIndex
+    || dodgeRecoveryIndex <= attackRecoveryIndex) {
+    throw new Error(`M129 remote authority did not show a complete attack-recovery -> dodge-recovery sequence: ${JSON.stringify(defenderResult.recoveryTransitions)}`);
+  }
+
+  const attackRecovery = defenderResult.recoveryTransitions[attackRecoveryIndex];
+  const attackRecoveryExit = defenderResult.recoveryTransitions[attackRecoveryExitIndex];
+  if (perpendicularAim.epochMs < attackRecovery.epochMs
+    || rollWheel.epochMs < attackRecovery.epochMs
+    || rollWheel.epochMs >= attackRecoveryExit.epochMs) {
+    throw new Error(`M129 genuine wheel was not inside Firefox's authoritative attack-recovery interval: ${JSON.stringify({
+      attackRecovery,
+      attackRecoveryExit,
+      perpendicularAim,
+      rollWheel,
+    })}`);
+  }
+
+  if (attackerResult.playerHp !== 100 || attackerResult.playerGuard !== 100
+    || attackerResult.opponentHp !== 66
+    || defenderResult.playerHp !== 66 || defenderResult.playerGuard !== 100) {
+    throw new Error(`M129 buffered roll changed the one-hit authoritative exchange: ${JSON.stringify(evidence)}`);
+  }
+  if (attackerResult.feedbackTransitions.includes("parried")
+    || defenderResult.feedbackTransitions.includes("parry-success")) {
+    throw new Error(`M129 roll-buffer flight accidentally resolved as parry: ${JSON.stringify(evidence)}`);
+  }
+
+  return evidence.map((entry) => ({
+    ...entry,
+    rollBufferWheelEpochMs: entry.browser === attacker.name ? rollWheel.epochMs : null,
+    rollBufferRecoveryStartEpochMs: entry.browser === defender.name ? attackRecovery.epochMs : null,
+    rollBufferRecoveryExitEpochMs: entry.browser === defender.name ? attackRecoveryExit.epochMs : null,
+  }));
 }
 
 async function runOnlineUiRunningAttackFlight(entries) {
@@ -3392,6 +3526,37 @@ async function performArenaFeint(session, elementId, xOffset = 200) {
   }
 }
 
+async function performArenaRecoveryBufferedRoll(session, elementId) {
+  const origin = { "element-6066-11e4-a52e-4f735466cecf": elementId };
+  // This command is issued only after Firefox has independently observed the
+  // authoritative light recovery. Pointer retarget and the real wheel share one
+  // W3C timeline; the browser-owned pause moves the wheel toward the final 90 ms
+  // without relying on the original LMB timestamp.
+  await webdriver(session.base, "POST", `/session/${session.sessionId}/actions`, {
+    actions: [
+      {
+        type: "pointer",
+        id: `mouse-${session.name}`,
+        parameters: { pointerType: "mouse" },
+        actions: [
+          { type: "pointerMove", duration: 0, origin, x: 0, y: 180 },
+          { type: "pause", duration: 145 },
+          { type: "pause", duration: 0 },
+        ],
+      },
+      {
+        type: "wheel",
+        id: `wheel-${session.name}`,
+        actions: [
+          { type: "pause", duration: 0 },
+          { type: "pause", duration: 145 },
+          { type: "scroll", x: 0, y: 0, deltaX: 0, deltaY: -120, duration: 0, origin },
+        ],
+      },
+    ],
+  });
+}
+
 async function performArenaAttack(session, elementId, xOffset = 200) {
   const origin = { "element-6066-11e4-a52e-4f735466cecf": elementId };
   await webdriver(session.base, "POST", `/session/${session.sessionId}/actions`, {
@@ -3477,6 +3642,7 @@ async function installUiObserver(session) {
     const threatGuardArc = document.querySelector('#threat-guard-arc');
     if (!target || !arena || !arenaStage || !overlay || !recovery || !threat || !threatCount || !threatSecondary || !threatSecondaryBearing || !threatSecondaryPhase || !threatSecondaryGuardArc || !threatBearing || !threatGuardArc) throw new Error('missing online UI flight target');
     const state = { events: [], eventTransitions: [], keys: [], pointers: [], wheels: [], overlayTransitions: [], feedbackTransitions: [], recoveryTransitions: [], threatTransitions: [], recoveryTellMaxPixels: 0, parryTellMaxPixels: 0, online: '', startedAt: performance.now() };
+    const epochEvidence = new URLSearchParams(location.search).get('scenario') === 'uirollbuffer';
     const record = () => {
       const text = target.textContent?.trim() ?? '';
       if (/^Online - player #\\d+ - server tick \\d+$/.test(text)) state.online = text;
@@ -3512,7 +3678,11 @@ async function installUiObserver(session) {
         detail: document.querySelector('#opponent-recovery-detail')?.textContent?.trim() ?? '',
       };
       const previous = state.recoveryTransitions.at(-1);
-      if (!previous || Object.keys(entry).some((key) => previous[key] !== entry[key])) state.recoveryTransitions.push(entry);
+      const changed = !previous || ['visible', 'state', 'label', 'detail'].some((key) => previous[key] !== entry[key]);
+      if (changed) {
+        if (epochEvidence) entry.epochMs = Date.now();
+        state.recoveryTransitions.push(entry);
+      }
     };
     const recordThreat = () => {
       const entry = {
@@ -3534,23 +3704,30 @@ async function installUiObserver(session) {
     for (const type of ['keydown', 'keyup']) {
       arena.addEventListener(type, (event) => state.keys.push(type + ':' + event.code), { capture: true });
     }
-    for (const type of ['pointerdown', 'pointerup']) {
+    const pointerTypes = new URLSearchParams(location.search).get('scenario') === 'uirollbuffer'
+      ? ['pointerdown', 'pointerup', 'pointermove']
+      : ['pointerdown', 'pointerup'];
+    for (const type of pointerTypes) {
       arena.addEventListener(type, (event) => {
         const rect = arena.getBoundingClientRect();
-        state.pointers.push({
+        const entry = {
           type,
           button: event.button,
           x: Number(((event.clientX - rect.left) / rect.width).toFixed(3)),
           y: Number(((event.clientY - rect.top) / rect.height).toFixed(3)),
           t: Number((performance.now() - state.startedAt).toFixed(1)),
-        });
+        };
+        if (epochEvidence) entry.epochMs = Date.now();
+        state.pointers.push(entry);
       }, { capture: true });
     }
     arena.addEventListener('wheel', (event) => {
-      state.wheels.push({
+      const entry = {
         deltaY: event.deltaY,
         t: Number((performance.now() - state.startedAt).toFixed(1)),
-      });
+      };
+      if (epochEvidence) entry.epochMs = Date.now();
+      state.wheels.push(entry);
     }, { capture: true });
     record();
     recordOverlay();

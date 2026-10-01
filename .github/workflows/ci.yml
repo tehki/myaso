@@ -284,6 +284,13 @@ jobs:
           node --check scripts/pvp_browser_flight_runner.mjs
           node scripts/pvp_browser_flight_runner.mjs
 
+      - name: Validate M129 real recovery roll buffer
+        env:
+          MYASO_PVP_SCENARIO: "uirollbuffer"
+        run: |
+          node --check scripts/pvp_browser_flight_runner.mjs
+          node scripts/pvp_browser_flight_runner.mjs
+
       - name: Validate M121 first-to-five duel kernel
         run: |
           cargo test --locked --manifest-path server/Cargo.toml first_to_kill_target_declares_winner_and_freezes_match_state
