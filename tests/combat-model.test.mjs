@@ -701,6 +701,64 @@ test("later roll intent overrides a buffered light attack", () => {
   assert.equal(attacker.stamina, COMBAT.stamina.max - COMBAT.dodge.staminaCost);
 });
 
+test("late fresh jump buffers through full light recovery and charges stamina on execution", () => {
+  const world = duel({ distance: 200 });
+  const { attacker, target } = enterLightRecovery(world);
+
+  advance(world, COMBAT.attack.recoveryMs - 85, { a: { aimX: target.x, aimY: target.y } });
+  stepWorld(world, { a: { jump: true, aimX: target.x, aimY: target.y } }, 5);
+  assert.equal(attacker.action, "attack_recovery");
+  assert.equal(attacker.bufferedJump, true);
+  assert.equal(attacker.stamina, COMBAT.stamina.max);
+
+  stepWorld(world, { a: { aimX: target.x, aimY: target.y } }, 5);
+  advance(world, 75, { a: { aimX: target.x, aimY: target.y } });
+  assert.equal(attacker.action, "jump");
+  assert.equal(attacker.actionElapsedMs, 0);
+  assert.equal(attacker.bufferedJump, false);
+  assert.equal(attacker.stamina, COMBAT.stamina.max - COMBAT.jump.staminaCost);
+});
+
+test("early held jump is not promoted and held Space does not auto-bunny-hop", () => {
+  const world = duel({ distance: 200 });
+  const { attacker, target } = enterLightRecovery(world);
+
+  advance(world, 100, { a: { aimX: target.x, aimY: target.y } });
+  const heldJump = { a: { jump: true, aimX: target.x, aimY: target.y } };
+  stepWorld(world, heldJump, 5);
+  assert.equal(attacker.bufferedJump, false);
+
+  advance(world, 150, heldJump);
+  assert.equal(attacker.action, "idle");
+  assert.equal(attacker.stamina, COMBAT.stamina.max);
+
+  stepWorld(world, heldJump, 5);
+  assert.equal(attacker.action, "idle");
+
+  stepWorld(world, { a: { aimX: target.x, aimY: target.y } }, 5);
+  stepWorld(world, heldJump, 5);
+  assert.equal(attacker.action, "jump");
+  assert.equal(attacker.stamina, COMBAT.stamina.max - COMBAT.jump.staminaCost);
+});
+
+test("later jump intent overrides a buffered light attack", () => {
+  const world = duel({ distance: 200 });
+  const { attacker, target } = enterLightRecovery(world);
+
+  advance(world, COMBAT.attack.recoveryMs - 85, { a: { aimX: target.x, aimY: target.y } });
+  stepWorld(world, { a: { attack: true, aimX: target.x, aimY: target.y } }, 5);
+  assert.equal(attacker.bufferedLightAttack, true);
+
+  stepWorld(world, { a: { aimX: target.x, aimY: target.y } }, 5);
+  stepWorld(world, { a: { jump: true, aimX: target.x, aimY: target.y } }, 5);
+  assert.equal(attacker.bufferedLightAttack, false);
+  assert.equal(attacker.bufferedJump, true);
+
+  advance(world, 70, { a: { aimX: target.x, aimY: target.y } });
+  assert.equal(attacker.action, "jump");
+  assert.equal(attacker.stamina, COMBAT.stamina.max - COMBAT.jump.staminaCost);
+});
+
 test("holding light does not auto-chain after recovery", () => {
   const world = duel({ distance: 200 });
   const [attacker, target] = world.fighters;
