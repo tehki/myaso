@@ -2585,6 +2585,217 @@ fn later_authoritative_jump_overrides_buffered_light() {
 }
 
 #[test]
+fn late_authoritative_kick_buffers_through_recovery_and_charges_on_execution() {
+    let mut world = duel(200.0);
+    advance(
+        &mut world,
+        5.0,
+        InputIntent {
+            attack: true,
+            facing_radians: 0.0,
+            ..InputIntent::default()
+        },
+        InputIntent::default(),
+    );
+    advance(
+        &mut world,
+        130.0,
+        InputIntent::default(),
+        InputIntent::default(),
+    );
+    advance(
+        &mut world,
+        80.0,
+        InputIntent::default(),
+        InputIntent::default(),
+    );
+    advance(
+        &mut world,
+        170.0,
+        InputIntent::default(),
+        InputIntent::default(),
+    );
+
+    advance(
+        &mut world,
+        5.0,
+        InputIntent {
+            kick: true,
+            facing_radians: 0.0,
+            ..InputIntent::default()
+        },
+        InputIntent::default(),
+    );
+    assert_eq!(
+        world.fighter(1).expect("attacker").action,
+        Action::AttackRecovery
+    );
+    assert_eq!(
+        world.fighter(1).expect("attacker").stamina.round() as u8,
+        100
+    );
+
+    advance(
+        &mut world,
+        5.0,
+        InputIntent::default(),
+        InputIntent::default(),
+    );
+    advance(
+        &mut world,
+        75.0,
+        InputIntent::default(),
+        InputIntent::default(),
+    );
+    assert_eq!(
+        world.fighter(1).expect("attacker").action,
+        Action::KickWindup
+    );
+    assert_eq!(
+        world.fighter(1).expect("attacker").stamina.round() as u8,
+        82
+    );
+}
+
+#[test]
+fn early_held_authoritative_kick_is_not_promoted_or_auto_repeated() {
+    let mut world = duel(200.0);
+    advance(
+        &mut world,
+        5.0,
+        InputIntent {
+            attack: true,
+            facing_radians: 0.0,
+            ..InputIntent::default()
+        },
+        InputIntent::default(),
+    );
+    advance(
+        &mut world,
+        130.0,
+        InputIntent::default(),
+        InputIntent::default(),
+    );
+    advance(
+        &mut world,
+        80.0,
+        InputIntent::default(),
+        InputIntent::default(),
+    );
+    advance(
+        &mut world,
+        100.0,
+        InputIntent::default(),
+        InputIntent::default(),
+    );
+
+    let held_kick = InputIntent {
+        kick: true,
+        facing_radians: 0.0,
+        ..InputIntent::default()
+    };
+    advance(&mut world, 5.0, held_kick, InputIntent::default());
+    advance(&mut world, 150.0, held_kick, InputIntent::default());
+    assert_eq!(world.fighter(1).expect("attacker").action, Action::Idle);
+    assert_eq!(
+        world.fighter(1).expect("attacker").stamina.round() as u8,
+        100
+    );
+
+    advance(&mut world, 5.0, held_kick, InputIntent::default());
+    assert_eq!(world.fighter(1).expect("attacker").action, Action::Idle);
+
+    advance(
+        &mut world,
+        5.0,
+        InputIntent::default(),
+        InputIntent::default(),
+    );
+    advance(&mut world, 5.0, held_kick, InputIntent::default());
+    assert_eq!(
+        world.fighter(1).expect("attacker").action,
+        Action::KickWindup
+    );
+    assert_eq!(
+        world.fighter(1).expect("attacker").stamina.round() as u8,
+        82
+    );
+}
+
+#[test]
+fn later_authoritative_kick_overrides_buffered_light() {
+    let mut world = duel(200.0);
+    advance(
+        &mut world,
+        5.0,
+        InputIntent {
+            attack: true,
+            facing_radians: 0.0,
+            ..InputIntent::default()
+        },
+        InputIntent::default(),
+    );
+    advance(
+        &mut world,
+        130.0,
+        InputIntent::default(),
+        InputIntent::default(),
+    );
+    advance(
+        &mut world,
+        80.0,
+        InputIntent::default(),
+        InputIntent::default(),
+    );
+    advance(
+        &mut world,
+        170.0,
+        InputIntent::default(),
+        InputIntent::default(),
+    );
+    advance(
+        &mut world,
+        5.0,
+        InputIntent {
+            attack: true,
+            facing_radians: 0.0,
+            ..InputIntent::default()
+        },
+        InputIntent::default(),
+    );
+    advance(
+        &mut world,
+        5.0,
+        InputIntent::default(),
+        InputIntent::default(),
+    );
+    advance(
+        &mut world,
+        5.0,
+        InputIntent {
+            kick: true,
+            facing_radians: 0.0,
+            ..InputIntent::default()
+        },
+        InputIntent::default(),
+    );
+    advance(
+        &mut world,
+        70.0,
+        InputIntent::default(),
+        InputIntent::default(),
+    );
+    assert_eq!(
+        world.fighter(1).expect("attacker").action,
+        Action::KickWindup
+    );
+    assert_eq!(
+        world.fighter(1).expect("attacker").stamina.round() as u8,
+        82
+    );
+}
+
+#[test]
 fn held_light_does_not_auto_chain_authoritatively() {
     let mut world = duel(200.0);
     let held = InputIntent {

@@ -27,6 +27,7 @@ const LIGHT_ATTACK_BUFFER_WINDOW_MS: f32 = 90.0;
 const BLOCK_BUFFER_WINDOW_MS: f32 = 90.0;
 const DODGE_BUFFER_WINDOW_MS: f32 = 90.0;
 const JUMP_BUFFER_WINDOW_MS: f32 = 90.0;
+const KICK_BUFFER_WINDOW_MS: f32 = 90.0;
 const RUNNING_ATTACK_WINDUP_MS: f32 = 160.0;
 const RUNNING_ATTACK_ACTIVE_MS: f32 = 90.0;
 const RUNNING_ATTACK_RECOVERY_MS: f32 = 310.0;
@@ -203,6 +204,15 @@ impl Default for InputIntent {
     }
 }
 
+#[derive(Debug, Clone, Copy, Default)]
+struct ActionEdges {
+    attack: bool,
+    block: bool,
+    dodge: bool,
+    kick: bool,
+    jump: bool,
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct Fighter {
     pub net_id: u32,
@@ -228,6 +238,7 @@ pub struct Fighter {
     attack_input_was_down: bool,
     block_input_was_down: bool,
     dodge_input_was_down: bool,
+    kick_input_was_down: bool,
     jump_input_was_down: bool,
     buffered_light_attack: bool,
     buffered_attack_lateral: f32,
@@ -235,6 +246,7 @@ pub struct Fighter {
     buffered_dodge: bool,
     buffered_dodge_dir_x: f32,
     buffered_dodge_dir_y: f32,
+    buffered_kick: bool,
     buffered_jump: bool,
     dodge_dir_x: f32,
     dodge_dir_y: f32,
@@ -271,6 +283,7 @@ impl Fighter {
             attack_input_was_down: false,
             block_input_was_down: false,
             dodge_input_was_down: false,
+            kick_input_was_down: false,
             jump_input_was_down: false,
             buffered_light_attack: false,
             buffered_attack_lateral: 0.0,
@@ -278,6 +291,7 @@ impl Fighter {
             buffered_dodge: false,
             buffered_dodge_dir_x: 0.0,
             buffered_dodge_dir_y: 0.0,
+            buffered_kick: false,
             buffered_jump: false,
             dodge_dir_x: 0.0,
             dodge_dir_y: 0.0,
@@ -334,6 +348,7 @@ impl Fighter {
         self.clear_light_attack_buffer();
         self.buffered_block = false;
         self.clear_buffered_dodge();
+        self.buffered_kick = false;
         self.buffered_jump = false;
     }
 
@@ -343,6 +358,12 @@ impl Fighter {
         self.dodge_dir_y = dir_y;
         self.roll_hit_targets.clear();
         self.set_action(Action::Dodge, DODGE_DURATION_MS);
+    }
+
+    fn begin_kick(&mut self) {
+        self.clear_recovery_input_buffer();
+        self.attack_hit_targets.clear();
+        self.set_action(Action::KickWindup, KICK_WINDUP_MS);
     }
 
     fn begin_light_attack(&mut self, lateral: f32) {
@@ -358,6 +379,14 @@ impl Fighter {
     }
 
     fn finish_light_recovery(&mut self, now_ms: f32) {
+        if self.buffered_kick {
+            if spend_stamina(now_ms, self, KICK_STAMINA_COST) {
+                self.begin_kick();
+            } else {
+                self.set_action(Action::Idle, 0.0);
+            }
+            return;
+        }
         if self.buffered_jump {
             if spend_stamina(now_ms, self, JUMP_STAMINA_COST) {
                 self.set_action(Action::Jump, JUMP_DURATION_MS);
@@ -589,28 +618,24 @@ impl World {
             }
 
             let input = normalize_input(fighter.input_with_pending_actions());
-            let attack_pressed = input.attack && !fighter.attack_input_was_down;
-            let block_pressed = input.block && !fighter.block_input_was_down;
-            let dodge_pressed = input.dodge && !fighter.dodge_input_was_down;
-            let jump_pressed = input.jump && !fighter.jump_input_was_down;
+            let edges = ActionEdges {
+                attack: input.attack && !fighter.attack_input_was_down,
+                block: input.block && !fighter.block_input_was_down,
+                dodge: input.dodge && !fighter.dodge_input_was_down,
+                kick: input.kick && !fighter.kick_input_was_down,
+                jump: input.jump && !fighter.jump_input_was_down,
+            };
             if fighter.action != Action::Knockdown {
                 fighter.facing = normalize_angle(input.facing_radians);
             }
-            begin_requested_action(
-                self.now_ms,
-                fighter,
-                input,
-                attack_pressed,
-                block_pressed,
-                dodge_pressed,
-                jump_pressed,
-            );
+            begin_requested_action(self.now_ms, fighter, input, edges);
             move_fighter(self.width, self.height, fighter, input, dt_ms);
             advance_action(self.now_ms, fighter, input, dt_ms);
             update_stamina(self.now_ms, fighter, input, dt_ms);
             fighter.attack_input_was_down = input.attack;
             fighter.block_input_was_down = input.block;
             fighter.dodge_input_was_down = input.dodge;
+            fighter.kick_input_was_down = input.kick;
             fighter.jump_input_was_down = input.jump;
             fighter.clear_pending_actions();
 
@@ -672,23 +697,21 @@ fn begin_requested_action(
     now_ms: f32,
     fighter: &mut Fighter,
     input: InputIntent,
-    attack_pressed: bool,
-    block_pressed: bool,
-    dodge_pressed: bool,
-    jump_pressed: bool,
+    edges: ActionEdges,
 ) {
     let light_recovery = matches!(
         fighter.action,
         Action::AttackRecovery | Action::AttackLeftRecovery | Action::AttackRightRecovery
     );
-    if light_recovery && (attack_pressed || block_pressed || dodge_pressed || jump_pressed) {
+    if light_recovery && (edges.attack || edges.block || edges.dodge || edges.kick || edges.jump) {
         let remaining_ms = fighter.action_duration_ms - fighter.action_elapsed_ms;
-        if block_pressed && remaining_ms <= BLOCK_BUFFER_WINDOW_MS + EPSILON {
+        if edges.block && remaining_ms <= BLOCK_BUFFER_WINDOW_MS + EPSILON {
             fighter.clear_light_attack_buffer();
             fighter.clear_buffered_dodge();
+            fighter.buffered_kick = false;
             fighter.buffered_jump = false;
             fighter.buffered_block = true;
-        } else if dodge_pressed
+        } else if edges.dodge
             && remaining_ms <= DODGE_BUFFER_WINDOW_MS + EPSILON
             && fighter.stamina + EPSILON >= DODGE_STAMINA_COST
         {
@@ -697,18 +720,30 @@ fn begin_requested_action(
             fighter.buffered_dodge = true;
             fighter.buffered_dodge_dir_x = fighter.facing.cos();
             fighter.buffered_dodge_dir_y = fighter.facing.sin();
+            fighter.buffered_kick = false;
             fighter.buffered_jump = false;
-        } else if jump_pressed
+        } else if edges.jump
             && remaining_ms <= JUMP_BUFFER_WINDOW_MS + EPSILON
             && fighter.stamina + EPSILON >= JUMP_STAMINA_COST
         {
             fighter.clear_light_attack_buffer();
             fighter.buffered_block = false;
             fighter.clear_buffered_dodge();
+            fighter.buffered_kick = false;
             fighter.buffered_jump = true;
-        } else if attack_pressed && remaining_ms <= LIGHT_ATTACK_BUFFER_WINDOW_MS + EPSILON {
+        } else if edges.kick
+            && remaining_ms <= KICK_BUFFER_WINDOW_MS + EPSILON
+            && fighter.stamina + EPSILON >= KICK_STAMINA_COST
+        {
+            fighter.clear_light_attack_buffer();
             fighter.buffered_block = false;
             fighter.clear_buffered_dodge();
+            fighter.buffered_jump = false;
+            fighter.buffered_kick = true;
+        } else if edges.attack && remaining_ms <= LIGHT_ATTACK_BUFFER_WINDOW_MS + EPSILON {
+            fighter.buffered_block = false;
+            fighter.clear_buffered_dodge();
+            fighter.buffered_kick = false;
             fighter.buffered_jump = false;
             fighter.buffered_light_attack = true;
             fighter.buffered_attack_lateral =
@@ -735,7 +770,7 @@ fn begin_requested_action(
     }
 
     if fighter.action == Action::Jump
-        && attack_pressed
+        && edges.attack
         && spend_stamina(now_ms, fighter, JUMP_ATTACK_STAMINA_COST)
     {
         fighter.attack_hit_targets.clear();
@@ -748,21 +783,20 @@ fn begin_requested_action(
         return;
     }
 
-    if dodge_pressed && spend_stamina(now_ms, fighter, DODGE_STAMINA_COST) {
+    if edges.dodge && spend_stamina(now_ms, fighter, DODGE_STAMINA_COST) {
         fighter.begin_dodge(fighter.facing.cos(), fighter.facing.sin());
         return;
     }
 
-    if input.kick
+    if edges.kick
         && fighter.action == Action::Idle
         && spend_stamina(now_ms, fighter, KICK_STAMINA_COST)
     {
-        fighter.attack_hit_targets.clear();
-        fighter.set_action(Action::KickWindup, KICK_WINDUP_MS);
+        fighter.begin_kick();
         return;
     }
 
-    if jump_pressed
+    if edges.jump
         && fighter.action == Action::Idle
         && spend_stamina(now_ms, fighter, JUMP_STAMINA_COST)
     {
@@ -771,7 +805,7 @@ fn begin_requested_action(
     }
 
     let moving = input.move_x.hypot(input.move_y) >= 0.5;
-    if attack_pressed
+    if edges.attack
         && input.run
         && moving
         && fighter.action == Action::Idle
@@ -788,7 +822,7 @@ fn begin_requested_action(
         return;
     }
 
-    if attack_pressed && fighter.action == Action::Idle {
+    if edges.attack && fighter.action == Action::Idle {
         let lateral = fighter.facing.sin() * input.move_x - fighter.facing.cos() * input.move_y;
         fighter.begin_light_attack(lateral);
         return;
@@ -1328,6 +1362,7 @@ fn respawn_fighter(fighter: &mut Fighter) {
     fighter.attack_input_was_down = false;
     fighter.block_input_was_down = false;
     fighter.dodge_input_was_down = false;
+    fighter.kick_input_was_down = false;
     fighter.jump_input_was_down = false;
     fighter.clear_pending_actions();
     fighter.clear_recovery_input_buffer();
