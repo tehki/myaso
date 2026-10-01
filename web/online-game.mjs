@@ -72,6 +72,7 @@ const killFeedEntries = [];
 const killFeedSequences = new Set();
 
 const params = new URLSearchParams(window.location.search);
+const acceptanceScenario = params.get("scenario");
 const server = params.get("server");
 const cert = params.get("cert");
 if (!server) throw new Error("online mode requires ?server=https://host:port/game");
@@ -179,6 +180,7 @@ networkClient = await connectAuthoritativeClient({
 function observeCombatState(state) {
   const ownId = networkClient?.playerNetId;
   if (!ownId) return;
+  recordAcceptanceState(state, ownId);
   const match = fighterMatchPresentation(state.values(), ownId);
   if (match.visible && !matchOver) {
     matchOver = true;
@@ -198,6 +200,37 @@ function observeCombatState(state) {
   combatMessageUntil = now + event.durationMs;
   setStatus(combatMessage);
   showCombatFeedback(event.feedback);
+}
+
+function recordAcceptanceState(state, ownId) {
+  if (acceptanceScenario !== "uijumpbuffer") return;
+  const focusNetId = fighterFocusNetId(state, ownId);
+  const acceptance = window.__MYASO_ACCEPTANCE_STATE__ ??= {
+    scenario: acceptanceScenario,
+    ownActionTransitions: [],
+    focusActionTransitions: [],
+  };
+  acceptance.playerNetId = ownId;
+  acceptance.focusNetId = focusNetId;
+  acceptance.serverTick = networkClient?.latestServerTick ?? 0;
+  const epochMs = Date.now();
+  recordAcceptanceAction(
+    acceptance.ownActionTransitions,
+    state.get(ownId)?.action,
+    epochMs,
+    acceptance.serverTick,
+  );
+  recordAcceptanceAction(
+    acceptance.focusActionTransitions,
+    focusNetId ? state.get(focusNetId)?.action : null,
+    epochMs,
+    acceptance.serverTick,
+  );
+}
+
+function recordAcceptanceAction(transitions, action, epochMs, serverTick) {
+  if (!Number.isInteger(action) || transitions.at(-1)?.action === action) return;
+  transitions.push({ action, epochMs, serverTick });
 }
 
 function recordKillEvent(event) {
