@@ -111,6 +111,7 @@ export const COMBAT = Object.freeze({
     blockWindowMs: 90,
     dodgeWindowMs: 90,
     jumpWindowMs: 90,
+    kickWindowMs: 90,
   }),
   guard: Object.freeze({
     max: 100,
@@ -139,6 +140,7 @@ export function createFighter({ id, x, y, facing = 0, spawnX = x, spawnY = y }) 
     attackInputWasDown: false,
     blockInputWasDown: false,
     dodgeInputWasDown: false,
+    kickInputWasDown: false,
     jumpInputWasDown: false,
     bufferedLightAttack: false,
     bufferedAttackLateral: 0,
@@ -146,6 +148,7 @@ export function createFighter({ id, x, y, facing = 0, spawnX = x, spawnY = y }) 
     bufferedDodge: false,
     bufferedDodgeDirX: 0,
     bufferedDodgeDirY: 0,
+    bufferedKick: false,
     bufferedJump: false,
     dodgeDirX: 0,
     dodgeDirY: 0,
@@ -182,15 +185,17 @@ export function stepWorld(world, inputs = {}, dtMs = 1000 / 120) {
     const attackPressed = input.attack && !fighter.attackInputWasDown;
     const blockPressed = input.block && !fighter.blockInputWasDown;
     const dodgePressed = input.dodge && !fighter.dodgeInputWasDown;
+    const kickPressed = input.kick && !fighter.kickInputWasDown;
     const jumpPressed = input.jump && !fighter.jumpInputWasDown;
     updateFacing(fighter, input);
-    beginRequestedAction(world, fighter, input, attackPressed, blockPressed, dodgePressed, jumpPressed);
+    beginRequestedAction(world, fighter, input, attackPressed, blockPressed, dodgePressed, kickPressed, jumpPressed);
     moveFighter(world, fighter, input, dtMs);
     advanceAction(world, fighter, input, dtMs);
     updateStamina(world, fighter, input, dtMs);
     fighter.attackInputWasDown = input.attack;
     fighter.blockInputWasDown = input.block;
     fighter.dodgeInputWasDown = input.dodge;
+    fighter.kickInputWasDown = input.kick;
     fighter.jumpInputWasDown = input.jump;
 
     if (fighter.action !== "block" && world.nowMs >= fighter.guardRegenBlockedUntilMs) {
@@ -253,6 +258,7 @@ function clearRecoveryInputBuffer(fighter) {
   clearLightAttackBuffer(fighter);
   fighter.bufferedBlock = false;
   clearBufferedDodge(fighter);
+  fighter.bufferedKick = false;
   fighter.bufferedJump = false;
 }
 
@@ -262,6 +268,12 @@ function beginDodge(fighter, dirX, dirY) {
   fighter.dodgeDirY = dirY;
   fighter.rollHitTargets.clear();
   setAction(fighter, "dodge", COMBAT.dodge.durationMs);
+}
+
+function beginKick(fighter) {
+  clearRecoveryInputBuffer(fighter);
+  fighter.attackHitTargets.clear();
+  setAction(fighter, "kick_windup", COMBAT.kick.windupMs);
 }
 
 function beginLightAttack(fighter, lateral) {
@@ -277,6 +289,11 @@ function beginLightAttack(fighter, lateral) {
 }
 
 function finishLightRecovery(world, fighter) {
+  if (fighter.bufferedKick) {
+    if (spendStamina(world, fighter, COMBAT.kick.staminaCost)) beginKick(fighter);
+    else setAction(fighter, "idle", 0);
+    return;
+  }
   if (fighter.bufferedJump) {
     if (spendStamina(world, fighter, COMBAT.jump.staminaCost)) setAction(fighter, "jump", COMBAT.jump.durationMs);
     else setAction(fighter, "idle", 0);
@@ -302,15 +319,16 @@ function finishLightRecovery(world, fighter) {
   beginLightAttack(fighter, lateral);
 }
 
-function beginRequestedAction(world, fighter, input, attackPressed, blockPressed, dodgePressed, jumpPressed) {
+function beginRequestedAction(world, fighter, input, attackPressed, blockPressed, dodgePressed, kickPressed, jumpPressed) {
   const lightRecovery = fighter.action === "attack_recovery"
     || fighter.action === "attack_left_recovery"
     || fighter.action === "attack_right_recovery";
-  if (lightRecovery && (attackPressed || blockPressed || dodgePressed || jumpPressed)) {
+  if (lightRecovery && (attackPressed || blockPressed || dodgePressed || kickPressed || jumpPressed)) {
     const remainingMs = fighter.actionDurationMs - fighter.actionElapsedMs;
     if (blockPressed && remainingMs <= COMBAT.inputBuffer.blockWindowMs + EPSILON) {
       clearLightAttackBuffer(fighter);
       clearBufferedDodge(fighter);
+      fighter.bufferedKick = false;
       fighter.bufferedJump = false;
       fighter.bufferedBlock = true;
     } else if (dodgePressed
@@ -321,6 +339,7 @@ function beginRequestedAction(world, fighter, input, attackPressed, blockPressed
       fighter.bufferedDodge = true;
       fighter.bufferedDodgeDirX = Math.cos(fighter.facing);
       fighter.bufferedDodgeDirY = Math.sin(fighter.facing);
+      fighter.bufferedKick = false;
       fighter.bufferedJump = false;
     } else if (jumpPressed
       && remainingMs <= COMBAT.inputBuffer.jumpWindowMs + EPSILON
@@ -328,10 +347,20 @@ function beginRequestedAction(world, fighter, input, attackPressed, blockPressed
       clearLightAttackBuffer(fighter);
       fighter.bufferedBlock = false;
       clearBufferedDodge(fighter);
+      fighter.bufferedKick = false;
       fighter.bufferedJump = true;
+    } else if (kickPressed
+      && remainingMs <= COMBAT.inputBuffer.kickWindowMs + EPSILON
+      && fighter.stamina + EPSILON >= COMBAT.kick.staminaCost) {
+      clearLightAttackBuffer(fighter);
+      fighter.bufferedBlock = false;
+      clearBufferedDodge(fighter);
+      fighter.bufferedJump = false;
+      fighter.bufferedKick = true;
     } else if (attackPressed && remainingMs <= COMBAT.inputBuffer.lightAttackWindowMs + EPSILON) {
       fighter.bufferedBlock = false;
       clearBufferedDodge(fighter);
+      fighter.bufferedKick = false;
       fighter.bufferedJump = false;
       fighter.bufferedLightAttack = true;
       fighter.bufferedAttackLateral = lightAttackLateral(fighter, input.moveX, input.moveY);
@@ -369,9 +398,8 @@ function beginRequestedAction(world, fighter, input, attackPressed, blockPressed
     return;
   }
 
-  if (input.kick && fighter.action === "idle" && spendStamina(world, fighter, COMBAT.kick.staminaCost)) {
-    fighter.attackHitTargets.clear();
-    setAction(fighter, "kick_windup", COMBAT.kick.windupMs);
+  if (kickPressed && fighter.action === "idle" && spendStamina(world, fighter, COMBAT.kick.staminaCost)) {
+    beginKick(fighter);
     return;
   }
 
@@ -762,6 +790,7 @@ function respawnFighter(fighter) {
   fighter.attackInputWasDown = false;
   fighter.blockInputWasDown = false;
   fighter.dodgeInputWasDown = false;
+  fighter.kickInputWasDown = false;
   fighter.jumpInputWasDown = false;
   clearRecoveryInputBuffer(fighter);
   setAction(fighter, "idle", 0);
