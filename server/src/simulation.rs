@@ -703,9 +703,7 @@ fn begin_requested_action(
         fighter.action,
         Action::AttackRecovery | Action::AttackLeftRecovery | Action::AttackRightRecovery
     );
-    if light_recovery
-        && (edges.attack || edges.block || edges.dodge || edges.kick || edges.jump)
-    {
+    if light_recovery && (edges.attack || edges.block || edges.dodge || edges.kick || edges.jump) {
         let remaining_ms = fighter.action_duration_ms - fighter.action_elapsed_ms;
         if edges.block && remaining_ms <= BLOCK_BUFFER_WINDOW_MS + EPSILON {
             fighter.clear_light_attack_buffer();
