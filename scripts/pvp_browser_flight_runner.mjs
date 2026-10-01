@@ -545,16 +545,34 @@ async function runOnlineUiIdentityFlight(entries) {
 
 async function runOnlineUiRecoveryReadabilityFlight(entries) {
   let evidence = await runOnlineUiFeedbackFlight(entries);
-  const attacker = evidence.find((entry) => entry.feedbackTransitions.includes("hit-confirm"));
+  let attacker = evidence.find((entry) => entry.feedbackTransitions.includes("hit-confirm"));
   let defender = evidence.find((entry) => entry.feedbackTransitions.includes("damage-taken"));
   if (!attacker || !defender || attacker.browser === defender.browser) {
     throw new Error(`M37 could not resolve attacker / defender: ${JSON.stringify(evidence)}`);
   }
+  const attackerBrowser = attacker.browser;
   const defenderBrowser = defender.browser;
-  const showedRecovery = defender.recoveryTransitions.some((entry) => entry.visible
-    && entry.state === "attack-recovery" && entry.label === "PUNISH" && entry.detail === "Attack recovery");
-  if (!showedRecovery) throw new Error(`M37 defender never rendered opponent attack recovery: ${JSON.stringify(defender.recoveryTransitions)}`);
-  if (attacker.recoveryTransitions.some((entry) => entry.visible && entry.state === "attack-recovery")) {
+  const observedRecovery = (entry) => entry?.recoveryTransitions.some((transition) => transition.visible
+    && transition.state === "attack-recovery"
+    && transition.label === "PUNISH"
+    && transition.detail === "Attack recovery") ?? false;
+
+  // A hit-confirm can arrive one render/snapshot ahead of the opponent
+  // recovery cue on loaded CI browsers. Require the same recovery frame, but
+  // poll for it instead of sampling only the first post-hit evidence.
+  let showedRecovery = observedRecovery(defender);
+  const recoveryDeadline = Date.now() + 700;
+  while (!showedRecovery && Date.now() < recoveryDeadline) {
+    await sleep(20);
+    evidence = await Promise.all(entries.map(readUiEvidence));
+    attacker = evidence.find((entry) => entry.browser === attackerBrowser);
+    defender = evidence.find((entry) => entry.browser === defenderBrowser);
+    showedRecovery = observedRecovery(defender);
+  }
+  if (!showedRecovery) {
+    throw new Error(`M37 defender never rendered opponent attack recovery: ${JSON.stringify(defender?.recoveryTransitions ?? [])}`);
+  }
+  if (attacker?.recoveryTransitions.some((entry) => entry.visible && entry.state === "attack-recovery")) {
     throw new Error(`M37 attacker incorrectly rendered its own recovery as opponent recovery: ${JSON.stringify(attacker.recoveryTransitions)}`);
   }
 
@@ -566,7 +584,7 @@ async function runOnlineUiRecoveryReadabilityFlight(entries) {
     await sleep(30);
   }
   evidence = await Promise.all(entries.map(readUiEvidence));
-  defender = evidence.find((entry) => entry.feedbackTransitions.includes("damage-taken"));
+  defender = evidence.find((entry) => entry.browser === defenderBrowser);
   if (!defender || defender.recoveryVisible || defender.recoveryTransitions.at(-1)?.visible !== false) {
     throw new Error(`M37 recovery cue did not clear after authoritative recovery: ${JSON.stringify(defender)}`);
   }
@@ -3530,8 +3548,8 @@ async function performArenaRecoveryBufferedRoll(session, elementId) {
   const origin = { "element-6066-11e4-a52e-4f735466cecf": elementId };
   // This command is issued only after Firefox has independently observed the
   // authoritative light recovery. Pointer retarget and the real wheel share one
-  // W3C timeline; the browser-owned pause moves the wheel toward the final 90 ms
-  // without relying on the original LMB timestamp.
+  // W3C timeline; a short browser-owned pause keeps the real wheel inside
+  // recovery even when newer Chrome/Firefox drivers add command overhead.
   await webdriver(session.base, "POST", `/session/${session.sessionId}/actions`, {
     actions: [
       {
@@ -3540,7 +3558,7 @@ async function performArenaRecoveryBufferedRoll(session, elementId) {
         parameters: { pointerType: "mouse" },
         actions: [
           { type: "pointerMove", duration: 0, origin, x: 0, y: 180 },
-          { type: "pause", duration: 145 },
+          { type: "pause", duration: 80 },
           { type: "pause", duration: 0 },
         ],
       },
@@ -3549,7 +3567,7 @@ async function performArenaRecoveryBufferedRoll(session, elementId) {
         id: `wheel-${session.name}`,
         actions: [
           { type: "pause", duration: 0 },
-          { type: "pause", duration: 145 },
+          { type: "pause", duration: 80 },
           { type: "scroll", x: 0, y: 0, deltaX: 0, deltaY: -120, duration: 0, origin },
         ],
       },

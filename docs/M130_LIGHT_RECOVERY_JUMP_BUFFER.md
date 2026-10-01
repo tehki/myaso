@@ -34,6 +34,14 @@ M130 proves in browser and authoritative simulation that:
 - a later jump intent can replace an earlier buffered light attack
 - browser and authoritative kernels stay behaviorally aligned
 
+## Acceptance harness stability
+
+The M130 quality pass also exposed CI timing jitter in two pre-existing real-browser gates after the hosted Chrome/Firefox driver update:
+
+- M37 now waits for the required authoritative opponent-recovery frame instead of sampling only the first post-hit render;
+- M129 shortens its browser-owned wheel pause so the genuine wheel remains inside the already-observed authoritative recovery window despite newer WebDriver command overhead.
+
+Both gates keep their original evidence requirements. These are acceptance-harness timing changes only; no combat behavior is relaxed or altered.
 ## Boundary
 
 No attack timing, recovery timing, jump duration, jump movement multiplier, stamina cost, damage, reach, iframe, packet format, replication format, or production UI behavior changes.
