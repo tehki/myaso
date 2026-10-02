@@ -1620,7 +1620,7 @@ async function runOnlineUiJumpAttackCounterplayFlight(entries, defense) {
   } else if (defense === "dodge") {
     await Promise.all([
       performArenaJumpAttackChord(attacker, attackerElementId, attackOffset, 90),
-      performArenaTimedPointerDodge(defender, defenderElementId, 120),
+      performArenaTimedPointerDodge(defender, defenderElementId, 90),
     ]);
   } else {
     throw new Error(`unsupported M138 jump-attack defense: ${defense}`);
