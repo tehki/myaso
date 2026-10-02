@@ -1615,12 +1615,10 @@ async function runOnlineUiJumpAttackCounterplayFlight(entries, defense) {
       await sleep(10);
     }
     if (!blockStart) throw new Error(`${label} never observed the defender's real wheel-back block`);
-    // Age the unchanged 240 ms short block beyond the 125 ms parry window by
-    // the time the 105 ms jump-attack windup resolves, while leaving generous
-    // room before block expiry.
-    const launchAt = blockStart.epochMs + 55;
-    const waitMs = Math.max(0, launchAt - Date.now());
-    if (waitMs > 0) await sleep(waitMs);
+    // The client-side observation already arrives after the authoritative
+    // block edge. Launch immediately after observing it: the 105 ms jump-attack
+    // windup then lands beyond the 125 ms parry window but inside the unchanged
+    // 240 ms short block on headless Chrome/Firefox scheduling.
     await performArenaJumpAttackChord(attacker, attackerElementId, attackOffset, 90);
   } else if (defense === "parry") {
     await Promise.all([
