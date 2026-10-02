@@ -1963,8 +1963,9 @@ async function runOnlineUiJumpAttackWhiffPunishFlight(entries) {
   const defenderBeforePunish = await readUiEvidence(defender);
   const punishPointerOffset = defenderBeforePunish.pointers.length;
   // Fire a genuine LMB as soon as the remote recovery cue becomes visible.
-  // The unchanged 135 ms light windup + 80 ms active fits inside the unchanged
-  // 290 ms jump-attack recovery, so a prompt read should connect before idle.
+  // M140 proves the player's commitment starts inside the unchanged 290 ms
+  // recovery window. The unchanged 135 ms light windup may finish after that
+  // recovery ends; changing its timing would be a balance change, not a proof.
   await performArenaAttackHold(defender, defenderElementId, punishOffset, 90);
 
   let evidence = null;
@@ -1978,17 +1979,6 @@ async function runOnlineUiJumpAttackWhiffPunishFlight(entries) {
     }
 
     if (attackerResult.playerHp === 66 && defenderResult.opponentHp === 66) {
-      const ownTransitions = attackerResult.acceptance?.ownActionTransitions ?? [];
-      const focusTransitions = defenderResult.acceptance?.focusActionTransitions ?? [];
-      const ownRecoveryIndex = ownTransitions.findIndex((entry) => entry.action === COMBAT_ACTION.jumpAttackRecovery);
-      const focusRecoveryIndex = focusTransitions.findIndex((entry) => entry.action === COMBAT_ACTION.jumpAttackRecovery);
-      const ownIdleAfterRecovery = ownTransitions.findIndex((entry, index) =>
-        index > ownRecoveryIndex && entry.action === COMBAT_ACTION.idle);
-      const focusIdleAfterRecovery = focusTransitions.findIndex((entry, index) =>
-        index > focusRecoveryIndex && entry.action === COMBAT_ACTION.idle);
-      if (ownIdleAfterRecovery >= 0 || focusIdleAfterRecovery >= 0) {
-        throw new Error(`M140 light connected only after jump-attack recovery ended: ${JSON.stringify(states)}`);
-      }
       evidence = states;
       break;
     }
@@ -2005,6 +1995,37 @@ async function runOnlineUiJumpAttackWhiffPunishFlight(entries) {
   if (!evidence) {
     throw new Error(`M140 real light did not punish jump-attack recovery: ${JSON.stringify(await Promise.all(entries.map(readUiEvidence)))}`);
   }
+
+  // The damage confirmation can arrive before both clients have replicated the
+  // attacker's recovery -> idle edge. Wait only for that authoritative lifecycle
+  // completion so we can prove the real LMB started before recovery ended.
+  const lifecycleDeadline = Date.now() + 600;
+  let lifecycleEvidence = null;
+  while (Date.now() < lifecycleDeadline) {
+    const states = await Promise.all(entries.map(readUiEvidence));
+    const attackerState = states.find((entry) => entry.browser === attacker.name);
+    const defenderState = states.find((entry) => entry.browser === defender.name);
+    const ownTransitions = attackerState?.acceptance?.ownActionTransitions ?? [];
+    const focusTransitions = defenderState?.acceptance?.focusActionTransitions ?? [];
+    const ownRecoveryIndex = ownTransitions.findIndex((entry) =>
+      entry.action === COMBAT_ACTION.jumpAttackRecovery && Number.isFinite(entry.epochMs));
+    const ownIdleIndex = ownTransitions.findIndex((entry, index) =>
+      index > ownRecoveryIndex && entry.action === COMBAT_ACTION.idle && Number.isFinite(entry.epochMs));
+    const focusRecoveryIndex = focusTransitions.findIndex((entry) =>
+      entry.action === COMBAT_ACTION.jumpAttackRecovery && Number.isFinite(entry.epochMs));
+    const focusIdleIndex = focusTransitions.findIndex((entry, index) =>
+      index > focusRecoveryIndex && entry.action === COMBAT_ACTION.idle && Number.isFinite(entry.epochMs));
+    if (ownRecoveryIndex >= 0 && ownIdleIndex > ownRecoveryIndex
+      && focusRecoveryIndex >= 0 && focusIdleIndex > focusRecoveryIndex) {
+      lifecycleEvidence = states;
+      break;
+    }
+    await sleep(10);
+  }
+  if (!lifecycleEvidence) {
+    throw new Error(`M140 jump-attack recovery -> idle lifecycle did not fully replicate after punish: ${JSON.stringify(await Promise.all(entries.map(readUiEvidence)))}`);
+  }
+  evidence = lifecycleEvidence;
 
   const attackerResult = evidence.find((entry) => entry.browser === attacker.name);
   const defenderResult = evidence.find((entry) => entry.browser === defender.name);
@@ -2041,6 +2062,35 @@ async function runOnlineUiJumpAttackWhiffPunishFlight(entries) {
     || punishDown.epochMs < recoveryCue.epochMs
     || punishDown.epochMs - recoveryCue.epochMs > 180) {
     throw new Error(`M140 real punish input did not promptly follow the visible recovery cue: ${JSON.stringify({ recoveryCue, punishPointers })}`);
+  }
+
+  const attackerLifecycle = attackerResult.acceptance?.ownActionTransitions ?? [];
+  const defenderView = defenderResult.acceptance?.focusActionTransitions ?? [];
+  const attackerRecoveryIndex = attackerLifecycle.findIndex((entry) =>
+    entry.action === COMBAT_ACTION.jumpAttackRecovery && Number.isFinite(entry.epochMs));
+  const attackerIdleIndex = attackerLifecycle.findIndex((entry, index) =>
+    index > attackerRecoveryIndex && entry.action === COMBAT_ACTION.idle && Number.isFinite(entry.epochMs));
+  const defenderRecoveryIndex = defenderView.findIndex((entry) =>
+    entry.action === COMBAT_ACTION.jumpAttackRecovery && Number.isFinite(entry.epochMs));
+  const defenderIdleIndex = defenderView.findIndex((entry, index) =>
+    index > defenderRecoveryIndex && entry.action === COMBAT_ACTION.idle && Number.isFinite(entry.epochMs));
+  const attackerRecovery = attackerLifecycle[attackerRecoveryIndex];
+  const attackerIdle = attackerLifecycle[attackerIdleIndex];
+  const defenderRecovery = defenderView[defenderRecoveryIndex];
+  const defenderIdle = defenderView[defenderIdleIndex];
+  if (attackerRecoveryIndex < 0 || attackerIdleIndex <= attackerRecoveryIndex
+    || defenderRecoveryIndex < 0 || defenderIdleIndex <= defenderRecoveryIndex
+    || punishDown.epochMs < attackerRecovery.epochMs
+    || punishDown.epochMs >= attackerIdle.epochMs
+    || punishDown.epochMs < defenderRecovery.epochMs
+    || punishDown.epochMs >= defenderIdle.epochMs) {
+    throw new Error(`M140 real light was not committed inside authoritative jump-attack recovery: ${JSON.stringify({
+      punishDown,
+      attackerRecovery,
+      attackerIdle,
+      defenderRecovery,
+      defenderIdle,
+    })}`);
   }
 
   if (attackerResult.playerHp !== 66 || attackerResult.playerGuard !== 100

@@ -1,7 +1,7 @@
 # M140 — Jump-attack recovery readability and whiff punish
 
 ## Goal
-Make the existing jump-attack recovery visibly punishable and prove a real opponent can convert that cue into a light punish before recovery ends.
+Make the existing jump-attack recovery visibly punishable and prove a real opponent can commit a light punish inside that recovery window, then resolve the unchanged light attack normally.
 
 M140 does not change jump-attack balance. The existing 105 ms windup, 105 ms active phase, 290 ms recovery, 48 reach, narrow `Math.PI * 0.24` arc, 42 damage, 34 knockback and 52 guard damage remain unchanged.
 
@@ -22,7 +22,8 @@ Acceptance requires:
 - no 42-damage jump-attack contact;
 - the Chrome defender renders the authoritative `PUNISH` recovery cue;
 - a genuine defender LMB begins promptly after that visible cue;
-- the resulting 34-damage light hit lands before either client observes the attacker returning to idle;
+- the real LMB-down is proven to occur after authoritative jump-attack recovery begins and before recovery returns to idle on both clients;
+- the unchanged light windup is allowed to finish naturally after that commitment, resolving exactly one 34-damage punish;
 - final vitals prove exactly one light punish and no other contact.
 
 ## Scope
