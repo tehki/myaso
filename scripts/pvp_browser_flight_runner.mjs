@@ -1674,9 +1674,12 @@ async function runOnlineUiJumpAttackCounterplayFlight(entries, defense) {
         && defenderResult.playerGuard <= 48
         && defenderResult.playerGuard >= 46;
     } else if (defense === "parry") {
+      const stunOverlaySeen = attackerResult.overlayTransitions.some((entry) =>
+        entry.visible && entry.title === "STUNNED");
       resolved = attackSeen
         && attackerResult.feedbackTransitions.includes("parried")
         && defenderResult.feedbackTransitions.includes("parry-success")
+        && stunOverlaySeen
         && attackerResult.playerHp === 100
         && attackerResult.playerGuard === 100
         && defenderResult.playerHp === 100
