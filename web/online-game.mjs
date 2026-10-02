@@ -203,7 +203,7 @@ function observeCombatState(state) {
 }
 
 function recordAcceptanceState(state, ownId) {
-  if (!["uijumpbuffer", "uikickbuffer"].includes(acceptanceScenario)) return;
+  if (!["uijumpbuffer", "uijumpattack", "uikickbuffer"].includes(acceptanceScenario)) return;
   const focusNetId = fighterFocusNetId(state, ownId);
   const acceptance = window.__MYASO_ACCEPTANCE_STATE__ ??= {
     scenario: acceptanceScenario,
