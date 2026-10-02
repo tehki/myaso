@@ -51,6 +51,7 @@ const threatCue = {
   guardArcLabel: document.querySelector("#threat-guard-arc"),
   netId: 0,
   state: "",
+  phaseText: "",
   count: 0,
   secondaryNetId: 0,
   secondaryBearing: "",
@@ -964,6 +965,7 @@ function updateThreatCue(ownId) {
   if (shouldHide) {
     threatCue.netId = 0;
     threatCue.state = "";
+    threatCue.phaseText = "";
     threatCue.count = 0;
     threatCue.secondaryNetId = 0;
     threatCue.secondaryBearing = "";
@@ -988,6 +990,12 @@ function updateThreatCue(ownId) {
   }
   if (threatCue.state !== state) {
     threatCue.state = state;
+  }
+  // Primary identity/phase can change while both threats remain in the same
+  // coarse state (for example JUMP WINDUP -> WINDUP). Keep the visible phase
+  // keyed to the exact authoritative phase instead of only to state changes.
+  if (threatCue.phaseText !== phase) {
+    threatCue.phaseText = phase;
     threatCue.phase.textContent = phase;
   }
   if (threatCue.countLabel) {
