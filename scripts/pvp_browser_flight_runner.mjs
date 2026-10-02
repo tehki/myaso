@@ -1607,16 +1607,34 @@ async function runOnlineUiJumpAttackCounterplayFlight(entries, defense) {
     const attackerFocus = attackerState?.acceptance?.focusActionTransitions ?? [];
     const defenderOwn = defenderState?.acceptance?.ownActionTransitions ?? [];
     const defenderFocus = defenderState?.acceptance?.focusActionTransitions ?? [];
-    const attackerActive = attackerOwn.find((entry) => entry.action === COMBAT_ACTION.jumpAttackActive);
-    const attackerSeesDodge = attackerFocus.find((entry) => entry.action === COMBAT_ACTION.dodge);
-    const defenderDodge = defenderOwn.find((entry) => entry.action === COMBAT_ACTION.dodge);
-    const defenderSeesActive = defenderFocus.find((entry) => entry.action === COMBAT_ACTION.jumpAttackActive);
-    return Number.isFinite(attackerActive?.serverTick)
-      && Number.isFinite(attackerSeesDodge?.serverTick)
-      && Number.isFinite(defenderDodge?.serverTick)
-      && Number.isFinite(defenderSeesActive?.serverTick)
-      && attackerActive.serverTick === attackerSeesDodge.serverTick
-      && defenderSeesActive.serverTick === defenderDodge.serverTick;
+
+    const intervalContains = (transitions, action, recoveryAction, tick) => {
+      const startIndex = transitions.findIndex((entry) =>
+        entry.action === action && Number.isFinite(entry.serverTick));
+      if (startIndex < 0 || !Number.isFinite(tick)) return false;
+      const start = transitions[startIndex];
+      const recovery = transitions.find((entry, index) =>
+        index > startIndex && entry.action === recoveryAction && Number.isFinite(entry.serverTick));
+      return Number.isFinite(recovery?.serverTick)
+        && start.serverTick <= tick
+        && tick < recovery.serverTick;
+    };
+
+    const attackerActive = attackerOwn.find((entry) =>
+      entry.action === COMBAT_ACTION.jumpAttackActive && Number.isFinite(entry.serverTick));
+    const defenderSeesActive = defenderFocus.find((entry) =>
+      entry.action === COMBAT_ACTION.jumpAttackActive && Number.isFinite(entry.serverTick));
+    return intervalContains(
+      attackerFocus,
+      COMBAT_ACTION.dodge,
+      COMBAT_ACTION.dodgeRecovery,
+      attackerActive?.serverTick,
+    ) && intervalContains(
+      defenderOwn,
+      COMBAT_ACTION.dodge,
+      COMBAT_ACTION.dodgeRecovery,
+      defenderSeesActive?.serverTick,
+    );
   };
 
   if (defense === "block") {
@@ -1636,7 +1654,7 @@ async function runOnlineUiJumpAttackCounterplayFlight(entries, defense) {
   } else if (defense === "dodge") {
     await Promise.all([
       performArenaJumpAttackChord(attacker, attackerElementId, attackOffset, 90),
-      performArenaTimedPointerDodge(defender, defenderElementId, 90),
+      performArenaTimedPointerDodge(defender, defenderElementId, 60),
     ]);
   } else {
     throw new Error(`unsupported M138 jump-attack defense: ${defense}`);
