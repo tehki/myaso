@@ -719,6 +719,44 @@ test("late fresh jump buffers through full light recovery and charges stamina on
   assert.equal(attacker.stamina, COMBAT.stamina.max - COMBAT.jump.staminaCost);
 });
 
+test("simultaneous Space plus light edge starts a jumping attack and charges both stamina costs", () => {
+  const world = duel({ distance: 60 });
+  const [attacker, target] = world.fighters;
+
+  stepWorld(world, {
+    a: { jump: true, attack: true, aimX: target.x, aimY: target.y },
+  }, 5);
+
+  assert.equal(attacker.action, "jump_attack_windup");
+  assert.equal(
+    attacker.stamina,
+    COMBAT.stamina.max - COMBAT.jump.staminaCost - COMBAT.jumpAttack.staminaCost,
+  );
+});
+
+test("late Space plus light chord buffers through full light recovery into jumping attack", () => {
+  const world = duel({ distance: 200 });
+  const { attacker, target } = enterLightRecovery(world);
+
+  advance(world, COMBAT.attack.recoveryMs - 85, { a: { aimX: target.x, aimY: target.y } });
+  stepWorld(world, {
+    a: { jump: true, attack: true, aimX: target.x, aimY: target.y },
+  }, 5);
+  assert.equal(attacker.action, "attack_recovery");
+  assert.equal(attacker.bufferedJumpAttack, true);
+  assert.equal(attacker.bufferedJump, false);
+  assert.equal(attacker.stamina, COMBAT.stamina.max);
+
+  stepWorld(world, { a: { aimX: target.x, aimY: target.y } }, 5);
+  advance(world, 75, { a: { aimX: target.x, aimY: target.y } });
+  assert.equal(attacker.action, "jump_attack_windup");
+  assert.equal(attacker.bufferedJumpAttack, false);
+  assert.equal(
+    attacker.stamina,
+    COMBAT.stamina.max - COMBAT.jump.staminaCost - COMBAT.jumpAttack.staminaCost,
+  );
+});
+
 test("early held jump is not promoted and held Space does not auto-bunny-hop", () => {
   const world = duel({ distance: 200 });
   const { attacker, target } = enterLightRecovery(world);

@@ -1345,6 +1345,30 @@ fn wilds_jump_converts_into_authoritative_jumping_attack() {
 }
 
 #[test]
+fn simultaneous_jump_and_attack_edge_starts_authoritative_jump_attack() {
+    let mut world = duel(60.0);
+    advance(
+        &mut world,
+        5.0,
+        InputIntent {
+            jump: true,
+            attack: true,
+            facing_radians: 0.0,
+            ..InputIntent::default()
+        },
+        InputIntent::default(),
+    );
+    assert_eq!(
+        world.fighter(1).expect("attacker").action,
+        Action::JumpAttackWindup
+    );
+    assert_eq!(
+        world.fighter(1).expect("attacker").stamina.round() as u8,
+        74
+    );
+}
+
+#[test]
 fn wilds_jump_attack_has_a_narrow_short_range_cone() {
     let mut far_world = duel(70.0);
     advance(
@@ -2449,6 +2473,80 @@ fn late_authoritative_jump_buffers_through_recovery_and_charges_on_execution() {
     assert_eq!(
         world.fighter(1).expect("attacker").stamina.round() as u8,
         86
+    );
+}
+
+#[test]
+fn late_authoritative_jump_attack_chord_buffers_through_full_light_recovery() {
+    let mut world = duel(200.0);
+    advance(
+        &mut world,
+        5.0,
+        InputIntent {
+            attack: true,
+            facing_radians: 0.0,
+            ..InputIntent::default()
+        },
+        InputIntent::default(),
+    );
+    advance(
+        &mut world,
+        130.0,
+        InputIntent::default(),
+        InputIntent::default(),
+    );
+    advance(
+        &mut world,
+        80.0,
+        InputIntent::default(),
+        InputIntent::default(),
+    );
+    advance(
+        &mut world,
+        170.0,
+        InputIntent::default(),
+        InputIntent::default(),
+    );
+
+    advance(
+        &mut world,
+        5.0,
+        InputIntent {
+            jump: true,
+            attack: true,
+            facing_radians: 0.0,
+            ..InputIntent::default()
+        },
+        InputIntent::default(),
+    );
+    assert_eq!(
+        world.fighter(1).expect("attacker").action,
+        Action::AttackRecovery
+    );
+    assert_eq!(
+        world.fighter(1).expect("attacker").stamina.round() as u8,
+        100
+    );
+
+    advance(
+        &mut world,
+        5.0,
+        InputIntent::default(),
+        InputIntent::default(),
+    );
+    advance(
+        &mut world,
+        75.0,
+        InputIntent::default(),
+        InputIntent::default(),
+    );
+    assert_eq!(
+        world.fighter(1).expect("attacker").action,
+        Action::JumpAttackWindup
+    );
+    assert_eq!(
+        world.fighter(1).expect("attacker").stamina.round() as u8,
+        74
     );
 }
 

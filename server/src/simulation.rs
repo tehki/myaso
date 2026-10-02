@@ -27,6 +27,7 @@ const LIGHT_ATTACK_BUFFER_WINDOW_MS: f32 = 90.0;
 const BLOCK_BUFFER_WINDOW_MS: f32 = 90.0;
 const DODGE_BUFFER_WINDOW_MS: f32 = 90.0;
 const JUMP_BUFFER_WINDOW_MS: f32 = 90.0;
+const JUMP_ATTACK_BUFFER_WINDOW_MS: f32 = 90.0;
 const KICK_BUFFER_WINDOW_MS: f32 = 90.0;
 const RUNNING_ATTACK_WINDUP_MS: f32 = 160.0;
 const RUNNING_ATTACK_ACTIVE_MS: f32 = 90.0;
@@ -248,6 +249,7 @@ pub struct Fighter {
     buffered_dodge_dir_y: f32,
     buffered_kick: bool,
     buffered_jump: bool,
+    buffered_jump_attack: bool,
     dodge_dir_x: f32,
     dodge_dir_y: f32,
     attack_hit_targets: BTreeSet<u32>,
@@ -293,6 +295,7 @@ impl Fighter {
             buffered_dodge_dir_y: 0.0,
             buffered_kick: false,
             buffered_jump: false,
+            buffered_jump_attack: false,
             dodge_dir_x: 0.0,
             dodge_dir_y: 0.0,
             attack_hit_targets: BTreeSet::new(),
@@ -350,6 +353,7 @@ impl Fighter {
         self.clear_buffered_dodge();
         self.buffered_kick = false;
         self.buffered_jump = false;
+        self.buffered_jump_attack = false;
     }
 
     fn begin_dodge(&mut self, dir_x: f32, dir_y: f32) {
@@ -364,6 +368,12 @@ impl Fighter {
         self.clear_recovery_input_buffer();
         self.attack_hit_targets.clear();
         self.set_action(Action::KickWindup, KICK_WINDUP_MS);
+    }
+
+    fn begin_jump_attack(&mut self) {
+        self.clear_recovery_input_buffer();
+        self.attack_hit_targets.clear();
+        self.set_action(Action::JumpAttackWindup, JUMP_ATTACK_WINDUP_MS);
     }
 
     fn begin_light_attack(&mut self, lateral: f32) {
@@ -382,6 +392,14 @@ impl Fighter {
         if self.buffered_kick {
             if spend_stamina(now_ms, self, KICK_STAMINA_COST) {
                 self.begin_kick();
+            } else {
+                self.set_action(Action::Idle, 0.0);
+            }
+            return;
+        }
+        if self.buffered_jump_attack {
+            if spend_stamina(now_ms, self, JUMP_STAMINA_COST + JUMP_ATTACK_STAMINA_COST) {
+                self.begin_jump_attack();
             } else {
                 self.set_action(Action::Idle, 0.0);
             }
@@ -710,6 +728,7 @@ fn begin_requested_action(
             fighter.clear_buffered_dodge();
             fighter.buffered_kick = false;
             fighter.buffered_jump = false;
+            fighter.buffered_jump_attack = false;
             fighter.buffered_block = true;
         } else if edges.dodge
             && remaining_ms <= DODGE_BUFFER_WINDOW_MS + EPSILON
@@ -722,6 +741,18 @@ fn begin_requested_action(
             fighter.buffered_dodge_dir_y = fighter.facing.sin();
             fighter.buffered_kick = false;
             fighter.buffered_jump = false;
+            fighter.buffered_jump_attack = false;
+        } else if edges.jump
+            && edges.attack
+            && remaining_ms <= JUMP_ATTACK_BUFFER_WINDOW_MS + EPSILON
+            && fighter.stamina + EPSILON >= JUMP_STAMINA_COST + JUMP_ATTACK_STAMINA_COST
+        {
+            fighter.clear_light_attack_buffer();
+            fighter.buffered_block = false;
+            fighter.clear_buffered_dodge();
+            fighter.buffered_kick = false;
+            fighter.buffered_jump = false;
+            fighter.buffered_jump_attack = true;
         } else if edges.jump
             && remaining_ms <= JUMP_BUFFER_WINDOW_MS + EPSILON
             && fighter.stamina + EPSILON >= JUMP_STAMINA_COST
@@ -730,6 +761,7 @@ fn begin_requested_action(
             fighter.buffered_block = false;
             fighter.clear_buffered_dodge();
             fighter.buffered_kick = false;
+            fighter.buffered_jump_attack = false;
             fighter.buffered_jump = true;
         } else if edges.kick
             && remaining_ms <= KICK_BUFFER_WINDOW_MS + EPSILON
@@ -739,12 +771,14 @@ fn begin_requested_action(
             fighter.buffered_block = false;
             fighter.clear_buffered_dodge();
             fighter.buffered_jump = false;
+            fighter.buffered_jump_attack = false;
             fighter.buffered_kick = true;
         } else if edges.attack && remaining_ms <= LIGHT_ATTACK_BUFFER_WINDOW_MS + EPSILON {
             fighter.buffered_block = false;
             fighter.clear_buffered_dodge();
             fighter.buffered_kick = false;
             fighter.buffered_jump = false;
+            fighter.buffered_jump_attack = false;
             fighter.buffered_light_attack = true;
             fighter.buffered_attack_lateral =
                 fighter.facing.sin() * input.move_x - fighter.facing.cos() * input.move_y;
@@ -773,8 +807,7 @@ fn begin_requested_action(
         && edges.attack
         && spend_stamina(now_ms, fighter, JUMP_ATTACK_STAMINA_COST)
     {
-        fighter.attack_hit_targets.clear();
-        fighter.set_action(Action::JumpAttackWindup, JUMP_ATTACK_WINDUP_MS);
+        fighter.begin_jump_attack();
         return;
     }
 
@@ -793,6 +826,19 @@ fn begin_requested_action(
         && spend_stamina(now_ms, fighter, KICK_STAMINA_COST)
     {
         fighter.begin_kick();
+        return;
+    }
+
+    if edges.jump
+        && edges.attack
+        && fighter.action == Action::Idle
+        && spend_stamina(
+            now_ms,
+            fighter,
+            JUMP_STAMINA_COST + JUMP_ATTACK_STAMINA_COST,
+        )
+    {
+        fighter.begin_jump_attack();
         return;
     }
 
