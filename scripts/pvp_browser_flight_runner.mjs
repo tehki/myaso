@@ -3186,8 +3186,10 @@ async function runOnlineUiThreatAwarenessFlight(entries, requireBearing = false)
   let evidence = null;
   for (let attempt = 0; attempt < 3 && !evidence; attempt += 1) {
     await performArenaAttack(left, leftArena, 200);
-    await sleep(420);
-    const states = await Promise.all(entries.map(readUiEvidence));
+    // Keep all three real browser sessions scheduled while the 135 ms windup and
+    // 80 ms active phase are live. Sleeping through the entire exchange lets a
+    // headless tab skip the short STRIKE render even though authority resolves it.
+    const states = await sampleUiEvidenceWhileActive(entries, 420);
     const leftState = states.find((entry) => entry.browser === left.name);
     const centerState = states.find((entry) => entry.browser === center.name);
     const rightState = states.find((entry) => entry.browser === right.name);
@@ -3285,8 +3287,10 @@ async function runOnlineUiMultiThreatFlight(entries, requireSecondary = false, r
       performArenaAttackBurst(left),
       performArenaAttackBurst(right),
     ]);
-    await sleep(240);
-    let states = await Promise.all(entries.map(readUiEvidence));
+    // The active phase is only 80 ms. Actively sample the three sessions instead
+    // of leaving them idle for 240 ms, otherwise headless scheduling can erase the
+    // brief simultaneous STRIKE frame from the observer history.
+    let states = await sampleUiEvidenceWhileActive(entries, 240);
     if (requireSecondaryPhase) {
       // A secondary WINDUP transition can arrive one browser sample before STRIKE under
       // headless runner jitter. Once simultaneous-threat evidence exists, allow only a
@@ -4001,6 +4005,17 @@ async function performArenaAttackBurst(session, clickCount = 3, initialPauseMs =
       actions,
     }],
   });
+}
+
+async function sampleUiEvidenceWhileActive(entries, durationMs, intervalMs = 20) {
+  const deadline = Date.now() + Math.max(0, durationMs);
+  const boundedIntervalMs = Math.max(8, Math.min(80, intervalMs));
+  let states = await Promise.all(entries.map(readUiEvidence));
+  while (Date.now() < deadline) {
+    await sleep(boundedIntervalMs);
+    states = await Promise.all(entries.map(readUiEvidence));
+  }
+  return states;
 }
 
 async function installUiObserver(session) {

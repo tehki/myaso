@@ -111,6 +111,7 @@ export const COMBAT = Object.freeze({
     blockWindowMs: 90,
     dodgeWindowMs: 90,
     jumpWindowMs: 90,
+    jumpAttackWindowMs: 90,
     kickWindowMs: 90,
   }),
   guard: Object.freeze({
@@ -150,6 +151,7 @@ export function createFighter({ id, x, y, facing = 0, spawnX = x, spawnY = y }) 
     bufferedDodgeDirY: 0,
     bufferedKick: false,
     bufferedJump: false,
+    bufferedJumpAttack: false,
     dodgeDirX: 0,
     dodgeDirY: 0,
     attackHitTargets: new Set(),
@@ -260,6 +262,7 @@ function clearRecoveryInputBuffer(fighter) {
   clearBufferedDodge(fighter);
   fighter.bufferedKick = false;
   fighter.bufferedJump = false;
+  fighter.bufferedJumpAttack = false;
 }
 
 function beginDodge(fighter, dirX, dirY) {
@@ -274,6 +277,12 @@ function beginKick(fighter) {
   clearRecoveryInputBuffer(fighter);
   fighter.attackHitTargets.clear();
   setAction(fighter, "kick_windup", COMBAT.kick.windupMs);
+}
+
+function beginJumpAttack(fighter) {
+  clearRecoveryInputBuffer(fighter);
+  fighter.attackHitTargets.clear();
+  setAction(fighter, "jump_attack_windup", COMBAT.jumpAttack.windupMs);
 }
 
 function beginLightAttack(fighter, lateral) {
@@ -291,6 +300,12 @@ function beginLightAttack(fighter, lateral) {
 function finishLightRecovery(world, fighter) {
   if (fighter.bufferedKick) {
     if (spendStamina(world, fighter, COMBAT.kick.staminaCost)) beginKick(fighter);
+    else setAction(fighter, "idle", 0);
+    return;
+  }
+  if (fighter.bufferedJumpAttack) {
+    const staminaCost = COMBAT.jump.staminaCost + COMBAT.jumpAttack.staminaCost;
+    if (spendStamina(world, fighter, staminaCost)) beginJumpAttack(fighter);
     else setAction(fighter, "idle", 0);
     return;
   }
@@ -330,6 +345,7 @@ function beginRequestedAction(world, fighter, input, attackPressed, blockPressed
       clearBufferedDodge(fighter);
       fighter.bufferedKick = false;
       fighter.bufferedJump = false;
+      fighter.bufferedJumpAttack = false;
       fighter.bufferedBlock = true;
     } else if (dodgePressed
       && remainingMs <= COMBAT.inputBuffer.dodgeWindowMs + EPSILON
@@ -341,6 +357,17 @@ function beginRequestedAction(world, fighter, input, attackPressed, blockPressed
       fighter.bufferedDodgeDirY = Math.sin(fighter.facing);
       fighter.bufferedKick = false;
       fighter.bufferedJump = false;
+      fighter.bufferedJumpAttack = false;
+    } else if (jumpPressed
+      && attackPressed
+      && remainingMs <= COMBAT.inputBuffer.jumpAttackWindowMs + EPSILON
+      && fighter.stamina + EPSILON >= COMBAT.jump.staminaCost + COMBAT.jumpAttack.staminaCost) {
+      clearLightAttackBuffer(fighter);
+      fighter.bufferedBlock = false;
+      clearBufferedDodge(fighter);
+      fighter.bufferedKick = false;
+      fighter.bufferedJump = false;
+      fighter.bufferedJumpAttack = true;
     } else if (jumpPressed
       && remainingMs <= COMBAT.inputBuffer.jumpWindowMs + EPSILON
       && fighter.stamina + EPSILON >= COMBAT.jump.staminaCost) {
@@ -348,6 +375,7 @@ function beginRequestedAction(world, fighter, input, attackPressed, blockPressed
       fighter.bufferedBlock = false;
       clearBufferedDodge(fighter);
       fighter.bufferedKick = false;
+      fighter.bufferedJumpAttack = false;
       fighter.bufferedJump = true;
     } else if (kickPressed
       && remainingMs <= COMBAT.inputBuffer.kickWindowMs + EPSILON
@@ -356,12 +384,14 @@ function beginRequestedAction(world, fighter, input, attackPressed, blockPressed
       fighter.bufferedBlock = false;
       clearBufferedDodge(fighter);
       fighter.bufferedJump = false;
+      fighter.bufferedJumpAttack = false;
       fighter.bufferedKick = true;
     } else if (attackPressed && remainingMs <= COMBAT.inputBuffer.lightAttackWindowMs + EPSILON) {
       fighter.bufferedBlock = false;
       clearBufferedDodge(fighter);
       fighter.bufferedKick = false;
       fighter.bufferedJump = false;
+      fighter.bufferedJumpAttack = false;
       fighter.bufferedLightAttack = true;
       fighter.bufferedAttackLateral = lightAttackLateral(fighter, input.moveX, input.moveY);
     }
@@ -385,8 +415,7 @@ function beginRequestedAction(world, fighter, input, attackPressed, blockPressed
   }
 
   if (fighter.action === "jump" && attackPressed && spendStamina(world, fighter, COMBAT.jumpAttack.staminaCost)) {
-    fighter.attackHitTargets.clear();
-    setAction(fighter, "jump_attack_windup", COMBAT.jumpAttack.windupMs);
+    beginJumpAttack(fighter);
     return;
   }
 
@@ -400,6 +429,12 @@ function beginRequestedAction(world, fighter, input, attackPressed, blockPressed
 
   if (kickPressed && fighter.action === "idle" && spendStamina(world, fighter, COMBAT.kick.staminaCost)) {
     beginKick(fighter);
+    return;
+  }
+
+  if (jumpPressed && attackPressed && fighter.action === "idle"
+    && spendStamina(world, fighter, COMBAT.jump.staminaCost + COMBAT.jumpAttack.staminaCost)) {
+    beginJumpAttack(fighter);
     return;
   }
 
