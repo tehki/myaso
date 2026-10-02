@@ -1588,7 +1588,7 @@ async function runOnlineUiJumpAttackCounterplayFlight(entries, defense) {
   const scenarioName = `uijumpattack${defense}`;
   const attackerName = defense === "dodge" ? "firefox" : "chrome";
   const defenderName = defense === "dodge" ? "chrome" : "firefox";
-  const movementMs = defense === "dodge" ? 200 : 180;
+  const movementMs = 180;
   const label = `M138 jump attack ${defense}`;
   const staged = await prepareHeavyCounterplayFlight(
     entries,
@@ -1618,10 +1618,9 @@ async function runOnlineUiJumpAttackCounterplayFlight(entries, defense) {
       scrollArenaWheel(defender, defenderElementId, 120, 35),
     ]);
   } else if (defense === "dodge") {
-    const towardAttackerOffset = movementCode === "KeyD" ? -80 : 80;
     await Promise.all([
       performArenaJumpAttackChord(attacker, attackerElementId, attackOffset, 90),
-      pressArenaPerpendicularDodgeAfterPause(defender, 55, defenderElementId, towardAttackerOffset, 180),
+      performArenaTimedPointerDodge(defender, defenderElementId, 120),
     ]);
   } else {
     throw new Error(`unsupported M138 jump-attack defense: ${defense}`);
@@ -1790,10 +1789,8 @@ async function runOnlineUiJumpAttackCounterplayFlight(entries, defense) {
       throw new Error(`${label} real wheel-back parry was not delivered: ${JSON.stringify(defenderResult)}`);
     }
   } else {
-    if (!defenseWheels.some((event) => event.deltaY < 0)
-      || !defenderResult.keys.includes("keydown:KeyS")
-      || !defenderResult.keys.includes("keyup:KeyS")) {
-      throw new Error(`${label} real wheel-forward perpendicular dodge was not delivered: ${JSON.stringify(defenderResult)}`);
+    if (!defenseWheels.some((event) => event.deltaY < 0)) {
+      throw new Error(`${label} real pointer-owned wheel-forward dodge was not delivered: ${JSON.stringify(defenderResult)}`);
     }
   }
 
@@ -4237,20 +4234,12 @@ async function scrollArenaWheelPair(session, elementId, deltaY, firstDelayMs, be
   });
 }
 
-async function pressArenaPerpendicularDodgeAfterPause(
-  session,
-  delayMs,
-  knownElementId = null,
-  xOffset = 0,
-  yOffset = 180,
-) {
+async function pressArenaPerpendicularDodgeAfterPause(session, delayMs, knownElementId = null) {
   const elementId = knownElementId ?? await resolveArenaElement(session, "wheel-roll");
   const origin = { "element-6066-11e4-a52e-4f735466cecf": elementId };
-  // Roll direction is pointer-owned. By default aim below arena center; M138
-  // may add a small toward-attacker X component so the narrow jump-attack arc
-  // still intersects while the unchanged dodge iframe is authoritative.
-  // The simultaneous S key remains intentionally redundant evidence that
-  // movement keys no longer steer the roll.
+  // Roll direction is pointer-owned. Aim below arena center immediately before
+  // wheel-forward; the simultaneous S key is intentionally redundant evidence
+  // that movement keys no longer steer the roll.
   await webdriver(session.base, "POST", `/session/${session.sessionId}/actions`, {
     actions: [
       {
@@ -4269,7 +4258,7 @@ async function pressArenaPerpendicularDodgeAfterPause(
         parameters: { pointerType: "mouse" },
         actions: [
           { type: "pause", duration: delayMs },
-          { type: "pointerMove", duration: 0, origin, x: xOffset, y: yOffset },
+          { type: "pointerMove", duration: 0, origin, x: 0, y: 180 },
           { type: "pause", duration: 15 },
         ],
       },
@@ -4279,6 +4268,39 @@ async function pressArenaPerpendicularDodgeAfterPause(
         actions: [
           { type: "pause", duration: delayMs },
           { type: "pause", duration: 15 },
+          { type: "scroll", x: 0, y: 0, deltaX: 0, deltaY: -120, duration: 0, origin },
+        ],
+      },
+    ],
+  });
+}
+
+async function performArenaTimedPointerDodge(session, elementId, delayMs = 120) {
+  const origin = { "element-6066-11e4-a52e-4f735466cecf": elementId };
+  const boundedDelayMs = Math.max(0, Math.min(220, Math.trunc(delayMs)));
+  // Keep pointer targeting and wheel-forward in one W3C timeline with exactly
+  // one browser-owned delay. The older M107 helper intentionally carries a
+  // redundant S-key proof, whose synchronized ticks are too long for the
+  // jump attack's 105 ms windup. This focused helper proves the production
+  // pointer-owned roll without altering gameplay or the established M107 gate.
+  await webdriver(session.base, "POST", `/session/${session.sessionId}/actions`, {
+    actions: [
+      {
+        type: "pointer",
+        id: `mouse-${session.name}`,
+        parameters: { pointerType: "mouse" },
+        actions: [
+          { type: "pointerMove", duration: 0, origin, x: 0, y: 180 },
+          { type: "pause", duration: boundedDelayMs },
+          { type: "pause", duration: 0 },
+        ],
+      },
+      {
+        type: "wheel",
+        id: `wheel-${session.name}`,
+        actions: [
+          { type: "pause", duration: 0 },
+          { type: "pause", duration: boundedDelayMs },
           { type: "scroll", x: 0, y: 0, deltaX: 0, deltaY: -120, duration: 0, origin },
         ],
       },

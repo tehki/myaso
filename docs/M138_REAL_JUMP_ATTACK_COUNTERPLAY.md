@@ -20,7 +20,7 @@ Every scenario requires one genuine WebDriver `Space + LMB` chord with:
 - Space and LMB downs within 60 ms;
 - no plain jump before authoritative jump-attack windup.
 
-Defensive proof requires the corresponding real wheel event, and dodge also requires the redundant real `S` key evidence used by the existing pointer-owned roll acceptance helper.
+Defensive proof requires the corresponding real wheel event. The dodge scenario uses a focused pointer + wheel WebDriver timeline so its single browser-owned delay fits the jump attack’s short windup; the older M107 redundant-`S` roll helper remains unchanged.
 
 ## Authoritative acceptance
 Both browsers must observe the authoritative jump-attack commitment beginning in windup.
