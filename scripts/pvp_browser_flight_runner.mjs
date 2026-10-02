@@ -17,7 +17,7 @@ const heavyKeyPulseMs = 120;
 // A full M62 threat chevron paints dozens of exact-tone pixels; a handful can
 // arise from raster overlap. Use one significance floor for positive and leak proof.
 const threatMarkerMinPixels = 8;
-if (!new Set(["damage", "inputloss", "parry", "dodge", "block", "guardbreak", "backblock", "respawn", "ui", "uirespawn", "uifeedback", "uihittell", "uivitals", "uiidentity", "uiscore", "uimatch", "uirematch", "uiffa3", "uikillfeed", "uifocus", "uithreat", "uithreatbearing", "uimultithreat", "uisecondarythreat", "uisecondarybearing", "uisecondaryphase", "uiguardarc", "uisecondaryguardarc", "uithreatmarkers", "uiparry", "uistun", "uiguardbreak", "uidodge", "uirecovery", "uirecoverytell", "uiattackintent", "uiheavy", "uiheavyinputloss", "uiheavyblock", "uiheavyparry", "uiheavydodge", "uiheavypunish", "uiheavyguardbreak", "uiheavyguardbreakpunish", "uifeint", "uirunningattack", "uidirectionallight", "uirollbuffer", "uijumpbuffer", "uijumpattack", "uijumpattackinputloss", "uijumpattackpunish", "uijumpattackblock", "uijumpattackparry", "uijumpattackdodge", "uijumpattackbuffer", "uikickbuffer", "uiguardbreaktell", "uiparrytell", "uiblockfacingtell", "uidodgetell", "uideathtell"]).has(scenario)) throw new Error(`unsupported MYASO_PVP_SCENARIO: ${scenario}`);
+if (!new Set(["damage", "inputloss", "parry", "dodge", "block", "guardbreak", "backblock", "respawn", "ui", "uirespawn", "uifeedback", "uihittell", "uivitals", "uiidentity", "uiscore", "uimatch", "uirematch", "uiffa3", "uikillfeed", "uifocus", "uithreat", "uithreatbearing", "uimultithreat", "uisecondarythreat", "uisecondarybearing", "uisecondaryphase", "uiguardarc", "uisecondaryguardarc", "uithreatmarkers", "uiparry", "uistun", "uiguardbreak", "uidodge", "uirecovery", "uirecoverytell", "uiattackintent", "uiheavy", "uiheavyinputloss", "uiheavyblock", "uiheavyparry", "uiheavydodge", "uiheavypunish", "uiheavyguardbreak", "uiheavyguardbreakpunish", "uifeint", "uirunningattack", "uidirectionallight", "uirollbuffer", "uijumpbuffer", "uijumpattack", "uijumpattackinputloss", "uijumpattackpunish", "uijumpattacktelegraph", "uijumpattackblock", "uijumpattackparry", "uijumpattackdodge", "uijumpattackbuffer", "uikickbuffer", "uiguardbreaktell", "uiparrytell", "uiblockfacingtell", "uidodgetell", "uideathtell"]).has(scenario)) throw new Error(`unsupported MYASO_PVP_SCENARIO: ${scenario}`);
 const staticPort = Number(process.env.MYASO_PVP_FLIGHT_HTTP_PORT ?? 4174);
 const browsers = [
   {
@@ -261,6 +261,9 @@ try {
   } else if (scenario === "uijumpattackpunish") {
     const results = await runOnlineUiJumpAttackWhiffPunishFlight(sessions);
     console.log(`M140_JUMP_ATTACK_WHIFF_PUNISH ${JSON.stringify({ ok: true, results })}`);
+  } else if (scenario === "uijumpattacktelegraph") {
+    const results = await runOnlineUiJumpAttackTelegraphFlight(sessions);
+    console.log(`M141_JUMP_ATTACK_TELEGRAPH ${JSON.stringify({ ok: true, results })}`);
   } else if (scenario === "uijumpattackblock") {
     const results = await runOnlineUiJumpAttackCounterplayFlight(sessions, "block");
     console.log(`M138_REAL_JUMP_ATTACK_BLOCK ${JSON.stringify({ ok: true, results })}`);
@@ -391,14 +394,14 @@ async function startBrowser(browser) {
     pageLoad: 30_000,
     implicit: 0,
   });
-  if (scenario === "uiparry" || scenario === "uistun" || scenario === "uiguardbreak" || scenario === "uidodge" || scenario === "uiattackintent" || scenario === "uiheavy" || scenario === "uiheavyinputloss" || scenario === "uiheavyblock" || scenario === "uiheavyparry" || scenario === "uiheavydodge" || scenario === "uiheavypunish" || scenario === "uiheavyguardbreak" || scenario === "uiheavyguardbreakpunish" || scenario === "uifeint" || scenario === "uirunningattack" || scenario === "uidirectionallight" || scenario === "uirollbuffer" || scenario === "uijumpbuffer" || scenario === "uijumpattack" || scenario === "uijumpattackinputloss" || scenario === "uijumpattackpunish" || scenario === "uijumpattackblock" || scenario === "uijumpattackparry" || scenario === "uijumpattackdodge" || scenario === "uijumpattackbuffer" || scenario === "uikickbuffer" || scenario === "uiguardbreaktell" || scenario === "uiparrytell" || scenario === "uiblockfacingtell" || scenario === "uidodgetell") {
+  if (scenario === "uiparry" || scenario === "uistun" || scenario === "uiguardbreak" || scenario === "uidodge" || scenario === "uiattackintent" || scenario === "uiheavy" || scenario === "uiheavyinputloss" || scenario === "uiheavyblock" || scenario === "uiheavyparry" || scenario === "uiheavydodge" || scenario === "uiheavypunish" || scenario === "uiheavyguardbreak" || scenario === "uiheavyguardbreakpunish" || scenario === "uifeint" || scenario === "uirunningattack" || scenario === "uidirectionallight" || scenario === "uirollbuffer" || scenario === "uijumpbuffer" || scenario === "uijumpattack" || scenario === "uijumpattackinputloss" || scenario === "uijumpattackpunish" || scenario === "uijumpattacktelegraph" || scenario === "uijumpattackblock" || scenario === "uijumpattackparry" || scenario === "uijumpattackdodge" || scenario === "uijumpattackbuffer" || scenario === "uikickbuffer" || scenario === "uiguardbreaktell" || scenario === "uiparrytell" || scenario === "uiblockfacingtell" || scenario === "uidodgetell") {
     await webdriver(base, "POST", `/session/${sessionId}/window/rect`, { x: 0, y: 0, width: 1280, height: 900 });
   }
   return { ...browser, child, base, sessionId };
 }
 
 async function navigate(session, gameUrl, certificateHash) {
-  const page = scenario === "ui" || scenario === "uirespawn" || scenario === "uifeedback" || scenario === "uihittell" || scenario === "uivitals" || scenario === "uiidentity" || scenario === "uiscore" || scenario === "uimatch" || scenario === "uirematch" || scenario === "uiffa3" || scenario === "uikillfeed" || scenario === "uifocus" || scenario === "uithreat" || scenario === "uithreatbearing" || scenario === "uimultithreat" || scenario === "uisecondarythreat" || scenario === "uisecondarybearing" || scenario === "uisecondaryphase" || scenario === "uiguardarc" || scenario === "uisecondaryguardarc" || scenario === "uithreatmarkers" || scenario === "uiparry" || scenario === "uistun" || scenario === "uiguardbreak" || scenario === "uidodge" || scenario === "uirecovery" || scenario === "uirecoverytell" || scenario === "uiattackintent" || scenario === "uiheavy" || scenario === "uiheavyinputloss" || scenario === "uiheavyblock" || scenario === "uiheavyparry" || scenario === "uiheavydodge" || scenario === "uiheavypunish" || scenario === "uiheavyguardbreak" || scenario === "uiheavyguardbreakpunish" || scenario === "uifeint" || scenario === "uirunningattack" || scenario === "uidirectionallight" || scenario === "uirollbuffer" || scenario === "uijumpbuffer" || scenario === "uijumpattack" || scenario === "uijumpattackinputloss" || scenario === "uijumpattackpunish" || scenario === "uijumpattackblock" || scenario === "uijumpattackparry" || scenario === "uijumpattackdodge" || scenario === "uijumpattackbuffer" || scenario === "uikickbuffer" || scenario === "uiguardbreaktell" || scenario === "uiparrytell" || scenario === "uiblockfacingtell" || scenario === "uidodgetell" || scenario === "uideathtell" ? "index.html" : "pvp-flight.html";
+  const page = scenario === "ui" || scenario === "uirespawn" || scenario === "uifeedback" || scenario === "uihittell" || scenario === "uivitals" || scenario === "uiidentity" || scenario === "uiscore" || scenario === "uimatch" || scenario === "uirematch" || scenario === "uiffa3" || scenario === "uikillfeed" || scenario === "uifocus" || scenario === "uithreat" || scenario === "uithreatbearing" || scenario === "uimultithreat" || scenario === "uisecondarythreat" || scenario === "uisecondarybearing" || scenario === "uisecondaryphase" || scenario === "uiguardarc" || scenario === "uisecondaryguardarc" || scenario === "uithreatmarkers" || scenario === "uiparry" || scenario === "uistun" || scenario === "uiguardbreak" || scenario === "uidodge" || scenario === "uirecovery" || scenario === "uirecoverytell" || scenario === "uiattackintent" || scenario === "uiheavy" || scenario === "uiheavyinputloss" || scenario === "uiheavyblock" || scenario === "uiheavyparry" || scenario === "uiheavydodge" || scenario === "uiheavypunish" || scenario === "uiheavyguardbreak" || scenario === "uiheavyguardbreakpunish" || scenario === "uifeint" || scenario === "uirunningattack" || scenario === "uidirectionallight" || scenario === "uirollbuffer" || scenario === "uijumpbuffer" || scenario === "uijumpattack" || scenario === "uijumpattackinputloss" || scenario === "uijumpattackpunish" || scenario === "uijumpattacktelegraph" || scenario === "uijumpattackblock" || scenario === "uijumpattackparry" || scenario === "uijumpattackdodge" || scenario === "uijumpattackbuffer" || scenario === "uikickbuffer" || scenario === "uiguardbreaktell" || scenario === "uiparrytell" || scenario === "uiblockfacingtell" || scenario === "uidodgetell" || scenario === "uideathtell" ? "index.html" : "pvp-flight.html";
   const url = new URL(`http://127.0.0.1:${staticPort}/web/${page}`);
   url.searchParams.set("server", gameUrl);
   url.searchParams.set("cert", certificateHash);
@@ -2121,6 +2124,151 @@ async function runOnlineUiJumpAttackWhiffPunishFlight(entries) {
       ? Math.max(jumpDown.epochMs, attackDown.epochMs)
       : null,
     jumpAttackPunishEpochMs: entry.browser === defender.name ? punishDown.epochMs : null,
+  }));
+}
+
+async function runOnlineUiJumpAttackTelegraphFlight(entries) {
+  const staged = await prepareHeavyCounterplayFlight(
+    entries,
+    "M141 jump attack telegraph",
+    { attackerName: "chrome", defenderName: "firefox", movementMs: 180 },
+  );
+  const { attacker, defender, attackerElementId, movementCode } = staged;
+  const attackRight = movementCode === "KeyD";
+  const attackOffset = attackRight ? 200 : -200;
+  const whiffOffset = -attackOffset;
+
+  const before = await Promise.all(entries.map(readUiEvidence));
+  const attackerBefore = before.find((entry) => entry.browser === attacker.name);
+  const defenderBefore = before.find((entry) => entry.browser === defender.name);
+  if (!attackerBefore || !defenderBefore) {
+    throw new Error(`M141 incomplete initial evidence: ${JSON.stringify(before)}`);
+  }
+  const keyOffset = attackerBefore.keyTransitions.length;
+  const pointerOffset = attackerBefore.pointers.length;
+  const offAxisThreatOffset = defenderBefore.threatTransitions.length;
+
+  // First prove the telegraph honors the existing narrow attack cone: at the
+  // same close spacing as M136, turn 180 degrees away and send a genuine chord.
+  await aimArena(attacker, attackerElementId, whiffOffset);
+  await sleep(40);
+  await Promise.all([
+    performArenaJumpAttackChord(attacker, attackerElementId, whiffOffset, 90),
+    sampleUiEvidenceWhileActive([defender], 360, 12),
+  ]);
+
+  let offAxisSettled = null;
+  const offAxisDeadline = Date.now() + 900;
+  while (Date.now() < offAxisDeadline) {
+    const states = await Promise.all(entries.map(readUiEvidence));
+    const attackerResult = states.find((entry) => entry.browser === attacker.name);
+    const own = attackerResult?.acceptance?.ownActionTransitions ?? [];
+    const recoveryIndex = own.findIndex((entry) => entry.action === COMBAT_ACTION.jumpAttackRecovery);
+    const idleIndex = own.findIndex((entry, index) => index > recoveryIndex && entry.action === COMBAT_ACTION.idle);
+    if (recoveryIndex >= 0 && idleIndex > recoveryIndex) {
+      offAxisSettled = states;
+      break;
+    }
+    await sleep(15);
+  }
+  if (!offAxisSettled) {
+    throw new Error(`M141 off-axis jump attack never completed: ${JSON.stringify(await Promise.all(entries.map(readUiEvidence)))}`);
+  }
+
+  const offAxisAttacker = offAxisSettled.find((entry) => entry.browser === attacker.name);
+  const offAxisDefender = offAxisSettled.find((entry) => entry.browser === defender.name);
+  const leakedJumpThreat = offAxisDefender?.threatTransitions.slice(offAxisThreatOffset).some((entry) =>
+    entry.visible && (entry.phase === "JUMP WINDUP" || entry.phase === "JUMP STRIKE"));
+  if (leakedJumpThreat) {
+    throw new Error(`M141 off-axis narrow jump attack leaked a threat cue: ${JSON.stringify(offAxisDefender?.threatTransitions)}`);
+  }
+  if (offAxisAttacker?.playerHp !== 100 || offAxisAttacker?.opponentHp !== 100
+    || offAxisDefender?.playerHp !== 100 || offAxisDefender?.opponentHp !== 100) {
+    throw new Error(`M141 off-axis narrow jump attack unexpectedly connected: ${JSON.stringify(offAxisSettled)}`);
+  }
+
+  // Now aim inside the same narrow cone. The opponent must see both committed
+  // phases before the unchanged 42-damage hit resolves.
+  await aimArena(attacker, attackerElementId, attackOffset);
+  await sleep(60);
+  const beforeInAxis = await readUiEvidence(defender);
+  const inAxisThreatOffset = beforeInAxis.threatTransitions.length;
+  await Promise.all([
+    performArenaJumpAttackChord(attacker, attackerElementId, attackOffset, 90),
+    sampleUiEvidenceWhileActive([defender], 380, 10),
+  ]);
+
+  let evidence = null;
+  const hitDeadline = Date.now() + 700;
+  while (Date.now() < hitDeadline) {
+    const states = await Promise.all(entries.map(readUiEvidence));
+    const attackerResult = states.find((entry) => entry.browser === attacker.name);
+    const defenderResult = states.find((entry) => entry.browser === defender.name);
+    if (attackerResult?.opponentHp === 58 && defenderResult?.playerHp === 58) {
+      evidence = states;
+      break;
+    }
+    await sleep(12);
+  }
+  if (!evidence) {
+    throw new Error(`M141 in-axis jump attack did not resolve one 42-damage hit: ${JSON.stringify(await Promise.all(entries.map(readUiEvidence)))}`);
+  }
+
+  const attackerResult = evidence.find((entry) => entry.browser === attacker.name);
+  const defenderResult = evidence.find((entry) => entry.browser === defender.name);
+  if (!attackerResult || !defenderResult) {
+    throw new Error(`M141 incomplete final evidence: ${JSON.stringify(evidence)}`);
+  }
+  if (attackerResult.acceptance?.scenario !== "uijumpattacktelegraph"
+    || defenderResult.acceptance?.scenario !== "uijumpattacktelegraph") {
+    throw new Error(`M141 authoritative acceptance hook was not active: ${JSON.stringify(evidence)}`);
+  }
+
+  const jumpThreats = defenderResult.threatTransitions.slice(inAxisThreatOffset);
+  const windupIndex = jumpThreats.findIndex((entry) =>
+    entry.visible && entry.phase === "JUMP WINDUP" && entry.state === "windup");
+  const strikeIndex = jumpThreats.findIndex((entry, index) =>
+    index > windupIndex && entry.visible && entry.phase === "JUMP STRIKE" && entry.state === "strike");
+  if (windupIndex < 0 || strikeIndex <= windupIndex) {
+    throw new Error(`M141 defender did not render JUMP WINDUP -> JUMP STRIKE: ${JSON.stringify(jumpThreats)}`);
+  }
+
+  const keys = attackerResult.keyTransitions.slice(keyOffset);
+  const pointers = attackerResult.pointers.slice(pointerOffset);
+  const spaceDowns = keys.filter((entry) => entry.type === "keydown" && entry.code === "Space");
+  const spaceUps = keys.filter((entry) => entry.type === "keyup" && entry.code === "Space");
+  const attackDowns = pointers.filter((entry) => entry.type === "pointerdown" && entry.button === 0);
+  const attackUps = pointers.filter((entry) => entry.type === "pointerup" && entry.button === 0);
+  if (spaceDowns.length !== 2 || spaceUps.length !== 2 || attackDowns.length !== 2 || attackUps.length !== 2) {
+    throw new Error(`M141 expected exactly two genuine jump-attack chords: ${JSON.stringify({ keys, pointers })}`);
+  }
+  for (let index = 0; index < 2; index += 1) {
+    if (!Number.isFinite(spaceDowns[index]?.epochMs) || !Number.isFinite(attackDowns[index]?.epochMs)
+      || Math.abs(spaceDowns[index].epochMs - attackDowns[index].epochMs) > 60) {
+      throw new Error(`M141 chord ${index + 1} was not same-tick Space + LMB: ${JSON.stringify({ spaceDowns, attackDowns })}`);
+    }
+  }
+  const firstAimValid = attackRight ? attackDowns[0].x <= 0.4 : attackDowns[0].x >= 0.6;
+  const secondAimValid = attackRight ? attackDowns[1].x >= 0.6 : attackDowns[1].x <= 0.4;
+  if (!firstAimValid || !secondAimValid) {
+    throw new Error(`M141 did not deliver off-axis then in-axis pointer ownership: ${JSON.stringify(attackDowns)}`);
+  }
+
+  if (attackerResult.playerHp !== 100 || attackerResult.playerGuard !== 100
+    || attackerResult.opponentHp !== 58 || attackerResult.opponentGuard !== 100
+    || defenderResult.playerHp !== 58 || defenderResult.playerGuard !== 100
+    || defenderResult.opponentHp !== 100 || defenderResult.opponentGuard !== 100) {
+    throw new Error(`M141 telegraph flight changed combat balance or resolved extra contact: ${JSON.stringify(evidence)}`);
+  }
+  if (!attackerResult.events.includes("Opponent hit - 42 HP.")
+    || !defenderResult.events.includes("Hit taken - 42 HP.")) {
+    throw new Error(`M141 in-axis jump hit feedback was not authoritative: ${JSON.stringify(evidence)}`);
+  }
+
+  return evidence.map((entry) => ({
+    ...entry,
+    jumpTelegraphWindupSeen: entry.browser === defender.name ? windupIndex >= 0 : null,
+    jumpTelegraphStrikeSeen: entry.browser === defender.name ? strikeIndex > windupIndex : null,
   }));
 }
 
@@ -4979,7 +5127,7 @@ async function installUiObserver(session) {
     const threatGuardArc = document.querySelector('#threat-guard-arc');
     if (!target || !arena || !arenaStage || !overlay || !recovery || !threat || !threatCount || !threatSecondary || !threatSecondaryBearing || !threatSecondaryPhase || !threatSecondaryGuardArc || !threatBearing || !threatGuardArc) throw new Error('missing online UI flight target');
     const state = { events: [], eventTransitions: [], keys: [], keyTransitions: [], pointers: [], wheels: [], overlayTransitions: [], feedbackTransitions: [], recoveryTransitions: [], threatTransitions: [], recoveryTellMaxPixels: 0, parryTellMaxPixels: 0, online: '', startedAt: performance.now() };
-    const epochEvidence = ['uirollbuffer', 'uijumpbuffer', 'uijumpattack', 'uijumpattackinputloss', 'uijumpattackpunish', 'uijumpattackblock', 'uijumpattackparry', 'uijumpattackdodge', 'uijumpattackbuffer', 'uikickbuffer'].includes(new URLSearchParams(location.search).get('scenario'));
+    const epochEvidence = ['uirollbuffer', 'uijumpbuffer', 'uijumpattack', 'uijumpattackinputloss', 'uijumpattackpunish', 'uijumpattacktelegraph', 'uijumpattackblock', 'uijumpattackparry', 'uijumpattackdodge', 'uijumpattackbuffer', 'uikickbuffer'].includes(new URLSearchParams(location.search).get('scenario'));
     const record = () => {
       const text = target.textContent?.trim() ?? '';
       if (/^Online - player #\\d+ - server tick \\d+$/.test(text)) state.online = text;
