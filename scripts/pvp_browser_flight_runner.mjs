@@ -1653,6 +1653,17 @@ async function runOnlineUiJumpAttackCounterplayFlight(entries, defense) {
       index > focusWindupIndex && entry.action === COMBAT_ACTION.jumpAttackActive);
     const attackSeen = ownWindupIndex >= 0 && ownActiveIndex > ownWindupIndex
       && focusWindupIndex >= 0 && focusActiveIndex > focusWindupIndex;
+    const ownRecoveryIndex = ownTransitions.findIndex((entry, index) =>
+      index > ownActiveIndex && entry.action === COMBAT_ACTION.jumpAttackRecovery);
+    const focusRecoveryIndex = focusTransitions.findIndex((entry, index) =>
+      index > focusActiveIndex && entry.action === COMBAT_ACTION.jumpAttackRecovery);
+    const ownStunnedIndex = ownTransitions.findIndex((entry, index) =>
+      index > ownActiveIndex && entry.action === COMBAT_ACTION.stunned);
+    const focusStunnedIndex = focusTransitions.findIndex((entry, index) =>
+      index > focusActiveIndex && entry.action === COMBAT_ACTION.stunned);
+    const terminalReplicated = defense === "parry"
+      ? ownStunnedIndex > ownActiveIndex && focusStunnedIndex > focusActiveIndex
+      : ownRecoveryIndex > ownActiveIndex && focusRecoveryIndex > focusActiveIndex;
 
     let resolved = false;
     if (defense === "block") {
@@ -1681,7 +1692,7 @@ async function runOnlineUiJumpAttackCounterplayFlight(entries, defense) {
         && defenderResult.playerHp === 100
         && defenderResult.playerGuard === 100;
     }
-    if (resolved) {
+    if (resolved && terminalReplicated) {
       evidence = states;
       break;
     }
