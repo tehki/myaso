@@ -1697,15 +1697,28 @@ async function runOnlineUiJumpAttackCounterplayFlight(entries, defense) {
       index > ownWindupIndex && entry.action === COMBAT_ACTION.stunned);
     const focusStunnedIndex = focusTransitions.findIndex((entry, index) =>
       index > focusWindupIndex && entry.action === COMBAT_ACTION.stunned);
-    // A successful parry resolves on the first active server tick and replaces
-    // jump-attack-active with stunned before the snapshot is replicated. Block
-    // and dodge preserve the attacker's active -> recovery lifecycle.
+    const ownKnockdownIndex = ownTransitions.findIndex((entry, index) =>
+      index > ownWindupIndex && entry.action === COMBAT_ACTION.knockdown);
+    const focusKnockdownIndex = focusTransitions.findIndex((entry, index) =>
+      index > focusWindupIndex && entry.action === COMBAT_ACTION.knockdown);
+    const rollCounter = defense === "dodge"
+      && attackerResult.feedbackTransitions.includes("rolled-over")
+      && defenderResult.feedbackTransitions.includes("roll-impact")
+      && ownKnockdownIndex > ownWindupIndex
+      && focusKnockdownIndex > focusWindupIndex;
+    // A successful parry or roll collision can replace jump-attack-active before
+    // it is replicated. The latter is an intended Wilds-style counter: the real
+    // pointer roll reaches the attacker first and knocks the commitment down.
     const attackSeen = defense === "parry"
       ? windupSeen && ownStunnedIndex > ownWindupIndex && focusStunnedIndex > focusWindupIndex
-      : windupSeen && activeSeen;
+      : defense === "dodge" && rollCounter
+        ? windupSeen
+        : windupSeen && activeSeen;
     const terminalReplicated = defense === "parry"
       ? ownStunnedIndex > ownWindupIndex && focusStunnedIndex > focusWindupIndex
-      : ownRecoveryIndex > ownActiveIndex && focusRecoveryIndex > focusActiveIndex;
+      : defense === "dodge" && rollCounter
+        ? ownKnockdownIndex > ownWindupIndex && focusKnockdownIndex > focusWindupIndex
+        : ownRecoveryIndex > ownActiveIndex && focusRecoveryIndex > focusActiveIndex;
 
     let resolved = false;
     if (defense === "block") {
@@ -1733,7 +1746,7 @@ async function runOnlineUiJumpAttackCounterplayFlight(entries, defense) {
         && defenderResult.feedbackTransitions.includes("dodge-success");
       const replicatedOverlap = hasReplicatedDodgeOverlap(attackerResult, defenderResult);
       resolved = attackSeen
-        && (iframeEvade || replicatedOverlap)
+        && (iframeEvade || replicatedOverlap || rollCounter)
         && attackerResult.playerHp === 100
         && attackerResult.playerGuard === 100
         && defenderResult.playerHp === 100
@@ -1785,9 +1798,18 @@ async function runOnlineUiJumpAttackCounterplayFlight(entries, defense) {
   const focusWindupIndex = focusTransitions.findIndex((entry) => entry.action === COMBAT_ACTION.jumpAttackWindup);
   const focusActiveIndex = focusTransitions.findIndex((entry, index) =>
     index > focusWindupIndex && entry.action === COMBAT_ACTION.jumpAttackActive);
+  const ownKnockdownIndex = ownTransitions.findIndex((entry, index) =>
+    index > ownWindupIndex && entry.action === COMBAT_ACTION.knockdown);
+  const focusKnockdownIndex = focusTransitions.findIndex((entry, index) =>
+    index > focusWindupIndex && entry.action === COMBAT_ACTION.knockdown);
+  const rollCounter = defense === "dodge"
+    && attackerResult.feedbackTransitions.includes("rolled-over")
+    && defenderResult.feedbackTransitions.includes("roll-impact")
+    && ownKnockdownIndex > ownWindupIndex
+    && focusKnockdownIndex > focusWindupIndex;
   const ownPlainJumpIndex = ownTransitions.findIndex((entry) => entry.action === COMBAT_ACTION.jump);
   if (ownWindupIndex < 0 || focusWindupIndex < 0
-    || (defense !== "parry"
+    || (defense !== "parry" && !rollCounter
       && (ownActiveIndex <= ownWindupIndex || focusActiveIndex <= focusWindupIndex))
     || (ownPlainJumpIndex >= 0 && ownPlainJumpIndex < ownWindupIndex)) {
     throw new Error(`${label} did not preserve direct authoritative jump-attack commitment: ${JSON.stringify({
@@ -1809,6 +1831,13 @@ async function runOnlineUiJumpAttackCounterplayFlight(entries, defense) {
     }
     if (!attackerResult.overlayTransitions.some((entry) => entry.visible && entry.title === "STUNNED")) {
       throw new Error(`${label} never exposed the parried attacker stun overlay`);
+    }
+  } else if (defense === "dodge" && rollCounter) {
+    if (ownKnockdownIndex <= ownWindupIndex || focusKnockdownIndex <= focusWindupIndex) {
+      throw new Error(`${label} did not replicate jump-attack windup -> knockdown on roll counter: ${JSON.stringify({
+        ownTransitions,
+        focusTransitions,
+      })}`);
     }
   } else {
     const ownRecoveryIndex = ownTransitions.findIndex((entry, index) =>
@@ -1840,8 +1869,8 @@ async function runOnlineUiJumpAttackCounterplayFlight(entries, defense) {
     }
     const iframeEvade = attackerResult.feedbackTransitions.includes("dodge-evaded")
       && defenderResult.feedbackTransitions.includes("dodge-success");
-    if (!iframeEvade && !hasReplicatedDodgeOverlap(attackerResult, defenderResult)) {
-      throw new Error(`${label} lacked both iframe feedback and same-tick authoritative roll overlap: ${JSON.stringify(evidence)}`);
+    if (!iframeEvade && !hasReplicatedDodgeOverlap(attackerResult, defenderResult) && !rollCounter) {
+      throw new Error(`${label} lacked iframe feedback, authoritative roll overlap, or roll-counter knockdown: ${JSON.stringify(evidence)}`);
     }
   }
 
@@ -6000,8 +6029,9 @@ function assertPairedResults(results) {
       }
       if (!Number.isFinite(result.firstParryMs)) throw new Error(`${result.browser} did not timestamp a verified parry`);
     } else if (scenario === "dodge") {
-      if (!result.defenderDodgeSeen || !result.dodgeOverlapSeen) {
-        throw new Error(`${result.browser} did not observe an in-range authoritative dodge/attack overlap`);
+      const rollCounter = result.attackerKnockdownSeen === true;
+      if (!result.defenderDodgeSeen || (!result.dodgeOverlapSeen && !rollCounter)) {
+        throw new Error(`${result.browser} did not observe an authoritative evade or roll-counter knockdown`);
       }
       if (result.minDefenderHp !== 100 || result.minDefenderGuard !== 100) {
         throw new Error(`${result.browser} defender paid HP/guard cost during dodge: ${JSON.stringify(result)}`);
@@ -6009,14 +6039,16 @@ function assertPairedResults(results) {
       if (result.defenderBlockSeen || Number.isFinite(result.firstParryMs)) {
         throw new Error(`${result.browser} roll scenario accidentally resolved as block/parry`);
       }
-      // Pointer-directed roll collisions may intentionally knock the attacker
-      // down. Verified in-range dodge overlap and untouched defender vitals
-      // remain the authoritative evade proof; knockdown is not a parry proxy.
-      if (!Number.isFinite(result.firstDodgeEvadeMs) || !Number.isFinite(result.dodgeOverlapDistance) || !Number.isFinite(result.dodgeOverlapArcDelta)) {
-        throw new Error(`${result.browser} did not record verified dodge geometry/timing`);
-      }
-      if (result.dodgeOverlapDistance > 94 || result.dodgeOverlapArcDelta > Math.PI * 0.39) {
-        throw new Error(`${result.browser} dodge overlap was outside authoritative hit geometry: ${JSON.stringify(result)}`);
+      // Wilds-style pointer rolls intentionally own collision knockdown. If the
+      // defender reaches the attacker first, that authoritative knockdown is a
+      // valid defensive resolution and can preempt the later attack/iframe overlap.
+      if (!rollCounter) {
+        if (!Number.isFinite(result.firstDodgeEvadeMs) || !Number.isFinite(result.dodgeOverlapDistance) || !Number.isFinite(result.dodgeOverlapArcDelta)) {
+          throw new Error(`${result.browser} did not record verified dodge geometry/timing`);
+        }
+        if (result.dodgeOverlapDistance > 94 || result.dodgeOverlapArcDelta > Math.PI * 0.39) {
+          throw new Error(`${result.browser} dodge overlap was outside authoritative hit geometry: ${JSON.stringify(result)}`);
+        }
       }
     } else if (scenario === "block") {
       if (!result.defenderBlockSeen || !result.blockOverlapSeen) {

@@ -27,3 +27,5 @@ Acceptance requires:
 
 ## Scope
 Changes are limited to combat readability, its unit assertions, query-gated acceptance telemetry, the browser flight gate, CI wiring, and this document. The playable build is not opened.
+## Legacy dodge acceptance alignment
+During exact-head qualification, two existing dodge gates exposed a valid alternate Wilds-style outcome: a pointer roll can reach the committed attacker first and knock them down before an attack/iframe overlap is observable. M140 aligns the inherited M24/M138 acceptance with the already-shipped roll-collision mechanic. A pristine defender plus authoritative attacker knockdown is accepted as a dodge counter; ordinary iframe evades still require their existing timing/geometry proof. No combat constants or resolver behavior are changed.
