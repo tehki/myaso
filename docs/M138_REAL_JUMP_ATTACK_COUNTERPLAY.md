@@ -23,9 +23,9 @@ Every scenario requires one genuine WebDriver `Space + LMB` chord with:
 Defensive proof requires the corresponding real wheel event, and dodge also requires the redundant real `S` key evidence used by the existing pointer-owned roll acceptance helper.
 
 ## Authoritative acceptance
-Both browsers must observe jump-attack windup and active state for the attacker.
+Both browsers must observe the authoritative jump-attack commitment beginning in windup.
 
-Block and dodge must continue into jump-attack recovery. Parry must instead transition the attacker from jump-attack active into the existing stunned state on both the attacking client and the observing client.
+Block and dodge must continue through replicated jump-attack active into recovery. A successful parry resolves on the first active server tick, so snapshots must instead replicate jump-attack windup directly into the existing stunned state on both the attacking client and the observing client.
 
 ## Combat result
 No combat constants change.

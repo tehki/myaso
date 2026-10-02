@@ -1651,18 +1651,24 @@ async function runOnlineUiJumpAttackCounterplayFlight(entries, defense) {
     const focusWindupIndex = focusTransitions.findIndex((entry) => entry.action === COMBAT_ACTION.jumpAttackWindup);
     const focusActiveIndex = focusTransitions.findIndex((entry, index) =>
       index > focusWindupIndex && entry.action === COMBAT_ACTION.jumpAttackActive);
-    const attackSeen = ownWindupIndex >= 0 && ownActiveIndex > ownWindupIndex
-      && focusWindupIndex >= 0 && focusActiveIndex > focusWindupIndex;
+    const windupSeen = ownWindupIndex >= 0 && focusWindupIndex >= 0;
+    const activeSeen = ownActiveIndex > ownWindupIndex && focusActiveIndex > focusWindupIndex;
     const ownRecoveryIndex = ownTransitions.findIndex((entry, index) =>
       index > ownActiveIndex && entry.action === COMBAT_ACTION.jumpAttackRecovery);
     const focusRecoveryIndex = focusTransitions.findIndex((entry, index) =>
       index > focusActiveIndex && entry.action === COMBAT_ACTION.jumpAttackRecovery);
     const ownStunnedIndex = ownTransitions.findIndex((entry, index) =>
-      index > ownActiveIndex && entry.action === COMBAT_ACTION.stunned);
+      index > ownWindupIndex && entry.action === COMBAT_ACTION.stunned);
     const focusStunnedIndex = focusTransitions.findIndex((entry, index) =>
-      index > focusActiveIndex && entry.action === COMBAT_ACTION.stunned);
+      index > focusWindupIndex && entry.action === COMBAT_ACTION.stunned);
+    // A successful parry resolves on the first active server tick and replaces
+    // jump-attack-active with stunned before the snapshot is replicated. Block
+    // and dodge preserve the attacker's active -> recovery lifecycle.
+    const attackSeen = defense === "parry"
+      ? windupSeen && ownStunnedIndex > ownWindupIndex && focusStunnedIndex > focusWindupIndex
+      : windupSeen && activeSeen;
     const terminalReplicated = defense === "parry"
-      ? ownStunnedIndex > ownActiveIndex && focusStunnedIndex > focusActiveIndex
+      ? ownStunnedIndex > ownWindupIndex && focusStunnedIndex > focusWindupIndex
       : ownRecoveryIndex > ownActiveIndex && focusRecoveryIndex > focusActiveIndex;
 
     let resolved = false;
@@ -1739,8 +1745,9 @@ async function runOnlineUiJumpAttackCounterplayFlight(entries, defense) {
   const focusActiveIndex = focusTransitions.findIndex((entry, index) =>
     index > focusWindupIndex && entry.action === COMBAT_ACTION.jumpAttackActive);
   const ownPlainJumpIndex = ownTransitions.findIndex((entry) => entry.action === COMBAT_ACTION.jump);
-  if (ownWindupIndex < 0 || ownActiveIndex <= ownWindupIndex
-    || focusWindupIndex < 0 || focusActiveIndex <= focusWindupIndex
+  if (ownWindupIndex < 0 || focusWindupIndex < 0
+    || (defense !== "parry"
+      && (ownActiveIndex <= ownWindupIndex || focusActiveIndex <= focusWindupIndex))
     || (ownPlainJumpIndex >= 0 && ownPlainJumpIndex < ownWindupIndex)) {
     throw new Error(`${label} did not preserve direct authoritative jump-attack commitment: ${JSON.stringify({
       ownTransitions,
@@ -1750,11 +1757,11 @@ async function runOnlineUiJumpAttackCounterplayFlight(entries, defense) {
 
   if (defense === "parry") {
     const ownStunnedIndex = ownTransitions.findIndex((entry, index) =>
-      index > ownActiveIndex && entry.action === COMBAT_ACTION.stunned);
+      index > ownWindupIndex && entry.action === COMBAT_ACTION.stunned);
     const focusStunnedIndex = focusTransitions.findIndex((entry, index) =>
-      index > focusActiveIndex && entry.action === COMBAT_ACTION.stunned);
-    if (ownStunnedIndex <= ownActiveIndex || focusStunnedIndex <= focusActiveIndex) {
-      throw new Error(`${label} did not replicate jump-attack active -> stunned: ${JSON.stringify({
+      index > focusWindupIndex && entry.action === COMBAT_ACTION.stunned);
+    if (ownStunnedIndex <= ownWindupIndex || focusStunnedIndex <= focusWindupIndex) {
+      throw new Error(`${label} did not replicate jump-attack windup -> stunned on parry: ${JSON.stringify({
         ownTransitions,
         focusTransitions,
       })}`);
