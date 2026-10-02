@@ -1442,7 +1442,7 @@ async function runOnlineUiJumpAttackFlight(entries) {
 
   await performArenaJumpAttackChord(attacker, attackerElementId, attackOffset, 90);
 
-  const deadline = Date.now() + 1400;
+  const deadline = Date.now() + 1800;
   let evidence = null;
   while (Date.now() < deadline) {
     const states = await Promise.all(entries.map(readUiEvidence));
@@ -1456,12 +1456,24 @@ async function runOnlineUiJumpAttackFlight(entries) {
       index > activeIndex && entry.action === COMBAT_ACTION.jumpAttackRecovery);
     const idleIndex = ownTransitions.findIndex((entry, index) =>
       index > recoveryIndex && entry.action === COMBAT_ACTION.idle);
+    const focusTransitions = defenderResult?.acceptance?.focusActionTransitions ?? [];
+    const focusWindupIndex = focusTransitions.findIndex((entry) => entry.action === COMBAT_ACTION.jumpAttackWindup);
+    const focusActiveIndex = focusTransitions.findIndex((entry, index) =>
+      index > focusWindupIndex && entry.action === COMBAT_ACTION.jumpAttackActive);
+    const focusRecoveryIndex = focusTransitions.findIndex((entry, index) =>
+      index > focusActiveIndex && entry.action === COMBAT_ACTION.jumpAttackRecovery);
+    const focusIdleIndex = focusTransitions.findIndex((entry, index) =>
+      index > focusRecoveryIndex && entry.action === COMBAT_ACTION.idle);
     if (attackerResult?.opponentHp === 58
       && defenderResult?.playerHp === 58
       && windupIndex >= 0
       && activeIndex > windupIndex
       && recoveryIndex > activeIndex
-      && idleIndex > recoveryIndex) {
+      && idleIndex > recoveryIndex
+      && focusWindupIndex >= 0
+      && focusActiveIndex > focusWindupIndex
+      && focusRecoveryIndex > focusActiveIndex
+      && focusIdleIndex > focusRecoveryIndex) {
       evidence = states;
       break;
     }
