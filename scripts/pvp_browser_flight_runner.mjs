@@ -1604,21 +1604,13 @@ async function runOnlineUiJumpAttackCounterplayFlight(entries, defense) {
   const wheelOffset = beforeDefender.wheels.length;
 
   if (defense === "block") {
-    await scrollArenaWheel(defender, defenderElementId, 120);
-    const blockDeadline = Date.now() + 450;
-    let blockStart = null;
-    while (Date.now() < blockDeadline) {
-      const state = await readUiEvidence(defender);
-      blockStart = [...(state.acceptance?.ownActionTransitions ?? [])].reverse().find((entry) =>
-        entry.action === COMBAT_ACTION.block && Number.isFinite(entry.epochMs)) ?? null;
-      if (blockStart) break;
-      await sleep(10);
-    }
-    if (!blockStart) throw new Error(`${label} never observed the defender's real wheel-back block`);
-    // The client-side observation already arrives after the authoritative
-    // block edge. Launch immediately after observing it: the 105 ms jump-attack
-    // windup then lands beyond the 125 ms parry window but inside the unchanged
-    // 240 ms short block on headless Chrome/Firefox scheduling.
+    // Two real wheel-back pulses 100 ms apart overlap the unchanged 240 ms
+    // client short-block window. The second pulse extends input delivery
+    // without restarting the authoritative Block action, so by jump-attack
+    // impact its 125 ms parry opening has expired while block is still held.
+    // This mirrors the proven M107 heavy-block strategy and removes a flaky
+    // WebDriver read round-trip from the timing boundary.
+    await scrollArenaWheelPair(defender, defenderElementId, 120, 20, 100);
     await performArenaJumpAttackChord(attacker, attackerElementId, attackOffset, 90);
   } else if (defense === "parry") {
     await Promise.all([
@@ -1783,9 +1775,15 @@ async function runOnlineUiJumpAttackCounterplayFlight(entries, defense) {
   }
 
   const defenseWheels = defenderResult.wheels.slice(wheelOffset);
-  if (defense === "block" || defense === "parry") {
+  if (defense === "block") {
+    const blockWheels = defenseWheels.filter((event) => event.deltaY > 0);
+    if (blockWheels.length < 2
+      || !defenderResult.acceptance.ownActionTransitions.some((entry) => entry.action === COMBAT_ACTION.block)) {
+      throw new Error(`${label} overlapping real wheel-back block was not delivered: ${JSON.stringify(defenderResult)}`);
+    }
+  } else if (defense === "parry") {
     if (!defenseWheels.some((event) => event.deltaY > 0)) {
-      throw new Error(`${label} real wheel-back defense was not delivered: ${JSON.stringify(defenderResult)}`);
+      throw new Error(`${label} real wheel-back parry was not delivered: ${JSON.stringify(defenderResult)}`);
     }
   } else {
     if (!defenseWheels.some((event) => event.deltaY < 0)

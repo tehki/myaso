@@ -6,7 +6,7 @@ Prove that the existing narrow jump attack can be answered by the existing Wilds
 ## Scenarios
 M138 adds three real-browser acceptance scenarios:
 
-- `uijumpattackblock`: defender pre-ages one wheel-back short block so impact lands after the 125 ms parry window but before the unchanged 240 ms block expires.
+- `uijumpattackblock`: defender sends two overlapping real wheel-back pulses 100 ms apart. The second extends the client’s unchanged 240 ms short-block input without restarting the authoritative Block action, so impact lands after the 125 ms parry opening while block remains held.
 - `uijumpattackparry`: defender sends wheel-back during the 105 ms jump-attack windup so impact lands inside the unchanged parry window.
 - `uijumpattackdodge`: defender sends wheel-forward with a perpendicular pointer-owned roll timed so the unchanged 125 ms iframe covers impact.
 
