@@ -307,6 +307,14 @@ jobs:
           node --check scripts/pvp_browser_flight_runner.mjs
           node scripts/pvp_browser_flight_runner.mjs
 
+      - name: Validate M136 real jump attack chord
+        env:
+          MYASO_PVP_SCENARIO: "uijumpattack"
+        run: |
+          node --check web/online-game.mjs
+          node --check scripts/pvp_browser_flight_runner.mjs
+          node scripts/pvp_browser_flight_runner.mjs
+
       - name: Validate M121 first-to-five duel kernel
         run: |
           cargo test --locked --manifest-path server/Cargo.toml first_to_kill_target_declares_winner_and_freezes_match_state
@@ -638,3 +646,5 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: python scripts/verify_main_push_provenance.py
+
+[executed on device: Machine (dddee116-9deb-47c7-9368-4393f817bdb1)]
