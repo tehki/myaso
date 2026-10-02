@@ -1588,7 +1588,7 @@ async function runOnlineUiJumpAttackCounterplayFlight(entries, defense) {
   const scenarioName = `uijumpattack${defense}`;
   const attackerName = defense === "dodge" ? "firefox" : "chrome";
   const defenderName = defense === "dodge" ? "chrome" : "firefox";
-  const movementMs = defense === "dodge" ? 230 : 180;
+  const movementMs = defense === "dodge" ? 200 : 180;
   const label = `M138 jump attack ${defense}`;
   const staged = await prepareHeavyCounterplayFlight(
     entries,
@@ -1618,9 +1618,10 @@ async function runOnlineUiJumpAttackCounterplayFlight(entries, defense) {
       scrollArenaWheel(defender, defenderElementId, 120, 35),
     ]);
   } else if (defense === "dodge") {
+    const towardAttackerOffset = movementCode === "KeyD" ? -80 : 80;
     await Promise.all([
       performArenaJumpAttackChord(attacker, attackerElementId, attackOffset, 90),
-      pressArenaPerpendicularDodgeAfterPause(defender, 55, defenderElementId),
+      pressArenaPerpendicularDodgeAfterPause(defender, 55, defenderElementId, towardAttackerOffset, 180),
     ]);
   } else {
     throw new Error(`unsupported M138 jump-attack defense: ${defense}`);
@@ -4236,12 +4237,20 @@ async function scrollArenaWheelPair(session, elementId, deltaY, firstDelayMs, be
   });
 }
 
-async function pressArenaPerpendicularDodgeAfterPause(session, delayMs, knownElementId = null) {
+async function pressArenaPerpendicularDodgeAfterPause(
+  session,
+  delayMs,
+  knownElementId = null,
+  xOffset = 0,
+  yOffset = 180,
+) {
   const elementId = knownElementId ?? await resolveArenaElement(session, "wheel-roll");
   const origin = { "element-6066-11e4-a52e-4f735466cecf": elementId };
-  // Roll direction is pointer-owned. Aim below arena center immediately before
-  // wheel-forward; the simultaneous S key is intentionally redundant evidence
-  // that movement keys no longer steer the roll.
+  // Roll direction is pointer-owned. By default aim below arena center; M138
+  // may add a small toward-attacker X component so the narrow jump-attack arc
+  // still intersects while the unchanged dodge iframe is authoritative.
+  // The simultaneous S key remains intentionally redundant evidence that
+  // movement keys no longer steer the roll.
   await webdriver(session.base, "POST", `/session/${session.sessionId}/actions`, {
     actions: [
       {
@@ -4260,7 +4269,7 @@ async function pressArenaPerpendicularDodgeAfterPause(session, delayMs, knownEle
         parameters: { pointerType: "mouse" },
         actions: [
           { type: "pause", duration: delayMs },
-          { type: "pointerMove", duration: 0, origin, x: 0, y: 180 },
+          { type: "pointerMove", duration: 0, origin, x: xOffset, y: yOffset },
           { type: "pause", duration: 15 },
         ],
       },
