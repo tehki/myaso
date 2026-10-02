@@ -1464,11 +1464,40 @@ async function runOnlineUiKickBufferFlight(entries) {
   const waitMs = Math.max(0, recoveryStart.epochMs + targetOffsetMs - Date.now());
   if (waitMs > 0) await sleep(waitMs);
   await performArenaRecoveryBufferedKick(attacker, attackerElementId, attackOffset, 45);
-  await sleep(520);
 
-  const evidence = await Promise.all(entries.map(readUiEvidence));
-  const attackerResult = evidence.find((entry) => entry.browser === attacker.name);
-  const defenderResult = evidence.find((entry) => entry.browser === defender.name);
+  // Hosted Firefox can briefly stall UI observation under software rendering
+  // even after the authoritative kick phases have replicated. Keep the full
+  // attack-recovery -> kick -> kick-recovery -> idle requirement, but poll
+  // until both browsers have actually observed the terminal idle instead of
+  // assuming a single fixed post-input sleep is enough.
+  const hasCompletedKickSequence = (transitions = []) => {
+    const recoveryIndex = transitions.findIndex((entry) =>
+      entry.action === COMBAT_ACTION.attackRecovery && Number.isFinite(entry.epochMs));
+    const kickIndex = transitions.findIndex((entry, index) =>
+      index > recoveryIndex && entry.action === COMBAT_ACTION.kickWindup && Number.isFinite(entry.epochMs));
+    const kickRecoveryIndex = transitions.findIndex((entry, index) =>
+      index > kickIndex && entry.action === COMBAT_ACTION.kickRecovery && Number.isFinite(entry.epochMs));
+    const idleIndex = transitions.findIndex((entry, index) =>
+      index > kickRecoveryIndex && entry.action === COMBAT_ACTION.idle && Number.isFinite(entry.epochMs));
+    return recoveryIndex >= 0 && kickIndex > recoveryIndex
+      && kickRecoveryIndex > kickIndex && idleIndex > kickRecoveryIndex;
+  };
+
+  const observationDeadline = Date.now() + 1600;
+  let evidence = null;
+  while (Date.now() < observationDeadline) {
+    evidence = await Promise.all(entries.map(readUiEvidence));
+    const attackerProbe = evidence.find((entry) => entry.browser === attacker.name);
+    const defenderProbe = evidence.find((entry) => entry.browser === defender.name);
+    if (hasCompletedKickSequence(attackerProbe?.acceptance?.ownActionTransitions)
+      && hasCompletedKickSequence(defenderProbe?.acceptance?.focusActionTransitions)) {
+      break;
+    }
+    await sleep(40);
+  }
+
+  const attackerResult = evidence?.find((entry) => entry.browser === attacker.name);
+  const defenderResult = evidence?.find((entry) => entry.browser === defender.name);
   if (!attackerResult || !defenderResult) {
     throw new Error(`M133 incomplete kick-buffer evidence: ${JSON.stringify(evidence)}`);
   }
