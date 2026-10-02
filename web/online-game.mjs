@@ -58,6 +58,7 @@ const threatCue = {
   secondaryGuardArc: "",
   bearing: "",
   guardArc: "",
+  jumpCommittedNetId: 0,
 };
 const threatScan = { count: 0, secondaryNetId: 0 };
 const combatReadability = createCombatReadabilityTracker();
@@ -922,10 +923,33 @@ function updateHud(ownId) {
 
 function updateThreatCue(ownId) {
   if (!threatCue.root || !networkClient) return;
-  const netId = fighterThreatNetId(networkClient.state, ownId, threatScan);
-  const threatCount = threatScan.count;
+  let netId = fighterThreatNetId(networkClient.state, ownId, threatScan);
+  let threatCount = threatScan.count;
   const secondaryNetId = threatScan.secondaryNetId;
+  const committedJump = threatCue.jumpCommittedNetId
+    ? networkClient.state.get(threatCue.jumpCommittedNetId)
+    : null;
+  if (threatCue.jumpCommittedNetId
+    && committedJump?.action !== COMBAT_ACTION.jumpAttackWindup
+    && committedJump?.action !== COMBAT_ACTION.jumpAttackActive) {
+    threatCue.jumpCommittedNetId = 0;
+  }
+  // A jump hit can knock the defender outside the narrow cone on the same
+  // authoritative tick that first exposes jumpAttackActive. If this exact
+  // attacker was already a spatially valid windup threat, preserve its active
+  // phase until authority leaves jumpAttackActive. Off-axis jump attacks never
+  // acquire this latch, so they still produce no false threat cue.
+  if (netId === 0 && threatCue.jumpCommittedNetId) {
+    const latched = networkClient.state.get(threatCue.jumpCommittedNetId);
+    if (latched?.action === COMBAT_ACTION.jumpAttackActive) {
+      netId = threatCue.jumpCommittedNetId;
+      threatCount = Math.max(1, threatCount);
+    }
+  }
   const attacker = netId ? networkClient.state.get(netId) : null;
+  if (attacker?.action === COMBAT_ACTION.jumpAttackWindup) {
+    threatCue.jumpCommittedNetId = netId;
+  }
   const secondaryAttacker = secondaryNetId ? networkClient.state.get(secondaryNetId) : null;
   const own = ownId ? networkClient.state.get(ownId) : null;
   const bearing = fighterThreatBearingLabel(own, attacker);

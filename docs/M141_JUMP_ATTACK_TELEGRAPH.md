@@ -22,3 +22,5 @@ Acceptance additionally verifies both chords are real same-tick keyboard/pointer
 
 ## Scope
 Changes are limited to threat/readability selection and labels, unit assertions, query-gated browser acceptance, CI wiring and this document. No combat constants change. The playable build is not opened.
+## Active-phase continuity after contact
+A successful jump hit can apply knockback on the same authoritative tick that first exposes `jumpAttackActive`. The UI therefore latches only a jump attacker that was already a valid in-cone `JUMP WINDUP` threat and preserves `JUMP STRIKE` while that same authoritative attacker remains active. This is presentation continuity only: it does not widen threat acquisition, reach, arc, hit geometry, or the active duration.
