@@ -39,3 +39,9 @@ The flight fails closed unless:
 No kick damage, reach, timing, stamina cost, knockdown, right-click run threshold, packet format, replication format, or production UI behavior changes.
 
 M133 adds browser acceptance evidence only. The playable build is not opened.
+
+## Hosted-browser stability
+
+Post-merge validation exposed a Firefox scheduling case where authoritative replication reached `kick-recovery`, but the final idle snapshot arrived after the flight's single fixed sample.
+
+The M133 acceptance flight now polls the same authoritative transition streams for the required final idle state for up to a bounded 1100 ms. It does not relax action ordering, timing rules, the 180 ms run threshold, or any combat behavior.

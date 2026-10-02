@@ -1464,9 +1464,40 @@ async function runOnlineUiKickBufferFlight(entries) {
   const waitMs = Math.max(0, recoveryStart.epochMs + targetOffsetMs - Date.now());
   if (waitMs > 0) await sleep(waitMs);
   await performArenaRecoveryBufferedKick(attacker, attackerElementId, attackOffset, 45);
-  await sleep(520);
 
-  const evidence = await Promise.all(entries.map(readUiEvidence));
+  // Hosted Firefox can briefly defer snapshot/UI work while WebDriver and the
+  // readability observer are busy. Poll authoritative transition evidence
+  // instead of assuming one fixed post-gesture sample will contain the final
+  // idle snapshot. The required action ordering remains unchanged.
+  const sequenceComplete = (transitions) => {
+    const recoveryIndex = transitions.findIndex((entry) =>
+      entry.action === COMBAT_ACTION.attackRecovery && Number.isFinite(entry.epochMs));
+    const kickIndex = transitions.findIndex((entry, index) =>
+      index > recoveryIndex && entry.action === COMBAT_ACTION.kickWindup && Number.isFinite(entry.epochMs));
+    const kickRecoveryIndex = transitions.findIndex((entry, index) =>
+      index > kickIndex && entry.action === COMBAT_ACTION.kickRecovery && Number.isFinite(entry.epochMs));
+    const idleIndex = transitions.findIndex((entry, index) =>
+      index > kickRecoveryIndex && entry.action === COMBAT_ACTION.idle && Number.isFinite(entry.epochMs));
+    return recoveryIndex >= 0 && kickIndex > recoveryIndex
+      && kickRecoveryIndex > kickIndex && idleIndex > kickRecoveryIndex;
+  };
+
+  let evidence = null;
+  const completionDeadline = Date.now() + 1100;
+  while (Date.now() < completionDeadline) {
+    const current = await Promise.all(entries.map(readUiEvidence));
+    const currentAttacker = current.find((entry) => entry.browser === attacker.name);
+    const currentDefender = current.find((entry) => entry.browser === defender.name);
+    if (currentAttacker && currentDefender
+      && sequenceComplete(currentAttacker.acceptance?.ownActionTransitions ?? [])
+      && sequenceComplete(currentDefender.acceptance?.focusActionTransitions ?? [])) {
+      evidence = current;
+      break;
+    }
+    await sleep(25);
+  }
+  evidence ??= await Promise.all(entries.map(readUiEvidence));
+
   const attackerResult = evidence.find((entry) => entry.browser === attacker.name);
   const defenderResult = evidence.find((entry) => entry.browser === defender.name);
   if (!attackerResult || !defenderResult) {
