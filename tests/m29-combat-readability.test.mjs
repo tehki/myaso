@@ -616,6 +616,8 @@ test("authoritative action hints explain light and heavy commitment windows", ()
   assert.match(combatActionHint(fighter(1, 100, 100, COMBAT_ACTION.attackRightWindup)), /Right sweep committed/);
   assert.match(combatActionHint(fighter(1, 100, 100, COMBAT_ACTION.runningAttackWindup)), /Running strike committed/);
   assert.match(combatActionHint(fighter(1, 100, 100, COMBAT_ACTION.runningAttackRecovery)), /Running strike recovery/);
+  assert.match(combatActionHint(fighter(1, 100, 100, COMBAT_ACTION.jumpAttackWindup)), /Jump attack committed/);
+  assert.match(combatActionHint(fighter(1, 100, 100, COMBAT_ACTION.jumpAttackRecovery)), /Jump attack recovery/);
   assert.match(combatActionHint(fighter(1, 100, 100, COMBAT_ACTION.heavyAttackWindup)), /Heavy strike committed/);
   assert.match(combatActionHint(fighter(1, 100, 100, COMBAT_ACTION.heavyAttackRecovery)), /Heavy recovery/);
   assert.match(combatActionHint(fighter(1, 100, 100, COMBAT_ACTION.feintRecovery)), /Feint recovery/);
@@ -638,6 +640,9 @@ test("authoritative opponent recovery exposes a bounded punish cue", () => {
   });
   assert.deepEqual(opponentRecoveryPresentation(fighter(2, 100, 100, COMBAT_ACTION.runningAttackRecovery)), {
     visible: true, state: "running-attack-recovery", label: "PUNISH", detail: "Running recovery",
+  });
+  assert.deepEqual(opponentRecoveryPresentation(fighter(2, 100, 100, COMBAT_ACTION.jumpAttackRecovery)), {
+    visible: true, state: "jump-attack-recovery", label: "PUNISH", detail: "Jump attack recovery",
   });
   assert.deepEqual(opponentRecoveryPresentation(fighter(2, 100, 100, COMBAT_ACTION.dodgeRecovery)), {
     visible: true, state: "dodge-recovery", label: "PUNISH", detail: "Dodge recovery",

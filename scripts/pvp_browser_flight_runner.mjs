@@ -17,7 +17,7 @@ const heavyKeyPulseMs = 120;
 // A full M62 threat chevron paints dozens of exact-tone pixels; a handful can
 // arise from raster overlap. Use one significance floor for positive and leak proof.
 const threatMarkerMinPixels = 8;
-if (!new Set(["damage", "inputloss", "parry", "dodge", "block", "guardbreak", "backblock", "respawn", "ui", "uirespawn", "uifeedback", "uihittell", "uivitals", "uiidentity", "uiscore", "uimatch", "uirematch", "uiffa3", "uikillfeed", "uifocus", "uithreat", "uithreatbearing", "uimultithreat", "uisecondarythreat", "uisecondarybearing", "uisecondaryphase", "uiguardarc", "uisecondaryguardarc", "uithreatmarkers", "uiparry", "uistun", "uiguardbreak", "uidodge", "uirecovery", "uirecoverytell", "uiattackintent", "uiheavy", "uiheavyinputloss", "uiheavyblock", "uiheavyparry", "uiheavydodge", "uiheavypunish", "uiheavyguardbreak", "uiheavyguardbreakpunish", "uifeint", "uirunningattack", "uidirectionallight", "uirollbuffer", "uijumpbuffer", "uijumpattack", "uijumpattackinputloss", "uijumpattackblock", "uijumpattackparry", "uijumpattackdodge", "uijumpattackbuffer", "uikickbuffer", "uiguardbreaktell", "uiparrytell", "uiblockfacingtell", "uidodgetell", "uideathtell"]).has(scenario)) throw new Error(`unsupported MYASO_PVP_SCENARIO: ${scenario}`);
+if (!new Set(["damage", "inputloss", "parry", "dodge", "block", "guardbreak", "backblock", "respawn", "ui", "uirespawn", "uifeedback", "uihittell", "uivitals", "uiidentity", "uiscore", "uimatch", "uirematch", "uiffa3", "uikillfeed", "uifocus", "uithreat", "uithreatbearing", "uimultithreat", "uisecondarythreat", "uisecondarybearing", "uisecondaryphase", "uiguardarc", "uisecondaryguardarc", "uithreatmarkers", "uiparry", "uistun", "uiguardbreak", "uidodge", "uirecovery", "uirecoverytell", "uiattackintent", "uiheavy", "uiheavyinputloss", "uiheavyblock", "uiheavyparry", "uiheavydodge", "uiheavypunish", "uiheavyguardbreak", "uiheavyguardbreakpunish", "uifeint", "uirunningattack", "uidirectionallight", "uirollbuffer", "uijumpbuffer", "uijumpattack", "uijumpattackinputloss", "uijumpattackpunish", "uijumpattackblock", "uijumpattackparry", "uijumpattackdodge", "uijumpattackbuffer", "uikickbuffer", "uiguardbreaktell", "uiparrytell", "uiblockfacingtell", "uidodgetell", "uideathtell"]).has(scenario)) throw new Error(`unsupported MYASO_PVP_SCENARIO: ${scenario}`);
 const staticPort = Number(process.env.MYASO_PVP_FLIGHT_HTTP_PORT ?? 4174);
 const browsers = [
   {
@@ -258,6 +258,9 @@ try {
       throw new Error(`M139 expected a deliberately dropped first-send jump-attack datagram, observed ${droppedActionDatagrams}`);
     }
     console.log(`M139_JUMP_ATTACK_INPUT_LOSS_RECOVERY ${JSON.stringify({ ok: true, droppedActionDatagrams, results })}`);
+  } else if (scenario === "uijumpattackpunish") {
+    const results = await runOnlineUiJumpAttackWhiffPunishFlight(sessions);
+    console.log(`M140_JUMP_ATTACK_WHIFF_PUNISH ${JSON.stringify({ ok: true, results })}`);
   } else if (scenario === "uijumpattackblock") {
     const results = await runOnlineUiJumpAttackCounterplayFlight(sessions, "block");
     console.log(`M138_REAL_JUMP_ATTACK_BLOCK ${JSON.stringify({ ok: true, results })}`);
@@ -388,14 +391,14 @@ async function startBrowser(browser) {
     pageLoad: 30_000,
     implicit: 0,
   });
-  if (scenario === "uiparry" || scenario === "uistun" || scenario === "uiguardbreak" || scenario === "uidodge" || scenario === "uiattackintent" || scenario === "uiheavy" || scenario === "uiheavyinputloss" || scenario === "uiheavyblock" || scenario === "uiheavyparry" || scenario === "uiheavydodge" || scenario === "uiheavypunish" || scenario === "uiheavyguardbreak" || scenario === "uiheavyguardbreakpunish" || scenario === "uifeint" || scenario === "uirunningattack" || scenario === "uidirectionallight" || scenario === "uirollbuffer" || scenario === "uijumpbuffer" || scenario === "uijumpattack" || scenario === "uijumpattackinputloss" || scenario === "uijumpattackblock" || scenario === "uijumpattackparry" || scenario === "uijumpattackdodge" || scenario === "uijumpattackbuffer" || scenario === "uikickbuffer" || scenario === "uiguardbreaktell" || scenario === "uiparrytell" || scenario === "uiblockfacingtell" || scenario === "uidodgetell") {
+  if (scenario === "uiparry" || scenario === "uistun" || scenario === "uiguardbreak" || scenario === "uidodge" || scenario === "uiattackintent" || scenario === "uiheavy" || scenario === "uiheavyinputloss" || scenario === "uiheavyblock" || scenario === "uiheavyparry" || scenario === "uiheavydodge" || scenario === "uiheavypunish" || scenario === "uiheavyguardbreak" || scenario === "uiheavyguardbreakpunish" || scenario === "uifeint" || scenario === "uirunningattack" || scenario === "uidirectionallight" || scenario === "uirollbuffer" || scenario === "uijumpbuffer" || scenario === "uijumpattack" || scenario === "uijumpattackinputloss" || scenario === "uijumpattackpunish" || scenario === "uijumpattackblock" || scenario === "uijumpattackparry" || scenario === "uijumpattackdodge" || scenario === "uijumpattackbuffer" || scenario === "uikickbuffer" || scenario === "uiguardbreaktell" || scenario === "uiparrytell" || scenario === "uiblockfacingtell" || scenario === "uidodgetell") {
     await webdriver(base, "POST", `/session/${sessionId}/window/rect`, { x: 0, y: 0, width: 1280, height: 900 });
   }
   return { ...browser, child, base, sessionId };
 }
 
 async function navigate(session, gameUrl, certificateHash) {
-  const page = scenario === "ui" || scenario === "uirespawn" || scenario === "uifeedback" || scenario === "uihittell" || scenario === "uivitals" || scenario === "uiidentity" || scenario === "uiscore" || scenario === "uimatch" || scenario === "uirematch" || scenario === "uiffa3" || scenario === "uikillfeed" || scenario === "uifocus" || scenario === "uithreat" || scenario === "uithreatbearing" || scenario === "uimultithreat" || scenario === "uisecondarythreat" || scenario === "uisecondarybearing" || scenario === "uisecondaryphase" || scenario === "uiguardarc" || scenario === "uisecondaryguardarc" || scenario === "uithreatmarkers" || scenario === "uiparry" || scenario === "uistun" || scenario === "uiguardbreak" || scenario === "uidodge" || scenario === "uirecovery" || scenario === "uirecoverytell" || scenario === "uiattackintent" || scenario === "uiheavy" || scenario === "uiheavyinputloss" || scenario === "uiheavyblock" || scenario === "uiheavyparry" || scenario === "uiheavydodge" || scenario === "uiheavypunish" || scenario === "uiheavyguardbreak" || scenario === "uiheavyguardbreakpunish" || scenario === "uifeint" || scenario === "uirunningattack" || scenario === "uidirectionallight" || scenario === "uirollbuffer" || scenario === "uijumpbuffer" || scenario === "uijumpattack" || scenario === "uijumpattackinputloss" || scenario === "uijumpattackblock" || scenario === "uijumpattackparry" || scenario === "uijumpattackdodge" || scenario === "uijumpattackbuffer" || scenario === "uikickbuffer" || scenario === "uiguardbreaktell" || scenario === "uiparrytell" || scenario === "uiblockfacingtell" || scenario === "uidodgetell" || scenario === "uideathtell" ? "index.html" : "pvp-flight.html";
+  const page = scenario === "ui" || scenario === "uirespawn" || scenario === "uifeedback" || scenario === "uihittell" || scenario === "uivitals" || scenario === "uiidentity" || scenario === "uiscore" || scenario === "uimatch" || scenario === "uirematch" || scenario === "uiffa3" || scenario === "uikillfeed" || scenario === "uifocus" || scenario === "uithreat" || scenario === "uithreatbearing" || scenario === "uimultithreat" || scenario === "uisecondarythreat" || scenario === "uisecondarybearing" || scenario === "uisecondaryphase" || scenario === "uiguardarc" || scenario === "uisecondaryguardarc" || scenario === "uithreatmarkers" || scenario === "uiparry" || scenario === "uistun" || scenario === "uiguardbreak" || scenario === "uidodge" || scenario === "uirecovery" || scenario === "uirecoverytell" || scenario === "uiattackintent" || scenario === "uiheavy" || scenario === "uiheavyinputloss" || scenario === "uiheavyblock" || scenario === "uiheavyparry" || scenario === "uiheavydodge" || scenario === "uiheavypunish" || scenario === "uiheavyguardbreak" || scenario === "uiheavyguardbreakpunish" || scenario === "uifeint" || scenario === "uirunningattack" || scenario === "uidirectionallight" || scenario === "uirollbuffer" || scenario === "uijumpbuffer" || scenario === "uijumpattack" || scenario === "uijumpattackinputloss" || scenario === "uijumpattackpunish" || scenario === "uijumpattackblock" || scenario === "uijumpattackparry" || scenario === "uijumpattackdodge" || scenario === "uijumpattackbuffer" || scenario === "uikickbuffer" || scenario === "uiguardbreaktell" || scenario === "uiparrytell" || scenario === "uiblockfacingtell" || scenario === "uidodgetell" || scenario === "uideathtell" ? "index.html" : "pvp-flight.html";
   const url = new URL(`http://127.0.0.1:${staticPort}/web/${page}`);
   url.searchParams.set("server", gameUrl);
   url.searchParams.set("cert", certificateHash);
@@ -1694,15 +1697,28 @@ async function runOnlineUiJumpAttackCounterplayFlight(entries, defense) {
       index > ownWindupIndex && entry.action === COMBAT_ACTION.stunned);
     const focusStunnedIndex = focusTransitions.findIndex((entry, index) =>
       index > focusWindupIndex && entry.action === COMBAT_ACTION.stunned);
-    // A successful parry resolves on the first active server tick and replaces
-    // jump-attack-active with stunned before the snapshot is replicated. Block
-    // and dodge preserve the attacker's active -> recovery lifecycle.
+    const ownKnockdownIndex = ownTransitions.findIndex((entry, index) =>
+      index > ownWindupIndex && entry.action === COMBAT_ACTION.knockdown);
+    const focusKnockdownIndex = focusTransitions.findIndex((entry, index) =>
+      index > focusWindupIndex && entry.action === COMBAT_ACTION.knockdown);
+    const rollCounter = defense === "dodge"
+      && attackerResult.feedbackTransitions.includes("rolled-over")
+      && defenderResult.feedbackTransitions.includes("roll-impact")
+      && ownKnockdownIndex > ownWindupIndex
+      && focusKnockdownIndex > focusWindupIndex;
+    // A successful parry or roll collision can replace jump-attack-active before
+    // it is replicated. The latter is an intended Wilds-style counter: the real
+    // pointer roll reaches the attacker first and knocks the commitment down.
     const attackSeen = defense === "parry"
       ? windupSeen && ownStunnedIndex > ownWindupIndex && focusStunnedIndex > focusWindupIndex
-      : windupSeen && activeSeen;
+      : defense === "dodge" && rollCounter
+        ? windupSeen
+        : windupSeen && activeSeen;
     const terminalReplicated = defense === "parry"
       ? ownStunnedIndex > ownWindupIndex && focusStunnedIndex > focusWindupIndex
-      : ownRecoveryIndex > ownActiveIndex && focusRecoveryIndex > focusActiveIndex;
+      : defense === "dodge" && rollCounter
+        ? ownKnockdownIndex > ownWindupIndex && focusKnockdownIndex > focusWindupIndex
+        : ownRecoveryIndex > ownActiveIndex && focusRecoveryIndex > focusActiveIndex;
 
     let resolved = false;
     if (defense === "block") {
@@ -1730,7 +1746,7 @@ async function runOnlineUiJumpAttackCounterplayFlight(entries, defense) {
         && defenderResult.feedbackTransitions.includes("dodge-success");
       const replicatedOverlap = hasReplicatedDodgeOverlap(attackerResult, defenderResult);
       resolved = attackSeen
-        && (iframeEvade || replicatedOverlap)
+        && (iframeEvade || replicatedOverlap || rollCounter)
         && attackerResult.playerHp === 100
         && attackerResult.playerGuard === 100
         && defenderResult.playerHp === 100
@@ -1782,9 +1798,18 @@ async function runOnlineUiJumpAttackCounterplayFlight(entries, defense) {
   const focusWindupIndex = focusTransitions.findIndex((entry) => entry.action === COMBAT_ACTION.jumpAttackWindup);
   const focusActiveIndex = focusTransitions.findIndex((entry, index) =>
     index > focusWindupIndex && entry.action === COMBAT_ACTION.jumpAttackActive);
+  const ownKnockdownIndex = ownTransitions.findIndex((entry, index) =>
+    index > ownWindupIndex && entry.action === COMBAT_ACTION.knockdown);
+  const focusKnockdownIndex = focusTransitions.findIndex((entry, index) =>
+    index > focusWindupIndex && entry.action === COMBAT_ACTION.knockdown);
+  const rollCounter = defense === "dodge"
+    && attackerResult.feedbackTransitions.includes("rolled-over")
+    && defenderResult.feedbackTransitions.includes("roll-impact")
+    && ownKnockdownIndex > ownWindupIndex
+    && focusKnockdownIndex > focusWindupIndex;
   const ownPlainJumpIndex = ownTransitions.findIndex((entry) => entry.action === COMBAT_ACTION.jump);
   if (ownWindupIndex < 0 || focusWindupIndex < 0
-    || (defense !== "parry"
+    || (defense !== "parry" && !rollCounter
       && (ownActiveIndex <= ownWindupIndex || focusActiveIndex <= focusWindupIndex))
     || (ownPlainJumpIndex >= 0 && ownPlainJumpIndex < ownWindupIndex)) {
     throw new Error(`${label} did not preserve direct authoritative jump-attack commitment: ${JSON.stringify({
@@ -1806,6 +1831,13 @@ async function runOnlineUiJumpAttackCounterplayFlight(entries, defense) {
     }
     if (!attackerResult.overlayTransitions.some((entry) => entry.visible && entry.title === "STUNNED")) {
       throw new Error(`${label} never exposed the parried attacker stun overlay`);
+    }
+  } else if (defense === "dodge" && rollCounter) {
+    if (ownKnockdownIndex <= ownWindupIndex || focusKnockdownIndex <= focusWindupIndex) {
+      throw new Error(`${label} did not replicate jump-attack windup -> knockdown on roll counter: ${JSON.stringify({
+        ownTransitions,
+        focusTransitions,
+      })}`);
     }
   } else {
     const ownRecoveryIndex = ownTransitions.findIndex((entry, index) =>
@@ -1837,8 +1869,8 @@ async function runOnlineUiJumpAttackCounterplayFlight(entries, defense) {
     }
     const iframeEvade = attackerResult.feedbackTransitions.includes("dodge-evaded")
       && defenderResult.feedbackTransitions.includes("dodge-success");
-    if (!iframeEvade && !hasReplicatedDodgeOverlap(attackerResult, defenderResult)) {
-      throw new Error(`${label} lacked both iframe feedback and same-tick authoritative roll overlap: ${JSON.stringify(evidence)}`);
+    if (!iframeEvade && !hasReplicatedDodgeOverlap(attackerResult, defenderResult) && !rollCounter) {
+      throw new Error(`${label} lacked iframe feedback, authoritative roll overlap, or roll-counter knockdown: ${JSON.stringify(evidence)}`);
     }
   }
 
@@ -1854,6 +1886,241 @@ async function runOnlineUiJumpAttackCounterplayFlight(entries, defense) {
     jumpAttackChordEpochMs: entry.browser === attacker.name
       ? Math.max(jumpDown.epochMs, attackDown.epochMs)
       : null,
+  }));
+}
+
+async function runOnlineUiJumpAttackWhiffPunishFlight(entries) {
+  const staged = await prepareHeavyCounterplayFlight(
+    entries,
+    "M140 jump attack whiff punish",
+    { attackerName: "firefox", defenderName: "chrome", movementMs: 180 },
+  );
+  const { attacker, defender, attackerElementId, defenderElementId, movementCode } = staged;
+  const attackRight = movementCode === "KeyD";
+  const whiffOffset = attackRight ? -200 : 200;
+  const punishOffset = attackRight ? -200 : 200;
+
+  const attackerBefore = await readUiEvidence(attacker);
+  const attackerKeyOffset = attackerBefore.keyTransitions.length;
+  const attackerPointerOffset = attackerBefore.pointers.length;
+
+  // Keep the fighters in the same close spacing that lets M136 connect, but
+  // deliberately turn the narrow jump attack 180 degrees away. This proves a
+  // directional whiff instead of manufacturing extra distance.
+  await aimArena(attacker, attackerElementId, whiffOffset);
+  await sleep(40);
+  await performArenaJumpAttackChord(attacker, attackerElementId, whiffOffset, 90);
+
+  let recoveryEvidence = null;
+  const recoveryDeadline = Date.now() + 900;
+  while (Date.now() < recoveryDeadline) {
+    const states = await Promise.all(entries.map(readUiEvidence));
+    const attackerResult = states.find((entry) => entry.browser === attacker.name);
+    const defenderResult = states.find((entry) => entry.browser === defender.name);
+    const ownTransitions = attackerResult?.acceptance?.ownActionTransitions ?? [];
+    const focusTransitions = defenderResult?.acceptance?.focusActionTransitions ?? [];
+
+    const ownWindup = ownTransitions.findIndex((entry) => entry.action === COMBAT_ACTION.jumpAttackWindup);
+    const ownActive = ownTransitions.findIndex((entry, index) =>
+      index > ownWindup && entry.action === COMBAT_ACTION.jumpAttackActive);
+    const ownRecovery = ownTransitions.findIndex((entry, index) =>
+      index > ownActive && entry.action === COMBAT_ACTION.jumpAttackRecovery);
+    const focusWindup = focusTransitions.findIndex((entry) => entry.action === COMBAT_ACTION.jumpAttackWindup);
+    const focusActive = focusTransitions.findIndex((entry, index) =>
+      index > focusWindup && entry.action === COMBAT_ACTION.jumpAttackActive);
+    const focusRecovery = focusTransitions.findIndex((entry, index) =>
+      index > focusActive && entry.action === COMBAT_ACTION.jumpAttackRecovery);
+    const recoveryCue = defenderResult?.recoveryTransitions.find((entry) =>
+      entry.visible
+      && entry.state === "jump-attack-recovery"
+      && entry.label === "PUNISH"
+      && entry.detail === "Jump attack recovery");
+
+    const pristineWhiff = attackerResult?.playerHp === 100
+      && attackerResult?.playerGuard === 100
+      && attackerResult?.opponentHp === 100
+      && attackerResult?.opponentGuard === 100
+      && defenderResult?.playerHp === 100
+      && defenderResult?.playerGuard === 100
+      && defenderResult?.opponentHp === 100
+      && defenderResult?.opponentGuard === 100;
+
+    if (ownWindup >= 0 && ownActive > ownWindup && ownRecovery > ownActive
+      && focusWindup >= 0 && focusActive > focusWindup && focusRecovery > focusActive
+      && recoveryCue && pristineWhiff) {
+      recoveryEvidence = states;
+      break;
+    }
+    if (!pristineWhiff && Number.isFinite(attackerResult?.playerHp)) {
+      throw new Error(`M140 jump attack failed to whiff cleanly: ${JSON.stringify(states)}`);
+    }
+    await sleep(10);
+  }
+  if (!recoveryEvidence) {
+    throw new Error(`M140 defender never observed punishable jump-attack recovery: ${JSON.stringify(await Promise.all(entries.map(readUiEvidence)))}`);
+  }
+
+  const defenderBeforePunish = await readUiEvidence(defender);
+  const punishPointerOffset = defenderBeforePunish.pointers.length;
+  // Fire a genuine LMB as soon as the remote recovery cue becomes visible.
+  // M140 proves the player's commitment starts inside the unchanged 290 ms
+  // recovery window. The unchanged 135 ms light windup may finish after that
+  // recovery ends; changing its timing would be a balance change, not a proof.
+  await performArenaAttackHold(defender, defenderElementId, punishOffset, 90);
+
+  let evidence = null;
+  const punishDeadline = Date.now() + 650;
+  while (Date.now() < punishDeadline) {
+    const states = await Promise.all(entries.map(readUiEvidence));
+    const attackerResult = states.find((entry) => entry.browser === attacker.name);
+    const defenderResult = states.find((entry) => entry.browser === defender.name);
+    if (!attackerResult || !defenderResult) {
+      throw new Error(`M140 incomplete punish evidence: ${JSON.stringify(states)}`);
+    }
+
+    if (attackerResult.playerHp === 66 && defenderResult.opponentHp === 66) {
+      evidence = states;
+      break;
+    }
+
+    const unexpectedVitals = attackerResult.playerHp < 66
+      || attackerResult.playerGuard !== 100
+      || defenderResult.playerHp !== 100
+      || defenderResult.playerGuard !== 100;
+    if (unexpectedVitals) {
+      throw new Error(`M140 punish resolved unexpected combat: ${JSON.stringify(states)}`);
+    }
+    await sleep(10);
+  }
+  if (!evidence) {
+    throw new Error(`M140 real light did not punish jump-attack recovery: ${JSON.stringify(await Promise.all(entries.map(readUiEvidence)))}`);
+  }
+
+  // The damage confirmation can arrive before both clients have replicated the
+  // attacker's recovery -> idle edge. Wait only for that authoritative lifecycle
+  // completion so we can prove the real LMB started before recovery ended.
+  const lifecycleDeadline = Date.now() + 600;
+  let lifecycleEvidence = null;
+  while (Date.now() < lifecycleDeadline) {
+    const states = await Promise.all(entries.map(readUiEvidence));
+    const attackerState = states.find((entry) => entry.browser === attacker.name);
+    const defenderState = states.find((entry) => entry.browser === defender.name);
+    const ownTransitions = attackerState?.acceptance?.ownActionTransitions ?? [];
+    const focusTransitions = defenderState?.acceptance?.focusActionTransitions ?? [];
+    const ownRecoveryIndex = ownTransitions.findIndex((entry) =>
+      entry.action === COMBAT_ACTION.jumpAttackRecovery && Number.isFinite(entry.epochMs));
+    const ownIdleIndex = ownTransitions.findIndex((entry, index) =>
+      index > ownRecoveryIndex && entry.action === COMBAT_ACTION.idle && Number.isFinite(entry.epochMs));
+    const focusRecoveryIndex = focusTransitions.findIndex((entry) =>
+      entry.action === COMBAT_ACTION.jumpAttackRecovery && Number.isFinite(entry.epochMs));
+    const focusIdleIndex = focusTransitions.findIndex((entry, index) =>
+      index > focusRecoveryIndex && entry.action === COMBAT_ACTION.idle && Number.isFinite(entry.epochMs));
+    if (ownRecoveryIndex >= 0 && ownIdleIndex > ownRecoveryIndex
+      && focusRecoveryIndex >= 0 && focusIdleIndex > focusRecoveryIndex) {
+      lifecycleEvidence = states;
+      break;
+    }
+    await sleep(10);
+  }
+  if (!lifecycleEvidence) {
+    throw new Error(`M140 jump-attack recovery -> idle lifecycle did not fully replicate after punish: ${JSON.stringify(await Promise.all(entries.map(readUiEvidence)))}`);
+  }
+  evidence = lifecycleEvidence;
+
+  const attackerResult = evidence.find((entry) => entry.browser === attacker.name);
+  const defenderResult = evidence.find((entry) => entry.browser === defender.name);
+  if (attackerResult.acceptance?.scenario !== "uijumpattackpunish"
+    || defenderResult.acceptance?.scenario !== "uijumpattackpunish") {
+    throw new Error(`M140 authoritative acceptance hook was not active: ${JSON.stringify(evidence)}`);
+  }
+
+  const chordKeys = attackerResult.keyTransitions.slice(attackerKeyOffset);
+  const chordPointers = attackerResult.pointers.slice(attackerPointerOffset);
+  const jumpDowns = chordKeys.filter((entry) => entry.type === "keydown" && entry.code === "Space");
+  const jumpUps = chordKeys.filter((entry) => entry.type === "keyup" && entry.code === "Space");
+  const attackDowns = chordPointers.filter((entry) => entry.type === "pointerdown" && entry.button === 0);
+  const attackUps = chordPointers.filter((entry) => entry.type === "pointerup" && entry.button === 0);
+  const jumpDown = jumpDowns[0];
+  const attackDown = attackDowns[0];
+  if (jumpDowns.length !== 1 || jumpUps.length !== 1
+    || attackDowns.length !== 1 || attackUps.length !== 1
+    || !Number.isFinite(jumpDown?.epochMs) || !Number.isFinite(attackDown?.epochMs)
+    || Math.abs(jumpDown.epochMs - attackDown.epochMs) > 60) {
+    throw new Error(`M140 did not deliver one genuine same-tick Space + LMB whiff chord: ${JSON.stringify({ chordKeys, chordPointers })}`);
+  }
+
+  const punishPointers = defenderResult.pointers.slice(punishPointerOffset);
+  const punishDown = punishPointers.find((entry) => entry.type === "pointerdown" && entry.button === 0);
+  const punishUp = punishPointers.find((entry) => entry.type === "pointerup" && entry.button === 0);
+  const recoveryCue = defenderResult.recoveryTransitions.find((entry) =>
+    entry.visible && entry.state === "jump-attack-recovery");
+  const punishAimValid = punishDown
+    && Math.abs(punishDown.y - 0.5) <= 0.15
+    && (attackRight ? punishDown.x <= 0.4 : punishDown.x >= 0.6);
+  if (!punishDown || !punishUp || !punishAimValid
+    || !Number.isFinite(punishDown.epochMs) || !Number.isFinite(recoveryCue?.epochMs)
+    || punishDown.epochMs < recoveryCue.epochMs
+    || punishDown.epochMs - recoveryCue.epochMs > 180) {
+    throw new Error(`M140 real punish input did not promptly follow the visible recovery cue: ${JSON.stringify({ recoveryCue, punishPointers })}`);
+  }
+
+  const attackerLifecycle = attackerResult.acceptance?.ownActionTransitions ?? [];
+  const defenderView = defenderResult.acceptance?.focusActionTransitions ?? [];
+  const attackerRecoveryIndex = attackerLifecycle.findIndex((entry) =>
+    entry.action === COMBAT_ACTION.jumpAttackRecovery && Number.isFinite(entry.epochMs));
+  const attackerIdleIndex = attackerLifecycle.findIndex((entry, index) =>
+    index > attackerRecoveryIndex && entry.action === COMBAT_ACTION.idle && Number.isFinite(entry.epochMs));
+  const defenderRecoveryIndex = defenderView.findIndex((entry) =>
+    entry.action === COMBAT_ACTION.jumpAttackRecovery && Number.isFinite(entry.epochMs));
+  const defenderIdleIndex = defenderView.findIndex((entry, index) =>
+    index > defenderRecoveryIndex && entry.action === COMBAT_ACTION.idle && Number.isFinite(entry.epochMs));
+  const attackerRecovery = attackerLifecycle[attackerRecoveryIndex];
+  const attackerIdle = attackerLifecycle[attackerIdleIndex];
+  const defenderRecovery = defenderView[defenderRecoveryIndex];
+  const defenderIdle = defenderView[defenderIdleIndex];
+  if (attackerRecoveryIndex < 0 || attackerIdleIndex <= attackerRecoveryIndex
+    || defenderRecoveryIndex < 0 || defenderIdleIndex <= defenderRecoveryIndex
+    || punishDown.epochMs < attackerRecovery.epochMs
+    || punishDown.epochMs >= attackerIdle.epochMs
+    || punishDown.epochMs < defenderRecovery.epochMs
+    || punishDown.epochMs >= defenderIdle.epochMs) {
+    throw new Error(`M140 real light was not committed inside authoritative jump-attack recovery: ${JSON.stringify({
+      punishDown,
+      attackerRecovery,
+      attackerIdle,
+      defenderRecovery,
+      defenderIdle,
+    })}`);
+  }
+
+  if (attackerResult.playerHp !== 66 || attackerResult.playerGuard !== 100
+    || attackerResult.opponentHp !== 100 || attackerResult.opponentGuard !== 100
+    || defenderResult.playerHp !== 100 || defenderResult.playerGuard !== 100
+    || defenderResult.opponentHp !== 66 || defenderResult.opponentGuard !== 100) {
+    throw new Error(`M140 whiff punish did not resolve as exactly one 34-damage light hit: ${JSON.stringify(evidence)}`);
+  }
+  if (attackerResult.events.includes("Opponent hit - 42 HP.")
+    || defenderResult.events.includes("Hit taken - 42 HP.")) {
+    throw new Error(`M140 deliberately whiffed jump attack unexpectedly connected: ${JSON.stringify(evidence)}`);
+  }
+  if (!defenderResult.events.includes("Opponent hit - 34 HP.")
+    || !attackerResult.events.includes("Hit taken - 34 HP.")) {
+    throw new Error(`M140 light punish feedback was not authoritative: ${JSON.stringify(evidence)}`);
+  }
+  if (!defenderResult.recoveryTransitions.some((entry) =>
+    entry.visible
+      && entry.state === "jump-attack-recovery"
+      && entry.label === "PUNISH"
+      && entry.detail === "Jump attack recovery")) {
+    throw new Error(`M140 defender never rendered jump-attack recovery as punishable: ${JSON.stringify(defenderResult.recoveryTransitions)}`);
+  }
+
+  return evidence.map((entry) => ({
+    ...entry,
+    jumpAttackWhiffChordEpochMs: entry.browser === attacker.name
+      ? Math.max(jumpDown.epochMs, attackDown.epochMs)
+      : null,
+    jumpAttackPunishEpochMs: entry.browser === defender.name ? punishDown.epochMs : null,
   }));
 }
 
@@ -4712,7 +4979,7 @@ async function installUiObserver(session) {
     const threatGuardArc = document.querySelector('#threat-guard-arc');
     if (!target || !arena || !arenaStage || !overlay || !recovery || !threat || !threatCount || !threatSecondary || !threatSecondaryBearing || !threatSecondaryPhase || !threatSecondaryGuardArc || !threatBearing || !threatGuardArc) throw new Error('missing online UI flight target');
     const state = { events: [], eventTransitions: [], keys: [], keyTransitions: [], pointers: [], wheels: [], overlayTransitions: [], feedbackTransitions: [], recoveryTransitions: [], threatTransitions: [], recoveryTellMaxPixels: 0, parryTellMaxPixels: 0, online: '', startedAt: performance.now() };
-    const epochEvidence = ['uirollbuffer', 'uijumpbuffer', 'uijumpattack', 'uijumpattackinputloss', 'uijumpattackblock', 'uijumpattackparry', 'uijumpattackdodge', 'uijumpattackbuffer', 'uikickbuffer'].includes(new URLSearchParams(location.search).get('scenario'));
+    const epochEvidence = ['uirollbuffer', 'uijumpbuffer', 'uijumpattack', 'uijumpattackinputloss', 'uijumpattackpunish', 'uijumpattackblock', 'uijumpattackparry', 'uijumpattackdodge', 'uijumpattackbuffer', 'uikickbuffer'].includes(new URLSearchParams(location.search).get('scenario'));
     const record = () => {
       const text = target.textContent?.trim() ?? '';
       if (/^Online - player #\\d+ - server tick \\d+$/.test(text)) state.online = text;
@@ -5812,8 +6079,9 @@ function assertPairedResults(results) {
       }
       if (!Number.isFinite(result.firstParryMs)) throw new Error(`${result.browser} did not timestamp a verified parry`);
     } else if (scenario === "dodge") {
-      if (!result.defenderDodgeSeen || !result.dodgeOverlapSeen) {
-        throw new Error(`${result.browser} did not observe an in-range authoritative dodge/attack overlap`);
+      const rollCounter = result.attackerKnockdownSeen === true;
+      if (!result.defenderDodgeSeen || (!result.dodgeOverlapSeen && !rollCounter)) {
+        throw new Error(`${result.browser} did not observe an authoritative evade or roll-counter knockdown`);
       }
       if (result.minDefenderHp !== 100 || result.minDefenderGuard !== 100) {
         throw new Error(`${result.browser} defender paid HP/guard cost during dodge: ${JSON.stringify(result)}`);
@@ -5821,14 +6089,16 @@ function assertPairedResults(results) {
       if (result.defenderBlockSeen || Number.isFinite(result.firstParryMs)) {
         throw new Error(`${result.browser} roll scenario accidentally resolved as block/parry`);
       }
-      // Pointer-directed roll collisions may intentionally knock the attacker
-      // down. Verified in-range dodge overlap and untouched defender vitals
-      // remain the authoritative evade proof; knockdown is not a parry proxy.
-      if (!Number.isFinite(result.firstDodgeEvadeMs) || !Number.isFinite(result.dodgeOverlapDistance) || !Number.isFinite(result.dodgeOverlapArcDelta)) {
-        throw new Error(`${result.browser} did not record verified dodge geometry/timing`);
-      }
-      if (result.dodgeOverlapDistance > 94 || result.dodgeOverlapArcDelta > Math.PI * 0.39) {
-        throw new Error(`${result.browser} dodge overlap was outside authoritative hit geometry: ${JSON.stringify(result)}`);
+      // Wilds-style pointer rolls intentionally own collision knockdown. If the
+      // defender reaches the attacker first, that authoritative knockdown is a
+      // valid defensive resolution and can preempt the later attack/iframe overlap.
+      if (!rollCounter) {
+        if (!Number.isFinite(result.firstDodgeEvadeMs) || !Number.isFinite(result.dodgeOverlapDistance) || !Number.isFinite(result.dodgeOverlapArcDelta)) {
+          throw new Error(`${result.browser} did not record verified dodge geometry/timing`);
+        }
+        if (result.dodgeOverlapDistance > 94 || result.dodgeOverlapArcDelta > Math.PI * 0.39) {
+          throw new Error(`${result.browser} dodge overlap was outside authoritative hit geometry: ${JSON.stringify(result)}`);
+        }
       }
     } else if (scenario === "block") {
       if (!result.defenderBlockSeen || !result.blockOverlapSeen) {

@@ -148,6 +148,12 @@ export function combatActionHint(entity) {
       return "Running strike active - carry momentum through the hit.";
     case COMBAT_ACTION.runningAttackRecovery:
       return "Running strike recovery - the lunge can be punished now.";
+    case COMBAT_ACTION.jumpAttackWindup:
+      return "Jump attack committed - the narrow lane is readable.";
+    case COMBAT_ACTION.jumpAttackActive:
+      return "Jump attack active - finish the airborne commitment.";
+    case COMBAT_ACTION.jumpAttackRecovery:
+      return "Jump attack recovery - you can be punished now.";
     case COMBAT_ACTION.heavyAttackWindup:
       return "Heavy strike committed - the long windup is readable.";
     case COMBAT_ACTION.heavyAttackActive:
@@ -183,6 +189,9 @@ export function opponentRecoveryPresentation(entity) {
   }
   if (entity?.action === COMBAT_ACTION.runningAttackRecovery) {
     return { visible: true, state: "running-attack-recovery", label: "PUNISH", detail: "Running recovery" };
+  }
+  if (entity?.action === COMBAT_ACTION.jumpAttackRecovery) {
+    return { visible: true, state: "jump-attack-recovery", label: "PUNISH", detail: "Jump attack recovery" };
   }
   if (entity?.action === COMBAT_ACTION.dodgeRecovery) {
     return { visible: true, state: "dodge-recovery", label: "PUNISH", detail: "Dodge recovery" };

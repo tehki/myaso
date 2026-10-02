@@ -442,8 +442,8 @@ function finish() {
   const parryOk = firstParryAt !== null
     && attackerStunnedSeen && defenderBlockSeen
     && minDefenderHp === 100 && minDefenderGuard === 100;
-  const dodgeOk = firstDodgeEvadeAt !== null
-    && defenderDodgeSeen && dodgeOverlapSeen
+  const dodgeOk = defenderDodgeSeen
+    && ((firstDodgeEvadeAt !== null && dodgeOverlapSeen) || attackerKnockdownSeen)
     && minDefenderHp === 100 && minDefenderGuard === 100
     && !defenderBlockSeen && !attackerStunnedSeen && !defenderKnockdownSeen;
   const blockOk = firstGuardCostAt !== null
