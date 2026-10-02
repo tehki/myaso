@@ -647,4 +647,3 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
         run: python scripts/verify_main_push_provenance.py
 
-[executed on device: Machine (dddee116-9deb-47c7-9368-4393f817bdb1)]
