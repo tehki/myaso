@@ -1687,12 +1687,15 @@ async function runOnlineUiJumpAttackBufferFlight(entries) {
   const attackDowns = pointerTransitions.filter((entry) => entry.type === "pointerdown" && entry.button === 0);
   const attackUps = pointerTransitions.filter((entry) => entry.type === "pointerup" && entry.button === 0);
   const jumpDown = jumpDowns[0];
-  const attackDown = attackDowns[0];
+  const setupAttackDown = attackDowns[0];
+  const attackDown = attackDowns[1];
   if (jumpDowns.length !== 1 || jumpUps.length !== 1
-    || attackDowns.length !== 1 || attackUps.length !== 1
+    || attackDowns.length !== 2 || attackUps.length !== 2
+    || !Number.isFinite(setupAttackDown?.epochMs)
     || !Number.isFinite(jumpDown?.epochMs) || !Number.isFinite(attackDown?.epochMs)
+    || setupAttackDown.epochMs >= attackDown.epochMs
     || Math.abs(jumpDown.epochMs - attackDown.epochMs) > 60) {
-    throw new Error(`M137 did not deliver one genuine late-recovery Space + LMB chord: ${JSON.stringify({
+    throw new Error(`M137 did not deliver one setup light followed by one genuine late-recovery Space + LMB chord: ${JSON.stringify({
       keyTransitions,
       pointerTransitions,
     })}`);
