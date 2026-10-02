@@ -1602,6 +1602,22 @@ async function runOnlineUiJumpAttackCounterplayFlight(entries, defense) {
   const pointerOffset = beforeAttacker.pointers.length;
   const beforeDefender = await readUiEvidence(defender);
   const wheelOffset = beforeDefender.wheels.length;
+  const hasReplicatedDodgeOverlap = (attackerState, defenderState) => {
+    const attackerOwn = attackerState?.acceptance?.ownActionTransitions ?? [];
+    const attackerFocus = attackerState?.acceptance?.focusActionTransitions ?? [];
+    const defenderOwn = defenderState?.acceptance?.ownActionTransitions ?? [];
+    const defenderFocus = defenderState?.acceptance?.focusActionTransitions ?? [];
+    const attackerActive = attackerOwn.find((entry) => entry.action === COMBAT_ACTION.jumpAttackActive);
+    const attackerSeesDodge = attackerFocus.find((entry) => entry.action === COMBAT_ACTION.dodge);
+    const defenderDodge = defenderOwn.find((entry) => entry.action === COMBAT_ACTION.dodge);
+    const defenderSeesActive = defenderFocus.find((entry) => entry.action === COMBAT_ACTION.jumpAttackActive);
+    return Number.isFinite(attackerActive?.serverTick)
+      && Number.isFinite(attackerSeesDodge?.serverTick)
+      && Number.isFinite(defenderDodge?.serverTick)
+      && Number.isFinite(defenderSeesActive?.serverTick)
+      && attackerActive.serverTick === attackerSeesDodge.serverTick
+      && defenderSeesActive.serverTick === defenderDodge.serverTick;
+  };
 
   if (defense === "block") {
     // Two real wheel-back pulses 100 ms apart overlap the unchanged 240 ms
@@ -1685,9 +1701,11 @@ async function runOnlineUiJumpAttackCounterplayFlight(entries, defense) {
         && defenderResult.playerHp === 100
         && defenderResult.playerGuard === 100;
     } else {
+      const iframeEvade = attackerResult.feedbackTransitions.includes("dodge-evaded")
+        && defenderResult.feedbackTransitions.includes("dodge-success");
+      const replicatedOverlap = hasReplicatedDodgeOverlap(attackerResult, defenderResult);
       resolved = attackSeen
-        && attackerResult.feedbackTransitions.includes("dodge-evaded")
-        && defenderResult.feedbackTransitions.includes("dodge-success")
+        && (iframeEvade || replicatedOverlap)
         && attackerResult.playerHp === 100
         && attackerResult.playerGuard === 100
         && defenderResult.playerHp === 100
@@ -1791,6 +1809,11 @@ async function runOnlineUiJumpAttackCounterplayFlight(entries, defense) {
   } else {
     if (!defenseWheels.some((event) => event.deltaY < 0)) {
       throw new Error(`${label} real pointer-owned wheel-forward dodge was not delivered: ${JSON.stringify(defenderResult)}`);
+    }
+    const iframeEvade = attackerResult.feedbackTransitions.includes("dodge-evaded")
+      && defenderResult.feedbackTransitions.includes("dodge-success");
+    if (!iframeEvade && !hasReplicatedDodgeOverlap(attackerResult, defenderResult)) {
+      throw new Error(`${label} lacked both iframe feedback and same-tick authoritative roll overlap: ${JSON.stringify(evidence)}`);
     }
   }
 

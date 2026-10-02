@@ -32,7 +32,7 @@ No combat constants change.
 
 - Block: both fighters remain at 100 HP; defender takes exactly 52 guard pressure and does not parry.
 - Parry: both fighters remain at 100 HP / 100 guard; defender receives parry success and attacker receives parried/stunned feedback.
-- Dodge: both fighters remain at 100 HP / 100 guard; attacker receives dodge-evaded and defender receives dodge-success feedback; no parry is accepted.
+- Dodge: both fighters remain at 100 HP / 100 guard. An iframe intercept may produce `dodge-evaded` / `dodge-success`; a positional roll evasion is also accepted only when both browsers replicate defender `dodge` and attacker `jumpAttackActive` on the same authoritative server tick. No parry is accepted.
 
 ## Boundaries
 M138 changes no combat timing, damage, reach, arc, stamina cost, movement, packet encoding, snapshot encoding, or server resolution rules.
