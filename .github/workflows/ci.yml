@@ -359,6 +359,14 @@ jobs:
           node --test --test-name-pattern="jump-attack threat|threat phase label|committed attack phase" tests/m29-combat-readability.test.mjs
           node scripts/pvp_browser_flight_runner.mjs
 
+      - name: Validate M142 jump attack FFA threat ordering
+        run: |
+          node --check scripts/pvp_browser_flight_runner.mjs
+          node --test --test-name-pattern="jump-attack threat|FFA threat summary|secondary FFA threat phase|primary FFA threat guard arc|secondary FFA threat guard arc" tests/m29-combat-readability.test.mjs
+          for scenario in uijumpffaprimary uijumpffasecondary; do
+            MYASO_PVP_SCENARIO="$scenario" node scripts/pvp_browser_flight_runner.mjs
+          done
+
       - name: Validate M121 first-to-five duel kernel
         run: |
           cargo test --locked --manifest-path server/Cargo.toml first_to_kill_target_declares_winner_and_freezes_match_state
