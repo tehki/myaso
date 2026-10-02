@@ -35,4 +35,6 @@ M136 does not change jump-attack reach, arc, damage, timings, stamina costs, mov
 
 The only production-file change is extending the already query-gated authoritative acceptance observer to the `uijumpattack` test scenario.
 
+Quality CI runs `uijumpattack` as a dedicated real-browser gate on the exact PR head.
+
 The playable build is not opened for this milestone.
