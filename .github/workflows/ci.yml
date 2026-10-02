@@ -349,6 +349,16 @@ jobs:
           node --test --test-name-pattern="action hints|opponent recovery" tests/m29-combat-readability.test.mjs
           node scripts/pvp_browser_flight_runner.mjs
 
+      - name: Validate M141 jump attack threat telegraph
+        env:
+          MYASO_PVP_SCENARIO: "uijumpattacktelegraph"
+        run: |
+          node --check src/browser/combat-readability.mjs
+          node --check web/online-game.mjs
+          node --check scripts/pvp_browser_flight_runner.mjs
+          node --test --test-name-pattern="jump-attack threat|threat phase label|committed attack phase" tests/m29-combat-readability.test.mjs
+          node scripts/pvp_browser_flight_runner.mjs
+
       - name: Validate M121 first-to-five duel kernel
         run: |
           cargo test --locked --manifest-path server/Cargo.toml first_to_kill_target_declares_winner_and_freezes_match_state

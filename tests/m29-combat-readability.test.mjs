@@ -138,6 +138,27 @@ test("FFA threat presentation identifies the most immediate attacker inside auth
   assert.equal(summary.secondaryNetId, 0);
 });
 
+test("jump-attack threat selection uses its deliberately narrow authoritative cone", () => {
+  const own = fighter(1, 100, 100, COMBAT_ACTION.idle, 100, 100);
+  const entities = new Map([
+    [1, own],
+    [2, fighter(2, 100, 100, COMBAT_ACTION.jumpAttackWindup, 45, 100, 0)],
+  ]);
+  const summary = { count: 0, secondaryNetId: 0 };
+
+  assert.equal(fighterThreatNetId(entities, 1, summary), 2);
+  assert.equal(summary.count, 1);
+
+  entities.get(2).y = 126;
+  assert.equal(fighterThreatNetId(entities, 1, summary), 0);
+  assert.equal(summary.count, 0);
+
+  entities.get(2).y = 100;
+  entities.get(2).x = 20;
+  assert.equal(fighterThreatNetId(entities, 1, summary), 0);
+  assert.equal(summary.count, 0);
+});
+
 test("heavy threat selection uses heavy reach and narrower authoritative arc", () => {
   const own = fighter(1, 100, 100, COMBAT_ACTION.idle, 100, 100);
   const entities = new Map([
@@ -235,6 +256,8 @@ test("threat phase label exposes light and heavy authoritative attack phases", (
   assert.equal(fighterThreatPhaseLabel({ action: COMBAT_ACTION.attackActive }), "STRIKE");
   assert.equal(fighterThreatPhaseLabel({ action: COMBAT_ACTION.heavyAttackWindup }), "HEAVY WINDUP");
   assert.equal(fighterThreatPhaseLabel({ action: COMBAT_ACTION.heavyAttackActive }), "HEAVY STRIKE");
+  assert.equal(fighterThreatPhaseLabel({ action: COMBAT_ACTION.jumpAttackWindup }), "JUMP WINDUP");
+  assert.equal(fighterThreatPhaseLabel({ action: COMBAT_ACTION.jumpAttackActive }), "JUMP STRIKE");
   assert.equal(fighterThreatPhaseLabel({ action: COMBAT_ACTION.attackRecovery }), "");
   assert.equal(fighterThreatPhaseLabel({ action: COMBAT_ACTION.heavyAttackRecovery }), "");
   assert.equal(fighterThreatPhaseLabel({ action: COMBAT_ACTION.idle }), "");
@@ -710,10 +733,10 @@ test("directional light threat labels expose the committed side", () => {
 });
 
 test("all committed attack phase labels map to visible threat states", () => {
-  for (const phase of ["WINDUP", "HEAVY WINDUP", "RUNNING WINDUP", "LEFT WINDUP", "RIGHT WINDUP"]) {
+  for (const phase of ["WINDUP", "HEAVY WINDUP", "RUNNING WINDUP", "JUMP WINDUP", "LEFT WINDUP", "RIGHT WINDUP"]) {
     assert.equal(fighterThreatPhaseState(phase), "windup", phase);
   }
-  for (const phase of ["STRIKE", "HEAVY STRIKE", "RUNNING STRIKE", "LEFT SWEEP", "RIGHT SWEEP"]) {
+  for (const phase of ["STRIKE", "HEAVY STRIKE", "RUNNING STRIKE", "JUMP STRIKE", "LEFT SWEEP", "RIGHT SWEEP"]) {
     assert.equal(fighterThreatPhaseState(phase), "strike", phase);
   }
   assert.equal(fighterThreatPhaseState(""), "");

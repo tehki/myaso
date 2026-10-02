@@ -249,6 +249,8 @@ export function fighterThreatPhaseLabel(attacker) {
   if (attacker?.action === COMBAT_ACTION.attackRightWindup) return "RIGHT WINDUP";
   if (attacker?.action === COMBAT_ACTION.runningAttackActive) return "RUNNING STRIKE";
   if (attacker?.action === COMBAT_ACTION.runningAttackWindup) return "RUNNING WINDUP";
+  if (attacker?.action === COMBAT_ACTION.jumpAttackActive) return "JUMP STRIKE";
+  if (attacker?.action === COMBAT_ACTION.jumpAttackWindup) return "JUMP WINDUP";
   if (attacker?.action === COMBAT_ACTION.heavyAttackActive) return "HEAVY STRIKE";
   if (attacker?.action === COMBAT_ACTION.heavyAttackWindup) return "HEAVY WINDUP";
   if (attacker?.action === COMBAT_ACTION.attackActive) return "STRIKE";
@@ -258,9 +260,9 @@ export function fighterThreatPhaseLabel(attacker) {
 
 export function fighterThreatPhaseState(phase) {
   if (phase === "STRIKE" || phase === "HEAVY STRIKE" || phase === "RUNNING STRIKE"
-    || phase === "LEFT SWEEP" || phase === "RIGHT SWEEP") return "strike";
+    || phase === "JUMP STRIKE" || phase === "LEFT SWEEP" || phase === "RIGHT SWEEP") return "strike";
   if (phase === "WINDUP" || phase === "HEAVY WINDUP" || phase === "RUNNING WINDUP"
-    || phase === "LEFT WINDUP" || phase === "RIGHT WINDUP") return "windup";
+    || phase === "JUMP WINDUP" || phase === "LEFT WINDUP" || phase === "RIGHT WINDUP") return "windup";
   return "";
 }
 
@@ -304,12 +306,14 @@ export function fighterThreatNetId(state, ownId = 0, summary = null) {
       || entity?.action === COMBAT_ACTION.attackLeftActive
       || entity?.action === COMBAT_ACTION.attackRightActive
       || entity?.action === COMBAT_ACTION.heavyAttackActive
-      || entity?.action === COMBAT_ACTION.runningAttackActive;
+      || entity?.action === COMBAT_ACTION.runningAttackActive
+      || entity?.action === COMBAT_ACTION.jumpAttackActive;
     const windup = entity?.action === COMBAT_ACTION.attackWindup
       || entity?.action === COMBAT_ACTION.attackLeftWindup
       || entity?.action === COMBAT_ACTION.attackRightWindup
       || entity?.action === COMBAT_ACTION.heavyAttackWindup
-      || entity?.action === COMBAT_ACTION.runningAttackWindup;
+      || entity?.action === COMBAT_ACTION.runningAttackWindup
+      || entity?.action === COMBAT_ACTION.jumpAttackWindup;
     const priority = active ? 0 : windup ? 1 : Infinity;
     const directionalLeft = entity?.action === COMBAT_ACTION.attackLeftActive || entity?.action === COMBAT_ACTION.attackLeftWindup;
     const directionalRight = entity?.action === COMBAT_ACTION.attackRightActive || entity?.action === COMBAT_ACTION.attackRightWindup;
@@ -317,9 +321,11 @@ export function fighterThreatNetId(state, ownId = 0, summary = null) {
       ? COMBAT.heavyAttack
       : entity?.action === COMBAT_ACTION.runningAttackActive || entity?.action === COMBAT_ACTION.runningAttackWindup
         ? COMBAT.runningAttack
-        : directionalLeft || directionalRight
-          ? COMBAT.directionalAttack
-          : COMBAT.attack;
+        : entity?.action === COMBAT_ACTION.jumpAttackActive || entity?.action === COMBAT_ACTION.jumpAttackWindup
+          ? COMBAT.jumpAttack
+          : directionalLeft || directionalRight
+            ? COMBAT.directionalAttack
+            : COMBAT.attack;
     const arcOffset = directionalLeft
       ? -COMBAT.directionalAttack.arcOffsetRadians
       : directionalRight
