@@ -646,4 +646,3 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: python scripts/verify_main_push_provenance.py
-
