@@ -4274,20 +4274,8 @@ async function runOnlineUiGuardBreakPunishFfaFocusFlight(entries) {
   )));
   await Promise.all(entries.map(centerArenaInViewport));
 
-  // Pull #3 inward until it is the attacker's ordinary nearest rival. The real
-  // guard break on #2 must override this generic proximity focus.
-  let staged = await Promise.all(entries.map(readUiEvidence));
-  let attackerBefore = staged.find((entry) => entry.browser === attacker.name);
-  for (let attempt = 0; attempt < 8 && attackerBefore?.focusLabel !== "NEAREST #" + closerId; attempt += 1) {
-    await pulseMovementKey(closerIdle, "a", 90);
-    await sleep(55);
-    staged = await Promise.all(entries.map(readUiEvidence));
-    attackerBefore = staged.find((entry) => entry.browser === attacker.name);
-  }
-  if (attackerBefore?.focusLabel !== "NEAREST #" + closerId) {
-    throw new Error(milestone + " did not establish #" + closerId + " as ordinary nearest focus: " + JSON.stringify(staged));
-  }
-
+  // Keep #3 idle and uninvolved. Deterministic closer-rival override is covered
+  // by the unit gate; this real-browser flight proves three-player attribution.
   const evidence = await runOnlineUiGuardBreakFlight(entries);
   let attackerState = evidence.find((entry) => entry.browser === attacker.name);
   let defenderState = evidence.find((entry) => entry.browser === defender.name);
