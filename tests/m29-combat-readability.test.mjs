@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { COMBAT_ACTION, FFA_KILL_TARGET, blockSpatialPresentation, combatActionHint, combatLifePresentation, combatOverlayPresentation, createCombatReadabilityTracker, createRemoteDamageTracker, fighterFocusNetId, fighterIdentityPresentation, fighterThreatBearingLabel, fighterThreatGuardArcLabel, fighterThreatNetId, fighterThreatPhaseLabel, fighterThreatPhaseState, fighterMatchPointPresentation, fighterMatchPresentation, fighterScoreboardPresentation, fighterVitalsPresentation, guardBreakSpatialPresentation, killFeedPresentation, opponentRecoveryPresentation, parrySpatialPresentation } from "../src/browser/combat-readability.mjs";
+import { COMBAT_ACTION, FFA_KILL_TARGET, blockSpatialPresentation, combatActionHint, combatLifePresentation, combatOverlayPresentation, createCombatReadabilityTracker, createRemoteDamageTracker, fighterFocusNetId, fighterRecoveryNetId, fighterIdentityPresentation, fighterThreatBearingLabel, fighterThreatGuardArcLabel, fighterThreatNetId, fighterThreatPhaseLabel, fighterThreatPhaseState, fighterMatchPointPresentation, fighterMatchPresentation, fighterScoreboardPresentation, fighterVitalsPresentation, guardBreakSpatialPresentation, killFeedPresentation, opponentRecoveryPresentation, parrySpatialPresentation } from "../src/browser/combat-readability.mjs";
 
 function fighter(netId, hp = 100, guard = 100, action = COMBAT_ACTION.idle, x = 0, y = 0, facing = 0) {
   return { netId, hp, guard, action, x, y, facing };
@@ -92,6 +92,26 @@ test("FFA focus presentation chooses the nearest living rival with stable tie-br
   entities.get(3).action = COMBAT_ACTION.dead;
   assert.equal(fighterFocusNetId(entities, 1), 0);
   assert.equal(fighterFocusNetId(entities, 99), 0);
+});
+
+test("FFA recovery focus chooses a recoverable rival ahead of a closer idle rival", () => {
+  const entities = new Map([
+    [1, fighter(1, 100, 100, COMBAT_ACTION.idle, 100, 100)],
+    [2, fighter(2, 100, 100, COMBAT_ACTION.idle, 120, 100)],
+    [3, fighter(3, 100, 100, COMBAT_ACTION.jumpAttackRecovery, 150, 100)],
+    [4, fighter(4, 100, 100, COMBAT_ACTION.attackRecovery, 180, 100)],
+  ]);
+  assert.equal(fighterFocusNetId(entities, 1), 2);
+  assert.equal(fighterRecoveryNetId(entities, 1), 3);
+
+  entities.get(2).action = COMBAT_ACTION.dodgeRecovery;
+  assert.equal(fighterRecoveryNetId(entities, 1), 2);
+
+  entities.get(2).action = COMBAT_ACTION.idle;
+  entities.get(3).action = COMBAT_ACTION.idle;
+  entities.get(4).action = COMBAT_ACTION.idle;
+  assert.equal(fighterRecoveryNetId(entities, 1), 0);
+  assert.equal(fighterRecoveryNetId(entities, 99), 0);
 });
 
 test("FFA primary threat bearing uses authoritative replicated positions", () => {
