@@ -94,14 +94,17 @@ test("FFA focus presentation chooses the nearest living rival with stable tie-br
   assert.equal(fighterFocusNetId(entities, 99), 0);
 });
 
-test("FFA recovery focus chooses a recoverable rival ahead of a closer idle rival", () => {
+test("FFA recovery focus chooses and hands off between simultaneous recoverable rivals", () => {
   const entities = new Map([
     [1, fighter(1, 100, 100, COMBAT_ACTION.idle, 100, 100)],
     [2, fighter(2, 100, 100, COMBAT_ACTION.idle, 120, 100)],
     [3, fighter(3, 100, 100, COMBAT_ACTION.jumpAttackRecovery, 150, 100)],
-    [4, fighter(4, 100, 100, COMBAT_ACTION.attackRecovery, 180, 100)],
+    [4, fighter(4, 100, 100, COMBAT_ACTION.attackRecovery, 130, 100)],
   ]);
   assert.equal(fighterFocusNetId(entities, 1), 2);
+  assert.equal(fighterRecoveryNetId(entities, 1), 4);
+
+  entities.get(4).action = COMBAT_ACTION.idle;
   assert.equal(fighterRecoveryNetId(entities, 1), 3);
 
   entities.get(2).action = COMBAT_ACTION.dodgeRecovery;
@@ -112,6 +115,10 @@ test("FFA recovery focus chooses a recoverable rival ahead of a closer idle riva
   entities.get(4).action = COMBAT_ACTION.idle;
   assert.equal(fighterRecoveryNetId(entities, 1), 0);
   assert.equal(fighterRecoveryNetId(entities, 99), 0);
+
+  entities.set(3, fighter(3, 100, 100, COMBAT_ACTION.attackRecovery, 140, 100));
+  entities.set(4, fighter(4, 100, 100, COMBAT_ACTION.jumpAttackRecovery, 60, 100));
+  assert.equal(fighterRecoveryNetId(entities, 1), 3);
 });
 
 test("FFA primary threat bearing uses authoritative replicated positions", () => {
