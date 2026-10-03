@@ -5160,13 +5160,17 @@ async function runOnlineUiMultiRecoveryPunishFlight(entries) {
   const focusTransitions = observerState.focusTransitions.slice(observerFocusOffset);
   const recoveryTransitions = observerState.recoveryTransitions.slice(observerRecoveryOffset);
   const selectedCue = focusTransitions.find((entry) => entry.label === `PUNISH TARGET #${heavyId}`);
-  const heavyRecoveryCue = recoveryTransitions.find((entry) =>
+  const heavyRecoveryCueIndex = recoveryTransitions.findIndex((entry) =>
     entry.visible
     && entry.state === "heavy-attack-recovery"
     && entry.label === "PUNISH"
     && entry.detail === "Heavy recovery");
-  if (!selectedCue || !heavyRecoveryCue) {
-    throw new Error(`${milestone} did not expose the selected heavy recovery target: ${JSON.stringify({
+  const heavyRecoveryCue = heavyRecoveryCueIndex >= 0 ? recoveryTransitions[heavyRecoveryCueIndex] : null;
+  const heavyRecoveryExitCue = recoveryTransitions.find((entry, index) =>
+    index > heavyRecoveryCueIndex
+    && (!entry.visible || entry.state !== "heavy-attack-recovery"));
+  if (!selectedCue || !heavyRecoveryCue || !heavyRecoveryExitCue) {
+    throw new Error(`${milestone} did not expose and close the selected heavy recovery target: ${JSON.stringify({
       focusTransitions,
       recoveryTransitions,
     })}`);
@@ -5219,12 +5223,14 @@ async function runOnlineUiMultiRecoveryPunishFlight(entries) {
   }
   if (punishDowns[0].epochMs < jumpRecovery.epochMs
     || punishDowns[0].epochMs >= jumpIdle.epochMs
-    || punishDowns[0].epochMs < heavyRecovery.epochMs
-    || punishDowns[0].epochMs >= heavyIdle.epochMs) {
+    || punishDowns[0].epochMs < heavyRecoveryCue.epochMs
+    || punishDowns[0].epochMs >= heavyRecoveryExitCue.epochMs) {
     throw new Error(`${milestone} punish input was not issued while both opponents were authoritatively recovering: ${JSON.stringify({
       punishDown: punishDowns[0],
       jumpRecovery,
       jumpIdle,
+      heavyRecoveryCue,
+      heavyRecoveryExitCue,
       heavyRecovery,
       heavyIdle,
     })}`);
