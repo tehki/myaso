@@ -205,7 +205,7 @@ function observeCombatState(state) {
 }
 
 function recordAcceptanceState(state, ownId) {
-  if (!["uijumpbuffer", "uijumpattack", "uijumpattackinputloss", "uijumpattackpunish", "uijumpattacktelegraph", "uijumprecoveryffa", "uijumppunishffa", "uimultirecoveryffa", "uimultirecoveryspatial", "uiparrypunishwindow", "uiparrypunishffa", "uijumpattackblock", "uijumpattackparry", "uijumpattackdodge", "uijumpattackbuffer", "uikickbuffer"].includes(acceptanceScenario)) return;
+  if (!["uijumpbuffer", "uijumpattack", "uijumpattackinputloss", "uijumpattackpunish", "uijumpattacktelegraph", "uijumprecoveryffa", "uijumppunishffa", "uimultirecoveryffa", "uimultirecoveryspatial", "uimultirecoverypunish", "uiparrypunishwindow", "uiparrypunishffa", "uijumpattackblock", "uijumpattackparry", "uijumpattackdodge", "uijumpattackbuffer", "uikickbuffer"].includes(acceptanceScenario)) return;
   const focusNetId = fighterParryPunishNetId(state, ownId) || fighterRecoveryNetId(state, ownId) || fighterFocusNetId(state, ownId);
   const acceptance = window.__MYASO_ACCEPTANCE_STATE__ ??= {
     scenario: acceptanceScenario,
