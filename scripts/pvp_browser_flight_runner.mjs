@@ -5849,10 +5849,11 @@ async function armRecoveryHandoffSampler(session) {
     const focusLabel = document.querySelector('#focus-label');
     if (!arena || !context || !focusLabel) return false;
     const prior = window.__MYASO_M145_RECOVERY_SAMPLER__;
-    if (prior?.frame) cancelAnimationFrame(prior.frame);
-    const state = { active: true, frame: 0, samples: [], startedAt: performance.now() };
+    prior?.observer?.disconnect();
+    const state = { samples: [], startedAt: performance.now(), observer: null };
     const sample = () => {
-      if (!state.active) return;
+      const label = focusLabel.textContent?.trim() ?? '';
+      if (!label.startsWith('PUNISH TARGET #')) return;
       const pixels = context.getImageData(0, 0, arena.width, arena.height).data;
       let count = 0;
       let xSum = 0;
@@ -5867,16 +5868,16 @@ async function armRecoveryHandoffSampler(session) {
         }
       }
       state.samples.push({
-        focusLabel: focusLabel.textContent?.trim() ?? '',
+        focusLabel: label,
         count,
         centroidX: count > 0 ? xSum / count : -1,
         canvasWidth: arena.width,
         t: Number((performance.now() - state.startedAt).toFixed(1)),
       });
-      state.frame = requestAnimationFrame(sample);
     };
+    state.observer = new MutationObserver(sample);
+    state.observer.observe(focusLabel, { childList: true, subtree: true, characterData: true });
     window.__MYASO_M145_RECOVERY_SAMPLER__ = state;
-    state.frame = requestAnimationFrame(sample);
     return true;
   `);
 }
@@ -5885,8 +5886,7 @@ async function stopRecoveryHandoffSampler(session) {
   return execute(session.base, session.sessionId, `
     const state = window.__MYASO_M145_RECOVERY_SAMPLER__;
     if (!state) return [];
-    state.active = false;
-    if (state.frame) cancelAnimationFrame(state.frame);
+    state.observer?.disconnect();
     return state.samples.map((entry) => ({ ...entry }));
   `);
 }
