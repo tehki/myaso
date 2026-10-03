@@ -5131,7 +5131,7 @@ async function runOnlineUiMultiRecoveryPunishFlight(entries) {
   await Promise.all([
     pulseMovementKey(heavyAttacker, "e", heavyKeyPulseMs),
     (async () => {
-      await sleep(200);
+      await sleep(100);
       await performArenaJumpAttackChord(jumpAttacker, jumpArena, -200, 90);
     })(),
     punishPromise,

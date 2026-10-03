@@ -12,7 +12,7 @@ The deterministic roles are:
 - Firefox / #2: observer and punisher
 - second Chrome / #3: closer off-axis heavy attacker
 
-#3 is staged on Firefox's right within light-attack range while #1 remains on Firefox's left. #3 performs a genuine KeyE heavy attack aimed away from Firefox. Two hundred milliseconds later #1 performs a genuine same-tick Space + LMB jump attack aimed away from Firefox.
+#3 is staged on Firefox's right within light-attack range while #1 remains on Firefox's left. #3 performs a genuine KeyE heavy attack aimed away from Firefox. One hundred milliseconds later #1 performs a genuine same-tick Space + LMB jump attack aimed away from Firefox, ensuring its unchanged recovery window is already authoritative when #3 becomes the selected punish target.
 The unchanged heavy recovery and jump-attack recovery overlap. When Firefox observes `PUNISH TARGET #3`, it immediately sends one genuine right-aimed LMB.
 
 Acceptance requires:
