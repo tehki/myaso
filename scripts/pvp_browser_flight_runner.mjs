@@ -1348,13 +1348,13 @@ async function runOnlineUiJumpBufferFlight(entries) {
     throw new Error("M131 Chrome never observed its authoritative light recovery before Space");
   }
 
-  // Aim for the late part of the 255 ms recovery. The deterministic JS/Rust
-  // kernels pin the exact 90 ms rule; this real-browser flight proves a genuine
-  // Space edge traverses WebDriver -> DOM -> client input -> authority without
-  // cancelling recovery. Leave driver/snapshot scheduling margin on both sides.
+  // Aim inside the late 90 ms buffer window, not just before it. Scheduling
+  // the real Space edge 20 ms into the valid window keeps the acceptance proof
+  // deterministic across fast and loaded headless browsers while preserving
+  // the unchanged authoritative 90 ms gameplay rule.
   const targetOffsetMs = Math.max(
     0,
-    COMBAT.attack.recoveryMs - COMBAT.inputBuffer.jumpWindowMs - 20,
+    COMBAT.attack.recoveryMs - COMBAT.inputBuffer.jumpWindowMs + 20,
   );
   const waitMs = Math.max(0, recoveryStart.epochMs + targetOffsetMs - Date.now());
   if (waitMs > 0) await sleep(waitMs);
