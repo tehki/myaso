@@ -4887,14 +4887,16 @@ async function runOnlineUiMultiRecoveryFfaFocusFlight(entries, spatial = false) 
 
   // Both attacks deliberately point away from Firefox so the proof is about
   // recovery arbitration, not damage. Start the shorter light attack first.
-  // Its 255 ms recovery overlaps the jump attack's 290 ms recovery, then exits
-  // first, leaving a short but real authoritative handoff window to #1.
+  // M144 keeps its original overlap timing. M145 delays the jump chord further
+  // so Firefox gets a stable authoritative snapshot after #3 exits recovery
+  // while #1 is still recoverable; gameplay timings themselves are unchanged.
+  const jumpInputDelayMs = spatial ? 100 : 45;
   let spatialSamples = [];
   if (spatial) await armRecoveryHandoffSampler(observer);
   await Promise.all([
     performArenaAttackHold(lightAttacker, lightArena, 200, 90),
     (async () => {
-      await sleep(45);
+      await sleep(jumpInputDelayMs);
       await performArenaJumpAttackChord(jumpAttacker, jumpArena, -200, 90);
     })(),
     sampleUiEvidenceWhileActive(entries, 760, 8),
@@ -4964,8 +4966,10 @@ async function runOnlineUiMultiRecoveryFfaFocusFlight(entries, spatial = false) 
   }
   if (Number.isFinite(lightDowns[0]?.epochMs) && Number.isFinite(jumpAttackDowns[0]?.epochMs)) {
     const inputLeadMs = jumpAttackDowns[0].epochMs - lightDowns[0].epochMs;
-    if (inputLeadMs < 20 || inputLeadMs > 120) {
-      throw new Error(`${milestone} did not preserve the intended light-before-jump overlap: ${JSON.stringify({ inputLeadMs, lightDowns, jumpAttackDowns })}`);
+    const minLeadMs = spatial ? 70 : 20;
+    const maxLeadMs = spatial ? 150 : 120;
+    if (inputLeadMs < minLeadMs || inputLeadMs > maxLeadMs) {
+      throw new Error(`${milestone} did not preserve the intended light-before-jump overlap: ${JSON.stringify({ inputLeadMs, minLeadMs, maxLeadMs, lightDowns, jumpAttackDowns })}`);
     }
   }
 
