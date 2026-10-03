@@ -68,7 +68,14 @@ export function createCombatReadabilityTracker() {
       }
       if (own && beforeOwn && peer && beforePeer) {
         collectControlImpactEvents(candidates, beforeOwn, own, beforePeer, peer);
-        collectParryEvents(candidates, beforeOwn, own, beforePeer, peer);
+      }
+      if (own && beforeOwn) {
+        for (const candidatePeer of peers) {
+          const beforeCandidatePeer = previous.get(candidatePeer.netId);
+          if (beforeCandidatePeer) {
+            collectParryEvents(candidates, beforeOwn, own, beforeCandidatePeer, candidatePeer);
+          }
+        }
       }
       pendingDodge = own && peer
         ? collectDodgeEvents(candidates, own, peer, ownId, pendingDodge, beforeOwn, beforePeer)
