@@ -3303,6 +3303,7 @@ async function runOnlineUiParryPunishFfaFocusFlight(entries) {
     throw new Error(`${milestone} expected three real browser clients, received ${entries.length}`);
   }
 
+  await Promise.all(entries.map(installUiObserver));
   const ready = await waitForUiReady(entries);
   const ordered = ready.slice().sort((a, b) => a.playerNetId - b.playerNetId);
   const attacker = entries.find((entry) => entry.name === ordered[0]?.browser);
