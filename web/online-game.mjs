@@ -205,7 +205,7 @@ function observeCombatState(state) {
 }
 
 function recordAcceptanceState(state, ownId) {
-  if (!["uijumpbuffer", "uijumpattack", "uijumpattackinputloss", "uijumpattackpunish", "uijumpattacktelegraph", "uijumprecoveryffa", "uimultirecoveryffa", "uijumpattackblock", "uijumpattackparry", "uijumpattackdodge", "uijumpattackbuffer", "uikickbuffer"].includes(acceptanceScenario)) return;
+  if (!["uijumpbuffer", "uijumpattack", "uijumpattackinputloss", "uijumpattackpunish", "uijumpattacktelegraph", "uijumprecoveryffa", "uimultirecoveryffa", "uimultirecoveryspatial", "uijumpattackblock", "uijumpattackparry", "uijumpattackdodge", "uijumpattackbuffer", "uikickbuffer"].includes(acceptanceScenario)) return;
   const focusNetId = fighterRecoveryNetId(state, ownId) || fighterFocusNetId(state, ownId);
   const acceptance = window.__MYASO_ACCEPTANCE_STATE__ ??= {
     scenario: acceptanceScenario,
@@ -425,6 +425,7 @@ function render(nowMs = performance.now(), impact = combatImpact.sample(nowMs)) 
   const renderServerTick = networkClient.latestServerTick >= interpolationTicks
     ? networkClient.latestServerTick - interpolationTicks
     : 0;
+  const recoveryFocusNetId = fighterRecoveryNetId(networkClient.state, ownId);
 
   for (const entity of networkClient.state.values()) {
     if (entity.netId === ownId) continue;
@@ -435,7 +436,8 @@ function render(nowMs = performance.now(), impact = combatImpact.sample(nowMs)) 
     }
     const sampled = networkClient.remoteInterpolator.sample(entity.netId, renderServerTick, scratch) ?? entity;
     const damageTell = remoteDamage.visible(entity.netId, nowMs);
-    drawFighterWorld(sampled, "#b96350", "#47251f", damageTell, entity.netId);
+    const recoveryTell = entity.netId === recoveryFocusNetId;
+    drawFighterWorld(sampled, "#b96350", "#47251f", damageTell, entity.netId, recoveryTell);
   }
   if (ownId && local.initialized) drawFighterScreen(canvas.width / 2, canvas.height / 2, local, "#e2d5b4", "#51452d");
   updateHud(ownId);
@@ -537,17 +539,17 @@ function drawThreatMarker(bearing, secondary) {
   ctx.restore();
 }
 
-function drawFighterWorld(fighter, body, shadow, damageTell = false, netId = 0) {
+function drawFighterWorld(fighter, body, shadow, damageTell = false, netId = 0, recoveryTell = false) {
   if (!local.initialized) return;
   const screenX = canvas.width / 2 + fighter.x - local.x;
   const screenY = canvas.height / 2 + fighter.y - local.y;
   if (screenX < -64 || screenX > canvas.width + 64 || screenY < -64 || screenY > canvas.height + 64) return;
-  drawFighterScreen(screenX, screenY, fighter, body, shadow, true, damageTell);
+  drawFighterScreen(screenX, screenY, fighter, body, shadow, true, damageTell, recoveryTell);
   drawRemoteVitals(screenX, screenY, fighter);
   drawRemoteIdentity(screenX, screenY, netId);
 }
 
-function drawFighterScreen(x, y, fighter, body, shadow, remote = false, damageTell = false) {
+function drawFighterScreen(x, y, fighter, body, shadow, remote = false, damageTell = false, recoveryTell = false) {
   ctx.save();
   const action = fighter.action ?? COMBAT_ACTION.idle;
   const airborne = action === COMBAT_ACTION.jump
@@ -574,7 +576,7 @@ function drawFighterScreen(x, y, fighter, body, shadow, remote = false, damageTe
   if (action === COMBAT_ACTION.knockdown) drawKnockdownTell();
   if (remote && parrySpatialPresentation(fighter).visible) drawParryTell();
   if (remote && guardBreakSpatialPresentation(fighter).visible) drawGuardBreakTell();
-  if (remote && opponentRecoveryPresentation(fighter).visible) drawRecoveryTell();
+  if (remote && recoveryTell) drawRecoveryTell();
   ctx.fillStyle = shadow;
   ctx.beginPath();
   ctx.ellipse(-2, 8, 20, 13, 0, 0, Math.PI * 2);
