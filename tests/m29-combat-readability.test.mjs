@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { COMBAT_ACTION, FFA_KILL_TARGET, blockSpatialPresentation, combatActionHint, combatLifePresentation, combatOverlayPresentation, createCombatReadabilityTracker, createRemoteDamageTracker, fighterFocusNetId, fighterRecoveryNetId, fighterIdentityPresentation, fighterThreatBearingLabel, fighterThreatGuardArcLabel, fighterThreatNetId, fighterThreatPhaseLabel, fighterThreatPhaseState, fighterMatchPointPresentation, fighterMatchPresentation, fighterScoreboardPresentation, fighterVitalsPresentation, guardBreakSpatialPresentation, killFeedPresentation, opponentRecoveryPresentation, parrySpatialPresentation } from "../src/browser/combat-readability.mjs";
+import { COMBAT_ACTION, FFA_KILL_TARGET, blockSpatialPresentation, combatActionHint, combatLifePresentation, combatOverlayPresentation, createCombatReadabilityTracker, createRemoteDamageTracker, fighterFocusNetId, fighterParryPunishNetId, fighterRecoveryNetId, fighterIdentityPresentation, fighterThreatBearingLabel, fighterThreatGuardArcLabel, fighterThreatNetId, fighterThreatPhaseLabel, fighterThreatPhaseState, fighterMatchPointPresentation, fighterMatchPresentation, fighterScoreboardPresentation, fighterVitalsPresentation, guardBreakSpatialPresentation, killFeedPresentation, opponentRecoveryPresentation, parrySpatialPresentation } from "../src/browser/combat-readability.mjs";
 
 function fighter(netId, hp = 100, guard = 100, action = COMBAT_ACTION.idle, x = 0, y = 0, facing = 0) {
   return { netId, hp, guard, action, x, y, facing };
@@ -119,6 +119,25 @@ test("FFA recovery focus chooses and hands off between simultaneous recoverable 
   entities.set(3, fighter(3, 100, 100, COMBAT_ACTION.attackRecovery, 140, 100));
   entities.set(4, fighter(4, 100, 100, COMBAT_ACTION.jumpAttackRecovery, 60, 100));
   assert.equal(fighterRecoveryNetId(entities, 1), 3);
+});
+
+test("FFA parry punish focus overrides a closer idle rival and excludes guard break stun", () => {
+  const entities = new Map([
+    [1, fighter(1, 100, 100, COMBAT_ACTION.idle, 100, 100)],
+    [2, fighter(2, 100, 100, COMBAT_ACTION.idle, 120, 100)],
+    [3, fighter(3, 100, 100, COMBAT_ACTION.stunned, 160, 100)],
+    [4, fighter(4, 100, 0, COMBAT_ACTION.stunned, 110, 100)],
+  ]);
+  assert.equal(fighterFocusNetId(entities, 1), 4);
+  assert.equal(fighterParryPunishNetId(entities, 1), 3);
+
+  entities.get(3).action = COMBAT_ACTION.idle;
+  assert.equal(fighterParryPunishNetId(entities, 1), 0);
+  assert.equal(fighterParryPunishNetId(entities, 99), 0);
+
+  entities.set(3, fighter(3, 100, 100, COMBAT_ACTION.stunned, 140, 100));
+  entities.set(5, fighter(5, 100, 100, COMBAT_ACTION.stunned, 60, 100));
+  assert.equal(fighterParryPunishNetId(entities, 1), 3);
 });
 
 test("FFA primary threat bearing uses authoritative replicated positions", () => {
@@ -414,6 +433,38 @@ test("being parried emits a distinct authoritative feedback cue", () => {
   assert.equal(event.kind, "parry");
   assert.equal(event.feedback, "parried");
   assert.match(event.text, /Parried/);
+});
+
+test("FFA parry feedback attributes the actual blocking and stunned pair", () => {
+  const defenderTracker = createCombatReadabilityTracker();
+  defenderTracker.observe(new Map([
+    [1, fighter(1, 100, 100, COMBAT_ACTION.block)],
+    [2, fighter(2, 100, 100, COMBAT_ACTION.attackActive)],
+    [3, fighter(3, 100, 100, COMBAT_ACTION.idle)],
+  ]), 1);
+  const defenderEvent = defenderTracker.observe(new Map([
+    [1, fighter(1, 100, 100, COMBAT_ACTION.block)],
+    [2, fighter(2, 100, 100, COMBAT_ACTION.stunned)],
+    [3, fighter(3, 100, 100, COMBAT_ACTION.idle)],
+  ]), 1);
+  assert.equal(defenderEvent.kind, "parry");
+  assert.equal(defenderEvent.feedback, "parry-success");
+  assert.match(defenderEvent.text, /Parry!/);
+
+  const attackerTracker = createCombatReadabilityTracker();
+  attackerTracker.observe(new Map([
+    [1, fighter(1, 100, 100, COMBAT_ACTION.attackActive)],
+    [2, fighter(2, 100, 100, COMBAT_ACTION.block)],
+    [3, fighter(3, 100, 100, COMBAT_ACTION.idle)],
+  ]), 1);
+  const attackerEvent = attackerTracker.observe(new Map([
+    [1, fighter(1, 100, 100, COMBAT_ACTION.stunned)],
+    [2, fighter(2, 100, 100, COMBAT_ACTION.block)],
+    [3, fighter(3, 100, 100, COMBAT_ACTION.idle)],
+  ]), 1);
+  assert.equal(attackerEvent.kind, "parry");
+  assert.equal(attackerEvent.feedback, "parried");
+  assert.match(attackerEvent.text, /Parried/);
 });
 
 test("authoritative kick stun emits distinct shove impact feedback", () => {
