@@ -435,6 +435,38 @@ test("being parried emits a distinct authoritative feedback cue", () => {
   assert.match(event.text, /Parried/);
 });
 
+test("FFA parry feedback attributes the actual blocking and stunned pair", () => {
+  const defenderTracker = createCombatReadabilityTracker();
+  defenderTracker.observe(new Map([
+    [1, fighter(1, 100, 100, COMBAT_ACTION.block)],
+    [2, fighter(2, 100, 100, COMBAT_ACTION.attackActive)],
+    [3, fighter(3, 100, 100, COMBAT_ACTION.idle)],
+  ]), 1);
+  const defenderEvent = defenderTracker.observe(new Map([
+    [1, fighter(1, 100, 100, COMBAT_ACTION.block)],
+    [2, fighter(2, 100, 100, COMBAT_ACTION.stunned)],
+    [3, fighter(3, 100, 100, COMBAT_ACTION.idle)],
+  ]), 1);
+  assert.equal(defenderEvent.kind, "parry");
+  assert.equal(defenderEvent.feedback, "parry-success");
+  assert.match(defenderEvent.text, /Parry!/);
+
+  const attackerTracker = createCombatReadabilityTracker();
+  attackerTracker.observe(new Map([
+    [1, fighter(1, 100, 100, COMBAT_ACTION.attackActive)],
+    [2, fighter(2, 100, 100, COMBAT_ACTION.block)],
+    [3, fighter(3, 100, 100, COMBAT_ACTION.idle)],
+  ]), 1);
+  const attackerEvent = attackerTracker.observe(new Map([
+    [1, fighter(1, 100, 100, COMBAT_ACTION.stunned)],
+    [2, fighter(2, 100, 100, COMBAT_ACTION.block)],
+    [3, fighter(3, 100, 100, COMBAT_ACTION.idle)],
+  ]), 1);
+  assert.equal(attackerEvent.kind, "parry");
+  assert.equal(attackerEvent.feedback, "parried");
+  assert.match(attackerEvent.text, /Parried/);
+});
+
 test("authoritative kick stun emits distinct shove impact feedback", () => {
   const tracker = createCombatReadabilityTracker();
   tracker.observe(
