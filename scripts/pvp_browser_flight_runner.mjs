@@ -4556,13 +4556,14 @@ async function runOnlineUiJumpFfaThreatFlight(entries, mode) {
   const rightPointerOffset = rightBefore.pointers.length;
   const centerThreatOffset = centerBefore.threatTransitions.length;
 
-  // The right light begins 80 ms after the jump chord starts. The genuine jump
-  // chord is held for 90 ms, so authority sees an overlap where both committed
-  // attacks are still in windup. That keeps the proof about multi-threat
-  // ordering/readability rather than post-hit knockback geometry.
+  // Start the right light 35 ms after the jump chord begins. Jump windup is
+  // only 105 ms, so the previous 80 ms delay left too little replicated overlap
+  // under loaded headless scheduling. A 35 ms delay preserves a broad shared
+  // windup interval while distance still deterministically decides whether the
+  // jump or light attacker is primary in each mode.
   await Promise.all([
     performArenaJumpAttackChord(left, leftArena, 200, 90),
-    performArenaAttackBurst(right, 3, 80, 8),
+    performArenaAttackBurst(right, 3, 35, 8),
     sampleUiEvidenceWhileActive(entries, 260, 8),
   ]);
 
