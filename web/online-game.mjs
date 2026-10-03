@@ -576,7 +576,7 @@ function drawFighterScreen(x, y, fighter, body, shadow, remote = false, damageTe
   if (action === COMBAT_ACTION.knockdown) drawKnockdownTell();
   if (remote && parrySpatialPresentation(fighter).visible) drawParryTell();
   if (remote && guardBreakSpatialPresentation(fighter).visible) drawGuardBreakTell();
-  if (remote && recoveryTell && opponentRecoveryPresentation(fighter).visible) drawRecoveryTell();
+  if (remote && recoveryTell) drawRecoveryTell();
   ctx.fillStyle = shadow;
   ctx.beginPath();
   ctx.ellipse(-2, 8, 20, 13, 0, 0, Math.PI * 2);
