@@ -1727,25 +1727,14 @@ async function runOnlineUiJumpAttackCounterplayFlight(entries, defense) {
     await scrollArenaWheelPair(defender, defenderElementId, 120, 20, 100);
     await performArenaJumpAttackChord(attacker, attackerElementId, attackOffset, 90);
   } else if (defense === "parry") {
-    // Synchronize the genuine wheel-back to the authoritative jump windup
-    // instead of wall-clock guessing. The jump windup is 105 ms and the fresh
-    // parry window is 125 ms, so a block that begins as soon as Firefox sees
-    // jump_attack_windup is still fresh at impact without changing gameplay.
+    // Keep the timing on Firefox's own WebDriver clock instead of waiting for
+    // a replicated windup and then paying another cross-browser round trip.
+    // Submit the genuine wheel-back first with a short in-browser pause, then
+    // submit the real Chrome Space+LMB chord immediately. The unchanged 125 ms
+    // parry window remains fresh at jump impact.
+    const parryPromise = scrollArenaWheel(defender, defenderElementId, 120, 20);
     const chordPromise = performArenaJumpAttackChord(attacker, attackerElementId, attackOffset, 90);
-    const windupDeadline = Date.now() + 260;
-    let replicatedWindup = null;
-    while (!replicatedWindup && Date.now() < windupDeadline) {
-      const focusActions = await readDefenderFocusActions();
-      replicatedWindup = focusActions.find((entry) =>
-        entry.action === COMBAT_ACTION.jumpAttackWindup && Number.isFinite(entry.serverTick));
-      if (!replicatedWindup) await sleep(4);
-    }
-    if (!replicatedWindup) {
-      await chordPromise;
-      throw new Error(`${label} Firefox never replicated jump windup before parry input`);
-    }
-    await scrollArenaWheel(defender, defenderElementId, 120, 0);
-    await chordPromise;
+    await Promise.all([parryPromise, chordPromise]);
   } else if (defense === "dodge") {
     // Put the timing on Chrome's own WebDriver clock. Submit the genuine wheel
     // request first with a short in-browser pause, then submit the Firefox
