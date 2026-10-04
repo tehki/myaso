@@ -2710,18 +2710,39 @@ async function runOnlineUiKickKnockdownFfaHitFlight(entries) {
       + JSON.stringify({ punishPointers, knockdownTransition: conversion.knockdownTransition, knockdownEndEpochMs }));
   }
 
-  const punisherActions = punisherState.acceptance?.ownActionTransitions ?? [];
-  const punishWindup = punisherActions.find((entry) =>
+  let punisherActions = punisherState.acceptance?.ownActionTransitions ?? [];
+  let punishWindup = punisherActions.find((entry) =>
     entry.action === COMBAT_ACTION.attackWindup
     && Number.isFinite(entry.epochMs)
     && entry.epochMs >= punishDown.epochMs - 40);
-  const punishActive = punishWindup
+  let punishActive = punishWindup
     ? punisherActions.find((entry) =>
       entry.action === COMBAT_ACTION.attackActive
       && Number.isFinite(entry.epochMs)
       && entry.epochMs >= punishWindup.epochMs)
     : null;
-  if (!punishWindup || !punishActive || punishActive.epochMs >= knockdownEndEpochMs + 80) {
+
+  // The HP=66 snapshot above already proves the authoritative hit landed
+  // while #2 was still in knockdown. The attacker's own action replication can
+  // trail that victim snapshot by a network frame, so give it a short bounded
+  // observation window instead of requiring attackActive in the same read.
+  const activeObservationDeadline = Date.now() + 220;
+  while ((!punishWindup || !punishActive) && Date.now() < activeObservationDeadline) {
+    await sleep(8);
+    const currentPunisher = await readUiEvidence(punisher);
+    punisherActions = currentPunisher.acceptance?.ownActionTransitions ?? [];
+    punishWindup = punisherActions.find((entry) =>
+      entry.action === COMBAT_ACTION.attackWindup
+      && Number.isFinite(entry.epochMs)
+      && entry.epochMs >= punishDown.epochMs - 40) ?? punishWindup;
+    punishActive = punishWindup
+      ? punisherActions.find((entry) =>
+        entry.action === COMBAT_ACTION.attackActive
+        && Number.isFinite(entry.epochMs)
+        && entry.epochMs >= punishWindup.epochMs)
+      : null;
+  }
+  if (!punishWindup || !punishActive) {
     throw new Error(milestone + " did not observe the third fighter's authoritative light conversion: "
       + JSON.stringify({ punishDown, punishWindup, punishActive, punisherActions }));
   }
