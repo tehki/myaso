@@ -434,6 +434,16 @@ jobs:
           node --test --test-name-pattern="FFA guard-break punish focus|zero-guard stun|authoritative opponent guard break" tests/m29-combat-readability.test.mjs
           node scripts/pvp_browser_flight_runner.mjs
 
+      - name: Validate M152 actionable FFA guard-break punish
+        env:
+          MYASO_PVP_SCENARIO: "uiguardbreakpunishffahit"
+        run: |
+          node --check src/browser/combat-readability.mjs
+          node --check web/online-game.mjs
+          node --check scripts/pvp_browser_flight_runner.mjs
+          node --test --test-name-pattern="FFA guard-break punish focus|zero-guard stun|authoritative opponent guard break" tests/m29-combat-readability.test.mjs
+          node scripts/pvp_browser_flight_runner.mjs
+
       - name: Validate M121 first-to-five duel kernel
         run: |
           cargo test --locked --manifest-path server/Cargo.toml first_to_kill_target_declares_winner_and_freezes_match_state

@@ -88,7 +88,7 @@ export const COMBAT = Object.freeze({
     shortBlockMs: 240,
     halfAngleRadians: Math.PI * 0.46,
     guardDamage: 38,
-    guardBreakStunMs: 520,
+    guardBreakStunMs: 650,
     parryStunMs: 650,
     moveMultiplier: 0.42,
   }),
@@ -710,6 +710,10 @@ function resolveAttacks(world, events) {
         const guardDamage = profile.kind === "kick" ? COMBAT.kick.blockedGuardDamage : profile.guardDamage;
         target.guard = Math.max(0, target.guard - guardDamage);
         if (target.guard <= EPSILON) {
+          target.guardRegenBlockedUntilMs = Math.max(
+            target.guardRegenBlockedUntilMs,
+            world.nowMs + COMBAT.block.guardBreakStunMs,
+          );
           setAction(target, "stunned", COMBAT.block.guardBreakStunMs);
           events.push({ type: "guard_break", attackerId: attacker.id, targetId: target.id });
         } else {
