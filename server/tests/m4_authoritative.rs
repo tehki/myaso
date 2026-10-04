@@ -449,6 +449,68 @@ fn heavy_attack_applies_64_guard_pressure_and_remains_parryable() {
 }
 
 #[test]
+fn light_guard_break_holds_zero_guard_for_actionable_650_ms_window() {
+    let mut world = duel(72.0);
+    let blocking = InputIntent {
+        block: true,
+        facing_radians: std::f32::consts::PI,
+        ..InputIntent::default()
+    };
+    let light = InputIntent {
+        attack: true,
+        facing_radians: 0.0,
+        ..InputIntent::default()
+    };
+
+    // Age the held block past the fresh-parry window, then pressure guard with
+    // two complete light commitments: 100 -> 62 -> 24.
+    advance(&mut world, 135.0, InputIntent::default(), blocking);
+    for expected_guard in [62_u8, 24_u8] {
+        let events = advance(&mut world, 230.0, light, blocking);
+        assert!(events
+            .iter()
+            .any(|event| matches!(event, CombatEvent::Block { .. })));
+        assert_eq!(
+            world.fighter(2).expect("target").guard.round() as u8,
+            expected_guard
+        );
+        advance(&mut world, 255.0, InputIntent::default(), blocking);
+        assert_eq!(world.fighter(1).expect("attacker").action, Action::Idle);
+        assert_eq!(world.fighter(2).expect("target").action, Action::Block);
+    }
+
+    // The third light exhausts guard and starts the authoritative broken state.
+    let break_events = advance(&mut world, 230.0, light, blocking);
+    assert!(break_events
+        .iter()
+        .any(|event| matches!(event, CombatEvent::GuardBreak { .. })));
+    assert_eq!(world.fighter(2).expect("target").guard.round() as u8, 0);
+    assert_eq!(world.fighter(2).expect("target").action, Action::Stunned);
+
+    // Normalize for the stun time already consumed inside the final 230 ms
+    // slice, then prove authority still owns the broken state at 600 ms.
+    let elapsed = world.fighter(2).expect("target").action_elapsed_ms;
+    assert!(elapsed > 0.0 && elapsed < 150.0);
+    advance(
+        &mut world,
+        (600.0 - elapsed).max(0.0),
+        InputIntent::default(),
+        InputIntent::default(),
+    );
+    assert_eq!(world.fighter(2).expect("target").action, Action::Stunned);
+    assert_eq!(world.fighter(2).expect("target").guard.round() as u8, 0);
+
+    // Control returns only after crossing the merged M152 650 ms contract.
+    advance(
+        &mut world,
+        60.0,
+        InputIntent::default(),
+        InputIntent::default(),
+    );
+    assert_eq!(world.fighter(2).expect("target").action, Action::Idle);
+}
+
+#[test]
 fn heavy_guard_break_preserves_a_real_light_punish_window_after_recovery() {
     let mut world = duel(72.0);
     let blocking = InputIntent {
