@@ -1659,7 +1659,11 @@ async function runOnlineUiJumpAttackCounterplayFlight(entries, defense) {
   const scenarioName = `uijumpattack${defense}`;
   const attackerName = defense === "dodge" ? "firefox" : "chrome";
   const defenderName = defense === "dodge" ? "chrome" : "firefox";
-  const movementMs = 180;
+  // Leave the dodge case slightly farther apart than block/parry. The unchanged
+  // jump attack still reaches during its active movement, but not at the very
+  // first active tick, giving the genuine wheel-forward roll time to become
+  // authoritative on hosted cross-browser WebDriver.
+  const movementMs = defense === "dodge" ? 140 : 180;
   const label = `M138 jump attack ${defense}`;
   const staged = await prepareHeavyCounterplayFlight(
     entries,
