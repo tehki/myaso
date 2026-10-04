@@ -1743,26 +1743,14 @@ async function runOnlineUiJumpAttackCounterplayFlight(entries, defense) {
     await scrollArenaWheel(defender, defenderElementId, 120, 0);
     await chordPromise;
   } else if (defense === "dodge") {
-    // Keep the production pointer aimed away from the attacker (prepared above)
-    // and synchronize wheel-forward to the attacker's own authoritative jump
-    // windup. This stays after server commitment but removes one replication
-    // hop that could leave only a few milliseconds before jump active.
+    // Submit the real pointer-owned roll to WebDriver at the same time as the
+    // real jump chord, then let the driver place the wheel events inside the
+    // committed 105 ms jump windup. This avoids a read->scroll round trip that
+    // can consume most of the windup on hosted browsers. The second pulse lands
+    // during the unchanged 170 ms dodge and is redundant input-delivery proof.
     const chordPromise = performArenaJumpAttackChord(attacker, attackerElementId, attackOffset, 90);
-    const windupDeadline = Date.now() + 260;
-    let authoritativeWindup = null;
-    while (!authoritativeWindup && Date.now() < windupDeadline) {
-      const attackerEvidence = await readUiEvidence(attacker);
-      const ownActions = attackerEvidence.acceptance?.ownActionTransitions ?? [];
-      authoritativeWindup = ownActions.find((entry) =>
-        entry.action === COMBAT_ACTION.jumpAttackWindup && Number.isFinite(entry.serverTick));
-      if (!authoritativeWindup) await sleep(4);
-    }
-    if (!authoritativeWindup) {
-      await chordPromise;
-      throw new Error(`${label} attacker never replicated its authoritative jump windup before dodge input`);
-    }
-    await scrollArenaWheel(defender, defenderElementId, -120, 0);
-    await chordPromise;
+    const dodgePromise = scrollArenaWheelPair(defender, defenderElementId, -120, 105, 45);
+    await Promise.all([chordPromise, dodgePromise]);
   } else {
     throw new Error(`unsupported M138 jump-attack defense: ${defense}`);
   }
