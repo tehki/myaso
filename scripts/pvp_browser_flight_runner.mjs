@@ -4572,8 +4572,11 @@ async function runOnlineUiGuardBreakPunishFfaFocusFlight(entries, convert = fals
       const currentDefender = states.find((entry) => entry.browser === defender.name);
       const currentCloser = states.find((entry) => entry.browser === closerIdle.name);
       const defenderAction = currentDefender?.acceptance?.ownActionTransitions?.at(-1)?.action;
+      // Guard regeneration may already have started by the frame where the
+      // 34 HP punish snapshot is observed. The authoritative zero-guard stun
+      // transition above proves the break; conversion requires the defender to
+      // still be stunned when the single punish lands, not guard to remain 0.
       if (currentDefender?.playerHp === 66
-        && currentDefender?.playerGuard === 0
         && currentAttacker?.playerHp === 100
         && currentCloser?.playerHp === 100
         && currentCloser?.playerGuard === 100
