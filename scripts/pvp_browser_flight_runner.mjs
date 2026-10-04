@@ -2793,6 +2793,267 @@ async function runOnlineUiKickKnockdownFfaHitFlight(entries) {
   }));
 }
 
+async function runOnlineUiRollKnockdownFfaHitFlight(entries) {
+  const milestone = "M156 actionable third-party roll knockdown punish";
+  if (entries.length !== 3) {
+    throw new Error(milestone + " expected three real browser clients, received " + entries.length);
+  }
+
+  await Promise.all(entries.map(installUiObserver));
+  const ready = await waitForUiReady(entries);
+  const roller = entries.find((entry) => entry.name === "chrome");
+  const defender = entries.find((entry) => entry.name === "firefox");
+  const punisher = entries.find((entry) => entry.name === "chrome2");
+  const rollerReady = ready.find((entry) => entry.browser === roller?.name);
+  const defenderReady = ready.find((entry) => entry.browser === defender?.name);
+  const punisherReady = ready.find((entry) => entry.browser === punisher?.name);
+  if (!roller || !defender || !punisher || !rollerReady || !defenderReady || !punisherReady) {
+    throw new Error(milestone + " could not resolve deterministic FFA roles: " + JSON.stringify(ready));
+  }
+
+  const rollerId = rollerReady.playerNetId;
+  const defenderId = defenderReady.playerNetId;
+  const punisherId = punisherReady.playerNetId;
+  await waitForUiThreePlayerReady(entries, [rollerId, defenderId, punisherId], 2500);
+  await Promise.all(entries.map((entry) => execute(
+    entry.base,
+    entry.sessionId,
+    "document.querySelector('#arena').focus(); return document.activeElement?.id;",
+  )));
+  await Promise.all(entries.map(centerArenaInViewport));
+
+  const rollerElementId = await resolveArenaElement(roller, milestone + " roller");
+  const punisherElementId = await resolveArenaElement(punisher, milestone + " punisher");
+  const rollRight = rollerId < defenderId;
+  const movementKey = rollRight ? "d" : "a";
+  const rollOffset = rollRight ? 200 : -200;
+  const punishOffset = punisherId < defenderId ? 200 : -200;
+
+  // #3 closes slightly toward #2 before the roll. The unchanged 34-unit
+  // collision knockback then puts #2 inside #3's unchanged 76-unit light
+  // reach without widening the 260 ms knockdown window.
+  const punisherMovementKey = punisherId < defenderId ? "d" : "a";
+  await pulseMovementKey(roller, movementKey, 120);
+  await pulseMovementKey(punisher, punisherMovementKey, 90);
+  await aimArena(roller, rollerElementId, rollOffset);
+  await aimArena(punisher, punisherElementId, punishOffset);
+  await sleep(50);
+
+  let conversion = null;
+  for (let attempt = 1; attempt <= 3 && !conversion; attempt += 1) {
+    const rollerBefore = await readUiEvidence(roller);
+    const rollerWheelOffset = rollerBefore.wheels.length;
+    await scrollArenaWheel(roller, rollerElementId, -120, 0);
+
+    const setupDeadline = Date.now() + COMBAT.dodge.durationMs
+      + COMBAT.dodge.collisionKnockdownMs + 260;
+    while (Date.now() < setupDeadline) {
+      const states = await Promise.all(entries.map(readUiEvidence));
+      const rollerState = states.find((entry) => entry.browser === roller.name);
+      const defenderState = states.find((entry) => entry.browser === defender.name);
+      const punisherState = states.find((entry) => entry.browser === punisher.name);
+      const rollerActions = rollerState?.acceptance?.ownActionTransitions ?? [];
+      const defenderActions = defenderState?.acceptance?.ownActionTransitions ?? [];
+      const rollTransition = rollerActions
+        .filter((entry) => entry.action === COMBAT_ACTION.dodge && Number.isFinite(entry.epochMs))
+        .at(-1);
+      const knockdownTransition = defenderActions
+        .filter((entry) => entry.action === COMBAT_ACTION.knockdown && Number.isFinite(entry.epochMs))
+        .at(-1);
+      const punisherFocusKnockdown = punisherState?.acceptance?.focusNetId === defenderId
+        && (punisherState?.acceptance?.focusActionTransitions ?? []).some((entry) =>
+          entry.action === COMBAT_ACTION.knockdown && Number.isFinite(entry.epochMs));
+      const punishReadability = punisherState?.focusLabel === "KNOCKDOWN #" + defenderId
+        && punisherState?.recoveryVisible
+        && punisherState?.recoveryState === "knockdown"
+        && punisherState?.recoveryLabel === "PUNISH"
+        && punisherState?.recoveryDetail === "Knockdown recovery";
+      const vitalsClean = rollerState?.playerHp === 100 && rollerState?.playerGuard === 100
+        && defenderState?.playerHp === 100 && defenderState?.playerGuard === 100
+        && punisherState?.playerHp === 100 && punisherState?.playerGuard === 100;
+
+      if (rollTransition && knockdownTransition
+        && punisherFocusKnockdown && punishReadability && vitalsClean) {
+        const rollWheels = rollerState.wheels.slice(rollerWheelOffset).filter((event) => event.deltaY < 0);
+        if (rollWheels.length !== 1 || !Number.isFinite(rollWheels[0].epochMs)) {
+          throw new Error(milestone + " did not deliver exactly one genuine wheel-forward roll: "
+            + JSON.stringify(rollerState.wheels.slice(rollerWheelOffset)));
+        }
+        if (knockdownTransition.epochMs + 80 < rollTransition.epochMs
+          || knockdownTransition.epochMs > rollTransition.epochMs + COMBAT.dodge.durationMs + 140) {
+          throw new Error(milestone + " could not tie knockdown to the authoritative roll: "
+            + JSON.stringify({ rollTransition, knockdownTransition }));
+        }
+
+        conversion = {
+          attempt,
+          punishPointerOffset: punisherState.pointers.length,
+          rollTransition,
+          rollWheel: rollWheels[0],
+          knockdownTransition,
+        };
+        await performArenaAttack(punisher, punisherElementId, punishOffset);
+        break;
+      }
+
+      if ((Number.isFinite(rollerState?.playerHp) && rollerState.playerHp < 100)
+        || (Number.isFinite(defenderState?.playerHp) && defenderState.playerHp < 100)
+        || (Number.isFinite(defenderState?.playerGuard) && defenderState.playerGuard < 100)
+        || (Number.isFinite(punisherState?.playerHp) && punisherState.playerHp < 100)
+        || (Number.isFinite(punisherState?.playerGuard) && punisherState.playerGuard < 100)) {
+        throw new Error(milestone + " setup changed health/guard before the third-party punish: "
+          + JSON.stringify(states));
+      }
+      await sleep(6);
+    }
+
+    if (!conversion && attempt < 3) {
+      await sleep(COMBAT.dodge.recoveryMs + COMBAT.dodge.collisionKnockdownMs + 140);
+      await pulseMovementKey(roller, movementKey, 55);
+      await aimArena(roller, rollerElementId, rollOffset);
+      await aimArena(punisher, punisherElementId, punishOffset);
+      await sleep(40);
+    }
+  }
+
+  if (!conversion) {
+    throw new Error(milestone + " never produced a third-party KNOCKDOWN target from the real roll: "
+      + JSON.stringify(await Promise.all(entries.map(readUiEvidence))));
+  }
+
+  let hitEvidence = null;
+  const hitDeadline = Date.now() + COMBAT.attack.windupMs + COMBAT.attack.activeMs + 260;
+  while (Date.now() < hitDeadline) {
+    const states = await Promise.all(entries.map(readUiEvidence));
+    const rollerState = states.find((entry) => entry.browser === roller.name);
+    const defenderState = states.find((entry) => entry.browser === defender.name);
+    const punisherState = states.find((entry) => entry.browser === punisher.name);
+    const defenderAction = defenderState?.acceptance?.ownActionTransitions?.at(-1)?.action;
+    if (defenderState?.playerHp === 66 && defenderState?.playerGuard === 100
+      && rollerState?.playerHp === 100 && rollerState?.playerGuard === 100
+      && punisherState?.playerHp === 100 && punisherState?.playerGuard === 100
+      && defenderAction === COMBAT_ACTION.knockdown) {
+      hitEvidence = states;
+      break;
+    }
+    if ((Number.isFinite(defenderState?.playerHp) && defenderState.playerHp < 66)
+      || (Number.isFinite(defenderState?.playerGuard) && defenderState.playerGuard < 100)
+      || (Number.isFinite(rollerState?.playerHp) && rollerState.playerHp < 100)
+      || (Number.isFinite(rollerState?.playerGuard) && rollerState.playerGuard < 100)
+      || (Number.isFinite(punisherState?.playerHp) && punisherState.playerHp < 100)
+      || (Number.isFinite(punisherState?.playerGuard) && punisherState.playerGuard < 100)) {
+      throw new Error(milestone + " punish damaged the wrong fighter, guard, or hit more than once: "
+        + JSON.stringify(states));
+    }
+    await sleep(8);
+  }
+  if (!hitEvidence) {
+    throw new Error(milestone + " did not land exactly one 34 HP third-party light while #"
+      + defenderId + " was still knocked down: "
+      + JSON.stringify(await Promise.all(entries.map(readUiEvidence))));
+  }
+
+  let rollerState = hitEvidence.find((entry) => entry.browser === roller.name);
+  let defenderState = hitEvidence.find((entry) => entry.browser === defender.name);
+  let punisherState = hitEvidence.find((entry) => entry.browser === punisher.name);
+  const punishPointers = punisherState.pointers.slice(conversion.punishPointerOffset);
+  const punishDowns = punishPointers.filter((entry) => entry.type === "pointerdown" && entry.button === 0);
+  const punishUps = punishPointers.filter((entry) => entry.type === "pointerup" && entry.button === 0);
+  const punishDown = punishDowns[0];
+  const punishAimValid = punishDown
+    && Math.abs(punishDown.y - 0.5) <= 0.15
+    && (punisherId < defenderId ? punishDown.x >= 0.6 : punishDown.x <= 0.4);
+  const knockdownEndEpochMs = conversion.knockdownTransition.epochMs + COMBAT.dodge.collisionKnockdownMs;
+  if (punishDowns.length !== 1 || punishUps.length !== 1 || !punishAimValid
+    || !Number.isFinite(punishDown?.epochMs)
+    || punishDown.epochMs < conversion.knockdownTransition.epochMs
+    || punishDown.epochMs >= knockdownEndEpochMs) {
+    throw new Error(milestone + " genuine third-party LMB missed the authoritative knockdown window: "
+      + JSON.stringify({ punishPointers, knockdownTransition: conversion.knockdownTransition, knockdownEndEpochMs }));
+  }
+
+  let punisherActions = punisherState.acceptance?.ownActionTransitions ?? [];
+  let punishWindup = punisherActions.find((entry) =>
+    entry.action === COMBAT_ACTION.attackWindup
+    && Number.isFinite(entry.epochMs)
+    && entry.epochMs >= punishDown.epochMs - 40);
+  let punishActive = punishWindup
+    ? punisherActions.find((entry) =>
+      entry.action === COMBAT_ACTION.attackActive
+      && Number.isFinite(entry.epochMs)
+      && entry.epochMs >= punishWindup.epochMs)
+    : null;
+
+  // The HP=66 snapshot above already proves the authoritative hit landed
+  // while #2 was still in knockdown. The attacker's own action replication can
+  // trail that victim snapshot by a network frame, so give it a short bounded
+  // observation window instead of requiring attackActive in the same read.
+  const activeObservationDeadline = Date.now() + 220;
+  while ((!punishWindup || !punishActive) && Date.now() < activeObservationDeadline) {
+    await sleep(8);
+    const currentPunisher = await readUiEvidence(punisher);
+    punisherActions = currentPunisher.acceptance?.ownActionTransitions ?? [];
+    punishWindup = punisherActions.find((entry) =>
+      entry.action === COMBAT_ACTION.attackWindup
+      && Number.isFinite(entry.epochMs)
+      && entry.epochMs >= punishDown.epochMs - 40) ?? punishWindup;
+    punishActive = punishWindup
+      ? punisherActions.find((entry) =>
+        entry.action === COMBAT_ACTION.attackActive
+        && Number.isFinite(entry.epochMs)
+        && entry.epochMs >= punishWindup.epochMs)
+      : null;
+  }
+  if (!punishWindup || !punishActive) {
+    throw new Error(milestone + " did not observe the third fighter's authoritative light conversion: "
+      + JSON.stringify({ punishDown, punishWindup, punishActive, punisherActions }));
+  }
+  if (!punisherState.events.includes("Opponent hit - 34 HP.")
+    || !defenderState.events.includes("Hit taken - 34 HP.")
+    || rollerState.events.includes("Hit taken - 34 HP.")) {
+    throw new Error(milestone + " hit feedback did not attribute the 34 HP punish only to #"
+      + punisherId + " -> #" + defenderId + ": " + JSON.stringify(hitEvidence));
+  }
+
+  const clearDeadline = Date.now() + COMBAT.dodge.collisionKnockdownMs + COMBAT.attack.recoveryMs + 520;
+  let finalEvidence = null;
+  while (Date.now() < clearDeadline) {
+    const states = await Promise.all(entries.map(readUiEvidence));
+    const currentKicker = states.find((entry) => entry.browser === roller.name);
+    const currentDefender = states.find((entry) => entry.browser === defender.name);
+    const currentPunisher = states.find((entry) => entry.browser === punisher.name);
+    const defenderAction = currentDefender?.acceptance?.ownActionTransitions?.at(-1)?.action;
+    if (currentPunisher
+      && currentPunisher.focusLabel !== "KNOCKDOWN #" + defenderId
+      && !currentPunisher.recoveryVisible
+      && defenderAction === COMBAT_ACTION.idle
+      && currentDefender?.playerHp === 66 && currentDefender?.playerGuard === 100
+      && currentKicker?.playerHp === 100 && currentKicker?.playerGuard === 100
+      && currentPunisher?.playerHp === 100 && currentPunisher?.playerGuard === 100) {
+      finalEvidence = states;
+      break;
+    }
+    await sleep(16);
+  }
+  if (!finalEvidence) {
+    throw new Error(milestone + " KNOCKDOWN focus did not clear after the punished fighter recovered: "
+      + JSON.stringify(await Promise.all(entries.map(readUiEvidence))));
+  }
+
+  return finalEvidence.map((entry) => ({
+    ...entry,
+    m156RollerId: rollerId,
+    m156KnockedDownId: defenderId,
+    m156PunisherId: punisherId,
+    m156RollAttempt: conversion.attempt,
+    m156RollEpochMs: conversion.rollTransition.epochMs,
+    m156RollWheelEpochMs: conversion.rollWheel.epochMs,
+    m156KnockdownEpochMs: conversion.knockdownTransition.epochMs,
+    m156PunishPointerEpochMs: punishDown.epochMs,
+    m156PunishActiveEpochMs: punishActive.epochMs,
+  }));
+}
+
 async function runOnlineUiRollKnockdownFfaFocusFlight(entries) {
   const milestone = "M154 roll knockdown FFA focus";
   if (entries.length !== 3) {
