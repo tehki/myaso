@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { COMBAT_ACTION, FFA_KILL_TARGET, blockSpatialPresentation, combatActionHint, combatLifePresentation, combatOverlayPresentation, createCombatReadabilityTracker, createRemoteDamageTracker, fighterFocusNetId, fighterParryPunishNetId, fighterRecoveryNetId, fighterIdentityPresentation, fighterThreatBearingLabel, fighterThreatGuardArcLabel, fighterThreatNetId, fighterThreatPhaseLabel, fighterThreatPhaseState, fighterMatchPointPresentation, fighterMatchPresentation, fighterScoreboardPresentation, fighterVitalsPresentation, guardBreakSpatialPresentation, killFeedPresentation, opponentRecoveryPresentation, parrySpatialPresentation } from "../src/browser/combat-readability.mjs";
+import { COMBAT_ACTION, FFA_KILL_TARGET, blockSpatialPresentation, combatActionHint, combatLifePresentation, combatOverlayPresentation, createCombatReadabilityTracker, createRemoteDamageTracker, fighterFocusNetId, fighterGuardBreakPunishNetId, fighterParryPunishNetId, fighterRecoveryNetId, fighterIdentityPresentation, fighterThreatBearingLabel, fighterThreatGuardArcLabel, fighterThreatNetId, fighterThreatPhaseLabel, fighterThreatPhaseState, fighterMatchPointPresentation, fighterMatchPresentation, fighterScoreboardPresentation, fighterVitalsPresentation, guardBreakSpatialPresentation, killFeedPresentation, opponentRecoveryPresentation, parrySpatialPresentation } from "../src/browser/combat-readability.mjs";
 
 function fighter(netId, hp = 100, guard = 100, action = COMBAT_ACTION.idle, x = 0, y = 0, facing = 0) {
   return { netId, hp, guard, action, x, y, facing };
@@ -138,6 +138,26 @@ test("FFA parry punish focus overrides a closer idle rival and excludes guard br
   entities.set(3, fighter(3, 100, 100, COMBAT_ACTION.stunned, 140, 100));
   entities.set(5, fighter(5, 100, 100, COMBAT_ACTION.stunned, 60, 100));
   assert.equal(fighterParryPunishNetId(entities, 1), 3);
+});
+
+test("FFA guard-break punish focus overrides a closer idle rival and stays distinct from parry stun", () => {
+  const entities = new Map([
+    [1, fighter(1, 100, 100, COMBAT_ACTION.idle, 100, 100)],
+    [2, fighter(2, 100, 100, COMBAT_ACTION.idle, 110, 100)],
+    [3, fighter(3, 100, 0, COMBAT_ACTION.stunned, 160, 100)],
+    [4, fighter(4, 100, 100, COMBAT_ACTION.stunned, 120, 100)],
+  ]);
+  assert.equal(fighterFocusNetId(entities, 1), 2);
+  assert.equal(fighterGuardBreakPunishNetId(entities, 1), 3);
+  assert.equal(fighterParryPunishNetId(entities, 1), 4);
+
+  entities.get(3).action = COMBAT_ACTION.idle;
+  assert.equal(fighterGuardBreakPunishNetId(entities, 1), 0);
+  assert.equal(fighterGuardBreakPunishNetId(entities, 99), 0);
+
+  entities.set(3, fighter(3, 100, 0, COMBAT_ACTION.stunned, 140, 100));
+  entities.set(5, fighter(5, 100, 0, COMBAT_ACTION.stunned, 60, 100));
+  assert.equal(fighterGuardBreakPunishNetId(entities, 1), 3);
 });
 
 test("FFA primary threat bearing uses authoritative replicated positions", () => {
