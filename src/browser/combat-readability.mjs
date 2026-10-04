@@ -421,6 +421,28 @@ export function fighterRecoveryNetId(state, ownId = 0) {
   return bestNetId;
 }
 
+export function fighterKnockdownPunishNetId(state, ownId = 0) {
+  if (!(state instanceof Map) || !Number.isInteger(ownId) || ownId <= 0) return 0;
+  const own = state.get(ownId);
+  if (!own || !Number.isFinite(own.x) || !Number.isFinite(own.y)) return 0;
+  let bestNetId = 0;
+  let bestDistanceSquared = Infinity;
+  for (const entity of state.values()) {
+    if (!entity || entity.netId === ownId || !Number.isInteger(entity.netId) || entity.netId <= 0
+      || !Number.isFinite(entity.x) || !Number.isFinite(entity.y)
+      || entity.action !== COMBAT_ACTION.knockdown) continue;
+    const dx = entity.x - own.x;
+    const dy = entity.y - own.y;
+    const distanceSquared = dx * dx + dy * dy;
+    if (distanceSquared < bestDistanceSquared
+      || (distanceSquared === bestDistanceSquared && (bestNetId === 0 || entity.netId < bestNetId))) {
+      bestNetId = entity.netId;
+      bestDistanceSquared = distanceSquared;
+    }
+  }
+  return bestNetId;
+}
+
 export function fighterParryPunishNetId(state, ownId = 0) {
   if (!(state instanceof Map) || !Number.isInteger(ownId) || ownId <= 0) return 0;
   const own = state.get(ownId);
