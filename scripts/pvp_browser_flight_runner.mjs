@@ -1782,14 +1782,18 @@ async function runOnlineUiJumpAttackCounterplayFlight(entries, defense) {
       index > ownWindupIndex && entry.action === COMBAT_ACTION.stunned);
     const focusStunnedIndex = focusTransitions.findIndex((entry, index) =>
       index > focusWindupIndex && entry.action === COMBAT_ACTION.stunned);
-    const ownKnockdownIndex = ownTransitions.findIndex((entry, index) =>
-      index > ownWindupIndex && entry.action === COMBAT_ACTION.knockdown);
+    const ownKnockdownIndex = ownTransitions.findIndex((entry) =>
+      entry.action === COMBAT_ACTION.knockdown);
     const focusKnockdownIndex = focusTransitions.findIndex((entry, index) =>
       index > focusWindupIndex && entry.action === COMBAT_ACTION.knockdown);
+    // The roll can replace jump windup before the attacker's own observer
+    // samples that transient state. The defender focus stream still proves
+    // authoritative jump commitment before the resulting knockdown.
     const rollCounter = defense === "dodge"
       && attackerResult.feedbackTransitions.includes("rolled-over")
       && defenderResult.feedbackTransitions.includes("roll-impact")
-      && ownKnockdownIndex > ownWindupIndex
+      && ownKnockdownIndex >= 0
+      && focusWindupIndex >= 0
       && focusKnockdownIndex > focusWindupIndex;
     // A successful parry or roll collision can replace jump-attack-active before
     // it is replicated. The latter is an intended Wilds-style counter: the real
@@ -1797,12 +1801,12 @@ async function runOnlineUiJumpAttackCounterplayFlight(entries, defense) {
     const attackSeen = defense === "parry"
       ? windupSeen && ownStunnedIndex > ownWindupIndex && focusStunnedIndex > focusWindupIndex
       : defense === "dodge" && rollCounter
-        ? windupSeen
+        ? focusWindupIndex >= 0
         : windupSeen && activeSeen;
     const terminalReplicated = defense === "parry"
       ? ownStunnedIndex > ownWindupIndex && focusStunnedIndex > focusWindupIndex
       : defense === "dodge" && rollCounter
-        ? ownKnockdownIndex > ownWindupIndex && focusKnockdownIndex > focusWindupIndex
+        ? ownKnockdownIndex >= 0 && focusKnockdownIndex > focusWindupIndex
         : ownRecoveryIndex > ownActiveIndex && focusRecoveryIndex > focusActiveIndex;
 
     let resolved = false;
@@ -1883,20 +1887,21 @@ async function runOnlineUiJumpAttackCounterplayFlight(entries, defense) {
   const focusWindupIndex = focusTransitions.findIndex((entry) => entry.action === COMBAT_ACTION.jumpAttackWindup);
   const focusActiveIndex = focusTransitions.findIndex((entry, index) =>
     index > focusWindupIndex && entry.action === COMBAT_ACTION.jumpAttackActive);
-  const ownKnockdownIndex = ownTransitions.findIndex((entry, index) =>
-    index > ownWindupIndex && entry.action === COMBAT_ACTION.knockdown);
+  const ownKnockdownIndex = ownTransitions.findIndex((entry) =>
+    entry.action === COMBAT_ACTION.knockdown);
   const focusKnockdownIndex = focusTransitions.findIndex((entry, index) =>
     index > focusWindupIndex && entry.action === COMBAT_ACTION.knockdown);
   const rollCounter = defense === "dodge"
     && attackerResult.feedbackTransitions.includes("rolled-over")
     && defenderResult.feedbackTransitions.includes("roll-impact")
-    && ownKnockdownIndex > ownWindupIndex
+    && ownKnockdownIndex >= 0
+    && focusWindupIndex >= 0
     && focusKnockdownIndex > focusWindupIndex;
   const ownPlainJumpIndex = ownTransitions.findIndex((entry) => entry.action === COMBAT_ACTION.jump);
-  if (ownWindupIndex < 0 || focusWindupIndex < 0
+  if ((!rollCounter && ownWindupIndex < 0) || focusWindupIndex < 0
     || (defense !== "parry" && !rollCounter
       && (ownActiveIndex <= ownWindupIndex || focusActiveIndex <= focusWindupIndex))
-    || (ownPlainJumpIndex >= 0 && ownPlainJumpIndex < ownWindupIndex)) {
+    || (ownWindupIndex >= 0 && ownPlainJumpIndex >= 0 && ownPlainJumpIndex < ownWindupIndex)) {
     throw new Error(`${label} did not preserve direct authoritative jump-attack commitment: ${JSON.stringify({
       ownTransitions,
       focusTransitions,
@@ -1918,8 +1923,8 @@ async function runOnlineUiJumpAttackCounterplayFlight(entries, defense) {
       throw new Error(`${label} never exposed the parried attacker stun overlay`);
     }
   } else if (defense === "dodge" && rollCounter) {
-    if (ownKnockdownIndex <= ownWindupIndex || focusKnockdownIndex <= focusWindupIndex) {
-      throw new Error(`${label} did not replicate jump-attack windup -> knockdown on roll counter: ${JSON.stringify({
+    if (ownKnockdownIndex < 0 || focusKnockdownIndex <= focusWindupIndex) {
+      throw new Error(`${label} did not preserve focused jump-windup -> knockdown roll counter evidence: ${JSON.stringify({
         ownTransitions,
         focusTransitions,
       })}`);
