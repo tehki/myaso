@@ -4327,8 +4327,8 @@ async function runOnlineUiGuardBreakPunishFfaFocusFlight(entries, convert = fals
   if (!attackerState || !defenderState || !closerState) {
     throw new Error(milestone + " incomplete guard-break evidence: " + JSON.stringify(evidence));
   }
-  if (COMBAT.block.guardBreakStunMs !== 520) {
-    throw new Error(milestone + " expected unchanged 520 ms guard-break stun, observed " + COMBAT.block.guardBreakStunMs);
+  if (COMBAT.block.guardBreakStunMs !== 650) {
+    throw new Error(milestone + " expected the actionable 650 ms guard-break stun, observed " + COMBAT.block.guardBreakStunMs);
   }
 
   let focusTransitions = attackerState.focusTransitions;

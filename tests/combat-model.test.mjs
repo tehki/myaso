@@ -158,6 +158,51 @@ test("directional block absorbs health damage and consumes guard", () => {
   assert.ok(events.some((event) => event.type === "block"));
 });
 
+test("guard break keeps guard exhausted through an actionable 650 ms punish window", () => {
+  const world = duel();
+  const [a, b] = world.fighters;
+  b.guard = COMBAT.block.guardDamage;
+
+  advance(world, COMBAT.block.parryWindowMs + 20, {
+    b: { block: true, aimX: a.x, aimY: a.y },
+  });
+
+  let guardBreakSeen = false;
+  for (let elapsed = 0; elapsed < COMBAT.attack.windupMs + COMBAT.attack.activeMs + 20; elapsed += 5) {
+    const events = stepWorld(world, {
+      a: { attack: true, aimX: b.x, aimY: b.y },
+      b: { block: true, aimX: a.x, aimY: a.y },
+    }, 5);
+    if (events.some((event) => event.type === "guard_break")) {
+      guardBreakSeen = true;
+      break;
+    }
+  }
+
+  assert.equal(guardBreakSeen, true);
+  assert.equal(b.action, "stunned");
+  assert.equal(b.guard, 0);
+  assert.equal(COMBAT.block.guardBreakStunMs, 650);
+  assert.ok(
+    COMBAT.block.guardBreakStunMs
+      >= COMBAT.attack.activeMs + COMBAT.attack.recoveryMs + COMBAT.attack.windupMs + 100,
+  );
+
+  advance(world, COMBAT.block.guardBreakStunMs - 10, {
+    a: { aimX: b.x, aimY: b.y },
+    b: { aimX: a.x, aimY: a.y },
+  });
+  assert.equal(b.action, "stunned");
+  assert.equal(b.guard, 0);
+
+  advance(world, 15, {
+    a: { aimX: b.x, aimY: b.y },
+    b: { aimX: a.x, aimY: a.y },
+  });
+  assert.equal(b.action, "idle");
+  assert.ok(b.guard > 0);
+});
+
 test("fresh block parries and stuns the attacker", () => {
   const world = duel();
   const [a, b] = world.fighters;
