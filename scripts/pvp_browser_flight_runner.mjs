@@ -2689,11 +2689,9 @@ async function runOnlineUiKickKnockdownFfaHitFlight(entries) {
     const kickerState = states.find((entry) => entry.browser === kicker.name);
     const defenderState = states.find((entry) => entry.browser === defender.name);
     const punisherState = states.find((entry) => entry.browser === punisher.name);
-    const defenderAction = defenderState?.acceptance?.ownActionTransitions?.at(-1)?.action;
     if (defenderState?.playerHp === 66 && defenderState?.playerGuard === 100
       && kickerState?.playerHp === 100 && kickerState?.playerGuard === 100
-      && punisherState?.playerHp === 100 && punisherState?.playerGuard === 100
-      && defenderAction === COMBAT_ACTION.knockdown) {
+      && punisherState?.playerHp === 100 && punisherState?.playerGuard === 100) {
       hitEvidence = states;
       break;
     }
@@ -2709,8 +2707,8 @@ async function runOnlineUiKickKnockdownFfaHitFlight(entries) {
     await sleep(8);
   }
   if (!hitEvidence) {
-    throw new Error(milestone + " did not land exactly one 34 HP third-party light while #"
-      + defenderId + " was still knocked down: "
+    throw new Error(milestone + " did not land exactly one 34 HP third-party light during #"
+      + defenderId + "'s knockdown conversion window: "
       + JSON.stringify(await Promise.all(entries.map(readUiEvidence))));
   }
 
@@ -2768,6 +2766,32 @@ async function runOnlineUiKickKnockdownFfaHitFlight(entries) {
   if (!punishWindup || !punishActive) {
     throw new Error(milestone + " did not observe the third fighter's authoritative light conversion: "
       + JSON.stringify({ punishDown, punishWindup, punishActive, punisherActions }));
+  }
+  const defenderTransitions = defenderState.acceptance?.ownActionTransitions ?? [];
+  const defenderRecovery = defenderTransitions.find((entry) =>
+    entry.action === COMBAT_ACTION.idle
+    && Number.isFinite(entry.epochMs)
+    && entry.epochMs > conversion.knockdownTransition.epochMs);
+  const defenderFocusActions = defenderState.acceptance?.focusActionTransitions ?? [];
+  const defenderSawPunishActive = defenderState.acceptance?.focusNetId === punisherId
+    && defenderFocusActions.some((entry) =>
+      entry.action === COMBAT_ACTION.attackActive
+      && Number.isFinite(entry.epochMs)
+      && entry.epochMs >= punishWindup.epochMs
+      && (!defenderRecovery || entry.epochMs < defenderRecovery.epochMs));
+  if (punishActive.epochMs >= knockdownEndEpochMs
+    || (defenderRecovery && punishActive.epochMs >= defenderRecovery.epochMs)
+    || !defenderSawPunishActive) {
+    throw new Error(milestone + " authoritative ordering did not prove #"
+      + punisherId + " became active before #" + defenderId + " recovered: "
+      + JSON.stringify({
+        knockdownTransition: conversion.knockdownTransition,
+        knockdownEndEpochMs,
+        punishWindup,
+        punishActive,
+        defenderRecovery,
+        defenderFocusActions,
+      }));
   }
   // Three-player observers can receive the generic attacker-side hit event on
   // a different spectator frame. The authoritative proof above already ties
@@ -2950,11 +2974,9 @@ async function runOnlineUiRollKnockdownFfaHitFlight(entries) {
     const rollerState = states.find((entry) => entry.browser === roller.name);
     const defenderState = states.find((entry) => entry.browser === defender.name);
     const punisherState = states.find((entry) => entry.browser === punisher.name);
-    const defenderAction = defenderState?.acceptance?.ownActionTransitions?.at(-1)?.action;
     if (defenderState?.playerHp === 66 && defenderState?.playerGuard === 100
       && rollerState?.playerHp === 100 && rollerState?.playerGuard === 100
-      && punisherState?.playerHp === 100 && punisherState?.playerGuard === 100
-      && defenderAction === COMBAT_ACTION.knockdown) {
+      && punisherState?.playerHp === 100 && punisherState?.playerGuard === 100) {
       hitEvidence = states;
       break;
     }
@@ -2970,8 +2992,8 @@ async function runOnlineUiRollKnockdownFfaHitFlight(entries) {
     await sleep(8);
   }
   if (!hitEvidence) {
-    throw new Error(milestone + " did not land exactly one 34 HP third-party light while #"
-      + defenderId + " was still knocked down: "
+    throw new Error(milestone + " did not land exactly one 34 HP third-party light during #"
+      + defenderId + "'s knockdown conversion window: "
       + JSON.stringify(await Promise.all(entries.map(readUiEvidence))));
   }
 
@@ -3029,6 +3051,32 @@ async function runOnlineUiRollKnockdownFfaHitFlight(entries) {
   if (!punishWindup || !punishActive) {
     throw new Error(milestone + " did not observe the third fighter's authoritative light conversion: "
       + JSON.stringify({ punishDown, punishWindup, punishActive, punisherActions }));
+  }
+  const defenderTransitions = defenderState.acceptance?.ownActionTransitions ?? [];
+  const defenderRecovery = defenderTransitions.find((entry) =>
+    entry.action === COMBAT_ACTION.idle
+    && Number.isFinite(entry.epochMs)
+    && entry.epochMs > conversion.knockdownTransition.epochMs);
+  const defenderFocusActions = defenderState.acceptance?.focusActionTransitions ?? [];
+  const defenderSawPunishActive = defenderState.acceptance?.focusNetId === punisherId
+    && defenderFocusActions.some((entry) =>
+      entry.action === COMBAT_ACTION.attackActive
+      && Number.isFinite(entry.epochMs)
+      && entry.epochMs >= punishWindup.epochMs
+      && (!defenderRecovery || entry.epochMs < defenderRecovery.epochMs));
+  if (punishActive.epochMs >= knockdownEndEpochMs
+    || (defenderRecovery && punishActive.epochMs >= defenderRecovery.epochMs)
+    || !defenderSawPunishActive) {
+    throw new Error(milestone + " authoritative ordering did not prove #"
+      + punisherId + " became active before #" + defenderId + " recovered: "
+      + JSON.stringify({
+        knockdownTransition: conversion.knockdownTransition,
+        knockdownEndEpochMs,
+        punishWindup,
+        punishActive,
+        defenderRecovery,
+        defenderFocusActions,
+      }));
   }
   // Keep source attribution on authoritative input/action/vitals evidence.
   // In three-player flights the generic attacker-side event can surface on a
