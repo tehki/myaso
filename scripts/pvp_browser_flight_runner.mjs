@@ -1699,9 +1699,13 @@ async function runOnlineUiJumpAttackCounterplayFlight(entries, defense) {
     await scrollArenaWheelPair(defender, defenderElementId, 120, 20, 100);
     await performArenaJumpAttackChord(attacker, attackerElementId, attackOffset, 90);
   } else if (defense === "parry") {
+    // Hosted WebDriver adds enough command latency that an extra 35 ms wheel
+    // pause can land the fresh block on the same server tick as jump impact.
+    // Send the genuine wheel-back immediately in parallel with the chord; the
+    // unchanged 125 ms parry window still determines the authoritative result.
     await Promise.all([
       performArenaJumpAttackChord(attacker, attackerElementId, attackOffset, 90),
-      scrollArenaWheel(defender, defenderElementId, 120, 35),
+      scrollArenaWheel(defender, defenderElementId, 120, 0),
     ]);
   } else if (defense === "dodge") {
     await Promise.all([
