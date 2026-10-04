@@ -4285,18 +4285,47 @@ async function runOnlineUiGuardBreakPunishFfaFocusFlight(entries, convert = fals
   let conversionPlan = null;
   const evidence = await runOnlineUiGuardBreakFlight(entries, {
     onGuardBroken: convert ? async ({ states, attackerElementId, attackOffset }) => {
-      const liveAttacker = states.find((entry) => entry.browser === attacker.name);
-      const liveDefender = states.find((entry) => entry.browser === defender.name);
-      const attackerActions = liveAttacker?.acceptance?.ownActionTransitions ?? [];
-      const defenderActions = liveDefender?.acceptance?.ownActionTransitions ?? [];
-      const guardBreakRecovery = attackerActions
-        .filter((entry) => entry.action === COMBAT_ACTION.attackRecovery && Number.isFinite(entry.epochMs))
-        .at(-1);
-      const guardBreakStunTransition = defenderActions
+      let timingStates = states;
+      let liveAttacker = timingStates.find((entry) => entry.browser === attacker.name);
+      let liveDefender = timingStates.find((entry) => entry.browser === defender.name);
+      let attackerActions = liveAttacker?.acceptance?.ownActionTransitions ?? [];
+      let defenderActions = liveDefender?.acceptance?.ownActionTransitions ?? [];
+      let guardBreakStunTransition = defenderActions
         .filter((entry) => entry.action === COMBAT_ACTION.stunned && Number.isFinite(entry.epochMs))
         .at(-1);
+      let guardBreakRecovery = guardBreakStunTransition
+        ? attackerActions
+          .filter((entry) => entry.action === COMBAT_ACTION.attackRecovery
+            && Number.isFinite(entry.epochMs)
+            && entry.epochMs >= guardBreakStunTransition.epochMs)
+          .at(-1)
+        : null;
+
+      // Authority can expose the defender's zero-guard stun a few ticks before
+      // the guard-breaking light itself reaches attackRecovery on the attacker.
+      // Wait for that *same* strike's recovery transition instead of reusing the
+      // previous attack recovery and firing the buffered punish too early.
+      const recoveryDeadline = Date.now() + 240;
+      while ((!guardBreakStunTransition || !guardBreakRecovery) && Date.now() < recoveryDeadline) {
+        await sleep(8);
+        timingStates = await Promise.all(entries.map(readUiEvidence));
+        liveAttacker = timingStates.find((entry) => entry.browser === attacker.name);
+        liveDefender = timingStates.find((entry) => entry.browser === defender.name);
+        attackerActions = liveAttacker?.acceptance?.ownActionTransitions ?? [];
+        defenderActions = liveDefender?.acceptance?.ownActionTransitions ?? [];
+        guardBreakStunTransition = defenderActions
+          .filter((entry) => entry.action === COMBAT_ACTION.stunned && Number.isFinite(entry.epochMs))
+          .at(-1);
+        guardBreakRecovery = guardBreakStunTransition
+          ? attackerActions
+            .filter((entry) => entry.action === COMBAT_ACTION.attackRecovery
+              && Number.isFinite(entry.epochMs)
+              && entry.epochMs >= guardBreakStunTransition.epochMs)
+            .at(-1)
+          : null;
+      }
       if (!liveAttacker || !liveDefender || !guardBreakRecovery || !guardBreakStunTransition) {
-        throw new Error(milestone + " did not capture live guard-break recovery timing: "
+        throw new Error(milestone + " did not capture the guard-breaking strike recovery timing: "
           + JSON.stringify({ attackerActions, defenderActions }));
       }
 
