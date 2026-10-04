@@ -2871,10 +2871,10 @@ async function runOnlineUiRollKnockdownFfaHitFlight(entries) {
   const punishOffset = punisherId < defenderId ? 200 : -200;
 
   // Separate the two possible light targets without changing combat reach.
-  // #3 steps outward first. Then #1 backs away briefly and keeps that opposite
-  // movement held: dodge ignores movement keys, while dodge recovery applies
-  // the normal 0.48 movement multiplier and continues pulling #1 out of #3's
-  // lane. #2 still receives the unchanged 34-unit roll knockback toward #3.
+  // Keep #3 at neutral spacing so the unchanged 34-unit roll knockback can
+  // bring #2 into the unchanged 76-unit light reach. #1 backs away briefly
+  // and keeps that opposite movement held; dodge recovery then continues
+  // pulling #1 out of #3's strike lane.
   await aimArena(roller, rollerElementId, rollOffset);
   await aimArena(punisher, punisherElementId, punishOffset);
   await sleep(50);
