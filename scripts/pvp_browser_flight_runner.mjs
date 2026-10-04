@@ -2869,10 +2869,11 @@ async function runOnlineUiRollKnockdownFfaHitFlight(entries) {
   const rollOffset = rollRight ? 200 : -200;
   const punishOffset = punisherId < defenderId ? 200 : -200;
 
-  // Keep #3 at its natural far-side spacing. The unchanged 34-unit roll
-  // knockback leaves #2 near the outer edge of #3's unchanged 76-unit light
-  // reach while keeping the roller behind #2 outside that same strike.
-  await pulseMovementKey(roller, movementKey, 120);
+  // Keep the natural FFA spacing before the roll. The default lane makes the
+  // collision happen late enough in the unchanged 170 ms roll that #2's
+  // unchanged 34-unit knockback lands inside #3's 76-unit light reach while
+  // #1 finishes the roll outside that reach. A forward pre-step makes #1
+  // collide too early and overshoot beside #2 into the punish lane.
   await aimArena(roller, rollerElementId, rollOffset);
   await aimArena(punisher, punisherElementId, punishOffset);
   await sleep(50);
@@ -2946,7 +2947,9 @@ async function runOnlineUiRollKnockdownFfaHitFlight(entries) {
 
     if (!conversion && attempt < 3) {
       await sleep(COMBAT.dodge.recoveryMs + COMBAT.dodge.collisionKnockdownMs + 140);
-      await pulseMovementKey(roller, movementKey, 55);
+      // Only nudge closer after a genuine miss, and keep the adjustment small
+      // so a retry still collides late instead of carrying #1 through #3's lane.
+      await pulseMovementKey(roller, movementKey, 25);
       await aimArena(roller, rollerElementId, rollOffset);
       await aimArena(punisher, punisherElementId, punishOffset);
       await sleep(40);
