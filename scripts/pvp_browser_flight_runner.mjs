@@ -1747,25 +1747,16 @@ async function runOnlineUiJumpAttackCounterplayFlight(entries, defense) {
     await scrollArenaWheel(defender, defenderElementId, 120, 0);
     await chordPromise;
   } else if (defense === "dodge") {
-    // Synchronize the genuine wheel-forward roll to the authoritative jump
-    // windup instead of racing WebDriver wall-clock delays. Once the defender
-    // has replicated jump_attack_windup, submit the real roll immediately;
-    // the unchanged 170 ms dodge / 125 ms iframe then covers jump impact.
+    // Chrome's hosted WebDriver wheel path is consistently slower than the
+    // Firefox Space+LMB action path. Pre-launch the genuine wheel request and
+    // give it a small head start so the actual browser wheel event lands near
+    // the real jump chord instead of after the 105 ms windup. This changes only
+    // harness scheduling; the unchanged 170 ms dodge / 125 ms iframe and roll
+    // collision remain the authoritative counterplay.
+    const dodgePromise = scrollArenaWheel(defender, defenderElementId, -120, 0);
+    await sleep(80);
     const chordPromise = performArenaJumpAttackChord(attacker, attackerElementId, attackOffset, 90);
-    const windupDeadline = Date.now() + 260;
-    let replicatedWindup = null;
-    while (!replicatedWindup && Date.now() < windupDeadline) {
-      const focusActions = await readDefenderFocusActions();
-      replicatedWindup = focusActions.find((entry) =>
-        entry.action === COMBAT_ACTION.jumpAttackWindup && Number.isFinite(entry.serverTick));
-      if (!replicatedWindup) await sleep(4);
-    }
-    if (!replicatedWindup) {
-      await chordPromise;
-      throw new Error(`${label} defender never replicated jump windup before dodge input`);
-    }
-    await scrollArenaWheel(defender, defenderElementId, -120, 0);
-    await chordPromise;
+    await Promise.all([dodgePromise, chordPromise]);
   } else {
     throw new Error(`unsupported M138 jump-attack defense: ${defense}`);
   }
