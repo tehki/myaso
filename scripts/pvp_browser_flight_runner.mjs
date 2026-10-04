@@ -4280,7 +4280,47 @@ async function runOnlineUiGuardBreakPunishFfaFocusFlight(entries, convert = fals
 
   // Keep #3 idle and uninvolved. Deterministic closer-rival override is covered
   // by the unit gate; this real-browser flight proves three-player attribution.
-  const evidence = await runOnlineUiGuardBreakFlight(entries);
+  // M152 injects its single punish press from the first guard=0 snapshot, before
+  // the slower readability convergence path consumes the 90 ms recovery buffer.
+  let conversionPlan = null;
+  const evidence = await runOnlineUiGuardBreakFlight(entries, {
+    onGuardBroken: convert ? async ({ states, attackerElementId, attackOffset }) => {
+      const liveAttacker = states.find((entry) => entry.browser === attacker.name);
+      const liveDefender = states.find((entry) => entry.browser === defender.name);
+      const attackerActions = liveAttacker?.acceptance?.ownActionTransitions ?? [];
+      const defenderActions = liveDefender?.acceptance?.ownActionTransitions ?? [];
+      const guardBreakRecovery = attackerActions
+        .filter((entry) => entry.action === COMBAT_ACTION.attackRecovery && Number.isFinite(entry.epochMs))
+        .at(-1);
+      const guardBreakStunTransition = defenderActions
+        .filter((entry) => entry.action === COMBAT_ACTION.stunned && Number.isFinite(entry.epochMs))
+        .at(-1);
+      if (!liveAttacker || !liveDefender || !guardBreakRecovery || !guardBreakStunTransition) {
+        throw new Error(milestone + " did not capture live guard-break recovery timing: "
+          + JSON.stringify({ attackerActions, defenderActions }));
+      }
+
+      const bufferLeadMs = Math.max(10, COMBAT.inputBuffer.lightAttackWindowMs - 5);
+      const targetInputEpochMs = guardBreakRecovery.epochMs + COMBAT.attack.recoveryMs - bufferLeadMs;
+      conversionPlan = {
+        punishPointerOffset: liveAttacker.pointers.length,
+        guardBreakRecovery,
+        guardBreakStunTransition,
+        targetInputEpochMs,
+      };
+
+      const waitMs = Math.max(0, targetInputEpochMs - Date.now());
+      if (waitMs > 0) await sleep(waitMs);
+      if (Date.now() >= guardBreakStunTransition.epochMs + COMBAT.block.guardBreakStunMs - COMBAT.attack.windupMs) {
+        throw new Error(milestone + " missed the buffered light-punish input window: "
+          + JSON.stringify(conversionPlan));
+      }
+
+      // A single genuine LMB edge inside the last 90 ms of attack recovery is
+      // buffered by the combat model and begins as soon as recovery completes.
+      await performArenaAttackHold(attacker, attackerElementId, attackOffset, 60);
+    } : null,
+  });
   let attackerState = evidence.find((entry) => entry.browser === attacker.name);
   let defenderState = evidence.find((entry) => entry.browser === defender.name);
   let closerState = evidence.find((entry) => entry.browser === closerIdle.name);
@@ -4340,39 +4380,14 @@ async function runOnlineUiGuardBreakPunishFfaFocusFlight(entries, convert = fals
 
   let punishPointerOffset = -1;
   let guardBreakStunTransition = null;
+  let guardBreakRecovery = null;
   if (convert) {
-    const attackerActions = attackerState.acceptance?.ownActionTransitions ?? [];
-    const defenderActions = defenderState.acceptance?.ownActionTransitions ?? [];
-    const guardBreakAttack = attackerActions
-      .filter((entry) => entry.action === COMBAT_ACTION.attackWindup && Number.isFinite(entry.epochMs))
-      .at(-1);
-    guardBreakStunTransition = defenderActions
-      .filter((entry) => entry.action === COMBAT_ACTION.stunned && Number.isFinite(entry.epochMs))
-      .at(-1);
-    if (!guardBreakAttack || !guardBreakStunTransition) {
-      throw new Error(milestone + " did not capture authoritative guard-break timing: "
-        + JSON.stringify({ attackerActions, defenderActions }));
+    if (!conversionPlan) {
+      throw new Error(milestone + " did not schedule the buffered punish from the live guard-break snapshot");
     }
-
-    const attackerElementId = await resolveArenaElement(attacker, milestone);
-    const beforePunish = await readUiEvidence(attacker);
-    punishPointerOffset = beforePunish.pointers.length;
-    const punishOffset = attackerId < defenderId ? 200 : -200;
-    await aimArena(attacker, attackerElementId, punishOffset);
-
-    const commitmentMs = COMBAT.attack.windupMs + COMBAT.attack.activeMs + COMBAT.attack.recoveryMs;
-    const targetInputEpochMs = Math.max(
-      guardBreakAttack.epochMs + commitmentMs + 5,
-      guardBreakStunTransition.epochMs + 330,
-    );
-    const waitMs = Math.max(0, targetInputEpochMs - Date.now());
-    if (waitMs > 0) await sleep(waitMs);
-    if (Date.now() >= guardBreakStunTransition.epochMs + COMBAT.block.guardBreakStunMs - COMBAT.attack.windupMs) {
-      throw new Error(milestone + " missed the authoritative light-punish input window: "
-        + JSON.stringify({ guardBreakAttack, guardBreakStunTransition, targetInputEpochMs }));
-    }
-
-    await performArenaAttackHold(attacker, attackerElementId, punishOffset, 90);
+    punishPointerOffset = conversionPlan.punishPointerOffset;
+    guardBreakStunTransition = conversionPlan.guardBreakStunTransition;
+    guardBreakRecovery = conversionPlan.guardBreakRecovery;
 
     let hitEvidence = null;
     const hitDeadline = Date.now() + 320;
@@ -4413,12 +4428,23 @@ async function runOnlineUiGuardBreakPunishFfaFocusFlight(entries, convert = fals
     const punishAimValid = punishDown
       && Math.abs(punishDown.y - 0.5) <= 0.15
       && (attackerId < defenderId ? punishDown.x >= 0.6 : punishDown.x <= 0.4);
+    const recoveryBufferOpenEpochMs = guardBreakRecovery.epochMs
+      + COMBAT.attack.recoveryMs - COMBAT.inputBuffer.lightAttackWindowMs;
+    const recoveryExitEpochMs = guardBreakRecovery.epochMs + COMBAT.attack.recoveryMs;
     if (punishDowns.length !== 1 || punishUps.length !== 1 || !punishAimValid
       || !Number.isFinite(punishDown?.epochMs)
       || punishDown.epochMs < guardBreakStunTransition.epochMs
-      || punishDown.epochMs >= guardBreakStunTransition.epochMs + COMBAT.block.guardBreakStunMs) {
-      throw new Error(milestone + " genuine punish input was outside the authoritative guard-break stun: "
-        + JSON.stringify({ punishPointers, guardBreakStunTransition }));
+      || punishDown.epochMs >= guardBreakStunTransition.epochMs + COMBAT.block.guardBreakStunMs
+      || punishDown.epochMs < recoveryBufferOpenEpochMs
+      || punishDown.epochMs > recoveryExitEpochMs + 25) {
+      throw new Error(milestone + " genuine punish input missed the authoritative recovery/stun window: "
+        + JSON.stringify({
+          punishPointers,
+          guardBreakStunTransition,
+          guardBreakRecovery,
+          recoveryBufferOpenEpochMs,
+          recoveryExitEpochMs,
+        }));
     }
     if (!attackerState.events.includes("Opponent hit - 34 HP.")
       || !defenderState.events.includes("Hit taken - 34 HP.")
@@ -4461,7 +4487,7 @@ async function runOnlineUiGuardBreakPunishFfaFocusFlight(entries, convert = fals
   }));
 }
 
-async function runOnlineUiGuardBreakFlight(entries) {
+async function runOnlineUiGuardBreakFlight(entries, { onGuardBroken = null } = {}) {
   await Promise.all(entries.map(installUiObserver));
   const ready = await waitForUiReady(entries);
   const attacker = entries.find((entry) => entry.name === "chrome");
@@ -4510,6 +4536,18 @@ async function runOnlineUiGuardBreakFlight(entries) {
       const states = await Promise.all(entries.map(readUiEvidence));
       const defenderState = states.find((entry) => entry.browser === defender.name);
       guardBroken = defenderState?.playerGuard === 0;
+      if (guardBroken && onGuardBroken) {
+        await onGuardBroken({
+          states,
+          attacker,
+          defender,
+          attackerElementId,
+          defenderElementId,
+          attackRight,
+          attackOffset,
+          blockOffset,
+        });
+      }
       if (!guardBroken) await sleep(300);
     }
     evidence = await waitForUiGuardBreakEvidence(entries, attacker, defender, guardBroken ? 500 : 300);
