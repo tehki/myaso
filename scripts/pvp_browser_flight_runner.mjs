@@ -1673,6 +1673,11 @@ async function runOnlineUiJumpAttackCounterplayFlight(entries, defense) {
   const pointerOffset = beforeAttacker.pointers.length;
   const beforeDefender = await readUiEvidence(defender);
   const wheelOffset = beforeDefender.wheels.length;
+  const readDefenderFocusActions = () => execute(
+    defender.base,
+    defender.sessionId,
+    "return (window.__MYASO_ACCEPTANCE_STATE__?.focusActionTransitions ?? []).map((entry) => ({ ...entry }));",
+  );
   const hasReplicatedDodgeOverlap = (attackerState, defenderState) => {
     const attackerOwn = attackerState?.acceptance?.ownActionTransitions ?? [];
     const attackerFocus = attackerState?.acceptance?.focusActionTransitions ?? [];
@@ -1726,8 +1731,8 @@ async function runOnlineUiJumpAttackCounterplayFlight(entries, defense) {
     const windupDeadline = Date.now() + 260;
     let replicatedWindup = null;
     while (!replicatedWindup && Date.now() < windupDeadline) {
-      const liveDefender = await readUiEvidence(defender);
-      replicatedWindup = (liveDefender.acceptance?.focusActionTransitions ?? []).find((entry) =>
+      const focusActions = await readDefenderFocusActions();
+      replicatedWindup = focusActions.find((entry) =>
         entry.action === COMBAT_ACTION.jumpAttackWindup && Number.isFinite(entry.serverTick));
       if (!replicatedWindup) await sleep(4);
     }
@@ -1746,8 +1751,8 @@ async function runOnlineUiJumpAttackCounterplayFlight(entries, defense) {
     const windupDeadline = Date.now() + 260;
     let replicatedWindup = null;
     while (!replicatedWindup && Date.now() < windupDeadline) {
-      const liveDefender = await readUiEvidence(defender);
-      replicatedWindup = (liveDefender.acceptance?.focusActionTransitions ?? []).find((entry) =>
+      const focusActions = await readDefenderFocusActions();
+      replicatedWindup = focusActions.find((entry) =>
         entry.action === COMBAT_ACTION.jumpAttackWindup && Number.isFinite(entry.serverTick));
       if (!replicatedWindup) await sleep(4);
     }
