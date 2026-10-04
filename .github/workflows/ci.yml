@@ -454,6 +454,16 @@ jobs:
           node --test --test-name-pattern="FFA knockdown punish focus|kick stun|shoved or rolled over|knockdown owns" tests/m29-combat-readability.test.mjs
           node scripts/pvp_browser_flight_runner.mjs
 
+      - name: Validate M154 roll knockdown FFA focus
+        env:
+          MYASO_PVP_SCENARIO: "uirollknockdownffa"
+        run: |
+          node --check src/browser/combat-readability.mjs
+          node --check web/online-game.mjs
+          node --check scripts/pvp_browser_flight_runner.mjs
+          node --test --test-name-pattern="FFA knockdown punish focus|roll collision|shoved or rolled over|knockdown owns|roll direction always follows pointer" tests/m29-combat-readability.test.mjs tests/combat-model.test.mjs
+          node scripts/pvp_browser_flight_runner.mjs
+
       - name: Validate M121 first-to-five duel kernel
         run: |
           cargo test --locked --manifest-path server/Cargo.toml first_to_kill_target_declares_winner_and_freezes_match_state
