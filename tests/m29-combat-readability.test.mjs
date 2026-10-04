@@ -141,6 +141,26 @@ test("FFA knockdown punish focus overrides a closer idle rival and remains recov
   assert.equal(fighterKnockdownPunishNetId(entities, 1), 3);
 });
 
+test("FFA knockdown arbitration selects nearest, breaks ties by net ID, and hands off on recovery", () => {
+  const entities = new Map([
+    [1, fighter(1, 100, 100, COMBAT_ACTION.idle, 100, 100)],
+    [2, fighter(2, 100, 100, COMBAT_ACTION.knockdown, 140, 100)],
+    [3, fighter(3, 100, 100, COMBAT_ACTION.knockdown, 70, 100)],
+    [4, fighter(4, 100, 100, COMBAT_ACTION.idle, 105, 100)],
+  ]);
+
+  assert.equal(fighterKnockdownPunishNetId(entities, 1), 3);
+
+  entities.get(3).x = 60;
+  assert.equal(fighterKnockdownPunishNetId(entities, 1), 2);
+
+  entities.get(2).action = COMBAT_ACTION.idle;
+  assert.equal(fighterKnockdownPunishNetId(entities, 1), 3);
+
+  entities.get(3).action = COMBAT_ACTION.idle;
+  assert.equal(fighterKnockdownPunishNetId(entities, 1), 0);
+});
+
 test("FFA parry punish focus overrides a closer idle rival and excludes guard break stun", () => {
   const entities = new Map([
     [1, fighter(1, 100, 100, COMBAT_ACTION.idle, 100, 100)],
