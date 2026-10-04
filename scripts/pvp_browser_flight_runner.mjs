@@ -972,15 +972,25 @@ async function runOnlineUiHeavyParryFlight(entries) {
   // pristine case. Any evidence that a heavy actually committed, hit, blocked,
   // or otherwise resolved makes the attempt terminal and therefore fail-closed.
   for (let attempt = 1; attempt <= 3 && !evidence; attempt += 1) {
-    // Launch the attacker E edge and defender wheel-back from separate browser
-    // sessions at the same time. The delayed wheel is therefore relative to the
-    // same WebDriver dispatch boundary instead of a later UI/snapshot observation.
-    // At 230 ms, the unchanged 240 ms short block covers the 320 ms heavy active
-    // transition and its unchanged 125 ms opening parry window.
-    await Promise.all([
-      pulseMovementKey(attacker, "e", heavyKeyPulseMs),
-      scrollArenaWheel(defender, defenderElementId, 120, 230),
-    ]);
+    // Anchor the genuine wheel-back to authoritative heavy windup instead of
+    // WebDriver dispatch timing. Heavy windup is 320 ms; once Firefox actually
+    // sees HEAVY WINDUP, wait into the final portion of that commitment and
+    // deliver wheel-back while the unchanged 125 ms parry window can still cover
+    // the active transition. A clean E-latch miss remains retryable below.
+    const heavyPromise = pulseMovementKey(attacker, "e", heavyKeyPulseMs);
+    const windupDeadline = Date.now() + COMBAT.heavyAttack.windupMs + 180;
+    let windupSeen = false;
+    while (!windupSeen && Date.now() < windupDeadline) {
+      const liveDefender = await readUiEvidence(defender);
+      windupSeen = liveDefender.threatTransitions.some((entry) =>
+        entry.visible && entry.phase === "HEAVY WINDUP");
+      if (!windupSeen) await sleep(6);
+    }
+    if (windupSeen) {
+      await sleep(150);
+      await scrollArenaWheel(defender, defenderElementId, 120, 0);
+    }
+    await heavyPromise;
     await sleep(220);
 
     lastObserved = await Promise.all(entries.map(readUiEvidence));
