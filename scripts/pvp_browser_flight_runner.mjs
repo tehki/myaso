@@ -1747,14 +1747,12 @@ async function runOnlineUiJumpAttackCounterplayFlight(entries, defense) {
     await scrollArenaWheel(defender, defenderElementId, 120, 0);
     await chordPromise;
   } else if (defense === "dodge") {
-    // Chrome's hosted WebDriver wheel path is consistently slower than the
-    // Firefox Space+LMB action path. Pre-launch the genuine wheel request and
-    // give it a small head start so the actual browser wheel event lands near
-    // the real jump chord instead of after the 105 ms windup. This changes only
-    // harness scheduling; the unchanged 170 ms dodge / 125 ms iframe and roll
-    // collision remain the authoritative counterplay.
-    const dodgePromise = scrollArenaWheel(defender, defenderElementId, -120, 0);
-    await sleep(80);
+    // Put the timing on Chrome's own WebDriver clock. Submit the genuine wheel
+    // request first with a short in-browser pause, then submit the Firefox
+    // Space+LMB chord immediately. This compensates hosted driver skew without
+    // letting the roll collide before jump_attack_windup is authoritative.
+    // Gameplay remains unchanged: 170 ms dodge, 125 ms iframe, normal roll hit.
+    const dodgePromise = scrollArenaWheel(defender, defenderElementId, -120, 30);
     const chordPromise = performArenaJumpAttackChord(attacker, attackerElementId, attackOffset, 90);
     await Promise.all([dodgePromise, chordPromise]);
   } else {
