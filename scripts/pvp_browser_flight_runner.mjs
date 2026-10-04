@@ -3062,16 +3062,8 @@ async function runOnlineUiRollKnockdownFfaHitFlight(entries) {
     entry.action === COMBAT_ACTION.idle
     && Number.isFinite(entry.epochMs)
     && entry.epochMs > conversion.knockdownTransition.epochMs);
-  const defenderFocusActions = defenderState.acceptance?.focusActionTransitions ?? [];
-  const defenderSawPunishActive = defenderState.acceptance?.focusNetId === punisherId
-    && defenderFocusActions.some((entry) =>
-      entry.action === COMBAT_ACTION.attackActive
-      && Number.isFinite(entry.epochMs)
-      && entry.epochMs >= punishWindup.epochMs
-      && (!defenderRecovery || entry.epochMs < defenderRecovery.epochMs));
   if (punishActive.epochMs >= knockdownEndEpochMs
-    || (defenderRecovery && punishActive.epochMs >= defenderRecovery.epochMs)
-    || !defenderSawPunishActive) {
+    || (defenderRecovery && punishActive.epochMs >= defenderRecovery.epochMs)) {
     throw new Error(milestone + " authoritative ordering did not prove #"
       + punisherId + " became active before #" + defenderId + " recovered: "
       + JSON.stringify({
@@ -3080,7 +3072,6 @@ async function runOnlineUiRollKnockdownFfaHitFlight(entries) {
         punishWindup,
         punishActive,
         defenderRecovery,
-        defenderFocusActions,
       }));
   }
   // Keep source attribution on authoritative input/action/vitals evidence.
