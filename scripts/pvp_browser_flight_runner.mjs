@@ -1744,12 +1744,12 @@ async function runOnlineUiJumpAttackCounterplayFlight(entries, defense) {
     await chordPromise;
   } else if (defense === "dodge") {
     // Submit the real pointer-owned roll to WebDriver at the same time as the
-    // real jump chord, then let the driver place the wheel events inside the
-    // committed 105 ms jump windup. This avoids a read->scroll round trip that
-    // can consume most of the windup on hosted browsers. The second pulse lands
-    // during the unchanged 170 ms dodge and is redundant input-delivery proof.
+    // real jump chord. Hosted input takes roughly one replication hop to become
+    // authoritative, so schedule the first wheel early in the 105 ms windup
+    // and a redundant second pulse 45 ms later. Once accepted, the unchanged
+    // 170 ms dodge / 125 ms iframe covers jump impact.
     const chordPromise = performArenaJumpAttackChord(attacker, attackerElementId, attackOffset, 90);
-    const dodgePromise = scrollArenaWheelPair(defender, defenderElementId, -120, 105, 45);
+    const dodgePromise = scrollArenaWheelPair(defender, defenderElementId, -120, 50, 45);
     await Promise.all([chordPromise, dodgePromise]);
   } else {
     throw new Error(`unsupported M138 jump-attack defense: ${defense}`);
