@@ -2898,17 +2898,16 @@ async function runOnlineUiRollKnockdownFfaHitFlight(entries) {
       const punisherFocusKnockdown = punisherState?.acceptance?.focusNetId === defenderId
         && (punisherState?.acceptance?.focusActionTransitions ?? []).some((entry) =>
           entry.action === COMBAT_ACTION.knockdown && Number.isFinite(entry.epochMs));
-      const punishReadability = punisherState?.focusLabel === "KNOCKDOWN #" + defenderId
-        && punisherState?.recoveryVisible
-        && punisherState?.recoveryState === "knockdown"
-        && punisherState?.recoveryLabel === "PUNISH"
-        && punisherState?.recoveryDetail === "Knockdown recovery";
       const vitalsClean = rollerState?.playerHp === 100 && rollerState?.playerGuard === 100
         && defenderState?.playerHp === 100 && defenderState?.playerGuard === 100
         && punisherState?.playerHp === 100 && punisherState?.playerGuard === 100;
 
+      // Commit the real LMB on #3's first authoritative knockdown snapshot.
+      // Waiting for the same state to paint through every HUD field costs one
+      // extra browser frame, which is material inside the unchanged 260 ms
+      // roll knockdown. The rendered focus/cue is still required below.
       if (rollTransition && knockdownTransition
-        && punisherFocusKnockdown && punishReadability && vitalsClean) {
+        && punisherFocusKnockdown && vitalsClean) {
         const rollWheels = rollerState.wheels.slice(rollerWheelOffset).filter((event) => event.deltaY < 0);
         if (rollWheels.length !== 1 || !Number.isFinite(rollWheels[0].epochMs)) {
           throw new Error(milestone + " did not deliver exactly one genuine wheel-forward roll: "
@@ -2989,6 +2988,17 @@ async function runOnlineUiRollKnockdownFfaHitFlight(entries) {
   let rollerState = hitEvidence.find((entry) => entry.browser === roller.name);
   let defenderState = hitEvidence.find((entry) => entry.browser === defender.name);
   let punisherState = hitEvidence.find((entry) => entry.browser === punisher.name);
+  const knockdownFocusSeen = punisherState.focusTransitions.some((entry) =>
+    entry.label === "KNOCKDOWN #" + defenderId);
+  const knockdownCueSeen = punisherState.recoveryTransitions.some((entry) =>
+    entry.visible
+    && entry.state === "knockdown"
+    && entry.label === "PUNISH"
+    && entry.detail === "Knockdown recovery");
+  if (!knockdownFocusSeen || !knockdownCueSeen) {
+    throw new Error(milestone + " third fighter never rendered the knockdown punish cue: "
+      + JSON.stringify({ focusTransitions: punisherState.focusTransitions, recoveryTransitions: punisherState.recoveryTransitions }));
+  }
   const punishPointers = punisherState.pointers.slice(conversion.punishPointerOffset);
   const punishDowns = punishPointers.filter((entry) => entry.type === "pointerdown" && entry.button === 0);
   const punishUps = punishPointers.filter((entry) => entry.type === "pointerup" && entry.button === 0);
