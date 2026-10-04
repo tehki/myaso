@@ -4466,7 +4466,7 @@ async function runOnlineUiGuardBreakPunishFfaFocusFlight(entries, convert = fals
       && currentAttacker.focusLabel !== "GUARD BREAK #" + defenderId
       && !currentAttacker.recoveryVisible
       && currentDefender?.playerHp === expectedDefenderHp
-      && (convert ? Number.isFinite(currentDefender?.playerGuard) : currentDefender?.playerGuard === 0)
+      && Number.isFinite(currentDefender?.playerGuard)
       && currentCloser?.playerHp === 100
       && currentCloser?.playerGuard === 100) {
       finalEvidence = states;
