@@ -2543,9 +2543,17 @@ async function runOnlineUiKickKnockdownFfaFocusFlight(entries) {
       const attackerState = states.find((entry) => entry.browser === attacker.name);
       const defenderState = states.find((entry) => entry.browser === defender.name);
       const bystanderState = states.find((entry) => entry.browser === bystander.name);
+      const attackerActions = attackerState?.acceptance?.ownActionTransitions ?? [];
       const defenderActions = defenderState?.acceptance?.ownActionTransitions ?? [];
       const knockdownSeen = defenderActions.some((entry) =>
         entry.action === COMBAT_ACTION.knockdown && Number.isFinite(entry.epochMs));
+      const kickWindupSeen = attackerActions.some((entry) =>
+        entry.action === COMBAT_ACTION.kickWindup && Number.isFinite(entry.epochMs));
+      const kickActiveSeen = attackerActions.some((entry) =>
+        entry.action === COMBAT_ACTION.kickActive && Number.isFinite(entry.epochMs));
+      const kickRecoverySeen = attackerActions.some((entry) =>
+        entry.action === COMBAT_ACTION.kickRecovery && Number.isFinite(entry.epochMs));
+      const kickProvenanceSeen = kickWindupSeen && kickActiveSeen && kickRecoverySeen;
       const focusSeen = attackerState?.focusTransitions.some((entry) =>
         entry.label === "KNOCKDOWN #" + defenderId);
       const cueSeen = attackerState?.recoveryTransitions.some((entry) =>
@@ -2553,12 +2561,10 @@ async function runOnlineUiKickKnockdownFfaFocusFlight(entries) {
         && entry.state === "knockdown"
         && entry.label === "PUNISH"
         && entry.detail === "Knockdown recovery");
-      const impactSeen = attackerState?.feedbackTransitions.includes("kick-confirm")
-        && defenderState?.feedbackTransitions.includes("shoved");
       const vitalsClean = attackerState?.playerHp === 100 && attackerState?.playerGuard === 100
         && defenderState?.playerHp === 100 && defenderState?.playerGuard === 100
         && bystanderState?.playerHp === 100 && bystanderState?.playerGuard === 100;
-      if (knockdownSeen && focusSeen && cueSeen && impactSeen && vitalsClean) {
+      if (knockdownSeen && kickProvenanceSeen && focusSeen && cueSeen && vitalsClean) {
         const kickPointers = attackerState.pointers.slice(pointerOffset);
         const rightDown = kickPointers.find((entry) => entry.type === "pointerdown" && entry.button === 2);
         const rightUp = kickPointers.find((entry) => entry.type === "pointerup" && entry.button === 2);
