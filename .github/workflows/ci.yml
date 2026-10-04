@@ -454,6 +454,16 @@ jobs:
           node --test --test-name-pattern="FFA knockdown punish focus|kick stun|shoved or rolled over|knockdown owns" tests/m29-combat-readability.test.mjs
           node scripts/pvp_browser_flight_runner.mjs
 
+      - name: Validate M155 actionable third-party knockdown punish
+        env:
+          MYASO_PVP_SCENARIO: "uikickknockdownffahit"
+        run: |
+          node --check src/browser/combat-readability.mjs
+          node --check web/online-game.mjs
+          node --check scripts/pvp_browser_flight_runner.mjs
+          node --test --test-name-pattern="FFA knockdown punish focus|kick stun|shoved or rolled over|knockdown owns" tests/m29-combat-readability.test.mjs
+          node scripts/pvp_browser_flight_runner.mjs
+
       - name: Validate M154 roll knockdown FFA focus
         env:
           MYASO_PVP_SCENARIO: "uirollknockdownffa"
