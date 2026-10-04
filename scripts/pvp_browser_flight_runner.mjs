@@ -1744,21 +1744,22 @@ async function runOnlineUiJumpAttackCounterplayFlight(entries, defense) {
     await chordPromise;
   } else if (defense === "dodge") {
     // Keep the production pointer aimed away from the attacker (prepared above)
-    // and synchronize wheel-forward to replicated jump windup. The older
-    // simultaneous helper could let the roll collide before authority had
-    // committed the jump attack, which tested pre-emption instead of dodge.
+    // and synchronize wheel-forward to the attacker's own authoritative jump
+    // windup. This stays after server commitment but removes one replication
+    // hop that could leave only a few milliseconds before jump active.
     const chordPromise = performArenaJumpAttackChord(attacker, attackerElementId, attackOffset, 90);
     const windupDeadline = Date.now() + 260;
-    let replicatedWindup = null;
-    while (!replicatedWindup && Date.now() < windupDeadline) {
-      const focusActions = await readDefenderFocusActions();
-      replicatedWindup = focusActions.find((entry) =>
+    let authoritativeWindup = null;
+    while (!authoritativeWindup && Date.now() < windupDeadline) {
+      const attackerEvidence = await readUiEvidence(attacker);
+      const ownActions = attackerEvidence.acceptance?.ownActionTransitions ?? [];
+      authoritativeWindup = ownActions.find((entry) =>
         entry.action === COMBAT_ACTION.jumpAttackWindup && Number.isFinite(entry.serverTick));
-      if (!replicatedWindup) await sleep(4);
+      if (!authoritativeWindup) await sleep(4);
     }
-    if (!replicatedWindup) {
+    if (!authoritativeWindup) {
       await chordPromise;
-      throw new Error(`${label} defender never replicated jump windup before dodge input`);
+      throw new Error(`${label} attacker never replicated its authoritative jump windup before dodge input`);
     }
     await scrollArenaWheel(defender, defenderElementId, -120, 0);
     await chordPromise;
