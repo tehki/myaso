@@ -1,6 +1,6 @@
 import { createFrameBudget } from "../src/browser/frame-budget.mjs";
 import { createCombatImpactController } from "../src/browser/combat-impact.mjs";
-import { COMBAT_ACTION, blockSpatialPresentation, combatActionHint, combatOverlayPresentation, createCombatReadabilityTracker, createRemoteDamageTracker, fighterFocusNetId, fighterGuardBreakPunishNetId, fighterParryPunishNetId, fighterRecoveryNetId, fighterIdentityPresentation, fighterThreatBearingLabel, fighterThreatGuardArcLabel, fighterThreatNetId, fighterThreatPhaseLabel, fighterThreatPhaseState, fighterMatchPointPresentation, fighterMatchPresentation, fighterScoreboardPresentation, FFA_KILL_TARGET, fighterVitalsPresentation, guardBreakSpatialPresentation, killFeedPresentation, opponentRecoveryPresentation, parrySpatialPresentation } from "../src/browser/combat-readability.mjs";
+import { COMBAT_ACTION, blockSpatialPresentation, combatActionHint, combatOverlayPresentation, createCombatReadabilityTracker, createRemoteDamageTracker, fighterFocusNetId, fighterGuardBreakPunishNetId, fighterKnockdownPunishNetId, fighterParryPunishNetId, fighterRecoveryNetId, fighterIdentityPresentation, fighterThreatBearingLabel, fighterThreatGuardArcLabel, fighterThreatNetId, fighterThreatPhaseLabel, fighterThreatPhaseState, fighterMatchPointPresentation, fighterMatchPresentation, fighterScoreboardPresentation, FFA_KILL_TARGET, fighterVitalsPresentation, guardBreakSpatialPresentation, killFeedPresentation, opponentRecoveryPresentation, parrySpatialPresentation } from "../src/browser/combat-readability.mjs";
 import { COMBAT } from "../src/combat/model.mjs";
 import { reconcilePrediction } from "../src/browser/reconciliation.mjs";
 import { NETWORK } from "../src/network/constants.mjs";
@@ -205,8 +205,12 @@ function observeCombatState(state) {
 }
 
 function recordAcceptanceState(state, ownId) {
-  if (!["uijumpbuffer", "uijumpattack", "uijumpattackinputloss", "uijumpattackpunish", "uijumpattacktelegraph", "uijumprecoveryffa", "uijumppunishffa", "uimultirecoveryffa", "uimultirecoveryspatial", "uimultirecoverypunish", "uiparrypunishwindow", "uiparrypunishffa", "uiparrypunishffahit", "uiguardbreakpunishffa", "uiguardbreakpunishffahit", "uijumpattackblock", "uijumpattackparry", "uijumpattackdodge", "uijumpattackbuffer", "uikickbuffer"].includes(acceptanceScenario)) return;
-  const focusNetId = fighterGuardBreakPunishNetId(state, ownId) || fighterParryPunishNetId(state, ownId) || fighterRecoveryNetId(state, ownId) || fighterFocusNetId(state, ownId);
+  if (!["uijumpbuffer", "uijumpattack", "uijumpattackinputloss", "uijumpattackpunish", "uijumpattacktelegraph", "uijumprecoveryffa", "uijumppunishffa", "uimultirecoveryffa", "uimultirecoveryspatial", "uimultirecoverypunish", "uiparrypunishwindow", "uiparrypunishffa", "uiparrypunishffahit", "uiguardbreakpunishffa", "uiguardbreakpunishffahit", "uikickknockdownffa", "uijumpattackblock", "uijumpattackparry", "uijumpattackdodge", "uijumpattackbuffer", "uikickbuffer"].includes(acceptanceScenario)) return;
+  const focusNetId = fighterGuardBreakPunishNetId(state, ownId)
+    || fighterParryPunishNetId(state, ownId)
+    || fighterKnockdownPunishNetId(state, ownId)
+    || fighterRecoveryNetId(state, ownId)
+    || fighterFocusNetId(state, ownId);
   const acceptance = window.__MYASO_ACCEPTANCE_STATE__ ??= {
     scenario: acceptanceScenario,
     ownActionTransitions: [],
@@ -906,15 +910,19 @@ function updateHud(ownId) {
   const nearestFocusNetId = fighterFocusNetId(networkClient.state, ownId);
   const guardBreakPunishNetId = fighterGuardBreakPunishNetId(networkClient.state, ownId);
   const parryPunishNetId = fighterParryPunishNetId(networkClient.state, ownId);
+  const knockdownPunishNetId = fighterKnockdownPunishNetId(networkClient.state, ownId);
   const recoveryFocusNetId = fighterRecoveryNetId(networkClient.state, ownId);
-  const focusNetId = guardBreakPunishNetId || parryPunishNetId || recoveryFocusNetId || nearestFocusNetId;
+  const focusNetId = guardBreakPunishNetId || parryPunishNetId || knockdownPunishNetId || recoveryFocusNetId || nearestFocusNetId;
   const remote = focusNetId ? networkClient.state.get(focusNetId) : null;
   setMeter("playerHp", hud.playerHp, hud.playerHpValue, own?.hp ?? local.hp);
   setMeter("playerGuard", hud.playerGuard, hud.playerGuardValue, own?.guard ?? local.guard);
   setMeter("playerStamina", hud.playerStamina, hud.playerStaminaValue, local.stamina);
   setMeter("botHp", hud.botHp, hud.botHpValue, remote?.hp ?? 0);
   setMeter("botGuard", hud.botGuard, hud.botGuardValue, remote?.guard ?? 0);
-  const focusMode = guardBreakPunishNetId ? "guard-break" : parryPunishNetId ? "parry" : recoveryFocusNetId ? "recovery" : "nearest";
+  const focusMode = guardBreakPunishNetId ? "guard-break"
+    : parryPunishNetId ? "parry"
+      : knockdownPunishNetId ? "knockdown"
+        : recoveryFocusNetId ? "recovery" : "nearest";
   setFocusTarget(focusNetId, focusMode);
   updateThreatCue(ownId);
   updateCombatOverlay(own, ownId);
@@ -1121,9 +1129,11 @@ function setFocusTarget(netId, mode = "nearest") {
       ? `GUARD BREAK #${netId}`
       : mode === "parry"
         ? `PARRY PUNISH #${netId}`
-        : mode === "recovery"
-          ? `PUNISH TARGET #${netId}`
-          : `NEAREST #${netId}`)
+        : mode === "knockdown"
+          ? `KNOCKDOWN #${netId}`
+          : mode === "recovery"
+            ? `PUNISH TARGET #${netId}`
+            : `NEAREST #${netId}`)
     : "NO RIVAL";
 }
 

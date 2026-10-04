@@ -90,7 +90,7 @@ const FEINT_MOVE_MULTIPLIER: f32 = 0.5;
 const BLOCK_PARRY_WINDOW_MS: f32 = 125.0;
 const BLOCK_HALF_ANGLE_RADIANS: f32 = std::f32::consts::PI * 0.46;
 const BLOCK_GUARD_DAMAGE: f32 = 38.0;
-const BLOCK_GUARD_BREAK_STUN_MS: f32 = 520.0;
+const BLOCK_GUARD_BREAK_STUN_MS: f32 = 650.0;
 const GUARD_BREAK_POST_RECOVERY_PUNISH_MS: f32 =
     BLOCK_GUARD_BREAK_STUN_MS - ATTACK_ACTIVE_MS - ATTACK_RECOVERY_MS;
 const HEAVY_GUARD_BREAK_STUN_MS: f32 =
@@ -1297,6 +1297,9 @@ fn resolve_attacks(
 
                 target.guard = (target.guard - profile.guard_damage).max(0.0);
                 if target.guard <= EPSILON {
+                    target.guard_regen_blocked_until_ms = target
+                        .guard_regen_blocked_until_ms
+                        .max(now_ms + profile.guard_break_stun_ms);
                     target.set_action(Action::Stunned, profile.guard_break_stun_ms);
                     events.push(CombatEvent::GuardBreak {
                         attacker: attacker.net_id,
