@@ -464,6 +464,11 @@ jobs:
           node --test --test-name-pattern="FFA knockdown punish focus|kick stun|shoved or rolled over|knockdown owns" tests/m29-combat-readability.test.mjs
           node scripts/pvp_browser_flight_runner.mjs
 
+      - name: Validate M157 knockdown arbitration contract
+        run: |
+          node --check src/browser/combat-readability.mjs
+          node --test --test-name-pattern="FFA knockdown arbitration|FFA knockdown punish focus" tests/m29-combat-readability.test.mjs
+
       - name: Validate M156 actionable third-party roll knockdown punish
         env:
           MYASO_PVP_SCENARIO: "uirollknockdownffahit"
