@@ -2859,20 +2859,25 @@ async function runOnlineUiRollKnockdownFfaHitFlight(entries) {
   const punisherElementId = await resolveArenaElement(punisher, milestone + " punisher");
   const rollRight = rollerId < defenderId;
   const movementKey = rollRight ? "d" : "a";
+  const retreatKey = rollRight ? "a" : "d";
+  const punisherAwayKey = punisherId < defenderId ? "a" : "d";
   const rollOffset = rollRight ? 200 : -200;
   const punishOffset = punisherId < defenderId ? 200 : -200;
 
-  // Keep the natural FFA spacing before the roll. The default lane makes the
-  // collision happen late enough in the unchanged 170 ms roll that #2's
-  // unchanged 34-unit knockback lands inside #3's 76-unit light reach while
-  // #1 finishes the roll outside that reach. A forward pre-step makes #1
-  // collide too early and overshoot beside #2 into the punish lane.
+  // Separate the two possible light targets without changing combat reach.
+  // #3 steps outward first. Then #1 backs away briefly and keeps that opposite
+  // movement held: dodge ignores movement keys, while dodge recovery applies
+  // the normal 0.48 movement multiplier and continues pulling #1 out of #3's
+  // lane. #2 still receives the unchanged 34-unit roll knockback toward #3.
+  await pulseMovementKey(punisher, punisherAwayKey, 150);
   await aimArena(roller, rollerElementId, rollOffset);
   await aimArena(punisher, punisherElementId, punishOffset);
   await sleep(50);
 
   let conversion = null;
   for (let attempt = 1; attempt <= 3 && !conversion; attempt += 1) {
+    await setMovementKey(roller, retreatKey, true);
+    await sleep(80);
     const rollerBefore = await readUiEvidence(roller);
     const rollerWheelOffset = rollerBefore.wheels.length;
     await scrollArenaWheel(roller, rollerElementId, -120, 0);
@@ -2939,10 +2944,11 @@ async function runOnlineUiRollKnockdownFfaHitFlight(entries) {
     }
 
     if (!conversion && attempt < 3) {
+      await setMovementKey(roller, retreatKey, false);
       await sleep(COMBAT.dodge.recoveryMs + COMBAT.dodge.collisionKnockdownMs + 140);
-      // Only nudge closer after a genuine miss, and keep the adjustment small
-      // so a retry still collides late instead of carrying #1 through #3's lane.
-      await pulseMovementKey(roller, movementKey, 25);
+      // Restore roughly the pre-attempt spacing before trying another genuine
+      // wheel edge; the next iteration applies the same bounded retreat again.
+      await pulseMovementKey(roller, movementKey, 80);
       await aimArena(roller, rollerElementId, rollOffset);
       await aimArena(punisher, punisherElementId, punishOffset);
       await sleep(40);
@@ -2978,6 +2984,7 @@ async function runOnlineUiRollKnockdownFfaHitFlight(entries) {
     }
     await sleep(8);
   }
+  await setMovementKey(roller, retreatKey, false);
   if (!hitEvidence) {
     throw new Error(milestone + " did not land exactly one 34 HP third-party light during #"
       + defenderId + "'s knockdown conversion window: "
