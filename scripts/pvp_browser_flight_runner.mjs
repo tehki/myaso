@@ -2869,12 +2869,10 @@ async function runOnlineUiRollKnockdownFfaHitFlight(entries) {
   const rollOffset = rollRight ? 200 : -200;
   const punishOffset = punisherId < defenderId ? 200 : -200;
 
-  // #3 closes slightly toward #2 before the roll. The unchanged 34-unit
-  // collision knockback then puts #2 inside #3's unchanged 76-unit light
-  // reach without widening the 260 ms knockdown window.
-  const punisherMovementKey = punisherId < defenderId ? "d" : "a";
+  // Keep #3 at its natural far-side spacing. The unchanged 34-unit roll
+  // knockback leaves #2 near the outer edge of #3's unchanged 76-unit light
+  // reach while keeping the roller behind #2 outside that same strike.
   await pulseMovementKey(roller, movementKey, 120);
-  await pulseMovementKey(punisher, punisherMovementKey, 90);
   await aimArena(roller, rollerElementId, rollOffset);
   await aimArena(punisher, punisherElementId, punishOffset);
   await sleep(50);
