@@ -2867,7 +2867,6 @@ async function runOnlineUiRollKnockdownFfaHitFlight(entries) {
   const rollRight = rollerId < defenderId;
   const movementKey = rollRight ? "d" : "a";
   const retreatKey = rollRight ? "a" : "d";
-  const punisherAwayKey = punisherId < defenderId ? "a" : "d";
   const rollOffset = rollRight ? 200 : -200;
   const punishOffset = punisherId < defenderId ? 200 : -200;
 
@@ -2876,7 +2875,6 @@ async function runOnlineUiRollKnockdownFfaHitFlight(entries) {
   // movement held: dodge ignores movement keys, while dodge recovery applies
   // the normal 0.48 movement multiplier and continues pulling #1 out of #3's
   // lane. #2 still receives the unchanged 34-unit roll knockback toward #3.
-  await pulseMovementKey(punisher, punisherAwayKey, 150);
   await aimArena(roller, rollerElementId, rollOffset);
   await aimArena(punisher, punisherElementId, punishOffset);
   await sleep(50);
