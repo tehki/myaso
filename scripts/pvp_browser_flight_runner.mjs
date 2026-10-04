@@ -1738,10 +1738,25 @@ async function runOnlineUiJumpAttackCounterplayFlight(entries, defense) {
     await scrollArenaWheel(defender, defenderElementId, 120, 0);
     await chordPromise;
   } else if (defense === "dodge") {
-    await Promise.all([
-      performArenaJumpAttackChord(attacker, attackerElementId, attackOffset, 90),
-      performArenaTimedPointerDodge(defender, defenderElementId, 60),
-    ]);
+    // Keep the production pointer aimed away from the attacker (prepared above)
+    // and synchronize wheel-forward to replicated jump windup. The older
+    // simultaneous helper could let the roll collide before authority had
+    // committed the jump attack, which tested pre-emption instead of dodge.
+    const chordPromise = performArenaJumpAttackChord(attacker, attackerElementId, attackOffset, 90);
+    const windupDeadline = Date.now() + 260;
+    let replicatedWindup = null;
+    while (!replicatedWindup && Date.now() < windupDeadline) {
+      const liveDefender = await readUiEvidence(defender);
+      replicatedWindup = (liveDefender.acceptance?.focusActionTransitions ?? []).find((entry) =>
+        entry.action === COMBAT_ACTION.jumpAttackWindup && Number.isFinite(entry.serverTick));
+      if (!replicatedWindup) await sleep(4);
+    }
+    if (!replicatedWindup) {
+      await chordPromise;
+      throw new Error(`${label} defender never replicated jump windup before dodge input`);
+    }
+    await scrollArenaWheel(defender, defenderElementId, -120, 0);
+    await chordPromise;
   } else {
     throw new Error(`unsupported M138 jump-attack defense: ${defense}`);
   }
