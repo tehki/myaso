@@ -2869,13 +2869,16 @@ async function runOnlineUiMultiKnockdownFfaFlight(entries) {
   const rollRight = rollerId < firstVictimId;
   const movementKey = rollRight ? "d" : "a";
   const secondClusterKey = secondVictimId > firstVictimId ? "a" : "d";
+  const secondVerticalKey = "s";
   const rollOffset = rollRight ? 200 : -200;
 
-  // Authoritative spawns are 96 px apart. Move #3 roughly 43 px toward #2 so
-  // a single unchanged 170 ms roll can contact #2 first and #3 later. #1 also
-  // closes roughly 26 px before rolling, preserving a useful stagger between
-  // the two unchanged 260 ms knockdown windows.
-  await pulseMovementKey(secondVictim, secondClusterKey, 200);
+  // Authoritative spawns are 96 px apart. Move #3 down by roughly one body
+  // width first, then about 69 px toward #2. This keeps #2 and #3 physically
+  // separate while putting them on the same roll corridor at different radial
+  // distances. #1 closes roughly 26 px before rolling, preserving a browser-
+  // visible stagger between the two unchanged 260 ms knockdown windows.
+  await pulseMovementKey(secondVictim, secondVerticalKey, 170);
+  await pulseMovementKey(secondVictim, secondClusterKey, 320);
   await pulseMovementKey(roller, movementKey, 120);
   await aimArena(roller, rollerElementId, rollOffset);
   await sleep(50);
