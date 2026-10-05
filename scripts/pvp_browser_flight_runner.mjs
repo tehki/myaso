@@ -1711,11 +1711,6 @@ async function runOnlineUiJumpAttackCounterplayFlight(entries, defense) {
   const pointerOffset = beforeAttacker.pointers.length;
   const beforeDefender = await readUiEvidence(defender);
   const wheelOffset = beforeDefender.wheels.length;
-  const readDefenderFocusActions = () => execute(
-    defender.base,
-    defender.sessionId,
-    "return (window.__MYASO_ACCEPTANCE_STATE__?.focusActionTransitions ?? []).map((entry) => ({ ...entry }));",
-  );
   const hasReplicatedDodgeOverlap = (attackerState, defenderState) => {
     const attackerOwn = attackerState?.acceptance?.ownActionTransitions ?? [];
     const attackerFocus = attackerState?.acceptance?.focusActionTransitions ?? [];
@@ -1760,46 +1755,23 @@ async function runOnlineUiJumpAttackCounterplayFlight(entries, defense) {
     // WebDriver read round-trip from the timing boundary.
     await scrollArenaWheelPair(defender, defenderElementId, 120, 20, 100);
     await performArenaJumpAttackChord(attacker, attackerElementId, attackOffset, 90);
-  } else if (defense === "parry") {
-    // Synchronize the genuine wheel-back to the authoritative jump windup
-    // instead of wall-clock guessing. The jump windup is 105 ms and the fresh
-    // parry window is 125 ms, so a block that begins as soon as Firefox sees
-    // jump_attack_windup is still fresh at impact without changing gameplay.
-    const chordPromise = performArenaJumpAttackChord(attacker, attackerElementId, attackOffset, 90);
-    const windupDeadline = Date.now() + 260;
-    let replicatedWindup = null;
-    while (!replicatedWindup && Date.now() < windupDeadline) {
-      const focusActions = await readDefenderFocusActions();
-      replicatedWindup = focusActions.find((entry) =>
-        entry.action === COMBAT_ACTION.jumpAttackWindup && Number.isFinite(entry.serverTick));
-      if (!replicatedWindup) await sleep(2);
+  } else if (defense === "parry" || defense === "dodge") {
+    // Keep the genuine Space+LMB chord held while scheduling the Chrome wheel
+    // defense from the actual WebDriver press completion, not from replicated
+    // snapshots. The bounded 70 ms lead removes cross-session observation
+    // latency while keeping the unchanged 105 ms jump windup, 125 ms parry
+    // opening, and 170 ms roll duration authoritative.
+    if (defense === "dodge") await aimArena(defender, defenderElementId, 0, 180);
+    let chordHeld = false;
+    try {
+      await pressArenaJumpAttackChord(attacker, attackerElementId, attackOffset);
+      chordHeld = true;
+      await sleep(70);
+      await scrollArenaWheel(defender, defenderElementId, defense === "parry" ? 120 : -120, 0);
+      await sleep(20);
+    } finally {
+      if (chordHeld) await releaseArenaJumpAttackChord(attacker);
     }
-    if (!replicatedWindup) {
-      await chordPromise;
-      throw new Error(`${label} Firefox never replicated jump windup before parry input`);
-    }
-    await scrollArenaWheel(defender, defenderElementId, 120, 0);
-    await chordPromise;
-  } else if (defense === "dodge") {
-    // Synchronize the genuine pointer-owned wheel-forward roll to the same
-    // authoritative jump-windup evidence used by parry. A fixed 60 ms delay
-    // can arrive on the attack-active server tick under loaded WebDriver.
-    await aimArena(defender, defenderElementId, 0, 180);
-    const chordPromise = performArenaJumpAttackChord(attacker, attackerElementId, attackOffset, 90);
-    const windupDeadline = Date.now() + 260;
-    let replicatedWindup = null;
-    while (!replicatedWindup && Date.now() < windupDeadline) {
-      const focusActions = await readDefenderFocusActions();
-      replicatedWindup = focusActions.find((entry) =>
-        entry.action === COMBAT_ACTION.jumpAttackWindup && Number.isFinite(entry.serverTick));
-      if (!replicatedWindup) await sleep(2);
-    }
-    if (!replicatedWindup) {
-      await chordPromise;
-      throw new Error(`${label} defender never replicated jump windup before dodge input`);
-    }
-    await scrollArenaWheel(defender, defenderElementId, -120, 0);
-    await chordPromise;
   } else {
     throw new Error(`unsupported M138 jump-attack defense: ${defense}`);
   }
@@ -8212,6 +8184,49 @@ async function performArenaRecoveryBufferedRoll(session, elementId) {
           { type: "pause", duration: 80 },
           { type: "scroll", x: 0, y: 0, deltaX: 0, deltaY: -120, duration: 0, origin },
         ],
+      },
+    ],
+  });
+}
+
+async function pressArenaJumpAttackChord(session, elementId, xOffset = 200) {
+  const origin = { "element-6066-11e4-a52e-4f735466cecf": elementId };
+  await webdriver(session.base, "POST", `/session/${session.sessionId}/actions`, {
+    actions: [
+      {
+        type: "key",
+        id: `keyboard-${session.name}`,
+        actions: [
+          { type: "pause", duration: 0 },
+          { type: "keyDown", value: " " },
+        ],
+      },
+      {
+        type: "pointer",
+        id: `mouse-${session.name}`,
+        parameters: { pointerType: "mouse" },
+        actions: [
+          { type: "pointerMove", duration: 0, origin, x: xOffset, y: 0 },
+          { type: "pointerDown", button: 0 },
+        ],
+      },
+    ],
+  });
+}
+
+async function releaseArenaJumpAttackChord(session) {
+  await webdriver(session.base, "POST", `/session/${session.sessionId}/actions`, {
+    actions: [
+      {
+        type: "key",
+        id: `keyboard-${session.name}`,
+        actions: [{ type: "keyUp", value: " " }],
+      },
+      {
+        type: "pointer",
+        id: `mouse-${session.name}`,
+        parameters: { pointerType: "mouse" },
+        actions: [{ type: "pointerUp", button: 0 }],
       },
     ],
   });
