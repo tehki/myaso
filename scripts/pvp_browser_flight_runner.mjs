@@ -5948,11 +5948,21 @@ async function runOnlineUiGuardBreakPunishFfaFocusFlight(entries, convert = fals
           recoveryExitEpochMs,
         }));
     }
+    const feedbackDeadline = Date.now() + 220;
+    while (Date.now() < feedbackDeadline
+      && (!attackerState.events.includes("Opponent hit - 34 HP.")
+        || !defenderState.events.includes("Hit taken - 34 HP."))) {
+      await sleep(8);
+      const feedbackStates = await Promise.all(entries.map(readUiEvidence));
+      attackerState = feedbackStates.find((entry) => entry.browser === attacker.name);
+      defenderState = feedbackStates.find((entry) => entry.browser === defender.name);
+      closerState = feedbackStates.find((entry) => entry.browser === closerIdle.name);
+    }
     if (!attackerState.events.includes("Opponent hit - 34 HP.")
       || !defenderState.events.includes("Hit taken - 34 HP.")
       || closerState.events.includes("Hit taken - 34 HP.")) {
       throw new Error(milestone + " authoritative hit feedback did not identify only the guard-broken fighter: "
-        + JSON.stringify(hitEvidence));
+        + JSON.stringify({ attackerState, defenderState, closerState }));
     }
   }
 
