@@ -1738,10 +1738,10 @@ async function runOnlineUiJumpAttackCounterplayFlight(entries, defense) {
     const windupDeadline = Date.now() + 260;
     let replicatedWindup = null;
     while (!replicatedWindup && Date.now() < windupDeadline) {
-      const liveDefender = await readUiEvidence(defender);
-      replicatedWindup = (liveDefender.acceptance?.focusActionTransitions ?? []).find((entry) =>
+      const focusActions = await readDefenderFocusActions();
+      replicatedWindup = focusActions.find((entry) =>
         entry.action === COMBAT_ACTION.jumpAttackWindup && Number.isFinite(entry.serverTick));
-      if (!replicatedWindup) await sleep(4);
+      if (!replicatedWindup) await sleep(2);
     }
     if (!replicatedWindup) {
       await chordPromise;
