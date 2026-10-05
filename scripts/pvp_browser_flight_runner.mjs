@@ -3195,9 +3195,9 @@ async function runOnlineUiMultiKnockdownFfaHitFlight(entries) {
   const secondActionOffset = secondBefore.acceptance?.ownActionTransitions?.length ?? 0;
   const punishPointerOffset = punisherBefore.pointers.length;
 
-  const readSecondOwnActions = () => execute(
-    secondVictim.base,
-    secondVictim.sessionId,
+  const readFirstOwnActions = () => execute(
+    firstVictim.base,
+    firstVictim.sessionId,
     "return (window.__MYASO_ACCEPTANCE_STATE__?.ownActionTransitions ?? []).map((entry) => ({ ...entry }));",
   );
   const readPunisherSelection = () => execute(
@@ -3210,31 +3210,33 @@ async function runOnlineUiMultiKnockdownFfaHitFlight(entries) {
   await scrollArenaWheel(roller, rollerElementId, -120, 0);
 
   let trigger = null;
-  const triggerDeadline = Date.now() + COMBAT.dodge.durationMs + COMBAT.dodge.collisionKnockdownMs + 180;
+  const triggerDeadline = Date.now() + COMBAT.dodge.durationMs + COMBAT.dodge.collisionKnockdownMs + 120;
   while (Date.now() < triggerDeadline && !trigger) {
-    const [secondActions, selection] = await Promise.all([
-      readSecondOwnActions(),
+    const [firstActions, selection] = await Promise.all([
+      readFirstOwnActions(),
       readPunisherSelection(),
     ]);
-    const secondKnockdown = secondActions.slice(secondActionOffset).find((entry) =>
+    const firstKnockdown = firstActions.slice(firstActionOffset).find((entry) =>
       entry.action === COMBAT_ACTION.knockdown && Number.isFinite(entry.epochMs));
     const primarySelected = selection.focusNetId === firstVictimId
       && selection.focusActionTransitions.some((entry) =>
         entry.action === COMBAT_ACTION.knockdown && Number.isFinite(entry.epochMs));
-    if (secondKnockdown && primarySelected) {
-      trigger = { secondKnockdown, selection };
+    if (firstKnockdown && primarySelected) {
+      trigger = { firstKnockdown, selection };
       break;
     }
     await sleep(2);
   }
   if (!trigger) {
     await setMovementKey(roller, retreatKey, false);
-    throw new Error(milestone + " never observed overlapping knockdown selection on #"
+    throw new Error(milestone + " never observed primary knockdown selection on #"
       + firstVictimId + ": " + JSON.stringify(await Promise.all(entries.map(readUiEvidence))));
   }
 
-  // Pointer is already aimed before the roll. Emit one genuine LMB immediately
-  // after the second knockdown proves simultaneous arbitration is active.
+  // Pointer is already aimed before the roll. Commit one genuine LMB as soon
+  // as #4 selects the first knocked-down fighter. The second roll collision
+  // must then occur before this light becomes attack-active, so the actual hit
+  // is still resolved while both unchanged knockdown windows overlap.
   await setArenaAttackButton(punisher, true);
   await sleep(40);
   await setArenaAttackButton(punisher, false);
@@ -3321,7 +3323,7 @@ async function runOnlineUiMultiKnockdownFfaHitFlight(entries) {
   const punishDown = punishDowns[0];
   if (punishDowns.length !== 1 || punishUps.length !== 1
     || !Number.isFinite(punishDown?.epochMs)
-    || punishDown.epochMs < provenance.secondKnockdown.epochMs
+    || punishDown.epochMs < provenance.firstKnockdown.epochMs
     || punishDown.epochMs >= provenance.firstKnockdown.epochMs + COMBAT.dodge.collisionKnockdownMs
     || punishDown.x >= 0.5 || punishDown.y <= 0.5) {
     throw new Error(milestone + " genuine #4 LMB did not target the selected overlap window: "
@@ -3340,10 +3342,18 @@ async function runOnlineUiMultiKnockdownFfaHitFlight(entries) {
       && entry.epochMs >= punishWindup.epochMs)
     : null;
   const primaryKnockdownEnd = provenance.firstKnockdown.epochMs + COMBAT.dodge.collisionKnockdownMs;
-  if (!punishWindup || !punishActive || punishActive.epochMs >= primaryKnockdownEnd) {
-    throw new Error(milestone + " #4 did not become authoritative attack-active before #"
-      + firstVictimId + " knockdown ended: "
-      + JSON.stringify({ punishDown, punishWindup, punishActive, primaryKnockdownEnd }));
+  if (!punishWindup || !punishActive
+    || punishActive.epochMs < provenance.secondKnockdown.epochMs
+    || punishActive.epochMs >= primaryKnockdownEnd) {
+    throw new Error(milestone + " #4 attack-active did not land inside the overlapping knockdown window: "
+      + JSON.stringify({
+        punishDown,
+        punishWindup,
+        punishActive,
+        firstKnockdown: provenance.firstKnockdown,
+        secondKnockdown: provenance.secondKnockdown,
+        primaryKnockdownEnd,
+      }));
   }
 
   const focusTransition = punisherState.focusTransitions.find((entry) =>
