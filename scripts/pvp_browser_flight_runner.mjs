@@ -4827,6 +4827,8 @@ async function runOnlineUiParryPunishFfaFocusFlight(entries, convert = false) {
   // begins from NEAREST #3 rather than recording setup movement noise.
   await Promise.all(entries.map(installUiObserver));
   const attackerElementId = await resolveArenaElement(attacker, milestone);
+  const baselineDefenderHp = defenderState.playerHp;
+  const baselineDefenderGuard = defenderState.playerGuard;
   const defenderElementId = await resolveArenaElement(defender, milestone);
   const attackRight = attackerId < defenderId;
   const movementKey = attackRight ? "d" : "a";
@@ -5112,7 +5114,8 @@ async function runOnlineUiParryPunishWindowFlight(entries) {
       break;
     }
     if ((Number.isFinite(currentAttacker?.playerHp) && currentAttacker.playerHp < 66)
-      || (Number.isFinite(currentDefender?.playerHp) && currentDefender.playerHp !== 100)) {
+      || (Number.isFinite(currentDefender?.playerHp) && currentDefender.playerHp !== baselineDefenderHp)
+      || (Number.isFinite(currentDefender?.playerGuard) && currentDefender.playerGuard !== baselineDefenderGuard)) {
       throw new Error(`${milestone} resolved unexpected combat while waiting for delayed punish: ${JSON.stringify(states)}`);
     }
     await sleep(12);
