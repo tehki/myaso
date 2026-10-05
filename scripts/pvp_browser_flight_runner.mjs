@@ -3080,6 +3080,309 @@ async function runOnlineUiMultiKnockdownFfaFlight(entries) {
   }));
 }
 
+
+async function runOnlineUiMultiKnockdownFfaHitFlight(entries) {
+  const milestone = "M159 actionable simultaneous FFA knockdown punish";
+  if (entries.length !== 4) {
+    throw new Error(milestone + " expected four real browser clients, received " + entries.length);
+  }
+
+  await Promise.all(entries.map(installUiObserver));
+  const ready = await waitForUiReady(entries);
+  const roller = entries.find((entry) => entry.name === "chrome");
+  const firstVictim = entries.find((entry) => entry.name === "firefox");
+  const secondVictim = entries.find((entry) => entry.name === "chrome2");
+  const punisher = entries.find((entry) => entry.name === "chrome3");
+  const rollerReady = ready.find((entry) => entry.browser === roller?.name);
+  const firstReady = ready.find((entry) => entry.browser === firstVictim?.name);
+  const secondReady = ready.find((entry) => entry.browser === secondVictim?.name);
+  const punisherReady = ready.find((entry) => entry.browser === punisher?.name);
+  if (!roller || !firstVictim || !secondVictim || !punisher
+    || !rollerReady || !firstReady || !secondReady || !punisherReady) {
+    throw new Error(milestone + " could not resolve deterministic FFA roles: " + JSON.stringify(ready));
+  }
+
+  const rollerId = rollerReady.playerNetId;
+  const firstVictimId = firstReady.playerNetId;
+  const secondVictimId = secondReady.playerNetId;
+  const punisherId = punisherReady.playerNetId;
+  const ids = [rollerId, firstVictimId, secondVictimId, punisherId];
+  const labels = ids.map((id) => "#" + id);
+  const rosterDeadline = Date.now() + 3200;
+  let rosterReady = null;
+  while (Date.now() < rosterDeadline) {
+    const states = await Promise.all(entries.map(readUiEvidence));
+    const converged = states.every((entry) =>
+      entry.playerHp === 100
+      && entry.playerGuard === 100
+      && entry.scoreboardRows?.length === 4
+      && entry.scoreboardRows.every((row, index) => row.label === labels[index] && row.kills === 0)
+      && entry.scoreboardRows.filter((row) => row.own).length === 1
+      && !entry.overlayVisible);
+    if (converged) {
+      rosterReady = states;
+      break;
+    }
+    await sleep(40);
+  }
+  if (!rosterReady) {
+    throw new Error(milestone + " four-player roster never converged: "
+      + JSON.stringify(await Promise.all(entries.map(readUiEvidence))));
+  }
+
+  await Promise.all(entries.map((entry) => execute(
+    entry.base,
+    entry.sessionId,
+    "document.querySelector('#arena').focus(); return document.activeElement?.id;",
+  )));
+  await Promise.all(entries.map(centerArenaInViewport));
+
+  const rollerElementId = await resolveArenaElement(roller, milestone + " roller");
+  const punisherElementId = await resolveArenaElement(punisher, milestone + " punisher");
+  const rollRight = rollerId < firstVictimId;
+  const rollKey = rollRight ? "d" : "a";
+  const retreatKey = rollRight ? "a" : "d";
+  const secondClusterKey = secondVictimId > firstVictimId ? "a" : "d";
+  const rollOffset = rollRight ? 200 : -200;
+  const punishX = -180;
+  const punishY = 120;
+
+  // Shift the roll corridor down so #4 can sit safely above it. #3 is staged
+  // below the corridor and toward #2, preserving the M158 ordered double-hit.
+  // #4 stops around x=262, y=42: after #2's unchanged 34-unit roll knockback
+  // and fighter separation, #2 is inside the unchanged 94 px center-distance
+  // light reach while the roller and lower #3 remain outside it.
+  await Promise.all([
+    pulseMovementKey(roller, "s", 235),
+    pulseMovementKey(firstVictim, "s", 235),
+    pulseMovementKey(secondVictim, "s", 405),
+    pulseMovementKey(punisher, "a", 315),
+  ]);
+  await pulseMovementKey(secondVictim, secondClusterKey, 320);
+  await pulseMovementKey(roller, rollKey, 120);
+  await Promise.all([
+    aimArena(roller, rollerElementId, rollOffset),
+    aimArena(punisher, punisherElementId, punishX, punishY),
+  ]);
+  await sleep(50);
+
+  const beforeStates = await Promise.all(entries.map(readUiEvidence));
+  const rollerBefore = beforeStates.find((entry) => entry.browser === roller.name);
+  const firstBefore = beforeStates.find((entry) => entry.browser === firstVictim.name);
+  const secondBefore = beforeStates.find((entry) => entry.browser === secondVictim.name);
+  const punisherBefore = beforeStates.find((entry) => entry.browser === punisher.name);
+  const wheelOffset = rollerBefore.wheels.length;
+  const firstActionOffset = firstBefore.acceptance?.ownActionTransitions?.length ?? 0;
+  const secondActionOffset = secondBefore.acceptance?.ownActionTransitions?.length ?? 0;
+  const punishPointerOffset = punisherBefore.pointers.length;
+
+  const readSecondOwnActions = () => execute(
+    secondVictim.base,
+    secondVictim.sessionId,
+    "return (window.__MYASO_ACCEPTANCE_STATE__?.ownActionTransitions ?? []).map((entry) => ({ ...entry }));",
+  );
+  const readPunisherSelection = () => execute(
+    punisher.base,
+    punisher.sessionId,
+    "const a=window.__MYASO_ACCEPTANCE_STATE__; return { focusNetId:a?.focusNetId ?? 0, focusActionTransitions:(a?.focusActionTransitions ?? []).map((entry)=>({...entry})) };",
+  );
+
+  await setMovementKey(roller, retreatKey, true);
+  await scrollArenaWheel(roller, rollerElementId, -120, 0);
+
+  let trigger = null;
+  const triggerDeadline = Date.now() + COMBAT.dodge.durationMs + COMBAT.dodge.collisionKnockdownMs + 180;
+  while (Date.now() < triggerDeadline && !trigger) {
+    const [secondActions, selection] = await Promise.all([
+      readSecondOwnActions(),
+      readPunisherSelection(),
+    ]);
+    const secondKnockdown = secondActions.slice(secondActionOffset).find((entry) =>
+      entry.action === COMBAT_ACTION.knockdown && Number.isFinite(entry.epochMs));
+    const primarySelected = selection.focusNetId === firstVictimId
+      && selection.focusActionTransitions.some((entry) =>
+        entry.action === COMBAT_ACTION.knockdown && Number.isFinite(entry.epochMs));
+    if (secondKnockdown && primarySelected) {
+      trigger = { secondKnockdown, selection };
+      break;
+    }
+    await sleep(2);
+  }
+  if (!trigger) {
+    await setMovementKey(roller, retreatKey, false);
+    throw new Error(milestone + " never observed overlapping knockdown selection on #"
+      + firstVictimId + ": " + JSON.stringify(await Promise.all(entries.map(readUiEvidence))));
+  }
+
+  // Pointer is already aimed before the roll. Emit one genuine LMB immediately
+  // after the second knockdown proves simultaneous arbitration is active.
+  await setArenaAttackButton(punisher, true);
+  await sleep(40);
+  await setArenaAttackButton(punisher, false);
+
+  let hitEvidence = null;
+  let provenance = null;
+  const hitDeadline = Date.now() + COMBAT.attack.windupMs + COMBAT.attack.activeMs + 360;
+  while (Date.now() < hitDeadline) {
+    const states = await Promise.all(entries.map(readUiEvidence));
+    const rollerState = states.find((entry) => entry.browser === roller.name);
+    const firstState = states.find((entry) => entry.browser === firstVictim.name);
+    const secondState = states.find((entry) => entry.browser === secondVictim.name);
+    const punisherState = states.find((entry) => entry.browser === punisher.name);
+    const rollerActions = rollerState?.acceptance?.ownActionTransitions ?? [];
+    const firstActions = (firstState?.acceptance?.ownActionTransitions ?? []).slice(firstActionOffset);
+    const secondActions = (secondState?.acceptance?.ownActionTransitions ?? []).slice(secondActionOffset);
+    const rollTransition = rollerActions
+      .filter((entry) => entry.action === COMBAT_ACTION.dodge && Number.isFinite(entry.epochMs))
+      .at(-1);
+    const firstKnockdown = firstActions.find((entry) =>
+      entry.action === COMBAT_ACTION.knockdown && Number.isFinite(entry.epochMs));
+    const secondKnockdown = secondActions.find((entry) =>
+      entry.action === COMBAT_ACTION.knockdown && Number.isFinite(entry.epochMs));
+    const rollWheels = rollerState?.wheels?.slice(wheelOffset)?.filter((entry) => entry.deltaY < 0) ?? [];
+    const primaryFocusSeen = punisherState?.focusTransitions?.some((entry) =>
+      entry.label === "KNOCKDOWN #" + firstVictimId);
+
+    if (rollTransition && firstKnockdown && secondKnockdown && rollWheels.length === 1 && primaryFocusSeen) {
+      provenance = { rollTransition, firstKnockdown, secondKnockdown, rollWheel: rollWheels[0] };
+    }
+
+    if (firstState?.playerHp === 66 && firstState?.playerGuard === 100
+      && secondState?.playerHp === 100 && secondState?.playerGuard === 100
+      && rollerState?.playerHp === 100 && rollerState?.playerGuard === 100
+      && punisherState?.playerHp === 100 && punisherState?.playerGuard === 100) {
+      hitEvidence = states;
+      break;
+    }
+
+    const wrongDamage = (Number.isFinite(secondState?.playerHp) && secondState.playerHp < 100)
+      || (Number.isFinite(rollerState?.playerHp) && rollerState.playerHp < 100)
+      || (Number.isFinite(punisherState?.playerHp) && punisherState.playerHp < 100)
+      || (Number.isFinite(firstState?.playerGuard) && firstState.playerGuard < 100)
+      || (Number.isFinite(secondState?.playerGuard) && secondState.playerGuard < 100)
+      || (Number.isFinite(rollerState?.playerGuard) && rollerState.playerGuard < 100)
+      || (Number.isFinite(punisherState?.playerGuard) && punisherState.playerGuard < 100)
+      || (Number.isFinite(firstState?.playerHp) && firstState.playerHp < 66);
+    if (wrongDamage) {
+      await setMovementKey(roller, retreatKey, false);
+      throw new Error(milestone + " damaged the wrong fighter/guard or hit more than once: "
+        + JSON.stringify(states));
+    }
+    await sleep(6);
+  }
+  await setMovementKey(roller, retreatKey, false);
+
+  if (!hitEvidence || !provenance) {
+    throw new Error(milestone + " did not land exactly one selected 34 HP punish with roll provenance: "
+      + JSON.stringify(await Promise.all(entries.map(readUiEvidence))));
+  }
+
+  const rollerState = hitEvidence.find((entry) => entry.browser === roller.name);
+  const firstState = hitEvidence.find((entry) => entry.browser === firstVictim.name);
+  const secondState = hitEvidence.find((entry) => entry.browser === secondVictim.name);
+  const punisherState = hitEvidence.find((entry) => entry.browser === punisher.name);
+
+  if (!Number.isFinite(provenance.rollWheel.epochMs)
+    || provenance.firstKnockdown.epochMs >= provenance.secondKnockdown.epochMs
+    || provenance.secondKnockdown.epochMs >= provenance.firstKnockdown.epochMs + COMBAT.dodge.collisionKnockdownMs) {
+    throw new Error(milestone + " did not prove ordered overlapping roll knockdowns: "
+      + JSON.stringify(provenance));
+  }
+  for (const transition of [provenance.firstKnockdown, provenance.secondKnockdown]) {
+    if (transition.epochMs + 80 < provenance.rollTransition.epochMs
+      || transition.epochMs > provenance.rollTransition.epochMs + COMBAT.dodge.durationMs + 140) {
+      throw new Error(milestone + " could not tie both knockdowns to the same authoritative roll: "
+        + JSON.stringify(provenance));
+    }
+  }
+
+  const punishPointers = punisherState.pointers.slice(punishPointerOffset);
+  const punishDowns = punishPointers.filter((entry) => entry.type === "pointerdown" && entry.button === 0);
+  const punishUps = punishPointers.filter((entry) => entry.type === "pointerup" && entry.button === 0);
+  const punishDown = punishDowns[0];
+  if (punishDowns.length !== 1 || punishUps.length !== 1
+    || !Number.isFinite(punishDown?.epochMs)
+    || punishDown.epochMs < provenance.secondKnockdown.epochMs
+    || punishDown.epochMs >= provenance.firstKnockdown.epochMs + COMBAT.dodge.collisionKnockdownMs
+    || punishDown.x >= 0.5 || punishDown.y <= 0.5) {
+    throw new Error(milestone + " genuine #4 LMB did not target the selected overlap window: "
+      + JSON.stringify({ punishPointers, provenance }));
+  }
+
+  const punisherActions = punisherState.acceptance?.ownActionTransitions ?? [];
+  const punishWindup = punisherActions.find((entry) =>
+    entry.action === COMBAT_ACTION.attackWindup
+    && Number.isFinite(entry.epochMs)
+    && entry.epochMs >= punishDown.epochMs - 40);
+  const punishActive = punishWindup
+    ? punisherActions.find((entry) =>
+      entry.action === COMBAT_ACTION.attackActive
+      && Number.isFinite(entry.epochMs)
+      && entry.epochMs >= punishWindup.epochMs)
+    : null;
+  const primaryKnockdownEnd = provenance.firstKnockdown.epochMs + COMBAT.dodge.collisionKnockdownMs;
+  if (!punishWindup || !punishActive || punishActive.epochMs >= primaryKnockdownEnd) {
+    throw new Error(milestone + " #4 did not become authoritative attack-active before #"
+      + firstVictimId + " knockdown ended: "
+      + JSON.stringify({ punishDown, punishWindup, punishActive, primaryKnockdownEnd }));
+  }
+
+  const focusTransition = punisherState.focusTransitions.find((entry) =>
+    entry.label === "KNOCKDOWN #" + firstVictimId && Number.isFinite(entry.epochMs));
+  const cueTransition = punisherState.recoveryTransitions.find((entry) =>
+    entry.visible
+    && entry.state === "knockdown"
+    && entry.label === "PUNISH"
+    && entry.detail === "Knockdown recovery");
+  if (!focusTransition || !cueTransition
+    || !firstState.events.includes("Hit taken - 34 HP.")) {
+    throw new Error(milestone + " selected-target readability/victim feedback was incomplete: "
+      + JSON.stringify({ focusTransition, cueTransition, firstEvents: firstState.events }));
+  }
+
+  // Let all actions settle and prove the secondary knockdown never took damage.
+  const settleDeadline = Date.now() + COMBAT.attack.recoveryMs + COMBAT.dodge.collisionKnockdownMs + 520;
+  let finalEvidence = null;
+  while (Date.now() < settleDeadline) {
+    const states = await Promise.all(entries.map(readUiEvidence));
+    const currentRoller = states.find((entry) => entry.browser === roller.name);
+    const currentFirst = states.find((entry) => entry.browser === firstVictim.name);
+    const currentSecond = states.find((entry) => entry.browser === secondVictim.name);
+    const currentPunisher = states.find((entry) => entry.browser === punisher.name);
+    const firstAction = currentFirst?.acceptance?.ownActionTransitions?.at(-1)?.action;
+    const secondAction = currentSecond?.acceptance?.ownActionTransitions?.at(-1)?.action;
+    const punishAction = currentPunisher?.acceptance?.ownActionTransitions?.at(-1)?.action;
+    if (firstAction === COMBAT_ACTION.idle
+      && secondAction === COMBAT_ACTION.idle
+      && punishAction === COMBAT_ACTION.idle
+      && currentFirst?.playerHp === 66 && currentFirst?.playerGuard === 100
+      && currentSecond?.playerHp === 100 && currentSecond?.playerGuard === 100
+      && currentRoller?.playerHp === 100 && currentRoller?.playerGuard === 100
+      && currentPunisher?.playerHp === 100 && currentPunisher?.playerGuard === 100) {
+      finalEvidence = states;
+      break;
+    }
+    await sleep(16);
+  }
+  if (!finalEvidence) {
+    throw new Error(milestone + " did not settle with only selected #"
+      + firstVictimId + " damaged: " + JSON.stringify(await Promise.all(entries.map(readUiEvidence))));
+  }
+
+  return finalEvidence.map((entry) => ({
+    ...entry,
+    m159RollerId: rollerId,
+    m159PrimaryKnockdownId: firstVictimId,
+    m159SecondaryKnockdownId: secondVictimId,
+    m159PunisherId: punisherId,
+    m159RollEpochMs: provenance.rollTransition.epochMs,
+    m159PrimaryKnockdownEpochMs: provenance.firstKnockdown.epochMs,
+    m159SecondaryKnockdownEpochMs: provenance.secondKnockdown.epochMs,
+    m159PunishPointerEpochMs: punishDown.epochMs,
+    m159PunishActiveEpochMs: punishActive.epochMs,
+  }));
+}
+
 async function runOnlineUiRollKnockdownFfaHitFlight(entries) {
   const milestone = "M156 actionable third-party roll knockdown punish";
   if (entries.length !== 3) {
