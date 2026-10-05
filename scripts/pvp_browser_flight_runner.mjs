@@ -6720,7 +6720,7 @@ async function runOnlineUiJumpFfaThreatFlight(entries, mode) {
   // about 91 px apart, allowing the right light to legitimately clip #1.
   // These shorter pulses keep the two attackers >120 px apart and preserve
   // deterministic primary/secondary ordering by authoritative distance.
-  const leftMovementMs = mode === "primary" ? 160 : 145;
+  const leftMovementMs = mode === "primary" ? 160 : 120;
   const rightMovementMs = mode === "primary" ? 120 : 160;
   await Promise.all([
     pulseMovementKey(left, "d", leftMovementMs),
