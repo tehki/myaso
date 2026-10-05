@@ -2883,76 +2883,96 @@ async function runOnlineUiRollKnockdownFfaHitFlight(entries) {
   for (let attempt = 1; attempt <= 3 && !conversion; attempt += 1) {
     await setMovementKey(roller, retreatKey, true);
     await sleep(80);
-    const rollerBefore = await readUiEvidence(roller);
+
+    const [rollerBefore, defenderBefore, punisherBefore] = await Promise.all([
+      readUiEvidence(roller),
+      readUiEvidence(defender),
+      readUiEvidence(punisher),
+    ]);
     const rollerWheelOffset = rollerBefore.wheels.length;
+    const defenderActionOffset = defenderBefore.acceptance?.ownActionTransitions?.length ?? 0;
+    const punishPointerOffset = punisherBefore.pointers.length;
     await scrollArenaWheel(roller, rollerElementId, -120, 0);
 
+    // The conversion window is only 260 ms and the unchanged light windup is
+    // 135 ms. Poll the victim's authoritative action stream alone so #3 can
+    // commit the real LMB on the first knockdown snapshot instead of paying
+    // three WebDriver reads plus focus/HUD replication before acting.
     const setupDeadline = Date.now() + COMBAT.dodge.durationMs
-      + COMBAT.dodge.collisionKnockdownMs + 260;
-    while (Date.now() < setupDeadline) {
-      const states = await Promise.all(entries.map(readUiEvidence));
-      const rollerState = states.find((entry) => entry.browser === roller.name);
-      const defenderState = states.find((entry) => entry.browser === defender.name);
-      const punisherState = states.find((entry) => entry.browser === punisher.name);
-      const rollerActions = rollerState?.acceptance?.ownActionTransitions ?? [];
-      const defenderActions = defenderState?.acceptance?.ownActionTransitions ?? [];
-      const rollTransition = rollerActions
-        .filter((entry) => entry.action === COMBAT_ACTION.dodge && Number.isFinite(entry.epochMs))
-        .at(-1);
-      const knockdownTransition = defenderActions
-        .filter((entry) => entry.action === COMBAT_ACTION.knockdown && Number.isFinite(entry.epochMs))
-        .at(-1);
-      const punisherFocusKnockdown = punisherState?.acceptance?.focusNetId === defenderId
-        && (punisherState?.acceptance?.focusActionTransitions ?? []).some((entry) =>
-          entry.action === COMBAT_ACTION.knockdown && Number.isFinite(entry.epochMs));
-      const vitalsClean = rollerState?.playerHp === 100 && rollerState?.playerGuard === 100
-        && defenderState?.playerHp === 100 && defenderState?.playerGuard === 100
-        && punisherState?.playerHp === 100 && punisherState?.playerGuard === 100;
-
-      // Commit the real LMB on #3's first authoritative knockdown snapshot.
-      // Waiting for the same state to paint through every HUD field costs one
-      // extra browser frame, which is material inside the unchanged 260 ms
-      // roll knockdown. The rendered focus/cue is still required below.
-      if (rollTransition && knockdownTransition
-        && punisherFocusKnockdown && vitalsClean) {
-        const rollWheels = rollerState.wheels.slice(rollerWheelOffset).filter((event) => event.deltaY < 0);
-        if (rollWheels.length !== 1 || !Number.isFinite(rollWheels[0].epochMs)) {
-          throw new Error(milestone + " did not deliver exactly one genuine wheel-forward roll: "
-            + JSON.stringify(rollerState.wheels.slice(rollerWheelOffset)));
-        }
-        if (knockdownTransition.epochMs + 80 < rollTransition.epochMs
-          || knockdownTransition.epochMs > rollTransition.epochMs + COMBAT.dodge.durationMs + 140) {
-          throw new Error(milestone + " could not tie knockdown to the authoritative roll: "
-            + JSON.stringify({ rollTransition, knockdownTransition }));
-        }
-
-        conversion = {
-          attempt,
-          punishPointerOffset: punisherState.pointers.length,
-          rollTransition,
-          rollWheel: rollWheels[0],
-          knockdownTransition,
-        };
-        await performArenaAttack(punisher, punisherElementId, punishOffset);
-        break;
-      }
-
-      if ((Number.isFinite(rollerState?.playerHp) && rollerState.playerHp < 100)
-        || (Number.isFinite(defenderState?.playerHp) && defenderState.playerHp < 100)
-        || (Number.isFinite(defenderState?.playerGuard) && defenderState.playerGuard < 100)
-        || (Number.isFinite(punisherState?.playerHp) && punisherState.playerHp < 100)
-        || (Number.isFinite(punisherState?.playerGuard) && punisherState.playerGuard < 100)) {
-        throw new Error(milestone + " setup changed health/guard before the third-party punish: "
-          + JSON.stringify(states));
-      }
-      await sleep(6);
+      + COMBAT.dodge.collisionKnockdownMs + 220;
+    let knockdownTransition = null;
+    while (Date.now() < setupDeadline && !knockdownTransition) {
+      const defenderState = await readUiEvidence(defender);
+      const newDefenderActions = (defenderState.acceptance?.ownActionTransitions ?? [])
+        .slice(defenderActionOffset);
+      knockdownTransition = newDefenderActions.find((entry) =>
+        entry.action === COMBAT_ACTION.knockdown && Number.isFinite(entry.epochMs)) ?? null;
+      if (knockdownTransition) break;
+      await sleep(3);
     }
 
-    if (!conversion && attempt < 3) {
+    if (knockdownTransition) {
+      conversion = {
+        attempt,
+        punishPointerOffset,
+        knockdownTransition,
+      };
+      await performArenaAttack(punisher, punisherElementId, punishOffset);
+
+      // Roll provenance and the rendered knockdown cue may trail the victim's
+      // first authoritative knockdown snapshot by one or more browser frames.
+      // Validate them after the LMB has already been committed.
+      const provenanceDeadline = Date.now() + 320;
+      while (Date.now() < provenanceDeadline) {
+        const states = await Promise.all(entries.map(readUiEvidence));
+        const rollerState = states.find((entry) => entry.browser === roller.name);
+        const defenderState = states.find((entry) => entry.browser === defender.name);
+        const punisherState = states.find((entry) => entry.browser === punisher.name);
+        const rollerActions = rollerState?.acceptance?.ownActionTransitions ?? [];
+        const rollTransition = rollerActions
+          .filter((entry) => entry.action === COMBAT_ACTION.dodge && Number.isFinite(entry.epochMs))
+          .at(-1);
+        const rollWheels = rollerState?.wheels
+          ?.slice(rollerWheelOffset)
+          ?.filter((event) => event.deltaY < 0) ?? [];
+        const vitalsClean = rollerState?.playerHp === 100 && rollerState?.playerGuard === 100
+          && defenderState?.playerHp === 100 && defenderState?.playerGuard === 100
+          && punisherState?.playerHp === 100 && punisherState?.playerGuard === 100;
+        const focusSeen = punisherState?.focusTransitions?.some((entry) =>
+          entry.label === "KNOCKDOWN #" + defenderId);
+        const cueSeen = punisherState?.recoveryTransitions?.some((entry) =>
+          entry.visible
+          && entry.state === "knockdown"
+          && entry.label === "PUNISH"
+          && entry.detail === "Knockdown recovery");
+
+        if (rollTransition && rollWheels.length === 1 && vitalsClean && focusSeen && cueSeen) {
+          if (!Number.isFinite(rollWheels[0].epochMs)) {
+            throw new Error(milestone + " genuine wheel-forward roll lacked epoch evidence: "
+              + JSON.stringify(rollWheels));
+          }
+          if (knockdownTransition.epochMs + 80 < rollTransition.epochMs
+            || knockdownTransition.epochMs > rollTransition.epochMs + COMBAT.dodge.durationMs + 140) {
+            throw new Error(milestone + " could not tie knockdown to the authoritative roll: "
+              + JSON.stringify({ rollTransition, knockdownTransition }));
+          }
+          conversion.rollTransition = rollTransition;
+          conversion.rollWheel = rollWheels[0];
+          break;
+        }
+        await sleep(6);
+      }
+
+      if (!conversion.rollTransition || !conversion.rollWheel) {
+        throw new Error(milestone + " did not validate roll provenance/readability after early LMB: "
+          + JSON.stringify(await Promise.all(entries.map(readUiEvidence))));
+      }
+      break;
+    }
+
+    if (attempt < 3) {
       await setMovementKey(roller, retreatKey, false);
       await sleep(COMBAT.dodge.recoveryMs + COMBAT.dodge.collisionKnockdownMs + 140);
-      // Restore roughly the pre-attempt spacing before trying another genuine
-      // wheel edge; the next iteration applies the same bounded retreat again.
       await pulseMovementKey(roller, movementKey, 80);
       await aimArena(roller, rollerElementId, rollOffset);
       await aimArena(punisher, punisherElementId, punishOffset);
