@@ -4827,8 +4827,6 @@ async function runOnlineUiParryPunishFfaFocusFlight(entries, convert = false) {
   // begins from NEAREST #3 rather than recording setup movement noise.
   await Promise.all(entries.map(installUiObserver));
   const attackerElementId = await resolveArenaElement(attacker, milestone);
-  const baselineDefenderHp = defenderState.playerHp;
-  const baselineDefenderGuard = defenderState.playerGuard;
   const defenderElementId = await resolveArenaElement(defender, milestone);
   const attackRight = attackerId < defenderId;
   const movementKey = attackRight ? "d" : "a";
@@ -5086,6 +5084,8 @@ async function runOnlineUiParryPunishWindowFlight(entries) {
     throw new Error(`${milestone} expected unchanged 650 ms parry stun, observed ${COMBAT.block.parryStunMs}`);
   }
 
+  const baselineDefenderHp = defenderState.playerHp;
+  const baselineDefenderGuard = defenderState.playerGuard;
   const defenderElementId = await resolveArenaElement(defender, milestone);
   await centerArenaInViewport(defender);
   const attackRight = attackerState.acceptance.playerNetId < defenderState.acceptance.playerNetId;
