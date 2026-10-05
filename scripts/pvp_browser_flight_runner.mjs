@@ -1687,8 +1687,12 @@ async function runOnlineUiJumpAttackFlight(entries, expectedScenario = "uijumpat
 
 async function runOnlineUiJumpAttackCounterplayFlight(entries, defense) {
   const scenarioName = `uijumpattack${defense}`;
-  const attackerName = defense === "dodge" ? "firefox" : "chrome";
-  const defenderName = defense === "dodge" ? "chrome" : "firefox";
+  // Keep the latency-sensitive parry/dodge wheel input on Chrome. Firefox
+  // remains the genuine jump attacker, preserving cross-browser counterplay,
+  // while avoiding highly variable Marionette wheel-command latency after
+  // authoritative windup replication. Block retains the opposite direction.
+  const attackerName = defense === "block" ? "chrome" : "firefox";
+  const defenderName = defense === "block" ? "firefox" : "chrome";
   // Leave the dodge case slightly farther apart than block/parry. The unchanged
   // jump attack still reaches during its active movement, but not at the very
   // first active tick, giving the genuine wheel-forward roll time to become
