@@ -1758,15 +1758,14 @@ async function runOnlineUiJumpAttackCounterplayFlight(entries, defense) {
   } else if (defense === "parry" || defense === "dodge") {
     // Keep the genuine Space+LMB chord held while scheduling the Chrome wheel
     // defense from the actual WebDriver press completion, not from replicated
-    // snapshots. The bounded 70 ms lead removes cross-session observation
-    // latency while keeping the unchanged 105 ms jump windup, 125 ms parry
-    // opening, and 170 ms roll duration authoritative.
+    // snapshots. The press command itself already spans the cross-browser
+    // handoff; send the wheel immediately so the authoritative defense owns at
+    // least one server frame before the unchanged jump-strike active window.
     if (defense === "dodge") await aimArena(defender, defenderElementId, 0, 180);
     let chordHeld = false;
     try {
       await pressArenaJumpAttackChord(attacker, attackerElementId, attackOffset);
       chordHeld = true;
-      await sleep(70);
       await scrollArenaWheel(defender, defenderElementId, defense === "parry" ? 120 : -120, 0);
       await sleep(20);
     } finally {
