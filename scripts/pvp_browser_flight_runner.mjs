@@ -1777,10 +1777,25 @@ async function runOnlineUiJumpAttackCounterplayFlight(entries, defense) {
     await scrollArenaWheel(defender, defenderElementId, 120, 0);
     await chordPromise;
   } else if (defense === "dodge") {
-    await Promise.all([
-      performArenaJumpAttackChord(attacker, attackerElementId, attackOffset, 90),
-      performArenaTimedPointerDodge(defender, defenderElementId, 60),
-    ]);
+    // Synchronize the genuine pointer-owned wheel-forward roll to the same
+    // authoritative jump-windup evidence used by parry. A fixed 60 ms delay
+    // can arrive on the attack-active server tick under loaded WebDriver.
+    await aimArena(defender, defenderElementId, 0, 180);
+    const chordPromise = performArenaJumpAttackChord(attacker, attackerElementId, attackOffset, 90);
+    const windupDeadline = Date.now() + 260;
+    let replicatedWindup = null;
+    while (!replicatedWindup && Date.now() < windupDeadline) {
+      const focusActions = await readDefenderFocusActions();
+      replicatedWindup = focusActions.find((entry) =>
+        entry.action === COMBAT_ACTION.jumpAttackWindup && Number.isFinite(entry.serverTick));
+      if (!replicatedWindup) await sleep(2);
+    }
+    if (!replicatedWindup) {
+      await chordPromise;
+      throw new Error(`${label} defender never replicated jump windup before dodge input`);
+    }
+    await scrollArenaWheel(defender, defenderElementId, -120, 0);
+    await chordPromise;
   } else {
     throw new Error(`unsupported M138 jump-attack defense: ${defense}`);
   }
