@@ -6745,16 +6745,24 @@ async function runOnlineUiJumpFfaThreatFlight(entries, mode) {
   const rightPointerOffset = rightBefore.pointers.length;
   const centerThreatOffset = centerBefore.threatTransitions.length;
 
-  // Start the right light 35 ms after the jump chord begins. Jump windup is
-  // only 105 ms, so the previous 80 ms delay left too little replicated overlap
-  // under loaded headless scheduling. A 35 ms delay preserves a broad shared
-  // windup interval while distance still deterministically decides whether the
-  // jump or light attacker is primary in each mode.
-  await Promise.all([
-    performArenaJumpAttackChord(left, leftArena, 200, 90),
-    performArenaAttackBurst(right, 3, 35, 8),
-    sampleUiEvidenceWhileActive(entries, 260, 8),
-  ]);
+  // Give the intended primary threat a short head start instead of relying on
+  // simultaneous cross-browser command scheduling. In primary mode the jump
+  // begins first; in secondary mode the right-side light begins first. Both
+  // unchanged windups still overlap broadly (105 ms jump / 135 ms light), but
+  // the center observer now receives a stable primary + secondary ordering.
+  const samplesPromise = sampleUiEvidenceWhileActive(entries, 280, 6);
+  let jumpPromise;
+  let lightPromise;
+  if (mode === "primary") {
+    jumpPromise = performArenaJumpAttackChord(left, leftArena, 200, 90);
+    await sleep(18);
+    lightPromise = performArenaAttackBurst(right, 3, 0, 8);
+  } else {
+    lightPromise = performArenaAttackBurst(right, 3, 0, 8);
+    await sleep(18);
+    jumpPromise = performArenaJumpAttackChord(left, leftArena, 200, 90);
+  }
+  await Promise.all([jumpPromise, lightPromise, samplesPromise]);
 
   let evidence = await Promise.all(entries.map(readUiEvidence));
   const leftId = ordered[0].playerNetId;
