@@ -6380,11 +6380,15 @@ async function runOnlineUiJumpFfaThreatFlight(entries, mode) {
   ]);
   await sleep(60);
 
-  // Both attackers must remain inside their unchanged attack geometry, but the
-  // chosen side is deliberately closer so simultaneous windups have a stable
+  // Keep both attackers inside their unchanged attack geometry while leaving
+  // them safely outside each other's hit reach. Jump attack needs the left
+  // fighter within 66 px of center (48 reach + 18 radius); the right light
+  // needs 94 px (76 + 18). The older 210/260 ms staging put the attackers
+  // about 91 px apart, allowing the right light to legitimately clip #1.
+  // These shorter pulses keep the two attackers >120 px apart and preserve
   // deterministic primary/secondary ordering by authoritative distance.
-  const leftMovementMs = mode === "primary" ? 260 : 210;
-  const rightMovementMs = mode === "primary" ? 210 : 260;
+  const leftMovementMs = mode === "primary" ? 160 : 145;
+  const rightMovementMs = mode === "primary" ? 120 : 160;
   await Promise.all([
     pulseMovementKey(left, "d", leftMovementMs),
     pulseMovementKey(right, "a", rightMovementMs),
