@@ -8182,8 +8182,9 @@ async function performArenaRecoveryBufferedRoll(session, elementId) {
   const origin = { "element-6066-11e4-a52e-4f735466cecf": elementId };
   // This command is issued only after Firefox has independently observed the
   // authoritative light recovery. Pointer retarget and the real wheel share one
-  // W3C timeline; a short browser-owned pause keeps the real wheel inside
-  // recovery even when newer Chrome/Firefox drivers add command overhead.
+  // W3C timeline. Current headless driver overhead already consumes roughly
+  // 100+ ms after that observation, so a 30 ms browser pause targets the final
+  // 90 ms input-buffer window without drifting past the 255 ms recovery exit.
   await webdriver(session.base, "POST", `/session/${session.sessionId}/actions`, {
     actions: [
       {
@@ -8192,7 +8193,7 @@ async function performArenaRecoveryBufferedRoll(session, elementId) {
         parameters: { pointerType: "mouse" },
         actions: [
           { type: "pointerMove", duration: 0, origin, x: 0, y: 180 },
-          { type: "pause", duration: 80 },
+          { type: "pause", duration: 30 },
           { type: "pause", duration: 0 },
         ],
       },
@@ -8201,7 +8202,7 @@ async function performArenaRecoveryBufferedRoll(session, elementId) {
         id: `wheel-${session.name}`,
         actions: [
           { type: "pause", duration: 0 },
-          { type: "pause", duration: 80 },
+          { type: "pause", duration: 30 },
           { type: "scroll", x: 0, y: 0, deltaX: 0, deltaY: -120, duration: 0, origin },
         ],
       },
