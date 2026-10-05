@@ -1304,7 +1304,8 @@ async function runOnlineUiRollBufferFlight(entries) {
   // Once recovery is real, retarget the pointer and send one genuine
   // wheel-forward after a browser-owned pause. Whether it was truly bufferable
   // is proved below from cross-browser epoch timestamps, not requested timings.
-  await performArenaRecoveryBufferedRoll(attacker, attackerElementId);
+  const recoveryStartEpochMs = recoveryWitness.evidence.recoveryTransitions[recoveryWitness.attackRecoveryIndex].epochMs;
+  await performArenaRecoveryBufferedRoll(attacker, attackerElementId, recoveryStartEpochMs);
 
   const deadline = Date.now() + 1200;
   let evidence = null;
@@ -1369,12 +1370,15 @@ async function runOnlineUiRollBufferFlight(entries) {
 
   const attackRecovery = defenderResult.recoveryTransitions[attackRecoveryIndex];
   const attackRecoveryExit = defenderResult.recoveryTransitions[attackRecoveryExitIndex];
+  const bufferOpenEpochMs = attackRecovery.epochMs
+    + COMBAT.attack.recoveryMs - COMBAT.inputBuffer.dodgeWindowMs;
   if (perpendicularAim.epochMs < attackRecovery.epochMs
-    || rollWheel.epochMs < attackRecovery.epochMs
+    || rollWheel.epochMs < bufferOpenEpochMs
     || rollWheel.epochMs >= attackRecoveryExit.epochMs) {
-    throw new Error(`M129 genuine wheel was not inside Firefox's authoritative attack-recovery interval: ${JSON.stringify({
+    throw new Error(`M129 genuine wheel was not inside Firefox's authoritative dodge-buffer interval: ${JSON.stringify({
       attackRecovery,
       attackRecoveryExit,
+      bufferOpenEpochMs,
       perpendicularAim,
       rollWheel,
     })}`);
@@ -8178,36 +8182,23 @@ async function performArenaFeint(session, elementId, xOffset = 200) {
   }
 }
 
-async function performArenaRecoveryBufferedRoll(session, elementId) {
-  const origin = { "element-6066-11e4-a52e-4f735466cecf": elementId };
-  // This command is issued only after Firefox has independently observed the
-  // authoritative light recovery. Pointer retarget and the real wheel share one
-  // W3C timeline. Current headless driver overhead already consumes roughly
-  // 100+ ms after that observation, so a 30 ms browser pause targets the final
-  // 90 ms input-buffer window without drifting past the 255 ms recovery exit.
-  await webdriver(session.base, "POST", `/session/${session.sessionId}/actions`, {
-    actions: [
-      {
-        type: "pointer",
-        id: `mouse-${session.name}`,
-        parameters: { pointerType: "mouse" },
-        actions: [
-          { type: "pointerMove", duration: 0, origin, x: 0, y: 180 },
-          { type: "pause", duration: 30 },
-          { type: "pause", duration: 0 },
-        ],
-      },
-      {
-        type: "wheel",
-        id: `wheel-${session.name}`,
-        actions: [
-          { type: "pause", duration: 0 },
-          { type: "pause", duration: 30 },
-          { type: "scroll", x: 0, y: 0, deltaX: 0, deltaY: -120, duration: 0, origin },
-        ],
-      },
-    ],
-  });
+async function performArenaRecoveryBufferedRoll(session, elementId, recoveryStartEpochMs) {
+  if (!Number.isFinite(recoveryStartEpochMs)) {
+    throw new Error("M129 recovery start epoch is required for buffered roll scheduling");
+  }
+
+  // Retarget only after Firefox has independently observed authoritative
+  // attack recovery. Then schedule one genuine wheel-forward from the shared
+  // epoch clock 10 ms inside the unchanged 90 ms dodge input-buffer window.
+  // This avoids fixed WebDriver pauses drifting either before buffer-open or
+  // beyond the 255 ms recovery exit as driver load changes.
+  await aimArena(session, elementId, 0, 180);
+  const bufferOpenEpochMs = recoveryStartEpochMs
+    + COMBAT.attack.recoveryMs - COMBAT.inputBuffer.dodgeWindowMs;
+  const targetSendEpochMs = bufferOpenEpochMs + 10;
+  const remainingMs = targetSendEpochMs - Date.now();
+  if (remainingMs > 0) await sleep(remainingMs);
+  await scrollArenaWheel(session, elementId, -120, 0);
 }
 
 async function pressArenaJumpAttackChord(session, elementId, xOffset = 200) {
