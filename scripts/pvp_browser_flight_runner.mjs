@@ -4005,13 +4005,12 @@ async function runOnlineUiBoundedRollKnockdownFlight(entries) {
   // the authoritative world delta before waiting for the late suppression roll.
   await aimAtAuthoritativeTarget(suppressor, suppressorElementId, defenderId);
 
-  // Start #3's genuine wheel-forward roll late in #2's original 260 ms down
-  // window. #1 has cleared the lane by then. #3's roll remains active when
-  // #2's original timer expires, which proves both "no refresh" and "no
-  // re-catch on the exact recovery frame" if #2 stays idle.
-  const suppressionTargetEpochMs = firstKnockdown.epochMs + 170;
-  const suppressionWaitMs = suppressionTargetEpochMs - Date.now();
-  if (suppressionWaitMs > 0) await sleep(suppressionWaitMs);
+  // Send #3's genuine wheel-forward roll immediately after the authoritative
+  // re-aim. The prior +170 ms wall-clock wait, combined with WebDriver/server
+  // ingress latency, could make the roll authoritative only after #2's 260 ms
+  // knockdown had already expired. The re-aim round trip itself provides
+  // enough delay for #1 to clear the lane; immediate wheel delivery leaves #3
+  // active across #2's original recovery frame without changing gameplay.
   await scrollArenaWheel(suppressor, suppressorElementId, -120, 0);
 
   let suppressedDodge = null;
