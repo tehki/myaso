@@ -2996,32 +2996,39 @@ async function runOnlineUiMultiKnockdownFfaFlight(entries) {
     const firstState = states.find((entry) => entry.browser === firstVictim.name);
     const secondState = states.find((entry) => entry.browser === secondVictim.name);
     const firstTransitions = firstState?.acceptance?.ownActionTransitions ?? [];
+    const secondTransitions = secondState?.acceptance?.ownActionTransitions ?? [];
     const firstRecovery = firstTransitions.find((entry) =>
       entry.action === COMBAT_ACTION.idle
       && Number.isFinite(entry.epochMs)
       && entry.epochMs > overlap.firstKnockdown.epochMs);
-    const secondCurrentAction = secondState?.acceptance?.ownActionTransitions?.at(-1)?.action;
-    const secondaryRendered = rollerState?.focusLabel === "KNOCKDOWN #" + secondVictimId
-      && rollerState?.recoveryVisible
-      && rollerState?.recoveryState === "knockdown"
-      && rollerState?.recoveryLabel === "PUNISH"
-      && rollerState?.recoveryDetail === "Knockdown recovery";
+    const secondRecovery = secondTransitions.find((entry) =>
+      entry.action === COMBAT_ACTION.idle
+      && Number.isFinite(entry.epochMs)
+      && entry.epochMs > overlap.secondKnockdown.epochMs);
+    const handoffTransition = rollerState?.focusTransitions
+      ?.find((entry) =>
+        entry.label === "KNOCKDOWN #" + secondVictimId
+        && Number.isFinite(entry.epochMs)
+        && (!firstRecovery || entry.epochMs >= firstRecovery.epochMs - 80));
     const vitalsClean = rollerState?.playerHp === 100 && rollerState?.playerGuard === 100
       && firstState?.playerHp === 100 && firstState?.playerGuard === 100
       && secondState?.playerHp === 100 && secondState?.playerGuard === 100;
 
-    if (firstRecovery
-      && secondCurrentAction === COMBAT_ACTION.knockdown
-      && secondaryRendered
-      && vitalsClean) {
-      const handoffTransition = rollerState.focusTransitions
-        .filter((entry) => entry.label === "KNOCKDOWN #" + secondVictimId && Number.isFinite(entry.epochMs))
-        .at(-1);
-      if (!handoffTransition || handoffTransition.epochMs < firstRecovery.epochMs - 80) {
-        throw new Error(milestone + " handoff was not ordered after the primary recovery: "
-          + JSON.stringify({ firstRecovery, handoffTransition, focusTransitions: rollerState.focusTransitions }));
+    // The handoff window can be shorter than one three-browser polling round.
+    // Prove it from ordered authoritative/UI transition history instead of
+    // requiring one sampled snapshot to catch #3 still knocked down.
+    if (firstRecovery && secondRecovery && handoffTransition && vitalsClean) {
+      if (handoffTransition.epochMs < firstRecovery.epochMs - 80
+        || handoffTransition.epochMs >= secondRecovery.epochMs) {
+        throw new Error(milestone + " handoff was not ordered between the two recoveries: "
+          + JSON.stringify({
+            firstRecovery,
+            handoffTransition,
+            secondRecovery,
+            focusTransitions: rollerState.focusTransitions,
+          }));
       }
-      handoff = { states, firstRecovery, handoffTransition };
+      handoff = { states, firstRecovery, secondRecovery, handoffTransition };
       break;
     }
     await sleep(8);
