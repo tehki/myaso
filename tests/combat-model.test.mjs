@@ -307,6 +307,77 @@ test("roll collision knocks rival down and consumes stamina", () => {
   assert.equal(a.stamina, COMBAT.stamina.max - COMBAT.dodge.staminaCost);
 });
 
+test("roll collision consumes downed contact without refreshing knockdown", () => {
+  const firstRoller = createFighter({ id: "a", x: 200, y: 200, facing: 0 });
+  const target = createFighter({ id: "b", x: 244, y: 200, facing: Math.PI });
+  const secondRoller = createFighter({ id: "c", x: 278, y: 250, facing: -Math.PI / 2 });
+  const world = createWorld({ width: 700, height: 500, fighters: [firstRoller, target, secondRoller] });
+
+  advance(world, 35, { a: { dodge: true, aimX: 400, aimY: 200 } });
+  assert.equal(target.action, "knockdown");
+  const elapsedBeforeSecondRoll = target.actionElapsedMs;
+
+  const secondEvents = advance(world, 20, {
+    c: { dodge: true, aimX: target.x, aimY: target.y },
+  });
+  assert.equal(target.action, "knockdown");
+  assert.ok(target.actionElapsedMs > elapsedBeforeSecondRoll);
+  assert.equal(
+    secondEvents.some((event) =>
+      event.type === "roll_hit" && event.attackerId === "c" && event.targetId === "b"),
+    false,
+  );
+
+  advance(world, 230);
+  assert.equal(target.action, "idle");
+});
+
+test("kick cannot refresh an existing bounded knockdown", () => {
+  const firstKicker = createFighter({ id: "a", x: 200, y: 200, facing: 0 });
+  const target = createFighter({ id: "b", x: 254, y: 200, facing: Math.PI });
+  const secondKicker = createFighter({ id: "c", x: 360, y: 200, facing: Math.PI });
+  const world = createWorld({ width: 700, height: 400, fighters: [firstKicker, target, secondKicker] });
+
+  advance(world, 170, {
+    a: { kick: true, aimX: target.x, aimY: target.y },
+  });
+  assert.equal(target.action, "knockdown");
+
+  const secondEvents = advance(world, 170, {
+    c: { kick: true, aimX: target.x, aimY: target.y },
+  });
+  assert.equal(target.action, "knockdown");
+  assert.equal(
+    secondEvents.some((event) =>
+      event.type === "kick" && event.attackerId === "c" && event.targetId === "b"),
+    false,
+  );
+
+  advance(world, 125);
+  assert.equal(target.action, "idle");
+  assert.equal(target.hp, 100);
+});
+
+test("ordinary light punish still damages a knocked-down fighter", () => {
+  const kicker = createFighter({ id: "a", x: 200, y: 200, facing: 0 });
+  const target = createFighter({ id: "b", x: 254, y: 200, facing: Math.PI });
+  const punisher = createFighter({ id: "c", x: 360, y: 200, facing: Math.PI });
+  const world = createWorld({ width: 700, height: 400, fighters: [kicker, target, punisher] });
+
+  advance(world, 170, {
+    a: { kick: true, aimX: target.x, aimY: target.y },
+  });
+  assert.equal(target.action, "knockdown");
+
+  const events = advance(world, COMBAT.attack.windupMs + COMBAT.attack.activeMs + 10, {
+    c: { attack: true, aimX: target.x, aimY: target.y },
+  });
+  assert.equal(target.hp, 100 - COMBAT.attack.damage);
+  assert.equal(target.action, "knockdown");
+  assert.ok(events.some((event) =>
+    event.type === "hit" && event.attackerId === "c" && event.targetId === "b"));
+});
+
 test("running is faster and drains stamina", () => {
   const runner = createFighter({ id: "runner", x: 100, y: 100, facing: 0 });
   const world = createWorld({ width: 800, height: 400, fighters: [runner] });
