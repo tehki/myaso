@@ -3846,6 +3846,280 @@ async function runOnlineUiRollKnockdownFfaFocusFlight(entries) {
 }
 
 
+
+async function runOnlineUiBoundedRollKnockdownFlight(entries) {
+  const milestone = "M162 bounded roll knockdown browser";
+  if (entries.length !== 3) {
+    throw new Error(milestone + " expected three real browser clients, received " + entries.length);
+  }
+
+  await Promise.all(entries.map(installUiObserver));
+  const ready = await waitForUiReady(entries);
+  const opener = entries.find((entry) => entry.name === "chrome");
+  const defender = entries.find((entry) => entry.name === "firefox");
+  const suppressor = entries.find((entry) => entry.name === "chrome2");
+  const openerReady = ready.find((entry) => entry.browser === opener?.name);
+  const defenderReady = ready.find((entry) => entry.browser === defender?.name);
+  const suppressorReady = ready.find((entry) => entry.browser === suppressor?.name);
+  if (!opener || !defender || !suppressor || !openerReady || !defenderReady || !suppressorReady) {
+    throw new Error(milestone + " could not resolve deterministic FFA roles: " + JSON.stringify(ready));
+  }
+
+  const openerId = openerReady.playerNetId;
+  const defenderId = defenderReady.playerNetId;
+  const suppressorId = suppressorReady.playerNetId;
+  await waitForUiThreePlayerReady(entries, [openerId, defenderId, suppressorId], 2500);
+  await Promise.all(entries.map((entry) => execute(
+    entry.base,
+    entry.sessionId,
+    "document.querySelector('#arena').focus(); return document.activeElement?.id;",
+  )));
+  await Promise.all(entries.map(centerArenaInViewport));
+
+  const openerElementId = await resolveArenaElement(opener, milestone + " opener");
+  const suppressorElementId = await resolveArenaElement(suppressor, milestone + " suppressor");
+  const rollRight = openerId < defenderId;
+  const openerMovementKey = rollRight ? "d" : "a";
+  const openerOffset = rollRight ? 200 : -200;
+  const suppressorHorizontalKey = suppressorId > defenderId ? "a" : "d";
+  const suppressorInitialX = suppressorId > defenderId ? -120 : 120;
+
+  // Browser spawns are 96 px apart. Move #3 down first, then horizontally
+  // beside #2 so it cannot body-block the opener. Move #1 into body-spacing
+  // range before the first roll so the unchanged 34 px knockback leaves #2
+  // almost directly above #3. #1 keeps moving through roll recovery, clearing
+  // the lane before #3's suppression roll begins.
+  await pulseMovementKey(suppressor, "s", 255);
+  await pulseMovementKey(suppressor, suppressorHorizontalKey, 285);
+  await pulseMovementKey(opener, openerMovementKey, 280);
+  await Promise.all([
+    aimArena(opener, openerElementId, openerOffset),
+    aimArena(suppressor, suppressorElementId, suppressorInitialX, -200),
+  ]);
+  await sleep(50);
+
+  const readOwnActions = (entry) => execute(
+    entry.base,
+    entry.sessionId,
+    "return (window.__MYASO_ACCEPTANCE_STATE__?.ownActionTransitions ?? []).map((item) => ({ ...item }));",
+  );
+  const readAcceptance = (entry) => execute(
+    entry.base,
+    entry.sessionId,
+    "const a=window.__MYASO_ACCEPTANCE_STATE__; return { ownActionTransitions:(a?.ownActionTransitions ?? []).map((item)=>({...item})), focusActionTransitions:(a?.focusActionTransitions ?? []).map((item)=>({...item})) };",
+  );
+
+  const [defenderBefore, openerBefore, suppressorBefore] = await Promise.all([
+    readOwnActions(defender),
+    readOwnActions(opener),
+    readOwnActions(suppressor),
+  ]);
+  const defenderOffset = defenderBefore.length;
+  const openerOffsetActions = openerBefore.length;
+  const suppressorOffsetActions = suppressorBefore.length;
+  const openerWheelOffset = (await readUiEvidence(opener)).wheels.length;
+  const suppressorWheelOffset = (await readUiEvidence(suppressor)).wheels.length;
+
+  // Keep #1's ordinary movement held. Dodge direction is pointer-owned, so the
+  // roll still travels toward #2; once dodge ends, the held movement carries
+  // #1 away from the collision lane.
+  await setMovementKey(opener, openerMovementKey, true);
+  await scrollArenaWheel(opener, openerElementId, -120, 0);
+
+  let firstKnockdown = null;
+  let openerDodge = null;
+  const firstDeadline = Date.now() + COMBAT.dodge.durationMs + 240;
+  while (Date.now() < firstDeadline && !firstKnockdown) {
+    const [defenderActions, openerActions] = await Promise.all([
+      readOwnActions(defender),
+      readOwnActions(opener),
+    ]);
+    firstKnockdown = defenderActions.slice(defenderOffset).find((entry) =>
+      entry.action === COMBAT_ACTION.knockdown && Number.isFinite(entry.epochMs)) ?? null;
+    openerDodge = openerActions.slice(openerOffsetActions).find((entry) =>
+      entry.action === COMBAT_ACTION.dodge && Number.isFinite(entry.epochMs)) ?? openerDodge;
+    if (!firstKnockdown) await sleep(1);
+  }
+  if (!firstKnockdown || !openerDodge) {
+    await setMovementKey(opener, openerMovementKey, false);
+    throw new Error(milestone + " opener never produced the first authoritative roll knockdown: "
+      + JSON.stringify(await Promise.all(entries.map(readUiEvidence))));
+  }
+
+  // Start #3's genuine wheel-forward roll late in #2's original 260 ms down
+  // window. #1 has cleared the lane by then. #3's roll remains active when
+  // #2's original timer expires, which proves both "no refresh" and "no
+  // re-catch on the exact recovery frame" if #2 stays idle.
+  const suppressionTargetEpochMs = firstKnockdown.epochMs + 170;
+  const suppressionWaitMs = suppressionTargetEpochMs - Date.now();
+  if (suppressionWaitMs > 0) await sleep(suppressionWaitMs);
+  await scrollArenaWheel(suppressor, suppressorElementId, -120, 0);
+
+  let suppressedDodge = null;
+  let suppressorDodgeRecovery = null;
+  let originalRecovery = null;
+  const recoveryDeadline = Date.now() + COMBAT.dodge.collisionKnockdownMs + COMBAT.dodge.durationMs + 320;
+  while (Date.now() < recoveryDeadline
+    && (!suppressedDodge || !suppressorDodgeRecovery || !originalRecovery)) {
+    const [defenderAcceptance, suppressorActions] = await Promise.all([
+      readAcceptance(defender),
+      readOwnActions(suppressor),
+    ]);
+    suppressedDodge = suppressorActions.slice(suppressorOffsetActions).find((entry) =>
+      entry.action === COMBAT_ACTION.dodge
+      && Number.isFinite(entry.epochMs)
+      && entry.epochMs >= firstKnockdown.epochMs) ?? suppressedDodge;
+    if (suppressedDodge) {
+      suppressorDodgeRecovery = suppressorActions.find((entry) =>
+        entry.action === COMBAT_ACTION.dodgeRecovery
+        && Number.isFinite(entry.epochMs)
+        && entry.epochMs > suppressedDodge.epochMs) ?? suppressorDodgeRecovery;
+    }
+    originalRecovery = defenderAcceptance.ownActionTransitions.slice(defenderOffset).find((entry) =>
+      entry.action === COMBAT_ACTION.idle
+      && Number.isFinite(entry.epochMs)
+      && entry.epochMs > firstKnockdown.epochMs) ?? originalRecovery;
+    if (!suppressedDodge || !suppressorDodgeRecovery || !originalRecovery) await sleep(2);
+  }
+
+  await setMovementKey(opener, openerMovementKey, false);
+
+  if (!suppressedDodge || !suppressorDodgeRecovery || !originalRecovery) {
+    throw new Error(milestone + " did not observe suppression roll plus original recovery: "
+      + JSON.stringify(await Promise.all(entries.map(readUiEvidence))));
+  }
+
+  const originalDurationObserved = originalRecovery.epochMs - firstKnockdown.epochMs;
+  const recoveryAfterSuppressedDodge = originalRecovery.epochMs - suppressedDodge.epochMs;
+  if (suppressedDodge.epochMs <= firstKnockdown.epochMs
+    || suppressedDodge.epochMs >= firstKnockdown.epochMs + COMBAT.dodge.collisionKnockdownMs
+    || originalDurationObserved < COMBAT.dodge.collisionKnockdownMs - 90
+    || originalDurationObserved > COMBAT.dodge.collisionKnockdownMs + 110
+    || recoveryAfterSuppressedDodge >= COMBAT.dodge.collisionKnockdownMs - 60
+    || originalRecovery.epochMs >= suppressorDodgeRecovery.epochMs) {
+    throw new Error(milestone + " suppression roll appears to have refreshed or re-caught the bounded knockdown: "
+      + JSON.stringify({
+        firstKnockdown,
+        suppressedDodge,
+        suppressorDodgeRecovery,
+        originalRecovery,
+        originalDurationObserved,
+        recoveryAfterSuppressedDodge,
+      }));
+  }
+
+  let states = await Promise.all(entries.map(readUiEvidence));
+  const openerState = states.find((entry) => entry.browser === opener.name);
+  const defenderState = states.find((entry) => entry.browser === defender.name);
+  const suppressorState = states.find((entry) => entry.browser === suppressor.name);
+  if (openerState?.playerHp !== 100 || openerState?.playerGuard !== 100
+    || defenderState?.playerHp !== 100 || defenderState?.playerGuard !== 100
+    || suppressorState?.playerHp !== 100 || suppressorState?.playerGuard !== 100) {
+    throw new Error(milestone + " control-only sequence changed health/guard: " + JSON.stringify(states));
+  }
+
+  const openerWheels = openerState.wheels.slice(openerWheelOffset).filter((entry) => entry.deltaY < 0);
+  const suppressorWheels = suppressorState.wheels.slice(suppressorWheelOffset).filter((entry) => entry.deltaY < 0);
+  if (openerWheels.length !== 1 || suppressorWheels.length !== 1
+    || !Number.isFinite(openerWheels[0].epochMs)
+    || !Number.isFinite(suppressorWheels[0].epochMs)
+    || suppressorWheels[0].epochMs < firstKnockdown.epochMs
+    || suppressorWheels[0].epochMs >= firstKnockdown.epochMs + COMBAT.dodge.collisionKnockdownMs) {
+    throw new Error(milestone + " lacked two genuine wheel-forward rolls in the bounded window: "
+      + JSON.stringify({ openerWheels, suppressorWheels, firstKnockdown }));
+  }
+
+  // Wait until #3 is fully idle. While its original roll is finishing, #2 must
+  // remain idle—M160 consumed the downed contact in rollHitTargets, so the same
+  // active roll cannot re-catch #2 on the recovery frame.
+  let suppressorIdle = null;
+  const idleDeadline = Date.now() + COMBAT.dodge.recoveryMs + 420;
+  while (Date.now() < idleDeadline && !suppressorIdle) {
+    const [defenderActions, suppressorActions] = await Promise.all([
+      readOwnActions(defender),
+      readOwnActions(suppressor),
+    ]);
+    const dodgeIndex = suppressorActions.findIndex((entry) =>
+      entry.action === COMBAT_ACTION.dodge
+      && Number.isFinite(entry.epochMs)
+      && entry.epochMs === suppressedDodge.epochMs);
+    suppressorIdle = suppressorActions.find((entry, index) =>
+      index > dodgeIndex
+      && entry.action === COMBAT_ACTION.idle
+      && Number.isFinite(entry.epochMs)) ?? null;
+    const recaught = defenderActions.slice(defenderOffset).find((entry) =>
+      entry.action === COMBAT_ACTION.knockdown
+      && Number.isFinite(entry.epochMs)
+      && entry.epochMs > originalRecovery.epochMs);
+    if (recaught) {
+      throw new Error(milestone + " same suppression roll re-caught #"
+        + defenderId + " after original recovery: " + JSON.stringify({ recaught, originalRecovery }));
+    }
+    if (!suppressorIdle) await sleep(4);
+  }
+  if (!suppressorIdle) {
+    throw new Error(milestone + " suppressor never returned idle after bounded roll");
+  }
+
+  // Move #1 vertically away from the verification lane. #3 ended above/left of
+  // #2 after its first diagonal roll; a real opposite-direction wheel-forward
+  // from that endpoint must knock the now-standing #2 down normally.
+  await pulseMovementKey(opener, "s", 300);
+  await aimArena(suppressor, suppressorElementId, -suppressorInitialX, 200);
+  await sleep(40);
+
+  const defenderBeforeVerify = await readOwnActions(defender);
+  const verifyDefenderOffset = defenderBeforeVerify.length;
+  const suppressorBeforeVerify = await readOwnActions(suppressor);
+  const verifySuppressorOffset = suppressorBeforeVerify.length;
+  const verifyWheelOffset = (await readUiEvidence(suppressor)).wheels.length;
+
+  await scrollArenaWheel(suppressor, suppressorElementId, -120, 0);
+
+  let verificationKnockdown = null;
+  let verificationDodge = null;
+  const verifyDeadline = Date.now() + COMBAT.dodge.durationMs + COMBAT.dodge.collisionKnockdownMs + 280;
+  while (Date.now() < verifyDeadline && (!verificationKnockdown || !verificationDodge)) {
+    const [defenderAcceptance, suppressorActions] = await Promise.all([
+      readAcceptance(defender),
+      readOwnActions(suppressor),
+    ]);
+    verificationKnockdown = defenderAcceptance.ownActionTransitions.slice(verifyDefenderOffset).find((entry) =>
+      entry.action === COMBAT_ACTION.knockdown && Number.isFinite(entry.epochMs)) ?? verificationKnockdown;
+    verificationDodge = suppressorActions.slice(verifySuppressorOffset).find((entry) =>
+      entry.action === COMBAT_ACTION.dodge && Number.isFinite(entry.epochMs)) ?? verificationDodge;
+    if (!verificationKnockdown || !verificationDodge) await sleep(2);
+  }
+
+  states = await Promise.all(entries.map(readUiEvidence));
+  const finalOpener = states.find((entry) => entry.browser === opener.name);
+  const finalDefender = states.find((entry) => entry.browser === defender.name);
+  const finalSuppressor = states.find((entry) => entry.browser === suppressor.name);
+  const verifyWheels = finalSuppressor?.wheels.slice(verifyWheelOffset).filter((entry) => entry.deltaY < 0) ?? [];
+  if (!verificationKnockdown || !verificationDodge
+    || verificationKnockdown.epochMs <= originalRecovery.epochMs
+    || verifyWheels.length !== 1 || !Number.isFinite(verifyWheels[0].epochMs)
+    || finalOpener?.playerHp !== 100 || finalOpener?.playerGuard !== 100
+    || finalDefender?.playerHp !== 100 || finalDefender?.playerGuard !== 100
+    || finalSuppressor?.playerHp !== 100 || finalSuppressor?.playerGuard !== 100) {
+    throw new Error(milestone + " post-recovery roll did not create a fresh clean knockdown: "
+      + JSON.stringify(states));
+  }
+
+  return states.map((entry) => ({
+    ...entry,
+    m162OpenerId: openerId,
+    m162DefenderId: defenderId,
+    m162SuppressorId: suppressorId,
+    m162FirstKnockdownEpochMs: firstKnockdown.epochMs,
+    m162SuppressedDodgeEpochMs: suppressedDodge.epochMs,
+    m162OriginalRecoveryEpochMs: originalRecovery.epochMs,
+    m162SuppressorDodgeRecoveryEpochMs: suppressorDodgeRecovery.epochMs,
+    m162OriginalDurationObservedMs: originalDurationObserved,
+    m162VerificationKnockdownEpochMs: verificationKnockdown.epochMs,
+  }));
+}
+
 async function runOnlineUiBoundedKickKnockdownFlight(entries) {
   const milestone = "M161 bounded kick knockdown browser";
   if (entries.length !== 3) {
