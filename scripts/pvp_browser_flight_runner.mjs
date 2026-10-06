@@ -3193,10 +3193,21 @@ async function runOnlineUiMultiKnockdownFfaHitFlight(entries) {
   const secondActionOffset = secondBefore.acceptance?.ownActionTransitions?.length ?? 0;
   const punishPointerOffset = punisherBefore.pointers.length;
 
-  const readRollerPrimarySelection = () => execute(
-    roller.base,
-    roller.sessionId,
-    "const a=window.__MYASO_ACCEPTANCE_STATE__; return { focusNetId:a?.focusNetId ?? 0, focusActionTransitions:(a?.focusActionTransitions ?? []).map((entry)=>({...entry})) };",
+  // Pre-aim before the roll so no target-selection/geometry round trip consumes
+  // the unchanged 260 ms knockdown window. The windup still re-aims after #3
+  // joins the overlap, preserving exclusive target proof against live positions.
+  const punishAim = await aimArenaForExclusiveAuthoritativeTarget(
+    punisher,
+    punisherElementId,
+    firstVictimId,
+    [rollerId, secondVictimId],
+    COMBAT.attack,
+    milestone + " selected punish pre-aim",
+  );
+  const readFirstOwnActions = () => execute(
+    firstVictim.base,
+    firstVictim.sessionId,
+    "return (window.__MYASO_ACCEPTANCE_STATE__?.ownActionTransitions ?? []).map((entry) => ({ ...entry }));",
   );
 
   await setMovementKey(roller, retreatKey, true);
@@ -3205,36 +3216,22 @@ async function runOnlineUiMultiKnockdownFfaHitFlight(entries) {
   let trigger = null;
   const triggerDeadline = Date.now() + COMBAT.dodge.durationMs + COMBAT.dodge.collisionKnockdownMs + 120;
   while (Date.now() < triggerDeadline && !trigger) {
-    const selection = await readRollerPrimarySelection();
-    const firstKnockdown = selection.focusNetId === firstVictimId
-      ? selection.focusActionTransitions.find((entry) =>
-        entry.action === COMBAT_ACTION.knockdown && Number.isFinite(entry.epochMs))
-      : null;
+    const firstActions = await readFirstOwnActions();
+    const firstKnockdown = firstActions.slice(firstActionOffset).find((entry) =>
+      entry.action === COMBAT_ACTION.knockdown && Number.isFinite(entry.epochMs));
     if (firstKnockdown) {
-      trigger = { firstKnockdown, selection };
+      trigger = { firstKnockdown };
       break;
     }
     await sleep(1);
   }
   if (!trigger) {
     await setMovementKey(roller, retreatKey, false);
-    throw new Error(milestone + " never observed Chrome #1 selecting the primary knockdown #"
+    throw new Error(milestone + " never observed authoritative primary knockdown #"
       + firstVictimId + ": " + JSON.stringify(await Promise.all(entries.map(readUiEvidence))));
   }
 
-  // Aim from the authoritative fighter coordinates at the actual primary
-  // knockdown moment. The selected #2 must stay inside the unchanged light
-  // arc while roller #1 and secondary #3 are explicitly excluded.
-  const punishAim = await aimArenaForExclusiveAuthoritativeTarget(
-    punisher,
-    punisherElementId,
-    firstVictimId,
-    [rollerId, secondVictimId],
-    COMBAT.attack,
-    milestone + " selected punish aim",
-  );
-
-  // Commit one genuine LMB immediately after the exclusive aim. Keep that
+  // Commit one genuine LMB immediately on #2's authoritative knockdown. Keep
   // same real button held while waiting for #3's authoritative knockdown, then
   // re-aim during the unchanged 135 ms light windup. This removes stale-facing
   // misses caused by #2's roll knockback/separation drift without changing
