@@ -3227,11 +3227,39 @@ async function runOnlineUiMultiKnockdownFfaHitFlight(entries) {
     milestone + " selected punish aim",
   );
 
-  // Commit one genuine LMB immediately after the exclusive aim. Provenance
-  // below still requires #3's knockdown before #4 becomes attack-active.
+  // Commit one genuine LMB immediately after the exclusive aim. Keep that
+  // same real button held while waiting for #3's authoritative knockdown, then
+  // re-aim during the unchanged 135 ms light windup. This removes stale-facing
+  // misses caused by #2's roll knockback/separation drift without changing
+  // attack reach, arc, windup, or the one-LMB provenance contract.
   await setArenaAttackButton(punisher, true);
-  await sleep(40);
+  let windupReaim = null;
+  const reaimDeadline = Date.now() + Math.max(80, COMBAT.attack.windupMs - 20);
+  while (!windupReaim && Date.now() < reaimDeadline) {
+    const secondState = await readUiEvidence(secondVictim);
+    const secondActions = (secondState?.acceptance?.ownActionTransitions ?? []).slice(secondActionOffset);
+    const secondKnockdown = secondActions.find((entry) =>
+      entry.action === COMBAT_ACTION.knockdown && Number.isFinite(entry.epochMs));
+    if (secondKnockdown) {
+      const aim = await aimArenaForExclusiveAuthoritativeTarget(
+        punisher,
+        punisherElementId,
+        firstVictimId,
+        [rollerId, secondVictimId],
+        COMBAT.attack,
+        milestone + " windup re-aim",
+      );
+      windupReaim = { secondKnockdown, aim };
+      break;
+    }
+    await sleep(2);
+  }
   await setArenaAttackButton(punisher, false);
+  if (!windupReaim) {
+    await setMovementKey(roller, retreatKey, false);
+    throw new Error(milestone + " did not refresh #4 aim on #3 knockdown before light active: "
+      + JSON.stringify(await Promise.all(entries.map(readUiEvidence))));
+  }
 
   let hitEvidence = null;
   let provenance = null;
@@ -3401,6 +3429,7 @@ async function runOnlineUiMultiKnockdownFfaHitFlight(entries) {
     m159SecondaryKnockdownEpochMs: provenance.secondKnockdown.epochMs,
     m159PunishPointerEpochMs: punishDown.epochMs,
     m159PunishActiveEpochMs: punishActive.epochMs,
+    m159WindupReaimDistance: windupReaim.aim.targetDistance,
   }));
 }
 
