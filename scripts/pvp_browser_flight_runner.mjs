@@ -3155,18 +3155,19 @@ async function runOnlineUiMultiKnockdownFfaHitFlight(entries) {
   const punishY = 120;
 
   // Shift the roll corridor down so #4 can sit safely above it. #3 is staged
-  // below the corridor and toward #2, with a few pixels of extra margin inside
-  // the unchanged 44 px roll-collision radius while preserving ordered hits.
-  // #4 stops around x=262, y=42: after #2's unchanged 34-unit roll knockback
-  // and fighter separation, #2 is inside the unchanged 94 px center-distance
-  // light reach while the roller and lower #3 remain outside it.
+  // below the corridor and slightly closer toward #2 for robust double-hit
+  // collision margin. #4 closes farther left and a little downward: after
+  // #2's unchanged 34-unit roll knockback, #2 is inside the unchanged 94 px
+  // center-distance light reach while the retreating roller and lower #3
+  // remain outside that same reach.
   await Promise.all([
     pulseMovementKey(roller, "s", 235),
     pulseMovementKey(firstVictim, "s", 235),
     pulseMovementKey(secondVictim, "s", 365),
-    pulseMovementKey(punisher, "a", 315),
+    pulseMovementKey(punisher, "a", 370),
   ]);
-  await pulseMovementKey(secondVictim, secondClusterKey, 320);
+  await pulseMovementKey(punisher, "s", 60);
+  await pulseMovementKey(secondVictim, secondClusterKey, 340);
   await pulseMovementKey(roller, rollKey, 120);
   await Promise.all([
     aimArena(roller, rollerElementId, rollOffset),
