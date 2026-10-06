@@ -3887,6 +3887,26 @@ async function runOnlineUiBoundedRollKnockdownFlight(entries) {
   const suppressorHorizontalKey = suppressorId > defenderId ? "a" : "d";
   const suppressorInitialX = suppressorId > defenderId ? -120 : 120;
 
+  const aimAtAuthoritativeTarget = async (entry, elementId, targetNetId) => {
+    const offset = await execute(entry.base, entry.sessionId, `
+      const a = window.__MYASO_ACCEPTANCE_STATE__;
+      const own = a?.fighters?.find((fighter) => fighter.netId === a.playerNetId);
+      const target = a?.fighters?.find((fighter) => fighter.netId === ${targetNetId});
+      const canvas = document.querySelector('#arena');
+      const rect = canvas.getBoundingClientRect();
+      if (!own || !target || !canvas || rect.width <= 0 || rect.height <= 0) return null;
+      return {
+        x: (target.x - own.x) * (rect.width / canvas.width),
+        y: (target.y - own.y) * (rect.height / canvas.height),
+      };
+    `);
+    if (!offset || !Number.isFinite(offset.x) || !Number.isFinite(offset.y)) {
+      throw new Error(milestone + " could not resolve authoritative target vector for #" + targetNetId);
+    }
+    await aimArena(entry, elementId, offset.x, offset.y);
+    return offset;
+  };
+
   // Browser spawns are 96 px apart. Move #3 down first, then horizontally
   // beside #2 so it cannot body-block the opener. Move #1 into body-spacing
   // range before the first roll so the unchanged 34 px knockback leaves #2
@@ -3909,26 +3929,6 @@ async function runOnlineUiBoundedRollKnockdownFlight(entries) {
     entry.sessionId,
     "const a=window.__MYASO_ACCEPTANCE_STATE__; return { ownActionTransitions:(a?.ownActionTransitions ?? []).map((item)=>({...item})), focusActionTransitions:(a?.focusActionTransitions ?? []).map((item)=>({...item})) };",
   );
-
-  const aimAtAuthoritativeTarget = async (entry, elementId, targetNetId) => {
-    const offset = await execute(entry.base, entry.sessionId, `
-      const a = window.__MYASO_ACCEPTANCE_STATE__;
-      const own = a?.fighters?.find((fighter) => fighter.netId === a.playerNetId);
-      const target = a?.fighters?.find((fighter) => fighter.netId === ${targetNetId});
-      const canvas = document.querySelector('#arena');
-      const rect = canvas.getBoundingClientRect();
-      if (!own || !target || !canvas || rect.width <= 0 || rect.height <= 0) return null;
-      return {
-        x: (target.x - own.x) * (rect.width / canvas.width),
-        y: (target.y - own.y) * (rect.height / canvas.height),
-      };
-    `);
-    if (!offset || !Number.isFinite(offset.x) || !Number.isFinite(offset.y)) {
-      throw new Error(milestone + " could not resolve authoritative target vector for #" + targetNetId);
-    }
-    await aimArena(entry, elementId, offset.x, offset.y);
-    return offset;
-  };
 
   const [defenderBefore, openerBefore, suppressorBefore] = await Promise.all([
     readOwnActions(defender),
