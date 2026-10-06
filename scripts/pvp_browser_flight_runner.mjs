@@ -5667,8 +5667,11 @@ async function runOnlineUiParryPunishWindowFlight(entries) {
     throw new Error(`${milestone} expected unchanged 650 ms parry stun, observed ${COMBAT.block.parryStunMs}`);
   }
 
+  const baselineAttackerHp = attackerState.playerHp;
+  const baselineAttackerGuard = attackerState.playerGuard;
   const baselineDefenderHp = defenderState.playerHp;
   const baselineDefenderGuard = defenderState.playerGuard;
+  const expectedAttackerHp = baselineAttackerHp - COMBAT.attack.damage;
   const defenderElementId = await resolveArenaElement(defender, milestone);
   await centerArenaInViewport(defender);
   const attackRight = attackerState.acceptance.playerNetId < defenderState.acceptance.playerNetId;
@@ -5692,12 +5695,14 @@ async function runOnlineUiParryPunishWindowFlight(entries) {
     const states = await Promise.all(entries.map(readUiEvidence));
     const currentAttacker = states.find((entry) => entry.browser === attacker.name);
     const currentDefender = states.find((entry) => entry.browser === defender.name);
-    if (currentAttacker?.playerHp === 66 && currentDefender?.opponentHp === 66) {
+    if (currentAttacker?.playerHp === expectedAttackerHp
+      && currentDefender?.opponentHp === expectedAttackerHp) {
       evidence = states;
       break;
     }
-    if ((Number.isFinite(currentAttacker?.playerHp) && currentAttacker.playerHp < 66)
+    if ((Number.isFinite(currentAttacker?.playerHp) && currentAttacker.playerHp < expectedAttackerHp)
       || (Number.isFinite(currentDefender?.playerHp) && currentDefender.playerHp !== baselineDefenderHp)
+      || (Number.isFinite(currentAttacker?.playerGuard) && currentAttacker.playerGuard !== baselineAttackerGuard)
       || (Number.isFinite(currentDefender?.playerGuard) && currentDefender.playerGuard !== baselineDefenderGuard)) {
       throw new Error(`${milestone} resolved unexpected combat while waiting for delayed punish: ${JSON.stringify(states)}`);
     }
@@ -5748,11 +5753,22 @@ async function runOnlineUiParryPunishWindowFlight(entries) {
   if (latestStunned < 0) {
     throw new Error(`${milestone} lost the authoritative parry-stun transition: ${JSON.stringify(finalTransitions)}`);
   }
-  if (attackerState.playerHp !== 66 || attackerState.playerGuard !== 100
-    || attackerState.opponentHp !== 100 || attackerState.opponentGuard !== 100
-    || defenderState.playerHp !== 100 || defenderState.playerGuard !== 100
-    || defenderState.opponentHp !== 66 || defenderState.opponentGuard !== 100) {
-    throw new Error(`${milestone} did not resolve exactly one 34-damage punish with clean guard/vitals: ${JSON.stringify(evidence)}`);
+  if (attackerState.playerHp !== expectedAttackerHp
+    || attackerState.playerGuard !== baselineAttackerGuard
+    || attackerState.opponentHp !== baselineDefenderHp
+    || attackerState.opponentGuard !== baselineDefenderGuard
+    || defenderState.playerHp !== baselineDefenderHp
+    || defenderState.playerGuard !== baselineDefenderGuard
+    || defenderState.opponentHp !== expectedAttackerHp
+    || defenderState.opponentGuard !== baselineAttackerGuard) {
+    throw new Error(`${milestone} did not resolve exactly one additional 34-damage punish with unchanged defender/guard state: ${JSON.stringify({
+      baselineAttackerHp,
+      baselineAttackerGuard,
+      baselineDefenderHp,
+      baselineDefenderGuard,
+      expectedAttackerHp,
+      evidence,
+    })}`);
   }
   if (!defenderState.events.includes("Opponent hit - 34 HP.")
     || !attackerState.events.includes("Hit taken - 34 HP.")) {
