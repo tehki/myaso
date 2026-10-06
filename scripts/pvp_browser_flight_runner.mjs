@@ -3163,7 +3163,7 @@ async function runOnlineUiMultiKnockdownFfaHitFlight(entries) {
   await Promise.all([
     pulseMovementKey(roller, "s", 235),
     pulseMovementKey(firstVictim, "s", 235),
-    pulseMovementKey(secondVictim, "s", 380),
+    pulseMovementKey(secondVictim, "s", 365),
     pulseMovementKey(punisher, "a", 315),
   ]);
   await pulseMovementKey(secondVictim, secondClusterKey, 320);
@@ -3184,10 +3184,10 @@ async function runOnlineUiMultiKnockdownFfaHitFlight(entries) {
   const secondActionOffset = secondBefore.acceptance?.ownActionTransitions?.length ?? 0;
   const punishPointerOffset = punisherBefore.pointers.length;
 
-  const readFirstOwnActions = () => execute(
-    firstVictim.base,
-    firstVictim.sessionId,
-    "return (window.__MYASO_ACCEPTANCE_STATE__?.ownActionTransitions ?? []).map((entry) => ({ ...entry }));",
+  const readRollerPrimarySelection = () => execute(
+    roller.base,
+    roller.sessionId,
+    "const a=window.__MYASO_ACCEPTANCE_STATE__; return { focusNetId:a?.focusNetId ?? 0, focusActionTransitions:(a?.focusActionTransitions ?? []).map((entry)=>({...entry})) };",
   );
 
   await setMovementKey(roller, retreatKey, true);
@@ -3196,23 +3196,26 @@ async function runOnlineUiMultiKnockdownFfaHitFlight(entries) {
   let trigger = null;
   const triggerDeadline = Date.now() + COMBAT.dodge.durationMs + COMBAT.dodge.collisionKnockdownMs + 120;
   while (Date.now() < triggerDeadline && !trigger) {
-    const firstActions = await readFirstOwnActions();
-    const firstKnockdown = firstActions.slice(firstActionOffset).find((entry) =>
-      entry.action === COMBAT_ACTION.knockdown && Number.isFinite(entry.epochMs));
+    const selection = await readRollerPrimarySelection();
+    const firstKnockdown = selection.focusNetId === firstVictimId
+      ? selection.focusActionTransitions.find((entry) =>
+        entry.action === COMBAT_ACTION.knockdown && Number.isFinite(entry.epochMs))
+      : null;
     if (firstKnockdown) {
-      trigger = { firstKnockdown };
+      trigger = { firstKnockdown, selection };
       break;
     }
     await sleep(1);
   }
   if (!trigger) {
     await setMovementKey(roller, retreatKey, false);
-    throw new Error(milestone + " never observed the primary roll knockdown on #"
+    throw new Error(milestone + " never observed Chrome #1 selecting the primary knockdown #"
       + firstVictimId + ": " + JSON.stringify(await Promise.all(entries.map(readUiEvidence))));
   }
 
   // Pointer is already aimed before the roll. Commit one genuine LMB on the
-  // first authoritative #2 knockdown snapshot. The provenance checks below
+  // earliest Chrome-observed primary knockdown instead of waiting for Firefox
+  // #2 to round-trip its own acceptance snapshot. The provenance checks below
   // still require #3's second knockdown to begin before #4 becomes attack-
   // active, so the actual 34 HP hit resolves during the overlap.
   await setArenaAttackButton(punisher, true);
