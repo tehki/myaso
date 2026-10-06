@@ -219,7 +219,8 @@ function recordAcceptanceState(state, ownId) {
   acceptance.playerNetId = ownId;
   acceptance.focusNetId = focusNetId;
   acceptance.serverTick = networkClient?.latestServerTick ?? 0;
-  if (acceptanceScenario === "uirollknockdownbounded") {
+  if (acceptanceScenario === "uirollknockdownbounded"
+    || acceptanceScenario === "uimultiknockdownffahit") {
     acceptance.fighters = [...state.values()].map((fighter) => ({
       netId: fighter.netId,
       x: fighter.x,
