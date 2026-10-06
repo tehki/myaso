@@ -8021,10 +8021,11 @@ async function runOnlineUiMultiRecoveryFfaFocusFlight(entries, spatial = false) 
 
   // Both attacks deliberately point away from Firefox so the proof is about
   // recovery arbitration, not damage. Start the shorter light attack first.
-  // M144 keeps its original overlap timing. M145 delays the jump chord further
-  // so Firefox gets a stable authoritative snapshot after #3 exits recovery
-  // while #1 is still recoverable; gameplay timings themselves are unchanged.
-  const jumpInputDelayMs = spatial ? 100 : 45;
+  // Keep both recovery windows overlapping, but leave enough authoritative
+  // server ticks after #3 exits recovery for Firefox to observe #1 as the
+  // remaining punishable target. The older 45 ms M144 stagger left only about
+  // two server ticks for that handoff under loaded CI.
+  const jumpInputDelayMs = spatial ? 100 : 90;
   let spatialSamples = [];
   if (spatial) await armRecoveryHandoffSampler(observer);
   await Promise.all([
