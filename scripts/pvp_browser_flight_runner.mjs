@@ -1376,21 +1376,43 @@ async function runOnlineUiRollBufferFlight(entries) {
 
   const attackRecovery = defenderResult.recoveryTransitions[attackRecoveryIndex];
   const attackRecoveryExit = defenderResult.recoveryTransitions[attackRecoveryExitIndex];
-  const bufferOpenEpochMs = attackRecovery.epochMs
+
+  // Prove buffering from the attacker's authoritative action stream using the
+  // same browser clock as the real wheel event. The successful buffered path
+  // must hand directly from attack recovery into dodge with no authoritative
+  // idle transition between them.
+  const ownActions = attackerResult.acceptance?.ownActionTransitions ?? [];
+  const ownAttackRecoveryIndex = ownActions.findIndex((entry) =>
+    entry.action === COMBAT_ACTION.attackRecovery
+      && Number.isFinite(entry.epochMs)
+      && Number.isFinite(entry.serverTick));
+  const ownDodgeIndex = ownActions.findIndex((entry, index) =>
+    index > ownAttackRecoveryIndex
+      && entry.action === COMBAT_ACTION.dodge
+      && Number.isFinite(entry.epochMs)
+      && Number.isFinite(entry.serverTick));
+  const ownIdleBetween = ownActions.find((entry, index) =>
+    index > ownAttackRecoveryIndex
+      && index < ownDodgeIndex
+      && entry.action === COMBAT_ACTION.idle);
+  if (ownAttackRecoveryIndex < 0 || ownDodgeIndex <= ownAttackRecoveryIndex || ownIdleBetween) {
+    throw new Error(`M129 authoritative buffered roll did not hand directly from attack recovery to dodge: ${JSON.stringify(ownActions)}`);
+  }
+
+  const ownAttackRecovery = ownActions[ownAttackRecoveryIndex];
+  const ownDodge = ownActions[ownDodgeIndex];
+  const bufferOpenEpochMs = ownAttackRecovery.epochMs
     + COMBAT.attack.recoveryMs - COMBAT.inputBuffer.dodgeWindowMs;
-  // Cross-browser Date.now() evidence is integer-millisecond resolution.
-  // Permit the exact same-ms recovery-clear tie only; a strictly later wheel
-  // still fails. The authoritative attack-recovery -> dodge-recovery sequence
-  // above independently proves the action was accepted through the buffer.
-  if (perpendicularAim.epochMs < attackRecovery.epochMs
+  if (perpendicularAim.epochMs < ownAttackRecovery.epochMs
     || rollWheel.epochMs < bufferOpenEpochMs
-    || rollWheel.epochMs > attackRecoveryExit.epochMs) {
-    throw new Error(`M129 genuine wheel was not inside Firefox's authoritative dodge-buffer interval: ${JSON.stringify({
-      attackRecovery,
-      attackRecoveryExit,
+    || rollWheel.epochMs > ownDodge.epochMs) {
+    throw new Error(`M129 genuine wheel was not inside the attacker's authoritative dodge-buffer interval: ${JSON.stringify({
+      ownAttackRecovery,
+      ownDodge,
       bufferOpenEpochMs,
       perpendicularAim,
       rollWheel,
+      ownActions,
     })}`);
   }
 
