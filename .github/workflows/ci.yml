@@ -513,6 +513,14 @@ jobs:
           node --test --test-name-pattern="roll collision consumes downed|roll collision knocks rival down" tests/combat-model.test.mjs
           node scripts/pvp_browser_flight_runner.mjs
 
+      - name: Validate M163 mixed-source bounded knockdown browser
+        run: |
+          node --check web/online-game.mjs
+          node --check scripts/pvp_browser_flight_runner.mjs
+          node --test --test-name-pattern="roll collision consumes downed|kick cannot refresh|roll collision knocks rival down|kick knockdown" tests/combat-model.test.mjs
+          MYASO_PVP_SCENARIO="uimixedknockdownrollkick" node scripts/pvp_browser_flight_runner.mjs
+          MYASO_PVP_SCENARIO="uimixedknockdownkickroll" node scripts/pvp_browser_flight_runner.mjs
+
       - name: Validate M156 actionable third-party roll knockdown punish
         env:
           MYASO_PVP_SCENARIO: "uirollknockdownffahit"
