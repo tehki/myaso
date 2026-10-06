@@ -478,6 +478,15 @@ jobs:
           node --test --test-name-pattern="FFA knockdown arbitration|FFA knockdown punish focus" tests/m29-combat-readability.test.mjs
           node scripts/pvp_browser_flight_runner.mjs
 
+      - name: Validate M159 actionable simultaneous FFA knockdown punish
+        env:
+          MYASO_PVP_SCENARIO: "uimultiknockdownffahit"
+        run: |
+          node --check web/online-game.mjs
+          node --check scripts/pvp_browser_flight_runner.mjs
+          node --test --test-name-pattern="FFA knockdown arbitration|FFA knockdown punish focus" tests/m29-combat-readability.test.mjs
+          node scripts/pvp_browser_flight_runner.mjs
+
       - name: Validate M156 actionable third-party roll knockdown punish
         env:
           MYASO_PVP_SCENARIO: "uirollknockdownffahit"
