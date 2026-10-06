@@ -1378,9 +1378,13 @@ async function runOnlineUiRollBufferFlight(entries) {
   const attackRecoveryExit = defenderResult.recoveryTransitions[attackRecoveryExitIndex];
   const bufferOpenEpochMs = attackRecovery.epochMs
     + COMBAT.attack.recoveryMs - COMBAT.inputBuffer.dodgeWindowMs;
+  // Cross-browser Date.now() evidence is integer-millisecond resolution.
+  // Permit the exact same-ms recovery-clear tie only; a strictly later wheel
+  // still fails. The authoritative attack-recovery -> dodge-recovery sequence
+  // above independently proves the action was accepted through the buffer.
   if (perpendicularAim.epochMs < attackRecovery.epochMs
     || rollWheel.epochMs < bufferOpenEpochMs
-    || rollWheel.epochMs >= attackRecoveryExit.epochMs) {
+    || rollWheel.epochMs > attackRecoveryExit.epochMs) {
     throw new Error(`M129 genuine wheel was not inside Firefox's authoritative dodge-buffer interval: ${JSON.stringify({
       attackRecovery,
       attackRecoveryExit,
