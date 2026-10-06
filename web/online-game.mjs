@@ -219,6 +219,14 @@ function recordAcceptanceState(state, ownId) {
   acceptance.playerNetId = ownId;
   acceptance.focusNetId = focusNetId;
   acceptance.serverTick = networkClient?.latestServerTick ?? 0;
+  if (acceptanceScenario === "uirollknockdownbounded") {
+    acceptance.fighters = [...state.values()].map((fighter) => ({
+      netId: fighter.netId,
+      x: fighter.x,
+      y: fighter.y,
+      action: fighter.action,
+    }));
+  }
   const epochMs = Date.now();
   recordAcceptanceAction(
     acceptance.ownActionTransitions,
