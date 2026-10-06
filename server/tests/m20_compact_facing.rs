@@ -12,6 +12,7 @@ fn record(net_id: u32, mask: u8, facing: u16) -> SnapshotRecord {
         facing,
         hp: 66,
         guard: 75,
+        stamina: 100,
         action: 1,
         flags: 2,
     }
