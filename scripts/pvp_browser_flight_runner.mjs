@@ -3831,6 +3831,237 @@ async function runOnlineUiRollKnockdownFfaFocusFlight(entries) {
   }));
 }
 
+
+async function runOnlineUiBoundedKickKnockdownFlight(entries) {
+  const milestone = "M161 bounded kick knockdown browser";
+  if (entries.length !== 3) {
+    throw new Error(milestone + " expected three real browser clients, received " + entries.length);
+  }
+
+  await Promise.all(entries.map(installUiObserver));
+  const ready = await waitForUiReady(entries);
+  const opener = entries.find((entry) => entry.name === "chrome");
+  const defender = entries.find((entry) => entry.name === "firefox");
+  const suppressor = entries.find((entry) => entry.name === "chrome2");
+  const openerReady = ready.find((entry) => entry.browser === opener?.name);
+  const defenderReady = ready.find((entry) => entry.browser === defender?.name);
+  const suppressorReady = ready.find((entry) => entry.browser === suppressor?.name);
+  if (!opener || !defender || !suppressor || !openerReady || !defenderReady || !suppressorReady) {
+    throw new Error(milestone + " could not resolve deterministic FFA roles: " + JSON.stringify(ready));
+  }
+
+  const openerId = openerReady.playerNetId;
+  const defenderId = defenderReady.playerNetId;
+  const suppressorId = suppressorReady.playerNetId;
+  await waitForUiThreePlayerReady(entries, [openerId, defenderId, suppressorId], 2500);
+  await Promise.all(entries.map((entry) => execute(
+    entry.base,
+    entry.sessionId,
+    "document.querySelector('#arena').focus(); return document.activeElement?.id;",
+  )));
+  await Promise.all(entries.map(centerArenaInViewport));
+
+  const openerElementId = await resolveArenaElement(opener, milestone + " opener");
+  const suppressorElementId = await resolveArenaElement(suppressor, milestone + " suppressor");
+  const attackRight = openerId < defenderId;
+  const openerMovementKey = attackRight ? "d" : "a";
+  const openerOffset = attackRight ? 200 : -200;
+  const suppressorOffset = suppressorId > defenderId ? -200 : 200;
+
+  // Reuse the proven M153 opener geometry. The unchanged 52-unit kick
+  // knockback naturally moves #2 toward idle #3, so #3 needs no extra
+  // movement to test a second kick against the active knockdown.
+  await pulseMovementKey(opener, openerMovementKey, 180);
+  await Promise.all([
+    aimArena(opener, openerElementId, openerOffset),
+    aimArena(suppressor, suppressorElementId, suppressorOffset),
+  ]);
+  await sleep(50);
+
+  const readOwnActions = (entry) => execute(
+    entry.base,
+    entry.sessionId,
+    "return (window.__MYASO_ACCEPTANCE_STATE__?.ownActionTransitions ?? []).map((item) => ({ ...item }));",
+  );
+
+  const [defenderBefore, openerBefore, suppressorBefore] = await Promise.all([
+    readOwnActions(defender),
+    readOwnActions(opener),
+    readOwnActions(suppressor),
+  ]);
+  const defenderOffset = defenderBefore.length;
+  const openerOffsetActions = openerBefore.length;
+  const suppressorOffsetActions = suppressorBefore.length;
+  const suppressorPointerOffset = (await readUiEvidence(suppressor)).pointers.length;
+
+  await performArenaRecoveryBufferedKick(opener, openerElementId, openerOffset, 45);
+
+  let firstKnockdown = null;
+  let openerKickActive = null;
+  const firstDeadline = Date.now() + COMBAT.kick.windupMs + COMBAT.kick.activeMs + 320;
+  while (Date.now() < firstDeadline && !firstKnockdown) {
+    const [defenderActions, openerActions] = await Promise.all([
+      readOwnActions(defender),
+      readOwnActions(opener),
+    ]);
+    firstKnockdown = defenderActions.slice(defenderOffset).find((entry) =>
+      entry.action === COMBAT_ACTION.knockdown && Number.isFinite(entry.epochMs)) ?? null;
+    openerKickActive = openerActions.slice(openerOffsetActions).find((entry) =>
+      entry.action === COMBAT_ACTION.kickActive && Number.isFinite(entry.epochMs)) ?? openerKickActive;
+    if (!firstKnockdown) await sleep(2);
+  }
+  if (!firstKnockdown || !openerKickActive) {
+    throw new Error(milestone + " opener never produced the first authoritative kick knockdown: "
+      + JSON.stringify(await Promise.all(entries.map(readUiEvidence))));
+  }
+
+  // Emit one genuine short RMB from #3 while #2 is already down. M160 must
+  // consume this control contact without resetting #2's original 360 ms timer.
+  await performArenaRecoveryBufferedKick(suppressor, suppressorElementId, suppressorOffset, 45);
+
+  let suppressedKickActive = null;
+  let originalRecovery = null;
+  const recoveryDeadline = Date.now() + COMBAT.kick.knockdownMs + 260;
+  while (Date.now() < recoveryDeadline && (!suppressedKickActive || !originalRecovery)) {
+    const [defenderActions, suppressorActions] = await Promise.all([
+      readOwnActions(defender),
+      readOwnActions(suppressor),
+    ]);
+    suppressedKickActive = suppressorActions.slice(suppressorOffsetActions).find((entry) =>
+      entry.action === COMBAT_ACTION.kickActive
+      && Number.isFinite(entry.epochMs)
+      && entry.epochMs >= firstKnockdown.epochMs) ?? suppressedKickActive;
+    originalRecovery = defenderActions.slice(defenderOffset).find((entry) =>
+      entry.action === COMBAT_ACTION.idle
+      && Number.isFinite(entry.epochMs)
+      && entry.epochMs > firstKnockdown.epochMs) ?? originalRecovery;
+    if (!suppressedKickActive || !originalRecovery) await sleep(3);
+  }
+
+  if (!suppressedKickActive || !originalRecovery) {
+    throw new Error(milestone + " did not observe suppressed kick plus original recovery: "
+      + JSON.stringify(await Promise.all(entries.map(readUiEvidence))));
+  }
+
+  const originalDurationObserved = originalRecovery.epochMs - firstKnockdown.epochMs;
+  const recoveryAfterSuppressedActive = originalRecovery.epochMs - suppressedKickActive.epochMs;
+  if (suppressedKickActive.epochMs <= firstKnockdown.epochMs
+    || suppressedKickActive.epochMs >= firstKnockdown.epochMs + COMBAT.kick.knockdownMs
+    || originalDurationObserved < COMBAT.kick.knockdownMs - 100
+    || originalDurationObserved > COMBAT.kick.knockdownMs + 120
+    || recoveryAfterSuppressedActive >= COMBAT.kick.knockdownMs - 60) {
+    throw new Error(milestone + " second kick appears to have refreshed the bounded knockdown: "
+      + JSON.stringify({
+        firstKnockdown,
+        suppressedKickActive,
+        originalRecovery,
+        originalDurationObserved,
+        recoveryAfterSuppressedActive,
+      }));
+  }
+
+  let states = await Promise.all(entries.map(readUiEvidence));
+  const openerState = states.find((entry) => entry.browser === opener.name);
+  const defenderState = states.find((entry) => entry.browser === defender.name);
+  const suppressorState = states.find((entry) => entry.browser === suppressor.name);
+  if (openerState?.playerHp !== 100 || openerState?.playerGuard !== 100
+    || defenderState?.playerHp !== 100 || defenderState?.playerGuard !== 100
+    || suppressorState?.playerHp !== 100 || suppressorState?.playerGuard !== 100) {
+    throw new Error(milestone + " control-only sequence changed health/guard: " + JSON.stringify(states));
+  }
+
+  const suppressedPointers = suppressorState.pointers.slice(suppressorPointerOffset);
+  const suppressedDown = suppressedPointers.find((entry) => entry.type === "pointerdown" && entry.button === 2);
+  const suppressedUp = suppressedPointers.find((entry) => entry.type === "pointerup" && entry.button === 2);
+  if (!suppressedDown || !suppressedUp
+    || !Number.isFinite(suppressedDown.epochMs) || !Number.isFinite(suppressedUp.epochMs)
+    || suppressedUp.epochMs <= suppressedDown.epochMs
+    || suppressedUp.epochMs - suppressedDown.epochMs >= 180) {
+    throw new Error(milestone + " did not deliver a genuine short RMB suppression kick: "
+      + JSON.stringify(suppressedPointers));
+  }
+
+  // Wait for #3's first kick recovery to finish, then repeat the exact same
+  // short RMB from the same position. Once #2 is standing, this must create a
+  // new knockdown, proving the suppressed attempt used real hittable geometry.
+  let suppressorIdle = null;
+  const idleDeadline = Date.now() + COMBAT.kick.recoveryMs + 500;
+  while (Date.now() < idleDeadline && !suppressorIdle) {
+    const actions = await readOwnActions(suppressor);
+    const activeIndex = actions.findIndex((entry) =>
+      entry.action === COMBAT_ACTION.kickActive
+      && Number.isFinite(entry.epochMs)
+      && entry.epochMs === suppressedKickActive.epochMs);
+    suppressorIdle = actions.find((entry, index) =>
+      index > activeIndex
+      && entry.action === COMBAT_ACTION.idle
+      && Number.isFinite(entry.epochMs)) ?? null;
+    if (!suppressorIdle) await sleep(5);
+  }
+  if (!suppressorIdle) {
+    throw new Error(milestone + " suppressor never returned idle before verification kick");
+  }
+
+  const defenderActionsBeforeVerify = await readOwnActions(defender);
+  const verifyDefenderOffset = defenderActionsBeforeVerify.length;
+  const suppressorActionsBeforeVerify = await readOwnActions(suppressor);
+  const verifySuppressorOffset = suppressorActionsBeforeVerify.length;
+  const verifyPointerOffset = (await readUiEvidence(suppressor)).pointers.length;
+
+  await performArenaRecoveryBufferedKick(suppressor, suppressorElementId, suppressorOffset, 45);
+
+  let verificationKnockdown = null;
+  let verificationKickActive = null;
+  const verifyDeadline = Date.now() + COMBAT.kick.windupMs + COMBAT.kick.activeMs + 360;
+  while (Date.now() < verifyDeadline && (!verificationKnockdown || !verificationKickActive)) {
+    const [defenderActions, suppressorActions] = await Promise.all([
+      readOwnActions(defender),
+      readOwnActions(suppressor),
+    ]);
+    verificationKnockdown = defenderActions.slice(verifyDefenderOffset).find((entry) =>
+      entry.action === COMBAT_ACTION.knockdown && Number.isFinite(entry.epochMs)) ?? verificationKnockdown;
+    verificationKickActive = suppressorActions.slice(verifySuppressorOffset).find((entry) =>
+      entry.action === COMBAT_ACTION.kickActive && Number.isFinite(entry.epochMs)) ?? verificationKickActive;
+    if (!verificationKnockdown || !verificationKickActive) await sleep(3);
+  }
+
+  states = await Promise.all(entries.map(readUiEvidence));
+  const finalOpener = states.find((entry) => entry.browser === opener.name);
+  const finalDefender = states.find((entry) => entry.browser === defender.name);
+  const finalSuppressor = states.find((entry) => entry.browser === suppressor.name);
+  if (!verificationKnockdown || !verificationKickActive
+    || verificationKnockdown.epochMs <= originalRecovery.epochMs
+    || finalOpener?.playerHp !== 100 || finalOpener?.playerGuard !== 100
+    || finalDefender?.playerHp !== 100 || finalDefender?.playerGuard !== 100
+    || finalSuppressor?.playerHp !== 100 || finalSuppressor?.playerGuard !== 100) {
+    throw new Error(milestone + " identical post-recovery kick did not create a fresh clean knockdown: "
+      + JSON.stringify(states));
+  }
+
+  const verifyPointers = finalSuppressor.pointers.slice(verifyPointerOffset);
+  const verifyDown = verifyPointers.find((entry) => entry.type === "pointerdown" && entry.button === 2);
+  const verifyUp = verifyPointers.find((entry) => entry.type === "pointerup" && entry.button === 2);
+  if (!verifyDown || !verifyUp
+    || !Number.isFinite(verifyDown.epochMs) || !Number.isFinite(verifyUp.epochMs)
+    || verifyUp.epochMs <= verifyDown.epochMs
+    || verifyUp.epochMs - verifyDown.epochMs >= 180) {
+    throw new Error(milestone + " verification kick lacked genuine short RMB provenance: "
+      + JSON.stringify(verifyPointers));
+  }
+
+  return states.map((entry) => ({
+    ...entry,
+    m161OpenerId: openerId,
+    m161DefenderId: defenderId,
+    m161SuppressorId: suppressorId,
+    m161FirstKnockdownEpochMs: firstKnockdown.epochMs,
+    m161SuppressedKickActiveEpochMs: suppressedKickActive.epochMs,
+    m161OriginalRecoveryEpochMs: originalRecovery.epochMs,
+    m161OriginalDurationObservedMs: originalDurationObserved,
+    m161VerificationKnockdownEpochMs: verificationKnockdown.epochMs,
+  }));
+}
+
 async function runOnlineUiKickKnockdownFfaFocusFlight(entries) {
   const milestone = "M153 kick knockdown FFA focus";
   if (entries.length !== 3) {
