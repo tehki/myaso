@@ -2602,12 +2602,6 @@ async function runOnlineUiKickKnockdownFfaHitFlight(entries) {
   const kickOffset = kickRight ? 200 : -200;
   const punishOffset = punisherId < defenderId ? 200 : -200;
 
-  const readDefenderOwnActions = () => execute(
-    defender.base,
-    defender.sessionId,
-    "return (window.__MYASO_ACCEPTANCE_STATE__?.ownActionTransitions ?? []).map((entry) => ({ ...entry }));",
-  );
-
   // #3 starts on the far side of #2. The unchanged 52-unit kick knockback
   // moves #2 into #3's unchanged 76-unit light reach, so a third fighter can
   // convert the 360 ms knockdown without widening any gameplay timing.
@@ -3426,6 +3420,12 @@ async function runOnlineUiRollKnockdownFfaHitFlight(entries) {
   const retreatKey = rollRight ? "a" : "d";
   const rollOffset = rollRight ? 200 : -200;
   const punishOffset = punisherId < defenderId ? 200 : -200;
+
+  const readDefenderOwnActions = () => execute(
+    defender.base,
+    defender.sessionId,
+    "return (window.__MYASO_ACCEPTANCE_STATE__?.ownActionTransitions ?? []).map((entry) => ({ ...entry }));",
+  );
 
   // Separate the two possible light targets without changing combat reach.
   // Keep #3 at neutral spacing so the unchanged 34-unit roll knockback can
