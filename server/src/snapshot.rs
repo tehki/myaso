@@ -1332,7 +1332,11 @@ pub fn decode_snapshot(bytes: &[u8]) -> Result<DecodedSnapshot, SnapshotDecodeEr
             facing: 0,
             hp: 0,
             guard: 0,
-            stamina: 100,
+            stamina: if mask & SNAPSHOT_FIELD_REMOVED != 0 {
+                0
+            } else {
+                100
+            },
             action: 0,
             flags: 0,
         };
