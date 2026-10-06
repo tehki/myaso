@@ -3984,16 +3984,16 @@ async function runOnlineUiBoundedRollKnockdownFlight(entries) {
   let firstKnockdown = null;
   let openerDodge = null;
   const firstDeadline = Date.now() + COMBAT.dodge.durationMs + 240;
-  while (Date.now() < firstDeadline && !firstKnockdown) {
+  while (Date.now() < firstDeadline && (!firstKnockdown || !openerDodge)) {
     const [defenderActions, openerActions] = await Promise.all([
       readOwnActions(defender),
       readOwnActions(opener),
     ]);
-    firstKnockdown = defenderActions.slice(defenderOffset).find((entry) =>
+    firstKnockdown = firstKnockdown ?? defenderActions.slice(defenderOffset).find((entry) =>
       entry.action === COMBAT_ACTION.knockdown && Number.isFinite(entry.epochMs)) ?? null;
-    openerDodge = openerActions.slice(openerOffsetActions).find((entry) =>
-      entry.action === COMBAT_ACTION.dodge && Number.isFinite(entry.epochMs)) ?? openerDodge;
-    if (!firstKnockdown) await sleep(1);
+    openerDodge = openerDodge ?? openerActions.slice(openerOffsetActions).find((entry) =>
+      entry.action === COMBAT_ACTION.dodge && Number.isFinite(entry.epochMs)) ?? null;
+    if (!firstKnockdown || !openerDodge) await sleep(1);
   }
   if (!firstKnockdown || !openerDodge) {
     await setMovementKey(opener, openerMovementKey, false);
