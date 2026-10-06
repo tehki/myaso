@@ -3155,14 +3155,15 @@ async function runOnlineUiMultiKnockdownFfaHitFlight(entries) {
   const punishY = 120;
 
   // Shift the roll corridor down so #4 can sit safely above it. #3 is staged
-  // below the corridor and toward #2, preserving the M158 ordered double-hit.
+  // below the corridor and toward #2, with a few pixels of extra margin inside
+  // the unchanged 44 px roll-collision radius while preserving ordered hits.
   // #4 stops around x=262, y=42: after #2's unchanged 34-unit roll knockback
   // and fighter separation, #2 is inside the unchanged 94 px center-distance
   // light reach while the roller and lower #3 remain outside it.
   await Promise.all([
     pulseMovementKey(roller, "s", 235),
     pulseMovementKey(firstVictim, "s", 235),
-    pulseMovementKey(secondVictim, "s", 405),
+    pulseMovementKey(secondVictim, "s", 380),
     pulseMovementKey(punisher, "a", 315),
   ]);
   await pulseMovementKey(secondVictim, secondClusterKey, 320);
@@ -3183,15 +3184,10 @@ async function runOnlineUiMultiKnockdownFfaHitFlight(entries) {
   const secondActionOffset = secondBefore.acceptance?.ownActionTransitions?.length ?? 0;
   const punishPointerOffset = punisherBefore.pointers.length;
 
-  const readFirstOwnActions = () => execute(
-    firstVictim.base,
-    firstVictim.sessionId,
+  const readSecondOwnActions = () => execute(
+    secondVictim.base,
+    secondVictim.sessionId,
     "return (window.__MYASO_ACCEPTANCE_STATE__?.ownActionTransitions ?? []).map((entry) => ({ ...entry }));",
-  );
-  const readPunisherSelection = () => execute(
-    punisher.base,
-    punisher.sessionId,
-    "const a=window.__MYASO_ACCEPTANCE_STATE__; return { focusNetId:a?.focusNetId ?? 0, focusActionTransitions:(a?.focusActionTransitions ?? []).map((entry)=>({...entry})) };",
   );
 
   await setMovementKey(roller, retreatKey, true);
@@ -3200,31 +3196,25 @@ async function runOnlineUiMultiKnockdownFfaHitFlight(entries) {
   let trigger = null;
   const triggerDeadline = Date.now() + COMBAT.dodge.durationMs + COMBAT.dodge.collisionKnockdownMs + 120;
   while (Date.now() < triggerDeadline && !trigger) {
-    const [firstActions, selection] = await Promise.all([
-      readFirstOwnActions(),
-      readPunisherSelection(),
-    ]);
-    const firstKnockdown = firstActions.slice(firstActionOffset).find((entry) =>
+    const secondActions = await readSecondOwnActions();
+    const secondKnockdown = secondActions.slice(secondActionOffset).find((entry) =>
       entry.action === COMBAT_ACTION.knockdown && Number.isFinite(entry.epochMs));
-    const primarySelected = selection.focusNetId === firstVictimId
-      && selection.focusActionTransitions.some((entry) =>
-        entry.action === COMBAT_ACTION.knockdown && Number.isFinite(entry.epochMs));
-    if (firstKnockdown && primarySelected) {
-      trigger = { firstKnockdown, selection };
+    if (secondKnockdown) {
+      trigger = { secondKnockdown };
       break;
     }
-    await sleep(2);
+    await sleep(1);
   }
   if (!trigger) {
     await setMovementKey(roller, retreatKey, false);
-    throw new Error(milestone + " never observed primary knockdown selection on #"
-      + firstVictimId + ": " + JSON.stringify(await Promise.all(entries.map(readUiEvidence))));
+    throw new Error(milestone + " never observed the secondary roll knockdown on #"
+      + secondVictimId + ": " + JSON.stringify(await Promise.all(entries.map(readUiEvidence))));
   }
 
-  // Pointer is already aimed before the roll. Commit one genuine LMB as soon
-  // as #4 selects the first knocked-down fighter. The second roll collision
-  // must then occur before this light becomes attack-active, so the actual hit
-  // is still resolved while both unchanged knockdown windows overlap.
+  // Pointer is already aimed before the roll. Commit one genuine LMB on the
+  // first authoritative #3 knockdown snapshot. This proves both knockdowns
+  // exist before the attack, while deterministic primary #2 selection is
+  // validated afterward from the recorded focus transitions.
   await setArenaAttackButton(punisher, true);
   await sleep(40);
   await setArenaAttackButton(punisher, false);
