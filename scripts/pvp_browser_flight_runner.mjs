@@ -3158,8 +3158,6 @@ async function runOnlineUiMultiKnockdownFfaHitFlight(entries) {
   const retreatKey = rollRight ? "a" : "d";
   const secondClusterKey = secondVictimId > firstVictimId ? "a" : "d";
   const rollOffset = rollRight ? 200 : -200;
-  const punishX = -180;
-  const punishY = 60;
 
   // Shift the roll corridor down so #4 can remain safely above it. Stage #1
   // closer to #2 before the roll so the unchanged 117 px dodge travel carries
@@ -3175,10 +3173,7 @@ async function runOnlineUiMultiKnockdownFfaHitFlight(entries) {
   ]);
   await pulseMovementKey(secondVictim, secondClusterKey, 340);
   await pulseMovementKey(roller, rollKey, 210);
-  await Promise.all([
-    aimArena(roller, rollerElementId, rollOffset),
-    aimArena(punisher, punisherElementId, punishX, punishY),
-  ]);
+  await aimArena(roller, rollerElementId, rollOffset);
   await sleep(50);
 
   const beforeStates = await Promise.all(entries.map(readUiEvidence));
@@ -3220,11 +3215,20 @@ async function runOnlineUiMultiKnockdownFfaHitFlight(entries) {
       + firstVictimId + ": " + JSON.stringify(await Promise.all(entries.map(readUiEvidence))));
   }
 
-  // Pointer is already aimed before the roll. Commit one genuine LMB on the
-  // earliest Chrome-observed primary knockdown instead of waiting for Firefox
-  // #2 to round-trip its own acceptance snapshot. The provenance checks below
-  // still require #3's second knockdown to begin before #4 becomes attack-
-  // active, so the actual 34 HP hit resolves during the overlap.
+  // Aim from the authoritative fighter coordinates at the actual primary
+  // knockdown moment. The selected #2 must stay inside the unchanged light
+  // arc while roller #1 and secondary #3 are explicitly excluded.
+  const punishAim = await aimArenaForExclusiveAuthoritativeTarget(
+    punisher,
+    punisherElementId,
+    firstVictimId,
+    [rollerId, secondVictimId],
+    COMBAT.attack,
+    milestone + " selected punish aim",
+  );
+
+  // Commit one genuine LMB immediately after the exclusive aim. Provenance
+  // below still requires #3's knockdown before #4 becomes attack-active.
   await setArenaAttackButton(punisher, true);
   await sleep(40);
   await setArenaAttackButton(punisher, false);
@@ -3313,10 +3317,9 @@ async function runOnlineUiMultiKnockdownFfaHitFlight(entries) {
     || !Number.isFinite(punishDown?.epochMs)
     || punishDown.epochMs < provenance.rollTransition.epochMs
     || punishDown.epochMs < provenance.firstKnockdown.epochMs - 40
-    || punishDown.epochMs >= provenance.firstKnockdown.epochMs + COMBAT.dodge.collisionKnockdownMs
-    || punishDown.x >= 0.5 || punishDown.y <= 0.5) {
+    || punishDown.epochMs >= provenance.firstKnockdown.epochMs + COMBAT.dodge.collisionKnockdownMs) {
     throw new Error(milestone + " genuine #4 LMB did not target the selected overlap window: "
-      + JSON.stringify({ punishPointers, provenance }));
+      + JSON.stringify({ punishPointers, provenance, punishAim }));
   }
 
   const punisherActions = punisherState.acceptance?.ownActionTransitions ?? [];
