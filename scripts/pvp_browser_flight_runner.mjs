@@ -3192,7 +3192,7 @@ async function runOnlineUiMultiKnockdownFfaHitFlight(entries) {
     pulseMovementKey(roller, "s", 235),
     pulseMovementKey(firstVictim, "s", 235),
     pulseMovementKey(secondVictim, "s", 365),
-    pulseMovementKey(punisher, "a", 940),
+    pulseMovementKey(punisher, "a", 900),
   ]);
   await pulseMovementKey(secondVictim, secondClusterKey, 340);
   await pulseMovementKey(roller, rollKey, 210);
