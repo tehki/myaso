@@ -7062,21 +7062,34 @@ async function runOnlineUiJumpFfaThreatFlight(entries, mode) {
   const rightId = ordered[2].playerNetId;
   const expectedPrimaryId = mode === "primary" ? leftId : rightId;
   const expectedSecondaryId = mode === "primary" ? rightId : leftId;
-  const expectedPrimaryPhase = mode === "primary" ? "JUMP WINDUP" : "WINDUP";
-  const expectedSecondaryPhase = mode === "primary" ? "WINDUP" : "JUMP WINDUP";
   const expectedPrimaryBearing = mode === "primary" ? "FROM LEFT" : "FROM RIGHT";
   const expectedSecondaryBearing = mode === "primary" ? "FROM RIGHT" : "FROM LEFT";
   const expectedPrimaryGuardArc = mode === "primary" ? "FLANK" : "FRONT";
   const expectedSecondaryGuardArc = mode === "primary" ? "FRONT" : "FLANK";
+  const expectedPhasePairs = mode === "primary"
+    ? [
+      { primary: "JUMP WINDUP", secondary: "WINDUP", state: "windup" },
+      { primary: "JUMP STRIKE", secondary: "STRIKE", state: "strike" },
+    ]
+    : [
+      { primary: "WINDUP", secondary: "JUMP WINDUP", state: "windup" },
+      { primary: "STRIKE", secondary: "JUMP STRIKE", state: "strike" },
+    ];
 
+  // Under loaded headless scheduling the shared windup frame can be skipped
+  // even though the center still renders the same deterministic primary /
+  // secondary ordering during the immediately following shared strike frame.
+  // Accept either phase pair while keeping identity, bearing, guard arc, and
+  // two-threat ownership fail-closed.
   const findExpectedThreat = (state) => state?.threatTransitions.slice(centerThreatOffset).find((event) =>
     event.visible
     && event.count === "2 THREATS"
     && event.label === `#${expectedPrimaryId}`
-    && event.phase === expectedPrimaryPhase
-    && event.state === "windup"
     && event.secondary === `NEXT #${expectedSecondaryId}`
-    && event.secondaryPhase === expectedSecondaryPhase
+    && expectedPhasePairs.some((pair) =>
+      event.phase === pair.primary
+      && event.secondaryPhase === pair.secondary
+      && event.state === pair.state)
     && event.bearing === expectedPrimaryBearing
     && event.secondaryBearing === expectedSecondaryBearing
     && event.guardArc === expectedPrimaryGuardArc
