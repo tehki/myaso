@@ -3178,9 +3178,9 @@ async function runOnlineUiMultiKnockdownFfaHitFlight(entries) {
   const secondActionOffset = secondBefore.acceptance?.ownActionTransitions?.length ?? 0;
   const punishPointerOffset = punisherBefore.pointers.length;
 
-  const readSecondOwnActions = () => execute(
-    secondVictim.base,
-    secondVictim.sessionId,
+  const readFirstOwnActions = () => execute(
+    firstVictim.base,
+    firstVictim.sessionId,
     "return (window.__MYASO_ACCEPTANCE_STATE__?.ownActionTransitions ?? []).map((entry) => ({ ...entry }));",
   );
 
@@ -3190,25 +3190,25 @@ async function runOnlineUiMultiKnockdownFfaHitFlight(entries) {
   let trigger = null;
   const triggerDeadline = Date.now() + COMBAT.dodge.durationMs + COMBAT.dodge.collisionKnockdownMs + 120;
   while (Date.now() < triggerDeadline && !trigger) {
-    const secondActions = await readSecondOwnActions();
-    const secondKnockdown = secondActions.slice(secondActionOffset).find((entry) =>
+    const firstActions = await readFirstOwnActions();
+    const firstKnockdown = firstActions.slice(firstActionOffset).find((entry) =>
       entry.action === COMBAT_ACTION.knockdown && Number.isFinite(entry.epochMs));
-    if (secondKnockdown) {
-      trigger = { secondKnockdown };
+    if (firstKnockdown) {
+      trigger = { firstKnockdown };
       break;
     }
     await sleep(1);
   }
   if (!trigger) {
     await setMovementKey(roller, retreatKey, false);
-    throw new Error(milestone + " never observed the secondary roll knockdown on #"
-      + secondVictimId + ": " + JSON.stringify(await Promise.all(entries.map(readUiEvidence))));
+    throw new Error(milestone + " never observed the primary roll knockdown on #"
+      + firstVictimId + ": " + JSON.stringify(await Promise.all(entries.map(readUiEvidence))));
   }
 
   // Pointer is already aimed before the roll. Commit one genuine LMB on the
-  // first authoritative #3 knockdown snapshot. This proves both knockdowns
-  // exist before the attack, while deterministic primary #2 selection is
-  // validated afterward from the recorded focus transitions.
+  // first authoritative #2 knockdown snapshot. The provenance checks below
+  // still require #3's second knockdown to begin before #4 becomes attack-
+  // active, so the actual 34 HP hit resolves during the overlap.
   await setArenaAttackButton(punisher, true);
   await sleep(40);
   await setArenaAttackButton(punisher, false);
