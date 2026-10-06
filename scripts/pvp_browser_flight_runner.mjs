@@ -3159,23 +3159,22 @@ async function runOnlineUiMultiKnockdownFfaHitFlight(entries) {
   const secondClusterKey = secondVictimId > firstVictimId ? "a" : "d";
   const rollOffset = rollRight ? 200 : -200;
   const punishX = -180;
-  const punishY = 120;
+  const punishY = 60;
 
-  // Shift the roll corridor down so #4 can sit safely above it. #3 is staged
-  // below the corridor and slightly closer toward #2 for robust double-hit
-  // collision margin. #4 closes farther left and a little downward: after
-  // #2's unchanged 34-unit roll knockback, #2 is inside the unchanged 94 px
-  // center-distance light reach while the retreating roller and lower #3
-  // remain outside that same reach.
+  // Shift the roll corridor down so #4 can remain safely above it. Stage #1
+  // closer to #2 before the roll so the unchanged 117 px dodge travel carries
+  // the roller clearly past #2 after impact. Put #4 near the midpoint between
+  // their eventual x positions but keep it >44 px above the roll corridor.
+  // A shallow down-left aim then includes selected #2 while excluding both
+  // the farther-right roller and the lower #3 by the unchanged light arc.
   await Promise.all([
     pulseMovementKey(roller, "s", 235),
     pulseMovementKey(firstVictim, "s", 235),
     pulseMovementKey(secondVictim, "s", 365),
-    pulseMovementKey(punisher, "a", 370),
+    pulseMovementKey(punisher, "a", 660),
   ]);
-  await pulseMovementKey(punisher, "s", 60);
   await pulseMovementKey(secondVictim, secondClusterKey, 340);
-  await pulseMovementKey(roller, rollKey, 120);
+  await pulseMovementKey(roller, rollKey, 210);
   await Promise.all([
     aimArena(roller, rollerElementId, rollOffset),
     aimArena(punisher, punisherElementId, punishX, punishY),
