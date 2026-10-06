@@ -3892,10 +3892,8 @@ async function runOnlineUiBoundedRollKnockdownFlight(entries) {
   await pulseMovementKey(suppressor, "s", 255);
   await pulseMovementKey(suppressor, suppressorHorizontalKey, 285);
   await pulseMovementKey(opener, openerMovementKey, 280);
-  await Promise.all([
-    aimArena(opener, openerElementId, openerOffset),
-    aimArena(suppressor, suppressorElementId, suppressorInitialX, -200),
-  ]);
+  await aimArena(opener, openerElementId, openerOffset);
+  await aimAtAuthoritativeTarget(suppressor, suppressorElementId, defenderId);
   await sleep(50);
 
   const readOwnActions = (entry) => execute(
@@ -3908,6 +3906,26 @@ async function runOnlineUiBoundedRollKnockdownFlight(entries) {
     entry.sessionId,
     "const a=window.__MYASO_ACCEPTANCE_STATE__; return { ownActionTransitions:(a?.ownActionTransitions ?? []).map((item)=>({...item})), focusActionTransitions:(a?.focusActionTransitions ?? []).map((item)=>({...item})) };",
   );
+
+  const aimAtAuthoritativeTarget = async (entry, elementId, targetNetId) => {
+    const offset = await execute(entry.base, entry.sessionId, `
+      const a = window.__MYASO_ACCEPTANCE_STATE__;
+      const own = a?.fighters?.find((fighter) => fighter.netId === a.playerNetId);
+      const target = a?.fighters?.find((fighter) => fighter.netId === ${targetNetId});
+      const canvas = document.querySelector('#arena');
+      const rect = canvas.getBoundingClientRect();
+      if (!own || !target || !canvas || rect.width <= 0 || rect.height <= 0) return null;
+      return {
+        x: (target.x - own.x) * (rect.width / canvas.width),
+        y: (target.y - own.y) * (rect.height / canvas.height),
+      };
+    `);
+    if (!offset || !Number.isFinite(offset.x) || !Number.isFinite(offset.y)) {
+      throw new Error(milestone + " could not resolve authoritative target vector for #" + targetNetId);
+    }
+    await aimArena(entry, elementId, offset.x, offset.y);
+    return offset;
+  };
 
   const [defenderBefore, openerBefore, suppressorBefore] = await Promise.all([
     readOwnActions(defender),
@@ -3945,6 +3963,10 @@ async function runOnlineUiBoundedRollKnockdownFlight(entries) {
     throw new Error(milestone + " opener never produced the first authoritative roll knockdown: "
       + JSON.stringify(await Promise.all(entries.map(readUiEvidence))));
   }
+
+  // #2 has moved by the opener's unchanged 34 px knockback. Re-aim #3 using
+  // the authoritative world delta before waiting for the late suppression roll.
+  await aimAtAuthoritativeTarget(suppressor, suppressorElementId, defenderId);
 
   // Start #3's genuine wheel-forward roll late in #2's original 260 ms down
   // window. #1 has cleared the lane by then. #3's roll remains active when
@@ -4065,7 +4087,7 @@ async function runOnlineUiBoundedRollKnockdownFlight(entries) {
   // #2 after its first diagonal roll; a real opposite-direction wheel-forward
   // from that endpoint must knock the now-standing #2 down normally.
   await pulseMovementKey(opener, "s", 300);
-  await aimArena(suppressor, suppressorElementId, -suppressorInitialX, 200);
+  await aimAtAuthoritativeTarget(suppressor, suppressorElementId, defenderId);
   await sleep(40);
 
   const defenderBeforeVerify = await readOwnActions(defender);
