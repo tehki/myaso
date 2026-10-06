@@ -1280,7 +1280,9 @@ fn resolve_attacks(
             if profile.kick && fighters[target_index].action == Action::Knockdown {
                 // Consume this target for the active kick without extending
                 // its existing bounded knockdown.
-                fighters[attacker_index].attack_hit_targets.insert(target_id);
+                fighters[attacker_index]
+                    .attack_hit_targets
+                    .insert(target_id);
                 continue;
             }
 
