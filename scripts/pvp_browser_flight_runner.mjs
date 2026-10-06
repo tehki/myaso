@@ -2616,83 +2616,99 @@ async function runOnlineUiKickKnockdownFfaHitFlight(entries) {
   await aimArena(punisher, punisherElementId, punishOffset);
   await sleep(60);
 
+  const readDefenderOwnActions = () => execute(
+    defender.base,
+    defender.sessionId,
+    "return (window.__MYASO_ACCEPTANCE_STATE__?.ownActionTransitions ?? []).map((entry) => ({ ...entry }));",
+  );
+
   let conversion = null;
   for (let attempt = 1; attempt <= 3 && !conversion; attempt += 1) {
-    const kickerBefore = await readUiEvidence(kicker);
+    const [kickerBefore, defenderBefore, punisherBefore] = await Promise.all([
+      readUiEvidence(kicker),
+      readUiEvidence(defender),
+      readUiEvidence(punisher),
+    ]);
     const kickerPointerOffset = kickerBefore.pointers.length;
+    const defenderActionOffset = defenderBefore.acceptance?.ownActionTransitions?.length ?? 0;
+    const punishPointerOffset = punisherBefore.pointers.length;
+
     await performArenaRecoveryBufferedKick(kicker, kickerElementId, kickOffset, 45);
 
+    // Poll only #2's authoritative action stream so the real LMB can start on
+    // the first knockdown snapshot. Kick phase/HUD provenance may replicate a
+    // frame later and is validated after the punish has already been committed.
     const setupDeadline = Date.now() + COMBAT.kick.windupMs + COMBAT.kick.activeMs
-      + COMBAT.kick.knockdownMs + 220;
-    while (Date.now() < setupDeadline) {
-      const states = await Promise.all(entries.map(readUiEvidence));
-      const kickerState = states.find((entry) => entry.browser === kicker.name);
-      const defenderState = states.find((entry) => entry.browser === defender.name);
-      const punisherState = states.find((entry) => entry.browser === punisher.name);
-      const kickerActions = kickerState?.acceptance?.ownActionTransitions ?? [];
-      const defenderActions = defenderState?.acceptance?.ownActionTransitions ?? [];
-      const kickWindup = kickerActions
-        .filter((entry) => entry.action === COMBAT_ACTION.kickWindup && Number.isFinite(entry.epochMs))
-        .at(-1);
-      const kickActive = kickerActions
-        .filter((entry) => entry.action === COMBAT_ACTION.kickActive && Number.isFinite(entry.epochMs))
-        .at(-1);
-      const knockdownTransition = defenderActions
-        .filter((entry) => entry.action === COMBAT_ACTION.knockdown && Number.isFinite(entry.epochMs))
-        .at(-1);
-      const punisherFocusKnockdown = punisherState?.acceptance?.focusNetId === defenderId
-        && (punisherState?.acceptance?.focusActionTransitions ?? []).some((entry) =>
-          entry.action === COMBAT_ACTION.knockdown && Number.isFinite(entry.epochMs));
-      const punishReadability = punisherState?.focusLabel === "KNOCKDOWN #" + defenderId
-        && punisherState?.recoveryVisible
-        && punisherState?.recoveryState === "knockdown"
-        && punisherState?.recoveryLabel === "PUNISH"
-        && punisherState?.recoveryDetail === "Knockdown recovery";
-      const vitalsClean = kickerState?.playerHp === 100 && kickerState?.playerGuard === 100
-        && defenderState?.playerHp === 100 && defenderState?.playerGuard === 100
-        && punisherState?.playerHp === 100 && punisherState?.playerGuard === 100;
+      + COMBAT.kick.knockdownMs + 160;
+    let knockdownTransition = null;
+    while (!knockdownTransition && Date.now() < setupDeadline) {
+      const defenderActions = (await readDefenderOwnActions()).slice(defenderActionOffset);
+      knockdownTransition = defenderActions.find((entry) =>
+        entry.action === COMBAT_ACTION.knockdown && Number.isFinite(entry.epochMs)) ?? null;
+      if (!knockdownTransition) await sleep(2);
+    }
 
-      if (kickWindup && kickActive && knockdownTransition
-        && punisherFocusKnockdown && punishReadability && vitalsClean) {
-        const kickPointers = kickerState.pointers.slice(kickerPointerOffset);
+    if (knockdownTransition) {
+      conversion = {
+        attempt,
+        punishPointerOffset,
+        knockdownTransition,
+      };
+      await performArenaAttack(punisher, punisherElementId, punishOffset);
+
+      const provenanceDeadline = Date.now() + 280;
+      while (Date.now() < provenanceDeadline) {
+        const states = await Promise.all(entries.map(readUiEvidence));
+        const kickerState = states.find((entry) => entry.browser === kicker.name);
+        const defenderState = states.find((entry) => entry.browser === defender.name);
+        const punisherState = states.find((entry) => entry.browser === punisher.name);
+        const kickerActions = kickerState?.acceptance?.ownActionTransitions ?? [];
+        const kickActive = kickerActions
+          .filter((entry) => entry.action === COMBAT_ACTION.kickActive && Number.isFinite(entry.epochMs))
+          .at(-1);
+        const kickPointers = kickerState?.pointers?.slice(kickerPointerOffset) ?? [];
         const rightDowns = kickPointers.filter((entry) => entry.type === "pointerdown" && entry.button === 2);
         const rightUps = kickPointers.filter((entry) => entry.type === "pointerup" && entry.button === 2);
         const rightDown = rightDowns[0];
         const rightUp = rightUps[0];
-        if (rightDowns.length !== 1 || rightUps.length !== 1
-          || !Number.isFinite(rightDown?.epochMs) || !Number.isFinite(rightUp?.epochMs)
-          || rightUp.epochMs <= rightDown.epochMs || rightUp.epochMs - rightDown.epochMs >= 180) {
-          throw new Error(milestone + " did not deliver one genuine short RMB kick: "
-            + JSON.stringify(kickPointers));
-        }
-        if (knockdownTransition.epochMs + 80 < kickActive.epochMs
-          || knockdownTransition.epochMs > kickActive.epochMs + COMBAT.kick.activeMs + 140) {
-          throw new Error(milestone + " could not tie knockdown to the authoritative kick active phase: "
-            + JSON.stringify({ kickActive, knockdownTransition }));
-        }
+        const focusSeen = punisherState?.focusTransitions?.some((entry) =>
+          entry.label === "KNOCKDOWN #" + defenderId);
+        const cueSeen = punisherState?.recoveryTransitions?.some((entry) =>
+          entry.visible
+          && entry.state === "knockdown"
+          && entry.label === "PUNISH"
+          && entry.detail === "Knockdown recovery");
+        const vitalsClean = kickerState?.playerHp === 100 && kickerState?.playerGuard === 100
+          && (defenderState?.playerHp === 100 || defenderState?.playerHp === 66)
+          && defenderState?.playerGuard === 100
+          && punisherState?.playerHp === 100 && punisherState?.playerGuard === 100;
 
-        conversion = {
-          attempt,
-          punishPointerOffset: punisherState.pointers.length,
-          kickActive,
-          knockdownTransition,
-        };
-        await performArenaAttack(punisher, punisherElementId, punishOffset);
-        break;
+        if (kickActive && rightDowns.length === 1 && rightUps.length === 1
+          && focusSeen && cueSeen && vitalsClean) {
+          if (!Number.isFinite(rightDown?.epochMs) || !Number.isFinite(rightUp?.epochMs)
+            || rightUp.epochMs <= rightDown.epochMs || rightUp.epochMs - rightDown.epochMs >= 180) {
+            throw new Error(milestone + " did not deliver one genuine short RMB kick: "
+              + JSON.stringify(kickPointers));
+          }
+          if (knockdownTransition.epochMs + 80 < kickActive.epochMs
+            || knockdownTransition.epochMs > kickActive.epochMs + COMBAT.kick.activeMs + 140) {
+            throw new Error(milestone + " could not tie knockdown to the authoritative kick active phase: "
+              + JSON.stringify({ kickActive, knockdownTransition }));
+          }
+          conversion.kickActive = kickActive;
+          break;
+        }
+        await sleep(6);
       }
 
-      if ((Number.isFinite(kickerState?.playerHp) && kickerState.playerHp < 100)
-        || (Number.isFinite(defenderState?.playerHp) && defenderState.playerHp < 100)
-        || (Number.isFinite(defenderState?.playerGuard) && defenderState.playerGuard < 100)
-        || (Number.isFinite(punisherState?.playerHp) && punisherState.playerHp < 100)
-        || (Number.isFinite(punisherState?.playerGuard) && punisherState.playerGuard < 100)) {
-        throw new Error(milestone + " setup changed health/guard before the third-party punish: "
-          + JSON.stringify(states));
+      if (!conversion.kickActive) {
+        throw new Error(milestone + " did not validate kick/readability provenance after early LMB: "
+          + JSON.stringify(await Promise.all(entries.map(readUiEvidence))));
       }
-      await sleep(8);
+      break;
     }
 
-    if (!conversion && attempt < 3) {
+    if (attempt < 3) {
       await sleep(COMBAT.kick.knockdownMs + COMBAT.kick.recoveryMs + 120);
       await pulseMovementKey(kicker, movementKey, 70);
       await aimArena(kicker, kickerElementId, kickOffset);
