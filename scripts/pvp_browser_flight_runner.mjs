@@ -3165,16 +3165,18 @@ async function runOnlineUiMultiKnockdownFfaHitFlight(entries) {
   // their eventual x positions but keep it >44 px above the roll corridor.
   // A shallow down-left aim then includes selected #2 while excluding both
   // the farther-right roller and the lower #3 by the unchanged light arc.
-  // Pull #4 to the top boundary before sliding left. The roll collision
-  // threshold is 44 px; keeping #4 ~70+ px above the downward-shifted corridor
-  // prevents accidental roll knockdown while preserving unchanged light reach
-  // to #2 after its roll knockback.
+  // Pull #4 to the top boundary, then farther left than the old staging.
+  // This creates center-distance exclusivity in addition to arc exclusivity:
+  // after #2's unchanged roll knockback, #2 remains inside the unchanged
+  // 94 px light center-distance reach while roller #1 and lower #3 are both
+  // outside it. The >70 px vertical gap still keeps #4 outside the 44 px roll
+  // collision threshold.
   await pulseMovementKey(punisher, "w", 120);
   await Promise.all([
     pulseMovementKey(roller, "s", 235),
     pulseMovementKey(firstVictim, "s", 235),
     pulseMovementKey(secondVictim, "s", 365),
-    pulseMovementKey(punisher, "a", 660),
+    pulseMovementKey(punisher, "a", 940),
   ]);
   await pulseMovementKey(secondVictim, secondClusterKey, 340);
   await pulseMovementKey(roller, rollKey, 210);
