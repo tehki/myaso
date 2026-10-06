@@ -1425,7 +1425,11 @@ fn decode_record_fields(
         }
     }
     if record.mask & SNAPSHOT_FIELD_VITALS != 0 {
-        let vital_bytes = if uses_authoritative_stamina(encoding) { 3 } else { 2 };
+        let vital_bytes = if uses_authoritative_stamina(encoding) {
+            3
+        } else {
+            2
+        };
         require(bytes, *offset, vital_bytes)?;
         record.hp = bytes[*offset];
         record.guard = bytes[*offset + 1];
@@ -1503,7 +1507,8 @@ fn snapshot_record_composition_for_encoding_with_context(
         SNAPSHOT_ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_U12_POSITION
         | SNAPSHOT_ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_LOCAL_U12_POSITION
         | SNAPSHOT_ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_LOCAL_U12_POSITION_U4_ACTION_FLAGS
-        | SNAPSHOT_ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_LOCAL_U12_POSITION_U4_ACTION_FLAGS_U8_STAMINA => {
+        | SNAPSHOT_ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_LOCAL_U12_POSITION_U4_ACTION_FLAGS_U8_STAMINA =>
+        {
             let escaped = record.net_id >= u32::from(PACKED_RECORD_NET_ID_ESCAPE);
             (1 + (escaped as usize) * u32_varint_bytes(record.net_id), 1)
         }
@@ -1530,7 +1535,11 @@ fn snapshot_record_composition_for_encoding_with_context(
         composition.facing = facing_bytes_for_encoding(encoding);
     }
     if record.mask & SNAPSHOT_FIELD_VITALS != 0 {
-        composition.vitals = if uses_authoritative_stamina(encoding) { 3 } else { 2 };
+        composition.vitals = if uses_authoritative_stamina(encoding) {
+            3
+        } else {
+            2
+        };
     }
     if record.mask & SNAPSHOT_FIELD_ACTION != 0 {
         composition.action = action_bytes_for_record(record, encoding);
@@ -2737,7 +2746,10 @@ mod tests {
             &mut scratch,
         );
         assert_eq!(
-            plan.records.iter().map(|record| record.net_id).collect::<Vec<_>>(),
+            plan.records
+                .iter()
+                .map(|record| record.net_id)
+                .collect::<Vec<_>>(),
             vec![1]
         );
         assert_eq!(plan.records[0].mask, SNAPSHOT_FIELD_VITALS);
