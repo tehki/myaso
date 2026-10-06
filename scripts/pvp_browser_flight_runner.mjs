@@ -8513,6 +8513,76 @@ async function resolveArenaElement(session, label) {
   return elementId;
 }
 
+async function aimArenaForExclusiveAuthoritativeTarget(session, elementId, targetNetId, excludedNetIds, profile, label) {
+  const script = "const a=window.__MYASO_ACCEPTANCE_STATE__;"
+    + "const own=a?.fighters?.find((fighter)=>fighter.netId===a.playerNetId);"
+    + "const target=a?.fighters?.find((fighter)=>fighter.netId===" + Number(targetNetId) + ");"
+    + "const canvas=document.querySelector('#arena');const rect=canvas?.getBoundingClientRect();"
+    + "return own&&target&&canvas&&rect?.width>0&&rect?.height>0?{own:{...own},target:{...target},fighters:(a?.fighters??[]).map((fighter)=>({...fighter})),width:rect.width,height:rect.height,canvasWidth:canvas.width,canvasHeight:canvas.height}:null;";
+  const geometry = await execute(session.base, session.sessionId, script);
+  if (!geometry) throw new Error(label + " could not read authoritative fighter geometry");
+
+  const excluded = new Set(excludedNetIds);
+  const own = geometry.own;
+  const target = geometry.target;
+  const maxDistance = profile.reach + COMBAT.fighterRadius;
+  const targetDx = target.x - own.x;
+  const targetDy = target.y - own.y;
+  const targetDistance = Math.hypot(targetDx, targetDy);
+  if (targetDistance > maxDistance) {
+    throw new Error(label + " selected target #" + targetNetId + " is outside unchanged light reach: "
+      + JSON.stringify({ targetDistance, maxDistance, own, target }));
+  }
+
+  const halfArc = profile.arcRadians / 2;
+  const targetAngle = Math.atan2(targetDy, targetDx);
+  const normalize = (angle) => {
+    let value = angle;
+    while (value > Math.PI) value -= Math.PI * 2;
+    while (value < -Math.PI) value += Math.PI * 2;
+    return value;
+  };
+  const candidates = [];
+  const sweepDegrees = Math.max(1, Math.floor(halfArc * 180 / Math.PI) - 2);
+  for (let degrees = -sweepDegrees; degrees <= sweepDegrees; degrees += 1) {
+    const facing = targetAngle + degrees * Math.PI / 180;
+    const targetMargin = halfArc - Math.abs(normalize(targetAngle - facing));
+    if (targetMargin < 0.02) continue;
+    let minExcludedMargin = Infinity;
+    let blocked = false;
+    for (const fighter of geometry.fighters) {
+      if (!excluded.has(fighter.netId)) continue;
+      const dx = fighter.x - own.x;
+      const dy = fighter.y - own.y;
+      const distance = Math.hypot(dx, dy);
+      if (distance > maxDistance) continue;
+      const angle = Math.atan2(dy, dx);
+      const outsideMargin = Math.abs(normalize(angle - facing)) - halfArc;
+      if (outsideMargin <= 0.03) { blocked = true; break; }
+      minExcludedMargin = Math.min(minExcludedMargin, outsideMargin);
+    }
+    if (!blocked) candidates.push({
+      facing,
+      targetMargin,
+      minExcludedMargin: Number.isFinite(minExcludedMargin) ? minExcludedMargin : Math.PI,
+    });
+  }
+  candidates.sort((a, b) =>
+    (b.minExcludedMargin + b.targetMargin * 0.35) - (a.minExcludedMargin + a.targetMargin * 0.35));
+  const chosen = candidates[0];
+  if (!chosen) {
+    throw new Error(label + " could not isolate #" + targetNetId + " with the unchanged light arc: "
+      + JSON.stringify({ own, target, excludedNetIds, fighters: geometry.fighters, maxDistance, halfArc }));
+  }
+
+  const worldRadius = 190;
+  const worldDx = Math.cos(chosen.facing) * worldRadius;
+  const worldDy = Math.sin(chosen.facing) * worldRadius;
+  const x = worldDx * (geometry.width / geometry.canvasWidth);
+  const y = worldDy * (geometry.height / geometry.canvasHeight);
+  await aimArena(session, elementId, x, y);
+  return { x, y, facing: chosen.facing, targetDistance, targetMargin: chosen.targetMargin, excludedMargin: chosen.minExcludedMargin };
+}
 async function aimArena(session, elementId, xOffset, yOffset = 0) {
   const origin = { "element-6066-11e4-a52e-4f735466cecf": elementId };
   await webdriver(session.base, "POST", `/session/${session.sessionId}/actions`, {
