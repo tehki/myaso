@@ -4989,11 +4989,13 @@ async function runOnlineUiDodgeFeedbackFlight(entries) {
   return evidence;
 }
 
-async function runOnlineUiParryFlight(entries, postParrySleepMs = 80) {
+async function runOnlineUiParryFlight(entries, postParrySleepMs = 80, roles = null) {
   await Promise.all(entries.map(installUiObserver));
   const ready = await waitForUiReady(entries);
-  const attacker = entries.find((entry) => entry.name === "chrome");
-  const defender = entries.find((entry) => entry.name === "firefox");
+  const attackerName = roles?.attackerName ?? "chrome";
+  const defenderName = roles?.defenderName ?? "firefox";
+  const attacker = entries.find((entry) => entry.name === attackerName);
+  const defender = entries.find((entry) => entry.name === defenderName);
   const attackerReady = ready.find((entry) => entry.browser === attacker?.name);
   const defenderReady = ready.find((entry) => entry.browser === defender?.name);
   if (!attacker || !defender || !attackerReady || !defenderReady) throw new Error(`could not resolve M33 UI roles from ${JSON.stringify(ready)}`);
@@ -5329,11 +5331,17 @@ async function runOnlineUiParryPunishFfaFocusFlight(entries, convert = false) {
 
 async function runOnlineUiParryPunishWindowFlight(entries) {
   const milestone = "M146 delayed parry punish";
-  const attacker = entries.find((entry) => entry.name === "chrome");
-  const defender = entries.find((entry) => entry.name === "firefox");
-  if (!attacker || !defender) throw new Error(`${milestone} could not resolve Chrome attacker / Firefox defender`);
+  // Keep the latency-sensitive wheel defender on Chrome. M33 retains its
+  // established Chrome-attacker / Firefox-defender path; M146 only needs a
+  // clean authoritative parry before proving the late punish window.
+  const attacker = entries.find((entry) => entry.name === "firefox");
+  const defender = entries.find((entry) => entry.name === "chrome");
+  if (!attacker || !defender) throw new Error(`${milestone} could not resolve Firefox attacker / Chrome defender`);
 
-  const parryEvidence = await runOnlineUiParryFlight(entries, 0);
+  const parryEvidence = await runOnlineUiParryFlight(entries, 0, {
+    attackerName: "firefox",
+    defenderName: "chrome",
+  });
   let attackerState = parryEvidence.find((entry) => entry.browser === attacker.name);
   let defenderState = parryEvidence.find((entry) => entry.browser === defender.name);
   if (!attackerState || !defenderState) {
