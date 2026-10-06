@@ -5906,16 +5906,14 @@ async function runOnlineUiGuardBreakPunishFfaFocusFlight(entries, convert = fals
       const currentAttacker = states.find((entry) => entry.browser === attacker.name);
       const currentDefender = states.find((entry) => entry.browser === defender.name);
       const currentCloser = states.find((entry) => entry.browser === closerIdle.name);
-      const defenderAction = currentDefender?.acceptance?.ownActionTransitions?.at(-1)?.action;
-      // Guard regeneration may already have started by the frame where the
-      // 34 HP punish snapshot is observed. The authoritative zero-guard stun
-      // transition above proves the break; conversion requires the defender to
-      // still be stunned when the single punish lands, not guard to remain 0.
+      // Polling can observe the 34 HP result one replication frame after the
+      // 650 ms stun has expired. Treat the HP result as the hit snapshot here;
+      // below, authoritative attack-active ordering proves the punish itself
+      // became active before the guard-break stun ended.
       if (currentDefender?.playerHp === 66
         && currentAttacker?.playerHp === 100
         && currentCloser?.playerHp === 100
-        && currentCloser?.playerGuard === 100
-        && defenderAction === COMBAT_ACTION.stunned) {
+        && currentCloser?.playerGuard === 100) {
         hitEvidence = states;
         break;
       }
@@ -5944,19 +5942,37 @@ async function runOnlineUiGuardBreakPunishFfaFocusFlight(entries, convert = fals
     const recoveryBufferOpenEpochMs = guardBreakRecovery.epochMs
       + COMBAT.attack.recoveryMs - COMBAT.inputBuffer.lightAttackWindowMs;
     const recoveryExitEpochMs = guardBreakRecovery.epochMs + COMBAT.attack.recoveryMs;
+    const punishActions = attackerState.acceptance?.ownActionTransitions ?? [];
+    const punishWindup = punishActions.find((entry) =>
+      entry.action === COMBAT_ACTION.attackWindup
+      && Number.isFinite(entry.epochMs)
+      && entry.epochMs >= punishDown.epochMs - 40);
+    const punishActive = punishWindup
+      ? punishActions.find((entry) =>
+        entry.action === COMBAT_ACTION.attackActive
+        && Number.isFinite(entry.epochMs)
+        && entry.epochMs >= punishWindup.epochMs)
+      : null;
+    const guardBreakStunEndEpochMs = guardBreakStunTransition.epochMs + COMBAT.block.guardBreakStunMs;
     if (punishDowns.length !== 1 || punishUps.length !== 1 || !punishAimValid
       || !Number.isFinite(punishDown?.epochMs)
       || punishDown.epochMs < guardBreakStunTransition.epochMs
       || punishDown.epochMs >= guardBreakStunTransition.epochMs + COMBAT.block.guardBreakStunMs
       || punishDown.epochMs < recoveryBufferOpenEpochMs
-      || punishDown.epochMs > recoveryExitEpochMs + 25) {
-      throw new Error(milestone + " genuine punish input missed the authoritative recovery/stun window: "
+      || punishDown.epochMs > recoveryExitEpochMs + 25
+      || !punishWindup
+      || !punishActive
+      || punishActive.epochMs >= guardBreakStunEndEpochMs) {
+      throw new Error(milestone + " genuine punish input/active phase missed the authoritative recovery/stun window: "
         + JSON.stringify({
           punishPointers,
           guardBreakStunTransition,
           guardBreakRecovery,
           recoveryBufferOpenEpochMs,
           recoveryExitEpochMs,
+          guardBreakStunEndEpochMs,
+          punishWindup,
+          punishActive,
         }));
     }
     const feedbackDeadline = Date.now() + 220;
