@@ -495,6 +495,15 @@ jobs:
           cargo test --manifest-path server/Cargo.toml wilds_kick_cannot_refresh_an_existing_knockdown
           cargo test --manifest-path server/Cargo.toml wilds_light_punish_still_damages_a_knocked_down_fighter
 
+      - name: Validate M161 bounded kick knockdown browser
+        env:
+          MYASO_PVP_SCENARIO: "uikickknockdownbounded"
+        run: |
+          node --check web/online-game.mjs
+          node --check scripts/pvp_browser_flight_runner.mjs
+          node --test --test-name-pattern="kick cannot refresh|kick knockdown" tests/combat-model.test.mjs
+          node scripts/pvp_browser_flight_runner.mjs
+
       - name: Validate M156 actionable third-party roll knockdown punish
         env:
           MYASO_PVP_SCENARIO: "uirollknockdownffahit"
