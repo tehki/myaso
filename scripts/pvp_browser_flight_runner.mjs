@@ -2602,6 +2602,12 @@ async function runOnlineUiKickKnockdownFfaHitFlight(entries) {
   const kickOffset = kickRight ? 200 : -200;
   const punishOffset = punisherId < defenderId ? 200 : -200;
 
+  const readDefenderOwnActions = () => execute(
+    defender.base,
+    defender.sessionId,
+    "return (window.__MYASO_ACCEPTANCE_STATE__?.ownActionTransitions ?? []).map((entry) => ({ ...entry }));",
+  );
+
   // #3 starts on the far side of #2. The unchanged 52-unit kick knockback
   // moves #2 into #3's unchanged 76-unit light reach, so a third fighter can
   // convert the 360 ms knockdown without widening any gameplay timing.
@@ -3463,13 +3469,12 @@ async function runOnlineUiRollKnockdownFfaHitFlight(entries) {
       + COMBAT.dodge.collisionKnockdownMs + 220;
     let knockdownTransition = null;
     while (Date.now() < setupDeadline && !knockdownTransition) {
-      const defenderState = await readUiEvidence(defender);
-      const newDefenderActions = (defenderState.acceptance?.ownActionTransitions ?? [])
-        .slice(defenderActionOffset);
+      const defenderActions = await readDefenderOwnActions();
+      const newDefenderActions = defenderActions.slice(defenderActionOffset);
       knockdownTransition = newDefenderActions.find((entry) =>
         entry.action === COMBAT_ACTION.knockdown && Number.isFinite(entry.epochMs)) ?? null;
       if (knockdownTransition) break;
-      await sleep(3);
+      await sleep(1);
     }
 
     if (knockdownTransition) {
@@ -3478,7 +3483,11 @@ async function runOnlineUiRollKnockdownFfaHitFlight(entries) {
         punishPointerOffset,
         knockdownTransition,
       };
-      await performArenaAttack(punisher, punisherElementId, punishOffset);
+      // Pointer was already aimed before the roll; avoid another pointerMove
+      // round trip before the tight 260 ms knockdown conversion window.
+      await setArenaAttackButton(punisher, true);
+      await sleep(40);
+      await setArenaAttackButton(punisher, false);
 
       // Roll provenance and the rendered knockdown cue may trail the victim's
       // first authoritative knockdown snapshot by one or more browser frames.
