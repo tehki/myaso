@@ -1770,12 +1770,12 @@ async function runOnlineUiJumpAttackCounterplayFlight(entries, defense) {
     await scrollArenaWheelPair(defender, defenderElementId, 120, 20, 100);
     await performArenaJumpAttackChord(attacker, attackerElementId, attackOffset, 90);
   } else if (defense === "parry" || defense === "dodge") {
-    // Firefox command completion can lag the actual Space+LMB edge by ~100 ms.
-    // Start both real-browser commands concurrently and let Chrome own a 90 ms
-    // browser-side pause before the wheel. With the unchanged 105 ms jump
-    // windup, this keeps the defense 15-115 ms ahead of strike activation
-    // across the observed Firefox dispatch range: inside the unchanged 125 ms
-    // parry opening and the unchanged 170 ms dodge duration.
+    // Start both real-browser commands concurrently. Chrome's wheel command
+    // carries ~30-40 ms of driver/input overhead on hosted CI, so only add a
+    // 10 ms browser-side pause. That places the wheel near authoritative jump
+    // windup onset and gives the defense multiple server ticks of lead before
+    // the unchanged 105 ms jump strike, while remaining inside the unchanged
+    // 125 ms parry opening and 170 ms dodge duration.
     if (defense === "dodge") await aimArena(defender, defenderElementId, 0, 180);
     let chordHeld = false;
     try {
@@ -1784,7 +1784,7 @@ async function runOnlineUiJumpAttackCounterplayFlight(entries, defense) {
         defender,
         defenderElementId,
         defense === "parry" ? 120 : -120,
-        90,
+        10,
       );
       await chordPress;
       chordHeld = true;
