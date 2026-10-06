@@ -3312,7 +3312,8 @@ async function runOnlineUiMultiKnockdownFfaHitFlight(entries) {
   const punishDown = punishDowns[0];
   if (punishDowns.length !== 1 || punishUps.length !== 1
     || !Number.isFinite(punishDown?.epochMs)
-    || punishDown.epochMs < provenance.firstKnockdown.epochMs
+    || punishDown.epochMs < provenance.rollTransition.epochMs
+    || punishDown.epochMs < provenance.firstKnockdown.epochMs - 40
     || punishDown.epochMs >= provenance.firstKnockdown.epochMs + COMBAT.dodge.collisionKnockdownMs
     || punishDown.x >= 0.5 || punishDown.y <= 0.5) {
     throw new Error(milestone + " genuine #4 LMB did not target the selected overlap window: "
