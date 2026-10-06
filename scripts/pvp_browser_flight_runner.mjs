@@ -3883,6 +3883,11 @@ async function runOnlineUiBoundedKickKnockdownFlight(entries) {
     entry.sessionId,
     "return (window.__MYASO_ACCEPTANCE_STATE__?.ownActionTransitions ?? []).map((item) => ({ ...item }));",
   );
+  const readAcceptance = (entry) => execute(
+    entry.base,
+    entry.sessionId,
+    "const a=window.__MYASO_ACCEPTANCE_STATE__; return { focusNetId:a?.focusNetId ?? 0, ownActionTransitions:(a?.ownActionTransitions ?? []).map((item)=>({...item})), focusActionTransitions:(a?.focusActionTransitions ?? []).map((item)=>({...item})) };",
+  );
 
   const [defenderBefore, openerBefore, suppressorBefore] = await Promise.all([
     readOwnActions(defender),
@@ -3923,15 +3928,24 @@ async function runOnlineUiBoundedKickKnockdownFlight(entries) {
   let originalRecovery = null;
   const recoveryDeadline = Date.now() + COMBAT.kick.knockdownMs + 260;
   while (Date.now() < recoveryDeadline && (!suppressedKickActive || !originalRecovery)) {
-    const [defenderActions, suppressorActions] = await Promise.all([
-      readOwnActions(defender),
+    const [defenderAcceptance, suppressorActions] = await Promise.all([
+      readAcceptance(defender),
       readOwnActions(suppressor),
     ]);
+    // The short kick-active phase can fall between #3's own sampled snapshots.
+    // #2's focus stream is victim-local authoritative evidence and reliably
+    // captures #3's active phase while #2 remains knocked down.
+    const victimObservedKickActive = defenderAcceptance.focusActionTransitions.find((entry) =>
+      entry.action === COMBAT_ACTION.kickActive
+      && Number.isFinite(entry.epochMs)
+      && entry.epochMs >= firstKnockdown.epochMs);
     suppressedKickActive = suppressorActions.slice(suppressorOffsetActions).find((entry) =>
       entry.action === COMBAT_ACTION.kickActive
       && Number.isFinite(entry.epochMs)
-      && entry.epochMs >= firstKnockdown.epochMs) ?? suppressedKickActive;
-    originalRecovery = defenderActions.slice(defenderOffset).find((entry) =>
+      && entry.epochMs >= firstKnockdown.epochMs)
+      ?? victimObservedKickActive
+      ?? suppressedKickActive;
+    originalRecovery = defenderAcceptance.ownActionTransitions.slice(defenderOffset).find((entry) =>
       entry.action === COMBAT_ACTION.idle
       && Number.isFinite(entry.epochMs)
       && entry.epochMs > firstKnockdown.epochMs) ?? originalRecovery;
@@ -4014,14 +4028,20 @@ async function runOnlineUiBoundedKickKnockdownFlight(entries) {
   let verificationKickActive = null;
   const verifyDeadline = Date.now() + COMBAT.kick.windupMs + COMBAT.kick.activeMs + 360;
   while (Date.now() < verifyDeadline && (!verificationKnockdown || !verificationKickActive)) {
-    const [defenderActions, suppressorActions] = await Promise.all([
-      readOwnActions(defender),
+    const [defenderAcceptance, suppressorActions] = await Promise.all([
+      readAcceptance(defender),
       readOwnActions(suppressor),
     ]);
-    verificationKnockdown = defenderActions.slice(verifyDefenderOffset).find((entry) =>
+    verificationKnockdown = defenderAcceptance.ownActionTransitions.slice(verifyDefenderOffset).find((entry) =>
       entry.action === COMBAT_ACTION.knockdown && Number.isFinite(entry.epochMs)) ?? verificationKnockdown;
+    const victimObservedVerifyActive = defenderAcceptance.focusActionTransitions.find((entry) =>
+      entry.action === COMBAT_ACTION.kickActive
+      && Number.isFinite(entry.epochMs)
+      && entry.epochMs > originalRecovery.epochMs);
     verificationKickActive = suppressorActions.slice(verifySuppressorOffset).find((entry) =>
-      entry.action === COMBAT_ACTION.kickActive && Number.isFinite(entry.epochMs)) ?? verificationKickActive;
+      entry.action === COMBAT_ACTION.kickActive && Number.isFinite(entry.epochMs))
+      ?? victimObservedVerifyActive
+      ?? verificationKickActive;
     if (!verificationKnockdown || !verificationKickActive) await sleep(3);
   }
 
