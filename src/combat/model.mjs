@@ -693,6 +693,11 @@ function resolveAttacks(world, events) {
 
       attacker.attackHitTargets.add(target.id);
 
+      // A kick that reaches a fighter already on the ground is consumed for
+      // this kick activation but must not refresh/extend the existing bounded
+      // knockdown. Ordinary damaging attacks remain valid punish options.
+      if (profile.kind === "kick" && target.action === "knockdown") continue;
+
       if (isInvulnerable(target)) {
         events.push({ type: "evade", attackerId: attacker.id, targetId: target.id });
         continue;
@@ -779,6 +784,9 @@ function resolveRollCollisions(world, events) {
       const dy = target.y - roller.y;
       if (Math.hypot(dx, dy) > COMBAT.fighterRadius * 2 + 8) continue;
       roller.rollHitTargets.add(target.id);
+      // Consume this roller/target contact even while the target is already
+      // down so the same roll cannot re-knock them the instant they stand.
+      if (target.action === "knockdown") continue;
       knockBack(world, roller, target, COMBAT.dodge.collisionKnockback);
       setAction(target, "knockdown", COMBAT.dodge.collisionKnockdownMs);
       events.push({ type: "roll_hit", attackerId: roller.id, targetId: target.id });

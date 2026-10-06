@@ -1099,6 +1099,12 @@ fn resolve_roll_collisions(width: f32, height: f32, fighters: &mut [Fighter]) {
             }
             let (roller, target) = two_mut(fighters, roller_index, target_index);
             roller.roll_hit_targets.insert(target.net_id);
+            // Consume the contact, but never refresh a bounded knockdown.
+            // This also prevents the same roll from re-catching the fighter
+            // on the exact frame they regain control.
+            if target.action == Action::Knockdown {
+                continue;
+            }
             knock_back(width, height, roller, target, ROLL_COLLISION_KNOCKBACK);
             target.set_action(Action::Knockdown, ROLL_COLLISION_KNOCKDOWN_MS);
         }
@@ -1268,6 +1274,15 @@ fn resolve_attacks(
                     profile,
                 )
             {
+                continue;
+            }
+
+            if profile.kick && fighters[target_index].action == Action::Knockdown {
+                // Consume this target for the active kick without extending
+                // its existing bounded knockdown.
+                fighters[attacker_index]
+                    .attack_hit_targets
+                    .insert(target_id);
                 continue;
             }
 

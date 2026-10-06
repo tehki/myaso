@@ -1318,6 +1318,142 @@ fn wilds_roll_collision_knocks_target_down_and_costs_stamina() {
 }
 
 #[test]
+fn wilds_roll_cannot_refresh_an_existing_knockdown() {
+    let mut world = World::new(700.0, 500.0);
+    assert!(world.add_player_at(1, 200.0, 200.0, 0.0));
+    assert!(world.add_player_at(2, 244.0, 200.0, std::f32::consts::PI));
+    assert!(world.add_player_at(3, 278.0, 250.0, -std::f32::consts::FRAC_PI_2));
+
+    advance_three(
+        &mut world,
+        35.0,
+        InputIntent {
+            dodge: true,
+            facing_radians: 0.0,
+            ..InputIntent::default()
+        },
+        InputIntent::default(),
+        InputIntent::default(),
+    );
+    assert_eq!(world.fighter(2).expect("target").action, Action::Knockdown);
+    let elapsed_before_second_roll = world.fighter(2).expect("target").action_elapsed_ms;
+
+    advance_three(
+        &mut world,
+        20.0,
+        InputIntent::default(),
+        InputIntent::default(),
+        InputIntent {
+            dodge: true,
+            facing_radians: -std::f32::consts::FRAC_PI_2,
+            ..InputIntent::default()
+        },
+    );
+    let target = world.fighter(2).expect("target");
+    assert_eq!(target.action, Action::Knockdown);
+    assert!(target.action_elapsed_ms > elapsed_before_second_roll);
+
+    advance_three(
+        &mut world,
+        230.0,
+        InputIntent::default(),
+        InputIntent::default(),
+        InputIntent::default(),
+    );
+    assert_eq!(world.fighter(2).expect("target").action, Action::Idle);
+}
+
+#[test]
+fn wilds_kick_cannot_refresh_an_existing_knockdown() {
+    let mut world = World::new(700.0, 400.0);
+    assert!(world.add_player_at(1, 200.0, 200.0, 0.0));
+    assert!(world.add_player_at(2, 254.0, 200.0, std::f32::consts::PI));
+    assert!(world.add_player_at(3, 360.0, 200.0, std::f32::consts::PI));
+
+    advance_three(
+        &mut world,
+        170.0,
+        InputIntent {
+            kick: true,
+            facing_radians: 0.0,
+            ..InputIntent::default()
+        },
+        InputIntent::default(),
+        InputIntent::default(),
+    );
+    assert_eq!(world.fighter(2).expect("target").action, Action::Knockdown);
+
+    advance_three(
+        &mut world,
+        170.0,
+        InputIntent::default(),
+        InputIntent::default(),
+        InputIntent {
+            kick: true,
+            facing_radians: std::f32::consts::PI,
+            ..InputIntent::default()
+        },
+    );
+    assert_eq!(world.fighter(2).expect("target").action, Action::Knockdown);
+
+    advance_three(
+        &mut world,
+        125.0,
+        InputIntent::default(),
+        InputIntent::default(),
+        InputIntent::default(),
+    );
+    let target = world.fighter(2).expect("target");
+    assert_eq!(target.action, Action::Idle);
+    assert_eq!(target.hp.round() as u8, 100);
+}
+
+#[test]
+fn wilds_light_punish_still_damages_a_knocked_down_fighter() {
+    let mut world = World::new(700.0, 400.0);
+    assert!(world.add_player_at(1, 200.0, 200.0, 0.0));
+    assert!(world.add_player_at(2, 254.0, 200.0, std::f32::consts::PI));
+    assert!(world.add_player_at(3, 360.0, 200.0, std::f32::consts::PI));
+
+    advance_three(
+        &mut world,
+        170.0,
+        InputIntent {
+            kick: true,
+            facing_radians: 0.0,
+            ..InputIntent::default()
+        },
+        InputIntent::default(),
+        InputIntent::default(),
+    );
+    assert_eq!(world.fighter(2).expect("target").action, Action::Knockdown);
+
+    let events = advance_three(
+        &mut world,
+        225.0,
+        InputIntent::default(),
+        InputIntent::default(),
+        InputIntent {
+            attack: true,
+            facing_radians: std::f32::consts::PI,
+            ..InputIntent::default()
+        },
+    );
+    let target = world.fighter(2).expect("target");
+    assert_eq!(target.hp.round() as u8, 66);
+    assert_eq!(target.action, Action::Knockdown);
+    assert!(events.iter().any(|event| matches!(
+        event,
+        CombatEvent::Hit {
+            attacker: 3,
+            target: 2,
+            damage: 34,
+            ..
+        }
+    )));
+}
+
+#[test]
 fn wilds_roll_direction_follows_pointer_facing_not_movement_input() {
     let mut world = World::new(800.0, 500.0);
     assert!(world.add_player_at(1, 300.0, 200.0, 0.0));

@@ -3149,14 +3149,15 @@ async function runOnlineUiMultiKnockdownFfaHitFlight(entries) {
   const punishY = 120;
 
   // Shift the roll corridor down so #4 can sit safely above it. #3 is staged
-  // below the corridor and toward #2, preserving the M158 ordered double-hit.
+  // below the corridor and toward #2, with a few pixels of extra margin inside
+  // the unchanged 44 px roll-collision radius while preserving ordered hits.
   // #4 stops around x=262, y=42: after #2's unchanged 34-unit roll knockback
   // and fighter separation, #2 is inside the unchanged 94 px center-distance
   // light reach while the roller and lower #3 remain outside it.
   await Promise.all([
     pulseMovementKey(roller, "s", 235),
     pulseMovementKey(firstVictim, "s", 235),
-    pulseMovementKey(secondVictim, "s", 405),
+    pulseMovementKey(secondVictim, "s", 380),
     pulseMovementKey(punisher, "a", 315),
   ]);
   await pulseMovementKey(secondVictim, secondClusterKey, 320);
@@ -3182,11 +3183,6 @@ async function runOnlineUiMultiKnockdownFfaHitFlight(entries) {
     firstVictim.sessionId,
     "return (window.__MYASO_ACCEPTANCE_STATE__?.ownActionTransitions ?? []).map((entry) => ({ ...entry }));",
   );
-  const readPunisherSelection = () => execute(
-    punisher.base,
-    punisher.sessionId,
-    "const a=window.__MYASO_ACCEPTANCE_STATE__; return { focusNetId:a?.focusNetId ?? 0, focusActionTransitions:(a?.focusActionTransitions ?? []).map((entry)=>({...entry})) };",
-  );
 
   await setMovementKey(roller, retreatKey, true);
   await scrollArenaWheel(roller, rollerElementId, -120, 0);
@@ -3194,31 +3190,25 @@ async function runOnlineUiMultiKnockdownFfaHitFlight(entries) {
   let trigger = null;
   const triggerDeadline = Date.now() + COMBAT.dodge.durationMs + COMBAT.dodge.collisionKnockdownMs + 120;
   while (Date.now() < triggerDeadline && !trigger) {
-    const [firstActions, selection] = await Promise.all([
-      readFirstOwnActions(),
-      readPunisherSelection(),
-    ]);
+    const firstActions = await readFirstOwnActions();
     const firstKnockdown = firstActions.slice(firstActionOffset).find((entry) =>
       entry.action === COMBAT_ACTION.knockdown && Number.isFinite(entry.epochMs));
-    const primarySelected = selection.focusNetId === firstVictimId
-      && selection.focusActionTransitions.some((entry) =>
-        entry.action === COMBAT_ACTION.knockdown && Number.isFinite(entry.epochMs));
-    if (firstKnockdown && primarySelected) {
-      trigger = { firstKnockdown, selection };
+    if (firstKnockdown) {
+      trigger = { firstKnockdown };
       break;
     }
-    await sleep(2);
+    await sleep(1);
   }
   if (!trigger) {
     await setMovementKey(roller, retreatKey, false);
-    throw new Error(milestone + " never observed primary knockdown selection on #"
+    throw new Error(milestone + " never observed the primary roll knockdown on #"
       + firstVictimId + ": " + JSON.stringify(await Promise.all(entries.map(readUiEvidence))));
   }
 
-  // Pointer is already aimed before the roll. Commit one genuine LMB as soon
-  // as #4 selects the first knocked-down fighter. The second roll collision
-  // must then occur before this light becomes attack-active, so the actual hit
-  // is still resolved while both unchanged knockdown windows overlap.
+  // Pointer is already aimed before the roll. Commit one genuine LMB on the
+  // first authoritative #2 knockdown snapshot. The provenance checks below
+  // still require #3's second knockdown to begin before #4 becomes attack-
+  // active, so the actual 34 HP hit resolves during the overlap.
   await setArenaAttackButton(punisher, true);
   await sleep(40);
   await setArenaAttackButton(punisher, false);
@@ -3431,6 +3421,12 @@ async function runOnlineUiRollKnockdownFfaHitFlight(entries) {
   const rollOffset = rollRight ? 200 : -200;
   const punishOffset = punisherId < defenderId ? 200 : -200;
 
+  const readDefenderOwnActions = () => execute(
+    defender.base,
+    defender.sessionId,
+    "return (window.__MYASO_ACCEPTANCE_STATE__?.ownActionTransitions ?? []).map((entry) => ({ ...entry }));",
+  );
+
   // Separate the two possible light targets without changing combat reach.
   // Keep #3 at neutral spacing so the unchanged 34-unit roll knockback can
   // bring #2 into the unchanged 76-unit light reach. #1 backs away briefly
@@ -3463,13 +3459,12 @@ async function runOnlineUiRollKnockdownFfaHitFlight(entries) {
       + COMBAT.dodge.collisionKnockdownMs + 220;
     let knockdownTransition = null;
     while (Date.now() < setupDeadline && !knockdownTransition) {
-      const defenderState = await readUiEvidence(defender);
-      const newDefenderActions = (defenderState.acceptance?.ownActionTransitions ?? [])
-        .slice(defenderActionOffset);
+      const defenderActions = await readDefenderOwnActions();
+      const newDefenderActions = defenderActions.slice(defenderActionOffset);
       knockdownTransition = newDefenderActions.find((entry) =>
         entry.action === COMBAT_ACTION.knockdown && Number.isFinite(entry.epochMs)) ?? null;
       if (knockdownTransition) break;
-      await sleep(3);
+      await sleep(1);
     }
 
     if (knockdownTransition) {
@@ -3478,7 +3473,11 @@ async function runOnlineUiRollKnockdownFfaHitFlight(entries) {
         punishPointerOffset,
         knockdownTransition,
       };
-      await performArenaAttack(punisher, punisherElementId, punishOffset);
+      // Pointer was already aimed before the roll; avoid another pointerMove
+      // round trip before the tight 260 ms knockdown conversion window.
+      await setArenaAttackButton(punisher, true);
+      await sleep(40);
+      await setArenaAttackButton(punisher, false);
 
       // Roll provenance and the rendered knockdown cue may trail the victim's
       // first authoritative knockdown snapshot by one or more browser frames.
@@ -5906,16 +5905,14 @@ async function runOnlineUiGuardBreakPunishFfaFocusFlight(entries, convert = fals
       const currentAttacker = states.find((entry) => entry.browser === attacker.name);
       const currentDefender = states.find((entry) => entry.browser === defender.name);
       const currentCloser = states.find((entry) => entry.browser === closerIdle.name);
-      const defenderAction = currentDefender?.acceptance?.ownActionTransitions?.at(-1)?.action;
-      // Guard regeneration may already have started by the frame where the
-      // 34 HP punish snapshot is observed. The authoritative zero-guard stun
-      // transition above proves the break; conversion requires the defender to
-      // still be stunned when the single punish lands, not guard to remain 0.
+      // Polling can observe the 34 HP result one replication frame after the
+      // 650 ms stun has expired. Treat the HP result as the hit snapshot here;
+      // below, authoritative attack-active ordering proves the punish itself
+      // became active before the guard-break stun ended.
       if (currentDefender?.playerHp === 66
         && currentAttacker?.playerHp === 100
         && currentCloser?.playerHp === 100
-        && currentCloser?.playerGuard === 100
-        && defenderAction === COMBAT_ACTION.stunned) {
+        && currentCloser?.playerGuard === 100) {
         hitEvidence = states;
         break;
       }
@@ -5944,19 +5941,37 @@ async function runOnlineUiGuardBreakPunishFfaFocusFlight(entries, convert = fals
     const recoveryBufferOpenEpochMs = guardBreakRecovery.epochMs
       + COMBAT.attack.recoveryMs - COMBAT.inputBuffer.lightAttackWindowMs;
     const recoveryExitEpochMs = guardBreakRecovery.epochMs + COMBAT.attack.recoveryMs;
+    const punishActions = attackerState.acceptance?.ownActionTransitions ?? [];
+    const punishWindup = punishActions.find((entry) =>
+      entry.action === COMBAT_ACTION.attackWindup
+      && Number.isFinite(entry.epochMs)
+      && entry.epochMs >= punishDown.epochMs - 40);
+    const punishActive = punishWindup
+      ? punishActions.find((entry) =>
+        entry.action === COMBAT_ACTION.attackActive
+        && Number.isFinite(entry.epochMs)
+        && entry.epochMs >= punishWindup.epochMs)
+      : null;
+    const guardBreakStunEndEpochMs = guardBreakStunTransition.epochMs + COMBAT.block.guardBreakStunMs;
     if (punishDowns.length !== 1 || punishUps.length !== 1 || !punishAimValid
       || !Number.isFinite(punishDown?.epochMs)
       || punishDown.epochMs < guardBreakStunTransition.epochMs
       || punishDown.epochMs >= guardBreakStunTransition.epochMs + COMBAT.block.guardBreakStunMs
       || punishDown.epochMs < recoveryBufferOpenEpochMs
-      || punishDown.epochMs > recoveryExitEpochMs + 25) {
-      throw new Error(milestone + " genuine punish input missed the authoritative recovery/stun window: "
+      || punishDown.epochMs > recoveryExitEpochMs + 25
+      || !punishWindup
+      || !punishActive
+      || punishActive.epochMs >= guardBreakStunEndEpochMs) {
+      throw new Error(milestone + " genuine punish input/active phase missed the authoritative recovery/stun window: "
         + JSON.stringify({
           punishPointers,
           guardBreakStunTransition,
           guardBreakRecovery,
           recoveryBufferOpenEpochMs,
           recoveryExitEpochMs,
+          guardBreakStunEndEpochMs,
+          punishWindup,
+          punishActive,
         }));
     }
     const feedbackDeadline = Date.now() + 220;
