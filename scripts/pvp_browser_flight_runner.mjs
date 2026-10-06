@@ -3165,6 +3165,11 @@ async function runOnlineUiMultiKnockdownFfaHitFlight(entries) {
   // their eventual x positions but keep it >44 px above the roll corridor.
   // A shallow down-left aim then includes selected #2 while excluding both
   // the farther-right roller and the lower #3 by the unchanged light arc.
+  // Pull #4 to the top boundary before sliding left. The roll collision
+  // threshold is 44 px; keeping #4 ~70+ px above the downward-shifted corridor
+  // prevents accidental roll knockdown while preserving unchanged light reach
+  // to #2 after its roll knockback.
+  await pulseMovementKey(punisher, "w", 120);
   await Promise.all([
     pulseMovementKey(roller, "s", 235),
     pulseMovementKey(firstVictim, "s", 235),
