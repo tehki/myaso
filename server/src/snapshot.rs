@@ -12,8 +12,10 @@ pub const SNAPSHOT_ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_U12_POSITION: u8 = 
 pub const SNAPSHOT_ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_LOCAL_U12_POSITION: u8 = 5;
 pub const SNAPSHOT_ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_LOCAL_U12_POSITION_U4_ACTION_FLAGS:
     u8 = 6;
+pub const SNAPSHOT_ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_LOCAL_U12_POSITION_U4_ACTION_FLAGS_U8_STAMINA:
+    u8 = 7;
 pub const SNAPSHOT_ENCODING_CURRENT: u8 =
-    SNAPSHOT_ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_LOCAL_U12_POSITION_U4_ACTION_FLAGS;
+    SNAPSHOT_ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_LOCAL_U12_POSITION_U4_ACTION_FLAGS_U8_STAMINA;
 pub const SNAPSHOT_FLAG_FULL: u8 = 1;
 pub const SNAPSHOT_FIELD_POSITION: u8 = 1 << 0;
 pub const SNAPSHOT_FIELD_FACING: u8 = 1 << 1;
@@ -53,6 +55,7 @@ pub struct WireEntity {
     pub facing: u16,
     pub hp: u8,
     pub guard: u8,
+    pub stamina: u8,
     pub action: u8,
     pub flags: u8,
 }
@@ -66,6 +69,7 @@ impl WireEntity {
             facing: quantize_angle(fighter.facing),
             hp: quantize_vital(fighter.hp),
             guard: quantize_vital(fighter.guard),
+            stamina: quantize_vital(fighter.stamina),
             action: fighter.action.wire_code(),
             flags: fighter.kills.min(u8::MAX as u16) as u8,
         }
@@ -81,6 +85,7 @@ pub struct SnapshotRecord {
     pub facing: u16,
     pub hp: u8,
     pub guard: u8,
+    pub stamina: u8,
     pub action: u8,
     pub flags: u8,
 }
@@ -99,6 +104,7 @@ impl SnapshotRecord {
             facing: 0,
             hp: 0,
             guard: 0,
+            stamina: 0,
             action: 0,
             flags: 0,
         }
@@ -113,6 +119,7 @@ impl SnapshotRecord {
             facing: state.facing,
             hp: state.hp,
             guard: state.guard,
+            stamina: state.stamina,
             action: state.action,
             flags: state.flags,
         }
@@ -721,9 +728,22 @@ fn plan_records(
         {
             let is_owner = state.net_id == viewer_net_id;
             let before = baseline.get(&state.net_id).copied();
-            let Some(record) = build_delta(state, before) else {
+            let Some(mut record) = build_delta(state, before) else {
                 continue;
             };
+            if !is_owner {
+                if let Some(before) = before {
+                    let stamina_only_vitals = state.hp == before.hp
+                        && state.guard == before.guard
+                        && state.stamina != before.stamina;
+                    if stamina_only_vitals {
+                        record.mask &= !SNAPSHOT_FIELD_VITALS;
+                        if record.mask == 0 {
+                            continue;
+                        }
+                    }
+                }
+            }
 
             let unseen_in_baseline = before.is_none();
             let last_sent_age = last_sent_tick
@@ -964,7 +984,7 @@ pub fn build_delta(state: WireEntity, before: Option<WireEntity>) -> Option<Snap
     if state.facing != before.facing {
         mask |= SNAPSHOT_FIELD_FACING;
     }
-    if state.hp != before.hp || state.guard != before.guard {
+    if state.hp != before.hp || state.guard != before.guard || state.stamina != before.stamina {
         mask |= SNAPSHOT_FIELD_VITALS;
     }
     if state.action != before.action || state.flags != before.flags {
@@ -986,6 +1006,7 @@ pub fn apply_records(state: &mut BTreeMap<u32, WireEntity>, records: &[SnapshotR
             facing: 0,
             hp: 100,
             guard: 100,
+            stamina: 100,
             action: 0,
             flags: 0,
         });
@@ -999,6 +1020,7 @@ pub fn apply_records(state: &mut BTreeMap<u32, WireEntity>, records: &[SnapshotR
         if record.mask & SNAPSHOT_FIELD_VITALS != 0 {
             next.hp = record.hp;
             next.guard = record.guard;
+            next.stamina = record.stamina;
         }
         if record.mask & SNAPSHOT_FIELD_ACTION != 0 {
             next.action = record.action;
@@ -1134,6 +1156,7 @@ fn encode_snapshot_with_composition(
             | SNAPSHOT_ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_U12_POSITION
             | SNAPSHOT_ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_LOCAL_U12_POSITION
             | SNAPSHOT_ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_LOCAL_U12_POSITION_U4_ACTION_FLAGS
+            | SNAPSHOT_ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_LOCAL_U12_POSITION_U4_ACTION_FLAGS_U8_STAMINA
     ));
     let total_bytes = composition.total_bytes();
 
@@ -1226,6 +1249,9 @@ fn encode_record_fields(
     if record.mask & SNAPSHOT_FIELD_VITALS != 0 {
         bytes.push(record.hp);
         bytes.push(record.guard);
+        if uses_authoritative_stamina(encoding) {
+            bytes.push(record.stamina);
+        }
     }
     if record.mask & SNAPSHOT_FIELD_ACTION != 0 {
         if uses_compact_action_flags(encoding) {
@@ -1257,6 +1283,7 @@ pub fn decode_snapshot(bytes: &[u8]) -> Result<DecodedSnapshot, SnapshotDecodeEr
             | SNAPSHOT_ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_U12_POSITION
             | SNAPSHOT_ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_LOCAL_U12_POSITION
             | SNAPSHOT_ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_LOCAL_U12_POSITION_U4_ACTION_FLAGS
+            | SNAPSHOT_ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_LOCAL_U12_POSITION_U4_ACTION_FLAGS_U8_STAMINA
     ) {
         return Err(SnapshotDecodeError::UnsupportedEncoding(encoding));
     }
@@ -1305,6 +1332,7 @@ pub fn decode_snapshot(bytes: &[u8]) -> Result<DecodedSnapshot, SnapshotDecodeEr
             facing: 0,
             hp: 0,
             guard: 0,
+            stamina: 100,
             action: 0,
             flags: 0,
         };
@@ -1351,6 +1379,7 @@ fn decode_record_fields(
             encoding,
             SNAPSHOT_ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_LOCAL_U12_POSITION
                 | SNAPSHOT_ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_LOCAL_U12_POSITION_U4_ACTION_FLAGS
+            | SNAPSHOT_ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_LOCAL_U12_POSITION_U4_ACTION_FLAGS_U8_STAMINA
         ) || record.mask & SNAPSHOT_FIELD_POSITION == 0
             || wide_position
             || record.mask & SNAPSHOT_FIELD_REMOVED != 0)
@@ -1396,10 +1425,14 @@ fn decode_record_fields(
         }
     }
     if record.mask & SNAPSHOT_FIELD_VITALS != 0 {
-        require(bytes, *offset, 2)?;
+        let vital_bytes = if uses_authoritative_stamina(encoding) { 3 } else { 2 };
+        require(bytes, *offset, vital_bytes)?;
         record.hp = bytes[*offset];
         record.guard = bytes[*offset + 1];
-        *offset += 2;
+        if uses_authoritative_stamina(encoding) {
+            record.stamina = bytes[*offset + 2];
+        }
+        *offset += vital_bytes;
     }
     if record.mask & SNAPSHOT_FIELD_ACTION != 0 {
         if uses_compact_action_flags(encoding) {
@@ -1469,7 +1502,8 @@ fn snapshot_record_composition_for_encoding_with_context(
         }
         SNAPSHOT_ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_U12_POSITION
         | SNAPSHOT_ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_LOCAL_U12_POSITION
-        | SNAPSHOT_ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_LOCAL_U12_POSITION_U4_ACTION_FLAGS => {
+        | SNAPSHOT_ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_LOCAL_U12_POSITION_U4_ACTION_FLAGS
+        | SNAPSHOT_ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_LOCAL_U12_POSITION_U4_ACTION_FLAGS_U8_STAMINA => {
             let escaped = record.net_id >= u32::from(PACKED_RECORD_NET_ID_ESCAPE);
             (1 + (escaped as usize) * u32_varint_bytes(record.net_id), 1)
         }
@@ -1496,7 +1530,7 @@ fn snapshot_record_composition_for_encoding_with_context(
         composition.facing = facing_bytes_for_encoding(encoding);
     }
     if record.mask & SNAPSHOT_FIELD_VITALS != 0 {
-        composition.vitals = 2;
+        composition.vitals = if uses_authoritative_stamina(encoding) { 3 } else { 2 };
     }
     if record.mask & SNAPSHOT_FIELD_ACTION != 0 {
         composition.action = action_bytes_for_record(record, encoding);
@@ -1539,6 +1573,7 @@ fn position_wire_encoding(
         encoding,
         SNAPSHOT_ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_LOCAL_U12_POSITION
             | SNAPSHOT_ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_LOCAL_U12_POSITION_U4_ACTION_FLAGS
+            | SNAPSHOT_ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_LOCAL_U12_POSITION_U4_ACTION_FLAGS_U8_STAMINA
     ) {
         let current = compact_position_pair(record.x, record.y);
         if previous_position.is_some_and(|previous| {
@@ -1644,6 +1679,7 @@ fn uses_compact_position(encoding: u8) -> bool {
             | SNAPSHOT_ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_U12_POSITION
             | SNAPSHOT_ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_LOCAL_U12_POSITION
             | SNAPSHOT_ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_LOCAL_U12_POSITION_U4_ACTION_FLAGS
+            | SNAPSHOT_ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_LOCAL_U12_POSITION_U4_ACTION_FLAGS_U8_STAMINA
     )
 }
 
@@ -1655,6 +1691,7 @@ fn uses_compact_facing(encoding: u8) -> bool {
             | SNAPSHOT_ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_U12_POSITION
             | SNAPSHOT_ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_LOCAL_U12_POSITION
             | SNAPSHOT_ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_LOCAL_U12_POSITION_U4_ACTION_FLAGS
+            | SNAPSHOT_ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_LOCAL_U12_POSITION_U4_ACTION_FLAGS_U8_STAMINA
     )
 }
 
@@ -1667,8 +1704,15 @@ fn facing_bytes_for_encoding(encoding: u8) -> usize {
 }
 
 fn uses_compact_action_flags(encoding: u8) -> bool {
-    encoding
-        == SNAPSHOT_ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_LOCAL_U12_POSITION_U4_ACTION_FLAGS
+    matches!(
+        encoding,
+        SNAPSHOT_ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_LOCAL_U12_POSITION_U4_ACTION_FLAGS
+            | SNAPSHOT_ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_LOCAL_U12_POSITION_U4_ACTION_FLAGS_U8_STAMINA
+    )
+}
+
+fn uses_authoritative_stamina(encoding: u8) -> bool {
+    encoding == SNAPSHOT_ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_LOCAL_U12_POSITION_U4_ACTION_FLAGS_U8_STAMINA
 }
 
 fn action_flags_are_compact(action: u8, flags: u8) -> bool {
@@ -1728,6 +1772,7 @@ fn uses_packed_record_header(encoding: u8) -> bool {
         SNAPSHOT_ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_U12_POSITION
             | SNAPSHOT_ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_LOCAL_U12_POSITION
             | SNAPSHOT_ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_LOCAL_U12_POSITION_U4_ACTION_FLAGS
+            | SNAPSHOT_ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_LOCAL_U12_POSITION_U4_ACTION_FLAGS_U8_STAMINA
     )
 }
 
@@ -1748,6 +1793,7 @@ fn packed_wire_mask_code(
         encoding,
         SNAPSHOT_ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_LOCAL_U12_POSITION
             | SNAPSHOT_ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_LOCAL_U12_POSITION_U4_ACTION_FLAGS
+            | SNAPSHOT_ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_LOCAL_U12_POSITION_U4_ACTION_FLAGS_U8_STAMINA
     ) && position_encoding == PositionWireEncoding::LocalCell
     {
         debug_assert!(wire_mask & SNAPSHOT_FIELD_POSITION != 0);
@@ -1766,6 +1812,7 @@ fn expand_packed_wire_mask(
         encoding,
         SNAPSHOT_ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_LOCAL_U12_POSITION
             | SNAPSHOT_ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_LOCAL_U12_POSITION_U4_ACTION_FLAGS
+            | SNAPSHOT_ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_LOCAL_U12_POSITION_U4_ACTION_FLAGS_U8_STAMINA
     ) && compact_mask & PACKED_MASK_LOCAL_POSITION_FLAG != 0
         && compact_mask != PACKED_MASK_LOCAL_POSITION_FLAG
     {
@@ -2282,6 +2329,7 @@ mod tests {
                 facing: 0,
                 hp: 100,
                 guard: 100,
+                stamina: 100,
                 action: 0,
                 flags: 0,
             },
@@ -2330,6 +2378,7 @@ mod tests {
                 facing: 2570,
                 hp: 91,
                 guard: 73,
+                stamina: 100,
                 action: 2,
                 flags: 1,
             },
@@ -2341,6 +2390,7 @@ mod tests {
                 facing: 5140,
                 hp: 0,
                 guard: 0,
+                stamina: 100,
                 action: 0,
                 flags: 0,
             },
@@ -2396,6 +2446,7 @@ mod tests {
                 facing: 0,
                 hp: 0,
                 guard: 0,
+                stamina: 100,
                 action: 0,
                 flags: 0,
             },
@@ -2407,6 +2458,7 @@ mod tests {
                 facing: 0,
                 hp: 0,
                 guard: 0,
+                stamina: 100,
                 action: 0,
                 flags: 0,
             },
@@ -2418,6 +2470,7 @@ mod tests {
                 facing: 0,
                 hp: 0,
                 guard: 0,
+                stamina: 100,
                 action: 0,
                 flags: 0,
             },
@@ -2429,6 +2482,7 @@ mod tests {
                 facing: 0,
                 hp: 0,
                 guard: 0,
+                stamina: 100,
                 action: 0,
                 flags: 0,
             },
@@ -2489,6 +2543,7 @@ mod tests {
                 facing: 0,
                 hp: 0,
                 guard: 0,
+                stamina: 100,
                 action: 2,
                 flags: 1,
             },
@@ -2500,6 +2555,7 @@ mod tests {
                 facing: 0,
                 hp: 0,
                 guard: 0,
+                stamina: 100,
                 action: 8,
                 flags: 2,
             },
@@ -2511,6 +2567,7 @@ mod tests {
                 facing: 0,
                 hp: 0,
                 guard: 0,
+                stamina: 100,
                 action: 0,
                 flags: 0,
             },
@@ -2522,6 +2579,7 @@ mod tests {
                 facing: 0,
                 hp: 0,
                 guard: 0,
+                stamina: 100,
                 action: 200,
                 flags: 240,
             },
@@ -2566,6 +2624,152 @@ mod tests {
             ),
             Err(SnapshotDecodeError::InvalidActionEncoding)
         );
+    }
+
+    #[test]
+    fn authoritative_stamina_roundtrips_in_v7_and_v6_keeps_two_byte_vitals() {
+        let record = SnapshotRecord {
+            net_id: 10,
+            mask: SNAPSHOT_FIELD_VITALS,
+            x: 0,
+            y: 0,
+            facing: 0,
+            hp: 91,
+            guard: 73,
+            stamina: 41,
+            action: 0,
+            flags: 0,
+        };
+        let records = vec![record];
+
+        let current = encode_snapshot_with_encoding(
+            11,
+            10,
+            790,
+            false,
+            &records,
+            crate::CONSERVATIVE_DATAGRAM_BYTES,
+            SNAPSHOT_ENCODING_CURRENT,
+        );
+        let v6 = encode_snapshot_with_encoding(
+            11,
+            10,
+            790,
+            false,
+            &records,
+            crate::CONSERVATIVE_DATAGRAM_BYTES,
+            SNAPSHOT_ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_LOCAL_U12_POSITION_U4_ACTION_FLAGS,
+        );
+
+        assert_eq!(current.bytes.len(), v6.bytes.len() + 1);
+        assert_eq!(current.composition.vitals, 3);
+        assert_eq!(v6.composition.vitals, 2);
+
+        let decoded = decode_snapshot(&current.bytes).expect("v7 stamina snapshot decodes");
+        assert_eq!(decoded.encoding, SNAPSHOT_ENCODING_CURRENT);
+        assert_eq!(decoded.records[0].stamina, 41);
+
+        let decoded_v6 = decode_snapshot(&v6.bytes).expect("v6 snapshot still decodes");
+        assert_eq!(
+            decoded_v6.encoding,
+            SNAPSHOT_ENCODING_PACKED_U10_IDS_U6_MASK_U8_FACING_LOCAL_U12_POSITION_U4_ACTION_FLAGS
+        );
+        assert_eq!(decoded_v6.records[0].hp, 91);
+        assert_eq!(decoded_v6.records[0].guard, 73);
+        assert_eq!(decoded_v6.records[0].stamina, 100);
+
+        let before = WireEntity {
+            net_id: 10,
+            x: 400,
+            y: 400,
+            facing: 0,
+            hp: 100,
+            guard: 100,
+            stamina: 100,
+            action: 0,
+            flags: 0,
+        };
+        let mut after = before;
+        after.stamina = 72;
+        let delta = build_delta(after, Some(before)).expect("stamina change creates delta");
+        assert_eq!(delta.mask, SNAPSHOT_FIELD_VITALS);
+        assert_eq!(delta.stamina, 72);
+    }
+
+    #[test]
+    fn planner_sends_owner_stamina_immediately_but_suppresses_remote_stamina_only_churn() {
+        let mut world = World::new(1200.0, 800.0);
+        assert!(world.add_player_at(1, 400.0, 300.0, 0.0));
+        assert!(world.add_player_at(2, 550.0, 300.0, 0.0));
+
+        let baseline_frame = ReplicationFrame::from_fighters(0, world.fighters());
+        let baseline: BTreeMap<_, _> = baseline_frame
+            .states
+            .iter()
+            .copied()
+            .map(|state| (state.net_id, state))
+            .collect();
+
+        let mut changed = baseline_frame.clone();
+        changed.server_tick = 1;
+        changed
+            .states
+            .iter_mut()
+            .find(|state| state.net_id == 1)
+            .expect("owner state")
+            .stamina = 72;
+        changed
+            .states
+            .iter_mut()
+            .find(|state| state.net_id == 2)
+            .expect("remote state")
+            .stamina = 72;
+
+        let mut last_sent: HashMap<_, _> = [(1_u32, 0_u32), (2, 0)].into_iter().collect();
+        let mut scratch = SnapshotPlannerScratch::default();
+        let plan = plan_records(
+            1,
+            1,
+            &changed,
+            &baseline,
+            &mut last_sent,
+            crate::CONSERVATIVE_DATAGRAM_BYTES,
+            &mut scratch,
+        );
+        assert_eq!(
+            plan.records.iter().map(|record| record.net_id).collect::<Vec<_>>(),
+            vec![1]
+        );
+        assert_eq!(plan.records[0].mask, SNAPSHOT_FIELD_VITALS);
+        assert_eq!(plan.records[0].stamina, 72);
+
+        let mut remote_damage = changed.clone();
+        let remote = remote_damage
+            .states
+            .iter_mut()
+            .find(|state| state.net_id == 2)
+            .expect("remote state");
+        remote.hp = 66;
+
+        let mut last_sent: HashMap<_, _> = [(1_u32, 0_u32), (2, 0)].into_iter().collect();
+        let mut scratch = SnapshotPlannerScratch::default();
+        let plan = plan_records(
+            1,
+            1,
+            &remote_damage,
+            &baseline,
+            &mut last_sent,
+            crate::CONSERVATIVE_DATAGRAM_BYTES,
+            &mut scratch,
+        );
+        let remote_record = plan
+            .records
+            .iter()
+            .find(|record| record.net_id == 2)
+            .expect("remote hp change remains urgent");
+        assert_ne!(remote_record.mask & SNAPSHOT_FIELD_VITALS, 0);
+        assert_eq!(remote_record.hp, 66);
+        assert_eq!(remote_record.stamina, 72);
     }
 
     #[test]
@@ -2718,6 +2922,7 @@ mod tests {
                     facing: 0,
                     hp: 100,
                     guard: 100,
+                    stamina: 100,
                     action: 0,
                     flags: 0,
                 },
@@ -3117,6 +3322,7 @@ mod tests {
                 facing: 4096,
                 hp: 90,
                 guard: 80,
+                stamina: 100,
                 action: 2,
                 flags: 1,
             }),
@@ -3128,6 +3334,7 @@ mod tests {
                     facing: 8192,
                     hp: 70,
                     guard: 60,
+                    stamina: 100,
                     action: 3,
                     flags: 2,
                 },

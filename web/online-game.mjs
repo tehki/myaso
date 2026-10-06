@@ -155,7 +155,10 @@ networkClient = await connectAuthoritativeClient({
     const ownId = networkClient?.playerNetId;
     if (!ownId) return;
     const own = state.get(ownId);
-    if (own && !local.initialized) restoreAuthoritative(own);
+    if (own) {
+      if (!local.initialized) restoreAuthoritative(own);
+      else if (Number.isFinite(own.stamina)) local.stamina = own.stamina;
+    }
     observeCombatState(state);
   },
   onReliableSnapshot(_result, state) {
@@ -416,6 +419,7 @@ function restoreAuthoritative(own) {
   local.facing = own.facing;
   local.hp = own.hp;
   local.guard = own.guard;
+  if (Number.isFinite(own.stamina)) local.stamina = own.stamina;
   local.action = own.action;
   local.initialized = true;
 }
@@ -925,7 +929,7 @@ function updateHud(ownId) {
   const remote = focusNetId ? networkClient.state.get(focusNetId) : null;
   setMeter("playerHp", hud.playerHp, hud.playerHpValue, own?.hp ?? local.hp);
   setMeter("playerGuard", hud.playerGuard, hud.playerGuardValue, own?.guard ?? local.guard);
-  setMeter("playerStamina", hud.playerStamina, hud.playerStaminaValue, local.stamina);
+  setMeter("playerStamina", hud.playerStamina, hud.playerStaminaValue, own?.stamina ?? local.stamina);
   setMeter("botHp", hud.botHp, hud.botHpValue, remote?.hp ?? 0);
   setMeter("botGuard", hud.botGuard, hud.botGuardValue, remote?.guard ?? 0);
   const focusMode = guardBreakPunishNetId ? "guard-break"

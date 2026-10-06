@@ -82,6 +82,7 @@ fn rust_snapshot_encoder_matches_the_js_wire_fixture() {
         facing: 16384,
         hp: 66,
         guard: 75,
+        stamina: 100,
         action: 1,
         flags: 2,
     };

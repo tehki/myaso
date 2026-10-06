@@ -262,6 +262,45 @@ test("snapshot delta encodes only changed fields and removals", () => {
   assert.ok(Math.abs(fighter.x - 101) <= 1);
 });
 
+test("snapshot v7 round-trips authoritative stamina while v6 stays byte-compatible", () => {
+  const quantized = quantizeEntity(entity(1, 100, 100, { stamina: 61 }));
+  const records = [{ ...quantized, mask: SNAPSHOT_FIELDS.FULL }];
+
+  const current = encodeSnapshot({
+    sequence: 8,
+    baselineSequence: 7,
+    serverTick: 1235,
+    records,
+    maxBytes: 1100,
+  });
+  const decoded = decodeSnapshot(current);
+  assert.equal(decoded.encoding, SNAPSHOT_ENCODINGS.CURRENT);
+  assert.equal(decoded.records[0].stamina, 61);
+
+  const state = new Map();
+  applySnapshotPacketInPlace(state, current);
+  assert.equal(state.get(1).stamina, 61);
+
+  const v6 = encodeSnapshot({
+    sequence: 8,
+    baselineSequence: 7,
+    serverTick: 1235,
+    records,
+    maxBytes: 1100,
+    encoding: SNAPSHOT_ENCODINGS.PACKED_U10_IDS_U6_MASK_U8_FACING_LOCAL_U12_POSITION_U4_ACTION_FLAGS,
+  });
+  assert.equal(current.byteLength, v6.byteLength + 1);
+  const decodedV6 = decodeSnapshot(v6);
+  assert.equal(decodedV6.records[0].stamina, undefined);
+
+  const staminaDelta = buildEntityDelta(
+    quantizeEntity(entity(1, 100, 100, { stamina: 72 })),
+    quantizeEntity(entity(1, 100, 100, { stamina: 100 })),
+  );
+  assert.equal(staminaDelta.mask, SNAPSHOT_FIELDS.VITALS);
+  assert.equal(staminaDelta.stamina, 72);
+});
+
 test("packed snapshot record headers shrink 512-range IDs and preserve escaped IDs", () => {
   const records = [
     {

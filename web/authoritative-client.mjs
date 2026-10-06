@@ -233,7 +233,11 @@ export function mergeReliableSnapshotPacketInPlace(
     }
     if (record.mask & SNAPSHOT_FIELDS.POSITION) { current.x = incoming.x; current.y = incoming.y; }
     if (record.mask & SNAPSHOT_FIELDS.FACING) current.facing = incoming.facing;
-    if (record.mask & SNAPSHOT_FIELDS.VITALS) { current.hp = incoming.hp; current.guard = incoming.guard; }
+    if (record.mask & SNAPSHOT_FIELDS.VITALS) {
+      current.hp = incoming.hp;
+      current.guard = incoming.guard;
+      if (incoming.stamina !== undefined) current.stamina = incoming.stamina;
+    }
     if (record.mask & SNAPSHOT_FIELDS.ACTION) { current.action = incoming.action; current.flags = incoming.flags; }
     current.serverTick = result.serverTick;
     mergedIds.push(record.netId);
