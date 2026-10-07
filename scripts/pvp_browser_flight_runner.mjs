@@ -1612,7 +1612,10 @@ async function runOnlineUiRollBufferFlight(entries) {
   const ownDodge = ownActions[ownDodgeIndex];
   const expectedRecoveryEndEpochMs = ownAttackRecovery.epochMs + COMBAT.attack.recoveryMs;
   const recoveryToDodgeDelayMs = ownDodge.epochMs - expectedRecoveryEndEpochMs;
-  if (recoveryToDodgeDelayMs < 0 || recoveryToDodgeDelayMs > 140) {
+  // Snapshot epochs are sampled on the 60 Hz authoritative timeline. The
+  // first legal dodge tick can therefore appear up to one frame before the
+  // nominal millisecond sum of recoveryStart + recoveryMs.
+  if (recoveryToDodgeDelayMs < -20 || recoveryToDodgeDelayMs > 140) {
     throw new Error(`M129 authoritative buffered roll exceeded bounded post-recovery delivery latency: ${JSON.stringify({
       ownAttackRecovery,
       ownDodge,
