@@ -1392,21 +1392,27 @@ async function runOnlineUiRollBufferFlight(entries) {
       && entry.action === COMBAT_ACTION.dodge
       && Number.isFinite(entry.epochMs)
       && Number.isFinite(entry.serverTick));
-  const ownIdleBetween = ownActions.filter((entry, index) =>
+  const unexpectedBetween = ownActions.find((entry, index) =>
     index > ownAttackRecoveryIndex
       && index < ownDodgeIndex
-      && entry.action === COMBAT_ACTION.idle
-      && Number.isFinite(entry.serverTick));
-  const boundedIdleBoundary = ownIdleBetween.length === 0
-    || (ownIdleBetween.length === 1
-      && ownDodgeIndex > ownAttackRecoveryIndex
-      && ownActions[ownDodgeIndex].serverTick - ownIdleBetween[0].serverTick <= 3);
-  if (ownAttackRecoveryIndex < 0 || ownDodgeIndex <= ownAttackRecoveryIndex || !boundedIdleBoundary) {
-    throw new Error(`M129 authoritative buffered roll exceeded bounded recovery handoff: ${JSON.stringify(ownActions)}`);
+      && entry.action !== COMBAT_ACTION.idle);
+  if (ownAttackRecoveryIndex < 0 || ownDodgeIndex <= ownAttackRecoveryIndex || unexpectedBetween) {
+    throw new Error(`M129 authoritative buffered roll left the expected recovery->idle->dodge path: ${JSON.stringify(ownActions)}`);
   }
 
   const ownAttackRecovery = ownActions[ownAttackRecoveryIndex];
   const ownDodge = ownActions[ownDodgeIndex];
+  const expectedRecoveryEndEpochMs = ownAttackRecovery.epochMs + COMBAT.attack.recoveryMs;
+  const recoveryToDodgeDelayMs = ownDodge.epochMs - expectedRecoveryEndEpochMs;
+  if (recoveryToDodgeDelayMs < 0 || recoveryToDodgeDelayMs > 140) {
+    throw new Error(`M129 authoritative buffered roll exceeded bounded post-recovery delivery latency: ${JSON.stringify({
+      ownAttackRecovery,
+      ownDodge,
+      expectedRecoveryEndEpochMs,
+      recoveryToDodgeDelayMs,
+      ownActions,
+    })}`);
+  }
   const bufferOpenEpochMs = ownAttackRecovery.epochMs
     + COMBAT.attack.recoveryMs - COMBAT.inputBuffer.dodgeWindowMs;
   if (perpendicularAim.epochMs < ownAttackRecovery.epochMs
