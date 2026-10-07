@@ -3657,11 +3657,12 @@ async function runOnlineUiMultiKnockdownFfaHitFlight(entries) {
   // before the deterministic body-contact region. Cross-session WebDriver and
   // input ingress can otherwise consume roughly one server tick after #2's
   // replicated knockdown and push the unchanged 135 ms light windup onto the
-  // 260 ms recovery boundary. The later provenance checks still require the
-  // real pointer edge to fall no more than 40 ms before #2's knockdown, both
-  // victims to be authoritatively down before attack-active, and exactly one
-  // 34 HP hit on the selected victim. No gameplay timing is changed.
-  await sleep(48);
+  // 260 ms recovery boundary. Keep one server-tick margin by dispatching 20 ms
+  // earlier; the later provenance checks still require the real pointer edge
+  // to fall no more than 40 ms before #2's knockdown, both victims to be
+  // authoritatively down before attack-active, and exactly one 34 HP hit on
+  // the selected victim. No gameplay timing is changed.
+  await sleep(28);
   await setArenaAttackButton(punisher, true);
   let windupReaim = null;
   const reaimDeadline = Date.now() + Math.max(80, COMBAT.attack.windupMs - 20);
