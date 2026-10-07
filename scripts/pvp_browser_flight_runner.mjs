@@ -3070,8 +3070,14 @@ async function runOnlineUiKickKnockdownFfaHitFlight(entries) {
         const defenderState = states.find((entry) => entry.browser === defender.name);
         const punisherState = states.find((entry) => entry.browser === punisher.name);
         const kickerActions = kickerState?.acceptance?.ownActionTransitions ?? [];
+        const kickWindup = kickerActions
+          .filter((entry) => entry.action === COMBAT_ACTION.kickWindup && Number.isFinite(entry.epochMs))
+          .at(-1);
         const kickActive = kickerActions
           .filter((entry) => entry.action === COMBAT_ACTION.kickActive && Number.isFinite(entry.epochMs))
+          .at(-1);
+        const kickRecovery = kickerActions
+          .filter((entry) => entry.action === COMBAT_ACTION.kickRecovery && Number.isFinite(entry.epochMs))
           .at(-1);
         const kickPointers = kickerState?.pointers?.slice(kickerPointerOffset) ?? [];
         const rightDowns = kickPointers.filter((entry) => entry.type === "pointerdown" && entry.button === 2);
@@ -3089,26 +3095,34 @@ async function runOnlineUiKickKnockdownFfaHitFlight(entries) {
           && (defenderState?.playerHp === 100 || defenderState?.playerHp === 66)
           && defenderState?.playerGuard === 100
           && punisherState?.playerHp === 100 && punisherState?.playerGuard === 100;
+        const bracketedKick = !kickActive
+          && kickWindup && kickRecovery
+          && Number.isFinite(kickWindup.serverTick)
+          && Number.isFinite(kickRecovery.serverTick)
+          && Number.isFinite(knockdownTransition.serverTick)
+          && kickWindup.serverTick <= knockdownTransition.serverTick
+          && knockdownTransition.serverTick <= kickRecovery.serverTick;
 
-        if (kickActive && rightDowns.length === 1 && rightUps.length === 1
+        if ((kickActive || bracketedKick) && rightDowns.length === 1 && rightUps.length === 1
           && focusSeen && cueSeen && vitalsClean) {
           if (!Number.isFinite(rightDown?.epochMs) || !Number.isFinite(rightUp?.epochMs)
             || rightUp.epochMs <= rightDown.epochMs || rightUp.epochMs - rightDown.epochMs >= 180) {
             throw new Error(milestone + " did not deliver one genuine short RMB kick: "
               + JSON.stringify(kickPointers));
           }
-          if (knockdownTransition.epochMs + 80 < kickActive.epochMs
-            || knockdownTransition.epochMs > kickActive.epochMs + COMBAT.kick.activeMs + 140) {
+          if (kickActive
+            && (knockdownTransition.epochMs + 80 < kickActive.epochMs
+              || knockdownTransition.epochMs > kickActive.epochMs + COMBAT.kick.activeMs + 140)) {
             throw new Error(milestone + " could not tie knockdown to the authoritative kick active phase: "
               + JSON.stringify({ kickActive, knockdownTransition }));
           }
-          conversion.kickActive = kickActive;
+          conversion.kickProvenance = { kickWindup, kickActive, kickRecovery, bracketedKick };
           break;
         }
         await sleep(6);
       }
 
-      if (!conversion.kickActive) {
+      if (!conversion.kickProvenance) {
         throw new Error(milestone + " did not validate kick/readability provenance after early LMB: "
           + JSON.stringify(await Promise.all(entries.map(readUiEvidence))));
       }
