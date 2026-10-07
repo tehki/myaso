@@ -2,7 +2,7 @@ import { createFrameBudget } from "../src/browser/frame-budget.mjs";
 import { createCombatImpactController } from "../src/browser/combat-impact.mjs";
 import { COMBAT_ACTION, blockSpatialPresentation, combatActionHint, combatOverlayPresentation, createCombatReadabilityTracker, createRemoteDamageTracker, fighterFocusNetId, fighterGuardBreakPunishNetId, fighterKnockdownPunishNetId, fighterParryPunishNetId, fighterRecoveryNetId, fighterIdentityPresentation, fighterThreatBearingLabel, fighterThreatGuardArcLabel, fighterThreatNetId, fighterThreatPhaseLabel, fighterThreatPhaseState, fighterMatchPointPresentation, fighterMatchPresentation, fighterScoreboardPresentation, FFA_KILL_TARGET, fighterVitalsPresentation, guardBreakSpatialPresentation, killFeedPresentation, opponentRecoveryPresentation, parrySpatialPresentation, staminaDenialPresentation } from "../src/browser/combat-readability.mjs";
 import { COMBAT } from "../src/combat/model.mjs";
-import { reconcilePrediction } from "../src/browser/reconciliation.mjs";
+import { isTickNewer32, reconcilePrediction } from "../src/browser/reconciliation.mjs";
 import { NETWORK } from "../src/network/constants.mjs";
 import { connectAuthoritativeClient, parseSha256Hex } from "./authoritative-client.mjs";
 
@@ -72,6 +72,7 @@ let combatMessage = null;
 let combatMessageUntil = 0;
 let combatFeedbackTimer = 0;
 let authoritativeStamina = null;
+let pendingStaminaDenial = null;
 let matchOver = false;
 const killFeedEntries = [];
 const killFeedSequences = new Set();
@@ -128,7 +129,7 @@ canvas.addEventListener("pointerup", (event) => {
     rightButtonDown = false;
     if (heldMs < runHoldThresholdMs) {
       kickRequested = true;
-      showStaminaDenial("kick");
+      queueStaminaDenial("kick");
     }
   }
 });
@@ -137,7 +138,7 @@ canvas.addEventListener("wheel", (event) => {
   canvas.focus();
   if (event.deltaY < 0) {
     rollRequested = true;
-    showStaminaDenial("roll");
+    queueStaminaDenial("roll");
   } else if (event.deltaY > 0) {
     shortBlockUntil = Math.max(shortBlockUntil, performance.now() + COMBAT.block.shortBlockMs);
   }
@@ -149,7 +150,7 @@ canvas.addEventListener("keydown", (event) => {
   if (event.code === "KeyE" && !event.repeat) heavyAttackRequested = true;
   if (event.code === "Space" && !event.repeat) {
     jumpRequested = true;
-    showStaminaDenial("jump");
+    queueStaminaDenial("jump");
   }
 });
 canvas.addEventListener("keyup", (event) => keys.delete(event.code));
@@ -192,6 +193,7 @@ networkClient = await connectAuthoritativeClient({
       restoreAuthoritative,
       replayInput(entry) { predictMovement(entry, 1000 / NETWORK.inputSendHz); },
     });
+    confirmStaminaDenial(own);
     networkStatus = `Online - player #${ownId} - server tick ${networkClient.latestServerTick}`;
   },
 });
@@ -236,7 +238,7 @@ function observeThreatCommitment(state, ownId) {
 }
 
 function recordAcceptanceState(state, ownId) {
-  if (!["uirollbuffer", "uijumpbuffer", "uijumpattack", "uijumpattackinputloss", "uijumpattackpunish", "uijumpattacktelegraph", "uijumprecoveryffa", "uijumppunishffa", "uimultirecoveryffa", "uimultirecoveryspatial", "uimultirecoverypunish", "uiparrypunishwindow", "uiparrypunishffa", "uiparrypunishffahit", "uiguardbreakpunishffa", "uiguardbreakpunishffahit", "uikickknockdownffa", "uikickknockdownffahit", "uikickknockdownbounded", "uirollknockdownbounded", "uirollknockdownffahit", "uimultiknockdownffa", "uimultiknockdownffahit", "uirollknockdownffa", "uistaminaauth", "uistaminaexhaustion", "uistaminafeedback", "uijumpattackblock", "uijumpattackparry", "uijumpattackdodge", "uijumpattackbuffer", "uikickbuffer"].includes(acceptanceScenario)) return;
+  if (!["uirollbuffer", "uijumpbuffer", "uijumpattack", "uijumpattackinputloss", "uijumpattackpunish", "uijumpattacktelegraph", "uijumprecoveryffa", "uijumppunishffa", "uimultirecoveryffa", "uimultirecoveryspatial", "uimultirecoverypunish", "uiparrypunishwindow", "uiparrypunishffa", "uiparrypunishffahit", "uiguardbreakpunishffa", "uiguardbreakpunishffahit", "uikickknockdownffa", "uikickknockdownffahit", "uikickknockdownbounded", "uirollknockdownbounded", "uirollknockdownffahit", "uimultiknockdownffa", "uimultiknockdownffahit", "uirollknockdownffa", "uistaminaauth", "uistaminaexhaustion", "uistaminafeedback", "uistaminaconfirmed", "uijumpattackblock", "uijumpattackparry", "uijumpattackdodge", "uijumpattackbuffer", "uikickbuffer"].includes(acceptanceScenario)) return;
   const focusNetId = fighterGuardBreakPunishNetId(state, ownId)
     || fighterParryPunishNetId(state, ownId)
     || fighterKnockdownPunishNetId(state, ownId)
@@ -345,14 +347,118 @@ function showCombatFeedback(feedback) {
   }, durationMs);
 }
 
-function showStaminaDenial(action) {
+function recordStaminaDenialStage(stage, details = {}) {
+  if (acceptanceScenario !== "uistaminaconfirmed") return;
+  const acceptance = window.__MYASO_ACCEPTANCE_STATE__;
+  if (!acceptance) return;
+  const transitions = acceptance.staminaDenialTransitions ??= [];
+  transitions.push({ stage, epochMs: Date.now(), ...details });
+}
+
+function queueStaminaDenial(action) {
   if (matchOver || local.action !== COMBAT_ACTION.idle) return;
   const presentation = staminaDenialPresentation(action, authoritativeStamina);
   if (!presentation) return;
+  pendingStaminaDenial = {
+    action,
+    presentation,
+    baselineStamina: authoritativeStamina,
+    submittedClientTick: null,
+  };
+  recordStaminaDenialStage("queued", {
+    action,
+    baselineStamina: authoritativeStamina,
+  });
+}
+
+function markStaminaDenialSubmitted(tick, input) {
+  if (!pendingStaminaDenial || pendingStaminaDenial.submittedClientTick !== null) return;
+  const included = pendingStaminaDenial.action === "roll" ? input.dodge
+    : pendingStaminaDenial.action === "kick" ? input.kick
+      : pendingStaminaDenial.action === "jump" ? input.jump
+        : false;
+  if (included) {
+    pendingStaminaDenial.submittedClientTick = tick >>> 0;
+    recordStaminaDenialStage("submitted", {
+      action: pendingStaminaDenial.action,
+      clientTick: pendingStaminaDenial.submittedClientTick,
+    });
+  }
+}
+
+function staminaActionAccepted(action, authoritativeAction) {
+  if (action === "roll") {
+    return authoritativeAction === COMBAT_ACTION.dodge
+      || authoritativeAction === COMBAT_ACTION.dodgeRecovery;
+  }
+  if (action === "kick") {
+    return authoritativeAction === COMBAT_ACTION.kickWindup
+      || authoritativeAction === COMBAT_ACTION.kickActive
+      || authoritativeAction === COMBAT_ACTION.kickRecovery;
+  }
+  if (action === "jump") {
+    return authoritativeAction === COMBAT_ACTION.jump
+      || authoritativeAction === COMBAT_ACTION.jumpAttackWindup
+      || authoritativeAction === COMBAT_ACTION.jumpAttackActive
+      || authoritativeAction === COMBAT_ACTION.jumpAttackRecovery;
+  }
+  return false;
+}
+
+function confirmStaminaDenial(own) {
+  const pending = pendingStaminaDenial;
+  if (!pending || pending.submittedClientTick === null || !networkClient) return;
+  const processed = networkClient.processedClientTick;
+  if (!Number.isInteger(processed)) return;
+  if (processed !== pending.submittedClientTick
+    && !isTickNewer32(processed, pending.submittedClientTick)) return;
+
+  pendingStaminaDenial = null;
+  const currentStamina = Number.isFinite(own?.stamina) ? own.stamina : authoritativeStamina;
+  const cost = pending.presentation.cost;
+  const spentEnough = Number.isFinite(pending.baselineStamina)
+    && Number.isFinite(currentStamina)
+    && pending.baselineStamina - currentStamina >= cost - 1;
+  const accepted = staminaActionAccepted(pending.action, own?.action) || spentEnough;
+  if (accepted) {
+    recordStaminaDenialStage("confirmed-accepted", {
+      action: pending.action,
+      clientTick: pending.submittedClientTick,
+      processedClientTick: processed,
+      authoritativeAction: own?.action ?? null,
+      authoritativeStamina: currentStamina,
+    });
+    return;
+  }
+
+  const presentation = staminaDenialPresentation(pending.action, currentStamina);
+  if (!presentation) {
+    recordStaminaDenialStage("confirmed-not-stamina", {
+      action: pending.action,
+      clientTick: pending.submittedClientTick,
+      processedClientTick: processed,
+      authoritativeAction: own?.action ?? null,
+      authoritativeStamina: currentStamina,
+    });
+    return;
+  }
+  recordStaminaDenialStage("confirmed-rejected", {
+    action: pending.action,
+    clientTick: pending.submittedClientTick,
+    processedClientTick: processed,
+    authoritativeAction: own?.action ?? null,
+    authoritativeStamina: currentStamina,
+  });
   combatMessage = presentation.text;
   combatMessageUntil = performance.now() + presentation.durationMs;
   setStatus(combatMessage);
   showCombatFeedback(presentation.feedback);
+  recordStaminaDenialStage("shown", {
+    action: pending.action,
+    clientTick: pending.submittedClientTick,
+    processedClientTick: processed,
+    authoritativeStamina: currentStamina,
+  });
 }
 
 function updateMouse(event) {
@@ -370,6 +476,7 @@ function releaseInputs() {
   jumpRequested = false;
   shortBlockUntil = 0;
   rightButtonDown = false;
+  pendingStaminaDenial = null;
 }
 
 function sampleInput() {
@@ -402,7 +509,9 @@ function simulatePrediction(stepMs) {
   if (!matchOver && local.initialized) predictMovement(currentInput, stepMs);
   predictionStep += 1;
   if (predictionStep % 2 === 0 && networkClient) {
-    networkClient.sendInput({ tick: clientTick, ...currentInput });
+    const outgoingTick = clientTick;
+    markStaminaDenialSubmitted(outgoingTick, currentInput);
+    networkClient.sendInput({ tick: outgoingTick, ...currentInput });
     clientTick = (clientTick + 1) >>> 0;
     attackRequested = false;
     heavyAttackRequested = false;
