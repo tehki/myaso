@@ -7485,24 +7485,21 @@ async function runOnlineUiJumpFfaThreatFlight(entries, mode) {
   const rightPointerOffset = rightBefore.pointers.length;
   const centerThreatOffset = centerBefore.threatTransitions.length;
 
-  // Start the genuine right-side light 30 ms before the jump chord. With the
-  // unchanged 135 ms light windup and 105 ms jump windup, both attacks then
-  // reach active at nearly the same authoritative time, giving the observer a
-  // broad deterministic two-threat frame without changing combat timing.
-  // Spatial distance still decides primary/secondary identity in each mode.
-  const samplesPromise = sampleUiEvidenceWhileActive(entries, 300, 5);
+  // Start the genuine jump chord first in both modes, then introduce the
+  // right-side light about 20 ms later. This guarantees a broad shared windup
+  // interval without depending on cross-browser Promise scheduling. Spatial
+  // distance, not start order, remains the only thing that decides whether the
+  // jump is primary or secondary in each M142 mode.
+  const samplesPromise = sampleUiEvidenceWhileActive(entries, 280, 6);
   let jumpHeld = false;
-  let lightHeld = false;
   try {
-    await setArenaAttackButton(right, true);
-    lightHeld = true;
-    await sleep(30);
     await pressArenaJumpAttackChord(left, leftArena, 200);
     jumpHeld = true;
-    await sleep(70);
+    await sleep(20);
+    await performArenaAttackBurst(right, 3, 0, 8);
+    await sleep(16);
   } finally {
     if (jumpHeld) await releaseArenaJumpAttackChord(left);
-    if (lightHeld) await setArenaAttackButton(right, false);
   }
   await samplesPromise;
 
