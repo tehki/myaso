@@ -1934,7 +1934,14 @@ async function runOnlineUiRollBufferFlight(entries) {
   }
   const bufferOpenEpochMs = ownAttackRecovery.epochMs
     + COMBAT.attack.recoveryMs - COMBAT.inputBuffer.dodgeWindowMs;
-  if (perpendicularAim.epochMs < ownAttackRecovery.epochMs
+  // Firefox can observe the shared authoritative recovery snapshot one
+  // replication sample before Chrome records its own recovery transition.
+  // Pointer retargeting is not an action edge, so tolerate at most one 60 Hz
+  // authoritative frame of that cross-browser observation skew. Keep the real
+  // wheel-forward strict: it must still land after buffer-open and before the
+  // buffered Dodge becomes authoritative.
+  const recoveryAimSkewMs = 20;
+  if (perpendicularAim.epochMs < ownAttackRecovery.epochMs - recoveryAimSkewMs
     || rollWheel.epochMs < bufferOpenEpochMs
     || rollWheel.epochMs > ownDodge.epochMs) {
     throw new Error(`M129 genuine wheel was not inside the attacker's authoritative dodge-buffer interval: ${JSON.stringify({
