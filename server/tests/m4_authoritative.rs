@@ -3119,3 +3119,43 @@ fn held_light_does_not_auto_chain_authoritatively() {
         Action::AttackWindup
     );
 }
+
+#[test]
+fn exhausted_dodge_edge_is_rejected_and_does_not_auto_fire_after_regeneration() {
+    let mut world = duel(200.0);
+    let run = InputIntent {
+        move_x: -1.0,
+        run: true,
+        facing_radians: 0.0,
+        ..InputIntent::default()
+    };
+    advance(&mut world, 3100.0, run, InputIntent::default());
+    assert!(world.fighter(1).expect("attacker").stamina < 28.0);
+
+    let dodge = InputIntent {
+        dodge: true,
+        facing_radians: 0.0,
+        ..InputIntent::default()
+    };
+    advance(&mut world, 5.0, dodge, InputIntent::default());
+    assert_eq!(world.fighter(1).expect("attacker").action, Action::Idle);
+    let rejected_at = world.fighter(1).expect("attacker").stamina;
+
+    advance(&mut world, 1000.0, dodge, InputIntent::default());
+    let regenerated = world.fighter(1).expect("attacker");
+    assert_eq!(regenerated.action, Action::Idle);
+    assert!(regenerated.stamina > 28.0);
+    assert!(regenerated.stamina > rejected_at);
+
+    advance(
+        &mut world,
+        5.0,
+        InputIntent::default(),
+        InputIntent::default(),
+    );
+    let before_retry = world.fighter(1).expect("attacker").stamina;
+    advance(&mut world, 5.0, dodge, InputIntent::default());
+    let attacker = world.fighter(1).expect("attacker");
+    assert_eq!(attacker.action, Action::Dodge);
+    assert!((attacker.stamina - (before_retry - 28.0)).abs() < 1.0);
+}

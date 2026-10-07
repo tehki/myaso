@@ -522,6 +522,17 @@ jobs:
           node --test --test-name-pattern="stamina|roll collision|kick" tests/combat-model.test.mjs tests/networking.test.mjs
           node scripts/pvp_browser_flight_runner.mjs
 
+      - name: Validate M165 authoritative stamina exhaustion
+        env:
+          MYASO_PVP_SCENARIO: "uistaminaexhaustion"
+          MYASO_PVP_FLIGHT_DURATION_MS: "12000"
+        run: |
+          node --check web/online-game.mjs
+          node --check scripts/pvp_browser_flight_runner.mjs
+          node --test --test-name-pattern="exhausted roll edge|stamina" tests/combat-model.test.mjs
+          cargo test --locked --manifest-path server/Cargo.toml exhausted_dodge_edge_is_rejected_and_does_not_auto_fire_after_regeneration
+          node scripts/pvp_browser_flight_runner.mjs
+
       - name: Validate M156 actionable third-party roll knockdown punish
         env:
           MYASO_PVP_SCENARIO: "uirollknockdownffahit"
