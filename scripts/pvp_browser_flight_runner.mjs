@@ -4314,7 +4314,7 @@ async function runOnlineUiBoundedKickKnockdownFlight(entries) {
   let firstKnockdown = null;
   let openerKickActive = null;
   const firstDeadline = Date.now() + COMBAT.kick.windupMs + COMBAT.kick.activeMs + 320;
-  while (Date.now() < firstDeadline && !firstKnockdown) {
+  while (Date.now() < firstDeadline && (!firstKnockdown || !openerKickActive)) {
     const [defenderActions, openerActions] = await Promise.all([
       readOwnActions(defender),
       readOwnActions(opener),
