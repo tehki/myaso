@@ -3220,7 +3220,7 @@ async function runOnlineUiMultiKnockdownFfaHitFlight(entries) {
   // Roll direction remains pointer-owned. Hold downward movement so that once
   // dodge recovery starts, #1 leaves #4's upper punish lane vertically instead
   // of crossing the selected #2 light cone horizontally.
-  const separationKey = "s";
+  const retreatKey = "s";
   const secondClusterKey = secondVictimId > firstVictimId ? "a" : "d";
   const rollOffset = rollRight ? 200 : -200;
 
@@ -3275,7 +3275,7 @@ async function runOnlineUiMultiKnockdownFfaHitFlight(entries) {
     "return (window.__MYASO_ACCEPTANCE_STATE__?.ownActionTransitions ?? []).map((entry) => ({ ...entry }));",
   );
 
-  await setMovementKey(roller, separationKey, true);
+  await setMovementKey(roller, retreatKey, true);
   await scrollArenaWheel(roller, rollerElementId, -120, 0);
 
   let trigger = null;
@@ -3291,7 +3291,7 @@ async function runOnlineUiMultiKnockdownFfaHitFlight(entries) {
     await sleep(1);
   }
   if (!trigger) {
-    await setMovementKey(roller, separationKey, false);
+    await setMovementKey(roller, retreatKey, false);
     throw new Error(milestone + " never observed authoritative primary knockdown #"
       + firstVictimId + ": " + JSON.stringify(await Promise.all(entries.map(readUiEvidence))));
   }
@@ -3325,7 +3325,7 @@ async function runOnlineUiMultiKnockdownFfaHitFlight(entries) {
   }
   await setArenaAttackButton(punisher, false);
   if (!windupReaim) {
-    await setMovementKey(roller, separationKey, false);
+    await setMovementKey(roller, retreatKey, false);
     throw new Error(milestone + " did not refresh #4 aim on #3 knockdown before light active: "
       + JSON.stringify(await Promise.all(entries.map(readUiEvidence))));
   }
@@ -3374,13 +3374,13 @@ async function runOnlineUiMultiKnockdownFfaHitFlight(entries) {
       || (Number.isFinite(punisherState?.playerGuard) && punisherState.playerGuard < 100)
       || (Number.isFinite(firstState?.playerHp) && firstState.playerHp < 66);
     if (wrongDamage) {
-      await setMovementKey(roller, separationKey, false);
+      await setMovementKey(roller, retreatKey, false);
       throw new Error(milestone + " damaged the wrong fighter/guard or hit more than once: "
         + JSON.stringify(states));
     }
     await sleep(6);
   }
-  await setMovementKey(roller, separationKey, false);
+  await setMovementKey(roller, retreatKey, false);
 
   if (!hitEvidence || !provenance) {
     throw new Error(milestone + " did not land exactly one selected 34 HP punish with roll provenance: "
@@ -3556,7 +3556,7 @@ async function runOnlineUiRollKnockdownFfaHitFlight(entries) {
 
   let conversion = null;
   for (let attempt = 1; attempt <= 3 && !conversion; attempt += 1) {
-    await setMovementKey(roller, separationKey, true);
+    await setMovementKey(roller, retreatKey, true);
     await sleep(80);
 
     const [rollerBefore, defenderBefore, punisherBefore] = await Promise.all([
@@ -3649,7 +3649,7 @@ async function runOnlineUiRollKnockdownFfaHitFlight(entries) {
     }
 
     if (attempt < 3) {
-      await setMovementKey(roller, separationKey, false);
+      await setMovementKey(roller, retreatKey, false);
       await sleep(COMBAT.dodge.recoveryMs + COMBAT.dodge.collisionKnockdownMs + 140);
       await pulseMovementKey(roller, movementKey, 80);
       await aimArena(roller, rollerElementId, rollOffset);
@@ -3687,7 +3687,7 @@ async function runOnlineUiRollKnockdownFfaHitFlight(entries) {
     }
     await sleep(8);
   }
-  await setMovementKey(roller, separationKey, false);
+  await setMovementKey(roller, retreatKey, false);
   if (!hitEvidence) {
     throw new Error(milestone + " did not land exactly one 34 HP third-party light during #"
       + defenderId + "'s knockdown conversion window: "
