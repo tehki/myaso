@@ -9108,11 +9108,11 @@ async function performArenaDirectionalLight(session, elementId, strafeKey, xOffs
 async function performArenaRunHold(session, elementId, movementKey, xOffset = 200, holdMs = 900) {
   const origin = { "element-6066-11e4-a52e-4f735466cecf": elementId };
   const boundedHoldMs = Math.max(700, Math.min(1150, Math.trunc(holdMs)));
-  await webdriver(session.base, "POST", \`/session/\${session.sessionId}/actions\`, {
+  await webdriver(session.base, "POST", `/session/${session.sessionId}/actions`, {
     actions: [
       {
         type: "pointer",
-        id: \`mouse-\${session.name}\`,
+        id: `mouse-${session.name}`,
         parameters: { pointerType: "mouse" },
         actions: [
           { type: "pointerMove", duration: 0, origin, x: xOffset, y: 0 },
@@ -9123,7 +9123,7 @@ async function performArenaRunHold(session, elementId, movementKey, xOffset = 20
       },
       {
         type: "key",
-        id: \`keyboard-\${session.name}\`,
+        id: `keyboard-${session.name}`,
         actions: [
           { type: "pause", duration: 0 },
           { type: "keyDown", value: movementKey },
