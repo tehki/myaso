@@ -544,6 +544,16 @@ jobs:
           node --test --test-name-pattern="stamina denial presentation" tests/m29-combat-readability.test.mjs
           node scripts/pvp_browser_flight_runner.mjs
 
+      - name: Validate M167 confirmed stamina denial
+        env:
+          MYASO_PVP_SCENARIO: "uistaminaconfirmed"
+          MYASO_PVP_FLIGHT_DURATION_MS: "9000"
+        run: |
+          node --check web/online-game.mjs
+          node --check scripts/pvp_browser_flight_runner.mjs
+          node --test --test-name-pattern="stamina denial presentation|exhausted roll edge" tests/m29-combat-readability.test.mjs tests/combat-model.test.mjs
+          node scripts/pvp_browser_flight_runner.mjs
+
       - name: Validate M156 actionable third-party roll knockdown punish
         env:
           MYASO_PVP_SCENARIO: "uirollknockdownffahit"
