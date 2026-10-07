@@ -2115,7 +2115,7 @@ async function runOnlineUiJumpAttackCounterplayFlight(entries, defense) {
   // The unchanged jump attack still reaches during its active movement, but
   // not on the very first active tick, giving the genuine Chrome wheel input
   // time to become authoritative after jump-windup commitment.
-  const movementMs = defense === "block" ? 180 : 140;
+  const movementMs = defense === "block" ? 180 : defense === "parry" ? 120 : 140;
   const label = `M138 jump attack ${defense}`;
   const staged = await prepareHeavyCounterplayFlight(
     entries,
@@ -2173,22 +2173,44 @@ async function runOnlineUiJumpAttackCounterplayFlight(entries, defense) {
     // WebDriver read round-trip from the timing boundary.
     await scrollArenaWheelPair(defender, defenderElementId, 120, 20, 100);
     await performArenaJumpAttackChord(attacker, attackerElementId, attackOffset, 90);
-  } else if (defense === "parry" || defense === "dodge") {
-    // Keep both real controls on browser-owned timelines. The previous
-    // authoritative-windup polling added a second WebDriver round trip and
-    // could deliver the Chrome wheel on the exact jump-active server tick.
-    // A 30 ms in-browser wheel pause keeps defense inside the unchanged
-    // 105 ms jump windup while remaining fresh for the 125 ms parry/iframe
-    // windows, without changing gameplay constants or attack geometry.
-    if (defense === "dodge") await aimArena(defender, defenderElementId, 0, 180);
+  } else if (defense === "parry") {
+    // Bind the genuine Chrome wheel-back to Chrome's replicated authoritative
+    // JUMP WINDUP rather than a fixed browser delay. That prevents the wheel
+    // from arriving before commitment and becoming an ordinary block. Keep the
+    // fighters slightly farther apart so the unchanged jump attack reaches
+    // after this single focus-stream read, still inside the 125 ms parry window.
+    const focusOffset = beforeDefender.acceptance?.focusActionTransitions?.length ?? 0;
+    let chordHeld = false;
+    try {
+      await pressArenaJumpAttackChord(attacker, attackerElementId, attackOffset);
+      chordHeld = true;
+      let defenderSawWindup = null;
+      const windupDeadline = Date.now() + 320;
+      while (!defenderSawWindup && Date.now() < windupDeadline) {
+        const focusActions = await execute(
+          defender.base,
+          defender.sessionId,
+          "return (window.__MYASO_ACCEPTANCE_STATE__?.focusActionTransitions ?? []).map((entry) => ({ ...entry }));",
+        );
+        defenderSawWindup = focusActions.slice(focusOffset).find((entry) =>
+          entry.action === COMBAT_ACTION.jumpAttackWindup && Number.isFinite(entry.serverTick)) ?? null;
+        if (!defenderSawWindup) await sleep(1);
+      }
+      if (!defenderSawWindup) {
+        throw new Error(label + " defender never observed authoritative jump windup before parry input");
+      }
+      await scrollArenaWheel(defender, defenderElementId, 120, 0);
+      await sleep(20);
+    } finally {
+      if (chordHeld) await releaseArenaJumpAttackChord(attacker);
+    }
+  } else if (defense === "dodge") {
+    // Dodge keeps the proven browser-owned overlap: genuine wheel-forward and
+    // genuine Space+LMB are issued concurrently, with the dodge aimed off-axis.
+    await aimArena(defender, defenderElementId, 0, 180);
     await Promise.all([
       performArenaJumpAttackChord(attacker, attackerElementId, attackOffset, 90),
-      scrollArenaWheel(
-        defender,
-        defenderElementId,
-        defense === "parry" ? 120 : -120,
-        30,
-      ),
+      scrollArenaWheel(defender, defenderElementId, -120, 30),
     ]);
   } else {
     throw new Error(`unsupported M138 jump-attack defense: ${defense}`);
