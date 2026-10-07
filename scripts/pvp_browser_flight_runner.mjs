@@ -4463,11 +4463,25 @@ async function runOnlineUiBoundedRollKnockdownFlight(entries) {
   }
 
   // #3 was already aimed at #2's unchanged 34-unit knockback destination.
-  // Dispatch on the first authoritative knockdown observation: the WebDriver
-  // observation itself supplies the scheduling gap, while avoiding another
-  // round trip that could move actual contact beyond the 260 ms downed window.
-  // #3 remains vertically separated from #1's corridor, so no opener-recovery
-  // wait is required. Gameplay timing and geometry are unchanged.
+  // Wait only for #1's own authoritative dodge-recovery transition, then fire
+  // #3 immediately. Because the aim is pre-staged, this costs one lightweight
+  // action-stream read instead of the old post-impact pointer round trip. It
+  // keeps #3 out of #1's active roll while preserving the remainder of #2's
+  // unchanged 260 ms knockdown window.
+  let openerDodgeRecovery = null;
+  const openerRecoveryDeadline = Date.now() + COMBAT.dodge.durationMs + 180;
+  while (Date.now() < openerRecoveryDeadline && !openerDodgeRecovery) {
+    const openerActions = await readOwnActions(opener);
+    openerDodgeRecovery = openerActions.slice(openerOffsetActions).find((entry) =>
+      entry.action === COMBAT_ACTION.dodgeRecovery
+      && Number.isFinite(entry.epochMs)
+      && entry.epochMs > openerDodge.epochMs) ?? null;
+    if (!openerDodgeRecovery) await sleep(1);
+  }
+  if (!openerDodgeRecovery) {
+    await setMovementKey(opener, openerMovementKey, false);
+    throw new Error(milestone + " opener never exposed dodge recovery before suppression roll");
+  }
   await scrollArenaWheel(suppressor, suppressorElementId, -120, 0);
 
   let suppressedDodge = null;
@@ -4508,6 +4522,9 @@ async function runOnlineUiBoundedRollKnockdownFlight(entries) {
   const recoveryAfterSuppressedDodge = originalRecovery.epochMs - suppressedDodge.epochMs;
   if (suppressedDodge.epochMs <= firstKnockdown.epochMs
     || suppressedDodge.epochMs >= originalRecovery.epochMs
+    || (Number.isFinite(suppressedDodge.serverTick)
+      && Number.isFinite(openerDodgeRecovery.serverTick)
+      && suppressedDodge.serverTick < openerDodgeRecovery.serverTick)
     || (Number.isFinite(suppressedDodge.serverTick)
       && Number.isFinite(originalRecovery.serverTick)
       && suppressedDodge.serverTick > originalRecovery.serverTick)
