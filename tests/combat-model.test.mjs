@@ -990,3 +990,29 @@ test("holding light does not auto-chain after recovery", () => {
   stepWorld(world, { a: { attack: true, aimX: target.x, aimY: target.y } }, 5);
   assert.equal(attacker.action, "attack_windup");
 });
+
+
+test("exhausted roll edge is rejected and does not auto-fire after regeneration", () => {
+  const world = duel({ distance: 200 });
+  const [attacker, target] = world.fighters;
+
+  advance(world, 3100, {
+    a: { moveX: -1, run: true, aimX: target.x, aimY: target.y },
+  });
+  assert.ok(attacker.stamina < COMBAT.dodge.staminaCost);
+
+  stepWorld(world, { a: { dodge: true, aimX: target.x - 100, aimY: target.y } }, 5);
+  assert.equal(attacker.action, "idle");
+  const rejectedAt = attacker.stamina;
+
+  advance(world, 1000, { a: { dodge: true, aimX: target.x - 100, aimY: target.y } });
+  assert.equal(attacker.action, "idle");
+  assert.ok(attacker.stamina > COMBAT.dodge.staminaCost);
+  assert.ok(attacker.stamina > rejectedAt);
+
+  stepWorld(world, { a: { aimX: target.x - 100, aimY: target.y } }, 5);
+  const beforeRetry = attacker.stamina;
+  stepWorld(world, { a: { dodge: true, aimX: target.x - 100, aimY: target.y } }, 5);
+  assert.equal(attacker.action, "dodge");
+  assert.ok(Math.abs(attacker.stamina - (beforeRetry - COMBAT.dodge.staminaCost)) < 1);
+});
