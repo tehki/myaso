@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { COMBAT_ACTION, FFA_KILL_TARGET, blockSpatialPresentation, combatActionHint, combatLifePresentation, combatOverlayPresentation, createCombatReadabilityTracker, createRemoteDamageTracker, fighterFocusNetId, fighterGuardBreakPunishNetId, fighterKnockdownPunishNetId, fighterParryPunishNetId, fighterRecoveryNetId, fighterIdentityPresentation, fighterThreatBearingLabel, fighterThreatGuardArcLabel, fighterThreatNetId, fighterThreatPhaseLabel, fighterThreatPhaseState, fighterMatchPointPresentation, fighterMatchPresentation, fighterScoreboardPresentation, fighterVitalsPresentation, guardBreakSpatialPresentation, killFeedPresentation, opponentRecoveryPresentation, parrySpatialPresentation } from "../src/browser/combat-readability.mjs";
+import { COMBAT_ACTION, FFA_KILL_TARGET, blockSpatialPresentation, combatActionHint, combatLifePresentation, combatOverlayPresentation, createCombatReadabilityTracker, createRemoteDamageTracker, fighterFocusNetId, fighterGuardBreakPunishNetId, fighterKnockdownPunishNetId, fighterParryPunishNetId, fighterRecoveryNetId, fighterIdentityPresentation, fighterThreatBearingLabel, fighterThreatGuardArcLabel, fighterThreatNetId, fighterThreatPhaseLabel, fighterThreatPhaseState, fighterMatchPointPresentation, fighterMatchPresentation, fighterScoreboardPresentation, fighterVitalsPresentation, guardBreakSpatialPresentation, killFeedPresentation, opponentRecoveryPresentation, parrySpatialPresentation, staminaDenialPresentation } from "../src/browser/combat-readability.mjs";
 
 function fighter(netId, hp = 100, guard = 100, action = COMBAT_ACTION.idle, x = 0, y = 0, facing = 0) {
   return { netId, hp, guard, action, x, y, facing };
@@ -9,6 +9,41 @@ function fighter(netId, hp = 100, guard = 100, action = COMBAT_ACTION.idle, x = 
 function state(own, peer) {
   return new Map([[own.netId, own], [peer.netId, peer]]);
 }
+
+test("stamina denial presentation names the unaffordable action without changing its cost", () => {
+  assert.deepEqual(staminaDenialPresentation("roll", 27.9), {
+    action: "roll",
+    cost: 28,
+    available: 27,
+    text: "Low stamina — roll needs 28.",
+    feedback: "stamina-denied",
+    durationMs: 700,
+  });
+  assert.deepEqual(staminaDenialPresentation("kick", 17), {
+    action: "kick",
+    cost: 18,
+    available: 17,
+    text: "Low stamina — kick needs 18.",
+    feedback: "stamina-denied",
+    durationMs: 700,
+  });
+  assert.deepEqual(staminaDenialPresentation("jump", 13), {
+    action: "jump",
+    cost: 14,
+    available: 13,
+    text: "Low stamina — jump needs 14.",
+    feedback: "stamina-denied",
+    durationMs: 700,
+  });
+});
+
+test("stamina denial presentation stays silent at or above the authoritative threshold", () => {
+  assert.equal(staminaDenialPresentation("roll", 28), null);
+  assert.equal(staminaDenialPresentation("kick", 18), null);
+  assert.equal(staminaDenialPresentation("jump", 14), null);
+  assert.equal(staminaDenialPresentation("unknown", 0), null);
+  assert.equal(staminaDenialPresentation("roll", Number.NaN), null);
+});
 
 test("authoritative HP loss becomes a readable hit message", () => {
   const tracker = createCombatReadabilityTracker();

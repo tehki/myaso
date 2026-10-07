@@ -184,6 +184,26 @@ export function combatActionHint(entity) {
   }
 }
 
+export function staminaDenialPresentation(action, stamina) {
+  if (!Number.isFinite(stamina)) return null;
+  const rule = action === "roll"
+    ? { label: "roll", cost: COMBAT.dodge.staminaCost }
+    : action === "kick"
+      ? { label: "kick", cost: COMBAT.kick.staminaCost }
+      : action === "jump"
+        ? { label: "jump", cost: COMBAT.jump.staminaCost }
+        : null;
+  if (!rule || stamina + 1e-9 >= rule.cost) return null;
+  return {
+    action,
+    cost: rule.cost,
+    available: Math.max(0, Math.min(COMBAT.stamina.max, Math.floor(stamina))),
+    text: `Low stamina — ${rule.label} needs ${rule.cost}.`,
+    feedback: "stamina-denied",
+    durationMs: 700,
+  };
+}
+
 export function opponentRecoveryPresentation(entity) {
   if (entity?.action === COMBAT_ACTION.attackRecovery) {
     return { visible: true, state: "attack-recovery", label: "PUNISH", detail: "Attack recovery" };

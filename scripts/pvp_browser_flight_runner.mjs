@@ -17,7 +17,7 @@ const heavyKeyPulseMs = 120;
 // A full M62 threat chevron paints dozens of exact-tone pixels; a handful can
 // arise from raster overlap. Use one significance floor for positive and leak proof.
 const threatMarkerMinPixels = 8;
-if (!new Set(["damage", "inputloss", "parry", "dodge", "block", "guardbreak", "backblock", "respawn", "ui", "uirespawn", "uifeedback", "uihittell", "uivitals", "uiidentity", "uiscore", "uimatch", "uirematch", "uiffa3", "uikillfeed", "uifocus", "uithreat", "uithreatbearing", "uimultithreat", "uisecondarythreat", "uisecondarybearing", "uisecondaryphase", "uiguardarc", "uisecondaryguardarc", "uithreatmarkers", "uijumpffaprimary", "uijumpffasecondary", "uijumprecoveryffa", "uijumppunishffa", "uimultirecoveryffa", "uimultirecoveryspatial", "uimultirecoverypunish", "uiparry", "uiparrypunishwindow", "uiparrypunishffa", "uiparrypunishffahit", "uiguardbreakpunishffa", "uiguardbreakpunishffahit", "uikickknockdownffa", "uikickknockdownffahit", "uikickknockdownbounded", "uirollknockdownbounded", "uirollknockdownffahit", "uimultiknockdownffa", "uimultiknockdownffahit", "uirollknockdownffa", "uistaminaauth", "uistaminaexhaustion", "uistun", "uiguardbreak", "uidodge", "uirecovery", "uirecoverytell", "uiattackintent", "uiheavy", "uiheavyinputloss", "uiheavyblock", "uiheavyparry", "uiheavydodge", "uiheavypunish", "uiheavyguardbreak", "uiheavyguardbreakpunish", "uifeint", "uirunningattack", "uidirectionallight", "uirollbuffer", "uijumpbuffer", "uijumpattack", "uijumpattackinputloss", "uijumpattackpunish", "uijumpattacktelegraph", "uijumpattackblock", "uijumpattackparry", "uijumpattackdodge", "uijumpattackbuffer", "uikickbuffer", "uiguardbreaktell", "uiparrytell", "uiblockfacingtell", "uidodgetell", "uideathtell"]).has(scenario)) throw new Error(`unsupported MYASO_PVP_SCENARIO: ${scenario}`);
+if (!new Set(["damage", "inputloss", "parry", "dodge", "block", "guardbreak", "backblock", "respawn", "ui", "uirespawn", "uifeedback", "uihittell", "uivitals", "uiidentity", "uiscore", "uimatch", "uirematch", "uiffa3", "uikillfeed", "uifocus", "uithreat", "uithreatbearing", "uimultithreat", "uisecondarythreat", "uisecondarybearing", "uisecondaryphase", "uiguardarc", "uisecondaryguardarc", "uithreatmarkers", "uijumpffaprimary", "uijumpffasecondary", "uijumprecoveryffa", "uijumppunishffa", "uimultirecoveryffa", "uimultirecoveryspatial", "uimultirecoverypunish", "uiparry", "uiparrypunishwindow", "uiparrypunishffa", "uiparrypunishffahit", "uiguardbreakpunishffa", "uiguardbreakpunishffahit", "uikickknockdownffa", "uikickknockdownffahit", "uikickknockdownbounded", "uirollknockdownbounded", "uirollknockdownffahit", "uimultiknockdownffa", "uimultiknockdownffahit", "uirollknockdownffa", "uistaminaauth", "uistaminaexhaustion", "uistaminafeedback", "uistun", "uiguardbreak", "uidodge", "uirecovery", "uirecoverytell", "uiattackintent", "uiheavy", "uiheavyinputloss", "uiheavyblock", "uiheavyparry", "uiheavydodge", "uiheavypunish", "uiheavyguardbreak", "uiheavyguardbreakpunish", "uifeint", "uirunningattack", "uidirectionallight", "uirollbuffer", "uijumpbuffer", "uijumpattack", "uijumpattackinputloss", "uijumpattackpunish", "uijumpattacktelegraph", "uijumpattackblock", "uijumpattackparry", "uijumpattackdodge", "uijumpattackbuffer", "uikickbuffer", "uiguardbreaktell", "uiparrytell", "uiblockfacingtell", "uidodgetell", "uideathtell"]).has(scenario)) throw new Error(`unsupported MYASO_PVP_SCENARIO: ${scenario}`);
 const staticPort = Number(process.env.MYASO_PVP_FLIGHT_HTTP_PORT ?? 4174);
 const browsers = [
   {
@@ -369,6 +369,9 @@ try {
   } else if (scenario === "uistaminaexhaustion") {
     const results = await runOnlineUiStaminaExhaustionFlight(sessions);
     console.log("M165_AUTHORITATIVE_STAMINA_EXHAUSTION " + JSON.stringify({ ok: true, results }));
+  } else if (scenario === "uistaminafeedback") {
+    const results = await runOnlineUiStaminaFeedbackFlight(sessions);
+    console.log("M166_AUTHORITATIVE_STAMINA_FEEDBACK " + JSON.stringify({ ok: true, results }));
   } else if (scenario === "uiguardbreaktell") {
     const results = await runOnlineUiGuardBreakTellFlight(sessions);
     console.log(`M40_FFA_GUARD_BREAK_TELL ${JSON.stringify({ ok: true, results })}`);
@@ -484,14 +487,14 @@ async function startBrowser(browser) {
     pageLoad: 30_000,
     implicit: 0,
   });
-  if (scenario === "uiparry" || scenario === "uistun" || scenario === "uiguardbreak" || scenario === "uidodge" || scenario === "uiattackintent" || scenario === "uiheavy" || scenario === "uiheavyinputloss" || scenario === "uiheavyblock" || scenario === "uiheavyparry" || scenario === "uiheavydodge" || scenario === "uiheavypunish" || scenario === "uiheavyguardbreak" || scenario === "uiheavyguardbreakpunish" || scenario === "uifeint" || scenario === "uirunningattack" || scenario === "uidirectionallight" || scenario === "uirollbuffer" || scenario === "uijumpbuffer" || scenario === "uijumpattack" || scenario === "uijumpattackinputloss" || scenario === "uijumpattackpunish" || scenario === "uijumpattacktelegraph" || scenario === "uijumpffaprimary" || scenario === "uijumpffasecondary" || scenario === "uijumprecoveryffa" || scenario === "uijumppunishffa" || scenario === "uimultirecoveryffa" || scenario === "uimultirecoveryspatial" || scenario === "uimultirecoverypunish" || scenario === "uiparrypunishwindow" || scenario === "uiparrypunishffa" || scenario === "uiparrypunishffahit" || scenario === "uiguardbreakpunishffa" || scenario === "uiguardbreakpunishffahit" || scenario === "uikickknockdownffa" || scenario === "uikickknockdownffahit" || scenario === "uikickknockdownbounded" || scenario === "uirollknockdownbounded" || scenario === "uirollknockdownffahit" || scenario === "uimultiknockdownffa" || scenario === "uimultiknockdownffahit" || scenario === "uirollknockdownffa" || scenario === "uistaminaauth" || scenario === "uistaminaexhaustion" || scenario === "uijumpattackblock" || scenario === "uijumpattackparry" || scenario === "uijumpattackdodge" || scenario === "uijumpattackbuffer" || scenario === "uikickbuffer" || scenario === "uiguardbreaktell" || scenario === "uiparrytell" || scenario === "uiblockfacingtell" || scenario === "uidodgetell") {
+  if (scenario === "uiparry" || scenario === "uistun" || scenario === "uiguardbreak" || scenario === "uidodge" || scenario === "uiattackintent" || scenario === "uiheavy" || scenario === "uiheavyinputloss" || scenario === "uiheavyblock" || scenario === "uiheavyparry" || scenario === "uiheavydodge" || scenario === "uiheavypunish" || scenario === "uiheavyguardbreak" || scenario === "uiheavyguardbreakpunish" || scenario === "uifeint" || scenario === "uirunningattack" || scenario === "uidirectionallight" || scenario === "uirollbuffer" || scenario === "uijumpbuffer" || scenario === "uijumpattack" || scenario === "uijumpattackinputloss" || scenario === "uijumpattackpunish" || scenario === "uijumpattacktelegraph" || scenario === "uijumpffaprimary" || scenario === "uijumpffasecondary" || scenario === "uijumprecoveryffa" || scenario === "uijumppunishffa" || scenario === "uimultirecoveryffa" || scenario === "uimultirecoveryspatial" || scenario === "uimultirecoverypunish" || scenario === "uiparrypunishwindow" || scenario === "uiparrypunishffa" || scenario === "uiparrypunishffahit" || scenario === "uiguardbreakpunishffa" || scenario === "uiguardbreakpunishffahit" || scenario === "uikickknockdownffa" || scenario === "uikickknockdownffahit" || scenario === "uikickknockdownbounded" || scenario === "uirollknockdownbounded" || scenario === "uirollknockdownffahit" || scenario === "uimultiknockdownffa" || scenario === "uimultiknockdownffahit" || scenario === "uirollknockdownffa" || scenario === "uistaminaauth" || scenario === "uistaminaexhaustion" || scenario === "uistaminafeedback" || scenario === "uijumpattackblock" || scenario === "uijumpattackparry" || scenario === "uijumpattackdodge" || scenario === "uijumpattackbuffer" || scenario === "uikickbuffer" || scenario === "uiguardbreaktell" || scenario === "uiparrytell" || scenario === "uiblockfacingtell" || scenario === "uidodgetell") {
     await webdriver(base, "POST", `/session/${sessionId}/window/rect`, { x: 0, y: 0, width: 1280, height: 900 });
   }
   return { ...browser, child, base, sessionId };
 }
 
 async function navigate(session, gameUrl, certificateHash) {
-  const page = scenario === "ui" || scenario === "uirespawn" || scenario === "uifeedback" || scenario === "uihittell" || scenario === "uivitals" || scenario === "uiidentity" || scenario === "uiscore" || scenario === "uimatch" || scenario === "uirematch" || scenario === "uiffa3" || scenario === "uikillfeed" || scenario === "uifocus" || scenario === "uithreat" || scenario === "uithreatbearing" || scenario === "uimultithreat" || scenario === "uisecondarythreat" || scenario === "uisecondarybearing" || scenario === "uisecondaryphase" || scenario === "uiguardarc" || scenario === "uisecondaryguardarc" || scenario === "uithreatmarkers" || scenario === "uijumpffaprimary" || scenario === "uijumpffasecondary" || scenario === "uijumprecoveryffa" || scenario === "uijumppunishffa" || scenario === "uimultirecoveryffa" || scenario === "uimultirecoveryspatial" || scenario === "uimultirecoverypunish" || scenario === "uiparry" || scenario === "uiparrypunishwindow" || scenario === "uiparrypunishffa" || scenario === "uiparrypunishffahit" || scenario === "uiguardbreakpunishffa" || scenario === "uiguardbreakpunishffahit" || scenario === "uikickknockdownffa" || scenario === "uikickknockdownffahit" || scenario === "uikickknockdownbounded" || scenario === "uirollknockdownbounded" || scenario === "uirollknockdownffahit" || scenario === "uimultiknockdownffa" || scenario === "uimultiknockdownffahit" || scenario === "uirollknockdownffa" || scenario === "uistaminaauth" || scenario === "uistaminaexhaustion" || scenario === "uistun" || scenario === "uiguardbreak" || scenario === "uidodge" || scenario === "uirecovery" || scenario === "uirecoverytell" || scenario === "uiattackintent" || scenario === "uiheavy" || scenario === "uiheavyinputloss" || scenario === "uiheavyblock" || scenario === "uiheavyparry" || scenario === "uiheavydodge" || scenario === "uiheavypunish" || scenario === "uiheavyguardbreak" || scenario === "uiheavyguardbreakpunish" || scenario === "uifeint" || scenario === "uirunningattack" || scenario === "uidirectionallight" || scenario === "uirollbuffer" || scenario === "uijumpbuffer" || scenario === "uijumpattack" || scenario === "uijumpattackinputloss" || scenario === "uijumpattackpunish" || scenario === "uijumpattacktelegraph" || scenario === "uijumpattackblock" || scenario === "uijumpattackparry" || scenario === "uijumpattackdodge" || scenario === "uijumpattackbuffer" || scenario === "uikickbuffer" || scenario === "uiguardbreaktell" || scenario === "uiparrytell" || scenario === "uiblockfacingtell" || scenario === "uidodgetell" || scenario === "uideathtell" ? "index.html" : "pvp-flight.html";
+  const page = scenario === "ui" || scenario === "uirespawn" || scenario === "uifeedback" || scenario === "uihittell" || scenario === "uivitals" || scenario === "uiidentity" || scenario === "uiscore" || scenario === "uimatch" || scenario === "uirematch" || scenario === "uiffa3" || scenario === "uikillfeed" || scenario === "uifocus" || scenario === "uithreat" || scenario === "uithreatbearing" || scenario === "uimultithreat" || scenario === "uisecondarythreat" || scenario === "uisecondarybearing" || scenario === "uisecondaryphase" || scenario === "uiguardarc" || scenario === "uisecondaryguardarc" || scenario === "uithreatmarkers" || scenario === "uijumpffaprimary" || scenario === "uijumpffasecondary" || scenario === "uijumprecoveryffa" || scenario === "uijumppunishffa" || scenario === "uimultirecoveryffa" || scenario === "uimultirecoveryspatial" || scenario === "uimultirecoverypunish" || scenario === "uiparry" || scenario === "uiparrypunishwindow" || scenario === "uiparrypunishffa" || scenario === "uiparrypunishffahit" || scenario === "uiguardbreakpunishffa" || scenario === "uiguardbreakpunishffahit" || scenario === "uikickknockdownffa" || scenario === "uikickknockdownffahit" || scenario === "uikickknockdownbounded" || scenario === "uirollknockdownbounded" || scenario === "uirollknockdownffahit" || scenario === "uimultiknockdownffa" || scenario === "uimultiknockdownffahit" || scenario === "uirollknockdownffa" || scenario === "uistaminaauth" || scenario === "uistaminaexhaustion" || scenario === "uistaminafeedback" || scenario === "uistun" || scenario === "uiguardbreak" || scenario === "uidodge" || scenario === "uirecovery" || scenario === "uirecoverytell" || scenario === "uiattackintent" || scenario === "uiheavy" || scenario === "uiheavyinputloss" || scenario === "uiheavyblock" || scenario === "uiheavyparry" || scenario === "uiheavydodge" || scenario === "uiheavypunish" || scenario === "uiheavyguardbreak" || scenario === "uiheavyguardbreakpunish" || scenario === "uifeint" || scenario === "uirunningattack" || scenario === "uidirectionallight" || scenario === "uirollbuffer" || scenario === "uijumpbuffer" || scenario === "uijumpattack" || scenario === "uijumpattackinputloss" || scenario === "uijumpattackpunish" || scenario === "uijumpattacktelegraph" || scenario === "uijumpattackblock" || scenario === "uijumpattackparry" || scenario === "uijumpattackdodge" || scenario === "uijumpattackbuffer" || scenario === "uikickbuffer" || scenario === "uiguardbreaktell" || scenario === "uiparrytell" || scenario === "uiblockfacingtell" || scenario === "uidodgetell" || scenario === "uideathtell" ? "index.html" : "pvp-flight.html";
   const url = new URL(`http://127.0.0.1:${staticPort}/web/${page}`);
   url.searchParams.set("server", gameUrl);
   url.searchParams.set("cert", certificateHash);
@@ -1543,14 +1546,19 @@ async function runOnlineUiStaminaExhaustionFlight(entries) {
   // Drain through genuine held-RMB movement until authority is safely below
   // the unchanged 28-point roll cost. A fixed three holds can bottom out near
   // 33 on a loaded runner because short WebDriver gaps allow regeneration.
-  // Sample immediately after each real hold and continue, bounded, until there
-  // is enough margin that the rejected wheel cannot cross the threshold while
-  // the next browser command is delivered.
+  // Sample after a short input-release settle and continue, bounded, until
+  // there is enough margin that the rejected wheel cannot cross the threshold
+  // while the next browser command is delivered.
   let exhausted = null;
   let drainHolds = 0;
   for (let index = 0; index < 5 && !exhausted; index += 1) {
     await performArenaRunHold(actor, actorElementId, awayKey, awayOffset, 1100);
     drainHolds += 1;
+    // Let the released RMB + movement sample become authoritative before
+    // establishing the exhausted baseline. This remains well inside the
+    // unchanged 360 ms stamina regen delay, so any later stamina change can be
+    // attributed to the tested action instead of a stale sprint packet.
+    await sleep(140);
     const state = await readUiEvidence(actor);
     if (staminaMatchesHud(state)
       && state.acceptance.authoritativeStamina < COMBAT.dodge.staminaCost - 6
@@ -1646,6 +1654,148 @@ async function runOnlineUiStaminaExhaustionFlight(entries) {
     m165RejectedWheelEpochMs: entry.browser === actor.name ? failedWheels[0].epochMs : null,
     m165RetryWheelEpochMs: entry.browser === actor.name ? retryWheels[0].epochMs : null,
     m165AcceptedStamina: entry.browser === actor.name ? 72 : null,
+  }));
+}
+
+async function runOnlineUiStaminaFeedbackFlight(entries) {
+  const milestone = "M166 authoritative stamina feedback";
+  if (entries.length !== 2) {
+    throw new Error(milestone + " expected two real browser clients, received " + entries.length);
+  }
+
+  await Promise.all(entries.map(installUiObserver));
+  const ready = await waitForUiReady(entries);
+  const actor = entries.find((entry) => entry.name === "chrome");
+  const peer = entries.find((entry) => entry.name === "firefox");
+  const actorReady = ready.find((entry) => entry.browser === actor?.name);
+  const peerReady = ready.find((entry) => entry.browser === peer?.name);
+  if (!actor || !peer || !actorReady || !peerReady) {
+    throw new Error(milestone + " could not resolve deterministic browser roles: " + JSON.stringify(ready));
+  }
+
+  await Promise.all(entries.map((entry) => execute(
+    entry.base,
+    entry.sessionId,
+    "document.querySelector('#arena').focus(); return document.activeElement?.id;",
+  )));
+  await Promise.all(entries.map(centerArenaInViewport));
+
+  const actorElementId = await resolveArenaElement(actor, milestone + " actor");
+  const actorId = actorReady.playerNetId;
+  const peerId = peerReady.playerNetId;
+  const awayOffset = actorId < peerId ? -200 : 200;
+  const awayKey = actorId < peerId ? "a" : "d";
+  await aimArena(actor, actorElementId, awayOffset);
+  await sleep(40);
+
+  const staminaMatchesHud = (state) => {
+    const authoritative = state?.acceptance?.authoritativeStamina;
+    return Number.isFinite(authoritative)
+      && Number.isFinite(state?.playerStamina)
+      && Math.round(authoritative) === state.playerStamina;
+  };
+
+  const waitForActor = async (predicate, timeoutMs, label) => {
+    const deadline = Date.now() + timeoutMs;
+    while (Date.now() < deadline) {
+      const state = await readUiEvidence(actor);
+      if (predicate(state)) return state;
+      await sleep(12);
+    }
+    throw new Error(milestone + " timed out waiting for " + label + ": "
+      + JSON.stringify(await readUiEvidence(actor)));
+  };
+
+  await waitForActor(
+    (state) => staminaMatchesHud(state)
+      && Math.round(state.acceptance.authoritativeStamina) === 100
+      && state.acceptance?.scenario === "uistaminafeedback",
+    1800,
+    "full authoritative stamina baseline",
+  );
+
+  let exhausted = null;
+  let drainHolds = 0;
+  for (let index = 0; index < 5 && !exhausted; index += 1) {
+    await performArenaRunHold(actor, actorElementId, awayKey, awayOffset, 1100);
+    drainHolds += 1;
+    // Let the released RMB + movement sample become authoritative before
+    // establishing the exhausted baseline. This remains well inside the
+    // unchanged 360 ms stamina regen delay, so any later stamina change can be
+    // attributed to the tested action instead of a stale sprint packet.
+    await sleep(140);
+    const state = await readUiEvidence(actor);
+    if (staminaMatchesHud(state)
+      && state.acceptance.authoritativeStamina < COMBAT.dodge.staminaCost - 6
+      && state.acceptance?.ownActionTransitions?.at(-1)?.action === COMBAT_ACTION.idle) {
+      exhausted = state;
+    }
+  }
+  if (!exhausted) {
+    throw new Error(milestone + " could not drain below the roll threshold with genuine running: "
+      + JSON.stringify(await readUiEvidence(actor)));
+  }
+
+  const exhaustedStamina = Math.round(exhausted.acceptance.authoritativeStamina);
+  const actionOffset = exhausted.acceptance.ownActionTransitions.length;
+  const staminaOffset = exhausted.acceptance.staminaTransitions.length;
+  const wheelOffset = exhausted.wheels.length;
+  const eventOffset = exhausted.events.length;
+  const feedbackOffset = exhausted.feedbackTransitions.length;
+
+  // Preserve M165's authority contract: the genuine wheel-forward still reaches
+  // the server. M166 adds only a client readability cue based on the latest
+  // replicated authoritative stamina value.
+  await scrollArenaWheel(actor, actorElementId, -120, 0);
+
+  const rejected = await waitForActor(
+    (state) => {
+      const newEvents = state.events.slice(eventOffset);
+      const newFeedback = state.feedbackTransitions.slice(feedbackOffset);
+      return newEvents.includes("Low stamina — roll needs 28.")
+        && newFeedback.includes("stamina-denied");
+    },
+    1000,
+    "visible low-stamina roll denial",
+  );
+
+  const failedWheels = rejected.wheels.slice(wheelOffset).filter((entry) => entry.deltaY < 0);
+  const failedActions = rejected.acceptance?.ownActionTransitions?.slice(actionOffset) ?? [];
+  const failedStamina = rejected.acceptance?.staminaTransitions?.slice(staminaOffset) ?? [];
+  if (failedWheels.length !== 1 || !Number.isFinite(failedWheels[0]?.epochMs)) {
+    throw new Error(milestone + " did not record exactly one denied wheel-forward input: "
+      + JSON.stringify(rejected.wheels.slice(wheelOffset)));
+  }
+  if (failedActions.some((entry) =>
+    entry.action === COMBAT_ACTION.dodge || entry.action === COMBAT_ACTION.dodgeRecovery)) {
+    throw new Error(milestone + " readability cue masked a real roll: " + JSON.stringify(failedActions));
+  }
+  const minimumAfterDenied = failedStamina.reduce(
+    (value, entry) => Number.isFinite(entry.stamina) ? Math.min(value, entry.stamina) : value,
+    exhaustedStamina,
+  );
+  if (minimumAfterDenied < exhaustedStamina - 1) {
+    throw new Error(milestone + " denied roll spent stamina: "
+      + JSON.stringify({ exhaustedStamina, failedStamina }));
+  }
+
+  const states = await Promise.all(entries.map(readUiEvidence));
+  for (const state of states) {
+    if (state.playerHp !== 100 || state.playerGuard !== 100) {
+      throw new Error(milestone + " feedback proof changed health/guard: " + JSON.stringify(states));
+    }
+  }
+
+  return states.map((entry) => ({
+    ...entry,
+    m166ActorId: actorId,
+    m166PeerId: peerId,
+    m166DrainHolds: entry.browser === actor.name ? drainHolds : null,
+    m166DeniedAtStamina: entry.browser === actor.name ? exhaustedStamina : null,
+    m166DeniedWheelEpochMs: entry.browser === actor.name ? failedWheels[0].epochMs : null,
+    m166FeedbackSeen: entry.browser === actor.name
+      ? entry.feedbackTransitions.includes("stamina-denied")
+      : null,
   }));
 }
 
@@ -1794,7 +1944,14 @@ async function runOnlineUiRollBufferFlight(entries) {
   }
   const bufferOpenEpochMs = ownAttackRecovery.epochMs
     + COMBAT.attack.recoveryMs - COMBAT.inputBuffer.dodgeWindowMs;
-  if (perpendicularAim.epochMs < ownAttackRecovery.epochMs
+  // Firefox can observe the shared authoritative recovery snapshot one
+  // replication sample before Chrome records its own recovery transition.
+  // Pointer retargeting is not an action edge, so tolerate at most one 60 Hz
+  // authoritative frame of that cross-browser observation skew. Keep the real
+  // wheel-forward strict: it must still land after buffer-open and before the
+  // buffered Dodge becomes authoritative.
+  const recoveryAimSkewMs = 20;
+  if (perpendicularAim.epochMs < ownAttackRecovery.epochMs - recoveryAimSkewMs
     || rollWheel.epochMs < bufferOpenEpochMs
     || rollWheel.epochMs > ownDodge.epochMs) {
     throw new Error(`M129 genuine wheel was not inside the attacker's authoritative dodge-buffer interval: ${JSON.stringify({
@@ -2120,11 +2277,13 @@ async function runOnlineUiJumpAttackCounterplayFlight(entries, defense) {
   // authoritative windup replication. Block retains the opposite direction.
   const attackerName = defense === "block" ? "chrome" : "firefox";
   const defenderName = defense === "block" ? "firefox" : "chrome";
-  // Leave latency-sensitive parry/dodge slightly farther apart than block.
-  // The unchanged jump attack still reaches during its active movement, but
-  // not on the very first active tick, giving the genuine Chrome wheel input
-  // time to become authoritative after jump-windup commitment.
-  const movementMs = defense === "block" ? 180 : 140;
+  // Keep dodge slightly farther apart so its wheel-forward can establish
+  // overlap without forcing a first-tick collision. Parry uses a small inward
+  // staging margin: 140 ms leaves the 48 + 18 unit jump-hit boundary almost
+  // exact under browser timing variance, which can turn a valid parry into a
+  // pure geometric whiff even when Block is authoritative before JUMP STRIKE.
+  // This changes acceptance setup only; gameplay reach and timing stay fixed.
+  const movementMs = defense === "block" ? 180 : defense === "parry" ? 170 : 140;
   const label = `M138 jump attack ${defense}`;
   const staged = await prepareHeavyCounterplayFlight(
     entries,
@@ -3364,15 +3523,14 @@ async function runOnlineUiMultiKnockdownFfaFlight(entries) {
   const rollOffset = rollRight ? 200 : -200;
 
   // Authoritative spawns are 96 px apart. Move #3 down just under one body
-  // width, then about 69 px toward #2. The older 170 ms vertical pulse left
-  // nominal center distance around 45-46 px, barely outside the unchanged
-  // 44 px roll-collision radius under frame quantization. A 145 ms pulse keeps
-  // the fighters physically separate while giving the real roll a few pixels
-  // of deterministic collision margin, without changing production geometry.
-  // #1 still closes roughly 26 px before rolling, preserving a browser-visible
-  // stagger between the two unchanged 260 ms knockdown windows.
+  // width, then about 43 px toward #2. Keeping roughly 53 px of horizontal
+  // separation makes the same unchanged roll contact #3 around 90-110 ms after
+  // #2 instead of only ~50 ms later. Both unchanged 260 ms knockdowns still
+  // overlap, but the browser now has a deterministic handoff window wide enough
+  // to render KNOCKDOWN #3 after #2 recovers. Production geometry is untouched.
+  // #1 still closes roughly 26 px before rolling.
   await pulseMovementKey(secondVictim, secondVerticalKey, 145);
-  await pulseMovementKey(secondVictim, secondClusterKey, 320);
+  await pulseMovementKey(secondVictim, secondClusterKey, 200);
   await pulseMovementKey(roller, movementKey, 120);
   await aimArena(roller, rollerElementId, rollOffset);
   await sleep(50);
@@ -4463,9 +4621,16 @@ async function runOnlineUiBoundedRollKnockdownFlight(entries) {
 
   // Keep #1's ordinary movement held. Dodge direction is pointer-owned, so the
   // roll still travels toward #2; once dodge ends, the held movement carries
-  // #1 away from the collision lane.
+  // #1 away from the collision lane. Schedule #3's genuine wheel-forward from
+  // its own browser clock 185 ms after #1's wheel edge: just beyond the
+  // unchanged 170 ms opener roll, but well inside #2's unchanged 260 ms
+  // knockdown. This removes variable WebDriver observation latency from the
+  // bounded-contact proof without changing gameplay timing or geometry.
   await setMovementKey(opener, openerMovementKey, true);
-  await scrollArenaWheel(opener, openerElementId, -120, 0);
+  await Promise.all([
+    scrollArenaWheel(opener, openerElementId, -120, 0),
+    scrollArenaWheel(suppressor, suppressorElementId, -120, 185),
+  ]);
 
   let firstKnockdown = null;
   let openerDodge = null;
@@ -4487,15 +4652,9 @@ async function runOnlineUiBoundedRollKnockdownFlight(entries) {
       + JSON.stringify(await Promise.all(entries.map(readUiEvidence))));
   }
 
-  // #3 was already aimed at #2's unchanged 34-unit knockback destination.
-  // Schedule its genuine wheel-forward from the first knockdown observation
-  // instead of waiting on another WebDriver read. Immediate dispatch reaches
-  // authority too early and can collide with #1; waiting for replicated dodge
-  // recovery can arrive after #2's unchanged 260 ms downed window. A browser-
-  // side 110 ms pause targets the middle of that measured authority window
-  // without changing any gameplay timing or geometry.
-  await scrollArenaWheel(suppressor, suppressorElementId, -120, 110);
-
+  // Both wheel inputs have already been delivered. The remaining proof uses
+  // only persisted authoritative transitions, so runner load cannot move the
+  // suppression input later in the downed window.
   let openerDodgeRecovery = null;
   let suppressedDodge = null;
   let suppressorDodgeRecovery = null;
@@ -9681,7 +9840,7 @@ async function installUiObserver(session) {
     const threatGuardArc = document.querySelector('#threat-guard-arc');
     if (!target || !arena || !arenaStage || !overlay || !recovery || !focusLabel || !threat || !threatCount || !threatSecondary || !threatSecondaryBearing || !threatSecondaryPhase || !threatSecondaryGuardArc || !threatBearing || !threatGuardArc) throw new Error('missing online UI flight target');
     const state = { events: [], eventTransitions: [], keys: [], keyTransitions: [], pointers: [], wheels: [], overlayTransitions: [], feedbackTransitions: [], recoveryTransitions: [], focusTransitions: [], threatTransitions: [], recoveryTellMaxPixels: 0, parryTellMaxPixels: 0, online: '', startedAt: performance.now() };
-    const epochEvidence = ['uirollbuffer', 'uijumpbuffer', 'uijumpattack', 'uijumpattackinputloss', 'uijumpattackpunish', 'uijumpattacktelegraph', 'uijumpffaprimary', 'uijumpffasecondary', 'uijumprecoveryffa', 'uijumppunishffa', 'uimultirecoveryffa', 'uimultirecoveryspatial', 'uimultirecoverypunish', 'uiparrypunishwindow', 'uiparrypunishffa', 'uiparrypunishffahit', 'uiguardbreakpunishffa', 'uiguardbreakpunishffahit', 'uikickknockdownffa', 'uikickknockdownffahit', 'uikickknockdownbounded', 'uirollknockdownbounded', 'uistaminaauth', 'uistaminaexhaustion', 'uirollknockdownffahit', 'uimultiknockdownffa', 'uimultiknockdownffahit', 'uirollknockdownffa', 'uijumpattackblock', 'uijumpattackparry', 'uijumpattackdodge', 'uijumpattackbuffer', 'uikickbuffer'].includes(new URLSearchParams(location.search).get('scenario'));
+    const epochEvidence = ['uirollbuffer', 'uijumpbuffer', 'uijumpattack', 'uijumpattackinputloss', 'uijumpattackpunish', 'uijumpattacktelegraph', 'uijumpffaprimary', 'uijumpffasecondary', 'uijumprecoveryffa', 'uijumppunishffa', 'uimultirecoveryffa', 'uimultirecoveryspatial', 'uimultirecoverypunish', 'uiparrypunishwindow', 'uiparrypunishffa', 'uiparrypunishffahit', 'uiguardbreakpunishffa', 'uiguardbreakpunishffahit', 'uikickknockdownffa', 'uikickknockdownffahit', 'uikickknockdownbounded', 'uirollknockdownbounded', 'uistaminaauth', 'uistaminaexhaustion', 'uistaminafeedback', 'uirollknockdownffahit', 'uimultiknockdownffa', 'uimultiknockdownffahit', 'uirollknockdownffa', 'uijumpattackblock', 'uijumpattackparry', 'uijumpattackdodge', 'uijumpattackbuffer', 'uikickbuffer'].includes(new URLSearchParams(location.search).get('scenario'));
     const record = () => {
       const text = target.textContent?.trim() ?? '';
       if (/^Online - player #\\d+ - server tick \\d+$/.test(text)) state.online = text;
