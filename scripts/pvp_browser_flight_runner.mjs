@@ -3392,10 +3392,13 @@ async function runOnlineUiMultiKnockdownFfaHitFlight(entries) {
   const secondState = hitEvidence.find((entry) => entry.browser === secondVictim.name);
   const punisherState = hitEvidence.find((entry) => entry.browser === punisher.name);
 
+  const firstKnockdownTick = provenance.firstKnockdown.serverTick;
+  const secondKnockdownTick = provenance.secondKnockdown.serverTick;
   if (!Number.isFinite(provenance.rollWheel.epochMs)
-    || provenance.firstKnockdown.epochMs >= provenance.secondKnockdown.epochMs
-    || provenance.secondKnockdown.epochMs >= provenance.firstKnockdown.epochMs + COMBAT.dodge.collisionKnockdownMs) {
-    throw new Error(milestone + " did not prove ordered overlapping roll knockdowns: "
+    || !Number.isFinite(firstKnockdownTick)
+    || !Number.isFinite(secondKnockdownTick)
+    || firstKnockdownTick > secondKnockdownTick) {
+    throw new Error(milestone + " did not prove authoritative ordered/same-tick roll knockdowns: "
       + JSON.stringify(provenance));
   }
   for (const transition of [provenance.firstKnockdown, provenance.secondKnockdown]) {
@@ -3430,18 +3433,22 @@ async function runOnlineUiMultiKnockdownFfaHitFlight(entries) {
       && Number.isFinite(entry.epochMs)
       && entry.epochMs >= punishWindup.epochMs)
     : null;
-  const primaryKnockdownEnd = provenance.firstKnockdown.epochMs + COMBAT.dodge.collisionKnockdownMs;
+  const firstRecovery = (firstState.acceptance?.ownActionTransitions ?? []).find((entry) =>
+    entry.action === COMBAT_ACTION.idle
+    && Number.isFinite(entry.serverTick)
+    && entry.serverTick > firstKnockdownTick);
   if (!punishWindup || !punishActive
-    || punishActive.epochMs < provenance.secondKnockdown.epochMs
-    || punishActive.epochMs >= primaryKnockdownEnd) {
-    throw new Error(milestone + " #4 attack-active did not land inside the overlapping knockdown window: "
+    || !Number.isFinite(punishActive.serverTick)
+    || punishActive.serverTick < Math.max(firstKnockdownTick, secondKnockdownTick)
+    || (firstRecovery && punishActive.serverTick >= firstRecovery.serverTick)) {
+    throw new Error(milestone + " #4 attack-active did not land inside the authoritative overlapping knockdown window: "
       + JSON.stringify({
         punishDown,
         punishWindup,
         punishActive,
         firstKnockdown: provenance.firstKnockdown,
         secondKnockdown: provenance.secondKnockdown,
-        primaryKnockdownEnd,
+        firstRecovery,
       }));
   }
 
