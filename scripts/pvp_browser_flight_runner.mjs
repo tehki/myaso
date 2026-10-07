@@ -2267,11 +2267,13 @@ async function runOnlineUiJumpAttackCounterplayFlight(entries, defense) {
   // authoritative windup replication. Block retains the opposite direction.
   const attackerName = defense === "block" ? "chrome" : "firefox";
   const defenderName = defense === "block" ? "firefox" : "chrome";
-  // Leave latency-sensitive parry/dodge slightly farther apart than block.
-  // The unchanged jump attack still reaches during its active movement, but
-  // not on the very first active tick, giving the genuine Chrome wheel input
-  // time to become authoritative after jump-windup commitment.
-  const movementMs = defense === "block" ? 180 : 140;
+  // Keep dodge slightly farther apart so its wheel-forward can establish
+  // overlap without forcing a first-tick collision. Parry uses a small inward
+  // staging margin: 140 ms leaves the 48 + 18 unit jump-hit boundary almost
+  // exact under browser timing variance, which can turn a valid parry into a
+  // pure geometric whiff even when Block is authoritative before JUMP STRIKE.
+  // This changes acceptance setup only; gameplay reach and timing stay fixed.
+  const movementMs = defense === "block" ? 180 : defense === "parry" ? 170 : 140;
   const label = `M138 jump attack ${defense}`;
   const staged = await prepareHeavyCounterplayFlight(
     entries,
