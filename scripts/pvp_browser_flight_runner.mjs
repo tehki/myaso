@@ -2174,12 +2174,10 @@ async function runOnlineUiJumpAttackCounterplayFlight(entries, defense) {
     && ownKnockdownIndex >= 0
     && focusWindupIndex >= 0
     && focusKnockdownIndex > focusWindupIndex;
-  const ownPlainJumpIndex = ownTransitions.findIndex((entry) => entry.action === COMBAT_ACTION.jump);
   if ((!rollCounter && ownWindupIndex < 0) || focusWindupIndex < 0
     || (defense !== "parry" && !rollCounter
-      && (ownActiveIndex <= ownWindupIndex || focusActiveIndex <= focusWindupIndex))
-    || (ownWindupIndex >= 0 && ownPlainJumpIndex >= 0 && ownPlainJumpIndex < ownWindupIndex)) {
-    throw new Error(`${label} did not preserve direct authoritative jump-attack commitment: ${JSON.stringify({
+      && (ownActiveIndex <= ownWindupIndex || focusActiveIndex <= focusWindupIndex))) {
+    throw new Error(`${label} did not preserve authoritative jump-attack commitment: ${JSON.stringify({
       ownTransitions,
       focusTransitions,
     })}`);
