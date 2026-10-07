@@ -4354,7 +4354,13 @@ async function runOnlineUiBoundedRollKnockdownFlight(entries) {
   const suppressorHorizontalKey = suppressorId > defenderId ? "a" : "d";
   const suppressorInitialX = suppressorId > defenderId ? -120 : 120;
 
-  const aimAtAuthoritativeTarget = async (entry, elementId, targetNetId) => {
+  const aimAtAuthoritativeTarget = async (
+    entry,
+    elementId,
+    targetNetId,
+    targetDeltaX = 0,
+    targetDeltaY = 0,
+  ) => {
     const offset = await execute(entry.base, entry.sessionId, `
       const a = window.__MYASO_ACCEPTANCE_STATE__;
       const own = a?.fighters?.find((fighter) => fighter.netId === a.playerNetId);
@@ -4363,8 +4369,8 @@ async function runOnlineUiBoundedRollKnockdownFlight(entries) {
       const rect = canvas.getBoundingClientRect();
       if (!own || !target || !canvas || rect.width <= 0 || rect.height <= 0) return null;
       return {
-        x: (target.x - own.x) * (rect.width / canvas.width),
-        y: (target.y - own.y) * (rect.height / canvas.height),
+        x: (target.x + ${targetDeltaX} - own.x) * (rect.width / canvas.width),
+        y: (target.y + ${targetDeltaY} - own.y) * (rect.height / canvas.height),
       };
     `);
     if (!offset || !Number.isFinite(offset.x) || !Number.isFinite(offset.y)) {
@@ -4383,7 +4389,15 @@ async function runOnlineUiBoundedRollKnockdownFlight(entries) {
   await pulseMovementKey(suppressor, suppressorHorizontalKey, 285);
   await pulseMovementKey(opener, openerMovementKey, 280);
   await aimArena(opener, openerElementId, openerOffset);
-  await aimAtAuthoritativeTarget(suppressor, suppressorElementId, defenderId);
+  // Pre-aim #3 at #2's deterministic post-impact position. This avoids a
+  // post-knockdown WebDriver re-aim round trip consuming most of the unchanged
+  // 260 ms downed window before the suppression roll can make contact.
+  await aimAtAuthoritativeTarget(
+    suppressor,
+    suppressorElementId,
+    defenderId,
+    rollRight ? COMBAT.dodge.collisionKnockback : -COMBAT.dodge.collisionKnockback,
+  );
   await sleep(50);
 
   const readOwnActions = (entry) => execute(
@@ -4434,21 +4448,12 @@ async function runOnlineUiBoundedRollKnockdownFlight(entries) {
       + JSON.stringify(await Promise.all(entries.map(readUiEvidence))));
   }
 
-  // #2 has moved by the opener's unchanged 34 px knockback. Re-aim #3 using
-  // the authoritative world delta, but do not launch while #1 is still in the
-  // active roll corridor. Under loaded browser scheduling #3 can otherwise
-  // collide with #1 on the opener's final dodge tick and get knocked down
-  // before it can exercise the bounded-contact contract.
-  await aimAtAuthoritativeTarget(suppressor, suppressorElementId, defenderId);
-
-  // The first authoritative knockdown is emitted on the roll-contact tick,
-  // which is already near the tail of #1's 170 ms active dodge. Waiting for
-  // #1's dodge-recovery transition to replicate costs another browser round
-  // trip and can consume #2's entire unchanged 260 ms knockdown window under
-  // loaded CI. Give the contact tick one short scheduling gap so #1 clears the
-  // shared collision cell, then dispatch #3's genuine wheel-forward roll while
-  // #2 is still authoritatively down. This changes acceptance timing only.
-  await sleep(24);
+  // #3 was already aimed at #2's unchanged 34-unit knockback destination.
+  // Dispatch on the first authoritative knockdown observation: the WebDriver
+  // observation itself supplies the scheduling gap, while avoiding another
+  // round trip that could move actual contact beyond the 260 ms downed window.
+  // #3 remains vertically separated from #1's corridor, so no opener-recovery
+  // wait is required. Gameplay timing and geometry are unchanged.
   await scrollArenaWheel(suppressor, suppressorElementId, -120, 0);
 
   let suppressedDodge = null;
