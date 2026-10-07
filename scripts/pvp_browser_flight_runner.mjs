@@ -1276,6 +1276,211 @@ async function runOnlineUiDirectionalLightFlight(entries) {
   return evidence;
 }
 
+
+async function runOnlineUiAuthoritativeStaminaFlight(entries) {
+  const milestone = "M164 authoritative stamina browser";
+  if (entries.length !== 2) {
+    throw new Error(milestone + " expected two real browser clients, received " + entries.length);
+  }
+
+  await Promise.all(entries.map(installUiObserver));
+  const ready = await waitForUiReady(entries);
+  const actor = entries.find((entry) => entry.name === "chrome");
+  const peer = entries.find((entry) => entry.name === "firefox");
+  const actorReady = ready.find((entry) => entry.browser === actor?.name);
+  const peerReady = ready.find((entry) => entry.browser === peer?.name);
+  if (!actor || !peer || !actorReady || !peerReady) {
+    throw new Error(milestone + " could not resolve deterministic browser roles: " + JSON.stringify(ready));
+  }
+
+  await Promise.all(entries.map((entry) => execute(
+    entry.base,
+    entry.sessionId,
+    "document.querySelector('#arena').focus(); return document.activeElement?.id;",
+  )));
+  await Promise.all(entries.map(centerArenaInViewport));
+
+  const actorElementId = await resolveArenaElement(actor, milestone + " actor");
+  const actorId = actorReady.playerNetId;
+  const peerId = peerReady.playerNetId;
+  const awayOffset = actorId < peerId ? -200 : 200;
+  const awayKey = actorId < peerId ? "a" : "d";
+  await aimArena(actor, actorElementId, awayOffset);
+  await sleep(40);
+
+  const staminaMatchesHud = (state, expected = null) => {
+    const authoritative = state?.acceptance?.authoritativeStamina;
+    if (!Number.isFinite(authoritative) || !Number.isFinite(state?.playerStamina)) return false;
+    if (Math.round(authoritative) !== state.playerStamina) return false;
+    return expected === null || Math.round(authoritative) === expected;
+  };
+
+  const waitForStamina = async (predicate, timeoutMs, label) => {
+    const deadline = Date.now() + timeoutMs;
+    while (Date.now() < deadline) {
+      const state = await readUiEvidence(actor);
+      if (predicate(state)) return state;
+      await sleep(12);
+    }
+    throw new Error(milestone + " timed out waiting for " + label + ": "
+      + JSON.stringify(await readUiEvidence(actor)));
+  };
+
+  const assertCleanVitals = async (label) => {
+    const states = await Promise.all(entries.map(readUiEvidence));
+    for (const state of states) {
+      if (state.playerHp !== 100 || state.playerGuard !== 100) {
+        throw new Error(milestone + " " + label + " changed health/guard: " + JSON.stringify(states));
+      }
+    }
+    return states;
+  };
+
+  const baseline = await waitForStamina(
+    (state) => staminaMatchesHud(state, 100)
+      && state.acceptance?.scenario === "uistaminaauth",
+    1800,
+    "authoritative full stamina baseline",
+  );
+  const baselineStaminaOffset = baseline.acceptance.staminaTransitions.length;
+  const baselineActionOffset = baseline.acceptance.ownActionTransitions.length;
+  const baselineWheelOffset = baseline.wheels.length;
+
+  // One genuine wheel-forward roll away from the peer. The server cost is an
+  // exact 28, so the owner snapshot and visible HUD must both settle at 72.
+  await scrollArenaWheel(actor, actorElementId, -120, 0);
+  const rollState = await waitForStamina(
+    (state) => {
+      const staminaTransitions = state.acceptance?.staminaTransitions?.slice(baselineStaminaOffset) ?? [];
+      const actionTransitions = state.acceptance?.ownActionTransitions?.slice(baselineActionOffset) ?? [];
+      return staminaMatchesHud(state, 72)
+        && staminaTransitions.some((entry) => entry.stamina === 72 && Number.isFinite(entry.serverTick))
+        && actionTransitions.some((entry) => entry.action === COMBAT_ACTION.dodge && Number.isFinite(entry.serverTick));
+    },
+    1000,
+    "28-point authoritative roll cost",
+  );
+  const rollWheels = rollState.wheels.slice(baselineWheelOffset).filter((entry) => entry.deltaY < 0);
+  if (rollWheels.length !== 1 || !Number.isFinite(rollWheels[0]?.epochMs)) {
+    throw new Error(milestone + " did not deliver exactly one genuine wheel-forward roll: "
+      + JSON.stringify(rollState.wheels.slice(baselineWheelOffset)));
+  }
+  await assertCleanVitals("roll stamina proof");
+
+  const rollRecovered = await waitForStamina(
+    (state) => staminaMatchesHud(state, 100)
+      && state.acceptance?.ownActionTransitions?.at(-1)?.action === COMBAT_ACTION.idle,
+    2400,
+    "post-roll authoritative regeneration",
+  );
+  const kickStaminaOffset = rollRecovered.acceptance.staminaTransitions.length;
+  const kickActionOffset = rollRecovered.acceptance.ownActionTransitions.length;
+  const kickPointerOffset = rollRecovered.pointers.length;
+
+  // Short RMB remains a genuine kick because it is held below the 180 ms run
+  // threshold. The exact server stamina cost is 18, so 100 -> 82.
+  await performArenaRecoveryBufferedKick(actor, actorElementId, awayOffset, 45);
+  const kickState = await waitForStamina(
+    (state) => {
+      const staminaTransitions = state.acceptance?.staminaTransitions?.slice(kickStaminaOffset) ?? [];
+      const actionTransitions = state.acceptance?.ownActionTransitions?.slice(kickActionOffset) ?? [];
+      return staminaMatchesHud(state, 82)
+        && staminaTransitions.some((entry) => entry.stamina === 82 && Number.isFinite(entry.serverTick))
+        && actionTransitions.some((entry) => entry.action === COMBAT_ACTION.kickWindup && Number.isFinite(entry.serverTick));
+    },
+    1000,
+    "18-point authoritative kick cost",
+  );
+  const kickPointers = kickState.pointers.slice(kickPointerOffset);
+  const rightDown = kickPointers.find((entry) => entry.type === "pointerdown" && entry.button === 2);
+  const rightUp = kickPointers.find((entry) => entry.type === "pointerup" && entry.button === 2);
+  if (!rightDown || !rightUp
+    || !Number.isFinite(rightDown.epochMs) || !Number.isFinite(rightUp.epochMs)
+    || rightUp.epochMs <= rightDown.epochMs
+    || rightUp.epochMs - rightDown.epochMs >= 180) {
+    throw new Error(milestone + " kick cost lacked genuine short-RMB provenance: "
+      + JSON.stringify(kickPointers));
+  }
+  await assertCleanVitals("kick stamina proof");
+
+  const kickRecovered = await waitForStamina(
+    (state) => staminaMatchesHud(state, 100)
+      && state.acceptance?.ownActionTransitions?.at(-1)?.action === COMBAT_ACTION.idle,
+    2400,
+    "post-kick authoritative regeneration",
+  );
+  const runStaminaOffset = kickRecovered.acceptance.staminaTransitions.length;
+  const runKeyOffset = kickRecovered.keyTransitions.length;
+  const runPointerOffset = kickRecovered.pointers.length;
+
+  // Hold RMB past the production threshold while genuinely moving away from
+  // the peer. Run drain is continuous (24/sec), so prove a substantial server
+  // decrease rather than depending on one exact scheduler duration.
+  await performArenaRunHold(actor, actorElementId, awayKey, awayOffset, 900);
+  const runState = await waitForStamina(
+    (state) => {
+      const transitions = state.acceptance?.staminaTransitions?.slice(runStaminaOffset) ?? [];
+      const minimum = transitions.reduce(
+        (value, entry) => Number.isFinite(entry.stamina) ? Math.min(value, entry.stamina) : value,
+        100,
+      );
+      return Number.isFinite(state.acceptance?.authoritativeStamina)
+        && state.playerStamina === Math.round(state.acceptance.authoritativeStamina)
+        && minimum <= 90
+        && state.acceptance.authoritativeStamina <= 92;
+    },
+    800,
+    "continuous authoritative run drain",
+  );
+
+  const runPointers = runState.pointers.slice(runPointerOffset);
+  const runKeys = runState.keyTransitions.slice(runKeyOffset);
+  const runDown = runPointers.find((entry) => entry.type === "pointerdown" && entry.button === 2);
+  const runUp = runPointers.find((entry) => entry.type === "pointerup" && entry.button === 2);
+  const moveDown = runKeys.find((entry) => entry.type === "keydown"
+    && (entry.code === "KeyA" || entry.code === "KeyD"));
+  const moveUp = runKeys.find((entry) => entry.type === "keyup"
+    && (entry.code === "KeyA" || entry.code === "KeyD"));
+  if (!runDown || !runUp || !moveDown || !moveUp
+    || !Number.isFinite(runDown.epochMs) || !Number.isFinite(runUp.epochMs)
+    || runUp.epochMs - runDown.epochMs < 700
+    || runUp.epochMs - runDown.epochMs > 1150) {
+    throw new Error(milestone + " run drain lacked genuine held-RMB movement provenance: "
+      + JSON.stringify({ runPointers, runKeys }));
+  }
+  const runActions = runState.acceptance?.ownActionTransitions?.slice(kickRecovered.acceptance.ownActionTransitions.length) ?? [];
+  if (runActions.some((entry) =>
+    entry.action === COMBAT_ACTION.kickWindup
+    || entry.action === COMBAT_ACTION.kickActive
+    || entry.action === COMBAT_ACTION.kickRecovery)) {
+    throw new Error(milestone + " held RMB accidentally resolved as a kick: " + JSON.stringify(runActions));
+  }
+  await assertCleanVitals("run stamina proof");
+
+  const finalState = await waitForStamina(
+    (state) => staminaMatchesHud(state, 100),
+    2400,
+    "authoritative stamina regeneration back to full",
+  );
+  const finalStates = await assertCleanVitals("final stamina proof");
+
+  return finalStates.map((entry) => ({
+    ...entry,
+    m164ActorId: actorId,
+    m164PeerId: peerId,
+    m164RollStamina: rollState.acceptance?.staminaTransitions
+      ?.slice(baselineStaminaOffset)
+      ?.find((item) => item.stamina === 72)?.stamina ?? null,
+    m164KickStamina: kickState.acceptance?.staminaTransitions
+      ?.slice(kickStaminaOffset)
+      ?.find((item) => item.stamina === 82)?.stamina ?? null,
+    m164RunMinimumStamina: runState.acceptance?.staminaTransitions
+      ?.slice(runStaminaOffset)
+      ?.reduce((value, item) => Number.isFinite(item.stamina) ? Math.min(value, item.stamina) : value, 100) ?? null,
+    m164FinalStamina: entry.browser === actor.name ? finalState.acceptance?.authoritativeStamina ?? null : null,
+  }));
+}
+
 async function runOnlineUiRollBufferFlight(entries) {
   const staged = await prepareHeavyCounterplayFlight(
     entries,
@@ -8893,6 +9098,37 @@ async function performArenaDirectionalLight(session, elementId, strafeKey, xOffs
           { type: "pause", duration: 40 },
           { type: "pointerUp", button: 0 },
           { type: "pause", duration: 150 },
+        ],
+      },
+    ],
+  });
+}
+
+
+async function performArenaRunHold(session, elementId, movementKey, xOffset = 200, holdMs = 900) {
+  const origin = { "element-6066-11e4-a52e-4f735466cecf": elementId };
+  const boundedHoldMs = Math.max(700, Math.min(1150, Math.trunc(holdMs)));
+  await webdriver(session.base, "POST", \`/session/\${session.sessionId}/actions\`, {
+    actions: [
+      {
+        type: "pointer",
+        id: \`mouse-\${session.name}\`,
+        parameters: { pointerType: "mouse" },
+        actions: [
+          { type: "pointerMove", duration: 0, origin, x: xOffset, y: 0 },
+          { type: "pointerDown", button: 2 },
+          { type: "pause", duration: boundedHoldMs },
+          { type: "pointerUp", button: 2 },
+        ],
+      },
+      {
+        type: "key",
+        id: \`keyboard-\${session.name}\`,
+        actions: [
+          { type: "pause", duration: 0 },
+          { type: "keyDown", value: movementKey },
+          { type: "pause", duration: boundedHoldMs },
+          { type: "keyUp", value: movementKey },
         ],
       },
     ],
