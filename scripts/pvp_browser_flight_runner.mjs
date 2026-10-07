@@ -3456,6 +3456,7 @@ async function runOnlineUiMultiKnockdownFfaHitFlight(entries) {
   const secondBefore = beforeStates.find((entry) => entry.browser === secondVictim.name);
   const punisherBefore = beforeStates.find((entry) => entry.browser === punisher.name);
   const wheelOffset = rollerBefore.wheels.length;
+  const rollerActionOffset = rollerBefore.acceptance?.ownActionTransitions?.length ?? 0;
   const firstActionOffset = firstBefore.acceptance?.ownActionTransitions?.length ?? 0;
   const secondActionOffset = secondBefore.acceptance?.ownActionTransitions?.length ?? 0;
   const punishPointerOffset = punisherBefore.pointers.length;
@@ -3471,38 +3472,37 @@ async function runOnlineUiMultiKnockdownFfaHitFlight(entries) {
     COMBAT.attack,
     milestone + " selected punish pre-aim",
   );
-  const readFirstOwnActions = () => execute(
-    firstVictim.base,
-    firstVictim.sessionId,
+  const readRollerOwnActions = () => execute(
+    roller.base,
+    roller.sessionId,
     "return (window.__MYASO_ACCEPTANCE_STATE__?.ownActionTransitions ?? []).map((entry) => ({ ...entry }));",
   );
 
   await setMovementKey(roller, retreatKey, true);
   await scrollArenaWheel(roller, rollerElementId, -120, 0);
 
-  let trigger = null;
-  const triggerDeadline = Date.now() + COMBAT.dodge.durationMs + COMBAT.dodge.collisionKnockdownMs + 120;
-  while (Date.now() < triggerDeadline && !trigger) {
-    const firstActions = await readFirstOwnActions();
-    const firstKnockdown = firstActions.slice(firstActionOffset).find((entry) =>
-      entry.action === COMBAT_ACTION.knockdown && Number.isFinite(entry.epochMs));
-    if (firstKnockdown) {
-      trigger = { firstKnockdown };
-      break;
-    }
-    await sleep(1);
+  let rollTrigger = null;
+  const rollTriggerDeadline = Date.now() + COMBAT.dodge.durationMs + 180;
+  while (Date.now() < rollTriggerDeadline && !rollTrigger) {
+    const rollerActions = await readRollerOwnActions();
+    rollTrigger = rollerActions.slice(rollerActionOffset).find((entry) =>
+      entry.action === COMBAT_ACTION.dodge && Number.isFinite(entry.epochMs)) ?? null;
+    if (!rollTrigger) await sleep(1);
   }
-  if (!trigger) {
+  if (!rollTrigger) {
     await setMovementKey(roller, retreatKey, false);
-    throw new Error(milestone + " never observed authoritative primary knockdown #"
-      + firstVictimId + ": " + JSON.stringify(await Promise.all(entries.map(readUiEvidence))));
+    throw new Error(milestone + " never observed the authoritative roll before punish staging");
   }
 
-  // Commit one genuine LMB immediately on #2's authoritative knockdown. Keep
-  // same real button held while waiting for #3's authoritative knockdown, then
-  // re-aim during the unchanged 135 ms light windup. This removes stale-facing
-  // misses caused by #2's roll knockback/separation drift without changing
-  // attack reach, arc, windup, or the one-LMB provenance contract.
+  // Stage #4's single genuine LMB from the authoritative dodge timeline just
+  // before the deterministic body-contact region. Cross-session WebDriver and
+  // input ingress can otherwise consume roughly one server tick after #2's
+  // replicated knockdown and push the unchanged 135 ms light windup onto the
+  // 260 ms recovery boundary. The later provenance checks still require the
+  // real pointer edge to fall no more than 40 ms before #2's knockdown, both
+  // victims to be authoritatively down before attack-active, and exactly one
+  // 34 HP hit on the selected victim. No gameplay timing is changed.
+  await sleep(48);
   await setArenaAttackButton(punisher, true);
   let windupReaim = null;
   const reaimDeadline = Date.now() + Math.max(80, COMBAT.attack.windupMs - 20);
