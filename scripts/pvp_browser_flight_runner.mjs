@@ -3669,14 +3669,12 @@ async function runOnlineUiMultiKnockdownFfaHitFlight(entries) {
 
   // Stage #4's single genuine LMB from the authoritative dodge timeline just
   // before the deterministic body-contact region. Cross-session WebDriver and
-  // input ingress can otherwise consume roughly one server tick after #2's
-  // replicated knockdown and push the unchanged 135 ms light windup onto the
-  // 260 ms recovery boundary. Keep one server-tick margin by dispatching 20 ms
-  // earlier; the later provenance checks still require the real pointer edge
-  // to fall no more than 40 ms before #2's knockdown, both victims to be
-  // authoritatively down before attack-active, and exactly one 34 HP hit on
-  // the selected victim. No gameplay timing is changed.
-  await sleep(28);
+  // input ingress already add roughly two server ticks before the edge becomes
+  // authoritative, so do not add a wall-clock pause here. The later provenance
+  // checks still require the real pointer edge to fall no more than 40 ms
+  // before #2's knockdown, both victims to be authoritatively down before
+  // attack-active, and exactly one 34 HP hit on the selected victim. No
+  // gameplay timing is changed.
   await setArenaAttackButton(punisher, true);
   let windupReaim = null;
   const reaimDeadline = Date.now() + Math.max(80, COMBAT.attack.windupMs - 20);
