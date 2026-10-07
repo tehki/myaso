@@ -208,7 +208,7 @@ function observeCombatState(state) {
 }
 
 function recordAcceptanceState(state, ownId) {
-  if (!["uirollbuffer", "uijumpbuffer", "uijumpattack", "uijumpattackinputloss", "uijumpattackpunish", "uijumpattacktelegraph", "uijumprecoveryffa", "uijumppunishffa", "uimultirecoveryffa", "uimultirecoveryspatial", "uimultirecoverypunish", "uiparrypunishwindow", "uiparrypunishffa", "uiparrypunishffahit", "uiguardbreakpunishffa", "uiguardbreakpunishffahit", "uikickknockdownffa", "uikickknockdownffahit", "uikickknockdownbounded", "uirollknockdownbounded", "uirollknockdownffahit", "uimultiknockdownffa", "uimultiknockdownffahit", "uirollknockdownffa", "uijumpattackblock", "uijumpattackparry", "uijumpattackdodge", "uijumpattackbuffer", "uikickbuffer"].includes(acceptanceScenario)) return;
+  if (!["uirollbuffer", "uijumpbuffer", "uijumpattack", "uijumpattackinputloss", "uijumpattackpunish", "uijumpattacktelegraph", "uijumprecoveryffa", "uijumppunishffa", "uimultirecoveryffa", "uimultirecoveryspatial", "uimultirecoverypunish", "uiparrypunishwindow", "uiparrypunishffa", "uiparrypunishffahit", "uiguardbreakpunishffa", "uiguardbreakpunishffahit", "uikickknockdownffa", "uikickknockdownffahit", "uikickknockdownbounded", "uirollknockdownbounded", "uirollknockdownffahit", "uimultiknockdownffa", "uimultiknockdownffahit", "uirollknockdownffa", "uistaminaauth", "uijumpattackblock", "uijumpattackparry", "uijumpattackdodge", "uijumpattackbuffer", "uikickbuffer"].includes(acceptanceScenario)) return;
   const focusNetId = fighterGuardBreakPunishNetId(state, ownId)
     || fighterParryPunishNetId(state, ownId)
     || fighterKnockdownPunishNetId(state, ownId)
@@ -218,10 +218,21 @@ function recordAcceptanceState(state, ownId) {
     scenario: acceptanceScenario,
     ownActionTransitions: [],
     focusActionTransitions: [],
+    staminaTransitions: [],
   };
   acceptance.playerNetId = ownId;
   acceptance.focusNetId = focusNetId;
   acceptance.serverTick = networkClient?.latestServerTick ?? 0;
+  const own = state.get(ownId);
+  if (Number.isFinite(own?.stamina)) {
+    acceptance.authoritativeStamina = own.stamina;
+    recordAcceptanceStamina(
+      acceptance.staminaTransitions,
+      own.stamina,
+      Date.now(),
+      acceptance.serverTick,
+    );
+  }
   if (acceptanceScenario === "uirollknockdownbounded"
     || acceptanceScenario === "uimultiknockdownffahit") {
     acceptance.fighters = [...state.values()].map((fighter) => ({
@@ -249,6 +260,13 @@ function recordAcceptanceState(state, ownId) {
 function recordAcceptanceAction(transitions, action, epochMs, serverTick) {
   if (!Number.isInteger(action) || transitions.at(-1)?.action === action) return;
   transitions.push({ action, epochMs, serverTick });
+}
+
+function recordAcceptanceStamina(transitions, stamina, epochMs, serverTick) {
+  if (!Number.isFinite(stamina)) return;
+  const rounded = Math.max(0, Math.min(100, Math.round(stamina)));
+  if (transitions.at(-1)?.stamina === rounded) return;
+  transitions.push({ stamina: rounded, epochMs, serverTick });
 }
 
 function recordKillEvent(event) {
