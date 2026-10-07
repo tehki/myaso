@@ -5868,7 +5868,7 @@ async function runOnlineUiParryPunishFfaFocusFlight(entries, convert = false) {
   // Stage #3 mostly below #2 instead of directly between #1 and #2. This
   // keeps #3 as Firefox's ordinary nearest rival while placing it outside
   // #1's unchanged 94-unit light-hit radius (76 reach + 18 fighter radius).
-  await pulseMovementKey(closerIdle, "s", 350);
+  await pulseMovementKey(closerIdle, "s", 380);
   await pulseMovementKey(closerIdle, "a", 450);
   await sleep(80);
   let baseline = await Promise.all(entries.map(readUiEvidence));
@@ -5896,7 +5896,11 @@ async function runOnlineUiParryPunishFfaFocusFlight(entries, convert = false) {
 
   // Close #1 into parry range. If that movement would make #1 geometrically
   // nearer than #3, pull #3 inward again before the parry commitment.
-  await pulseMovementKey(attacker, movementKey, 100);
+  // Keep #1 just inside the unchanged 94-unit light-hit envelope rather
+  // than over-closing the lane. This leaves a larger perpendicular safety
+  // margin for the nearer idle #3, which must remain focusable by #2 without
+  // entering #1's light cone under loaded browser scheduling.
+  await pulseMovementKey(attacker, movementKey, 60);
   await sleep(60);
   let staged = await Promise.all(entries.map(readUiEvidence));
   let stagedDefender = staged.find((entry) => entry.browser === defender.name);
