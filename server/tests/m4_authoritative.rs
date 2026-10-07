@@ -3120,7 +3120,6 @@ fn held_light_does_not_auto_chain_authoritatively() {
     );
 }
 
-
 #[test]
 fn exhausted_dodge_edge_is_rejected_and_does_not_auto_fire_after_regeneration() {
     let mut world = duel(200.0);
