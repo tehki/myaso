@@ -60,8 +60,10 @@ const threatCue = {
   bearing: "",
   guardArc: "",
   jumpCommittedNetId: 0,
+  jumpCommittedPrimary: false,
 };
 const threatScan = { count: 0, secondaryNetId: 0 };
+const threatCommitmentScan = { count: 0, secondaryNetId: 0 };
 const combatReadability = createCombatReadabilityTracker();
 const combatImpact = createCombatImpactController();
 const remoteDamage = createRemoteDamageTracker();
@@ -198,6 +200,7 @@ function observeCombatState(state) {
   const ownId = networkClient?.playerNetId;
   if (!ownId) return;
   recordAcceptanceState(state, ownId);
+  observeThreatCommitment(state, ownId);
   const match = fighterMatchPresentation(state.values(), ownId);
   if (match.visible && !matchOver) {
     matchOver = true;
@@ -217,6 +220,19 @@ function observeCombatState(state) {
   combatMessageUntil = now + event.durationMs;
   setStatus(combatMessage);
   showCombatFeedback(event.feedback);
+}
+
+function observeThreatCommitment(state, ownId) {
+  const primaryNetId = fighterThreatNetId(state, ownId, threatCommitmentScan);
+  const candidateIds = [primaryNetId, threatCommitmentScan.secondaryNetId];
+  for (const netId of candidateIds) {
+    if (!netId) continue;
+    const attacker = state.get(netId);
+    if (attacker?.action !== COMBAT_ACTION.jumpAttackWindup) continue;
+    threatCue.jumpCommittedNetId = netId;
+    threatCue.jumpCommittedPrimary = netId === primaryNetId;
+    break;
+  }
 }
 
 function recordAcceptanceState(state, ownId) {
@@ -997,7 +1013,7 @@ function updateThreatCue(ownId) {
   if (!threatCue.root || !networkClient) return;
   let netId = fighterThreatNetId(networkClient.state, ownId, threatScan);
   let threatCount = threatScan.count;
-  const secondaryNetId = threatScan.secondaryNetId;
+  let secondaryNetId = threatScan.secondaryNetId;
   const committedJump = threatCue.jumpCommittedNetId
     ? networkClient.state.get(threatCue.jumpCommittedNetId)
     : null;
@@ -1005,23 +1021,33 @@ function updateThreatCue(ownId) {
     && committedJump?.action !== COMBAT_ACTION.jumpAttackWindup
     && committedJump?.action !== COMBAT_ACTION.jumpAttackActive) {
     threatCue.jumpCommittedNetId = 0;
+    threatCue.jumpCommittedPrimary = false;
   }
-  // A jump hit can knock the defender outside the narrow cone on the same
-  // authoritative tick that first exposes jumpAttackActive. If this exact
-  // attacker was already a spatially valid windup threat, preserve its active
-  // phase until authority leaves jumpAttackActive. Off-axis jump attacks never
-  // acquire this latch, so they still produce no false threat cue.
-  if (netId === 0 && threatCue.jumpCommittedNetId) {
-    const latched = networkClient.state.get(threatCue.jumpCommittedNetId);
-    if (latched?.action === COMBAT_ACTION.jumpAttackActive) {
+
+  // Snapshot observation owns the jump commitment latch so a loaded renderer
+  // cannot skip the entire 105 ms windup. Once a spatially valid jump commits,
+  // preserve its primary/secondary rank through the active hit frame even if
+  // the hit knockback moves the defender outside the narrow 48 px cone before
+  // the next animation frame. Off-axis jumps never acquire the latch.
+  if (threatCue.jumpCommittedNetId
+    && committedJump?.action === COMBAT_ACTION.jumpAttackActive
+    && netId !== threatCue.jumpCommittedNetId
+    && secondaryNetId !== threatCue.jumpCommittedNetId) {
+    if (netId === 0) {
       netId = threatCue.jumpCommittedNetId;
+      secondaryNetId = 0;
       threatCount = Math.max(1, threatCount);
+    } else {
+      threatCount = Math.max(2, threatCount);
+      if (threatCue.jumpCommittedPrimary) {
+        secondaryNetId = netId;
+        netId = threatCue.jumpCommittedNetId;
+      } else {
+        secondaryNetId = threatCue.jumpCommittedNetId;
+      }
     }
   }
   const attacker = netId ? networkClient.state.get(netId) : null;
-  if (attacker?.action === COMBAT_ACTION.jumpAttackWindup) {
-    threatCue.jumpCommittedNetId = netId;
-  }
   const secondaryAttacker = secondaryNetId ? networkClient.state.get(secondaryNetId) : null;
   const own = ownId ? networkClient.state.get(ownId) : null;
   const bearing = fighterThreatBearingLabel(own, attacker);
