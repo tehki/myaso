@@ -1540,20 +1540,28 @@ async function runOnlineUiStaminaExhaustionFlight(entries) {
     "full authoritative stamina baseline",
   );
 
-  // Three genuine held-RMB movement intervals drain more than 72 stamina.
-  // Keep the action pointed away from Firefox so the proof cannot change
-  // health/guard while establishing the exhausted threshold.
-  for (let index = 0; index < 3; index += 1) {
+  // Drain through genuine held-RMB movement until authority is safely below
+  // the unchanged 28-point roll cost. A fixed three holds can bottom out near
+  // 33 on a loaded runner because short WebDriver gaps allow regeneration.
+  // Sample immediately after each real hold and continue, bounded, until there
+  // is enough margin that the rejected wheel cannot cross the threshold while
+  // the next browser command is delivered.
+  let exhausted = null;
+  let drainHolds = 0;
+  for (let index = 0; index < 5 && !exhausted; index += 1) {
     await performArenaRunHold(actor, actorElementId, awayKey, awayOffset, 1100);
+    drainHolds += 1;
+    const state = await readUiEvidence(actor);
+    if (staminaMatchesHud(state)
+      && state.acceptance.authoritativeStamina < COMBAT.dodge.staminaCost - 6
+      && state.acceptance?.ownActionTransitions?.at(-1)?.action === COMBAT_ACTION.idle) {
+      exhausted = state;
+    }
   }
-
-  const exhausted = await waitForActor(
-    (state) => staminaMatchesHud(state)
-      && state.acceptance.authoritativeStamina < COMBAT.dodge.staminaCost - 2
-      && state.acceptance?.ownActionTransitions?.at(-1)?.action === COMBAT_ACTION.idle,
-    900,
-    "sub-roll-cost authoritative stamina",
-  );
+  if (!exhausted) {
+    throw new Error(milestone + " could not drain below the roll threshold with genuine running: "
+      + JSON.stringify(await readUiEvidence(actor)));
+  }
   const exhaustedStamina = Math.round(exhausted.acceptance.authoritativeStamina);
   const failedActionOffset = exhausted.acceptance.ownActionTransitions.length;
   const failedStaminaOffset = exhausted.acceptance.staminaTransitions.length;
@@ -1633,6 +1641,7 @@ async function runOnlineUiStaminaExhaustionFlight(entries) {
     ...entry,
     m165ActorId: actorId,
     m165PeerId: peerId,
+    m165DrainHolds: entry.browser === actor.name ? drainHolds : null,
     m165RejectedAtStamina: entry.browser === actor.name ? exhaustedStamina : null,
     m165RejectedWheelEpochMs: entry.browser === actor.name ? failedWheels[0].epochMs : null,
     m165RetryWheelEpochMs: entry.browser === actor.name ? retryWheels[0].epochMs : null,
