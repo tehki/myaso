@@ -5859,14 +5859,16 @@ async function runOnlineUiParryPunishFfaFocusFlight(entries, convert = false) {
   )));
   await Promise.all(entries.map(centerArenaInViewport));
 
-  // Pull #3 inward so Firefox has a stable ordinary nearest rival that should
-  // be overridden only by a real parry stun on #1.
-  await pulseMovementKey(closerIdle, "a", 300);
+  // Stage #3 mostly below #2 instead of directly between #1 and #2. This
+  // keeps #3 as Firefox's ordinary nearest rival while placing it outside
+  // #1's unchanged 94-unit light-hit radius (76 reach + 18 fighter radius).
+  await pulseMovementKey(closerIdle, "s", 350);
+  await pulseMovementKey(closerIdle, "a", 450);
   await sleep(80);
   let baseline = await Promise.all(entries.map(readUiEvidence));
   let defenderBefore = baseline.find((entry) => entry.browser === defender.name);
   for (let attempt = 0; attempt < 4 && defenderBefore?.focusLabel !== `NEAREST #${closerId}`; attempt += 1) {
-    await pulseMovementKey(closerIdle, "a", 70);
+    await pulseMovementKey(closerIdle, "w", 30);
     await sleep(60);
     baseline = await Promise.all(entries.map(readUiEvidence));
     defenderBefore = baseline.find((entry) => entry.browser === defender.name);
@@ -5888,12 +5890,12 @@ async function runOnlineUiParryPunishFfaFocusFlight(entries, convert = false) {
 
   // Close #1 into parry range. If that movement would make #1 geometrically
   // nearer than #3, pull #3 inward again before the parry commitment.
-  await pulseMovementKey(attacker, movementKey, 120);
+  await pulseMovementKey(attacker, movementKey, 100);
   await sleep(60);
   let staged = await Promise.all(entries.map(readUiEvidence));
   let stagedDefender = staged.find((entry) => entry.browser === defender.name);
   for (let attempt = 0; attempt < 3 && stagedDefender?.focusLabel !== `NEAREST #${closerId}`; attempt += 1) {
-    await pulseMovementKey(closerIdle, "a", 70);
+    await pulseMovementKey(closerIdle, "w", 30);
     await sleep(50);
     staged = await Promise.all(entries.map(readUiEvidence));
     stagedDefender = staged.find((entry) => entry.browser === defender.name);
