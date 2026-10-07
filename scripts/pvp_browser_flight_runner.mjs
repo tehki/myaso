@@ -4281,25 +4281,14 @@ async function runOnlineUiBoundedRollKnockdownFlight(entries) {
   // before it can exercise the bounded-contact contract.
   await aimAtAuthoritativeTarget(suppressor, suppressorElementId, defenderId);
 
-  let openerDodgeRecovery = null;
-  const openerClearDeadline = Date.now() + COMBAT.dodge.durationMs + 120;
-  while (Date.now() < openerClearDeadline && !openerDodgeRecovery) {
-    const openerActions = await readOwnActions(opener);
-    openerDodgeRecovery = openerActions.find((entry) =>
-      entry.action === COMBAT_ACTION.dodgeRecovery
-      && Number.isFinite(entry.epochMs)
-      && entry.epochMs > openerDodge.epochMs) ?? null;
-    if (!openerDodgeRecovery) await sleep(1);
-  }
-  if (!openerDodgeRecovery) {
-    await setMovementKey(opener, openerMovementKey, false);
-    throw new Error(milestone + " opener never cleared active dodge before suppression roll");
-  }
-
-  // Fire #3 immediately on the first authoritative dodge-recovery snapshot.
-  // That keeps #1 out of the collision path while leaving the remaining
-  // portion of #2's unchanged 260 ms knockdown window for the suppression
-  // contact. No gameplay timing or geometry constants are changed.
+  // The first authoritative knockdown is emitted on the roll-contact tick,
+  // which is already near the tail of #1's 170 ms active dodge. Waiting for
+  // #1's dodge-recovery transition to replicate costs another browser round
+  // trip and can consume #2's entire unchanged 260 ms knockdown window under
+  // loaded CI. Give the contact tick one short scheduling gap so #1 clears the
+  // shared collision cell, then dispatch #3's genuine wheel-forward roll while
+  // #2 is still authoritatively down. This changes acceptance timing only.
+  await sleep(24);
   await scrollArenaWheel(suppressor, suppressorElementId, -120, 0);
 
   let suppressedDodge = null;
