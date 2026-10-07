@@ -4479,37 +4479,30 @@ async function runOnlineUiBoundedRollKnockdownFlight(entries) {
   }
 
   // #3 was already aimed at #2's unchanged 34-unit knockback destination.
-  // Wait only for #1's own authoritative dodge-recovery transition, then fire
-  // #3 immediately. Because the aim is pre-staged, this costs one lightweight
-  // action-stream read instead of the old post-impact pointer round trip. It
-  // keeps #3 out of #1's active roll while preserving the remainder of #2's
-  // unchanged 260 ms knockdown window.
-  let openerDodgeRecovery = null;
-  const openerRecoveryDeadline = Date.now() + COMBAT.dodge.durationMs + 180;
-  while (Date.now() < openerRecoveryDeadline && !openerDodgeRecovery) {
-    const openerActions = await readOwnActions(opener);
-    openerDodgeRecovery = openerActions.slice(openerOffsetActions).find((entry) =>
-      entry.action === COMBAT_ACTION.dodgeRecovery
-      && Number.isFinite(entry.epochMs)
-      && entry.epochMs > openerDodge.epochMs) ?? null;
-    if (!openerDodgeRecovery) await sleep(1);
-  }
-  if (!openerDodgeRecovery) {
-    await setMovementKey(opener, openerMovementKey, false);
-    throw new Error(milestone + " opener never exposed dodge recovery before suppression roll");
-  }
-  await scrollArenaWheel(suppressor, suppressorElementId, -120, 0);
+  // Schedule its genuine wheel-forward from the first knockdown observation
+  // instead of waiting on another WebDriver read. Immediate dispatch reaches
+  // authority too early and can collide with #1; waiting for replicated dodge
+  // recovery can arrive after #2's unchanged 260 ms downed window. A browser-
+  // side 110 ms pause targets the middle of that measured authority window
+  // without changing any gameplay timing or geometry.
+  await scrollArenaWheel(suppressor, suppressorElementId, -120, 110);
 
+  let openerDodgeRecovery = null;
   let suppressedDodge = null;
   let suppressorDodgeRecovery = null;
   let originalRecovery = null;
   const recoveryDeadline = Date.now() + COMBAT.dodge.collisionKnockdownMs + COMBAT.dodge.durationMs + 320;
   while (Date.now() < recoveryDeadline
-    && (!suppressedDodge || !suppressorDodgeRecovery || !originalRecovery)) {
-    const [defenderAcceptance, suppressorActions] = await Promise.all([
+    && (!openerDodgeRecovery || !suppressedDodge || !suppressorDodgeRecovery || !originalRecovery)) {
+    const [defenderAcceptance, openerActions, suppressorActions] = await Promise.all([
       readAcceptance(defender),
+      readOwnActions(opener),
       readOwnActions(suppressor),
     ]);
+    openerDodgeRecovery = openerActions.slice(openerOffsetActions).find((entry) =>
+      entry.action === COMBAT_ACTION.dodgeRecovery
+      && Number.isFinite(entry.epochMs)
+      && entry.epochMs > openerDodge.epochMs) ?? openerDodgeRecovery;
     suppressedDodge = suppressorActions.slice(suppressorOffsetActions).find((entry) =>
       entry.action === COMBAT_ACTION.dodge
       && Number.isFinite(entry.epochMs)
@@ -4524,12 +4517,12 @@ async function runOnlineUiBoundedRollKnockdownFlight(entries) {
       entry.action === COMBAT_ACTION.idle
       && Number.isFinite(entry.epochMs)
       && entry.epochMs > firstKnockdown.epochMs) ?? originalRecovery;
-    if (!suppressedDodge || !suppressorDodgeRecovery || !originalRecovery) await sleep(2);
+    if (!openerDodgeRecovery || !suppressedDodge || !suppressorDodgeRecovery || !originalRecovery) await sleep(2);
   }
 
   await setMovementKey(opener, openerMovementKey, false);
 
-  if (!suppressedDodge || !suppressorDodgeRecovery || !originalRecovery) {
+  if (!openerDodgeRecovery || !suppressedDodge || !suppressorDodgeRecovery || !originalRecovery) {
     throw new Error(milestone + " did not observe suppression roll plus original recovery: "
       + JSON.stringify(await Promise.all(entries.map(readUiEvidence))));
   }
