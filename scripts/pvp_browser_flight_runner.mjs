@@ -3550,7 +3550,7 @@ async function runOnlineUiRollKnockdownFfaHitFlight(entries) {
 
   let conversion = null;
   for (let attempt = 1; attempt <= 3 && !conversion; attempt += 1) {
-    await setMovementKey(roller, separationKey, true);
+    await setMovementKey(roller, retreatKey, true);
     await sleep(80);
 
     const [rollerBefore, defenderBefore, punisherBefore] = await Promise.all([
@@ -3643,7 +3643,7 @@ async function runOnlineUiRollKnockdownFfaHitFlight(entries) {
     }
 
     if (attempt < 3) {
-      await setMovementKey(roller, separationKey, false);
+      await setMovementKey(roller, retreatKey, false);
       await sleep(COMBAT.dodge.recoveryMs + COMBAT.dodge.collisionKnockdownMs + 140);
       await pulseMovementKey(roller, movementKey, 80);
       await aimArena(roller, rollerElementId, rollOffset);
@@ -3681,7 +3681,7 @@ async function runOnlineUiRollKnockdownFfaHitFlight(entries) {
     }
     await sleep(8);
   }
-  await setMovementKey(roller, separationKey, false);
+  await setMovementKey(roller, retreatKey, false);
   if (!hitEvidence) {
     throw new Error(milestone + " did not land exactly one 34 HP third-party light during #"
       + defenderId + "'s knockdown conversion window: "
