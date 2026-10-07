@@ -2115,7 +2115,7 @@ async function runOnlineUiJumpAttackCounterplayFlight(entries, defense) {
   // The unchanged jump attack still reaches during its active movement, but
   // not on the very first active tick, giving the genuine Chrome wheel input
   // time to become authoritative after jump-windup commitment.
-  const movementMs = defense === "block" ? 180 : defense === "parry" ? 120 : 140;
+  const movementMs = defense === "block" ? 180 : 140;
   const label = `M138 jump attack ${defense}`;
   const staged = await prepareHeavyCounterplayFlight(
     entries,
