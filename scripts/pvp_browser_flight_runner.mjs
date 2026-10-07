@@ -1546,14 +1546,19 @@ async function runOnlineUiStaminaExhaustionFlight(entries) {
   // Drain through genuine held-RMB movement until authority is safely below
   // the unchanged 28-point roll cost. A fixed three holds can bottom out near
   // 33 on a loaded runner because short WebDriver gaps allow regeneration.
-  // Sample immediately after each real hold and continue, bounded, until there
-  // is enough margin that the rejected wheel cannot cross the threshold while
-  // the next browser command is delivered.
+  // Sample after a short input-release settle and continue, bounded, until
+  // there is enough margin that the rejected wheel cannot cross the threshold
+  // while the next browser command is delivered.
   let exhausted = null;
   let drainHolds = 0;
   for (let index = 0; index < 5 && !exhausted; index += 1) {
     await performArenaRunHold(actor, actorElementId, awayKey, awayOffset, 1100);
     drainHolds += 1;
+    // Let the released RMB + movement sample become authoritative before
+    // establishing the exhausted baseline. This remains well inside the
+    // unchanged 360 ms stamina regen delay, so any later stamina change can be
+    // attributed to the tested action instead of a stale sprint packet.
+    await sleep(140);
     const state = await readUiEvidence(actor);
     if (staminaMatchesHud(state)
       && state.acceptance.authoritativeStamina < COMBAT.dodge.staminaCost - 6
@@ -1714,6 +1719,11 @@ async function runOnlineUiStaminaFeedbackFlight(entries) {
   for (let index = 0; index < 5 && !exhausted; index += 1) {
     await performArenaRunHold(actor, actorElementId, awayKey, awayOffset, 1100);
     drainHolds += 1;
+    // Let the released RMB + movement sample become authoritative before
+    // establishing the exhausted baseline. This remains well inside the
+    // unchanged 360 ms stamina regen delay, so any later stamina change can be
+    // attributed to the tested action instead of a stale sprint packet.
+    await sleep(140);
     const state = await readUiEvidence(actor);
     if (staminaMatchesHud(state)
       && state.acceptance.authoritativeStamina < COMBAT.dodge.staminaCost - 6
