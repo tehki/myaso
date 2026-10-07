@@ -77,6 +77,7 @@ kbd { border: 1px solid #575144; border-bottom-width: 2px; border-radius: 5px; b
 .arena-stage[data-combat-feedback="shoved"]::after { animation: shoved .36s ease-out; }
 .arena-stage[data-combat-feedback="roll-impact"]::after { animation: roll-impact .32s ease-out; }
 .arena-stage[data-combat-feedback="rolled-over"]::after { animation: rolled-over .34s ease-out; }
+.arena-stage[data-combat-feedback="stamina-denied"]::after { animation: stamina-denied .36s ease-out; }
 canvas { display: block; width: 100%; height: auto; aspect-ratio: 16 / 9; outline: none; cursor: crosshair; touch-action: none; }
 canvas:focus-visible { box-shadow: inset 0 0 0 2px #c5a457; }
 .combat-overlay { position: absolute; inset: 0; z-index: 2; display: grid; place-content: center; gap: 8px; text-align: center; pointer-events: none; background: rgba(10, 9, 7, .56); backdrop-filter: blur(2px); }
@@ -97,6 +98,7 @@ canvas:focus-visible { box-shadow: inset 0 0 0 2px #c5a457; }
 @keyframes shoved { from { opacity: .94; box-shadow: inset 0 0 0 7px rgba(197, 111, 83, .9); } to { opacity: 0; box-shadow: inset 0 0 0 17px rgba(197, 111, 83, 0); } }
 @keyframes roll-impact { from { opacity: .9; box-shadow: inset 0 0 0 6px rgba(133, 202, 190, .86); } to { opacity: 0; box-shadow: inset 0 0 0 15px rgba(133, 202, 190, 0); } }
 @keyframes rolled-over { from { opacity: .94; box-shadow: inset 0 0 0 7px rgba(105, 166, 166, .9); } to { opacity: 0; box-shadow: inset 0 0 0 17px rgba(105, 166, 166, 0); } }
+@keyframes stamina-denied { from { opacity: .9; box-shadow: inset 0 0 0 6px rgba(79, 143, 116, .86); } to { opacity: 0; box-shadow: inset 0 0 0 15px rgba(79, 143, 116, 0); } }
 .focus-hint { margin: 0; padding: 9px 12px; border-top: 1px solid #342f26; color: #847c6e; font-size: 12px; text-align: center; }
 @media (max-width: 760px) {
   .hud { grid-template-columns: 1fr 1fr; }

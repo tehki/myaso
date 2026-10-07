@@ -1,6 +1,6 @@
 import { createFrameBudget } from "../src/browser/frame-budget.mjs";
 import { createCombatImpactController } from "../src/browser/combat-impact.mjs";
-import { COMBAT_ACTION, blockSpatialPresentation, combatActionHint, combatOverlayPresentation, createCombatReadabilityTracker, createRemoteDamageTracker, fighterFocusNetId, fighterGuardBreakPunishNetId, fighterKnockdownPunishNetId, fighterParryPunishNetId, fighterRecoveryNetId, fighterIdentityPresentation, fighterThreatBearingLabel, fighterThreatGuardArcLabel, fighterThreatNetId, fighterThreatPhaseLabel, fighterThreatPhaseState, fighterMatchPointPresentation, fighterMatchPresentation, fighterScoreboardPresentation, FFA_KILL_TARGET, fighterVitalsPresentation, guardBreakSpatialPresentation, killFeedPresentation, opponentRecoveryPresentation, parrySpatialPresentation } from "../src/browser/combat-readability.mjs";
+import { COMBAT_ACTION, blockSpatialPresentation, combatActionHint, combatOverlayPresentation, createCombatReadabilityTracker, createRemoteDamageTracker, fighterFocusNetId, fighterGuardBreakPunishNetId, fighterKnockdownPunishNetId, fighterParryPunishNetId, fighterRecoveryNetId, fighterIdentityPresentation, fighterThreatBearingLabel, fighterThreatGuardArcLabel, fighterThreatNetId, fighterThreatPhaseLabel, fighterThreatPhaseState, fighterMatchPointPresentation, fighterMatchPresentation, fighterScoreboardPresentation, FFA_KILL_TARGET, fighterVitalsPresentation, guardBreakSpatialPresentation, killFeedPresentation, opponentRecoveryPresentation, parrySpatialPresentation, staminaDenialPresentation } from "../src/browser/combat-readability.mjs";
 import { COMBAT } from "../src/combat/model.mjs";
 import { reconcilePrediction } from "../src/browser/reconciliation.mjs";
 import { NETWORK } from "../src/network/constants.mjs";
@@ -69,6 +69,7 @@ let networkStatus = "Connecting to authoritative server...";
 let combatMessage = null;
 let combatMessageUntil = 0;
 let combatFeedbackTimer = 0;
+let authoritativeStamina = null;
 let matchOver = false;
 const killFeedEntries = [];
 const killFeedSequences = new Set();
@@ -123,21 +124,31 @@ canvas.addEventListener("pointerup", (event) => {
   if (event.button === 2) {
     const heldMs = performance.now() - rightButtonDownAt;
     rightButtonDown = false;
-    if (heldMs < runHoldThresholdMs) kickRequested = true;
+    if (heldMs < runHoldThresholdMs) {
+      kickRequested = true;
+      showStaminaDenial("kick");
+    }
   }
 });
 canvas.addEventListener("wheel", (event) => {
   event.preventDefault();
   canvas.focus();
-  if (event.deltaY < 0) rollRequested = true;
-  else if (event.deltaY > 0) shortBlockUntil = Math.max(shortBlockUntil, performance.now() + COMBAT.block.shortBlockMs);
+  if (event.deltaY < 0) {
+    rollRequested = true;
+    showStaminaDenial("roll");
+  } else if (event.deltaY > 0) {
+    shortBlockUntil = Math.max(shortBlockUntil, performance.now() + COMBAT.block.shortBlockMs);
+  }
 }, { passive: false });
 canvas.addEventListener("pointermove", updateMouse);
 canvas.addEventListener("keydown", (event) => {
   if (["KeyW", "KeyA", "KeyS", "KeyD", "KeyE", "Space"].includes(event.code)) event.preventDefault();
   keys.add(event.code);
   if (event.code === "KeyE" && !event.repeat) heavyAttackRequested = true;
-  if (event.code === "Space" && !event.repeat) jumpRequested = true;
+  if (event.code === "Space" && !event.repeat) {
+    jumpRequested = true;
+    showStaminaDenial("jump");
+  }
 });
 canvas.addEventListener("keyup", (event) => keys.delete(event.code));
 window.addEventListener("blur", releaseInputs);
@@ -156,6 +167,7 @@ networkClient = await connectAuthoritativeClient({
     if (!ownId) return;
     const own = state.get(ownId);
     if (own) {
+      if (Number.isFinite(own.stamina)) authoritativeStamina = own.stamina;
       if (!local.initialized) restoreAuthoritative(own);
       else if (Number.isFinite(own.stamina)) local.stamina = own.stamina;
     }
@@ -208,7 +220,7 @@ function observeCombatState(state) {
 }
 
 function recordAcceptanceState(state, ownId) {
-  if (!["uirollbuffer", "uijumpbuffer", "uijumpattack", "uijumpattackinputloss", "uijumpattackpunish", "uijumpattacktelegraph", "uijumprecoveryffa", "uijumppunishffa", "uimultirecoveryffa", "uimultirecoveryspatial", "uimultirecoverypunish", "uiparrypunishwindow", "uiparrypunishffa", "uiparrypunishffahit", "uiguardbreakpunishffa", "uiguardbreakpunishffahit", "uikickknockdownffa", "uikickknockdownffahit", "uikickknockdownbounded", "uirollknockdownbounded", "uirollknockdownffahit", "uimultiknockdownffa", "uimultiknockdownffahit", "uirollknockdownffa", "uistaminaauth", "uistaminaexhaustion", "uijumpattackblock", "uijumpattackparry", "uijumpattackdodge", "uijumpattackbuffer", "uikickbuffer"].includes(acceptanceScenario)) return;
+  if (!["uirollbuffer", "uijumpbuffer", "uijumpattack", "uijumpattackinputloss", "uijumpattackpunish", "uijumpattacktelegraph", "uijumprecoveryffa", "uijumppunishffa", "uimultirecoveryffa", "uimultirecoveryspatial", "uimultirecoverypunish", "uiparrypunishwindow", "uiparrypunishffa", "uiparrypunishffahit", "uiguardbreakpunishffa", "uiguardbreakpunishffahit", "uikickknockdownffa", "uikickknockdownffahit", "uikickknockdownbounded", "uirollknockdownbounded", "uirollknockdownffahit", "uimultiknockdownffa", "uimultiknockdownffahit", "uirollknockdownffa", "uistaminaauth", "uistaminaexhaustion", "uistaminafeedback", "uijumpattackblock", "uijumpattackparry", "uijumpattackdodge", "uijumpattackbuffer", "uikickbuffer"].includes(acceptanceScenario)) return;
   const focusNetId = fighterGuardBreakPunishNetId(state, ownId)
     || fighterParryPunishNetId(state, ownId)
     || fighterKnockdownPunishNetId(state, ownId)
@@ -315,6 +327,16 @@ function showCombatFeedback(feedback) {
     if (arenaStage.dataset.combatFeedback === feedback) delete arenaStage.dataset.combatFeedback;
     combatFeedbackTimer = 0;
   }, durationMs);
+}
+
+function showStaminaDenial(action) {
+  if (matchOver || local.action !== COMBAT_ACTION.idle) return;
+  const presentation = staminaDenialPresentation(action, authoritativeStamina);
+  if (!presentation) return;
+  combatMessage = presentation.text;
+  combatMessageUntil = performance.now() + presentation.durationMs;
+  setStatus(combatMessage);
+  showCombatFeedback(presentation.feedback);
 }
 
 function updateMouse(event) {
@@ -437,7 +459,10 @@ function restoreAuthoritative(own) {
   local.facing = own.facing;
   local.hp = own.hp;
   local.guard = own.guard;
-  if (Number.isFinite(own.stamina)) local.stamina = own.stamina;
+  if (Number.isFinite(own.stamina)) {
+    authoritativeStamina = own.stamina;
+    local.stamina = own.stamina;
+  }
   local.action = own.action;
   local.initialized = true;
 }
