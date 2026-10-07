@@ -4272,15 +4272,31 @@ async function runOnlineUiBoundedRollKnockdownFlight(entries) {
   }
 
   // #2 has moved by the opener's unchanged 34 px knockback. Re-aim #3 using
-  // the authoritative world delta before waiting for the late suppression roll.
+  // the authoritative world delta, but do not launch while #1 is still in the
+  // active roll corridor. Under loaded browser scheduling #3 can otherwise
+  // collide with #1 on the opener's final dodge tick and get knocked down
+  // before it can exercise the bounded-contact contract.
   await aimAtAuthoritativeTarget(suppressor, suppressorElementId, defenderId);
 
-  // Send #3's genuine wheel-forward roll immediately after the authoritative
-  // re-aim. The prior +170 ms wall-clock wait, combined with WebDriver/server
-  // ingress latency, could make the roll authoritative only after #2's 260 ms
-  // knockdown had already expired. The re-aim round trip itself provides
-  // enough delay for #1 to clear the lane; immediate wheel delivery leaves #3
-  // active across #2's original recovery frame without changing gameplay.
+  let openerDodgeRecovery = null;
+  const openerClearDeadline = Date.now() + COMBAT.dodge.durationMs + 120;
+  while (Date.now() < openerClearDeadline && !openerDodgeRecovery) {
+    const openerActions = await readOwnActions(opener);
+    openerDodgeRecovery = openerActions.find((entry) =>
+      entry.action === COMBAT_ACTION.dodgeRecovery
+      && Number.isFinite(entry.epochMs)
+      && entry.epochMs > openerDodge.epochMs) ?? null;
+    if (!openerDodgeRecovery) await sleep(1);
+  }
+  if (!openerDodgeRecovery) {
+    await setMovementKey(opener, openerMovementKey, false);
+    throw new Error(milestone + " opener never cleared active dodge before suppression roll");
+  }
+
+  // Fire #3 immediately on the first authoritative dodge-recovery snapshot.
+  // That keeps #1 out of the collision path while leaving the remaining
+  // portion of #2's unchanged 260 ms knockdown window for the suppression
+  // contact. No gameplay timing or geometry constants are changed.
   await scrollArenaWheel(suppressor, suppressorElementId, -120, 0);
 
   let suppressedDodge = null;
