@@ -2191,13 +2191,23 @@ async function runOnlineUiJumpAttackCounterplayFlight(entries, defense) {
       if (chordHeld) await releaseArenaJumpAttackChord(attacker);
     }
   } else if (defense === "dodge") {
-    // Dodge keeps the proven browser-owned overlap: genuine wheel-forward and
-    // genuine Space+LMB are issued concurrently, with the dodge aimed off-axis.
+    // Deliver the genuine Firefox Space+LMB chord first, then give its normal
+    // realtime input loop one short send window before Chrome's wheel-forward.
+    // Concurrent WebDriver commands can let Chrome reach authority first under
+    // load, producing a roll collision before JUMP WINDUP exists at all. The
+    // 35 ms delivery gap changes only the acceptance harness; the unchanged
+    // 170 ms dodge still overlaps the 105 ms jump windup/active commitment.
     await aimArena(defender, defenderElementId, 0, 180);
-    await Promise.all([
-      performArenaJumpAttackChord(attacker, attackerElementId, attackOffset, 90),
-      scrollArenaWheel(defender, defenderElementId, -120, 30),
-    ]);
+    let chordHeld = false;
+    try {
+      await pressArenaJumpAttackChord(attacker, attackerElementId, attackOffset);
+      chordHeld = true;
+      await sleep(35);
+      await scrollArenaWheel(defender, defenderElementId, -120, 0);
+      await sleep(20);
+    } finally {
+      if (chordHeld) await releaseArenaJumpAttackChord(attacker);
+    }
   } else {
     throw new Error(`unsupported M138 jump-attack defense: ${defense}`);
   }
