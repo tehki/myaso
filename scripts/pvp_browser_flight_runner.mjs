@@ -6626,17 +6626,33 @@ async function runOnlineUiGuardBreakPunishFfaFocusFlight(entries, convert = fals
     const recoveryBufferOpenEpochMs = guardBreakRecovery.epochMs
       + COMBAT.attack.recoveryMs - COMBAT.inputBuffer.lightAttackWindowMs;
     const recoveryExitEpochMs = guardBreakRecovery.epochMs + COMBAT.attack.recoveryMs;
-    const punishActions = attackerState.acceptance?.ownActionTransitions ?? [];
-    const punishWindup = punishActions.find((entry) =>
+    let punishActions = attackerState.acceptance?.ownActionTransitions ?? [];
+    let punishWindup = punishActions.find((entry) =>
       entry.action === COMBAT_ACTION.attackWindup
       && Number.isFinite(entry.epochMs)
       && entry.epochMs >= punishDown.epochMs - 40);
-    const punishActive = punishWindup
+    let punishActive = punishWindup
       ? punishActions.find((entry) =>
         entry.action === COMBAT_ACTION.attackActive
         && Number.isFinite(entry.epochMs)
         && entry.epochMs >= punishWindup.epochMs)
       : null;
+    const punishPhaseDeadline = Date.now() + 180;
+    while ((!punishWindup || !punishActive) && Date.now() < punishPhaseDeadline) {
+      await sleep(6);
+      attackerState = await readUiEvidence(attacker);
+      punishActions = attackerState.acceptance?.ownActionTransitions ?? [];
+      punishWindup = punishActions.find((entry) =>
+        entry.action === COMBAT_ACTION.attackWindup
+        && Number.isFinite(entry.epochMs)
+        && entry.epochMs >= punishDown.epochMs - 40) ?? punishWindup;
+      punishActive = punishWindup
+        ? punishActions.find((entry) =>
+          entry.action === COMBAT_ACTION.attackActive
+          && Number.isFinite(entry.epochMs)
+          && entry.epochMs >= punishWindup.epochMs)
+        : null;
+    }
     const guardBreakStunEndEpochMs = guardBreakStunTransition.epochMs + COMBAT.block.guardBreakStunMs;
     if (punishDowns.length !== 1 || punishUps.length !== 1 || !punishAimValid
       || !Number.isFinite(punishDown?.epochMs)
