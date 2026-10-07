@@ -3523,15 +3523,14 @@ async function runOnlineUiMultiKnockdownFfaFlight(entries) {
   const rollOffset = rollRight ? 200 : -200;
 
   // Authoritative spawns are 96 px apart. Move #3 down just under one body
-  // width, then about 69 px toward #2. The older 170 ms vertical pulse left
-  // nominal center distance around 45-46 px, barely outside the unchanged
-  // 44 px roll-collision radius under frame quantization. A 145 ms pulse keeps
-  // the fighters physically separate while giving the real roll a few pixels
-  // of deterministic collision margin, without changing production geometry.
-  // #1 still closes roughly 26 px before rolling, preserving a browser-visible
-  // stagger between the two unchanged 260 ms knockdown windows.
+  // width, then about 43 px toward #2. Keeping roughly 53 px of horizontal
+  // separation makes the same unchanged roll contact #3 around 90-110 ms after
+  // #2 instead of only ~50 ms later. Both unchanged 260 ms knockdowns still
+  // overlap, but the browser now has a deterministic handoff window wide enough
+  // to render KNOCKDOWN #3 after #2 recovers. Production geometry is untouched.
+  // #1 still closes roughly 26 px before rolling.
   await pulseMovementKey(secondVictim, secondVerticalKey, 145);
-  await pulseMovementKey(secondVictim, secondClusterKey, 320);
+  await pulseMovementKey(secondVictim, secondClusterKey, 200);
   await pulseMovementKey(roller, movementKey, 120);
   await aimArena(roller, rollerElementId, rollOffset);
   await sleep(50);
