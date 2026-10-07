@@ -4336,7 +4336,10 @@ async function runOnlineUiBoundedRollKnockdownFlight(entries) {
   const originalDurationObserved = originalRecovery.epochMs - firstKnockdown.epochMs;
   const recoveryAfterSuppressedDodge = originalRecovery.epochMs - suppressedDodge.epochMs;
   if (suppressedDodge.epochMs <= firstKnockdown.epochMs
-    || suppressedDodge.epochMs >= firstKnockdown.epochMs + COMBAT.dodge.collisionKnockdownMs
+    || suppressedDodge.epochMs >= originalRecovery.epochMs
+    || (Number.isFinite(suppressedDodge.serverTick)
+      && Number.isFinite(originalRecovery.serverTick)
+      && suppressedDodge.serverTick > originalRecovery.serverTick)
     || originalDurationObserved < COMBAT.dodge.collisionKnockdownMs - 90
     || originalDurationObserved > COMBAT.dodge.collisionKnockdownMs + 110
     || recoveryAfterSuppressedDodge >= COMBAT.dodge.collisionKnockdownMs - 60
@@ -4368,7 +4371,7 @@ async function runOnlineUiBoundedRollKnockdownFlight(entries) {
     || !Number.isFinite(openerWheels[0].epochMs)
     || !Number.isFinite(suppressorWheels[0].epochMs)
     || suppressorWheels[0].epochMs < firstKnockdown.epochMs
-    || suppressorWheels[0].epochMs >= firstKnockdown.epochMs + COMBAT.dodge.collisionKnockdownMs) {
+    || suppressorWheels[0].epochMs >= originalRecovery.epochMs) {
     throw new Error(milestone + " lacked two genuine wheel-forward rolls in the bounded window: "
       + JSON.stringify({ openerWheels, suppressorWheels, firstKnockdown }));
   }
