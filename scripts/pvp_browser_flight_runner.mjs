@@ -1759,6 +1759,12 @@ async function runOnlineUiJumpAttackCounterplayFlight(entries, defense) {
   const pointerOffset = beforeAttacker.pointers.length;
   const beforeDefender = await readUiEvidence(defender);
   const wheelOffset = beforeDefender.wheels.length;
+  const attackerActionOffset = beforeAttacker.acceptance?.ownActionTransitions?.length ?? 0;
+  const readAttackerOwnActions = () => execute(
+    attacker.base,
+    attacker.sessionId,
+    "return (window.__MYASO_ACCEPTANCE_STATE__?.ownActionTransitions ?? []).map((entry) => ({ ...entry }));",
+  );
   const hasReplicatedDodgeOverlap = (attackerState, defenderState) => {
     const attackerOwn = attackerState?.acceptance?.ownActionTransitions ?? [];
     const attackerFocus = attackerState?.acceptance?.focusActionTransitions ?? [];
@@ -1804,25 +1810,35 @@ async function runOnlineUiJumpAttackCounterplayFlight(entries, defense) {
     await scrollArenaWheelPair(defender, defenderElementId, 120, 20, 100);
     await performArenaJumpAttackChord(attacker, attackerElementId, attackOffset, 90);
   } else if (defense === "parry" || defense === "dodge") {
-    // Start both real-browser commands concurrently. Chrome's wheel command
-    // carries ~30-40 ms of driver/input overhead on hosted CI. Dodge wants the
-    // earliest possible roll ownership, while parry must start later so its
-    // unchanged 125 ms opening is still fresh at the 105 ms jump impact.
-    // Keep dodge at 10 ms; delay only parry to 35 ms.
+    // Trigger the genuine wheel defense from the attacker's own authoritative
+    // jump-windup transition. This avoids both failure modes of fixed browser
+    // delays: arriving before server commitment (ordinary block) or after
+    // jump-attack-active (clean hit). The unchanged 105 ms windup, 125 ms
+    // parry opening, and 170 ms dodge duration remain authoritative.
     if (defense === "dodge") await aimArena(defender, defenderElementId, 0, 180);
-    const defenseDelayMs = defense === "parry" ? 35 : 10;
     let chordHeld = false;
     try {
-      const chordPress = pressArenaJumpAttackChord(attacker, attackerElementId, attackOffset);
-      const defenseWheel = scrollArenaWheel(
+      await pressArenaJumpAttackChord(attacker, attackerElementId, attackOffset);
+      chordHeld = true;
+
+      let authoritativeWindup = null;
+      const windupDeadline = Date.now() + 320;
+      while (!authoritativeWindup && Date.now() < windupDeadline) {
+        const ownActions = await readAttackerOwnActions();
+        authoritativeWindup = ownActions.slice(attackerActionOffset).find((entry) =>
+          entry.action === COMBAT_ACTION.jumpAttackWindup && Number.isFinite(entry.serverTick)) ?? null;
+        if (!authoritativeWindup) await sleep(1);
+      }
+      if (!authoritativeWindup) {
+        throw new Error(`${label} attacker never entered authoritative jump windup before defense input`);
+      }
+
+      await scrollArenaWheel(
         defender,
         defenderElementId,
         defense === "parry" ? 120 : -120,
-        defenseDelayMs,
+        0,
       );
-      await chordPress;
-      chordHeld = true;
-      await defenseWheel;
       await sleep(20);
     } finally {
       if (chordHeld) await releaseArenaJumpAttackChord(attacker);
