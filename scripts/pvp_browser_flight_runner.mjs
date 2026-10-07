@@ -1376,17 +1376,55 @@ async function runOnlineUiRollBufferFlight(entries) {
 
   const attackRecovery = defenderResult.recoveryTransitions[attackRecoveryIndex];
   const attackRecoveryExit = defenderResult.recoveryTransitions[attackRecoveryExitIndex];
-  const bufferOpenEpochMs = attackRecovery.epochMs
+
+  // Prove buffering from the attacker's authoritative action stream using the
+  // same browser clock as the real wheel event. Snapshot sampling can expose a
+  // single idle sample at the exact recovery boundary even when the buffered
+  // dodge is already queued for the next authoritative update. Accept that
+  // one-sample boundary only when dodge appears within 3 server ticks.
+  const ownActions = attackerResult.acceptance?.ownActionTransitions ?? [];
+  const ownAttackRecoveryIndex = ownActions.findIndex((entry) =>
+    entry.action === COMBAT_ACTION.attackRecovery
+      && Number.isFinite(entry.epochMs)
+      && Number.isFinite(entry.serverTick));
+  const ownDodgeIndex = ownActions.findIndex((entry, index) =>
+    index > ownAttackRecoveryIndex
+      && entry.action === COMBAT_ACTION.dodge
+      && Number.isFinite(entry.epochMs)
+      && Number.isFinite(entry.serverTick));
+  const unexpectedBetween = ownActions.find((entry, index) =>
+    index > ownAttackRecoveryIndex
+      && index < ownDodgeIndex
+      && entry.action !== COMBAT_ACTION.idle);
+  if (ownAttackRecoveryIndex < 0 || ownDodgeIndex <= ownAttackRecoveryIndex || unexpectedBetween) {
+    throw new Error(`M129 authoritative buffered roll left the expected recovery->idle->dodge path: ${JSON.stringify(ownActions)}`);
+  }
+
+  const ownAttackRecovery = ownActions[ownAttackRecoveryIndex];
+  const ownDodge = ownActions[ownDodgeIndex];
+  const expectedRecoveryEndEpochMs = ownAttackRecovery.epochMs + COMBAT.attack.recoveryMs;
+  const recoveryToDodgeDelayMs = ownDodge.epochMs - expectedRecoveryEndEpochMs;
+  if (recoveryToDodgeDelayMs < 0 || recoveryToDodgeDelayMs > 140) {
+    throw new Error(`M129 authoritative buffered roll exceeded bounded post-recovery delivery latency: ${JSON.stringify({
+      ownAttackRecovery,
+      ownDodge,
+      expectedRecoveryEndEpochMs,
+      recoveryToDodgeDelayMs,
+      ownActions,
+    })}`);
+  }
+  const bufferOpenEpochMs = ownAttackRecovery.epochMs
     + COMBAT.attack.recoveryMs - COMBAT.inputBuffer.dodgeWindowMs;
-  if (perpendicularAim.epochMs < attackRecovery.epochMs
+  if (perpendicularAim.epochMs < ownAttackRecovery.epochMs
     || rollWheel.epochMs < bufferOpenEpochMs
-    || rollWheel.epochMs >= attackRecoveryExit.epochMs) {
-    throw new Error(`M129 genuine wheel was not inside Firefox's authoritative dodge-buffer interval: ${JSON.stringify({
-      attackRecovery,
-      attackRecoveryExit,
+    || rollWheel.epochMs > ownDodge.epochMs) {
+    throw new Error(`M129 genuine wheel was not inside the attacker's authoritative dodge-buffer interval: ${JSON.stringify({
+      ownAttackRecovery,
+      ownDodge,
       bufferOpenEpochMs,
       perpendicularAim,
       rollWheel,
+      ownActions,
     })}`);
   }
 
@@ -1703,11 +1741,11 @@ async function runOnlineUiJumpAttackCounterplayFlight(entries, defense) {
   // authoritative windup replication. Block retains the opposite direction.
   const attackerName = defense === "block" ? "chrome" : "firefox";
   const defenderName = defense === "block" ? "firefox" : "chrome";
-  // Leave the dodge case slightly farther apart than block/parry. The unchanged
-  // jump attack still reaches during its active movement, but not at the very
-  // first active tick, giving the genuine wheel-forward roll time to become
-  // authoritative on hosted cross-browser WebDriver.
-  const movementMs = defense === "dodge" ? 140 : 180;
+  // Leave latency-sensitive parry/dodge slightly farther apart than block.
+  // The unchanged jump attack still reaches during its active movement, but
+  // not on the very first active tick, giving the genuine Chrome wheel input
+  // time to become authoritative after jump-windup commitment.
+  const movementMs = defense === "block" ? 180 : 140;
   const label = `M138 jump attack ${defense}`;
   const staged = await prepareHeavyCounterplayFlight(
     entries,
@@ -1721,6 +1759,12 @@ async function runOnlineUiJumpAttackCounterplayFlight(entries, defense) {
   const pointerOffset = beforeAttacker.pointers.length;
   const beforeDefender = await readUiEvidence(defender);
   const wheelOffset = beforeDefender.wheels.length;
+  const attackerActionOffset = beforeAttacker.acceptance?.ownActionTransitions?.length ?? 0;
+  const readAttackerOwnActions = () => execute(
+    attacker.base,
+    attacker.sessionId,
+    "return (window.__MYASO_ACCEPTANCE_STATE__?.ownActionTransitions ?? []).map((entry) => ({ ...entry }));",
+  );
   const hasReplicatedDodgeOverlap = (attackerState, defenderState) => {
     const attackerOwn = attackerState?.acceptance?.ownActionTransitions ?? [];
     const attackerFocus = attackerState?.acceptance?.focusActionTransitions ?? [];
@@ -1766,17 +1810,35 @@ async function runOnlineUiJumpAttackCounterplayFlight(entries, defense) {
     await scrollArenaWheelPair(defender, defenderElementId, 120, 20, 100);
     await performArenaJumpAttackChord(attacker, attackerElementId, attackOffset, 90);
   } else if (defense === "parry" || defense === "dodge") {
-    // Keep the genuine Space+LMB chord held while scheduling the Chrome wheel
-    // defense from the actual WebDriver press completion, not from replicated
-    // snapshots. The press command itself already spans the cross-browser
-    // handoff; send the wheel immediately so the authoritative defense owns at
-    // least one server frame before the unchanged jump-strike active window.
+    // Trigger the genuine wheel defense from the attacker's own authoritative
+    // jump-windup transition. This avoids both failure modes of fixed browser
+    // delays: arriving before server commitment (ordinary block) or after
+    // jump-attack-active (clean hit). The unchanged 105 ms windup, 125 ms
+    // parry opening, and 170 ms dodge duration remain authoritative.
     if (defense === "dodge") await aimArena(defender, defenderElementId, 0, 180);
     let chordHeld = false;
     try {
       await pressArenaJumpAttackChord(attacker, attackerElementId, attackOffset);
       chordHeld = true;
-      await scrollArenaWheel(defender, defenderElementId, defense === "parry" ? 120 : -120, 0);
+
+      let authoritativeWindup = null;
+      const windupDeadline = Date.now() + 320;
+      while (!authoritativeWindup && Date.now() < windupDeadline) {
+        const ownActions = await readAttackerOwnActions();
+        authoritativeWindup = ownActions.slice(attackerActionOffset).find((entry) =>
+          entry.action === COMBAT_ACTION.jumpAttackWindup && Number.isFinite(entry.serverTick)) ?? null;
+        if (!authoritativeWindup) await sleep(1);
+      }
+      if (!authoritativeWindup) {
+        throw new Error(`${label} attacker never entered authoritative jump windup before defense input`);
+      }
+
+      await scrollArenaWheel(
+        defender,
+        defenderElementId,
+        defense === "parry" ? 120 : -120,
+        0,
+      );
       await sleep(20);
     } finally {
       if (chordHeld) await releaseArenaJumpAttackChord(attacker);
@@ -3171,7 +3233,10 @@ async function runOnlineUiMultiKnockdownFfaHitFlight(entries) {
   const punisherElementId = await resolveArenaElement(punisher, milestone + " punisher");
   const rollRight = rollerId < firstVictimId;
   const rollKey = rollRight ? "d" : "a";
-  const retreatKey = rollRight ? "a" : "d";
+  // Roll direction remains pointer-owned. Hold downward movement so that once
+  // dodge recovery starts, #1 leaves #4's upper punish lane vertically instead
+  // of crossing the selected #2 light cone horizontally.
+  const retreatKey = "s";
   const secondClusterKey = secondVictimId > firstVictimId ? "a" : "d";
   const rollOffset = rollRight ? 200 : -200;
 
@@ -3192,7 +3257,7 @@ async function runOnlineUiMultiKnockdownFfaHitFlight(entries) {
     pulseMovementKey(roller, "s", 235),
     pulseMovementKey(firstVictim, "s", 235),
     pulseMovementKey(secondVictim, "s", 365),
-    pulseMovementKey(punisher, "a", 900),
+    pulseMovementKey(punisher, "a", 870),
   ]);
   await pulseMovementKey(secondVictim, secondClusterKey, 340);
   await pulseMovementKey(roller, rollKey, 210);
@@ -3343,10 +3408,13 @@ async function runOnlineUiMultiKnockdownFfaHitFlight(entries) {
   const secondState = hitEvidence.find((entry) => entry.browser === secondVictim.name);
   const punisherState = hitEvidence.find((entry) => entry.browser === punisher.name);
 
+  const firstKnockdownTick = provenance.firstKnockdown.serverTick;
+  const secondKnockdownTick = provenance.secondKnockdown.serverTick;
   if (!Number.isFinite(provenance.rollWheel.epochMs)
-    || provenance.firstKnockdown.epochMs >= provenance.secondKnockdown.epochMs
-    || provenance.secondKnockdown.epochMs >= provenance.firstKnockdown.epochMs + COMBAT.dodge.collisionKnockdownMs) {
-    throw new Error(milestone + " did not prove ordered overlapping roll knockdowns: "
+    || !Number.isFinite(firstKnockdownTick)
+    || !Number.isFinite(secondKnockdownTick)
+    || firstKnockdownTick > secondKnockdownTick) {
+    throw new Error(milestone + " did not prove authoritative ordered/same-tick roll knockdowns: "
       + JSON.stringify(provenance));
   }
   for (const transition of [provenance.firstKnockdown, provenance.secondKnockdown]) {
@@ -3381,18 +3449,22 @@ async function runOnlineUiMultiKnockdownFfaHitFlight(entries) {
       && Number.isFinite(entry.epochMs)
       && entry.epochMs >= punishWindup.epochMs)
     : null;
-  const primaryKnockdownEnd = provenance.firstKnockdown.epochMs + COMBAT.dodge.collisionKnockdownMs;
+  const firstRecovery = (firstState.acceptance?.ownActionTransitions ?? []).find((entry) =>
+    entry.action === COMBAT_ACTION.idle
+    && Number.isFinite(entry.serverTick)
+    && entry.serverTick > firstKnockdownTick);
   if (!punishWindup || !punishActive
-    || punishActive.epochMs < provenance.secondKnockdown.epochMs
-    || punishActive.epochMs >= primaryKnockdownEnd) {
-    throw new Error(milestone + " #4 attack-active did not land inside the overlapping knockdown window: "
+    || !Number.isFinite(punishActive.serverTick)
+    || punishActive.serverTick < Math.max(firstKnockdownTick, secondKnockdownTick)
+    || (firstRecovery && punishActive.serverTick >= firstRecovery.serverTick)) {
+    throw new Error(milestone + " #4 attack-active did not land inside the authoritative overlapping knockdown window: "
       + JSON.stringify({
         punishDown,
         punishWindup,
         punishActive,
         firstKnockdown: provenance.firstKnockdown,
         secondKnockdown: provenance.secondKnockdown,
-        primaryKnockdownEnd,
+        firstRecovery,
       }));
   }
 
@@ -4265,7 +4337,7 @@ async function runOnlineUiBoundedKickKnockdownFlight(entries) {
   let firstKnockdown = null;
   let openerKickActive = null;
   const firstDeadline = Date.now() + COMBAT.kick.windupMs + COMBAT.kick.activeMs + 320;
-  while (Date.now() < firstDeadline && !firstKnockdown) {
+  while (Date.now() < firstDeadline && (!firstKnockdown || !openerKickActive)) {
     const [defenderActions, openerActions] = await Promise.all([
       readOwnActions(defender),
       readOwnActions(opener),
@@ -6580,17 +6652,33 @@ async function runOnlineUiGuardBreakPunishFfaFocusFlight(entries, convert = fals
     const recoveryBufferOpenEpochMs = guardBreakRecovery.epochMs
       + COMBAT.attack.recoveryMs - COMBAT.inputBuffer.lightAttackWindowMs;
     const recoveryExitEpochMs = guardBreakRecovery.epochMs + COMBAT.attack.recoveryMs;
-    const punishActions = attackerState.acceptance?.ownActionTransitions ?? [];
-    const punishWindup = punishActions.find((entry) =>
+    let punishActions = attackerState.acceptance?.ownActionTransitions ?? [];
+    let punishWindup = punishActions.find((entry) =>
       entry.action === COMBAT_ACTION.attackWindup
       && Number.isFinite(entry.epochMs)
       && entry.epochMs >= punishDown.epochMs - 40);
-    const punishActive = punishWindup
+    let punishActive = punishWindup
       ? punishActions.find((entry) =>
         entry.action === COMBAT_ACTION.attackActive
         && Number.isFinite(entry.epochMs)
         && entry.epochMs >= punishWindup.epochMs)
       : null;
+    const punishPhaseDeadline = Date.now() + 180;
+    while ((!punishWindup || !punishActive) && Date.now() < punishPhaseDeadline) {
+      await sleep(6);
+      attackerState = await readUiEvidence(attacker);
+      punishActions = attackerState.acceptance?.ownActionTransitions ?? [];
+      punishWindup = punishActions.find((entry) =>
+        entry.action === COMBAT_ACTION.attackWindup
+        && Number.isFinite(entry.epochMs)
+        && entry.epochMs >= punishDown.epochMs - 40) ?? punishWindup;
+      punishActive = punishWindup
+        ? punishActions.find((entry) =>
+          entry.action === COMBAT_ACTION.attackActive
+          && Number.isFinite(entry.epochMs)
+          && entry.epochMs >= punishWindup.epochMs)
+        : null;
+    }
     const guardBreakStunEndEpochMs = guardBreakStunTransition.epochMs + COMBAT.block.guardBreakStunMs;
     if (punishDowns.length !== 1 || punishUps.length !== 1 || !punishAimValid
       || !Number.isFinite(punishDown?.epochMs)
@@ -8021,10 +8109,11 @@ async function runOnlineUiMultiRecoveryFfaFocusFlight(entries, spatial = false) 
 
   // Both attacks deliberately point away from Firefox so the proof is about
   // recovery arbitration, not damage. Start the shorter light attack first.
-  // M144 keeps its original overlap timing. M145 delays the jump chord further
-  // so Firefox gets a stable authoritative snapshot after #3 exits recovery
-  // while #1 is still recoverable; gameplay timings themselves are unchanged.
-  const jumpInputDelayMs = spatial ? 100 : 45;
+  // Keep both recovery windows overlapping, but leave enough authoritative
+  // server ticks after #3 exits recovery for Firefox to observe #1 as the
+  // remaining punishable target. The older 45 ms M144 stagger left only about
+  // two server ticks for that handoff under loaded CI.
+  const jumpInputDelayMs = spatial ? 100 : 90;
   let spatialSamples = [];
   if (spatial) await armRecoveryHandoffSampler(observer);
   await Promise.all([

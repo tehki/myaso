@@ -13,6 +13,7 @@ fn record(net_id: u32, mask: u8) -> SnapshotRecord {
         facing: 30,
         hp: 90,
         guard: 80,
+        stamina: 100,
         action: 2,
         flags: 1,
     }
@@ -32,13 +33,13 @@ fn byte_composition_exactly_matches_encoded_snapshot_length() {
     assert_eq!(composition.header, SNAPSHOT_HEADER_BYTES);
     assert_eq!(composition.net_ids, 4);
     assert_eq!(composition.masks, 4);
-    // V6 keeps V5 local-cell position encoding and additionally packs the
-    // common action/flags pair into one byte.
+    // V7 keeps V6 compact action/flags and adds one stamina byte to each
+    // VITALS record while preserving all prior encoding layouts.
     assert_eq!(composition.position, 5);
     assert_eq!(composition.facing, 2);
-    assert_eq!(composition.vitals, 4);
+    assert_eq!(composition.vitals, 6);
     assert_eq!(composition.action, 1);
-    assert_eq!(composition.total_bytes(), 34);
+    assert_eq!(composition.total_bytes(), 36);
     assert_eq!(composition.total_bytes(), encoded.len());
 
     assert_eq!(SNAPSHOT_FIELD_ACTION, 1 << 3);

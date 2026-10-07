@@ -14,6 +14,7 @@ fn record(mask: u8, x: u16, y: u16) -> SnapshotRecord {
         facing: 16384,
         hp: 66,
         guard: 75,
+        stamina: 100,
         action: 1,
         flags: 2,
     }
