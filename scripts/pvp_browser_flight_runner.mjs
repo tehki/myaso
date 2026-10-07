@@ -1967,12 +1967,6 @@ async function runOnlineUiJumpAttackCounterplayFlight(entries, defense) {
   const pointerOffset = beforeAttacker.pointers.length;
   const beforeDefender = await readUiEvidence(defender);
   const wheelOffset = beforeDefender.wheels.length;
-  const attackerActionOffset = beforeAttacker.acceptance?.ownActionTransitions?.length ?? 0;
-  const readAttackerOwnActions = () => execute(
-    attacker.base,
-    attacker.sessionId,
-    "return (window.__MYASO_ACCEPTANCE_STATE__?.ownActionTransitions ?? []).map((entry) => ({ ...entry }));",
-  );
   const hasReplicatedDodgeOverlap = (attackerState, defenderState) => {
     const attackerOwn = attackerState?.acceptance?.ownActionTransitions ?? [];
     const attackerFocus = attackerState?.acceptance?.focusActionTransitions ?? [];
@@ -2018,39 +2012,22 @@ async function runOnlineUiJumpAttackCounterplayFlight(entries, defense) {
     await scrollArenaWheelPair(defender, defenderElementId, 120, 20, 100);
     await performArenaJumpAttackChord(attacker, attackerElementId, attackOffset, 90);
   } else if (defense === "parry" || defense === "dodge") {
-    // Trigger the genuine wheel defense from the attacker's own authoritative
-    // jump-windup transition. This avoids both failure modes of fixed browser
-    // delays: arriving before server commitment (ordinary block) or after
-    // jump-attack-active (clean hit). The unchanged 105 ms windup, 125 ms
-    // parry opening, and 170 ms dodge duration remain authoritative.
+    // Keep both real controls on browser-owned timelines. The previous
+    // authoritative-windup polling added a second WebDriver round trip and
+    // could deliver the Chrome wheel on the exact jump-active server tick.
+    // A 30 ms in-browser wheel pause keeps defense inside the unchanged
+    // 105 ms jump windup while remaining fresh for the 125 ms parry/iframe
+    // windows, without changing gameplay constants or attack geometry.
     if (defense === "dodge") await aimArena(defender, defenderElementId, 0, 180);
-    let chordHeld = false;
-    try {
-      await pressArenaJumpAttackChord(attacker, attackerElementId, attackOffset);
-      chordHeld = true;
-
-      let authoritativeWindup = null;
-      const windupDeadline = Date.now() + 320;
-      while (!authoritativeWindup && Date.now() < windupDeadline) {
-        const ownActions = await readAttackerOwnActions();
-        authoritativeWindup = ownActions.slice(attackerActionOffset).find((entry) =>
-          entry.action === COMBAT_ACTION.jumpAttackWindup && Number.isFinite(entry.serverTick)) ?? null;
-        if (!authoritativeWindup) await sleep(1);
-      }
-      if (!authoritativeWindup) {
-        throw new Error(`${label} attacker never entered authoritative jump windup before defense input`);
-      }
-
-      await scrollArenaWheel(
+    await Promise.all([
+      performArenaJumpAttackChord(attacker, attackerElementId, attackOffset, 90),
+      scrollArenaWheel(
         defender,
         defenderElementId,
         defense === "parry" ? 120 : -120,
-        0,
-      );
-      await sleep(20);
-    } finally {
-      if (chordHeld) await releaseArenaJumpAttackChord(attacker);
-    }
+        30,
+      ),
+    ]);
   } else {
     throw new Error(`unsupported M138 jump-attack defense: ${defense}`);
   }
