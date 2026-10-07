@@ -2174,31 +2174,17 @@ async function runOnlineUiJumpAttackCounterplayFlight(entries, defense) {
     await scrollArenaWheelPair(defender, defenderElementId, 120, 20, 100);
     await performArenaJumpAttackChord(attacker, attackerElementId, attackOffset, 90);
   } else if (defense === "parry") {
-    // Bind the genuine Chrome wheel-back to Chrome's replicated authoritative
-    // JUMP WINDUP rather than a fixed browser delay. That prevents the wheel
-    // from arriving before commitment and becoming an ordinary block. Keep the
-    // fighters slightly farther apart so the unchanged jump attack reaches
-    // after this single focus-stream read, still inside the 125 ms parry window.
-    const focusOffset = beforeDefender.acceptance?.focusActionTransitions?.length ?? 0;
+    // Start one genuine Space+LMB chord, then issue the genuine Chrome
+    // wheel-back immediately after WebDriver has delivered the held chord.
+    // The previous focus-stream round trip cost roughly one server tick under
+    // load and could make Block authoritative on the same tick as JUMP STRIKE.
+    // With the existing 120 ms staging distance, immediate wheel delivery still
+    // reaches authority late enough that the unchanged 125 ms parry opening
+    // spans impact, while removing the extra replicated-windup observation hop.
     let chordHeld = false;
     try {
       await pressArenaJumpAttackChord(attacker, attackerElementId, attackOffset);
       chordHeld = true;
-      let defenderSawWindup = null;
-      const windupDeadline = Date.now() + 320;
-      while (!defenderSawWindup && Date.now() < windupDeadline) {
-        const focusActions = await execute(
-          defender.base,
-          defender.sessionId,
-          "return (window.__MYASO_ACCEPTANCE_STATE__?.focusActionTransitions ?? []).map((entry) => ({ ...entry }));",
-        );
-        defenderSawWindup = focusActions.slice(focusOffset).find((entry) =>
-          entry.action === COMBAT_ACTION.jumpAttackWindup && Number.isFinite(entry.serverTick)) ?? null;
-        if (!defenderSawWindup) await sleep(1);
-      }
-      if (!defenderSawWindup) {
-        throw new Error(label + " defender never observed authoritative jump windup before parry input");
-      }
       await scrollArenaWheel(defender, defenderElementId, 120, 0);
       await sleep(20);
     } finally {
