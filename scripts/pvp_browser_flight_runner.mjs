@@ -4612,9 +4612,16 @@ async function runOnlineUiBoundedRollKnockdownFlight(entries) {
 
   // Keep #1's ordinary movement held. Dodge direction is pointer-owned, so the
   // roll still travels toward #2; once dodge ends, the held movement carries
-  // #1 away from the collision lane.
+  // #1 away from the collision lane. Schedule #3's genuine wheel-forward from
+  // its own browser clock 185 ms after #1's wheel edge: just beyond the
+  // unchanged 170 ms opener roll, but well inside #2's unchanged 260 ms
+  // knockdown. This removes variable WebDriver observation latency from the
+  // bounded-contact proof without changing gameplay timing or geometry.
   await setMovementKey(opener, openerMovementKey, true);
-  await scrollArenaWheel(opener, openerElementId, -120, 0);
+  await Promise.all([
+    scrollArenaWheel(opener, openerElementId, -120, 0),
+    scrollArenaWheel(suppressor, suppressorElementId, -120, 185),
+  ]);
 
   let firstKnockdown = null;
   let openerDodge = null;
@@ -4636,15 +4643,9 @@ async function runOnlineUiBoundedRollKnockdownFlight(entries) {
       + JSON.stringify(await Promise.all(entries.map(readUiEvidence))));
   }
 
-  // #3 was already aimed at #2's unchanged 34-unit knockback destination.
-  // Schedule its genuine wheel-forward from the first knockdown observation
-  // instead of waiting on another WebDriver read. Immediate dispatch reaches
-  // authority too early and can collide with #1; waiting for replicated dodge
-  // recovery can arrive after #2's unchanged 260 ms downed window. A browser-
-  // side 110 ms pause targets the middle of that measured authority window
-  // without changing any gameplay timing or geometry.
-  await scrollArenaWheel(suppressor, suppressorElementId, -120, 110);
-
+  // Both wheel inputs have already been delivered. The remaining proof uses
+  // only persisted authoritative transitions, so runner load cannot move the
+  // suppression input later in the downed window.
   let openerDodgeRecovery = null;
   let suppressedDodge = null;
   let suppressorDodgeRecovery = null;
