@@ -1799,12 +1799,12 @@ async function runOnlineUiJumpAttackCounterplayFlight(entries, defense) {
     await performArenaJumpAttackChord(attacker, attackerElementId, attackOffset, 90);
   } else if (defense === "parry" || defense === "dodge") {
     // Start both real-browser commands concurrently. Chrome's wheel command
-    // carries ~30-40 ms of driver/input overhead on hosted CI, so only add a
-    // 10 ms browser-side pause. That places the wheel near authoritative jump
-    // windup onset and gives the defense multiple server ticks of lead before
-    // the unchanged 105 ms jump strike, while remaining inside the unchanged
-    // 125 ms parry opening and 170 ms dodge duration.
+    // carries ~30-40 ms of driver/input overhead on hosted CI. Dodge wants the
+    // earliest possible roll ownership, while parry must start later so its
+    // unchanged 125 ms opening is still fresh at the 105 ms jump impact.
+    // Keep dodge at 10 ms; delay only parry to 35 ms.
     if (defense === "dodge") await aimArena(defender, defenderElementId, 0, 180);
+    const defenseDelayMs = defense === "parry" ? 35 : 10;
     let chordHeld = false;
     try {
       const chordPress = pressArenaJumpAttackChord(attacker, attackerElementId, attackOffset);
@@ -1812,7 +1812,7 @@ async function runOnlineUiJumpAttackCounterplayFlight(entries, defense) {
         defender,
         defenderElementId,
         defense === "parry" ? 120 : -120,
-        10,
+        defenseDelayMs,
       );
       await chordPress;
       chordHeld = true;
