@@ -35,12 +35,21 @@ test("stamina denial presentation names the unaffordable action without changing
     feedback: "stamina-denied",
     durationMs: 700,
   });
+  assert.deepEqual(staminaDenialPresentation("running-attack", 9), {
+    action: "running-attack",
+    cost: 10,
+    available: 9,
+    text: "Low stamina — running attack needs 10.",
+    feedback: "stamina-denied",
+    durationMs: 700,
+  });
 });
 
 test("stamina denial presentation stays silent at or above the authoritative threshold", () => {
   assert.equal(staminaDenialPresentation("roll", 28), null);
   assert.equal(staminaDenialPresentation("kick", 18), null);
   assert.equal(staminaDenialPresentation("jump", 14), null);
+  assert.equal(staminaDenialPresentation("running-attack", 10), null);
   assert.equal(staminaDenialPresentation("unknown", 0), null);
   assert.equal(staminaDenialPresentation("roll", Number.NaN), null);
 });

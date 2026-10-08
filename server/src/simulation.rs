@@ -851,14 +851,14 @@ fn begin_requested_action(
     }
 
     let moving = input.move_x.hypot(input.move_y) >= 0.5;
-    if edges.attack
-        && input.run
-        && moving
-        && fighter.action == Action::Idle
-        && spend_stamina(now_ms, fighter, RUNNING_ATTACK_STAMINA_COST)
-    {
-        fighter.attack_hit_targets.clear();
-        fighter.set_action(Action::RunningAttackWindup, RUNNING_ATTACK_WINDUP_MS);
+    if edges.attack && input.run && moving && fighter.action == Action::Idle {
+        if spend_stamina(now_ms, fighter, RUNNING_ATTACK_STAMINA_COST) {
+            fighter.attack_hit_targets.clear();
+            fighter.set_action(Action::RunningAttackWindup, RUNNING_ATTACK_WINDUP_MS);
+        }
+        // A committed run+attack edge is exclusively a running-strike attempt.
+        // Insufficient stamina consumes that edge instead of falling through to
+        // an ordinary light attack.
         return;
     }
 

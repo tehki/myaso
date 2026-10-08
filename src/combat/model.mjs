@@ -444,10 +444,14 @@ function beginRequestedAction(world, fighter, input, attackPressed, blockPressed
   }
 
   const moving = Math.hypot(input.moveX, input.moveY) >= 0.5;
-  if (attackPressed && input.run && moving && fighter.action === "idle"
-    && spendStamina(world, fighter, COMBAT.runningAttack.staminaCost)) {
-    fighter.attackHitTargets.clear();
-    setAction(fighter, "running_attack_windup", COMBAT.runningAttack.windupMs);
+  if (attackPressed && input.run && moving && fighter.action === "idle") {
+    if (spendStamina(world, fighter, COMBAT.runningAttack.staminaCost)) {
+      fighter.attackHitTargets.clear();
+      setAction(fighter, "running_attack_windup", COMBAT.runningAttack.windupMs);
+    }
+    // A committed run+LMB chord is exclusively a running-strike attempt.
+    // If stamina cannot pay the unchanged cost, consume the edge instead of
+    // degrading into a free ordinary light attack.
     return;
   }
 

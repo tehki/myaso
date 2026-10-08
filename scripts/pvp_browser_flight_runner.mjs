@@ -375,7 +375,7 @@ try {
     console.log("M166_AUTHORITATIVE_STAMINA_FEEDBACK " + JSON.stringify({ ok: true, results }));
   } else if (scenario === "uistaminaconfirmed") {
     const results = await runOnlineUiConfirmedStaminaActionsFlight(sessions);
-    console.log("M168_CONFIRMED_STAMINA_ACTIONS " + JSON.stringify({ ok: true, results }));
+    console.log("M169_CONFIRMED_STAMINA_ACTIONS " + JSON.stringify({ ok: true, results }));
   } else if (scenario === "uiguardbreaktell") {
     const results = await runOnlineUiGuardBreakTellFlight(sessions);
     console.log(`M40_FFA_GUARD_BREAK_TELL ${JSON.stringify({ ok: true, results })}`);
@@ -1860,7 +1860,7 @@ async function runOnlineUiStaminaFeedbackFlight(
 }
 
 async function runOnlineUiConfirmedStaminaActionsFlight(entries) {
-  const milestone = "M168 confirmed stamina actions";
+  const milestone = "M169 confirmed stamina actions";
   if (entries.length !== 2) {
     throw new Error(milestone + " expected two real browser clients, received " + entries.length);
   }
@@ -1921,7 +1921,7 @@ async function runOnlineUiConfirmedStaminaActionsFlight(entries) {
     let state = await readUiEvidence(actor);
     for (let index = 0; index < 6; index += 1) {
       if (staminaMatchesHud(state)
-        && state.acceptance.authoritativeStamina < COMBAT.jump.staminaCost - 2
+        && state.acceptance.authoritativeStamina < COMBAT.runningAttack.staminaCost - 2
         && state.acceptance?.ownActionTransitions?.at(-1)?.action === COMBAT_ACTION.idle) {
         return state;
       }
@@ -1930,7 +1930,7 @@ async function runOnlineUiConfirmedStaminaActionsFlight(entries) {
       await sleep(140);
       state = await readUiEvidence(actor);
     }
-    throw new Error(milestone + " could not establish sub-jump-cost authoritative stamina: "
+    throw new Error(milestone + " could not establish sub-running-attack-cost authoritative stamina: "
       + JSON.stringify(state));
   };
 
@@ -1996,6 +1996,63 @@ async function runOnlineUiConfirmedStaminaActionsFlight(entries) {
         return { epochMs: downs[0].epochMs, detail: { down: downs[0], up: ups[0] } };
       },
     },
+    {
+      action: "running-attack",
+      cost: COMBAT.runningAttack.staminaCost,
+      text: "Low stamina — running attack needs 10.",
+      // A denied running-strike chord must not degrade into either the running
+      // strike itself or any ordinary/directional light attack.
+      accepted: new Set([
+        COMBAT_ACTION.runningAttackWindup,
+        COMBAT_ACTION.runningAttackActive,
+        COMBAT_ACTION.runningAttackRecovery,
+        COMBAT_ACTION.attackWindup,
+        COMBAT_ACTION.attackActive,
+        COMBAT_ACTION.attackRecovery,
+        COMBAT_ACTION.attackLeftWindup,
+        COMBAT_ACTION.attackLeftActive,
+        COMBAT_ACTION.attackLeftRecovery,
+        COMBAT_ACTION.attackRightWindup,
+        COMBAT_ACTION.attackRightActive,
+        COMBAT_ACTION.attackRightRecovery,
+      ]),
+      allowContinuousDrain: true,
+      // Hold real sprint movement longer before LMB so any stamina regenerated
+      // while crossing the 180 ms RMB threshold is drained back below 10.
+      perform: () => performArenaRunningAttack(actor, actorElementId, awayKey, awayOffset, 520),
+      captureOffset: (state) => ({
+        pointers: state.pointers.length,
+        keys: state.keyTransitions.length,
+      }),
+      inputEvidence: (state, offset) => {
+        const pointers = state.pointers.slice(offset.pointers);
+        const keys = state.keyTransitions.slice(offset.keys);
+        const rightDown = pointers.find((entry) => entry.type === "pointerdown" && entry.button === 2);
+        const rightUp = pointers.find((entry) => entry.type === "pointerup" && entry.button === 2);
+        const lightDown = pointers.find((entry) => entry.type === "pointerdown" && entry.button === 0);
+        const lightUp = pointers.find((entry) => entry.type === "pointerup" && entry.button === 0);
+        const movementCode = "Key" + awayKey.toUpperCase();
+        const moveDown = keys.find((entry) => entry.type === "keydown" && entry.code === movementCode);
+        const moveUp = keys.find((entry) => entry.type === "keyup" && entry.code === movementCode);
+        const complete = rightDown && rightUp && lightDown && lightUp && moveDown && moveUp
+          && [rightDown, rightUp, lightDown, lightUp, moveDown, moveUp]
+            .every((entry) => Number.isFinite(entry.epochMs))
+          && lightDown.epochMs - rightDown.epochMs >= 180
+          && moveDown.epochMs > rightDown.epochMs
+          && moveDown.epochMs < lightDown.epochMs
+          && lightUp.epochMs > lightDown.epochMs
+          && rightUp.epochMs > lightUp.epochMs
+          && moveUp.epochMs > lightUp.epochMs;
+        if (!complete) {
+          throw new Error(milestone + " running attack did not record one genuine run+LMB chord: "
+            + JSON.stringify({ pointers, keys }));
+        }
+        return {
+          epochMs: lightDown.epochMs,
+          detail: { rightDown, rightUp, lightDown, lightUp, moveDown, moveUp },
+        };
+      },
+    },
   ];
 
   const proofs = [];
@@ -2034,7 +2091,7 @@ async function runOnlineUiConfirmedStaminaActionsFlight(entries) {
       (value, entry) => Number.isFinite(entry.stamina) ? Math.min(value, entry.stamina) : value,
       baselineStamina,
     );
-    if (minimumStamina < baselineStamina - 1) {
+    if (!actionCase.allowContinuousDrain && minimumStamina < baselineStamina - 1) {
       throw new Error(milestone + " denied " + actionCase.action + " spent stamina: "
         + JSON.stringify({ baselineStamina, staminaTransitions }));
     }
@@ -2101,10 +2158,10 @@ async function runOnlineUiConfirmedStaminaActionsFlight(entries) {
 
   return states.map((entry) => ({
     ...entry,
-    m168ActorId: actorId,
-    m168PeerId: peerId,
-    m168DrainHolds: entry.browser === actor.name ? drainHolds : null,
-    m168Proofs: entry.browser === actor.name ? proofs : [],
+    m169ActorId: actorId,
+    m169PeerId: peerId,
+    m169DrainHolds: entry.browser === actor.name ? drainHolds : null,
+    m169Proofs: entry.browser === actor.name ? proofs : [],
   }));
 }
 
@@ -9809,7 +9866,7 @@ async function performArenaRunHold(session, elementId, movementKey, xOffset = 20
   });
 }
 
-async function performArenaRunningAttack(session, elementId, movementKey, xOffset = 200) {
+async function performArenaRunningAttack(session, elementId, movementKey, xOffset = 200, movementLeadMs = 80) {
   const origin = { "element-6066-11e4-a52e-4f735466cecf": elementId };
   const pointerId = `mouse-${session.name}`;
   const attackPointerId = `mouse-attack-${session.name}`;
@@ -9846,7 +9903,8 @@ async function performArenaRunningAttack(session, elementId, movementKey, xOffse
       }],
     });
     movementHeld = true;
-    await sleep(80);
+    const boundedMovementLeadMs = Math.max(80, Math.min(600, Math.trunc(movementLeadMs)));
+    await sleep(boundedMovementLeadMs);
     lightHeld = true;
     await webdriver(session.base, "POST", `/session/${session.sessionId}/actions`, {
       actions: [{
