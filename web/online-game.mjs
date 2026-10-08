@@ -270,6 +270,7 @@ function recordAcceptanceState(state, ownId) {
     );
   }
   if (acceptanceScenario === "uirollknockdownbounded"
+    || acceptanceScenario === "uimultiknockdownffa"
     || acceptanceScenario === "uimultiknockdownffahit") {
     acceptance.fighters = [...state.values()].map((fighter) => ({
       netId: fighter.netId,

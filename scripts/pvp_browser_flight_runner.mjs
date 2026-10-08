@@ -3883,23 +3883,81 @@ async function runOnlineUiMultiKnockdownFfaFlight(entries) {
 
   const rollerElementId = await resolveArenaElement(roller, milestone + " roller");
   const rollRight = rollerId < firstVictimId;
-  const movementKey = rollRight ? "d" : "a";
-  const secondClusterKey = secondVictimId > firstVictimId ? "a" : "d";
-  const secondVerticalKey = "s";
   const rollOffset = rollRight ? 200 : -200;
 
-  // Authoritative spawns are 96 px apart. Move #3 down just under one body
-  // width, then about 43 px toward #2. Keeping roughly 53 px of horizontal
-  // separation makes the same unchanged roll contact #3 around 90-110 ms after
-  // #2 instead of only ~50 ms later. Both unchanged 260 ms knockdowns still
-  // overlap, but the browser now has a deterministic handoff window wide enough
-  // to render KNOCKDOWN #3 after #2 recovers. Production geometry is untouched.
-  // #1 still closes roughly 26 px before rolling.
-  await pulseMovementKey(secondVictim, secondVerticalKey, 145);
-  await pulseMovementKey(secondVictim, secondClusterKey, 200);
-  await pulseMovementKey(roller, movementKey, 120);
+  const positionRelativeToAuthoritativeTarget = async (
+    entry,
+    ownNetId,
+    targetNetId,
+    desiredDx,
+    desiredDy,
+    label,
+  ) => {
+    const tolerance = 5;
+    let last = null;
+    for (let attempt = 0; attempt < 12; attempt += 1) {
+      const state = await readUiEvidence(entry);
+      const fighters = state.acceptance?.fighters ?? [];
+      const own = fighters.find((fighter) => fighter.netId === ownNetId);
+      const target = fighters.find((fighter) => fighter.netId === targetNetId);
+      if (!own || !target
+        || !Number.isFinite(own.x) || !Number.isFinite(own.y)
+        || !Number.isFinite(target.x) || !Number.isFinite(target.y)) {
+        await sleep(35);
+        continue;
+      }
+
+      const errorX = target.x + desiredDx - own.x;
+      const errorY = target.y + desiredDy - own.y;
+      last = { own: { ...own }, target: { ...target }, errorX, errorY };
+      if (Math.abs(errorX) <= tolerance && Math.abs(errorY) <= tolerance) {
+        return last;
+      }
+
+      const useX = Math.abs(errorX) >= Math.abs(errorY);
+      const distance = Math.abs(useX ? errorX : errorY);
+      const key = useX
+        ? (errorX > 0 ? "d" : "a")
+        : (errorY > 0 ? "s" : "w");
+      // Move only part of the measured error. Each iteration closes the loop on
+      // fresh replicated coordinates, so browser/input scheduler jitter cannot
+      // accumulate into a different contact geometry.
+      const durationMs = Math.max(
+        35,
+        Math.min(140, Math.round((distance / COMBAT.moveSpeed) * 1000 * 0.72)),
+      );
+      await pulseMovementKey(entry, key, durationMs);
+      await sleep(70);
+    }
+    throw new Error(milestone + " could not stage authoritative " + label + " geometry: "
+      + JSON.stringify(last));
+  };
+
+  // Stage from replicated world coordinates instead of assuming a WebDriver
+  // key-hold duration equals a fixed authoritative distance. #3 sits slightly
+  // below and behind #2 along the roll path: far enough for ordered contacts,
+  // close enough that the unchanged 260 ms knockdowns overlap. #1 starts about
+  // 74 px before #2 on that same path. Production geometry/timing is untouched.
+  const secondaryDx = rollRight ? 56 : -56;
+  const rollerDx = rollRight ? -74 : 74;
+  await positionRelativeToAuthoritativeTarget(
+    secondVictim,
+    secondVictimId,
+    firstVictimId,
+    secondaryDx,
+    26,
+    "secondary victim",
+  );
+  await positionRelativeToAuthoritativeTarget(
+    roller,
+    rollerId,
+    firstVictimId,
+    rollerDx,
+    0,
+    "roller",
+  );
   await aimArena(roller, rollerElementId, rollOffset);
-  await sleep(50);
+  await sleep(60);
 
   const beforeStates = await Promise.all(entries.map(readUiEvidence));
   const rollerBefore = beforeStates.find((entry) => entry.browser === roller.name);
@@ -11372,6 +11430,7 @@ async function readUiEvidence(session) {
         staminaDenialTransitions: (window.__MYASO_ACCEPTANCE_STATE__.staminaDenialTransitions ?? []).map((entry) => ({ ...entry })),
         ownActionTransitions: (window.__MYASO_ACCEPTANCE_STATE__.ownActionTransitions ?? []).map((entry) => ({ ...entry })),
         focusActionTransitions: (window.__MYASO_ACCEPTANCE_STATE__.focusActionTransitions ?? []).map((entry) => ({ ...entry })),
+        fighters: (window.__MYASO_ACCEPTANCE_STATE__.fighters ?? []).map((fighter) => ({ ...fighter })),
       } : null,
     };
   `);
