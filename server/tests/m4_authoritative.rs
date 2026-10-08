@@ -1768,6 +1768,7 @@ fn exhausted_attacker_cannot_feint() {
         },
         InputIntent::default(),
     );
+    let before_feint = world.fighter(1).expect("attacker").stamina;
     advance(
         &mut world,
         5.0,
@@ -1780,7 +1781,20 @@ fn exhausted_attacker_cannot_feint() {
     );
     let attacker = world.fighter(1).expect("attacker");
     assert_eq!(attacker.action, Action::AttackWindup);
-    assert!(attacker.stamina < 12.0);
+    assert!(attacker.stamina >= before_feint);
+
+    advance(
+        &mut world,
+        ATTACK_WINDUP_MS,
+        InputIntent {
+            facing_radians: std::f32::consts::PI,
+            ..InputIntent::default()
+        },
+        InputIntent::default(),
+    );
+    let attacker = world.fighter(1).expect("attacker");
+    assert_eq!(attacker.action, Action::AttackActive);
+    assert!(attacker.stamina >= before_feint);
 }
 
 #[test]

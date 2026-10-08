@@ -296,7 +296,7 @@ try {
     console.log(`M111_HEAVY_GUARD_BREAK_PUNISH ${JSON.stringify({ ok: true, results })}`);
   } else if (scenario === "uifeint") {
     const results = await runOnlineUiFeintFlight(sessions);
-    console.log(`M117_REAL_WHEEL_FEINT ${JSON.stringify({ ok: true, results })}`);
+    console.log(`M170_EXHAUSTED_FEINT_COMMITMENT ${JSON.stringify({ ok: true, results })}`);
   } else if (scenario === "uirunningattack") {
     const results = await runOnlineUiRunningAttackFlight(sessions);
     console.log(`M119_REAL_RUNNING_STRIKE ${JSON.stringify({ ok: true, results })}`);
@@ -6006,7 +6006,127 @@ async function runOnlineUiFeintFlight(entries) {
     || defenderResult.feedbackTransitions.includes("parry-success")) {
     throw new Error(`M117 feint accidentally resolved combat contact: ${JSON.stringify(evidence)}`);
   }
-  return evidence;
+
+  // M170 extends the same real-browser gesture into exhaustion. First wait for
+  // the successful feint recovery to return authority to idle, then drain
+  // stamina through genuine RMB-hold running while moving away from the rival.
+  // Reusing performArenaFeint below is important: sufficient stamina above just
+  // proved this exact browser-owned LMB+wheel-back schedule lands in the early
+  // 70 ms feint window.
+  const awayKey = movementCode === "KeyD" ? "a" : "d";
+  const awayOffset = -attackOffset;
+  await aimArena(attacker, attackerElementId, awayOffset);
+  const waitForAttacker = async (predicate, timeoutMs, label) => {
+    const deadline = Date.now() + timeoutMs;
+    while (Date.now() < deadline) {
+      const state = await readUiEvidence(attacker);
+      if (predicate(state)) return state;
+      await sleep(12);
+    }
+    throw new Error("M170 exhausted feint timed out waiting for " + label + ": "
+      + JSON.stringify(await readUiEvidence(attacker)));
+  };
+
+  await waitForAttacker(
+    (state) => state.acceptance?.ownActionTransitions?.at(-1)?.action === COMBAT_ACTION.idle,
+    COMBAT.feint.recoveryMs + 700,
+    "idle after successful feint",
+  );
+
+  let exhausted = null;
+  let drainHolds = 0;
+  for (let index = 0; index < 6 && !exhausted; index += 1) {
+    const state = await readUiEvidence(attacker);
+    if (Number.isFinite(state.acceptance?.authoritativeStamina)
+      && state.acceptance.authoritativeStamina < COMBAT.feint.staminaCost - 2
+      && state.acceptance?.ownActionTransitions?.at(-1)?.action === COMBAT_ACTION.idle) {
+      exhausted = state;
+      break;
+    }
+    await performArenaRunHold(attacker, attackerElementId, awayKey, awayOffset, 1100);
+    drainHolds += 1;
+    await sleep(140);
+  }
+  if (!exhausted) {
+    exhausted = await readUiEvidence(attacker);
+    if (!Number.isFinite(exhausted.acceptance?.authoritativeStamina)
+      || exhausted.acceptance.authoritativeStamina >= COMBAT.feint.staminaCost - 2
+      || exhausted.acceptance?.ownActionTransitions?.at(-1)?.action !== COMBAT_ACTION.idle) {
+      throw new Error("M170 exhausted feint could not establish sub-feint-cost stamina: "
+        + JSON.stringify(exhausted));
+    }
+  }
+
+  const baselineStamina = Math.round(exhausted.acceptance.authoritativeStamina);
+  const actionOffset = exhausted.acceptance.ownActionTransitions.length;
+  const staminaOffset = exhausted.acceptance.staminaTransitions.length;
+  const pointerOffset = exhausted.pointers.length;
+  const exhaustedWheelOffset = exhausted.wheels.length;
+  await performArenaFeint(attacker, attackerElementId, awayOffset);
+
+  const committed = await waitForAttacker(
+    (state) => {
+      const actions = state.acceptance?.ownActionTransitions?.slice(actionOffset) ?? [];
+      return actions.some((entry) =>
+        entry.action === COMBAT_ACTION.attackActive
+        || entry.action === COMBAT_ACTION.attackLeftActive
+        || entry.action === COMBAT_ACTION.attackRightActive)
+        && !actions.some((entry) => entry.action === COMBAT_ACTION.feintRecovery);
+    },
+    900,
+    "original light commitment after rejected feint",
+  );
+
+  const exhaustedPointers = committed.pointers.slice(pointerOffset);
+  const exhaustedWheels = committed.wheels.slice(exhaustedWheelOffset);
+  const exhaustedLightDown = exhaustedPointers.find((entry) =>
+    entry.type === "pointerdown" && entry.button === 0);
+  const exhaustedLightUp = exhaustedPointers.find((entry) =>
+    entry.type === "pointerup" && entry.button === 0);
+  const exhaustedWheelBack = exhaustedWheels.find((entry) => entry.deltaY > 0);
+  if (!exhaustedLightDown || !exhaustedLightUp || !exhaustedWheelBack
+    || !Number.isFinite(exhaustedLightDown.epochMs)
+    || !Number.isFinite(exhaustedLightUp.epochMs)
+    || !Number.isFinite(exhaustedWheelBack.epochMs)
+    || exhaustedLightUp.epochMs <= exhaustedLightDown.epochMs
+    || Math.abs(exhaustedWheelBack.epochMs - exhaustedLightDown.epochMs) > 80) {
+    throw new Error("M170 exhausted feint did not deliver the same genuine early LMB+wheel-back chord: "
+      + JSON.stringify({ pointers: exhaustedPointers, wheels: exhaustedWheels }));
+  }
+
+  const exhaustedActions = committed.acceptance.ownActionTransitions.slice(actionOffset);
+  if (exhaustedActions.some((entry) => entry.action === COMBAT_ACTION.feintRecovery)) {
+    throw new Error("M170 exhausted wheel-back incorrectly entered feint recovery: "
+      + JSON.stringify(exhaustedActions));
+  }
+  const staminaTransitions = committed.acceptance.staminaTransitions.slice(staminaOffset);
+  const minimumStamina = staminaTransitions.reduce(
+    (value, entry) => Number.isFinite(entry.stamina) ? Math.min(value, entry.stamina) : value,
+    baselineStamina,
+  );
+  if (minimumStamina < baselineStamina - 1) {
+    throw new Error("M170 rejected feint spent the 12-stamina feint cost: "
+      + JSON.stringify({ baselineStamina, staminaTransitions }));
+  }
+
+  const exhaustedEvidence = await Promise.all(entries.map(readUiEvidence));
+  for (const state of exhaustedEvidence) {
+    if (state.playerHp !== 100 || state.playerGuard !== 100) {
+      throw new Error("M170 exhausted feint proof changed health/guard: "
+        + JSON.stringify(exhaustedEvidence));
+    }
+  }
+
+  return exhaustedEvidence.map((entry) => ({
+    ...entry,
+    m170AttackerId: attackerResult.playerNetId,
+    m170DrainHolds: entry.browser === attacker.name ? drainHolds : null,
+    m170DeniedAtStamina: entry.browser === attacker.name ? baselineStamina : null,
+    m170WheelEpochMs: entry.browser === attacker.name ? exhaustedWheelBack.epochMs : null,
+    m170CommittedWithoutFeint: entry.browser === attacker.name
+      ? !exhaustedActions.some((item) => item.action === COMBAT_ACTION.feintRecovery)
+      : null,
+  }));
 }
 
 async function runOnlineUiHeavyWhiffPunishFlight(entries) {
@@ -10222,7 +10342,7 @@ async function installUiObserver(session) {
     const threatGuardArc = document.querySelector('#threat-guard-arc');
     if (!target || !arena || !arenaStage || !overlay || !recovery || !focusLabel || !threat || !threatCount || !threatSecondary || !threatSecondaryBearing || !threatSecondaryPhase || !threatSecondaryGuardArc || !threatBearing || !threatGuardArc) throw new Error('missing online UI flight target');
     const state = { events: [], eventTransitions: [], keys: [], keyTransitions: [], pointers: [], wheels: [], overlayTransitions: [], feedbackTransitions: [], recoveryTransitions: [], focusTransitions: [], threatTransitions: [], recoveryTellMaxPixels: 0, parryTellMaxPixels: 0, online: '', startedAt: performance.now() };
-    const epochEvidence = ['uirollbuffer', 'uijumpbuffer', 'uijumpattack', 'uijumpattackinputloss', 'uijumpattackpunish', 'uijumpattacktelegraph', 'uijumpffaprimary', 'uijumpffasecondary', 'uijumprecoveryffa', 'uijumppunishffa', 'uimultirecoveryffa', 'uimultirecoveryspatial', 'uimultirecoverypunish', 'uiparrypunishwindow', 'uiparrypunishffa', 'uiparrypunishffahit', 'uiguardbreakpunishffa', 'uiguardbreakpunishffahit', 'uikickknockdownffa', 'uikickknockdownffahit', 'uikickknockdownbounded', 'uirollknockdownbounded', 'uistaminaauth', 'uistaminaexhaustion', 'uistaminafeedback', 'uistaminaconfirmed', 'uirollknockdownffahit', 'uimultiknockdownffa', 'uimultiknockdownffahit', 'uirollknockdownffa', 'uijumpattackblock', 'uijumpattackparry', 'uijumpattackdodge', 'uijumpattackbuffer', 'uikickbuffer'].includes(new URLSearchParams(location.search).get('scenario'));
+    const epochEvidence = ['uirollbuffer', 'uijumpbuffer', 'uijumpattack', 'uijumpattackinputloss', 'uijumpattackpunish', 'uijumpattacktelegraph', 'uijumpffaprimary', 'uijumpffasecondary', 'uijumprecoveryffa', 'uijumppunishffa', 'uimultirecoveryffa', 'uimultirecoveryspatial', 'uimultirecoverypunish', 'uiparrypunishwindow', 'uiparrypunishffa', 'uiparrypunishffahit', 'uiguardbreakpunishffa', 'uiguardbreakpunishffahit', 'uikickknockdownffa', 'uikickknockdownffahit', 'uikickknockdownbounded', 'uirollknockdownbounded', 'uistaminaauth', 'uistaminaexhaustion', 'uistaminafeedback', 'uistaminaconfirmed', 'uifeint', 'uirollknockdownffahit', 'uimultiknockdownffa', 'uimultiknockdownffahit', 'uirollknockdownffa', 'uijumpattackblock', 'uijumpattackparry', 'uijumpattackdodge', 'uijumpattackbuffer', 'uikickbuffer'].includes(new URLSearchParams(location.search).get('scenario'));
     const record = () => {
       const text = target.textContent?.trim() ?? '';
       if (/^Online - player #\\d+ - server tick \\d+$/.test(text)) state.online = text;
