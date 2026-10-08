@@ -2017,7 +2017,9 @@ async function runOnlineUiConfirmedStaminaActionsFlight(entries) {
         COMBAT_ACTION.attackRightRecovery,
       ]),
       allowContinuousDrain: true,
-      perform: () => performArenaRunningAttack(actor, actorElementId, awayKey, awayOffset),
+      // Hold real sprint movement longer before LMB so any stamina regenerated
+      // while crossing the 180 ms RMB threshold is drained back below 10.
+      perform: () => performArenaRunningAttack(actor, actorElementId, awayKey, awayOffset, 520),
       captureOffset: (state) => ({
         pointers: state.pointers.length,
         keys: state.keyTransitions.length,
@@ -9864,7 +9866,7 @@ async function performArenaRunHold(session, elementId, movementKey, xOffset = 20
   });
 }
 
-async function performArenaRunningAttack(session, elementId, movementKey, xOffset = 200) {
+async function performArenaRunningAttack(session, elementId, movementKey, xOffset = 200, movementLeadMs = 80) {
   const origin = { "element-6066-11e4-a52e-4f735466cecf": elementId };
   const pointerId = `mouse-${session.name}`;
   const attackPointerId = `mouse-attack-${session.name}`;
@@ -9901,7 +9903,8 @@ async function performArenaRunningAttack(session, elementId, movementKey, xOffse
       }],
     });
     movementHeld = true;
-    await sleep(80);
+    const boundedMovementLeadMs = Math.max(80, Math.min(600, Math.trunc(movementLeadMs)));
+    await sleep(boundedMovementLeadMs);
     lightHeld = true;
     await webdriver(session.base, "POST", `/session/${session.sessionId}/actions`, {
       actions: [{
