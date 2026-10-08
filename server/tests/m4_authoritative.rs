@@ -3159,3 +3159,35 @@ fn exhausted_dodge_edge_is_rejected_and_does_not_auto_fire_after_regeneration() 
     assert_eq!(attacker.action, Action::Dodge);
     assert!((attacker.stamina - (before_retry - 28.0)).abs() < 1.0);
 }
+
+#[test]
+fn exhausted_running_attack_edge_is_consumed_without_light_fallback() {
+    let mut world = duel(200.0);
+    let run_away = InputIntent {
+        move_x: -1.0,
+        run: true,
+        facing_radians: std::f32::consts::PI,
+        ..InputIntent::default()
+    };
+    advance(&mut world, 3900.0, run_away, InputIntent::default());
+    let before = world.fighter(1).expect("attacker").stamina;
+    assert!(before < 10.0);
+
+    advance(
+        &mut world,
+        5.0,
+        InputIntent {
+            move_x: -1.0,
+            attack: true,
+            run: true,
+            facing_radians: std::f32::consts::PI,
+            ..InputIntent::default()
+        },
+        InputIntent::default(),
+    );
+
+    let attacker = world.fighter(1).expect("attacker");
+    assert_eq!(attacker.action, Action::Idle);
+    assert!(attacker.stamina <= before);
+    assert!(attacker.stamina > (before - 1.0).max(0.0));
+}

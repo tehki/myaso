@@ -116,7 +116,13 @@ let staminaRegenBlockedUntil = 0;
 canvas.addEventListener("contextmenu", (event) => event.preventDefault());
 canvas.addEventListener("pointerdown", (event) => {
   canvas.focus();
-  if (event.button === 0) attackRequested = true;
+  if (event.button === 0) {
+    attackRequested = true;
+    const runningGesture = rightButtonDown
+      && performance.now() - rightButtonDownAt >= runHoldThresholdMs
+      && (keys.has("KeyW") || keys.has("KeyA") || keys.has("KeyS") || keys.has("KeyD"));
+    if (runningGesture) queueStaminaDenial("running-attack");
+  }
   if (event.button === 2) {
     rightButtonDown = true;
     rightButtonDownAt = performance.now();
@@ -376,7 +382,9 @@ function markStaminaDenialSubmitted(tick, input) {
   const included = pendingStaminaDenial.action === "roll" ? input.dodge
     : pendingStaminaDenial.action === "kick" ? input.kick
       : pendingStaminaDenial.action === "jump" ? input.jump
-        : false;
+        : pendingStaminaDenial.action === "running-attack"
+          ? input.attack && input.run && Math.hypot(input.moveX, input.moveY) >= 0.5
+          : false;
   if (included) {
     pendingStaminaDenial.submittedClientTick = tick >>> 0;
     recordStaminaDenialStage("submitted", {
@@ -402,6 +410,11 @@ function staminaActionAccepted(action, authoritativeAction) {
       || authoritativeAction === COMBAT_ACTION.jumpAttackActive
       || authoritativeAction === COMBAT_ACTION.jumpAttackRecovery;
   }
+  if (action === "running-attack") {
+    return authoritativeAction === COMBAT_ACTION.runningAttackWindup
+      || authoritativeAction === COMBAT_ACTION.runningAttackActive
+      || authoritativeAction === COMBAT_ACTION.runningAttackRecovery;
+  }
   return false;
 }
 
@@ -419,7 +432,8 @@ function confirmStaminaDenial(own) {
   const spentEnough = Number.isFinite(pending.baselineStamina)
     && Number.isFinite(currentStamina)
     && pending.baselineStamina - currentStamina >= cost - 1;
-  const accepted = staminaActionAccepted(pending.action, own?.action) || spentEnough;
+  const accepted = staminaActionAccepted(pending.action, own?.action)
+    || (pending.action !== "running-attack" && spentEnough);
   if (accepted) {
     recordStaminaDenialStage("confirmed-accepted", {
       action: pending.action,

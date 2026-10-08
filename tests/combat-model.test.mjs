@@ -1016,3 +1016,19 @@ test("exhausted roll edge is rejected and does not auto-fire after regeneration"
   assert.equal(attacker.action, "dodge");
   assert.ok(Math.abs(attacker.stamina - (beforeRetry - COMBAT.dodge.staminaCost)) < 1);
 });
+
+test("exhausted running strike edge is consumed instead of falling back to a light attack", () => {
+  const world = duel({ distance: 200 });
+  const [attacker] = world.fighters;
+  advance(world, 3900, { a: { moveX: -1, run: true, aimX: 0, aimY: 200 } });
+  assert.ok(attacker.stamina < COMBAT.runningAttack.staminaCost);
+  const before = attacker.stamina;
+
+  stepWorld(world, {
+    a: { moveX: -1, run: true, attack: true, aimX: 0, aimY: 200 },
+  }, 5);
+
+  assert.equal(attacker.action, "idle");
+  assert.ok(attacker.stamina <= before);
+  assert.ok(attacker.stamina > Math.max(0, before - 1));
+});
