@@ -1785,7 +1785,7 @@ fn exhausted_attacker_cannot_feint() {
 
     advance(
         &mut world,
-        ATTACK_WINDUP_MS,
+        135.0,
         InputIntent {
             facing_radians: std::f32::consts::PI,
             ..InputIntent::default()
