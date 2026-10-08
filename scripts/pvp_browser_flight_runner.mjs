@@ -374,12 +374,8 @@ try {
     const results = await runOnlineUiStaminaFeedbackFlight(sessions);
     console.log("M166_AUTHORITATIVE_STAMINA_FEEDBACK " + JSON.stringify({ ok: true, results }));
   } else if (scenario === "uistaminaconfirmed") {
-    const results = await runOnlineUiStaminaFeedbackFlight(sessions, {
-      milestone: "M167 confirmed stamina denial",
-      scenarioName: "uistaminaconfirmed",
-      requireConfirmed: true,
-    });
-    console.log("M167_CONFIRMED_STAMINA_DENIAL " + JSON.stringify({ ok: true, results }));
+    const results = await runOnlineUiConfirmedStaminaActionsFlight(sessions);
+    console.log("M168_CONFIRMED_STAMINA_ACTIONS " + JSON.stringify({ ok: true, results }));
   } else if (scenario === "uiguardbreaktell") {
     const results = await runOnlineUiGuardBreakTellFlight(sessions);
     console.log(`M40_FFA_GUARD_BREAK_TELL ${JSON.stringify({ ok: true, results })}`);
@@ -1860,6 +1856,255 @@ async function runOnlineUiStaminaFeedbackFlight(
     m167ConfirmedShown: entry.browser === actor.name && requireConfirmed
       ? confirmedProof?.shown?.stage === "shown"
       : null,
+  }));
+}
+
+async function runOnlineUiConfirmedStaminaActionsFlight(entries) {
+  const milestone = "M168 confirmed stamina actions";
+  if (entries.length !== 2) {
+    throw new Error(milestone + " expected two real browser clients, received " + entries.length);
+  }
+
+  await Promise.all(entries.map(installUiObserver));
+  const ready = await waitForUiReady(entries);
+  const actor = entries.find((entry) => entry.name === "chrome");
+  const peer = entries.find((entry) => entry.name === "firefox");
+  const actorReady = ready.find((entry) => entry.browser === actor?.name);
+  const peerReady = ready.find((entry) => entry.browser === peer?.name);
+  if (!actor || !peer || !actorReady || !peerReady) {
+    throw new Error(milestone + " could not resolve deterministic browser roles: " + JSON.stringify(ready));
+  }
+
+  await Promise.all(entries.map((entry) => execute(
+    entry.base,
+    entry.sessionId,
+    "document.querySelector('#arena').focus(); return document.activeElement?.id;",
+  )));
+  await Promise.all(entries.map(centerArenaInViewport));
+
+  const actorElementId = await resolveArenaElement(actor, milestone + " actor");
+  const actorId = actorReady.playerNetId;
+  const peerId = peerReady.playerNetId;
+  const awayOffset = actorId < peerId ? -200 : 200;
+  const awayKey = actorId < peerId ? "a" : "d";
+  await aimArena(actor, actorElementId, awayOffset);
+  await sleep(40);
+
+  const staminaMatchesHud = (state) => {
+    const authoritative = state?.acceptance?.authoritativeStamina;
+    return Number.isFinite(authoritative)
+      && Number.isFinite(state?.playerStamina)
+      && Math.round(authoritative) === state.playerStamina;
+  };
+
+  const waitForActor = async (predicate, timeoutMs, label) => {
+    const deadline = Date.now() + timeoutMs;
+    while (Date.now() < deadline) {
+      const state = await readUiEvidence(actor);
+      if (predicate(state)) return state;
+      await sleep(12);
+    }
+    throw new Error(milestone + " timed out waiting for " + label + ": "
+      + JSON.stringify(await readUiEvidence(actor)));
+  };
+
+  await waitForActor(
+    (state) => staminaMatchesHud(state)
+      && Math.round(state.acceptance.authoritativeStamina) === 100
+      && state.acceptance?.scenario === "uistaminaconfirmed",
+    1800,
+    "full authoritative stamina baseline",
+  );
+
+  let drainHolds = 0;
+  const ensureExhausted = async () => {
+    let state = await readUiEvidence(actor);
+    for (let index = 0; index < 6; index += 1) {
+      if (staminaMatchesHud(state)
+        && state.acceptance.authoritativeStamina < COMBAT.jump.staminaCost - 2
+        && state.acceptance?.ownActionTransitions?.at(-1)?.action === COMBAT_ACTION.idle) {
+        return state;
+      }
+      await performArenaRunHold(actor, actorElementId, awayKey, awayOffset, 1100);
+      drainHolds += 1;
+      await sleep(140);
+      state = await readUiEvidence(actor);
+    }
+    throw new Error(milestone + " could not establish sub-jump-cost authoritative stamina: "
+      + JSON.stringify(state));
+  };
+
+  const actionCases = [
+    {
+      action: "roll",
+      cost: COMBAT.dodge.staminaCost,
+      text: "Low stamina — roll needs 28.",
+      accepted: new Set([COMBAT_ACTION.dodge, COMBAT_ACTION.dodgeRecovery]),
+      perform: () => scrollArenaWheel(actor, actorElementId, -120, 0),
+      captureOffset: (state) => state.wheels.length,
+      inputEvidence: (state, offset) => {
+        const wheels = state.wheels.slice(offset).filter((entry) => entry.deltaY < 0);
+        if (wheels.length !== 1 || !Number.isFinite(wheels[0]?.epochMs)) {
+          throw new Error(milestone + " roll did not record one genuine wheel-forward: "
+            + JSON.stringify(state.wheels.slice(offset)));
+        }
+        return { epochMs: wheels[0].epochMs, detail: wheels[0] };
+      },
+    },
+    {
+      action: "kick",
+      cost: COMBAT.kick.staminaCost,
+      text: "Low stamina — kick needs 18.",
+      accepted: new Set([COMBAT_ACTION.kickWindup, COMBAT_ACTION.kickActive, COMBAT_ACTION.kickRecovery]),
+      perform: () => performArenaRecoveryBufferedKick(actor, actorElementId, awayOffset, 45),
+      captureOffset: (state) => state.pointers.length,
+      inputEvidence: (state, offset) => {
+        const pointers = state.pointers.slice(offset).filter((entry) => entry.button === 2);
+        const downs = pointers.filter((entry) => entry.type === "pointerdown");
+        const ups = pointers.filter((entry) => entry.type === "pointerup");
+        if (downs.length !== 1 || ups.length !== 1
+          || !Number.isFinite(downs[0]?.epochMs) || !Number.isFinite(ups[0]?.epochMs)
+          || ups[0].epochMs <= downs[0].epochMs || ups[0].epochMs - downs[0].epochMs >= 180) {
+          throw new Error(milestone + " kick did not record one genuine short RMB gesture: "
+            + JSON.stringify(pointers));
+        }
+        return { epochMs: downs[0].epochMs, detail: { down: downs[0], up: ups[0] } };
+      },
+    },
+    {
+      action: "jump",
+      cost: COMBAT.jump.staminaCost,
+      text: "Low stamina — jump needs 14.",
+      accepted: new Set([
+        COMBAT_ACTION.jump,
+        COMBAT_ACTION.jumpAttackWindup,
+        COMBAT_ACTION.jumpAttackActive,
+        COMBAT_ACTION.jumpAttackRecovery,
+      ]),
+      perform: () => performArenaJumpPress(actor, 45),
+      captureOffset: (state) => state.keyTransitions.length,
+      inputEvidence: (state, offset) => {
+        const keys = state.keyTransitions.slice(offset).filter((entry) => entry.code === "Space");
+        const downs = keys.filter((entry) => entry.type === "keydown");
+        const ups = keys.filter((entry) => entry.type === "keyup");
+        if (downs.length !== 1 || ups.length !== 1
+          || !Number.isFinite(downs[0]?.epochMs) || !Number.isFinite(ups[0]?.epochMs)
+          || ups[0].epochMs <= downs[0].epochMs || ups[0].epochMs - downs[0].epochMs >= 180) {
+          throw new Error(milestone + " jump did not record one genuine short Space gesture: "
+            + JSON.stringify(keys));
+        }
+        return { epochMs: downs[0].epochMs, detail: { down: downs[0], up: ups[0] } };
+      },
+    },
+  ];
+
+  const proofs = [];
+  for (const actionCase of actionCases) {
+    const exhausted = await ensureExhausted();
+    const baselineStamina = Math.round(exhausted.acceptance.authoritativeStamina);
+    const actionOffset = exhausted.acceptance.ownActionTransitions.length;
+    const staminaOffset = exhausted.acceptance.staminaTransitions.length;
+    const denialOffset = exhausted.acceptance?.staminaDenialTransitions?.length ?? 0;
+    const eventOffset = exhausted.events.length;
+    const feedbackOffset = exhausted.feedbackTransitions.length;
+    const inputOffset = actionCase.captureOffset(exhausted);
+
+    await actionCase.perform();
+
+    const rejected = await waitForActor(
+      (state) => {
+        const transitions = state.acceptance?.staminaDenialTransitions?.slice(denialOffset) ?? [];
+        return transitions.some((entry) => entry.stage === "shown" && entry.action === actionCase.action)
+          && state.events.slice(eventOffset).includes(actionCase.text)
+          && state.feedbackTransitions.slice(feedbackOffset).includes("stamina-denied");
+      },
+      1200,
+      actionCase.action + " confirmed stamina denial",
+    );
+
+    const input = actionCase.inputEvidence(rejected, inputOffset);
+    const newActions = rejected.acceptance?.ownActionTransitions?.slice(actionOffset) ?? [];
+    if (newActions.some((entry) => actionCase.accepted.has(entry.action))) {
+      throw new Error(milestone + " " + actionCase.action + " was accepted despite confirmed denial: "
+        + JSON.stringify(newActions));
+    }
+
+    const staminaTransitions = rejected.acceptance?.staminaTransitions?.slice(staminaOffset) ?? [];
+    const minimumStamina = staminaTransitions.reduce(
+      (value, entry) => Number.isFinite(entry.stamina) ? Math.min(value, entry.stamina) : value,
+      baselineStamina,
+    );
+    if (minimumStamina < baselineStamina - 1) {
+      throw new Error(milestone + " denied " + actionCase.action + " spent stamina: "
+        + JSON.stringify({ baselineStamina, staminaTransitions }));
+    }
+
+    const transitions = rejected.acceptance?.staminaDenialTransitions?.slice(denialOffset) ?? [];
+    const queuedIndex = transitions.findIndex((entry) =>
+      entry.stage === "queued" && entry.action === actionCase.action);
+    const submittedIndex = transitions.findIndex((entry, index) =>
+      index > queuedIndex && entry.stage === "submitted" && entry.action === actionCase.action);
+    const rejectedIndex = transitions.findIndex((entry, index) =>
+      index > submittedIndex && entry.stage === "confirmed-rejected" && entry.action === actionCase.action);
+    const shownIndex = transitions.findIndex((entry, index) =>
+      index > rejectedIndex && entry.stage === "shown" && entry.action === actionCase.action);
+    if (queuedIndex < 0 || submittedIndex <= queuedIndex
+      || rejectedIndex <= submittedIndex || shownIndex <= rejectedIndex) {
+      throw new Error(milestone + " " + actionCase.action
+        + " did not preserve queued/submitted/rejected/shown ordering: "
+        + JSON.stringify(transitions));
+    }
+
+    const queued = transitions[queuedIndex];
+    const submitted = transitions[submittedIndex];
+    const confirmed = transitions[rejectedIndex];
+    const shown = transitions[shownIndex];
+    const ackIncludesInput = Number.isInteger(submitted.clientTick)
+      && Number.isInteger(confirmed.processedClientTick)
+      && (confirmed.processedClientTick === submitted.clientTick
+        || isTickNewer32(confirmed.processedClientTick, submitted.clientTick));
+    if (!ackIncludesInput
+      || !Number.isFinite(queued.epochMs)
+      || !Number.isFinite(submitted.epochMs)
+      || !Number.isFinite(confirmed.epochMs)
+      || !Number.isFinite(shown.epochMs)
+      || submitted.epochMs < queued.epochMs
+      || confirmed.epochMs < submitted.epochMs
+      || shown.epochMs < confirmed.epochMs
+      || !Number.isFinite(confirmed.authoritativeStamina)
+      || confirmed.authoritativeStamina >= actionCase.cost) {
+      throw new Error(milestone + " " + actionCase.action
+        + " denial was not tied to acknowledged sub-cost authority: "
+        + JSON.stringify(transitions));
+    }
+
+    proofs.push({
+      action: actionCase.action,
+      cost: actionCase.cost,
+      baselineStamina,
+      inputEpochMs: input.epochMs,
+      submittedClientTick: submitted.clientTick,
+      processedClientTick: confirmed.processedClientTick,
+      authoritativeStamina: confirmed.authoritativeStamina,
+      shownEpochMs: shown.epochMs,
+    });
+
+    await sleep(120);
+  }
+
+  const states = await Promise.all(entries.map(readUiEvidence));
+  for (const state of states) {
+    if (state.playerHp !== 100 || state.playerGuard !== 100) {
+      throw new Error(milestone + " denial proof changed health/guard: " + JSON.stringify(states));
+    }
+  }
+
+  return states.map((entry) => ({
+    ...entry,
+    m168ActorId: actorId,
+    m168PeerId: peerId,
+    m168DrainHolds: entry.browser === actor.name ? drainHolds : null,
+    m168Proofs: entry.browser === actor.name ? proofs : [],
   }));
 }
 
@@ -9771,6 +10016,21 @@ async function performArenaJumpAttackChord(session, elementId, xOffset = 200, ho
         ],
       },
     ],
+  });
+}
+
+async function performArenaJumpPress(session, holdMs = 45) {
+  const boundedHoldMs = Math.max(25, Math.min(120, Math.trunc(holdMs)));
+  await webdriver(session.base, "POST", `/session/${session.sessionId}/actions`, {
+    actions: [{
+      type: "key",
+      id: `keyboard-${session.name}`,
+      actions: [
+        { type: "keyDown", value: " " },
+        { type: "pause", duration: boundedHoldMs },
+        { type: "keyUp", value: " " },
+      ],
+    }],
   });
 }
 
