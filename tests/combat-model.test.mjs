@@ -502,13 +502,19 @@ test("late wheel-back cannot cancel a committed heavy strike", () => {
   assert.equal(a.stamina, COMBAT.stamina.max);
 });
 
-test("feint is unavailable when stamina cannot pay its cost", () => {
+test("exhausted feint is rejected without erasing the committed light attack", () => {
   const world = duel({ distance: 60 });
   const [a, b] = world.fighters;
   a.stamina = COMBAT.feint.staminaCost - 1;
   stepWorld(world, { a: { attack: true, aimX: b.x, aimY: b.y } }, 5);
+  const beforeFeint = a.stamina;
   stepWorld(world, { a: { block: true, aimX: b.x, aimY: b.y } }, 5);
   assert.equal(a.action, "attack_windup");
+  assert.ok(a.stamina >= beforeFeint);
+
+  advance(world, COMBAT.attack.windupMs, { a: { aimX: -200, aimY: b.y } });
+  assert.equal(a.action, "attack_active");
+  assert.ok(a.stamina >= beforeFeint);
 });
 
 test("kick knockdown is a bounded fallen state that restores control", () => {

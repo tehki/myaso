@@ -105,6 +105,15 @@ jobs:
           node --test --test-name-pattern="stamina denial presentation|exhausted roll edge" tests/m29-combat-readability.test.mjs tests/combat-model.test.mjs
           node scripts/pvp_browser_flight_runner.mjs
 
+      - name: Validate M158 real simultaneous FFA knockdown arbitration
+        env:
+          MYASO_PVP_SCENARIO: "uimultiknockdownffa"
+        run: |
+          node --check web/online-game.mjs
+          node --check scripts/pvp_browser_flight_runner.mjs
+          node --test --test-name-pattern="FFA knockdown arbitration|FFA knockdown punish focus" tests/m29-combat-readability.test.mjs
+          node scripts/pvp_browser_flight_runner.mjs
+
       - name: Validate M64 fixed input ingress batch
         run: cargo test --locked --manifest-path server/Cargo.toml ingress_uses_a_fixed_three_sample_batch
 
@@ -478,15 +487,6 @@ jobs:
         run: |
           node --check src/browser/combat-readability.mjs
           node --test --test-name-pattern="FFA knockdown arbitration|FFA knockdown punish focus" tests/m29-combat-readability.test.mjs
-
-      - name: Validate M158 real simultaneous FFA knockdown arbitration
-        env:
-          MYASO_PVP_SCENARIO: "uimultiknockdownffa"
-        run: |
-          node --check web/online-game.mjs
-          node --check scripts/pvp_browser_flight_runner.mjs
-          node --test --test-name-pattern="FFA knockdown arbitration|FFA knockdown punish focus" tests/m29-combat-readability.test.mjs
-          node scripts/pvp_browser_flight_runner.mjs
 
       - name: Validate M159 actionable simultaneous FFA knockdown punish
         env:

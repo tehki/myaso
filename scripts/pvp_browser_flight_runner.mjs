@@ -296,7 +296,7 @@ try {
     console.log(`M111_HEAVY_GUARD_BREAK_PUNISH ${JSON.stringify({ ok: true, results })}`);
   } else if (scenario === "uifeint") {
     const results = await runOnlineUiFeintFlight(sessions);
-    console.log(`M117_REAL_WHEEL_FEINT ${JSON.stringify({ ok: true, results })}`);
+    console.log(`M170_EXHAUSTED_FEINT_COMMITMENT ${JSON.stringify({ ok: true, results })}`);
   } else if (scenario === "uirunningattack") {
     const results = await runOnlineUiRunningAttackFlight(sessions);
     console.log(`M119_REAL_RUNNING_STRIKE ${JSON.stringify({ ok: true, results })}`);
@@ -3883,23 +3883,121 @@ async function runOnlineUiMultiKnockdownFfaFlight(entries) {
 
   const rollerElementId = await resolveArenaElement(roller, milestone + " roller");
   const rollRight = rollerId < firstVictimId;
-  const movementKey = rollRight ? "d" : "a";
-  const secondClusterKey = secondVictimId > firstVictimId ? "a" : "d";
-  const secondVerticalKey = "s";
   const rollOffset = rollRight ? 200 : -200;
 
-  // Authoritative spawns are 96 px apart. Move #3 down just under one body
-  // width, then about 43 px toward #2. Keeping roughly 53 px of horizontal
-  // separation makes the same unchanged roll contact #3 around 90-110 ms after
-  // #2 instead of only ~50 ms later. Both unchanged 260 ms knockdowns still
-  // overlap, but the browser now has a deterministic handoff window wide enough
-  // to render KNOCKDOWN #3 after #2 recovers. Production geometry is untouched.
-  // #1 still closes roughly 26 px before rolling.
-  await pulseMovementKey(secondVictim, secondVerticalKey, 145);
-  await pulseMovementKey(secondVictim, secondClusterKey, 200);
-  await pulseMovementKey(roller, movementKey, 120);
+  const positionRelativeToAuthoritativeTarget = async (
+    entry,
+    ownNetId,
+    targetNetId,
+    desiredDx,
+    desiredDy,
+    label,
+  ) => {
+    const tolerance = 5;
+    let last = null;
+    for (let attempt = 0; attempt < 12; attempt += 1) {
+      const state = await readUiEvidence(entry);
+      const fighters = state.acceptance?.fighters ?? [];
+      const own = fighters.find((fighter) => fighter.netId === ownNetId);
+      const target = fighters.find((fighter) => fighter.netId === targetNetId);
+      if (!own || !target
+        || !Number.isFinite(own.x) || !Number.isFinite(own.y)
+        || !Number.isFinite(target.x) || !Number.isFinite(target.y)) {
+        await sleep(35);
+        continue;
+      }
+
+      const errorX = target.x + desiredDx - own.x;
+      const errorY = target.y + desiredDy - own.y;
+      last = { own: { ...own }, target: { ...target }, errorX, errorY };
+      if (Math.abs(errorX) <= tolerance && Math.abs(errorY) <= tolerance) {
+        return last;
+      }
+
+      const useX = Math.abs(errorX) >= Math.abs(errorY);
+      const distance = Math.abs(useX ? errorX : errorY);
+      const key = useX
+        ? (errorX > 0 ? "d" : "a")
+        : (errorY > 0 ? "s" : "w");
+      // Move only part of the measured error. Each iteration closes the loop on
+      // fresh replicated coordinates, so browser/input scheduler jitter cannot
+      // accumulate into a different contact geometry.
+      const durationMs = Math.max(
+        35,
+        Math.min(140, Math.round((distance / COMBAT.moveSpeed) * 1000 * 0.72)),
+      );
+      await pulseMovementKey(entry, key, durationMs);
+      await sleep(70);
+    }
+    throw new Error(milestone + " could not stage authoritative " + label + " geometry: "
+      + JSON.stringify(last));
+  };
+
+  // Stage from replicated world coordinates instead of assuming a WebDriver
+  // key-hold duration equals a fixed authoritative distance. #3 sits 40 px
+  // ahead of #2 and 31 px off-axis. This restores the proven M158 cluster shape:
+  // #2's unchanged 34 px knockback cannot eject #3 beyond the roll corridor,
+  // while one unchanged 170 ms roll still reaches both victims in order.
+  // A deterministic tolerance sweep over every +/-5 px staging extreme produces
+  // both contacts with 67-117 ms stagger and the second contact by 150 ms.
+  // Production geometry/timing is untouched.
+  const secondaryDx = rollRight ? 40 : -40;
+  const secondaryDy = 31;
+  const rollerDx = rollRight ? -62 : 62;
+  let stagedGeometry = null;
+  for (let pass = 0; pass < 5; pass += 1) {
+    await positionRelativeToAuthoritativeTarget(
+      secondVictim,
+      secondVictimId,
+      firstVictimId,
+      secondaryDx,
+      secondaryDy,
+      "secondary victim",
+    );
+    await positionRelativeToAuthoritativeTarget(
+      roller,
+      rollerId,
+      firstVictimId,
+      rollerDx,
+      0,
+      "roller",
+    );
+    await sleep(70);
+
+    const state = await readUiEvidence(roller);
+    const fighters = state.acceptance?.fighters ?? [];
+    const rollerFighter = fighters.find((fighter) => fighter.netId === rollerId);
+    const firstFighter = fighters.find((fighter) => fighter.netId === firstVictimId);
+    const secondFighter = fighters.find((fighter) => fighter.netId === secondVictimId);
+    if (rollerFighter && firstFighter && secondFighter) {
+      const geometry = {
+        rollerDx: rollerFighter.x - firstFighter.x,
+        rollerDy: rollerFighter.y - firstFighter.y,
+        secondaryDx: secondFighter.x - firstFighter.x,
+        secondaryDy: secondFighter.y - firstFighter.y,
+      };
+      const stable = Math.abs(geometry.rollerDx - rollerDx) <= 5
+        && Math.abs(geometry.rollerDy) <= 5
+        && Math.abs(geometry.secondaryDx - secondaryDx) <= 5
+        && Math.abs(geometry.secondaryDy - secondaryDy) <= 5;
+      if (stable) {
+        stagedGeometry = {
+          pass: pass + 1,
+          roller: { ...rollerFighter },
+          first: { ...firstFighter },
+          second: { ...secondFighter },
+          ...geometry,
+        };
+        break;
+      }
+    }
+  }
+  if (!stagedGeometry) {
+    throw new Error(milestone + " could not stabilize authoritative three-fighter roll geometry");
+  }
+
   await aimArena(roller, rollerElementId, rollOffset);
-  await sleep(50);
+  await sleep(60);
 
   const beforeStates = await Promise.all(entries.map(readUiEvidence));
   const rollerBefore = beforeStates.find((entry) => entry.browser === roller.name);
@@ -3982,7 +4080,11 @@ async function runOnlineUiMultiKnockdownFfaFlight(entries) {
   if (!overlap) {
     throw new Error(milestone + " never produced two overlapping roll knockdowns with #"
       + firstVictimId + " selected first: "
-      + JSON.stringify(await Promise.all(entries.map(readUiEvidence))));
+      + JSON.stringify({
+        stagedGeometry,
+        beforeStates,
+        finalStates: await Promise.all(entries.map(readUiEvidence)),
+      }));
   }
 
   let handoff = null;
@@ -6006,7 +6108,127 @@ async function runOnlineUiFeintFlight(entries) {
     || defenderResult.feedbackTransitions.includes("parry-success")) {
     throw new Error(`M117 feint accidentally resolved combat contact: ${JSON.stringify(evidence)}`);
   }
-  return evidence;
+
+  // M170 extends the same real-browser gesture into exhaustion. First wait for
+  // the successful feint recovery to return authority to idle, then drain
+  // stamina through genuine RMB-hold running while moving away from the rival.
+  // Reusing performArenaFeint below is important: sufficient stamina above just
+  // proved this exact browser-owned LMB+wheel-back schedule lands in the early
+  // 70 ms feint window.
+  const awayKey = movementCode === "KeyD" ? "a" : "d";
+  const awayOffset = -attackOffset;
+  await aimArena(attacker, attackerElementId, awayOffset);
+  const waitForAttacker = async (predicate, timeoutMs, label) => {
+    const deadline = Date.now() + timeoutMs;
+    while (Date.now() < deadline) {
+      const state = await readUiEvidence(attacker);
+      if (predicate(state)) return state;
+      await sleep(12);
+    }
+    throw new Error("M170 exhausted feint timed out waiting for " + label + ": "
+      + JSON.stringify(await readUiEvidence(attacker)));
+  };
+
+  await waitForAttacker(
+    (state) => state.acceptance?.ownActionTransitions?.at(-1)?.action === COMBAT_ACTION.idle,
+    COMBAT.feint.recoveryMs + 700,
+    "idle after successful feint",
+  );
+
+  let exhausted = null;
+  let drainHolds = 0;
+  for (let index = 0; index < 6 && !exhausted; index += 1) {
+    const state = await readUiEvidence(attacker);
+    if (Number.isFinite(state.acceptance?.authoritativeStamina)
+      && state.acceptance.authoritativeStamina < COMBAT.feint.staminaCost - 2
+      && state.acceptance?.ownActionTransitions?.at(-1)?.action === COMBAT_ACTION.idle) {
+      exhausted = state;
+      break;
+    }
+    await performArenaRunHold(attacker, attackerElementId, awayKey, awayOffset, 1100);
+    drainHolds += 1;
+    await sleep(140);
+  }
+  if (!exhausted) {
+    exhausted = await readUiEvidence(attacker);
+    if (!Number.isFinite(exhausted.acceptance?.authoritativeStamina)
+      || exhausted.acceptance.authoritativeStamina >= COMBAT.feint.staminaCost - 2
+      || exhausted.acceptance?.ownActionTransitions?.at(-1)?.action !== COMBAT_ACTION.idle) {
+      throw new Error("M170 exhausted feint could not establish sub-feint-cost stamina: "
+        + JSON.stringify(exhausted));
+    }
+  }
+
+  const baselineStamina = Math.round(exhausted.acceptance.authoritativeStamina);
+  const actionOffset = exhausted.acceptance.ownActionTransitions.length;
+  const staminaOffset = exhausted.acceptance.staminaTransitions.length;
+  const pointerOffset = exhausted.pointers.length;
+  const exhaustedWheelOffset = exhausted.wheels.length;
+  await performArenaFeint(attacker, attackerElementId, awayOffset);
+
+  const committed = await waitForAttacker(
+    (state) => {
+      const actions = state.acceptance?.ownActionTransitions?.slice(actionOffset) ?? [];
+      return actions.some((entry) =>
+        entry.action === COMBAT_ACTION.attackActive
+        || entry.action === COMBAT_ACTION.attackLeftActive
+        || entry.action === COMBAT_ACTION.attackRightActive)
+        && !actions.some((entry) => entry.action === COMBAT_ACTION.feintRecovery);
+    },
+    900,
+    "original light commitment after rejected feint",
+  );
+
+  const exhaustedPointers = committed.pointers.slice(pointerOffset);
+  const exhaustedWheels = committed.wheels.slice(exhaustedWheelOffset);
+  const exhaustedLightDown = exhaustedPointers.find((entry) =>
+    entry.type === "pointerdown" && entry.button === 0);
+  const exhaustedLightUp = exhaustedPointers.find((entry) =>
+    entry.type === "pointerup" && entry.button === 0);
+  const exhaustedWheelBack = exhaustedWheels.find((entry) => entry.deltaY > 0);
+  if (!exhaustedLightDown || !exhaustedLightUp || !exhaustedWheelBack
+    || !Number.isFinite(exhaustedLightDown.epochMs)
+    || !Number.isFinite(exhaustedLightUp.epochMs)
+    || !Number.isFinite(exhaustedWheelBack.epochMs)
+    || exhaustedLightUp.epochMs <= exhaustedLightDown.epochMs
+    || Math.abs(exhaustedWheelBack.epochMs - exhaustedLightDown.epochMs) > 80) {
+    throw new Error("M170 exhausted feint did not deliver the same genuine early LMB+wheel-back chord: "
+      + JSON.stringify({ pointers: exhaustedPointers, wheels: exhaustedWheels }));
+  }
+
+  const exhaustedActions = committed.acceptance.ownActionTransitions.slice(actionOffset);
+  if (exhaustedActions.some((entry) => entry.action === COMBAT_ACTION.feintRecovery)) {
+    throw new Error("M170 exhausted wheel-back incorrectly entered feint recovery: "
+      + JSON.stringify(exhaustedActions));
+  }
+  const staminaTransitions = committed.acceptance.staminaTransitions.slice(staminaOffset);
+  const minimumStamina = staminaTransitions.reduce(
+    (value, entry) => Number.isFinite(entry.stamina) ? Math.min(value, entry.stamina) : value,
+    baselineStamina,
+  );
+  if (minimumStamina < baselineStamina - 1) {
+    throw new Error("M170 rejected feint spent the 12-stamina feint cost: "
+      + JSON.stringify({ baselineStamina, staminaTransitions }));
+  }
+
+  const exhaustedEvidence = await Promise.all(entries.map(readUiEvidence));
+  for (const state of exhaustedEvidence) {
+    if (state.playerHp !== 100 || state.playerGuard !== 100) {
+      throw new Error("M170 exhausted feint proof changed health/guard: "
+        + JSON.stringify(exhaustedEvidence));
+    }
+  }
+
+  return exhaustedEvidence.map((entry) => ({
+    ...entry,
+    m170AttackerId: attackerResult.playerNetId,
+    m170DrainHolds: entry.browser === attacker.name ? drainHolds : null,
+    m170DeniedAtStamina: entry.browser === attacker.name ? baselineStamina : null,
+    m170WheelEpochMs: entry.browser === attacker.name ? exhaustedWheelBack.epochMs : null,
+    m170CommittedWithoutFeint: entry.browser === attacker.name
+      ? !exhaustedActions.some((item) => item.action === COMBAT_ACTION.feintRecovery)
+      : null,
+  }));
 }
 
 async function runOnlineUiHeavyWhiffPunishFlight(entries) {
@@ -10222,7 +10444,7 @@ async function installUiObserver(session) {
     const threatGuardArc = document.querySelector('#threat-guard-arc');
     if (!target || !arena || !arenaStage || !overlay || !recovery || !focusLabel || !threat || !threatCount || !threatSecondary || !threatSecondaryBearing || !threatSecondaryPhase || !threatSecondaryGuardArc || !threatBearing || !threatGuardArc) throw new Error('missing online UI flight target');
     const state = { events: [], eventTransitions: [], keys: [], keyTransitions: [], pointers: [], wheels: [], overlayTransitions: [], feedbackTransitions: [], recoveryTransitions: [], focusTransitions: [], threatTransitions: [], recoveryTellMaxPixels: 0, parryTellMaxPixels: 0, online: '', startedAt: performance.now() };
-    const epochEvidence = ['uirollbuffer', 'uijumpbuffer', 'uijumpattack', 'uijumpattackinputloss', 'uijumpattackpunish', 'uijumpattacktelegraph', 'uijumpffaprimary', 'uijumpffasecondary', 'uijumprecoveryffa', 'uijumppunishffa', 'uimultirecoveryffa', 'uimultirecoveryspatial', 'uimultirecoverypunish', 'uiparrypunishwindow', 'uiparrypunishffa', 'uiparrypunishffahit', 'uiguardbreakpunishffa', 'uiguardbreakpunishffahit', 'uikickknockdownffa', 'uikickknockdownffahit', 'uikickknockdownbounded', 'uirollknockdownbounded', 'uistaminaauth', 'uistaminaexhaustion', 'uistaminafeedback', 'uistaminaconfirmed', 'uirollknockdownffahit', 'uimultiknockdownffa', 'uimultiknockdownffahit', 'uirollknockdownffa', 'uijumpattackblock', 'uijumpattackparry', 'uijumpattackdodge', 'uijumpattackbuffer', 'uikickbuffer'].includes(new URLSearchParams(location.search).get('scenario'));
+    const epochEvidence = ['uirollbuffer', 'uijumpbuffer', 'uijumpattack', 'uijumpattackinputloss', 'uijumpattackpunish', 'uijumpattacktelegraph', 'uijumpffaprimary', 'uijumpffasecondary', 'uijumprecoveryffa', 'uijumppunishffa', 'uimultirecoveryffa', 'uimultirecoveryspatial', 'uimultirecoverypunish', 'uiparrypunishwindow', 'uiparrypunishffa', 'uiparrypunishffahit', 'uiguardbreakpunishffa', 'uiguardbreakpunishffahit', 'uikickknockdownffa', 'uikickknockdownffahit', 'uikickknockdownbounded', 'uirollknockdownbounded', 'uistaminaauth', 'uistaminaexhaustion', 'uistaminafeedback', 'uistaminaconfirmed', 'uifeint', 'uirollknockdownffahit', 'uimultiknockdownffa', 'uimultiknockdownffahit', 'uirollknockdownffa', 'uijumpattackblock', 'uijumpattackparry', 'uijumpattackdodge', 'uijumpattackbuffer', 'uikickbuffer'].includes(new URLSearchParams(location.search).get('scenario'));
     const record = () => {
       const text = target.textContent?.trim() ?? '';
       if (/^Online - player #\\d+ - server tick \\d+$/.test(text)) state.online = text;
@@ -11372,6 +11594,7 @@ async function readUiEvidence(session) {
         staminaDenialTransitions: (window.__MYASO_ACCEPTANCE_STATE__.staminaDenialTransitions ?? []).map((entry) => ({ ...entry })),
         ownActionTransitions: (window.__MYASO_ACCEPTANCE_STATE__.ownActionTransitions ?? []).map((entry) => ({ ...entry })),
         focusActionTransitions: (window.__MYASO_ACCEPTANCE_STATE__.focusActionTransitions ?? []).map((entry) => ({ ...entry })),
+        fighters: (window.__MYASO_ACCEPTANCE_STATE__.fighters ?? []).map((fighter) => ({ ...fighter })),
       } : null,
     };
   `);
