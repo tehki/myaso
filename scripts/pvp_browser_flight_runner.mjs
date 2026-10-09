@@ -10167,6 +10167,37 @@ async function performArenaRunningAttack(session, elementId, movementKey, xOffse
   }
 }
 
+async function performArenaHeavyFeint(session, elementId, xOffset = 200) {
+  const origin = { "element-6066-11e4-a52e-4f735466cecf": elementId };
+  try {
+    await webdriver(session.base, "POST", "/session/" + session.sessionId + "/actions", {
+      actions: [
+        {
+          type: "key",
+          id: "keyboard-" + session.name,
+          actions: [
+            { type: "keyDown", value: "e" },
+            { type: "pause", duration: 50 },
+            { type: "keyUp", value: "e" },
+          ],
+        },
+        {
+          type: "wheel",
+          id: "wheel-" + session.name,
+          actions: [
+            { type: "pause", duration: 70 },
+            { type: "scroll", x: 0, y: 0, deltaX: 0, deltaY: 120, duration: 0, origin },
+            { type: "pause", duration: 0 },
+          ],
+        },
+      ],
+    });
+  } catch (error) {
+    await webdriver(session.base, "DELETE", "/session/" + session.sessionId + "/actions");
+    throw error;
+  }
+}
+
 async function performArenaFeint(session, elementId, xOffset = 200) {
   const origin = { "element-6066-11e4-a52e-4f735466cecf": elementId };
   // Keep LMB and wheel-back in one W3C action command so browser-internal
