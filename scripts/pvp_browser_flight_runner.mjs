@@ -3943,22 +3943,58 @@ async function runOnlineUiMultiKnockdownFfaFlight(entries) {
   // inside the unchanged 260 ms knockdowns. Production geometry/timing is untouched.
   const secondaryDx = rollRight ? 80 : -80;
   const rollerDx = rollRight ? -62 : 62;
-  await positionRelativeToAuthoritativeTarget(
-    secondVictim,
-    secondVictimId,
-    firstVictimId,
-    secondaryDx,
-    6,
-    "secondary victim",
-  );
-  await positionRelativeToAuthoritativeTarget(
-    roller,
-    rollerId,
-    firstVictimId,
-    rollerDx,
-    0,
-    "roller",
-  );
+  let stagedGeometry = null;
+  for (let pass = 0; pass < 5; pass += 1) {
+    await positionRelativeToAuthoritativeTarget(
+      secondVictim,
+      secondVictimId,
+      firstVictimId,
+      secondaryDx,
+      6,
+      "secondary victim",
+    );
+    await positionRelativeToAuthoritativeTarget(
+      roller,
+      rollerId,
+      firstVictimId,
+      rollerDx,
+      0,
+      "roller",
+    );
+    await sleep(70);
+
+    const state = await readUiEvidence(roller);
+    const fighters = state.acceptance?.fighters ?? [];
+    const rollerFighter = fighters.find((fighter) => fighter.netId === rollerId);
+    const firstFighter = fighters.find((fighter) => fighter.netId === firstVictimId);
+    const secondFighter = fighters.find((fighter) => fighter.netId === secondVictimId);
+    if (rollerFighter && firstFighter && secondFighter) {
+      const geometry = {
+        rollerDx: rollerFighter.x - firstFighter.x,
+        rollerDy: rollerFighter.y - firstFighter.y,
+        secondaryDx: secondFighter.x - firstFighter.x,
+        secondaryDy: secondFighter.y - firstFighter.y,
+      };
+      const stable = Math.abs(geometry.rollerDx - rollerDx) <= 5
+        && Math.abs(geometry.rollerDy) <= 5
+        && Math.abs(geometry.secondaryDx - secondaryDx) <= 5
+        && Math.abs(geometry.secondaryDy - 6) <= 5;
+      if (stable) {
+        stagedGeometry = {
+          pass: pass + 1,
+          roller: { ...rollerFighter },
+          first: { ...firstFighter },
+          second: { ...secondFighter },
+          ...geometry,
+        };
+        break;
+      }
+    }
+  }
+  if (!stagedGeometry) {
+    throw new Error(milestone + " could not stabilize authoritative three-fighter roll geometry");
+  }
+
   await aimArena(roller, rollerElementId, rollOffset);
   await sleep(60);
 
@@ -4043,7 +4079,11 @@ async function runOnlineUiMultiKnockdownFfaFlight(entries) {
   if (!overlap) {
     throw new Error(milestone + " never produced two overlapping roll knockdowns with #"
       + firstVictimId + " selected first: "
-      + JSON.stringify(await Promise.all(entries.map(readUiEvidence))));
+      + JSON.stringify({
+        stagedGeometry,
+        beforeStates,
+        finalStates: await Promise.all(entries.map(readUiEvidence)),
+      }));
   }
 
   let handoff = null;
