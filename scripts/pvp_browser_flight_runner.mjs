@@ -3934,21 +3934,21 @@ async function runOnlineUiMultiKnockdownFfaFlight(entries) {
   };
 
   // Stage from replicated world coordinates instead of assuming a WebDriver
-  // key-hold duration equals a fixed authoritative distance. #3 sits farther
-  // ahead but closer to the roll axis than #2. After #2 receives the unchanged
-  // 34 px roll knockback, the two victims remain outside the 36 px body-separation
-  // radius, so collision resolution cannot push #3 out of the roll corridor.
-  // The same unchanged roll then contacts #3 roughly 100 ms after #2, leaving a
-  // wide overlap inside both unchanged 260 ms knockdowns. #1 starts about 74 px
-  // before #2 on that same path. Production geometry/timing is untouched.
-  const secondaryDx = rollRight ? 68 : -68;
-  const rollerDx = rollRight ? -74 : 74;
+  // key-hold duration equals a fixed authoritative distance. #3 sits well ahead
+  // of #2 and only slightly off the roll axis. Even at the controller's +/-5 px
+  // staging tolerance, #2's unchanged 34 px roll knockback leaves the victims
+  // outside the 36 px body-separation radius, so collision resolution cannot
+  // eject #3 from the corridor. #1 starts 62 px before #2; the unchanged roll
+  // contacts #3 about 115 ms after #2 and still leaves roughly 145 ms of overlap
+  // inside the unchanged 260 ms knockdowns. Production geometry/timing is untouched.
+  const secondaryDx = rollRight ? 80 : -80;
+  const rollerDx = rollRight ? -62 : 62;
   await positionRelativeToAuthoritativeTarget(
     secondVictim,
     secondVictimId,
     firstVictimId,
     secondaryDx,
-    16,
+    6,
     "secondary victim",
   );
   await positionRelativeToAuthoritativeTarget(
