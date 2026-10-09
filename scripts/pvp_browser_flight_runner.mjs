@@ -3934,14 +3934,14 @@ async function runOnlineUiMultiKnockdownFfaFlight(entries) {
   };
 
   // Stage from replicated world coordinates instead of assuming a WebDriver
-  // key-hold duration equals a fixed authoritative distance. #3 sits well ahead
-  // of #2 and only slightly off the roll axis. Even at the controller's +/-5 px
-  // staging tolerance, #2's unchanged 34 px roll knockback leaves the victims
-  // outside the 36 px body-separation radius, so collision resolution cannot
-  // eject #3 from the corridor. #1 starts 62 px before #2; the unchanged roll
-  // contacts #3 about 115 ms after #2 and still leaves roughly 145 ms of overlap
-  // inside the unchanged 260 ms knockdowns. Production geometry/timing is untouched.
-  const secondaryDx = rollRight ? 80 : -80;
+  // key-hold duration equals a fixed authoritative distance. #3 sits ahead of
+  // #2 and only slightly off the roll axis. A 62 px center separation keeps the
+  // victims outside the unchanged 36 px body-separation radius while placing
+  // #3 inside the real roll's measured second-contact envelope under loaded CI.
+  // #1 also starts 62 px before #2, yielding roughly a 90 ms contact stagger and
+  // about 170 ms of overlap inside the unchanged 260 ms knockdowns.
+  // Production geometry/timing is untouched.
+  const secondaryDx = rollRight ? 62 : -62;
   const rollerDx = rollRight ? -62 : 62;
   let stagedGeometry = null;
   for (let pass = 0; pass < 5; pass += 1) {
