@@ -3934,14 +3934,15 @@ async function runOnlineUiMultiKnockdownFfaFlight(entries) {
   };
 
   // Stage from replicated world coordinates instead of assuming a WebDriver
-  // key-hold duration equals a fixed authoritative distance. #3 sits ahead of
-  // #2 and only slightly off the roll axis. A 62 px center separation keeps the
-  // victims outside the unchanged 36 px body-separation radius while placing
-  // #3 inside the real roll's measured second-contact envelope under loaded CI.
-  // #1 also starts 62 px before #2, yielding roughly a 90 ms contact stagger and
-  // about 170 ms of overlap inside the unchanged 260 ms knockdowns.
+  // key-hold duration equals a fixed authoritative distance. #3 sits 40 px
+  // ahead of #2 and 31 px off-axis. This restores the proven M158 cluster shape:
+  // #2's unchanged 34 px knockback cannot eject #3 beyond the roll corridor,
+  // while one unchanged 170 ms roll still reaches both victims in order.
+  // A deterministic tolerance sweep over every +/-5 px staging extreme produces
+  // both contacts with 67-117 ms stagger and the second contact by 150 ms.
   // Production geometry/timing is untouched.
-  const secondaryDx = rollRight ? 62 : -62;
+  const secondaryDx = rollRight ? 40 : -40;
+  const secondaryDy = 31;
   const rollerDx = rollRight ? -62 : 62;
   let stagedGeometry = null;
   for (let pass = 0; pass < 5; pass += 1) {
@@ -3950,7 +3951,7 @@ async function runOnlineUiMultiKnockdownFfaFlight(entries) {
       secondVictimId,
       firstVictimId,
       secondaryDx,
-      6,
+      secondaryDy,
       "secondary victim",
     );
     await positionRelativeToAuthoritativeTarget(
@@ -3978,7 +3979,7 @@ async function runOnlineUiMultiKnockdownFfaFlight(entries) {
       const stable = Math.abs(geometry.rollerDx - rollerDx) <= 5
         && Math.abs(geometry.rollerDy) <= 5
         && Math.abs(geometry.secondaryDx - secondaryDx) <= 5
-        && Math.abs(geometry.secondaryDy - 6) <= 5;
+        && Math.abs(geometry.secondaryDy - secondaryDy) <= 5;
       if (stable) {
         stagedGeometry = {
           pass: pass + 1,
