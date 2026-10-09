@@ -1798,6 +1798,69 @@ fn exhausted_attacker_cannot_feint() {
 }
 
 #[test]
+fn exhausted_attacker_cannot_feint_heavy() {
+    let mut world = duel(60.0);
+    advance(
+        &mut world,
+        3700.0,
+        InputIntent {
+            move_x: -1.0,
+            run: true,
+            facing_radians: 0.0,
+            ..InputIntent::default()
+        },
+        InputIntent::default(),
+    );
+    assert!(world.fighter(1).expect("attacker").stamina < 12.0);
+    advance(
+        &mut world,
+        5.0,
+        InputIntent {
+            heavy_attack: true,
+            facing_radians: 0.0,
+            ..InputIntent::default()
+        },
+        InputIntent::default(),
+    );
+    advance(
+        &mut world,
+        70.0,
+        InputIntent {
+            facing_radians: 0.0,
+            ..InputIntent::default()
+        },
+        InputIntent::default(),
+    );
+    let before_feint = world.fighter(1).expect("attacker").stamina;
+    advance(
+        &mut world,
+        5.0,
+        InputIntent {
+            block: true,
+            facing_radians: 0.0,
+            ..InputIntent::default()
+        },
+        InputIntent::default(),
+    );
+    let attacker = world.fighter(1).expect("attacker");
+    assert_eq!(attacker.action, Action::HeavyAttackWindup);
+    assert!(attacker.stamina >= before_feint);
+
+    advance(
+        &mut world,
+        320.0,
+        InputIntent {
+            facing_radians: std::f32::consts::PI,
+            ..InputIntent::default()
+        },
+        InputIntent::default(),
+    );
+    let attacker = world.fighter(1).expect("attacker");
+    assert_eq!(attacker.action, Action::HeavyAttackActive);
+    assert!(attacker.stamina >= before_feint);
+}
+
+#[test]
 fn wilds_parry_stun_preserves_a_comfortable_light_punish_window() {
     let mut world = duel(72.0);
     advance(

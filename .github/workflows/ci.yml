@@ -271,7 +271,7 @@ jobs:
           node --check scripts/pvp_browser_flight_runner.mjs
           node scripts/pvp_browser_flight_runner.mjs
 
-      - name: Validate M117 real wheel-back combat feint
+      - name: Validate M171 exhausted light/heavy feint commitment
         env:
           MYASO_PVP_SCENARIO: "uifeint"
         run: |

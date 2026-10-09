@@ -517,6 +517,23 @@ test("exhausted feint is rejected without erasing the committed light attack", (
   assert.ok(a.stamina >= beforeFeint);
 });
 
+test("exhausted heavy feint is rejected without erasing the committed heavy attack", () => {
+  const world = duel({ distance: 60 });
+  const [a, b] = world.fighters;
+  advance(world, 3700, { a: { moveX: -1, run: true, aimX: b.x, aimY: b.y } });
+  assert.ok(a.stamina < COMBAT.feint.staminaCost);
+  stepWorld(world, { a: { heavyAttack: true, aimX: b.x, aimY: b.y } }, 5);
+  const beforeFeint = a.stamina;
+  advance(world, 70, { a: { aimX: b.x, aimY: b.y } });
+  stepWorld(world, { a: { block: true, aimX: b.x, aimY: b.y } }, 5);
+  assert.equal(a.action, "heavy_attack_windup");
+  assert.ok(a.stamina >= beforeFeint);
+
+  advance(world, COMBAT.heavyAttack.windupMs, { a: { aimX: -200, aimY: b.y } });
+  assert.equal(a.action, "heavy_attack_active");
+  assert.ok(a.stamina >= beforeFeint);
+});
+
 test("kick knockdown is a bounded fallen state that restores control", () => {
   const world = duel({ distance: 54 });
   const [a, b] = world.fighters;

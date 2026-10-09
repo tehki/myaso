@@ -296,7 +296,7 @@ try {
     console.log(`M111_HEAVY_GUARD_BREAK_PUNISH ${JSON.stringify({ ok: true, results })}`);
   } else if (scenario === "uifeint") {
     const results = await runOnlineUiFeintFlight(sessions);
-    console.log(`M170_EXHAUSTED_FEINT_COMMITMENT ${JSON.stringify({ ok: true, results })}`);
+    console.log(`M171_EXHAUSTED_HEAVY_FEINT_COMMITMENT ${JSON.stringify({ ok: true, results })}`);
   } else if (scenario === "uirunningattack") {
     const results = await runOnlineUiRunningAttackFlight(sessions);
     console.log(`M119_REAL_RUNNING_STRIKE ${JSON.stringify({ ok: true, results })}`);
@@ -6219,7 +6219,95 @@ async function runOnlineUiFeintFlight(entries) {
     }
   }
 
-  return exhaustedEvidence.map((entry) => ({
+  // M171 repeats the same authority rule for the distinct heavy-feint window.
+  // Wait for the rejected light to finish, refresh exhaustion while moving away,
+  // then deliver one browser-owned KeyE + wheel-back chord inside 160 ms.
+  await waitForAttacker(
+    (state) => state.acceptance?.ownActionTransitions?.at(-1)?.action === COMBAT_ACTION.idle,
+    COMBAT.attack.activeMs + COMBAT.attack.recoveryMs + 900,
+    "idle after exhausted light commitment",
+  );
+
+  let heavyExhausted = null;
+  for (let index = 0; index < 6 && !heavyExhausted; index += 1) {
+    const state = await readUiEvidence(attacker);
+    if (Number.isFinite(state.acceptance?.authoritativeStamina)
+      && state.acceptance.authoritativeStamina < COMBAT.feint.staminaCost - 2
+      && state.acceptance?.ownActionTransitions?.at(-1)?.action === COMBAT_ACTION.idle) {
+      heavyExhausted = state;
+      break;
+    }
+    await performArenaRunHold(attacker, attackerElementId, awayKey, awayOffset, 1100);
+    drainHolds += 1;
+    await sleep(140);
+  }
+  if (!heavyExhausted) {
+    heavyExhausted = await readUiEvidence(attacker);
+    if (!Number.isFinite(heavyExhausted.acceptance?.authoritativeStamina)
+      || heavyExhausted.acceptance.authoritativeStamina >= COMBAT.feint.staminaCost - 2
+      || heavyExhausted.acceptance?.ownActionTransitions?.at(-1)?.action !== COMBAT_ACTION.idle) {
+      throw new Error("M171 exhausted heavy feint could not establish sub-feint-cost stamina: "
+        + JSON.stringify(heavyExhausted));
+    }
+  }
+
+  const heavyBaselineStamina = Math.round(heavyExhausted.acceptance.authoritativeStamina);
+  const heavyActionOffset = heavyExhausted.acceptance.ownActionTransitions.length;
+  const heavyStaminaOffset = heavyExhausted.acceptance.staminaTransitions.length;
+  const heavyKeyOffset = heavyExhausted.keyTransitions.length;
+  const heavyWheelOffset = heavyExhausted.wheels.length;
+  await performArenaHeavyFeint(attacker, attackerElementId, awayOffset);
+
+  const heavyCommitted = await waitForAttacker(
+    (state) => {
+      const actions = state.acceptance?.ownActionTransitions?.slice(heavyActionOffset) ?? [];
+      return actions.some((entry) => entry.action === COMBAT_ACTION.heavyAttackActive)
+        && !actions.some((entry) => entry.action === COMBAT_ACTION.feintRecovery);
+    },
+    COMBAT.heavyAttack.windupMs + 900,
+    "original heavy commitment after rejected heavy feint",
+  );
+
+  const heavyKeys = heavyCommitted.keyTransitions.slice(heavyKeyOffset);
+  const heavyWheels = heavyCommitted.wheels.slice(heavyWheelOffset);
+  const heavyDown = heavyKeys.find((entry) => entry.type === "keydown" && entry.code === "KeyE");
+  const heavyUp = heavyKeys.find((entry) => entry.type === "keyup" && entry.code === "KeyE");
+  const heavyWheelBack = heavyWheels.find((entry) => entry.deltaY > 0);
+  if (!heavyDown || !heavyUp || !heavyWheelBack
+    || !Number.isFinite(heavyDown.epochMs)
+    || !Number.isFinite(heavyUp.epochMs)
+    || !Number.isFinite(heavyWheelBack.epochMs)
+    || heavyUp.epochMs <= heavyDown.epochMs
+    || heavyWheelBack.epochMs < heavyDown.epochMs
+    || heavyWheelBack.epochMs - heavyDown.epochMs > COMBAT.feint.heavyWindowMs - 10) {
+    throw new Error("M171 exhausted heavy feint did not deliver a genuine early KeyE+wheel-back chord: "
+      + JSON.stringify({ keys: heavyKeys, wheels: heavyWheels }));
+  }
+
+  const heavyActions = heavyCommitted.acceptance.ownActionTransitions.slice(heavyActionOffset);
+  if (heavyActions.some((entry) => entry.action === COMBAT_ACTION.feintRecovery)) {
+    throw new Error("M171 exhausted heavy wheel-back incorrectly entered feint recovery: "
+      + JSON.stringify(heavyActions));
+  }
+  const heavyStaminaTransitions = heavyCommitted.acceptance.staminaTransitions.slice(heavyStaminaOffset);
+  const heavyMinimumStamina = heavyStaminaTransitions.reduce(
+    (value, entry) => Number.isFinite(entry.stamina) ? Math.min(value, entry.stamina) : value,
+    heavyBaselineStamina,
+  );
+  if (heavyMinimumStamina < heavyBaselineStamina - 1) {
+    throw new Error("M171 rejected heavy feint spent the 12-stamina feint cost: "
+      + JSON.stringify({ heavyBaselineStamina, heavyStaminaTransitions }));
+  }
+
+  const heavyEvidence = await Promise.all(entries.map(readUiEvidence));
+  for (const state of heavyEvidence) {
+    if (state.playerHp !== 100 || state.playerGuard !== 100) {
+      throw new Error("M171 exhausted heavy feint proof changed health/guard: "
+        + JSON.stringify(heavyEvidence));
+    }
+  }
+
+  return heavyEvidence.map((entry) => ({
     ...entry,
     m170AttackerId: attackerResult.playerNetId,
     m170DrainHolds: entry.browser === attacker.name ? drainHolds : null,
@@ -6227,6 +6315,11 @@ async function runOnlineUiFeintFlight(entries) {
     m170WheelEpochMs: entry.browser === attacker.name ? exhaustedWheelBack.epochMs : null,
     m170CommittedWithoutFeint: entry.browser === attacker.name
       ? !exhaustedActions.some((item) => item.action === COMBAT_ACTION.feintRecovery)
+      : null,
+    m171HeavyDeniedAtStamina: entry.browser === attacker.name ? heavyBaselineStamina : null,
+    m171HeavyWheelEpochMs: entry.browser === attacker.name ? heavyWheelBack.epochMs : null,
+    m171HeavyCommittedWithoutFeint: entry.browser === attacker.name
+      ? !heavyActions.some((item) => item.action === COMBAT_ACTION.feintRecovery)
       : null,
   }));
 }
@@ -10164,6 +10257,37 @@ async function performArenaRunningAttack(session, elementId, movementKey, xOffse
       await webdriver(session.base, "DELETE", `/session/${session.sessionId}/actions`);
       await sleep(20);
     }
+  }
+}
+
+async function performArenaHeavyFeint(session, elementId, xOffset = 200) {
+  const origin = { "element-6066-11e4-a52e-4f735466cecf": elementId };
+  try {
+    await webdriver(session.base, "POST", "/session/" + session.sessionId + "/actions", {
+      actions: [
+        {
+          type: "key",
+          id: "keyboard-" + session.name,
+          actions: [
+            { type: "keyDown", value: "e" },
+            { type: "pause", duration: 50 },
+            { type: "keyUp", value: "e" },
+          ],
+        },
+        {
+          type: "wheel",
+          id: "wheel-" + session.name,
+          actions: [
+            { type: "pause", duration: 70 },
+            { type: "scroll", x: 0, y: 0, deltaX: 0, deltaY: 120, duration: 0, origin },
+            { type: "pause", duration: 0 },
+          ],
+        },
+      ],
+    });
+  } catch (error) {
+    await webdriver(session.base, "DELETE", "/session/" + session.sessionId + "/actions");
+    throw error;
   }
 }
 
