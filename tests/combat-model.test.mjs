@@ -520,7 +520,8 @@ test("exhausted feint is rejected without erasing the committed light attack", (
 test("exhausted heavy feint is rejected without erasing the committed heavy attack", () => {
   const world = duel({ distance: 60 });
   const [a, b] = world.fighters;
-  a.stamina = COMBAT.feint.staminaCost - 1;
+  advance(world, 3700, { a: { moveX: -1, run: true, aimX: b.x, aimY: b.y } });
+  assert.ok(a.stamina < COMBAT.feint.staminaCost);
   stepWorld(world, { a: { heavyAttack: true, aimX: b.x, aimY: b.y } }, 5);
   const beforeFeint = a.stamina;
   advance(world, 70, { a: { aimX: b.x, aimY: b.y } });
