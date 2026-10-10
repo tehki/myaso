@@ -103,6 +103,7 @@ let animationFrameId = 0;
 let predictionStep = 0;
 let clientTick = 0;
 let attackRequested = false;
+let leftButtonDown = false;
 let heavyAttackRequested = false;
 let rollRequested = false;
 let kickRequested = false;
@@ -118,8 +119,11 @@ canvas.addEventListener("pointerdown", (event) => {
   canvas.focus();
   if (event.button === 0) {
     attackRequested = true;
+    leftButtonDown = true;
     if (local.action === COMBAT_ACTION.jump) {
       queueStaminaDenial("jump-attack");
+    } else if (!pendingStaminaDenial && (jumpRequested || keys.has("Space"))) {
+      queueStaminaDenial("jump-attack-chord");
     } else {
       const runningGesture = rightButtonDown
         && performance.now() - rightButtonDownAt >= runHoldThresholdMs
@@ -134,6 +138,7 @@ canvas.addEventListener("pointerdown", (event) => {
   updateMouse(event);
 });
 canvas.addEventListener("pointerup", (event) => {
+  if (event.button === 0) leftButtonDown = false;
   if (event.button === 2) {
     const heldMs = performance.now() - rightButtonDownAt;
     rightButtonDown = false;
@@ -161,6 +166,7 @@ canvas.addEventListener("keydown", (event) => {
   if (event.code === "Space" && !event.repeat) {
     jumpRequested = true;
     queueStaminaDenial("jump");
+    if (!pendingStaminaDenial && leftButtonDown) queueStaminaDenial("jump-attack-chord");
   }
 });
 canvas.addEventListener("keyup", (event) => keys.delete(event.code));
@@ -391,7 +397,8 @@ function markStaminaDenialSubmitted(tick, input) {
     : pendingStaminaDenial.action === "kick" ? input.kick
       : pendingStaminaDenial.action === "jump" ? input.jump
         : pendingStaminaDenial.action === "jump-attack" ? input.attack
-          : pendingStaminaDenial.action === "running-attack"
+          : pendingStaminaDenial.action === "jump-attack-chord" ? input.jump && input.attack
+            : pendingStaminaDenial.action === "running-attack"
             ? input.attack && input.run && Math.hypot(input.moveX, input.moveY) >= 0.5
             : false;
   if (included) {
@@ -419,7 +426,7 @@ function staminaActionAccepted(action, authoritativeAction) {
       || authoritativeAction === COMBAT_ACTION.jumpAttackActive
       || authoritativeAction === COMBAT_ACTION.jumpAttackRecovery;
   }
-  if (action === "jump-attack") {
+  if (action === "jump-attack" || action === "jump-attack-chord") {
     return authoritativeAction === COMBAT_ACTION.jumpAttackWindup
       || authoritativeAction === COMBAT_ACTION.jumpAttackActive
       || authoritativeAction === COMBAT_ACTION.jumpAttackRecovery;
@@ -498,6 +505,7 @@ function updateMouse(event) {
 function releaseInputs() {
   keys.clear();
   attackRequested = false;
+  leftButtonDown = false;
   heavyAttackRequested = false;
   rollRequested = false;
   kickRequested = false;

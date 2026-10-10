@@ -311,7 +311,7 @@ try {
     console.log(`M131_REAL_RECOVERY_JUMP_BUFFER ${JSON.stringify({ ok: true, results })}`);
   } else if (scenario === "uijumpattack") {
     const results = await runOnlineUiJumpAttackFlight(sessions);
-    console.log(`M172_CONFIRMED_AIRBORNE_JUMP_ATTACK_DENIAL ${JSON.stringify({ ok: true, results })}`);
+    console.log(`M173_CONFIRMED_JUMP_ATTACK_CHORD_DENIAL ${JSON.stringify({ ok: true, results })}`);
   } else if (scenario === "uijumpattackinputloss") {
     const results = await runOnlineUiJumpAttackFlight(sessions, "uijumpattackinputloss");
     const droppedActionDatagrams = (game.output().match(/M63_INPUT_ACTION_PACKET_DROPPED/g) ?? []).length;
@@ -2628,9 +2628,17 @@ async function runOnlineUiJumpAttackFlight(entries, expectedScenario = "uijumpat
     throw new Error(`M136 jump-attack flight accidentally resolved as parry: ${JSON.stringify(evidence)}`);
   }
 
-  const finalEvidence = expectedScenario === "uijumpattack"
-    ? await runM172AirborneDenialPhase(entries, attacker, defender, attackerElementId, movementCode)
-    : evidence;
+  let finalEvidence = evidence;
+  if (expectedScenario === "uijumpattack") {
+    await runM172AirborneDenialPhase(entries, attacker, defender, attackerElementId, movementCode);
+    finalEvidence = await runM173JumpAttackChordDenialPhase(
+      entries,
+      attacker,
+      defender,
+      attackerElementId,
+      movementCode,
+    );
+  }
   return finalEvidence.map((entry) => ({
     ...entry,
     jumpAttackChordEpochMs: entry.browser === attacker.name ? chordEpochMs : null,
@@ -2827,6 +2835,198 @@ async function runM172AirborneDenialPhase(entries, attacker, defender, attackerE
     m172SubmittedTick: entry.browser === attacker.name ? submitted.clientTick : null,
     m172ProcessedTick: entry.browser === attacker.name ? confirmed.processedClientTick : null,
     m172Denied: entry.browser === attacker.name ? true : null,
+  }));
+}
+
+async function runM173JumpAttackChordDenialPhase(entries, attacker, defender, attackerElementId, movementCode) {
+  const milestone = "M173 confirmed jump-attack chord denial";
+  const attackOffset = movementCode === "KeyD" ? 200 : -200;
+  const awayKey = movementCode === "KeyD" ? "a" : "d";
+  const awayOffset = -attackOffset;
+  await aimArena(attacker, attackerElementId, awayOffset);
+
+  const waitForAttacker = async (predicate, timeoutMs, label) => {
+    const deadline = Date.now() + timeoutMs;
+    while (Date.now() < deadline) {
+      const state = await readUiEvidence(attacker);
+      if (predicate(state)) return state;
+      await sleep(12);
+    }
+    throw new Error(milestone + " timed out waiting for " + label + ": "
+      + JSON.stringify(await readUiEvidence(attacker)));
+  };
+
+  await waitForAttacker(
+    (state) => state.acceptance?.ownActionTransitions?.at(-1)?.action === COMBAT_ACTION.idle,
+    900,
+    "idle before low-stamina chord",
+  );
+
+  let ready = null;
+  let drainHolds = 0;
+  for (let index = 0; index < 8 && !ready; index += 1) {
+    const state = await readUiEvidence(attacker);
+    const stamina = state.acceptance?.authoritativeStamina;
+    const idle = state.acceptance?.ownActionTransitions?.at(-1)?.action === COMBAT_ACTION.idle;
+    if (Number.isFinite(stamina)
+      && stamina >= COMBAT.jump.staminaCost
+      && stamina < COMBAT.jump.staminaCost + COMBAT.jumpAttack.staminaCost
+      && idle) {
+      ready = state;
+      break;
+    }
+    if (Number.isFinite(stamina) && stamina < COMBAT.jump.staminaCost) {
+      ready = await waitForAttacker(
+        (candidate) => Number.isFinite(candidate.acceptance?.authoritativeStamina)
+          && candidate.acceptance.authoritativeStamina >= COMBAT.jump.staminaCost + 2
+          && candidate.acceptance.authoritativeStamina
+            < COMBAT.jump.staminaCost + COMBAT.jumpAttack.staminaCost
+          && candidate.acceptance?.ownActionTransitions?.at(-1)?.action === COMBAT_ACTION.idle,
+        1800,
+        "regen into the jump-only chord window",
+      );
+      break;
+    }
+    const holdMs = !Number.isFinite(stamina) || stamina > 48 ? 1100
+      : stamina > 34 ? 750
+        : stamina > 27 ? 480
+          : 330;
+    await performArenaRunHold(attacker, attackerElementId, awayKey, awayOffset, holdMs);
+    drainHolds += 1;
+    await sleep(140);
+  }
+  if (!ready) {
+    throw new Error(milestone + " could not establish 14-25 authoritative stamina: "
+      + JSON.stringify(await readUiEvidence(attacker)));
+  }
+
+  const baselineStamina = ready.acceptance.authoritativeStamina;
+  const actionOffset = ready.acceptance.ownActionTransitions.length;
+  const staminaOffset = ready.acceptance.staminaTransitions.length;
+  const denialOffset = ready.acceptance?.staminaDenialTransitions?.length ?? 0;
+  const keyOffset = ready.keyTransitions.length;
+  const pointerOffset = ready.pointers.length;
+  const eventOffset = ready.events.length;
+  const feedbackOffset = ready.feedbackTransitions.length;
+  const defenderBefore = await readUiEvidence(defender);
+  const focusOffset = defenderBefore.acceptance?.focusActionTransitions?.length ?? 0;
+
+  await performArenaJumpAttackChord(attacker, attackerElementId, awayOffset, 90);
+
+  const rejected = await waitForAttacker(
+    (state) => {
+      const transitions = state.acceptance?.staminaDenialTransitions?.slice(denialOffset) ?? [];
+      const actions = state.acceptance?.ownActionTransitions?.slice(actionOffset) ?? [];
+      return transitions.some((entry) => entry.stage === "shown" && entry.action === "jump-attack-chord")
+        && actions.some((entry) => entry.action === COMBAT_ACTION.jump)
+        && state.events.slice(eventOffset).includes("Low stamina — jump attack needs 26.")
+        && state.feedbackTransitions.slice(feedbackOffset).includes("stamina-denied");
+    },
+    1000,
+    "confirmed low-stamina same-tick jump-attack chord denial",
+  );
+
+  const keys = rejected.keyTransitions.slice(keyOffset).filter((entry) => entry.code === "Space");
+  const pointers = rejected.pointers.slice(pointerOffset).filter((entry) => entry.button === 0);
+  const jumpDowns = keys.filter((entry) => entry.type === "keydown");
+  const jumpUps = keys.filter((entry) => entry.type === "keyup");
+  const attackDowns = pointers.filter((entry) => entry.type === "pointerdown");
+  const attackUps = pointers.filter((entry) => entry.type === "pointerup");
+  const jumpDown = jumpDowns[0];
+  const attackDown = attackDowns[0];
+  if (jumpDowns.length !== 1 || jumpUps.length !== 1 || attackDowns.length !== 1 || attackUps.length !== 1
+    || !Number.isFinite(jumpDown?.epochMs) || !Number.isFinite(attackDown?.epochMs)
+    || Math.abs(jumpDown.epochMs - attackDown.epochMs) > 60) {
+    throw new Error(milestone + " did not record one genuine same-tick Space + LMB chord: "
+      + JSON.stringify({ keys, pointers }));
+  }
+
+  const actions = rejected.acceptance?.ownActionTransitions?.slice(actionOffset) ?? [];
+  const jumpIndex = actions.findIndex((entry) => entry.action === COMBAT_ACTION.jump);
+  if (jumpIndex < 0 || actions.some((entry) =>
+    entry.action === COMBAT_ACTION.jumpAttackWindup
+    || entry.action === COMBAT_ACTION.jumpAttackActive
+    || entry.action === COMBAT_ACTION.jumpAttackRecovery)) {
+    throw new Error(milestone + " did not degrade exclusively to ordinary Jump: " + JSON.stringify(actions));
+  }
+
+  const staminaTransitions = rejected.acceptance?.staminaTransitions?.slice(staminaOffset) ?? [];
+  const minimumStamina = staminaTransitions.reduce(
+    (value, entry) => Number.isFinite(entry.stamina) ? Math.min(value, entry.stamina) : value,
+    baselineStamina,
+  );
+  const expectedAfterJump = baselineStamina - COMBAT.jump.staminaCost;
+  if (minimumStamina < expectedAfterJump - 1 || minimumStamina > expectedAfterJump + 1) {
+    throw new Error(milestone + " did not spend exactly the ordinary jump cost: "
+      + JSON.stringify({ baselineStamina, minimumStamina, expectedAfterJump, staminaTransitions }));
+  }
+
+  const transitions = rejected.acceptance?.staminaDenialTransitions?.slice(denialOffset) ?? [];
+  const queuedIndex = transitions.findIndex((entry) =>
+    entry.stage === "queued" && entry.action === "jump-attack-chord");
+  const submittedIndex = transitions.findIndex((entry, index) =>
+    index > queuedIndex && entry.stage === "submitted" && entry.action === "jump-attack-chord");
+  const rejectedIndex = transitions.findIndex((entry, index) =>
+    index > submittedIndex && entry.stage === "confirmed-rejected" && entry.action === "jump-attack-chord");
+  const shownIndex = transitions.findIndex((entry, index) =>
+    index > rejectedIndex && entry.stage === "shown" && entry.action === "jump-attack-chord");
+  if (queuedIndex < 0 || submittedIndex <= queuedIndex || rejectedIndex <= submittedIndex || shownIndex <= rejectedIndex) {
+    throw new Error(milestone + " did not preserve denial lifecycle ordering: " + JSON.stringify(transitions));
+  }
+  const queued = transitions[queuedIndex];
+  const submitted = transitions[submittedIndex];
+  const confirmed = transitions[rejectedIndex];
+  const shown = transitions[shownIndex];
+  if (!Number.isInteger(submitted.clientTick)
+    || !Number.isInteger(confirmed.processedClientTick)
+    || (confirmed.processedClientTick !== submitted.clientTick
+      && !isTickNewer32(confirmed.processedClientTick, submitted.clientTick))
+    || !Number.isFinite(confirmed.authoritativeStamina)
+    || baselineStamina >= COMBAT.jump.staminaCost + COMBAT.jumpAttack.staminaCost
+    || shown.epochMs < confirmed.epochMs) {
+    throw new Error(milestone + " did not tie visible downgrade to acknowledged sub-cost authority: "
+      + JSON.stringify({ baselineStamina, transitions }));
+  }
+
+  await waitForAttacker(
+    (state) => state.acceptance?.ownActionTransitions?.at(-1)?.action === COMBAT_ACTION.idle,
+    COMBAT.jump.durationMs + 700,
+    "fallback jump recovery to idle",
+  );
+
+  const states = await Promise.all(entries.map(readUiEvidence));
+  const attackerFinal = states.find((entry) => entry.browser === attacker.name);
+  const defenderFinal = states.find((entry) => entry.browser === defender.name);
+  if (!attackerFinal || !defenderFinal) {
+    throw new Error(milestone + " incomplete final evidence: " + JSON.stringify(states));
+  }
+  const focusActions = defenderFinal.acceptance?.focusActionTransitions?.slice(focusOffset) ?? [];
+  if (!focusActions.some((entry) => entry.action === COMBAT_ACTION.jump)
+    || focusActions.some((entry) =>
+      entry.action === COMBAT_ACTION.jumpAttackWindup
+      || entry.action === COMBAT_ACTION.jumpAttackActive
+      || entry.action === COMBAT_ACTION.jumpAttackRecovery)) {
+    throw new Error(milestone + " remote client did not replicate only the fallback Jump: "
+      + JSON.stringify(focusActions));
+  }
+  if (attackerFinal.playerHp !== ready.playerHp
+    || attackerFinal.playerGuard !== ready.playerGuard
+    || attackerFinal.opponentHp !== ready.opponentHp
+    || attackerFinal.opponentGuard !== ready.opponentGuard
+    || defenderFinal.playerHp !== defenderBefore.playerHp
+    || defenderFinal.playerGuard !== defenderBefore.playerGuard) {
+    throw new Error(milestone + " chord downgrade changed combat vitals: " + JSON.stringify(states));
+  }
+
+  return states.map((entry) => ({
+    ...entry,
+    m173DrainHolds: entry.browser === attacker.name ? drainHolds : null,
+    m173BaselineStamina: entry.browser === attacker.name ? Math.round(baselineStamina) : null,
+    m173SubmittedTick: entry.browser === attacker.name ? submitted.clientTick : null,
+    m173ProcessedTick: entry.browser === attacker.name ? confirmed.processedClientTick : null,
+    m173DeniedChord: entry.browser === attacker.name ? true : null,
+    m173QueuedEpochMs: entry.browser === attacker.name ? queued.epochMs : null,
+    m173ShownEpochMs: entry.browser === attacker.name ? shown.epochMs : null,
   }));
 }
 
