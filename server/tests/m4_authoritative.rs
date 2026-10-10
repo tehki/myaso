@@ -3587,3 +3587,219 @@ fn exhausted_later_roll_plus_light_preserves_an_earlier_buffered_light() {
         Action::AttackWindup
     );
 }
+
+#[test]
+fn same_tick_kick_and_light_attack_resolves_exclusively_to_kick() {
+    let mut world = duel(200.0);
+    advance(
+        &mut world,
+        5.0,
+        InputIntent {
+            kick: true,
+            attack: true,
+            facing_radians: 0.0,
+            ..InputIntent::default()
+        },
+        InputIntent::default(),
+    );
+    let attacker = world.fighter(1).expect("attacker");
+    assert_eq!(attacker.action, Action::KickWindup);
+    assert!((attacker.stamina - 82.0).abs() < 0.1);
+
+    advance(
+        &mut world,
+        700.0,
+        InputIntent::default(),
+        InputIntent::default(),
+    );
+    assert_eq!(world.fighter(2).expect("target").hp, 100.0);
+}
+
+#[test]
+fn exhausted_same_tick_kick_and_light_consumes_the_light_edge() {
+    let mut world = duel(200.0);
+    advance(
+        &mut world,
+        3900.0,
+        InputIntent {
+            move_x: -1.0,
+            run: true,
+            facing_radians: 0.0,
+            ..InputIntent::default()
+        },
+        InputIntent::default(),
+    );
+    let before = world.fighter(1).expect("attacker").stamina;
+    assert!(before < 18.0);
+
+    advance(
+        &mut world,
+        5.0,
+        InputIntent {
+            kick: true,
+            attack: true,
+            facing_radians: 0.0,
+            ..InputIntent::default()
+        },
+        InputIntent::default(),
+    );
+    assert_eq!(world.fighter(1).expect("attacker").action, Action::Idle);
+    assert!(world.fighter(1).expect("attacker").stamina >= before - 0.1);
+
+    advance(
+        &mut world,
+        350.0,
+        InputIntent::default(),
+        InputIntent::default(),
+    );
+    assert_eq!(world.fighter(1).expect("attacker").action, Action::Idle);
+    assert_eq!(world.fighter(2).expect("target").hp, 100.0);
+}
+
+#[test]
+fn exhausted_recovery_kick_plus_light_does_not_create_a_new_light_buffer() {
+    let mut world = duel(200.0);
+    advance(
+        &mut world,
+        3900.0,
+        InputIntent {
+            move_x: -1.0,
+            run: true,
+            facing_radians: 0.0,
+            ..InputIntent::default()
+        },
+        InputIntent::default(),
+    );
+    advance(
+        &mut world,
+        5.0,
+        InputIntent {
+            attack: true,
+            facing_radians: 0.0,
+            ..InputIntent::default()
+        },
+        InputIntent::default(),
+    );
+    advance(
+        &mut world,
+        130.0,
+        InputIntent::default(),
+        InputIntent::default(),
+    );
+    advance(
+        &mut world,
+        80.0,
+        InputIntent::default(),
+        InputIntent::default(),
+    );
+    advance(
+        &mut world,
+        170.0,
+        InputIntent::default(),
+        InputIntent::default(),
+    );
+    assert!(world.fighter(1).expect("attacker").stamina < 18.0);
+
+    advance(
+        &mut world,
+        5.0,
+        InputIntent {
+            kick: true,
+            attack: true,
+            facing_radians: 0.0,
+            ..InputIntent::default()
+        },
+        InputIntent::default(),
+    );
+    advance(
+        &mut world,
+        80.0,
+        InputIntent::default(),
+        InputIntent::default(),
+    );
+    assert_eq!(world.fighter(1).expect("attacker").action, Action::Idle);
+}
+
+#[test]
+fn exhausted_later_kick_plus_light_preserves_an_earlier_buffered_light() {
+    let mut world = duel(200.0);
+    advance(
+        &mut world,
+        3900.0,
+        InputIntent {
+            move_x: -1.0,
+            run: true,
+            facing_radians: 0.0,
+            ..InputIntent::default()
+        },
+        InputIntent::default(),
+    );
+    advance(
+        &mut world,
+        5.0,
+        InputIntent {
+            attack: true,
+            facing_radians: 0.0,
+            ..InputIntent::default()
+        },
+        InputIntent::default(),
+    );
+    advance(
+        &mut world,
+        130.0,
+        InputIntent::default(),
+        InputIntent::default(),
+    );
+    advance(
+        &mut world,
+        80.0,
+        InputIntent::default(),
+        InputIntent::default(),
+    );
+    advance(
+        &mut world,
+        170.0,
+        InputIntent::default(),
+        InputIntent::default(),
+    );
+
+    advance(
+        &mut world,
+        5.0,
+        InputIntent {
+            attack: true,
+            facing_radians: 0.0,
+            ..InputIntent::default()
+        },
+        InputIntent::default(),
+    );
+    advance(
+        &mut world,
+        5.0,
+        InputIntent::default(),
+        InputIntent::default(),
+    );
+    assert!(world.fighter(1).expect("attacker").stamina < 18.0);
+
+    advance(
+        &mut world,
+        5.0,
+        InputIntent {
+            kick: true,
+            attack: true,
+            facing_radians: 0.0,
+            ..InputIntent::default()
+        },
+        InputIntent::default(),
+    );
+    advance(
+        &mut world,
+        70.0,
+        InputIntent::default(),
+        InputIntent::default(),
+    );
+    assert_eq!(
+        world.fighter(1).expect("attacker").action,
+        Action::AttackWindup
+    );
+}

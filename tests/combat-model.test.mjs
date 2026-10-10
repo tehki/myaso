@@ -1169,3 +1169,79 @@ test("exhausted same-tick roll and light consumes the light edge instead of atta
   assert.equal(fighter.action, "idle");
   assert.equal(target.hp, 100);
 });
+
+test("same-tick kick and light attack resolves exclusively to kick", () => {
+  const world = duel({ distance: 200 });
+  const [fighter, target] = world.fighters;
+  const before = fighter.stamina;
+
+  stepWorld(world, {
+    a: { kick: true, attack: true, aimX: target.x, aimY: target.y },
+  }, 5);
+
+  assert.equal(fighter.action, "kick_windup");
+  assert.equal(fighter.stamina, before - COMBAT.kick.staminaCost);
+
+  advance(world, COMBAT.kick.windupMs + COMBAT.kick.activeMs + COMBAT.kick.recoveryMs + 20, {
+    a: { aimX: target.x, aimY: target.y },
+  });
+  assert.equal(fighter.action, "idle");
+  assert.equal(target.hp, 100);
+});
+
+test("exhausted same-tick kick and light consumes the light edge instead of attacking", () => {
+  const world = duel({ distance: 200 });
+  const [fighter, target] = world.fighters;
+  fighter.stamina = COMBAT.kick.staminaCost - 1;
+  const before = fighter.stamina;
+
+  stepWorld(world, {
+    a: { kick: true, attack: true, aimX: target.x, aimY: target.y },
+  }, 5);
+
+  assert.equal(fighter.action, "idle");
+  assert.ok(fighter.stamina >= before - 0.1);
+  advance(world, COMBAT.attack.windupMs + COMBAT.attack.activeMs + 50, {
+    a: { aimX: target.x, aimY: target.y },
+  });
+  assert.equal(fighter.action, "idle");
+  assert.equal(target.hp, 100);
+});
+
+test("exhausted same-tick recovery kick plus light does not create a new light buffer", () => {
+  const world = duel({ distance: 200 });
+  const { attacker, target } = enterLightRecovery(world);
+
+  advance(world, COMBAT.attack.recoveryMs - 85, { a: { aimX: target.x, aimY: target.y } });
+  attacker.stamina = COMBAT.kick.staminaCost - 1;
+  stepWorld(world, {
+    a: { kick: true, attack: true, aimX: target.x, aimY: target.y },
+  }, 5);
+
+  assert.equal(attacker.action, "attack_recovery");
+  assert.equal(attacker.bufferedKick, false);
+  assert.equal(attacker.bufferedLightAttack, false);
+
+  advance(world, 80, { a: { aimX: target.x, aimY: target.y } });
+  assert.equal(attacker.action, "idle");
+});
+
+test("exhausted later kick plus light preserves an earlier buffered light", () => {
+  const world = duel({ distance: 200 });
+  const { attacker, target } = enterLightRecovery(world);
+
+  advance(world, COMBAT.attack.recoveryMs - 85, { a: { aimX: target.x, aimY: target.y } });
+  stepWorld(world, { a: { attack: true, aimX: target.x, aimY: target.y } }, 5);
+  assert.equal(attacker.bufferedLightAttack, true);
+  stepWorld(world, { a: { aimX: target.x, aimY: target.y } }, 5);
+
+  attacker.stamina = COMBAT.kick.staminaCost - 1;
+  stepWorld(world, {
+    a: { kick: true, attack: true, aimX: target.x, aimY: target.y },
+  }, 5);
+  assert.equal(attacker.bufferedKick, false);
+  assert.equal(attacker.bufferedLightAttack, true);
+
+  advance(world, 70, { a: { aimX: target.x, aimY: target.y } });
+  assert.equal(attacker.action, "attack_windup");
+});

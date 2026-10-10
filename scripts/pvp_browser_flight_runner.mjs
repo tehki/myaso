@@ -375,7 +375,7 @@ try {
     console.log("M166_AUTHORITATIVE_STAMINA_FEEDBACK " + JSON.stringify({ ok: true, results }));
   } else if (scenario === "uistaminaconfirmed") {
     const results = await runOnlineUiConfirmedStaminaActionsFlight(sessions);
-    console.log("M174_CONFIRMED_ROLL_ATTACK_ARBITRATION " + JSON.stringify({ ok: true, results }));
+    console.log("M175_CONFIRMED_KICK_ATTACK_ARBITRATION " + JSON.stringify({ ok: true, results }));
   } else if (scenario === "uiguardbreaktell") {
     const results = await runOnlineUiGuardBreakTellFlight(sessions);
     console.log(`M40_FFA_GUARD_BREAK_TELL ${JSON.stringify({ ok: true, results })}`);
@@ -1860,7 +1860,7 @@ async function runOnlineUiStaminaFeedbackFlight(
 }
 
 async function runOnlineUiConfirmedStaminaActionsFlight(entries) {
-  const milestone = "M174 roll/attack arbitration";
+  const milestone = "M175 kick/attack arbitration";
   if (entries.length !== 2) {
     throw new Error(milestone + " expected two real browser clients, received " + entries.length);
   }
@@ -2011,6 +2011,53 @@ async function runOnlineUiConfirmedStaminaActionsFlight(entries) {
             + JSON.stringify(pointers));
         }
         return { epochMs: downs[0].epochMs, detail: { down: downs[0], up: ups[0] } };
+      },
+    },
+    {
+      action: "kick",
+      proofName: "kick+light",
+      cost: COMBAT.kick.staminaCost,
+      text: "Low stamina — kick needs 18.",
+      // WebDriver serializes mouse-button transitions; kernel tests own the
+      // true same-input-tick no-light guarantee. This phase proves the real
+      // short-RMB + LMB gesture and authority-confirmed kick denial.
+      accepted: new Set([
+        COMBAT_ACTION.kickWindup,
+        COMBAT_ACTION.kickActive,
+        COMBAT_ACTION.kickRecovery,
+      ]),
+      requireEventText: false,
+      settleToIdle: true,
+      perform: () => performArenaKickAttackChord(actor, actorElementId, awayOffset, 90),
+      captureOffset: (state) => state.pointers.length,
+      inputEvidence: (state, offset) => {
+        const pointers = state.pointers.slice(offset);
+        const right = pointers.filter((entry) => entry.button === 2);
+        const left = pointers.filter((entry) => entry.button === 0);
+        const rightDowns = right.filter((entry) => entry.type === "pointerdown");
+        const rightUps = right.filter((entry) => entry.type === "pointerup");
+        const leftDowns = left.filter((entry) => entry.type === "pointerdown");
+        const leftUps = left.filter((entry) => entry.type === "pointerup");
+        const rightDown = rightDowns[0];
+        const rightUp = rightUps[0];
+        const leftDown = leftDowns[0];
+        const leftUp = leftUps[0];
+        const complete = rightDowns.length === 1 && rightUps.length === 1
+          && leftDowns.length === 1 && leftUps.length === 1
+          && [rightDown, rightUp, leftDown, leftUp].every((entry) => Number.isFinite(entry?.epochMs))
+          && rightUp.epochMs > rightDown.epochMs
+          && rightUp.epochMs - rightDown.epochMs < 180
+          && leftDown.epochMs >= rightDown.epochMs
+          && leftDown.epochMs <= rightUp.epochMs
+          && leftUp.epochMs > leftDown.epochMs;
+        if (!complete) {
+          throw new Error(milestone + " kick+light did not record one genuine short-RMB + LMB gesture: "
+            + JSON.stringify(pointers));
+        }
+        return {
+          epochMs: rightUp.epochMs,
+          detail: { rightDown, rightUp, leftDown, leftUp },
+        };
       },
     },
     {
@@ -10953,6 +11000,28 @@ async function performArenaRecoveryBufferedJump(session, holdMs = 760) {
         { type: "keyDown", value: " " },
         { type: "pause", duration: boundedHoldMs },
         { type: "keyUp", value: " " },
+      ],
+    }],
+  });
+}
+
+async function performArenaKickAttackChord(session, elementId, xOffset = 200, holdMs = 90) {
+  const origin = { "element-6066-11e4-a52e-4f735466cecf": elementId };
+  const boundedHoldMs = Math.max(60, Math.min(140, Math.trunc(holdMs)));
+  const leadMs = Math.max(25, Math.min(80, Math.floor(boundedHoldMs / 2)));
+  await webdriver(session.base, "POST", "/session/" + session.sessionId + "/actions", {
+    actions: [{
+      type: "pointer",
+      id: "mouse-" + session.name,
+      parameters: { pointerType: "mouse" },
+      actions: [
+        { type: "pointerMove", duration: 0, origin, x: xOffset, y: 0 },
+        { type: "pointerDown", button: 2 },
+        { type: "pause", duration: leadMs },
+        { type: "pointerDown", button: 0 },
+        { type: "pause", duration: Math.max(20, boundedHoldMs - leadMs) },
+        { type: "pointerUp", button: 0 },
+        { type: "pointerUp", button: 2 },
       ],
     }],
   });
