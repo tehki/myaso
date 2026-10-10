@@ -3264,21 +3264,26 @@ async function runOnlineUiJumpAttackCounterplayFlight(entries, defense) {
       if (chordHeld) await releaseArenaJumpAttackChord(attacker);
     }
   } else if (defense === "dodge") {
-    // Deliver the genuine Firefox Space+LMB chord first, then give its normal
-    // realtime input loop one short send window before Chrome's wheel-forward.
-    // Concurrent WebDriver commands can let Chrome reach authority first under
-    // load, producing a roll collision before JUMP WINDUP exists at all. The
-    // 35 ms delivery gap changes only the acceptance harness; the unchanged
-    // 170 ms dodge still overlaps the 105 ms jump windup/active commitment.
+    // Keep the real Chrome wheel-forward independent of Firefox WebDriver's
+    // chord-command response. CI observed Firefox's acknowledgment arriving
+    // after jump impact, despite a genuine wheel being delivered. Dispatch
+    // concurrently with a 20 ms pause in Chrome's own wheel action source;
+    // the authoritative dodge/active-overlap and zero-damage assertions below
+    // still reject premature roll collisions and late dodges. No combat
+    // timings, iframes, geometry, or packet formats change.
     await aimArena(defender, defenderElementId, 0, 180);
     let chordHeld = false;
+    const chordPromise = pressArenaJumpAttackChord(
+      attacker, attackerElementId, attackOffset,
+    ).then(() => { chordHeld = true; });
     try {
-      await pressArenaJumpAttackChord(attacker, attackerElementId, attackOffset);
-      chordHeld = true;
-      await sleep(35);
-      await scrollArenaWheel(defender, defenderElementId, -120, 0);
+      await Promise.all([
+        chordPromise,
+        scrollArenaWheel(defender, defenderElementId, -120, 20),
+      ]);
       await sleep(20);
     } finally {
+      await chordPromise.catch(() => {});
       if (chordHeld) await releaseArenaJumpAttackChord(attacker);
     }
   } else {
