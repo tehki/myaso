@@ -2767,7 +2767,7 @@ fn airborne_attack_below_conversion_cost_stays_an_ordinary_jump() {
         InputIntent::default(),
     );
     let before_jump = world.fighter(1).expect("attacker").stamina;
-    assert!(before_jump >= 14.0 && before_jump < 26.0);
+    assert!((14.0..26.0).contains(&before_jump));
 
     advance(
         &mut world,
