@@ -8570,17 +8570,16 @@ async function runOnlineUiGuardBreakFlight(entries, { onGuardBroken = null } = {
     blockHeld = true;
     let guardBroken = false;
     for (let attempt = 0; attempt < 4 && !guardBroken; attempt += 1) {
-      // Two wheel-back pulses keep the short directional block continuous long
-      // enough to cover a light impact while aging beyond the parry window.
-      await setArenaBlock(defender, defenderElementId, true);
-      await sleep(150);
-      await setArenaBlock(defender, defenderElementId, true);
-      // Primary attack is a one-shot pointerdown latch cleared after an outbound
-      // input sample. Use the same bounded genuine-click burst as M55 so each
-      // intended guard-pressure strike survives client/network sampling jitter.
-      // The burst completes inside one 135 ms windup; the 530 ms total spacing
-      // below still keeps accepted strikes in separate combat cycles.
-      await performArenaAttackBurst(attacker);
+      // Deliver genuine wheel-back and LMB controls on separate browser
+      // sessions at the same time, but hold the attack source for 60 ms. With
+      // the unchanged 135 ms light windup, impact lands roughly 195 ms after
+      // block begins: safely beyond the 125 ms parry window while still inside
+      // the 240 ms short-block window. This avoids WebDriver round-trip drift
+      // expiring the first block before the first real impact.
+      await Promise.all([
+        scrollArenaWheel(defender, defenderElementId, 120, 0),
+        performArenaAttackBurst(attacker, 3, 60),
+      ]);
       await sleep(230);
       const states = await Promise.all(entries.map(readUiEvidence));
       const defenderState = states.find((entry) => entry.browser === defender.name);
