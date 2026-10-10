@@ -139,6 +139,7 @@ export function createFighter({ id, x, y, facing = 0, spawnX = x, spawnY = y }) 
     actionElapsedMs: 0,
     actionDurationMs: 0,
     attackInputWasDown: false,
+    heavyAttackInputWasDown: false,
     blockInputWasDown: false,
     dodgeInputWasDown: false,
     kickInputWasDown: false,
@@ -185,16 +186,18 @@ export function stepWorld(world, inputs = {}, dtMs = 1000 / 120) {
 
     const input = normalizeInput(inputs[fighter.id]);
     const attackPressed = input.attack && !fighter.attackInputWasDown;
+    const heavyAttackPressed = input.heavyAttack && !fighter.heavyAttackInputWasDown;
     const blockPressed = input.block && !fighter.blockInputWasDown;
     const dodgePressed = input.dodge && !fighter.dodgeInputWasDown;
     const kickPressed = input.kick && !fighter.kickInputWasDown;
     const jumpPressed = input.jump && !fighter.jumpInputWasDown;
     updateFacing(fighter, input);
-    beginRequestedAction(world, fighter, input, attackPressed, blockPressed, dodgePressed, kickPressed, jumpPressed);
+    beginRequestedAction(world, fighter, input, attackPressed, heavyAttackPressed, blockPressed, dodgePressed, kickPressed, jumpPressed);
     moveFighter(world, fighter, input, dtMs);
     advanceAction(world, fighter, input, dtMs);
     updateStamina(world, fighter, input, dtMs);
     fighter.attackInputWasDown = input.attack;
+    fighter.heavyAttackInputWasDown = input.heavyAttack;
     fighter.blockInputWasDown = input.block;
     fighter.dodgeInputWasDown = input.dodge;
     fighter.kickInputWasDown = input.kick;
@@ -334,7 +337,7 @@ function finishLightRecovery(world, fighter) {
   beginLightAttack(fighter, lateral);
 }
 
-function beginRequestedAction(world, fighter, input, attackPressed, blockPressed, dodgePressed, kickPressed, jumpPressed) {
+function beginRequestedAction(world, fighter, input, attackPressed, heavyAttackPressed, blockPressed, dodgePressed, kickPressed, jumpPressed) {
   const lightRecovery = fighter.action === "attack_recovery"
     || fighter.action === "attack_left_recovery"
     || fighter.action === "attack_right_recovery";
@@ -487,7 +490,7 @@ function beginRequestedAction(world, fighter, input, attackPressed, blockPressed
     return;
   }
 
-  if (input.heavyAttack && fighter.action === "idle") {
+  if (heavyAttackPressed && fighter.action === "idle") {
     fighter.attackHitTargets.clear();
     setAction(fighter, "heavy_attack_windup", COMBAT.heavyAttack.windupMs);
     return;
@@ -871,6 +874,7 @@ function respawnFighter(fighter) {
   fighter.rollHitTargets.clear();
   fighter.staminaRegenBlockedUntilMs = 0;
   fighter.attackInputWasDown = false;
+  fighter.heavyAttackInputWasDown = false;
   fighter.blockInputWasDown = false;
   fighter.dodgeInputWasDown = false;
   fighter.kickInputWasDown = false;

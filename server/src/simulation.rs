@@ -208,6 +208,7 @@ impl Default for InputIntent {
 #[derive(Debug, Clone, Copy, Default)]
 struct ActionEdges {
     attack: bool,
+    heavy_attack: bool,
     block: bool,
     dodge: bool,
     kick: bool,
@@ -237,6 +238,7 @@ pub struct Fighter {
     pending_jump: bool,
     action_duration_ms: f32,
     attack_input_was_down: bool,
+    heavy_attack_input_was_down: bool,
     block_input_was_down: bool,
     dodge_input_was_down: bool,
     kick_input_was_down: bool,
@@ -283,6 +285,7 @@ impl Fighter {
             pending_jump: false,
             action_duration_ms: 0.0,
             attack_input_was_down: false,
+            heavy_attack_input_was_down: false,
             block_input_was_down: false,
             dodge_input_was_down: false,
             kick_input_was_down: false,
@@ -638,6 +641,7 @@ impl World {
             let input = normalize_input(fighter.input_with_pending_actions());
             let edges = ActionEdges {
                 attack: input.attack && !fighter.attack_input_was_down,
+                heavy_attack: input.heavy_attack && !fighter.heavy_attack_input_was_down,
                 block: input.block && !fighter.block_input_was_down,
                 dodge: input.dodge && !fighter.dodge_input_was_down,
                 kick: input.kick && !fighter.kick_input_was_down,
@@ -651,6 +655,7 @@ impl World {
             advance_action(self.now_ms, fighter, input, dt_ms);
             update_stamina(self.now_ms, fighter, input, dt_ms);
             fighter.attack_input_was_down = input.attack;
+            fighter.heavy_attack_input_was_down = input.heavy_attack;
             fighter.block_input_was_down = input.block;
             fighter.dodge_input_was_down = input.dodge;
             fighter.kick_input_was_down = input.kick;
@@ -899,7 +904,7 @@ fn begin_requested_action(
         return;
     }
 
-    if input.heavy_attack && fighter.action == Action::Idle {
+    if edges.heavy_attack && fighter.action == Action::Idle {
         fighter.attack_hit_targets.clear();
         fighter.set_action(Action::HeavyAttackWindup, HEAVY_ATTACK_WINDUP_MS);
         return;
@@ -1461,6 +1466,7 @@ fn respawn_fighter(fighter: &mut Fighter) {
     fighter.stamina_regen_blocked_until_ms = 0.0;
     fighter.recently_interacted_with = None;
     fighter.attack_input_was_down = false;
+    fighter.heavy_attack_input_was_down = false;
     fighter.block_input_was_down = false;
     fighter.dodge_input_was_down = false;
     fighter.kick_input_was_down = false;
