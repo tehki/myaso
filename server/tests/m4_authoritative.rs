@@ -2753,6 +2753,64 @@ fn late_authoritative_jump_buffers_through_recovery_and_charges_on_execution() {
 }
 
 #[test]
+fn airborne_attack_below_conversion_cost_stays_an_ordinary_jump() {
+    let mut world = duel(200.0);
+    advance(
+        &mut world,
+        3200.0,
+        InputIntent {
+            move_x: -1.0,
+            run: true,
+            facing_radians: 0.0,
+            ..InputIntent::default()
+        },
+        InputIntent::default(),
+    );
+    let before_jump = world.fighter(1).expect("attacker").stamina;
+    assert!((14.0..26.0).contains(&before_jump));
+
+    advance(
+        &mut world,
+        5.0,
+        InputIntent {
+            jump: true,
+            facing_radians: 0.0,
+            ..InputIntent::default()
+        },
+        InputIntent::default(),
+    );
+    let before_light = world.fighter(1).expect("attacker").stamina;
+    assert!(before_light < 12.0);
+    assert_eq!(world.fighter(1).expect("attacker").action, Action::Jump);
+
+    advance(
+        &mut world,
+        5.0,
+        InputIntent {
+            attack: true,
+            facing_radians: 0.0,
+            ..InputIntent::default()
+        },
+        InputIntent::default(),
+    );
+    let attacker = world.fighter(1).expect("attacker");
+    assert_eq!(attacker.action, Action::Jump);
+    assert!(attacker.stamina >= before_light);
+
+    advance(
+        &mut world,
+        450.0,
+        InputIntent {
+            facing_radians: std::f32::consts::PI,
+            ..InputIntent::default()
+        },
+        InputIntent::default(),
+    );
+    assert_eq!(world.fighter(1).expect("attacker").action, Action::Idle);
+    assert_eq!(world.fighter(2).expect("target").hp, 100.0);
+}
+
+#[test]
 fn late_authoritative_jump_attack_chord_buffers_through_full_light_recovery() {
     let mut world = duel(200.0);
     advance(

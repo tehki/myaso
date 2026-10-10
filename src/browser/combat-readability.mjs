@@ -192,9 +192,11 @@ export function staminaDenialPresentation(action, stamina) {
       ? { label: "kick", cost: COMBAT.kick.staminaCost }
       : action === "jump"
         ? { label: "jump", cost: COMBAT.jump.staminaCost }
-        : action === "running-attack"
-          ? { label: "running attack", cost: COMBAT.runningAttack.staminaCost }
-          : null;
+        : action === "jump-attack"
+          ? { label: "jump attack", cost: COMBAT.jumpAttack.staminaCost }
+          : action === "running-attack"
+            ? { label: "running attack", cost: COMBAT.runningAttack.staminaCost }
+            : null;
   if (!rule || stamina + 1e-9 >= rule.cost) return null;
   return {
     action,

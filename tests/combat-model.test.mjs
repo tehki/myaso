@@ -858,6 +858,25 @@ test("late fresh jump buffers through full light recovery and charges stamina on
   assert.equal(attacker.stamina, COMBAT.stamina.max - COMBAT.jump.staminaCost);
 });
 
+test("airborne light edge below conversion cost stays an ordinary jump", () => {
+  const world = duel({ distance: 200 });
+  const [fighter, target] = world.fighters;
+  fighter.stamina = COMBAT.jump.staminaCost + COMBAT.jumpAttack.staminaCost - 2;
+
+  stepWorld(world, { a: { jump: true, aimX: target.x, aimY: target.y } }, 5);
+  assert.equal(fighter.action, "jump");
+  assert.equal(fighter.stamina, COMBAT.jumpAttack.staminaCost - 2);
+
+  const beforeLight = fighter.stamina;
+  stepWorld(world, { a: { attack: true, aimX: target.x, aimY: target.y } }, 5);
+  assert.equal(fighter.action, "jump");
+  assert.ok(fighter.stamina >= beforeLight);
+
+  advance(world, COMBAT.jump.durationMs + 20, { a: { aimX: target.x, aimY: target.y } });
+  assert.equal(fighter.action, "idle");
+  assert.equal(target.hp, 100);
+});
+
 test("simultaneous Space plus light edge starts a jumping attack and charges both stamina costs", () => {
   const world = duel({ distance: 60 });
   const [attacker, target] = world.fighters;
