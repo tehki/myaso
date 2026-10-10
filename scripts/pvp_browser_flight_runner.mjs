@@ -1042,7 +1042,12 @@ async function runOnlineUiHeavyParryFlight(entries) {
       if (!windupSeen) await sleep(6);
     }
     if (windupSeen) {
-      await sleep(150);
+      // Firefox's wheel can register tens of milliseconds before the
+      // authoritative block intent begins. A 150 ms windup offset sometimes
+      // makes the 125 ms parry interval expire before heavy impact, yielding
+      // real guard pressure instead of the parry under slower driver delivery.
+      // Bias the genuine wheel 40 ms later; do not widen gameplay parry timing.
+      await sleep(190);
       await scrollArenaWheel(defender, defenderElementId, 120, 0);
     }
     await heavyPromise;
@@ -8713,16 +8718,14 @@ async function runOnlineUiGuardBreakFlight(entries, { onGuardBroken = null } = {
     blockHeld = true;
     let guardBroken = false;
     for (let attempt = 0; attempt < 4 && !guardBroken; attempt += 1) {
-      // Deliver genuine wheel-back and LMB controls on separate browser
-      // sessions at the same time, but hold the attack source for 60 ms. With
-      // the unchanged 135 ms light windup, impact lands roughly 195 ms after
-      // block begins: safely beyond the 125 ms parry window while still inside
-      // the 240 ms short-block window. This avoids WebDriver round-trip drift
-      // expiring the first block before the first real impact.
-      await Promise.all([
-        scrollArenaWheel(defender, defenderElementId, 120, 0),
-        performArenaAttackBurst(attacker, 3, 60),
-      ]);
+      // Dispatch the genuine wheel-back before the real LMB burst. When
+      // independent WebDriver calls run concurrently, the Firefox wheel can
+      // arrive 100+ ms after Chrome's first click, turning the intended held
+      // block into a fresh parry. Awaiting the wheel orders the controls while
+      // the unchanged 135 ms light windup still lands past the 125 ms parry
+      // window and within the 240 ms short-block window.
+      await scrollArenaWheel(defender, defenderElementId, 120, 0);
+      await performArenaAttackBurst(attacker, 3, 0);
       await sleep(230);
       const states = await Promise.all(entries.map(readUiEvidence));
       const defenderState = states.find((entry) => entry.browser === defender.name);
