@@ -2254,6 +2254,12 @@ async function runOnlineUiConfirmedStaminaActionsFlight(entries) {
     });
 
     if (actionCase.settleToIdle) {
+      // The denial ACK can arrive before a serialized companion LMB has been
+      // reflected in the next authoritative snapshot. Give that real browser
+      // input one replication interval to surface before accepting Idle;
+      // otherwise a stale-idle read can start the next proof inside a light
+      // attack that is only just beginning on the server.
+      await sleep(120);
       await waitForActor(
         (state) => state.acceptance?.ownActionTransitions?.at(-1)?.action === COMBAT_ACTION.idle,
         900,
