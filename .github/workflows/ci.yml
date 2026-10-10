@@ -326,7 +326,7 @@ jobs:
           node --check scripts/pvp_browser_flight_runner.mjs
           node scripts/pvp_browser_flight_runner.mjs
 
-      - name: Validate M136 real jump attack chord
+      - name: Validate M172 confirmed airborne jump-attack denial
         env:
           MYASO_PVP_SCENARIO: "uijumpattack"
         run: |

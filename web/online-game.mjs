@@ -118,10 +118,14 @@ canvas.addEventListener("pointerdown", (event) => {
   canvas.focus();
   if (event.button === 0) {
     attackRequested = true;
-    const runningGesture = rightButtonDown
-      && performance.now() - rightButtonDownAt >= runHoldThresholdMs
-      && (keys.has("KeyW") || keys.has("KeyA") || keys.has("KeyS") || keys.has("KeyD"));
-    if (runningGesture) queueStaminaDenial("running-attack");
+    if (local.action === COMBAT_ACTION.jump) {
+      queueStaminaDenial("jump-attack");
+    } else {
+      const runningGesture = rightButtonDown
+        && performance.now() - rightButtonDownAt >= runHoldThresholdMs
+        && (keys.has("KeyW") || keys.has("KeyA") || keys.has("KeyS") || keys.has("KeyD"));
+      if (runningGesture) queueStaminaDenial("running-attack");
+    }
   }
   if (event.button === 2) {
     rightButtonDown = true;
@@ -355,7 +359,7 @@ function showCombatFeedback(feedback) {
 }
 
 function recordStaminaDenialStage(stage, details = {}) {
-  if (acceptanceScenario !== "uistaminaconfirmed") return;
+  if (acceptanceScenario !== "uistaminaconfirmed" && acceptanceScenario !== "uijumpattack") return;
   const acceptance = window.__MYASO_ACCEPTANCE_STATE__;
   if (!acceptance) return;
   const transitions = acceptance.staminaDenialTransitions ??= [];
@@ -363,7 +367,10 @@ function recordStaminaDenialStage(stage, details = {}) {
 }
 
 function queueStaminaDenial(action) {
-  if (matchOver || local.action !== COMBAT_ACTION.idle) return;
+  const eligibleAction = action === "jump-attack"
+    ? local.action === COMBAT_ACTION.jump
+    : local.action === COMBAT_ACTION.idle;
+  if (matchOver || !eligibleAction) return;
   const presentation = staminaDenialPresentation(action, authoritativeStamina);
   if (!presentation) return;
   pendingStaminaDenial = {
@@ -383,9 +390,10 @@ function markStaminaDenialSubmitted(tick, input) {
   const included = pendingStaminaDenial.action === "roll" ? input.dodge
     : pendingStaminaDenial.action === "kick" ? input.kick
       : pendingStaminaDenial.action === "jump" ? input.jump
-        : pendingStaminaDenial.action === "running-attack"
-          ? input.attack && input.run && Math.hypot(input.moveX, input.moveY) >= 0.5
-          : false;
+        : pendingStaminaDenial.action === "jump-attack" ? input.attack
+          : pendingStaminaDenial.action === "running-attack"
+            ? input.attack && input.run && Math.hypot(input.moveX, input.moveY) >= 0.5
+            : false;
   if (included) {
     pendingStaminaDenial.submittedClientTick = tick >>> 0;
     recordStaminaDenialStage("submitted", {
@@ -408,6 +416,11 @@ function staminaActionAccepted(action, authoritativeAction) {
   if (action === "jump") {
     return authoritativeAction === COMBAT_ACTION.jump
       || authoritativeAction === COMBAT_ACTION.jumpAttackWindup
+      || authoritativeAction === COMBAT_ACTION.jumpAttackActive
+      || authoritativeAction === COMBAT_ACTION.jumpAttackRecovery;
+  }
+  if (action === "jump-attack") {
+    return authoritativeAction === COMBAT_ACTION.jumpAttackWindup
       || authoritativeAction === COMBAT_ACTION.jumpAttackActive
       || authoritativeAction === COMBAT_ACTION.jumpAttackRecovery;
   }
