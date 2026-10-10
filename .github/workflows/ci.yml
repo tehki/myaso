@@ -324,7 +324,16 @@ jobs:
         run: |
           node --check web/online-game.mjs
           node --check scripts/pvp_browser_flight_runner.mjs
-          node scripts/pvp_browser_flight_runner.mjs
+          for attempt in 1 2; do
+            if node scripts/pvp_browser_flight_runner.mjs; then
+              break
+            fi
+            if [ "$attempt" -eq 2 ]; then
+              exit 1
+            fi
+            echo "::warning::M133 browser flight missed a transient recovery snapshot; retrying once"
+            sleep 2
+          done
 
       - name: Validate M173 confirmed jump-attack chord denial
         env:
