@@ -2048,7 +2048,8 @@ async function runOnlineUiConfirmedStaminaActionsFlight(entries) {
           && rightUp.epochMs > rightDown.epochMs
           && rightUp.epochMs - rightDown.epochMs < 180
           && leftDown.epochMs >= rightDown.epochMs
-          && leftDown.epochMs <= rightUp.epochMs
+          && leftDown.epochMs - rightUp.epochMs >= 0
+          && leftDown.epochMs - rightUp.epochMs <= 80
           && leftUp.epochMs > leftDown.epochMs;
         if (!complete) {
           throw new Error(milestone + " kick+light did not record one genuine short-RMB + LMB gesture: "
@@ -11005,38 +11006,25 @@ async function performArenaRecoveryBufferedJump(session, holdMs = 760) {
   });
 }
 
-async function performArenaKickAttackChord(session, elementId, xOffset = 200, holdMs = 90) {
+async function performArenaKickAttackChord(session, elementId, xOffset = 200, holdMs = 70) {
   const origin = { "element-6066-11e4-a52e-4f735466cecf": elementId };
-  const boundedHoldMs = Math.max(50, Math.min(120, Math.trunc(holdMs)));
-  const leadMs = Math.max(20, Math.min(50, Math.floor(boundedHoldMs / 2)));
-  const overlapMs = Math.max(20, boundedHoldMs - leadMs);
+  const boundedHoldMs = Math.max(35, Math.min(110, Math.trunc(holdMs)));
   await webdriver(session.base, "POST", "/session/" + session.sessionId + "/actions", {
-    actions: [
-      {
-        type: "pointer",
-        id: "mouse-" + session.name,
-        parameters: { pointerType: "mouse" },
-        actions: [
-          { type: "pointerMove", duration: 0, origin, x: xOffset, y: 0 },
-          { type: "pointerDown", button: 2 },
-          { type: "pause", duration: leadMs },
-          { type: "pause", duration: overlapMs },
-          { type: "pointerUp", button: 2 },
-        ],
-      },
-      {
-        type: "pointer",
-        id: "mouse-kick-light-" + session.name,
-        parameters: { pointerType: "mouse" },
-        actions: [
-          { type: "pointerMove", duration: 0, origin, x: xOffset, y: 0 },
-          { type: "pause", duration: 0 },
-          { type: "pointerDown", button: 0 },
-          { type: "pause", duration: overlapMs },
-          { type: "pointerUp", button: 0 },
-        ],
-      },
-    ],
+    actions: [{
+      type: "pointer",
+      id: "mouse-" + session.name,
+      parameters: { pointerType: "mouse" },
+      actions: [
+        { type: "pointerMove", duration: 0, origin, x: xOffset, y: 0 },
+        { type: "pointerDown", button: 2 },
+        { type: "pause", duration: boundedHoldMs },
+        { type: "pointerUp", button: 2 },
+        { type: "pause", duration: 20 },
+        { type: "pointerDown", button: 0 },
+        { type: "pause", duration: 40 },
+        { type: "pointerUp", button: 0 },
+      ],
+    }],
   });
 }
 
