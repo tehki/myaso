@@ -3691,7 +3691,10 @@ fn exhausted_recovery_jump_light_consumes_new_but_preserves_earlier_buffer() {
             InputIntent::default(),
             InputIntent::default(),
         );
-        assert_eq!(world.fighter(1).expect("attacker").action, Action::AttackRecovery);
+        assert_eq!(
+            world.fighter(1).expect("attacker").action,
+            Action::AttackRecovery
+        );
         assert!(world.fighter(1).expect("attacker").stamina < 14.0);
 
         if previously_buffered {
@@ -3724,7 +3727,10 @@ fn exhausted_recovery_jump_light_consumes_new_but_preserves_earlier_buffer() {
             },
             InputIntent::default(),
         );
-        assert_eq!(world.fighter(1).expect("attacker").action, Action::AttackRecovery);
+        assert_eq!(
+            world.fighter(1).expect("attacker").action,
+            Action::AttackRecovery
+        );
 
         advance(
             &mut world,
@@ -3734,7 +3740,11 @@ fn exhausted_recovery_jump_light_consumes_new_but_preserves_earlier_buffer() {
         );
         assert_eq!(
             world.fighter(1).expect("attacker").action,
-            if previously_buffered { Action::AttackWindup } else { Action::Idle }
+            if previously_buffered {
+                Action::AttackWindup
+            } else {
+                Action::Idle
+            }
         );
     }
 }
