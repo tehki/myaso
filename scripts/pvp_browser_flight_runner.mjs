@@ -11007,23 +11007,36 @@ async function performArenaRecoveryBufferedJump(session, holdMs = 760) {
 
 async function performArenaKickAttackChord(session, elementId, xOffset = 200, holdMs = 90) {
   const origin = { "element-6066-11e4-a52e-4f735466cecf": elementId };
-  const boundedHoldMs = Math.max(60, Math.min(140, Math.trunc(holdMs)));
-  const leadMs = Math.max(25, Math.min(80, Math.floor(boundedHoldMs / 2)));
+  const boundedHoldMs = Math.max(50, Math.min(120, Math.trunc(holdMs)));
+  const leadMs = Math.max(20, Math.min(50, Math.floor(boundedHoldMs / 2)));
+  const overlapMs = Math.max(20, boundedHoldMs - leadMs);
   await webdriver(session.base, "POST", "/session/" + session.sessionId + "/actions", {
-    actions: [{
-      type: "pointer",
-      id: "mouse-" + session.name,
-      parameters: { pointerType: "mouse" },
-      actions: [
-        { type: "pointerMove", duration: 0, origin, x: xOffset, y: 0 },
-        { type: "pointerDown", button: 2 },
-        { type: "pause", duration: leadMs },
-        { type: "pointerDown", button: 0 },
-        { type: "pause", duration: Math.max(20, boundedHoldMs - leadMs) },
-        { type: "pointerUp", button: 0 },
-        { type: "pointerUp", button: 2 },
-      ],
-    }],
+    actions: [
+      {
+        type: "pointer",
+        id: "mouse-" + session.name,
+        parameters: { pointerType: "mouse" },
+        actions: [
+          { type: "pointerMove", duration: 0, origin, x: xOffset, y: 0 },
+          { type: "pointerDown", button: 2 },
+          { type: "pause", duration: leadMs },
+          { type: "pause", duration: overlapMs },
+          { type: "pointerUp", button: 2 },
+        ],
+      },
+      {
+        type: "pointer",
+        id: "mouse-kick-light-" + session.name,
+        parameters: { pointerType: "mouse" },
+        actions: [
+          { type: "pointerMove", duration: 0, origin, x: xOffset, y: 0 },
+          { type: "pause", duration: 0 },
+          { type: "pointerDown", button: 0 },
+          { type: "pause", duration: overlapMs },
+          { type: "pointerUp", button: 0 },
+        ],
+      },
+    ],
   });
 }
 
