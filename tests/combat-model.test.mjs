@@ -877,6 +877,25 @@ test("airborne light edge below conversion cost stays an ordinary jump", () => {
   assert.equal(target.hp, 100);
 });
 
+test("low-stamina Space plus light chord degrades to the ordinary jump only", () => {
+  const world = duel({ distance: 200 });
+  const [fighter, target] = world.fighters;
+  fighter.stamina = COMBAT.jump.staminaCost + COMBAT.jumpAttack.staminaCost - 1;
+
+  stepWorld(world, {
+    a: { jump: true, attack: true, aimX: target.x, aimY: target.y },
+  }, 5);
+
+  assert.equal(fighter.action, "jump");
+  assert.equal(
+    fighter.stamina,
+    COMBAT.jumpAttack.staminaCost - 1,
+  );
+  advance(world, COMBAT.jump.durationMs + 20, { a: { aimX: target.x, aimY: target.y } });
+  assert.equal(fighter.action, "idle");
+  assert.equal(target.hp, 100);
+});
+
 test("simultaneous Space plus light edge starts a jumping attack and charges both stamina costs", () => {
   const world = duel({ distance: 60 });
   const [attacker, target] = world.fighters;
