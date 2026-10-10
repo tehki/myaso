@@ -223,7 +223,7 @@ try {
     console.log(`M149_SELECTED_RECOVERY_PUNISH ${JSON.stringify({ ok: true, results })}`);
   } else if (scenario === "uiparry") {
     const results = await runOnlineUiParryFlight(sessions);
-    console.log(`M33_ONLINE_PARRY_FEEDBACK ${JSON.stringify({ ok: true, results })}`);
+    console.log(`M176_BLOCK_ATTACK_ARBITRATION ${JSON.stringify({ ok: true, results })}`);
   } else if (scenario === "uiparrypunishwindow") {
     const results = await runOnlineUiParryPunishWindowFlight(sessions);
     console.log(`M146_PARRY_PUNISH_WINDOW ${JSON.stringify({ ok: true, results })}`);
@@ -7212,6 +7212,120 @@ async function runOnlineUiDodgeFeedbackFlight(entries) {
   return evidence;
 }
 
+async function runM176BlockAttackArbitrationPhase(
+  entries,
+  actor,
+  peer,
+  actorElementId,
+  awayOffset,
+) {
+  const milestone = "M176 block/light arbitration";
+  const attackStates = new Set([
+    COMBAT_ACTION.attackWindup,
+    COMBAT_ACTION.attackActive,
+    COMBAT_ACTION.attackRecovery,
+    COMBAT_ACTION.attackLeftWindup,
+    COMBAT_ACTION.attackLeftActive,
+    COMBAT_ACTION.attackLeftRecovery,
+    COMBAT_ACTION.attackRightWindup,
+    COMBAT_ACTION.attackRightActive,
+    COMBAT_ACTION.attackRightRecovery,
+  ]);
+
+  const waitForBothIdle = async (timeoutMs) => {
+    const deadline = Date.now() + timeoutMs;
+    while (Date.now() < deadline) {
+      const states = await Promise.all(entries.map(readUiEvidence));
+      const actorState = states.find((entry) => entry.browser === actor.name);
+      const peerState = states.find((entry) => entry.browser === peer.name);
+      if (actorState?.acceptance?.ownActionTransitions?.at(-1)?.action === COMBAT_ACTION.idle
+        && peerState?.acceptance?.ownActionTransitions?.at(-1)?.action === COMBAT_ACTION.idle) {
+        return states;
+      }
+      await sleep(12);
+    }
+    throw new Error(milestone + " timed out waiting for both clients to recover: "
+      + JSON.stringify(await Promise.all(entries.map(readUiEvidence))));
+  };
+
+  const baseline = await waitForBothIdle(1500);
+  const actorBefore = baseline.find((entry) => entry.browser === actor.name);
+  const peerBefore = baseline.find((entry) => entry.browser === peer.name);
+  if (!actorBefore || !peerBefore) {
+    throw new Error(milestone + " could not resolve browser roles: " + JSON.stringify(baseline));
+  }
+
+  const ownOffset = actorBefore.acceptance?.ownActionTransitions?.length ?? 0;
+  const focusOffset = peerBefore.acceptance?.focusActionTransitions?.length ?? 0;
+  const wheelOffset = actorBefore.wheels.length;
+  const pointerOffset = actorBefore.pointers.length;
+
+  await aimArena(actor, actorElementId, awayOffset);
+  await performArenaBlockAttackChord(actor, actorElementId, awayOffset, 70);
+
+  const deadline = Date.now() + 700;
+  let observed = null;
+  while (Date.now() < deadline && !observed) {
+    const states = await Promise.all(entries.map(readUiEvidence));
+    const actorState = states.find((entry) => entry.browser === actor.name);
+    const peerState = states.find((entry) => entry.browser === peer.name);
+    const ownActions = actorState?.acceptance?.ownActionTransitions?.slice(ownOffset) ?? [];
+    const focusActions = peerState?.acceptance?.focusActionTransitions?.slice(focusOffset) ?? [];
+    const localBlock = ownActions.some((entry) => entry.action === COMBAT_ACTION.block);
+    const remoteBlock = focusActions.some((entry) => entry.action === COMBAT_ACTION.block);
+    if (localBlock && remoteBlock) observed = states;
+    else await sleep(12);
+  }
+  if (!observed) {
+    throw new Error(milestone + " did not replicate Block on both browsers: "
+      + JSON.stringify(await Promise.all(entries.map(readUiEvidence))));
+  }
+
+  const actorObserved = observed.find((entry) => entry.browser === actor.name);
+  const peerObserved = observed.find((entry) => entry.browser === peer.name);
+  const ownActions = actorObserved?.acceptance?.ownActionTransitions?.slice(ownOffset) ?? [];
+  const focusActions = peerObserved?.acceptance?.focusActionTransitions?.slice(focusOffset) ?? [];
+  if (ownActions.some((entry) => attackStates.has(entry.action))
+    || focusActions.some((entry) => attackStates.has(entry.action))) {
+    throw new Error(milestone + " leaked a light attack behind wheel-back: "
+      + JSON.stringify({ ownActions, focusActions }));
+  }
+
+  const wheels = actorObserved.wheels.slice(wheelOffset).filter((entry) => entry.deltaY > 0);
+  const pointers = actorObserved.pointers.slice(pointerOffset).filter((entry) => entry.button === 0);
+  const downs = pointers.filter((entry) => entry.type === "pointerdown");
+  const ups = pointers.filter((entry) => entry.type === "pointerup");
+  if (wheels.length !== 1 || downs.length !== 1 || ups.length !== 1) {
+    throw new Error(milestone + " did not record one genuine wheel-back + LMB gesture: "
+      + JSON.stringify({ wheels, pointers }));
+  }
+
+  await sleep(COMBAT.block.shortBlockMs + 120);
+  const finalStates = await waitForBothIdle(900);
+  const actorFinal = finalStates.find((entry) => entry.browser === actor.name);
+  const peerFinal = finalStates.find((entry) => entry.browser === peer.name);
+  const finalOwnActions = actorFinal?.acceptance?.ownActionTransitions?.slice(ownOffset) ?? [];
+  const finalFocusActions = peerFinal?.acceptance?.focusActionTransitions?.slice(focusOffset) ?? [];
+  if (finalOwnActions.some((entry) => attackStates.has(entry.action))
+    || finalFocusActions.some((entry) => attackStates.has(entry.action))) {
+    throw new Error(milestone + " serialized a late light attack after block recovery: "
+      + JSON.stringify({ finalOwnActions, finalFocusActions }));
+  }
+  if (actorFinal.playerHp !== actorBefore.playerHp
+    || actorFinal.playerGuard !== actorBefore.playerGuard
+    || actorFinal.opponentHp !== actorBefore.opponentHp
+    || actorFinal.opponentGuard !== actorBefore.opponentGuard
+    || peerFinal.playerHp !== peerBefore.playerHp
+    || peerFinal.playerGuard !== peerBefore.playerGuard) {
+    throw new Error(milestone + " changed combat vitals: " + JSON.stringify(finalStates));
+  }
+
+  return finalStates.map((entry) => ({
+    ...entry,
+    m176BlockAttackArbitration: entry.browser === actor.name ? true : null,
+  }));
+}
+
 async function runOnlineUiParryFlight(entries, postParrySleepMs = 80, roles = null) {
   await Promise.all(entries.map(installUiObserver));
   const ready = await waitForUiReady(entries);
@@ -11064,6 +11178,16 @@ async function performArenaAttack(session, elementId, xOffset = 200) {
       ],
     }],
   });
+}
+
+async function performArenaBlockAttackChord(session, elementId, xOffset = 200, holdMs = 70) {
+  const boundedHoldMs = Math.max(45, Math.min(140, Math.trunc(holdMs)));
+  // Browser automation stages wheel-back first because W3C multi-source input
+  // ordering is not deterministic across Chrome and Firefox. JS/Rust kernels
+  // remain authoritative for the true same-input-tick arbitration contract.
+  await scrollArenaWheel(session, elementId, 120, 0);
+  await sleep(20);
+  await performArenaAttackHold(session, elementId, xOffset, boundedHoldMs);
 }
 
 async function performArenaAttackHold(session, elementId, xOffset = 200, holdMs = 180) {

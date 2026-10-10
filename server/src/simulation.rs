@@ -824,6 +824,13 @@ fn begin_requested_action(
         return;
     }
 
+    // Fresh same-tick defense is intentional: wheel-back owns a simultaneous
+    // light-attack edge from idle. Feint handling above remains unchanged.
+    if edges.block && edges.attack && fighter.action == Action::Idle {
+        fighter.set_action(Action::Block, f32::INFINITY);
+        return;
+    }
+
     // Fresh same-tick arbitration is intentional: roll owns a
     // simultaneous light-attack edge. If the roll is exhausted, consume only
     // that same-tick LMB instead of leaking a free light attack behind denial.

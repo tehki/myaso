@@ -1132,6 +1132,25 @@ test("exhausted running strike edge is consumed instead of falling back to a lig
   assert.ok(attacker.stamina > Math.max(0, before - 1));
 });
 
+test("same-tick block and light attack resolves exclusively to block", () => {
+  const world = duel({ distance: 200 });
+  const [fighter, target] = world.fighters;
+  const before = fighter.stamina;
+
+  stepWorld(world, {
+    a: { block: true, attack: true, aimX: target.x, aimY: target.y },
+  }, 5);
+
+  assert.equal(fighter.action, "block");
+  assert.equal(fighter.stamina, before);
+
+  stepWorld(world, {
+    a: { aimX: target.x, aimY: target.y },
+  }, 5);
+  assert.equal(fighter.action, "idle");
+  assert.equal(target.hp, 100);
+});
+
 test("same-tick roll and light attack resolves exclusively to roll", () => {
   const world = duel({ distance: 200 });
   const [fighter, target] = world.fighters;
