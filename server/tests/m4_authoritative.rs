@@ -3618,6 +3618,128 @@ fn exhausted_later_roll_plus_light_preserves_an_earlier_buffered_light() {
 }
 
 #[test]
+fn exhausted_same_tick_jump_and_light_consumes_the_light_edge() {
+    let mut world = duel(200.0);
+    advance(
+        &mut world,
+        4100.0,
+        InputIntent {
+            move_x: -1.0,
+            run: true,
+            facing_radians: 0.0,
+            ..InputIntent::default()
+        },
+        InputIntent::default(),
+    );
+    let before = world.fighter(1).expect("attacker").stamina;
+    assert!(before < 14.0);
+
+    advance(
+        &mut world,
+        5.0,
+        InputIntent {
+            jump: true,
+            attack: true,
+            facing_radians: 0.0,
+            ..InputIntent::default()
+        },
+        InputIntent::default(),
+    );
+    assert_eq!(world.fighter(1).expect("attacker").action, Action::Idle);
+    assert!(world.fighter(1).expect("attacker").stamina >= before - 0.1);
+
+    advance(
+        &mut world,
+        350.0,
+        InputIntent::default(),
+        InputIntent::default(),
+    );
+    assert_eq!(world.fighter(1).expect("attacker").action, Action::Idle);
+    assert_eq!(world.fighter(2).expect("target").hp, 100.0);
+}
+
+#[test]
+fn exhausted_recovery_jump_light_consumes_new_but_preserves_earlier_buffer() {
+    // Both cases start in late light recovery with less than base jump stamina.
+    // The denied Space+LMB must never replace an older accepted light buffer.
+    for previously_buffered in [false, true] {
+        let mut world = duel(200.0);
+        advance(
+            &mut world,
+            4100.0,
+            InputIntent {
+                move_x: -1.0,
+                run: true,
+                facing_radians: 0.0,
+                ..InputIntent::default()
+            },
+            InputIntent::default(),
+        );
+        advance(
+            &mut world,
+            5.0,
+            InputIntent {
+                attack: true,
+                facing_radians: 0.0,
+                ..InputIntent::default()
+            },
+            InputIntent::default(),
+        );
+        advance(
+            &mut world,
+            130.0 + 80.0 + 170.0,
+            InputIntent::default(),
+            InputIntent::default(),
+        );
+        assert_eq!(world.fighter(1).expect("attacker").action, Action::AttackRecovery);
+        assert!(world.fighter(1).expect("attacker").stamina < 14.0);
+
+        if previously_buffered {
+            advance(
+                &mut world,
+                5.0,
+                InputIntent {
+                    attack: true,
+                    facing_radians: 0.0,
+                    ..InputIntent::default()
+                },
+                InputIntent::default(),
+            );
+            advance(
+                &mut world,
+                5.0,
+                InputIntent::default(),
+                InputIntent::default(),
+            );
+        }
+
+        advance(
+            &mut world,
+            5.0,
+            InputIntent {
+                jump: true,
+                attack: true,
+                facing_radians: 0.0,
+                ..InputIntent::default()
+            },
+            InputIntent::default(),
+        );
+        assert_eq!(world.fighter(1).expect("attacker").action, Action::AttackRecovery);
+
+        advance(
+            &mut world,
+            80.0,
+            InputIntent::default(),
+            InputIntent::default(),
+        );
+        assert_eq!(
+            world.fighter(1).expect("attacker").action,
+            if previously_buffered { Action::AttackWindup } else { Action::Idle }
+        );
+    }
+}
+
+#[test]
 fn same_tick_kick_and_light_attack_resolves_exclusively_to_kick() {
     let mut world = duel(200.0);
     advance(

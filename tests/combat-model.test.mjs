@@ -934,6 +934,62 @@ test("low-stamina Space plus light chord degrades to the ordinary jump only", ()
   assert.equal(target.hp, 100);
 });
 
+test("exhausted same-tick jump and light consumes LMB instead of attacking", () => {
+  const world = duel({ distance: 200 });
+  const [fighter, target] = world.fighters;
+  fighter.stamina = COMBAT.jump.staminaCost - 1;
+  const before = fighter.stamina;
+
+  stepWorld(world, {
+    a: { jump: true, attack: true, aimX: target.x, aimY: target.y },
+  }, 5);
+
+  assert.equal(fighter.action, "idle");
+  assert.ok(fighter.stamina >= before - 0.1);
+  advance(world, COMBAT.attack.windupMs + COMBAT.attack.activeMs + 50, {
+    a: { aimX: target.x, aimY: target.y },
+  });
+  assert.equal(fighter.action, "idle");
+  assert.equal(target.hp, 100);
+});
+
+test("exhausted recovery Space plus LMB cannot create a new light buffer", () => {
+  const world = duel({ distance: 200 });
+  const { attacker, target } = enterLightRecovery(world);
+  advance(world, COMBAT.attack.recoveryMs - 85, { a: { aimX: target.x, aimY: target.y } });
+  attacker.stamina = COMBAT.jump.staminaCost - 1;
+
+  stepWorld(world, {
+    a: { jump: true, attack: true, aimX: target.x, aimY: target.y },
+  }, 5);
+  assert.equal(attacker.bufferedJumpAttack, false);
+  assert.equal(attacker.bufferedJump, false);
+  assert.equal(attacker.bufferedLightAttack, false);
+
+  advance(world, 80, { a: { aimX: target.x, aimY: target.y } });
+  assert.equal(attacker.action, "idle");
+});
+
+test("exhausted later jump plus light preserves an earlier buffered light", () => {
+  const world = duel({ distance: 200 });
+  const { attacker, target } = enterLightRecovery(world);
+  advance(world, COMBAT.attack.recoveryMs - 85, { a: { aimX: target.x, aimY: target.y } });
+  stepWorld(world, { a: { attack: true, aimX: target.x, aimY: target.y } }, 5);
+  assert.equal(attacker.bufferedLightAttack, true);
+  stepWorld(world, { a: { aimX: target.x, aimY: target.y } }, 5);
+
+  attacker.stamina = COMBAT.jump.staminaCost - 1;
+  stepWorld(world, {
+    a: { jump: true, attack: true, aimX: target.x, aimY: target.y },
+  }, 5);
+  assert.equal(attacker.bufferedJumpAttack, false);
+  assert.equal(attacker.bufferedJump, false);
+  assert.equal(attacker.bufferedLightAttack, true);
+
+  advance(world, 70, { a: { aimX: target.x, aimY: target.y } });
+  assert.equal(attacker.action, "attack_windup");
+});
+
 test("simultaneous Space plus light edge starts a jumping attack and charges both stamina costs", () => {
   const world = duel({ distance: 60 });
   const [attacker, target] = world.fighters;
