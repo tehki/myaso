@@ -3464,9 +3464,24 @@ fn exhausted_recovery_roll_plus_light_does_not_create_a_new_light_buffer() {
         },
         InputIntent::default(),
     );
-    advance(&mut world, 130.0, InputIntent::default(), InputIntent::default());
-    advance(&mut world, 80.0, InputIntent::default(), InputIntent::default());
-    advance(&mut world, 170.0, InputIntent::default(), InputIntent::default());
+    advance(
+        &mut world,
+        130.0,
+        InputIntent::default(),
+        InputIntent::default(),
+    );
+    advance(
+        &mut world,
+        80.0,
+        InputIntent::default(),
+        InputIntent::default(),
+    );
+    advance(
+        &mut world,
+        170.0,
+        InputIntent::default(),
+        InputIntent::default(),
+    );
     assert!(world.fighter(1).expect("attacker").stamina < 28.0);
 
     advance(
@@ -3480,7 +3495,12 @@ fn exhausted_recovery_roll_plus_light_does_not_create_a_new_light_buffer() {
         },
         InputIntent::default(),
     );
-    advance(&mut world, 80.0, InputIntent::default(), InputIntent::default());
+    advance(
+        &mut world,
+        80.0,
+        InputIntent::default(),
+        InputIntent::default(),
+    );
     assert_eq!(world.fighter(1).expect("attacker").action, Action::Idle);
 }
 
@@ -3508,9 +3528,24 @@ fn exhausted_later_roll_plus_light_preserves_an_earlier_buffered_light() {
         },
         InputIntent::default(),
     );
-    advance(&mut world, 130.0, InputIntent::default(), InputIntent::default());
-    advance(&mut world, 80.0, InputIntent::default(), InputIntent::default());
-    advance(&mut world, 170.0, InputIntent::default(), InputIntent::default());
+    advance(
+        &mut world,
+        130.0,
+        InputIntent::default(),
+        InputIntent::default(),
+    );
+    advance(
+        &mut world,
+        80.0,
+        InputIntent::default(),
+        InputIntent::default(),
+    );
+    advance(
+        &mut world,
+        170.0,
+        InputIntent::default(),
+        InputIntent::default(),
+    );
 
     advance(
         &mut world,
@@ -3522,7 +3557,12 @@ fn exhausted_later_roll_plus_light_preserves_an_earlier_buffered_light() {
         },
         InputIntent::default(),
     );
-    advance(&mut world, 5.0, InputIntent::default(), InputIntent::default());
+    advance(
+        &mut world,
+        5.0,
+        InputIntent::default(),
+        InputIntent::default(),
+    );
     assert!(world.fighter(1).expect("attacker").stamina < 28.0);
 
     advance(
@@ -3536,6 +3576,14 @@ fn exhausted_later_roll_plus_light_preserves_an_earlier_buffered_light() {
         },
         InputIntent::default(),
     );
-    advance(&mut world, 70.0, InputIntent::default(), InputIntent::default());
-    assert_eq!(world.fighter(1).expect("attacker").action, Action::AttackWindup);
+    advance(
+        &mut world,
+        70.0,
+        InputIntent::default(),
+        InputIntent::default(),
+    );
+    assert_eq!(
+        world.fighter(1).expect("attacker").action,
+        Action::AttackWindup
+    );
 }
