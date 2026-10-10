@@ -59,6 +59,50 @@ test("heavy attack has longer windup active and recovery commitment", () => {
   assert.equal(a.action, "idle");
 });
 
+test("holding heavy through recovery cannot auto-chain without a fresh press", () => {
+  const world = duel({ distance: 200 });
+  const [attacker, target] = world.fighters;
+  const heldHeavy = { a: { heavyAttack: true, aimX: target.x, aimY: target.y } };
+
+  stepWorld(world, heldHeavy, 5);
+  assert.equal(attacker.action, "heavy_attack_windup");
+
+  advance(
+    world,
+    COMBAT.heavyAttack.windupMs + COMBAT.heavyAttack.activeMs
+      + COMBAT.heavyAttack.recoveryMs + 25,
+    heldHeavy,
+  );
+  assert.equal(attacker.action, "idle");
+  advance(world, 200, heldHeavy);
+  assert.equal(attacker.action, "idle");
+  assert.equal(target.hp, 100);
+
+  stepWorld(world, { a: { aimX: target.x, aimY: target.y } }, 5);
+  stepWorld(world, heldHeavy, 5);
+  assert.equal(attacker.action, "heavy_attack_windup");
+});
+
+test("pressing heavy during heavy recovery does not queue a second heavy", () => {
+  const world = duel({ distance: 200 });
+  const [attacker, target] = world.fighters;
+  stepWorld(world, { a: { heavyAttack: true, aimX: target.x, aimY: target.y } }, 5);
+  advance(
+    world,
+    COMBAT.heavyAttack.windupMs + COMBAT.heavyAttack.activeMs,
+    { a: { aimX: target.x, aimY: target.y } },
+  );
+  assert.equal(attacker.action, "heavy_attack_recovery");
+
+  const heldHeavy = { a: { heavyAttack: true, aimX: target.x, aimY: target.y } };
+  advance(world, COMBAT.heavyAttack.recoveryMs + 100, heldHeavy);
+  assert.equal(attacker.action, "idle");
+
+  stepWorld(world, { a: { aimX: target.x, aimY: target.y } }, 5);
+  stepWorld(world, heldHeavy, 5);
+  assert.equal(attacker.action, "heavy_attack_windup");
+});
+
 test("heavy attack deals 46 damage once and applies stronger guard pressure", () => {
   const hitWorld = duel();
   const [attacker, target] = hitWorld.fighters;

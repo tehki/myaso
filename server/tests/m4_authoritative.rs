@@ -291,6 +291,75 @@ fn attack_preserves_windup_active_and_recovery_commitment() {
 }
 
 #[test]
+fn held_heavy_does_not_auto_repeat_without_a_new_press() {
+    let mut world = duel(200.0);
+    let held_heavy = InputIntent {
+        heavy_attack: true,
+        facing_radians: 0.0,
+        ..InputIntent::default()
+    };
+
+    advance(&mut world, 5.0, held_heavy, InputIntent::default());
+    assert_eq!(
+        world.fighter(1).expect("attacker").action,
+        Action::HeavyAttackWindup
+    );
+    advance(&mut world, 865.0, held_heavy, InputIntent::default());
+    assert_eq!(world.fighter(1).expect("attacker").action, Action::Idle);
+    advance(&mut world, 200.0, held_heavy, InputIntent::default());
+    assert_eq!(world.fighter(1).expect("attacker").action, Action::Idle);
+    assert_eq!(world.fighter(2).expect("target").hp, 100.0);
+
+    advance(
+        &mut world,
+        5.0,
+        InputIntent::default(),
+        InputIntent::default(),
+    );
+    advance(&mut world, 5.0, held_heavy, InputIntent::default());
+    assert_eq!(
+        world.fighter(1).expect("attacker").action,
+        Action::HeavyAttackWindup
+    );
+}
+
+#[test]
+fn fresh_heavy_during_recovery_is_not_buffered() {
+    let mut world = duel(200.0);
+    let held_heavy = InputIntent {
+        heavy_attack: true,
+        ..InputIntent::default()
+    };
+    advance(&mut world, 5.0, held_heavy, InputIntent::default());
+    advance(
+        &mut world,
+        420.0,
+        InputIntent::default(),
+        InputIntent::default(),
+    );
+    assert_eq!(
+        world.fighter(1).expect("attacker").action,
+        Action::HeavyAttackRecovery
+    );
+
+    advance(&mut world, 5.0, held_heavy, InputIntent::default());
+    advance(&mut world, 465.0, held_heavy, InputIntent::default());
+    assert_eq!(world.fighter(1).expect("attacker").action, Action::Idle);
+
+    advance(
+        &mut world,
+        5.0,
+        InputIntent::default(),
+        InputIntent::default(),
+    );
+    advance(&mut world, 5.0, held_heavy, InputIntent::default());
+    assert_eq!(
+        world.fighter(1).expect("attacker").action,
+        Action::HeavyAttackWindup
+    );
+}
+
+#[test]
 fn heavy_attack_preserves_long_commitment_and_deals_46_once() {
     let mut commitment = duel(200.0);
     commitment.set_input(
