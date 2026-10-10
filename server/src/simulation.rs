@@ -769,14 +769,18 @@ fn begin_requested_action(
             fighter.buffered_jump = true;
         } else if edges.kick
             && remaining_ms <= KICK_BUFFER_WINDOW_MS + EPSILON
-            && fighter.stamina + EPSILON >= KICK_STAMINA_COST
+            && (fighter.stamina + EPSILON >= KICK_STAMINA_COST || edges.attack)
         {
-            fighter.clear_light_attack_buffer();
-            fighter.buffered_block = false;
-            fighter.clear_buffered_dodge();
-            fighter.buffered_jump = false;
-            fighter.buffered_jump_attack = false;
-            fighter.buffered_kick = true;
+            if fighter.stamina + EPSILON >= KICK_STAMINA_COST {
+                fighter.clear_light_attack_buffer();
+                fighter.buffered_block = false;
+                fighter.clear_buffered_dodge();
+                fighter.buffered_jump = false;
+                fighter.buffered_jump_attack = false;
+                fighter.buffered_kick = true;
+            }
+            // Exhausted short-RMB still owns a simultaneous LMB edge, while
+            // preserving any light attack buffered on an earlier input tick.
         } else if edges.attack && remaining_ms <= LIGHT_ATTACK_BUFFER_WINDOW_MS + EPSILON {
             fighter.buffered_block = false;
             fighter.clear_buffered_dodge();
@@ -833,12 +837,14 @@ fn begin_requested_action(
         }
     }
 
-    if edges.kick
-        && fighter.action == Action::Idle
-        && spend_stamina(now_ms, fighter, KICK_STAMINA_COST)
-    {
-        fighter.begin_kick();
-        return;
+    if edges.kick && fighter.action == Action::Idle {
+        if spend_stamina(now_ms, fighter, KICK_STAMINA_COST) {
+            fighter.begin_kick();
+            return;
+        }
+        if edges.attack {
+            return;
+        }
     }
 
     if edges.jump

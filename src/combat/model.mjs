@@ -383,13 +383,17 @@ function beginRequestedAction(world, fighter, input, attackPressed, blockPressed
       fighter.bufferedJump = true;
     } else if (kickPressed
       && remainingMs <= COMBAT.inputBuffer.kickWindowMs + EPSILON
-      && fighter.stamina + EPSILON >= COMBAT.kick.staminaCost) {
-      clearLightAttackBuffer(fighter);
-      fighter.bufferedBlock = false;
-      clearBufferedDodge(fighter);
-      fighter.bufferedJump = false;
-      fighter.bufferedJumpAttack = false;
-      fighter.bufferedKick = true;
+      && (fighter.stamina + EPSILON >= COMBAT.kick.staminaCost || attackPressed)) {
+      if (fighter.stamina + EPSILON >= COMBAT.kick.staminaCost) {
+        clearLightAttackBuffer(fighter);
+        fighter.bufferedBlock = false;
+        clearBufferedDodge(fighter);
+        fighter.bufferedJump = false;
+        fighter.bufferedJumpAttack = false;
+        fighter.bufferedKick = true;
+      }
+      // Exhausted short-RMB still owns a simultaneous LMB edge, but does not
+      // erase a light attack buffered on an earlier input tick.
     } else if (attackPressed && remainingMs <= COMBAT.inputBuffer.lightAttackWindowMs + EPSILON) {
       fighter.bufferedBlock = false;
       clearBufferedDodge(fighter);
@@ -437,9 +441,12 @@ function beginRequestedAction(world, fighter, input, attackPressed, blockPressed
     if (attackPressed) return;
   }
 
-  if (kickPressed && fighter.action === "idle" && spendStamina(world, fighter, COMBAT.kick.staminaCost)) {
-    beginKick(fighter);
-    return;
+  if (kickPressed && fighter.action === "idle") {
+    if (spendStamina(world, fighter, COMBAT.kick.staminaCost)) {
+      beginKick(fighter);
+      return;
+    }
+    if (attackPressed) return;
   }
 
   if (jumpPressed && attackPressed && fighter.action === "idle"

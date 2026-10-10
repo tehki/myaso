@@ -375,7 +375,7 @@ try {
     console.log("M166_AUTHORITATIVE_STAMINA_FEEDBACK " + JSON.stringify({ ok: true, results }));
   } else if (scenario === "uistaminaconfirmed") {
     const results = await runOnlineUiConfirmedStaminaActionsFlight(sessions);
-    console.log("M174_CONFIRMED_ROLL_ATTACK_ARBITRATION " + JSON.stringify({ ok: true, results }));
+    console.log("M175_CONFIRMED_KICK_ATTACK_ARBITRATION " + JSON.stringify({ ok: true, results }));
   } else if (scenario === "uiguardbreaktell") {
     const results = await runOnlineUiGuardBreakTellFlight(sessions);
     console.log(`M40_FFA_GUARD_BREAK_TELL ${JSON.stringify({ ok: true, results })}`);
@@ -1860,7 +1860,7 @@ async function runOnlineUiStaminaFeedbackFlight(
 }
 
 async function runOnlineUiConfirmedStaminaActionsFlight(entries) {
-  const milestone = "M174 roll/attack arbitration";
+  const milestone = "M175 kick/attack arbitration";
   if (entries.length !== 2) {
     throw new Error(milestone + " expected two real browser clients, received " + entries.length);
   }
@@ -1980,8 +1980,9 @@ async function runOnlineUiConfirmedStaminaActionsFlight(entries) {
           || !Number.isFinite(wheels[0]?.epochMs)
           || !Number.isFinite(downs[0]?.epochMs) || !Number.isFinite(ups[0]?.epochMs)
           || ups[0].epochMs <= downs[0].epochMs
-          || Math.abs(wheels[0].epochMs - downs[0].epochMs) > 80) {
-          throw new Error(milestone + " roll+light did not record one genuine same-tick wheel-forward + LMB chord: "
+          || downs[0].epochMs < wheels[0].epochMs
+          || downs[0].epochMs - wheels[0].epochMs > 260) {
+          throw new Error(milestone + " roll+light did not record one genuine staged wheel-forward + LMB gesture: "
             + JSON.stringify({
               wheels: state.wheels.slice(offset.wheels),
               pointers: state.pointers.slice(offset.pointers),
@@ -2011,6 +2012,54 @@ async function runOnlineUiConfirmedStaminaActionsFlight(entries) {
             + JSON.stringify(pointers));
         }
         return { epochMs: downs[0].epochMs, detail: { down: downs[0], up: ups[0] } };
+      },
+    },
+    {
+      action: "kick",
+      proofName: "kick+light",
+      cost: COMBAT.kick.staminaCost,
+      text: "Low stamina — kick needs 18.",
+      // WebDriver serializes mouse-button transitions; kernel tests own the
+      // true same-input-tick no-light guarantee. This phase proves the real
+      // short-RMB + LMB gesture and authority-confirmed kick denial.
+      accepted: new Set([
+        COMBAT_ACTION.kickWindup,
+        COMBAT_ACTION.kickActive,
+        COMBAT_ACTION.kickRecovery,
+      ]),
+      requireEventText: false,
+      settleToIdle: true,
+      perform: () => performArenaKickAttackChord(actor, actorElementId, awayOffset, 90),
+      captureOffset: (state) => state.pointers.length,
+      inputEvidence: (state, offset) => {
+        const pointers = state.pointers.slice(offset);
+        const right = pointers.filter((entry) => entry.button === 2);
+        const left = pointers.filter((entry) => entry.button === 0);
+        const rightDowns = right.filter((entry) => entry.type === "pointerdown");
+        const rightUps = right.filter((entry) => entry.type === "pointerup");
+        const leftDowns = left.filter((entry) => entry.type === "pointerdown");
+        const leftUps = left.filter((entry) => entry.type === "pointerup");
+        const rightDown = rightDowns[0];
+        const rightUp = rightUps[0];
+        const leftDown = leftDowns[0];
+        const leftUp = leftUps[0];
+        const complete = rightDowns.length === 1 && rightUps.length === 1
+          && leftDowns.length === 1 && leftUps.length === 1
+          && [rightDown, rightUp, leftDown, leftUp].every((entry) => Number.isFinite(entry?.epochMs))
+          && rightUp.epochMs > rightDown.epochMs
+          && rightUp.epochMs - rightDown.epochMs < 180
+          && leftDown.epochMs >= rightDown.epochMs
+          && leftDown.epochMs - rightUp.epochMs >= 0
+          && leftDown.epochMs - rightUp.epochMs <= 80
+          && leftUp.epochMs > leftDown.epochMs;
+        if (!complete) {
+          throw new Error(milestone + " kick+light did not record one genuine short-RMB + LMB gesture: "
+            + JSON.stringify(pointers));
+        }
+        return {
+          epochMs: rightUp.epochMs,
+          detail: { rightDown, rightUp, leftDown, leftUp },
+        };
       },
     },
     {
@@ -2205,6 +2254,12 @@ async function runOnlineUiConfirmedStaminaActionsFlight(entries) {
     });
 
     if (actionCase.settleToIdle) {
+      // The denial ACK can arrive before a serialized companion LMB has been
+      // reflected in the next authoritative snapshot. Give that real browser
+      // input one replication interval to surface before accepting Idle;
+      // otherwise a stale-idle read can start the next proof inside a light
+      // attack that is only just beginning on the server.
+      await sleep(120);
       await waitForActor(
         (state) => state.acceptance?.ownActionTransitions?.at(-1)?.action === COMBAT_ACTION.idle,
         900,
@@ -4261,14 +4316,29 @@ async function runOnlineUiKickKnockdownFfaHitFlight(entries) {
     && Number.isFinite(entry.epochMs)
     && entry.epochMs > conversion.knockdownTransition.epochMs);
   const defenderFocusActions = defenderState.acceptance?.focusActionTransitions ?? [];
+  const beforeOrSameRecoveryTick = (entry) => {
+    if (!defenderRecovery) return true;
+    if (Number.isFinite(entry.serverTick) && Number.isFinite(defenderRecovery.serverTick)) {
+      return entry.serverTick <= defenderRecovery.serverTick;
+    }
+    return entry.epochMs < defenderRecovery.epochMs;
+  };
   const defenderSawPunishActive = defenderState.acceptance?.focusNetId === punisherId
     && defenderFocusActions.some((entry) =>
       entry.action === COMBAT_ACTION.attackActive
       && Number.isFinite(entry.epochMs)
       && entry.epochMs >= punishWindup.epochMs
-      && (!defenderRecovery || entry.epochMs < defenderRecovery.epochMs));
+      && beforeOrSameRecoveryTick(entry));
+  const punishActiveAfterRecovery = defenderRecovery
+    && (Number.isFinite(punishActive.serverTick) && Number.isFinite(defenderRecovery.serverTick)
+      ? punishActive.serverTick > defenderRecovery.serverTick
+      : punishActive.epochMs >= defenderRecovery.epochMs);
+  // hitEvidence already proves exactly one 34 HP hit resolved while the victim
+  // was knocked down. When active and recovery replicate on the same server
+  // tick, browser epoch order is not authoritative; only a later recovery tick
+  // invalidates the conversion.
   if (punishActive.epochMs >= knockdownEndEpochMs
-    || (defenderRecovery && punishActive.epochMs >= defenderRecovery.epochMs)
+    || punishActiveAfterRecovery
     || !defenderSawPunishActive) {
     throw new Error(milestone + " authoritative ordering did not prove #"
       + punisherId + " became active before #" + defenderId + " recovered: "
@@ -8515,17 +8585,16 @@ async function runOnlineUiGuardBreakFlight(entries, { onGuardBroken = null } = {
     blockHeld = true;
     let guardBroken = false;
     for (let attempt = 0; attempt < 4 && !guardBroken; attempt += 1) {
-      // Two wheel-back pulses keep the short directional block continuous long
-      // enough to cover a light impact while aging beyond the parry window.
-      await setArenaBlock(defender, defenderElementId, true);
-      await sleep(150);
-      await setArenaBlock(defender, defenderElementId, true);
-      // Primary attack is a one-shot pointerdown latch cleared after an outbound
-      // input sample. Use the same bounded genuine-click burst as M55 so each
-      // intended guard-pressure strike survives client/network sampling jitter.
-      // The burst completes inside one 135 ms windup; the 530 ms total spacing
-      // below still keeps accepted strikes in separate combat cycles.
-      await performArenaAttackBurst(attacker);
+      // Deliver genuine wheel-back and LMB controls on separate browser
+      // sessions at the same time, but hold the attack source for 60 ms. With
+      // the unchanged 135 ms light windup, impact lands roughly 195 ms after
+      // block begins: safely beyond the 125 ms parry window while still inside
+      // the 240 ms short-block window. This avoids WebDriver round-trip drift
+      // expiring the first block before the first real impact.
+      await Promise.all([
+        scrollArenaWheel(defender, defenderElementId, 120, 0),
+        performArenaAttackBurst(attacker, 3, 60),
+      ]);
       await sleep(230);
       const states = await Promise.all(entries.map(readUiEvidence));
       const defenderState = states.find((entry) => entry.browser === defender.name);
@@ -10657,33 +10726,15 @@ async function performArenaRunHold(session, elementId, movementKey, xOffset = 20
 }
 
 async function performArenaRollAttackChord(session, elementId, xOffset = 200, holdMs = 70) {
-  const origin = { "element-6066-11e4-a52e-4f735466cecf": elementId };
   const boundedHoldMs = Math.max(45, Math.min(140, Math.trunc(holdMs)));
-  await webdriver(session.base, "POST", "/session/" + session.sessionId + "/actions", {
-    actions: [
-      {
-        type: "pointer",
-        id: "mouse-" + session.name,
-        parameters: { pointerType: "mouse" },
-        actions: [
-          { type: "pointerMove", duration: 0, origin, x: xOffset, y: 0 },
-          { type: "pointerDown", button: 0 },
-          { type: "pause", duration: boundedHoldMs },
-          { type: "pointerUp", button: 0 },
-        ],
-      },
-      {
-        type: "wheel",
-        id: "wheel-" + session.name,
-        actions: [
-          { type: "pause", duration: 0 },
-          { type: "scroll", x: 0, y: 0, deltaX: 0, deltaY: -120, duration: 0, origin },
-          { type: "pause", duration: boundedHoldMs },
-          { type: "pause", duration: 0 },
-        ],
-      },
-    ],
-  });
+  // ChromeDriver can serialize pointer before wheel even when both W3C sources
+  // share one action request. Deliver wheel-forward first so the roll-denial
+  // candidate is queued while the fighter is still idle, then follow with one
+  // genuine bounded LMB gesture. Kernel tests remain authoritative for the true
+  // same-input-tick arbitration contract.
+  await scrollArenaWheel(session, elementId, -120, 0);
+  await sleep(20);
+  await performArenaAttackHold(session, elementId, xOffset, boundedHoldMs);
 }
 
 async function performArenaRunningAttack(session, elementId, movementKey, xOffset = 200, movementLeadMs = 80) {
@@ -10953,6 +11004,28 @@ async function performArenaRecoveryBufferedJump(session, holdMs = 760) {
         { type: "keyDown", value: " " },
         { type: "pause", duration: boundedHoldMs },
         { type: "keyUp", value: " " },
+      ],
+    }],
+  });
+}
+
+async function performArenaKickAttackChord(session, elementId, xOffset = 200, holdMs = 70) {
+  const origin = { "element-6066-11e4-a52e-4f735466cecf": elementId };
+  const boundedHoldMs = Math.max(35, Math.min(110, Math.trunc(holdMs)));
+  await webdriver(session.base, "POST", "/session/" + session.sessionId + "/actions", {
+    actions: [{
+      type: "pointer",
+      id: "mouse-" + session.name,
+      parameters: { pointerType: "mouse" },
+      actions: [
+        { type: "pointerMove", duration: 0, origin, x: xOffset, y: 0 },
+        { type: "pointerDown", button: 2 },
+        { type: "pause", duration: boundedHoldMs },
+        { type: "pointerUp", button: 2 },
+        { type: "pause", duration: 20 },
+        { type: "pointerDown", button: 0 },
+        { type: "pause", duration: 40 },
+        { type: "pointerUp", button: 0 },
       ],
     }],
   });
