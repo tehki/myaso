@@ -2951,14 +2951,28 @@ async function runM173JumpAttackChordDenialPhase(entries, attacker, defender, at
   }
 
   const staminaTransitions = rejected.acceptance?.staminaTransitions?.slice(staminaOffset) ?? [];
-  const minimumStamina = staminaTransitions.reduce(
-    (value, entry) => Number.isFinite(entry.stamina) ? Math.min(value, entry.stamina) : value,
-    baselineStamina,
-  );
-  const expectedAfterJump = baselineStamina - COMBAT.jump.staminaCost;
+  let minimumStamina = baselineStamina;
+  let minimumIndex = -1;
+  for (let index = 0; index < staminaTransitions.length; index += 1) {
+    const stamina = staminaTransitions[index]?.stamina;
+    if (Number.isFinite(stamina) && stamina < minimumStamina) {
+      minimumStamina = stamina;
+      minimumIndex = index;
+    }
+  }
+  const preSpendStamina = minimumIndex > 0 && Number.isFinite(staminaTransitions[minimumIndex - 1]?.stamina)
+    ? staminaTransitions[minimumIndex - 1].stamina
+    : baselineStamina;
+  const expectedAfterJump = preSpendStamina - COMBAT.jump.staminaCost;
   if (minimumStamina < expectedAfterJump - 1 || minimumStamina > expectedAfterJump + 1) {
     throw new Error(milestone + " did not spend exactly the ordinary jump cost: "
-      + JSON.stringify({ baselineStamina, minimumStamina, expectedAfterJump, staminaTransitions }));
+      + JSON.stringify({
+        baselineStamina,
+        preSpendStamina,
+        minimumStamina,
+        expectedAfterJump,
+        staminaTransitions,
+      }));
   }
 
   const transitions = rejected.acceptance?.staminaDenialTransitions?.slice(denialOffset) ?? [];
