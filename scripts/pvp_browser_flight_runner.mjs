@@ -375,7 +375,7 @@ try {
     console.log("M166_AUTHORITATIVE_STAMINA_FEEDBACK " + JSON.stringify({ ok: true, results }));
   } else if (scenario === "uistaminaconfirmed") {
     const results = await runOnlineUiConfirmedStaminaActionsFlight(sessions);
-    console.log("M169_CONFIRMED_STAMINA_ACTIONS " + JSON.stringify({ ok: true, results }));
+    console.log("M174_CONFIRMED_ROLL_ATTACK_ARBITRATION " + JSON.stringify({ ok: true, results }));
   } else if (scenario === "uiguardbreaktell") {
     const results = await runOnlineUiGuardBreakTellFlight(sessions);
     console.log(`M40_FFA_GUARD_BREAK_TELL ${JSON.stringify({ ok: true, results })}`);
@@ -1860,7 +1860,7 @@ async function runOnlineUiStaminaFeedbackFlight(
 }
 
 async function runOnlineUiConfirmedStaminaActionsFlight(entries) {
-  const milestone = "M169 confirmed stamina actions";
+  const milestone = "M174 roll/attack arbitration";
   if (entries.length !== 2) {
     throw new Error(milestone + " expected two real browser clients, received " + entries.length);
   }
@@ -1949,6 +1949,48 @@ async function runOnlineUiConfirmedStaminaActionsFlight(entries) {
             + JSON.stringify(state.wheels.slice(offset)));
         }
         return { epochMs: wheels[0].epochMs, detail: wheels[0] };
+      },
+    },
+    {
+      action: "roll",
+      proofName: "roll+light",
+      cost: COMBAT.dodge.staminaCost,
+      text: "Low stamina — roll needs 28.",
+      // W3C wheel and pointer sources are not dispatched atomically by
+      // ChromeDriver: one source can precede the other by tens of milliseconds.
+      // Kernel tests own the true same-input-tick no-light guarantee; this real
+      // browser phase proves both genuine controls and confirmed roll denial.
+      accepted: new Set([
+        COMBAT_ACTION.dodge,
+        COMBAT_ACTION.dodgeRecovery,
+      ]),
+      requireEventText: false,
+      settleToIdle: true,
+      perform: () => performArenaRollAttackChord(actor, actorElementId, awayOffset, 70),
+      captureOffset: (state) => ({
+        wheels: state.wheels.length,
+        pointers: state.pointers.length,
+      }),
+      inputEvidence: (state, offset) => {
+        const wheels = state.wheels.slice(offset.wheels).filter((entry) => entry.deltaY < 0);
+        const pointers = state.pointers.slice(offset.pointers).filter((entry) => entry.button === 0);
+        const downs = pointers.filter((entry) => entry.type === "pointerdown");
+        const ups = pointers.filter((entry) => entry.type === "pointerup");
+        if (wheels.length !== 1 || downs.length !== 1 || ups.length !== 1
+          || !Number.isFinite(wheels[0]?.epochMs)
+          || !Number.isFinite(downs[0]?.epochMs) || !Number.isFinite(ups[0]?.epochMs)
+          || ups[0].epochMs <= downs[0].epochMs
+          || Math.abs(wheels[0].epochMs - downs[0].epochMs) > 80) {
+          throw new Error(milestone + " roll+light did not record one genuine same-tick wheel-forward + LMB chord: "
+            + JSON.stringify({
+              wheels: state.wheels.slice(offset.wheels),
+              pointers: state.pointers.slice(offset.pointers),
+            }));
+        }
+        return {
+          epochMs: Math.max(wheels[0].epochMs, downs[0].epochMs),
+          detail: { wheel: wheels[0], down: downs[0], up: ups[0] },
+        };
       },
     },
     {
@@ -2071,8 +2113,13 @@ async function runOnlineUiConfirmedStaminaActionsFlight(entries) {
     const rejected = await waitForActor(
       (state) => {
         const transitions = state.acceptance?.staminaDenialTransitions?.slice(denialOffset) ?? [];
-        return transitions.some((entry) => entry.stage === "shown" && entry.action === actionCase.action)
-          && state.events.slice(eventOffset).includes(actionCase.text)
+        const hasShownDenial = transitions.some(
+          (entry) => entry.stage === "shown" && entry.action === actionCase.action,
+        );
+        const hasExpectedEvent = actionCase.requireEventText === false
+          || state.events.slice(eventOffset).includes(actionCase.text);
+        return hasShownDenial
+          && hasExpectedEvent
           && state.feedbackTransitions.slice(feedbackOffset).includes("stamina-denied");
       },
       1200,
@@ -2136,7 +2183,18 @@ async function runOnlineUiConfirmedStaminaActionsFlight(entries) {
     }
 
     proofs.push({
+      proof: actionCase.proofName ?? actionCase.action,
       action: actionCase.action,
+      serializedLightObserved: Boolean(actionCase.settleToIdle
+        && newActions.some((entry) => entry.action === COMBAT_ACTION.attackWindup
+          || entry.action === COMBAT_ACTION.attackActive
+          || entry.action === COMBAT_ACTION.attackRecovery
+          || entry.action === COMBAT_ACTION.attackLeftWindup
+          || entry.action === COMBAT_ACTION.attackLeftActive
+          || entry.action === COMBAT_ACTION.attackLeftRecovery
+          || entry.action === COMBAT_ACTION.attackRightWindup
+          || entry.action === COMBAT_ACTION.attackRightActive
+          || entry.action === COMBAT_ACTION.attackRightRecovery)),
       cost: actionCase.cost,
       baselineStamina,
       inputEpochMs: input.epochMs,
@@ -2146,7 +2204,15 @@ async function runOnlineUiConfirmedStaminaActionsFlight(entries) {
       shownEpochMs: shown.epochMs,
     });
 
-    await sleep(120);
+    if (actionCase.settleToIdle) {
+      await waitForActor(
+        (state) => state.acceptance?.ownActionTransitions?.at(-1)?.action === COMBAT_ACTION.idle,
+        900,
+        actionCase.action + " serialized browser chord recovery",
+      );
+    } else {
+      await sleep(120);
+    }
   }
 
   const states = await Promise.all(entries.map(readUiEvidence));
@@ -10584,6 +10650,36 @@ async function performArenaRunHold(session, elementId, movementKey, xOffset = 20
           { type: "keyDown", value: movementKey },
           { type: "pause", duration: boundedHoldMs },
           { type: "keyUp", value: movementKey },
+        ],
+      },
+    ],
+  });
+}
+
+async function performArenaRollAttackChord(session, elementId, xOffset = 200, holdMs = 70) {
+  const origin = { "element-6066-11e4-a52e-4f735466cecf": elementId };
+  const boundedHoldMs = Math.max(45, Math.min(140, Math.trunc(holdMs)));
+  await webdriver(session.base, "POST", "/session/" + session.sessionId + "/actions", {
+    actions: [
+      {
+        type: "pointer",
+        id: "mouse-" + session.name,
+        parameters: { pointerType: "mouse" },
+        actions: [
+          { type: "pointerMove", duration: 0, origin, x: xOffset, y: 0 },
+          { type: "pointerDown", button: 0 },
+          { type: "pause", duration: boundedHoldMs },
+          { type: "pointerUp", button: 0 },
+        ],
+      },
+      {
+        type: "wheel",
+        id: "wheel-" + session.name,
+        actions: [
+          { type: "pause", duration: 0 },
+          { type: "scroll", x: 0, y: 0, deltaX: 0, deltaY: -120, duration: 0, origin },
+          { type: "pause", duration: boundedHoldMs },
+          { type: "pause", duration: 0 },
         ],
       },
     ],

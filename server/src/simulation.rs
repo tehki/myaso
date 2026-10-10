@@ -732,16 +732,20 @@ fn begin_requested_action(
             fighter.buffered_block = true;
         } else if edges.dodge
             && remaining_ms <= DODGE_BUFFER_WINDOW_MS + EPSILON
-            && fighter.stamina + EPSILON >= DODGE_STAMINA_COST
+            && (fighter.stamina + EPSILON >= DODGE_STAMINA_COST || edges.attack)
         {
-            fighter.clear_light_attack_buffer();
-            fighter.buffered_block = false;
-            fighter.buffered_dodge = true;
-            fighter.buffered_dodge_dir_x = fighter.facing.cos();
-            fighter.buffered_dodge_dir_y = fighter.facing.sin();
-            fighter.buffered_kick = false;
-            fighter.buffered_jump = false;
-            fighter.buffered_jump_attack = false;
+            if fighter.stamina + EPSILON >= DODGE_STAMINA_COST {
+                fighter.clear_light_attack_buffer();
+                fighter.buffered_block = false;
+                fighter.buffered_dodge = true;
+                fighter.buffered_dodge_dir_x = fighter.facing.cos();
+                fighter.buffered_dodge_dir_y = fighter.facing.sin();
+                fighter.buffered_kick = false;
+                fighter.buffered_jump = false;
+                fighter.buffered_jump_attack = false;
+            }
+            // Exhausted wheel-forward still owns a simultaneous light edge,
+            // while preserving any attack buffered on an earlier input tick.
         } else if edges.jump
             && edges.attack
             && remaining_ms <= JUMP_ATTACK_BUFFER_WINDOW_MS + EPSILON
@@ -816,9 +820,17 @@ fn begin_requested_action(
         return;
     }
 
-    if edges.dodge && spend_stamina(now_ms, fighter, DODGE_STAMINA_COST) {
-        fighter.begin_dodge(fighter.facing.cos(), fighter.facing.sin());
-        return;
+    // Fresh same-tick arbitration is intentional: roll owns a
+    // simultaneous light-attack edge. If the roll is exhausted, consume only
+    // that same-tick LMB instead of leaking a free light attack behind denial.
+    if edges.dodge {
+        if spend_stamina(now_ms, fighter, DODGE_STAMINA_COST) {
+            fighter.begin_dodge(fighter.facing.cos(), fighter.facing.sin());
+            return;
+        }
+        if edges.attack {
+            return;
+        }
     }
 
     if edges.kick

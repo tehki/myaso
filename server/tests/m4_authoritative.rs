@@ -3371,3 +3371,219 @@ fn exhausted_running_attack_edge_is_consumed_without_light_fallback() {
     assert!(attacker.stamina <= before);
     assert!(attacker.stamina > (before - 1.0).max(0.0));
 }
+
+#[test]
+fn same_tick_roll_and_light_attack_resolves_exclusively_to_roll() {
+    let mut world = duel(200.0);
+    advance(
+        &mut world,
+        5.0,
+        InputIntent {
+            dodge: true,
+            attack: true,
+            facing_radians: 0.0,
+            ..InputIntent::default()
+        },
+        InputIntent::default(),
+    );
+    let attacker = world.fighter(1).expect("attacker");
+    assert_eq!(attacker.action, Action::Dodge);
+    assert!((attacker.stamina - 72.0).abs() < 0.1);
+
+    advance(
+        &mut world,
+        700.0,
+        InputIntent::default(),
+        InputIntent::default(),
+    );
+    assert_eq!(world.fighter(2).expect("target").hp, 100.0);
+}
+
+#[test]
+fn exhausted_same_tick_roll_and_light_consumes_the_light_edge() {
+    let mut world = duel(200.0);
+    advance(
+        &mut world,
+        3200.0,
+        InputIntent {
+            move_x: -1.0,
+            run: true,
+            facing_radians: 0.0,
+            ..InputIntent::default()
+        },
+        InputIntent::default(),
+    );
+    let before = world.fighter(1).expect("attacker").stamina;
+    assert!(before < 28.0);
+
+    advance(
+        &mut world,
+        5.0,
+        InputIntent {
+            dodge: true,
+            attack: true,
+            facing_radians: 0.0,
+            ..InputIntent::default()
+        },
+        InputIntent::default(),
+    );
+    assert_eq!(world.fighter(1).expect("attacker").action, Action::Idle);
+    assert!(world.fighter(1).expect("attacker").stamina >= before - 0.1);
+
+    advance(
+        &mut world,
+        350.0,
+        InputIntent::default(),
+        InputIntent::default(),
+    );
+    assert_eq!(world.fighter(1).expect("attacker").action, Action::Idle);
+    assert_eq!(world.fighter(2).expect("target").hp, 100.0);
+}
+
+#[test]
+fn exhausted_recovery_roll_plus_light_does_not_create_a_new_light_buffer() {
+    let mut world = duel(200.0);
+    advance(
+        &mut world,
+        3200.0,
+        InputIntent {
+            move_x: -1.0,
+            run: true,
+            facing_radians: 0.0,
+            ..InputIntent::default()
+        },
+        InputIntent::default(),
+    );
+    advance(
+        &mut world,
+        5.0,
+        InputIntent {
+            attack: true,
+            facing_radians: 0.0,
+            ..InputIntent::default()
+        },
+        InputIntent::default(),
+    );
+    advance(
+        &mut world,
+        130.0,
+        InputIntent::default(),
+        InputIntent::default(),
+    );
+    advance(
+        &mut world,
+        80.0,
+        InputIntent::default(),
+        InputIntent::default(),
+    );
+    advance(
+        &mut world,
+        170.0,
+        InputIntent::default(),
+        InputIntent::default(),
+    );
+    assert!(world.fighter(1).expect("attacker").stamina < 28.0);
+
+    advance(
+        &mut world,
+        5.0,
+        InputIntent {
+            dodge: true,
+            attack: true,
+            facing_radians: std::f32::consts::FRAC_PI_2,
+            ..InputIntent::default()
+        },
+        InputIntent::default(),
+    );
+    advance(
+        &mut world,
+        80.0,
+        InputIntent::default(),
+        InputIntent::default(),
+    );
+    assert_eq!(world.fighter(1).expect("attacker").action, Action::Idle);
+}
+
+#[test]
+fn exhausted_later_roll_plus_light_preserves_an_earlier_buffered_light() {
+    let mut world = duel(200.0);
+    advance(
+        &mut world,
+        3200.0,
+        InputIntent {
+            move_x: -1.0,
+            run: true,
+            facing_radians: 0.0,
+            ..InputIntent::default()
+        },
+        InputIntent::default(),
+    );
+    advance(
+        &mut world,
+        5.0,
+        InputIntent {
+            attack: true,
+            facing_radians: 0.0,
+            ..InputIntent::default()
+        },
+        InputIntent::default(),
+    );
+    advance(
+        &mut world,
+        130.0,
+        InputIntent::default(),
+        InputIntent::default(),
+    );
+    advance(
+        &mut world,
+        80.0,
+        InputIntent::default(),
+        InputIntent::default(),
+    );
+    advance(
+        &mut world,
+        170.0,
+        InputIntent::default(),
+        InputIntent::default(),
+    );
+
+    advance(
+        &mut world,
+        5.0,
+        InputIntent {
+            attack: true,
+            facing_radians: 0.0,
+            ..InputIntent::default()
+        },
+        InputIntent::default(),
+    );
+    advance(
+        &mut world,
+        5.0,
+        InputIntent::default(),
+        InputIntent::default(),
+    );
+    assert!(world.fighter(1).expect("attacker").stamina < 28.0);
+
+    advance(
+        &mut world,
+        5.0,
+        InputIntent {
+            dodge: true,
+            attack: true,
+            facing_radians: std::f32::consts::FRAC_PI_2,
+            ..InputIntent::default()
+        },
+        InputIntent::default(),
+    );
+    advance(
+        &mut world,
+        70.0,
+        InputIntent::default(),
+        InputIntent::default(),
+    );
+    assert_eq!(
+        world.fighter(1).expect("attacker").action,
+        Action::AttackWindup
+    );
+}
