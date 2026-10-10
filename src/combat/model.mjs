@@ -372,6 +372,11 @@ function beginRequestedAction(world, fighter, input, attackPressed, blockPressed
       fighter.bufferedKick = false;
       fighter.bufferedJump = false;
       fighter.bufferedJumpAttack = true;
+    } else if (jumpPressed && attackPressed
+      && remainingMs <= COMBAT.inputBuffer.jumpWindowMs + EPSILON
+      && fighter.stamina + EPSILON < COMBAT.jump.staminaCost) {
+      // An exhausted Space+LMB chord is a denied jump, not a free light
+      // attack. Keep any attack buffered on an earlier input tick intact.
     } else if (jumpPressed
       && remainingMs <= COMBAT.inputBuffer.jumpWindowMs + EPSILON
       && fighter.stamina + EPSILON >= COMBAT.jump.staminaCost) {
@@ -466,6 +471,9 @@ function beginRequestedAction(world, fighter, input, attackPressed, blockPressed
     setAction(fighter, "jump", COMBAT.jump.durationMs);
     return;
   }
+  // Space+LMB remains a single jump-attack intent. If even the base jump
+  // cannot be paid, consume the LMB edge instead of starting a free light.
+  if (jumpPressed && attackPressed && fighter.action === "idle") return;
 
   const moving = Math.hypot(input.moveX, input.moveY) >= 0.5;
   if (attackPressed && input.run && moving && fighter.action === "idle") {

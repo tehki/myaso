@@ -758,6 +758,13 @@ fn begin_requested_action(
             fighter.buffered_jump = false;
             fighter.buffered_jump_attack = true;
         } else if edges.jump
+            && edges.attack
+            && remaining_ms <= JUMP_BUFFER_WINDOW_MS + EPSILON
+            && fighter.stamina + EPSILON < JUMP_STAMINA_COST
+        {
+            // An exhausted Space+LMB chord must not create a free light buffer.
+            // Preserve any earlier buffered attack when this jump is denied.
+        } else if edges.jump
             && remaining_ms <= JUMP_BUFFER_WINDOW_MS + EPSILON
             && fighter.stamina + EPSILON >= JUMP_STAMINA_COST
         {
@@ -872,6 +879,11 @@ fn begin_requested_action(
         && spend_stamina(now_ms, fighter, JUMP_STAMINA_COST)
     {
         fighter.set_action(Action::Jump, JUMP_DURATION_MS);
+        return;
+    }
+    // Space+LMB is one jump-attack intent. Denied base-jump stamina must
+    // consume the simultaneous light edge rather than starting a free attack.
+    if edges.jump && edges.attack && fighter.action == Action::Idle {
         return;
     }
 
