@@ -349,15 +349,19 @@ function beginRequestedAction(world, fighter, input, attackPressed, blockPressed
       fighter.bufferedBlock = true;
     } else if (dodgePressed
       && remainingMs <= COMBAT.inputBuffer.dodgeWindowMs + EPSILON
-      && fighter.stamina + EPSILON >= COMBAT.dodge.staminaCost) {
-      clearLightAttackBuffer(fighter);
-      fighter.bufferedBlock = false;
-      fighter.bufferedDodge = true;
-      fighter.bufferedDodgeDirX = Math.cos(fighter.facing);
-      fighter.bufferedDodgeDirY = Math.sin(fighter.facing);
-      fighter.bufferedKick = false;
-      fighter.bufferedJump = false;
-      fighter.bufferedJumpAttack = false;
+      && (fighter.stamina + EPSILON >= COMBAT.dodge.staminaCost || attackPressed)) {
+      if (fighter.stamina + EPSILON >= COMBAT.dodge.staminaCost) {
+        clearLightAttackBuffer(fighter);
+        fighter.bufferedBlock = false;
+        fighter.bufferedDodge = true;
+        fighter.bufferedDodgeDirX = Math.cos(fighter.facing);
+        fighter.bufferedDodgeDirY = Math.sin(fighter.facing);
+        fighter.bufferedKick = false;
+        fighter.bufferedJump = false;
+        fighter.bufferedJumpAttack = false;
+      }
+      // Exhausted wheel-forward still owns a simultaneous LMB edge, but does
+      // not erase an attack that was buffered on an earlier input tick.
     } else if (jumpPressed
       && attackPressed
       && remainingMs <= COMBAT.inputBuffer.jumpAttackWindowMs + EPSILON
@@ -422,9 +426,15 @@ function beginRequestedAction(world, fighter, input, attackPressed, blockPressed
   const canInterrupt = fighter.action === "idle" || fighter.action === "block";
   if (!canInterrupt) return;
 
-  if (dodgePressed && spendStamina(world, fighter, COMBAT.dodge.staminaCost)) {
-    beginDodge(fighter, Math.cos(fighter.facing), Math.sin(fighter.facing));
-    return;
+  // Fresh same-tick arbitration is intentional: roll owns a
+  // simultaneous light-attack edge. If the roll is exhausted, consume only
+  // that same-tick LMB instead of leaking a free light attack behind denial.
+  if (dodgePressed) {
+    if (spendStamina(world, fighter, COMBAT.dodge.staminaCost)) {
+      beginDodge(fighter, Math.cos(fighter.facing), Math.sin(fighter.facing));
+      return;
+    }
+    if (attackPressed) return;
   }
 
   if (kickPressed && fighter.action === "idle" && spendStamina(world, fighter, COMBAT.kick.staminaCost)) {

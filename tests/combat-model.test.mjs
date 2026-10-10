@@ -840,6 +840,44 @@ test("later roll intent overrides a buffered light attack", () => {
   assert.equal(attacker.stamina, COMBAT.stamina.max - COMBAT.dodge.staminaCost);
 });
 
+test("exhausted same-tick recovery roll plus light does not create a new light buffer", () => {
+  const world = duel({ distance: 200 });
+  const { attacker, target } = enterLightRecovery(world);
+
+  advance(world, COMBAT.attack.recoveryMs - 85, { a: { aimX: target.x, aimY: target.y } });
+  attacker.stamina = COMBAT.dodge.staminaCost - 1;
+  stepWorld(world, {
+    a: { dodge: true, attack: true, aimX: attacker.x, aimY: attacker.y + 100 },
+  }, 5);
+
+  assert.equal(attacker.action, "attack_recovery");
+  assert.equal(attacker.bufferedDodge, false);
+  assert.equal(attacker.bufferedLightAttack, false);
+
+  advance(world, 80, { a: { aimX: target.x, aimY: target.y } });
+  assert.equal(attacker.action, "idle");
+});
+
+test("exhausted later roll plus light preserves an earlier buffered light", () => {
+  const world = duel({ distance: 200 });
+  const { attacker, target } = enterLightRecovery(world);
+
+  advance(world, COMBAT.attack.recoveryMs - 85, { a: { aimX: target.x, aimY: target.y } });
+  stepWorld(world, { a: { attack: true, aimX: target.x, aimY: target.y } }, 5);
+  assert.equal(attacker.bufferedLightAttack, true);
+  stepWorld(world, { a: { aimX: target.x, aimY: target.y } }, 5);
+
+  attacker.stamina = COMBAT.dodge.staminaCost - 1;
+  stepWorld(world, {
+    a: { dodge: true, attack: true, aimX: attacker.x, aimY: attacker.y + 100 },
+  }, 5);
+  assert.equal(attacker.bufferedDodge, false);
+  assert.equal(attacker.bufferedLightAttack, true);
+
+  advance(world, 70, { a: { aimX: target.x, aimY: target.y } });
+  assert.equal(attacker.action, "attack_windup");
+});
+
 test("late fresh jump buffers through full light recovery and charges stamina on execution", () => {
   const world = duel({ distance: 200 });
   const { attacker, target } = enterLightRecovery(world);
@@ -1092,4 +1130,42 @@ test("exhausted running strike edge is consumed instead of falling back to a lig
   assert.equal(attacker.action, "idle");
   assert.ok(attacker.stamina <= before);
   assert.ok(attacker.stamina > Math.max(0, before - 1));
+});
+
+test("same-tick roll and light attack resolves exclusively to roll", () => {
+  const world = duel({ distance: 200 });
+  const [fighter, target] = world.fighters;
+  const before = fighter.stamina;
+
+  stepWorld(world, {
+    a: { dodge: true, attack: true, aimX: target.x, aimY: target.y },
+  }, 5);
+
+  assert.equal(fighter.action, "dodge");
+  assert.equal(fighter.stamina, before - COMBAT.dodge.staminaCost);
+
+  advance(world, COMBAT.dodge.durationMs + COMBAT.dodge.recoveryMs + 20, {
+    a: { aimX: target.x, aimY: target.y },
+  });
+  assert.equal(fighter.action, "idle");
+  assert.equal(target.hp, 100);
+});
+
+test("exhausted same-tick roll and light consumes the light edge instead of attacking", () => {
+  const world = duel({ distance: 200 });
+  const [fighter, target] = world.fighters;
+  fighter.stamina = COMBAT.dodge.staminaCost - 1;
+  const before = fighter.stamina;
+
+  stepWorld(world, {
+    a: { dodge: true, attack: true, aimX: target.x, aimY: target.y },
+  }, 5);
+
+  assert.equal(fighter.action, "idle");
+  assert.ok(fighter.stamina >= before - 0.1);
+  advance(world, COMBAT.attack.windupMs + COMBAT.attack.activeMs + 50, {
+    a: { aimX: target.x, aimY: target.y },
+  });
+  assert.equal(fighter.action, "idle");
+  assert.equal(target.hp, 100);
 });

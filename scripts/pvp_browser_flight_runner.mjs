@@ -375,7 +375,7 @@ try {
     console.log("M166_AUTHORITATIVE_STAMINA_FEEDBACK " + JSON.stringify({ ok: true, results }));
   } else if (scenario === "uistaminaconfirmed") {
     const results = await runOnlineUiConfirmedStaminaActionsFlight(sessions);
-    console.log("M169_CONFIRMED_STAMINA_ACTIONS " + JSON.stringify({ ok: true, results }));
+    console.log("M174_CONFIRMED_ROLL_ATTACK_ARBITRATION " + JSON.stringify({ ok: true, results }));
   } else if (scenario === "uiguardbreaktell") {
     const results = await runOnlineUiGuardBreakTellFlight(sessions);
     console.log(`M40_FFA_GUARD_BREAK_TELL ${JSON.stringify({ ok: true, results })}`);
@@ -1860,7 +1860,7 @@ async function runOnlineUiStaminaFeedbackFlight(
 }
 
 async function runOnlineUiConfirmedStaminaActionsFlight(entries) {
-  const milestone = "M169 confirmed stamina actions";
+  const milestone = "M174 roll/attack arbitration";
   if (entries.length !== 2) {
     throw new Error(milestone + " expected two real browser clients, received " + entries.length);
   }
@@ -1949,6 +1949,51 @@ async function runOnlineUiConfirmedStaminaActionsFlight(entries) {
             + JSON.stringify(state.wheels.slice(offset)));
         }
         return { epochMs: wheels[0].epochMs, detail: wheels[0] };
+      },
+    },
+    {
+      action: "roll",
+      proofName: "roll+light",
+      cost: COMBAT.dodge.staminaCost,
+      text: "Low stamina — roll needs 28.",
+      accepted: new Set([
+        COMBAT_ACTION.dodge,
+        COMBAT_ACTION.dodgeRecovery,
+        COMBAT_ACTION.attackWindup,
+        COMBAT_ACTION.attackActive,
+        COMBAT_ACTION.attackRecovery,
+        COMBAT_ACTION.attackLeftWindup,
+        COMBAT_ACTION.attackLeftActive,
+        COMBAT_ACTION.attackLeftRecovery,
+        COMBAT_ACTION.attackRightWindup,
+        COMBAT_ACTION.attackRightActive,
+        COMBAT_ACTION.attackRightRecovery,
+      ]),
+      perform: () => performArenaRollAttackChord(actor, actorElementId, awayOffset, 70),
+      captureOffset: (state) => ({
+        wheels: state.wheels.length,
+        pointers: state.pointers.length,
+      }),
+      inputEvidence: (state, offset) => {
+        const wheels = state.wheels.slice(offset.wheels).filter((entry) => entry.deltaY < 0);
+        const pointers = state.pointers.slice(offset.pointers).filter((entry) => entry.button === 0);
+        const downs = pointers.filter((entry) => entry.type === "pointerdown");
+        const ups = pointers.filter((entry) => entry.type === "pointerup");
+        if (wheels.length !== 1 || downs.length !== 1 || ups.length !== 1
+          || !Number.isFinite(wheels[0]?.epochMs)
+          || !Number.isFinite(downs[0]?.epochMs) || !Number.isFinite(ups[0]?.epochMs)
+          || ups[0].epochMs <= downs[0].epochMs
+          || Math.abs(wheels[0].epochMs - downs[0].epochMs) > 80) {
+          throw new Error(milestone + " roll+light did not record one genuine same-tick wheel-forward + LMB chord: "
+            + JSON.stringify({
+              wheels: state.wheels.slice(offset.wheels),
+              pointers: state.pointers.slice(offset.pointers),
+            }));
+        }
+        return {
+          epochMs: Math.max(wheels[0].epochMs, downs[0].epochMs),
+          detail: { wheel: wheels[0], down: downs[0], up: ups[0] },
+        };
       },
     },
     {
@@ -2136,6 +2181,7 @@ async function runOnlineUiConfirmedStaminaActionsFlight(entries) {
     }
 
     proofs.push({
+      proof: actionCase.proofName ?? actionCase.action,
       action: actionCase.action,
       cost: actionCase.cost,
       baselineStamina,
@@ -10584,6 +10630,36 @@ async function performArenaRunHold(session, elementId, movementKey, xOffset = 20
           { type: "keyDown", value: movementKey },
           { type: "pause", duration: boundedHoldMs },
           { type: "keyUp", value: movementKey },
+        ],
+      },
+    ],
+  });
+}
+
+async function performArenaRollAttackChord(session, elementId, xOffset = 200, holdMs = 70) {
+  const origin = { "element-6066-11e4-a52e-4f735466cecf": elementId };
+  const boundedHoldMs = Math.max(45, Math.min(140, Math.trunc(holdMs)));
+  await webdriver(session.base, "POST", "/session/" + session.sessionId + "/actions", {
+    actions: [
+      {
+        type: "pointer",
+        id: "mouse-" + session.name,
+        parameters: { pointerType: "mouse" },
+        actions: [
+          { type: "pointerMove", duration: 0, origin, x: xOffset, y: 0 },
+          { type: "pointerDown", button: 0 },
+          { type: "pause", duration: boundedHoldMs },
+          { type: "pointerUp", button: 0 },
+        ],
+      },
+      {
+        type: "wheel",
+        id: "wheel-" + session.name,
+        actions: [
+          { type: "pause", duration: 0 },
+          { type: "scroll", x: 0, y: 0, deltaX: 0, deltaY: -120, duration: 0, origin },
+          { type: "pause", duration: boundedHoldMs },
+          { type: "pause", duration: 0 },
         ],
       },
     ],
