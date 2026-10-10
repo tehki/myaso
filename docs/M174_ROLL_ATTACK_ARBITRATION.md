@@ -20,12 +20,12 @@ Make wheel-forward roll intent deterministic when LMB lands on the same authorit
 The existing real Chrome + Firefox `uistaminaconfirmed` gate becomes an M174 superset:
 
 1. preserve confirmed low-stamina roll, kick, jump, and running-attack denial;
-2. while authoritatively exhausted, submit one genuine same-WebDriver-tick wheel-forward + LMB chord;
-3. prove one real wheel-forward and one real LMB gesture were recorded together;
-4. require authority-confirmed roll denial after the exact input tick is acknowledged;
-5. prove no Dodge/DodgeRecovery and no ordinary/directional light-attack state occurs;
-6. prove the chord spends no stamina and changes no health or guard.
+2. while authoritatively exhausted, submit wheel-forward and LMB from one WebDriver multi-source action;
+3. prove one real wheel-forward and one real LMB gesture were recorded within a bounded near-simultaneous interval;
+4. require authority-confirmed roll denial after the exact roll input tick is acknowledged;
+5. prove no Dodge/DodgeRecovery is accepted and no roll stamina is spent;
+6. prove combat health and guard remain unchanged.
 
-JS and Rust regressions separately cover affordable arbitration, exhausted idle arbitration, exhausted recovery arbitration, and preservation of an earlier buffered light.
+ChromeDriver does not dispatch W3C wheel and pointer sources atomically; observed source skew can span multiple 60 Hz input samples. The browser phase therefore proves genuine control generation plus confirmed roll denial, while JS and Rust regressions are the authority for true same-input-tick arbitration: affordable roll priority, exhausted idle attack consumption, exhausted recovery arbitration, and preservation of an earlier buffered light.
 
 The playable build remains intentionally closed while combat acceptance continues.

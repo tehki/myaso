@@ -1956,19 +1956,16 @@ async function runOnlineUiConfirmedStaminaActionsFlight(entries) {
       proofName: "roll+light",
       cost: COMBAT.dodge.staminaCost,
       text: "Low stamina — roll needs 28.",
+      // W3C wheel and pointer sources are not dispatched atomically by
+      // ChromeDriver: one source can precede the other by tens of milliseconds.
+      // Kernel tests own the true same-input-tick no-light guarantee; this real
+      // browser phase proves both genuine controls and confirmed roll denial.
       accepted: new Set([
         COMBAT_ACTION.dodge,
         COMBAT_ACTION.dodgeRecovery,
-        COMBAT_ACTION.attackWindup,
-        COMBAT_ACTION.attackActive,
-        COMBAT_ACTION.attackRecovery,
-        COMBAT_ACTION.attackLeftWindup,
-        COMBAT_ACTION.attackLeftActive,
-        COMBAT_ACTION.attackLeftRecovery,
-        COMBAT_ACTION.attackRightWindup,
-        COMBAT_ACTION.attackRightActive,
-        COMBAT_ACTION.attackRightRecovery,
       ]),
+      requireEventText: false,
+      settleToIdle: true,
       perform: () => performArenaRollAttackChord(actor, actorElementId, awayOffset, 70),
       captureOffset: (state) => ({
         wheels: state.wheels.length,
@@ -2116,8 +2113,13 @@ async function runOnlineUiConfirmedStaminaActionsFlight(entries) {
     const rejected = await waitForActor(
       (state) => {
         const transitions = state.acceptance?.staminaDenialTransitions?.slice(denialOffset) ?? [];
-        return transitions.some((entry) => entry.stage === "shown" && entry.action === actionCase.action)
-          && state.events.slice(eventOffset).includes(actionCase.text)
+        const hasShownDenial = transitions.some(
+          (entry) => entry.stage === "shown" && entry.action === actionCase.action,
+        );
+        const hasExpectedEvent = actionCase.requireEventText === false
+          || state.events.slice(eventOffset).includes(actionCase.text);
+        return hasShownDenial
+          && hasExpectedEvent
           && state.feedbackTransitions.slice(feedbackOffset).includes("stamina-denied");
       },
       1200,
@@ -2183,6 +2185,16 @@ async function runOnlineUiConfirmedStaminaActionsFlight(entries) {
     proofs.push({
       proof: actionCase.proofName ?? actionCase.action,
       action: actionCase.action,
+      serializedLightObserved: Boolean(actionCase.settleToIdle
+        && newActions.some((entry) => entry.action === COMBAT_ACTION.attackWindup
+          || entry.action === COMBAT_ACTION.attackActive
+          || entry.action === COMBAT_ACTION.attackRecovery
+          || entry.action === COMBAT_ACTION.attackLeftWindup
+          || entry.action === COMBAT_ACTION.attackLeftActive
+          || entry.action === COMBAT_ACTION.attackLeftRecovery
+          || entry.action === COMBAT_ACTION.attackRightWindup
+          || entry.action === COMBAT_ACTION.attackRightActive
+          || entry.action === COMBAT_ACTION.attackRightRecovery)),
       cost: actionCase.cost,
       baselineStamina,
       inputEpochMs: input.epochMs,
@@ -2192,7 +2204,15 @@ async function runOnlineUiConfirmedStaminaActionsFlight(entries) {
       shownEpochMs: shown.epochMs,
     });
 
-    await sleep(120);
+    if (actionCase.settleToIdle) {
+      await waitForActor(
+        (state) => state.acceptance?.ownActionTransitions?.at(-1)?.action === COMBAT_ACTION.idle,
+        900,
+        actionCase.action + " serialized browser chord recovery",
+      );
+    } else {
+      await sleep(120);
+    }
   }
 
   const states = await Promise.all(entries.map(readUiEvidence));
