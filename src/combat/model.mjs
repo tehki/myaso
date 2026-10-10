@@ -430,6 +430,13 @@ function beginRequestedAction(world, fighter, input, attackPressed, blockPressed
   const canInterrupt = fighter.action === "idle" || fighter.action === "block";
   if (!canInterrupt) return;
 
+  // Fresh same-tick defense is intentional: wheel-back owns a simultaneous
+  // light-attack edge from idle. Feint handling above remains unchanged.
+  if (blockPressed && attackPressed && fighter.action === "idle") {
+    setAction(fighter, "block", Number.POSITIVE_INFINITY);
+    return;
+  }
+
   // Fresh same-tick arbitration is intentional: roll owns a
   // simultaneous light-attack edge. If the roll is exhausted, consume only
   // that same-tick LMB instead of leaking a free light attack behind denial.

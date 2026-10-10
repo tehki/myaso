@@ -3373,6 +3373,35 @@ fn exhausted_running_attack_edge_is_consumed_without_light_fallback() {
 }
 
 #[test]
+fn same_tick_block_and_light_attack_resolves_exclusively_to_block() {
+    let mut world = duel(200.0);
+    let before = world.fighter(1).expect("attacker").stamina;
+    advance(
+        &mut world,
+        5.0,
+        InputIntent {
+            block: true,
+            attack: true,
+            facing_radians: 0.0,
+            ..InputIntent::default()
+        },
+        InputIntent::default(),
+    );
+    let attacker = world.fighter(1).expect("attacker");
+    assert_eq!(attacker.action, Action::Block);
+    assert!((attacker.stamina - before).abs() < 0.1);
+
+    advance(
+        &mut world,
+        5.0,
+        InputIntent::default(),
+        InputIntent::default(),
+    );
+    assert_eq!(world.fighter(1).expect("attacker").action, Action::Idle);
+    assert_eq!(world.fighter(2).expect("target").hp, 100.0);
+}
+
+#[test]
 fn same_tick_roll_and_light_attack_resolves_exclusively_to_roll() {
     let mut world = duel(200.0);
     advance(
