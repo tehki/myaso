@@ -4316,14 +4316,29 @@ async function runOnlineUiKickKnockdownFfaHitFlight(entries) {
     && Number.isFinite(entry.epochMs)
     && entry.epochMs > conversion.knockdownTransition.epochMs);
   const defenderFocusActions = defenderState.acceptance?.focusActionTransitions ?? [];
+  const beforeOrSameRecoveryTick = (entry) => {
+    if (!defenderRecovery) return true;
+    if (Number.isFinite(entry.serverTick) && Number.isFinite(defenderRecovery.serverTick)) {
+      return entry.serverTick <= defenderRecovery.serverTick;
+    }
+    return entry.epochMs < defenderRecovery.epochMs;
+  };
   const defenderSawPunishActive = defenderState.acceptance?.focusNetId === punisherId
     && defenderFocusActions.some((entry) =>
       entry.action === COMBAT_ACTION.attackActive
       && Number.isFinite(entry.epochMs)
       && entry.epochMs >= punishWindup.epochMs
-      && (!defenderRecovery || entry.epochMs < defenderRecovery.epochMs));
+      && beforeOrSameRecoveryTick(entry));
+  const punishActiveAfterRecovery = defenderRecovery
+    && (Number.isFinite(punishActive.serverTick) && Number.isFinite(defenderRecovery.serverTick)
+      ? punishActive.serverTick > defenderRecovery.serverTick
+      : punishActive.epochMs >= defenderRecovery.epochMs);
+  // hitEvidence already proves exactly one 34 HP hit resolved while the victim
+  // was knocked down. When active and recovery replicate on the same server
+  // tick, browser epoch order is not authoritative; only a later recovery tick
+  // invalidates the conversion.
   if (punishActive.epochMs >= knockdownEndEpochMs
-    || (defenderRecovery && punishActive.epochMs >= defenderRecovery.epochMs)
+    || punishActiveAfterRecovery
     || !defenderSawPunishActive) {
     throw new Error(milestone + " authoritative ordering did not prove #"
       + punisherId + " became active before #" + defenderId + " recovered: "
