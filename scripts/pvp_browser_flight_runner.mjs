@@ -3238,20 +3238,29 @@ async function runOnlineUiJumpAttackCounterplayFlight(entries, defense) {
     await scrollArenaWheelPair(defender, defenderElementId, 120, 20, 100);
     await performArenaJumpAttackChord(attacker, attackerElementId, attackOffset, 90);
   } else if (defense === "parry") {
-    // Start one genuine Space+LMB chord, then issue the genuine Chrome
-    // wheel-back immediately after WebDriver has delivered the held chord.
-    // The previous focus-stream round trip cost roughly one server tick under
-    // load and could make Block authoritative on the same tick as JUMP STRIKE.
-    // With the existing 120 ms staging distance, immediate wheel delivery still
-    // reaches authority late enough that the unchanged 125 ms parry opening
-    // spans impact, while removing the extra replicated-windup observation hop.
+    // Dispatch the genuine Firefox Space+LMB chord and a delayed Chrome
+    // wheel-back concurrently. Waiting for the Firefox WebDriver response
+    // before dispatching Chrome can cost over 200 ms under hosted CI load:
+    // the wheel then arrives after the 105 ms jump windup and deals HP damage.
+    // The 70 ms wheel-source pause is measured from Chrome's own command
+    // clock, independent of Firefox's variable command-completion latency.
+    // CI calibration found 130 ms landed after impact, while 20 ms opened
+    // block too early; center the pulse within the 125 ms parry window.
+    // Preserve the real browser gesture, 125 ms parry window, and all combat
+    // constants. The authoritative stunned/zero-damage assertions below
+    // still fail closed if wheel timing misses the actual jump strike.
     let chordHeld = false;
+    const chordPromise = pressArenaJumpAttackChord(
+      attacker, attackerElementId, attackOffset,
+    ).then(() => { chordHeld = true; });
     try {
-      await pressArenaJumpAttackChord(attacker, attackerElementId, attackOffset);
-      chordHeld = true;
-      await scrollArenaWheel(defender, defenderElementId, 120, 0);
+      await Promise.all([
+        chordPromise,
+        scrollArenaWheel(defender, defenderElementId, 120, 70),
+      ]);
       await sleep(20);
     } finally {
+      await chordPromise.catch(() => {});
       if (chordHeld) await releaseArenaJumpAttackChord(attacker);
     }
   } else if (defense === "dodge") {
