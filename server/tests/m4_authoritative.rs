@@ -2807,7 +2807,7 @@ fn airborne_attack_below_conversion_cost_stays_an_ordinary_jump() {
         InputIntent::default(),
     );
     assert_eq!(world.fighter(1).expect("attacker").action, Action::Idle);
-    assert_eq!(world.fighter(2).expect("target").hp, 100);
+    assert_eq!(world.fighter(2).expect("target").hp, 100.0);
 }
 
 #[test]
