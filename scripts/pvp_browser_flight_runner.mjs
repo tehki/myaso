@@ -3242,8 +3242,10 @@ async function runOnlineUiJumpAttackCounterplayFlight(entries, defense) {
     // wheel-back concurrently. Waiting for the Firefox WebDriver response
     // before dispatching Chrome can cost over 200 ms under hosted CI load:
     // the wheel then arrives after the 105 ms jump windup and deals HP damage.
-    // The 130 ms wheel-source pause is measured from Chrome's own command
+    // The 20 ms wheel-source pause is measured from Chrome's own command
     // clock, independent of Firefox's variable command-completion latency.
+    // CI evidence showed a 130 ms pause arriving at the strike frame; the
+    // shorter delay leaves room for the unchanged 125 ms parry opening.
     // Preserve the real browser gesture, 125 ms parry window, and all combat
     // constants. The authoritative stunned/zero-damage assertions below
     // still fail closed if wheel timing misses the actual jump strike.
@@ -3254,7 +3256,7 @@ async function runOnlineUiJumpAttackCounterplayFlight(entries, defense) {
     try {
       await Promise.all([
         chordPromise,
-        scrollArenaWheel(defender, defenderElementId, 120, 130),
+        scrollArenaWheel(defender, defenderElementId, 120, 20),
       ]);
       await sleep(20);
     } finally {
