@@ -1036,9 +1036,19 @@ async function runOnlineUiHeavyParryFlight(entries) {
     const windupDeadline = Date.now() + COMBAT.heavyAttack.windupMs + 180;
     let windupSeen = false;
     while (!windupSeen && Date.now() < windupDeadline) {
-      const liveDefender = await readUiEvidence(defender);
+      // Both clients witness the same authoritative heavy commitment, but
+      // headless Firefox can skip the short spatial threat frame under load.
+      // The attacker's committed event is an independent authoritative
+      // witness; do not skip the genuine wheel merely because Firefox's
+      // HUD missed one replicated windup snapshot.
+      const [liveDefender, liveAttacker] = await Promise.all([
+        readUiEvidence(defender),
+        readUiEvidence(attacker),
+      ]);
       windupSeen = liveDefender.threatTransitions.some((entry) =>
-        entry.visible && entry.phase === "HEAVY WINDUP");
+        entry.visible && entry.phase === "HEAVY WINDUP")
+        || liveAttacker.events.some((message) =>
+          message.startsWith("Heavy strike committed"));
       if (!windupSeen) await sleep(6);
     }
     if (windupSeen) {
