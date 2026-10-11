@@ -7935,12 +7935,25 @@ async function runOnlineUiBlockFacingTellFlight(entries) {
   const aimOffset = defenderReady.playerNetId > observerReady.playerNetId ? -200 : 200;
   await aimArena(defender, defenderElementId, aimOffset);
 
+  // The wheel-back short block lasts 240 ms, often less than several
+  // headless WebDriver round trips. Start canvas-frame capture before the
+  // genuine wheel and preserve the original remote-only pixel assertion.
+  await Promise.all(entries.map(armBlockFacingTellSampler));
   let tell;
-  await setArenaBlock(defender, defenderElementId, true);
   try {
-    tell = await waitForRemoteBlockFacingTell(observer, defender, 900);
+    await setArenaBlock(defender, defenderElementId, true);
+    await sleep(COMBAT.block.shortBlockMs + 100);
+    const [observerMax, localMax] = await Promise.all([
+      readBlockFacingTellSampler(observer),
+      readBlockFacingTellSampler(defender),
+    ]);
+    if (observerMax < 24 || localMax !== 0) {
+      throw new Error(`M42 remote-only block-facing pixels incorrect: observer=${observerMax} local=${localMax}`);
+    }
+    tell = { observerMax, localMax };
   } finally {
     await setArenaBlock(defender, defenderElementId, false);
+    await Promise.allSettled(entries.map(stopBlockFacingTellSampler));
   }
   await waitForBlockFacingTellClear(observer, 1000);
 
@@ -11745,6 +11758,39 @@ async function sampleBlockFacingTellPixels(session) {
       if (Math.abs(pixels[i] - 154) <= 2 && Math.abs(pixels[i + 1] - 215) <= 2 && Math.abs(pixels[i + 2] - 167) <= 2 && pixels[i + 3] > 0) count += 1;
     }
     return count;
+  `);
+}
+
+async function armBlockFacingTellSampler(session) {
+  return execute(session.base, session.sessionId, `
+    const arena = document.querySelector('#arena');
+    const ctx = arena?.getContext('2d');
+    if (!ctx) return false;
+    const state = { active: true, maxPixels: 0, frame: 0 };
+    const sample = () => {
+      if (!state.active) return;
+      const data = ctx.getImageData(0, 0, arena.width, arena.height).data;
+      let count = 0;
+      for (let i = 0; i < data.length; i += 4)
+        if (Math.abs(data[i] - 154) <= 2 && Math.abs(data[i + 1] - 215) <= 2 && Math.abs(data[i + 2] - 167) <= 2 && data[i + 3] > 0) count++;
+      state.maxPixels = Math.max(state.maxPixels, count);
+      state.frame = requestAnimationFrame(sample);
+    };
+    window.__MYASO_M42_FACING_SAMPLER__ = state;
+    sample();
+    return true;
+  `);
+}
+async function readBlockFacingTellSampler(session) {
+  return execute(session.base, session.sessionId, "return window.__MYASO_M42_FACING_SAMPLER__?.maxPixels ?? 0;");
+}
+async function stopBlockFacingTellSampler(session) {
+  return execute(session.base, session.sessionId, `
+    const state = window.__MYASO_M42_FACING_SAMPLER__;
+    if (!state) return 0;
+    state.active = false;
+    cancelAnimationFrame(state.frame);
+    return state.maxPixels;
   `);
 }
 
