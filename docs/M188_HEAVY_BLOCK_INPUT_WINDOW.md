@@ -39,3 +39,14 @@ block and 215 ms for parry, before WebDriver delivery overhead. These offsets
 change only acceptance scheduling; the Rust server remains the sole arbiter.
 Any 46 HP damage, parry during a block test, or missing parry during a parry
 test remains a hard CI failure. A complete final-head quality run is required.
+
+## Early repeatability gate
+
+Quality #995 demonstrated that a 110 ms post-commit heavy-block wheel can still
+be processed inside the server's parry window after loaded WebDriver/input
+latency. The next candidate advances that **single genuine wheel** to a 65 ms
+post-commit target, without touching the unchanged 125 ms parry or 240 ms block
+windows. The six-fresh-browser repeatability gate moves immediately after
+Rust validation to surface instability before running the entire PvP suite.
+Any parry in `uiheavyblock`, any 46 HP leak, or any missing parry in
+`uiheavyparry` still blocks promotion.
