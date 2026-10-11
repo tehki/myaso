@@ -8552,7 +8552,12 @@ async function runOnlineUiGuardBreakPunishFfaFocusFlight(entries, convert = fals
     guardBreakRecovery = conversionPlan.guardBreakRecovery;
 
     let hitEvidence = null;
-    const hitDeadline = Date.now() + 320;
+    // The buffered light has a genuine 135 ms windup after attack recovery,
+    // and real Chrome/Firefox snapshots can arrive a frame after the 34 HP
+    // result. The older 320 ms poll occasionally expired even when the
+    // authoritative hit landed inside the unchanged 650 ms guard-break stun.
+    // Wait for evidence only; never extend the stun or synthesize an attack.
+    const hitDeadline = Date.now() + COMBAT.block.guardBreakStunMs + 120;
     while (Date.now() < hitDeadline) {
       const states = await Promise.all(entries.map(readUiEvidence));
       const currentAttacker = states.find((entry) => entry.browser === attacker.name);
