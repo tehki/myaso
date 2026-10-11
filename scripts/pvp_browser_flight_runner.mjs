@@ -947,47 +947,93 @@ function assertHeavyControlDelivered(attackerResult, movementCode, label) {
 // before the exchange, then pre-arm the two real browser action commands in
 // parallel. The pointer observer only records event time; it never generates
 // input or changes combat state.
-async function measureRealPointerDispatchLag(session, elementId, aimOffset) {
-  await execute(session.base, session.sessionId,
-    "window.__MYASO_M190_POINTER_EPOCH__=null;"
-    + "document.querySelector('#arena').addEventListener('pointermove',"
-    + "()=>{window.__MYASO_M190_POINTER_EPOCH__=Date.now()},"
-    + "{capture:true,once:true});return true;");
-  const dispatchedAt = Date.now();
-  await aimArena(session, elementId, aimOffset, 1);
-  const eventEpochMs = await execute(session.base, session.sessionId,
-    "return window.__MYASO_M190_POINTER_EPOCH__;");
-  await aimArena(session, elementId, aimOffset, 0);
-  if (!Number.isFinite(eventEpochMs) || eventEpochMs < dispatchedAt
-    || eventEpochMs - dispatchedAt > 1500) {
-    throw new Error("M190 failed to observe genuine pointer dispatch: " + JSON.stringify({
-      browser: session.name, dispatchedAt, eventEpochMs,
-    }));
+// M192: calibrate the *actual* authoritative E and wheel ingress on these
+// browser sessions, not a different pointerMove path. A genuine off-axis heavy
+// whiff and an isolated real wheel-back run while both fighters are at 100 HP
+// and outside a damage exchange. Their observed server action transitions
+// measure end-to-end input latency without mutating acceptance or game state.
+async function calibrateHeavyIngress(
+  attacker, defender, attackerElementId, defenderElementId,
+  attackOffset, blockOffset,
+) {
+  const before = await Promise.all([readUiEvidence(attacker), readUiEvidence(defender)]);
+  const attackOffsetIndex = before[0].acceptance?.ownActionTransitions?.length ?? 0;
+  const defendOffsetIndex = before[1].acceptance?.ownActionTransitions?.length ?? 0;
+
+  await aimArena(attacker, attackerElementId, -attackOffset);
+  await sleep(45);
+  const eRequestEpochMs = Date.now();
+  await pulseMovementKey(attacker, "e", heavyKeyPulseMs);
+  await sleep(COMBAT.heavyAttack.windupMs + COMBAT.heavyAttack.activeMs
+    + COMBAT.heavyAttack.recoveryMs + 210);
+  const whiff = await Promise.all([readUiEvidence(attacker), readUiEvidence(defender)]);
+  const windup = whiff[0].acceptance?.ownActionTransitions?.slice(attackOffsetIndex)
+    .find(entry => entry.action === COMBAT_ACTION.heavyAttackWindup);
+  const lateIdle = whiff[0].acceptance?.ownActionTransitions?.slice(attackOffsetIndex)
+    .some((entry) => entry.action === COMBAT_ACTION.idle
+      && Number.isFinite(windup?.epochMs) && entry.epochMs > windup.epochMs);
+  if (!windup || !lateIdle || whiff.some(x => x.playerHp !== 100
+    || x.playerGuard !== 100)) {
+    throw new Error("M192 real heavy calibration whiff was not clean: "
+      + JSON.stringify({ attacker: whiff[0].acceptance, defender: whiff[1].acceptance,
+        hp: whiff.map(x => x.playerHp), guard: whiff.map(x => x.playerGuard) }));
   }
-  return eventEpochMs - dispatchedAt;
+  const eIngressMs = windup.epochMs - eRequestEpochMs;
+
+  // No heavy is pending during this isolated real wheel, so it cannot fake a
+  // parry result or apply guard pressure. The 240 ms short block fully expires
+  // before the actual test exchange starts.
+  const wheelRequestEpochMs = Date.now();
+  await scrollArenaWheel(defender, defenderElementId, 120, 0);
+  await sleep(COMBAT.block.shortBlockMs + 210);
+  const afterWheel = await Promise.all([readUiEvidence(attacker), readUiEvidence(defender)]);
+  const block = afterWheel[1].acceptance?.ownActionTransitions?.slice(defendOffsetIndex)
+    .find(entry => entry.action === COMBAT_ACTION.block);
+  const wheelIngressMs = Number.isFinite(block?.epochMs)
+    ? block.epochMs - wheelRequestEpochMs : NaN;
+  if (!Number.isFinite(eIngressMs) || eIngressMs < 0 || eIngressMs > 750
+    || !Number.isFinite(wheelIngressMs) || wheelIngressMs < 0 || wheelIngressMs > 750
+    || afterWheel.some(x => x.playerHp !== 100 || x.playerGuard !== 100)) {
+    throw new Error("M192 real wheel/E calibration did not preserve authority: "
+      + JSON.stringify({ eIngressMs, wheelIngressMs,
+        attack: afterWheel[0].acceptance, defense: afterWheel[1].acceptance,
+        hp: afterWheel.map(x => x.playerHp),
+        guard: afterWheel.map(x => x.playerGuard) }));
+  }
+  await Promise.all([
+    aimArena(attacker, attackerElementId, attackOffset),
+    aimArena(defender, defenderElementId, blockOffset),
+  ]);
+  await sleep(55);
+  return { eIngressMs, wheelIngressMs, windupTick: windup.serverTick,
+    blockTick: block.serverTick };
 }
 
-// The unchanged heavy input and the genuine Firefox wheel are dispatched at
-// once, with Firefox's W3C-native pause compensating for measured differences
-// in Chrome/Firefox action-delivery latency. Unlike waiting until replicated
-// windup appears, this can send the wheel *before* the phase telemetry arrives
-// and therefore handle loaded 100-200ms driver delays without synthetic input.
+// One real Chrome E gesture and one real Firefox wheel-back remain the entire
+// measured exchange. The W3C-native wheel pause compensates for observed
+// E-to-server-windup and wheel-to-server-block latency, not pointer latency.
+// Any wrong result is still a terminal failure in the block/parry callers.
 async function performHeavyCounterplayWindowWheel(
   attacker, defender, attackerElementId, defenderElementId,
   attackOffset, blockOffset, targetAfterWindupMs,
 ) {
-  const before = await readUiEvidence(attacker);
-  const actionOffset = before.acceptance?.ownActionTransitions?.length ?? 0;
-  const [attackerDriverMs, defenderDriverMs] = await Promise.all([
-    measureRealPointerDispatchLag(attacker, attackerElementId, attackOffset),
-    measureRealPointerDispatchLag(defender, defenderElementId, blockOffset),
-  ]);
-  const wheelDelayMs = Math.max(0, Math.min(420, Math.round(
-    targetAfterWindupMs + attackerDriverMs - defenderDriverMs,
-  )));
-  console.log("M190_HEAVY_INPUT_PLAN " + JSON.stringify({
-    scenario, attackerDriverMs, defenderDriverMs,
-    targetAfterWindupMs, wheelDelayMs,
+  const calibration = await calibrateHeavyIngress(
+    attacker, defender, attackerElementId, defenderElementId,
+    attackOffset, blockOffset,
+  );
+  const before = await Promise.all([readUiEvidence(attacker), readUiEvidence(defender)]);
+  const attackActionOffset = before[0].acceptance?.ownActionTransitions?.length ?? 0;
+  const defendActionOffset = before[1].acceptance?.ownActionTransitions?.length ?? 0;
+  const wheelOffset = before[1].wheels.length;
+  const wheelDelayMs = Math.round(
+    targetAfterWindupMs + calibration.eIngressMs - calibration.wheelIngressMs,
+  );
+  if (wheelDelayMs < 0 || wheelDelayMs > 450) {
+    throw new Error("M192 calibrated wheel timing outside admissible W3C pause: "
+      + JSON.stringify({ ...calibration, targetAfterWindupMs, wheelDelayMs }));
+  }
+  console.log("M192_REAL_INGRESS_PLAN " + JSON.stringify({
+    scenario, ...calibration, targetAfterWindupMs, wheelDelayMs,
   }));
   await Promise.all([
     pulseMovementKey(attacker, "e", heavyKeyPulseMs),
@@ -996,11 +1042,15 @@ async function performHeavyCounterplayWindowWheel(
   const [afterAttack, afterDefend] = await Promise.all([
     readUiEvidence(attacker), readUiEvidence(defender),
   ]);
-  const committed = afterAttack.acceptance?.ownActionTransitions?.slice(actionOffset)
+  if (afterDefend.wheels.length !== wheelOffset + 1) {
+    throw new Error("M192 expected exactly one real exchange wheel after calibration: "
+      + JSON.stringify(afterDefend.wheels.slice(wheelOffset)));
+  }
+  const committed = afterAttack.acceptance?.ownActionTransitions?.slice(attackActionOffset)
     .find(entry => entry.action === COMBAT_ACTION.heavyAttackWindup);
-  const blocked = afterDefend.acceptance?.ownActionTransitions
-    ?.find(entry => entry.action === COMBAT_ACTION.block);
-  console.log("M190_HEAVY_ACTION_EVIDENCE " + JSON.stringify({
+  const blocked = afterDefend.acceptance?.ownActionTransitions?.slice(defendActionOffset)
+    .find(entry => entry.action === COMBAT_ACTION.block);
+  console.log("M192_REAL_INGRESS_OUTCOME " + JSON.stringify({
     scenario,
     committedTick: committed?.serverTick ?? null,
     blockTick: blocked?.serverTick ?? null,
@@ -1028,7 +1078,7 @@ async function runOnlineUiHeavyBlockFlight(entries) {
     // A parry, missed block, or HP leak remains a terminal CI failure.
     await performHeavyCounterplayWindowWheel(
       attacker, defender, attackerElementId, defenderElementId,
-      attackOffset, blockOffset, 130,
+      attackOffset, blockOffset, 155,
     );
     await sleep(470);
 
@@ -1115,7 +1165,7 @@ async function runOnlineUiHeavyParryFlight(entries) {
     // parry interval. Real stun and unchanged HP remain required.
     await performHeavyCounterplayWindowWheel(
       attacker, defender, attackerElementId, defenderElementId,
-      attackOffset, blockOffset, 250,
+      attackOffset, blockOffset, 255,
     );
     await sleep(220);
 
