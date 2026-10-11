@@ -113,6 +113,16 @@ jobs:
             MYASO_PVP_SCENARIO="$scenario" node scripts/pvp_browser_flight_runner.mjs
           done
 
+      - name: Validate M193 repeated real guard-break block-only pressure
+        run: |
+          node --check scripts/pvp_browser_flight_runner.mjs
+          # Fresh Chrome/Firefox W3C sessions, with exact -38 guard-pressure,
+          # 100 HP, zero parries, and eventual authoritative guard-break.
+          for attempt in 1 2 3; do
+            echo "M193 real guard-break qualification attempt $attempt/3"
+            MYASO_PVP_SCENARIO=uiguardbreak node scripts/pvp_browser_flight_runner.mjs
+          done
+
       - name: Validate M175 confirmed kick/attack arbitration
         env:
           MYASO_PVP_SCENARIO: "uistaminaconfirmed"
