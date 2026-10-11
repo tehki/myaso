@@ -8787,18 +8787,18 @@ async function runOnlineUiGuardBreakFlight(entries, { onGuardBroken = null } = {
     blockHeld = true;
     let guardBroken = false;
     for (let attempt = 0; attempt < 4 && !guardBroken; attempt += 1) {
-      // M187: Start the genuine Chrome light burst, then deliver Firefox's
-      // genuine wheel-back almost concurrently. Sequential wheel-then-
-      // mouse WebDriver round trips sometimes produced >300 ms wheel-to-hit:
-      // the 240 ms short block legitimately expired before the first strike.
-      // The real 135 ms light windup keeps the wheel inside the attack lead,
-      // while the unchanged 125 ms parry / 240 ms short-block windows still
-      // determine whether the outcome is a parry, block, or unguarded hit.
-      const attackBurst = performArenaAttackBurst(attacker, 3, 0);
-      await sleep(1);
+      // M187: begin the real Firefox wheel-back before the real Chrome LMB
+      // burst, but dispatch across independent browser sessions concurrently.
+      // Awaiting the full wheel WebDriver response first caused short-block
+      // expiry and a 34 HP hit; starting the LMB first made the 125 ms parry
+      // window catch it instead. A 35 ms lead plus the 135 ms light windup
+      // targets the genuine 125–240 ms block-only interval, with all outcomes
+      // still decided by the unchanged authoritative combat rules.
+      const blockInput = scrollArenaWheel(defender, defenderElementId, 120, 0);
+      await sleep(35);
       await Promise.all([
-        attackBurst,
-        scrollArenaWheel(defender, defenderElementId, 120, 0),
+        blockInput,
+        performArenaAttackBurst(attacker, 3, 0),
       ]);
       await sleep(230);
       const states = await Promise.all(entries.map(readUiEvidence));

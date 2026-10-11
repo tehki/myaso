@@ -8,8 +8,9 @@ correct guard pressure and guard-break events. The existing 100 HP acceptance
 predicate correctly rejected the flight.
 
 ## Corrective choreography
-- Begin a genuine WebDriver Chrome LMB attack burst.
-- Immediately after starting, issue Firefox's genuine WebDriver wheel-back block; await both. The 1 ms scheduling yield allows both real browser inputs to overlap without a fixed late wheel.
+- Begin the genuine Firefox WebDriver wheel-back block input.
+- After a 35 ms lead, start the genuine Chrome WebDriver LMB burst while the wheel dispatch is still in flight; await both responses concurrently.
+- This puts the light's unchanged 135 ms startup into the block-only segment (beyond 125 ms parry, inside 240 ms short block), without paying the sequential wheel-response latency.
 - Keep the original 135 ms light windup, 125 ms parry and 240 ms short-block
   windows fully authoritative and unchanged.
 - Fail immediately if any hit leaks through with defender HP below 100,
