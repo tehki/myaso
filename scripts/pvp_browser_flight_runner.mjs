@@ -1115,7 +1115,7 @@ async function runOnlineUiHeavyParryFlight(entries) {
     // parry interval. Real stun and unchanged HP remain required.
     await performHeavyCounterplayWindowWheel(
       attacker, defender, attackerElementId, defenderElementId,
-      attackOffset, blockOffset, 265,
+      attackOffset, blockOffset, 250,
     );
     await sleep(220);
 
