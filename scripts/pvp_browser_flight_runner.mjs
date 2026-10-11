@@ -5215,18 +5215,20 @@ async function runOnlineUiRollKnockdownFfaHitFlight(entries) {
     const rollerWheelOffset = rollerBefore.wheels.length;
     const defenderActionOffset = defenderBefore.acceptance?.ownActionTransitions?.length ?? 0;
     const punishPointerOffset = punisherBefore.pointers.length;
-    await scrollArenaWheel(roller, rollerElementId, -120, 0);
 
-    // The conversion window is only 260 ms and the unchanged light windup is
-    // 135 ms. Watch the victim's authoritative action stream inside Firefox so #3 can
-    // commit the real LMB on the first knockdown snapshot instead of paying
-    // three WebDriver reads plus focus/HUD replication before acting.
-    const setupDeadline = Date.now() + COMBAT.dodge.durationMs
+    // Begin observing Firefox before sending the genuine Chrome wheel-forward.
+    // Awaiting that WebDriver wheel response first can consume a meaningful
+    // fraction of the 260 ms knockdown before the observer is even armed.
+    // Parallel sessions retain real wheel and pointer provenance; neither
+    // action nor authoritative state is synthesized or modified here.
+    const knockdownTimeoutMs = COMBAT.dodge.durationMs
       + COMBAT.dodge.collisionKnockdownMs + 220;
-    const knockdownTransition = await waitForDefenderKnockdown(
+    const knockdownWatcher = waitForDefenderKnockdown(
       defenderActionOffset,
-      Math.max(0, setupDeadline - Date.now()),
+      knockdownTimeoutMs,
     );
+    const rollInput = scrollArenaWheel(roller, rollerElementId, -120, 0);
+    const [knockdownTransition] = await Promise.all([knockdownWatcher, rollInput]);
 
     if (knockdownTransition) {
       conversion = {
