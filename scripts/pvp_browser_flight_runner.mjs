@@ -942,30 +942,42 @@ function assertHeavyControlDelivered(attackerResult, movementCode, label) {
   }
 }
 
-// Schedule real Chrome/Firefox counterplay from the same rendered, authoritative
-// heavy commitment rather than variable driver startup time. The timestamp is
-// measured by Chrome's own performance clock; no game state or input is forged.
-async function performHeavyCounterplayWindowWheel(attacker, defender, defenderElementId, targetAfterCommitMs) {
+// M189: the transient "Heavy strike committed" HUD event can lag behind the
+// server action by >100 ms. Observe the replicated authoritative HeavyWindup
+// action transition instead (read-only instrumentation enabled for these two
+// acceptance scenarios), and deliver a *real* wheel through Firefox WebDriver.
+// No JS-generated combat inputs and no server-side gameplay modifications.
+async function performHeavyCounterplayWindowWheel(attacker, defender, defenderElementId, targetAfterWindupMs) {
   const before = await readUiEvidence(attacker);
-  const eventOffset = before.eventTransitions.length;
+  const actionOffset = before.acceptance?.ownActionTransitions?.length ?? 0;
   const heavyPromise = pulseMovementKey(attacker, "e", heavyKeyPulseMs);
   const deadline = Date.now() + COMBAT.heavyAttack.windupMs - 15;
-  let ageMs = null;
+  let evidence = null;
   while (Date.now() < deadline) {
-    const age = await execute(attacker.base, attacker.sessionId,
-      "const s=window.__MYASO_M30_UI__;const e=s?.eventTransitions?.slice(" + eventOffset
-        + ").find(x=>x.text.startsWith('Heavy strike committed'));"
-        + "return e&&Number.isFinite(e.t)?performance.now()-s.startedAt-e.t:null;");
-    if (Number.isFinite(age) && age >= 0) {
-      ageMs = age;
+    const transition = await execute(attacker.base, attacker.sessionId,
+      "const a=window.__MYASO_ACCEPTANCE_STATE__;const t=a?.ownActionTransitions?.slice("
+        + actionOffset + ").find(e=>e.action===" + COMBAT_ACTION.heavyAttackWindup + ");"
+        + "return t&&Number.isFinite(t.epochMs)?{ageMs:Date.now()-t.epochMs,"
+        + "serverTick:t.serverTick,epochMs:t.epochMs}:null;");
+    if (Number.isFinite(transition?.ageMs) && transition.ageMs >= 0) {
+      evidence = transition;
       break;
     }
     await sleep(6);
   }
-  // W3C dispatch remains genuine, including when the observer misses an
-  // unlatched E press. Resolved hits/parries still fail closed in the caller.
-  const delayMs = ageMs === null ? 0
-    : Math.max(0, Math.min(300, Math.round(targetAfterCommitMs - ageMs)));
+  // No synthetic fallback. A missed edge stays subject to the existing
+  // strict clean-miss retry; any resolved parry/hit in the wrong scenario
+  // remains a terminal failure.
+  const delayMs = evidence === null ? 0
+    : Math.max(0, Math.min(250, Math.round(targetAfterWindupMs - evidence.ageMs)));
+  console.log("M189_HEAVY_WINDUP_SYNC " + JSON.stringify({
+    scenario,
+    observed: evidence !== null,
+    ageMs: evidence?.ageMs ?? null,
+    serverTick: evidence?.serverTick ?? null,
+    targetAfterWindupMs,
+    wheelDelayMs: delayMs,
+  }));
   await Promise.all([
     heavyPromise,
     scrollArenaWheel(defender, defenderElementId, 120, delayMs),
@@ -986,13 +998,11 @@ async function runOnlineUiHeavyBlockFlight(entries) {
   // completely unresolved: pristine HP/guard and no parry feedback. Any resolved
   // or partially resolved exchange fails closed instead of being retried.
   for (let attempt = 1; attempt <= 3 && !evidence; attempt += 1) {
-    // M188: real repeated flights showed the 110 ms post-commit target
-    // rearmed parry because WebDriver/input ingestion added more latency
-    // after dispatch. Aim 65 ms after the observed committed event to put
-    // server-owned impact in the 125–240 ms block-only interval. A genuine
-    // parry, missed block, or health loss remains a hard failure.
+    // Aim the genuine wheel for the central 125–240 ms block-only impact
+    // interval, based on the replicated windup action rather than stale HUD.
+    // A parry, missed block, or any HP loss still fails this flight.
     await performHeavyCounterplayWindowWheel(
-      attacker, defender, defenderElementId, 65,
+      attacker, defender, defenderElementId, 80,
     );
     await sleep(470);
 
@@ -1075,13 +1085,11 @@ async function runOnlineUiHeavyParryFlight(entries) {
   // pristine case. Any evidence that a heavy actually committed, hit, blocked,
   // or otherwise resolved makes the attempt terminal and therefore fail-closed.
   for (let attempt = 1; attempt <= 3 && !evidence; attempt += 1) {
-    // Repeatable browser tests exposed an earlier-than-usual 293 ms heavy
-    // commitment-to-impact interval. Advance the single real Firefox wheel
-    // to 190 ms after the observed Chrome commitment so server-owned parry
-    // ingestion has margin even on fast authoritative strikes. Assert stun,
-    // unchanged HP, and genuine parry feedback exactly as before.
+    // Aim the one real wheel in the final 125 ms server parry window,
+    // anchored to the replicated HeavyWindup transition, not HUD latency.
+    // Real stun and unchanged HP still gate acceptance.
     await performHeavyCounterplayWindowWheel(
-      attacker, defender, defenderElementId, 190,
+      attacker, defender, defenderElementId, 195,
     );
     await sleep(220);
 
@@ -11085,8 +11093,11 @@ async function performArenaFeint(session, elementId, xOffset = 200) {
   // same-tick wheel and LMB can be coalesced as Block before a light attack
   // starts (M170 exhausted-feint proof). Put the real wheel in the next action
   // tick, 20 ms after LMB-down, still inside the unchanged 70 ms feint window.
-  // Hold LMB for 90 ms across several browser/input samples so a genuine
-  // attack edge is observable even when Chrome delays an outbound frame.
+  // An unsplit 90 ms pointer pause makes W3C driver ticks postpone the
+  // wheel until ~90 ms after mouse-down (past the authoritative 70 ms light
+  // feint window). Split pointer hold into 20 + 70 ms ticks: the real wheel
+  // executes with the first short tick, while the LMB remains genuinely
+  // depressed across the full 90 ms for a sampled attack edge.
   try {
     await webdriver(session.base, "POST", `/session/${session.sessionId}/actions`, {
       actions: [
@@ -11097,7 +11108,8 @@ async function performArenaFeint(session, elementId, xOffset = 200) {
           actions: [
             { type: "pointerMove", duration: 0, origin, x: xOffset, y: 0 },
             { type: "pointerDown", button: 0 },
-            { type: "pause", duration: 90 },
+            { type: "pause", duration: 20 },
+            { type: "pause", duration: 70 },
             { type: "pointerUp", button: 0 },
           ],
         },
@@ -11109,6 +11121,7 @@ async function performArenaFeint(session, elementId, xOffset = 200) {
             { type: "pause", duration: 20 },
             { type: "scroll", x: 0, y: 0, deltaX: 0, deltaY: 120, duration: 0, origin },
             { type: "pause", duration: 70 },
+            { type: "pause", duration: 0 },
           ],
         },
       ],
