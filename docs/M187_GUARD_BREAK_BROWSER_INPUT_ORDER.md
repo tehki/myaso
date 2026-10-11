@@ -25,3 +25,14 @@ Window boundaries and the outcome are decided only by the Rust server.
 Real Chrome and Firefox M34 / M40 flights plus complete GitHub Rust, JS,
 cross-browser and capacity quality run on the merged ancestor. No playable
 build launch or production deployment.
+
+## Full-suite M107 choreography hardening
+Repeated full CI on the prior M187 head failed a pre-existing M107 browser
+scenario before M34 could execute. One run produced an accidental roll-collision
+knockdown rather than a perpendicular dodge. Another produced a parry during the
+heavy-block flight: its second wheel-back pulse rearmed the 125 ms parry window
+shortly before impact. The M107 acceptance now uses one genuine wheel-back
+within the normal 240 ms short-block interval and a shorter genuine approach
+before the perpendicular roll. No input synthesis, outcome forgiveness, or
+server-side balance changes are permitted; M107 retains its exact guarded-hit
+and dodge-feedback assertions.
