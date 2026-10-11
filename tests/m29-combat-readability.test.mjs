@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { COMBAT_ACTION, FFA_KILL_TARGET, blockSpatialPresentation, combatActionHint, combatLifePresentation, combatOverlayPresentation, createCombatReadabilityTracker, createRemoteDamageTracker, fighterFocusNetId, fighterGuardBreakPunishNetId, guardBreakPunishRangeCue, fighterKnockdownPunishNetId, knockdownPunishRangeCue, fighterParryPunishNetId, parryPunishRangeCue, fighterRecoveryNetId, fighterIdentityPresentation, fighterThreatBearingLabel, fighterThreatGuardArcLabel, fighterThreatNetId, fighterThreatPhaseLabel, fighterThreatPhaseState, fighterMatchPointPresentation, fighterMatchPresentation, fighterScoreboardPresentation, fighterVitalsPresentation, guardBreakSpatialPresentation, killFeedPresentation, opponentRecoveryPresentation, parrySpatialPresentation, staminaDenialPresentation } from "../src/browser/combat-readability.mjs";
+import { COMBAT_ACTION, FFA_KILL_TARGET, blockSpatialPresentation, combatActionHint, combatLifePresentation, combatOverlayPresentation, createCombatReadabilityTracker, createRemoteDamageTracker, fighterFocusNetId, fighterGuardBreakPunishNetId, guardBreakPunishRangeCue, fighterKnockdownPunishNetId, knockdownPunishRangeCue, fighterParryPunishNetId, parryPunishRangeCue, fighterRecoveryNetId, recoveryPunishRangeCue, fighterIdentityPresentation, fighterThreatBearingLabel, fighterThreatGuardArcLabel, fighterThreatNetId, fighterThreatPhaseLabel, fighterThreatPhaseState, fighterMatchPointPresentation, fighterMatchPresentation, fighterScoreboardPresentation, fighterVitalsPresentation, guardBreakSpatialPresentation, killFeedPresentation, opponentRecoveryPresentation, parrySpatialPresentation, staminaDenialPresentation } from "../src/browser/combat-readability.mjs";
 
 function fighter(netId, hp = 100, guard = 100, action = COMBAT_ACTION.idle, x = 0, y = 0, facing = 0) {
   return { netId, hp, guard, action, x, y, facing };
@@ -1015,4 +1015,43 @@ test("M184 knockdown punish guidance uses current light geometry and excludes ot
   down.action = COMBAT_ACTION.idle;
   assert.equal(knockdownPunishRangeCue(own, down), "");
   assert.equal(knockdownPunishRangeCue(own, null), "");
+});
+
+test("M185 recovery punish hints use genuine recovery states and current light geometry", () => {
+  const own = fighter(1, 100, 100, COMBAT_ACTION.idle, 100, 100, 0);
+  const target = fighter(2, 100, 100, COMBAT_ACTION.attackRecovery, 194, 100, Math.PI);
+  const recoveries = [
+    COMBAT_ACTION.attackRecovery,
+    COMBAT_ACTION.attackLeftRecovery,
+    COMBAT_ACTION.attackRightRecovery,
+    COMBAT_ACTION.heavyAttackRecovery,
+    COMBAT_ACTION.runningAttackRecovery,
+    COMBAT_ACTION.jumpAttackRecovery,
+    COMBAT_ACTION.dodgeRecovery,
+    COMBAT_ACTION.feintRecovery,
+  ];
+  for (const action of recoveries) {
+    target.action = action;
+    assert.equal(recoveryPunishRangeCue(own, target), "IN LIGHT ARC", String(action));
+  }
+  target.x = 196;
+  assert.equal(recoveryPunishRangeCue(own, target), "CLOSE FOR LIGHT");
+  target.x = 60;
+  assert.equal(recoveryPunishRangeCue(own, target), "FACE TARGET");
+  own.facing = Math.PI;
+  assert.equal(recoveryPunishRangeCue(own, target), "IN LIGHT ARC");
+  own.action = COMBAT_ACTION.attackRecovery;
+  assert.equal(recoveryPunishRangeCue(own, target), "", "cannot punish while committed");
+  own.action = COMBAT_ACTION.block;
+  assert.equal(recoveryPunishRangeCue(own, target), "IN LIGHT ARC");
+  target.action = COMBAT_ACTION.knockdown;
+  assert.equal(recoveryPunishRangeCue(own, target), "", "knockdown uses its own focus");
+  target.action = COMBAT_ACTION.stunned;
+  target.guard = 0;
+  assert.equal(recoveryPunishRangeCue(own, target), "", "guard break is not attack recovery");
+  target.guard = 100;
+  assert.equal(recoveryPunishRangeCue(own, target), "", "parry stun is not attack recovery");
+  target.action = COMBAT_ACTION.idle;
+  assert.equal(recoveryPunishRangeCue(own, target), "");
+  assert.equal(recoveryPunishRangeCue(own, null), "");
 });
