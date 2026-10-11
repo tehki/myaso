@@ -724,7 +724,21 @@ async function runOnlineUiRecoveryReadabilityFlight(entries) {
 }
 
 async function runOnlineUiRecoveryTellFlight(entries) {
-  let evidence = await runOnlineUiFeedbackFlight(entries);
+  // M38's former post-hit pixel polling started after the 255 ms attack
+  // recovery had often ended on a loaded runner. Capture every painted
+  // frame from before the genuine attack, as in the M45 damage-tell gate.
+  await Promise.all(entries.map(armRecoveryTellSampler));
+  let evidence;
+  let pixels;
+  try {
+    evidence = await runOnlineUiFeedbackFlight(entries);
+    pixels = await Promise.all(entries.map(async (entry) => ({
+      browser: entry.name,
+      max: await readRecoveryTellSampler(entry),
+    })));
+  } finally {
+    await Promise.allSettled(entries.map(stopRecoveryTellSampler));
+  }
   const attacker = evidence.find((entry) => entry.feedbackTransitions.includes("hit-confirm"));
   const defender = evidence.find((entry) => entry.feedbackTransitions.includes("damage-taken"));
   if (!attacker || !defender || attacker.browser === defender.browser) {
@@ -734,11 +748,15 @@ async function runOnlineUiRecoveryTellFlight(entries) {
   const defenderSession = entries.find((entry) => entry.name === defender.browser);
   if (!attackerSession || !defenderSession) throw new Error(`M38 could not resolve browser sessions`);
 
-  const tell = await waitForRemoteRecoveryTell(defenderSession, attackerSession, 700);
+  const observerMax = pixels.find((entry) => entry.browser === defender.browser)?.max ?? 0;
+  const localMax = pixels.find((entry) => entry.browser === attacker.browser)?.max ?? 0;
+  if (observerMax < 24 || localMax !== 0) {
+    throw new Error(`M38 recovery-tell pixels violated remote-only evidence: observer=${observerMax} local=${localMax}`);
+  }
   evidence = await Promise.all(entries.map(readUiEvidence));
   evidence = evidence.map((entry) => ({
     ...entry,
-    recoveryTellMaxPixels: entry.browser === defender.browser ? tell.observerMax : tell.localMax,
+    recoveryTellMaxPixels: entry.browser === defender.browser ? observerMax : localMax,
   }));
   const finalAttacker = evidence.find((entry) => entry.browser === attacker.browser);
   const finalDefender = evidence.find((entry) => entry.browser === defender.browser);
@@ -11585,24 +11603,50 @@ async function sampleRecoveryTellPixels(session) {
   `);
 }
 
-async function waitForRemoteRecoveryTell(observer, localAttacker, timeoutMs) {
-  const deadline = Date.now() + timeoutMs;
-  let observerMax = 0;
-  let localMax = 0;
-  while (Date.now() < deadline) {
-    const [observerPixels, localPixels] = await Promise.all([
-      sampleRecoveryTellPixels(observer),
-      sampleRecoveryTellPixels(localAttacker),
-    ]);
-    observerMax = Math.max(observerMax, observerPixels);
-    localMax = Math.max(localMax, localPixels);
-    if (observerMax >= 24) {
-      if (localMax !== 0) throw new Error(`M38 local attacker painted the remote-only recovery ring: ${localMax}`);
-      return { observerMax, localMax };
-    }
-    await sleep(20);
-  }
-  throw new Error(`M38 remote recovery ring never appeared: observer=${observerMax} local=${localMax}`);
+async function armRecoveryTellSampler(session) {
+  return execute(session.base, session.sessionId, `
+    const arena = document.querySelector('#arena');
+    const context = arena?.getContext('2d');
+    if (!context) return false;
+    const prior = window.__MYASO_M38_RECOVERY_SAMPLER__;
+    if (prior) prior.active = false;
+    if (prior?.frame) cancelAnimationFrame(prior.frame);
+    const state = { active: true, frame: 0, maxPixels: 0 };
+    const sample = () => {
+      if (!state.active) return;
+      const half = 160;
+      const x = Math.max(0, Math.floor(arena.width / 2 - half));
+      const y = Math.max(0, Math.floor(arena.height / 2 - half));
+      const width = Math.min(half * 2, arena.width - x);
+      const height = Math.min(half * 2, arena.height - y);
+      const pixels = context.getImageData(x, y, width, height).data;
+      let count = 0;
+      for (let i = 0; i < pixels.length; i += 4) {
+        if (Math.abs(pixels[i] - 239) <= 2 && Math.abs(pixels[i + 1] - 207) <= 2
+          && Math.abs(pixels[i + 2] - 115) <= 2 && pixels[i + 3] >= 250) count += 1;
+      }
+      state.maxPixels = Math.max(state.maxPixels, count);
+      state.frame = requestAnimationFrame(sample);
+    };
+    window.__MYASO_M38_RECOVERY_SAMPLER__ = state;
+    state.frame = requestAnimationFrame(sample);
+    return true;
+  `);
+}
+
+async function readRecoveryTellSampler(session) {
+  return execute(session.base, session.sessionId,
+    "return window.__MYASO_M38_RECOVERY_SAMPLER__?.maxPixels ?? 0;");
+}
+
+async function stopRecoveryTellSampler(session) {
+  return execute(session.base, session.sessionId, `
+    const state = window.__MYASO_M38_RECOVERY_SAMPLER__;
+    if (!state) return 0;
+    state.active = false;
+    if (state.frame) cancelAnimationFrame(state.frame);
+    return state.maxPixels;
+  `);
 }
 
 async function armDodgeTellSampler(session, fullCanvas) {
