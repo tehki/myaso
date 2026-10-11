@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { createFrameBudget } from "../src/browser/frame-budget.mjs";
+import { installRightButtonGesture } from "../src/browser/right-button-gesture.mjs";
 import {
   applySnapshotPacketInPlace,
   createSnapshotApplyResult,
@@ -256,4 +257,103 @@ test("WebTransport close drains a pending realtime flush before releasing writer
     if (originalWebTransport === undefined) delete globalThis.WebTransport;
     else globalThis.WebTransport = originalWebTransport;
   }
+});
+
+function rightPointer(type, pointerId = 7, button = 2) {
+  const event = new Event(type);
+  Object.assign(event, { pointerId, button });
+  return event;
+}
+
+test("right-button tap kicks once while hold sprints without kick", () => {
+  const canvas = new EventTarget();
+  const windowTarget = new EventTarget();
+  const captures = [];
+  canvas.setPointerCapture = (pointerId) => { captures.push(pointerId); };
+  let nowMs = 100;
+  let kicks = 0;
+  const gesture = installRightButtonGesture(canvas, {
+    now: () => nowMs,
+    eventTarget: windowTarget,
+    onKick: () => { kicks += 1; },
+  });
+
+  canvas.dispatchEvent(rightPointer("pointerdown"));
+  nowMs = 279;
+  assert.equal(gesture.isRunning(), false);
+  canvas.dispatchEvent(rightPointer("pointerup"));
+  windowTarget.dispatchEvent(rightPointer("pointerup"));
+  assert.equal(kicks, 1, "bubbled pointerup must not cause a second kick");
+  assert.equal(gesture.isRunning(), false);
+
+  nowMs = 400;
+  canvas.dispatchEvent(rightPointer("pointerdown"));
+  nowMs = 580;
+  assert.equal(gesture.isRunning(), true, "180ms is the sprint threshold");
+  nowMs = 710;
+  windowTarget.dispatchEvent(rightPointer("pointerup"));
+  assert.equal(gesture.isRunning(), false, "release outside the canvas ends sprint");
+  assert.equal(kicks, 1, "a running hold is not a kick");
+  assert.deepEqual(captures, [7, 7]);
+});
+
+test("right-button capture loss, blur and pointercancel never trigger a kick", () => {
+  const canvas = new EventTarget();
+  const windowTarget = new EventTarget();
+  let nowMs = 0;
+  let kicks = 0;
+  const gesture = installRightButtonGesture(canvas, {
+    now: () => nowMs,
+    eventTarget: windowTarget,
+    onKick: () => { kicks += 1; },
+  });
+
+  canvas.dispatchEvent(rightPointer("pointerdown", 3));
+  nowMs = 200;
+  assert.equal(gesture.isRunning(), true);
+  canvas.dispatchEvent(rightPointer("pointercancel", 3));
+  assert.equal(gesture.isRunning(), false);
+  windowTarget.dispatchEvent(rightPointer("pointerup", 3));
+  assert.equal(kicks, 0);
+
+  canvas.dispatchEvent(rightPointer("pointerdown", 4));
+  canvas.dispatchEvent(rightPointer("lostpointercapture", 4));
+  windowTarget.dispatchEvent(rightPointer("pointerup", 4));
+  assert.equal(kicks, 0);
+
+  canvas.dispatchEvent(rightPointer("pointerdown", 5));
+  windowTarget.dispatchEvent(new Event("blur"));
+  windowTarget.dispatchEvent(rightPointer("pointerup", 5));
+  assert.equal(gesture.isRunning(), false);
+  assert.equal(kicks, 0);
+});
+
+test("right-button ignores unmatched releases and repeated downs cannot reset sprint timer", () => {
+  const canvas = new EventTarget();
+  const windowTarget = new EventTarget();
+  let nowMs = 100;
+  let kicks = 0;
+  const gesture = installRightButtonGesture(canvas, {
+    now: () => nowMs,
+    eventTarget: windowTarget,
+    onKick: () => { kicks += 1; },
+  });
+
+  windowTarget.dispatchEvent(rightPointer("pointerup", 7));
+  canvas.dispatchEvent(rightPointer("pointerdown", 7));
+  nowMs = 200;
+  canvas.dispatchEvent(rightPointer("pointerdown", 7));
+  canvas.dispatchEvent(rightPointer("pointerdown", 8));
+  nowMs = 280;
+  assert.equal(gesture.isRunning(), true);
+  windowTarget.dispatchEvent(rightPointer("pointerup", 8));
+  assert.equal(gesture.isRunning(), true, "unrelated pointer cannot release sprint");
+  windowTarget.dispatchEvent(rightPointer("pointerup", 7));
+  assert.equal(kicks, 0, "repeated down did not turn a long hold into a tap");
+
+  nowMs = 400;
+  canvas.dispatchEvent(rightPointer("pointerdown", 9));
+  gesture.cancel();
+  canvas.dispatchEvent(rightPointer("pointerup", 9));
+  assert.equal(kicks, 0);
 });
