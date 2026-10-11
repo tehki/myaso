@@ -5147,10 +5147,32 @@ async function runOnlineUiRollKnockdownFfaHitFlight(entries) {
   const rollOffset = rollRight ? 200 : -200;
   const punishOffset = punisherId < defenderId ? 200 : -200;
 
-  const readDefenderOwnActions = () => execute(
+  // Subscribe to the first authoritative knockdown within Firefox instead
+  // of serially polling WebDriver HTTP across this 260 ms conversion window.
+  const waitForDefenderKnockdown = (offset, timeoutMs) => webdriver(
     defender.base,
-    defender.sessionId,
-    "return (window.__MYASO_ACCEPTANCE_STATE__?.ownActionTransitions ?? []).map((entry) => ({ ...entry }));",
+    "POST",
+    `/session/${defender.sessionId}/execute/async`,
+    {
+      script: `
+        const [offset, knockdownAction, timeoutMs] = arguments;
+        const done = arguments[arguments.length - 1];
+        const started = performance.now();
+        let watcher;
+        const check = () => {
+          const events = window.__MYASO_ACCEPTANCE_STATE__?.ownActionTransitions ?? [];
+          const found = events.slice(offset).find((event) =>
+            event.action === knockdownAction && Number.isFinite(event.epochMs));
+          if (found || performance.now() - started >= timeoutMs) {
+            clearInterval(watcher);
+            done(found ? { ...found } : null);
+          }
+        };
+        watcher = setInterval(check, 4);
+        check();
+      `,
+      args: [offset, COMBAT_ACTION.knockdown, timeoutMs],
+    },
   );
 
   // Separate the two possible light targets without changing combat reach.
@@ -5178,20 +5200,15 @@ async function runOnlineUiRollKnockdownFfaHitFlight(entries) {
     await scrollArenaWheel(roller, rollerElementId, -120, 0);
 
     // The conversion window is only 260 ms and the unchanged light windup is
-    // 135 ms. Poll the victim's authoritative action stream alone so #3 can
+    // 135 ms. Watch the victim's authoritative action stream inside Firefox so #3 can
     // commit the real LMB on the first knockdown snapshot instead of paying
     // three WebDriver reads plus focus/HUD replication before acting.
     const setupDeadline = Date.now() + COMBAT.dodge.durationMs
       + COMBAT.dodge.collisionKnockdownMs + 220;
-    let knockdownTransition = null;
-    while (Date.now() < setupDeadline && !knockdownTransition) {
-      const defenderActions = await readDefenderOwnActions();
-      const newDefenderActions = defenderActions.slice(defenderActionOffset);
-      knockdownTransition = newDefenderActions.find((entry) =>
-        entry.action === COMBAT_ACTION.knockdown && Number.isFinite(entry.epochMs)) ?? null;
-      if (knockdownTransition) break;
-      await sleep(1);
-    }
+    const knockdownTransition = await waitForDefenderKnockdown(
+      defenderActionOffset,
+      Math.max(0, setupDeadline - Date.now()),
+    );
 
     if (knockdownTransition) {
       conversion = {
@@ -9425,10 +9442,15 @@ async function runOnlineUiJumpFfaThreatFlight(entries, mode) {
   // fighter within 66 px of center (48 reach + 18 radius); the right light
   // needs 94 px (76 + 18). The older 210/260 ms staging put the attackers
   // about 91 px apart, allowing the right light to legitimately clip #1.
-  // These shorter pulses keep the two attackers >120 px apart and preserve
+  // These bounded pulses keep the two attackers outside mutual hit reach and preserve
   // deterministic primary/secondary ordering by authoritative distance.
-  const leftMovementMs = mode === "primary" ? 160 : 155;
-  const rightMovementMs = mode === "primary" ? 120 : 250;
+  // M142 secondary's earlier 155/250 ms pulses left the narrow 66 px jump
+  // reach near its boundary on loaded runners: both genuine attacks landed,
+  // but Firefox often saw only the right-side threat in replicated snapshots.
+  // Move both attackers the same additional 25 ms so the distance priority
+  // remains unchanged, while retaining >94 px separation between rivals.
+  const leftMovementMs = mode === "primary" ? 160 : 180;
+  const rightMovementMs = mode === "primary" ? 120 : 275;
   await Promise.all([
     pulseMovementKey(left, "d", leftMovementMs),
     pulseMovementKey(right, "a", rightMovementMs),
