@@ -50,3 +50,13 @@ windows. The six-fresh-browser repeatability gate moves immediately after
 Rust validation to surface instability before running the entire PvP suite.
 Any parry in `uiheavyblock`, any 46 HP leak, or any missing parry in
 `uiheavyparry` still blocks promotion.
+
+## Heavy-parry fast-impact margin
+
+Quality #998 passed all three heavy-block repeats and two heavy-parry repeats.
+The third parry sent its real wheel approximately 61 ms before the displayed
+impact and allowed a genuine 46 HP hit. Under CI, observed heavy-commit-to-hit
+ranges from roughly 293 to 345 ms. The parry target advances from 215 ms to
+190 ms after the observed commitment to leave more room for WebDriver/network
+ingress on a fast impact. The original 125 ms server parry window, 240 ms
+block, attack windup, and fail-closed 100 HP check stay unchanged.
