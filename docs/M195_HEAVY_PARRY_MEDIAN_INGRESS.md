@@ -8,8 +8,8 @@ After M194 PR #218 passed full quality and merged as bd7da51, [main quality #381
 
 - Perform **three distinct real Chrome E heavy whiffs**, off-axis, with full recovery; require read-only server heavy-windup and idle transitions plus 100 HP/100 guard for both fighters.
 - Perform **three separate real Firefox wheel-back short-block calibrations** while no attack is pending, each after prior block expiry. Require genuine server block transition and 100 HP/100 guard.
-- Use the median of each true action type's server-ingress delays and clamp the resulting *applied* E-to-wheel skew to +/-40ms. Log all six samples, medians, raw and applied skew; never fabricate action timestamps or combat outcomes.
-- Center the one-wheel true parry probe at 245ms after heavy windup rather than 255ms, within the existing late 125ms parry window before 320ms heavy impact, allowing extra time for positive wheel ingress jitter.
+- Use the median of each true action type's server-ingress delays and clamp the resulting *applied* E-to-wheel skew to +/-40ms for heavy blocks and +/-25ms for parries. Log all six samples, medians, raw and applied skew; never fabricate action timestamps or combat outcomes.
+- Center the one-wheel true parry probe at 265ms after heavy windup, with its narrower +/-25ms calibrated skew, within the existing late 125ms parry window before 320ms heavy impact, to prevent both the previously observed late 46 HP hit and the early ordinary 64 guard block seen in PR quality #1021.
 - The **actual test exchange still sends one and only one real Firefox WebDriver wheel-back** with a genuine Chrome E. Calibration input is isolated, never used as acceptance or as a second combat wheel.
 - Fail closed on 46 HP hits, 64 guard-only blocks, missing parry/stun, wrong HP/guard, action corruption, or calibration anomalies.
 

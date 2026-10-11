@@ -1033,7 +1033,11 @@ async function performHeavyCounterplayWindowWheel(
   // Bound the correction from sampled E/wheel ingress to avoid
   // path-dependent skew pushing the sole parry wheel past impact.
   const rawSkewMs = calibration.eIngressMs - calibration.wheelIngressMs;
-  const appliedSkewMs = Math.max(-40, Math.min(40, rawSkewMs));
+  // A large negative compensation pre-arms heavy parry too early and
+  // turns the genuine parry into an ordinary -64 guard block. Use a narrower
+  // 25ms bound for parry while preserving the 40ms block-only calibration.
+  const skewLimitMs = targetAfterWindupMs >= 240 ? 25 : 40;
+  const appliedSkewMs = Math.max(-skewLimitMs, Math.min(skewLimitMs, rawSkewMs));
   const wheelDelayMs = Math.round(targetAfterWindupMs + appliedSkewMs);
   if (wheelDelayMs < 0 || wheelDelayMs > 450) {
     throw new Error("M192 calibrated wheel timing outside admissible W3C pause: "
@@ -1172,7 +1176,7 @@ async function runOnlineUiHeavyParryFlight(entries) {
     // parry interval. Real stun and unchanged HP remain required.
     await performHeavyCounterplayWindowWheel(
       attacker, defender, attackerElementId, defenderElementId,
-      attackOffset, blockOffset, 245,
+      attackOffset, blockOffset, 265,
     );
     await sleep(220);
 
