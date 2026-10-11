@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { COMBAT_ACTION, FFA_KILL_TARGET, blockSpatialPresentation, combatActionHint, combatLifePresentation, combatOverlayPresentation, createCombatReadabilityTracker, createRemoteDamageTracker, fighterFocusNetId, fighterGuardBreakPunishNetId, fighterKnockdownPunishNetId, fighterParryPunishNetId, fighterRecoveryNetId, fighterIdentityPresentation, fighterThreatBearingLabel, fighterThreatGuardArcLabel, fighterThreatNetId, fighterThreatPhaseLabel, fighterThreatPhaseState, fighterMatchPointPresentation, fighterMatchPresentation, fighterScoreboardPresentation, fighterVitalsPresentation, guardBreakSpatialPresentation, killFeedPresentation, opponentRecoveryPresentation, parrySpatialPresentation, staminaDenialPresentation } from "../src/browser/combat-readability.mjs";
+import { COMBAT_ACTION, FFA_KILL_TARGET, blockSpatialPresentation, combatActionHint, combatLifePresentation, combatOverlayPresentation, createCombatReadabilityTracker, createRemoteDamageTracker, fighterFocusNetId, fighterGuardBreakPunishNetId, fighterKnockdownPunishNetId, fighterParryPunishNetId, parryPunishRangeCue, fighterRecoveryNetId, fighterIdentityPresentation, fighterThreatBearingLabel, fighterThreatGuardArcLabel, fighterThreatNetId, fighterThreatPhaseLabel, fighterThreatPhaseState, fighterMatchPointPresentation, fighterMatchPresentation, fighterScoreboardPresentation, fighterVitalsPresentation, guardBreakSpatialPresentation, killFeedPresentation, opponentRecoveryPresentation, parrySpatialPresentation, staminaDenialPresentation } from "../src/browser/combat-readability.mjs";
 
 function fighter(netId, hp = 100, guard = 100, action = COMBAT_ACTION.idle, x = 0, y = 0, facing = 0) {
   return { netId, hp, guard, action, x, y, facing };
@@ -941,4 +941,31 @@ test("all committed attack phase labels map to visible threat states", () => {
   }
   assert.equal(fighterThreatPhaseState(""), "");
   assert.equal(fighterThreatPhaseState("RECOVERY"), "");
+});
+
+
+test("M182 parry punish guidance uses authoritative light reach and facing without changing stun", () => {
+  const own = fighter(1, 100, 100, COMBAT_ACTION.idle, 100, 100, 0);
+  const parried = fighter(2, 100, 90, COMBAT_ACTION.stunned, 194, 100, Math.PI);
+  assert.equal(parryPunishRangeCue(own, parried), "IN LIGHT ARC", "94-unit light reach boundary counts");
+  parried.x = 194.01;
+  assert.equal(parryPunishRangeCue(own, parried), "CLOSE FOR LIGHT");
+  parried.x = 40;
+  assert.equal(parryPunishRangeCue(own, parried), "FACE TARGET", "facing is required at close range");
+  own.facing = Math.PI;
+  assert.equal(parryPunishRangeCue(own, parried), "IN LIGHT ARC");
+  own.facing = Number.NaN;
+  assert.equal(parryPunishRangeCue(own, parried), "AIM FOR LIGHT");
+  own.facing = Math.PI;
+  assert.equal(parryPunishRangeCue({ ...own, x: Number.NaN }, parried), "");
+  parried.guard = 0;
+  assert.equal(parryPunishRangeCue(own, parried), "", "guard-break stun is not parry punish");
+  parried.guard = 100;
+  own.action = COMBAT_ACTION.knockdown;
+  assert.equal(parryPunishRangeCue(own, parried), "", "a downed player cannot convert a punish");
+  own.action = COMBAT_ACTION.block;
+  assert.equal(parryPunishRangeCue(own, parried), "IN LIGHT ARC", "a blocking player can release and punish");
+  parried.action = COMBAT_ACTION.idle;
+  assert.equal(parryPunishRangeCue(own, parried), "", "a recovered fighter is never a punish cue");
+  assert.equal(parryPunishRangeCue(own, null), "");
 });
