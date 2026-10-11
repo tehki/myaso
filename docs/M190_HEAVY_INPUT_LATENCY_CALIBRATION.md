@@ -42,3 +42,22 @@ those trial values. The full M107 original gate is also moved immediately
 after the six-repeat gate, so loaded Chrome/Firefox input failures are found
 before later unrelated PvP tests. All mandatory gates and original fail-closed
 outcomes remain unchanged. No combat or network timing changes.
+
+## M190.1 — Outlier-resistant W3C calibration
+
+Post-merge `main` CI [#38136882013](https://github.com/tehki/myaso/actions/runs/38136882013)
+reproduced a heavy-parry rejection despite full green PR quality: all three
+heavy-block repeats passed, but the first parry became an ordinary 64-guard
+block. The single Firefox pointer calibration read **106 ms**, while Chrome
+read 19 ms; the raw -87 ms differential shortened the 250 ms wheel pause to
+163 ms. Authoritative state showed Firefox block approximately 200 ms after
+Chrome windup, too early for the 125 ms parry at heavy impact.
+
+The calibration now takes **three genuine pointer-move samples** per browser
+and uses the median, logging each sample. The cross-browser pointer difference
+is bounded to +/-40 ms, since pointer timing is not a guaranteed predictor
+of the next W3C wheel. Browser aim is restored before each exchange; no test
+injects synthetic combat actions or manipulates authoritative state. A wrong
+block/parry/hit remains a hard failure in both the six-repeat and original
+M107 gates. All combat timings, damage, protocol, stamina, and deployment
+policies are unchanged.
