@@ -5411,8 +5411,21 @@ async function runOnlineUiRollKnockdownFfaHitFlight(entries) {
     entry.action === COMBAT_ACTION.idle
     && Number.isFinite(entry.epochMs)
     && entry.epochMs > conversion.knockdownTransition.epochMs);
-  if (punishActive.epochMs >= knockdownEndEpochMs
-    || (defenderRecovery && punishActive.epochMs >= defenderRecovery.epochMs)) {
+  // The two independent browser snapshots can attach epochMs timestamps
+  // 10–20 ms apart to actions processed in the *same authoritative tick*.
+  // Compare server ticks for cross-fighter ordering. A same-tick boundary is
+  // valid only if the server confirms exactly one 34 HP victim hit, while the
+  // attack must still precede the original knockdown's 260 ms end bound.
+  const verifiedSameTickHit = defenderRecovery
+    && Number.isFinite(punishActive.serverTick)
+    && punishActive.serverTick === defenderRecovery.serverTick
+    && defenderState.playerHp === 66
+    && defenderState.events.includes("Hit taken - 34 HP.");
+  const attackPrecedesRecovery = !defenderRecovery
+    || (Number.isFinite(punishActive.serverTick) && Number.isFinite(defenderRecovery.serverTick)
+      ? punishActive.serverTick < defenderRecovery.serverTick || verifiedSameTickHit
+      : punishActive.epochMs < defenderRecovery.epochMs);
+  if (punishActive.epochMs >= knockdownEndEpochMs || !attackPrecedesRecovery) {
     throw new Error(milestone + " authoritative ordering did not prove #"
       + punisherId + " became active before #" + defenderId + " recovered: "
       + JSON.stringify({
