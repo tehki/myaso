@@ -128,6 +128,65 @@ export function createRemoteDamageTracker({ durationMs = 320 } = {}) {
   };
 }
 
+// M196: only snapshot-authoritative own action phases may drive the local
+// readiness cue. W3C input intent and local prediction must never report a
+// successful parry, dodge, or available attack before server confirmation.
+const OWN_WINDUPS = new Set([
+  COMBAT_ACTION.attackWindup, COMBAT_ACTION.attackLeftWindup,
+  COMBAT_ACTION.attackRightWindup, COMBAT_ACTION.heavyAttackWindup,
+  COMBAT_ACTION.runningAttackWindup, COMBAT_ACTION.jumpAttackWindup,
+  COMBAT_ACTION.kickWindup,
+]);
+const OWN_ACTIVES = new Set([
+  COMBAT_ACTION.attackActive, COMBAT_ACTION.attackLeftActive,
+  COMBAT_ACTION.attackRightActive, COMBAT_ACTION.heavyAttackActive,
+  COMBAT_ACTION.runningAttackActive, COMBAT_ACTION.jumpAttackActive,
+  COMBAT_ACTION.kickActive,
+]);
+const OWN_RECOVERIES = new Set([
+  COMBAT_ACTION.attackRecovery, COMBAT_ACTION.attackLeftRecovery,
+  COMBAT_ACTION.attackRightRecovery, COMBAT_ACTION.heavyAttackRecovery,
+  COMBAT_ACTION.runningAttackRecovery, COMBAT_ACTION.jumpAttackRecovery,
+  COMBAT_ACTION.kickRecovery, COMBAT_ACTION.feintRecovery,
+]);
+
+const HIDDEN_OWN_READINESS = Object.freeze({
+  visible: false, state: "", label: "", detail: "",
+});
+
+export function ownCombatReadinessPresentation(entity) {
+  if (!entity || !Number.isInteger(entity.action) || !Number.isFinite(entity.hp)
+    || entity.hp <= 0 || entity.action === COMBAT_ACTION.dead) {
+    return HIDDEN_OWN_READINESS;
+  }
+  if (OWN_WINDUPS.has(entity.action)) {
+    return { visible: true, state: "windup", label: "WINDUP", detail: "Attack committed" };
+  }
+  if (OWN_ACTIVES.has(entity.action)) {
+    return { visible: true, state: "active", label: "STRIKING", detail: "Attack in progress" };
+  }
+  if (OWN_RECOVERIES.has(entity.action)) {
+    return { visible: true, state: "recovery", label: "RECOVERING", detail: "Vulnerable to punish" };
+  }
+  switch (entity.action) {
+    case COMBAT_ACTION.idle:
+      return { visible: true, state: "ready", label: "READY", detail: "Movement and light attacks" };
+    case COMBAT_ACTION.block:
+      return { visible: true, state: "block", label: "BLOCKING", detail: "Guard held · facing matters" };
+    case COMBAT_ACTION.dodge:
+      return { visible: true, state: "evade", label: "ROLLING", detail: "Movement committed" };
+    case COMBAT_ACTION.dodgeRecovery:
+      return { visible: true, state: "recovery", label: "ROLL RECOVERY", detail: "Wait for control" };
+    case COMBAT_ACTION.jump:
+      return { visible: true, state: "airborne", label: "AIRBORNE", detail: "Jump committed" };
+    case COMBAT_ACTION.stunned:
+      return { visible: true, state: "locked", label: "STUNNED", detail: "Actions locked" };
+    case COMBAT_ACTION.knockdown:
+      return { visible: true, state: "locked", label: "KNOCKED DOWN", detail: "Get up before attacking" };
+    default:
+      return HIDDEN_OWN_READINESS;
+  }
+}
 export function combatActionHint(entity) {
   if (!entity) return null;
   switch (entity.action) {

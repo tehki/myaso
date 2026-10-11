@@ -1,7 +1,7 @@
 import { createFrameBudget } from "../src/browser/frame-budget.mjs";
 import { installRightButtonGesture } from "../src/browser/right-button-gesture.mjs";
 import { createCombatImpactController } from "../src/browser/combat-impact.mjs";
-import { COMBAT_ACTION, blockSpatialPresentation, combatActionHint, combatOverlayPresentation, createCombatReadabilityTracker, createRemoteDamageTracker, fighterFocusNetId, fighterGuardBreakPunishNetId, guardBreakPunishRangeCue, fighterKnockdownPunishNetId, knockdownPunishRangeCue, fighterParryPunishNetId, parryPunishRangeCue, fighterRecoveryNetId, recoveryPunishRangeCue, punishRangeCueIntent, fighterIdentityPresentation, fighterThreatBearingLabel, fighterThreatGuardArcLabel, fighterThreatNetId, fighterThreatPhaseLabel, fighterThreatPhaseState, fighterMatchPointPresentation, fighterMatchPresentation, fighterScoreboardPresentation, FFA_KILL_TARGET, fighterVitalsPresentation, guardBreakSpatialPresentation, killFeedPresentation, opponentRecoveryPresentation, parrySpatialPresentation, staminaDenialPresentation } from "../src/browser/combat-readability.mjs";
+import { COMBAT_ACTION, blockSpatialPresentation, combatActionHint, combatOverlayPresentation, createCombatReadabilityTracker, createRemoteDamageTracker, fighterFocusNetId, fighterGuardBreakPunishNetId, guardBreakPunishRangeCue, fighterKnockdownPunishNetId, knockdownPunishRangeCue, fighterParryPunishNetId, parryPunishRangeCue, fighterRecoveryNetId, recoveryPunishRangeCue, punishRangeCueIntent, fighterIdentityPresentation, fighterThreatBearingLabel, fighterThreatGuardArcLabel, fighterThreatNetId, fighterThreatPhaseLabel, fighterThreatPhaseState, fighterMatchPointPresentation, fighterMatchPresentation, fighterScoreboardPresentation, FFA_KILL_TARGET, fighterVitalsPresentation, guardBreakSpatialPresentation, killFeedPresentation, opponentRecoveryPresentation, parrySpatialPresentation, staminaDenialPresentation, ownCombatReadinessPresentation } from "../src/browser/combat-readability.mjs";
 import { COMBAT } from "../src/combat/model.mjs";
 import { isTickNewer32, reconcilePrediction } from "../src/browser/reconciliation.mjs";
 import { NETWORK } from "../src/network/constants.mjs";
@@ -29,6 +29,14 @@ const hud = {
   focusLabel: document.querySelector("#focus-label"),
 };
 const hudCache = { playerHp: null, playerGuard: null, playerStamina: null, botHp: null, botGuard: null, focusNetId: null, focusMode: null, status: null, scoreboard: null, matchPoint: null };
+const ownReadiness = {
+  root: document.querySelector("#own-readiness"),
+  label: document.querySelector("#own-readiness-label"),
+  detail: document.querySelector("#own-readiness-detail"),
+  state: "",
+  text: "",
+  detailText: "",
+};
 const combatOverlay = {
   root: document.querySelector("#combat-overlay"),
   title: document.querySelector("#combat-overlay-title"),
@@ -1135,6 +1143,7 @@ function updateHud(ownId) {
       : knockdownPunishNetId ? "knockdown"
         : recoveryFocusNetId ? "recovery" : "nearest";
   setFocusTarget(focusNetId, focusMode);
+  updateOwnReadiness(own);
   updateThreatCue(ownId);
   updateCombatOverlay(own, ownId);
   updateOpponentRecovery(remote, focusMode, own);
@@ -1145,6 +1154,33 @@ function updateHud(ownId) {
   } else {
     combatMessage = null;
     setStatus(combatActionHint(own) ?? networkStatus);
+  }
+}
+
+function updateOwnReadiness(own) {
+  if (!ownReadiness.root) return;
+  const presentation = ownCombatReadinessPresentation(own);
+  if (ownReadiness.root.hidden === presentation.visible) {
+    ownReadiness.root.hidden = !presentation.visible;
+  }
+  if (!presentation.visible) {
+    ownReadiness.state = "";
+    ownReadiness.text = "";
+    ownReadiness.detailText = "";
+    if (ownReadiness.root.dataset.state) delete ownReadiness.root.dataset.state;
+    return;
+  }
+  if (ownReadiness.state !== presentation.state) {
+    ownReadiness.state = presentation.state;
+    ownReadiness.root.dataset.state = presentation.state;
+  }
+  if (ownReadiness.text !== presentation.label) {
+    ownReadiness.text = presentation.label;
+    ownReadiness.label.textContent = presentation.label;
+  }
+  if (ownReadiness.detailText !== presentation.detail) {
+    ownReadiness.detailText = presentation.detail;
+    ownReadiness.detail.textContent = presentation.detail;
   }
 }
 
