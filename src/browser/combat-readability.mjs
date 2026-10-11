@@ -245,6 +245,24 @@ export function parrySpatialPresentation(entity) {
   return { visible: false, state: "" };
 }
 
+// An advisory cue for the current replicated geometry, not a promise that
+// the target will remain stunned throughout a future strike windup.
+export function parryPunishRangeCue(own, target) {
+  if (!parrySpatialPresentation(target).visible
+    || !own || !Number.isFinite(own.x) || !Number.isFinite(own.y)
+    || !Number.isFinite(target?.x) || !Number.isFinite(target?.y)) return "";
+  const dx = target.x - own.x;
+  const dy = target.y - own.y;
+  const reach = COMBAT.attack.reach + COMBAT.fighterRadius;
+  if (dx * dx + dy * dy > reach * reach) return "CLOSE FOR LIGHT";
+  if (!Number.isFinite(own.facing)) return "AIM FOR LIGHT";
+  if (dx !== 0 || dy !== 0) {
+    const delta = angleDelta(Math.atan2(dy, dx), own.facing);
+    if (Math.abs(delta) > COMBAT.attack.arcRadians / 2) return "FACE TARGET";
+  }
+  return "IN LIGHT ARC";
+}
+
 export function blockSpatialPresentation(entity) {
   if (entity?.action === COMBAT_ACTION.block && Number.isFinite(entity.facing)) {
     return { visible: true, state: "blocking", facing: entity.facing };
