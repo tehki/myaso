@@ -1,7 +1,7 @@
 import { createFrameBudget } from "../src/browser/frame-budget.mjs";
 import { installRightButtonGesture } from "../src/browser/right-button-gesture.mjs";
 import { createCombatImpactController } from "../src/browser/combat-impact.mjs";
-import { COMBAT_ACTION, blockSpatialPresentation, combatActionHint, combatOverlayPresentation, createCombatReadabilityTracker, createRemoteDamageTracker, fighterFocusNetId, fighterGuardBreakPunishNetId, guardBreakPunishRangeCue, fighterKnockdownPunishNetId, fighterParryPunishNetId, parryPunishRangeCue, fighterRecoveryNetId, fighterIdentityPresentation, fighterThreatBearingLabel, fighterThreatGuardArcLabel, fighterThreatNetId, fighterThreatPhaseLabel, fighterThreatPhaseState, fighterMatchPointPresentation, fighterMatchPresentation, fighterScoreboardPresentation, FFA_KILL_TARGET, fighterVitalsPresentation, guardBreakSpatialPresentation, killFeedPresentation, opponentRecoveryPresentation, parrySpatialPresentation, staminaDenialPresentation } from "../src/browser/combat-readability.mjs";
+import { COMBAT_ACTION, blockSpatialPresentation, combatActionHint, combatOverlayPresentation, createCombatReadabilityTracker, createRemoteDamageTracker, fighterFocusNetId, fighterGuardBreakPunishNetId, guardBreakPunishRangeCue, fighterKnockdownPunishNetId, knockdownPunishRangeCue, fighterParryPunishNetId, parryPunishRangeCue, fighterRecoveryNetId, fighterIdentityPresentation, fighterThreatBearingLabel, fighterThreatGuardArcLabel, fighterThreatNetId, fighterThreatPhaseLabel, fighterThreatPhaseState, fighterMatchPointPresentation, fighterMatchPresentation, fighterScoreboardPresentation, FFA_KILL_TARGET, fighterVitalsPresentation, guardBreakSpatialPresentation, killFeedPresentation, opponentRecoveryPresentation, parrySpatialPresentation, staminaDenialPresentation } from "../src/browser/combat-readability.mjs";
 import { COMBAT } from "../src/combat/model.mjs";
 import { isTickNewer32, reconcilePrediction } from "../src/browser/reconciliation.mjs";
 import { NETWORK } from "../src/network/constants.mjs";
@@ -1300,7 +1300,9 @@ function updateOpponentRecovery(remote, focusMode = "nearest", own = null) {
   const rangeLabel = focusMode === "parry"
     ? parryPunishRangeCue(own, remote)
     : focusMode === "guard-break"
-      ? guardBreakPunishRangeCue(own, remote) : "";
+      ? guardBreakPunishRangeCue(own, remote)
+      : focusMode === "knockdown"
+        ? knockdownPunishRangeCue(own, remote) : "";
   if (opponentRecovery.rangeCue) {
     const shouldHideRange = !rangeLabel;
     if (opponentRecovery.rangeCue.hidden !== shouldHideRange) opponentRecovery.rangeCue.hidden = shouldHideRange;
