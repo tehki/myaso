@@ -257,6 +257,11 @@ export function guardBreakPunishRangeCue(own, target) {
   return lightPunishGeometryCue(own, target);
 }
 
+export function knockdownPunishRangeCue(own, target) {
+  if (target?.action !== COMBAT_ACTION.knockdown) return "";
+  return lightPunishGeometryCue(own, target);
+}
+
 function lightPunishGeometryCue(own, target) {
   if (!own || (own.action !== COMBAT_ACTION.idle && own.action !== COMBAT_ACTION.block)
     || !Number.isFinite(own.x) || !Number.isFinite(own.y)
