@@ -956,14 +956,16 @@ async function runOnlineUiHeavyBlockFlight(entries) {
   // completely unresolved: pristine HP/guard and no parry feedback. Any resolved
   // or partially resolved exchange fails closed instead of being retried.
   for (let attempt = 1; attempt <= 3 && !evidence; attempt += 1) {
-    // Deliver a single genuine wheel-back during heavy windup. A second
-    // wheel at ~170 ms rearmed the 125 ms parry window immediately before
-    // impact under loaded Firefox CI, incorrectly turning the guarded heavy
-    // into a parry. The first wheel lands in the unchanged 125–240 ms
-    // block-only interval; never rearm parry in this block acceptance.
+    // M188: issue #205 reproduced a genuine 46 HP hit on merged main:
+    // Firefox's wheel arrived ~296 ms before heavy impact, so its unchanged
+    // 240 ms block had expired. Shift the *single* genuine wheel to ~170 ms
+    // after the real heavy E edge. The 320 ms heavy startup then leaves
+    // roughly 150 ms between wheel and impact: beyond the unchanged 125 ms
+    // parry, but inside the 240 ms block. Never send a second wheel: a
+    // late wheel re-arms parry and would conceal the required guard pressure.
     await Promise.all([
       pulseMovementKey(attacker, "e", heavyKeyPulseMs),
-      scrollArenaWheel(defender, defenderElementId, 120, 70),
+      scrollArenaWheel(defender, defenderElementId, 120, 170),
     ]);
     await sleep(470);
 
