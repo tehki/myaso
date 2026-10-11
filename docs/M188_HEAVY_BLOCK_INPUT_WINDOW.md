@@ -24,3 +24,18 @@ observe the parry within its original 125 ms window. Heavy block remains
 separate with one wheel at 170 ms; no balance constants or assertions change.
 The repeatability gate now verifies **three** independent heavy-block and
 **three** independent heavy-parry runs before the full M8 capacity gate.
+
+## M188 repeated-flight correction
+
+Quality #993 passed the original M107 flight and two independent M188
+heavy-block repeats, then correctly failed the third: Firefox parried instead
+of holding block. The replicated heavy-commit-to-impact interval varies under
+CI load. A fixed delay from E key delivery cannot reliably distinguish the
+125 ms parry window from the 240 ms short block. The latest flight uses an
+independent read-only Chrome event observer to measure the age of the genuine
+`Heavy strike committed` UI transition and send Firefox's *real* W3C wheel
+with a bounded remaining delay. Targets are 110 ms after that transition for
+block and 215 ms for parry, before WebDriver delivery overhead. These offsets
+change only acceptance scheduling; the Rust server remains the sole arbiter.
+Any 46 HP damage, parry during a block test, or missing parry during a parry
+test remains a hard CI failure. A complete final-head quality run is required.
