@@ -1,4 +1,5 @@
 import { createFrameBudget } from "../src/browser/frame-budget.mjs";
+import { installRightButtonGesture } from "../src/browser/right-button-gesture.mjs";
 import { createCombatImpactController } from "../src/browser/combat-impact.mjs";
 import { COMBAT_ACTION, blockSpatialPresentation, combatActionHint, combatOverlayPresentation, createCombatReadabilityTracker, createRemoteDamageTracker, fighterFocusNetId, fighterGuardBreakPunishNetId, fighterKnockdownPunishNetId, fighterParryPunishNetId, fighterRecoveryNetId, fighterIdentityPresentation, fighterThreatBearingLabel, fighterThreatGuardArcLabel, fighterThreatNetId, fighterThreatPhaseLabel, fighterThreatPhaseState, fighterMatchPointPresentation, fighterMatchPresentation, fighterScoreboardPresentation, FFA_KILL_TARGET, fighterVitalsPresentation, guardBreakSpatialPresentation, killFeedPresentation, opponentRecoveryPresentation, parrySpatialPresentation, staminaDenialPresentation } from "../src/browser/combat-readability.mjs";
 import { COMBAT } from "../src/combat/model.mjs";
@@ -109,9 +110,12 @@ let rollRequested = false;
 let kickRequested = false;
 let jumpRequested = false;
 let shortBlockUntil = 0;
-let rightButtonDown = false;
-let rightButtonDownAt = 0;
-const runHoldThresholdMs = 180;
+const rightButtonGesture = installRightButtonGesture(canvas, {
+  onKick: () => {
+    kickRequested = true;
+    queueStaminaDenial("kick");
+  },
+});
 let staminaRegenBlockedUntil = 0;
 
 canvas.addEventListener("contextmenu", (event) => event.preventDefault());
@@ -125,28 +129,17 @@ canvas.addEventListener("pointerdown", (event) => {
     } else if (!pendingStaminaDenial && (jumpRequested || keys.has("Space"))) {
       queueStaminaDenial("jump-attack-chord");
     } else {
-      const runningGesture = rightButtonDown
-        && performance.now() - rightButtonDownAt >= runHoldThresholdMs
+      const runningGesture = rightButtonGesture.isRunning()
         && (keys.has("KeyW") || keys.has("KeyA") || keys.has("KeyS") || keys.has("KeyD"));
       if (runningGesture) queueStaminaDenial("running-attack");
     }
   }
-  if (event.button === 2) {
-    rightButtonDown = true;
-    rightButtonDownAt = performance.now();
-  }
+
   updateMouse(event);
 });
 canvas.addEventListener("pointerup", (event) => {
   if (event.button === 0) leftButtonDown = false;
-  if (event.button === 2) {
-    const heldMs = performance.now() - rightButtonDownAt;
-    rightButtonDown = false;
-    if (heldMs < runHoldThresholdMs) {
-      kickRequested = true;
-      queueStaminaDenial("kick");
-    }
-  }
+
 });
 canvas.addEventListener("wheel", (event) => {
   event.preventDefault();
@@ -511,7 +504,7 @@ function releaseInputs() {
   kickRequested = false;
   jumpRequested = false;
   shortBlockUntil = 0;
-  rightButtonDown = false;
+  rightButtonGesture.cancel();
   pendingStaminaDenial = null;
 }
 
@@ -536,7 +529,7 @@ function sampleInput() {
   currentInput.dodge = rollRequested;
   currentInput.block = performance.now() < shortBlockUntil;
   currentInput.kick = kickRequested;
-  currentInput.run = rightButtonDown && performance.now() - rightButtonDownAt >= runHoldThresholdMs;
+  currentInput.run = rightButtonGesture.isRunning();
   currentInput.jump = jumpRequested;
 }
 
