@@ -1075,11 +1075,13 @@ async function runOnlineUiHeavyParryFlight(entries) {
   // pristine case. Any evidence that a heavy actually committed, hit, blocked,
   // or otherwise resolved makes the attempt terminal and therefore fail-closed.
   for (let attempt = 1; attempt <= 3 && !evidence; attempt += 1) {
-    // Target the late 125 ms parry interval from the same authoritative
-    // Chrome heavy-commit event, without an unbounded HUD-poll plus sleep.
-    // Keep exactly one real Firefox wheel and require real parry/stun proof.
+    // Repeatable browser tests exposed an earlier-than-usual 293 ms heavy
+    // commitment-to-impact interval. Advance the single real Firefox wheel
+    // to 190 ms after the observed Chrome commitment so server-owned parry
+    // ingestion has margin even on fast authoritative strikes. Assert stun,
+    // unchanged HP, and genuine parry feedback exactly as before.
     await performHeavyCounterplayWindowWheel(
-      attacker, defender, defenderElementId, 215,
+      attacker, defender, defenderElementId, 190,
     );
     await sleep(220);
 
