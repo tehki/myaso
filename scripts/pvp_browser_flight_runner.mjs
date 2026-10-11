@@ -956,13 +956,14 @@ async function runOnlineUiHeavyBlockFlight(entries) {
   // completely unresolved: pristine HP/guard and no parry feedback. Any resolved
   // or partially resolved exchange fails closed instead of being retried.
   for (let attempt = 1; attempt <= 3 && !evidence; attempt += 1) {
-    // Start the genuine E edge and schedule two genuine wheel-back pulses from
-    // the defender's own WebDriver clock at 70 ms and 170 ms. Their unchanged
-    // 240 ms short-block windows overlap by 140 ms, leaving enough scheduler
-    // margin that authority stays in one Block action through the ~320 ms impact.
+    // Deliver a single genuine wheel-back during heavy windup. A second
+    // wheel at ~170 ms rearmed the 125 ms parry window immediately before
+    // impact under loaded Firefox CI, incorrectly turning the guarded heavy
+    // into a parry. The first wheel lands in the unchanged 125–240 ms
+    // block-only interval; never rearm parry in this block acceptance.
     await Promise.all([
       pulseMovementKey(attacker, "e", heavyKeyPulseMs),
-      scrollArenaWheelPair(defender, defenderElementId, 120, 70, 100),
+      scrollArenaWheel(defender, defenderElementId, 120, 70),
     ]);
     await sleep(470);
 
@@ -1151,7 +1152,10 @@ async function runOnlineUiHeavyDodgeFlight(entries) {
   const staged = await prepareHeavyCounterplayFlight(
     entries,
     "M107 heavy dodge",
-    { attackerName: "firefox", defenderName: "chrome", movementMs: 200 },
+    // Preserve heavy-strike reach while retaining roll collision clearance:
+    // the old 200 ms approach occasionally put the fighters into the roll's
+    // authoritative collision radius before the perpendicular dodge began.
+    { attackerName: "firefox", defenderName: "chrome", movementMs: 120 },
   );
   const { attacker, defender, movementCode } = staged;
 
