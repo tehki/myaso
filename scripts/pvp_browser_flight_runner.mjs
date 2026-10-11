@@ -948,23 +948,32 @@ function assertHeavyControlDelivered(attackerResult, movementCode, label) {
 // parallel. The pointer observer only records event time; it never generates
 // input or changes combat state.
 async function measureRealPointerDispatchLag(session, elementId, aimOffset) {
-  await execute(session.base, session.sessionId,
-    "window.__MYASO_M190_POINTER_EPOCH__=null;"
-    + "document.querySelector('#arena').addEventListener('pointermove',"
-    + "()=>{window.__MYASO_M190_POINTER_EPOCH__=Date.now()},"
-    + "{capture:true,once:true});return true;");
-  const dispatchedAt = Date.now();
-  await aimArena(session, elementId, aimOffset, 1);
-  const eventEpochMs = await execute(session.base, session.sessionId,
-    "return window.__MYASO_M190_POINTER_EPOCH__;");
-  await aimArena(session, elementId, aimOffset, 0);
-  if (!Number.isFinite(eventEpochMs) || eventEpochMs < dispatchedAt
-    || eventEpochMs - dispatchedAt > 1500) {
-    throw new Error("M190 failed to observe genuine pointer dispatch: " + JSON.stringify({
-      browser: session.name, dispatchedAt, eventEpochMs,
-    }));
+  // A single W3C pointer sample occasionally takes >100ms under loaded
+  // headless Firefox and is not representative of the following wheel.
+  // Collect three *genuine* tiny pointer moves and use their median.
+  // Each move is then returned to the intended aim; none activates combat.
+  const samplesMs = [];
+  for (let sample = 0; sample < 3; sample += 1) {
+    await execute(session.base, session.sessionId,
+      "window.__MYASO_M190_POINTER_EPOCH__=null;"
+      + "document.querySelector('#arena').addEventListener('pointermove',"
+      + "()=>{window.__MYASO_M190_POINTER_EPOCH__=Date.now()},"
+      + "{capture:true,once:true});return true;");
+    const dispatchedAt = Date.now();
+    await aimArena(session, elementId, aimOffset, 1);
+    const eventEpochMs = await execute(session.base, session.sessionId,
+      "return window.__MYASO_M190_POINTER_EPOCH__;");
+    await aimArena(session, elementId, aimOffset, 0);
+    if (!Number.isFinite(eventEpochMs) || eventEpochMs < dispatchedAt
+      || eventEpochMs - dispatchedAt > 1500) {
+      throw new Error("M190 failed to observe genuine pointer dispatch: " + JSON.stringify({
+        browser: session.name, sample, dispatchedAt, eventEpochMs,
+      }));
+    }
+    samplesMs.push(eventEpochMs - dispatchedAt);
   }
-  return eventEpochMs - dispatchedAt;
+  const sorted = [...samplesMs].sort((a, b) => a - b);
+  return { medianMs: sorted[1], samplesMs };
 }
 
 // The unchanged heavy input and the genuine Firefox wheel are dispatched at
@@ -978,15 +987,23 @@ async function performHeavyCounterplayWindowWheel(
 ) {
   const before = await readUiEvidence(attacker);
   const actionOffset = before.acceptance?.ownActionTransitions?.length ?? 0;
-  const [attackerDriverMs, defenderDriverMs] = await Promise.all([
+  const [attackerCalibration, defenderCalibration] = await Promise.all([
     measureRealPointerDispatchLag(attacker, attackerElementId, attackOffset),
     measureRealPointerDispatchLag(defender, defenderElementId, blockOffset),
   ]);
-  const wheelDelayMs = Math.max(0, Math.min(420, Math.round(
-    targetAfterWindupMs + attackerDriverMs - defenderDriverMs,
-  )));
+  const rawCorrectionMs = attackerCalibration.medianMs - defenderCalibration.medianMs;
+  // Keep a slow pointer outlier from subtracting the whole 125ms parry window.
+  // A pointer dispatch is evidence, not a guaranteed wheel-delivery clock.
+  const appliedCorrectionMs = Math.max(-40, Math.min(40, Math.round(rawCorrectionMs)));
+  const wheelDelayMs = Math.max(0, Math.min(420,
+    targetAfterWindupMs + appliedCorrectionMs));
   console.log("M190_HEAVY_INPUT_PLAN " + JSON.stringify({
-    scenario, attackerDriverMs, defenderDriverMs,
+    scenario,
+    attackerDriverMs: attackerCalibration.medianMs,
+    defenderDriverMs: defenderCalibration.medianMs,
+    attackerSamplesMs: attackerCalibration.samplesMs,
+    defenderSamplesMs: defenderCalibration.samplesMs,
+    rawCorrectionMs, appliedCorrectionMs,
     targetAfterWindupMs, wheelDelayMs,
   }));
   await Promise.all([
