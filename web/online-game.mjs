@@ -1,7 +1,7 @@
 import { createFrameBudget } from "../src/browser/frame-budget.mjs";
 import { installRightButtonGesture } from "../src/browser/right-button-gesture.mjs";
 import { createCombatImpactController } from "../src/browser/combat-impact.mjs";
-import { COMBAT_ACTION, blockSpatialPresentation, combatActionHint, combatOverlayPresentation, createCombatReadabilityTracker, createRemoteDamageTracker, fighterFocusNetId, fighterGuardBreakPunishNetId, fighterKnockdownPunishNetId, fighterParryPunishNetId, fighterRecoveryNetId, fighterIdentityPresentation, fighterThreatBearingLabel, fighterThreatGuardArcLabel, fighterThreatNetId, fighterThreatPhaseLabel, fighterThreatPhaseState, fighterMatchPointPresentation, fighterMatchPresentation, fighterScoreboardPresentation, FFA_KILL_TARGET, fighterVitalsPresentation, guardBreakSpatialPresentation, killFeedPresentation, opponentRecoveryPresentation, parrySpatialPresentation, staminaDenialPresentation } from "../src/browser/combat-readability.mjs";
+import { COMBAT_ACTION, blockSpatialPresentation, combatActionHint, combatOverlayPresentation, createCombatReadabilityTracker, createRemoteDamageTracker, fighterFocusNetId, fighterGuardBreakPunishNetId, fighterKnockdownPunishNetId, fighterParryPunishNetId, parryPunishRangeCue, fighterRecoveryNetId, fighterIdentityPresentation, fighterThreatBearingLabel, fighterThreatGuardArcLabel, fighterThreatNetId, fighterThreatPhaseLabel, fighterThreatPhaseState, fighterMatchPointPresentation, fighterMatchPresentation, fighterScoreboardPresentation, FFA_KILL_TARGET, fighterVitalsPresentation, guardBreakSpatialPresentation, killFeedPresentation, opponentRecoveryPresentation, parrySpatialPresentation, staminaDenialPresentation } from "../src/browser/combat-readability.mjs";
 import { COMBAT } from "../src/combat/model.mjs";
 import { isTickNewer32, reconcilePrediction } from "../src/browser/reconciliation.mjs";
 import { NETWORK } from "../src/network/constants.mjs";
@@ -38,6 +38,7 @@ const opponentRecovery = {
   root: document.querySelector("#opponent-recovery"),
   label: document.querySelector("#opponent-recovery-label"),
   detail: document.querySelector("#opponent-recovery-detail"),
+  rangeCue: document.querySelector("#parry-punish-range"),
 };
 const threatCue = {
   root: document.querySelector("#threat-cue"),
@@ -1136,7 +1137,7 @@ function updateHud(ownId) {
   setFocusTarget(focusNetId, focusMode);
   updateThreatCue(ownId);
   updateCombatOverlay(own, ownId);
-  updateOpponentRecovery(remote, focusMode);
+  updateOpponentRecovery(remote, focusMode, own);
   updateScoreboard(ownId);
   const now = performance.now();
   if (combatMessage && now <= combatMessageUntil) {
@@ -1295,7 +1296,13 @@ function updateCombatOverlay(own, ownId) {
   if (combatOverlay.detail.textContent !== presentation.detail) combatOverlay.detail.textContent = presentation.detail;
 }
 
-function updateOpponentRecovery(remote, focusMode = "nearest") {
+function updateOpponentRecovery(remote, focusMode = "nearest", own = null) {
+  const rangeLabel = focusMode === "parry" ? parryPunishRangeCue(own, remote) : "";
+  if (opponentRecovery.rangeCue) {
+    const shouldHideRange = !rangeLabel;
+    if (opponentRecovery.rangeCue.hidden !== shouldHideRange) opponentRecovery.rangeCue.hidden = shouldHideRange;
+    if (rangeLabel && opponentRecovery.rangeCue.textContent !== rangeLabel) opponentRecovery.rangeCue.textContent = rangeLabel;
+  }
   const presentation = focusMode === "guard-break"
     ? { visible: true, state: "guard-break-stun", label: "PUNISH", detail: "Guard break stun" }
     : focusMode === "parry"
