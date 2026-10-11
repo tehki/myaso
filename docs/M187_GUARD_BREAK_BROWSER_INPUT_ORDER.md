@@ -9,7 +9,7 @@ predicate correctly rejected the flight.
 
 ## Corrective choreography
 - Begin a genuine WebDriver Chrome LMB attack burst.
-- After 40 ms, issue Firefox's genuine WebDriver wheel-back block; await both.
+- Immediately after starting, issue Firefox's genuine WebDriver wheel-back block; await both. The 1 ms scheduling yield allows both real browser inputs to overlap without a fixed late wheel.
 - Keep the original 135 ms light windup, 125 ms parry and 240 ms short-block
   windows fully authoritative and unchanged.
 - Fail immediately if any hit leaks through with defender HP below 100,
