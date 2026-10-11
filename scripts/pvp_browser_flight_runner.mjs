@@ -5215,18 +5215,20 @@ async function runOnlineUiRollKnockdownFfaHitFlight(entries) {
     const rollerWheelOffset = rollerBefore.wheels.length;
     const defenderActionOffset = defenderBefore.acceptance?.ownActionTransitions?.length ?? 0;
     const punishPointerOffset = punisherBefore.pointers.length;
-    await scrollArenaWheel(roller, rollerElementId, -120, 0);
 
-    // The conversion window is only 260 ms and the unchanged light windup is
-    // 135 ms. Watch the victim's authoritative action stream inside Firefox so #3 can
-    // commit the real LMB on the first knockdown snapshot instead of paying
-    // three WebDriver reads plus focus/HUD replication before acting.
-    const setupDeadline = Date.now() + COMBAT.dodge.durationMs
+    // Begin observing Firefox before sending the genuine Chrome wheel-forward.
+    // Awaiting that WebDriver wheel response first can consume a meaningful
+    // fraction of the 260 ms knockdown before the observer is even armed.
+    // Parallel sessions retain real wheel and pointer provenance; neither
+    // action nor authoritative state is synthesized or modified here.
+    const knockdownTimeoutMs = COMBAT.dodge.durationMs
       + COMBAT.dodge.collisionKnockdownMs + 220;
-    const knockdownTransition = await waitForDefenderKnockdown(
+    const knockdownWatcher = waitForDefenderKnockdown(
       defenderActionOffset,
-      Math.max(0, setupDeadline - Date.now()),
+      knockdownTimeoutMs,
     );
+    const rollInput = scrollArenaWheel(roller, rollerElementId, -120, 0);
+    const [knockdownTransition] = await Promise.all([knockdownWatcher, rollInput]);
 
     if (knockdownTransition) {
       conversion = {
@@ -5663,14 +5665,17 @@ async function runOnlineUiBoundedRollKnockdownFlight(entries) {
   await pulseMovementKey(suppressor, suppressorHorizontalKey, 285);
   await pulseMovementKey(opener, openerMovementKey, 280);
   await aimArena(opener, openerElementId, openerOffset);
-  // Pre-aim #3 at #2's deterministic post-impact position. This avoids a
-  // post-knockdown WebDriver re-aim round trip consuming most of the unchanged
-  // 260 ms downed window before the suppression roll can make contact.
+  // Pre-aim #3 near #2's deterministic post-impact position, from a
+  // lower flank. The additional 24 px Y offset keeps the real roll's lane
+  // away from #1 while preserving collision proximity to the downed #2.
+  // This avoids a WebDriver re-aim round trip inside the unchanged 260 ms
+  // knockdown window and still requires a genuine suppression roll.
   await aimAtAuthoritativeTarget(
     suppressor,
     suppressorElementId,
     defenderId,
     rollRight ? COMBAT.dodge.collisionKnockback : -COMBAT.dodge.collisionKnockback,
+    24,
   );
   await sleep(50);
 
@@ -7935,12 +7940,25 @@ async function runOnlineUiBlockFacingTellFlight(entries) {
   const aimOffset = defenderReady.playerNetId > observerReady.playerNetId ? -200 : 200;
   await aimArena(defender, defenderElementId, aimOffset);
 
+  // The wheel-back short block lasts 240 ms, often less than several
+  // headless WebDriver round trips. Start canvas-frame capture before the
+  // genuine wheel and preserve the original remote-only pixel assertion.
+  await Promise.all(entries.map(armBlockFacingTellSampler));
   let tell;
-  await setArenaBlock(defender, defenderElementId, true);
   try {
-    tell = await waitForRemoteBlockFacingTell(observer, defender, 900);
+    await setArenaBlock(defender, defenderElementId, true);
+    await sleep(COMBAT.block.shortBlockMs + 100);
+    const [observerMax, localMax] = await Promise.all([
+      readBlockFacingTellSampler(observer),
+      readBlockFacingTellSampler(defender),
+    ]);
+    if (observerMax < 24 || localMax !== 0) {
+      throw new Error(`M42 remote-only block-facing pixels incorrect: observer=${observerMax} local=${localMax}`);
+    }
+    tell = { observerMax, localMax };
   } finally {
     await setArenaBlock(defender, defenderElementId, false);
+    await Promise.allSettled(entries.map(stopBlockFacingTellSampler));
   }
   await waitForBlockFacingTellClear(observer, 1000);
 
@@ -11745,6 +11763,39 @@ async function sampleBlockFacingTellPixels(session) {
       if (Math.abs(pixels[i] - 154) <= 2 && Math.abs(pixels[i + 1] - 215) <= 2 && Math.abs(pixels[i + 2] - 167) <= 2 && pixels[i + 3] > 0) count += 1;
     }
     return count;
+  `);
+}
+
+async function armBlockFacingTellSampler(session) {
+  return execute(session.base, session.sessionId, `
+    const arena = document.querySelector('#arena');
+    const ctx = arena?.getContext('2d');
+    if (!ctx) return false;
+    const state = { active: true, maxPixels: 0, frame: 0 };
+    const sample = () => {
+      if (!state.active) return;
+      const data = ctx.getImageData(0, 0, arena.width, arena.height).data;
+      let count = 0;
+      for (let i = 0; i < data.length; i += 4)
+        if (Math.abs(data[i] - 154) <= 2 && Math.abs(data[i + 1] - 215) <= 2 && Math.abs(data[i + 2] - 167) <= 2 && data[i + 3] > 0) count++;
+      state.maxPixels = Math.max(state.maxPixels, count);
+      state.frame = requestAnimationFrame(sample);
+    };
+    window.__MYASO_M42_FACING_SAMPLER__ = state;
+    sample();
+    return true;
+  `);
+}
+async function readBlockFacingTellSampler(session) {
+  return execute(session.base, session.sessionId, "return window.__MYASO_M42_FACING_SAMPLER__?.maxPixels ?? 0;");
+}
+async function stopBlockFacingTellSampler(session) {
+  return execute(session.base, session.sessionId, `
+    const state = window.__MYASO_M42_FACING_SAMPLER__;
+    if (!state) return 0;
+    state.active = false;
+    cancelAnimationFrame(state.frame);
+    return state.maxPixels;
   `);
 }
 
