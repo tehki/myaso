@@ -942,71 +942,76 @@ function assertHeavyControlDelivered(attackerResult, movementCode, label) {
   }
 }
 
-// M190: true W3C input latency may exceed the entire 125 ms block-only
-// window. Calibrate each driver's *real* pointerMove dispatch immediately
-// before the exchange, then pre-arm the two real browser action commands in
-// parallel. The pointer observer only records event time; it never generates
-// input or changes combat state.
-// M192: calibrate the *actual* authoritative E and wheel ingress on these
-// browser sessions, not a different pointerMove path. A genuine off-axis heavy
-// whiff and an isolated real wheel-back run while both fighters are at 100 HP
-// and outside a damage exchange. Their observed server action transitions
-// measure end-to-end input latency without mutating acceptance or game state.
+// M195: three independent true E and wheel-back ingress calibrations replace
+// the one-shot sample that over-delayed post-merge heavy parry.
+// Read-only server action transitions prove every clean calibration.
 async function calibrateHeavyIngress(
   attacker, defender, attackerElementId, defenderElementId,
   attackOffset, blockOffset,
 ) {
-  const before = await Promise.all([readUiEvidence(attacker), readUiEvidence(defender)]);
-  const attackOffsetIndex = before[0].acceptance?.ownActionTransitions?.length ?? 0;
-  const defendOffsetIndex = before[1].acceptance?.ownActionTransitions?.length ?? 0;
-
+  const eIngressSamples = [];
+  const wheelIngressSamples = [];
+  let windupTick = null;
+  let blockTick = null;
   await aimArena(attacker, attackerElementId, -attackOffset);
   await sleep(45);
-  const eRequestEpochMs = Date.now();
-  await pulseMovementKey(attacker, "e", heavyKeyPulseMs);
-  await sleep(COMBAT.heavyAttack.windupMs + COMBAT.heavyAttack.activeMs
-    + COMBAT.heavyAttack.recoveryMs + 210);
-  const whiff = await Promise.all([readUiEvidence(attacker), readUiEvidence(defender)]);
-  const windup = whiff[0].acceptance?.ownActionTransitions?.slice(attackOffsetIndex)
-    .find(entry => entry.action === COMBAT_ACTION.heavyAttackWindup);
-  const lateIdle = whiff[0].acceptance?.ownActionTransitions?.slice(attackOffsetIndex)
-    .some((entry) => entry.action === COMBAT_ACTION.idle
-      && Number.isFinite(windup?.epochMs) && entry.epochMs > windup.epochMs);
-  if (!windup || !lateIdle || whiff.some(x => x.playerHp !== 100
-    || x.playerGuard !== 100)) {
-    throw new Error("M192 real heavy calibration whiff was not clean: "
-      + JSON.stringify({ attacker: whiff[0].acceptance, defender: whiff[1].acceptance,
-        hp: whiff.map(x => x.playerHp), guard: whiff.map(x => x.playerGuard) }));
+  for (let sample = 0; sample < 3; sample += 1) {
+    const before = await readUiEvidence(attacker);
+    const offset = before.acceptance?.ownActionTransitions?.length ?? 0;
+    const started = Date.now();
+    await pulseMovementKey(attacker, "e", heavyKeyPulseMs);
+    await sleep(COMBAT.heavyAttack.windupMs + COMBAT.heavyAttack.activeMs
+      + COMBAT.heavyAttack.recoveryMs + 210);
+    const whiff = await Promise.all([readUiEvidence(attacker), readUiEvidence(defender)]);
+    const actions = whiff[0].acceptance?.ownActionTransitions?.slice(offset) ?? [];
+    const windup = actions.find(x => x.action === COMBAT_ACTION.heavyAttackWindup);
+    const recovered = actions.some(x => x.action === COMBAT_ACTION.idle
+      && Number.isFinite(windup?.epochMs) && x.epochMs > windup.epochMs);
+    const ingress = windup?.epochMs - started;
+    if (!windup || !recovered || !Number.isFinite(ingress)
+      || ingress < 0 || ingress > 750
+      || whiff.some(x => x.playerHp !== 100 || x.playerGuard !== 100)) {
+      throw new Error("M195 genuine heavy whiff calibration failed: "
+        + JSON.stringify({ sample, ingress, actions, hp: whiff.map(x => x.playerHp),
+          guard: whiff.map(x => x.playerGuard) }));
+    }
+    eIngressSamples.push(ingress);
+    windupTick = windup.serverTick;
   }
-  const eIngressMs = windup.epochMs - eRequestEpochMs;
-
-  // No heavy is pending during this isolated real wheel, so it cannot fake a
-  // parry result or apply guard pressure. The 240 ms short block fully expires
-  // before the actual test exchange starts.
-  const wheelRequestEpochMs = Date.now();
-  await scrollArenaWheel(defender, defenderElementId, 120, 0);
-  await sleep(COMBAT.block.shortBlockMs + 210);
-  const afterWheel = await Promise.all([readUiEvidence(attacker), readUiEvidence(defender)]);
-  const block = afterWheel[1].acceptance?.ownActionTransitions?.slice(defendOffsetIndex)
-    .find(entry => entry.action === COMBAT_ACTION.block);
-  const wheelIngressMs = Number.isFinite(block?.epochMs)
-    ? block.epochMs - wheelRequestEpochMs : NaN;
-  if (!Number.isFinite(eIngressMs) || eIngressMs < 0 || eIngressMs > 750
-    || !Number.isFinite(wheelIngressMs) || wheelIngressMs < 0 || wheelIngressMs > 750
-    || afterWheel.some(x => x.playerHp !== 100 || x.playerGuard !== 100)) {
-    throw new Error("M192 real wheel/E calibration did not preserve authority: "
-      + JSON.stringify({ eIngressMs, wheelIngressMs,
-        attack: afterWheel[0].acceptance, defense: afterWheel[1].acceptance,
-        hp: afterWheel.map(x => x.playerHp),
-        guard: afterWheel.map(x => x.playerGuard) }));
+  // Genuine isolated wheel inputs occur after full heavy recovery; each
+  // 240ms short-block expires before the next wheel or actual exchange.
+  for (let sample = 0; sample < 3; sample += 1) {
+    const before = await readUiEvidence(defender);
+    const offset = before.acceptance?.ownActionTransitions?.length ?? 0;
+    const started = Date.now();
+    await scrollArenaWheel(defender, defenderElementId, 120, 0);
+    await sleep(COMBAT.block.shortBlockMs + 210);
+    const after = await Promise.all([readUiEvidence(attacker), readUiEvidence(defender)]);
+    const actions = after[1].acceptance?.ownActionTransitions?.slice(offset) ?? [];
+    const block = actions.find(x => x.action === COMBAT_ACTION.block);
+    const ingress = block?.epochMs - started;
+    if (!Number.isFinite(ingress) || ingress < 0 || ingress > 750
+      || after.some(x => x.playerHp !== 100 || x.playerGuard !== 100)) {
+      throw new Error("M195 genuine wheel calibration failed: "
+        + JSON.stringify({ sample, ingress, actions, hp: after.map(x => x.playerHp),
+          guard: after.map(x => x.playerGuard) }));
+    }
+    wheelIngressSamples.push(ingress);
+    blockTick = block.serverTick;
   }
   await Promise.all([
     aimArena(attacker, attackerElementId, attackOffset),
     aimArena(defender, defenderElementId, blockOffset),
   ]);
   await sleep(55);
-  return { eIngressMs, wheelIngressMs, windupTick: windup.serverTick,
-    blockTick: block.serverTick };
+  const median = xs => [...xs].sort((a, b) => a - b)[1];
+  const eIngressMs = median(eIngressSamples);
+  const wheelIngressMs = median(wheelIngressSamples);
+  console.log("M195_REAL_INGRESS_SAMPLES " + JSON.stringify({
+    scenario, eIngressSamples, wheelIngressSamples, eIngressMs, wheelIngressMs,
+  }));
+  return { eIngressMs, wheelIngressMs, eIngressSamples,
+    wheelIngressSamples, windupTick, blockTick };
 }
 
 // One real Chrome E gesture and one real Firefox wheel-back remain the entire
@@ -1025,15 +1030,21 @@ async function performHeavyCounterplayWindowWheel(
   const attackActionOffset = before[0].acceptance?.ownActionTransitions?.length ?? 0;
   const defendActionOffset = before[1].acceptance?.ownActionTransitions?.length ?? 0;
   const wheelOffset = before[1].wheels.length;
-  const wheelDelayMs = Math.round(
-    targetAfterWindupMs + calibration.eIngressMs - calibration.wheelIngressMs,
-  );
+  // Bound the correction from sampled E/wheel ingress to avoid
+  // path-dependent skew pushing the sole parry wheel past impact.
+  const rawSkewMs = calibration.eIngressMs - calibration.wheelIngressMs;
+  // A large negative compensation pre-arms heavy parry too early and
+  // turns the genuine parry into an ordinary -64 guard block. Use a narrower
+  // 25ms bound for parry while preserving the 40ms block-only calibration.
+  const skewLimitMs = targetAfterWindupMs >= 240 ? 25 : 40;
+  const appliedSkewMs = Math.max(-skewLimitMs, Math.min(skewLimitMs, rawSkewMs));
+  const wheelDelayMs = Math.round(targetAfterWindupMs + appliedSkewMs);
   if (wheelDelayMs < 0 || wheelDelayMs > 450) {
     throw new Error("M192 calibrated wheel timing outside admissible W3C pause: "
       + JSON.stringify({ ...calibration, targetAfterWindupMs, wheelDelayMs }));
   }
   console.log("M192_REAL_INGRESS_PLAN " + JSON.stringify({
-    scenario, ...calibration, targetAfterWindupMs, wheelDelayMs,
+    scenario, ...calibration, targetAfterWindupMs, rawSkewMs, appliedSkewMs, wheelDelayMs,
   }));
   await Promise.all([
     pulseMovementKey(attacker, "e", heavyKeyPulseMs),
@@ -1165,7 +1176,7 @@ async function runOnlineUiHeavyParryFlight(entries) {
     // parry interval. Real stun and unchanged HP remain required.
     await performHeavyCounterplayWindowWheel(
       attacker, defender, attackerElementId, defenderElementId,
-      attackOffset, blockOffset, 255,
+      attackOffset, blockOffset, 265,
     );
     await sleep(220);
 
