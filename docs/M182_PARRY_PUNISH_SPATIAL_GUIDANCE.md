@@ -9,8 +9,8 @@ reach/facing relationship readable without claiming a guaranteed future hit.
   text to maintain M147/M150 real-browser acceptance semantics.
 - Add a separate context cue using replicated player/target positions and facing:
   `IN LIGHT ARC`, `FACE TARGET`, or `CLOSE FOR LIGHT`.
-- Only expose the cue for a valid parry-stunned target (stunned, positive guard)
-  with finite replicated positions; hide when stun ends, focus changes, or
+- Only expose the cue while the player can act from idle/block and the target
+  is parry-stunned (stunned, positive guard) with finite replicated positions; hide when stun ends, focus changes, or
   positional evidence is missing.
 - Use the existing light-attack geometry (76 reach + 18 fighter radius, centered
   0.78π arc), with no change to authoritative simulation, stamina, stun duration,

@@ -961,6 +961,10 @@ test("M182 parry punish guidance uses authoritative light reach and facing witho
   parried.guard = 0;
   assert.equal(parryPunishRangeCue(own, parried), "", "guard-break stun is not parry punish");
   parried.guard = 100;
+  own.action = COMBAT_ACTION.knockdown;
+  assert.equal(parryPunishRangeCue(own, parried), "", "a downed player cannot convert a punish");
+  own.action = COMBAT_ACTION.block;
+  assert.equal(parryPunishRangeCue(own, parried), "IN LIGHT ARC", "a blocking player can release and punish");
   parried.action = COMBAT_ACTION.idle;
   assert.equal(parryPunishRangeCue(own, parried), "", "a recovered fighter is never a punish cue");
   assert.equal(parryPunishRangeCue(own, null), "");

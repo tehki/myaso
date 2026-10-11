@@ -249,7 +249,8 @@ export function parrySpatialPresentation(entity) {
 // the target will remain stunned throughout a future strike windup.
 export function parryPunishRangeCue(own, target) {
   if (!parrySpatialPresentation(target).visible
-    || !own || !Number.isFinite(own.x) || !Number.isFinite(own.y)
+    || !own || (own.action !== COMBAT_ACTION.idle && own.action !== COMBAT_ACTION.block)
+    || !Number.isFinite(own.x) || !Number.isFinite(own.y)
     || !Number.isFinite(target?.x) || !Number.isFinite(target?.y)) return "";
   const dx = target.x - own.x;
   const dy = target.y - own.y;
