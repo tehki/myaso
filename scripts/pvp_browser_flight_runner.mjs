@@ -985,7 +985,7 @@ async function calibrateHeavyIngress(
   // before the actual test exchange starts.
   const wheelRequestEpochMs = Date.now();
   await scrollArenaWheel(defender, defenderElementId, 120, 0);
-  await sleep(COMBAT.block.durationMs + 210);
+  await sleep(COMBAT.block.shortBlockMs + 210);
   const afterWheel = await Promise.all([readUiEvidence(attacker), readUiEvidence(defender)]);
   const block = afterWheel[1].acceptance?.ownActionTransitions?.slice(defendOffsetIndex)
     .find(entry => entry.action === COMBAT_ACTION.block);
