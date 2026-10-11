@@ -9,7 +9,8 @@ leave sprint held; an unmatched or repeated press could corrupt tap classificati
 - Both browser modes share the same right-button gesture implementation.
 - A genuine right-button tap shorter than 180 ms emits exactly one kick on release.
 - Holding for at least 180 ms enables sprint; releasing it does not kick.
-- Pointer capture and a window-level pointerup fallback end an off-canvas hold.
+- A window-level pointerup fallback ends an off-canvas hold without forcing pointer
+  capture, which can be lost when the second mouse-button source starts an attack.
 - Pointercancel, lostpointercapture, window blur and explicit input reset cancel
   the gesture without triggering kick.
 - Pointer ownership rejects unrelated release/cancel events. Repeated downs do not

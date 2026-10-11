@@ -15,12 +15,9 @@ export function installRightButtonGesture(
     if (event.button !== 2 || activePointerId !== null) return;
     activePointerId = event.pointerId;
     pressedAtMs = now();
-    // Capturing ensures releasing outside the arena cannot leave sprint stuck.
-    try {
-      canvas.setPointerCapture?.(event.pointerId);
-    } catch {
-      // The window pointerup fallback below still clears the gesture.
-    }
+    // Do not capture the mouse pointer: browser drivers (and some multi-button
+    // devices) can hand capture to a second button source while RMB remains
+    // physically held. Window pointerup observes off-canvas releases instead.
   }
 
   function onPointerUp(event) {

@@ -294,7 +294,7 @@ test("right-button tap kicks once while hold sprints without kick", () => {
   windowTarget.dispatchEvent(rightPointer("pointerup"));
   assert.equal(gesture.isRunning(), false, "release outside the canvas ends sprint");
   assert.equal(kicks, 1, "a running hold is not a kick");
-  assert.deepEqual(captures, [7, 7]);
+  assert.deepEqual(captures, [], "mouse pointer capture must not interrupt RMB during LMB chords");
 });
 
 test("right-button capture loss, blur and pointercancel never trigger a kick", () => {
@@ -344,6 +344,9 @@ test("right-button ignores unmatched releases and repeated downs cannot reset sp
   nowMs = 200;
   canvas.dispatchEvent(rightPointer("pointerdown", 7));
   canvas.dispatchEvent(rightPointer("pointerdown", 8));
+  // Simulated secondary LMB source must not cancel the original RMB hold.
+  canvas.dispatchEvent(rightPointer("pointerdown", 9, 0));
+  canvas.dispatchEvent(rightPointer("pointerup", 9, 0));
   nowMs = 280;
   assert.equal(gesture.isRunning(), true);
   windowTarget.dispatchEvent(rightPointer("pointerup", 8));
