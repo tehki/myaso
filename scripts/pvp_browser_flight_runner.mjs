@@ -8890,25 +8890,39 @@ async function runOnlineUiGuardBreakFlight(entries, { onGuardBroken = null } = {
     blockHeld = true;
     let guardBroken = false;
     for (let attempt = 0; attempt < 4 && !guardBroken; attempt += 1) {
-      // M187: begin the real Firefox wheel-back before the real Chrome LMB
-      // burst, but dispatch across independent browser sessions concurrently.
-      // Awaiting the full wheel WebDriver response first caused short-block
-      // expiry and a 34 HP hit; starting the LMB first made the 125 ms parry
-      // window catch it instead. A 35 ms lead plus the 135 ms light windup
-      // targets the genuine 125–240 ms block-only interval, with all outcomes
-      // still decided by the unchanged authoritative combat rules.
-      const blockInput = scrollArenaWheel(defender, defenderElementId, 120, 0);
-      await sleep(35);
+      // M193: main CI #38139942679 reproduced a parry when Firefox's true
+      // wheel-back preceded Chrome's light burst by only 35 ms. Loaded driver
+      // ingress can consume that lead. Start both genuine W3C sessions
+      // concurrently and use a Chrome-owned 75 ms pause before real LMB.
+      // With the unchanged 135 ms light windup this targets ~210 ms from
+      // wheel to impact: outside 125 ms parry, inside 240 ms short block.
+      // Each exchange still requires real -38 guard pressure and 100 HP.
       await Promise.all([
-        blockInput,
-        performArenaAttackBurst(attacker, 3, 0),
+        scrollArenaWheel(defender, defenderElementId, 120, 0),
+        performArenaAttackBurst(attacker, 3, 75),
       ]);
       await sleep(230);
       const states = await Promise.all(entries.map(readUiEvidence));
       const defenderState = states.find((entry) => entry.browser === defender.name);
+      const attackerState = states.find((entry) => entry.browser === attacker.name);
+      // A real parry must never be silently counted as one of the guard-break
+      // exchanges, even if later strikes successfully drain guard.
+      if (attackerState?.feedbackTransitions.includes("parried")
+        || defenderState?.feedbackTransitions.includes("parry-success")) {
+        throw new Error(`M193 guard-break exchange ${attempt + 1} resolved as parry instead of -38 guard: ${JSON.stringify(states)}`);
+      }
       if (defenderState?.playerHp !== 100) {
         throw new Error(`M34 guard-break staging allowed an unblocked strike: ${JSON.stringify(states)}`);
       }
+      console.log("M193_GUARD_BREAK_EXCHANGE " + JSON.stringify({
+        attempt: attempt + 1,
+        attackerEvents: attackerState?.events.slice(-3),
+        defenderEvents: defenderState?.events.slice(-3),
+        defenderHp: defenderState?.playerHp,
+        defenderGuard: defenderState?.playerGuard,
+        wheelCount: defenderState?.wheels.filter(event => event.deltaY > 0).length,
+        attackCount: attackerState?.pointers.filter(event => event.type === "pointerdown" && event.button === 0).length,
+      }));
       guardBroken = defenderState?.playerGuard === 0;
       if (guardBroken && onGuardBroken) {
         await onGuardBroken({
