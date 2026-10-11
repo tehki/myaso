@@ -5663,14 +5663,17 @@ async function runOnlineUiBoundedRollKnockdownFlight(entries) {
   await pulseMovementKey(suppressor, suppressorHorizontalKey, 285);
   await pulseMovementKey(opener, openerMovementKey, 280);
   await aimArena(opener, openerElementId, openerOffset);
-  // Pre-aim #3 at #2's deterministic post-impact position. This avoids a
-  // post-knockdown WebDriver re-aim round trip consuming most of the unchanged
-  // 260 ms downed window before the suppression roll can make contact.
+  // Pre-aim #3 near #2's deterministic post-impact position, from a
+  // lower flank. The additional 24 px Y offset keeps the real roll's lane
+  // away from #1 while preserving collision proximity to the downed #2.
+  // This avoids a WebDriver re-aim round trip inside the unchanged 260 ms
+  // knockdown window and still requires a genuine suppression roll.
   await aimAtAuthoritativeTarget(
     suppressor,
     suppressorElementId,
     defenderId,
     rollRight ? COMBAT.dodge.collisionKnockback : -COMBAT.dodge.collisionKnockback,
+    24,
   );
   await sleep(50);
 
