@@ -942,6 +942,36 @@ function assertHeavyControlDelivered(attackerResult, movementCode, label) {
   }
 }
 
+// Schedule real Chrome/Firefox counterplay from the same rendered, authoritative
+// heavy commitment rather than variable driver startup time. The timestamp is
+// measured by Chrome's own performance clock; no game state or input is forged.
+async function performHeavyCounterplayWindowWheel(attacker, defender, defenderElementId, targetAfterCommitMs) {
+  const before = await readUiEvidence(attacker);
+  const eventOffset = before.eventTransitions.length;
+  const heavyPromise = pulseMovementKey(attacker, "e", heavyKeyPulseMs);
+  const deadline = Date.now() + COMBAT.heavyAttack.windupMs - 15;
+  let ageMs = null;
+  while (Date.now() < deadline) {
+    const age = await execute(attacker.base, attacker.sessionId,
+      "const s=window.__MYASO_M30_UI__;const e=s?.eventTransitions?.slice(" + eventOffset
+        + ").find(x=>x.text.startsWith('Heavy strike committed'));"
+        + "return e&&Number.isFinite(e.t)?performance.now()-s.startedAt-e.t:null;");
+    if (Number.isFinite(age) && age >= 0) {
+      ageMs = age;
+      break;
+    }
+    await sleep(6);
+  }
+  // W3C dispatch remains genuine, including when the observer misses an
+  // unlatched E press. Resolved hits/parries still fail closed in the caller.
+  const delayMs = ageMs === null ? 0
+    : Math.max(0, Math.min(300, Math.round(targetAfterCommitMs - ageMs)));
+  await Promise.all([
+    heavyPromise,
+    scrollArenaWheel(defender, defenderElementId, 120, delayMs),
+  ]);
+}
+
 async function runOnlineUiHeavyBlockFlight(entries) {
   const staged = await prepareHeavyCounterplayFlight(entries, "M107 heavy block");
   const { attacker, defender, attackerElementId, defenderElementId, movementCode } = staged;
@@ -956,15 +986,14 @@ async function runOnlineUiHeavyBlockFlight(entries) {
   // completely unresolved: pristine HP/guard and no parry feedback. Any resolved
   // or partially resolved exchange fails closed instead of being retried.
   for (let attempt = 1; attempt <= 3 && !evidence; attempt += 1) {
-    // Deliver a single genuine wheel-back during heavy windup. A second
-    // wheel at ~170 ms rearmed the 125 ms parry window immediately before
-    // impact under loaded Firefox CI, incorrectly turning the guarded heavy
-    // into a parry. The first wheel lands in the unchanged 125–240 ms
-    // block-only interval; never rearm parry in this block acceptance.
-    await Promise.all([
-      pulseMovementKey(attacker, "e", heavyKeyPulseMs),
-      scrollArenaWheel(defender, defenderElementId, 120, 70),
-    ]);
+    // M188: real repeated flights showed the 110 ms post-commit target
+    // rearmed parry because WebDriver/input ingestion added more latency
+    // after dispatch. Aim 65 ms after the observed committed event to put
+    // server-owned impact in the 125–240 ms block-only interval. A genuine
+    // parry, missed block, or health loss remains a hard failure.
+    await performHeavyCounterplayWindowWheel(
+      attacker, defender, defenderElementId, 65,
+    );
     await sleep(470);
 
     lastObserved = await Promise.all(entries.map(readUiEvidence));
@@ -1046,41 +1075,14 @@ async function runOnlineUiHeavyParryFlight(entries) {
   // pristine case. Any evidence that a heavy actually committed, hit, blocked,
   // or otherwise resolved makes the attempt terminal and therefore fail-closed.
   for (let attempt = 1; attempt <= 3 && !evidence; attempt += 1) {
-    // Anchor the genuine wheel-back to authoritative heavy windup instead of
-    // WebDriver dispatch timing. Heavy windup is 320 ms; once Firefox actually
-    // sees HEAVY WINDUP, wait into the final portion of that commitment and
-    // deliver wheel-back while the unchanged 125 ms parry window can still cover
-    // the active transition. A clean E-latch miss remains retryable below.
-    const heavyPromise = pulseMovementKey(attacker, "e", heavyKeyPulseMs);
-    const windupDeadline = Date.now() + COMBAT.heavyAttack.windupMs + 180;
-    let windupSeen = false;
-    while (!windupSeen && Date.now() < windupDeadline) {
-      // Both clients witness the same authoritative heavy commitment, but
-      // headless Firefox can skip the short spatial threat frame under load.
-      // The attacker's committed event is an independent authoritative
-      // witness; do not skip the genuine wheel merely because Firefox's
-      // HUD missed one replicated windup snapshot.
-      const [liveDefender, liveAttacker] = await Promise.all([
-        readUiEvidence(defender),
-        readUiEvidence(attacker),
-      ]);
-      windupSeen = liveDefender.threatTransitions.some((entry) =>
-        entry.visible && entry.phase === "HEAVY WINDUP")
-        || liveAttacker.events.some((message) =>
-          message.startsWith("Heavy strike committed"));
-      if (!windupSeen) await sleep(6);
-    }
-    if (windupSeen) {
-      // M107 real-browser timing can swing in either direction: at 190 ms
-      // Firefox occasionally delivers its genuine wheel after the heavy has
-      // already hit; at 150 ms the 125 ms parry interval may expire first.
-      // A 165 ms offset gives the narrow genuine parry window more room for
-      // both WebDriver delivery and attack-windup replication jitter.
-      // Preserve server-authoritative parry timing and real wheel provenance.
-      await sleep(165);
-      await scrollArenaWheel(defender, defenderElementId, 120, 0);
-    }
-    await heavyPromise;
+    // Repeatable browser tests exposed an earlier-than-usual 293 ms heavy
+    // commitment-to-impact interval. Advance the single real Firefox wheel
+    // to 190 ms after the observed Chrome commitment so server-owned parry
+    // ingestion has margin even on fast authoritative strikes. Assert stun,
+    // unchanged HP, and genuine parry feedback exactly as before.
+    await performHeavyCounterplayWindowWheel(
+      attacker, defender, defenderElementId, 190,
+    );
     await sleep(220);
 
     lastObserved = await Promise.all(entries.map(readUiEvidence));
