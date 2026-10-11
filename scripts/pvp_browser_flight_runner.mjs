@@ -5147,10 +5147,32 @@ async function runOnlineUiRollKnockdownFfaHitFlight(entries) {
   const rollOffset = rollRight ? 200 : -200;
   const punishOffset = punisherId < defenderId ? 200 : -200;
 
-  const readDefenderOwnActions = () => execute(
+  // Subscribe to the first authoritative knockdown within Firefox instead
+  // of serially polling WebDriver HTTP across this 260 ms conversion window.
+  const waitForDefenderKnockdown = (offset, timeoutMs) => webdriver(
     defender.base,
-    defender.sessionId,
-    "return (window.__MYASO_ACCEPTANCE_STATE__?.ownActionTransitions ?? []).map((entry) => ({ ...entry }));",
+    "POST",
+    `/session/${defender.sessionId}/execute/async`,
+    {
+      script: `
+        const [offset, knockdownAction, timeoutMs] = arguments;
+        const done = arguments[arguments.length - 1];
+        const started = performance.now();
+        let watcher;
+        const check = () => {
+          const events = window.__MYASO_ACCEPTANCE_STATE__?.ownActionTransitions ?? [];
+          const found = events.slice(offset).find((event) =>
+            event.action === knockdownAction && Number.isFinite(event.epochMs));
+          if (found || performance.now() - started >= timeoutMs) {
+            clearInterval(watcher);
+            done(found ? { ...found } : null);
+          }
+        };
+        watcher = setInterval(check, 4);
+        check();
+      `,
+      args: [offset, COMBAT_ACTION.knockdown, timeoutMs],
+    },
   );
 
   // Separate the two possible light targets without changing combat reach.
@@ -5178,20 +5200,15 @@ async function runOnlineUiRollKnockdownFfaHitFlight(entries) {
     await scrollArenaWheel(roller, rollerElementId, -120, 0);
 
     // The conversion window is only 260 ms and the unchanged light windup is
-    // 135 ms. Poll the victim's authoritative action stream alone so #3 can
+    // 135 ms. Watch the victim's authoritative action stream inside Firefox so #3 can
     // commit the real LMB on the first knockdown snapshot instead of paying
     // three WebDriver reads plus focus/HUD replication before acting.
     const setupDeadline = Date.now() + COMBAT.dodge.durationMs
       + COMBAT.dodge.collisionKnockdownMs + 220;
-    let knockdownTransition = null;
-    while (Date.now() < setupDeadline && !knockdownTransition) {
-      const defenderActions = await readDefenderOwnActions();
-      const newDefenderActions = defenderActions.slice(defenderActionOffset);
-      knockdownTransition = newDefenderActions.find((entry) =>
-        entry.action === COMBAT_ACTION.knockdown && Number.isFinite(entry.epochMs)) ?? null;
-      if (knockdownTransition) break;
-      await sleep(1);
-    }
+    const knockdownTransition = await waitForDefenderKnockdown(
+      defenderActionOffset,
+      Math.max(0, setupDeadline - Date.now()),
+    );
 
     if (knockdownTransition) {
       conversion = {
@@ -8552,7 +8569,12 @@ async function runOnlineUiGuardBreakPunishFfaFocusFlight(entries, convert = fals
     guardBreakRecovery = conversionPlan.guardBreakRecovery;
 
     let hitEvidence = null;
-    const hitDeadline = Date.now() + 320;
+    // The buffered light has a genuine 135 ms windup after attack recovery,
+    // and real Chrome/Firefox snapshots can arrive a frame after the 34 HP
+    // result. The older 320 ms poll occasionally expired even when the
+    // authoritative hit landed inside the unchanged 650 ms guard-break stun.
+    // Wait for evidence only; never extend the stun or synthesize an attack.
+    const hitDeadline = Date.now() + COMBAT.block.guardBreakStunMs + 120;
     while (Date.now() < hitDeadline) {
       const states = await Promise.all(entries.map(readUiEvidence));
       const currentAttacker = states.find((entry) => entry.browser === attacker.name);
