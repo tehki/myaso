@@ -248,8 +248,17 @@ export function parrySpatialPresentation(entity) {
 // An advisory cue for the current replicated geometry, not a promise that
 // the target will remain stunned throughout a future strike windup.
 export function parryPunishRangeCue(own, target) {
-  if (!parrySpatialPresentation(target).visible
-    || !own || (own.action !== COMBAT_ACTION.idle && own.action !== COMBAT_ACTION.block)
+  if (!parrySpatialPresentation(target).visible) return "";
+  return lightPunishGeometryCue(own, target);
+}
+
+export function guardBreakPunishRangeCue(own, target) {
+  if (!guardBreakSpatialPresentation(target).visible) return "";
+  return lightPunishGeometryCue(own, target);
+}
+
+function lightPunishGeometryCue(own, target) {
+  if (!own || (own.action !== COMBAT_ACTION.idle && own.action !== COMBAT_ACTION.block)
     || !Number.isFinite(own.x) || !Number.isFinite(own.y)
     || !Number.isFinite(target?.x) || !Number.isFinite(target?.y)) return "";
   const dx = target.x - own.x;
