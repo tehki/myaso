@@ -8890,16 +8890,17 @@ async function runOnlineUiGuardBreakFlight(entries, { onGuardBroken = null } = {
     blockHeld = true;
     let guardBroken = false;
     for (let attempt = 0; attempt < 4 && !guardBroken; attempt += 1) {
-      // M193: main CI #38139942679 reproduced a parry when Firefox's true
-      // wheel-back preceded Chrome's light burst by only 35 ms. Loaded driver
-      // ingress can consume that lead. Start both genuine W3C sessions
-      // concurrently and use a Chrome-owned 75 ms pause before real LMB.
-      // With the unchanged 135 ms light windup this targets ~210 ms from
-      // wheel to impact: outside 125 ms parry, inside 240 ms short block.
-      // Each exchange still requires real -38 guard pressure and 100 HP.
+      // M194: main CI #38143732093 hit for 34 HP on the third
+      // genuine block-only trial. The 75 ms pointer pause + 135 ms
+      // light windup nominally targeted 210 ms, too near the 240 ms
+      // block expiry once real browser ingress jitter was added.
+      // Use a 45 ms W3C pointer pause to target 180 ms, inside the
+      // unchanged 125-240 ms block-only interval. Preserve exactly
+      // one real Firefox wheel and Chrome pointer burst, and never
+      // relax authoritative HP, parry, or -38 guard assertions.
       await Promise.all([
         scrollArenaWheel(defender, defenderElementId, 120, 0),
-        performArenaAttackBurst(attacker, 3, 75),
+        performArenaAttackBurst(attacker, 3, 45),
       ]);
       await sleep(230);
       const states = await Promise.all(entries.map(readUiEvidence));
@@ -8922,6 +8923,12 @@ async function runOnlineUiGuardBreakFlight(entries, { onGuardBroken = null } = {
         defenderGuard: defenderState?.playerGuard,
         wheelCount: defenderState?.wheels.filter(event => event.deltaY > 0).length,
         attackCount: attackerState?.pointers.filter(event => event.type === "pointerdown" && event.button === 0).length,
+        wheelToFeedbackMs: (() => {
+          const wheel = defenderState?.wheels?.at(-1);
+          const feedback = defenderState?.eventTransitions?.at(-1);
+          return Number.isFinite(wheel?.t) && Number.isFinite(feedback?.t)
+            ? Number((feedback.t - wheel.t).toFixed(1)) : null;
+        })(),
       }));
       guardBroken = defenderState?.playerGuard === 0;
       if (guardBroken && onGuardBroken) {
