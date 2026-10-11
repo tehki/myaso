@@ -13,3 +13,7 @@ This changes test observation/scheduling only. The Rust server, movement, E stri
 ## Gate
 
 The three independent `uiheavyblock` and three `uiheavyparry` real Chrome/Firefox trials run early after authoritative Rust checks, followed by original M107, M34/M40, the full PvP/FFA suites, and M8 capacity. Final-head full quality must pass prior to merge. No playable build or production rollout.
+
+## Additional W3C light-feint input ordering regression
+
+The initial M189 full CI [#1002](https://github.com/tehki/myaso/actions/runs/38132382164) passed the six real heavy-defense trials but failed a separate M117 `uifeint` flight. The true Chrome left-mouse press was observed, and a true wheel-back followed about **92 ms later**, beyond the unchanged 70 ms light-feint window. The test's single 90 ms pointer-hold pause shared its W3C tick with the wheel, delaying the scroll to the end of that long tick. Split the genuine pointer hold into a 20 ms tick (containing the scroll) and a later 70 ms tick before release. This preserves a 90 ms held left mouse button while delivering the wheel within the real 70 ms light-feint window. Full CI, including M117/M170/M171 and all M189 defenses, is required again. No combat rule or damage is changed.
