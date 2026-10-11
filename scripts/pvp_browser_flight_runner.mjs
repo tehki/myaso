@@ -986,12 +986,13 @@ async function runOnlineUiHeavyBlockFlight(entries) {
   // completely unresolved: pristine HP/guard and no parry feedback. Any resolved
   // or partially resolved exchange fails closed instead of being retried.
   for (let attempt = 1; attempt <= 3 && !evidence; attempt += 1) {
-    // M188: fresh browser runs showed both an expired block and a parry
-    // with fixed E-relative delays. Instead, target the central block-only
-    // interval from Chrome's observed authoritative heavy commitment.
-    // The single genuine Firefox wheel must still yield 64 guard pressure.
+    // M188: real repeated flights showed the 110 ms post-commit target
+    // rearmed parry because WebDriver/input ingestion added more latency
+    // after dispatch. Aim 65 ms after the observed committed event to put
+    // server-owned impact in the 125–240 ms block-only interval. A genuine
+    // parry, missed block, or health loss remains a hard failure.
     await performHeavyCounterplayWindowWheel(
-      attacker, defender, defenderElementId, 110,
+      attacker, defender, defenderElementId, 65,
     );
     await sleep(470);
 
