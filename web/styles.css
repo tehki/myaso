@@ -31,7 +31,8 @@ kbd { border: 1px solid #575144; border-bottom-width: 2px; border-radius: 5px; b
 .readiness-cue[data-state="windup"] b, .readiness-cue[data-state="active"] b { color: #f0c47e; }
 .readiness-cue[data-state="recovery"] b, .readiness-cue[data-state="locked"] b { color: #ee988a; }
 .readiness-cue[data-state="block"] b, .readiness-cue[data-state="evade"] b { color: #9acbc8; }
-.readiness-cue[data-state="airborne"] b { color: #dcc3ef; }.meter { display: grid; grid-template-columns: 44px 1fr 34px; gap: 7px; align-items: center; margin-top: 7px; font-size: 11px; color: #a9a191; }
+.readiness-cue[data-state="airborne"] b { color: #dcc3ef; }
+.meter { display: grid; grid-template-columns: 44px 1fr 34px; gap: 7px; align-items: center; margin-top: 7px; font-size: 11px; color: #a9a191; }
 .meter > div { height: 7px; overflow: hidden; border-radius: 999px; background: #302b23; }
 .meter i { display: block; height: 100%; width: 100%; transform: scaleX(1); transform-origin: left center; background: #a44437; transition: transform .09s linear; }
 .meter.guard i { background: #8d793f; }

@@ -1183,6 +1183,7 @@ function updateOwnReadiness(own) {
     ownReadiness.detail.textContent = presentation.detail;
   }
 }
+
 function updateThreatCue(ownId) {
   if (!threatCue.root || !networkClient) return;
   let netId = fighterThreatNetId(networkClient.state, ownId, threatScan);
