@@ -11093,8 +11093,11 @@ async function performArenaFeint(session, elementId, xOffset = 200) {
   // same-tick wheel and LMB can be coalesced as Block before a light attack
   // starts (M170 exhausted-feint proof). Put the real wheel in the next action
   // tick, 20 ms after LMB-down, still inside the unchanged 70 ms feint window.
-  // Hold LMB for 90 ms across several browser/input samples so a genuine
-  // attack edge is observable even when Chrome delays an outbound frame.
+  // An unsplit 90 ms pointer pause makes W3C driver ticks postpone the
+  // wheel until ~90 ms after mouse-down (past the authoritative 70 ms light
+  // feint window). Split pointer hold into 20 + 70 ms ticks: the real wheel
+  // executes with the first short tick, while the LMB remains genuinely
+  // depressed across the full 90 ms for a sampled attack edge.
   try {
     await webdriver(session.base, "POST", `/session/${session.sessionId}/actions`, {
       actions: [
@@ -11105,7 +11108,8 @@ async function performArenaFeint(session, elementId, xOffset = 200) {
           actions: [
             { type: "pointerMove", duration: 0, origin, x: xOffset, y: 0 },
             { type: "pointerDown", button: 0 },
-            { type: "pause", duration: 90 },
+            { type: "pause", duration: 20 },
+            { type: "pause", duration: 70 },
             { type: "pointerUp", button: 0 },
           ],
         },
@@ -11117,6 +11121,7 @@ async function performArenaFeint(session, elementId, xOffset = 200) {
             { type: "pause", duration: 20 },
             { type: "scroll", x: 0, y: 0, deltaX: 0, deltaY: 120, duration: 0, origin },
             { type: "pause", duration: 70 },
+            { type: "pause", duration: 0 },
           ],
         },
       ],
