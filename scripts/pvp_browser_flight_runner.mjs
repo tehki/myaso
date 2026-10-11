@@ -9478,9 +9478,9 @@ async function runOnlineUiJumpFfaThreatFlight(entries, mode) {
   // M142 secondary's earlier 155/250 ms pulses left the narrow 66 px jump
   // reach near its boundary on loaded runners: both genuine attacks landed,
   // but Firefox often saw only the right-side threat in replicated snapshots.
-  // Move both attackers the same additional 25 ms so the distance priority
-  // remains unchanged, while retaining >94 px separation between rivals.
-  const leftMovementMs = mode === "primary" ? 160 : 180;
+  // Keep secondary staging balanced; in primary mode pull the jump attacker
+  // deeper inside its narrow 66 px reach while retaining safe rival spacing.
+  const leftMovementMs = mode === "primary" ? 200 : 180;
   const rightMovementMs = mode === "primary" ? 120 : 275;
   await Promise.all([
     pulseMovementKey(left, "d", leftMovementMs),
@@ -9506,7 +9506,7 @@ async function runOnlineUiJumpFfaThreatFlight(entries, mode) {
   const centerThreatOffset = centerBefore.threatTransitions.length;
 
   // Start the genuine jump chord first in both modes, then introduce the
-  // right-side light about 20 ms later. This guarantees a broad shared windup
+  // right-side light 8–20 ms later. This widens the shared windup
   // interval without depending on cross-browser Promise scheduling. Spatial
   // distance, not start order, remains the only thing that decides whether the
   // jump is primary or secondary in each M142 mode.
@@ -9515,7 +9515,7 @@ async function runOnlineUiJumpFfaThreatFlight(entries, mode) {
   try {
     await pressArenaJumpAttackChord(left, leftArena, 200);
     jumpHeld = true;
-    await sleep(20);
+    await sleep(mode === "primary" ? 8 : 20);
     await performArenaAttackBurst(right, 3, 0, 8);
     await sleep(16);
   } finally {
