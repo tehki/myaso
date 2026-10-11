@@ -247,6 +247,14 @@ export function parrySpatialPresentation(entity) {
 
 // An advisory cue for the current replicated geometry, not a promise that
 // the target will remain stunned throughout a future strike windup.
+// Keep spatial guidance readable without suggesting every hint is a hit-ready state.
+export function punishRangeCueIntent(label) {
+  if (label === "IN LIGHT ARC") return "ready";
+  if (label === "FACE TARGET" || label === "CLOSE FOR LIGHT") return "adjust";
+  if (label === "AIM FOR LIGHT") return "unknown";
+  return "";
+}
+
 export function parryPunishRangeCue(own, target) {
   if (!parrySpatialPresentation(target).visible) return "";
   return lightPunishGeometryCue(own, target);
