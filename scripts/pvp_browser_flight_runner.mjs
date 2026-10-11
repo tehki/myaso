@@ -9425,10 +9425,15 @@ async function runOnlineUiJumpFfaThreatFlight(entries, mode) {
   // fighter within 66 px of center (48 reach + 18 radius); the right light
   // needs 94 px (76 + 18). The older 210/260 ms staging put the attackers
   // about 91 px apart, allowing the right light to legitimately clip #1.
-  // These shorter pulses keep the two attackers >120 px apart and preserve
+  // These bounded pulses keep the two attackers outside mutual hit reach and preserve
   // deterministic primary/secondary ordering by authoritative distance.
-  const leftMovementMs = mode === "primary" ? 160 : 155;
-  const rightMovementMs = mode === "primary" ? 120 : 250;
+  // M142 secondary's earlier 155/250 ms pulses left the narrow 66 px jump
+  // reach near its boundary on loaded runners: both genuine attacks landed,
+  // but Firefox often saw only the right-side threat in replicated snapshots.
+  // Move both attackers the same additional 25 ms so the distance priority
+  // remains unchanged, while retaining >94 px separation between rivals.
+  const leftMovementMs = mode === "primary" ? 160 : 180;
+  const rightMovementMs = mode === "primary" ? 120 : 275;
   await Promise.all([
     pulseMovementKey(left, "d", leftMovementMs),
     pulseMovementKey(right, "a", rightMovementMs),
