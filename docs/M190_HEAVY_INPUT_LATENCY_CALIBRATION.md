@@ -28,3 +28,17 @@ at tick 237. The real wheel was delivered too early for the 125ms parry window.
 The Firefox-native W3C parry pause therefore advances from a 240ms to **265ms**
 after the estimated real E onset. This is test-only scheduling, not a change to
 authoritative combat timings or acceptable results.
+
+## Second full-quality flight and timing refinement
+
+Quality #1008 was rerun unchanged after an unrelated M144 observation gap.
+On the rerun all six heavy-defense repetitions and M144 passed, but original
+M107 `uiheavyparry` produced a genuine 46 HP hit: Firefox's real wheel arrived
+approximately 15ms before the visible impact and the authoritative block
+transition entered after strike activation. Under a separate earlier flight,
+a 240ms planned parry wheel resolved as normal guard pressure. These opposing
+failures bracket a narrow W3C timing target; M190 selects **250ms** between
+those trial values. The full M107 original gate is also moved immediately
+after the six-repeat gate, so loaded Chrome/Firefox input failures are found
+before later unrelated PvP tests. All mandatory gates and original fail-closed
+outcomes remain unchanged. No combat or network timing changes.
