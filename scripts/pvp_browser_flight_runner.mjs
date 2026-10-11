@@ -942,46 +942,71 @@ function assertHeavyControlDelivered(attackerResult, movementCode, label) {
   }
 }
 
-// M189: the transient "Heavy strike committed" HUD event can lag behind the
-// server action by >100 ms. Observe the replicated authoritative HeavyWindup
-// action transition instead (read-only instrumentation enabled for these two
-// acceptance scenarios), and deliver a *real* wheel through Firefox WebDriver.
-// No JS-generated combat inputs and no server-side gameplay modifications.
-async function performHeavyCounterplayWindowWheel(attacker, defender, defenderElementId, targetAfterWindupMs) {
+// M190: true W3C input latency may exceed the entire 125 ms block-only
+// window. Calibrate each driver's *real* pointerMove dispatch immediately
+// before the exchange, then pre-arm the two real browser action commands in
+// parallel. The pointer observer only records event time; it never generates
+// input or changes combat state.
+async function measureRealPointerDispatchLag(session, elementId, aimOffset) {
+  await execute(session.base, session.sessionId,
+    "window.__MYASO_M190_POINTER_EPOCH__=null;"
+    + "document.querySelector('#arena').addEventListener('pointermove',"
+    + "()=>{window.__MYASO_M190_POINTER_EPOCH__=Date.now()},"
+    + "{capture:true,once:true});return true;");
+  const dispatchedAt = Date.now();
+  await aimArena(session, elementId, aimOffset, 1);
+  const eventEpochMs = await execute(session.base, session.sessionId,
+    "return window.__MYASO_M190_POINTER_EPOCH__;");
+  await aimArena(session, elementId, aimOffset, 0);
+  if (!Number.isFinite(eventEpochMs) || eventEpochMs < dispatchedAt
+    || eventEpochMs - dispatchedAt > 1500) {
+    throw new Error("M190 failed to observe genuine pointer dispatch: " + JSON.stringify({
+      browser: session.name, dispatchedAt, eventEpochMs,
+    }));
+  }
+  return eventEpochMs - dispatchedAt;
+}
+
+// The unchanged heavy input and the genuine Firefox wheel are dispatched at
+// once, with Firefox's W3C-native pause compensating for measured differences
+// in Chrome/Firefox action-delivery latency. Unlike waiting until replicated
+// windup appears, this can send the wheel *before* the phase telemetry arrives
+// and therefore handle loaded 100-200ms driver delays without synthetic input.
+async function performHeavyCounterplayWindowWheel(
+  attacker, defender, attackerElementId, defenderElementId,
+  attackOffset, blockOffset, targetAfterWindupMs,
+) {
   const before = await readUiEvidence(attacker);
   const actionOffset = before.acceptance?.ownActionTransitions?.length ?? 0;
-  const heavyPromise = pulseMovementKey(attacker, "e", heavyKeyPulseMs);
-  const deadline = Date.now() + COMBAT.heavyAttack.windupMs - 15;
-  let evidence = null;
-  while (Date.now() < deadline) {
-    const transition = await execute(attacker.base, attacker.sessionId,
-      "const a=window.__MYASO_ACCEPTANCE_STATE__;const t=a?.ownActionTransitions?.slice("
-        + actionOffset + ").find(e=>e.action===" + COMBAT_ACTION.heavyAttackWindup + ");"
-        + "return t&&Number.isFinite(t.epochMs)?{ageMs:Date.now()-t.epochMs,"
-        + "serverTick:t.serverTick,epochMs:t.epochMs}:null;");
-    if (Number.isFinite(transition?.ageMs) && transition.ageMs >= 0) {
-      evidence = transition;
-      break;
-    }
-    await sleep(6);
-  }
-  // No synthetic fallback. A missed edge stays subject to the existing
-  // strict clean-miss retry; any resolved parry/hit in the wrong scenario
-  // remains a terminal failure.
-  const delayMs = evidence === null ? 0
-    : Math.max(0, Math.min(250, Math.round(targetAfterWindupMs - evidence.ageMs)));
-  console.log("M189_HEAVY_WINDUP_SYNC " + JSON.stringify({
-    scenario,
-    observed: evidence !== null,
-    ageMs: evidence?.ageMs ?? null,
-    serverTick: evidence?.serverTick ?? null,
-    targetAfterWindupMs,
-    wheelDelayMs: delayMs,
+  const [attackerDriverMs, defenderDriverMs] = await Promise.all([
+    measureRealPointerDispatchLag(attacker, attackerElementId, attackOffset),
+    measureRealPointerDispatchLag(defender, defenderElementId, blockOffset),
+  ]);
+  const wheelDelayMs = Math.max(0, Math.min(420, Math.round(
+    targetAfterWindupMs + attackerDriverMs - defenderDriverMs,
+  )));
+  console.log("M190_HEAVY_INPUT_PLAN " + JSON.stringify({
+    scenario, attackerDriverMs, defenderDriverMs,
+    targetAfterWindupMs, wheelDelayMs,
   }));
   await Promise.all([
-    heavyPromise,
-    scrollArenaWheel(defender, defenderElementId, 120, delayMs),
+    pulseMovementKey(attacker, "e", heavyKeyPulseMs),
+    scrollArenaWheel(defender, defenderElementId, 120, wheelDelayMs),
   ]);
+  const [afterAttack, afterDefend] = await Promise.all([
+    readUiEvidence(attacker), readUiEvidence(defender),
+  ]);
+  const committed = afterAttack.acceptance?.ownActionTransitions?.slice(actionOffset)
+    .find(entry => entry.action === COMBAT_ACTION.heavyAttackWindup);
+  const blocked = afterDefend.acceptance?.ownActionTransitions
+    ?.find(entry => entry.action === COMBAT_ACTION.block);
+  console.log("M190_HEAVY_ACTION_EVIDENCE " + JSON.stringify({
+    scenario,
+    committedTick: committed?.serverTick ?? null,
+    blockTick: blocked?.serverTick ?? null,
+    blockAfterWindupMs: committed && blocked
+      ? blocked.epochMs - committed.epochMs : null,
+  }));
 }
 
 async function runOnlineUiHeavyBlockFlight(entries) {
@@ -998,11 +1023,12 @@ async function runOnlineUiHeavyBlockFlight(entries) {
   // completely unresolved: pristine HP/guard and no parry feedback. Any resolved
   // or partially resolved exchange fails closed instead of being retried.
   for (let attempt = 1; attempt <= 3 && !evidence; attempt += 1) {
-    // Aim the genuine wheel for the central 125–240 ms block-only impact
-    // interval, based on the replicated windup action rather than stale HUD.
-    // A parry, missed block, or any HP loss still fails this flight.
+    // Calibrate genuine browser delivery before committing the real E + wheel.
+    // Aim for a short block at heavy impact, outside the 125ms parry interval.
+    // A parry, missed block, or HP leak remains a terminal CI failure.
     await performHeavyCounterplayWindowWheel(
-      attacker, defender, defenderElementId, 80,
+      attacker, defender, attackerElementId, defenderElementId,
+      attackOffset, blockOffset, 130,
     );
     await sleep(470);
 
@@ -1085,11 +1111,11 @@ async function runOnlineUiHeavyParryFlight(entries) {
   // pristine case. Any evidence that a heavy actually committed, hit, blocked,
   // or otherwise resolved makes the attempt terminal and therefore fail-closed.
   for (let attempt = 1; attempt <= 3 && !evidence; attempt += 1) {
-    // Aim the one real wheel in the final 125 ms server parry window,
-    // anchored to the replicated HeavyWindup transition, not HUD latency.
-    // Real stun and unchanged HP still gate acceptance.
+    // Calibrate and pre-arm the genuine Firefox wheel for the late server
+    // parry interval. Real stun and unchanged HP remain required.
     await performHeavyCounterplayWindowWheel(
-      attacker, defender, defenderElementId, 195,
+      attacker, defender, attackerElementId, defenderElementId,
+      attackOffset, blockOffset, 250,
     );
     await sleep(220);
 
