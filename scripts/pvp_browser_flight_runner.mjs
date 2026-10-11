@@ -8784,17 +8784,25 @@ async function runOnlineUiGuardBreakFlight(entries, { onGuardBroken = null } = {
     blockHeld = true;
     let guardBroken = false;
     for (let attempt = 0; attempt < 4 && !guardBroken; attempt += 1) {
-      // Dispatch the genuine wheel-back before the real LMB burst. When
-      // independent WebDriver calls run concurrently, the Firefox wheel can
-      // arrive 100+ ms after Chrome's first click, turning the intended held
-      // block into a fresh parry. Awaiting the wheel orders the controls while
-      // the unchanged 135 ms light windup still lands past the 125 ms parry
-      // window and within the 240 ms short-block window.
-      await scrollArenaWheel(defender, defenderElementId, 120, 0);
-      await performArenaAttackBurst(attacker, 3, 0);
+      // M187: Start the genuine Chrome light burst, then deliver Firefox's
+      // genuine wheel-back about 40 ms into the windup. Sequential wheel-then-
+      // mouse WebDriver round trips sometimes produced >300 ms wheel-to-hit:
+      // the 240 ms short block legitimately expired before the first strike.
+      // The real 135 ms light windup keeps the wheel inside the attack lead,
+      // while the unchanged 125 ms parry / 240 ms short-block windows still
+      // determine whether the outcome is a parry, block, or unguarded hit.
+      const attackBurst = performArenaAttackBurst(attacker, 3, 0);
+      await sleep(40);
+      await Promise.all([
+        attackBurst,
+        scrollArenaWheel(defender, defenderElementId, 120, 0),
+      ]);
       await sleep(230);
       const states = await Promise.all(entries.map(readUiEvidence));
       const defenderState = states.find((entry) => entry.browser === defender.name);
+      if (defenderState?.playerHp !== 100) {
+        throw new Error(`M34 guard-break staging allowed an unblocked strike: ${JSON.stringify(states)}`);
+      }
       guardBroken = defenderState?.playerGuard === 0;
       if (guardBroken && onGuardBroken) {
         await onGuardBroken({
