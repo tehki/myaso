@@ -1070,12 +1070,13 @@ async function runOnlineUiHeavyParryFlight(entries) {
       if (!windupSeen) await sleep(6);
     }
     if (windupSeen) {
-      // Firefox's wheel can register tens of milliseconds before the
-      // authoritative block intent begins. A 150 ms windup offset sometimes
-      // makes the 125 ms parry interval expire before heavy impact, yielding
-      // real guard pressure instead of the parry under slower driver delivery.
-      // Bias the genuine wheel 40 ms later; do not widen gameplay parry timing.
-      await sleep(190);
+      // M107 real-browser timing can swing in either direction: at 190 ms
+      // Firefox occasionally delivers its genuine wheel after the heavy has
+      // already hit; at 150 ms the 125 ms parry interval may expire first.
+      // A 165 ms offset gives the narrow genuine parry window more room for
+      // both WebDriver delivery and attack-windup replication jitter.
+      // Preserve server-authoritative parry timing and real wheel provenance.
+      await sleep(165);
       await scrollArenaWheel(defender, defenderElementId, 120, 0);
     }
     await heavyPromise;
