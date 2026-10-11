@@ -1,4 +1,5 @@
 import { createFrameBudget } from "../src/browser/frame-budget.mjs";
+import { installRightButtonGesture } from "../src/browser/right-button-gesture.mjs";
 import { createCombatImpactController } from "../src/browser/combat-impact.mjs";
 import { COMBAT, createFighter, createWorld, stepWorld } from "../src/combat/model.mjs";
 import { createSparringAi } from "../src/combat/sparring-ai.mjs";
@@ -47,9 +48,9 @@ let rollRequested = false;
 let kickRequested = false;
 let jumpRequested = false;
 let shortBlockUntil = 0;
-let rightButtonDown = false;
-let rightButtonDownAt = 0;
-const runHoldThresholdMs = 180;
+const rightButtonGesture = installRightButtonGesture(canvas, {
+  onKick: () => { kickRequested = true; },
+});
 let messageUntil = 0;
 let animationFrameId = 0;
 const fixedStepMs = 1000 / 120;
@@ -66,18 +67,8 @@ canvas.addEventListener("contextmenu", (event) => event.preventDefault());
 canvas.addEventListener("pointerdown", (event) => {
   canvas.focus();
   if (event.button === 0) attackRequested = true;
-  if (event.button === 2) {
-    rightButtonDown = true;
-    rightButtonDownAt = performance.now();
-  }
+
   updateMouse(event);
-});
-canvas.addEventListener("pointerup", (event) => {
-  if (event.button === 2) {
-    const heldMs = performance.now() - rightButtonDownAt;
-    rightButtonDown = false;
-    if (heldMs < runHoldThresholdMs) kickRequested = true;
-  }
 });
 canvas.addEventListener("wheel", (event) => {
   event.preventDefault();
@@ -104,7 +95,7 @@ function releaseInputs() {
   kickRequested = false;
   jumpRequested = false;
   shortBlockUntil = 0;
-  rightButtonDown = false;
+  rightButtonGesture.cancel();
 }
 
 function updateMouse(event) {
@@ -123,7 +114,7 @@ function playerInput() {
   playerInputState.block = world.nowMs < shortBlockUntil;
   playerInputState.dodge = rollRequested;
   playerInputState.kick = kickRequested;
-  playerInputState.run = rightButtonDown && performance.now() - rightButtonDownAt >= runHoldThresholdMs;
+  playerInputState.run = rightButtonGesture.isRunning();
   playerInputState.jump = jumpRequested;
   attackRequested = false;
   heavyAttackRequested = false;
@@ -241,7 +232,7 @@ function actionHint() {
   if (player.action === "block") return "Short block — wheel back again to re-time the parry.";
   if (player.action === "dodge") return "ROLL — i-frames plus collision knockdown.";
   if (player.action === "knockdown") return "KNOCKED DOWN — short recovery before control returns.";
-  if (rightButtonDown && performance.now() - rightButtonDownAt >= runHoldThresholdMs) return "RUNNING — stamina drains while sprinting.";
+  if (rightButtonGesture.isRunning()) return "RUNNING — stamina drains while sprinting.";
   return "Wheel up roll · wheel down parry · RMB tap shove · hold RMB run · Space jump.";
 }
 
