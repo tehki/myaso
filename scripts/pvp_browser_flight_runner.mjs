@@ -956,13 +956,14 @@ async function runOnlineUiHeavyBlockFlight(entries) {
   // completely unresolved: pristine HP/guard and no parry feedback. Any resolved
   // or partially resolved exchange fails closed instead of being retried.
   for (let attempt = 1; attempt <= 3 && !evidence; attempt += 1) {
-    // Start the genuine E edge and schedule two genuine wheel-back pulses from
-    // the defender's own WebDriver clock at 70 ms and 170 ms. Their unchanged
-    // 240 ms short-block windows overlap by 140 ms, leaving enough scheduler
-    // margin that authority stays in one Block action through the ~320 ms impact.
+    // Deliver a single genuine wheel-back during heavy windup. A second
+    // wheel at ~170 ms rearmed the 125 ms parry window immediately before
+    // impact under loaded Firefox CI, incorrectly turning the guarded heavy
+    // into a parry. The first wheel lands in the unchanged 125–240 ms
+    // block-only interval; never rearm parry in this block acceptance.
     await Promise.all([
       pulseMovementKey(attacker, "e", heavyKeyPulseMs),
-      scrollArenaWheelPair(defender, defenderElementId, 120, 70, 100),
+      scrollArenaWheel(defender, defenderElementId, 120, 70),
     ]);
     await sleep(470);
 
@@ -1070,12 +1071,13 @@ async function runOnlineUiHeavyParryFlight(entries) {
       if (!windupSeen) await sleep(6);
     }
     if (windupSeen) {
-      // Firefox's wheel can register tens of milliseconds before the
-      // authoritative block intent begins. A 150 ms windup offset sometimes
-      // makes the 125 ms parry interval expire before heavy impact, yielding
-      // real guard pressure instead of the parry under slower driver delivery.
-      // Bias the genuine wheel 40 ms later; do not widen gameplay parry timing.
-      await sleep(190);
+      // M107 real-browser timing can swing in either direction: at 190 ms
+      // Firefox occasionally delivers its genuine wheel after the heavy has
+      // already hit; at 150 ms the 125 ms parry interval may expire first.
+      // A 165 ms offset gives the narrow genuine parry window more room for
+      // both WebDriver delivery and attack-windup replication jitter.
+      // Preserve server-authoritative parry timing and real wheel provenance.
+      await sleep(165);
       await scrollArenaWheel(defender, defenderElementId, 120, 0);
     }
     await heavyPromise;
@@ -1150,7 +1152,10 @@ async function runOnlineUiHeavyDodgeFlight(entries) {
   const staged = await prepareHeavyCounterplayFlight(
     entries,
     "M107 heavy dodge",
-    { attackerName: "firefox", defenderName: "chrome", movementMs: 200 },
+    // Preserve heavy-strike reach while retaining roll collision clearance:
+    // the old 200 ms approach occasionally put the fighters into the roll's
+    // authoritative collision radius before the perpendicular dodge began.
+    { attackerName: "firefox", defenderName: "chrome", movementMs: 120 },
   );
   const { attacker, defender, movementCode } = staged;
 
@@ -5410,8 +5415,21 @@ async function runOnlineUiRollKnockdownFfaHitFlight(entries) {
     entry.action === COMBAT_ACTION.idle
     && Number.isFinite(entry.epochMs)
     && entry.epochMs > conversion.knockdownTransition.epochMs);
-  if (punishActive.epochMs >= knockdownEndEpochMs
-    || (defenderRecovery && punishActive.epochMs >= defenderRecovery.epochMs)) {
+  // The two independent browser snapshots can attach epochMs timestamps
+  // 10–20 ms apart to actions processed in the *same authoritative tick*.
+  // Compare server ticks for cross-fighter ordering. A same-tick boundary is
+  // valid only if the server confirms exactly one 34 HP victim hit, while the
+  // attack must still precede the original knockdown's 260 ms end bound.
+  const verifiedSameTickHit = defenderRecovery
+    && Number.isFinite(punishActive.serverTick)
+    && punishActive.serverTick === defenderRecovery.serverTick
+    && defenderState.playerHp === 66
+    && defenderState.events.includes("Hit taken - 34 HP.");
+  const attackPrecedesRecovery = !defenderRecovery
+    || (Number.isFinite(punishActive.serverTick) && Number.isFinite(defenderRecovery.serverTick)
+      ? punishActive.serverTick < defenderRecovery.serverTick || verifiedSameTickHit
+      : punishActive.epochMs < defenderRecovery.epochMs);
+  if (punishActive.epochMs >= knockdownEndEpochMs || !attackPrecedesRecovery) {
     throw new Error(milestone + " authoritative ordering did not prove #"
       + punisherId + " became active before #" + defenderId + " recovered: "
       + JSON.stringify({
@@ -8786,17 +8804,25 @@ async function runOnlineUiGuardBreakFlight(entries, { onGuardBroken = null } = {
     blockHeld = true;
     let guardBroken = false;
     for (let attempt = 0; attempt < 4 && !guardBroken; attempt += 1) {
-      // Dispatch the genuine wheel-back before the real LMB burst. When
-      // independent WebDriver calls run concurrently, the Firefox wheel can
-      // arrive 100+ ms after Chrome's first click, turning the intended held
-      // block into a fresh parry. Awaiting the wheel orders the controls while
-      // the unchanged 135 ms light windup still lands past the 125 ms parry
-      // window and within the 240 ms short-block window.
-      await scrollArenaWheel(defender, defenderElementId, 120, 0);
-      await performArenaAttackBurst(attacker, 3, 0);
+      // M187: begin the real Firefox wheel-back before the real Chrome LMB
+      // burst, but dispatch across independent browser sessions concurrently.
+      // Awaiting the full wheel WebDriver response first caused short-block
+      // expiry and a 34 HP hit; starting the LMB first made the 125 ms parry
+      // window catch it instead. A 35 ms lead plus the 135 ms light windup
+      // targets the genuine 125–240 ms block-only interval, with all outcomes
+      // still decided by the unchanged authoritative combat rules.
+      const blockInput = scrollArenaWheel(defender, defenderElementId, 120, 0);
+      await sleep(35);
+      await Promise.all([
+        blockInput,
+        performArenaAttackBurst(attacker, 3, 0),
+      ]);
       await sleep(230);
       const states = await Promise.all(entries.map(readUiEvidence));
       const defenderState = states.find((entry) => entry.browser === defender.name);
+      if (defenderState?.playerHp !== 100) {
+        throw new Error(`M34 guard-break staging allowed an unblocked strike: ${JSON.stringify(states)}`);
+      }
       guardBroken = defenderState?.playerGuard === 0;
       if (guardBroken && onGuardBroken) {
         await onGuardBroken({
@@ -11053,12 +11079,12 @@ async function performArenaHeavyFeint(session, elementId, xOffset = 200) {
 
 async function performArenaFeint(session, elementId, xOffset = 200) {
   const origin = { "element-6066-11e4-a52e-4f735466cecf": elementId };
-  // Keep LMB and wheel-back in one W3C action command so browser-internal
-  // timing, not WebDriver round-trip latency, owns the unchanged 70 ms feint
-  // window. Dispatch wheel-back in the same action tick as LMB-down: the first
-  // sampled frame starts the light, and the still-live short Block feints it on
-  // the next frame. Keep LMB held for 45 ms so the real attack edge spans
-  // multiple browser/input frames before release.
+  // Keep LMB and wheel-back in one W3C command. Under loaded Chrome CI,
+  // same-tick wheel and LMB can be coalesced as Block before a light attack
+  // starts (M170 exhausted-feint proof). Put the real wheel in the next action
+  // tick, 20 ms after LMB-down, still inside the unchanged 70 ms feint window.
+  // Hold LMB for 90 ms across several browser/input samples so a genuine
+  // attack edge is observable even when Chrome delays an outbound frame.
   try {
     await webdriver(session.base, "POST", `/session/${session.sessionId}/actions`, {
       actions: [
@@ -11069,7 +11095,7 @@ async function performArenaFeint(session, elementId, xOffset = 200) {
           actions: [
             { type: "pointerMove", duration: 0, origin, x: xOffset, y: 0 },
             { type: "pointerDown", button: 0 },
-            { type: "pause", duration: 45 },
+            { type: "pause", duration: 90 },
             { type: "pointerUp", button: 0 },
           ],
         },
@@ -11078,9 +11104,9 @@ async function performArenaFeint(session, elementId, xOffset = 200) {
           id: `wheel-${session.name}`,
           actions: [
             { type: "pause", duration: 0 },
+            { type: "pause", duration: 20 },
             { type: "scroll", x: 0, y: 0, deltaX: 0, deltaY: 120, duration: 0, origin },
-            { type: "pause", duration: 45 },
-            { type: "pause", duration: 0 },
+            { type: "pause", duration: 70 },
           ],
         },
       ],
