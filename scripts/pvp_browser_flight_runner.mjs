@@ -1269,17 +1269,30 @@ async function runOnlineUiHeavyDodgeFlight(entries) {
     const commitsBefore = beforeAttacker?.events.filter((text) =>
       text.startsWith("Heavy strike committed")).length ?? 0;
 
-    await pulseMovementKey(attacker, "e", heavyKeyPulseMs);
+    // M204: release the genuine heavy E key *after* scheduling the real
+    // defender dodge. Waiting for the full key pulse previously let the
+    // unchanged 46 HP heavy hit land before Chrome's wheel arrived.
+    await setMovementKey(attacker, "e", true);
     const commitDeadline = Date.now() + 360;
-    while (Date.now() < commitDeadline) {
-      const state = await readUiEvidence(attacker);
-      const commits = state.events.filter((text) =>
-        text.startsWith("Heavy strike committed")).length;
-      if (commits > commitsBefore) {
-        committedObserved = true;
-        break;
+    try {
+      while (Date.now() < commitDeadline) {
+        const state = await readUiEvidence(attacker);
+        const commits = state.events.filter((text) =>
+          text.startsWith("Heavy strike committed")).length;
+        if (commits > commitsBefore) {
+          committedObserved = true;
+          break;
+        }
+        await sleep(10);
       }
-      await sleep(10);
+      if (committedObserved) {
+        // Browser-owned pause: real E is still held while Chrome schedules
+        // one genuine wheel-forward + perpendicular S control for the first
+        // attack active phase, not for a later strike in the same heavy.
+        await pressArenaPerpendicularDodgeAfterPause(defender, 120);
+      }
+    } finally {
+      await setMovementKey(attacker, "e", false);
     }
     if (committedObserved) break;
 
@@ -1309,12 +1322,9 @@ async function runOnlineUiHeavyDodgeFlight(entries) {
     throw new Error(`M107 heavy dodge did not latch after bounded clean retries: ${JSON.stringify(lastCommitEvidence)}`);
   }
 
-  // The sample-safe 120 ms real E hold now contributes the timing margin that
-  // used to come from an extra post-observation sleep. Roll immediately after
-  // authoritative heavy commitment is observed so the unchanged 125 ms iframe
-  // overlaps the ~320 ms heavy active transition instead of landing after it.
-  await pressArenaPerpendicularDodgeAfterPause(defender, 0);
-  // Let active -> recovery resolve without evidence polling inside the iframe.
+  // M204 issued the *single* genuine dodge before releasing E, while the
+  // first heavy was still winding up. Let authoritative active/recovery settle
+  // without polling inside the unchanged 125ms iframe.
   await sleep(360);
 
   const evidence = await Promise.all(entries.map(readUiEvidence));

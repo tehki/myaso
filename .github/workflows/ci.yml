@@ -86,7 +86,7 @@ jobs:
           node --check tests/m15-reliable-convergence.test.mjs
           node --check tests/m16-browser-512.test.mjs
           node --check tests/m17-reliable-delta.test.mjs
-          node --test tests/browser-runtime.test.mjs tests/m6-browser-authority.test.mjs tests/m7-browser-flight.test.mjs tests/m12-reliable-baseline.test.mjs tests/m15-reliable-convergence.test.mjs tests/m16-browser-512.test.mjs tests/m17-reliable-delta.test.mjs tests/m29-combat-readability.test.mjs tests/m200-feedback-latency.test.mjs tests/m202-guardbreak-convergence.test.mjs tests/m203-w3c-wheel-ack.test.mjs
+          node --test tests/browser-runtime.test.mjs tests/m6-browser-authority.test.mjs tests/m7-browser-flight.test.mjs tests/m12-reliable-baseline.test.mjs tests/m15-reliable-convergence.test.mjs tests/m16-browser-512.test.mjs tests/m17-reliable-delta.test.mjs tests/m29-combat-readability.test.mjs tests/m200-feedback-latency.test.mjs tests/m202-guardbreak-convergence.test.mjs tests/m203-w3c-wheel-ack.test.mjs tests/m204-heavy-dodge-input-order.test.mjs
           node scripts/browser_hotpath_probe.mjs
 
       - name: Validate authoritative Rust server
