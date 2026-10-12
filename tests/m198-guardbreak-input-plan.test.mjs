@@ -15,8 +15,9 @@ const plan = () => planM198GuardBreakW3cExchange({
 test("M198 schedules a single real click inside the unchanged block-only interval", () => {
   const result = plan();
   assert.equal(result.clicksPerWheel, 1);
-  assert.equal(result.pointerPauseMs, 0);
-  assert.equal(result.nominalWheelToImpactMs, 135);
+  assert.equal(result.pointerPauseMs, 40);
+  assert.equal(result.nominalWheelToImpactMs, 175);
+  assert.equal(result.blockOnlyMarginMs, 50);
   assert.ok(result.nominalWheelToImpactMs > COMBAT.block.parryWindowMs);
   assert.ok(result.nominalWheelToImpactMs < COMBAT.block.shortBlockMs);
   assert.equal(result.minimumExchanges, 3);
