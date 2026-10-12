@@ -6,6 +6,7 @@ import process from "node:process";
 import { setTimeout as sleep } from "node:timers/promises";
 import { COMBAT_ACTION, FFA_KILL_TARGET } from "../src/browser/combat-readability.mjs";
 import { COMBAT } from "../src/combat/model.mjs";
+import { planM197KnockdownClusterNudge } from "./m197-knockdown-cluster.mjs";
 import { isTickNewer32 } from "../src/browser/reconciliation.mjs";
 
 const root = process.cwd();
@@ -4967,6 +4968,55 @@ async function runOnlineUiMultiKnockdownFfaHitFlight(entries) {
   ]);
   await pulseMovementKey(secondVictim, secondClusterKey, 340);
   await pulseMovementKey(roller, rollKey, 210);
+
+  // M197: the browser/driver skew is not safely solved by weakening the
+  // 260ms authoritative knockdown overlap assertion. Align the SECOND
+  // victim's projected x contact point ~18px after the first BEFORE the
+  // roll, using only true W3C key events and read-only server snapshots.
+  // This reduces second contact lag while retaining distinct victims,
+  // genuine wheel/LMB provenance and first-victim-only target selection.
+  const readM197Cluster = async () => {
+    const evidence = await readUiEvidence(punisher);
+    const fighters = evidence.acceptance?.fighters ?? [];
+    const first = fighters.find(fighter => fighter.netId === firstVictimId);
+    const second = fighters.find(fighter => fighter.netId === secondVictimId);
+    if (!Number.isFinite(first?.x) || !Number.isFinite(second?.x)) {
+      throw new Error(milestone + " M197 staging missing genuine authoritative victim positions: "
+        + JSON.stringify({ first, second, fighters }));
+    }
+    return { first, second };
+  };
+  const clusterPlans = [];
+  let clusterAligned = null;
+  for (let adjustment = 0; adjustment < 3; adjustment += 1) {
+    const { first, second } = await readM197Cluster();
+    const plan = planM197KnockdownClusterNudge({
+      rollRight, firstX: first.x, secondX: second.x,
+      moveSpeed: COMBAT.moveSpeed, targetLeadPx: 18, tolerancePx: 8,
+    });
+    clusterPlans.push({ adjustment, firstX: first.x, secondX: second.x, ...plan });
+    if (plan.aligned) {
+      clusterAligned = plan;
+      break;
+    }
+    await pulseMovementKey(secondVictim, plan.key, plan.pulseMs);
+    await sleep(90);
+  }
+  if (!clusterAligned) {
+    const { first, second } = await readM197Cluster();
+    const plan = planM197KnockdownClusterNudge({
+      rollRight, firstX: first.x, secondX: second.x,
+      moveSpeed: COMBAT.moveSpeed, targetLeadPx: 18, tolerancePx: 8,
+    });
+    clusterPlans.push({ adjustment: 3, firstX: first.x, secondX: second.x, ...plan });
+    if (!plan.aligned) {
+      throw new Error(milestone + " M197 could not stage genuine ordered roll contacts: "
+        + JSON.stringify(clusterPlans));
+    }
+  }
+  console.log("M197_GENUINE_CLUSTER_STAGING " + JSON.stringify({
+    milestone, rollRight, clusterPlans,
+  }));
   await aimArena(roller, rollerElementId, rollOffset);
   await sleep(50);
 
