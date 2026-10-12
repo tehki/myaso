@@ -15,8 +15,8 @@ const plan = () => planM198GuardBreakW3cExchange({
 test("M198 schedules a single real click inside the unchanged block-only interval", () => {
   const result = plan();
   assert.equal(result.clicksPerWheel, 1);
-  assert.equal(result.pointerPauseMs, 45);
-  assert.equal(result.nominalWheelToImpactMs, 180);
+  assert.equal(result.pointerPauseMs, 0);
+  assert.equal(result.nominalWheelToImpactMs, 135);
   assert.ok(result.nominalWheelToImpactMs > COMBAT.block.parryWindowMs);
   assert.ok(result.nominalWheelToImpactMs < COMBAT.block.shortBlockMs);
   assert.equal(result.minimumExchanges, 3);
@@ -45,7 +45,8 @@ test("M198 guard-break browser acceptance uses genuine one-click W3C plan", () =
     source.indexOf("async function runOnlineUiGuardBreakFlight("),
     source.indexOf("async function waitForUiGuardBreakEvidence("),
   );
-  assert.ok(guardBreak.includes("scrollArenaWheel(defender, defenderElementId, 120, 0)"));
+  assert.ok(guardBreak.includes("await scrollArenaWheel(defender, defenderElementId, 120, 0);"));
+  assert.match(guardBreak, /await scrollArenaWheel\(defender, defenderElementId, 120, 0\);\s+await performArenaAttackBurst\(/);
   assert.ok(guardBreak.includes("attacker, m198Plan.clicksPerWheel, m198Plan.pointerPauseMs"));
   assert.ok(guardBreak.includes("defenderState?.playerHp !== 100"));
   assert.ok(guardBreak.includes("feedbackTransitions.includes(\"parried\")"));

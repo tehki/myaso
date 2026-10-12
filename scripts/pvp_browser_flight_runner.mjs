@@ -8966,17 +8966,19 @@ async function runOnlineUiGuardBreakFlight(entries, { onGuardBroken = null } = {
       // first Chrome down/up in a 3-click W3C burst take 187ms, though its
       // requested hold was 10ms. The authoritative attack committed only
       // 240ms after first down and hit after Firefox's 240ms block expired.
-      // Dispatch just ONE genuine Chrome LMB per genuine Firefox wheel in
-      // each distinct exchange. Three -38 guarded hits still exhaust guard.
-      // The 45ms W3C pause keeps nominal impact ~180ms, strictly inside
-      // the unchanged 125-240ms block-only window. No parries, HP loss,
-      // synthetic actions or altered gameplay values may qualify.
-      await Promise.all([
-        scrollArenaWheel(defender, defenderElementId, 120, 0),
-        performArenaAttackBurst(
-          attacker, m198Plan.clicksPerWheel, m198Plan.pointerPauseMs,
-        ),
-      ]);
+      // M198 rev2: exact-head quality #1029 correctly blocked a new
+      // parry in one trial: parallel Chrome/Fox driver calls permitted a
+      // late Firefox wheel to race ahead of Chrome's 135ms attack windup.
+      // Await ONE genuine Firefox W3C wheel-back, then immediately dispatch
+      // ONE genuine Chrome LMB without the prior 45ms pointer pause.
+      // Wheel ordering is now deterministic; WebDriver/snapshot latency
+      // contributes the remaining real inter-client delay. Three distinct
+      // genuine -38 guarded hits still must exhaust 100 guard, with zero
+      // parries, HP loss, synthetic inputs, or gameplay timing changes.
+      await scrollArenaWheel(defender, defenderElementId, 120, 0);
+      await performArenaAttackBurst(
+        attacker, m198Plan.clicksPerWheel, m198Plan.pointerPauseMs,
+      );
       await sleep(230);
       const states = await Promise.all(entries.map(readUiEvidence));
       const defenderState = states.find((entry) => entry.browser === defender.name);

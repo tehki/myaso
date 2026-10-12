@@ -9,10 +9,10 @@ export function planM198GuardBreakW3cExchange({
     throw new RangeError("M198 requires valid authoritative combat timing and guard parameters");
   }
 
-  const blockOnlyMidpointMs = (parryWindowMs + shortBlockMs) / 2;
-  const pointerPauseMs = Math.max(0, Math.floor(
-    (blockOnlyMidpointMs - attackWindupMs) / 5,
-  ) * 5);
+  // The Firefox wheel must complete before the Chrome click is dispatched.
+  // The real cross-driver round trip already adds positive delay, so do
+  // not add another 45ms Chrome pointer pause after that wheel ACK.
+  const pointerPauseMs = 0;
   const nominalWheelToImpactMs = attackWindupMs + pointerPauseMs;
   if (nominalWheelToImpactMs <= parryWindowMs
     || nominalWheelToImpactMs >= shortBlockMs) {

@@ -15,8 +15,8 @@ hit landed outside Firefox's unchanged 240ms short block and caused
 
 Each exchange now sends one genuine Firefox wheel-back paired with
 **one genuine Chrome LMB click**, not a three-click batch that can
-starve browser input processing. The unchanged 45ms W3C pointer
-pause plus 135ms nominal light windup targets ~180ms after wheel,
+starve browser input processing. A guaranteed wheel-first W3C sequence, with zero additional Chrome pointer
+pause, lets the real cross-browser driver delay place the 135ms light windup
 between the existing 125ms parry and 240ms short-block expiry.
 Independent exchanges continue until the defender's guard breaks;
 at least three actual attacker clicks and three actual Firefox
@@ -33,3 +33,8 @@ No gameplay constants or Rust/server/network code change. Full
 exact-head Rust, JavaScript, genuine Chrome/Firefox W3C, FFA and
 512-player capacity CI plus a separate post-merge main CI must pass.
 The playable build stays closed and production remains undeployed.
+
+
+## Qualification revision
+
+PR #227 quality #1029 passed two complete guard-break repetitions but failed a third because the independent parallel wheel/click calls produced a genuine parry. Revision 2 explicitly awaits the real Firefox W3C wheel acknowledgement before issuing one Chrome W3C click and removes the previously simultaneous 45ms pause. All real-HP/guard and no-parry assertions remain unchanged.
