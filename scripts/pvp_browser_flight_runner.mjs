@@ -6,6 +6,7 @@ import process from "node:process";
 import { setTimeout as sleep } from "node:timers/promises";
 import { COMBAT_ACTION, FFA_KILL_TARGET } from "../src/browser/combat-readability.mjs";
 import { COMBAT } from "../src/combat/model.mjs";
+import { planM198GuardBreakW3cExchange } from "./m198-guardbreak-input-plan.mjs";
 import { planM197KnockdownClusterNudge } from "./m197-knockdown-cluster.mjs";
 import { isTickNewer32 } from "../src/browser/reconciliation.mjs";
 
@@ -8949,20 +8950,35 @@ async function runOnlineUiGuardBreakFlight(entries, { onGuardBroken = null } = {
   let blockHeld = false;
   try {
     blockHeld = true;
+    const m198Plan = planM198GuardBreakW3cExchange({
+      parryWindowMs: COMBAT.block.parryWindowMs,
+      shortBlockMs: COMBAT.block.shortBlockMs,
+      attackWindupMs: COMBAT.attack.windupMs,
+      guardDamage: COMBAT.attack.guardDamage,
+      maxGuard: COMBAT.guard.max,
+    });
+    if (m198Plan.minimumExchanges > 4) {
+      throw new Error("M198 guard-break exchange budget cannot exhaust authoritative guard");
+    }
     let guardBroken = false;
     for (let attempt = 0; attempt < 4 && !guardBroken; attempt += 1) {
-      // M194: main CI #38143732093 hit for 34 HP on the third
-      // genuine block-only trial. The 75 ms pointer pause + 135 ms
-      // light windup nominally targeted 210 ms, too near the 240 ms
-      // block expiry once real browser ingress jitter was added.
-      // Use a 45 ms W3C pointer pause to target 180 ms, inside the
-      // unchanged 125-240 ms block-only interval. Preserve exactly
-      // one real Firefox wheel and Chrome pointer burst, and never
-      // relax authoritative HP, parry, or -38 guard assertions.
-      await Promise.all([
-        scrollArenaWheel(defender, defenderElementId, 120, 0),
-        performArenaAttackBurst(attacker, 3, 45),
-      ]);
+      // M198: post-merge M197 main quality #38219864770 observed the
+      // first Chrome down/up in a 3-click W3C burst take 187ms, though its
+      // requested hold was 10ms. The authoritative attack committed only
+      // 240ms after first down and hit after Firefox's 240ms block expired.
+      // M198 rev2: exact-head quality #1029 correctly blocked a new
+      // parry in one trial: parallel Chrome/Fox driver calls permitted a
+      // late Firefox wheel to race ahead of Chrome's 135ms attack windup.
+      // Await ONE genuine Firefox W3C wheel-back, then immediately dispatch
+      // ONE genuine Chrome LMB without the prior 45ms pointer pause.
+      // Wheel ordering is now deterministic; WebDriver/snapshot latency
+      // contributes the remaining real inter-client delay. Three distinct
+      // genuine -38 guarded hits still must exhaust 100 guard, with zero
+      // parries, HP loss, synthetic inputs, or gameplay timing changes.
+      await scrollArenaWheel(defender, defenderElementId, 120, 0);
+      await performArenaAttackBurst(
+        attacker, m198Plan.clicksPerWheel, m198Plan.pointerPauseMs,
+      );
       await sleep(230);
       const states = await Promise.all(entries.map(readUiEvidence));
       const defenderState = states.find((entry) => entry.browser === defender.name);
@@ -8984,6 +9000,15 @@ async function runOnlineUiGuardBreakFlight(entries, { onGuardBroken = null } = {
         defenderGuard: defenderState?.playerGuard,
         wheelCount: defenderState?.wheels.filter(event => event.deltaY > 0).length,
         attackCount: attackerState?.pointers.filter(event => event.type === "pointerdown" && event.button === 0).length,
+        m198Plan,
+        chromeClickHoldMs: (() => {
+          const downs = attackerState?.pointers.filter(event => event.type === "pointerdown" && event.button === 0) ?? [];
+          const ups = attackerState?.pointers.filter(event => event.type === "pointerup" && event.button === 0) ?? [];
+          const down = downs.at(-1);
+          const up = ups.at(-1);
+          return Number.isFinite(down?.t) && Number.isFinite(up?.t)
+            ? Number((up.t - down.t).toFixed(1)) : null;
+        })(),
         wheelToFeedbackMs: (() => {
           const wheel = defenderState?.wheels?.at(-1);
           const feedback = defenderState?.eventTransitions?.at(-1);
