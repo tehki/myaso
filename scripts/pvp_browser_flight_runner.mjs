@@ -1259,7 +1259,7 @@ async function runOnlineUiHeavyDodgeFlight(entries) {
     // authoritative collision radius before the perpendicular dodge began.
     { attackerName: "firefox", defenderName: "chrome", movementMs: 120 },
   );
-  const { attacker, defender, movementCode } = staged;
+  const { attacker, defender, defenderElementId, movementCode } = staged;
 
   let committedObserved = false;
   let lastCommitEvidence = null;
@@ -1286,10 +1286,17 @@ async function runOnlineUiHeavyDodgeFlight(entries) {
         await sleep(10);
       }
       if (committedObserved) {
-        // Browser-owned pause: real E is still held while Chrome schedules
-        // one genuine wheel-forward + perpendicular S control for the first
-        // attack active phase, not for a later strike in the same heavy.
-        await pressArenaPerpendicularDodgeAfterPause(defender, 120);
+        // M204 rev2: an overloaded Chrome synchronized 3-source W3C action
+        // stretched a nominal 135ms from S-down to wheel into >300ms.
+        // Separate genuine S press from the native pointer+wheel gesture;
+        // target the FIRST heavy active window with a bounded host pause.
+        await sleep(120);
+        await setMovementKey(defender, "s", true);
+        try {
+          await performArenaTimedPointerDodge(defender, defenderElementId, 15);
+        } finally {
+          await setMovementKey(defender, "s", false);
+        }
       }
     } finally {
       await setMovementKey(attacker, "e", false);
@@ -1322,9 +1329,9 @@ async function runOnlineUiHeavyDodgeFlight(entries) {
     throw new Error(`M107 heavy dodge did not latch after bounded clean retries: ${JSON.stringify(lastCommitEvidence)}`);
   }
 
-  // M204 issued the *single* genuine dodge before releasing E, while the
-  // first heavy was still winding up. Let authoritative active/recovery settle
-  // without polling inside the unchanged 125ms iframe.
+  // M204 issued exactly one genuine Chrome pointer-owned wheel and S control
+  // before releasing Firefox E, while the first heavy was still winding up.
+  // Let authoritative active/recovery settle without polling inside iframe.
   await sleep(360);
 
   const evidence = await Promise.all(entries.map(readUiEvidence));

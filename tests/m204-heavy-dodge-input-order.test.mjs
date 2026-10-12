@@ -12,10 +12,14 @@ const flight = source.slice(
 test("M204 schedules one genuine wheel during the FIRST heavy key hold, before E release", () => {
   const keyDown = flight.indexOf('await setMovementKey(attacker, "e", true);');
   const commit = flight.indexOf("if (committedObserved) {");
-  const dodge = flight.indexOf("await pressArenaPerpendicularDodgeAfterPause(defender, 120);");
+  const sDown = flight.indexOf('await setMovementKey(defender, "s", true);');
+  const dodge = flight.indexOf("await performArenaTimedPointerDodge(defender, defenderElementId, 15);");
+  const sUp = flight.indexOf('await setMovementKey(defender, "s", false);');
   const keyUp = flight.indexOf('await setMovementKey(attacker, "e", false);');
-  assert.ok(keyDown >= 0 && commit > keyDown && dodge > commit && keyUp > dodge);
-  assert.equal(flight.match(/await pressArenaPerpendicularDodgeAfterPause\(/g)?.length, 1);
+  assert.ok(keyDown >= 0 && commit > keyDown && sDown > commit
+    && dodge > sDown && sUp > dodge && keyUp > sUp);
+  assert.equal(flight.match(/await performArenaTimedPointerDodge\(/g)?.length, 1);
+  assert.ok(!flight.includes("await pressArenaPerpendicularDodgeAfterPause("));
   assert.ok(flight.includes("finally {"));
   assert.ok(!flight.includes('await pulseMovementKey(attacker, "e", heavyKeyPulseMs);'));
 });
