@@ -9,19 +9,27 @@ export function planM198GuardBreakW3cExchange({
     throw new RangeError("M198 requires valid authoritative combat timing and guard parameters");
   }
 
-  // The Firefox wheel must complete before the Chrome click is dispatched.
-  // The real cross-driver round trip already adds positive delay, so do
-  // not add another 45ms Chrome pointer pause after that wheel ACK.
-  const pointerPauseMs = 0;
+  // M199: M198 post-merge quality #38259669037 parried the third real
+  // Chrome click in repetition 5/5. The zero-pause 135ms impact target
+  // was only 10ms beyond the unchanged 125ms parry boundary. Add one
+  // bounded genuine W3C pointer pause AFTER the sequential Firefox wheel
+  // acknowledgement, targeting 175ms nominally (50ms beyond parry,
+  // 65ms before the short-block expiry). Cap at 40ms to protect the
+  // upper-tail browser ingress jitter; never manipulate server actions.
+  const nominalCenterMs = (parryWindowMs + shortBlockMs) / 2;
+  const pointerPauseMs = Math.max(0, Math.min(40, Math.round(nominalCenterMs - attackWindupMs)));
   const nominalWheelToImpactMs = attackWindupMs + pointerPauseMs;
-  if (nominalWheelToImpactMs <= parryWindowMs
-    || nominalWheelToImpactMs >= shortBlockMs) {
-    throw new RangeError("M198 genuine click cannot reach the block-only interval");
-  }
-  return Object.freeze({
+  const blockOnlyMarginMs = Math.min(
+    nominalWheelToImpactMs - parryWindowMs,
+    shortBlockMs - nominalWheelToImpactMs,
+  );
+  if (blockOnlyMarginMs <= 0) {
+    throw new RangeError("M199 genuine click cannot reach the block-only interval");
+  }  return Object.freeze({
     clicksPerWheel: 1,
     pointerPauseMs,
     nominalWheelToImpactMs,
+    blockOnlyMarginMs,
     minimumExchanges: Math.ceil(maxGuard / guardDamage),
   });
 }
