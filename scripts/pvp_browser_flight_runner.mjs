@@ -9,6 +9,7 @@ import { COMBAT } from "../src/combat/model.mjs";
 import { planM198GuardBreakW3cExchange } from "./m198-guardbreak-input-plan.mjs";
 import { measureM200WheelFeedbackLatency } from "./m200-feedback-latency.mjs";
 import { mustAwaitM202GuardConvergence } from "./m202-guardbreak-convergence.mjs";
+import { planM203W3cPointerPause } from "./m203-w3c-wheel-ack.mjs";
 import { planM197KnockdownClusterNudge } from "./m197-knockdown-cluster.mjs";
 import { isTickNewer32 } from "../src/browser/reconciliation.mjs";
 
@@ -8977,9 +8978,15 @@ async function runOnlineUiGuardBreakFlight(entries, { onGuardBroken = null } = {
       // contributes the remaining real inter-client delay. Three distinct
       // genuine -38 guarded hits still must exhaust 100 guard, with zero
       // parries, HP loss, synthetic inputs, or gameplay timing changes.
+      const wheelCommandStart = performance.now();
       await scrollArenaWheel(defender, defenderElementId, 120, 0);
+      const wheelCommandMs = performance.now() - wheelCommandStart;
+      const m203PointerPauseMs = planM203W3cPointerPause({
+        wheelCommandMs,
+        nominalPointerPauseMs: m198Plan.pointerPauseMs,
+      });
       await performArenaAttackBurst(
-        attacker, m198Plan.clicksPerWheel, m198Plan.pointerPauseMs,
+        attacker, m198Plan.clicksPerWheel, m203PointerPauseMs,
       );
       await sleep(230);
       const states = await Promise.all(entries.map(readUiEvidence));
@@ -9003,6 +9010,8 @@ async function runOnlineUiGuardBreakFlight(entries, { onGuardBroken = null } = {
         wheelCount: defenderState?.wheels.filter(event => event.deltaY > 0).length,
         attackCount: attackerState?.pointers.filter(event => event.type === "pointerdown" && event.button === 0).length,
         m198Plan,
+        m203WheelCommandMs: Number(wheelCommandMs.toFixed(1)),
+        m203PointerPauseMs,
         chromeClickHoldMs: (() => {
           const downs = attackerState?.pointers.filter(event => event.type === "pointerdown" && event.button === 0) ?? [];
           const ups = attackerState?.pointers.filter(event => event.type === "pointerup" && event.button === 0) ?? [];

@@ -47,8 +47,10 @@ test("M198 guard-break browser acceptance uses genuine one-click W3C plan", () =
     source.indexOf("async function waitForUiGuardBreakEvidence("),
   );
   assert.ok(guardBreak.includes("await scrollArenaWheel(defender, defenderElementId, 120, 0);"));
-  assert.match(guardBreak, /await scrollArenaWheel\(defender, defenderElementId, 120, 0\);\s+await performArenaAttackBurst\(/);
-  assert.ok(guardBreak.includes("attacker, m198Plan.clicksPerWheel, m198Plan.pointerPauseMs"));
+  assert.ok(guardBreak.indexOf("await scrollArenaWheel(defender, defenderElementId, 120, 0);") < guardBreak.indexOf("await performArenaAttackBurst("));
+  assert.ok(guardBreak.includes("planM203W3cPointerPause({"));
+  assert.ok(guardBreak.includes("attacker, m198Plan.clicksPerWheel, m203PointerPauseMs"));
+  assert.ok(guardBreak.includes("nominalPointerPauseMs: m198Plan.pointerPauseMs"));
   assert.ok(guardBreak.includes("defenderState?.playerHp !== 100"));
   assert.ok(guardBreak.includes("feedbackTransitions.includes(\"parried\")"));
   assert.ok(guardBreak.includes("defenderResult.playerGuard !== 0"));
