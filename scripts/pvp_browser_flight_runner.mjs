@@ -9,6 +9,7 @@ import { COMBAT } from "../src/combat/model.mjs";
 import { planM198GuardBreakW3cExchange } from "./m198-guardbreak-input-plan.mjs";
 import { measureM200WheelFeedbackLatency } from "./m200-feedback-latency.mjs";
 import { mustAwaitM202GuardConvergence } from "./m202-guardbreak-convergence.mjs";
+import { verifyM201ServerPunishProof } from "./m201-authoritative-phase-proof.mjs";
 import { planM203W3cPointerPause } from "./m203-w3c-wheel-ack.mjs";
 import { planM197KnockdownClusterNudge } from "./m197-knockdown-cluster.mjs";
 import { isTickNewer32 } from "../src/browser/reconciliation.mjs";
@@ -114,11 +115,13 @@ const children = new Set();
 const sessions = [];
 let staticServer;
 let gameServer;
+let m201ServerOutput = () => "";
 
 try {
   staticServer = await startStaticServer();
   const game = await startGameServer();
   gameServer = game.child;
+  m201ServerOutput = game.output;
   for (const browser of browsers) sessions.push(await startBrowser(browser));
   if (scenario === "uimultithreat" || scenario === "uisecondarythreat" || scenario === "uisecondarybearing" || scenario === "uisecondaryphase" || scenario === "uiguardarc" || scenario === "uisecondaryguardarc" || scenario === "uithreatmarkers" || scenario === "uijumpffaprimary" || scenario === "uijumpffasecondary" || scenario === "uijumprecoveryffa" || scenario === "uijumppunishffa" || scenario === "uimultirecoveryffa" || scenario === "uimultirecoveryspatial" || scenario === "uimultirecoverypunish" || scenario === "uiparrypunishffa" || scenario === "uiparrypunishffahit" || scenario === "uiguardbreakpunishffa" || scenario === "uiguardbreakpunishffahit" || scenario === "uikickknockdownffa" || scenario === "uikickknockdownffahit" || scenario === "uikickknockdownbounded" || scenario === "uirollknockdownbounded" || scenario === "uirollknockdownffahit" || scenario === "uimultiknockdownffa" || scenario === "uimultiknockdownffahit" || scenario === "uirollknockdownffa") {
     const expected = [
@@ -440,6 +443,7 @@ async function startGameServer() {
     env: {
       ...process.env,
       MYASO_BIND: "127.0.0.1:0",
+      MYASO_FLIGHT_ACTION_PROOF: scenario === "uiguardbreakpunishffahit" ? "1" : "0",
       MYASO_FLIGHT_DROP_NEW_ACTION_DATAGRAMS:
         scenario === "inputloss" || scenario === "uiheavyinputloss" || scenario === "uijumpattackinputloss" ? "1" : "0",
     },
@@ -8841,55 +8845,59 @@ async function runOnlineUiGuardBreakPunishFfaFocusFlight(entries, convert = fals
     const recoveryBufferOpenEpochMs = guardBreakRecovery.epochMs
       + COMBAT.attack.recoveryMs - COMBAT.inputBuffer.lightAttackWindowMs;
     const recoveryExitEpochMs = guardBreakRecovery.epochMs + COMBAT.attack.recoveryMs;
-    let punishActions = attackerState.acceptance?.ownActionTransitions ?? [];
-    let punishWindup = punishActions.find((entry) =>
+    // Browser snapshots are sampled every 50ms, so the unchanged 80ms light
+    // active phase is occasionally absent from ownActionTransitions. Keep the
+    // original real W3C pointer/aim/recovery window checks, but require exact
+    // phase and damage provenance from the 60Hz authoritative server's own
+    // loopback-only, read-only transition record instead of inferring success.
+    const sampledActions = attackerState.acceptance?.ownActionTransitions ?? [];
+    const sampledWindup = sampledActions.find(entry =>
       entry.action === COMBAT_ACTION.attackWindup
       && Number.isFinite(entry.epochMs)
-      && entry.epochMs >= punishDown.epochMs - 40);
-    let punishActive = punishWindup
-      ? punishActions.find((entry) =>
+      && entry.epochMs >= punishDown?.epochMs - 40) ?? null;
+    const sampledActive = sampledWindup
+      ? sampledActions.find(entry =>
         entry.action === COMBAT_ACTION.attackActive
         && Number.isFinite(entry.epochMs)
-        && entry.epochMs >= punishWindup.epochMs)
+        && entry.epochMs >= sampledWindup.epochMs) ?? null
       : null;
-    const punishPhaseDeadline = Date.now() + 180;
-    while ((!punishWindup || !punishActive) && Date.now() < punishPhaseDeadline) {
-      await sleep(6);
-      attackerState = await readUiEvidence(attacker);
-      punishActions = attackerState.acceptance?.ownActionTransitions ?? [];
-      punishWindup = punishActions.find((entry) =>
-        entry.action === COMBAT_ACTION.attackWindup
-        && Number.isFinite(entry.epochMs)
-        && entry.epochMs >= punishDown.epochMs - 40) ?? punishWindup;
-      punishActive = punishWindup
-        ? punishActions.find((entry) =>
-          entry.action === COMBAT_ACTION.attackActive
-          && Number.isFinite(entry.epochMs)
-          && entry.epochMs >= punishWindup.epochMs)
-        : null;
+    let authoritativePunish = null;
+    let proofFailure = null;
+    const proofDeadline = Date.now() + 180;
+    while (!authoritativePunish && Date.now() < proofDeadline) {
+      try {
+        authoritativePunish = verifyM201ServerPunishProof(m201ServerOutput(), {
+          attackerId, defenderId, closerId,
+        });
+      } catch (error) {
+        proofFailure = error?.message ?? String(error);
+        await sleep(8);
+      }
     }
     const guardBreakStunEndEpochMs = guardBreakStunTransition.epochMs + COMBAT.block.guardBreakStunMs;
     if (punishDowns.length !== 1 || punishUps.length !== 1 || !punishAimValid
       || !Number.isFinite(punishDown?.epochMs)
       || punishDown.epochMs < guardBreakStunTransition.epochMs
-      || punishDown.epochMs >= guardBreakStunTransition.epochMs + COMBAT.block.guardBreakStunMs
+      || punishDown.epochMs >= guardBreakStunEndEpochMs
       || punishDown.epochMs < recoveryBufferOpenEpochMs
       || punishDown.epochMs > recoveryExitEpochMs + 25
-      || !punishWindup
-      || !punishActive
-      || punishActive.epochMs >= guardBreakStunEndEpochMs) {
-      throw new Error(milestone + " genuine punish input/active phase missed the authoritative recovery/stun window: "
+      || !authoritativePunish
+      || (Number.isInteger(guardBreakRecovery.serverTick)
+        && authoritativePunish.windup.tick <= guardBreakRecovery.serverTick)) {
+      throw new Error(milestone + " genuine input / authoritative server active phase failed: "
         + JSON.stringify({
-          punishPointers,
-          guardBreakStunTransition,
-          guardBreakRecovery,
-          recoveryBufferOpenEpochMs,
-          recoveryExitEpochMs,
-          guardBreakStunEndEpochMs,
-          punishWindup,
-          punishActive,
+          punishPointers, guardBreakStunTransition, guardBreakRecovery,
+          recoveryBufferOpenEpochMs, recoveryExitEpochMs, guardBreakStunEndEpochMs,
+          sampledWindup, sampledActive, authoritativePunish, proofFailure,
         }));
     }
+    console.log("M201_SERVER_AUTH_PUNISH_PROOF " + JSON.stringify({
+      attackerId, defenderId, closerId,
+      punishPointerCount: punishDowns.length,
+      sampleWindupObserved: !!sampledWindup,
+      sampleActiveObserved: !!sampledActive,
+      ...authoritativePunish,
+    }));
     const feedbackDeadline = Date.now() + 220;
     while (Date.now() < feedbackDeadline
       && (!attackerState.events.includes("Opponent hit - 34 HP.")
