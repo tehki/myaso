@@ -9,6 +9,7 @@ import { COMBAT } from "../src/combat/model.mjs";
 import { planM198GuardBreakW3cExchange } from "./m198-guardbreak-input-plan.mjs";
 import { measureM200WheelFeedbackLatency } from "./m200-feedback-latency.mjs";
 import { mustAwaitM202GuardConvergence } from "./m202-guardbreak-convergence.mjs";
+import { planM203W3cPointerPause } from "./m203-w3c-wheel-ack.mjs";
 import { planM197KnockdownClusterNudge } from "./m197-knockdown-cluster.mjs";
 import { isTickNewer32 } from "../src/browser/reconciliation.mjs";
 
@@ -1258,7 +1259,7 @@ async function runOnlineUiHeavyDodgeFlight(entries) {
     // authoritative collision radius before the perpendicular dodge began.
     { attackerName: "firefox", defenderName: "chrome", movementMs: 120 },
   );
-  const { attacker, defender, movementCode } = staged;
+  const { attacker, defender, defenderElementId, movementCode } = staged;
 
   let committedObserved = false;
   let lastCommitEvidence = null;
@@ -1268,17 +1269,40 @@ async function runOnlineUiHeavyDodgeFlight(entries) {
     const commitsBefore = beforeAttacker?.events.filter((text) =>
       text.startsWith("Heavy strike committed")).length ?? 0;
 
-    await pulseMovementKey(attacker, "e", heavyKeyPulseMs);
+    // M204: release the genuine heavy E key *after* scheduling the real
+    // defender dodge. Waiting for the full key pulse previously let the
+    // unchanged 46 HP heavy hit land before Chrome's wheel arrived.
+    await setMovementKey(attacker, "e", true);
     const commitDeadline = Date.now() + 360;
-    while (Date.now() < commitDeadline) {
-      const state = await readUiEvidence(attacker);
-      const commits = state.events.filter((text) =>
-        text.startsWith("Heavy strike committed")).length;
-      if (commits > commitsBefore) {
-        committedObserved = true;
-        break;
+    try {
+      while (Date.now() < commitDeadline) {
+        const state = await readUiEvidence(attacker);
+        const commits = state.events.filter((text) =>
+          text.startsWith("Heavy strike committed")).length;
+        if (commits > commitsBefore) {
+          committedObserved = true;
+          break;
+        }
+        await sleep(10);
       }
-      await sleep(10);
+      if (committedObserved) {
+        // M204 rev3: exact-head #38290258466 showed the separate real
+        // S/pointer-wheel took ~83ms from S-down to wheel, plus our old
+        // 120ms host wait; the first authoritative hit arrived just 4ms
+        // after wheel. Use a 45ms host wait, preserving a meaningful
+        // pre-impact margin inside the unchanged 125ms dodge iframe.
+        // This is acceptance-only pacing; real Chrome W3C wheel and S
+        // remain mandatory and HP=100 still gates success.
+        await sleep(45);
+        await setMovementKey(defender, "s", true);
+        try {
+          await performArenaTimedPointerDodge(defender, defenderElementId, 15);
+        } finally {
+          await setMovementKey(defender, "s", false);
+        }
+      }
+    } finally {
+      await setMovementKey(attacker, "e", false);
     }
     if (committedObserved) break;
 
@@ -1308,12 +1332,9 @@ async function runOnlineUiHeavyDodgeFlight(entries) {
     throw new Error(`M107 heavy dodge did not latch after bounded clean retries: ${JSON.stringify(lastCommitEvidence)}`);
   }
 
-  // The sample-safe 120 ms real E hold now contributes the timing margin that
-  // used to come from an extra post-observation sleep. Roll immediately after
-  // authoritative heavy commitment is observed so the unchanged 125 ms iframe
-  // overlaps the ~320 ms heavy active transition instead of landing after it.
-  await pressArenaPerpendicularDodgeAfterPause(defender, 0);
-  // Let active -> recovery resolve without evidence polling inside the iframe.
+  // M204 issued exactly one genuine Chrome pointer-owned wheel and S control
+  // before releasing Firefox E, while the first heavy was still winding up.
+  // Let authoritative active/recovery settle without polling inside iframe.
   await sleep(360);
 
   const evidence = await Promise.all(entries.map(readUiEvidence));
@@ -8977,9 +8998,15 @@ async function runOnlineUiGuardBreakFlight(entries, { onGuardBroken = null } = {
       // contributes the remaining real inter-client delay. Three distinct
       // genuine -38 guarded hits still must exhaust 100 guard, with zero
       // parries, HP loss, synthetic inputs, or gameplay timing changes.
+      const wheelCommandStart = performance.now();
       await scrollArenaWheel(defender, defenderElementId, 120, 0);
+      const wheelCommandMs = performance.now() - wheelCommandStart;
+      const m203PointerPauseMs = planM203W3cPointerPause({
+        wheelCommandMs,
+        nominalPointerPauseMs: m198Plan.pointerPauseMs,
+      });
       await performArenaAttackBurst(
-        attacker, m198Plan.clicksPerWheel, m198Plan.pointerPauseMs,
+        attacker, m198Plan.clicksPerWheel, m203PointerPauseMs,
       );
       await sleep(230);
       const states = await Promise.all(entries.map(readUiEvidence));
@@ -9003,6 +9030,8 @@ async function runOnlineUiGuardBreakFlight(entries, { onGuardBroken = null } = {
         wheelCount: defenderState?.wheels.filter(event => event.deltaY > 0).length,
         attackCount: attackerState?.pointers.filter(event => event.type === "pointerdown" && event.button === 0).length,
         m198Plan,
+        m203WheelCommandMs: Number(wheelCommandMs.toFixed(1)),
+        m203PointerPauseMs,
         chromeClickHoldMs: (() => {
           const downs = attackerState?.pointers.filter(event => event.type === "pointerdown" && event.button === 0) ?? [];
           const ups = attackerState?.pointers.filter(event => event.type === "pointerup" && event.button === 0) ?? [];

@@ -1,0 +1,7 @@
+# M203 — bounded W3C wheel acknowledgement pacing
+
+M202 independent merged-main quality [#38278549018](https://github.com/tehki/myaso/actions/runs/38278549018) correctly failed on the first M34 genuine Firefox wheel-back plus Chrome LMB because the resulting 34 HP hit was unblocked (Firefox full 100 guard and 66 HP; Chrome feedback `hit-confirm`). The original M199 plan assumes a 40ms initial Chrome pointer pause that protects against the 125ms parry boundary, but slow serialized Firefox W3C acknowledgement can push the true hit beyond the existing 240ms block expiration.
+
+M203 changes only the acceptance runner: measure the real time spent awaiting a genuine Firefox wheel command, and reduce the **extra** W3C Chrome pointer pause from 40 toward zero as wheel acknowledgement gets slower. There is still one real Firefox wheel and exactly one Chrome LMB per planned exchange. Fast acknowledgements retain the previous pause. All negative results are forbidden; bounded test-only pacing cannot affect the Rust authority, the attack's 135ms windup, the 125ms parry or 240ms short block. A parry, unblocked hit, wrong victim, wrong guard amount, synthetic input, or missing authoritative guard break fails exactly as before.
+
+The elapsed command time is a scheduling heuristic, **not** an authoritative input-to-impact measurement. No browser clocks are mixed and no acceptance assertion is relaxed. Require full exact-head CI and independent merged-main quality. No playable build or production deployment.
