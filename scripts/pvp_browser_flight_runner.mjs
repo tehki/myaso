@@ -1286,11 +1286,14 @@ async function runOnlineUiHeavyDodgeFlight(entries) {
         await sleep(10);
       }
       if (committedObserved) {
-        // M204 rev2: an overloaded Chrome synchronized 3-source W3C action
-        // stretched a nominal 135ms from S-down to wheel into >300ms.
-        // Separate genuine S press from the native pointer+wheel gesture;
-        // target the FIRST heavy active window with a bounded host pause.
-        await sleep(120);
+        // M204 rev3: exact-head #38290258466 showed the separate real
+        // S/pointer-wheel took ~83ms from S-down to wheel, plus our old
+        // 120ms host wait; the first authoritative hit arrived just 4ms
+        // after wheel. Use a 45ms host wait, preserving a meaningful
+        // pre-impact margin inside the unchanged 125ms dodge iframe.
+        // This is acceptance-only pacing; real Chrome W3C wheel and S
+        // remain mandatory and HP=100 still gates success.
+        await sleep(45);
         await setMovementKey(defender, "s", true);
         try {
           await performArenaTimedPointerDodge(defender, defenderElementId, 15);
