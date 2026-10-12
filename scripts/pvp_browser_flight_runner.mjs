@@ -7,6 +7,7 @@ import { setTimeout as sleep } from "node:timers/promises";
 import { COMBAT_ACTION, FFA_KILL_TARGET } from "../src/browser/combat-readability.mjs";
 import { COMBAT } from "../src/combat/model.mjs";
 import { planM198GuardBreakW3cExchange } from "./m198-guardbreak-input-plan.mjs";
+import { measureM200WheelFeedbackLatency } from "./m200-feedback-latency.mjs";
 import { planM197KnockdownClusterNudge } from "./m197-knockdown-cluster.mjs";
 import { isTickNewer32 } from "../src/browser/reconciliation.mjs";
 
@@ -9009,11 +9010,20 @@ async function runOnlineUiGuardBreakFlight(entries, { onGuardBroken = null } = {
           return Number.isFinite(down?.t) && Number.isFinite(up?.t)
             ? Number((up.t - down.t).toFixed(1)) : null;
         })(),
-        wheelToFeedbackMs: (() => {
-          const wheel = defenderState?.wheels?.at(-1);
-          const feedback = defenderState?.eventTransitions?.at(-1);
-          return Number.isFinite(wheel?.t) && Number.isFinite(feedback?.t)
-            ? Number((feedback.t - wheel.t).toFixed(1)) : null;
+        // M200: only a matching *newer* server-derived UI cue can be paired
+        // with this browser's genuine wheel. Repeated identical messages may
+        // be deduplicated by the observer; explicitly report unobserved.
+        ...(() => {
+          const observation = measureM200WheelFeedbackLatency({
+            wheel: defenderState?.wheels?.at(-1),
+            transitions: defenderState?.eventTransitions,
+            remainingGuard: defenderState?.playerGuard,
+          });
+          return {
+            wheelToFeedbackMs: observation?.wheelToFeedbackMs ?? null,
+            m200FeedbackKind: observation?.feedbackKind ?? null,
+            m200TelemetryStatus: observation ? "matched" : "unobserved",
+          };
         })(),
       }));
       guardBroken = defenderState?.playerGuard === 0;
