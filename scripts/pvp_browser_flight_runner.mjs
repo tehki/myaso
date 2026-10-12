@@ -8,6 +8,7 @@ import { COMBAT_ACTION, FFA_KILL_TARGET } from "../src/browser/combat-readabilit
 import { COMBAT } from "../src/combat/model.mjs";
 import { planM198GuardBreakW3cExchange } from "./m198-guardbreak-input-plan.mjs";
 import { measureM200WheelFeedbackLatency } from "./m200-feedback-latency.mjs";
+import { mustAwaitM202GuardConvergence } from "./m202-guardbreak-convergence.mjs";
 import { planM197KnockdownClusterNudge } from "./m197-knockdown-cluster.mjs";
 import { isTickNewer32 } from "../src/browser/reconciliation.mjs";
 
@@ -9027,9 +9028,41 @@ async function runOnlineUiGuardBreakFlight(entries, { onGuardBroken = null } = {
         })(),
       }));
       guardBroken = defenderState?.playerGuard === 0;
+      let confirmedStates = states;
+      if (!guardBroken && mustAwaitM202GuardConvergence({
+        attemptsDone: attempt + 1,
+        minimumExchanges: m198Plan.minimumExchanges,
+        attackerConfirmed: attackerState?.feedbackTransitions.includes("guard-break-confirm") ?? false,
+        defenderGuard: defenderState?.playerGuard,
+      })) {
+        // M202: never send another genuine wheel/click against an already
+        // guard-broken victim merely because its snapshot still shows 24 guard.
+        const deadline = performance.now() + 450;
+        do {
+          await sleep(12);
+          confirmedStates = await Promise.all(entries.map(readUiEvidence));
+          const updatedAttacker = confirmedStates.find((entry) => entry.browser === attacker.name);
+          const updatedDefender = confirmedStates.find((entry) => entry.browser === defender.name);
+          if (updatedAttacker?.feedbackTransitions.includes("parried")
+            || updatedDefender?.feedbackTransitions.includes("parry-success")
+            || updatedDefender?.playerHp !== 100 || updatedAttacker?.playerHp !== 100) {
+            throw new Error("M202 pending guard break violated parry/HP proof: " + JSON.stringify(confirmedStates));
+          }
+          guardBroken = updatedDefender?.playerGuard === 0;
+          if (guardBroken) {
+            console.log("M202_GUARD_BREAK_CONVERGED " + JSON.stringify({
+              attemptsDone: attempt + 1, defenderGuard: updatedDefender.playerGuard,
+              attackerConfirmed: updatedAttacker?.feedbackTransitions.includes("guard-break-confirm"),
+            }));
+          }
+        } while (!guardBroken && performance.now() < deadline);
+        if (!guardBroken) {
+          throw new Error("M202 zero guard did not converge after genuine inputs: " + JSON.stringify(confirmedStates));
+        }
+      }
       if (guardBroken && onGuardBroken) {
         await onGuardBroken({
-          states,
+          states: confirmedStates,
           attacker,
           defender,
           attackerElementId,
