@@ -26,9 +26,9 @@ test("M203 maintains one genuine Firefox scroll followed by one genuine Chrome W
   const source=readFileSync(new URL("../scripts/pvp_browser_flight_runner.mjs",import.meta.url),"utf8");
   const section=source.slice(source.indexOf("async function runOnlineUiGuardBreakFlight("),
     source.indexOf("async function waitForUiGuardBreakEvidence("));
-  assert.match(section,/await scrollArenaWheel\(defender, defenderElementId, 120, 0\);/);
-  assert.match(section,/planM203W3cPointerPause\(\{/);
-  assert.match(section,/attacker, m198Plan.clicksPerWheel, m203PointerPauseMs/);
+  assert.ok(section.includes("sendWheel: () => scrollArenaWheel(defender, defenderElementId, 120, 0)"));
+  assert.ok(section.includes("dispatchM208WheelLedW3cExchange({"));
+  assert.ok(section.includes("attacker, m198Plan.clicksPerWheel, pointerPauseMs"));
   assert.ok(section.includes("defenderState?.playerHp !== 100"));
   assert.ok(section.includes('feedbackTransitions.includes("parried")'));
   assert.ok(section.includes("defenderResult.playerGuard !== 0"));

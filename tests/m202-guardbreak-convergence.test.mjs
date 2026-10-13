@@ -34,7 +34,7 @@ test("M202 browser runner converges without extra genuine input or relaxed asser
   assert.ok(section.includes("M202 zero guard did not converge"));
   assert.ok(section.includes("defenderState?.playerHp !== 100"));
   assert.ok(section.includes("attackerState?.feedbackTransitions.includes(\"parried\")"));
-  assert.ok(section.includes("await scrollArenaWheel(defender, defenderElementId, 120, 0);"));
-  assert.ok(section.includes("await performArenaAttackBurst("));
+  assert.ok(section.includes("sendWheel: () => scrollArenaWheel(defender, defenderElementId, 120, 0)"));
+  assert.ok(section.includes("sendAttack: (pointerPauseMs) => performArenaAttackBurst("));
   assert.ok(section.includes("defenderResult.playerGuard !== 0"));
 });
