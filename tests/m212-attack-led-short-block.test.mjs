@@ -43,20 +43,26 @@ test("M212 true wheel fires 48ms before one Chrome down and one up", async () =>
   assert.equal(result.wheelHeadStartMs, 48);
 });
 
-test("M212 late wheel ACK does not create duplicate Chrome or Firefox inputs", async () => {
+test("M212 late real Firefox ACK gates Chrome down without duplicate inputs", async () => {
   const wheel = deferred();
   const events = [];
+  let time = 0;
   const flight = dispatchM212AttackLedShortBlock({
+    now: () => time,
     sendWheel: () => { events.push("wheel"); return wheel.promise; },
     sendAttackDown: () => { events.push("down"); },
     sendAttackUp: () => { events.push("up"); },
-    sleep: () => Promise.resolve(),
+    sleep: ms => { events.push("pause:" + ms); if (ms === 48) time = 48; return Promise.resolve(); },
   });
   await new Promise(setImmediate);
-  assert.deepEqual(events, ["wheel", "down", "up"]);
+  assert.deepEqual(events, ["wheel", "pause:48"]);
+  time = 120;
   wheel.resolve();
-  await flight;
-  assert.deepEqual(events, ["wheel", "down", "up"]);
+  const result = await flight;
+  assert.deepEqual(events, ["wheel", "pause:48", "down", "pause:10", "up"]);
+  assert.equal(result.wheelAckMs, 120);
+  assert.equal(result.attackDownDispatchMs, 120);
+  assert.equal(result.wheelHeadStartMs, 48);
 });
 
 test("M212 early Firefox failure prevents Chrome down/up", async () => {
@@ -71,7 +77,7 @@ test("M212 early Firefox failure prevents Chrome down/up", async () => {
   assert.equal(up, 0);
 });
 
-test("M212 late Firefox wheel failure still releases Chrome once then fails", async () => {
+test("M212 late Firefox wheel rejection fails before any Chrome input", async () => {
   const wheel = deferred();
   const events = [];
   const flight = dispatchM212AttackLedShortBlock({
@@ -83,7 +89,7 @@ test("M212 late Firefox wheel failure still releases Chrome once then fails", as
   await new Promise(setImmediate);
   wheel.reject(Error("Late Firefox wheel rejected"));
   await assert.rejects(flight, /Late Firefox wheel rejected/);
-  assert.deepEqual(events, ["wheel", "down", "up"]);
+  assert.deepEqual(events, ["wheel"]);
 });
 
 test("M212 Chrome down failure is fatal and never sends a mouse up", async () => {
