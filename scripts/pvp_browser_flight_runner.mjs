@@ -11,6 +11,7 @@ import { measureM200WheelFeedbackLatency } from "./m200-feedback-latency.mjs";
 import { mustAwaitM202GuardConvergence } from "./m202-guardbreak-convergence.mjs";
 import { verifyM201ServerPunishProof } from "./m201-authoritative-phase-proof.mjs";
 import { verifyM206ServerKnockdownPunish } from "./m206-knockdown-punish-proof.mjs";
+import { verifyM209DualKnockdownServerPunish } from "./m209-dual-knockdown-proof.mjs";
 import { planM203W3cPointerPause } from "./m203-w3c-wheel-ack.mjs";
 import { dispatchM208WheelLedW3cExchange } from "./m208-w3c-wheel-headstart.mjs";
 import { dispatchM207AttackLedDodge } from "./m207-attack-led-dodge.mjs";
@@ -447,7 +448,8 @@ async function startGameServer() {
       ...process.env,
       MYASO_BIND: "127.0.0.1:0",
       MYASO_FLIGHT_ACTION_PROOF: (scenario === "uiguardbreakpunishffahit"
-        || scenario === "uikickknockdownffahit") ? "1" : "0",
+        || scenario === "uikickknockdownffahit"
+        || scenario === "uimultiknockdownffahit") ? "1" : "0",
       MYASO_FLIGHT_DROP_NEW_ACTION_DATAGRAMS:
         scenario === "inputloss" || scenario === "uiheavyinputloss" || scenario === "uijumpattackinputloss" ? "1" : "0",
     },
@@ -5189,36 +5191,48 @@ async function runOnlineUiMultiKnockdownFfaHitFlight(entries) {
       + JSON.stringify({ punishPointers, provenance, punishAim }));
   }
 
-  const punisherActions = punisherState.acceptance?.ownActionTransitions ?? [];
-  const punishWindup = punisherActions.find((entry) =>
+  // M209: 50ms replicated browser snapshots can miss the true 80ms light
+  // active phase. Require the *actual* 60Hz authoritative roll, both
+  // knockdowns, punisher windup->active and selected victim hit instead.
+  // A genuinely late active at or after FIRST recovery remains invalid.
+  const sampledActions = punisherState.acceptance?.ownActionTransitions ?? [];
+  const punishWindup = sampledActions.find(entry =>
     entry.action === COMBAT_ACTION.attackWindup
     && Number.isFinite(entry.epochMs)
-    && entry.epochMs >= punishDown.epochMs - 40);
-  const punishActive = punishWindup
-    ? punisherActions.find((entry) =>
+    && entry.epochMs >= punishDown.epochMs - 40) ?? null;
+  const sampledPunishActive = punishWindup
+    ? sampledActions.find(entry =>
       entry.action === COMBAT_ACTION.attackActive
       && Number.isFinite(entry.epochMs)
-      && entry.epochMs >= punishWindup.epochMs)
+      && entry.epochMs >= punishWindup.epochMs) ?? null
     : null;
-  const firstRecovery = (firstState.acceptance?.ownActionTransitions ?? []).find((entry) =>
-    entry.action === COMBAT_ACTION.idle
-    && Number.isFinite(entry.serverTick)
-    && entry.serverTick > firstKnockdownTick);
-  if (!punishWindup || !punishActive
-    || !Number.isFinite(punishActive.serverTick)
-    || punishActive.serverTick < Math.max(firstKnockdownTick, secondKnockdownTick)
-    || (firstRecovery && punishActive.serverTick >= firstRecovery.serverTick)) {
-    throw new Error(milestone + " #4 attack-active did not land inside the authoritative overlapping knockdown window: "
+  let authoritativePunish = null;
+  let proofError = null;
+  const m209ProofDeadline = Date.now() + 180;
+  while (!authoritativePunish && Date.now() < m209ProofDeadline) {
+    try {
+      authoritativePunish = verifyM209DualKnockdownServerPunish(m201ServerOutput(), {
+        rollerId, firstVictimId, secondVictimId, punisherId,
+      });
+    } catch (error) {
+      proofError = error?.message ?? String(error);
+      await sleep(8);
+    }
+  }
+  if (!authoritativePunish) {
+    throw new Error(milestone + " server attack-active/hit was not inside BOTH authentic knockdowns: "
       + JSON.stringify({
-        punishDown,
-        punishWindup,
-        punishActive,
-        firstKnockdown: provenance.firstKnockdown,
-        secondKnockdown: provenance.secondKnockdown,
-        firstRecovery,
+        punishDown, sampledWindup: punishWindup,
+        sampledPunishActive, firstKnockdown: provenance.firstKnockdown,
+        secondKnockdown: provenance.secondKnockdown, proofError,
       }));
   }
-
+  console.log("M209_SERVER_DUAL_KNOCKDOWN_PUNISH " + JSON.stringify({
+    rollerId, firstVictimId, secondVictimId, punisherId,
+    genuineLmbDowns: punishDowns.length, genuineLmbUps: punishUps.length,
+    sampledActiveObserved: !!sampledPunishActive,
+    ...authoritativePunish,
+  }));
   const focusTransition = punisherState.focusTransitions.find((entry) =>
     entry.label === "KNOCKDOWN #" + firstVictimId && Number.isFinite(entry.epochMs));
   const cueTransition = punisherState.recoveryTransitions.find((entry) =>
@@ -5271,7 +5285,9 @@ async function runOnlineUiMultiKnockdownFfaHitFlight(entries) {
     m159PrimaryKnockdownEpochMs: provenance.firstKnockdown.epochMs,
     m159SecondaryKnockdownEpochMs: provenance.secondKnockdown.epochMs,
     m159PunishPointerEpochMs: punishDown.epochMs,
-    m159PunishActiveEpochMs: punishActive.epochMs,
+    m159PunishActiveEpochMs: sampledPunishActive?.epochMs ?? null,
+    m209ServerPunishActiveTick: authoritativePunish.active.tick,
+    m209ServerFirstRecoveryTick: authoritativePunish.firstRecovery?.tick ?? null,
     m159WindupReaimDistance: windupReaim.aim.targetDistance,
   }));
 }
