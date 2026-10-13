@@ -9,7 +9,7 @@ use myaso_server::{
     TARGET_PLAYERS_PER_MAP,
 };
 use std::{
-    collections::VecDeque,
+    collections::{BTreeMap, VecDeque},
     env,
     net::SocketAddr,
     sync::{
@@ -268,7 +268,20 @@ async fn main() -> Result<()> {
 
     let gate = AdmissionGate::new(TARGET_PLAYERS_PER_MAP - flight.background_players);
     let game = SharedGame::new(flight);
-    tokio::spawn(run_authoritative_clock(Arc::clone(&game)));
+    // Accept server-side diagnostic output only on loopback and only when
+    // explicitly requested by the real-browser M201 acceptance fixture.
+    let flight_action_proof = match env::var("MYASO_FLIGHT_ACTION_PROOF").as_deref() {
+        Ok("1") => true,
+        Ok("0") | Err(_) => false,
+        Ok(_) => bail!("MYASO_FLIGHT_ACTION_PROOF must be 0 or 1"),
+    };
+    if flight_action_proof && !bind.ip().is_loopback() {
+        bail!("authoritative flight action proof is permitted only on loopback binds");
+    }
+    tokio::spawn(run_authoritative_clock(
+        Arc::clone(&game),
+        flight_action_proof,
+    ));
 
     loop {
         let incoming = endpoint.accept().await;
@@ -406,15 +419,67 @@ async fn load_identity(bind: SocketAddr) -> Result<Identity> {
     }
 }
 
-async fn run_authoritative_clock(game: Arc<SharedGame>) {
+// This stdout trace is a loopback-only *read-only* CI diagnostic. The server
+// emits actions on every authoritative simulation tick (60 Hz), unlike the
+// 50ms replicated snapshots, which can miss an 80ms attack-active phase.
+// No extra messages are sent to the gameplay clients or network protocol.
+fn m201_flight_proof_lines(
+    world: &World,
+    events: &[CombatEvent],
+    previous: &mut BTreeMap<u32, u8>,
+) -> Vec<String> {
+    let mut lines = Vec::new();
+    let tick = world.tick;
+    for fighter in world.fighters() {
+        // Background pressure fixtures are synthetic actors; only report
+        // live browser-owned fighters to keep the trace bounded.
+        if fighter.net_id >= FLIGHT_BACKGROUND_NET_ID_BASE {
+            continue;
+        }
+        let action = fighter.action.wire_code();
+        if let Some(from) = previous.insert(fighter.net_id, action) {
+            if from != action {
+                lines.push(format!(
+                    "M201_AUTH_ACTION tick={tick} fighter={} from={from} to={action}",
+                    fighter.net_id
+                ));
+            }
+        }
+    }
+    for event in events {
+        match event {
+            CombatEvent::GuardBreak { attacker, target } => lines.push(format!(
+                "M201_AUTH_BREAK tick={tick} attacker={attacker} target={target}"
+            )),
+            CombatEvent::Hit {
+                attacker,
+                target,
+                damage,
+                hp,
+            } => lines.push(format!(
+                "M201_AUTH_HIT tick={tick} attacker={attacker} target={target} damage={damage} hp={hp}"
+            )),
+            _ => {}
+        }
+    }
+    lines
+}
+
+async fn run_authoritative_clock(game: Arc<SharedGame>, flight_action_proof: bool) {
     let mut interval = tokio::time::interval(Duration::from_secs_f64(1.0 / 60.0));
     interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
     let mut events = Vec::new();
+    let mut previous_actions = BTreeMap::new();
     loop {
         interval.tick().await;
         let mut state = game.state.lock().await;
         state.apply_flight_background_motion();
         state.world.step_into(&mut events);
+        if flight_action_proof {
+            for line in m201_flight_proof_lines(&state.world, &events, &mut previous_actions) {
+                println!("{line}");
+            }
+        }
         state.record_combat_events(&events);
         if state.world.tick % SNAPSHOT_EVERY_SERVER_TICKS == 0 {
             state.refresh_replication_frame();
