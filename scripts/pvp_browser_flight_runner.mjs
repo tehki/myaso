@@ -13,6 +13,7 @@ import { verifyM201ServerPunishProof } from "./m201-authoritative-phase-proof.mj
 import { verifyM206ServerKnockdownPunish } from "./m206-knockdown-punish-proof.mjs";
 import { planM203W3cPointerPause } from "./m203-w3c-wheel-ack.mjs";
 import { dispatchM208WheelLedW3cExchange } from "./m208-w3c-wheel-headstart.mjs";
+import { dispatchM207AttackLedDodge } from "./m207-attack-led-dodge.mjs";
 import { planM197KnockdownClusterNudge } from "./m197-knockdown-cluster.mjs";
 import { isTickNewer32 } from "../src/browser/reconciliation.mjs";
 
@@ -7383,12 +7384,20 @@ async function runOnlineUiDodgeFeedbackFlight(entries) {
       defenderMovementHeld = true;
       await setMovementKey(defender, "s", true);
 
+      // M207: send one genuine Firefox LMB down FIRST. Do not allow a slow
+      // W3C response to postpone Chrome's one real wheel-forward until
+      // after the unchanged 135ms light windup and 125ms dodge iframe.
+      // Actual server HP and evade feedback still decide correctness.
       attackHeld = true;
-      await setArenaAttack(attacker, attackerElementId, true, attackOffset);
+      const m207Dispatch = await dispatchM207AttackLedDodge({
+        sendAttackDown: () => setArenaAttack(attacker, attackerElementId, true, attackOffset),
+        sendDodgeWheel: () => scrollArenaWheel(defender, defenderElementId, -120),
+        sleep,
+      });
       const attackPressedAt = Date.now();
-
-      await sleep(20);
-      await scrollArenaWheel(defender, defenderElementId, -120);
+      console.log("M207_GENUINE_LIGHT_DODGE_DISPATCH " + JSON.stringify({
+        attempt, ...m207Dispatch,
+      }));
       rollIssued = true;
 
       await sleep(60);
