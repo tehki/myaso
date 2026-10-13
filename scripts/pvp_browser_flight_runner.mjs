@@ -11350,15 +11350,14 @@ async function performArenaHeavyFeint(session, elementId, xOffset = 200) {
 
 async function performArenaFeint(session, elementId, xOffset = 200) {
   const origin = { "element-6066-11e4-a52e-4f735466cecf": elementId };
-  // Keep LMB and wheel-back in one W3C command. Under loaded Chrome CI,
-  // same-tick wheel and LMB can be coalesced as Block before a light attack
-  // starts (M170 exhausted-feint proof). Put the real wheel in the next action
-  // tick, 20 ms after LMB-down, still inside the unchanged 70 ms feint window.
-  // An unsplit 90 ms pointer pause makes W3C driver ticks postpone the
-  // wheel until ~90 ms after mouse-down (past the authoritative 70 ms light
-  // feint window). Split pointer hold into 20 + 70 ms ticks: the real wheel
-  // executes with the first short tick, while the LMB remains genuinely
-  // depressed across the full 90 ms for a sampled attack edge.
+  // M210: Keep one genuine LMB and wheel-back in the same W3C command,
+  // but separate their ticks: same-tick delivery can choose Block before
+  // the attack starts. The previous 20ms wheel tick was observed at +81ms
+  // in real Chrome CI, beyond the unchanged authoritative 70ms light
+  // feint-cancel window, causing a real 34HP hit and a valid test failure.
+  // Schedule the wheel in the next W3C tick after only 5ms, with 85ms
+  // further LMB hold for the same full 90ms pressed gesture. No damage,
+  // server input, feint window or game mechanics are changed.
   try {
     await webdriver(session.base, "POST", `/session/${session.sessionId}/actions`, {
       actions: [
@@ -11369,8 +11368,8 @@ async function performArenaFeint(session, elementId, xOffset = 200) {
           actions: [
             { type: "pointerMove", duration: 0, origin, x: xOffset, y: 0 },
             { type: "pointerDown", button: 0 },
-            { type: "pause", duration: 20 },
-            { type: "pause", duration: 70 },
+            { type: "pause", duration: 5 },
+            { type: "pause", duration: 85 },
             { type: "pointerUp", button: 0 },
           ],
         },
@@ -11379,9 +11378,9 @@ async function performArenaFeint(session, elementId, xOffset = 200) {
           id: `wheel-${session.name}`,
           actions: [
             { type: "pause", duration: 0 },
-            { type: "pause", duration: 20 },
+            { type: "pause", duration: 5 },
             { type: "scroll", x: 0, y: 0, deltaX: 0, deltaY: 120, duration: 0, origin },
-            { type: "pause", duration: 70 },
+            { type: "pause", duration: 85 },
             { type: "pause", duration: 0 },
           ],
         },
