@@ -9032,7 +9032,8 @@ async function runOnlineUiGuardBreakFlight(entries, { onGuardBroken = null } = {
       const m212FirefoxOutcome = defenderState?.eventTransitions?.filter(
         (event) => event.text.startsWith("Hit taken")
           || event.text.startsWith("Parry!")
-          || event.text.startsWith("Guard break"),
+          || event.text.startsWith("Block held")
+          || event.text.startsWith("Guard broken"),
       ).at(-1);
       const m212ChromeDown = attackerState?.pointers?.filter(
         (event) => event.type === "pointerdown" && event.button === 0,
@@ -9040,7 +9041,8 @@ async function runOnlineUiGuardBreakFlight(entries, { onGuardBroken = null } = {
       const m212ChromeUp = attackerState?.pointers?.filter(
         (event) => event.type === "pointerup" && event.button === 0,
       ).at(-1);
-      const m212Duration = (end, start) => Number.isFinite(end?.t) && Number.isFinite(start?.t)
+      const m212Duration = (end, start) => Number.isFinite(end?.t)
+        && Number.isFinite(start?.t) && end.t >= start.t
         ? Number((end.t - start.t).toFixed(1)) : null;
       console.log("M212_GUARD_BREAK_INGRESS " + JSON.stringify({
         attempt: attempt + 1,

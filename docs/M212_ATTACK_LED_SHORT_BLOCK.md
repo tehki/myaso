@@ -27,3 +27,8 @@ Local tests alone do not qualify. Pass full exact-head quality with real indepen
 
 ## Read-only ingress diagnostics (pre-merge)
 A single real M194 failure now emits `M212_GUARD_BREAK_INGRESS` **before** the unchanged fail-closed guard. It records wheel/down/up dispatch and ACK in the **single Node harness clock**; Firefox wheel, block feedback, and hit/parry relative timings **only in Firefox's local clock**; and actual Chrome pointer down/up duration **only in Chrome's local clock**. Unknown observations stay `null`. This pinpoints scheduling/driver lag without ever pretending client clocks are synchronized or converting late damage/parry into passing evidence.
+
+- A prior block cue may be deduplicated by the browser observer; when its timestamp predates the current genuine wheel, its per-exchange duration is reported `null`, never a misleading negative latency. Genuine `Block held` and `Guard broken` feedback can count as the same-browser outcome cue.
+
+## Focused acceptance result
+[Focused M194 run #38456824920](https://github.com/tehki/myaso/actions/runs/38456824920) passed all **5 independent real Chrome+Firefox sessions**, with **15 genuine guard-pressure exchanges**, 100HP intact, and guard 100→62→24→0 in each. The branch-only temporary focused workflow used for investigation is removed before release; it is not a production or long-lived CI workflow. The normal complete quality workflow remains mandatory before merge and once again after merge.

@@ -133,6 +133,8 @@ test("M212 runner preserves true wheel/down/up and original no-parry/no-HP guard
   const diagnosticsOffset = segment.indexOf('console.log("M212_GUARD_BREAK_INGRESS "');
   assert.ok(diagnosticsOffset > 0);
   assert.ok(segment.includes("wheelToImpactOrParryMs: m212Duration("));
+  assert.ok(segment.includes('event.text.startsWith("Block held")'));
+  assert.ok(segment.includes("end.t >= start.t"));
   assert.ok(segment.includes("genuineClickHoldMs: m212Duration("));
   assert.ok(segment.includes("harnessW3c: m212Exchange"));
   assert.ok(diagnosticsOffset < segment.indexOf("M193 guard-break exchange"));
