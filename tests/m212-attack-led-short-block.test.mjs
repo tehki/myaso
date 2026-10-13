@@ -9,100 +9,120 @@ const deferred = () => {
   return { promise, resolve, reject };
 };
 
-test("M212 slow Chrome down ACK still precedes one real wheel then release", async () => {
-  const down = deferred();
-  const lead = deferred();
+test("M212 true wheel fires 90ms before one Chrome down and one up", async () => {
+  const wheelLead = deferred();
+  const clickHold = deferred();
   const events = [];
   let time = 0;
   const flight = dispatchM212AttackLedShortBlock({
     now: () => time,
-    sendAttackDown: () => { events.push("down"); return down.promise; },
     sendWheel: () => { events.push("wheel"); },
+    sendAttackDown: () => { events.push("down"); },
     sendAttackUp: () => { events.push("up"); },
-    sleep: ms => { events.push("lead:" + ms); return lead.promise; },
+    sleep: ms => {
+      events.push("pause:" + ms);
+      return ms === 90 ? wheelLead.promise : clickHold.promise;
+    },
   });
   await new Promise(setImmediate);
-  assert.deepEqual(events, ["down"]);
-  time = 203;
-  down.resolve();
+  assert.deepEqual(events, ["wheel", "pause:90"]);
+  time = 90;
+  wheelLead.resolve();
   await new Promise(setImmediate);
-  assert.deepEqual(events, ["down", "lead:55", "wheel"]);
-  time = 258;
-  lead.resolve();
+  assert.deepEqual(events, ["wheel", "pause:90", "down", "pause:10"]);
+  time = 100;
+  clickHold.resolve();
   const result = await flight;
-  assert.deepEqual(events, ["down", "lead:55", "wheel", "up"]);
-  assert.equal(result.attackDownAckMs, 203);
-  assert.equal(result.wheelHeadStartMs, 55);
-  assert.equal(result.attackUpDispatchMs, 258);
+  assert.deepEqual(events, ["wheel", "pause:90", "down", "pause:10", "up"]);
+  assert.equal(result.attackDownDispatchMs, 90);
+  assert.equal(result.attackUpDispatchMs, 100);
+  assert.equal(result.wheelHeadStartMs, 90);
 });
 
-test("M212 slow real Firefox wheel ACK does not create an extra wheel or attack", async () => {
+test("M212 late wheel ACK does not create duplicate Chrome or Firefox inputs", async () => {
   const wheel = deferred();
   const events = [];
   const flight = dispatchM212AttackLedShortBlock({
-    sendAttackDown: () => { events.push("down"); },
     sendWheel: () => { events.push("wheel"); return wheel.promise; },
+    sendAttackDown: () => { events.push("down"); },
     sendAttackUp: () => { events.push("up"); },
     sleep: () => Promise.resolve(),
   });
   await new Promise(setImmediate);
-  assert.deepEqual(events, ["down", "wheel", "up"]);
+  assert.deepEqual(events, ["wheel", "down", "up"]);
   wheel.resolve();
   await flight;
-  assert.deepEqual(events, ["down", "wheel", "up"]);
+  assert.deepEqual(events, ["wheel", "down", "up"]);
 });
 
-test("M212 failed Chrome down never dispatches Firefox wheel or release", async () => {
-  const events = [];
+test("M212 early Firefox failure prevents Chrome down/up", async () => {
+  let down = 0, up = 0;
   await assert.rejects(() => dispatchM212AttackLedShortBlock({
-    sendAttackDown: () => { events.push("down"); throw Error("Chrome down rejected"); },
-    sendWheel: () => { events.push("wheel"); },
-    sendAttackUp: () => { events.push("up"); },
+    sendWheel: () => { throw Error("Firefox rejected"); },
+    sendAttackDown: () => { down++; },
+    sendAttackUp: () => { up++; },
     sleep: () => Promise.resolve(),
-  }), /Chrome down rejected/);
-  assert.deepEqual(events, ["down"]);
+  }), /Firefox rejected/);
+  assert.equal(down, 0);
+  assert.equal(up, 0);
 });
 
-test("M212 failed Firefox wheel still releases held Chrome button once, then fails", async () => {
+test("M212 late Firefox wheel failure still releases Chrome once then fails", async () => {
+  const wheel = deferred();
   const events = [];
-  await assert.rejects(() => dispatchM212AttackLedShortBlock({
+  const flight = dispatchM212AttackLedShortBlock({
+    sendWheel: () => { events.push("wheel"); return wheel.promise; },
     sendAttackDown: () => { events.push("down"); },
-    sendWheel: () => { events.push("wheel"); throw Error("Firefox wheel failed"); },
     sendAttackUp: () => { events.push("up"); },
     sleep: () => Promise.resolve(),
-  }), /Firefox wheel failed/);
-  assert.deepEqual(events, ["down", "wheel", "up"]);
+  });
+  await new Promise(setImmediate);
+  wheel.reject(Error("Late Firefox wheel rejected"));
+  await assert.rejects(flight, /Late Firefox wheel rejected/);
+  assert.deepEqual(events, ["wheel", "down", "up"]);
 });
 
-test("M212 failed Chrome release fails closed and never retries", async () => {
+test("M212 Chrome down failure is fatal and never sends a mouse up", async () => {
   let ups = 0;
   await assert.rejects(() => dispatchM212AttackLedShortBlock({
-    sendAttackDown: () => {},
     sendWheel: () => {},
+    sendAttackDown: () => { throw Error("Chrome down failed"); },
+    sendAttackUp: () => { ups++; },
+    sleep: () => Promise.resolve(),
+  }), /Chrome down failed/);
+  assert.equal(ups, 0);
+});
+
+test("M212 Chrome release failure fails closed with one mouse up", async () => {
+  let ups = 0;
+  await assert.rejects(() => dispatchM212AttackLedShortBlock({
+    sendWheel: () => {},
+    sendAttackDown: () => {},
     sendAttackUp: () => { ups++; throw Error("Chrome up failed"); },
     sleep: () => Promise.resolve(),
   }), /Chrome up failed/);
   assert.equal(ups, 1);
 });
 
-test("M212 refuses missing callbacks or invalid head-start plans", async () => {
+test("M212 rejects missing W3C callbacks and unbounded input timing", async () => {
   for (const overrides of [{ sendWheel: null }, { sendAttackDown: null },
     { sendAttackUp: null }, { sleep: null }, { wheelHeadStartMs: -1 },
-    { wheelHeadStartMs: Infinity }, { wheelHeadStartMs: 126 }]) {
+    { wheelHeadStartMs: Infinity }, { wheelHeadStartMs: 126 },
+    { clickHoldMs: -1 }, { clickHoldMs: 101 }]) {
     await assert.rejects(() => dispatchM212AttackLedShortBlock({
-      sendAttackDown: () => {}, sendWheel: () => {}, sendAttackUp: () => {},
+      sendWheel: () => {}, sendAttackDown: () => {}, sendAttackUp: () => {},
       sleep: () => Promise.resolve(), ...overrides,
     }), TypeError);
   }
 });
 
-test("M212 runner preserves genuine down/wheel/up and strict no-parry, no-HP guard", () => {
+test("M212 runner preserves true wheel/down/up and original no-parry/no-HP guards", () => {
   const source = readFileSync(new URL("../scripts/pvp_browser_flight_runner.mjs", import.meta.url), "utf8");
   const segment = source.slice(source.indexOf("async function runOnlineUiGuardBreakFlight("),
     source.indexOf("async function waitForUiGuardBreakEvidence("));
   assert.ok(segment.includes("dispatchM212AttackLedShortBlock({"));
-  assert.ok(segment.includes("sendAttackDown: () => setArenaAttackButton(attacker, true)"));
   assert.ok(segment.includes("sendWheel: () => scrollArenaWheel(defender, defenderElementId, 120, 0)"));
+  assert.ok(segment.includes("sendAttackDown: () => setArenaAttackButton(attacker, true)"));
   assert.ok(segment.includes("sendAttackUp: () => setArenaAttackButton(attacker, false)"));
   assert.ok(segment.includes('feedbackTransitions.includes("parried")'));
   assert.ok(segment.includes("defenderState?.playerHp !== 100"));

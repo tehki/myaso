@@ -9001,16 +9001,16 @@ async function runOnlineUiGuardBreakFlight(entries, { onGuardBroken = null } = {
       // contributes the remaining real inter-client delay. Three distinct
       // genuine -38 guarded hits still must exhaust 100 guard, with zero
       // parries, HP loss, synthetic inputs, or gameplay timing changes.
-      // M212: whole-click wheel-first can hit after the 240ms block
-      // expiry when Chrome's real pointer release stalls >200ms; whole-click
-      // attack-first can instead trigger a parry inside the 125ms window.
-      // Send ONE genuine W3C Chrome down, ONE real Firefox wheel-back,
-      // then ONE genuine Chrome up after a bounded head start. The original
-      // 100HP/-38guard/no-parry guards still reject any late action.
-      // No synthetic inputs, replays or changed combat constants.
+      // M212: whole Chrome click after Firefox wheel expired the 240ms
+      // block when its release took 203ms; full-click attack-first and
+      // down/wheel/up instead landed in the unchanged 125ms parry window.
+      // Dispatch ONE real Firefox wheel 90ms ahead of ONE genuine split
+      // Chrome W3C down/up to target the block-only interval. The original
+      // 100HP/-38guard/no-parry proof rejects early, late or missing action.
+      // Never fabricate inputs, repeat failed exchanges or alter mechanics.
       const m212Exchange = await dispatchM212AttackLedShortBlock({
-        sendAttackDown: () => setArenaAttackButton(attacker, true),
         sendWheel: () => scrollArenaWheel(defender, defenderElementId, 120, 0),
+        sendAttackDown: () => setArenaAttackButton(attacker, true),
         sendAttackUp: () => setArenaAttackButton(attacker, false),
         sleep,
       });
@@ -9036,10 +9036,11 @@ async function runOnlineUiGuardBreakFlight(entries, { onGuardBroken = null } = {
         wheelCount: defenderState?.wheels.filter(event => event.deltaY > 0).length,
         attackCount: attackerState?.pointers.filter(event => event.type === "pointerdown" && event.button === 0).length,
         m198Plan,
+        m212ChromeDownDispatchMs: m212Exchange.attackDownDispatchMs,
         m212ChromeDownAckMs: m212Exchange.attackDownAckMs,
-        m212FirefoxWheelDispatchMs: m212Exchange.wheelDispatchMs,
         m212ChromeUpDispatchMs: m212Exchange.attackUpDispatchMs,
         m212WheelHeadStartMs: m212Exchange.wheelHeadStartMs,
+        m212ClickHoldMs: m212Exchange.clickHoldMs,
         chromeClickHoldMs: (() => {
           const downs = attackerState?.pointers.filter(event => event.type === "pointerdown" && event.button === 0) ?? [];
           const ups = attackerState?.pointers.filter(event => event.type === "pointerup" && event.button === 0) ?? [];

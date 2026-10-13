@@ -1,37 +1,44 @@
-// M212: genuine cross-browser light/block scheduling. The authoritative
-// 125ms parry / 240ms short block / 135ms light windup are never altered.
-// Chrome W3C click completion varies from ~11ms to >200ms; sending a whole
-// click after Firefox block can hit after block expiry, while finishing the
-// whole click before Firefox block can trigger a parry.
+// M212 strict, acceptance-only W3C input sequencing (revised after CI).
+// True full-click Firefox-wheel-first could expire during a 203ms Chrome
+// pointer release. True full-click Chrome-first, and then down/wheel/up,
+// instead parried: Firefox's server block began ~90ms before impact.
+// A genuine Firefox wheel ~90ms BEFORE a split Chrome down/up centers the
+// intended impact in the unchanged 125..240ms block-only interval.
 //
-// Send exactly one true Chrome mouse-down, then dispatch one real Firefox
-// wheel-back while Chrome is still down. After a bounded genuine W3C lead,
-// send one true Chrome mouse-up, committing the strike. A late input fails
-// the original M194 server-authoritative guard/HP/parry acceptance checks.
+// No simulated events, retries, direct server writes or combat changes.
 export async function dispatchM212AttackLedShortBlock({
-  sendAttackDown, sendWheel, sendAttackUp, sleep,
-  now = () => performance.now(), wheelHeadStartMs = 55,
+  sendWheel, sendAttackDown, sendAttackUp, sleep,
+  now = () => performance.now(), wheelHeadStartMs = 90, clickHoldMs = 10,
 }) {
-  if (![sendAttackDown, sendWheel, sendAttackUp, sleep, now]
-    .every(callback => typeof callback === "function")
-    || !Number.isFinite(wheelHeadStartMs)
-    || wheelHeadStartMs < 0 || wheelHeadStartMs > 125) {
-    throw new TypeError("M212 requires bounded genuine W3C input callbacks");
+  if (![sendWheel, sendAttackDown, sendAttackUp, sleep, now]
+    .every(fn => typeof fn === "function")
+    || !Number.isFinite(wheelHeadStartMs) || wheelHeadStartMs < 0
+    || wheelHeadStartMs > 125
+    || !Number.isFinite(clickHoldMs) || clickHoldMs < 0
+    || clickHoldMs > 100) {
+    throw new TypeError("M212 requires bounded genuine W3C wheel/down/up callbacks");
   }
   const startedAt = now();
-  // An unsuccessful real Chrome down must not dispatch a Firefox wheel.
+  // Exactly one Firefox wheel, started first. Do not equate its ACK or
+  // browser monotonic clock with authoritative server activation.
+  let wheelFailure = null;
+  // Call the real W3C sender immediately so a synchronous driver failure
+  // aborts before any Chrome down. The promise still tracks late rejections.
+  const issuedWheel = sendWheel();
+  const wheelOutcome = Promise.resolve(issuedWheel).then(
+    () => ({ ok: true }), error => {
+      wheelFailure = error;
+      return { ok: false, error };
+    },
+  );
+  await sleep(wheelHeadStartMs);
+  // Fail before Chrome down if the actual W3C wheel has already failed.
+  if (wheelFailure) throw wheelFailure;
+  const attackDownDispatchMs = Math.max(0, now() - startedAt);
   await Promise.resolve().then(sendAttackDown);
   const attackDownAckMs = Math.max(0, now() - startedAt);
-  // Wheel starts before the real Chrome release. Never replay either input.
-  const wheelDispatchMs = Math.max(0, now() - startedAt);
-  const wheelOutcome = Promise.resolve().then(sendWheel).then(
-    () => ({ ok: true, value: null }),
-    error => ({ ok: false, error }),
-  );
-  // Allow only a bounded cross-browser input lead. Do not compare browser
-  // monotonic clock origins or claim server success from harness timing.
-  // Even when Firefox fails, release Chrome's real button exactly once.
-  await sleep(wheelHeadStartMs);
+  // Genuine click release is required even when the Firefox ACK is late.
+  await sleep(clickHoldMs);
   const attackUpDispatchMs = Math.max(0, now() - startedAt);
   const [releaseResult, wheelResult] = await Promise.allSettled([
     Promise.resolve().then(sendAttackUp), wheelOutcome,
@@ -39,12 +46,12 @@ export async function dispatchM212AttackLedShortBlock({
   if (releaseResult.status === "rejected") throw releaseResult.reason;
   if (wheelResult.status === "rejected") throw wheelResult.reason;
   if (!wheelResult.value.ok) throw wheelResult.value.error;
-  const completeMs = Math.max(0, now() - startedAt);
   return {
+    attackDownDispatchMs: Number(attackDownDispatchMs.toFixed(1)),
     attackDownAckMs: Number(attackDownAckMs.toFixed(1)),
-    wheelDispatchMs: Number(wheelDispatchMs.toFixed(1)),
     attackUpDispatchMs: Number(attackUpDispatchMs.toFixed(1)),
-    completeMs: Number(completeMs.toFixed(1)),
+    completeMs: Number(Math.max(0, now() - startedAt).toFixed(1)),
     wheelHeadStartMs,
+    clickHoldMs,
   };
 }

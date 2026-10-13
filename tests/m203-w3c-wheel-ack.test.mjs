@@ -22,7 +22,7 @@ test("M203 rejects invalid timing and never creates negative W3C pauses", () => 
   }
   assert.throws(() => pause({ wheelCommandMs: 10, nominalPointerPauseMs: 9999 }), RangeError);
 });
-test("M203 helper remains stable while M212 orders one genuine Chrome click before Firefox wheel", () => {
+test("M203 helper remains stable while M212 orders wheel before split genuine Chrome click", () => {
   const source=readFileSync(new URL("../scripts/pvp_browser_flight_runner.mjs",import.meta.url),"utf8");
   const section=source.slice(source.indexOf("async function runOnlineUiGuardBreakFlight("),
     source.indexOf("async function waitForUiGuardBreakEvidence("));

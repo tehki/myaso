@@ -72,7 +72,7 @@ test("M208 fails closed on invalid head-start or synthetic dispatch callbacks", 
     }),RangeError);
   }
 });
-test("M208 helper remains testable but M212 runner now uses attack-first W3C scheduling",()=>{
+test("M208 helper remains testable but M212 runner uses wheel-first split W3C scheduling",()=>{
   const source=readFileSync(new URL("../scripts/pvp_browser_flight_runner.mjs",import.meta.url),"utf8");
   const segment=source.slice(source.indexOf("async function runOnlineUiGuardBreakFlight("),
     source.indexOf("async function waitForUiGuardBreakEvidence("));
