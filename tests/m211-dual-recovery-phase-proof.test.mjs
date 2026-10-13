@@ -32,7 +32,7 @@ test("M211 missing jump active fails despite honest Space+LMB and recovery",()=>
 test("M211 rejects same-tick or retrograde server transitions",()=>{
  const sameTick = lines.map(s=>s.replace("tick=108 fighter=3 from=1 to=2",
    "tick=100 fighter=3 from=1 to=2"))
-   .sort((a,b)=>Number(a.match(/tick=(\\d+)/)[1])-Number(b.match(/tick=(\\d+)/)[1]));
+   .sort((a,b)=>Number(a.match(/tick=(\d+)/)[1])-Number(b.match(/tick=(\d+)/)[1]));
  assert.throws(()=>verify(trace(sameTick),ids),/unordered/);
  assert.throws(()=>verify(shift("tick=125 fighter=1","tick=135 fighter=1"),ids),/unordered|overlap/);
 });
