@@ -27,7 +27,8 @@ test("M209 fails closed if browser misses 80ms active phase but server also lack
 test("M209 rejects attack active on first victim recovery tick, even if hit is correct",()=>{
  const ordered=parts.map(x=>x.includes("tick=116 fighter=4")?
   "M201_AUTH_ACTION tick=121 fighter=4 from=1 to=2":x.includes("tick=117 attacker=4")?
-  "M201_AUTH_HIT tick=122 attacker=4 target=2 damage=34 hp=66":x)
+  "M201_AUTH_HIT tick=122 attacker=4 target=2 damage=34 hp=66":x.includes("tick=108 fighter=4")?
+  "M201_AUTH_ACTION tick=111 fighter=4 from=0 to=1":x)
  .filter(x=>!x.includes("tick=120 fighter=4"));
  const seq=ordered.sort((a,b)=>Number(a.match(/tick=(\d+)/)[1])-Number(b.match(/tick=(\d+)/)[1]));
  assert.throws(()=>verify(trace(seq),ids),/BEFORE first recovery/);
