@@ -87,7 +87,7 @@ jobs:
           node --check tests/m15-reliable-convergence.test.mjs
           node --check tests/m16-browser-512.test.mjs
           node --check tests/m17-reliable-delta.test.mjs
-          node --test tests/browser-runtime.test.mjs tests/m6-browser-authority.test.mjs tests/m7-browser-flight.test.mjs tests/m12-reliable-baseline.test.mjs tests/m15-reliable-convergence.test.mjs tests/m16-browser-512.test.mjs tests/m17-reliable-delta.test.mjs tests/m29-combat-readability.test.mjs tests/m200-feedback-latency.test.mjs tests/m202-guardbreak-convergence.test.mjs tests/m203-w3c-wheel-ack.test.mjs tests/m204-heavy-dodge-input-order.test.mjs tests/m201-authoritative-phase-proof.test.mjs
+          node --test tests/browser-runtime.test.mjs tests/m6-browser-authority.test.mjs tests/m7-browser-flight.test.mjs tests/m12-reliable-baseline.test.mjs tests/m15-reliable-convergence.test.mjs tests/m16-browser-512.test.mjs tests/m17-reliable-delta.test.mjs tests/m29-combat-readability.test.mjs tests/m200-feedback-latency.test.mjs tests/m202-guardbreak-convergence.test.mjs tests/m203-w3c-wheel-ack.test.mjs tests/m204-heavy-dodge-input-order.test.mjs tests/m201-authoritative-phase-proof.test.mjs tests/m205-repeat-proof-gate.test.mjs
           node scripts/browser_hotpath_probe.mjs
 
       - name: Validate authoritative Rust server
@@ -510,15 +510,25 @@ jobs:
           node --test --test-name-pattern="FFA guard-break punish focus|zero-guard stun|authoritative opponent guard break" tests/m29-combat-readability.test.mjs
           node scripts/pvp_browser_flight_runner.mjs
 
-      - name: Validate M152 actionable FFA guard-break punish
+      - name: Validate M205 repeated M201 server-tick FFA punish proof
         env:
           MYASO_PVP_SCENARIO: "uiguardbreakpunishffahit"
         run: |
           node --check src/browser/combat-readability.mjs
           node --check web/online-game.mjs
           node --check scripts/pvp_browser_flight_runner.mjs
+          node --check scripts/m201-authoritative-phase-proof.mjs
+          node --test tests/m201-authoritative-phase-proof.test.mjs
           node --test --test-name-pattern="FFA guard-break punish focus|zero-guard stun|authoritative opponent guard break" tests/m29-combat-readability.test.mjs
-          node scripts/pvp_browser_flight_runner.mjs
+          # Fresh actual Chrome/Firefox/Chrome2 processes per iteration. The
+          # acceptance runner starts a NEW Rust loopback server and all three
+          # real browsers on each invocation, with no synthetic combat inputs.
+          # Server-origin 60Hz M201 phase and exact 34HP proof must pass 3/3;
+          # do not retry a failed trial or weaken the original M152 checks.
+          for attempt in 1 2 3; do
+            echo "M205 genuine three-browser server punish proof $attempt/3"
+            node scripts/pvp_browser_flight_runner.mjs
+          done
 
       - name: Validate M153 kick knockdown FFA focus
         env:
