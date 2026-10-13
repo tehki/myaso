@@ -79,6 +79,7 @@ jobs:
           node --check scripts/m202-guardbreak-convergence.mjs
           node --check scripts/m203-w3c-wheel-ack.mjs
           node --check scripts/m208-w3c-wheel-headstart.mjs
+          node --check scripts/m207-attack-led-dodge.mjs
           node --check scripts/m201-authoritative-phase-proof.mjs
           node --check scripts/m206-knockdown-punish-proof.mjs
           node --check tests/browser-runtime.test.mjs
@@ -89,7 +90,7 @@ jobs:
           node --check tests/m15-reliable-convergence.test.mjs
           node --check tests/m16-browser-512.test.mjs
           node --check tests/m17-reliable-delta.test.mjs
-          node --test tests/browser-runtime.test.mjs tests/m6-browser-authority.test.mjs tests/m7-browser-flight.test.mjs tests/m12-reliable-baseline.test.mjs tests/m15-reliable-convergence.test.mjs tests/m16-browser-512.test.mjs tests/m17-reliable-delta.test.mjs tests/m29-combat-readability.test.mjs tests/m200-feedback-latency.test.mjs tests/m202-guardbreak-convergence.test.mjs tests/m203-w3c-wheel-ack.test.mjs tests/m204-heavy-dodge-input-order.test.mjs tests/m201-authoritative-phase-proof.test.mjs tests/m205-repeat-proof-gate.test.mjs tests/m206-knockdown-punish-proof.test.mjs tests/m208-w3c-wheel-headstart.test.mjs
+          node --test tests/browser-runtime.test.mjs tests/m6-browser-authority.test.mjs tests/m7-browser-flight.test.mjs tests/m12-reliable-baseline.test.mjs tests/m15-reliable-convergence.test.mjs tests/m16-browser-512.test.mjs tests/m17-reliable-delta.test.mjs tests/m29-combat-readability.test.mjs tests/m200-feedback-latency.test.mjs tests/m202-guardbreak-convergence.test.mjs tests/m203-w3c-wheel-ack.test.mjs tests/m204-heavy-dodge-input-order.test.mjs tests/m201-authoritative-phase-proof.test.mjs tests/m205-repeat-proof-gate.test.mjs tests/m206-knockdown-punish-proof.test.mjs tests/m208-w3c-wheel-headstart.test.mjs tests/m207-attack-led-dodge.test.mjs
           node scripts/browser_hotpath_probe.mjs
 
       - name: Validate authoritative Rust server
