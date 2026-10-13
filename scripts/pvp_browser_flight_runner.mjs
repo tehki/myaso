@@ -12,6 +12,7 @@ import { mustAwaitM202GuardConvergence } from "./m202-guardbreak-convergence.mjs
 import { verifyM201ServerPunishProof } from "./m201-authoritative-phase-proof.mjs";
 import { verifyM206ServerKnockdownPunish } from "./m206-knockdown-punish-proof.mjs";
 import { verifyM209DualKnockdownServerPunish } from "./m209-dual-knockdown-proof.mjs";
+import { verifyM211DualRecoveryServerProof } from "./m211-dual-recovery-phase-proof.mjs";
 import { planM203W3cPointerPause } from "./m203-w3c-wheel-ack.mjs";
 import { dispatchM212AttackLedShortBlock } from "./m212-attack-led-short-block.mjs";
 import { dispatchM207AttackLedDodge } from "./m207-attack-led-dodge.mjs";
@@ -449,7 +450,9 @@ async function startGameServer() {
       MYASO_BIND: "127.0.0.1:0",
       MYASO_FLIGHT_ACTION_PROOF: (scenario === "uiguardbreakpunishffahit"
         || scenario === "uikickknockdownffahit"
-        || scenario === "uimultiknockdownffahit") ? "1" : "0",
+        || scenario === "uimultiknockdownffahit"
+        || scenario === "uimultirecoveryffa"
+        || scenario === "uimultirecoveryspatial") ? "1" : "0",
       MYASO_FLIGHT_DROP_NEW_ACTION_DATAGRAMS:
         scenario === "inputloss" || scenario === "uiheavyinputloss" || scenario === "uijumpattackinputloss" ? "1" : "0",
     },
@@ -10494,22 +10497,50 @@ async function runOnlineUiMultiRecoveryFfaFocusFlight(entries, spatial = false) 
     }
   }
 
+  // M211: sampled replicated ownActionTransitions may omit the authentic
+  // 80ms attack-active state, while the read-only server has observed the
+  // full 60Hz windup->active->recovery->idle edge chain. Preserve genuine
+  // W3C input, sampled windup/recovery/idle, visible two-stage focus and
+  // all 100HP/guard assertions; replace only the fallible sampled active
+  // expectation with mandatory native server tick evidence.
   const jumpOwn = jumpState.acceptance?.ownActionTransitions ?? [];
   const lightOwn = lightState.acceptance?.ownActionTransitions ?? [];
   const jumpWindup = jumpOwn.findIndex((entry) => entry.action === COMBAT_ACTION.jumpAttackWindup);
-  const jumpActive = jumpOwn.findIndex((entry, index) => index > jumpWindup && entry.action === COMBAT_ACTION.jumpAttackActive);
-  const jumpRecovery = jumpOwn.findIndex((entry, index) => index > jumpActive && entry.action === COMBAT_ACTION.jumpAttackRecovery);
+  const jumpActiveSample = jumpOwn.findIndex((entry, index) => index > jumpWindup && entry.action === COMBAT_ACTION.jumpAttackActive);
+  const jumpRecovery = jumpOwn.findIndex((entry, index) => index > jumpWindup && entry.action === COMBAT_ACTION.jumpAttackRecovery);
   const jumpIdle = jumpOwn.findIndex((entry, index) => index > jumpRecovery && entry.action === COMBAT_ACTION.idle);
   const lightWindup = lightOwn.findIndex((entry) => entry.action === COMBAT_ACTION.attackWindup);
-  const lightActive = lightOwn.findIndex((entry, index) => index > lightWindup && entry.action === COMBAT_ACTION.attackActive);
-  const lightRecovery = lightOwn.findIndex((entry, index) => index > lightActive && entry.action === COMBAT_ACTION.attackRecovery);
+  const lightActiveSample = lightOwn.findIndex((entry, index) => index > lightWindup && entry.action === COMBAT_ACTION.attackActive);
+  const lightRecovery = lightOwn.findIndex((entry, index) => index > lightWindup && entry.action === COMBAT_ACTION.attackRecovery);
   const lightIdle = lightOwn.findIndex((entry, index) => index > lightRecovery && entry.action === COMBAT_ACTION.idle);
+  let authoritativeLifecycles = null;
+  let proofFailure = null;
+  const proofDeadline = Date.now() + 180;
+  while (!authoritativeLifecycles && Date.now() < proofDeadline) {
+    try {
+      authoritativeLifecycles = verifyM211DualRecoveryServerProof(m201ServerOutput(), {
+        jumpId, lightId, observerId,
+      });
+    } catch (error) {
+      proofFailure = error?.message ?? String(error);
+      await sleep(8);
+    }
+  }
   if (jumpState.acceptance?.scenario !== expectedScenario
     || lightState.acceptance?.scenario !== expectedScenario
-    || jumpWindup < 0 || jumpActive <= jumpWindup || jumpRecovery <= jumpActive || jumpIdle <= jumpRecovery
-    || lightWindup < 0 || lightActive <= lightWindup || lightRecovery <= lightActive || lightIdle <= lightRecovery) {
-    throw new Error(`${milestone} did not preserve both authoritative attack lifecycles: ${JSON.stringify({ jumpOwn, lightOwn })}`);
+    || jumpWindup < 0 || jumpRecovery <= jumpWindup || jumpIdle <= jumpRecovery
+    || lightWindup < 0 || lightRecovery <= lightWindup || lightIdle <= lightRecovery
+    || !authoritativeLifecycles) {
+    throw new Error(`${milestone} did not preserve both authoritative attack lifecycles: ${JSON.stringify({
+      jumpOwn, lightOwn, proofFailure, authoritativeLifecycles,
+    })}`);
   }
+  console.log("M211_SERVER_DUAL_RECOVERY_PHASES " + JSON.stringify({
+    jumpId, observerId, lightId, spatial,
+    sampledJumpActiveObserved: jumpActiveSample > jumpWindup,
+    sampledLightActiveObserved: lightActiveSample > lightWindup,
+    ...authoritativeLifecycles,
+  }));
 
   if (observerState.acceptance?.scenario !== expectedScenario
     || observerState.acceptance.playerNetId !== observerId
