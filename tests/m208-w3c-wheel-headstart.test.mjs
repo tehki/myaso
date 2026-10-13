@@ -31,7 +31,9 @@ test("M208 slow Firefox ACK cannot postpone first real Chrome attack beyond 65ms
     sendWheel:()=>{events.push("wheel-start");return wheel.promise;},
     sendAttack:p=>{events.push("attack:"+p);},
   });
-  for(let i=0;i<3;i++)await Promise.resolve();
+  // Promise.race -> scheduler -> Promise.all may require several microtasks;
+  // yield one actual Node loop turn rather than asserting prematurely.
+  await new Promise(setImmediate);
   assert.deepEqual(events,["wheel-start","attack:0"]);
   time=130;
   wheel.resolve();
