@@ -22,11 +22,17 @@ export async function dispatchM212AttackLedShortBlock({
   // Exactly one Firefox wheel, started first. Do not equate its ACK or
   // browser monotonic clock with authoritative server activation.
   let wheelFailure = null;
+  let wheelAckMs = null;
+  let attackUpAckMs = null;
   // Call the real W3C sender immediately so a synchronous driver failure
   // aborts before any Chrome down. The promise still tracks late rejections.
   const issuedWheel = sendWheel();
   const wheelOutcome = Promise.resolve(issuedWheel).then(
-    () => ({ ok: true }), error => {
+    () => {
+      wheelAckMs = Math.max(0, now() - startedAt);
+      return { ok: true };
+    }, error => {
+      wheelAckMs = Math.max(0, now() - startedAt);
       wheelFailure = error;
       return { ok: false, error };
     },
@@ -41,15 +47,21 @@ export async function dispatchM212AttackLedShortBlock({
   await sleep(clickHoldMs);
   const attackUpDispatchMs = Math.max(0, now() - startedAt);
   const [releaseResult, wheelResult] = await Promise.allSettled([
-    Promise.resolve().then(sendAttackUp), wheelOutcome,
+    Promise.resolve().then(sendAttackUp).finally(() => {
+      attackUpAckMs = Math.max(0, now() - startedAt);
+    }),
+    wheelOutcome,
   ]);
   if (releaseResult.status === "rejected") throw releaseResult.reason;
   if (wheelResult.status === "rejected") throw wheelResult.reason;
   if (!wheelResult.value.ok) throw wheelResult.value.error;
   return {
+    wheelDispatchMs: 0,
+    wheelAckMs: Number(wheelAckMs.toFixed(1)),
     attackDownDispatchMs: Number(attackDownDispatchMs.toFixed(1)),
     attackDownAckMs: Number(attackDownAckMs.toFixed(1)),
     attackUpDispatchMs: Number(attackUpDispatchMs.toFixed(1)),
+    attackUpAckMs: Number(attackUpAckMs.toFixed(1)),
     completeMs: Number(Math.max(0, now() - startedAt).toFixed(1)),
     wheelHeadStartMs,
     clickHoldMs,

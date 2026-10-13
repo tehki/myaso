@@ -23,3 +23,7 @@ All timestamps quoted within each individual browser's own monotonic observer cl
 Local tests alone do not qualify. Pass full exact-head quality with real independent Firefox+Chrome M194 repetitions and all FFA/512-population suites; then independently validate merged main. Keep public playable and production deployments disabled.
 
 - [Quality #38455651000](https://github.com/tehki/myaso/actions/runs/38455651000), 25ms wheel lead: one genuine Firefox wheel t=581, parry t=715, so 134ms wheel→impact in the same Firefox clock and a strict early-parry failure. The 48ms candidate is an empirical middle between 25ms (134ms early) and 90ms (271ms late), not acceptance evidence.
+
+
+## Read-only ingress diagnostics (pre-merge)
+A single real M194 failure now emits `M212_GUARD_BREAK_INGRESS` **before** the unchanged fail-closed guard. It records wheel/down/up dispatch and ACK in the **single Node harness clock**; Firefox wheel, block feedback, and hit/parry relative timings **only in Firefox's local clock**; and actual Chrome pointer down/up duration **only in Chrome's local clock**. Unknown observations stay `null`. This pinpoints scheduling/driver lag without ever pretending client clocks are synchronized or converting late damage/parry into passing evidence.

@@ -34,8 +34,12 @@ test("M212 true wheel fires 48ms before one Chrome down and one up", async () =>
   clickHold.resolve();
   const result = await flight;
   assert.deepEqual(events, ["wheel", "pause:48", "down", "pause:10", "up"]);
+  assert.equal(result.wheelDispatchMs, 0);
+  assert.equal(result.wheelAckMs, 0);
   assert.equal(result.attackDownDispatchMs, 48);
+  assert.equal(result.attackDownAckMs, 48);
   assert.equal(result.attackUpDispatchMs, 58);
+  assert.equal(result.attackUpAckMs, 58);
   assert.equal(result.wheelHeadStartMs, 48);
 });
 
@@ -124,6 +128,15 @@ test("M212 runner preserves true wheel/down/up and original no-parry/no-HP guard
   assert.ok(segment.includes("sendWheel: () => scrollArenaWheel(defender, defenderElementId, 120, 0)"));
   assert.ok(segment.includes("sendAttackDown: () => setArenaAttackButton(attacker, true)"));
   assert.ok(segment.includes("sendAttackUp: () => setArenaAttackButton(attacker, false)"));
+  // The real failure must log both W3C harness-clock ingress and Firefox/
+  // Chrome-local observations BEFORE the original fatal guard assertions.
+  const diagnosticsOffset = segment.indexOf('console.log("M212_GUARD_BREAK_INGRESS "');
+  assert.ok(diagnosticsOffset > 0);
+  assert.ok(segment.includes("wheelToImpactOrParryMs: m212Duration("));
+  assert.ok(segment.includes("genuineClickHoldMs: m212Duration("));
+  assert.ok(segment.includes("harnessW3c: m212Exchange"));
+  assert.ok(diagnosticsOffset < segment.indexOf("M193 guard-break exchange"));
+  assert.ok(diagnosticsOffset < segment.indexOf("M34 guard-break staging allowed an unblocked strike"));
   assert.ok(segment.includes('feedbackTransitions.includes("parried")'));
   assert.ok(segment.includes("defenderState?.playerHp !== 100"));
   assert.ok(segment.includes("defenderResult.playerGuard !== 0"));

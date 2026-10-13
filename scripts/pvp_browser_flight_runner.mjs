@@ -9018,6 +9018,49 @@ async function runOnlineUiGuardBreakFlight(entries, { onGuardBroken = null } = {
       const states = await Promise.all(entries.map(readUiEvidence));
       const defenderState = states.find((entry) => entry.browser === defender.name);
       const attackerState = states.find((entry) => entry.browser === attacker.name);
+      // Read-only M212 ingress diagnostics must be printed BEFORE the strict
+      // assertions throw. W3C dispatch/ACK offsets share this harness clock;
+      // defender wheel, block cue and damage/parry use Firefox's own clock;
+      // Chrome down, up and strike cue use Chrome's own clock. NEVER compare
+      // Chrome and Firefox local timestamp origins directly.
+      const m212FirefoxWheel = defenderState?.wheels?.filter(
+        (event) => event.deltaY > 0,
+      ).at(-1);
+      const m212FirefoxBlock = defenderState?.eventTransitions?.filter(
+        (event) => event.text.startsWith("Blocking"),
+      ).at(-1);
+      const m212FirefoxOutcome = defenderState?.eventTransitions?.filter(
+        (event) => event.text.startsWith("Hit taken")
+          || event.text.startsWith("Parry!")
+          || event.text.startsWith("Guard break"),
+      ).at(-1);
+      const m212ChromeDown = attackerState?.pointers?.filter(
+        (event) => event.type === "pointerdown" && event.button === 0,
+      ).at(-1);
+      const m212ChromeUp = attackerState?.pointers?.filter(
+        (event) => event.type === "pointerup" && event.button === 0,
+      ).at(-1);
+      const m212Duration = (end, start) => Number.isFinite(end?.t) && Number.isFinite(start?.t)
+        ? Number((end.t - start.t).toFixed(1)) : null;
+      console.log("M212_GUARD_BREAK_INGRESS " + JSON.stringify({
+        attempt: attempt + 1,
+        harnessW3c: m212Exchange,
+        firefox: {
+          wheelEventMs: m212FirefoxWheel?.t ?? null,
+          blockCueMs: m212FirefoxBlock?.t ?? null,
+          impactOrParryCueMs: m212FirefoxOutcome?.t ?? null,
+          wheelToBlockCueMs: m212Duration(m212FirefoxBlock, m212FirefoxWheel),
+          wheelToImpactOrParryMs: m212Duration(m212FirefoxOutcome, m212FirefoxWheel),
+          hp: defenderState?.playerHp,
+          guard: defenderState?.playerGuard,
+        },
+        chrome: {
+          pointerDownMs: m212ChromeDown?.t ?? null,
+          pointerUpMs: m212ChromeUp?.t ?? null,
+          genuineClickHoldMs: m212Duration(m212ChromeUp, m212ChromeDown),
+          feedback: attackerState?.combatFeedback,
+        },
+      }));
       // A real parry must never be silently counted as one of the guard-break
       // exchanges, even if later strikes successfully drain guard.
       if (attackerState?.feedbackTransitions.includes("parried")
