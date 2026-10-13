@@ -40,7 +40,7 @@ test("M206 is wired only into real W3C third-party punish loopback flight",()=>{
   const source=readFileSync(new URL("../scripts/pvp_browser_flight_runner.mjs",import.meta.url),"utf8");
   const section=source.slice(source.indexOf("async function runOnlineUiKickKnockdownFfaHitFlight("),
     source.indexOf("async function runOnlineUiMultiKnockdownFfaFlight("));
-  assert.ok(source.includes('MYASO_FLIGHT_ACTION_PROOF: scenario === "uiguardbreakpunishffahit"'));
+  assert.ok(source.includes('MYASO_FLIGHT_ACTION_PROOF: (scenario === "uiguardbreakpunishffahit"'));
   assert.ok(source.includes('scenario === "uikickknockdownffahit"'));
   assert.ok(section.includes("verifyM206ServerKnockdownPunish(m201ServerOutput()"));
   assert.ok(section.includes("punishDowns.length !== 1"));
