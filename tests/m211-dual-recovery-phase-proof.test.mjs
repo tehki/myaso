@@ -30,7 +30,10 @@ test("M211 missing jump active fails despite honest Space+LMB and recovery",()=>
  assert.throws(()=>verify(trace(lines.filter(s=>!s.includes("tick=119"))),ids),/jump.*phase edge 17/);
 });
 test("M211 rejects same-tick or retrograde server transitions",()=>{
- assert.throws(()=>verify(shift("tick=108 fighter=3","tick=106 fighter=3"),ids),/unordered/);
+ const sameTick = lines.map(s=>s.replace("tick=108 fighter=3 from=1 to=2",
+   "tick=100 fighter=3 from=1 to=2"))
+   .sort((a,b)=>Number(a.match(/tick=(\\d+)/)[1])-Number(b.match(/tick=(\\d+)/)[1]));
+ assert.throws(()=>verify(trace(sameTick),ids),/unordered/);
  assert.throws(()=>verify(shift("tick=125 fighter=1","tick=135 fighter=1"),ids),/unordered|overlap/);
 });
 test("M211 requires genuine simultaneous recovery overlap and ordered handoff",()=>{
