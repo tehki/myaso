@@ -10,6 +10,7 @@ import { planM198GuardBreakW3cExchange } from "./m198-guardbreak-input-plan.mjs"
 import { measureM200WheelFeedbackLatency } from "./m200-feedback-latency.mjs";
 import { mustAwaitM202GuardConvergence } from "./m202-guardbreak-convergence.mjs";
 import { verifyM201ServerPunishProof } from "./m201-authoritative-phase-proof.mjs";
+import { verifyM206ServerKnockdownPunish } from "./m206-knockdown-punish-proof.mjs";
 import { planM203W3cPointerPause } from "./m203-w3c-wheel-ack.mjs";
 import { planM197KnockdownClusterNudge } from "./m197-knockdown-cluster.mjs";
 import { isTickNewer32 } from "../src/browser/reconciliation.mjs";
@@ -443,7 +444,8 @@ async function startGameServer() {
     env: {
       ...process.env,
       MYASO_BIND: "127.0.0.1:0",
-      MYASO_FLIGHT_ACTION_PROOF: scenario === "uiguardbreakpunishffahit" ? "1" : "0",
+      MYASO_FLIGHT_ACTION_PROOF: (scenario === "uiguardbreakpunishffahit"
+        || scenario === "uikickknockdownffahit") ? "1" : "0",
       MYASO_FLIGHT_DROP_NEW_ACTION_DATAGRAMS:
         scenario === "inputloss" || scenario === "uiheavyinputloss" || scenario === "uijumpattackinputloss" ? "1" : "0",
     },
@@ -4452,83 +4454,46 @@ async function runOnlineUiKickKnockdownFfaHitFlight(entries) {
       + JSON.stringify({ punishPointers, knockdownTransition: conversion.knockdownTransition, knockdownEndEpochMs }));
   }
 
-  let punisherActions = punisherState.acceptance?.ownActionTransitions ?? [];
-  let punishWindup = punisherActions.find((entry) =>
+  // M206: the normal 50ms snapshots can miss the unchanged 80ms
+  // light active state even though the real Chrome2 W3C LMB hit landed.
+  // M201's loopback-only 60Hz server trace is now also enabled for this
+  // three-player kick-knockdown scenario. Prove actual same-strike action
+  // windup->active and the exact server-authored victim hit in server ticks.
+  const sampledPunisherActions = punisherState.acceptance?.ownActionTransitions ?? [];
+  const sampledWindup = sampledPunisherActions.find(entry =>
     entry.action === COMBAT_ACTION.attackWindup
     && Number.isFinite(entry.epochMs)
-    && entry.epochMs >= punishDown.epochMs - 40);
-  let punishActive = punishWindup
-    ? punisherActions.find((entry) =>
+    && entry.epochMs >= punishDown.epochMs - 40) ?? null;
+  const sampledActive = sampledWindup
+    ? sampledPunisherActions.find(entry =>
       entry.action === COMBAT_ACTION.attackActive
       && Number.isFinite(entry.epochMs)
-      && entry.epochMs >= punishWindup.epochMs)
+      && entry.epochMs >= sampledWindup.epochMs) ?? null
     : null;
-
-  // The HP=66 snapshot above already proves the authoritative hit landed
-  // while #2 was still in knockdown. The attacker's own action replication can
-  // trail that victim snapshot by a network frame, so give it a short bounded
-  // observation window instead of requiring attackActive in the same read.
-  const activeObservationDeadline = Date.now() + 220;
-  while ((!punishWindup || !punishActive) && Date.now() < activeObservationDeadline) {
-    await sleep(8);
-    const currentPunisher = await readUiEvidence(punisher);
-    punisherActions = currentPunisher.acceptance?.ownActionTransitions ?? [];
-    punishWindup = punisherActions.find((entry) =>
-      entry.action === COMBAT_ACTION.attackWindup
-      && Number.isFinite(entry.epochMs)
-      && entry.epochMs >= punishDown.epochMs - 40) ?? punishWindup;
-    punishActive = punishWindup
-      ? punisherActions.find((entry) =>
-        entry.action === COMBAT_ACTION.attackActive
-        && Number.isFinite(entry.epochMs)
-        && entry.epochMs >= punishWindup.epochMs)
-      : null;
-  }
-  if (!punishWindup || !punishActive) {
-    throw new Error(milestone + " did not observe the third fighter's authoritative light conversion: "
-      + JSON.stringify({ punishDown, punishWindup, punishActive, punisherActions }));
-  }
-  const defenderTransitions = defenderState.acceptance?.ownActionTransitions ?? [];
-  const defenderRecovery = defenderTransitions.find((entry) =>
-    entry.action === COMBAT_ACTION.idle
-    && Number.isFinite(entry.epochMs)
-    && entry.epochMs > conversion.knockdownTransition.epochMs);
-  const defenderFocusActions = defenderState.acceptance?.focusActionTransitions ?? [];
-  const beforeOrSameRecoveryTick = (entry) => {
-    if (!defenderRecovery) return true;
-    if (Number.isFinite(entry.serverTick) && Number.isFinite(defenderRecovery.serverTick)) {
-      return entry.serverTick <= defenderRecovery.serverTick;
+  let authoritativePunish = null;
+  let serverProofFailure = null;
+  const proofDeadline = Date.now() + 180;
+  while (!authoritativePunish && Date.now() < proofDeadline) {
+    try {
+      authoritativePunish = verifyM206ServerKnockdownPunish(m201ServerOutput(), {
+        kickerId, defenderId, punisherId,
+      });
+    } catch (error) {
+      serverProofFailure = error?.message ?? String(error);
+      await sleep(8);
     }
-    return entry.epochMs < defenderRecovery.epochMs;
-  };
-  const defenderSawPunishActive = defenderState.acceptance?.focusNetId === punisherId
-    && defenderFocusActions.some((entry) =>
-      entry.action === COMBAT_ACTION.attackActive
-      && Number.isFinite(entry.epochMs)
-      && entry.epochMs >= punishWindup.epochMs
-      && beforeOrSameRecoveryTick(entry));
-  const punishActiveAfterRecovery = defenderRecovery
-    && (Number.isFinite(punishActive.serverTick) && Number.isFinite(defenderRecovery.serverTick)
-      ? punishActive.serverTick > defenderRecovery.serverTick
-      : punishActive.epochMs >= defenderRecovery.epochMs);
-  // hitEvidence already proves exactly one 34 HP hit resolved while the victim
-  // was knocked down. When active and recovery replicate on the same server
-  // tick, browser epoch order is not authoritative; only a later recovery tick
-  // invalidates the conversion.
-  if (punishActive.epochMs >= knockdownEndEpochMs
-    || punishActiveAfterRecovery
-    || !defenderSawPunishActive) {
-    throw new Error(milestone + " authoritative ordering did not prove #"
-      + punisherId + " became active before #" + defenderId + " recovered: "
-      + JSON.stringify({
-        knockdownTransition: conversion.knockdownTransition,
-        knockdownEndEpochMs,
-        punishWindup,
-        punishActive,
-        defenderRecovery,
-        defenderFocusActions,
-      }));
   }
+  if (!authoritativePunish) {
+    throw new Error(milestone + " did not prove the true third-party server attack active/hit inside knockdown: "
+      + JSON.stringify({ punishDown, sampledWindup, sampledActive, serverProofFailure }));
+  }
+  console.log("M206_SERVER_KNOCKDOWN_PUNISH_PROOF " + JSON.stringify({
+    kickerId, defenderId, punisherId,
+    genuinePunishDowns: punishDowns.length,
+    genuinePunishUps: punishUps.length,
+    sampledActiveObserved: !!sampledActive,
+    ...authoritativePunish,
+  }));
   // Three-player observers can receive the generic attacker-side hit event on
   // a different spectator frame. The authoritative proof above already ties
   // the only real LMB to #3 and the 34 HP loss to knocked-down #2, so require
@@ -4571,7 +4536,8 @@ async function runOnlineUiKickKnockdownFfaHitFlight(entries) {
     m155KickAttempt: conversion.attempt,
     m155KnockdownEpochMs: conversion.knockdownTransition.epochMs,
     m155PunishPointerEpochMs: punishDown.epochMs,
-    m155PunishActiveEpochMs: punishActive.epochMs,
+    m155PunishActiveEpochMs: sampledActive?.epochMs ?? null,
+    m206PunishActiveServerTick: authoritativePunish.active.tick,
   }));
 }
 
