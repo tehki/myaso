@@ -9004,7 +9004,7 @@ async function runOnlineUiGuardBreakFlight(entries, { onGuardBroken = null } = {
       // M212: whole Chrome click after Firefox wheel expired the 240ms
       // block when its release took 203ms; full-click attack-first and
       // down/wheel/up instead landed in the unchanged 125ms parry window.
-      // Dispatch ONE real Firefox wheel 25ms ahead of ONE genuine split
+      // Dispatch ONE real Firefox wheel 48ms ahead of ONE genuine split
       // Chrome W3C down/up to target the block-only interval. The original
       // 100HP/-38guard/no-parry proof rejects early, late or missing action.
       // Never fabricate inputs, repeat failed exchanges or alter mechanics.

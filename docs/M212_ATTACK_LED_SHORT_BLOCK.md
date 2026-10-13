@@ -10,7 +10,7 @@ All timestamps quoted within each individual browser's own monotonic observer cl
 
 ## Revised candidate — shortened wheel lead before split click
 
-- Send exactly **one genuine Firefox W3C backward wheel first**. Do not require a long ACK before continuing; a bounded 25ms harness head start is used. The 90ms trial reached unblocked damage, with 271ms Firefox wheel→hit; earlier attack-led trials reached parries near 148ms. This shorter lead is a test-only candidate intended to target the 125..240ms block-only interval, not a guarantee of success.
+- Send exactly **one genuine Firefox W3C backward wheel first**. Do not require a long ACK before continuing; a bounded 48ms harness head start is used. The 90ms trial reached unblocked damage, with 271ms Firefox wheel→hit; earlier attack-led trials reached parries near 148ms. This shorter lead is a test-only candidate intended to target the 125..240ms block-only interval, not a guarantee of success.
 - Then send exactly **one Chrome W3C mouse-down**, keep pressed for a bounded 10ms after down ACK, then send exactly **one Chrome W3C mouse-up**. Split input avoids W3C full-click duration problems; an actual slow pointer action remains visible and fails if outside timing.
 - Require all actual genuine W3C calls to succeed, including late wheel errors. If the wheel fails before Chrome action, do not attack; if it fails after real Chrome down, the release still happens once to avoid a stuck pointer, then test fails.
 - No synthetic page events, direct server actions, hidden retries or second attack.
@@ -21,3 +21,5 @@ All timestamps quoted within each individual browser's own monotonic observer cl
 ## Release policy
 
 Local tests alone do not qualify. Pass full exact-head quality with real independent Firefox+Chrome M194 repetitions and all FFA/512-population suites; then independently validate merged main. Keep public playable and production deployments disabled.
+
+- [Quality #38455651000](https://github.com/tehki/myaso/actions/runs/38455651000), 25ms wheel lead: one genuine Firefox wheel t=581, parry t=715, so 134ms wheel→impact in the same Firefox clock and a strict early-parry failure. The 48ms candidate is an empirical middle between 25ms (134ms early) and 90ms (271ms late), not acceptance evidence.
