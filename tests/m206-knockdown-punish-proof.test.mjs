@@ -29,8 +29,11 @@ test("M206 refuses wrong victim, early recovery, wrong damage and extra hit",()=
   assert.throws(()=>verifyM206ServerKnockdownPunish(trace.replace("damage=34 hp=66","damage=35 hp=65"),roles));
   assert.throws(()=>verifyM206ServerKnockdownPunish(
     trace+"M201_AUTH_HIT tick=123 attacker=3 target=1 damage=34 hp=66\n",roles));
-  assert.throws(()=>verifyM206ServerKnockdownPunish(
-    trace.replace("tick=122 fighter=2 from=19 to=0","tick=118 fighter=2 from=19 to=0"),roles),/recovery/);
+  const prematureRecovery = trace
+    .replace("M201_AUTH_HIT tick=119 attacker=3 target=2 damage=34 hp=66",
+      "M201_AUTH_ACTION tick=118 fighter=2 from=19 to=0\nM201_AUTH_HIT tick=119 attacker=3 target=2 damage=34 hp=66")
+    .replace("M201_AUTH_ACTION tick=122 fighter=2 from=19 to=0\n", "");
+  assert.throws(()=>verifyM206ServerKnockdownPunish(prematureRecovery,roles),/recovery/);
 });
 test("M206 rejects synthetic player IDs or uncorrelated kick knockdown",()=>{
   assert.throws(()=>verifyM206ServerKnockdownPunish(trace,{...roles,punisherId:1}),RangeError);
