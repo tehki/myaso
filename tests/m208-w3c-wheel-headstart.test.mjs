@@ -78,7 +78,7 @@ test("M208 helper remains testable but M212 runner now uses attack-first W3C sch
     source.indexOf("async function waitForUiGuardBreakEvidence("));
   assert.ok(segment.includes("dispatchM212AttackLedShortBlock({"));
   assert.ok(segment.includes("sendWheel: () => scrollArenaWheel(defender, defenderElementId, 120, 0)"));
-  assert.ok(segment.includes("attacker, m198Plan.clicksPerWheel, 0"));
+  assert.ok(segment.includes("sendAttackUp: () => setArenaAttackButton(attacker, false)"));
   assert.ok(segment.includes("feedbackTransitions.includes(\"parried\")"));
   assert.ok(segment.includes("defenderState?.playerHp !== 100"));
   assert.ok(segment.includes("defenderResult.playerGuard !== 0"));

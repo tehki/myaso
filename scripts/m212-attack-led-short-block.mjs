@@ -1,32 +1,50 @@
-// M212 acceptance-only W3C sequencing for real guard-break pressure.
-// Chrome's genuinely delivered down->up can take >200ms even when the
-// requested W3C hold is 10ms. A Firefox block started BEFORE this full hold
-// can expire before the first 34HP strike reaches the authoritative server.
+// M212: genuine cross-browser light/block scheduling. The authoritative
+// 125ms parry / 240ms short block / 135ms light windup are never altered.
+// Chrome W3C click completion varies from ~11ms to >200ms; sending a whole
+// click after Firefox block can hit after block expiry, while finishing the
+// whole click before Firefox block can trigger a parry.
 //
-// Commit one genuine Chrome click first, then dispatch exactly one genuine
-// Firefox block wheel immediately after Chrome's W3C ACK. This aligns the
-// short block with the ensuing server-authoritative light windup instead
-// of with the unpredictable duration of Chrome's pointer release.
-// Real HP, parry, guard and 125/240ms timings still fail closed in M194.
-// Never retry either input or synthesize it through page JavaScript.
+// Send exactly one true Chrome mouse-down, then dispatch one real Firefox
+// wheel-back while Chrome is still down. After a bounded genuine W3C lead,
+// send one true Chrome mouse-up, committing the strike. A late input fails
+// the original M194 server-authoritative guard/HP/parry acceptance checks.
 export async function dispatchM212AttackLedShortBlock({
-  sendAttack, sendWheel, now = () => performance.now(),
+  sendAttackDown, sendWheel, sendAttackUp, sleep,
+  now = () => performance.now(), wheelHeadStartMs = 55,
 }) {
-  if (typeof sendAttack !== "function" || typeof sendWheel !== "function"
-    || typeof now !== "function") {
-    throw new TypeError("M212 requires genuine W3C attack and block callbacks");
+  if (![sendAttackDown, sendWheel, sendAttackUp, sleep, now]
+    .every(callback => typeof callback === "function")
+    || !Number.isFinite(wheelHeadStartMs)
+    || wheelHeadStartMs < 0 || wheelHeadStartMs > 125) {
+    throw new TypeError("M212 requires bounded genuine W3C input callbacks");
   }
   const startedAt = now();
-  // If the true Chrome command fails, do not send a block and conceal it.
-  await Promise.resolve().then(sendAttack);
-  const attackAckMs = Math.max(0, now() - startedAt);
-  // Firefox must receive just ONE genuine W3C wheel. Its failure is fatal.
+  // An unsuccessful real Chrome down must not dispatch a Firefox wheel.
+  await Promise.resolve().then(sendAttackDown);
+  const attackDownAckMs = Math.max(0, now() - startedAt);
+  // Wheel starts before the real Chrome release. Never replay either input.
   const wheelDispatchMs = Math.max(0, now() - startedAt);
-  await Promise.resolve().then(sendWheel);
-  const wheelAckMs = Math.max(0, now() - startedAt);
+  const wheelOutcome = Promise.resolve().then(sendWheel).then(
+    () => ({ ok: true, value: null }),
+    error => ({ ok: false, error }),
+  );
+  // Allow only a bounded cross-browser input lead. Do not compare browser
+  // monotonic clock origins or claim server success from harness timing.
+  // Even when Firefox fails, release Chrome's real button exactly once.
+  await sleep(wheelHeadStartMs);
+  const attackUpDispatchMs = Math.max(0, now() - startedAt);
+  const [releaseResult, wheelResult] = await Promise.allSettled([
+    Promise.resolve().then(sendAttackUp), wheelOutcome,
+  ]);
+  if (releaseResult.status === "rejected") throw releaseResult.reason;
+  if (wheelResult.status === "rejected") throw wheelResult.reason;
+  if (!wheelResult.value.ok) throw wheelResult.value.error;
+  const completeMs = Math.max(0, now() - startedAt);
   return {
-    attackAckMs: Number(attackAckMs.toFixed(1)),
+    attackDownAckMs: Number(attackDownAckMs.toFixed(1)),
     wheelDispatchMs: Number(wheelDispatchMs.toFixed(1)),
-    wheelAckMs: Number(wheelAckMs.toFixed(1)),
+    attackUpDispatchMs: Number(attackUpDispatchMs.toFixed(1)),
+    completeMs: Number(completeMs.toFixed(1)),
+    wheelHeadStartMs,
   };
 }

@@ -9,59 +9,101 @@ const deferred = () => {
   return { promise, resolve, reject };
 };
 
-test("M212 waits for a slow real Chrome pointer release before one Firefox block wheel", async () => {
-  const attack = deferred();
+test("M212 slow Chrome down ACK still precedes one real wheel then release", async () => {
+  const down = deferred();
+  const lead = deferred();
   const events = [];
   let time = 0;
   const flight = dispatchM212AttackLedShortBlock({
     now: () => time,
-    sendAttack: () => { events.push("chrome-click-start"); return attack.promise; },
-    sendWheel: () => { events.push("firefox-wheel"); time = 240; },
+    sendAttackDown: () => { events.push("down"); return down.promise; },
+    sendWheel: () => { events.push("wheel"); },
+    sendAttackUp: () => { events.push("up"); },
+    sleep: ms => { events.push("lead:" + ms); return lead.promise; },
   });
   await new Promise(setImmediate);
-  assert.deepEqual(events, ["chrome-click-start"]);
+  assert.deepEqual(events, ["down"]);
   time = 203;
-  attack.resolve();
+  down.resolve();
+  await new Promise(setImmediate);
+  assert.deepEqual(events, ["down", "lead:55", "wheel"]);
+  time = 258;
+  lead.resolve();
   const result = await flight;
-  assert.deepEqual(events, ["chrome-click-start", "firefox-wheel"]);
-  assert.equal(result.attackAckMs, 203);
-  assert.equal(result.wheelDispatchMs, 203);
-  assert.equal(result.wheelAckMs, 240);
+  assert.deepEqual(events, ["down", "lead:55", "wheel", "up"]);
+  assert.equal(result.attackDownAckMs, 203);
+  assert.equal(result.wheelHeadStartMs, 55);
+  assert.equal(result.attackUpDispatchMs, 258);
 });
 
-test("M212 does not send Firefox wheel after rejected Chrome W3C input", async () => {
-  let wheels = 0;
-  await assert.rejects(() => dispatchM212AttackLedShortBlock({
-    sendAttack: () => Promise.reject(new Error("Chrome W3C rejected")),
-    sendWheel: () => { wheels += 1; },
-  }), /Chrome W3C rejected/);
-  assert.equal(wheels, 0);
+test("M212 slow real Firefox wheel ACK does not create an extra wheel or attack", async () => {
+  const wheel = deferred();
+  const events = [];
+  const flight = dispatchM212AttackLedShortBlock({
+    sendAttackDown: () => { events.push("down"); },
+    sendWheel: () => { events.push("wheel"); return wheel.promise; },
+    sendAttackUp: () => { events.push("up"); },
+    sleep: () => Promise.resolve(),
+  });
+  await new Promise(setImmediate);
+  assert.deepEqual(events, ["down", "wheel", "up"]);
+  wheel.resolve();
+  await flight;
+  assert.deepEqual(events, ["down", "wheel", "up"]);
 });
 
-test("M212 treats genuine Firefox wheel failure as fatal, never replaying Chrome", async () => {
-  let attacks = 0, wheels = 0;
+test("M212 failed Chrome down never dispatches Firefox wheel or release", async () => {
+  const events = [];
   await assert.rejects(() => dispatchM212AttackLedShortBlock({
-    sendAttack: () => { attacks += 1; },
-    sendWheel: () => { wheels += 1; throw new Error("Firefox wheel failed"); },
+    sendAttackDown: () => { events.push("down"); throw Error("Chrome down rejected"); },
+    sendWheel: () => { events.push("wheel"); },
+    sendAttackUp: () => { events.push("up"); },
+    sleep: () => Promise.resolve(),
+  }), /Chrome down rejected/);
+  assert.deepEqual(events, ["down"]);
+});
+
+test("M212 failed Firefox wheel still releases held Chrome button once, then fails", async () => {
+  const events = [];
+  await assert.rejects(() => dispatchM212AttackLedShortBlock({
+    sendAttackDown: () => { events.push("down"); },
+    sendWheel: () => { events.push("wheel"); throw Error("Firefox wheel failed"); },
+    sendAttackUp: () => { events.push("up"); },
+    sleep: () => Promise.resolve(),
   }), /Firefox wheel failed/);
-  assert.equal(attacks, 1);
-  assert.equal(wheels, 1);
+  assert.deepEqual(events, ["down", "wheel", "up"]);
 });
 
-test("M212 rejects missing or synthetic W3C dispatch callbacks", async () => {
-  for (const option of [{}, { sendAttack: () => {} }, { sendWheel: () => {} },
-    { sendAttack: "fake", sendWheel: () => {} }]) {
-    await assert.rejects(() => dispatchM212AttackLedShortBlock(option), TypeError);
+test("M212 failed Chrome release fails closed and never retries", async () => {
+  let ups = 0;
+  await assert.rejects(() => dispatchM212AttackLedShortBlock({
+    sendAttackDown: () => {},
+    sendWheel: () => {},
+    sendAttackUp: () => { ups++; throw Error("Chrome up failed"); },
+    sleep: () => Promise.resolve(),
+  }), /Chrome up failed/);
+  assert.equal(ups, 1);
+});
+
+test("M212 refuses missing callbacks or invalid head-start plans", async () => {
+  for (const overrides of [{ sendWheel: null }, { sendAttackDown: null },
+    { sendAttackUp: null }, { sleep: null }, { wheelHeadStartMs: -1 },
+    { wheelHeadStartMs: Infinity }, { wheelHeadStartMs: 126 }]) {
+    await assert.rejects(() => dispatchM212AttackLedShortBlock({
+      sendAttackDown: () => {}, sendWheel: () => {}, sendAttackUp: () => {},
+      sleep: () => Promise.resolve(), ...overrides,
+    }), TypeError);
   }
 });
 
-test("M212 M194 runner preserves genuine inputs and original fail-closed guard proof", () => {
+test("M212 runner preserves genuine down/wheel/up and strict no-parry, no-HP guard", () => {
   const source = readFileSync(new URL("../scripts/pvp_browser_flight_runner.mjs", import.meta.url), "utf8");
   const segment = source.slice(source.indexOf("async function runOnlineUiGuardBreakFlight("),
     source.indexOf("async function waitForUiGuardBreakEvidence("));
   assert.ok(segment.includes("dispatchM212AttackLedShortBlock({"));
+  assert.ok(segment.includes("sendAttackDown: () => setArenaAttackButton(attacker, true)"));
   assert.ok(segment.includes("sendWheel: () => scrollArenaWheel(defender, defenderElementId, 120, 0)"));
-  assert.ok(segment.includes("attacker, m198Plan.clicksPerWheel, 0"));
+  assert.ok(segment.includes("sendAttackUp: () => setArenaAttackButton(attacker, false)"));
   assert.ok(segment.includes('feedbackTransitions.includes("parried")'));
   assert.ok(segment.includes("defenderState?.playerHp !== 100"));
   assert.ok(segment.includes("defenderResult.playerGuard !== 0"));

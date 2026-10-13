@@ -1,24 +1,26 @@
-# M212 — attack-led genuine short-block acceptance
+# M212 — genuine W3C block-only sequencing, revised after CI
 
-## Evidence
+## Reproduced opposite failures
 
-M211 PR #249 head `39036dcc0cc4c1bd6e9509e45b850cd25950e0d5` failed exact-head quality run [#38432344532](https://github.com/tehki/myaso/actions/runs/38432344532), M194 first fresh Chrome/Firefox real UI block-only guard-break trial. See [Issue #250](https://github.com/tehki/myaso/issues/250).
+- [M211 PR #249 original quality #38432344532](https://github.com/tehki/myaso/actions/runs/38432344532) showed Firefox one real wheel-back at observer t=538ms followed by **unblocked 34HP**, HP 66 / guard 100 at t=968ms. Chrome one real down t=579.7, up t=782.4 (**203ms genuine click hold**), attack confirmation t=967.2. Firefox wheel→damage ~430ms in its own clock, beyond unchanged 240ms short block.
+- [M212 PR #251 revision 1 quality #38452643108](https://github.com/tehki/myaso/actions/runs/38452643108) put the **complete** Chrome W3C click before the wheel; Firefox correctly **parried** the first light. Chrome down t=497.9, up t=509.3, parried t=700.1; Firefox wheel t=499, block feedback t=616, parry feedback t=704. Its own block feedback→parry was ~88ms, inside the unchanged 125ms parry window. The strict M193/M194 test failed closed.
 
-The browser observer recorded exactly one Chrome LMB pointerDown ~579.7ms, real pointerUp ~782.4ms (**203ms hold despite a nominal 10ms**); Firefox's single true wheel-back arrived at ~538ms with blocking feedback at 576ms. The light hit was registered at ~968ms (defender HP 66, guard 100). Within the Firefox observer clock alone wheel-to-hit was ~430ms, outside unchanged 240ms short block. The M34 fail-closed guard correctly rejected it.
+Chrome and Firefox local monotonic clocks are NOT synchronized; never subtract absolute timestamps across browsers.
 
-Do **not** compare uncalibrated Chrome and Firefox monotonic clocks.
+## Candidate revision 2 (after M211 main integration)
 
-## Candidate acceptance-only correction
+The W3C click duration is unreliable as an atomic unit. A whole Firefox wheel before the whole Chrome click risks short-block expiry; a wheel after the whole click risks a parry.
 
-M208 initiated Firefox wheel before Chrome W3C click and capped the Firefox wheel-command ACK wait at 65ms. That cannot bound the subsequent real Chrome pointerDown→pointerUp release duration, and the block can expire while a W3C click is still executing.
+Use the existing genuine W3C pointer input:
+1. Issue exactly **one Chrome pointer-down** and await its WebDriver acknowledgement.
+2. Dispatch exactly **one Firefox wheel-back**, then keep Chrome down across a bounded **55ms** genuine inter-browser lead (only harness time, no game delay or altered combat value).
+3. Issue exactly **one Chrome pointer-up** and await both W3C requests. Release must be attempted even if Firefox's wheel fails, so a held mouse is not left stuck. The test remains failed on either WebDriver error.
+4. Read the actual browser W3C pointer down/up, wheel, server-generated block/damage/parry/guard and state. Real success must be independently evidenced; scheduling order alone is never accepted.
 
-M212 uses one genuine Chrome W3C down/pause/up, waits for that W3C command to complete, then immediately dispatches one genuine Firefox W3C wheel-back. It thus aligns the 240ms block with the real Chrome click's *completion* rather than the variable click hold duration. This is a scheduling hypothesis to prove in **real browsers**; it is **not** sufficient to pass merely based on callback order. If the real wheel arrives after strike or inside the unchanged 125ms parry phase, the existing strict CI must fail.
+All original M194 gates remain strict: no parries, no damage, exact -38 guard per guarded hit, guard-break after real exchanges, one real W3C click and wheel, no synthetic events, hidden gameplay retries, adjusted Rust timings, protocol changes, or game logic changes. Fail if an exchange lands in the 125ms parry or outside the 240ms short block.
 
-- No synthetic `dispatchEvent`, direct server action, second click/wheel, hidden retries, or forged acceptance.
-- No Rust game rules, state machine, protocol, guard/stamina values, 125ms parry, 240ms block or 34HP light damage changed.
-- Keep one genuine Chrome click and one genuine Firefox block wheel per exchange, exactly 100 HP and -38 guard on a guarded light, no parry, full final guard-break evidence.
-- Deterministic Node tests check slow (203ms) click completion ordering and both browser driver failures.
-- Full fresh Chrome/Firefox M194 repetition, all exact-head quality, then independent merged-main quality required. Do **not** merge on green Node tests alone.
-- No public playable or production launch.
+The previously merged M211 Rust server 60Hz read-only action proof is preserved on this combined PR branch, including both M144/M145 CI steps. Local Node tests include delayed down ACK, slow wheel ACK, failed wheel cleanup, single up/down/wheel, historical guard assertions, and full CI workflow wiring.
 
-Potential limitation: if Firefox's genuine wheel ingress after Chrome ACK is too slow, the wheel may enter the parry zone or arrive after the first hit. Reject that real exchange rather than weaken the gate; use server-native tick evidence to tune any future choreography.
+## Release gate
+
+Do not merge on local unit tests. Require full exact-head CI including multiple fresh real Chrome/Firefox M194 trials; then independent merged-main CI after merge. Keep playable and production deployment closed.

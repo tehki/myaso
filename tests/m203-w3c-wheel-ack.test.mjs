@@ -28,7 +28,7 @@ test("M203 helper remains stable while M212 orders one genuine Chrome click befo
     source.indexOf("async function waitForUiGuardBreakEvidence("));
   assert.ok(section.includes("sendWheel: () => scrollArenaWheel(defender, defenderElementId, 120, 0)"));
   assert.ok(section.includes("dispatchM212AttackLedShortBlock({"));
-  assert.ok(section.includes("attacker, m198Plan.clicksPerWheel, 0"));
+  assert.ok(section.includes("sendAttackUp: () => setArenaAttackButton(attacker, false)"));
   assert.ok(section.includes("defenderState?.playerHp !== 100"));
   assert.ok(section.includes('feedbackTransitions.includes("parried")'));
   assert.ok(section.includes("defenderResult.playerGuard !== 0"));
