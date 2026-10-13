@@ -2,13 +2,13 @@
 // True full-click Firefox-wheel-first could expire during a 203ms Chrome
 // pointer release. True full-click Chrome-first, and then down/wheel/up,
 // instead parried: Firefox's server block began ~90ms before impact.
-// A genuine Firefox wheel ~90ms BEFORE a split Chrome down/up centers the
+// A genuine Firefox wheel ~25ms BEFORE a split Chrome down/up targets the
 // intended impact in the unchanged 125..240ms block-only interval.
 //
 // No simulated events, retries, direct server writes or combat changes.
 export async function dispatchM212AttackLedShortBlock({
   sendWheel, sendAttackDown, sendAttackUp, sleep,
-  now = () => performance.now(), wheelHeadStartMs = 90, clickHoldMs = 10,
+  now = () => performance.now(), wheelHeadStartMs = 25, clickHoldMs = 10,
 }) {
   if (![sendWheel, sendAttackDown, sendAttackUp, sleep, now]
     .every(fn => typeof fn === "function")

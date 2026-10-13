@@ -8,9 +8,9 @@
 
 All timestamps quoted within each individual browser's own monotonic observer clock; do **not** subtract Chrome and Firefox clock origins directly.
 
-## Revised candidate — wheel lead before split click
+## Revised candidate — shortened wheel lead before split click
 
-- Send exactly **one genuine Firefox W3C backward wheel first**. Do not require a long ACK before continuing; a bounded 90ms harness head start is used, tuned to target the midpoint of the original 125..240ms block-only interval from the observed parry cases.
+- Send exactly **one genuine Firefox W3C backward wheel first**. Do not require a long ACK before continuing; a bounded 25ms harness head start is used. The 90ms trial reached unblocked damage, with 271ms Firefox wheel→hit; earlier attack-led trials reached parries near 148ms. This shorter lead is a test-only candidate intended to target the 125..240ms block-only interval, not a guarantee of success.
 - Then send exactly **one Chrome W3C mouse-down**, keep pressed for a bounded 10ms after down ACK, then send exactly **one Chrome W3C mouse-up**. Split input avoids W3C full-click duration problems; an actual slow pointer action remains visible and fails if outside timing.
 - Require all actual genuine W3C calls to succeed, including late wheel errors. If the wheel fails before Chrome action, do not attack; if it fails after real Chrome down, the release still happens once to avoid a stuck pointer, then test fails.
 - No synthetic page events, direct server actions, hidden retries or second attack.

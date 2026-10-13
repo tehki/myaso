@@ -9,7 +9,7 @@ const deferred = () => {
   return { promise, resolve, reject };
 };
 
-test("M212 true wheel fires 90ms before one Chrome down and one up", async () => {
+test("M212 true wheel fires 25ms before one Chrome down and one up", async () => {
   const wheelLead = deferred();
   const clickHold = deferred();
   const events = [];
@@ -21,22 +21,22 @@ test("M212 true wheel fires 90ms before one Chrome down and one up", async () =>
     sendAttackUp: () => { events.push("up"); },
     sleep: ms => {
       events.push("pause:" + ms);
-      return ms === 90 ? wheelLead.promise : clickHold.promise;
+      return ms === 25 ? wheelLead.promise : clickHold.promise;
     },
   });
   await new Promise(setImmediate);
-  assert.deepEqual(events, ["wheel", "pause:90"]);
-  time = 90;
+  assert.deepEqual(events, ["wheel", "pause:25"]);
+  time = 25;
   wheelLead.resolve();
   await new Promise(setImmediate);
-  assert.deepEqual(events, ["wheel", "pause:90", "down", "pause:10"]);
-  time = 100;
+  assert.deepEqual(events, ["wheel", "pause:25", "down", "pause:10"]);
+  time = 35;
   clickHold.resolve();
   const result = await flight;
-  assert.deepEqual(events, ["wheel", "pause:90", "down", "pause:10", "up"]);
-  assert.equal(result.attackDownDispatchMs, 90);
-  assert.equal(result.attackUpDispatchMs, 100);
-  assert.equal(result.wheelHeadStartMs, 90);
+  assert.deepEqual(events, ["wheel", "pause:25", "down", "pause:10", "up"]);
+  assert.equal(result.attackDownDispatchMs, 25);
+  assert.equal(result.attackUpDispatchMs, 35);
+  assert.equal(result.wheelHeadStartMs, 25);
 });
 
 test("M212 late wheel ACK does not create duplicate Chrome or Firefox inputs", async () => {
