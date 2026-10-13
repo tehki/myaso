@@ -72,13 +72,13 @@ test("M208 fails closed on invalid head-start or synthetic dispatch callbacks", 
     }),RangeError);
   }
 });
-test("M208 real guard-break runner retains wheel-first one-click and strict no-parry, no-HP tests",()=>{
+test("M208 helper remains testable but M212 runner now uses attack-first W3C scheduling",()=>{
   const source=readFileSync(new URL("../scripts/pvp_browser_flight_runner.mjs",import.meta.url),"utf8");
   const segment=source.slice(source.indexOf("async function runOnlineUiGuardBreakFlight("),
     source.indexOf("async function waitForUiGuardBreakEvidence("));
-  assert.ok(segment.includes("dispatchM208WheelLedW3cExchange({"));
+  assert.ok(segment.includes("dispatchM212AttackLedShortBlock({"));
   assert.ok(segment.includes("sendWheel: () => scrollArenaWheel(defender, defenderElementId, 120, 0)"));
-  assert.ok(segment.includes("attacker, m198Plan.clicksPerWheel, pointerPauseMs"));
+  assert.ok(segment.includes("attacker, m198Plan.clicksPerWheel, 0"));
   assert.ok(segment.includes("feedbackTransitions.includes(\"parried\")"));
   assert.ok(segment.includes("defenderState?.playerHp !== 100"));
   assert.ok(segment.includes("defenderResult.playerGuard !== 0"));

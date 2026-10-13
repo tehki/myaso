@@ -13,7 +13,7 @@ import { verifyM201ServerPunishProof } from "./m201-authoritative-phase-proof.mj
 import { verifyM206ServerKnockdownPunish } from "./m206-knockdown-punish-proof.mjs";
 import { verifyM209DualKnockdownServerPunish } from "./m209-dual-knockdown-proof.mjs";
 import { planM203W3cPointerPause } from "./m203-w3c-wheel-ack.mjs";
-import { dispatchM208WheelLedW3cExchange } from "./m208-w3c-wheel-headstart.mjs";
+import { dispatchM212AttackLedShortBlock } from "./m212-attack-led-short-block.mjs";
 import { dispatchM207AttackLedDodge } from "./m207-attack-led-dodge.mjs";
 import { planM197KnockdownClusterNudge } from "./m197-knockdown-cluster.mjs";
 import { isTickNewer32 } from "../src/browser/reconciliation.mjs";
@@ -8998,19 +8998,19 @@ async function runOnlineUiGuardBreakFlight(entries, { onGuardBroken = null } = {
       // contributes the remaining real inter-client delay. Three distinct
       // genuine -38 guarded hits still must exhaust 100 guard, with zero
       // parries, HP loss, synthetic inputs, or gameplay timing changes.
-      // M208: the real wheel POST starts FIRST. Wait for its driver ACK
-      // only up to 65ms, then begin ONE genuine Chrome LMB regardless of
-      // whether Firefox's WebDriver response is still pending. A slow ACK
-      // no longer adds unbounded delay to the unchanged 240ms short block.
-      // Both W3C calls must succeed, and the unchanged HP/parry/guard gates
-      // below reject any cross-driver input-order inversion or late hit.
-      const m208Exchange = await dispatchM208WheelLedW3cExchange({
-        sendWheel: () => scrollArenaWheel(defender, defenderElementId, 120, 0),
-        sendAttack: (pointerPauseMs) => performArenaAttackBurst(
-          attacker, m198Plan.clicksPerWheel, pointerPauseMs,
+      // M212: a genuine Chrome W3C pointerDown->pointerUp sometimes takes
+      // >200ms, even with a nominal 10ms click hold. Sending Firefox's
+      // 240ms short block before that slow Chrome release lets it expire.
+      // Start ONE genuine Chrome click, await its full W3C ACK, and then
+      // issue ONE real Firefox wheel-back. This places the block nearer the
+      // ensuing server windup/hit; any late/parried/unblocked strike still
+      // fails the original 100HP, -38guard and no-parry proof below.
+      // No retries, synthetic gameplay input or changed combat constants.
+      const m212Exchange = await dispatchM212AttackLedShortBlock({
+        sendAttack: () => performArenaAttackBurst(
+          attacker, m198Plan.clicksPerWheel, 0,
         ),
-        sleep,
-        nominalPointerPauseMs: m198Plan.pointerPauseMs,
+        sendWheel: () => scrollArenaWheel(defender, defenderElementId, 120, 0),
       });
       await sleep(230);
       const states = await Promise.all(entries.map(readUiEvidence));
@@ -9034,10 +9034,9 @@ async function runOnlineUiGuardBreakFlight(entries, { onGuardBroken = null } = {
         wheelCount: defenderState?.wheels.filter(event => event.deltaY > 0).length,
         attackCount: attackerState?.pointers.filter(event => event.type === "pointerdown" && event.button === 0).length,
         m198Plan,
-        m203WheelCommandMs: m208Exchange.wheelAckMs,
-        m203PointerPauseMs: m208Exchange.pointerPauseMs,
-        m208WheelAckBeforeAttack: m208Exchange.wheelAckBeforeAttack,
-        m208ChromeDispatchMs: m208Exchange.chromeDispatchMs,
+        m212ChromeAttackAckMs: m212Exchange.attackAckMs,
+        m212FirefoxWheelAckMs: m212Exchange.wheelAckMs,
+        m212WheelDispatchMs: m212Exchange.wheelDispatchMs,
         chromeClickHoldMs: (() => {
           const downs = attackerState?.pointers.filter(event => event.type === "pointerdown" && event.button === 0) ?? [];
           const ups = attackerState?.pointers.filter(event => event.type === "pointerup" && event.button === 0) ?? [];
