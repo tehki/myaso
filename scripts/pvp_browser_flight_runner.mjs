@@ -21,6 +21,7 @@ import { verifyM209DualKnockdownServerPunish } from "./m209-dual-knockdown-proof
 import { verifyM211DualRecoveryServerProof } from "./m211-dual-recovery-phase-proof.mjs";
 import { planM203W3cPointerPause } from "./m203-w3c-wheel-ack.mjs";
 import { dispatchM212AttackLedShortBlock } from "./m212-attack-led-short-block.mjs";
+import { createM221TrustedWheelRegistry } from "./m221-trusted-wheel-attestation.mjs";
 import { dispatchM207AttackLedDodge } from "./m207-attack-led-dodge.mjs";
 import { planM197KnockdownClusterNudge } from "./m197-knockdown-cluster.mjs";
 import { isTickNewer32 } from "../src/browser/reconciliation.mjs";
@@ -127,6 +128,7 @@ const sessions = [];
 let staticServer;
 let gameServer;
 let m201ServerOutput = () => "";
+const m221Registry = createM221TrustedWheelRegistry();
 
 try {
   staticServer = await startStaticServer();
@@ -426,6 +428,19 @@ async function startStaticServer() {
   const server = createServer(async (request, response) => {
     try {
       const url = new URL(request.url ?? "/", `http://${request.headers.host ?? "127.0.0.1"}`);
+      // Acceptance-only localhost receipt. No input is generated here.
+      if (url.pathname === "/__myaso_m221_trusted_wheel" && request.method === "POST") {
+        let body = "";
+        for await (const chunk of request) {
+          body += chunk;
+          if (body.length > 1024) return send(response, 413, "payload too large");
+        }
+        const packet = JSON.parse(body);
+        if (!m221Registry.receive(packet)) return send(response, 422, "untrusted/stale wheel");
+        response.writeHead(204);
+        response.end();
+        return;
+      }
       let relative = decodeURIComponent(url.pathname);
       if (relative === "/") relative = "/web/pvp-flight.html";
       const absolute = path.resolve(root, `.${relative}`);
@@ -9108,12 +9123,25 @@ async function runOnlineUiGuardBreakFlight(entries, { onGuardBroken = null } = {
       // Chrome W3C down/up to target the block-only interval. The original
       // 100HP/-38guard/no-parry proof rejects early, late or missing action.
       // Never fabricate inputs, repeat failed exchanges or alter mechanics.
-      const m212Exchange = await dispatchM212AttackLedShortBlock({
-        sendWheel: () => scrollArenaWheel(defender, defenderElementId, 120, 0),
-        sendAttackDown: () => setArenaAttackButton(attacker, true),
-        sendAttackUp: () => setArenaAttackButton(attacker, false),
-        sleep,
-      });
+      const challenge = m221Registry.issue();
+      let m212Exchange;
+      try {
+        // Arm the real Firefox observer BEFORE the one genuine W3C wheel.
+        // Chrome responds after browser delivery, not the delayed HTTP ACK.
+        // Original W3C ACK and strict combat assertions are still mandatory.
+        await execute(defender.base, defender.sessionId,
+          "window.__MYASO_M221_WHEEL_TOKEN__ = " + JSON.stringify(challenge.token)
+            + "; return true;");
+        m212Exchange = await dispatchM212AttackLedShortBlock({
+          sendWheel: () => scrollArenaWheel(defender, defenderElementId, 120, 0),
+          awaitTrustedWheel: () => challenge.wait(),
+          sendAttackDown: () => setArenaAttackButton(attacker, true),
+          sendAttackUp: () => setArenaAttackButton(attacker, false),
+          sleep,
+        });
+      } finally {
+        challenge.close();
+      }
       await sleep(230);
       const states = await Promise.all(entries.map(readUiEvidence));
       const defenderState = states.find((entry) => entry.browser === defender.name);
@@ -11943,6 +11971,18 @@ async function installUiObserver(session) {
       };
       if (epochEvidence) entry.epochMs = Date.now();
       state.wheels.push(entry);
+      // M221 reports only the browser's trusted native W3C wheel-back event.
+      // No preventDefault, dispatchEvent or control/game modification.
+      const challenge = window.__MYASO_M221_WHEEL_TOKEN__;
+      if (challenge && event.isTrusted === true && event.deltaY > 0) {
+        window.__MYASO_M221_WHEEL_TOKEN__ = null;
+        fetch('/__myaso_m221_trusted_wheel', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ token: challenge, trusted: event.isTrusted === true, deltaY: event.deltaY }),
+          keepalive: true,
+        }).catch(() => {});
+      }
     }, { capture: true });
     record();
     recordOverlay();

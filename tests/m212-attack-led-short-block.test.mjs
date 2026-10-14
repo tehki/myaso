@@ -150,3 +150,70 @@ test("M212 runner preserves true wheel/down/up and original no-parry/no-HP guard
   assert.ok(segment.includes("defenderResult.playerGuard !== 0"));
   assert.ok(segment.includes("defenderResult.playerHp !== 100"));
 });
+
+
+test("M221 genuine trusted Firefox event permits Chrome attack while wheel ACK is pending", async () => {
+  const wheel = deferred();
+  const observed = deferred();
+  const pause = deferred();
+  const events = [];
+  let time = 0;
+  const flight = dispatchM212AttackLedShortBlock({
+    now: () => time,
+    sendWheel: () => { events.push("real-wheel"); return wheel.promise; },
+    awaitTrustedWheel: () => observed.promise,
+    sendAttackDown: () => { events.push("real-down"); },
+    sendAttackUp: () => { events.push("real-up"); },
+    sleep: ms => { events.push("pause:" + ms); return ms === 48 ? pause.promise : Promise.resolve(); },
+  });
+  await new Promise(setImmediate);
+  assert.deepEqual(events, ["real-wheel"]);
+  time = 18;
+  observed.resolve({trusted:true,deltaY:120});
+  await new Promise(setImmediate);
+  assert.deepEqual(events, ["real-wheel","pause:48"]);
+  time = 66;
+  pause.resolve();
+  await new Promise(setImmediate);
+  assert.ok(events.includes("real-down"));
+  assert.ok(events.includes("real-up"));
+  let settled = false;
+  flight.then(()=>{ settled=true; });
+  await new Promise(setImmediate);
+  assert.equal(settled,false,"genuine W3C ACK remains mandatory for final success");
+  time = 128;
+  wheel.resolve();
+  const result=await flight;
+  assert.equal(result.wheelAckMs,128);
+  assert.equal(result.attackDownDispatchMs,66);
+  assert.equal(result.trustedWheelObservedMs,18);
+  assert.deepEqual(events,["real-wheel","pause:48","real-down","pause:10","real-up"]);
+});
+
+test("M221 browser event receipt rejects untrusted wheel; never attacks",async()=>{
+  const seen=[];
+  await assert.rejects(()=>dispatchM212AttackLedShortBlock({
+    sendWheel:()=>{seen.push("wheel");},
+    awaitTrustedWheel:()=>({trusted:false,deltaY:120}),
+    sendAttackDown:()=>{seen.push("down");},
+    sendAttackUp:()=>{seen.push("up");},
+    sleep:()=>Promise.resolve(),
+  }),/actual trusted wheel-back/);
+  assert.deepEqual(seen,["wheel"]);
+});
+
+test("M221 late WebDriver rejection remains fatal after attested genuine click",async()=>{
+  const wheel=deferred();
+  const events=[];
+  const flight=dispatchM212AttackLedShortBlock({
+    sendWheel:()=>wheel.promise,
+    awaitTrustedWheel:()=>({trusted:true,deltaY:120}),
+    sendAttackDown:()=>events.push("down"),
+    sendAttackUp:()=>events.push("up"),
+    sleep:()=>Promise.resolve(),
+  });
+  await new Promise(setImmediate);
+  wheel.reject(Error("geckodriver rejected action"));
+  await assert.rejects(flight,/geckodriver rejected action/);
+  assert.ok(events.length===0 || events.join(",")==="down,up");
+});

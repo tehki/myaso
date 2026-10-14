@@ -10,10 +10,12 @@
 // No simulated events, retries, direct server writes or combat changes.
 export async function dispatchM212AttackLedShortBlock({
   sendWheel, sendAttackDown, sendAttackUp, sleep,
+  awaitTrustedWheel = null,
   now = () => performance.now(), wheelHeadStartMs = 48, clickHoldMs = 10,
 }) {
   if (![sendWheel, sendAttackDown, sendAttackUp, sleep, now]
     .every(fn => typeof fn === "function")
+    || (awaitTrustedWheel !== null && typeof awaitTrustedWheel !== "function")
     || !Number.isFinite(wheelHeadStartMs) || wheelHeadStartMs < 0
     || wheelHeadStartMs > 125
     || !Number.isFinite(clickHoldMs) || clickHoldMs < 0
@@ -42,8 +44,32 @@ export async function dispatchM212AttackLedShortBlock({
   // This avoids the exact-head quality regression with a 119.7ms wheel
   // ACK where the first strike landed within the 125ms parry window.
   // No wheel or attack may be resent, and no game-side times are changed.
-  const [wheelResult] = await Promise.all([wheelOutcome, sleep(wheelHeadStartMs)]);
-  if (!wheelResult.ok) throw wheelResult.error;
+  // M221 optional genuine DOM-wheel delivery receipt comes through a
+  // localhost-only test-harness side channel, not through synthetic dispatch.
+  // The normal M212 path still waits for WebDriver ACK when no receipt exists.
+  // Never treat a driver ACK (which may be late) as the DOM event timestamp.
+  let trustedWheelObservedMs = null;
+  if (awaitTrustedWheel) {
+    const observedOutcome = Promise.resolve().then(awaitTrustedWheel).then(
+      report => {
+        if (report?.trusted !== true || !(report.deltaY > 0)) {
+          throw new Error("M221 requires actual trusted wheel-back DOM delivery");
+        }
+        trustedWheelObservedMs = Math.max(0, now() - startedAt);
+      },
+    );
+    // A wheel-command rejection is fatal even before the DOM receipt.
+    await Promise.race([
+      observedOutcome,
+      wheelOutcome.then(result => result.ok ? new Promise(() => {}) : Promise.reject(result.error)),
+    ]);
+    // A constant head start measured AFTER genuine DOM delivery makes
+    // Chrome's down independent of geckodriver's slow command ACK tail.
+    await sleep(wheelHeadStartMs);
+  } else {
+    const [wheelResult] = await Promise.all([wheelOutcome, sleep(wheelHeadStartMs)]);
+    if (!wheelResult.ok) throw wheelResult.error;
+  }
   const attackDownDispatchMs = Math.max(0, now() - startedAt);
   await Promise.resolve().then(sendAttackDown);
   const attackDownAckMs = Math.max(0, now() - startedAt);
@@ -53,6 +79,11 @@ export async function dispatchM212AttackLedShortBlock({
   await Promise.resolve().then(sendAttackUp).finally(() => {
     attackUpAckMs = Math.max(0, now() - startedAt);
   });
+  // Late W3C command failures stay fatal. No second action is ever sent.
+  if (awaitTrustedWheel) {
+    const wheelResult = await wheelOutcome;
+    if (!wheelResult.ok) throw wheelResult.error;
+  }
   return {
     wheelDispatchMs: 0,
     wheelAckMs: Number(wheelAckMs.toFixed(1)),
@@ -63,5 +94,6 @@ export async function dispatchM212AttackLedShortBlock({
     completeMs: Number(Math.max(0, now() - startedAt).toFixed(1)),
     wheelHeadStartMs,
     clickHoldMs,
+    trustedWheelObservedMs: trustedWheelObservedMs === null ? null : Number(trustedWheelObservedMs.toFixed(1)),
   };
 }
