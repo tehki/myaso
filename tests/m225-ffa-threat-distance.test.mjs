@@ -31,7 +31,7 @@ test("M225 corrects genuine wrong ordering using bounded W3C movement pulses",()
  assert.equal(p.rightMove.key,"d");
 });
 test("M225 rejects too-close rivals even if threat order is correct",()=>{
- assert.equal(get("secondary",55,43).ready,false);
+ assert.equal(get("secondary",53,40).ready,false);
  assert.equal(get("primary",47,50).ready,false);
 });
 test("M225 rejects missing, invalid, or reversed real position evidence",()=>{
