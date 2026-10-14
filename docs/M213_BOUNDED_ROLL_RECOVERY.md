@@ -15,3 +15,7 @@ CI must observe original genuine W3C wheels (one per acting browser), server #1 
 ## Gates
 
 Full focused real 3-browser M162 repetitions and full exact-head quality CI must pass independently. M213 is a separate issue and PR from M212, and should be merged only after M212 has qualified and merged.
+
+## Focused three-browser result
+
+[Focused M213 CI #38517785465](https://github.com/tehki/myaso/actions/runs/38517785465) passed **3/3** independent strict real Chrome/Firefox/Chrome2 M162 scenarios with the single genuine third-party wheel at 215ms. The temporary branch-only focused CI has been removed before release; the M213 unit source-contract test is wired permanently into normal quality CI. Full exact-head normal quality and merged-main qualification remain mandatory.
