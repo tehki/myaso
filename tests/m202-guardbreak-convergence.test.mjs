@@ -35,6 +35,6 @@ test("M202 browser runner converges without extra genuine input or relaxed asser
   assert.ok(section.includes("defenderState?.playerHp !== 100"));
   assert.ok(section.includes("attackerState?.feedbackTransitions.includes(\"parried\")"));
   assert.ok(section.includes("sendWheel: () => scrollArenaWheel(defender, defenderElementId, 120, 0)"));
-  assert.ok(section.includes("sendAttackDown: () => setArenaAttackButton(attacker, true)"));
+  assert.ok(section.includes("sendAttackClick: (clickHoldMs) => performArenaM221GuardBreakClick(attacker, clickHoldMs)"));
   assert.ok(section.includes("defenderResult.playerGuard !== 0"));
 });
