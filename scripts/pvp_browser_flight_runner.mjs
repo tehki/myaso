@@ -12,6 +12,7 @@ import { summarizeM214ConfirmedFeedback } from "./m214-confirmed-feedback-latenc
 import { summarizeM215SuccessfulRollLatency } from "./m215-successful-roll-latency.mjs";
 import { summarizeM216ParryPunishLatency } from "./m216-successful-parry-punish-latency.mjs";
 import { summarizeM217SuccessfulKickLatency } from "./m217-successful-kick-latency.mjs";
+import { summarizeM218JumpAttackLatency } from "./m218-successful-jump-attack-latency.mjs";
 import { observeM219RollBufferIngress } from "./m219-buffered-roll-ingress-evidence.mjs";
 import { mustAwaitM202GuardConvergence } from "./m202-guardbreak-convergence.mjs";
 import { verifyM201ServerPunishProof } from "./m201-authoritative-phase-proof.mjs";
@@ -2946,6 +2947,19 @@ async function runOnlineUiJumpAttackFlight(entries, expectedScenario = "uijumpat
     || defenderResult.feedbackTransitions.includes("parry-success")) {
     throw new Error(`M136 jump-attack flight accidentally resolved as parry: ${JSON.stringify(evidence)}`);
   }
+
+  // Diagnostic only, after existing strict real Space+LMB chord,
+  // authoritative direct jumpAttack, exactly one 42HP hit and no parry.
+  // All timestamps below come from the same Chrome actor browser observer.
+  console.log("M218_SUCCESSFUL_JUMP_ATTACK_LATENCY " + JSON.stringify(
+    summarizeM218JumpAttackLatency({
+      sameBrowserClock: true,
+      jumpDown,
+      attackDown,
+      observedWindup: authoritativeWindup,
+      eventTransitions: attackerResult.eventTransitions,
+    }),
+  ));
 
   let finalEvidence = evidence;
   if (expectedScenario === "uijumpattack") {
