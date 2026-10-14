@@ -22,13 +22,13 @@ test("M203 rejects invalid timing and never creates negative W3C pauses", () => 
   }
   assert.throws(() => pause({ wheelCommandMs: 10, nominalPointerPauseMs: 9999 }), RangeError);
 });
-test("M203 maintains one genuine Firefox scroll followed by one genuine Chrome W3C click", () => {
+test("M203 helper remains stable while M212 orders wheel before split genuine Chrome click", () => {
   const source=readFileSync(new URL("../scripts/pvp_browser_flight_runner.mjs",import.meta.url),"utf8");
   const section=source.slice(source.indexOf("async function runOnlineUiGuardBreakFlight("),
     source.indexOf("async function waitForUiGuardBreakEvidence("));
   assert.ok(section.includes("sendWheel: () => scrollArenaWheel(defender, defenderElementId, 120, 0)"));
-  assert.ok(section.includes("dispatchM208WheelLedW3cExchange({"));
-  assert.ok(section.includes("attacker, m198Plan.clicksPerWheel, pointerPauseMs"));
+  assert.ok(section.includes("dispatchM212AttackLedShortBlock({"));
+  assert.ok(section.includes("sendAttackUp: () => setArenaAttackButton(attacker, false)"));
   assert.ok(section.includes("defenderState?.playerHp !== 100"));
   assert.ok(section.includes('feedbackTransitions.includes("parried")'));
   assert.ok(section.includes("defenderResult.playerGuard !== 0"));
