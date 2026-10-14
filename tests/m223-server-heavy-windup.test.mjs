@@ -1,0 +1,59 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+import { readFileSync } from "node:fs";
+import { awaitM223HeavyWindup } from "../scripts/m223-server-heavy-windup.mjs";
+
+test("M223 accepts only fresh native server windup of intended fighter", async () => {
+  let now=0;
+  const history="M201_AUTH_ACTION tick=111 fighter=1 from=0 to=9\n";
+  let output=history;
+  const result=await awaitM223HeavyWindup({
+    afterOffset:history.length, fighterId:1,
+    readOutput:()=>output, now:()=>now,
+    sleep:ms=>{
+      now+=ms;
+      output+=now<8?"M201_AUTH_ACTION tick=222 fighter=2 from=0 to=9\n":
+        "M201_AUTH_ACTION tick=333 fighter=1 from=0 to=9\n";
+    },
+  });
+  assert.deepEqual(result,{serverTick:333,observedAfterMs:8});
+});
+
+test("M223 missing authoritative proof fails closed", async () => {
+  let now=0;
+  await assert.rejects(()=>awaitM223HeavyWindup({
+    afterOffset:0,fighterId:1,readOutput:()=>"",
+    now:()=>now,timeoutMs:12,sleep:ms=>{now+=ms;},
+  }),/did not observe genuine authoritative heavy windup/);
+});
+
+test("M223 rejects truncated stream, partial line and invalid fighter", async () => {
+  let now=0;
+  await assert.rejects(()=>awaitM223HeavyWindup({
+    afterOffset:1,fighterId:1,readOutput:()=>"",
+    now:()=>now,sleep:ms=>{now+=ms;},
+  }),/stream unavailable/);
+  await assert.rejects(()=>awaitM223HeavyWindup({
+    afterOffset:0,fighterId:0,readOutput:()=>"",
+    sleep:()=>{},
+  }),TypeError);
+  await assert.rejects(()=>awaitM223HeavyWindup({
+    afterOffset:0,fighterId:1,
+    readOutput:()=>"M201_AUTH_ACTION tick=100 fighter=1 from=0 to=9",
+    now:()=>now,timeoutMs:8,sleep:ms=>{now+=ms;},
+  }),/did not observe/);
+});
+
+test("M223 preserves one genuine E and one wheel plus strict combat outcomes",()=>{
+  const source=readFileSync(new URL("../scripts/pvp_browser_flight_runner.mjs",import.meta.url),"utf8");
+  const code=source.slice(source.indexOf("async function performHeavyCounterplayWindowWheel("),
+    source.indexOf("async function runOnlineUiHeavyBlockFlight("));
+  assert.ok(code.includes("awaitM223HeavyWindup({"));
+  assert.ok(code.includes('pulseMovementKey(attacker, "e", heavyKeyPulseMs)'));
+  assert.ok(code.includes("scrollArenaWheel(defender, defenderElementId, 120, m223WheelDelayMs)"));
+  assert.ok(code.includes("M192_REAL_INGRESS_OUTCOME"));
+  assert.ok(code.includes("M223_SERVER_WINDUP_PLAN"));
+  assert.ok(source.includes('scenario === "uiheavyblock" || scenario === "uiheavyparry"'));
+  assert.ok(source.includes('Opponent blocked - guard -64.'));
+  assert.ok(source.includes('feedbackTransitions.includes("parried")'));
+});
