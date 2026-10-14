@@ -13,6 +13,7 @@ import { summarizeM215SuccessfulRollLatency } from "./m215-successful-roll-laten
 import { summarizeM216ParryPunishLatency } from "./m216-successful-parry-punish-latency.mjs";
 import { summarizeM217SuccessfulKickLatency } from "./m217-successful-kick-latency.mjs";
 import { summarizeM218JumpAttackLatency } from "./m218-successful-jump-attack-latency.mjs";
+import { observeM219RollBufferIngress } from "./m219-buffered-roll-ingress-evidence.mjs";
 import { summarizeM220KnockdownFocusTimeline } from "./m220-knockdown-focus-timeline.mjs";
 import { mustAwaitM202GuardConvergence } from "./m202-guardbreak-convergence.mjs";
 import { verifyM201ServerPunishProof } from "./m201-authoritative-phase-proof.mjs";
@@ -2606,6 +2607,16 @@ async function runOnlineUiRollBufferFlight(entries) {
   const ownDodge = ownActions[ownDodgeIndex];
   const expectedRecoveryEndEpochMs = ownAttackRecovery.epochMs + COMBAT.attack.recoveryMs;
   const recoveryToDodgeDelayMs = ownDodge.epochMs - expectedRecoveryEndEpochMs;
+  // Read-only M219 evidence, including when the original strict bound fails.
+  // This log is not an alternate success condition or input-buffer proof.
+  console.log("M219_BUFFERED_ROLL_INGRESS " + JSON.stringify(observeM219RollBufferIngress({
+    sameBrowserClock: true,
+    wheel: rollWheel,
+    recovery: ownAttackRecovery,
+    dodge: ownDodge,
+    recoveryMs: COMBAT.attack.recoveryMs,
+    bufferWindowMs: COMBAT.inputBuffer.dodgeWindowMs,
+  })));
   // Snapshot epochs are sampled on the 60 Hz authoritative timeline. The
   // first legal dodge tick can therefore appear up to one frame before the
   // nominal millisecond sum of recoveryStart + recoveryMs.

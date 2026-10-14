@@ -81,6 +81,7 @@ jobs:
           node --check scripts/m216-successful-parry-punish-latency.mjs
           node --check scripts/m217-successful-kick-latency.mjs
           node --check scripts/m218-successful-jump-attack-latency.mjs
+          node --check scripts/m219-buffered-roll-ingress-evidence.mjs
           node --check scripts/m220-knockdown-focus-timeline.mjs
           node --check scripts/m202-guardbreak-convergence.mjs
           node --check scripts/m203-w3c-wheel-ack.mjs
@@ -98,7 +99,7 @@ jobs:
           node --check tests/m15-reliable-convergence.test.mjs
           node --check tests/m16-browser-512.test.mjs
           node --check tests/m17-reliable-delta.test.mjs
-          node --test tests/browser-runtime.test.mjs tests/m6-browser-authority.test.mjs tests/m7-browser-flight.test.mjs tests/m12-reliable-baseline.test.mjs tests/m15-reliable-convergence.test.mjs tests/m16-browser-512.test.mjs tests/m17-reliable-delta.test.mjs tests/m29-combat-readability.test.mjs tests/m200-feedback-latency.test.mjs tests/m214-confirmed-feedback-latency.test.mjs tests/m215-successful-roll-latency.test.mjs tests/m216-successful-parry-punish-latency.test.mjs tests/m217-successful-kick-latency.test.mjs tests/m218-successful-jump-attack-latency.test.mjs tests/m220-knockdown-focus-timeline.test.mjs tests/m202-guardbreak-convergence.test.mjs tests/m203-w3c-wheel-ack.test.mjs tests/m204-heavy-dodge-input-order.test.mjs tests/m201-authoritative-phase-proof.test.mjs tests/m205-repeat-proof-gate.test.mjs tests/m206-knockdown-punish-proof.test.mjs tests/m208-w3c-wheel-headstart.test.mjs tests/m212-attack-led-short-block.test.mjs tests/m213-suppression-roll-recovery-order.test.mjs tests/m207-attack-led-dodge.test.mjs tests/m209-dual-knockdown-proof.test.mjs tests/m210-early-feint-wheel.test.mjs tests/m211-dual-recovery-phase-proof.test.mjs
+          node --test tests/browser-runtime.test.mjs tests/m6-browser-authority.test.mjs tests/m7-browser-flight.test.mjs tests/m12-reliable-baseline.test.mjs tests/m15-reliable-convergence.test.mjs tests/m16-browser-512.test.mjs tests/m17-reliable-delta.test.mjs tests/m29-combat-readability.test.mjs tests/m200-feedback-latency.test.mjs tests/m214-confirmed-feedback-latency.test.mjs tests/m215-successful-roll-latency.test.mjs tests/m216-successful-parry-punish-latency.test.mjs tests/m217-successful-kick-latency.test.mjs tests/m218-successful-jump-attack-latency.test.mjs tests/m219-buffered-roll-ingress-evidence.test.mjs tests/m220-knockdown-focus-timeline.test.mjs tests/m202-guardbreak-convergence.test.mjs tests/m203-w3c-wheel-ack.test.mjs tests/m204-heavy-dodge-input-order.test.mjs tests/m201-authoritative-phase-proof.test.mjs tests/m205-repeat-proof-gate.test.mjs tests/m206-knockdown-punish-proof.test.mjs tests/m208-w3c-wheel-headstart.test.mjs tests/m212-attack-led-short-block.test.mjs tests/m213-suppression-roll-recovery-order.test.mjs tests/m207-attack-led-dodge.test.mjs tests/m209-dual-knockdown-proof.test.mjs tests/m210-early-feint-wheel.test.mjs tests/m211-dual-recovery-phase-proof.test.mjs
           node scripts/browser_hotpath_probe.mjs
 
       - name: Validate authoritative Rust server
