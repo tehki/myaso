@@ -69,11 +69,11 @@ test("M223.1 clamps slow wheel samples without changing server combat windows", 
     targetAfterWindupMs:155, sampledWheelIngressMs:39,
   }), {boundedWheelIngressMs:65,wheelDelayMs:90});
   assert.deepEqual(planM223WheelDelay({
-    targetAfterWindupMs:265, sampledWheelIngressMs:103,
-  }), {boundedWheelIngressMs:85,wheelDelayMs:180});
+    targetAfterWindupMs:285, sampledWheelIngressMs:103,
+  }), {boundedWheelIngressMs:85,wheelDelayMs:200});
   assert.deepEqual(planM223WheelDelay({
-    targetAfterWindupMs:265, sampledWheelIngressMs:39,
-  }), {boundedWheelIngressMs:65,wheelDelayMs:200});
+    targetAfterWindupMs:285, sampledWheelIngressMs:39,
+  }), {boundedWheelIngressMs:65,wheelDelayMs:220});
 });
 
 test("M223.1 refuses invalid or unqualified sampled ingress", () => {
@@ -85,4 +85,20 @@ test("M223.1 refuses invalid or unqualified sampled ingress", () => {
   assert.throws(()=>planM223WheelDelay({
     targetAfterWindupMs:240,sampledWheelIngressMs:70,
   }),TypeError);
+});
+
+test("M226 uses later genuine parry wheel only, preserving M188 and M107 strict outcome checks", () => {
+  const source=readFileSync(new URL("../scripts/pvp_browser_flight_runner.mjs",import.meta.url),"utf8");
+  const block=source.slice(source.indexOf("async function runOnlineUiHeavyBlockFlight("),
+    source.indexOf("async function runOnlineUiHeavyParryFlight("));
+  const parry=source.slice(source.indexOf("async function runOnlineUiHeavyParryFlight("),
+    source.indexOf("async function runOnlineUi",source.indexOf("async function runOnlineUiHeavyParryFlight(")+20));
+  assert.ok(block.includes("attackOffset, blockOffset, 155,"));
+  assert.ok(parry.includes("attackOffset, blockOffset, 285,"));
+  assert.ok(source.includes('feedbackTransitions.includes("parried")'));
+  assert.ok(source.includes("defenderResult.playerGuard !== 100"));
+  assert.ok(source.includes("defenderResult.playerHp !== 100"));
+  assert.deepEqual(planM223WheelDelay({targetAfterWindupMs:285,sampledWheelIngressMs:82}),
+    {boundedWheelIngressMs:82,wheelDelayMs:203});
+  assert.throws(()=>planM223WheelDelay({targetAfterWindupMs:265,sampledWheelIngressMs:82}),TypeError);
 });

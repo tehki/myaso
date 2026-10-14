@@ -28,14 +28,17 @@ export async function awaitM223HeavyWindup({
   throw new Error("M223 did not observe genuine authoritative heavy windup in time");
 }
 
-// M223.1 acceptance-only sequencing budget, not gameplay timing.
+// M223.1 / M226 acceptance-only sequencing budget, not gameplay timing.
+// M226 moves only the genuine CI parry wheel objective 20ms later: observed
+// Block ~6 server ticks before heavy Active can exceed the 125ms parry timer
+// by actual hit time. Never change server hit/parry mechanics or proof gates.
 // Median genuine W3C calibration is noisy across hosted Chrome/Firefox.
 // Observed CI #38582705600: a 103ms calibration median over-predicted actual
 // wheel ingress (~31ms), so subtracting all 103ms expired short block early.
 // Keep the planned defender activation safely between parry and block expiry.
 // Wrong authoritative outcome still fails the existing strict M107 checks.
 export function planM223WheelDelay({ targetAfterWindupMs, sampledWheelIngressMs }) {
-  if (![155, 265].includes(targetAfterWindupMs)
+  if (![155, 285].includes(targetAfterWindupMs)
     || !Number.isFinite(sampledWheelIngressMs)
     || sampledWheelIngressMs < 0 || sampledWheelIngressMs > 750) {
     throw new TypeError("M223 requires genuine bounded heavy wheel calibration");
