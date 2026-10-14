@@ -176,8 +176,8 @@ test("M221 genuine trusted Firefox event permits Chrome attack while wheel ACK i
   time = 18;
   observed.resolve({trusted:true,deltaY:120});
   await new Promise(setImmediate);
-  assert.deepEqual(events, ["real-wheel","pause:48"]);
-  time = 66;
+  assert.deepEqual(events, ["real-wheel","pause:30"]);
+  time = 48;
   pause.resolve();
   await new Promise(setImmediate);
   assert.ok(events.includes("real-down"));
@@ -190,9 +190,9 @@ test("M221 genuine trusted Firefox event permits Chrome attack while wheel ACK i
   wheel.resolve();
   const result=await flight;
   assert.equal(result.wheelAckMs,128);
-  assert.equal(result.attackDownDispatchMs,66);
+  assert.equal(result.attackDownDispatchMs,48);
   assert.equal(result.trustedWheelObservedMs,18);
-  assert.deepEqual(events,["real-wheel","pause:48","real-down","pause:10","real-up"]);
+  assert.deepEqual(events,["real-wheel","pause:30","real-down","pause:10","real-up"]);
 });
 
 test("M221 browser event receipt rejects untrusted wheel; never attacks",async()=>{
@@ -247,4 +247,48 @@ test("M221 rejected genuine W3C click batch fails closed without retry", async (
     sleep: () => {},
   }), /Chrome W3C batch rejected/);
   assert.equal(clicks, 1);
+});
+
+test("M221 slow trusted wheel receipt consumes, not restarts, qualified 48ms head start", async () => {
+  let elapsed = 0;
+  const commands = [];
+  const result = await dispatchM212AttackLedShortBlock({
+    now: () => elapsed,
+    sendWheel: () => { commands.push("genuine-wheel"); },
+    awaitTrustedWheel: () => { elapsed = 33; return { trusted: true, deltaY: 120 }; },
+    sendAttackClick: holdMs => { commands.push("genuine-W3C-click:" + holdMs); },
+    sleep: ms => { commands.push("wait:" + ms); elapsed += ms; },
+  });
+  assert.deepEqual(commands, ["genuine-wheel", "wait:15", "genuine-W3C-click:10"]);
+  assert.equal(result.trustedWheelObservedMs, 33);
+  assert.equal(result.attackDownDispatchMs, 48);
+  assert.equal(result.attackDownAckMs, null);
+});
+
+test("M221 receipt later than 48ms never triggers a second full wait or unauthenticated attack", async () => {
+  let elapsed = 0;
+  const commands = [];
+  const outcome = await dispatchM212AttackLedShortBlock({
+    now: () => elapsed,
+    sendWheel: () => { commands.push("genuine-wheel"); },
+    awaitTrustedWheel: () => { elapsed = 83; return { trusted: true, deltaY: 120 }; },
+    sendAttackClick: holdMs => { commands.push("genuine-W3C-click:" + holdMs); },
+    sleep: ms => { commands.push("wait:" + ms); elapsed += ms; },
+  });
+  assert.deepEqual(commands, ["genuine-wheel", "genuine-W3C-click:10"]);
+  assert.equal(outcome.attackDownDispatchMs, 83);
+  assert.equal(outcome.trustedWheelObservedMs, 83);
+});
+
+test("M221 missing trusted Firefox event cannot send Chrome click even after 48ms", async () => {
+  let elapsed = 0;
+  let clicks = 0;
+  await assert.rejects(() => dispatchM212AttackLedShortBlock({
+    now: () => elapsed,
+    sendWheel: () => {},
+    awaitTrustedWheel: () => { elapsed = 140; throw Error("trusted wheel absent"); },
+    sendAttackClick: () => { clicks++; },
+    sleep: ms => { elapsed += ms; },
+  }), /trusted wheel absent/);
+  assert.equal(clicks, 0);
 });

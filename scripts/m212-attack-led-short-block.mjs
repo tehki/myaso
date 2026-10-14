@@ -2,9 +2,10 @@
 // True full-click Firefox-wheel-first could expire during a 203ms Chrome
 // pointer release. True full-click Chrome-first, and then down/wheel/up,
 // instead parried: Firefox's server block began ~90ms before impact.
-// A genuine Firefox wheel leads the split Chrome down/up by at least 48ms.
-// When WebDriver's real wheel ACK takes longer, wait for that ACK before
-// pressing Chrome; otherwise the defensive 125ms parry begins too late.
+// Legacy M212 keeps the original split Chrome down/up and wheel-ACK gate.
+// M221 uses one W3C click batch only after a trusted Firefox wheel receipt;
+// its 48ms head start is measured from the real W3C wheel COMMAND START,
+// not from a delayed localhost fetch receipt. ACK remains mandatory for proof.
 // The unchanged 125..240ms block-only window must still pass in real CI.
 //
 // No simulated events, retries, direct server writes or combat changes.
@@ -65,9 +66,15 @@ export async function dispatchM212AttackLedShortBlock({
       observedOutcome,
       wheelOutcome.then(result => result.ok ? new Promise(() => {}) : Promise.reject(result.error)),
     ]);
-    // A constant head start measured AFTER genuine DOM delivery makes
-    // Chrome's down independent of geckodriver's slow command ACK tail.
-    await sleep(wheelHeadStartMs);
+    // M221: the qualified head start begins at W3C wheel dispatch, not at
+    // the later localhost fetch receipt. Waiting a second full 48ms after
+    // receipt let overloaded Firefox exceed its unchanged 240ms short-block
+    // interval (CI #38566792473). Trust the actual event BEFORE Chrome down,
+    // but do not double-count time already elapsed in this harness clock.
+    // This does not compare Firefox and Chrome local performance.now origins.
+    const elapsedSinceWheelCommandMs = Math.max(0, now() - startedAt);
+    const remainingHeadStartMs = Math.max(0, wheelHeadStartMs - elapsedSinceWheelCommandMs);
+    if (remainingHeadStartMs > 0) await sleep(remainingHeadStartMs);
   } else {
     const [wheelResult] = await Promise.all([wheelOutcome, sleep(wheelHeadStartMs)]);
     if (!wheelResult.ok) throw wheelResult.error;
