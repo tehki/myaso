@@ -21,6 +21,7 @@ import { verifyM206ServerKnockdownPunish } from "./m206-knockdown-punish-proof.m
 import { verifyM209DualKnockdownServerPunish } from "./m209-dual-knockdown-proof.mjs";
 import { verifyM211DualRecoveryServerProof } from "./m211-dual-recovery-phase-proof.mjs";
 import { planM203W3cPointerPause } from "./m203-w3c-wheel-ack.mjs";
+import { planM225ThreatDistanceStaging } from "./m225-ffa-threat-distance.mjs";
 import { awaitM223HeavyWindup, planM223WheelDelay } from "./m223-server-heavy-windup.mjs";
 import { dispatchM212AttackLedShortBlock } from "./m212-attack-led-short-block.mjs";
 import { dispatchM207AttackLedDodge } from "./m207-attack-led-dodge.mjs";
@@ -10008,6 +10009,40 @@ async function runOnlineUiJumpFfaThreatFlight(entries, mode) {
     pulseMovementKey(right, "a", rightMovementMs),
   ]);
   await sleep(60);
+
+  // M225: fixed WebDriver key durations can invert authoritative distance
+  // order under runner load. Observe genuine server-replicated coordinates
+  // at centre and adjust with bounded, ordinary real W3C movement keys.
+  // Never reorder HUD state or weaken the original two-threat assertion.
+  let geometryReady = false;
+  for (let geometryAttempt = 1; geometryAttempt <= 4; geometryAttempt += 1) {
+    const centerState = await readUiEvidence(center);
+    const stage = planM225ThreatDistanceStaging({
+      fighters: centerState.acceptance?.fighters,
+      leftId: ids[0], centerId: ids[1], rightId: ids[2], mode,
+    });
+    console.log("M225_REAL_THREAT_GEOMETRY " + JSON.stringify({
+      mode, geometryAttempt, ...stage,
+      authoritativeTick: centerState.acceptance?.serverTick ?? null,
+    }));
+    if (stage.ready) {
+      geometryReady = true;
+      break;
+    }
+    if (geometryAttempt === 4) break;
+    await Promise.all([
+      stage.leftMove.ms
+        ? pulseMovementKey(left, stage.leftMove.key, stage.leftMove.ms)
+        : Promise.resolve(),
+      stage.rightMove.ms
+        ? pulseMovementKey(right, stage.rightMove.key, stage.rightMove.ms)
+        : Promise.resolve(),
+    ]);
+    await sleep(75);
+  }
+  if (!geometryReady) {
+    throw new Error(`${milestone} cannot stage genuine ordered attack geometry after four bounded attempts`);
+  }
   await Promise.all([
     aimArena(left, leftArena, 200),
     aimArena(right, rightArena, -200),
