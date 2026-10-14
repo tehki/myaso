@@ -14,6 +14,7 @@ import { summarizeM216ParryPunishLatency } from "./m216-successful-parry-punish-
 import { summarizeM217SuccessfulKickLatency } from "./m217-successful-kick-latency.mjs";
 import { summarizeM218JumpAttackLatency } from "./m218-successful-jump-attack-latency.mjs";
 import { observeM219RollBufferIngress } from "./m219-buffered-roll-ingress-evidence.mjs";
+import { summarizeM220KnockdownFocusTimeline } from "./m220-knockdown-focus-timeline.mjs";
 import { mustAwaitM202GuardConvergence } from "./m202-guardbreak-convergence.mjs";
 import { verifyM201ServerPunishProof } from "./m201-authoritative-phase-proof.mjs";
 import { verifyM206ServerKnockdownPunish } from "./m206-knockdown-punish-proof.mjs";
@@ -4888,6 +4889,21 @@ async function runOnlineUiMultiKnockdownFfaFlight(entries) {
   }
 
   if (!handoff) {
+    const diagnostics = await Promise.all(entries.map(readUiEvidence));
+    // Diagnostic only. The genuine M158 handoff still fails closed here.
+    // Compare only shared server tick IDs across clients, not epochMs.
+    console.log("M220_KNOCKDOWN_FOCUS_TIMELINE " + JSON.stringify(
+      summarizeM220KnockdownFocusTimeline({
+        roller: diagnostics.find((entry) => entry.browser === roller.name),
+        firstVictim: diagnostics.find((entry) => entry.browser === firstVictim.name),
+        secondVictim: diagnostics.find((entry) => entry.browser === secondVictim.name),
+        firstId: firstVictimId,
+        secondId: secondVictimId,
+        knockdownAction: COMBAT_ACTION.knockdown,
+        idleAction: COMBAT_ACTION.idle,
+        strictHandoffPassed: false,
+      }),
+    ));
     throw new Error(milestone + " did not hand KNOCKDOWN focus from #"
       + firstVictimId + " to still-downed #" + secondVictimId + ": "
       + JSON.stringify(await Promise.all(entries.map(readUiEvidence))));
