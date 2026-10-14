@@ -126,14 +126,19 @@ test("M212 rejects missing W3C callbacks and unbounded input timing", async () =
   }
 });
 
-test("M212 runner preserves true wheel/down/up and original no-parry/no-HP guards", () => {
+test("M221 runner preserves real wheel/W3C down-up and original no-parry/no-HP guards", () => {
   const source = readFileSync(new URL("../scripts/pvp_browser_flight_runner.mjs", import.meta.url), "utf8");
   const segment = source.slice(source.indexOf("async function runOnlineUiGuardBreakFlight("),
     source.indexOf("async function waitForUiGuardBreakEvidence("));
   assert.ok(segment.includes("dispatchM212AttackLedShortBlock({"));
   assert.ok(segment.includes("sendWheel: () => scrollArenaWheel(defender, defenderElementId, 120, 0)"));
-  assert.ok(segment.includes("sendAttackDown: () => setArenaAttackButton(attacker, true)"));
-  assert.ok(segment.includes("sendAttackUp: () => setArenaAttackButton(attacker, false)"));
+  assert.ok(segment.includes("sendAttackClick: (clickHoldMs) => performArenaM221GuardBreakClick(attacker, clickHoldMs)"));
+  const w3cClick = source.slice(source.indexOf("async function performArenaM221GuardBreakClick("),
+    source.indexOf("async function setArenaAttackButton("));
+  assert.ok(w3cClick.includes('{ type: "pointerDown", button: 0 }'));
+  assert.ok(w3cClick.includes('{ type: "pause", duration: clickHoldMs }'));
+  assert.ok(w3cClick.includes('{ type: "pointerUp", button: 0 }'));
+  assert.ok(w3cClick.includes('/session/${session.sessionId}/actions'));
   // The real failure must log both W3C harness-clock ingress and Firefox/
   // Chrome-local observations BEFORE the original fatal guard assertions.
   const diagnosticsOffset = segment.indexOf('console.log("M212_GUARD_BREAK_INGRESS "');
@@ -216,4 +221,30 @@ test("M221 late WebDriver rejection remains fatal after attested genuine click",
   wheel.reject(Error("geckodriver rejected action"));
   await assert.rejects(flight,/geckodriver rejected action/);
   assert.ok(events.length===0 || events.join(",")==="down,up");
+});
+
+test("M221 one W3C click batch has no down-ACK to up barrier", async () => {
+  const events = [];
+  const result = await dispatchM212AttackLedShortBlock({
+    sendWheel: () => { events.push("real-wheel"); },
+    awaitTrustedWheel: () => ({ trusted: true, deltaY: 120 }),
+    sendAttackClick: holdMs => { events.push("real-W3C-click:" + holdMs); },
+    sleep: ms => { events.push("pause:" + ms); },
+    now: () => 0,
+  });
+  assert.deepEqual(events, ["real-wheel", "pause:48", "real-W3C-click:10"]);
+  assert.equal(result.attackDownAckMs, null, "no invented down ACK in single W3C batch");
+  assert.equal(result.attackUpDispatchMs, null, "no invented up dispatch timestamp");
+  assert.equal(result.attackUpAckMs, 0);
+});
+
+test("M221 rejected genuine W3C click batch fails closed without retry", async () => {
+  let clicks = 0;
+  await assert.rejects(() => dispatchM212AttackLedShortBlock({
+    sendWheel: () => {},
+    awaitTrustedWheel: () => ({ trusted: true, deltaY: 120 }),
+    sendAttackClick: () => { clicks++; throw Error("Chrome W3C batch rejected"); },
+    sleep: () => {},
+  }), /Chrome W3C batch rejected/);
+  assert.equal(clicks, 1);
 });

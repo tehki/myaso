@@ -10,11 +10,13 @@
 // No simulated events, retries, direct server writes or combat changes.
 export async function dispatchM212AttackLedShortBlock({
   sendWheel, sendAttackDown, sendAttackUp, sleep,
-  awaitTrustedWheel = null,
+  sendAttackClick = null, awaitTrustedWheel = null,
   now = () => performance.now(), wheelHeadStartMs = 48, clickHoldMs = 10,
 }) {
-  if (![sendWheel, sendAttackDown, sendAttackUp, sleep, now]
-    .every(fn => typeof fn === "function")
+  if (![sendWheel, sleep, now].every(fn => typeof fn === "function")
+    || (sendAttackClick === null
+      ? typeof sendAttackDown !== "function" || typeof sendAttackUp !== "function"
+      : typeof sendAttackClick !== "function")
     || (awaitTrustedWheel !== null && typeof awaitTrustedWheel !== "function")
     || !Number.isFinite(wheelHeadStartMs) || wheelHeadStartMs < 0
     || wheelHeadStartMs > 125
@@ -71,14 +73,26 @@ export async function dispatchM212AttackLedShortBlock({
     if (!wheelResult.ok) throw wheelResult.error;
   }
   const attackDownDispatchMs = Math.max(0, now() - startedAt);
-  await Promise.resolve().then(sendAttackDown);
-  const attackDownAckMs = Math.max(0, now() - startedAt);
-  // Genuine click release is required even when the Firefox ACK is late.
-  await sleep(clickHoldMs);
-  const attackUpDispatchMs = Math.max(0, now() - startedAt);
-  await Promise.resolve().then(sendAttackUp).finally(() => {
-    attackUpAckMs = Math.max(0, now() - startedAt);
-  });
+  let attackDownAckMs = null;
+  let attackUpDispatchMs = null;
+  if (sendAttackClick) {
+    // M221: one real Chrome W3C request owns down, a 10ms pointer pause and
+    // up. Never wait for an HTTP ACK between the browser's down and up.
+    // Separate event timestamps come from the real DOM pointer observer,
+    // not from invented driver-time offsets.
+    await Promise.resolve().then(() => sendAttackClick(clickHoldMs)).finally(() => {
+      attackUpAckMs = Math.max(0, now() - startedAt);
+    });
+  } else {
+    // The original M212 split-action fallback remains unchanged.
+    await Promise.resolve().then(sendAttackDown);
+    attackDownAckMs = Math.max(0, now() - startedAt);
+    await sleep(clickHoldMs);
+    attackUpDispatchMs = Math.max(0, now() - startedAt);
+    await Promise.resolve().then(sendAttackUp).finally(() => {
+      attackUpAckMs = Math.max(0, now() - startedAt);
+    });
+  }
   // Late W3C command failures stay fatal. No second action is ever sent.
   if (awaitTrustedWheel) {
     const wheelResult = await wheelOutcome;
@@ -88,8 +102,8 @@ export async function dispatchM212AttackLedShortBlock({
     wheelDispatchMs: 0,
     wheelAckMs: Number(wheelAckMs.toFixed(1)),
     attackDownDispatchMs: Number(attackDownDispatchMs.toFixed(1)),
-    attackDownAckMs: Number(attackDownAckMs.toFixed(1)),
-    attackUpDispatchMs: Number(attackUpDispatchMs.toFixed(1)),
+    attackDownAckMs: attackDownAckMs === null ? null : Number(attackDownAckMs.toFixed(1)),
+    attackUpDispatchMs: attackUpDispatchMs === null ? null : Number(attackUpDispatchMs.toFixed(1)),
     attackUpAckMs: Number(attackUpAckMs.toFixed(1)),
     completeMs: Number(Math.max(0, now() - startedAt).toFixed(1)),
     wheelHeadStartMs,

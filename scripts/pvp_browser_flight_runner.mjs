@@ -9151,8 +9151,7 @@ async function runOnlineUiGuardBreakFlight(entries, { onGuardBroken = null } = {
         m212Exchange = await dispatchM212AttackLedShortBlock({
           sendWheel: () => scrollArenaWheel(defender, defenderElementId, 120, 0),
           awaitTrustedWheel: () => challenge.wait(),
-          sendAttackDown: () => setArenaAttackButton(attacker, true),
-          sendAttackUp: () => setArenaAttackButton(attacker, false),
+          sendAttackClick: (clickHoldMs) => performArenaM221GuardBreakClick(attacker, clickHoldMs),
           sleep,
         });
       } finally {
@@ -11813,6 +11812,26 @@ async function performArenaAttackHold(session, elementId, xOffset = 200, holdMs 
         { type: "pointerMove", duration: 0, origin, x: xOffset, y: 0 },
         { type: "pointerDown", button: 0 },
         { type: "pause", duration: boundedHoldMs },
+        { type: "pointerUp", button: 0 },
+      ],
+    }],
+  });
+}
+
+// M221: one genuine Chrome W3C transaction; no driver-ACK barrier between
+// pointerDown and pointerUp. Strict M34 damage/guard checks remain unchanged.
+async function performArenaM221GuardBreakClick(session, clickHoldMs = 10) {
+  if (!Number.isInteger(clickHoldMs) || clickHoldMs < 0 || clickHoldMs > 100) {
+    throw new TypeError("M221 requires bounded genuine W3C click hold");
+  }
+  await webdriver(session.base, "POST", `/session/${session.sessionId}/actions`, {
+    actions: [{
+      type: "pointer",
+      id: `mouse-${session.name}`,
+      parameters: { pointerType: "mouse" },
+      actions: [
+        { type: "pointerDown", button: 0 },
+        { type: "pause", duration: clickHoldMs },
         { type: "pointerUp", button: 0 },
       ],
     }],
