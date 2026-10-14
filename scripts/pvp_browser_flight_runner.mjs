@@ -11,6 +11,7 @@ import { measureM200WheelFeedbackLatency } from "./m200-feedback-latency.mjs";
 import { summarizeM214ConfirmedFeedback } from "./m214-confirmed-feedback-latency.mjs";
 import { summarizeM215SuccessfulRollLatency } from "./m215-successful-roll-latency.mjs";
 import { summarizeM216ParryPunishLatency } from "./m216-successful-parry-punish-latency.mjs";
+import { summarizeM217SuccessfulKickLatency } from "./m217-successful-kick-latency.mjs";
 import { mustAwaitM202GuardConvergence } from "./m202-guardbreak-convergence.mjs";
 import { verifyM201ServerPunishProof } from "./m201-authoritative-phase-proof.mjs";
 import { verifyM206ServerKnockdownPunish } from "./m206-knockdown-punish-proof.mjs";
@@ -6426,6 +6427,7 @@ async function runOnlineUiKickKnockdownFfaFocusFlight(entries) {
 
   let evidence = null;
   let successfulAttempt = 0;
+  let successfulPointerOffset = null;
   for (let attempt = 1; attempt <= 3 && !evidence; attempt += 1) {
     const before = await readUiEvidence(attacker);
     const pointerOffset = before.pointers.length;
@@ -6468,6 +6470,7 @@ async function runOnlineUiKickKnockdownFfaFocusFlight(entries) {
         }
         evidence = states;
         successfulAttempt = attempt;
+        successfulPointerOffset = pointerOffset;
         break;
       }
       if ((Number.isFinite(attackerState?.playerHp) && attackerState.playerHp < 100)
@@ -6516,6 +6519,21 @@ async function runOnlineUiKickKnockdownFfaFocusFlight(entries) {
     throw new Error(milestone + " knockdown focus did not clear after control returned: "
       + JSON.stringify(await Promise.all(entries.map(readUiEvidence))));
   }
+
+  // M217 is diagnostic only. Original M153 genuine 3-player kick,
+  // no-damage knockdown, focus cue and full recovery must already pass.
+  const finalAttacker = finalEvidence.find((entry) => entry.browser === attacker.name);
+  console.log("M217_SUCCESSFUL_KICK_FEEDBACK_LATENCY " + JSON.stringify(
+    summarizeM217SuccessfulKickLatency({
+      sameBrowserClock: true,
+      pointers: finalAttacker?.pointers,
+      successfulPointerOffset,
+      actionTransitions: finalAttacker?.acceptance?.ownActionTransitions,
+      focusTransitions: finalAttacker?.focusTransitions,
+      kickWindupAction: COMBAT_ACTION.kickWindup,
+      victimId: defenderId,
+    }),
+  ));
 
   return finalEvidence.map((entry) => ({
     ...entry,
