@@ -27,3 +27,22 @@ export async function awaitM223HeavyWindup({
   }
   throw new Error("M223 did not observe genuine authoritative heavy windup in time");
 }
+
+// M223.1 acceptance-only sequencing budget, not gameplay timing.
+// Median genuine W3C calibration is noisy across hosted Chrome/Firefox.
+// Observed CI #38582705600: a 103ms calibration median over-predicted actual
+// wheel ingress (~31ms), so subtracting all 103ms expired short block early.
+// Keep the planned defender activation safely between parry and block expiry.
+// Wrong authoritative outcome still fails the existing strict M107 checks.
+export function planM223WheelDelay({ targetAfterWindupMs, sampledWheelIngressMs }) {
+  if (![155, 265].includes(targetAfterWindupMs)
+    || !Number.isFinite(sampledWheelIngressMs)
+    || sampledWheelIngressMs < 0 || sampledWheelIngressMs > 750) {
+    throw new TypeError("M223 requires genuine bounded heavy wheel calibration");
+  }
+  const boundedWheelIngressMs = Math.max(65, Math.min(85, sampledWheelIngressMs));
+  return Object.freeze({
+    boundedWheelIngressMs,
+    wheelDelayMs: Math.round(targetAfterWindupMs - boundedWheelIngressMs),
+  });
+}

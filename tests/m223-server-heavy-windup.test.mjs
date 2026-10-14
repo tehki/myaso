@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { readFileSync } from "node:fs";
-import { awaitM223HeavyWindup } from "../scripts/m223-server-heavy-windup.mjs";
+import { awaitM223HeavyWindup, planM223WheelDelay } from "../scripts/m223-server-heavy-windup.mjs";
 
 test("M223 accepts only fresh native server windup of intended fighter", async () => {
   let now=0;
@@ -56,4 +56,33 @@ test("M223 preserves one genuine E and one wheel plus strict combat outcomes",()
   assert.ok(source.includes('scenario === "uiheavyblock" || scenario === "uiheavyparry"'));
   assert.ok(source.includes('Opponent blocked - guard -64.'));
   assert.ok(source.includes('feedbackTransitions.includes("parried")'));
+});
+
+test("M223.1 clamps slow wheel samples without changing server combat windows", () => {
+  assert.deepEqual(planM223WheelDelay({
+    targetAfterWindupMs:155, sampledWheelIngressMs:103,
+  }), {boundedWheelIngressMs:85,wheelDelayMs:70});
+  assert.deepEqual(planM223WheelDelay({
+    targetAfterWindupMs:155, sampledWheelIngressMs:70,
+  }), {boundedWheelIngressMs:70,wheelDelayMs:85});
+  assert.deepEqual(planM223WheelDelay({
+    targetAfterWindupMs:155, sampledWheelIngressMs:39,
+  }), {boundedWheelIngressMs:65,wheelDelayMs:90});
+  assert.deepEqual(planM223WheelDelay({
+    targetAfterWindupMs:265, sampledWheelIngressMs:103,
+  }), {boundedWheelIngressMs:85,wheelDelayMs:180});
+  assert.deepEqual(planM223WheelDelay({
+    targetAfterWindupMs:265, sampledWheelIngressMs:39,
+  }), {boundedWheelIngressMs:65,wheelDelayMs:200});
+});
+
+test("M223.1 refuses invalid or unqualified sampled ingress", () => {
+  for (const sample of [-1,NaN,Infinity,751]) {
+    assert.throws(()=>planM223WheelDelay({
+      targetAfterWindupMs:155, sampledWheelIngressMs:sample,
+    }),TypeError);
+  }
+  assert.throws(()=>planM223WheelDelay({
+    targetAfterWindupMs:240,sampledWheelIngressMs:70,
+  }),TypeError);
 });

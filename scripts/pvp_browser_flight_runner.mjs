@@ -21,7 +21,7 @@ import { verifyM206ServerKnockdownPunish } from "./m206-knockdown-punish-proof.m
 import { verifyM209DualKnockdownServerPunish } from "./m209-dual-knockdown-proof.mjs";
 import { verifyM211DualRecoveryServerProof } from "./m211-dual-recovery-phase-proof.mjs";
 import { planM203W3cPointerPause } from "./m203-w3c-wheel-ack.mjs";
-import { awaitM223HeavyWindup } from "./m223-server-heavy-windup.mjs";
+import { awaitM223HeavyWindup, planM223WheelDelay } from "./m223-server-heavy-windup.mjs";
 import { dispatchM212AttackLedShortBlock } from "./m212-attack-led-short-block.mjs";
 import { dispatchM207AttackLedDodge } from "./m207-attack-led-dodge.mjs";
 import { planM197KnockdownClusterNudge } from "./m197-knockdown-cluster.mjs";
@@ -1095,9 +1095,15 @@ async function performHeavyCounterplayWindowWheel(
       if (!eResult.ok) throw eResult.error;
       throw error;
     }
-    const m223WheelDelayMs = Math.max(0, Math.round(
-      targetAfterWindupMs - calibration.wheelIngressMs,
-    ));
+    // M223.1: calibration can contain ~100ms wheel-driver outliers while
+    // the actual live W3C wheel arrives in ~30ms. Subtracting the outlier
+    // schedules block too early, causing its unchanged 240ms timer to expire
+    // before impact. Bound ONLY the CI harness delay estimator.
+    const m223Plan = planM223WheelDelay({
+      targetAfterWindupMs,
+      sampledWheelIngressMs: calibration.wheelIngressMs,
+    });
+    const m223WheelDelayMs = m223Plan.wheelDelayMs;
     const wheelIssuedAtMs = Date.now();
     const [eResult, wheelResult] = await Promise.all([
       eOutcome,
@@ -1111,6 +1117,7 @@ async function performHeavyCounterplayWindowWheel(
       observedWindupAfterMs: windup.observedAfterMs,
       eCommandToWheelDispatchMs: wheelIssuedAtMs - eIssuedAtMs,
       wheelIngressCalibrationMs: calibration.wheelIngressMs,
+      boundedWheelIngressMs: m223Plan.boundedWheelIngressMs,
       wheelDelayMs: m223WheelDelayMs, targetAfterWindupMs,
       eW3cAck: eResult.ok, wheelW3cAck: wheelResult.ok,
     }));
