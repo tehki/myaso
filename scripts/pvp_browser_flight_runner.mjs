@@ -10,6 +10,7 @@ import { planM198GuardBreakW3cExchange } from "./m198-guardbreak-input-plan.mjs"
 import { measureM200WheelFeedbackLatency } from "./m200-feedback-latency.mjs";
 import { summarizeM214ConfirmedFeedback } from "./m214-confirmed-feedback-latency.mjs";
 import { summarizeM215SuccessfulRollLatency } from "./m215-successful-roll-latency.mjs";
+import { summarizeM216ParryPunishLatency } from "./m216-successful-parry-punish-latency.mjs";
 import { mustAwaitM202GuardConvergence } from "./m202-guardbreak-convergence.mjs";
 import { verifyM201ServerPunishProof } from "./m201-authoritative-phase-proof.mjs";
 import { verifyM206ServerKnockdownPunish } from "./m206-knockdown-punish-proof.mjs";
@@ -8112,6 +8113,20 @@ async function runOnlineUiParryPunishWindowFlight(entries) {
     || !defenderState.feedbackTransitions.includes("parry-success")) {
     throw new Error(`${milestone} lost the authoritative parry proof before the punish: ${JSON.stringify(evidence)}`);
   }
+
+  // Read-only M216: record only after M146 proves the real wheel parry,
+  // server-authoritative 650ms stun, one late LMB, exact 34HP and both cues.
+  // All subtractions below involve the same Chrome defender browser observer.
+  console.log("M216_PARRY_PUNISH_FEEDBACK_LATENCY " + JSON.stringify(
+    summarizeM216ParryPunishLatency({
+      sameBrowserClock: true,
+      wheels: defenderState.wheels,
+      eventTransitions: defenderState.eventTransitions,
+      pointers: defenderState.pointers,
+      focusActionTransitions: defenderState.acceptance?.focusActionTransitions,
+      stunnedAction: COMBAT_ACTION.stunned,
+    }),
+  ));
 
   return evidence.map((entry) => ({
     ...entry,
