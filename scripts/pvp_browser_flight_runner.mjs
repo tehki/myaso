@@ -5884,14 +5884,19 @@ async function runOnlineUiBoundedRollKnockdownFlight(entries) {
   // Keep #1's ordinary movement held. Dodge direction is pointer-owned, so the
   // roll still travels toward #2; once dodge ends, the held movement carries
   // #1 away from the collision lane. Schedule #3's genuine wheel-forward from
-  // its own browser clock 185 ms after #1's wheel edge: just beyond the
-  // unchanged 170 ms opener roll, but well inside #2's unchanged 260 ms
-  // knockdown. This removes variable WebDriver observation latency from the
-  // bounded-contact proof without changing gameplay timing or geometry.
+  // its own browser clock 215 ms after #1's wheel edge: just beyond the
+  // unchanged 170 ms opener roll, leaving time for #1's authoritative
+  // dodgeRecovery to appear before #3 can collide with #1. At 185 ms,
+  // #3 repeatedly knocked down #1 on its recovery tick 369 and prevented
+  // the strict original-recovery proof, while the passing main trial had
+  // #1 dodgeRecovery at 369 before its knockdown at 372.
+  // The single genuine #3 wheel must STILL contact already-downed #2
+  // before its unchanged 260 ms recovery. No gameplay timing or geometry
+  // is altered, and server-tick recovery/HP/guard gates below stay strict.
   await setMovementKey(opener, openerMovementKey, true);
   await Promise.all([
     scrollArenaWheel(opener, openerElementId, -120, 0),
-    scrollArenaWheel(suppressor, suppressorElementId, -120, 185),
+    scrollArenaWheel(suppressor, suppressorElementId, -120, 215),
   ]);
 
   let firstKnockdown = null;
