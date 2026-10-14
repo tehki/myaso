@@ -1,4 +1,5 @@
 import { NETWORK } from "../src/network/constants.mjs";
+import { isM224AuthoritativeDodgeResolved } from "../src/browser/m224-dodge-completion.mjs";
 import { connectAuthoritativeClient, parseSha256Hex } from "./authoritative-client.mjs";
 
 const params = new URLSearchParams(location.search);
@@ -249,7 +250,13 @@ function observeState(state) {
   const scenarioSucceeded = scenario === "parry"
     ? firstParryAt !== null
     : scenario === "dodge"
-      ? firstDodgeEvadeAt !== null
+      ? isM224AuthoritativeDodgeResolved({
+          firstDodgeEvadeAt,
+          attackerKnockdownSeen: attackerIsOwn ? ownKnockdownSeen : peerKnockdownSeen,
+          defenderDodgeSeen: attackerIsOwn ? peerDodgeSeen : ownDodgeSeen,
+          minDefenderHp: defenderHp,
+          minDefenderGuard: defenderGuard,
+        })
       : scenario === "block"
         ? firstGuardCostAt !== null && blockOverlapSeen
         : scenario === "guardbreak"
