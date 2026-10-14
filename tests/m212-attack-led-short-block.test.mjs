@@ -169,7 +169,7 @@ test("M221 genuine trusted Firefox event permits Chrome attack while wheel ACK i
     awaitTrustedWheel: () => observed.promise,
     sendAttackDown: () => { events.push("real-down"); },
     sendAttackUp: () => { events.push("real-up"); },
-    sleep: ms => { events.push("pause:" + ms); return ms === 48 ? pause.promise : Promise.resolve(); },
+    sleep: ms => { events.push("pause:" + ms); return ms === 30 ? pause.promise : Promise.resolve(); },
   });
   await new Promise(setImmediate);
   assert.deepEqual(events, ["real-wheel"]);
