@@ -21,6 +21,7 @@ import { verifyM206ServerKnockdownPunish } from "./m206-knockdown-punish-proof.m
 import { verifyM209DualKnockdownServerPunish } from "./m209-dual-knockdown-proof.mjs";
 import { verifyM211DualRecoveryServerProof } from "./m211-dual-recovery-phase-proof.mjs";
 import { planM203W3cPointerPause } from "./m203-w3c-wheel-ack.mjs";
+import { awaitM223HeavyWindup, planM223WheelDelay } from "./m223-server-heavy-windup.mjs";
 import { dispatchM212AttackLedShortBlock } from "./m212-attack-led-short-block.mjs";
 import { createM221TrustedWheelRegistry } from "./m221-trusted-wheel-attestation.mjs";
 import { dispatchM207AttackLedDodge } from "./m207-attack-led-dodge.mjs";
@@ -471,6 +472,7 @@ async function startGameServer() {
       ...process.env,
       MYASO_BIND: "127.0.0.1:0",
       MYASO_FLIGHT_ACTION_PROOF: (scenario === "uiguardbreakpunishffahit"
+        || scenario === "uiheavyblock" || scenario === "uiheavyparry"
         || scenario === "uikickknockdownffahit"
         || scenario === "uimultiknockdownffahit"
         || scenario === "uimultirecoveryffa"
@@ -1086,10 +1088,63 @@ async function performHeavyCounterplayWindowWheel(
   console.log("M192_REAL_INGRESS_PLAN " + JSON.stringify({
     scenario, ...calibration, targetAfterWindupMs, rawSkewMs, appliedSkewMs, wheelDelayMs,
   }));
-  await Promise.all([
-    pulseMovementKey(attacker, "e", heavyKeyPulseMs),
-    scrollArenaWheel(defender, defenderElementId, 120, wheelDelayMs),
-  ]);
+  if (scenario === "uiheavyblock" || scenario === "uiheavyparry") {
+    // M223: stage the real wheel from a fresh server-observed heavy windup.
+    // Do not predict E acceptance from W3C ACK or inject synthetic events.
+    const logOffset = m201ServerOutput().length;
+    const fighterId = before[0].playerNetId;
+    const eIssuedAtMs = Date.now();
+    const eOutcome = Promise.resolve().then(() =>
+      pulseMovementKey(attacker, "e", heavyKeyPulseMs)).then(
+      () => ({ ok: true }),
+      error => ({ ok: false, error }),
+    );
+    let windup;
+    try {
+      windup = await awaitM223HeavyWindup({
+        readOutput: m201ServerOutput, afterOffset: logOffset,
+        fighterId, sleep, timeoutMs: 800,
+      });
+    } catch (error) {
+      const eResult = await eOutcome;
+      if (!eResult.ok) throw eResult.error;
+      throw error;
+    }
+    // M223.1: calibration can contain ~100ms wheel-driver outliers while
+    // the actual live W3C wheel arrives in ~30ms. Subtracting the outlier
+    // schedules block too early, causing its unchanged 240ms timer to expire
+    // before impact. Bound ONLY the CI harness delay estimator.
+    const m223Plan = planM223WheelDelay({
+      targetAfterWindupMs,
+      sampledWheelIngressMs: calibration.wheelIngressMs,
+    });
+    const m223WheelDelayMs = m223Plan.wheelDelayMs;
+    const wheelIssuedAtMs = Date.now();
+    const [eResult, wheelResult] = await Promise.all([
+      eOutcome,
+      scrollArenaWheel(defender, defenderElementId, 120, m223WheelDelayMs).then(
+        () => ({ ok: true }),
+        error => ({ ok: false, error }),
+      ),
+    ]);
+    console.log("M223_SERVER_WINDUP_PLAN " + JSON.stringify({
+      scenario, fighterId, serverWindupTick: windup.serverTick,
+      observedWindupAfterMs: windup.observedAfterMs,
+      eCommandToWheelDispatchMs: wheelIssuedAtMs - eIssuedAtMs,
+      wheelIngressCalibrationMs: calibration.wheelIngressMs,
+      boundedWheelIngressMs: m223Plan.boundedWheelIngressMs,
+      wheelDelayMs: m223WheelDelayMs, targetAfterWindupMs,
+      eW3cAck: eResult.ok, wheelW3cAck: wheelResult.ok,
+    }));
+    if (!eResult.ok) throw eResult.error;
+    if (!wheelResult.ok) throw wheelResult.error;
+  } else {
+    // Preserve legacy scheduling outside strict M188 heavy defense.
+    await Promise.all([
+      pulseMovementKey(attacker, "e", heavyKeyPulseMs),
+      scrollArenaWheel(defender, defenderElementId, 120, wheelDelayMs),
+    ]);
+  }
   const [afterAttack, afterDefend] = await Promise.all([
     readUiEvidence(attacker), readUiEvidence(defender),
   ]);
