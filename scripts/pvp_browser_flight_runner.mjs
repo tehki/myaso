@@ -8,6 +8,7 @@ import { COMBAT_ACTION, FFA_KILL_TARGET } from "../src/browser/combat-readabilit
 import { COMBAT } from "../src/combat/model.mjs";
 import { planM198GuardBreakW3cExchange } from "./m198-guardbreak-input-plan.mjs";
 import { measureM200WheelFeedbackLatency } from "./m200-feedback-latency.mjs";
+import { summarizeM214ConfirmedFeedback } from "./m214-confirmed-feedback-latency.mjs";
 import { summarizeM215SuccessfulRollLatency } from "./m215-successful-roll-latency.mjs";
 import { mustAwaitM202GuardConvergence } from "./m202-guardbreak-convergence.mjs";
 import { verifyM201ServerPunishProof } from "./m201-authoritative-phase-proof.mjs";
@@ -2421,6 +2422,11 @@ async function runOnlineUiConfirmedStaminaActionsFlight(entries) {
       cost: actionCase.cost,
       baselineStamina,
       inputEpochMs: input.epochMs,
+      // These phases were all recorded by the same actor browser observer.
+      sameBrowserClock: true,
+      queuedEpochMs: queued.epochMs,
+      submittedEpochMs: submitted.epochMs,
+      confirmedEpochMs: confirmed.epochMs,
       submittedClientTick: submitted.clientTick,
       processedClientTick: confirmed.processedClientTick,
       authoritativeStamina: confirmed.authoritativeStamina,
@@ -2451,6 +2457,11 @@ async function runOnlineUiConfirmedStaminaActionsFlight(entries) {
     }
   }
 
+  // Diagnostic only. This log happens after the original strict
+  // authority/health/guard checks, and can never turn a failed proof green.
+  console.log("M214_CONFIRMED_DENIAL_FEEDBACK_LATENCY " + JSON.stringify(
+    summarizeM214ConfirmedFeedback(proofs),
+  ));
   return states.map((entry) => ({
     ...entry,
     m169ActorId: actorId,
