@@ -9,6 +9,7 @@ import { COMBAT } from "../src/combat/model.mjs";
 import { planM198GuardBreakW3cExchange } from "./m198-guardbreak-input-plan.mjs";
 import { measureM200WheelFeedbackLatency } from "./m200-feedback-latency.mjs";
 import { summarizeM214ConfirmedFeedback } from "./m214-confirmed-feedback-latency.mjs";
+import { summarizeM215SuccessfulRollLatency } from "./m215-successful-roll-latency.mjs";
 import { mustAwaitM202GuardConvergence } from "./m202-guardbreak-convergence.mjs";
 import { verifyM201ServerPunishProof } from "./m201-authoritative-phase-proof.mjs";
 import { verifyM206ServerKnockdownPunish } from "./m206-knockdown-punish-proof.mjs";
@@ -6095,6 +6096,31 @@ async function runOnlineUiBoundedRollKnockdownFlight(entries) {
     throw new Error(milestone + " post-recovery roll did not create a fresh clean knockdown: "
       + JSON.stringify(states));
   }
+
+  // This diagnostic never qualifies a failed M162 proof: read-only after
+  // genuine single wheels, server knockdown/recovery, no re-catch and 100HP
+  // guards. Browser-epoch wheel/action and browser-performance wheel/cue
+  // durations are kept separate; no cross-browser/server clock subtraction.
+  console.log("M215_SUCCESSFUL_ROLL_LATENCY " + JSON.stringify(
+    summarizeM215SuccessfulRollLatency([
+      {
+        browser: opener.name, phase: "opening", sameBrowserClock: true,
+        wheel: openerWheels[0], observedAction: openerDodge,
+        eventTransitions: finalOpener.eventTransitions,
+      },
+      {
+        browser: suppressor.name, phase: "suppression", sameBrowserClock: true,
+        wheel: suppressorWheels[0], observedAction: suppressedDodge,
+        eventTransitions: finalSuppressor.eventTransitions,
+        nextWheelT: verifyWheels[0].t,
+      },
+      {
+        browser: suppressor.name, phase: "verification", sameBrowserClock: true,
+        wheel: verifyWheels[0], observedAction: verificationDodge,
+        eventTransitions: finalSuppressor.eventTransitions,
+      },
+    ]),
+  ));
 
   return states.map((entry) => ({
     ...entry,
