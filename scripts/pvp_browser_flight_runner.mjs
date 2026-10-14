@@ -456,8 +456,8 @@ async function startGameServer() {
     env: {
       ...process.env,
       MYASO_BIND: "127.0.0.1:0",
-      MYASO_FLIGHT_ACTION_PROOF: (scenario === "uiheavyblock" || scenario === "uiheavyparry"
-        || scenario === "uiguardbreakpunishffahit"
+      MYASO_FLIGHT_ACTION_PROOF: (scenario === "uiguardbreakpunishffahit"
+        || scenario === "uiheavyblock" || scenario === "uiheavyparry"
         || scenario === "uikickknockdownffahit"
         || scenario === "uimultiknockdownffahit"
         || scenario === "uimultirecoveryffa"
