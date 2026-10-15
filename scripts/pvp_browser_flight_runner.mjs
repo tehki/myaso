@@ -10717,7 +10717,7 @@ async function runOnlineUiMultiRecoveryFfaFocusFlight(entries, spatial = false) 
   // Space+LMB chord after the browser confirms it actually saw light input,
   // instead of relying on an unrelated Node sleep(90) command-issue clock.
   // M145's pre-existing 100ms spatial recovery staging is untouched.
-  const jumpInputDelayMs = spatial ? 100 : 65;
+  const jumpInputDelayMs = spatial ? 100 : 25;
   const lightChallenge = spatial ? null : m227Registry.issue();
   if (lightChallenge) {
     await execute(lightAttacker.base, lightAttacker.sessionId,
