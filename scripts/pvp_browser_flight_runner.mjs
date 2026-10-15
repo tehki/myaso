@@ -301,6 +301,14 @@ try {
     if (droppedActionDatagrams < 1) {
       throw new Error(`M108 expected a deliberately dropped first-send heavy-action datagram, observed ${droppedActionDatagrams}`);
     }
+    // M229: require real server-side acceptance proof, in addition to the
+    // unchanged authentic 46HP Chrome/Firefox M108 hit assertions above.
+    // This is loopback-only evidence, never a forged input or a retry.
+    const acceptedHeavyInputs = (game.output().match(/M229_LOOPBACK_HEAVY_INPUT_ACCEPTED/g) ?? []).length;
+    if (acceptedHeavyInputs < 1) {
+      throw new Error(`M229 missing server-accepted heavy after genuine KeyE and deliberate first drop: ${JSON.stringify({ droppedActionDatagrams, acceptedHeavyInputs })}`);
+    }
+    console.log(`M229_HEAVY_LOSS_INGRESS_EVIDENCE ${JSON.stringify({ ok: true, droppedActionDatagrams, acceptedHeavyInputs })}`);
     console.log(`M108_HEAVY_INPUT_LOSS_RECOVERY ${JSON.stringify({ ok: true, droppedActionDatagrams, results })}`);
   } else if (scenario === "uiheavyblock") {
     const results = await runOnlineUiHeavyBlockFlight(sessions);
