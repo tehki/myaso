@@ -25,6 +25,7 @@ import { planM225ThreatDistanceStaging } from "./m225-ffa-threat-distance.mjs";
 import { awaitM223HeavyWindup, planM223WheelDelay } from "./m223-server-heavy-windup.mjs";
 import { dispatchM212AttackLedShortBlock } from "./m212-attack-led-short-block.mjs";
 import { createM221TrustedWheelRegistry } from "./m221-trusted-wheel-attestation.mjs";
+import { createM227TrustedLightRegistry } from "./m227-trusted-light-pointer.mjs";
 import { dispatchM207AttackLedDodge } from "./m207-attack-led-dodge.mjs";
 import { planM197KnockdownClusterNudge } from "./m197-knockdown-cluster.mjs";
 import { isTickNewer32 } from "../src/browser/reconciliation.mjs";
@@ -132,6 +133,7 @@ let staticServer;
 let gameServer;
 let m201ServerOutput = () => "";
 const m221Registry = createM221TrustedWheelRegistry();
+const m227Registry = createM227TrustedLightRegistry();
 
 try {
   staticServer = await startStaticServer();
@@ -440,6 +442,19 @@ async function startStaticServer() {
         }
         const packet = JSON.parse(body);
         if (!m221Registry.receive(packet)) return send(response, 422, "untrusted/stale wheel");
+        response.writeHead(204);
+        response.end();
+        return;
+      }
+      // M227: read-only trusted browser pointerdown notification, never input.
+      if (url.pathname === "/__myaso_m227_trusted_light" && request.method === "POST") {
+        let body = "";
+        for await (const chunk of request) {
+          body += chunk;
+          if (body.length > 1024) return send(response, 413, "payload too large");
+        }
+        const packet = JSON.parse(body);
+        if (!m227Registry.receive(packet)) return send(response, 422, "untrusted/stale light pointerdown");
         response.writeHead(204);
         response.end();
         return;
@@ -10697,17 +10712,38 @@ async function runOnlineUiMultiRecoveryFfaFocusFlight(entries, spatial = false) 
   // server ticks after #3 exits recovery for Firefox to observe #1 as the
   // remaining punishable target. The older 45 ms M144 stagger left only about
   // two server ticks for that handoff under loaded CI.
-  const jumpInputDelayMs = spatial ? 100 : 90;
+  // M227 (M144 only): arm the localhost *read-only* trusted pointerdown
+  // receipt before starting the real light W3C action. Start the single real
+  // Space+LMB chord after the browser confirms it actually saw light input,
+  // instead of relying on an unrelated Node sleep(90) command-issue clock.
+  // M145's pre-existing 100ms spatial recovery staging is untouched.
+  const jumpInputDelayMs = spatial ? 100 : 25;
+  const lightChallenge = spatial ? null : m227Registry.issue();
+  if (lightChallenge) {
+    await execute(lightAttacker.base, lightAttacker.sessionId,
+      "window.__MYASO_M227_LIGHT_TOKEN__ = " + JSON.stringify(lightChallenge.token)
+        + "; return true;");
+  }
   let spatialSamples = [];
   if (spatial) await armRecoveryHandoffSampler(observer);
-  await Promise.all([
-    performArenaAttackHold(lightAttacker, lightArena, 200, 90),
-    (async () => {
-      await sleep(jumpInputDelayMs);
-      await performArenaJumpAttackChord(jumpAttacker, jumpArena, -200, 90);
-    })(),
-    sampleUiEvidenceWhileActive(entries, 760, 8),
-  ]);
+  try {
+    await Promise.all([
+      performArenaAttackHold(lightAttacker, lightArena, 200, 90),
+      (async () => {
+        if (lightChallenge) {
+          const receipt = await lightChallenge.wait();
+          console.log("M227_TRUSTED_LIGHT_ONSET " + JSON.stringify({
+            milestone, scenario: expectedScenario, ...receipt,
+          }));
+        }
+        await sleep(jumpInputDelayMs);
+        await performArenaJumpAttackChord(jumpAttacker, jumpArena, -200, 90);
+      })(),
+      sampleUiEvidenceWhileActive(entries, 760, 8),
+    ]);
+  } finally {
+    lightChallenge?.close();
+  }
   if (spatial) spatialSamples = await stopRecoveryHandoffSampler(observer);
 
   const evidence = await Promise.all(entries.map(readUiEvidence));
@@ -12091,6 +12127,20 @@ async function installUiObserver(session) {
         };
         if (epochEvidence) entry.epochMs = Date.now();
         state.pointers.push(entry);
+        // M227: receipt of the actual trusted W3C light down on Chrome2.
+        // No DOM input emission, handler cancellation or gameplay mutation.
+        if (type === 'pointerdown' && event.isTrusted === true && event.button === 0) {
+          const token = window.__MYASO_M227_LIGHT_TOKEN__;
+          if (token) {
+            window.__MYASO_M227_LIGHT_TOKEN__ = null;
+            fetch('/__myaso_m227_trusted_light', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({ token, trusted: true, type, button: event.button }),
+              keepalive: true,
+            }).catch(() => {});
+          }
+        }
       }, { capture: true });
     }
     arena.addEventListener('wheel', (event) => {
