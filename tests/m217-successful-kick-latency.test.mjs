@@ -18,6 +18,9 @@ test("M217 correlates one genuine short RMB with observed kick and focus cue", (
   const a = summarizeM217SuccessfulKickLatency(sample());
   assert.equal(a.rightDownToObservedWindupMs, 51);
   assert.equal(a.rightDownToKnockdownFocusMs, 152);
+  assert.equal(a.rightHoldMs, 45);
+  assert.equal(a.rightUpToObservedWindupMs, 6);
+  assert.equal(a.rightUpToKnockdownFocusMs, 107);
   assert.equal(a.observedWindupServerTick, 308);
   assert.deepEqual(a.missingReasons, []);
 });
@@ -52,4 +55,41 @@ test("M217 is logged only after strict M153 true 3-browser kick, HP and focus-cl
   assert.ok(section.includes("kick exchange changed health/guard instead of pure knockdown"));
   assert.ok(section.includes("sameBrowserClock: true"));
   assert.ok(section.includes("kickWindupAction: COMBAT_ACTION.kickWindup"));
+});
+
+test("M228 release-to-action timing cannot borrow a pre-release transition or cue", () => {
+  const windupBeforeRelease = sample();
+  windupBeforeRelease.actionTransitions[0].epochMs = 1544;
+  const earlyWindup = summarizeM217SuccessfulKickLatency(windupBeforeRelease);
+  assert.equal(earlyWindup.rightDownToObservedWindupMs, 44);
+  assert.equal(earlyWindup.rightUpToObservedWindupMs, null);
+  assert.ok(earlyWindup.missingReasons.includes("authoritative-windup-precedes-rmb-release"));
+
+  const focusBeforeRelease = sample();
+  focusBeforeRelease.focusTransitions[0].t = 840;
+  const earlyCue = summarizeM217SuccessfulKickLatency(focusBeforeRelease);
+  assert.equal(earlyCue.rightDownToKnockdownFocusMs, 40);
+  assert.equal(earlyCue.rightUpToKnockdownFocusMs, null);
+  assert.ok(earlyCue.missingReasons.includes("knockdown-focus-precedes-rmb-release"));
+});
+
+test("M228 rejects missing, repeated or unordered pointerup without manufacturing post-release lag", () => {
+  const missing = sample();
+  missing.pointers.pop();
+  const missingResult = summarizeM217SuccessfulKickLatency(missing);
+  assert.equal(missingResult.rightHoldMs, null);
+  assert.equal(missingResult.rightUpToObservedWindupMs, null);
+  assert.ok(missingResult.missingReasons.includes("one-genuine-short-rmb-missing"));
+
+  const repeated = sample();
+  repeated.pointers.push({...repeated.pointers[1],epochMs:1550,t:850});
+  assert.equal(summarizeM217SuccessfulKickLatency(repeated).rightUpToKnockdownFocusMs,null);
+
+  const outOfOrder = sample();
+  outOfOrder.pointers[1].t = 799;
+  assert.equal(summarizeM217SuccessfulKickLatency(outOfOrder).rightUpToObservedWindupMs,null);
+
+  const invalidClock = sample();
+  invalidClock.sameBrowserClock = false;
+  assert.equal(summarizeM217SuccessfulKickLatency(invalidClock).rightUpToObservedWindupMs,null);
 });
