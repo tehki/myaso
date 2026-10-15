@@ -608,8 +608,9 @@ async fn handle_connection(
                 }
 
                 let accepted = ingress.ingest(&packet);
-                let coalesced = coalesce_accepted_input_batch(accepted.as_slice())
-                    .map(|sample| (sample.tick, sample.into()));
+                let coalesced: Option<(u32, InputIntent)> =
+                    coalesce_accepted_input_batch(accepted.as_slice())
+                        .map(|sample| (sample.tick, sample.into()));
                 // M229: loopback-only read-only evidence after real ingress/dedup.
                 // Never claim that sending an action proved it was accepted.
                 if game.drop_new_action_datagrams {
