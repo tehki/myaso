@@ -1024,12 +1024,20 @@ mod tests {
             let within_replay = additional_losses < 2;
             assert_eq!(
                 accepted_heavy_ticks,
-                if within_replay { vec![ACTION_TICK] } else { Vec::new() },
+                if within_replay {
+                    vec![ACTION_TICK]
+                } else {
+                    Vec::new()
+                },
                 "a third lost datagram exhausts three-sample replay"
             );
             assert_eq!(
                 state.world.fighter(1).expect("fighter").action,
-                if within_replay { Action::HeavyAttackWindup } else { Action::Idle },
+                if within_replay {
+                    Action::HeavyAttackWindup
+                } else {
+                    Action::Idle
+                },
                 "never invent a heavy action after replay is exhausted"
             );
             assert_eq!(state.world.fighter(1).expect("fighter").hp, 100.0);
