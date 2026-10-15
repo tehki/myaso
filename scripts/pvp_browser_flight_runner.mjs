@@ -21,8 +21,10 @@ import { verifyM206ServerKnockdownPunish } from "./m206-knockdown-punish-proof.m
 import { verifyM209DualKnockdownServerPunish } from "./m209-dual-knockdown-proof.mjs";
 import { verifyM211DualRecoveryServerProof } from "./m211-dual-recovery-phase-proof.mjs";
 import { planM203W3cPointerPause } from "./m203-w3c-wheel-ack.mjs";
+import { planM225ThreatDistanceStaging } from "./m225-ffa-threat-distance.mjs";
 import { awaitM223HeavyWindup, planM223WheelDelay } from "./m223-server-heavy-windup.mjs";
 import { dispatchM212AttackLedShortBlock } from "./m212-attack-led-short-block.mjs";
+import { createM221TrustedWheelRegistry } from "./m221-trusted-wheel-attestation.mjs";
 import { dispatchM207AttackLedDodge } from "./m207-attack-led-dodge.mjs";
 import { planM197KnockdownClusterNudge } from "./m197-knockdown-cluster.mjs";
 import { isTickNewer32 } from "../src/browser/reconciliation.mjs";
@@ -129,6 +131,7 @@ const sessions = [];
 let staticServer;
 let gameServer;
 let m201ServerOutput = () => "";
+const m221Registry = createM221TrustedWheelRegistry();
 
 try {
   staticServer = await startStaticServer();
@@ -428,6 +431,19 @@ async function startStaticServer() {
   const server = createServer(async (request, response) => {
     try {
       const url = new URL(request.url ?? "/", `http://${request.headers.host ?? "127.0.0.1"}`);
+      // Acceptance-only localhost receipt. No input is generated here.
+      if (url.pathname === "/__myaso_m221_trusted_wheel" && request.method === "POST") {
+        let body = "";
+        for await (const chunk of request) {
+          body += chunk;
+          if (body.length > 1024) return send(response, 413, "payload too large");
+        }
+        const packet = JSON.parse(body);
+        if (!m221Registry.receive(packet)) return send(response, 422, "untrusted/stale wheel");
+        response.writeHead(204);
+        response.end();
+        return;
+      }
       let relative = decodeURIComponent(url.pathname);
       if (relative === "/") relative = "/web/pvp-flight.html";
       const absolute = path.resolve(root, `.${relative}`);
@@ -1252,11 +1268,15 @@ async function runOnlineUiHeavyParryFlight(entries) {
   // pristine case. Any evidence that a heavy actually committed, hit, blocked,
   // or otherwise resolved makes the attempt terminal and therefore fail-closed.
   for (let attempt = 1; attempt <= 3 && !evidence; attempt += 1) {
-    // Calibrate and pre-arm the genuine Firefox wheel for the late server
-    // parry interval. Real stun and unchanged HP remain required.
+    // M226: use the final part of genuine server windup for parry. Across
+    // repeated hosted CI runs the previous 265ms W3C plan started real
+    // authoritative Block ~6 server ticks before heavy Active, and some
+    // impacts occurred just beyond the unchanged 125ms parry interval.
+    // Aim 20ms later, still before the 320ms heavy active commitment.
+    // Real stun / zero HP and guard cost remain mandatory, fail closed.
     await performHeavyCounterplayWindowWheel(
       attacker, defender, attackerElementId, defenderElementId,
-      attackOffset, blockOffset, 265,
+      attackOffset, blockOffset, 285,
     );
     await sleep(220);
 
@@ -9179,12 +9199,24 @@ async function runOnlineUiGuardBreakFlight(entries, { onGuardBroken = null } = {
       // Chrome W3C down/up to target the block-only interval. The original
       // 100HP/-38guard/no-parry proof rejects early, late or missing action.
       // Never fabricate inputs, repeat failed exchanges or alter mechanics.
-      const m212Exchange = await dispatchM212AttackLedShortBlock({
-        sendWheel: () => scrollArenaWheel(defender, defenderElementId, 120, 0),
-        sendAttackDown: () => setArenaAttackButton(attacker, true),
-        sendAttackUp: () => setArenaAttackButton(attacker, false),
-        sleep,
-      });
+      const challenge = m221Registry.issue();
+      let m212Exchange;
+      try {
+        // Arm the real Firefox observer BEFORE the one genuine W3C wheel.
+        // Chrome responds after browser delivery, not the delayed HTTP ACK.
+        // Original W3C ACK and strict combat assertions are still mandatory.
+        await execute(defender.base, defender.sessionId,
+          "window.__MYASO_M221_WHEEL_TOKEN__ = " + JSON.stringify(challenge.token)
+            + "; return true;");
+        m212Exchange = await dispatchM212AttackLedShortBlock({
+          sendWheel: () => scrollArenaWheel(defender, defenderElementId, 120, 0),
+          awaitTrustedWheel: () => challenge.wait(),
+          sendAttackClick: (clickHoldMs) => performArenaM221GuardBreakClick(attacker, clickHoldMs),
+          sleep,
+        });
+      } finally {
+        challenge.close();
+      }
       await sleep(230);
       const states = await Promise.all(entries.map(readUiEvidence));
       const defenderState = states.find((entry) => entry.browser === defender.name);
@@ -10008,6 +10040,40 @@ async function runOnlineUiJumpFfaThreatFlight(entries, mode) {
     pulseMovementKey(right, "a", rightMovementMs),
   ]);
   await sleep(60);
+
+  // M225: fixed WebDriver key durations can invert authoritative distance
+  // order under runner load. Observe genuine server-replicated coordinates
+  // at centre and adjust with bounded, ordinary real W3C movement keys.
+  // Never reorder HUD state or weaken the original two-threat assertion.
+  let geometryReady = false;
+  for (let geometryAttempt = 1; geometryAttempt <= 4; geometryAttempt += 1) {
+    const centerState = await readUiEvidence(center);
+    const stage = planM225ThreatDistanceStaging({
+      fighters: centerState.acceptance?.fighters,
+      leftId: ids[0], centerId: ids[1], rightId: ids[2], mode,
+    });
+    console.log("M225_REAL_THREAT_GEOMETRY " + JSON.stringify({
+      mode, geometryAttempt, ...stage,
+      authoritativeTick: centerState.acceptance?.serverTick ?? null,
+    }));
+    if (stage.ready) {
+      geometryReady = true;
+      break;
+    }
+    if (geometryAttempt === 4) break;
+    await Promise.all([
+      stage.leftMove.ms
+        ? pulseMovementKey(left, stage.leftMove.key, stage.leftMove.ms)
+        : Promise.resolve(),
+      stage.rightMove.ms
+        ? pulseMovementKey(right, stage.rightMove.key, stage.rightMove.ms)
+        : Promise.resolve(),
+    ]);
+    await sleep(75);
+  }
+  if (!geometryReady) {
+    throw new Error(`${milestone} cannot stage genuine ordered attack geometry after four bounded attempts`);
+  }
   await Promise.all([
     aimArena(left, leftArena, 200),
     aimArena(right, rightArena, -200),
@@ -11846,6 +11912,26 @@ async function performArenaAttackHold(session, elementId, xOffset = 200, holdMs 
   });
 }
 
+// M221: one genuine Chrome W3C transaction; no driver-ACK barrier between
+// pointerDown and pointerUp. Strict M34 damage/guard checks remain unchanged.
+async function performArenaM221GuardBreakClick(session, clickHoldMs = 10) {
+  if (!Number.isInteger(clickHoldMs) || clickHoldMs < 0 || clickHoldMs > 100) {
+    throw new TypeError("M221 requires bounded genuine W3C click hold");
+  }
+  await webdriver(session.base, "POST", `/session/${session.sessionId}/actions`, {
+    actions: [{
+      type: "pointer",
+      id: `mouse-${session.name}`,
+      parameters: { pointerType: "mouse" },
+      actions: [
+        { type: "pointerDown", button: 0 },
+        { type: "pause", duration: clickHoldMs },
+        { type: "pointerUp", button: 0 },
+      ],
+    }],
+  });
+}
+
 async function setArenaAttackButton(session, pressed) {
   await webdriver(session.base, "POST", `/session/${session.sessionId}/actions`, {
     actions: [{
@@ -12014,6 +12100,18 @@ async function installUiObserver(session) {
       };
       if (epochEvidence) entry.epochMs = Date.now();
       state.wheels.push(entry);
+      // M221 reports only the browser's trusted native W3C wheel-back event.
+      // No preventDefault, dispatchEvent or control/game modification.
+      const challenge = window.__MYASO_M221_WHEEL_TOKEN__;
+      if (challenge && event.isTrusted === true && event.deltaY > 0) {
+        window.__MYASO_M221_WHEEL_TOKEN__ = null;
+        fetch('/__myaso_m221_trusted_wheel', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ token: challenge, trusted: event.isTrusted === true, deltaY: event.deltaY }),
+          keepalive: true,
+        }).catch(() => {});
+      }
     }, { capture: true });
     record();
     recordOverlay();

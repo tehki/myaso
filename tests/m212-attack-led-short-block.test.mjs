@@ -126,14 +126,19 @@ test("M212 rejects missing W3C callbacks and unbounded input timing", async () =
   }
 });
 
-test("M212 runner preserves true wheel/down/up and original no-parry/no-HP guards", () => {
+test("M221 runner preserves real wheel/W3C down-up and original no-parry/no-HP guards", () => {
   const source = readFileSync(new URL("../scripts/pvp_browser_flight_runner.mjs", import.meta.url), "utf8");
   const segment = source.slice(source.indexOf("async function runOnlineUiGuardBreakFlight("),
     source.indexOf("async function waitForUiGuardBreakEvidence("));
   assert.ok(segment.includes("dispatchM212AttackLedShortBlock({"));
   assert.ok(segment.includes("sendWheel: () => scrollArenaWheel(defender, defenderElementId, 120, 0)"));
-  assert.ok(segment.includes("sendAttackDown: () => setArenaAttackButton(attacker, true)"));
-  assert.ok(segment.includes("sendAttackUp: () => setArenaAttackButton(attacker, false)"));
+  assert.ok(segment.includes("sendAttackClick: (clickHoldMs) => performArenaM221GuardBreakClick(attacker, clickHoldMs)"));
+  const w3cClick = source.slice(source.indexOf("async function performArenaM221GuardBreakClick("),
+    source.indexOf("async function setArenaAttackButton("));
+  assert.ok(w3cClick.includes('{ type: "pointerDown", button: 0 }'));
+  assert.ok(w3cClick.includes('{ type: "pause", duration: clickHoldMs }'));
+  assert.ok(w3cClick.includes('{ type: "pointerUp", button: 0 }'));
+  assert.ok(w3cClick.includes('/session/${session.sessionId}/actions'));
   // The real failure must log both W3C harness-clock ingress and Firefox/
   // Chrome-local observations BEFORE the original fatal guard assertions.
   const diagnosticsOffset = segment.indexOf('console.log("M212_GUARD_BREAK_INGRESS "');
@@ -149,4 +154,141 @@ test("M212 runner preserves true wheel/down/up and original no-parry/no-HP guard
   assert.ok(segment.includes("defenderState?.playerHp !== 100"));
   assert.ok(segment.includes("defenderResult.playerGuard !== 0"));
   assert.ok(segment.includes("defenderResult.playerHp !== 100"));
+});
+
+
+test("M221 genuine trusted Firefox event permits Chrome attack while wheel ACK is pending", async () => {
+  const wheel = deferred();
+  const observed = deferred();
+  const pause = deferred();
+  const events = [];
+  let time = 0;
+  const flight = dispatchM212AttackLedShortBlock({
+    now: () => time,
+    sendWheel: () => { events.push("real-wheel"); return wheel.promise; },
+    awaitTrustedWheel: () => observed.promise,
+    sendAttackDown: () => { events.push("real-down"); },
+    sendAttackUp: () => { events.push("real-up"); },
+    sleep: ms => { events.push("pause:" + ms); return ms === 30 ? pause.promise : Promise.resolve(); },
+  });
+  await new Promise(setImmediate);
+  assert.deepEqual(events, ["real-wheel"]);
+  time = 18;
+  observed.resolve({trusted:true,deltaY:120});
+  await new Promise(setImmediate);
+  assert.deepEqual(events, ["real-wheel","pause:30"]);
+  time = 48;
+  pause.resolve();
+  await new Promise(setImmediate);
+  assert.ok(events.includes("real-down"));
+  assert.ok(events.includes("real-up"));
+  let settled = false;
+  flight.then(()=>{ settled=true; });
+  await new Promise(setImmediate);
+  assert.equal(settled,false,"genuine W3C ACK remains mandatory for final success");
+  time = 128;
+  wheel.resolve();
+  const result=await flight;
+  assert.equal(result.wheelAckMs,128);
+  assert.equal(result.attackDownDispatchMs,48);
+  assert.equal(result.trustedWheelObservedMs,18);
+  assert.deepEqual(events,["real-wheel","pause:30","real-down","pause:10","real-up"]);
+});
+
+test("M221 browser event receipt rejects untrusted wheel; never attacks",async()=>{
+  const seen=[];
+  await assert.rejects(()=>dispatchM212AttackLedShortBlock({
+    sendWheel:()=>{seen.push("wheel");},
+    awaitTrustedWheel:()=>({trusted:false,deltaY:120}),
+    sendAttackDown:()=>{seen.push("down");},
+    sendAttackUp:()=>{seen.push("up");},
+    sleep:()=>Promise.resolve(),
+  }),/actual trusted wheel-back/);
+  assert.deepEqual(seen,["wheel"]);
+});
+
+test("M221 late WebDriver rejection remains fatal after attested genuine click",async()=>{
+  const wheel=deferred();
+  const events=[];
+  const flight=dispatchM212AttackLedShortBlock({
+    sendWheel:()=>wheel.promise,
+    awaitTrustedWheel:()=>({trusted:true,deltaY:120}),
+    sendAttackDown:()=>events.push("down"),
+    sendAttackUp:()=>events.push("up"),
+    sleep:()=>Promise.resolve(),
+  });
+  await new Promise(setImmediate);
+  wheel.reject(Error("geckodriver rejected action"));
+  await assert.rejects(flight,/geckodriver rejected action/);
+  assert.ok(events.length===0 || events.join(",")==="down,up");
+});
+
+test("M221 one W3C click batch has no down-ACK to up barrier", async () => {
+  const events = [];
+  const result = await dispatchM212AttackLedShortBlock({
+    sendWheel: () => { events.push("real-wheel"); },
+    awaitTrustedWheel: () => ({ trusted: true, deltaY: 120 }),
+    sendAttackClick: holdMs => { events.push("real-W3C-click:" + holdMs); },
+    sleep: ms => { events.push("pause:" + ms); },
+    now: () => 0,
+  });
+  assert.deepEqual(events, ["real-wheel", "pause:48", "real-W3C-click:10"]);
+  assert.equal(result.attackDownAckMs, null, "no invented down ACK in single W3C batch");
+  assert.equal(result.attackUpDispatchMs, null, "no invented up dispatch timestamp");
+  assert.equal(result.attackUpAckMs, 0);
+});
+
+test("M221 rejected genuine W3C click batch fails closed without retry", async () => {
+  let clicks = 0;
+  await assert.rejects(() => dispatchM212AttackLedShortBlock({
+    sendWheel: () => {},
+    awaitTrustedWheel: () => ({ trusted: true, deltaY: 120 }),
+    sendAttackClick: () => { clicks++; throw Error("Chrome W3C batch rejected"); },
+    sleep: () => {},
+  }), /Chrome W3C batch rejected/);
+  assert.equal(clicks, 1);
+});
+
+test("M221 slow trusted wheel receipt consumes, not restarts, qualified 48ms head start", async () => {
+  let elapsed = 0;
+  const commands = [];
+  const result = await dispatchM212AttackLedShortBlock({
+    now: () => elapsed,
+    sendWheel: () => { commands.push("genuine-wheel"); },
+    awaitTrustedWheel: () => { elapsed = 33; return { trusted: true, deltaY: 120 }; },
+    sendAttackClick: holdMs => { commands.push("genuine-W3C-click:" + holdMs); },
+    sleep: ms => { commands.push("wait:" + ms); elapsed += ms; },
+  });
+  assert.deepEqual(commands, ["genuine-wheel", "wait:15", "genuine-W3C-click:10"]);
+  assert.equal(result.trustedWheelObservedMs, 33);
+  assert.equal(result.attackDownDispatchMs, 48);
+  assert.equal(result.attackDownAckMs, null);
+});
+
+test("M221 receipt later than 48ms never triggers a second full wait or unauthenticated attack", async () => {
+  let elapsed = 0;
+  const commands = [];
+  const outcome = await dispatchM212AttackLedShortBlock({
+    now: () => elapsed,
+    sendWheel: () => { commands.push("genuine-wheel"); },
+    awaitTrustedWheel: () => { elapsed = 83; return { trusted: true, deltaY: 120 }; },
+    sendAttackClick: holdMs => { commands.push("genuine-W3C-click:" + holdMs); },
+    sleep: ms => { commands.push("wait:" + ms); elapsed += ms; },
+  });
+  assert.deepEqual(commands, ["genuine-wheel", "genuine-W3C-click:10"]);
+  assert.equal(outcome.attackDownDispatchMs, 83);
+  assert.equal(outcome.trustedWheelObservedMs, 83);
+});
+
+test("M221 missing trusted Firefox event cannot send Chrome click even after 48ms", async () => {
+  let elapsed = 0;
+  let clicks = 0;
+  await assert.rejects(() => dispatchM212AttackLedShortBlock({
+    now: () => elapsed,
+    sendWheel: () => {},
+    awaitTrustedWheel: () => { elapsed = 140; throw Error("trusted wheel absent"); },
+    sendAttackClick: () => { clicks++; },
+    sleep: ms => { elapsed += ms; },
+  }), /trusted wheel absent/);
+  assert.equal(clicks, 0);
 });

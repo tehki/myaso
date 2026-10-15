@@ -1,0 +1,7 @@
+# M225 — genuine spatial preflight for M142 three-browser threat ranking
+
+[Main quality #38610297701, attempt 2](https://github.com/tehki/myaso/actions/runs/38610297701) failed M142 secondary FFA order after two valid, damaging attacks. The Firefox center observer genuinely showed two threats, but #1 jump was primary and #3 light was secondary. The strict test correctly requires #3 light as primary and #1 jump as secondary.
+
+M142 previously guessed the committed geometric primary with fixed key pulse duration. Under loaded W3C delivery, those durations do not prove the actual ranking distance. This test-only change enables existing read-only `window.__MYASO_ACCEPTANCE_STATE__.fighters` coordinates for the two M142 scenarios, and checks the *actual authoritative replicas* at center after genuine Chrome left/right staging. For secondary mode, #1 jump must be farther than #3 light by >=8 units, both in attack range, with >=96 unit rival separation. If they are not staged, it issues at most three more bounded **genuine W3C WASD** position corrections (30..145ms) and checks again. Four failed geometry checks abort before any attack; no manipulated coordinates or fake evidence. The strict two-threat ordering, bearings, phases, no leakage, true Chrome/Firefox real input, and HP/guard evidence remain unchanged.
+
+No game physics, combat timing, packet format, production or playable build changes. A successful single quality is only a first gate: repeat full exact-head quality and independent post-merge main qualification remain mandatory.
