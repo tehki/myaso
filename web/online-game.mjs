@@ -1,4 +1,5 @@
 import { createFrameBudget } from "../src/browser/frame-budget.mjs";
+import { recordM233RecoveryHandoff } from "../src/browser/m233-recovery-handoff-trace.mjs";
 import { installRightButtonGesture } from "../src/browser/right-button-gesture.mjs";
 import { createCombatImpactController } from "../src/browser/combat-impact.mjs";
 import { COMBAT_ACTION, blockSpatialPresentation, combatActionHint, combatOverlayPresentation, createCombatReadabilityTracker, createRemoteDamageTracker, fighterFocusNetId, fighterGuardBreakPunishNetId, guardBreakPunishRangeCue, fighterKnockdownPunishNetId, knockdownPunishRangeCue, fighterParryPunishNetId, parryPunishRangeCue, fighterRecoveryNetId, recoveryPunishRangeCue, punishRangeCueIntent, fighterIdentityPresentation, fighterThreatBearingLabel, fighterThreatGuardArcLabel, fighterThreatNetId, fighterThreatPhaseLabel, fighterThreatPhaseState, fighterMatchPointPresentation, fighterMatchPresentation, fighterScoreboardPresentation, FFA_KILL_TARGET, fighterVitalsPresentation, guardBreakSpatialPresentation, killFeedPresentation, opponentRecoveryPresentation, parrySpatialPresentation, staminaDenialPresentation, ownCombatReadinessPresentation } from "../src/browser/combat-readability.mjs";
@@ -271,6 +272,19 @@ function recordAcceptanceState(state, ownId) {
   acceptance.playerNetId = ownId;
   acceptance.focusNetId = focusNetId;
   acceptance.serverTick = networkClient?.latestServerTick ?? 0;
+  if (acceptanceScenario === "uimultirecoveryspatial") {
+    acceptance.m233RecoveryHandoff ??= [];
+    recordM233RecoveryHandoff(acceptance.m233RecoveryHandoff, {
+      source: "ingress",
+      state,
+      ownId,
+      focusNetId,
+      focusMode: "replicated",
+      serverTick: acceptance.serverTick,
+      epochMs: Date.now(),
+      isRecovery: (entity) => opponentRecoveryPresentation(entity).visible,
+    });
+  }
   const own = state.get(ownId);
   if (Number.isFinite(own?.stamina)) {
     acceptance.authoritativeStamina = own.stamina;
@@ -1145,6 +1159,21 @@ function updateHud(ownId) {
       : knockdownPunishNetId ? "knockdown"
         : recoveryFocusNetId ? "recovery" : "nearest";
   setFocusTarget(focusNetId, focusMode);
+  if (acceptanceScenario === "uimultirecoveryspatial"
+    && window.__MYASO_ACCEPTANCE_STATE__?.scenario === acceptanceScenario) {
+    const acceptance = window.__MYASO_ACCEPTANCE_STATE__;
+    acceptance.m233RecoveryHandoff ??= [];
+    recordM233RecoveryHandoff(acceptance.m233RecoveryHandoff, {
+      source: "hud",
+      state: networkClient.state,
+      ownId,
+      focusNetId,
+      focusMode,
+      serverTick: networkClient.latestServerTick,
+      epochMs: Date.now(),
+      isRecovery: (entity) => opponentRecoveryPresentation(entity).visible,
+    });
+  }
   updateOwnReadiness(own);
   updateThreatCue(ownId);
   updateCombatOverlay(own, ownId);

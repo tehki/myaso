@@ -15,6 +15,7 @@ import { summarizeM217SuccessfulKickLatency } from "./m217-successful-kick-laten
 import { correlateM230HeavyReplayEvidence } from "./m230-heavy-replay-correlation.mjs";
 import { withM231M108FailureEvidence } from "./m231-m108-failure-path.mjs";
 import { summarizeM232SpatialHandoffFailure } from "./m232-spatial-handoff-failure.mjs";
+import { summarizeM233RecoveryHandoff } from "../src/browser/m233-recovery-handoff-trace.mjs";
 import { summarizeM218JumpAttackLatency } from "./m218-successful-jump-attack-latency.mjs";
 import { observeM219RollBufferIngress } from "./m219-buffered-roll-ingress-evidence.mjs";
 import { summarizeM220KnockdownFocusTimeline } from "./m220-knockdown-focus-timeline.mjs";
@@ -10794,10 +10795,13 @@ async function runOnlineUiMultiRecoveryFfaFocusFlight(entries, spatial = false) 
     const spatialFailureEvidence = spatial
       ? summarizeM232SpatialHandoffFailure(spatialSamples, { lightId, jumpId })
       : null;
+    const m233FailureEvidence = spatial
+      ? summarizeM233RecoveryHandoff(observerState.acceptance?.m233RecoveryHandoff, { lightId, jumpId })
+      : null;
     throw new Error(`${milestone} did not arbitrate nearest punishable -> remaining punishable -> nearest rival: ${JSON.stringify({
       focusTransitions,
       evidence,
-      ...(spatial ? { spatialFailureEvidence } : {}),
+      ...(spatial ? { spatialFailureEvidence, m233FailureEvidence } : {}),
     })}`);
   }
 
@@ -13299,6 +13303,10 @@ async function readUiEvidence(session) {
         ownActionTransitions: (window.__MYASO_ACCEPTANCE_STATE__.ownActionTransitions ?? []).map((entry) => ({ ...entry })),
         focusActionTransitions: (window.__MYASO_ACCEPTANCE_STATE__.focusActionTransitions ?? []).map((entry) => ({ ...entry })),
         fighters: (window.__MYASO_ACCEPTANCE_STATE__.fighters ?? []).map((fighter) => ({ ...fighter })),
+        m233RecoveryHandoff: (window.__MYASO_ACCEPTANCE_STATE__.m233RecoveryHandoff ?? []).slice(-96).map((entry) => ({
+          ...entry,
+          fighters: (entry.fighters ?? []).map((fighter) => ({ ...fighter })),
+        })),
       } : null,
     };
   `);
