@@ -302,7 +302,7 @@ try {
     // rethrow the identical error. The original real-browser hit check is
     // executed exactly once, with no replay or synthetic DOM event.
     const results = await withM231M108FailureEvidence(
-      () => runOnlineUiHeavyStrikeFlight(sessions),
+      async () => await runOnlineUiHeavyStrikeFlight(sessions),
       () => game.output(),
       (diagnostic) => console.error("M231_M108_FAILURE_PATH_EVIDENCE " + JSON.stringify(diagnostic)),
     );
