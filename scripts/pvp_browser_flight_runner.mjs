@@ -12,6 +12,7 @@ import { summarizeM214ConfirmedFeedback } from "./m214-confirmed-feedback-latenc
 import { summarizeM215SuccessfulRollLatency } from "./m215-successful-roll-latency.mjs";
 import { summarizeM216ParryPunishLatency } from "./m216-successful-parry-punish-latency.mjs";
 import { summarizeM217SuccessfulKickLatency } from "./m217-successful-kick-latency.mjs";
+import { correlateM230HeavyReplayEvidence } from "./m230-heavy-replay-correlation.mjs";
 import { summarizeM218JumpAttackLatency } from "./m218-successful-jump-attack-latency.mjs";
 import { observeM219RollBufferIngress } from "./m219-buffered-roll-ingress-evidence.mjs";
 import { summarizeM220KnockdownFocusTimeline } from "./m220-knockdown-focus-timeline.mjs";
@@ -308,6 +309,14 @@ try {
     if (acceptedHeavyInputs < 1) {
       throw new Error(`M229 missing server-accepted heavy after genuine KeyE and deliberate first drop: ${JSON.stringify({ droppedActionDatagrams, acceptedHeavyInputs })}`);
     }
+    // M230: counts alone may accept an unrelated heavy from another session
+    // or a later action edge. Require the *same* first-dropped sample tick.
+    const exactReplay = correlateM230HeavyReplayEvidence(game.output());
+    if (exactReplay.droppedActionDatagrams !== droppedActionDatagrams
+      || exactReplay.acceptedHeavyInputs !== acceptedHeavyInputs) {
+      throw new Error("M230 strict one-shot count mismatch after exact replay correlation");
+    }
+    console.log("M230_EXACT_HEAVY_REPLAY_EVIDENCE " + JSON.stringify(exactReplay));
     console.log(`M229_HEAVY_LOSS_INGRESS_EVIDENCE ${JSON.stringify({ ok: true, droppedActionDatagrams, acceptedHeavyInputs })}`);
     console.log(`M108_HEAVY_INPUT_LOSS_RECOVERY ${JSON.stringify({ ok: true, droppedActionDatagrams, results })}`);
   } else if (scenario === "uiheavyblock") {
