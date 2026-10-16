@@ -30,14 +30,11 @@ if ! id myaso-alpha >/dev/null 2>&1; then
   useradd --system --user-group --home-dir "$base" --shell /usr/sbin/nologin myaso-alpha
 fi
 install -d -m 0750 -o myaso-alpha -g myaso-alpha /etc/myaso-alpha/tls
-install -d -m 0755 /usr/local/libexec/myaso-alpha /etc/caddy
-install -m 0755 "$release/ops/alpha/rotate-cert.sh" /usr/local/libexec/myaso-alpha/rotate-cert.sh
-ln -sfn "$release" "$base/current.next"
-mv -Tf "$base/current.next" "$base/current"
-/usr/local/libexec/myaso-alpha/rotate-cert.sh
+ln -sfn "$release" "$base/staged.next"
+mv -Tf "$base/staged.next" "$base/staged"
 echo "STAGED myaso alpha revision $revision"
 if [[ "$mode" == --stage ]]; then
-  echo "Stage-only: no public sockets, firewall, Caddy routes or new services enabled."
+  echo "Stage-only: does not change current release, rotate live cert, open sockets, firewall, Caddy routes or services."
   exit 0
 fi
 
@@ -54,6 +51,13 @@ if [[ -e /etc/caddy/myaso-alpha.caddy ]]; then
 else
   install -m 0644 "$release/ops/alpha/Caddyfile.game" /etc/caddy/myaso-alpha.caddy
 fi
+# Activation happens only after DNS + site ownership checks succeeded.
+previous_release=$(readlink "$base/current" || true)
+install -d -m 0755 /usr/local/libexec/myaso-alpha /etc/caddy
+install -m 0755 "$release/ops/alpha/rotate-cert.sh" /usr/local/libexec/myaso-alpha/rotate-cert.sh
+ln -sfn "$release" "$base/current.next"
+mv -Tf "$base/current.next" "$base/current"
+/usr/local/libexec/myaso-alpha/rotate-cert.sh
 main_caddy=/etc/caddy/Caddyfile
 import_line='import /etc/caddy/myaso-alpha.caddy'
 if ! grep -Fqx "$import_line" "$main_caddy"; then
@@ -64,6 +68,12 @@ if ! caddy validate --config "$main_caddy"; then
   echo "Caddy validation failed; restoring prior Caddyfile without reloading" >&2
   if [[ -f "$main_caddy.pre-myaso-$revision" ]]; then
     cp -a "$main_caddy.pre-myaso-$revision" "$main_caddy"
+  fi
+  if [[ -n "$previous_release" ]]; then
+    ln -sfn "$previous_release" "$base/current.next"
+    mv -Tf "$base/current.next" "$base/current"
+  else
+    rm -f "$base/current"
   fi
   exit 4
 fi
