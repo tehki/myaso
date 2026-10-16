@@ -13,6 +13,7 @@ import { summarizeM215SuccessfulRollLatency } from "./m215-successful-roll-laten
 import { summarizeM216ParryPunishLatency } from "./m216-successful-parry-punish-latency.mjs";
 import { summarizeM217SuccessfulKickLatency } from "./m217-successful-kick-latency.mjs";
 import { correlateM230HeavyReplayEvidence } from "./m230-heavy-replay-correlation.mjs";
+import { withM231M108FailureEvidence } from "./m231-m108-failure-path.mjs";
 import { summarizeM218JumpAttackLatency } from "./m218-successful-jump-attack-latency.mjs";
 import { observeM219RollBufferIngress } from "./m219-buffered-roll-ingress-evidence.mjs";
 import { summarizeM220KnockdownFocusTimeline } from "./m220-knockdown-focus-timeline.mjs";
@@ -297,7 +298,14 @@ try {
     const results = await runOnlineUiHeavyStrikeFlight(sessions);
     console.log(`M106_ONLINE_HEAVY_STRIKE ${JSON.stringify({ ok: true, results })}`);
   } else if (scenario === "uiheavyinputloss") {
-    const results = await runOnlineUiHeavyStrikeFlight(sessions);
+    // On a RED M108 flight, emit bounded server-ingress provenance then
+    // rethrow the identical error. The original real-browser hit check is
+    // executed exactly once, with no replay or synthetic DOM event.
+    const results = await withM231M108FailureEvidence(
+      () => runOnlineUiHeavyStrikeFlight(sessions),
+      () => game.output(),
+      (diagnostic) => console.error("M231_M108_FAILURE_PATH_EVIDENCE " + JSON.stringify(diagnostic)),
+    );
     const droppedActionDatagrams = (game.output().match(/M63_INPUT_ACTION_PACKET_DROPPED/g) ?? []).length;
     if (droppedActionDatagrams < 1) {
       throw new Error(`M108 expected a deliberately dropped first-send heavy-action datagram, observed ${droppedActionDatagrams}`);
