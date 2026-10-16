@@ -30,6 +30,7 @@ import { awaitM223HeavyWindup, planM223WheelDelay } from "./m223-server-heavy-wi
 import { dispatchM212AttackLedShortBlock } from "./m212-attack-led-short-block.mjs";
 import { createM221TrustedWheelRegistry } from "./m221-trusted-wheel-attestation.mjs";
 import { createM227TrustedLightRegistry } from "./m227-trusted-light-pointer.mjs";
+import { summarizeM235RecoveryTellFailure } from "./m235-recovery-tell-failure-evidence.mjs";
 import { dispatchM207AttackLedDodge } from "./m207-attack-led-dodge.mjs";
 import { planM197KnockdownClusterNudge } from "./m197-knockdown-cluster.mjs";
 import { isTickNewer32 } from "../src/browser/reconciliation.mjs";
@@ -836,7 +837,23 @@ async function runOnlineUiRecoveryTellFlight(entries) {
   const observerMax = pixels.find((entry) => entry.browser === defender.browser)?.max ?? 0;
   const localMax = pixels.find((entry) => entry.browser === attacker.browser)?.max ?? 0;
   if (observerMax < 24 || localMax !== 0) {
-    throw new Error(`M38 recovery-tell pixels violated remote-only evidence: observer=${observerMax} local=${localMax}`);
+    // M235: read-only evidence only on the unchanged strict native M38 RED.
+    const samples = await Promise.all(entries.map(async (entry) => {
+      const [sampler, ui] = await Promise.allSettled([
+        readRecoveryTellSamplerDiagnostics(entry), readUiEvidence(entry),
+      ]);
+      return { browser: entry.name,
+        sampler: sampler.status === "fulfilled" ? sampler.value : null,
+        samplerError: sampler.status === "rejected" ? String(sampler.reason).slice(0, 160) : null,
+        ui: ui.status === "fulfilled" ? ui.value : null,
+        uiError: ui.status === "rejected" ? String(ui.reason).slice(0, 160) : null,
+      };
+    }));
+    const m235FailureEvidence = summarizeM235RecoveryTellFailure({
+      samples, observerBrowser: defender.browser, localBrowser: attacker.browser,
+      serverOutput: m201ServerOutput(),
+    });
+    throw new Error(`M38 recovery-tell pixels violated remote-only evidence: observer=${observerMax} local=${localMax}; m235FailureEvidence=${JSON.stringify(m235FailureEvidence)}`);
   }
   evidence = await Promise.all(entries.map(readUiEvidence));
   evidence = evidence.map((entry) => ({
@@ -12363,7 +12380,7 @@ async function armRecoveryTellSampler(session) {
     const prior = window.__MYASO_M38_RECOVERY_SAMPLER__;
     if (prior) prior.active = false;
     if (prior?.frame) cancelAnimationFrame(prior.frame);
-    const state = { active: true, frame: 0, maxPixels: 0 };
+    const state = { active: true, frame: 0, maxPixels: 0, sampledFrames: 0, lastPixels: null, firstSampleEpochMs: null, lastSampleEpochMs: null, maxPixelsEpochMs: null, arena: null };
     const sample = () => {
       if (!state.active) return;
       const half = 160;
@@ -12377,6 +12394,13 @@ async function armRecoveryTellSampler(session) {
         if (Math.abs(pixels[i] - 239) <= 2 && Math.abs(pixels[i + 1] - 207) <= 2
           && Math.abs(pixels[i + 2] - 115) <= 2 && pixels[i + 3] >= 250) count += 1;
       }
+      state.sampledFrames += 1;
+      state.lastPixels = count;
+      const epochMs = Date.now();
+      if (state.firstSampleEpochMs === null) state.firstSampleEpochMs = epochMs;
+      state.lastSampleEpochMs = epochMs;
+      state.arena = { width: arena.width, height: arena.height, x, y, sampleWidth: width, sampleHeight: height };
+      if (count > state.maxPixels) state.maxPixelsEpochMs = epochMs;
       state.maxPixels = Math.max(state.maxPixels, count);
       state.frame = requestAnimationFrame(sample);
     };
@@ -12389,6 +12413,17 @@ async function armRecoveryTellSampler(session) {
 async function readRecoveryTellSampler(session) {
   return execute(session.base, session.sessionId,
     "return window.__MYASO_M38_RECOVERY_SAMPLER__?.maxPixels ?? 0;");
+}
+
+async function readRecoveryTellSamplerDiagnostics(session) {
+  return execute(session.base, session.sessionId, `
+    const s = window.__MYASO_M38_RECOVERY_SAMPLER__;
+    if (!s) return null;
+    return { sampledFrames: s.sampledFrames, maxPixels: s.maxPixels,
+      lastPixels: s.lastPixels, firstSampleEpochMs: s.firstSampleEpochMs,
+      lastSampleEpochMs: s.lastSampleEpochMs, maxPixelsEpochMs: s.maxPixelsEpochMs,
+      arena: s.arena };
+  `);
 }
 
 async function stopRecoveryTellSampler(session) {
