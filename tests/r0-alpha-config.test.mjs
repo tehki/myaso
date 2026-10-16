@@ -42,4 +42,6 @@ test("R0 launcher offers a real online route; existing local practice remains se
   assert.match(launcher, /typeof WebTransport !== "function"/);
   assert.match(launcher, /alphaPlayPath\(config\)/);
   assert.match(bootstrap, /params\.has\("server"\)/);
+  assert.match(bootstrap, /Multiplayer connection failed/);
+  assert.match(bootstrap, /\/web\/alpha\.html/);
 });
