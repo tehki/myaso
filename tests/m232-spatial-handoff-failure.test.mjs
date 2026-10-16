@@ -68,7 +68,8 @@ test("M232 adds actual sampler evidence only to failing spatial M145 path", () =
   const failed = body.slice(body.indexOf("if (lightPunishIndex < 0"));
   assert.ok(failed.includes("spatialFailureEvidence = spatial"));
   assert.ok(failed.includes("summarizeM232SpatialHandoffFailure(spatialSamples, { lightId, jumpId })"));
-  assert.ok(failed.includes("...(spatial ? { spatialFailureEvidence } : {})"));
+  assert.ok(failed.includes("...(spatial ? { spatialFailureEvidence, m233FailureEvidence } : {})"));
+  assert.ok(failed.includes("summarizeM233RecoveryHandoff(observerState.acceptance?.m233RecoveryHandoff"));
   assert.ok(failed.includes("throw new Error("));
   assert.ok(body.includes("M211_SERVER_DUAL_RECOVERY_PHASES"));
   assert.ok(body.includes("spatialSamples.findIndex"));
