@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Read-only, fail-closed public HTTPS preflight for myaso R0 alpha.
 // Not a gameplay, UDP/QUIC, performance or deployment qualification.
-import { resolve4 } from 'node:dns/promises';
+import { resolve4, resolve6 } from 'node:dns/promises';
 import { request } from 'node:https';
 import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
@@ -17,12 +17,18 @@ export function checkDns(addresses) {
     addresses.every((address) => address === EXPECTED_IPV4);
 }
 
+export function checkIpv6(addresses) {
+  // No IPv6 deployment is configured for the R0 host. Refuse an AAAA route
+  // that browsers could select instead of the verified IPv4 endpoint.
+  return Array.isArray(addresses) && addresses.length === 0;
+}
+
 export function checkAlphaConfig(config) {
   return config !== null && typeof config === 'object' && !Array.isArray(config) &&
     config.serverUrl === `https://${HOST}:4433/game` &&
     typeof config.certificateSha256 === 'string' &&
     /^[a-fA-F0-9]{64}$/.test(config.certificateSha256) &&
-    Number.isInteger(config.maxPlayers) && config.maxPlayers >= 1 && config.maxPlayers <= 8;
+    Number.isInteger(config.maxPlayers) && config.maxPlayers >= 2 && config.maxPlayers <= 8;
 }
 
 export function checkResponse(path, status, body) {
@@ -85,7 +91,14 @@ async function main() {
   };
   try {
     const addresses = await resolve4(HOST);
-    report.dns = { ok: checkDns(addresses), ipv4: addresses };
+    let ipv6 = [];
+    try {
+      ipv6 = await resolve6(HOST);
+    } catch (error) {
+      // NXDOMAIN/no-data only: a temporary resolver failure must fail closed.
+      if (error?.code !== 'ENODATA' && error?.code !== 'ENOTFOUND') throw error;
+    }
+    report.dns = { ok: checkDns(addresses) && checkIpv6(ipv6), ipv4: addresses, ipv6Count: ipv6.length };
   } catch (error) {
     report.dns.error = error?.code ?? 'RESOLUTION_ERROR';
   }
