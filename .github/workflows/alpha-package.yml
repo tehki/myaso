@@ -1,6 +1,15 @@
 name: alpha-package
 
 on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'ops/alpha/**'
+      - 'web/alpha*'
+      - 'web/bootstrap.mjs'
+      - 'server/src/main.rs'
+      - 'tests/r0-alpha-config.test.mjs'
+      - '.github/workflows/alpha-package.yml'
   workflow_dispatch:
 
 permissions:
@@ -8,7 +17,7 @@ permissions:
 
 jobs:
   linux-alpha:
-    if: github.ref == 'refs/heads/main'
+    if: (github.event_name == 'pull_request' && github.head_ref == 'feature/r0-open-trust-layer-multiplayer-alpha') || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
