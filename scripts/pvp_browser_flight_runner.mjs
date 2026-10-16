@@ -10739,13 +10739,14 @@ async function runOnlineUiMultiRecoveryFfaFocusFlight(entries, spatial = false) 
   // server ticks after #3 exits recovery for Firefox to observe #1 as the
   // remaining punishable target. The older 45 ms M144 stagger left only about
   // two server ticks for that handoff under loaded CI.
-  // M227 (M144 only): arm the localhost *read-only* trusted pointerdown
-  // receipt before starting the real light W3C action. Start the single real
-  // Space+LMB chord after the browser confirms it actually saw light input,
-  // instead of relying on an unrelated Node sleep(90) command-issue clock.
-  // M145's pre-existing 100ms spatial recovery staging is untouched.
+  // M234: use the same authentic trusted Chrome2 pointerdown receipt for
+  // both M144 and M145. M145 previously started its 100ms timer when Node
+  // dispatched concurrent WebDriver commands, rather than when the browser
+  // actually observed the light attack. Under load that could shift the
+  // genuine 70..150ms M145 overlap window. Keep both original delays and
+  // all actual-input, 100 HP, 3-stage HUD and server assertions unchanged.
   const jumpInputDelayMs = spatial ? 100 : 25;
-  const lightChallenge = spatial ? null : m227Registry.issue();
+  const lightChallenge = m227Registry.issue();
   if (lightChallenge) {
     await execute(lightAttacker.base, lightAttacker.sessionId,
       "window.__MYASO_M227_LIGHT_TOKEN__ = " + JSON.stringify(lightChallenge.token)
@@ -10759,7 +10760,7 @@ async function runOnlineUiMultiRecoveryFfaFocusFlight(entries, spatial = false) 
       (async () => {
         if (lightChallenge) {
           const receipt = await lightChallenge.wait();
-          console.log("M227_TRUSTED_LIGHT_ONSET " + JSON.stringify({
+          console.log((spatial ? "M234_TRUSTED_SPATIAL_LIGHT_ONSET " : "M227_TRUSTED_LIGHT_ONSET ") + JSON.stringify({
             milestone, scenario: expectedScenario, ...receipt,
           }));
         }
