@@ -3,6 +3,16 @@
 # browsers require <14 days for WebTransport serverCertificateHashes.
 set -euo pipefail
 umask 077
+# One EXIT trap covers temporary keys and JSON even when any step fails.
+tmpcert=''
+tmpkey=''
+config_temp=''
+cleanup() {
+    for candidate in "$tmpcert" "$tmpkey" "$config_temp"; do
+        if [[ -n "$candidate" ]]; then rm -f -- "$candidate"; fi
+    done
+}
+trap cleanup EXIT
 DOMAIN=game.open-trust-layer.org
 TLS_DIR=/etc/myaso-alpha/tls
 PUBLIC=/srv/myaso/alpha/current/public
@@ -13,7 +23,6 @@ rotated=0
 if [[ ! -s "$cert" || ! -s "$key" ]] || ! openssl x509 -in "$cert" -noout -checkend 259200 >/dev/null 2>&1; then
     tmpcert=$(mktemp "$TLS_DIR/cert.XXXXXXXX")
     tmpkey=$(mktemp "$TLS_DIR/key.XXXXXXXX")
-    trap 'rm -f "$tmpcert" "$tmpkey"' EXIT
     openssl req -new -x509 -nodes -days 10 -sha256 \
         -newkey ec -pkeyopt ec_paramgen_curve:P-256 \
         -subj "/CN=$DOMAIN" -addext "subjectAltName=DNS:$DOMAIN" \
@@ -27,7 +36,6 @@ fi
 hash=$(openssl x509 -in "$cert" -outform DER | sha256sum | cut -d ' ' -f 1)
 [[ "$hash" =~ ^[0-9a-f]{64}$ ]] || exit 1
 config_temp=$(mktemp "$PUBLIC/.game-config.XXXXXXXX")
-trap 'rm -f "$config_temp"' EXIT
 printf '{"serverUrl":"https://%s:4433/game","certificateSha256":"%s","maxPlayers":8}\n' "$DOMAIN" "$hash" > "$config_temp"
 chmod 0644 "$config_temp"
 mv -f "$config_temp" "$PUBLIC/game-config.json"
