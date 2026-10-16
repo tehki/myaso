@@ -1350,3 +1350,19 @@ mod tests {
         ));
     }
 }
+
+#[cfg(test)]
+mod r0_player_cap_tests {
+    use super::parse_player_cap;
+
+    #[test]
+    fn alpha_cap_is_strict_and_engineering_default_is_preserved() {
+        assert_eq!(parse_player_cap(None).unwrap(), 512);
+        assert_eq!(parse_player_cap(Some("2")).unwrap(), 2);
+        assert_eq!(parse_player_cap(Some("8")).unwrap(), 8);
+        assert_eq!(parse_player_cap(Some("512")).unwrap(), 512);
+        for invalid in ["", "0", "1", "513", "-1", "abc", "8.5"] {
+            assert!(parse_player_cap(Some(invalid)).is_err(), "unexpected admission cap accepted: {invalid}");
+        }
+    }
+}
