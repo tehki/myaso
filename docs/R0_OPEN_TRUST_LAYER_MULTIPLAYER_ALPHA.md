@@ -69,9 +69,9 @@ R0 as invite-locked or account-authenticated until those controls exist.
 4. On the VPS, run `bash install-vps.sh --stage PACKAGE PACKAGE.sha256`
    (installer is in the checked-out trusted PR/source). This creates a
    dedicated `myaso-alpha` user and release path under
-   `/srv/myaso/alpha`, generates/pins the 10-day certificate, and stages the
-   config. **Stage mode does not reload Caddy, open UDP/4433 or enable the game
-   service**, and can run before the DNS record exists.
+   `/srv/myaso/alpha`, and stages an inactive release symlink. Certificate
+   generation and changes to the active release are deferred to activation. **Stage mode does not change Caddy, rotate certificates, modify the current
+   release, open UDP/4433 or enable the game service**, and can run before the DNS record exists.
 5. Verify the DNS A record resolves publicly to `168.113.210.63`, then run
    `bash install-vps.sh --activate PACKAGE PACKAGE.sha256`. It verifies DNS,
    validates Caddy before reload, adds an **isolated** hostname-only site,
