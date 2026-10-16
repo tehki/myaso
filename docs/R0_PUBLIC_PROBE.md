@@ -2,9 +2,9 @@
 
 Run `node scripts/probe-r0-public.mjs` to check **only** the fixed public game hostname:
 
-1. All resolved public IPv4 A records match the documented VPS IPv4 address.
+1. All resolved public IPv4 A records match the documented VPS IPv4 address, and no unconfigured IPv6 AAAA records exist.
 2. A verified TCP/443 HTTPS GET of `/web/alpha.html` returns HTTP 200.
-3. A verified TCP/443 HTTPS GET of `/game-config.json` returns HTTP 200 and valid bounded R0 configuration, including the pinned WebTransport/UDP 4433 certificate SHA-256.
+3. A verified TCP/443 HTTPS GET of `/game-config.json` returns HTTP 200 and valid 2–8-player R0 configuration, including the pinned WebTransport/UDP 4433 certificate SHA-256.
 
 This is a read-only command. It does **not** disable TLS verification, follow redirects, send credentials, change DNS, alter Caddy or restart services. It connects HTTPS only to the DNS-checked IP while preserving the hostname for TLS SNI verification. The JSON report prints status metadata, never raw responses or private keys. Success exits **0** and incomplete readiness exits **2**.
 
@@ -15,3 +15,7 @@ Run from two independent network clients, such as Serj and X230i, after **separa
 ## Observed network failure — 2026-10-17
 
 Public DNS resolved game.open-trust-layer.org to the expected address, but verified TLS negotiation returned `tlsv1 alert internal error` independently from Serj and X230i. This does not identify the root cause: the operator must check the actual VPS Caddy site import/certificate state before attempting activation. Never bypass TLS verification or modify existing sites to force a green check.
+
+## Subsequent public recheck — 2026-10-17
+
+Independent verified TLS GETs from Serj and X230i returned HTTP 200 for `/web/alpha.html` and `/game-config.json`. The config advertised `maxPlayers:8`, the expected WebTransport URL on UDP/4433 and a SHA-256 fingerprint. This **does not prove** native QUIC negotiation, service safety or a successful two-browser game. The earlier HTTPS handshake error is historical evidence, not the latest observed state. No VPS modifications were performed as part of these checks.
