@@ -616,11 +616,18 @@ async fn handle_connection(
                 if game.drop_new_action_datagrams {
                     if let Some((input_tick, intent)) = coalesced.as_ref() {
                         if intent.heavy_attack {
-                            println!(
-                                "M229_LOOPBACK_HEAVY_INPUT_ACCEPTED session={stable_id} client_tick={input_tick} packet_tick={} accepted_samples={}",
-                                packet.client_tick,
-                                accepted.len()
-                            );
+                            // M230: log the original *accepted* heavy sample
+                            // tick, not only the newest coalesced input tick.
+                            if let Some(heavy_sample) =
+                                accepted.iter().rev().find(|sample| sample.heavy_attack)
+                            {
+                                let action_tick = heavy_sample.tick;
+                                println!(
+                                    "M229_LOOPBACK_HEAVY_INPUT_ACCEPTED session={stable_id} action_tick={action_tick} client_tick={input_tick} packet_tick={} accepted_samples={}",
+                                    packet.client_tick,
+                                    accepted.len()
+                                );
+                            }
                         }
                     }
                 }
