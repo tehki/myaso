@@ -608,8 +608,22 @@ async fn handle_connection(
                 }
 
                 let accepted = ingress.ingest(&packet);
-                let coalesced = coalesce_accepted_input_batch(accepted.as_slice())
-                    .map(|sample| (sample.tick, sample.into()));
+                let coalesced: Option<(u32, InputIntent)> =
+                    coalesce_accepted_input_batch(accepted.as_slice())
+                        .map(|sample| (sample.tick, sample.into()));
+                // M229: loopback-only read-only evidence after real ingress/dedup.
+                // Never claim that sending an action proved it was accepted.
+                if game.drop_new_action_datagrams {
+                    if let Some((input_tick, intent)) = coalesced.as_ref() {
+                        if intent.heavy_attack {
+                            println!(
+                                "M229_LOOPBACK_HEAVY_INPUT_ACCEPTED session={stable_id} client_tick={input_tick} packet_tick={} accepted_samples={}",
+                                packet.client_tick,
+                                accepted.len()
+                            );
+                        }
+                    }
+                }
                 let server_tick = {
                     let mut state = game.state.lock().await;
                     apply_coalesced_input_and_read_tick(
@@ -940,6 +954,95 @@ mod tests {
             Some(42)
         );
         assert_eq!(dropped, VecDeque::from([38, 42]));
+    }
+
+    #[test]
+    fn m229_heavy_one_shot_replay_matrix_shows_exact_three_packet_boundary() {
+        use myaso_server::simulation::Action;
+
+        // Deterministic protocol test, not synthetic browser acceptance:
+        // a genuine KeyE is encoded as one heavy-action client tick.
+        // Each 34-byte datagram carries newest-to-oldest three samples.
+        const ACTION_TICK: u32 = 700;
+        for additional_losses in 0..=2_u32 {
+            let mut ingress = InputIngressWindow::default();
+            let mut dropped_action_ticks = VecDeque::new();
+            let mut state = GameState::new(0, 0);
+            assert!(state.world.add_player(1));
+            let mut acks = VecDeque::new();
+            let mut accepted_heavy_ticks = Vec::new();
+
+            for packet_offset in 0..4_u32 {
+                let packet_tick = ACTION_TICK + packet_offset;
+                let mut bytes = vec![0_u8; 16 + 3 * 6];
+                bytes[0] = PROTOCOL_VERSION;
+                bytes[1] = 1; // Input datagram.
+                bytes[2] = 3; // Actual protocol redundancy.
+                bytes[4..6].copy_from_slice(&(packet_offset as u16).to_le_bytes());
+                bytes[8..12].copy_from_slice(&packet_tick.to_le_bytes());
+                for sample_offset in 0..3_u32 {
+                    let sample_tick = packet_tick - sample_offset;
+                    let index = 16 + sample_offset as usize * 6;
+                    bytes[index] = sample_offset as u8;
+                    bytes[index + 5] = u8::from(sample_tick == ACTION_TICK) << 3;
+                }
+                let packet = decode_input_packet(&bytes).expect("valid genuine input wire format");
+                assert_eq!(packet.samples().len(), 3);
+
+                if packet_offset == 0 {
+                    // Existing M63 fixture must deliberately drop the first
+                    // datagram with the new one-shot heavy action.
+                    assert_eq!(
+                        register_new_action_datagram(packet.samples(), &mut dropped_action_ticks),
+                        Some(ACTION_TICK)
+                    );
+                    continue;
+                }
+                if packet_offset <= additional_losses {
+                    // Additional simulated QUIC loss, not a repeated KeyE.
+                    continue;
+                }
+                assert_eq!(
+                    register_new_action_datagram(packet.samples(), &mut dropped_action_ticks),
+                    None,
+                    "replay of an already dropped action must not be re-dropped"
+                );
+                let accepted = ingress.ingest(&packet);
+                if let Some(sample) = coalesce_accepted_input_batch(accepted.as_slice()) {
+                    if sample.heavy_attack {
+                        accepted_heavy_ticks.push(ACTION_TICK);
+                    }
+                    apply_coalesced_input_and_read_tick(
+                        &mut state,
+                        1,
+                        Some((sample.tick, sample.into())),
+                        &mut acks,
+                    );
+                }
+                state.world.step();
+            }
+
+            let within_replay = additional_losses < 2;
+            assert_eq!(
+                accepted_heavy_ticks,
+                if within_replay {
+                    vec![ACTION_TICK]
+                } else {
+                    Vec::new()
+                },
+                "a third lost datagram exhausts three-sample replay"
+            );
+            assert_eq!(
+                state.world.fighter(1).expect("fighter").action,
+                if within_replay {
+                    Action::HeavyAttackWindup
+                } else {
+                    Action::Idle
+                },
+                "never invent a heavy action after replay is exhausted"
+            );
+            assert_eq!(state.world.fighter(1).expect("fighter").hp, 100.0);
+        }
     }
 
     #[test]
