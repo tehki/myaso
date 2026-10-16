@@ -42,7 +42,7 @@ if [[ "$mode" == --stage ]]; then
 fi
 
 # Fail closed: no public site or UDP opening before the operator creates DNS.
-resolved=$(getent ahostsv4 game.open-trust-layer.org | awk 'NR==1 {print $1}')
+resolved=$(getent ahostsv4 game.open-trust-layer.org 2>/dev/null | awk 'NR==1 {print $1}' || true)
 if [[ "$resolved" != 168.113.210.63 ]]; then
   echo "DNS not ready: set game.open-trust-layer.org A 168.113.210.63" >&2
   exit 3
@@ -61,7 +61,10 @@ if ! grep -Fqx "$import_line" "$main_caddy"; then
   printf '\n# R0 myaso alpha, separate from existing site blocks\n%s\n' "$import_line" >> "$main_caddy"
 fi
 if ! caddy validate --config "$main_caddy"; then
-  echo "Caddy validation failed; restore $main_caddy.pre-myaso-$revision before retry" >&2
+  echo "Caddy validation failed; restoring prior Caddyfile without reloading" >&2
+  if [[ -f "$main_caddy.pre-myaso-$revision" ]]; then
+    cp -a "$main_caddy.pre-myaso-$revision" "$main_caddy"
+  fi
   exit 4
 fi
 install -m 0644 "$release/ops/alpha/myaso-alpha.service" /etc/systemd/system/myaso-alpha.service
