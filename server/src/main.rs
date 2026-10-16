@@ -359,8 +359,12 @@ async fn main() -> Result<()> {
 }
 
 fn parse_player_cap(raw: Option<&str>) -> Result<usize> {
-    let Some(raw) = raw else { return Ok(TARGET_PLAYERS_PER_MAP); };
-    let count: usize = raw.parse().context("MYASO_MAX_PLAYERS must be a decimal integer")?;
+    let Some(raw) = raw else {
+        return Ok(TARGET_PLAYERS_PER_MAP);
+    };
+    let count: usize = raw
+        .parse()
+        .context("MYASO_MAX_PLAYERS must be a decimal integer")?;
     if !(2..=TARGET_PLAYERS_PER_MAP).contains(&count) {
         bail!("MYASO_MAX_PLAYERS must be between 2 and {TARGET_PLAYERS_PER_MAP}");
     }
@@ -1362,7 +1366,10 @@ mod r0_player_cap_tests {
         assert_eq!(parse_player_cap(Some("8")).unwrap(), 8);
         assert_eq!(parse_player_cap(Some("512")).unwrap(), 512);
         for invalid in ["", "0", "1", "513", "-1", "abc", "8.5"] {
-            assert!(parse_player_cap(Some(invalid)).is_err(), "unexpected admission cap accepted: {invalid}");
+            assert!(
+                parse_player_cap(Some(invalid)).is_err(),
+                "unexpected admission cap accepted: {invalid}"
+            );
         }
     }
 }
