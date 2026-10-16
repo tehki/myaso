@@ -101,6 +101,7 @@ jobs:
           node --check src/browser/m233-recovery-handoff-trace.mjs
           node --check tests/m233-recovery-handoff-trace.test.mjs
           node --check tests/m234-m145-trusted-light-onset.test.mjs
+          node --check tests/r0-alpha-config.test.mjs
           node --check tests/m6-browser-authority.test.mjs
           node --check tests/m7-browser-flight.test.mjs
           node --check tests/m12-reliable-baseline.test.mjs
@@ -956,6 +957,13 @@ jobs:
 
       - name: Validate M234 trusted M145 light-onset staging
         run: node --test tests/m234-m145-trusted-light-onset.test.mjs
+
+      - name: Validate R0 multiplayer alpha entrypoint and deployment safety
+        run: |
+          node --check web/alpha.mjs
+          node --check web/alpha-config.mjs
+          node --test tests/r0-alpha-config.test.mjs
+          bash -n ops/alpha/install-vps.sh ops/alpha/rotate-cert.sh
 
       - name: Validate M63 redundant action recovery under input loss
         env:

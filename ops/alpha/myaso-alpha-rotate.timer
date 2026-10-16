@@ -1,0 +1,11 @@
+[Unit]
+Description=Check pinned WebTransport certificate daily
+
+[Timer]
+OnCalendar=*-*-* 03:17:00
+Persistent=true
+RandomizedDelaySec=15m
+Unit=myaso-alpha-rotate.service
+
+[Install]
+WantedBy=timers.target

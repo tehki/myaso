@@ -1,0 +1,12 @@
+# R0 alpha is an isolated *new* site. Existing Admin-Call Caddy handlers are untouched.
+# Caddy obtains the public HTTPS certificate after the game DNS A record exists.
+game.open-trust-layer.org {
+    encode zstd gzip
+    root * /srv/myaso/alpha/current/public
+    @config path /game-config.json
+    header @config Cache-Control "no-store, max-age=0"
+    header X-Content-Type-Options nosniff
+    header Referrer-Policy strict-origin-when-cross-origin
+    redir / /web/alpha.html 302
+    file_server
+}

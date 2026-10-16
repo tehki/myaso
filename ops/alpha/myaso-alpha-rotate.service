@@ -1,0 +1,6 @@
+[Unit]
+Description=Rotate short-lived pinned myaso WebTransport certificate
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/libexec/myaso-alpha/rotate-cert.sh

@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#171411">
+  <title>MYASO.IO — Multiplayer Alpha</title>
+  <link rel="stylesheet" href="/web/alpha.css">
+</head>
+<body>
+  <main class="page">
+    <header class="topbar">
+      <span class="brand">MYASO<span>.IO</span></span>
+      <span class="phase">OPEN TRUST LAYER / ALPHA</span>
+    </header>
+    <section class="hero" aria-labelledby="heading">
+      <p class="eyebrow">THE ARENA IS CALLING</p>
+      <h1 id="heading">FIGHT<br><em>FOR YOUR</em><br>PLACE.</h1>
+      <p class="intro">Real players. One shared arena. No grind and no pay-to-win. Read the strike, time the parry, and land the punish.</p>
+      <div class="actions">
+        <button id="join-arena" disabled>JOIN MULTIPLAYER <span aria-hidden="true">↗</span></button>
+        <button class="secondary" id="copy-invite">COPY INVITE LINK</button>
+      </div>
+      <p class="status" id="server-status" role="status">Checking the arena configuration…</p>
+      <p class="share-status" id="share-status" role="status"></p>
+    </section>
+    <section class="details" aria-label="Alpha game information">
+      <article><span class="small">01 / FORMAT</span><strong>FREE FOR ALL</strong><p id="alpha-cap">One shared arena · Limited capacity</p></article>
+      <article><span class="small">02 / COMBAT</span><strong>SKILL FIRST</strong><p>Roll, block, kick, jump, counterattack. Death and respawn are part of the fight.</p></article>
+      <article><span class="small">03 / STATUS</span><strong>EARLY ACCESS</strong><p>This is a real-player technical alpha. Expect rough edges and brief restarts.</p></article>
+    </section>
+    <footer><span>WASD move · Mouse aim · LMB strike · RMB kick/run · Wheel roll/parry · Space jump</span><a href="/web/">LOCAL PRACTICE</a></footer>
+  </main>
+  <script type="module" src="/web/alpha.mjs"></script>
+</body>
+</html>

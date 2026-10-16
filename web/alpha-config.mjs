@@ -1,0 +1,32 @@
+// R0: validate the VPS-controlled WebTransport endpoint before opening a game.
+// The trusted HTTPS page serves /game-config.json with the currently pinned,
+// short-lived QUIC certificate SHA-256. Never use an arbitrary external URL.
+export function parseAlphaConfig(raw, expectedHost = "game.open-trust-layer.org") {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+    throw new TypeError("alpha configuration is unavailable");
+  }
+  if (typeof raw.serverUrl !== "string") throw new TypeError("alpha server URL is missing");
+  const url = new URL(raw.serverUrl);
+  if (url.protocol !== "https:" || url.hostname !== expectedHost
+    || url.port !== "4433" || url.pathname !== "/game"
+    || url.search || url.hash || url.username || url.password) {
+    throw new TypeError("alpha server URL is not the trusted game endpoint");
+  }
+  if (typeof raw.certificateSha256 !== "string" || !/^[0-9a-f]{64}$/i.test(raw.certificateSha256)) {
+    throw new TypeError("alpha certificate fingerprint must be 64 hexadecimal characters");
+  }
+  if (!Number.isInteger(raw.maxPlayers) || raw.maxPlayers < 2 || raw.maxPlayers > 8) {
+    throw new TypeError("alpha player cap must be between 2 and 8");
+  }
+  return Object.freeze({
+    serverUrl: url.href,
+    certificateSha256: raw.certificateSha256.toLowerCase(),
+    maxPlayers: raw.maxPlayers,
+  });
+}
+export function alphaPlayPath(config) {
+  return "/web/?" + new URLSearchParams({
+    server: config.serverUrl,
+    cert: config.certificateSha256,
+  });
+}

@@ -266,7 +266,20 @@ async fn main() -> Result<()> {
         println!("development certificate SHA-256: {hash}");
     }
 
-    let gate = AdmissionGate::new(TARGET_PLAYERS_PER_MAP - flight.background_players);
+    // R0 alpha: explicitly cap *real* concurrent players on the shared VPS.
+    // Flight fixtures remain loopback-only, and the default engineering cap
+    // stays unchanged for the existing 512-player acceptance suite.
+    let player_cap_raw = match env::var("MYASO_MAX_PLAYERS") {
+        Ok(value) => Some(value),
+        Err(env::VarError::NotPresent) => None,
+        Err(error) => bail!("MYASO_MAX_PLAYERS is invalid: {error}"),
+    };
+    let player_cap = parse_player_cap(player_cap_raw.as_deref())?;
+    if flight.background_players >= player_cap {
+        bail!("flight background player count must remain below MYASO_MAX_PLAYERS");
+    }
+    let gate = AdmissionGate::new(player_cap - flight.background_players);
+    println!("myaso admission cap: {player_cap} concurrent players");
     let game = SharedGame::new(flight);
     // Accept server-side diagnostic output only on loopback and only when
     // explicitly requested by the real-browser M201 acceptance fixture.
@@ -345,6 +358,18 @@ async fn main() -> Result<()> {
     }
 }
 
+fn parse_player_cap(raw: Option<&str>) -> Result<usize> {
+    let Some(raw) = raw else {
+        return Ok(TARGET_PLAYERS_PER_MAP);
+    };
+    let count: usize = raw
+        .parse()
+        .context("MYASO_MAX_PLAYERS must be a decimal integer")?;
+    if !(2..=TARGET_PLAYERS_PER_MAP).contains(&count) {
+        bail!("MYASO_MAX_PLAYERS must be between 2 and {TARGET_PLAYERS_PER_MAP}");
+    }
+    Ok(count)
+}
 fn load_loopback_flight_config(bind: SocketAddr) -> Result<LoopbackFlightConfig> {
     let background_players = env::var("MYASO_FLIGHT_BACKGROUND_PLAYERS")
         .ok()
@@ -1327,5 +1352,24 @@ mod tests {
             4,
             Duration::from_millis(250)
         ));
+    }
+}
+
+#[cfg(test)]
+mod r0_player_cap_tests {
+    use super::parse_player_cap;
+
+    #[test]
+    fn alpha_cap_is_strict_and_engineering_default_is_preserved() {
+        assert_eq!(parse_player_cap(None).unwrap(), 512);
+        assert_eq!(parse_player_cap(Some("2")).unwrap(), 2);
+        assert_eq!(parse_player_cap(Some("8")).unwrap(), 8);
+        assert_eq!(parse_player_cap(Some("512")).unwrap(), 512);
+        for invalid in ["", "0", "1", "513", "-1", "abc", "8.5"] {
+            assert!(
+                parse_player_cap(Some(invalid)).is_err(),
+                "unexpected admission cap accepted: {invalid}"
+            );
+        }
     }
 }
