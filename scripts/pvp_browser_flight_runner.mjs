@@ -14,6 +14,7 @@ import { summarizeM216ParryPunishLatency } from "./m216-successful-parry-punish-
 import { summarizeM217SuccessfulKickLatency } from "./m217-successful-kick-latency.mjs";
 import { correlateM230HeavyReplayEvidence } from "./m230-heavy-replay-correlation.mjs";
 import { withM231M108FailureEvidence } from "./m231-m108-failure-path.mjs";
+import { summarizeM232SpatialHandoffFailure } from "./m232-spatial-handoff-failure.mjs";
 import { summarizeM218JumpAttackLatency } from "./m218-successful-jump-attack-latency.mjs";
 import { observeM219RollBufferIngress } from "./m219-buffered-roll-ingress-evidence.mjs";
 import { summarizeM220KnockdownFocusTimeline } from "./m220-knockdown-focus-timeline.mjs";
@@ -10787,9 +10788,16 @@ async function runOnlineUiMultiRecoveryFfaFocusFlight(entries, spatial = false) 
   const nearestReturnIndex = focusTransitions.findIndex((entry, index) =>
     index > jumpPunishIndex && entry.label === `NEAREST #${lightId}`);
   if (lightPunishIndex < 0 || jumpPunishIndex <= lightPunishIndex || nearestReturnIndex <= jumpPunishIndex) {
+    // M232: only on a genuine M145 spatial RED, include the already-captured
+    // Firefox focus-label/ring pixel samples. Keep the original strict
+    // 3-stage gate, authentic W3C input and authoritative evidence unchanged.
+    const spatialFailureEvidence = spatial
+      ? summarizeM232SpatialHandoffFailure(spatialSamples, { lightId, jumpId })
+      : null;
     throw new Error(`${milestone} did not arbitrate nearest punishable -> remaining punishable -> nearest rival: ${JSON.stringify({
       focusTransitions,
       evidence,
+      ...(spatial ? { spatialFailureEvidence } : {}),
     })}`);
   }
 
