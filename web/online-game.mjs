@@ -5,6 +5,7 @@ import { createCombatImpactController } from "../src/browser/combat-impact.mjs";
 import { COMBAT_ACTION, blockSpatialPresentation, combatActionHint, combatOverlayPresentation, createCombatReadabilityTracker, createRemoteDamageTracker, fighterFocusNetId, fighterGuardBreakPunishNetId, guardBreakPunishRangeCue, fighterKnockdownPunishNetId, knockdownPunishRangeCue, fighterParryPunishNetId, parryPunishRangeCue, fighterRecoveryNetId, recoveryPunishRangeCue, punishRangeCueIntent, fighterIdentityPresentation, fighterThreatBearingLabel, fighterThreatGuardArcLabel, fighterThreatNetId, fighterThreatPhaseLabel, fighterThreatPhaseState, fighterMatchPointPresentation, fighterMatchPresentation, fighterScoreboardPresentation, FFA_KILL_TARGET, fighterVitalsPresentation, guardBreakSpatialPresentation, killFeedPresentation, opponentRecoveryPresentation, parrySpatialPresentation, staminaDenialPresentation, ownCombatReadinessPresentation } from "../src/browser/combat-readability.mjs";
 import { COMBAT } from "../src/combat/model.mjs";
 import { isTickNewer32, reconcilePrediction } from "../src/browser/reconciliation.mjs";
+import { createReconciliationCamera, createSnapshotRenderClock } from "../src/browser/smooth-motion.mjs";
 import { NETWORK } from "../src/network/constants.mjs";
 import { connectAuthoritativeClient, parseSha256Hex } from "./authoritative-client.mjs";
 
@@ -107,6 +108,9 @@ const currentInput = {
 };
 const arenaLayer = createArenaLayer();
 const remoteScratch = new Map();
+const snapshotRenderClock = createSnapshotRenderClock();
+const visualCamera = createReconciliationCamera();
+const visualCameraPosition = { x: 0, y: 0 };
 const fixedStepMs = 1000 / NETWORK.clientPredictionHz;
 const frameBudget = createFrameBudget({ stepMs: fixedStepMs, maxFrameDeltaMs: 50, maxStepsPerFrame: 6 });
 let networkClient = null;
@@ -205,6 +209,8 @@ networkClient = await connectAuthoritativeClient({
     const ownId = networkClient?.playerNetId;
     const own = ownId ? networkClient.state.get(ownId) : null;
     if (!own) return;
+    const preReconcileX = local.x;
+    const preReconcileY = local.y;
     reconcilePrediction({
       history: networkClient.predictionHistory,
       processedClientTick: networkClient.processedClientTick,
@@ -212,6 +218,13 @@ networkClient = await connectAuthoritativeClient({
       restoreAuthoritative,
       replayInput(entry) { predictMovement(entry, 1000 / NETWORK.inputSendHz); },
     });
+    if (Number.isFinite(preReconcileX) && Number.isFinite(preReconcileY)) {
+      visualCamera.absorb(
+        { x: preReconcileX, y: preReconcileY },
+        local,
+        performance.now(),
+      );
+    }
     confirmStaminaDenial(own);
     networkStatus = `Online - player #${ownId} - server tick ${networkClient.latestServerTick}`;
   },
@@ -660,10 +673,10 @@ function render(nowMs = performance.now(), impact = combatImpact.sample(nowMs)) 
     const own = networkClient.state.get(ownId);
     if (own) restoreAuthoritative(own);
   }
-  const interpolationTicks = Math.round((NETWORK.reconciliation.remoteInterpolationMs / 1000) * NETWORK.serverSimulationHz);
-  const renderServerTick = networkClient.latestServerTick >= interpolationTicks
-    ? networkClient.latestServerTick - interpolationTicks
-    : 0;
+  // 20Hz packets alone cannot drive smooth 60Hz remote motion. Interpolate
+  // with an advancing render-only clock; cap extrapolation on missing packets.
+  const renderServerTick = snapshotRenderClock.sample(networkClient.latestServerTick, nowMs);
+  visualCamera.sample(local, nowMs, visualCameraPosition);
   const recoveryFocusNetId = fighterRecoveryNetId(networkClient.state, ownId);
 
   for (const entity of networkClient.state.values()) {
@@ -700,8 +713,8 @@ function drawImpactBurst(impact) {
     const focusNetId = fighterFocusNetId(networkClient.state, networkClient.playerNetId);
     const focus = focusNetId ? networkClient.state.get(focusNetId) : null;
     if (focus && local.initialized) {
-      x += focus.x - local.x;
-      y += focus.y - local.y;
+      x += focus.x - visualCameraPosition.x;
+      y += focus.y - visualCameraPosition.y;
     }
   }
 
@@ -780,8 +793,8 @@ function drawThreatMarker(bearing, secondary) {
 
 function drawFighterWorld(fighter, body, shadow, damageTell = false, netId = 0, recoveryTell = false) {
   if (!local.initialized) return;
-  const screenX = canvas.width / 2 + fighter.x - local.x;
-  const screenY = canvas.height / 2 + fighter.y - local.y;
+  const screenX = canvas.width / 2 + fighter.x - visualCameraPosition.x;
+  const screenY = canvas.height / 2 + fighter.y - visualCameraPosition.y;
   if (screenX < -64 || screenX > canvas.width + 64 || screenY < -64 || screenY > canvas.height + 64) return;
   drawFighterScreen(screenX, screenY, fighter, body, shadow, true, damageTell, recoveryTell);
   drawRemoteVitals(screenX, screenY, fighter);
@@ -1504,9 +1517,13 @@ function handleVisibilityChange() {
     if (animationFrameId) cancelAnimationFrame(animationFrameId);
     animationFrameId = 0;
     frameBudget.reset();
+    snapshotRenderClock.reset();
+    visualCamera.reset();
     return;
   }
   frameBudget.reset(performance.now());
+  snapshotRenderClock.reset();
+  visualCamera.reset();
   if (!animationFrameId) animationFrameId = requestAnimationFrame(frame);
 }
 
