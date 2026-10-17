@@ -520,6 +520,7 @@ jobs:
         run: |
           node --check web/online-game.mjs
           node --check scripts/pvp_browser_flight_runner.mjs
+          node --test tests/r1-parry-short-click.test.mjs
           node scripts/pvp_browser_flight_runner.mjs
 
       - name: Validate M147 actionable FFA recovery punish

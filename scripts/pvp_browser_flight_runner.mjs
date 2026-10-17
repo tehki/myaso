@@ -7842,21 +7842,35 @@ async function runOnlineUiParryFlight(entries, postParrySleepMs = 80, roles = nu
   for (let attempt = 0; attempt < 4 && !evidence; attempt += 1) {
     await pulseMovementKey(attacker, movementKey, attempt === 0 ? 120 : 80);
     lastAttemptBaseline = await Promise.all(entries.map(readUiEvidence));
-    let attackHeld = false;
-    let blockHeld = false;
-    try {
-      attackHeld = true;
-      await setArenaAttack(attacker, attackerElementId, true, attackOffset);
-      await sleep(70);
-      blockHeld = true;
-      await setArenaBlock(defender, defenderElementId, true);
-      await sleep(190);
-      evidence = await waitForUiParryEvidence(entries, attacker, defender, 320, false, lastAttemptBaseline);
-    } finally {
-      if (attackHeld) await setArenaAttack(attacker, attackerElementId, false, attackOffset);
-      if (blockHeld) await setArenaBlock(defender, defenderElementId, false);
+    // R1 short LMB commits the light on genuine pointerUP. The pre-R1
+    // down -> wheel -> 190ms -> up sequence can exceed the 320ms charge
+    // threshold under real WebDriver latency and produce a HEAVY instead.
+    // Use one complete, 75ms trusted W3C tap before the real wheel-back.
+    // Keep its independent 125ms parry/650ms stun and genuine feedback gates.
+    await performArenaAttackHold(attacker, attackerElementId, attackOffset, 75);
+    await sleep(55);
+    await setArenaBlock(defender, defenderElementId, true);
+    evidence = await waitForUiParryEvidence(entries, attacker, defender, 350, false, lastAttemptBaseline);
+    if (!evidence) {
+      const after = await Promise.all(entries.map(readUiEvidence));
+      const stagedAttacker = after.find((entry) => entry.browser === attacker.name);
+      const stagedDefender = after.find((entry) => entry.browser === defender.name);
+      const attackerBefore = lastAttemptBaseline.find((entry) => entry.browser === attacker.name);
+      const defenderBefore = lastAttemptBaseline.find((entry) => entry.browser === defender.name);
+      // Never replay a resolved but unsuccessful parry: any real HP/guard
+      // change, a heavy commitment, or death remains a fatal red gate.
+      const pristine = stagedAttacker?.playerHp === attackerBefore?.playerHp
+        && stagedAttacker?.playerGuard === attackerBefore?.playerGuard
+        && stagedDefender?.playerHp === defenderBefore?.playerHp
+        && stagedDefender?.playerGuard === defenderBefore?.playerGuard
+        && !stagedAttacker?.events.some((entry) => entry.startsWith("Heavy strike committed"))
+        && !stagedDefender?.events.some((entry) => entry.startsWith("Hit taken"))
+        && !stagedAttacker?.events.some((entry) => entry.startsWith("Opponent hit"));
+      if (!pristine) {
+        throw new Error("M33 genuine short-click parry resolved unexpectedly: " + JSON.stringify(after));
+      }
+      await sleep(260);
     }
-    if (!evidence) await sleep(260);
   }
   if (!evidence) evidence = await waitForUiParryEvidence(entries, attacker, defender, 800, true, lastAttemptBaseline);
 

@@ -76,3 +76,18 @@ gesture and stops retrying immediately. It still requires the exact
 one-hit 34HP punish, 100HP/guard defender, one genuine heavy whiff,
 and bidirectional authoritative hit feedback. No extra input, synthetic
 browser event, combat timing, network or production code changes.
+
+### M33 / M146 genuine short-click parry choreography
+Strict quality run 39025822336 attempt 2 reached 82 green steps and passed
+M144 three-stage recovery and M145 spatial recovery. It failed M146 because
+the inherited M33 parry fixture held Firefox LMB down while submitting Chrome
+wheel-back and waiting a further 190ms, then sent pointerUP. Under browser
+scheduler latency this becomes an R1 **charged heavy** (authoritative
+Firefox heavy windup/recovery and 46-damage strikes), not the intended light.
+The shared parry fixture now sends one complete 75ms authentic W3C left
+tap, waits 55ms, then sends the one genuine wheel-back. Any real damage,
+guard loss or committed heavy remains fatal; clean retries only. M146 still
+requires the real 125ms parry, unchanged 650ms stun, a genuine delayed light
+input at 340..470ms after stun, exact 34HP punish, and both authoritative
+feedback events. Production combat, input routing, server and network
+constants remain unchanged.
