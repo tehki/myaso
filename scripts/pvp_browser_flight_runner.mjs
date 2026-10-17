@@ -7204,7 +7204,8 @@ async function runOnlineUiFeintFlight(entries) {
     || !Number.isFinite(exhaustedLightUp.epochMs)
     || !Number.isFinite(exhaustedWheelBack.epochMs)
     || exhaustedLightUp.epochMs <= exhaustedLightDown.epochMs
-    || Math.abs(exhaustedWheelBack.epochMs - exhaustedLightDown.epochMs) > 80) {
+    || exhaustedWheelBack.epochMs < exhaustedLightUp.epochMs
+    || exhaustedWheelBack.epochMs - exhaustedLightUp.epochMs > 80) {
     throw new Error("M170 exhausted feint did not deliver the same genuine early LMB+wheel-back chord: "
       + JSON.stringify({ pointers: exhaustedPointers, wheels: exhaustedWheels }));
   }

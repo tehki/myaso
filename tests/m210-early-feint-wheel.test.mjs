@@ -14,21 +14,21 @@ function extractActions(id){
  const end=gesture.indexOf("]",b);
  return gesture.slice(b,end+1);
 }
-test("M210 keeps one genuine W3C LMB down and up, held for 90ms",()=>{
+test("R1 preserves one genuine short W3C LMB held for 85ms then released",()=>{
  const pointer=extractActions("mouse");
  assert.equal((pointer.match(/type: "pointerDown"/g)||[]).length,1);
  assert.equal((pointer.match(/type: "pointerUp"/g)||[]).length,1);
  assert.ok(pointer.indexOf("pointerDown")<pointer.indexOf("pointerUp"));
- assert.match(pointer,/duration: 5/);
  assert.match(pointer,/duration: 85/);
- assert.ok(pointer.indexOf("duration: 5")<pointer.indexOf("duration: 85"));
- assert.ok(!pointer.includes("duration: 20"));
+ assert.match(pointer,/duration: 20/);
+ assert.ok(pointer.indexOf("duration: 85")<pointer.indexOf("pointerUp"));
+ assert.ok(pointer.indexOf("pointerUp")<pointer.indexOf("duration: 20"));
 });
-test("M210 real wheel-back is in next W3C tick, not same tick as LMB-down",()=>{
+test("R1 wheel-back is in a later W3C tick than LMB release",()=>{
  const wheel=extractActions("wheel");
  assert.equal((wheel.match(/type: "scroll"/g)||[]).length,1);
- assert.ok(wheel.indexOf("duration: 5") < wheel.indexOf('type: "scroll"'));
- assert.ok(wheel.indexOf('type: "scroll"') < wheel.indexOf("duration: 85"));
+ assert.ok(wheel.indexOf("duration: 85") < wheel.indexOf("duration: 20"));
+ assert.ok(wheel.indexOf("duration: 20") < wheel.indexOf('type: "scroll"'));
  assert.match(wheel,/deltaY: 120/);
 });
 test("M210 preserves unchanged 70ms feint, strict 100HP and one observed recovery",()=>{
@@ -41,5 +41,6 @@ test("M210 preserves unchanged 70ms feint, strict 100HP and one observed recover
  assert.ok(flight.includes("COMBAT.feint.staminaCost"));
  assert.ok(flight.includes("exhaustedLightDown"));
  assert.ok(flight.includes("exhaustedWheelBack"));
- assert.ok(flight.includes("Math.abs(exhaustedWheelBack.epochMs - exhaustedLightDown.epochMs) > 80"));
+ assert.ok(flight.includes("exhaustedWheelBack.epochMs - exhaustedLightUp.epochMs > 80"));
+ assert.ok(flight.includes("exhaustedWheelBack.epochMs < exhaustedLightUp.epochMs"));
 });
