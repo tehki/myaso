@@ -64,3 +64,15 @@ proofs and real browser input evidence; extend **M144 observation only**
 to a bounded 1250ms. M145 spatial observation stays 760ms and its
 original 100ms trusted-input lead/70–150ms proof remains unchanged.
 No production gameplay, timing or network change.
+
+### M109 late confirmed light commitment
+Quality run 39022536314 failed its strict real Chrome/Firefox M109 punish
+when the genuine Chrome light pointerdown/up was seen and the remote Firefox
+threat plus local `Attack committed` arrived only in the final evidence read,
+after the 105ms commit poll. The old harness misclassified that positive,
+non-clean evidence as an unexpected retry failure. R1 recognizes a
+**late real commitment** from the SAME already-verified complete pointer
+gesture and stops retrying immediately. It still requires the exact
+one-hit 34HP punish, 100HP/guard defender, one genuine heavy whiff,
+and bidirectional authoritative hit feedback. No extra input, synthetic
+browser event, combat timing, network or production code changes.

@@ -327,6 +327,7 @@ jobs:
           MYASO_PVP_SCENARIO: "uiheavypunish"
         run: |
           node --check scripts/pvp_browser_flight_runner.mjs
+          node --test tests/r1-m109-late-commit.test.mjs
           node scripts/pvp_browser_flight_runner.mjs
 
       - name: Validate M110 real heavy guard-break pressure

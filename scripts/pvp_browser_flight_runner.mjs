@@ -7490,6 +7490,20 @@ async function runOnlineUiHeavyWhiffPunishFlight(entries) {
       if (!down || !up || up.t <= down.t) {
         throw new Error(`M109 punish retry ${attempt} lacked a complete real LMB gesture: ${JSON.stringify(missDefender)}`);
       }
+      // R1 light commits on real pointerup. The additional evidence read
+      // after the bounded 105ms poll can be the FIRST read to confirm a
+      // genuinely committed light or remote threat. Accept that evidence
+      // as this attempt's commit; never classify it as a clean latch miss
+      // or send a duplicate LMB. The strict 34HP/no-heavy-hit final gates
+      // below still reject any failed punish.
+      const lateCommitted = lightCommitCount(missDefender) > commitsBefore
+        || lightThreatCount(missAttacker) > threatsBefore
+        || missAttacker.playerHp < 100 || missDefender.opponentHp < 100;
+      if (lateCommitted) {
+        successfulPunishPointerOffset = pointerOffset;
+        punishCommitted = true;
+        break;
+      }
       const cleanLatchMiss = missAttacker.playerHp === 100 && missAttacker.playerGuard === 100
         && missAttacker.opponentHp === 100 && missAttacker.opponentGuard === 100
         && missDefender.playerHp === 100 && missDefender.playerGuard === 100
