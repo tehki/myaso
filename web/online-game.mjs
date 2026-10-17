@@ -2,12 +2,13 @@ import { createFrameBudget } from "../src/browser/frame-budget.mjs";
 import { recordM233RecoveryHandoff } from "../src/browser/m233-recovery-handoff-trace.mjs";
 import { installRightButtonGesture } from "../src/browser/right-button-gesture.mjs";
 import { createLeftButtonCharge } from "../src/browser/left-button-charge.mjs";
-import { captureLightAttackMovement } from "../src/browser/light-attack-movement.mjs";
+import { captureLightAttackMovement, resolveLightAttackReleaseMovement } from "../src/browser/light-attack-movement.mjs";
 import { createCombatImpactController } from "../src/browser/combat-impact.mjs";
 import { COMBAT_ACTION, blockSpatialPresentation, combatActionHint, combatOverlayPresentation, createCombatReadabilityTracker, createRemoteDamageTracker, fighterFocusNetId, fighterGuardBreakPunishNetId, guardBreakPunishRangeCue, fighterKnockdownPunishNetId, knockdownPunishRangeCue, fighterParryPunishNetId, parryPunishRangeCue, fighterRecoveryNetId, recoveryPunishRangeCue, punishRangeCueIntent, fighterIdentityPresentation, fighterThreatBearingLabel, fighterThreatGuardArcLabel, fighterThreatNetId, fighterThreatPhaseLabel, fighterThreatPhaseState, fighterMatchPointPresentation, fighterMatchPresentation, fighterScoreboardPresentation, FFA_KILL_TARGET, fighterVitalsPresentation, guardBreakSpatialPresentation, killFeedPresentation, opponentRecoveryPresentation, parrySpatialPresentation, staminaDenialPresentation, ownCombatReadinessPresentation } from "../src/browser/combat-readability.mjs";
 import { COMBAT } from "../src/combat/model.mjs";
 import { isTickNewer32, reconcilePrediction } from "../src/browser/reconciliation.mjs";
 import { createReconciliationCamera, createSnapshotRenderClock } from "../src/browser/smooth-motion.mjs";
+import { ARENA_VIEW_ZOOM, nearbyOffscreenPointers, projectArenaPoint } from "../src/browser/arena-viewport.mjs";
 import { NETWORK } from "../src/network/constants.mjs";
 import { connectAuthoritativeClient, parseSha256Hex } from "./authoritative-client.mjs";
 
@@ -124,6 +125,7 @@ function updateNetworkDiagnostics(nowMs) {
     + ` | Camera correction p95 ${s.cameraCorrectionP95 === null ? "collecting…" : s.cameraCorrectionP95 + "u"}`
     + ` | Stale-own ACKs ${s.staleOwnAtAckCount}`
     + ` | Deferred reconciles ${networkClient.ackGateMetrics.deferred}`
+    + ` | Render catch-ups ${snapshotRenderClock.metrics().boundedCatchups}`
     + ` | Samples ${s.inputAckSamples}`;
 }
 const acceptanceScenario = params.get("scenario");
@@ -144,6 +146,7 @@ const currentInput = {
 };
 const arenaLayer = createArenaLayer();
 const remoteScratch = new Map();
+const visibleEnemyPositions = [];
 const snapshotRenderClock = createSnapshotRenderClock();
 const visualCamera = createReconciliationCamera();
 const visualCameraPosition = { x: 0, y: 0 };
@@ -155,6 +158,7 @@ let predictionStep = 0;
 let clientTick = 0;
 let attackRequested = false;
 let committedLightMove = null;
+let leftButtonPressMovement = null;
 let leftButtonDown = false;
 let heavyAttackRequested = false;
 let rollRequested = false;
@@ -164,14 +168,16 @@ let shortBlockUntil = 0;
 const leftButtonCharge = createLeftButtonCharge({
   onLight() {
     attackRequested = true;
-    committedLightMove = captureLightAttackMovement(keys);
+    committedLightMove = resolveLightAttackReleaseMovement(
+      captureLightAttackMovement(keys), leftButtonPressMovement);
+    leftButtonPressMovement = null;
     if (local.action === COMBAT_ACTION.jump) queueStaminaDenial("jump-attack");
     else if (!pendingStaminaDenial && (jumpRequested || keys.has("Space"))) queueStaminaDenial("jump-attack-chord");
     else if (rightButtonGesture.isRunning() && ["KeyW", "KeyA", "KeyS", "KeyD"].some((code) => keys.has(code))) {
       queueStaminaDenial("running-attack");
     }
   },
-  onHeavy() { heavyAttackRequested = true; },
+  onHeavy() { heavyAttackRequested = true; leftButtonPressMovement = null; },
 });
 const rightButtonGesture = installRightButtonGesture(canvas, {
   onKick: () => {
@@ -187,6 +193,7 @@ canvas.addEventListener("pointerdown", (event) => {
   updateMouse(event);
   if (event.button === 0) {
     leftButtonDown = true;
+    leftButtonPressMovement = captureLightAttackMovement(keys);
     const runningChord = rightButtonGesture.isRunning()
       && ["KeyW", "KeyA", "KeyS", "KeyD"].some((code) => keys.has(code));
     leftButtonCharge.press(event.pointerId, {
@@ -199,14 +206,22 @@ function onLeftPointerUp(event) {
   leftButtonDown = false;
   updateMouse(event);
   leftButtonCharge.release(event.pointerId);
+  leftButtonPressMovement = null;
 }
 canvas.addEventListener("pointerup", onLeftPointerUp);
 window.addEventListener("pointerup", onLeftPointerUp);
 canvas.addEventListener("pointercancel", (event) => {
-  if (event.button === 0) { leftButtonDown = false; leftButtonCharge.cancel(event.pointerId); }
+  if (event.button === 0) {
+    leftButtonDown = false;
+    leftButtonPressMovement = null;
+    leftButtonCharge.cancel(event.pointerId);
+  }
 });
 canvas.addEventListener("lostpointercapture", (event) => {
-  if (event.pointerId !== undefined) leftButtonCharge.cancel(event.pointerId);
+  if (event.pointerId !== undefined) {
+    leftButtonPressMovement = null;
+    leftButtonCharge.cancel(event.pointerId);
+  }
 });
 canvas.addEventListener("wheel", (event) => {
   event.preventDefault();
@@ -593,6 +608,7 @@ function releaseInputs() {
   attackRequested = false;
   committedLightMove = null;
   leftButtonDown = false;
+  leftButtonPressMovement = null;
   leftButtonCharge.cancel();
   heavyAttackRequested = false;
   rollRequested = false;
@@ -739,22 +755,49 @@ function render(nowMs = performance.now(), impact = combatImpact.sample(nowMs)) 
   visualCamera.sample(local, nowMs, visualCameraPosition);
   updateNetworkDiagnostics(nowMs);
   const recoveryFocusNetId = fighterRecoveryNetId(networkClient.state, ownId);
+  visibleEnemyPositions.length = 0;
+  // Apply the zoom to *rendering* only. Local prediction, sampled mouse aim,
+  // network packets, combat arcs and authoritative hitboxes stay in world units.
+  // Keep HUD and edge pointers outside this transform at readable pixel size.
+  ctx.save();
+  ctx.translate(canvas.width / 2, canvas.height / 2);
+  ctx.scale(ARENA_VIEW_ZOOM, ARENA_VIEW_ZOOM);
+  ctx.translate(-canvas.width / 2, -canvas.height / 2);
 
   for (const entity of networkClient.state.values()) {
     if (entity.netId === ownId) continue;
     let scratch = remoteScratch.get(entity.netId);
     if (!scratch) {
-      scratch = {};
+      scratch = { netId: entity.netId };
       remoteScratch.set(entity.netId, scratch);
     }
     const sampled = networkClient.remoteInterpolator.sample(entity.netId, renderServerTick, scratch) ?? entity;
+    // Keep all remote sprites for the screen-space HUD pass. The offscreen
+    // pointer helper excludes dead fighters on its own.
+    visibleEnemyPositions.push(sampled);
     const damageTell = remoteDamage.visible(entity.netId, nowMs);
     const recoveryTell = entity.netId === recoveryFocusNetId;
-    drawFighterWorld(sampled, "#b96350", "#47251f", damageTell, entity.netId, recoveryTell);
+    drawFighterWorld(sampled, "#b96350", "#47251f", damageTell, recoveryTell);
   }
   if (ownId && local.initialized) drawFighterScreen(canvas.width / 2, canvas.height / 2, local, "#e2d5b4", "#51452d");
+  ctx.restore();
+  // R1 wider view: health/guard bars and player identity badges are UI,
+  // not world geometry. Keep their original unscaled 42px/34px readability
+  // while placing them above their zoom-projected remote fighter positions.
+  // This also preserves strict M46 66/100 vitals and M47 identity pixels.
+  if (local.initialized) {
+    for (const enemy of visibleEnemyPositions) {
+      const projected = projectArenaPoint(enemy.x, enemy.y,
+        visualCameraPosition.x, visualCameraPosition.y, canvas.width, canvas.height);
+      if (projected.x < -64 || projected.x > canvas.width + 64
+        || projected.y < -64 || projected.y > canvas.height + 64) continue;
+      drawRemoteVitals(projected.x, projected.y, enemy);
+      drawRemoteIdentity(projected.x, projected.y, enemy.netId);
+    }
+  }
   updateHud(ownId);
   drawThreatMarkers();
+  if (local.initialized) drawOffscreenEnemyPointers(visibleEnemyPositions, ownId);
   ctx.restore();
   drawImpactBurst(impact);
 }
@@ -774,8 +817,10 @@ function drawImpactBurst(impact) {
     const focusNetId = fighterFocusNetId(networkClient.state, networkClient.playerNetId);
     const focus = focusNetId ? networkClient.state.get(focusNetId) : null;
     if (focus && local.initialized) {
-      x += focus.x - visualCameraPosition.x;
-      y += focus.y - visualCameraPosition.y;
+      const projected = projectArenaPoint(focus.x, focus.y,
+        visualCameraPosition.x, visualCameraPosition.y, canvas.width, canvas.height);
+      x = projected.x;
+      y = projected.y;
     }
   }
 
@@ -804,6 +849,40 @@ function drawImpactBurst(impact) {
   ctx.beginPath();
   ctx.arc(x, y, Math.max(4, radius * 0.34), 0, Math.PI * 2);
   ctx.fill();
+  ctx.restore();
+}
+
+function drawOffscreenEnemyPointers(positions, ownId) {
+  const pointers = nearbyOffscreenPointers(positions, ownId, visualCameraPosition,
+    canvas.width, canvas.height, { deadAction: COMBAT_ACTION.dead });
+  if (!pointers.length) return;
+  ctx.save();
+  ctx.fillStyle = "#dcae83";
+  ctx.strokeStyle = "#4d302a";
+  ctx.lineWidth = 1;
+  ctx.font = "9px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  for (const pointer of pointers) {
+    // Subtle 9px pointer, not a threatening attack indicator. Existing
+    // parry/attack red markers have independent meaning and remain intact.
+    ctx.save();
+    ctx.translate(pointer.x, pointer.y);
+    ctx.rotate(pointer.angle);
+    ctx.globalAlpha = 0.85;
+    ctx.beginPath();
+    ctx.moveTo(9, 0);
+    ctx.lineTo(-3, -4.5);
+    ctx.lineTo(-3, 4.5);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    ctx.restore();
+    ctx.fillStyle = "#edd9b5";
+    ctx.fillText(`#${pointer.netId}`, pointer.x - Math.cos(pointer.angle) * 15,
+      pointer.y - Math.sin(pointer.angle) * 15);
+    ctx.fillStyle = "#dcae83";
+  }
   ctx.restore();
 }
 
@@ -852,14 +931,15 @@ function drawThreatMarker(bearing, secondary) {
   ctx.restore();
 }
 
-function drawFighterWorld(fighter, body, shadow, damageTell = false, netId = 0, recoveryTell = false) {
+function drawFighterWorld(fighter, body, shadow, damageTell = false, recoveryTell = false) {
   if (!local.initialized) return;
   const screenX = canvas.width / 2 + fighter.x - visualCameraPosition.x;
   const screenY = canvas.height / 2 + fighter.y - visualCameraPosition.y;
-  if (screenX < -64 || screenX > canvas.width + 64 || screenY < -64 || screenY > canvas.height + 64) return;
+  const projected = projectArenaPoint(fighter.x, fighter.y,
+    visualCameraPosition.x, visualCameraPosition.y, canvas.width, canvas.height);
+  if (projected.x < -64 || projected.x > canvas.width + 64
+    || projected.y < -64 || projected.y > canvas.height + 64) return;
   drawFighterScreen(screenX, screenY, fighter, body, shadow, true, damageTell, recoveryTell);
-  drawRemoteVitals(screenX, screenY, fighter);
-  drawRemoteIdentity(screenX, screenY, netId);
 }
 
 function drawFighterScreen(x, y, fighter, body, shadow, remote = false, damageTell = false, recoveryTell = false) {

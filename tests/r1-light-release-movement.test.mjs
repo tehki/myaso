@@ -21,8 +21,11 @@ test("directional light snapshots handle opposed keys and diagonals", () => {
 test("practice and online freeze only genuine light-commit movement then discard after input", () => {
   const offline = readFileSync(new URL("../web/game.mjs", import.meta.url), "utf8");
   const online = readFileSync(new URL("../web/online-game.mjs", import.meta.url), "utf8");
+  assert.match(offline, /onLight\(\) \{[\s\S]{0,140}committedLightMove = captureLightAttackMovement\(keys\)/);
+  assert.match(online, /onLight\(\) \{[\s\S]{0,170}committedLightMove = resolveLightAttackReleaseMovement\(/);
+  assert.match(online, /captureLightAttackMovement\(keys\), leftButtonPressMovement/);
+  assert.match(online, /leftButtonPressMovement = captureLightAttackMovement\(keys\)/);
   for (const content of [offline, online]) {
-    assert.match(content, /onLight\(\) \{[\s\S]{0,140}committedLightMove = captureLightAttackMovement\(keys\)/);
     assert.match(content, /committedLightMove\?\.moveX|attackRequested && committedLightMove/);
     assert.match(content, /committedLightMove = null;/);
     assert.match(content, /leftButtonCharge\.cancel\(\);/);

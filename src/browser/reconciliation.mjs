@@ -86,6 +86,12 @@ function copyInput(tick, input = {}) {
     heavyAttack: Boolean(input.heavyAttack),
     dodge: Boolean(input.dodge),
     block: Boolean(input.block),
+    // Preserve the genuine normalized input flags across ACK-based replay.
+    // Omitting run used to replay a sprint at normal walking speed and jerk
+    // the camera back toward the authoritative position on every ACK.
+    kick: Boolean(input.kick),
+    run: Boolean(input.run),
+    jump: Boolean(input.jump),
   };
 }
 

@@ -10853,8 +10853,13 @@ async function runOnlineUiMultiRecoveryFfaFocusFlight(entries, spatial = false) 
       // correctly yields #3 recovery before #1 recovery. Observe long enough
       // for the subsequent genuine #1 recovery to CLEAR and Firefox to return
       // to ordinary #3 focus. Keep all strict three-stage and server proofs.
-      // M145 spatial sampling/timing is unchanged.
-      sampleUiEvidenceWhileActive(entries, spatial ? 760 : 1250, 8),
+      // M245: M145's 760ms read-only observation could stop while the
+      // SECOND authentic recovery remained active even though the two
+      // required punish-target transitions already occurred. Keep its
+      // genuine 70..150ms input-lead, server tick, exact three-stage focus,
+      // 100HP and independent remote pixel proof gates unchanged; observe
+      // the real recovery until it can return to ordinary nearest focus.
+      sampleUiEvidenceWhileActive(entries, 1250, 8),
     ]);
   } finally {
     lightChallenge?.close();
