@@ -19,6 +19,7 @@ import { summarizeM233RecoveryHandoff } from "../src/browser/m233-recovery-hando
 import { summarizeM218JumpAttackLatency } from "./m218-successful-jump-attack-latency.mjs";
 import { observeM219RollBufferIngress } from "./m219-buffered-roll-ingress-evidence.mjs";
 import { dispatchM121DirectionalLight, planM121DirectionalLight } from "./m121-directional-light-plan.mjs";
+import { planM159GenuinePunishTap } from "./m159-genuine-punish-tap.mjs";
 import { summarizeM220KnockdownFocusTimeline } from "./m220-knockdown-focus-timeline.mjs";
 import { mustAwaitM202GuardConvergence } from "./m202-guardbreak-convergence.mjs";
 import { verifyM201ServerPunishProof } from "./m201-authoritative-phase-proof.mjs";
@@ -5257,17 +5258,17 @@ async function runOnlineUiMultiKnockdownFfaHitFlight(entries) {
     throw new Error(milestone + " never observed the authoritative roll before punish staging");
   }
 
-  // R1 short LMB commits on authentic pointerUP, not pointerDOWN.
-  // Keep the genuine press synchronized to the observed authoritative dodge
-  // and RELEASE after 40ms, before cross-browser #3-knockdown observation or
-  // retargeting latency can postpone the 135ms light windup beyond the
-  // unchanged 260ms shared knockdown. A fresh genuine mouse move re-aims
-  // during the already-committed windup after #3's actual knockdown.
-  // The unchanged strict M209 60Hz server proof must still show active AND
-  // the exact single 34HP hit strictly before either victim recovers.
-  await setArenaAttackButton(punisher, true);
-  await sleep(40);
-  await setArenaAttackButton(punisher, false);
+  // R1 commits a short LMB light on authentic pointerUP. One genuine
+  // ChromeDriver W3C pointer transaction (down -> 10ms -> up) removes the
+  // inter-request driver ACK and the previous 40ms hold from M159's real
+  // 260ms overlapping knockdown window. Aim stays pre-staged, then the
+  // browser re-aims during the actual windup after #3's knockdown.
+  // The M209 60Hz authoritative proof STILL demands attack-active AND the
+  // exact single selected 34HP hit before EITHER genuine knockdown recovers.
+  await webdriver(
+    punisher.base, "POST", `/session/${punisher.sessionId}/actions`,
+    planM159GenuinePunishTap(`mouse-${punisher.name}`),
+  );
   let windupReaim = null;
   const reaimDeadline = Date.now() + Math.max(80, COMBAT.attack.windupMs - 20);
   while (!windupReaim && Date.now() < reaimDeadline) {
