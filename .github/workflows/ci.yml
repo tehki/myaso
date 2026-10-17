@@ -604,6 +604,7 @@ jobs:
         run: |
           node --check web/online-game.mjs
           node --check scripts/pvp_browser_flight_runner.mjs
+          node --test tests/r1-m159-early-light-release.test.mjs
           node --test --test-name-pattern="FFA knockdown arbitration|FFA knockdown punish focus" tests/m29-combat-readability.test.mjs
           for attempt in 1 2; do
             if node scripts/pvp_browser_flight_runner.mjs; then

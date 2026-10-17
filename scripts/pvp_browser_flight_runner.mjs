@@ -5237,15 +5237,17 @@ async function runOnlineUiMultiKnockdownFfaHitFlight(entries) {
     throw new Error(milestone + " never observed the authoritative roll before punish staging");
   }
 
-  // Stage #4's single genuine LMB from the authoritative dodge timeline just
-  // before the deterministic body-contact region. Cross-session WebDriver and
-  // input ingress already add roughly two server ticks before the edge becomes
-  // authoritative, so do not add a wall-clock pause here. The later provenance
-  // checks still require the real pointer edge to fall no more than 40 ms
-  // before #2's knockdown, both victims to be authoritatively down before
-  // attack-active, and exactly one 34 HP hit on the selected victim. No
-  // gameplay timing is changed.
+  // R1 short LMB commits on authentic pointerUP, not pointerDOWN.
+  // Keep the genuine press synchronized to the observed authoritative dodge
+  // and RELEASE after 40ms, before cross-browser #3-knockdown observation or
+  // retargeting latency can postpone the 135ms light windup beyond the
+  // unchanged 260ms shared knockdown. A fresh genuine mouse move re-aims
+  // during the already-committed windup after #3's actual knockdown.
+  // The unchanged strict M209 60Hz server proof must still show active AND
+  // the exact single 34HP hit strictly before either victim recovers.
   await setArenaAttackButton(punisher, true);
+  await sleep(40);
+  await setArenaAttackButton(punisher, false);
   let windupReaim = null;
   const reaimDeadline = Date.now() + Math.max(80, COMBAT.attack.windupMs - 20);
   while (!windupReaim && Date.now() < reaimDeadline) {
@@ -5267,7 +5269,6 @@ async function runOnlineUiMultiKnockdownFfaHitFlight(entries) {
     }
     await sleep(2);
   }
-  await setArenaAttackButton(punisher, false);
   if (!windupReaim) {
     await setMovementKey(roller, retreatKey, false);
     throw new Error(milestone + " did not refresh #4 aim on #3 knockdown before light active: "
@@ -5357,8 +5358,11 @@ async function runOnlineUiMultiKnockdownFfaHitFlight(entries) {
   const punishDowns = punishPointers.filter((entry) => entry.type === "pointerdown" && entry.button === 0);
   const punishUps = punishPointers.filter((entry) => entry.type === "pointerup" && entry.button === 0);
   const punishDown = punishDowns[0];
+  const punishUp = punishUps[0];
   if (punishDowns.length !== 1 || punishUps.length !== 1
-    || !Number.isFinite(punishDown?.epochMs)
+    || !Number.isFinite(punishDown?.epochMs) || !Number.isFinite(punishUp?.epochMs)
+    || punishUp.epochMs <= punishDown.epochMs
+    || punishUp.epochMs - punishDown.epochMs >= 320
     || punishDown.epochMs < provenance.rollTransition.epochMs
     || punishDown.epochMs < provenance.firstKnockdown.epochMs - 40
     || punishDown.epochMs >= provenance.firstKnockdown.epochMs + COMBAT.dodge.collisionKnockdownMs) {

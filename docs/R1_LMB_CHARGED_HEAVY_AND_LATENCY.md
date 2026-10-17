@@ -103,3 +103,21 @@ genuine wheel-back after 55ms, with exact one-down/one-up real timestamp
 proof (<320ms). The 650ms authoritative parry stun, target selection,
 exact 34HP hit on parried #1, untouched #2/#3 vitals and original event
 and focus restoration gates are unchanged. No production changes.
+
+### M159 strict 60Hz simultaneous knockdown punish with R1 light-on-release
+Exact-head quality run 39027292446 passed 90 steps including M146 and M150,
+but both genuine four-browser M159 attempts failed strict M209 server truth:
+first knockdown at ticks 393 / 405, second at 396 / 408, and punish active
+at 411 / 423, later than the first victim's 16-tick knockdown expiry
+(409 / 421). Legacy browser flight pressed #4 LMB near roll contact but
+waited for second-victim remote observation AND expensive target re-aim
+BEFORE pointerUP; R1 light commits only on release. This postpones the
+135ms windup beyond the authentic shared 260ms knockdown. The flight now
+sends the one genuine pointerDOWN, waits 40ms and sends matching genuine
+pointerUP *before* waiting on #3 replication or re-aiming during the
+already-committed windup. It additionally requires exactly one complete,
+chronological short (<320ms) genuine LMB. Every original M209 60Hz server
+action/hit transition, ordered dual knockdown, genuine wheel, exclusive
+reaim, unchanged 34HP single target, zero guard/collateral damage, and
+focus recovery assertion remains mandatory. This changes no gameplay,
+server, replication, combat timing or balancing constants.
