@@ -349,6 +349,7 @@ jobs:
           MYASO_PVP_SCENARIO: "uifeint"
         run: |
           node --check scripts/pvp_browser_flight_runner.mjs
+          node --test tests/m210-early-feint-wheel.test.mjs tests/r1-m236-feint-immediate-wheel.test.mjs
           node scripts/pvp_browser_flight_runner.mjs
 
       - name: Validate M119 real running strike

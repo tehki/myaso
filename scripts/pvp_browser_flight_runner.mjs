@@ -11809,11 +11809,13 @@ async function performArenaHeavyFeint(session, elementId, xOffset = 200) {
 async function performArenaFeint(session, elementId, xOffset = 200) {
   const origin = { "element-6066-11e4-a52e-4f735466cecf": elementId };
   // R1: a short LMB fires its light edge on RELEASE, not pointerdown.
-  // Preserve the original strict 70ms server feint window by issuing genuine
-  // 85ms LMB press/release followed by a wheel-back 20ms later, all inside
-  // one W3C multi-source action. Wheel before release now blocks first,
-  // so the old M210 schedule is semantically invalid for R1 tap-to-light.
-  // Never widen feint windows or fake input/authoritative state.
+  // M236: issue wheel-back in the immediately FOLLOWING W3C tick, with
+  // no extra timed pause after the genuine 85ms pointerUp. Both exact-head
+  // M171 failures saw a real 77..91ms up-to-wheel gap when the previous
+  // 20ms pause and an extra empty W3C tick delayed block ingress beyond the
+  // unchanged 70ms server-authoritative feint window. Wheel before release
+  // blocks first, so do not put scroll in the same tick as pointerUp.
+  // Keep one real W3C multi-source action and all 70ms/12-stamina HP gates.
   try {
     await webdriver(session.base, "POST", `/session/${session.sessionId}/actions`, {
       actions: [
@@ -11826,7 +11828,6 @@ async function performArenaFeint(session, elementId, xOffset = 200) {
             { type: "pointerDown", button: 0 },
             { type: "pause", duration: 85 },
             { type: "pointerUp", button: 0 },
-            { type: "pause", duration: 20 },
             { type: "pause", duration: 0 },
           ],
         },
@@ -11838,7 +11839,6 @@ async function performArenaFeint(session, elementId, xOffset = 200) {
             { type: "pause", duration: 0 },
             { type: "pause", duration: 85 },
             { type: "pause", duration: 0 },
-            { type: "pause", duration: 20 },
             { type: "scroll", x: 0, y: 0, deltaX: 0, deltaY: 120, duration: 0, origin },
           ],
         },

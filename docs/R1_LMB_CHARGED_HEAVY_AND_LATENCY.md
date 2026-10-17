@@ -154,3 +154,20 @@ strict sequential 3-stage focus labels, M211 authoritative dual
 recovery lifecycle, zero HP/guard changes, and third-stage clear.
 M145 retains exactly its previous 100ms timer and 70..150ms spatial gate.
 No production gameplay, network or server changes.
+
+### M236 genuine short-LMB feint, remove post-release driver tick
+Exact-head quality #39034355458 and retry #39033144071 each passed
+65 CI stages before **M171** (M117 sufficient-stamina feint precondition)
+produced a real 34HP hit. Genuine LMB pointerUP to wheel-back intervals
+were ~77ms and ~91ms respectively. The test's R1 choreography still
+inserted an extra W3C 20ms pause AND empty source-alignment tick after
+the genuine 85ms short click, delaying wheel ingress beyond the
+**unchanged 70ms** light-feint server window. Keep the same genuine
+85ms down/up, but send the one true wheel-back in the IMMEDIATELY NEXT
+W3C tick (rather than after the deliberate 20ms pause), in the same
+multi-source command, with no simulated input. M117 authoritative
+FeintRecovery/readability, exact no-damage/guard, exhausted-light and
+exhausted-heavy non-cancellation, 12 stamina cost, original <=80ms
+exhausted-gesture provenance, and server authority remain unchanged.
+This is an acceptance-only scheduling candidate: full exact-head
+real Chrome/Firefox CI must prove it; no production release yet.
