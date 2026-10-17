@@ -19,6 +19,8 @@ test("M144 retains exact real 60..200ms light-release lead gate with earlier tru
   assert.ok(flight.includes("inputLeadMs < minLeadMs || inputLeadMs > maxLeadMs"));
   assert.ok(flight.includes("lightPunishIndex < 0 || jumpPunishIndex <= lightPunishIndex || nearestReturnIndex <= jumpPunishIndex"));
   assert.ok(flight.includes("verifyM211DualRecoveryServerProof(m201ServerOutput()"));
-  assert.ok(flight.includes("sampleUiEvidenceWhileActive(entries, spatial ? 760 : 1250, 8)"));
+  assert.ok(flight.includes("sampleUiEvidenceWhileActive(entries, 1250, 8)"));
+  assert.ok(flight.includes("const minLeadMs = spatial ? 70 : 60;"));
+  assert.ok(flight.includes("const maxLeadMs = spatial ? 150 : 200;"));
   assert.ok(flight.includes("evidence.some((entry) => entry.playerHp !== 100 || entry.playerGuard !== 100)"));
 });
