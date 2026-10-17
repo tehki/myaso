@@ -1,6 +1,8 @@
 import { createFrameBudget } from "../src/browser/frame-budget.mjs";
 import { recordM233RecoveryHandoff } from "../src/browser/m233-recovery-handoff-trace.mjs";
 import { installRightButtonGesture } from "../src/browser/right-button-gesture.mjs";
+import { createLeftButtonCharge } from "../src/browser/left-button-charge.mjs";
+import { captureLightAttackMovement } from "../src/browser/light-attack-movement.mjs";
 import { createCombatImpactController } from "../src/browser/combat-impact.mjs";
 import { COMBAT_ACTION, blockSpatialPresentation, combatActionHint, combatOverlayPresentation, createCombatReadabilityTracker, createRemoteDamageTracker, fighterFocusNetId, fighterGuardBreakPunishNetId, guardBreakPunishRangeCue, fighterKnockdownPunishNetId, knockdownPunishRangeCue, fighterParryPunishNetId, parryPunishRangeCue, fighterRecoveryNetId, recoveryPunishRangeCue, punishRangeCueIntent, fighterIdentityPresentation, fighterThreatBearingLabel, fighterThreatGuardArcLabel, fighterThreatNetId, fighterThreatPhaseLabel, fighterThreatPhaseState, fighterMatchPointPresentation, fighterMatchPresentation, fighterScoreboardPresentation, FFA_KILL_TARGET, fighterVitalsPresentation, guardBreakSpatialPresentation, killFeedPresentation, opponentRecoveryPresentation, parrySpatialPresentation, staminaDenialPresentation, ownCombatReadinessPresentation } from "../src/browser/combat-readability.mjs";
 import { COMBAT } from "../src/combat/model.mjs";
@@ -10,6 +12,21 @@ import { NETWORK } from "../src/network/constants.mjs";
 import { connectAuthoritativeClient, parseSha256Hex } from "./authoritative-client.mjs";
 
 const canvas = document.querySelector("#arena");
+const chargeHud = {
+  root: document.querySelector("#heavy-charge-indicator"),
+  value: document.querySelector("#heavy-charge-value"),
+  fill: document.querySelector("#heavy-charge-fill"),
+};
+function updateChargeHud() {
+  const progress = leftButtonCharge.progress();
+  chargeHud.root.hidden = progress <= 0;
+  if (progress <= 0) return;
+  const percent = Math.min(100, Math.round(progress * 100));
+  chargeHud.value.textContent = percent === 100 ? "READY" : `${percent}%`;
+  chargeHud.root.dataset.ready = String(percent === 100);
+  chargeHud.fill.style.transform = `scaleX(${progress})`;
+}
+
 const ctx = canvas.getContext("2d", { alpha: false });
 const eventText = document.querySelector("#event-text");
 const arenaStage = document.querySelector(".arena-stage");
@@ -137,12 +154,25 @@ let animationFrameId = 0;
 let predictionStep = 0;
 let clientTick = 0;
 let attackRequested = false;
+let committedLightMove = null;
 let leftButtonDown = false;
 let heavyAttackRequested = false;
 let rollRequested = false;
 let kickRequested = false;
 let jumpRequested = false;
 let shortBlockUntil = 0;
+const leftButtonCharge = createLeftButtonCharge({
+  onLight() {
+    attackRequested = true;
+    committedLightMove = captureLightAttackMovement(keys);
+    if (local.action === COMBAT_ACTION.jump) queueStaminaDenial("jump-attack");
+    else if (!pendingStaminaDenial && (jumpRequested || keys.has("Space"))) queueStaminaDenial("jump-attack-chord");
+    else if (rightButtonGesture.isRunning() && ["KeyW", "KeyA", "KeyS", "KeyD"].some((code) => keys.has(code))) {
+      queueStaminaDenial("running-attack");
+    }
+  },
+  onHeavy() { heavyAttackRequested = true; },
+});
 const rightButtonGesture = installRightButtonGesture(canvas, {
   onKick: () => {
     kickRequested = true;
@@ -154,25 +184,29 @@ let staminaRegenBlockedUntil = 0;
 canvas.addEventListener("contextmenu", (event) => event.preventDefault());
 canvas.addEventListener("pointerdown", (event) => {
   canvas.focus();
-  if (event.button === 0) {
-    attackRequested = true;
-    leftButtonDown = true;
-    if (local.action === COMBAT_ACTION.jump) {
-      queueStaminaDenial("jump-attack");
-    } else if (!pendingStaminaDenial && (jumpRequested || keys.has("Space"))) {
-      queueStaminaDenial("jump-attack-chord");
-    } else {
-      const runningGesture = rightButtonGesture.isRunning()
-        && (keys.has("KeyW") || keys.has("KeyA") || keys.has("KeyS") || keys.has("KeyD"));
-      if (runningGesture) queueStaminaDenial("running-attack");
-    }
-  }
-
   updateMouse(event);
+  if (event.button === 0) {
+    leftButtonDown = true;
+    const runningChord = rightButtonGesture.isRunning()
+      && ["KeyW", "KeyA", "KeyS", "KeyD"].some((code) => keys.has(code));
+    leftButtonCharge.press(event.pointerId, {
+      immediate: local.action === COMBAT_ACTION.jump || jumpRequested || keys.has("Space") || runningChord,
+    });
+  }
 });
-canvas.addEventListener("pointerup", (event) => {
-  if (event.button === 0) leftButtonDown = false;
-
+function onLeftPointerUp(event) {
+  if (event.button !== 0) return;
+  leftButtonDown = false;
+  updateMouse(event);
+  leftButtonCharge.release(event.pointerId);
+}
+canvas.addEventListener("pointerup", onLeftPointerUp);
+window.addEventListener("pointerup", onLeftPointerUp);
+canvas.addEventListener("pointercancel", (event) => {
+  if (event.button === 0) { leftButtonDown = false; leftButtonCharge.cancel(event.pointerId); }
+});
+canvas.addEventListener("lostpointercapture", (event) => {
+  if (event.pointerId !== undefined) leftButtonCharge.cancel(event.pointerId);
 });
 canvas.addEventListener("wheel", (event) => {
   event.preventDefault();
@@ -192,7 +226,7 @@ canvas.addEventListener("keydown", (event) => {
   if (event.code === "Space" && !event.repeat) {
     jumpRequested = true;
     queueStaminaDenial("jump");
-    if (!pendingStaminaDenial && leftButtonDown) queueStaminaDenial("jump-attack-chord");
+    if (leftButtonDown) leftButtonCharge.commitLight();
   }
 });
 canvas.addEventListener("keyup", (event) => keys.delete(event.code));
@@ -557,7 +591,9 @@ function updateMouse(event) {
 function releaseInputs() {
   keys.clear();
   attackRequested = false;
+  committedLightMove = null;
   leftButtonDown = false;
+  leftButtonCharge.cancel();
   heavyAttackRequested = false;
   rollRequested = false;
   kickRequested = false;
@@ -580,8 +616,10 @@ function sampleInput() {
     currentInput.jump = false;
     return;
   }
-  currentInput.moveX = (keys.has("KeyD") ? 1 : 0) - (keys.has("KeyA") ? 1 : 0);
-  currentInput.moveY = (keys.has("KeyS") ? 1 : 0) - (keys.has("KeyW") ? 1 : 0);
+  currentInput.moveX = attackRequested && committedLightMove
+    ? committedLightMove.moveX : (keys.has("KeyD") ? 1 : 0) - (keys.has("KeyA") ? 1 : 0);
+  currentInput.moveY = attackRequested && committedLightMove
+    ? committedLightMove.moveY : (keys.has("KeyS") ? 1 : 0) - (keys.has("KeyW") ? 1 : 0);
   currentInput.facing = Math.atan2(mouse.y - canvas.height / 2, mouse.x - canvas.width / 2);
   currentInput.attack = attackRequested;
   currentInput.heavyAttack = heavyAttackRequested;
@@ -602,6 +640,7 @@ function simulatePrediction(stepMs) {
     networkClient.sendInput({ tick: outgoingTick, ...currentInput });
     clientTick = (clientTick + 1) >>> 0;
     attackRequested = false;
+    committedLightMove = null;
     heavyAttackRequested = false;
     rollRequested = false;
     kickRequested = false;
@@ -834,7 +873,18 @@ function drawFighterScreen(x, y, fighter, body, shadow, remote = false, damageTe
   const lift = airborne ? 18 : 0;
   ctx.translate(x, y - lift);
   ctx.rotate((fighter.facing ?? 0) + (action === COMBAT_ACTION.dodge ? Math.PI * 0.35 : 0) + (knockedDown ? Math.PI / 2 : 0));
+  const localCharge = remote ? 0 : leftButtonCharge.progress();
+  const heavyWindup = action === COMBAT_ACTION.heavyAttackWindup;
+  const heavyActive = action === COMBAT_ACTION.heavyAttackActive;
+  // Visually load up and pitch into the mouse-directed blow. World position,
+  // hitbox, reach, collision and server authority are deliberately unchanged.
+  if (localCharge > 0 || heavyWindup || heavyActive) {
+    const lean = heavyActive ? 16 : heavyWindup ? 9 : localCharge * 8;
+    ctx.translate(lean, 0);
+    ctx.scale(1 + (heavyActive ? 0.22 : localCharge * 0.09), heavyActive ? 0.89 : 1);
+  }
   if (knockedDown) ctx.scale(1.38, 0.62);
+  if (localCharge > 0) drawLmbChargeTell(localCharge);
   ctx.globalAlpha = action === COMBAT_ACTION.dead ? 0.28 : 1;
   if (action === COMBAT_ACTION.attackWindup || action === COMBAT_ACTION.attackActive) drawAttackTell(action, remote);
   if (action === COMBAT_ACTION.attackLeftWindup || action === COMBAT_ACTION.attackLeftActive
@@ -1009,6 +1059,17 @@ function drawRunningAttackTell(action, remote) {
   );
   ctx.closePath();
   ctx.fill();
+  ctx.stroke();
+  ctx.restore();
+}
+
+function drawLmbChargeTell(progress) {
+  ctx.save();
+  ctx.strokeStyle = progress >= 1 ? "#ffe49b" : "rgba(255, 172, 82, 0.88)";
+  ctx.lineWidth = 3 + progress * 4;
+  ctx.lineCap = "round";
+  ctx.beginPath();
+  ctx.arc(0, 0, COMBAT.heavyAttack.reach + COMBAT.fighterRadius, -0.68, -0.68 + progress * 1.36);
   ctx.stroke();
   ctx.restore();
 }
@@ -1523,6 +1584,7 @@ function createArenaLayer() {
 function frame(now) {
   if (document.hidden) return;
   frameBudget.advance(now, simulatePrediction);
+  updateChargeHud();
   const impact = combatImpact.sample(now);
   if (impact.freeze) {
     const ownId = networkClient?.playerNetId;

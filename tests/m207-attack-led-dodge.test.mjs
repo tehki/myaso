@@ -64,16 +64,22 @@ test("M207 rejects invalid wait and silent non-W3C callbacks",async()=>{
     }),RangeError);
   }
 });
-test("M207 remains actual Firefox LMB+Chrome wheel with strict clean HP and no-parry assertions",()=>{
+test("M238 updates real M36 to complete R1 light before real Chrome wheel, retaining strict M207 evasion contract",()=>{
   const source=readFileSync(new URL("../scripts/pvp_browser_flight_runner.mjs",import.meta.url),"utf8");
   const section=source.slice(source.indexOf("async function runOnlineUiDodgeFeedbackFlight("),
-    source.indexOf("async function runOnlineUiDodgeTellFlight("));
-  assert.ok(section.includes("dispatchM207AttackLedDodge({"));
-  assert.ok(section.includes("sendAttackDown: () => setArenaAttack(attacker, attackerElementId, true, attackOffset)"));
-  assert.ok(section.includes("sendDodgeWheel: () => scrollArenaWheel(defender, defenderElementId, -120)"));
-  assert.ok(section.includes("await setArenaAttack(attacker, attackerElementId, false, attackOffset)"));
+    source.indexOf("async function runM176BlockAttackArbitrationPhase("));
+  const click=section.indexOf("await performArenaAttackHold(attacker, attackerElementId, attackOffset, 65)");
+  const lead=section.indexOf("await sleep(35)",click);
+  const wheel=section.indexOf("await scrollArenaWheel(defender, defenderElementId, -120)",lead);
+  assert.ok(click>=0 && lead>click && wheel>lead);
+  assert.ok(!section.includes("dispatchM207AttackLedDodge({"));
+  assert.ok(!section.includes("await setArenaAttack(attacker, attackerElementId, false, attackOffset)"));
   assert.ok(section.includes('await setMovementKey(defender, "s", false)'));
+  assert.ok(section.includes("attackDown.epochMs >= attackUp.epochMs"));
+  assert.ok(section.includes("rollWheel.epochMs <= attackUp.epochMs"));
+  assert.ok(section.includes("rollWheel.epochMs - attackUp.epochMs >= COMBAT.attack.windupMs"));
   assert.ok(section.includes("defenderResult.playerHp !== 100"));
   assert.ok(section.includes('feedbackTransitions.includes("parried")'));
   assert.ok(section.includes('rollWheel = defenderResult.wheels.find((event) => event.deltaY < 0)'));
+  assert.ok(section.includes("waitForUiDodgeEvidence(entries, attacker, defender, 520, false, lastAttemptBaseline)"));
 });

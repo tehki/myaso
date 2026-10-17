@@ -327,6 +327,7 @@ jobs:
           MYASO_PVP_SCENARIO: "uiheavypunish"
         run: |
           node --check scripts/pvp_browser_flight_runner.mjs
+          node --test tests/r1-m109-late-commit.test.mjs
           node scripts/pvp_browser_flight_runner.mjs
 
       - name: Validate M110 real heavy guard-break pressure
@@ -348,6 +349,7 @@ jobs:
           MYASO_PVP_SCENARIO: "uifeint"
         run: |
           node --check scripts/pvp_browser_flight_runner.mjs
+          node --test tests/m210-early-feint-wheel.test.mjs tests/r1-m236-feint-immediate-wheel.test.mjs
           node scripts/pvp_browser_flight_runner.mjs
 
       - name: Validate M119 real running strike
@@ -500,6 +502,7 @@ jobs:
           node --check src/browser/combat-readability.mjs
           node --check web/online-game.mjs
           node --check scripts/pvp_browser_flight_runner.mjs
+          node --test tests/r1-m144-lead-headroom.test.mjs
           node --test --test-name-pattern="FFA recovery focus|authoritative opponent recovery" tests/m29-combat-readability.test.mjs
           node scripts/pvp_browser_flight_runner.mjs
 
@@ -519,6 +522,7 @@ jobs:
         run: |
           node --check web/online-game.mjs
           node --check scripts/pvp_browser_flight_runner.mjs
+          node --test tests/r1-parry-short-click.test.mjs
           node scripts/pvp_browser_flight_runner.mjs
 
       - name: Validate M147 actionable FFA recovery punish
@@ -537,6 +541,7 @@ jobs:
           node --check src/browser/combat-readability.mjs
           node --check web/online-game.mjs
           node --check scripts/pvp_browser_flight_runner.mjs
+          node --test tests/r1-parry-short-click.test.mjs
           node --test --test-name-pattern="FFA parry punish focus|authoritative opponent recovery" tests/m29-combat-readability.test.mjs
           node scripts/pvp_browser_flight_runner.mjs
 
@@ -601,6 +606,7 @@ jobs:
         run: |
           node --check web/online-game.mjs
           node --check scripts/pvp_browser_flight_runner.mjs
+          node --test tests/r1-m159-early-light-release.test.mjs
           node --test --test-name-pattern="FFA knockdown arbitration|FFA knockdown punish focus" tests/m29-combat-readability.test.mjs
           for attempt in 1 2; do
             if node scripts/pvp_browser_flight_runner.mjs; then
@@ -686,6 +692,7 @@ jobs:
           node --check src/browser/combat-readability.mjs
           node --check web/online-game.mjs
           node --check scripts/pvp_browser_flight_runner.mjs
+          node --test tests/r1-m156-knockdown-light-latency.test.mjs tests/r1-m237-m156-short-click-early-commit.test.mjs
           node --test --test-name-pattern="FFA knockdown punish focus|roll collision|knockdown owns" tests/m29-combat-readability.test.mjs
           node scripts/pvp_browser_flight_runner.mjs
 
@@ -811,7 +818,9 @@ jobs:
       - name: Validate M36 real online authoritative dodge feedback
         env:
           MYASO_PVP_SCENARIO: "uidodge"
-        run: node scripts/pvp_browser_flight_runner.mjs
+        run: |
+          node --test tests/m207-attack-led-dodge.test.mjs tests/r1-m238-committed-light-dodge.test.mjs
+          node scripts/pvp_browser_flight_runner.mjs
 
       - name: Validate M37 authoritative opponent recovery readability
         env:
@@ -826,7 +835,9 @@ jobs:
       - name: Validate M39 spatial FFA attack intent
         env:
           MYASO_PVP_SCENARIO: "uiattackintent"
-        run: node scripts/pvp_browser_flight_runner.mjs
+        run: |
+          node --test tests/r1-m240-m39-release-windup.test.mjs
+          node scripts/pvp_browser_flight_runner.mjs
 
       - name: Validate M40 spatial FFA guard-break tell
         env:
@@ -976,6 +987,14 @@ jobs:
 
       - name: Validate M234 trusted M145 light-onset staging
         run: node --test tests/m234-m145-trusted-light-onset.test.mjs
+
+      - name: Validate R1 tap/hold LMB charge and preserved RMB contract
+        run: |
+          node --check src/browser/left-button-charge.mjs
+          node --check src/browser/light-attack-movement.mjs
+          node --check web/game.mjs
+          node --check web/online-game.mjs
+          node --test tests/r1-lmb-charge-heavy.test.mjs tests/r1-light-release-movement.test.mjs tests/browser-runtime.test.mjs
 
       - name: Validate R0 multiplayer alpha entrypoint and deployment safety
         run: |
