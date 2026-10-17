@@ -1,4 +1,5 @@
 import { createPredictionHistory, isTickNewer32 } from "../src/browser/reconciliation.mjs";
+import { createNetworkDiagnostics } from "../src/browser/network-diagnostics.mjs";
 import { createRemoteInterpolator } from "../src/browser/remote-interpolation.mjs";
 import { applySnapshotPacketInPlace, createSnapshotApplyResult } from "../src/browser/snapshot-store.mjs";
 import { NETWORK, PACKET_TYPE } from "../src/network/constants.mjs";
@@ -24,6 +25,7 @@ export async function connectAuthoritativeClient({
   const reliableSnapshotResult = createSnapshotApplyResult();
   const reliableMergeState = createReliableSnapshotMergeState();
   const predictionHistory = createPredictionHistory({ maxEntries: 64 });
+  const diagnostics = createNetworkDiagnostics();
   const remoteInterpolator = createRemoteInterpolator();
   const inputSamples = [];
   let inputSequence = 0;
@@ -59,6 +61,7 @@ export async function connectAuthoritativeClient({
         latestSnapshotSequence = snapshotResult.sequence;
         acknowledgedSnapshotSequence = snapshotResult.sequence;
         latestServerTick = snapshotResult.serverTick;
+        diagnostics.noteSnapshot();
         if (snapshotResult.full) remoteInterpolator.clear();
         for (const entity of state.values()) {
           if (entity.netId !== playerNetId) remoteInterpolator.push(entity, latestServerTick);
@@ -69,6 +72,7 @@ export async function connectAuthoritativeClient({
       }
       if (packetType === PACKET_TYPE.INPUT_ACK) {
         const ack = decodeInputAck(bytes);
+        diagnostics.noteAck(ack.processedClientTick);
         pendingAck = ack;
         playerNetId = ack.playerNetId;
         flushPendingAck();
@@ -152,6 +156,7 @@ export async function connectAuthoritativeClient({
     });
     inputSequence = (inputSequence + 1) & 0xffff;
     transport.sendRealtimeOwned(new Uint8Array(packet));
+    diagnostics.noteSentInput(normalized.tick);
   }
 
   return {
@@ -159,6 +164,7 @@ export async function connectAuthoritativeClient({
     state,
     predictionHistory,
     remoteInterpolator,
+    diagnostics,
     sendInput,
     close(reason) { transport.close(reason); },
     get playerNetId() { return playerNetId; },

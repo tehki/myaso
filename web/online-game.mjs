@@ -90,6 +90,23 @@ const killFeedEntries = [];
 const killFeedSequences = new Set();
 
 const params = new URLSearchParams(window.location.search);
+const diagnosticsVisible = params.get("netstats") === "1";
+const diagnosticsPanel = document.querySelector("#network-diagnostics");
+if (diagnosticsPanel) diagnosticsPanel.hidden = !diagnosticsVisible;
+let lastDiagnosticsDrawMs = 0;
+function updateNetworkDiagnostics(nowMs) {
+  if (!diagnosticsVisible || !diagnosticsPanel || !networkClient || nowMs - lastDiagnosticsDrawMs < 500) return;
+  lastDiagnosticsDrawMs = nowMs;
+  const s = networkClient.diagnostics.snapshot();
+  const time = (ms) => ms === null ? "collecting…" : `${Math.round(ms)}ms`;
+  // textContent only: measurements never enter HTML, storage or network logs.
+  diagnosticsPanel.textContent =
+    `Input→ACK p50 ${time(s.inputAckP50Ms)} · p95 ${time(s.inputAckP95Ms)}`
+    + ` | Jitter p95 ${time(s.ackJitterP95Ms)}`
+    + ` | Snapshots p50 ${time(s.snapshotGapP50Ms)} · p95 ${time(s.snapshotGapP95Ms)}`
+    + ` | Camera correction p95 ${s.cameraCorrectionP95 === null ? "collecting…" : s.cameraCorrectionP95 + "u"}`
+    + ` | Stale-own ACKs ${s.staleOwnAtAckCount} | Samples ${s.inputAckSamples}`;
+}
 const acceptanceScenario = params.get("scenario");
 const server = params.get("server");
 const cert = params.get("cert");
@@ -205,7 +222,7 @@ networkClient = await connectAuthoritativeClient({
   onKillEvent(event) {
     recordKillEvent(event);
   },
-  onAck() {
+  onAck(ack) {
     const ownId = networkClient?.playerNetId;
     const own = ownId ? networkClient.state.get(ownId) : null;
     if (!own) return;
@@ -219,11 +236,9 @@ networkClient = await connectAuthoritativeClient({
       replayInput(entry) { predictMovement(entry, 1000 / NETWORK.inputSendHz); },
     });
     if (Number.isFinite(preReconcileX) && Number.isFinite(preReconcileY)) {
-      visualCamera.absorb(
-        { x: preReconcileX, y: preReconcileY },
-        local,
-        performance.now(),
-      );
+      const before = { x: preReconcileX, y: preReconcileY };
+      const correction = visualCamera.absorb(before, local, performance.now());
+      networkClient.diagnostics.noteReconciliation(ack, own, correction.distance);
     }
     confirmStaminaDenial(own);
     networkStatus = `Online - player #${ownId} - server tick ${networkClient.latestServerTick}`;
@@ -677,6 +692,7 @@ function render(nowMs = performance.now(), impact = combatImpact.sample(nowMs)) 
   // with an advancing render-only clock; cap extrapolation on missing packets.
   const renderServerTick = snapshotRenderClock.sample(networkClient.latestServerTick, nowMs);
   visualCamera.sample(local, nowMs, visualCameraPosition);
+  updateNetworkDiagnostics(nowMs);
   const recoveryFocusNetId = fighterRecoveryNetId(networkClient.state, ownId);
 
   for (const entity of networkClient.state.values()) {
