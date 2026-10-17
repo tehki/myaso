@@ -59,6 +59,12 @@ jobs:
           node --check tests/m21-compact-position.test.mjs
           node --test tests/networking.test.mjs tests/m4-snapshot-compat.test.mjs tests/m19-compact-record-identity.test.mjs tests/m20-compact-facing.test.mjs tests/m21-compact-position.test.mjs
 
+      - name: Validate R1 smooth network rendering and jitter guards
+        run: |
+          node --check src/browser/smooth-motion.mjs
+          node --check web/online-game.mjs
+          node --test tests/r1-smooth-network.test.mjs tests/browser-runtime.test.mjs
+
       - name: Validate browser runtime hot path
         run: |
           node --check src/browser/m224-dodge-completion.mjs
