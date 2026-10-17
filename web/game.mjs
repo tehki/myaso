@@ -1,5 +1,6 @@
 import { createFrameBudget } from "../src/browser/frame-budget.mjs";
 import { installRightButtonGesture } from "../src/browser/right-button-gesture.mjs";
+import { createLeftButtonCharge } from "../src/browser/left-button-charge.mjs";
 import { createCombatImpactController } from "../src/browser/combat-impact.mjs";
 import { COMBAT, createFighter, createWorld, stepWorld } from "../src/combat/model.mjs";
 import { createSparringAi } from "../src/combat/sparring-ai.mjs";
@@ -48,6 +49,10 @@ let rollRequested = false;
 let kickRequested = false;
 let jumpRequested = false;
 let shortBlockUntil = 0;
+const leftButtonCharge = createLeftButtonCharge({
+  onLight() { attackRequested = true; },
+  onHeavy() { heavyAttackRequested = true; },
+});
 const rightButtonGesture = installRightButtonGesture(canvas, {
   onKick: () => { kickRequested = true; },
 });
@@ -66,10 +71,24 @@ let combatFeedbackTimer = 0;
 canvas.addEventListener("contextmenu", (event) => event.preventDefault());
 canvas.addEventListener("pointerdown", (event) => {
   canvas.focus();
-  if (event.button === 0) attackRequested = true;
-
   updateMouse(event);
+  if (event.button === 0) {
+    const runningChord = rightButtonGesture.isRunning()
+      && ["KeyW", "KeyA", "KeyS", "KeyD"].some((code) => keys.has(code));
+    leftButtonCharge.press(event.pointerId, {
+      immediate: player.action === "jump" || jumpRequested || keys.has("Space") || runningChord,
+    });
+  }
 });
+function onLeftPointerUp(event) {
+  if (event.button !== 0) return;
+  updateMouse(event);
+  leftButtonCharge.release(event.pointerId);
+}
+canvas.addEventListener("pointerup", onLeftPointerUp);
+window.addEventListener("pointerup", onLeftPointerUp);
+canvas.addEventListener("pointercancel", (event) => leftButtonCharge.cancel(event.pointerId));
+canvas.addEventListener("lostpointercapture", (event) => leftButtonCharge.cancel(event.pointerId));
 canvas.addEventListener("wheel", (event) => {
   event.preventDefault();
   canvas.focus();
@@ -82,7 +101,10 @@ canvas.addEventListener("keydown", (event) => {
   if (["KeyW", "KeyA", "KeyS", "KeyD", "KeyE", "Space"].includes(event.code)) event.preventDefault();
   keys.add(event.code);
   if (event.code === "KeyE" && !event.repeat) heavyAttackRequested = true;
-  if (event.code === "Space" && !event.repeat) jumpRequested = true;
+  if (event.code === "Space" && !event.repeat) {
+    jumpRequested = true;
+    leftButtonCharge.commitLight();
+  }
 });
 canvas.addEventListener("keyup", (event) => keys.delete(event.code));
 document.addEventListener("visibilitychange", handleVisibilityChange);
@@ -90,6 +112,7 @@ document.addEventListener("visibilitychange", handleVisibilityChange);
 function releaseInputs() {
   keys.clear();
   attackRequested = false;
+  leftButtonCharge.cancel();
   heavyAttackRequested = false;
   rollRequested = false;
   kickRequested = false;
@@ -233,7 +256,8 @@ function actionHint() {
   if (player.action === "dodge") return "ROLL — i-frames plus collision knockdown.";
   if (player.action === "knockdown") return "KNOCKED DOWN — short recovery before control returns.";
   if (rightButtonGesture.isRunning()) return "RUNNING — stamina drains while sprinting.";
-  return "Wheel up roll · wheel down parry · RMB tap shove · hold RMB run · Space jump.";
+  if (leftButtonCharge.progress() > 0) return "CHARGING HEAVY — hold LMB, aim with mouse, release to strike.";
+  return "Tap LMB light · hold LMB heavy · RMB tap shove · RMB hold run · wheel roll/parry · Space jump.";
 }
 
 function render(impact = combatImpact.sample(performance.now())) {
@@ -320,7 +344,16 @@ function drawFighter(fighter, body, shadow) {
   ctx.translate(fighter.x, fighter.y - lift);
   const rollSpin = fighter.action === "dodge" ? fighter.actionElapsedMs / COMBAT.dodge.durationMs * Math.PI * 2 : 0;
   ctx.rotate(fighter.facing + rollSpin + (knockedDown ? Math.PI / 2 : 0));
+  const localCharge = fighter.id === "player" ? leftButtonCharge.progress() : 0;
+  const heavyWindup = fighter.action === "heavy_attack_windup";
+  const heavyActive = fighter.action === "heavy_attack_active";
+  if (localCharge > 0 || heavyWindup || heavyActive) {
+    const lean = heavyActive ? 16 : heavyWindup ? 9 : localCharge * 8;
+    ctx.translate(lean, 0);
+    ctx.scale(1 + (heavyActive ? 0.22 : localCharge * 0.09), heavyActive ? 0.89 : 1);
+  }
   if (knockedDown) ctx.scale(1.38, 0.62);
+  if (localCharge > 0) drawLmbChargeTell(localCharge);
   ctx.globalAlpha = dead ? 0.28 : 1;
 
   if (fighter.action === "attack_windup" || fighter.action === "attack_active") drawAttackArc(fighter);
@@ -455,6 +488,17 @@ function drawRunningAttackArc(fighter) {
   ctx.closePath();
   ctx.fill();
   ctx.stroke();
+}
+
+function drawLmbChargeTell(progress) {
+  ctx.save();
+  ctx.strokeStyle = progress >= 1 ? "#ffe49b" : "rgba(255, 172, 82, 0.88)";
+  ctx.lineWidth = 3 + progress * 4;
+  ctx.lineCap = "round";
+  ctx.beginPath();
+  ctx.arc(0, 0, COMBAT.heavyAttack.reach + COMBAT.fighterRadius, -0.68, -0.68 + progress * 1.36);
+  ctx.stroke();
+  ctx.restore();
 }
 
 function drawHeavyAttackArc(fighter) {

@@ -958,6 +958,13 @@ jobs:
       - name: Validate M234 trusted M145 light-onset staging
         run: node --test tests/m234-m145-trusted-light-onset.test.mjs
 
+      - name: Validate R1 tap/hold LMB charge and preserved RMB contract
+        run: |
+          node --check src/browser/left-button-charge.mjs
+          node --check web/game.mjs
+          node --check web/online-game.mjs
+          node --test tests/r1-lmb-charge-heavy.test.mjs tests/browser-runtime.test.mjs
+
       - name: Validate R0 multiplayer alpha entrypoint and deployment safety
         run: |
           node --check web/alpha.mjs
