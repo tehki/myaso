@@ -30,7 +30,6 @@ import { awaitM223HeavyWindup, planM223WheelDelay } from "./m223-server-heavy-wi
 import { dispatchM212AttackLedShortBlock } from "./m212-attack-led-short-block.mjs";
 import { createM221TrustedWheelRegistry } from "./m221-trusted-wheel-attestation.mjs";
 import { createM227TrustedLightRegistry } from "./m227-trusted-light-pointer.mjs";
-import { dispatchM207AttackLedDodge } from "./m207-attack-led-dodge.mjs";
 import { planM197KnockdownClusterNudge } from "./m197-knockdown-cluster.mjs";
 import { isTickNewer32 } from "../src/browser/reconciliation.mjs";
 
@@ -7645,42 +7644,34 @@ async function runOnlineUiDodgeFeedbackFlight(entries) {
 
     let rollIssued = false;
     let defenderMovementHeld = false;
-    let attackHeld = false;
 
-    // Anchor ordering on completed real W3C input edges instead of cross-driver
-    // promise timing. KeyS is held first as redundant provenance, Firefox LMB is
-    // then delivered and acknowledged, and one normal input tick later Chrome
-    // sends a short wheel-only command while KeyS remains down. Keeping the wheel
-    // out of a multi-device action avoids W3C tick alignment delaying it.
+    // M238: R1's light is committed on genuine pointerUP, never on DOWN.
+    // The legacy M207 DOWN -> wheel -> wait -> UP sequence rolled before
+    // any attack existed. Exact-head #39037691090 saw 3 genuine Chrome
+    // wheels and three Firefox ~210ms LMB holds, but only roll collisions
+    // and unrelated late attacks, no authentic dodge-evaded/dodge-success.
+    // Send one COMPLETE 65ms real Firefox W3C short LMB first, then aim
+    // Chrome's genuine perpendicular wheel 35ms later so the unchanged
+    // 135ms attack windup overlaps the unchanged 125ms dodge iframe.
+    // Only W3C inputs, never a synthetic attack, second wheel, or widened
+    // game window. Keep M36's strict fresh evade feedback and zero HP.
     try {
       await aimArena(defender, defenderElementId, 0, 180);
       defenderMovementHeld = true;
       await setMovementKey(defender, "s", true);
 
-      // M207: send one genuine Firefox LMB down FIRST. Do not allow a slow
-      // W3C response to postpone Chrome's one real wheel-forward until
-      // after the unchanged 135ms light windup and 125ms dodge iframe.
-      // Actual server HP and evade feedback still decide correctness.
-      attackHeld = true;
-      const m207Dispatch = await dispatchM207AttackLedDodge({
-        sendAttackDown: () => setArenaAttack(attacker, attackerElementId, true, attackOffset),
-        sendDodgeWheel: () => scrollArenaWheel(defender, defenderElementId, -120),
-        sleep,
-      });
-      const attackPressedAt = Date.now();
-      console.log("M207_GENUINE_LIGHT_DODGE_DISPATCH " + JSON.stringify({
-        attempt, ...m207Dispatch,
-      }));
+      await performArenaAttackHold(attacker, attackerElementId, attackOffset, 65);
+      await sleep(35);
+      await scrollArenaWheel(defender, defenderElementId, -120);
       rollIssued = true;
+      console.log("M238_GENUINE_RELEASED_LIGHT_DODGE " + JSON.stringify({
+        attempt, lightHoldMs: 65, postReleaseLeadMs: 35,
+      }));
 
       await sleep(60);
       defenderMovementHeld = false;
       await setMovementKey(defender, "s", false);
-
-      const remainingAttackHoldMs = Math.max(0, 180 - (Date.now() - attackPressedAt));
-      if (remainingAttackHoldMs > 0) await sleep(remainingAttackHoldMs);
     } finally {
-      if (attackHeld) await setArenaAttack(attacker, attackerElementId, false, attackOffset);
       if (defenderMovementHeld) await setMovementKey(defender, "s", false);
     }
     await sleep(180);
@@ -7713,11 +7704,22 @@ async function runOnlineUiDodgeFeedbackFlight(entries) {
   const defenderResult = evidence.find((entry) => entry.browser === defender.name);
   if (!attackerResult || !defenderResult) throw new Error(`incomplete M36 UI evidence: ${JSON.stringify(evidence)}`);
   const attackDown = attackerResult.pointers.find((event) => event.type === "pointerdown" && event.button === 0);
+  const attackUp = attackerResult.pointers.find((event) => event.type === "pointerup" && event.button === 0);
   const movementDelivered = attackerResult.keys.includes(`keydown:${movementCode}`) && attackerResult.keys.includes(`keyup:${movementCode}`);
   const aimDelivered = attackDown && Math.abs(attackDown.y - 0.5) <= 0.15 && (attackRight ? attackDown.x >= 0.6 : attackDown.x <= 0.4);
   if (!movementDelivered || !aimDelivered) throw new Error(`M36 real attacker movement/aim was not delivered: ${JSON.stringify(attackerResult)}`);
   const rollWheel = defenderResult.wheels.find((event) => event.deltaY < 0);
   if (!defenderResult.keys.includes("keydown:KeyS") || !defenderResult.keys.includes("keyup:KeyS") || !rollWheel) throw new Error(`M36 real pointer-directed wheel-roll controls were not delivered: ${JSON.stringify(defenderResult)}`);
+  if (!Number.isFinite(attackDown?.epochMs) || !Number.isFinite(attackUp?.epochMs)
+    || !Number.isFinite(rollWheel.epochMs)
+    || attackDown.epochMs >= attackUp.epochMs
+    || attackUp.epochMs - attackDown.epochMs >= 320
+    || rollWheel.epochMs <= attackUp.epochMs
+    || rollWheel.epochMs - attackUp.epochMs >= COMBAT.attack.windupMs) {
+    throw new Error(`M238 dodge never proved one genuine R1 light release BEFORE real wheel inside unchanged windup: ${JSON.stringify({
+      attackDown, attackUp, rollWheel,
+    })}`);
+  }
   if (attackerResult.playerHp !== 100 || attackerResult.playerGuard !== 100 || defenderResult.playerHp !== 100 || defenderResult.playerGuard !== 100) throw new Error(`M36 dodge exchange changed authoritative vitals: ${JSON.stringify(evidence)}`);
   if (attackerResult.feedbackTransitions.includes("parried") || defenderResult.feedbackTransitions.includes("parry-success")) throw new Error(`M36 dodge exchange accidentally resolved as parry: ${JSON.stringify(evidence)}`);
   return evidence;

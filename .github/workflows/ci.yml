@@ -818,7 +818,9 @@ jobs:
       - name: Validate M36 real online authoritative dodge feedback
         env:
           MYASO_PVP_SCENARIO: "uidodge"
-        run: node scripts/pvp_browser_flight_runner.mjs
+        run: |
+          node --test tests/m207-attack-led-dodge.test.mjs tests/r1-m238-committed-light-dodge.test.mjs
+          node scripts/pvp_browser_flight_runner.mjs
 
       - name: Validate M37 authoritative opponent recovery readability
         env:

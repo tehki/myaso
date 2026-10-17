@@ -188,3 +188,24 @@ ticks, knockdown, attack duration, hit reach or input protocol. Exact
 genuine pointer chronology, strict active-before-recovery, one 34HP
 victim-only hit, zero guard/collateral damage and real FFA readability
 proof remain mandatory. CI validation pending.
+
+### M238 genuine committed R1 short-light before real M36 roll
+Exact-head quality #39037691090 passed **116** steps including M156
+strict third-party knockdown and M171 light-feint, then failed real
+Chrome/Firefox M36: each of three genuine Chrome wheels arrived while
+the Firefox LMB was still held, ~170ms before real release. R1 creates
+the light on pointerUP, so the roll occurred with NO attacking light
+and produced ordinary roll collision/late unopposed light rather than
+fresh authoritative dodge-evade success. The old M207 down-wheel-up
+dispatch is no longer a valid R1 strike-dodge choreography.
+
+The M238 **acceptance-only** flight now sends one real complete Firefox
+65ms W3C pointerdown/pointerup, waits 35ms and sends one real
+perpendicular Chrome wheel while the genuine S movement key is held.
+It proves the pointerUP was after down but BEFORE wheel, both under
+the unchanged 320ms heavy threshold and 135ms server light windup.
+It retains strict fresh bidirectional dodge-evaded/dodge-success
+messages, zero HP/guard loss, no parry, true pointer-directed wheel and
+original recovery behavior. All 125ms dodge iframe, 135ms windup,
+movement, physics, knockdown, game and server code remain unchanged.
+This is a test scheduling candidate until exact-head CI passes.
