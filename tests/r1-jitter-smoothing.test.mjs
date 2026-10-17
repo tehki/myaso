@@ -47,6 +47,16 @@ test("jitter cap respects outages, monotonicity, backwards time and uint32 wrap"
   assert.throws(()=>createSnapshotRenderClock({maxFrameStepMs:-2}),RangeError);
 });
 
+test("zero-time duplicate render must not sneak forward across a WAN packet burst",()=>{
+  const clock=createSnapshotRenderClock();
+  clock.sample(300,1000);
+  const first=clock.sample(300,1016);
+  const sameTime=clock.sample(340,1016);
+  assert.equal(sameTime,first,"no advancement without wall time, even after newer snapshot");
+  const next=clock.sample(340,1017);
+  assert.ok(next>sameTime && next-sameTime<=1.45*60/1000+1e-9);
+});
+
 test("R1 smoothing is render-only, never alters input ACK, camera, or hit geometry",()=>{
  const src=readFileSync(new URL("../src/browser/smooth-motion.mjs",import.meta.url),"utf8");
  const online=readFileSync(new URL("../web/online-game.mjs",import.meta.url),"utf8");

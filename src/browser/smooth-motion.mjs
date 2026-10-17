@@ -65,7 +65,8 @@ export function createSnapshotRenderClock({
     let result = proposed;
     if (previousRenderTick !== null && previousFrameMs !== null) {
       const dt = Math.max(0, Math.min(maxFrameStepMs, nowMs - previousFrameMs));
-      const maxTicks = Math.max(0.5, dt * serverHz / 1000 * maxCatchUpRate);
+      // Same-time animation calls must not advance the remote clock at all.
+      const maxTicks = dt * serverHz / 1000 * maxCatchUpRate;
       result = Math.max(previousRenderTick, Math.min(proposed, previousRenderTick + maxTicks));
       if (proposed - result > 0.001) boundedCatchups++;
     }
