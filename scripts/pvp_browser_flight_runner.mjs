@@ -11737,14 +11737,12 @@ async function performArenaHeavyFeint(session, elementId, xOffset = 200) {
 
 async function performArenaFeint(session, elementId, xOffset = 200) {
   const origin = { "element-6066-11e4-a52e-4f735466cecf": elementId };
-  // M210: Keep one genuine LMB and wheel-back in the same W3C command,
-  // but separate their ticks: same-tick delivery can choose Block before
-  // the attack starts. The previous 20ms wheel tick was observed at +81ms
-  // in real Chrome CI, beyond the unchanged authoritative 70ms light
-  // feint-cancel window, causing a real 34HP hit and a valid test failure.
-  // Schedule the wheel in the next W3C tick after only 5ms, with 85ms
-  // further LMB hold for the same full 90ms pressed gesture. No damage,
-  // server input, feint window or game mechanics are changed.
+  // R1: a short LMB fires its light edge on RELEASE, not pointerdown.
+  // Preserve the original strict 70ms server feint window by issuing genuine
+  // 85ms LMB press/release followed by a wheel-back 20ms later, all inside
+  // one W3C multi-source action. Wheel before release now blocks first,
+  // so the old M210 schedule is semantically invalid for R1 tap-to-light.
+  // Never widen feint windows or fake input/authoritative state.
   try {
     await webdriver(session.base, "POST", `/session/${session.sessionId}/actions`, {
       actions: [
@@ -11755,9 +11753,10 @@ async function performArenaFeint(session, elementId, xOffset = 200) {
           actions: [
             { type: "pointerMove", duration: 0, origin, x: xOffset, y: 0 },
             { type: "pointerDown", button: 0 },
-            { type: "pause", duration: 5 },
             { type: "pause", duration: 85 },
             { type: "pointerUp", button: 0 },
+            { type: "pause", duration: 20 },
+            { type: "pause", duration: 0 },
           ],
         },
         {
@@ -11765,10 +11764,11 @@ async function performArenaFeint(session, elementId, xOffset = 200) {
           id: `wheel-${session.name}`,
           actions: [
             { type: "pause", duration: 0 },
-            { type: "pause", duration: 5 },
-            { type: "scroll", x: 0, y: 0, deltaX: 0, deltaY: 120, duration: 0, origin },
+            { type: "pause", duration: 0 },
             { type: "pause", duration: 85 },
             { type: "pause", duration: 0 },
+            { type: "pause", duration: 20 },
+            { type: "scroll", x: 0, y: 0, deltaX: 0, deltaY: 120, duration: 0, origin },
           ],
         },
       ],

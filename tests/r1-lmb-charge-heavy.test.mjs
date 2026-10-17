@@ -98,3 +98,30 @@ test("R1 preserves original RMB sprint/kick, E heavy, and space/run attack input
   assert.match(html, /LMB hold/);
   assert.match(html, /RMB hold/);
 });
+
+test("R1 genuine W3C feint releases short LMB before wheel-back in the unchanged feint window", () => {
+  const runner = readFileSync(new URL("../scripts/pvp_browser_flight_runner.mjs", import.meta.url), "utf8");
+  const start = runner.indexOf("async function performArenaFeint(");
+  const end = runner.indexOf("async function performArenaRecoveryBufferedRoll(", start);
+  assert.ok(start > 0 && end > start, "genuine Firefox/Chrome feint command remains present");
+  const body = runner.slice(start, end);
+  assert.match(body, /{ type: "pointerDown", button: 0 },\s*{ type: "pause", duration: 85 },\s*{ type: "pointerUp", button: 0 }/);
+  assert.match(body, /{ type: "pause", duration: 20 },\s*{ type: "scroll", x: 0, y: 0, deltaX: 0, deltaY: 120/);
+  assert.match(body, /W3C multi-source action/);
+  assert.doesNotMatch(body, /window\.__MYASO|dispatchEvent\(/, "only real browser-owned actions can prove feint");
+});
+
+test("R1 charge meter is independently visible even while damage/status messages update", () => {
+  const html = readFileSync(new URL("../web/index.html", import.meta.url), "utf8");
+  const css = readFileSync(new URL("../web/styles.css", import.meta.url), "utf8");
+  for (const path of ["../web/game.mjs", "../web/online-game.mjs"]) {
+    const content = readFileSync(new URL(path, import.meta.url), "utf8");
+    assert.match(content, /function updateChargeHud\(\)/);
+    assert.match(content, /chargeHud\.root\.hidden = progress <= 0/);
+    assert.match(content, /chargeHud\.value\.textContent = percent === 100 \? "READY"/);
+    assert.match(content, /updateChargeHud\(\);/);
+  }
+  assert.match(html, /id="heavy-charge-indicator"/);
+  assert.match(css, /\.heavy-charge-indicator\[hidden\]/);
+  assert.match(css, /pointer-events: none/);
+});

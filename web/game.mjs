@@ -6,6 +6,21 @@ import { COMBAT, createFighter, createWorld, stepWorld } from "../src/combat/mod
 import { createSparringAi } from "../src/combat/sparring-ai.mjs";
 
 const canvas = document.querySelector("#arena");
+const chargeHud = {
+  root: document.querySelector("#heavy-charge-indicator"),
+  value: document.querySelector("#heavy-charge-value"),
+  fill: document.querySelector("#heavy-charge-fill"),
+};
+function updateChargeHud() {
+  const progress = leftButtonCharge.progress();
+  chargeHud.root.hidden = progress <= 0;
+  if (progress <= 0) return;
+  const percent = Math.min(100, Math.round(progress * 100));
+  chargeHud.value.textContent = percent === 100 ? "READY" : `${percent}%`;
+  chargeHud.root.dataset.ready = String(percent === 100);
+  chargeHud.fill.style.transform = `scaleX(${progress})`;
+}
+
 const ctx = canvas.getContext("2d", { alpha: false });
 const eventText = document.querySelector("#event-text");
 const arenaStage = document.querySelector(".arena-stage");
@@ -570,6 +585,7 @@ function simulateStep(stepMs) {
 function frame(now) {
   if (document.hidden) return;
   frameBudget.advance(now, simulateStep);
+  updateChargeHud();
   updateHud();
   const impact = combatImpact.sample(now);
   if (!impact.freeze) render(impact);
