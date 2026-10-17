@@ -71,7 +71,9 @@ test("R1 snapshot cadence, jitter and camera correction expose stale authoritati
   m.noteSnapshot();
   time = 1050; m.noteSnapshot();
   time = 1170; m.noteSnapshot();
+  m.noteAckAnchor({serverTick: 120}, {serverTick: 118});
   m.noteReconciliation({serverTick: 120}, {serverTick: 118}, 12);
+  m.noteAckAnchor({serverTick: 121}, {serverTick: 121});
   m.noteReconciliation({serverTick: 121}, {serverTick: 121}, 3);
   const s = m.snapshot();
   assert.equal(s.snapshots, 3);

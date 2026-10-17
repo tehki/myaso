@@ -99,8 +99,12 @@ try {
     onReliableSnapshot(_result, state) {
       observeState(state);
     },
-    onAck() {
+    onProcessedAck() {
+      // Count real server processed-input ACK packets, not how often the
+      // presentation layer happens to have a fresh reconciliation anchor.
       acknowledgements += 1;
+    },
+    onAck() {
       observeState(client.state);
     },
   });

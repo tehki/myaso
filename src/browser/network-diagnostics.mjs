@@ -63,13 +63,19 @@ export function createNetworkDiagnostics({
     lastSnapshotMs = at;
   }
 
-  function noteReconciliation(ack, own, distance) {
-    record(cameraCorrections, distance);
+  // Count stale authoritative position at *ACK arrival*, even if the
+  // reconciliation gate waits and never applies that stale anchor. Otherwise
+  // the instrumentation would misleadingly report zero stale arrivals.
+  function noteAckAnchor(ack, own) {
     if (!Number.isInteger(ack?.serverTick) || !Number.isInteger(own?.serverTick)) return;
     if (isTickNewer32(ack.serverTick, own.serverTick)) {
       staleOwnAtAckCount += 1;
       maxStaleOwnTicks = Math.max(maxStaleOwnTicks, (ack.serverTick - own.serverTick) >>> 0);
     }
+  }
+
+  function noteReconciliation(_ack, _own, distance) {
+    record(cameraCorrections, distance);
   }
 
   function quantile(list, fraction) {
@@ -96,6 +102,6 @@ export function createNetworkDiagnostics({
   }
 
   return Object.freeze({
-    noteSentInput, noteAck, noteSnapshot, noteReconciliation, snapshot,
+    noteSentInput, noteAck, noteAckAnchor, noteSnapshot, noteReconciliation, snapshot,
   });
 }
