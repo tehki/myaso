@@ -7977,21 +7977,15 @@ async function runOnlineUiParryPunishFfaFocusFlight(entries, convert = false) {
   const focusOffset = stagedDefender.focusTransitions.length;
   const recoveryOffset = stagedDefender.recoveryTransitions.length;
 
-  let attackHeld = false;
-  let blockHeld = false;
-  let parryEvidence = null;
-  try {
-    attackHeld = true;
-    await setArenaAttack(attacker, attackerElementId, true, attackOffset);
-    await sleep(70);
-    blockHeld = true;
-    await setArenaBlock(defender, defenderElementId, true);
-    await sleep(190);
-    parryEvidence = await waitForUiParryEvidence(entries, attacker, defender, 520, true, staged);
-  } finally {
-    if (attackHeld) await setArenaAttack(attacker, attackerElementId, false, attackOffset);
-    if (blockHeld) await setArenaBlock(defender, defenderElementId, false);
-  }
+  // R1 shared controls: a short left click commits its genuine light on
+  // pointerUP; the old M150 down -> wheel -> 190ms -> up sequence could
+  // miss the commitment or charge a HEAVY on a delayed W3C release.
+  // Keep the exact three-player geometry, parry cue and strict 34HP
+  // target isolation checks. No synthetic events or second attack.
+  await performArenaAttackHold(attacker, attackerElementId, attackOffset, 75);
+  await sleep(55);
+  await setArenaBlock(defender, defenderElementId, true);
+  const parryEvidence = await waitForUiParryEvidence(entries, attacker, defender, 520, true, staged);
 
   let attackerState = parryEvidence.find((entry) => entry.browser === attacker.name);
   let defenderState = parryEvidence.find((entry) => entry.browser === defender.name);
@@ -8121,14 +8115,21 @@ async function runOnlineUiParryPunishFfaFocusFlight(entries, convert = false) {
   }
 
   const attackPointers = attackerState.pointers.slice(attackPointerOffset);
-  const attackDown = attackPointers.find((entry) => entry.type === "pointerdown" && entry.button === 0);
+  const attackDowns = attackPointers.filter((entry) => entry.type === "pointerdown" && entry.button === 0);
+  const attackUps = attackPointers.filter((entry) => entry.type === "pointerup" && entry.button === 0);
+  const attackDown = attackDowns[0];
+  const attackUp = attackUps[0];
   const blockWheel = defenderState.wheels.slice(defenderWheelOffset).find((entry) => entry.deltaY > 0);
   const attackAimValid = attackDown
     && Math.abs(attackDown.y - 0.5) <= 0.15
     && (attackRight ? attackDown.x >= 0.6 : attackDown.x <= 0.4);
+  const authenticShortLight = attackDowns.length === 1 && attackUps.length === 1
+    && Number.isFinite(attackDown?.epochMs) && Number.isFinite(attackUp?.epochMs)
+    && attackUp.epochMs > attackDown.epochMs
+    && attackUp.epochMs - attackDown.epochMs < 320;
   if (!attackerState.keys.includes(`keydown:${movementCode}`)
     || !attackerState.keys.includes(`keyup:${movementCode}`)
-    || !attackAimValid || !blockWheel) {
+    || !attackAimValid || !authenticShortLight || !blockWheel) {
     throw new Error(`${milestone} lacked genuine attack / wheel-back parry provenance: ${JSON.stringify({ attackerState, defenderState })}`);
   }
 

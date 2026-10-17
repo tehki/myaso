@@ -33,3 +33,27 @@ test("M146 retains exact genuine late punish and authoritative stun/combat gates
   assert.ok(s.includes('defenderState.events.includes("Opponent hit - 34 HP.")'));
   assert.ok(s.includes('attackerState.events.includes("Hit taken - 34 HP.")'));
 });
+
+test("M147/M150 FFA parry uses one complete short light before wheel, preserves target isolation", () => {
+  const src = readFileSync(new URL("../scripts/pvp_browser_flight_runner.mjs", import.meta.url), "utf8");
+  const begin = src.indexOf("async function runOnlineUiParryPunishFfaFocusFlight(");
+  const end = src.indexOf("\nasync function runOnlineUiParryPunishWindowFlight(", begin + 20);
+  assert.ok(begin > 0 && end > begin);
+  const flight = src.slice(begin, end);
+  const light = flight.indexOf("await performArenaAttackHold(attacker, attackerElementId, attackOffset, 75)");
+  const lead = flight.indexOf("await sleep(55)", light);
+  const wheel = flight.indexOf("await setArenaBlock(defender, defenderElementId, true)", lead);
+  const check = flight.indexOf("await waitForUiParryEvidence(entries, attacker, defender, 520, true, staged)", wheel);
+  assert.ok(light >= 0 && lead > light && wheel > lead && check > wheel);
+  assert.ok(!flight.includes("await setArenaAttack(attacker, attackerElementId, true, attackOffset)"));
+  assert.ok(flight.includes("attackDowns.length === 1 && attackUps.length === 1"));
+  assert.ok(flight.includes("attackUp.epochMs - attackDown.epochMs < 320"));
+  assert.ok(flight.includes("!attackAimValid || !authenticShortLight || !blockWheel"));
+  assert.ok(flight.includes("COMBAT.block.parryStunMs !== 650"));
+  assert.ok(flight.includes("targetInputEpochMs = stunTransition.epochMs + 250"));
+  assert.ok(flight.includes("currentAttacker?.playerHp === 66"));
+  assert.ok(flight.includes("currentDefender?.playerHp === 100"));
+  assert.ok(flight.includes("currentCloser?.playerHp === 100"));
+  assert.ok(flight.includes("focusLabel === `NEAREST #${closerId}`"));
+  assert.ok(flight.includes('closerState.events.includes("Hit taken - 34 HP.")'));
+});

@@ -91,3 +91,15 @@ requires the real 125ms parry, unchanged 650ms stun, a genuine delayed light
 input at 340..470ms after stun, exact 34HP punish, and both authoritative
 feedback events. Production combat, input routing, server and network
 constants remain unchanged.
+
+### M147/M150 FFA parry: complete genuine R1 short click
+Exact-head CI 39026753719 passed strict M146 and M147 recovery tests, but
+M150 failed before parry with Firefox #2 seeing a real wheel-back and
+Chrome #1 still showing a lone pointerdown: inherited FFA fixture delayed
+the corresponding pointerUP through a 190ms wheel hold, which conflicts
+with R1's light-on-release semantics and can charge heavy under load.
+M147/M150 now send one genuine 75ms W3C short click and only then a
+genuine wheel-back after 55ms, with exact one-down/one-up real timestamp
+proof (<320ms). The 650ms authoritative parry stun, target selection,
+exact 34HP hit on parried #1, untouched #2/#3 vitals and original event
+and focus restoration gates are unchanged. No production changes.
