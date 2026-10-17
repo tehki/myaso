@@ -835,7 +835,9 @@ jobs:
       - name: Validate M39 spatial FFA attack intent
         env:
           MYASO_PVP_SCENARIO: "uiattackintent"
-        run: node scripts/pvp_browser_flight_runner.mjs
+        run: |
+          node --test tests/r1-m240-m39-release-windup.test.mjs
+          node scripts/pvp_browser_flight_runner.mjs
 
       - name: Validate M40 spatial FFA guard-break tell
         env:

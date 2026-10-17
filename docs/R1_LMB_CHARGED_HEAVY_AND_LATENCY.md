@@ -225,3 +225,19 @@ events. Strict down < up < wheel < up + 135ms, light-hold <320ms,
 genuine attack/dodge feedback, zero HP/guard loss and no parry remain
 unchanged and fail closed. No synthetic input, gameplay, physics,
 server, attack window, or telemetry protocol modifications.
+
+### M240 real M39 windup after R1 short release
+Exact-head quality #39047009902 passed 119 steps, including the repaired
+real Chrome/Firefox M36 dodge, but M39's genuine Chrome LMB input still
+used the legacy DOWN -> await remote-windup 600ms -> UP pattern. Under
+R1 light-on-release, no attack exists while down is held, so Firefox's
+passive sampler remained at 0 for all three attempts. M240 retains the
+pre-armed passive Firefox 320x320 requestAnimationFrame sampler, starts
+its read concurrently with one genuine 65ms W3C Chrome pointerdown/up,
+and fails closed if the remote authoritative windup pixels never reach
+24 or the Chrome negative-control has any pixels. The post-click
+evidence is read again to require authentic LMB pointerUP, held less
+than 320ms, without discarding the earlier remote-only pixel result.
+Existing genuine movement/aim, cleared-boundary evidence, server
+135ms windup, 80ms active, 255ms recovery, HP, physics, action
+authority and net protocol are unchanged. Full exact-head CI required.

@@ -875,12 +875,18 @@ async function runOnlineUiAttackIntentFlight(entries) {
   let evidence = null;
   try {
     for (let attempt = 0; attempt < 3 && !evidence; attempt += 1) {
-      await setArenaAttack(attacker, attackerElementId, true, attackOffset);
-      try {
-        evidence = await waitForRemoteWindupTell(entries, attacker, defender, 600, false);
-      } finally {
-        await setArenaAttack(attacker, attackerElementId, false, attackOffset);
-      }
+      // M240: short LMB is committed on genuine pointerUP (R1). The former
+      // DOWN -> wait up to 600ms for windup -> UP deadlocked the windup
+      // itself. Arm the passive Firefox frame sampler BEFORE the real
+      // 65ms Chrome W3C down/up so the 135ms server windup is captured
+      // without delaying the release behind the observer WebDriver polls.
+      // Promise.all still fails closed for either genuine W3C input failure
+      // or the missing 24-pixel remote-only authoritative tell.
+      const [observed] = await Promise.all([
+        waitForRemoteWindupTell(entries, attacker, defender, 600, false),
+        performArenaAttackHold(attacker, attackerElementId, attackOffset, 65),
+      ]);
+      evidence = observed;
       if (!evidence) await sleep(520);
     }
     if (!evidence) evidence = await waitForRemoteWindupTell(entries, attacker, defender, 300, true);
@@ -888,6 +894,14 @@ async function runOnlineUiAttackIntentFlight(entries) {
     await stopWindupTellSampler(defender);
   }
   await waitForWindupTellClear(defender, 500);
+  // Read authentic pointerUP AFTER the W3C transaction has completed.
+  // The earlier captured pixel values remain mandatory positive/negative
+  // evidence and are not replaced with a fabricated later canvas sample.
+  const completed = await Promise.all(entries.map(readUiEvidence));
+  evidence = evidence.map((entry) => ({
+    ...completed.find((item) => item.browser === entry.browser),
+    windupTellMaxPixels: entry.windupTellMaxPixels,
+  }));
   const attackerResult = evidence.find((entry) => entry.browser === attacker.name);
   const defenderResult = evidence.find((entry) => entry.browser === defender.name);
   if (!attackerResult || !defenderResult) throw new Error(`incomplete M39 UI evidence: ${JSON.stringify(evidence)}`);
@@ -895,8 +909,14 @@ async function runOnlineUiAttackIntentFlight(entries) {
     throw new Error(`M39 real attacker movement was not delivered: ${JSON.stringify(attackerResult)}`);
   }
   const attackDown = attackerResult.pointers.find((event) => event.type === "pointerdown" && event.button === 0);
+  const attackUp = attackerResult.pointers.find((event) => event.type === "pointerup" && event.button === 0);
   const aimValid = attackDown && Math.abs(attackDown.y - 0.5) <= 0.15 && (attackRight ? attackDown.x >= 0.6 : attackDown.x <= 0.4);
-  if (!aimValid) throw new Error(`M39 real attacker aim was not delivered: ${JSON.stringify(attackerResult)}`);
+  if (!aimValid || !attackUp || attackUp.t <= attackDown.t || attackUp.t - attackDown.t >= 320) {
+    throw new Error(`M240 genuine short-LMB pointerUP or M39 aimed attack missing: ${JSON.stringify(attackerResult)}`);
+  }
+  if (defenderResult.windupTellMaxPixels < 24 || attackerResult.windupTellMaxPixels !== 0) {
+    throw new Error(`M39 remote-only authoritative windup pixel proof changed: ${JSON.stringify(evidence)}`);
+  }
   return evidence;
 }
 
