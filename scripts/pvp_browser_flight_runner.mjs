@@ -5570,20 +5570,28 @@ async function runOnlineUiRollKnockdownFfaHitFlight(entries) {
       defenderActionOffset,
       knockdownTimeoutMs,
     );
-    const rollInput = scrollArenaWheel(roller, rollerElementId, -120, 0);
-    const [knockdownTransition] = await Promise.all([knockdownWatcher, rollInput]);
+    // Do not await the independent roller WebDriver wheel ACK before Chrome2
+    // can react to Firefox's already-observed authoritative knockdown.
+    // The wheel transport and victim watcher are concurrent, and any wheel
+    // error still fails the flight at the explicitly awaited completion.
+    const rollCompletion = scrollArenaWheel(roller, rollerElementId, -120, 0)
+      .then(() => ({ ok: true }), (error) => ({ ok: false, error }));
+    const knockdownTransition = await knockdownWatcher;
 
     if (knockdownTransition) {
+      // R1 light is committed on pointerUP. Fire one authentic complete W3C
+      // short click at the already-staged mouse aim IMMEDIATELY after the
+      // replicated knockdown, without two round trips + JS sleep or the
+      // other browser's wheel ACK. The unchanged server 260ms knockdown,
+      // 135ms light windup and 34HP exact-hit assertions remain mandatory.
+      await performArenaM221GuardBreakClick(punisher, 35);
+      const rollResult = await rollCompletion;
+      if (!rollResult.ok) throw rollResult.error;
       conversion = {
         attempt,
         punishPointerOffset,
         knockdownTransition,
       };
-      // Pointer was already aimed before the roll; avoid another pointerMove
-      // round trip before the tight 260 ms knockdown conversion window.
-      await setArenaAttackButton(punisher, true);
-      await sleep(40);
-      await setArenaAttackButton(punisher, false);
 
       // Roll provenance and the rendered knockdown cue may trail the victim's
       // first authoritative knockdown snapshot by one or more browser frames.
@@ -5636,6 +5644,8 @@ async function runOnlineUiRollKnockdownFfaHitFlight(entries) {
       break;
     }
 
+    const rollResult = await rollCompletion;
+    if (!rollResult.ok) throw rollResult.error;
     if (attempt < 3) {
       await setMovementKey(roller, retreatKey, false);
       await sleep(COMBAT.dodge.recoveryMs + COMBAT.dodge.collisionKnockdownMs + 140);
@@ -5700,12 +5710,15 @@ async function runOnlineUiRollKnockdownFfaHitFlight(entries) {
   const punishDowns = punishPointers.filter((entry) => entry.type === "pointerdown" && entry.button === 0);
   const punishUps = punishPointers.filter((entry) => entry.type === "pointerup" && entry.button === 0);
   const punishDown = punishDowns[0];
+  const punishUp = punishUps[0];
   const punishAimValid = punishDown
     && Math.abs(punishDown.y - 0.5) <= 0.15
     && (punisherId < defenderId ? punishDown.x >= 0.6 : punishDown.x <= 0.4);
   const knockdownEndEpochMs = conversion.knockdownTransition.epochMs + COMBAT.dodge.collisionKnockdownMs;
   if (punishDowns.length !== 1 || punishUps.length !== 1 || !punishAimValid
-    || !Number.isFinite(punishDown?.epochMs)
+    || !Number.isFinite(punishDown?.epochMs) || !Number.isFinite(punishUp?.epochMs)
+    || punishUp.epochMs <= punishDown.epochMs
+    || punishUp.epochMs - punishDown.epochMs >= 320
     || punishDown.epochMs < conversion.knockdownTransition.epochMs
     || punishDown.epochMs >= knockdownEndEpochMs) {
     throw new Error(milestone + " genuine third-party LMB missed the authoritative knockdown window: "

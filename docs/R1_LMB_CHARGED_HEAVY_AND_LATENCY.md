@@ -121,3 +121,20 @@ action/hit transition, ordered dual knockdown, genuine wheel, exclusive
 reaim, unchanged 34HP single target, zero guard/collateral damage, and
 focus recovery assertion remains mandatory. This changes no gameplay,
 server, replication, combat timing or balancing constants.
+
+### M156 real-wheel ACK versus third-party short-LMB release
+Exact-head quality 39030953365 passed 97 stages, including the repaired
+strict M159 dual-knockdown and all earlier real-browser parry gates,
+then failed M156: Firefox #2 genuine roll-knockdown at authoritative tick
+318, Chrome2 #3 light windup at 327 and active at 336, after #2 recovery
+at tick 333. Old harness awaited **both** Firefox's live knockdown and
+Chrome #1's separate wheel W3C ACK before issuing Chrome2's two-command
+down/40ms/up click. The post-knockdown WebDriver ACK plus multiple extra
+round trips delayed real light-on-release beyond the unmodified 260ms
+window. M156 now reacts to the already-observed Firefox knockdown
+immediately, sends one real, complete 35ms short W3C LMB at the existing
+aim in a single driver call and awaits the genuine wheel ACK afterwards,
+still rejecting any wheel error. Real pointerdown/up timestamps, positive
+sub-320ms release, exact 34HP/66HP victim, zero collateral and guard loss,
+and strict authoritative attack-active BEFORE recovery are all mandatory.
+No production gameplay/balancing/protocol changes or time-window widening.

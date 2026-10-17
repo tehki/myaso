@@ -690,6 +690,7 @@ jobs:
           node --check src/browser/combat-readability.mjs
           node --check web/online-game.mjs
           node --check scripts/pvp_browser_flight_runner.mjs
+          node --test tests/r1-m156-knockdown-light-latency.test.mjs
           node --test --test-name-pattern="FFA knockdown punish focus|roll collision|knockdown owns" tests/m29-combat-readability.test.mjs
           node scripts/pvp_browser_flight_runner.mjs
 

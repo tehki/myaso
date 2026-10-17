@@ -1,0 +1,28 @@
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import test from "node:test";
+
+test("M156 real Chrome2 short click starts after actual Firefox knockdown, not wheel driver ACK", () => {
+  const source = readFileSync(new URL("../scripts/pvp_browser_flight_runner.mjs", import.meta.url), "utf8");
+  const begin = source.indexOf("async function runOnlineUiRollKnockdownFfaHitFlight(");
+  const end = source.indexOf("\nasync function ", begin + 25);
+  const flight = source.slice(begin, end);
+  assert.ok(begin > 0 && end > begin);
+  const armed = flight.indexOf("const knockdownWatcher = waitForDefenderKnockdown(");
+  const wheel = flight.indexOf("const rollCompletion = scrollArenaWheel(", armed);
+  const watched = flight.indexOf("const knockdownTransition = await knockdownWatcher", wheel);
+  const click = flight.indexOf("await performArenaM221GuardBreakClick(punisher, 35)", watched);
+  const ack = flight.indexOf("const rollResult = await rollCompletion", click);
+  assert.ok(armed >= 0 && wheel > armed && watched > wheel && click > watched && ack > click);
+  assert.ok(flight.includes(".then(() => ({ ok: true }), (error) => ({ ok: false, error }))"));
+  assert.ok(flight.includes("if (!rollResult.ok) throw rollResult.error"));
+  assert.ok(!flight.includes("await setArenaAttackButton(punisher, true)"));
+  assert.ok(!flight.includes("await setArenaAttackButton(punisher, false)"));
+  assert.ok(flight.includes("punishDowns.length !== 1 || punishUps.length !== 1"));
+  assert.ok(flight.includes("punishUp.epochMs - punishDown.epochMs >= 320"));
+  assert.ok(flight.includes("punishDown.epochMs < conversion.knockdownTransition.epochMs"));
+  assert.ok(flight.includes("punishActive.epochMs >= knockdownEndEpochMs || !attackPrecedesRecovery"));
+  assert.ok(flight.includes('defenderState.events.includes("Hit taken - 34 HP.")'));
+  assert.ok(flight.includes("defenderState?.playerHp === 66 && defenderState?.playerGuard === 100"));
+  assert.ok(flight.includes("punisherState?.playerHp === 100 && punisherState?.playerGuard === 100"));
+});
