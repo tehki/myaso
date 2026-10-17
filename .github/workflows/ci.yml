@@ -59,6 +59,25 @@ jobs:
           node --check tests/m21-compact-position.test.mjs
           node --test tests/networking.test.mjs tests/m4-snapshot-compat.test.mjs tests/m19-compact-record-identity.test.mjs tests/m20-compact-facing.test.mjs tests/m21-compact-position.test.mjs
 
+      - name: Validate R1 smooth network rendering and jitter guards
+        run: |
+          node --check src/browser/smooth-motion.mjs
+          node --check web/online-game.mjs
+          node --test tests/r1-smooth-network.test.mjs tests/browser-runtime.test.mjs
+
+      - name: Validate R1 own-snapshot ACK alignment
+        run: |
+          node --check src/browser/own-snapshot-ack-gate.mjs
+          node --check web/authoritative-client.mjs
+          node --test tests/r1-own-snapshot-ack-gate.test.mjs tests/m6-browser-authority.test.mjs
+
+      - name: Validate R1 real WebTransport latency telemetry
+        run: |
+          node --check src/browser/network-diagnostics.mjs
+          node --check web/authoritative-client.mjs
+          node --check web/online-game.mjs
+          node --test tests/r1-network-diagnostics.test.mjs tests/m6-browser-authority.test.mjs
+
       - name: Validate browser runtime hot path
         run: |
           node --check src/browser/m224-dodge-completion.mjs
@@ -961,9 +980,10 @@ jobs:
       - name: Validate R1 tap/hold LMB charge and preserved RMB contract
         run: |
           node --check src/browser/left-button-charge.mjs
+          node --check src/browser/light-attack-movement.mjs
           node --check web/game.mjs
           node --check web/online-game.mjs
-          node --test tests/r1-lmb-charge-heavy.test.mjs tests/browser-runtime.test.mjs
+          node --test tests/r1-lmb-charge-heavy.test.mjs tests/r1-light-release-movement.test.mjs tests/browser-runtime.test.mjs
 
       - name: Validate R0 multiplayer alpha entrypoint and deployment safety
         run: |

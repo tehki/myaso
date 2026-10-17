@@ -2,10 +2,12 @@ import { createFrameBudget } from "../src/browser/frame-budget.mjs";
 import { recordM233RecoveryHandoff } from "../src/browser/m233-recovery-handoff-trace.mjs";
 import { installRightButtonGesture } from "../src/browser/right-button-gesture.mjs";
 import { createLeftButtonCharge } from "../src/browser/left-button-charge.mjs";
+import { captureLightAttackMovement } from "../src/browser/light-attack-movement.mjs";
 import { createCombatImpactController } from "../src/browser/combat-impact.mjs";
 import { COMBAT_ACTION, blockSpatialPresentation, combatActionHint, combatOverlayPresentation, createCombatReadabilityTracker, createRemoteDamageTracker, fighterFocusNetId, fighterGuardBreakPunishNetId, guardBreakPunishRangeCue, fighterKnockdownPunishNetId, knockdownPunishRangeCue, fighterParryPunishNetId, parryPunishRangeCue, fighterRecoveryNetId, recoveryPunishRangeCue, punishRangeCueIntent, fighterIdentityPresentation, fighterThreatBearingLabel, fighterThreatGuardArcLabel, fighterThreatNetId, fighterThreatPhaseLabel, fighterThreatPhaseState, fighterMatchPointPresentation, fighterMatchPresentation, fighterScoreboardPresentation, FFA_KILL_TARGET, fighterVitalsPresentation, guardBreakSpatialPresentation, killFeedPresentation, opponentRecoveryPresentation, parrySpatialPresentation, staminaDenialPresentation, ownCombatReadinessPresentation } from "../src/browser/combat-readability.mjs";
 import { COMBAT } from "../src/combat/model.mjs";
 import { isTickNewer32, reconcilePrediction } from "../src/browser/reconciliation.mjs";
+import { createReconciliationCamera, createSnapshotRenderClock } from "../src/browser/smooth-motion.mjs";
 import { NETWORK } from "../src/network/constants.mjs";
 import { connectAuthoritativeClient, parseSha256Hex } from "./authoritative-client.mjs";
 
@@ -105,6 +107,25 @@ const killFeedEntries = [];
 const killFeedSequences = new Set();
 
 const params = new URLSearchParams(window.location.search);
+const diagnosticsVisible = params.get("netstats") === "1";
+const diagnosticsPanel = document.querySelector("#network-diagnostics");
+if (diagnosticsPanel) diagnosticsPanel.hidden = !diagnosticsVisible;
+let lastDiagnosticsDrawMs = 0;
+function updateNetworkDiagnostics(nowMs) {
+  if (!diagnosticsVisible || !diagnosticsPanel || !networkClient || nowMs - lastDiagnosticsDrawMs < 500) return;
+  lastDiagnosticsDrawMs = nowMs;
+  const s = networkClient.diagnostics.snapshot();
+  const time = (ms) => ms === null ? "collecting…" : `${Math.round(ms)}ms`;
+  // textContent only: measurements never enter HTML, storage or network logs.
+  diagnosticsPanel.textContent =
+    `Input→ACK p50 ${time(s.inputAckP50Ms)} · p95 ${time(s.inputAckP95Ms)}`
+    + ` | Jitter p95 ${time(s.ackJitterP95Ms)}`
+    + ` | Snapshots p50 ${time(s.snapshotGapP50Ms)} · p95 ${time(s.snapshotGapP95Ms)}`
+    + ` | Camera correction p95 ${s.cameraCorrectionP95 === null ? "collecting…" : s.cameraCorrectionP95 + "u"}`
+    + ` | Stale-own ACKs ${s.staleOwnAtAckCount}`
+    + ` | Deferred reconciles ${networkClient.ackGateMetrics.deferred}`
+    + ` | Samples ${s.inputAckSamples}`;
+}
 const acceptanceScenario = params.get("scenario");
 const server = params.get("server");
 const cert = params.get("cert");
@@ -123,6 +144,9 @@ const currentInput = {
 };
 const arenaLayer = createArenaLayer();
 const remoteScratch = new Map();
+const snapshotRenderClock = createSnapshotRenderClock();
+const visualCamera = createReconciliationCamera();
+const visualCameraPosition = { x: 0, y: 0 };
 const fixedStepMs = 1000 / NETWORK.clientPredictionHz;
 const frameBudget = createFrameBudget({ stepMs: fixedStepMs, maxFrameDeltaMs: 50, maxStepsPerFrame: 6 });
 let networkClient = null;
@@ -130,6 +154,7 @@ let animationFrameId = 0;
 let predictionStep = 0;
 let clientTick = 0;
 let attackRequested = false;
+let committedLightMove = null;
 let leftButtonDown = false;
 let heavyAttackRequested = false;
 let rollRequested = false;
@@ -139,6 +164,7 @@ let shortBlockUntil = 0;
 const leftButtonCharge = createLeftButtonCharge({
   onLight() {
     attackRequested = true;
+    committedLightMove = captureLightAttackMovement(keys);
     if (local.action === COMBAT_ACTION.jump) queueStaminaDenial("jump-attack");
     else if (!pendingStaminaDenial && (jumpRequested || keys.has("Space"))) queueStaminaDenial("jump-attack-chord");
     else if (rightButtonGesture.isRunning() && ["KeyW", "KeyA", "KeyS", "KeyD"].some((code) => keys.has(code))) {
@@ -220,6 +246,10 @@ networkClient = await connectAuthoritativeClient({
     if (!ownId) return;
     const own = state.get(ownId);
     if (own) {
+      // Initial player state is available before the first aligned input ACK.
+      if (networkStatus.startsWith("Connecting")) {
+        networkStatus = `Online - player #${ownId} - server tick ${networkClient.latestServerTick}`;
+      }
       if (Number.isFinite(own.stamina)) authoritativeStamina = own.stamina;
       if (!local.initialized) restoreAuthoritative(own);
       else if (Number.isFinite(own.stamina)) local.stamina = own.stamina;
@@ -232,10 +262,12 @@ networkClient = await connectAuthoritativeClient({
   onKillEvent(event) {
     recordKillEvent(event);
   },
-  onAck() {
+  onAck(ack) {
     const ownId = networkClient?.playerNetId;
     const own = ownId ? networkClient.state.get(ownId) : null;
     if (!own) return;
+    const preReconcileX = local.x;
+    const preReconcileY = local.y;
     reconcilePrediction({
       history: networkClient.predictionHistory,
       processedClientTick: networkClient.processedClientTick,
@@ -243,6 +275,11 @@ networkClient = await connectAuthoritativeClient({
       restoreAuthoritative,
       replayInput(entry) { predictMovement(entry, 1000 / NETWORK.inputSendHz); },
     });
+    if (Number.isFinite(preReconcileX) && Number.isFinite(preReconcileY)) {
+      const before = { x: preReconcileX, y: preReconcileY };
+      const correction = visualCamera.absorb(before, local, performance.now());
+      networkClient.diagnostics.noteReconciliation(ack, own, correction.distance);
+    }
     confirmStaminaDenial(own);
     networkStatus = `Online - player #${ownId} - server tick ${networkClient.latestServerTick}`;
   },
@@ -554,6 +591,7 @@ function updateMouse(event) {
 function releaseInputs() {
   keys.clear();
   attackRequested = false;
+  committedLightMove = null;
   leftButtonDown = false;
   leftButtonCharge.cancel();
   heavyAttackRequested = false;
@@ -578,8 +616,10 @@ function sampleInput() {
     currentInput.jump = false;
     return;
   }
-  currentInput.moveX = (keys.has("KeyD") ? 1 : 0) - (keys.has("KeyA") ? 1 : 0);
-  currentInput.moveY = (keys.has("KeyS") ? 1 : 0) - (keys.has("KeyW") ? 1 : 0);
+  currentInput.moveX = attackRequested && committedLightMove
+    ? committedLightMove.moveX : (keys.has("KeyD") ? 1 : 0) - (keys.has("KeyA") ? 1 : 0);
+  currentInput.moveY = attackRequested && committedLightMove
+    ? committedLightMove.moveY : (keys.has("KeyS") ? 1 : 0) - (keys.has("KeyW") ? 1 : 0);
   currentInput.facing = Math.atan2(mouse.y - canvas.height / 2, mouse.x - canvas.width / 2);
   currentInput.attack = attackRequested;
   currentInput.heavyAttack = heavyAttackRequested;
@@ -600,6 +640,7 @@ function simulatePrediction(stepMs) {
     networkClient.sendInput({ tick: outgoingTick, ...currentInput });
     clientTick = (clientTick + 1) >>> 0;
     attackRequested = false;
+    committedLightMove = null;
     heavyAttackRequested = false;
     rollRequested = false;
     kickRequested = false;
@@ -692,10 +733,11 @@ function render(nowMs = performance.now(), impact = combatImpact.sample(nowMs)) 
     const own = networkClient.state.get(ownId);
     if (own) restoreAuthoritative(own);
   }
-  const interpolationTicks = Math.round((NETWORK.reconciliation.remoteInterpolationMs / 1000) * NETWORK.serverSimulationHz);
-  const renderServerTick = networkClient.latestServerTick >= interpolationTicks
-    ? networkClient.latestServerTick - interpolationTicks
-    : 0;
+  // 20Hz packets alone cannot drive smooth 60Hz remote motion. Interpolate
+  // with an advancing render-only clock; cap extrapolation on missing packets.
+  const renderServerTick = snapshotRenderClock.sample(networkClient.latestServerTick, nowMs);
+  visualCamera.sample(local, nowMs, visualCameraPosition);
+  updateNetworkDiagnostics(nowMs);
   const recoveryFocusNetId = fighterRecoveryNetId(networkClient.state, ownId);
 
   for (const entity of networkClient.state.values()) {
@@ -732,8 +774,8 @@ function drawImpactBurst(impact) {
     const focusNetId = fighterFocusNetId(networkClient.state, networkClient.playerNetId);
     const focus = focusNetId ? networkClient.state.get(focusNetId) : null;
     if (focus && local.initialized) {
-      x += focus.x - local.x;
-      y += focus.y - local.y;
+      x += focus.x - visualCameraPosition.x;
+      y += focus.y - visualCameraPosition.y;
     }
   }
 
@@ -812,8 +854,8 @@ function drawThreatMarker(bearing, secondary) {
 
 function drawFighterWorld(fighter, body, shadow, damageTell = false, netId = 0, recoveryTell = false) {
   if (!local.initialized) return;
-  const screenX = canvas.width / 2 + fighter.x - local.x;
-  const screenY = canvas.height / 2 + fighter.y - local.y;
+  const screenX = canvas.width / 2 + fighter.x - visualCameraPosition.x;
+  const screenY = canvas.height / 2 + fighter.y - visualCameraPosition.y;
   if (screenX < -64 || screenX > canvas.width + 64 || screenY < -64 || screenY > canvas.height + 64) return;
   drawFighterScreen(screenX, screenY, fighter, body, shadow, true, damageTell, recoveryTell);
   drawRemoteVitals(screenX, screenY, fighter);
@@ -1559,9 +1601,13 @@ function handleVisibilityChange() {
     if (animationFrameId) cancelAnimationFrame(animationFrameId);
     animationFrameId = 0;
     frameBudget.reset();
+    snapshotRenderClock.reset();
+    visualCamera.reset();
     return;
   }
   frameBudget.reset(performance.now());
+  snapshotRenderClock.reset();
+  visualCamera.reset();
   if (!animationFrameId) animationFrameId = requestAnimationFrame(frame);
 }
 

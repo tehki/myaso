@@ -92,8 +92,11 @@ try {
       maxReliableAdvancedEntities = Math.max(maxReliableAdvancedEntities, advanced);
       if (firstBackgroundReliableMs === null && advanced > 0) firstBackgroundReliableMs = now - reliableBaselineAt;
     },
-    onAck() {
+    onProcessedAck() {
+      // Real ACK receipt and readiness to reconcile are distinct timelines.
       acknowledgements += 1;
+    },
+    onAck() {
       const ownId = client?.playerNetId;
       const own = ownId ? client.state.get(ownId) : null;
       if (!own) return;

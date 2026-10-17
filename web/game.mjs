@@ -1,6 +1,7 @@
 import { createFrameBudget } from "../src/browser/frame-budget.mjs";
 import { installRightButtonGesture } from "../src/browser/right-button-gesture.mjs";
 import { createLeftButtonCharge } from "../src/browser/left-button-charge.mjs";
+import { captureLightAttackMovement } from "../src/browser/light-attack-movement.mjs";
 import { createCombatImpactController } from "../src/browser/combat-impact.mjs";
 import { COMBAT, createFighter, createWorld, stepWorld } from "../src/combat/model.mjs";
 import { createSparringAi } from "../src/combat/sparring-ai.mjs";
@@ -59,13 +60,17 @@ const playerInputState = {
 const inputs = { player: playerInputState, bot: null };
 const sparringAi = createSparringAi();
 let attackRequested = false;
+let committedLightMove = null;
 let heavyAttackRequested = false;
 let rollRequested = false;
 let kickRequested = false;
 let jumpRequested = false;
 let shortBlockUntil = 0;
 const leftButtonCharge = createLeftButtonCharge({
-  onLight() { attackRequested = true; },
+  onLight() {
+    attackRequested = true;
+    committedLightMove = captureLightAttackMovement(keys);
+  },
   onHeavy() { heavyAttackRequested = true; },
 });
 const rightButtonGesture = installRightButtonGesture(canvas, {
@@ -127,6 +132,7 @@ document.addEventListener("visibilitychange", handleVisibilityChange);
 function releaseInputs() {
   keys.clear();
   attackRequested = false;
+  committedLightMove = null;
   leftButtonCharge.cancel();
   heavyAttackRequested = false;
   rollRequested = false;
@@ -143,8 +149,8 @@ function updateMouse(event) {
 }
 
 function playerInput() {
-  playerInputState.moveX = (keys.has("KeyD") ? 1 : 0) - (keys.has("KeyA") ? 1 : 0);
-  playerInputState.moveY = (keys.has("KeyS") ? 1 : 0) - (keys.has("KeyW") ? 1 : 0);
+  playerInputState.moveX = committedLightMove?.moveX ?? ((keys.has("KeyD") ? 1 : 0) - (keys.has("KeyA") ? 1 : 0));
+  playerInputState.moveY = committedLightMove?.moveY ?? ((keys.has("KeyS") ? 1 : 0) - (keys.has("KeyW") ? 1 : 0));
   playerInputState.aimX = mouse.x;
   playerInputState.aimY = mouse.y;
   playerInputState.attack = attackRequested;
@@ -155,6 +161,7 @@ function playerInput() {
   playerInputState.run = rightButtonGesture.isRunning();
   playerInputState.jump = jumpRequested;
   attackRequested = false;
+  committedLightMove = null;
   heavyAttackRequested = false;
   rollRequested = false;
   kickRequested = false;

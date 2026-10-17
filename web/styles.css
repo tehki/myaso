@@ -47,6 +47,9 @@ kbd { border: 1px solid #575144; border-bottom-width: 2px; border-radius: 5px; b
 .heavy-charge-track { grid-column: 1 / -1; height: 5px; background: #5e3c28; border-radius: 5px; overflow: hidden; }
 .heavy-charge-track i { display: block; width: 100%; height: 100%; background: #ffad5c; transform-origin: left; transform: scaleX(0); }
 
+.network-diagnostics { position: absolute; left: 12px; bottom: 12px; right: 12px; z-index: 3; width: fit-content; max-width: calc(100% - 24px); padding: 7px 9px; border: 1px solid rgba(153,188,176,.38); border-radius: 7px; background: rgba(9,25,25,.9); color: #c9e2d4; font: 10px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; line-height: 1.45; pointer-events: none; }
+.network-diagnostics[hidden] { display: none; }
+.heavy-charge-indicator:not([hidden]) + .network-diagnostics { bottom: 80px; }
 .threat-cue { position: absolute; top: 14px; left: 50%; z-index: 3; display: inline-flex; align-items: center; gap: 7px; transform: translateX(-50%); padding: 7px 10px; border: 1px solid rgba(226, 111, 82, .42); border-radius: 8px; background: rgba(47, 19, 14, .88); color: #f4d6cc; font: 11px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; letter-spacing: .08em; pointer-events: none; }
 .threat-cue[hidden] { display: none; }
 .threat-cue strong { color: #ff8f72; font-size: 10px; letter-spacing: .14em; }

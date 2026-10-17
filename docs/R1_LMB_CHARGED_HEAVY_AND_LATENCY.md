@@ -24,3 +24,18 @@ Real public R0 test clients measured **137 ms RTT (Windows Machine)** and **152 
 Strict R1 test adaptation: original M117/M170 real Firefox/Chrome W3C feint gesture sent wheel-back while the 90ms LMB was still held. Under the corrected release-to-light contract this blocks *before* the light exists, so it cannot prove a feint. The adapted W3C sequence performs an 85ms real press/release and sends the real wheel-back 20ms later within the original 70ms feint window. This preserves original authority, visual observations and fail-closed results without altering the combat model.
 
 M170 exhausted-feint proof now compares the real wheel-back timestamp to **pointerup** rather than pointerdown, requires wheel after release, and retains its original 80ms maximum gesture timing. Earlier M210 tests that encoded the old down-first attack were updated to validate the new 85ms press / 20ms post-release wheel W3C schedule; no hitpoints, recovery requirement, stamina cost or authority assertions were loosened.
+
+### R1 integration: directional light release/input sampling
+Short LMB now commits on pointer release; a genuine held strafe can be released in
+the next W3C/browser action tick *before* the next 60 Hz input sample. That formerly
+turned a left-sweep into an ordinary 34 HP light even though the player held strafe
+at attack commitment. Capture only the real movement keys at light commitment,
+carry them on the *single attack-bearing input* and clear after send/consumption.
+Normal movement resumes from live keys on the following input. Mirror this in
+offline practice. Preserve strict M121 real-browser assertions for directional
+windup, recovery, and identical damage; do not alter server combat, packet
+format, attack/feint windows or physics.
+
+Rebased on R1 smooth rendering, network diagnostics and own-snapshot ACK alignment.
+The separate charge-ring and opt-in network HUD are both retained. Full CI and
+independent merged-main qualification remain required before VPS rollout.
