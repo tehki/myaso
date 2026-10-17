@@ -171,3 +171,20 @@ exhausted-heavy non-cancellation, 12 stamina cost, original <=80ms
 exhausted-gesture provenance, and server authority remain unchanged.
 This is an acceptance-only scheduling candidate: full exact-head
 real Chrome/Firefox CI must prove it; no production release yet.
+
+### M237 M156 genuine short click release headroom
+Exact-head quality #39035692849 passed 97 checks including the real
+M171 sufficient-stamina feint gate, then M156 returned first victim
+knockdown at server tick 216, Chrome2 light windup at 222, attack-active
+at tick 231 and victim recovery also at tick 231. Under the unchanged
+260ms knockdown/135ms light windup, the genuine 35ms W3C down/up still
+spent ~two 60Hz ticks of the remaining conversion window on held
+mouse input. M237 uses the same one real W3C transaction, now with
+**5ms** held LMB before pointerUP, immediately after Firefox's genuine
+authoritative knockdown observation; the separate roller's wheel
+acknowledgment remains awaited and fail-closed only AFTER the click.
+This should recover ~30ms margin without changing combat code, server
+ticks, knockdown, attack duration, hit reach or input protocol. Exact
+genuine pointer chronology, strict active-before-recovery, one 34HP
+victim-only hit, zero guard/collateral damage and real FFA readability
+proof remain mandatory. CI validation pending.

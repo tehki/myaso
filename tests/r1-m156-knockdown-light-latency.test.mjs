@@ -11,7 +11,7 @@ test("M156 real Chrome2 short click starts after actual Firefox knockdown, not w
   const armed = flight.indexOf("const knockdownWatcher = waitForDefenderKnockdown(");
   const wheel = flight.indexOf("const rollCompletion = scrollArenaWheel(", armed);
   const watched = flight.indexOf("const knockdownTransition = await knockdownWatcher", wheel);
-  const click = flight.indexOf("await performArenaM221GuardBreakClick(punisher, 35)", watched);
+  const click = flight.indexOf("await performArenaM221GuardBreakClick(punisher, 5)", watched);
   const ack = flight.indexOf("const rollResult = await rollCompletion", click);
   assert.ok(armed >= 0 && wheel > armed && watched > wheel && click > watched && ack > click);
   assert.ok(flight.includes(".then(() => ({ ok: true }), (error) => ({ ok: false, error }))"));

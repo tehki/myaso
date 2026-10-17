@@ -5579,12 +5579,15 @@ async function runOnlineUiRollKnockdownFfaHitFlight(entries) {
     const knockdownTransition = await knockdownWatcher;
 
     if (knockdownTransition) {
-      // R1 light is committed on pointerUP. Fire one authentic complete W3C
-      // short click at the already-staged mouse aim IMMEDIATELY after the
-      // replicated knockdown, without two round trips + JS sleep or the
-      // other browser's wheel ACK. The unchanged server 260ms knockdown,
-      // 135ms light windup and 34HP exact-hit assertions remain mandatory.
-      await performArenaM221GuardBreakClick(punisher, 35);
+      // R1 light is committed on pointerUP. M237: a genuine 35ms hold
+      // still left attack-active at the exact same 60Hz tick as #2 recovery
+      // in quality #39035692849 (231/231). Use a genuine 5ms W3C click at
+      // the pre-staged mouse aim to recover 30ms of INPUT release headroom.
+      // This is one real down/up, not a fabricated or early synthetic hit.
+      // Do not await the roller's unrelated driver wheel ACK, lengthen the
+      // 260ms knockdown, shorten the 135ms server windup, or permit a
+      // same-tick active/recovery without the original strict checks.
+      await performArenaM221GuardBreakClick(punisher, 5);
       const rollResult = await rollCompletion;
       if (!rollResult.ok) throw rollResult.error;
       conversion = {
