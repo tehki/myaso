@@ -17,6 +17,7 @@ export async function connectAuthoritativeClient({
   webSocketUrl,
   onSnapshot,
   onAck,
+  onProcessedAck,
   onReliableSnapshot,
   onKillEvent,
   onProtocolError,
@@ -74,7 +75,10 @@ export async function connectAuthoritativeClient({
         const ack = decodeInputAck(bytes);
         diagnostics.noteAck(ack.processedClientTick);
         diagnostics.noteAckAnchor(ack, state.get(ack.playerNetId));
-        ackGate.offer(ack);
+        // A genuine processed-input ACK is independently observable even when
+        // positional reconciliation must wait for a fresh own snapshot.
+        const receivedNewAck = ackGate.offer(ack);
+        if (receivedNewAck) onProcessedAck?.(ack);
         playerNetId = ack.playerNetId;
         flushPendingAck();
       }

@@ -88,3 +88,22 @@ test("R1 authoritative client defers prediction discard until the aligned own sn
  assert.match(online,/Deferred reconciles/);
  assert.doesNotMatch(client,/latestServerTick !== pendingAck\.serverTick/);
 });
+
+test("R1 strict Chrome/Firefox flight counts actual server ACK packets, not deferred presentation replay",()=>{
+ const client=readFileSync(new URL("../web/authoritative-client.mjs",import.meta.url),"utf8");
+ const pvp=readFileSync(new URL("../web/pvp-flight.mjs",import.meta.url),"utf8");
+ const flight=readFileSync(new URL("../web/flight.mjs",import.meta.url),"utf8");
+ const runner=readFileSync(new URL("../scripts/pvp_browser_flight_runner.mjs",import.meta.url),"utf8");
+ assert.match(client,/onProcessedAck,/);
+ assert.match(client,/if \(receivedNewAck\) onProcessedAck\?\.\(ack\)/);
+ assert.match(client,/ackGate\.flush\(own, \(ack\) => \{/);
+ for(const source of [pvp,flight]){
+   const start=source.indexOf("onProcessedAck()");
+   const end=source.indexOf("onAck()",start);
+   assert.ok(start>0 && end>start);
+   assert.match(source.slice(start,end),/acknowledgements \+= 1/);
+   assert.doesNotMatch(source.slice(end,end+100),/acknowledgements \+= 1/);
+ }
+ assert.match(pvp,/snapshots >= 10 && acknowledgements >= 10 && sentInputs >= 20/);
+ assert.match(runner,/result\.snapshots < 10 \|\| result\.acknowledgements < 10 \|\| result\.sentInputs < 20/);
+});

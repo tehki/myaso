@@ -17,6 +17,7 @@ Issue #293 and the merged opt-in local diagnostic PR #296 documented on X230i:
 - Keep one pending ACK, preserving bounded memory. During idle stationary periods, snapshots may not carry a new own-player position. Do not infer freshness or fabricate input acknowledgment in that case. A future own-player authoritative update releases the pending ACK.
 - The network diagnostics keep counting stale **on-arrival** ACK anchors even if reconciliation is deferred, avoiding a misleading improvement in instrumentation.
 - The game displays the initial connected status as soon as a player snapshot arrives, without relying on immediate positional reconciliation.
+- Strict-flight distinction: a new onProcessedAck callback exposes genuinely accepted server ACK packets while onAck only runs when fresh positional state is available. The strict browser flight still requires 10 true ACKs with the same timing, damage, guard and parry invariants. No tests fabricate ACKs or reduce thresholds.
 
 No server changes, tick-rate changes, hitboxes, inputs, combat damage, stamina settings, animation constants or protocol modifications.
 
@@ -33,3 +34,7 @@ A separate **real cross-machine combat trial** used Linux X230i with candidate l
 This is still a **draft until strict full CI, independent merged-main quality and human smoke**. Snapshots may omit stationary fighters: stale pending ACKs can be deferred for longer than before and coalesce. Ensure that does not degrade local movement after resume, online identity status, stamina denials, knockback or prediction-history loss under packet jitter, before considering production deployment. Keep the previous production release available and avoid touching shared VPS services.
 
 The client change is deliberately limited to the reconciliation scheduling; it **does not shorten ~150ms network RTT, the server's 20Hz snapshot interval or ~250ms median input-to-ACK delay**. A geographically closer game region may ultimately be required for players on high-latency routes.
+
+## First CI failure and correction
+
+The original PR head failed the M23 cross-browser parry flight: Firefox observed the correct authoritative stun, block, intact HP/guard and 33ms parry reaction but reported only 7 applied reconciliations as acknowledgements during its ~994ms trial. The unchanged test requires 10. The correction counts genuinely received processed-input ACK packets separately from deferred position replays, preserving the strict acceptance and alignment gate. Exact-head browser CI must still pass.
