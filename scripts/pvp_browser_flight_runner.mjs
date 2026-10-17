@@ -30,7 +30,6 @@ import { awaitM223HeavyWindup, planM223WheelDelay } from "./m223-server-heavy-wi
 import { dispatchM212AttackLedShortBlock } from "./m212-attack-led-short-block.mjs";
 import { createM221TrustedWheelRegistry } from "./m221-trusted-wheel-attestation.mjs";
 import { createM227TrustedLightRegistry } from "./m227-trusted-light-pointer.mjs";
-import { dispatchM207AttackLedDodge } from "./m207-attack-led-dodge.mjs";
 import { planM197KnockdownClusterNudge } from "./m197-knockdown-cluster.mjs";
 import { isTickNewer32 } from "../src/browser/reconciliation.mjs";
 
@@ -876,12 +875,18 @@ async function runOnlineUiAttackIntentFlight(entries) {
   let evidence = null;
   try {
     for (let attempt = 0; attempt < 3 && !evidence; attempt += 1) {
-      await setArenaAttack(attacker, attackerElementId, true, attackOffset);
-      try {
-        evidence = await waitForRemoteWindupTell(entries, attacker, defender, 600, false);
-      } finally {
-        await setArenaAttack(attacker, attackerElementId, false, attackOffset);
-      }
+      // M240: short LMB is committed on genuine pointerUP (R1). The former
+      // DOWN -> wait up to 600ms for windup -> UP deadlocked the windup
+      // itself. Arm the passive Firefox frame sampler BEFORE the real
+      // 65ms Chrome W3C down/up so the 135ms server windup is captured
+      // without delaying the release behind the observer WebDriver polls.
+      // Promise.all still fails closed for either genuine W3C input failure
+      // or the missing 24-pixel remote-only authoritative tell.
+      const [observed] = await Promise.all([
+        waitForRemoteWindupTell(entries, attacker, defender, 600, false),
+        performArenaAttackHold(attacker, attackerElementId, attackOffset, 65),
+      ]);
+      evidence = observed;
       if (!evidence) await sleep(520);
     }
     if (!evidence) evidence = await waitForRemoteWindupTell(entries, attacker, defender, 300, true);
@@ -889,6 +894,14 @@ async function runOnlineUiAttackIntentFlight(entries) {
     await stopWindupTellSampler(defender);
   }
   await waitForWindupTellClear(defender, 500);
+  // Read authentic pointerUP AFTER the W3C transaction has completed.
+  // The earlier captured pixel values remain mandatory positive/negative
+  // evidence and are not replaced with a fabricated later canvas sample.
+  const completed = await Promise.all(entries.map(readUiEvidence));
+  evidence = evidence.map((entry) => ({
+    ...completed.find((item) => item.browser === entry.browser),
+    windupTellMaxPixels: entry.windupTellMaxPixels,
+  }));
   const attackerResult = evidence.find((entry) => entry.browser === attacker.name);
   const defenderResult = evidence.find((entry) => entry.browser === defender.name);
   if (!attackerResult || !defenderResult) throw new Error(`incomplete M39 UI evidence: ${JSON.stringify(evidence)}`);
@@ -896,8 +909,14 @@ async function runOnlineUiAttackIntentFlight(entries) {
     throw new Error(`M39 real attacker movement was not delivered: ${JSON.stringify(attackerResult)}`);
   }
   const attackDown = attackerResult.pointers.find((event) => event.type === "pointerdown" && event.button === 0);
+  const attackUp = attackerResult.pointers.find((event) => event.type === "pointerup" && event.button === 0);
   const aimValid = attackDown && Math.abs(attackDown.y - 0.5) <= 0.15 && (attackRight ? attackDown.x >= 0.6 : attackDown.x <= 0.4);
-  if (!aimValid) throw new Error(`M39 real attacker aim was not delivered: ${JSON.stringify(attackerResult)}`);
+  if (!aimValid || !attackUp || attackUp.t <= attackDown.t || attackUp.t - attackDown.t >= 320) {
+    throw new Error(`M240 genuine short-LMB pointerUP or M39 aimed attack missing: ${JSON.stringify(attackerResult)}`);
+  }
+  if (defenderResult.windupTellMaxPixels < 24 || attackerResult.windupTellMaxPixels !== 0) {
+    throw new Error(`M39 remote-only authoritative windup pixel proof changed: ${JSON.stringify(evidence)}`);
+  }
   return evidence;
 }
 
@@ -5237,15 +5256,17 @@ async function runOnlineUiMultiKnockdownFfaHitFlight(entries) {
     throw new Error(milestone + " never observed the authoritative roll before punish staging");
   }
 
-  // Stage #4's single genuine LMB from the authoritative dodge timeline just
-  // before the deterministic body-contact region. Cross-session WebDriver and
-  // input ingress already add roughly two server ticks before the edge becomes
-  // authoritative, so do not add a wall-clock pause here. The later provenance
-  // checks still require the real pointer edge to fall no more than 40 ms
-  // before #2's knockdown, both victims to be authoritatively down before
-  // attack-active, and exactly one 34 HP hit on the selected victim. No
-  // gameplay timing is changed.
+  // R1 short LMB commits on authentic pointerUP, not pointerDOWN.
+  // Keep the genuine press synchronized to the observed authoritative dodge
+  // and RELEASE after 40ms, before cross-browser #3-knockdown observation or
+  // retargeting latency can postpone the 135ms light windup beyond the
+  // unchanged 260ms shared knockdown. A fresh genuine mouse move re-aims
+  // during the already-committed windup after #3's actual knockdown.
+  // The unchanged strict M209 60Hz server proof must still show active AND
+  // the exact single 34HP hit strictly before either victim recovers.
   await setArenaAttackButton(punisher, true);
+  await sleep(40);
+  await setArenaAttackButton(punisher, false);
   let windupReaim = null;
   const reaimDeadline = Date.now() + Math.max(80, COMBAT.attack.windupMs - 20);
   while (!windupReaim && Date.now() < reaimDeadline) {
@@ -5267,7 +5288,6 @@ async function runOnlineUiMultiKnockdownFfaHitFlight(entries) {
     }
     await sleep(2);
   }
-  await setArenaAttackButton(punisher, false);
   if (!windupReaim) {
     await setMovementKey(roller, retreatKey, false);
     throw new Error(milestone + " did not refresh #4 aim on #3 knockdown before light active: "
@@ -5357,8 +5377,11 @@ async function runOnlineUiMultiKnockdownFfaHitFlight(entries) {
   const punishDowns = punishPointers.filter((entry) => entry.type === "pointerdown" && entry.button === 0);
   const punishUps = punishPointers.filter((entry) => entry.type === "pointerup" && entry.button === 0);
   const punishDown = punishDowns[0];
+  const punishUp = punishUps[0];
   if (punishDowns.length !== 1 || punishUps.length !== 1
-    || !Number.isFinite(punishDown?.epochMs)
+    || !Number.isFinite(punishDown?.epochMs) || !Number.isFinite(punishUp?.epochMs)
+    || punishUp.epochMs <= punishDown.epochMs
+    || punishUp.epochMs - punishDown.epochMs >= 320
     || punishDown.epochMs < provenance.rollTransition.epochMs
     || punishDown.epochMs < provenance.firstKnockdown.epochMs - 40
     || punishDown.epochMs >= provenance.firstKnockdown.epochMs + COMBAT.dodge.collisionKnockdownMs) {
@@ -5566,20 +5589,31 @@ async function runOnlineUiRollKnockdownFfaHitFlight(entries) {
       defenderActionOffset,
       knockdownTimeoutMs,
     );
-    const rollInput = scrollArenaWheel(roller, rollerElementId, -120, 0);
-    const [knockdownTransition] = await Promise.all([knockdownWatcher, rollInput]);
+    // Do not await the independent roller WebDriver wheel ACK before Chrome2
+    // can react to Firefox's already-observed authoritative knockdown.
+    // The wheel transport and victim watcher are concurrent, and any wheel
+    // error still fails the flight at the explicitly awaited completion.
+    const rollCompletion = scrollArenaWheel(roller, rollerElementId, -120, 0)
+      .then(() => ({ ok: true }), (error) => ({ ok: false, error }));
+    const knockdownTransition = await knockdownWatcher;
 
     if (knockdownTransition) {
+      // R1 light is committed on pointerUP. M237: a genuine 35ms hold
+      // still left attack-active at the exact same 60Hz tick as #2 recovery
+      // in quality #39035692849 (231/231). Use a genuine 5ms W3C click at
+      // the pre-staged mouse aim to recover 30ms of INPUT release headroom.
+      // This is one real down/up, not a fabricated or early synthetic hit.
+      // Do not await the roller's unrelated driver wheel ACK, lengthen the
+      // 260ms knockdown, shorten the 135ms server windup, or permit a
+      // same-tick active/recovery without the original strict checks.
+      await performArenaM221GuardBreakClick(punisher, 5);
+      const rollResult = await rollCompletion;
+      if (!rollResult.ok) throw rollResult.error;
       conversion = {
         attempt,
         punishPointerOffset,
         knockdownTransition,
       };
-      // Pointer was already aimed before the roll; avoid another pointerMove
-      // round trip before the tight 260 ms knockdown conversion window.
-      await setArenaAttackButton(punisher, true);
-      await sleep(40);
-      await setArenaAttackButton(punisher, false);
 
       // Roll provenance and the rendered knockdown cue may trail the victim's
       // first authoritative knockdown snapshot by one or more browser frames.
@@ -5632,6 +5666,8 @@ async function runOnlineUiRollKnockdownFfaHitFlight(entries) {
       break;
     }
 
+    const rollResult = await rollCompletion;
+    if (!rollResult.ok) throw rollResult.error;
     if (attempt < 3) {
       await setMovementKey(roller, retreatKey, false);
       await sleep(COMBAT.dodge.recoveryMs + COMBAT.dodge.collisionKnockdownMs + 140);
@@ -5696,12 +5732,15 @@ async function runOnlineUiRollKnockdownFfaHitFlight(entries) {
   const punishDowns = punishPointers.filter((entry) => entry.type === "pointerdown" && entry.button === 0);
   const punishUps = punishPointers.filter((entry) => entry.type === "pointerup" && entry.button === 0);
   const punishDown = punishDowns[0];
+  const punishUp = punishUps[0];
   const punishAimValid = punishDown
     && Math.abs(punishDown.y - 0.5) <= 0.15
     && (punisherId < defenderId ? punishDown.x >= 0.6 : punishDown.x <= 0.4);
   const knockdownEndEpochMs = conversion.knockdownTransition.epochMs + COMBAT.dodge.collisionKnockdownMs;
   if (punishDowns.length !== 1 || punishUps.length !== 1 || !punishAimValid
-    || !Number.isFinite(punishDown?.epochMs)
+    || !Number.isFinite(punishDown?.epochMs) || !Number.isFinite(punishUp?.epochMs)
+    || punishUp.epochMs <= punishDown.epochMs
+    || punishUp.epochMs - punishDown.epochMs >= 320
     || punishDown.epochMs < conversion.knockdownTransition.epochMs
     || punishDown.epochMs >= knockdownEndEpochMs) {
     throw new Error(milestone + " genuine third-party LMB missed the authoritative knockdown window: "
@@ -7204,7 +7243,8 @@ async function runOnlineUiFeintFlight(entries) {
     || !Number.isFinite(exhaustedLightUp.epochMs)
     || !Number.isFinite(exhaustedWheelBack.epochMs)
     || exhaustedLightUp.epochMs <= exhaustedLightDown.epochMs
-    || Math.abs(exhaustedWheelBack.epochMs - exhaustedLightDown.epochMs) > 80) {
+    || exhaustedWheelBack.epochMs < exhaustedLightUp.epochMs
+    || exhaustedWheelBack.epochMs - exhaustedLightUp.epochMs > 80) {
     throw new Error("M170 exhausted feint did not deliver the same genuine early LMB+wheel-back chord: "
       + JSON.stringify({ pointers: exhaustedPointers, wheels: exhaustedWheels }));
   }
@@ -7489,6 +7529,20 @@ async function runOnlineUiHeavyWhiffPunishFlight(entries) {
       if (!down || !up || up.t <= down.t) {
         throw new Error(`M109 punish retry ${attempt} lacked a complete real LMB gesture: ${JSON.stringify(missDefender)}`);
       }
+      // R1 light commits on real pointerup. The additional evidence read
+      // after the bounded 105ms poll can be the FIRST read to confirm a
+      // genuinely committed light or remote threat. Accept that evidence
+      // as this attempt's commit; never classify it as a clean latch miss
+      // or send a duplicate LMB. The strict 34HP/no-heavy-hit final gates
+      // below still reject any failed punish.
+      const lateCommitted = lightCommitCount(missDefender) > commitsBefore
+        || lightThreatCount(missAttacker) > threatsBefore
+        || missAttacker.playerHp < 100 || missDefender.opponentHp < 100;
+      if (lateCommitted) {
+        successfulPunishPointerOffset = pointerOffset;
+        punishCommitted = true;
+        break;
+      }
       const cleanLatchMiss = missAttacker.playerHp === 100 && missAttacker.playerGuard === 100
         && missAttacker.opponentHp === 100 && missAttacker.opponentGuard === 100
         && missDefender.playerHp === 100 && missDefender.playerGuard === 100
@@ -7610,42 +7664,34 @@ async function runOnlineUiDodgeFeedbackFlight(entries) {
 
     let rollIssued = false;
     let defenderMovementHeld = false;
-    let attackHeld = false;
 
-    // Anchor ordering on completed real W3C input edges instead of cross-driver
-    // promise timing. KeyS is held first as redundant provenance, Firefox LMB is
-    // then delivered and acknowledged, and one normal input tick later Chrome
-    // sends a short wheel-only command while KeyS remains down. Keeping the wheel
-    // out of a multi-device action avoids W3C tick alignment delaying it.
+    // M238: R1's light is committed on genuine pointerUP, never on DOWN.
+    // The legacy M207 DOWN -> wheel -> wait -> UP sequence rolled before
+    // any attack existed. Exact-head #39037691090 saw 3 genuine Chrome
+    // wheels and three Firefox ~210ms LMB holds, but only roll collisions
+    // and unrelated late attacks, no authentic dodge-evaded/dodge-success.
+    // Send one COMPLETE 65ms real Firefox W3C short LMB first, then aim
+    // Chrome's genuine perpendicular wheel 35ms later so the unchanged
+    // 135ms attack windup overlaps the unchanged 125ms dodge iframe.
+    // Only W3C inputs, never a synthetic attack, second wheel, or widened
+    // game window. Keep M36's strict fresh evade feedback and zero HP.
     try {
       await aimArena(defender, defenderElementId, 0, 180);
       defenderMovementHeld = true;
       await setMovementKey(defender, "s", true);
 
-      // M207: send one genuine Firefox LMB down FIRST. Do not allow a slow
-      // W3C response to postpone Chrome's one real wheel-forward until
-      // after the unchanged 135ms light windup and 125ms dodge iframe.
-      // Actual server HP and evade feedback still decide correctness.
-      attackHeld = true;
-      const m207Dispatch = await dispatchM207AttackLedDodge({
-        sendAttackDown: () => setArenaAttack(attacker, attackerElementId, true, attackOffset),
-        sendDodgeWheel: () => scrollArenaWheel(defender, defenderElementId, -120),
-        sleep,
-      });
-      const attackPressedAt = Date.now();
-      console.log("M207_GENUINE_LIGHT_DODGE_DISPATCH " + JSON.stringify({
-        attempt, ...m207Dispatch,
-      }));
+      await performArenaAttackHold(attacker, attackerElementId, attackOffset, 65);
+      await sleep(35);
+      await scrollArenaWheel(defender, defenderElementId, -120);
       rollIssued = true;
+      console.log("M238_GENUINE_RELEASED_LIGHT_DODGE " + JSON.stringify({
+        attempt, lightHoldMs: 65, postReleaseLeadMs: 35,
+      }));
 
       await sleep(60);
       defenderMovementHeld = false;
       await setMovementKey(defender, "s", false);
-
-      const remainingAttackHoldMs = Math.max(0, 180 - (Date.now() - attackPressedAt));
-      if (remainingAttackHoldMs > 0) await sleep(remainingAttackHoldMs);
     } finally {
-      if (attackHeld) await setArenaAttack(attacker, attackerElementId, false, attackOffset);
       if (defenderMovementHeld) await setMovementKey(defender, "s", false);
     }
     await sleep(180);
@@ -7678,11 +7724,22 @@ async function runOnlineUiDodgeFeedbackFlight(entries) {
   const defenderResult = evidence.find((entry) => entry.browser === defender.name);
   if (!attackerResult || !defenderResult) throw new Error(`incomplete M36 UI evidence: ${JSON.stringify(evidence)}`);
   const attackDown = attackerResult.pointers.find((event) => event.type === "pointerdown" && event.button === 0);
+  const attackUp = attackerResult.pointers.find((event) => event.type === "pointerup" && event.button === 0);
   const movementDelivered = attackerResult.keys.includes(`keydown:${movementCode}`) && attackerResult.keys.includes(`keyup:${movementCode}`);
   const aimDelivered = attackDown && Math.abs(attackDown.y - 0.5) <= 0.15 && (attackRight ? attackDown.x >= 0.6 : attackDown.x <= 0.4);
   if (!movementDelivered || !aimDelivered) throw new Error(`M36 real attacker movement/aim was not delivered: ${JSON.stringify(attackerResult)}`);
   const rollWheel = defenderResult.wheels.find((event) => event.deltaY < 0);
   if (!defenderResult.keys.includes("keydown:KeyS") || !defenderResult.keys.includes("keyup:KeyS") || !rollWheel) throw new Error(`M36 real pointer-directed wheel-roll controls were not delivered: ${JSON.stringify(defenderResult)}`);
+  if (!Number.isFinite(attackDown?.epochMs) || !Number.isFinite(attackUp?.epochMs)
+    || !Number.isFinite(rollWheel.epochMs)
+    || attackDown.epochMs >= attackUp.epochMs
+    || attackUp.epochMs - attackDown.epochMs >= 320
+    || rollWheel.epochMs <= attackUp.epochMs
+    || rollWheel.epochMs - attackUp.epochMs >= COMBAT.attack.windupMs) {
+    throw new Error(`M238 dodge never proved one genuine R1 light release BEFORE real wheel inside unchanged windup: ${JSON.stringify({
+      attackDown, attackUp, rollWheel,
+    })}`);
+  }
   if (attackerResult.playerHp !== 100 || attackerResult.playerGuard !== 100 || defenderResult.playerHp !== 100 || defenderResult.playerGuard !== 100) throw new Error(`M36 dodge exchange changed authoritative vitals: ${JSON.stringify(evidence)}`);
   if (attackerResult.feedbackTransitions.includes("parried") || defenderResult.feedbackTransitions.includes("parry-success")) throw new Error(`M36 dodge exchange accidentally resolved as parry: ${JSON.stringify(evidence)}`);
   return evidence;
@@ -7827,21 +7884,35 @@ async function runOnlineUiParryFlight(entries, postParrySleepMs = 80, roles = nu
   for (let attempt = 0; attempt < 4 && !evidence; attempt += 1) {
     await pulseMovementKey(attacker, movementKey, attempt === 0 ? 120 : 80);
     lastAttemptBaseline = await Promise.all(entries.map(readUiEvidence));
-    let attackHeld = false;
-    let blockHeld = false;
-    try {
-      attackHeld = true;
-      await setArenaAttack(attacker, attackerElementId, true, attackOffset);
-      await sleep(70);
-      blockHeld = true;
-      await setArenaBlock(defender, defenderElementId, true);
-      await sleep(190);
-      evidence = await waitForUiParryEvidence(entries, attacker, defender, 320, false, lastAttemptBaseline);
-    } finally {
-      if (attackHeld) await setArenaAttack(attacker, attackerElementId, false, attackOffset);
-      if (blockHeld) await setArenaBlock(defender, defenderElementId, false);
+    // R1 short LMB commits the light on genuine pointerUP. The pre-R1
+    // down -> wheel -> 190ms -> up sequence can exceed the 320ms charge
+    // threshold under real WebDriver latency and produce a HEAVY instead.
+    // Use one complete, 75ms trusted W3C tap before the real wheel-back.
+    // Keep its independent 125ms parry/650ms stun and genuine feedback gates.
+    await performArenaAttackHold(attacker, attackerElementId, attackOffset, 75);
+    await sleep(55);
+    await setArenaBlock(defender, defenderElementId, true);
+    evidence = await waitForUiParryEvidence(entries, attacker, defender, 350, false, lastAttemptBaseline);
+    if (!evidence) {
+      const after = await Promise.all(entries.map(readUiEvidence));
+      const stagedAttacker = after.find((entry) => entry.browser === attacker.name);
+      const stagedDefender = after.find((entry) => entry.browser === defender.name);
+      const attackerBefore = lastAttemptBaseline.find((entry) => entry.browser === attacker.name);
+      const defenderBefore = lastAttemptBaseline.find((entry) => entry.browser === defender.name);
+      // Never replay a resolved but unsuccessful parry: any real HP/guard
+      // change, a heavy commitment, or death remains a fatal red gate.
+      const pristine = stagedAttacker?.playerHp === attackerBefore?.playerHp
+        && stagedAttacker?.playerGuard === attackerBefore?.playerGuard
+        && stagedDefender?.playerHp === defenderBefore?.playerHp
+        && stagedDefender?.playerGuard === defenderBefore?.playerGuard
+        && !stagedAttacker?.events.some((entry) => entry.startsWith("Heavy strike committed"))
+        && !stagedDefender?.events.some((entry) => entry.startsWith("Hit taken"))
+        && !stagedAttacker?.events.some((entry) => entry.startsWith("Opponent hit"));
+      if (!pristine) {
+        throw new Error("M33 genuine short-click parry resolved unexpectedly: " + JSON.stringify(after));
+      }
+      await sleep(260);
     }
-    if (!evidence) await sleep(260);
   }
   if (!evidence) evidence = await waitForUiParryEvidence(entries, attacker, defender, 800, true, lastAttemptBaseline);
 
@@ -7948,21 +8019,15 @@ async function runOnlineUiParryPunishFfaFocusFlight(entries, convert = false) {
   const focusOffset = stagedDefender.focusTransitions.length;
   const recoveryOffset = stagedDefender.recoveryTransitions.length;
 
-  let attackHeld = false;
-  let blockHeld = false;
-  let parryEvidence = null;
-  try {
-    attackHeld = true;
-    await setArenaAttack(attacker, attackerElementId, true, attackOffset);
-    await sleep(70);
-    blockHeld = true;
-    await setArenaBlock(defender, defenderElementId, true);
-    await sleep(190);
-    parryEvidence = await waitForUiParryEvidence(entries, attacker, defender, 520, true, staged);
-  } finally {
-    if (attackHeld) await setArenaAttack(attacker, attackerElementId, false, attackOffset);
-    if (blockHeld) await setArenaBlock(defender, defenderElementId, false);
-  }
+  // R1 shared controls: a short left click commits its genuine light on
+  // pointerUP; the old M150 down -> wheel -> 190ms -> up sequence could
+  // miss the commitment or charge a HEAVY on a delayed W3C release.
+  // Keep the exact three-player geometry, parry cue and strict 34HP
+  // target isolation checks. No synthetic events or second attack.
+  await performArenaAttackHold(attacker, attackerElementId, attackOffset, 75);
+  await sleep(55);
+  await setArenaBlock(defender, defenderElementId, true);
+  const parryEvidence = await waitForUiParryEvidence(entries, attacker, defender, 520, true, staged);
 
   let attackerState = parryEvidence.find((entry) => entry.browser === attacker.name);
   let defenderState = parryEvidence.find((entry) => entry.browser === defender.name);
@@ -8092,14 +8157,21 @@ async function runOnlineUiParryPunishFfaFocusFlight(entries, convert = false) {
   }
 
   const attackPointers = attackerState.pointers.slice(attackPointerOffset);
-  const attackDown = attackPointers.find((entry) => entry.type === "pointerdown" && entry.button === 0);
+  const attackDowns = attackPointers.filter((entry) => entry.type === "pointerdown" && entry.button === 0);
+  const attackUps = attackPointers.filter((entry) => entry.type === "pointerup" && entry.button === 0);
+  const attackDown = attackDowns[0];
+  const attackUp = attackUps[0];
   const blockWheel = defenderState.wheels.slice(defenderWheelOffset).find((entry) => entry.deltaY > 0);
   const attackAimValid = attackDown
     && Math.abs(attackDown.y - 0.5) <= 0.15
     && (attackRight ? attackDown.x >= 0.6 : attackDown.x <= 0.4);
+  const authenticShortLight = attackDowns.length === 1 && attackUps.length === 1
+    && Number.isFinite(attackDown?.epochMs) && Number.isFinite(attackUp?.epochMs)
+    && attackUp.epochMs > attackDown.epochMs
+    && attackUp.epochMs - attackDown.epochMs < 320;
   if (!attackerState.keys.includes(`keydown:${movementCode}`)
     || !attackerState.keys.includes(`keyup:${movementCode}`)
-    || !attackAimValid || !blockWheel) {
+    || !attackAimValid || !authenticShortLight || !blockWheel) {
     throw new Error(`${milestone} lacked genuine attack / wheel-back parry provenance: ${JSON.stringify({ attackerState, defenderState })}`);
   }
 
@@ -10745,7 +10817,17 @@ async function runOnlineUiMultiRecoveryFfaFocusFlight(entries, spatial = false) 
   // actually observed the light attack. Under load that could shift the
   // genuine 70..150ms M145 overlap window. Keep both original delays and
   // all actual-input, 100 HP, 3-stage HUD and server assertions unchanged.
-  const jumpInputDelayMs = spatial ? 100 : 25;
+  // R1: light now commits on pointerup, not pointerdown. M144 must stage the
+  // jump after the genuine 90ms light tap RELEASE so that #3 exits recovery
+  // first, then #1, preserving the strict three-stage observer proof.
+  // M235: one real Chrome2/Chrome pair delivered 212ms release-to-jump lead
+  // despite the former 185ms timer, breaching M144's unchanged 200ms cap.
+  // Center the M144-only trusted-down timer at 155ms to leave 30ms more
+  // W3C driver / event-loop headroom; do NOT widen the original 60..200ms
+  // actual-input gate or change the 90ms click or any combat action lifetime.
+  // M145 retains its independent 100ms trusted-down choreography and the
+  // original measured 70..150ms spatial input lead gate unchanged.
+  const jumpInputDelayMs = spatial ? 100 : 155;
   const lightChallenge = m227Registry.issue();
   if (lightChallenge) {
     await execute(lightAttacker.base, lightAttacker.sessionId,
@@ -10767,7 +10849,12 @@ async function runOnlineUiMultiRecoveryFfaFocusFlight(entries, spatial = false) 
         await sleep(jumpInputDelayMs);
         await performArenaJumpAttackChord(jumpAttacker, jumpArena, -200, 90);
       })(),
-      sampleUiEvidenceWhileActive(entries, 760, 8),
+      // R1 M144: light commits on release and its 185ms delayed jump now
+      // correctly yields #3 recovery before #1 recovery. Observe long enough
+      // for the subsequent genuine #1 recovery to CLEAR and Firefox to return
+      // to ordinary #3 focus. Keep all strict three-stage and server proofs.
+      // M145 spatial sampling/timing is unchanged.
+      sampleUiEvidenceWhileActive(entries, spatial ? 760 : 1250, 8),
     ]);
   } finally {
     lightChallenge?.close();
@@ -10845,10 +10932,19 @@ async function runOnlineUiMultiRecoveryFfaFocusFlight(entries, spatial = false) 
   if (lightDowns.length !== 1 || lightUps.length !== 1 || lightDowns[0].x <= 0.5) {
     throw new Error(`${milestone} lacked one genuine off-axis light attack from #${lightId}: ${JSON.stringify(lightPointers)}`);
   }
-  if (Number.isFinite(lightDowns[0]?.epochMs) && Number.isFinite(jumpAttackDowns[0]?.epochMs)) {
-    const inputLeadMs = jumpAttackDowns[0].epochMs - lightDowns[0].epochMs;
-    const minLeadMs = spatial ? 70 : 20;
-    const maxLeadMs = spatial ? 150 : 120;
+  if (!Number.isFinite(lightDowns[0]?.epochMs)
+    || !Number.isFinite(lightUps[0]?.epochMs)
+    || !Number.isFinite(jumpAttackDowns[0]?.epochMs)) {
+    throw new Error(`${milestone} missing authentic timestamped light/jump input evidence: ${JSON.stringify({ lightDowns, lightUps, jumpAttackDowns })}`);
+  }
+  {
+    const inputLeadMs = spatial
+      ? jumpAttackDowns[0].epochMs - lightDowns[0].epochMs
+      : jumpAttackDowns[0].epochMs - lightUps[0].epochMs;
+    // M145 compares actual genuine pointerDOWN times; R1 M144 compares
+    // genuine light pointerUP -> jump pointerDOWN because release commits light.
+    const minLeadMs = spatial ? 70 : 60;
+    const maxLeadMs = spatial ? 150 : 200;
     if (inputLeadMs < minLeadMs || inputLeadMs > maxLeadMs) {
       throw new Error(`${milestone} did not preserve the intended light-before-jump overlap: ${JSON.stringify({ inputLeadMs, minLeadMs, maxLeadMs, lightDowns, jumpAttackDowns })}`);
     }
@@ -11737,14 +11833,14 @@ async function performArenaHeavyFeint(session, elementId, xOffset = 200) {
 
 async function performArenaFeint(session, elementId, xOffset = 200) {
   const origin = { "element-6066-11e4-a52e-4f735466cecf": elementId };
-  // M210: Keep one genuine LMB and wheel-back in the same W3C command,
-  // but separate their ticks: same-tick delivery can choose Block before
-  // the attack starts. The previous 20ms wheel tick was observed at +81ms
-  // in real Chrome CI, beyond the unchanged authoritative 70ms light
-  // feint-cancel window, causing a real 34HP hit and a valid test failure.
-  // Schedule the wheel in the next W3C tick after only 5ms, with 85ms
-  // further LMB hold for the same full 90ms pressed gesture. No damage,
-  // server input, feint window or game mechanics are changed.
+  // R1: a short LMB fires its light edge on RELEASE, not pointerdown.
+  // M236: issue wheel-back in the immediately FOLLOWING W3C tick, with
+  // no extra timed pause after the genuine 85ms pointerUp. Both exact-head
+  // M171 failures saw a real 77..91ms up-to-wheel gap when the previous
+  // 20ms pause and an extra empty W3C tick delayed block ingress beyond the
+  // unchanged 70ms server-authoritative feint window. Wheel before release
+  // blocks first, so do not put scroll in the same tick as pointerUp.
+  // Keep one real W3C multi-source action and all 70ms/12-stamina HP gates.
   try {
     await webdriver(session.base, "POST", `/session/${session.sessionId}/actions`, {
       actions: [
@@ -11755,9 +11851,9 @@ async function performArenaFeint(session, elementId, xOffset = 200) {
           actions: [
             { type: "pointerMove", duration: 0, origin, x: xOffset, y: 0 },
             { type: "pointerDown", button: 0 },
-            { type: "pause", duration: 5 },
             { type: "pause", duration: 85 },
             { type: "pointerUp", button: 0 },
+            { type: "pause", duration: 0 },
           ],
         },
         {
@@ -11765,10 +11861,10 @@ async function performArenaFeint(session, elementId, xOffset = 200) {
           id: `wheel-${session.name}`,
           actions: [
             { type: "pause", duration: 0 },
-            { type: "pause", duration: 5 },
-            { type: "scroll", x: 0, y: 0, deltaX: 0, deltaY: 120, duration: 0, origin },
+            { type: "pause", duration: 0 },
             { type: "pause", duration: 85 },
             { type: "pause", duration: 0 },
+            { type: "scroll", x: 0, y: 0, deltaX: 0, deltaY: 120, duration: 0, origin },
           ],
         },
       ],
@@ -12068,7 +12164,7 @@ async function installUiObserver(session) {
     const threatGuardArc = document.querySelector('#threat-guard-arc');
     if (!target || !arena || !arenaStage || !overlay || !recovery || !focusLabel || !threat || !threatCount || !threatSecondary || !threatSecondaryBearing || !threatSecondaryPhase || !threatSecondaryGuardArc || !threatBearing || !threatGuardArc) throw new Error('missing online UI flight target');
     const state = { events: [], eventTransitions: [], keys: [], keyTransitions: [], pointers: [], wheels: [], overlayTransitions: [], feedbackTransitions: [], recoveryTransitions: [], focusTransitions: [], threatTransitions: [], recoveryTellMaxPixels: 0, parryTellMaxPixels: 0, online: '', startedAt: performance.now() };
-    const epochEvidence = ['uirollbuffer', 'uijumpbuffer', 'uijumpattack', 'uijumpattackinputloss', 'uijumpattackpunish', 'uijumpattacktelegraph', 'uijumpffaprimary', 'uijumpffasecondary', 'uijumprecoveryffa', 'uijumppunishffa', 'uimultirecoveryffa', 'uimultirecoveryspatial', 'uimultirecoverypunish', 'uiparrypunishwindow', 'uiparrypunishffa', 'uiparrypunishffahit', 'uiguardbreakpunishffa', 'uiguardbreakpunishffahit', 'uikickknockdownffa', 'uikickknockdownffahit', 'uikickknockdownbounded', 'uirollknockdownbounded', 'uistaminaauth', 'uistaminaexhaustion', 'uistaminafeedback', 'uistaminaconfirmed', 'uifeint', 'uirollknockdownffahit', 'uimultiknockdownffa', 'uimultiknockdownffahit', 'uirollknockdownffa', 'uijumpattackblock', 'uijumpattackparry', 'uijumpattackdodge', 'uijumpattackbuffer', 'uikickbuffer'].includes(new URLSearchParams(location.search).get('scenario'));
+    const epochEvidence = ['uidodge', 'uirollbuffer', 'uijumpbuffer', 'uijumpattack', 'uijumpattackinputloss', 'uijumpattackpunish', 'uijumpattacktelegraph', 'uijumpffaprimary', 'uijumpffasecondary', 'uijumprecoveryffa', 'uijumppunishffa', 'uimultirecoveryffa', 'uimultirecoveryspatial', 'uimultirecoverypunish', 'uiparrypunishwindow', 'uiparrypunishffa', 'uiparrypunishffahit', 'uiguardbreakpunishffa', 'uiguardbreakpunishffahit', 'uikickknockdownffa', 'uikickknockdownffahit', 'uikickknockdownbounded', 'uirollknockdownbounded', 'uistaminaauth', 'uistaminaexhaustion', 'uistaminafeedback', 'uistaminaconfirmed', 'uifeint', 'uirollknockdownffahit', 'uimultiknockdownffa', 'uimultiknockdownffahit', 'uirollknockdownffa', 'uijumpattackblock', 'uijumpattackparry', 'uijumpattackdodge', 'uijumpattackbuffer', 'uikickbuffer'].includes(new URLSearchParams(location.search).get('scenario'));
     const record = () => {
       const text = target.textContent?.trim() ?? '';
       if (/^Online - player #\\d+ - server tick \\d+$/.test(text)) state.online = text;

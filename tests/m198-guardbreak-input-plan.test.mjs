@@ -47,8 +47,21 @@ test("M198 guard-break browser acceptance uses genuine one-click W3C plan", () =
     source.indexOf("async function waitForUiGuardBreakEvidence("),
   );
   assert.ok(guardBreak.includes("dispatchM212AttackLedShortBlock({"));
-  assert.ok(guardBreak.indexOf("sendWheel: () => scrollArenaWheel(defender, defenderElementId, 120, 0)") < guardBreak.indexOf("sendAttackDown: () => setArenaAttackButton(attacker, true)"));
-  assert.ok(guardBreak.includes("sendAttackUp: () => setArenaAttackButton(attacker, false)"));
+  // M221 replaced the split WebDriver down/ACK/up path with one authentic
+  // W3C click after a trusted Firefox wheel. The old static M198 text check
+  // referenced a sender no longer used; keep both delivery ordering and
+  // single-click proof strict instead of silently accepting missing callbacks.
+  const wheel = guardBreak.indexOf("sendWheel: () => scrollArenaWheel(defender, defenderElementId, 120, 0)");
+  const click = guardBreak.indexOf("sendAttackClick: (clickHoldMs) => performArenaM221GuardBreakClick(attacker, clickHoldMs)");
+  assert.ok(wheel >= 0 && click > wheel);
+  assert.ok(guardBreak.includes("awaitTrustedWheel: () => challenge.wait()"));
+  const clickFn = source.slice(
+    source.indexOf("async function performArenaM221GuardBreakClick("),
+    source.indexOf("async function setArenaAttackButton("),
+  );
+  assert.ok(clickFn.includes('type: "pointerDown", button: 0'));
+  assert.ok(clickFn.includes('type: "pointerUp", button: 0'));
+  assert.ok(clickFn.includes('duration: clickHoldMs'));
   assert.ok(guardBreak.includes("defenderState?.playerHp !== 100"));
   assert.ok(guardBreak.includes("feedbackTransitions.includes(\"parried\")"));
   assert.ok(guardBreak.includes("defenderResult.playerGuard !== 0"));
