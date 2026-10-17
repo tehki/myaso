@@ -105,7 +105,9 @@ function updateNetworkDiagnostics(nowMs) {
     + ` | Jitter p95 ${time(s.ackJitterP95Ms)}`
     + ` | Snapshots p50 ${time(s.snapshotGapP50Ms)} · p95 ${time(s.snapshotGapP95Ms)}`
     + ` | Camera correction p95 ${s.cameraCorrectionP95 === null ? "collecting…" : s.cameraCorrectionP95 + "u"}`
-    + ` | Stale-own ACKs ${s.staleOwnAtAckCount} | Samples ${s.inputAckSamples}`;
+    + ` | Stale-own ACKs ${s.staleOwnAtAckCount}`
+    + ` | Deferred reconciles ${networkClient.ackGateMetrics.deferred}`
+    + ` | Samples ${s.inputAckSamples}`;
 }
 const acceptanceScenario = params.get("scenario");
 const server = params.get("server");
@@ -210,6 +212,10 @@ networkClient = await connectAuthoritativeClient({
     if (!ownId) return;
     const own = state.get(ownId);
     if (own) {
+      // Initial player state is available before the first aligned input ACK.
+      if (networkStatus.startsWith("Connecting")) {
+        networkStatus = `Online - player #${ownId} - server tick ${networkClient.latestServerTick}`;
+      }
       if (Number.isFinite(own.stamina)) authoritativeStamina = own.stamina;
       if (!local.initialized) restoreAuthoritative(own);
       else if (Number.isFinite(own.stamina)) local.stamina = own.stamina;

@@ -1,5 +1,6 @@
 import { createPredictionHistory, isTickNewer32 } from "../src/browser/reconciliation.mjs";
 import { createNetworkDiagnostics } from "../src/browser/network-diagnostics.mjs";
+import { createOwnSnapshotAckGate } from "../src/browser/own-snapshot-ack-gate.mjs";
 import { createRemoteInterpolator } from "../src/browser/remote-interpolation.mjs";
 import { applySnapshotPacketInPlace, createSnapshotApplyResult } from "../src/browser/snapshot-store.mjs";
 import { NETWORK, PACKET_TYPE } from "../src/network/constants.mjs";
@@ -26,15 +27,14 @@ export async function connectAuthoritativeClient({
   const reliableMergeState = createReliableSnapshotMergeState();
   const predictionHistory = createPredictionHistory({ maxEntries: 64 });
   const diagnostics = createNetworkDiagnostics();
+  const ackGate = createOwnSnapshotAckGate();
   const remoteInterpolator = createRemoteInterpolator();
   const inputSamples = [];
   let inputSequence = 0;
   let latestSnapshotSequence = 0xffff;
   let acknowledgedSnapshotSequence = 0xffff;
   let latestServerTick = 0;
-  let processedClientTick = null;
   let playerNetId = null;
-  let pendingAck = null;
   let reliableSnapshots = 0;
 
   const transport = await connectGameTransport({
@@ -73,7 +73,8 @@ export async function connectAuthoritativeClient({
       if (packetType === PACKET_TYPE.INPUT_ACK) {
         const ack = decodeInputAck(bytes);
         diagnostics.noteAck(ack.processedClientTick);
-        pendingAck = ack;
+        diagnostics.noteAckAnchor(ack, state.get(ack.playerNetId));
+        ackGate.offer(ack);
         playerNetId = ack.playerNetId;
         flushPendingAck();
       }
@@ -119,14 +120,15 @@ export async function connectAuthoritativeClient({
   }
 
   function flushPendingAck() {
-    if (!pendingAck) return;
-    if (latestServerTick !== pendingAck.serverTick && !isTickNewer32(latestServerTick, pendingAck.serverTick)) return;
-    if (processedClientTick === null || isTickNewer32(pendingAck.processedClientTick, processedClientTick)) {
-      processedClientTick = pendingAck.processedClientTick;
-      predictionHistory.discardThrough(processedClientTick);
-      onAck?.(pendingAck);
-    }
-    pendingAck = null;
+    // Only replay from our own authoritative position, not from the newest
+    // global server tick, which may advance without updating the local fighter.
+    // Pending ACKs coalesce to the newest client tick; no input is discarded
+    // while that authoritative position is older than the ACK server tick.
+    const own = playerNetId ? state.get(playerNetId) : null;
+    ackGate.flush(own, (ack) => {
+      predictionHistory.discardThrough(ack.processedClientTick);
+      onAck?.(ack);
+    });
   }
 
   function sendInput(sample) {
@@ -168,7 +170,8 @@ export async function connectAuthoritativeClient({
     sendInput,
     close(reason) { transport.close(reason); },
     get playerNetId() { return playerNetId; },
-    get processedClientTick() { return processedClientTick; },
+    get processedClientTick() { return ackGate.lastAppliedClientTick; },
+    get ackGateMetrics() { return ackGate.metrics(); },
     get latestServerTick() { return latestServerTick; },
     get latestSnapshotSequence() { return latestSnapshotSequence; },
     get acknowledgedSnapshotSequence() { return acknowledgedSnapshotSequence; },

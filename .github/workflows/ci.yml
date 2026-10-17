@@ -65,6 +65,12 @@ jobs:
           node --check web/online-game.mjs
           node --test tests/r1-smooth-network.test.mjs tests/browser-runtime.test.mjs
 
+      - name: Validate R1 own-snapshot ACK alignment
+        run: |
+          node --check src/browser/own-snapshot-ack-gate.mjs
+          node --check web/authoritative-client.mjs
+          node --test tests/r1-own-snapshot-ack-gate.test.mjs tests/m6-browser-authority.test.mjs
+
       - name: Validate R1 real WebTransport latency telemetry
         run: |
           node --check src/browser/network-diagnostics.mjs
