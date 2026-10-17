@@ -39,3 +39,17 @@ format, attack/feint windows or physics.
 Rebased on R1 smooth rendering, network diagnostics and own-snapshot ACK alignment.
 The separate charge-ring and opt-in network HUD are both retained. Full CI and
 independent merged-main qualification remain required before VPS rollout.
+
+### R1 M144 genuine release-order correction
+The existing M144 three-client flight previously triggered a jump 25ms after
+the trusted LMB pointerdown. After R1 moved short-light commitment to pointerup,
+the genuine Space+LMB jump could enter recovery first and the light recovery
+second. That inverted the strict expected #3 -> #1 -> nearest focus order,
+despite unchanged 100HP and server-authentic inputs. The M144-only jump
+choreography now waits 185ms after the trusted initial LMB down, while
+validating a real 60..200ms **light pointerup -> jump pointerdown** delay.
+The M145 spatial flight retains its separate 100ms trusted-down staging and
+original measured 70..150ms **down -> down** gate. Strict three-stage
+observer recovery, authoritative server lifecycle, true W3C gestures,
+and full 100HP/100guard checks are unchanged. No production attack timing
+or server mechanics are modified.

@@ -10746,7 +10746,12 @@ async function runOnlineUiMultiRecoveryFfaFocusFlight(entries, spatial = false) 
   // actually observed the light attack. Under load that could shift the
   // genuine 70..150ms M145 overlap window. Keep both original delays and
   // all actual-input, 100 HP, 3-stage HUD and server assertions unchanged.
-  const jumpInputDelayMs = spatial ? 100 : 25;
+  // R1: light now commits on pointerup, not pointerdown. M144 must stage the
+  // jump after the genuine 90ms light tap RELEASE so that #3 exits recovery
+  // first, then #1, preserving the strict three-stage observer proof.
+  // M145 retains its independent 100ms trusted-down choreography and the
+  // original measured 70..150ms spatial input lead gate unchanged.
+  const jumpInputDelayMs = spatial ? 100 : 185;
   const lightChallenge = m227Registry.issue();
   if (lightChallenge) {
     await execute(lightAttacker.base, lightAttacker.sessionId,
@@ -10846,10 +10851,19 @@ async function runOnlineUiMultiRecoveryFfaFocusFlight(entries, spatial = false) 
   if (lightDowns.length !== 1 || lightUps.length !== 1 || lightDowns[0].x <= 0.5) {
     throw new Error(`${milestone} lacked one genuine off-axis light attack from #${lightId}: ${JSON.stringify(lightPointers)}`);
   }
-  if (Number.isFinite(lightDowns[0]?.epochMs) && Number.isFinite(jumpAttackDowns[0]?.epochMs)) {
-    const inputLeadMs = jumpAttackDowns[0].epochMs - lightDowns[0].epochMs;
-    const minLeadMs = spatial ? 70 : 20;
-    const maxLeadMs = spatial ? 150 : 120;
+  if (!Number.isFinite(lightDowns[0]?.epochMs)
+    || !Number.isFinite(lightUps[0]?.epochMs)
+    || !Number.isFinite(jumpAttackDowns[0]?.epochMs)) {
+    throw new Error(`${milestone} missing authentic timestamped light/jump input evidence: ${JSON.stringify({ lightDowns, lightUps, jumpAttackDowns })}`);
+  }
+  {
+    const inputLeadMs = spatial
+      ? jumpAttackDowns[0].epochMs - lightDowns[0].epochMs
+      : jumpAttackDowns[0].epochMs - lightUps[0].epochMs;
+    // M145 compares actual genuine pointerDOWN times; R1 M144 compares
+    // genuine light pointerUP -> jump pointerDOWN because release commits light.
+    const minLeadMs = spatial ? 70 : 60;
+    const maxLeadMs = spatial ? 150 : 200;
     if (inputLeadMs < minLeadMs || inputLeadMs > maxLeadMs) {
       throw new Error(`${milestone} did not preserve the intended light-before-jump overlap: ${JSON.stringify({ inputLeadMs, minLeadMs, maxLeadMs, lightDowns, jumpAttackDowns })}`);
     }
