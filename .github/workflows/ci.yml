@@ -70,7 +70,7 @@ jobs:
           node --check src/browser/arena-viewport.mjs
           node --check src/browser/smooth-motion.mjs
           node --check web/online-game.mjs
-          node --test tests/r1-zoom-edge-pointers.test.mjs tests/r1-jitter-smoothing.test.mjs tests/r1-smooth-network.test.mjs
+          node --test tests/r1-zoom-edge-pointers.test.mjs tests/r1-jitter-smoothing.test.mjs tests/r1-run-replay-movement.test.mjs tests/r1-smooth-network.test.mjs
 
       - name: Validate R1 own-snapshot ACK alignment
         run: |
