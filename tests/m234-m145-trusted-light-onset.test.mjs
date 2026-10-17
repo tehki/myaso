@@ -36,6 +36,7 @@ test("M234 anchors both M144 and M145 to a trusted receipt, preserving genuine g
   assert.ok(start >= 0 && end > start);
   const flight = runner.slice(start, end);
   assert.ok(flight.includes("const jumpInputDelayMs = spatial ? 100 : 185;"));
+  assert.ok(flight.includes("sampleUiEvidenceWhileActive(entries, spatial ? 760 : 1250, 8)"));
   assert.ok(flight.includes("const lightChallenge = m227Registry.issue();"));
   assert.ok(!flight.includes("spatial ? null : m227Registry.issue()"));
   const challengeAt = flight.indexOf("const lightChallenge = m227Registry.issue();");

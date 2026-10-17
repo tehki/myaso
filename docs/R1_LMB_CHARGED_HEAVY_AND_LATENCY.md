@@ -53,3 +53,14 @@ original measured 70..150ms **down -> down** gate. Strict three-stage
 observer recovery, authoritative server lifecycle, true W3C gestures,
 and full 100HP/100guard checks are unchanged. No production attack timing
 or server mechanics are modified.
+
+### M144 strict third-stage observation
+Quality attempt 2 on head `625527b` confirmed the corrected ordered Firefox
+focus sequence `PUNISH TARGET #3 -> PUNISH TARGET #1`, but the existing
+760ms M144 observation ended before the second authoritative jump-recovery
+window fully cleared, so `NEAREST #3` had not yet appeared. Keep the
+original genuine three-stage strict gate, actual 100HP/guard, server action
+proofs and real browser input evidence; extend **M144 observation only**
+to a bounded 1250ms. M145 spatial observation stays 760ms and its
+original 100ms trusted-input lead/70–150ms proof remains unchanged.
+No production gameplay, timing or network change.

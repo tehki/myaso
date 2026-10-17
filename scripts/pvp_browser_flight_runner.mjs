@@ -10773,7 +10773,12 @@ async function runOnlineUiMultiRecoveryFfaFocusFlight(entries, spatial = false) 
         await sleep(jumpInputDelayMs);
         await performArenaJumpAttackChord(jumpAttacker, jumpArena, -200, 90);
       })(),
-      sampleUiEvidenceWhileActive(entries, 760, 8),
+      // R1 M144: light commits on release and its 185ms delayed jump now
+      // correctly yields #3 recovery before #1 recovery. Observe long enough
+      // for the subsequent genuine #1 recovery to CLEAR and Firefox to return
+      // to ordinary #3 focus. Keep all strict three-stage and server proofs.
+      // M145 spatial sampling/timing is unchanged.
+      sampleUiEvidenceWhileActive(entries, spatial ? 760 : 1250, 8),
     ]);
   } finally {
     lightChallenge?.close();
