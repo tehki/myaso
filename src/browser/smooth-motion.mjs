@@ -8,20 +8,29 @@ export function createSnapshotRenderClock({
   serverHz = NETWORK.serverSimulationHz,
   interpolationMs = NETWORK.reconciliation.remoteInterpolationMs,
   maxAdvanceMs = NETWORK.reconciliation.maxRemoteExtrapolationMs,
+  maxCatchUpRate = 1.45,
+  maxFrameStepMs = 50,
 } = {}) {
-  if (![serverHz, interpolationMs, maxAdvanceMs].every(Number.isFinite)
-    || serverHz <= 0 || interpolationMs < 0 || maxAdvanceMs <= 0) {
+  if (![serverHz, interpolationMs, maxAdvanceMs, maxCatchUpRate, maxFrameStepMs].every(Number.isFinite)
+    || serverHz <= 0 || interpolationMs < 0 || maxAdvanceMs <= 0
+    || maxCatchUpRate < 1 || maxCatchUpRate > 2 || maxFrameStepMs <= 0 || maxFrameStepMs > 250) {
     throw new RangeError("render clock parameters must be finite and positive");
   }
   let latestTick = null;
   let arrivalMs = 0;
   let previousRenderTick = null;
+  let previousFrameMs = null;
+  let boundedCatchups = 0;
+  let targetGapTicks = 0;
   const behindTicks = (interpolationMs / 1000) * serverHz;
 
   function reset() {
     latestTick = null;
     arrivalMs = 0;
     previousRenderTick = null;
+    previousFrameMs = null;
+    boundedCatchups = 0;
+    targetGapTicks = 0;
   }
 
   function sample(serverTick, nowMs) {
@@ -32,6 +41,7 @@ export function createSnapshotRenderClock({
       latestTick = serverTick;
       arrivalMs = nowMs;
       previousRenderTick = null;
+      previousFrameMs = null;
     } else if (isTickNewer32(serverTick, latestTick)) {
       // Tick wrap is rare; reset interpolation rather than sending a huge
       // fractional timestamp through the existing remote sample ring.
@@ -39,6 +49,7 @@ export function createSnapshotRenderClock({
         latestTick = serverTick;
         arrivalMs = nowMs;
         previousRenderTick = null;
+        previousFrameMs = null;
       } else {
         latestTick = serverTick;
         arrivalMs = nowMs;
@@ -46,14 +57,27 @@ export function createSnapshotRenderClock({
     }
     const elapsedMs = Math.max(0, Math.min(maxAdvanceMs, nowMs - arrivalMs));
     const proposed = Math.max(0, latestTick + elapsedMs * serverHz / 1000 - behindTicks);
-    // Never make an opponent step backwards because of packet arrival jitter.
-    // Long outages freeze at maxAdvanceMs instead of extrapolating forever.
-    const result = previousRenderTick === null ? proposed : Math.max(previousRenderTick, proposed);
+    // Jittery WAN bursts can carry several new server ticks in one packet.
+    // Jumping the *render* clock straight there teleports remote sprites.
+    // Limit only visual catch-up to 145% of real elapsed frame time, with
+    // an independent per-frame bound. It catches up steadily and never
+    // modifies the actual snapshot ring, server tick or combat authority.
+    let result = proposed;
+    if (previousRenderTick !== null && previousFrameMs !== null) {
+      const dt = Math.max(0, Math.min(maxFrameStepMs, nowMs - previousFrameMs));
+      const maxTicks = Math.max(0.5, dt * serverHz / 1000 * maxCatchUpRate);
+      result = Math.max(previousRenderTick, Math.min(proposed, previousRenderTick + maxTicks));
+      if (proposed - result > 0.001) boundedCatchups++;
+    }
+    targetGapTicks = Math.max(0, proposed - result);
     previousRenderTick = result;
+    previousFrameMs = nowMs;
     return result;
   }
 
-  return Object.freeze({ sample, reset });
+  function metrics() { return { boundedCatchups, targetGapTicks }; }
+
+  return Object.freeze({ sample, reset, metrics });
 }
 
 // Rendering only. Preserve the pre-reconciliation *visual* camera coordinate,
