@@ -209,3 +209,19 @@ messages, zero HP/guard loss, no parry, true pointer-directed wheel and
 original recovery behavior. All 125ms dodge iframe, 135ms windup,
 movement, physics, knockdown, game and server code remain unchanged.
 This is a test scheduling candidate until exact-head CI passes.
+
+### M239 M36 read-only genuine input epoch evidence
+Exact-head quality #39043583258 passed **116** steps and M36 reached
+the **post-dodge-feedback final validation** after one completed genuine
+Firefox 65ms LMB and one Chrome wheel about 99ms later. The new
+M238 final check (correctly) demanded exact cross-browser epochMs
+timestamps, but installUiObserver's allowlist did not include M36's
+uidodge scenario. It recorded authentic pointerdown, pointerup and
+wheel with only browser-local performance t; the epochMs properties
+were absent on both, causing a false instrumentation-only CI failure.
+M239 adds ONLY uidodge to the read-only epochEvidence recording
+allowlist so genuine Date.now() stamps accompany the existing browser
+events. Strict down < up < wheel < up + 135ms, light-hold <320ms,
+genuine attack/dodge feedback, zero HP/guard loss and no parry remain
+unchanged and fail closed. No synthetic input, gameplay, physics,
+server, attack window, or telemetry protocol modifications.

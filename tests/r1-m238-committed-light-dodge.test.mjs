@@ -22,3 +22,24 @@ test("M238 M36 waits for real short pointerUP before perpendicular wheel, withou
  assert.ok(flight.includes('attackerResult.feedbackTransitions.includes("parried")'));
  assert.ok(!flight.includes("dispatchEvent("));
 });
+
+test("M239 M36 records authentic cross-browser epoch timestamps, never invents them", () => {
+  const src=readFileSync(new URL("../scripts/pvp_browser_flight_runner.mjs",import.meta.url),"utf8");
+  const a=src.indexOf("async function installUiObserver(");
+  const b=src.indexOf("\nasync function ",a+30);
+  assert.ok(a>=0 && b>a);
+  const observer=src.slice(a,b);
+  assert.ok(observer.includes("const epochEvidence = ['uidodge',"));
+  assert.ok(observer.includes("if (epochEvidence) entry.epochMs = Date.now();"));
+  assert.ok(observer.includes("state.pointers.push(entry);"));
+  assert.ok(observer.includes("state.wheels.push(entry);"));
+  const flight=src.slice(src.indexOf("async function runOnlineUiDodgeFeedbackFlight("),
+    src.indexOf("\nasync function ",src.indexOf("async function runOnlineUiDodgeFeedbackFlight(")+25));
+  assert.ok(flight.includes("Number.isFinite(attackDown?.epochMs)"));
+  assert.ok(flight.includes("Number.isFinite(attackUp?.epochMs)"));
+  assert.ok(flight.includes("Number.isFinite(rollWheel.epochMs)"));
+  assert.ok(flight.includes("rollWheel.epochMs - attackUp.epochMs >= COMBAT.attack.windupMs"));
+  assert.ok(flight.includes("waitForUiDodgeEvidence(entries, attacker, defender, 520, false, lastAttemptBaseline)"));
+  assert.ok(flight.includes("attackerResult.playerHp !== 100 || attackerResult.playerGuard !== 100"));
+  assert.ok(flight.includes("defenderResult.playerHp !== 100 || defenderResult.playerGuard !== 100"));
+});
