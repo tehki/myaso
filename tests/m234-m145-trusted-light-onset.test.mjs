@@ -35,7 +35,7 @@ test("M234 anchors both M144 and M145 to a trusted receipt, preserving genuine g
   const end = runner.indexOf("\nasync function ", start + 20);
   assert.ok(start >= 0 && end > start);
   const flight = runner.slice(start, end);
-  assert.ok(flight.includes("const jumpInputDelayMs = spatial ? 100 : 185;"));
+  assert.ok(flight.includes("const jumpInputDelayMs = spatial ? 100 : 155;"));
   assert.ok(flight.includes("sampleUiEvidenceWhileActive(entries, spatial ? 760 : 1250, 8)"));
   assert.ok(flight.includes("const lightChallenge = m227Registry.issue();"));
   assert.ok(!flight.includes("spatial ? null : m227Registry.issue()"));
@@ -53,7 +53,7 @@ test("M234 anchors both M144 and M145 to a trusted receipt, preserving genuine g
   assert.ok(flight.includes("jumpAttackDowns[0].epochMs - lightDowns[0].epochMs"));
   assert.ok(flight.includes("jumpAttackDowns[0].epochMs - lightUps[0].epochMs"));
   assert.ok(flight.includes("!Number.isFinite(lightUps[0]?.epochMs)"));
-  assert.ok(flight.includes("const jumpInputDelayMs = spatial ? 100 : 185;"));
+  assert.ok(flight.includes("const jumpInputDelayMs = spatial ? 100 : 155;"));
   assert.ok(runner.includes("event.isTrusted === true && event.button === 0"));
   assert.ok(runner.includes("m227Registry.receive(packet)"));
 });

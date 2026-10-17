@@ -138,3 +138,19 @@ still rejecting any wheel error. Real pointerdown/up timestamps, positive
 sub-320ms release, exact 34HP/66HP victim, zero collateral and guard loss,
 and strict authoritative attack-active BEFORE recovery are all mandatory.
 No production gameplay/balancing/protocol changes or time-window widening.
+
+### M235 M144 trusted input lead headroom
+Exact-head quality run 39033144071 passed 80 steps then M144 failed its
+*unchanged* 60..200ms genuine light-pointerUP to jump-pointerDOWN gate:
+observed 212ms, with both actual gestures and original independent
+server-authentic attack recovery lifecycles. This is **not** evidence for
+changing any attack windows. The true W3C Chrome2 / Chrome dispatch and
+event-loop skew added ~27ms to M144's former 185ms trusted-onset delay.
+M144-only orchestration now uses 155ms after the existing M227 trusted
+pointerdown receipt to recover 30ms scheduling headroom. The light remains
+a real 90ms W3C press/release, jump remains a real 90ms Space/LMB chord,
+the measured 60..200ms gate stays unmodified and fails closed, as do the
+strict sequential 3-stage focus labels, M211 authoritative dual
+recovery lifecycle, zero HP/guard changes, and third-stage clear.
+M145 retains exactly its previous 100ms timer and 70..150ms spatial gate.
+No production gameplay, network or server changes.

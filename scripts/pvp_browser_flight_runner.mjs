@@ -10795,9 +10795,14 @@ async function runOnlineUiMultiRecoveryFfaFocusFlight(entries, spatial = false) 
   // R1: light now commits on pointerup, not pointerdown. M144 must stage the
   // jump after the genuine 90ms light tap RELEASE so that #3 exits recovery
   // first, then #1, preserving the strict three-stage observer proof.
+  // M235: one real Chrome2/Chrome pair delivered 212ms release-to-jump lead
+  // despite the former 185ms timer, breaching M144's unchanged 200ms cap.
+  // Center the M144-only trusted-down timer at 155ms to leave 30ms more
+  // W3C driver / event-loop headroom; do NOT widen the original 60..200ms
+  // actual-input gate or change the 90ms click or any combat action lifetime.
   // M145 retains its independent 100ms trusted-down choreography and the
   // original measured 70..150ms spatial input lead gate unchanged.
-  const jumpInputDelayMs = spatial ? 100 : 185;
+  const jumpInputDelayMs = spatial ? 100 : 155;
   const lightChallenge = m227Registry.issue();
   if (lightChallenge) {
     await execute(lightAttacker.base, lightAttacker.sessionId,
