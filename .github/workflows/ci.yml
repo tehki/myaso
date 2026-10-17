@@ -65,6 +65,13 @@ jobs:
           node --check web/online-game.mjs
           node --test tests/r1-smooth-network.test.mjs tests/browser-runtime.test.mjs
 
+      - name: Validate R1 real WebTransport latency telemetry
+        run: |
+          node --check src/browser/network-diagnostics.mjs
+          node --check web/authoritative-client.mjs
+          node --check web/online-game.mjs
+          node --test tests/r1-network-diagnostics.test.mjs tests/m6-browser-authority.test.mjs
+
       - name: Validate browser runtime hot path
         run: |
           node --check src/browser/m224-dodge-completion.mjs
