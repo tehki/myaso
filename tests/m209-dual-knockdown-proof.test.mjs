@@ -58,8 +58,8 @@ test("M209 real browser retains one true W3C wheel and LMB plus strict HP and fo
  assert.ok(s.includes('scenario === "uimultiknockdownffahit"'));
  assert.ok(part.includes("verifyM209DualKnockdownServerPunish(m201ServerOutput()"));
  assert.ok(part.includes("await scrollArenaWheel(roller, rollerElementId, -120, 0);"));
- assert.ok(part.includes("await setArenaAttackButton(punisher, true);"));
- assert.ok(part.includes("await setArenaAttackButton(punisher, false);"));
+  assert.ok(part.includes("planM159GenuinePunishTap(`mouse-${punisher.name}`)"), "genuine one-packet LMB action required");
+  assert.ok(s.includes('import { planM159GenuinePunishTap } from "./m159-genuine-punish-tap.mjs";'), "real W3C action-plan helper imported");
  assert.ok(part.includes("punishDowns.length !== 1 || punishUps.length !== 1"));
  assert.ok(part.includes("firstState?.playerHp === 66"));
  assert.ok(part.includes("secondState?.playerHp === 100"));
