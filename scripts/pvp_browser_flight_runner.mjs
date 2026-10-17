@@ -18,6 +18,8 @@ import { summarizeM232SpatialHandoffFailure } from "./m232-spatial-handoff-failu
 import { summarizeM233RecoveryHandoff } from "../src/browser/m233-recovery-handoff-trace.mjs";
 import { summarizeM218JumpAttackLatency } from "./m218-successful-jump-attack-latency.mjs";
 import { observeM219RollBufferIngress } from "./m219-buffered-roll-ingress-evidence.mjs";
+import { dispatchM121DirectionalLight, planM121DirectionalLight } from "./m121-directional-light-plan.mjs";
+import { planM159GenuinePunishTap } from "./m159-genuine-punish-tap.mjs";
 import { summarizeM220KnockdownFocusTimeline } from "./m220-knockdown-focus-timeline.mjs";
 import { mustAwaitM202GuardConvergence } from "./m202-guardbreak-convergence.mjs";
 import { verifyM201ServerPunishProof } from "./m201-authoritative-phase-proof.mjs";
@@ -5256,17 +5258,17 @@ async function runOnlineUiMultiKnockdownFfaHitFlight(entries) {
     throw new Error(milestone + " never observed the authoritative roll before punish staging");
   }
 
-  // R1 short LMB commits on authentic pointerUP, not pointerDOWN.
-  // Keep the genuine press synchronized to the observed authoritative dodge
-  // and RELEASE after 40ms, before cross-browser #3-knockdown observation or
-  // retargeting latency can postpone the 135ms light windup beyond the
-  // unchanged 260ms shared knockdown. A fresh genuine mouse move re-aims
-  // during the already-committed windup after #3's actual knockdown.
-  // The unchanged strict M209 60Hz server proof must still show active AND
-  // the exact single 34HP hit strictly before either victim recovers.
-  await setArenaAttackButton(punisher, true);
-  await sleep(40);
-  await setArenaAttackButton(punisher, false);
+  // R1 commits a short LMB light on authentic pointerUP. One genuine
+  // ChromeDriver W3C pointer transaction (down -> 10ms -> up) removes the
+  // inter-request driver ACK and the previous 40ms hold from M159's real
+  // 260ms overlapping knockdown window. Aim stays pre-staged, then the
+  // browser re-aims during the actual windup after #3's knockdown.
+  // The M209 60Hz authoritative proof STILL demands attack-active AND the
+  // exact single selected 34HP hit before EITHER genuine knockdown recovers.
+  await webdriver(
+    punisher.base, "POST", `/session/${punisher.sessionId}/actions`,
+    planM159GenuinePunishTap(`mouse-${punisher.name}`),
+  );
   let windupReaim = null;
   const reaimDeadline = Date.now() + Math.max(80, COMBAT.attack.windupMs - 20);
   while (!windupReaim && Date.now() < reaimDeadline) {
@@ -11647,35 +11649,17 @@ async function setArenaAttack(session, elementId, pressed, xOffset = 200) {
 
 async function performArenaDirectionalLight(session, elementId, strafeKey, xOffset = 200) {
   const origin = { "element-6066-11e4-a52e-4f735466cecf": elementId };
-  await webdriver(session.base, "POST", `/session/${session.sessionId}/actions`, {
-    actions: [
-      {
-        type: "key",
-        id: `keyboard-${session.name}`,
-        actions: [
-          { type: "keyDown", value: strafeKey },
-          { type: "pause", duration: 0 },
-          { type: "pause", duration: 0 },
-          { type: "pause", duration: 0 },
-          { type: "pause", duration: 0 },
-          { type: "keyUp", value: strafeKey },
-        ],
-      },
-      {
-        type: "pointer",
-        id: `mouse-${session.name}`,
-        parameters: { pointerType: "mouse" },
-        actions: [
-          { type: "pointerMove", duration: 0, origin, x: xOffset, y: 0 },
-          { type: "pause", duration: 30 },
-          { type: "pointerDown", button: 0 },
-          { type: "pause", duration: 40 },
-          { type: "pointerUp", button: 0 },
-          { type: "pause", duration: 150 },
-        ],
-      },
-    ],
-  });
+  const sequence = planM121DirectionalLight(
+    strafeKey, origin, xOffset, `keyboard-${session.name}`, `mouse-${session.name}`,
+  );
+  // The short LMB light now commits on RELEASE. Sending keyboard-up in the
+  // same multi-device W3C action can race that release under ChromeDriver.
+  // Separate real WebDriver commands preserve the key until pointer-up;
+  // never inject a DOM event or authoritative fighter state into the game.
+  await dispatchM121DirectionalLight(
+    (body) => webdriver(session.base, "POST", `/session/${session.sessionId}/actions`, body),
+    sequence,
+  );
 }
 
 
