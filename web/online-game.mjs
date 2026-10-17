@@ -2,7 +2,7 @@ import { createFrameBudget } from "../src/browser/frame-budget.mjs";
 import { recordM233RecoveryHandoff } from "../src/browser/m233-recovery-handoff-trace.mjs";
 import { installRightButtonGesture } from "../src/browser/right-button-gesture.mjs";
 import { createLeftButtonCharge } from "../src/browser/left-button-charge.mjs";
-import { captureLightAttackMovement } from "../src/browser/light-attack-movement.mjs";
+import { captureLightAttackMovement, resolveLightAttackReleaseMovement } from "../src/browser/light-attack-movement.mjs";
 import { createCombatImpactController } from "../src/browser/combat-impact.mjs";
 import { COMBAT_ACTION, blockSpatialPresentation, combatActionHint, combatOverlayPresentation, createCombatReadabilityTracker, createRemoteDamageTracker, fighterFocusNetId, fighterGuardBreakPunishNetId, guardBreakPunishRangeCue, fighterKnockdownPunishNetId, knockdownPunishRangeCue, fighterParryPunishNetId, parryPunishRangeCue, fighterRecoveryNetId, recoveryPunishRangeCue, punishRangeCueIntent, fighterIdentityPresentation, fighterThreatBearingLabel, fighterThreatGuardArcLabel, fighterThreatNetId, fighterThreatPhaseLabel, fighterThreatPhaseState, fighterMatchPointPresentation, fighterMatchPresentation, fighterScoreboardPresentation, FFA_KILL_TARGET, fighterVitalsPresentation, guardBreakSpatialPresentation, killFeedPresentation, opponentRecoveryPresentation, parrySpatialPresentation, staminaDenialPresentation, ownCombatReadinessPresentation } from "../src/browser/combat-readability.mjs";
 import { COMBAT } from "../src/combat/model.mjs";
@@ -158,6 +158,7 @@ let predictionStep = 0;
 let clientTick = 0;
 let attackRequested = false;
 let committedLightMove = null;
+let leftButtonPressMovement = null;
 let leftButtonDown = false;
 let heavyAttackRequested = false;
 let rollRequested = false;
@@ -167,14 +168,16 @@ let shortBlockUntil = 0;
 const leftButtonCharge = createLeftButtonCharge({
   onLight() {
     attackRequested = true;
-    committedLightMove = captureLightAttackMovement(keys);
+    committedLightMove = resolveLightAttackReleaseMovement(
+      captureLightAttackMovement(keys), leftButtonPressMovement);
+    leftButtonPressMovement = null;
     if (local.action === COMBAT_ACTION.jump) queueStaminaDenial("jump-attack");
     else if (!pendingStaminaDenial && (jumpRequested || keys.has("Space"))) queueStaminaDenial("jump-attack-chord");
     else if (rightButtonGesture.isRunning() && ["KeyW", "KeyA", "KeyS", "KeyD"].some((code) => keys.has(code))) {
       queueStaminaDenial("running-attack");
     }
   },
-  onHeavy() { heavyAttackRequested = true; },
+  onHeavy() { heavyAttackRequested = true; leftButtonPressMovement = null; },
 });
 const rightButtonGesture = installRightButtonGesture(canvas, {
   onKick: () => {
@@ -190,6 +193,7 @@ canvas.addEventListener("pointerdown", (event) => {
   updateMouse(event);
   if (event.button === 0) {
     leftButtonDown = true;
+    leftButtonPressMovement = captureLightAttackMovement(keys);
     const runningChord = rightButtonGesture.isRunning()
       && ["KeyW", "KeyA", "KeyS", "KeyD"].some((code) => keys.has(code));
     leftButtonCharge.press(event.pointerId, {
@@ -202,14 +206,22 @@ function onLeftPointerUp(event) {
   leftButtonDown = false;
   updateMouse(event);
   leftButtonCharge.release(event.pointerId);
+  leftButtonPressMovement = null;
 }
 canvas.addEventListener("pointerup", onLeftPointerUp);
 window.addEventListener("pointerup", onLeftPointerUp);
 canvas.addEventListener("pointercancel", (event) => {
-  if (event.button === 0) { leftButtonDown = false; leftButtonCharge.cancel(event.pointerId); }
+  if (event.button === 0) {
+    leftButtonDown = false;
+    leftButtonPressMovement = null;
+    leftButtonCharge.cancel(event.pointerId);
+  }
 });
 canvas.addEventListener("lostpointercapture", (event) => {
-  if (event.pointerId !== undefined) leftButtonCharge.cancel(event.pointerId);
+  if (event.pointerId !== undefined) {
+    leftButtonPressMovement = null;
+    leftButtonCharge.cancel(event.pointerId);
+  }
 });
 canvas.addEventListener("wheel", (event) => {
   event.preventDefault();
@@ -596,6 +608,7 @@ function releaseInputs() {
   attackRequested = false;
   committedLightMove = null;
   leftButtonDown = false;
+  leftButtonPressMovement = null;
   leftButtonCharge.cancel();
   heavyAttackRequested = false;
   rollRequested = false;
