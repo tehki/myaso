@@ -66,3 +66,28 @@ test("real online loop applies scale only to world draw, then restores for reada
   assert.ok(!body.includes("local.x * ARENA_VIEW_ZOOM"));
   assert.ok(!body.includes("networkClient.sendInput({ tick: outgoingTick, ...currentInput, zoom:"));
 });
+
+
+test("M46/M47 remote HP, guard and identity stay full-resolution outside zoomed world",()=>{
+  const online=readFileSync(new URL("../web/online-game.mjs",import.meta.url),"utf8");
+  const begin=online.indexOf("function render(nowMs =");
+  const end=online.indexOf("\nfunction drawImpactBurst(",begin);
+  const body=online.slice(begin,end);
+  const scale=body.indexOf("ctx.scale(ARENA_VIEW_ZOOM, ARENA_VIEW_ZOOM)");
+  const actor=body.indexOf("drawFighterWorld(sampled,");
+  const restore=body.indexOf("ctx.restore();",actor);
+  const vitals=body.indexOf("drawRemoteVitals(projected.x, projected.y, enemy)");
+  const identity=body.indexOf("drawRemoteIdentity(projected.x, projected.y, enemy.netId)");
+  assert.ok(scale>=0 && actor>scale && restore>actor && vitals>restore && identity>restore);
+  assert.ok(body.includes("projectArenaPoint(enemy.x, enemy.y,"));
+  assert.ok(body.includes("visibleEnemyPositions.push(sampled)"));
+  const world=online.slice(online.indexOf("function drawFighterWorld("),
+    online.indexOf("\nfunction drawFighterScreen(",online.indexOf("function drawFighterWorld(")));
+  assert.ok(!world.includes("drawRemoteVitals("));
+  assert.ok(!world.includes("drawRemoteIdentity("));
+  const vitalsFunction=online.slice(online.indexOf("function drawRemoteVitals("),
+    online.indexOf("\nfunction drawRemoteIdentity(",online.indexOf("function drawRemoteVitals(")));
+  assert.match(vitalsFunction,/const width = 42;/);
+  assert.match(vitalsFunction,/presentation.hp \/ 100/);
+  assert.match(vitalsFunction,/presentation.guard \/ 100/);
+});

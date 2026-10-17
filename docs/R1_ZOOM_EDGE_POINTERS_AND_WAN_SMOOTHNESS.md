@@ -13,3 +13,7 @@ The server already sends 20Hz snapshots while browser presentation advances at ~
 
 ## Release acceptance
 Focused unit and CI tests cover four directional edges, diagonal clipping, near/far/death filtering, number cap, render/HUD isolation, target-clock burst bounds and teleport/outage handling. Still require the full main-equivalent Rust/Chrome/Firefox/512-player quality suite and external live smoke. Keep previous release rollback until client tests pass. **Do not confuse reduced visual snapping with lower actual network RTT**; routing/ACK latency remains tracked in #293.
+
+
+## M46/M47 full-resolution remote vitals and identity
+The first exact-head quality rerun passed 127 checks (including unchanged M147 FFA punish) but M46 spatial vitals failed: reducing the entire drawing context to 84% shrank the ordinary 42px green guard bar to ~34 pixels, below the original strict full-size readability check. The observed red 22/green 34 ratio already represented the *correct* authoritative 66/100 damage. The fix moves remote health bars and identity badges to a separate **unscaled screen-space pass**, centered at the same zoom-projected enemy positions. The remote sprite/world combat and attack tells remain zoomed; full-resolution UI stays 42px wide, player labels 34px. M46/M47 tests and thresholds are unchanged. Never fake health or change server combat state. This also improves actual readability at the wider camera scale.

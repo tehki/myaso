@@ -759,15 +759,29 @@ function render(nowMs = performance.now(), impact = combatImpact.sample(nowMs)) 
       remoteScratch.set(entity.netId, scratch);
     }
     const sampled = networkClient.remoteInterpolator.sample(entity.netId, renderServerTick, scratch) ?? entity;
-    if (sampled.action !== COMBAT_ACTION.dead) {
-      visibleEnemyPositions.push(sampled);
-    }
+    // Keep all remote sprites for the screen-space HUD pass. The offscreen
+    // pointer helper excludes dead fighters on its own.
+    visibleEnemyPositions.push(sampled);
     const damageTell = remoteDamage.visible(entity.netId, nowMs);
     const recoveryTell = entity.netId === recoveryFocusNetId;
-    drawFighterWorld(sampled, "#b96350", "#47251f", damageTell, entity.netId, recoveryTell);
+    drawFighterWorld(sampled, "#b96350", "#47251f", damageTell, recoveryTell);
   }
   if (ownId && local.initialized) drawFighterScreen(canvas.width / 2, canvas.height / 2, local, "#e2d5b4", "#51452d");
   ctx.restore();
+  // R1 wider view: health/guard bars and player identity badges are UI,
+  // not world geometry. Keep their original unscaled 42px/34px readability
+  // while placing them above their zoom-projected remote fighter positions.
+  // This also preserves strict M46 66/100 vitals and M47 identity pixels.
+  if (local.initialized) {
+    for (const enemy of visibleEnemyPositions) {
+      const projected = projectArenaPoint(enemy.x, enemy.y,
+        visualCameraPosition.x, visualCameraPosition.y, canvas.width, canvas.height);
+      if (projected.x < -64 || projected.x > canvas.width + 64
+        || projected.y < -64 || projected.y > canvas.height + 64) continue;
+      drawRemoteVitals(projected.x, projected.y, enemy);
+      drawRemoteIdentity(projected.x, projected.y, enemy.netId);
+    }
+  }
   updateHud(ownId);
   drawThreatMarkers();
   if (local.initialized) drawOffscreenEnemyPointers(visibleEnemyPositions, ownId);
@@ -904,7 +918,7 @@ function drawThreatMarker(bearing, secondary) {
   ctx.restore();
 }
 
-function drawFighterWorld(fighter, body, shadow, damageTell = false, netId = 0, recoveryTell = false) {
+function drawFighterWorld(fighter, body, shadow, damageTell = false, recoveryTell = false) {
   if (!local.initialized) return;
   const screenX = canvas.width / 2 + fighter.x - visualCameraPosition.x;
   const screenY = canvas.height / 2 + fighter.y - visualCameraPosition.y;
@@ -913,8 +927,6 @@ function drawFighterWorld(fighter, body, shadow, damageTell = false, netId = 0, 
   if (projected.x < -64 || projected.x > canvas.width + 64
     || projected.y < -64 || projected.y > canvas.height + 64) return;
   drawFighterScreen(screenX, screenY, fighter, body, shadow, true, damageTell, recoveryTell);
-  drawRemoteVitals(screenX, screenY, fighter);
-  drawRemoteIdentity(screenX, screenY, netId);
 }
 
 function drawFighterScreen(x, y, fighter, body, shadow, remote = false, damageTell = false, recoveryTell = false) {
