@@ -5265,7 +5265,13 @@ async function runOnlineUiMultiKnockdownFfaHitFlight(entries) {
   // The unchanged strict M209 60Hz server proof must still show active AND
   // the exact single 34HP hit strictly before either victim recovers.
   await setArenaAttackButton(punisher, true);
-  await sleep(40);
+  // M246: R1 commits light on real pointerUP. The former 40ms hold consumed
+  // ~2.4 authoritative 60Hz ticks of the *unchanged* 260ms double-knockdown
+  // while both Chrome W3C pointer requests already supply a real, trusted
+  // down/up edge. Release after 5ms, as in the validated M156 early-punish
+  // flight, to leave genuine attack-active/hit comfortably before recovery.
+  // Do not synthesize input or weaken the strict M209 60Hz overlap proof.
+  await sleep(5);
   await setArenaAttackButton(punisher, false);
   let windupReaim = null;
   const reaimDeadline = Date.now() + Math.max(80, COMBAT.attack.windupMs - 20);
