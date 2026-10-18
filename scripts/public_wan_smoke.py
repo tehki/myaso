@@ -22,12 +22,55 @@ ORIGIN = "https://game.open-trust-layer.org"
 GAME_ENDPOINT = ORIGIN + ":4433/game"
 ONLINE_RE = re.compile(r"Online - player #([0-9]+) - server tick ([0-9]+)")
 WEB_DRIVER_STATUS = "/status"
+# Temporary, test-browser-only requestAnimationFrame sampler. Bounded to 96
+# actual callback intervals; never touches the game renderer or networking.
+FRAME_PROBE_INIT = """
+if (!window.__MYASO_R2_FRAME_PROBE__) {
+  const periods = [];
+  let previous = null;
+  let lastVisible = document.visibilityState;
+  const takeFrame = (ts) => {
+    if (document.visibilityState !== lastVisible) {
+      periods.length = 0;
+      previous = null;
+      lastVisible = document.visibilityState;
+    }
+    if (document.visibilityState === 'visible' && previous !== null) {
+      const delta = ts - previous;
+      if (Number.isFinite(delta) && delta >= 0 && delta < 60000) {
+        periods.push(delta);
+        if (periods.length > 96) periods.shift();
+      }
+    }
+    previous = ts;
+    requestAnimationFrame(takeFrame);
+  };
+  window.__MYASO_R2_FRAME_PROBE__ = {
+    snapshot() {
+      const sorted = [...periods].sort((a, b) => a - b);
+      const pct = p => sorted.length ? sorted[Math.ceil((sorted.length - 1) * p)] : null;
+      return {
+        samples: sorted.length,
+        p50_ms: pct(.50),
+        p95_ms: pct(.95),
+        max_ms: sorted.length ? sorted.at(-1) : null,
+        above_50_percent: sorted.length
+          ? Math.round(periods.filter(ms => ms > 50).length * 1000 / sorted.length) / 10
+          : null,
+      };
+    },
+  };
+  requestAnimationFrame(takeFrame);
+}
+return true;
+"""
 DOM_READ = """
 return {
   webtransport: typeof WebTransport === 'function',
   status: document.querySelector('#event-text')?.textContent ?? '',
   scoreboard: Array.from(document.querySelectorAll('#scoreboard-list li span'), el => el.textContent),
-  netstats: document.querySelector('#network-diagnostics')?.textContent ?? ''
+  netstats: document.querySelector('#network-diagnostics')?.textContent ?? '',
+  frame_cadence: window.__MYASO_R2_FRAME_PROBE__?.snapshot() ?? null
 };
 """
 
@@ -50,6 +93,7 @@ def summarize_observations(samples, require_peer=False):
     last_stats = ""
     latest_tick = None
     movement = any(s.get("w3c_movement") for s in samples)
+    last_cadence = None
     for sample in samples:
         match = ONLINE_RE.search(sample.get("status", ""))
         if match:
@@ -59,6 +103,8 @@ def summarize_observations(samples, require_peer=False):
             latest_tick = int(match.group(2))
         if sample.get("netstats"):
             last_stats = sample["netstats"]
+        if isinstance(sample.get("frame_cadence"), dict):
+            last_cadence = sample["frame_cadence"]
         # The actual scoreboard is from browser DOM, not local position guesses.
         peer_ids.update(int(m.group(1)) for label in sample.get("scoreboard", [])
                         if (m := re.fullmatch(r"#([0-9]+)", label)))
@@ -92,6 +138,13 @@ def summarize_observations(samples, require_peer=False):
         "genuine_w3c_movement_issued": movement,
         "real_input_ack_observed": values["ack_p50_ms"] is not None,
         "real_render_telemetry_observed": values["extra_render_p50_ms"] is not None,
+        "real_browser_frame_cadence_observed": (
+            isinstance(last_cadence, dict) and
+            type(last_cadence.get("samples")) is int and
+            last_cadence["samples"] >= 2 and
+            isinstance(last_cadence.get("p95_ms"), (float, int)) and
+            last_cadence["p95_ms"] >= 0
+        ),
     }
     if require_peer:
         pass_checks["remote_fighter_seen_in_scoreboard"] = bool(peer_ids)
@@ -103,6 +156,7 @@ def summarize_observations(samples, require_peer=False):
         "last_authoritative_tick": latest_tick,
         "samples": len(samples),
         "measurements": values,
+        "browser_frame_cadence": last_cadence,
     }
 
 
@@ -209,6 +263,9 @@ def run_probe(duration_seconds, require_peer):
                 "netstats": "1",
             })
             _webdriver(base, root + "/url", "POST", {"url": ORIGIN + path}, timeout=20)
+            if _webdriver(base, root + "/execute/sync", "POST",
+                          {"script": FRAME_PROBE_INIT, "args": []}, timeout=10) is not True:
+                raise RuntimeError("native requestAnimationFrame sampler not armed")
             deadline = time.monotonic() + duration_seconds
             did_move = False
             while time.monotonic() < deadline:

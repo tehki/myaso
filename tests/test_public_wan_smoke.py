@@ -38,6 +38,9 @@ class PublicWanSmokeTests(unittest.TestCase):
         raw = [{"status": "Online - player #44 - server tick 1230",
                 "scoreboard": ["#44", "#45"], "webtransport": True,
                 "w3c_movement": True,
+                "frame_cadence": {"samples": 96, "p50_ms": 16.7,
+                                  "p95_ms": 18.2, "max_ms": 21.2,
+                                  "above_50_percent": 0},
                 "netstats": "Input->ACK p50 220ms · p95 400ms"
                             " | Jitter p95 55ms | Snapshots p50 49ms · p95 143ms"
                             " | Camera correction p95 0.7u | Stale-own ACKs 23"
@@ -56,6 +59,8 @@ class PublicWanSmokeTests(unittest.TestCase):
         self.assertEqual(out["measurements"]["deferred_reconciles"], 82)
         self.assertEqual(out["measurements"]["extra_render_p95_ms"], 88)
         self.assertEqual(out["measurements"]["render_samples"], 96)
+        self.assertTrue(out["checks"]["real_browser_frame_cadence_observed"])
+        self.assertEqual(out["browser_frame_cadence"]["p95_ms"], 18.2)
 
     def test_high_local_cpu_pressure_confounds_wan_quality_not_player_connectivity(self):
         quiet = mod.classify_host_pressure(4, 1.8)
@@ -67,9 +72,18 @@ class PublicWanSmokeTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 mod.classify_host_pressure(*args)
 
+    def test_missing_real_frame_cadence_never_passes_even_if_peer_present(self):
+        snap = {"status": "Online - player #3 - server tick 90",
+                "scoreboard": ["#3", "#4"], "webtransport": True,
+                "w3c_movement": True, "netstats": "ACK p50 10ms | Extra render lag p50 0ms"}
+        evidence = mod.summarize_observations([snap], True)
+        self.assertFalse(evidence["checks"]["real_browser_frame_cadence_observed"])
+        self.assertFalse(evidence["pass"])
+
     def test_no_peer_fails_closed_and_identity_changes_refused(self):
         snap = {"status": "Online - player #3 - server tick 90",
                 "scoreboard": ["#3"], "webtransport": True, "w3c_movement": True,
+                "frame_cadence": {"samples": 30, "p95_ms": 17.0},
                 "netstats": "ACK p50 10ms | Extra render lag p50 0ms"}
         self.assertFalse(mod.summarize_observations([snap], True)["pass"])
         self.assertTrue(mod.summarize_observations([snap], False)["pass"])

@@ -30,3 +30,7 @@ The structured summary deliberately segments input ACK, ACK jitter, snapshot del
 ### CPU-load confounder (18 October)
 
 X230i had a load average 17.64 while providing just 4 logical CPUs, with a concurrent npm install, compiler and GitHub Actions worker. Its later two-host sample had ~9.6 seconds extra visual-lag p95 while Serj recorded 122ms. That is **not** evidence of a 9.6-second Internet route RTT, nor proof of a renderer regression: the overloaded headless browser can stop scheduling frames or WebDriver reads. The probe now records the normalized one-minute CPU-load pressure before/after the session; a value >=1.5 per logical CPU flags its latency interpretation as inconclusive, while retaining a separate truthful connectivity outcome. Re-test on an idle browser host before tuning simulation or interpolation.
+
+### Browser frame scheduling (test-only)
+
+The probe installs a single read-only native requestAnimationFrame loop inside the temporary Chromium session. It retains at most 96 real frame-interval samples, resets on page visibility transitions and returns p50/p95/max plus percentage of intervals over 50ms. The probe refuses a successful verdict when frame cadence is unavailable. This measures browser scheduling, not network RTT, lost packets or authoritative simulation. A high frame-gap p95 beside low ACK latency and high extra render lag supports a host starvation hypothesis; it does not by itself prove a root cause. No production game source, animation callback or server input changes are made.

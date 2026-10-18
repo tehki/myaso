@@ -13,6 +13,9 @@ test("R2 WAN browser smoke uses public pinned WebTransport, native W3C input and
   assert.match(src, /"type": "keyUp", "value": "w"/);
   assert.match(src, /"DELETE"\)/);
   assert.match(src, /"remote_fighter_seen_in_scoreboard"/);
+  assert.match(src, /requestAnimationFrame\(takeFrame\)/);
+  assert.match(src, /periods\.length > 96/);
+  assert.match(src, /"real_browser_frame_cadence_observed"/);
   assert.match(src, /12 <= args\.duration <= 60/);
   assert.doesNotMatch(src, /dispatchEvent|createEvent|new WebTransport|fakeSnapshot|setInterval/);
 });
