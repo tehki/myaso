@@ -109,3 +109,14 @@ test("R2 authoritative transport retains the true dash flag before redundancy/pa
   const recon=readFileSync(new URL("../src/browser/reconciliation.mjs",import.meta.url),"utf8");
   assert.match(recon,/dash: Boolean\(input\.dash\)/);
 });
+
+test("R2 native light flight uses a real short tap instead of accidental heavy hold",()=>{
+  const source=readFileSync(new URL("../scripts/pvp_browser_flight_runner.mjs",import.meta.url),"utf8");
+  const start=source.indexOf("async function performArenaAttackHold(");
+  const end=source.indexOf("\nasync function ",start+30);
+  const helper=source.slice(start,end);
+  assert.match(helper,/Math\.max\(20, Math\.min\(35, Math\.trunc\(holdMs\)\)\)/);
+  assert.match(helper,/pointerDown", button: 0/);
+  assert.match(helper,/pointerUp", button: 0/);
+  assert.match(helper,/pause", duration: boundedHoldMs/);
+});

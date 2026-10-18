@@ -12097,7 +12097,11 @@ async function performArenaBlockAttackChord(session, elementId, xOffset = 200, h
 
 async function performArenaAttackHold(session, elementId, xOffset = 200, holdMs = 180) {
   const origin = { "element-6066-11e4-a52e-4f735466cecf": elementId };
-  const boundedHoldMs = Math.max(40, Math.min(500, Math.trunc(holdMs)));
+  // R2: this is the real LIGHT gesture shared by genuine PvP flights.
+  // A requested 90ms press legitimately upgrades to heavy after 80ms; cap
+  // it to a true 20–35ms tap rather than weakening the 34HP light gates.
+  // Charging heavy still has its separate sustained-LMB and KeyE proof.
+  const boundedHoldMs = Math.max(20, Math.min(35, Math.trunc(holdMs)));
   await webdriver(session.base, "POST", `/session/${session.sessionId}/actions`, {
     actions: [{
       type: "pointer",
