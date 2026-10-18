@@ -722,12 +722,12 @@ async fn handle_connection(
                     // A final clear on an unreliable QUIC datagram may be
                     // dropped, so repeat a bounded five times (250ms) then
                     // return to zero traffic. Never persist ghost swords.
-                    let (weapons, active) = {
+                    let weapons = {
                         let state = game.state.lock().await;
                         let active = !state.world.thrown_weapons().is_empty()
                             || state.world.fighters().iter().any(|fighter|
                                 state.world.weapon_rearm_remaining_ms(fighter.net_id) > 0);
-                        (active.then(|| encode_projectile_snapshot(&state.world, player_id)), active)
+                        active.then(|| encode_projectile_snapshot(&state.world, player_id))
                     };
                     if let Some(weapons) = weapons {
                         weapon_clear_redundancy = 5;
