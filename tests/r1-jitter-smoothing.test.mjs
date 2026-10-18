@@ -71,6 +71,33 @@ test("R1 smoothing is render-only, never alters input ACK, camera, or hit geomet
 
 import { createRenderGapTelemetry } from "../src/browser/render-gap-telemetry.mjs";
 
+test("M251 bootstraps remote render clock on first real authoritative tick, never on default zero", () => {
+  const clock = createSnapshotRenderClock();
+  assert.equal(clock.sample(0, 1000), 0, "zero is the pre-snapshot placeholder");
+  assert.equal(clock.sample(0, 1016), 0);
+  assert.deepEqual(clock.metrics(), { boundedCatchups: 0, targetGapTicks: 0 });
+  const first = clock.sample(3815000, 1032);
+  assert.ok(first > 3814990 && first <= 3815000,
+    "a long-running live server must not take hours of bounded catch-up to reach its first real tick");
+  assert.equal(clock.metrics().targetGapTicks, 0, "first real tick sets clock origin immediately");
+  const followup = clock.sample(3815020, 1048);
+  assert.ok(followup - first > 0 && followup - first < 1.5,
+    "subsequent actual WAN packet bursts remain strictly capped at 1.45x");
+  assert.ok(clock.metrics().targetGapTicks > 0 && clock.metrics().targetGapTicks < 20);
+});
+
+test("M251 genuine new match starting at tick zero remains stable before nonzero authority", () => {
+  const clock = createSnapshotRenderClock();
+  assert.equal(clock.sample(0, 1000), 0);
+  assert.equal(clock.sample(0, 1050), 0);
+  assert.equal(clock.sample(3, 1100), 0);
+  assert.equal(clock.metrics().targetGapTicks, 0);
+  assert.ok(clock.sample(9, 1150) >= 0);
+  clock.reset();
+  assert.equal(clock.sample(0, 2000), 0, "visibility or clock reset re-arms bootstrap guard");
+  assert.ok(clock.sample(1000, 2050) > 990);
+});
+
 test("M251 reports bounded true extra render gap not cumulative cap counts", () => {
  const t = createRenderGapTelemetry({sampleLimit:4,sampleIntervalMs:100});
  assert.deepEqual(t.snapshot(), {samples:0,p50Ms:null,p95Ms:null,maxMs:null,overThresholdPct:null});
