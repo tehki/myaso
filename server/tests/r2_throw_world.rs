@@ -80,3 +80,68 @@ fn server_throw_impacts_fighter_once_and_triggers_34hp_damage() {
     assert_eq!(world.fighter(2).unwrap().hp, 66.0);
     assert!(world.thrown_weapons().is_empty());
 }
+
+#[test]
+fn real_world_kick_reflects_server_projectile_and_transfers_34hp_credit() {
+    let mut world = World::new(1000.0, 800.0);
+    assert!(world.add_player_at(1, 100.0, 100.0, 0.0));
+    assert!(world.add_player_at(2, 230.0, 100.0, std::f32::consts::PI));
+    world.throw_weapon(1).expect("server-accepted real throw");
+    world.set_input(
+        2,
+        InputIntent {
+            kick: true,
+            facing_radians: std::f32::consts::PI,
+            ..InputIntent::default()
+        },
+    );
+    let first = world.step_by(100.0);
+    assert!(
+        first.is_empty(),
+        "windup and projectile outbound must not damage"
+    );
+    assert_eq!(world.fighter(2).unwrap().action, Action::KickActive);
+
+    let reflect_tick = world.step_by(50.0);
+    assert!(
+        reflect_tick.is_empty(),
+        "front-facing active kick must reflect, not hit"
+    );
+    assert_eq!(world.thrown_weapons().len(), 1);
+    let projectile = world.thrown_weapons()[0];
+    assert_eq!(
+        projectile.owner, 2,
+        "authoritative kill credit transfers to kicker"
+    );
+    assert!(
+        projectile.dir_x < -0.99,
+        "real kick sends projectile back toward thrower"
+    );
+    assert_eq!(
+        projectile.expires_at, 900_000,
+        "reflection must not extend lifetime"
+    );
+    assert_eq!(world.fighter(2).unwrap().hp, 100.0);
+    assert_eq!(world.weapon_rearm_remaining_ms(1), 29_850);
+    assert_eq!(world.weapon_rearm_remaining_ms(2), 0);
+
+    world.set_input(2, InputIntent::default());
+    let outbound = world.step_by(100.0);
+    assert!(outbound.is_empty());
+    let returned = world.step_by(40.0);
+    assert!(
+        returned.iter().any(|event| matches!(
+            event,
+            CombatEvent::Hit {
+                attacker: 2,
+                target: 1,
+                damage: 34,
+                hp: 66
+            }
+        )),
+        "reflected projectile must produce existing authoritative combat hit"
+    );
+    assert_eq!(world.fighter(1).unwrap().hp, 66.0);
+    assert_eq!(world.fighter(2).unwrap().hp, 100.0);
+    assert!(world.thrown_weapons().is_empty());
+}
