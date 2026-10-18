@@ -13,13 +13,13 @@ test("M236 immediate post-release genuine wheel in one W3C command, no added tim
   const up = pointer.indexOf('{ type: "pointerUp", button: 0 }');
   assert.ok(up >= 0);
   assert.ok(pointer.indexOf('{ type: "pointerDown", button: 0 }') < up);
-  assert.ok(pointer.indexOf('{ type: "pause", duration: 85 }') < up);
+  assert.ok(pointer.indexOf('{ type: "pause", duration: 20 }') < up);
   assert.match(pointer.slice(up), /pointerUp", button: 0 },\s*{ type: "pause", duration: 0 }/);
   assert.ok(!pointer.slice(up).includes("duration: 20"));
-  const wheelTicks = wheel.match(/\{ type: "pause", duration: (?:0|85) \}/g) ?? [];
+  const wheelTicks = wheel.match(/\{ type: "pause", duration: (?:0|20) \}/g) ?? [];
   assert.equal(wheelTicks.length, 4);
-  assert.match(wheel, /duration: 85 },\s*{ type: "pause", duration: 0 },\s*{ type: "scroll"/);
-  assert.ok(!wheel.includes("duration: 20"));
+  assert.match(wheel, /duration: 20 },\s*{ type: "pause", duration: 0 },\s*{ type: "scroll"/);
+  assert.ok(!wheel.includes("duration: 85"));
   assert.match(wheel, /deltaY: 120/);
   assert.ok(flight.includes('type: "pointer"') && flight.includes('type: "wheel"'));
   assert.ok(!flight.includes("dispatchEvent("));
