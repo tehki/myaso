@@ -1,0 +1,38 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+
+const source = readFileSync(new URL("../scripts/pvp_browser_flight_runner.mjs", import.meta.url), "utf8");
+const section = (startToken, endToken) => {
+  const start = source.indexOf(startToken);
+  const end = source.indexOf(endToken, start + startToken.length);
+  assert.ok(start >= 0 && end > start, "M41 sampler boundaries present");
+  return source.slice(start, end);
+};
+
+test("M250 M41 samples authentic raster pixels once per browser animation frame, not a wall-timer", () => {
+  const arm = section("async function armParryTellSampler(", "async function readParryTellSampler(");
+  assert.ok(arm.includes("const pixels = context.getImageData(x, y, width, height).data"));
+  assert.ok(arm.includes("state.frame = requestAnimationFrame(sample)"));
+  assert.ok(arm.includes("cancelAnimationFrame(prior.frame)"));
+  assert.ok(!arm.includes("setTimeout(sample"));
+  assert.ok(arm.includes("state.maxPixels = Math.max(state.maxPixels, count)"));
+  assert.ok(arm.includes("Math.abs(pixels[i] - 127) <= 2"));
+  assert.ok(arm.includes("Math.abs(pixels[i + 1] - 207) <= 2"));
+  assert.ok(arm.includes("Math.abs(pixels[i + 2] - 244) <= 2"));
+  assert.ok(arm.includes("pixels[i + 3] >= 250"));
+});
+
+test("M250 retains strict remote-only M41 pixels and cleans sampler without changes to gameplay", () => {
+  const stop = section("async function stopParryTellSampler(", "async function sampleParryTellPixels(");
+  const flight = section("async function runOnlineUiParryTellFlight(", "async function runOnlineUiBlockFacingTellFlight(");
+  assert.ok(stop.includes("state.active = false"));
+  assert.ok(stop.includes("cancelAnimationFrame(state.frame)"));
+  assert.ok(flight.includes("armParryTellSampler(observer)"));
+  assert.ok(flight.includes("armParryTellSampler(parriedLocal)"));
+  assert.ok(flight.includes("evidence = await runOnlineUiParryFlight(entries)"));
+  assert.ok(flight.includes("if (observerMax < 24)"));
+  assert.ok(flight.includes("if (localMax !== 0)"));
+  assert.ok(flight.includes("await Promise.all(entries.map(stopParryTellSampler))"));
+  assert.ok(flight.includes("await waitForParryTellClear(observer, 1200)"));
+});
