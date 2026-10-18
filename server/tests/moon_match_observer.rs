@@ -11,7 +11,7 @@ fn real_simulation_five_kill_match_win_can_reach_research_observer() {
     assert!(world.add_player_at(1, 200.0, 200.0, 0.0));
     assert!(world.add_player_at(2, 272.0, 200.0, std::f32::consts::PI));
 
-    let (observer, mut receiver) = MatchWinObserver::research_channel(1);
+    let (observer, receiver) = MatchWinObserver::research_channel(1);
     let attack = InputIntent {
         attack: true,
         facing_radians: 0.0,
