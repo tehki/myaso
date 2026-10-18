@@ -156,6 +156,14 @@ jobs:
           cargo clippy --locked --manifest-path server/Cargo.toml --all-targets -- -D warnings
           cargo test --locked --manifest-path server/Cargo.toml
 
+      - name: Validate R2 genuine two-client F throw and disarm
+        env:
+          MYASO_PVP_SCENARIO: "uithrow"
+        run: |
+          node --check scripts/pvp_browser_flight_runner.mjs
+          node --test tests/r2-native-f-throw.test.mjs
+          node scripts/pvp_browser_flight_runner.mjs
+
       - name: Validate M188 repeated real heavy counterplay windows
         run: |
           # Three fresh Chrome/Firefox sessions for each real defensive read.

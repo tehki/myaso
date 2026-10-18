@@ -309,6 +309,26 @@ networkClient = await connectAuthoritativeClient({
   onKillEvent(event) {
     recordKillEvent(event);
   },
+  onProjectileSnapshot(update) {
+    if (acceptanceScenario !== "uithrow") return;
+    // Strict native browser evidence comes only from an actual decoded
+    // server datagram, not from local F input or canvas animation.
+    const acceptance = window.__MYASO_ACCEPTANCE_STATE__ ??= {
+      scenario: acceptanceScenario,
+      ownActionTransitions: [],
+      focusActionTransitions: [],
+      staminaTransitions: [],
+    };
+    const snapshots = acceptance.throwSnapshots ??= [];
+    if (snapshots.length >= 128) snapshots.shift();
+    snapshots.push({
+      epochMs: Date.now(),
+      serverTick: update.serverTick,
+      ownDisarmRemainingMs: update.ownDisarmRemainingMs,
+      weapons: [...update.projectiles.values()].map(({ id, owner, x, y }) => ({ id, owner, x, y })),
+      disarmed: [...update.disarmed.keys()],
+    });
+  },
   onAck(ack) {
     const ownId = networkClient?.playerNetId;
     const own = ownId ? networkClient.state.get(ownId) : null;
@@ -372,7 +392,7 @@ function observeThreatCommitment(state, ownId) {
 }
 
 function recordAcceptanceState(state, ownId) {
-  if (!["uirollbuffer", "uijumpbuffer", "uijumpattack", "uijumpattackinputloss", "uijumpattackpunish", "uijumpattacktelegraph", "uijumprecoveryffa", "uijumppunishffa", "uimultirecoveryffa", "uimultirecoveryspatial", "uimultirecoverypunish", "uiparrypunishwindow", "uiparrypunishffa", "uiparrypunishffahit", "uiguardbreakpunishffa", "uiguardbreakpunishffahit", "uikickknockdownffa", "uikickknockdownffahit", "uikickknockdownbounded", "uirollknockdownbounded", "uirollknockdownffahit", "uimultiknockdownffa", "uimultiknockdownffahit", "uirollknockdownffa", "uistaminaauth", "uistaminaexhaustion", "uistaminafeedback", "uistaminaconfirmed", "uifeint", "uiheavyblock", "uiheavyparry", "uijumpffaprimary", "uijumpffasecondary", "uijumpattackblock", "uijumpattackparry", "uijumpattackdodge", "uijumpattackbuffer", "uikickbuffer"].includes(acceptanceScenario)) return;
+  if (!["uirollbuffer", "uijumpbuffer", "uijumpattack", "uijumpattackinputloss", "uijumpattackpunish", "uijumpattacktelegraph", "uijumprecoveryffa", "uijumppunishffa", "uimultirecoveryffa", "uimultirecoveryspatial", "uimultirecoverypunish", "uiparrypunishwindow", "uiparrypunishffa", "uiparrypunishffahit", "uiguardbreakpunishffa", "uiguardbreakpunishffahit", "uikickknockdownffa", "uikickknockdownffahit", "uikickknockdownbounded", "uirollknockdownbounded", "uirollknockdownffahit", "uimultiknockdownffa", "uimultiknockdownffahit", "uirollknockdownffa", "uithrow", "uistaminaauth", "uistaminaexhaustion", "uistaminafeedback", "uistaminaconfirmed", "uifeint", "uiheavyblock", "uiheavyparry", "uijumpffaprimary", "uijumpffasecondary", "uijumpattackblock", "uijumpattackparry", "uijumpattackdodge", "uijumpattackbuffer", "uikickbuffer"].includes(acceptanceScenario)) return;
   const focusNetId = fighterGuardBreakPunishNetId(state, ownId)
     || fighterParryPunishNetId(state, ownId)
     || fighterKnockdownPunishNetId(state, ownId)
