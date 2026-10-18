@@ -7859,7 +7859,11 @@ async function runM176BlockAttackArbitrationPhase(
   }));
 }
 
-async function runOnlineUiParryFlight(entries, postParrySleepMs = 80, roles = null) {
+async function runOnlineUiParryFlight(entries, postParrySleepMs = 80, roles = null, parryLeadMs = 55) {
+  // Test-harness timing only. Keep the same authentic LMB and wheel input.
+  if (!Number.isFinite(parryLeadMs) || parryLeadMs < 0 || parryLeadMs > 125) {
+    throw new RangeError("M33/M146 parry lead must be a bounded finite millisecond value");
+  }
   await Promise.all(entries.map(installUiObserver));
   const ready = await waitForUiReady(entries);
   const attackerName = roles?.attackerName ?? "chrome";
@@ -7890,7 +7894,11 @@ async function runOnlineUiParryFlight(entries, postParrySleepMs = 80, roles = nu
     // Use one complete, 75ms trusted W3C tap before the real wheel-back.
     // Keep its independent 125ms parry/650ms stun and genuine feedback gates.
     await performArenaAttackHold(attacker, attackerElementId, attackOffset, 75);
-    await sleep(55);
+    // M248: M146 Firefox->Chrome light may reach its 60Hz active tick before
+    // Chrome's native wheel has reached the server if the WebDriver gap is
+    // too long. Shift ONLY that M146 wheel toward genuine pointerUP while
+    // retaining the unchanged 125ms parry, 135ms windup and 650ms stun.
+    await sleep(parryLeadMs);
     await setArenaBlock(defender, defenderElementId, true);
     evidence = await waitForUiParryEvidence(entries, attacker, defender, 350, false, lastAttemptBaseline);
     if (!evidence) {
@@ -8232,7 +8240,7 @@ async function runOnlineUiParryPunishWindowFlight(entries) {
   const parryEvidence = await runOnlineUiParryFlight(entries, 0, {
     attackerName: "firefox",
     defenderName: "chrome",
-  });
+  }, 15);
   let attackerState = parryEvidence.find((entry) => entry.browser === attacker.name);
   let defenderState = parryEvidence.find((entry) => entry.browser === defender.name);
   if (!attackerState || !defenderState) {
