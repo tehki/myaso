@@ -11799,7 +11799,9 @@ async function performArenaRunningAttack(session, elementId, movementKey, xOffse
         actions: [
           { type: "pointerMove", duration: 0, origin, x: xOffset, y: 0 },
           { type: "pointerDown", button: 0 },
-          { type: "pause", duration: 90 },
+          // R2: true 20ms light tap. A 90ms hold legitimately upgrades the
+          // live 80ms charging windup to heavy, which is NOT a running light.
+          { type: "pause", duration: 20 },
           { type: "pointerUp", button: 0 },
         ],
       }],
