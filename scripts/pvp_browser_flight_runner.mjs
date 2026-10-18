@@ -7901,7 +7901,13 @@ async function runOnlineUiParryFlight(entries, postParrySleepMs = 80, roles = nu
     // Use one complete, 75ms trusted W3C tap before the real wheel-back.
     // Keep its independent 125ms parry/650ms stun and genuine feedback gates.
     await performArenaAttackHold(attacker, attackerElementId, attackOffset, 75);
-    await sleep(55);
+    // R2 short-LMB helper releases in <=35ms, but genuine Firefox W3C
+    // delivery and the 60Hz input sampler can consume another tick. Full
+    // M146 39153407753 observed first active hit at tick243 while block
+    // first appeared tick243 (too late for parry). Deliver real wheel 35ms
+    // earlier, inside the unchanged 125ms parry window and without adding
+    // virtual clicks, relaxing HP=100 or altering authoritative timings.
+    await sleep(20);
     await setArenaBlock(defender, defenderElementId, true);
     evidence = await waitForUiParryEvidence(entries, attacker, defender, 350, false, lastAttemptBaseline);
     if (!evidence) {
