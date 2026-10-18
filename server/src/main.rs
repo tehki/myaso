@@ -206,10 +206,12 @@ struct SharedGame {
     next_player_id: AtomicU32,
     reliable_write_delay: Duration,
     drop_new_action_datagrams: bool,
+    // Public anonymous reconnects must not reset 30s weapon disarm.
+    weapon_throw_enabled: bool,
 }
 
 impl SharedGame {
-    fn new(flight: LoopbackFlightConfig) -> Arc<Self> {
+    fn new(flight: LoopbackFlightConfig, weapon_throw_enabled: bool) -> Arc<Self> {
         Arc::new(Self {
             state: Mutex::new(GameState::new(
                 flight.background_players,
@@ -218,6 +220,7 @@ impl SharedGame {
             next_player_id: AtomicU32::new(1),
             reliable_write_delay: flight.reliable_write_delay,
             drop_new_action_datagrams: flight.drop_new_action_datagrams,
+            weapon_throw_enabled,
         })
     }
 
@@ -237,6 +240,17 @@ fn should_enqueue_reliable_catchup(
     reliable_write_delay: Duration,
 ) -> bool {
     background_deadline_misses > 0 || (!reliable_write_delay.is_zero() && omitted_due_to_budget > 0)
+}
+
+// A new numeric fighter ID is not a durable player identity.
+// Refuse public F throwing until server-verified reconnect continuity exists.
+fn weapon_throw_gate(setting: Result<&str, &env::VarError>, loopback: bool) -> Result<bool> {
+    match setting {
+        Err(_) | Ok("0") => Ok(false),
+        Ok("1") if loopback => Ok(true),
+        Ok("1") => bail!("F throw requires verified reconnect identity; loopback-only for now"),
+        Ok(_) => bail!("MYASO_ENABLE_WEAPON_THROW must be 0 or 1"),
+    }
 }
 
 #[tokio::main]
@@ -281,7 +295,11 @@ async fn main() -> Result<()> {
     }
     let gate = AdmissionGate::new(player_cap - flight.background_players);
     println!("myaso admission cap: {player_cap} concurrent players");
-    let game = SharedGame::new(flight);
+    let weapon_throw_enabled = weapon_throw_gate(
+        env::var("MYASO_ENABLE_WEAPON_THROW").as_deref(),
+        bind.ip().is_loopback(),
+    )?;
+    let game = SharedGame::new(flight, weapon_throw_enabled);
     // Accept server-side diagnostic output only on loopback and only when
     // explicitly requested by the real-browser M201 acceptance fixture.
     let flight_action_proof = match env::var("MYASO_FLIGHT_ACTION_PROOF").as_deref() {
@@ -671,7 +689,8 @@ async fn handle_connection(
                     // Authenticated connection identity and latest accepted
                     // facing/position are the only authority for a real F
                     // throw. Old/replayed/stale datagrams never spawn.
-                    if packet.throw_weapon && fresh_input_sequence && !accepted.is_empty() {
+                    if game.weapon_throw_enabled && packet.throw_weapon
+                        && fresh_input_sequence && !accepted.is_empty() {
                         let _ = state.world.throw_weapon(player_id);
                     }
                     tick
@@ -941,6 +960,15 @@ fn encode_input_ack(processed_client_tick: u32, server_tick: u32, player_net_id:
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn throw_gate_blocks_public_anonymous_reconnect_bypass() {
+        assert!(!super::weapon_throw_gate(Err(&std::env::VarError::NotPresent), false).unwrap());
+        assert!(!super::weapon_throw_gate(Ok("0"), false).unwrap());
+        assert!(super::weapon_throw_gate(Ok("1"), true).unwrap());
+        assert!(super::weapon_throw_gate(Ok("1"), false).is_err());
+        assert!(super::weapon_throw_gate(Ok("maybe"), true).is_err());
+    }
+
     use super::*;
 
     fn action_sample(tick: u32, heavy_attack: bool) -> InputSample {

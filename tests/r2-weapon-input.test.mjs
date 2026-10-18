@@ -30,3 +30,12 @@ test("F is an original keyboard edge and not an injected synthetic attack",()=>{
  assert.match(client,/pendingThrowReplicas = 3/);
  assert.match(client,/throwWeapon: true/);
 });
+
+test("F loopback-only gate blocks public anonymous reconnect cooldown resets",()=>{
+ const server=readFileSync(new URL("../server/src/main.rs",import.meta.url),"utf8");
+ const browser=readFileSync(new URL("../scripts/pvp_browser_flight_runner.mjs",import.meta.url),"utf8");
+ assert.match(server,/weapon_throw_gate\(/);
+ assert.match(server,/loopback-only for now/);
+ assert.match(server,/game\.weapon_throw_enabled && packet\.throw_weapon/);
+ assert.match(browser,/MYASO_ENABLE_WEAPON_THROW: scenario === "uithrow" \? "1" : "0"/);
+});

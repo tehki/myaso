@@ -519,6 +519,8 @@ async function startGameServer() {
     env: {
       ...process.env,
       MYASO_BIND: "127.0.0.1:0",
+      // Loopback-only throw; public anonymous players have no rearm identity.
+      MYASO_ENABLE_WEAPON_THROW: scenario === "uithrow" ? "1" : "0",
       MYASO_FLIGHT_ACTION_PROOF: (scenario === "uiguardbreakpunishffahit"
         || scenario === "uiheavyblock" || scenario === "uiheavyparry"
         || scenario === "uikickknockdownffahit"
@@ -3673,10 +3675,11 @@ async function runOnlineUiJumpAttackCounterplayFlight(entries, defense) {
     // wheel-back concurrently. Waiting for the Firefox WebDriver response
     // before dispatching Chrome can cost over 200 ms under hosted CI load:
     // the wheel then arrives after the 105 ms jump windup and deals HP damage.
-    // The 70 ms wheel-source pause is measured from Chrome's own command
-    // clock, independent of Firefox's variable command-completion latency.
-    // CI calibration found 130 ms landed after impact, while 20 ms opened
-    // block too early; center the pulse within the 125 ms parry window.
+    // Wheel-source pause uses Chrome's own W3C clock, independent of
+    // Firefox command completion. CI run #39167811949 saw genuine wheel
+    // t773 and 42HP contact t800 with the old 70ms pause: it reached the
+    // server too late. Earlier 20ms sometimes opened Block too early.
+    // Move to 45ms without changing the 125ms parry or 42HP proof gates.
     // Preserve the real browser gesture, 125 ms parry window, and all combat
     // constants. The authoritative stunned/zero-damage assertions below
     // still fail closed if wheel timing misses the actual jump strike.
@@ -3687,7 +3690,7 @@ async function runOnlineUiJumpAttackCounterplayFlight(entries, defense) {
     try {
       await Promise.all([
         chordPromise,
-        scrollArenaWheel(defender, defenderElementId, 120, 70),
+        scrollArenaWheel(defender, defenderElementId, 120, 45),
       ]);
       await sleep(20);
     } finally {

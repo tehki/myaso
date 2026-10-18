@@ -37,3 +37,14 @@ compatible because the packet uses its own type code 6.
 **Next gate remains genuine Chrome+Firefox two-player throw/reflection/damage
 proof** plus complete Rust Clippy/unit and old combat suites. No production
 activation or merge until the stacked parent and this draft are green.
+
+
+## Anonymous reconnect safety gate
+
+R0 alpha players have no verified durable identity. A reconnect allocates a
+new fighter ID, bypassing a prior 30-second rearm keyed only by net ID.
+Instead of relying on insecure IP limits or forgeable localStorage IDs,
+MYASO_ENABLE_WEAPON_THROW defaults to 0, and even explicit 1 is rejected
+on non-loopback listeners. Native two-browser uithrow acceptance explicitly
+enables F only on 127.0.0.1. Public F remains disabled until the server
+can authenticate returning identities and keep cooldown state across rejoin.
