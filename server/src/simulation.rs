@@ -1,5 +1,8 @@
+use crate::projectile::{
+    Event as WeaponEvent, Fighter as WeaponFighter, Projectile, Refusal as WeaponRefusal,
+    WeaponProjectiles,
+};
 use std::collections::BTreeSet;
-use crate::projectile::{WeaponProjectiles, Projectile, Event as WeaponEvent, Refusal as WeaponRefusal, Fighter as WeaponFighter};
 
 pub const DEFAULT_WORLD_WIDTH: f32 = 8192.0;
 pub const DEFAULT_WORLD_HEIGHT: f32 = 8192.0;
@@ -565,12 +568,21 @@ impl World {
     /// read from the server's own accepted fighter state, never packet extras.
     pub fn throw_weapon(&mut self, net_id: u32) -> Result<WeaponEvent, WeaponRefusal> {
         let fighter = self.fighter(net_id).ok_or(WeaponRefusal::BadInput)?;
-        if self.match_over() || matches!(fighter.action,
-            Action::Dead | Action::Stunned | Action::Knockdown | Action::Dodge | Action::Dash) {
+        if self.match_over()
+            || matches!(
+                fighter.action,
+                Action::Dead | Action::Stunned | Action::Knockdown | Action::Dodge | Action::Dash
+            )
+        {
             return Err(WeaponRefusal::BadInput);
         }
         self.weapon_projectiles.throw(
-            net_id, fighter.x, fighter.y, fighter.facing, self.width, self.height
+            net_id,
+            fighter.x,
+            fighter.y,
+            fighter.facing,
+            self.width,
+            self.height,
         )
     }
 
@@ -672,8 +684,9 @@ impl World {
         self.projectile_fractional_ms -= f64::from(projectile_dt);
         if self.winner.is_some() {
             // A match transition never pauses the genuine 30s rearm clock.
-            self.weapon_projectiles.advance(projectile_dt, self.width,
-                self.height, &[], &[]).expect("validated world geometry");
+            self.weapon_projectiles
+                .advance(projectile_dt, self.width, self.height, &[], &[])
+                .expect("validated world geometry");
             if self.now_ms + EPSILON >= self.reset_at_ms {
                 self.reset_match();
                 events.push(CombatEvent::MatchReset);
@@ -746,18 +759,22 @@ impl World {
         let combatants: Vec<WeaponFighter> = if self.weapon_projectiles.active().is_empty() {
             Vec::new()
         } else {
-            self.fighters.iter().map(|fighter| WeaponFighter {
-            id: fighter.net_id,
-            x: fighter.x,
-            y: fighter.y,
-            aim: fighter.facing,
-            kick_active: fighter.action == Action::KickActive,
-            alive: fighter.action != Action::Dead,
-        }).collect()
+            self.fighters
+                .iter()
+                .map(|fighter| WeaponFighter {
+                    id: fighter.net_id,
+                    x: fighter.x,
+                    y: fighter.y,
+                    aim: fighter.facing,
+                    kick_active: fighter.action == Action::KickActive,
+                    alive: fighter.action != Action::Dead,
+                })
+                .collect()
         };
-        let projectile_events = self.weapon_projectiles.advance(
-            projectile_dt, self.width, self.height, &combatants, &[],
-        ).expect("World dimension and obstacle geometry were validated at initialization");
+        let projectile_events = self
+            .weapon_projectiles
+            .advance(projectile_dt, self.width, self.height, &combatants, &[])
+            .expect("World dimension and obstacle geometry were validated at initialization");
         for projectile_event in projectile_events {
             if let WeaponEvent::Hit { owner, target, .. } = projectile_event {
                 self.apply_projectile_hit(owner, target, events);
@@ -765,10 +782,19 @@ impl World {
         }
     }
 
-    fn apply_projectile_hit(&mut self, owner_id: u32, victim_id: u32, events: &mut Vec<CombatEvent>) {
+    fn apply_projectile_hit(
+        &mut self,
+        owner_id: u32,
+        victim_id: u32,
+        events: &mut Vec<CombatEvent>,
+    ) {
         const PROJECTILE_DAMAGE: f32 = 34.0;
-        let Ok(owner_index) = self.fighter_index(owner_id) else { return };
-        let Ok(victim_index) = self.fighter_index(victim_id) else { return };
+        let Ok(owner_index) = self.fighter_index(owner_id) else {
+            return;
+        };
+        let Ok(victim_index) = self.fighter_index(victim_id) else {
+            return;
+        };
         if owner_index == victim_index || self.fighters[victim_index].action == Action::Dead {
             return;
         }
@@ -776,7 +802,10 @@ impl World {
         owner.recently_interacted_with = Some(victim_id);
         target.recently_interacted_with = Some(owner_id);
         if is_invulnerable(target) {
-            events.push(CombatEvent::Evade { attacker: owner_id, target: victim_id });
+            events.push(CombatEvent::Evade {
+                attacker: owner_id,
+                target: victim_id,
+            });
             return;
         }
         // Blocking stops thrown-weapon damage, but only a genuine active KICK
@@ -784,7 +813,10 @@ impl World {
         if target.action == Action::Block {
             target.guard = (target.guard - BLOCK_GUARD_DAMAGE).max(0.0);
             target.guard_regen_blocked_until_ms = self.now_ms + GUARD_REGEN_DELAY_MS;
-            events.push(CombatEvent::Block { attacker: owner_id, target: victim_id });
+            events.push(CombatEvent::Block {
+                attacker: owner_id,
+                target: victim_id,
+            });
             return;
         }
         target.hp = (target.hp - PROJECTILE_DAMAGE).max(0.0);
@@ -801,11 +833,17 @@ impl World {
             target.action_elapsed_ms = 0.0;
             target.action_duration_ms = 0.0;
             target.respawn_at_ms = self.now_ms + RESPAWN_MS;
-            events.push(CombatEvent::Death { fighter: victim_id, killer: owner_id });
+            events.push(CombatEvent::Death {
+                fighter: victim_id,
+                killer: owner_id,
+            });
             if owner.kills >= FFA_KILL_TARGET {
                 self.winner = Some(owner_id);
                 self.reset_at_ms = self.now_ms + FFA_MATCH_RESET_MS;
-                events.push(CombatEvent::MatchWon { winner: owner_id, kills: owner.kills });
+                events.push(CombatEvent::MatchWon {
+                    winner: owner_id,
+                    kills: owner.kills,
+                });
             }
         }
     }
