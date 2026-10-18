@@ -45,7 +45,10 @@ fn real_simulation_five_kill_match_win_can_reach_research_observer() {
         }
     }
 
-    assert!(saw_authoritative_win, "genuine game should produce MatchWon");
+    assert!(
+        saw_authoritative_win,
+        "genuine game should produce MatchWon"
+    );
     assert_eq!(world.match_winner(), Some(1));
     let recorded = receiver.try_recv().expect("one observed win");
     assert_eq!(recorded.winner_net_id, 1);
