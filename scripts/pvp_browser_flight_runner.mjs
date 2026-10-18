@@ -12666,13 +12666,16 @@ async function armParryTellSampler(session) {
     const context = arena?.getContext('2d');
     if (!context) return false;
     const prior = window.__MYASO_M41_PARRY_SAMPLER__;
-    if (prior?.timer) clearTimeout(prior.timer);
+    if (prior?.frame) cancelAnimationFrame(prior.frame);
     const half = 180;
     const x = Math.max(0, Math.floor(arena.width / 2 - half));
     const y = Math.max(0, Math.floor(arena.height / 2 - half));
     const width = Math.min(half * 2, arena.width - x);
     const height = Math.min(half * 2, arena.height - y);
-    const state = { active: true, timer: 0, maxPixels: 0 };
+    // M250: inspect completed native canvas frames instead of a 40ms timer
+    // that can miss a short-lived remote parry ring during driver jitter.
+    // This is read-only; no pixels, effects or combat state are injected.
+    const state = { active: true, frame: 0, maxPixels: 0 };
     const sample = () => {
       if (!state.active) return;
       const pixels = context.getImageData(x, y, width, height).data;
@@ -12681,10 +12684,10 @@ async function armParryTellSampler(session) {
         if (Math.abs(pixels[i] - 127) <= 2 && Math.abs(pixels[i + 1] - 207) <= 2 && Math.abs(pixels[i + 2] - 244) <= 2 && pixels[i + 3] >= 250) count += 1;
       }
       state.maxPixels = Math.max(state.maxPixels, count);
-      state.timer = setTimeout(sample, 40);
+      state.frame = requestAnimationFrame(sample);
     };
     window.__MYASO_M41_PARRY_SAMPLER__ = state;
-    state.timer = setTimeout(sample, 20);
+    state.frame = requestAnimationFrame(sample);
     return true;
   `);
 }
@@ -12698,7 +12701,7 @@ async function stopParryTellSampler(session) {
     const state = window.__MYASO_M41_PARRY_SAMPLER__;
     if (!state) return 0;
     state.active = false;
-    if (state.timer) clearTimeout(state.timer);
+    if (state.frame) cancelAnimationFrame(state.frame);
     return state.maxPixels;
   `);
 }
