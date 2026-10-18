@@ -10647,6 +10647,29 @@ async function runOnlineUiJumpRecoveryFfaPunishFlight(entries) {
     await sleep(10);
   }
 
+  // M247: the victim's 66-HP snapshot can arrive up to a few 20Hz frames
+  // before the attacker's own hit-confirm snapshot. A valid hit and completed
+  // recovery/focus handoff are NOT evidence that both browsers are on the
+  // same snapshot tick. Read only; never resend LMB or extend the original
+  // 290ms recovery / authoritative punish-down timing requirements.
+  const feedbackDeliveryDeadline = Date.now() + 240;
+  while (Date.now() < feedbackDeliveryDeadline
+    && !evidence.find((entry) => entry.browser === observer.name)?.events.includes("Opponent hit - 34 HP.")) {
+    await sleep(12);
+    const refreshed = await Promise.all(entries.map(readUiEvidence));
+    const currentJump = refreshed.find((entry) => entry.browser === jumpAttacker.name);
+    const currentObserver = refreshed.find((entry) => entry.browser === observer.name);
+    const currentCloser = refreshed.find((entry) => entry.browser === closerIdle.name);
+    // Never hide collateral damage, failed guard integrity or an extra hit.
+    if (!currentJump || !currentObserver || !currentCloser
+      || currentJump.playerHp !== 66 || currentJump.playerGuard !== 100
+      || currentObserver.playerHp !== 100 || currentObserver.playerGuard !== 100
+      || currentCloser.playerHp !== 100 || currentCloser.playerGuard !== 100) {
+      throw new Error(`${milestone} pending hit feedback changed authoritative vitals: ${JSON.stringify(refreshed)}`);
+    }
+    evidence = refreshed;
+  }
+
   const jumpState = evidence.find((entry) => entry.browser === jumpAttacker.name);
   const observerState = evidence.find((entry) => entry.browser === observer.name);
   const closerState = evidence.find((entry) => entry.browser === closerIdle.name);
