@@ -119,8 +119,12 @@ mod tests {
         let packet = encode_projectile_snapshot(&world, 1);
         assert_eq!(packet[2] as usize, MAX_VISIBLE_PROJECTILES);
         assert_eq!(packet[3] as usize, MAX_VISIBLE_DISARMED);
-        assert_eq!(packet.len(), HEADER_BYTES + MAX_VISIBLE_PROJECTILES * PROJECTILE_BYTES
-            + MAX_VISIBLE_DISARMED * DISARMED_BYTES);
+        assert_eq!(
+            packet.len(),
+            HEADER_BYTES
+                + MAX_VISIBLE_PROJECTILES * PROJECTILE_BYTES
+                + MAX_VISIBLE_DISARMED * DISARMED_BYTES
+        );
         assert!(packet.len() <= crate::CONSERVATIVE_DATAGRAM_BYTES);
     }
 }
