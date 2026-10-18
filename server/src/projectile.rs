@@ -183,10 +183,12 @@ impl WeaponProjectiles {
                     weapon.y,
                     next_x,
                     next_y,
-                    o.x0 - RADIUS,
-                    o.y0 - RADIUS,
-                    o.x1 + RADIUS,
-                    o.y1 + RADIUS,
+                    Obstacle {
+                        x0: o.x0 - RADIUS,
+                        y0: o.y0 - RADIUS,
+                        x1: o.x1 + RADIUS,
+                        y1: o.y1 + RADIUS,
+                    },
                 ) {
                     earliest(&mut contact, t, Collision::Obstacle);
                 }
@@ -320,11 +322,9 @@ fn segment_rect(
     y: f32,
     nx: f32,
     ny: f32,
-    x0: f32,
-    y0: f32,
-    x1: f32,
-    y1: f32,
+    box_: Obstacle,
 ) -> Option<f32> {
+    let Obstacle { x0, y0, x1, y1 } = box_;
     let mut lo = 0.0f32;
     let mut hi = 1.0f32;
     for (start, end, min, max) in [(x, nx, x0, x1), (y, ny, y0, y1)] {
