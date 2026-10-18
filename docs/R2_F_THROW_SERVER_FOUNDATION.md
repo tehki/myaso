@@ -22,3 +22,18 @@ hits to authoritative 34 HP combat events. Unit tests cover header encoding
 and World damage/disarm. **Not playable or deployable:** this branch still needs
 position/disarm snapshot replication to all clients, browser flight rendering,
 solid in-map obstacles, and two-client native PvP reflection and WAN proof.
+
+## Network render implementation (still draft)
+
+The game server also sends a separate <=1100-byte bounded nearby thrown-weapon
+snapshot every 50ms after realtime readiness, without changing the old fighter
+snapshot or 34-byte input packet. Each packet carries up to 40 projectile
+positions/angles/lifetimes, up to 24 nearby disarmed actors, and the viewer's
+own millisecond rearm countdown. The browser validates sizes, ignores stale
+server ticks, renders flying sword sprites, suppresses weapon-held sprites while
+disarmed, and shows the rearm countdown. Existing unknown packet handlers remain
+compatible because the packet uses its own type code 6.
+
+**Next gate remains genuine Chrome+Firefox two-player throw/reflection/damage
+proof** plus complete Rust Clippy/unit and old combat suites. No production
+activation or merge until the stacked parent and this draft are green.

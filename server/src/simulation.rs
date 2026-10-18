@@ -564,6 +564,10 @@ impl World {
         self.weapon_projectiles.remaining_disarm_ms(net_id)
     }
 
+    pub fn projectile_now_ms(&self) -> u64 {
+        self.weapon_projectiles.now()
+    }
+
     /// Triggered only after authenticated packet ingress. Aim/position are
     /// read from the server's own accepted fighter state, never packet extras.
     pub fn throw_weapon(&mut self, net_id: u32) -> Result<WeaponEvent, WeaponRefusal> {
@@ -576,11 +580,13 @@ impl World {
         {
             return Err(WeaponRefusal::BadInput);
         }
+        // F uses the latest input direction from this authenticated packet,
+        // not the previous server tick's cached visual facing.
         self.weapon_projectiles.throw(
             net_id,
             fighter.x,
             fighter.y,
-            fighter.facing,
+            normalize_angle(fighter.latest_input.facing_radians),
             self.width,
             self.height,
         )

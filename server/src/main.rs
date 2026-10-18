@@ -5,6 +5,7 @@ use myaso_server::{
     reliable::{try_enqueue_reliable, ReliableQueueError},
     simulation::{CombatEvent, InputIntent, World},
     snapshot::{ReplicationFrame, SnapshotSession},
+    projectile_wire::encode_projectile_snapshot,
     AdmissionGate, InputIngressWindow, InputSample, CONSERVATIVE_DATAGRAM_BYTES, PROTOCOL_VERSION,
     TARGET_PLAYERS_PER_MAP,
 };
@@ -714,6 +715,16 @@ async fn handle_connection(
                     connection
                         .send_datagram(snapshot.bytes)
                         .context("send authoritative snapshot datagram")?;
+                }
+                if realtime_ready {
+                    // Independent <=1100 byte owner/equip/projectile snapshot.
+                    // Late joiners get the closest bounded set at first ACK.
+                    let weapons = {
+                        let state = game.state.lock().await;
+                        encode_projectile_snapshot(&state.world, player_id)
+                    };
+                    connection.send_datagram(weapons)
+                        .context("send authoritative thrown-weapon snapshot")?;
                 }
                 let mut kill_event_queued = false;
                 if let Some(event) = pending_kill_event {

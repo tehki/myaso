@@ -107,7 +107,7 @@ impl WeaponProjectiles {
         if !self.equipped(owner) {
             return Err(Refusal::Disarmed);
         }
-        if self.active.len() >= MAX_ALIVE || self.next_id == u64::MAX {
+        if self.active.len() >= MAX_ALIVE || self.next_id >= u32::MAX as u64 {
             return Err(Refusal::Full);
         }
         let id = self.next_id;
