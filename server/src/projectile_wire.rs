@@ -110,11 +110,17 @@ mod tests {
 
     #[test]
     fn snapshot_is_strictly_bounded_below_quic_datagram_budget() {
-        assert!(
-            HEADER_BYTES
-                + MAX_VISIBLE_PROJECTILES * PROJECTILE_BYTES
-                + MAX_VISIBLE_DISARMED * DISARMED_BYTES
-                <= crate::CONSERVATIVE_DATAGRAM_BYTES
-        );
+        let mut world = World::new(8192.0, 8192.0);
+        for id in 1..=MAX_VISIBLE_PROJECTILES as u32 {
+            let x = 100.0 + id as f32 * 45.0;
+            assert!(world.add_player_at(id, x, 150.0, 0.0));
+            assert!(world.throw_weapon(id).is_ok());
+        }
+        let packet = encode_projectile_snapshot(&world, 1);
+        assert_eq!(packet[2] as usize, MAX_VISIBLE_PROJECTILES);
+        assert_eq!(packet[3] as usize, MAX_VISIBLE_DISARMED);
+        assert_eq!(packet.len(), HEADER_BYTES + MAX_VISIBLE_PROJECTILES * PROJECTILE_BYTES
+            + MAX_VISIBLE_DISARMED * DISARMED_BYTES);
+        assert!(packet.len() <= crate::CONSERVATIVE_DATAGRAM_BYTES);
     }
 }

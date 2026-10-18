@@ -571,6 +571,7 @@ async fn handle_connection(
     let initial_baseline_sequence = initial_baseline.sequence;
     let mut acknowledged_snapshot = u16::MAX;
     let mut realtime_ready = false;
+    let mut previously_sent_weapon_state = false;
     let mut last_reliable_background_tick = initial_frame.server_tick();
     let mut last_reliable_sequence = initial_reliable_baseline.sequence;
     let mut reliable_deltas_since_checkpoint = 0_u8;
@@ -717,14 +718,28 @@ async fn handle_connection(
                         .context("send authoritative snapshot datagram")?;
                 }
                 if realtime_ready {
-                    // Independent <=1100 byte owner/equip/projectile snapshot.
-                    // Late joiners get the closest bounded set at first ACK.
-                    let weapons = {
+                    // Never increase baseline network load for R1 matches
+                    // with no thrown weapons. Send a final empty snapshot
+                    // once to clear stale render state after the last expiry.
+                    let (weapons, active) = {
                         let state = game.state.lock().await;
-                        encode_projectile_snapshot(&state.world, player_id)
+                        let active = !state.world.thrown_weapons().is_empty()
+                            || state.world.fighters().iter().any(|fighter|
+                                state.world.weapon_rearm_remaining_ms(fighter.net_id) > 0);
+                        (active.then(|| encode_projectile_snapshot(&state.world, player_id)), active)
                     };
-                    connection.send_datagram(weapons)
-                        .context("send authoritative thrown-weapon snapshot")?;
+                    if let Some(weapons) = weapons {
+                        connection.send_datagram(weapons)
+                            .context("send authoritative thrown-weapon snapshot")?;
+                    } else if previously_sent_weapon_state {
+                        let empty = {
+                            let state = game.state.lock().await;
+                            encode_projectile_snapshot(&state.world, player_id)
+                        };
+                        connection.send_datagram(empty)
+                            .context("clear expired thrown-weapon snapshot")?;
+                    }
+                    previously_sent_weapon_state = active;
                 }
                 let mut kill_event_queued = false;
                 if let Some(event) = pending_kill_event {
