@@ -6,6 +6,7 @@ No fabricated packets, local-server stand-ins, coordinate logs, or deployment.
 """
 import argparse
 import json
+import os
 import re
 import socket
 import subprocess
@@ -105,6 +106,26 @@ def summarize_observations(samples, require_peer=False):
     }
 
 
+
+def classify_host_pressure(logical_cpus, one_minute_load):
+    """Load is a host-wide scheduler indicator, not game CPU time or WAN RTT."""
+    if not isinstance(logical_cpus, int) or logical_cpus <= 0:
+        raise ValueError("logical CPU count unavailable")
+    if not isinstance(one_minute_load, (int, float)) or not 0 <= one_minute_load < float("inf"):
+        raise ValueError("invalid host load")
+    ratio = round(one_minute_load / logical_cpus, 2)
+    return {"logical_cpus": logical_cpus, "load_1m_per_cpu": ratio,
+            "load_confounded": ratio >= 1.5}
+
+
+def current_host_pressure():
+    try:
+        return classify_host_pressure(os.cpu_count(), os.getloadavg()[0])
+    except (AttributeError, OSError, ValueError):
+        return {"logical_cpus": None, "load_1m_per_cpu": None,
+                "load_confounded": None}
+
+
 def _request(url, method="GET", data=None, timeout=12):
     payload = None if data is None else json.dumps(data).encode("utf-8")
     req = Request(url, payload, {"Content-Type": "application/json"}, method=method)
@@ -154,6 +175,7 @@ def run_probe(duration_seconds, require_peer):
     session = None
     driver = None
     observations = []
+    start_pressure = current_host_pressure()
     with tempfile.TemporaryDirectory(prefix="myaso-r2-public-browser-") as profile:
         try:
             driver = subprocess.Popen(
@@ -202,7 +224,17 @@ def run_probe(duration_seconds, require_peer):
                     did_move = True
                     current["w3c_movement"] = True
                 time.sleep(1)
-            return summarize_observations(observations, require_peer)
+            result = summarize_observations(observations, require_peer)
+            end_pressure = current_host_pressure()
+            result["host_capacity"] = {
+                "start": start_pressure, "end": end_pressure,
+                "interpretation": (
+                    "WAN latency inconclusive under overloaded browser host"
+                    if start_pressure["load_confounded"] or end_pressure["load_confounded"]
+                    else "No high host load observed; human playfeel still unverified"
+                ),
+            }
+            return result
         finally:
             if session:
                 try:

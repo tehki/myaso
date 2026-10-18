@@ -57,6 +57,16 @@ class PublicWanSmokeTests(unittest.TestCase):
         self.assertEqual(out["measurements"]["extra_render_p95_ms"], 88)
         self.assertEqual(out["measurements"]["render_samples"], 96)
 
+    def test_high_local_cpu_pressure_confounds_wan_quality_not_player_connectivity(self):
+        quiet = mod.classify_host_pressure(4, 1.8)
+        busy = mod.classify_host_pressure(4, 17.64)
+        self.assertFalse(quiet["load_confounded"])
+        self.assertTrue(busy["load_confounded"])
+        self.assertEqual(busy["load_1m_per_cpu"], 4.41)
+        for args in [(0, 5), (4, -1), (4, float("inf"))]:
+            with self.assertRaises(ValueError):
+                mod.classify_host_pressure(*args)
+
     def test_no_peer_fails_closed_and_identity_changes_refused(self):
         snap = {"status": "Online - player #3 - server tick 90",
                 "scoreboard": ["#3"], "webtransport": True, "w3c_movement": True,

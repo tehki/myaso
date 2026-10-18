@@ -26,3 +26,7 @@ The reported input-to-ACK p50/p95 are local browser measurements, not ICMP RTT, 
 Keep issue #293 open for repeat WAN measurements, strict 2–8-player genuine combat and human acceptance. Do not weaken 1.45x max render catch-up, server authority or CI. This helper performs no VPS deployment, synthetic packet injection, private screenshot capture or server restart. Any unavailable real evidence fails closed with nonzero status.
 
 The structured summary deliberately segments input ACK, ACK jitter, snapshot delivery and extra visual-render lag before parsing each p95. This prevents confusing the large remote-presentation outliers with network transport delay or global player RTT. Read alongside the per-host render-gap sample count and camera-correction measurement.
+
+### CPU-load confounder (18 October)
+
+X230i had a load average 17.64 while providing just 4 logical CPUs, with a concurrent npm install, compiler and GitHub Actions worker. Its later two-host sample had ~9.6 seconds extra visual-lag p95 while Serj recorded 122ms. That is **not** evidence of a 9.6-second Internet route RTT, nor proof of a renderer regression: the overloaded headless browser can stop scheduling frames or WebDriver reads. The probe now records the normalized one-minute CPU-load pressure before/after the session; a value >=1.5 per logical CPU flags its latency interpretation as inconclusive, while retaining a separate truthful connectivity outcome. Re-test on an idle browser host before tuning simulation or interpolation.
