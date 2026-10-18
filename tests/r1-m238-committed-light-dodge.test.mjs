@@ -9,10 +9,10 @@ test("M238 M36 waits for real short pointerUP before perpendicular wheel, withou
  const flight=src.slice(a,b);
  assert.ok(a>=0 && b>a);
  const downup=flight.indexOf("await performArenaAttackHold(attacker, attackerElementId, attackOffset, 65)");
- const wait=flight.indexOf("await sleep(35)",downup);
- const wheel=flight.indexOf("await scrollArenaWheel(defender, defenderElementId, -120)",wait);
+ const wheel=flight.indexOf("await scrollArenaWheel(defender, defenderElementId, -120)",downup);
  const evidence=flight.indexOf("waitForUiDodgeEvidence(entries, attacker, defender, 520, false, lastAttemptBaseline)",wheel);
- assert.ok(downup>=0 && wait>downup && wheel>wait && evidence>wheel);
+ assert.ok(downup>=0 && wheel>downup && evidence>wheel);
+ assert.ok(!flight.slice(downup,wheel).includes("await sleep("));
  assert.ok(flight.includes("attackUp.epochMs - attackDown.epochMs >= 320"));
  assert.ok(flight.includes("rollWheel.epochMs <= attackUp.epochMs"));
  assert.ok(flight.includes("rollWheel.epochMs - attackUp.epochMs >= COMBAT.attack.windupMs"));
