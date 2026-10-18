@@ -9,7 +9,9 @@ test("M33 and M146 perform complete genuine short LMB before parry, never chargi
   assert.ok(start >= 0 && end > start);
   const flight = source.slice(start, end);
   const tap = flight.indexOf("await performArenaAttackHold(attacker, attackerElementId, attackOffset, 75)");
-  const lead = flight.indexOf("await sleep(55)", tap);
+  const lead = flight.indexOf("await sleep(parryLeadMs)", tap);
+  assert.ok(flight.includes("roles = null, parryLeadMs = 55"));
+  assert.ok(flight.includes('parryLeadMs < 0 || parryLeadMs > 125'));
   const wheel = flight.indexOf("await setArenaBlock(defender, defenderElementId, true)", lead);
   const proof = flight.indexOf("await waitForUiParryEvidence(entries, attacker, defender, 350, false, lastAttemptBaseline)", wheel);
   assert.ok(tap >= 0 && lead > tap && wheel > lead && proof > wheel);
@@ -25,6 +27,9 @@ test("M146 retains exact genuine late punish and authoritative stun/combat gates
   const s = src.slice(src.indexOf("async function runOnlineUiParryPunishWindowFlight("),
     src.indexOf("\nasync function runOnlineUiParryTellFlight("));
   assert.ok(s.includes('await runOnlineUiParryFlight(entries, 0, {'));
+  assert.ok(s.includes('attackerName: "firefox",'));
+  assert.ok(s.includes('defenderName: "chrome",'));
+  assert.ok(s.includes('}, 15);'));
   assert.ok(s.includes("COMBAT.block.parryStunMs !== 650"));
   assert.ok(s.includes("targetInputEpochMs = stunTransition.epochMs + 370"));
   assert.ok(s.includes("performArenaAttackHold(defender, defenderElementId, punishOffset, 90)"));
