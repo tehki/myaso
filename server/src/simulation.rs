@@ -1573,7 +1573,6 @@ fn clamp(value: f32, min: f32, max: f32) -> f32 {
     value.max(min).min(max)
 }
 
-
 #[cfg(test)]
 mod r2_combat_control_tests {
     use super::*;
@@ -1582,9 +1581,15 @@ mod r2_combat_control_tests {
     fn dash_is_directional_and_server_cooldown_is_three_seconds() {
         let mut world = World::new(800.0, 600.0);
         assert!(world.add_player_at(1, 300.0, 300.0, 0.0));
-        assert!(world.set_input(1, InputIntent {
-            move_y: -1.0, dash: true, facing_radians: 0.0, ..InputIntent::default()
-        }));
+        assert!(world.set_input(
+            1,
+            InputIntent {
+                move_y: -1.0,
+                dash: true,
+                facing_radians: 0.0,
+                ..InputIntent::default()
+            }
+        ));
         world.step();
         let start = world.fighter(1).unwrap();
         assert_eq!(start.action, Action::Dash);
@@ -1594,15 +1599,33 @@ mod r2_combat_control_tests {
         assert!(ready >= 3000.0);
 
         assert!(world.set_input(1, InputIntent::default()));
-        for _ in 0..20 { world.step(); }
+        for _ in 0..20 {
+            world.step();
+        }
         assert_eq!(world.fighter(1).unwrap().action, Action::Idle);
-        assert!(world.set_input(1, InputIntent { move_x: 1.0, dash: true, ..InputIntent::default() }));
+        assert!(world.set_input(
+            1,
+            InputIntent {
+                move_x: 1.0,
+                dash: true,
+                ..InputIntent::default()
+            }
+        ));
         world.step();
         assert_eq!(world.fighter(1).unwrap().action, Action::Idle);
         assert_eq!(world.fighter(1).unwrap().dash_ready_at_ms, ready);
         assert!(world.set_input(1, InputIntent::default()));
-        while world.now_ms < ready { world.step(); }
-        assert!(world.set_input(1, InputIntent { move_x: 1.0, dash: true, ..InputIntent::default() }));
+        while world.now_ms < ready {
+            world.step();
+        }
+        assert!(world.set_input(
+            1,
+            InputIntent {
+                move_x: 1.0,
+                dash: true,
+                ..InputIntent::default()
+            }
+        ));
         world.step();
         assert_eq!(world.fighter(1).unwrap().action, Action::Dash);
         assert!(world.fighter(1).unwrap().dash_dir_x > 0.99);
@@ -1612,10 +1635,22 @@ mod r2_combat_control_tests {
     fn held_lmb_converts_only_an_unlanded_light_windup() {
         let mut world = World::new(800.0, 600.0);
         assert!(world.add_player_at(1, 250.0, 300.0, 0.0));
-        world.set_input(1, InputIntent { attack: true, ..InputIntent::default() });
+        world.set_input(
+            1,
+            InputIntent {
+                attack: true,
+                ..InputIntent::default()
+            },
+        );
         world.step();
         assert_eq!(world.fighter(1).unwrap().action, Action::AttackWindup);
-        world.set_input(1, InputIntent { heavy_attack: true, ..InputIntent::default() });
+        world.set_input(
+            1,
+            InputIntent {
+                heavy_attack: true,
+                ..InputIntent::default()
+            },
+        );
         world.step();
         assert_eq!(world.fighter(1).unwrap().action, Action::HeavyAttackWindup);
         assert!(world.fighter(1).unwrap().attack_hit_targets.is_empty());
@@ -1625,10 +1660,29 @@ mod r2_combat_control_tests {
     fn running_light_windup_can_upgrade_to_heavy_before_contact() {
         let mut world = World::new(800.0, 600.0);
         world.add_player_at(1, 250.0, 300.0, 0.0);
-        world.set_input(1, InputIntent { attack: true, run: true, move_x: 1.0, ..InputIntent::default() });
+        world.set_input(
+            1,
+            InputIntent {
+                attack: true,
+                run: true,
+                move_x: 1.0,
+                ..InputIntent::default()
+            },
+        );
         world.step();
-        assert_eq!(world.fighter(1).unwrap().action, Action::RunningAttackWindup);
-        world.set_input(1, InputIntent { heavy_attack: true, run: true, move_x: 1.0, ..InputIntent::default() });
+        assert_eq!(
+            world.fighter(1).unwrap().action,
+            Action::RunningAttackWindup
+        );
+        world.set_input(
+            1,
+            InputIntent {
+                heavy_attack: true,
+                run: true,
+                move_x: 1.0,
+                ..InputIntent::default()
+            },
+        );
         world.step();
         assert_eq!(world.fighter(1).unwrap().action, Action::HeavyAttackWindup);
     }
@@ -1642,16 +1696,29 @@ mod r2_combat_control_tests {
         world.add_player_at(2, 338.0, 200.0, std::f32::consts::PI);
         world.fighters[0].set_action(Action::HeavyAttackActive, 1000.0);
         let events = world.step();
-        assert!(events.iter().any(|event| matches!(event, CombatEvent::Hit {
-            attacker: 1, target: 2, damage: 46, hp: 54
-        })));
+        assert!(events.iter().any(|event| matches!(
+            event,
+            CombatEvent::Hit {
+                attacker: 1,
+                target: 2,
+                damage: 46,
+                hp: 54
+            }
+        )));
     }
 
     #[test]
     fn block_hold_movement_is_exactly_half_speed() {
         let mut world = World::new(800.0, 600.0);
         world.add_player_at(1, 200.0, 200.0, 0.0);
-        world.set_input(1, InputIntent { block: true, move_x: 1.0, ..InputIntent::default() });
+        world.set_input(
+            1,
+            InputIntent {
+                block: true,
+                move_x: 1.0,
+                ..InputIntent::default()
+            },
+        );
         world.step_by(100.0);
         let own = world.fighter(1).unwrap();
         assert_eq!(own.action, Action::Block);

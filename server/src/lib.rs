@@ -54,7 +54,12 @@ impl From<InputSample> for simulation::InputIntent {
 pub fn coalesce_accepted_input_batch(samples: &[InputSample]) -> Option<InputSample> {
     let mut newest = *samples.last()?;
     if let Some(action_sample) = samples.iter().rev().find(|sample| {
-        sample.attack || sample.heavy_attack || sample.dodge || sample.kick || sample.jump || sample.dash
+        sample.attack
+            || sample.heavy_attack
+            || sample.dodge
+            || sample.kick
+            || sample.jump
+            || sample.dash
     }) {
         newest.attack = action_sample.attack;
         newest.heavy_attack = action_sample.heavy_attack;
