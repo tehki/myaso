@@ -24,3 +24,5 @@ Offline checks:
 The reported input-to-ACK p50/p95 are local browser measurements, not ICMP RTT, server latency, or general performance promises. Extra render lag measures delay beyond the existing 90ms interpolation, not hit delay. The helper proves two real WebTransport sessions, W3C movement issuance, authoritative ticks, real browser ACK telemetry and peer presence; it does not certify Rust server binary identity, genuine hit/parry/respawn, 8-player load or good human game feel.
 
 Keep issue #293 open for repeat WAN measurements, strict 2–8-player genuine combat and human acceptance. Do not weaken 1.45x max render catch-up, server authority or CI. This helper performs no VPS deployment, synthetic packet injection, private screenshot capture or server restart. Any unavailable real evidence fails closed with nonzero status.
+
+The structured summary deliberately segments input ACK, ACK jitter, snapshot delivery and extra visual-render lag before parsing each p95. This prevents confusing the large remote-presentation outliers with network transport delay or global player RTT. Read alongside the per-host render-gap sample count and camera-correction measurement.

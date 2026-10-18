@@ -62,16 +62,29 @@ def summarize_observations(samples, require_peer=False):
         peer_ids.update(int(m.group(1)) for label in sample.get("scoreboard", [])
                         if (m := re.fullmatch(r"#([0-9]+)", label)))
     peer_ids.discard(own)
+    # Parse each HUD field inside its own pipe-separated segment. A generic
+    # "p95" search can silently misattribute ACK vs snapshot/render latency.
+    segments = [part.strip() for part in last_stats.split("|")]
+    metric_specs = [
+        ("ack_p50_ms", "ACK p50", r"ACK p50 ([0-9]+)ms"),
+        ("ack_p95_ms", "ACK p50", r"ACK p50 [0-9]+ms.*?p95 ([0-9]+)ms"),
+        ("ack_jitter_p95_ms", "Jitter p95", r"Jitter p95 ([0-9]+)ms"),
+        ("snapshot_p50_ms", "Snapshots p50", r"Snapshots p50 ([0-9]+)ms"),
+        ("snapshot_p95_ms", "Snapshots p50", r"Snapshots p50 [0-9]+ms.*?p95 ([0-9]+)ms"),
+        ("camera_correction_p95_units", "Camera correction p95", r"Camera correction p95 ([0-9.]+)u"),
+        ("stale_own_acks", "Stale-own ACKs", r"Stale-own ACKs ([0-9]+)"),
+        ("deferred_reconciles", "Deferred reconciles", r"Deferred reconciles ([0-9]+)"),
+        ("render_catchups", "Render catch-ups", r"Render catch-ups ([0-9]+)"),
+        ("extra_render_p50_ms", "Extra render lag p50", r"Extra render lag p50 ([0-9]+)ms"),
+        ("extra_render_p95_ms", "Extra render lag p50", r"Extra render lag p50 [0-9]+ms.*?p95 ([0-9]+)ms"),
+        ("render_over_33_percent", ">33ms", r">33ms ([0-9.]+)%"),
+        ("render_samples", ">33ms", r"\(([0-9]+) samples\)"),
+    ]
     values = {}
-    for name, pattern in [
-        ("ack_p50_ms", r"ACK p50 ([0-9]+)ms"),
-        ("ack_p95_ms", r"p95 ([0-9]+)ms"),
-        ("extra_render_p50_ms", r"Extra render lag p50 ([0-9]+)ms"),
-        ("extra_render_p95_ms", r"Extra render lag p50 [0-9]+ms . p95 ([0-9]+)ms"),
-        ("render_over_33_percent", r">33ms ([0-9.]+)%"),
-    ]:
-        m = re.search(pattern, last_stats)
-        values[name] = float(m.group(1)) if m else None
+    for name, marker, pattern in metric_specs:
+        part = next((entry for entry in segments if marker in entry), "")
+        match = re.search(pattern, part)
+        values[name] = float(match.group(1)) if match else None
     pass_checks = {
         "authoritative_player_online": own is not None and latest_tick is not None and latest_tick > 0,
         "native_webtransport_supported": any(s.get("webtransport") is True for s in samples),

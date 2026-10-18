@@ -39,6 +39,9 @@ class PublicWanSmokeTests(unittest.TestCase):
                 "scoreboard": ["#44", "#45"], "webtransport": True,
                 "w3c_movement": True,
                 "netstats": "Input->ACK p50 220ms · p95 400ms"
+                            " | Jitter p95 55ms | Snapshots p50 49ms · p95 143ms"
+                            " | Camera correction p95 0.7u | Stale-own ACKs 23"
+                            " | Deferred reconciles 82 | Render catch-ups 109"
                             " | Extra render lag p50 2ms · p95 88ms"
                             " | >33ms 14.6% (96 samples)"}]
         out = mod.summarize_observations(raw, require_peer=True)
@@ -46,7 +49,13 @@ class PublicWanSmokeTests(unittest.TestCase):
         self.assertEqual(out["fighter_id"], 44)
         self.assertEqual(out["peer_ids"], [45])
         self.assertEqual(out["measurements"]["ack_p50_ms"], 220)
+        self.assertEqual(out["measurements"]["ack_p95_ms"], 400)
+        self.assertEqual(out["measurements"]["ack_jitter_p95_ms"], 55)
+        self.assertEqual(out["measurements"]["snapshot_p95_ms"], 143)
+        self.assertEqual(out["measurements"]["camera_correction_p95_units"], 0.7)
+        self.assertEqual(out["measurements"]["deferred_reconciles"], 82)
         self.assertEqual(out["measurements"]["extra_render_p95_ms"], 88)
+        self.assertEqual(out["measurements"]["render_samples"], 96)
 
     def test_no_peer_fails_closed_and_identity_changes_refused(self):
         snap = {"status": "Online - player #3 - server tick 90",
