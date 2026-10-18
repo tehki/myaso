@@ -182,6 +182,14 @@ jobs:
             MYASO_PVP_SCENARIO="$scenario" node scripts/pvp_browser_flight_runner.mjs
           done
 
+      - name: Validate R2 middle-mouse held block across three real strikes
+        env:
+          MYASO_PVP_SCENARIO: "uimiddleblockpressure"
+        run: |
+          node --check scripts/pvp_browser_flight_runner.mjs
+          node --test tests/r2-middle-held-guardbreak.test.mjs
+          node scripts/pvp_browser_flight_runner.mjs
+
       - name: Validate M194 repeated real guard-break block-only pressure
         run: |
           node --check scripts/pvp_browser_flight_runner.mjs

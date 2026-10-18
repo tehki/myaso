@@ -36,3 +36,15 @@ test("M250 retains strict remote-only M41 pixels and cleans sampler without chan
   assert.ok(flight.includes("await Promise.all(entries.map(stopParryTellSampler))"));
   assert.ok(flight.includes("await waitForParryTellClear(observer, 1200)"));
 });
+
+test("M41 records real remote draw calls only for diagnostics without weakening exact pixel gate", () => {
+  const view = readFileSync(new URL("../web/online-game.mjs", import.meta.url), "utf8");
+  const diagnostic = section("async function readParryTellSamplerDiagnostics(", "async function stopParryTellSampler(");
+  const flight = section("async function runOnlineUiParryTellFlight(", "async function runOnlineUiBlockFacingTellFlight(");
+  assert.match(view, /acceptanceScenario === "uiparrytell"/);
+  assert.match(view, /__MYASO_M41_DRAW_TRACE__/);
+  assert.match(diagnostic, /remoteRingDraw: window\.__MYASO_M41_DRAW_TRACE__/);
+  assert.match(flight, /if \(observerMax < 24\)/);
+  assert.match(flight, /if \(localMax !== 0\)/);
+  assert.ok(!flight.includes("remoteRingDraw?.draws > 0)"));
+});

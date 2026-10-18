@@ -1089,7 +1089,16 @@ function drawFighterScreen(x, y, fighter, body, shadow, remote = false, damageTe
   if (action === COMBAT_ACTION.dodge) drawDodgeTell(remote);
   if (action === COMBAT_ACTION.stunned) drawStunTell();
   if (action === COMBAT_ACTION.knockdown) drawKnockdownTell();
-  if (remote && parrySpatialPresentation(fighter).visible) drawParryTell();
+  if (remote && parrySpatialPresentation(fighter).visible) {
+    drawParryTell();
+    // Acceptance-only renderer diagnostics, NOT a substitute for strict pixels.
+    if (acceptanceScenario === "uiparrytell") {
+      const trace = window.__MYASO_M41_DRAW_TRACE__ ??= { draws: 0, latest: null };
+      trace.draws += 1;
+      trace.latest = { netId: fighter.netId, x, y, action, guard: fighter.guard,
+        atMs: performance.now() };
+    }
+  }
   if (remote && guardBreakSpatialPresentation(fighter).visible) drawGuardBreakTell();
   if (remote && recoveryTell) drawRecoveryTell();
   ctx.fillStyle = shadow;
