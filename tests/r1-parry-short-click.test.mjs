@@ -10,7 +10,7 @@ test("M33 and M146 perform complete genuine short LMB before parry, never chargi
   const flight = source.slice(start, end);
   const dispatch = flight.indexOf("await Promise.all([");
   const tap = flight.indexOf("performArenaAttackHold(attacker, attackerElementId, attackOffset, 35)", dispatch);
-  const lead = flight.indexOf("await sleep(40)", tap);
+  const lead = flight.indexOf("await sleep(120)", tap);
   const wheel = flight.indexOf("await setArenaBlock(defender, defenderElementId, true)", lead);
   const proof = flight.indexOf("await waitForUiParryEvidence(entries, attacker, defender, 350, false, lastAttemptBaseline)", wheel);
   assert.ok(dispatch >= 0 && tap > dispatch && lead > tap && wheel > lead && proof > wheel);
