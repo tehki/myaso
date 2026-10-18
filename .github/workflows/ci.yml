@@ -146,6 +146,8 @@ jobs:
           cargo check --locked --manifest-path server/Cargo.toml
           cargo clippy --locked --manifest-path server/Cargo.toml --all-targets -- -D warnings
           cargo test --locked --manifest-path server/Cargo.toml
+          # Offline, unpaced genuine World-step probe; not a live 60Hz acceptance gate.
+          cargo run --locked --manifest-path server/Cargo.toml --bin moon_observer_tick_probe -- --ticks=1024 --players=32
 
       - name: Validate M188 repeated real heavy counterplay windows
         run: |
