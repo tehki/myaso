@@ -9323,6 +9323,13 @@ async function runOnlineUiGuardBreakFlight(entries, { onGuardBroken = null } = {
           "window.__MYASO_M221_WHEEL_TOKEN__ = " + JSON.stringify(challenge.token)
             + "; return true;");
         m212Exchange = await dispatchM212AttackLedShortBlock({
+          // M249: R1 light commits on pointerUP (not DOWN as in early M212).
+          // The old 48ms fixed post-wheel wait now adds directly to the real
+          // wheel->impact lag and can outlast the unmodified 240ms block.
+          // One trusted DOM receipt is STILL mandatory before the single
+          // genuine W3C click. With a prompt receipt, send it immediately;
+          // the 135ms authoritative light windup remains unchanged.
+          wheelHeadStartMs: 0,
           sendWheel: () => scrollArenaWheel(defender, defenderElementId, 120, 0),
           awaitTrustedWheel: () => challenge.wait(),
           sendAttackClick: (clickHoldMs) => performArenaM221GuardBreakClick(attacker, clickHoldMs),
