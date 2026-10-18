@@ -1442,14 +1442,13 @@ async function runOnlineUiHeavyDodgeFlight(entries) {
         await sleep(10);
       }
       if (committedObserved) {
-        // M204 rev3: exact-head #38290258466 showed the separate real
-        // S/pointer-wheel took ~83ms from S-down to wheel, plus our old
-        // 120ms host wait; the first authoritative hit arrived just 4ms
-        // after wheel. Use a 45ms host wait, preserving a meaningful
-        // pre-impact margin inside the unchanged 125ms dodge iframe.
-        // This is acceptance-only pacing; real Chrome W3C wheel and S
-        // remain mandatory and HP=100 still gates success.
-        await sleep(45);
+        // R2 130-unit heavy can still contact the defender during the
+        // perpendicular roll, so iframe timing (not simply clearing reach)
+        // must be proven. On strict 39149931060 the authentic Chrome wheel
+        // arrived ~147ms before 46-HP contact, outside the original 125ms
+        // iframe. Align the *real* wheel 45ms later to sample near impact;
+        // never extend i-frames, reduce hit geometry or relax HP=100 gates.
+        await sleep(90);
         await setMovementKey(defender, "s", true);
         try {
           await performArenaTimedPointerDodge(defender, defenderElementId, 15);
