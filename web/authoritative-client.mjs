@@ -32,6 +32,7 @@ export async function connectAuthoritativeClient({
   const remoteInterpolator = createRemoteInterpolator();
   const inputSamples = [];
   let inputSequence = 0;
+  let pendingThrowReplicas = 0;
   let latestSnapshotSequence = 0xffff;
   let acknowledgedSnapshotSequence = 0xffff;
   let latestServerTick = 0;
@@ -161,6 +162,22 @@ export async function connectAuthoritativeClient({
       ackServerTick: latestServerTick,
       samples: [...inputSamples].reverse(),
     });
+    // Triple-send the same genuine one-shot action on consecutive input
+    // packets, not three distinct throws. Server disarm prevents duplicates.
+    if (sample.throwWeapon) pendingThrowReplicas = 3;
+    if (pendingThrowReplicas > 0) {
+      const flagged = encodeInputPacket({
+        sequence: inputSequence,
+        ackSnapshotSequence: acknowledgedSnapshotSequence,
+        clientTick: normalized.tick,
+        ackServerTick: latestServerTick,
+        samples: [...inputSamples].reverse(),
+        throwWeapon: true,
+      });
+      // overwrite the one unflagged packet; avoid extra datagram queue churn
+      new Uint8Array(packet).set(new Uint8Array(flagged));
+      pendingThrowReplicas -= 1;
+    }
     inputSequence = (inputSequence + 1) & 0xffff;
     transport.sendRealtimeOwned(new Uint8Array(packet));
     diagnostics.noteSentInput(normalized.tick);

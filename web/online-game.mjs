@@ -146,6 +146,7 @@ const webTransportOptions = cert
 const keys = new Set();
 const dashGesture = createDirectionalDash();
 let dashRequested = false;
+let throwWeaponRequested = false;
 let dashMove = null;
 let predictedDashDir = { x: 0, y: 0 };
 const mouse = { x: canvas.width / 2, y: canvas.height / 2 };
@@ -259,6 +260,7 @@ canvas.addEventListener("wheel", (event) => {
 canvas.addEventListener("pointermove", updateMouse);
 canvas.addEventListener("keydown", (event) => {
   if (["KeyW", "KeyA", "KeyS", "KeyD", "KeyE", "Space"].includes(event.code)) event.preventDefault();
+  if (event.code === "KeyF" && !event.repeat && !keys.has(event.code)) throwWeaponRequested = true;
   if (["KeyW", "KeyA", "KeyS", "KeyD"].includes(event.code) && !keys.has(event.code)) {
     const direction = dashGesture.press(event.code, performance.now(), event.repeat);
     if (direction && local.action === COMBAT_ACTION.idle
@@ -637,6 +639,7 @@ function releaseInputs() {
   keys.clear();
   dashGesture.clearTaps();
   dashRequested = false;
+  throwWeaponRequested = false;
   dashMove = null;
   attackRequested = false;
   committedLightMove = null;
@@ -665,6 +668,7 @@ function sampleInput() {
     currentInput.run = false;
     currentInput.jump = false;
     currentInput.dash = false;
+    currentInput.throwWeapon = false;
     return;
   }
   currentInput.moveX = dashRequested && dashMove ? dashMove.x : attackRequested && committedLightMove
@@ -676,6 +680,7 @@ function sampleInput() {
   currentInput.heavyAttack = heavyAttackRequested;
   currentInput.dodge = rollRequested;
   currentInput.dash = dashRequested;
+  currentInput.throwWeapon = throwWeaponRequested;
   currentInput.block = middleBlockHeld || performance.now() < shortBlockUntil;
   currentInput.kick = kickRequested;
   currentInput.run = rightButtonGesture.isRunning();
@@ -698,6 +703,7 @@ function simulatePrediction(stepMs) {
     kickRequested = false;
     jumpRequested = false;
     dashRequested = false;
+    throwWeaponRequested = false;
     dashMove = null;
   }
 }

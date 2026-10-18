@@ -146,6 +146,7 @@ pub struct InputPacket {
     pub ack_snapshot_sequence: u16,
     pub client_tick: u32,
     pub ack_server_tick: u32,
+    pub throw_weapon: bool,
     sample_count: u8,
     samples: [InputSample; INPUT_REDUNDANCY_MAX],
 }
@@ -162,6 +163,7 @@ pub enum DecodeError {
     UnsupportedProtocol(u8),
     WrongPacketType(u8),
     InvalidSampleCount(u8),
+    InvalidHeaderFlags(u8),
     InvalidLength { expected: usize, actual: usize },
 }
 
@@ -176,6 +178,10 @@ pub fn decode_input_packet(bytes: &[u8]) -> Result<InputPacket, DecodeError> {
         return Err(DecodeError::WrongPacketType(bytes[1]));
     }
 
+    if bytes[3] & !1 != 0 {
+        return Err(DecodeError::InvalidHeaderFlags(bytes[3]));
+    }
+    let throw_weapon = bytes[3] & 1 != 0;
     let sample_count = bytes[2] as usize;
     if !(1..=INPUT_REDUNDANCY_MAX).contains(&sample_count) {
         return Err(DecodeError::InvalidSampleCount(bytes[2]));
@@ -224,6 +230,7 @@ pub fn decode_input_packet(bytes: &[u8]) -> Result<InputPacket, DecodeError> {
         ack_snapshot_sequence,
         client_tick,
         ack_server_tick,
+        throw_weapon,
         sample_count: sample_count as u8,
         samples,
     })

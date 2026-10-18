@@ -17,6 +17,7 @@ export function encodeInputPacket({
   clientTick,
   ackServerTick = 0,
   samples,
+  throwWeapon = false,
 }) {
   assertUint16(sequence, "sequence");
   assertUint16(ackSnapshotSequence, "ackSnapshotSequence");
@@ -31,7 +32,9 @@ export function encodeInputPacket({
   view.setUint8(0, NETWORK.protocolVersion);
   view.setUint8(1, PACKET_TYPE.INPUT);
   view.setUint8(2, samples.length);
-  view.setUint8(3, 0);
+  // R2: existing reserved header bit, authenticated by the connection;
+  // repeated across 3 consecutive input sends for lossy datagram recovery.
+  view.setUint8(3, throwWeapon ? 1 : 0);
   view.setUint16(4, sequence, true);
   view.setUint16(6, ackSnapshotSequence, true);
   view.setUint32(8, clientTick, true);
@@ -61,6 +64,7 @@ export function decodeInputPacket(buffer) {
   if (view.byteLength < HEADER_BYTES) throw new RangeError("input packet is truncated");
   if (view.getUint8(0) !== NETWORK.protocolVersion) throw new Error("unsupported protocol version");
   if (view.getUint8(1) !== PACKET_TYPE.INPUT) throw new Error("not an input packet");
+  if ((view.getUint8(3) & ~1) !== 0) throw new Error("unknown input header flags");
   const count = view.getUint8(2);
   if (count < 1 || count > NETWORK.inputRedundancy) throw new RangeError("invalid input sample count");
   if (view.byteLength !== HEADER_BYTES + count * SAMPLE_BYTES) throw new RangeError("invalid input packet length");
@@ -92,6 +96,7 @@ export function decodeInputPacket(buffer) {
     sequence: view.getUint16(4, true),
     ackSnapshotSequence: view.getUint16(6, true),
     clientTick,
+    throwWeapon: Boolean(view.getUint8(3) & 1),
     ackServerTick: view.getUint32(12, true),
     samples,
   };

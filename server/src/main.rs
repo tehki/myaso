@@ -622,7 +622,9 @@ async fn handle_connection(
                     }
                 }
 
-                if last_input_sequence.is_none_or(|previous| is_sequence_newer16(packet.sequence, previous)) {
+                let fresh_input_sequence =
+                    last_input_sequence.is_none_or(|previous| is_sequence_newer16(packet.sequence, previous));
+                if fresh_input_sequence {
                     last_input_sequence = Some(packet.sequence);
                     advance_snapshot_ack(
                         &mut acknowledged_snapshot,
@@ -658,12 +660,19 @@ async fn handle_connection(
                 }
                 let server_tick = {
                     let mut state = game.state.lock().await;
-                    apply_coalesced_input_and_read_tick(
+                    let tick = apply_coalesced_input_and_read_tick(
                         &mut state,
                         player_id,
                         coalesced,
                         &mut pending_input_acks,
-                    )
+                    );
+                    // Authenticated connection identity and latest accepted
+                    // facing/position are the only authority for a real F
+                    // throw. Old/replayed/stale datagrams never spawn.
+                    if packet.throw_weapon && fresh_input_sequence && !accepted.is_empty() {
+                        let _ = state.world.throw_weapon(player_id);
+                    }
+                    tick
                 };
                 if server_tick.wrapping_sub(packet.ack_server_tick) > 600 {
                     eprintln!(

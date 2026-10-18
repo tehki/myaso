@@ -1,4 +1,5 @@
 use std::collections::BTreeSet;
+use crate::projectile::{WeaponProjectiles, Projectile, Event as WeaponEvent, Refusal as WeaponRefusal, Fighter as WeaponFighter};
 
 pub const DEFAULT_WORLD_WIDTH: f32 = 8192.0;
 pub const DEFAULT_WORLD_HEIGHT: f32 = 8192.0;
@@ -521,6 +522,8 @@ pub struct World {
     winner: Option<u32>,
     reset_at_ms: f32,
     fighters: Vec<Fighter>,
+    weapon_projectiles: WeaponProjectiles,
+    projectile_fractional_ms: f64,
 }
 
 impl Default for World {
@@ -541,11 +544,34 @@ impl World {
             winner: None,
             reset_at_ms: 0.0,
             fighters: Vec::new(),
+            weapon_projectiles: WeaponProjectiles::new(),
+            projectile_fractional_ms: 0.0,
         }
     }
 
     pub fn fighters(&self) -> &[Fighter] {
         &self.fighters
+    }
+
+    pub fn thrown_weapons(&self) -> &[Projectile] {
+        self.weapon_projectiles.active()
+    }
+
+    pub fn weapon_rearm_remaining_ms(&self, net_id: u32) -> u64 {
+        self.weapon_projectiles.remaining_disarm_ms(net_id)
+    }
+
+    /// Triggered only after authenticated packet ingress. Aim/position are
+    /// read from the server's own accepted fighter state, never packet extras.
+    pub fn throw_weapon(&mut self, net_id: u32) -> Result<WeaponEvent, WeaponRefusal> {
+        let fighter = self.fighter(net_id).ok_or(WeaponRefusal::BadInput)?;
+        if self.match_over() || matches!(fighter.action,
+            Action::Dead | Action::Stunned | Action::Knockdown | Action::Dodge | Action::Dash) {
+            return Err(WeaponRefusal::BadInput);
+        }
+        self.weapon_projectiles.throw(
+            net_id, fighter.x, fighter.y, fighter.facing, self.width, self.height
+        )
     }
 
     fn fighter_index(&self, net_id: u32) -> Result<usize, usize> {
@@ -641,7 +667,13 @@ impl World {
         events.clear();
         self.now_ms += dt_ms;
         self.tick = self.tick.wrapping_add(1);
+        self.projectile_fractional_ms += f64::from(dt_ms);
+        let projectile_dt = self.projectile_fractional_ms.floor() as u32;
+        self.projectile_fractional_ms -= f64::from(projectile_dt);
         if self.winner.is_some() {
+            // A match transition never pauses the genuine 30s rearm clock.
+            self.weapon_projectiles.advance(projectile_dt, self.width,
+                self.height, &[], &[]).expect("validated world geometry");
             if self.now_ms + EPSILON >= self.reset_at_ms {
                 self.reset_match();
                 events.push(CombatEvent::MatchReset);
@@ -673,7 +705,8 @@ impl World {
             if fighter.action != Action::Knockdown {
                 fighter.facing = normalize_angle(input.facing_radians);
             }
-            begin_requested_action(self.now_ms, fighter, input, edges);
+            let equipped = self.weapon_projectiles.equipped(fighter.net_id);
+            begin_requested_action(self.now_ms, fighter, input, edges, equipped);
             move_fighter(self.width, self.height, fighter, input, dt_ms);
             advance_action(self.now_ms, fighter, input, dt_ms);
             update_stamina(self.now_ms, fighter, input, dt_ms);
@@ -701,10 +734,79 @@ impl World {
             self.height,
             self.now_ms,
             &mut self.fighters,
+            &self.weapon_projectiles,
             events,
         ) {
             self.winner = Some(winner);
             self.reset_at_ms = self.now_ms + FFA_MATCH_RESET_MS;
+        }
+
+        // Normal no-throw alpha matches avoid a 512-player transient
+        // allocation every 60Hz server frame just to advance the disarm clock.
+        let combatants: Vec<WeaponFighter> = if self.weapon_projectiles.active().is_empty() {
+            Vec::new()
+        } else {
+            self.fighters.iter().map(|fighter| WeaponFighter {
+            id: fighter.net_id,
+            x: fighter.x,
+            y: fighter.y,
+            aim: fighter.facing,
+            kick_active: fighter.action == Action::KickActive,
+            alive: fighter.action != Action::Dead,
+        }).collect()
+        };
+        let projectile_events = self.weapon_projectiles.advance(
+            projectile_dt, self.width, self.height, &combatants, &[],
+        ).expect("World dimension and obstacle geometry were validated at initialization");
+        for projectile_event in projectile_events {
+            if let WeaponEvent::Hit { owner, target, .. } = projectile_event {
+                self.apply_projectile_hit(owner, target, events);
+            }
+        }
+    }
+
+    fn apply_projectile_hit(&mut self, owner_id: u32, victim_id: u32, events: &mut Vec<CombatEvent>) {
+        const PROJECTILE_DAMAGE: f32 = 34.0;
+        let Ok(owner_index) = self.fighter_index(owner_id) else { return };
+        let Ok(victim_index) = self.fighter_index(victim_id) else { return };
+        if owner_index == victim_index || self.fighters[victim_index].action == Action::Dead {
+            return;
+        }
+        let (owner, target) = two_mut(&mut self.fighters, owner_index, victim_index);
+        owner.recently_interacted_with = Some(victim_id);
+        target.recently_interacted_with = Some(owner_id);
+        if is_invulnerable(target) {
+            events.push(CombatEvent::Evade { attacker: owner_id, target: victim_id });
+            return;
+        }
+        // Blocking stops thrown-weapon damage, but only a genuine active KICK
+        // can reverse the projectile and transfer ownership before this point.
+        if target.action == Action::Block {
+            target.guard = (target.guard - BLOCK_GUARD_DAMAGE).max(0.0);
+            target.guard_regen_blocked_until_ms = self.now_ms + GUARD_REGEN_DELAY_MS;
+            events.push(CombatEvent::Block { attacker: owner_id, target: victim_id });
+            return;
+        }
+        target.hp = (target.hp - PROJECTILE_DAMAGE).max(0.0);
+        events.push(CombatEvent::Hit {
+            attacker: owner_id,
+            target: victim_id,
+            damage: PROJECTILE_DAMAGE as u8,
+            hp: target.hp.round() as u8,
+        });
+        if target.hp <= EPSILON {
+            owner.kills = owner.kills.saturating_add(1);
+            target.clear_light_attack_buffer();
+            target.action = Action::Dead;
+            target.action_elapsed_ms = 0.0;
+            target.action_duration_ms = 0.0;
+            target.respawn_at_ms = self.now_ms + RESPAWN_MS;
+            events.push(CombatEvent::Death { fighter: victim_id, killer: owner_id });
+            if owner.kills >= FFA_KILL_TARGET {
+                self.winner = Some(owner_id);
+                self.reset_at_ms = self.now_ms + FFA_MATCH_RESET_MS;
+                events.push(CombatEvent::MatchWon { winner: owner_id, kills: owner.kills });
+            }
         }
     }
 
@@ -745,6 +847,7 @@ fn begin_requested_action(
     fighter: &mut Fighter,
     input: InputIntent,
     edges: ActionEdges,
+    equipped: bool,
 ) {
     let light_recovery = matches!(
         fighter.action,
@@ -854,6 +957,14 @@ fn begin_requested_action(
         fighter.begin_jump_attack();
         return;
     }
+
+    // Weaponless fighters still retain kick, dash, roll and ordinary block.
+    // No sword hit or charged upgrade can start while disarmed.
+    let edges = ActionEdges {
+        attack: edges.attack && equipped,
+        heavy_attack: edges.heavy_attack && equipped,
+        ..edges
+    };
 
     // R2: an immediate authentic LMB light may upgrade to charged heavy
     // only during its unlanded windup. Running light may upgrade as well.
@@ -1360,12 +1471,16 @@ fn resolve_attacks(
     height: f32,
     now_ms: f32,
     fighters: &mut [Fighter],
+    equipped_weapons: &WeaponProjectiles,
     events: &mut Vec<CombatEvent>,
 ) -> Option<u32> {
     for attacker_index in 0..fighters.len() {
         let Some(profile) = attack_profile(fighters[attacker_index].action) else {
             continue;
         };
+        if !profile.kick && !equipped_weapons.equipped(fighters[attacker_index].net_id) {
+            continue;
+        }
 
         for target_index in 0..fighters.len() {
             if attacker_index == target_index {

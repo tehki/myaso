@@ -52,7 +52,7 @@ pub enum Event {
     Expire { id: u64 },
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct WeaponProjectiles {
     clock: u64,
     next_id: u64,
