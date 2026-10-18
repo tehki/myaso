@@ -41,6 +41,14 @@ jobs:
           node --check web/game.mjs
           node --test tests/combat-model.test.mjs
 
+      - name: Validate R2 responsive controls, server-style dash and combat geometry
+        run: |
+          node --check src/browser/dash-input.mjs
+          node --check src/browser/left-button-charge.mjs
+          node --check web/online-game.mjs
+          node --check web/game.mjs
+          node --test tests/r2-combat-controls.test.mjs tests/r1-lmb-charge-heavy.test.mjs
+
       - name: Validate realtime networking JavaScript
         run: |
           node --check src/network/constants.mjs
@@ -164,6 +172,14 @@ jobs:
           for scenario in uiheavyblock uiheavyparry uiheavydodge; do
             MYASO_PVP_SCENARIO="$scenario" node scripts/pvp_browser_flight_runner.mjs
           done
+
+      - name: Validate R2 middle-mouse held block across three real strikes
+        env:
+          MYASO_PVP_SCENARIO: "uimiddleblockpressure"
+        run: |
+          node --check scripts/pvp_browser_flight_runner.mjs
+          node --test tests/r2-middle-held-guardbreak.test.mjs
+          node scripts/pvp_browser_flight_runner.mjs
 
       - name: Validate M194 repeated real guard-break block-only pressure
         run: |

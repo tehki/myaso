@@ -44,17 +44,21 @@ const RUNNING_ATTACK_RECOVERY_MOVE_MULTIPLIER: f32 = 0.42;
 const HEAVY_ATTACK_WINDUP_MS: f32 = 320.0;
 const HEAVY_ATTACK_ACTIVE_MS: f32 = 100.0;
 const HEAVY_ATTACK_RECOVERY_MS: f32 = 420.0;
-const HEAVY_ATTACK_REACH: f32 = 82.0;
+const HEAVY_ATTACK_REACH: f32 = 130.0;
 const HEAVY_ATTACK_ARC_RADIANS: f32 = std::f32::consts::PI * 0.68;
 const HEAVY_ATTACK_DAMAGE: f32 = 46.0;
 const HEAVY_ATTACK_KNOCKBACK: f32 = 28.0;
 const HEAVY_ATTACK_GUARD_DAMAGE: f32 = 64.0;
+const DASH_DURATION_MS: f32 = 140.0;
+const DASH_SPEED: f32 = 750.0;
+const DASH_STAMINA_COST: f32 = 20.0;
+const DASH_COOLDOWN_MS: f32 = 3000.0;
 const DODGE_DURATION_MS: f32 = 170.0;
 const DODGE_RECOVERY_MS: f32 = 180.0;
 const DODGE_SPEED: f32 = 690.0;
 const DODGE_IFRAME_MS: f32 = 125.0;
 const DODGE_STAMINA_COST: f32 = 28.0;
-const ROLL_COLLISION_KNOCKDOWN_MS: f32 = 260.0;
+const ROLL_COLLISION_KNOCKDOWN_MS: f32 = 520.0;
 const ROLL_COLLISION_KNOCKBACK: f32 = 34.0;
 const KICK_WINDUP_MS: f32 = 90.0;
 const KICK_ACTIVE_MS: f32 = 70.0;
@@ -96,7 +100,7 @@ const GUARD_BREAK_POST_RECOVERY_PUNISH_MS: f32 =
 const HEAVY_GUARD_BREAK_STUN_MS: f32 =
     HEAVY_ATTACK_ACTIVE_MS + HEAVY_ATTACK_RECOVERY_MS + GUARD_BREAK_POST_RECOVERY_PUNISH_MS;
 const BLOCK_PARRY_STUN_MS: f32 = 650.0;
-const BLOCK_MOVE_MULTIPLIER: f32 = 0.42;
+const BLOCK_MOVE_MULTIPLIER: f32 = 0.5;
 const GUARD_MAX: f32 = 100.0;
 const GUARD_REGEN_PER_SECOND: f32 = 24.0;
 const GUARD_REGEN_DELAY_MS: f32 = 520.0;
@@ -135,6 +139,7 @@ pub enum Action {
     Stunned,
     Knockdown,
     Dead,
+    Dash,
 }
 
 impl Action {
@@ -170,6 +175,7 @@ impl Action {
             Self::AttackRightWindup => 27,
             Self::AttackRightActive => 28,
             Self::AttackRightRecovery => 29,
+            Self::Dash => 30,
         }
     }
 }
@@ -186,6 +192,7 @@ pub struct InputIntent {
     pub kick: bool,
     pub run: bool,
     pub jump: bool,
+    pub dash: bool,
 }
 
 impl Default for InputIntent {
@@ -201,6 +208,7 @@ impl Default for InputIntent {
             kick: false,
             run: false,
             jump: false,
+            dash: false,
         }
     }
 }
@@ -213,6 +221,7 @@ struct ActionEdges {
     dodge: bool,
     kick: bool,
     jump: bool,
+    dash: bool,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -236,6 +245,7 @@ pub struct Fighter {
     pending_dodge: bool,
     pending_kick: bool,
     pending_jump: bool,
+    pending_dash: bool,
     action_duration_ms: f32,
     attack_input_was_down: bool,
     heavy_attack_input_was_down: bool,
@@ -243,6 +253,10 @@ pub struct Fighter {
     dodge_input_was_down: bool,
     kick_input_was_down: bool,
     jump_input_was_down: bool,
+    dash_input_was_down: bool,
+    dash_ready_at_ms: f32,
+    dash_dir_x: f32,
+    dash_dir_y: f32,
     buffered_light_attack: bool,
     buffered_attack_lateral: f32,
     buffered_block: bool,
@@ -283,6 +297,7 @@ impl Fighter {
             pending_dodge: false,
             pending_kick: false,
             pending_jump: false,
+            pending_dash: false,
             action_duration_ms: 0.0,
             attack_input_was_down: false,
             heavy_attack_input_was_down: false,
@@ -290,6 +305,10 @@ impl Fighter {
             dodge_input_was_down: false,
             kick_input_was_down: false,
             jump_input_was_down: false,
+            dash_input_was_down: false,
+            dash_ready_at_ms: 0.0,
+            dash_dir_x: 0.0,
+            dash_dir_y: 0.0,
             buffered_light_attack: false,
             buffered_attack_lateral: 0.0,
             buffered_block: false,
@@ -319,6 +338,7 @@ impl Fighter {
         self.pending_dodge |= input.dodge && !self.latest_input.dodge;
         self.pending_kick |= input.kick && !self.latest_input.kick;
         self.pending_jump |= input.jump && !self.latest_input.jump;
+        self.pending_dash |= input.dash && !self.latest_input.dash;
     }
 
     fn input_with_pending_actions(&self) -> InputIntent {
@@ -328,6 +348,7 @@ impl Fighter {
         input.dodge |= self.pending_dodge;
         input.kick |= self.pending_kick;
         input.jump |= self.pending_jump;
+        input.dash |= self.pending_dash;
         input
     }
 
@@ -337,6 +358,7 @@ impl Fighter {
         self.pending_dodge = false;
         self.pending_kick = false;
         self.pending_jump = false;
+        self.pending_dash = false;
     }
 
     fn clear_light_attack_buffer(&mut self) {
@@ -646,6 +668,7 @@ impl World {
                 dodge: input.dodge && !fighter.dodge_input_was_down,
                 kick: input.kick && !fighter.kick_input_was_down,
                 jump: input.jump && !fighter.jump_input_was_down,
+                dash: input.dash && !fighter.dash_input_was_down,
             };
             if fighter.action != Action::Knockdown {
                 fighter.facing = normalize_angle(input.facing_radians);
@@ -660,6 +683,7 @@ impl World {
             fighter.dodge_input_was_down = input.dodge;
             fighter.kick_input_was_down = input.kick;
             fighter.jump_input_was_down = input.jump;
+            fighter.dash_input_was_down = input.dash;
             fighter.clear_pending_actions();
 
             if fighter.action != Action::Block
@@ -831,6 +855,29 @@ fn begin_requested_action(
         return;
     }
 
+    // R2: an immediate authentic LMB light may upgrade to charged heavy
+    // only during its unlanded windup. Running light may upgrade as well.
+    // Once active, already-hit or recovering, the second action is rejected.
+    if edges.heavy_attack
+        && matches!(
+            fighter.action,
+            Action::AttackWindup
+                | Action::AttackLeftWindup
+                | Action::AttackRightWindup
+                | Action::RunningAttackWindup
+        )
+        && fighter.action_elapsed_ms
+            < (if fighter.action == Action::RunningAttackWindup {
+                RUNNING_ATTACK_WINDUP_MS
+            } else {
+                ATTACK_WINDUP_MS
+            })
+    {
+        fighter.attack_hit_targets.clear();
+        fighter.set_action(Action::HeavyAttackWindup, HEAVY_ATTACK_WINDUP_MS);
+        return;
+    }
+
     let can_interrupt = matches!(fighter.action, Action::Idle | Action::Block);
     if !can_interrupt {
         return;
@@ -854,6 +901,20 @@ fn begin_requested_action(
         if edges.attack {
             return;
         }
+    }
+
+    if edges.dash
+        && fighter.action == Action::Idle
+        && now_ms >= fighter.dash_ready_at_ms
+        && input.move_x.hypot(input.move_y) > 0.5
+        && spend_stamina(now_ms, fighter, DASH_STAMINA_COST)
+    {
+        let magnitude = input.move_x.hypot(input.move_y);
+        fighter.dash_dir_x = input.move_x / magnitude;
+        fighter.dash_dir_y = input.move_y / magnitude;
+        fighter.dash_ready_at_ms = now_ms + DASH_COOLDOWN_MS;
+        fighter.set_action(Action::Dash, DASH_DURATION_MS);
+        return;
     }
 
     if edges.kick && fighter.action == Action::Idle {
@@ -934,6 +995,10 @@ fn move_fighter(width: f32, height: f32, fighter: &mut Fighter, input: InputInte
     }
 
     match fighter.action {
+        Action::Dash => {
+            velocity_x = fighter.dash_dir_x * DASH_SPEED;
+            velocity_y = fighter.dash_dir_y * DASH_SPEED;
+        }
         Action::Dodge => {
             velocity_x = fighter.dodge_dir_x * DODGE_SPEED;
             velocity_y = fighter.dodge_dir_y * DODGE_SPEED;
@@ -1075,6 +1140,7 @@ fn advance_action(now_ms: f32, fighter: &mut Fighter, input: InputIntent, dt_ms:
             fighter.set_action(Action::HeavyAttackRecovery, HEAVY_ATTACK_RECOVERY_MS)
         }
         Action::HeavyAttackRecovery => fighter.set_action(Action::Idle, 0.0),
+        Action::Dash => fighter.set_action(Action::Idle, 0.0),
         Action::Dodge => fighter.set_action(Action::DodgeRecovery, DODGE_RECOVERY_MS),
         Action::DodgeRecovery | Action::Jump => fighter.set_action(Action::Idle, 0.0),
         Action::KickWindup => fighter.set_action(Action::KickActive, KICK_ACTIVE_MS),
@@ -1471,6 +1537,7 @@ fn respawn_fighter(fighter: &mut Fighter) {
     fighter.dodge_input_was_down = false;
     fighter.kick_input_was_down = false;
     fighter.jump_input_was_down = false;
+    fighter.dash_input_was_down = false;
     fighter.clear_pending_actions();
     fighter.clear_recovery_input_buffer();
     fighter.set_action(Action::Idle, 0.0);
@@ -1504,4 +1571,157 @@ pub fn angle_delta(a: f32, b: f32) -> f32 {
 
 fn clamp(value: f32, min: f32, max: f32) -> f32 {
     value.max(min).min(max)
+}
+
+#[cfg(test)]
+mod r2_combat_control_tests {
+    use super::*;
+
+    #[test]
+    fn dash_is_directional_and_server_cooldown_is_three_seconds() {
+        let mut world = World::new(800.0, 600.0);
+        assert!(world.add_player_at(1, 300.0, 300.0, 0.0));
+        assert!(world.set_input(
+            1,
+            InputIntent {
+                move_y: -1.0,
+                dash: true,
+                facing_radians: 0.0,
+                ..InputIntent::default()
+            }
+        ));
+        world.step();
+        let start = world.fighter(1).unwrap();
+        assert_eq!(start.action, Action::Dash);
+        assert!(start.y < 300.0);
+        assert!(start.dash_dir_y < -0.99);
+        let ready = start.dash_ready_at_ms;
+        assert!(ready >= 3000.0);
+
+        assert!(world.set_input(1, InputIntent::default()));
+        for _ in 0..20 {
+            world.step();
+        }
+        assert_eq!(world.fighter(1).unwrap().action, Action::Idle);
+        assert!(world.set_input(
+            1,
+            InputIntent {
+                move_x: 1.0,
+                dash: true,
+                ..InputIntent::default()
+            }
+        ));
+        world.step();
+        assert_eq!(world.fighter(1).unwrap().action, Action::Idle);
+        assert_eq!(world.fighter(1).unwrap().dash_ready_at_ms, ready);
+        assert!(world.set_input(1, InputIntent::default()));
+        while world.now_ms < ready {
+            world.step();
+        }
+        assert!(world.set_input(
+            1,
+            InputIntent {
+                move_x: 1.0,
+                dash: true,
+                ..InputIntent::default()
+            }
+        ));
+        world.step();
+        assert_eq!(world.fighter(1).unwrap().action, Action::Dash);
+        assert!(world.fighter(1).unwrap().dash_dir_x > 0.99);
+    }
+
+    #[test]
+    fn held_lmb_converts_only_an_unlanded_light_windup() {
+        let mut world = World::new(800.0, 600.0);
+        assert!(world.add_player_at(1, 250.0, 300.0, 0.0));
+        world.set_input(
+            1,
+            InputIntent {
+                attack: true,
+                ..InputIntent::default()
+            },
+        );
+        world.step();
+        assert_eq!(world.fighter(1).unwrap().action, Action::AttackWindup);
+        world.set_input(
+            1,
+            InputIntent {
+                heavy_attack: true,
+                ..InputIntent::default()
+            },
+        );
+        world.step();
+        assert_eq!(world.fighter(1).unwrap().action, Action::HeavyAttackWindup);
+        assert!(world.fighter(1).unwrap().attack_hit_targets.is_empty());
+    }
+
+    #[test]
+    fn running_light_windup_can_upgrade_to_heavy_before_contact() {
+        let mut world = World::new(800.0, 600.0);
+        world.add_player_at(1, 250.0, 300.0, 0.0);
+        world.set_input(
+            1,
+            InputIntent {
+                attack: true,
+                run: true,
+                move_x: 1.0,
+                ..InputIntent::default()
+            },
+        );
+        world.step();
+        assert_eq!(
+            world.fighter(1).unwrap().action,
+            Action::RunningAttackWindup
+        );
+        world.set_input(
+            1,
+            InputIntent {
+                heavy_attack: true,
+                run: true,
+                move_x: 1.0,
+                ..InputIntent::default()
+            },
+        );
+        world.step();
+        assert_eq!(world.fighter(1).unwrap().action, Action::HeavyAttackWindup);
+    }
+
+    #[test]
+    fn heavy_reach_matches_client_painted_arc_and_roll_doubles_ground_time() {
+        assert_eq!(HEAVY_ATTACK_REACH, 130.0);
+        assert_eq!(ROLL_COLLISION_KNOCKDOWN_MS, 520.0);
+        let mut world = World::new(800.0, 600.0);
+        world.add_player_at(1, 200.0, 200.0, 0.0);
+        world.add_player_at(2, 338.0, 200.0, std::f32::consts::PI);
+        world.fighters[0].set_action(Action::HeavyAttackActive, 1000.0);
+        let events = world.step();
+        assert!(events.iter().any(|event| matches!(
+            event,
+            CombatEvent::Hit {
+                attacker: 1,
+                target: 2,
+                damage: 46,
+                hp: 54
+            }
+        )));
+    }
+
+    #[test]
+    fn block_hold_movement_is_exactly_half_speed() {
+        let mut world = World::new(800.0, 600.0);
+        world.add_player_at(1, 200.0, 200.0, 0.0);
+        world.set_input(
+            1,
+            InputIntent {
+                block: true,
+                move_x: 1.0,
+                ..InputIntent::default()
+            },
+        );
+        world.step_by(100.0);
+        let own = world.fighter(1).unwrap();
+        assert_eq!(own.action, Action::Block);
+        assert!((own.x - 210.75).abs() < 0.001);
+    }
 }

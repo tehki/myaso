@@ -149,6 +149,7 @@ export async function connectAuthoritativeClient({
       kick: Boolean(sample.kick),
       run: Boolean(sample.run),
       jump: Boolean(sample.jump),
+      dash: Boolean(sample.dash),
     };
     predictionHistory.push(normalized.tick, normalized);
     inputSamples.push(normalized);

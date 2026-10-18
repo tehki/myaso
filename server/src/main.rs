@@ -919,6 +919,7 @@ mod tests {
             kick: false,
             run: false,
             jump: false,
+            dash: false,
         }
     }
 
@@ -1228,6 +1229,7 @@ mod tests {
             kick: false,
             run: false,
             jump: false,
+            dash: false,
         };
 
         let server_tick =

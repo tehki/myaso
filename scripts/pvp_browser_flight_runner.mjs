@@ -43,7 +43,7 @@ const heavyKeyPulseMs = 120;
 // A full M62 threat chevron paints dozens of exact-tone pixels; a handful can
 // arise from raster overlap. Use one significance floor for positive and leak proof.
 const threatMarkerMinPixels = 8;
-if (!new Set(["damage", "inputloss", "parry", "dodge", "block", "guardbreak", "backblock", "respawn", "ui", "uirespawn", "uifeedback", "uihittell", "uivitals", "uiidentity", "uiscore", "uimatch", "uirematch", "uiffa3", "uikillfeed", "uifocus", "uithreat", "uithreatbearing", "uimultithreat", "uisecondarythreat", "uisecondarybearing", "uisecondaryphase", "uiguardarc", "uisecondaryguardarc", "uithreatmarkers", "uijumpffaprimary", "uijumpffasecondary", "uijumprecoveryffa", "uijumppunishffa", "uimultirecoveryffa", "uimultirecoveryspatial", "uimultirecoverypunish", "uiparry", "uiparrypunishwindow", "uiparrypunishffa", "uiparrypunishffahit", "uiguardbreakpunishffa", "uiguardbreakpunishffahit", "uikickknockdownffa", "uikickknockdownffahit", "uikickknockdownbounded", "uirollknockdownbounded", "uirollknockdownffahit", "uimultiknockdownffa", "uimultiknockdownffahit", "uirollknockdownffa", "uistaminaauth", "uistaminaexhaustion", "uistaminafeedback", "uistaminaconfirmed", "uistun", "uiguardbreak", "uidodge", "uirecovery", "uirecoverytell", "uiattackintent", "uiheavy", "uiheavyinputloss", "uiheavyblock", "uiheavyparry", "uiheavydodge", "uiheavypunish", "uiheavyguardbreak", "uiheavyguardbreakpunish", "uifeint", "uirunningattack", "uidirectionallight", "uirollbuffer", "uijumpbuffer", "uijumpattack", "uijumpattackinputloss", "uijumpattackpunish", "uijumpattacktelegraph", "uijumpattackblock", "uijumpattackparry", "uijumpattackdodge", "uijumpattackbuffer", "uikickbuffer", "uiguardbreaktell", "uiparrytell", "uiblockfacingtell", "uidodgetell", "uideathtell"]).has(scenario)) throw new Error(`unsupported MYASO_PVP_SCENARIO: ${scenario}`);
+if (!new Set(["damage", "inputloss", "parry", "dodge", "block", "guardbreak", "backblock", "respawn", "ui", "uirespawn", "uifeedback", "uihittell", "uivitals", "uiidentity", "uiscore", "uimatch", "uirematch", "uiffa3", "uikillfeed", "uifocus", "uithreat", "uithreatbearing", "uimultithreat", "uisecondarythreat", "uisecondarybearing", "uisecondaryphase", "uiguardarc", "uisecondaryguardarc", "uithreatmarkers", "uijumpffaprimary", "uijumpffasecondary", "uijumprecoveryffa", "uijumppunishffa", "uimultirecoveryffa", "uimultirecoveryspatial", "uimultirecoverypunish", "uiparry", "uiparrypunishwindow", "uiparrypunishffa", "uiparrypunishffahit", "uiguardbreakpunishffa", "uiguardbreakpunishffahit", "uikickknockdownffa", "uikickknockdownffahit", "uikickknockdownbounded", "uirollknockdownbounded", "uirollknockdownffahit", "uimultiknockdownffa", "uimultiknockdownffahit", "uirollknockdownffa", "uistaminaauth", "uistaminaexhaustion", "uistaminafeedback", "uistaminaconfirmed", "uistun", "uiguardbreak", "uimiddleblockpressure", "uidodge", "uirecovery", "uirecoverytell", "uiattackintent", "uiheavy", "uiheavyinputloss", "uiheavyblock", "uiheavyparry", "uiheavydodge", "uiheavypunish", "uiheavyguardbreak", "uiheavyguardbreakpunish", "uifeint", "uirunningattack", "uidirectionallight", "uirollbuffer", "uijumpbuffer", "uijumpattack", "uijumpattackinputloss", "uijumpattackpunish", "uijumpattacktelegraph", "uijumpattackblock", "uijumpattackparry", "uijumpattackdodge", "uijumpattackbuffer", "uikickbuffer", "uiguardbreaktell", "uiparrytell", "uiblockfacingtell", "uidodgetell", "uideathtell"]).has(scenario)) throw new Error(`unsupported MYASO_PVP_SCENARIO: ${scenario}`);
 const staticPort = Number(process.env.MYASO_PVP_FLIGHT_HTTP_PORT ?? 4174);
 const browsers = [
   {
@@ -431,6 +431,9 @@ try {
   } else if (scenario === "uiguardbreaktell") {
     const results = await runOnlineUiGuardBreakTellFlight(sessions);
     console.log(`M40_FFA_GUARD_BREAK_TELL ${JSON.stringify({ ok: true, results })}`);
+  } else if (scenario === "uimiddleblockpressure") {
+    const results = await runOnlineUiMiddleBlockPressureFlight(sessions);
+    console.log("R2_GENUINE_MIDDLE_HOLD_GUARD_PRESSURE " + JSON.stringify({ ok: true, results }));
   } else if (scenario === "uiguardbreak") {
     const results = await runOnlineUiGuardBreakFlight(sessions);
     console.log(`M34_ONLINE_GUARD_BREAK_FEEDBACK ${JSON.stringify({ ok: true, results })}`);
@@ -575,14 +578,14 @@ async function startBrowser(browser) {
     pageLoad: 30_000,
     implicit: 0,
   });
-  if (scenario === "uiparry" || scenario === "uistun" || scenario === "uiguardbreak" || scenario === "uidodge" || scenario === "uiattackintent" || scenario === "uiheavy" || scenario === "uiheavyinputloss" || scenario === "uiheavyblock" || scenario === "uiheavyparry" || scenario === "uiheavydodge" || scenario === "uiheavypunish" || scenario === "uiheavyguardbreak" || scenario === "uiheavyguardbreakpunish" || scenario === "uifeint" || scenario === "uirunningattack" || scenario === "uidirectionallight" || scenario === "uirollbuffer" || scenario === "uijumpbuffer" || scenario === "uijumpattack" || scenario === "uijumpattackinputloss" || scenario === "uijumpattackpunish" || scenario === "uijumpattacktelegraph" || scenario === "uijumpffaprimary" || scenario === "uijumpffasecondary" || scenario === "uijumprecoveryffa" || scenario === "uijumppunishffa" || scenario === "uimultirecoveryffa" || scenario === "uimultirecoveryspatial" || scenario === "uimultirecoverypunish" || scenario === "uiparrypunishwindow" || scenario === "uiparrypunishffa" || scenario === "uiparrypunishffahit" || scenario === "uiguardbreakpunishffa" || scenario === "uiguardbreakpunishffahit" || scenario === "uikickknockdownffa" || scenario === "uikickknockdownffahit" || scenario === "uikickknockdownbounded" || scenario === "uirollknockdownbounded" || scenario === "uirollknockdownffahit" || scenario === "uimultiknockdownffa" || scenario === "uimultiknockdownffahit" || scenario === "uirollknockdownffa" || scenario === "uistaminaauth" || scenario === "uistaminaexhaustion" || scenario === "uistaminafeedback" || scenario === "uistaminaconfirmed" || scenario === "uijumpattackblock" || scenario === "uijumpattackparry" || scenario === "uijumpattackdodge" || scenario === "uijumpattackbuffer" || scenario === "uikickbuffer" || scenario === "uiguardbreaktell" || scenario === "uiparrytell" || scenario === "uiblockfacingtell" || scenario === "uidodgetell") {
+  if (scenario === "uiparry" || scenario === "uistun" || scenario === "uiguardbreak" || scenario === "uimiddleblockpressure" || scenario === "uidodge" || scenario === "uiattackintent" || scenario === "uiheavy" || scenario === "uiheavyinputloss" || scenario === "uiheavyblock" || scenario === "uiheavyparry" || scenario === "uiheavydodge" || scenario === "uiheavypunish" || scenario === "uiheavyguardbreak" || scenario === "uiheavyguardbreakpunish" || scenario === "uifeint" || scenario === "uirunningattack" || scenario === "uidirectionallight" || scenario === "uirollbuffer" || scenario === "uijumpbuffer" || scenario === "uijumpattack" || scenario === "uijumpattackinputloss" || scenario === "uijumpattackpunish" || scenario === "uijumpattacktelegraph" || scenario === "uijumpffaprimary" || scenario === "uijumpffasecondary" || scenario === "uijumprecoveryffa" || scenario === "uijumppunishffa" || scenario === "uimultirecoveryffa" || scenario === "uimultirecoveryspatial" || scenario === "uimultirecoverypunish" || scenario === "uiparrypunishwindow" || scenario === "uiparrypunishffa" || scenario === "uiparrypunishffahit" || scenario === "uiguardbreakpunishffa" || scenario === "uiguardbreakpunishffahit" || scenario === "uikickknockdownffa" || scenario === "uikickknockdownffahit" || scenario === "uikickknockdownbounded" || scenario === "uirollknockdownbounded" || scenario === "uirollknockdownffahit" || scenario === "uimultiknockdownffa" || scenario === "uimultiknockdownffahit" || scenario === "uirollknockdownffa" || scenario === "uistaminaauth" || scenario === "uistaminaexhaustion" || scenario === "uistaminafeedback" || scenario === "uistaminaconfirmed" || scenario === "uijumpattackblock" || scenario === "uijumpattackparry" || scenario === "uijumpattackdodge" || scenario === "uijumpattackbuffer" || scenario === "uikickbuffer" || scenario === "uiguardbreaktell" || scenario === "uiparrytell" || scenario === "uiblockfacingtell" || scenario === "uidodgetell") {
     await webdriver(base, "POST", `/session/${sessionId}/window/rect`, { x: 0, y: 0, width: 1280, height: 900 });
   }
   return { ...browser, child, base, sessionId };
 }
 
 async function navigate(session, gameUrl, certificateHash) {
-  const page = scenario === "ui" || scenario === "uirespawn" || scenario === "uifeedback" || scenario === "uihittell" || scenario === "uivitals" || scenario === "uiidentity" || scenario === "uiscore" || scenario === "uimatch" || scenario === "uirematch" || scenario === "uiffa3" || scenario === "uikillfeed" || scenario === "uifocus" || scenario === "uithreat" || scenario === "uithreatbearing" || scenario === "uimultithreat" || scenario === "uisecondarythreat" || scenario === "uisecondarybearing" || scenario === "uisecondaryphase" || scenario === "uiguardarc" || scenario === "uisecondaryguardarc" || scenario === "uithreatmarkers" || scenario === "uijumpffaprimary" || scenario === "uijumpffasecondary" || scenario === "uijumprecoveryffa" || scenario === "uijumppunishffa" || scenario === "uimultirecoveryffa" || scenario === "uimultirecoveryspatial" || scenario === "uimultirecoverypunish" || scenario === "uiparry" || scenario === "uiparrypunishwindow" || scenario === "uiparrypunishffa" || scenario === "uiparrypunishffahit" || scenario === "uiguardbreakpunishffa" || scenario === "uiguardbreakpunishffahit" || scenario === "uikickknockdownffa" || scenario === "uikickknockdownffahit" || scenario === "uikickknockdownbounded" || scenario === "uirollknockdownbounded" || scenario === "uirollknockdownffahit" || scenario === "uimultiknockdownffa" || scenario === "uimultiknockdownffahit" || scenario === "uirollknockdownffa" || scenario === "uistaminaauth" || scenario === "uistaminaexhaustion" || scenario === "uistaminafeedback" || scenario === "uistaminaconfirmed" || scenario === "uistun" || scenario === "uiguardbreak" || scenario === "uidodge" || scenario === "uirecovery" || scenario === "uirecoverytell" || scenario === "uiattackintent" || scenario === "uiheavy" || scenario === "uiheavyinputloss" || scenario === "uiheavyblock" || scenario === "uiheavyparry" || scenario === "uiheavydodge" || scenario === "uiheavypunish" || scenario === "uiheavyguardbreak" || scenario === "uiheavyguardbreakpunish" || scenario === "uifeint" || scenario === "uirunningattack" || scenario === "uidirectionallight" || scenario === "uirollbuffer" || scenario === "uijumpbuffer" || scenario === "uijumpattack" || scenario === "uijumpattackinputloss" || scenario === "uijumpattackpunish" || scenario === "uijumpattacktelegraph" || scenario === "uijumpattackblock" || scenario === "uijumpattackparry" || scenario === "uijumpattackdodge" || scenario === "uijumpattackbuffer" || scenario === "uikickbuffer" || scenario === "uiguardbreaktell" || scenario === "uiparrytell" || scenario === "uiblockfacingtell" || scenario === "uidodgetell" || scenario === "uideathtell" ? "index.html" : "pvp-flight.html";
+  const page = scenario === "ui" || scenario === "uirespawn" || scenario === "uifeedback" || scenario === "uihittell" || scenario === "uivitals" || scenario === "uiidentity" || scenario === "uiscore" || scenario === "uimatch" || scenario === "uirematch" || scenario === "uiffa3" || scenario === "uikillfeed" || scenario === "uifocus" || scenario === "uithreat" || scenario === "uithreatbearing" || scenario === "uimultithreat" || scenario === "uisecondarythreat" || scenario === "uisecondarybearing" || scenario === "uisecondaryphase" || scenario === "uiguardarc" || scenario === "uisecondaryguardarc" || scenario === "uithreatmarkers" || scenario === "uijumpffaprimary" || scenario === "uijumpffasecondary" || scenario === "uijumprecoveryffa" || scenario === "uijumppunishffa" || scenario === "uimultirecoveryffa" || scenario === "uimultirecoveryspatial" || scenario === "uimultirecoverypunish" || scenario === "uiparry" || scenario === "uiparrypunishwindow" || scenario === "uiparrypunishffa" || scenario === "uiparrypunishffahit" || scenario === "uiguardbreakpunishffa" || scenario === "uiguardbreakpunishffahit" || scenario === "uikickknockdownffa" || scenario === "uikickknockdownffahit" || scenario === "uikickknockdownbounded" || scenario === "uirollknockdownbounded" || scenario === "uirollknockdownffahit" || scenario === "uimultiknockdownffa" || scenario === "uimultiknockdownffahit" || scenario === "uirollknockdownffa" || scenario === "uistaminaauth" || scenario === "uistaminaexhaustion" || scenario === "uistaminafeedback" || scenario === "uistaminaconfirmed" || scenario === "uistun" || scenario === "uiguardbreak" || scenario === "uimiddleblockpressure" || scenario === "uidodge" || scenario === "uirecovery" || scenario === "uirecoverytell" || scenario === "uiattackintent" || scenario === "uiheavy" || scenario === "uiheavyinputloss" || scenario === "uiheavyblock" || scenario === "uiheavyparry" || scenario === "uiheavydodge" || scenario === "uiheavypunish" || scenario === "uiheavyguardbreak" || scenario === "uiheavyguardbreakpunish" || scenario === "uifeint" || scenario === "uirunningattack" || scenario === "uidirectionallight" || scenario === "uirollbuffer" || scenario === "uijumpbuffer" || scenario === "uijumpattack" || scenario === "uijumpattackinputloss" || scenario === "uijumpattackpunish" || scenario === "uijumpattacktelegraph" || scenario === "uijumpattackblock" || scenario === "uijumpattackparry" || scenario === "uijumpattackdodge" || scenario === "uijumpattackbuffer" || scenario === "uikickbuffer" || scenario === "uiguardbreaktell" || scenario === "uiparrytell" || scenario === "uiblockfacingtell" || scenario === "uidodgetell" || scenario === "uideathtell" ? "index.html" : "pvp-flight.html";
   const url = new URL(`http://127.0.0.1:${staticPort}/web/${page}`);
   url.searchParams.set("server", gameUrl);
   url.searchParams.set("cert", certificateHash);
@@ -1442,14 +1445,13 @@ async function runOnlineUiHeavyDodgeFlight(entries) {
         await sleep(10);
       }
       if (committedObserved) {
-        // M204 rev3: exact-head #38290258466 showed the separate real
-        // S/pointer-wheel took ~83ms from S-down to wheel, plus our old
-        // 120ms host wait; the first authoritative hit arrived just 4ms
-        // after wheel. Use a 45ms host wait, preserving a meaningful
-        // pre-impact margin inside the unchanged 125ms dodge iframe.
-        // This is acceptance-only pacing; real Chrome W3C wheel and S
-        // remain mandatory and HP=100 still gates success.
-        await sleep(45);
+        // R2 130-unit heavy can still contact the defender during the
+        // perpendicular roll, so iframe timing (not simply clearing reach)
+        // must be proven. On strict 39149931060 the authentic Chrome wheel
+        // arrived ~147ms before 46-HP contact, outside the original 125ms
+        // iframe. Align the *real* wheel 45ms later to sample near impact;
+        // never extend i-frames, reduce hit geometry or relax HP=100 gates.
+        await sleep(90);
         await setMovementKey(defender, "s", true);
         try {
           await performArenaTimedPointerDodge(defender, defenderElementId, 15);
@@ -4813,8 +4815,14 @@ async function runOnlineUiMultiKnockdownFfaFlight(entries) {
   // A deterministic tolerance sweep over every +/-5 px staging extreme produces
   // both contacts with 67-117 ms stagger and the second contact by 150 ms.
   // Production geometry/timing is untouched.
-  const secondaryDx = rollRight ? 40 : -40;
-  const secondaryDy = 31;
+  // R2 3-second WASD dash can legitimately fire during repeated real staging
+  // pulses. Re-measure both actual fighter positions, and stage the second
+  // opponent firmly inside the SAME 170ms mouse-roll collision corridor.
+  // Old (40,31) was at the farthest edge: exact-head 39153033803 showed a
+  // genuine roll knocking #2 down but entirely missing #3 at 42/36 offset.
+  // Keep both server-owned contacts, #2-first ordering and untouched HP gates.
+  const secondaryDx = rollRight ? 34 : -34;
+  const secondaryDy = 24;
   const rollerDx = rollRight ? -62 : 62;
   let stagedGeometry = null;
   for (let pass = 0; pass < 5; pass += 1) {
@@ -6188,8 +6196,11 @@ async function runOnlineUiBoundedRollKnockdownFlight(entries) {
       && suppressedDodge.serverTick > originalRecovery.serverTick)
     || originalDurationObserved < COMBAT.dodge.collisionKnockdownMs - 90
     || originalDurationObserved > COMBAT.dodge.collisionKnockdownMs + 110
-    || recoveryAfterSuppressedDodge >= COMBAT.dodge.collisionKnockdownMs - 60
-    || originalRecovery.epochMs >= suppressorDodgeRecovery.epochMs) {
+    // R2 doubled original knockdown (520ms). It is valid for the suppressing
+    // roller's 350ms dodge+recovery to finish BEFORE the downed victim rises.
+    // Preserve strict original 520ms +/- bounds and genuine second-roll
+    // ordering instead of retaining obsolete pre-R2 recovery ordering.
+    || recoveryAfterSuppressedDodge >= COMBAT.dodge.collisionKnockdownMs - 60) {
     throw new Error(milestone + " suppression roll appears to have refreshed or re-caught the bounded knockdown: "
       + JSON.stringify({
         firstKnockdown,
@@ -7668,27 +7679,26 @@ async function runOnlineUiDodgeFeedbackFlight(entries) {
     let rollIssued = false;
     let defenderMovementHeld = false;
 
-    // M238: R1's light is committed on genuine pointerUP, never on DOWN.
-    // The legacy M207 DOWN -> wheel -> wait -> UP sequence rolled before
-    // any attack existed. Exact-head #39037691090 saw 3 genuine Chrome
-    // wheels and three Firefox ~210ms LMB holds, but only roll collisions
-    // and unrelated late attacks, no authentic dodge-evaded/dodge-success.
-    // Send one COMPLETE 65ms real Firefox W3C short LMB first, then aim
-    // Chrome's genuine perpendicular wheel 35ms later so the unchanged
-    // 135ms attack windup overlaps the unchanged 125ms dodge iframe.
-    // Only W3C inputs, never a synthetic attack, second wheel, or widened
-    // game window. Keep M36's strict fresh evade feedback and zero HP.
+    // R2: genuine LMB commits the light on pointerDOWN, NOT on UP.
+    // M36 #39158029761 showed first authoritative 34HP contact before
+    // Chrome's dodge i-frames, followed by genuine dodge-success. With
+    // actual Firefox down/up separated by 44ms, an obsolete 35ms host wait
+    // AFTER the W3C click ACK delayed the Chrome wheel until just 38ms
+    // before the first hit. Submit the one genuine perpendicular roll
+    // IMMEDIATELY after the full Firefox W3C click; do not add a host
+    // timer. Retain the real UP-before-wheel cross-browser epoch proof,
+    // unchanged 135ms light windup, 125ms iframe and strict zero-HP
+    // damage/parry gates. No fake input or replay of a resolved exchange.
     try {
       await aimArena(defender, defenderElementId, 0, 180);
       defenderMovementHeld = true;
       await setMovementKey(defender, "s", true);
 
       await performArenaAttackHold(attacker, attackerElementId, attackOffset, 65);
-      await sleep(35);
       await scrollArenaWheel(defender, defenderElementId, -120);
       rollIssued = true;
       console.log("M238_GENUINE_RELEASED_LIGHT_DODGE " + JSON.stringify({
-        attempt, lightHoldMs: 65, postReleaseLeadMs: 35,
+        attempt, requestedLightHoldMs: 65, postClickHostWaitMs: 0,
       }));
 
       await sleep(60);
@@ -7893,7 +7903,13 @@ async function runOnlineUiParryFlight(entries, postParrySleepMs = 80, roles = nu
     // Use one complete, 75ms trusted W3C tap before the real wheel-back.
     // Keep its independent 125ms parry/650ms stun and genuine feedback gates.
     await performArenaAttackHold(attacker, attackerElementId, attackOffset, 75);
-    await sleep(55);
+    // R2 short-LMB helper releases in <=35ms, but genuine Firefox W3C
+    // delivery and the 60Hz input sampler can consume another tick. Full
+    // M146 39153407753 observed first active hit at tick243 while block
+    // first appeared tick243 (too late for parry). Deliver real wheel 35ms
+    // earlier, inside the unchanged 125ms parry window and without adding
+    // virtual clicks, relaxing HP=100 or altering authoritative timings.
+    await sleep(20);
     await setArenaBlock(defender, defenderElementId, true);
     evidence = await waitForUiParryEvidence(entries, attacker, defender, 350, false, lastAttemptBaseline);
     if (!evidence) {
@@ -9270,6 +9286,111 @@ async function runOnlineUiGuardBreakPunishFfaFocusFlight(entries, convert = fals
     m151GuardBrokenId: defenderId,
     m151CloserIdleId: closerId,
   }));
+}
+
+async function runOnlineUiMiddleBlockPressureFlight(entries) {
+  const milestone = "R2 native middle-mouse held block, exactly three guard-pressure hits";
+  if (entries.length !== 2) throw new Error(milestone + ": requires two real browsers");
+  await Promise.all(entries.map(installUiObserver));
+  const ready = await waitForUiReady(entries);
+  const attacker = entries.find(entry => entry.name === "chrome");
+  const defender = entries.find(entry => entry.name === "firefox");
+  const chrome = ready.find(entry => entry.browser === "chrome");
+  const firefox = ready.find(entry => entry.browser === "firefox");
+  if (!attacker || !defender || !chrome || !firefox) {
+    throw new Error(milestone + ": missing server identities");
+  }
+  const right = chrome.playerNetId < firefox.playerNetId;
+  await Promise.all(entries.map(entry => execute(entry.base, entry.sessionId,
+    "document.querySelector('#arena').focus(); return document.activeElement?.id;")));
+  const attackArena = await resolveArenaElement(attacker, milestone + " attacker");
+  const blockArena = await resolveArenaElement(defender, milestone + " blocker");
+  await Promise.all(entries.map(centerArenaInViewport));
+  await pulseMovementKey(attacker, right ? "d" : "a", 120);
+  await Promise.all([
+    aimArena(attacker, attackArena, right ? 200 : -200),
+    aimArena(defender, blockArena, right ? -200 : 200),
+  ]);
+  const before = await Promise.all(entries.map(readUiEvidence));
+  if (before.some(state => state.playerHp !== 100 || state.playerGuard !== 100)) {
+    throw new Error(milestone + ": staging altered starting vitals " + JSON.stringify(before));
+  }
+  const blockOrigin = { "element-6066-11e4-a52e-4f735466cecf": blockArena };
+  let pointerDownSent = false;
+  try {
+    // ONE real Firefox W3C middle pointerDown. Keep held for all three
+    // independently authenticated Chrome click/impact phases.
+    await webdriver(defender.base, "POST", "/session/" + defender.sessionId + "/actions", {
+      actions: [{
+        type: "pointer", id: "mouse-" + defender.name, parameters: { pointerType: "mouse" },
+        actions: [
+          { type: "pointerMove", duration: 0, origin: blockOrigin,
+            x: right ? -200 : 200, y: 0 },
+          { type: "pointerDown", button: 1 },
+        ],
+      }],
+    });
+    pointerDownSent = true;
+    // A continuous block is not a timed parry: wait past the original
+    // 125ms parry window, then demand three genuine -38 guard hits.
+    await sleep(220);
+    const expectedGuards = [62, 24, 0];
+    for (let index = 0; index < expectedGuards.length; index++) {
+      await performArenaM221GuardBreakClick(attacker, 10);
+      const deadline = Date.now() + 1100;
+      let good = false;
+      while (Date.now() < deadline) {
+        const states = await Promise.all(entries.map(readUiEvidence));
+        const a = states.find(state => state.browser === "chrome");
+        const b = states.find(state => state.browser === "firefox");
+        if (a.playerHp !== 100 || b.playerHp !== 100
+          || a.feedbackTransitions.includes("parried")
+          || b.feedbackTransitions.includes("parry-success")
+          || b.playerGuard < expectedGuards[index]) {
+          throw new Error(milestone + ": unblocked, parried, or over-damaged "
+            + JSON.stringify({ index, states }));
+        }
+        if (b.playerGuard === expectedGuards[index]) {
+          good = true;
+          break;
+        }
+        await sleep(12);
+      }
+      if (!good) {
+        throw new Error(milestone + ": missing exact -38 guard step "
+          + JSON.stringify({ index, expectedGuard: expectedGuards[index],
+            evidence: await Promise.all(entries.map(readUiEvidence)) }));
+      }
+      if (index < 2) await sleep(360);
+    }
+  } finally {
+    if (pointerDownSent) {
+      await webdriver(defender.base, "POST", "/session/" + defender.sessionId + "/actions", {
+        actions: [{
+          type: "pointer", id: "mouse-" + defender.name,
+          parameters: { pointerType: "mouse" },
+          actions: [{ type: "pointerUp", button: 1 }],
+        }],
+      });
+    }
+  }
+  const evidence = await Promise.all(entries.map(readUiEvidence));
+  const defenderState = evidence.find(state => state.browser === defender.name);
+  const attackerState = evidence.find(state => state.browser === attacker.name);
+  const middles = defenderState.pointers.filter(p => p.button === 1);
+  if (middles.filter(p => p.type === "pointerdown").length !== 1
+    || middles.filter(p => p.type === "pointerup").length !== 1
+    || defenderState.wheels.some(w => w.deltaY > 0)
+    || attackerState.pointers.filter(p => p.type === "pointerdown" && p.button === 0).length !== 3
+    || defenderState.playerGuard !== 0
+    || attackerState.playerHp !== 100 || defenderState.playerHp !== 100
+    || defenderState.feedbackTransitions.includes("parry-success")
+    || attackerState.feedbackTransitions.includes("parried")) {
+    throw new Error(milestone + ": authentic MMB, 100HP, and zero-parry proof failed "
+      + JSON.stringify(evidence));
+  }
+  return { nativeMiddleHold: true, exactGuardSequence: [62, 24, 0],
+    noParry: true, noHpDamage: true, realClicks: 3 };
 }
 
 async function runOnlineUiGuardBreakFlight(entries, { onGuardBroken = null } = {}) {
@@ -11800,7 +11921,9 @@ async function performArenaRunningAttack(session, elementId, movementKey, xOffse
         actions: [
           { type: "pointerMove", duration: 0, origin, x: xOffset, y: 0 },
           { type: "pointerDown", button: 0 },
-          { type: "pause", duration: 90 },
+          // R2: true 20ms light tap. A 90ms hold legitimately upgrades the
+          // live 80ms charging windup to heavy, which is NOT a running light.
+          { type: "pause", duration: 20 },
           { type: "pointerUp", button: 0 },
         ],
       }],
@@ -11864,14 +11987,13 @@ async function performArenaHeavyFeint(session, elementId, xOffset = 200) {
 
 async function performArenaFeint(session, elementId, xOffset = 200) {
   const origin = { "element-6066-11e4-a52e-4f735466cecf": elementId };
-  // R1: a short LMB fires its light edge on RELEASE, not pointerdown.
-  // M236: issue wheel-back in the immediately FOLLOWING W3C tick, with
-  // no extra timed pause after the genuine 85ms pointerUp. Both exact-head
-  // M171 failures saw a real 77..91ms up-to-wheel gap when the previous
-  // 20ms pause and an extra empty W3C tick delayed block ingress beyond the
-  // unchanged 70ms server-authoritative feint window. Wheel before release
-  // blocks first, so do not put scroll in the same tick as pointerUp.
-  // Keep one real W3C multi-source action and all 70ms/12-stamina HP gates.
+  // R2: one authentic W3C multi-source action: pointer and wheel. The light
+  // now commits on genuine pointerDOWN, so the old 85ms
+  // R1 tap exceeds both the unchanged 70ms feint window and R2 80ms
+  // heavy-upgrade threshold. Use a true short 20ms LMB click, and send
+  // wheel-back in the immediately following native W3C tick, with no
+  // extra pause after pointerUP. Server 70ms/12-stamina, no-damage,
+  // authoritative feint/denial and real browser input gates stay strict.
   try {
     await webdriver(session.base, "POST", `/session/${session.sessionId}/actions`, {
       actions: [
@@ -11882,7 +12004,7 @@ async function performArenaFeint(session, elementId, xOffset = 200) {
           actions: [
             { type: "pointerMove", duration: 0, origin, x: xOffset, y: 0 },
             { type: "pointerDown", button: 0 },
-            { type: "pause", duration: 85 },
+            { type: "pause", duration: 20 },
             { type: "pointerUp", button: 0 },
             { type: "pause", duration: 0 },
           ],
@@ -11893,7 +12015,7 @@ async function performArenaFeint(session, elementId, xOffset = 200) {
           actions: [
             { type: "pause", duration: 0 },
             { type: "pause", duration: 0 },
-            { type: "pause", duration: 85 },
+            { type: "pause", duration: 20 },
             { type: "pause", duration: 0 },
             { type: "scroll", x: 0, y: 0, deltaX: 0, deltaY: 120, duration: 0, origin },
           ],
@@ -12097,7 +12219,11 @@ async function performArenaBlockAttackChord(session, elementId, xOffset = 200, h
 
 async function performArenaAttackHold(session, elementId, xOffset = 200, holdMs = 180) {
   const origin = { "element-6066-11e4-a52e-4f735466cecf": elementId };
-  const boundedHoldMs = Math.max(40, Math.min(500, Math.trunc(holdMs)));
+  // R2: this is the real LIGHT gesture shared by genuine PvP flights.
+  // A requested 90ms press legitimately upgrades to heavy after 80ms; cap
+  // it to a true 20–35ms tap rather than weakening the 34HP light gates.
+  // Charging heavy still has its separate sustained-LMB and KeyE proof.
+  const boundedHoldMs = Math.max(20, Math.min(35, Math.trunc(holdMs)));
   await webdriver(session.base, "POST", `/session/${session.sessionId}/actions`, {
     actions: [{
       type: "pointer",
@@ -12736,6 +12862,7 @@ async function readParryTellSamplerDiagnostics(session) {
       firstRingAtMs: state.firstRingAtMs, crop: state.crop,
       canvasWidth: document.querySelector('#arena')?.width ?? null,
       canvasHeight: document.querySelector('#arena')?.height ?? null,
+      remoteRingDraw: window.__MYASO_M41_DRAW_TRACE__ ?? null,
     };
   `);
 }

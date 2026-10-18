@@ -30,6 +30,7 @@ pub struct InputSample {
     pub kick: bool,
     pub run: bool,
     pub jump: bool,
+    pub dash: bool,
 }
 
 impl From<InputSample> for simulation::InputIntent {
@@ -45,6 +46,7 @@ impl From<InputSample> for simulation::InputIntent {
             kick: sample.kick,
             run: sample.run,
             jump: sample.jump,
+            dash: sample.dash,
         }
     }
 }
@@ -52,15 +54,21 @@ impl From<InputSample> for simulation::InputIntent {
 pub fn coalesce_accepted_input_batch(samples: &[InputSample]) -> Option<InputSample> {
     let mut newest = *samples.last()?;
     if let Some(action_sample) = samples.iter().rev().find(|sample| {
-        sample.attack || sample.heavy_attack || sample.dodge || sample.kick || sample.jump
+        sample.attack
+            || sample.heavy_attack
+            || sample.dodge
+            || sample.kick
+            || sample.jump
+            || sample.dash
     }) {
         newest.attack = action_sample.attack;
         newest.heavy_attack = action_sample.heavy_attack;
         newest.dodge = action_sample.dodge;
         newest.kick = action_sample.kick;
         newest.jump = action_sample.jump;
+        newest.dash = action_sample.dash;
         newest.facing_radians = action_sample.facing_radians;
-        if action_sample.dodge || action_sample.jump {
+        if action_sample.dodge || action_sample.jump || action_sample.dash {
             newest.move_x = action_sample.move_x;
             newest.move_y = action_sample.move_y;
         }
@@ -80,6 +88,7 @@ const EMPTY_INPUT_SAMPLE: InputSample = InputSample {
     kick: false,
     run: false,
     jump: false,
+    dash: false,
 };
 
 #[derive(Debug, Clone, Copy)]
@@ -205,6 +214,7 @@ pub fn decode_input_packet(bytes: &[u8]) -> Result<InputPacket, DecodeError> {
             kick: buttons & 0b0001_0000 != 0,
             run: buttons & 0b0010_0000 != 0,
             jump: buttons & 0b0100_0000 != 0,
+            dash: buttons & 0b1000_0000 != 0,
         };
         offset += INPUT_SAMPLE_BYTES;
     }
@@ -607,6 +617,7 @@ mod tests {
             kick: false,
             run: false,
             jump: false,
+            dash: false,
         };
         let newest_idle = InputSample {
             tick: 101,
@@ -620,6 +631,7 @@ mod tests {
             kick: false,
             run: false,
             jump: false,
+            dash: false,
         };
 
         let coalesced =
@@ -654,6 +666,7 @@ mod tests {
             kick: false,
             run: false,
             jump: false,
+            dash: false,
         };
         let newer_heavy = InputSample {
             tick: 301,
@@ -667,6 +680,7 @@ mod tests {
             kick: false,
             run: false,
             jump: false,
+            dash: false,
         };
         let newest_idle = InputSample {
             tick: 302,
@@ -680,6 +694,7 @@ mod tests {
             kick: false,
             run: false,
             jump: false,
+            dash: false,
         };
 
         let coalesced = coalesce_accepted_input_batch(&[older_attack, newer_heavy, newest_idle])
@@ -708,6 +723,7 @@ mod tests {
             kick: false,
             run: false,
             jump: false,
+            dash: false,
         };
         let newer_dodge = InputSample {
             tick: 201,
@@ -721,6 +737,7 @@ mod tests {
             kick: false,
             run: false,
             jump: false,
+            dash: false,
         };
         let newest_idle = InputSample {
             tick: 202,
@@ -734,6 +751,7 @@ mod tests {
             kick: false,
             run: false,
             jump: false,
+            dash: false,
         };
 
         let coalesced = coalesce_accepted_input_batch(&[older_attack, newer_dodge, newest_idle])

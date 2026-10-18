@@ -372,7 +372,7 @@ test("roll collision consumes downed contact without refreshing knockdown", () =
     false,
   );
 
-  advance(world, 230);
+  advance(world, 500);
   assert.equal(target.action, "idle");
 });
 
