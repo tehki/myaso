@@ -6187,8 +6187,11 @@ async function runOnlineUiBoundedRollKnockdownFlight(entries) {
       && suppressedDodge.serverTick > originalRecovery.serverTick)
     || originalDurationObserved < COMBAT.dodge.collisionKnockdownMs - 90
     || originalDurationObserved > COMBAT.dodge.collisionKnockdownMs + 110
-    || recoveryAfterSuppressedDodge >= COMBAT.dodge.collisionKnockdownMs - 60
-    || originalRecovery.epochMs >= suppressorDodgeRecovery.epochMs) {
+    // R2 doubled original knockdown (520ms). It is valid for the suppressing
+    // roller's 350ms dodge+recovery to finish BEFORE the downed victim rises.
+    // Preserve strict original 520ms +/- bounds and genuine second-roll
+    // ordering instead of retaining obsolete pre-R2 recovery ordering.
+    || recoveryAfterSuppressedDodge >= COMBAT.dodge.collisionKnockdownMs - 60) {
     throw new Error(milestone + " suppression roll appears to have refreshed or re-caught the bounded knockdown: "
       + JSON.stringify({
         firstKnockdown,
