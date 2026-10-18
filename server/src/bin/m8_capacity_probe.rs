@@ -369,6 +369,7 @@ fn deterministic_input(net_id: u32, tick: u32) -> InputIntent {
         kick: false,
         run: false,
         jump: false,
+        dash: false,
     }
 }
 

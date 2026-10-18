@@ -1,6 +1,7 @@
 import { createFrameBudget } from "../src/browser/frame-budget.mjs";
 import { recordM233RecoveryHandoff } from "../src/browser/m233-recovery-handoff-trace.mjs";
 import { installRightButtonGesture } from "../src/browser/right-button-gesture.mjs";
+import { createDirectionalDash } from "../src/browser/dash-input.mjs";
 import { createLeftButtonCharge } from "../src/browser/left-button-charge.mjs";
 import { captureLightAttackMovement, resolveLightAttackReleaseMovement } from "../src/browser/light-attack-movement.mjs";
 import { createCombatImpactController } from "../src/browser/combat-impact.mjs";
@@ -143,10 +144,14 @@ const webTransportOptions = cert
   : undefined;
 
 const keys = new Set();
+const dashGesture = createDirectionalDash();
+let dashRequested = false;
+let dashMove = null;
+let predictedDashDir = { x: 0, y: 0 };
 const mouse = { x: canvas.width / 2, y: canvas.height / 2 };
 const local = { x: 0, y: 0, facing: 0, hp: 100, guard: 100, stamina: 100, action: 0, initialized: false };
 const currentInput = {
-  moveX: 0, moveY: 0, facing: 0, attack: false, heavyAttack: false,
+  moveX: 0, moveY: 0, facing: 0, attack: false, heavyAttack: false, dash: false,
   dodge: false, block: false, kick: false, run: false, jump: false,
 };
 const arenaLayer = createArenaLayer();
@@ -170,6 +175,7 @@ let rollRequested = false;
 let kickRequested = false;
 let jumpRequested = false;
 let shortBlockUntil = 0;
+let middleBlockHeld = false;
 const leftButtonCharge = createLeftButtonCharge({
   onLight() {
     attackRequested = true;
@@ -193,20 +199,30 @@ const rightButtonGesture = installRightButtonGesture(canvas, {
 let staminaRegenBlockedUntil = 0;
 
 canvas.addEventListener("contextmenu", (event) => event.preventDefault());
+canvas.addEventListener("auxclick", (event) => {
+  if (event.button === 1) event.preventDefault();
+});
 canvas.addEventListener("pointerdown", (event) => {
   canvas.focus();
   updateMouse(event);
+  if (event.button === 1) {
+    event.preventDefault();
+    middleBlockHeld = true;
+    return;
+  }
   if (event.button === 0) {
     leftButtonDown = true;
     leftButtonPressMovement = captureLightAttackMovement(keys);
-    const runningChord = rightButtonGesture.isRunning()
-      && ["KeyW", "KeyA", "KeyS", "KeyD"].some((code) => keys.has(code));
     leftButtonCharge.press(event.pointerId, {
-      immediate: local.action === COMBAT_ACTION.jump || jumpRequested || keys.has("Space") || runningChord,
+      immediate: local.action === COMBAT_ACTION.jump || jumpRequested || keys.has("Space"),
     });
   }
 });
 function onLeftPointerUp(event) {
+  if (event.button === 1) {
+    middleBlockHeld = false;
+    return;
+  }
   if (event.button !== 0) return;
   leftButtonDown = false;
   updateMouse(event);
@@ -216,6 +232,7 @@ function onLeftPointerUp(event) {
 canvas.addEventListener("pointerup", onLeftPointerUp);
 window.addEventListener("pointerup", onLeftPointerUp);
 canvas.addEventListener("pointercancel", (event) => {
+  if (event.button === 1) middleBlockHeld = false;
   if (event.button === 0) {
     leftButtonDown = false;
     leftButtonPressMovement = null;
@@ -223,6 +240,7 @@ canvas.addEventListener("pointercancel", (event) => {
   }
 });
 canvas.addEventListener("lostpointercapture", (event) => {
+  if (event.button === 1) middleBlockHeld = false;
   if (event.pointerId !== undefined) {
     leftButtonPressMovement = null;
     leftButtonCharge.cancel(event.pointerId);
@@ -241,6 +259,13 @@ canvas.addEventListener("wheel", (event) => {
 canvas.addEventListener("pointermove", updateMouse);
 canvas.addEventListener("keydown", (event) => {
   if (["KeyW", "KeyA", "KeyS", "KeyD", "KeyE", "Space"].includes(event.code)) event.preventDefault();
+  if (["KeyW", "KeyA", "KeyS", "KeyD"].includes(event.code) && !keys.has(event.code)) {
+    const direction = dashGesture.press(event.code, performance.now(), event.repeat);
+    if (direction && local.action === COMBAT_ACTION.idle
+      && local.stamina >= COMBAT.dash.staminaCost) {
+      dashRequested = true; dashMove = direction;
+    }
+  }
   keys.add(event.code);
   if (event.code === "KeyE" && !event.repeat) heavyAttackRequested = true;
   if (event.code === "Space" && !event.repeat) {
@@ -610,6 +635,9 @@ function updateMouse(event) {
 
 function releaseInputs() {
   keys.clear();
+  dashGesture.clearTaps();
+  dashRequested = false;
+  dashMove = null;
   attackRequested = false;
   committedLightMove = null;
   leftButtonDown = false;
@@ -620,6 +648,7 @@ function releaseInputs() {
   kickRequested = false;
   jumpRequested = false;
   shortBlockUntil = 0;
+  middleBlockHeld = false;
   rightButtonGesture.cancel();
   pendingStaminaDenial = null;
 }
@@ -635,17 +664,19 @@ function sampleInput() {
     currentInput.kick = false;
     currentInput.run = false;
     currentInput.jump = false;
+    currentInput.dash = false;
     return;
   }
-  currentInput.moveX = attackRequested && committedLightMove
+  currentInput.moveX = dashRequested && dashMove ? dashMove.x : attackRequested && committedLightMove
     ? committedLightMove.moveX : (keys.has("KeyD") ? 1 : 0) - (keys.has("KeyA") ? 1 : 0);
-  currentInput.moveY = attackRequested && committedLightMove
+  currentInput.moveY = dashRequested && dashMove ? dashMove.y : attackRequested && committedLightMove
     ? committedLightMove.moveY : (keys.has("KeyS") ? 1 : 0) - (keys.has("KeyW") ? 1 : 0);
   currentInput.facing = Math.atan2(mouse.y - canvas.height / 2, mouse.x - canvas.width / 2);
   currentInput.attack = attackRequested;
   currentInput.heavyAttack = heavyAttackRequested;
   currentInput.dodge = rollRequested;
-  currentInput.block = performance.now() < shortBlockUntil;
+  currentInput.dash = dashRequested;
+  currentInput.block = middleBlockHeld || performance.now() < shortBlockUntil;
   currentInput.kick = kickRequested;
   currentInput.run = rightButtonGesture.isRunning();
   currentInput.jump = jumpRequested;
@@ -666,6 +697,8 @@ function simulatePrediction(stepMs) {
     rollRequested = false;
     kickRequested = false;
     jumpRequested = false;
+    dashRequested = false;
+    dashMove = null;
   }
 }
 
@@ -690,7 +723,12 @@ function predictMovement(input, dtMs) {
   } else if (now >= staminaRegenBlockedUntil) {
     local.stamina = Math.min(COMBAT.stamina.max, local.stamina + COMBAT.stamina.regenPerSecond * dtMs / 1000);
   }
-  if (input.dodge || local.action === COMBAT_ACTION.dodge) {
+  if (input.dash) predictedDashDir = { x: input.moveX, y: input.moveY };
+  if (local.action === COMBAT_ACTION.dash) {
+    moveX = predictedDashDir.x;
+    moveY = predictedDashDir.y;
+    speed = COMBAT.dash.speed;
+  } else if (input.dodge || local.action === COMBAT_ACTION.dodge) {
     moveX = Math.cos(local.facing);
     moveY = Math.sin(local.facing);
     speed = COMBAT.dodge.speed;

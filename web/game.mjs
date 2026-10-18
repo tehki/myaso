@@ -1,5 +1,6 @@
 import { createFrameBudget } from "../src/browser/frame-budget.mjs";
 import { installRightButtonGesture } from "../src/browser/right-button-gesture.mjs";
+import { createDirectionalDash } from "../src/browser/dash-input.mjs";
 import { createLeftButtonCharge } from "../src/browser/left-button-charge.mjs";
 import { captureLightAttackMovement } from "../src/browser/light-attack-movement.mjs";
 import { createCombatImpactController } from "../src/browser/combat-impact.mjs";
@@ -51,10 +52,13 @@ const bot = createFighter({ id: "bot", x: 690, y: 270, facing: Math.PI });
 const world = createWorld({ width: canvas.width, height: canvas.height, fighters: [player, bot] });
 
 const keys = new Set();
+const dashGesture = createDirectionalDash();
+let dashRequested = false;
+let dashMove = null;
 const mouse = { x: 700, y: 270 };
 const playerInputState = {
   moveX: 0, moveY: 0, aimX: mouse.x, aimY: mouse.y,
-  attack: false, heavyAttack: false, block: false, dodge: false,
+  attack: false, heavyAttack: false, block: false, dodge: false, dash: false,
   kick: false, run: false, jump: false,
 };
 const inputs = { player: playerInputState, bot: null };
@@ -66,6 +70,7 @@ let rollRequested = false;
 let kickRequested = false;
 let jumpRequested = false;
 let shortBlockUntil = 0;
+let middleBlockHeld = false;
 const leftButtonCharge = createLeftButtonCharge({
   onLight() {
     attackRequested = true;
@@ -89,26 +94,42 @@ const combatImpact = createCombatImpactController();
 let combatFeedbackTimer = 0;
 
 canvas.addEventListener("contextmenu", (event) => event.preventDefault());
+canvas.addEventListener("auxclick", (event) => {
+  if (event.button === 1) event.preventDefault();
+});
 canvas.addEventListener("pointerdown", (event) => {
   canvas.focus();
   updateMouse(event);
+  if (event.button === 1) {
+    event.preventDefault();
+    middleBlockHeld = true;
+    return;
+  }
   if (event.button === 0) {
-    const runningChord = rightButtonGesture.isRunning()
-      && ["KeyW", "KeyA", "KeyS", "KeyD"].some((code) => keys.has(code));
     leftButtonCharge.press(event.pointerId, {
-      immediate: player.action === "jump" || jumpRequested || keys.has("Space") || runningChord,
+      immediate: player.action === "jump" || jumpRequested || keys.has("Space"),
     });
   }
 });
 function onLeftPointerUp(event) {
+  if (event.button === 1) {
+    middleBlockHeld = false;
+    return;
+  }
   if (event.button !== 0) return;
   updateMouse(event);
   leftButtonCharge.release(event.pointerId);
 }
 canvas.addEventListener("pointerup", onLeftPointerUp);
 window.addEventListener("pointerup", onLeftPointerUp);
-canvas.addEventListener("pointercancel", (event) => leftButtonCharge.cancel(event.pointerId));
-canvas.addEventListener("lostpointercapture", (event) => leftButtonCharge.cancel(event.pointerId));
+canvas.addEventListener("pointercancel", (event) => {
+  if (event.button === 1) middleBlockHeld = false;
+  if (event.button === 0) leftButtonCharge.cancel(event.pointerId);
+});
+canvas.addEventListener("lostpointercapture", (event) => {
+  if (event.button === 1) middleBlockHeld = false;
+  leftButtonCharge.cancel(event.pointerId);
+});
 canvas.addEventListener("wheel", (event) => {
   event.preventDefault();
   canvas.focus();
@@ -119,6 +140,13 @@ canvas.addEventListener("pointermove", updateMouse);
 window.addEventListener("blur", releaseInputs);
 canvas.addEventListener("keydown", (event) => {
   if (["KeyW", "KeyA", "KeyS", "KeyD", "KeyE", "Space"].includes(event.code)) event.preventDefault();
+  if (["KeyW", "KeyA", "KeyS", "KeyD"].includes(event.code) && !keys.has(event.code)) {
+    const direction = dashGesture.press(event.code, performance.now(), event.repeat);
+    if (direction && player.action === "idle"
+      && player.stamina >= COMBAT.dash.staminaCost) {
+      dashRequested = true; dashMove = direction;
+    }
+  }
   keys.add(event.code);
   if (event.code === "KeyE" && !event.repeat) heavyAttackRequested = true;
   if (event.code === "Space" && !event.repeat) {
@@ -131,6 +159,9 @@ document.addEventListener("visibilitychange", handleVisibilityChange);
 
 function releaseInputs() {
   keys.clear();
+  dashGesture.clearTaps();
+  dashRequested = false;
+  dashMove = null;
   attackRequested = false;
   committedLightMove = null;
   leftButtonCharge.cancel();
@@ -139,6 +170,7 @@ function releaseInputs() {
   kickRequested = false;
   jumpRequested = false;
   shortBlockUntil = 0;
+  middleBlockHeld = false;
   rightButtonGesture.cancel();
 }
 
@@ -149,14 +181,15 @@ function updateMouse(event) {
 }
 
 function playerInput() {
-  playerInputState.moveX = committedLightMove?.moveX ?? ((keys.has("KeyD") ? 1 : 0) - (keys.has("KeyA") ? 1 : 0));
-  playerInputState.moveY = committedLightMove?.moveY ?? ((keys.has("KeyS") ? 1 : 0) - (keys.has("KeyW") ? 1 : 0));
+  playerInputState.moveX = dashRequested && dashMove ? dashMove.x : committedLightMove?.moveX ?? ((keys.has("KeyD") ? 1 : 0) - (keys.has("KeyA") ? 1 : 0));
+  playerInputState.moveY = dashRequested && dashMove ? dashMove.y : committedLightMove?.moveY ?? ((keys.has("KeyS") ? 1 : 0) - (keys.has("KeyW") ? 1 : 0));
   playerInputState.aimX = mouse.x;
   playerInputState.aimY = mouse.y;
   playerInputState.attack = attackRequested;
   playerInputState.heavyAttack = heavyAttackRequested;
-  playerInputState.block = world.nowMs < shortBlockUntil;
+  playerInputState.block = middleBlockHeld || world.nowMs < shortBlockUntil;
   playerInputState.dodge = rollRequested;
+  playerInputState.dash = dashRequested;
   playerInputState.kick = kickRequested;
   playerInputState.run = rightButtonGesture.isRunning();
   playerInputState.jump = jumpRequested;
@@ -166,6 +199,8 @@ function playerInput() {
   rollRequested = false;
   kickRequested = false;
   jumpRequested = false;
+  dashRequested = false;
+  dashMove = null;
   return playerInputState;
 }
 

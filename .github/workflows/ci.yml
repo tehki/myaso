@@ -41,6 +41,14 @@ jobs:
           node --check web/game.mjs
           node --test tests/combat-model.test.mjs
 
+      - name: Validate R2 responsive controls, server-style dash and combat geometry
+        run: |
+          node --check src/browser/dash-input.mjs
+          node --check src/browser/left-button-charge.mjs
+          node --check web/online-game.mjs
+          node --check web/game.mjs
+          node --test tests/r2-combat-controls.test.mjs tests/r1-lmb-charge-heavy.test.mjs
+
       - name: Validate realtime networking JavaScript
         run: |
           node --check src/network/constants.mjs

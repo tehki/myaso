@@ -24,6 +24,7 @@ const phases = [
   { state: "ready", label: "READY", actions: ["idle"] },
   { state: "block", label: "BLOCKING", actions: ["block"] },
   { state: "evade", label: "ROLLING", actions: ["dodge"] },
+  { state: "evade", label: "DASH", actions: ["dash"] },
   { state: "recovery", label: "ROLL RECOVERY", actions: ["dodgeRecovery"] },
   { state: "airborne", label: "AIRBORNE", actions: ["jump"] },
   { state: "locked", label: "STUNNED", actions: ["stunned"] },

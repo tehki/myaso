@@ -31,6 +31,7 @@ export const COMBAT_ACTION = Object.freeze({
   attackRightWindup: 27,
   attackRightActive: 28,
   attackRightRecovery: 29,
+  dash: 30,
 });
 
 const PRIORITY = Object.freeze({
@@ -173,6 +174,8 @@ export function ownCombatReadinessPresentation(entity) {
       return { visible: true, state: "ready", label: "READY", detail: "Movement and light attacks" };
     case COMBAT_ACTION.block:
       return { visible: true, state: "block", label: "BLOCKING", detail: "Guard held · facing matters" };
+    case COMBAT_ACTION.dash:
+      return { visible: true, state: "evade", label: "DASH", detail: "Directional burst · cooldown" };
     case COMBAT_ACTION.dodge:
       return { visible: true, state: "evade", label: "ROLLING", detail: "Movement committed" };
     case COMBAT_ACTION.dodgeRecovery:
@@ -228,6 +231,8 @@ export function combatActionHint(entity) {
       return "Heavy recovery - you are highly punishable now.";
     case COMBAT_ACTION.feintRecovery:
       return "Feint recovery - bait landed or failed; reset before committing again.";
+    case COMBAT_ACTION.dash:
+      return "Dashing - movement burst committed.";
     case COMBAT_ACTION.dodge:
       return "Dodging - use the movement to reset spacing.";
     case COMBAT_ACTION.block:

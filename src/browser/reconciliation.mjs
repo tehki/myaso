@@ -92,6 +92,7 @@ function copyInput(tick, input = {}) {
     kick: Boolean(input.kick),
     run: Boolean(input.run),
     jump: Boolean(input.jump),
+    dash: Boolean(input.dash),
   };
 }
 

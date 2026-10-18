@@ -9,6 +9,7 @@ const BUTTON_HEAVY_ATTACK = 1 << 3;
 const BUTTON_KICK = 1 << 4;
 const BUTTON_RUN = 1 << 5;
 const BUTTON_JUMP = 1 << 6;
+const BUTTON_DASH = 1 << 7;
 
 export function encodeInputPacket({
   sequence,
@@ -82,6 +83,7 @@ export function decodeInputPacket(buffer) {
       kick: Boolean(buttons & BUTTON_KICK),
       run: Boolean(buttons & BUTTON_RUN),
       jump: Boolean(buttons & BUTTON_JUMP),
+      dash: Boolean(buttons & BUTTON_DASH),
     });
     offset += SAMPLE_BYTES;
   }
@@ -109,7 +111,8 @@ function encodeButtons(sample) {
     | (sample.heavyAttack ? BUTTON_HEAVY_ATTACK : 0)
     | (sample.kick ? BUTTON_KICK : 0)
     | (sample.run ? BUTTON_RUN : 0)
-    | (sample.jump ? BUTTON_JUMP : 0);
+    | (sample.jump ? BUTTON_JUMP : 0)
+    | (sample.dash ? BUTTON_DASH : 0);
 }
 
 function quantizeAxis(value) {
