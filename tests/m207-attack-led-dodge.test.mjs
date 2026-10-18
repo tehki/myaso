@@ -69,9 +69,9 @@ test("M238 updates real M36 to complete R1 light before real Chrome wheel, retai
   const section=source.slice(source.indexOf("async function runOnlineUiDodgeFeedbackFlight("),
     source.indexOf("async function runM176BlockAttackArbitrationPhase("));
   const click=section.indexOf("await performArenaAttackHold(attacker, attackerElementId, attackOffset, 65)");
-  const lead=section.indexOf("await sleep(35)",click);
-  const wheel=section.indexOf("await scrollArenaWheel(defender, defenderElementId, -120)",lead);
-  assert.ok(click>=0 && lead>click && wheel>lead);
+  const wheel=section.indexOf("await scrollArenaWheel(defender, defenderElementId, -120)",click);
+  assert.ok(click>=0 && wheel>click);
+  assert.ok(!section.slice(click,wheel).includes("await sleep("));
   assert.ok(!section.includes("dispatchM207AttackLedDodge({"));
   assert.ok(!section.includes("await setArenaAttack(attacker, attackerElementId, false, attackOffset)"));
   assert.ok(section.includes('await setMovementKey(defender, "s", false)'));

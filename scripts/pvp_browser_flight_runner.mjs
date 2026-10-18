@@ -7759,27 +7759,26 @@ async function runOnlineUiDodgeFeedbackFlight(entries) {
     let rollIssued = false;
     let defenderMovementHeld = false;
 
-    // M238: R1's light is committed on genuine pointerUP, never on DOWN.
-    // The legacy M207 DOWN -> wheel -> wait -> UP sequence rolled before
-    // any attack existed. Exact-head #39037691090 saw 3 genuine Chrome
-    // wheels and three Firefox ~210ms LMB holds, but only roll collisions
-    // and unrelated late attacks, no authentic dodge-evaded/dodge-success.
-    // Send one COMPLETE 65ms real Firefox W3C short LMB first, then aim
-    // Chrome's genuine perpendicular wheel 35ms later so the unchanged
-    // 135ms attack windup overlaps the unchanged 125ms dodge iframe.
-    // Only W3C inputs, never a synthetic attack, second wheel, or widened
-    // game window. Keep M36's strict fresh evade feedback and zero HP.
+    // R2: genuine LMB commits the light on pointerDOWN, NOT on UP.
+    // M36 #39158029761 showed first authoritative 34HP contact before
+    // Chrome's dodge i-frames, followed by genuine dodge-success. With
+    // actual Firefox down/up separated by 44ms, an obsolete 35ms host wait
+    // AFTER the W3C click ACK delayed the Chrome wheel until just 38ms
+    // before the first hit. Submit the one genuine perpendicular roll
+    // IMMEDIATELY after the full Firefox W3C click; do not add a host
+    // timer. Retain the real UP-before-wheel cross-browser epoch proof,
+    // unchanged 135ms light windup, 125ms iframe and strict zero-HP
+    // damage/parry gates. No fake input or replay of a resolved exchange.
     try {
       await aimArena(defender, defenderElementId, 0, 180);
       defenderMovementHeld = true;
       await setMovementKey(defender, "s", true);
 
       await performArenaAttackHold(attacker, attackerElementId, attackOffset, 65);
-      await sleep(35);
       await scrollArenaWheel(defender, defenderElementId, -120);
       rollIssued = true;
       console.log("M238_GENUINE_RELEASED_LIGHT_DODGE " + JSON.stringify({
-        attempt, lightHoldMs: 65, postReleaseLeadMs: 35,
+        attempt, requestedLightHoldMs: 65, postClickHostWaitMs: 0,
       }));
 
       await sleep(60);
