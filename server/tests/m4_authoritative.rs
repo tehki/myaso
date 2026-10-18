@@ -1425,7 +1425,7 @@ fn wilds_roll_cannot_refresh_an_existing_knockdown() {
 
     advance_three(
         &mut world,
-        230.0,
+        500.0,
         InputIntent::default(),
         InputIntent::default(),
         InputIntent::default(),
