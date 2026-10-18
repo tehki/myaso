@@ -7,9 +7,9 @@ use myaso_server::{
 
 #[test]
 fn real_simulation_five_kill_match_win_can_reach_research_observer() {
-    let mut world = World::new(600.0, 400.0);
-    assert!(world.add_player_at(1, 200.0, 200.0, 0.0));
-    assert!(world.add_player_at(2, 272.0, 200.0, std::f32::consts::PI));
+    let mut world = World::new(200.0, 300.0);
+    assert!(world.add_player_at(1, 100.0, 100.0, 0.0));
+    assert!(world.add_player_at(2, 160.0, 100.0, std::f32::consts::PI));
 
     let (observer, receiver) = MatchWinObserver::research_channel(1);
     let attack = InputIntent {
@@ -25,13 +25,18 @@ fn real_simulation_five_kill_match_win_can_reach_research_observer() {
         let is_idle = world
             .fighter(1)
             .is_some_and(|fighter| fighter.action == Action::Idle);
-        world.set_input(1, InputIntent::default());
-        let release = world.step_by(5.0);
-        observer.observe(world.tick, &release);
-        if is_idle {
+        // Mirror the existing authoritative first-to-five test helper:
+        // only inject a new attack edge from Idle, otherwise just release.
+        let events = if is_idle {
+            world.set_input(1, InputIntent::default());
+            let release = world.step_by(5.0);
+            observer.observe(world.tick, &release);
             world.set_input(1, attack);
-        }
-        let events = world.step_by(5.0);
+            world.step_by(5.0)
+        } else {
+            world.set_input(1, InputIntent::default());
+            world.step_by(5.0)
+        };
         observer.observe(world.tick, &events);
         if events.iter().any(|event| {
             matches!(
