@@ -1,6 +1,6 @@
 //! Offline, unpaced measurement of genuine Rust World::step_into alongside
 //! the default-off Moon Coin MatchWon observation boundary.
- //!
+//!
  //! THIS IS NOT a deployed game, WebTransport latency, 60Hz SLA, consent,
  //! replay-safe proof, wallet or settlement test. Deliberately injects a fake
  //! MatchWon on every synthetic tick for the stress cases.
@@ -53,7 +53,8 @@ impl Percentiles {
         assert!(!samples.is_empty());
         let mut sorted = samples.to_vec();
         sorted.sort_unstable();
-        let select = |pct: usize| sorted[((sorted.len() * pct).div_ceil(100) - 1).min(sorted.len() - 1)];
+        let select =
+            |pct: usize| sorted[((sorted.len() * pct).div_ceil(100) - 1).min(sorted.len() - 1)];
         Self {
             p50_ns: select(50),
             p95_ns: select(95),
@@ -137,7 +138,11 @@ fn measure(mode: Mode, ticks: usize, players: u32) -> Measurement {
         tick_times.push(clock_ns(start));
 
         let start = Instant::now();
-        let source_events = if synthetic_win { &artificial_win[..] } else { &events[..] };
+        let source_events = if synthetic_win {
+            &artificial_win[..]
+        } else {
+            &events[..]
+        };
         observer.observe(world.tick, source_events);
         observer_times.push(clock_ns(start));
 
@@ -160,8 +165,12 @@ fn measure(mode: Mode, ticks: usize, players: u32) -> Measurement {
 }
 
 fn positive_bounded(value: &str, prefix: &str, min: usize, max: usize) -> Result<usize, String> {
-    let text = value.strip_prefix(prefix).ok_or_else(|| format!("invalid argument: {value}"))?;
-    let n = text.parse::<usize>().map_err(|_| format!("invalid integer for {prefix}"))?;
+    let text = value
+        .strip_prefix(prefix)
+        .ok_or_else(|| format!("invalid argument: {value}"))?;
+    let n = text
+        .parse::<usize>()
+        .map_err(|_| format!("invalid integer for {prefix}"))?;
     if !(min..=max).contains(&n) {
         return Err(format!("{prefix} must be between {min} and {max}"));
     }
