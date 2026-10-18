@@ -8392,10 +8392,13 @@ async function runOnlineUiParryTellFlight(entries) {
   const parriedLocal = entries.find((entry) => entry.name === "chrome");
   if (!observer || !parriedLocal) throw new Error("M41 could not resolve Firefox observer / Chrome parried fighter");
 
-  await Promise.all([
+  const armed = await Promise.all([
     armParryTellSampler(observer),
     armParryTellSampler(parriedLocal),
   ]);
+  if (armed.some((status) => status !== true)) {
+    throw new Error("M41 failed to arm real canvas observers: " + JSON.stringify(armed));
+  }
   let evidence;
   let tell;
   try {
@@ -8405,7 +8408,24 @@ async function runOnlineUiParryTellFlight(entries) {
       readParryTellSampler(parriedLocal),
     ]);
     if (observerMax < 24) {
-      throw new Error(`M41 remote parry-stun tell never appeared: observer=${observerMax} local=${localMax}`);
+      // M254: fail with read-only frame sampling and authentic combat/HUD
+      // state; do not substitute HUD labels for >=24 actual raster pixels.
+      const [observerSampler, localSampler, currentEvidence] = await Promise.all([
+        readParryTellSamplerDiagnostics(observer),
+        readParryTellSamplerDiagnostics(parriedLocal),
+        Promise.all(entries.map(readUiEvidence)),
+      ]);
+      const summary = currentEvidence.map((state) => ({
+        browser: state.browser,
+        playerNetId: state.playerNetId,
+        playerHp: state.playerHp,
+        playerGuard: state.playerGuard,
+        feedbackTransitions: state.feedbackTransitions?.slice(-6),
+        focusTransitions: state.focusTransitions?.slice(-6),
+        recoveryTransitions: state.recoveryTransitions?.slice(-6),
+        eventTransitions: state.eventTransitions?.slice(-8),
+      }));
+      throw new Error(`M41 remote parry-stun tell never appeared: observer=${observerMax} local=${localMax} diagnostics=${JSON.stringify({ observerSampler, localSampler, summary })}`);
     }
     if (localMax !== 0) {
       throw new Error(`M41 local parried fighter painted the remote-only tell: ${localMax}`);
@@ -12672,13 +12692,17 @@ async function armParryTellSampler(session) {
     const context = arena?.getContext('2d');
     if (!context) return false;
     const prior = window.__MYASO_M41_PARRY_SAMPLER__;
-    if (prior?.timer) clearTimeout(prior.timer);
+    if (prior?.frame) cancelAnimationFrame(prior.frame);
     const half = 180;
     const x = Math.max(0, Math.floor(arena.width / 2 - half));
     const y = Math.max(0, Math.floor(arena.height / 2 - half));
     const width = Math.min(half * 2, arena.width - x);
     const height = Math.min(half * 2, arena.height - y);
-    const state = { active: true, timer: 0, maxPixels: 0 };
+    // M250: inspect completed native canvas frames instead of a 40ms timer
+    // that can miss a short-lived remote parry ring during driver jitter.
+    // This is read-only; no pixels, effects or combat state are injected.
+    const state = { active: true, frame: 0, maxPixels: 0, sampledFrames: 0,
+      lastSampleAtMs: null, firstRingAtMs: null, crop: { x, y, width, height } };
     const sample = () => {
       if (!state.active) return;
       const pixels = context.getImageData(x, y, width, height).data;
@@ -12686,11 +12710,14 @@ async function armParryTellSampler(session) {
       for (let i = 0; i < pixels.length; i += 4) {
         if (Math.abs(pixels[i] - 127) <= 2 && Math.abs(pixels[i + 1] - 207) <= 2 && Math.abs(pixels[i + 2] - 244) <= 2 && pixels[i + 3] >= 250) count += 1;
       }
+      state.sampledFrames += 1;
+      state.lastSampleAtMs = performance.now();
+      if (count >= 24 && state.firstRingAtMs === null) state.firstRingAtMs = state.lastSampleAtMs;
       state.maxPixels = Math.max(state.maxPixels, count);
-      state.timer = setTimeout(sample, 40);
+      state.frame = requestAnimationFrame(sample);
     };
     window.__MYASO_M41_PARRY_SAMPLER__ = state;
-    state.timer = setTimeout(sample, 20);
+    state.frame = requestAnimationFrame(sample);
     return true;
   `);
 }
@@ -12699,12 +12726,26 @@ async function readParryTellSampler(session) {
   return execute(session.base, session.sessionId, `return window.__MYASO_M41_PARRY_SAMPLER__?.maxPixels ?? 0;`);
 }
 
+async function readParryTellSamplerDiagnostics(session) {
+  return execute(session.base, session.sessionId, `
+    const state = window.__MYASO_M41_PARRY_SAMPLER__;
+    if (!state) return { armed: false };
+    return {
+      armed: true, active: state.active, sampledFrames: state.sampledFrames,
+      maxPixels: state.maxPixels, lastSampleAtMs: state.lastSampleAtMs,
+      firstRingAtMs: state.firstRingAtMs, crop: state.crop,
+      canvasWidth: document.querySelector('#arena')?.width ?? null,
+      canvasHeight: document.querySelector('#arena')?.height ?? null,
+    };
+  `);
+}
+
 async function stopParryTellSampler(session) {
   return execute(session.base, session.sessionId, `
     const state = window.__MYASO_M41_PARRY_SAMPLER__;
     if (!state) return 0;
     state.active = false;
-    if (state.timer) clearTimeout(state.timer);
+    if (state.frame) cancelAnimationFrame(state.frame);
     return state.maxPixels;
   `);
 }
