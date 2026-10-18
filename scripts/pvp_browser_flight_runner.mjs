@@ -7907,14 +7907,19 @@ async function runOnlineUiParryFlight(entries, postParrySleepMs = 80, roles = nu
     // 40ms stagger (#39162207784) produced an actual guard block -38 because
     // wheel preceded impact by ~165ms (>125ms parry window); 120ms stagger
     // (#39163209028) produced actual 34HP damage because the wheel reached
-    // the authoritative fighter too late. Test the physical midpoint 80ms,
-    // preserving original 125ms parry/650ms stun, HP and native provenance.
+    // the authoritative fighter too late. Use the measured 80ms stagger for
+    // Chrome. Firefox's native wheel has greater command latency: exact-head
+    // #39167931316 M41 observed Chrome pointerDOWN t1228 and Firefox wheel
+    // t1408 (180ms later), only 27ms before contact t1435. The same gesture
+    // on Chrome would arrive earlier. Dispatch Firefox wheel with no *extra*
+    // host delay; Firefox's own W3C command still takes finite real time.
+    // Preserve original 125ms parry/650ms stun, HP and provenance gates.
     // Keep real input, original 135ms light windup, 125ms parry, 650ms stun,
     // 100HP/100guard and the original strict 34-HP late punish proof.
     await Promise.all([
       performArenaAttackHold(attacker, attackerElementId, attackOffset, 35),
       (async () => {
-        await sleep(80);
+        if (defender.name !== "firefox") await sleep(80);
         await setArenaBlock(defender, defenderElementId, true);
       })(),
     ]);
