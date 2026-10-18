@@ -8,11 +8,14 @@ test("M33 and M146 perform complete genuine short LMB before parry, never chargi
   const end = source.indexOf("\nasync function runOnlineUiParryPunishFfaFocusFlight(", start + 20);
   assert.ok(start >= 0 && end > start);
   const flight = source.slice(start, end);
-  const tap = flight.indexOf("await performArenaAttackHold(attacker, attackerElementId, attackOffset, 75)");
-  const lead = flight.indexOf("await sleep(20)", tap);
+  const dispatch = flight.indexOf("await Promise.all([");
+  const tap = flight.indexOf("performArenaAttackHold(attacker, attackerElementId, attackOffset, 35)", dispatch);
+  const lead = flight.indexOf("await sleep(40)", tap);
   const wheel = flight.indexOf("await setArenaBlock(defender, defenderElementId, true)", lead);
   const proof = flight.indexOf("await waitForUiParryEvidence(entries, attacker, defender, 350, false, lastAttemptBaseline)", wheel);
-  assert.ok(tap >= 0 && lead > tap && wheel > lead && proof > wheel);
+  assert.ok(dispatch >= 0 && tap > dispatch && lead > tap && wheel > lead && proof > wheel);
+  assert.ok(!flight.slice(tap,proof).includes("await sleep(20)"));
+  assert.ok(flight.slice(tap,proof).includes("})(),"));
   assert.ok(!flight.includes("await setArenaAttack(attacker, attackerElementId, true, attackOffset)"));
   assert.ok(flight.includes('entry.startsWith("Heavy strike committed")'));
   assert.ok(flight.includes("if (!pristine)"));

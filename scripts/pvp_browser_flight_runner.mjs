@@ -7977,20 +7977,22 @@ async function runOnlineUiParryFlight(entries, postParrySleepMs = 80, roles = nu
   for (let attempt = 0; attempt < 4 && !evidence; attempt += 1) {
     await pulseMovementKey(attacker, movementKey, attempt === 0 ? 120 : 80);
     lastAttemptBaseline = await Promise.all(entries.map(readUiEvidence));
-    // R1 short LMB commits the light on genuine pointerUP. The pre-R1
-    // down -> wheel -> 190ms -> up sequence can exceed the 320ms charge
-    // threshold under real WebDriver latency and produce a HEAVY instead.
-    // Use one complete, 75ms trusted W3C tap before the real wheel-back.
-    // Keep its independent 125ms parry/650ms stun and genuine feedback gates.
-    await performArenaAttackHold(attacker, attackerElementId, attackOffset, 75);
-    // R2 short-LMB helper releases in <=35ms, but genuine Firefox W3C
-    // delivery and the 60Hz input sampler can consume another tick. Full
-    // M146 39153407753 observed first active hit at tick243 while block
-    // first appeared tick243 (too late for parry). Deliver real wheel 35ms
-    // earlier, inside the unchanged 125ms parry window and without adding
-    // virtual clicks, relaxing HP=100 or altering authoritative timings.
-    await sleep(20);
-    await setArenaBlock(defender, defenderElementId, true);
+    // R2 light begins on the *genuine Firefox pointerDOWN*. A sequential
+    // host-side W3C click ACK + sleep + second browser W3C wheel can arrive
+    // AFTER the first 135ms server hit under shared-runner load (#39161362913:
+    // Firefox DOWN 1792354090033, Chrome wheel 1792354090243, HP=66).
+    // Schedule independently authenticated real Firefox short LMB and Chrome
+    // wheel in parallel. Chrome's wheel is launched 40ms after the Firefox
+    // W3C action is submitted, not 20ms AFTER its completed HTTP response.
+    // Keep real input, original 135ms light windup, 125ms parry, 650ms stun,
+    // 100HP/100guard and the original strict 34-HP late punish proof.
+    await Promise.all([
+      performArenaAttackHold(attacker, attackerElementId, attackOffset, 35),
+      (async () => {
+        await sleep(40);
+        await setArenaBlock(defender, defenderElementId, true);
+      })(),
+    ]);
     evidence = await waitForUiParryEvidence(entries, attacker, defender, 350, false, lastAttemptBaseline);
     if (!evidence) {
       const after = await Promise.all(entries.map(readUiEvidence));
