@@ -4812,8 +4812,14 @@ async function runOnlineUiMultiKnockdownFfaFlight(entries) {
   // A deterministic tolerance sweep over every +/-5 px staging extreme produces
   // both contacts with 67-117 ms stagger and the second contact by 150 ms.
   // Production geometry/timing is untouched.
-  const secondaryDx = rollRight ? 40 : -40;
-  const secondaryDy = 31;
+  // R2 3-second WASD dash can legitimately fire during repeated real staging
+  // pulses. Re-measure both actual fighter positions, and stage the second
+  // opponent firmly inside the SAME 170ms mouse-roll collision corridor.
+  // Old (40,31) was at the farthest edge: exact-head 39153033803 showed a
+  // genuine roll knocking #2 down but entirely missing #3 at 42/36 offset.
+  // Keep both server-owned contacts, #2-first ordering and untouched HP gates.
+  const secondaryDx = rollRight ? 34 : -34;
+  const secondaryDy = 24;
   const rollerDx = rollRight ? -62 : 62;
   let stagedGeometry = null;
   for (let pass = 0; pass < 5; pass += 1) {
