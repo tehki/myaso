@@ -317,13 +317,7 @@ fn segment_circle(x: f32, y: f32, nx: f32, ny: f32, cx: f32, cy: f32, r: f32) ->
     let t = (-b - disc.sqrt()) / (2.0 * a);
     (0.0..=1.0).contains(&t).then_some(t)
 }
-fn segment_rect(
-    x: f32,
-    y: f32,
-    nx: f32,
-    ny: f32,
-    box_: Obstacle,
-) -> Option<f32> {
+fn segment_rect(x: f32, y: f32, nx: f32, ny: f32, box_: Obstacle) -> Option<f32> {
     let Obstacle { x0, y0, x1, y1 } = box_;
     let mut lo = 0.0f32;
     let mut hi = 1.0f32;
