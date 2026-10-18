@@ -14,21 +14,21 @@ function extractActions(id){
  const end=gesture.indexOf("]",b);
  return gesture.slice(b,end+1);
 }
-test("R1 preserves one genuine short W3C LMB held for 85ms then released",()=>{
+test("R1 preserves one genuine short W3C LMB held for 20ms then released",()=>{
  const pointer=extractActions("mouse");
  assert.equal((pointer.match(/type: "pointerDown"/g)||[]).length,1);
  assert.equal((pointer.match(/type: "pointerUp"/g)||[]).length,1);
  assert.ok(pointer.indexOf("pointerDown")<pointer.indexOf("pointerUp"));
- assert.match(pointer,/duration: 85/);
+ assert.match(pointer,/duration: 20/);
  assert.match(pointer,/duration: 0/);
- assert.ok(pointer.indexOf("duration: 85")<pointer.indexOf("pointerUp"));
+ assert.ok(pointer.indexOf("duration: 20")<pointer.indexOf("pointerUp"));
  assert.ok(pointer.indexOf("pointerUp")<pointer.lastIndexOf("duration: 0"));
 });
 test("R1 wheel-back is in the immediately following W3C tick after LMB release",()=>{
  const wheel=extractActions("wheel");
  assert.equal((wheel.match(/type: "scroll"/g)||[]).length,1);
- assert.ok(wheel.indexOf("duration: 85") < wheel.indexOf('type: "scroll"'));
- assert.ok(!wheel.includes("duration: 20"));
+ assert.ok(wheel.indexOf("duration: 20") < wheel.indexOf('type: "scroll"'));
+ assert.ok(!wheel.includes("duration: 85"));
  assert.match(wheel, /duration: 0[^]*type: "scroll"/);
  assert.match(wheel,/deltaY: 120/);
 });
