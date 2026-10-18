@@ -124,6 +124,7 @@ fn measure(mode: Mode, ticks: usize, players: u32) -> Measurement {
 
     // Drop receiver to exercise a real disconnected channel, not mock status.
     let receiver = if matches!(mode, Mode::Disconnected) {
+        drop(receiver);
         None
     } else {
         receiver
