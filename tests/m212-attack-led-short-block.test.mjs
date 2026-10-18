@@ -292,3 +292,57 @@ test("M221 missing trusted Firefox event cannot send Chrome click even after 48m
   }), /trusted wheel absent/);
   assert.equal(clicks, 0);
 });
+
+test("M249 R1 zero fixed head start still gates the only genuine click on trusted wheel event", async () => {
+  const wheelAck = deferred(), trustedWheel = deferred();
+  const events = [];
+  let time = 0;
+  const flight = dispatchM212AttackLedShortBlock({
+    now: () => time,
+    wheelHeadStartMs: 0,
+    sendWheel: () => { events.push("wheel-start"); return wheelAck.promise; },
+    awaitTrustedWheel: () => trustedWheel.promise,
+    sendAttackClick: ms => { events.push("real-click:" + ms); },
+    sleep: ms => { events.push("sleep:" + ms); },
+  });
+  await new Promise(setImmediate);
+  assert.deepEqual(events, ["wheel-start"]);
+  time = 21;
+  trustedWheel.resolve({ trusted: true, deltaY: 120 });
+  await new Promise(setImmediate);
+  assert.deepEqual(events, ["wheel-start", "real-click:10"]);
+  let completed = false;
+  flight.then(() => { completed = true; });
+  await new Promise(setImmediate);
+  assert.equal(completed, false, "wheel W3C ACK remains a final success prerequisite");
+  time = 49;
+  wheelAck.resolve();
+  const proof = await flight;
+  assert.equal(proof.wheelHeadStartMs, 0);
+  assert.equal(proof.trustedWheelObservedMs, 21);
+  assert.equal(proof.attackDownDispatchMs, 21);
+  assert.equal(proof.wheelAckMs, 49);
+  assert.equal(proof.attackDownAckMs, null);
+  assert.equal(proof.attackUpDispatchMs, null);
+  assert.deepEqual(events, ["wheel-start", "real-click:10"]);
+});
+
+test("M249 runner changes only R1 M194 call-site head start and preserves strict fail-closed guards", () => {
+  const s = readFileSync(new URL("../scripts/pvp_browser_flight_runner.mjs", import.meta.url), "utf8");
+  const begin = s.indexOf("async function runOnlineUiGuardBreakFlight(");
+  const end = s.indexOf("async function waitForUiGuardBreakEvidence(", begin);
+  assert.ok(begin >= 0 && end > begin);
+  const flight = s.slice(begin, end);
+  const scheduling = flight.indexOf("m212Exchange = await dispatchM212AttackLedShortBlock({");
+  assert.ok(scheduling > 0);
+  const options = flight.slice(scheduling, scheduling + 900);
+  assert.ok(options.includes("wheelHeadStartMs: 0"));
+  assert.ok(options.includes("awaitTrustedWheel: () => challenge.wait()"));
+  assert.ok(options.includes("sendWheel: () => scrollArenaWheel(defender, defenderElementId, 120, 0)"));
+  assert.ok(options.includes("sendAttackClick: (clickHoldMs) => performArenaM221GuardBreakClick(attacker, clickHoldMs)"));
+  assert.ok(flight.includes('defenderState?.playerHp !== 100'));
+  assert.ok(flight.includes('feedbackTransitions.includes("parried")'));
+  assert.ok(flight.includes('defenderResult.playerGuard !== 0'));
+  assert.ok(flight.includes('defenderResult.playerHp !== 100'));
+  assert.ok(flight.includes('console.log("M212_GUARD_BREAK_INGRESS "'));
+});
