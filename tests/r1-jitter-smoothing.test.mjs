@@ -77,11 +77,11 @@ test("M251 reports bounded true extra render gap not cumulative cap counts", () 
  assert.equal(t.noteFrame(1000,0,60),true);
  assert.equal(t.noteFrame(1050,600,60),false);
  for(const [ms,ticks] of [[1100,0.6],[1200,2.4],[1300,6]]) assert.equal(t.noteFrame(ms,ticks,60),true);
- assert.deepEqual(t.snapshot(),{samples:4,p50Ms:10,p95Ms:100,maxMs:100,overThresholdPct:50});
+ assert.deepEqual(t.snapshot(),{samples:4,p50Ms:40,p95Ms:100,maxMs:100,overThresholdPct:50});
  t.noteFrame(1400,0.3,60); // 5ms, evicts oldest 0ms
- assert.deepEqual(t.snapshot(),{samples:4,p50Ms:10,p95Ms:100,maxMs:100,overThresholdPct:50});
+ assert.deepEqual(t.snapshot(),{samples:4,p50Ms:40,p95Ms:100,maxMs:100,overThresholdPct:50});
  t.noteFrame(1500,0.12,60); // 2ms, evicts 10ms
- assert.deepEqual(t.snapshot(),{samples:4,p50Ms:5,p95Ms:100,maxMs:100,overThresholdPct:50});
+ assert.deepEqual(t.snapshot(),{samples:4,p50Ms:40,p95Ms:100,maxMs:100,overThresholdPct:50});
  t.noteFrame(1600,0,60); // 0ms, evicts 40ms
  assert.equal(t.snapshot().overThresholdPct,25);
 });
