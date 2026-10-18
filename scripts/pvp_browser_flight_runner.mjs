@@ -7982,20 +7982,19 @@ async function runOnlineUiParryFlight(entries, postParrySleepMs = 80, roles = nu
     // AFTER the first 135ms server hit under shared-runner load (#39161362913:
     // Firefox DOWN 1792354090033, Chrome wheel 1792354090243, HP=66).
     // Schedule independently authenticated real Firefox short LMB and Chrome
-    // wheel in parallel. Chrome's wheel is launched 120ms after the Firefox
-    // W3C action is submitted, NOT after its completed HTTP response. Strict
-    // M33 #39162207784 measured Chrome LMB DOWN t503ms, Firefox wheel
-    // t511ms, active hit t676ms with a real -38 guard BLOCK (not parry):
-    // the wheel was ~165ms before impact, outside the untouched 125ms
-    // parry window. Center the actual incoming wheel ~85ms before contact,
-    // preserving input authenticity, exact 125ms parry/650ms stun and
-    // 100HP/100guard gates.
+    // wheel in parallel, staggered after real pointerDown, NOT after the
+    // complete cross-browser WebDriver HTTP response. Strict CI evidence:
+    // 40ms stagger (#39162207784) produced an actual guard block -38 because
+    // wheel preceded impact by ~165ms (>125ms parry window); 120ms stagger
+    // (#39163209028) produced actual 34HP damage because the wheel reached
+    // the authoritative fighter too late. Test the physical midpoint 80ms,
+    // preserving original 125ms parry/650ms stun, HP and native provenance.
     // Keep real input, original 135ms light windup, 125ms parry, 650ms stun,
     // 100HP/100guard and the original strict 34-HP late punish proof.
     await Promise.all([
       performArenaAttackHold(attacker, attackerElementId, attackOffset, 35),
       (async () => {
-        await sleep(120);
+        await sleep(80);
         await setArenaBlock(defender, defenderElementId, true);
       })(),
     ]);
