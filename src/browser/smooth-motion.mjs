@@ -37,6 +37,13 @@ export function createSnapshotRenderClock({
     if (!Number.isFinite(nowMs) || !Number.isInteger(serverTick) || serverTick < 0 || serverTick > 0xffffffff) {
       throw new TypeError("valid server uint32 tick and monotonic browser time required");
     }
+    // M251: the browser client exposes initial latestServerTick=0 before the
+    // first real authoritative snapshot. Do not anchor the renderer to this
+    // placeholder: a long-running server might first report tick 3,800,000,
+    // and bounding that as an ordinary 1.45x WAN burst would take HOURS to
+    // catch up. Real servers starting at tick zero still show a stable zero
+    // frame until their first nonzero tick; no authority is forged or skipped.
+    if (latestTick === null && serverTick === 0) return 0;
     if (latestTick === null || nowMs < arrivalMs) {
       latestTick = serverTick;
       arrivalMs = nowMs;

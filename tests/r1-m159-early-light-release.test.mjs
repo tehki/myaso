@@ -9,12 +9,17 @@ test("M159 real light releases before slow remote knockdown-reaim, preserves M20
   assert.ok(start >= 0 && end > start);
   const flight = source.slice(start, end);
   const down = flight.indexOf("await setArenaAttackButton(punisher, true)");
-  const hold = flight.indexOf("await sleep(40)", down);
+  const hold = flight.indexOf("await sleep(5)", down);
   const up = flight.indexOf("await setArenaAttackButton(punisher, false)", hold);
   const secondary = flight.indexOf("const secondState = await readUiEvidence(secondVictim)", up);
   const reaim = flight.indexOf("await aimArenaForExclusiveAuthoritativeTarget(", secondary);
   const verifier = flight.indexOf("verifyM209DualKnockdownServerPunish(m201ServerOutput()", reaim);
   assert.ok(down > 0 && hold > down && up > hold && secondary > up && reaim > secondary && verifier > reaim);
+  // The original 260ms authentic knockdown window and actual 60Hz proof stay
+  // mandatory; we reclaim 35ms only from a genuine, shorter browser tap.
+  assert.ok(!flight.includes("await sleep(40);\n  await setArenaAttackButton(punisher, false);"));
+  assert.ok(flight.includes("punishDown.epochMs >= provenance.firstKnockdown.epochMs + COMBAT.dodge.collisionKnockdownMs"));
+  assert.ok(flight.includes("verifyM209DualKnockdownServerPunish(m201ServerOutput()"));
   assert.equal(flight.match(/await setArenaAttackButton\(punisher, true\)/g)?.length, 1);
   assert.equal(flight.match(/await setArenaAttackButton\(punisher, false\)/g)?.length, 1);
   assert.ok(flight.includes("punishDowns.length !== 1 || punishUps.length !== 1"));
