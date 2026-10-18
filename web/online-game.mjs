@@ -8,6 +8,7 @@ import { COMBAT_ACTION, blockSpatialPresentation, combatActionHint, combatOverla
 import { COMBAT } from "../src/combat/model.mjs";
 import { isTickNewer32, reconcilePrediction } from "../src/browser/reconciliation.mjs";
 import { createReconciliationCamera, createSnapshotRenderClock } from "../src/browser/smooth-motion.mjs";
+import { createRenderGapTelemetry } from "../src/browser/render-gap-telemetry.mjs";
 import { ARENA_VIEW_ZOOM, nearbyOffscreenPointers, projectArenaPoint } from "../src/browser/arena-viewport.mjs";
 import { NETWORK } from "../src/network/constants.mjs";
 import { connectAuthoritativeClient, parseSha256Hex } from "./authoritative-client.mjs";
@@ -109,6 +110,7 @@ const killFeedSequences = new Set();
 
 const params = new URLSearchParams(window.location.search);
 const diagnosticsVisible = params.get("netstats") === "1";
+const renderGapTelemetry = diagnosticsVisible ? createRenderGapTelemetry() : null;
 const diagnosticsPanel = document.querySelector("#network-diagnostics");
 if (diagnosticsPanel) diagnosticsPanel.hidden = !diagnosticsVisible;
 let lastDiagnosticsDrawMs = 0;
@@ -116,6 +118,7 @@ function updateNetworkDiagnostics(nowMs) {
   if (!diagnosticsVisible || !diagnosticsPanel || !networkClient || nowMs - lastDiagnosticsDrawMs < 500) return;
   lastDiagnosticsDrawMs = nowMs;
   const s = networkClient.diagnostics.snapshot();
+  const renderGap = renderGapTelemetry.snapshot();
   const time = (ms) => ms === null ? "collecting…" : `${Math.round(ms)}ms`;
   // textContent only: measurements never enter HTML, storage or network logs.
   diagnosticsPanel.textContent =
@@ -126,6 +129,8 @@ function updateNetworkDiagnostics(nowMs) {
     + ` | Stale-own ACKs ${s.staleOwnAtAckCount}`
     + ` | Deferred reconciles ${networkClient.ackGateMetrics.deferred}`
     + ` | Render catch-ups ${snapshotRenderClock.metrics().boundedCatchups}`
+    + ` | Extra render lag p50 ${time(renderGap.p50Ms)} · p95 ${time(renderGap.p95Ms)}`
+    + ` | >33ms ${renderGap.overThresholdPct === null ? "collecting…" : renderGap.overThresholdPct + "%"} (${renderGap.samples} samples)`
     + ` | Samples ${s.inputAckSamples}`;
 }
 const acceptanceScenario = params.get("scenario");
@@ -752,6 +757,9 @@ function render(nowMs = performance.now(), impact = combatImpact.sample(nowMs)) 
   // 20Hz packets alone cannot drive smooth 60Hz remote motion. Interpolate
   // with an advancing render-only clock; cap extrapolation on missing packets.
   const renderServerTick = snapshotRenderClock.sample(networkClient.latestServerTick, nowMs);
+  // Opt-in read-only sampling never feeds back into the clock or gameplay.
+  if (renderGapTelemetry) renderGapTelemetry.noteFrame(nowMs,
+    snapshotRenderClock.metrics().targetGapTicks, NETWORK.serverSimulationHz);
   visualCamera.sample(local, nowMs, visualCameraPosition);
   updateNetworkDiagnostics(nowMs);
   const recoveryFocusNetId = fighterRecoveryNetId(networkClient.state, ownId);
@@ -1682,11 +1690,13 @@ function handleVisibilityChange() {
     animationFrameId = 0;
     frameBudget.reset();
     snapshotRenderClock.reset();
+    if (renderGapTelemetry) renderGapTelemetry.reset();
     visualCamera.reset();
     return;
   }
   frameBudget.reset(performance.now());
   snapshotRenderClock.reset();
+  if (renderGapTelemetry) renderGapTelemetry.reset();
   visualCamera.reset();
   if (!animationFrameId) animationFrameId = requestAnimationFrame(frame);
 }
