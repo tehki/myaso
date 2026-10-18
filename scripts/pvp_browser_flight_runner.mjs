@@ -5258,14 +5258,17 @@ async function runOnlineUiMultiKnockdownFfaHitFlight(entries) {
 
   // R1 short LMB commits on authentic pointerUP, not pointerDOWN.
   // Keep the genuine press synchronized to the observed authoritative dodge
-  // and RELEASE after 40ms, before cross-browser #3-knockdown observation or
+  // and RELEASE after 5ms, before cross-browser #3-knockdown observation or
   // retargeting latency can postpone the 135ms light windup beyond the
   // unchanged 260ms shared knockdown. A fresh genuine mouse move re-aims
   // during the already-committed windup after #3's actual knockdown.
   // The unchanged strict M209 60Hz server proof must still show active AND
   // the exact single 34HP hit strictly before either victim recovers.
   await setArenaAttackButton(punisher, true);
-  await sleep(40);
+  // M252 integrates M246: real R1 short-LMB triggers on pointerUP.
+  // Use an authentic 5ms W3C down/up tap to preserve the strict unchanged
+  // 260ms BOTH-knockdown overlap under cross-browser driver scheduling.
+  await sleep(5);
   await setArenaAttackButton(punisher, false);
   let windupReaim = null;
   const reaimDeadline = Date.now() + Math.max(80, COMBAT.attack.windupMs - 20);
@@ -9323,6 +9326,9 @@ async function runOnlineUiGuardBreakFlight(entries, { onGuardBroken = null } = {
           "window.__MYASO_M221_WHEEL_TOKEN__ = " + JSON.stringify(challenge.token)
             + "; return true;");
         m212Exchange = await dispatchM212AttackLedShortBlock({
+          // M252 integrates M249: no obsolete fixed 48ms post-wheel delay
+          // after genuine trusted Firefox wheel receipt in R1 guardbreak.
+          wheelHeadStartMs: 0,
           sendWheel: () => scrollArenaWheel(defender, defenderElementId, 120, 0),
           awaitTrustedWheel: () => challenge.wait(),
           sendAttackClick: (clickHoldMs) => performArenaM221GuardBreakClick(attacker, clickHoldMs),
