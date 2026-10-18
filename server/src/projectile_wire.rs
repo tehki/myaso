@@ -35,9 +35,7 @@ pub fn encode_projectile_snapshot(world: &World, viewer: u32) -> Vec<u8> {
     disarmed.truncate(MAX_VISIBLE_DISARMED);
 
     let mut payload = Vec::with_capacity(
-        HEADER_BYTES
-            + projectiles.len() * PROJECTILE_BYTES
-            + disarmed.len() * DISARMED_BYTES,
+        HEADER_BYTES + projectiles.len() * PROJECTILE_BYTES + disarmed.len() * DISARMED_BYTES,
     );
     payload.push(crate::PROTOCOL_VERSION);
     payload.push(PROJECTILE_SNAPSHOT_TYPE);
@@ -52,10 +50,10 @@ pub fn encode_projectile_snapshot(world: &World, viewer: u32) -> Vec<u8> {
         payload.extend_from_slice(&projectile.owner.to_le_bytes());
         payload.extend_from_slice(&position(projectile.x).to_le_bytes());
         payload.extend_from_slice(&position(projectile.y).to_le_bytes());
-        payload.extend_from_slice(
-            &angle(projectile.dir_y.atan2(projectile.dir_x)).to_le_bytes(),
-        );
-        let remaining = projectile.expires_at.saturating_sub(world.projectile_now_ms());
+        payload.extend_from_slice(&angle(projectile.dir_y.atan2(projectile.dir_x)).to_le_bytes());
+        let remaining = projectile
+            .expires_at
+            .saturating_sub(world.projectile_now_ms());
         let remaining_seconds = remaining.div_ceil(1000).min(u16::MAX as u64) as u16;
         payload.extend_from_slice(&remaining_seconds.to_le_bytes());
     }
@@ -98,7 +96,10 @@ mod tests {
         assert_eq!(empty[3], 0);
         world.throw_weapon(1).unwrap();
         let payload = encode_projectile_snapshot(&world, 1);
-        assert_eq!(payload.len(), HEADER_BYTES + PROJECTILE_BYTES + DISARMED_BYTES);
+        assert_eq!(
+            payload.len(),
+            HEADER_BYTES + PROJECTILE_BYTES + DISARMED_BYTES
+        );
         assert_eq!(payload[0..4], [1, 6, 1, 1]);
         assert_eq!(u16::from_le_bytes([payload[8], payload[9]]), 30_000);
         assert_eq!(u32::from_le_bytes(payload[12..16].try_into().unwrap()), 1);
@@ -109,9 +110,11 @@ mod tests {
 
     #[test]
     fn snapshot_is_strictly_bounded_below_quic_datagram_budget() {
-        assert!(HEADER_BYTES
-            + MAX_VISIBLE_PROJECTILES * PROJECTILE_BYTES
-            + MAX_VISIBLE_DISARMED * DISARMED_BYTES
-            <= crate::CONSERVATIVE_DATAGRAM_BYTES);
+        assert!(
+            HEADER_BYTES
+                + MAX_VISIBLE_PROJECTILES * PROJECTILE_BYTES
+                + MAX_VISIBLE_DISARMED * DISARMED_BYTES
+                <= crate::CONSERVATIVE_DATAGRAM_BYTES
+        );
     }
 }
