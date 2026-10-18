@@ -1,9 +1,9 @@
 //! Offline, unpaced measurement of genuine Rust World::step_into alongside
 //! the default-off Moon Coin MatchWon observation boundary.
 //!
- //! THIS IS NOT a deployed game, WebTransport latency, 60Hz SLA, consent,
- //! replay-safe proof, wallet or settlement test. Deliberately injects a fake
- //! MatchWon on every synthetic tick for the stress cases.
+//! THIS IS NOT a deployed game, WebTransport latency, 60Hz SLA, consent,
+//! replay-safe proof, wallet or settlement test. Deliberately injects a fake
+//! MatchWon on every synthetic tick for the stress cases.
 
 use myaso_server::{
     match_observer::{MatchWinObserver, ObserverCounters},
