@@ -5,6 +5,7 @@ import { createDirectionalDash } from "../src/browser/dash-input.mjs";
 import { createLeftButtonCharge } from "../src/browser/left-button-charge.mjs";
 import { captureLightAttackMovement, resolveLightAttackReleaseMovement } from "../src/browser/light-attack-movement.mjs";
 import { createCombatImpactController } from "../src/browser/combat-impact.mjs";
+import { createGameAudio, installGameAudioControls, soundForCombatFeedback, createRemoteActionAudioTracker } from "../src/browser/game-audio.mjs";
 import { COMBAT_ACTION, blockSpatialPresentation, combatActionHint, combatOverlayPresentation, createCombatReadabilityTracker, createRemoteDamageTracker, fighterFocusNetId, fighterGuardBreakPunishNetId, guardBreakPunishRangeCue, fighterKnockdownPunishNetId, knockdownPunishRangeCue, fighterParryPunishNetId, parryPunishRangeCue, fighterRecoveryNetId, recoveryPunishRangeCue, punishRangeCueIntent, fighterIdentityPresentation, fighterThreatBearingLabel, fighterThreatGuardArcLabel, fighterThreatNetId, fighterThreatPhaseLabel, fighterThreatPhaseState, fighterMatchPointPresentation, fighterMatchPresentation, fighterScoreboardPresentation, FFA_KILL_TARGET, fighterVitalsPresentation, guardBreakSpatialPresentation, killFeedPresentation, opponentRecoveryPresentation, parrySpatialPresentation, staminaDenialPresentation, ownCombatReadinessPresentation } from "../src/browser/combat-readability.mjs";
 import { COMBAT } from "../src/combat/model.mjs";
 import { isTickNewer32, reconcilePrediction } from "../src/browser/reconciliation.mjs";
@@ -144,6 +145,9 @@ const webTransportOptions = cert
   : undefined;
 
 const keys = new Set();
+const audio = createGameAudio();
+installGameAudioControls(audio);
+const remoteActionAudio = createRemoteActionAudioTracker();
 const dashGesture = createDirectionalDash();
 let dashRequested = false;
 let dashMove = null;
@@ -179,6 +183,7 @@ let middleBlockHeld = false;
 const leftButtonCharge = createLeftButtonCharge({
   onLight() {
     attackRequested = true;
+    audio.play("light");
     committedLightMove = resolveLightAttackReleaseMovement(
       captureLightAttackMovement(keys), leftButtonPressMovement);
     leftButtonPressMovement = null;
@@ -188,11 +193,12 @@ const leftButtonCharge = createLeftButtonCharge({
       queueStaminaDenial("running-attack");
     }
   },
-  onHeavy() { heavyAttackRequested = true; leftButtonPressMovement = null; },
+  onHeavy() { heavyAttackRequested = true; audio.play("heavy"); leftButtonPressMovement = null; },
 });
 const rightButtonGesture = installRightButtonGesture(canvas, {
   onKick: () => {
     kickRequested = true;
+    audio.play("kick");
     queueStaminaDenial("kick");
   },
 });
@@ -204,6 +210,7 @@ canvas.addEventListener("auxclick", (event) => {
 });
 canvas.addEventListener("pointerdown", (event) => {
   canvas.focus();
+  audio.unlock();
   updateMouse(event);
   if (event.button === 1) {
     event.preventDefault();
@@ -251,25 +258,31 @@ canvas.addEventListener("wheel", (event) => {
   canvas.focus();
   if (event.deltaY < 0) {
     rollRequested = true;
+    audio.play("roll");
     queueStaminaDenial("roll");
   } else if (event.deltaY > 0) {
     shortBlockUntil = Math.max(shortBlockUntil, performance.now() + COMBAT.block.shortBlockMs);
+    audio.play("parry");
   }
 }, { passive: false });
 canvas.addEventListener("pointermove", updateMouse);
 canvas.addEventListener("keydown", (event) => {
+  audio.unlock();
   if (["KeyW", "KeyA", "KeyS", "KeyD", "KeyE", "Space"].includes(event.code)) event.preventDefault();
   if (["KeyW", "KeyA", "KeyS", "KeyD"].includes(event.code) && !keys.has(event.code)) {
     const direction = dashGesture.press(event.code, performance.now(), event.repeat);
     if (direction && local.action === COMBAT_ACTION.idle
       && local.stamina >= COMBAT.dash.staminaCost) {
       dashRequested = true; dashMove = direction;
+      audio.play("roll");
     }
   }
   keys.add(event.code);
   if (event.code === "KeyE" && !event.repeat) heavyAttackRequested = true;
+  if (event.code === "KeyE" && !event.repeat) audio.play("heavy");
   if (event.code === "Space" && !event.repeat) {
     jumpRequested = true;
+    audio.play("jump");
     queueStaminaDenial("jump");
     if (leftButtonDown) leftButtonCharge.commitLight();
   }
@@ -348,6 +361,7 @@ function observeCombatState(state) {
   }
   const now = performance.now();
   remoteDamage.observe(state, ownId, now);
+  remoteActionAudio.observe(state, ownId, (cue, options) => audio.play(cue, options));
   const event = combatReadability.observe(state, ownId);
   if (!event) return;
   combatMessage = event.text;
@@ -454,6 +468,7 @@ function recordKillEvent(event) {
   if (!presentation.visible) return;
   killFeedSequences.add(event.sequence);
   killFeedEntries.unshift({ sequence: event.sequence, ...presentation });
+  if (presentation.victimOwn) audio.play("death");
   while (killFeedEntries.length > 4) {
     const removed = killFeedEntries.pop();
     killFeedSequences.delete(removed.sequence);
@@ -481,6 +496,8 @@ function clearKillFeed() {
 
 function showCombatFeedback(feedback) {
   if (!feedback || !arenaStage) return;
+  const cue = soundForCombatFeedback(feedback);
+  if (cue) audio.play(cue);
   combatImpact.trigger(feedback, performance.now());
   if (combatFeedbackTimer) clearTimeout(combatFeedbackTimer);
   delete arenaStage.dataset.combatFeedback;
@@ -680,6 +697,9 @@ function sampleInput() {
   currentInput.kick = kickRequested;
   currentInput.run = rightButtonGesture.isRunning();
   currentInput.jump = jumpRequested;
+  if (local.action === COMBAT_ACTION.idle && (currentInput.moveX || currentInput.moveY)) {
+    audio.play("step", { level: currentInput.run ? .90 : .55 });
+  }
 }
 
 function simulatePrediction(stepMs) {
