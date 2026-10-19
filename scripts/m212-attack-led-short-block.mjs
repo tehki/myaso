@@ -82,10 +82,21 @@ export async function dispatchM212AttackLedShortBlock({
     // not after a delayed HTTP driver ACK or synthetic event. Real CI
     // #39303800110 recorded the third guard-break wheel at server tick 379,
     // Chrome windup already at 377, and a true PARRY at 385 (6 ticks).
-    // One optional 45ms genuine post-wheel pause centers a block-only hit
-    // after the unchanged 125ms parry expires and before 240ms block expiry.
-    // Fail-closed HP/guard/parry and W3C ACK assertions are unchanged.
-    if (postTrustedWheelMs > 0) await sleep(postTrustedWheelMs);
+    // Typical trusted receipts consume ~5-14ms; CI #39309716318 attempt
+    // 5 consumed 70ms, then a further fixed 45ms made the genuine light hit
+    // after the 240ms block expired (34 HP unblocked). Budget the pause from
+    // actual elapsed time since the W3C wheel command, reserving the ordinary
+    // 12ms receipt transit only. A delayed receipt consumes the pause instead
+    // of appending it. Never send before the trusted event is observed.
+    // The server's 125ms parry / 240ms block intervals and all HP/guard,
+    // receipt, ACK, and genuine browser input assertions remain unchanged.
+    if (postTrustedWheelMs > 0) {
+      const normalReceiptBudgetMs = 12;
+      const elapsedMs = Math.max(0, now() - startedAt);
+      const alreadyConsumedMs = Math.max(0, elapsedMs - normalReceiptBudgetMs);
+      const remainingPauseMs = Math.max(0, postTrustedWheelMs - alreadyConsumedMs);
+      if (remainingPauseMs > 0) await sleep(remainingPauseMs);
+    }
   } else {
     const [wheelResult] = await Promise.all([wheelOutcome, sleep(wheelHeadStartMs)]);
     if (!wheelResult.ok) throw wheelResult.error;
