@@ -133,6 +133,12 @@ test("R3 shared audio is wired to both runtimes without delaying light attacks",
     assert.match(source, /onLight\(\) \{[\s\S]*?audio\.play\("light"\)/);
     assert.match(source, /audio\.play\("step"/);
     assert.match(source, /audio\.play\("jump"\)/);
+    const pointerDown = source.slice(source.indexOf('canvas.addEventListener("pointerdown"'), source.indexOf("function onLeftPointerUp"));
+    const inputIndex = pointerDown.indexOf("leftButtonCharge.press(");
+    const unlockIndex = pointerDown.indexOf("audio.unlock();", inputIndex);
+    assert.ok(inputIndex >= 0 && unlockIndex > inputIndex, "native pointer attack commits before the AudioContext starts");
+    assert.match(pointerDown, /if \(firstAudioGesture && accepted\) audio\.play\("light"\)/,
+      "the first legitimate attack still receives its sound once unlocked");
   }
   const online = readFileSync(new URL("../web/online-game.mjs", import.meta.url), "utf8");
   assert.match(online, /remoteActionAudio\.observe/);
