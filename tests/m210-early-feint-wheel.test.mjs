@@ -41,8 +41,8 @@ test("M210 preserves unchanged 70ms feint, strict 100HP and one observed recover
  assert.ok(flight.includes("COMBAT.feint.staminaCost"));
  assert.ok(flight.includes("exhaustedLightDown"));
  assert.ok(flight.includes("exhaustedWheelBack"));
- assert.ok(flight.includes("exhaustedWheelBack.epochMs - exhaustedLightUp.epochMs > 80"));
- assert.ok(flight.includes("exhaustedWheelBack.epochMs < exhaustedLightUp.epochMs"));
+ assert.ok(flight.includes("exhaustedWheelBack.epochMs - exhaustedLightDown.epochMs > COMBAT.feint.lightWindowMs"));
+ assert.ok(flight.includes("exhaustedWheelBack.epochMs > exhaustedLightUp.epochMs"));
 });
 
 
