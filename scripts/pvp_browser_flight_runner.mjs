@@ -8511,6 +8511,27 @@ async function runOnlineUiParryPunishWindowFlight(entries) {
   }));
 }
 
+// M255: M41's native parry can finish one animation frame before its raster
+// effect becomes visible. Sample the actual completed canvas frames for a
+// bounded 350ms; never substitute an action/HUD label for >=24 real pixels.
+async function awaitParryTellRaster(observer, parriedLocal, timeoutMs = 350) {
+  const deadline = Date.now() + timeoutMs;
+  let observerMax = 0;
+  let localMax = 0;
+  do {
+    const [observedPixels, localPixels] = await Promise.all([
+      readParryTellSampler(observer),
+      readParryTellSampler(parriedLocal),
+    ]);
+    observerMax = Math.max(observerMax, observedPixels);
+    localMax = Math.max(localMax, localPixels);
+    if (observerMax >= 24) break;
+    if (Date.now() >= deadline) break;
+    await sleep(20);
+  } while (true);
+  return [observerMax, localMax];
+}
+
 async function runOnlineUiParryTellFlight(entries) {
   const observer = entries.find((entry) => entry.name === "firefox");
   const parriedLocal = entries.find((entry) => entry.name === "chrome");
@@ -8527,10 +8548,7 @@ async function runOnlineUiParryTellFlight(entries) {
   let tell;
   try {
     evidence = await runOnlineUiParryFlight(entries);
-    const [observerMax, localMax] = await Promise.all([
-      readParryTellSampler(observer),
-      readParryTellSampler(parriedLocal),
-    ]);
+    const [observerMax, localMax] = await awaitParryTellRaster(observer, parriedLocal);
     if (observerMax < 24) {
       // M254: fail with read-only frame sampling and authentic combat/HUD
       // state; do not substitute HUD labels for >=24 actual raster pixels.
