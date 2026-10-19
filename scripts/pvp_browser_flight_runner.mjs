@@ -1233,7 +1233,16 @@ async function performHeavyCounterplayWindowWheel(
 }
 
 async function runOnlineUiHeavyBlockFlight(entries) {
-  const staged = await prepareHeavyCounterplayFlight(entries, "M107 heavy block");
+  // R2 restored heavy reach 130 -> 82 with a physical 24px active lunge.
+  // The old 180ms approach left the victim barely inside late lunge contact,
+  // after the authentic 240ms defender block had expired (native M188 RED:
+  // one real 46HP hit). Close ~24px more with genuine 215px/s movement
+  // before the exchange, so impact occurs at the start of heavy active.
+  // Keep M223 genuine server-windup timing, exact -64 guard, 100HP and
+  // parry/late-block failure gates unchanged.
+  const staged = await prepareHeavyCounterplayFlight(
+    entries, "M107 heavy block", { movementMs: 290 },
+  );
   const { attacker, defender, attackerElementId, defenderElementId, movementCode } = staged;
   const attackRight = movementCode === "KeyD";
   const attackOffset = attackRight ? 200 : -200;
