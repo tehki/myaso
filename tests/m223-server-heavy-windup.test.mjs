@@ -103,10 +103,14 @@ test("M226 uses later genuine parry wheel only, preserving M188 and M107 strict 
   // Move the dispatch target without changing original guard / parry windows.
   assert.ok(block.includes("attackOffset, blockOffset, 255,"));
   assert.ok(!block.includes("attackOffset, blockOffset, 155,"));
-  assert.ok(parry.includes("attackOffset, blockOffset, 285,"));
+  // Short-reach active lunge: authoritative block tick 605, hit tick 615
+  // proves 285ms is ~167ms before contact; aim genuine parry wheel later.
+  assert.ok(parry.includes("attackOffset, blockOffset, 365,"));
   assert.ok(source.includes('feedbackTransitions.includes("parried")'));
   assert.ok(source.includes("defenderResult.playerGuard !== 100"));
   assert.ok(source.includes("defenderResult.playerHp !== 100"));
+  assert.deepEqual(planM223WheelDelay({targetAfterWindupMs:365,sampledWheelIngressMs:69}),
+    {boundedWheelIngressMs:69,wheelDelayMs:296});
   assert.deepEqual(planM223WheelDelay({targetAfterWindupMs:285,sampledWheelIngressMs:82}),
     {boundedWheelIngressMs:82,wheelDelayMs:203});
   assert.throws(()=>planM223WheelDelay({targetAfterWindupMs:265,sampledWheelIngressMs:82}),TypeError);
