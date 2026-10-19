@@ -44,7 +44,7 @@ test("M234 anchors both M144 and M145 to a trusted receipt, preserving genuine g
   assert.ok(!flight.includes("spatial ? null : m227Registry.issue()"));
   const challengeAt = flight.indexOf("const lightChallenge = m227Registry.issue();");
   const armAt = flight.indexOf("window.__MYASO_M227_LIGHT_TOKEN__");
-  const pressAt = flight.indexOf("performArenaAttackHold(lightAttacker, lightArena, 200, 90)");
+  const pressAt = flight.indexOf("performArenaAttackHold(lightAttacker, lightArena, 200, 45)");
   const waitAt = flight.indexOf("await lightChallenge.wait()");
   const delayAt = flight.indexOf("await sleep(jumpInputDelayMs)");
   const chordAt = flight.indexOf("performArenaJumpAttackChord(jumpAttacker, jumpArena, -200, 90)");
