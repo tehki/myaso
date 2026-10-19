@@ -10,11 +10,11 @@ test("M331 genuine wheel is issued before real LMB release after pointerDOWN", (
   const flight = source.slice(start, end);
   const pointer = flight.slice(flight.indexOf('id: `mouse-${session.name}`'), flight.indexOf('id: `wheel-${session.name}`'));
   const wheel = flight.slice(flight.indexOf('id: `wheel-${session.name}`'), flight.indexOf("\n      ],\n    });", flight.indexOf('id: `wheel-${session.name}`')));
-  const types = input => [...input.matchAll(/\\{ type: "(pointerMove|pointerDown|pointerUp|pause|scroll)"/g)].map(x => x[1]);
+  const types = input => [...input.matchAll(/\{ type: "(pointerMove|pointerDown|pointerUp|pause|scroll)"/g)].map(x => x[1]);
   assert.deepEqual(types(pointer), ["pointerMove", "pointerDown", "pause", "pause", "pointerUp"]);
   assert.deepEqual(types(wheel), ["pause", "pause", "scroll", "pause", "pause"]);
-  assert.match(pointer, /pointerDown", button: 0 },\\s*{ type: "pause", duration: 0 },\\s*{ type: "pause", duration: 20 },\\s*{ type: "pointerUp"/);
-  assert.match(wheel, /deltaY: 120[^\\n]*},\\s*{ type: "pause", duration: 20 }/);
+  assert.match(pointer, /pointerDown", button: 0 },\s*{ type: "pause", duration: 0 },\s*{ type: "pause", duration: 20 },\s*{ type: "pointerUp"/);
+  assert.match(wheel, /deltaY: 120[^\n]*},\s*{ type: "pause", duration: 20 }/);
   assert.doesNotMatch(pointer.slice(pointer.indexOf('{ type: "pointerUp"')), /{ type: "pause"/);
   assert.ok(!wheel.includes("duration: 85"));
   assert.ok(flight.includes('type: "pointer"') && flight.includes('type: "wheel"'));
