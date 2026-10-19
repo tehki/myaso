@@ -473,6 +473,12 @@ fn m201_flight_proof_lines(
     }
     for event in events {
         match event {
+            CombatEvent::Block { attacker, target } => lines.push(format!(
+                "M201_AUTH_BLOCK tick={tick} attacker={attacker} target={target}"
+            )),
+            CombatEvent::Parry { attacker, target } => lines.push(format!(
+                "M201_AUTH_PARRY tick={tick} attacker={attacker} target={target}"
+            )),
             CombatEvent::GuardBreak { attacker, target } => lines.push(format!(
                 "M201_AUTH_BREAK tick={tick} attacker={attacker} target={target}"
             )),
