@@ -16,7 +16,11 @@ test("restored short heavy reaches during the guarded active window through real
   const span = runner.slice(runner.indexOf("async function runOnlineUiHeavyBlockFlight("),
     runner.indexOf("async function runOnlineUiHeavyParryFlight("));
   assert.match(span, /prepareHeavyCounterplayFlight\(\s*entries, "M107 heavy block", \{ movementMs: 400 \}/);
-  assert.match(span, /targetAfterWindupMs|155/);
+  // Trace-backed genuine wheel lead: tick 2635 windup, tick 2643 block,
+  // tick 2660 hit proved 155ms expired before contact. Preserve original
+  // 125ms parry and 240ms short block periods; change only test staging.
+  assert.match(span, /attackOffset, blockOffset, 255,/);
+  assert.doesNotMatch(span, /attackOffset, blockOffset, 155,/);
   assert.match(span, /defenderResult\.playerHp === 100/);
   assert.match(span, /"parried"/);
   assert.match(span, /"parry-success"/);
