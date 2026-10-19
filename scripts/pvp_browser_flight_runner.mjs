@@ -11142,7 +11142,10 @@ async function runOnlineUiMultiRecoveryFfaFocusFlight(entries, spatial = false) 
   // genuine light UP, when the R1 short attack is already classified, so
   // WebDriver/HTTP startup jitter cannot consume its recovery overlap.
   // Both unchanged strict 60..200ms and 70..150ms windows are checked below.
-  const jumpInputDelayMs = spatial ? 100 : 70;
+  // M326: stage the genuine M145 W3C chord 20ms earlier after the trusted
+  // light pointerDOWN receipt. Keep the strict measured 70..150ms lead gate,
+  // genuine native Space/LMB inputs, and independent M144 release delay intact.
+  const jumpInputDelayMs = spatial ? 80 : 70;
   const lightChallenge = m227Registry.issue({ type: spatial ? "pointerdown" : "pointerup" });
   if (lightChallenge) {
     await execute(lightAttacker.base, lightAttacker.sessionId,

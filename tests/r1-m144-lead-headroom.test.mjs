@@ -8,7 +8,7 @@ test("M144 retains exact real 60..200ms light-release lead gate with earlier tru
   const end = source.indexOf("\nasync function ", start + 20);
   assert.ok(start > 0 && end > start);
   const flight = source.slice(start, end);
-  assert.ok(flight.includes("const jumpInputDelayMs = spatial ? 100 : 70;"));
+  assert.ok(flight.includes("const jumpInputDelayMs = spatial ? 80 : 70;"));
   assert.ok(flight.includes("await lightChallenge.wait()"));
   assert.ok(flight.includes('m227Registry.issue({ type: spatial ? "pointerdown" : "pointerup" })'));
   assert.ok(flight.includes("await sleep(jumpInputDelayMs)"));
@@ -24,4 +24,22 @@ test("M144 retains exact real 60..200ms light-release lead gate with earlier tru
   assert.ok(flight.includes("const minLeadMs = spatial ? 70 : 60;"));
   assert.ok(flight.includes("const maxLeadMs = spatial ? 150 : 200;"));
   assert.ok(flight.includes("evidence.some((entry) => entry.playerHp !== 100 || entry.playerGuard !== 100)"));
+});
+
+
+test("M326 authentic spatial jump headroom retains unchanged measured and server gates", () => {
+  const source = readFileSync(new URL("../scripts/pvp_browser_flight_runner.mjs", import.meta.url), "utf8");
+  const start = source.indexOf("async function runOnlineUiMultiRecoveryFfaFocusFlight(");
+  const end = source.indexOf("\nasync function ", start + 20);
+  const flight = source.slice(start, end);
+  assert.ok(flight.includes("const jumpInputDelayMs = spatial ? 80 : 70;"));
+  assert.ok(flight.includes('m227Registry.issue({ type: spatial ? "pointerdown" : "pointerup" })'));
+  assert.ok(flight.includes("await lightChallenge.wait()"));
+  assert.ok(flight.includes("const minLeadMs = spatial ? 70 : 60;"));
+  assert.ok(flight.includes("const maxLeadMs = spatial ? 150 : 200;"));
+  assert.ok(flight.includes("jumpAttackDowns[0].epochMs - lightDowns[0].epochMs"));
+  assert.ok(flight.includes("jumpAttackDowns[0].epochMs - lightUps[0].epochMs"));
+  assert.ok(flight.includes("inputLeadMs < minLeadMs || inputLeadMs > maxLeadMs"));
+  assert.ok(flight.includes("verifyM211DualRecoveryServerProof(m201ServerOutput()"));
+  assert.ok(!flight.includes("dispatchEvent("));
 });
