@@ -1,6 +1,8 @@
 # World & Buildings B2 — isolated atomic two-world prototype
 
-This stacks on B1 (#338). It introduces **a dormant Rust multi-world
+B1 (#338) passed its full required GitHub quality gate and was merged into
+`main` at `c398047fdcddff33de3323fc4eba2dd09ac419d3`. This B2 branch is
+rebased directly onto that commit. B2 introduces **a dormant Rust multi-world
 simulation container**; the live WebTransport connection handler, production
 server, WebSocket fallback, browser client, packet version and all existing
 combat timings remain unchanged.
@@ -53,5 +55,7 @@ remote snapshots on zone change, and prove a third client outside receives
 no tavern entities or attack effects. Benchmark, add collision maps,
 rollback, and only then consider release enablement.
 
-Governance: required exact-head quality must pass on both B1 and B2; B2
-may not be merged before B1. PR merge is not production deployment.
+Governance: B1 has passed CI and merged. B2 requires its **own new**
+exact-head quality check on the rebased `main` base. The previous B2 CI failed
+M194 due to genuine late cross-browser input timing unrelated to this dormant
+module; that failure cannot be waived. Merge does not deploy production.
