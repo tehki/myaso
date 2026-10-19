@@ -1,6 +1,10 @@
 // Read-only loopback server proof, independent from client snapshot cadence.
 const forms = {
   action: /^M201_AUTH_ACTION tick=(\d+) fighter=(\d+) from=(\d+) to=(\d+)$/,
+  // M322: M320 emits genuine server defense events in the same 60 Hz stream.
+  // Parse them strictly rather than rejecting an otherwise valid M205 proof.
+  block: /^M201_AUTH_BLOCK tick=(\d+) attacker=(\d+) target=(\d+)$/,
+  parry: /^M201_AUTH_PARRY tick=(\d+) attacker=(\d+) target=(\d+)$/,
   break: /^M201_AUTH_BREAK tick=(\d+) attacker=(\d+) target=(\d+)$/,
   hit: /^M201_AUTH_HIT tick=(\d+) attacker=(\d+) target=(\d+) damage=(\d+) hp=(\d+)$/,
 };
@@ -21,8 +25,8 @@ export function parseM201ServerProof(output) {
     if (!args.every(Number.isSafeInteger)) throw new Error("M201 unsafe server tick/value");
     const [tick, a, b, c, d] = args;
     const row = kind === "action" ? { kind, tick, fighter: a, from: b, to: c }
-      : kind === "break" ? { kind, tick, attacker: a, target: b }
-        : { kind, tick, attacker: a, target: b, damage: c, hp: d };
+      : kind === "hit" ? { kind, tick, attacker: a, target: b, damage: c, hp: d }
+        : { kind, tick, attacker: a, target: b };
     if (rows.length && row.tick < rows.at(-1).tick) {
       throw new Error("M201 unordered authoritative ticks");
     }

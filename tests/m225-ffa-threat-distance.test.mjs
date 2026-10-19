@@ -54,3 +54,19 @@ test("M225 is read-only, original M142 strict primary/secondary assertions remai
  assert.ok(web.includes('acceptanceScenario === "uijumpffaprimary"'));
  assert.ok(web.includes('acceptanceScenario === "uijumpffasecondary"'));
 });
+
+
+test("M142 real W3C geometry correction cannot accidentally double-tap dash",()=>{
+ const source=readFileSync(new URL("../scripts/pvp_browser_flight_runner.mjs",import.meta.url),"utf8");
+ const start=source.indexOf("async function runOnlineUiJumpFfaThreatFlight(");
+ const section=source.slice(start,source.indexOf("\nasync function ",start+25));
+ const prior=section.indexOf("if (geometryAttempt === 4) break;");
+ const safeGap=section.indexOf("await sleep(300);",prior);
+ const left=section.indexOf("pulseMovementKey(left, stage.leftMove.key, stage.leftMove.ms)",safeGap);
+ const right=section.indexOf("pulseMovementKey(right, stage.rightMove.key, stage.rightMove.ms)",safeGap);
+ assert.ok(prior>=0&&safeGap>prior&&left>safeGap&&right>safeGap);
+ const dash=readFileSync(new URL("../src/browser/dash-input.mjs",import.meta.url),"utf8");
+ assert.ok(dash.includes("DASH_DOUBLE_TAP_MS = 240;"));
+ assert.ok(section.includes("cannot stage genuine ordered attack geometry"));
+ assert.ok(!section.includes("dispatchEvent("));
+});
