@@ -1,25 +1,25 @@
 # R2 — Responsive melee, directional dash, hold block, longer roll knockdown
 
-Scope: owner-requested gameplay change. Staged and **not a production release**.
-All new movement/attacks must remain authoritative. Previous R1 timings and test
-fixtures are not silently accepted as R2 facts; CI must requalify true W3C combat.
+Scope: owner-requested gameplay change, initially shipped with R2. The heavy
+reach and LMB load changes below describe the **superseding 19 October owner
+correction** (see R2_HEAVY_REACH_AND_CHARGE_RESTORATION.md). All movement and
+attacks remain server-authoritative; the current production release is not
+changed merely by committing source changes.
 
 ## Implemented in this branch
 
-1. Heavy melee reach: 82 → 130 world units (plus 18px fighter hit radius).
-   Server's actual target-center reach is therefore 148, matching the visible
-   arc; light reach remains 76+18=94. Angle, windup, damage, i-frames and
-   hit-target deduplication are otherwise unchanged.
-2. LMB pointerDOWN queues a light immediately, rather than waiting for
-   pointerUP to distinguish tap vs hold. A continuous LMB hold for 80ms upgrades
-   **only the still-unlanded** light/running-attack windup to the existing
-   320ms heavy attack. The light must not also score damage. Space+LMB jump
-   chord stays a light/jump action, not an accidental heavy. E heavy shortcut
-   remains. This resolves the fundamental tap-vs-hold timing tradeoff by
-   permitting a short *authoritative windup conversion*, not speculative damage.
-3. Running + immediate LMB remains the existing running strike, and running +
-   sustained LMB can upgrade before hit to heavy. Running sprint controls,
-   60Hz packets and stamina source of truth remain unchanged.
+1. Heavy reach was briefly increased to 130 in the initial R2 build, but
+   user feedback restored **82** world units against the normal light's 76.
+   The active heavy now performs a short server-authoritative 24px forward
+   lunge over 100ms, with real collision/bounds and unchanged painted arc.
+2. The initial R2 reduced the LMB hold classifier from 320 to 80ms. The owner
+   restored **320ms** on 19 October: tap produces a single light on physical
+   release, held LMB produces only a heavy on release, and loading cannot
+   yield a premature 135ms light. Space+LMB immediate jump chord and E heavy
+   shortcut are preserved; heavy still has its authoritative 320ms windup.
+3. Running short-LMB release still issues the running strike; long LMB hold
+   issues heavy exclusively. Running sprint controls, packet cadence and
+   authoritative stamina remain unchanged.
 4. Double-tap the **same physical WASD key** twice within 240ms (with an actual
    keyUp in between) to dash in that direction, regardless of mouse facing.
    Uses remaining bit 7 of the unchanged 34-byte input format, action code 30
@@ -55,7 +55,7 @@ snapshot replication, disarm HUD and PvP acceptance exist.
 - JS/Rust state transitions, protocol bit7 round-trip and rollback-safe source
   compatibility; full browser Chrome+Firefox genuine input/impact tests.
 - Re-qualify R1 browser flights whose strict evidence intentionally assumed
-  light commits on pointerUP or roll knockdowns end after 260ms. Do not just
+  light commits on pointerDOWN or roll knockdowns end after 260ms. Do not just
   change expected damage or disable assertions; prove the new owner-requested
   semantics from real server outcomes.
 - Exact-head full quality GREEN, independently merged-main quality GREEN, R2

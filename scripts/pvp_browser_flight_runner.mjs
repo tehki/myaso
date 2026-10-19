@@ -12116,11 +12116,11 @@ async function performArenaHeavyFeint(session, elementId, xOffset = 200) {
 
 async function performArenaFeint(session, elementId, xOffset = 200) {
   const origin = { "element-6066-11e4-a52e-4f735466cecf": elementId };
-  // M324: authentic W3C multi-source action; LMB release and wheel-back share the
-  // same W3C tick after its 20ms hold. A separate wheel-only tick previously
-  // arrived 70-78ms after pointerDown under driver contention, too late
-  // for the unchanged server-authoritative 70ms feint window.
-  // No synthetic DOM events, extra timed wait, or combat-rule relaxation.
+  // R2 heavy charge restoration: ordinary LMB light now commits on pointerUP.
+  // Send one authentic pointerUP tick first, THEN one genuine wheel-back tick
+  // (20ms later) while the unaltered 70ms server feint window is live.
+  // Same-tick release + wheel would let block arbitrate before light exists.
+  // Do not fabricate DOM events or relax authentic zero-contact assertions.
   try {
     await webdriver(session.base, "POST", `/session/${session.sessionId}/actions`, {
       actions: [
@@ -12133,6 +12133,7 @@ async function performArenaFeint(session, elementId, xOffset = 200) {
             { type: "pointerDown", button: 0 },
             { type: "pause", duration: 20 },
             { type: "pointerUp", button: 0 },
+            { type: "pause", duration: 20 },
           ],
         },
         {
@@ -12141,6 +12142,7 @@ async function performArenaFeint(session, elementId, xOffset = 200) {
           actions: [
             { type: "pause", duration: 0 },
             { type: "pause", duration: 0 },
+            { type: "pause", duration: 20 },
             { type: "pause", duration: 20 },
             { type: "scroll", x: 0, y: 0, deltaX: 0, deltaY: 120, duration: 0, origin },
           ],

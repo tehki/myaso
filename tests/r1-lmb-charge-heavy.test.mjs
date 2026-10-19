@@ -14,44 +14,38 @@ function harness() {
   return { gesture, actions, set(value) { ms = value; } };
 }
 
-test("R2 LMB pointerDOWN commits exactly one light immediately", () => {
+test("R1 restored 320ms LMB loading: short tap releases exactly one light", () => {
   const h = harness();
+  assert.equal(LEFT_HEAVY_CHARGE_MS, 320);
   assert.equal(h.gesture.press(1), true);
-  assert.deepEqual(h.actions, ["light"], "no 320ms tap classification wait");
+  assert.deepEqual(h.actions, [], "no 135ms light while heavy still loading");
   h.set(1000 + LEFT_HEAVY_CHARGE_MS - 1);
   assert.equal(h.gesture.release(1), "light");
-  assert.deepEqual(h.actions, ["light"], "pointerUP does not issue a second light");
+  assert.deepEqual(h.actions, ["light"]);
+  assert.equal(h.gesture.release(1), null);
 });
 
-test("R2 sustained LMB upgrades windup into heavy before light can hit", () => {
+test("320ms held LMB commits only heavy upon release, never free early light", () => {
   const h = harness();
   assert.equal(h.gesture.press(7), true);
-  assert.deepEqual(h.actions, ["light"]);
   h.set(1000 + LEFT_HEAVY_CHARGE_MS);
+  assert.equal(h.gesture.progress(), 1);
+  assert.deepEqual(h.actions, []);
   assert.equal(h.gesture.release(7), "heavy");
-  assert.deepEqual(h.actions, ["light", "heavy"]);
+  assert.deepEqual(h.actions, ["heavy"]);
   assert.equal(h.gesture.release(7), null);
 });
 
-test("R2 timer-driven hold upgrade fires without waiting for mouse release", () => {
-  let ms = 0, callback = null;
-  const actions = [];
-  const gesture = createLeftButtonCharge({
-    now: () => ms,
-    schedule(fn) { callback = fn; return 1; },
-    cancelScheduled() { callback = null; },
-    onLight: () => actions.push("light"),
-    onHeavy: () => actions.push("heavy"),
-  });
-  gesture.press(1);
-  ms = LEFT_HEAVY_CHARGE_MS;
-  callback();
-  assert.deepEqual(actions, ["light", "heavy"]);
-  assert.equal(gesture.release(1), "heavy");
-  assert.deepEqual(actions, ["light", "heavy"]);
+test("sustained hold without release cannot secretly land a light", () => {
+  const h = harness();
+  h.gesture.press(9);
+  h.set(1000 + LEFT_HEAVY_CHARGE_MS + 600);
+  assert.deepEqual(h.actions, []);
+  assert.equal(h.gesture.release(9), "heavy");
+  assert.deepEqual(h.actions, ["heavy"]);
 });
 
-test("R2 jump chord commits light immediately and cannot upgrade", () => {
+test("jump chord commits immediately and does not turn into heavy after long hold", () => {
   const h = harness();
   h.gesture.press(2, { immediate: true });
   assert.deepEqual(h.actions, ["light"]);
@@ -66,23 +60,22 @@ test("R2 jump chord commits light immediately and cannot upgrade", () => {
   assert.deepEqual(h.actions, ["light", "light"]);
 });
 
-test("R1 blur, capture loss, unmatched IDs and repeats never accidentally strike", () => {
+test("blur, capture loss, unmatched IDs and repeat presses never fire pending attack", () => {
   const h = harness();
-  assert.equal(h.gesture.press(1), true);
+  h.gesture.press(1);
   h.set(1100);
-  assert.equal(h.gesture.press(1), false, "repeated down cannot reset charge threshold");
+  assert.equal(h.gesture.press(1), false);
   assert.equal(h.gesture.press(9), false);
   assert.equal(h.gesture.release(9), null);
   assert.equal(h.gesture.cancel(9), false);
   assert.equal(h.gesture.cancel(1), true);
   h.set(2000);
   assert.equal(h.gesture.release(1), null);
-  assert.deepEqual(h.actions, ["light"]);
   h.gesture.press(2);
   h.set(5000);
   h.gesture.cancel();
   assert.equal(h.gesture.release(2), null);
-  assert.deepEqual(h.actions, ["light", "light"]);
+  assert.deepEqual(h.actions, []);
 });
 
 test("R1 preserves original RMB sprint/kick, E heavy, and space/run attack input routes", () => {
@@ -107,15 +100,15 @@ test("R1 preserves original RMB sprint/kick, E heavy, and space/run attack input
   assert.match(html, /RMB hold/);
 });
 
-test("M324 genuine wheel+LMB release in same W3C tick", () => {
+test("R2 restored charge defers wheel until after the real LMB release", () => {
   const runner = readFileSync(new URL("../scripts/pvp_browser_flight_runner.mjs", import.meta.url), "utf8");
   const start = runner.indexOf("async function performArenaFeint(");
   const end = runner.indexOf("async function performArenaRecoveryBufferedRoll(", start);
   assert.ok(start > 0 && end > start, "genuine Firefox/Chrome feint command remains present");
   const body = runner.slice(start, end);
   assert.match(body, /{ type: "pointerDown", button: 0 },\s*{ type: "pause", duration: 20 },\s*{ type: "pointerUp", button: 0 }/);
-  assert.match(body, /{ type: "pause", duration: 20 },\s*{ type: "scroll", x: 0, y: 0, deltaX: 0, deltaY: 120/);
-  assert.match(body, /W3C multi-source action/);
+  assert.match(body, /{ type: "pause", duration: 20 },\s*{ type: "pause", duration: 20 },\s*{ type: "scroll", x: 0, y: 0, deltaX: 0, deltaY: 120/);
+  assert.match(body, /genuine wheel-back tick/);
   assert.doesNotMatch(body, /window\.__MYASO|dispatchEvent\(/, "only real browser-owned actions can prove feint");
 });
 
