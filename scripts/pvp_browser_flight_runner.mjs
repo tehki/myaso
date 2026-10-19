@@ -1240,6 +1240,12 @@ async function runOnlineUiHeavyBlockFlight(entries) {
   // the same 46HP contact just after block expiry). Close the FULL 48px
   // difference between old 130 and current 82 reach with genuine 215px/s
   // movement before the exchange, to hit in the early active phase.
+  // A genuine two-browser CI trace (M223 windup tick 2635, block tick 2643,
+  // heavy hit tick 2660) proved the 155ms lead expires the unchanged 240ms
+  // block before contact: block ended at tick 2656 and 46HP leaked.
+  // Shift only this genuine wheel's target to 255ms after server-observed
+  // heavy windup. The ~100ms shift centers an ~180ms block-to-impact gap
+  // inside unchanged 125-240ms guard-only window. Never widen a proof gate.
   // Keep M223 genuine server-windup timing, exact -64 guard, 100HP and
   // parry/late-block failure gates unchanged.
   const staged = await prepareHeavyCounterplayFlight(
@@ -1262,7 +1268,7 @@ async function runOnlineUiHeavyBlockFlight(entries) {
     // A parry, missed block, or HP leak remains a terminal CI failure.
     await performHeavyCounterplayWindowWheel(
       attacker, defender, attackerElementId, defenderElementId,
-      attackOffset, blockOffset, 155,
+      attackOffset, blockOffset, 255,
     );
     await sleep(470);
 
