@@ -1445,13 +1445,15 @@ async function runOnlineUiHeavyDodgeFlight(entries) {
         await sleep(10);
       }
       if (committedObserved) {
-        // R2 130-unit heavy can still contact the defender during the
-        // perpendicular roll, so iframe timing (not simply clearing reach)
-        // must be proven. On strict 39149931060 the authentic Chrome wheel
-        // arrived ~147ms before 46-HP contact, outside the original 125ms
-        // iframe. Align the *real* wheel 45ms later to sample near impact;
-        // never extend i-frames, reduce hit geometry or relax HP=100 gates.
-        await sleep(90);
+        // Heavy M107 #39213856621 recorded a real Chrome wheel only 12ms
+        // before the FIRST 46HP hit (then a true dodge-success), so the
+        // unchanged server 125ms iframe was not active at first contact.
+        // After the genuine 320ms heavy commitment is observed, remove the
+        // obsolete 90ms host delay. A short 15ms scheduling margin places the
+        // same one trusted Chrome wheel earlier in the windup; continue
+        // requiring exact zero HP, one wheel and successful dodge feedback.
+        // Do NOT alter heavy geometry, damage, i-frames or assertions.
+        await sleep(15);
         await setMovementKey(defender, "s", true);
         try {
           await performArenaTimedPointerDodge(defender, defenderElementId, 15);

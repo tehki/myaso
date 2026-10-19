@@ -12,7 +12,8 @@ const flight = source.slice(
 test("M204 schedules one genuine wheel during the FIRST heavy key hold, before E release", () => {
   const keyDown = flight.indexOf('await setMovementKey(attacker, "e", true);');
   const commit = flight.indexOf("if (committedObserved) {");
-  assert.ok(flight.includes("await sleep(90);"));
+  assert.ok(flight.includes("await sleep(15);"));
+  assert.ok(!flight.includes("await sleep(90);"));
   assert.ok(!flight.includes("await sleep(120);"));
   const sDown = flight.indexOf('await setMovementKey(defender, "s", true);');
   const dodge = flight.indexOf("await performArenaTimedPointerDodge(defender, defenderElementId, 15);");
