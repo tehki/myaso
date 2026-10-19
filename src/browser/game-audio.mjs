@@ -5,6 +5,7 @@ const CUES = Object.freeze({
   heavy: { start: 330, end: 65, duration: .24, gain: .28, noise: .20, filter: 900, wave: "sawtooth", minMs: 85 },
   kick: { start: 185, end: 55, duration: .125, gain: .26, noise: .15, filter: 600, wave: "triangle", minMs: 90 },
   roll: { start: 240, end: 110, duration: .17, gain: .08, noise: .24, filter: 1250, wave: "sine", minMs: 130 },
+  guard: { start: 460, end: 260, duration: .065, gain: .075, noise: .045, filter: 1200, wave: "sine", minMs: 100 },
   parry: { start: 1180, end: 740, duration: .14, gain: .18, noise: .10, filter: 2900, wave: "triangle", minMs: 100 },
   jump: { start: 290, end: 520, duration: .11, gain: .10, noise: .045, filter: 1550, wave: "sine", minMs: 120 },
   step: { start: 140, end: 65, duration: .070, gain: .045, noise: .080, filter: 410, wave: "triangle", minMs: 200 },
