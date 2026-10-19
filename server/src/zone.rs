@@ -115,6 +115,7 @@ pub enum ZoneError {
     TransferCooldown,
     StaleRequest,
     ZoneCapacity,
+    TransferConflict,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -137,7 +138,7 @@ struct Member {
 
 /// Registry is keyed by *authenticated connection's* net ID. Callers must
 /// never source fighter IDs, positions or source zones from untrusted packets.
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct ZoneAuthority {
     members: BTreeMap<u32, Member>,
 }

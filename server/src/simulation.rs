@@ -601,6 +601,47 @@ impl World {
         true
     }
 
+    /// B2 dormant zone migration: fresh action edges and spawn anchor at the
+    /// trusted doorway destination. Preserve vitals and remaining cooldowns;
+    /// never heal or carry a pending attack into an interior.
+    pub(crate) fn add_transferred_player(
+        &mut self,
+        source: &Fighter,
+        source_now_ms: f32,
+        x: f32,
+        y: f32,
+    ) -> bool {
+        if self.winner.is_some()
+            || self.fighter_index(source.net_id).is_ok()
+            || !x.is_finite()
+            || !y.is_finite()
+            || x < FIGHTER_RADIUS
+            || y < FIGHTER_RADIUS
+            || x > self.width - FIGHTER_RADIUS
+            || y > self.height - FIGHTER_RADIUS
+            || source.action != Action::Idle
+            || source.hp <= 0.0
+        {
+            return false;
+        }
+        let mut transferred = Fighter::new(source.net_id, x, y, source.facing);
+        transferred.hp = source.hp;
+        transferred.guard = source.guard;
+        transferred.stamina = source.stamina;
+        // Kills are per-zone FFA; they cannot carry between separate matches.
+        transferred.guard_regen_blocked_until_ms =
+            self.now_ms + (source.guard_regen_blocked_until_ms - source_now_ms).max(0.0);
+        transferred.stamina_regen_blocked_until_ms =
+            self.now_ms + (source.stamina_regen_blocked_until_ms - source_now_ms).max(0.0);
+        transferred.dash_ready_at_ms =
+            self.now_ms + (source.dash_ready_at_ms - source_now_ms).max(0.0);
+        let insertion_index = self
+            .fighter_index(source.net_id)
+            .expect_err("duplicate fighter checked above");
+        self.fighters.insert(insertion_index, transferred);
+        true
+    }
+
     pub fn remove_player(&mut self, net_id: u32) -> bool {
         let Ok(index) = self.fighter_index(net_id) else {
             return false;
