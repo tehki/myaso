@@ -31,7 +31,7 @@ test("M117/M170/M171 still reject genuine 34HP feint miss and preserve 70ms serv
   assert.ok(flight.includes("defenderResult.playerHp !== 100"));
   assert.ok(flight.includes('!attemptDefender.feedbackTransitions.includes("damage-taken")'));
   assert.ok(flight.includes("cleanRemoteObservationMiss && !cleanGestureLatchMiss"));
-  assert.ok(flight.includes("exhaustedWheelBack.epochMs - exhaustedLightUp.epochMs > 80"));
+  assert.ok(flight.includes("exhaustedWheelBack.epochMs - exhaustedLightDown.epochMs > COMBAT.feint.lightWindowMs"));
   assert.ok(flight.includes("COMBAT.feint.staminaCost"));
   const model = readFileSync(new URL("../src/combat/model.mjs", import.meta.url), "utf8");
   assert.ok(model.includes("lightWindowMs: 70"));
