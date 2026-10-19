@@ -5,6 +5,13 @@ import sys
 
 ROOT = Path(__file__).resolve().parents[1]
 GOV = ROOT / "REPOSITORY_GOVERNANCE_v1.2.yaml"
+CI = ROOT / ".github/workflows/ci.yml"
+P0_REQUIRED = (
+    "name: quality",
+    "runs-on: ubuntu-latest",
+    "group: myaso-quality-${{ github.event_name == 'pull_request' && github.event.pull_request.number || github.sha }}",
+    "cancel-in-progress: ${{ github.event_name == 'pull_request' }}",
+)
 
 REQUIRED = (
     "name: myaso-repository-governance",
@@ -41,6 +48,8 @@ def main() -> int:
     text = GOV.read_text(encoding="utf-8")
     missing = [needle for needle in REQUIRED if needle not in text]
     forbidden = [needle for needle in FORBIDDEN_SOURCE_REPO_MARKERS if needle in text]
+    workflow = CI.read_text(encoding="utf-8")
+    missing.extend(f"CI priority-zero hygiene: {v}" for v in P0_REQUIRED if v not in workflow)
     if missing or forbidden:
         for needle in missing:
             print(f"missing required governance invariant: {needle}", file=sys.stderr)

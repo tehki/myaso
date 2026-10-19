@@ -9,6 +9,13 @@ on:
 permissions:
   contents: read
 
+# P0 (priority zero) queue hygiene: keep the newest branch-owned PR quality
+# execution, while NEVER cancelling merged-main release qualification.
+# GitHub-hosted runners have no cross-repository numeric priority control.
+concurrency:
+  group: myaso-quality-${{ github.event_name == 'pull_request' && github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   quality:
     name: quality
