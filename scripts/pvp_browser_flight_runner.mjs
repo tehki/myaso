@@ -11111,9 +11111,13 @@ async function runOnlineUiMultiRecoveryFfaFocusFlight(entries, spatial = false) 
   // actually observed the light attack. Under load that could shift the
   // genuine 70..150ms M145 overlap window. Keep both original delays and
   // all actual-input, 100 HP, 3-stage HUD and server assertions unchanged.
-  // R1: light now commits on pointerup, not pointerdown. M144 must stage the
-  // jump after the genuine 90ms light tap RELEASE so that #3 exits recovery
-  // first, then #1, preserving the strict three-stage observer proof.
+  // M328: genuine Chrome2 LMB held 90ms crossed the R2 80ms heavy-upgrade
+  // classifier on exact-head CI #39303383627: #3 transitioned light
+  // windup(1) -> heavy windup(9) -> active(10) -> recovery(11). That made
+  // #1 recover BEFORE #3, correctly failing strict M144 focus order.
+  // Dispatch one genuine 45ms short click instead, below the 80ms classifier.
+  // Preserve real pointerDOWN/UP, M144 60..200ms release-to-jump and M145
+  // 70..150ms pointerDOWN-to-jump, server phases, HP and pixel assertions.
   // M235: one real Chrome2/Chrome pair delivered 212ms release-to-jump lead
   // despite the former 185ms timer, breaching M144's unchanged 200ms cap.
   // Center the M144-only trusted-down timer at 155ms to leave 30ms more
@@ -11137,7 +11141,7 @@ async function runOnlineUiMultiRecoveryFfaFocusFlight(entries, spatial = false) 
   if (spatial) await armRecoveryHandoffSampler(observer);
   try {
     await Promise.all([
-      performArenaAttackHold(lightAttacker, lightArena, 200, 90),
+      performArenaAttackHold(lightAttacker, lightArena, 200, 45),
       (async () => {
         if (lightChallenge) {
           const receipt = await lightChallenge.wait();
