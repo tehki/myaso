@@ -134,11 +134,17 @@ test("R3 shared audio is wired to both runtimes without delaying light attacks",
     assert.match(source, /audio\.play\("step"/);
     assert.match(source, /audio\.play\("jump"\)/);
     const pointerDown = source.slice(source.indexOf('canvas.addEventListener("pointerdown"'), source.indexOf("function onLeftPointerUp"));
-    const inputIndex = pointerDown.indexOf("leftButtonCharge.press(");
-    const unlockIndex = pointerDown.indexOf("audio.unlock();", inputIndex);
-    assert.ok(inputIndex >= 0 && unlockIndex > inputIndex, "native pointer attack commits before the AudioContext starts");
-    assert.match(pointerDown, /if \(firstAudioGesture && accepted\) audio\.play\("light"\)/,
-      "the first legitimate attack still receives its sound once unlocked");
+    const pointerUp = source.slice(source.indexOf("function onLeftPointerUp"), source.indexOf('canvas.addEventListener("pointerup"'));
+    assert.match(pointerDown, /leftButtonCharge\.press\(event\.pointerId/,
+      "native pointerDOWN must still commit attack immediately");
+    assert.doesNotMatch(pointerDown, /audio\.unlock\(/,
+      "first-use AudioContext startup cannot postpone a native pointerUP");
+    assert.match(pointerUp, /const committed = leftButtonCharge\.release\(event\.pointerId\)/,
+      "release classification completes before audio startup");
+    assert.ok(pointerUp.indexOf("leftButtonCharge.release(") < pointerUp.indexOf("audio.unlock()"),
+      "audio unlock must follow the 80ms light/heavy classification");
+    assert.match(pointerUp, /audio\.play\(committed === "heavy" \? "heavy" : "light"\)/,
+      "first trusted release can unlock and play its committed cue");
   }
   const online = readFileSync(new URL("../web/online-game.mjs", import.meta.url), "utf8");
   assert.match(online, /remoteActionAudio\.observe/);

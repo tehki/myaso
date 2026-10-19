@@ -214,22 +214,16 @@ canvas.addEventListener("pointerdown", (event) => {
   if (event.button === 1) {
     event.preventDefault();
     middleBlockHeld = true;
-    audio.unlock();
     return;
   }
   if (event.button === 0) {
     leftButtonDown = true;
     leftButtonPressMovement = captureLightAttackMovement(keys);
-    const firstAudioGesture = !audio.isUnlocked();
-    const accepted = leftButtonCharge.press(event.pointerId, {
+    leftButtonCharge.press(event.pointerId, {
       immediate: local.action === COMBAT_ACTION.jump || jumpRequested || keys.has("Space"),
     });
-    // Never let first-gesture AudioContext startup postpone the input request.
-    audio.unlock();
-    if (firstAudioGesture && accepted) audio.play("light");
     return;
   }
-  audio.unlock();
 });
 function onLeftPointerUp(event) {
   if (event.button === 1) {
@@ -239,8 +233,13 @@ function onLeftPointerUp(event) {
   if (event.button !== 0) return;
   leftButtonDown = false;
   updateMouse(event);
-  leftButtonCharge.release(event.pointerId);
+  const committed = leftButtonCharge.release(event.pointerId);
   leftButtonPressMovement = null;
+  if (committed && !audio.isUnlocked()) {
+    // Audio startup follows native pointer release, not attack classification.
+    audio.unlock();
+    audio.play(committed === "heavy" ? "heavy" : "light");
+  }
 }
 canvas.addEventListener("pointerup", onLeftPointerUp);
 window.addEventListener("pointerup", onLeftPointerUp);
@@ -273,7 +272,7 @@ canvas.addEventListener("wheel", (event) => {
 }, { passive: false });
 canvas.addEventListener("pointermove", updateMouse);
 canvas.addEventListener("keydown", (event) => {
-  audio.unlock();
+  const firstAudioGesture = !audio.isUnlocked();
   if (["KeyW", "KeyA", "KeyS", "KeyD", "KeyE", "Space"].includes(event.code)) event.preventDefault();
   if (["KeyW", "KeyA", "KeyS", "KeyD"].includes(event.code) && !keys.has(event.code)) {
     const direction = dashGesture.press(event.code, performance.now(), event.repeat);
@@ -292,6 +291,10 @@ canvas.addEventListener("keydown", (event) => {
     queueStaminaDenial("jump");
     if (leftButtonDown) leftButtonCharge.commitLight();
   }
+  // Keyboard input also wins over the one-time audio unlock.
+  audio.unlock();
+  if (firstAudioGesture && !event.repeat && event.code === "KeyE") audio.play("heavy");
+  if (firstAudioGesture && !event.repeat && event.code === "Space") audio.play("jump");
 });
 canvas.addEventListener("keyup", (event) => keys.delete(event.code));
 window.addEventListener("blur", releaseInputs);
