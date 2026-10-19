@@ -5,6 +5,7 @@ import { createRemoteInterpolator } from "../src/browser/remote-interpolation.mj
 import { applySnapshotPacketInPlace, createSnapshotApplyResult } from "../src/browser/snapshot-store.mjs";
 import { NETWORK, PACKET_TYPE } from "../src/network/constants.mjs";
 import { decodeSnapshot, SNAPSHOT_FIELDS } from "../src/network/snapshot-codec.mjs";
+import { decodeProjectileSnapshot } from "../src/network/projectile-snapshot-codec.mjs";
 import { decodeInputAck } from "../src/network/input-ack-codec.mjs";
 import { decodeKillEvent } from "../src/network/kill-event-codec.mjs";
 import { encodeInputPacket } from "../src/network/input-codec.mjs";
@@ -20,6 +21,7 @@ export async function connectAuthoritativeClient({
   onProcessedAck,
   onReliableSnapshot,
   onKillEvent,
+  onProjectileSnapshot,
   onProtocolError,
 } = {}) {
   const state = new Map();
@@ -31,7 +33,12 @@ export async function connectAuthoritativeClient({
   const ackGate = createOwnSnapshotAckGate();
   const remoteInterpolator = createRemoteInterpolator();
   const inputSamples = [];
+  let projectileServerTick = null;
+  let weaponDisarmRemainingMs = 0;
+  const projectiles = new Map();
+  const disarmedFighters = new Map();
   let inputSequence = 0;
+  let pendingThrowReplicas = 0;
   let latestSnapshotSequence = 0xffff;
   let acknowledgedSnapshotSequence = 0xffff;
   let latestServerTick = 0;
@@ -55,6 +62,19 @@ export async function connectAuthoritativeClient({
       const bytes = asUint8Array(packet);
       if (bytes.length < 2) return;
       const packetType = bytes[1];
+      if (packetType === PACKET_TYPE.PROJECTILES) {
+        const update = decodeProjectileSnapshot(bytes);
+        if (projectileServerTick !== null
+          && !isTickNewer32(update.serverTick, projectileServerTick)) return;
+        projectileServerTick = update.serverTick;
+        weaponDisarmRemainingMs = update.ownDisarmRemainingMs;
+        projectiles.clear();
+        for (const [id, projectile] of update.projectiles) projectiles.set(id, projectile);
+        disarmedFighters.clear();
+        for (const [id, remaining] of update.disarmed) disarmedFighters.set(id, remaining);
+        onProjectileSnapshot?.(update, projectiles, disarmedFighters);
+        return;
+      }
       if (packetType === PACKET_TYPE.SNAPSHOT) {
         const sequence = bytes[4] | (bytes[5] << 8);
         if (latestSnapshotSequence !== 0xffff && !isSequenceNewer16(sequence, latestSnapshotSequence)) return;
@@ -161,6 +181,22 @@ export async function connectAuthoritativeClient({
       ackServerTick: latestServerTick,
       samples: [...inputSamples].reverse(),
     });
+    // Triple-send the same genuine one-shot action on consecutive input
+    // packets, not three distinct throws. Server disarm prevents duplicates.
+    if (sample.throwWeapon) pendingThrowReplicas = 3;
+    if (pendingThrowReplicas > 0) {
+      const flagged = encodeInputPacket({
+        sequence: inputSequence,
+        ackSnapshotSequence: acknowledgedSnapshotSequence,
+        clientTick: normalized.tick,
+        ackServerTick: latestServerTick,
+        samples: [...inputSamples].reverse(),
+        throwWeapon: true,
+      });
+      // overwrite the one unflagged packet; avoid extra datagram queue churn
+      new Uint8Array(packet).set(new Uint8Array(flagged));
+      pendingThrowReplicas -= 1;
+    }
     inputSequence = (inputSequence + 1) & 0xffff;
     transport.sendRealtimeOwned(new Uint8Array(packet));
     diagnostics.noteSentInput(normalized.tick);
@@ -171,6 +207,10 @@ export async function connectAuthoritativeClient({
     state,
     predictionHistory,
     remoteInterpolator,
+    projectiles,
+    disarmedFighters,
+    get weaponDisarmRemainingMs() { return weaponDisarmRemainingMs; },
+    get weaponEquipped() { return weaponDisarmRemainingMs === 0; },
     diagnostics,
     sendInput,
     close(reason) { transport.close(reason); },

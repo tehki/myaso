@@ -2,6 +2,7 @@ use anyhow::{bail, Context, Result};
 use myaso_server::{
     coalesce_accepted_input_batch, decode_input_packet, is_sequence_newer16, is_tick_newer32,
     kill_event::{encode_kill_event, KillEventPacket},
+    projectile_wire::encode_projectile_snapshot,
     reliable::{try_enqueue_reliable, ReliableQueueError},
     simulation::{CombatEvent, InputIntent, World},
     snapshot::{ReplicationFrame, SnapshotSession},
@@ -205,10 +206,12 @@ struct SharedGame {
     next_player_id: AtomicU32,
     reliable_write_delay: Duration,
     drop_new_action_datagrams: bool,
+    // Public anonymous reconnects must not reset 30s weapon disarm.
+    weapon_throw_enabled: bool,
 }
 
 impl SharedGame {
-    fn new(flight: LoopbackFlightConfig) -> Arc<Self> {
+    fn new(flight: LoopbackFlightConfig, weapon_throw_enabled: bool) -> Arc<Self> {
         Arc::new(Self {
             state: Mutex::new(GameState::new(
                 flight.background_players,
@@ -217,6 +220,7 @@ impl SharedGame {
             next_player_id: AtomicU32::new(1),
             reliable_write_delay: flight.reliable_write_delay,
             drop_new_action_datagrams: flight.drop_new_action_datagrams,
+            weapon_throw_enabled,
         })
     }
 
@@ -236,6 +240,17 @@ fn should_enqueue_reliable_catchup(
     reliable_write_delay: Duration,
 ) -> bool {
     background_deadline_misses > 0 || (!reliable_write_delay.is_zero() && omitted_due_to_budget > 0)
+}
+
+// A new numeric fighter ID is not a durable player identity.
+// Refuse public F throwing until server-verified reconnect continuity exists.
+fn weapon_throw_gate(setting: Result<&str, &env::VarError>, loopback: bool) -> Result<bool> {
+    match setting {
+        Err(_) | Ok("0") => Ok(false),
+        Ok("1") if loopback => Ok(true),
+        Ok("1") => bail!("F throw requires verified reconnect identity; loopback-only for now"),
+        Ok(_) => bail!("MYASO_ENABLE_WEAPON_THROW must be 0 or 1"),
+    }
 }
 
 #[tokio::main]
@@ -280,7 +295,11 @@ async fn main() -> Result<()> {
     }
     let gate = AdmissionGate::new(player_cap - flight.background_players);
     println!("myaso admission cap: {player_cap} concurrent players");
-    let game = SharedGame::new(flight);
+    let weapon_throw_enabled = weapon_throw_gate(
+        env::var("MYASO_ENABLE_WEAPON_THROW").as_deref(),
+        bind.ip().is_loopback(),
+    )?;
+    let game = SharedGame::new(flight, weapon_throw_enabled);
     // Accept server-side diagnostic output only on loopback and only when
     // explicitly requested by the real-browser M201 acceptance fixture.
     let flight_action_proof = match env::var("MYASO_FLIGHT_ACTION_PROOF").as_deref() {
@@ -570,6 +589,7 @@ async fn handle_connection(
     let initial_baseline_sequence = initial_baseline.sequence;
     let mut acknowledged_snapshot = u16::MAX;
     let mut realtime_ready = false;
+    let mut weapon_clear_redundancy = 0_u8;
     let mut last_reliable_background_tick = initial_frame.server_tick();
     let mut last_reliable_sequence = initial_reliable_baseline.sequence;
     let mut reliable_deltas_since_checkpoint = 0_u8;
@@ -622,7 +642,9 @@ async fn handle_connection(
                     }
                 }
 
-                if last_input_sequence.is_none_or(|previous| is_sequence_newer16(packet.sequence, previous)) {
+                let fresh_input_sequence =
+                    last_input_sequence.is_none_or(|previous| is_sequence_newer16(packet.sequence, previous));
+                if fresh_input_sequence {
                     last_input_sequence = Some(packet.sequence);
                     advance_snapshot_ack(
                         &mut acknowledged_snapshot,
@@ -658,12 +680,20 @@ async fn handle_connection(
                 }
                 let server_tick = {
                     let mut state = game.state.lock().await;
-                    apply_coalesced_input_and_read_tick(
+                    let tick = apply_coalesced_input_and_read_tick(
                         &mut state,
                         player_id,
                         coalesced,
                         &mut pending_input_acks,
-                    )
+                    );
+                    // Authenticated connection identity and latest accepted
+                    // facing/position are the only authority for a real F
+                    // throw. Old/replayed/stale datagrams never spawn.
+                    if game.weapon_throw_enabled && packet.throw_weapon
+                        && fresh_input_sequence && !accepted.is_empty() {
+                        let _ = state.world.throw_weapon(player_id);
+                    }
+                    tick
                 };
                 if server_tick.wrapping_sub(packet.ack_server_tick) > 600 {
                     eprintln!(
@@ -705,6 +735,32 @@ async fn handle_connection(
                     connection
                         .send_datagram(snapshot.bytes)
                         .context("send authoritative snapshot datagram")?;
+                }
+                if realtime_ready {
+                    // No extra datagrams for R1 matches without projectiles.
+                    // A final clear on an unreliable QUIC datagram may be
+                    // dropped, so repeat a bounded five times (250ms) then
+                    // return to zero traffic. Never persist ghost swords.
+                    let weapons = {
+                        let state = game.state.lock().await;
+                        let active = !state.world.thrown_weapons().is_empty()
+                            || state.world.fighters().iter().any(|fighter|
+                                state.world.weapon_rearm_remaining_ms(fighter.net_id) > 0);
+                        active.then(|| encode_projectile_snapshot(&state.world, player_id))
+                    };
+                    if let Some(weapons) = weapons {
+                        weapon_clear_redundancy = 5;
+                        connection.send_datagram(weapons)
+                            .context("send authoritative thrown-weapon snapshot")?;
+                    } else if weapon_clear_redundancy > 0 {
+                        weapon_clear_redundancy -= 1;
+                        let empty = {
+                            let state = game.state.lock().await;
+                            encode_projectile_snapshot(&state.world, player_id)
+                        };
+                        connection.send_datagram(empty)
+                            .context("clear expired thrown-weapon snapshot")?;
+                    }
                 }
                 let mut kill_event_queued = false;
                 if let Some(event) = pending_kill_event {
@@ -904,6 +960,15 @@ fn encode_input_ack(processed_client_tick: u32, server_tick: u32, player_net_id:
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn throw_gate_blocks_public_anonymous_reconnect_bypass() {
+        assert!(!super::weapon_throw_gate(Err(&std::env::VarError::NotPresent), false).unwrap());
+        assert!(!super::weapon_throw_gate(Ok("0"), false).unwrap());
+        assert!(super::weapon_throw_gate(Ok("1"), true).unwrap());
+        assert!(super::weapon_throw_gate(Ok("1"), false).is_err());
+        assert!(super::weapon_throw_gate(Ok("maybe"), true).is_err());
+    }
+
     use super::*;
 
     fn action_sample(tick: u32, heavy_attack: bool) -> InputSample {

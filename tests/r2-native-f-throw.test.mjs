@@ -1,0 +1,21 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+import { readFileSync } from "node:fs";
+const source=readFileSync(new URL("../scripts/pvp_browser_flight_runner.mjs",import.meta.url),"utf8");
+const a=source.indexOf("async function runOnlineUiThrowFlight(");
+const b=source.indexOf("\nasync function ",a+40);
+const flight=source.slice(a,b);
+test("R2 F native Chrome/Firefox: authenticated keyboard, remote projectile, 34HP and disarm evidence",()=>{
+ assert.ok(a>=0 && b>a);
+ assert.match(flight,/await pulseMovementKey\(attacker, "f", 110\)/);
+ assert.match(flight,/entry.name === ordered\[0\].browser|e.name === ordered\[0\].browser/);
+ assert.match(flight,/acceptance\?\.throwSnapshots/);
+ assert.match(flight,/s.weapons.some\(\(w\) =>/);
+ assert.match(flight,/b.playerHp === 66/);
+ assert.match(flight,/nativeKeyF: true/);
+ assert.match(flight,/rejectedSecondThrow: true/);
+ assert.match(flight,/KeyF/);
+ assert.ok(!flight.includes("dispatchEvent("));
+ assert.ok(!flight.includes("new KeyboardEvent("));
+ assert.ok(!flight.includes("forceSet"));
+});

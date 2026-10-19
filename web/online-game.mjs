@@ -146,6 +146,7 @@ const webTransportOptions = cert
 const keys = new Set();
 const dashGesture = createDirectionalDash();
 let dashRequested = false;
+let throwWeaponRequested = false;
 let dashMove = null;
 let predictedDashDir = { x: 0, y: 0 };
 const mouse = { x: canvas.width / 2, y: canvas.height / 2 };
@@ -258,7 +259,8 @@ canvas.addEventListener("wheel", (event) => {
 }, { passive: false });
 canvas.addEventListener("pointermove", updateMouse);
 canvas.addEventListener("keydown", (event) => {
-  if (["KeyW", "KeyA", "KeyS", "KeyD", "KeyE", "Space"].includes(event.code)) event.preventDefault();
+  if (["KeyW", "KeyA", "KeyS", "KeyD", "KeyE", "KeyF", "Space"].includes(event.code)) event.preventDefault();
+  if (event.code === "KeyF" && !event.repeat && !keys.has(event.code)) throwWeaponRequested = true;
   if (["KeyW", "KeyA", "KeyS", "KeyD"].includes(event.code) && !keys.has(event.code)) {
     const direction = dashGesture.press(event.code, performance.now(), event.repeat);
     if (direction && local.action === COMBAT_ACTION.idle
@@ -306,6 +308,26 @@ networkClient = await connectAuthoritativeClient({
   },
   onKillEvent(event) {
     recordKillEvent(event);
+  },
+  onProjectileSnapshot(update) {
+    if (acceptanceScenario !== "uithrow") return;
+    // Strict native browser evidence comes only from an actual decoded
+    // server datagram, not from local F input or canvas animation.
+    const acceptance = window.__MYASO_ACCEPTANCE_STATE__ ??= {
+      scenario: acceptanceScenario,
+      ownActionTransitions: [],
+      focusActionTransitions: [],
+      staminaTransitions: [],
+    };
+    const snapshots = acceptance.throwSnapshots ??= [];
+    if (snapshots.length >= 128) snapshots.shift();
+    snapshots.push({
+      epochMs: Date.now(),
+      serverTick: update.serverTick,
+      ownDisarmRemainingMs: update.ownDisarmRemainingMs,
+      weapons: [...update.projectiles.values()].map(({ id, owner, x, y }) => ({ id, owner, x, y })),
+      disarmed: [...update.disarmed.keys()],
+    });
   },
   onAck(ack) {
     const ownId = networkClient?.playerNetId;
@@ -370,7 +392,7 @@ function observeThreatCommitment(state, ownId) {
 }
 
 function recordAcceptanceState(state, ownId) {
-  if (!["uirollbuffer", "uijumpbuffer", "uijumpattack", "uijumpattackinputloss", "uijumpattackpunish", "uijumpattacktelegraph", "uijumprecoveryffa", "uijumppunishffa", "uimultirecoveryffa", "uimultirecoveryspatial", "uimultirecoverypunish", "uiparrypunishwindow", "uiparrypunishffa", "uiparrypunishffahit", "uiguardbreakpunishffa", "uiguardbreakpunishffahit", "uikickknockdownffa", "uikickknockdownffahit", "uikickknockdownbounded", "uirollknockdownbounded", "uirollknockdownffahit", "uimultiknockdownffa", "uimultiknockdownffahit", "uirollknockdownffa", "uistaminaauth", "uistaminaexhaustion", "uistaminafeedback", "uistaminaconfirmed", "uifeint", "uiheavyblock", "uiheavyparry", "uijumpffaprimary", "uijumpffasecondary", "uijumpattackblock", "uijumpattackparry", "uijumpattackdodge", "uijumpattackbuffer", "uikickbuffer"].includes(acceptanceScenario)) return;
+  if (!["uirollbuffer", "uijumpbuffer", "uijumpattack", "uijumpattackinputloss", "uijumpattackpunish", "uijumpattacktelegraph", "uijumprecoveryffa", "uijumppunishffa", "uimultirecoveryffa", "uimultirecoveryspatial", "uimultirecoverypunish", "uiparrypunishwindow", "uiparrypunishffa", "uiparrypunishffahit", "uiguardbreakpunishffa", "uiguardbreakpunishffahit", "uikickknockdownffa", "uikickknockdownffahit", "uikickknockdownbounded", "uirollknockdownbounded", "uirollknockdownffahit", "uimultiknockdownffa", "uimultiknockdownffahit", "uirollknockdownffa", "uithrow", "uistaminaauth", "uistaminaexhaustion", "uistaminafeedback", "uistaminaconfirmed", "uifeint", "uiheavyblock", "uiheavyparry", "uijumpffaprimary", "uijumpffasecondary", "uijumpattackblock", "uijumpattackparry", "uijumpattackdodge", "uijumpattackbuffer", "uikickbuffer"].includes(acceptanceScenario)) return;
   const focusNetId = fighterGuardBreakPunishNetId(state, ownId)
     || fighterParryPunishNetId(state, ownId)
     || fighterKnockdownPunishNetId(state, ownId)
@@ -637,6 +659,7 @@ function releaseInputs() {
   keys.clear();
   dashGesture.clearTaps();
   dashRequested = false;
+  throwWeaponRequested = false;
   dashMove = null;
   attackRequested = false;
   committedLightMove = null;
@@ -665,6 +688,7 @@ function sampleInput() {
     currentInput.run = false;
     currentInput.jump = false;
     currentInput.dash = false;
+    currentInput.throwWeapon = false;
     return;
   }
   currentInput.moveX = dashRequested && dashMove ? dashMove.x : attackRequested && committedLightMove
@@ -676,6 +700,7 @@ function sampleInput() {
   currentInput.heavyAttack = heavyAttackRequested;
   currentInput.dodge = rollRequested;
   currentInput.dash = dashRequested;
+  currentInput.throwWeapon = throwWeaponRequested;
   currentInput.block = middleBlockHeld || performance.now() < shortBlockUntil;
   currentInput.kick = kickRequested;
   currentInput.run = rightButtonGesture.isRunning();
@@ -698,6 +723,7 @@ function simulatePrediction(stepMs) {
     kickRequested = false;
     jumpRequested = false;
     dashRequested = false;
+    throwWeaponRequested = false;
     dashMove = null;
   }
 }
@@ -826,6 +852,7 @@ function render(nowMs = performance.now(), impact = combatImpact.sample(nowMs)) 
     drawFighterWorld(sampled, "#b96350", "#47251f", damageTell, recoveryTell);
   }
   if (ownId && local.initialized) drawFighterScreen(canvas.width / 2, canvas.height / 2, local, "#e2d5b4", "#51452d");
+  for (const projectile of networkClient.projectiles.values()) drawThrownWeapon(projectile);
   ctx.restore();
   // R1 wider view: health/guard bars and player identity badges are UI,
   // not world geometry. Keep their original unscaled 42px/34px readability
@@ -842,10 +869,45 @@ function render(nowMs = performance.now(), impact = combatImpact.sample(nowMs)) 
     }
   }
   updateHud(ownId);
+  if (networkClient.weaponDisarmRemainingMs > 0) {
+    ctx.save();
+    ctx.fillStyle = "#f8ba78";
+    ctx.font = "bold 12px ui-monospace, monospace";
+    ctx.textAlign = "right";
+    ctx.fillText("WEAPONLESS · " + Math.ceil(networkClient.weaponDisarmRemainingMs / 1000) + "s", canvas.width - 20, 25);
+    ctx.restore();
+  }
   drawThreatMarkers();
   if (local.initialized) drawOffscreenEnemyPointers(visibleEnemyPositions, ownId);
   ctx.restore();
   drawImpactBurst(impact);
+}
+
+function drawThrownWeapon(weapon) {
+  if (!local.initialized) return;
+  const x = canvas.width / 2 + weapon.x - visualCameraPosition.x;
+  const y = canvas.height / 2 + weapon.y - visualCameraPosition.y;
+  const projected = projectArenaPoint(weapon.x, weapon.y, visualCameraPosition.x,
+    visualCameraPosition.y, canvas.width, canvas.height);
+  if (projected.x < -20 || projected.x > canvas.width + 20
+    || projected.y < -20 || projected.y > canvas.height + 20) return;
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(weapon.facing);
+  ctx.strokeStyle = "#f5e3ac";
+  ctx.lineWidth = 4;
+  ctx.lineCap = "round";
+  ctx.beginPath();
+  ctx.moveTo(-13, 0);
+  ctx.lineTo(17, 0);
+  ctx.stroke();
+  ctx.strokeStyle = "#aa7046";
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.moveTo(-7, -6);
+  ctx.lineTo(-7, 6);
+  ctx.stroke();
+  ctx.restore();
 }
 
 function drawImpactBurst(impact) {
@@ -1019,7 +1081,10 @@ function drawFighterScreen(x, y, fighter, body, shadow, remote = false, damageTe
   if (action === COMBAT_ACTION.heavyAttackWindup || action === COMBAT_ACTION.heavyAttackActive) drawHeavyAttackTell(action, remote);
   if (action === COMBAT_ACTION.jumpAttackWindup || action === COMBAT_ACTION.jumpAttackActive) drawJumpAttackTell(action, remote);
   if (action === COMBAT_ACTION.kickWindup || action === COMBAT_ACTION.kickActive) drawKickTell(action);
-  drawWeaponTrail(action);
+  const isDisarmed = remote
+    ? Boolean(networkClient?.disarmedFighters.has(fighter.netId))
+    : Boolean(networkClient && !networkClient.weaponEquipped);
+  if (!isDisarmed) drawWeaponTrail(action);
   if (action === COMBAT_ACTION.block) drawBlockTell(remote, fighter);
   if (action === COMBAT_ACTION.dodge) drawDodgeTell(remote);
   if (action === COMBAT_ACTION.stunned) drawStunTell();
@@ -1049,7 +1114,7 @@ function drawFighterScreen(x, y, fighter, body, shadow, remote = false, damageTe
   ctx.arc(7, -5, 3, 0, Math.PI * 2);
   ctx.fill();
   ctx.fillStyle = "#c8b684";
-  ctx.fillRect(12, -2, 26, 4);
+  if (!isDisarmed) ctx.fillRect(12, -2, 26, 4);
   if (remote && action !== COMBAT_ACTION.dead && damageTell) {
     drawDamageTell();
   }
