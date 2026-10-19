@@ -1358,12 +1358,15 @@ async function runOnlineUiHeavyParryFlight(entries) {
     // Restored 82px heavy reach moves actual contact to the lunge's late
     // active phase. Genuine CI: windup tick 590, wheel block tick 605, hit
     // tick 615 = 167ms block-to-contact, outside the unchanged 125ms parry.
-    // Move only the real W3C wheel target 80ms later to center the authentic
-    // parry around 87ms before server impact. The delayed wheel remains
-    // within heavy active; keep original real stun/zero-vitals/guard proof.
+    // On exact-head native CI the 365ms lead still resolved as guard:
+    // windup tick 522, block tick 540, 46HP hit replaced by an authoritative
+    // BLOCK tick 547. Seven ticks (about 117ms) straddle the strict 125ms
+    // parry edge due to server input/impact phase. Move the genuine wheel
+    // dispatch 40ms later toward a five-tick parry gap. Keep authentic
+    // server-confirmed stun, zero HP/guard change, and all failure gates.
     await performHeavyCounterplayWindowWheel(
       attacker, defender, attackerElementId, defenderElementId,
-      attackOffset, blockOffset, 365,
+      attackOffset, blockOffset, 405,
     );
     await sleep(220);
 
