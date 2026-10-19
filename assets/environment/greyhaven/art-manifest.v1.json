@@ -1,0 +1,277 @@
+{
+  "schemaVersion": 1,
+  "artDirection": "Blood & Iron — Medieval Realism",
+  "status": "A1 approved direction, first blockout pending visual sign-off",
+  "location": "Moonvale / Greyhaven / Red Lion Street",
+  "coordinateConvention": {
+    "xy": "game world XY: positive X right, positive Y down on current 2D camera",
+    "z": "3D-source height only (never sent to server)",
+    "metersPerWorldUnit": 0.025,
+    "fighterRadiusWorldUnits": 18,
+    "fighterRadiusMeters": 0.45,
+    "worldCanvasWidth": 8192,
+    "worldCanvasHeight": 8192,
+    "cameraZoom": 0.84,
+    "cameraSource": "src/browser/arena-viewport.mjs",
+    "orthographicBakeAngle": "TBD: only lock after actual knight-village composition review"
+  },
+  "firstSlice": {
+    "placeId": "greyhaven-red-lion-street",
+    "approvedBuilding": {
+      "id": "red-lion",
+      "mapId": "moonvale-overworld",
+      "visualPrefab": "red-lion-exterior",
+      "exterior": {
+        "x": 4240,
+        "y": 3880,
+        "width": 250,
+        "height": 170
+      },
+      "door": {
+        "x": 4365,
+        "y": 4075,
+        "portalId": "red-lion-enter"
+      },
+      "interior": {
+        "id": "red-lion-inn",
+        "width": 780,
+        "height": 620
+      }
+    },
+    "sourceOfTruth": "World geography/door positions proposed in PR #336; do not enable as authoritative without server zone support"
+  },
+  "materials": [
+    {
+      "id": "limestone",
+      "color": "#A39A85",
+      "roughness": 0.91
+    },
+    {
+      "id": "old-timber",
+      "color": "#71523C",
+      "roughness": 0.87
+    },
+    {
+      "id": "limewash",
+      "color": "#D4C9B2",
+      "roughness": 0.96
+    },
+    {
+      "id": "roof-tile",
+      "color": "#884F3F",
+      "roughness": 0.9
+    },
+    {
+      "id": "dark-wood",
+      "color": "#423226",
+      "roughness": 0.91
+    },
+    {
+      "id": "window",
+      "color": "#403C32",
+      "roughness": 0.36
+    },
+    {
+      "id": "iron",
+      "color": "#4C4945",
+      "roughness": 0.72
+    },
+    {
+      "id": "red-lion",
+      "color": "#B45F4A",
+      "roughness": 0.85
+    }
+  ],
+  "prefabBacklog": [
+    {
+      "id": "red-lion-exterior",
+      "kind": "architecture",
+      "priority": "must",
+      "quantity": 1,
+      "status": "geometry-blockout",
+      "source": "assets/environment/greyhaven/red_lion_blockout.obj"
+    },
+    {
+      "id": "half-timber-house-small",
+      "kind": "architecture",
+      "priority": "must",
+      "quantity": 1,
+      "status": "planned"
+    },
+    {
+      "id": "half-timber-house-medium",
+      "kind": "architecture",
+      "priority": "must",
+      "quantity": 1,
+      "status": "planned"
+    },
+    {
+      "id": "stone-cottage",
+      "kind": "architecture",
+      "priority": "must",
+      "quantity": 1,
+      "status": "planned"
+    },
+    {
+      "id": "blacksmith",
+      "kind": "architecture",
+      "priority": "must",
+      "quantity": 1,
+      "status": "planned"
+    },
+    {
+      "id": "road-cobblestone",
+      "kind": "terrain",
+      "priority": "must",
+      "quantity": 4,
+      "status": "planned"
+    },
+    {
+      "id": "road-dirt",
+      "kind": "terrain",
+      "priority": "must",
+      "quantity": 4,
+      "status": "planned"
+    },
+    {
+      "id": "oak",
+      "kind": "vegetation",
+      "priority": "must",
+      "quantity": 2,
+      "status": "planned"
+    },
+    {
+      "id": "birch",
+      "kind": "vegetation",
+      "priority": "must",
+      "quantity": 1,
+      "status": "planned"
+    },
+    {
+      "id": "pine",
+      "kind": "vegetation",
+      "priority": "must",
+      "quantity": 1,
+      "status": "planned"
+    },
+    {
+      "id": "grass-clumps",
+      "kind": "vegetation",
+      "priority": "must",
+      "quantity": 6,
+      "status": "planned"
+    },
+    {
+      "id": "shrubs",
+      "kind": "vegetation",
+      "priority": "must",
+      "quantity": 4,
+      "status": "planned"
+    },
+    {
+      "id": "fence",
+      "kind": "props",
+      "priority": "must",
+      "quantity": 4,
+      "status": "planned"
+    },
+    {
+      "id": "well",
+      "kind": "props",
+      "priority": "must",
+      "quantity": 1,
+      "status": "planned"
+    },
+    {
+      "id": "cart",
+      "kind": "props",
+      "priority": "must",
+      "quantity": 1,
+      "status": "planned"
+    },
+    {
+      "id": "barrel",
+      "kind": "props",
+      "priority": "must",
+      "quantity": 3,
+      "status": "planned"
+    },
+    {
+      "id": "crate",
+      "kind": "props",
+      "priority": "must",
+      "quantity": 3,
+      "status": "planned"
+    },
+    {
+      "id": "wood-pile",
+      "kind": "props",
+      "priority": "should",
+      "quantity": 2,
+      "status": "planned"
+    },
+    {
+      "id": "inn-signage",
+      "kind": "props",
+      "priority": "must",
+      "quantity": 1,
+      "status": "planned"
+    },
+    {
+      "id": "lantern",
+      "kind": "props",
+      "priority": "must",
+      "quantity": 2,
+      "status": "planned"
+    },
+    {
+      "id": "tavern-tables",
+      "kind": "interior",
+      "priority": "must",
+      "quantity": 3,
+      "status": "planned"
+    },
+    {
+      "id": "tavern-benches",
+      "kind": "interior",
+      "priority": "must",
+      "quantity": 6,
+      "status": "planned"
+    },
+    {
+      "id": "tavern-counter",
+      "kind": "interior",
+      "priority": "must",
+      "quantity": 1,
+      "status": "planned"
+    },
+    {
+      "id": "tavern-fireplace",
+      "kind": "interior",
+      "priority": "must",
+      "quantity": 1,
+      "status": "planned"
+    },
+    {
+      "id": "tavern-kitchen",
+      "kind": "interior",
+      "priority": "must",
+      "quantity": 3,
+      "status": "planned"
+    },
+    {
+      "id": "tavern-stairs",
+      "kind": "interior",
+      "priority": "should",
+      "quantity": 1,
+      "status": "planned"
+    }
+  ],
+  "acceptance": {
+    "priority": "Combat and fighter telegraphs readable above realism; verify occlusion hiding/fading",
+    "render": "Source models Blender-editable; prefer baked 2.5D in current Canvas; realtime glTF only after benchmark",
+    "targetFPS": "60 desktop aspirational (unmeasured); mobile benchmark required",
+    "access": "offline previews never imply server-authoritative enterable zones",
+    "release": "visual-only behind opt-in flag; branch protection and no deployment without separate approval"
+  }
+}
