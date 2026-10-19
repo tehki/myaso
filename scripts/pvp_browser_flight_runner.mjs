@@ -7283,8 +7283,12 @@ async function runOnlineUiFeintFlight(entries) {
     || !Number.isFinite(exhaustedLightUp.epochMs)
     || !Number.isFinite(exhaustedWheelBack.epochMs)
     || exhaustedLightUp.epochMs <= exhaustedLightDown.epochMs
-    || exhaustedWheelBack.epochMs < exhaustedLightUp.epochMs
-    || exhaustedWheelBack.epochMs - exhaustedLightUp.epochMs > 80) {
+    // M331 sends a genuine wheel in the first W3C tick after pointerDOWN,
+    // before the 20ms held-pointer release. Check the actual DOM ordering;
+    // do not require the former wheel-after-pointerUP choreography.
+    || exhaustedWheelBack.epochMs < exhaustedLightDown.epochMs
+    || exhaustedWheelBack.epochMs > exhaustedLightUp.epochMs
+    || exhaustedWheelBack.epochMs - exhaustedLightDown.epochMs > COMBAT.feint.lightWindowMs) {
     throw new Error("M170 exhausted feint did not deliver the same genuine early LMB+wheel-back chord: "
       + JSON.stringify({ pointers: exhaustedPointers, wheels: exhaustedWheels }));
   }
