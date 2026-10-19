@@ -517,6 +517,7 @@ async function startGameServer() {
       ...process.env,
       MYASO_BIND: "127.0.0.1:0",
       MYASO_FLIGHT_ACTION_PROOF: (scenario === "uiguardbreakpunishffahit"
+        || scenario === "uiguardbreak" || scenario === "uiguardbreaktell"
         || scenario === "uiheavyblock" || scenario === "uiheavyparry"
         || scenario === "uiheavydodge"
         || scenario === "uikickknockdownffahit"
@@ -9558,6 +9559,10 @@ async function runOnlineUiGuardBreakFlight(entries, { onGuardBroken = null } = {
       // Chrome W3C down/up to target the block-only interval. The original
       // 100HP/-38guard/no-parry proof rejects early, late or missing action.
       // Never fabricate inputs, repeat failed exchanges or alter mechanics.
+      // M320: capture ONLY this genuine exchange's authoritative action/event
+      // transitions. The loopback-only server trace is evidence, not a clock
+      // used to schedule attacks or to waive M194's HP/guard/parry assertions.
+      const m320ServerOutputStart = m201ServerOutput().length;
       const challenge = m221Registry.issue();
       let m212Exchange;
       try {
@@ -9627,6 +9632,17 @@ async function runOnlineUiGuardBreakFlight(entries, { onGuardBroken = null } = {
           genuineClickHoldMs: m212Duration(m212ChromeUp, m212ChromeDown),
           feedback: attackerState?.combatFeedback,
         },
+      }));
+      const m320AuthoritativeLines = m201ServerOutput()
+        .slice(m320ServerOutputStart)
+        .split(/\r?\n/)
+        .filter(line => /^M201_AUTH_(ACTION|BLOCK|PARRY|BREAK) /.test(line))
+        .slice(-16);
+      console.log("M320_GUARD_BREAK_AUTH_TRACE " + JSON.stringify({
+        attempt: attempt + 1,
+        attackerNetId: attackerReady.playerNetId,
+        defenderNetId: defenderReady.playerNetId,
+        tickLines: m320AuthoritativeLines,
       }));
       // A real parry must never be silently counted as one of the guard-break
       // exchanges, even if later strikes successfully drain guard.
