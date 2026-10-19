@@ -1234,14 +1234,16 @@ async function performHeavyCounterplayWindowWheel(
 
 async function runOnlineUiHeavyBlockFlight(entries) {
   // R2 restored heavy reach 130 -> 82 with a physical 24px active lunge.
-  // The old 180ms approach left the victim barely inside late lunge contact,
-  // after the authentic 240ms defender block had expired (native M188 RED:
-  // one real 46HP hit). Close ~24px more with genuine 215px/s movement
-  // before the exchange, so impact occurs at the start of heavy active.
+  // The old 180ms approach left the victim outside the restored 82px arc;
+  // the server completed 240ms Block before the late physically lunged hit.
+  // A 290ms approach was also insufficient (second native M188 red confirmed
+  // the same 46HP contact just after block expiry). Close the FULL 48px
+  // difference between old 130 and current 82 reach with genuine 215px/s
+  // movement before the exchange, to hit in the early active phase.
   // Keep M223 genuine server-windup timing, exact -64 guard, 100HP and
   // parry/late-block failure gates unchanged.
   const staged = await prepareHeavyCounterplayFlight(
-    entries, "M107 heavy block", { movementMs: 290 },
+    entries, "M107 heavy block", { movementMs: 400 },
   );
   const { attacker, defender, attackerElementId, defenderElementId, movementCode } = staged;
   const attackRight = movementCode === "KeyD";
@@ -1330,7 +1332,11 @@ async function runOnlineUiHeavyBlockFlight(entries) {
 }
 
 async function runOnlineUiHeavyParryFlight(entries) {
-  const staged = await prepareHeavyCounterplayFlight(entries, "M107 heavy parry");
+  // Parry likewise needs the target within restored 82px impact reach at the
+  // *start* of heavy active; do not silently compensate via old 130px radius.
+  const staged = await prepareHeavyCounterplayFlight(
+    entries, "M107 heavy parry", { movementMs: 400 },
+  );
   const { attacker, defender, attackerElementId, defenderElementId, movementCode } = staged;
   const attackRight = movementCode === "KeyD";
   const attackOffset = attackRight ? 200 : -200;
