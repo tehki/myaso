@@ -3,6 +3,7 @@ use std::sync::{
     Arc,
 };
 
+pub mod door_wire;
 pub mod kill_event;
 pub mod reliable;
 pub mod simulation;
