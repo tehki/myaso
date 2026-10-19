@@ -83,7 +83,10 @@ const PORTALS: [Portal; 2] = [
     Portal {
         id: PortalId::RedLionEnter,
         source: ZoneId::Moonvale,
-        at: Position { x: 4365.0, y: 4075.0 },
+        at: Position {
+            x: 4365.0,
+            y: 4075.0,
+        },
         radius: 52.0,
         target: ZoneId::RedLionInn,
         spawn: Position { x: 390.0, y: 480.0 },
@@ -94,7 +97,10 @@ const PORTALS: [Portal; 2] = [
         at: Position { x: 390.0, y: 550.0 },
         radius: 42.0,
         target: ZoneId::Moonvale,
-        spawn: Position { x: 4365.0, y: 4143.0 },
+        spawn: Position {
+            x: 4365.0,
+            y: 4143.0,
+        },
     },
 ];
 
@@ -168,11 +174,16 @@ impl ZoneAuthority {
     }
 
     pub fn zone_of(&self, authenticated_net_id: u32) -> Option<ZoneId> {
-        self.members.get(&authenticated_net_id).map(|member| member.zone)
+        self.members
+            .get(&authenticated_net_id)
+            .map(|member| member.zone)
     }
 
     pub fn occupants(&self, zone: ZoneId) -> usize {
-        self.members.values().filter(|member| member.zone == zone).count()
+        self.members
+            .values()
+            .filter(|member| member.zone == zone)
+            .count()
     }
 
     /// Filter replication visibility and combat candidate sets by both
@@ -188,7 +199,9 @@ impl ZoneAuthority {
         let zone = self.zone_of(viewer);
         self.members
             .iter()
-            .filter(move |(id, member)| **id != viewer && Some(member.zone) == zone && zone.is_some())
+            .filter(move |(id, member)| {
+                **id != viewer && Some(member.zone) == zone && zone.is_some()
+            })
             .map(|(id, _)| *id)
     }
 
@@ -242,9 +255,7 @@ impl ZoneAuthority {
         if portal.source != member.zone {
             return Err(ZoneError::WrongSource);
         }
-        if (portal.at.x - at.x).hypot(portal.at.y - at.y)
-            > portal.radius + PORTAL_REACH
-        {
+        if (portal.at.x - at.x).hypot(portal.at.y - at.y) > portal.radius + PORTAL_REACH {
             return Err(ZoneError::TooFarFromDoor);
         }
         if !portal.spawn.valid_for(portal.target) {
@@ -306,10 +317,22 @@ mod tests {
         assert_eq!(zones.register(1), Err(ZoneError::DuplicateFighter));
 
         let a = zones
-            .authorize(1, PortalId::RedLionEnter, 1, 1000, &fighter(1, 4365.0, 4075.0))
+            .authorize(
+                1,
+                PortalId::RedLionEnter,
+                1,
+                1000,
+                &fighter(1, 4365.0, 4075.0),
+            )
             .unwrap();
         let b = zones
-            .authorize(2, PortalId::RedLionEnter, 6, 1000, &fighter(2, 4365.0, 4075.0))
+            .authorize(
+                2,
+                PortalId::RedLionEnter,
+                6,
+                1000,
+                &fighter(2, 4365.0, 4075.0),
+            )
             .unwrap();
         assert_eq!(a.to, ZoneId::RedLionInn);
         assert_eq!(a.arrival, Position { x: 390.0, y: 480.0 });
@@ -328,7 +351,13 @@ mod tests {
             .authorize(1, PortalId::RedLionExit, 2, 1120, &fighter(1, 390.0, 550.0))
             .unwrap();
         assert_eq!(exit.to, ZoneId::Moonvale);
-        assert_eq!(exit.arrival, Position { x: 4365.0, y: 4143.0 });
+        assert_eq!(
+            exit.arrival,
+            Position {
+                x: 4365.0,
+                y: 4143.0
+            }
+        );
         assert!(zones.same_zone(1, 3));
         assert!(!zones.same_zone(1, 2));
         assert!(zones.unregister(2));
@@ -340,18 +369,44 @@ mod tests {
         let mut zones = ZoneAuthority::new();
         zones.register(1).unwrap();
         assert_eq!(
-            zones.authorize(1, PortalId::RedLionEnter, 4, 500, &fighter(2, 4365.0, 4075.0)),
+            zones.authorize(
+                1,
+                PortalId::RedLionEnter,
+                4,
+                500,
+                &fighter(2, 4365.0, 4075.0)
+            ),
             Err(ZoneError::UnknownFighter)
         );
         assert_eq!(
-            zones.authorize(1, PortalId::RedLionExit, 4, 500, &fighter(1, 4365.0, 4075.0)),
+            zones.authorize(
+                1,
+                PortalId::RedLionExit,
+                4,
+                500,
+                &fighter(1, 4365.0, 4075.0)
+            ),
             Err(ZoneError::WrongSource)
         );
         assert_eq!(
-            zones.authorize(1, PortalId::RedLionEnter, 4, 500, &fighter(1, 4020.0, 4170.0)),
+            zones.authorize(
+                1,
+                PortalId::RedLionEnter,
+                4,
+                500,
+                &fighter(1, 4020.0, 4170.0)
+            ),
             Err(ZoneError::TooFarFromDoor)
         );
-        zones.authorize(1, PortalId::RedLionEnter, 4, 500, &fighter(1, 4365.0, 4075.0)).unwrap();
+        zones
+            .authorize(
+                1,
+                PortalId::RedLionEnter,
+                4,
+                500,
+                &fighter(1, 4365.0, 4075.0),
+            )
+            .unwrap();
         assert_eq!(
             zones.authorize(1, PortalId::RedLionExit, 4, 700, &fighter(1, 390.0, 550.0)),
             Err(ZoneError::StaleRequest)
@@ -375,7 +430,13 @@ mod tests {
         let mut zones = ZoneAuthority::new();
         zones.register(1).unwrap();
         assert_eq!(
-            zones.authorize(99, PortalId::RedLionEnter, 1, 500, &fighter(99, 4365.0, 4075.0)),
+            zones.authorize(
+                99,
+                PortalId::RedLionEnter,
+                1,
+                500,
+                &fighter(99, 4365.0, 4075.0)
+            ),
             Err(ZoneError::UnknownFighter)
         );
         let mut busy = fighter(1, 4365.0, 4075.0);
@@ -393,7 +454,13 @@ mod tests {
         assert_eq!(zones.register(0), Err(ZoneError::UnknownFighter));
         zones.register(1).unwrap();
         let accepted = zones
-            .authorize(1, PortalId::RedLionEnter, u32::MAX - 1, 200, &fighter(1, 4365.0, 4075.0))
+            .authorize(
+                1,
+                PortalId::RedLionEnter,
+                u32::MAX - 1,
+                200,
+                &fighter(1, 4365.0, 4075.0),
+            )
             .unwrap();
         assert_eq!(accepted.request_nonce, u32::MAX - 1);
         assert_eq!(
