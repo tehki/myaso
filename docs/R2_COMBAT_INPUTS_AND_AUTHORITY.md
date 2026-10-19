@@ -12,13 +12,14 @@ changed merely by committing source changes.
    user feedback restored **82** world units against the normal light's 76.
    The active heavy now performs a short server-authoritative 24px forward
    lunge over 100ms, with real collision/bounds and unchanged painted arc.
-2. The initial R2 reduced the LMB hold classifier from 320 to 80ms. The owner
-   restored **320ms** on 19 October: tap produces a single light on physical
-   release, held LMB produces only a heavy on release, and loading cannot
-   yield a premature 135ms light. Space+LMB immediate jump chord and E heavy
-   shortcut are preserved; heavy still has its authoritative 320ms windup.
-3. Running short-LMB release still issues the running strike; long LMB hold
-   issues heavy exclusively. Running sprint controls, packet cadence and
+2. **Normal LMB pointerDOWN is instant** (no delayed tap classification).
+   The initial 80ms internal hold classification is necessary to upgrade the
+   unlanded 135ms light into heavy *before* double damage; this timing is not
+   the heavy load. The separate **320ms authoritative heavy windup** remains
+   fully restored and its charge indicator is only shown after long-hold
+   classification. Space+LMB jump chord and E heavy shortcut remain intact.
+3. Running short-LMB pointerDOWN issues the running strike immediately;
+   sustained LMB upgrades the unlanded windup to heavy. Running sprint controls, packet cadence and
    authoritative stamina remain unchanged.
 4. Double-tap the **same physical WASD key** twice within 240ms (with an actual
    keyUp in between) to dash in that direction, regardless of mouse facing.

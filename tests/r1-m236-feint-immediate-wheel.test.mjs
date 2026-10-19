@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 
-test("R2 restored short LMB release gets one true W3C tick before wheel-back", () => {
+test("M324 genuine wheel+LMB release same W3C tick", () => {
   const source = readFileSync(new URL("../scripts/pvp_browser_flight_runner.mjs", import.meta.url), "utf8");
   const start = source.indexOf("async function performArenaFeint(");
   const end = source.indexOf("\nasync function ", start + 25);
@@ -14,11 +14,11 @@ test("R2 restored short LMB release gets one true W3C tick before wheel-back", (
   assert.ok(up >= 0);
   assert.ok(pointer.indexOf('{ type: "pointerDown", button: 0 }') < up);
   assert.ok(pointer.indexOf('{ type: "pause", duration: 20 }') < up);
-  assert.match(pointer.slice(up), /pointerUp", button: 0 },\s*{ type: "pause", duration: 20 }/);
-  assert.equal((pointer.slice(up).match(/duration: 20/g)||[]).length,1);
+  assert.doesNotMatch(pointer.slice(up), /{ type: "pause", duration: (?:0|20) }/);
+  assert.ok(!pointer.slice(up).includes("duration: 20"));
   const wheelTicks = wheel.match(/\{ type: "pause", duration: (?:0|20) \}/g) ?? [];
-  assert.equal(wheelTicks.length, 4);
-  assert.match(wheel, /duration: 20 },\s*{ type: "pause", duration: 20 },\s*{ type: "scroll"/);
+  assert.equal(wheelTicks.length, 3);
+  assert.match(wheel, /duration: 20 },\s*{ type: "scroll"/);
   assert.ok(!wheel.includes("duration: 85"));
   assert.match(wheel, /deltaY: 120/);
   assert.ok(flight.includes('type: "pointer"') && flight.includes('type: "wheel"'));
