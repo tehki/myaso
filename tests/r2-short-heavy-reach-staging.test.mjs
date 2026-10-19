@@ -41,7 +41,7 @@ test("genuine heavy parry also stages within shortened physical reach before 125
   const span = runner.slice(runner.indexOf("async function runOnlineUiHeavyParryFlight("),
     runner.indexOf("async function runOnlineUiHeavyDodgeFlight("));
   assert.match(span, /prepareHeavyCounterplayFlight\(\s*entries, "M107 heavy parry", \{ movementMs: 400 \}/);
-  assert.match(span, /attackOffset, blockOffset, 365/);
+  assert.match(span, /attackOffset, blockOffset, 405/);
   assert.match(span, /"parry-success"/);
   assert.match(span, /"parried"/);
   assert.doesNotMatch(span, /dispatchEvent\(|simulateAttack|skipDefense/);
