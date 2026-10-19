@@ -18,3 +18,14 @@ Rust and JS tests assert identical byte fixtures, round trips, invalid packet le
 5. Add walls/furniture collision, occupied-spawn safety, rollback and capacity tests. Preserve strict M142/M194 acceptance.
 
 Independent of B2 PR #340 while its quality remains red. Live packets 1–4, protocol version and gameplay are unchanged. Merge is not deployment.
+
+## Dormant session replay/epoch state guard
+
+Rust `ZoneSession` is keyed to an admitted, authenticated fighter and starts
+at epoch 1 in Moonvale. It rejects wrong-zone portals, stale epoch and replayed
+nonces (including 32-bit wraparound). It only constructs server ACKs from
+a validated authoritative `ZoneTransfer`, checks fighter/source/destination
+identity and spawn before committing epoch or nonce. Its four tests prove
+rejected transfers leave session state unchanged. **Do not connect the
+registry or session guard to live packets until B2 world migration, session
+mutation and ACK publication are one atomic transaction.**
