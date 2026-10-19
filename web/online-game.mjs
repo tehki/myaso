@@ -210,20 +210,26 @@ canvas.addEventListener("auxclick", (event) => {
 });
 canvas.addEventListener("pointerdown", (event) => {
   canvas.focus();
-  audio.unlock();
   updateMouse(event);
   if (event.button === 1) {
     event.preventDefault();
     middleBlockHeld = true;
+    audio.unlock();
     return;
   }
   if (event.button === 0) {
     leftButtonDown = true;
     leftButtonPressMovement = captureLightAttackMovement(keys);
-    leftButtonCharge.press(event.pointerId, {
+    const firstAudioGesture = !audio.isUnlocked();
+    const accepted = leftButtonCharge.press(event.pointerId, {
       immediate: local.action === COMBAT_ACTION.jump || jumpRequested || keys.has("Space"),
     });
+    // Never let first-gesture AudioContext startup postpone the input request.
+    audio.unlock();
+    if (firstAudioGesture && accepted) audio.play("light");
+    return;
   }
+  audio.unlock();
 });
 function onLeftPointerUp(event) {
   if (event.button === 1) {
