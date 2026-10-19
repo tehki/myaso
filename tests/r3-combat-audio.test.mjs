@@ -133,6 +133,9 @@ test("R3 shared audio is wired to both runtimes without delaying light attacks",
     assert.match(source, /onLight\(\) \{[\s\S]*?audio\.play\("light"\)/);
     assert.match(source, /audio\.play\("step"/);
     assert.match(source, /audio\.play\("jump"\)/);
+    const lightCallback = source.slice(source.indexOf("  onLight() {"), source.indexOf("  onHeavy()"));
+    assert.ok(lightCallback.indexOf('committedLightMove =') < lightCallback.indexOf('audio.play("light")'),
+      "finish movement/stamina input bookkeeping before constructing WebAudio nodes");
     const pointerDown = source.slice(source.indexOf('canvas.addEventListener("pointerdown"'), source.indexOf("function onLeftPointerUp"));
     const pointerUp = source.slice(source.indexOf("function onLeftPointerUp"), source.indexOf('canvas.addEventListener("pointerup"'));
     assert.match(pointerDown, /leftButtonCharge\.press\(event\.pointerId/,

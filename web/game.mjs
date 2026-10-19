@@ -77,8 +77,8 @@ let middleBlockHeld = false;
 const leftButtonCharge = createLeftButtonCharge({
   onLight() {
     attackRequested = true;
-    audio.play("light");
     committedLightMove = captureLightAttackMovement(keys);
+    audio.play("light");
   },
   onHeavy() { heavyAttackRequested = true; audio.play("heavy"); },
 });

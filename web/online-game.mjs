@@ -183,7 +183,6 @@ let middleBlockHeld = false;
 const leftButtonCharge = createLeftButtonCharge({
   onLight() {
     attackRequested = true;
-    audio.play("light");
     committedLightMove = resolveLightAttackReleaseMovement(
       captureLightAttackMovement(keys), leftButtonPressMovement);
     leftButtonPressMovement = null;
@@ -192,6 +191,7 @@ const leftButtonCharge = createLeftButtonCharge({
     else if (rightButtonGesture.isRunning() && ["KeyW", "KeyA", "KeyS", "KeyD"].some((code) => keys.has(code))) {
       queueStaminaDenial("running-attack");
     }
+    audio.play("light");
   },
   onHeavy() { heavyAttackRequested = true; leftButtonPressMovement = null; audio.play("heavy"); },
 });
