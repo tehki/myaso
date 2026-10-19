@@ -8090,6 +8090,9 @@ async function runOnlineUiParryPunishFfaFocusFlight(entries, convert = false) {
   let baseline = await Promise.all(entries.map(readUiEvidence));
   let defenderBefore = baseline.find((entry) => entry.browser === defender.name);
   for (let attempt = 0; attempt < 4 && defenderBefore?.focusLabel !== `NEAREST #${closerId}`; attempt += 1) {
+    // M321: genuine W3C correction must not activate the R2 240ms dash,
+    // including across the two nearest-focus staging correction loops.
+    await sleep(300);
     await pulseMovementKey(closerIdle, "w", 30);
     await sleep(60);
     baseline = await Promise.all(entries.map(readUiEvidence));
@@ -8121,6 +8124,9 @@ async function runOnlineUiParryPunishFfaFocusFlight(entries, convert = false) {
   let staged = await Promise.all(entries.map(readUiEvidence));
   let stagedDefender = staged.find((entry) => entry.browser === defender.name);
   for (let attempt = 0; attempt < 3 && stagedDefender?.focusLabel !== `NEAREST #${closerId}`; attempt += 1) {
+    // M321: genuine W3C correction must not activate the R2 240ms dash,
+    // including across the two nearest-focus staging correction loops.
+    await sleep(300);
     await pulseMovementKey(closerIdle, "w", 30);
     await sleep(50);
     staged = await Promise.all(entries.map(readUiEvidence));
