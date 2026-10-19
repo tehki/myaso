@@ -262,7 +262,7 @@ canvas.addEventListener("wheel", (event) => {
     queueStaminaDenial("roll");
   } else if (event.deltaY > 0) {
     shortBlockUntil = Math.max(shortBlockUntil, performance.now() + COMBAT.block.shortBlockMs);
-    audio.play("parry");
+    audio.play("guard");
   }
 }, { passive: false });
 canvas.addEventListener("pointermove", updateMouse);
