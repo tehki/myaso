@@ -9600,6 +9600,12 @@ async function runOnlineUiGuardBreakFlight(entries, { onGuardBroken = null } = {
           // M252 integrates M249: no obsolete fixed 48ms post-wheel delay
           // after genuine trusted Firefox wheel receipt in R1 guardbreak.
           wheelHeadStartMs: 0,
+          // A real authenticated wheel must precede Chrome light by enough
+          // time to EXPIRE the 125ms parry but remain inside 240ms guard.
+          // Authoritative CI #39303800110 recorded a third-contact parry
+          // at wheel tick 379 / hit tick 385; this acceptance-only 45ms
+          // wait follows the actual trusted DOM event, not wheel ACK.
+          postTrustedWheelMs: 45,
           sendWheel: () => scrollArenaWheel(defender, defenderElementId, 120, 0),
           awaitTrustedWheel: () => challenge.wait(),
           sendAttackClick: (clickHoldMs) => performArenaM221GuardBreakClick(attacker, clickHoldMs),
