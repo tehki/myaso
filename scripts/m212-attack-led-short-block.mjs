@@ -13,6 +13,7 @@ export async function dispatchM212AttackLedShortBlock({
   sendWheel, sendAttackDown, sendAttackUp, sleep,
   sendAttackClick = null, awaitTrustedWheel = null,
   now = () => performance.now(), wheelHeadStartMs = 48, clickHoldMs = 10,
+  postTrustedWheelMs = 0,
 }) {
   if (![sendWheel, sleep, now].every(fn => typeof fn === "function")
     || (sendAttackClick === null
@@ -22,7 +23,9 @@ export async function dispatchM212AttackLedShortBlock({
     || !Number.isFinite(wheelHeadStartMs) || wheelHeadStartMs < 0
     || wheelHeadStartMs > 125
     || !Number.isFinite(clickHoldMs) || clickHoldMs < 0
-    || clickHoldMs > 100) {
+    || clickHoldMs > 100
+    || !Number.isFinite(postTrustedWheelMs) || postTrustedWheelMs < 0
+    || postTrustedWheelMs > 60) {
     throw new TypeError("M212 requires bounded genuine W3C wheel/down/up callbacks");
   }
   const startedAt = now();
@@ -75,6 +78,25 @@ export async function dispatchM212AttackLedShortBlock({
     const elapsedSinceWheelCommandMs = Math.max(0, now() - startedAt);
     const remainingHeadStartMs = Math.max(0, wheelHeadStartMs - elapsedSinceWheelCommandMs);
     if (remainingHeadStartMs > 0) await sleep(remainingHeadStartMs);
+    // M329 acceptance-only: wait after the REAL trusted Firefox DOM event,
+    // not after a delayed HTTP driver ACK or synthetic event. Real CI
+    // #39303800110 recorded the third guard-break wheel at server tick 379,
+    // Chrome windup already at 377, and a true PARRY at 385 (6 ticks).
+    // Typical trusted receipts consume ~5-14ms; CI #39309716318 attempt
+    // 5 consumed 70ms, then a further fixed 45ms made the genuine light hit
+    // after the 240ms block expired (34 HP unblocked). Budget the pause from
+    // actual elapsed time since the W3C wheel command, reserving the ordinary
+    // 12ms receipt transit only. A delayed receipt consumes the pause instead
+    // of appending it. Never send before the trusted event is observed.
+    // The server's 125ms parry / 240ms block intervals and all HP/guard,
+    // receipt, ACK, and genuine browser input assertions remain unchanged.
+    if (postTrustedWheelMs > 0) {
+      const normalReceiptBudgetMs = 12;
+      const elapsedMs = Math.max(0, now() - startedAt);
+      const alreadyConsumedMs = Math.max(0, elapsedMs - normalReceiptBudgetMs);
+      const remainingPauseMs = Math.max(0, postTrustedWheelMs - alreadyConsumedMs);
+      if (remainingPauseMs > 0) await sleep(remainingPauseMs);
+    }
   } else {
     const [wheelResult] = await Promise.all([wheelOutcome, sleep(wheelHeadStartMs)]);
     if (!wheelResult.ok) throw wheelResult.error;
@@ -114,6 +136,7 @@ export async function dispatchM212AttackLedShortBlock({
     attackUpAckMs: Number(attackUpAckMs.toFixed(1)),
     completeMs: Number(Math.max(0, now() - startedAt).toFixed(1)),
     wheelHeadStartMs,
+    postTrustedWheelMs,
     clickHoldMs,
     trustedWheelObservedMs: trustedWheelObservedMs === null ? null : Number(trustedWheelObservedMs.toFixed(1)),
   };
