@@ -69,6 +69,12 @@ test("M223.1 clamps slow wheel samples without changing server combat windows", 
     targetAfterWindupMs:155, sampledWheelIngressMs:39,
   }), {boundedWheelIngressMs:65,wheelDelayMs:90});
   assert.deepEqual(planM223WheelDelay({
+    targetAfterWindupMs:255, sampledWheelIngressMs:31,
+  }), {boundedWheelIngressMs:65,wheelDelayMs:190});
+  assert.deepEqual(planM223WheelDelay({
+    targetAfterWindupMs:255, sampledWheelIngressMs:103,
+  }), {boundedWheelIngressMs:85,wheelDelayMs:170});
+  assert.deepEqual(planM223WheelDelay({
     targetAfterWindupMs:285, sampledWheelIngressMs:103,
   }), {boundedWheelIngressMs:85,wheelDelayMs:200});
   assert.deepEqual(planM223WheelDelay({
@@ -93,7 +99,10 @@ test("M226 uses later genuine parry wheel only, preserving M188 and M107 strict 
     source.indexOf("async function runOnlineUiHeavyParryFlight("));
   const parry=source.slice(source.indexOf("async function runOnlineUiHeavyParryFlight("),
     source.indexOf("async function runOnlineUi",source.indexOf("async function runOnlineUiHeavyParryFlight(")+20));
-  assert.ok(block.includes("attackOffset, blockOffset, 155,"));
+  // Authentic M107 block previously expired 2-4 server ticks before heavy hit.
+  // Move the dispatch target without changing original guard / parry windows.
+  assert.ok(block.includes("attackOffset, blockOffset, 255,"));
+  assert.ok(!block.includes("attackOffset, blockOffset, 155,"));
   assert.ok(parry.includes("attackOffset, blockOffset, 285,"));
   assert.ok(source.includes('feedbackTransitions.includes("parried")'));
   assert.ok(source.includes("defenderResult.playerGuard !== 100"));
