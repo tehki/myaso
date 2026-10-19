@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 
-test("M324 genuine wheel+LMB release same W3C tick", () => {
+test("M331 genuine wheel is issued before real LMB release after pointerDOWN", () => {
   const source = readFileSync(new URL("../scripts/pvp_browser_flight_runner.mjs", import.meta.url), "utf8");
   const start = source.indexOf("async function performArenaFeint(");
   const end = source.indexOf("\nasync function ", start + 25);
@@ -10,17 +10,13 @@ test("M324 genuine wheel+LMB release same W3C tick", () => {
   const flight = source.slice(start, end);
   const pointer = flight.slice(flight.indexOf('id: `mouse-${session.name}`'), flight.indexOf('id: `wheel-${session.name}`'));
   const wheel = flight.slice(flight.indexOf('id: `wheel-${session.name}`'), flight.indexOf("\n      ],\n    });", flight.indexOf('id: `wheel-${session.name}`')));
-  const up = pointer.indexOf('{ type: "pointerUp", button: 0 }');
-  assert.ok(up >= 0);
-  assert.ok(pointer.indexOf('{ type: "pointerDown", button: 0 }') < up);
-  assert.ok(pointer.indexOf('{ type: "pause", duration: 20 }') < up);
-  assert.doesNotMatch(pointer.slice(up), /{ type: "pause", duration: (?:0|20) }/);
-  assert.ok(!pointer.slice(up).includes("duration: 20"));
-  const wheelTicks = wheel.match(/\{ type: "pause", duration: (?:0|20) \}/g) ?? [];
-  assert.equal(wheelTicks.length, 3);
-  assert.match(wheel, /duration: 20 },\s*{ type: "scroll"/);
+  const types = input => [...input.matchAll(/\\{ type: "(pointerMove|pointerDown|pointerUp|pause|scroll)"/g)].map(x => x[1]);
+  assert.deepEqual(types(pointer), ["pointerMove", "pointerDown", "pause", "pause", "pointerUp"]);
+  assert.deepEqual(types(wheel), ["pause", "pause", "scroll", "pause", "pause"]);
+  assert.match(pointer, /pointerDown", button: 0 },\\s*{ type: "pause", duration: 0 },\\s*{ type: "pause", duration: 20 },\\s*{ type: "pointerUp"/);
+  assert.match(wheel, /deltaY: 120[^\\n]*},\\s*{ type: "pause", duration: 20 }/);
+  assert.doesNotMatch(pointer.slice(pointer.indexOf('{ type: "pointerUp"')), /{ type: "pause"/);
   assert.ok(!wheel.includes("duration: 85"));
-  assert.match(wheel, /deltaY: 120/);
   assert.ok(flight.includes('type: "pointer"') && flight.includes('type: "wheel"'));
   assert.ok(!flight.includes("dispatchEvent("));
 });
