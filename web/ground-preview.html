@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>myaso.io — Ground v1.0 battlefield preview</title>
+<style>
+:root{color-scheme:dark}*{box-sizing:border-box}body{margin:0;background:#111813;color:#e2ddc8;font:15px system-ui, sans-serif}
+header{display:flex;justify-content:space-between;align-items:center;gap:24px;padding:15px 22px;background:#20251b;border-bottom:1px solid #3f4935}
+h1{font:600 23px Georgia,serif;margin:0}small{color:#a2aa92}.main{max-width:1200px;margin:18px auto;padding:0 18px}
+canvas{display:block;width:100%;aspect-ratio:16/10;max-height:690px;background:#566044;border:1px solid #6e7151;border-radius:9px;box-shadow:0 16px 55px #0008}
+.hud{display:flex;justify-content:space-between;flex-wrap:wrap;gap:14px;margin:12px 0;color:#aeb699}
+kbd{background:#303a29;border:1px solid #617050;border-radius:4px;padding:2px 5px;color:#e8e4ce}
+</style></head>
+<body>
+<header><div><h1>⚔️ myaso.io — Ground v1.0</h1><small>Medieval battlefield · deterministic chunks · prototype</small></div><div>🌕⚡️🚀</div></header>
+<div class="main"><canvas id="arena" width="1120" height="700" aria-label="Interactive battlefield terrain"></canvas>
+<div class="hud"><span><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> move camera · mouse wheel zoom · <kbd>R</kbd> reset</span><span id="stats">Loading ground...</span></div>
+<small>This is the new world-space terrain alone with schematic fighters for scale. The gameplay engine is unchanged; the feature is opt-in via <code>&amp;ground=1</code>.</small>
+</div>
+<script type="module">
+import { createBattlefieldGround, drawGroundContactShadow } from "../src/browser/battlefield-ground.mjs";
+const canvas=document.querySelector("#arena"), ctx=canvas.getContext("2d");
+const terrain=createBattlefieldGround(), camera={x:4096,y:4096};
+const keys=new Set();let zoom=.84,last=performance.now();
+document.addEventListener("keydown",e=>{keys.add(e.code); if(e.code==="KeyR"){camera.x=4096;camera.y=4096;zoom=.84;}});
+document.addEventListener("keyup",e=>keys.delete(e.code));
+canvas.addEventListener("wheel",e=>{e.preventDefault();zoom=Math.max(.58,Math.min(1.15,zoom+(e.deltaY<0?.055:-.055)));},{passive:false});
+function fighter(x,y,body,shield,angle){
+  drawGroundContactShadow(ctx,x,y);
+  ctx.save();ctx.translate(x,y);ctx.rotate(angle);
+  ctx.fillStyle=body;ctx.beginPath();ctx.arc(0,0,17,0,Math.PI*2);ctx.fill();
+  ctx.strokeStyle="#2c3330";ctx.lineWidth=3;ctx.stroke();
+  ctx.fillStyle="#d1bc88";ctx.fillRect(11,-2,26,4);
+  ctx.fillStyle=shield;ctx.beginPath();ctx.ellipse(-15,-7,12,15,-.22,0,2*Math.PI);ctx.fill();
+  ctx.strokeStyle="#cfc8ab";ctx.lineWidth=2;ctx.stroke();ctx.restore();
+}
+function frame(now){
+  const dt=Math.min(.05,(now-last)/1000);last=now;
+  const mx=Number(keys.has("KeyD")||keys.has("ArrowRight"))-Number(keys.has("KeyA")||keys.has("ArrowLeft"));
+  const my=Number(keys.has("KeyS")||keys.has("ArrowDown"))-Number(keys.has("KeyW")||keys.has("ArrowUp"));
+  const n=Math.hypot(mx,my)||1;camera.x+=mx/n*260*dt;camera.y+=my/n*260*dt;
+  ctx.setTransform(1,0,0,1,0,0);ctx.clearRect(0,0,canvas.width,canvas.height);
+  ctx.save();ctx.translate(canvas.width/2,canvas.height/2);ctx.scale(zoom,zoom);ctx.translate(-canvas.width/2,-canvas.height/2);
+  terrain.draw(ctx,camera,canvas.width,canvas.height,zoom);
+  const wx=canvas.width/2,wy=canvas.height/2;
+  fighter(wx,wy,"#bfc4bc","#ad3935",-0.22);
+  fighter(wx+130,wy-85,"#737d80","#35404f",2.5);
+  fighter(wx-200,wy+125,"#928e7d","#515841",-0.65);
+  ctx.restore();
+  document.querySelector("#stats").textContent=`camera ${Math.round(camera.x)},${Math.round(camera.y)} · zoom ${zoom.toFixed(2)} · visible ${terrain.stats.rendered} · cached ${terrain.stats.cached}/24 · new/frame ${terrain.stats.generated}`;
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+</script></body></html>

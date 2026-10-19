@@ -11,6 +11,7 @@ import { isTickNewer32, reconcilePrediction } from "../src/browser/reconciliatio
 import { createReconciliationCamera, createSnapshotRenderClock } from "../src/browser/smooth-motion.mjs";
 import { createRenderGapTelemetry } from "../src/browser/render-gap-telemetry.mjs";
 import { ARENA_VIEW_ZOOM, nearbyOffscreenPointers, projectArenaPoint } from "../src/browser/arena-viewport.mjs";
+import { createBattlefieldGround, drawGroundContactShadow } from "../src/browser/battlefield-ground.mjs";
 import { NETWORK } from "../src/network/constants.mjs";
 import { connectAuthoritativeClient, parseSha256Hex } from "./authoritative-client.mjs";
 
@@ -111,6 +112,9 @@ const killFeedSequences = new Set();
 
 const params = new URLSearchParams(window.location.search);
 const diagnosticsVisible = params.get("netstats") === "1";
+// Ground v1.0 is a visual opt-in. All acceptance scenarios keep their baseline pixels.
+const groundEnabled = params.get("ground") === "1" && !params.has("scenario");
+const battlefieldGround = groundEnabled ? createBattlefieldGround() : null;
 const renderGapTelemetry = diagnosticsVisible ? createRenderGapTelemetry() : null;
 const diagnosticsPanel = document.querySelector("#network-diagnostics");
 if (diagnosticsPanel) diagnosticsPanel.hidden = !diagnosticsVisible;
@@ -810,6 +814,10 @@ function render(nowMs = performance.now(), impact = combatImpact.sample(nowMs)) 
   ctx.scale(ARENA_VIEW_ZOOM, ARENA_VIEW_ZOOM);
   ctx.translate(-canvas.width / 2, -canvas.height / 2);
 
+  if (battlefieldGround && local.initialized) {
+    battlefieldGround.draw(ctx, visualCameraPosition, canvas.width, canvas.height, ARENA_VIEW_ZOOM);
+  }
+
   for (const entity of networkClient.state.values()) {
     if (entity.netId === ownId) continue;
     let scratch = remoteScratch.get(entity.netId);
@@ -825,7 +833,10 @@ function render(nowMs = performance.now(), impact = combatImpact.sample(nowMs)) 
     const recoveryTell = entity.netId === recoveryFocusNetId;
     drawFighterWorld(sampled, "#b96350", "#47251f", damageTell, recoveryTell);
   }
-  if (ownId && local.initialized) drawFighterScreen(canvas.width / 2, canvas.height / 2, local, "#e2d5b4", "#51452d");
+  if (ownId && local.initialized) {
+    if (groundEnabled) drawFighterGroundShadow(canvas.width / 2, canvas.height / 2, local);
+    drawFighterScreen(canvas.width / 2, canvas.height / 2, local, "#e2d5b4", "#51452d");
+  }
   ctx.restore();
   // R1 wider view: health/guard bars and player identity badges are UI,
   // not world geometry. Keep their original unscaled 42px/34px readability
@@ -985,7 +996,17 @@ function drawFighterWorld(fighter, body, shadow, damageTell = false, recoveryTel
     visualCameraPosition.x, visualCameraPosition.y, canvas.width, canvas.height);
   if (projected.x < -64 || projected.x > canvas.width + 64
     || projected.y < -64 || projected.y > canvas.height + 64) return;
+  if (groundEnabled) drawFighterGroundShadow(screenX, screenY, fighter);
   drawFighterScreen(screenX, screenY, fighter, body, shadow, true, damageTell, recoveryTell);
+}
+
+function drawFighterGroundShadow(x, y, fighter) {
+  const action = fighter.action ?? COMBAT_ACTION.idle;
+  drawGroundContactShadow(ctx, x, y, {
+    airborne: action === COMBAT_ACTION.jump || action === COMBAT_ACTION.jumpAttackWindup
+      || action === COMBAT_ACTION.jumpAttackActive || action === COMBAT_ACTION.jumpAttackRecovery,
+    dead: action === COMBAT_ACTION.dead,
+  });
 }
 
 function drawFighterScreen(x, y, fighter, body, shadow, remote = false, damageTell = false, recoveryTell = false) {
@@ -1036,10 +1057,12 @@ function drawFighterScreen(x, y, fighter, body, shadow, remote = false, damageTe
   }
   if (remote && guardBreakSpatialPresentation(fighter).visible) drawGuardBreakTell();
   if (remote && recoveryTell) drawRecoveryTell();
-  ctx.fillStyle = shadow;
-  ctx.beginPath();
-  ctx.ellipse(-2, 8, 20, 13, 0, 0, Math.PI * 2);
-  ctx.fill();
+  if (!groundEnabled) {
+    ctx.fillStyle = shadow;
+    ctx.beginPath();
+    ctx.ellipse(-2, 8, 20, 13, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
   ctx.fillStyle = body;
   ctx.beginPath();
   ctx.arc(0, 0, COMBAT.fighterRadius, 0, Math.PI * 2);
