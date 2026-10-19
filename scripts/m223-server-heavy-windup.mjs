@@ -42,7 +42,7 @@ export async function awaitM223HeavyWindup({
 // Keep the planned defender activation safely between parry and block expiry.
 // Wrong authoritative outcome still fails the existing strict M107 checks.
 export function planM223WheelDelay({ targetAfterWindupMs, sampledWheelIngressMs }) {
-  if (![155, 255, 285].includes(targetAfterWindupMs)
+  if (![155, 255, 285, 365].includes(targetAfterWindupMs)
     || !Number.isFinite(sampledWheelIngressMs)
     || sampledWheelIngressMs < 0 || sampledWheelIngressMs > 750) {
     throw new TypeError("M223 requires genuine bounded heavy wheel calibration");
