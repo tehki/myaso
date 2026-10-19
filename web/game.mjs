@@ -139,7 +139,7 @@ canvas.addEventListener("wheel", (event) => {
   event.preventDefault();
   canvas.focus();
   if (event.deltaY < 0) { rollRequested = true; audio.play("roll"); }
-  else if (event.deltaY > 0) { shortBlockUntil = Math.max(shortBlockUntil, world.nowMs + COMBAT.block.shortBlockMs); audio.play("parry"); }
+  else if (event.deltaY > 0) { shortBlockUntil = Math.max(shortBlockUntil, world.nowMs + COMBAT.block.shortBlockMs); audio.play("guard"); }
 }, { passive: false });
 canvas.addEventListener("pointermove", updateMouse);
 window.addEventListener("blur", releaseInputs);
