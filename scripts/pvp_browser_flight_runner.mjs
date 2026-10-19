@@ -11119,9 +11119,14 @@ async function runOnlineUiMultiRecoveryFfaFocusFlight(entries, spatial = false) 
   // Center the M144-only trusted-down timer at 155ms to leave 30ms more
   // W3C driver / event-loop headroom; do NOT widen the original 60..200ms
   // actual-input gate or change the 90ms click or any combat action lifetime.
-  // M145 retains its independent 100ms trusted-down choreography and the
-  // original measured 70..150ms spatial input lead gate unchanged.
-  const jumpInputDelayMs = spatial ? 100 : 155;
+  // M326: a genuine M145 native Chromium jump input arrived at +152ms
+  // after the trusted Chrome2 LMB down on merged-main quality #39288349455.
+  // The prior 100ms dispatch delay left too little room for W3C/driver queue
+  // skew (+52ms observed). Dispatch at +80ms instead, preserving the original
+  // measured 70..150ms real input lead window, no synthetic events or retries,
+  // and all authoritative three-stage focus/zero-damage assertions.
+  // M144 retains its independent 155ms release-to-jump choreography.
+  const jumpInputDelayMs = spatial ? 80 : 155;
   const lightChallenge = m227Registry.issue();
   if (lightChallenge) {
     await execute(lightAttacker.base, lightAttacker.sessionId,
