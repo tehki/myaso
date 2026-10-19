@@ -518,6 +518,7 @@ async function startGameServer() {
       MYASO_BIND: "127.0.0.1:0",
       MYASO_FLIGHT_ACTION_PROOF: (scenario === "uiguardbreakpunishffahit"
         || scenario === "uiheavyblock" || scenario === "uiheavyparry"
+        || scenario === "uiheavydodge"
         || scenario === "uikickknockdownffahit"
         || scenario === "uimultiknockdownffahit"
         || scenario === "uimultirecoveryffa"
@@ -1425,41 +1426,55 @@ async function runOnlineUiHeavyDodgeFlight(entries) {
   for (let attempt = 1; attempt <= 3 && !committedObserved; attempt += 1) {
     const before = await Promise.all(entries.map(readUiEvidence));
     const beforeAttacker = before.find((entry) => entry.browser === attacker.name);
-    const commitsBefore = beforeAttacker?.events.filter((text) =>
-      text.startsWith("Heavy strike committed")).length ?? 0;
-
-    // M204: release the genuine heavy E key *after* scheduling the real
-    // defender dodge. Waiting for the full key pulse previously let the
-    // unchanged 46 HP heavy hit land before Chrome's wheel arrived.
-    await setMovementKey(attacker, "e", true);
-    const commitDeadline = Date.now() + 360;
+    // M204: server-confirm the exact FIRST heavy windup before the sole
+    // genuine Chrome wheel. R2's 130-unit reach proved static host sleeps
+    // unreliable (#39213856621: wheel too late, #39215007573: wheel early).
+    // The loopback-only M201_ACTION proof binds this to the authoritative
+    // fighter and 60Hz tick; never infer commitment from a WebDriver ACK.
+    const serverLogOffset = m201ServerOutput().length;
+    const eResult = setMovementKey(attacker, "e", true).then(
+      () => ({ ok: true }), error => ({ ok: false, error }),
+    );
     try {
-      while (Date.now() < commitDeadline) {
-        const state = await readUiEvidence(attacker);
-        const commits = state.events.filter((text) =>
-          text.startsWith("Heavy strike committed")).length;
-        if (commits > commitsBefore) {
-          committedObserved = true;
-          break;
-        }
-        await sleep(10);
+      let windup;
+      try {
+        windup = await awaitM223HeavyWindup({
+          readOutput: m201ServerOutput, afterOffset: serverLogOffset,
+          fighterId: beforeAttacker.playerNetId, sleep, timeoutMs: 550,
+        });
+      } catch (error) {
+        const delivered = await eResult;
+        if (!delivered.ok) throw delivered.error;
+        throw error;
       }
-      if (committedObserved) {
-        // R2 130-unit heavy can still contact the defender during the
-        // perpendicular roll, so iframe timing (not simply clearing reach)
-        // must be proven. On strict 39149931060 the authentic Chrome wheel
-        // arrived ~147ms before 46-HP contact, outside the original 125ms
-        // iframe. Align the *real* wheel 45ms later to sample near impact;
-        // never extend i-frames, reduce hit geometry or relax HP=100 gates.
-        await sleep(90);
-        await setMovementKey(defender, "s", true);
-        try {
-          await performArenaTimedPointerDodge(defender, defenderElementId, 15);
-        } finally {
-          await setMovementKey(defender, "s", false);
-        }
+      const windupObservedEpochMs = Date.now();
+      const delivered = await eResult;
+      if (!delivered.ok) throw delivered.error;
+      committedObserved = true;
+      // Schedule one real W3C pointer-owned roll ~170ms after server windup
+      // is observed. Approx. 60ms browser+network receipt then positions
+      // its ~125ms i-frame around the 320ms heavy active contact, WITHOUT
+      // modifying either combat timer, heavy reach, 46HP or test assertions.
+      // Date.now() absolute scheduling avoids accumulating Chrome KeyS
+      // WebDriver ACK latency before the wheel and keeps heavy E held.
+      const wheelTargetEpochMs = windupObservedEpochMs + 170;
+      await setMovementKey(defender, "s", true);
+      try {
+        const remainingMs = wheelTargetEpochMs - Date.now();
+        if (remainingMs > 0) await sleep(remainingMs);
+        const wheelIssuedEpochMs = Date.now();
+        await performArenaTimedPointerDodge(defender, defenderElementId, 15);
+        console.log("M204_SERVER_WINDUP_NATIVE_DODGE " + JSON.stringify({
+          fighterId: beforeAttacker.playerNetId, serverWindupTick: windup.serverTick,
+          windupObservedAfterMs: windup.observedAfterMs,
+          plannedAfterWindupMs: 170,
+          wheelIssuedAfterObservedMs: wheelIssuedEpochMs - windupObservedEpochMs,
+        }));
+      } finally {
+        await setMovementKey(defender, "s", false);
       }
     } finally {
+      await eResult;
       await setMovementKey(attacker, "e", false);
     }
     if (committedObserved) break;
@@ -3539,6 +3554,17 @@ async function runOnlineUiJumpAttackCounterplayFlight(entries, defense) {
   );
   const { attacker, defender, attackerElementId, defenderElementId, movementCode } = staged;
   const attackOffset = movementCode === "KeyD" ? 200 : -200;
+  // M138's 105ms windup is shorter than ordinary M33 light. The previous
+  // hardcoded 70ms Chrome wheel pause reached the game after jump impact
+  // on all 3 genuine CI tries (#39180123977). Before the real exchange,
+  // measure each browser's trusted pointer and wheel latency, target wheel
+  // ~25ms after jump chord pointerDOWN, and reset strict evidence afterward.
+  const jumpParryIngress = defense === "parry"
+    ? await calibrateNativeParryIngress(
+      attacker, defender, attackerElementId, defenderElementId, attackOffset, 25,
+    )
+    : null;
+  if (jumpParryIngress) await Promise.all(entries.map(installUiObserver));
   const beforeAttacker = await readUiEvidence(attacker);
   const keyTransitionOffset = beforeAttacker.keyTransitions.length;
   const pointerOffset = beforeAttacker.pointers.length;
@@ -3589,25 +3615,24 @@ async function runOnlineUiJumpAttackCounterplayFlight(entries, defense) {
     await scrollArenaWheelPair(defender, defenderElementId, 120, 20, 100);
     await performArenaJumpAttackChord(attacker, attackerElementId, attackOffset, 90);
   } else if (defense === "parry") {
-    // Dispatch the genuine Firefox Space+LMB chord and a delayed Chrome
-    // wheel-back concurrently. Waiting for the Firefox WebDriver response
-    // before dispatching Chrome can cost over 200 ms under hosted CI load:
-    // the wheel then arrives after the 105 ms jump windup and deals HP damage.
-    // The 70 ms wheel-source pause is measured from Chrome's own command
-    // clock, independent of Firefox's variable command-completion latency.
-    // CI calibration found 130 ms landed after impact, while 20 ms opened
-    // block too early; center the pulse within the 125 ms parry window.
-    // Preserve the real browser gesture, 125 ms parry window, and all combat
-    // constants. The authoritative stunned/zero-damage assertions below
-    // still fail closed if wheel timing misses the actual jump strike.
+    // Reuse per-browser real W3C ingress calibration, targeting one genuine
+    // wheel ~25ms after the authentic Space+LMB pointerDOWN. The unchanged
+    // 105ms jump windup and 125ms parry are narrow enough that hardcoded
+    // 70ms wheel pause reached authoritative Active on 3/3 CI attempts.
+    // Neither genuine input nor the strict stun/100HP/100guard proof changes.
     let chordHeld = false;
-    const chordPromise = pressArenaJumpAttackChord(
-      attacker, attackerElementId, attackOffset,
-    ).then(() => { chordHeld = true; });
+    const chordPromise = (async () => {
+      if (jumpParryIngress.attackLeadMs > 0) await sleep(jumpParryIngress.attackLeadMs);
+      await pressArenaJumpAttackChord(attacker, attackerElementId, attackOffset);
+      chordHeld = true;
+    })();
     try {
       await Promise.all([
         chordPromise,
-        scrollArenaWheel(defender, defenderElementId, 120, 70),
+        (async () => {
+          if (jumpParryIngress.wheelLeadMs > 0) await sleep(jumpParryIngress.wheelLeadMs);
+          await scrollArenaWheel(defender, defenderElementId, 120, 0);
+        })(),
       ]);
       await sleep(20);
     } finally {
@@ -7872,6 +7897,72 @@ async function runM176BlockAttackArbitrationPhase(
   }));
 }
 
+
+async function calibrateNativeParryIngress(
+  attacker, defender, attackerElementId, defenderElementId, attackOffset,
+  targetAfterPointerDownMs = 70,
+) {
+  // Measure only trusted input delivery, never synthesize game controls.
+  // Three harmless mouse moves and real isolated wheel-back blocks before
+  // the live combat exchange; each 240ms block expires before next probe.
+  const measure = async (session, eventKind, issue) => {
+    const listener = "const arena=document.querySelector('#arena');"
+      + "const probe={receivedEpochMs:null};window.__MYASO_M33_CALIBRATION__=probe;"
+      + "arena.addEventListener(" + JSON.stringify(eventKind) + ",event=>{"
+      + "if(event.isTrusted && probe.receivedEpochMs===null"
+      + (eventKind === "wheel" ? " && event.deltaY>0" : "")
+      + ")probe.receivedEpochMs=Date.now();},{capture:true,once:true});";
+    await execute(session.base, session.sessionId, listener);
+    const issuedAtMs = Date.now();
+    await issue();
+    let received = null;
+    for (let poll = 0; poll < 5 && received === null; poll += 1) {
+      received = await execute(session.base, session.sessionId,
+        "return window.__MYASO_M33_CALIBRATION__?.receivedEpochMs ?? null;");
+      if (received === null) await sleep(10);
+    }
+    const latencyMs = received - issuedAtMs;
+    if (!Number.isFinite(received) || !Number.isFinite(latencyMs)
+      || latencyMs < 0 || latencyMs >= 400) {
+      throw new Error("M33 trusted input calibration lacked bounded receipt: "
+        + JSON.stringify({ browser: session.name, eventKind, issuedAtMs, received }));
+    }
+    return latencyMs;
+  };
+  const pointerSamples = [];
+  const wheelSamples = [];
+  for (let sample = 0; sample < 3; sample += 1) {
+    await aimArena(attacker, attackerElementId, attackOffset + (sample % 2 ? -32 : 32));
+    const [pointerMs, wheelMs] = await Promise.all([
+      measure(attacker, "pointermove",
+        () => aimArena(attacker, attackerElementId, attackOffset)),
+      measure(defender, "wheel",
+        () => scrollArenaWheel(defender, defenderElementId, 120, 0)),
+    ]);
+    pointerSamples.push(pointerMs);
+    wheelSamples.push(wheelMs);
+    await sleep(COMBAT.block.shortBlockMs + 130);
+  }
+  const median = samples => [...samples].sort((a, b) => a - b)[1];
+  const pointerMs = median(pointerSamples);
+  const wheelMs = median(wheelSamples);
+  // M33 light active follows pointerDOWN in 135ms; M138 jump attack
+  // follows Space+LMB in only 105ms. Choose the scenario's requested wheel
+  // arrival relative to *genuine* pointerDOWN, never widen either parry.
+  if (!Number.isFinite(targetAfterPointerDownMs) || targetAfterPointerDownMs < 0
+    || targetAfterPointerDownMs > 85) {
+    throw new RangeError("native parry arrival target outside strict window");
+  }
+  const skewMs = Math.max(-180, Math.min(180,
+    Math.round(pointerMs + 12 + targetAfterPointerDownMs - wheelMs)));
+  const result = { attacker: attacker.name, defender: defender.name,
+    pointerSamples, wheelSamples, pointerMs, wheelMs,
+    targetAfterPointerDownMs,
+    attackLeadMs: Math.max(0, -skewMs), wheelLeadMs: Math.max(0, skewMs) };
+  console.log("M33_TRUSTED_W3C_INGRESS_CALIBRATION " + JSON.stringify(result));
+  return result;
+}
+
 async function runOnlineUiParryFlight(entries, postParrySleepMs = 80, roles = null) {
   await Promise.all(entries.map(installUiObserver));
   const ready = await waitForUiReady(entries);
@@ -7892,25 +7983,35 @@ async function runOnlineUiParryFlight(entries, postParrySleepMs = 80, roles = nu
   const defenderElementId = await resolveArenaElement(defender, "M33 defender");
   await Promise.all(entries.map(centerArenaInViewport));
   await aimArena(defender, defenderElementId, attackRight ? -200 : 200);
+  // Calibration is performed in the genuine browser prior to combat,
+  // while neither fighter is attacking. Reset observer records afterward so
+  // the M33/M41/M146 exchange still has exactly ONE trusted parry wheel.
+  const parryIngress = await calibrateNativeParryIngress(
+    attacker, defender, attackerElementId, defenderElementId, attackOffset,
+  );
+  await Promise.all(entries.map(installUiObserver));
   let evidence = null;
   let lastAttemptBaseline = null;
   for (let attempt = 0; attempt < 4 && !evidence; attempt += 1) {
     await pulseMovementKey(attacker, movementKey, attempt === 0 ? 120 : 80);
     lastAttemptBaseline = await Promise.all(entries.map(readUiEvidence));
-    // R1 short LMB commits the light on genuine pointerUP. The pre-R1
-    // down -> wheel -> 190ms -> up sequence can exceed the 320ms charge
-    // threshold under real WebDriver latency and produce a HEAVY instead.
-    // Use one complete, 75ms trusted W3C tap before the real wheel-back.
-    // Keep its independent 125ms parry/650ms stun and genuine feedback gates.
-    await performArenaAttackHold(attacker, attackerElementId, attackOffset, 75);
-    // R2 short-LMB helper releases in <=35ms, but genuine Firefox W3C
-    // delivery and the 60Hz input sampler can consume another tick. Full
-    // M146 39153407753 observed first active hit at tick243 while block
-    // first appeared tick243 (too late for parry). Deliver real wheel 35ms
-    // earlier, inside the unchanged 125ms parry window and without adding
-    // virtual clicks, relaxing HP=100 or altering authoritative timings.
-    await sleep(20);
-    await setArenaBlock(defender, defenderElementId, true);
+    // M33/M41/M146: use the same genuinely observed browser latencies that
+    // are sampled before combat, not hard-coded Chrome/Firefox host delays.
+    // Trusted pointermove and wheel-back are real W3C events; no synthetic
+    // event may enter the arena. Stagger the live Firefox/Chrome actions
+    // around the measured delivery time, placing the ONE genuine wheel
+    // ~70ms after true light pointerdown, inside unchanged 125ms parry.
+    // Any actual -38 guard block or 34 HP hit remains a terminal failure.
+    await Promise.all([
+      (async () => {
+        if (parryIngress.attackLeadMs > 0) await sleep(parryIngress.attackLeadMs);
+        await performArenaAttackHold(attacker, attackerElementId, attackOffset, 35);
+      })(),
+      (async () => {
+        if (parryIngress.wheelLeadMs > 0) await sleep(parryIngress.wheelLeadMs);
+        await setArenaBlock(defender, defenderElementId, true);
+      })(),
+    ]);
     evidence = await waitForUiParryEvidence(entries, attacker, defender, 350, false, lastAttemptBaseline);
     if (!evidence) {
       const after = await Promise.all(entries.map(readUiEvidence));

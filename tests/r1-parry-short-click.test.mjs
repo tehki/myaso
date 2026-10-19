@@ -8,11 +8,17 @@ test("M33 and M146 perform complete genuine short LMB before parry, never chargi
   const end = source.indexOf("\nasync function runOnlineUiParryPunishFfaFocusFlight(", start + 20);
   assert.ok(start >= 0 && end > start);
   const flight = source.slice(start, end);
-  const tap = flight.indexOf("await performArenaAttackHold(attacker, attackerElementId, attackOffset, 75)");
-  const lead = flight.indexOf("await sleep(20)", tap);
+  const dispatch = flight.indexOf("await Promise.all([");
+  const tap = flight.indexOf("performArenaAttackHold(attacker, attackerElementId, attackOffset, 35)", dispatch);
+  const lead = flight.indexOf("if (parryIngress.wheelLeadMs > 0) await sleep(parryIngress.wheelLeadMs)", tap);
   const wheel = flight.indexOf("await setArenaBlock(defender, defenderElementId, true)", lead);
   const proof = flight.indexOf("await waitForUiParryEvidence(entries, attacker, defender, 350, false, lastAttemptBaseline)", wheel);
-  assert.ok(tap >= 0 && lead > tap && wheel > lead && proof > wheel);
+  assert.ok(dispatch >= 0 && tap > dispatch && lead > tap && wheel > lead && proof > wheel);
+  assert.ok(flight.includes("const parryIngress = await calibrateNativeParryIngress("));
+  assert.ok(flight.includes("await Promise.all(entries.map(installUiObserver));"));
+  assert.ok(flight.includes("if (parryIngress.attackLeadMs > 0) await sleep(parryIngress.attackLeadMs)"));
+  assert.ok(!flight.includes('defender.name !== "firefox"'));
+  assert.ok(flight.slice(tap,proof).includes("})(),"));
   assert.ok(!flight.includes("await setArenaAttack(attacker, attackerElementId, true, attackOffset)"));
   assert.ok(flight.includes('entry.startsWith("Heavy strike committed")'));
   assert.ok(flight.includes("if (!pristine)"));
@@ -56,4 +62,22 @@ test("M147/M150 FFA parry uses one complete short light before wheel, preserves 
   assert.ok(flight.includes("currentCloser?.playerHp === 100"));
   assert.ok(flight.includes("focusLabel === `NEAREST #${closerId}`"));
   assert.ok(flight.includes('closerState.events.includes("Hit taken - 34 HP.")'));
+});
+
+test("M33 records trusted native wheel and pointer latency without synthetic inputs or altered combat rules", () => {
+  const source = readFileSync(new URL("../scripts/pvp_browser_flight_runner.mjs", import.meta.url), "utf8");
+  const a = source.indexOf("async function calibrateNativeParryIngress(");
+  const b = source.indexOf("async function runOnlineUiParryFlight(", a);
+  const calibration = source.slice(a, b);
+  assert.ok(a > 0 && b > a);
+  assert.match(calibration, /event.isTrusted/);
+  assert.match(calibration, /pointermove/);
+  assert.match(calibration, /scrollArenaWheel\(defender, defenderElementId, 120, 0\)/);
+  assert.match(calibration, /COMBAT.block.shortBlockMs \+ 130/);
+  assert.match(calibration, /pointerSamples/);
+  assert.match(calibration, /wheelSamples/);
+  assert.match(calibration, /attackLeadMs: Math.max\(0, -skewMs\)/);
+  assert.match(calibration, /wheelLeadMs: Math.max\(0, skewMs\)/);
+  assert.ok(!calibration.includes("dispatchEvent("));
+  assert.ok(!calibration.includes("new WheelEvent("));
 });
