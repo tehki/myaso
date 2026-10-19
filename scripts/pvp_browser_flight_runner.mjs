@@ -1355,15 +1355,15 @@ async function runOnlineUiHeavyParryFlight(entries) {
   // pristine case. Any evidence that a heavy actually committed, hit, blocked,
   // or otherwise resolved makes the attempt terminal and therefore fail-closed.
   for (let attempt = 1; attempt <= 3 && !evidence; attempt += 1) {
-    // M226: use the final part of genuine server windup for parry. Across
-    // repeated hosted CI runs the previous 265ms W3C plan started real
-    // authoritative Block ~6 server ticks before heavy Active, and some
-    // impacts occurred just beyond the unchanged 125ms parry interval.
-    // Aim 20ms later, still before the 320ms heavy active commitment.
-    // Real stun / zero HP and guard cost remain mandatory, fail closed.
+    // Restored 82px heavy reach moves actual contact to the lunge's late
+    // active phase. Genuine CI: windup tick 590, wheel block tick 605, hit
+    // tick 615 = 167ms block-to-contact, outside the unchanged 125ms parry.
+    // Move only the real W3C wheel target 80ms later to center the authentic
+    // parry around 87ms before server impact. The delayed wheel remains
+    // within heavy active; keep original real stun/zero-vitals/guard proof.
     await performHeavyCounterplayWindowWheel(
       attacker, defender, attackerElementId, defenderElementId,
-      attackOffset, blockOffset, 285,
+      attackOffset, blockOffset, 365,
     );
     await sleep(220);
 
