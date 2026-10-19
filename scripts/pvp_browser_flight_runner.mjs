@@ -518,6 +518,7 @@ async function startGameServer() {
       MYASO_BIND: "127.0.0.1:0",
       MYASO_FLIGHT_ACTION_PROOF: (scenario === "uiguardbreakpunishffahit"
         || scenario === "uiheavyblock" || scenario === "uiheavyparry"
+        || scenario === "uiheavydodge"
         || scenario === "uikickknockdownffahit"
         || scenario === "uimultiknockdownffahit"
         || scenario === "uimultirecoveryffa"
@@ -1425,43 +1426,55 @@ async function runOnlineUiHeavyDodgeFlight(entries) {
   for (let attempt = 1; attempt <= 3 && !committedObserved; attempt += 1) {
     const before = await Promise.all(entries.map(readUiEvidence));
     const beforeAttacker = before.find((entry) => entry.browser === attacker.name);
-    const commitsBefore = beforeAttacker?.events.filter((text) =>
-      text.startsWith("Heavy strike committed")).length ?? 0;
-
-    // M204: release the genuine heavy E key *after* scheduling the real
-    // defender dodge. Waiting for the full key pulse previously let the
-    // unchanged 46 HP heavy hit land before Chrome's wheel arrived.
-    await setMovementKey(attacker, "e", true);
-    const commitDeadline = Date.now() + 360;
+    // M204: server-confirm the exact FIRST heavy windup before the sole
+    // genuine Chrome wheel. R2's 130-unit reach proved static host sleeps
+    // unreliable (#39213856621: wheel too late, #39215007573: wheel early).
+    // The loopback-only M201_ACTION proof binds this to the authoritative
+    // fighter and 60Hz tick; never infer commitment from a WebDriver ACK.
+    const serverLogOffset = m201ServerOutput().length;
+    const eResult = setMovementKey(attacker, "e", true).then(
+      () => ({ ok: true }), error => ({ ok: false, error }),
+    );
     try {
-      while (Date.now() < commitDeadline) {
-        const state = await readUiEvidence(attacker);
-        const commits = state.events.filter((text) =>
-          text.startsWith("Heavy strike committed")).length;
-        if (commits > commitsBefore) {
-          committedObserved = true;
-          break;
-        }
-        await sleep(10);
+      let windup;
+      try {
+        windup = await awaitM223HeavyWindup({
+          readOutput: m201ServerOutput, afterOffset: serverLogOffset,
+          fighterId: beforeAttacker.playerNetId, sleep, timeoutMs: 550,
+        });
+      } catch (error) {
+        const delivered = await eResult;
+        if (!delivered.ok) throw delivered.error;
+        throw error;
       }
-      if (committedObserved) {
-        // Heavy M107 #39213856621 recorded a real Chrome wheel only 12ms
-        // before the FIRST 46HP hit (then a true dodge-success), so the
-        // unchanged server 125ms iframe was not active at first contact.
-        // After the genuine 320ms heavy commitment is observed, remove the
-        // obsolete 90ms host delay. A short 15ms scheduling margin places the
-        // same one trusted Chrome wheel earlier in the windup; continue
-        // requiring exact zero HP, one wheel and successful dodge feedback.
-        // Do NOT alter heavy geometry, damage, i-frames or assertions.
-        await sleep(15);
-        await setMovementKey(defender, "s", true);
-        try {
-          await performArenaTimedPointerDodge(defender, defenderElementId, 15);
-        } finally {
-          await setMovementKey(defender, "s", false);
-        }
+      const windupObservedEpochMs = Date.now();
+      const delivered = await eResult;
+      if (!delivered.ok) throw delivered.error;
+      committedObserved = true;
+      // Schedule one real W3C pointer-owned roll ~170ms after server windup
+      // is observed. Approx. 60ms browser+network receipt then positions
+      // its ~125ms i-frame around the 320ms heavy active contact, WITHOUT
+      // modifying either combat timer, heavy reach, 46HP or test assertions.
+      // Date.now() absolute scheduling avoids accumulating Chrome KeyS
+      // WebDriver ACK latency before the wheel and keeps heavy E held.
+      const wheelTargetEpochMs = windupObservedEpochMs + 170;
+      await setMovementKey(defender, "s", true);
+      try {
+        const remainingMs = wheelTargetEpochMs - Date.now();
+        if (remainingMs > 0) await sleep(remainingMs);
+        const wheelIssuedEpochMs = Date.now();
+        await performArenaTimedPointerDodge(defender, defenderElementId, 15);
+        console.log("M204_SERVER_WINDUP_NATIVE_DODGE " + JSON.stringify({
+          fighterId: beforeAttacker.playerNetId, serverWindupTick: windup.serverTick,
+          windupObservedAfterMs: windup.observedAfterMs,
+          plannedAfterWindupMs: 170,
+          wheelIssuedAfterObservedMs: wheelIssuedEpochMs - windupObservedEpochMs,
+        }));
+      } finally {
+        await setMovementKey(defender, "s", false);
       }
     } finally {
+      await eResult;
       await setMovementKey(attacker, "e", false);
     }
     if (committedObserved) break;
