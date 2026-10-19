@@ -3539,6 +3539,17 @@ async function runOnlineUiJumpAttackCounterplayFlight(entries, defense) {
   );
   const { attacker, defender, attackerElementId, defenderElementId, movementCode } = staged;
   const attackOffset = movementCode === "KeyD" ? 200 : -200;
+  // M138's 105ms windup is shorter than ordinary M33 light. The previous
+  // hardcoded 70ms Chrome wheel pause reached the game after jump impact
+  // on all 3 genuine CI tries (#39180123977). Before the real exchange,
+  // measure each browser's trusted pointer and wheel latency, target wheel
+  // ~25ms after jump chord pointerDOWN, and reset strict evidence afterward.
+  const jumpParryIngress = defense === "parry"
+    ? await calibrateNativeParryIngress(
+      attacker, defender, attackerElementId, defenderElementId, attackOffset, 25,
+    )
+    : null;
+  if (jumpParryIngress) await Promise.all(entries.map(installUiObserver));
   const beforeAttacker = await readUiEvidence(attacker);
   const keyTransitionOffset = beforeAttacker.keyTransitions.length;
   const pointerOffset = beforeAttacker.pointers.length;
@@ -3589,25 +3600,24 @@ async function runOnlineUiJumpAttackCounterplayFlight(entries, defense) {
     await scrollArenaWheelPair(defender, defenderElementId, 120, 20, 100);
     await performArenaJumpAttackChord(attacker, attackerElementId, attackOffset, 90);
   } else if (defense === "parry") {
-    // Dispatch the genuine Firefox Space+LMB chord and a delayed Chrome
-    // wheel-back concurrently. Waiting for the Firefox WebDriver response
-    // before dispatching Chrome can cost over 200 ms under hosted CI load:
-    // the wheel then arrives after the 105 ms jump windup and deals HP damage.
-    // The 70 ms wheel-source pause is measured from Chrome's own command
-    // clock, independent of Firefox's variable command-completion latency.
-    // CI calibration found 130 ms landed after impact, while 20 ms opened
-    // block too early; center the pulse within the 125 ms parry window.
-    // Preserve the real browser gesture, 125 ms parry window, and all combat
-    // constants. The authoritative stunned/zero-damage assertions below
-    // still fail closed if wheel timing misses the actual jump strike.
+    // Reuse per-browser real W3C ingress calibration, targeting one genuine
+    // wheel ~25ms after the authentic Space+LMB pointerDOWN. The unchanged
+    // 105ms jump windup and 125ms parry are narrow enough that hardcoded
+    // 70ms wheel pause reached authoritative Active on 3/3 CI attempts.
+    // Neither genuine input nor the strict stun/100HP/100guard proof changes.
     let chordHeld = false;
-    const chordPromise = pressArenaJumpAttackChord(
-      attacker, attackerElementId, attackOffset,
-    ).then(() => { chordHeld = true; });
+    const chordPromise = (async () => {
+      if (jumpParryIngress.attackLeadMs > 0) await sleep(jumpParryIngress.attackLeadMs);
+      await pressArenaJumpAttackChord(attacker, attackerElementId, attackOffset);
+      chordHeld = true;
+    })();
     try {
       await Promise.all([
         chordPromise,
-        scrollArenaWheel(defender, defenderElementId, 120, 70),
+        (async () => {
+          if (jumpParryIngress.wheelLeadMs > 0) await sleep(jumpParryIngress.wheelLeadMs);
+          await scrollArenaWheel(defender, defenderElementId, 120, 0);
+        })(),
       ]);
       await sleep(20);
     } finally {
@@ -7873,7 +7883,10 @@ async function runM176BlockAttackArbitrationPhase(
 }
 
 
-async function calibrateNativeParryIngress(attacker, defender, attackerElementId, defenderElementId, attackOffset) {
+async function calibrateNativeParryIngress(
+  attacker, defender, attackerElementId, defenderElementId, attackOffset,
+  targetAfterPointerDownMs = 70,
+) {
   // Measure only trusted input delivery, never synthesize game controls.
   // Three harmless mouse moves and real isolated wheel-back blocks before
   // the live combat exchange; each 240ms block expires before next probe.
@@ -7918,11 +7931,18 @@ async function calibrateNativeParryIngress(attacker, defender, attackerElementId
   const median = samples => [...samples].sort((a, b) => a - b)[1];
   const pointerMs = median(pointerSamples);
   const wheelMs = median(wheelSamples);
-  // Genuine W3C LMB has a pointerMove then pointerDown. Target the real wheel
-  // 70ms after light commitment; unchanged active starts 135ms after LMB down.
-  const skewMs = Math.max(-180, Math.min(180, Math.round(pointerMs + 12 + 70 - wheelMs)));
+  // M33 light active follows pointerDOWN in 135ms; M138 jump attack
+  // follows Space+LMB in only 105ms. Choose the scenario's requested wheel
+  // arrival relative to *genuine* pointerDOWN, never widen either parry.
+  if (!Number.isFinite(targetAfterPointerDownMs) || targetAfterPointerDownMs < 0
+    || targetAfterPointerDownMs > 85) {
+    throw new RangeError("native parry arrival target outside strict window");
+  }
+  const skewMs = Math.max(-180, Math.min(180,
+    Math.round(pointerMs + 12 + targetAfterPointerDownMs - wheelMs)));
   const result = { attacker: attacker.name, defender: defender.name,
     pointerSamples, wheelSamples, pointerMs, wheelMs,
+    targetAfterPointerDownMs,
     attackLeadMs: Math.max(0, -skewMs), wheelLeadMs: Math.max(0, skewMs) };
   console.log("M33_TRUSTED_W3C_INGRESS_CALIBRATION " + JSON.stringify(result));
   return result;
