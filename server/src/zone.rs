@@ -232,7 +232,7 @@ impl ZoneAuthority {
         }
         if member.last_transfer_tick.is_some_and(|previous| {
             let elapsed = authoritative_tick.wrapping_sub(previous);
-            elapsed < PORTAL_COOLDOWN_TICKS || elapsed >= 0x8000_0000
+            !(PORTAL_COOLDOWN_TICKS..0x8000_0000).contains(&elapsed)
         }) {
             return Err(ZoneError::TransferCooldown);
         }
