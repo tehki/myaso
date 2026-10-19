@@ -4,6 +4,7 @@ import { createDirectionalDash } from "../src/browser/dash-input.mjs";
 import { createLeftButtonCharge } from "../src/browser/left-button-charge.mjs";
 import { captureLightAttackMovement } from "../src/browser/light-attack-movement.mjs";
 import { createCombatImpactController } from "../src/browser/combat-impact.mjs";
+import { createGameAudio, installGameAudioControls, soundForCombatFeedback } from "../src/browser/game-audio.mjs";
 import { COMBAT, createFighter, createWorld, stepWorld } from "../src/combat/model.mjs";
 import { createSparringAi } from "../src/combat/sparring-ai.mjs";
 
@@ -52,6 +53,8 @@ const bot = createFighter({ id: "bot", x: 690, y: 270, facing: Math.PI });
 const world = createWorld({ width: canvas.width, height: canvas.height, fighters: [player, bot] });
 
 const keys = new Set();
+const audio = createGameAudio();
+installGameAudioControls(audio);
 const dashGesture = createDirectionalDash();
 let dashRequested = false;
 let dashMove = null;
@@ -74,12 +77,13 @@ let middleBlockHeld = false;
 const leftButtonCharge = createLeftButtonCharge({
   onLight() {
     attackRequested = true;
+    audio.play("light");
     committedLightMove = captureLightAttackMovement(keys);
   },
-  onHeavy() { heavyAttackRequested = true; },
+  onHeavy() { heavyAttackRequested = true; audio.play("heavy"); },
 });
 const rightButtonGesture = installRightButtonGesture(canvas, {
-  onKick: () => { kickRequested = true; },
+  onKick: () => { kickRequested = true; audio.play("kick"); },
 });
 let messageUntil = 0;
 let animationFrameId = 0;
@@ -99,6 +103,7 @@ canvas.addEventListener("auxclick", (event) => {
 });
 canvas.addEventListener("pointerdown", (event) => {
   canvas.focus();
+  audio.unlock();
   updateMouse(event);
   if (event.button === 1) {
     event.preventDefault();
@@ -133,24 +138,28 @@ canvas.addEventListener("lostpointercapture", (event) => {
 canvas.addEventListener("wheel", (event) => {
   event.preventDefault();
   canvas.focus();
-  if (event.deltaY < 0) rollRequested = true;
-  else if (event.deltaY > 0) shortBlockUntil = Math.max(shortBlockUntil, world.nowMs + COMBAT.block.shortBlockMs);
+  if (event.deltaY < 0) { rollRequested = true; audio.play("roll"); }
+  else if (event.deltaY > 0) { shortBlockUntil = Math.max(shortBlockUntil, world.nowMs + COMBAT.block.shortBlockMs); audio.play("parry"); }
 }, { passive: false });
 canvas.addEventListener("pointermove", updateMouse);
 window.addEventListener("blur", releaseInputs);
 canvas.addEventListener("keydown", (event) => {
+  audio.unlock();
   if (["KeyW", "KeyA", "KeyS", "KeyD", "KeyE", "Space"].includes(event.code)) event.preventDefault();
   if (["KeyW", "KeyA", "KeyS", "KeyD"].includes(event.code) && !keys.has(event.code)) {
     const direction = dashGesture.press(event.code, performance.now(), event.repeat);
     if (direction && player.action === "idle"
       && player.stamina >= COMBAT.dash.staminaCost) {
       dashRequested = true; dashMove = direction;
+      audio.play("roll");
     }
   }
   keys.add(event.code);
   if (event.code === "KeyE" && !event.repeat) heavyAttackRequested = true;
+  if (event.code === "KeyE" && !event.repeat) audio.play("heavy");
   if (event.code === "Space" && !event.repeat) {
     jumpRequested = true;
+    audio.play("jump");
     leftButtonCharge.commitLight();
   }
 });
@@ -193,6 +202,9 @@ function playerInput() {
   playerInputState.kick = kickRequested;
   playerInputState.run = rightButtonGesture.isRunning();
   playerInputState.jump = jumpRequested;
+  if (player.action === "idle" && (playerInputState.moveX || playerInputState.moveY)) {
+    audio.play("step", { level: playerInputState.run ? .90 : .55 });
+  }
   attackRequested = false;
   committedLightMove = null;
   heavyAttackRequested = false;
@@ -214,6 +226,9 @@ function botInput() {
 
 function handleEvents(events) {
   for (const event of events) {
+    const cue = ({ hit: "hit", block: "block", parry: "parry", kick: "kick", roll_hit: "hit",
+      guard_break: "guardbreak", death: "death" })[event.type];
+    if (cue) audio.play(cue);
     const names = { player: "You", bot: "Bot" };
     if (event.type === "hit") {
       say(`${names[event.attackerId]} hit ${names[event.targetId]} for ${event.damage}.`, 560);
