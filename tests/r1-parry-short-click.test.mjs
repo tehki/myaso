@@ -15,6 +15,12 @@ test("M33 and M146 perform complete genuine short LMB before parry, never chargi
   const proof = flight.indexOf("await waitForUiParryEvidence(entries, attacker, defender, 350, false, lastAttemptBaseline)", wheel);
   assert.ok(dispatch >= 0 && tap > dispatch && lead > tap && wheel > lead && proof > wheel);
   assert.ok(flight.includes("const parryIngress = await calibrateNativeParryIngress("));
+  // Preserve genuine input and fail-closed outcomes; only staged native
+  // dispatch moves later. The server's 125ms parry window is unchanged.
+  assert.match(source.slice(source.indexOf("async function calibrateNativeParryIngress("), start),
+    /targetAfterPointerDownMs = 100/);
+  assert.match(source.slice(source.indexOf("async function calibrateNativeParryIngress("), start),
+    /targetAfterPointerDownMs > 110/);
   assert.ok(flight.includes("await Promise.all(entries.map(installUiObserver));"));
   assert.ok(flight.includes("if (parryIngress.attackLeadMs > 0) await sleep(parryIngress.attackLeadMs)"));
   assert.ok(!flight.includes('defender.name !== "firefox"'));
