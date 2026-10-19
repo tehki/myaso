@@ -48,3 +48,18 @@ test("M41 records real remote draw calls only for diagnostics without weakening 
   assert.match(flight, /if \(localMax !== 0\)/);
   assert.ok(!flight.includes("remoteRingDraw?.draws > 0)"));
 });
+
+test("M255 waits for real raster frames after authoritative parry, without faking proof", () => {
+  const wait = section("async function awaitParryTellRaster(", "async function runOnlineUiParryTellFlight(");
+  const flight = section("async function runOnlineUiParryTellFlight(", "async function runOnlineUiBlockFacingTellFlight(");
+  assert.match(wait, /timeoutMs = 350/);
+  assert.match(wait, /readParryTellSampler\(observer\)/);
+  assert.match(wait, /readParryTellSampler\(parriedLocal\)/);
+  assert.match(wait, /observerMax >= 24/);
+  assert.match(wait, /await sleep\(20\)/);
+  assert.doesNotMatch(wait, /dispatchEvent|onParry|remoteRingDraw|forceMax/);
+  assert.match(flight, /await awaitParryTellRaster\(observer, parriedLocal\)/);
+  assert.match(flight, /if \(observerMax < 24\)/);
+  assert.match(flight, /if \(localMax !== 0\)/);
+  assert.match(flight, /finally \{\s*await Promise\.all\(entries\.map\(stopParryTellSampler\)\)/);
+});
