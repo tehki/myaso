@@ -8,8 +8,9 @@ test("M144 retains exact real 60..200ms light-release lead gate with earlier tru
   const end = source.indexOf("\nasync function ", start + 20);
   assert.ok(start > 0 && end > start);
   const flight = source.slice(start, end);
-  assert.ok(flight.includes("const jumpInputDelayMs = spatial ? 100 : 155;"));
+  assert.ok(flight.includes("const jumpInputDelayMs = spatial ? 100 : 70;"));
   assert.ok(flight.includes("await lightChallenge.wait()"));
+  assert.ok(flight.includes('m227Registry.issue({ type: spatial ? "pointerdown" : "pointerup" })'));
   assert.ok(flight.includes("await sleep(jumpInputDelayMs)"));
   assert.ok(flight.includes("performArenaAttackHold(lightAttacker, lightArena, 200, 90)"));
   assert.ok(flight.includes("performArenaJumpAttackChord(jumpAttacker, jumpArena, -200, 90)"));

@@ -7,17 +7,20 @@ export function createM227TrustedLightRegistry({ timeoutMs = 600 } = {}) {
   }
   let serial = 0;
   const pending = new Map();
-  function issue() {
+  function issue({ type = "pointerdown" } = {}) {
+    if (type !== "pointerdown" && type !== "pointerup") {
+      throw new TypeError("M227 requires one genuine left-button pointer event type");
+    }
     const token = "m227-light-" + (++serial);
     let resolve, reject, timer = null;
     const promise = new Promise((res, rej) => { resolve = res; reject = rej; });
-    pending.set(token, { resolve });
+    pending.set(token, { resolve, type });
     return Object.freeze({
       token,
       wait() {
         if (timer === null) timer = setTimeout(() => {
           pending.delete(token);
-          reject(new Error("M227 trusted light pointerdown was not observed"));
+          reject(new Error(`M227 trusted light ${type} was not observed`));
         }, timeoutMs);
         return promise;
       },
@@ -29,11 +32,12 @@ export function createM227TrustedLightRegistry({ timeoutMs = 600 } = {}) {
   }
   function receive(packet) {
     if (typeof packet?.token !== "string" || packet.trusted !== true
-      || packet.type !== "pointerdown" || packet.button !== 0) return false;
+      || (packet.type !== "pointerdown" && packet.type !== "pointerup")
+      || packet.button !== 0) return false;
     const entry = pending.get(packet.token);
-    if (!entry) return false;
+    if (!entry || entry.type !== packet.type) return false;
     pending.delete(packet.token);
-    entry.resolve(Object.freeze({ trusted: true, type: "pointerdown", button: 0 }));
+    entry.resolve(Object.freeze({ trusted: true, type: packet.type, button: 0 }));
     return true;
   }
   return Object.freeze({ issue, receive });

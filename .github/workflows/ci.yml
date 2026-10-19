@@ -9,6 +9,13 @@ on:
 permissions:
   contents: read
 
+# P0 (priority zero) queue hygiene: keep the newest branch-owned PR quality
+# execution, while NEVER cancelling merged-main release qualification.
+# GitHub-hosted runners have no cross-repository numeric priority control.
+concurrency:
+  group: myaso-quality-${{ github.event_name == 'pull_request' && github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   quality:
     name: quality
@@ -148,6 +155,7 @@ jobs:
           node --check tests/m15-reliable-convergence.test.mjs
           node --check tests/m16-browser-512.test.mjs
           node --check tests/m17-reliable-delta.test.mjs
+          node --test tests/m250-frame-parry-tell.test.mjs
           node --test tests/m224-dodge-completion.test.mjs tests/m225-ffa-threat-distance.test.mjs tests/m223-server-heavy-windup.test.mjs tests/browser-runtime.test.mjs tests/m6-browser-authority.test.mjs tests/m7-browser-flight.test.mjs tests/m12-reliable-baseline.test.mjs tests/m15-reliable-convergence.test.mjs tests/m16-browser-512.test.mjs tests/m17-reliable-delta.test.mjs tests/m29-combat-readability.test.mjs tests/m200-feedback-latency.test.mjs tests/m214-confirmed-feedback-latency.test.mjs tests/m215-successful-roll-latency.test.mjs tests/m216-successful-parry-punish-latency.test.mjs tests/m217-successful-kick-latency.test.mjs tests/m218-successful-jump-attack-latency.test.mjs tests/m219-buffered-roll-ingress-evidence.test.mjs tests/m220-knockdown-focus-timeline.test.mjs tests/m221-trusted-wheel-attestation.test.mjs tests/m227-trusted-light-pointer.test.mjs tests/m229-heavy-input-loss-evidence.test.mjs tests/m230-heavy-replay-correlation.test.mjs tests/m231-m108-failure-path.test.mjs tests/m232-spatial-handoff-failure.test.mjs tests/m233-recovery-handoff-trace.test.mjs tests/m234-m145-trusted-light-onset.test.mjs tests/m202-guardbreak-convergence.test.mjs tests/m203-w3c-wheel-ack.test.mjs tests/m204-heavy-dodge-input-order.test.mjs tests/m201-authoritative-phase-proof.test.mjs tests/m205-repeat-proof-gate.test.mjs tests/m206-knockdown-punish-proof.test.mjs tests/m208-w3c-wheel-headstart.test.mjs tests/m212-attack-led-short-block.test.mjs tests/m213-suppression-roll-recovery-order.test.mjs tests/m207-attack-led-dodge.test.mjs tests/m209-dual-knockdown-proof.test.mjs tests/m210-early-feint-wheel.test.mjs tests/m211-dual-recovery-phase-proof.test.mjs
           node scripts/browser_hotpath_probe.mjs
 

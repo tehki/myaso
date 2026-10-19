@@ -8511,6 +8511,27 @@ async function runOnlineUiParryPunishWindowFlight(entries) {
   }));
 }
 
+// M255: M41's native parry can finish one animation frame before its raster
+// effect becomes visible. Sample the actual completed canvas frames for a
+// bounded 350ms; never substitute an action/HUD label for >=24 real pixels.
+async function awaitParryTellRaster(observer, parriedLocal, timeoutMs = 350) {
+  const deadline = Date.now() + timeoutMs;
+  let observerMax = 0;
+  let localMax = 0;
+  do {
+    const [observedPixels, localPixels] = await Promise.all([
+      readParryTellSampler(observer),
+      readParryTellSampler(parriedLocal),
+    ]);
+    observerMax = Math.max(observerMax, observedPixels);
+    localMax = Math.max(localMax, localPixels);
+    if (observerMax >= 24) break;
+    if (Date.now() >= deadline) break;
+    await sleep(20);
+  } while (true);
+  return [observerMax, localMax];
+}
+
 async function runOnlineUiParryTellFlight(entries) {
   const observer = entries.find((entry) => entry.name === "firefox");
   const parriedLocal = entries.find((entry) => entry.name === "chrome");
@@ -8527,10 +8548,7 @@ async function runOnlineUiParryTellFlight(entries) {
   let tell;
   try {
     evidence = await runOnlineUiParryFlight(entries);
-    const [observerMax, localMax] = await Promise.all([
-      readParryTellSampler(observer),
-      readParryTellSampler(parriedLocal),
-    ]);
+    const [observerMax, localMax] = await awaitParryTellRaster(observer, parriedLocal);
     if (observerMax < 24) {
       // M254: fail with read-only frame sampling and authentic combat/HUD
       // state; do not substitute HUD labels for >=24 actual raster pixels.
@@ -11103,11 +11121,16 @@ async function runOnlineUiMultiRecoveryFfaFocusFlight(entries, spatial = false) 
   // actual-input gate or change the 90ms click or any combat action lifetime.
   // M145 retains its independent 100ms trusted-down choreography and the
   // original measured 70..150ms spatial input lead gate unchanged.
-  const jumpInputDelayMs = spatial ? 100 : 155;
-  const lightChallenge = m227Registry.issue();
+  // Spatial M145 remains anchored to genuine light DOWN. M144 anchors to
+  // genuine light UP, when the R1 short attack is already classified, so
+  // WebDriver/HTTP startup jitter cannot consume its recovery overlap.
+  // Both unchanged strict 60..200ms and 70..150ms windows are checked below.
+  const jumpInputDelayMs = spatial ? 100 : 70;
+  const lightChallenge = m227Registry.issue({ type: spatial ? "pointerdown" : "pointerup" });
   if (lightChallenge) {
     await execute(lightAttacker.base, lightAttacker.sessionId,
       "window.__MYASO_M227_LIGHT_TOKEN__ = " + JSON.stringify(lightChallenge.token)
+        + "; window.__MYASO_M227_LIGHT_TOKEN_TYPE__ = " + JSON.stringify(spatial ? "pointerdown" : "pointerup")
         + "; return true;");
   }
   let spatialSamples = [];
@@ -11118,7 +11141,7 @@ async function runOnlineUiMultiRecoveryFfaFocusFlight(entries, spatial = false) 
       (async () => {
         if (lightChallenge) {
           const receipt = await lightChallenge.wait();
-          console.log((spatial ? "M234_TRUSTED_SPATIAL_LIGHT_ONSET " : "M227_TRUSTED_LIGHT_ONSET ") + JSON.stringify({
+          console.log((spatial ? "M234_TRUSTED_SPATIAL_LIGHT_ONSET " : "M227_TRUSTED_LIGHT_RELEASE ") + JSON.stringify({
             milestone, scenario: expectedScenario, ...receipt,
           }));
         }
@@ -12543,11 +12566,12 @@ async function installUiObserver(session) {
         };
         if (epochEvidence) entry.epochMs = Date.now();
         state.pointers.push(entry);
-        // M227: receipt of the actual trusted W3C light down on Chrome2.
-        // No DOM input emission, handler cancellation or gameplay mutation.
-        if (type === 'pointerdown' && event.isTrusted === true && event.button === 0) {
+        // M227/M234: capture the selected real W3C light down (M145) or
+        // release (M144). This emits proof only; never synthesizes input.
+        if (event.isTrusted === true && event.button === 0) {
           const token = window.__MYASO_M227_LIGHT_TOKEN__;
-          if (token) {
+          const expectedType = window.__MYASO_M227_LIGHT_TOKEN_TYPE__ || 'pointerdown';
+          if (token && type === expectedType) {
             window.__MYASO_M227_LIGHT_TOKEN__ = null;
             fetch('/__myaso_m227_trusted_light', {
               method: 'POST',
