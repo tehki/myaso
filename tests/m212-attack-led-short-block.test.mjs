@@ -293,6 +293,48 @@ test("M221 missing trusted Firefox event cannot send Chrome click even after 48m
   assert.equal(clicks, 0);
 });
 
+test("M329 holds genuine W3C short click 45ms after trusted Firefox DOM receipt", async () => {
+  let time = 0;
+  const events = [];
+  const outcome = await dispatchM212AttackLedShortBlock({
+    now: () => time,
+    wheelHeadStartMs: 0,
+    postTrustedWheelMs: 45,
+    sendWheel: () => { events.push("real-wheel"); },
+    awaitTrustedWheel: () => {
+      time = 12;
+      events.push("trusted-receipt");
+      return { trusted: true, deltaY: 120 };
+    },
+    sendAttackClick: holdMs => { events.push("real-W3C-click:" + holdMs + "@" + time); },
+    sleep: ms => { events.push("wait:" + ms); time += ms; },
+  });
+  assert.deepEqual(events, [
+    "real-wheel", "trusted-receipt", "wait:45", "real-W3C-click:10@57",
+  ]);
+  assert.equal(outcome.trustedWheelObservedMs, 12, "report actual DOM receipt, not delayed click time");
+  assert.equal(outcome.attackDownDispatchMs, 57);
+  assert.equal(outcome.postTrustedWheelMs, 45);
+  assert.equal(outcome.wheelHeadStartMs, 0);
+  assert.equal(outcome.attackDownAckMs, null);
+  assert.equal(outcome.attackUpDispatchMs, null);
+});
+
+test("M329 rejects unbounded post-trusted receipt time without sending W3C input", async () => {
+  let wheel = 0, click = 0;
+  for (const delay of [-1, 61, Infinity, NaN]) {
+    await assert.rejects(() => dispatchM212AttackLedShortBlock({
+      postTrustedWheelMs: delay,
+      sendWheel: () => { wheel++; },
+      awaitTrustedWheel: () => ({ trusted: true, deltaY: 120 }),
+      sendAttackClick: () => { click++; },
+      sleep: () => {},
+    }), TypeError);
+  }
+  assert.equal(wheel, 0);
+  assert.equal(click, 0);
+});
+
 test("M249 R1 zero fixed head start still gates the only genuine click on trusted wheel event", async () => {
   const wheelAck = deferred(), trustedWheel = deferred();
   const events = [];
@@ -337,6 +379,7 @@ test("M249 runner changes only R1 M194 call-site head start and preserves strict
   assert.ok(scheduling > 0);
   const options = flight.slice(scheduling, scheduling + 900);
   assert.ok(options.includes("wheelHeadStartMs: 0"));
+  assert.ok(options.includes("postTrustedWheelMs: 45"));
   assert.ok(options.includes("awaitTrustedWheel: () => challenge.wait()"));
   assert.ok(options.includes("sendWheel: () => scrollArenaWheel(defender, defenderElementId, 120, 0)"));
   assert.ok(options.includes("sendAttackClick: (clickHoldMs) => performArenaM221GuardBreakClick(attacker, clickHoldMs)"));
