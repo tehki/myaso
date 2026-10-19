@@ -10423,6 +10423,12 @@ async function runOnlineUiJumpFfaThreatFlight(entries, mode) {
       break;
     }
     if (geometryAttempt === 4) break;
+    // R2 directional dash: a double WASD keyDown inside 240ms is a real
+    // 42-unit dash, not a fine staging move. M142 #39223717854 recorded
+    // right distance 78 -> 120 -> 162 during tiny correction taps.
+    // Separate all genuine W3C corrections by >240ms, including from the
+    // initial staging gesture. Never change combat reach or strict evidence.
+    await sleep(300);
     await Promise.all([
       stage.leftMove.ms
         ? pulseMovementKey(left, stage.leftMove.key, stage.leftMove.ms)
