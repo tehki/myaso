@@ -29,6 +29,7 @@ import { planM225ThreatDistanceStaging } from "./m225-ffa-threat-distance.mjs";
 import { awaitM223HeavyWindup, planM223WheelDelay } from "./m223-server-heavy-windup.mjs";
 import { dispatchM212AttackLedShortBlock } from "./m212-attack-led-short-block.mjs";
 import { createM221TrustedWheelRegistry } from "./m221-trusted-wheel-attestation.mjs";
+import { attachM325TrustedWheelSocket } from "./m325-trusted-wheel-socket.mjs";
 import { createM227TrustedLightRegistry } from "./m227-trusted-light-pointer.mjs";
 import { planM197KnockdownClusterNudge } from "./m197-knockdown-cluster.mjs";
 import { isTickNewer32 } from "../src/browser/reconciliation.mjs";
@@ -133,6 +134,7 @@ if (scenario === "uimultiknockdownffahit") {
 const children = new Set();
 const sessions = [];
 let staticServer;
+let m325Dispose = () => {};
 let gameServer;
 let m201ServerOutput = () => "";
 const m221Registry = createM221TrustedWheelRegistry();
@@ -455,6 +457,7 @@ try {
     try { await webdriver(session.base, "DELETE", `/session/${session.sessionId}`); } catch {}
   }
   for (const child of children) terminate(child);
+  m325Dispose(); // Drain upgraded localhost browser proof sockets before HTTP close.
   if (staticServer) await new Promise((resolve) => staticServer.close(resolve));
 }
 
@@ -503,6 +506,9 @@ async function startStaticServer() {
       send(response, error?.code === "ENOENT" ? 404 : 500, "not found");
     }
   });
+  // M325: receive a genuine Firefox wheel from a pre-connected local socket.
+  // Unlike a per-wheel fetch, it does not need to establish HTTP transport.
+  m325Dispose = attachM325TrustedWheelSocket(server, m221Registry);
   await new Promise((resolve, reject) => {
     server.once("error", reject);
     server.listen(staticPort, "127.0.0.1", resolve);
@@ -9517,6 +9523,16 @@ async function runOnlineUiGuardBreakFlight(entries, { onGuardBroken = null } = {
   const attackOffset = attackRight ? 200 : -200;
   const blockOffset = attackRight ? -200 : 200;
 
+  // M325: ensure Firefox's test-only localhost socket is already connected.
+  // Fail before combat if we cannot certify a genuine native wheel promptly.
+  let m325ChannelReady = false;
+  for (let poll = 0; poll < 25 && !m325ChannelReady; poll += 1) {
+    m325ChannelReady = await execute(defender.base, defender.sessionId,
+      "return window.__MYASO_M325_WHEEL_CHANNEL__?.readyState === WebSocket.OPEN;");
+    if (!m325ChannelReady) await sleep(30);
+  }
+  if (!m325ChannelReady) throw new Error("M325 trusted Firefox wheel socket did not open");
+
   await Promise.all(entries.map((entry) => execute(entry.base, entry.sessionId, "document.querySelector('#arena').focus(); return document.activeElement?.id;")));
   const attackerElementId = await resolveArenaElement(attacker, "M34 attacker");
   const defenderElementId = await resolveArenaElement(defender, "M34 defender");
@@ -9579,9 +9595,10 @@ async function runOnlineUiGuardBreakFlight(entries, { onGuardBroken = null } = {
           "window.__MYASO_M221_WHEEL_TOKEN__ = " + JSON.stringify(challenge.token)
             + "; return true;");
         m212Exchange = await dispatchM212AttackLedShortBlock({
-          // M252 integrates M249: no obsolete fixed 48ms post-wheel delay
-          // after genuine trusted Firefox wheel receipt in R1 guardbreak.
-          wheelHeadStartMs: 0,
+          // M325: wait only the remaining part of a bounded 25ms genuine
+          // wheel-command lead. The preconnected trusted receipt avoids per-
+          // event HTTP overhead; strict real parry/guard/HP checks still own truth.
+          wheelHeadStartMs: 25,
           sendWheel: () => scrollArenaWheel(defender, defenderElementId, 120, 0),
           awaitTrustedWheel: () => challenge.wait(),
           sendAttackClick: (clickHoldMs) => performArenaM221GuardBreakClick(attacker, clickHoldMs),
@@ -12446,6 +12463,11 @@ async function installUiObserver(session) {
     const threatGuardArc = document.querySelector('#threat-guard-arc');
     if (!target || !arena || !arenaStage || !overlay || !recovery || !focusLabel || !threat || !threatCount || !threatSecondary || !threatSecondaryBearing || !threatSecondaryPhase || !threatSecondaryGuardArc || !threatBearing || !threatGuardArc) throw new Error('missing online UI flight target');
     const state = { events: [], eventTransitions: [], keys: [], keyTransitions: [], pointers: [], wheels: [], overlayTransitions: [], feedbackTransitions: [], recoveryTransitions: [], focusTransitions: [], threatTransitions: [], recoveryTellMaxPixels: 0, parryTellMaxPixels: 0, online: '', startedAt: performance.now() };
+    // Only the real Firefox M194 flight opens a socket; no production client code.
+    if (${scenario === "uiguardbreak" && session.name === "firefox"}) {
+      window.__MYASO_M325_WHEEL_CHANNEL__ = new WebSocket(
+        "ws://" + location.host + "/__myaso_m325_trusted_wheel");
+    }
     const epochEvidence = ['uidodge', 'uirollbuffer', 'uijumpbuffer', 'uijumpattack', 'uijumpattackinputloss', 'uijumpattackpunish', 'uijumpattacktelegraph', 'uijumpffaprimary', 'uijumpffasecondary', 'uijumprecoveryffa', 'uijumppunishffa', 'uimultirecoveryffa', 'uimultirecoveryspatial', 'uimultirecoverypunish', 'uiparrypunishwindow', 'uiparrypunishffa', 'uiparrypunishffahit', 'uiguardbreakpunishffa', 'uiguardbreakpunishffahit', 'uikickknockdownffa', 'uikickknockdownffahit', 'uikickknockdownbounded', 'uirollknockdownbounded', 'uistaminaauth', 'uistaminaexhaustion', 'uistaminafeedback', 'uistaminaconfirmed', 'uifeint', 'uirollknockdownffahit', 'uimultiknockdownffa', 'uimultiknockdownffahit', 'uirollknockdownffa', 'uijumpattackblock', 'uijumpattackparry', 'uijumpattackdodge', 'uijumpattackbuffer', 'uikickbuffer'].includes(new URLSearchParams(location.search).get('scenario'));
     const record = () => {
       const text = target.textContent?.trim() ?? '';
@@ -12571,12 +12593,19 @@ async function installUiObserver(session) {
       const challenge = window.__MYASO_M221_WHEEL_TOKEN__;
       if (challenge && event.isTrusted === true && event.deltaY > 0) {
         window.__MYASO_M221_WHEEL_TOKEN__ = null;
-        fetch('/__myaso_m221_trusted_wheel', {
-          method: 'POST',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ token: challenge, trusted: event.isTrusted === true, deltaY: event.deltaY }),
-          keepalive: true,
-        }).catch(() => {});
+        const receipt = JSON.stringify({
+          token: challenge, trusted: event.isTrusted === true, deltaY: event.deltaY,
+        });
+        const channel = window.__MYASO_M325_WHEEL_CHANNEL__;
+        if (channel) {
+          if (channel.readyState === WebSocket.OPEN) channel.send(receipt);
+        } else {
+          // Preserve original M221 HTTP attestation for other acceptance lanes.
+          fetch('/__myaso_m221_trusted_wheel', {
+            method: 'POST', headers: { 'content-type': 'application/json' },
+            body: receipt, keepalive: true,
+          }).catch(() => {});
+        }
       }
     }, { capture: true });
     record();
