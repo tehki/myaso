@@ -24,13 +24,12 @@ test("R1 preserves one genuine short W3C LMB held for 20ms then released",()=>{
  assert.ok(pointer.indexOf("duration: 20")<pointer.indexOf("pointerUp"));
  assert.match(pointer,/pointerUp", button: 0 },?\s*\]$/);
 });
-test("M324 wheel-back shares the W3C tick with LMB release",()=>{
- const wheel=extractActions("wheel");
- assert.equal((wheel.match(/type: "scroll"/g)||[]).length,1);
- assert.ok(wheel.indexOf("duration: 20") < wheel.indexOf('type: "scroll"'));
+test("M331 wheel-back precedes held LMB release in one genuine W3C batch", () => {
+ const wheel = extractActions("wheel");
+ assert.equal((wheel.match(/type: "scroll"/g) || []).length, 1);
+ assert.ok(wheel.indexOf('type: "scroll"') < wheel.indexOf('duration: 20'));
  assert.ok(!wheel.includes("duration: 85"));
- assert.match(wheel, /duration: 20 },\s*{ type: "scroll"/);
- assert.match(wheel,/deltaY: 120/);
+ assert.match(wheel, /type: "scroll"[^\n]*deltaY: 120[^\n]*},\s*{ type: "pause", duration: 20 }/);
 });
 test("M210 preserves unchanged 70ms feint, strict 100HP and one observed recovery",()=>{
  assert.ok(flight.includes("await performArenaFeint(attacker, attackerElementId, attackOffset)"));
@@ -47,17 +46,18 @@ test("M210 preserves unchanged 70ms feint, strict 100HP and one observed recover
 });
 
 
-test("M324 W3C releases LMB in the wheel scroll tick and preserves fail-closed evidence",()=>{
- const p=extractActions("mouse");
- const w=extractActions("wheel");
- const kinds=(v)=>[...v.matchAll(/type: "([^"]+)"/g)].map(x=>x[1]);
- const pointerKinds=kinds(p), wheelKinds=kinds(w);
- assert.deepEqual(pointerKinds,["pointerMove","pointerDown","pause","pointerUp"]);
- assert.deepEqual(wheelKinds,["pause","pause","pause","scroll"]);
- assert.equal(pointerKinds.indexOf("pointerUp"),wheelKinds.indexOf("scroll"));
- assert.match(p,/pause", duration: 20 },\s*{ type: "pointerUp"/);
- assert.match(w,/pause", duration: 20 },\s*{ type: "scroll"/);
- assert.doesNotMatch(gesture,/dispatchEvent\(|window\.__MYASO/);
+test("M331 W3C scroll follows pointerDOWN and precedes pointerUP with strict feint proof", () => {
+ const p = extractActions("mouse");
+ const w = extractActions("wheel");
+ const kinds = v => [...v.matchAll(/type: "([^"]+)"/g)].map(x => x[1]);
+ const pointerKinds = kinds(p), wheelKinds = kinds(w);
+ assert.deepEqual(pointerKinds, ["pointerMove", "pointerDown", "pause", "pause", "pointerUp"]);
+ assert.deepEqual(wheelKinds, ["pause", "pause", "scroll", "pause", "pause"]);
+ assert.ok(pointerKinds.indexOf("pointerDown") < wheelKinds.indexOf("scroll"));
+ assert.ok(wheelKinds.indexOf("scroll") < pointerKinds.indexOf("pointerUp"));
+ assert.match(p, /pause", duration: 0 },\s*{ type: "pause", duration: 20 },\s*{ type: "pointerUp"/);
+ assert.match(w, /deltaY: 120[^\n]*},\s*{ type: "pause", duration: 20 }/);
+ assert.doesNotMatch(gesture, /dispatchEvent\(|window\.__MYASO/);
  assert.ok(flight.includes('!attemptDefender.feedbackTransitions.includes("damage-taken")'));
  assert.ok(flight.includes("M117 feint attempt"));
 });
