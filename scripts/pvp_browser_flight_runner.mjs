@@ -12139,11 +12139,13 @@ async function performArenaHeavyFeint(session, elementId, xOffset = 200) {
 
 async function performArenaFeint(session, elementId, xOffset = 200) {
   const origin = { "element-6066-11e4-a52e-4f735466cecf": elementId };
-  // M324: authentic W3C multi-source action; LMB release and wheel-back share the
-  // same W3C tick after its 20ms hold. A separate wheel-only tick previously
-  // arrived 70-78ms after pointerDown under driver contention, too late
-  // for the unchanged server-authoritative 70ms feint window.
-  // No synthetic DOM events, extra timed wait, or combat-rule relaxation.
+  // M331: one genuine W3C multi-source action. Start wheel-back in the
+  // zero-duration tick AFTER pointerDOWN and BEFORE the 20ms LMB hold/up.
+  // M324 dispatched the wheel in the pointerUP tick; exact-head CI
+  // #39312313079 measured 81ms from real pointerDOWN to real wheel despite
+  // the 20ms W3C hold, causing an authoritative 34HP hit, not a feint.
+  // Advancing one tick preserves actual mouse down/up, one trusted wheel,
+  // and the unchanged 70ms server-feint gate. No synthetic events or retries.
   try {
     await webdriver(session.base, "POST", `/session/${session.sessionId}/actions`, {
       actions: [
@@ -12154,6 +12156,7 @@ async function performArenaFeint(session, elementId, xOffset = 200) {
           actions: [
             { type: "pointerMove", duration: 0, origin, x: xOffset, y: 0 },
             { type: "pointerDown", button: 0 },
+            { type: "pause", duration: 0 },
             { type: "pause", duration: 20 },
             { type: "pointerUp", button: 0 },
           ],
@@ -12164,8 +12167,9 @@ async function performArenaFeint(session, elementId, xOffset = 200) {
           actions: [
             { type: "pause", duration: 0 },
             { type: "pause", duration: 0 },
-            { type: "pause", duration: 20 },
             { type: "scroll", x: 0, y: 0, deltaX: 0, deltaY: 120, duration: 0, origin },
+            { type: "pause", duration: 20 },
+            { type: "pause", duration: 0 },
           ],
         },
       ],
