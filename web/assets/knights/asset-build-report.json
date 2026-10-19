@@ -1,0 +1,44 @@
+{
+  "silver_walk": {
+    "frames": 8,
+    "sourceFrameSize": 320,
+    "outputFrameSize": 160,
+    "bytes": 178278
+  },
+  "silver_idle": {
+    "frames": 4,
+    "sourceFrameSize": 320,
+    "outputFrameSize": 160,
+    "bytes": 79814
+  },
+  "silver_sprint": {
+    "frames": 8,
+    "sourceFrameSize": 320,
+    "outputFrameSize": 160,
+    "bytes": 179226
+  },
+  "silver_jump": {
+    "frames": 6,
+    "sourceFrameSize": 320,
+    "outputFrameSize": 160,
+    "bytes": 153198
+  },
+  "t1_walk": {
+    "frames": 8,
+    "sourceFrameSize": 320,
+    "outputFrameSize": 160,
+    "bytes": 169852
+  },
+  "t1_attack": {
+    "frames": 8,
+    "sourceFrameSize": 320,
+    "outputFrameSize": 160,
+    "bytes": 196032
+  },
+  "t1_block": {
+    "frames": 4,
+    "sourceFrameSize": 256,
+    "outputFrameSize": 160,
+    "bytes": 95110
+  }
+}

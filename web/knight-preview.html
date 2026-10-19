@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>myaso.io — Knight renderer QA</title>
+<style>
+html{font:16px system-ui;background:#141b20;color:#eee5d8}body{max-width:1100px;margin:18px auto;padding:0 14px}
+canvas{width:100%;max-width:960px;background:#243239;border:1px solid #53636a;border-radius:12px}
+button{background:#35464e;color:#fff;border:1px solid #70858d;border-radius:6px;padding:8px 12px;cursor:pointer}
+p{color:#b9c7c9}kbd{background:#32444d;padding:2px 5px;border-radius:4px}
+</style></head><body>
+<h1>myaso.io — renderer QA</h1>
+<p>These exact WebP atlases feed the opt-in multiplayer renderer. Move Silver with <kbd>WASD</kbd>; hold <kbd>Shift</kbd> to sprint; change direction with movement. T1 Sentinel walks automatically, demonstrating both models.</p>
+<div><button id="jump">Silver: jump</button><button id="attack">Sentinel: attack</button><button id="block">Sentinel: block</button><span id="ready">Loading textures…</span></div>
+<canvas id="arena" width="960" height="500"></canvas>
+<p>Multiplayer: append <code>&amp;knights=1</code> to the existing <code>?server=…</code> URL; remove the flag for immediate graphics rollback. No combat changes.</p>
+<script type="module">
+import { createKnightSpriteRenderer } from "./knight-sprites.mjs";
+import { COMBAT_ACTION } from "../src/browser/combat-readability.mjs";
+const ctx=document.querySelector("canvas").getContext("2d");
+const player={x:280,y:250,facing:Math.PI/2,action:COMBAT_ACTION.idle};
+const rival={x:660,y:250,facing:Math.PI/2,action:COMBAT_ACTION.idle,netId:2};
+const renderer=createKnightSpriteRenderer();
+const keys=new Set();let jumpUntil=0,rivalUntil=0,rivalAction=COMBAT_ACTION.idle,now0=performance.now();
+addEventListener("keydown",e=>{if(["KeyW","KeyA","KeyS","KeyD","ShiftLeft","ShiftRight"].includes(e.code)){keys.add(e.code);e.preventDefault();}});
+addEventListener("keyup",e=>keys.delete(e.code));
+document.querySelector("#jump").onclick=()=>jumpUntil=performance.now()+430;
+document.querySelector("#attack").onclick=()=>{rivalAction=COMBAT_ACTION.attackActive;rivalUntil=performance.now()+470;};
+document.querySelector("#block").onclick=()=>{rivalAction=COMBAT_ACTION.block;rivalUntil=performance.now()+240;};
+let last=performance.now();
+function frame(now) {
+ const dt=Math.min(0.05,Math.max(0,(now-last)/1000));last=now;
+ let dx=Number(keys.has("KeyD"))-Number(keys.has("KeyA"));
+ let dy=Number(keys.has("KeyS"))-Number(keys.has("KeyW"));
+ const l=Math.hypot(dx,dy);
+ if(l){dx/=l;dy/=l;player.facing=Math.atan2(dy,dx);const speed=(keys.has("ShiftLeft")||keys.has("ShiftRight"))?340:215;player.x+=dx*speed*dt;player.y+=dy*speed*dt;}
+ player.x=Math.max(50,Math.min(910,player.x));player.y=Math.max(75,Math.min(450,player.y));
+ player.action=now<jumpUntil?COMBAT_ACTION.jump:COMBAT_ACTION.idle;
+ rival.action=now<rivalUntil?rivalAction:COMBAT_ACTION.idle;
+ rival.x=660+Math.sin((now-now0)/1500)*80;
+ rival.y=250+Math.cos((now-now0)/1400)*45;
+ rival.facing=Math.atan2(Math.cos((now-now0)/1400),Math.sin((now-now0)/1500));
+ ctx.clearRect(0,0,960,500);ctx.fillStyle="#263840";ctx.fillRect(0,0,960,500);
+ ctx.strokeStyle="#364e55";for(let i=0;i<960;i+=40){ctx.beginPath();ctx.moveTo(i,0);ctx.lineTo(i,500);ctx.stroke();}
+ for(let j=0;j<500;j+=40){ctx.beginPath();ctx.moveTo(0,j);ctx.lineTo(960,j);ctx.stroke();}
+ for(const [fighter,remote,name] of [[player,false,"SILVER KNIGHT"],[rival,true,"T1 SENTINEL"]]){
+  ctx.save();ctx.translate(fighter.x,fighter.y);
+  const rendered=renderer.draw(ctx,fighter,{remote,rotation:0,nowMs:now});
+  if(!rendered){ctx.fillStyle=remote?"#b96350":"#e2d5b4";ctx.beginPath();ctx.arc(0,0,18,0,2*Math.PI);ctx.fill();}
+  ctx.restore();ctx.fillStyle="#e9e1ce";ctx.font="bold 13px system-ui";ctx.textAlign="center";ctx.fillText(name,fighter.x,fighter.y-58);
+ }
+ document.querySelector("#ready").textContent=renderer.loaded().length+"/7 atlases loaded";
+ requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+</script></body></html>
