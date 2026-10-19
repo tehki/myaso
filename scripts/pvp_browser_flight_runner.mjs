@@ -12116,13 +12116,11 @@ async function performArenaHeavyFeint(session, elementId, xOffset = 200) {
 
 async function performArenaFeint(session, elementId, xOffset = 200) {
   const origin = { "element-6066-11e4-a52e-4f735466cecf": elementId };
-  // R2: one authentic W3C multi-source action: pointer and wheel. The light
-  // now commits on genuine pointerDOWN, so the old 85ms
-  // R1 tap exceeds both the unchanged 70ms feint window and R2 80ms
-  // heavy-upgrade threshold. Use a true short 20ms LMB click, and send
-  // wheel-back in the immediately following native W3C tick, with no
-  // extra pause after pointerUP. Server 70ms/12-stamina, no-damage,
-  // authoritative feint/denial and real browser input gates stay strict.
+  // M324: authentic W3C multi-source action; LMB release and wheel-back share the
+  // same W3C tick after its 20ms hold. A separate wheel-only tick previously
+  // arrived 70-78ms after pointerDown under driver contention, too late
+  // for the unchanged server-authoritative 70ms feint window.
+  // No synthetic DOM events, extra timed wait, or combat-rule relaxation.
   try {
     await webdriver(session.base, "POST", `/session/${session.sessionId}/actions`, {
       actions: [
@@ -12135,7 +12133,6 @@ async function performArenaFeint(session, elementId, xOffset = 200) {
             { type: "pointerDown", button: 0 },
             { type: "pause", duration: 20 },
             { type: "pointerUp", button: 0 },
-            { type: "pause", duration: 0 },
           ],
         },
         {
@@ -12145,7 +12142,6 @@ async function performArenaFeint(session, elementId, xOffset = 200) {
             { type: "pause", duration: 0 },
             { type: "pause", duration: 0 },
             { type: "pause", duration: 20 },
-            { type: "pause", duration: 0 },
             { type: "scroll", x: 0, y: 0, deltaX: 0, deltaY: 120, duration: 0, origin },
           ],
         },

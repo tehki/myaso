@@ -22,14 +22,14 @@ test("R1 preserves one genuine short W3C LMB held for 20ms then released",()=>{
  assert.match(pointer,/duration: 20/);
  assert.match(pointer,/duration: 0/);
  assert.ok(pointer.indexOf("duration: 20")<pointer.indexOf("pointerUp"));
- assert.ok(pointer.indexOf("pointerUp")<pointer.lastIndexOf("duration: 0"));
+ assert.match(pointer,/pointerUp", button: 0 },?\s*\]$/);
 });
-test("R1 wheel-back is in the immediately following W3C tick after LMB release",()=>{
+test("M324 wheel-back shares the W3C tick with LMB release",()=>{
  const wheel=extractActions("wheel");
  assert.equal((wheel.match(/type: "scroll"/g)||[]).length,1);
  assert.ok(wheel.indexOf("duration: 20") < wheel.indexOf('type: "scroll"'));
  assert.ok(!wheel.includes("duration: 85"));
- assert.match(wheel, /duration: 0[^]*type: "scroll"/);
+ assert.match(wheel, /duration: 20 },\s*{ type: "scroll"/);
  assert.match(wheel,/deltaY: 120/);
 });
 test("M210 preserves unchanged 70ms feint, strict 100HP and one observed recovery",()=>{
