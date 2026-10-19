@@ -193,7 +193,7 @@ const leftButtonCharge = createLeftButtonCharge({
       queueStaminaDenial("running-attack");
     }
   },
-  onHeavy() { heavyAttackRequested = true; audio.play("heavy"); leftButtonPressMovement = null; },
+  onHeavy() { heavyAttackRequested = true; leftButtonPressMovement = null; audio.play("heavy"); },
 });
 const rightButtonGesture = installRightButtonGesture(canvas, {
   onKick: () => {
