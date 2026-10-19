@@ -320,6 +320,46 @@ test("M329 holds genuine W3C short click 45ms after trusted Firefox DOM receipt"
   assert.equal(outcome.attackUpDispatchMs, null);
 });
 
+test("M330 slow trusted receipt consumes the extra pause instead of expiring the guard", async () => {
+  for (const [receiptMs, expectedPauseMs] of [[5, 45], [12, 45], [30, 27], [70, 0], [105, 0]]) {
+    let time = 0;
+    const events = [];
+    const outcome = await dispatchM212AttackLedShortBlock({
+      now: () => time,
+      wheelHeadStartMs: 0,
+      postTrustedWheelMs: 45,
+      sendWheel: () => { events.push("trusted-W3C-wheel-command"); },
+      awaitTrustedWheel: () => {
+        time = receiptMs;
+        events.push("real-trusted-receipt");
+        return { trusted: true, deltaY: 120 };
+      },
+      sendAttackClick: () => { events.push("one-real-W3C-click@" + time); },
+      sleep: ms => { events.push("wait:" + ms); time += ms; },
+    });
+    const expected = ["trusted-W3C-wheel-command", "real-trusted-receipt"];
+    if (expectedPauseMs > 0) expected.push("wait:" + expectedPauseMs);
+    expected.push("one-real-W3C-click@" + (receiptMs + expectedPauseMs));
+    assert.deepEqual(events, expected);
+    assert.equal(outcome.trustedWheelObservedMs, receiptMs);
+    assert.equal(outcome.attackDownDispatchMs, receiptMs + expectedPauseMs);
+    assert.equal(outcome.postTrustedWheelMs, 45);
+  }
+});
+
+test("M330 rejects missing trusted receipt even when slow-wheel compensation is enabled", async () => {
+  let clicks = 0;
+  await assert.rejects(() => dispatchM212AttackLedShortBlock({
+    wheelHeadStartMs: 0,
+    postTrustedWheelMs: 45,
+    sendWheel: () => {},
+    awaitTrustedWheel: () => { throw Error("missing trusted real wheel"); },
+    sendAttackClick: () => { clicks++; },
+    sleep: () => {},
+  }), /missing trusted real wheel/);
+  assert.equal(clicks, 0);
+});
+
 test("M329 rejects unbounded post-trusted receipt time without sending W3C input", async () => {
   let wheel = 0, click = 0;
   for (const delay of [-1, 61, Infinity, NaN]) {
