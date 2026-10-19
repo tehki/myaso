@@ -7901,7 +7901,7 @@ async function runM176BlockAttackArbitrationPhase(
 
 async function calibrateNativeParryIngress(
   attacker, defender, attackerElementId, defenderElementId, attackOffset,
-  targetAfterPointerDownMs = 70,
+  targetAfterPointerDownMs = 100,
 ) {
   // Measure only trusted input delivery, never synthesize game controls.
   // Three harmless mouse moves and real isolated wheel-back blocks before
@@ -7948,10 +7948,16 @@ async function calibrateNativeParryIngress(
   const pointerMs = median(pointerSamples);
   const wheelMs = median(wheelSamples);
   // M33 light active follows pointerDOWN in 135ms; M138 jump attack
-  // follows Space+LMB in only 105ms. Choose the scenario's requested wheel
-  // arrival relative to *genuine* pointerDOWN, never widen either parry.
+  // follows Space+LMB in only 105ms. A native M41 run on 2026-10-19
+  // resolved M33 as -38 guard: genuine light at 203.8ms, Firefox wheel
+  // at 206ms (per-browser observed input clocks) and authoritative block,
+  // not parry. Shift ONLY the M33 native wheel goal from 70 to 100ms after
+  // pointerDOWN, leaving 35ms nominal pre-impact headroom. The 110ms
+  // calibration dispatch ceiling is below 135ms light windup; it is NOT
+  // an extension of the unchanged 125ms authoritative parry window.
+  // Choose each scenario's target from real delivery samples.
   if (!Number.isFinite(targetAfterPointerDownMs) || targetAfterPointerDownMs < 0
-    || targetAfterPointerDownMs > 85) {
+    || targetAfterPointerDownMs > 110) {
     throw new RangeError("native parry arrival target outside strict window");
   }
   const skewMs = Math.max(-180, Math.min(180,
@@ -8001,7 +8007,9 @@ async function runOnlineUiParryFlight(entries, postParrySleepMs = 80, roles = nu
     // Trusted pointermove and wheel-back are real W3C events; no synthetic
     // event may enter the arena. Stagger the live Firefox/Chrome actions
     // around the measured delivery time, placing the ONE genuine wheel
-    // ~70ms after true light pointerdown, inside unchanged 125ms parry.
+    // ~100ms after true light pointerdown, before 135ms light impact
+    // and inside the unchanged 125ms authoritative parry. M138 continues
+    // using its separate genuine 25ms jump-attack parry target.
     // Any actual -38 guard block or 34 HP hit remains a terminal failure.
     await Promise.all([
       (async () => {
