@@ -34,7 +34,10 @@ ln -sfn "$release" "$base/staged.next"
 mv -Tf "$base/staged.next" "$base/staged"
 echo "STAGED myaso alpha revision $revision"
 if [[ "$mode" == --stage ]]; then
-  echo "Stage-only: does not change current release, rotate live cert, open sockets, firewall, Caddy routes or services."
+  # Preseed only the INACTIVE release with the existing public certificate pin.
+  # The official --activate path still generates/rotates TLS and rewrites config.
+  bash "$release/ops/alpha/write-staged-config.sh" "$release/public" /etc/myaso-alpha/tls/cert.pem
+  echo "Stage-only: no active release, cert, sockets, firewall, Caddy routes or service changes."
   exit 0
 fi
 
