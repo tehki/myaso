@@ -45,3 +45,19 @@ test("M210 preserves unchanged 70ms feint, strict 100HP and one observed recover
  assert.ok(flight.includes("exhaustedWheelBack.epochMs - exhaustedLightUp.epochMs > 80"));
  assert.ok(flight.includes("exhaustedWheelBack.epochMs < exhaustedLightUp.epochMs"));
 });
+
+
+test("M324 W3C releases LMB in the wheel scroll tick and preserves fail-closed evidence",()=>{
+ const p=extractActions("mouse");
+ const w=extractActions("wheel");
+ const kinds=(v)=>[...v.matchAll(/type: "([^"]+)"/g)].map(x=>x[1]);
+ const pointerKinds=kinds(p), wheelKinds=kinds(w);
+ assert.deepEqual(pointerKinds,["pointerMove","pointerDown","pause","pointerUp"]);
+ assert.deepEqual(wheelKinds,["pause","pause","pause","scroll"]);
+ assert.equal(pointerKinds.indexOf("pointerUp"),wheelKinds.indexOf("scroll"));
+ assert.match(p,/pause", duration: 20 },\s*{ type: "pointerUp"/);
+ assert.match(w,/pause", duration: 20 },\s*{ type: "scroll"/);
+ assert.doesNotMatch(gesture,/dispatchEvent\(|window\.__MYASO/);
+ assert.ok(flight.includes('!attemptDefender.feedbackTransitions.includes("damage-taken")'));
+ assert.ok(flight.includes("M117 feint attempt"));
+});
