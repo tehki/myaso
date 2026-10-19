@@ -360,8 +360,12 @@ mod tests {
             zones.authorize(1, PortalId::RedLionExit, 3, 700, &fighter(1, 390.0, 550.0)),
             Err(ZoneError::StaleRequest)
         );
+        // World::add_player_at clamps invalid coordinates, so inject this
+        // directly into the server-side fighter snapshot to exercise denial.
+        let mut invalid = fighter(1, 390.0, 550.0);
+        invalid.x = f32::NAN;
         assert_eq!(
-            zones.authorize(1, PortalId::RedLionExit, 5, 700, &fighter(1, f32::NAN, 550.0)),
+            zones.authorize(1, PortalId::RedLionExit, 5, 700, &invalid),
             Err(ZoneError::InvalidPosition)
         );
     }
