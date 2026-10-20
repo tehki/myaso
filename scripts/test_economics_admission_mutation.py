@@ -206,8 +206,11 @@ class AdmissionMutationTests(unittest.TestCase):
             db.execute("DELETE FROM admission_mutations WHERE revision=1")
             db.execute("UPDATE admitted_sessions SET state='active' WHERE player_id=10")
             db.execute("UPDATE metadata SET mutation_revision=0 WHERE singleton=1")
-        self.assertEqual(audit_fixture_database(self.db).mutation_revision, 0)
-        with self.assertRaises(WitnessConflict):
+        # Global envelope retains the missing mutation commit, so tampering
+        # is now detected by structural audit *before* checkpoint verification.
+        with self.assertRaises(CorruptState):
+            audit_fixture_database(self.db)
+        with self.assertRaises((InvalidCheckpoint, WitnessConflict, CorruptState)):
             self.observe()
         self.assertEqual(read_fixture_witness_mutation_revision(self.witness), 1)
 
