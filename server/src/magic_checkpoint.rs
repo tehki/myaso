@@ -357,7 +357,7 @@ mod tests {
 
     #[test]
     fn world_teacher_tick_requires_fire_before_ember_and_persists_progression() {
-        use crate::magic_teacher::{TeacherSpawn, TeacherId};
+        use crate::magic_teacher::{TeacherId, TeacherSpawn};
         use crate::simulation::World;
         use crate::zone::{Position, ZoneAuthority};
 
@@ -448,7 +448,7 @@ mod tests {
 
     #[test]
     fn world_teacher_tick_rejects_stale_forged_and_missing_authority() {
-        use crate::magic_teacher::{TeacherSpawn, TeacherId};
+        use crate::magic_teacher::{TeacherId, TeacherSpawn};
         use crate::simulation::World;
         use crate::zone::{Position, ZoneAuthority};
 
