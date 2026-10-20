@@ -460,3 +460,64 @@ decoding, closed/reopened site masks and revision fencing. Full
 Chromium/WebTransport verification must be separately established by
 a working browser test environment and GitHub exact-head quality;
 local Serj Chromium previously crashed before navigation.
+
+## LW-1N — Opt-in server-clock worksite maintenance event demonstration
+
+The pilot can now exercise its **real live worksite-status change path**
+without accepting any commands from clients or mistaking browser preview
+scenery for authoritative collision. Set **both**
+`MYASO_NPC_PILOT=1 MYASO_NPC_MAINTENANCE=1` on a strictly loopback-bound
+Rust server. Both flags default to disabled independently; maintenance
+requires the loopback pilot and the server rejects malformed values or
+attempted maintenance without the pilot (including public binds).
+
+When explicitly enabled, a deterministic server-owned **staging event**
+closes the work yard at authoritative world tick **900**
+(roughly 15 seconds after startup) and reopens it at tick **2100**
+(roughly 35 seconds after startup). This does **not** represent
+real player destruction, a weather system, authored map interiors or
+physical building damage. No client packet or chat prompt can change
+the event schedule or authority state. The stage-only event is applied
+from the existing sequential 60Hz Rust simulation clock and calls
+exactly the same versioned Moonvale `WorksiteAuthority` as prior phases:
+revision 1 (all available) to revision 2 (work yard unavailable), then
+revision 3 (all available). The normal type-12 reliable status replication
+observes and delivers newer states when its bounded queue has capacity.
+
+The sequence deliberately exercises a **mid-delivery closure**.
+Tomas collects one well bucket at tick 600; when the work yard closes,
+he still owns the conserved carried water, cannot deliver at tick 1800
+and cannot collect more. A newer authoritative revision reopens the
+work yard at tick 2100, and the existing scheduled route delivers
+the same bucket at tick 4200. All stock and the task ledger remain
+conserved; no catch-up teleport, fake completion, duplicate payout or
+extra fighter is created. Other independent workers may continue their
+valid jobs while Tomas is blocked.
+
+The fixture never overwrites a newer or independently modified
+trusted worksite manifest: it adopts the close only while at the
+default revision 1/all-active state and reopens only from its own
+specific revision 2/yard-closed state. Replay, skipped/discontinuous
+server ticks and any other source's version change prevent the
+fixture from inventing an update. Ordinary NPC pilot runs with the
+maintenance flag unset behave exactly as before.
+
+Example local command:
+
+```sh
+MYASO_BIND=127.0.0.1:4433 MYASO_NPC_PILOT=1 MYASO_NPC_MAINTENANCE=1 \
+  cargo run --locked --manifest-path server/Cargo.toml
+```
+
+The existing browser NPC panel should report **5/5 available, then
+4/5 (work yard closed), then 5/5** as the server advances. Local Rust
+tests verify exact live-world ticks, status byte snapshots, safe cargo,
+stale/revision supersession, protected admission and eventual
+delivery. Authentic browser/WebTransport proof still requires
+a successful working headless Chromium acceptance environment;
+the last standalone Serj Chromium had crashed independently of
+game loading. Full protected exact-head CI remains mandatory.
+
+This is **not** an integration with the still-open World & Gameplay
+collision/door PRs, nor production server world entities or active
+economics. Disable maintenance before any eventual realm deployment.

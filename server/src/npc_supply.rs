@@ -19,6 +19,11 @@ const IRON_TOTAL: u16 = 6;
 const TARGET_YARD_WATER: u8 = 4;
 const TARGET_MARKET_FOOD: u8 = 4;
 const TARGET_FORGE_NAILS: u8 = 3;
+// LW-1N opt-in deterministic loopback-only event fixture. This is a
+// staged maintenance outage, not player damage or actual world collision.
+const MAINTENANCE_CLOSE_TICK: u32 = 900;
+const MAINTENANCE_REOPEN_TICK: u32 = 2100;
+const WORK_YARD_CLOSED: [bool; npc_worksites::WORKSITES.len()] = [true, false, true, true, true];
 
 /// An NPC's decision is recomputed only from conserved server stocks;
 /// a chat request can read it but never submit or execute it.
@@ -115,6 +120,7 @@ pub struct NpcSupplyWorld {
     last_step: Option<u32>,
     sequence: u32,
     sites: npc_worksites::WorksiteAuthority,
+    pilot_maintenance: bool,
 }
 
 impl Default for NpcSupplyWorld {
@@ -125,6 +131,7 @@ impl Default for NpcSupplyWorld {
             last_step: None,
             sequence: 0,
             sites: npc_worksites::WorksiteAuthority::default(),
+            pilot_maintenance: false,
         }
     }
 }
@@ -153,6 +160,44 @@ impl NpcSupplyWorld {
 
     pub fn worksite_revision(&self) -> u32 {
         self.sites.revision()
+    }
+
+    /// Called only by the loopback server startup with a separate opt-in flag.
+    /// It never grants client-side authority and cannot persist or mint stock.
+    pub fn enable_pilot_maintenance(&mut self) {
+        self.pilot_maintenance = true;
+    }
+
+    fn advance_pilot_maintenance(&mut self, tick: u32) {
+        if !self.pilot_maintenance {
+            return;
+        }
+        // Fail closed if a real trusted source has already advanced the object
+        // revision or changed any sites: never override another authority.
+        match tick {
+            MAINTENANCE_CLOSE_TICK
+                if self.sites.revision() == 1
+                    && self.sites.active_flags() == [true; npc_worksites::WORKSITES.len()] =>
+            {
+                let _ = self.adopt_server_worksites(
+                    crate::zone::ZoneId::Moonvale,
+                    1,
+                    2,
+                    WORK_YARD_CLOSED,
+                );
+            }
+            MAINTENANCE_REOPEN_TICK
+                if self.sites.revision() == 2 && self.sites.active_flags() == WORK_YARD_CLOSED =>
+            {
+                let _ = self.adopt_server_worksites(
+                    crate::zone::ZoneId::Moonvale,
+                    1,
+                    3,
+                    [true; npc_worksites::WORKSITES.len()],
+                );
+            }
+            _ => {}
+        }
     }
 
     pub fn worksite_status_packet(&self) -> [u8; 12] {
@@ -258,6 +303,7 @@ impl NpcSupplyWorld {
         if tick == 0 {
             return;
         }
+        self.advance_pilot_maintenance(tick);
         match tick % CYCLE {
             FORGE => {
                 if self.decision(2) == WorkDecision::ForgeNails && self.sites.allows(2, 5, tick) {
@@ -670,5 +716,114 @@ mod tests {
             1
         );
         assert!(town.stocks().conserved());
+    }
+
+    #[test]
+    fn pilot_maintenance_live_clock_closes_and_restores_workyard_without_lost_cargo() {
+        let mut town = NpcSupplyWorld::default();
+        town.enable_pilot_maintenance();
+        assert_eq!(town.worksite_revision(), 1);
+        assert_eq!(town.worksite_status_packet()[8], 31);
+        run_until(&mut town, 0, 600);
+        assert_eq!(town.stocks().tomas_water, 1);
+        assert_eq!(town.stocks().well_water, 7);
+        assert_eq!(town.worksite_revision(), 1);
+
+        run_until(&mut town, 601, MAINTENANCE_CLOSE_TICK);
+        assert_eq!(town.worksite_revision(), 2);
+        assert_eq!(
+            town.worksite_status_packet(),
+            [1, 12, 1, 0, 2, 0, 0, 0, 29, 0, 0, 0]
+        );
+        assert_eq!(town.decision(5), WorkDecision::Rest);
+        assert!(town
+            .needs_report()
+            .contains("blocked: required worksite unavailable"));
+        run_until(&mut town, MAINTENANCE_CLOSE_TICK + 1, 1800);
+        assert_eq!(town.stocks().tomas_water, 1);
+        assert_eq!(town.stocks().yard_water, 0);
+        assert_eq!(
+            town.history()
+                .iter()
+                .filter(|e| e.actor == 5 && e.operation == 2)
+                .count(),
+            0
+        );
+
+        run_until(&mut town, 1801, MAINTENANCE_REOPEN_TICK);
+        assert_eq!(town.worksite_revision(), 3);
+        assert_eq!(
+            town.worksite_status_packet(),
+            [1, 12, 1, 0, 3, 0, 0, 0, 31, 0, 0, 0]
+        );
+        assert_eq!(town.decision(5), WorkDecision::DeliverWater);
+        run_until(&mut town, MAINTENANCE_REOPEN_TICK + 1, 4200);
+        assert_eq!(town.stocks().yard_water, 1);
+        assert_eq!(town.stocks().tomas_water, 0);
+        assert_eq!(town.stocks().well_water, 7);
+        let deliveries: Vec<_> = town
+            .history()
+            .iter()
+            .filter(|e| e.actor == 5 && e.operation == 2)
+            .collect();
+        assert_eq!(deliveries.len(), 1);
+        assert_eq!(deliveries[0].tick, 4200);
+        assert_eq!(deliveries[0].worksite_revision, 3);
+        assert!(town.stocks().conserved());
+    }
+
+    #[test]
+    fn pilot_maintenance_disabled_by_default_and_never_overrides_other_authority() {
+        let mut disabled = NpcSupplyWorld::default();
+        run_until(&mut disabled, 0, MAINTENANCE_REOPEN_TICK);
+        assert_eq!(disabled.worksite_revision(), 1);
+        assert_eq!(disabled.stocks().yard_water, 1);
+        assert_eq!(disabled.worksite_status_packet()[8], 31);
+
+        let mut third_party = NpcSupplyWorld::default();
+        third_party.enable_pilot_maintenance();
+        let custom = [false, true, true, true, true];
+        third_party
+            .adopt_server_worksites(crate::zone::ZoneId::Moonvale, 1, 2, custom)
+            .unwrap();
+        run_until(&mut third_party, 0, MAINTENANCE_REOPEN_TICK);
+        assert_eq!(third_party.worksite_revision(), 2);
+        assert_eq!(third_party.worksite_status_packet()[8], 30);
+        assert!(third_party.stocks().conserved());
+
+        let mut superseded = NpcSupplyWorld::default();
+        superseded.enable_pilot_maintenance();
+        run_until(&mut superseded, 0, MAINTENANCE_CLOSE_TICK);
+        assert_eq!(superseded.worksite_status_packet()[8], 29);
+        superseded
+            .adopt_server_worksites(crate::zone::ZoneId::Moonvale, 1, 3, custom)
+            .unwrap();
+        run_until(
+            &mut superseded,
+            MAINTENANCE_CLOSE_TICK + 1,
+            MAINTENANCE_REOPEN_TICK,
+        );
+        assert_eq!(superseded.worksite_revision(), 3);
+        assert_eq!(superseded.worksite_status_packet()[8], 30);
+    }
+
+    #[test]
+    fn replayed_or_skipped_clock_ticks_cannot_trigger_fake_outage_transitions() {
+        let mut town = NpcSupplyWorld::default();
+        town.enable_pilot_maintenance();
+        town.advance(0);
+        town.advance(MAINTENANCE_CLOSE_TICK);
+        assert_eq!(town.worksite_revision(), 1);
+        run_until(&mut town, 1, MAINTENANCE_CLOSE_TICK);
+        assert_eq!(town.worksite_revision(), 2);
+        town.advance(MAINTENANCE_CLOSE_TICK);
+        town.advance(MAINTENANCE_REOPEN_TICK);
+        assert_eq!(town.worksite_revision(), 2);
+        run_until(
+            &mut town,
+            MAINTENANCE_CLOSE_TICK + 1,
+            MAINTENANCE_REOPEN_TICK,
+        );
+        assert_eq!(town.worksite_revision(), 3);
     }
 }

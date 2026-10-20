@@ -308,7 +308,22 @@ async fn main() -> Result<()> {
         Err(env::VarError::NotPresent) => parse_npc_pilot(None, bind)?,
         Err(error) => bail!("MYASO_NPC_PILOT is invalid: {error}"),
     };
+    // The maintenance fixture is a separate explicit flag. Never allow it
+    // without the existing loopback-only pilot gate.
+    let npc_maintenance_enabled = match env::var("MYASO_NPC_MAINTENANCE") {
+        Ok(value) => parse_npc_maintenance(Some(&value), npc_pilot_enabled)?,
+        Err(env::VarError::NotPresent) => parse_npc_maintenance(None, npc_pilot_enabled)?,
+        Err(error) => bail!("MYASO_NPC_MAINTENANCE is invalid: {error}"),
+    };
     let game = SharedGame::new(flight, npc_pilot_enabled);
+    if npc_maintenance_enabled {
+        let mut state = game.state.lock().await;
+        state
+            .npc_supply
+            .as_mut()
+            .expect("pilot required for maintenance")
+            .enable_pilot_maintenance();
+    }
     // Accept server-side diagnostic output only on loopback and only when
     // explicitly requested by the real-browser M201 acceptance fixture.
     let flight_action_proof = match env::var("MYASO_FLIGHT_ACTION_PROOF").as_deref() {
@@ -406,6 +421,18 @@ fn parse_npc_pilot(raw: Option<&str>, bind: SocketAddr) -> Result<bool> {
     };
     if enabled && !bind.ip().is_loopback() {
         bail!("NPC pilot is loopback-only and cannot be enabled on a public bind");
+    }
+    Ok(enabled)
+}
+
+fn parse_npc_maintenance(raw: Option<&str>, npc_pilot_enabled: bool) -> Result<bool> {
+    let enabled = match raw {
+        None | Some("0") => false,
+        Some("1") => true,
+        Some(_) => bail!("MYASO_NPC_MAINTENANCE must be 0 or 1"),
+    };
+    if enabled && !npc_pilot_enabled {
+        bail!("NPC maintenance requires an enabled loopback NPC pilot");
     }
     Ok(enabled)
 }
@@ -1342,6 +1369,67 @@ mod tests {
         }]);
         assert!(disabled.npc_routines.is_none());
         assert_eq!(disabled.kill_events.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn maintenance_fixture_replicates_live_clock_site_revisions_without_gameplay_fighters() {
+        let flight = LoopbackFlightConfig {
+            background_players: 0,
+            near_pressure_players: 0,
+            reliable_write_delay: Duration::ZERO,
+            drop_new_action_datagrams: false,
+        };
+        let game = SharedGame::new(flight, true);
+        let mut state = game.state.lock().await;
+        state
+            .npc_supply
+            .as_mut()
+            .unwrap()
+            .enable_pilot_maintenance();
+        let mut events = Vec::new();
+        for _ in 0..900 {
+            state.world.step_into(&mut events);
+            assert!(events.is_empty());
+            let tick = state.world.tick;
+            state.npc_supply.as_mut().unwrap().advance(tick);
+        }
+        let supply = state.npc_supply.as_ref().unwrap();
+        assert_eq!(state.world.tick, 900);
+        assert_eq!(supply.worksite_revision(), 2);
+        assert_eq!(
+            supply.worksite_status_packet(),
+            [1, 12, 1, 0, 2, 0, 0, 0, 29, 0, 0, 0]
+        );
+        assert_eq!(supply.stocks().tomas_water, 1);
+        assert!(state.world.fighters().is_empty());
+
+        for _ in 900..2100 {
+            state.world.step_into(&mut events);
+            assert!(events.is_empty());
+            let tick = state.world.tick;
+            state.npc_supply.as_mut().unwrap().advance(tick);
+        }
+        let supply = state.npc_supply.as_ref().unwrap();
+        assert_eq!(state.world.tick, 2100);
+        assert_eq!(supply.worksite_revision(), 3);
+        assert_eq!(
+            supply.worksite_status_packet(),
+            [1, 12, 1, 0, 3, 0, 0, 0, 31, 0, 0, 0]
+        );
+        assert_eq!(supply.stocks().tomas_water, 1);
+        assert_eq!(supply.stocks().yard_water, 0);
+        assert!(supply.stocks().conserved());
+        assert!(state.world.fighters().is_empty());
+    }
+
+    #[test]
+    fn maintenance_fixture_is_separately_opt_in_and_requires_pilot() {
+        assert!(!parse_npc_maintenance(None, false).unwrap());
+        assert!(!parse_npc_maintenance(Some("0"), false).unwrap());
+        assert!(parse_npc_maintenance(Some("1"), false).is_err());
+        assert!(parse_npc_maintenance(Some("yes"), true).is_err());
+        assert!(parse_npc_maintenance(Some("1"), true).unwrap());
+        assert!(!parse_npc_maintenance(None, true).unwrap());
     }
 
     #[test]
