@@ -153,6 +153,12 @@ fn kind_code(kind: ItemKind) -> u8 {
         ItemKind::BlackPearl => 5,
         ItemKind::Gold => 6,
         ItemKind::HealingPotion => 7,
+        ItemKind::IronSword => 8,
+        ItemKind::WoodenClub => 9,
+        ItemKind::ChainmailArmor => 10,
+        ItemKind::IronHelmet => 11,
+        ItemKind::LeatherBoots => 12,
+        ItemKind::WoodenShield => 13,
     }
 }
 
@@ -166,6 +172,12 @@ fn decode_kind(value: u8) -> Result<ItemKind, CheckpointError> {
         5 => Ok(ItemKind::BlackPearl),
         6 => Ok(ItemKind::Gold),
         7 => Ok(ItemKind::HealingPotion),
+        8 => Ok(ItemKind::IronSword),
+        9 => Ok(ItemKind::WoodenClub),
+        10 => Ok(ItemKind::ChainmailArmor),
+        11 => Ok(ItemKind::IronHelmet),
+        12 => Ok(ItemKind::LeatherBoots),
+        13 => Ok(ItemKind::WoodenShield),
         _ => Err(CheckpointError::Corrupt),
     }
 }
@@ -175,6 +187,8 @@ fn slot_code(slot: EquipmentSlot) -> u8 {
         EquipmentSlot::MainHand => 0,
         EquipmentSlot::OffHand => 1,
         EquipmentSlot::Body => 2,
+        EquipmentSlot::Head => 3,
+        EquipmentSlot::Feet => 4,
     }
 }
 
@@ -183,6 +197,8 @@ fn decode_slot(value: u8) -> Result<EquipmentSlot, CheckpointError> {
         0 => Ok(EquipmentSlot::MainHand),
         1 => Ok(EquipmentSlot::OffHand),
         2 => Ok(EquipmentSlot::Body),
+        3 => Ok(EquipmentSlot::Head),
+        4 => Ok(EquipmentSlot::Feet),
         _ => Err(CheckpointError::Corrupt),
     }
 }
@@ -501,6 +517,35 @@ pub fn load_quiescent(path: &Path) -> Result<LootAuthority, CheckpointError> {
     }
     let snapshot = decode(&fs::read(path)?)?;
     LootAuthority::restore_state(snapshot).map_err(|_| CheckpointError::Corrupt)
+}
+
+#[cfg(test)]
+mod new_gear_codec_tests {
+    use super::*;
+
+    #[test]
+    fn new_gear_codes_roundtrip_without_changing_existing_disk_ids() {
+        assert_eq!(kind_code(ItemKind::RustySword), 0);
+        assert_eq!(kind_code(ItemKind::LeatherArmor), 1);
+        assert_eq!(slot_code(EquipmentSlot::MainHand), 0);
+        assert_eq!(slot_code(EquipmentSlot::OffHand), 1);
+        assert_eq!(slot_code(EquipmentSlot::Body), 2);
+        for item in [
+            ItemKind::IronSword,
+            ItemKind::WoodenClub,
+            ItemKind::ChainmailArmor,
+            ItemKind::IronHelmet,
+            ItemKind::LeatherBoots,
+            ItemKind::WoodenShield,
+        ] {
+            assert_eq!(decode_kind(kind_code(item)).unwrap(), item);
+        }
+        for slot in [EquipmentSlot::Head, EquipmentSlot::Feet] {
+            assert_eq!(decode_slot(slot_code(slot)).unwrap(), slot);
+        }
+        assert!(decode_kind(255).is_err());
+        assert!(decode_slot(255).is_err());
+    }
 }
 
 #[cfg(test)]
