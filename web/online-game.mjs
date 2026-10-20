@@ -363,6 +363,9 @@ networkClient = await connectAuthoritativeClient({
   onNpcWorksites(sites) {
     npcUI?.setWorksites(sites);
   },
+  onNpcWorksiteStatus(status) {
+    npcUI?.updateWorksiteStatus(status);
+  },
   onNpcReply(reply) {
     npcUI?.receive(reply);
   },
@@ -1092,12 +1095,13 @@ function drawNpcPilotMarkers() {
       visualCameraPosition.y, canvas.width, canvas.height);
     if (p.x < -80 || p.x > canvas.width + 80
       || p.y < -50 || p.y > canvas.height + 50) continue;
-    ctx.fillStyle = "#668f98";
+    const closed = site.active === false;
+    ctx.fillStyle = closed ? "#735c5b" : "#668f98";
     ctx.beginPath();
     ctx.rect(p.x - 4, p.y - 4, 8, 8);
     ctx.fill();
-    ctx.fillStyle = "#a6d1d2";
-    ctx.fillText(site.name, p.x, p.y + 18);
+    ctx.fillStyle = closed ? "#dd9991" : "#a6d1d2";
+    ctx.fillText(closed ? `${site.name} (closed)` : site.name, p.x, p.y + 18);
   }
   ctx.font = "bold 11px sans-serif";
   for (const npc of npcUI.npcs) {

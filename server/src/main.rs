@@ -620,6 +620,7 @@ async fn handle_connection(
         &initial_baseline.bytes,
     )
     .await?;
+    let mut last_worksite_revision = 0_u32;
     if game.npc_pilot_enabled {
         send_reliable_frame(
             &mut reliable_send,
@@ -639,6 +640,27 @@ async fn handle_connection(
             &npc_worksites::packet(),
         )
         .await?;
+        let initial_worksite_status = {
+            let state = game.state.lock().await;
+            state
+                .npc_supply
+                .as_ref()
+                .expect("pilot supply initialized")
+                .worksite_status_packet()
+        };
+        send_reliable_frame(
+            &mut reliable_send,
+            &mut reliable_frame_buffer,
+            &initial_worksite_status,
+        )
+        .await?;
+        // Save the *exact* revision sent on this connection. A future
+        // server update during connection setup must not be silently skipped.
+        last_worksite_revision = u32::from_le_bytes(
+            initial_worksite_status[4..8]
+                .try_into()
+                .expect("four revision bytes"),
+        );
         send_reliable_frame(
             &mut reliable_send,
             &mut reliable_frame_buffer,
@@ -666,6 +688,7 @@ async fn handle_connection(
     let mut last_reliable_background_tick = initial_frame.server_tick();
     let mut last_npc_state_tick = initial_frame.server_tick();
     let mut last_npc_supply_tick = initial_frame.server_tick();
+    let mut last_worksite_status_check_tick = initial_frame.server_tick();
     let mut last_reliable_sequence = initial_reliable_baseline.sequence;
     let mut reliable_deltas_since_checkpoint = 0_u8;
     let (reliable_tx, mut reliable_rx) = mpsc::channel::<ReliablePayload>(1);
@@ -1075,6 +1098,27 @@ async fn handle_connection(
                         Ok(true) => last_npc_supply_tick = server_tick,
                         Ok(false) => {}
                         Err(ReliableQueueError::Closed) => bail!("NPC supply writer unavailable"),
+                    }
+                }
+                // Low-priority pilot-only site availability changes. Only check
+                // once per second, after combat recovery and supply frames have
+                // had first chance to reserve the bounded reliable queue.
+                // Retry a changed revision on backpressure; never roll back.
+                if game.npc_pilot_enabled && !kill_event_queued
+                    && server_tick.wrapping_sub(last_worksite_status_check_tick) >= STATE_INTERVAL_TICKS
+                {
+                    last_worksite_status_check_tick = server_tick;
+                    let status = {
+                        let state = game.state.lock().await;
+                        let supply = state.npc_supply.as_ref().expect("pilot supply initialized");
+                        (supply.worksite_revision(), supply.worksite_status_packet())
+                    };
+                    if status.0 > last_worksite_revision {
+                        match try_enqueue_reliable(&reliable_tx, || ReliablePayload::Bytes(status.1.to_vec())) {
+                            Ok(true) => last_worksite_revision = status.0,
+                            Ok(false) => {}
+                            Err(ReliableQueueError::Closed) => bail!("NPC worksite status writer unavailable"),
+                        }
                     }
                 }
                 if let Some(client_tick) = safe_input_ack {

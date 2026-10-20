@@ -1,7 +1,7 @@
 // LW-1 loopback NPC pilot on the existing reliable stream; never on combat datagrams.
 // These packet types are separate from the frozen v1 input/snapshot/kill-event payloads.
 export const NPC_WIRE = Object.freeze({
-  request: 5, response: 6, roster: 7, state: 8, supplies: 9, obstacles: 10, worksites: 11, maxTextBytes: 240,
+  request: 5, response: 6, roster: 7, state: 8, supplies: 9, obstacles: 10, worksites: 11, worksiteStatus: 12, maxTextBytes: 240,
 });
 const encoder = new TextEncoder();
 const decoder = new TextDecoder("utf-8", { fatal: true });
@@ -167,4 +167,22 @@ export function decodeNpcWorksites(bytes) {
     return Object.freeze({ id, actor, x, y, name });
   });
   return Object.freeze(sites);
+}
+
+// Read-only server worksite availability. It is NOT an action request or
+// a valid payload in the client-to-server direction. Fail closed on any
+// unknown state bits, padding, schema, revision or total length.
+export function decodeNpcWorksiteStatus(bytes) {
+  const payload = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
+  if (payload.length !== 12 || payload[0] !== 1 || payload[1] !== NPC_WIRE.worksiteStatus
+      || payload[2] !== 1 || payload[3] !== 0 || payload[9] !== 0
+      || payload[10] !== 0 || payload[11] !== 0 || (payload[8] & 0xe0) !== 0) {
+    throw new TypeError("invalid NPC worksite status header");
+  }
+  const revision = new DataView(
+    payload.buffer, payload.byteOffset, payload.byteLength
+  ).getUint32(4, true);
+  if (revision === 0) throw new TypeError("invalid NPC worksite status revision");
+  const active = Array.from({length:5}, (_, i) => Boolean(payload[8] & (1 << i)));
+  return Object.freeze({ revision, active: Object.freeze(active) });
 }

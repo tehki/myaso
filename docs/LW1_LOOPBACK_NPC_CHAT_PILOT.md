@@ -415,3 +415,48 @@ replayed phase refusal, forge outage/resumption, audit provenance,
 and all previous world/transport invariants. The World & Gameplay
 preview-only collision manifest is still not connected; no production
 zone, combat collider, currency, inventory or loot state is modified.
+
+## LW-1M — Reliable revisioned worksite-status snapshots (loopback-only)
+
+The five immutable LW-1K worksite anchors (well, yard, depot, market,
+forge) still arrive as pilot-only reliable packet type 11. LW-1M adds a
+separate **12-byte reliable type-12 worksite availability snapshot**:
+protocol/version 1, status schema 1, authoritative 32-bit revision,
+five-bit active-site mask in the fixed site-ID order, and zero padding.
+The Rust status producer serializes directly from the same
+`WorksiteAuthority` whose availability rules govern stock mutation.
+The JavaScript decoder rejects wrong size, type, protocol, schema,
+reserved bits, unknown mask bits and zero revisions. No client action
+or instruction is added: both packet types flow from server to browser
+only.
+
+Every loopback pilot connection first receives the immutable worksite
+registry and its matching initial availability snapshot. Its server
+connection records **the revision actually sent**, rather than reading
+a newer value later; any change during connection setup is therefore
+still eligible for the subsequent update. At most once per second,
+after combat kill notices, reliable catch-up and NPC state/supply
+frames have had priority, the server checks for a strictly newer
+worksite revision. It tries to enqueue a small status frame on the
+existing bounded reliable queue, retries changes after backpressure,
+and never blocks combat simulation to push worksite status. There is
+no recurring traffic when the revision is unchanged.
+
+The localhost browser displays the accepted server revision, the
+available count and which worksite(s) are closed, and marks unavailable
+worksites in muted red. **Only newer revisions are rendered**; stale
+and repeated status frames cannot visually reopen a closed worksite.
+The display remains strictly informational, with no clickable
+resource pickup or browser-owned collision behavior.
+
+LW-1L server-side availability remains all-active by default. No live
+world-event producer exists yet, so status changes are currently
+provable through isolated trusted Rust fixture tests; this is **not**
+an assertion that Greyhaven contains real closable buildings or
+interactive player objects. Real-world zone/door/collider ownership
+is still blocked on the World & Gameplay authoritative contract.
+Rust and JS tests enforce the exact byte schema, read-only status
+decoding, closed/reopened site masks and revision fencing. Full
+Chromium/WebTransport verification must be separately established by
+a working browser test environment and GitHub exact-head quality;
+local Serj Chromium previously crashed before navigation.

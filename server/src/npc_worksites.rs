@@ -7,6 +7,7 @@
 use crate::{npc_navigation, npc_routines::NpcRoutines, zone::ZoneId, PROTOCOL_VERSION};
 
 pub const WORKSITE_PACKET_TYPE: u8 = 11;
+pub const WORKSITE_STATUS_PACKET_TYPE: u8 = 12;
 const INTERACTION_RADIUS: i32 = 10;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -98,6 +99,24 @@ impl WorksiteAuthority {
 
     pub fn active_flags(&self) -> [bool; WORKSITES.len()] {
         self.active
+    }
+
+    /// Dedicated 12-byte reliable, read-only v1 availability status.
+    /// Byte 8 is a five-bit active mask in immutable worksite-id order.
+    /// Clients must require monotonic revisions and zero reserved bits.
+    pub fn status_packet(&self) -> [u8; 12] {
+        let mask = self
+            .active
+            .iter()
+            .enumerate()
+            .fold(0_u8, |mask, (i, active)| mask | u8::from(*active) << i);
+        let mut frame = [0_u8; 12];
+        frame[0] = PROTOCOL_VERSION;
+        frame[1] = WORKSITE_STATUS_PACKET_TYPE;
+        frame[2] = 1; // immutable v1 status schema
+        frame[4..8].copy_from_slice(&self.revision.to_le_bytes());
+        frame[8] = mask;
+        frame
     }
 
     /// Atomic full-snapshot adoption from an approved authoritative server
@@ -225,6 +244,37 @@ mod tests {
         assert_eq!(&data[0..4], &[1, 11, 5, 0]);
         assert_eq!(&data[4..10], &[1, 5, 84, 1, 255, 0]);
         assert_eq!(&data[28..34], &[5, 2, 210, 0, 65, 0]);
+    }
+
+    #[test]
+    fn status_is_exact_read_only_revision_snapshot_and_rejects_stale_changes() {
+        let mut sites = WorksiteAuthority::default();
+        assert_eq!(
+            sites.status_packet(),
+            [1, 12, 1, 0, 1, 0, 0, 0, 31, 0, 0, 0]
+        );
+        let mut active = [true; 5];
+        active[0] = false;
+        active[3] = false;
+        sites
+            .adopt_server_manifest(ZoneId::Moonvale, 1, 2, active)
+            .unwrap();
+        assert_eq!(
+            sites.status_packet(),
+            [1, 12, 1, 0, 2, 0, 0, 0, 22, 0, 0, 0]
+        );
+        assert_eq!(
+            sites.adopt_server_manifest(ZoneId::Moonvale, 1, 1, [true; 5]),
+            Err(WorksiteRevisionError::StaleRevision)
+        );
+        assert_eq!(sites.status_packet()[8], 22);
+        sites
+            .adopt_server_manifest(ZoneId::Moonvale, 1, 3, [true; 5])
+            .unwrap();
+        assert_eq!(
+            sites.status_packet(),
+            [1, 12, 1, 0, 3, 0, 0, 0, 31, 0, 0, 0]
+        );
     }
 
     #[test]

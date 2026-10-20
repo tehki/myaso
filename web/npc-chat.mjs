@@ -11,6 +11,9 @@ export function createNpcChatPanel({ onSend, onFocus }) {
   description.textContent = "Staging characters · scripted dialogue · memories last this session only.";
   const roster = document.createElement("select");
   roster.setAttribute("aria-label", "Choose a nearby NPC");
+  const worksiteSummary = document.createElement("p");
+  worksiteSummary.className = "npc-pilot-worksites";
+  worksiteSummary.textContent = "Worksites: waiting for server status.";
   const supplies = document.createElement("p");
   supplies.className = "npc-pilot-supplies";
   supplies.textContent = "Settlement supplies: awaiting verified server report.";
@@ -28,11 +31,12 @@ export function createNpcChatPanel({ onSend, onFocus }) {
   submit.type = "submit";
   submit.textContent = "Speak";
   form.append(input, submit);
-  panel.append(heading, description, roster, supplies, history, form);
+  panel.append(heading, description, roster, supplies, worksiteSummary, history, form);
   document.querySelector(".arena-wrap")?.append(panel);
   let npcs = [];
   let obstacles = [];
   let worksites = [];
+  let lastWorksiteRevision = null;
   let lastStateTick = null;
   let lastSuppliesTick = null;
 
@@ -56,6 +60,8 @@ export function createNpcChatPanel({ onSend, onFocus }) {
     panel.hidden = !entries.length;
     obstacles = [];
     worksites = [];
+    lastWorksiteRevision = null;
+    worksiteSummary.textContent = "Worksites: waiting for server status.";
     lastStateTick = null;
     lastSuppliesTick = null;
     supplies.textContent = "Settlement supplies: awaiting verified server report.";
@@ -122,7 +128,23 @@ export function createNpcChatPanel({ onSend, onFocus }) {
     get obstacles() { return obstacles; },
     setObstacles(value) { obstacles = value; },
     get worksites() { return worksites; },
-    setWorksites(value) { worksites = value; },
+    setWorksites(value) {
+      worksites = value;
+      lastWorksiteRevision = null;
+      worksiteSummary.textContent = "Worksites: waiting for server status.";
+    },
+    updateWorksiteStatus({ revision, active }) {
+      if (panel.hidden || worksites.length !== 5 || active.length !== 5
+          || (lastWorksiteRevision !== null && revision <= lastWorksiteRevision)) return;
+      // Render from server status only. Never infer whether a world prop
+      // can be used from its static label or its client canvas position.
+      worksites = worksites.map((site, i) => ({ ...site, active: active[i] }));
+      lastWorksiteRevision = revision;
+      const available = active.filter(Boolean).length;
+      worksiteSummary.textContent =
+        `Server worksites · ${available}/5 available · revision ${revision}`
+        + (available < 5 ? ` · Closed: ${worksites.filter(s => !s.active).map(s => s.name).join(", ")}` : "");
+    },
     setRoster,
     updateState,
     updateSupplies,

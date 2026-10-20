@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { NETWORK } from "../src/network/constants.mjs";
-import { encodeNpcRequest, decodeNpcRoster, decodeNpcResponse, decodeNpcState, decodeNpcSupplies, decodeNpcObstacles, decodeNpcWorksites } from "../src/network/npc-chat-codec.mjs";
+import { encodeNpcRequest, decodeNpcRoster, decodeNpcResponse, decodeNpcState, decodeNpcSupplies, decodeNpcObstacles, decodeNpcWorksites, decodeNpcWorksiteStatus } from "../src/network/npc-chat-codec.mjs";
 import { encodeInputPacket, decodeInputPacket, inputPacketBytes } from "../src/network/input-codec.mjs";
 import { SpatialInterestGrid } from "../src/network/interest-grid.mjs";
 import { InputIngressWindow } from "../src/network/input-ingress.mjs";
@@ -670,4 +670,20 @@ test("NPC pilot resource sites use exact immutable server site identities", () =
   assert.throws(() => decodeNpcWorksites(Uint8Array.from(packet, (b,i) => i === 4 ? 2 : b)), /worksite registry/);
   assert.throws(() => decodeNpcWorksites(Uint8Array.from(packet, (b,i) => i === 29 ? 3 : b)), /worksite registry/);
   assert.throws(() => decodeNpcWorksites(Uint8Array.from(packet, (b,i) => i === 8 ? 0 : b)), /worksite registry/);
+});
+
+test("revisioned NPC worksite availability snapshots reject malformed masks and replayable revisions", () => {
+  const baseline = Uint8Array.from([1,12,1,0,1,0,0,0,31,0,0,0]);
+  const all = decodeNpcWorksiteStatus(baseline);
+  assert.equal(all.revision, 1);
+  assert.deepEqual(all.active, [true,true,true,true,true]);
+  assert.ok(Object.isFrozen(all.active));
+  const changed = decodeNpcWorksiteStatus(Uint8Array.from([1,12,1,0,2,0,0,0,22,0,0,0]));
+  assert.equal(changed.revision, 2);
+  assert.deepEqual(changed.active, [false,true,true,false,true]);
+  assert.throws(() => decodeNpcWorksiteStatus(baseline.subarray(0,11)), /status header/);
+  assert.throws(() => decodeNpcWorksiteStatus(Uint8Array.from(baseline,(b,i)=> i===8 ? 255 : b)), /status header/);
+  assert.throws(() => decodeNpcWorksiteStatus(Uint8Array.from(baseline,(b,i)=> i===9 ? 1 : b)), /status header/);
+  assert.throws(() => decodeNpcWorksiteStatus(Uint8Array.from(baseline,(b,i)=> i===2 ? 2 : b)), /status header/);
+  assert.throws(() => decodeNpcWorksiteStatus(Uint8Array.from(baseline,(b,i)=> i===4 ? 0 : b)), /status revision/);
 });

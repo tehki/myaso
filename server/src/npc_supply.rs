@@ -155,6 +155,10 @@ impl NpcSupplyWorld {
         self.sites.revision()
     }
 
+    pub fn worksite_status_packet(&self) -> [u8; 12] {
+        self.sites.status_packet()
+    }
+
     /// Finite, need-driven assignment with deterministic profession ownership.
     /// Inventory already in transit is reserved against demand to prevent
     /// over-collection; delivery of carried goods always takes precedence.
