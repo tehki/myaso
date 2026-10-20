@@ -33,6 +33,13 @@ Status: **domain foundation only — NOT live-game enabled**. Approved design di
 - These are **domain-level APIs only**, not durable storage or the realtime replication wire format; they must not be invoked using client-provided actor positions, character identities or zone IDs.
 - The domain is **not** connected to transport, live simulation events, renderer or storage. No new dependencies or changes to authoritative melee, snapshots, game controls, certificates, production data or deployed code.
 
+## Earned Magic Alpha progression (isolated)
+
+- The new [Magic domain](../server/src/magic.rs) stores runes, taught spells and unlocked mana per trusted CharacterId, outside physical full-loot inventories. At spawn all are empty; the first earned rune awakens mana. Fire and the first Ember spell require separate lessons.
+- NPC teacher, quest and rare-discovery lesson awards use globally unique nonzero server-minted receipt IDs. Duplicate receipts, duplicate learned runes and spell lessons without prerequisite runes are rejected. The caller must still verify the teacher, quest, character and reward; there is no player-facing grant command.
+- Read-only Ember preparation verifies the exact authenticated session lease, learned Fire rune and Ember spell, equipped lootable Spellbook, Sulfur Ash reagent and mana. It costs 15 mana and one Sulfur Ash if eventually cast, but the preview consumes nothing and produces no effects.
+- Tests cover no-free-magic spawn, rewards, replayed receipts, casting prerequisites and rune/spell knowledge surviving full-loot death when the spellbook is taken. The knowledge ledger is **in memory only** and must be persisted transactionally with items before activating NPC lessons or spells. No live Magic integration, projectiles or combat changes.
+
 ## Magic follows the item foundation
 
 1. Server validates reward and records rune knowledge independent of inventory.
