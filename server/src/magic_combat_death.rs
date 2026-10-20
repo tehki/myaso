@@ -179,7 +179,12 @@ pub fn commit_world_death_loot(
         .world
         .fighter(victim)
         .ok_or(CombatDeathCheckpointError::MissingWorldFighter)?;
-    if !tick.world.now_ms.is_finite() || tick.world.now_ms < 0.0 {
+    // An out-of-range f32 otherwise saturates when cast to u64 and can
+    // produce effectively immortal corpse/ground expiry timestamps.
+    if !tick.world.now_ms.is_finite()
+        || tick.world.now_ms < 0.0
+        || tick.world.now_ms >= u64::MAX as f32
+    {
         return Err(CombatDeathCheckpointError::InvalidWorldTime);
     }
     commit_combat_death_loot(
@@ -343,6 +348,55 @@ mod tests {
             Err(CombatDeathCheckpointError::DuplicateDeathEvent)
         ));
         assert_eq!(state.loot.corpses().len(), 0);
+        assert_eq!(state.magic.pending_ember_intents().count(), 2);
+        assert!(!checkpoint.exists());
+    }
+
+    #[test]
+    fn world_tick_adapter_rejects_overflowing_world_time_before_loot_changes() {
+        let mut state = Fixture::new();
+        let checkpoint = path();
+        let mut world = World::new(800.0, 600.0);
+        world.add_player_at(1, 200.0, 200.0, 0.0);
+        let death = [Fixture::death_event()];
+        let lease = SessionLease::new(1, 1).unwrap();
+        for invalid_time in [u64::MAX as f32, f32::MAX] {
+            world.now_ms = invalid_time;
+            assert!(matches!(
+                commit_world_death_loot(
+                    &checkpoint,
+                    &mut state.loot,
+                    &mut state.magic,
+                    &state.identity,
+                    WorldDeathTick {
+                        lease,
+                        world: &world,
+                        completed_tick: world.tick,
+                        combat_events: &death,
+                        zones: &state.zones,
+                    },
+                ),
+                Err(CombatDeathCheckpointError::InvalidWorldTime)
+            ));
+        }
+        world.now_ms = 1_000.0;
+        assert!(matches!(
+            commit_world_death_loot(
+                &checkpoint,
+                &mut state.loot,
+                &mut state.magic,
+                &state.identity,
+                WorldDeathTick {
+                    lease,
+                    world: &world,
+                    completed_tick: world.tick,
+                    combat_events: &death,
+                    zones: &state.zones,
+                },
+            ),
+            Err(CombatDeathCheckpointError::NotDead)
+        ));
+        assert!(state.loot.corpses().is_empty());
         assert_eq!(state.magic.pending_ember_intents().count(), 2);
         assert!(!checkpoint.exists());
     }
