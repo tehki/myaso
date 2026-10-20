@@ -29,7 +29,7 @@ test("M239 M36 records authentic cross-browser epoch timestamps, never invents t
   const b=src.indexOf("\nasync function ",a+30);
   assert.ok(a>=0 && b>a);
   const observer=src.slice(a,b);
-  assert.ok(observer.includes("const epochEvidence = ['uidodge',"));
+  assert.match(observer, /const epochEvidence = \[[^\]]*[\'"]uidodge[\'"][^\]]*\]\.includes\(new URLSearchParams\(location\.search\)\.get\(\'scenario\'\)\)/);
   assert.ok(observer.includes("if (epochEvidence) entry.epochMs = Date.now();"));
   assert.ok(observer.includes("state.pointers.push(entry);"));
   assert.ok(observer.includes("state.wheels.push(entry);"));
