@@ -1,0 +1,15 @@
+{
+  "bodyPresentation": "adult-feminine",
+  "clip": "idle",
+  "directions": 8,
+  "framesPerDirection": 4,
+  "sourceFramePx": 160,
+  "atlasWidth": 640,
+  "atlasHeight": 1280,
+  "bytes": 43134,
+  "sha256": "d0112058a5a1a85b688854f1c1bf6e6f4f37edca682971c4f353e6067dcf8e15",
+  "hasTransparency": true,
+  "renderOnly": true,
+  "sourceOriginal": true,
+  "activatedInGame": false
+}

@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="icon" href="data:,"><title>Graphics 3A — Adult base-body A0 review</title>
+<style>
+:root{color-scheme:dark}body{font:15px/1.5 system-ui,sans-serif;background:#171d20;color:#e9e1d2;margin:0;padding:22px}
+main{max-width:1000px;margin:auto}h1{font:700 27px Georgia,serif}
+fieldset{display:flex;gap:20px;flex-wrap:wrap;border:1px solid #53666b;padding:15px}
+canvas{display:block;max-width:100%;background:#344047;border:1px solid #6a7a80;margin:16px auto}
+select{padding:8px;background:#35474c;color:white}p{color:#c8d0ce}.note{font-size:13px}
+</style></head><body><main>
+<h1>myaso.io — Adult character source A0</h1>
+<p>Original Blender 4.5 adult-body form studies, unarmed and unequipped. Eight directional RGBA idle atlases. Not a production renderer, not multiplayer, and not final anatomical realism.</p>
+<fieldset><label>Body presentation <select id="body"><option value="adult-masculine">Adult masculine</option><option value="adult-feminine">Adult feminine</option></select></label>
+<label>Facing <select id="direction"><option value="0">South</option><option value="1">Southwest</option><option value="2">West</option><option value="3">Northwest</option><option value="4">North</option><option value="5">Northeast</option><option value="6">East</option><option value="7">Southeast</option></select></label>
+<span id="ready">Loading source-rendered atlases…</span></fieldset>
+<canvas id="stage" width="960" height="520" aria-label="Both source-rendered adult character styles on a ground reference"></canvas>
+<p class="note">Art only: each source atlas tile is 160×160, displayed at the approved 96×96 idle destination. Bare bodies have no equipment. An optional privacy overlay is a separate future presentation layer; this preview does not grant items or simulate equipment ownership.</p>
+</main><script type="module">
+import {createUnequippedAdultAppearance,planAdultCharacterLayers} from "../src/browser/character-appearance.mjs";
+const body=document.querySelector("#body"),direction=document.querySelector("#direction"),status=document.querySelector("#ready");
+const canvas=document.querySelector("#stage"),ctx=canvas.getContext("2d");
+const images={};const errors=[];let loaded=0,frame=0,currentDirection=0;
+for(const name of ["adult-masculine","adult-feminine"]){
+ const img=new Image();images[name]=img;
+ img.onload=()=>{if(img.naturalWidth!==640||img.naturalHeight!==1280){errors.push(name+": invalid atlas size");return;}loaded++;status.textContent=loaded===2?"2 original adult atlases loaded":loaded+"/2 atlases";};
+ img.onerror=()=>errors.push(name+": image load failed");
+ img.src="./assets/adults/"+name+"_idle.webp";
+}
+function draw(now){
+ const selected=body.value;
+ const plan=planAdultCharacterLayers(createUnequippedAdultAppearance(selected));
+ if(!plan.supported||plan.layers.length!==1)errors.push("unexpected nonempty equipment");
+ currentDirection=Number(direction.value);frame=Math.floor(now/260)%4;
+ ctx.fillStyle="#2a383f";ctx.fillRect(0,0,canvas.width,canvas.height);
+ ctx.fillStyle="#485257";ctx.fillRect(0,398,canvas.width,122);
+ ctx.fillStyle="#817468";ctx.fillRect(0,397,canvas.width,3);
+ const sites=[{name:"adult-masculine",x:330},{name:"adult-feminine",x:630}];
+ for(const site of sites){
+  ctx.save();ctx.translate(site.x,398);
+  ctx.fillStyle="rgba(0,0,0,.4)";ctx.beginPath();ctx.ellipse(0,7,20,8,0,0,Math.PI*2);ctx.fill();
+  const img=images[site.name];if(img.complete&&img.naturalWidth===640){
+    ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality="high";
+    ctx.drawImage(img,frame*160,currentDirection*160,160,160,-48,-62.4,96,96);
+  }
+  ctx.restore();
+  ctx.fillStyle="#f5ebd8";ctx.font="16px sans-serif";
+  ctx.textAlign="center";ctx.fillText(site.name,site.x,456);
+ }
+ requestAnimationFrame(draw);
+}
+requestAnimationFrame(draw);
+window.__ADULT_A0_PREVIEW__=()=>{
+ const selected=body.value,plan=planAdultCharacterLayers(createUnequippedAdultAppearance(selected));
+ return {loaded,errors:[...new Set(errors)],direction:currentDirection,frame,selected,
+  equipment:plan.layers.map(x=>x.kind),drawSize:[96,96],sourceSize:[160,160],
+  atlasSize:[640,1280],authoritativeChanges:false,productionActivated:false};
+};
+</script></body></html>
