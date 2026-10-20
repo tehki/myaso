@@ -1,0 +1,28 @@
+/* U5: respect the OS preference, while preserving brief impact information.
+   Existing game logic removes data-combat-feedback after ~320-420ms.
+   This override changes only visuals, never combat event timing or input. */
+@media (prefers-reduced-motion: reduce) {
+  .meter i {
+    transition: none;
+  }
+  .arena-stage[data-combat-feedback]::after {
+    animation: none;
+    opacity: 1;
+    box-shadow: inset 0 0 0 3px var(--reduced-impact-color, rgba(211, 195, 157, .8));
+  }
+  .arena-stage[data-combat-feedback="hit-confirm"]::after,
+  .arena-stage[data-combat-feedback="parry-success"]::after,
+  .arena-stage[data-combat-feedback="dodge-success"]::after,
+  .arena-stage[data-combat-feedback="block-confirm"]::after,
+  .arena-stage[data-combat-feedback="guard-break-confirm"]::after,
+  .arena-stage[data-combat-feedback="kick-confirm"]::after {
+    --reduced-impact-color: rgba(157, 200, 153, .9);
+  }
+  .arena-stage[data-combat-feedback="damage-taken"]::after,
+  .arena-stage[data-combat-feedback="guard-broken"]::after,
+  .arena-stage[data-combat-feedback="shoved"]::after,
+  .arena-stage[data-combat-feedback="rolled-over"]::after,
+  .arena-stage[data-combat-feedback="stamina-denied"]::after {
+    --reduced-impact-color: rgba(224, 137, 120, .92);
+  }
+}
