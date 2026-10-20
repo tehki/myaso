@@ -1,0 +1,64 @@
+name: Core C3g atomic item + world PostgreSQL acceptance
+
+on:
+  pull_request:
+    paths:
+      - "server/sql/003_atomic_item_world_mutations.sql"
+      - "scripts/verify_atomic_item_world_pg.py"
+      - ".github/workflows/core-c3g-item-world.yml"
+  push:
+    branches: [main]
+    paths:
+      - "server/sql/003_atomic_item_world_mutations.sql"
+      - "scripts/verify_atomic_item_world_pg.py"
+      - ".github/workflows/core-c3g-item-world.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  atomic-item-world:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: myaso_c3g_test
+          POSTGRES_PASSWORD: ephemeral-test-only
+          POSTGRES_DB: myaso_c3g_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U myaso_c3g_test -d myaso_c3g_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    env:
+      PGHOST: 127.0.0.1
+      PGPORT: "5432"
+      PGUSER: myaso_c3g_test
+      PGPASSWORD: ephemeral-test-only
+      PGDATABASE: myaso_c3g_test
+      MYASO_C3G_TEST_ONLY: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: PostgreSQL client
+        run: |
+          if ! command -v psql >/dev/null 2>&1; then
+            sudo apt-get update -qq
+            sudo apt-get install -y postgresql-client
+          fi
+          psql --version
+      - name: Validate Python test harness
+        run: python -m py_compile scripts/verify_atomic_item_world_pg.py
+      - name: Install C4c, C4d and atomic item/world schemas
+        run: |
+          psql -X -v ON_ERROR_STOP=1 -f server/sql/001_zone_authority_postgres.sql
+          psql -X -v ON_ERROR_STOP=1 -f server/sql/002_fenced_world_mutations.sql
+          psql -X -v ON_ERROR_STOP=1 -f server/sql/003_atomic_item_world_mutations.sql
+      - name: Prove atomic item world state receipts outbox and crash recovery
+        run: python scripts/verify_atomic_item_world_pg.py
