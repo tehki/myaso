@@ -15,9 +15,9 @@ A newly created character is an **adult** man or woman and begins visibly unclot
 ## Pure JavaScript presentation contract
 
 `src/browser/character-appearance.mjs` exports:
-- `createUnequippedAdultAppearance(bodyPresentation)`: immutable, schema-v1 snapshot with **Body**, **OffHand** and **MainHand** empty.
+- `createUnequippedAdultAppearance(bodyPresentation)`: immutable, schema-v1 snapshot with **Body**, **Feet**, **Head**, **OffHand** and **MainHand** empty.
 - `planAdultCharacterLayers(appearance, {concealUnclothedBody})`: deterministic symbolic base-body / optional privacy cover / equipped items in draw order. This is **not a canvas renderer, asset loader or network protocol**.
-- Only validated `LeatherArmor → body`, `Spellbook → offHand`, `RustySword → mainHand` art keys are mapped. The mapping matches the current *nonactivated* Rust `EquipmentSlot` and `ItemKind` from Magic & Items [#354](https://github.com/tehki/myaso/pull/354); no unsupported item should silently render as naked. New garment slots need explicit approval with Magic/Core, not cosmetic invention.
+- The current draft mapping covers **five** physical server equipment slots introduced by Magic & Items [#424](https://github.com/tehki/myaso/pull/424), which is stacked on [#354](https://github.com/tehki/myaso/pull/354): `Body`, `Feet`, `Head`, `OffHand`, `MainHand`. All nine equippable physical `ItemKind` values in #424 are mapped explicitly. This is a preview dependency on a **draft domain change**, not a claim those kinds have landed in `main` or are live. No unsupported item should silently render as naked. Additional garment slots need explicit agreement with Magic/Core, not cosmetic invention.
 
 ### Draw/render safety
 The `supported` flag means the symbolic presentation request is *schema-valid*, **not** that the actual atlases exist or are loaded. A future renderer must check all asset readiness before selecting this presentation. Any invalid schema, unknown equipment kind, wrong slot, missing canonical slot or missing atlas falls back to existing known-good fighter rendering rather than suppressing gear or presenting unsupported clothing as nudity.
@@ -34,6 +34,22 @@ Never derive visible authoritative inventory from client-provided item names, lo
 
 ## Tests
 
-Run `node --test tests/character-appearance.test.mjs` locally. The new test is import-only and does not change any existing game runtime or strict browser acceptance.
+Run `node --test tests/character-appearance.test.mjs` locally. Dedicated pull-request GitHub workflow `graphics-adult-character-contract.yml` also runs Node syntax and these tests, independently of protected full quality. The new test is import-only and does not change any existing game runtime or strict browser acceptance.
 
-**No live feature is enabled by this change.** Real adult base-body assets and equipment renderer remain outstanding. This is a compatibility foundation, not a declaration that playable nude characters are already in production.
+**No live feature is enabled by this change.** Real adult base-body assets and equipment renderer remain outstanding. New slots are intentionally incorporated ahead of the Magic #424 stack to prevent 3A creating an obsolete 3-slot atlas specification. This is a compatibility foundation, not a declaration that playable nude characters are already in production.
+
+### Staged equipment art catalog (Magic #424)
+
+| Server item kind | Physical slot | Symbolic asset key |
+| --- | --- | --- |
+| LeatherArmor | Body | `equipment/leather-armor` |
+| ChainmailArmor | Body | `equipment/chainmail-armor` |
+| LeatherBoots | Feet | `equipment/leather-boots` |
+| IronHelmet | Head | `equipment/iron-helmet` |
+| Spellbook | OffHand | `equipment/spellbook` |
+| WoodenShield | OffHand | `equipment/wooden-shield` |
+| RustySword | MainHand | `equipment/rusty-sword` |
+| IronSword | MainHand | `equipment/iron-sword` |
+| WoodenClub | MainHand | `equipment/wooden-club` |
+
+**These are asset-name specifications, not images already checked into the repo.** Layer order is a deterministic data ordering for preview only. 3A must resolve directional occlusion (for example which hand/shield goes behind the torso in northeast vs southwest) before creating a final art compositor. A missing required WebP should trigger safe legacy rendering rather than be drawn invisibly. Additional source requirements, rigging, character state transitions and responsible departments are in [#421](https://github.com/tehki/myaso/issues/421).
