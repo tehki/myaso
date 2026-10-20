@@ -28,18 +28,16 @@ function circleTouchesWalls(city, x, y, radius) {
   const top = city.y, bottom = top + city.h;
   const t = WALL_HALF_THICKNESS;
   const gX = GREYHAVEN_GATE_X, gY = GREYHAVEN_GATE_Y;
-  return [
-    // Top/bottom have wide central gates.
-    [left - t, top - t, gX - GATE_X_HALF_WIDTH, top + t],
-    [gX + GATE_X_HALF_WIDTH, top - t, right + t, top + t],
-    [left - t, bottom - t, gX - GATE_X_HALF_WIDTH, bottom + t],
-    [gX + GATE_X_HALF_WIDTH, bottom - t, right + t, bottom + t],
-    // Left/right gates align with the west/east King's Road.
-    [left - t, top - t, left + t, gY - GATE_Y_HALF_HEIGHT],
-    [left - t, gY + GATE_Y_HALF_HEIGHT, left + t, bottom + t],
-    [right - t, top - t, right + t, gY - GATE_Y_HALF_HEIGHT],
-    [right - t, gY + GATE_Y_HALF_HEIGHT, right + t, bottom + t],
-  ].some(rect => circleTouchesRect(x, y, radius, ...rect));
+  // Eight fixed wall spans with two explicit roadway gates. Avoid temporary
+  // rectangle arrays in the per-frame movement hot path.
+  return circleTouchesRect(x,y,radius,left-t,top-t,gX-GATE_X_HALF_WIDTH,top+t)
+    || circleTouchesRect(x,y,radius,gX+GATE_X_HALF_WIDTH,top-t,right+t,top+t)
+    || circleTouchesRect(x,y,radius,left-t,bottom-t,gX-GATE_X_HALF_WIDTH,bottom+t)
+    || circleTouchesRect(x,y,radius,gX+GATE_X_HALF_WIDTH,bottom-t,right+t,bottom+t)
+    || circleTouchesRect(x,y,radius,left-t,top-t,left+t,gY-GATE_Y_HALF_HEIGHT)
+    || circleTouchesRect(x,y,radius,left-t,gY+GATE_Y_HALF_HEIGHT,left+t,bottom+t)
+    || circleTouchesRect(x,y,radius,right-t,top-t,right+t,gY-GATE_Y_HALF_HEIGHT)
+    || circleTouchesRect(x,y,radius,right-t,gY+GATE_Y_HALF_HEIGHT,right+t,bottom+t);
 }
 
 function distSquaredToSegment(x, y, ax, ay, bx, by) {
@@ -52,15 +50,16 @@ function distSquaredToSegment(x, y, ax, ay, bx, by) {
 }
 
 function insideBridgeLane(bridges, x, y, radius) {
-  return bridges.some(bridge => {
-    // The bridge is a walkable dry strip; its approach extends slightly
-    // beyond the rendered deck so the river bank cannot create a dead gap.
+  // Avoid an allocated closure for every swept substep.
+  for (const bridge of bridges) {
+    // Deck is a dry strip, extended into the riverbanks to avoid a dead gap.
     const halfClearHeight = bridge.h / 2 - radius;
-    return halfClearHeight > 0
+    if (halfClearHeight > 0
       && Math.abs(y - bridge.y) <= halfClearHeight
       && x >= bridge.x - bridge.w / 2 - 3 * radius
-      && x <= bridge.x + bridge.w / 2 + 3 * radius;
-  });
+      && x <= bridge.x + bridge.w / 2 + 3 * radius) return true;
+  }
+  return false;
 }
 
 function inUnbridgedRiver(map, x, y, radius) {
