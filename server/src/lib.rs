@@ -163,6 +163,8 @@ pub enum DecodeError {
     UnsupportedProtocol(u8),
     WrongPacketType(u8),
     InvalidSampleCount(u8),
+    NonZeroReservedHeader(u8),
+    InvalidMovementAxis { sample_index: usize },
     InvalidLength { expected: usize, actual: usize },
 }
 
@@ -181,6 +183,9 @@ pub fn decode_input_packet(bytes: &[u8]) -> Result<InputPacket, DecodeError> {
     if !(1..=INPUT_REDUNDANCY_MAX).contains(&sample_count) {
         return Err(DecodeError::InvalidSampleCount(bytes[2]));
     }
+    if bytes[3] != 0 {
+        return Err(DecodeError::NonZeroReservedHeader(bytes[3]));
+    }
 
     let expected = INPUT_HEADER_BYTES + sample_count * INPUT_SAMPLE_BYTES;
     if bytes.len() != expected {
@@ -197,10 +202,17 @@ pub fn decode_input_packet(bytes: &[u8]) -> Result<InputPacket, DecodeError> {
 
     let mut samples = [EMPTY_INPUT_SAMPLE; INPUT_REDUNDANCY_MAX];
     let mut offset = INPUT_HEADER_BYTES;
-    for sample in samples.iter_mut().take(sample_count) {
+    for (sample_index, sample) in samples.iter_mut().take(sample_count).enumerate() {
         let tick_delta = bytes[offset] as u32;
-        let move_x = (bytes[offset + 1] as i8) as f32 / 127.0;
-        let move_y = (bytes[offset + 2] as i8) as f32 / 127.0;
+        let axis_x = bytes[offset + 1] as i8;
+        let axis_y = bytes[offset + 2] as i8;
+        // The v1 client encoder only emits [-127, 127]. The -128 code
+        // represents a movement magnitude beyond the negotiated range.
+        if axis_x == i8::MIN || axis_y == i8::MIN {
+            return Err(DecodeError::InvalidMovementAxis { sample_index });
+        }
+        let move_x = axis_x as f32 / 127.0;
+        let move_y = axis_y as f32 / 127.0;
         let facing_wire = u16::from_le_bytes([bytes[offset + 3], bytes[offset + 4]]);
         let buttons = bytes[offset + 5];
         *sample = InputSample {
