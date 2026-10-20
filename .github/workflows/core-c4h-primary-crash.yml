@@ -45,7 +45,6 @@ jobs:
       PGPASSWORD: ephemeral-test-only
       PGDATABASE: myaso_c4h_test
       MYASO_C4H_TEST_ONLY: "1"
-      C4H_TEST_POSTGRES_CONTAINER: ${{ job.services.postgres.id }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -66,4 +65,6 @@ jobs:
           psql -X -v ON_ERROR_STOP=1 -f server/sql/002_fenced_world_mutations.sql
           psql -X -v ON_ERROR_STOP=1 -f server/sql/003_nonzero_authority_ids.sql
       - name: Prove exact ephemeral primary crash restart fencing
+        env:
+          C4H_TEST_POSTGRES_CONTAINER: ${{ job.services.postgres.id }}
         run: python scripts/verify_zone_primary_crash.py
