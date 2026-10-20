@@ -181,26 +181,40 @@ export async function openLocalChat(gameConnection, {
       try { writer.releaseLock(); } catch { /* already released */ }
     }
   }
-  let pending = new Uint8Array(0);
+  // A WebTransport read is free to coalesce many *complete* frames into
+  // one chunk. Only buffer the single partial frame being decoded: rejecting
+  // a large but valid chunk, or allocating it wholesale, is unnecessary.
+  const pending = new Uint8Array(CHAT.maxFrameBytes + 2);
+  let buffered = 0;
   const reading = (async () => {
     try {
       while (!closed) {
         const { done, value } = await reader.read();
         if (done) break;
         const chunk = checkedBytes(value);
-        if (pending.length + chunk.length > 4096) throw new RangeError("chat receive buffer overflow");
-        const next = new Uint8Array(pending.length + chunk.length);
-        next.set(pending);
-        next.set(chunk, pending.length);
-        pending = next;
-        while (pending.length >= 2) {
+        let offset = 0;
+        while (offset < chunk.length) {
+          if (buffered < 2) {
+            const take = Math.min(2 - buffered, chunk.length - offset);
+            pending.set(chunk.subarray(offset, offset + take), buffered);
+            buffered += take;
+            offset += take;
+            if (buffered < 2) continue;
+          }
           const length = pending[0] | (pending[1] << 8);
-          if (length < 9 || length > CHAT.maxFrameBytes) throw new RangeError("chat frame length invalid");
-          if (pending.length < length + 2) break;
-          const event = decodeChatServerFrame(pending.slice(2, length + 2));
-          pending = pending.slice(length + 2);
-          if (event.kind === "result") onResult?.(event);
-          else onReceived?.(event);
+          if (length < 9 || length > CHAT.maxFrameBytes) {
+            throw new RangeError("chat frame length invalid");
+          }
+          const take = Math.min(length + 2 - buffered, chunk.length - offset);
+          pending.set(chunk.subarray(offset, offset + take), buffered);
+          buffered += take;
+          offset += take;
+          if (buffered === length + 2) {
+            const event = decodeChatServerFrame(pending.slice(2, buffered));
+            buffered = 0;
+            if (event.kind === "result") onResult?.(event);
+            else onReceived?.(event);
+          }
         }
       }
     } finally {
