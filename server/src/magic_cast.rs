@@ -3,7 +3,6 @@
 //! Requires a single world lock over combat, identity, loot and magic state.
 //! On post-rename fsync errors, the disk/memory result is indeterminate until
 //! reconciled; production must add a durable journal and effect coordination.
-use std::path::Path;
 use crate::character_identity::{CharacterId, SessionIdentityRegistry};
 use crate::loot::{LootAuthority, LootError};
 use crate::loot_persistence::{atomic_write, CheckpointError};
@@ -12,6 +11,7 @@ use crate::magic::{MagicAuthority, MagicError, Spell};
 use crate::magic_checkpoint::{bundle, JointCheckpointError};
 use crate::simulation::{Action, Fighter};
 use crate::zone::{ZoneAuthority, ZoneId};
+use std::path::Path;
 
 #[derive(Debug)]
 pub enum CastError {
@@ -69,10 +69,9 @@ pub fn commit_ember_cost(
     {
         return Err(CastError::InvalidPosition);
     }
-    let mut staged_loot = LootAuthority::restore_state(
-        loot.export_state().map_err(CastError::Loot)?,
-    )
-    .map_err(CastError::Loot)?;
+    let mut staged_loot =
+        LootAuthority::restore_state(loot.export_state().map_err(CastError::Loot)?)
+            .map_err(CastError::Loot)?;
     let mut staged_magic = magic.clone();
     staged_loot
         .record_operation(character, op.sequence)
@@ -86,8 +85,7 @@ pub fn commit_ember_cost(
     staged_magic
         .spend_mana(character, plan.mana_cost)
         .map_err(CastError::Magic)?;
-    let bytes = bundle(&staged_loot, identity, &staged_magic)
-        .map_err(CastError::Checkpoint)?;
+    let bytes = bundle(&staged_loot, identity, &staged_magic).map_err(CastError::Checkpoint)?;
     atomic_write(path, &bytes).map_err(CastError::Io)?;
     *loot = staged_loot;
     *magic = staged_magic;
@@ -132,7 +130,13 @@ mod tests {
         world.fighter(1).unwrap().clone()
     }
 
-    fn setup() -> (LootAuthority, MagicAuthority, SessionIdentityRegistry, ZoneAuthority, CharacterId) {
+    fn setup() -> (
+        LootAuthority,
+        MagicAuthority,
+        SessionIdentityRegistry,
+        ZoneAuthority,
+        CharacterId,
+    ) {
         let mut loot = LootAuthority::new();
         let mut magic = MagicAuthority::new();
         let mut identity = SessionIdentityRegistry::new();
@@ -145,12 +149,14 @@ mod tests {
             (1, Lesson::Rune(Rune::Fire)),
             (2, Lesson::Spell(Spell::Ember)),
         ] {
-            magic.grant_lesson(LessonAward {
-                receipt: NonZeroU64::new(receipt).unwrap(),
-                character,
-                source: LessonSource::NpcTeacher,
-                lesson,
-            }).unwrap();
+            magic
+                .grant_lesson(LessonAward {
+                    receipt: NonZeroU64::new(receipt).unwrap(),
+                    character,
+                    source: LessonSource::NpcTeacher,
+                    lesson,
+                })
+                .unwrap();
         }
         (loot, magic, identity, zones, character)
     }
@@ -169,20 +175,44 @@ mod tests {
         let fighter = actor();
         for (sequence, expected) in [(10, 85), (11, 70)] {
             let receipt = commit_ember_cost(
-                &file, &mut loot, &mut magic, &identity, &zones, op(sequence), &fighter,
+                &file,
+                &mut loot,
+                &mut magic,
+                &identity,
+                &zones,
+                op(sequence),
+                &fighter,
             ).unwrap();
             assert_eq!(receipt.mana_spent, 15);
             assert_eq!(receipt.sulfur_ash_spent, 1);
             assert_eq!(magic.mana(character), expected);
         }
         assert!(matches!(
-            commit_ember_cost(&file, &mut loot, &mut magic, &identity, &zones, op(11), &fighter),
+            commit_ember_cost(
+                &file,
+                &mut loot,
+                &mut magic,
+                &identity,
+                &zones,
+                op(11),
+                &fighter,
+            ),
             Err(CastError::Loot(LootError::ReplayOperation))
         ));
         let (recovered_loot, recovered_magic) = load_joint(&file).unwrap();
         assert_eq!(recovered_magic.mana(character), 70);
-        assert_eq!(recovered_loot.committed_operation_sequence(character), Some(11));
-        assert_eq!(recovered_loot.parked_inventory(character).unwrap().backpack()[0].amount, 1);
+        assert_eq!(
+            recovered_loot.committed_operation_sequence(character),
+            Some(11)
+        );
+        assert_eq!(
+            recovered_loot
+                .parked_inventory(character)
+                .unwrap()
+                .backpack()[0]
+                .amount,
+            1
+        );
         assert_eq!(loot.inventory(1).unwrap().backpack()[0].amount, 1);
         let _ = fs::remove_file(&file);
     }
@@ -194,24 +224,64 @@ mod tests {
         let mut wrong = actor();
         wrong.net_id = 99;
         assert!(matches!(
-            commit_ember_cost(&file, &mut loot, &mut magic, &identity, &zones, op(1), &wrong),
+            commit_ember_cost(
+                &file,
+                &mut loot,
+                &mut magic,
+                &identity,
+                &zones,
+                op(1),
+                &wrong,
+            ),
             Err(CastError::WrongFighter)
         ));
         let mut dead = actor();
         dead.action = Action::Dead;
         assert!(matches!(
-            commit_ember_cost(&file, &mut loot, &mut magic, &identity, &zones, op(1), &dead),
+            commit_ember_cost(
+                &file,
+                &mut loot,
+                &mut magic,
+                &identity,
+                &zones,
+                op(1),
+                &dead,
+            ),
             Err(CastError::CombatLocked)
         ));
         assert!(matches!(
-            commit_ember_cost(&file, &mut loot, &mut magic, &identity, &zones, op(1), &actor()),
+            commit_ember_cost(
+                &file,
+                &mut loot,
+                &mut magic,
+                &identity,
+                &zones,
+                op(1),
+                &actor(),
+            ),
             Err(CastError::Magic(MagicError::MissingSpellbook))
         ));
         stock(&mut loot, 1);
-        commit_ember_cost(&file, &mut loot, &mut magic, &identity, &zones, op(1), &actor())
+        commit_ember_cost(
+            &file,
+            &mut loot,
+            &mut magic,
+            &identity,
+            &zones,
+            op(1),
+            &actor(),
+        )
             .unwrap();
         assert!(matches!(
-            commit_ember_cost(&file, &mut loot, &mut magic, &identity, &zones, op(2), &actor()),
+            commit_ember_cost(
+                &file,
+                &mut loot,
+                &mut magic,
+                &identity,
+                &zones,
+                op(2),
+                &actor(),
+            ),
             Err(CastError::Magic(MagicError::MissingReagent))
         ));
         assert_eq!(magic.mana(character), 85);
@@ -227,7 +297,13 @@ mod tests {
         let impossible = file.with_extension("no-parent").join("loot.bin");
         assert!(matches!(
             commit_ember_cost(
-                &impossible, &mut loot, &mut magic, &identity, &zones, op(1), &actor(),
+                &impossible,
+                &mut loot,
+                &mut magic,
+                &identity,
+                &zones,
+                op(1),
+                &actor(),
             ),
             Err(CastError::Io(CheckpointError::Io(_)))
         ));
