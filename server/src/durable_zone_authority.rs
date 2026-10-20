@@ -22,6 +22,51 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 
+// Rust's std File::try_lock is not stable until 1.89; the server's MSRV is
+// 1.88. Use a narrowly scoped POSIX advisory lock on supported Unix hosts.
+#[cfg(unix)]
+unsafe extern "C" {
+    fn flock(fd: std::os::raw::c_int, operation: std::os::raw::c_int) -> std::os::raw::c_int;
+}
+
+#[cfg(unix)]
+fn try_exclusive_os_lock(file: &File) -> io::Result<bool> {
+    use std::os::fd::AsRawFd;
+    // POSIX flock constants: exclusive=2, nonblocking=4. Linux local
+    // filesystems and cooperating processes are the only supported model.
+    // SAFETY: file owns a valid descriptor throughout this foreign call.
+    let result = unsafe { flock(file.as_raw_fd(), 2 | 4) };
+    if result == 0 {
+        Ok(true)
+    } else {
+        let error = io::Error::last_os_error();
+        if error.kind() == io::ErrorKind::WouldBlock {
+            Ok(false)
+        } else {
+            Err(error)
+        }
+    }
+}
+
+#[cfg(unix)]
+fn release_os_lock(file: &File) -> io::Result<()> {
+    use std::os::fd::AsRawFd;
+    // POSIX flock LOCK_UN=8. The file descriptor is still open here.
+    // SAFETY: file owns a valid descriptor throughout this foreign call.
+    let result = unsafe { flock(file.as_raw_fd(), 8) };
+    if result == 0 { Ok(()) } else { Err(io::Error::last_os_error()) }
+}
+
+#[cfg(not(unix))]
+fn try_exclusive_os_lock(_file: &File) -> io::Result<bool> {
+    Err(io::Error::new(io::ErrorKind::Unsupported, "local zone locks require Unix"))
+}
+
+#[cfg(not(unix))]
+fn release_os_lock(_file: &File) -> io::Result<()> {
+    Ok(())
+}
+
 const MAGIC: [u8; 4] = *b"MYZA";
 const VERSION: u8 = 1;
 const RECORD_BYTES: usize = 96;
@@ -330,7 +375,7 @@ impl Drop for DurableZoneAuthority {
     fn drop(&mut self) {
         // Release immediately on normal shutdown. The operating system also
         // releases this advisory lock when the owning process terminates.
-        let _ = self._writer_lock.unlock();
+        let _ = release_os_lock(&self._writer_lock);
     }
 }
 
@@ -346,12 +391,10 @@ impl DurableZoneAuthority {
             lock_options.mode(0o600);
         }
         let lock = lock_options.open(root.join(".zone-authority.lock"))?;
-        match lock.try_lock() {
-            Ok(()) => {}
-            Err(std::fs::TryLockError::WouldBlock) => {
-                return Err(DurableAuthorityError::Busy);
-            }
-            Err(e) => return Err(DurableAuthorityError::Io(e.into())),
+        match try_exclusive_os_lock(&lock) {
+            Ok(true) => {}
+            Ok(false) => return Err(DurableAuthorityError::Busy),
+            Err(error) => return Err(DurableAuthorityError::Io(error)),
         }
         let mut commits = Vec::new();
         for entry in fs::read_dir(&root)? {
