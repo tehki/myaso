@@ -352,7 +352,7 @@ mod tests {
     }
 
     #[test]
-    fn 1024_viewers_cannot_overflow_global_zone_or_viewer_fx_limits() {
+    fn thousand_viewers_cannot_overflow_global_zone_or_viewer_fx_limits() {
         let mut registry = TrustedFxHandoff::new();
         let mut batches = Vec::new();
         let mut writers = Vec::new();
