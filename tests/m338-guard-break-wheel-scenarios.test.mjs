@@ -3,9 +3,9 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 import { requiresM338GuardBreakWheelSocket } from "../scripts/m338-guard-break-wheel-scenarios.mjs";
 
-test("M338 M194, M151 and M152 all open genuine Firefox M325 wheel socket", () => {
+test("M339 M194, M151, M152 and M40 open genuine Firefox M325 wheel socket", () => {
   for (const scenario of [
-    "uiguardbreak", "uiguardbreakpunishffa", "uiguardbreakpunishffahit",
+    "uiguardbreak", "uiguardbreaktell", "uiguardbreakpunishffa", "uiguardbreakpunishffahit",
   ]) {
     assert.equal(requiresM338GuardBreakWheelSocket(scenario, "firefox"), true, scenario);
     for (const browser of ["chrome", "chrome2", "chrome3"]) {
@@ -43,4 +43,22 @@ test("M338 connects before guard-break W3C input and preserves genuine wheel pro
   assert.ok(flight.includes("postTrustedWheelMs: 45"));
   assert.ok(flight.includes("b.playerGuard < expectedGuards[index]") || flight.includes("defenderResult.playerGuard !== 0"));
   assert.ok(!observer.includes("dispatchEvent("));
+});
+
+test("M339 explicitly covers every scenario delegating to M34 guard-break flight", () => {
+  const runner = readFileSync(new URL("../scripts/pvp_browser_flight_runner.mjs", import.meta.url), "utf8");
+  const direct = runner.indexOf('} else if (scenario === "uiguardbreak") {');
+  const tell = runner.indexOf('} else if (scenario === "uiguardbreaktell") {');
+  const ffa = runner.indexOf('} else if (scenario === "uiguardbreakpunishffa") {');
+  const hit = runner.indexOf('} else if (scenario === "uiguardbreakpunishffahit") {');
+  assert.ok([direct, tell, ffa, hit].every((index) => index >= 0));
+  assert.ok(runner.slice(direct, direct + 150).includes("runOnlineUiGuardBreakFlight(sessions)"));
+  assert.ok(runner.slice(tell, tell + 160).includes("runOnlineUiGuardBreakTellFlight(sessions)"));
+  assert.ok(runner.includes("async function runOnlineUiGuardBreakTellFlight(entries) {\n  const evidence = await runOnlineUiGuardBreakFlight(entries);"));
+  assert.ok(runner.slice(ffa, ffa + 160).includes("runOnlineUiGuardBreakPunishFfaFocusFlight(sessions)"));
+  assert.ok(runner.slice(hit, hit + 165).includes("runOnlineUiGuardBreakPunishFfaFocusFlight(sessions, true)"));
+  for (const scenario of ["uiguardbreak", "uiguardbreaktell",
+    "uiguardbreakpunishffa", "uiguardbreakpunishffahit"]) {
+    assert.equal(requiresM338GuardBreakWheelSocket(scenario, "firefox"), true, scenario);
+  }
 });

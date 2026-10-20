@@ -12646,9 +12646,9 @@ async function installUiObserver(session) {
     const threatGuardArc = document.querySelector('#threat-guard-arc');
     if (!target || !arena || !arenaStage || !overlay || !recovery || !focusLabel || !threat || !threatCount || !threatSecondary || !threatSecondaryBearing || !threatSecondaryPhase || !threatSecondaryGuardArc || !threatBearing || !threatGuardArc) throw new Error('missing online UI flight target');
     const state = { events: [], eventTransitions: [], keys: [], keyTransitions: [], pointers: [], wheels: [], overlayTransitions: [], feedbackTransitions: [], recoveryTransitions: [], focusTransitions: [], threatTransitions: [], recoveryTellMaxPixels: 0, parryTellMaxPixels: 0, online: '', startedAt: performance.now() };
-    // M338: M151/M152 share the exact M194 guard-break wheel verifier.
+    // M338/M339: M151/M152 and M40 share the exact M194 guard-break wheel verifier.
     // Open the same real Firefox-only, localhost trusted-proof socket in all
-    // three scenarios. Parent FFA flights reinstall UI observers: reuse the
+    // four scenarios. Parent FFA flights reinstall UI observers: reuse the
     // existing OPEN/CONNECTING channel rather than leaking another socket.
     if (${requiresM338GuardBreakWheelSocket(scenario, session.name)}) {
       const prior = window.__MYASO_M325_WHEEL_CHANNEL__;
