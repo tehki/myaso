@@ -34,6 +34,12 @@ jobs:
       - name: Compile governance scripts
         run: python -m py_compile scripts/*.py
 
+      - name: Validate Graphics 3C Greyhaven environment materials
+        run: |
+          node --check src/browser/greyhaven-terrain-materials.mjs
+          node --check src/browser/authored-world-renderer.mjs
+          node --test tests/greyhaven-environment-3c.test.mjs tests/authored-world.test.mjs
+
       - name: Validate combat JavaScript
         run: |
           node --version

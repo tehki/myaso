@@ -1,6 +1,7 @@
 // Visual-only renderer for designer-authored fixed maps.
 // Loading an interior in the offline preview does not grant a network zone transfer.
 import { AUTHORED_MAPS, MAP_IDS, getAuthoredMap } from "../world/authored-maps.mjs";
+import { paintGreyhavenGroundDetails } from "./greyhaven-terrain-materials.mjs";
 
 export const WORLD_TILE_SIZE = 512;
 export const WORLD_CACHE_CAP = 24;
@@ -83,7 +84,7 @@ function paintCityWalls(ctx,city) {
   ctx.textAlign="center";ctx.fillText(city.name,x+w/2,y+120);
 }
 
-function paintOverworld(ctx,map) {
+function paintOverworld(ctx,map,tileBounds) {
   ctx.fillStyle="#627751";ctx.fillRect(0,0,map.width,map.height);
   // Authored agricultural plots, not generated terrain.
   for(const f of map.fields){
@@ -102,6 +103,8 @@ function paintOverworld(ctx,map) {
     strokePolyline(ctx,road.points,road.width,"#b7a17d");
     strokePolyline(ctx,road.points,road.width*.58,"#c4ae8c");
   }
+  // Static, bounded Graphics 3C material layer on the same cached Canvas tiles.
+  paintGreyhavenGroundDetails(ctx,map,tileBounds);
   for(const bridge of map.bridges){
     ctx.fillStyle="#766e5c";
     ctx.fillRect(bridge.x-bridge.w/2,bridge.y-bridge.h/2-5,bridge.w,bridge.h+10);
@@ -194,7 +197,8 @@ export function createAuthoredWorldRenderer({makeCanvas=()=>document.createEleme
     const c=texture.getContext("2d",{alpha:false});
     if(!c)throw new Error("2D world canvas unavailable");
     c.save();c.translate(-x*WORLD_TILE_SIZE,-y*WORLD_TILE_SIZE);
-    paintOverworld(c,map);c.restore();
+    paintOverworld(c,map,{x:x*WORLD_TILE_SIZE,y:y*WORLD_TILE_SIZE,
+      width:WORLD_TILE_SIZE,height:WORLD_TILE_SIZE});c.restore();
     return texture;
   }
   return {
