@@ -46,16 +46,23 @@ kbd{border-radius:4px;border:1px solid #677354;background:#303a2d;color:#fff2d2;
 #trail-rejoin{font-size:12px;margin-top:5px;color:#b9d5c0}
 #rejoin-map-key{font-size:12px;margin-top:6px;color:#99e6e7}
 #rejoin-map-key[hidden]{display:none}
+#lore-hud{color:#f0cd99;font-weight:600}
+.lore-panel{margin-top:11px;padding:13px 17px;border:1px solid #796748;border-radius:9px;background:#2d261c}
+.lore-panel summary{cursor:pointer;color:#f3d39c;font-weight:600}
+.lore-panel ol{margin:10px 0 0;padding-left:23px;display:grid;gap:6px}
+.lore-panel li{color:#eadcc7;line-height:1.45}
+.lore-panel li.unseen{color:#a89a85}
+#lore-notice{margin-bottom:8px;color:#f1cc91;font-weight:600}
 </style></head><body>
 <header><div><h1>⚔️ Moonvale — World & Buildings v1.0</h1>
 <div class="sub">A fixed medieval world, with a separate, deliberately larger tavern interior</div></div>
 <div>🌕⚡️🚀</div></header>
 <div class="shell"><canvas id="arena" width="1100" height="688"></canvas>
 <div class="hud"><span><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> move · <kbd>E</kbd> enter/exit · <kbd>F</kbd> inspect · mouse wheel zoom · <kbd>R</kbd> reset</span>
-<span id="place">Moonvale</span><span id="door"></span><span id="survey"></span></div>
+<span id="place">Moonvale</span><span id="door"></span><span id="survey"></span><span id="lore-hud"></span></div>
 <div class="notice">LOCAL DESIGN PREVIEW only: door transitions are simulated here to demonstrate map links.
 This preview locally collides with buildings, city walls, tavern furniture and rivers (cross at bridges).
-Press F at marked natural sites to write a session-only field note; no harvesting, items or currency.
+Press F at marked natural sites to write a session-only field note, or read lore at nearby inscriptions. Each press selects one nearest interaction; no harvesting, items or currency.
 Authoritative multiplayer collision and transfers are NOT enabled on the live server.
 The geography, town names, buildings and roads are fixed and identical for all players.</div>
 <section class="discovery-panel" aria-label="Explorer's journal">
@@ -67,6 +74,11 @@ The geography, town names, buildings and roads are fixed and identical for all p
 <div id="survey-notice" role="status" aria-live="polite" hidden></div>
 <details><summary>Field notebook · <span id="survey-progress">0 / 8 sites inspected</span></summary>
 <ol id="survey-journal"></ol></details>
+</section>
+<section class="lore-panel" aria-label="Roadside lore">
+<div id="lore-notice" role="status" aria-live="polite" hidden></div>
+<details><summary>Roadside chronicles · <span id="lore-progress">0 / 6 accounts read</span></summary>
+<ol id="lore-journal"></ol></details>
 </section>
 <section class="expedition-panel" aria-label="Explorer's expeditions">
 <h2>Explorer's expeditions</h2>
@@ -96,6 +108,8 @@ import { localWayfindingHint, drawLocalWayfindingSketch } from "../src/world/loc
 import { certifiedTrailForNext } from "../src/world/local-trails.mjs";
 import { localTrailPosition } from "../src/world/local-trail-progress.mjs";
 import { localSampledTrailRejoin } from "../src/world/local-rejoin.mjs";
+import { MOONVALE_ROADSIDE_LORE, createLocalLoreJournal, nearbyLocalLoreSite,
+  readLocalLore, localLoreProgress } from "../src/world/roadside-lore.mjs";
 import { drawLocalRejoinSketch } from "../src/world/local-rejoin-sketch.mjs";
 import { MOONVALE_FIELD_SITES, createLocalFieldNotebook, nearbyLocalFieldSite,
   observeLocalFieldSite, localFieldSurveyProgress } from "../src/world/field-survey.mjs";
@@ -110,6 +124,26 @@ let zoom=interiorQA ? 1 : .86;
 let last=performance.now(), cooldown=0;
 const place=document.querySelector("#place"),door=document.querySelector("#door");
 const survey=document.querySelector("#survey");
+const loreHud=document.querySelector("#lore-hud");
+const loreJournal=createLocalLoreJournal();
+const loreList=document.querySelector("#lore-journal");
+const loreProgress=document.querySelector("#lore-progress");
+const loreNotice=document.querySelector("#lore-notice");
+let loreNoticeUntil=0;
+function refreshLoreJournal(){
+  const fragment=document.createDocumentFragment();
+  for(const site of MOONVALE_ROADSIDE_LORE){
+    const read=loreJournal.has(site.id);
+    const li=document.createElement("li");
+    li.className=read?"read":"unseen";
+    li.textContent=read?site.name+" — "+site.passage:"Unrecorded — "+site.clue;
+    fragment.appendChild(li);
+  }
+  loreList.replaceChildren(fragment);
+  const progress=localLoreProgress(loreJournal);
+  loreProgress.textContent=progress.documented+" / "+progress.total+" accounts read";
+}
+refreshLoreJournal();
 const discoveryJournal=createLocalDiscoveryJournal();
 const discoveryList=document.querySelector("#discovery-journal");
 const discoveryProgress=document.querySelector("#discovery-progress");
@@ -251,13 +285,27 @@ document.addEventListener("keydown",e=>{
     refreshWayfinding(performance.now());
   }
   if(e.code==="KeyF"&&!e.repeat){
-    recordExpeditionMilestone(advanceLocalExpedition(expeditionState,mapId,player.x,player.y,"inspect"),performance.now());
-    const note=observeLocalFieldSite(fieldNotebook,mapId,player.x,player.y);
-    if(note){
-      refreshFieldNotebook();
-      surveyNotice.textContent="Field note: "+note.name+" — "+note.observation;
-      surveyNotice.hidden=false;
-      surveyNoticeUntil=performance.now()+5000;
+    const loreSite=nearbyLocalLoreSite(mapId,player.x,player.y);
+    const fieldSite=nearbyLocalFieldSite(mapId,player.x,player.y);
+    const loreDistance=loreSite?Math.hypot(loreSite.x-player.x,loreSite.y-player.y):Infinity;
+    const fieldDistance=fieldSite?Math.hypot(fieldSite.x-player.x,fieldSite.y-player.y):Infinity;
+    if(loreSite && loreDistance<fieldDistance){
+      const entry=readLocalLore(loreJournal,mapId,player.x,player.y);
+      if(entry){
+        refreshLoreJournal();
+        loreNotice.textContent="Chronicle read: "+entry.name+" — "+entry.passage;
+        loreNotice.hidden=false;
+        loreNoticeUntil=performance.now()+5500;
+      }
+    }else{
+      recordExpeditionMilestone(advanceLocalExpedition(expeditionState,mapId,player.x,player.y,"inspect"),performance.now());
+      const note=observeLocalFieldSite(fieldNotebook,mapId,player.x,player.y);
+      if(note){
+        refreshFieldNotebook();
+        surveyNotice.textContent="Field note: "+note.name+" — "+note.observation;
+        surveyNotice.hidden=false;
+        surveyNoticeUntil=performance.now()+5000;
+      }
     }
   }
   if(e.code==="KeyE"&&!e.repeat&&performance.now()>cooldown){
@@ -307,12 +355,29 @@ function tick(now){
       ctx.beginPath();ctx.arc(sx,sy,3,0,Math.PI*2);ctx.fill();
     }
   }
+  // Six bounded static story markers, never server entities or quest items.
+  if(mapId===MAP_IDS.overworld){
+    for(const site of MOONVALE_ROADSIDE_LORE){
+      const dx=site.x-camera.x,dy=site.y-camera.y;
+      if(Math.abs(dx)>700||Math.abs(dy)>500)continue;
+      const sx=canvas.width/2+dx,sy=canvas.height/2+dy;
+      ctx.fillStyle=loreJournal.has(site.id)?"#857b61":"#f6d293";
+      ctx.fillRect(sx-5,sy-5,10,10);
+      ctx.strokeStyle="#403624";ctx.lineWidth=1.6;ctx.strokeRect(sx-5,sy-5,10,10);
+    }
+  }
   drawKnight(canvas.width/2,canvas.height/2,Math.atan2(my,mx));
   ctx.restore();
   const nearby=nearbyAuthoredPortal(mapId,player.x,player.y,16);
   door.textContent=nearby?"Press E — "+(map.kind==="outdoor"?"Enter The Red Lion Inn":"Return to Greyhaven"):"";
   const nearSurvey=nearbyLocalFieldSite(mapId,player.x,player.y);
-  survey.textContent=nearSurvey?(fieldNotebook.has(nearSurvey.id)?"Recorded — ":"Press F — Inspect ")+nearSurvey.name:"";
+  const nearLore=nearbyLocalLoreSite(mapId,player.x,player.y);
+  const loreD=nearLore?Math.hypot(nearLore.x-player.x,nearLore.y-player.y):Infinity;
+  const fieldD=nearSurvey?Math.hypot(nearSurvey.x-player.x,nearSurvey.y-player.y):Infinity;
+  survey.textContent=nearSurvey && fieldD<=loreD
+    ?(fieldNotebook.has(nearSurvey.id)?"Recorded — ":"Press F — Inspect ")+nearSurvey.name:"";
+  loreHud.textContent=nearLore && loreD<fieldD
+    ?(loreJournal.has(nearLore.id)?"Read — ":"Press F — Read ")+nearLore.name:"";
   recordExpeditionMilestone(advanceLocalExpedition(expeditionState,mapId,player.x,player.y,"visit"),now);
   const discoveries=recordLocalDiscoveries(discoveryJournal,mapId,player.x,player.y);
   if(discoveries.length){
@@ -323,6 +388,7 @@ function tick(now){
   }
   if(now>discoveryNoticeUntil)discoveryNotice.hidden=true;
   if(now>surveyNoticeUntil)surveyNotice.hidden=true;
+  if(now>loreNoticeUntil)loreNotice.hidden=true;
   if(now>expeditionNoticeUntil)expeditionNotice.hidden=true;
   refreshWayfinding(now);
   place.textContent=map.name+" · "+Math.round(player.x)+","+Math.round(player.y)+" · cached "+world.stats.cached+"/24";
