@@ -22,6 +22,7 @@ p.add_argument("--scene",type=Path,required=True)
 p.add_argument("--out-dir",type=Path,required=True)
 p.add_argument("--samples",type=int,default=4)
 p.add_argument("--canvas",type=int,default=640)
+p.add_argument("--only",choices=("red_lion","gable_merchant","blacksmith"),default=None)
 args=p.parse_args(argv)
 assert args.scene.is_file()
 assert args.canvas in (512,640,768)
@@ -154,7 +155,17 @@ report={
   "blacksmithWorkyard":workyard_qa,
   "buildings":{}
 }
+if args.only:
+    previous=args.out_dir/"greyhaven_a26_render_report.json"
+    assert previous.is_file(), "Partial render requires existing complete baseline report"
+    previous_report=json.loads(previous.read_text(encoding="utf8"))
+    assert set(previous_report["buildings"])=={"red_lion","gable_merchant","blacksmith"}
+    assert previous_report["scene"]==args.scene.name
+    assert previous_report["canvas"]==[args.canvas,args.canvas]
+    report["buildings"]=previous_report["buildings"]
 for slug,name,door_name in BUILDINGS:
+    if args.only and slug!=args.only:
+        continue
     door=bpy.data.objects.get(door_name)
     assert door is not None and door.type=="MESH",door_name
     corners=[door.matrix_world @ Vector(v) for v in door.bound_box]
