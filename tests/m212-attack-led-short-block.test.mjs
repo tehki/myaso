@@ -451,7 +451,7 @@ test("R2 fast trusted wheel releases real held LMB then waits for wheel ACK", as
   time=18;
   trusted.resolve({trusted:true,deltaY:120});
   await new Promise(setImmediate);
-  assert.deepEqual(events,["native-down","timer:70","native-wheel","native-up"]);
+  assert.deepEqual(events,["native-down","timer:200","native-wheel","native-up"]);
   let settled=false;
   flight.then(()=>{settled=true;});
   await new Promise(setImmediate);
@@ -481,7 +481,7 @@ test("R2 delayed receipt never stretches a real held LMB past bounded 200ms grac
   time=205;
   timer.resolve();
   await new Promise(setImmediate);
-  assert.deepEqual(events,["down","grace:70","wheel","up"]);
+  assert.deepEqual(events,["down","grace:200","wheel","up"]);
   let settled=false;
   flight.then(()=>{settled=true;});
   await new Promise(setImmediate);
@@ -512,7 +512,7 @@ test("R2 genuine 59ms wheel attestation wins before 200ms grace and releases onc
   time=59;
   trusted.resolve({trusted:true,deltaY:120});
   await new Promise(setImmediate);
-  assert.deepEqual(events,["down","grace:70","wheel","up"]);
+  assert.deepEqual(events,["down","grace:200","wheel","up"]);
   // The still-unresolved timeout must not issue an extra release.
   time=200;timer.resolve();
   await new Promise(setImmediate);
