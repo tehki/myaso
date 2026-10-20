@@ -55,9 +55,16 @@ impl ZoneId {
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub enum ItemLocation {
     Inventory(CharacterId),
-    Equipped { character_id: CharacterId, slot: u8 },
+    Equipped {
+        character_id: CharacterId,
+        slot: u8,
+    },
     Corpse(CorpseId),
-    Ground { zone_id: ZoneId, x_cm: i32, y_cm: i32 },
+    Ground {
+        zone_id: ZoneId,
+        x_cm: i32,
+        y_cm: i32,
+    },
 }
 
 type EquipmentSlot = (CharacterId, u8);
@@ -75,13 +82,19 @@ impl ItemLocation {
 /// must never be allowed to steal or duplicate existing items.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum OwnershipOp {
-    Create { item: ItemId, at: ItemLocation },
+    Create {
+        item: ItemId,
+        at: ItemLocation,
+    },
     Move {
         item: ItemId,
         from: ItemLocation,
         to: ItemLocation,
     },
-    Destroy { item: ItemId, from: ItemLocation },
+    Destroy {
+        item: ItemId,
+        from: ItemLocation,
+    },
 }
 
 impl OwnershipOp {
@@ -299,27 +312,54 @@ mod tests {
             .apply(
                 txn(1),
                 &[
-                    OwnershipOp::Create { item: item(100), at: sword(1) },
-                    OwnershipOp::Create { item: item(101), at: bag(1) },
-                    OwnershipOp::Create { item: item(102), at: bag(1) },
+                    OwnershipOp::Create {
+                        item: item(100),
+                        at: sword(1),
+                    },
+                    OwnershipOp::Create {
+                        item: item(101),
+                        at: bag(1),
+                    },
+                    OwnershipOp::Create {
+                        item: item(102),
+                        at: bag(1),
+                    },
                 ],
             )
             .expect("create loadout");
         let death = [
-            OwnershipOp::Move { item: item(100), from: sword(1), to: ItemLocation::Corpse(corpse(55)) },
-            OwnershipOp::Move { item: item(101), from: bag(1), to: ItemLocation::Corpse(corpse(55)) },
+            OwnershipOp::Move {
+                item: item(100),
+                from: sword(1),
+                to: ItemLocation::Corpse(corpse(55)),
+            },
+            OwnershipOp::Move {
+                item: item(101),
+                from: bag(1),
+                to: ItemLocation::Corpse(corpse(55)),
+            },
             OwnershipOp::Move {
                 item: item(102),
                 from: bag(1),
-                to: ItemLocation::Ground { zone_id: zone(7), x_cm: -88, y_cm: 139 },
+                to: ItemLocation::Ground {
+                    zone_id: zone(7),
+                    x_cm: -88,
+                    y_cm: 139,
+                },
             },
         ];
         let receipt = ledger.apply(txn(2), &death).expect("atomic death");
         assert_eq!(receipt.operation_count, 3);
         assert_eq!(ledger.item_count(), 3);
         assert_eq!(ledger.equipped_item(character(1), 1), None);
-        assert_eq!(ledger.location(item(100)), Some(ItemLocation::Corpse(corpse(55))));
-        assert_eq!(ledger.location(item(101)), Some(ItemLocation::Corpse(corpse(55))));
+        assert_eq!(
+            ledger.location(item(100)),
+            Some(ItemLocation::Corpse(corpse(55)))
+        );
+        assert_eq!(
+            ledger.location(item(101)),
+            Some(ItemLocation::Corpse(corpse(55)))
+        );
         assert_eq!(ledger.location(item(102)), death[2].target());
         assert_eq!(ledger.apply(txn(2), &death), Ok(receipt));
         assert_eq!(ledger.item_count(), 3);
@@ -328,33 +368,87 @@ mod tests {
     #[test]
     fn batch_rejects_one_bad_expected_location_without_partial_death() {
         let mut ledger = ItemOwnershipLedger::default();
-        ledger.apply(txn(1), &[
-            OwnershipOp::Create { item: item(1), at: sword(1) },
-            OwnershipOp::Create { item: item(2), at: bag(1) },
-        ]).expect("initial");
+        ledger
+            .apply(
+                txn(1),
+                &[
+                    OwnershipOp::Create {
+                        item: item(1),
+                        at: sword(1),
+                    },
+                    OwnershipOp::Create {
+                        item: item(2),
+                        at: bag(1),
+                    },
+                ],
+            )
+            .expect("initial");
         let bad = [
-            OwnershipOp::Move { item: item(1), from: sword(1), to: ItemLocation::Corpse(corpse(2)) },
-            OwnershipOp::Move { item: item(2), from: bag(99), to: ItemLocation::Corpse(corpse(2)) },
+            OwnershipOp::Move {
+                item: item(1),
+                from: sword(1),
+                to: ItemLocation::Corpse(corpse(2)),
+            },
+            OwnershipOp::Move {
+                item: item(2),
+                from: bag(99),
+                to: ItemLocation::Corpse(corpse(2)),
+            },
         ];
-        assert_eq!(ledger.apply(txn(2), &bad), Err(OwnershipError::ExpectedLocationMismatch));
+        assert_eq!(
+            ledger.apply(txn(2), &bad),
+            Err(OwnershipError::ExpectedLocationMismatch)
+        );
         assert_eq!(ledger.location(item(1)), Some(sword(1)));
         assert_eq!(ledger.location(item(2)), Some(bag(1)));
         assert_eq!(ledger.equipped_item(character(1), 1), Some(item(1)));
-        assert_eq!(ledger.apply(txn(2), &bad[..1]).expect("valid later").sequence, 2);
+        assert_eq!(
+            ledger
+                .apply(txn(2), &bad[..1])
+                .expect("valid later")
+                .sequence,
+            2
+        );
     }
 
     #[test]
     fn equipment_uniqueness_allows_atomic_swap_but_not_collisions() {
         let mut ledger = ItemOwnershipLedger::default();
-        ledger.apply(txn(1), &[
-            OwnershipOp::Create { item: item(1), at: sword(1) },
-            OwnershipOp::Create { item: item(2), at: bag(1) },
-        ]).expect("initial");
-        let collision = [OwnershipOp::Move { item: item(2), from: bag(1), to: sword(1) }];
-        assert_eq!(ledger.apply(txn(2), &collision), Err(OwnershipError::EquipmentSlotOccupied));
+        ledger
+            .apply(
+                txn(1),
+                &[
+                    OwnershipOp::Create {
+                        item: item(1),
+                        at: sword(1),
+                    },
+                    OwnershipOp::Create {
+                        item: item(2),
+                        at: bag(1),
+                    },
+                ],
+            )
+            .expect("initial");
+        let collision = [OwnershipOp::Move {
+            item: item(2),
+            from: bag(1),
+            to: sword(1),
+        }];
+        assert_eq!(
+            ledger.apply(txn(2), &collision),
+            Err(OwnershipError::EquipmentSlotOccupied)
+        );
         let swap = [
-            OwnershipOp::Move { item: item(1), from: sword(1), to: bag(1) },
-            OwnershipOp::Move { item: item(2), from: bag(1), to: sword(1) },
+            OwnershipOp::Move {
+                item: item(1),
+                from: sword(1),
+                to: bag(1),
+            },
+            OwnershipOp::Move {
+                item: item(2),
+                from: bag(1),
+                to: sword(1),
+            },
         ];
         ledger.apply(txn(2), &swap).expect("atomic swap");
         assert_eq!(ledger.equipped_item(character(1), 1), Some(item(2)));
@@ -366,11 +460,24 @@ mod tests {
     fn competing_looters_cannot_acquire_same_item_twice() {
         let mut ledger = ItemOwnershipLedger::default();
         let at = ItemLocation::Corpse(corpse(5));
-        ledger.apply(txn(1), &[OwnershipOp::Create { item: item(8), at }]).expect("corpse");
-        let first = [OwnershipOp::Move { item: item(8), from: at, to: bag(1) }];
-        let second = [OwnershipOp::Move { item: item(8), from: at, to: bag(2) }];
+        ledger
+            .apply(txn(1), &[OwnershipOp::Create { item: item(8), at }])
+            .expect("corpse");
+        let first = [OwnershipOp::Move {
+            item: item(8),
+            from: at,
+            to: bag(1),
+        }];
+        let second = [OwnershipOp::Move {
+            item: item(8),
+            from: at,
+            to: bag(2),
+        }];
         ledger.apply(txn(2), &first).expect("first looter");
-        assert_eq!(ledger.apply(txn(3), &second), Err(OwnershipError::ExpectedLocationMismatch));
+        assert_eq!(
+            ledger.apply(txn(3), &second),
+            Err(OwnershipError::ExpectedLocationMismatch)
+        );
         assert_eq!(ledger.location(item(8)), Some(bag(1)));
         assert_eq!(ledger.item_count(), 1);
     }
@@ -378,26 +485,59 @@ mod tests {
     #[test]
     fn identical_retry_is_idempotent_and_different_payload_is_rejected() {
         let mut ledger = ItemOwnershipLedger::default();
-        let create = [OwnershipOp::Create { item: item(7), at: bag(1) }];
+        let create = [OwnershipOp::Create {
+            item: item(7),
+            at: bag(1),
+        }];
         let first = ledger.apply(txn(7), &create).expect("create");
         assert_eq!(ledger.apply(txn(7), &create), Ok(first));
         assert_eq!(
-            ledger.apply(txn(7), &[OwnershipOp::Create { item: item(7), at: bag(2) }]),
+            ledger.apply(
+                txn(7),
+                &[OwnershipOp::Create {
+                    item: item(7),
+                    at: bag(2)
+                }]
+            ),
             Err(OwnershipError::ConflictingReplay)
         );
         assert_eq!(ledger.location(item(7)), Some(bag(1)));
-        assert_eq!(ledger.apply(txn(8), &create), Err(OwnershipError::ItemAlreadyExists));
+        assert_eq!(
+            ledger.apply(txn(8), &create),
+            Err(OwnershipError::ItemAlreadyExists)
+        );
     }
 
     #[test]
     fn destroy_requires_location_and_cannot_recreate_using_same_transaction() {
         let mut ledger = ItemOwnershipLedger::default();
-        ledger.apply(txn(1), &[OwnershipOp::Create { item: item(7), at: bag(1) }]).expect("create");
+        ledger
+            .apply(
+                txn(1),
+                &[OwnershipOp::Create {
+                    item: item(7),
+                    at: bag(1),
+                }],
+            )
+            .expect("create");
         assert_eq!(
-            ledger.apply(txn(2), &[OwnershipOp::Destroy { item: item(7), from: bag(2) }]),
+            ledger.apply(
+                txn(2),
+                &[OwnershipOp::Destroy {
+                    item: item(7),
+                    from: bag(2)
+                }]
+            ),
             Err(OwnershipError::ExpectedLocationMismatch)
         );
-        ledger.apply(txn(2), &[OwnershipOp::Destroy { item: item(7), from: bag(1) }])
+        ledger
+            .apply(
+                txn(2),
+                &[OwnershipOp::Destroy {
+                    item: item(7),
+                    from: bag(1),
+                }],
+            )
             .expect("valid destroy");
         assert_eq!(ledger.location(item(7)), None);
         assert_eq!(ledger.item_count(), 0);
@@ -406,20 +546,47 @@ mod tests {
     #[test]
     fn duplicate_items_invalid_batch_and_overlarge_batches_fail_closed() {
         let mut ledger = ItemOwnershipLedger::default();
-        assert_eq!(ledger.apply(txn(1), &[]), Err(OwnershipError::EmptyTransaction));
-        let same = [OwnershipOp::Create { item: item(4), at: bag(1) }; 2];
-        assert_eq!(ledger.apply(txn(1), &same), Err(OwnershipError::DuplicateItem));
+        assert_eq!(
+            ledger.apply(txn(1), &[]),
+            Err(OwnershipError::EmptyTransaction)
+        );
+        let same = [OwnershipOp::Create {
+            item: item(4),
+            at: bag(1),
+        }; 2];
+        assert_eq!(
+            ledger.apply(txn(1), &same),
+            Err(OwnershipError::DuplicateItem)
+        );
         assert_eq!(ledger.item_count(), 0);
-        let oversized = vec![OwnershipOp::Create { item: item(4), at: bag(1) }; MAX_OWNERSHIP_OPS + 1];
-        assert_eq!(ledger.apply(txn(1), &oversized), Err(OwnershipError::TooManyOperations));
+        let oversized = vec![
+            OwnershipOp::Create {
+                item: item(4),
+                at: bag(1)
+            };
+            MAX_OWNERSHIP_OPS + 1
+        ];
+        assert_eq!(
+            ledger.apply(txn(1), &oversized),
+            Err(OwnershipError::TooManyOperations)
+        );
         assert_eq!(ledger.item_count(), 0);
     }
 
     #[test]
     fn sequence_overflow_rejects_without_mutation() {
-        let mut ledger = ItemOwnershipLedger { sequence: u64::MAX, ..Default::default() };
+        let mut ledger = ItemOwnershipLedger {
+            sequence: u64::MAX,
+            ..Default::default()
+        };
         assert_eq!(
-            ledger.apply(txn(1), &[OwnershipOp::Create { item: item(1), at: bag(1) }]),
+            ledger.apply(
+                txn(1),
+                &[OwnershipOp::Create {
+                    item: item(1),
+                    at: bag(1)
+                }]
+            ),
             Err(OwnershipError::SequenceExhausted)
         );
         assert_eq!(ledger.item_count(), 0);
