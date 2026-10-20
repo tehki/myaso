@@ -30,7 +30,7 @@ SQLite uses **WAL, synchronous=FULL, foreign keys enabled, an explicit `BEGIN IM
 
 Local authorized Serj development machine (standard Python 3 and SQLite stdlib):
 
-- **14/14 unittest cases passed** using separate real temporary SQLite files.
+- **21/21 unittest cases passed** using separate real temporary SQLite files after the fixture consent/admission extension (the initial 14-test milestone was passed separately).
 - A normal committed sale survives connection close/reopen with one set of postings, one deed owner and one outbox event.
 - Retrying the same operation ID returns the same canonical receipt, even when the server logical tick moves forward. Reusing an ID with another buyer/payload is rejected.
 - Invalid session identity, stale balance/deed versions, expired/revoked/self sale, overdraft, and title revision overflow fail without partial debits.
@@ -41,6 +41,14 @@ Local authorized Serj development machine (standard Python 3 and SQLite stdlib):
 - Snapshot asserts `sum(accounts.balance) == issued_units`, one three-posting zero-sum group per receipt, one outbox entry per receipt, and a consistent committed sequence.
 
 The `hard_exit_*` failure points deliberately terminate their **own Python process**. Invoke them only in this offline test harness and never from a game server or other important process.
+
+### E2d+ fixture admission and exact seller consent (20 October 2026)
+
+The in-memory-authentication gap was made explicit in the SQLite laboratory. Two additional **file-backed fixture tables** enforce that the *claimed* player ID and session epoch must have a currently active admission record, and that the listing's seller consent has a matching approved record with the **same listing, seller, parcel, title version, map revision, price, commission and expiry**. The consent must not have been revoked or consumed. The consent is **consumed atomically within the same commit** as ledger postings, title transfer, listing consumption, receipt and outbox event. Retrying a committed operation with an admitted session returns the prior receipt; an epoch revoked after commit is denied further receipt access through this experimental endpoint.
+
+Seven additional regression tests cover forged/missing consent, revoked consent with active listing, mutated sale conditions, revoked/unknown session epochs, atomic consent consumption, safe retry and post-commit process-kill recovery with the consent state. **21/21 offline tests passed locally**, including the original crash/restart and concurrent-buyer suite. Strictness does **not** mean real admission: the test fixture inserts known IDs and epochs itself, a Python caller can still fabricate a matching `VerifiedSession`, and the `approved_consent` reference is not a verifiable signature. A production trusted admission service and cryptographically or otherwise securely attested seller authorization are still mandatory.
+
+The conformance checks are schema/transaction tests only. They do not validate production credential issuance, seller keys, server-to-DB trust, server ticks, account ownership, anti-alt land policies, identity revocation across devices, or distributed commit.
 
 ### What this does **not** prove
 
