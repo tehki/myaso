@@ -7,6 +7,7 @@ pub mod kill_event;
 pub mod reliable;
 pub mod simulation;
 pub mod snapshot;
+pub mod world_geometry; // D3 dormant read-only parity module, no runtime wiring.
 
 pub const PROTOCOL_VERSION: u8 = 1;
 pub const INPUT_PACKET_TYPE: u8 = 1;
