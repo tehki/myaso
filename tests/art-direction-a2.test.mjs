@@ -41,7 +41,7 @@ test('A2 CPU look-dev uses self-authored procedural materials, not external down
 
 test('A2 tavern and street barrels have non-overlapping outer iron hoops', () => {
   // Read the authored layout, rather than testing an unrelated copy of the positions.
-  const definition = author.match(/BARREL_LAYOUT = \(\n([\s\S]*?)\n\)/);
+  const definition = author.match(/BARREL_LAYOUT = \(\r?\n([\s\S]*?)\r?\n\)/);
   assert.ok(definition, 'barrel positions must be declared in a reviewable layout');
   const barrels = [...definition[1].matchAll(/\("([^"]+)",\s*(-?[\d.]+),\s*(-?[\d.]+)\)/g)]
     .map(([, name, x, y]) => ({ name, x: Number(x), y: Number(y) }));
