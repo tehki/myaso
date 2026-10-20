@@ -176,6 +176,15 @@ jobs:
           cargo check --locked --manifest-path server/Cargo.toml --example magic_fx_loopback
           node scripts/physics_fx_real_browser_flight.mjs
 
+      # P10 requires 16 simultaneously established real QUIC sessions per
+      # browser against ONE shared zone/FX hub, but uses only loopback
+      # GP test markers, not real combat or 512-player production traffic.
+      - name: Validate P10 concurrent real WebTransport FX crowd
+        run: |
+          node --check scripts/physics_fx_crowd_browser_flight.mjs
+          cargo check --locked --manifest-path server/Cargo.toml --example magic_fx_crowd_loopback
+          node scripts/physics_fx_crowd_browser_flight.mjs
+
       - name: Validate M188 repeated real heavy counterplay windows
         run: |
           # Three fresh Chrome/Firefox sessions for each real defensive read.
