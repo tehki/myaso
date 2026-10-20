@@ -190,3 +190,45 @@ It builds 240 trusted synthetic semantic events across five zones, queries 512 v
 ### Limits / follow-up
 
 P5 is a **reference spatial index only**: the broker still has a global max of 256 pending effects and 48 per zone. It is not a horizontally sharded multi-server world, not a scene collision broadphase, and not tested on thousands of live players. Before shipping, Core & Multiplayer must own authoritative zone identity, active shard boundaries, delivery lifecycle, per-subscriber throughput and observability; Graphics owns crowd-tier presentation; Magic & Items owns validated spell semantics. The existing active packet protocol is unchanged. No P5 runtime activation, merge or deployment is authorized.
+
+## P6 — explicit multi-zone FX shards and cosmetic delivery budget planner (2026-10-20)
+
+P6 adds an **inactive server-side reference planner** `server/src/magic_fx_delivery.rs`. It is not wired to WebTransport, input processing, authenticated casting or existing snapshots, so no playable mechanics change.
+
+### Fixed safe limits (payload bytes only)
+
+| Bound | P6 setting |
+| --- | ---: |
+| Pre-registered server-owned zone shards per process | 16 |
+| Pending FX per shard | 256 (P4) |
+| New FX per shard/tick | 12 (P4) |
+| Pending FX per single zone | 48 (P4) |
+| Returned cosmetic packets per viewer/tick | 6 |
+| Cosmetic payload per viewer/tick | 192 bytes |
+| Cosmetic payload per zone/tick | 4096 bytes |
+| Global cosmetic payload per process/tick | 16,384 bytes |
+
+Every shard owns an independent P4 `SemanticEffectBroker` and P5 spatial index. Zone IDs must be explicitly registered by the trusted server and are never inferred from client messages. Hub ticks are strictly monotonic. New shards begin on the hub's current tick; they cannot resurrect expired events. Zone-local event IDs may repeat *across different zones*; the event envelope already identifies its owning zone and the browser receiver resets dedup state on an authorized zone transition.
+
+`FxDeliverySession` is an **in-memory per-connection state holder**, not a new login or auth system. It stores authenticated net ID (supplied by trusted Core code), currently authorized zone ID, monotonic zone-local delivery cursor and last poll tick. Only Core may call `reset_authorized_zone()` on a verified portal/reconnect. A mismatch between session and server-trusted viewer zone, invalid viewer coordinates/radii, an unregistered zone or repeated polling in the same tick fails closed before any budget is consumed.
+
+`ShardedMagicFxHub::plan_delivery()` returns encoded packets **to its server caller, without sending them**. The planner caps the returned work by minimum remaining global/zone/viewer cosmetic bytes, delegates proximity queries to the P5 grid, preserves event order, and moves the cursor only for encoded effects. If the quota is exhausted, it returns an empty visual batch; this must never block movement, damage, input ACKs or snapshots. Counters include only fixed 32-byte semantic *payload*; WebTransport, datagram framing, cryptography, retransmissions and network congestion are not estimated.
+
+**Saturation/fairness limitation:** this planner is explicitly order-dependent. Core must use rotated or fair session scheduling before ever connecting it to a 512-player realm; a fixed poll order can starve tail viewers. The sample benchmark rotates its polling start as a **test technique**, but the runtime has no fairness policy yet and is not production-ready.
+
+### Reproducible acceptance (synthetic only)
+
+- Unit tests cover independent zone budgets/IDs, cross-zone rejections, zone transitions and reconnect resets, no replay in one tick, expiry, shard creation limits and strict server ticks.
+- A 512-viewer/4-zone test asserts global, zone and per-viewer byte caps, immutable source zone in each 32-byte packet and tick budget reset.
+- An eight-zone saturation test separately proves the process-wide 16 KiB cap even when per-zone budgets would allow more.
+- Optional benchmark:
+  ```sh
+  cargo run --locked --release --manifest-path server/Cargo.toml --example magic_fx_delivery_bench
+  ```
+  It runs 512 **synthetic** per-connection cursors across eight registered zone shards over 16 authority ticks, rotates poll order, verifies zone IDs and byte caps, and prints measured planner-call p95, semantic payload and count of nonempty polls. **It does not create 512 actual connections or measure browser FPS/real network latency**. The benchmark has to be executed and its output recorded before making speed claims.
+
+### Outstanding production dependencies
+
+Core & Multiplayer must provide authenticated viewer identity, zone ownership, fair subscription/order, server tick and bandwidth scheduling. Magic & Items owns rune/mana/reagent/cooldown validation; World supplies trusted collision geometry and zone manifests; Graphics handles client visual quality and accessibility. Multi-process ownership, persistent shard lifecycle, cross-shard transfers, reconnect epochs, true sequencing/ACKs, live transport prioritization, metrics and end-to-end 512 real-client load validation remain outstanding.
+
+No P6 activation, merge or deployment is authorized.
