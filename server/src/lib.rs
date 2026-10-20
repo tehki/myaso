@@ -10,6 +10,7 @@ pub mod reliable;
 pub mod simulation;
 pub mod snapshot;
 pub mod world_mutation_contract;
+pub mod worker_admission;
 pub mod zone;
 pub mod zone_lease;
 
