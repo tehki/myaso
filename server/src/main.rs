@@ -1,7 +1,9 @@
 use anyhow::{bail, Context, Result};
 use myaso_server::{
-    chat::{decode_send, encode_result, ChatPosition, ChatResult, LocalChatHub,
-           MAX_CHAT_FRAME, OUTBOUND_QUEUE},
+    chat::{
+        decode_send, encode_result, ChatPosition, ChatResult, LocalChatHub, MAX_CHAT_FRAME,
+        OUTBOUND_QUEUE,
+    },
     coalesce_accepted_input_batch, decode_input_packet, is_sequence_newer16, is_tick_newer32,
     kill_event::{encode_kill_event, KillEventPacket},
     reliable::{try_enqueue_reliable, ReliableQueueError},
@@ -844,13 +846,17 @@ async fn handle_connection(
 /// Never mix with input datagrams or game snapshot/kill-event reliable frames.
 async fn read_chat_frame(recv: &mut RecvStream) -> Result<Vec<u8>> {
     let mut length = [0_u8; 2];
-    recv.read_exact(&mut length).await.context("read chat length")?;
+    recv.read_exact(&mut length)
+        .await
+        .context("read chat length")?;
     let size = u16::from_le_bytes(length) as usize;
     if !(9..=MAX_CHAT_FRAME).contains(&size) {
         bail!("invalid local chat frame length");
     }
     let mut bytes = vec![0; size];
-    recv.read_exact(&mut bytes).await.context("read bounded chat frame")?;
+    recv.read_exact(&mut bytes)
+        .await
+        .context("read bounded chat frame")?;
     Ok(bytes)
 }
 
@@ -862,9 +868,12 @@ async fn run_chat_stream(
     player_id: u32,
     game: Arc<SharedGame>,
 ) -> Result<()> {
-    let mut writer = connection.open_uni().await
+    let mut writer = connection
+        .open_uni()
+        .await
         .context("open isolated chat reply stream")?
-        .await.context("initialize isolated chat reply stream")?;
+        .await
+        .context("initialize isolated chat reply stream")?;
     let mut violations = 0_u8;
     loop {
         tokio::select! {
