@@ -864,7 +864,13 @@ fn begin_requested_action(
             return; // Activation waits for the authoritative 320ms deadline.
         }
         if input.attack && !input.heavy_attack {
-            if input.jump && spend_stamina(now_ms, fighter, JUMP_STAMINA_COST + JUMP_ATTACK_STAMINA_COST) {
+            if input.jump
+                && spend_stamina(
+                    now_ms,
+                    fighter,
+                    JUMP_STAMINA_COST + JUMP_ATTACK_STAMINA_COST,
+                )
+            {
                 fighter.begin_jump_attack();
             } else if input.run && input.move_x.hypot(input.move_y) >= 0.5 {
                 if spend_stamina(now_ms, fighter, RUNNING_ATTACK_STAMINA_COST) {
@@ -874,7 +880,8 @@ fn begin_requested_action(
                     fighter.set_action(Action::Idle, 0.0);
                 }
             } else {
-                let lateral = fighter.facing.sin() * input.move_x - fighter.facing.cos() * input.move_y;
+                let lateral =
+                    fighter.facing.sin() * input.move_x - fighter.facing.cos() * input.move_y;
                 fighter.begin_light_attack(lateral);
             }
             return;
@@ -1780,7 +1787,9 @@ mod r2_combat_control_tests {
                 ..InputIntent::default()
             },
         );
-        for _ in 0..5 { world.step(); }
+        for _ in 0..5 {
+            world.step();
+        }
         assert_eq!(world.fighter(1).unwrap().action, Action::HeavyAttackWindup);
         world.set_input(
             1,
@@ -1804,7 +1813,9 @@ mod r2_combat_control_tests {
                 ..InputIntent::default()
             },
         );
-        for _ in 0..5 { running.step(); }
+        for _ in 0..5 {
+            running.step();
+        }
         running.set_input(
             2,
             InputIntent {
@@ -1815,7 +1826,10 @@ mod r2_combat_control_tests {
             },
         );
         running.step();
-        assert_eq!(running.fighter(2).unwrap().action, Action::RunningAttackWindup);
+        assert_eq!(
+            running.fighter(2).unwrap().action,
+            Action::RunningAttackWindup
+        );
     }
 
     #[test]
