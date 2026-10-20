@@ -554,6 +554,93 @@ mod tests {
         ));
     }
 
+    /// Real OS crash acceptance: a durable journal survives SIGKILL and
+    /// a new process recovers both the item and its idempotency receipt.
+    #[cfg(unix)]
+    #[test]
+    fn killed_writer_releases_lock_and_preserves_committed_receipt() {
+        use std::{process::Command, thread, time::Duration};
+
+        let root = Root::new();
+        let ready = root.0.with_extension("writer-ready");
+        let mut child = Command::new(std::env::current_exe().expect("test executable"))
+            .arg("--ignored")
+            .arg("--exact")
+            .arg("item_journal::tests::subprocess_crash_writer_probe")
+            .arg("--nocapture")
+            .env("MYASO_ITEM_JOURNAL_CRASH_ROOT", &root.0)
+            .env("MYASO_ITEM_JOURNAL_CRASH_READY", &ready)
+            .spawn()
+            .expect("spawn separate writer process");
+
+        let mut ready_seen = false;
+        for _ in 0..500 {
+            if ready.exists() {
+                ready_seen = true;
+                break;
+            }
+            if child.try_wait().expect("check child").is_some() {
+                break;
+            }
+            thread::sleep(Duration::from_millis(20));
+        }
+        let blocked = matches!(
+            DurableItemJournal::open(&root.0),
+            Err(ItemJournalError::WriterBusy)
+        );
+        // Explicit OS process termination rather than gracefully dropping the
+        // journal; always reap the child before any assertions can panic.
+        let _ = child.kill();
+        let _ = child.wait();
+        assert!(ready_seen, "writer must durably commit before forced kill");
+        assert!(blocked, "live crashed-process candidate must hold OS lock");
+
+        let mut recovered = root.open();
+        assert_eq!(recovered.location(item(101)), Some(inv(7)));
+        let receipt = recovered
+            .apply(
+                txn(501),
+                &[OwnershipOp::Create {
+                    item: item(101),
+                    at: inv(7),
+                }],
+            )
+            .expect("lost ACK retry returns original committed receipt");
+        assert_eq!(receipt.sequence, 1);
+        assert!(!root.record(2).exists(), "retry must not duplicate commit");
+        drop(recovered);
+        let _ = fs::remove_file(ready);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    #[ignore = "executed by killed_writer_releases_lock_and_preserves_committed_receipt"]
+    fn subprocess_crash_writer_probe() {
+        let (Some(root), Some(ready)) = (
+            std::env::var_os("MYASO_ITEM_JOURNAL_CRASH_ROOT"),
+            std::env::var_os("MYASO_ITEM_JOURNAL_CRASH_READY"),
+        ) else {
+            return;
+        };
+        let mut store = DurableItemJournal::open(PathBuf::from(root))
+            .expect("child must acquire exclusive lock");
+        let receipt = store
+            .apply(
+                txn(501),
+                &[OwnershipOp::Create {
+                    item: item(101),
+                    at: inv(7),
+                }],
+            )
+            .expect("child commits before crash");
+        assert_eq!(receipt.sequence, 1);
+        fs::write(ready, b"committed").expect("signal parent after durable commit");
+        // Keep the journal handle alive until the parent kills this process.
+        loop {
+            std::thread::park();
+        }
+    }
+
     #[test]
     fn versioned_codec_covers_all_location_variants_and_rejects_tampering() {
         let record = JournalRecord {
