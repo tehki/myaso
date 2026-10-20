@@ -1,7 +1,7 @@
 # Core & Multiplayer — Phase 1 audit and first ingress hardening milestone
 
-Date: 2026-10-20  
-Baseline: `main` at `7c5fe9b08e86254cff9e05ae07c1d0d572cb7879`  
+Date: 2026-10-20
+Baseline: `main` at `7c5fe9b08e86254cff9e05ae07c1d0d572cb7879`
 Scope: repository-level static architecture review and CI evidence, **not** a production load certification.
 
 ## Verified baseline
