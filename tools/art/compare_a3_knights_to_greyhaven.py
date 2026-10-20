@@ -181,6 +181,7 @@ report = {
     "renderEngine": "Cycles CPU",
     "renderSamples": scene.cycles.samples,
     "targetRollFrame": args.roll_frame,
+    "rollReview": "Two separate single-character stills to prevent visual overlap",
     "changesGameplay": False
 }
 # This review blend contains owner-provided character models; never push it
@@ -191,12 +192,29 @@ bpy.ops.wm.save_as_mainfile(filepath=str(args.out_dir/"blood_iron_knights_local_
 if args.render:
     scene.render.filepath = str(args.out_dir/"blood_iron_knights_scale_a2.png")
     bpy.ops.render.render(write_still=True)
-    for fighter in (silver, sentinel):
-        for rig in fighter["rigs"]:
-            rig.animation_data.action = fighter["roll"]
-    scene.frame_set(args.roll_frame)
-    scene.render.filepath = str(args.out_dir/"blood_iron_knights_roll_a2.png")
-    bpy.ops.render.render(write_still=True)
+    # Render each approved roll independently. When both glTF root-motion
+    # actions play at once they overlap near the inn, hiding shoulder/hand
+    # articulation. The QA is about pose and scale, NOT multiplayer combat.
+    for hero, companion, name in (
+        (silver, sentinel, "blood_iron_silver_roll_a2.png"),
+        (sentinel, silver, "blood_iron_sentinel_roll_a2.png"),
+    ):
+        for ob in companion["objects"]:
+            if ob.type == "MESH":
+                ob.hide_render = True
+        for rig in hero["rigs"]:
+            rig.animation_data.action = hero["roll"]
+        scene.frame_set(args.roll_frame)
+        scene.render.filepath = str(args.out_dir/name)
+        bpy.ops.render.render(write_still=True)
+        for ob in companion["objects"]:
+            if ob.type == "MESH" and not is_proxy(ob):
+                ob.hide_render = False
+        for rig in hero["rigs"]:
+            rig.animation_data.action = next(
+                (a for a in bpy.data.actions if a.name == hero["idleAction"]), None
+            )
+        scene.frame_set(1)
 
 (args.out_dir/"blood_iron_knights_scale_report.json").write_text(
     json.dumps(report, indent=2) + "\n", encoding="utf8")
