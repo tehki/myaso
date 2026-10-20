@@ -180,6 +180,16 @@ try {
     screenshotCount:3,errors:browserErrors.length,
     companionCommit:actualCommit
   }));
+  // Optional interactive, loopback-only review. PR #326 assets are served
+  // from the separate checkout, not copied into the graphics repository.
+  // Pass --serve as a final argument; Ctrl+C exits and closes localhost.
+  if(process.argv.slice(4).includes("--serve")){
+    await browser.close();
+    browser=null;
+    console.log("A29_INTERACTIVE_PREVIEW=http://127.0.0.1:"+
+      server.address().port+"/web/greyhaven-a29-knight-lab.html");
+    await new Promise(done=>process.once("SIGINT",done));
+  }
 }finally{
   if(browser)await browser.close();
   await new Promise(done=>server.close(done));
