@@ -17,7 +17,7 @@ Outputs:
 
 ## Authoring scope and measured geometry
 
-- 352 original, deterministic handmade clay tiles in **one Blender mesh** (four muted fired-clay material variants). Tile underlayer and original A1 roof geometry remain intact. Mesh tagged **roof-occlusion-candidate** for a future independently reviewed layer bake.
+- 352 original, deterministic handmade clay tiles in **one Blender mesh** (four muted fired-clay material variants). Original A1 roof geometry remains intact; the protruding wooden placeholder courses are **kept but hidden only in the derived A2.1 scene**, with a reversible custom property. Mesh tagged **roof-occlusion-candidate** for a future independently reviewed layer bake.
 - 56 shallow dressed foundation-stone faces, grouped in **one Blender mesh**; placement is measured against the actual original A1 stone foundation. The tavern door remains untouched.
 - 12 oak draw-peg heads, grouped in **one Blender mesh** at exposed timber-frame joints. No new collision.
 - Nine new project-authored procedural Blender materials. No third-party textures, asset packages or downloads.
