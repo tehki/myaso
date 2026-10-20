@@ -15,6 +15,9 @@ pub mod simulation;
 pub mod snapshot;
 pub mod zone;
 
+#[cfg(test)]
+mod magic_fx_fair_tests;
+
 pub const PROTOCOL_VERSION: u8 = 1;
 pub const INPUT_PACKET_TYPE: u8 = 1;
 pub const INPUT_HEADER_BYTES: usize = 16;
