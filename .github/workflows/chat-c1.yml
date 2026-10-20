@@ -49,6 +49,7 @@ jobs:
       - name: Server chat parser, routing and rate-limit tests
         run: |
           cargo test --locked --manifest-path server/Cargo.toml --lib chat::
+          cargo test --locked --manifest-path server/Cargo.toml --bin myaso-server chat_ingress_budget_tests::
       - name: Browser transport and binary codec contract
         run: |
           node --check src/network/chat-codec.mjs
