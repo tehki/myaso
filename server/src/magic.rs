@@ -920,8 +920,14 @@ mod tests {
             spells: Vec::new(),
             mana: 0,
         };
-        assert_eq!(magic.preview_knowledge(lease(1, 1), &ids), Ok(empty.clone()));
-        assert_eq!(magic.preview_knowledge(lease(2, 1), &ids), Ok(empty.clone()));
+        assert_eq!(
+            magic.preview_knowledge(lease(1, 1), &ids),
+            Ok(empty.clone())
+        );
+        assert_eq!(
+            magic.preview_knowledge(lease(2, 1), &ids),
+            Ok(empty.clone())
+        );
 
         magic
             .grant_lesson(award(1, hero, Lesson::Rune(Rune::Fire)))
@@ -953,10 +959,7 @@ mod tests {
         assert_eq!(magic.encode_progression().unwrap(), before);
 
         let restored = MagicAuthority::decode_progression(&before).unwrap();
-        assert_eq!(
-            restored.preview_knowledge(lease(1, 1), &ids),
-            Ok(expected)
-        );
+        assert_eq!(restored.preview_knowledge(lease(1, 1), &ids), Ok(expected));
     }
 
     #[test]
