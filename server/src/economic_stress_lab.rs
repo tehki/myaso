@@ -53,6 +53,31 @@ pub struct Snapshot {
     pub counters: Counters,
 }
 
+/// Read-only housing diagnostics; *not* a guarantee of accessible land.
+/// Immediate affordability ignores survival costs, actual income variability,
+/// parcel location, player preference, and taxes. Do not use for live pricing.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct HousingAccess {
+    /// All players with at least one plot.
+    pub owners: u64,
+    pub landless: u64,
+    /// Holders of two or more plots (descriptive, not a penalty).
+    pub multiple_plot_owners: u64,
+    /// Current first-home candidates with sufficient sandbox cash, irrespective
+    /// of plots remaining. Players who already own land are excluded.
+    pub landless_cash_eligible: u64,
+    /// Landless players unable to pay even the plot sticker price.
+    pub landless_cash_shortfall: u64,
+    /// Upper bound on first-home purchases that *could* fit in remaining plots.
+    /// Does not assign parcels or reserve funds.
+    pub capacity_limited_first_homes: u64,
+    /// Cash-qualified first-home candidates without available plot capacity.
+    pub supply_constrained_candidates: u64,
+    /// Share of currently owned plots held by the highest-holding 10% of all
+    /// players, measured in basis points. None means no plots have owners.
+    pub top_decile_plot_share_bps: Option<u16>,
+}
+
 /// Deterministic toy population, not a player behavioral forecast.
 /// No issuance/minting during the simulation: all credit rewards debit treasury.
 #[derive(Clone, Debug)]
@@ -295,6 +320,52 @@ impl Economy {
         Ok(())
     }
 
+    /// Offline-only affordability and concentration diagnostics. A snapshot
+    /// cannot sell or reserve a plot and does not imply real housing access.
+    pub fn housing_access(&self) -> HousingAccess {
+        let mut owners = 0_u64;
+        let mut multi = 0_u64;
+        let mut cash_eligible = 0_u64;
+        let mut cash_shortfall = 0_u64;
+        for (&held, &balance) in self.held_plots.iter().zip(&self.balances) {
+            if held > 0 {
+                owners += 1;
+                if held >= 2 {
+                    multi += 1;
+                }
+            } else if balance >= self.policy.plot_price {
+                cash_eligible += 1;
+            } else {
+                cash_shortfall += 1;
+            }
+        }
+        let landless = cash_eligible + cash_shortfall;
+        let capacity_limited = cash_eligible.min(self.remaining_plots);
+        let mut sorted_plots = self.held_plots.clone();
+        sorted_plots.sort_unstable();
+        let owned: u64 = sorted_plots.iter().map(|&n| u64::from(n)).sum();
+        let top_share = if owned == 0 {
+            None
+        } else {
+            let decile_size = sorted_plots.len().div_ceil(10);
+            let top: u64 = sorted_plots[sorted_plots.len() - decile_size..]
+                .iter()
+                .map(|&n| u64::from(n))
+                .sum();
+            Some(((u128::from(top) * 10_000 / u128::from(owned)).min(10_000)) as u16)
+        };
+        HousingAccess {
+            owners,
+            landless,
+            multiple_plot_owners: multi,
+            landless_cash_eligible: cash_eligible,
+            landless_cash_shortfall: cash_shortfall,
+            capacity_limited_first_homes: capacity_limited,
+            supply_constrained_candidates: cash_eligible - capacity_limited,
+            top_decile_plot_share_bps: top_share,
+        }
+    }
+
     pub fn snapshot(&self) -> Snapshot {
         let mut ordered = self.balances.clone();
         ordered.sort_unstable();
@@ -347,6 +418,90 @@ mod tests {
             plot_upkeep: 1,
             max_plots_per_player: 2,
         }
+    }
+
+    #[test]
+    fn first_home_supply_shortage_is_visible_even_with_enough_cash() {
+        let mut p = policy();
+        p.treasury_reserve_floor = 0;
+        let mut sim = Economy::new(10, 100, 100, 1, p, 19).unwrap();
+        let initial = sim.housing_access();
+        assert_eq!(initial.owners, 0);
+        assert_eq!(initial.landless, 10);
+        assert_eq!(initial.landless_cash_eligible, 10);
+        assert_eq!(initial.landless_cash_shortfall, 0);
+        assert_eq!(initial.capacity_limited_first_homes, 1);
+        assert_eq!(initial.supply_constrained_candidates, 9);
+        assert_eq!(initial.top_decile_plot_share_bps, None);
+
+        sim.claim_plot(0).unwrap();
+        let after = sim.housing_access();
+        assert_eq!(after.owners, 1);
+        assert_eq!(after.landless, 9);
+        assert_eq!(after.landless_cash_eligible, 9);
+        assert_eq!(after.capacity_limited_first_homes, 0);
+        assert_eq!(after.supply_constrained_candidates, 9);
+        assert_eq!(after.top_decile_plot_share_bps, Some(10_000));
+        assert!(sim.conserved());
+    }
+
+    #[test]
+    fn multi_property_concentration_is_distinct_from_player_wealth() {
+        let mut p = policy();
+        p.treasury_reserve_floor = 0;
+        let mut sim = Economy::new(10, 500, 100, 20, p, 23).unwrap();
+        sim.claim_plot(0).unwrap();
+        sim.claim_plot(0).unwrap();
+        sim.claim_plot(1).unwrap();
+        let report = sim.housing_access();
+        assert_eq!(report.owners, 2);
+        assert_eq!(report.multiple_plot_owners, 1);
+        assert_eq!(report.landless, 8);
+        assert_eq!(report.landless_cash_eligible, 8);
+        assert_eq!(report.capacity_limited_first_homes, 8);
+        assert_eq!(report.supply_constrained_candidates, 0);
+        assert_eq!(report.top_decile_plot_share_bps, Some(6_666));
+        assert!(sim.conserved());
+    }
+
+    #[test]
+    fn available_plots_do_not_make_unaffordable_housing_accessible() {
+        let mut p = policy();
+        p.treasury_reserve_floor = 0;
+        let mut sim = Economy::new(3, 30, 100, 12, p, 6).unwrap();
+        let before = sim.housing_access();
+        assert_eq!(before.landless_cash_shortfall, 3);
+        assert_eq!(before.landless_cash_eligible, 0);
+        assert_eq!(before.capacity_limited_first_homes, 0);
+        assert_eq!(before.supply_constrained_candidates, 0);
+        assert_eq!(before.top_decile_plot_share_bps, None);
+
+        // Transfers can change affordability without issuing any new money.
+        sim.market_trade(1, 0, 7).unwrap();
+        assert_eq!(sim.housing_access().landless_cash_shortfall, 3);
+        assert!(sim.conserved());
+    }
+
+    #[test]
+    fn affordability_access_metrics_remain_consistent_in_long_run() {
+        let mut sim = Economy::new(1_000, 100, 150_000, 200, policy(), 500).unwrap();
+        for _ in 0..90 {
+            sim.run_day().unwrap();
+        }
+        let access = sim.housing_access();
+        let snapshot = sim.snapshot();
+        assert_eq!(access.owners + access.landless, 1_000);
+        assert_eq!(
+            access.landless_cash_eligible + access.landless_cash_shortfall,
+            access.landless
+        );
+        assert!(access.capacity_limited_first_homes <= snapshot.vacant_plots);
+        assert_eq!(
+            access.capacity_limited_first_homes + access.supply_constrained_candidates,
+            access.landless_cash_eligible
+        );
+        assert!(access.top_decile_plot_share_bps.is_some());
+        assert!(sim.conserved());
     }
 
     #[test]
