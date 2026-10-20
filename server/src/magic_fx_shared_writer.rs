@@ -181,17 +181,21 @@ pub fn try_write_core_guarded<W: CoreAuthenticatedWriter>(
 ) -> SharedWriteReport<CoreGuardedEnqueueError<W::Error>> {
     let mut gameplay_attempts = 0usize;
     let mut stale_optional = 0usize;
-    let mut result = try_write_shared(plan, |_| true, |route, bytes| {
-        let is_gameplay = gameplay_attempts < plan.gameplay_datagrams;
-        if is_gameplay {
-            gameplay_attempts += 1;
-        }
-        let outcome = writer.enqueue_if_current(route, bytes);
-        if !is_gameplay && matches!(&outcome, Err(CoreGuardedEnqueueError::StaleGeneration)) {
-            stale_optional += 1;
-        }
-        outcome
-    });
+    let mut result = try_write_shared(
+        plan,
+        |_| true,
+        |route, bytes| {
+            let is_gameplay = gameplay_attempts < plan.gameplay_datagrams;
+            if is_gameplay {
+                gameplay_attempts += 1;
+            }
+            let outcome = writer.enqueue_if_current(route, bytes);
+            if !is_gameplay && matches!(&outcome, Err(CoreGuardedEnqueueError::StaleGeneration)) {
+                stale_optional += 1;
+            }
+            outcome
+        },
+    );
     // Retain the real reason for discarding FX from a fenced generation
     // rather than misreporting these as socket congestion failures.
     result.cosmetic_send_failed -= stale_optional;
@@ -520,8 +524,14 @@ mod tests {
         let mut registry = TrustedFxHandoff::new();
         let route = registry.register_trusted(7, 7, 7).unwrap();
         let gameplay = vec![
-            CoreGameplayDatagram { route, bytes: vec![11] },
-            CoreGameplayDatagram { route, bytes: vec![12] },
+            CoreGameplayDatagram {
+                route,
+                bytes: vec![11],
+            },
+            CoreGameplayDatagram {
+                route,
+                bytes: vec![12],
+            },
         ];
         let fx = fx_plan(route, 1);
         let plan = composed(&registry, route, &gameplay, &fx, 3);
@@ -546,7 +556,10 @@ mod tests {
     fn p15_generation_rotates_after_gameplay_and_only_discards_old_fx() {
         let mut registry = TrustedFxHandoff::new();
         let route = registry.register_trusted(7, 7, 7).unwrap();
-        let gameplay = vec![CoreGameplayDatagram { route, bytes: vec![11] }];
+        let gameplay = vec![CoreGameplayDatagram {
+            route,
+            bytes: vec![11],
+        }];
         let fx = fx_plan(route, 2);
         let plan = composed(&registry, route, &gameplay, &fx, 3);
         let mut core = CoreMock::new(route);
@@ -567,8 +580,14 @@ mod tests {
         let mut registry = TrustedFxHandoff::new();
         let route = registry.register_trusted(7, 7, 7).unwrap();
         let gameplay = vec![
-            CoreGameplayDatagram { route, bytes: vec![11] },
-            CoreGameplayDatagram { route, bytes: vec![12] },
+            CoreGameplayDatagram {
+                route,
+                bytes: vec![11],
+            },
+            CoreGameplayDatagram {
+                route,
+                bytes: vec![12],
+            },
         ];
         let fx = fx_plan(route, 1);
         let plan = composed(&registry, route, &gameplay, &fx, 3);
@@ -593,7 +612,10 @@ mod tests {
     fn p15_optional_queue_rejection_cannot_rollback_accepted_gameplay() {
         let mut registry = TrustedFxHandoff::new();
         let route = registry.register_trusted(7, 7, 7).unwrap();
-        let gameplay = vec![CoreGameplayDatagram { route, bytes: vec![11] }];
+        let gameplay = vec![CoreGameplayDatagram {
+            route,
+            bytes: vec![11],
+        }];
         let fx = fx_plan(route, 2);
         let plan = composed(&registry, route, &gameplay, &fx, 3);
         let mut core = CoreMock::new(route);
@@ -609,13 +631,24 @@ mod tests {
 
     #[test]
     fn p15_preflight_failure_never_calls_core_atomic_gate() {
-        let route = FxRoute { connection_id: 7, generation: 1 };
+        let route = FxRoute {
+            connection_id: 7,
+            generation: 1,
+        };
         let effect = effect(7);
         let game = [1u8];
         let invalid = SharedDispatchPlan {
             ordered: vec![
-                SharedDispatchDatagram { route, priority: SharedPriority::Cosmetic, bytes: &effect },
-                SharedDispatchDatagram { route, priority: SharedPriority::Gameplay, bytes: &game },
+                SharedDispatchDatagram {
+                    route,
+                    priority: SharedPriority::Cosmetic,
+                    bytes: &effect,
+                },
+                SharedDispatchDatagram {
+                    route,
+                    priority: SharedPriority::Gameplay,
+                    bytes: &game,
+                },
             ],
             gameplay_datagrams: 1,
             gameplay_payload_bytes: 1,

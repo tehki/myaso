@@ -16,8 +16,7 @@ use myaso_server::magic_fx_shared_transport::{
     plan_shared_dispatch, CoreGameplayDatagram, CoreWriterCapacity, SharedPriority,
 };
 use myaso_server::magic_fx_shared_writer::{
-    try_write_core_guarded, try_write_shared, CoreAuthenticatedWriter,
-    CoreGuardedEnqueueError,
+    try_write_core_guarded, try_write_shared, CoreAuthenticatedWriter, CoreGuardedEnqueueError,
 };
 use std::collections::BTreeMap;
 use std::net::SocketAddr;
@@ -54,7 +53,8 @@ impl CoreAuthenticatedWriter for LabCoreWriter<'_> {
         if !self.handoff.route_current(route) {
             return Err(CoreGuardedEnqueueError::StaleGeneration);
         }
-        let Some((connection, registered_route)) = self.connections.get(&route.connection_id) else {
+        let Some((connection, registered_route)) = self.connections.get(&route.connection_id)
+        else {
             return Err(CoreGuardedEnqueueError::StaleGeneration);
         };
         if *registered_route != route {
@@ -318,7 +318,11 @@ async fn main() -> Result<()> {
                         wrote.gameplay_sent
                     );
                 }
-                (wrote.gameplay_sent, wrote.cosmetic_sent, wrote.cosmetic_not_sent)
+                (
+                    wrote.gameplay_sent,
+                    wrote.cosmetic_sent,
+                    wrote.cosmetic_not_sent,
+                )
             } else {
                 let wrote = try_write_shared(
                     &dispatch,
@@ -338,7 +342,11 @@ async fn main() -> Result<()> {
                         wrote.gameplay_sent
                     );
                 }
-                (wrote.gameplay_sent, wrote.cosmetic_sent, wrote.cosmetic_not_sent)
+                (
+                    wrote.gameplay_sent,
+                    wrote.cosmetic_sent,
+                    wrote.cosmetic_not_sent,
+                )
             };
             assert_eq!(wrote_gameplay, connections.len());
             assert_eq!(wrote_cosmetic, dispatch.cosmetic_datagrams);
