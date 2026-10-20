@@ -52,7 +52,15 @@ CREATE TABLE metadata (
     singleton INTEGER PRIMARY KEY CHECK (singleton=1),
     sequence INTEGER NOT NULL CHECK(sequence>=0),
     issued_units INTEGER NOT NULL CHECK(issued_units>=0),
-    title_cap INTEGER NOT NULL CHECK(title_cap>=1)
+    title_cap INTEGER NOT NULL CHECK(title_cap>=1),
+    mutation_revision INTEGER NOT NULL DEFAULT 0 CHECK(mutation_revision>=0)
+);
+CREATE TABLE admission_mutations (
+    revision INTEGER PRIMARY KEY CHECK(revision>0),
+    operation_id TEXT NOT NULL UNIQUE CHECK(length(operation_id) BETWEEN 1 AND 64),
+    mutation_kind TEXT NOT NULL CHECK(mutation_kind IN ('session_revoke','listing_revoke')),
+    target_id INTEGER NOT NULL CHECK(target_id>0),
+    target_epoch INTEGER NOT NULL CHECK(target_epoch>=0)
 );
 CREATE TABLE accounts (
     id INTEGER PRIMARY KEY CHECK(id>0),
