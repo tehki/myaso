@@ -122,6 +122,11 @@ impl SessionIdentityRegistry {
         Some(character)
     }
 
+    /// Trusted server-internal inventory of authenticated active leases.
+    pub(crate) fn verified_bindings(&self) -> impl Iterator<Item = (SessionLease, CharacterId)> + '_ {
+        self.by_session.values().copied()
+    }
+
     pub fn active_count(&self) -> usize {
         self.by_session.len()
     }
