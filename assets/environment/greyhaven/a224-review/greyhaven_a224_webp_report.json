@@ -1,0 +1,70 @@
+{
+  "actualGameRenderIntegrated": false,
+  "baseAlphaUnchanged": true,
+  "collisionOrPortalActivated": false,
+  "decorativeHeightRisePixelsPerMeter": [
+    0.0,
+    -28.560009
+  ],
+  "layers": {
+    "base": {
+      "bytes": 42650,
+      "croppedPixels": [
+        228,
+        297
+      ],
+      "drawOffsetFromVisualDoorPixels": [
+        -114.0,
+        -269.0
+      ],
+      "file": "red_lion_a224_base.webp",
+      "flippedIntoGamePositiveYDown": true,
+      "roundtripExactRGBA": true,
+      "sha256": "b9d8e1888c26a63cb11b69381db81c352cb45750ea32ad3c7d567d60b2f244ff",
+      "visualDoorAnchorInCropPixels": [
+        114.0,
+        269.0
+      ]
+    },
+    "roof": {
+      "bytes": 37406,
+      "croppedPixels": [
+        238,
+        197
+      ],
+      "drawOffsetFromVisualDoorPixels": [
+        -119.0,
+        -283.0
+      ],
+      "file": "red_lion_a224_roof.webp",
+      "flippedIntoGamePositiveYDown": true,
+      "roundtripExactRGBA": true,
+      "sha256": "31664c803ec73e1b89ce5a717976bb6d9de58bb69a8bb30e45e09449d030f2c9",
+      "visualDoorAnchorInCropPixels": [
+        119.0,
+        283.0
+      ]
+    }
+  },
+  "milestone": "Blood & Iron A2.24 source-preserving RGB facade art",
+  "originalFacadeGroundBasisPreserved": true,
+  "originalGameGroundBasisPixelsPerMeter": {
+    "x": [
+      33.600006,
+      0.0
+    ],
+    "y": [
+      0.0,
+      33.600006
+    ]
+  },
+  "originalGroundVerticesMovedXY": false,
+  "originalRoofBinaryPreserved": true,
+  "originalSceneOrKnightSourcesChanged": false,
+  "preview": "greyhaven_a224_facade_before_after.png",
+  "productionApproved": false,
+  "visualDoorPivotPx": [
+    320.0,
+    320.0
+  ]
+}

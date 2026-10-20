@@ -1,0 +1,74 @@
+{
+  "doorAndRoofOutlineModified": false,
+  "gameRuntimeOrMultiplayerModified": false,
+  "gameViewZoom": 0.84,
+  "groundBasisPixelsPerSourceMeter": {
+    "x": [
+      33.600006,
+      0.0
+    ],
+    "y": [
+      0.0,
+      33.600006
+    ]
+  },
+  "imageFiles": {
+    "base": "red_lion_a224_base.webp",
+    "preview": "greyhaven_a224_facade_before_after.png",
+    "roof": "red_lion_a224_roof.webp"
+  },
+  "losslessBaseRoundtrip": true,
+  "milestone": "Blood & Iron A2.24 native Red Lion facade RGB shading polish",
+  "newBaseByteLength": 42650,
+  "newBaseCropPixels": [
+    228,
+    297
+  ],
+  "newBaseDrawOffsetFromVisualDoorPixels": [
+    -114.0,
+    -269.0
+  ],
+  "newBaseSha256": "b9d8e1888c26a63cb11b69381db81c352cb45750ea32ad3c7d567d60b2f244ff",
+  "newFacadeAlphaBounds": [
+    209,
+    54,
+    431,
+    345
+  ],
+  "newFacadeAlphaChannelIdentical": true,
+  "newRoofSha256": "31664c803ec73e1b89ce5a717976bb6d9de58bb69a8bb30e45e09449d030f2c9",
+  "originalA222BaseSha256": "1cb4d4fe5a275d17bc8dedfdfa9f4b6b811e66c49e53d1abb008cab7fa229ef2",
+  "originalA222RoofSha256": "31664c803ec73e1b89ce5a717976bb6d9de58bb69a8bb30e45e09449d030f2c9",
+  "originalBaseDrawOffsetFromVisualDoorPixels": [
+    -114.0,
+    -269.0
+  ],
+  "originalFacadeAlphaBounds": [
+    209,
+    54,
+    431,
+    345
+  ],
+  "originalFacePixelColorsChanged": 8135,
+  "originalKnightsModified": false,
+  "productionApproved": false,
+  "roofBinaryIdenticalToA222": true,
+  "roofByteLength": 37406,
+  "serverAuthoritativePortalOrCollisionChanged": false,
+  "sourceArtSceneSaved": false,
+  "sourceBaseCropPixels": [
+    228,
+    297
+  ],
+  "sourceBaseline": "A2.22 original Blender Red Lion",
+  "sourceReviewDifferenceBounds": [
+    209,
+    226,
+    433,
+    324
+  ],
+  "visualDoorPivotPx": [
+    320,
+    320
+  ]
+}
