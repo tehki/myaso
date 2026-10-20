@@ -9,6 +9,7 @@ This follows [A1 direction](BLOOD_AND_IRON_ART_DIRECTION_RU.md) and [roadmap #34
 - Red Lion A1 blockout with procedural limestone, lime plaster, weathered timber, clay and iron materials.
 - Four additional facade modules: slate-roof merchant house, thatched cottage, stone weaver's cottage, blacksmith workshop with anvil and glowing forge. These are **look-dev prototypes, not final hero meshes**.
 - One authored fixed street composition, 1,032 cobbles consolidated into **one Blender mesh**; handcart, 6 oaks, fences, grass and barrels.
+- **Barrel clearance:** both the originally overlapping A1 tavern barrel group and the A2 street placements are reconstructed as seven original procedural barrel assemblies. Their outer iron hoops have radius 0.315 m; pairwise clearance is asserted >= 0.10 m (actual closest pair 0.153 m). The historical A1 source OBJ remains untouched.
 - Original shader-node noise, color ramp and bump materials. **No external textures, paid libraries, reference downloads or generative assets**. Geometry is original project-authored Python.
 - Orthographic street and Red Lion review cameras, roof-occlusion candidate mesh tags, Cycles CPU lighting. The camera pitch is a **composition study**, not a locked game export angle.
 
