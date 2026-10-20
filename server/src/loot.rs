@@ -1353,9 +1353,13 @@ mod tests {
         let id = loot.grant(1, ItemKind::Gold, 7).unwrap();
         let snap = loot.export_state().unwrap();
         let mut duplicate = snap.clone();
-        duplicate.players.get_mut(&2).unwrap().backpack.push(
-            duplicate.players[&1].backpack[0].clone()
-        );
+        let cloned_stack = duplicate.players[&1].backpack[0].clone();
+        duplicate
+            .players
+            .get_mut(&2)
+            .unwrap()
+            .backpack
+            .push(cloned_stack);
         assert!(matches!(
             LootAuthority::restore_state(duplicate),
             Err(LootError::InvalidState)
