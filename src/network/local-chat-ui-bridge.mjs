@@ -119,9 +119,12 @@ export async function openLocalChatUiBridge(gameConnection, {
       });
       // Writable stream delays must not indefinitely block the UI's ACK timer.
       // Only the server-issued result can resolve the promise successfully.
-      Promise.resolve().then(() => wire.send({
-        correlation, text, channel: CHAT.channelLocal,
-      })).catch(error => {
+      Promise.resolve().then(() => {
+        // Closing/replacing the adapter before the queued microtask runs
+        // must never submit a message from a retired session.
+        if (retired || wire.closed || !pending.has(correlation)) return;
+        return wire.send({ correlation, text, channel: CHAT.channelLocal });
+      }).catch(error => {
         const record = pending.get(correlation);
         if (record) {
           pending.delete(correlation);
