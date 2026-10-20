@@ -5,7 +5,10 @@
 
 CREATE TABLE IF NOT EXISTS core_zone.world_state (
     entity_kind smallint NOT NULL,
-    entity_id bytea NOT NULL CHECK (octet_length(entity_id) = 16),
+    entity_id bytea NOT NULL CHECK (
+        octet_length(entity_id) = 16
+        AND entity_id <> decode('00000000000000000000000000000000', 'hex')
+    ),
     revision bigint NOT NULL CHECK (revision > 0),
     payload bytea NOT NULL CHECK (octet_length(payload) BETWEEN 1 AND 4096),
     PRIMARY KEY (entity_kind, entity_id),
@@ -17,9 +20,15 @@ CREATE TABLE IF NOT EXISTS core_zone.world_state (
 -- Missing results exist only inside an uncommitted DB transaction, never
 -- visible to another committed transaction.
 CREATE TABLE IF NOT EXISTS core_zone.world_mutation_receipts (
-    mutation_id bytea PRIMARY KEY CHECK (octet_length(mutation_id) = 16),
+    mutation_id bytea PRIMARY KEY CHECK (
+        octet_length(mutation_id) = 16
+        AND mutation_id <> decode('00000000000000000000000000000000', 'hex')
+    ),
     entity_kind smallint NOT NULL,
-    entity_id bytea NOT NULL CHECK (octet_length(entity_id) = 16),
+    entity_id bytea NOT NULL CHECK (
+        octet_length(entity_id) = 16
+        AND entity_id <> decode('00000000000000000000000000000000', 'hex')
+    ),
     worker bigint NOT NULL CHECK (worker > 0),
     zone bigint NOT NULL CHECK (zone > 0),
     authority_epoch bigint NOT NULL CHECK (authority_epoch > 0),
@@ -36,7 +45,10 @@ CREATE TABLE IF NOT EXISTS core_zone.world_event_outbox (
     sequence bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     mutation_id bytea UNIQUE NOT NULL,
     entity_kind smallint NOT NULL,
-    entity_id bytea NOT NULL CHECK (octet_length(entity_id) = 16),
+    entity_id bytea NOT NULL CHECK (
+        octet_length(entity_id) = 16
+        AND entity_id <> decode('00000000000000000000000000000000', 'hex')
+    ),
     authority_epoch bigint NOT NULL CHECK (authority_epoch > 0),
     world_revision bigint NOT NULL CHECK (world_revision > 0),
     payload bytea NOT NULL CHECK (octet_length(payload) BETWEEN 1 AND 4096),
@@ -76,7 +88,9 @@ DECLARE
     published_sequence bigint;
 BEGIN
     IF p_mutation IS NULL OR octet_length(p_mutation) != 16
+        OR p_mutation = decode('00000000000000000000000000000000', 'hex')
         OR p_entity IS NULL OR octet_length(p_entity) != 16
+        OR p_entity = decode('00000000000000000000000000000000', 'hex')
         OR p_payload IS NULL OR octet_length(p_payload) NOT BETWEEN 1 AND 4096
         OR p_kind IS NULL OR p_kind NOT IN (1, 2)
         OR p_worker IS NULL OR p_worker <= 0
