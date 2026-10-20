@@ -10,14 +10,14 @@ use std::fs;
 use std::path::Path;
 
 use crate::character_identity::{SessionIdentityRegistry, SessionLease};
-use crate::magic_teacher::{TeacherAuthority, TeacherError, TeacherRequest};
-use crate::zone::ZoneAuthority;
 use crate::loot::{LootAuthority, LootError};
 use crate::loot_persistence::{
     atomic_write, checksum, decode, encode, CheckpointError, MAX_FILE_BYTES,
 };
 use crate::loot_transaction::{quiescent_verified, TransactionError};
 use crate::magic::{LessonAward, MagicAuthority, MagicError, MagicSnapshotError};
+use crate::magic_teacher::{TeacherAuthority, TeacherError, TeacherRequest};
+use crate::zone::ZoneAuthority;
 
 const HEADER: &[u8; 8] = b"MYWLD001";
 const MAGIC_MAX_BYTES: usize = 1024 * 1024;

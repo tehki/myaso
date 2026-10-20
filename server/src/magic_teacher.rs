@@ -221,7 +221,10 @@ mod tests {
             .unwrap();
         let mut identity = SessionIdentityRegistry::new();
         identity
-            .bind_verified(SessionLease::new(1, 1).unwrap(), CharacterId::new(50).unwrap())
+            .bind_verified(
+                SessionLease::new(1, 1).unwrap(),
+                CharacterId::new(50).unwrap(),
+            )
             .unwrap();
         let mut zones = ZoneAuthority::new();
         zones.register(1).unwrap();
@@ -300,7 +303,10 @@ mod tests {
             .unwrap();
         let mut identity = SessionIdentityRegistry::new();
         identity
-            .bind_verified(SessionLease::new(1, 1).unwrap(), CharacterId::new(10).unwrap())
+            .bind_verified(
+                SessionLease::new(1, 1).unwrap(),
+                CharacterId::new(10).unwrap(),
+            )
             .unwrap();
         let mut zones = ZoneAuthority::new();
         zones.register(1).unwrap();
