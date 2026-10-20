@@ -1,5 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
 import { MAP_IDS, getAuthoredMap } from "../src/world/authored-maps.mjs";
 import { isAuthoredPreviewWalkable, moveAuthoredPreview } from "../src/world/authored-preview-collision.mjs";
 import {
@@ -105,4 +107,24 @@ test("D6 survey IDs, output and progress never expose mutable world resources", 
   assert.equal(notebook.size,1);
   assert.ok(Object.isFrozen(localFieldSurveyProgress(notebook)));
   assert.equal(nearbyLocalFieldSite(MAP_IDS.tavern,390,480),null);
+});
+
+test("D6 offline preview wires the F-key notebook without touching online client", () => {
+  const html=readFileSync(new URL("../web/world-preview.html",import.meta.url),"utf8");
+  const script=html.match(/<script type="module">([\s\S]*?)<\/script>/);
+  assert.ok(script,"module block missing");
+  const syntax=spawnSync(process.execPath,["--check","--input-type=module"],{
+    input:script[1],encoding:"utf8",timeout:10000,
+  });
+  assert.equal(syntax.status,0,syntax.stderr);
+  assert.match(html,/id="survey-journal"/);
+  assert.match(html,/id="survey-progress"/);
+  assert.match(script[1],/observeLocalFieldSite\(fieldNotebook,mapId,player.x,player.y\)/);
+  assert.match(script[1],/if\(e.code==="KeyF"&&!e.repeat\)/);
+  assert.match(script[1],/mapId===MAP_IDS.overworld/);
+  assert.doesNotMatch(script[1],/fetch\(|localStorage|sessionStorage|WebSocket|WebTransport/);
+  for(const p of ["../web/online-game.mjs","../server/src/main.rs","../server/src/simulation.rs"]){
+    const live=readFileSync(new URL(p,import.meta.url),"utf8");
+    assert.doesNotMatch(live,/field-survey|observeLocalFieldSite|localFieldSurveyProgress/);
+  }
 });
