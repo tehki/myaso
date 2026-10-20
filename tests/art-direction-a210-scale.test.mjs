@@ -74,7 +74,7 @@ test("A2.10 scale review cannot alter the game client or source knight atlases",
   assert.match(html,/visual sizes/);
   assert.doesNotMatch(html,/online-game\.mjs/);
   assert.match(js,/const testPlacement/);
-  assert.match(js,/KNIGHT/);
+  assert.match(js,/sourceClipFrames/);
   assert.match(js,/rigFootContactValidated:false/);
   assert.match(js,/gameScaleChanged:false/);
   assert.match(js,/physicsChanged:false/);
