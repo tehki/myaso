@@ -76,3 +76,17 @@ test('A2 knight/building scale review only reads approved A3 GLBs and keeps rend
   assert.match(qa, /"nativeBlenderSceneCommitted": False/);
   assert.doesNotMatch(qa, /export_scene\.gltf|requests\.|urlretrieve\(/);
 });
+
+
+test('A2 GLB comparison excludes non-character spheres and samples real roll clips', () => {
+  const qa = readFileSync(new URL('../tools/art/compare_a3_knights_to_greyhaven.py', import.meta.url), 'utf8');
+  assert.match(qa, /ob\.name\.startswith\("Icosphere"\)/);
+  assert.match(qa, /len\(ob\.data\.vertices\) <= 64/);
+  assert.match(qa, /ob\.hide_render = True/);
+  assert.match(qa, /if ob\.type != "MESH" or is_proxy\(ob\)/);
+  assert.match(qa, /default=5\)/);
+  assert.match(qa, /rig\.animation_data\.action = idle/);
+  assert.match(qa, /rig\.animation_data\.action = fighter\["roll"\]/);
+  assert.match(qa, /roll\.frame_range\[0\] <= args\.roll_frame <= roll\.frame_range\[1\]/);
+  assert.match(qa, /"actualBrowserSpriteComparisonDone": False/);
+});
