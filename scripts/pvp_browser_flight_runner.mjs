@@ -9021,15 +9021,16 @@ async function runOnlineUiHeavyGuardBreakPunishFlight(entries) {
   const lightThreatsBefore = baselineDefender.threatTransitions.filter((entry) =>
     entry.visible && (entry.phase === "WINDUP" || entry.phase === "STRIKE")).length;
 
-  // Time genuine clicks from the accepted second-heavy request rather than from
-  // a remote recovery snapshot. Authoritative input ingress and browser scheduling
-  // can shift the actual Idle boundary relative to the local issuance timestamp,
-  // so sample a bounded ~300 ms window around the unchanged 840 ms commitment.
-  // Only the first accepted click can start the light; subsequent clicks occur
-  // during its own commitment and are ignored. Exact-one-hit validation below
-  // remains fail-closed.
+  // Time the one genuine click from the accepted second-heavy request.
+  // Heavy windup + active + recovery is 840ms. The former 800ms click could
+  // release during authoritative heavy recovery, which DOES NOT buffer light
+  // attacks; the real 10ms W3C click was correctly ignored by the server.
+  // Schedule 60ms after the unchanged recovery boundary, still early enough
+  // for 135ms light windup to hit inside the defender's heavy guard-break stun.
+  // No extra clicks, synthetic events, damage relaxations or combat balance changes.
   const elapsedSinceHeavyIssue = Date.now() - secondHeavyIssuedAt;
-  const firstClickTargetMs = 800;
+  const firstClickTargetMs = COMBAT.heavyAttack.windupMs
+    + COMBAT.heavyAttack.activeMs + COMBAT.heavyAttack.recoveryMs + 60;
   const initialPauseMs = Math.max(0, firstClickTargetMs - elapsedSinceHeavyIssue);
   // The in-page observer timestamps both event-text and overlay mutations. That
   // provides stronger ordering evidence than repeated WebDriver reads and does
