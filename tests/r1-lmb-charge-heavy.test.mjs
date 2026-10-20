@@ -173,6 +173,8 @@ test("M111 one genuine LMB release gives exactly one 34HP guard-break punish", (
   const end = source.indexOf("\nasync function ", start + 40);
   assert.ok(start >= 0 && end > start);
   const proof = source.slice(start, end);
+  assert.match(proof, /const firstClickTargetMs = COMBAT\.heavyAttack\.windupMs\s*\+ COMBAT\.heavyAttack\.activeMs \+ COMBAT\.heavyAttack\.recoveryMs \+ 60/,
+    "M111 must release a genuine light after authoritative heavy recovery, not during it");
   assert.match(proof, /performArenaAttackBurst\(attacker, 1, initialPauseMs, 0\)/);
   assert.doesNotMatch(proof, /performArenaAttackBurst\(attacker, 9/);
   assert.match(proof, /Opponent hit - 34 HP\./);
