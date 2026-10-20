@@ -54,12 +54,19 @@ fn release_os_lock(file: &File) -> io::Result<()> {
     // POSIX flock LOCK_UN=8. The file descriptor is still open here.
     // SAFETY: file owns a valid descriptor throughout this foreign call.
     let result = unsafe { flock(file.as_raw_fd(), 8) };
-    if result == 0 { Ok(()) } else { Err(io::Error::last_os_error()) }
+    if result == 0 {
+        Ok(())
+    } else {
+        Err(io::Error::last_os_error())
+    }
 }
 
 #[cfg(not(unix))]
 fn try_exclusive_os_lock(_file: &File) -> io::Result<bool> {
-    Err(io::Error::new(io::ErrorKind::Unsupported, "local zone locks require Unix"))
+    Err(io::Error::new(
+        io::ErrorKind::Unsupported,
+        "local zone locks require Unix",
+    ))
 }
 
 #[cfg(not(unix))]
