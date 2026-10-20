@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { readFileSync, readdirSync } from "node:fs";
 import { createGameAudio } from "../src/browser/game-audio.mjs";
 
@@ -372,7 +373,7 @@ test("R4.2 Death uses two real CC0 human grunts with short low falls, never crea
   assert.match(source, /name === "death" \? 1250/, "death low-pass removes shrill upper harmonics");
   const doc = readFileSync(new URL("../web/audio/SOURCES.md", import.meta.url), "utf8");
   assert.match(doc, /Exewin[\s\S]*?CC0/i);
-  assert.match(doc, /human[\s\S]*?death-grunt/i);
+  assert.match(doc, /real \*\*human dying\/grunt\*\*/i);
   const audio = createGameAudio({
     AudioContextImpl: Context, AudioElementImpl: MusicTrack, storage: null, random: () => .5,
     fetchImpl: async () => ({
@@ -437,4 +438,37 @@ test("R4 four-song playlist advances on ended, wraps, and never overlaps or auto
   audio.dispose();
   assert.equal(track.onended, null, "disposed audio never advances on stale events");
   assert.equal(audio.nextMusicTrack(), false);
+});
+
+test("R4 source evidence preserves exact Musopen download IDs, sound credits, licensing, and bytes", () => {
+  const source = readFileSync(new URL("../web/audio/SOURCES.md", import.meta.url), "utf8");
+  const html = readFileSync(new URL("../web/audio/credits.html", import.meta.url), "utf8");
+  const gameHtml = readFileSync(new URL("../web/index.html", import.meta.url), "utf8");
+  const audition = readFileSync(new URL("../web/audio/audition.html", import.meta.url), "utf8");
+  const items = [
+    ["moonlight-sonata-adagio.mp3", "4689d506-fb06-439a-878b-0a80e9722084",
+      "04fd810bc2dad1aa5f2dd5c8703c068c5830b4f1c2540aaea7b2451ee775015a"],
+    ["vivaldi-autumn-adagio.mp3", "616970c4-72d3-43e6-b680-5fa879330b18",
+      "2191f3ac31bd6214c4040df7be181deaf9751f621d079c58577f81bacf5ad911"],
+    ["vivaldi-winter.mp3", "edc962f5-6cc9-40ab-ae28-c2bfcb859ae6",
+      "6ae40350af0ca7458b66711478a47cb1acc793adb338c51f11f4ee8f4da37438"],
+    ["track-04-untitled.mp3", "3274b502-2ab0-4506-9d49-d2442a02699b",
+      "5d4547cccaf97fb17f7160bf7d165de5ad11ec3819cc6a1a05ef5f054942b54c"],
+  ];
+  for (const [name, id, checksum] of items) {
+    const bytes = readFileSync(new URL("../web/audio/music/" + name, import.meta.url));
+    assert.equal(createHash("sha256").update(bytes).digest("hex"), checksum,
+      name + " changed from the unmodified original recording");
+    assert.ok(source.includes(id) && source.includes(checksum),
+      name + " must retain original Windows-download provenance");
+    assert.ok(html.includes(id), name + " must have accessible credits");
+  }
+  assert.match(source, /Creative Commons Attribution ShareAlike 1\.0/);
+  assert.match(source, /John Harrison[\s\S]*?Robert Turizziani/);
+  assert.match(source, /Do not label Autumn as CC0 or public domain/);
+  assert.match(source, /Untitled \(#4\)[\s\S]*?unverified/);
+  assert.match(html, /creativecommons\.org\/licenses\/by-sa\/1\.0/);
+  assert.match(html, /The specific performer and recording license have not yet been confirmed/);
+  assert.match(gameHtml, /href="\/web\/audio\/credits\.html"/);
+  assert.match(audition, /href="\.\/credits\.html"/);
 });

@@ -1,24 +1,37 @@
-# myaso.io Sound R4 — audio provenance and playlist
+# myaso.io Sound R4 — Audio sources, licensing and playlist
 
-## Four user-provided MP3 music recordings
+## Four source-identical MP3 recordings
 
-The owner supplied **four MP3 recordings from their Windows Music folder**
-for the game. The existing generated `Moonlit Melody` and old organ drone
-have been removed from gameplay. The new music layer plays **one MP3 at a time
-in sequence**, advances when a song ends, returns to the first after track 4,
-and does not preload all 4 simultaneously. It remains off until the player
-explicitly enables Music; effects volume/mute are independent.
+The project owner supplied these four **user-provided** MP3 files from the Windows
+`%USERPROFILE%\Music` folder. Windows NTFS `Zone.Identifier`
+alternate data streams on **all four original files** identify
+`ReferrerUrl=https://musopen.org/` and individual
+`HostUrl=https://dl.musopen.org/recordings/...` downloads.
+That is file-origin evidence, **not an automatic guarantee of licensing**.
 
-| Playback order | Bundled file | Windows-file metadata | Duration |
+The game plays the four originals **sequentially** through a single opt-in
+HTML media element. A track ends before the next starts; after #4 it
+wraps to #1. `preload=none`, independent music volume and mute,
+visibility pause, and no gameplay-triggered autoplay are preserved.
+
+| Order | Bundled file | Recording details and duration | Download recording ID |
 | --- | --- | --- | --- |
-| 1 | `moonlight-sonata-adagio.mp3` | Beethoven, *Piano Sonata No. 14, Op. 27 No. 2, I. Adagio sostenuto* (embedded artist: Unknown Artist) | 5:35.54 |
-| 2 | `vivaldi-autumn-adagio.mp3` | Vivaldi, *The Four Seasons — Autumn: Adagio molto*; embedded artist: John Harrison — Violin | 2:32.69 |
-| 3 | `vivaldi-winter.mp3` | Vivaldi, *The Four Seasons — Winter*; embedded artist: The USAF Concert Band and Singing Sergeants | 3:17.67 |
-| 4 | `track-04-untitled.mp3` | Source file has no title/artist tags (Windows music category: Blues); do not invent an identity | 10:22.92 |
+| 1 | `moonlight-sonata-adagio.mp3` | Beethoven, Sonata No. 14, first movement; 5:35.54; audio tags say *Unknown Artist* | `4689d506-fb06-439a-878b-0a80e9722084` |
+| 2 | `vivaldi-autumn-adagio.mp3` | Vivaldi, Four Seasons — Autumn: Adagio molto; John Harrison, violin; 2:32.69 | `616970c4-72d3-43e6-b680-5fa879330b18` |
+| 3 | `vivaldi-winter.mp3` | Vivaldi, Four Seasons — Winter; USAF Concert Band and Singing Sergeants; 3:17.67 | `edc962f5-6cc9-40ab-ae28-c2bfcb859ae6` |
+| 4 | `track-04-untitled.mp3` | Title and performer *unknown*; Windows category Blues; 10:22.92 | `3274b502-2ab0-4506-9d49-d2442a02699b` |
 
-All four files are **byte-for-byte identical to the owner's provided
-original MP3s**. The file names have been normalized for web serving; there
-is no transcode, remix or lossy re-encoding. SHA-256 checksums:
+### Original download URLs from the Windows file zone metadata
+
+- #1 <https://dl.musopen.org/recordings/4689d506-fb06-439a-878b-0a80e9722084.mp3>
+- #2 <https://dl.musopen.org/recordings/616970c4-72d3-43e6-b680-5fa879330b18.mp3>
+- #3 <https://dl.musopen.org/recordings/edc962f5-6cc9-40ab-ae28-c2bfcb859ae6.mp3>
+- #4 <https://dl.musopen.org/recordings/3274b502-2ab0-4506-9d49-d2442a02699b.mp3>
+
+The Windows original filenames sometimes included a `filename=` query
+parameter. The recording ID above is the same canonical Musopen download.
+The four bundled MP3s were copied byte-for-byte, not transcoded or
+remixed. Source and committed asset SHA-256 hashes match:
 
 ```text
 moonlight-sonata-adagio.mp3       04fd810bc2dad1aa5f2dd5c8703c068c5830b4f1c2540aaea7b2451ee775015a
@@ -27,59 +40,84 @@ vivaldi-winter.mp3               6ae40350af0ca7458b66711478a47cb1acc793adb338c51
 track-04-untitled.mp3           5d4547cccaf97fb17f7160bf7d165de5ad11ec3819cc6a1a05ef5f054942b54c
 ```
 
-**Licensing note:** the user reports that the four recordings are public
-domain / royalty-free. Composition copyright and **recording-specific
-redistribution/public-performance rights** are different. We have not
-independently verified rights in the individual performances or the fourth
-untitled MP3, and do not assert a particular license for them. Confirm
-recording-specific rights before shipping the files in a public release.
+### Recording-specific permissions: release checklist
 
-## Original physical combat/movement Foley (CC0)
+**Musopen source terms:** https://musopen.org/faq/ explains that
+the rights in the composition and a particular performance are separate,
+and Musopen cannot guarantee the copyright status of every upload.
+The catalog notes that specific restrictions require checking each
+recording's license icon: https://musopen.org/music/.
+
+- **Autumn (#2): verified attribution/share-alike required.** The
+  owner's MP3 contains the embedded comment: `John Harrison, Violin;
+  Robert Turizziani, Conductor; Wichita State University Chamber
+  Players`, then **Creative Commons Attribution ShareAlike 1.0** and
+  https://creativecommons.org/licenses/by-sa/1.0/.
+  Wikimedia Commons confirms this specific performance is available
+  under Creative Commons BY-SA, including selectable later versions:
+  https://commons.wikimedia.org/wiki/File:Vivaldi_-_Four_Seasons_3_Autumn_mvt_2_Adagio_molto_-_John_Harrison_violin.oga.
+  When distributing or using this recording, retain appropriate
+  performer/source/license attribution and comply with the selected
+  BY-SA version's conditions. **Do not label Autumn as CC0 or public domain.**
+- **Moonlight (#1): exact Musopen download source known; recording-specific
+  license/performer not independently verified.** Beethoven's
+  composition being old does not independently clear this performance.
+- **Winter (#3): exact Musopen download source and the USAF performer
+  attribution known; recording-specific terms not independently
+  confirmed against that exact MP3.** Likely U.S. federal public
+  domain material, but do not assert it without checking provenance.
+- **Untitled (#4): exact Musopen download source known but the artist,
+  composition and recording-specific license are still unverified.**
+  The MP3 has no ID3 title/artist. Do not invent them from its genre.
+
+**Release gate:** The owner reports the recordings as royalty-free / public
+domain. That statement and Musopen-hosted origin are documented, but they
+do not establish that every recording meets public redistribution and
+commercial game-use requirements. Check each individual Musopen recording
+license before merging into public distribution, particularly #1 and #4,
+and apply BY-SA attribution for #2. Evidence/reference links are
+preserved here for review.
+
+## Physical combat/movement Foley (CC0)
 
 **Kenney RPG Audio (2014), CC0 1.0:**
 - https://kenney.nl/assets/rpg-audio
 - https://opengameart.org/content/50-rpg-sound-effects
 - https://opengameart.org/sites/default/files/RPGsounds_Kenney.zip
 
-The bundle retains **22 unchanged CC0 Kenney OGG effects** for movement,
-blades, footfalls, cloth, leather and restrained metal clicks. Harsh
-`metalPot1/2/3` and squeaking `creak1` were deliberately removed after
-the owner's listening feedback. Guard Break uses filtered soft leather/cloth
-instead of piercing metal.
+The game retains 22 unchanged Kenney CC0 OGG sounds for blade motions,
+footfalls, cloth, leather and restrained metal clicks. It removed the
+resonant `metalPot1/2/3` recordings and squeaking `creak1` after
+owner listening feedback. Guard Break uses soft, filtered physical impacts.
 
-## Death — human grunt + physical fall (CC0)
+## Death grunt and physical fall (CC0)
 
-**Exewin, "Death sounds" (2018), CC0 1.0:**
+**Exewin, Death Sounds (2018), CC0 1.0:**
 - https://opengameart.org/content/death-sounds-0
-- Original source package: https://opengameart.org/sites/default/files/exewinDeathSoundsPack.zip
+- https://opengameart.org/sites/default/files/exewinDeathSoundsPack.zip
 
-Derived `deathFall1.ogg` and `deathFall2.ogg` use Exewin human
-death-grunt recordings 6 and 11 plus a Kenney leather fall sound. Source
-recipe: `scripts/build_death_falls.sh`. Offline low-pass, fade and
-gain limiting remove harsh high frequency; runtime applies an additional
-1250 Hz low-pass and reduced playback level. There is no old wooden creak.
+The two derived `deathFall1.ogg` and `deathFall2.ogg` each combine a
+real **human dying/grunt** recording from Exewin with a Kenney leather fall.
+Reproducible processing recipe: `scripts/build_death_falls.sh`.
+Offline low-pass/fade/gain
+limiting and the runtime's additional 1250 Hz low-pass avoid sharp squeaks.
 
-## Audition and runtime boundaries
+## Sound-only listening / runtime
 
-`web/audio/audition.html` exercises the identical browser mixer with
-**24 / 24 local OGG effects**, the four independent MP3 songs, an explicit
-Music on/off toggle and **Next track** preview. It does not load the
-playable world, networking, physics or characters, and its settings do not
-modify the player's persisted game preferences.
+`web/audio/audition.html` uses the same sound mixer and gates cue controls
+until **24 / 24 recorded OGG effects** decode. Its Music switch and
+**Next track** button preview all four user MP3s without opening the game,
+connecting to multiplayer or modifying saved gameplay audio preferences.
 
-From the sound-branch checkout, serve the repository root locally:
+From the local Sound branch checkout:
 
 ```powershell
 py -m http.server 8000
 ```
 
-Open `http://127.0.0.1:8000/web/audio/audition.html`. Press Prepare
-24 recordings, select Music on and try Next track to hear all four. The
-playlist cycles automatically on completion; only one media element plays,
-with `preload=none`, default Music slider 35% times a 30% bus headroom
-factor, and independent combat effects.
-
-Native Chromium/Firefox acceptance must confirm correct MP3 MIME and
-actual media playback; unit tests verify opt-in, end-of-track progression,
-round-robin wrap, no overlap, pause, no off-state autoplay and cleanup.
-Human listening and license verification are separate release gates.
+Open `http://127.0.0.1:8000/web/audio/audition.html`. Music is opt-in
+and defaults to 35% on the 30%-headroom media bus. The single playlist
+player has `preload=none`, ends-driven next track, automatic wrap and
+visibility pause. Native Chrome/Firefox CI verifies MP3 MIME and actual
+playback; tests verify no overlap, unintended autoplay and source hashes.
+Human listening was approved by the owner on 2026-10-20.
