@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
+import { LEFT_HEAVY_CHARGE_MS } from "../src/browser/left-button-charge.mjs";
 
 test("M144 retains exact real 60..200ms light-release lead gate with earlier trusted onset", () => {
   const source = readFileSync(new URL("../scripts/pvp_browser_flight_runner.mjs", import.meta.url), "utf8");
@@ -11,7 +12,10 @@ test("M144 retains exact real 60..200ms light-release lead gate with earlier tru
   assert.ok(flight.includes("const jumpInputDelayMs = spatial ? 80 : 155;"));
   assert.ok(flight.includes("await lightChallenge.wait()"));
   assert.ok(flight.includes("await sleep(jumpInputDelayMs)"));
-  assert.ok(flight.includes("performArenaAttackHold(lightAttacker, lightArena, 200, 90)"));
+  // Real UI light click must not cross the 80ms heavy upgrade timer.
+  const genuineLightClickMs = 45;
+  assert.ok(genuineLightClickMs < LEFT_HEAVY_CHARGE_MS);
+  assert.ok(flight.includes(`performArenaAttackHold(lightAttacker, lightArena, 200, ${genuineLightClickMs})`));
   assert.ok(flight.includes("performArenaJumpAttackChord(jumpAttacker, jumpArena, -200, 90)"));
   assert.ok(flight.includes("jumpAttackDowns[0].epochMs - lightUps[0].epochMs"));
   assert.ok(flight.includes("const minLeadMs = spatial ? 70 : 60;"));
