@@ -77,8 +77,16 @@ async function run(browser, port) {
     await script(`
       return import("/src/browser/game-audio.mjs").then(({createGameAudio}) => {
         window.__r4SourceStarts = 0;
+        window.__r4Fetches = [];
+        window.__r4Decodes = [];
         class TrackedContext extends (window.AudioContext || window.webkitAudioContext) {
           constructor(...args) { super(...args); window.__r4Context = this; }
+          decodeAudioData(bytes) {
+            return super.decodeAudioData(bytes).then(
+              (buffer) => { window.__r4Decodes.push({ ok: true, duration: buffer.duration }); return buffer; },
+              (error) => { window.__r4Decodes.push({ error: String(error) }); throw error; },
+            );
+          }
           createBufferSource() {
             const source = super.createBufferSource();
             const start = source.start.bind(source);
@@ -91,6 +99,16 @@ async function run(browser, port) {
         }
         window.__r4Audio = createGameAudio({
           AudioContextImpl: TrackedContext, AudioElementImpl: TrackedMusic,
+          fetchImpl: async (url, options) => {
+            try {
+              const response = await fetch(url, options);
+              window.__r4Fetches.push({ url, status: response.status, type: response.headers.get("content-type") });
+              return response;
+            } catch (error) {
+              window.__r4Fetches.push({ url, error: String(error) });
+              throw error;
+            }
+          },
           storage: null,
         });
         const button = document.createElement("button");
@@ -151,6 +169,8 @@ async function run(browser, port) {
             audioContextType: typeof window.AudioContext,
             musicState: window.__r4Music?.readyState,
             musicError: window.__r4Music?.error?.message,
+            fetches: window.__r4Fetches.slice(0, 5), fetchCount: window.__r4Fetches.length,
+            decodes: window.__r4Decodes.slice(0, 5), decodeCount: window.__r4Decodes.length,
             vorbisSupport: document.createElement("audio").canPlayType('audio/ogg; codecs="vorbis"'),
             directDecode
           };
