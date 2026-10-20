@@ -43,7 +43,10 @@ struct ChatIngressBudget {
 
 impl ChatIngressBudget {
     fn new(now: Instant) -> Self {
-        Self { window_start: now, frames: 0 }
+        Self {
+            window_start: now,
+            frames: 0,
+        }
     }
 
     fn consume(&mut self, now: Instant) -> bool {
