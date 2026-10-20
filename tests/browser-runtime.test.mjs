@@ -1,3 +1,4 @@
+import "./forced-colors-readability.test.mjs";
 import "./arena-lobby-link.test.mjs";
 import "./reduced-motion-feedback.test.mjs";
 import "./hud-announcements.test.mjs";

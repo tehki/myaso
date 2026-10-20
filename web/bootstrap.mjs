@@ -3,9 +3,11 @@ import { installArenaFocusGuide } from "../src/browser/arena-focus-guide.mjs";
 import { installHudAnnouncements } from "../src/browser/hud-announcements.mjs";
 import { installReducedMotionFeedback } from "../src/browser/reduced-motion-feedback.mjs";
 import { installArenaLobbyLink } from "../src/browser/arena-lobby-link.mjs";
+import { installForcedColorsReadability } from "../src/browser/forced-colors-readability.mjs";
 installControlGuide(document);
 installHudAnnouncements(document);
 installReducedMotionFeedback(document);
+installForcedColorsReadability(document);
 
 const params = new URLSearchParams(window.location.search);
 installArenaFocusGuide(document, { online: params.has("server") });
