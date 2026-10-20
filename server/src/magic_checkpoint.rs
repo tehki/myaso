@@ -445,9 +445,15 @@ mod tests {
             Err(JointCheckpointError::UnreconciledEmberEffects)
         ));
 
-        let (mut uncommitted_loot, magic) = load_joint(&file).unwrap();
-        uncommitted_loot.record_operation(hero, 51).unwrap();
-        assert_eq!(magic.pending_ember_intents().count(), 2);
+        let (_, magic) = load_joint(&file).unwrap();
+        let mut uncommitted_loot = LootAuthority::new();
+        uncommitted_loot.register(1).unwrap();
+        uncommitted_loot.register(2).unwrap();
+        assert!(matches!(
+            save_joint(&file, &uncommitted_loot, &identity, &magic),
+            Err(JointCheckpointError::Corrupt)
+        ));
+        assert_eq!(inspect_joint_ember_recovery_holds(&file).unwrap().len(), 2);
         let _ = fs::remove_file(&file);
     }
 
