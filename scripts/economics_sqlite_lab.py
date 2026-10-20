@@ -80,6 +80,27 @@ CREATE TABLE listings (
 );
 CREATE UNIQUE INDEX one_active_listing_per_parcel
     ON listings(parcel_id) WHERE state='active';
+-- Admitted epochs are fixed demo records, NOT proof of real authentication.
+CREATE TABLE admitted_sessions (
+    player_id INTEGER NOT NULL REFERENCES accounts(id),
+    epoch INTEGER NOT NULL CHECK(epoch>0),
+    state TEXT NOT NULL CHECK(state IN ('active','revoked')),
+    PRIMARY KEY(player_id,epoch)
+);
+-- Seller consent must bind all material listing terms. Approval is fixture-
+-- seeded, NOT cryptographically signed or admitted by a real seller login.
+CREATE TABLE seller_consents (
+    id TEXT PRIMARY KEY CHECK(length(id)>0),
+    listing_id INTEGER NOT NULL UNIQUE REFERENCES listings(id),
+    seller_id INTEGER NOT NULL REFERENCES accounts(id),
+    parcel_id INTEGER NOT NULL REFERENCES titles(parcel_id),
+    title_revision INTEGER NOT NULL CHECK(title_revision>=1),
+    map_revision INTEGER NOT NULL CHECK(map_revision>=1),
+    price INTEGER NOT NULL CHECK(price>0),
+    fee_bps INTEGER NOT NULL CHECK(fee_bps BETWEEN 0 AND 1000),
+    expires_tick INTEGER NOT NULL CHECK(expires_tick>0),
+    state TEXT NOT NULL CHECK(state IN ('approved','revoked','consumed'))
+);
 CREATE TABLE receipts (
     op_id TEXT PRIMARY KEY,
     payload TEXT NOT NULL,
@@ -150,6 +171,15 @@ def bootstrap_fixture(db_path: str | Path) -> None:
             "map_revision,price,fee_bps,approved_consent,expires_tick,state)"
             " VALUES(50,42,20,1,7,500,200,'TEST_FIXTURE_ONLY',100,'active')"
         )
+        db.executemany(
+            "INSERT INTO admitted_sessions(player_id,epoch,state)"
+            " VALUES(?,8,'active')", [(10,), (20,), (30,)]
+        )
+        db.execute(
+            "INSERT INTO seller_consents(id,listing_id,seller_id,parcel_id,"
+            "title_revision,map_revision,price,fee_bps,expires_tick,state)"
+            " VALUES('TEST_FIXTURE_ONLY',50,20,42,1,7,500,200,100,'approved')"
+        )
         db.commit()
     except BaseException:
         db.rollback()
@@ -198,6 +228,13 @@ def purchase(
     committed = False
     try:
         db.execute("BEGIN IMMEDIATE")
+        # Demonstrates authority-state admission, NOT real session proof.
+        admitted = db.execute(
+            "SELECT state FROM admitted_sessions WHERE player_id=? AND epoch=?",
+            (session.player_id, session.epoch),
+        ).fetchone()
+        if admitted != ("active",):
+            raise Denied("Session not admitted or already revoked")
         previous = db.execute(
             "SELECT payload,receipt FROM receipts WHERE op_id=?", (intent.op_id,)
         ).fetchone()
@@ -221,6 +258,14 @@ def purchase(
         if (state != "active" or seller == intent.buyer_id
             or not consent or trusted_tick > expiry):
             raise Denied("Inactive, expired or self-issued sale")
+        approved = db.execute(
+            "SELECT listing_id,seller_id,parcel_id,title_revision,"
+            "map_revision,price,fee_bps,expires_tick,state"
+            " FROM seller_consents WHERE id=?", (consent,),
+        ).fetchone()
+        if approved != (intent.listing_id, seller, parcel, expected_title,
+                        expected_map, price, fee_bps, expiry, "approved"):
+            raise Denied("Missing, revoked, consumed or altered seller consent")
         title = db.execute(
             "SELECT owner_id,revision,map_revision FROM titles WHERE parcel_id=?",
             (parcel,),
@@ -300,6 +345,12 @@ def purchase(
         ).rowcount != 1:
             raise Denied("Listing already consumed")
         if db.execute(
+            "UPDATE seller_consents SET state='consumed'"
+            " WHERE id=? AND listing_id=? AND state='approved'",
+            (consent, intent.listing_id),
+        ).rowcount != 1:
+            raise Denied("Seller consent was concurrently revoked or consumed")
+        if db.execute(
             "UPDATE metadata SET sequence=? WHERE singleton=1 AND sequence=?",
             (seq, meta[0]),
         ).rowcount != 1:
@@ -366,13 +417,21 @@ def snapshot(db_path: str | Path) -> dict:
         postings = db.execute("SELECT sequence, sum(delta_units),count(*)"
                               " FROM postings GROUP BY sequence").fetchall()
         outbox = db.execute("SELECT count(*) FROM outbox").fetchone()[0]
+        consent_state = db.execute(
+            "SELECT state FROM seller_consents WHERE id='TEST_FIXTURE_ONLY'"
+        ).fetchone()[0]
+        admitted_sessions = db.execute(
+            "SELECT player_id,epoch,state FROM admitted_sessions ORDER BY player_id,epoch"
+        ).fetchall()
         return {
             "accounts": accounts, "title": owner, "listing": listing[0],
             "sequence": meta[0], "issued": meta[1], "receipts": receipts,
             "postings": postings, "outbox": outbox,
+            "consent": consent_state, "sessions": admitted_sessions,
             "conserved": sum(a[1] for a in accounts) == meta[1]
                 and all(total == 0 and n == 3 for _, total, n in postings)
-                and receipts == meta[0] and outbox == receipts,
+                and receipts == meta[0] and outbox == receipts
+                and (listing[0] == "consumed") == (consent_state == "consumed"),
         }
     finally:
         db.close()
