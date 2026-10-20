@@ -20,11 +20,15 @@ export function planM225ThreatDistanceStaging({fighters, leftId, centerId, right
   // Preserve actual M142 combat reaches: jump 48+18=66, light 76+18=94.
   // Leave ≥95 separation so the right light does not clip the left attacker.
   const primary=mode==="primary";
-  const leftTarget=primary?53:61;
+  // M340: keep a stable safety margin under the unchanged 66px native
+  // jump threat radius. Exact merged-main CI #39437391824 accepted 64px in
+  // M142 secondary, but late authoritative movement reached 82px before
+  // attack, so Firefox correctly rendered only the right-side light.
+  const leftTarget=primary?53:57;
   const rightTarget=primary?82:47;
   const inBands=primary
-    ? leftDistance>=46 && leftDistance<=64 && rightDistance>=70 && rightDistance<=92
-    : leftDistance>=53 && leftDistance<=65 && rightDistance>=40 && rightDistance<=58;
+    ? leftDistance>=46 && leftDistance<=60 && rightDistance>=70 && rightDistance<=92
+    : leftDistance>=53 && leftDistance<=60 && rightDistance>=40 && rightDistance<=58;
   const correctOrder=primary
     ? leftDistance+8<=rightDistance
     : rightDistance+8<=leftDistance;
@@ -45,5 +49,25 @@ export function planM225ThreatDistanceStaging({fighters, leftId, centerId, right
     correctOrder,
     leftMove:ready?{key:null,ms:0}:move(leftDistance,leftTarget,"d","a"),
     rightMove:ready?{key:null,ms:0}:move(rightDistance,rightTarget,"a","d"),
+  });
+}
+
+
+// M340 acceptance-only stable replica certificate. Two consecutive real
+// server-replicated snapshots must independently satisfy the unchanged M142
+// geometry, and be stationary to within 3px. Never creates or edits fighters.
+export function qualifyM340StableThreatGeometry(first, confirmed) {
+  if (!first || !confirmed
+    || ![first.leftDistance, first.rightDistance,
+      confirmed.leftDistance, confirmed.rightDistance].every(Number.isFinite)) {
+    throw new TypeError("M340 requires two finite authoritative geometry samples");
+  }
+  const leftDrift = Math.abs(first.leftDistance - confirmed.leftDistance);
+  const rightDrift = Math.abs(first.rightDistance - confirmed.rightDistance);
+  return Object.freeze({
+    ready: first.ready === true && confirmed.ready === true
+      && leftDrift <= 3 && rightDrift <= 3,
+    leftDrift: Number(leftDrift.toFixed(2)),
+    rightDrift: Number(rightDrift.toFixed(2)),
   });
 }
