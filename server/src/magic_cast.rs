@@ -148,15 +148,7 @@ pub fn commit_world_ember_cost(
         .world
         .fighter(tick.operation.lease.server_session())
         .ok_or(CastError::MissingWorldFighter)?;
-    commit_ember_cost(
-        path,
-        loot,
-        magic,
-        identity,
-        zones,
-        tick.operation,
-        fighter,
-    )
+    commit_ember_cost(path, loot, magic, identity, zones, tick.operation, fighter)
 }
 
 #[cfg(test)]
@@ -241,32 +233,22 @@ mod tests {
             world: &world,
             completed_tick: world.tick,
         };
-        let receipt = commit_world_ember_cost(
-            &checkpoint,
-            &mut loot,
-            &mut magic,
-            &identity,
-            &zones,
-            tick,
-        )
-        .unwrap();
+        let receipt =
+            commit_world_ember_cost(&checkpoint, &mut loot, &mut magic, &identity, &zones, tick)
+                .unwrap();
         assert_eq!(receipt.mana_spent, 15);
         assert_eq!(receipt.sulfur_ash_spent, 1);
         assert_eq!(magic.mana(character), 85);
         assert_eq!(loot.inventory(1).unwrap().backpack()[0].amount, 2);
         assert!(matches!(
-            commit_world_ember_cost(
-                &checkpoint,
-                &mut loot,
-                &mut magic,
-                &identity,
-                &zones,
-                tick,
-            ),
+            commit_world_ember_cost(&checkpoint, &mut loot, &mut magic, &identity, &zones, tick,),
             Err(CastError::Loot(LootError::ReplayOperation))
         ));
         let (recovered_loot, recovered_magic) = load_joint(&checkpoint).unwrap();
-        assert_eq!(recovered_loot.committed_operation_sequence(character), Some(45));
+        assert_eq!(
+            recovered_loot.committed_operation_sequence(character),
+            Some(45)
+        );
         assert_eq!(
             recovered_loot
                 .parked_inventory(character)
@@ -383,26 +365,13 @@ mod tests {
             completed_tick: world.tick,
         };
         assert!(matches!(
-            commit_world_ember_cost(
-                &checkpoint,
-                &mut loot,
-                &mut magic,
-                &identity,
-                &zones,
-                tick,
-            ),
+            commit_world_ember_cost(&checkpoint, &mut loot, &mut magic, &identity, &zones, tick,),
             Err(CastError::Magic(MagicError::MissingSpellbook))
         ));
         stock(&mut loot, 1);
-        let receipt = commit_world_ember_cost(
-            &checkpoint,
-            &mut loot,
-            &mut magic,
-            &identity,
-            &zones,
-            tick,
-        )
-        .unwrap();
+        let receipt =
+            commit_world_ember_cost(&checkpoint, &mut loot, &mut magic, &identity, &zones, tick)
+                .unwrap();
         assert_eq!(receipt.sequence, 30);
         assert!(matches!(
             commit_world_ember_cost(
