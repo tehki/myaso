@@ -16,6 +16,9 @@ Status: **domain foundation only — NOT live-game enabled**. Approved design di
 - [Rust server loot domain](../server/src/loot.rs) defines backpack inventory, equippable objects, server-minted item identities, world-positioned corpses and ground loot.
 - Confirmed death drains possessions once. Ground/corpse interactions validate server-side Fighter identity, current location, authoritative ZoneId, interaction distance, decay and backpack capacity. Stale pickup and repeated death fail closed. No item can be consumed twice by competing player interactions.
 - Alpha-only tunable defaults: 64 backpack stacks, up to 3 scattered objects per death, 56-unit interaction radius, 15-minute ground decay and 20-minute corpse decay.
+- Partial stack drops and contested ground/corpse pickups preserve item quantities and unique server-minted fragment IDs; stale or overlarge grabs fail without modifying the world stack.
+- Read-only `visible_loot` queries return up to 128 nearest non-expired objects within 550 world units of a verified live fighter, in one server-selected zone. Ground previews expose item kind and quantity; corpse previews expose only a corpse entity and victim ID, never the corpse's contents before an authorized loot interaction. Ordering is deterministic (distance, entity ID).
+- These are **domain-level APIs only**, not durable storage or the realtime replication wire format; they must not be invoked using client-provided actor positions, character identities or zone IDs.
 - The domain is **not** connected to transport, live simulation events, renderer or storage. No new dependencies or changes to authoritative melee, snapshots, game controls, certificates, production data or deployed code.
 
 ## Magic follows the item foundation
