@@ -127,7 +127,10 @@ impl ShardedMagicFxHub {
             return Err(ShardError::InvalidTick);
         }
         for shard in self.shards.values_mut() {
-            shard.broker.advance(trusted_tick).map_err(ShardError::Broker)?;
+            shard
+                .broker
+                .advance(trusted_tick)
+                .map_err(ShardError::Broker)?;
             shard.payload_bytes_this_tick = 0;
         }
         self.current_tick = Some(trusted_tick);
@@ -173,9 +176,7 @@ impl ShardedMagicFxHub {
         if session.authenticated_net_id == 0 || session.zone_id == 0 {
             return Err(ShardError::InvalidSession);
         }
-        if trusted_viewer.zone_id == 0
-            || trusted_viewer.zone_id != session.zone_id
-        {
+        if trusted_viewer.zone_id == 0 || trusted_viewer.zone_id != session.zone_id {
             return Err(ShardError::WrongSessionZone);
         }
         if !trusted_viewer.x.is_finite()
@@ -198,8 +199,7 @@ impl ShardedMagicFxHub {
             .get_mut(&session.zone_id)
             .ok_or(ShardError::UnknownZone)?;
 
-        let per_zone_remaining =
-            MAX_FX_PAYLOAD_BYTES_PER_ZONE_TICK - shard.payload_bytes_this_tick;
+        let per_zone_remaining = MAX_FX_PAYLOAD_BYTES_PER_ZONE_TICK - shard.payload_bytes_this_tick;
         let global_remaining =
             MAX_FX_PAYLOAD_BYTES_GLOBAL_TICK - self.global_payload_bytes_this_tick;
         let limit = (per_zone_remaining / MAGIC_FX_PACKET_BYTES)
@@ -225,13 +225,19 @@ impl ShardedMagicFxHub {
     }
 
     pub fn zone_payload_bytes_this_tick(&self, zone_id: u32) -> Option<usize> {
-        self.shards.get(&zone_id).map(|shard| shard.payload_bytes_this_tick)
+        self.shards
+            .get(&zone_id)
+            .map(|shard| shard.payload_bytes_this_tick)
     }
 
     pub fn stats(&self) -> ShardBudgetStats {
         ShardBudgetStats {
             zone_shards: self.shards.len(),
-            pending_fx: self.shards.values().map(|shard| shard.broker.pending()).sum(),
+            pending_fx: self
+                .shards
+                .values()
+                .map(|shard| shard.broker.pending())
+                .sum(),
             global_payload_bytes_this_tick: self.global_payload_bytes_this_tick,
             max_global_payload_bytes_per_tick: MAX_FX_PAYLOAD_BYTES_GLOBAL_TICK,
         }
@@ -314,19 +320,34 @@ mod tests {
             hub.plan_delivery(3, &mut session, viewer(1)),
             Err(ShardError::InvalidTick)
         );
-        assert_eq!(hub.plan_delivery(4, &mut session, viewer(1)).unwrap().len(), 6);
+        assert_eq!(
+            hub.plan_delivery(4, &mut session, viewer(1)).unwrap().len(),
+            6
+        );
         assert_eq!(
             hub.plan_delivery(4, &mut session, viewer(1)),
             Err(ShardError::SessionAlreadyPolled)
         );
         hub.advance(5).unwrap();
-        assert_eq!(hub.plan_delivery(5, &mut session, viewer(1)).unwrap().len(), 6);
+        assert_eq!(
+            hub.plan_delivery(5, &mut session, viewer(1)).unwrap().len(),
+            6
+        );
         session.reset_authorized_zone(2).unwrap();
         assert_eq!(session.last_event_id, 0);
-        assert_eq!(hub.plan_delivery(5, &mut session, viewer(2)).unwrap().len(), 6);
+        assert_eq!(
+            hub.plan_delivery(5, &mut session, viewer(2)).unwrap().len(),
+            6
+        );
         assert_eq!(session.zone_id, 2);
-        assert_eq!(hub.plan_delivery(5, &mut session, viewer(1)), Err(ShardError::WrongSessionZone));
-        assert_eq!(session.reset_authorized_zone(0), Err(ShardError::InvalidZone));
+        assert_eq!(
+            hub.plan_delivery(5, &mut session, viewer(1)),
+            Err(ShardError::WrongSessionZone)
+        );
+        assert_eq!(
+            session.reset_authorized_zone(0),
+            Err(ShardError::InvalidZone)
+        );
     }
 
     #[test]
@@ -341,7 +362,10 @@ mod tests {
         }
         assert_eq!(hub.stats().zone_shards, MAX_FX_ZONE_SHARDS);
         assert_eq!(hub.register_zone(17), Err(ShardError::ZoneCapacity));
-        assert_eq!(hub.admit_trusted(1, spec(20, 0.0)), Err(ShardError::UnknownZone));
+        assert_eq!(
+            hub.admit_trusted(1, spec(20, 0.0)),
+            Err(ShardError::UnknownZone)
+        );
         assert_eq!(hub.advance(1), Err(ShardError::InvalidTick));
         assert_eq!(hub.advance(0), Err(ShardError::InvalidTick));
     }
@@ -371,8 +395,10 @@ mod tests {
         assert_eq!(total, hub.stats().global_payload_bytes_this_tick);
         assert!(total <= MAX_FX_PAYLOAD_BYTES_GLOBAL_TICK);
         for zone in 1..=4 {
-            assert!(hub.zone_payload_bytes_this_tick(zone).unwrap()
-                <= MAX_FX_PAYLOAD_BYTES_PER_ZONE_TICK);
+            assert!(
+                hub.zone_payload_bytes_this_tick(zone).unwrap()
+                    <= MAX_FX_PAYLOAD_BYTES_PER_ZONE_TICK
+            );
         }
         hub.advance(5).unwrap();
         assert_eq!(hub.stats().global_payload_bytes_this_tick, 0);
@@ -397,7 +423,10 @@ mod tests {
         for zone in 1..=8 {
             for i in 1..=64 {
                 let mut session = FxDeliverySession::new(zone * 1_000 + i, zone).unwrap();
-                sent += hub.plan_delivery(4, &mut session, viewer(zone)).unwrap().len()
+                sent += hub
+                    .plan_delivery(4, &mut session, viewer(zone))
+                    .unwrap()
+                    .len()
                     * MAGIC_FX_PACKET_BYTES;
             }
         }
@@ -429,7 +458,10 @@ mod tests {
         );
         assert_eq!(hub.stats().global_payload_bytes_this_tick, 0);
         assert_eq!(session.last_event_id, 0);
-        assert_eq!(FxDeliverySession::new(0, 1), Err(ShardError::InvalidSession));
+        assert_eq!(
+            FxDeliverySession::new(0, 1),
+            Err(ShardError::InvalidSession)
+        );
     }
 
     #[test]
@@ -444,6 +476,9 @@ mod tests {
         hub.advance(6).unwrap();
         assert_eq!(hub.stats().pending_fx, 0);
         let mut session = FxDeliverySession::new(10, 7).unwrap();
-        assert!(hub.plan_delivery(6, &mut session, viewer(7)).unwrap().is_empty());
+        assert!(hub
+            .plan_delivery(6, &mut session, viewer(7))
+            .unwrap()
+            .is_empty());
     }
 }

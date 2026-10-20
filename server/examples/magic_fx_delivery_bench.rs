@@ -84,15 +84,24 @@ fn main() {
                 nonempty_polls += 1;
             }
             for packet in packets {
-                assert_eq!(u32::from_le_bytes(packet[4..8].try_into().unwrap()), zone_id);
+                assert_eq!(
+                    u32::from_le_bytes(packet[4..8].try_into().unwrap()),
+                    zone_id
+                );
             }
         }
         assert!(round_bytes <= MAX_FX_PAYLOAD_BYTES_GLOBAL_TICK);
         assert_eq!(hub.stats().global_payload_bytes_this_tick, round_bytes);
     }
 
-    println!("scenario=synthetic_magic_fx_delivery_p6 viewers={VIEWERS} zones={ZONES} rounds={ROUNDS}");
-    println!("pending_events={} zone_shards={}", hub.stats().pending_fx, hub.stats().zone_shards);
+    println!(
+        "scenario=synthetic_magic_fx_delivery_p6 viewers={VIEWERS} zones={ZONES} rounds={ROUNDS}"
+    );
+    println!(
+        "pending_events={} zone_shards={}",
+        hub.stats().pending_fx,
+        hub.stats().zone_shards
+    );
     println!("planner_poll_p95_us={:.3}", percentile_95_us(&mut measures));
     println!(
         "emitted_semantic_packets={emitted_packets} payload_only_bytes={} nonempty_polls={nonempty_polls}",
