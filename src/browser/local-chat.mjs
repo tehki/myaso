@@ -112,10 +112,11 @@ export function installLocalChat(doc, { online = false, adapter = null, idFactor
   function isReady() { return Boolean(online && transport && typeof transport.send === "function" && transport.ready !== false); }
   function availability() {
     const ready = isReady();
+    const changed = root.dataset.connected !== String(ready);
     root.dataset.connected = String(ready);
     input.disabled = !ready || pending;
     send.disabled = !ready || pending;
-    if (!pending) status.textContent = ready ? "Local · nearby players only" :
+    if (changed) status.textContent = ready ? "Local · nearby players only" :
       online ? "Chat unavailable — awaiting Core server support." : "Practice has no multiplayer chat.";
     return ready;
   }
