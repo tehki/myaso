@@ -20,7 +20,7 @@ row-locking mutation gate. C4d puts the consequential state transition
 - `core_zone.world_state`: one versioned, opaque, bounded
   (1–4096-byte) world-state payload per typed character/ground-item ID.
 - `core_zone.world_mutation_receipts`: immutable complete request,
-  globally unique 16-byte mutation ID, verified worker/zone/authority
+  globally unique nonzero 16-byte mutation ID (SQL and Rust both reject all-zero IDs), verified worker/zone/authority
   generation, expected revision and committed state/outbox receipt.
 - `core_zone.world_event_outbox`: append-only event with its committed
   state revision, same mutation ID, payload and authoritative generation.
