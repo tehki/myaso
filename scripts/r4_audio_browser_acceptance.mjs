@@ -134,7 +134,30 @@ async function run(browser, port) {
       if (loaded === 26) break;
       await delay(100);
     }
-    assert.equal(loaded, 26, browser + " did not decode all 26 native OGG files");
+    if (loaded !== 26) {
+      const diagnostics = await script(`
+        return (async () => {
+          let directDecode;
+          try {
+            const ctx = new (window.AudioContext || window.webkitAudioContext)();
+            const bytes = await (await fetch("/web/audio/foley/footstep01.ogg")).arrayBuffer();
+            const buffer = await ctx.decodeAudioData(bytes);
+            directDecode = { duration: buffer.duration, state: ctx.state };
+            await ctx.close();
+          } catch (err) { directDecode = { error: String(err) }; }
+          return {
+            unlock: window.__r4Unlock, unlocked: window.__r4Audio.isUnlocked(),
+            contextState: window.__r4Context?.state,
+            audioContextType: typeof window.AudioContext,
+            musicState: window.__r4Music?.readyState,
+            musicError: window.__r4Music?.error?.message,
+            vorbisSupport: document.createElement("audio").canPlayType('audio/ogg; codecs="vorbis"'),
+            directDecode
+          };
+        })();
+      `);
+      throw new Error(browser + " decoded " + loaded + "/26 OGG assets: " + JSON.stringify(diagnostics));
+    }
     const result = await script(`
       return (async () => {
         const a = window.__r4Audio;
