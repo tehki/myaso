@@ -688,7 +688,10 @@ impl LootAuthority {
         if !at.in_zone(zone) {
             return Err(LootError::InvalidPosition);
         }
-        let corpse = self.corpses.get(&selection.corpse_id).ok_or(LootError::NotFound)?;
+        let corpse = self
+            .corpses
+            .get(&selection.corpse_id)
+            .ok_or(LootError::NotFound)?;
         if corpse.expires_at_ms <= now_ms {
             return Err(LootError::NotFound);
         }
