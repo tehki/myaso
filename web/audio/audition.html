@@ -32,8 +32,8 @@
 
   <section aria-label="Prepare recorded audio">
     <h2>1. Prepare recordings</h2>
-    <div class="row"><button id="prepare" class="primary" type="button">Prepare 23 recordings</button>
-      <span id="counter">0 / 23 decoded</span></div>
+    <div class="row"><button id="prepare" class="primary" type="button">Prepare 24 recordings</button>
+      <span id="counter">0 / 24 decoded</span></div>
     <output id="status" role="status" aria-live="polite">Press Prepare to unlock audio and load the local recordings.</output>
     <p class="note">Audio loads in two small background workers. If a recording cannot decode, this audition fails closed rather than silently substituting a synthesized sound.</p>
   </section>
@@ -98,13 +98,13 @@
       if (pollId !== null) return;
       pollId = setInterval(() => {
         const count = audio.loadedFoleyCount();
-        counter.textContent = count + " / 23 decoded";
-        if (count !== 23) return;
+        counter.textContent = count + " / 24 decoded";
+        if (count !== 24) return;
         clearInterval(pollId);
         pollId = null;
         ready = true;
         for (const button of container.querySelectorAll("button")) button.disabled = false;
-        status.textContent = "Ready: 23/23 recorded sounds decoded. Try repeated cues and the music layer.";
+        status.textContent = "Ready: 24/24 recorded sounds decoded. Try repeated cues and the music layer.";
       }, 100);
     });
     window.addEventListener("pagehide", () => {

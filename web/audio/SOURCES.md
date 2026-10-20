@@ -1,87 +1,96 @@
-# myaso.io Sound R4.1 — sources and listening direction
+# myaso.io Sound R4.2 — recorded death and melodic ambient
 
-## Physical combat sound effects — CC0
+## Physical combat / movement foley (CC0)
 
-**Kenney, RPG Audio (2014), CC0 1.0**
-- https://kenney.nl/assets/rpg-audio
-- https://opengameart.org/content/50-rpg-sound-effects
-- Distribution: https://opengameart.org/sites/default/files/RPGsounds_Kenney.zip
+**Kenney, RPG Audio (2014), Creative Commons CC0 1.0**
+- Source: https://kenney.nl/assets/rpg-audio
+- Mirrored CC0 source: https://opengameart.org/content/50-rpg-sound-effects
+- Original package: https://opengameart.org/sites/default/files/RPGsounds_Kenney.zip
 
-The 23 bundled `web/audio/foley/*.ogg` files are unchanged recordings
-from the original Kenney OGG set. They include blade movement, leathery
-impacts, soft fabric shifts, physical footfalls and a short restrained
-metal click. Playback uses subtle randomized rates and gain calibration.
+The 22 remaining original `web/audio/foley/*.ogg` Kenney recordings
+cover blades, leather/cloth, metal clicks, movement and footsteps. The
+three resonant `metalPot` recordings were removed in R4.1 due to
+painful high-frequency squealing, particularly in Guard Break.
 
-**R4.1 listening-driven safety correction:** the three resonant
-`metalPot1/2/3.ogg` files were removed. They sounded sharp or squealing,
-especially as Guard Break variants. **Guard Break now rotates only between
-low, dry leather and cloth recordings**, slowed down and passed through a
-950 Hz low-pass filter at reduced volume. Block and parry use similarly
-damped recordings with a 1750 Hz low-pass filter. A softened procedural
-fallback remains available if a browser cannot decode OGG.
+## Death: genuine human voice and grounded fall (CC0)
 
-The quiet draw-knife recordings require small gain compensation (8x);
-`metalClick` receives a 4x trim, and `cloth4` 2x. These corrections are
-controlled by final per-cue volume. There is no real-time audio analysis
-or synchronous asset loading on combat input.
+**Exewin, "Death sounds" (2018), Creative Commons CC0 1.0**
+- Licensed source: https://opengameart.org/content/death-sounds-0
+- CC0 original download: https://opengameart.org/sites/default/files/exewinDeathSoundsPack.zip
+- Source recordings used: `exewinDeathSoundsPack/6.ogg` and `11.ogg`
+- Final in-game sounds: `deathFall1.ogg` and `deathFall2.ogg`
 
-## Original minimal Moonlit Notes music (R4.1)
+R4.2 removes `creak1.ogg` and its reference from Death: it was a
+physical door/wood creak, not a credible dying character, and included
+the shrill squeaking the owner reported. The two replacement variants
+contain real **human dying/grunt vocal performances** with an offset
+Kenney leather impact suggesting a body hitting the ground. Offline
+low-pass (roughly 1150–1200 Hz), fade-outs, gain limits and an additional
+1250 Hz low-pass in the player keep these cues short, warm and non-shrill.
+Their final recorded-cue playback gain is reduced to 0.50.
+They are recorded CC0 derivatives, **not synthetic screams**.
 
-- File: `web/audio/music/moonlit-notes.ogg`
-- Source: `scripts/generate_moonlit_notes.py` (reproducible PCM score)
-- Original composition for myaso.io; **no third-party music recording**
-- 96-second quiet loop, 24 short pentatonic notes, true silence between
-  notes and at loop boundaries, no sustained chords, organs, pads or drone
-- Standard 48 kHz stereo Vorbis OGG (~287 KB) resampled from 24 kHz mono score; served locally
-
-The previous 137-second `Cathedral in the forest` CC0 recording was removed
-in response to listening feedback: its constantly sustained organ-like
-texture competed with the game's natural sounds. The new track is
-intentionally simple: a few low soft notes with room for silence.
-
-Regenerate from the repository root:
+To reproduce the derived files using the CC0 original ZIP and ffmpeg:
 
 ```bash
-python3 scripts/generate_moonlit_notes.py /tmp/myaso-moonlit-notes.wav
-ffmpeg -y -i /tmp/myaso-moonlit-notes.wav -ar 48000 -ac 2 -c:a libvorbis -q:a 3 web/audio/music/moonlit-notes.ogg
+bash scripts/build_death_falls.sh /path/to/exewinDeathSoundsPack.zip
 ```
 
-Music remains independently opt-in; at the default Music setting of
-35%, the media element is limited to 10.5% of full-scale playback. Sound
-effects and music have separate controls and persist independently. No
-automatic music starts on combat input; hidden tabs pause playback.
+This offline recipe is a development tool only. The browser never fetches
+source archives and always uses the two bundled resulting OGG files.
 
-## Sound-only listening review
+## Melodic fantasy ambience: Moonlit Melody (original score)
 
-The standalone `web/audio/audition.html` uses the identical mixer from
-`src/browser/game-audio.mjs` without loading or simulating the game.
-Buttons are disabled until **23 / 23 decoded** local CC0 effects are ready.
-The page does not silently play synthesized replacements during a review.
+- File: `web/audio/music/moonlit-melody.ogg`
+- Source: `scripts/generate_moonlit_notes.py`
+- 96 seconds; **eight individual melodic phrases**, each with recognizable
+  call-and-response, gentle low plucked harmony and occasional bell replies
+- 80 BPM, short harp/wood-style notes and small stereo early reflections
+- No continuously sustained chord, organ-like timbre, looped pad, or drone
+- No third-party music; original composition built for myaso.io
+- 48 kHz stereo Vorbis (~676 KB), significantly smaller than R4's 2.95 MB
 
-From a Sound R4.1 branch checkout:
+R4.1's 24 isolated notes were too sparse and dull. R4.2 adds melodic
+contour and short counterlines to evoke an atmospheric fantasy realm
+while leaving quiet spaces for combat and environmental sound.
+A music-only track stays separately opt-in, not synchronized to hits,
+never forced on by combat, and capped at 30% of the independent Music
+volume slider. Default Music level remains 35%.
+
+Reproduce the soundtrack from the original project score:
+
+```bash
+python3 scripts/generate_moonlit_notes.py /tmp/moonlit-melody.wav
+ffmpeg -y -i /tmp/moonlit-melody.wav -ar 48000 -ac 2 -c:a libvorbis -q:a 3 web/audio/music/moonlit-melody.ogg
+```
+
+## Listening / review
+
+The `web/audio/audition.html` sound-only page loads the actual game mixer
+and gates all cue buttons on **24 / 24 decoded recorded effects**.
+No playable game, combat simulation or network connection is launched.
+Use comfortable headphones and review repeated Death cues to verify
+distinct non-squeaking grunts plus physical falls, then enable Music
+to hear the new melody and subtle supporting harmony. Also try
+Parry/Block/Guard Break for harshness, and compare effects against music.
+
+In Windows PowerShell from the checkout root:
 
 ```powershell
 py -m http.server 8000
 ```
 
-Then open `http://127.0.0.1:8000/web/audio/audition.html`; click
-**Prepare 23 recordings**, wait for all 23 to decode, and try Guard Break
-multiple times. Compare Parry/Block, Light/Heavy and the quiet Moonlit Notes
-music. Pan the sound to test spatial placement. Use comfortable headphone
-levels at first.
+Open `http://127.0.0.1:8000/web/audio/audition.html`, press
+**Prepare 24 recordings**, and listen. Reviewer approval remains required;
+passing automated decoding/playback does not establish subjective quality.
 
-Before R4.1 is subjectively accepted, a human listener should confirm
-**no shrill/squeaky Guard Break variant**, dull but legible hit and block
-feedback, blade motion that remains physical, and only sparse simple notes
-in the background. The automated Chromium/Firefox native media tests
-prove playback and controls, not whether the audio sounds good to a person.
+## Runtime / architecture
 
-## Technical constraints
-
-- Client audio is optional, nonauthoritative and never blocks input,
-  rendering, networking, death, loot, or server simulation.
-- The two OGG decode workers are bounded per browser; audio stays local.
-- Distant opponents are attenuated, replayed packets remain silent, and
-  speculative local attacks are never treated as confirmed remote hits.
-- All 23 foley samples remain CC0, with source credits above; the new
-  Moonlit Notes music is original to this project.
+- 22 unchanged Kenney CC0 effects + 2 derived Exewin/Kenney CC0 Death files
+  = 24 bundled foley OGG recordings. `creak1` and squealing `metalPot*` gone.
+- Recorded foley prioritized; nonblocking R3 synthesizer is only a
+  fail-soft fallback when OGG loading/decoding fails.
+- Two bounded asynchronous fetch+decode workers; no synchronous audio on
+  trusted combat input, no remote streaming, no production token use.
+- Nearby remote fighters are spatially attenuated; duplicate snapshots
+  cannot replay the same sound. Audio never affects server authority.

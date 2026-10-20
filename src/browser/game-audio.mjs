@@ -13,7 +13,7 @@ const CUES = Object.freeze({
   damage: { start: 110, end: 38, duration: .22, gain: .33, noise: .27, filter: 550, wave: "triangle", minMs: 60 },
   block: { start: 390, end: 140, duration: .13, gain: .10, noise: .045, filter: 950, wave: "triangle", minMs: 80 },
   guardbreak: { start: 220, end: 65, duration: .24, gain: .14, noise: .04, filter: 650, wave: "triangle", minMs: 130 },
-  death: { start: 155, end: 35, duration: .30, gain: .20, noise: .11, filter: 500, wave: "triangle", minMs: 300 },
+  death: { start: 155, end: 48, duration: .36, gain: .13, noise: .05, filter: 450, wave: "triangle", minMs: 300 },
   ui: { start: 720, end: 920, duration: .07, gain: .075, noise: 0, filter: 1200, wave: "sine", minMs: 75 },
 });
 
@@ -33,7 +33,7 @@ const RECORDED_FOLEY = Object.freeze({
   damage: ["dropLeather", "cloth1"],
   block: ["beltHandle1", "dropLeather", "metalClick"],
   guardbreak: ["dropLeather", "cloth1"],
-  death: ["creak1", "dropLeather"],
+  death: ["deathFall1", "deathFall2"],
 });
 // Owner listening review: the original metal pot resonances squeal, with the
 // worst variant in Guard Break. Exclude those files entirely rather than
@@ -42,7 +42,7 @@ const RECORDED_FOLEY = Object.freeze({
 const FOLEY_GAIN_TRIM = Object.freeze({
   drawKnife1: 8, drawKnife2: 8, metalClick: 4, cloth4: 2,
 });
-const AMBIENT_TRACK = new URL("../../web/audio/music/moonlit-notes.ogg", import.meta.url).href;
+const AMBIENT_TRACK = new URL("../../web/audio/music/moonlit-melody.ogg", import.meta.url).href;
 const SETTINGS_KEY = "myaso.audio.v1";
 const clamp = (value, low, high) => Math.max(low, Math.min(high, value));
 
@@ -222,17 +222,20 @@ export function createGameAudio({ AudioContextImpl = globalThis.AudioContext ?? 
         if (sample.playbackRate) {
           sample.playbackRate.value = name === "guardbreak"
             ? .80 + clamp(random(), 0, 1) * .05
+            : name === "death" ? .94 + clamp(random(), 0, 1) * .04
             : .96 + clamp(random(), 0, 1) * .08;
         }
         const envelope = context.createGain();
         const cueGain = name === "step" ? .46
           : name === "guardbreak" ? .34
+          : name === "death" ? .50
           : name === "parry" || name === "block" ? .44 : .64;
         const peak = Math.max(.0002, amplitude * cueGain * (FOLEY_GAIN_TRIM[variant] ?? 1));
         envelope.gain.setValueAtTime(peak, now);
         // Short dull impact rather than a screaming resonant ring. A single
         // local biquad per very short defensive cue does not touch simulation.
         const cutoff = name === "guardbreak" ? 950
+          : name === "death" ? 1250
           : name === "parry" || name === "block" ? 1750 : null;
         const filter = cutoff !== null ? context.createBiquadFilter() : null;
         if (filter) {

@@ -1,13 +1,12 @@
 #!/usr/bin/env python3
-"""Reproduce R4.1's original, quiet, sparse ambient cue without third-party samples.
+"""Render the original myaso.io Moonlit Melody, a non-droning fantasy ambience.
 
-Run from repository root:
-  python3 scripts/generate_moonlit_notes.py /tmp/moonlit-notes.wav
-  ffmpeg -y -i /tmp/moonlit-notes.wav -ar 48000 -ac 2 -c:a libvorbis -q:a 3 web/audio/music/moonlit-notes.ogg
+Reproducible score: 8 x 16-beat melodic phrases at 80 BPM, gentle short
+harp/wood notes, quiet answering voices, soft stereo echoes. No sustaining
+organ/pad waveform or near-continuous bass note. Nothing generated at runtime.
 
-Short, softly plucked pentatonic notes with long SILENCES; no pads, organs,
-sustained chord drones, high-frequency attacks or music-network dependency.
-Fixed score and renderer: every build generates identical PCM samples.
+  python3 scripts/generate_moonlit_notes.py /tmp/moonlit-melody.wav
+  ffmpeg -y -i /tmp/moonlit-melody.wav -ar 48000 -ac 2 -c:a libvorbis -q:a 3 web/audio/music/moonlit-melody.ogg
 """
 from array import array
 from math import exp, pi, sin
@@ -17,60 +16,106 @@ import wave
 
 SAMPLE_RATE = 24_000
 SECONDS = 96
-# Hand-composed sparse melody in a low D-minor-pentatonic palette.
-# (seconds after loop start, frequency Hz, emphasis). Each note fades before
-# the next; the closing four seconds and opening one second are truly silent.
-NOTES = (
-    (1.3, 293.66, 0.78), (4.8, 220.00, 0.65),
-    (9.2, 261.63, 0.78), (12.8, 349.23, 0.63),
-    (17.2, 293.66, 0.70), (21.0, 220.00, 0.65),
-    (24.8, 261.63, 0.72), (28.5, 293.66, 0.59),
-    (33.0, 392.00, 0.63), (36.3, 349.23, 0.64),
-    (40.6, 293.66, 0.82), (44.1, 220.00, 0.64),
-    (48.4, 261.63, 0.76), (51.8, 349.23, 0.58),
-    (56.0, 293.66, 0.72), (59.6, 261.63, 0.61),
-    (64.0, 220.00, 0.75), (67.7, 293.66, 0.63),
-    (72.1, 349.23, 0.70), (75.4, 293.66, 0.63),
-    (79.6, 261.63, 0.74), (83.2, 220.00, 0.64),
-    (87.3, 293.66, 0.79), (90.4, 220.00, 0.51),
-)
+BEAT_SECONDS = 0.75
+FREQ = {
+    "D3": 146.83, "F3": 174.61, "G3": 196.00, "A3": 220.00,
+    "C4": 261.63, "D4": 293.66, "E4": 329.63, "F4": 349.23,
+    "G4": 392.00, "A4": 440.00, "Bb4": 466.16, "C5": 523.25,
+    "D5": 587.33, "E5": 659.25, "F5": 698.46,
+}
+# Beat offset, pitch, duration in beats. Each phrase tells its own musical
+# line; answering phrases are related but never an endlessly repeated arpeggio.
+PHRASES = [
+    [(0,"D4",1),(1.5,"F4",.9),(3,"A4",1.5),(5.5,"G4",.8),
+     (6.5,"F4",1),(8,"E4",1.3),(10,"D4",1.4),(12,"F4",1),(13.5,"E4",1)],
+    [(0,"F4",1.2),(1.5,"A4",1),(3,"C5",1.6),(5.5,"A4",.8),
+     (6.5,"G4",1),(8,"F4",1.4),(10.5,"E4",1),(12,"F4",.8),(13.5,"A4",1)],
+    [(0,"D5",1.4),(2,"C5",1),(3.5,"A4",1.3),(5.5,"F4",1),
+     (7,"G4",1),(8.5,"A4",1),(10,"Bb4",.8),(11.5,"A4",1.2),(13.5,"F4",1)],
+    [(0,"G4",.9),(1.5,"Bb4",1.1),(3.5,"A4",1),(5,"F4",1.3),
+     (7,"E4",1),(8.5,"D4",1.3),(10.5,"F4",.8),(12,"A4",.8),(14,"E4",.8)],
+    [(0,"D4",1),(1.5,"F4",.8),(3,"A4",1),(4.5,"C5",.8),
+     (6,"A4",1),(7.5,"F4",1.1),(9.5,"G4",.9),(11,"F4",.8),(13.5,"D4",1.3)],
+    [(0,"C5",1),(1.5,"D5",1),(3.5,"A4",1.4),(6,"G4",1.1),
+     (7.5,"F4",.9),(9,"A4",.8),(10.5,"G4",1),(12.5,"F4",1),(14,"E4",.8)],
+    [(0,"F4",1.2),(2,"A4",1),(3.5,"F5",1.2),(5.5,"E5",1),
+     (7,"C5",1.2),(9,"A4",.9),(10.5,"G4",1),(12,"F4",1),(14,"E4",.8)],
+    [(0,"D5",1),(1.5,"C5",.8),(3,"A4",1),(5,"F4",1.2),
+     (7,"G4",.8),(8.5,"F4",1),(10,"E4",.8),(11.5,"D4",1.1),(13,"D4",1.1)],
+]
+# Sparse bass/inner voicings are melodic plucked notes, never sustained beds.
+ROOTS = ["D3", "F3", "G3", "D3", "D3", "F3", "G3", "D3"]
+RESPONSES = ["A3", "C4", "D4", "F3", "A3", "D4", "F3", "A3"]
 
 
 def render():
-    samples = array("f", [0.0]) * (SAMPLE_RATE * SECONDS)
-    # Short round plucks (~1.7s) rather than legato sustained notes.
-    for start, pitch, emphasis in NOTES:
-        offset = round(start * SAMPLE_RATE)
-        length = round(1.72 * SAMPLE_RATE)
-        phase = 2 * pi * pitch / SAMPLE_RATE
-        for i in range(length):
+    length = SECONDS * SAMPLE_RATE
+    left = array("f", [0.0]) * length
+    right = array("f", [0.0]) * length
+
+    def pluck(start_s, pitch_name, duration, strength, pan, voice="harp"):
+        start_index = round(start_s * SAMPLE_RATE)
+        if start_index >= length or start_index < 0:
+            return
+        count = min(round(duration * SAMPLE_RATE), length - start_index)
+        w = 2 * pi * FREQ[pitch_name] / SAMPLE_RATE
+        if voice == "harp":
+            decay, second, third = 2.3, 0.24, 0.065
+        elif voice == "wood":
+            decay, second, third = 3.1, 0.13, 0.025
+        else:  # high bell has a soft edge and a shorter tail than a pad
+            decay, second, third = 2.7, 0.17, 0.04
+        lv = (1 - pan) * 0.5
+        rv = (1 + pan) * 0.5
+        for i in range(count):
             t = i / SAMPLE_RATE
-            attack = min(1.0, t / 0.014)
-            # The upper partials vanish quickly to avoid metallic squeals.
-            fundamental = sin(phase * i)
-            soft_second = 0.16 * exp(-3.5 * t) * sin(2 * phase * i)
-            soft_third = 0.025 * exp(-7.0 * t) * sin(3 * phase * i)
-            release = min(1.0, max(0.0, (1.72 - t) / 0.075))
-            value = (fundamental + soft_second + soft_third) * attack * release * exp(-2.65 * t)
-            samples[offset + i] += 0.23 * emphasis * value
-    # Tiny reflections create a natural-room impression, not a sustained bed.
-    for delay, strength in ((0.095, 0.055), (0.21, 0.024)):
+            attack = min(1.0, t / 0.022)
+            release = min(1.0, max(0.0, (duration - t) / .085))
+            envelope = strength * attack * release * exp(-decay * t)
+            value = envelope * (sin(w * i)
+                + second * exp(-4.4 * t) * sin(2 * w * i)
+                + third * exp(-7.0 * t) * sin(3 * w * i))
+            left[start_index + i] += value * lv
+            right[start_index + i] += value * rv
+
+    # Leave ~0.45s at the head and ~1.5s at the tail for a smooth quiet seam.
+    for phrase_id, phrase in enumerate(PHRASES):
+        base = phrase_id * 16 * BEAT_SECONDS + 0.48
+        for idx, (beat, name, span) in enumerate(phrase):
+            pluck(base + beat * BEAT_SECONDS, name, min(1.6, span * BEAT_SECONDS + .30),
+                .42 * (0.88 + (idx % 3) * .06), (-.28 if idx % 2 else .28), "harp")
+        # The background has discrete low wood notes with true gaps.
+        pluck(base + 0.0, ROOTS[phrase_id], 1.55, .16, -.18, "wood")
+        pluck(base + 4.1 * BEAT_SECONDS, RESPONSES[phrase_id], 1.2, .13, .25, "wood")
+        pluck(base + 8.0 * BEAT_SECONDS, ROOTS[phrase_id], 1.55, .13, -.10, "wood")
+        pluck(base + 12.1 * BEAT_SECONDS, RESPONSES[phrase_id], 1.2, .11, .20, "wood")
+        # Two tiny high answering notes make the tune conversational, not dull.
+        if phrase_id in (1, 2, 4, 5, 6):
+            pluck(base + 4.5 * BEAT_SECONDS, "D5", .72, .11, .60, "bell")
+            pluck(base + 11.0 * BEAT_SECONDS, "C5", .64, .10, -.53, "bell")
+
+    # Early stereo reflections at low level; no long reverberant pad or drone.
+    for delay, gain in ((.18, .11), (.37, .055), (.57, .024)):
         shift = round(delay * SAMPLE_RATE)
-        for i in range(len(samples) - shift - 1, shift - 1, -1):
-            samples[i] += samples[i - shift] * strength
-    # Hard bounds and fixed integer PCM for reproducible source.
-    pcm = array("h", (int(round(max(-1.0, min(1.0, v)) * 32767)) for v in samples))
+        for i in range(length - shift - 1, shift - 1, -1):
+            left[i] += right[i - shift] * gain
+            right[i] += left[i - shift] * gain
+
+    pcm = array("h")
+    for l, r in zip(left, right):
+        pcm.extend((int(max(-1, min(1, l)) * 32767),
+                    int(max(-1, min(1, r)) * 32767)))
     if sys.byteorder != "little":
         pcm.byteswap()
     return pcm.tobytes()
 
 
 if __name__ == "__main__":
-    dest = Path(sys.argv[1] if len(sys.argv) > 1 else "/tmp/moonlit-notes.wav")
+    dest = Path(sys.argv[1] if len(sys.argv) > 1 else "/tmp/moonlit-melody.wav")
     dest.parent.mkdir(parents=True, exist_ok=True)
     with wave.open(str(dest), "wb") as writer:
-        writer.setnchannels(1)
+        writer.setnchannels(2)
         writer.setsampwidth(2)
         writer.setframerate(SAMPLE_RATE)
         writer.writeframes(render())
-    print(f"Wrote original sparse-note PCM: {dest} ({SECONDS}s, {len(NOTES)} notes)")
+    print(f"Wrote melodic fantasy ambience: {dest} ({SECONDS}s, {len(PHRASES)} phrases)")
