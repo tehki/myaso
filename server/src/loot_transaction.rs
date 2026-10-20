@@ -495,6 +495,147 @@ mod tests {
     }
 
     #[test]
+    fn two_looters_cannot_claim_same_corpse_item_and_recovery_keeps_winner() {
+        use crate::magic_checkpoint::load_joint;
+        use crate::simulation::Action;
+
+        // Offline domain fixture: the actual Combat World/HP transaction is
+        // not integrated here. Only the typed pickup gate is under test.
+        let mut world = World::new(800.0, 600.0);
+        for (id, x, y) in [(1, 200.0, 200.0), (2, 210.0, 200.0), (3, 220.0, 200.0)] {
+            assert!(world.add_player_at(id, x, y, 0.0));
+        }
+        let mut zones = ZoneAuthority::new();
+        let mut identity = SessionIdentityRegistry::new();
+        let mut loot = LootAuthority::new();
+        for id in 1..=3 {
+            zones.register(id).unwrap();
+            loot.register(id).unwrap();
+            identity
+                .bind_verified(lease(id), CharacterId::new(u64::from(id)).unwrap())
+                .unwrap();
+        }
+
+        let sword = loot.grant(1, ItemKind::RustySword, 1).unwrap();
+        let mut victim = world.fighter(1).unwrap().clone();
+        victim.action = Action::Dead;
+        victim.hp = 0.0;
+        let corpse = loot.death(1, &victim, ZoneId::Moonvale, 0).unwrap();
+        assert_eq!(loot.corpses()[&corpse].items[0].id, sword);
+        let selection = VerifiedPickupSelection::Corpse {
+            selection: CorpseItemRef {
+                corpse_id: corpse,
+                item_id: sword,
+            },
+            amount: 1,
+        };
+        let magic = MagicAuthority::new();
+        let checkpoint = checkpoint_path();
+        let winner = CharacterId::new(2).unwrap();
+        let other = CharacterId::new(3).unwrap();
+
+        let taken = commit_verified_pickup(
+            &checkpoint,
+            &mut loot,
+            &magic,
+            &identity,
+            PickupWorldTick {
+                world: &world,
+                completed_tick: world.tick,
+                zones: &zones,
+            },
+            VerifiedLootOperation {
+                lease: lease(2),
+                sequence: 1,
+            },
+            selection,
+        )
+        .unwrap();
+        assert_eq!(taken.id, sword);
+        assert!(loot.corpses()[&corpse].items.is_empty());
+
+        let loser = commit_verified_pickup(
+            &checkpoint,
+            &mut loot,
+            &magic,
+            &identity,
+            PickupWorldTick {
+                world: &world,
+                completed_tick: world.tick,
+                zones: &zones,
+            },
+            VerifiedLootOperation {
+                lease: lease(3),
+                sequence: 1,
+            },
+            selection,
+        );
+        assert!(matches!(loser, Err(PickupCommitError::Loot(LootError::NotFound))));
+        assert_eq!(loot.committed_operation_sequence(winner), Some(1));
+        assert_eq!(loot.committed_operation_sequence(other), None);
+        assert!(loot.inventory(3).unwrap().backpack().is_empty());
+
+        let (stored, _) = load_joint(&checkpoint).unwrap();
+        assert!(stored.corpses()[&corpse].items.is_empty());
+        assert_eq!(stored.parked_inventory(winner).unwrap().backpack()[0].id, sword);
+        assert!(stored.parked_inventory(other).unwrap().backpack().is_empty());
+        assert_eq!(stored.committed_operation_sequence(other), None);
+        let _ = fs::remove_file(&checkpoint);
+    }
+
+    #[test]
+    fn distant_looter_cannot_consume_corpse_item_or_operation_sequence() {
+        use crate::simulation::Action;
+
+        let mut world = World::new(800.0, 600.0);
+        world.add_player_at(1, 200.0, 200.0, 0.0);
+        world.add_player_at(2, 500.0, 500.0, 0.0);
+        let mut zones = ZoneAuthority::new();
+        zones.register(1).unwrap();
+        zones.register(2).unwrap();
+        let mut identity = SessionIdentityRegistry::new();
+        let character = CharacterId::new(22).unwrap();
+        identity.bind_verified(lease(1), CharacterId::new(11).unwrap()).unwrap();
+        identity.bind_verified(lease(2), character).unwrap();
+        let mut loot = LootAuthority::new();
+        loot.register(1).unwrap();
+        loot.register(2).unwrap();
+        let sword = loot.grant(1, ItemKind::RustySword, 1).unwrap();
+        let mut victim = world.fighter(1).unwrap().clone();
+        victim.action = Action::Dead;
+        victim.hp = 0.0;
+        let corpse = loot.death(1, &victim, ZoneId::Moonvale, 0).unwrap();
+        let checkpoint = checkpoint_path();
+        let result = commit_verified_pickup(
+            &checkpoint,
+            &mut loot,
+            &MagicAuthority::new(),
+            &identity,
+            PickupWorldTick {
+                world: &world,
+                completed_tick: world.tick,
+                zones: &zones,
+            },
+            VerifiedLootOperation {
+                lease: lease(2),
+                sequence: 42,
+            },
+            VerifiedPickupSelection::Corpse {
+                selection: CorpseItemRef {
+                    corpse_id: corpse,
+                    item_id: sword,
+                },
+                amount: 1,
+            },
+        );
+        assert!(matches!(result, Err(PickupCommitError::Loot(LootError::OutOfReach))));
+        assert_eq!(loot.corpses()[&corpse].items[0].id, sword);
+        assert!(loot.inventory(2).unwrap().backpack().is_empty());
+        assert_eq!(loot.committed_operation_sequence(character), None);
+        assert!(!checkpoint.exists());
+    }
+
+    #[test]
     fn replay_sequence_is_rejected_even_after_disk_recovery() {
         let mut loot = LootAuthority::new();
         let mut identity = SessionIdentityRegistry::new();
