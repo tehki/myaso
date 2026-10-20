@@ -158,6 +158,26 @@ pub fn answer_with_world(
     witnessed_death: bool,
     supply_report: Option<&str>,
 ) -> String {
+    answer_with_social(
+        session,
+        npc,
+        utterance,
+        activity,
+        witnessed_death,
+        supply_report,
+        None,
+    )
+}
+
+pub fn answer_with_social(
+    session: &mut DialogueSession,
+    npc: &Npc,
+    utterance: &str,
+    activity: &str,
+    witnessed_death: bool,
+    supply_report: Option<&str>,
+    heard_from: Option<&str>,
+) -> String {
     let clean = utterance.trim().to_lowercase();
     if let Some(proposed) = clean.strip_prefix("my name is ") {
         let name = utterance.trim().get(11..).unwrap_or("").trim();
@@ -218,12 +238,15 @@ pub fn answer_with_world(
     } else if contains_any(&clean, &["quest", "job", "work", "reward"]) {
         "No verified contract is available yet. I won't promise rewards that do not exist."
             .to_string()
-    } else if contains_any(
-        &clean,
-        &["rumor", "news", "bandit", "merchant missing", "any deaths"],
-    ) {
+    } else if contains_any(&clean, &["bandit", "merchant missing"]) {
+        "I have no verified information about that specific claim.".to_string()
+    } else if contains_any(&clean, &["rumor", "news", "any deaths"]) {
         if witnessed_death {
             "I witnessed a fighter fall nearby in a real combat encounter. I know no more than that.".to_string()
+        } else if let Some(source) = heard_from {
+            format!(
+                "I heard from {source} that a fighter fell nearby. I did not witness it myself."
+            )
         } else {
             "I haven't witnessed a reliable report. Ask again when the town has news.".to_string()
         }
@@ -362,6 +385,48 @@ mod tests {
         );
         assert!(
             answer_with_context(&mut session, npc, "news", "standing watch", false)
+                .contains("haven't witnessed")
+        );
+    }
+
+    #[test]
+    fn gossip_dialogue_preserves_original_witness_and_hearsay_provenance() {
+        let mut session = DialogueSession::default();
+        let marta = &NPCS[1];
+        let heard = answer_with_social(
+            &mut session,
+            marta,
+            "news",
+            "working at the forge",
+            false,
+            None,
+            Some("Aldric"),
+        );
+        assert!(heard.contains("heard from Aldric"));
+        assert!(heard.contains("did not witness"));
+        let firsthand = answer_with_social(
+            &mut session,
+            marta,
+            "news",
+            "working at the forge",
+            true,
+            None,
+            Some("Aldric"),
+        );
+        assert!(firsthand.contains("I witnessed"));
+        assert!(!firsthand.contains("heard from"));
+        assert!(answer_with_social(
+            &mut session,
+            marta,
+            "merchant missing",
+            "working",
+            false,
+            None,
+            Some("Aldric"),
+        )
+        .contains("no verified information"));
+        assert!(
+            answer_with_social(&mut session, marta, "news", "working", false, None, None,)
                 .contains("haven't witnessed")
         );
     }

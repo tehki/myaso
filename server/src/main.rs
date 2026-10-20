@@ -552,6 +552,9 @@ async fn run_authoritative_clock(game: Arc<SharedGame>, flight_action_proof: boo
         }
         state.record_combat_events(&events);
         let tick = state.world.tick;
+        if let Some(routines) = state.npc_routines.as_mut() {
+            routines.advance_social(tick);
+        }
         if let Some(supply) = state.npc_supply.as_mut() {
             supply.advance(tick);
         }
@@ -719,6 +722,10 @@ async fn handle_connection(
                             .npc_routines
                             .as_ref()
                             .and_then(|routines| routines.context(npc_id, state.world.tick));
+                        let heard_from = state
+                            .npc_routines
+                            .as_ref()
+                            .and_then(|routines| routines.rumor_source(npc_id, state.world.tick));
                         state.world.fighter(player_id).map(|fighter| {
                             (
                                 fighter.x,
@@ -727,11 +734,12 @@ async fn handle_connection(
                                 state.world.tick,
                                 context,
                                 report,
+                                heard_from,
                             )
                         })
                     };
                     match viewer {
-                        Some((x, y, alive, tick, context, report)) => {
+                        Some((x, y, alive, tick, context, report, heard_from)) => {
                             let npc = NpcRoutines::position(npc_id, tick).and_then(|position| {
                                 living_world::nearby_npc_at(
                                     npc_id, x, y, alive, position.x, position.y,
@@ -745,13 +753,14 @@ async fn handle_connection(
                                     living_world::response_packet(
                                         npc_id,
                                         0,
-                                        &living_world::answer_with_world(
+                                        &living_world::answer_with_social(
                                             &mut dialogue,
                                             npc,
                                             utterance,
                                             activity,
                                             witnessed,
                                             report.as_deref(),
+                                            heard_from,
                                         ),
                                     )
                                 }
@@ -1179,6 +1188,39 @@ mod tests {
         );
         assert!(text.contains("iron bars"));
         assert_eq!(game.npc_supply.as_ref().unwrap().stocks(), before);
+    }
+
+    #[test]
+    fn real_combat_event_drives_provenance_labeled_npc_news_without_gameplay_mutation() {
+        let mut state = GameState::new(0, 0);
+        state.npc_routines = Some(NpcRoutines::default());
+        assert!(state.world.add_player_at(1, 50.0, 50.0, 0.0));
+        assert!(state.world.add_player_at(2, 20.0, 250.0, 0.0));
+        state.record_combat_events(&[CombatEvent::Death {
+            fighter: 2,
+            killer: 1,
+        }]);
+        let routines = state.npc_routines.as_mut().unwrap();
+        assert!(routines.context(1, 0).unwrap().1);
+        assert!(!routines.context(2, 0).unwrap().1);
+        assert_eq!(routines.rumor_source(2, 0), None);
+        routines.advance_social(60);
+        assert_eq!(routines.rumor_source(2, 60), Some("Aldric"));
+        let mut visitor = DialogueSession::default();
+        let dialogue = living_world::answer_with_social(
+            &mut visitor,
+            &living_world::NPCS[1],
+            "news",
+            "working at the forge",
+            false,
+            None,
+            routines.rumor_source(2, 60),
+        );
+        assert!(dialogue.contains("heard from Aldric"));
+        assert!(dialogue.contains("did not witness"));
+        assert_eq!(state.kill_events.len(), 1);
+        assert_eq!(state.world.fighters().len(), 2);
+        assert_eq!(state.world.fighter(2).unwrap().x, 20.0);
     }
 
     #[test]

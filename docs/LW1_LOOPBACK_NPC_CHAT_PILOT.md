@@ -190,3 +190,38 @@ static three NPC pilot routes**; this movement controller intentionally remains
 unspawned until server-owned Greyhaven map collision and cross-zone ownership
 arrive from their independent PR streams. No live combat physics or browser
 protocol changes were made.
+
+## LW-1G — Grounded NPC-to-NPC local news (loopback-only)
+
+**Aldric, Marta, Rowan, Elara and Tomas can now share a verified,
+short-lived local report at an actual pilot NPC encounter.** If the combat
+simulation reports a death in the existing authoritative `CombatEvent::Death`
+path, a nearby NPC may **directly witness** that event. Once per simulated
+second (60 ticks), a direct witness can tell another NPC if their server-timed
+positions are within 105 world units **and** the straight conversation path
+does not intersect a known pilot barrier. No browser/client chat packet can
+inject a witnessed event, start social updates, name a news source, or modify
+the supply ledger.
+
+NPC dialogues distinguish the evidence levels: a direct witness says
+**"I witnessed a fighter fall"**; a recipient says **"I heard from Aldric
+... I did not witness it myself"** (the name is chosen from the immutable
+trusted NPC roster); NPCs with neither firsthand nor secondhand evidence
+say they have no verified news. Claims about bandits or a missing merchant
+remain unverified even when a nearby fighter really died. There is **no**
+player name, identity, killer/victim ID, dialogue transcript, procedural
+rumor, AI provider, quest reward or persistent database behind this feature.
+
+Only a **firsthand** witness can communicate an event; the NPC that hears
+the report may not retransmit it as firsthand knowledge. If it later
+genuinely witnesses another combat event, firsthand evidence overrides the
+earlier rumor. Both firsthand and secondhand reports expire no later than
+two minutes after the **original** world event. The fixed-size arrays
+contain only event timestamps and one NPC roster identifier; nothing is
+logged or persisted. Moving positions and obstacle avoidance come from the
+same NPC server world tick as the previous pilot.
+
+This is not production hearing, visibility, or full dialogue AI. Physical
+Greyhaven LOS, obstructions, crowds and interiors remain dependent on the
+separate authoritative world collision/door PRs. The experiment remains
+off by default, loopback-only, combat-independent and unmerged.

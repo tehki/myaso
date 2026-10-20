@@ -11,6 +11,15 @@ const LEG_TICKS: u32 = 600;
 const CYCLE_TICKS: u32 = 4 * LEG_TICKS;
 const WITNESS_RADIUS: f32 = 235.0;
 const WITNESS_MEMORY_TICKS: u32 = 120 * 60;
+const GOSSIP_RADIUS: f32 = 105.0;
+const SOCIAL_INTERVAL_TICKS: u32 = 60;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct HeardReport {
+    original_event_tick: u32,
+    heard_tick: u32,
+    source_id: u8,
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct NpcState {
@@ -25,6 +34,10 @@ pub struct NpcRoutines {
     // Transient server-simulated observations of verified deaths nearby.
     // No combat identities, chat text, persistent player IDs, or logs.
     witnessed_death_tick: [Option<u32>; NPCS.len()],
+    // Only a verified direct witness may pass on a report at a real NPC meeting.
+    // Neither recipient nor source can create a new combat event or reward.
+    heard_report: [Option<HeardReport>; NPCS.len()],
+    last_social_tick: Option<u32>,
 }
 
 impl NpcRoutines {
@@ -65,8 +78,91 @@ impl NpcRoutines {
             let dy = y - f32::from(state.y);
             if dx * dx + dy * dy <= WITNESS_RADIUS * WITNESS_RADIUS {
                 self.witnessed_death_tick[index] = Some(tick);
+                self.heard_report[index] = None;
             }
         }
+    }
+
+    /// Bounded NPC-NPC local event relay, executed at most once per simulated
+    /// second and only on trusted world clock ticks. No second-hand retransmit.
+    pub fn advance_social(&mut self, tick: u32) {
+        if tick == 0
+            || tick % SOCIAL_INTERVAL_TICKS != 0
+            || self.last_social_tick.is_some_and(|previous| {
+                let elapsed = tick.wrapping_sub(previous);
+                elapsed == 0 || elapsed >= (1 << 31)
+            })
+        {
+            return;
+        }
+        self.last_social_tick = Some(tick);
+        let positions =
+            NPCS.map(|npc| Self::position(npc.id, tick).expect("authored NPC position"));
+        // Snapshot firsthand witnesses before choosing recipients. Knowledge
+        // shared this tick cannot recursively spread to further NPCs.
+        for (source_index, source) in NPCS.iter().enumerate() {
+            let Some(event_tick) = self.witnessed_death_tick[source_index] else {
+                continue;
+            };
+            if tick.wrapping_sub(event_tick) > WITNESS_MEMORY_TICKS {
+                continue;
+            }
+            for (receiver_index, _) in NPCS.iter().enumerate() {
+                if source_index == receiver_index {
+                    continue;
+                }
+                if self.witnessed_death_tick[receiver_index]
+                    .is_some_and(|seen| tick.wrapping_sub(seen) <= WITNESS_MEMORY_TICKS)
+                {
+                    continue;
+                }
+                let dx =
+                    f32::from(positions[source_index].x) - f32::from(positions[receiver_index].x);
+                let dy =
+                    f32::from(positions[source_index].y) - f32::from(positions[receiver_index].y);
+                if dx * dx + dy * dy > GOSSIP_RADIUS * GOSSIP_RADIUS
+                    || !npc_navigation::pilot_line_of_sight(
+                        (positions[source_index].x, positions[source_index].y),
+                        (positions[receiver_index].x, positions[receiver_index].y),
+                    )
+                {
+                    continue;
+                }
+                let replaces = self.heard_report[receiver_index].is_none_or(|old| {
+                    tick.wrapping_sub(old.original_event_tick) > WITNESS_MEMORY_TICKS
+                        || (event_tick != old.original_event_tick
+                            && event_tick.wrapping_sub(old.original_event_tick) < (1 << 31))
+                        || (event_tick == old.original_event_tick && source.id < old.source_id)
+                });
+                if replaces {
+                    self.heard_report[receiver_index] = Some(HeardReport {
+                        original_event_tick: event_tick,
+                        heard_tick: tick,
+                        source_id: source.id,
+                    });
+                }
+            }
+        }
+    }
+
+    /// Returned name is from the trusted fixed NPC roster, never a claimed
+    /// player nickname. The source must have actually witnessed a death.
+    pub fn rumor_source(&self, id: u8, tick: u32) -> Option<&'static str> {
+        let index = NPCS.iter().position(|npc| npc.id == id)?;
+        if self.witnessed_death_tick[index]
+            .is_some_and(|seen| tick.wrapping_sub(seen) <= WITNESS_MEMORY_TICKS)
+        {
+            return None;
+        }
+        let heard = self.heard_report[index]?;
+        if tick.wrapping_sub(heard.original_event_tick) > WITNESS_MEMORY_TICKS
+            || tick.wrapping_sub(heard.heard_tick) > WITNESS_MEMORY_TICKS
+        {
+            return None;
+        }
+        NPCS.iter()
+            .find(|npc| npc.id == heard.source_id)
+            .map(|npc| npc.name)
     }
 
     pub fn context(&self, id: u8, tick: u32) -> Option<(&'static str, bool)> {
@@ -156,5 +252,58 @@ mod tests {
         assert_eq!(packet, NpcRoutines::state_packet(600));
         assert_eq!(packet[8], 1);
         assert_eq!(packet[8 + 2 * 6], 3);
+    }
+
+    #[test]
+    fn firsthand_report_passes_only_at_npc_meeting_with_explicit_source() {
+        let mut town = NpcRoutines::default();
+        // A real combat death near Aldric, but too distant for Marta.
+        town.witness_death(60, 10.0, 250.0);
+        assert!(town.context(1, 60).unwrap().1);
+        assert!(!town.context(2, 60).unwrap().1);
+        assert_eq!(town.rumor_source(2, 60), None);
+        town.advance_social(59); // social cadence cannot be client-triggered
+        assert_eq!(town.rumor_source(2, 60), None);
+        town.advance_social(60);
+        assert_eq!(town.rumor_source(2, 60), Some("Aldric"));
+        assert!(!town.context(2, 60).unwrap().1);
+        assert_eq!(town.rumor_source(4, 60), None); // too far from witnesses
+        assert_eq!(town.rumor_source(99, 60), None);
+        assert_eq!(town.heard_report[1].unwrap().original_event_tick, 60);
+        town.advance_social(60);
+        assert_eq!(town.heard_report[1].unwrap().heard_tick, 60);
+        assert_eq!(town.rumor_source(2, 60 + WITNESS_MEMORY_TICKS + 1), None);
+    }
+
+    #[test]
+    fn hearsay_cannot_retransmit_and_real_witness_takes_precedence() {
+        let mut town = NpcRoutines::default();
+        town.heard_report[0] = Some(HeardReport {
+            original_event_tick: 60,
+            heard_tick: 60,
+            source_id: 2,
+        });
+        town.advance_social(60);
+        assert!(town.heard_report[1].is_none());
+        assert!(town.heard_report[2].is_none());
+
+        let mut meeting = NpcRoutines::default();
+        meeting.witness_death(60, 10.0, 250.0);
+        meeting.advance_social(60);
+        assert!(meeting.rumor_source(2, 60).is_some());
+        meeting.witness_death(120, 210.0, 65.0);
+        assert_eq!(meeting.rumor_source(2, 120), None);
+        assert!(meeting.context(2, 120).unwrap().1);
+    }
+
+    #[test]
+    fn gossip_is_transient_and_nonpersonal_through_tick_wraparound() {
+        let mut town = NpcRoutines::default();
+        let event = u32::MAX - 64;
+        town.witness_death(event, 10.0, 250.0);
+        // Explicit social cadence after wraparound.
+        town.advance_social(60);
+        assert_eq!(town.rumor_source(2, 60), Some("Aldric"));
+        assert_eq!(town.rumor_source(2, 60 + WITNESS_MEMORY_TICKS + 100), None);
     }
 }

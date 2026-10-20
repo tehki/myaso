@@ -136,6 +136,28 @@ pub fn valid_route(id: u8) -> bool {
         .is_some_and(|slot| routes()[slot].is_some())
 }
 
+/// Tiny, allocation-free line check through authored *pilot* obstacles only.
+/// Meeting events must not pass through the staged wall/crate. This is not
+/// production zone visibility or combat line-of-sight.
+pub fn pilot_line_of_sight(from: (u16, u16), to: (u16, u16)) -> bool {
+    let dx = i32::from(to.0) - i32::from(from.0);
+    let dy = i32::from(to.1) - i32::from(from.1);
+    let steps = ((dx.abs().max(dy.abs()) + GRID_STEP - 1) / GRID_STEP).max(1);
+    for step in 0..=steps {
+        let x = i32::from(from.0) + dx * step / steps;
+        let y = i32::from(from.1) + dy * step / steps;
+        if PILOT_BARRIERS.iter().any(|rect| {
+            x >= i32::from(rect.x)
+                && y >= i32::from(rect.y)
+                && x <= i32::from(rect.x + rect.width)
+                && y <= i32::from(rect.y + rect.height)
+        }) {
+            return false;
+        }
+    }
+    true
+}
+
 pub fn obstacle_packet() -> Vec<u8> {
     let mut bytes = vec![
         PROTOCOL_VERSION,
@@ -198,6 +220,14 @@ mod tests {
                 blocked(x, y)
             }));
         }
+    }
+
+    #[test]
+    fn pilot_social_encounter_line_of_sight_does_not_cross_crates() {
+        assert!(pilot_line_of_sight((120, 95), (210, 65)));
+        assert!(!pilot_line_of_sight((275, 190), (340, 255)));
+        assert!(!pilot_line_of_sight((340, 255), (275, 190)));
+        assert!(pilot_line_of_sight((120, 95), (120, 95)));
     }
 
     #[test]
