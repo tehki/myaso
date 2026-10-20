@@ -1,0 +1,628 @@
+{
+  "milestone": "Blood & Iron A2.9 real unmerged PR326 knight sprites and PR350 roof art",
+  "browser": "Chrome/154.0.8037.99",
+  "companionPr326Commit": "c0b08a2a527cc492199db9f1e01dc9727225987f",
+  "companionModuleSHA256": "6b4f7e907d3822c84dbc91932e3bbfc4161b3f5db6acbcc108946a8f7288b700",
+  "companionAtlasSHA256": {
+    "silver_idle": "828cf05dd873d0c8f35e887f5e46c35af87f084ac321977e358c985e7a2106b4",
+    "silver_roll": "31c774ac930a5cf1060640f1fc2914b02d6d5ddccd7d56591123efd098909426",
+    "t1_roll": "16ea4b62867e95e1be7a4c18b3b48cc427b8338badae882692e6b1e051f0a24f"
+  },
+  "initial": {
+    "state": "ready",
+    "clip": "silver_idle",
+    "directionIndex": 0,
+    "frame": 0,
+    "frames": 4,
+    "renderWidth": 80,
+    "renderHeight": 80,
+    "drawOffset": [
+      -40,
+      -52
+    ],
+    "silhouetteAlphaBounds": {
+      "left": 50,
+      "top": 26,
+      "right": 115,
+      "bottom": 143,
+      "pixels": 4428
+    },
+    "silhouetteBottomFromOriginPx": 20,
+    "roofOpacity": 0.4,
+    "roofOverActor": true,
+    "renderMs": 60,
+    "source": "companion PR #326 actual atlas",
+    "originKind": "world-center, NOT anatomically verified foot",
+    "anatomicalFootPivotVerified": false,
+    "gameIntegrated": false,
+    "realAtlasLoaded": true,
+    "version": "A2.9",
+    "sourceAssetsCommittedToGraphicsPR": false,
+    "browserGameXYAligned": false,
+    "authoritativePortalVerified": false,
+    "actualMultiplayerFPSMeasured": false
+  },
+  "rolled": {
+    "state": "ready",
+    "clip": "silver_roll",
+    "directionIndex": 0,
+    "frame": 7,
+    "frames": 8,
+    "renderWidth": 112,
+    "renderHeight": 112,
+    "drawOffset": [
+      -56,
+      -65
+    ],
+    "silhouetteAlphaBounds": {
+      "left": 56,
+      "top": 38,
+      "right": 108,
+      "bottom": 122,
+      "pixels": 2286
+    },
+    "silhouetteBottomFromOriginPx": 21.099999999999994,
+    "roofOpacity": 0.4,
+    "roofOverActor": true,
+    "renderMs": 35.299999952316284,
+    "source": "companion PR #326 actual atlas",
+    "originKind": "world-center, NOT anatomically verified foot",
+    "anatomicalFootPivotVerified": false,
+    "gameIntegrated": false,
+    "realAtlasLoaded": true,
+    "version": "A2.9",
+    "sourceAssetsCommittedToGraphicsPR": false,
+    "browserGameXYAligned": false,
+    "authoritativePortalVerified": false,
+    "actualMultiplayerFPSMeasured": false
+  },
+  "sentinel": {
+    "state": "ready",
+    "clip": "t1_roll",
+    "directionIndex": 6,
+    "frame": 5,
+    "frames": 8,
+    "renderWidth": 112,
+    "renderHeight": 112,
+    "drawOffset": [
+      -56,
+      -65
+    ],
+    "silhouetteAlphaBounds": {
+      "left": 36,
+      "top": 78,
+      "right": 99,
+      "bottom": 139,
+      "pixels": 1882
+    },
+    "silhouetteBottomFromOriginPx": 33,
+    "roofOpacity": 0.4,
+    "roofOverActor": true,
+    "renderMs": 43,
+    "source": "companion PR #326 actual atlas",
+    "originKind": "world-center, NOT anatomically verified foot",
+    "anatomicalFootPivotVerified": false,
+    "gameIntegrated": false,
+    "realAtlasLoaded": true,
+    "version": "A2.9",
+    "sourceAssetsCommittedToGraphicsPR": false,
+    "browserGameXYAligned": false,
+    "authoritativePortalVerified": false,
+    "actualMultiplayerFPSMeasured": false
+  },
+  "faded": {
+    "state": "ready",
+    "clip": "t1_roll",
+    "directionIndex": 6,
+    "frame": 5,
+    "frames": 8,
+    "renderWidth": 112,
+    "renderHeight": 112,
+    "drawOffset": [
+      -56,
+      -65
+    ],
+    "silhouetteAlphaBounds": {
+      "left": 36,
+      "top": 78,
+      "right": 99,
+      "bottom": 139,
+      "pixels": 1882
+    },
+    "silhouetteBottomFromOriginPx": 33,
+    "roofOpacity": 0.2,
+    "roofOverActor": false,
+    "renderMs": 1.5999999046325684,
+    "source": "companion PR #326 actual atlas",
+    "originKind": "world-center, NOT anatomically verified foot",
+    "anatomicalFootPivotVerified": false,
+    "gameIntegrated": false,
+    "realAtlasLoaded": true,
+    "version": "A2.9",
+    "sourceAssetsCommittedToGraphicsPR": false,
+    "browserGameXYAligned": false,
+    "authoritativePortalVerified": false,
+    "actualMultiplayerFPSMeasured": false
+  },
+  "sampledFrameCount": 36,
+  "alphaSilhouetteSamples": [
+    {
+      "clip": "silver_idle",
+      "directionIndex": 0,
+      "frame": 0,
+      "proxyBottomRelativeToOriginPx": 20,
+      "alphaBounds": {
+        "left": 50,
+        "top": 26,
+        "right": 115,
+        "bottom": 143,
+        "pixels": 4428
+      }
+    },
+    {
+      "clip": "silver_idle",
+      "directionIndex": 0,
+      "frame": 1,
+      "proxyBottomRelativeToOriginPx": 20,
+      "alphaBounds": {
+        "left": 49,
+        "top": 26,
+        "right": 115,
+        "bottom": 143,
+        "pixels": 4302
+      }
+    },
+    {
+      "clip": "silver_idle",
+      "directionIndex": 0,
+      "frame": 3,
+      "proxyBottomRelativeToOriginPx": 20,
+      "alphaBounds": {
+        "left": 49,
+        "top": 26,
+        "right": 115,
+        "bottom": 143,
+        "pixels": 4299
+      }
+    },
+    {
+      "clip": "silver_idle",
+      "directionIndex": 2,
+      "frame": 0,
+      "proxyBottomRelativeToOriginPx": 20.5,
+      "alphaBounds": {
+        "left": 55,
+        "top": 25,
+        "right": 102,
+        "bottom": 144,
+        "pixels": 3068
+      }
+    },
+    {
+      "clip": "silver_idle",
+      "directionIndex": 2,
+      "frame": 1,
+      "proxyBottomRelativeToOriginPx": 20.5,
+      "alphaBounds": {
+        "left": 55,
+        "top": 26,
+        "right": 103,
+        "bottom": 144,
+        "pixels": 3064
+      }
+    },
+    {
+      "clip": "silver_idle",
+      "directionIndex": 2,
+      "frame": 3,
+      "proxyBottomRelativeToOriginPx": 20.5,
+      "alphaBounds": {
+        "left": 55,
+        "top": 26,
+        "right": 103,
+        "bottom": 144,
+        "pixels": 3059
+      }
+    },
+    {
+      "clip": "silver_idle",
+      "directionIndex": 4,
+      "frame": 0,
+      "proxyBottomRelativeToOriginPx": 18,
+      "alphaBounds": {
+        "left": 44,
+        "top": 26,
+        "right": 109,
+        "bottom": 139,
+        "pixels": 4665
+      }
+    },
+    {
+      "clip": "silver_idle",
+      "directionIndex": 4,
+      "frame": 1,
+      "proxyBottomRelativeToOriginPx": 18,
+      "alphaBounds": {
+        "left": 44,
+        "top": 26,
+        "right": 110,
+        "bottom": 139,
+        "pixels": 4573
+      }
+    },
+    {
+      "clip": "silver_idle",
+      "directionIndex": 4,
+      "frame": 3,
+      "proxyBottomRelativeToOriginPx": 18,
+      "alphaBounds": {
+        "left": 44,
+        "top": 26,
+        "right": 110,
+        "bottom": 139,
+        "pixels": 4576
+      }
+    },
+    {
+      "clip": "silver_idle",
+      "directionIndex": 6,
+      "frame": 0,
+      "proxyBottomRelativeToOriginPx": 19.5,
+      "alphaBounds": {
+        "left": 57,
+        "top": 26,
+        "right": 104,
+        "bottom": 142,
+        "pixels": 3290
+      }
+    },
+    {
+      "clip": "silver_idle",
+      "directionIndex": 6,
+      "frame": 1,
+      "proxyBottomRelativeToOriginPx": 19.5,
+      "alphaBounds": {
+        "left": 56,
+        "top": 26,
+        "right": 104,
+        "bottom": 142,
+        "pixels": 3295
+      }
+    },
+    {
+      "clip": "silver_idle",
+      "directionIndex": 6,
+      "frame": 3,
+      "proxyBottomRelativeToOriginPx": 19.5,
+      "alphaBounds": {
+        "left": 56,
+        "top": 26,
+        "right": 104,
+        "bottom": 142,
+        "pixels": 3292
+      }
+    },
+    {
+      "clip": "silver_roll",
+      "directionIndex": 0,
+      "frame": 0,
+      "proxyBottomRelativeToOriginPx": 21.1,
+      "alphaBounds": {
+        "left": 56,
+        "top": 38,
+        "right": 108,
+        "bottom": 122,
+        "pixels": 2286
+      }
+    },
+    {
+      "clip": "silver_roll",
+      "directionIndex": 0,
+      "frame": 3,
+      "proxyBottomRelativeToOriginPx": 11.3,
+      "alphaBounds": {
+        "left": 37,
+        "top": 55,
+        "right": 91,
+        "bottom": 108,
+        "pixels": 1755
+      }
+    },
+    {
+      "clip": "silver_roll",
+      "directionIndex": 0,
+      "frame": 7,
+      "proxyBottomRelativeToOriginPx": 21.1,
+      "alphaBounds": {
+        "left": 56,
+        "top": 38,
+        "right": 108,
+        "bottom": 122,
+        "pixels": 2286
+      }
+    },
+    {
+      "clip": "silver_roll",
+      "directionIndex": 2,
+      "frame": 0,
+      "proxyBottomRelativeToOriginPx": 20.4,
+      "alphaBounds": {
+        "left": 61,
+        "top": 38,
+        "right": 100,
+        "bottom": 121,
+        "pixels": 1961
+      }
+    },
+    {
+      "clip": "silver_roll",
+      "directionIndex": 2,
+      "frame": 3,
+      "proxyBottomRelativeToOriginPx": 10.6,
+      "alphaBounds": {
+        "left": 54,
+        "top": 39,
+        "right": 102,
+        "bottom": 107,
+        "pixels": 1886
+      }
+    },
+    {
+      "clip": "silver_roll",
+      "directionIndex": 2,
+      "frame": 7,
+      "proxyBottomRelativeToOriginPx": 20.4,
+      "alphaBounds": {
+        "left": 61,
+        "top": 38,
+        "right": 100,
+        "bottom": 121,
+        "pixels": 1961
+      }
+    },
+    {
+      "clip": "silver_roll",
+      "directionIndex": 4,
+      "frame": 0,
+      "proxyBottomRelativeToOriginPx": 18.3,
+      "alphaBounds": {
+        "left": 51,
+        "top": 33,
+        "right": 104,
+        "bottom": 118,
+        "pixels": 2760
+      }
+    },
+    {
+      "clip": "silver_roll",
+      "directionIndex": 4,
+      "frame": 3,
+      "proxyBottomRelativeToOriginPx": 21.8,
+      "alphaBounds": {
+        "left": 68,
+        "top": 59,
+        "right": 122,
+        "bottom": 123,
+        "pixels": 1826
+      }
+    },
+    {
+      "clip": "silver_roll",
+      "directionIndex": 4,
+      "frame": 7,
+      "proxyBottomRelativeToOriginPx": 18.3,
+      "alphaBounds": {
+        "left": 51,
+        "top": 33,
+        "right": 104,
+        "bottom": 118,
+        "pixels": 2760
+      }
+    },
+    {
+      "clip": "silver_roll",
+      "directionIndex": 6,
+      "frame": 0,
+      "proxyBottomRelativeToOriginPx": 22.5,
+      "alphaBounds": {
+        "left": 60,
+        "top": 37,
+        "right": 98,
+        "bottom": 124,
+        "pixels": 1695
+      }
+    },
+    {
+      "clip": "silver_roll",
+      "directionIndex": 6,
+      "frame": 3,
+      "proxyBottomRelativeToOriginPx": 19.7,
+      "alphaBounds": {
+        "left": 58,
+        "top": 66,
+        "right": 105,
+        "bottom": 120,
+        "pixels": 1704
+      }
+    },
+    {
+      "clip": "silver_roll",
+      "directionIndex": 6,
+      "frame": 7,
+      "proxyBottomRelativeToOriginPx": 22.5,
+      "alphaBounds": {
+        "left": 60,
+        "top": 37,
+        "right": 98,
+        "bottom": 124,
+        "pixels": 1695
+      }
+    },
+    {
+      "clip": "t1_roll",
+      "directionIndex": 0,
+      "frame": 0,
+      "proxyBottomRelativeToOriginPx": 31.6,
+      "alphaBounds": {
+        "left": 57,
+        "top": 55,
+        "right": 100,
+        "bottom": 137,
+        "pixels": 2147
+      }
+    },
+    {
+      "clip": "t1_roll",
+      "directionIndex": 0,
+      "frame": 3,
+      "proxyBottomRelativeToOriginPx": 41.4,
+      "alphaBounds": {
+        "left": 58,
+        "top": 90,
+        "right": 109,
+        "bottom": 151,
+        "pixels": 1719
+      }
+    },
+    {
+      "clip": "t1_roll",
+      "directionIndex": 0,
+      "frame": 7,
+      "proxyBottomRelativeToOriginPx": 31.6,
+      "alphaBounds": {
+        "left": 57,
+        "top": 55,
+        "right": 100,
+        "bottom": 137,
+        "pixels": 2147
+      }
+    },
+    {
+      "clip": "t1_roll",
+      "directionIndex": 2,
+      "frame": 0,
+      "proxyBottomRelativeToOriginPx": 30.9,
+      "alphaBounds": {
+        "left": 60,
+        "top": 52,
+        "right": 101,
+        "bottom": 136,
+        "pixels": 1640
+      }
+    },
+    {
+      "clip": "t1_roll",
+      "directionIndex": 2,
+      "frame": 3,
+      "proxyBottomRelativeToOriginPx": 31.6,
+      "alphaBounds": {
+        "left": 31,
+        "top": 70,
+        "right": 76,
+        "bottom": 137,
+        "pixels": 1610
+      }
+    },
+    {
+      "clip": "t1_roll",
+      "directionIndex": 2,
+      "frame": 7,
+      "proxyBottomRelativeToOriginPx": 30.9,
+      "alphaBounds": {
+        "left": 60,
+        "top": 52,
+        "right": 101,
+        "bottom": 136,
+        "pixels": 1640
+      }
+    },
+    {
+      "clip": "t1_roll",
+      "directionIndex": 4,
+      "frame": 0,
+      "proxyBottomRelativeToOriginPx": 31.6,
+      "alphaBounds": {
+        "left": 59,
+        "top": 50,
+        "right": 102,
+        "bottom": 137,
+        "pixels": 2147
+      }
+    },
+    {
+      "clip": "t1_roll",
+      "directionIndex": 4,
+      "frame": 3,
+      "proxyBottomRelativeToOriginPx": 13.4,
+      "alphaBounds": {
+        "left": 50,
+        "top": 64,
+        "right": 102,
+        "bottom": 111,
+        "pixels": 1377
+      }
+    },
+    {
+      "clip": "t1_roll",
+      "directionIndex": 4,
+      "frame": 7,
+      "proxyBottomRelativeToOriginPx": 31.6,
+      "alphaBounds": {
+        "left": 59,
+        "top": 50,
+        "right": 102,
+        "bottom": 137,
+        "pixels": 2147
+      }
+    },
+    {
+      "clip": "t1_roll",
+      "directionIndex": 6,
+      "frame": 0,
+      "proxyBottomRelativeToOriginPx": 33.7,
+      "alphaBounds": {
+        "left": 58,
+        "top": 52,
+        "right": 99,
+        "bottom": 140,
+        "pixels": 1624
+      }
+    },
+    {
+      "clip": "t1_roll",
+      "directionIndex": 6,
+      "frame": 3,
+      "proxyBottomRelativeToOriginPx": 22.5,
+      "alphaBounds": {
+        "left": 83,
+        "top": 78,
+        "right": 128,
+        "bottom": 124,
+        "pixels": 1258
+      }
+    },
+    {
+      "clip": "t1_roll",
+      "directionIndex": 6,
+      "frame": 7,
+      "proxyBottomRelativeToOriginPx": 33.7,
+      "alphaBounds": {
+        "left": 58,
+        "top": 52,
+        "right": 99,
+        "bottom": 140,
+        "pixels": 1624
+      }
+    }
+  ],
+  "browserErrors": [],
+  "canvasPresentationOnly": true,
+  "anatomicalFootPivotVerified": false,
+  "combatHitboxChanged": false,
+  "spriteOrAtlasCommittedIntoGraphicsPR": false,
+  "realGameRuntimeTested": false,
+  "gameFrameTimeMeasured": false,
+  "multiplayerRooftopOcclusionValidated": false,
+  "deployed": false,
+  "caveat": "Bottommost alpha pixel proxy is not an anatomical foot contact or collision ground proof. Rendered on a static roof preview, not the live multiplayer game."
+}
