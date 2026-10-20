@@ -1,0 +1,46 @@
+{
+  "node": "v24.19.0",
+  "platform": "win32",
+  "arch": "x64",
+  "scenario": "4 real Greyhaven chunks, 200 iterations each (800 planner calls / sample); sequential alternating A/B rounds",
+  "previousRevision": "a12045ccf82395ce431316d9ec8264009baff660",
+  "samples": {
+    "candidate": [
+      101.448,
+      120.792,
+      109.616,
+      99.216,
+      102.771,
+      89.974,
+      102.238,
+      92.347,
+      96.326
+    ],
+    "previous": [
+      122.093,
+      122.12,
+      108.361,
+      117.837,
+      128.421,
+      117.511,
+      148.196,
+      124.173,
+      102.847
+    ]
+  },
+  "medianMs": {
+    "candidate": 101.448,
+    "previous": 122.093
+  },
+  "featureCounts": {
+    "candidate": {
+      "total": 800,
+      "checksum": 143000
+    },
+    "previous": {
+      "total": 800,
+      "checksum": 143000
+    }
+  },
+  "scope": "Node CPU-only planner benchmark. Not Chrome Canvas, frame duration, memory, multiplayer or GPU FPS."
+}

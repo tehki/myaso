@@ -9,7 +9,7 @@ const map = AUTHORED_MAPS[MAP_IDS.overworld];
 const greyhaven = {x:4096,y:4096,width:512,height:512};
 
 test("3C source-owned Greyhaven materials respect authored map and deterministic inputs", () => {
-  assert.equal(GREYHAVEN_MATERIAL_VERSION, "3c-p2-1");
+  assert.equal(GREYHAVEN_MATERIAL_VERSION, "3c-p2-2");
   const before = JSON.stringify(map);
   const a = createGreyhavenTerrainPlan(map, greyhaven);
   const b = createGreyhavenTerrainPlan(map, greyhaven);
@@ -55,7 +55,7 @@ test("3C draws through existing world tile renderer, without a new cache", () =>
   const calls={fill:0,stroke:0,ellipse:0};
   const c={save(){},restore(){},translate(){},beginPath(){},moveTo(){},lineTo(){},
     arc(){},fillText(){},fillRect(){calls.fill++;},strokeRect(){calls.stroke++;},
-    ellipse(){calls.ellipse++;},fill(){},stroke(){calls.stroke++;}};
+    ellipse(){calls.ellipse++;},fill(){calls.fill++;},stroke(){calls.stroke++;}};
   const painted=paintGreyhavenGroundDetails(c,map,greyhaven);
   assert.ok(painted.pavers>0&&calls.fill>0&&calls.stroke>0&&calls.ellipse>0);
   let canvases=0;

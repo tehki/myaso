@@ -45,3 +45,16 @@ Actual Chrome 154.0.8037.99, Windows Machine, viewport 1120x720, DPR 1.0. Both b
 - JSON report: greyhaven_3c_browser_report.json. The original #336 screenshot and unchanged PR #336 head are preserved.
 
 This is **not** an acceptable claim of full multiplayer performance. The extra cold-chunk work should be profiled on low-end hardware, especially when moving rapidly and generating the maximum three tiles/frame. Consider further density reductions or a pre-baked atlas if the integration budget cannot absorb the measured delta. In the first experimental version pavers were denser and stroked individually, causing substantially greater overhead; the current implementation uses prefiltered road segments and single-fill stones.
+
+
+## P2.2 — planner fast path (2026-10-21)
+
+The stone silhouettes and terrain positions remain **pixel-identical** to P2.1 in the real Chrome 1120×720 offline Greyhaven preview (Pillow RGBA before/after image difference: none). The planner now checks authored building rectangles without square roots when emitting pavers, and performs a cheap expanded-bounds rejection before calculating woodland-edge/foundation distances. No extra asset, persistent cache, network call, entity update, extra full-scene pass or per-frame animation is introduced.
+
+Reproduce the **isolated planner benchmark** by checking out exact original P2.1 commit a12045ccf82395ce431316d9ec8264009baff660 into a separate read-only worktree, then set GREYHAVEN_PREVIOUS_MODULE to that worktree's src/browser/greyhaven-terrain-materials.mjs and GREYHAVEN_PREVIOUS_SHA to the pinned SHA. Run:
+
+    node tools/art/benchmark_greyhaven_3c_plan.mjs
+
+On Windows Machine Node v24.19.0 (x64), nine alternating A/B runs, 800 calls per run across four authored tiles, both variants yield **143,000 features summed across 800 plans**. The first comparison had a previous median **200.061 ms** vs optimized **173.722 ms** (13.2% faster). A repeated comparison had previous **122.093 ms** vs optimized **101.448 ms** (16.9% faster); the repo JSON records the second run. Both are *CPU-only material planner* microbenchmarks and must not be reported as gameplay frame-rate improvements. Measured runtime depends on system load.
+
+The repeated Chrome 154 cold-six-chunk benchmark had baseline PR #336 median **26.4 ms** vs optimized candidate median **27.4 ms** (+1.0ms, ~3.8%) and no browser page errors. This measurement is noisy compared with the earlier P2.1 session (16.1ms vs 21.2ms). Real-world chunk-frame performance **remains unqualified**, with no claim of full FPS or production readiness. No multiplayer visual CI was changed, and the M41 parry-tell failure in original #419 exact-head quality 39511746799 is recorded for central Combat triage, not bypassed.

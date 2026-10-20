@@ -11,7 +11,7 @@ const MAX_PAVERS = 900;
 const MAX_COVER = 130;
 const MAX_SOIL = 80;
 
-export const GREYHAVEN_MATERIAL_VERSION = "3c-p2-1";
+export const GREYHAVEN_MATERIAL_VERSION = "3c-p2-2";
 
 function hash(x, y, salt = 0) {
   let h = Math.imul(x ^ salt, 0x45d9f3b) ^ Math.imul(y, 0x119de1f3);
@@ -35,13 +35,23 @@ function segmentsForTile(roads, left, top, right, bottom) {
   return segments;
 }
 
+function insideBuilding(x, y, buildings) {
+  for (const b of buildings)
+    if (x >= b.x && x <= b.x + b.w && y >= b.y && y <= b.y + b.h) return true;
+  return false;
+}
+
 function nearBuilding(x, y, buildings) {
   for (const b of buildings) {
+    // Eliminate the expensive distance calculation for the far majority of
+    // road-edge grid samples while preserving the authored footprint test.
+    if (x < b.x - 42 || x > b.x + b.w + 42 ||
+        y < b.y - 42 || y > b.y + b.h + 42) continue;
     const dx = Math.max(b.x - x, 0, x - (b.x + b.w));
     const dy = Math.max(b.y - y, 0, y - (b.y + b.h));
-    // No surface details inside a building's authored footprint.
-    if (x >= b.x && x <= b.x + b.w && y >= b.y && y <= b.y + b.h) return -1;
-    if (Math.hypot(dx, dy) < 42) return Math.hypot(dx, dy);
+    if (dx === 0 && dy === 0) return -1;
+    const squared = dx * dx + dy * dy;
+    if (squared < 42 * 42) return Math.sqrt(squared);
   }
   return Infinity;
 }
@@ -89,7 +99,7 @@ export function createGreyhavenTerrainPlan(map, tile) {
       if (x < map.city.x || x > map.city.x + map.city.w ||
           y < map.city.y || y > map.city.y + map.city.h) continue;
       const road = roadDistance(x, y, segments);
-      if (road.distance > road.width * .44 || nearBuilding(x, y, buildings) < 0) continue;
+      if (road.distance > road.width * .44 || insideBuilding(x, y, buildings)) continue;
       empty.pavers.push({x, y, w: 18 + (seed % 4), h: 16 + ((seed >>> 7) % 3),
         tone: seed % STONE_COLORS.length});
     }
