@@ -1,0 +1,38 @@
+{
+  "artOnly": true,
+  "barrelsUnchanged": 7,
+  "baseScene": "blood_iron_greyhaven_a2.blend",
+  "combatChanged": false,
+  "doorPortalChanged": false,
+  "drawCallWarning": "Blender mesh batching measured; browser draw calls not validated",
+  "editableSource": "blood_iron_red_lion_a21.blend",
+  "legacyRoofCoursesRetainedButHidden": true,
+  "license": "Project-authored procedural geometry; no external textures/assets",
+  "materialsAdded": 9,
+  "milestone": "Blood & Iron A2.1 additive Red Lion art polish",
+  "newArtMeshes": 3,
+  "originalMeshObjectsPreserved": 289,
+  "physicsChanged": false,
+  "productionApproved": false,
+  "renderSize": [
+    1120,
+    720
+  ],
+  "renderer": "Cycles CPU",
+  "rollChanged": false,
+  "roof": {
+    "materialVariants": 4,
+    "meshBatches": 1,
+    "occlusionLayer": "roof-occlusion-candidate",
+    "tileCount": 352
+  },
+  "samples": 4,
+  "stoneFoundation": {
+    "faceBlocks": 56,
+    "meshBatches": 1
+  },
+  "timberJoinery": {
+    "meshBatches": 1,
+    "pegs": 12
+  }
+}
