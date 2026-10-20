@@ -3,6 +3,7 @@ use std::sync::{
     Arc,
 };
 
+pub mod character_recovery;
 pub mod character_store;
 pub mod identity;
 pub mod kill_event;
