@@ -168,6 +168,14 @@ jobs:
           cargo clippy --locked --manifest-path server/Cargo.toml --all-targets -- -D warnings
           cargo test --locked --manifest-path server/Cargo.toml
 
+      # P9 runs a separate 127.0.0.1:0 QUIC server with a throwaway test
+      # certificate. It never enables FX in the playable arena or main.rs.
+      - name: Validate P9 real loopback semantic FX WebTransport
+        run: |
+          node --check scripts/physics_fx_real_browser_flight.mjs
+          cargo check --locked --manifest-path server/Cargo.toml --example magic_fx_loopback
+          node scripts/physics_fx_real_browser_flight.mjs
+
       - name: Validate M188 repeated real heavy counterplay windows
         run: |
           # Three fresh Chrome/Firefox sessions for each real defensive read.
