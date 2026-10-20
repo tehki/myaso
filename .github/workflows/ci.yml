@@ -194,6 +194,14 @@ jobs:
           cargo check --locked --manifest-path server/Cargo.toml --example magic_fx_crowd_loopback
           P13_SHARED_DISPATCH=1 node scripts/physics_fx_crowd_browser_flight.mjs
 
+      # P15 tests the Core-owned fused generation-check + enqueue boundary
+      # against 16 actual browser QUIC sessions per engine; opt-in only.
+      - name: Validate P15 guarded Core writer on real shared WebTransport
+        run: |
+          node --check scripts/physics_fx_crowd_browser_flight.mjs
+          cargo check --locked --manifest-path server/Cargo.toml --example magic_fx_crowd_loopback
+          P13_SHARED_DISPATCH=1 P15_CORE_GUARD=1 node scripts/physics_fx_crowd_browser_flight.mjs
+
       # P11 runs REAL /game authoritative ACK/snapshot/browser-frame
       # acceptance while a separate 16-connection QUIC FX fixture loads
       # the same CI host. Does not activate magic on gameplay sockets.
