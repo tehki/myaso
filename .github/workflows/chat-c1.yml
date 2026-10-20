@@ -43,7 +43,8 @@ jobs:
       - name: Real Rust WebTransport 3-client acceptance
         run: cargo test --locked --manifest-path server/Cargo.toml --test local_chat_multiplayer -- --nocapture
       - name: Server chat parser, routing and rate-limit tests
-        run: cargo test --locked --manifest-path server/Cargo.toml --lib chat::
+        run: |
+          cargo test --locked --manifest-path server/Cargo.toml --lib chat::
       - name: Browser transport and binary codec contract
         run: |
           node --check src/network/chat-codec.mjs
