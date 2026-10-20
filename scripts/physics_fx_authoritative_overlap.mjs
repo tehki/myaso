@@ -49,7 +49,9 @@ function launch(label, script, env = {}, onLine = () => {}) {
   pipe("stderr", child.stderr);
   const completion = new Promise((resolve, reject) => {
     child.on("error", reject);
-    child.on("exit", (code, signal) => {
+    // close fires after stdout/stderr have drained; exit does not.
+    // Evidence parsing must include final per-browser JSON lines.
+    child.on("close", (code, signal) => {
       active.delete(child);
       if (code === 0) resolve(events);
       else reject(new Error(`${label} exit=${code} signal=${signal}; tail=${events.slice(-10).map(x => x.line).join(" | ")}`));
@@ -163,7 +165,10 @@ try {
   await Promise.race([
     admittedOnce,
     crowdRun.completion.then(() => { throw new Error("P11 FX crowd ended before it accepted real connections"); }),
-    new Promise((_, reject) => setTimeout(() => reject(new Error("P11 FX crowd accept exceeded 90s")), 90000)),
+    new Promise((_, reject) => {
+      const timer = setTimeout(() => reject(new Error("P11 FX crowd accept exceeded 90s")), 90000);
+      timer.unref();
+    }),
   ]);
   const gameRun = launch("p11-game-loaded", "scripts/browser_flight_runner.mjs", {
     ...flightEnv,
