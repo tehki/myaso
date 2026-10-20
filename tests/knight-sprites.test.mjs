@@ -170,3 +170,60 @@ test("A2.11 baseline 100% rollback and approved 120% keep identical atlas frames
   assert.throws(()=>createKnightSpriteRenderer({ImageCtor:MockImage,
     presentationScale:1.5}),RangeError);
 });
+
+test("unsupported authoritative actions fall back to original combat artwork", () => {
+  const localFallback = [
+    COMBAT_ACTION.attackWindup, COMBAT_ACTION.attackActive,
+    COMBAT_ACTION.attackRecovery, COMBAT_ACTION.heavyAttackWindup,
+    COMBAT_ACTION.runningAttackActive, COMBAT_ACTION.jumpAttackWindup,
+    COMBAT_ACTION.jumpAttackActive, COMBAT_ACTION.jumpAttackRecovery,
+    COMBAT_ACTION.kickWindup, COMBAT_ACTION.kickActive,
+    COMBAT_ACTION.kickRecovery, COMBAT_ACTION.block,
+    COMBAT_ACTION.stunned, COMBAT_ACTION.feintRecovery,
+    COMBAT_ACTION.knockdown, COMBAT_ACTION.dead, COMBAT_ACTION.dash,
+  ];
+  for (const action of localFallback) {
+    assert.equal(knightClip(action, false, 320, true), null,
+      "local action " + action + " must not be depicted as a walking knight");
+  }
+  for (const action of [
+    COMBAT_ACTION.kickWindup, COMBAT_ACTION.stunned,
+    COMBAT_ACTION.jump, COMBAT_ACTION.knockdown,
+    COMBAT_ACTION.dead, COMBAT_ACTION.dash,
+  ]) {
+    assert.equal(knightClip(action, true, 320, true), null,
+      "remote action " + action + " must use original gameplay art");
+  }
+  assert.equal(knightClip(COMBAT_ACTION.block, true), "t1_block");
+  assert.equal(knightClip(COMBAT_ACTION.attackActive, true), "t1_attack");
+  assert.equal(knightClip(COMBAT_ACTION.jump, false), "silver_jump");
+});
+
+test("fallback resets old roll before a separate roll starts", () => {
+  const drawn = [];
+  class MockImage {
+    set src(url) {
+      const name = url.match(/([^/]+)\\.webp$/)?.[1];
+      this.naturalWidth = (KNIGHT_CLIPS[name] ?? 0) * KNIGHT_FRAME_PX;
+      this.naturalHeight = 8 * KNIGHT_FRAME_PX;
+      this.onload?.();
+    }
+  }
+  const ctx = {save(){},restore(){},rotate(){},beginPath(){},ellipse(){},
+    fill(){},drawImage(...args){drawn.push(args);}};
+  const renderer = createKnightSpriteRenderer({ImageCtor:MockImage,
+    assetBase:new URL("https://example.test/knights/")});
+  const actor = {x:10,y:20,facing:Math.PI/2,action:COMBAT_ACTION.dodge};
+  assert.equal(renderer.draw(ctx,actor,{nowMs:1000}),true);
+  assert.equal(drawn.at(-1)[1],0);
+  actor.action=COMBAT_ACTION.dodgeRecovery;
+  assert.equal(renderer.draw(ctx,actor,{nowMs:1280}),true);
+  assert.equal(drawn.at(-1)[1],6*KNIGHT_FRAME_PX);
+  actor.action=COMBAT_ACTION.kickWindup;
+  assert.equal(renderer.draw(ctx,actor,{nowMs:1400}),false);
+  const before=drawn.length;
+  actor.action=COMBAT_ACTION.dodge;
+  assert.equal(renderer.draw(ctx,actor,{nowMs:1700}),true);
+  assert.equal(drawn.length,before+1);
+  assert.equal(drawn.at(-1)[1],0,"next roll restarts at frame zero");
+});
