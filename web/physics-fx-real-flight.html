@@ -54,7 +54,12 @@ const controller = new AbortController();
   const transport = new WebTransport(endpoint, {
     serverCertificateHashes: [{ algorithm: "sha-256", value: certificate }],
   });
-  await transport.ready;
+  window.__P9_STAGE__ = "waiting-for-transport-ready";
+  await Promise.race([
+    transport.ready,
+    new Promise((_, reject) => setTimeout(() => reject(new Error("WebTransport handshake exceeded 10 seconds")), 10000)),
+  ]);
+  window.__P9_STAGE__ = "transport-ready";
 
   const reader = transport.datagrams.readable.getReader();
   const writer = transport.datagrams.writable.getWriter();
@@ -119,7 +124,9 @@ const controller = new AbortController();
     }
   }, 90);
   // All datagrams come from the trusted, loopback-only *lab*, not the live game.
+  window.__P9_STAGE__ = "collecting-live-datagrams";
   await new Promise((resolve) => setTimeout(resolve, 4_150));
+  window.__P9_STAGE__ = "calculating-results";
   clearInterval(sendTimer);
   results.gameplayGapP95Ms = p95(gpGaps);
   results.baselinePingP95Ms = p95(basePings);
@@ -135,11 +142,14 @@ const controller = new AbortController();
     results.malformedFx === 0 &&
     Number.isFinite(results.pingRttP95Ms) &&
     Number.isFinite(results.gameplayGapP95Ms);
+  // Report BEFORE cleanup: Firefox may keep a pending QUIC stream cancellation
+  // unresolved after the sidecar's final datagram. Cleanup is best effort.
+  window.__P9_RESULT__ = results;
+  window.__P9_STAGE__ = "reported-results";
   controller.abort();
-  try { await reader.cancel(); } catch {}
+  try { void reader.cancel().catch(() => {}); } catch {}
   transport.close({ closeCode: 0, reason: "P9 loopback flight complete" });
   void pump.catch(() => {});
-  window.__P9_RESULT__ = results;
 })().catch((error) => {
   controller.abort();
   window.__P9_ERROR__ = String(error?.stack ?? error);
