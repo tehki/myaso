@@ -1,0 +1,88 @@
+name: R2 packaged-binary lifecycle qualification (no deploy)
+on:
+  push:
+    branches:
+      - test/r2-packaged-lifecycle-20261020
+permissions:
+  contents: read
+  actions: read
+jobs:
+  packaged-lifecycle:
+    name: Pinned R2 artifact Chrome Firefox PvP lifecycle
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+      - name: Verify all gameplay source exactly matches shipped R2
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD^)" = 7c5fe9b08e86254cff9e05ae07c1d0d572cb7879
+          test -z "$(git diff --name-only HEAD^ HEAD -- server src web scripts/pvp_browser_flight_runner.mjs)"
+      - name: Retrieve immutable built release artifact
+        uses: actions/download-artifact@v4
+        with:
+          repository: tehki/myaso
+          run-id: 39462969713
+          name: myaso-alpha-linux-amd64
+          github-token: ${{ github.token }}
+          path: r2-alpha
+      - name: Verify and extract the exact inactive VPS candidate
+        run: |
+          set -euo pipefail
+          cd r2-alpha
+          sha256sum -c myaso-alpha-7c5fe9b08e86254cff9e05ae07c1d0d572cb7879.tar.gz.sha256
+          test "$(sha256sum myaso-alpha-7c5fe9b08e86254cff9e05ae07c1d0d572cb7879.tar.gz | cut -d' ' -f1)" = 48e4ecbafab58d1f28b9918fb41327ed6561a393c61cbd509ec925d9dd15a697
+          mkdir -p "$GITHUB_WORKSPACE/r2-unpack"
+          tar -C "$GITHUB_WORKSPACE/r2-unpack" -xf myaso-alpha-7c5fe9b08e86254cff9e05ae07c1d0d572cb7879.tar.gz
+          test "$(cat "$GITHUB_WORKSPACE/r2-unpack/REVISION")" = 7c5fe9b08e86254cff9e05ae07c1d0d572cb7879
+          test "$(sha256sum "$GITHUB_WORKSPACE/r2-unpack/bin/myaso-server" | cut -d' ' -f1)" = bd18e5788dd5a8ecf8bc5483d236695855469cf95e543926e0a5fe1f95df7ad7
+          test -x "$GITHUB_WORKSPACE/r2-unpack/bin/myaso-server"
+      - name: Adapt acceptance launcher ONLY to use the signed-release-candidate executable
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path("scripts/pvp_browser_flight_runner.mjs")
+          s=p.read_text()
+          old='spawn("cargo", ["run", "--locked", "--manifest-path", "server/Cargo.toml", "--bin", "myaso-server", "--quiet"], {'
+          new='spawn(process.env.MYASO_R2_PACKAGED_SERVER, [], {'
+          assert s.count(old)==1, "Expected exactly one cargo server launcher"
+          p.write_text(s.replace(old,new))
+          PY
+          node --check scripts/pvp_browser_flight_runner.mjs
+          command -v chromedriver
+          command -v geckodriver
+          command -v google-chrome
+          command -v firefox
+          mkdir -p r2-lifecycle-evidence
+      - name: Exact packaged server — cross-browser death and authoritative respawn
+        env:
+          MYASO_PVP_SCENARIO: respawn
+          MYASO_R2_PACKAGED_SERVER: ${{ github.workspace }}/r2-unpack/bin/myaso-server
+        run: |
+          set -euo pipefail
+          node scripts/pvp_browser_flight_runner.mjs 2>&1 | tee r2-lifecycle-evidence/respawn.log
+      - name: Exact packaged server — UI death and respawn lifecycle
+        env:
+          MYASO_PVP_SCENARIO: uirespawn
+          MYASO_R2_PACKAGED_SERVER: ${{ github.workspace }}/r2-unpack/bin/myaso-server
+        run: |
+          set -euo pipefail
+          node scripts/pvp_browser_flight_runner.mjs 2>&1 | tee r2-lifecycle-evidence/uirespawn.log
+      - name: Exact packaged server — repeated match and respawn/rejoin lifecycle
+        env:
+          MYASO_PVP_SCENARIO: uirematch
+          MYASO_R2_PACKAGED_SERVER: ${{ github.workspace }}/r2-unpack/bin/myaso-server
+        run: |
+          set -euo pipefail
+          node scripts/pvp_browser_flight_runner.mjs 2>&1 | tee r2-lifecycle-evidence/uirematch.log
+      - name: Save exact-artifact acceptance logs even on failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: r2-exact-packaged-server-lifecycle
+          path: r2-lifecycle-evidence/
+          if-no-files-found: ignore
+          retention-days: 7
