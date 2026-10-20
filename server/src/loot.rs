@@ -550,6 +550,189 @@ impl LootAuthority {
         Ok(item)
     }
 
+    /// Split a stack while dropping it into the world. Full-stack drops retain
+    /// their existing item identity; partial drops receive a fresh server ID.
+    /// Both item and world entity identities are allocated before mutation.
+    pub fn drop_backpack_amount(
+        &mut self,
+        authenticated_id: u32,
+        fighter: &Fighter,
+        zone: ZoneId,
+        item_id: u64,
+        amount: u16,
+        now_ms: u64,
+    ) -> Result<u64, LootError> {
+        if amount == 0 {
+            return Err(LootError::InvalidStack);
+        }
+        self.require_alive(authenticated_id, fighter)?;
+        let at = Point::from_fighter(fighter);
+        if !at.in_zone(zone) {
+            return Err(LootError::InvalidPosition);
+        }
+        let inventory = self.players.get(&authenticated_id).expect("checked");
+        let index = inventory
+            .backpack
+            .iter()
+            .position(|item| item.id == item_id)
+            .ok_or(LootError::NotFound)?;
+        let source = &inventory.backpack[index];
+        if amount > source.amount || (!source.kind.stackable() && amount != source.amount) {
+            return Err(LootError::InvalidStack);
+        }
+        if amount == source.amount {
+            return self.drop_backpack(authenticated_id, fighter, zone, item_id, now_ms);
+        }
+        self.next_id.checked_add(2).ok_or(LootError::IdExhausted)?;
+        let fragment_id = self.allocate_id().expect("IDs reserved");
+        let entity_id = self.allocate_id().expect("IDs reserved");
+        let inventory = self.players.get_mut(&authenticated_id).expect("checked");
+        let source = &mut inventory.backpack[index];
+        source.amount -= amount;
+        let fragment = ItemStack {
+            id: fragment_id,
+            kind: source.kind,
+            amount,
+        };
+        self.ground.insert(
+            entity_id,
+            GroundDrop {
+                entity_id,
+                zone,
+                at,
+                expires_at_ms: now_ms.saturating_add(GROUND_DECAY_MS),
+                item: fragment,
+            },
+        );
+        Ok(entity_id)
+    }
+
+    /// Take all or part of a ground stack. The remainder keeps its world
+    /// identity so observers cannot mistake a partial pickup for a new drop.
+    pub fn take_ground_amount(
+        &mut self,
+        authenticated_id: u32,
+        fighter: &Fighter,
+        zone: ZoneId,
+        drop_id: u64,
+        amount: u16,
+        now_ms: u64,
+    ) -> Result<ItemStack, LootError> {
+        if amount == 0 {
+            return Err(LootError::InvalidStack);
+        }
+        self.require_alive(authenticated_id, fighter)?;
+        let at = Point::from_fighter(fighter);
+        if !at.in_zone(zone) {
+            return Err(LootError::InvalidPosition);
+        }
+        let drop = self.ground.get(&drop_id).ok_or(LootError::NotFound)?;
+        if drop.expires_at_ms <= now_ms {
+            return Err(LootError::NotFound);
+        }
+        if drop.zone != zone {
+            return Err(LootError::WrongZone);
+        }
+        if !at.near(drop.at) {
+            return Err(LootError::OutOfReach);
+        }
+        if amount > drop.item.amount || (!drop.item.kind.stackable() && amount != drop.item.amount) {
+            return Err(LootError::InvalidStack);
+        }
+        if self.players[&authenticated_id].backpack.len() >= BACKPACK_CAPACITY {
+            return Err(LootError::InventoryFull);
+        }
+        if amount == drop.item.amount {
+            return self.take_ground(authenticated_id, fighter, zone, drop_id, now_ms);
+        }
+        let fragment_id = self.allocate_id()?;
+        let drop = self.ground.get_mut(&drop_id).expect("checked");
+        drop.item.amount -= amount;
+        let fragment = ItemStack {
+            id: fragment_id,
+            kind: drop.item.kind,
+            amount,
+        };
+        self.players
+            .get_mut(&authenticated_id)
+            .expect("checked")
+            .backpack
+            .push(fragment.clone());
+        Ok(fragment)
+    }
+
+    /// Take a partial reagent, potion or gold stack from a corpse while
+    /// leaving the unclaimed remainder available to competing looters.
+    pub fn take_corpse_amount(
+        &mut self,
+        authenticated_id: u32,
+        fighter: &Fighter,
+        zone: ZoneId,
+        corpse_id: u64,
+        item_id: u64,
+        amount: u16,
+        now_ms: u64,
+    ) -> Result<ItemStack, LootError> {
+        if amount == 0 {
+            return Err(LootError::InvalidStack);
+        }
+        self.require_alive(authenticated_id, fighter)?;
+        let at = Point::from_fighter(fighter);
+        if !at.in_zone(zone) {
+            return Err(LootError::InvalidPosition);
+        }
+        let corpse = self.corpses.get(&corpse_id).ok_or(LootError::NotFound)?;
+        if corpse.expires_at_ms <= now_ms {
+            return Err(LootError::NotFound);
+        }
+        if corpse.zone != zone {
+            return Err(LootError::WrongZone);
+        }
+        if !at.near(corpse.at) {
+            return Err(LootError::OutOfReach);
+        }
+        let source = corpse
+            .items
+            .iter()
+            .find(|item| item.id == item_id)
+            .ok_or(LootError::NotFound)?;
+        if amount > source.amount || (!source.kind.stackable() && amount != source.amount) {
+            return Err(LootError::InvalidStack);
+        }
+        if self.players[&authenticated_id].backpack.len() >= BACKPACK_CAPACITY {
+            return Err(LootError::InventoryFull);
+        }
+        if amount == source.amount {
+            return self.take_corpse(
+                authenticated_id,
+                fighter,
+                zone,
+                corpse_id,
+                item_id,
+                now_ms,
+            );
+        }
+        let fragment_id = self.allocate_id()?;
+        let corpse = self.corpses.get_mut(&corpse_id).expect("checked");
+        let source = corpse
+            .items
+            .iter_mut()
+            .find(|item| item.id == item_id)
+            .expect("checked");
+        source.amount -= amount;
+        let fragment = ItemStack {
+            id: fragment_id,
+            kind: source.kind,
+            amount,
+        };
+        self.players
+            .get_mut(&authenticated_id)
+            .expect("checked")
+            .backpack
+            .push(fragment.clone());
+        Ok(fragment)
+    }
+
     /// A server-side world tick may call this after all loot actions for the tick.
     /// Items decay only through this explicit policy, not when their owner dies.
     pub fn expire(&mut self, now_ms: u64) {
@@ -761,6 +944,155 @@ mod tests {
         );
         assert!(!loot.ground().contains_key(&drop_id));
         assert_eq!(loot.inventory(2).unwrap().backpack()[0].id, sword);
+    }
+
+
+    #[test]
+    fn splitting_ground_stack_preserves_every_unit_across_competing_looters() {
+        let mut loot = LootAuthority::new();
+        for id in [1, 2, 3] {
+            loot.register(id).unwrap();
+        }
+        let gold_id = loot.grant(1, ItemKind::Gold, 10).unwrap();
+        let drop_id = loot
+            .drop_backpack_amount(
+                1,
+                &fighter(1, 200.0, 200.0, false),
+                ZoneId::Moonvale,
+                gold_id,
+                7,
+                0,
+            )
+            .unwrap();
+        assert_eq!(loot.inventory(1).unwrap().backpack()[0].amount, 3);
+        assert_eq!(loot.ground()[&drop_id].item.amount, 7);
+        let first = loot
+            .take_ground_amount(
+                2,
+                &fighter(2, 200.0, 200.0, false),
+                ZoneId::Moonvale,
+                drop_id,
+                4,
+                1,
+            )
+            .unwrap();
+        assert_eq!(first.amount, 4);
+        assert_ne!(first.id, gold_id);
+        assert_eq!(loot.ground()[&drop_id].item.amount, 3);
+        let second = loot
+            .take_ground_amount(
+                3,
+                &fighter(3, 200.0, 200.0, false),
+                ZoneId::Moonvale,
+                drop_id,
+                3,
+                2,
+            )
+            .unwrap();
+        assert_eq!(second.amount, 3);
+        assert!(!loot.ground().contains_key(&drop_id));
+        assert_eq!(3 + first.amount + second.amount, 10);
+        assert_eq!(
+            loot.take_ground_amount(
+                2,
+                &fighter(2, 200.0, 200.0, false),
+                ZoneId::Moonvale,
+                drop_id,
+                1,
+                3,
+            ),
+            Err(LootError::NotFound)
+        );
+    }
+
+    #[test]
+    fn corpse_partial_pickup_preserves_item_remainder_and_rejects_overdraw() {
+        let mut loot = LootAuthority::new();
+        for id in [1, 2, 3] {
+            loot.register(id).unwrap();
+        }
+        let gold_id = loot.grant(1, ItemKind::Gold, 9).unwrap();
+        let corpse_id = loot
+            .death(1, &fighter(1, 200.0, 200.0, true), ZoneId::Moonvale, 0)
+            .unwrap();
+        assert_eq!(loot.corpses()[&corpse_id].items[0].amount, 8);
+        let first = loot
+            .take_corpse_amount(
+                2,
+                &fighter(2, 200.0, 200.0, false),
+                ZoneId::Moonvale,
+                corpse_id,
+                gold_id,
+                5,
+                1,
+            )
+            .unwrap();
+        assert_eq!(first.amount, 5);
+        assert_eq!(loot.corpses()[&corpse_id].items[0].amount, 3);
+        assert_eq!(
+            loot.take_corpse_amount(
+                3,
+                &fighter(3, 200.0, 200.0, false),
+                ZoneId::Moonvale,
+                corpse_id,
+                gold_id,
+                4,
+                2,
+            ),
+            Err(LootError::InvalidStack)
+        );
+        assert_eq!(loot.corpses()[&corpse_id].items[0].amount, 3);
+        let remainder = loot
+            .take_corpse_amount(
+                3,
+                &fighter(3, 200.0, 200.0, false),
+                ZoneId::Moonvale,
+                corpse_id,
+                gold_id,
+                3,
+                3,
+            )
+            .unwrap();
+        assert_eq!(first.amount + remainder.amount + 1, 9);
+        assert!(loot.corpses()[&corpse_id].items.is_empty());
+    }
+
+    #[test]
+    fn partial_pickup_denials_never_reduce_world_stack() {
+        let mut loot = LootAuthority::new();
+        loot.register(1).unwrap();
+        loot.register(2).unwrap();
+        let sword = loot.grant(1, ItemKind::RustySword, 1).unwrap();
+        let drop_id = loot
+            .drop_backpack(1, &fighter(1, 200.0, 200.0, false), ZoneId::Moonvale, sword, 0)
+            .unwrap();
+        let nearby = fighter(2, 200.0, 200.0, false);
+        assert_eq!(
+            loot.take_ground_amount(2, &nearby, ZoneId::Moonvale, drop_id, 0, 1),
+            Err(LootError::InvalidStack)
+        );
+        assert_eq!(
+            loot.take_ground_amount(2, &nearby, ZoneId::Moonvale, drop_id, 2, 1),
+            Err(LootError::InvalidStack)
+        );
+        assert_eq!(
+            loot.take_ground_amount(2, &nearby, ZoneId::RedLionInn, drop_id, 1, 1),
+            Err(LootError::WrongZone)
+        );
+        assert_eq!(
+            loot.take_ground_amount(
+                2,
+                &fighter(2, 450.0, 450.0, false),
+                ZoneId::Moonvale,
+                drop_id,
+                1,
+                1,
+            ),
+            Err(LootError::OutOfReach)
+        );
+        assert_eq!(loot.ground()[&drop_id].item.id, sword);
+        assert_eq!(loot.ground()[&drop_id].item.amount, 1);
+        assert!(loot.inventory(2).unwrap().backpack().is_empty());
     }
 
     #[test]
