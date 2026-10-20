@@ -44,3 +44,18 @@ Renderer tests: `node --test tests/knight-sprites.test.mjs`.
 - T1 Sentinel camera height offset: `--height-offset 0.67` (T1 has a different model-space origin). Without this the Sentinel is clipped at the top for some facings.
 - Each roll bake: `--samples 2` CPU Cycles; 64 transparent 160x160 PNG tiles; the packing tool requires no clipped silhouettes and produces a 1280x1280 WebP.
 - Keep Blender source, its export validation JSON, and original owner models off GitHub unless provenance, size budgets and permission are reviewed.
+
+### A2.11 — approved 120% visual-scale calibration (preview only)
+
+The owner reviewed the Red Lion door/knight side-by-side alternatives in [graphics PR #350](https://github.com/tehki/myaso/pull/350) and selected **120%** for the opt-in knight sprite presentation. This change is limited to **drawImage destination rectangles and cosmetic shadows** in `web/knight-sprites.mjs`.
+
+| | Previous | Approved 120% |
+| --- | ---: | ---: |
+| Standing/walk/attack/block/jump | 80×80 px | **96×96 px** |
+| Silver/T1 A3 forward roll | 112×112 px | **134×134 px** |
+
+The source GLB/Blender files, 160×160 atlas tiles, 8-direction mappings, 350ms A3 roll cycle, server-authoritative fighter positions, collision, hitboxes, movement, input and network protocol do not change. The result is horizontally centered on the **same fighter origin**; y offsets scale with the sprite: old standing `(-40,-52)` vs new `(-48,-62.4)`, old roll `(-56,-65)` vs new `(-67,-78)`. Width 134px is the nearest whole pixel to 112×1.2=134.4px.
+
+**Opt-in and rollback:** the main game still defaults to no knight sprites. Add `&knights=1` for the 120% presentation, `&knights=1&knightScale=100` for the previous 100% rendering, or remove `knights=1` to return immediately to the original circle/combat cues. No other scale values are supported by the renderer.
+
+**Verification:** `node --test tests/knight-sprites.test.mjs` and local Chrome `node tools/art/verify_knight_a211_browser.mjs <out-dir>`. The standalone page `/web/knight-scale-a211-preview.html` shows 100% and 120% using the actual WebPs. This is not a measured multiplayer FPS or validated anatomical foot-pivot; the 3/4 Greyhaven camera mismatch remains a separate graphics issue in PR #350. Do not merge on art QA alone without required exact-head CI, current base and owner release governance; do not deploy to production without separate authorization.
