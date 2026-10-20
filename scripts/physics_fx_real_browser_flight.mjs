@@ -93,6 +93,8 @@ async function startLab() {
   child.stderr.setEncoding("utf8");
   child.stderr.on("data", (value) => { stderr += value; process.stderr.write(value); });
   child.stdout.on("data", (value) => {
+    // Only test-sidecar output: accepted lab session diagnostics, no user data.
+    process.stdout.write(`[p9-lab] ${value}`);
     buffer += value;
     for (const line of buffer.split(/\r?\n/)) {
       const e = line.match(/P9_LOOPBACK_LISTENING (https:\/\/127\.0\.0\.1:\d+\/physics-fx-lab)/);
