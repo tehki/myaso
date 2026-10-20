@@ -4,6 +4,7 @@ use std::sync::{
 };
 
 pub mod kill_event;
+pub mod living_world;
 pub mod reliable;
 pub mod simulation;
 pub mod snapshot;

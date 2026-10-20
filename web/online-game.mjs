@@ -14,6 +14,7 @@ import { createRenderGapTelemetry } from "../src/browser/render-gap-telemetry.mj
 import { ARENA_VIEW_ZOOM, nearbyOffscreenPointers, projectArenaPoint } from "../src/browser/arena-viewport.mjs";
 import { NETWORK } from "../src/network/constants.mjs";
 import { connectAuthoritativeClient, parseSha256Hex } from "./authoritative-client.mjs";
+import { createNpcChatPanel } from "./npc-chat.mjs";
 
 const canvas = document.querySelector("#arena");
 const chargeHud = {
@@ -167,6 +168,13 @@ const visualCameraPosition = { x: 0, y: 0 };
 const fixedStepMs = 1000 / NETWORK.clientPredictionHz;
 const frameBudget = createFrameBudget({ stepMs: fixedStepMs, maxFrameDeltaMs: 50, maxStepsPerFrame: 6 });
 let networkClient = null;
+const npcUI = createNpcChatPanel({
+  onSend(id, message) {
+    if (!networkClient) throw new Error("NPC session is not connected");
+    return networkClient.sendNpcChat(id, message);
+  },
+  onFocus() { releaseInputs(); },
+});
 let animationFrameId = 0;
 let predictionStep = 0;
 let clientTick = 0;
@@ -272,6 +280,11 @@ canvas.addEventListener("wheel", (event) => {
 }, { passive: false });
 canvas.addEventListener("pointermove", updateMouse);
 canvas.addEventListener("keydown", (event) => {
+  if (event.code === "Enter" && npcUI.enabled) {
+    event.preventDefault();
+    npcUI.focus();
+    return;
+  }
   const firstAudioGesture = !audio.isUnlocked();
   if (["KeyW", "KeyA", "KeyS", "KeyD", "KeyE", "Space"].includes(event.code)) event.preventDefault();
   if (["KeyW", "KeyA", "KeyS", "KeyD"].includes(event.code) && !keys.has(event.code)) {
@@ -328,6 +341,12 @@ networkClient = await connectAuthoritativeClient({
   },
   onKillEvent(event) {
     recordKillEvent(event);
+  },
+  onNpcRoster(roster) {
+    npcUI.setRoster(roster);
+  },
+  onNpcReply(reply) {
+    npcUI.receive(reply);
   },
   onAck(ack) {
     const ownId = networkClient?.playerNetId;
@@ -878,6 +897,7 @@ function render(nowMs = performance.now(), impact = combatImpact.sample(nowMs)) 
   }
   if (ownId && local.initialized) drawFighterScreen(canvas.width / 2, canvas.height / 2, local, "#e2d5b4", "#51452d");
   ctx.restore();
+  drawNpcPilotMarkers();
   // R1 wider view: health/guard bars and player identity badges are UI,
   // not world geometry. Keep their original unscaled 42px/34px readability
   // while placing them above their zoom-projected remote fighter positions.
@@ -1025,6 +1045,28 @@ function drawThreatMarker(bearing, secondary) {
     ctx.lineTo(x + 7, y + 6);
   }
   ctx.stroke();
+  ctx.restore();
+}
+
+// Read-only presentation of static staging NPC anchors; not combat fighters.
+function drawNpcPilotMarkers() {
+  if (!local.initialized || !npcUI.enabled) return;
+  ctx.save();
+  ctx.textAlign = "center";
+  ctx.font = "bold 11px sans-serif";
+  for (const npc of npcUI.npcs) {
+    const p = projectArenaPoint(npc.x, npc.y, visualCameraPosition.x,
+      visualCameraPosition.y, canvas.width, canvas.height);
+    if (p.x < -90 || p.x > canvas.width + 90 || p.y < -80 || p.y > canvas.height + 80) continue;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, 10, 0, Math.PI * 2);
+    ctx.fillStyle = "#cba56a";
+    ctx.fill();
+    ctx.fillStyle = "#12110f";
+    ctx.fillText("!", p.x, p.y + 4);
+    ctx.fillStyle = "#f1dbaf";
+    ctx.fillText(npc.name, p.x, p.y - 17);
+  }
   ctx.restore();
 }
 

@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { NETWORK } from "../src/network/constants.mjs";
+import { encodeNpcRequest, decodeNpcRoster, decodeNpcResponse } from "../src/network/npc-chat-codec.mjs";
 import { encodeInputPacket, decodeInputPacket, inputPacketBytes } from "../src/network/input-codec.mjs";
 import { SpatialInterestGrid } from "../src/network/interest-grid.mjs";
 import { InputIngressWindow } from "../src/network/input-ingress.mjs";
@@ -551,4 +552,28 @@ test("512-player dense-map replication still produces a bounded datagram", () =>
   const packet = encodeSnapshot({ sequence: 100, baselineSequence: 99, serverTick: 900, records: plan.records, maxBytes: 1100 });
   assert.ok(packet.byteLength <= 1100);
   assert.ok(plan.selected.length < candidates.length, "dense crowd should be priority-limited rather than fragmenting");
+});
+
+test("NPC pilot request matches Rust v1 reliable framing without changing combat packets", () => {
+  assert.deepEqual([...encodeNpcRequest(1, "hi")], [1, 5, 1, 0, 2, 0, 104, 105]);
+  assert.equal(encodeNpcRequest(2, "Привет")[4], 12);
+  assert.throws(() => encodeNpcRequest(1, "\nadmin"), /single-line/);
+  assert.throws(() => encodeNpcRequest(1, "a".repeat(241)), /240/);
+  assert.throws(() => encodeNpcRequest(0, "hi"), /identifier/);
+  assert.equal(NETWORK.protocolVersion, 1);
+});
+
+test("NPC reliable responses and roster are bounded, strict UTF-8, and reject duplicate IDs", () => {
+  const msg = new TextEncoder().encode("Rowan: Greetings");
+  const response = new Uint8Array([1, 6, 3, 0, msg.length, 0, ...msg]);
+  assert.deepEqual(decodeNpcResponse(response), { id: 3, denied: false, text: "Rowan: Greetings" });
+  assert.throws(() => decodeNpcResponse(response.subarray(0, response.length - 1)), /response body/);
+
+  const name = new TextEncoder().encode("Aldric");
+  const role = new TextEncoder().encode("Innkeeper");
+  const item = [1, 120, 0, 95, 0, name.length, ...name, role.length, ...role];
+  const roster = new Uint8Array([1, 7, 1, 0, ...item]);
+  assert.deepEqual(decodeNpcRoster(roster), [{ id: 1, x: 120, y: 95, name: "Aldric", role: "Innkeeper" }]);
+  assert.throws(() => decodeNpcRoster(new Uint8Array([1, 7, 2, 0, ...item, ...item])), /identifier/);
+  assert.throws(() => decodeNpcRoster(roster.subarray(0, roster.length - 1)), /occupation/);
 });

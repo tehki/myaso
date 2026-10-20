@@ -8,6 +8,7 @@ import { decodeSnapshot, SNAPSHOT_FIELDS } from "../src/network/snapshot-codec.m
 import { decodeInputAck } from "../src/network/input-ack-codec.mjs";
 import { decodeKillEvent } from "../src/network/kill-event-codec.mjs";
 import { encodeInputPacket } from "../src/network/input-codec.mjs";
+import { encodeNpcRequest, decodeNpcResponse, decodeNpcRoster, NPC_WIRE } from "../src/network/npc-chat-codec.mjs";
 import { isSequenceNewer16 } from "../src/network/sequence.mjs";
 import { connectGameTransport } from "./network-transport.mjs";
 
@@ -20,6 +21,8 @@ export async function connectAuthoritativeClient({
   onProcessedAck,
   onReliableSnapshot,
   onKillEvent,
+  onNpcRoster,
+  onNpcReply,
   onProtocolError,
 } = {}) {
   const state = new Map();
@@ -91,6 +94,14 @@ export async function connectAuthoritativeClient({
     try {
       const bytes = asUint8Array(packet);
       if (bytes.length < 2) return;
+      if (bytes[1] === NPC_WIRE.roster) {
+        onNpcRoster?.(decodeNpcRoster(bytes));
+        return;
+      }
+      if (bytes[1] === NPC_WIRE.response) {
+        onNpcReply?.(decodeNpcResponse(bytes));
+        return;
+      }
       if (bytes[1] === PACKET_TYPE.KILL_EVENT) {
         onKillEvent?.(decodeKillEvent(bytes));
         return;
@@ -173,6 +184,7 @@ export async function connectAuthoritativeClient({
     remoteInterpolator,
     diagnostics,
     sendInput,
+    sendNpcChat(npcId, text) { return transport.sendReliable(encodeNpcRequest(npcId, text)); },
     close(reason) { transport.close(reason); },
     get playerNetId() { return playerNetId; },
     get processedClientTick() { return ackGate.lastAppliedClientTick; },

@@ -2,6 +2,7 @@ use anyhow::{bail, Context, Result};
 use myaso_server::{
     coalesce_accepted_input_batch, decode_input_packet, is_sequence_newer16, is_tick_newer32,
     kill_event::{encode_kill_event, KillEventPacket},
+    living_world::{self, DialogueSession},
     reliable::{try_enqueue_reliable, ReliableQueueError},
     simulation::{CombatEvent, InputIntent, World},
     snapshot::{ReplicationFrame, SnapshotSession},
@@ -205,10 +206,11 @@ struct SharedGame {
     next_player_id: AtomicU32,
     reliable_write_delay: Duration,
     drop_new_action_datagrams: bool,
+    npc_pilot_enabled: bool,
 }
 
 impl SharedGame {
-    fn new(flight: LoopbackFlightConfig) -> Arc<Self> {
+    fn new(flight: LoopbackFlightConfig, npc_pilot_enabled: bool) -> Arc<Self> {
         Arc::new(Self {
             state: Mutex::new(GameState::new(
                 flight.background_players,
@@ -217,6 +219,7 @@ impl SharedGame {
             next_player_id: AtomicU32::new(1),
             reliable_write_delay: flight.reliable_write_delay,
             drop_new_action_datagrams: flight.drop_new_action_datagrams,
+            npc_pilot_enabled,
         })
     }
 
@@ -280,7 +283,17 @@ async fn main() -> Result<()> {
     }
     let gate = AdmissionGate::new(player_cap - flight.background_players);
     println!("myaso admission cap: {player_cap} concurrent players");
-    let game = SharedGame::new(flight);
+    // The pilot is deliberately loopback-only until stable identities,
+    // retention, moderation and verified world-state actions are available.
+    let npc_pilot_enabled = match env::var("MYASO_NPC_PILOT").as_deref() {
+        Ok("1") => true,
+        Ok("0") | Err(_) => false,
+        Ok(_) => bail!("MYASO_NPC_PILOT must be 0 or 1"),
+    };
+    if npc_pilot_enabled && !bind.ip().is_loopback() {
+        bail!("NPC pilot is loopback-only and cannot be enabled on a public bind");
+    }
+    let game = SharedGame::new(flight, npc_pilot_enabled);
     // Accept server-side diagnostic output only on loopback and only when
     // explicitly requested by the real-browser M201 acceptance fixture.
     let flight_action_proof = match env::var("MYASO_FLIGHT_ACTION_PROOF").as_deref() {
@@ -533,7 +546,7 @@ async fn handle_connection(
     let mut last_input_sequence = None;
     let mut dropped_action_ticks = VecDeque::with_capacity(MAX_DROPPED_ACTION_TICKS);
     let mut pending_input_acks = VecDeque::with_capacity(MAX_PENDING_INPUT_ACKS);
-    let (mut reliable_send, _reliable_recv) = connection
+    let (mut reliable_send, mut reliable_recv) = connection
         .accept_bi()
         .await
         .context("accept reliable game stream")?;
@@ -573,6 +586,13 @@ async fn handle_connection(
         &initial_baseline.bytes,
     )
     .await?;
+    if game.npc_pilot_enabled {
+        send_reliable_frame(
+            &mut reliable_send,
+            &mut reliable_frame_buffer,
+            &living_world::roster_packet(),
+        ).await?;
+    }
     let initial_baseline_sequence = initial_baseline.sequence;
     let mut acknowledged_snapshot = u16::MAX;
     let mut realtime_ready = false;
@@ -594,11 +614,85 @@ async fn handle_connection(
         }
         Ok::<(), anyhow::Error>(())
     });
+    // The reliable reader owns framing, independent of snapshot ticks. Reading
+    // a partial frame inside select! would be cancellation-unsafe.
+    let mut npc_reader = if game.npc_pilot_enabled {
+        let world = Arc::clone(&game);
+        let reply_tx = reliable_tx.clone();
+        Some(tokio::spawn(async move {
+            let mut dialogue = DialogueSession::default();
+            let mut last_spoken = None;
+            loop {
+                let mut header = [0_u8; 2];
+                reliable_recv.read_exact(&mut header).await.context("read NPC frame header")?;
+                let length = usize::from(u16::from_le_bytes(header));
+                if !(6..=living_world::MAX_WIRE_BYTES).contains(&length) {
+                    bail!("invalid NPC frame length");
+                }
+                let mut payload = vec![0_u8; length];
+                reliable_recv.read_exact(&mut payload).await.context("read NPC frame body")?;
+                let (npc_id, utterance) = match living_world::decode_request(&payload) {
+                    Ok(request) => request,
+                    Err(_) => bail!("invalid NPC request"),
+                };
+                let now = tokio::time::Instant::now();
+                let throttled = last_spoken.is_some_and(|last: tokio::time::Instant| {
+                    now.duration_since(last) < Duration::from_millis(850)
+                });
+                // No chat bodies, nicknames or prompts are written to logs or disk.
+                let reply = if throttled {
+                    living_world::response_packet(npc_id, 1, "Please allow me a moment.")
+                } else {
+                    last_spoken = Some(now);
+                    let viewer = {
+                        let state = world.state.lock().await;
+                        state.world.fighter(player_id).map(|fighter| (
+                            fighter.x, fighter.y,
+                            fighter.action != myaso_server::simulation::Action::Dead,
+                        ))
+                    };
+                    let answer = match viewer {
+                        Some((x, y, alive)) => match living_world::nearby_npc(npc_id, x, y, alive) {
+                            Ok(npc) => living_world::response_packet(
+                                npc_id, 0, &living_world::answer(&mut dialogue, npc, utterance)
+                            ),
+                            Err(_) => living_world::response_packet(
+                                npc_id, 1, "Move closer to this NPC to speak."
+                            ),
+                        },
+                        None => living_world::response_packet(npc_id, 1, "Player unavailable."),
+                    };
+                    answer
+                };
+                tokio::time::timeout(
+                    Duration::from_secs(2),
+                    reply_tx.send(ReliablePayload::Bytes(reply)),
+                ).await.context("NPC reply send timed out")?
+                    .map_err(|_| anyhow::anyhow!("NPC reply writer unavailable"))?;
+            }
+            #[allow(unreachable_code)]
+            Ok::<(), anyhow::Error>(())
+        }))
+    } else {
+        None
+    };
     let mut snapshot_interval = tokio::time::interval(SNAPSHOT_INTERVAL);
     snapshot_interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
 
     loop {
         tokio::select! {
+            reader_result = async {
+                match &mut npc_reader {
+                    Some(task) => task.await,
+                    None => std::future::pending().await,
+                }
+            } => {
+                match reader_result {
+                    Ok(Ok(())) => bail!("NPC reader ended unexpectedly"),
+                    Ok(Err(error)) => return Err(error),
+                    Err(error) => bail!("NPC reader task failed: {error}"),
+                }
+            }
             writer_result = &mut reliable_writer => {
                 match writer_result {
                     Ok(Ok(())) => bail!("reliable writer ended unexpectedly"),
