@@ -60,7 +60,7 @@ pub struct EmberCombatContext<'a> {
 /// No collision with terrain, PvP permissions or defenses are modeled.
 /// Ordering: nearest forward distance, then lowest stable character ID.
 /// Only targets with a verified active lease and registered live inventory
- /// qualify. A target lease is a server-side binding, not a client capability.
+/// qualify. A target lease is a server-side binding, not a client capability.
 /// Returns None when no valid target intersects the temporary corridor.
 ///
 /// A preview is NOT an effect-resolution receipt; any later Combat application
@@ -119,8 +119,7 @@ pub fn preview_ember_target(
         {
             continue;
         }
-        let Some((target_lease, target_character)) =
-            ctx.identity.verified_fighter(target.net_id)
+        let Some((target_lease, target_character)) = ctx.identity.verified_fighter(target.net_id)
         else {
             continue;
         };
@@ -145,22 +144,18 @@ pub fn preview_ember_target(
             best = Some((target.net_id, target_character, target_lease, forward));
         }
     }
-    Ok(
-        best.map(
-            |(target_net_id, target_character, target_lease, distance_along_ray)| {
-                EmberTargetProposal {
-                    character,
-                    sequence: ctx.sequence,
-                    zone: intent.zone,
-                    target_net_id,
-                    target_character,
-                    target_lease,
-                    world_tick: ctx.world.tick,
-                    distance_along_ray,
-                }
-            },
-        ),
-    )
+    Ok(best.map(
+        |(target_net_id, target_character, target_lease, distance_along_ray)| EmberTargetProposal {
+            character,
+            sequence: ctx.sequence,
+            zone: intent.zone,
+            target_net_id,
+            target_character,
+            target_lease,
+            world_tick: ctx.world.tick,
+            distance_along_ray,
+        },
+    ))
 }
 
 /// Revalidate a provisional handoff using the exact, current authoritative
