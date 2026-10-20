@@ -192,3 +192,28 @@ test('A2.3 WebP exporter validates lossless alpha, visible pixels and composite 
   assert.match(src,/"performanceFPSMeasured":False/);
   assert.doesNotMatch(src,/requests\.|urlretrieve\(|subprocess\.|shutil\.rmtree/);
 });
+
+
+test('A2.4 projection comparator reads true viewport zoom and rejects oblique-to-XY registration', () => {
+  const source=readFileSync(new URL('../tools/art/measure_greyhaven_a24_projection.py',import.meta.url),'utf8');
+  assert.match(source,/export const ARENA_VIEW_ZOOM/);
+  assert.match(source,/world_to_camera_view/);
+  assert.match(source,/scene\.camera/);
+  assert.match(source,/door_server=\(float\(door_world\["x"\]\),float\(door_world\["y"\]\)\)/);
+  assert.match(source,/width\/2\+\(wx-door_server\[0\]\)\*zoom/);
+  assert.match(source,/height\/2\+\(wy-door_server\[1\]\)\*zoom/);
+  assert.match(source,/"directSingleLayerPlacementApproved":False/);
+  assert.match(source,/"requiresCameraMatchedRerender":True/);
+  assert.doesNotMatch(source,/save_as_mainfile|requests\.|urlretrieve\(/);
+});
+
+test('A2.4 cropped roof layer roundtrips pixel-identically and is explicitly offline', () => {
+  const source=readFileSync(new URL('../tools/art/crop_greyhaven_a24_roof.py',import.meta.url),'utf8');
+  assert.match(source,/lossless=True,method=6,exact=True/);
+  assert.match(source,/full\.getchannel\("A"\)\.getbbox\(\)/);
+  assert.match(source,/rebuilt\.alpha_composite/);
+  assert.match(source,/ImageChops\.difference/);
+  assert.match(source,/"coordinateSpace":"UNSCALED A2\.3 Blender review camera pixel frame/);
+  assert.match(source,/"runtimeIntegrated":False/);
+  assert.match(source,/"stableGameWorldPivotValidated":False/);
+});
