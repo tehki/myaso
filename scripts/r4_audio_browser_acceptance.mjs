@@ -116,6 +116,7 @@ async function run(browser, port) {
         button.textContent = "Test sound";
         button.addEventListener("click", () => {
           window.__r4Unlock = window.__r4Audio.unlock();
+          window.__r4Audio.play("ui"); // Start an audio source inside the trusted gesture.
           window.__r4Audio.setMusicEnabled(true);
         });
         document.body.prepend(button);
@@ -178,6 +179,16 @@ async function run(browser, port) {
       `);
       throw new Error(browser + " decoded " + loaded + "/26 OGG assets: " + JSON.stringify(diagnostics));
     }
+    let audioState = await script("return window.__r4Context.state");
+    if (audioState !== "running") {
+      await click("#r4-audio-probe"); // Firefox may require a further trusted gesture.
+      for (let n = 0; n < 40; n++) {
+        audioState = await script("return window.__r4Context.state");
+        if (audioState === "running") break;
+        await delay(100);
+      }
+    }
+    assert.equal(audioState, "running", browser + " context did not resume after genuine gesture");
     const result = await script(`
       return (async () => {
         const a = window.__r4Audio;
