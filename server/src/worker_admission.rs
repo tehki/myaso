@@ -138,10 +138,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        identity::CharacterId,
-        world_mutation_contract::WorldMutationCommand,
-    };
+    use crate::{identity::CharacterId, world_mutation_contract::WorldMutationCommand};
     use std::{collections::BTreeMap, num::NonZeroU128};
 
     fn worker(id: u64) -> WorkerId {
@@ -195,7 +192,10 @@ mod tests {
             Ok(self.current)
         }
     }
-    fn rig() -> (WorkerAdmissionVerifier<Sessions, Authority>, WorkerAdmissionClaim<u64>) {
+    fn rig() -> (
+        WorkerAdmissionVerifier<Sessions, Authority>,
+        WorkerAdmissionClaim<u64>,
+    ) {
         let mut by_handle = BTreeMap::new();
         by_handle.insert(21, (worker(5), entity(), nz(8), false));
         by_handle.insert(22, (worker(6), entity(), nz(8), false));
