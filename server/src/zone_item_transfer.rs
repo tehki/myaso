@@ -211,7 +211,12 @@ mod tests {
         }
     }
 
-    fn transfer(t: u128, item_id: u128, source: GroundPoint, destination: GroundPoint) -> GroundZoneTransfer {
+    fn transfer(
+        t: u128,
+        item_id: u128,
+        source: GroundPoint,
+        destination: GroundPoint,
+    ) -> GroundZoneTransfer {
         GroundZoneTransfer {
             transaction: txn(t),
             item: item(item_id),
@@ -245,15 +250,27 @@ mod tests {
             let mut coordinator = GroundTransferCoordinator::new(&mut journal);
             let proof = coordinator.commit(command).expect("durable transfer");
             assert_eq!(proof.receipt().sequence, 2);
-            assert_eq!(coordinator.confirm_arrival(proof).expect("confirmation"), ArrivalStatus::Current);
+            assert_eq!(
+                coordinator.confirm_arrival(proof).expect("confirmation"),
+                ArrivalStatus::Current
+            );
             proof
         };
         drop(journal);
         let mut recovered = root.journal();
-        assert_eq!(recovered.location(item(10)), Some(destination.as_location()));
+        assert_eq!(
+            recovered.location(item(10)),
+            Some(destination.as_location())
+        );
         let mut coordinator = GroundTransferCoordinator::new(&mut recovered);
-        assert_eq!(coordinator.confirm_arrival(proof).expect("recover proof"), ArrivalStatus::Current);
-        assert_eq!(coordinator.commit(command).expect("idempotent retry"), proof);
+        assert_eq!(
+            coordinator.confirm_arrival(proof).expect("recover proof"),
+            ArrivalStatus::Current
+        );
+        assert_eq!(
+            coordinator.commit(command).expect("idempotent retry"),
+            proof
+        );
         assert_eq!(recovered.item_count(), 1);
     }
 
@@ -268,11 +285,16 @@ mod tests {
         let winning = coordinator.commit(first).expect("first source wins");
         assert!(matches!(
             coordinator.commit(second),
-            Err(TransferError::Journal(ItemJournalError::InvalidTransaction(
-                OwnershipError::ExpectedLocationMismatch
-            )))
+            Err(TransferError::Journal(
+                ItemJournalError::InvalidTransaction(OwnershipError::ExpectedLocationMismatch)
+            ))
         ));
-        assert_eq!(coordinator.confirm_arrival(winning).expect("current winner"), ArrivalStatus::Current);
+        assert_eq!(
+            coordinator
+                .confirm_arrival(winning)
+                .expect("current winner"),
+            ArrivalStatus::Current
+        );
         assert_eq!(journal.item_count(), 1);
     }
 
@@ -285,17 +307,32 @@ mod tests {
         let transfer = transfer(2, 12, source, destination);
         let fictitious = GroundTransferProof {
             transfer,
-            receipt: OwnershipReceipt { sequence: 2, operation_count: 1 },
+            receipt: OwnershipReceipt {
+                sequence: 2,
+                operation_count: 1,
+            },
         };
         let mut coordinator = GroundTransferCoordinator::new(&mut journal);
-        assert!(matches!(coordinator.confirm_arrival(fictitious), Err(TransferError::NotCommitted)));
+        assert!(matches!(
+            coordinator.confirm_arrival(fictitious),
+            Err(TransferError::NotCommitted)
+        ));
         let real = coordinator.commit(transfer).expect("commit");
         let malformed = GroundTransferProof {
-            receipt: OwnershipReceipt { sequence: 99, operation_count: 1 },
+            receipt: OwnershipReceipt {
+                sequence: 99,
+                operation_count: 1,
+            },
             ..real
         };
-        assert!(matches!(coordinator.confirm_arrival(malformed), Err(TransferError::ReceiptMismatch)));
-        assert_eq!(coordinator.confirm_arrival(real).expect("valid proof"), ArrivalStatus::Current);
+        assert!(matches!(
+            coordinator.confirm_arrival(malformed),
+            Err(TransferError::ReceiptMismatch)
+        ));
+        assert_eq!(
+            coordinator.confirm_arrival(real).expect("valid proof"),
+            ArrivalStatus::Current
+        );
     }
 
     #[test]
@@ -309,11 +346,14 @@ mod tests {
         let proof = coordinator.commit(committed).expect("commit");
         assert!(matches!(
             coordinator.commit(conflicting),
-            Err(TransferError::Journal(ItemJournalError::InvalidTransaction(
-                OwnershipError::ConflictingReplay
-            )))
+            Err(TransferError::Journal(
+                ItemJournalError::InvalidTransaction(OwnershipError::ConflictingReplay)
+            ))
         ));
-        assert_eq!(coordinator.confirm_arrival(proof).expect("original"), ArrivalStatus::Current);
+        assert_eq!(
+            coordinator.confirm_arrival(proof).expect("original"),
+            ArrivalStatus::Current
+        );
     }
 
     #[test]
@@ -324,16 +364,32 @@ mod tests {
         let target = point(3, 7, -8);
         let mut journal = initial(&root, 14, source);
         let mut coordinator = GroundTransferCoordinator::new(&mut journal);
-        let first = coordinator.commit(transfer(2, 14, source, middle)).expect("first");
-        let second = coordinator.commit(transfer(3, 14, middle, target)).expect("second");
-        assert_eq!(coordinator.confirm_arrival(first).expect("old receipt"), ArrivalStatus::Superseded);
-        assert_eq!(coordinator.confirm_arrival(second).expect("new receipt"), ArrivalStatus::Current);
+        let first = coordinator
+            .commit(transfer(2, 14, source, middle))
+            .expect("first");
+        let second = coordinator
+            .commit(transfer(3, 14, middle, target))
+            .expect("second");
+        assert_eq!(
+            coordinator.confirm_arrival(first).expect("old receipt"),
+            ArrivalStatus::Superseded
+        );
+        assert_eq!(
+            coordinator.confirm_arrival(second).expect("new receipt"),
+            ArrivalStatus::Current
+        );
         drop(coordinator);
         drop(journal);
         let mut restored = root.journal();
         let verifier = GroundTransferCoordinator::new(&mut restored);
-        assert_eq!(verifier.confirm_arrival(first).expect("restored first"), ArrivalStatus::Superseded);
-        assert_eq!(verifier.confirm_arrival(second).expect("restored second"), ArrivalStatus::Current);
+        assert_eq!(
+            verifier.confirm_arrival(first).expect("restored first"),
+            ArrivalStatus::Superseded
+        );
+        assert_eq!(
+            verifier.confirm_arrival(second).expect("restored second"),
+            ArrivalStatus::Current
+        );
     }
 
     #[test]
@@ -348,13 +404,18 @@ mod tests {
         ));
         assert!(matches!(
             coordinator.commit(transfer(2, 15, point(99, 0, 0), point(2, 40, 40))),
-            Err(TransferError::Journal(ItemJournalError::InvalidTransaction(
-                OwnershipError::ExpectedLocationMismatch
-            )))
+            Err(TransferError::Journal(
+                ItemJournalError::InvalidTransaction(OwnershipError::ExpectedLocationMismatch)
+            ))
         ));
-        let valid = coordinator.commit(transfer(2, 15, origin, point(2, 1, 1))).expect("first valid");
+        let valid = coordinator
+            .commit(transfer(2, 15, origin, point(2, 1, 1)))
+            .expect("first valid");
         assert_eq!(valid.receipt().sequence, 2);
-        assert_eq!(coordinator.confirm_arrival(valid).expect("arrival"), ArrivalStatus::Current);
+        assert_eq!(
+            coordinator.confirm_arrival(valid).expect("arrival"),
+            ArrivalStatus::Current
+        );
     }
 
     #[test]
@@ -364,11 +425,23 @@ mod tests {
         let destination = point(2, 1, 1);
         let mut journal = initial(&root, 16, source);
         let mut coordinator = GroundTransferCoordinator::new(&mut journal);
-        let committed = coordinator.commit(transfer(2, 16, source, destination)).expect("commit");
-        assert_eq!(coordinator.confirm_arrival(committed).expect("live proof"), ArrivalStatus::Current);
+        let committed = coordinator
+            .commit(transfer(2, 16, source, destination))
+            .expect("commit");
+        assert_eq!(
+            coordinator.confirm_arrival(committed).expect("live proof"),
+            ArrivalStatus::Current
+        );
         drop(coordinator);
         drop(journal);
-        fs::write(root.0.join("00000000000000000002.mytx"), b"damaged committed record").expect("damage");
-        assert!(matches!(DurableItemJournal::open(&root.0), Err(ItemJournalError::InvalidRecord(_))));
+        fs::write(
+            root.0.join("00000000000000000002.mytx"),
+            b"damaged committed record",
+        )
+        .expect("damage");
+        assert!(matches!(
+            DurableItemJournal::open(&root.0),
+            Err(ItemJournalError::InvalidRecord(_))
+        ));
     }
 }
