@@ -41,6 +41,9 @@ jobs:
       - name: Compile governance scripts
         run: python -m py_compile scripts/*.py
 
+      - name: Validate E2d SQLite settlement recovery
+        run: python -m unittest discover -s scripts -p 'test_economics_sqlite_lab.py' -v
+
       - name: Validate combat JavaScript
         run: |
           node --version
