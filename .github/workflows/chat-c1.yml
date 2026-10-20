@@ -8,7 +8,9 @@ on:
       - "server/src/lib.rs"
       - "server/tests/local_chat_multiplayer.rs"
       - "src/network/chat-codec.mjs"
+      - "src/network/local-chat-ui-bridge.mjs"
       - "tests/chat-codec.test.mjs"
+      - "tests/local-chat-ui-bridge.test.mjs"
       - "docs/CORE_CHAT_C1_LOCAL_PROTOCOL.md"
       - ".github/workflows/chat-c1.yml"
   push:
@@ -19,7 +21,9 @@ on:
       - "server/src/lib.rs"
       - "server/tests/local_chat_multiplayer.rs"
       - "src/network/chat-codec.mjs"
+      - "src/network/local-chat-ui-bridge.mjs"
       - "tests/chat-codec.test.mjs"
+      - "tests/local-chat-ui-bridge.test.mjs"
       - ".github/workflows/chat-c1.yml"
 
 permissions:
@@ -49,3 +53,5 @@ jobs:
         run: |
           node --check src/network/chat-codec.mjs
           node --test tests/chat-codec.test.mjs
+          node --check src/network/local-chat-ui-bridge.mjs
+          node --test tests/local-chat-ui-bridge.test.mjs
