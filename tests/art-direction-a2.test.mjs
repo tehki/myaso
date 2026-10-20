@@ -41,13 +41,13 @@ test('A2 CPU look-dev uses self-authored procedural materials, not external down
 
 test('A2 tavern and street barrels have non-overlapping outer iron hoops', () => {
   // Read the authored layout, rather than testing an unrelated copy of the positions.
-  const definition = author.match(/BARREL_LAYOUT = \\(\n([\\s\\S]*?)\n\\)/);
+  const definition = author.match(/BARREL_LAYOUT = \(\n([\s\S]*?)\n\)/);
   assert.ok(definition, 'barrel positions must be declared in a reviewable layout');
-  const barrels = [...definition[1].matchAll(/\\("([^"]+)",\\s*(-?[\\d.]+),\\s*(-?[\\d.]+)\\)/g)]
+  const barrels = [...definition[1].matchAll(/\("([^"]+)",\s*(-?[\d.]+),\s*(-?[\d.]+)\)/g)]
     .map(([, name, x, y]) => ({ name, x: Number(x), y: Number(y) }));
   assert.equal(barrels.length, 7, 'both A1 and A2 barrel groups should be rebuilt');
-  const radius = Number(author.match(/BARREL_OUTER_RADIUS = ([\\d.]+)/)?.[1]);
-  const requiredGap = Number(author.match(/BARREL_MIN_GAP = ([\\d.]+)/)?.[1]);
+  const radius = Number(author.match(/BARREL_OUTER_RADIUS = ([\d.]+)/)?.[1]);
+  const requiredGap = Number(author.match(/BARREL_MIN_GAP = ([\d.]+)/)?.[1]);
   assert.equal(radius, 0.315);
   assert.ok(requiredGap >= 0.1);
   for (let i = 0; i < barrels.length; i++) {
@@ -58,6 +58,6 @@ test('A2 tavern and street barrels have non-overlapping outer iron hoops', () =>
     }
   }
   assert.match(author, /use_split_groups=True/);
-  assert.match(author, /bpy\\.data\\.objects\\.remove\\(ob, do_unlink=True\\)/);
+  assert.match(author, /bpy\.data\.objects\.remove\(ob, do_unlink=True\)/);
   assert.match(author, /assert edge_gap >= BARREL_MIN_GAP/);
 });
