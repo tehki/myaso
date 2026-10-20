@@ -100,6 +100,13 @@ test("D16 linked stories must reference every site exactly once without invented
   assert.equal(Object.hasOwn(audit.counts,"gold"),false);
 });
 
+test("D16 baseline content cannot silently disappear from published manifests",()=>{
+  includes(auditMoonvaleAuthoring({fields:Object.freeze(MOONVALE_FIELD_SITES.slice(0,-1))}),"MANIFEST_SHRINK");
+  includes(auditMoonvaleAuthoring({lore:Object.freeze(MOONVALE_ROADSIDE_LORE.slice(0,-1))}),"MANIFEST_SHRINK");
+  includes(auditMoonvaleAuthoring({trails:Object.freeze(CERTIFIED_TRAILS.slice(0,-1))}),"MANIFEST_SHRINK");
+  includes(auditMoonvaleAuthoring({threads:Object.freeze(MOONVALE_CHRONICLE_THREADS.slice(0,-1))}),"MANIFEST_SHRINK");
+});
+
 test("D16 CLI is a strict deterministic build gate without writes or online dependencies",()=>{
   const file=new URL("../scripts/audit-world-authoring.mjs",import.meta.url);
   const result=spawnSync(process.execPath,[fileURLToPath(file)],{encoding:"utf8",timeout:10000});
