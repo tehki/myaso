@@ -102,3 +102,29 @@ test('A2 A3 roll stills keep each knight visible independently of the other', ()
   assert.match(qa, /scene\.frame_set\(args\.roll_frame\)/);
   assert.match(qa, /if ob\.type == "MESH" and not is_proxy\(ob\):/);
 });
+
+
+test('A2.1 Red Lion polish stays additive and preserves door, barrels and original meshes', () => {
+  const art = readFileSync(new URL('../tools/art/polish_red_lion_a21.py', import.meta.url), 'utf8');
+  assert.match(art, /bpy\.ops\.wm\.open_mainfile/);
+  assert.match(art, /originals = \{o\.name for o in scene\.objects/);
+  assert.match(art, /assert all\(name in scene\.objects for name in originals\)/);
+  assert.match(art, /len\(original_barrels\) == 7/);
+  assert.match(art, /assert all\(tuple\(round\(v,6\) for v in scene\.objects\[name\]\.location\)==pos/);
+  assert.match(art, /"combatChanged":False/);
+  assert.match(art, /"doorPortalChanged":False/);
+  assert.match(art, /"rollChanged":False/);
+  assert.doesNotMatch(art,/requests\.|urlretrieve\(|export_scene\.gltf|subprocess\./);
+});
+
+test('A2.1 materials remain three batched geometry surfaces with a separate roof layer', () => {
+  const art = readFileSync(new URL('../tools/art/polish_red_lion_a21.py', import.meta.url), 'utf8');
+  assert.match(art, /tile_rows, tile_cols = 11, 16/);
+  assert.match(art, /assert 300<=tile_count<=352/);
+  assert.match(art, /assert stone_count >= 55/);
+  assert.match(art, /assert peg_count==12/);
+  assert.match(art, /"newArtMeshes":3/);
+  assert.match(art, /"meshBatches":1/);
+  assert.match(art, /"roof-occlusion-candidate"/);
+  assert.match(art, /scene\.cycles\.device = "CPU"/);
+});
