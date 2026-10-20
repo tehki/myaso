@@ -4,6 +4,22 @@ import { COMBAT_ACTION } from "../src/browser/combat-readability.mjs";
 
 export const KNIGHT_FRAME_PX = 160;
 export const KNIGHT_ROLL_PRESENTATION_MS = 350;
+// Owner-approved A2.10 knight visual scale. This affects ONLY the optional
+// knight sprite renderer, not gameplay positions, roll physics or hitboxes.
+// &knights=1 uses 120%; &knights=1&knightScale=100 previews the old presentation.
+export const KNIGHT_PRESENTATION_SCALE = 1.2;
+export function knightPresentationRect(rolling, scale = KNIGHT_PRESENTATION_SCALE) {
+  if (scale !== 1 && scale !== KNIGHT_PRESENTATION_SCALE) {
+    throw new RangeError("Only approved baseline/120% knight visual scales are supported");
+  }
+  const baseSize = rolling ? 112 : 80;
+  const size = Math.round(baseSize * scale);
+  return {
+    x: -size / 2,
+    y: (rolling ? -65 : -52) * scale,
+    width: size, height: size,
+  };
+}
 export const KNIGHT_DIRECTIONS = Object.freeze([
   "south", "southwest", "west", "northwest", "north", "northeast", "east", "southeast",
 ]);
@@ -54,7 +70,11 @@ export function spriteAtlasRect(facing, frame, frames) {
 }
 
 export function createKnightSpriteRenderer({ ImageCtor = Image,
-  assetBase = new URL("./assets/knights/", import.meta.url) } = {}) {
+  assetBase = new URL("./assets/knights/", import.meta.url),
+  presentationScale = KNIGHT_PRESENTATION_SCALE } = {}) {
+  // Fail closed for unsupported visual transforms rather than silently
+  // scaling A3 source art to arbitrary dimensions.
+  knightPresentationRect(false, presentationScale);
   const atlases = new Map();
   const states = new Map();
   for (const [name] of Object.entries(KNIGHT_CLIPS)) {
@@ -118,16 +138,17 @@ export function createKnightSpriteRenderer({ ImageCtor = Image,
       ctx.rotate(-rotation);
       ctx.fillStyle = remote ? "rgba(55, 32, 26, .45)" : "rgba(49, 38, 28, .45)";
       ctx.beginPath();
-      ctx.ellipse(0, 11, 20, 8, 0, 0, Math.PI * 2);
+      ctx.ellipse(0, 11 * presentationScale, 20 * presentationScale,
+        8 * presentationScale, 0, 0, Math.PI * 2);
       ctx.fill();
       ctx.imageSmoothingEnabled = true;
       ctx.imageSmoothingQuality = "high";
-      // This A3 roll bake uses a wider camera to retain the full shoulder
-      // contact silhouette; scale its presentation to match the idle knight.
-      const rolling = clip.endsWith("_roll");
+      // A2.11 keeps the visual sprite horizontally centered on the existing
+      // fighter world origin, even when 112 * 1.2 rounds to 134 pixels.
+      // Source atlas, combat geometry and A3 350ms cycle are unchanged.
+      const rect = knightPresentationRect(clip.endsWith("_roll"), presentationScale);
       ctx.drawImage(atlas.image, src.x, src.y, src.width, src.height,
-        rolling ? -56 : -40, rolling ? -65 : -52,
-        rolling ? 112 : 80, rolling ? 112 : 80);
+        rect.x, rect.y, rect.width, rect.height);
       ctx.restore();
       // Bounded cache: disconnected remote identities do not accumulate forever.
       if (states.size > 600) {
