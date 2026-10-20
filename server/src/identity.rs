@@ -256,7 +256,8 @@ mod tests {
         assert_eq!(CharacterRecord::decode(&bad), Err(CharacterRecordError::ChecksumMismatch));
         bad = good;
         bad[8..24].fill(0);
-        bad[32..36].copy_from_slice(&fnv1a32(&bad[..32]).to_le_bytes());
+        let checksum = fnv1a32(&bad[..32]);
+        bad[32..36].copy_from_slice(&checksum.to_le_bytes());
         assert_eq!(CharacterRecord::decode(&bad), Err(CharacterRecordError::InvalidCharacterId));
         assert!(CharacterId::new(0).is_none());
     }
