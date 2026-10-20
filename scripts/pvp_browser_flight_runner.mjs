@@ -12400,22 +12400,17 @@ async function performArenaJumpAttackChord(session, elementId, xOffset = 200, ho
   });
 }
 
-// M334 acceptance-only: pointer was genuinely positioned by aimArena
-// before timing began. Native Space and LMB share the FIRST W3C action tick;
-// no pointerMove is interleaved between them. Other chords stay unchanged.
+// M335 acceptance-only: genuine pointer first, keyboard second, same FIRST
+// WebDriver action tick. Exact-head CI #39415462650 measured Space 64ms ahead
+// of LMB despite genuine pre-aim. Direct local ChromeDriver native-input
+// measurements delivered <=1ms onset gap in pointer-first order, compared
+// with 2..5ms keyboard-first without CI contention. Original <=60ms actual
+// event gate stays strict. The client legitimately handles Space after LMB
+// down by committing its light, so the jump attack still fires just once.
 async function performArenaPreAimedJumpAttackChord(session, holdMs = 90) {
   const boundedHoldMs = Math.max(50, Math.min(180, Math.trunc(holdMs)));
   await webdriver(session.base, "POST", `/session/${session.sessionId}/actions`, {
     actions: [
-      {
-        type: "key",
-        id: `keyboard-${session.name}`,
-        actions: [
-          { type: "keyDown", value: " " },
-          { type: "pause", duration: boundedHoldMs },
-          { type: "keyUp", value: " " },
-        ],
-      },
       {
         type: "pointer",
         id: `mouse-${session.name}`,
@@ -12424,6 +12419,15 @@ async function performArenaPreAimedJumpAttackChord(session, holdMs = 90) {
           { type: "pointerDown", button: 0 },
           { type: "pause", duration: boundedHoldMs },
           { type: "pointerUp", button: 0 },
+        ],
+      },
+      {
+        type: "key",
+        id: `keyboard-${session.name}`,
+        actions: [
+          { type: "keyDown", value: " " },
+          { type: "pause", duration: boundedHoldMs },
+          { type: "keyUp", value: " " },
         ],
       },
     ],

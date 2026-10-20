@@ -26,13 +26,16 @@ test("M334 genuine pointer pre-aim precedes authenticated light event and native
   assert.match(flight, /Math\.abs\(spaceDowns\[0\]\.epochMs - jumpAttackDowns\[0\]\.epochMs\) > 60/);
 });
 
-test("M334 one native W3C command sends Space and LMB in first identical tick with no pointerMove", () => {
+test("M335 one W3C pointer-first command keeps Space and LMB in the same first tick", () => {
   assert.equal((chord.match(/webdriver\(session\.base, "POST"/g) ?? []).length, 1);
-  assert.match(chord, /type: "key"[\s\S]*?type: "keyDown", value: " "/);
-  assert.match(chord, /type: "pointer"[\s\S]*?type: "pointerDown", button: 0/);
+  const pointerIndex = chord.indexOf('type: "pointer"');
+  const keyIndex = chord.indexOf('type: "key"');
+  assert.ok(pointerIndex >= 0 && pointerIndex < keyIndex, "native pointer source precedes keyboard");
+  const mouse = chord.slice(pointerIndex, keyIndex);
+  const key = chord.slice(keyIndex);
+  assert.match(mouse, /type: "pointerDown", button: 0/);
+  assert.match(key, /type: "keyDown", value: " "/);
   assert.doesNotMatch(chord, /type: "pointerMove"|dispatchEvent\(|window\.__MYASO/);
-  const key = chord.slice(chord.indexOf('type: "key"'), chord.indexOf('type: "pointer"'));
-  const mouse = chord.slice(chord.indexOf('type: "pointer"'));
   assert.equal((key.match(/type: "keyDown"/g) ?? []).length, 1);
   assert.equal((mouse.match(/type: "pointerDown"/g) ?? []).length, 1);
   assert.ok(key.indexOf('type: "keyDown"') < key.indexOf('type: "pause"'));
@@ -40,4 +43,8 @@ test("M334 one native W3C command sends Space and LMB in first identical tick wi
   assert.match(key, /type: "pause", duration: boundedHoldMs[\s\S]*type: "keyUp"/);
   assert.match(mouse, /type: "pause", duration: boundedHoldMs[\s\S]*type: "pointerUp"/);
   assert.match(chord, /Math\.max\(50, Math\.min\(180, Math\.trunc\(holdMs\)\)\)/);
+  // Game officially supports Space pressed with LMB already down.
+  const game = readFileSync(new URL("../web/online-game.mjs", import.meta.url), "utf8");
+  assert.ok(game.includes('if (leftButtonDown) leftButtonCharge.commitLight()'));
+  assert.ok(game.includes('jumpRequested = true;'));
 });
