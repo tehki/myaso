@@ -103,7 +103,8 @@ mod tests {
                 .duration_since(UNIX_EPOCH)
                 .expect("clock")
                 .as_nanos();
-            let dir = std::env::temp_dir().join(format!("myaso-c2c-{}-{t}-{n}", std::process::id()));
+            let dir =
+                std::env::temp_dir().join(format!("myaso-c2c-{}-{t}-{n}", std::process::id()));
             fs::create_dir(&dir).expect("create test directory");
             Self(dir)
         }
@@ -159,7 +160,9 @@ mod tests {
         let old = coordinator.recover(&Claim::First, conn(1)).expect("login");
         assert_eq!(root.generation(10), 1);
         assert!(coordinator.is_current(old));
-        let new = coordinator.recover(&Claim::First, conn(2)).expect("takeover");
+        let new = coordinator
+            .recover(&Claim::First, conn(2))
+            .expect("takeover");
         assert_eq!(root.generation(10), 2);
         assert_eq!(new.generation(), 2);
         assert!(!coordinator.is_current(old));
@@ -208,7 +211,9 @@ mod tests {
             .recover(&Claim::First, conn(6))
             .expect("login");
         let mut after = CharacterRecoveryCoordinator::new(TestVerifier, root.store());
-        let new = after.recover(&Claim::First, conn(7)).expect("restart login");
+        let new = after
+            .recover(&Claim::First, conn(7))
+            .expect("restart login");
         assert_eq!(root.generation(10), 2);
         assert_eq!(new.generation(), 2);
         assert!(!after.is_current(old));
@@ -228,7 +233,9 @@ mod tests {
             .expect("simulated pre-activation commit");
         assert_eq!(committed.session_generation, 1);
         let mut coordinator = CharacterRecoveryCoordinator::new(TestVerifier, root.store());
-        let lease = coordinator.recover(&Claim::First, conn(8)).expect("retry verified");
+        let lease = coordinator
+            .recover(&Claim::First, conn(8))
+            .expect("retry verified");
         assert_eq!(lease.generation(), 2);
         assert!(coordinator.is_current(lease));
     }
@@ -242,7 +249,9 @@ mod tests {
         let mut coordinator = CharacterRecoveryCoordinator::new(TestVerifier, root.store());
         assert!(matches!(
             coordinator.recover(&Claim::First, conn(9)),
-            Err(RecoveryError::Storage(CharacterStoreError::InvalidRecord(_)))
+            Err(RecoveryError::Storage(CharacterStoreError::InvalidRecord(
+                _
+            )))
         ));
     }
 }
