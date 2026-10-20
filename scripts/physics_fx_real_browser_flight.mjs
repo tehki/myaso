@@ -97,9 +97,9 @@ async function startLab() {
     for (const line of buffer.split(/\r?\n/)) {
       const e = line.match(/P9_LOOPBACK_LISTENING (https:\/\/127\.0\.0\.1:\d+\/physics-fx-lab)/);
       if (e) endpoint = e[1];
-      const h = line.match(/P9_CERT_SHA256 ([a-f0-9:]+)/i);
-      if (h) {
-        const hex = h[1].replaceAll(":", "").toLowerCase();
+      if (line.includes("P9_CERT_SHA256 ")) {
+        const hex = line.split("P9_CERT_SHA256 ").at(-1).trim()
+          .replace(/[^0-9a-fA-F]/g, "").toLowerCase();
         if (hex.length === 64) cert = hex;
       }
     }
