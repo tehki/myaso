@@ -187,7 +187,7 @@ pub fn try_write_core_guarded<W: CoreAuthenticatedWriter>(
             gameplay_attempts += 1;
         }
         let outcome = writer.enqueue_if_current(route, bytes);
-        if !is_gameplay && matches!(outcome, Err(CoreGuardedEnqueueError::StaleGeneration)) {
+        if !is_gameplay && matches!(&outcome, Err(CoreGuardedEnqueueError::StaleGeneration)) {
             stale_optional += 1;
         }
         outcome
