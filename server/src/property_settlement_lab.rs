@@ -109,6 +109,19 @@ pub enum Error {
     CorruptJournal,
 }
 
+/// Laboratory replay completeness expectations that must be obtained from
+/// an INDEPENDENT trustworthy committed checkpoint in a future implementation.
+/// Constructing these from the same untrusted/replayed journal proves nothing.
+/// This carries no MAC/signature and does not authenticate a real database.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct JournalAnchor {
+    pub expected_sequence: u64,
+    pub expected_total_supply: u128,
+    pub expected_player_accounts: usize,
+    pub expected_owned_titles: usize,
+    pub expected_active_listings: usize,
+}
+
 /// Reference aggregate simulates ONE writer via &mut self. In production:
 /// serializable DB row locks + UNIQUE operation_id + atomic ledger/title/listing
 /// journal commit are all mandatory. No independent service updates permitted.
@@ -379,6 +392,35 @@ impl Lab {
         self.journal.push(receipt);
         self.sequence = sequence;
         Ok(receipt)
+    }
+
+    /// A model checkpoint for testing. Production MUST read its expected
+    /// values from an independent, integrity-protected committed checkpoint;
+    /// a value produced from this object is not a trusted recovery anchor.
+    pub fn journal_anchor(&self) -> JournalAnchor {
+        JournalAnchor {
+            expected_sequence: self.sequence,
+            expected_total_supply: self.total_supply,
+            expected_player_accounts: self.accounts.len(),
+            expected_owned_titles: self.titles.len(),
+            expected_active_listings: self.listings.values().filter(|l| l.active).count(),
+        }
+    }
+
+    /// Adds expected committed-tail completeness to deterministic replay.
+    /// This cannot verify a *self-declared* anchor or identify who altered a
+    /// journal. Persistent DB transaction and authenticated checkpoint are
+    /// still necessary; valid journal prefixes otherwise look consistent.
+    pub fn reconstruct_with_anchor(
+        seed: &Seed,
+        journal: &[Receipt],
+        trusted: JournalAnchor,
+    ) -> Result<Self, Error> {
+        let state = Self::reconstruct(seed, journal)?;
+        if state.journal_anchor() != trusted {
+            return Err(Error::CorruptJournal);
+        }
+        Ok(state)
     }
 
     /// Laboratory-only deterministic journal verification/reconstruction.
@@ -653,6 +695,80 @@ mod tests {
             Lab::reconstruct(&s, &[altered]),
             Err(Error::CorruptJournal)
         ));
+    }
+
+    #[test]
+    fn trusted_sequence_anchor_detects_valid_but_truncated_journal_tail() {
+        let genesis = seed();
+        let mut state = Lab::from_seed(&genesis).unwrap();
+        // An empty journal is a perfectly valid standalone replay prefix.
+        // But it must be rejected if an independently trusted checkpoint
+        // asserts that transaction #1 was already committed.
+        let first = state.purchase(auth(10), intent(1, 10), 50).unwrap();
+        let committed = state.journal_anchor();
+        assert_eq!(committed.expected_sequence, 1);
+        assert_eq!(committed.expected_total_supply, 2400);
+        assert_eq!(committed.expected_active_listings, 0);
+        let empty_prefix = Lab::reconstruct(&genesis, &[]).unwrap();
+        assert_eq!(empty_prefix.title(42).unwrap().owner_id, 20);
+        assert!(matches!(
+            Lab::reconstruct_with_anchor(&genesis, &[], committed),
+            Err(Error::CorruptJournal)
+        ));
+        let restored = Lab::reconstruct_with_anchor(&genesis, &[first], committed).unwrap();
+        assert_eq!(restored.journal_anchor(), committed);
+        assert_eq!(restored.title(42).unwrap().owner_id, 10);
+        assert!(restored.conserved());
+    }
+
+    #[test]
+    fn stale_or_mismatched_trusted_anchor_is_not_silently_accepted() {
+        let genesis = seed();
+        let mut state = Lab::from_seed(&genesis).unwrap();
+        let receipt = state.purchase(auth(10), intent(1, 10), 50).unwrap();
+        let anchor = state.journal_anchor();
+
+        let mut wrong = anchor;
+        wrong.expected_sequence = 0;
+        assert_eq!(
+            Lab::reconstruct_with_anchor(&genesis, &[receipt], wrong).map(|s| s.journal_anchor()),
+            Err(Error::CorruptJournal)
+        );
+
+        wrong = anchor;
+        wrong.expected_total_supply += 1;
+        assert!(matches!(
+            Lab::reconstruct_with_anchor(&genesis, &[receipt], wrong),
+            Err(Error::CorruptJournal)
+        ));
+
+        wrong = anchor;
+        wrong.expected_active_listings = 1;
+        assert!(matches!(
+            Lab::reconstruct_with_anchor(&genesis, &[receipt], wrong),
+            Err(Error::CorruptJournal)
+        ));
+
+        wrong = anchor;
+        wrong.expected_owned_titles = 2;
+        assert!(matches!(
+            Lab::reconstruct_with_anchor(&genesis, &[receipt], wrong),
+            Err(Error::CorruptJournal)
+        ));
+    }
+
+    #[test]
+    fn anchored_replay_does_not_count_duplicate_purchase_twice() {
+        let genesis = seed();
+        let mut state = Lab::from_seed(&genesis).unwrap();
+        let first = state.purchase(auth(10), intent(1, 10), 50).unwrap();
+        assert_eq!(state.purchase(auth(10), intent(1, 10), 50), Ok(first));
+        let anchor = state.journal_anchor();
+        assert_eq!(anchor.expected_sequence, 1);
+        let replayed = Lab::reconstruct_with_anchor(&genesis, state.journal(), anchor).unwrap();
+        assert_eq!(replayed.journal().len(), 1);
+        assert_eq!(replayed.balance(10), state.balance(10));
+        assert_eq!(replayed.treasury(), state.treasury());
     }
 
     #[test]
