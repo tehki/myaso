@@ -53,6 +53,23 @@ jobs:
           node --check src/browser/game-audio.mjs
           node --test tests/r3-combat-audio.test.mjs
 
+      # GitHub's headless Linux runner has no hardware speaker. Give Firefox
+      # a real PulseAudio output sink rather than bypassing media playback.
+      - name: Prepare headless Firefox audio output
+        run: |
+          if ! command -v pulseaudio >/dev/null; then
+            sudo apt-get update -qq
+            sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq pulseaudio
+          fi
+          mkdir -p "$RUNNER_TEMP/myaso-r4-audio"
+          chmod 700 "$RUNNER_TEMP/myaso-r4-audio"
+          echo "XDG_RUNTIME_DIR=$RUNNER_TEMP/myaso-r4-audio" >> "$GITHUB_ENV"
+          export XDG_RUNTIME_DIR="$RUNNER_TEMP/myaso-r4-audio"
+          pulseaudio --start --exit-idle-time=-1
+          pactl load-module module-null-sink sink_name=myaso_r4_sound
+          pactl set-default-sink myaso_r4_sound
+          pactl info
+
       - name: Validate R4 native recorded audio and ambient music
         run: |
           node --check scripts/r4_audio_browser_acceptance.mjs
