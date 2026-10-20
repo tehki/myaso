@@ -1,0 +1,51 @@
+{
+  "a3TimingChanged": false,
+  "anatomicalSoleContactValidated": false,
+  "authoritativeFloorKnown": false,
+  "blenderVersion": "4.5.14 LTS",
+  "hasDedicatedOutsoleLabel": false,
+  "materialBasedBootSoleIsolationSupported": false,
+  "meshInventory": [
+    {
+      "footSkinGroups": [
+        "mixamorig:LeftFoot",
+        "mixamorig:LeftToeBase",
+        "mixamorig:RightFoot",
+        "mixamorig:RightToeBase"
+      ],
+      "materials": [
+        "Material_0"
+      ],
+      "meshName": "geometry_0",
+      "polygons": 98787,
+      "polygonsByMaterial": {
+        "Material_0": 98787
+      },
+      "shoeOrSoleSemanticLabels": [],
+      "skinned": true,
+      "vertices": 105847
+    },
+    {
+      "footSkinGroups": [],
+      "materials": [],
+      "meshName": "Icosphere",
+      "polygons": 80,
+      "polygonsByMaterial": {
+        "(none)": 80
+      },
+      "shoeOrSoleSemanticLabels": [],
+      "skinned": false,
+      "vertices": 42
+    }
+  ],
+  "milestone": "Blood & Iron A2.15 first-party A3 footwear provenance audit",
+  "originalGLBOrBlenderModified": false,
+  "productionApproved": false,
+  "reason": "No separately named outsole/boot material or vertex group. Foot skin groups exist, but are not an anatomical sole label.",
+  "skinnedMaterialCount": 1,
+  "skinnedMeshCount": 1,
+  "skinnedMeshPolygonCount": 98787,
+  "sourceName": "silver-knight-roll-A3.glb",
+  "sourceSHA256": "e4a263d480896fb1069ffc81e913e9aaa7324ff344611f5b69829cfee25c5d94",
+  "spritePresentationScaleChanged": false
+}

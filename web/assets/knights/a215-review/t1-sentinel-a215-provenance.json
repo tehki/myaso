@@ -1,0 +1,51 @@
+{
+  "a3TimingChanged": false,
+  "anatomicalSoleContactValidated": false,
+  "authoritativeFloorKnown": false,
+  "blenderVersion": "4.5.14 LTS",
+  "hasDedicatedOutsoleLabel": false,
+  "materialBasedBootSoleIsolationSupported": false,
+  "meshInventory": [
+    {
+      "footSkinGroups": [],
+      "materials": [],
+      "meshName": "Icosphere",
+      "polygons": 80,
+      "polygonsByMaterial": {
+        "(none)": 80
+      },
+      "shoeOrSoleSemanticLabels": [],
+      "skinned": false,
+      "vertices": 42
+    },
+    {
+      "footSkinGroups": [
+        "mixamorig:LeftFoot",
+        "mixamorig:LeftToeBase",
+        "mixamorig:RightFoot",
+        "mixamorig:RightToeBase"
+      ],
+      "materials": [
+        "Material.001"
+      ],
+      "meshName": "material",
+      "polygons": 149880,
+      "polygonsByMaterial": {
+        "Material.001": 149880
+      },
+      "shoeOrSoleSemanticLabels": [],
+      "skinned": true,
+      "vertices": 101687
+    }
+  ],
+  "milestone": "Blood & Iron A2.15 first-party A3 footwear provenance audit",
+  "originalGLBOrBlenderModified": false,
+  "productionApproved": false,
+  "reason": "No separately named outsole/boot material or vertex group. Foot skin groups exist, but are not an anatomical sole label.",
+  "skinnedMaterialCount": 1,
+  "skinnedMeshCount": 1,
+  "skinnedMeshPolygonCount": 149880,
+  "sourceName": "t1-sentinel-roll-A3.glb",
+  "sourceSHA256": "b89432a621d1f0956b7c06449035e0a055d11b17d6ceb34c9b26264eadcb6aed",
+  "spritePresentationScaleChanged": false
+}
