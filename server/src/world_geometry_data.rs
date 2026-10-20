@@ -55,6 +55,3 @@ pub(super) const BRIDGES: [Rect; 2] = [
     Rect { x: 1980.0, y: 4240.0, w: 240.0, h: 97.0 },
     Rect { x: 2100.0, y: 5500.0, w: 240.0, h: 78.0 },
 ];
-
-
-[executed on device: Machine (dddee116-9deb-47c7-9368-4393f817bdb1)]
