@@ -9,6 +9,7 @@ pub mod reliable;
 pub mod simulation;
 pub mod snapshot;
 pub mod zone;
+pub mod durable_zone_authority;
 pub mod zone_lease;
 
 pub const PROTOCOL_VERSION: u8 = 1;
