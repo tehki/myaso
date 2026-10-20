@@ -3,8 +3,8 @@ use std::sync::{
     Arc,
 };
 
-pub mod property;
 pub mod kill_event;
+pub mod property;
 pub mod reliable;
 pub mod simulation;
 pub mod snapshot;
