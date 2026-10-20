@@ -225,6 +225,7 @@ mod tests {
     use crate::character_identity::CharacterId;
     use crate::loot::{EquipmentSlot, ItemKind};
     use crate::magic::{Lesson, LessonSource, Rune, Spell};
+    use crate::zone::ZoneId;
     use std::num::NonZeroU64;
     use std::sync::atomic::{AtomicU64, Ordering};
 
