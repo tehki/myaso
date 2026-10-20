@@ -18,7 +18,7 @@ Then Pillow with WebP:
 
     python tools/art/encode_greyhaven_a26_webp.py --in-dir /local/a26-review
 
-The first slice contains Red Lion, Gable Merchant and Blacksmith. Each has three 640x640 original RGBA PNG masters (base, roof, whole), two original-pixel-lossless cropped RGBA WebPs, a checkerboard review composite, and reports:
+The first slice contains Red Lion, Gable Merchant and Blacksmith. Since the Blacksmith model is physically turned 180 degrees toward its street, the script also turns **its isolated art review camera** by 180 degrees to show the entrance rather than the empty rear facade. This camera change does not rotate or move the building in the world; each reviewed sprite is independently anchored and **not a common screen-aligned world atlas**. Each has three 640x640 original RGBA PNG masters (base, roof, whole), two original-pixel-lossless cropped RGBA WebPs, a checkerboard review composite, and reports:
 
 - greyhaven_a26_render_report.json: Blender camera settings, measured ground-basis X/Y and their uncorrected game-XY disagreement, actual rendered layer/object counts, visual door anchor.
 - greyhaven_a26_webp_report.json: per-layer crop rectangles, visual-door-relative draw offsets, RGBA reconstruction fidelity, WebP SHA256 / byte counts, and mean RGB difference between the separate-layer composite and independently rendered full object.
