@@ -221,8 +221,12 @@ house("Gable Merchant", -12.8,-4.4,5.2,4.5,3.9,1.9,plaster,slate,chimney=True)
 house("Tanner's Cottage", 12.7,-4.4,4.25,4.35,3.25,1.4,plaster,straw,chimney=True)
 house("Stone Weaver", -13.1,10.1,5.3,4.7,3.1,1.35,stone,tile,math.pi,chimney=True)
 house("Blacksmith", 12.6,10.0,5.9,5.0,3.65,1.5,plaster,slate,math.pi,chimney=True)
-box("Blacksmith / open forge hearth",(13.3,6.95,.62),(1.3,.8,1.1),stone,.1)
-box("Blacksmith / orange embers",(13.3,6.48,.92),(.78,.08,.31),ember)
+# A2.7.1: place the outdoor forge to the west of the anvil, outside
+# the entrance/doorstep corridor. Visual authoring only, no collision rules.
+# Forge x bounds [8.65,9.95], anvil x bounds [10.275,11.125]:
+# 0.325 m separation. Door is centered x=12.6, y≈7.37.
+box("Blacksmith / open forge hearth",(9.3,6.05,.62),(1.3,.8,1.1),stone,.1)
+box("Blacksmith / orange embers",(9.3,5.70,.92),(.78,.08,.31),ember)
 box("Blacksmith / anvil",(10.7,6.4,.92),(.85,.46,.27),iron,.06)
 box("Blacksmith / anvil stand",(10.7,6.4,.51),(.45,.42,.63),timber,.05)
 
