@@ -235,7 +235,6 @@ async fn real_three_connection_local_chat_and_distant_isolation() {
     assert!(alice.connection.max_datagram_size().unwrap_or(0) > 0);
 }
 
-
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn reconnect_binds_new_sender_without_reusing_an_old_chat_session() {
     let (_server, url, digest) = start_server();
@@ -244,12 +243,17 @@ async fn reconnect_binds_new_sender_without_reusing_an_old_chat_session() {
     original.send(1, b"old session", 1).await;
     assert!(assert_result(&original.receive().await, 1, 0) > 0);
     assert!(assert_received(&neighbor.receive().await, 1, "old session") > 0);
-    original.connection.close(VarInt::from_u32(0), b"test disconnect");
+    original
+        .connection
+        .close(VarInt::from_u32(0), b"test disconnect");
     let mut replacement = Player::connect(&url, &digest).await;
     replacement.send(1, b"new session", 1).await;
     let accepted = assert_result(&replacement.receive().await, 1, 0);
     assert!(accepted > 0);
-    assert_eq!(assert_received(&neighbor.receive().await, 3, "new session"), accepted);
+    assert_eq!(
+        assert_received(&neighbor.receive().await, 3, "new session"),
+        accepted
+    );
     neighbor.send(2, b"welcome back", 1).await;
     assert!(assert_result(&neighbor.receive().await, 2, 0) > accepted);
     assert!(assert_received(&replacement.receive().await, 2, "welcome back") > accepted);
@@ -272,17 +276,32 @@ async fn genuine_realtime_input_ack_coexists_with_reliable_chat() {
     input[6..8].copy_from_slice(&u16::MAX.to_le_bytes());
     input[8..12].copy_from_slice(&101_u32.to_le_bytes());
     input[17] = 127; // move X
-    sender.connection.send_datagram(input.to_vec()).expect("send genuine game input");
+    sender
+        .connection
+        .send_datagram(input.to_vec())
+        .expect("send genuine game input");
     let acknowledged = timeout(Duration::from_secs(5), async {
         loop {
-            let packet = sender.connection.receive_datagram().await.expect("game datagram");
+            let packet = sender
+                .connection
+                .receive_datagram()
+                .await
+                .expect("game datagram");
             if packet.len() == 16 && packet[0] == 1 && packet[1] == 3 {
                 break packet;
             }
         }
-    }).await.expect("gameplay input ACK under chat traffic");
-    assert_eq!(u32::from_le_bytes(acknowledged[4..8].try_into().unwrap()), 101);
-    assert_eq!(u32::from_le_bytes(acknowledged[12..16].try_into().unwrap()), 1);
+    })
+    .await
+    .expect("gameplay input ACK under chat traffic");
+    assert_eq!(
+        u32::from_le_bytes(acknowledged[4..8].try_into().unwrap()),
+        101
+    );
+    assert_eq!(
+        u32::from_le_bytes(acknowledged[12..16].try_into().unwrap()),
+        1
+    );
     neighbor.send(11, b"Movement still works", 1).await;
     assert!(assert_result(&neighbor.receive().await, 11, 0) > 0);
     assert!(assert_received(&sender.receive().await, 2, "Movement still works") > 0);
