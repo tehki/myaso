@@ -55,6 +55,8 @@ export function createGameAudio({ AudioContextImpl = globalThis.AudioContext ?? 
   const loadedSamples = new Map();
   const pendingSamples = new Map();
   let warmupStarted = false;
+  let disposed = false;
+  const abortFoley = typeof AbortController === "function" ? new AbortController() : null;
   const lastPlayed = new Map();
   const variantCursor = new Map();
 
@@ -74,21 +76,25 @@ export function createGameAudio({ AudioContextImpl = globalThis.AudioContext ?? 
     if (master) master.gain.value = muted ? 0 : volume;
   }
   function ensureFoleyWarmup() {
-    if (warmupStarted || !fetchImpl || !context || typeof context.decodeAudioData !== "function") return;
+    if (disposed || warmupStarted || !fetchImpl || !context || typeof context.decodeAudioData !== "function") return;
     warmupStarted = true;
+    const decoder = context;
     // At most two background decodes per client. A busy 3-player browser CI
     // must not suddenly launch 78 fetch/decode tasks next to timed native input.
     // Missing/corrupt OGG always leaves the existing R3 fallback available.
     const names = [...new Set(Object.values(RECORDED_FOLEY).flat())];
     let next = 0;
     async function worker() {
-      while (next < names.length) {
+      while (!disposed && next < names.length) {
         const name = names[next++];
         const url = new URL(`../../web/audio/foley/${name}.ogg`, import.meta.url).href;
-        const load = Promise.resolve().then(() => fetchImpl(url))
-          .then((response) => response?.ok ? response.arrayBuffer() : null)
-          .then((bytes) => bytes ? context.decodeAudioData(bytes) : null)
-          .then((buffer) => { if (buffer) loadedSamples.set(name, buffer); })
+        const load = Promise.resolve().then(() => {
+          if (disposed) return null;
+          return fetchImpl(url, abortFoley ? { signal: abortFoley.signal } : undefined);
+        })
+          .then((response) => !disposed && response?.ok ? response.arrayBuffer() : null)
+          .then((bytes) => bytes && !disposed ? decoder.decodeAudioData(bytes) : null)
+          .then((buffer) => { if (buffer && !disposed) loadedSamples.set(name, buffer); })
           .catch(() => { /* Missing sample must never become an input error. */ })
           .finally(() => pendingSamples.delete(name));
         pendingSamples.set(name, load);
@@ -117,6 +123,7 @@ export function createGameAudio({ AudioContextImpl = globalThis.AudioContext ?? 
       try { track.pause(); } catch { /* No effect on input. */ }
       return;
     }
+    if (!track.paused) return; // Slider and visibility updates must not restart music.
     try {
       const started = track.play();
       if (started?.catch) started.catch(() => {
@@ -126,13 +133,14 @@ export function createGameAudio({ AudioContextImpl = globalThis.AudioContext ?? 
     } catch { /* Autoplay remains user-gesture gated. */ }
   }
   function setMusicEnabled(value) {
+    if (disposed) return;
     musicEnabled = Boolean(value);
     if (musicEnabled) makeMusicTrack();
     syncMusic();
     persist();
   }
   function setMusicVolume(value) {
-    if (!Number.isFinite(value)) return;
+    if (disposed || !Number.isFinite(value)) return;
     musicVolume = clamp(value, 0, 1);
     syncMusic();
     persist();
@@ -140,6 +148,7 @@ export function createGameAudio({ AudioContextImpl = globalThis.AudioContext ?? 
   function suspendMusicWhenHidden() { syncMusic(); }
 
   function unlock() {
+    if (disposed) return false;
     // A previously enabled ambient track may resume only on the next real
     // player gesture in a new session, never automatically during bootstrap.
     if (musicEnabled && !musicTrack) { makeMusicTrack(); syncMusic(); }
@@ -170,19 +179,20 @@ export function createGameAudio({ AudioContextImpl = globalThis.AudioContext ?? 
     return true;
   }
   function setMuted(value) {
+    if (disposed) return;
     muted = Boolean(value);
     updateMaster();
     persist();
   }
   function setVolume(value) {
-    if (!Number.isFinite(value)) return;
+    if (disposed || !Number.isFinite(value)) return;
     volume = clamp(value, 0, 1);
     updateMaster();
     persist();
   }
   function play(name, { pan = 0, level = 1 } = {}) {
     const spec = CUES[name];
-    if (!spec || muted || volume <= 0 || !context || !master || globalThis.document?.hidden) return false;
+    if (disposed || !spec || muted || volume <= 0 || !context || !master || globalThis.document?.hidden) return false;
     const now = context.currentTime;
     if (now - (lastPlayed.get(name) ?? -Infinity) < spec.minMs / 1000) return false;
     lastPlayed.set(name, now);
@@ -249,7 +259,24 @@ export function createGameAudio({ AudioContextImpl = globalThis.AudioContext ?? 
       return true;
     } catch { return false; } // Audio must never interfere with combat/input.
   }
-  return Object.freeze({ unlock, play, setMuted, setVolume,
+  function dispose() {
+    if (disposed) return;
+    disposed = true;
+    abortFoley?.abort();
+    try { musicTrack?.pause(); } catch { /* Already stopped or unavailable. */ }
+    const closingContext = context;
+    context = null;
+    master = null;
+    noiseBuffer = null;
+    loadedSamples.clear();
+    pendingSamples.clear();
+    lastPlayed.clear();
+    variantCursor.clear();
+    try { closingContext?.close?.()?.catch?.(() => {}); }
+    catch { /* A closed or unsupported audio device is harmless. */ }
+    musicTrack = null;
+  }
+  return Object.freeze({ unlock, play, dispose, setMuted, setVolume,
     setMusicEnabled, setMusicVolume, suspendMusicWhenHidden,
     isMuted: () => muted, getVolume: () => volume, isUnlocked: () => context !== null,
     isMusicEnabled: () => musicEnabled, getMusicVolume: () => musicVolume,

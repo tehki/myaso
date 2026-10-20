@@ -142,3 +142,90 @@ test("R4 mute, slider and separate Music buttons are shared by online and offlin
     assert.doesNotMatch(code, /setMusicEnabled\(true\)/, "combat/input never starts music");
   }
 });
+
+test("R4 media slider changes do not retrigger playback; hidden tabs pause and resume only when visible", () => {
+  const previous = globalThis.document;
+  globalThis.document = { hidden: false };
+  try {
+    const audio = createGameAudio({ AudioContextImpl: Context, AudioElementImpl: MusicTrack,
+      fetchImpl: null, storage: null });
+    audio.setMusicEnabled(true);
+    const track = MusicTrack.created.at(-1);
+    assert.equal(track.playCalls, 1);
+    audio.setMusicVolume(0.5);
+    audio.setMusicVolume(0.65);
+    assert.equal(track.playCalls, 1, "changing music volume must not restart an active loop");
+    globalThis.document.hidden = true;
+    audio.suspendMusicWhenHidden();
+    assert.equal(track.paused, true);
+    const started = track.playCalls;
+    audio.setMusicEnabled(true);
+    assert.equal(track.playCalls, started, "hidden tab must never start playback");
+    globalThis.document.hidden = false;
+    audio.suspendMusicWhenHidden();
+    assert.equal(track.paused, false);
+    assert.equal(track.playCalls, started + 1, "returning to visible resumes exactly once");
+    audio.suspendMusicWhenHidden();
+    assert.equal(track.playCalls, started + 1, "duplicate visibility events cannot stack playback");
+    audio.dispose();
+    assert.equal(track.paused, true);
+    assert.equal(audio.unlock(), false);
+    assert.equal(audio.play("light"), false);
+    audio.setMusicEnabled(true);
+    assert.equal(audio.isMusicEnabled(), true, "dispose never silently overwrites saved preferences");
+  } finally {
+    if (previous === undefined) delete globalThis.document;
+    else globalThis.document = previous;
+  }
+});
+
+test("R4 unreadable recordings use nonblocking fallback and disposal cancels in-flight loads", async () => {
+  let attempts = 0;
+  let aborts = 0;
+  class ClosingContext extends Context {
+    close() { this.closed = true; return Promise.resolve(); }
+  }
+  const broken = createGameAudio({ AudioContextImpl: ClosingContext, AudioElementImpl: MusicTrack,
+    fetchImpl: async () => ({ ok: false }), storage: null });
+  assert.equal(broken.unlock(), true);
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.equal(broken.loadedFoleyCount(), 0);
+  assert.equal(broken.play("heavy"), true, "missing OGG must preserve gameplay-independent fallback");
+  assert.equal(Context.instances.at(-1).oscillators, 1);
+  broken.dispose();
+  assert.equal(Context.instances.at(-1).closed, true);
+
+  const pending = createGameAudio({ AudioContextImpl: ClosingContext, AudioElementImpl: MusicTrack,
+    storage: null, fetchImpl: (_url, options) => {
+      attempts++;
+      return new Promise((_resolve, reject) => {
+        options?.signal?.addEventListener("abort", () => {
+          aborts++;
+          reject(new Error("aborted"));
+        }, { once: true });
+      });
+    },
+  });
+  pending.unlock();
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.equal(attempts, 2, "only two concurrent media requests");
+  pending.dispose();
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.equal(aborts, 2);
+  assert.equal(pending.loadedFoleyCount(), 0);
+  assert.equal(pending.unlock(), false, "disposed instance cannot recreate AudioContext");
+  pending.dispose(); // idempotent
+});
+
+test("R4 native browser servers declare OGG MIME and CI runs genuine browser audio proof", () => {
+  for (const runner of ["browser_flight_runner.mjs", "pvp_browser_flight_runner.mjs"]) {
+    const source = readFileSync(new URL("../scripts/" + runner, import.meta.url), "utf8");
+    assert.match(source, /filename\.endsWith\("\.ogg"\)\) return "audio\/ogg"/);
+  }
+  const workflow = readFileSync(new URL("../.github/workflows/ci.yml", import.meta.url), "utf8");
+  assert.match(workflow, /node --test tests\/r4-natural-ambient-audio\.test\.mjs/);
+  assert.match(workflow, /node scripts\/r4_audio_browser_acceptance\.mjs/);
+  const harness = readFileSync(new URL("../scripts/r4_audio_browser_acceptance.mjs", import.meta.url), "utf8");
+  assert.match(harness, /r4-audio-probe/);
+  assert.match(harness, /assert\.equal\(result\.sources, 1/);
+});

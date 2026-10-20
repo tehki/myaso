@@ -53,6 +53,12 @@ jobs:
           node --check src/browser/game-audio.mjs
           node --test tests/r3-combat-audio.test.mjs
 
+      - name: Validate R4 native recorded audio and ambient music
+        run: |
+          node --check scripts/r4_audio_browser_acceptance.mjs
+          node --test tests/r4-natural-ambient-audio.test.mjs
+          node scripts/r4_audio_browser_acceptance.mjs
+
       - name: Validate R2 responsive controls, server-style dash and combat geometry
         run: |
           node --check src/browser/dash-input.mjs
