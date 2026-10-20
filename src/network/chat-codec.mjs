@@ -142,15 +142,19 @@ export async function openLocalChat(gameConnection, {
     writer = outgoing.getWriter();
     const incoming = transport.incomingUnidirectionalStreams.getReader();
     const pendingRead = incoming.read();
-    // The read may complete only *after* timeout cancellation. Release its
-    // lock in both cases, without waiting forever for a failed handshake.
+    // Release the reader after the reply or failure. On a timeout, release
+    // the pending reader lock (rejecting its read) instead of cancelling the
+    // *shared* incomingUnidirectionalStreams collection. A cancelled
+    // collection would also prevent unrelated/future QUIC incoming streams.
     pendingRead.then(
       () => { try { incoming.releaseLock(); } catch { /* best effort */ } },
       () => { try { incoming.releaseLock(); } catch { /* best effort */ } },
     );
     const channel = await boundedChatHandshake(
       pendingRead, handshakeTimeoutMs, "reply stream",
-      { onTimeout: () => { void incoming.cancel("chat reply timeout").catch(() => {}); } },
+      { onTimeout: () => {
+        try { incoming.releaseLock(); } catch { /* best effort */ }
+      } },
     );
     if (channel.done || !channel.value) throw new Error("chat reply stream unavailable");
     reader = channel.value.getReader();
