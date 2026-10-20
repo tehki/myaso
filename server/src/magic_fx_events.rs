@@ -186,7 +186,8 @@ impl SemanticEffectBroker {
                 }
                 let dx = effect.spec.x - viewer.x;
                 let dy = effect.spec.y - viewer.y;
-                dx.abs() <= viewer.radius && dy.abs() <= viewer.radius
+                dx.abs() <= viewer.radius
+                    && dy.abs() <= viewer.radius
                     && dx * dx + dy * dy <= radius_sq
             })
             .take(limit)
@@ -272,9 +273,8 @@ mod tests {
         assert_eq!(
             encode_magic_fx(&event).unwrap(),
             [
-                0x4d, 0x45, 1, 0, 7, 0, 0, 0, 1, 0, 0, 0, 100, 0, 0, 0,
-                0x44, 0x33, 0x22, 0x11, 50, 0, 0, 0, 0xe3, 0xff, 0xff, 0xff,
-                128, 45, 0, 0,
+                0x4d, 0x45, 1, 0, 7, 0, 0, 0, 1, 0, 0, 0, 100, 0, 0, 0, 0x44, 0x33, 0x22, 0x11, 50,
+                0, 0, 0, 0xe3, 0xff, 0xff, 0xff, 128, 45, 0, 0,
             ]
         );
     }
@@ -289,9 +289,14 @@ mod tests {
         let found = broker.interest_snapshot(viewer(7, 100.0), 0, 16);
         assert_eq!(found.len(), 1);
         assert_eq!(found[0].event_id, first);
-        assert_eq!(broker.interest_snapshot(viewer(7, 100.0), first, 16).len(), 0);
+        assert_eq!(
+            broker.interest_snapshot(viewer(7, 100.0), first, 16).len(),
+            0
+        );
         assert!(broker.interest_snapshot(viewer(0, 100.0), 0, 16).is_empty());
-        assert!(broker.interest_snapshot(viewer(7, f32::NAN), 0, 16).is_empty());
+        assert!(broker
+            .interest_snapshot(viewer(7, f32::NAN), 0, 16)
+            .is_empty());
         assert!(broker.interest_snapshot(viewer(7, 100.0), 0, 0).is_empty());
     }
 
@@ -304,7 +309,10 @@ mod tests {
                 broker.admit_trusted(tick, fire(7, offset as f32)).unwrap();
             }
         }
-        assert_eq!(broker.interest_snapshot(viewer(7, 0.0), 0, 900).len(), MAX_VIEWER_FX_EVENTS);
+        assert_eq!(
+            broker.interest_snapshot(viewer(7, 0.0), 0, 900).len(),
+            MAX_VIEWER_FX_EVENTS
+        );
         assert_eq!(broker.pending(), 36);
     }
 
@@ -319,7 +327,10 @@ mod tests {
         }
         assert_eq!(broker.pending(), MAX_FX_EVENTS_PER_ZONE);
         broker.advance(5).unwrap();
-        assert_eq!(broker.admit_trusted(5, fire(7, 0.0)), Err(FxError::OverloadedZone));
+        assert_eq!(
+            broker.admit_trusted(5, fire(7, 0.0)),
+            Err(FxError::OverloadedZone)
+        );
         assert_eq!(broker.pending(), MAX_FX_EVENTS_PER_ZONE);
         broker.admit_trusted(5, fire(8, 0.0)).unwrap();
     }
@@ -327,22 +338,40 @@ mod tests {
     #[test]
     fn rejects_stale_ticks_invalid_coordinates_and_malformed_event_intensity() {
         let mut broker = SemanticEffectBroker::new();
-        assert_eq!(broker.admit_trusted(1, fire(7, 0.0)), Err(FxError::InvalidTick));
+        assert_eq!(
+            broker.admit_trusted(1, fire(7, 0.0)),
+            Err(FxError::InvalidTick)
+        );
         assert_eq!(broker.advance(0), Err(FxError::InvalidTick));
         broker.advance(12).unwrap();
         assert_eq!(broker.advance(11), Err(FxError::InvalidTick));
         assert_eq!(broker.advance(12), Err(FxError::InvalidTick));
-        assert_eq!(broker.admit_trusted(11, fire(7, 0.0)), Err(FxError::InvalidTick));
+        assert_eq!(
+            broker.admit_trusted(11, fire(7, 0.0)),
+            Err(FxError::InvalidTick)
+        );
         let mut invalid = fire(7, f32::NAN);
-        assert_eq!(broker.admit_trusted(12, invalid), Err(FxError::InvalidEffect));
+        assert_eq!(
+            broker.admit_trusted(12, invalid),
+            Err(FxError::InvalidEffect)
+        );
         invalid = fire(0, 10.0);
-        assert_eq!(broker.admit_trusted(12, invalid), Err(FxError::InvalidEffect));
+        assert_eq!(
+            broker.admit_trusted(12, invalid),
+            Err(FxError::InvalidEffect)
+        );
         invalid = fire(7, 10.0);
         invalid.intensity = 0;
-        assert_eq!(broker.admit_trusted(12, invalid), Err(FxError::InvalidEffect));
+        assert_eq!(
+            broker.admit_trusted(12, invalid),
+            Err(FxError::InvalidEffect)
+        );
         invalid.intensity = 1;
         invalid.ttl_ticks = 121;
-        assert_eq!(broker.admit_trusted(12, invalid), Err(FxError::InvalidEffect));
+        assert_eq!(
+            broker.admit_trusted(12, invalid),
+            Err(FxError::InvalidEffect)
+        );
         assert_eq!(broker.pending(), 0);
     }
 
@@ -366,6 +395,9 @@ mod tests {
         broker.admit_trusted(10, fire(7, 0.0)).unwrap();
         let mut copies = broker.interest_snapshot(viewer(7, 0.0), 0, 16);
         copies[0].spec.x = 999.0;
-        assert_eq!(broker.interest_snapshot(viewer(7, 0.0), 0, 16)[0].spec.x, 0.0);
+        assert_eq!(
+            broker.interest_snapshot(viewer(7, 0.0), 0, 16)[0].spec.x,
+            0.0
+        );
     }
 }

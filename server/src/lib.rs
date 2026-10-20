@@ -6,8 +6,8 @@ use std::sync::{
 pub mod elemental_collision;
 pub mod elemental_fields;
 pub mod elemental_physics;
-pub mod magic_fx_events;
 pub mod kill_event;
+pub mod magic_fx_events;
 pub mod reliable;
 pub mod simulation;
 pub mod snapshot;
