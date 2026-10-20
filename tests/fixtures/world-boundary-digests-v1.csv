@@ -1,0 +1,6 @@
+# D5 world boundary digest v1: region,samples,blocked,fnv32
+city-walls,4000,2144,33a5fb57
+building-edges,4000,2907,6ec1322a
+river-bridges,4000,3033,aeed36d0
+inn-furniture,4000,3073,43ac8176
+world-uniform,4000,206,139e0be1

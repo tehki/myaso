@@ -166,6 +166,12 @@ jobs:
           node --test tests/world-movement-parity.test.mjs
           cargo test --locked --manifest-path server/Cargo.toml world_movement
 
+      - name: Validate D5 seeded cross-language collision boundary parity
+        run: |
+          node scripts/generate-world-boundary-digests.mjs --check
+          node --test tests/world-boundary-parity.test.mjs
+          cargo test --locked --manifest-path server/Cargo.toml d5_twenty_thousand_edge_biased_queries_match_browser_digests
+
       - name: Validate M188 repeated real heavy counterplay windows
         run: |
           # Three fresh Chrome/Firefox sessions for each real defensive read.
