@@ -64,7 +64,9 @@ try {
   const staticPort = staticServer.address().port;
   const lab = await startLab();
   const results = [];
-  for (const browser of browsers) {
+  // Diagnostic order: Firefox first confirms whether its QUIC handshake
+  // fails without a prior Chrome session on this throwaway UDP endpoint.
+  for (const browser of [...browsers].reverse()) {
     const result = await runBrowser(browser, lab, staticPort);
     if (!result.ok || result.gameplayMarkers < 50 || result.fxPackets < 12 ||
         result.pingReplies < 8 || result.malformedFx !== 0) {
