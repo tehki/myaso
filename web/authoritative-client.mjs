@@ -8,7 +8,7 @@ import { decodeSnapshot, SNAPSHOT_FIELDS } from "../src/network/snapshot-codec.m
 import { decodeInputAck } from "../src/network/input-ack-codec.mjs";
 import { decodeKillEvent } from "../src/network/kill-event-codec.mjs";
 import { encodeInputPacket } from "../src/network/input-codec.mjs";
-import { encodeNpcRequest, decodeNpcResponse, decodeNpcRoster, decodeNpcState, decodeNpcSupplies, NPC_WIRE } from "../src/network/npc-chat-codec.mjs";
+import { encodeNpcRequest, decodeNpcResponse, decodeNpcRoster, decodeNpcState, decodeNpcSupplies, decodeNpcObstacles, NPC_WIRE } from "../src/network/npc-chat-codec.mjs";
 import { isSequenceNewer16 } from "../src/network/sequence.mjs";
 import { connectGameTransport } from "./network-transport.mjs";
 
@@ -24,6 +24,7 @@ export async function connectAuthoritativeClient({
   onNpcRoster,
   onNpcState,
   onNpcSupplies,
+  onNpcObstacles,
   onNpcReply,
   onProtocolError,
 } = {}) {
@@ -110,6 +111,10 @@ export async function connectAuthoritativeClient({
       }
       if (bytes[1] === NPC_WIRE.supplies) {
         onNpcSupplies?.(decodeNpcSupplies(bytes));
+        return;
+      }
+      if (bytes[1] === NPC_WIRE.obstacles) {
+        onNpcObstacles?.(decodeNpcObstacles(bytes));
         return;
       }
       if (bytes[1] === PACKET_TYPE.KILL_EVENT) {

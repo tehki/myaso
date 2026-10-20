@@ -357,6 +357,9 @@ networkClient = await connectAuthoritativeClient({
   onNpcSupplies(snapshot) {
     npcUI?.updateSupplies(snapshot);
   },
+  onNpcObstacles(barriers) {
+    npcUI?.setObstacles(barriers);
+  },
   onNpcReply(reply) {
     npcUI?.receive(reply);
   },
@@ -1060,10 +1063,25 @@ function drawThreatMarker(bearing, secondary) {
   ctx.restore();
 }
 
-// Read-only presentation of static staging NPC anchors; not combat fighters.
+// Pilot-only NPC navigation geometry, separate from player combat collision.
 function drawNpcPilotMarkers() {
   if (!local.initialized || !npcUI?.enabled) return;
   ctx.save();
+  for (const wall of npcUI.obstacles) {
+    const near = projectArenaPoint(wall.x, wall.y, visualCameraPosition.x,
+      visualCameraPosition.y, canvas.width, canvas.height);
+    const far = projectArenaPoint(wall.x + wall.width, wall.y + wall.height,
+      visualCameraPosition.x, visualCameraPosition.y, canvas.width, canvas.height);
+    const width = far.x - near.x, height = far.y - near.y;
+    if (near.x > canvas.width || near.y > canvas.height
+      || far.x < 0 || far.y < 0) continue;
+    ctx.fillStyle = "rgba(113, 85, 52, 0.27)";
+    ctx.strokeStyle = "rgba(239, 193, 105, 0.72)";
+    ctx.setLineDash([4, 3]);
+    ctx.fillRect(near.x, near.y, width, height);
+    ctx.strokeRect(near.x, near.y, width, height);
+  }
+  ctx.setLineDash([]);
   ctx.textAlign = "center";
   ctx.font = "bold 11px sans-serif";
   for (const npc of npcUI.npcs) {

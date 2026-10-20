@@ -31,6 +31,7 @@ export function createNpcChatPanel({ onSend, onFocus }) {
   panel.append(heading, description, roster, supplies, history, form);
   document.querySelector(".arena-wrap")?.append(panel);
   let npcs = [];
+  let obstacles = [];
   let lastStateTick = null;
   let lastSuppliesTick = null;
 
@@ -52,6 +53,7 @@ export function createNpcChatPanel({ onSend, onFocus }) {
       roster.append(option);
     }
     panel.hidden = !entries.length;
+    obstacles = [];
     lastStateTick = null;
     lastSuppliesTick = null;
     supplies.textContent = "Settlement supplies: awaiting verified server report.";
@@ -115,6 +117,8 @@ export function createNpcChatPanel({ onSend, onFocus }) {
   });
   return {
     get npcs() { return npcs; },
+    get obstacles() { return obstacles; },
+    setObstacles(value) { obstacles = value; },
     setRoster,
     updateState,
     updateSupplies,

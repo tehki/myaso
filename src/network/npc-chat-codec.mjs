@@ -1,7 +1,7 @@
 // LW-1 loopback NPC pilot on the existing reliable stream; never on combat datagrams.
 // These packet types are separate from the frozen v1 input/snapshot/kill-event payloads.
 export const NPC_WIRE = Object.freeze({
-  request: 5, response: 6, roster: 7, state: 8, supplies: 9, maxTextBytes: 240,
+  request: 5, response: 6, roster: 7, state: 8, supplies: 9, obstacles: 10, maxTextBytes: 240,
 });
 const encoder = new TextEncoder();
 const decoder = new TextDecoder("utf-8", { fatal: true });
@@ -117,4 +117,24 @@ export function decodeNpcSupplies(bytes) {
     lastActor: payload[20],
     lastOperation: payload[21],
   });
+}
+
+export function decodeNpcObstacles(bytes) {
+  const payload = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
+  if (payload.length < 4 || payload[0] !== 1 || payload[1] !== NPC_WIRE.obstacles
+      || payload[2] !== 3 || payload[3] !== 0 || payload.length !== 4 + payload[2] * 8) {
+    throw new TypeError("invalid pilot NPC obstacle geometry");
+  }
+  const view = new DataView(payload.buffer, payload.byteOffset, payload.byteLength);
+  const boxes = [];
+  for (let i = 0; i < payload[2]; i++) {
+    const offset = 4 + i * 8;
+    const [x, y, width, height] = [0, 2, 4, 6].map((relative) => view.getUint16(offset + relative, true));
+    if (width === 0 || height === 0 || width > 100 || height > 100
+      || x < 60 || y < 30 || x + width > 460 || y + height > 320) {
+      throw new TypeError("invalid pilot NPC obstacle bounds");
+    }
+    boxes.push(Object.freeze({ x, y, width, height }));
+  }
+  return Object.freeze(boxes);
 }

@@ -117,3 +117,35 @@ The next integration boundary remains a physically navigable Greyhaven world,
 actual resource objects, stable verified player identities and separately
 permissioned/transactional player interaction. These are intentionally not
 claimed by LW-1C.
+
+## LW-1D — Obstacle-aware test navigation (loopback-only)
+
+The three moving staging NPCs now follow a **bounded deterministic grid path**
+instead of walking straight through barriers. Rowan walks around a barricade,
+Elara around a market stall and Tomas around a supply crate. The server owns
+three explicitly authored **pilot geometry** rectangles (packet type 10,
+4-byte header + three 8-byte rectangles). NPC positions are still authoritative
+and continue to use packet type 8; speech range and supply actions use the
+same server world tick as before.
+
+The pathfinder builds three shortest-path routes **once per process**, using
+a small, finite grid with eight neighboring cells and deterministic tie
+breaking. Traversal rejects blocked cells, prevents diagonal corner cutting
+and reserves eight world units of personal space around rectangles.
+The forward leg uses equal-distance interpolation, reverses along the same
+safe path and has predictable shift/rest windows. Missing or inconsistent
+routes fail closed to each NPC's staging start position.
+
+The browser renders the pilot barriers as **dashed translucent overlays**
+and moving NPC markers. These blockers are **NPC-navigation-only**:
+player combat colliders, arena movement, attack reach, physics and existing
+map/zone transport **are not modified**. The test barriers must be replaced
+with approved, server-authoritative Greyhaven map-manifest colliders before
+claiming real building/door navigation or making NPCs collidable.
+
+New Rust cases verify that each route reaches its authored waypoint,
+the naive straight line would hit a blocker, all sampled movement stays
+outside expanded obstacle rectangles, diagonal paths cannot cut through
+corners, and pilot geometry uses the separate bounded packet type 10.
+The browser decoder validates rectangle count, dimensions and in-bounds
+coordinates before showing a barrier.

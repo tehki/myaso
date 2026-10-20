@@ -3,6 +3,7 @@ use myaso_server::{
     coalesce_accepted_input_batch, decode_input_packet, is_sequence_newer16, is_tick_newer32,
     kill_event::{encode_kill_event, KillEventPacket},
     living_world::{self, DialogueSession},
+    npc_navigation,
     npc_routines::{NpcRoutines, STATE_INTERVAL_TICKS},
     npc_supply::NpcSupplyWorld,
     reliable::{try_enqueue_reliable, ReliableQueueError},
@@ -620,6 +621,12 @@ async fn handle_connection(
             &mut reliable_send,
             &mut reliable_frame_buffer,
             &living_world::roster_packet(),
+        )
+        .await?;
+        send_reliable_frame(
+            &mut reliable_send,
+            &mut reliable_frame_buffer,
+            &npc_navigation::obstacle_packet(),
         )
         .await?;
         send_reliable_frame(

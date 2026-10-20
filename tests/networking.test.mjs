@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { NETWORK } from "../src/network/constants.mjs";
-import { encodeNpcRequest, decodeNpcRoster, decodeNpcResponse, decodeNpcState, decodeNpcSupplies } from "../src/network/npc-chat-codec.mjs";
+import { encodeNpcRequest, decodeNpcRoster, decodeNpcResponse, decodeNpcState, decodeNpcSupplies, decodeNpcObstacles } from "../src/network/npc-chat-codec.mjs";
 import { encodeInputPacket, decodeInputPacket, inputPacketBytes } from "../src/network/input-codec.mjs";
 import { SpatialInterestGrid } from "../src/network/interest-grid.mjs";
 import { InputIngressWindow } from "../src/network/input-ingress.mjs";
@@ -632,5 +632,22 @@ test("NPC supply snapshots preserve exact finite totals and reject forged proven
   ]) {
     assert.throws(() => decodeNpcSupplies(invalid), /NPC supply|NPC supplies/);
   }
+  assert.equal(NETWORK.protocolVersion, 1);
+});
+
+test("NPC pilot navigation barriers are server-advertised, bounded and fail closed", () => {
+  const packet = new Uint8Array([1,10,3,0,
+    195,0,180,0,35,0,35,0,
+    89,1,105,0,30,0,45,0,
+    38,1,216,0,24,0,31,0,
+  ]);
+  assert.deepEqual(decodeNpcObstacles(packet), [
+    { x: 195, y: 180, width: 35, height: 35 },
+    { x: 345, y: 105, width: 30, height: 45 },
+    { x: 294, y: 216, width: 24, height: 31 },
+  ]);
+  assert.throws(() => decodeNpcObstacles(packet.subarray(0, 27)), /obstacle geometry/);
+  assert.throws(() => decodeNpcObstacles(Uint8Array.from(packet, (n,i) => i===2 ? 2 : n)), /obstacle geometry/);
+  assert.throws(() => decodeNpcObstacles(Uint8Array.from(packet, (n,i) => i===8 ? 0 : n)), /obstacle bounds/);
   assert.equal(NETWORK.protocolVersion, 1);
 });

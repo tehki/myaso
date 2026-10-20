@@ -1,7 +1,8 @@
 //! Loopback-only LW-1 NPC schedule and witnessed events.
-//! Staging positions are independent of combat fighters/collision/navigation.
+//! Staging positions follow pilot-only obstacle-aware navigation, isolated from combat collision.
 //! This module never drives a physics actor and stores no conversation bodies.
 use crate::living_world::NPCS;
+use crate::npc_navigation;
 use crate::PROTOCOL_VERSION;
 
 pub const STATE_TYPE: u8 = 8;
@@ -29,12 +30,6 @@ pub struct NpcRoutines {
 impl NpcRoutines {
     pub fn position(id: u8, tick: u32) -> Option<NpcState> {
         let npc = NPCS.iter().find(|npc| npc.id == id)?;
-        let (to_x, to_y) = match id {
-            3 => (275, 190), // Rowan walks a short watch route.
-            4 => (395, 150), // Elara walks between staging market anchors.
-            5 => (340, 255), // Tomas carries supplies by the well.
-            _ => (npc.x, npc.y),
-        };
         let phase = tick % CYCLE_TICKS;
         let (numerator, activity) = if phase < LEG_TICKS {
             (phase, 1)
@@ -45,8 +40,10 @@ impl NpcRoutines {
         } else {
             (0, 0)
         };
-        let x = interpolate(npc.x, to_x, numerator);
-        let y = interpolate(npc.y, to_y, numerator);
+        let (x, y) = match id {
+            3..=5 => npc_navigation::position(id, numerator).unwrap_or((npc.x, npc.y)),
+            _ => (npc.x, npc.y),
+        };
         // Stationary professions have an alternating shift rather than
         // reporting an imaginary walk.
         let activity = match id {
@@ -110,12 +107,6 @@ impl NpcRoutines {
         }
         packet
     }
-}
-
-fn interpolate(from: u16, to: u16, numerator: u32) -> u16 {
-    let origin = i32::from(from);
-    let delta = i32::from(to) - origin;
-    (origin + (delta * numerator as i32) / LEG_TICKS as i32) as u16
 }
 
 #[cfg(test)]
