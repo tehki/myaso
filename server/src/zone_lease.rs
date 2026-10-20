@@ -16,6 +16,7 @@ impl WorkerId {
     pub fn new(value: u64) -> Option<Self> {
         NonZeroU64::new(value).map(Self)
     }
+    pub fn get(self) -> u64 { self.0.get() }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
@@ -24,6 +25,7 @@ impl ZoneKey {
     pub fn new(value: u64) -> Option<Self> {
         NonZeroU64::new(value).map(Self)
     }
+    pub fn get(self) -> u64 { self.0.get() }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
@@ -67,6 +69,7 @@ pub struct HandoffTicket {
     operation: NonZeroU128,
 }
 impl HandoffTicket {
+    pub fn operation(self) -> NonZeroU128 { self.operation }
     pub fn source(self) -> AuthorityLease {
         self.source
     }
@@ -98,7 +101,7 @@ struct Slot {
 /// Exactly one authoritative lease per entity within this registry.
 /// The pending state freezes writes by *both* workers. A durable cross-host
 /// coordinator is required before using this with independent workers.
-#[derive(Default, Debug)]
+#[derive(Clone, Default, Debug)]
 pub struct ZoneLeaseRegistry {
     slots: BTreeMap<OwnedEntity, Slot>,
 }
