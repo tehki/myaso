@@ -297,3 +297,7 @@ mod tests {
         ));
     }
 }
+
+#[cfg(test)]
+#[path = "world_boundary_parity.rs"]
+mod boundary_parity;
