@@ -35,6 +35,10 @@ impl ItemKind {
         )
     }
 
+    pub const fn is_reagent(self) -> bool {
+        matches!(self, Self::SulfurAsh | Self::BlackPearl)
+    }
+
     pub const fn fits(self, slot: EquipmentSlot) -> bool {
         matches!(
             (self, slot),
@@ -275,6 +279,143 @@ impl LootAuthority {
             .backpack
             .push(ItemStack { id, kind, amount });
         Ok(id)
+    }
+
+    /// Split a backpack stack into two physical item identities. Only a
+    /// server-validated inventory interaction may call this. Item totals are
+    /// conserved, and exhaustion/capacity errors leave the original untouched.
+    pub fn split_backpack_stack(
+        &mut self,
+        authenticated_id: u32,
+        item_id: u64,
+        amount: u16,
+    ) -> Result<u64, LootError> {
+        if self.dead.contains(&authenticated_id) {
+            return Err(LootError::DeadPlayer);
+        }
+        let inventory = self
+            .players
+            .get(&authenticated_id)
+            .ok_or(LootError::UnknownPlayer)?;
+        let original = inventory
+            .backpack
+            .iter()
+            .find(|item| item.id == item_id)
+            .ok_or(LootError::NotFound)?;
+        if !original.kind.stackable() || amount == 0 || amount >= original.amount {
+            return Err(LootError::InvalidStack);
+        }
+        if inventory.backpack.len() >= BACKPACK_CAPACITY {
+            return Err(LootError::InventoryFull);
+        }
+        let fragment_id = self.allocate_id()?;
+        let inventory = self.players.get_mut(&authenticated_id).expect("checked");
+        let original = inventory
+            .backpack
+            .iter_mut()
+            .find(|item| item.id == item_id)
+            .expect("checked");
+        original.amount -= amount;
+        let kind = original.kind;
+        inventory.backpack.push(ItemStack {
+            id: fragment_id,
+            kind,
+            amount,
+        });
+        Ok(fragment_id)
+    }
+
+    /// Merge two same-kind stackable backpack items. The destination item ID
+    /// stays stable; the source item ID is retired. Rejected merges never
+    /// mutate inventory or lose quantities (including u16 overflow).
+    pub fn merge_backpack_stacks(
+        &mut self,
+        authenticated_id: u32,
+        destination_id: u64,
+        source_id: u64,
+    ) -> Result<(), LootError> {
+        if self.dead.contains(&authenticated_id) {
+            return Err(LootError::DeadPlayer);
+        }
+        let inventory = self
+            .players
+            .get_mut(&authenticated_id)
+            .ok_or(LootError::UnknownPlayer)?;
+        if destination_id == source_id {
+            return Err(LootError::InvalidStack);
+        }
+        let destination = inventory
+            .backpack
+            .iter()
+            .find(|item| item.id == destination_id)
+            .ok_or(LootError::NotFound)?;
+        let source = inventory
+            .backpack
+            .iter()
+            .find(|item| item.id == source_id)
+            .ok_or(LootError::NotFound)?;
+        if !destination.kind.stackable() || destination.kind != source.kind {
+            return Err(LootError::InvalidStack);
+        }
+        let combined = destination
+            .amount
+            .checked_add(source.amount)
+            .ok_or(LootError::InvalidStack)?;
+        let source_index = inventory
+            .backpack
+            .iter()
+            .position(|item| item.id == source_id)
+            .expect("checked");
+        inventory.backpack.remove(source_index);
+        inventory
+            .backpack
+            .iter_mut()
+            .find(|item| item.id == destination_id)
+            .expect("checked")
+            .amount = combined;
+        Ok(())
+    }
+
+    /// Server-only magic reagent expenditure. This is intentionally not a
+    /// network command: rune/spell authorization will be checked by the
+    /// future authoritative casting service before calling it. If the total
+    /// is insufficient no stack is changed or destroyed.
+    pub fn consume_reagent(
+        &mut self,
+        authenticated_id: u32,
+        kind: ItemKind,
+        amount: u16,
+    ) -> Result<(), LootError> {
+        if !kind.is_reagent() || amount == 0 {
+            return Err(LootError::InvalidStack);
+        }
+        if self.dead.contains(&authenticated_id) {
+            return Err(LootError::DeadPlayer);
+        }
+        let inventory = self
+            .players
+            .get_mut(&authenticated_id)
+            .ok_or(LootError::UnknownPlayer)?;
+        let available: u32 = inventory
+            .backpack
+            .iter()
+            .filter(|item| item.kind == kind)
+            .map(|item| u32::from(item.amount))
+            .sum();
+        if available < u32::from(amount) {
+            return Err(LootError::InvalidStack);
+        }
+        let mut remaining = amount;
+        for stack in &mut inventory.backpack {
+            if stack.kind != kind || remaining == 0 {
+                continue;
+            }
+            let consumed = remaining.min(stack.amount);
+            stack.amount -= consumed;
+            remaining -= consumed;
+        }
+        inventory.backpack.retain(|stack| stack.amount > 0);
+        Ok(())
     }
 
     pub fn equip(
@@ -1041,6 +1182,107 @@ mod tests {
         );
         assert!(!loot.ground().contains_key(&drop_id));
         assert_eq!(loot.inventory(2).unwrap().backpack()[0].id, sword);
+    }
+
+    #[test]
+    fn backpack_stack_split_merge_and_overflow_are_atomic() {
+        let mut loot = LootAuthority::new();
+        loot.register(1).unwrap();
+        loot.register(2).unwrap();
+        let gold_id = loot.grant(1, ItemKind::Gold, 11).unwrap();
+        let fragment_id = loot.split_backpack_stack(1, gold_id, 4).unwrap();
+        let backpack = loot.inventory(1).unwrap().backpack();
+        assert_eq!(backpack.len(), 2);
+        assert_eq!(backpack[0].amount, 7);
+        assert_eq!(backpack[1].amount, 4);
+        assert_ne!(gold_id, fragment_id);
+        assert_eq!(
+            loot.merge_backpack_stacks(2, gold_id, fragment_id),
+            Err(LootError::NotFound)
+        );
+        assert_eq!(
+            loot.split_backpack_stack(1, gold_id, 7),
+            Err(LootError::InvalidStack)
+        );
+        loot.merge_backpack_stacks(1, gold_id, fragment_id)
+            .unwrap();
+        assert_eq!(loot.inventory(1).unwrap().backpack().len(), 1);
+        assert_eq!(loot.inventory(1).unwrap().backpack()[0].amount, 11);
+        assert_eq!(loot.inventory(1).unwrap().backpack()[0].id, gold_id);
+        let large = loot.grant(1, ItemKind::Gold, u16::MAX).unwrap();
+        assert_eq!(
+            loot.merge_backpack_stacks(1, gold_id, large),
+            Err(LootError::InvalidStack)
+        );
+        assert_eq!(loot.inventory(1).unwrap().backpack().len(), 2);
+        assert_eq!(loot.inventory(1).unwrap().backpack()[0].amount, 11);
+        assert_eq!(loot.inventory(1).unwrap().backpack()[1].amount, u16::MAX);
+        assert_eq!(
+            loot.merge_backpack_stacks(1, gold_id, gold_id),
+            Err(LootError::InvalidStack)
+        );
+        let sword = loot.grant(1, ItemKind::RustySword, 1).unwrap();
+        assert_eq!(
+            loot.split_backpack_stack(1, sword, 1),
+            Err(LootError::InvalidStack)
+        );
+        assert_eq!(
+            loot.merge_backpack_stacks(1, gold_id, sword),
+            Err(LootError::InvalidStack)
+        );
+    }
+
+    #[test]
+    fn reagent_spending_spans_stacks_without_partial_failure_or_other_consumption() {
+        let mut loot = LootAuthority::new();
+        loot.register(1).unwrap();
+        let first_id = loot.grant(1, ItemKind::SulfurAsh, 3).unwrap();
+        let second_id = loot.grant(1, ItemKind::SulfurAsh, 5).unwrap();
+        let gold_id = loot.grant(1, ItemKind::Gold, 20).unwrap();
+        assert_eq!(
+            loot.consume_reagent(1, ItemKind::SulfurAsh, 9),
+            Err(LootError::InvalidStack)
+        );
+        assert_eq!(loot.inventory(1).unwrap().backpack()[0].amount, 3);
+        assert_eq!(loot.inventory(1).unwrap().backpack()[1].amount, 5);
+        assert_eq!(
+            loot.consume_reagent(1, ItemKind::Gold, 1),
+            Err(LootError::InvalidStack)
+        );
+        assert_eq!(
+            loot.consume_reagent(1, ItemKind::SulfurAsh, 0),
+            Err(LootError::InvalidStack)
+        );
+        loot.consume_reagent(1, ItemKind::SulfurAsh, 6).unwrap();
+        let backpack = loot.inventory(1).unwrap().backpack();
+        assert_eq!(backpack.len(), 2);
+        assert_eq!(backpack[0].id, second_id);
+        assert_eq!(backpack[0].amount, 2);
+        assert_eq!(backpack[1].id, gold_id);
+        assert_eq!(backpack[1].amount, 20);
+        assert!(!backpack.iter().any(|stack| stack.id == first_id));
+        loot.consume_reagent(1, ItemKind::SulfurAsh, 2).unwrap();
+        assert_eq!(loot.inventory(1).unwrap().backpack().len(), 1);
+        assert_eq!(
+            loot.consume_reagent(1, ItemKind::SulfurAsh, 1),
+            Err(LootError::InvalidStack)
+        );
+    }
+
+    #[test]
+    fn backpack_split_fails_at_capacity_without_modification() {
+        let mut loot = LootAuthority::new();
+        loot.register(1).unwrap();
+        let id = loot.grant(1, ItemKind::Gold, 8).unwrap();
+        for _ in 1..BACKPACK_CAPACITY {
+            loot.grant(1, ItemKind::HealingPotion, 1).unwrap();
+        }
+        assert_eq!(
+            loot.split_backpack_stack(1, id, 3),
+            Err(LootError::InventoryFull)
+        );
+        assert_eq!(loot.inventory(1).unwrap().backpack().len(), BACKPACK_CAPACITY);
+        assert_eq!(loot.inventory(1).unwrap().backpack()[0].amount, 8);
     }
 
     #[test]
