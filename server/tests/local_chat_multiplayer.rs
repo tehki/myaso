@@ -409,3 +409,54 @@ async fn interleaved_outbound_chat_does_not_discard_half_read_inbound_frame() {
     assert!(id > 0);
     assert_eq!(assert_received(&bob.receive().await, 1, text), id);
 }
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn truncated_chat_length_prefix_times_out_but_gameplay_stays_live() {
+    let (_server, url, digest) = start_server();
+    let mut player = Player::connect(&url, &digest).await;
+
+    // A malicious/failed peer sends the first length byte only. The chat
+    // task must time out, even though an otherwise idle chat remains valid.
+    player
+        .chat_send
+        .write_all(&[20_u8])
+        .await
+        .expect("send first chat length byte");
+    let mut one = [0_u8; 1];
+    let reply = timeout(
+        Duration::from_secs(14),
+        player.chat_recv.read_exact(&mut one),
+    )
+    .await
+    .expect("partial chat header must close optional reply stream");
+    assert!(reply.is_err(), "partial chat header must not live forever");
+
+    // A chat-only protocol failure must not close/reallocate the game socket.
+    let mut input = [0_u8; 22];
+    input[0] = 1;
+    input[1] = 1;
+    input[2] = 1;
+    input[4..6].copy_from_slice(&1_u16.to_le_bytes());
+    input[6..8].copy_from_slice(&u16::MAX.to_le_bytes());
+    input[8..12].copy_from_slice(&202_u32.to_le_bytes());
+    input[17] = 127;
+    player
+        .connection
+        .send_datagram(input)
+        .expect("genuine unchanged input after partial chat header");
+    timeout(Duration::from_secs(5), async {
+        loop {
+            let packet = player
+                .connection
+                .receive_datagram()
+                .await
+                .expect("gameplay remains connected");
+            if packet.len() == 16 && packet[0] == 1 && packet[1] == 3 {
+                assert_eq!(u32::from_le_bytes(packet[4..8].try_into().unwrap()), 202);
+                break;
+            }
+        }
+    })
+    .await
+    .expect("gameplay input ACK survives stalled chat header");
+}
