@@ -78,7 +78,7 @@ impl TeacherAuthority {
 
     /// Trusted registration only: do not expose it in the client protocol.
     /// No teacher is implicitly spawned into the live world by this call.
-    pub(crate) fn register_trusted(&mut self, spawn: TeacherSpawn) -> Result<(), TeacherError> {
+    pub fn register_trusted(&mut self, spawn: TeacherSpawn) -> Result<(), TeacherError> {
         let (width, height) = spawn.zone.bounds();
         if !spawn.at.x.is_finite()
             || !spawn.at.y.is_finite()
