@@ -334,12 +334,11 @@ impl LootAuthority {
             3
         } else if total >= 6 {
             2
-        } else if total >= 2 {
-            1
-        } else if inventory
-            .backpack
-            .first()
-            .is_some_and(|stack| stack.kind.stackable() && stack.amount > 1)
+        } else if total >= 2
+            || inventory
+                .backpack
+                .first()
+                .is_some_and(|stack| stack.kind.stackable() && stack.amount > 1)
         {
             1
         } else {
@@ -593,6 +592,7 @@ mod tests {
         assert_eq!(loot.ground().len(), 1);
         assert_eq!(loot.corpses()[&corpse_id].items.len(), 3);
         let scattered = loot.ground().values().next().unwrap();
+        let drop_id = scattered.entity_id;
         assert_eq!(
             (scattered.item.kind, scattered.item.amount),
             (ItemKind::SulfurAsh, 1)
@@ -610,7 +610,6 @@ mod tests {
             loot.death(1, &fighter(1, 200.0, 200.0, true), ZoneId::Moonvale, 110),
             Err(LootError::AlreadyDead)
         );
-        let drop_id = scattered.entity_id;
         let thief = fighter(2, 200.0, 200.0, false);
         let stolen = loot
             .take_ground(2, &thief, ZoneId::Moonvale, drop_id, 200)
