@@ -1,0 +1,69 @@
+name: Core C4h isolated primary crash recovery
+
+on:
+  pull_request:
+    paths:
+      - "scripts/verify_zone_primary_crash.py"
+      - ".github/workflows/core-c4h-primary-crash.yml"
+      - "server/sql/001_zone_authority_postgres.sql"
+      - "server/sql/002_fenced_world_mutations.sql"
+      - "server/sql/003_nonzero_authority_ids.sql"
+  push:
+    branches: [main]
+    paths:
+      - "scripts/verify_zone_primary_crash.py"
+      - ".github/workflows/core-c4h-primary-crash.yml"
+      - "server/sql/001_zone_authority_postgres.sql"
+      - "server/sql/002_fenced_world_mutations.sql"
+      - "server/sql/003_nonzero_authority_ids.sql"
+
+permissions:
+  contents: read
+
+jobs:
+  ephemeral-primary-restart:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: myaso_c4h_test
+          POSTGRES_PASSWORD: ephemeral-test-only
+          POSTGRES_DB: myaso_c4h_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U myaso_c4h_test -d myaso_c4h_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    env:
+      PGHOST: 127.0.0.1
+      PGPORT: "5432"
+      PGUSER: myaso_c4h_test
+      PGPASSWORD: ephemeral-test-only
+      PGDATABASE: myaso_c4h_test
+      MYASO_C4H_TEST_ONLY: "1"
+      C4H_TEST_POSTGRES_CONTAINER: ${{ job.services.postgres.id }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: PostgreSQL client and static contract
+        run: |
+          if ! command -v psql >/dev/null 2>&1; then
+            sudo apt-get update -qq
+            sudo apt-get install -y postgresql-client
+          fi
+          psql --version
+          docker --version
+          python -m py_compile scripts/verify_zone_primary_crash.py
+      - name: Install isolated PostgreSQL C4c C4d C4e authority
+        run: |
+          psql -X -v ON_ERROR_STOP=1 -f server/sql/001_zone_authority_postgres.sql
+          psql -X -v ON_ERROR_STOP=1 -f server/sql/002_fenced_world_mutations.sql
+          psql -X -v ON_ERROR_STOP=1 -f server/sql/003_nonzero_authority_ids.sql
+      - name: Prove exact ephemeral primary crash restart fencing
+        run: python scripts/verify_zone_primary_crash.py
