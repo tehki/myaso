@@ -719,6 +719,27 @@ function simulatePrediction(stepMs) {
   if (predictionStep % 2 === 0 && networkClient) {
     const outgoingTick = clientTick;
     markStaminaDenialSubmitted(outgoingTick, currentInput);
+    // M336: read-only, scenario-scoped input-plane provenance. A real DOM
+    // Space+LMB without authoritative action may mean no 30Hz input sampled
+    // during the genuine W3C hold. Record what the production sender actually
+    // submitted, with no replay, network payload or gameplay change.
+    if (acceptanceScenario === "uimultirecoveryspatial") {
+      const debug = window.__MYASO_ACCEPTANCE_STATE__;
+      if (debug) {
+        debug.lastSubmittedClientTick = outgoingTick;
+        debug.lastSubmittedAtEpochMs = Date.now();
+        if (currentInput.attack || currentInput.jump || currentInput.heavyAttack) {
+          debug.inputSubmissions ??= [];
+          debug.inputSubmissions.push({
+            clientTick: outgoingTick, epochMs: debug.lastSubmittedAtEpochMs,
+            attack: Boolean(currentInput.attack),
+            jump: Boolean(currentInput.jump),
+            heavyAttack: Boolean(currentInput.heavyAttack),
+          });
+          if (debug.inputSubmissions.length > 32) debug.inputSubmissions.shift();
+        }
+      }
+    }
     networkClient.sendInput({ tick: outgoingTick, ...currentInput });
     clientTick = (clientTick + 1) >>> 0;
     attackRequested = false;

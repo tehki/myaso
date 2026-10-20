@@ -11273,7 +11273,12 @@ async function runOnlineUiMultiRecoveryFfaFocusFlight(entries, spatial = false) 
           }));
         }
         await sleep(jumpInputDelayMs);
-        await performArenaPreAimedJumpAttackChord(jumpAttacker, 90);
+        // M336: on CI #39418435711 M145's genuine 1ms-synchronized
+        // Space+LMB was delivered to DOM but #1 never sent an authoritative
+        // action. Hold the *same* one real W3C chord through more 30Hz input
+        // sampling frames. M144 stays at 90ms; all original 60/70/150/200ms
+        // onset/recovery, damage and focus gates remain unchanged.
+        await performArenaPreAimedJumpAttackChord(jumpAttacker, spatial ? 180 : 90);
       })(),
       // R1 M144: light commits on release and its 185ms delayed jump now
       // correctly yields #3 recovery before #1 recovery. Observe long enough
@@ -13897,6 +13902,9 @@ async function readUiEvidence(session) {
       wheels: (state.wheels ?? []).slice(),
       acceptance: window.__MYASO_ACCEPTANCE_STATE__ ? {
         scenario: window.__MYASO_ACCEPTANCE_STATE__.scenario ?? '',
+        lastSubmittedClientTick: window.__MYASO_ACCEPTANCE_STATE__.lastSubmittedClientTick ?? null,
+        lastSubmittedAtEpochMs: window.__MYASO_ACCEPTANCE_STATE__.lastSubmittedAtEpochMs ?? null,
+        inputSubmissions: (window.__MYASO_ACCEPTANCE_STATE__.inputSubmissions ?? []).slice(-32).map((entry) => ({ ...entry })),
         playerNetId: Number(window.__MYASO_ACCEPTANCE_STATE__.playerNetId ?? 0),
         focusNetId: Number(window.__MYASO_ACCEPTANCE_STATE__.focusNetId ?? 0),
         serverTick: Number(window.__MYASO_ACCEPTANCE_STATE__.serverTick ?? 0),
