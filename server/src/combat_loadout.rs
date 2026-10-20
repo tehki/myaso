@@ -11,7 +11,9 @@
 
 use std::collections::BTreeSet;
 
+use crate::character_identity::{SessionIdentityRegistry, SessionLease};
 use crate::loot::{EquipmentSlot, Inventory, ItemKind, ItemStack, LootAuthority};
+use crate::simulation::{Action, World};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum MainHandCombatItem {
@@ -46,6 +48,9 @@ pub struct CombatLoadout {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CombatLoadoutError {
+    UnverifiedSession,
+    MissingWorldFighter,
+    DeadFighter,
     MissingInventory,
     InvalidEquippedItem(EquipmentSlot),
     DuplicateEquippedItem(u64),
@@ -53,7 +58,7 @@ pub enum CombatLoadoutError {
 
 /// Only for a server-resolved actor; callers MUST NOT accept a network-provided
 /// actor ID or read this outside the authoritative Loot/World tick boundary.
-pub fn resolve_server_owned_loadout(
+pub(crate) fn resolve_server_owned_loadout(
     loot: &LootAuthority,
     server_actor_id: u32,
 ) -> Result<CombatLoadout, CombatLoadoutError> {
@@ -61,6 +66,36 @@ pub fn resolve_server_owned_loadout(
         .inventory(server_actor_id)
         .ok_or(CombatLoadoutError::MissingInventory)?;
     resolve_inventory_loadout(inventory)
+}
+
+/// Trusted runtime-facing path: only an *exact active server-issued lease*
+/// can read an actor's gear. A dead/missing World actor cannot supply combat
+/// stats, even if Loot still contains a physical inventory.
+///
+/// Core must hold the World/Identity/Loot tick fence and guarantee that a
+/// disconnect parks the old character's inventory before reusing a numeric
+/// session ID. This check alone is NOT an ownership/connection transaction.
+pub fn resolve_verified_session_loadout(
+    identity: &SessionIdentityRegistry,
+    lease: SessionLease,
+    world: &World,
+    loot: &LootAuthority,
+) -> Result<CombatLoadout, CombatLoadoutError> {
+    identity
+        .resolve_session(lease)
+        .ok_or(CombatLoadoutError::UnverifiedSession)?;
+    let actor = lease.server_session();
+    let fighter = world
+        .fighter(actor)
+        .ok_or(CombatLoadoutError::MissingWorldFighter)?;
+    if fighter.action == Action::Dead
+        || !fighter.hp.is_finite()
+        || fighter.hp <= 0.0
+        || loot.is_dead(actor)
+    {
+        return Err(CombatLoadoutError::DeadFighter);
+    }
+    resolve_server_owned_loadout(loot, actor)
 }
 
 fn checked_slot<'a>(
@@ -182,6 +217,63 @@ mod tests {
         assert_eq!(after.main_hand, MainHandCombatItem::Unarmed);
         assert_eq!(after.off_hand, OffHandCombatItem::WoodenShield(shield));
         assert_eq!(after.body, BodyCombatArmor::ChainmailArmor(armor));
+    }
+
+    #[test]
+    fn stale_session_missing_fighter_and_death_never_expose_equipped_gear() {
+        use crate::character_identity::CharacterId;
+        use crate::zone::ZoneId;
+
+        let mut world = World::new(800.0, 600.0);
+        assert!(world.add_player_at(1, 200.0, 200.0, 0.0));
+        let mut loot = LootAuthority::new();
+        loot.register(1).unwrap();
+        let sword = loot.grant(1, ItemKind::IronSword, 1).unwrap();
+        loot.equip(1, sword, EquipmentSlot::MainHand).unwrap();
+
+        let mut identity = SessionIdentityRegistry::new();
+        let character = CharacterId::new(23).unwrap();
+        let current = SessionLease::new(1, 1).unwrap();
+        let stale = SessionLease::new(1, 2).unwrap();
+        identity.bind_verified(current, character).unwrap();
+
+        assert_eq!(
+            resolve_verified_session_loadout(&identity, current, &world, &loot)
+                .unwrap()
+                .main_hand,
+            MainHandCombatItem::IronSword(sword)
+        );
+        assert_eq!(
+            resolve_verified_session_loadout(&identity, stale, &world, &loot),
+            Err(CombatLoadoutError::UnverifiedSession)
+        );
+
+        assert!(world.remove_player(1));
+        assert_eq!(
+            resolve_verified_session_loadout(&identity, current, &world, &loot),
+            Err(CombatLoadoutError::MissingWorldFighter)
+        );
+        assert!(world.add_player_at(1, 200.0, 200.0, 0.0));
+
+        let mut dead_fighter = world.fighter(1).unwrap().clone();
+        dead_fighter.action = Action::Dead;
+        loot.death(1, &dead_fighter, ZoneId::Moonvale, 10)
+            .unwrap();
+        assert_eq!(
+            resolve_verified_session_loadout(&identity, current, &world, &loot),
+            Err(CombatLoadoutError::DeadFighter)
+        );
+
+        assert_eq!(identity.release_session(current), Some(character));
+        identity.bind_verified(stale, character).unwrap();
+        assert_eq!(
+            resolve_verified_session_loadout(&identity, current, &world, &loot),
+            Err(CombatLoadoutError::UnverifiedSession)
+        );
+        assert_eq!(
+            resolve_verified_session_loadout(&identity, stale, &world, &loot),
+            Err(CombatLoadoutError::DeadFighter)
+        );
     }
 
     #[test]
