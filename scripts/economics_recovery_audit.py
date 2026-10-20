@@ -156,8 +156,24 @@ def _audit(db: sqlite3.Connection) -> AuditReport:
         _reject("Admission mutation revision chain is incomplete")
     if len({row[1] for row in mutations}) != len(mutations):
         _reject("Duplicate admission mutation operation IDs")
+    latest_cap_change = None
+    seen_issued = set()
     for revision, operation_id, kind, target, epoch in mutations:
-        if kind == "session_revoke":
+        if kind == "session_issue":
+            if epoch <= 0 or (target, epoch) in seen_issued:
+                _reject("Duplicate or invalid fixture session issue")
+            seen_issued.add((target, epoch))
+            row = db.execute(
+                "SELECT state FROM admitted_sessions WHERE player_id=? AND epoch=?",
+                (target, epoch),
+            ).fetchone()
+            if row is None or row[0] not in ("active", "revoked"):
+                _reject("Committed session issue lacks admitted epoch")
+        elif kind == "title_cap_change":
+            if epoch != 0 or target <= 0:
+                _reject("Malformed title cap policy mutation")
+            latest_cap_change = target
+        elif kind == "session_revoke":
             recorded = db.execute(
                 "SELECT state FROM admitted_sessions WHERE player_id=? AND epoch=?",
                 (target, epoch),
@@ -179,6 +195,8 @@ def _audit(db: sqlite3.Connection) -> AuditReport:
                 _reject("Committed seller-consent revocation missing")
         else:
             _reject("Unknown mutation kind")
+    if latest_cap_change is not None and latest_cap_change != cap:
+        _reject("Current property cap disagrees with last committed mutation")
 
     receipts = db.execute(
         "SELECT op_id,payload,buyer_id,sequence,receipt"
