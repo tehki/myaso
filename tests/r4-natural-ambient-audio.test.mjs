@@ -271,3 +271,19 @@ test("R4 per-recording gain trims stabilize quiet blade variants and tame metal 
   assert.ok(.55 * .64 * 8 * 10 ** (-24.3 / 20) < 1);
   audio.dispose();
 });
+
+test("R4 sound-only audition gates recorded playback on 26 decoded OGGs", () => {
+  const html = readFileSync(new URL("../web/audio/audition.html", import.meta.url), "utf8");
+  assert.match(html, /createGameAudio, installGameAudioControls/);
+  assert.match(html, /audio\.loadedFoleyCount\(\)/);
+  assert.match(html, /if \(count !== 26\) return/);
+  assert.match(html, /button\.disabled = true/);
+  assert.match(html, /button\.disabled = false/);
+  assert.match(html, /audio\.play\(cue, \{ pan: Number\(panSlider\.value\) \/ 100 \}\)/);
+  assert.match(html, /createGameAudio\(\{ storage: null \}\)/,
+    "manual audition must not alter gameplay audio preferences");
+  assert.match(html, /window\.addEventListener\("pagehide"/);
+  assert.doesNotMatch(html, /<script[^>]+src=|\/web\/(?:game|online-game)\.mjs/);
+  const harness = readFileSync(new URL("../scripts/r4_audio_browser_acceptance.mjs", import.meta.url), "utf8");
+  assert.match(harness, /R4_AUDITION/);
+});

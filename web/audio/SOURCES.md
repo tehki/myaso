@@ -40,3 +40,33 @@ not replace subjective listening tests for material character or final mix.
 - **Ambient music:** quiet background atmosphere, not synchronized to fights and never a loud combat-theme interruption. A dedicated Music on/off control is opt-in; a separate level defaults to 35% on a 30%-headroom bus. The page and network simulation never force audio autoplay.
 - **Space:** positional nearby remote cues, distance reduction, 1-cue-per-action onset, and no distant sounds. Avoid needless sound overlap.
 - **Future:** swap region-appropriate biome/weather loops at the music boundary and add in-world distance-reduced NPC, environment and inventory sounds without changing authoritative game mechanics.
+
+## Sound-only listening review (no playable game)
+
+The standalone `web/audio/audition.html` uses **the same
+`src/browser/game-audio.mjs` mixer as gameplay**, including measured CC0
+recording trims, randomized playback speed, pan, game effects slider and
+independent low-level ambient music. There is no combat simulation or game
+connection on this page. Effects stay disabled until all 26 local OGG files
+decode; the page never silently substitutes synthetic sounds during review.
+
+From the repository root on Windows, serve the current Sound branch locally:
+
+```powershell
+py -m http.server 8000
+```
+
+Then open `http://localhost:8000/web/audio/audition.html`. Click **Prepare 26
+recordings**, wait for **26 / 26 decoded**, and use the cue buttons. Try each
+cue a few times to hear variant loudness, then turn on the independent ambient
+music and compare attacks and blocks over it. Pan the sound left/right to
+audition remote spatial placement. Use comfortable headphone levels.
+
+Before Sound R4 can be called *subjectively accepted*, a human listener
+should verify that light/heavy blades are distinguishable and convincingly
+physical, parry/block metal is not painfully sharp, footsteps and cloth
+movement sound proportional, death and damage are readable, and music remains
+background atmosphere without dominating combat. The listening reviewer
+should explicitly report approval or concrete changes needed. Native CI
+automatically tests correct decoding/playback/UI but does not claim human
+listening approval.

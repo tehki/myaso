@@ -232,6 +232,29 @@ async function run(browser, port) {
     console.log("R4_NATIVE_AUDIO " + JSON.stringify({ browser, decoded: loaded, ...result, playbackTime }));
     // Release native media/context resources before closing browser.
     await script("window.__r4Audio.dispose(); return true;");
+
+    // The non-gameplay Sound Audition page is the manual-listening artifact:
+    // confirm genuine user activation, full recorded loading and cue controls
+    // in both native browsers, without opening the playable game.
+    await command(base, "POST", prefix + "/url", { url: site + "/web/audio/audition.html" });
+    assert.equal(await script('return document.querySelector("[data-cue=light]").disabled'), true,
+      browser + " sound audition permits an unqualified synthetic cue");
+    await click("#prepare");
+    let auditionLoaded = false;
+    for (let n = 0; n < 120; n++) {
+      auditionLoaded = await script('return document.querySelector("#counter").textContent === "26 / 26 decoded"');
+      if (auditionLoaded) break;
+      await delay(100);
+    }
+    assert.equal(auditionLoaded, true, browser + " sound audition did not decode all 26 OGGs");
+    assert.equal(await script('return document.querySelector("[data-cue=light]").disabled'), false);
+    await click("[data-cue=light]");
+    const auditionStatus = await script('return document.querySelector("#status").textContent');
+    assert.match(auditionStatus, /Playing Light \(recorded variant\)/);
+    await click("#music-toggle");
+    assert.equal(await script('return document.querySelector("#music-toggle").getAttribute("aria-pressed")'), "true");
+    console.log("R4_AUDITION " + JSON.stringify({ browser, decoded: 26,
+      recordedCuePlayed: true, independentMusicEnabled: true, noGameplay: true }));
   } finally {
     if (session) await command(base, "DELETE", "/session/" + session).catch(() => {});
     child.kill("SIGTERM");
