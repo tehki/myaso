@@ -21,8 +21,10 @@ was successful but its acknowledgment was lost.
 ## C4b implementation
 
 `server/src/durable_zone_authority.rs` uses a dedicated, server-provisioned,
-private **local filesystem** directory and a long-held `File::try_lock()`
-advisory lock to serialize **cooperating local processes**. The lock is
+private **local filesystem** directory and a long-held POSIX `flock`
+advisory lock to serialize **cooperating local processes**. The narrow Unix
+adapter preserves the server's Rust 1.88 minimum supported version; on other
+operating systems this prototype refuses to acquire an authority lock. The lock is
 explicitly released on normal shutdown and released by the operating system
 upon process termination. An independently opened second handle or separate
 test process fails closed with `Busy` while a writer is present.
