@@ -4,7 +4,7 @@ import { readFile, stat } from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
 import { setTimeout as sleep } from "node:timers/promises";
-import { COMBAT_ACTION, FFA_KILL_TARGET } from "../src/browser/combat-readability.mjs";
+import { COMBAT_ACTION, FFA_KILL_TARGET, fighterThreatPhaseState } from "../src/browser/combat-readability.mjs";
 import { COMBAT } from "../src/combat/model.mjs";
 import { planM198GuardBreakW3cExchange } from "./m198-guardbreak-input-plan.mjs";
 import { measureM200WheelFeedbackLatency } from "./m200-feedback-latency.mjs";
@@ -10383,8 +10383,11 @@ async function runOnlineUiMultiThreatFlight(entries, requireSecondary = false, r
           if (!secondaryPhases.has("WINDUP") || !secondaryPhases.has("STRIKE")) {
             throw new Error(`M59 did not observe authoritative secondary WINDUP and STRIKE phases: ${JSON.stringify(states)}`);
           }
+          // A held LMB now exposes genuine HEAVY WINDUP before early pointerUP
+          // releases a light WINDUP. Both are canonical windup phases, not
+          // an active secondary threat outranking a winding-up primary.
           const inconsistentWindup = phaseEvents.some((event) =>
-            event.state === "windup" && event.secondaryPhase !== "WINDUP");
+            event.state === "windup" && fighterThreatPhaseState(event.secondaryPhase) !== "windup");
           if (inconsistentWindup) {
             throw new Error(`M59 secondary phase violated active-before-windup threat priority: ${JSON.stringify(states)}`);
           }
