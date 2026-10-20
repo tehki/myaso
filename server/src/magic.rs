@@ -260,9 +260,7 @@ impl MagicAuthority {
         y: f32,
         facing: f32,
     ) -> Result<(), MagicError> {
-        if !self.knows_rune(character, Rune::Fire)
-            || !self.knows_spell(character, Spell::Ember)
-        {
+        if !self.knows_rune(character, Rune::Fire) || !self.knows_spell(character, Spell::Ember) {
             return Err(MagicError::PrerequisiteMissing);
         }
         let intent = EmberEffectIntent {
@@ -556,7 +554,11 @@ impl MagicAuthority {
                 origin_y_bits: reader.u32()?,
                 facing_bits: reader.u32()?,
             };
-            if !intent.valid() || pending_ember.insert((character, sequence), intent).is_some() {
+            if !intent.valid()
+                || pending_ember
+                    .insert((character, sequence), intent)
+                    .is_some()
+            {
                 return Err(MagicSnapshotError::Corrupt);
             }
         }
@@ -702,7 +704,11 @@ mod tests {
         magic
             .grant_lesson(award(2, hero, Lesson::Spell(Spell::Ember)))
             .unwrap();
-        for (sequence, x, heading) in [(0, 200.0, 0.0), (1, f32::NAN, 0.0), (1, 200.0, f32::INFINITY)] {
+        for (sequence, x, heading) in [
+            (0, 200.0, 0.0),
+            (1, f32::NAN, 0.0),
+            (1, 200.0, f32::INFINITY),
+        ] {
             assert_eq!(
                 magic.stage_ember_intent(hero, sequence, ZoneId::Moonvale, x, 200.0, heading),
                 Err(MagicError::InvalidEffectIntent)

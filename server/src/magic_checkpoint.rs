@@ -78,12 +78,31 @@ impl From<TeacherError> for JointCheckpointError {
     }
 }
 
+/// Ensure each pending Ember intent is backed by a committed operation in
+/// the same loot state. A forged or partially persisted intent must never
+/// become eligible for future Combat resolution after recovery.
+fn verify_intent_watermarks(
+    loot: &LootAuthority,
+    magic: &MagicAuthority,
+) -> Result<(), JointCheckpointError> {
+    for intent in magic.pending_ember_intents() {
+        if loot
+            .committed_operation_sequence(intent.character)
+            .is_none_or(|committed| committed < intent.sequence)
+        {
+            return Err(JointCheckpointError::Corrupt);
+        }
+    }
+    Ok(())
+}
+
 pub(crate) fn bundle(
     loot: &LootAuthority,
     identity: &SessionIdentityRegistry,
     magic: &MagicAuthority,
 ) -> Result<Vec<u8>, JointCheckpointError> {
     let projected = quiescent_verified(loot.export_state()?, identity)?;
+    verify_intent_watermarks(&projected, magic)?;
     let loot_bytes = encode(&projected.export_state()?)?;
     let magic_bytes = magic.encode_progression()?;
     if loot_bytes.len() > MAX_FILE_BYTES || magic_bytes.len() > MAGIC_MAX_BYTES {
@@ -127,6 +146,7 @@ fn unbundle(bytes: &[u8]) -> Result<(LootAuthority, MagicAuthority), JointCheckp
     let loot_end = 16 + loot_length;
     let loot = LootAuthority::restore_state(decode(&bytes[16..loot_end])?)?;
     let magic = MagicAuthority::decode_progression(&bytes[loot_end..payload_len])?;
+    verify_intent_watermarks(&loot, &magic)?;
     Ok((loot, magic))
 }
 
@@ -472,6 +492,24 @@ mod tests {
         assert!(!magic.knows_rune(hero, Rune::Fire));
         assert!(!bad.exists());
         assert!(!path.exists());
+    }
+
+    #[test]
+    fn unmatched_ember_intent_cannot_enter_combined_checkpoint() {
+        let (loot, mut magic, identity, hero) = fixtures();
+        magic
+            .grant_lesson(award(1, hero, Lesson::Rune(Rune::Fire)))
+            .unwrap();
+        magic
+            .grant_lesson(award(2, hero, Lesson::Spell(Spell::Ember)))
+            .unwrap();
+        magic
+            .stage_ember_intent(hero, 8, ZoneId::Moonvale, 200.0, 200.0, 0.0)
+            .unwrap();
+        assert!(matches!(
+            bundle(&loot, &identity, &magic),
+            Err(JointCheckpointError::Corrupt)
+        ));
     }
 
     #[test]
