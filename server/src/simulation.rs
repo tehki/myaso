@@ -1758,20 +1758,40 @@ mod r2_combat_control_tests {
     #[test]
     fn same_tick_charge_release_keeps_newest_light_heavy_or_cancel_mode() {
         for (release, expected) in [
-            (InputIntent { attack: true, ..InputIntent::default() }, Action::AttackWindup),
-            (InputIntent { heavy_attack: true, ..InputIntent::default() }, Action::HeavyAttackWindup),
+            (
+                InputIntent {
+                    attack: true,
+                    ..InputIntent::default()
+                },
+                Action::AttackWindup,
+            ),
+            (
+                InputIntent {
+                    heavy_attack: true,
+                    ..InputIntent::default()
+                },
+                Action::HeavyAttackWindup,
+            ),
             (InputIntent::default(), Action::Idle),
         ] {
             let mut world = World::new(800.0, 600.0);
             assert!(world.add_player_at(1, 250.0, 300.0, 0.0));
-            assert!(world.set_input(1, InputIntent {
-                attack: true, heavy_attack: true, ..InputIntent::default()
-            }));
+            assert!(world.set_input(
+                1,
+                InputIntent {
+                    attack: true,
+                    heavy_attack: true,
+                    ..InputIntent::default()
+                }
+            ));
             // Both WebTransport datagrams arrived before one 60Hz world.step.
             assert!(world.set_input(1, release));
             world.step();
-            assert_eq!(world.fighter(1).unwrap().action, expected,
-                "latest release intent must beat pending held bits");
+            assert_eq!(
+                world.fighter(1).unwrap().action,
+                expected,
+                "latest release intent must beat pending held bits"
+            );
         }
     }
 
@@ -1779,12 +1799,23 @@ mod r2_combat_control_tests {
     fn releasing_after_one_server_charge_tick_commits_exactly_one_light() {
         let mut world = World::new(800.0, 600.0);
         world.add_player_at(1, 250.0, 300.0, 0.0);
-        world.set_input(1, InputIntent {
-            attack: true, heavy_attack: true, ..InputIntent::default()
-        });
+        world.set_input(
+            1,
+            InputIntent {
+                attack: true,
+                heavy_attack: true,
+                ..InputIntent::default()
+            },
+        );
         world.step();
         assert_eq!(world.fighter(1).unwrap().action, Action::HeavyAttackWindup);
-        world.set_input(1, InputIntent { attack: true, ..InputIntent::default() });
+        world.set_input(
+            1,
+            InputIntent {
+                attack: true,
+                ..InputIntent::default()
+            },
+        );
         world.step();
         assert_eq!(world.fighter(1).unwrap().action, Action::AttackWindup);
         world.set_input(1, InputIntent::default());
