@@ -876,10 +876,19 @@ fn begin_requested_action(
             return;
         }
         fighter.charging_heavy = false;
-        if input.heavy_attack && !input.attack {
-            return; // Activation waits for the authoritative 320ms deadline.
+        // An untrusted client may claim READY before this server has counted
+        // 320ms of continuous hold. Never extend that early release into a
+        // delayed heavy hit: it resolves as the same light/running-light that
+        // an honest client sends on release before READY.
+        if input.heavy_attack
+            && !input.attack
+            && fighter.action_elapsed_ms + EPSILON >= HEAVY_ATTACK_WINDUP_MS
+        {
+            return; // READY: advance_action commits the charged hit this tick.
         }
-        if input.attack && !input.heavy_attack {
+        if (input.attack && !input.heavy_attack)
+            || (input.heavy_attack && !input.attack)
+        {
             if input.jump
                 && spend_stamina(
                     now_ms,
@@ -2005,6 +2014,57 @@ mod r2_combat_control_tests {
             running.fighter(2).unwrap().action,
             Action::RunningAttackWindup
         );
+    }
+
+    #[test]
+    fn fabricated_early_heavy_release_is_only_light_or_running_light() {
+        for (running, expected) in [
+            (false, Action::AttackWindup),
+            (true, Action::RunningAttackWindup),
+        ] {
+            let mut world = World::new(800.0, 600.0);
+            world.add_player_at(1, 250.0, 300.0, 0.0);
+            let move_x = if running { 1.0 } else { 0.0 };
+            world.set_input(
+                1,
+                InputIntent {
+                    attack: true,
+                    heavy_attack: true,
+                    run: running,
+                    move_x,
+                    ..InputIntent::default()
+                },
+            );
+            for _ in 0..5 {
+                world.step();
+            }
+            assert!(world.fighter(1).unwrap().charging_heavy);
+            assert!(
+                world.fighter(1).unwrap().action_elapsed_ms < HEAVY_ATTACK_WINDUP_MS
+            );
+
+            // Malicious or reordered release claims a heavy even though this
+            // authoritative hold was only five 60Hz ticks long.
+            world.set_input(
+                1,
+                InputIntent {
+                    heavy_attack: true,
+                    run: running,
+                    move_x,
+                    ..InputIntent::default()
+                },
+            );
+            world.step();
+            assert_eq!(
+                world.fighter(1).unwrap().action,
+                expected,
+                "a forged READY flag cannot grant a delayed heavy strike"
+            );
+            assert!(!world.fighter(1).unwrap().charging_heavy);
+            world.set_input(1, InputIntent::default());
+            world.step();
+            assert_eq!(world.fighter(1).unwrap().action, expected);
+        }
     }
 
     #[test]
