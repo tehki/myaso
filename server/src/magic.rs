@@ -216,7 +216,6 @@ const fn spell_plan(spell: Spell) -> SpellPlan {
     }
 }
 
-
 const PROGRESSION_MAGIC: &[u8; 8] = b"MYMAG001";
 const ALL_RUNES: [Rune; 6] = [
     Rune::Fire,
@@ -365,7 +364,11 @@ impl MagicAuthority {
             if spell_bits & 1 != 0 {
                 spells.insert(Spell::Ember);
             }
-            let knowledge = CharacterMagic { runes, spells, mana };
+            let knowledge = CharacterMagic {
+                runes,
+                spells,
+                mana,
+            };
             if characters.insert(character, knowledge).is_some() {
                 return Err(MagicSnapshotError::Corrupt);
             }

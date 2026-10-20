@@ -11,7 +11,9 @@ use std::path::Path;
 
 use crate::character_identity::{SessionIdentityRegistry, SessionLease};
 use crate::loot::{LootAuthority, LootError};
-use crate::loot_persistence::{atomic_write, checksum, decode, encode, CheckpointError, MAX_FILE_BYTES};
+use crate::loot_persistence::{
+    atomic_write, checksum, decode, encode, CheckpointError, MAX_FILE_BYTES,
+};
 use crate::loot_transaction::{quiescent_verified, TransactionError};
 use crate::magic::{LessonAward, MagicAuthority, MagicError, MagicSnapshotError};
 
@@ -192,7 +194,12 @@ mod tests {
         }
     }
 
-    fn fixtures() -> (LootAuthority, MagicAuthority, SessionIdentityRegistry, CharacterId) {
+    fn fixtures() -> (
+        LootAuthority,
+        MagicAuthority,
+        SessionIdentityRegistry,
+        CharacterId,
+    ) {
         let mut loot = LootAuthority::new();
         let magic = MagicAuthority::new();
         let mut identity = SessionIdentityRegistry::new();
@@ -247,7 +254,10 @@ mod tests {
                 .id,
             book
         );
-        assert_eq!(identity.release_session(SessionLease::new(1, 1).unwrap()), Some(hero));
+        assert_eq!(
+            identity.release_session(SessionLease::new(1, 1).unwrap()),
+            Some(hero)
+        );
         identity
             .bind_verified(SessionLease::new(2, 1).unwrap(), hero)
             .unwrap();
@@ -282,7 +292,10 @@ mod tests {
             SessionLease::new(9, 1).unwrap(),
             award(1, hero, Lesson::Rune(Rune::Fire)),
         );
-        assert!(matches!(spoof, Err(JointCheckpointError::UnverifiedCharacter)));
+        assert!(matches!(
+            spoof,
+            Err(JointCheckpointError::UnverifiedCharacter)
+        ));
         assert!(!magic.knows_rune(hero, Rune::Fire));
         let bad = path.with_extension("missing-parent").join("world.bin");
         let failure = transact_lesson(
@@ -316,11 +329,18 @@ mod tests {
         )
         .unwrap();
         let mut bytes = fs::read(&path).unwrap();
-        bytes[bytes.len() - 13] ^= 0x41;
+        let corrupt_index = bytes.len() - 13;
+        bytes[corrupt_index] ^= 0x41;
         fs::write(&path, &bytes).unwrap();
-        assert!(matches!(load_joint(&path), Err(JointCheckpointError::Corrupt)));
+        assert!(matches!(
+            load_joint(&path),
+            Err(JointCheckpointError::Corrupt)
+        ));
         fs::write(&path, b"MYASOL03").unwrap();
-        assert!(matches!(load_joint(&path), Err(JointCheckpointError::Corrupt)));
+        assert!(matches!(
+            load_joint(&path),
+            Err(JointCheckpointError::Corrupt)
+        ));
         let _ = fs::remove_file(&path);
     }
 }
