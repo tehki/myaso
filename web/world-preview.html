@@ -40,6 +40,9 @@ kbd{border-radius:4px;border:1px solid #677354;background:#303a2d;color:#fff2d2;
   border:1px solid #6c604b;border-radius:6px}
 #wayfinding-map[hidden]{display:none}
 .wayfinding-note{font-size:12px;color:#afaa95;margin-top:5px}
+#trail-progress{color:#d1d7b9;font-size:12px;margin-top:7px;min-height:17px}
+#trail-progress-bar{display:block;width:100%;max-width:248px;height:7px;margin:6px 0 0;accent-color:#ebc77e}
+#trail-progress-bar[hidden]{display:none}
 </style></head><body>
 <header><div><h1>⚔️ Moonvale — World & Buildings v1.0</h1>
 <div class="sub">A fixed medieval world, with a separate, deliberately larger tavern interior</div></div>
@@ -70,7 +73,9 @@ The geography, town names, buildings and roads are fixed and identical for all p
 <div id="expedition-notice" role="status" aria-live="polite" hidden></div>
 <div class="wayfinding-panel" aria-label="Traveler's compass and sketch">
 <div id="wayfinding-compass" role="status">Choose an expedition to see a bearing.</div>
-<div class="wayfinding-note">Straight-line compass only. When a surveyed trail is shown, it connects previous and next milestones—not your current position. Rejoin on foot. Press <kbd>M</kbd> to toggle the sketch.</div>
+<div class="wayfinding-note">Straight-line compass only. Surveyed trails connect authored milestones, not your current position. Nearness does not guarantee a safe rejoin. Press <kbd>M</kbd> to toggle the sketch.</div>
+<div id="trail-progress" role="status" aria-live="off">No active surveyed trail.</div>
+<progress id="trail-progress-bar" max="100" value="0" aria-label="Nearest point along selected milestone trail" hidden></progress>
 <canvas id="wayfinding-map" width="248" height="248" aria-label="Moonvale sketch map, white player and amber destination" hidden></canvas>
 </div>
 </section>
@@ -84,6 +89,7 @@ import { MOONVALE_EXPEDITIONS, createLocalExpeditionState, chooseLocalExpedition
   localExpeditionProgress, advanceLocalExpedition } from "../src/world/local-expeditions.mjs";
 import { localWayfindingHint, drawLocalWayfindingSketch } from "../src/world/local-wayfinding.mjs";
 import { certifiedTrailForNext } from "../src/world/local-trails.mjs";
+import { localTrailPosition } from "../src/world/local-trail-progress.mjs";
 import { MOONVALE_FIELD_SITES, createLocalFieldNotebook, nearbyLocalFieldSite,
   observeLocalFieldSite, localFieldSurveyProgress } from "../src/world/field-survey.mjs";
 const canvas=document.querySelector("#arena");
@@ -115,6 +121,8 @@ const expeditionNotice=document.querySelector("#expedition-notice");
 const wayfindingCompass=document.querySelector("#wayfinding-compass");
 const wayfindingMap=document.querySelector("#wayfinding-map");
 const wayfindingContext=wayfindingMap.getContext("2d",{alpha:false});
+const trailProgress=document.querySelector("#trail-progress");
+const trailProgressBar=document.querySelector("#trail-progress-bar");
 let wayfindingVisible=false;
 let nextWayfindingAt=0;
 function refreshWayfinding(now){
@@ -126,6 +134,17 @@ function refreshWayfinding(now){
     ? "Bearing "+hint.direction+" · "+Math.round(hint.distance)+" units to "+hint.targetName
       +(trail?" · surveyed trail: "+trail.points.length+" waypoints":" · direct bearing only")
     : "No active overworld expedition bearing.";
+  const position=localTrailPosition(expeditionState,mapId,player.x,player.y);
+  trailProgressBar.hidden=!position;
+  if(position){
+    trailProgressBar.value=Math.round(position.completionFraction*100);
+    trailProgress.textContent=position.nearTrail
+      ? "Near surveyed trail · "+Math.round(position.remainingDistance)+" units to next milestone along corridor"
+      : "Off trail by "+Math.round(position.offTrailDistance)+" units · nearest corridor point has "
+        +Math.round(position.remainingDistance)+" units remaining. Return via walkable roads.";
+  }else{
+    trailProgress.textContent="No active surveyed trail.";
+  }
   wayfindingMap.hidden=!wayfindingVisible || mapId!==MAP_IDS.overworld;
   if(!wayfindingMap.hidden){
     drawLocalWayfindingSketch(wayfindingContext,mapId,player.x,player.y,expeditionState);

@@ -195,6 +195,11 @@ jobs:
           node scripts/generate-world-trails.mjs --check
           node --test tests/world-certified-trails.test.mjs
 
+      - name: Validate D10 passive trail progress and off-route guidance
+        run: |
+          node --check src/world/local-trail-progress.mjs
+          node --test tests/world-trail-progress.test.mjs
+
       - name: Validate M188 repeated real heavy counterplay windows
         run: |
           # Three fresh Chrome/Firefox sessions for each real defensive read.
