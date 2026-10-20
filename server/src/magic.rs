@@ -140,10 +140,10 @@ impl MagicAuthority {
         let entry = self.characters.entry(award.character).or_default();
         match award.lesson {
             Lesson::Rune(rune) => {
-                entry.runes.insert(rune);
-                if entry.mana == 0 {
+                if entry.runes.is_empty() {
                     entry.mana = AWAKENED_MANA;
                 }
+                entry.runes.insert(rune);
             }
             Lesson::Spell(spell) => {
                 entry.spells.insert(spell);
@@ -268,6 +268,21 @@ mod tests {
             .grant_lesson(award(1, hero, Lesson::Spell(Spell::Ember)))
             .unwrap();
         assert!(magic.knows_spell(hero, Spell::Ember));
+    }
+
+    #[test]
+    fn learning_another_rune_never_refills_depleted_mana() {
+        let mut magic = MagicAuthority::new();
+        let hero = character(99);
+        magic
+            .grant_lesson(award(1, hero, Lesson::Rune(Rune::Fire)))
+            .unwrap();
+        magic.characters.get_mut(&hero).unwrap().mana = 0;
+        magic
+            .grant_lesson(award(2, hero, Lesson::Rune(Rune::Water)))
+            .unwrap();
+        assert_eq!(magic.mana(hero), 0);
+        assert!(magic.knows_rune(hero, Rune::Water));
     }
 
     #[test]
