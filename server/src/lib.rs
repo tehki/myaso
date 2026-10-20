@@ -9,6 +9,7 @@ pub mod elemental_physics;
 pub mod kill_event;
 pub mod magic_fx_delivery;
 pub mod magic_fx_events;
+pub mod magic_fx_handoff;
 pub mod magic_fx_spatial;
 pub mod reliable;
 pub mod simulation;
