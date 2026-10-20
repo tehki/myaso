@@ -36,6 +36,10 @@ pub enum DurableAuthorityError {
     Poisoned,
 }
 
+impl From<io::Error> for DurableAuthorityError {
+    fn from(error: io::Error) -> Self { Self::Io(error) }
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 #[repr(u8)]
 enum Action {
@@ -126,7 +130,8 @@ impl Event {
         bytes[60..68].copy_from_slice(&self.target_worker.map_or(0, WorkerId::get).to_le_bytes());
         bytes[68..76].copy_from_slice(&self.target_zone.map_or(0, ZoneKey::get).to_le_bytes());
         bytes[76..92].copy_from_slice(&self.operation.map_or(0, NonZeroU128::get).to_le_bytes());
-        bytes[92..96].copy_from_slice(&fnv32(&bytes[..92]).to_le_bytes());
+        let checksum = fnv32(&bytes[..92]);
+        bytes[92..96].copy_from_slice(&checksum.to_le_bytes());
         bytes
     }
 
@@ -285,10 +290,10 @@ impl DurableZoneAuthority {
         let lock = lock_options.open(root.join(".zone-authority.lock"))?;
         match lock.try_lock() {
             Ok(()) => {}
-            Err(e) if e.kind() == io::ErrorKind::WouldBlock => {
+            Err(std::fs::TryLockError::WouldBlock) => {
                 return Err(DurableAuthorityError::Busy);
             }
-            Err(e) => return Err(DurableAuthorityError::Io(e)),
+            Err(e) => return Err(DurableAuthorityError::Io(e.into())),
         }
         let mut commits = Vec::new();
         for entry in fs::read_dir(&root)? {
