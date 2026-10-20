@@ -319,23 +319,21 @@ mod tests {
             zones: &fixture.zones,
             world: &fixture.world,
         };
-        let proposal =
-            preview_ember_target_for_completed_tick(context(), fixture.world.tick)
-                .unwrap()
-                .unwrap();
+        let proposal = preview_ember_target_for_completed_tick(context(), fixture.world.tick)
+            .unwrap()
+            .unwrap();
         assert_eq!(proposal.world_tick, fixture.world.tick);
         assert_eq!(proposal.target_net_id, 3);
         assert_eq!(
-            revalidate_ember_target_for_completed_tick(
-                context(),
-                fixture.world.tick,
-                proposal,
-            ),
+            revalidate_ember_target_for_completed_tick(context(), fixture.world.tick, proposal,),
             Ok(())
         );
         assert_eq!(fixture.world.fighter(3).unwrap().hp, hp_before);
         assert_eq!(fixture.magic.mana(fixture.character), mana_before);
-        assert_eq!(fixture.magic.pending_ember_intents().count(), pending_before);
+        assert_eq!(
+            fixture.magic.pending_ember_intents().count(),
+            pending_before
+        );
         assert_eq!(
             fixture.loot.committed_operation_sequence(fixture.character),
             Some(10)
