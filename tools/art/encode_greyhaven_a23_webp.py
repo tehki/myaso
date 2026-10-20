@@ -83,6 +83,23 @@ from PIL import ImageStat
 difference=ImageChops.difference(ref.convert("RGB"),composed.convert("RGB"))
 stats=ImageStat.Stat(difference)
 mae=sum(stats.mean)/len(stats.mean)
+# Compare only pixels covered by the rendered A2.3 world. The full A2.2
+# baseline includes an opaque blue-gray sky while the two layers preserve
+# transparent sky, so an all-canvas error would overstate art mismatch.
+foreground_mask=composed.getchannel("A")
+foreground_mae=sum(ImageStat.Stat(difference,mask=foreground_mask).mean)/3
+# Checkerboard is a reviewer convenience, never a game sprite/backplate.
+checker=Image.new("RGBA",expected,(110,110,110,255))
+from PIL import ImageDraw
+draw=ImageDraw.Draw(checker)
+for y in range(0,expected[1],32):
+    for x in range(0,expected[0],32):
+        if ((x//32)+(y//32))%2==0:
+            draw.rectangle((x,y,min(expected[0]-1,x+31),
+                            min(expected[1]-1,y+31)),fill=(155,155,155,255))
+checker.alpha_composite(composed)
+checker_path=args.in_dir/"greyhaven_a23_checkerboard_preview.png"
+checker.convert("RGB").save(checker_path)
 # This is a straightforward alpha composite for inspection, NOT a proof that
 # the depth-sorted game renderer or its cast shadows produce the same pixels.
 report={
@@ -98,6 +115,8 @@ report={
  "performanceFPSMeasured":False,
  "layers":result,
  "compositePreview":composite_path.name,
+ "checkerboardPreview":checker_path.name,
+ "compositeForegroundRGBMeanAbsoluteErrorVsFullRender":round(foreground_mae,3),
  "compositeRGBMeanAbsoluteErrorVsFullRender":round(mae,3),
  "compositingCaveat":"shadow and occlusion differences remain; layer stacking is not pixel-perfect or browser-validated",
  "sourceScenePreserved":True
