@@ -14,7 +14,7 @@ const webps=JSON.parse(readFileSync(new URL(
 
 test("Blacksmith forge is next to anvil, not across the entrance path",()=>{
   assert.match(build, /"Blacksmith \/ open forge hearth",\(9\.3,6\.05,\.62\)/);
-  assert.match(build, /"Blacksmith \/ orange embers",\(9\.3,5\.70,\.92\)/);
+  assert.match(build, /"Blacksmith \/ orange embers",\(9\.3,5\.54,\.92\)/);
   assert.match(build, /"Blacksmith \/ anvil",\(10\.7,6\.4,\.92\)/);
   assert.match(renderScript, /assert not intersects\(forge,entrance_lane\)/);
   assert.match(renderScript, /assert not intersects\(anvil,entrance_lane\)/);
@@ -25,7 +25,9 @@ test("Blacksmith forge is next to anvil, not across the entrance path",()=>{
   assert.match(renderScript, /"originalBlenderSceneSaved":False/);
   const q=report.blacksmithWorkyard;
   assert.deepEqual(q.correctedForgeCenterXYZ,[9.3,6.05,.62]);
-  assert.deepEqual(q.correctedEmbersCenterXYZ,[9.3,5.7,.92]);
+  assert.deepEqual(q.correctedEmbersCenterXYZ,[9.3,5.54,.92]);
+  assert.equal(q.visibleFrontFireboxOpening,true);
+  assert.match(build, /"Blacksmith \/ firebox mouth",\(9\.3,5\.60,\.90\)/);
   assert.deepEqual(q.originalForgeCenterXYZ,[13.3,6.95,.62]);
   assert.equal(q.forgeToAnvilHorizontalClearanceMeters,.325);
   assert.equal(q.forgingPropsInEntranceCorridor,false);
