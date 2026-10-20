@@ -79,6 +79,15 @@ pub struct SpellPlan {
 
 /// Durable no-effect outcome. "Applied" does not exist until Combat can
 /// atomically persist damage/death/world events with the intent transition.
+/// Read-only, character-scoped knowledge for a future authenticated UI.
+/// This is not a network payload and never includes reward receipts or intents.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MagicKnowledgePreview {
+    pub runes: Vec<Rune>,
+    pub spells: Vec<Spell>,
+    pub mana: u16,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum EmberEffectStatus {
     Pending,
@@ -162,6 +171,31 @@ impl MagicAuthority {
         self.characters
             .get(&character)
             .map_or(0, |value| value.mana)
+    }
+
+    /// Returns only the verified session's knowledge. A new character has
+    /// no magic; reading knowledge never grants a rune or refills mana.
+    /// Callers must authenticate the connection and supply its server lease.
+    pub fn preview_knowledge(
+        &self,
+        lease: SessionLease,
+        identity: &SessionIdentityRegistry,
+    ) -> Result<MagicKnowledgePreview, MagicError> {
+        let character = identity
+            .resolve_session(lease)
+            .ok_or(MagicError::UnverifiedSession)?;
+        let Some(knowledge) = self.characters.get(&character) else {
+            return Ok(MagicKnowledgePreview {
+                runes: Vec::new(),
+                spells: Vec::new(),
+                mana: 0,
+            });
+        };
+        Ok(MagicKnowledgePreview {
+            runes: knowledge.runes.iter().copied().collect(),
+            spells: knowledge.spells.iter().copied().collect(),
+            mana: knowledge.mana,
+        })
     }
 
     /// Server-only NPC, quest or rare-reward confirmation. This does NOT
@@ -870,6 +904,59 @@ mod tests {
             Err(MagicSnapshotError::Corrupt)
         ));
         assert_eq!(magic.pending_ember_intents().count(), 1);
+    }
+
+    #[test]
+    fn knowledge_preview_is_scoped_to_verified_character_and_survives_restart() {
+        let mut magic = MagicAuthority::new();
+        let hero = character(730);
+        let newcomer = character(731);
+        let mut ids = SessionIdentityRegistry::new();
+        ids.bind_verified(lease(1, 1), hero).unwrap();
+        ids.bind_verified(lease(2, 1), newcomer).unwrap();
+
+        let empty = MagicKnowledgePreview {
+            runes: Vec::new(),
+            spells: Vec::new(),
+            mana: 0,
+        };
+        assert_eq!(magic.preview_knowledge(lease(1, 1), &ids), Ok(empty.clone()));
+        assert_eq!(magic.preview_knowledge(lease(2, 1), &ids), Ok(empty.clone()));
+
+        magic
+            .grant_lesson(award(1, hero, Lesson::Rune(Rune::Fire)))
+            .unwrap();
+        magic
+            .grant_lesson(award(2, hero, Lesson::Spell(Spell::Ember)))
+            .unwrap();
+        magic.spend_mana(hero, 15).unwrap();
+        let before = magic.encode_progression().unwrap();
+        let expected = MagicKnowledgePreview {
+            runes: vec![Rune::Fire],
+            spells: vec![Spell::Ember],
+            mana: 85,
+        };
+
+        assert_eq!(
+            magic.preview_knowledge(lease(1, 1), &ids),
+            Ok(expected.clone())
+        );
+        assert_eq!(magic.preview_knowledge(lease(2, 1), &ids), Ok(empty));
+        assert_eq!(
+            magic.preview_knowledge(lease(1, 2), &ids),
+            Err(MagicError::UnverifiedSession)
+        );
+        assert_eq!(
+            magic.preview_knowledge(lease(9, 1), &ids),
+            Err(MagicError::UnverifiedSession)
+        );
+        assert_eq!(magic.encode_progression().unwrap(), before);
+
+        let restored = MagicAuthority::decode_progression(&before).unwrap();
+        assert_eq!(
+            restored.preview_knowledge(lease(1, 1), &ids),
+            Ok(expected)
+        );
     }
 
     #[test]
