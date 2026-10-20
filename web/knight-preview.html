@@ -11,14 +11,16 @@ p{color:#b9c7c9}kbd{background:#32444d;padding:2px 5px;border-radius:4px}
 <p>These exact WebP atlases feed the opt-in multiplayer renderer. Move Silver with <kbd>WASD</kbd>; hold <kbd>Shift</kbd> to sprint; change direction with movement. T1 Sentinel walks automatically; use the two Roll buttons to inspect the 170 ms active roll followed by 180 ms recovery.</p>
 <div><button id="jump">Silver: jump</button><button id="roll">Silver: roll</button><button id="attack">Sentinel: attack</button><button id="block">Sentinel: block</button><button id="roll-t1">Sentinel: roll</button><span id="ready">Loading texturesâ€¦</span></div>
 <canvas id="arena" width="960" height="500"></canvas>
-<p>Multiplayer: append <code>&amp;knights=1</code> to the existing <code>?server=â€¦</code> URL; remove the flag for immediate graphics rollback. No combat changes.</p>
+<p>A2.11 approved presentation: <code>&amp;knights=1</code> uses 120%; <code>&amp;knights=1&amp;knightScale=100</code> restores the original size. This preview also accepts <code>?knightScale=100</code>. Multiplayer: append <code>&amp;knights=1</code> to the existing <code>?server=â€¦</code> URL; remove the flag for immediate graphics rollback. No combat changes.</p>
 <script type="module">
-import { createKnightSpriteRenderer } from "./knight-sprites.mjs";
+import { KNIGHT_PRESENTATION_SCALE, createKnightSpriteRenderer } from "./knight-sprites.mjs";
 import { COMBAT_ACTION } from "../src/browser/combat-readability.mjs";
 const ctx=document.querySelector("canvas").getContext("2d");
 const player={x:280,y:250,facing:Math.PI/2,action:COMBAT_ACTION.idle};
 const rival={x:660,y:250,facing:Math.PI/2,action:COMBAT_ACTION.idle,netId:2};
-const renderer=createKnightSpriteRenderer();
+const displayScale=new URLSearchParams(window.location.search).get("knightScale")==="100"
+  ? 1 : KNIGHT_PRESENTATION_SCALE;
+const renderer=createKnightSpriteRenderer({presentationScale:displayScale});
 const keys=new Set();let jumpUntil=0,rollStart=-Infinity,rivalRollStart=-Infinity,rivalUntil=0,rivalAction=COMBAT_ACTION.idle,now0=performance.now();
 addEventListener("keydown",e=>{if(["KeyW","KeyA","KeyS","KeyD","ShiftLeft","ShiftRight"].includes(e.code)){keys.add(e.code);e.preventDefault();}});
 addEventListener("keyup",e=>keys.delete(e.code));
@@ -53,7 +55,7 @@ function frame(now) {
   if(!rendered){ctx.fillStyle=remote?"#b96350":"#e2d5b4";ctx.beginPath();ctx.arc(0,0,18,0,2*Math.PI);ctx.fill();}
   ctx.restore();ctx.fillStyle="#e9e1ce";ctx.font="bold 13px system-ui";ctx.textAlign="center";ctx.fillText(name,fighter.x,fighter.y-58);
  }
- document.querySelector("#ready").textContent=renderer.loaded().length+"/9 atlases loaded";
+ document.querySelector("#ready").textContent=renderer.loaded().length+"/9 atlases loaded · "+Math.round(displayScale*100)+"% visual scale";
  requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);
