@@ -44,6 +44,8 @@ kbd{border-radius:4px;border:1px solid #677354;background:#303a2d;color:#fff2d2;
 #trail-progress-bar{display:block;width:100%;max-width:248px;height:7px;margin:6px 0 0;accent-color:#ebc77e}
 #trail-progress-bar[hidden]{display:none}
 #trail-rejoin{font-size:12px;margin-top:5px;color:#b9d5c0}
+#rejoin-map-key{font-size:12px;margin-top:6px;color:#99e6e7}
+#rejoin-map-key[hidden]{display:none}
 </style></head><body>
 <header><div><h1>⚔️ Moonvale — World & Buildings v1.0</h1>
 <div class="sub">A fixed medieval world, with a separate, deliberately larger tavern interior</div></div>
@@ -78,6 +80,7 @@ The geography, town names, buildings and roads are fixed and identical for all p
 <div id="trail-progress" role="status" aria-live="off">No active surveyed trail.</div>
 <progress id="trail-progress-bar" max="100" value="0" aria-label="Nearest point along selected milestone trail" hidden></progress>
 <div id="trail-rejoin" role="status" aria-live="off"></div>
+<div id="rejoin-map-key" hidden>● Cyan marker: sampled-clear return point; dashed cyan line: static preview approach, not live navigation.</div>
 <canvas id="wayfinding-map" width="248" height="248" aria-label="Moonvale sketch map, white player and amber destination" hidden></canvas>
 </div>
 </section>
@@ -93,6 +96,7 @@ import { localWayfindingHint, drawLocalWayfindingSketch } from "../src/world/loc
 import { certifiedTrailForNext } from "../src/world/local-trails.mjs";
 import { localTrailPosition } from "../src/world/local-trail-progress.mjs";
 import { localSampledTrailRejoin } from "../src/world/local-rejoin.mjs";
+import { drawLocalRejoinSketch } from "../src/world/local-rejoin-sketch.mjs";
 import { MOONVALE_FIELD_SITES, createLocalFieldNotebook, nearbyLocalFieldSite,
   observeLocalFieldSite, localFieldSurveyProgress } from "../src/world/field-survey.mjs";
 const canvas=document.querySelector("#arena");
@@ -127,6 +131,7 @@ const wayfindingContext=wayfindingMap.getContext("2d",{alpha:false});
 const trailProgress=document.querySelector("#trail-progress");
 const trailProgressBar=document.querySelector("#trail-progress-bar");
 const trailRejoin=document.querySelector("#trail-rejoin");
+const rejoinMapKey=document.querySelector("#rejoin-map-key");
 let wayfindingVisible=false;
 let nextWayfindingAt=0;
 function refreshWayfinding(now){
@@ -157,8 +162,12 @@ function refreshWayfinding(now){
         +" units. Static preview geometry only."
       : "No sampled-clear direct rejoin nearby — follow walkable roads.";
   wayfindingMap.hidden=!wayfindingVisible || mapId!==MAP_IDS.overworld;
+  rejoinMapKey.hidden=wayfindingMap.hidden || !rejoin;
   if(!wayfindingMap.hidden){
-    drawLocalWayfindingSketch(wayfindingContext,mapId,player.x,player.y,expeditionState);
+    const drawn=drawLocalWayfindingSketch(wayfindingContext,mapId,player.x,player.y,expeditionState);
+    if(drawn && rejoin){
+      drawLocalRejoinSketch(wayfindingContext,mapId,player.x,player.y,rejoin);
+    }
   }
 }
 let expeditionNoticeUntil=0;

@@ -205,6 +205,11 @@ jobs:
           node --check src/world/local-rejoin.mjs
           node --test tests/world-safe-rejoin.test.mjs
 
+      - name: Validate D12 sampled-clear rejoin sketch marker
+        run: |
+          node --check src/world/local-rejoin-sketch.mjs
+          node --test tests/world-rejoin-sketch.test.mjs
+
       - name: Validate M188 repeated real heavy counterplay windows
         run: |
           # Three fresh Chrome/Firefox sessions for each real defensive read.
