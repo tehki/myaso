@@ -132,7 +132,12 @@ requested Greyhaven greeting and response while C (192 units from A)
 gets nothing for A's 160-unit radius. Real packets verify authoritative
 sender ID, accepted result, invalid requests, bad UTF-8, excessive text,
 unsupported channels, forged sender-field extensions and duplicate
-submission behavior.
+submission behavior. Further real-server acceptance now verifies that a disconnected
+session cannot keep its former sender identity after reconnect (the new
+connection receives a new server-issued net ID), and that a real unchanged
+v1 input datagram still receives the authoritative game input ACK while
+chat is active. These are real transport tests, but not a browser-based
+measurement of roll/parry/combat timing under chat load.
 
 `server/src/chat.rs` unit tests check server proximity and zone
 filtering, slow recipients, replay, rate limits, disconnect and malformed
