@@ -7,9 +7,10 @@
   **READY**, continue to hold as long as you wish.
 - Release **LMB** before 320 ms: request **one light attack**.
 - Release **LMB** at or beyond 320 ms: request **one heavy attack**. The
-  authoritative server retains its **320 ms heavy windup before impact**, so
-  releasing commits the heavy; it is **not instantaneous damage on release**.
-  This prevents clients from bypassing server combat timing.
+  authoritative server **starts its 320 ms windup while held** and pauses
+  in READY after that minimum. Releasing then activates the heavy; if the
+  server has a few milliseconds remaining due to input transit, it completes
+  them before impact. The heavy cannot hit while LMB remains pressed.
 - Hold **RMB** for at least 180 ms to run, hold a movement key, then click and
   release **LMB** for a running strike. Mouse button chord events use native
   `mousedown`/`mouseup` fallback because a second held mouse button does
@@ -20,8 +21,11 @@
 
 ## Preserved safety and tests
 
-The authoritative server's heavy windup, reach, lunge, damage and parry windows
-are **unchanged**. The two browser clients share the same gesture classifier.
+The server enforces the **unchanged 320 ms** charge duration, 82 reach,
+physical lunge, damage, guard and parry windows. During LMB hold, both
+existing attack+heavy input bits signal a sustained charge (no wire-format
+change); release sends only the selected strike. The server remembers a
+completed charge until release and does not automatically activate it. The two browser clients share the same gesture classifier.
 The running-attack intent is latched through the next input sample so releasing
 RMB just after LMB cannot erase the running strike.
 

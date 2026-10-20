@@ -123,6 +123,7 @@ test("both clients receive chorded RMB+LMB mouse events and retain running relea
     assert.match(s, /chordedLeftDown = false/);
     assert.match(s, /rightButtonGesture\.isRunning\(\)/);
     assert.match(s, /runningAttackRequested/);
+    assert.match(s, /leftButtonCharge\.isCharging\(\)/, "held charge sent on existing wire bits");
     assert.match(s, /rightButtonGesture\.isRunning\(\) \|\| runningAttackRequested/, "RMB run is latched through the outgoing attack tick");
     assert.match(s, /leftButtonCharge\.release\(event\.pointerId\)/);
     assert.match(s, /leftButtonCharge\.commitLight\(\)/);

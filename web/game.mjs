@@ -214,8 +214,9 @@ function playerInput() {
   playerInputState.moveY = dashRequested && dashMove ? dashMove.y : committedLightMove?.moveY ?? ((keys.has("KeyS") ? 1 : 0) - (keys.has("KeyW") ? 1 : 0));
   playerInputState.aimX = mouse.x;
   playerInputState.aimY = mouse.y;
-  playerInputState.attack = attackRequested;
-  playerInputState.heavyAttack = heavyAttackRequested;
+  const leftChargeHeld = leftButtonCharge.isCharging();
+  playerInputState.attack = attackRequested || leftChargeHeld;
+  playerInputState.heavyAttack = heavyAttackRequested || leftChargeHeld;
   playerInputState.block = middleBlockHeld || world.nowMs < shortBlockUntil;
   playerInputState.dodge = rollRequested;
   playerInputState.dash = dashRequested;

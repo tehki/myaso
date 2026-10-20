@@ -703,8 +703,9 @@ function sampleInput() {
   currentInput.moveY = dashRequested && dashMove ? dashMove.y : attackRequested && committedLightMove
     ? committedLightMove.moveY : (keys.has("KeyS") ? 1 : 0) - (keys.has("KeyW") ? 1 : 0);
   currentInput.facing = Math.atan2(mouse.y - canvas.height / 2, mouse.x - canvas.width / 2);
-  currentInput.attack = attackRequested;
-  currentInput.heavyAttack = heavyAttackRequested;
+  const leftChargeHeld = leftButtonCharge.isCharging();
+  currentInput.attack = attackRequested || leftChargeHeld;
+  currentInput.heavyAttack = heavyAttackRequested || leftChargeHeld;
   currentInput.dodge = rollRequested;
   currentInput.dash = dashRequested;
   currentInput.block = middleBlockHeld || performance.now() < shortBlockUntil;

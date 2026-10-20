@@ -250,6 +250,7 @@ pub struct Fighter {
     action_duration_ms: f32,
     attack_input_was_down: bool,
     heavy_attack_input_was_down: bool,
+    charging_heavy: bool,
     block_input_was_down: bool,
     dodge_input_was_down: bool,
     kick_input_was_down: bool,
@@ -302,6 +303,7 @@ impl Fighter {
             action_duration_ms: 0.0,
             attack_input_was_down: false,
             heavy_attack_input_was_down: false,
+            charging_heavy: false,
             block_input_was_down: false,
             dodge_input_was_down: false,
             kick_input_was_down: false,
@@ -463,6 +465,9 @@ impl Fighter {
     }
 
     fn set_action(&mut self, action: Action, duration_ms: f32) {
+        if action != Action::HeavyAttackWindup {
+            self.charging_heavy = false;
+        }
         if !matches!(
             action,
             Action::AttackRecovery | Action::AttackLeftRecovery | Action::AttackRightRecovery
@@ -848,6 +853,35 @@ fn begin_requested_action(
         return;
     }
 
+    // Combo attack+heavy flags are a sustained LMB charge. The server owns
+    // the 320ms windup; reaching READY never emits an attack while held.
+    if fighter.charging_heavy {
+        if input.attack && input.heavy_attack {
+            return;
+        }
+        fighter.charging_heavy = false;
+        if input.heavy_attack && !input.attack {
+            return; // Activation waits for the authoritative 320ms deadline.
+        }
+        if input.attack && !input.heavy_attack {
+            if input.jump && spend_stamina(now_ms, fighter, JUMP_STAMINA_COST + JUMP_ATTACK_STAMINA_COST) {
+                fighter.begin_jump_attack();
+            } else if input.run && input.move_x.hypot(input.move_y) >= 0.5 {
+                if spend_stamina(now_ms, fighter, RUNNING_ATTACK_STAMINA_COST) {
+                    fighter.attack_hit_targets.clear();
+                    fighter.set_action(Action::RunningAttackWindup, RUNNING_ATTACK_WINDUP_MS);
+                } else {
+                    fighter.set_action(Action::Idle, 0.0);
+                }
+            } else {
+                let lateral = fighter.facing.sin() * input.move_x - fighter.facing.cos() * input.move_y;
+                fighter.begin_light_attack(lateral);
+            }
+            return;
+        }
+        fighter.set_action(Action::Idle, 0.0); // Lost focus cancels the charge.
+        return;
+    }
     if fighter.action == Action::Jump
         && edges.attack
         && spend_stamina(now_ms, fighter, JUMP_ATTACK_STAMINA_COST)
@@ -955,6 +989,12 @@ fn begin_requested_action(
     }
 
     let moving = input.move_x.hypot(input.move_y) >= 0.5;
+    if fighter.action == Action::Idle && input.attack && input.heavy_attack && edges.attack {
+        fighter.attack_hit_targets.clear();
+        fighter.set_action(Action::HeavyAttackWindup, HEAVY_ATTACK_WINDUP_MS);
+        fighter.charging_heavy = true;
+        return;
+    }
     if edges.attack && input.run && moving && fighter.action == Action::Idle {
         if spend_stamina(now_ms, fighter, RUNNING_ATTACK_STAMINA_COST) {
             fighter.attack_hit_targets.clear();
@@ -1100,6 +1140,11 @@ fn advance_action(now_ms: f32, fighter: &mut Fighter, input: InputIntent, dt_ms:
         return;
     }
     fighter.action_elapsed_ms += dt_ms;
+
+    if fighter.action == Action::HeavyAttackWindup && fighter.charging_heavy {
+        fighter.action_elapsed_ms = fighter.action_elapsed_ms.min(HEAVY_ATTACK_WINDUP_MS);
+        return; // READY heavy is held until a real release packet.
+    }
 
     if fighter.action == Action::Block {
         if !input.block {
@@ -1689,6 +1734,116 @@ mod r2_combat_control_tests {
         );
         world.step();
         assert_eq!(world.fighter(1).unwrap().action, Action::HeavyAttackWindup);
+    }
+
+    #[test]
+    fn manual_heavy_charge_stays_ready_until_release_and_never_auto_hits() {
+        let mut world = World::new(800.0, 600.0);
+        assert!(world.add_player_at(1, 250.0, 300.0, 0.0));
+        world.set_input(
+            1,
+            InputIntent {
+                attack: true,
+                heavy_attack: true,
+                ..InputIntent::default()
+            },
+        );
+        for _ in 0..50 {
+            world.step();
+            assert_eq!(world.fighter(1).unwrap().action, Action::HeavyAttackWindup);
+        }
+        assert!(
+            (world.fighter(1).unwrap().action_elapsed_ms - HEAVY_ATTACK_WINDUP_MS).abs() < 0.001,
+            "server clamps full charge at READY while LMB remains down"
+        );
+        world.set_input(
+            1,
+            InputIntent {
+                heavy_attack: true,
+                ..InputIntent::default()
+            },
+        );
+        world.step();
+        assert_eq!(world.fighter(1).unwrap().action, Action::HeavyAttackActive);
+        assert!(!world.fighter(1).unwrap().charging_heavy);
+    }
+
+    #[test]
+    fn undercharged_lmb_release_becomes_light_and_running_charge_release_runs() {
+        let mut world = World::new(800.0, 600.0);
+        assert!(world.add_player_at(1, 250.0, 300.0, 0.0));
+        world.set_input(
+            1,
+            InputIntent {
+                attack: true,
+                heavy_attack: true,
+                ..InputIntent::default()
+            },
+        );
+        for _ in 0..5 { world.step(); }
+        assert_eq!(world.fighter(1).unwrap().action, Action::HeavyAttackWindup);
+        world.set_input(
+            1,
+            InputIntent {
+                attack: true,
+                ..InputIntent::default()
+            },
+        );
+        world.step();
+        assert_eq!(world.fighter(1).unwrap().action, Action::AttackWindup);
+
+        let mut running = World::new(800.0, 600.0);
+        running.add_player_at(2, 250.0, 300.0, 0.0);
+        running.set_input(
+            2,
+            InputIntent {
+                attack: true,
+                heavy_attack: true,
+                run: true,
+                move_x: 1.0,
+                ..InputIntent::default()
+            },
+        );
+        for _ in 0..5 { running.step(); }
+        running.set_input(
+            2,
+            InputIntent {
+                attack: true,
+                run: true,
+                move_x: 1.0,
+                ..InputIntent::default()
+            },
+        );
+        running.step();
+        assert_eq!(running.fighter(2).unwrap().action, Action::RunningAttackWindup);
+    }
+
+    #[test]
+    fn cancelled_charge_never_strikes_and_existing_e_heavy_remains_authoritative() {
+        let mut world = World::new(800.0, 600.0);
+        assert!(world.add_player_at(1, 250.0, 300.0, 0.0));
+        world.set_input(
+            1,
+            InputIntent {
+                attack: true,
+                heavy_attack: true,
+                ..InputIntent::default()
+            },
+        );
+        world.step();
+        world.set_input(1, InputIntent::default());
+        world.step();
+        assert_eq!(world.fighter(1).unwrap().action, Action::Idle);
+        world.set_input(
+            1,
+            InputIntent {
+                heavy_attack: true,
+                ..InputIntent::default()
+            },
+        );
+        world.step();
+        assert_eq!(world.fighter(1).unwrap().action, Action::HeavyAttackWindup);
+        assert!(!world.fighter(1).unwrap().charging_heavy);
     }
 
     #[test]
