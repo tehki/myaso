@@ -1,0 +1,378 @@
+"""E2d standalone SQLite settlement *laboratory* (not a game server or wallet).
+
+A real SQLite file, a single BEGIN IMMEDIATE transaction, WAL/FULL synchronous
+settings, explicit idempotency receipts, and ledger/title/listing/outbox writes.
+No runtime entrypoint, credentials, signing, HTTP, Moon Coin, or real accounts.
+A VerifiedSession is ONLY a test-fixture type; it is NOT authentication.
+Seller consent is an admitted fixture value; it is NOT a signature.
+Do not run this against any production account/property data.
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+import json
+import os
+from pathlib import Path
+import re
+import sqlite3
+
+MAX_INT = (1 << 63) - 1
+MAX_FEE_BPS = 1000
+OP_ID_RE = re.compile(r"[A-Za-z0-9_-]{1,64}\Z")
+
+
+class Denied(Exception):
+    """Reject a purchase without persisting any partial transfer."""
+
+
+class InjectedFailure(RuntimeError):
+    """Simulate failure at a particular transaction phase."""
+
+
+@dataclass(frozen=True)
+class VerifiedSession:
+    # A caller may construct this. Production needs a separate trusted auth gate.
+    player_id: int
+    epoch: int
+
+
+@dataclass(frozen=True)
+class PurchaseIntent:
+    op_id: str
+    buyer_id: int
+    listing_id: int
+    title_revision: int
+    buyer_revision: int
+
+
+SCHEMA = """
+CREATE TABLE metadata (
+    singleton INTEGER PRIMARY KEY CHECK (singleton=1),
+    sequence INTEGER NOT NULL CHECK(sequence>=0),
+    issued_units INTEGER NOT NULL CHECK(issued_units>=0),
+    title_cap INTEGER NOT NULL CHECK(title_cap>=1)
+);
+CREATE TABLE accounts (
+    id INTEGER PRIMARY KEY CHECK(id>0),
+    kind TEXT NOT NULL CHECK(kind IN ('player','treasury')),
+    units INTEGER NOT NULL CHECK(units>=0),
+    revision INTEGER NOT NULL CHECK(revision>=1)
+);
+CREATE UNIQUE INDEX one_treasury ON accounts(kind) WHERE kind='treasury';
+CREATE TABLE titles (
+    parcel_id INTEGER PRIMARY KEY CHECK(parcel_id>0),
+    owner_id INTEGER NOT NULL REFERENCES accounts(id),
+    revision INTEGER NOT NULL CHECK(revision>=1),
+    map_revision INTEGER NOT NULL CHECK(map_revision>=1)
+);
+CREATE TABLE listings (
+    id INTEGER PRIMARY KEY CHECK(id>0),
+    parcel_id INTEGER NOT NULL REFERENCES titles(parcel_id),
+    seller_id INTEGER NOT NULL REFERENCES accounts(id),
+    expected_title_revision INTEGER NOT NULL CHECK(expected_title_revision>=1),
+    map_revision INTEGER NOT NULL CHECK(map_revision>=1),
+    price INTEGER NOT NULL CHECK(price>0),
+    fee_bps INTEGER NOT NULL CHECK(fee_bps BETWEEN 0 AND 1000),
+    approved_consent TEXT NOT NULL CHECK(length(approved_consent)>0),
+    expires_tick INTEGER NOT NULL CHECK(expires_tick>0),
+    state TEXT NOT NULL CHECK(state IN ('active','consumed','revoked'))
+);
+CREATE UNIQUE INDEX one_active_listing_per_parcel
+    ON listings(parcel_id) WHERE state='active';
+CREATE TABLE receipts (
+    op_id TEXT PRIMARY KEY,
+    payload TEXT NOT NULL,
+    buyer_id INTEGER NOT NULL REFERENCES accounts(id),
+    sequence INTEGER NOT NULL UNIQUE CHECK(sequence>0),
+    receipt TEXT NOT NULL
+);
+CREATE TABLE postings (
+    sequence INTEGER NOT NULL REFERENCES receipts(sequence),
+    slot INTEGER NOT NULL CHECK(slot BETWEEN 0 AND 2),
+    account_id INTEGER NOT NULL REFERENCES accounts(id),
+    delta_units INTEGER NOT NULL,
+    PRIMARY KEY(sequence,slot)
+);
+CREATE TABLE outbox (
+    sequence INTEGER PRIMARY KEY REFERENCES receipts(sequence),
+    event_kind TEXT NOT NULL,
+    event_payload TEXT NOT NULL
+);
+"""
+
+
+def _positive(value: int) -> bool:
+    return isinstance(value, int) and not isinstance(value, bool) and 0 < value <= MAX_INT
+
+
+def _nonnegative(value: int) -> bool:
+    return isinstance(value, int) and not isinstance(value, bool) and 0 <= value <= MAX_INT
+
+
+def _connect(db_path: str | Path) -> sqlite3.Connection:
+    db = sqlite3.connect(str(db_path), timeout=8.0, isolation_level=None)
+    db.execute("PRAGMA busy_timeout=8000")
+    db.execute("PRAGMA foreign_keys=ON")
+    db.execute("PRAGMA journal_mode=WAL")
+    db.execute("PRAGMA synchronous=FULL")
+    return db
+
+
+def bootstrap_fixture(db_path: str | Path) -> None:
+    """Create one disposable database with fictional test actors only.
+
+    DO NOT make this function reachable from the game server or the network.
+    A consent reference here is fixture seed data, not verified seller consent.
+    """
+    p = Path(db_path)
+    if p.exists() or p.with_name(p.name + "-wal").exists():
+        raise FileExistsError("Fixture must start with an unused database filename")
+    db = _connect(p)
+    try:
+        db.executescript(SCHEMA)
+        db.execute("BEGIN IMMEDIATE")
+        db.execute(
+            "INSERT INTO metadata(singleton,sequence,issued_units,title_cap)"
+            " VALUES(1,0,2400,2)"
+        )
+        db.executemany(
+            "INSERT INTO accounts(id,kind,units,revision) VALUES(?,?,?,1)",
+            [(1, "treasury", 100), (10, "player", 1500),
+             (20, "player", 200), (30, "player", 600)],
+        )
+        db.execute(
+            "INSERT INTO titles(parcel_id,owner_id,revision,map_revision)"
+            " VALUES(42,20,1,7)"
+        )
+        db.execute(
+            "INSERT INTO listings(id,parcel_id,seller_id,expected_title_revision,"
+            "map_revision,price,fee_bps,approved_consent,expires_tick,state)"
+            " VALUES(50,42,20,1,7,500,200,'TEST_FIXTURE_ONLY',100,'active')"
+        )
+        db.commit()
+    except BaseException:
+        db.rollback()
+        raise
+    finally:
+        db.close()
+
+
+def _payload(session: VerifiedSession, intent: PurchaseIntent) -> str:
+    return json.dumps(
+        {"buyer": intent.buyer_id, "epoch": session.epoch, "listing": intent.listing_id,
+         "op": intent.op_id, "title_rev": intent.title_revision,
+         "buyer_rev": intent.buyer_revision},
+        sort_keys=True, separators=(",", ":"),
+    )
+
+
+def purchase(
+    db_path: str | Path,
+    session: VerifiedSession,
+    intent: PurchaseIntent,
+    trusted_tick: int,
+    *,
+    failpoint: str | None = None,
+) -> dict:
+    """Commit exactly one file-backed test purchase or no purchase.
+
+    Accepted failpoints: after_debit, after_title, before_commit, after_commit.
+    Testing-only crash points use hard_exit_<phase> and exit the process (91).
+    The last simulates lost acknowledgment: a commit occurred despite failure.
+    """
+    if failpoint not in (None, "after_debit", "after_title",
+                         "before_commit", "after_commit",
+                         "hard_exit_after_debit", "hard_exit_after_title",
+                         "hard_exit_before_commit", "hard_exit_after_commit"):
+        raise ValueError("Unknown failpoint")
+    if (not _positive(session.player_id) or not _positive(session.epoch)
+        or not _positive(intent.buyer_id) or session.player_id != intent.buyer_id
+        or not _positive(intent.listing_id) or not _positive(intent.title_revision)
+        or not _positive(intent.buyer_revision)
+        or not isinstance(intent.op_id, str) or not OP_ID_RE.fullmatch(intent.op_id)
+        or not _nonnegative(trusted_tick)):
+        raise Denied("Invalid or unverified test buyer/intent")
+    payload = _payload(session, intent)
+    db = _connect(db_path)
+    committed = False
+    try:
+        db.execute("BEGIN IMMEDIATE")
+        previous = db.execute(
+            "SELECT payload,receipt FROM receipts WHERE op_id=?", (intent.op_id,)
+        ).fetchone()
+        if previous is not None:
+            if previous[0] != payload:
+                raise Denied("Operation ID already committed for another payload")
+            result = json.loads(previous[1])
+            db.commit()
+            committed = True
+            return result
+
+        listing = db.execute(
+            "SELECT parcel_id,seller_id,expected_title_revision,map_revision,"
+            "price,fee_bps,approved_consent,expires_tick,state"
+            " FROM listings WHERE id=?", (intent.listing_id,)
+        ).fetchone()
+        if listing is None:
+            raise Denied("Unknown listing")
+        (parcel, seller, expected_title, expected_map, price, fee_bps,
+         consent, expiry, state) = listing
+        if (state != "active" or seller == intent.buyer_id
+            or not consent or trusted_tick > expiry):
+            raise Denied("Inactive, expired or self-issued sale")
+        title = db.execute(
+            "SELECT owner_id,revision,map_revision FROM titles WHERE parcel_id=?",
+            (parcel,),
+        ).fetchone()
+        if (title != (seller, expected_title, expected_map)
+            or title[1] != intent.title_revision):
+            raise Denied("Stale deed or map revision")
+        buyer_row = db.execute(
+            "SELECT units,revision,kind FROM accounts WHERE id=?",
+            (intent.buyer_id,),
+        ).fetchone()
+        seller_row = db.execute(
+            "SELECT units,revision,kind FROM accounts WHERE id=?", (seller,)
+        ).fetchone()
+        treasury_row = db.execute(
+            "SELECT units,revision,kind FROM accounts WHERE id=1"
+        ).fetchone()
+        if (buyer_row is None or seller_row is None or treasury_row is None
+            or buyer_row[2] != "player" or seller_row[2] != "player"
+            or treasury_row[2] != "treasury"
+            or buyer_row[1] != intent.buyer_revision):
+            raise Denied("Invalid buyer, seller or stale spendable revision")
+        meta = db.execute(
+            "SELECT sequence,issued_units,title_cap FROM metadata WHERE singleton=1"
+        ).fetchone()
+        if meta is None:
+            raise Denied("No trusted model policy")
+        ownership = db.execute(
+            "SELECT count(*) FROM titles WHERE owner_id=?", (intent.buyer_id,)
+        ).fetchone()[0]
+        if ownership >= meta[2]:
+            raise Denied("Property ownership cap")
+        if buyer_row[0] < price:
+            raise Denied("Insufficient credits")
+        fee = price * fee_bps // 10000
+        proceeds = price - fee
+        seller_after = seller_row[0] + proceeds
+        treasury_after = treasury_row[0] + fee
+        if (not _nonnegative(seller_after) or not _nonnegative(treasury_after)
+            or title[1] >= MAX_INT or meta[0] >= MAX_INT
+            or any(r[1] >= MAX_INT for r in (buyer_row,seller_row,treasury_row))):
+            raise Denied("Arithmetic or revision overflow")
+        seq = meta[0] + 1
+        postings = [(intent.buyer_id, -price), (seller, proceeds), (1, fee)]
+        if sum(delta for _, delta in postings) != 0:
+            raise Denied("Unbalanced transaction")
+
+        def change_account(account_id: int, old: tuple, new_units: int) -> None:
+            updated = db.execute(
+                "UPDATE accounts SET units=?, revision=revision+1"
+                " WHERE id=? AND units=? AND revision=?",
+                (new_units, account_id, old[0], old[1]),
+            ).rowcount
+            if updated != 1:
+                raise Denied("Concurrent balance update")
+
+        change_account(intent.buyer_id, buyer_row, buyer_row[0] - price)
+        if failpoint == "hard_exit_after_debit":
+            os._exit(91)  # Intentional offline process-kill acceptance only.
+        if failpoint == "after_debit":
+            raise InjectedFailure("Before second account credit")
+        change_account(seller, seller_row, seller_after)
+        change_account(1, treasury_row, treasury_after)
+        if db.execute(
+            "UPDATE titles SET owner_id=?,revision=revision+1"
+            " WHERE parcel_id=? AND owner_id=? AND revision=? AND map_revision=?",
+            (intent.buyer_id, parcel, seller, expected_title, expected_map),
+        ).rowcount != 1:
+            raise Denied("Concurrent deed update")
+        if failpoint == "hard_exit_after_title":
+            os._exit(91)  # Intentional offline process-kill acceptance only.
+        if failpoint == "after_title":
+            raise InjectedFailure("Before consuming listing")
+        if db.execute(
+            "UPDATE listings SET state='consumed' WHERE id=? AND state='active'",
+            (intent.listing_id,),
+        ).rowcount != 1:
+            raise Denied("Listing already consumed")
+        if db.execute(
+            "UPDATE metadata SET sequence=? WHERE singleton=1 AND sequence=?",
+            (seq, meta[0]),
+        ).rowcount != 1:
+            raise Denied("Concurrent committed sequence")
+        receipt = {
+            "op_id": intent.op_id, "sequence": seq,
+            "buyer_id": intent.buyer_id, "seller_id": seller, "parcel_id": parcel,
+            "listing_id": intent.listing_id, "title_version": expected_title + 1,
+            "map_revision": expected_map, "price": price,
+            "seller_proceeds": proceeds, "treasury_fee": fee,
+            "consent_ref": consent, "committed_tick": trusted_tick,
+        }
+        receipt_json = json.dumps(receipt, sort_keys=True, separators=(",", ":"))
+        db.execute(
+            "INSERT INTO receipts(op_id,payload,buyer_id,sequence,receipt)"
+            " VALUES(?,?,?,?,?)",
+            (intent.op_id, payload, intent.buyer_id, seq, receipt_json),
+        )
+        db.executemany(
+            "INSERT INTO postings(sequence,slot,account_id,delta_units)"
+            " VALUES(?,?,?,?)",
+            [(seq, i, account, delta) for i, (account, delta) in enumerate(postings)],
+        )
+        db.execute(
+            "INSERT INTO outbox(sequence,event_kind,event_payload)"
+            " VALUES(?, 'title_transferred',?)", (seq, receipt_json)
+        )
+        if failpoint == "hard_exit_before_commit":
+            os._exit(91)  # Intentional offline process-kill acceptance only.
+        if failpoint == "before_commit":
+            raise InjectedFailure("After inserts, before durable commit")
+        db.commit()
+        committed = True
+        if failpoint == "hard_exit_after_commit":
+            os._exit(91)  # Intentional offline process-kill acceptance only.
+        if failpoint == "after_commit":
+            raise InjectedFailure("Commit completed; acknowledgment lost")
+        return receipt
+    except BaseException:
+        if not committed:
+            db.rollback()
+        raise
+    finally:
+        db.close()
+
+
+def snapshot(db_path: str | Path) -> dict:
+    """Inspect persisted test state after closing/reopening the SQLite file."""
+    db = _connect(db_path)
+    try:
+        accounts = db.execute(
+            "SELECT id,units,revision FROM accounts ORDER BY id"
+        ).fetchall()
+        owner = db.execute(
+            "SELECT owner_id,revision FROM titles WHERE parcel_id=42"
+        ).fetchone()
+        listing = db.execute(
+            "SELECT state FROM listings WHERE id=50"
+        ).fetchone()
+        meta = db.execute(
+            "SELECT sequence,issued_units FROM metadata WHERE singleton=1"
+        ).fetchone()
+        receipts = db.execute("SELECT count(*) FROM receipts").fetchone()[0]
+        postings = db.execute("SELECT sequence, sum(delta_units),count(*)"
+                              " FROM postings GROUP BY sequence").fetchall()
+        outbox = db.execute("SELECT count(*) FROM outbox").fetchone()[0]
+        return {
+            "accounts": accounts, "title": owner, "listing": listing[0],
+            "sequence": meta[0], "issued": meta[1], "receipts": receipts,
+            "postings": postings, "outbox": outbox,
+            "conserved": sum(a[1] for a in accounts) == meta[1]
+                and all(total == 0 and n == 3 for _, total, n in postings)
+                and receipts == meta[0] and outbox == receipts,
+        }
+    finally:
+        db.close()
