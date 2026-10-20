@@ -155,6 +155,10 @@ async function runBrowser(browser, gameUrl, certificateHash) {
     flightUrl.searchParams.set("duration", String(flightDurationMs));
     flightUrl.searchParams.set("stress", String(stressEntities));
     await webdriver(base, "POST", `/session/${sessionId}/url`, { url: flightUrl.toString() });
+    // P11 optional co-host load correlation; no live networking change.
+    if (process.env.MYASO_P11_OVERLAP_TRACE === "1") {
+      console.log(`P11_REAL_GAME_BROWSER_STARTED browser=${browser.name}`);
+    }
 
     const deadline = Date.now() + flightDurationMs + 20000;
     while (Date.now() < deadline) {
