@@ -134,10 +134,19 @@ mod tests {
 
     #[test]
     fn invalid_requests_fail_closed_without_mutating_origin() {
-        let origin = GeometryPosition { x: 4365.0, y: 4150.0 };
+        let origin = GeometryPosition {
+            x: 4365.0,
+            y: 4150.0,
+        };
         for delta in [
-            GeometryPosition { x: f32::NAN, y: 0.0 },
-            GeometryPosition { x: f32::INFINITY, y: 0.0 },
+            GeometryPosition {
+                x: f32::NAN,
+                y: 0.0,
+            },
+            GeometryPosition {
+                x: f32::INFINITY,
+                y: 0.0,
+            },
             GeometryPosition { x: 17.0, y: 0.0 },
             GeometryPosition { x: 12.0, y: 12.0 },
         ] {
@@ -152,7 +161,10 @@ mod tests {
 
     #[test]
     fn repeated_steps_do_not_tunnel_through_red_lion_wall_or_river() {
-        let mut at = GeometryPosition { x: 4365.0, y: 4150.0 };
+        let mut at = GeometryPosition {
+            x: 4365.0,
+            y: 4150.0,
+        };
         for _ in 0..40 {
             at = shadow_resolve_walk(
                 GeometryMap::Moonvale,
@@ -162,9 +174,15 @@ mod tests {
             )
             .unwrap();
         }
-        assert!(at.y >= 4068.0 && at.y < 4095.0, "Red Lion roof bypass: {at:?}");
+        assert!(
+            at.y >= 4068.0 && at.y < 4095.0,
+            "Red Lion roof bypass: {at:?}"
+        );
 
-        let mut across = GeometryPosition { x: 2250.0, y: 3600.0 };
+        let mut across = GeometryPosition {
+            x: 2250.0,
+            y: 3600.0,
+        };
         for _ in 0..80 {
             across = shadow_resolve_walk(
                 GeometryMap::Moonvale,
@@ -179,7 +197,10 @@ mod tests {
 
     #[test]
     fn bridge_and_inn_paths_remain_walkable() {
-        let mut at = GeometryPosition { x: 2200.0, y: 4250.0 };
+        let mut at = GeometryPosition {
+            x: 2200.0,
+            y: 4250.0,
+        };
         for _ in 0..50 {
             at = shadow_resolve_walk(
                 GeometryMap::Moonvale,
