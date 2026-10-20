@@ -367,3 +367,51 @@ World & Gameplay D2 authoritative server collider/door contract, and
 on properly modeled server-side object entity ownership. Preview
 collision art is not trusted as production physics. The pilot remains
 off by default, strictly loopback-only, and unmerged.
+
+## LW-1L — Server-only revision-pinned worksite lifecycle
+
+The bounded pilot worksite registry now has a **revisioned server-owned
+availability snapshot** separate from the visual fixed-position type-11
+worksite listing. Each of five sites can be unavailable, such as a
+closed well, inaccessible work yard, absent market stall or damaged forge.
+A future *trusted Rust world-object authority* may adopt a complete
+five-site manifest only when it names the Moonvale zone, uses known
+version 1, and carries a strictly newer monotonic revision than the
+last accepted one. Wrong-zone, unsupported-version, zero/stale or
+replayed updates reject the whole change without touching any site.
+No player packet, browser form, chat message or public endpoint can
+issue an availability revision.
+
+**NPC decisions and actual stock mutations now both require available
+physical source/destination sites**: a worker does not pick up materials
+if the intended delivery destination is unavailable, and cannot forge
+at a closed forge. If a destination closes after an NPC has collected
+cargo, the cargo remains in that NPC's conserved server stock slot:
+there is no teleport, dropped accounting item, completed task ledger
+event, or new pickup while carrying. Upon restoration via a strictly
+newer approved manifest, the worker resumes delivery at its next
+authorized server-clock arrival, still within the fixed site reach,
+without replaying missed actions or consuming duplicate resources.
+The read-only settlement-needs dialogue reports a blocked worksite,
+rather than inventing a feasible job.
+
+The bounded supply history now additionally associates each accepted
+resource mutation with the **current worksite authority revision**,
+creating a verifiable internal audit link between a valid site
+configuration and the job it authorized. This does not alter the existing
+22-byte supply wire protocol or entitle players to any money, items or
+rewards. The localhost pilot starts with all five sites active and
+there is **no live world-event producer for dynamic closures** yet:
+outages and recovery are tested via direct, trusted Rust fixture calls
+only. The browser's static worksite markers therefore still describe
+the default all-active staging setup. Future server-authoritative
+object updates would need their own validated replication/status flow
+before being shown as dynamic interactive props.
+
+Local tests cover stale and wrong-zone rejection, atomic rollback on
+invalid versions, missing destinations preventing source pickup,
+mid-transit closure preserving finite cargo, later revision recovery,
+replayed phase refusal, forge outage/resumption, audit provenance,
+and all previous world/transport invariants. The World & Gameplay
+preview-only collision manifest is still not connected; no production
+zone, combat collider, currency, inventory or loot state is modified.

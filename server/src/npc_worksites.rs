@@ -4,7 +4,7 @@
 //! map collision, economic inventory, or interactable player objects. NPC
 //! jobs need a scheduled work opportunity AND authenticated server proximity.
 //! No client supplied action, coordinate, object id, or entity can authorize work.
-use crate::{npc_navigation, npc_routines::NpcRoutines, PROTOCOL_VERSION};
+use crate::{npc_navigation, npc_routines::NpcRoutines, zone::ZoneId, PROTOCOL_VERSION};
 
 pub const WORKSITE_PACKET_TYPE: u8 = 11;
 const INTERACTION_RADIUS: i32 = 10;
@@ -58,6 +58,76 @@ pub const WORKSITES: [WorkSite; 5] = [
         y: 65,
     }, // forge
 ];
+
+/// Future trusted-server object lifecycle; not exposed on any player or
+/// browser request route. Pilot worksite positions are fixed and nonphysical.
+/// The site-state manifest belongs to Moonvale ONLY, never tavern/interior.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum WorksiteRevisionError {
+    WrongZone,
+    InvalidVersion,
+    StaleRevision,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct WorksiteAuthority {
+    revision: u32,
+    active: [bool; WORKSITES.len()],
+}
+
+impl Default for WorksiteAuthority {
+    fn default() -> Self {
+        Self {
+            revision: 1,
+            active: [true; WORKSITES.len()],
+        }
+    }
+}
+
+impl WorksiteAuthority {
+    pub fn revision(&self) -> u32 {
+        self.revision
+    }
+
+    pub fn active_for(&self, actor: u8, operation: u8) -> bool {
+        WORKSITES
+            .iter()
+            .position(|site| site.actor == actor && site.operation == operation)
+            .is_some_and(|index| self.active[index])
+    }
+
+    pub fn active_flags(&self) -> [bool; WORKSITES.len()] {
+        self.active
+    }
+
+    /// Atomic full-snapshot adoption from an approved authoritative server
+    /// world object registry. A stale, invalid or cross-zone manifest MUST NOT
+    /// partially flip an object state or resurrect a destroyed/closed site.
+    pub fn adopt_server_manifest(
+        &mut self,
+        zone: ZoneId,
+        version: u16,
+        revision: u32,
+        active: [bool; WORKSITES.len()],
+    ) -> Result<(), WorksiteRevisionError> {
+        if zone != ZoneId::Moonvale {
+            return Err(WorksiteRevisionError::WrongZone);
+        }
+        if version != 1 {
+            return Err(WorksiteRevisionError::InvalidVersion);
+        }
+        if revision <= self.revision {
+            return Err(WorksiteRevisionError::StaleRevision);
+        }
+        self.active = active;
+        self.revision = revision;
+        Ok(())
+    }
+
+    pub fn allows(&self, actor: u8, operation: u8, tick: u32) -> bool {
+        self.active_for(actor, operation) && allows(actor, operation, tick)
+    }
+}
 
 pub fn allows(actor: u8, operation: u8, tick: u32) -> bool {
     let Some(site) = WORKSITES
@@ -155,5 +225,45 @@ mod tests {
         assert_eq!(&data[0..4], &[1, 11, 5, 0]);
         assert_eq!(&data[4..10], &[1, 5, 84, 1, 255, 0]);
         assert_eq!(&data[28..34], &[5, 2, 210, 0, 65, 0]);
+    }
+
+    #[test]
+    fn world_object_outages_use_atomic_monotonic_moonvale_revisions() {
+        let mut authority = WorksiteAuthority::default();
+        assert_eq!(authority.revision(), 1);
+        assert_eq!(authority.active_flags(), [true; 5]);
+        assert!(authority.allows(5, 1, 600));
+        let mut closed = [true; 5];
+        closed[0] = false; // Well is unavailable.
+        assert_eq!(
+            authority.adopt_server_manifest(ZoneId::RedLionInn, 1, 2, closed),
+            Err(WorksiteRevisionError::WrongZone)
+        );
+        assert_eq!(
+            authority.adopt_server_manifest(ZoneId::Moonvale, 2, 2, closed),
+            Err(WorksiteRevisionError::InvalidVersion)
+        );
+        assert_eq!(
+            authority.adopt_server_manifest(ZoneId::Moonvale, 1, 1, closed),
+            Err(WorksiteRevisionError::StaleRevision)
+        );
+        assert!(authority.allows(5, 1, 600));
+        assert_eq!(authority.revision(), 1);
+        assert!(authority
+            .adopt_server_manifest(ZoneId::Moonvale, 1, 2, closed)
+            .is_ok());
+        assert_eq!(authority.revision(), 2);
+        assert!(!authority.active_for(5, 1));
+        assert!(!authority.allows(5, 1, 600));
+        assert!(authority.allows(5, 2, 1800));
+        assert_eq!(
+            authority.adopt_server_manifest(ZoneId::Moonvale, 1, 2, [true; 5]),
+            Err(WorksiteRevisionError::StaleRevision)
+        );
+        assert!(!authority.allows(5, 1, 600));
+        assert!(authority
+            .adopt_server_manifest(ZoneId::Moonvale, 1, 3, [true; 5])
+            .is_ok());
+        assert!(authority.allows(5, 1, 600));
     }
 }

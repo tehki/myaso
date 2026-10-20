@@ -103,6 +103,9 @@ pub struct SupplyEvent {
     pub sequence: u32,
     pub actor: u8,
     pub operation: u8,
+    /// Server worldsite authority revision that permitted this mutation.
+    /// Audit-only, never a browser command or player-reward entitlement.
+    pub worksite_revision: u32,
 }
 
 #[derive(Debug, Clone)]
@@ -111,6 +114,7 @@ pub struct NpcSupplyWorld {
     history: VecDeque<SupplyEvent>,
     last_step: Option<u32>,
     sequence: u32,
+    sites: npc_worksites::WorksiteAuthority,
 }
 
 impl Default for NpcSupplyWorld {
@@ -120,6 +124,7 @@ impl Default for NpcSupplyWorld {
             history: VecDeque::with_capacity(HISTORY_LIMIT),
             last_step: None,
             sequence: 0,
+            sites: npc_worksites::WorksiteAuthority::default(),
         }
     }
 }
@@ -133,21 +138,47 @@ impl NpcSupplyWorld {
         &self.history
     }
 
+    /// Future server-owned Moonvale worksite changes, independent of combat
+    /// geometry. No incoming chat, player datagram or browser route calls it.
+    pub fn adopt_server_worksites(
+        &mut self,
+        zone: crate::zone::ZoneId,
+        version: u16,
+        revision: u32,
+        active: [bool; npc_worksites::WORKSITES.len()],
+    ) -> Result<(), npc_worksites::WorksiteRevisionError> {
+        self.sites
+            .adopt_server_manifest(zone, version, revision, active)
+    }
+
+    pub fn worksite_revision(&self) -> u32 {
+        self.sites.revision()
+    }
+
     /// Finite, need-driven assignment with deterministic profession ownership.
     /// Inventory already in transit is reserved against demand to prevent
     /// over-collection; delivery of carried goods always takes precedence.
     pub fn decision(&self, actor: u8) -> WorkDecision {
         let s = self.stocks;
         match actor {
-            2 if s.forge_iron > 0 && s.forge_nails < TARGET_FORGE_NAILS => WorkDecision::ForgeNails,
-            5 if s.tomas_water > 0 => WorkDecision::DeliverWater,
+            2 if s.forge_iron > 0
+                && s.forge_nails < TARGET_FORGE_NAILS
+                && self.sites.active_for(2, 5) =>
+            {
+                WorkDecision::ForgeNails
+            }
+            5 if s.tomas_water > 0 && self.sites.active_for(5, 2) => WorkDecision::DeliverWater,
             5 if s.well_water > 0
+                && self.sites.active_for(5, 1)
+                && self.sites.active_for(5, 2)
                 && s.yard_water.saturating_add(s.tomas_water) < TARGET_YARD_WATER =>
             {
                 WorkDecision::CollectWater
             }
-            4 if s.elara_food > 0 => WorkDecision::DeliverFood,
+            4 if s.elara_food > 0 && self.sites.active_for(4, 4) => WorkDecision::DeliverFood,
             4 if s.depot_food > 0
+                && self.sites.active_for(4, 3)
+                && self.sites.active_for(4, 4)
                 && s.stall_food.saturating_add(s.elara_food) < TARGET_MARKET_FOOD =>
             {
                 WorkDecision::CollectFood
@@ -198,7 +229,7 @@ impl NpcSupplyWorld {
             } else if available == 0 {
                 "blocked: source empty"
             } else {
-                "no feasible task at this time"
+                "blocked: required worksite unavailable"
             };
             summary.push_str(&format!("{name}: {deficit} still needed ({label})"));
         }
@@ -225,40 +256,31 @@ impl NpcSupplyWorld {
         }
         match tick % CYCLE {
             FORGE => {
-                if self.decision(2) == WorkDecision::ForgeNails && npc_worksites::allows(2, 5, tick)
-                {
+                if self.decision(2) == WorkDecision::ForgeNails && self.sites.allows(2, 5, tick) {
                     self.stocks.forge_iron -= 1;
                     self.stocks.forge_nails += 1;
                     self.record(tick, 2, 5);
                 }
             }
             PICKUP => {
-                if self.decision(5) == WorkDecision::CollectWater
-                    && npc_worksites::allows(5, 1, tick)
-                {
+                if self.decision(5) == WorkDecision::CollectWater && self.sites.allows(5, 1, tick) {
                     self.stocks.well_water -= 1;
                     self.stocks.tomas_water += 1;
                     self.record(tick, 5, 1);
                 }
-                if self.decision(4) == WorkDecision::CollectFood
-                    && npc_worksites::allows(4, 3, tick)
-                {
+                if self.decision(4) == WorkDecision::CollectFood && self.sites.allows(4, 3, tick) {
                     self.stocks.depot_food -= 1;
                     self.stocks.elara_food += 1;
                     self.record(tick, 4, 3);
                 }
             }
             DROP_OFF => {
-                if self.decision(5) == WorkDecision::DeliverWater
-                    && npc_worksites::allows(5, 2, tick)
-                {
+                if self.decision(5) == WorkDecision::DeliverWater && self.sites.allows(5, 2, tick) {
                     self.stocks.tomas_water -= 1;
                     self.stocks.yard_water += 1;
                     self.record(tick, 5, 2);
                 }
-                if self.decision(4) == WorkDecision::DeliverFood
-                    && npc_worksites::allows(4, 4, tick)
-                {
+                if self.decision(4) == WorkDecision::DeliverFood && self.sites.allows(4, 4, tick) {
                     self.stocks.elara_food -= 1;
                     self.stocks.stall_food += 1;
                     self.record(tick, 4, 4);
@@ -279,6 +301,7 @@ impl NpcSupplyWorld {
             sequence: self.sequence,
             actor,
             operation,
+            worksite_revision: self.sites.revision(),
         });
     }
 
@@ -539,5 +562,109 @@ mod tests {
         assert_eq!(decision, WorkDecision::CollectWater);
         assert_eq!(world.stocks(), old);
         assert!(world.history().is_empty());
+    }
+
+    #[test]
+    fn unavailable_destination_blocks_pickup_without_inventing_task_or_losing_cargo() {
+        use crate::zone::ZoneId;
+        let mut town = NpcSupplyWorld::default();
+        let mut flags = [true; npc_worksites::WORKSITES.len()];
+        flags[1] = false; // Work yard missing: do not pick up well water.
+        town.adopt_server_worksites(ZoneId::Moonvale, 1, 2, flags)
+            .unwrap();
+        run_until(&mut town, 0, 600);
+        assert_eq!(town.decision(5), WorkDecision::Rest);
+        assert_eq!(town.stocks().well_water, 8);
+        assert_eq!(town.stocks().tomas_water, 0);
+        assert_eq!(town.stocks().yard_water, 0);
+        assert!(town
+            .needs_report()
+            .contains("blocked: required worksite unavailable"));
+        assert!(town.history().iter().all(|record| record.actor != 5));
+        assert!(town.stocks().conserved());
+
+        // Restore the destination, then collect at the NEXT authorized pickup
+        // tick; a prior skipped phase never becomes a catch-up teleport.
+        town.adopt_server_worksites(ZoneId::Moonvale, 1, 3, [true; 5])
+            .unwrap();
+        run_until(&mut town, 601, 2999);
+        assert_eq!(town.stocks().well_water, 8);
+        town.advance(3000);
+        assert_eq!(town.stocks().well_water, 7);
+        assert_eq!(town.stocks().tomas_water, 1);
+
+        // A destination closes after collection. The bucket remains with Tomas
+        // even after arriving at the old worksite; no task is credited.
+        town.adopt_server_worksites(ZoneId::Moonvale, 1, 4, flags)
+            .unwrap();
+        run_until(&mut town, 3001, 4200);
+        assert_eq!(town.stocks().tomas_water, 1);
+        assert_eq!(town.stocks().yard_water, 0);
+        assert_eq!(town.decision(5), WorkDecision::Rest);
+        assert!(town
+            .history()
+            .iter()
+            .all(|record| !(record.actor == 5 && record.operation == 2)));
+        assert!(town.stocks().conserved());
+
+        // An old revision may not re-open the site. Only a newer authoritative
+        // snapshot allows exactly one eventual on-site handoff.
+        assert_eq!(
+            town.adopt_server_worksites(ZoneId::Moonvale, 1, 3, [true; 5]),
+            Err(npc_worksites::WorksiteRevisionError::StaleRevision)
+        );
+        town.adopt_server_worksites(ZoneId::Moonvale, 1, 5, [true; 5])
+            .unwrap();
+        run_until(&mut town, 4201, 6600);
+        assert_eq!(town.stocks().well_water, 7);
+        assert_eq!(town.stocks().tomas_water, 0);
+        assert_eq!(town.stocks().yard_water, 1);
+        assert_eq!(
+            town.history()
+                .iter()
+                .filter(|event| event.actor == 5 && event.operation == 2)
+                .count(),
+            1
+        );
+        assert_eq!(
+            town.history()
+                .iter()
+                .find(|event| event.actor == 5 && event.operation == 2)
+                .unwrap()
+                .worksite_revision,
+            5
+        );
+        assert!(town.stocks().conserved());
+    }
+
+    #[test]
+    fn revoked_forge_can_resume_on_new_server_revision_only() {
+        use crate::zone::ZoneId;
+        let mut town = NpcSupplyWorld::default();
+        let mut flags = [true; npc_worksites::WORKSITES.len()];
+        flags[4] = false; // Forge physically unavailable.
+        town.adopt_server_worksites(ZoneId::Moonvale, 1, 2, flags)
+            .unwrap();
+        run_until(&mut town, 0, 300);
+        assert_eq!(town.stocks().forge_iron, 6);
+        assert_eq!(town.stocks().forge_nails, 0);
+        assert!(!town.history().iter().any(|event| event.actor == 2));
+        assert_eq!(town.decision(2), WorkDecision::Rest);
+        assert!(town
+            .needs_report()
+            .contains("blocked: required worksite unavailable"));
+        town.adopt_server_worksites(ZoneId::Moonvale, 1, 3, [true; 5])
+            .unwrap();
+        run_until(&mut town, 301, 2700);
+        assert_eq!(town.stocks().forge_iron, 5);
+        assert_eq!(town.stocks().forge_nails, 1);
+        assert_eq!(
+            town.history()
+                .iter()
+                .filter(|event| event.actor == 2)
+                .count(),
+            1
+        );
+        assert!(town.stocks().conserved());
     }
 }
