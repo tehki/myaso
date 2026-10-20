@@ -285,14 +285,11 @@ async fn main() -> Result<()> {
     println!("myaso admission cap: {player_cap} concurrent players");
     // The pilot is deliberately loopback-only until stable identities,
     // retention, moderation and verified world-state actions are available.
-    let npc_pilot_enabled = match env::var("MYASO_NPC_PILOT").as_deref() {
-        Ok("1") => true,
-        Ok("0") | Err(_) => false,
-        Ok(_) => bail!("MYASO_NPC_PILOT must be 0 or 1"),
+    let npc_pilot_enabled = match env::var("MYASO_NPC_PILOT") {
+        Ok(value) => parse_npc_pilot(Some(&value), bind)?,
+        Err(env::VarError::NotPresent) => parse_npc_pilot(None, bind)?,
+        Err(error) => bail!("MYASO_NPC_PILOT is invalid: {error}"),
     };
-    if npc_pilot_enabled && !bind.ip().is_loopback() {
-        bail!("NPC pilot is loopback-only and cannot be enabled on a public bind");
-    }
     let game = SharedGame::new(flight, npc_pilot_enabled);
     // Accept server-side diagnostic output only on loopback and only when
     // explicitly requested by the real-browser M201 acceptance fixture.
@@ -383,6 +380,18 @@ fn parse_player_cap(raw: Option<&str>) -> Result<usize> {
     }
     Ok(count)
 }
+fn parse_npc_pilot(raw: Option<&str>, bind: SocketAddr) -> Result<bool> {
+    let enabled = match raw {
+        None | Some("0") => false,
+        Some("1") => true,
+        Some(_) => bail!("MYASO_NPC_PILOT must be 0 or 1"),
+    };
+    if enabled && !bind.ip().is_loopback() {
+        bail!("NPC pilot is loopback-only and cannot be enabled on a public bind");
+    }
+    Ok(enabled)
+}
+
 fn load_loopback_flight_config(bind: SocketAddr) -> Result<LoopbackFlightConfig> {
     let background_players = env::var("MYASO_FLIGHT_BACKGROUND_PLAYERS")
         .ok()
@@ -1022,6 +1031,17 @@ fn encode_input_ack(processed_client_tick: u32, server_tick: u32, player_net_id:
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn npc_pilot_is_opt_in_and_rejects_public_binds() {
+        let loopback: SocketAddr = "127.0.0.1:4433".parse().unwrap();
+        let public: SocketAddr = "0.0.0.0:4433".parse().unwrap();
+        assert!(!parse_npc_pilot(None, loopback).unwrap());
+        assert!(!parse_npc_pilot(Some("0"), public).unwrap());
+        assert!(parse_npc_pilot(Some("1"), loopback).unwrap());
+        assert!(parse_npc_pilot(Some("1"), public).is_err());
+        assert!(parse_npc_pilot(Some("yes"), loopback).is_err());
+    }
 
     fn action_sample(tick: u32, heavy_attack: bool) -> InputSample {
         InputSample {
