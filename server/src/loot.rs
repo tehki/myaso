@@ -281,11 +281,7 @@ impl LootAuthority {
         Ok(())
     }
 
-    pub fn unequip(
-        &mut self,
-        authenticated_id: u32,
-        slot: EquipmentSlot,
-    ) -> Result<(), LootError> {
+    pub fn unequip(&mut self, authenticated_id: u32, slot: EquipmentSlot) -> Result<(), LootError> {
         if self.dead.contains(&authenticated_id) {
             return Err(LootError::DeadPlayer);
         }
@@ -296,7 +292,10 @@ impl LootAuthority {
         if inventory.backpack.len() >= BACKPACK_CAPACITY {
             return Err(LootError::InventoryFull);
         }
-        let item = inventory.equipment.remove(&slot).ok_or(LootError::NotFound)?;
+        let item = inventory
+            .equipment
+            .remove(&slot)
+            .ok_or(LootError::NotFound)?;
         inventory.backpack.push(item);
         Ok(())
     }
@@ -727,11 +726,39 @@ mod tests {
         loot.register(2).unwrap();
         let sword = loot.grant(1, ItemKind::RustySword, 1).unwrap();
         loot.equip(1, sword, EquipmentSlot::MainHand).unwrap();
-        assert_eq!(loot.drop_backpack(1, &fighter(1, 150.0, 150.0, false), ZoneId::Moonvale, sword, 1), Err(LootError::NotFound));
+        assert_eq!(
+            loot.drop_backpack(
+                1,
+                &fighter(1, 150.0, 150.0, false),
+                ZoneId::Moonvale,
+                sword,
+                1
+            ),
+            Err(LootError::NotFound)
+        );
         loot.unequip(1, EquipmentSlot::MainHand).unwrap();
-        let drop_id = loot.drop_backpack(1, &fighter(1, 150.0, 150.0, false), ZoneId::Moonvale, sword, 10).unwrap();
+        let drop_id = loot
+            .drop_backpack(
+                1,
+                &fighter(1, 150.0, 150.0, false),
+                ZoneId::Moonvale,
+                sword,
+                10,
+            )
+            .unwrap();
         assert_eq!(loot.inventory(1).unwrap().stack_count(), 0);
-        assert_eq!(loot.take_ground(2, &fighter(2, 150.0, 150.0, false), ZoneId::Moonvale, drop_id, 11).unwrap().id, sword);
+        assert_eq!(
+            loot.take_ground(
+                2,
+                &fighter(2, 150.0, 150.0, false),
+                ZoneId::Moonvale,
+                drop_id,
+                11
+            )
+            .unwrap()
+            .id,
+            sword
+        );
         assert!(!loot.ground().contains_key(&drop_id));
         assert_eq!(loot.inventory(2).unwrap().backpack()[0].id, sword);
     }
