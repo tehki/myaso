@@ -2,20 +2,22 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 
-test("M33 and M146 perform complete genuine short LMB before parry, never charging heavy", () => {
+test("M33/M146 retain calibrated real gestures; M41 uses ACKed release before one native wheel", () => {
   const source = readFileSync(new URL("../scripts/pvp_browser_flight_runner.mjs", import.meta.url), "utf8");
   const start = source.indexOf("async function runOnlineUiParryFlight(");
   const end = source.indexOf("\nasync function runOnlineUiParryPunishFfaFocusFlight(", start + 20);
   assert.ok(start >= 0 && end > start);
   const flight = source.slice(start, end);
-  const dispatch = flight.indexOf("await Promise.all([");
+  const dispatch = flight.indexOf("await Promise.all([", flight.indexOf("} else {", flight.indexOf('if (scenario === "uiparrytell")')));
   const tap = flight.indexOf("performArenaAttackHold(attacker, attackerElementId, attackOffset, 35)", dispatch);
   const lead = flight.indexOf("if (parryIngress.wheelLeadMs > 0) await sleep(parryIngress.wheelLeadMs)", tap);
   const releaseDelay = flight.indexOf("await sleep(releaseToStrikeParryDelayMs)", lead);
   const wheel = flight.indexOf("await setArenaBlock(defender, defenderElementId, true)", releaseDelay);
   const proof = flight.indexOf("await waitForUiParryEvidence(entries, attacker, defender, 350, false, lastAttemptBaseline)", wheel);
   assert.ok(dispatch >= 0 && tap > dispatch && lead > tap && releaseDelay > lead && wheel > releaseDelay && proof > wheel);
-  assert.match(flight, /const releaseToStrikeParryDelayMs = scenario === "uiparrytell" \? 83 : 95/);
+  assert.match(flight, /const releaseToStrikeParryDelayMs = 95/);
+  assert.match(flight, /if \(scenario === "uiparrytell"\) \{/);
+  assert.match(flight, /await dispatchM41NativeParryAfterRelease\(\{/);
   assert.match(flight, /Any actual -38 guard block or 34 HP hit remains a terminal failure/);
   assert.ok(flight.includes("const parryIngress = await calibrateNativeParryIngress("));
   // Preserve genuine input and fail-closed outcomes; only staged native
