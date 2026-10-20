@@ -1,7 +1,8 @@
 //! Earned magic progression for Magic Alpha. NOT a live casting system.
 //! Runes, spells and mana are keyed by durable CharacterId, not loot items.
 //! Lesson grants require independent server-side reward eligibility checks.
-//! No networking, NPC proximity, magic persistence or combat integration yet.
+//! No networking, NPC proximity, account authentication or combat integration yet.
+//! The offline progression codec is used only by the experimental joint checkpoint.
 use std::collections::{BTreeMap, BTreeSet};
 use std::num::NonZeroU64;
 
@@ -215,6 +216,183 @@ const fn spell_plan(spell: Spell) -> SpellPlan {
     }
 }
 
+
+const PROGRESSION_MAGIC: &[u8; 8] = b"MYMAG001";
+const ALL_RUNES: [Rune; 6] = [
+    Rune::Fire,
+    Rune::Water,
+    Rune::Air,
+    Rune::Earth,
+    Rune::Life,
+    Rune::Arcane,
+];
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MagicSnapshotError {
+    Corrupt,
+    TooLarge,
+    InvalidState,
+}
+
+struct MagicReader<'a> {
+    bytes: &'a [u8],
+    cursor: usize,
+}
+
+impl<'a> MagicReader<'a> {
+    fn new(bytes: &'a [u8]) -> Self {
+        Self { bytes, cursor: 0 }
+    }
+
+    fn take(&mut self, count: usize) -> Result<&'a [u8], MagicSnapshotError> {
+        let end = self
+            .cursor
+            .checked_add(count)
+            .ok_or(MagicSnapshotError::Corrupt)?;
+        let result = self
+            .bytes
+            .get(self.cursor..end)
+            .ok_or(MagicSnapshotError::Corrupt)?;
+        self.cursor = end;
+        Ok(result)
+    }
+
+    fn u8(&mut self) -> Result<u8, MagicSnapshotError> {
+        Ok(self.take(1)?[0])
+    }
+
+    fn u16(&mut self) -> Result<u16, MagicSnapshotError> {
+        Ok(u16::from_le_bytes(
+            self.take(2)?.try_into().expect("fixed length"),
+        ))
+    }
+
+    fn u32(&mut self) -> Result<u32, MagicSnapshotError> {
+        Ok(u32::from_le_bytes(
+            self.take(4)?.try_into().expect("fixed length"),
+        ))
+    }
+
+    fn u64(&mut self) -> Result<u64, MagicSnapshotError> {
+        Ok(u64::from_le_bytes(
+            self.take(8)?.try_into().expect("fixed length"),
+        ))
+    }
+
+    fn finish(&self) -> Result<(), MagicSnapshotError> {
+        if self.cursor == self.bytes.len() {
+            Ok(())
+        } else {
+            Err(MagicSnapshotError::Corrupt)
+        }
+    }
+}
+
+impl MagicAuthority {
+    /// Canonical bounded, versioned bytes for a joint world checkpoint.
+    /// Never treat this unauthenticated byte format as proof of a lesson.
+    pub(crate) fn encode_progression(&self) -> Result<Vec<u8>, MagicSnapshotError> {
+        if self.characters.len() > MAX_MAGIC_CHARACTERS
+            || self.claimed_receipts.len() > MAX_LESSON_RECEIPTS
+        {
+            return Err(MagicSnapshotError::TooLarge);
+        }
+        let mut bytes = Vec::new();
+        bytes.extend_from_slice(PROGRESSION_MAGIC);
+        bytes.extend_from_slice(&(self.characters.len() as u32).to_le_bytes());
+        for (character, knowledge) in &self.characters {
+            if knowledge.mana > AWAKENED_MANA
+                || (knowledge.runes.is_empty()
+                    && (!knowledge.spells.is_empty() || knowledge.mana != 0))
+                || (knowledge.spells.contains(&Spell::Ember)
+                    && !knowledge.runes.contains(&Rune::Fire))
+            {
+                return Err(MagicSnapshotError::InvalidState);
+            }
+            bytes.extend_from_slice(&character.get().to_le_bytes());
+            bytes.extend_from_slice(&knowledge.mana.to_le_bytes());
+            let rune_bits = ALL_RUNES
+                .iter()
+                .enumerate()
+                .fold(0_u8, |bits, (index, rune)| {
+                    if knowledge.runes.contains(rune) {
+                        bits | (1 << index)
+                    } else {
+                        bits
+                    }
+                });
+            bytes.push(rune_bits);
+            bytes.push(u8::from(knowledge.spells.contains(&Spell::Ember)));
+        }
+        bytes.extend_from_slice(&(self.claimed_receipts.len() as u32).to_le_bytes());
+        for receipt in &self.claimed_receipts {
+            bytes.extend_from_slice(&receipt.get().to_le_bytes());
+        }
+        Ok(bytes)
+    }
+
+    /// Fail-closed recovery: no partial rune knowledge is ever returned.
+    pub(crate) fn decode_progression(bytes: &[u8]) -> Result<Self, MagicSnapshotError> {
+        let mut reader = MagicReader::new(bytes);
+        if reader.take(PROGRESSION_MAGIC.len())? != PROGRESSION_MAGIC {
+            return Err(MagicSnapshotError::Corrupt);
+        }
+        let character_count = reader.u32()? as usize;
+        if character_count > MAX_MAGIC_CHARACTERS {
+            return Err(MagicSnapshotError::TooLarge);
+        }
+        let mut characters = BTreeMap::new();
+        for _ in 0..character_count {
+            let character = CharacterId::new(reader.u64()?).ok_or(MagicSnapshotError::Corrupt)?;
+            let mana = reader.u16()?;
+            let rune_bits = reader.u8()?;
+            let spell_bits = reader.u8()?;
+            if rune_bits & !0b0011_1111 != 0 || spell_bits & !0b0000_0001 != 0 {
+                return Err(MagicSnapshotError::Corrupt);
+            }
+            let runes = ALL_RUNES
+                .iter()
+                .enumerate()
+                .filter_map(|(index, rune)| {
+                    if rune_bits & (1 << index) != 0 {
+                        Some(*rune)
+                    } else {
+                        None
+                    }
+                })
+                .collect();
+            let mut spells = BTreeSet::new();
+            if spell_bits & 1 != 0 {
+                spells.insert(Spell::Ember);
+            }
+            let knowledge = CharacterMagic { runes, spells, mana };
+            if characters.insert(character, knowledge).is_some() {
+                return Err(MagicSnapshotError::Corrupt);
+            }
+        }
+        let receipt_count = reader.u32()? as usize;
+        if receipt_count > MAX_LESSON_RECEIPTS {
+            return Err(MagicSnapshotError::TooLarge);
+        }
+        let mut claimed_receipts = BTreeSet::new();
+        for _ in 0..receipt_count {
+            let receipt = NonZeroU64::new(reader.u64()?).ok_or(MagicSnapshotError::Corrupt)?;
+            if !claimed_receipts.insert(receipt) {
+                return Err(MagicSnapshotError::Corrupt);
+            }
+        }
+        reader.finish()?;
+        let result = Self {
+            characters,
+            claimed_receipts,
+        };
+        result
+            .encode_progression()
+            .map_err(|_| MagicSnapshotError::Corrupt)?;
+        Ok(result)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -246,6 +424,52 @@ mod tests {
             value.action = Action::Dead;
         }
         value
+    }
+
+    #[test]
+    fn progression_codec_preserves_runes_mana_and_claimed_receipts() {
+        let mut magic = MagicAuthority::new();
+        let hero = character(333);
+        magic
+            .grant_lesson(award(40, hero, Lesson::Rune(Rune::Fire)))
+            .unwrap();
+        magic
+            .grant_lesson(award(41, hero, Lesson::Spell(Spell::Ember)))
+            .unwrap();
+        magic.characters.get_mut(&hero).unwrap().mana = 25;
+        let bytes = magic.encode_progression().unwrap();
+        let mut restored = MagicAuthority::decode_progression(&bytes).unwrap();
+        assert_eq!(restored, magic);
+        assert_eq!(restored.mana(hero), 25);
+        assert_eq!(
+            restored.grant_lesson(award(40, character(334), Lesson::Rune(Rune::Water))),
+            Err(MagicError::DuplicateReward)
+        );
+        assert!(matches!(
+            MagicAuthority::decode_progression(&bytes[..bytes.len() - 1]),
+            Err(MagicSnapshotError::Corrupt)
+        ));
+    }
+
+    #[test]
+    fn progression_codec_rejects_unknown_runes_and_impossible_mana() {
+        let mut magic = MagicAuthority::new();
+        magic
+            .grant_lesson(award(10, character(20), Lesson::Rune(Rune::Fire)))
+            .unwrap();
+        let bytes = magic.encode_progression().unwrap();
+        let mut unknown_rune = bytes.clone();
+        unknown_rune[PROGRESSION_MAGIC.len() + 4 + 8 + 2] = 0b1000_0000;
+        assert!(matches!(
+            MagicAuthority::decode_progression(&unknown_rune),
+            Err(MagicSnapshotError::Corrupt)
+        ));
+        let mut impossible_mana = bytes;
+        impossible_mana[PROGRESSION_MAGIC.len() + 4 + 8] = 200;
+        assert!(matches!(
+            MagicAuthority::decode_progression(&impossible_mana),
+            Err(MagicSnapshotError::Corrupt)
+        ));
     }
 
     #[test]
