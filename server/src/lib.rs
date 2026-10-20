@@ -8,6 +8,7 @@ pub mod reliable;
 pub mod simulation;
 pub mod snapshot;
 pub mod world_geometry; // D3 dormant read-only parity module, no runtime wiring.
+pub mod world_movement; // D4 dormant walking parity, not live input resolution.
 
 pub const PROTOCOL_VERSION: u8 = 1;
 pub const INPUT_PACKET_TYPE: u8 = 1;
