@@ -24,10 +24,7 @@ fn viewer(index: u32) -> ViewerInterest {
     }
 }
 
-fn baseline(
-    all: &[SemanticEffect],
-    view: ViewerInterest,
-) -> impl Iterator<Item = &SemanticEffect> {
+fn baseline(all: &[SemanticEffect], view: ViewerInterest) -> impl Iterator<Item = &SemanticEffect> {
     let radius_sq = view.radius * view.radius;
     all.iter()
         .filter(move |event| {
