@@ -12,6 +12,9 @@ use myaso_server::magic_fx_delivery::{
 };
 use myaso_server::magic_fx_events::{TrustedEffectSpec, ViewerInterest, MAGIC_FX_PACKET_BYTES};
 use myaso_server::magic_fx_handoff::{FxQueueGate, FxRoute, TrustedFxHandoff, TrustedFxViewer};
+use myaso_server::magic_fx_shared_transport::{
+    plan_shared_dispatch, CoreGameplayDatagram, CoreWriterCapacity, SharedPriority,
+};
 use std::collections::BTreeMap;
 use std::net::SocketAddr;
 use std::sync::Arc;
@@ -48,6 +51,14 @@ async fn main() -> Result<()> {
     if !(DEFAULT_TICKS..=MAX_TICKS).contains(&total_ticks) {
         bail!("P10_LAB_TICKS must be between {DEFAULT_TICKS} and {MAX_TICKS}");
     }
+    // P13 is a strictly opt-in shared-writer laboratory exercise. The
+    // existing P10/P11 real-crowd tests remain bit-for-bit unchanged.
+    let shared_dispatch = match std::env::var("P13_SHARED_DISPATCH") {
+        Ok(value) if value == "1" => true,
+        Ok(value) if value == "0" => false,
+        Err(std::env::VarError::NotPresent) => false,
+        _ => bail!("P13_SHARED_DISPATCH must be 0 or 1"),
+    };
     let addr: SocketAddr = "127.0.0.1:0".parse().expect("loopback literal");
     let identity = Identity::self_signed(["localhost", "127.0.0.1", "::1"])
         .context("P10 ephemeral loopback identity")?;
@@ -139,6 +150,10 @@ async fn main() -> Result<()> {
     let mut total_gp = 0usize;
     let mut total_fx_bytes = 0usize;
     let mut blocked_cosmetic_polls = 0usize;
+    let mut shared_gameplay_sent = 0usize;
+    let mut shared_visual_sent = 0usize;
+    let mut shared_visual_dropped = 0usize;
+    let mut shared_congested_ticks = 0usize;
     for tick in 1..=total_ticks {
         clock.tick().await;
         hub.advance(tick)
@@ -150,11 +165,13 @@ async fn main() -> Result<()> {
         let mut marker = [0u8; 6];
         marker[..2].copy_from_slice(b"GP");
         marker[2..].copy_from_slice(&(tick as u32).to_le_bytes());
-        for (connection, _) in connections.values() {
-            connection
-                .send_datagram(marker)
-                .context("P10 test gameplay marker")?;
-            total_gp += 1;
+        if !shared_dispatch {
+            for (connection, _) in connections.values() {
+                connection
+                    .send_datagram(marker)
+                    .context("P10 test gameplay marker")?;
+                total_gp += 1;
+            }
         }
 
         if tick >= FX_START_TICK {
@@ -198,16 +215,72 @@ async fn main() -> Result<()> {
         blocked_cosmetic_polls += plan.suppressed_by_gameplay_or_backpressure;
         assert!(plan.cosmetic_payload_bytes <= MAX_FX_PAYLOAD_BYTES_PER_ZONE_TICK);
         assert!(plan.cosmetic_payload_bytes <= MAX_FX_PAYLOAD_BYTES_GLOBAL_TICK);
-        total_fx_bytes += plan.cosmetic_payload_bytes;
-        for batch in plan.routes {
-            if !handoff.route_current(batch.route) {
-                continue;
+        if shared_dispatch {
+            // P13: REAL QUIC writes on the SAME test connection for GP and
+            // ME, but every GP test payload is first validated/reserved by
+            // the P12 gameplay-first dispatch planner.
+            let gameplay: Vec<CoreGameplayDatagram> = connections
+                .values()
+                .map(|(_, route)| CoreGameplayDatagram {
+                    route: *route,
+                    bytes: marker.to_vec(),
+                })
+                .collect();
+            let writers: Vec<CoreWriterCapacity> = connections
+                .values()
+                .map(|(_, route)| CoreWriterCapacity {
+                    route: *route,
+                    // Simulated cosmetic congestion every fifth tick:
+                    // gameplay retains its slot; optional FX must drop.
+                    available_datagrams: if tick % 5 == 0 { 1 } else { 2 },
+                    gameplay_waiting: false,
+                    backpressured: false,
+                })
+                .collect();
+            let dispatch = plan_shared_dispatch(&handoff, &gameplay, &plan, &writers)
+                .expect("P13 game payload and trusted routes always have capacity");
+            assert_eq!(dispatch.gameplay_datagrams, connections.len());
+            assert!(dispatch.ordered.len() >= connections.len());
+            assert!(dispatch.ordered[..connections.len()]
+                .iter()
+                .all(|packet| packet.priority == SharedPriority::Gameplay));
+            assert!(dispatch.ordered[connections.len()..]
+                .iter()
+                .all(|packet| packet.priority == SharedPriority::Cosmetic));
+            assert!(dispatch.cosmetic_payload_bytes <= MAX_FX_PAYLOAD_BYTES_PER_ZONE_TICK);
+            assert!(dispatch.cosmetic_payload_bytes <= MAX_FX_PAYLOAD_BYTES_GLOBAL_TICK);
+            if tick % 5 == 0 {
+                assert_eq!(dispatch.cosmetic_datagrams, 0);
+                shared_congested_ticks += 1;
             }
-            if let Some((connection, _)) = connections.get(&batch.route.connection_id) {
-                for packet in batch.packets {
-                    connection
-                        .send_datagram(packet)
-                        .context("P10 real cosmetic FX QUIC datagram")?;
+            shared_gameplay_sent += dispatch.gameplay_datagrams;
+            shared_visual_sent += dispatch.cosmetic_datagrams;
+            shared_visual_dropped += dispatch.cosmetic_dropped;
+            total_gp += dispatch.gameplay_datagrams;
+            total_fx_bytes += dispatch.cosmetic_payload_bytes;
+            for payload in &dispatch.ordered {
+                if !handoff.route_current(payload.route) {
+                    bail!("P13 stale route detected at final loopback enqueue");
+                }
+                let (connection, _) = connections
+                    .get(&payload.route.connection_id)
+                    .context("P13 connection missing at final loopback enqueue")?;
+                connection
+                    .send_datagram(payload.bytes.to_vec())
+                    .context("P13 real shared-connection QUIC datagram")?;
+            }
+        } else {
+            total_fx_bytes += plan.cosmetic_payload_bytes;
+            for batch in plan.routes {
+                if !handoff.route_current(batch.route) {
+                    continue;
+                }
+                if let Some((connection, _)) = connections.get(&batch.route.connection_id) {
+                    for packet in batch.packets {
+                        connection
+                            .send_datagram(packet)
+                            .context("P10 real cosmetic FX QUIC datagram")?;
+                    }
                 }
             }
         }
@@ -217,6 +290,15 @@ async fn main() -> Result<()> {
         connections.len(),
         total_fx_bytes / MAGIC_FX_PACKET_BYTES
     );
+    if shared_dispatch {
+        assert_eq!(shared_gameplay_sent, expected * total_ticks as usize);
+        assert!(shared_visual_sent > 0);
+        assert!(shared_visual_dropped > 0);
+        assert!(shared_congested_ticks > 0);
+        println!(
+            "P13_SHARED_DISPATCH_SUMMARY connections={expected} ticks={total_ticks} gameplay_sent={shared_gameplay_sent} fx_sent={shared_visual_sent} cosmetic_dropped={shared_visual_dropped} congestion_ticks={shared_congested_ticks}"
+        );
+    }
     // Keep QUIC sessions available through the browser measurement/report
     // window. Closing the whole endpoint immediately after tick 115 caused
     // spurious "Connection lost" errors despite successful real receipts.
