@@ -1,0 +1,26 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="icon" href="data:,"><title>Greyhaven A2.21 — 2.5D Red Lion XY Review</title><style>
+:root{color-scheme:dark}*{box-sizing:border-box}body{margin:0;background:#17211c;color:#e8dfc8;font:14px/1.55 system-ui,sans-serif}
+header{padding:18px;background:#26362d;border-bottom:1px solid #60745e}h1{font:700 26px Georgia,serif;margin:0}
+main{max-width:1490px;margin:0 auto;padding:16px}.controls{display:flex;flex-wrap:wrap;gap:18px;align-items:center;padding:13px;background:#2a382e;border-radius:7px}
+label{display:flex;gap:8px;align-items:center}select{padding:8px;border-radius:5px;color:#fff;background:#405541;border:1px solid #86997d}
+input{accent-color:#e5c182}input[type=range]{width:125px}.panels{display:grid;grid-template-columns:1fr 1fr;gap:15px;margin:14px 0}
+figure{margin:0;padding:11px;border:1px solid #657660;border-radius:7px;background:#25352c}canvas{width:100%;aspect-ratio:1;display:block;background:#677769}
+figcaption{padding-top:8px}strong{color:#f4eacb}.status{padding:12px;background:#2b3b2d;border-radius:7px}
+.warning{font-size:12px;color:#eccc91}.note{font-size:12px;color:#bed0bc}
+@media(max-width:820px){.panels{grid-template-columns:1fr}}</style></head><body><header>
+<h1>⚔️ Greyhaven A2.21 — Cinematic facade, game-XY ground</h1>
+<div class="note">Original Red Lion Blender scene, XY-correct elevated decorative render, original 120% knight sprite from independent PR #326</div>
+</header><main><div class="controls">
+<label>East <input type="range" id="east" min="-120" max="120" step="10" value="120"><output id="east-out">+120</output></label>
+<label>South <input type="range" id="south" min="-120" max="120" step="10" value="-80"><output id="south-out">−80</output></label>
+<label>Character <select id="clip"><option value="silver_idle">Silver standing · 96px</option><option value="silver_roll">Silver A3 roll · 134px</option><option value="t1_roll">Sentinel A3 roll · 134px</option></select></label>
+<label>Roof alpha <input type="range" id="roof" min="0" max="100" value="75" step="5"><output id="roof-out">75%</output></label>
+<label><input id="markers" type="checkbox" checked>XY ground trace</label></div>
+<div class="panels">
+<figure><canvas id="elevated" width="640" height="640" aria-label="XY-grounded decorative Red Lion and actual knight sprite"></canvas>
+<figcaption><strong>A2.21 2.5D prototype</strong> — source timber-and-stone facade and roof redrawn with game-XY-correct ground positions. Height and roof are artistic only.</figcaption></figure>
+<figure><canvas id="cinematic" width="640" height="640" aria-label="A2.6 original cinematic Red Lion and same game XY knight"></canvas>
+<figcaption><strong>A2.6 cinematic reference</strong> — original beautiful 3/4 perspective, but the ground basis disagrees with game XY away from the door.</figcaption></figure></div>
+<p id="result" class="status" role="status">Loading original artwork and separate knight assets…</p>
+<p class="warning"><strong>Art-only preview.</strong> The proposed Red Lion doorway (4365,4075) is not an authoritative server portal. The sheared height is not physically correct, roof not approved for live occlusion, and both source PRs remain unmerged. No change to game actor, server, collision, hitbox or A3 roll.</p>
+</main><script type="module" src="./greyhaven-a221-2p5d.mjs"></script></body></html>
