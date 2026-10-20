@@ -134,6 +134,24 @@ impl NpcRoutines {
         self.detours_enabled = true;
     }
 
+    /// Chat authority uses the very same committed NPC pilot coordinate
+    /// as the type-8 replication packet and encounter/witness checks.
+    /// A player cannot talk to the ghost of Rowan's original patrol while
+    /// an approved inspection detour is active.
+    pub fn speaking_target(
+        &self,
+        id: u8,
+        tick: u32,
+        player_x: f32,
+        player_y: f32,
+        alive: bool,
+    ) -> Result<&'static crate::living_world::Npc, crate::living_world::ChatError> {
+        let npc = self
+            .position_at(id, tick)
+            .ok_or(crate::living_world::ChatError::UnknownNpc)?;
+        crate::living_world::nearby_npc_at(id, player_x, player_y, alive, npc.x, npc.y)
+    }
+
     pub fn position_at(&self, id: u8, tick: u32) -> Option<NpcState> {
         if id != 3 {
             return Self::position(id, tick);
@@ -1469,5 +1487,144 @@ mod tests {
             progress + 2
         );
         assert!(supply.stocks().conserved());
+    }
+
+    #[test]
+    fn chat_proximity_follows_rowans_actual_opt_in_detour_not_ghost_patrol() {
+        use crate::living_world::{ChatError, SPEAK_RADIUS};
+        let mut supply = NpcSupplyWorld::default();
+        supply.enable_pilot_maintenance();
+        let mut moving = NpcRoutines::default();
+        moving.enable_pilot_guard_detours();
+        let mut ordinary = NpcRoutines::default();
+        for tick in 0..=1980 {
+            supply.advance(tick);
+            moving.advance_pilot_movement(tick, &supply);
+            moving.advance_worksite_social(tick, &supply);
+            ordinary.advance_worksite_social(tick, &supply);
+        }
+        assert_eq!(SPEAK_RADIUS, 180.0);
+        assert_eq!(supply.worksite_revision(), 2);
+        assert!(moving.guard_detour.is_some());
+        let actual = moving.position_at(3, 1980).unwrap();
+        let original = NpcRoutines::position(3, 1980).unwrap();
+        assert_eq!((actual.x, actual.y), (270, 220));
+        assert_eq!((original.x, original.y), (155, 205));
+
+        // A player at the *real detouring* NPC can speak, despite the
+        // original static schedule now being >180 units away.
+        let npc = moving.speaking_target(3, 1980, 449.0, 220.0, true).unwrap();
+        assert_eq!(npc.id, 3);
+        assert_eq!(
+            ordinary
+                .speaking_target(3, 1980, 449.0, 220.0, true)
+                .unwrap_err(),
+            ChatError::OutOfRange
+        );
+
+        // The converse: a player near the abandoned patrol coordinate
+        // cannot address Rowan through a phantom duplicate of himself.
+        assert_eq!(
+            moving
+                .speaking_target(3, 1980, 60.0, 205.0, true)
+                .unwrap_err(),
+            ChatError::OutOfRange
+        );
+        assert!(ordinary.speaking_target(3, 1980, 60.0, 205.0, true).is_ok());
+
+        // The actual location is the exact server-replicated type-8
+        // coordinate, with no second client-inferred movement source.
+        let frame = moving.state_packet_with_supply(1980, &supply);
+        let index = 8 + 2 * 6;
+        assert_eq!(
+            u16::from_le_bytes([frame[index + 1], frame[index + 2]]),
+            actual.x
+        );
+        assert_eq!(
+            u16::from_le_bytes([frame[index + 3], frame[index + 4]]),
+            actual.y
+        );
+        assert_eq!(moving.position_at(3, 1980), Some(actual));
+    }
+
+    #[test]
+    fn chat_range_keeps_dead_unknown_and_invalid_player_checks_during_detour() {
+        use crate::living_world::ChatError;
+        let mut supply = NpcSupplyWorld::default();
+        supply.enable_pilot_maintenance();
+        let mut moving = NpcRoutines::default();
+        moving.enable_pilot_guard_detours();
+        for tick in 0..=1560 {
+            supply.advance(tick);
+            moving.advance_pilot_movement(tick, &supply);
+            moving.advance_worksite_social(tick, &supply);
+        }
+        let actual = moving.position_at(3, 1560).unwrap();
+        assert_eq!(
+            moving
+                .speaking_target(3, 1560, f32::from(actual.x), f32::from(actual.y), false)
+                .unwrap_err(),
+            ChatError::Dead
+        );
+        assert_eq!(
+            moving
+                .speaking_target(3, 1560, f32::NAN, f32::from(actual.y), true)
+                .unwrap_err(),
+            ChatError::OutOfRange
+        );
+        assert_eq!(
+            moving
+                .speaking_target(3, 1560, 0.0, f32::INFINITY, true)
+                .unwrap_err(),
+            ChatError::OutOfRange
+        );
+        assert_eq!(
+            moving
+                .speaking_target(99, 1560, f32::from(actual.x), f32::from(actual.y), true)
+                .unwrap_err(),
+            ChatError::UnknownNpc
+        );
+        assert!(moving
+            .speaking_target(3, 1560, f32::from(actual.x), f32::from(actual.y), true)
+            .is_ok());
+        assert_eq!(supply.stocks().tomas_water, 1);
+        assert!(supply.stocks().conserved());
+    }
+
+    #[test]
+    fn resumed_patrol_restores_chat_proximity_after_authoritative_site_reopening() {
+        use crate::living_world::ChatError;
+        let mut supply = NpcSupplyWorld::default();
+        supply.enable_pilot_maintenance();
+        let mut moving = NpcRoutines::default();
+        moving.enable_pilot_guard_detours();
+        for tick in 0..=2700 {
+            supply.advance(tick);
+            moving.advance_pilot_movement(tick, &supply);
+            moving.advance_worksite_social(tick, &supply);
+        }
+        assert_eq!(supply.worksite_revision(), 3);
+        assert!(moving.guard_detour.is_none());
+        let departure = NpcRoutines::position(3, 1380).unwrap();
+        assert_eq!(moving.position_at(3, 2700), Some(departure));
+        assert!(moving
+            .speaking_target(
+                3,
+                2700,
+                f32::from(departure.x) - 179.0,
+                f32::from(departure.y),
+                true
+            )
+            .is_ok());
+        assert_eq!(
+            moving
+                .speaking_target(3, 2700, 449.0, 220.0, true)
+                .unwrap_err(),
+            ChatError::OutOfRange
+        );
+        assert_eq!(
+            supply.stocks().well_water + supply.stocks().tomas_water + supply.stocks().yard_water,
+            8
+        );
     }
 }

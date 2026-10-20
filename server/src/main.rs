@@ -879,11 +879,19 @@ async fn handle_connection(
                             })
                         });
                         state.world.fighter(player_id).map(|fighter| {
+                            let npc = state.npc_routines.as_ref().and_then(|routines| {
+                                routines
+                                    .speaking_target(
+                                        npc_id,
+                                        state.world.tick,
+                                        fighter.x,
+                                        fighter.y,
+                                        fighter.action != myaso_server::simulation::Action::Dead,
+                                    )
+                                    .ok()
+                            });
                             (
-                                fighter.x,
-                                fighter.y,
-                                fighter.action != myaso_server::simulation::Action::Dead,
-                                state.world.tick,
+                                npc,
                                 context,
                                 report,
                                 completed_work,
@@ -899,10 +907,7 @@ async fn handle_connection(
                     };
                     match viewer {
                         Some((
-                            x,
-                            y,
-                            alive,
-                            tick,
+                            npc,
                             context,
                             report,
                             completed_work,
@@ -913,47 +918,38 @@ async fn handle_connection(
                             acquaintance,
                             worksite_hearsay,
                             guard_watch,
-                        )) => {
-                            let npc = NpcRoutines::position(npc_id, tick).and_then(|position| {
-                                living_world::nearby_npc_at(
-                                    npc_id, x, y, alive, position.x, position.y,
-                                )
-                                .ok()
-                            });
-                            match npc {
-                                Some(npc) => {
-                                    let (activity, witnessed) =
-                                        context.unwrap_or(("working", false));
-                                    living_world::response_packet(
-                                        npc_id,
-                                        0,
-                                        &living_world::answer_with_relations(
-                                            &mut dialogue,
-                                            npc,
-                                            utterance,
-                                            activity,
-                                            witnessed,
-                                            report.as_deref(),
-                                            living_world::SocialFacts {
-                                                heard_from,
-                                                acquaintance,
-                                                completed_work: completed_work.as_deref(),
-                                                worksite_report: worksite_report.as_deref(),
-                                                settlement_needs: settlement_needs.as_deref(),
-                                                planned_work,
-                                                worksite_hearsay: worksite_hearsay.as_deref(),
-                                                guard_watch: guard_watch.as_deref(),
-                                            },
-                                        ),
-                                    )
-                                }
-                                None => living_world::response_packet(
+                        )) => match npc {
+                            Some(npc) => {
+                                let (activity, witnessed) = context.unwrap_or(("working", false));
+                                living_world::response_packet(
                                     npc_id,
-                                    1,
-                                    "Move closer to this NPC to speak.",
-                                ),
+                                    0,
+                                    &living_world::answer_with_relations(
+                                        &mut dialogue,
+                                        npc,
+                                        utterance,
+                                        activity,
+                                        witnessed,
+                                        report.as_deref(),
+                                        living_world::SocialFacts {
+                                            heard_from,
+                                            acquaintance,
+                                            completed_work: completed_work.as_deref(),
+                                            worksite_report: worksite_report.as_deref(),
+                                            settlement_needs: settlement_needs.as_deref(),
+                                            planned_work,
+                                            worksite_hearsay: worksite_hearsay.as_deref(),
+                                            guard_watch: guard_watch.as_deref(),
+                                        },
+                                    ),
+                                )
                             }
-                        }
+                            None => living_world::response_packet(
+                                npc_id,
+                                1,
+                                "Move closer to this NPC to speak.",
+                            ),
+                        },
                         None => living_world::response_packet(npc_id, 1, "Player unavailable."),
                     }
                 };

@@ -920,3 +920,49 @@ worker routes for immobile professions. No change to the 38-byte
 read-only NPC state wire frame, Combat, Physics, Economy, player
 inventory, zoning, actual buildings, doors or production deployment.
 **Preview-only World & Gameplay collision remains untrusted and unmerged.**
+
+## LW-1W — NPC conversations use committed physical pilot position
+
+Prior pilot phases correctly replicated Rowan's **real server-owned**
+detour coordinates and used them for NPC-to-NPC meetings and
+combat-witness locality, but the reliable NPC chat reader still
+checked speaking range against `NpcRoutines::position(npc_id, tick)`
+(the original fixed patrol). A nearby player could therefore
+speak to a **ghost of Rowan at the old schedule** while Rowan was
+actually investigating the work yard, or be rejected while
+standing next to the actual detouring NPC.
+
+The server's NPC chat admission now calls
+`NpcRoutines::speaking_target`, which authorizes proximity using
+the exact `position_at` coordinate also used by the existing
+server type-8 replicated NPC marker. The player fighter position,
+life/death state, NPC position and simulation tick are captured
+under **one authoritative world-state lock**; the request cannot
+mix a fighter's position at one tick with an NPC position at
+another tick. The admission predicate remains the preexisting
+180-world-unit circle with the same finite-coordinate checks,
+valid fixed-roster NPC IDs and denial for a dead player. Neither
+client prediction nor chat text can change its inputs.
+
+With all three localhost pilot flags explicitly enabled, the
+staged yard-closure scenario moves Rowan to (270,220) at tick
+1980 while his original patrol would instead be at (155,205).
+A player at (449,220) can speak to the *actual* Rowan because
+they are 179 units away, whereas the old false-location check
+would have rejected them. A player at (60,205) is near the
+old phantom patrol and is now correctly refused as out of
+range. Ordinary pilot mode (detours disabled) retains the
+baseline rules. At tick 2700, after the yard reopens and the
+detour reverses, speaking range follows Rowan's actual resumed
+departure position, not the original spawn or a stale detour
+destination. The same server coordinate is proven identical to
+the reliable NPC position packet's guarded Rowan fields.
+
+Regression tests cover actual-vs-ghost range boundaries, default
+baseline behavior, simulated closure/return, dead players,
+unknown NPC IDs, NaN/infinite coordinates, type-8 location
+consistency and finite stock conservation. The request remains
+a loopback-only text reply with no world mutations, new wire
+messages, collision changes, quests, items, money, accounts or
+production enablement. The main World & Gameplay door and
+collision interfaces remain separate and unmerged.
