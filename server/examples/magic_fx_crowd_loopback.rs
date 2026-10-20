@@ -10,9 +10,7 @@ use myaso_server::elemental_physics::Element;
 use myaso_server::magic_fx_delivery::{
     ShardedMagicFxHub, MAX_FX_PAYLOAD_BYTES_GLOBAL_TICK, MAX_FX_PAYLOAD_BYTES_PER_ZONE_TICK,
 };
-use myaso_server::magic_fx_events::{
-    TrustedEffectSpec, ViewerInterest, MAGIC_FX_PACKET_BYTES,
-};
+use myaso_server::magic_fx_events::{TrustedEffectSpec, ViewerInterest, MAGIC_FX_PACKET_BYTES};
 use myaso_server::magic_fx_handoff::{FxQueueGate, FxRoute, TrustedFxHandoff, TrustedFxViewer};
 use std::collections::BTreeMap;
 use std::net::SocketAddr;
@@ -131,7 +129,8 @@ async fn main() -> Result<()> {
     let mut blocked_cosmetic_polls = 0usize;
     for tick in 1..=TOTAL_TICKS {
         clock.tick().await;
-        hub.advance(tick).expect("strictly increasing P10 fixture tick");
+        hub.advance(tick)
+            .expect("strictly increasing P10 fixture tick");
 
         // Real QUIC datagram markers are sent FIRST to every real connection.
         // The marker is NOT a real gameplay snapshot/ACK and does not imply
