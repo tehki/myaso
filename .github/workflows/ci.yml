@@ -177,6 +177,11 @@ jobs:
           node --check src/world/field-survey.mjs
           node --test tests/world-field-survey.test.mjs tests/world-landmark-discovery.test.mjs
 
+      - name: Validate D7 offline-only ordered expeditions
+        run: |
+          node --check src/world/local-expeditions.mjs
+          node --test tests/world-local-expeditions.test.mjs
+
       - name: Validate M188 repeated real heavy counterplay windows
         run: |
           # Three fresh Chrome/Firefox sessions for each real defensive read.
