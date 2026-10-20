@@ -26,7 +26,10 @@ pub enum ItemKind {
 
 impl ItemKind {
     pub const fn stackable(self) -> bool {
-        matches!(self, Self::SulfurAsh | Self::BlackPearl | Self::Gold | Self::HealingPotion)
+        matches!(
+            self,
+            Self::SulfurAsh | Self::BlackPearl | Self::Gold | Self::HealingPotion
+        )
     }
 
     pub const fn fits(self, slot: EquipmentSlot) -> bool {
@@ -81,7 +84,10 @@ pub struct Point {
 
 impl Point {
     fn from_fighter(fighter: &Fighter) -> Self {
-        Self { x: fighter.x, y: fighter.y }
+        Self {
+            x: fighter.x,
+            y: fighter.y,
+        }
     }
 
     fn in_zone(self, zone: ZoneId) -> bool {
@@ -160,7 +166,10 @@ pub struct LootAuthority {
 
 impl LootAuthority {
     pub fn new() -> Self {
-        Self { next_id: 1, ..Self::default() }
+        Self {
+            next_id: 1,
+            ..Self::default()
+        }
     }
 
     fn allocate_id(&mut self) -> Result<u64, LootError> {
@@ -206,31 +215,55 @@ impl LootAuthority {
     }
 
     /// Trusted server-only grant, never an incoming client action.
-    pub fn grant(&mut self, authenticated_id: u32, kind: ItemKind, amount: u16) -> Result<u64, LootError> {
+    pub fn grant(
+        &mut self,
+        authenticated_id: u32,
+        kind: ItemKind,
+        amount: u16,
+    ) -> Result<u64, LootError> {
         if amount == 0 || (amount != 1 && !kind.stackable()) {
             return Err(LootError::InvalidStack);
         }
         if self.dead.contains(&authenticated_id) {
             return Err(LootError::DeadPlayer);
         }
-        let inventory = self.players.get(&authenticated_id).ok_or(LootError::UnknownPlayer)?;
+        let inventory = self
+            .players
+            .get(&authenticated_id)
+            .ok_or(LootError::UnknownPlayer)?;
         if inventory.backpack.len() >= BACKPACK_CAPACITY {
             return Err(LootError::InventoryFull);
         }
         let id = self.allocate_id()?;
-        self.players.get_mut(&authenticated_id).expect("checked").backpack.push(ItemStack { id, kind, amount });
+        self.players
+            .get_mut(&authenticated_id)
+            .expect("checked")
+            .backpack
+            .push(ItemStack { id, kind, amount });
         Ok(id)
     }
 
-    pub fn equip(&mut self, authenticated_id: u32, item_id: u64, slot: EquipmentSlot) -> Result<(), LootError> {
+    pub fn equip(
+        &mut self,
+        authenticated_id: u32,
+        item_id: u64,
+        slot: EquipmentSlot,
+    ) -> Result<(), LootError> {
         if self.dead.contains(&authenticated_id) {
             return Err(LootError::DeadPlayer);
         }
-        let inventory = self.players.get_mut(&authenticated_id).ok_or(LootError::UnknownPlayer)?;
+        let inventory = self
+            .players
+            .get_mut(&authenticated_id)
+            .ok_or(LootError::UnknownPlayer)?;
         if inventory.equipment.contains_key(&slot) {
             return Err(LootError::SlotOccupied);
         }
-        let index = inventory.backpack.iter().position(|item| item.id == item_id).ok_or(LootError::NotFound)?;
+        let index = inventory
+            .backpack
+            .iter()
+            .position(|item| item.id == item_id)
+            .ok_or(LootError::NotFound)?;
         if !inventory.backpack[index].kind.fits(slot) {
             return Err(LootError::WrongSlot);
         }
@@ -242,7 +275,13 @@ impl LootAuthority {
     /// Server-authoritative death event. No item is destroyed or kept by the victim:
     /// all equipment and backpack items move to the corpse or visible ground drops.
     /// Knowledge of previously learned runes is NOT a physical item here.
-    pub fn death(&mut self, authenticated_id: u32, fighter: &Fighter, zone: ZoneId, now_ms: u64) -> Result<u64, LootError> {
+    pub fn death(
+        &mut self,
+        authenticated_id: u32,
+        fighter: &Fighter,
+        zone: ZoneId,
+        now_ms: u64,
+    ) -> Result<u64, LootError> {
         if fighter.net_id != authenticated_id {
             return Err(LootError::InvalidPlayer);
         }
@@ -262,12 +301,26 @@ impl LootAuthority {
 
         let inventory = self.players.get(&authenticated_id).expect("checked");
         let total = inventory.stack_count();
-        let scatter_count = if total >= 12 { 3 } else if total >= 6 { 2 } else if total >= 2 { 1 }
-            else if inventory.backpack.first().is_some_and(|stack| stack.kind.stackable() && stack.amount > 1) { 1 }
-            else { 0 };
+        let scatter_count = if total >= 12 {
+            3
+        } else if total >= 6 {
+            2
+        } else if total >= 2 {
+            1
+        } else if inventory
+            .backpack
+            .first()
+            .is_some_and(|stack| stack.kind.stackable() && stack.amount > 1)
+        {
+            1
+        } else {
+            0
+        };
         // Reserve every ID before modifying inventory to make ID exhaustion atomic.
         let needed = 1_u64 + scatter_count as u64 * 2;
-        self.next_id.checked_add(needed).ok_or(LootError::IdExhausted)?;
+        self.next_id
+            .checked_add(needed)
+            .ok_or(LootError::IdExhausted)?;
 
         let corpse_id = self.allocate_id()?;
         let inventory = self.players.get_mut(&authenticated_id).expect("checked");
@@ -276,35 +329,47 @@ impl LootAuthority {
         for index in 0..scatter_count {
             // A physical stack is scattered whole, except bulk reagents/gold/potions:
             // scatter one unit and preserve the rest in the corpse.
-            let candidate_index = items.iter().rposition(|item| item.kind.stackable() && item.amount > 1)
+            let candidate_index = items
+                .iter()
+                .rposition(|item| item.kind.stackable() && item.amount > 1)
                 .unwrap_or(items.len() - 1);
             let mut stack = items.remove(candidate_index);
             let drop_item = if stack.kind.stackable() && stack.amount > 1 {
                 stack.amount -= 1;
                 let split_id = self.allocate_id().expect("IDs reserved");
-                let fragment = ItemStack { id: split_id, kind: stack.kind, amount: 1 };
+                let fragment = ItemStack {
+                    id: split_id,
+                    kind: stack.kind,
+                    amount: 1,
+                };
                 items.push(stack);
                 fragment
             } else {
                 stack
             };
             let drop_id = self.allocate_id().expect("IDs reserved");
-            self.ground.insert(drop_id, GroundDrop {
-                entity_id: drop_id,
-                zone,
-                at: at.scattered(zone, index),
-                expires_at_ms: now_ms.saturating_add(GROUND_DECAY_MS),
-                item: drop_item,
-            });
+            self.ground.insert(
+                drop_id,
+                GroundDrop {
+                    entity_id: drop_id,
+                    zone,
+                    at: at.scattered(zone, index),
+                    expires_at_ms: now_ms.saturating_add(GROUND_DECAY_MS),
+                    item: drop_item,
+                },
+            );
         }
-        self.corpses.insert(corpse_id, Corpse {
-            entity_id: corpse_id,
-            victim: authenticated_id,
-            zone,
-            at,
-            expires_at_ms: now_ms.saturating_add(CORPSE_DECAY_MS),
-            items,
-        });
+        self.corpses.insert(
+            corpse_id,
+            Corpse {
+                entity_id: corpse_id,
+                victim: authenticated_id,
+                zone,
+                at,
+                expires_at_ms: now_ms.saturating_add(CORPSE_DECAY_MS),
+                items,
+            },
+        );
         self.dead.insert(authenticated_id);
         Ok(corpse_id)
     }
@@ -321,7 +386,14 @@ impl LootAuthority {
     }
 
     /// Caller MUST source zone from ZoneAuthority and fighter from authoritative World.
-    pub fn take_ground(&mut self, authenticated_id: u32, fighter: &Fighter, zone: ZoneId, drop_id: u64, now_ms: u64) -> Result<ItemStack, LootError> {
+    pub fn take_ground(
+        &mut self,
+        authenticated_id: u32,
+        fighter: &Fighter,
+        zone: ZoneId,
+        drop_id: u64,
+        now_ms: u64,
+    ) -> Result<ItemStack, LootError> {
         self.require_alive(authenticated_id, fighter)?;
         let at = Point::from_fighter(fighter);
         if !at.in_zone(zone) {
@@ -337,16 +409,35 @@ impl LootAuthority {
         if !at.near(drop.at) {
             return Err(LootError::OutOfReach);
         }
-        if self.players.get(&authenticated_id).expect("checked").backpack.len() >= BACKPACK_CAPACITY {
+        if self
+            .players
+            .get(&authenticated_id)
+            .expect("checked")
+            .backpack
+            .len()
+            >= BACKPACK_CAPACITY
+        {
             return Err(LootError::InventoryFull);
         }
         let drop = self.ground.remove(&drop_id).expect("checked");
         let item = drop.item;
-        self.players.get_mut(&authenticated_id).expect("checked").backpack.push(item.clone());
+        self.players
+            .get_mut(&authenticated_id)
+            .expect("checked")
+            .backpack
+            .push(item.clone());
         Ok(item)
     }
 
-    pub fn take_corpse(&mut self, authenticated_id: u32, fighter: &Fighter, zone: ZoneId, corpse_id: u64, item_id: u64, now_ms: u64) -> Result<ItemStack, LootError> {
+    pub fn take_corpse(
+        &mut self,
+        authenticated_id: u32,
+        fighter: &Fighter,
+        zone: ZoneId,
+        corpse_id: u64,
+        item_id: u64,
+        now_ms: u64,
+    ) -> Result<ItemStack, LootError> {
         self.require_alive(authenticated_id, fighter)?;
         let at = Point::from_fighter(fighter);
         if !at.in_zone(zone) {
@@ -362,12 +453,32 @@ impl LootAuthority {
         if !at.near(corpse.at) {
             return Err(LootError::OutOfReach);
         }
-        let index = corpse.items.iter().position(|item| item.id == item_id).ok_or(LootError::NotFound)?;
-        if self.players.get(&authenticated_id).expect("checked").backpack.len() >= BACKPACK_CAPACITY {
+        let index = corpse
+            .items
+            .iter()
+            .position(|item| item.id == item_id)
+            .ok_or(LootError::NotFound)?;
+        if self
+            .players
+            .get(&authenticated_id)
+            .expect("checked")
+            .backpack
+            .len()
+            >= BACKPACK_CAPACITY
+        {
             return Err(LootError::InventoryFull);
         }
-        let item = self.corpses.get_mut(&corpse_id).expect("checked").items.remove(index);
-        self.players.get_mut(&authenticated_id).expect("checked").backpack.push(item.clone());
+        let item = self
+            .corpses
+            .get_mut(&corpse_id)
+            .expect("checked")
+            .items
+            .remove(index);
+        self.players
+            .get_mut(&authenticated_id)
+            .expect("checked")
+            .backpack
+            .push(item.clone());
         Ok(item)
     }
 
@@ -375,7 +486,8 @@ impl LootAuthority {
     /// Items decay only through this explicit policy, not when their owner dies.
     pub fn expire(&mut self, now_ms: u64) {
         self.ground.retain(|_, drop| drop.expires_at_ms > now_ms);
-        self.corpses.retain(|_, corpse| corpse.expires_at_ms > now_ms);
+        self.corpses
+            .retain(|_, corpse| corpse.expires_at_ms > now_ms);
     }
 }
 
@@ -404,21 +516,43 @@ mod tests {
         let reagent = loot.grant(1, ItemKind::SulfurAsh, 12).unwrap();
         loot.equip(1, weapon, EquipmentSlot::MainHand).unwrap();
         loot.equip(1, armor, EquipmentSlot::Body).unwrap();
-        let corpse_id = loot.death(1, &fighter(1, 200.0, 200.0, true), ZoneId::Moonvale, 100).unwrap();
+        let corpse_id = loot
+            .death(1, &fighter(1, 200.0, 200.0, true), ZoneId::Moonvale, 100)
+            .unwrap();
         assert_eq!(loot.inventory(1).unwrap().stack_count(), 0);
         assert_eq!(loot.ground().len(), 1);
         assert_eq!(loot.corpses()[&corpse_id].items.len(), 3);
         let scattered = loot.ground().values().next().unwrap();
-        assert_eq!((scattered.item.kind, scattered.item.amount), (ItemKind::SulfurAsh, 1));
-        assert_eq!(loot.corpses()[&corpse_id].items.iter().find(|i| i.id == reagent).unwrap().amount, 11);
-        assert_eq!(loot.death(1, &fighter(1, 200.0, 200.0, true), ZoneId::Moonvale, 110), Err(LootError::AlreadyDead));
+        assert_eq!(
+            (scattered.item.kind, scattered.item.amount),
+            (ItemKind::SulfurAsh, 1)
+        );
+        assert_eq!(
+            loot.corpses()[&corpse_id]
+                .items
+                .iter()
+                .find(|i| i.id == reagent)
+                .unwrap()
+                .amount,
+            11
+        );
+        assert_eq!(
+            loot.death(1, &fighter(1, 200.0, 200.0, true), ZoneId::Moonvale, 110),
+            Err(LootError::AlreadyDead)
+        );
         let drop_id = scattered.entity_id;
         let thief = fighter(2, 200.0, 200.0, false);
-        let stolen = loot.take_ground(2, &thief, ZoneId::Moonvale, drop_id, 200).unwrap();
+        let stolen = loot
+            .take_ground(2, &thief, ZoneId::Moonvale, drop_id, 200)
+            .unwrap();
         assert_eq!(stolen.amount, 1);
-        assert_eq!(loot.take_ground(2, &thief, ZoneId::Moonvale, drop_id, 201), Err(LootError::NotFound));
+        assert_eq!(
+            loot.take_ground(2, &thief, ZoneId::Moonvale, drop_id, 201),
+            Err(LootError::NotFound)
+        );
         for item_id in [weapon, armor, reagent] {
-            loot.take_corpse(2, &thief, ZoneId::Moonvale, corpse_id, item_id, 200).unwrap();
+            loot.take_corpse(2, &thief, ZoneId::Moonvale, corpse_id, item_id, 200)
+                .unwrap();
         }
         assert_eq!(loot.inventory(2).unwrap().stack_count(), 4);
         assert!(loot.corpses()[&corpse_id].items.is_empty());
@@ -430,13 +564,51 @@ mod tests {
         loot.register(1).unwrap();
         loot.register(2).unwrap();
         loot.grant(1, ItemKind::Gold, 20).unwrap();
-        assert_eq!(loot.death(1, &fighter(1, 100.0, 100.0, false), ZoneId::Moonvale, 0), Err(LootError::NotDead));
-        assert_eq!(loot.death(1, &fighter(2, 100.0, 100.0, true), ZoneId::Moonvale, 0), Err(LootError::InvalidPlayer));
-        let corpse_id = loot.death(1, &fighter(1, 100.0, 100.0, true), ZoneId::Moonvale, 0).unwrap();
+        assert_eq!(
+            loot.death(1, &fighter(1, 100.0, 100.0, false), ZoneId::Moonvale, 0),
+            Err(LootError::NotDead)
+        );
+        assert_eq!(
+            loot.death(1, &fighter(2, 100.0, 100.0, true), ZoneId::Moonvale, 0),
+            Err(LootError::InvalidPlayer)
+        );
+        let corpse_id = loot
+            .death(1, &fighter(1, 100.0, 100.0, true), ZoneId::Moonvale, 0)
+            .unwrap();
         let item_id = loot.corpses()[&corpse_id].items[0].id;
-        assert_eq!(loot.take_corpse(2, &fighter(2, 100.0, 100.0, false), ZoneId::RedLionInn, corpse_id, item_id, 1), Err(LootError::WrongZone));
-        assert_eq!(loot.take_corpse(2, &fighter(2, 400.0, 400.0, false), ZoneId::Moonvale, corpse_id, item_id, 1), Err(LootError::OutOfReach));
-        assert_eq!(loot.take_corpse(2, &fighter(1, 100.0, 100.0, false), ZoneId::Moonvale, corpse_id, item_id, 1), Err(LootError::InvalidPlayer));
+        assert_eq!(
+            loot.take_corpse(
+                2,
+                &fighter(2, 100.0, 100.0, false),
+                ZoneId::RedLionInn,
+                corpse_id,
+                item_id,
+                1
+            ),
+            Err(LootError::WrongZone)
+        );
+        assert_eq!(
+            loot.take_corpse(
+                2,
+                &fighter(2, 400.0, 400.0, false),
+                ZoneId::Moonvale,
+                corpse_id,
+                item_id,
+                1
+            ),
+            Err(LootError::OutOfReach)
+        );
+        assert_eq!(
+            loot.take_corpse(
+                2,
+                &fighter(1, 100.0, 100.0, false),
+                ZoneId::Moonvale,
+                corpse_id,
+                item_id,
+                1
+            ),
+            Err(LootError::InvalidPlayer)
+        );
         assert_eq!(loot.inventory(2).unwrap().stack_count(), 0);
     }
 
@@ -449,12 +621,34 @@ mod tests {
         for _ in 0..BACKPACK_CAPACITY {
             loot.grant(2, ItemKind::Gold, 1).unwrap();
         }
-        let corpse_id = loot.death(1, &fighter(1, 100.0, 100.0, true), ZoneId::Moonvale, 0).unwrap();
-        assert_eq!(loot.take_corpse(2, &fighter(2, 100.0, 100.0, false), ZoneId::Moonvale, corpse_id, id, 1), Err(LootError::InventoryFull));
+        let corpse_id = loot
+            .death(1, &fighter(1, 100.0, 100.0, true), ZoneId::Moonvale, 0)
+            .unwrap();
+        assert_eq!(
+            loot.take_corpse(
+                2,
+                &fighter(2, 100.0, 100.0, false),
+                ZoneId::Moonvale,
+                corpse_id,
+                id,
+                1
+            ),
+            Err(LootError::InventoryFull)
+        );
         assert_eq!(loot.corpses()[&corpse_id].items.len(), 1);
         loot.expire(CORPSE_DECAY_MS);
         assert!(!loot.corpses().contains_key(&corpse_id));
-        assert_eq!(loot.take_corpse(2, &fighter(2, 100.0, 100.0, false), ZoneId::Moonvale, corpse_id, id, CORPSE_DECAY_MS), Err(LootError::NotFound));
+        assert_eq!(
+            loot.take_corpse(
+                2,
+                &fighter(2, 100.0, 100.0, false),
+                ZoneId::Moonvale,
+                corpse_id,
+                id,
+                CORPSE_DECAY_MS
+            ),
+            Err(LootError::NotFound)
+        );
     }
 
     #[test]
@@ -464,8 +658,14 @@ mod tests {
         let book = loot.grant(1, ItemKind::Spellbook, 1).unwrap();
         loot.equip(1, book, EquipmentSlot::OffHand).unwrap();
         assert!(loot.grant(1, ItemKind::FireRuneScroll, 2).is_err());
-        let corpse_id = loot.death(1, &fighter(1, 100.0, 100.0, true), ZoneId::Moonvale, 0).unwrap();
+        let corpse_id = loot
+            .death(1, &fighter(1, 100.0, 100.0, true), ZoneId::Moonvale, 0)
+            .unwrap();
         assert_eq!(loot.corpses()[&corpse_id].items[0].id, book);
-        assert!(loot.inventory(1).unwrap().equipped(EquipmentSlot::OffHand).is_none());
+        assert!(loot
+            .inventory(1)
+            .unwrap()
+            .equipped(EquipmentSlot::OffHand)
+            .is_none());
     }
 }
