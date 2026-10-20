@@ -13,7 +13,7 @@
 use std::path::Path;
 
 use crate::character_identity::{CharacterId, SessionIdentityRegistry, SessionLease};
-use crate::loot::{LootAuthority, LootError};
+use crate::loot::{LootAuthority, LootError, CORPSE_DECAY_MS};
 use crate::loot_persistence::{atomic_write, CheckpointError};
 use crate::magic::{EmberEffectStatus, MagicAuthority, MagicError};
 use crate::magic_checkpoint::{bundle, JointCheckpointError};
@@ -103,6 +103,12 @@ pub(crate) fn commit_combat_death_loot(
         || ctx.fighter.y > height - 18.0
     {
         return Err(CombatDeathCheckpointError::WrongPosition);
+    }
+
+    // Direct internal callers must not create loot whose expiry silently
+    // saturates at u64::MAX. The corpse lifetime is the longest loot TTL.
+    if ctx.now_ms > u64::MAX - CORPSE_DECAY_MS {
+        return Err(CombatDeathCheckpointError::InvalidWorldTime);
     }
 
     let mut staged_loot = LootAuthority::restore_state(
@@ -510,6 +516,35 @@ mod tests {
         ));
         assert_eq!(state.loot.corpses().len(), 1);
         let _ = fs::remove_file(&path);
+    }
+
+    #[test]
+    fn direct_death_checkpoint_refuses_saturated_expiry_without_mutation() {
+        let mut state = Fixture::new();
+        let checkpoint = path();
+        let event = Fixture::death_event();
+        for invalid_time in [u64::MAX - CORPSE_DECAY_MS + 1, u64::MAX] {
+            assert!(matches!(
+                commit_combat_death_loot(
+                    &checkpoint,
+                    &mut state.loot,
+                    &mut state.magic,
+                    &state.identity,
+                    CombatDeathContext {
+                        lease: SessionLease::new(1, 1).unwrap(),
+                        event: &event,
+                        fighter: &state.victim,
+                        zones: &state.zones,
+                        now_ms: invalid_time,
+                    },
+                ),
+                Err(CombatDeathCheckpointError::InvalidWorldTime)
+            ));
+        }
+        assert!(state.loot.corpses().is_empty());
+        assert!(!state.loot.is_dead(1));
+        assert_eq!(state.magic.pending_ember_intents().count(), 2);
+        assert!(!checkpoint.exists());
     }
 
     #[test]
