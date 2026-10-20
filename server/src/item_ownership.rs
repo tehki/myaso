@@ -159,6 +159,8 @@ struct AppliedTransaction {
 #[derive(Default, Debug)]
 pub struct ItemOwnershipLedger {
     items: BTreeMap<ItemId, ItemLocation>,
+    /// Destroyed IDs stay retired to prevent resurrection under a new transaction.
+    retired: BTreeSet<ItemId>,
     equipped: BTreeMap<EquipmentSlot, ItemId>,
     applied: BTreeMap<OwnershipTxnId, AppliedTransaction>,
     sequence: u64,
@@ -215,7 +217,9 @@ impl ItemOwnershipLedger {
             }
             let old_location = self.location(item);
             match op {
-                OwnershipOp::Create { .. } if old_location.is_some() => {
+                OwnershipOp::Create { .. }
+                    if old_location.is_some() || self.retired.contains(&item) =>
+                {
                     return Err(OwnershipError::ItemAlreadyExists);
                 }
                 OwnershipOp::Move { from, .. } | OwnershipOp::Destroy { from, .. } => {
@@ -279,6 +283,7 @@ impl ItemOwnershipLedger {
                 }
                 None => {
                     self.items.remove(&item);
+                    self.retired.insert(item);
                 }
             }
         }
@@ -597,6 +602,22 @@ mod tests {
             Err(OwnershipError::TooManyOperations)
         );
         assert_eq!(ledger.item_count(), 0);
+    }
+
+    #[test]
+    fn destroyed_item_ids_cannot_be_resurrected_with_new_transaction_ids() {
+        let mut ledger = ItemOwnershipLedger::default();
+        ledger
+            .apply(txn(1), &[OwnershipOp::Create { item: item(8), at: bag(1) }])
+            .expect("mint once");
+        ledger
+            .apply(txn(2), &[OwnershipOp::Destroy { item: item(8), from: bag(1) }])
+            .expect("destroy");
+        assert_eq!(
+            ledger.apply(txn(3), &[OwnershipOp::Create { item: item(8), at: bag(1) }]),
+            Err(OwnershipError::ItemAlreadyExists)
+        );
+        assert_eq!(ledger.location(item(8)), None);
     }
 
     #[test]
