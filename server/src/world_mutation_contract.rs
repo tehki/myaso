@@ -48,7 +48,12 @@ impl VerifiedWorldAuthority {
         zone: ZoneKey,
         epoch: NonZeroU64,
     ) -> Self {
-        Self { entity, worker, zone, epoch }
+        Self {
+            entity,
+            worker,
+            zone,
+            epoch,
+        }
     }
 }
 
@@ -153,7 +158,11 @@ impl WorldMutationReceipt {
             .ok()
             .and_then(NonZeroU64::new)
             .ok_or(WorldMutationContractError::InvalidReceipt)?;
-        Ok(Self { world_revision, outbox_sequence, replayed })
+        Ok(Self {
+            world_revision,
+            outbox_sequence,
+            replayed,
+        })
     }
 }
 
@@ -173,14 +182,18 @@ mod tests {
     }
     impl TrustedWorkerVerifier for FakeVerifier {
         type Claim = Claim;
-        fn verify_worker(&self, claim: &Claim)
-            -> Result<VerifiedWorldAuthority, WorldMutationContractError>
-        {
+        fn verify_worker(
+            &self,
+            claim: &Claim,
+        ) -> Result<VerifiedWorldAuthority, WorldMutationContractError> {
             if !claim.trusted {
                 return Err(WorldMutationContractError::UntrustedRequest);
             }
             Ok(VerifiedWorldAuthority::from_trusted_authority(
-                claim.entity, claim.worker, claim.zone, claim.epoch,
+                claim.entity,
+                claim.worker,
+                claim.zone,
+                claim.epoch,
             ))
         }
     }
@@ -210,9 +223,18 @@ mod tests {
             .expect("verified parameters");
         let bind = command.bind();
         assert_eq!(bind.entity_kind, 1);
-        assert_eq!(bind.entity_id, &[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]);
-        assert_eq!(bind.mutation_id, &[16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31]);
-        assert_eq!((bind.worker, bind.zone, bind.epoch, bind.expected_revision), (17, 99, 2, 15));
+        assert_eq!(
+            bind.entity_id,
+            &[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
+        );
+        assert_eq!(
+            bind.mutation_id,
+            &[16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31]
+        );
+        assert_eq!(
+            (bind.worker, bind.zone, bind.epoch, bind.expected_revision),
+            (17, 99, 2, 15)
+        );
         assert_eq!(bind.payload, b"snapshot");
     }
 
@@ -270,10 +292,14 @@ mod tests {
     #[test]
     fn receipt_cannot_contain_zero_or_negative_sequence() {
         assert!(WorldMutationReceipt::from_sql(1, 2, false).is_ok());
-        assert_eq!(WorldMutationReceipt::from_sql(1, 0, false),
-            Err(WorldMutationContractError::InvalidReceipt));
-        assert_eq!(WorldMutationReceipt::from_sql(-1, 2, true),
-            Err(WorldMutationContractError::InvalidReceipt));
+        assert_eq!(
+            WorldMutationReceipt::from_sql(1, 0, false),
+            Err(WorldMutationContractError::InvalidReceipt)
+        );
+        assert_eq!(
+            WorldMutationReceipt::from_sql(-1, 2, true),
+            Err(WorldMutationContractError::InvalidReceipt)
+        );
         let receipt = WorldMutationReceipt::from_sql(6, 7, true).unwrap();
         assert!(receipt.replayed);
     }
