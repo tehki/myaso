@@ -42,10 +42,10 @@ pub enum FieldError {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ElementReaction {
-    Steam,      // Fire meets ice.
-    Flare,      // Wind fuels fire.
-    Blizzard,   // Wind sweeps ice.
-    ArcSurge,   // Lightning resonates with arcane energy.
+    Steam,    // Fire meets ice.
+    Flare,    // Wind fuels fire.
+    Blizzard, // Wind sweeps ice.
+    ArcSurge, // Lightning resonates with arcane energy.
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -135,7 +135,11 @@ impl ElementalFieldLedger {
         if self.fields.len() >= MAX_ACTIVE_FIELDS {
             return Err(FieldError::Capacity);
         }
-        if self.fields.iter().filter(|field| field.zone_id == spec.zone_id).count()
+        if self
+            .fields
+            .iter()
+            .filter(|field| field.zone_id == spec.zone_id)
+            .count()
             >= MAX_FIELDS_PER_ZONE
         {
             return Err(FieldError::ZoneCapacity);
@@ -229,7 +233,10 @@ mod tests {
             ([Element::Fire, Element::Ice], ElementReaction::Steam),
             ([Element::Fire, Element::Wind], ElementReaction::Flare),
             ([Element::Ice, Element::Wind], ElementReaction::Blizzard),
-            ([Element::Lightning, Element::Arcane], ElementReaction::ArcSurge),
+            (
+                [Element::Lightning, Element::Arcane],
+                ElementReaction::ArcSurge,
+            ),
         ] {
             let mut first = ElementalFieldLedger::new();
             let mut second = ElementalFieldLedger::new();
@@ -255,7 +262,10 @@ mod tests {
         fields.spawn(spec(Element::Wind), 4).unwrap();
         assert_eq!(fields.sample_at(8, 100.0, 100.0).unwrap().element_mask, 0);
         assert_eq!(fields.sample_at(7, 160.0, 100.0).unwrap().element_mask, 0);
-        assert_eq!(fields.sample_at(7, 100.0, 100.0).unwrap().element_mask, 0b01000);
+        assert_eq!(
+            fields.sample_at(7, 100.0, 100.0).unwrap().element_mask,
+            0b01000
+        );
         assert!(fields.sample_at(0, 100.0, 100.0).is_none());
         assert!(fields.sample_at(7, f32::INFINITY, 0.0).is_none());
     }
@@ -263,12 +273,18 @@ mod tests {
     #[test]
     fn server_tick_and_event_inputs_fail_closed_before_mutation() {
         let mut fields = ElementalFieldLedger::new();
-        assert_eq!(fields.spawn(spec(Element::Fire), 1), Err(FieldError::InvalidTick));
+        assert_eq!(
+            fields.spawn(spec(Element::Fire), 1),
+            Err(FieldError::InvalidTick)
+        );
         assert_eq!(fields.advance(0), Err(FieldError::InvalidTick));
         fields.advance(10).unwrap();
         assert_eq!(fields.advance(10), Err(FieldError::InvalidTick));
         assert_eq!(fields.advance(9), Err(FieldError::InvalidTick));
-        assert_eq!(fields.spawn(spec(Element::Fire), 9), Err(FieldError::InvalidTick));
+        assert_eq!(
+            fields.spawn(spec(Element::Fire), 9),
+            Err(FieldError::InvalidTick)
+        );
         let mut bad = spec(Element::Fire);
         bad.zone_id = 0;
         assert_eq!(fields.spawn(bad, 10), Err(FieldError::InvalidField));
@@ -294,7 +310,10 @@ mod tests {
             field.x = 100.0 + i as f32;
             assert!(ledger.spawn(field, 10).is_ok());
         }
-        assert_eq!(ledger.spawn(spec(Element::Wind), 10), Err(FieldError::ZoneCapacity));
+        assert_eq!(
+            ledger.spawn(spec(Element::Wind), 10),
+            Err(FieldError::ZoneCapacity)
+        );
         for i in MAX_FIELDS_PER_ZONE..MAX_ACTIVE_FIELDS {
             let mut field = spec(Element::Arcane);
             field.zone_id = 8 + (i / MAX_FIELDS_PER_ZONE) as u32;
@@ -326,7 +345,10 @@ mod tests {
         ledger.spawn(spec(Element::Lightning), 1).unwrap();
         let before = ledger.fields().to_vec();
         for _ in 0..100 {
-            assert_eq!(ledger.sample_at(7, 100.0, 100.0).unwrap().element_mask, 0b00100);
+            assert_eq!(
+                ledger.sample_at(7, 100.0, 100.0).unwrap().element_mask,
+                0b00100
+            );
         }
         assert_eq!(ledger.fields(), before);
     }

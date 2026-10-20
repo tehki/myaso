@@ -45,15 +45,11 @@ fn coord(value: f32) -> bool {
 }
 
 fn rect_valid(min_x: f32, min_y: f32, max_x: f32, max_y: f32) -> bool {
-    coord(min_x) && coord(min_y) && coord(max_x) && coord(max_y)
-        && min_x < max_x && min_y < max_y
+    coord(min_x) && coord(min_y) && coord(max_x) && coord(max_y) && min_x < max_x && min_y < max_y
 }
 
 fn inside_bounds(x: f32, y: f32, r: f32, window: &CollisionWindow<'_>) -> bool {
-    x >= window.min_x + r
-        && y >= window.min_y + r
-        && x <= window.max_x - r
-        && y <= window.max_y - r
+    x >= window.min_x + r && y >= window.min_y + r && x <= window.max_x - r && y <= window.max_y - r
 }
 
 // Slab raycast of a point center against the barrier inflated by body radius.
@@ -77,10 +73,7 @@ fn entry_fraction(
 
     let mut enter: f32 = 0.0;
     let mut exit: f32 = 1.0;
-    for (position, delta, low, high) in [
-        (x, dx, min_x, max_x),
-        (y, dy, min_y, max_y),
-    ] {
+    for (position, delta, low, high) in [(x, dx, min_x, max_x), (y, dy, min_y, max_y)] {
         if delta == 0.0 {
             if position < low || position > high {
                 return None;
@@ -137,7 +130,12 @@ pub fn clip_radial_impulse(
     }
     // Refuse incomplete collision coverage: no speculative edge crossings.
     if !inside_bounds(target.x, target.y, radius, window)
-        || !inside_bounds(target.x + proposal.dx, target.y + proposal.dy, radius, window)
+        || !inside_bounds(
+            target.x + proposal.dx,
+            target.y + proposal.dy,
+            radius,
+            window,
+        )
     {
         return None;
     }
@@ -228,8 +226,8 @@ mod tests {
 
     #[test]
     fn swept_body_stops_before_wall_instead_of_tunneling_through_it() {
-        let result = clip_radial_impulse(&impulse(24.0, 0.0), &target(), &window(&[WALL]), 91)
-            .unwrap();
+        let result =
+            clip_radial_impulse(&impulse(24.0, 0.0), &target(), &window(&[WALL]), 91).unwrap();
         assert!(result.blocked);
         assert!(result.dx >= 0.0 && result.dx < 8.0);
         assert_eq!(result.dy, 0.0);
@@ -308,7 +306,9 @@ mod tests {
     #[test]
     fn collider_budget_rejects_unbounded_collision_windows() {
         let too_many = [WALL; MAX_COLLIDERS_PER_WINDOW + 1];
-        assert!(clip_radial_impulse(&impulse(10.0, 0.0), &target(), &window(&too_many), 91).is_none());
+        assert!(
+            clip_radial_impulse(&impulse(10.0, 0.0), &target(), &window(&too_many), 91).is_none()
+        );
     }
 
     #[test]
@@ -341,10 +341,15 @@ mod tests {
         assert!(clip_radial_impulse(&impulse(10.0, 0.0), &target, &window(&[]), 91).is_none());
         target.mobile = true;
         assert!(clip_radial_impulse(
-            &ProposedDisplacement { entity_id: 99, dx: 10.0, dy: 0.0 },
+            &ProposedDisplacement {
+                entity_id: 99,
+                dx: 10.0,
+                dy: 0.0
+            },
             &target,
             &window(&[]),
             91,
-        ).is_none());
+        )
+        .is_none());
     }
 }
