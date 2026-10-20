@@ -18,7 +18,8 @@ use crate::loot_transaction::{quiescent_verified, TransactionError};
 use crate::magic::{
     EmberEffectStatus, LessonAward, MagicAuthority, MagicError, MagicSnapshotError,
 };
-use crate::magic_teacher::{TeacherAuthority, TeacherError, TeacherRequest};
+use crate::magic_teacher::{TeacherAuthority, TeacherError, TeacherId, TeacherRequest};
+use crate::simulation::World;
 use crate::zone::ZoneAuthority;
 
 const HEADER: &[u8; 8] = b"MYWLD003";
@@ -34,6 +35,9 @@ pub enum JointCheckpointError {
     Magic(MagicError),
     MagicSnapshot(MagicSnapshotError),
     UnverifiedCharacter,
+    StaleWorldTick,
+    MissingWorldFighter,
+    InvalidWorldTime,
     Teacher(TeacherError),
     WrongZone,
     Corrupt,
@@ -222,6 +226,56 @@ pub fn transact_teacher_lesson(
     Ok(receipt)
 }
 
+/// World-derived First Awakening lesson input. The caller must hold the same
+/// serialized world-writer lock over World, identity, teacher manifest, and
+/// joint checkpoint through the durable commit. This is not a client packet.
+/// Core must eventually provide a verified world authority/epoch fence.
+pub struct WorldTeacherTick<'a> {
+    pub lease: SessionLease,
+    pub teacher: TeacherId,
+    pub world: &'a World,
+    pub completed_tick: u32,
+}
+
+/// Stage a genuine server-owned teacher encounter against the actual Fighter
+/// in the completed World tick, never against an externally built snapshot.
+/// A trusted NPC manifest supplies lesson meaning, and the existing staged
+/// joint checkpoint preserves lessons and receipts through recovery.
+/// This experimental adapter has no live NPC spawn or client network handler.
+pub fn transact_world_teacher_lesson(
+    path: &Path,
+    loot: &LootAuthority,
+    magic: &mut MagicAuthority,
+    identity: &SessionIdentityRegistry,
+    zones: &ZoneAuthority,
+    teachers: &TeacherAuthority,
+    tick: WorldTeacherTick<'_>,
+) -> Result<std::num::NonZeroU64, JointCheckpointError> {
+    if tick.completed_tick == 0 || tick.world.tick != tick.completed_tick {
+        return Err(JointCheckpointError::StaleWorldTick);
+    }
+    if !tick.world.now_ms.is_finite() || tick.world.now_ms < 0.0 {
+        return Err(JointCheckpointError::InvalidWorldTime);
+    }
+    let fighter = tick
+        .world
+        .fighter(tick.lease.server_session())
+        .ok_or(JointCheckpointError::MissingWorldFighter)?;
+    transact_teacher_lesson(
+        path,
+        loot,
+        magic,
+        identity,
+        zones,
+        teachers,
+        TeacherRequest {
+            lease: tick.lease,
+            teacher: tick.teacher,
+            fighter,
+        },
+    )
+}
+
 /// Persist an authoritative "NO EFFECT" decision before publishing it.
 /// Interrupt/Cancel never applies damage; only a future Combat transaction
 /// may mark an effect as actually applied, together with all world effects.
@@ -299,6 +353,185 @@ mod tests {
             .unwrap();
         loot.register(1).unwrap();
         (loot, magic, identity, hero)
+    }
+
+    #[test]
+    fn world_teacher_tick_requires_fire_before_ember_and_persists_progression() {
+        use crate::magic_teacher::{TeacherSpawn, TeacherId};
+        use crate::simulation::World;
+        use crate::zone::{Position, ZoneAuthority};
+
+        let (loot, mut magic, identity, hero) = fixtures();
+        let mut zones = ZoneAuthority::new();
+        zones.register(1).unwrap();
+        let mut teachers = TeacherAuthority::new();
+        for (id, lesson) in [
+            (200, Lesson::Rune(Rune::Fire)),
+            (201, Lesson::Spell(Spell::Ember)),
+        ] {
+            teachers
+                .register_trusted(TeacherSpawn {
+                    id: TeacherId::new(id).unwrap(),
+                    zone: ZoneId::Moonvale,
+                    at: Position { x: 200.0, y: 200.0 },
+                    lesson,
+                })
+                .unwrap();
+        }
+        let mut world = World::new(800.0, 600.0);
+        world.add_player_at(1, 200.0, 200.0, 0.0);
+        world.step();
+        let path = checkpoint_path();
+        let lease = SessionLease::new(1, 1).unwrap();
+
+        assert!(matches!(
+            transact_world_teacher_lesson(
+                &path,
+                &loot,
+                &mut magic,
+                &identity,
+                &zones,
+                &teachers,
+                WorldTeacherTick {
+                    lease,
+                    teacher: TeacherId::new(201).unwrap(),
+                    world: &world,
+                    completed_tick: world.tick,
+                },
+            ),
+            Err(JointCheckpointError::Magic(MagicError::PrerequisiteMissing))
+        ));
+        assert!(!path.exists());
+        assert_eq!(magic.mana(hero), 0);
+
+        for (teacher_id, expected_receipt) in [(200, 1), (201, 2)] {
+            let receipt = transact_world_teacher_lesson(
+                &path,
+                &loot,
+                &mut magic,
+                &identity,
+                &zones,
+                &teachers,
+                WorldTeacherTick {
+                    lease,
+                    teacher: TeacherId::new(teacher_id).unwrap(),
+                    world: &world,
+                    completed_tick: world.tick,
+                },
+            )
+            .unwrap();
+            assert_eq!(receipt.get(), expected_receipt);
+        }
+        let (_, mut recovered) = load_joint(&path).unwrap();
+        assert!(recovered.knows_rune(hero, Rune::Fire));
+        assert!(recovered.knows_spell(hero, Spell::Ember));
+        assert_eq!(recovered.mana(hero), 100);
+        assert!(matches!(
+            transact_world_teacher_lesson(
+                &path,
+                &loot,
+                &mut recovered,
+                &identity,
+                &zones,
+                &teachers,
+                WorldTeacherTick {
+                    lease,
+                    teacher: TeacherId::new(200).unwrap(),
+                    world: &world,
+                    completed_tick: world.tick,
+                },
+            ),
+            Err(JointCheckpointError::Magic(MagicError::AlreadyKnown))
+        ));
+        let _ = fs::remove_file(&path);
+    }
+
+    #[test]
+    fn world_teacher_tick_rejects_stale_forged_and_missing_authority() {
+        use crate::magic_teacher::{TeacherSpawn, TeacherId};
+        use crate::simulation::World;
+        use crate::zone::{Position, ZoneAuthority};
+
+        let (loot, mut magic, identity, hero) = fixtures();
+        let mut zones = ZoneAuthority::new();
+        zones.register(1).unwrap();
+        let mut teachers = TeacherAuthority::new();
+        let teacher = TeacherId::new(300).unwrap();
+        teachers
+            .register_trusted(TeacherSpawn {
+                id: teacher,
+                zone: ZoneId::Moonvale,
+                at: Position { x: 200.0, y: 200.0 },
+                lesson: Lesson::Rune(Rune::Fire),
+            })
+            .unwrap();
+        let mut world = World::new(800.0, 600.0);
+        world.add_player_at(1, 200.0, 200.0, 0.0);
+        world.step();
+        let lease = SessionLease::new(1, 1).unwrap();
+        let path = checkpoint_path();
+
+        for (world_ref, completed_tick, used_lease) in [
+            (&world, 0, lease),
+            (&world, world.tick + 1, lease),
+            (&world, world.tick, SessionLease::new(1, 2).unwrap()),
+        ] {
+            let rejected = transact_world_teacher_lesson(
+                &path,
+                &loot,
+                &mut magic,
+                &identity,
+                &zones,
+                &teachers,
+                WorldTeacherTick {
+                    lease: used_lease,
+                    teacher,
+                    world: world_ref,
+                    completed_tick,
+                },
+            );
+            assert!(rejected.is_err());
+        }
+        let mut no_fighter = World::new(800.0, 600.0);
+        no_fighter.step();
+        assert!(matches!(
+            transact_world_teacher_lesson(
+                &path,
+                &loot,
+                &mut magic,
+                &identity,
+                &zones,
+                &teachers,
+                WorldTeacherTick {
+                    lease,
+                    teacher,
+                    world: &no_fighter,
+                    completed_tick: no_fighter.tick,
+                },
+            ),
+            Err(JointCheckpointError::MissingWorldFighter)
+        ));
+        let mut invalid_time = world.clone();
+        invalid_time.now_ms = f32::INFINITY;
+        assert!(matches!(
+            transact_world_teacher_lesson(
+                &path,
+                &loot,
+                &mut magic,
+                &identity,
+                &zones,
+                &teachers,
+                WorldTeacherTick {
+                    lease,
+                    teacher,
+                    world: &invalid_time,
+                    completed_tick: invalid_time.tick,
+                },
+            ),
+            Err(JointCheckpointError::InvalidWorldTime)
+        ));
+        assert!(!magic.knows_rune(hero, Rune::Fire));
+        assert!(!path.exists());
     }
 
     #[test]
