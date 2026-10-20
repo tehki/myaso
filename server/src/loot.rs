@@ -1204,8 +1204,7 @@ mod tests {
             loot.split_backpack_stack(1, gold_id, 7),
             Err(LootError::InvalidStack)
         );
-        loot.merge_backpack_stacks(1, gold_id, fragment_id)
-            .unwrap();
+        loot.merge_backpack_stacks(1, gold_id, fragment_id).unwrap();
         assert_eq!(loot.inventory(1).unwrap().backpack().len(), 1);
         assert_eq!(loot.inventory(1).unwrap().backpack()[0].amount, 11);
         assert_eq!(loot.inventory(1).unwrap().backpack()[0].id, gold_id);
@@ -1281,7 +1280,10 @@ mod tests {
             loot.split_backpack_stack(1, id, 3),
             Err(LootError::InventoryFull)
         );
-        assert_eq!(loot.inventory(1).unwrap().backpack().len(), BACKPACK_CAPACITY);
+        assert_eq!(
+            loot.inventory(1).unwrap().backpack().len(),
+            BACKPACK_CAPACITY
+        );
         assert_eq!(loot.inventory(1).unwrap().backpack()[0].amount, 8);
     }
 
