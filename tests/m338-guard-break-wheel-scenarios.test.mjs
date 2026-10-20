@@ -43,7 +43,8 @@ test("M338 connects before guard-break W3C input and preserves genuine wheel pro
   const r2 = readFileSync(new URL("../scripts/r2-release-led-short-block.mjs", import.meta.url), "utf8");
   assert.ok(flight.includes("dispatchR2ReleaseLedShortBlock({"));
   assert.match(r2, /receiptGraceMs = 100/);
-  assert.match(r2, /postTrustedWheelMs: 0/);
+  assert.match(r2, /postTrustedWheelMs = 0/);
+  assert.match(r2, /postTrustedWheelMs: rounded\(postTrustedWheelMs\)/);
   assert.ok(flight.includes("b.playerGuard < expectedGuards[index]") || flight.includes("defenderResult.playerGuard !== 0"));
   assert.ok(!observer.includes("dispatchEvent("));
 });
