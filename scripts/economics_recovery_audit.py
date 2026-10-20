@@ -287,6 +287,16 @@ def _audit(db: sqlite3.Connection) -> AuditReport:
     material = [
         (name, _all_rows(db, name, order)) for name, order in TABLES
     ]
+    # Schema constraints are part of the externally checked fixture state.
+    # Exclude storage-specific root page numbers and SQLite internal tables,
+    # which can differ after legitimate SQLite backup/compaction.
+    material.append((
+        "schema",
+        db.execute(
+            "SELECT type,name,tbl_name,sql FROM sqlite_master "
+            "WHERE name NOT LIKE 'sqlite_%' ORDER BY type,name"
+        ).fetchall(),
+    ))
     digest = hashlib.sha256(
         json.dumps(material, separators=(",", ":"), ensure_ascii=True)
         .encode("ascii")
