@@ -35,11 +35,6 @@ const ATTACKS = new Set([
   COMBAT_ACTION.runningAttackWindup, COMBAT_ACTION.runningAttackActive, COMBAT_ACTION.runningAttackRecovery,
   COMBAT_ACTION.jumpAttackWindup, COMBAT_ACTION.jumpAttackActive, COMBAT_ACTION.jumpAttackRecovery,
 ]);
-const AIRBORNE = new Set([
-  COMBAT_ACTION.jump, COMBAT_ACTION.jumpAttackWindup,
-  COMBAT_ACTION.jumpAttackActive, COMBAT_ACTION.jumpAttackRecovery,
-]);
-
 export function knightDirectionIndex(facing) {
   if (!Number.isFinite(facing)) return 0;
   const turn = Math.PI * 2;
@@ -47,17 +42,20 @@ export function knightDirectionIndex(facing) {
 }
 
 export function knightClip(action, remote, speed = 0, moving = false) {
-  if (action === COMBAT_ACTION.dead || action === COMBAT_ACTION.knockdown
-    || action === COMBAT_ACTION.dash) return null;
   if (action === COMBAT_ACTION.dodge || action === COMBAT_ACTION.dodgeRecovery) {
     return remote ? "t1_roll" : "silver_roll";
   }
+  // The optional atlases cover only a subset of authoritative Combat actions.
+  // An unrelated idle/walk pose would falsely depict readiness during kicks,
+  // stun, knockdown, jump attacks, or committed local sword attacks. Let the
+  // existing combat renderer draw those actions and their truthful tells.
   if (remote) {
     if (action === COMBAT_ACTION.block) return "t1_block";
     if (ATTACKS.has(action)) return "t1_attack";
-    return "t1_walk";
+    return action === COMBAT_ACTION.idle ? "t1_walk" : null;
   }
-  if (AIRBORNE.has(action)) return "silver_jump";
+  if (action === COMBAT_ACTION.jump) return "silver_jump";
+  if (action !== COMBAT_ACTION.idle) return null;
   if (moving && speed >= 280) return "silver_sprint";
   return moving ? "silver_walk" : "silver_idle";
 }
@@ -113,7 +111,12 @@ export function createKnightSpriteRenderer({ ImageCtor = Image,
       state.atMs = nowMs;
       const moving = nowMs - state.lastMoveMs < 135;
       const clip = knightClip(fighter.action ?? COMBAT_ACTION.idle, remote, state.speed, moving);
-      if (!clip) return false;
+      if (!clip) {
+        // End the previous clip on unsupported states. A future roll must
+        // start at frame zero rather than resume its previous final frame.
+        state.clip = null;
+        return false;
+      }
       const atlas = atlases.get(clip);
       if (!atlas?.ready) return false;
       if (state.clip !== clip) {
