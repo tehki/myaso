@@ -76,3 +76,37 @@ P2 extends the **same unmerged draft** with `src/browser/magic-particle-renderer
 ### After P2
 
 The next review boundary is a strictly versioned *server-to-client-only* semantic effect event envelope, interest gating, replay/expiry tests and magic authoritative caster validation. Do not turn visual events into trusted hit/collision data, and do not merge with unmerged Magic & Items or NPC geometry implementations without a separate integration pass.
+
+## P3 follow-up — server collision and bounded elemental fields (2026-10-20)
+
+**All P3 modules remain inactive and server-internal.** The purpose is to establish reviewable physics contracts without touching active combat timing, Magic & Items inventory, NPC paths, world manifests, snapshot formats or network input.
+
+### Revision-pinned collider sweep
+
+`server/src/elemental_collision.rs` implements `clip_radial_impulse` for a P1 `ProposedDisplacement` and a trusted `CollisionWindow` with explicit zone, nonzero revision and a completeness assertion from the server-owned manifest producer. It checks the target identity/zone/mobility, finite bounded geometry, full initial and destination coverage, and up to 64 authoritative static AABB barriers. A swept-circle against an inflated obstacle stops at the earliest contact with a 0.125-unit margin; inside-wall starts stay blocked. It cannot move a player, mutate coordinates or enable spells.
+
+Missing, incomplete, mismatched, over-cap or stale geometry returns no resolution. In particular a client MUST NEVER be able to set `CollisionWindow.complete`, supply a revision, or choose the collider list. The current P3 calculation does **not** certify that the passed window genuinely corresponds to a live Greyhaven chunk; collision-manifest integration is a separate reviewed prerequisite. All collision response is a *proposal*, never a full physical dynamics solver. It intentionally does not slide along walls or cross realm boundaries.
+
+### Server-owned elemental field ledger
+
+`server/src/elemental_fields.rs` introduces `ElementalFieldLedger` keyed to a **strictly increasing trusted server tick**. Fields have nonzero IDs, zone IDs, finite positions, a maximum radius of 128 units, and a lifetime of at most 600 ticks (10 seconds at the current 60Hz authority rate). Each active field has one semantic `Element`. Hard limits: **128 fields globally in the isolated process** and **24 per zone**. Excess is rejected without replacing existing fields. Expiry occurs on `advance(tick)`; no background timer runs.
+
+The server-internal, read-only `sample_at(zone, x, y)` computes overlap masks and a deterministic priority reaction:
+
+| Overlap | Semantic reaction (no active gameplay effect) |
+| --- | --- |
+| Fire + Ice | Steam |
+| Fire + Wind | Flare |
+| Ice + Wind | Blizzard |
+| Lightning + Arcane | ArcSurge |
+
+These are **event classifications only**, not damage, fire spread, ice friction, lightning chaining or status application. Their actual gameplay semantics require Combat, Magic & Items, World, and Economics review. No persistent effects or ownership changes are implied.
+
+The fixed 128-field cap is intentionally conservative and temporary; it is not proof that a giant realm can share one monolithic field registry. The production follow-up must shard/spatially index by authoritative zone/chunk and provide cost measurements for crowded scenes. Field IDs currently live in-process only; saving/loading and restart-safe uniqueness are NOT implemented.
+
+### P3 acceptance requirements
+
+- Unit tests: movement stops short of obstacles, diagonal no-tunneling, starting-overlap fail closed, border containment, mismatched zone/revision and over-cap denial, deterministic element combination and expiry, realm/zone caps and unchanged input state.
+- Exact-head `quality` CI must pass Rust formatting/check/clippy/tests **and** real Chromium/Firefox combat acceptance. No reduction or skipping of existing M194/M144/other gates.
+- Previous P2 [quality run #39463504399](https://github.com/tehki/myaso/actions/runs/39463504399) failed **M194 real guard-break block-only pressure**: a genuine third browser exchange parried rather than blocking. Physics changes are hard-disabled, and P3 does not touch that combat path. The Combat department must investigate independently; full PR stays red until authoritative CI is green.
+- Do not merge or deploy the draft or expose P3 to client packets. Rollback remains dropping/reverting the isolated physics branch.
