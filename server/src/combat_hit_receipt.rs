@@ -133,7 +133,10 @@ mod tests {
         let bytes = encode_hit_receipt(fixture()).unwrap();
         assert_eq!(
             bytes,
-            [1, 5, 0, 0, 4, 3, 2, 1, 13, 12, 11, 10, 2, 0, 0, 0, 1, 0, 0, 0, 0, 0, 8, 66, 0, 0, 132, 66]
+            [
+                1, 5, 0, 0, 4, 3, 2, 1, 13, 12, 11, 10, 2, 0, 0, 0, 1, 0, 0, 0, 0, 0, 8, 66, 0, 0,
+                132, 66
+            ]
         );
         assert_eq!(decode_hit_receipt(&bytes), Ok(fixture()));
     }
@@ -180,36 +183,63 @@ mod tests {
     fn malformed_actor_or_nonfinite_damage_fails_closed() {
         let mut packet = fixture();
         packet.attacker = packet.target;
-        assert_eq!(encode_hit_receipt(packet), Err(HitReceiptError::InvalidActors));
+        assert_eq!(
+            encode_hit_receipt(packet),
+            Err(HitReceiptError::InvalidActors)
+        );
         packet = fixture();
         packet.target_hp = f32::NAN;
-        assert_eq!(encode_hit_receipt(packet), Err(HitReceiptError::InvalidHealth));
+        assert_eq!(
+            encode_hit_receipt(packet),
+            Err(HitReceiptError::InvalidHealth)
+        );
         packet = fixture();
         packet.damage = f32::INFINITY;
-        assert_eq!(encode_hit_receipt(packet), Err(HitReceiptError::InvalidDamage));
+        assert_eq!(
+            encode_hit_receipt(packet),
+            Err(HitReceiptError::InvalidDamage)
+        );
         packet = fixture();
         packet.damage = 0.0;
-        assert_eq!(encode_hit_receipt(packet), Err(HitReceiptError::InvalidDamage));
+        assert_eq!(
+            encode_hit_receipt(packet),
+            Err(HitReceiptError::InvalidDamage)
+        );
     }
 
     #[test]
     fn reserved_bytes_wrong_type_and_corruption_are_rejected() {
         let bytes = encode_hit_receipt(fixture()).unwrap();
-        assert_eq!(decode_hit_receipt(&bytes[..27]), Err(HitReceiptError::InvalidLength));
+        assert_eq!(
+            decode_hit_receipt(&bytes[..27]),
+            Err(HitReceiptError::InvalidLength)
+        );
         let mut bad = bytes;
         bad[0] = 2;
-        assert_eq!(decode_hit_receipt(&bad), Err(HitReceiptError::WrongProtocol));
+        assert_eq!(
+            decode_hit_receipt(&bad),
+            Err(HitReceiptError::WrongProtocol)
+        );
         bad = bytes;
         bad[1] = 4;
-        assert_eq!(decode_hit_receipt(&bad), Err(HitReceiptError::WrongPacketType));
+        assert_eq!(
+            decode_hit_receipt(&bad),
+            Err(HitReceiptError::WrongPacketType)
+        );
         bad = bytes;
         bad[2] = 1;
         assert_eq!(decode_hit_receipt(&bad), Err(HitReceiptError::ReservedBits));
         bad = bytes;
         bad[12..16].copy_from_slice(&0_u32.to_le_bytes());
-        assert_eq!(decode_hit_receipt(&bad), Err(HitReceiptError::InvalidActors));
+        assert_eq!(
+            decode_hit_receipt(&bad),
+            Err(HitReceiptError::InvalidActors)
+        );
         bad = bytes;
         bad[20..24].copy_from_slice(&f32::NAN.to_le_bytes());
-        assert_eq!(decode_hit_receipt(&bad), Err(HitReceiptError::InvalidDamage));
+        assert_eq!(
+            decode_hit_receipt(&bad),
+            Err(HitReceiptError::InvalidDamage)
+        );
     }
 }
