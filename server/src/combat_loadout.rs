@@ -93,13 +93,21 @@ fn resolve_inventory_loadout(inventory: &Inventory) -> Result<CombatLoadout, Com
         Some((ItemKind::RustySword, id)) => MainHandCombatItem::RustySword(id),
         Some((ItemKind::IronSword, id)) => MainHandCombatItem::IronSword(id),
         Some((ItemKind::WoodenClub, id)) => MainHandCombatItem::WoodenClub(id),
-        Some(_) => return Err(CombatLoadoutError::InvalidEquippedItem(EquipmentSlot::MainHand)),
+        Some(_) => {
+            return Err(CombatLoadoutError::InvalidEquippedItem(
+                EquipmentSlot::MainHand,
+            ))
+        }
     };
     let off_hand = match off.map(|item| (item.kind, item.id)) {
         None => OffHandCombatItem::Empty,
         Some((ItemKind::WoodenShield, id)) => OffHandCombatItem::WoodenShield(id),
         Some((ItemKind::Spellbook, id)) => OffHandCombatItem::Spellbook(id),
-        Some(_) => return Err(CombatLoadoutError::InvalidEquippedItem(EquipmentSlot::OffHand)),
+        Some(_) => {
+            return Err(CombatLoadoutError::InvalidEquippedItem(
+                EquipmentSlot::OffHand,
+            ))
+        }
     };
     let body = match body.map(|item| (item.kind, item.id)) {
         None => BodyCombatArmor::Unarmored,
@@ -181,19 +189,33 @@ mod tests {
         let mut inventory = Inventory::default();
         inventory.equipment.insert(
             EquipmentSlot::MainHand,
-            ItemStack { id: 1, kind: ItemKind::Gold, amount: 1 },
+            ItemStack {
+                id: 1,
+                kind: ItemKind::Gold,
+                amount: 1,
+            },
         );
         assert_eq!(
             resolve_inventory_loadout(&inventory),
-            Err(CombatLoadoutError::InvalidEquippedItem(EquipmentSlot::MainHand))
+            Err(CombatLoadoutError::InvalidEquippedItem(
+                EquipmentSlot::MainHand
+            ))
         );
         inventory.equipment.insert(
             EquipmentSlot::MainHand,
-            ItemStack { id: 1, kind: ItemKind::RustySword, amount: 1 },
+            ItemStack {
+                id: 1,
+                kind: ItemKind::RustySword,
+                amount: 1,
+            },
         );
         inventory.equipment.insert(
             EquipmentSlot::OffHand,
-            ItemStack { id: 1, kind: ItemKind::WoodenShield, amount: 1 },
+            ItemStack {
+                id: 1,
+                kind: ItemKind::WoodenShield,
+                amount: 1,
+            },
         );
         assert_eq!(
             resolve_inventory_loadout(&inventory),
@@ -202,11 +224,17 @@ mod tests {
         inventory.equipment.remove(&EquipmentSlot::OffHand);
         inventory.equipment.insert(
             EquipmentSlot::MainHand,
-            ItemStack { id: 0, kind: ItemKind::RustySword, amount: 1 },
+            ItemStack {
+                id: 0,
+                kind: ItemKind::RustySword,
+                amount: 1,
+            },
         );
         assert_eq!(
             resolve_inventory_loadout(&inventory),
-            Err(CombatLoadoutError::InvalidEquippedItem(EquipmentSlot::MainHand))
+            Err(CombatLoadoutError::InvalidEquippedItem(
+                EquipmentSlot::MainHand
+            ))
         );
     }
 }
