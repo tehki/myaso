@@ -11,6 +11,15 @@ CREATE TABLE IF NOT EXISTS core_zone.item_state (
     CHECK (retired = (location IS NULL))
 );
 -- Item IDs never leave this table, including destroyed/retired items.
+-- Matches the C3a Rust ledger's equipment-index uniqueness invariant.
+-- An equipped C3f location is tag 2, 16-byte BE character ID, one slot byte,
+-- followed by eight zero bytes. Bytea substring starts at 1 in SQL:
+-- [2..18] encodes (character ID, slot) and must be globally unique.
+-- Live gameplay must still verify actor authorization and item provenance.
+-- Single-item C3g intentionally does NOT support atomic two-item swaps.
+CREATE UNIQUE INDEX IF NOT EXISTS item_equipment_slot_unique
+    ON core_zone.item_state ((substring(location FROM 2 FOR 17)))
+    WHERE NOT retired AND location IS NOT NULL AND get_byte(location, 0) = 2;
 
 CREATE TABLE IF NOT EXISTS core_zone.item_world_receipts (
     operation_id bytea PRIMARY KEY CHECK (octet_length(operation_id) = 16),
