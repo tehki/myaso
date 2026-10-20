@@ -30,7 +30,7 @@ SQLite uses **WAL, synchronous=FULL, foreign keys enabled, an explicit `BEGIN IM
 
 Local authorized Serj development machine (standard Python 3 and SQLite stdlib):
 
-- **21/21 unittest cases passed** using separate real temporary SQLite files after the fixture consent/admission extension (the initial 14-test milestone was passed separately).
+- **30/30 unittest cases passed** using separate real temporary SQLite files after the fixture consent/admission extension (the initial 14-test milestone was passed separately).
 - A normal committed sale survives connection close/reopen with one set of postings, one deed owner and one outbox event.
 - Retrying the same operation ID returns the same canonical receipt, even when the server logical tick moves forward. Reusing an ID with another buyer/payload is rejected.
 - Invalid session identity, stale balance/deed versions, expired/revoked/self sale, overdraft, and title revision overflow fail without partial debits.
@@ -49,6 +49,16 @@ The in-memory-authentication gap was made explicit in the SQLite laboratory. Two
 Seven additional regression tests cover forged/missing consent, revoked consent with active listing, mutated sale conditions, revoked/unknown session epochs, atomic consent consumption, safe retry and post-commit process-kill recovery with the consent state. **21/21 offline tests passed locally**, including the original crash/restart and concurrent-buyer suite. Strictness does **not** mean real admission: the test fixture inserts known IDs and epochs itself, a Python caller can still fabricate a matching `VerifiedSession`, and the `approved_consent` reference is not a verifiable signature. A production trusted admission service and cryptographically or otherwise securely attested seller authorization are still mandatory.
 
 The conformance checks are schema/transaction tests only. They do not validate production credential issuance, seller keys, server-to-DB trust, server ticks, account ownership, anti-alt land policies, identity revocation across devices, or distributed commit.
+
+### E2d outbox projection & consumer crash recovery (20 October 2026)
+
+E2d now also exercises *downstream recovery* of committed property-transfer notices. The new `title_projection` table is a deliberately delayed **read-side mirror**, not the authoritative deed. The new `projection_inbox` table records the committed event sequence and SHA-256 digest of each applied outbox payload. `pending_title_events` is a bounded offline query for undelivered events. `project_title_event` applies **one trusted committed receipt** by advancing the mirror and recording inbox deduplication **within one SQLite transaction**. Repeated execution of the same event returns `already_applied`, with no second state change. Malformed or modified outbox contents are rejected against the independently stored receipt in this local fixture.
+
+The consumer implementation has injectable failures after updating the read model but before COMMIT, before COMMIT after inserting inbox, and after COMMIT with an intentionally lost acknowledgment. Child-process `os._exit(91)` checks verify that **incomplete projection and inbox state roll back together**, whereas a completed projection can safely be retried. Two independent processes racing to project the same receipt converge on one read model version and one inbox record.
+
+**Proof limit:** This is exactly-once *application to one local SQLite read model*, NOT exactly-once network delivery or exactly-once effects in other services. It sends **no** events to external consumers. Event digest verification is not an independently authenticated, signed integrity chain and cannot prevent someone with direct database write authority from tampering with both the receipt and event. The production protocol must use a trusted internal consumer identity, a durable asynchronous transport, recipient-side idempotency, backup/recovery and out-of-order multi-parcel event ordering.
+
+Nine additional outbox tests cover initial lag, deduplicated retry, injected rollback, hard process kills before and after consumer COMMIT, lost acknowledgment, competing processes, tampered outbox contents, and invalid sequence/poll budgets. Together with the preceding 21 E2d tests: **30/30 local Python unittest tests passed**, including process-kill tests. Exact-head GitHub Actions CI remains mandatory; earlier CI results must not be applied to this updated commit.
 
 ### What this does **not** prove
 
