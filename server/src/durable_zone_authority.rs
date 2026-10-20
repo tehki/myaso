@@ -575,20 +575,11 @@ mod tests {
     fn orphan_stage_ignored_but_unprepared_commit_fails_closed() {
         let root = Root::new();
         let mut original = root.open();
-        original.register(item(1), worker(1), zone(1)).expect("register");
+        let lease = original.register(item(1), worker(1), zone(1)).expect("register");
         drop(original);
         fs::write(root.0.join(".pending-zone-power-loss"), b"partial").expect("orphan");
-        assert!(root.open().can_mutate(
-            AuthorityLease {
-                entity: item(1),
-                worker: worker(1),
-                zone: zone(1),
-                epoch: 1,
-            }
-        ));
-        let forged = Event::from_lease(2, Action::Register, AuthorityLease {
-            entity: item(2), worker: worker(1), zone: zone(1), epoch: 1,
-        });
+        assert!(root.open().can_mutate(lease));
+        let forged = Event::from_lease(2, Action::Register, lease);
         let mut illegal = Event { action: Action::Commit, ..forged };
         illegal.target_worker = Some(worker(2));
         illegal.target_zone = Some(zone(2));
