@@ -94,7 +94,7 @@ async fn run_lab_connection(connection: Connection, id: u32) -> Result<()> {
                 gp[0] = b'G';
                 gp[1] = b'P';
                 gp[2..6].copy_from_slice(&(tick as u32).to_le_bytes());
-                connection.send_datagram(gp.to_vec())
+                connection.send_datagram(gp)
                     .context("send test gameplay marker")?;
 
                 if tick >= FX_START_TICK {
@@ -136,7 +136,7 @@ async fn run_lab_connection(connection: Connection, id: u32) -> Result<()> {
                     for packet in batch.packets {
                         // The EXACT P4 semantic 32-byte payload travels over
                         // an actual QUIC datagram. No per-particle streaming.
-                        connection.send_datagram(packet.to_vec())
+                        connection.send_datagram(packet)
                             .context("send optional P9 cosmetic datagram")?;
                     }
                 }
@@ -150,7 +150,7 @@ async fn run_lab_connection(connection: Connection, id: u32) -> Result<()> {
                     reply[0] = b'P';
                     reply[1] = b'O';
                     reply[2..6].copy_from_slice(&input[2..6]);
-                    connection.send_datagram(reply.to_vec())
+                    connection.send_datagram(reply)
                         .context("send P9 test ping reply")?;
                 }
                 // Ignore all other incoming data. NO spell or combat input.
