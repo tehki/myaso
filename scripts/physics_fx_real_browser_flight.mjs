@@ -133,17 +133,19 @@ async function runBrowser(browser, lab, staticPort) {
     page.searchParams.set("cert", lab.cert);
     await webdriver(base, "POST", `/session/${sessionId}/url`, { url: page.toString() });
     const deadline = Date.now() + 16000;
+    let lastStage = "page-not-started";
     while (Date.now() < deadline) {
       const result = await webdriver(base, "POST", `/session/${sessionId}/execute/sync`, {
-        script: "return {result:window.__P9_RESULT__||null,error:window.__P9_ERROR__||null};",
+        script: "return {result:window.__P9_RESULT__||null,error:window.__P9_ERROR__||null,stage:window.__P9_STAGE__||null};",
         args: [],
       });
       const value = result.value ?? result;
+      lastStage = value?.stage ?? lastStage;
       if (value.error) throw new Error(`P9 ${browser.name} page: ${value.error}`);
       if (value.result) return value.result;
       await sleep(175);
     }
-    throw new Error(`P9 ${browser.name} real QUIC datagram flight timed out`);
+    throw new Error(`P9 ${browser.name} real QUIC datagram flight timed out (stage: ${lastStage})`);
   } finally {
     if (sessionId) {
       try { await webdriver(base, "DELETE", `/session/${sessionId}`); } catch {}
