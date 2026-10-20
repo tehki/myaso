@@ -110,7 +110,7 @@ report={
   "gameZoom":zoom,
   "gameWorldUnitsPerMeter":1/mscale,
   "expectedGamePixelsPerMeter":zoom/mscale,
-  "authoritativeDoorGameXY":[*door_server],
+  "manifestDoorGameXY":[*door_server],
   "visualDoorOriginInBlenderMeters":[round(v,5) for v in origin],
   "browserComparisonViewportPixels":[width,height],
   "blenderBasisPxPerMeterX":[round(v,5) for v in bvecx],
@@ -120,7 +120,7 @@ report={
   "maxSampleErrorPx":round(errmax,3),
   "directSingleLayerPlacementApproved":False,
   "requiresCameraMatchedRerender":True,
-  "caveat":"Door world coordinate is from A1 manifest; real game projection assumes screen XY and independent camera. Review sample is not a gameplay portal or an engine registration."
+  "caveat":"Door world XY are proposed A1 manifest coordinates, NOT a validated server-authoritative portal; the runtime is a flat XY camera. Review only."
 }
 # The current oblique Blender camera is mathematically inconsistent with
 # unrotated world XY. Never greenlight it by merely moving/scaling the PNG.
