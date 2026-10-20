@@ -28,7 +28,7 @@ const LAB_ZONE_ID: u32 = 7;
 #[tokio::main]
 async fn main() -> Result<()> {
     let addr: SocketAddr = "127.0.0.1:0".parse().expect("static loopback address");
-    let identity = Identity::self_signed(["localhost", "127.0.0.1"])
+    let identity = Identity::self_signed(["localhost", "127.0.0.1", "::1"])
         .context("generate P9 loopback-only test identity")?;
     let cert_hash = identity
         .certificate_chain()
@@ -40,6 +40,7 @@ async fn main() -> Result<()> {
     let config = ServerConfig::builder()
         .with_bind_address(addr)
         .with_identity(identity)
+        .keep_alive_interval(Some(Duration::from_secs(2)))
         .build();
     let endpoint = Endpoint::server(config).context("bind P9 loopback WebTransport")?;
     let local_addr = endpoint.local_addr().context("read P9 loopback address")?;
@@ -56,6 +57,7 @@ async fn main() -> Result<()> {
         }
         let connection = request.accept().await.context("accept P9 WebTransport")?;
         let id = next_id.fetch_add(1, Ordering::Relaxed);
+        println!("P9_LAB_ACCEPTED test_connection_id={id}");
         tokio::spawn(async move {
             if let Err(error) = run_lab_connection(connection, id).await {
                 eprintln!("P9 loopback client session ended: {error:#}");
