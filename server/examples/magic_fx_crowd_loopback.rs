@@ -22,7 +22,8 @@ use wtransport::{Connection, Endpoint, Identity, ServerConfig};
 
 const PATH: &str = "/physics-fx-crowd";
 const ZONE: u32 = 7;
-const TOTAL_TICKS: u64 = 115;
+const DEFAULT_TICKS: u64 = 115;
+const MAX_TICKS: u64 = 350;
 const FX_START_TICK: u64 = 21;
 const MAX_LAB_CONNECTIONS: usize = 64;
 
@@ -35,6 +36,17 @@ async fn main() -> Result<()> {
         .context("P10 expected connection count must be a decimal integer")?;
     if !(2..=MAX_LAB_CONNECTIONS).contains(&expected) {
         bail!("P10 expected connections must be 2..={MAX_LAB_CONNECTIONS}");
+    }
+    // Optional longer P11 shared-host contention window, validated and
+    // bounded. The existing P10 115-tick acceptance is unchanged by default.
+    let total_ticks = std::env::var("P10_LAB_TICKS")
+        .ok()
+        .map(|s| s.parse::<u64>())
+        .transpose()
+        .context("P10_LAB_TICKS must be an integer")?
+        .unwrap_or(DEFAULT_TICKS);
+    if !(DEFAULT_TICKS..=MAX_TICKS).contains(&total_ticks) {
+        bail!("P10_LAB_TICKS must be between {DEFAULT_TICKS} and {MAX_TICKS}");
     }
     let addr: SocketAddr = "127.0.0.1:0".parse().expect("loopback literal");
     let identity = Identity::self_signed(["localhost", "127.0.0.1", "::1"])
@@ -127,7 +139,7 @@ async fn main() -> Result<()> {
     let mut total_gp = 0usize;
     let mut total_fx_bytes = 0usize;
     let mut blocked_cosmetic_polls = 0usize;
-    for tick in 1..=TOTAL_TICKS {
+    for tick in 1..=total_ticks {
         clock.tick().await;
         hub.advance(tick)
             .expect("strictly increasing P10 fixture tick");
@@ -201,7 +213,7 @@ async fn main() -> Result<()> {
         }
     }
     println!(
-        "P10_REAL_CROWD_SUMMARY connections={} ticks={TOTAL_TICKS} gameplay_markers_sent={total_gp} cosmetic_payload_bytes={total_fx_bytes} semantic_packets={} suppressed_optional_polls={blocked_cosmetic_polls}",
+        "P10_REAL_CROWD_SUMMARY connections={} ticks={total_ticks} gameplay_markers_sent={total_gp} cosmetic_payload_bytes={total_fx_bytes} semantic_packets={} suppressed_optional_polls={blocked_cosmetic_polls}",
         connections.len(),
         total_fx_bytes / MAGIC_FX_PACKET_BYTES
     );
