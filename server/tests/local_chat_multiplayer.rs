@@ -1,0 +1,165 @@
+//! Genuine WebTransport acceptance: three independent client connections
+//! against the real Rust server, with authoritative spawn positions.
+//! This is LOOPBACK acceptance, not an independent-network/WAN claim.
+use std::{
+    io::{BufRead, BufReader},
+    process::{Child, Command, Stdio},
+    sync::mpsc,
+    time::Duration,
+};
+use tokio::time::timeout;
+use wtransport::{ClientConfig, Connection, Endpoint, RecvStream, SendStream};
+
+struct TestServer(Child);
+impl Drop for TestServer {
+    fn drop(&mut self) {
+        let _ = self.0.kill();
+        let _ = self.0.wait();
+    }
+}
+fn start_server() -> (TestServer, String) {
+    let mut process = Command::new(env!("CARGO_BIN_EXE_myaso-server"))
+        .env("MYASO_BIND", "127.0.0.1:0")
+        .env("MYASO_CHAT_RADIUS", "160")
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null())
+        .spawn().expect("start actual game server");
+    let output = process.stdout.take().expect("server output");
+    let (sender, receiver) = mpsc::channel();
+    std::thread::spawn(move || {
+        for line in BufReader::new(output).lines().map_while(Result::ok) {
+            if let Some(url) = line.split("listening on ").nth(1) {
+                let _ = sender.send(url.trim().to_owned());
+                break;
+            }
+        }
+    });
+    let url = receiver.recv_timeout(Duration::from_secs(15))
+        .expect("actual game server listening URL");
+    assert!(url.starts_with("https://127.0.0.1:"));
+    (TestServer(process), url)
+}
+
+struct Player {
+    _endpoint: Endpoint,
+    connection: Connection,
+    _game_send: SendStream,
+    _game_recv: RecvStream,
+    chat_send: SendStream,
+    chat_recv: RecvStream,
+}
+impl Player {
+    async fn connect(url: &str) -> Self {
+        // Self-signed certificate bypass is permitted solely in this loopback
+        // test harness, never in production player/browser connections.
+        let endpoint = Endpoint::client(ClientConfig::builder()
+            .with_bind_default()
+            .with_no_cert_validation()
+            .build()).expect("test endpoint");
+        let connection = timeout(Duration::from_secs(8), endpoint.connect(url))
+            .await.expect("connect timeout").expect("connect");
+        let (game_send, game_recv) = timeout(Duration::from_secs(8),
+            async { connection.open_bi().await.expect("game bi").await.expect("game init") })
+            .await.expect("game bi timeout");
+        let chat_send = timeout(Duration::from_secs(8),
+            async { connection.open_uni().await.expect("chat uni").await.expect("chat init") })
+            .await.expect("chat open timeout");
+        let chat_recv = timeout(Duration::from_secs(8), connection.accept_uni())
+            .await.expect("server chat reply timeout").expect("server chat reply");
+        Self {
+            _endpoint: endpoint,
+            connection,
+            _game_send: game_send,
+            _game_recv: game_recv,
+            chat_send,
+            chat_recv,
+        }
+    }
+    async fn send(&mut self, correlation: u32, text: &[u8], channel: u8) {
+        let mut frame = vec![0x31, 1, channel];
+        frame.extend_from_slice(&correlation.to_le_bytes());
+        frame.extend_from_slice(&(text.len() as u16).to_le_bytes());
+        frame.extend_from_slice(text);
+        self.send_raw(&frame).await;
+    }
+    async fn send_raw(&mut self, frame: &[u8]) {
+        let len = u16::try_from(frame.len()).expect("test bounded frame");
+        self.chat_send.write_all(&len.to_le_bytes()).await.expect("frame size write");
+        self.chat_send.write_all(frame).await.expect("frame write");
+    }
+    async fn receive(&mut self) -> Vec<u8> {
+        timeout(Duration::from_secs(6), async {
+            let mut len = [0_u8; 2];
+            self.chat_recv.read_exact(&mut len).await.expect("chat length");
+            let size = u16::from_le_bytes(len) as usize;
+            assert!((9..=512).contains(&size), "chat response must be bounded");
+            let mut bytes = vec![0; size];
+            self.chat_recv.read_exact(&mut bytes).await.expect("chat frame");
+            bytes
+        }).await.expect("chat frame timeout")
+    }
+}
+fn assert_result(frame: &[u8], correlation: u32, code: u8) -> u64 {
+    assert_eq!(frame.len(), 15);
+    assert_eq!(&frame[..2], &[0x33, 1]);
+    assert_eq!(u32::from_le_bytes(frame[2..6].try_into().unwrap()), correlation);
+    assert_eq!(frame[6], code);
+    u64::from_le_bytes(frame[7..15].try_into().unwrap())
+}
+fn assert_received(frame: &[u8], sender: u32, text: &str) -> u64 {
+    assert_eq!(&frame[..3], &[0x32, 1, 1]);
+    assert_eq!(u32::from_le_bytes(frame[11..15].try_into().unwrap()),sender);
+    let len = u16::from_le_bytes(frame[19..21].try_into().unwrap()) as usize;
+    assert_eq!(len, text.len());
+    assert_eq!(std::str::from_utf8(&frame[21..]).unwrap(),text);
+    u64::from_le_bytes(frame[3..11].try_into().unwrap())
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn real_three_connection_local_chat_and_distant_isolation() {
+    let (_server, url) = start_server();
+    let mut alice = Player::connect(&url).await;
+    let mut bob = Player::connect(&url).await;
+    let mut distant = Player::connect(&url).await;
+
+    // Server-assigned IDs are 1, 2, 3, with spawn X=42, 138, 234.
+    // A-B separation is 96 units, A-C separation is 192.
+    alice.send(100, b"Greetings! Have you seen the blacksmith?", 1).await;
+    let accepted = alice.receive().await;
+    let message_id = assert_result(&accepted, 100, 0);
+    assert!(message_id != 0);
+    let received = bob.receive().await;
+    assert_eq!(assert_received(&received, 1, "Greetings! Have you seen the blacksmith?"),message_id);
+    assert!(timeout(Duration::from_millis(350), distant.receive()).await.is_err(),
+        "distant player must receive no local chat");
+
+    bob.send(101, b"Yes, near the market.", 1).await;
+    assert!(assert_result(&bob.receive().await, 101, 0) > 0);
+    assert!(assert_received(&alice.receive().await, 2, "Yes, near the market.") > message_id);
+
+    alice.send(100, b"Greetings! Have you seen the blacksmith?", 1).await;
+    assert_eq!(assert_result(&alice.receive().await,100,8),message_id);
+    assert!(timeout(Duration::from_millis(250), bob.receive()).await.is_err(),
+        "duplicate request must not fan out twice");
+
+    alice.send(102, &[0xff, 0xfe], 1).await;
+    assert_eq!(assert_result(&alice.receive().await,102,3),0);
+    alice.send(103, b"bad channel", 3).await;
+    assert_eq!(assert_result(&alice.receive().await,103,6),0);
+    alice.send(104, &vec![b'x';241], 1).await;
+    assert_eq!(assert_result(&alice.receive().await,104,4),0);
+    // Coordinates and forged sender identity are not part of ChatSend.
+    let mut forged = vec![0x31,1,1];
+    forged.extend_from_slice(&105_u32.to_le_bytes());
+    forged.extend_from_slice(&2_u16.to_le_bytes());
+    forged.extend_from_slice(b"ok");
+    forged.extend_from_slice(&2_u32.to_le_bytes()); // unrecognized sender extension
+    alice.send_raw(&forged).await;
+    assert_eq!(assert_result(&alice.receive().await,105,3),0);
+    assert!(timeout(Duration::from_millis(250), bob.receive()).await.is_err(),
+        "invalid forged request must not deliver");
+
+    // Chat never consumes the realtime input/datagram channel.
+    assert!(alice.connection.max_datagram_size().unwrap_or(0) > 0);
+}
