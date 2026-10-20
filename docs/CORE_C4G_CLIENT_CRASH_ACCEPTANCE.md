@@ -37,6 +37,19 @@ PostgreSQL 16 service from `.github/workflows/core-c4g-session-crash.yml`.
    the exact mutation ID commits once, then returns its unchanged
    historical receipt and does not duplicate outbox events.
 
+4. Execute a world mutation and issue `COMMIT`, suppressing the client's
+   result. Verify the PostgreSQL backend is `idle` after a unique marker
+   (not `idle in transaction`), then kill that `psql` client. A fresh
+   session must find one committed state, one receipt and one outbox event.
+   Retrying the same mutation ID returns the original historical receipt
+   without repeating the event. After transferring ownership to epoch 2,
+   historical replay remains a *receipt*, never authority for an old write.
+5. Execute a prepare+commit handoff within one `BEGIN`/`COMMIT`, kill
+   the client after the committed-state marker, and retry the original
+   commit and prepare operation IDs on a new connection. Neither replay
+   may advance epoch again or restore the retired source authority; only
+   the successor can execute the first world mutation.
+
 ## Safety constraints
 
 - The test refuses to run unless `MYASO_C4G_TEST_ONLY=1`,
@@ -47,9 +60,10 @@ PostgreSQL 16 service from `.github/workflows/core-c4g-session-crash.yml`.
   targeted. It uses fixed test IDs and synthetic tiny world payloads.
 - The only deliberate SIGKILL is to a `Popen` child `psql`
   process that this script created. Its PostgreSQL backend is not killed.
-- Backends are distinguished by the last SQL marker and
-  `pg_stat_activity.state='idle in transaction'`, not by an
-  unbounded timing guess or a long-running server-side sleep. Child processes are reaped in `finally`.
+- Backends are distinguished by a unique last SQL marker and
+  `pg_stat_activity.state='idle in transaction'` before COMMIT versus
+  `state='idle'` after COMMIT, not by an unbounded timing guess or a
+  long-running server-side sleep. Child processes are reaped in `finally`.
 - No synchronous database round trip is added to the 60 Hz game tick.
 - Core 8A/8B must still supply genuine session authentication, Core 8C must
   prove independent-host partition/failover behavior, and Development Center
@@ -60,8 +74,10 @@ PostgreSQL 16 service from `.github/workflows/core-c4g-session-crash.yml`.
 - A real PostgreSQL service SIGKILL, client/server independent network
   partition or promotion of asynchronous replica.
 - Filesystem WAL fsync, disk-full behavior, restore or failover convergence.
-- Unknown-commit-outcome across a lost network ACK (C4d already checks
-  identical post-commit receipt replay; C4g demonstrates precommit death).
+- True unknown-commit-outcome across a **network partition**, independent
+  remote workers or primary failover. C4g demonstrates an *inferred known*
+  committed outcome through PostgreSQL inspection and lost client-side ACK,
+  not a WAN-wide uncertainty protocol.
 - Durable outbox publication to clients, bounded replication backpressure,
   game-world snapshot handoff and live combat integration.
 
