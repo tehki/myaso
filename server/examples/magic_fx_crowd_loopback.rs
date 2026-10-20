@@ -266,7 +266,7 @@ async fn main() -> Result<()> {
                     .get(&payload.route.connection_id)
                     .context("P13 connection missing at final loopback enqueue")?;
                 connection
-                    .send_datagram(payload.bytes.to_vec())
+                    .send_datagram(payload.bytes)
                     .context("P13 real shared-connection QUIC datagram")?;
             }
         } else {
