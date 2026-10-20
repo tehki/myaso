@@ -227,6 +227,44 @@ pub fn commit_verified_pickup(
     Ok(item)
 }
 
+/// Read corpse contents only for a verified session in the current completed
+/// authoritative world tick. Caller MUST hold the shared World/Zone/Identity/
+/// Loot read lock; this does not acquire a lock or activate a network endpoint.
+/// Unlike general loot visibility, this explicit interaction may disclose
+/// item identities, types and stack amounts to the requesting player only.
+/// The returned copy never moves physical items or advances replay watermarks.
+pub fn inspect_verified_corpse(
+    loot: &LootAuthority,
+    identity: &SessionIdentityRegistry,
+    tick: PickupWorldTick<'_>,
+    lease: SessionLease,
+    corpse_id: u64,
+) -> Result<Vec<ItemStack>, PickupCommitError> {
+    if tick.world.tick != tick.completed_tick {
+        return Err(PickupCommitError::StaleWorldTick);
+    }
+    if !tick.world.now_ms.is_finite()
+        || tick.world.now_ms < 0.0
+        || tick.world.now_ms >= u64::MAX as f32
+    {
+        return Err(PickupCommitError::InvalidWorldTime);
+    }
+    identity
+        .resolve_session(lease)
+        .ok_or(PickupCommitError::UnverifiedSession)?;
+    let actor = lease.server_session();
+    let fighter = tick
+        .world
+        .fighter(actor)
+        .ok_or(PickupCommitError::MissingWorldFighter)?;
+    let zone = tick
+        .zones
+        .zone_of(actor)
+        .ok_or(PickupCommitError::UnknownZone)?;
+    loot.inspect_corpse(actor, fighter, zone, corpse_id, tick.world.now_ms as u64)
+        .map_err(PickupCommitError::Loot)
+}
+
 /// A gear request contains only an item/slot selection; the actor identity,
 /// position, authoritative tick and zone never come from a packet.
 /// Dropping equipped gear requires explicit unequip first.
@@ -974,6 +1012,177 @@ mod tests {
         assert_eq!(item.amount, 2);
         assert!(!loot.ground().contains_key(&ground));
         let _ = fs::remove_file(&checkpoint);
+    }
+
+    #[test]
+    fn verified_corpse_inspection_is_private_bounded_and_read_only() {
+        use crate::loot::LootAppearance;
+        use crate::simulation::Action;
+
+        let mut world = World::new(800.0, 600.0);
+        for (id, x, y) in [(1, 200.0, 200.0), (2, 210.0, 200.0), (3, 700.0, 550.0)] {
+            assert!(world.add_player_at(id, x, y, 0.0));
+        }
+        let mut zones = ZoneAuthority::new();
+        let mut identity = SessionIdentityRegistry::new();
+        let mut loot = LootAuthority::new();
+        for id in 1..=3 {
+            zones.register(id).unwrap();
+            loot.register(id).unwrap();
+            identity
+                .bind_verified(lease(id), CharacterId::new(u64::from(id)).unwrap())
+                .unwrap();
+        }
+        let sword = loot.grant(1, ItemKind::RustySword, 1).unwrap();
+        let gold = loot.grant(1, ItemKind::Gold, 5).unwrap();
+        let mut victim = world.fighter(1).unwrap().clone();
+        victim.action = Action::Dead;
+        victim.hp = 0.0;
+        let corpse = loot.death(1, &victim, ZoneId::Moonvale, 0).unwrap();
+
+        // General world visibility reveals only a corpse entity and victim.
+        let preview = loot
+            .visible_loot(2, world.fighter(2).unwrap(), ZoneId::Moonvale, 0)
+            .unwrap();
+        assert!(preview.iter().any(|v| {
+            v.entity_id == corpse && matches!(v.appearance, LootAppearance::Corpse { victim: 1 })
+        }));
+
+        let contents = inspect_verified_corpse(
+            &loot,
+            &identity,
+            PickupWorldTick {
+                world: &world,
+                completed_tick: world.tick,
+                zones: &zones,
+            },
+            lease(2),
+            corpse,
+        )
+        .unwrap();
+        // Cross-check #428's common liveness guard: inspection, not only pickup,
+        // must deny a Fighter whose HP is invalid before Action becomes Dead.
+        for hp in [0.0, -1.0, f32::NAN, f32::INFINITY] {
+            let mut dying = world.fighter(2).unwrap().clone();
+            dying.hp = hp;
+            assert!(matches!(
+                loot.inspect_corpse(2, &dying, ZoneId::Moonvale, corpse, 0),
+                Err(LootError::DeadPlayer)
+            ));
+        }
+        assert_eq!(contents.len(), 2);
+        assert!(contents.iter().any(|item| item.id == sword));
+        assert!(contents
+            .iter()
+            .any(|item| item.id == gold && item.amount == 4));
+
+        // An inspection result is a detached snapshot, never an ownership transfer.
+        let mut forged_client_copy = contents;
+        forged_client_copy[0].amount = 999;
+        assert_ne!(forged_client_copy, loot.corpses()[&corpse].items);
+
+        assert!(matches!(
+            inspect_verified_corpse(
+                &loot,
+                &identity,
+                PickupWorldTick {
+                    world: &world,
+                    completed_tick: world.tick,
+                    zones: &zones
+                },
+                SessionLease::new(2, 2).unwrap(),
+                corpse,
+            ),
+            Err(PickupCommitError::UnverifiedSession)
+        ));
+        assert!(matches!(
+            inspect_verified_corpse(
+                &loot,
+                &identity,
+                PickupWorldTick {
+                    world: &world,
+                    completed_tick: world.tick,
+                    zones: &zones
+                },
+                lease(3),
+                corpse,
+            ),
+            Err(PickupCommitError::Loot(LootError::OutOfReach))
+        ));
+        assert!(matches!(
+            inspect_verified_corpse(
+                &loot,
+                &identity,
+                PickupWorldTick {
+                    world: &world,
+                    completed_tick: world.tick + 1,
+                    zones: &zones
+                },
+                lease(2),
+                corpse,
+            ),
+            Err(PickupCommitError::StaleWorldTick)
+        ));
+        assert!(matches!(
+            inspect_verified_corpse(
+                &loot,
+                &identity,
+                PickupWorldTick {
+                    world: &world,
+                    completed_tick: world.tick,
+                    zones: &zones
+                },
+                lease(1),
+                corpse,
+            ),
+            Err(PickupCommitError::Loot(LootError::DeadPlayer))
+        ));
+
+        // After another legitimate looter takes an item, fresh inspection
+        // must no longer report that item's identity.
+        loot.take_corpse_amount(
+            2,
+            world.fighter(2).unwrap(),
+            ZoneId::Moonvale,
+            CorpseItemRef {
+                corpse_id: corpse,
+                item_id: sword,
+            },
+            1,
+            0,
+        )
+        .unwrap();
+        let updated = inspect_verified_corpse(
+            &loot,
+            &identity,
+            PickupWorldTick {
+                world: &world,
+                completed_tick: world.tick,
+                zones: &zones,
+            },
+            lease(2),
+            corpse,
+        )
+        .unwrap();
+        assert_eq!(updated.len(), 1);
+        assert_eq!(updated[0].id, gold);
+
+        world.now_ms = 1_200_000.0;
+        assert!(matches!(
+            inspect_verified_corpse(
+                &loot,
+                &identity,
+                PickupWorldTick {
+                    world: &world,
+                    completed_tick: world.tick,
+                    zones: &zones
+                },
+                lease(2),
+                corpse,
+            ),
+            Err(PickupCommitError::Loot(LootError::NotFound))
+        ));
+        assert_eq!(loot.corpses()[&corpse].items.len(), 1);
     }
 
     #[test]
