@@ -11,6 +11,7 @@ pub mod magic_fx_delivery;
 pub mod magic_fx_events;
 pub mod magic_fx_handoff;
 pub mod magic_fx_shared_transport;
+pub mod magic_fx_shared_writer;
 pub mod magic_fx_spatial;
 pub mod reliable;
 pub mod simulation;
