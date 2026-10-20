@@ -132,7 +132,7 @@ def cylinder(name, pos, radius, depth, material, verts=12, rot=None):
     ob.data.materials.append(material)
     return ob
 
-def roof_prism(name, cx,cy,w,d,h, rise, material, rot=0):
+def roof_prism(name, cx,cy,w,d,h, rise, material, gable_material, rot=0):
     # Ridge runs on local Y; actual gables are closed rather than one flat plane.
     x0,x1=-w/2-.24,w/2+.24
     y0,y1=-d/2-.30,d/2+.30
@@ -140,10 +140,13 @@ def roof_prism(name, cx,cy,w,d,h, rise, material, rot=0):
          (x0,y1,h),(0,y1,h+rise),(x1,y1,h)]
     co,si=math.cos(rot),math.sin(rot)
     vs=[(cx+x*co-y*si,cy+x*si+y*co,z) for x,y,z in pts]
-    fs=[(0,1,4,3),(1,2,5,4),(0,3,5,2,1),(0,2,5,3)]
+    fs=[(0,1,4,3),(1,2,5,4),(0,2,1),(3,4,5),(0,3,5,2)]
     mesh=bpy.data.meshes.new(name)
     mesh.from_pydata(vs,[],fs)
     mesh.materials.append(material)
+    mesh.materials.append(gable_material)
+    mesh.polygons[2].material_index=1
+    mesh.polygons[3].material_index=1
     obj=bpy.data.objects.new(name,mesh)
     scene.collection.objects.link(obj)
     return obj
@@ -160,7 +163,13 @@ def facade_box(name,cx,cy,rot,x,y,z,dx,dy,dz,material,bevel=0):
 def house(name,x,y,w,d,eave,rise,wallmat,roofmat,rot=0,chimney=False):
     facade_box(name+" / rubble foundation",x,y,rot,0,0,.28,w+.25,d+.25,.56,stone,.07)
     facade_box(name+" / plaster walls",x,y,rot,0,0,(eave+.56)/2,w,d,eave-.56,wallmat,.04)
-    roof_prism(name+" / roof occlusion",x,y,w,d,eave,rise,roofmat,rot)
+    roof_prism(name+" / roof occlusion",x,y,w,d,eave,rise,roofmat,wallmat,rot)
+    # Shallow roof-tile rows give readable scale before any image-texture baking.
+    for j in range(7):
+        xx=(j+1)*(w/2)/8
+        for side in (-1,1):
+            zz=eave+rise*(1-xx/(w/2+.24))+.035
+            facade_box(name+" / laid roof courses",x,y,rot,side*xx,0,zz,.055,d+.43,.055,roofmat)
     for lx in (-w/2+.09,0,w/2-.09):
         facade_box(name+" / vertical timber",x,y,rot,lx,d/2+.055,eave/2,.15,.17,eave-.45,timber)
     for z in (.68,1.65,eave-.13):
@@ -185,7 +194,7 @@ def house(name,x,y,w,d,eave,rise,wallmat,roofmat,rot=0,chimney=False):
 
 # Red Lion: keep original A1 scale and material IDs, but enhance shaders.
 pre=set(bpy.context.scene.objects)
-bpy.ops.wm.obj_import(filepath=str(args.a1_obj.resolve()))
+bpy.ops.wm.obj_import(filepath=str(args.a1_obj.resolve()), forward_axis="Y", up_axis="Z")
 imported=[obj for obj in scene.objects if obj not in pre]
 replaced={"limestone":stone,"limewash":plaster,"old_timber":timber,
           "roof_tile":tile,"dark_wood":oak,"window":glass,
