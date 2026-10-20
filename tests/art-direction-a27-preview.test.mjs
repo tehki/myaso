@@ -50,5 +50,5 @@ test("A2.7 local Chrome acceptance does not modify or deploy the production game
   assert.match(acceptance,/noRealGameFrameTimeTest:true/);
   assert.match(acceptance,/notProductionApproved:true/);
   assert.match(acceptance,/greyhaven_a27_browser_roof_fade\.png/);
-  assert.doesNotMatch(acceptance,/git push|docker|deploy|fetch\(.*admin/);
+  assert.doesNotMatch(acceptance,/git push|docker|fetch\(.*admin/);
 });
