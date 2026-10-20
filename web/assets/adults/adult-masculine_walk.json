@@ -1,0 +1,16 @@
+{
+  "bodyPresentation": "adult-masculine",
+  "clip": "walk",
+  "directions": 8,
+  "framesPerDirection": 4,
+  "sourceFramePx": 160,
+  "atlasWidth": 640,
+  "atlasHeight": 1280,
+  "bytes": 45468,
+  "sha256": "8fe708d05b83b96cea53f7436c53af44ccdc8ac97435485043ed4d701cbf551a",
+  "rgbaTransparency": true,
+  "originalSource": true,
+  "productionActive": false,
+  "footGroundingVerified": false,
+  "serverMovementModified": false
+}

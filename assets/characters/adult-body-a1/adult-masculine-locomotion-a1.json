@@ -1,0 +1,26 @@
+{
+  "bodyPresentation": "adult-masculine",
+  "sourceOriginal": "first-party Blender A0 mesh and rig",
+  "sourceBlend": "adult-masculine-locomotion-a1.blend",
+  "sourceGlb": "adult-masculine-locomotion-a1.glb",
+  "originalA0Unchanged": true,
+  "rigBones": 22,
+  "sourceFrames": [
+    1,
+    5,
+    9,
+    13
+  ],
+  "clips": [
+    "walk",
+    "run"
+  ],
+  "directions": 8,
+  "frameSize": 160,
+  "renderedFrames": 64,
+  "smoke": false,
+  "footGroundContactVerified": false,
+  "networkedGameVerified": false,
+  "productionReady": false,
+  "authoritativeCombatChanged": false
+}
