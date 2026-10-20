@@ -30,7 +30,10 @@ def call(statement: str, *, expect_failure: bool = False) -> str:
             completed.returncode == 0,
             f"database query failed: {statement}\n{completed.stderr}",
         )
-    return completed.stdout.strip()
+    # psql -c with SET ROLE; SELECT ... prints an additional SET status
+    # line. The last nonempty line is the single-value query result.
+    output = completed.stdout.strip().splitlines()
+    return output[-1].strip() if output else ""
 
 
 def entity(n: int) -> str:
