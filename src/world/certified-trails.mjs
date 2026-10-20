@@ -115,4 +115,4 @@ export const CERTIFIED_TRAILS = Object.freeze([
       ]
     ]
   }
-]);
+].map(item => Object.freeze({from:item.from,to:item.to,points:Object.freeze(item.points.map(pair=>Object.freeze(pair)))})));
