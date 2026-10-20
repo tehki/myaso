@@ -11,6 +11,9 @@ pub const PICKUP_REACH: f32 = 56.0;
 pub const GROUND_DECAY_MS: u64 = 15 * 60 * 1000;
 pub const CORPSE_DECAY_MS: u64 = 20 * 60 * 1000;
 pub const MAX_SCATTERED_OBJECTS: usize = 3;
+/// Domain-only visibility envelope, not a public replication protocol.
+pub const LOOT_VISIBILITY_REACH: f32 = 550.0;
+pub const MAX_VISIBLE_LOOT_ENTITIES: usize = 128;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum ItemKind {
@@ -141,6 +144,21 @@ pub struct Corpse {
     pub at: Point,
     pub expires_at_ms: u64,
     pub items: Vec<ItemStack>,
+}
+
+/// Public appearance data only. A corpse's contents require an authorized
+/// interaction; visibility must not reveal its inventory before opening it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LootAppearance {
+    Ground { kind: ItemKind, amount: u16 },
+    Corpse { victim: u32 },
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct VisibleLoot {
+    pub entity_id: u64,
+    pub at: Point,
+    pub appearance: LootAppearance,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -743,6 +761,75 @@ impl LootAuthority {
         Ok(fragment)
     }
 
+    /// Preview only nearby, non-expired physical objects in the viewer's
+    /// verified zone. The caller MUST resolve Fighter and ZoneId from server
+    /// authority, never from a client-selected origin or destination.
+    /// Results are nearest-first, stable on equal distance and bounded.
+    /// This is a read-only domain query; it does NOT activate replication.
+    pub fn visible_loot(
+        &self,
+        authenticated_id: u32,
+        fighter: &Fighter,
+        zone: ZoneId,
+        now_ms: u64,
+    ) -> Result<Vec<VisibleLoot>, LootError> {
+        self.require_alive(authenticated_id, fighter)?;
+        let at = Point::from_fighter(fighter);
+        if !at.in_zone(zone) {
+            return Err(LootError::InvalidPosition);
+        }
+        let max_distance_squared = LOOT_VISIBILITY_REACH * LOOT_VISIBILITY_REACH;
+        let mut found = Vec::new();
+        for drop in self.ground.values() {
+            if drop.zone != zone || drop.expires_at_ms <= now_ms {
+                continue;
+            }
+            let dx = drop.at.x - at.x;
+            let dy = drop.at.y - at.y;
+            let distance_squared = dx * dx + dy * dy;
+            if distance_squared <= max_distance_squared {
+                found.push((
+                    distance_squared,
+                    VisibleLoot {
+                        entity_id: drop.entity_id,
+                        at: drop.at,
+                        appearance: LootAppearance::Ground {
+                            kind: drop.item.kind,
+                            amount: drop.item.amount,
+                        },
+                    },
+                ));
+            }
+        }
+        for corpse in self.corpses.values() {
+            if corpse.zone != zone || corpse.expires_at_ms <= now_ms {
+                continue;
+            }
+            let dx = corpse.at.x - at.x;
+            let dy = corpse.at.y - at.y;
+            let distance_squared = dx * dx + dy * dy;
+            if distance_squared <= max_distance_squared {
+                found.push((
+                    distance_squared,
+                    VisibleLoot {
+                        entity_id: corpse.entity_id,
+                        at: corpse.at,
+                        appearance: LootAppearance::Corpse {
+                            victim: corpse.victim,
+                        },
+                    },
+                ));
+            }
+        }
+        found.sort_by(|left, right| {
+            left.0
+                .total_cmp(&right.0)
+                .then_with(|| left.1.entity_id.cmp(&right.1.entity_id))
+        });
+        found.truncate(MAX_VISIBLE_LOOT_ENTITIES);
+        Ok(found.into_iter().map(|(_, item)| item).collect())
+    }
+
     /// A server-side world tick may call this after all loot actions for the tick.
     /// Items decay only through this explicit policy, not when their owner dies.
     pub fn expire(&mut self, now_ms: u64) {
@@ -1114,6 +1201,103 @@ mod tests {
         assert_eq!(loot.ground()[&drop_id].item.id, sword);
         assert_eq!(loot.ground()[&drop_id].item.amount, 1);
         assert!(loot.inventory(2).unwrap().backpack().is_empty());
+    }
+
+    #[test]
+    fn loot_visibility_is_zone_scoped_distance_limited_and_content_private() {
+        let mut loot = LootAuthority::new();
+        for id in [1, 2, 3, 4] {
+            loot.register(id).unwrap();
+        }
+        let near_id = loot.grant(1, ItemKind::SulfurAsh, 3).unwrap();
+        let near_drop = loot
+            .drop_backpack(
+                1,
+                &fighter(1, 200.0, 200.0, false),
+                ZoneId::Moonvale,
+                near_id,
+                0,
+            )
+            .unwrap();
+        let far_id = loot.grant(2, ItemKind::Gold, 10).unwrap();
+        loot.drop_backpack(
+            2,
+            &fighter(2, 800.0, 800.0, false),
+            ZoneId::Moonvale,
+            far_id,
+            0,
+        )
+        .unwrap();
+        let other_zone_id = loot.grant(3, ItemKind::HealingPotion, 1).unwrap();
+        loot.drop_backpack(
+            3,
+            &fighter(3, 200.0, 200.0, false),
+            ZoneId::RedLionInn,
+            other_zone_id,
+            0,
+        )
+        .unwrap();
+        let corpse_item_id = loot.grant(4, ItemKind::Spellbook, 1).unwrap();
+        let corpse_id = loot
+            .death(4, &fighter(4, 210.0, 200.0, true), ZoneId::Moonvale, 0)
+            .unwrap();
+        let visible = loot
+            .visible_loot(1, &fighter(1, 200.0, 200.0, false), ZoneId::Moonvale, 1)
+            .unwrap();
+        assert_eq!(visible.len(), 2);
+        assert_eq!(visible[0].entity_id, near_drop);
+        assert_eq!(
+            visible[0].appearance,
+            LootAppearance::Ground {
+                kind: ItemKind::SulfurAsh,
+                amount: 3,
+            }
+        );
+        assert_eq!(visible[1].entity_id, corpse_id);
+        assert_eq!(
+            visible[1].appearance,
+            LootAppearance::Corpse { victim: 4 }
+        );
+        assert_ne!(visible[1].entity_id, corpse_item_id);
+        assert_eq!(
+            loot.visible_loot(1, &fighter(2, 200.0, 200.0, false), ZoneId::Moonvale, 1),
+            Err(LootError::InvalidPlayer)
+        );
+        assert!(loot
+            .visible_loot(
+                1,
+                &fighter(1, 200.0, 200.0, false),
+                ZoneId::Moonvale,
+                CORPSE_DECAY_MS,
+            )
+            .unwrap()
+            .is_empty());
+    }
+
+    #[test]
+    fn loot_visibility_returns_nearest_entities_with_deterministic_bound() {
+        let mut loot = LootAuthority::new();
+        loot.register(1).unwrap();
+        for index in 0..(MAX_VISIBLE_LOOT_ENTITIES + 1) {
+            let item_id = loot.grant(1, ItemKind::Gold, 1).unwrap();
+            let distance = 50.0 + index as f32;
+            loot.drop_backpack(
+                1,
+                &fighter(1, 200.0 + distance, 200.0, false),
+                ZoneId::Moonvale,
+                item_id,
+                0,
+            )
+            .unwrap();
+        }
+        let near = loot
+            .visible_loot(1, &fighter(1, 200.0, 200.0, false), ZoneId::Moonvale, 0)
+            .unwrap();
+        assert_eq!(near.len(), MAX_VISIBLE_LOOT_ENTITIES);
+        let first = loot.ground().get(&near[0].entity_id).unwrap();
+        let last = loot.ground().get(&near[near.len() - 1].entity_id).unwrap();
+        assert_eq!(first.at.x, 250.0);
+        assert_eq!(last.at.x, 377.0);
     }
 
     #[test]
