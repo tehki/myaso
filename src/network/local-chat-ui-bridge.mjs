@@ -14,7 +14,11 @@ let nextAdapterInstance = 0;
 export async function openLocalChatUiBridge(gameConnection, {
   openChannel = openLocalChat,
   onDisconnect = () => {},
+  ackTimeoutMs = ACK_TIMEOUT_MS,
 } = {}) {
+  if (!Number.isInteger(ackTimeoutMs) || ackTimeoutMs < 1 || ackTimeoutMs > ACK_TIMEOUT_MS) {
+    throw new RangeError("invalid chat acknowledgement deadline");
+  }
   const listeners = new Set();
   const pending = new Map();
   const recentIds = new Set();
@@ -37,6 +41,14 @@ export async function openLocalChatUiBridge(gameConnection, {
     listeners.clear();
     failPending(reason);
     try { onDisconnect(reason); } catch { /* UI observers never control transport. */ }
+  }
+  function failChatTransport(reason) {
+    // ACK absence/write failure makes the optional chat channel untrustworthy;
+    // continuing to enqueue would silently accumulate blocked QUIC writes.
+    // A fresh game/chat session is required; never close gameplay WebTransport.
+    retire(reason);
+    try { Promise.resolve(wire?.close?.()).catch(() => {}); }
+    catch { /* failure cannot change combat connection */ }
   }
   function onReceived(event) {
     if (retired || event?.kind !== "received" || event.channel !== CHAT.channelLocal
@@ -112,9 +124,11 @@ export async function openLocalChatUiBridge(gameConnection, {
       if (recentOrder.length > MAX_RECENT_UI_IDS) recentIds.delete(recentOrder.shift());
       const result = new Promise((resolve, reject) => {
         const timer = setTimeout(() => {
-          pending.delete(correlation);
-          reject(new Error("No authoritative chat acknowledgement"));
-        }, ACK_TIMEOUT_MS);
+          if (!pending.delete(correlation)) return;
+          const reason = new Error("No authoritative chat acknowledgement");
+          reject(reason);
+          failChatTransport(reason);
+        }, ackTimeoutMs);
         pending.set(correlation, { uiId: clientMessageId, resolve, reject, timer });
       });
       // Writable stream delays must not indefinitely block the UI's ACK timer.
@@ -130,6 +144,7 @@ export async function openLocalChatUiBridge(gameConnection, {
           pending.delete(correlation);
           clearTimeout(record.timer);
           record.reject(error);
+          failChatTransport(error);
         }
       });
       return result;
