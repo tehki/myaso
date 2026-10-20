@@ -1,0 +1,107 @@
+{
+  "schemaVersion": 1,
+  "kind": "architecture-visual-handoff",
+  "buildingId": "red-lion",
+  "visualPrefab": "red-lion-exterior",
+  "status": "unapproved-art-review",
+  "provenance": {
+    "graphicsPr": 350,
+    "graphicsBaseCommit": "c07c6e8bf1dca3941bed805e87d1fc9ff44a1dd7",
+    "worldProposalPr": 336,
+    "worldProposalUnmerged": true,
+    "originalBlenderScene": "assets/environment/greyhaven/a22-review/blood_iron_greyhaven_a22.blend",
+    "sourceGeometry": "assets/environment/greyhaven/a222-review/greyhaven_a222_geometry_report.json",
+    "sourceRasterReport": "assets/environment/greyhaven/a224-review/greyhaven_a224_webp_report.json"
+  },
+  "proposedWorldPlacement": {
+    "mapId": "moonvale-overworld",
+    "exterior": {
+      "x": 4240,
+      "y": 3880,
+      "width": 250,
+      "height": 170
+    },
+    "door": {
+      "x": 4365,
+      "y": 4075,
+      "portalId": "red-lion-enter",
+      "status": "proposed-visual-anchor-only"
+    },
+    "doorOffsetFromExteriorSouthEdgeWorldUnits": 25
+  },
+  "projection": {
+    "module": "src/browser/arena-viewport.mjs",
+    "cameraZoom": 0.84,
+    "metersPerWorldUnit": 0.025,
+    "visualDoorCanvasPx": [
+      320,
+      320
+    ],
+    "reviewCanvasPx": [
+      640,
+      640
+    ],
+    "groundBasisPixelsPerSourceMeter": {
+      "x": [
+        33.600006,
+        0
+      ],
+      "y": [
+        0,
+        33.600006
+      ]
+    }
+  },
+  "rasterLayers": {
+    "base": {
+      "file": "assets/environment/greyhaven/a224-review/red_lion_a224_base.webp",
+      "sha256": "b9d8e1888c26a63cb11b69381db81c352cb45750ea32ad3c7d567d60b2f244ff",
+      "croppedPixels": [
+        228,
+        297
+      ],
+      "drawOffsetFromVisualDoorPixels": [
+        -114,
+        -269
+      ],
+      "alphaBoundsCanvasPx": [
+        209,
+        54,
+        431,
+        345
+      ]
+    },
+    "roof": {
+      "file": "assets/environment/greyhaven/a224-review/red_lion_a224_roof.webp",
+      "sha256": "31664c803ec73e1b89ce5a717976bb6d9de58bb69a8bb30e45e09449d030f2c9",
+      "croppedPixels": [
+        238,
+        197
+      ],
+      "drawOffsetFromVisualDoorPixels": [
+        -119,
+        -283
+      ],
+      "alphaBoundsCanvasPx": [
+        204,
+        40,
+        436,
+        231
+      ]
+    }
+  },
+  "sourceProof": {
+    "facadeRgbPixelsChanged": 8135,
+    "facadeAlphaPixelsChanged": 0,
+    "roofBinaryUnchangedFromA222": true,
+    "groundVerticesMovedXY": 0,
+    "proposedDoorVisualAnchorChanged": false
+  },
+  "integrationGate": {
+    "visualPreviewOnly": true,
+    "automaticRoofOcclusionImplemented": false,
+    "authoritativePortalOrCollisionImplemented": false,
+    "multiplayerInteriorAccepted": false,
+    "productionApproved": false
+  }
+}
