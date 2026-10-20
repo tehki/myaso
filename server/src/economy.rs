@@ -23,13 +23,32 @@ pub enum Actor {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Command {
-    Transfer { from: u64, to: u64, amount: u64 },
-    ServiceFee { player: u64, amount: u64 },
-    OpenEscrow { id: u64, buyer: u64, seller: u64, amount: u64 },
-    SettleEscrow { id: u64, fee: u64 },
-    RefundEscrow { id: u64 },
+    Transfer {
+        from: u64,
+        to: u64,
+        amount: u64,
+    },
+    ServiceFee {
+        player: u64,
+        amount: u64,
+    },
+    OpenEscrow {
+        id: u64,
+        buyer: u64,
+        seller: u64,
+        amount: u64,
+    },
+    SettleEscrow {
+        id: u64,
+        fee: u64,
+    },
+    RefundEscrow {
+        id: u64,
+    },
     /// Sandbox retirement, not an on-chain token burn.
-    RetireTreasury { amount: u64 },
+    RetireTreasury {
+        amount: u64,
+    },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -97,10 +116,7 @@ enum HoldChange {
 impl SandboxLedger {
     /// Lab-only genesis, explicitly not a reward/mint endpoint.
     /// Rejects duplicate IDs and arithmetic overflow.
-    pub fn sandbox_bootstrap(
-        players: &[(u64, u64)],
-        treasury: u64,
-    ) -> Result<Self, LedgerError> {
+    pub fn sandbox_bootstrap(players: &[(u64, u64)], treasury: u64) -> Result<Self, LedgerError> {
         let mut balances = BTreeMap::new();
         let mut issued_units = u128::from(treasury);
         balances.insert(Account::Treasury, treasury);
@@ -170,8 +186,14 @@ impl SandboxLedger {
                 }
                 (
                     vec![
-                        Posting { account: Account::Player(from), delta: -i128::from(amount) },
-                        Posting { account: Account::Player(to), delta: i128::from(amount) },
+                        Posting {
+                            account: Account::Player(from),
+                            delta: -i128::from(amount),
+                        },
+                        Posting {
+                            account: Account::Player(to),
+                            delta: i128::from(amount),
+                        },
                     ],
                     HoldChange::None,
                 )
@@ -183,13 +205,24 @@ impl SandboxLedger {
                 }
                 (
                     vec![
-                        Posting { account: Account::Player(player), delta: -i128::from(amount) },
-                        Posting { account: Account::Treasury, delta: i128::from(amount) },
+                        Posting {
+                            account: Account::Player(player),
+                            delta: -i128::from(amount),
+                        },
+                        Posting {
+                            account: Account::Treasury,
+                            delta: i128::from(amount),
+                        },
                     ],
                     HoldChange::None,
                 )
             }
-            Command::OpenEscrow { id, buyer, seller, amount } => {
+            Command::OpenEscrow {
+                id,
+                buyer,
+                seller,
+                amount,
+            } => {
                 self.ensure_players(&[buyer, seller])?;
                 if id == 0 || buyer == seller || amount == 0 {
                     return Err(LedgerError::InvalidAmount);
@@ -199,11 +232,21 @@ impl SandboxLedger {
                 }
                 (
                     vec![
-                        Posting { account: Account::Player(buyer), delta: -i128::from(amount) },
-                        Posting { account: Account::Escrow(id), delta: i128::from(amount) },
+                        Posting {
+                            account: Account::Player(buyer),
+                            delta: -i128::from(amount),
+                        },
+                        Posting {
+                            account: Account::Escrow(id),
+                            delta: i128::from(amount),
+                        },
                     ],
                     HoldChange::Create(Escrow {
-                        id, buyer, seller, amount, status: EscrowStatus::Open,
+                        id,
+                        buyer,
+                        seller,
+                        amount,
+                        status: EscrowStatus::Open,
                     }),
                 )
             }
@@ -213,7 +256,10 @@ impl SandboxLedger {
                     return Err(LedgerError::InvalidAmount);
                 }
                 let mut postings = vec![
-                    Posting { account: Account::Escrow(id), delta: -i128::from(hold.amount) },
+                    Posting {
+                        account: Account::Escrow(id),
+                        delta: -i128::from(hold.amount),
+                    },
                     Posting {
                         account: Account::Player(hold.seller),
                         delta: i128::from(hold.amount - fee),
@@ -221,7 +267,8 @@ impl SandboxLedger {
                 ];
                 if fee != 0 {
                     postings.push(Posting {
-                        account: Account::Treasury, delta: i128::from(fee),
+                        account: Account::Treasury,
+                        delta: i128::from(fee),
                     });
                 }
                 (postings, HoldChange::Finalize(id, EscrowStatus::Settled))
@@ -230,8 +277,14 @@ impl SandboxLedger {
                 let hold = self.open_hold(id)?;
                 (
                     vec![
-                        Posting { account: Account::Escrow(id), delta: -i128::from(hold.amount) },
-                        Posting { account: Account::Player(hold.buyer), delta: i128::from(hold.amount) },
+                        Posting {
+                            account: Account::Escrow(id),
+                            delta: -i128::from(hold.amount),
+                        },
+                        Posting {
+                            account: Account::Player(hold.buyer),
+                            delta: i128::from(hold.amount),
+                        },
                     ],
                     HoldChange::Finalize(id, EscrowStatus::Refunded),
                 )
@@ -242,8 +295,14 @@ impl SandboxLedger {
                 }
                 (
                     vec![
-                        Posting { account: Account::Treasury, delta: -i128::from(amount) },
-                        Posting { account: Account::Retired, delta: i128::from(amount) },
+                        Posting {
+                            account: Account::Treasury,
+                            delta: -i128::from(amount),
+                        },
+                        Posting {
+                            account: Account::Retired,
+                            delta: i128::from(amount),
+                        },
                     ],
                     HoldChange::None,
                 )
@@ -252,7 +311,10 @@ impl SandboxLedger {
 
         // Validate every touched account and journal sequence before any mutation.
         let updated = self.stage_postings(&postings)?;
-        let next_sequence = self.sequence.checked_add(1).ok_or(LedgerError::ArithmeticOverflow)?;
+        let next_sequence = self
+            .sequence
+            .checked_add(1)
+            .ok_or(LedgerError::ArithmeticOverflow)?;
         let receipt = JournalEntry {
             sequence: next_sequence,
             operation_id,
@@ -317,16 +379,17 @@ impl SandboxLedger {
         }
     }
 
-    fn stage_postings(
-        &self,
-        postings: &[Posting],
-    ) -> Result<BTreeMap<Account, u64>, LedgerError> {
+    fn stage_postings(&self, postings: &[Posting]) -> Result<BTreeMap<Account, u64>, LedgerError> {
         let mut net = BTreeMap::<Account, i128>::new();
         let mut sum = 0_i128;
         for posting in postings {
             let total = net.entry(posting.account).or_insert(0);
-            *total = total.checked_add(posting.delta).ok_or(LedgerError::ArithmeticOverflow)?;
-            sum = sum.checked_add(posting.delta).ok_or(LedgerError::ArithmeticOverflow)?;
+            *total = total
+                .checked_add(posting.delta)
+                .ok_or(LedgerError::ArithmeticOverflow)?;
+            sum = sum
+                .checked_add(posting.delta)
+                .ok_or(LedgerError::ArithmeticOverflow)?;
         }
         if sum != 0 {
             return Err(LedgerError::ArithmeticOverflow);
@@ -334,7 +397,9 @@ impl SandboxLedger {
         let mut staged = BTreeMap::new();
         for (account, delta) in net {
             let before = i128::from(self.balances.get(&account).copied().unwrap_or(0));
-            let after = before.checked_add(delta).ok_or(LedgerError::ArithmeticOverflow)?;
+            let after = before
+                .checked_add(delta)
+                .ok_or(LedgerError::ArithmeticOverflow)?;
             if after < 0 {
                 return Err(LedgerError::InsufficientFunds);
             }
@@ -346,10 +411,9 @@ impl SandboxLedger {
 
     /// Fast correctness check for lab tests; not called on the 60 Hz gameplay loop.
     pub fn check_conservation(&self) -> bool {
-        self.balances
-            .values()
-            .try_fold(0_u128, |total, &balance| total.checked_add(u128::from(balance)))
-            == Some(self.issued_units)
+        self.balances.values().try_fold(0_u128, |total, &balance| {
+            total.checked_add(u128::from(balance))
+        }) == Some(self.issued_units)
     }
 }
 
@@ -364,10 +428,17 @@ mod tests {
     #[test]
     fn transfer_is_double_entry_and_conserves_issuance() {
         let mut l = ledger();
-        let entry = l.execute(
-            Actor::Player(1), 1,
-            Command::Transfer { from: 1, to: 2, amount: 40 },
-        ).unwrap();
+        let entry = l
+            .execute(
+                Actor::Player(1),
+                1,
+                Command::Transfer {
+                    from: 1,
+                    to: 2,
+                    amount: 40,
+                },
+            )
+            .unwrap();
         assert_eq!(entry.postings.iter().map(|p| p.delta).sum::<i128>(), 0);
         assert_eq!(l.balance(Account::Player(1)), Some(60));
         assert_eq!(l.balance(Account::Player(2)), Some(60));
@@ -378,10 +449,20 @@ mod tests {
     #[test]
     fn denies_impersonation_and_replay_id_leak() {
         let mut l = ledger();
-        let cmd = Command::Transfer { from: 1, to: 2, amount: 3 };
-        assert_eq!(l.execute(Actor::Player(2), 10, cmd), Err(LedgerError::Unauthorized));
+        let cmd = Command::Transfer {
+            from: 1,
+            to: 2,
+            amount: 3,
+        };
+        assert_eq!(
+            l.execute(Actor::Player(2), 10, cmd),
+            Err(LedgerError::Unauthorized)
+        );
         l.execute(Actor::Player(1), 10, cmd).unwrap();
-        assert_eq!(l.execute(Actor::Player(2), 10, cmd), Err(LedgerError::Unauthorized));
+        assert_eq!(
+            l.execute(Actor::Player(2), 10, cmd),
+            Err(LedgerError::Unauthorized)
+        );
         assert_eq!(l.journal().len(), 1);
     }
 
@@ -389,7 +470,15 @@ mod tests {
     fn overdraft_and_rejected_operations_change_nothing() {
         let mut l = ledger();
         assert_eq!(
-            l.execute(Actor::Player(1), 2, Command::Transfer { from: 1, to: 2, amount: 101 }),
+            l.execute(
+                Actor::Player(1),
+                2,
+                Command::Transfer {
+                    from: 1,
+                    to: 2,
+                    amount: 101
+                }
+            ),
             Err(LedgerError::InsufficientFunds)
         );
         assert_eq!(l.balance(Account::Player(1)), Some(100));
@@ -400,14 +489,24 @@ mod tests {
     #[test]
     fn idempotent_retry_not_double_charged_and_conflict_rejected() {
         let mut l = ledger();
-        let cmd = Command::ServiceFee { player: 1, amount: 7 };
+        let cmd = Command::ServiceFee {
+            player: 1,
+            amount: 7,
+        };
         let first = l.execute(Actor::Player(1), 9, cmd).unwrap();
         assert_eq!(l.execute(Actor::Player(1), 9, cmd), Ok(first));
         assert_eq!(l.balance(Account::Player(1)), Some(93));
         assert_eq!(l.balance(Account::Treasury), Some(37));
         assert_eq!(l.journal().len(), 1);
         assert_eq!(
-            l.execute(Actor::Player(1), 9, Command::ServiceFee { player: 1, amount: 8 }),
+            l.execute(
+                Actor::Player(1),
+                9,
+                Command::ServiceFee {
+                    player: 1,
+                    amount: 8
+                }
+            ),
             Err(LedgerError::ReplayedOperationConflict)
         );
     }
@@ -415,11 +514,20 @@ mod tests {
     #[test]
     fn escrow_settlement_pays_seller_and_collects_fee_once() {
         let mut l = ledger();
-        l.execute(Actor::Player(1), 1, Command::OpenEscrow {
-            id: 15, buyer: 1, seller: 2, amount: 25,
-        }).unwrap();
+        l.execute(
+            Actor::Player(1),
+            1,
+            Command::OpenEscrow {
+                id: 15,
+                buyer: 1,
+                seller: 2,
+                amount: 25,
+            },
+        )
+        .unwrap();
         assert_eq!(l.balance(Account::Escrow(15)), Some(25));
-        l.execute(Actor::System, 2, Command::SettleEscrow { id: 15, fee: 2 }).unwrap();
+        l.execute(Actor::System, 2, Command::SettleEscrow { id: 15, fee: 2 })
+            .unwrap();
         assert_eq!(l.balance(Account::Escrow(15)), Some(0));
         assert_eq!(l.balance(Account::Player(2)), Some(43));
         assert_eq!(l.balance(Account::Treasury), Some(32));
@@ -434,10 +542,19 @@ mod tests {
     #[test]
     fn escrow_refund_returns_to_original_buyer() {
         let mut l = ledger();
-        l.execute(Actor::Player(1), 1, Command::OpenEscrow {
-            id: 15, buyer: 1, seller: 2, amount: 25,
-        }).unwrap();
-        l.execute(Actor::System, 2, Command::RefundEscrow { id: 15 }).unwrap();
+        l.execute(
+            Actor::Player(1),
+            1,
+            Command::OpenEscrow {
+                id: 15,
+                buyer: 1,
+                seller: 2,
+                amount: 25,
+            },
+        )
+        .unwrap();
+        l.execute(Actor::System, 2, Command::RefundEscrow { id: 15 })
+            .unwrap();
         assert_eq!(l.balance(Account::Player(1)), Some(100));
         assert_eq!(l.balance(Account::Escrow(15)), Some(0));
         assert_eq!(
@@ -455,20 +572,50 @@ mod tests {
         ));
         let mut l = ledger();
         assert_eq!(
-            l.execute(Actor::Player(1), 1, Command::Transfer { from: 1, to: 3, amount: 1 }),
+            l.execute(
+                Actor::Player(1),
+                1,
+                Command::Transfer {
+                    from: 1,
+                    to: 3,
+                    amount: 1
+                }
+            ),
             Err(LedgerError::UnknownPlayer)
         );
         assert_eq!(
-            l.execute(Actor::Player(1), 1, Command::ServiceFee { player: 1, amount: 0 }),
+            l.execute(
+                Actor::Player(1),
+                1,
+                Command::ServiceFee {
+                    player: 1,
+                    amount: 0
+                }
+            ),
             Err(LedgerError::InvalidAmount)
         );
         assert_eq!(
-            l.execute(Actor::Player(1), 0, Command::ServiceFee { player: 1, amount: 1 }),
+            l.execute(
+                Actor::Player(1),
+                0,
+                Command::ServiceFee {
+                    player: 1,
+                    amount: 1
+                }
+            ),
             Err(LedgerError::InvalidIdentity)
         );
         let mut big = SandboxLedger::sandbox_bootstrap(&[(1, u64::MAX), (2, 1)], 0).unwrap();
         assert_eq!(
-            big.execute(Actor::Player(2), 1, Command::Transfer { from: 2, to: 1, amount: 1 }),
+            big.execute(
+                Actor::Player(2),
+                1,
+                Command::Transfer {
+                    from: 2,
+                    to: 1,
+                    amount: 1
+                }
+            ),
             Err(LedgerError::ArithmeticOverflow)
         );
         assert!(big.check_conservation());
@@ -477,7 +624,8 @@ mod tests {
     #[test]
     fn sandbox_retirement_is_accounted_not_secret_money_deletion() {
         let mut l = ledger();
-        l.execute(Actor::System, 1, Command::RetireTreasury { amount: 10 }).unwrap();
+        l.execute(Actor::System, 1, Command::RetireTreasury { amount: 10 })
+            .unwrap();
         assert_eq!(l.balance(Account::Treasury), Some(20));
         assert_eq!(l.balance(Account::Retired), Some(10));
         assert_eq!(l.issued_units(), 150);
@@ -491,7 +639,12 @@ mod tests {
     #[test]
     fn escrow_duplicate_and_fee_overrun_leave_state_unchanged() {
         let mut l = ledger();
-        let create = Command::OpenEscrow { id: 8, buyer: 1, seller: 2, amount: 9 };
+        let create = Command::OpenEscrow {
+            id: 8,
+            buyer: 1,
+            seller: 2,
+            amount: 9,
+        };
         l.execute(Actor::Player(1), 1, create).unwrap();
         assert_eq!(
             l.execute(Actor::Player(1), 2, create),
