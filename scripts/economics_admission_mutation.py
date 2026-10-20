@@ -1,4 +1,4 @@
-"""E2d offline fixture revocations with durable monotonic mutation revisions.
+"""E2d offline fixture admissions, revocations and policy mutation revisions.
 
 No credentials, issuer authorization, production player sessions, game endpoints,
 seller keys, or wallet integration are provided. A Python caller able to open
@@ -19,7 +19,7 @@ _ALLOWED_FAULTS = (
 )
 
 
-def _revocation(
+def _fixture_mutation(
     db_path: str | Path,
     operation_id: str,
     kind: str,
@@ -35,12 +35,12 @@ def _revocation(
         or not isinstance(target_epoch, int) or isinstance(target_epoch, bool)
         or target_epoch < 0 or target_epoch > MAX_INT):
         raise Denied("Invalid fictional revocation request")
-    if kind not in ("session_revoke", "listing_revoke"):
+    if kind not in ("session_issue", "session_revoke", "listing_revoke", "title_cap_change"):
         raise Denied("Unknown fixture revocation kind")
-    if kind == "session_revoke" and target_epoch == 0:
+    if kind in ("session_revoke", "session_issue") and target_epoch == 0:
         raise Denied("Session epoch must be positive")
-    if kind == "listing_revoke" and target_epoch != 0:
-        raise Denied("Listing revocation has no session epoch")
+    if kind in ("listing_revoke", "title_cap_change") and target_epoch != 0:
+        raise Denied("Non-session mutation must not carry a session epoch")
 
     db = _connect(db_path)
     committed = False
@@ -52,12 +52,41 @@ def _revocation(
         ).fetchone()
         if old is not None:
             if old[1:] != (kind, target_id, target_epoch):
-                raise Denied("Revocation operation ID reused with different intent")
+                raise Denied("Fixture mutation operation ID reused with different intent")
             db.commit()
             committed = True
             return old[0]
 
-        if kind == "session_revoke":
+        if kind == "session_issue":
+            owner = db.execute(
+                "SELECT kind FROM accounts WHERE id=?", (target_id,),
+            ).fetchone()
+            latest = db.execute(
+                "SELECT COALESCE(MAX(epoch),0) FROM admitted_sessions WHERE player_id=?",
+                (target_id,),
+            ).fetchone()[0]
+            if owner != ("player",) or target_epoch <= latest:
+                raise Denied("New epoch must belong to fixture player and be strictly increasing")
+            db.execute(
+                "INSERT INTO admitted_sessions(player_id,epoch,state) VALUES(?,?,'active')",
+                (target_id, target_epoch),
+            )
+        elif kind == "title_cap_change":
+            prior = db.execute(
+                "SELECT title_cap FROM metadata WHERE singleton=1",
+            ).fetchone()
+            most_titles = db.execute(
+                "SELECT COALESCE(MAX(c),0) FROM ("
+                " SELECT COUNT(*) AS c FROM titles GROUP BY owner_id)"
+            ).fetchone()[0]
+            if prior is None or prior[0] == target_id or target_id < most_titles:
+                raise Denied("Invalid, unchanged or below-current-holdings title cap")
+            if db.execute(
+                "UPDATE metadata SET title_cap=? WHERE singleton=1 AND title_cap=?",
+                (target_id, prior[0]),
+            ).rowcount != 1:
+                raise Denied("Concurrent title policy revision")
+        elif kind == "session_revoke":
             count = db.execute(
                 "UPDATE admitted_sessions SET state='revoked'"
                 " WHERE player_id=? AND epoch=? AND state='active'",
@@ -89,7 +118,7 @@ def _revocation(
             "SELECT mutation_revision FROM metadata WHERE singleton=1"
         ).fetchone()
         if current is None or current[0] >= MAX_INT:
-            raise Denied("Revocation revision overflow")
+            raise Denied("Fixture mutation revision overflow")
         revision = current[0] + 1
         if db.execute(
             "UPDATE metadata SET mutation_revision=?"
@@ -131,7 +160,7 @@ def revoke_fixture_session(
     failpoint: str | None = None,
 ) -> int:
     """Trustlessly *not* authenticated: revoke an admitted fictional session."""
-    return _revocation(
+    return _fixture_mutation(
         db_path, operation_id, "session_revoke", player_id, session_epoch,
         failpoint=failpoint,
     )
@@ -145,7 +174,37 @@ def revoke_fixture_listing(
     failpoint: str | None = None,
 ) -> int:
     """Revoke fictional listing and test consent in the same SQLite commit."""
-    return _revocation(
+    return _fixture_mutation(
         db_path, operation_id, "listing_revoke", listing_id, 0,
+        failpoint=failpoint,
+    )
+
+
+
+def issue_fixture_session(
+    db_path: str | Path,
+    *,
+    operation_id: str,
+    player_id: int,
+    session_epoch: int,
+    failpoint: str | None = None,
+) -> int:
+    """Create a toy admission epoch; the caller is NOT authenticated."""
+    return _fixture_mutation(
+        db_path, operation_id, "session_issue", player_id, session_epoch,
+        failpoint=failpoint,
+    )
+
+
+def change_fixture_title_cap(
+    db_path: str | Path,
+    *,
+    operation_id: str,
+    new_cap: int,
+    failpoint: str | None = None,
+) -> int:
+    """Version a fictional property-limit policy; no server config is changed."""
+    return _fixture_mutation(
+        db_path, operation_id, "title_cap_change", new_cap, 0,
         failpoint=failpoint,
     )
