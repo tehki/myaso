@@ -44,9 +44,14 @@ transactions by an authenticated, authorized server service:
 **Never accept these function parameters directly from the browser.**
 They are inputs to a trusted service-side transaction after credential,
 character ownership, worker identity, item/zone/physics and permission checks.
-Default schema/table and function grants are revoked from PUBLIC. A later
-deployment must establish narrowly scoped service roles, TLS, secret rotation
-and auditable access controls.
+Default schema/table and function grants are revoked from PUBLIC. Authority
+functions use `SECURITY DEFINER` with an explicit fixed `search_path`; a
+restricted server role can receive only schema USAGE + function EXECUTE,
+without direct authority table DML. The acceptance test verifies this denial.
+For production, the migration's function owner must be a dedicated NOLOGIN
+role with minimum necessary privileges rather than a superuser. A later
+deployment must establish narrowly scoped service roles, TLS, secret rotation,
+connection restrictions, audit trails and role ownership verification.
 
 The entity IDs are opaque 16-byte identifiers. Before Rust integration,
 define one canonical serialization convention for `CharacterId`/item IDs,
@@ -75,6 +80,8 @@ The acceptance scenarios cover:
    entity yield exactly one winner.
 9. `assert_mutation_authority` holds a database row lock within a transaction:
    another client with a short lock timeout cannot prepare until commit.
+10. A restricted database service role may call vetted authority functions
+    but cannot SELECT/UPDATE the authority tables directly.
 
 This is **one PostgreSQL primary shared by independent connections**. It is
 not a two-host network test, multi-primary transaction proof, replication
