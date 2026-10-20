@@ -1,12 +1,13 @@
-// R2: commit the responsive light immediately, with a bounded early
-// windup-to-heavy upgrade for a sustained LMB hold. The authoritative server
-// alone decides whether an unlanded light windup may convert to heavy.
-// A genuine tap never waits for the heavy-load classifier.
-export const LEFT_HEAVY_CHARGE_MS = 80;
+// Normal LMB is immediate on genuine pointerDOWN. An internal early hold
+// classifier promotes an as-yet-unlanded light before its 135ms windup expires.
+// The HEAVY attack itself still has its original 320ms authoritative loading;
+// do not mistake the 80ms gesture-arbitration interval for the heavy windup.
+export const LEFT_HEAVY_CHARGE_MS = 320;
+export const LEFT_HEAVY_UPGRADE_MS = 80;
 
 export function createLeftButtonCharge({
   now = () => performance.now(),
-  thresholdMs = LEFT_HEAVY_CHARGE_MS,
+  thresholdMs = LEFT_HEAVY_UPGRADE_MS,
   schedule = (callback, ms) => setTimeout(callback, ms),
   cancelScheduled = (id) => clearTimeout(id),
   onLight,
@@ -23,6 +24,7 @@ export function createLeftButtonCharge({
   let committed = false;
   let upgraded = false;
   let timer = null;
+  let upgradedAtMs = 0;
 
   function stopTimer() {
     if (timer !== null) cancelScheduled(timer);
@@ -35,6 +37,7 @@ export function createLeftButtonCharge({
     pointer = null;
     committed = false;
     upgraded = false;
+    upgradedAtMs = 0;
     return active;
   }
   function upgrade() {
@@ -46,6 +49,7 @@ export function createLeftButtonCharge({
       return false;
     }
     upgraded = true;
+    upgradedAtMs = now();
     onHeavy();
     return true;
   }
@@ -55,6 +59,7 @@ export function createLeftButtonCharge({
     startedMs = now();
     committed = Boolean(immediate);
     upgraded = false;
+    upgradedAtMs = 0;
     // Light request starts on the actual pointerDOWN, never delayed until up.
     onLight();
     if (!committed) timer = schedule(upgrade, thresholdMs);
@@ -76,8 +81,10 @@ export function createLeftButtonCharge({
     return result;
   }
   function progress() {
-    if (pointer === null || committed || upgraded) return 0;
-    return Math.max(0, Math.min(1, (now() - startedMs) / thresholdMs));
+    // Do not show a charging bar for quick taps. Only a classified heavy
+    // (which already issued its one real server request) earns a charge HUD.
+    if (pointer === null || committed || !upgraded) return 0;
+    return Math.max(0, Math.min(1, (now() - upgradedAtMs) / LEFT_HEAVY_CHARGE_MS));
   }
   return Object.freeze({ press, release, commitLight, cancel, progress,
     isPressed: () => pointer !== null });

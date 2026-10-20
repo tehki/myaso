@@ -44,7 +44,8 @@ const RUNNING_ATTACK_RECOVERY_MOVE_MULTIPLIER: f32 = 0.42;
 const HEAVY_ATTACK_WINDUP_MS: f32 = 320.0;
 const HEAVY_ATTACK_ACTIVE_MS: f32 = 100.0;
 const HEAVY_ATTACK_RECOVERY_MS: f32 = 420.0;
-const HEAVY_ATTACK_REACH: f32 = 130.0;
+const HEAVY_ATTACK_REACH: f32 = 82.0;
+const HEAVY_ATTACK_LUNGE_SPEED: f32 = 240.0;
 const HEAVY_ATTACK_ARC_RADIANS: f32 = std::f32::consts::PI * 0.68;
 const HEAVY_ATTACK_DAMAGE: f32 = 46.0;
 const HEAVY_ATTACK_KNOCKBACK: f32 = 28.0;
@@ -1043,10 +1044,13 @@ fn move_fighter(width: f32, height: f32, fighter: &mut Fighter, input: InputInte
             velocity_x *= 0.20;
             velocity_y *= 0.20;
         }
+        Action::HeavyAttackActive => {
+            velocity_x = fighter.facing.cos() * HEAVY_ATTACK_LUNGE_SPEED;
+            velocity_y = fighter.facing.sin() * HEAVY_ATTACK_LUNGE_SPEED;
+        }
         Action::AttackActive
         | Action::AttackLeftActive
         | Action::AttackRightActive
-        | Action::HeavyAttackActive
         | Action::Stunned
         | Action::Knockdown => {
             velocity_x = 0.0;
@@ -1689,11 +1693,12 @@ mod r2_combat_control_tests {
 
     #[test]
     fn heavy_reach_matches_client_painted_arc_and_roll_doubles_ground_time() {
-        assert_eq!(HEAVY_ATTACK_REACH, 130.0);
+        assert_eq!(HEAVY_ATTACK_REACH, 82.0);
+        assert_eq!(HEAVY_ATTACK_LUNGE_SPEED, 240.0);
         assert_eq!(ROLL_COLLISION_KNOCKDOWN_MS, 520.0);
         let mut world = World::new(800.0, 600.0);
         world.add_player_at(1, 200.0, 200.0, 0.0);
-        world.add_player_at(2, 338.0, 200.0, std::f32::consts::PI);
+        world.add_player_at(2, 293.0, 200.0, std::f32::consts::PI);
         world.fighters[0].set_action(Action::HeavyAttackActive, 1000.0);
         let events = world.step();
         assert!(events.iter().any(|event| matches!(
@@ -1705,6 +1710,22 @@ mod r2_combat_control_tests {
                 hp: 54
             }
         )));
+    }
+
+    #[test]
+    fn heavy_leap_physically_advances_without_restoring_the_old_130px_hit_range() {
+        let mut world = World::new(800.0, 600.0);
+        world.add_player_at(1, 200.0, 200.0, 0.0);
+        world.add_player_at(2, 330.0, 200.0, std::f32::consts::PI);
+        world.fighters[0].set_action(Action::HeavyAttackActive, 1000.0);
+        let original_x = world.fighter(1).unwrap().x;
+        let events = world.step();
+        let next_x = world.fighter(1).unwrap().x;
+        assert!(next_x > original_x + 3.0 && next_x < original_x + 5.0);
+        assert_eq!(world.fighter(2).unwrap().hp, 100.0);
+        assert!(!events
+            .iter()
+            .any(|event| matches!(event, CombatEvent::Hit { .. })));
     }
 
     #[test]

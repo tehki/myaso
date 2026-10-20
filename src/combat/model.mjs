@@ -41,7 +41,8 @@ export const COMBAT = Object.freeze({
     windupMs: 320,
     activeMs: 100,
     recoveryMs: 420,
-    reach: 130,
+    reach: 82,
+    lungeSpeed: 240, // 24px forward over the 100ms active strike
     arcRadians: Math.PI * 0.68,
     damage: 46,
     knockback: 28,
@@ -591,10 +592,12 @@ function moveFighter(world, fighter, input, dtMs) {
   } else if (fighter.action === "running_attack_active") {
     velocityX *= COMBAT.runningAttack.activeMoveMultiplier;
     velocityY *= COMBAT.runningAttack.activeMoveMultiplier;
+  } else if (fighter.action === "heavy_attack_active") {
+    velocityX = Math.cos(fighter.facing) * COMBAT.heavyAttack.lungeSpeed;
+    velocityY = Math.sin(fighter.facing) * COMBAT.heavyAttack.lungeSpeed;
   } else if (fighter.action === "attack_active"
     || fighter.action === "attack_left_active"
-    || fighter.action === "attack_right_active"
-    || fighter.action === "heavy_attack_active") {
+    || fighter.action === "attack_right_active") {
     velocityX = 0;
     velocityY = 0;
   } else if (fighter.action === "attack_recovery"

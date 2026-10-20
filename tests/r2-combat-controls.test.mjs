@@ -5,20 +5,22 @@ import { COMBAT, createFighter, createWorld, stepWorld } from "../src/combat/mod
 import { createDirectionalDash } from "../src/browser/dash-input.mjs";
 import { encodeInputPacket, decodeInputPacket, inputPacketBytes } from "../src/network/input-codec.mjs";
 
-test("R2 heavy damage is authoritative up to displayed 130 reach plus fighter radius, light misses same target", () => {
-  assert.equal(COMBAT.heavyAttack.reach, 130);
-  const fighter = createFighter({id:"a",x:200,y:200,facing:0});
-  const target = createFighter({id:"b",x:338,y:200,facing:Math.PI});
-  const world = createWorld({width:800,height:500,fighters:[fighter,target]});
-  fighter.action = "attack_active";
-  fighter.actionDurationMs=1000;
-  stepWorld(world,{},1000/120);
-  assert.equal(target.hp,100,"light's 94-unit max center distance cannot hit");
-  fighter.action="heavy_attack_active";
-  fighter.actionElapsedMs=0;
-  fighter.actionDurationMs=1000;
-  stepWorld(world,{},1000/120);
-  assert.equal(target.hp,54,"heavy reaches center distance 138 within 148px visual arc");
+test("heavy restores near-light attack range, physical forward lunge, and 320ms hold", () => {
+  assert.equal(COMBAT.attack.reach, 76);
+  assert.equal(COMBAT.heavyAttack.reach, 82);
+  assert.equal(COMBAT.heavyAttack.lungeSpeed, 240);
+  const a = createFighter({ id: "a", x: 200, y: 200, facing: 0 });
+  const b = createFighter({ id: "b", x: 350, y: 200, facing: Math.PI });
+  const world = createWorld({ width: 800, height: 500, fighters: [a, b] });
+  a.action = "heavy_attack_active";
+  a.actionDurationMs = 1000;
+  stepWorld(world, {}, 100);
+  assert.ok(Math.abs(a.x - 224) < 0.001, "heavy travels 24px towards cursor");
+  assert.equal(b.hp, 100, "a distant victim cannot be hit by a 82px heavy arc");
+  // Within the shortened arc, a correctly aimed heavy still damages once.
+  b.x = a.x + 98;
+  stepWorld(world, {}, 1000 / 120);
+  assert.equal(b.hp, 54);
 });
 
 test("R2 roll collision knocks down for 520ms rather than 260ms",()=>{

@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { createLeftButtonCharge, LEFT_HEAVY_CHARGE_MS } from "../src/browser/left-button-charge.mjs";
+import { createLeftButtonCharge, LEFT_HEAVY_CHARGE_MS, LEFT_HEAVY_UPGRADE_MS } from "../src/browser/left-button-charge.mjs";
 
 function harness() {
   let ms = 1000;
@@ -14,11 +14,11 @@ function harness() {
   return { gesture, actions, set(value) { ms = value; } };
 }
 
-test("R2 LMB pointerDOWN commits exactly one light immediately", () => {
+test("instant LMB pointerDOWN starts exactly one normal light without loading", () => {
   const h = harness();
   assert.equal(h.gesture.press(1), true);
-  assert.deepEqual(h.actions, ["light"], "no 320ms tap classification wait");
-  h.set(1000 + LEFT_HEAVY_CHARGE_MS - 1);
+  assert.deepEqual(h.actions, ["light"], "no tap-on-release or 320ms charging wait");
+  h.set(1000 + LEFT_HEAVY_UPGRADE_MS - 1);
   assert.equal(h.gesture.release(1), "light");
   assert.deepEqual(h.actions, ["light"], "pointerUP does not issue a second light");
 });
@@ -33,7 +33,7 @@ test("R2 sustained LMB upgrades windup into heavy before light can hit", () => {
   assert.equal(h.gesture.release(7), null);
 });
 
-test("R2 timer-driven hold upgrade fires without waiting for mouse release", () => {
+test("long LMB changes into heavy before the light windup hits, without delaying normal attack", () => {
   let ms = 0, callback = null;
   const actions = [];
   const gesture = createLeftButtonCharge({
@@ -44,7 +44,7 @@ test("R2 timer-driven hold upgrade fires without waiting for mouse release", () 
     onHeavy: () => actions.push("heavy"),
   });
   gesture.press(1);
-  ms = LEFT_HEAVY_CHARGE_MS;
+  ms = LEFT_HEAVY_UPGRADE_MS;
   callback();
   assert.deepEqual(actions, ["light", "heavy"]);
   assert.equal(gesture.release(1), "heavy");
@@ -134,4 +134,51 @@ test("R1 charge meter is independently visible even while damage/status messages
   assert.match(html, /id="heavy-charge-indicator"/);
   assert.match(css, /\.heavy-charge-indicator\[hidden\]/);
   assert.match(css, /pointer-events: none/);
+});
+
+
+test("instant light and 320ms authoritative heavy loading are separate timing contracts", () => {
+  assert.equal(LEFT_HEAVY_CHARGE_MS, 320);
+  assert.equal(LEFT_HEAVY_UPGRADE_MS, 80);
+  const h = harness();
+  h.gesture.press(44);
+  assert.deepEqual(h.actions, ["light"]);
+  assert.equal(h.gesture.progress(), 0, "short LMB tap must not show the charging HUD");
+  h.set(1000 + LEFT_HEAVY_UPGRADE_MS - 1);
+  assert.equal(h.gesture.progress(), 0, "still no loading HUD for light input");
+  assert.equal(h.gesture.release(44), "light");
+  assert.deepEqual(h.actions, ["light"]);
+});
+
+test("classified heavy displays the original 320ms loading interval, without a second light", () => {
+  let ms = 1000, tick;
+  const actions = [];
+  const gesture = createLeftButtonCharge({
+    now: () => ms,
+    schedule(callback) { tick = callback; return 1; },
+    cancelScheduled() { tick = null; },
+    onLight() { actions.push("light"); },
+    onHeavy() { actions.push("heavy"); },
+  });
+  gesture.press(7);
+  assert.deepEqual(actions, ["light"]);
+  assert.equal(gesture.progress(), 0);
+  ms += LEFT_HEAVY_UPGRADE_MS;
+  tick();
+  assert.deepEqual(actions, ["light", "heavy"]);
+  assert.equal(gesture.progress(), 0, "heavy windup only begins after classification");
+  ms += 160;
+  assert.equal(gesture.progress(), 0.5);
+  ms += 160;
+  assert.equal(gesture.progress(), 1);
+  assert.equal(gesture.release(7), "heavy");
+  assert.deepEqual(actions, ["light", "heavy"], "only one light start, one pre-hit heavy upgrade");
+  assert.equal(gesture.progress(), 0);
+});
+
+test("heavy windup stays server-authoritative at 320ms, not 80ms", () => {
+  const model = readFileSync(new URL("../src/combat/model.mjs", import.meta.url), "utf8");
+  const server = readFileSync(new URL("../server/src/simulation.rs", import.meta.url), "utf8");
+  assert.match(model, /windupMs: 320,\s*activeMs: 100,\s*recoveryMs: 420,\s*reach: 82/);
+  assert.match(server, /HEAVY_ATTACK_WINDUP_MS: f32 = 320\.0/);
 });
