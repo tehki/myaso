@@ -9,9 +9,7 @@
 
 use crate::magic_fx_events::MAGIC_FX_PACKET_BYTES;
 use crate::magic_fx_handoff::FxRoute;
-use crate::magic_fx_shared_transport::{
-    SharedDispatchPlan, SharedPriority,
-};
+use crate::magic_fx_shared_transport::{SharedDispatchPlan, SharedPriority};
 use crate::CONSERVATIVE_DATAGRAM_BYTES;
 
 #[derive(Debug, PartialEq, Eq)]
@@ -151,8 +149,8 @@ mod tests {
     use super::*;
     use crate::magic_fx_handoff::{FxHandoffPlan, FxRoutedBatch, TrustedFxHandoff};
     use crate::magic_fx_shared_transport::{
-        plan_shared_dispatch, CoreGameplayDatagram, CoreWriterCapacity,
-        SharedDispatchDatagram, SharedDispatchPlan,
+        plan_shared_dispatch, CoreGameplayDatagram, CoreWriterCapacity, SharedDispatchDatagram,
+        SharedDispatchPlan,
     };
     use std::cell::Cell;
 
@@ -203,17 +201,35 @@ mod tests {
         let mut registry = TrustedFxHandoff::new();
         let route = registry.register_trusted(7, 7, 7).unwrap();
         let gameplay = vec![
-            CoreGameplayDatagram { route, bytes: vec![1, 2] },
-            CoreGameplayDatagram { route, bytes: vec![3, 4] },
+            CoreGameplayDatagram {
+                route,
+                bytes: vec![1, 2],
+            },
+            CoreGameplayDatagram {
+                route,
+                bytes: vec![3, 4],
+            },
         ];
         let fx = fx_plan(route, 2);
         let plan = composed(&registry, route, &gameplay, &fx, 4);
         let mut sent = Vec::new();
-        let output = try_write_shared(&plan, |r| registry.route_current(r), |_, bytes| {
-            sent.push(bytes.to_vec());
-            Ok::<_, ()>(())
-        });
-        assert_eq!(sent, vec![vec![1, 2], vec![3, 4], effect(7).to_vec(), effect(7).to_vec()]);
+        let output = try_write_shared(
+            &plan,
+            |r| registry.route_current(r),
+            |_, bytes| {
+                sent.push(bytes.to_vec());
+                Ok::<_, ()>(())
+            },
+        );
+        assert_eq!(
+            sent,
+            vec![
+                vec![1, 2],
+                vec![3, 4],
+                effect(7).to_vec(),
+                effect(7).to_vec()
+            ]
+        );
         assert_eq!(output.gameplay_sent, 2);
         assert_eq!(output.next_unsent_gameplay_index, 2);
         assert_eq!(output.cosmetic_sent, 2);
@@ -226,20 +242,33 @@ mod tests {
         let mut registry = TrustedFxHandoff::new();
         let route = registry.register_trusted(7, 7, 7).unwrap();
         let gameplay = vec![
-            CoreGameplayDatagram { route, bytes: vec![1] },
-            CoreGameplayDatagram { route, bytes: vec![2] },
-            CoreGameplayDatagram { route, bytes: vec![3] },
+            CoreGameplayDatagram {
+                route,
+                bytes: vec![1],
+            },
+            CoreGameplayDatagram {
+                route,
+                bytes: vec![2],
+            },
+            CoreGameplayDatagram {
+                route,
+                bytes: vec![3],
+            },
         ];
         let fx = fx_plan(route, 1);
         let plan = composed(&registry, route, &gameplay, &fx, 4);
         let mut accepted = Vec::new();
-        let output = try_write_shared(&plan, |r| registry.route_current(r), |_, bytes| {
-            if bytes == [2] {
-                return Err("full");
-            }
-            accepted.push(bytes.to_vec());
-            Ok(())
-        });
+        let output = try_write_shared(
+            &plan,
+            |r| registry.route_current(r),
+            |_, bytes| {
+                if bytes == [2] {
+                    return Err("full");
+                }
+                accepted.push(bytes.to_vec());
+                Ok(())
+            },
+        );
         assert_eq!(accepted, vec![vec![1]]);
         assert_eq!(output.gameplay_sent, 1);
         assert_eq!(output.next_unsent_gameplay_index, 1);
@@ -258,18 +287,25 @@ mod tests {
     fn reconnect_after_gameplay_prevents_later_fx_from_crossing_generations() {
         let mut registry = TrustedFxHandoff::new();
         let route = registry.register_trusted(7, 7, 7).unwrap();
-        let gameplay = vec![CoreGameplayDatagram { route, bytes: vec![1] }];
+        let gameplay = vec![CoreGameplayDatagram {
+            route,
+            bytes: vec![1],
+        }];
         let fx = fx_plan(route, 1);
         let plan = composed(&registry, route, &gameplay, &fx, 2);
         let checks = Cell::new(0);
         let mut sent = Vec::new();
-        let output = try_write_shared(&plan, |_| {
-            checks.set(checks.get() + 1);
-            checks.get() == 1
-        }, |_, bytes| {
-            sent.push(bytes.to_vec());
-            Ok::<_, ()>(())
-        });
+        let output = try_write_shared(
+            &plan,
+            |_| {
+                checks.set(checks.get() + 1);
+                checks.get() == 1
+            },
+            |_, bytes| {
+                sent.push(bytes.to_vec());
+                Ok::<_, ()>(())
+            },
+        );
         assert_eq!(sent, vec![vec![1]]);
         assert_eq!(output.gameplay_sent, 1);
         assert_eq!(output.stale_cosmetic_skipped, 1);
@@ -281,14 +317,21 @@ mod tests {
     fn stale_first_gameplay_route_fails_closed_before_socket_enqueue() {
         let mut registry = TrustedFxHandoff::new();
         let route = registry.register_trusted(7, 7, 7).unwrap();
-        let gameplay = vec![CoreGameplayDatagram { route, bytes: vec![1] }];
+        let gameplay = vec![CoreGameplayDatagram {
+            route,
+            bytes: vec![1],
+        }];
         let fx = fx_plan(route, 1);
         let plan = composed(&registry, route, &gameplay, &fx, 2);
         let called = Cell::new(0);
-        let output = try_write_shared(&plan, |_| false, |_, _| {
-            called.set(called.get() + 1);
-            Ok::<_, ()>(())
-        });
+        let output = try_write_shared(
+            &plan,
+            |_| false,
+            |_, _| {
+                called.set(called.get() + 1);
+                Ok::<_, ()>(())
+            },
+        );
         assert_eq!(called.get(), 0);
         assert_eq!(output.next_unsent_gameplay_index, 0);
         assert_eq!(output.cosmetic_not_sent, 1);
@@ -302,19 +345,26 @@ mod tests {
     fn cosmetic_failure_drops_only_visual_traffic_and_continues() {
         let mut registry = TrustedFxHandoff::new();
         let route = registry.register_trusted(7, 7, 7).unwrap();
-        let gameplay = vec![CoreGameplayDatagram { route, bytes: vec![1] }];
+        let gameplay = vec![CoreGameplayDatagram {
+            route,
+            bytes: vec![1],
+        }];
         let fx = fx_plan(route, 2);
         let plan = composed(&registry, route, &gameplay, &fx, 3);
         let attempts = Cell::new(0);
-        let output = try_write_shared(&plan, |_| true, |_, bytes| {
-            if bytes.len() == MAGIC_FX_PACKET_BYTES {
-                attempts.set(attempts.get() + 1);
-                if attempts.get() == 1 {
-                    return Err("cosmetic pressure");
+        let output = try_write_shared(
+            &plan,
+            |_| true,
+            |_, bytes| {
+                if bytes.len() == MAGIC_FX_PACKET_BYTES {
+                    attempts.set(attempts.get() + 1);
+                    if attempts.get() == 1 {
+                        return Err("cosmetic pressure");
+                    }
                 }
-            }
-            Ok(())
-        });
+                Ok(())
+            },
+        );
         assert_eq!(output.gameplay_sent, 1);
         assert_eq!(output.cosmetic_sent, 1);
         assert_eq!(output.cosmetic_send_failed, 1);
@@ -324,13 +374,24 @@ mod tests {
 
     #[test]
     fn malformed_public_plan_is_rejected_before_any_socket_writes() {
-        let route = FxRoute { connection_id: 7, generation: 2 };
+        let route = FxRoute {
+            connection_id: 7,
+            generation: 2,
+        };
         let snapshot = [1u8, 2];
         let cosmetic = effect(7);
         let plan = SharedDispatchPlan {
             ordered: vec![
-                SharedDispatchDatagram { route, priority: SharedPriority::Cosmetic, bytes: &cosmetic },
-                SharedDispatchDatagram { route, priority: SharedPriority::Gameplay, bytes: &snapshot },
+                SharedDispatchDatagram {
+                    route,
+                    priority: SharedPriority::Cosmetic,
+                    bytes: &cosmetic,
+                },
+                SharedDispatchDatagram {
+                    route,
+                    priority: SharedPriority::Gameplay,
+                    bytes: &snapshot,
+                },
             ],
             gameplay_datagrams: 1,
             gameplay_payload_bytes: 2,
@@ -340,10 +401,14 @@ mod tests {
             stale_cosmetic_dropped: 0,
         };
         let sends = Cell::new(0);
-        let report = try_write_shared(&plan, |_| true, |_, _| {
-            sends.set(sends.get() + 1);
-            Ok::<_, ()>(())
-        });
+        let report = try_write_shared(
+            &plan,
+            |_| true,
+            |_, _| {
+                sends.set(sends.get() + 1);
+                Ok::<_, ()>(())
+            },
+        );
         assert_eq!(sends.get(), 0);
         assert_eq!(report.gameplay_sent, 0);
         assert_eq!(report.next_unsent_gameplay_index, 0);
