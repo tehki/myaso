@@ -4,6 +4,7 @@
 //! must approve message type, ordered reliability, replay rules and session
 //! generation fencing before enabling any client-visible hit confirmation.
 //! Do not infer attacker identity from snapshot HP changes.
+use crate::simulation::CombatEvent;
 use crate::PROTOCOL_VERSION;
 
 pub const HIT_RECEIPT_TYPE_PROPOSAL: u8 = 5;
@@ -31,6 +32,34 @@ pub enum HitReceiptError {
 }
 
 impl HitReceipt {
+    /// Derived from a completed authoritative simulation event, never
+    /// packet-supplied attacker claims or replicated HP deltas.
+    pub fn from_combat_event(
+        sequence: u32,
+        server_tick: u32,
+        event: &CombatEvent,
+    ) -> Result<Option<Self>, HitReceiptError> {
+        let CombatEvent::Hit {
+            attacker,
+            target,
+            damage,
+            hp,
+        } = event
+        else {
+            return Ok(None);
+        };
+        let receipt = Self {
+            sequence,
+            server_tick,
+            attacker: *attacker,
+            target: *target,
+            damage: f32::from(*damage),
+            target_hp: f32::from(*hp),
+        };
+        receipt.validate()?;
+        Ok(Some(receipt))
+    }
+
     pub fn validate(&self) -> Result<(), HitReceiptError> {
         if self.attacker == 0 || self.target == 0 || self.attacker == self.target {
             return Err(HitReceiptError::InvalidActors);
@@ -107,6 +136,44 @@ mod tests {
             [1, 5, 0, 0, 4, 3, 2, 1, 13, 12, 11, 10, 2, 0, 0, 0, 1, 0, 0, 0, 0, 0, 8, 66, 0, 0, 132, 66]
         );
         assert_eq!(decode_hit_receipt(&bytes), Ok(fixture()));
+    }
+
+    #[test]
+    fn receipt_is_created_only_from_a_real_simulation_hit() {
+        let hit = CombatEvent::Hit {
+            attacker: 2,
+            target: 1,
+            damage: 34,
+            hp: 66,
+        };
+        assert_eq!(
+            HitReceipt::from_combat_event(fixture().sequence, fixture().server_tick, &hit),
+            Ok(Some(fixture()))
+        );
+        assert_eq!(
+            HitReceipt::from_combat_event(
+                4,
+                9,
+                &CombatEvent::Parry {
+                    attacker: 2,
+                    target: 1,
+                }
+            ),
+            Ok(None)
+        );
+        assert_eq!(
+            HitReceipt::from_combat_event(
+                4,
+                9,
+                &CombatEvent::Hit {
+                    attacker: 2,
+                    target: 2,
+                    damage: 34,
+                    hp: 66,
+                }
+            ),
+            Err(HitReceiptError::InvalidActors)
+        );
     }
 
     #[test]
