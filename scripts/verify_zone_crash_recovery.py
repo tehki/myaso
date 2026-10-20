@@ -85,9 +85,9 @@ def kill_precommit_transaction(operation, marker):
     )
     try:
         require(client.stdin is not None, "psql stdin must be writable")
-        client.stdin.write("BEGIN;\\n")
-        client.stdin.write(operation + "\\n")
-        client.stdin.write(f"SELECT '{marker}';\\n")
+        client.stdin.write("BEGIN;\n")
+        client.stdin.write(operation + "\n")
+        client.stdin.write(f"SELECT '{marker}';\n")
         client.stdin.flush()
         observed = False
         for _ in range(100):
