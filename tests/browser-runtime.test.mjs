@@ -1,3 +1,4 @@
+import "./chat-c1-adapter-lifecycle.test.mjs";
 import "./chat-c1-foundation.test.mjs";
 import test from "node:test";
 import assert from "node:assert/strict";
