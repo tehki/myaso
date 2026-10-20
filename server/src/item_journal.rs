@@ -579,6 +579,26 @@ mod tests {
     }
 
     #[test]
+    fn destroyed_item_identity_cannot_be_reissued_after_restart() {
+        let root = Root::new();
+        let mut journal = root.open();
+        journal
+            .apply(txn(1), &[OwnershipOp::Create { item: item(77), at: inv(1) }])
+            .expect("create");
+        journal
+            .apply(txn(2), &[OwnershipOp::Destroy { item: item(77), from: inv(1) }])
+            .expect("destroy");
+        drop(journal);
+        let mut restarted = root.open();
+        assert_eq!(restarted.location(item(77)), None);
+        assert!(matches!(
+            restarted.apply(txn(3), &[OwnershipOp::Create { item: item(77), at: inv(2) }]),
+            Err(ItemJournalError::InvalidTransaction(OwnershipError::ItemAlreadyExists))
+        ));
+        assert!(!root.record(3).exists());
+    }
+
+    #[test]
     fn orphan_stage_ignored_but_tampered_canonical_record_fails_closed() {
         let root = Root::new();
         let mut store = root.open();
