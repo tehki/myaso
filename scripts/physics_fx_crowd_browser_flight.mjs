@@ -7,6 +7,8 @@ import path from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
 
 const root = process.cwd();
+const extendedWindowMs = process.env.P10_WINDOW_MS ?? "4200";
+if (!/^\\d+$/.test(extendedWindowMs) || Number(extendedWindowMs) < 4200 || Number(extendedWindowMs) > 10500) throw new Error("P10_WINDOW_MS must be 4200..10500");
 const children = new Set();
 const files = new Map([
   ["/web/physics-fx-crowd-flight.html", "web/physics-fx-crowd-flight.html"],
@@ -140,6 +142,7 @@ async function runBrowser(browser, lab, staticPort) {
     page.searchParams.set("server", lab.endpoint);
     page.searchParams.set("cert", lab.cert);
     page.searchParams.set("sessions", "16");
+    page.searchParams.set("windowMs", extendedWindowMs);
     await webdriver(base, "POST", `/session/${sessionId}/url`, { url: page.toString() });
     const deadline = Date.now() + 65000;
     let lastStage = "page-not-started";
