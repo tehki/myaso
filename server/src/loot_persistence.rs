@@ -213,7 +213,9 @@ fn checksum(payload: &[u8]) -> u64 {
 }
 
 fn encode(snapshot: &LootStateSnapshot) -> Result<Vec<u8>, CheckpointError> {
-    snapshot.validate().map_err(|_| CheckpointError::InvalidState)?;
+    snapshot
+        .validate()
+        .map_err(|_| CheckpointError::InvalidState)?;
     if !snapshot.players.is_empty() || !snapshot.dead.is_empty() {
         return Err(CheckpointError::InvalidState);
     }
@@ -242,14 +244,12 @@ fn encode(snapshot: &LootStateSnapshot) -> Result<Vec<u8>, CheckpointError> {
         for item in &parked.inventory.backpack {
             writer.item(item);
         }
-        writer.u8(
-            parked
-                .inventory
-                .equipment
-                .len()
-                .try_into()
-                .map_err(|_| CheckpointError::TooLarge)?,
-        );
+        writer.u8(parked
+            .inventory
+            .equipment
+            .len()
+            .try_into()
+            .map_err(|_| CheckpointError::TooLarge)?);
         for (slot, item) in &parked.inventory.equipment {
             writer.u8(slot_code(*slot));
             writer.item(item);
@@ -309,9 +309,7 @@ fn decode(bytes: &[u8]) -> Result<LootStateSnapshot, CheckpointError> {
         return Err(CheckpointError::Corrupt);
     }
     let content_size = bytes.len() - 8;
-    let stored = u64::from_le_bytes(
-        bytes[content_size..].try_into().expect("exact digest"),
-    );
+    let stored = u64::from_le_bytes(bytes[content_size..].try_into().expect("exact digest"));
     if checksum(&bytes[..content_size]) != stored {
         return Err(CheckpointError::Corrupt);
     }
@@ -443,7 +441,11 @@ fn decode(bytes: &[u8]) -> Result<LootStateSnapshot, CheckpointError> {
 /// file, file fsync, atomic rename, and Unix parent directory fsync.
 /// This is NOT a transaction around each gameplay event or account identity.
 pub fn save_quiescent(path: &Path, loot: &LootAuthority) -> Result<(), CheckpointError> {
-    let bytes = encode(&loot.export_state().map_err(|_| CheckpointError::InvalidState)?)?;
+    let bytes = encode(
+        &loot
+            .export_state()
+            .map_err(|_| CheckpointError::InvalidState)?,
+    )?;
     let counter = WRITE_SEQUENCE.fetch_add(1, Ordering::Relaxed);
     let suffix = format!("pending-{}-{counter}", std::process::id());
     let temp = path.with_extension(suffix);
@@ -536,7 +538,10 @@ mod tests {
             sword
         );
         assert_eq!(restored.ground()[&dropped].item.id, reagent);
-        assert_eq!(restored.export_state().unwrap(), loot.export_state().unwrap());
+        assert_eq!(
+            restored.export_state().unwrap(),
+            loot.export_state().unwrap()
+        );
     }
 
     #[test]
