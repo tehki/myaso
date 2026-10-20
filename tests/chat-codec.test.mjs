@@ -212,3 +212,69 @@ test("malformed incoming chat frame closes optional writer, not gameplay transpo
   assert.equal(reply.locked, false);
   assert.equal(gameplayClosed, 0);
 });
+
+test("coalesced valid chat frames over 4096 bytes decode with one bounded frame buffer", async () => {
+  const text = "🌕".repeat(60); // 240 UTF-8 bytes, largest valid local chat payload
+  const packets = Array.from({ length: 32 }, (_, i) => frame(makeReceived({
+    sender: i + 1, messageId: BigInt(i + 1), text,
+  })));
+  const bytes = new Uint8Array(packets.reduce((sum, packet) => sum + packet.length, 0));
+  let pos = 0;
+  for (const packet of packets) {
+    bytes.set(packet, pos);
+    pos += packet.length;
+  }
+  assert.ok(bytes.length > 4096, "the combined transport chunk exceeds old buffer limit");
+  let gameplayClosed = 0;
+  const reply = new ReadableStream({
+    start(controller) { controller.enqueue(bytes); controller.close(); },
+  });
+  const transport = {
+    createUnidirectionalStream: async () => new WritableStream(),
+    incomingUnidirectionalStreams: new ReadableStream({
+      start(controller) { controller.enqueue(reply); controller.close(); },
+    }),
+    close() { gameplayClosed++; },
+  };
+  const events = [];
+  const chat = await openLocalChat({ kind: "webtransport", transport }, {
+    onReceived(event) { events.push(event); },
+  });
+  await chat.reading;
+  assert.equal(events.length, 32);
+  for (let i = 0; i < events.length; i++) {
+    assert.equal(events[i].messageId, BigInt(i + 1));
+    assert.equal(events[i].senderId, i + 1);
+    assert.equal(events[i].text, text);
+  }
+  assert.equal(chat.closed, true);
+  assert.equal(gameplayClosed, 0, "only optional chat stream may close");
+});
+
+test("fragmented and coalesced chat frames still reject invalid length prefixes", async () => {
+  const reply = new ReadableStream({
+    start(controller) {
+      controller.enqueue(frame(makeResult()).slice(0, 1));
+      const goodTail = frame(makeResult()).slice(1);
+      const batch = new Uint8Array(goodTail.length + 2);
+      batch.set(goodTail, 0);
+      batch.set([0xff, 0xff], goodTail.length);
+      controller.enqueue(batch);
+      controller.close();
+    },
+  });
+  const transport = {
+    createUnidirectionalStream: async () => new WritableStream(),
+    incomingUnidirectionalStreams: new ReadableStream({
+      start(controller) { controller.enqueue(reply); controller.close(); },
+    }),
+  };
+  const results = [];
+  const chat = await openLocalChat({ kind: "webtransport", transport }, {
+    onResult(event) { results.push(event); },
+  });
+  await assert.rejects(chat.reading, /chat frame length invalid/);
+  assert.equal(results.length, 1, "valid first frame remains delivered");
+  assert.equal(results[0].correlation, 77);
+  assert.equal(chat.closed, true);
+});
