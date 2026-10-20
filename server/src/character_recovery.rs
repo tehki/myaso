@@ -222,7 +222,9 @@ mod tests {
         root.provision(10);
         let mut store = root.store();
         let id = CharacterId::new(10).expect("id");
-        let committed = store.advance_generation(store.load(id).expect("load"))
+        let original = store.load(id).expect("load");
+        let committed = store
+            .advance_generation(original)
             .expect("simulated pre-activation commit");
         assert_eq!(committed.session_generation, 1);
         let mut coordinator = CharacterRecoveryCoordinator::new(TestVerifier, root.store());
