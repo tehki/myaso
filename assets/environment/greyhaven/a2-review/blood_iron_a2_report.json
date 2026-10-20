@@ -5,9 +5,16 @@
   "editableSource": "blood_iron_greyhaven_a2.blend",
   "renderer": "Cycles CPU",
   "samples": 4,
-  "sceneMeshes": 267,
+  "sceneMeshes": 289,
   "materialCount": 24,
   "batchedCobblestones": 1032,
+  "barrels": {
+    "count": 7,
+    "outerRadiusMeters": 0.315,
+    "minimumRequiredGapMeters": 0.1,
+    "measuredMinimumEdgeClearanceMeters": 0.153,
+    "removedOverlappingSourceGroup": true
+  },
   "buildings": [
     "Red Lion A1 enhanced",
     "Gable Merchant",
