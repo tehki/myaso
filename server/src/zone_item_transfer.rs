@@ -378,7 +378,6 @@ mod tests {
             coordinator.confirm_arrival(second).expect("new receipt"),
             ArrivalStatus::Current
         );
-        drop(coordinator);
         drop(journal);
         let mut restored = root.journal();
         let verifier = GroundTransferCoordinator::new(&mut restored);
@@ -432,7 +431,6 @@ mod tests {
             coordinator.confirm_arrival(committed).expect("live proof"),
             ArrivalStatus::Current
         );
-        drop(coordinator);
         drop(journal);
         fs::write(
             root.0.join("00000000000000000002.mytx"),
