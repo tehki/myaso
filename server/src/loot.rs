@@ -424,7 +424,11 @@ impl LootAuthority {
         if !self.players.contains_key(&id) {
             return Err(LootError::UnknownPlayer);
         }
-        if self.dead.contains(&id) || fighter.action == Action::Dead {
+        if self.dead.contains(&id)
+            || fighter.action == Action::Dead
+            || !fighter.hp.is_finite()
+            || fighter.hp <= 0.0
+        {
             return Err(LootError::DeadPlayer);
         }
         Ok(())
@@ -854,9 +858,6 @@ impl LootAuthority {
         now_ms: u64,
     ) -> Result<Vec<ItemStack>, LootError> {
         self.require_alive(authenticated_id, fighter)?;
-        if !fighter.hp.is_finite() || fighter.hp <= 0.0 {
-            return Err(LootError::DeadPlayer);
-        }
         let at = Point::from_fighter(fighter);
         if !at.in_zone(zone) {
             return Err(LootError::InvalidPosition);
@@ -1541,6 +1542,51 @@ mod tests {
         );
         assert!(!loot.ground().contains_key(&drop_id));
         assert_eq!(loot.inventory(2).unwrap().backpack()[0].id, sword);
+    }
+
+    #[test]
+    fn zero_hp_or_nonfinite_fighter_cannot_pick_up_ground_gear() {
+        let mut loot = LootAuthority::new();
+        loot.register(1).unwrap();
+        loot.register(2).unwrap();
+        let sword = loot.grant(1, ItemKind::RustySword, 1).unwrap();
+        let drop_id = loot
+            .drop_backpack(
+                1,
+                &fighter(1, 150.0, 150.0, false),
+                ZoneId::Moonvale,
+                sword,
+                10,
+            )
+            .unwrap();
+
+        // HP may reach zero before the Combat action changes to Dead.
+        // An invalid health value must also fail closed, not grant loot.
+        for hp in [0.0, -1.0, f32::NAN, f32::INFINITY] {
+            let mut dying = fighter(2, 150.0, 150.0, false);
+            dying.hp = hp;
+            assert_eq!(
+                loot.take_ground_amount(2, &dying, ZoneId::Moonvale, drop_id, 1, 11),
+                Err(LootError::DeadPlayer)
+            );
+            assert!(loot.inventory(2).unwrap().backpack().is_empty());
+            assert_eq!(loot.ground()[&drop_id].item.id, sword);
+        }
+
+        assert_eq!(
+            loot.take_ground_amount(
+                2,
+                &fighter(2, 150.0, 150.0, false),
+                ZoneId::Moonvale,
+                drop_id,
+                1,
+                11,
+            )
+            .unwrap()
+            .id,
+            sword
+        );
+        assert!(!loot.ground().contains_key(&drop_id));
     }
 
     #[test]

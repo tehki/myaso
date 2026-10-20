@@ -328,7 +328,11 @@ pub fn commit_verified_equipment(
     {
         return Err(PickupCommitError::Loot(LootError::InvalidPosition));
     }
-    if fighter.action == Action::Dead || fighter.hp <= 0.0 || loot.is_dead(actor) {
+    if fighter.action == Action::Dead
+        || !fighter.hp.is_finite()
+        || fighter.hp <= 0.0
+        || loot.is_dead(actor)
+    {
         return Err(PickupCommitError::Loot(LootError::DeadPlayer));
     }
     let mut staged =
@@ -1056,6 +1060,16 @@ mod tests {
             corpse,
         )
         .unwrap();
+        // Cross-check #428's common liveness guard: inspection, not only pickup,
+        // must deny a Fighter whose HP is invalid before Action becomes Dead.
+        for hp in [0.0, -1.0, f32::NAN, f32::INFINITY] {
+            let mut dying = world.fighter(2).unwrap().clone();
+            dying.hp = hp;
+            assert!(matches!(
+                loot.inspect_corpse(2, &dying, ZoneId::Moonvale, corpse, 0),
+                Err(LootError::DeadPlayer)
+            ));
+        }
         assert_eq!(contents.len(), 2);
         assert!(contents.iter().any(|item| item.id == sword));
         assert!(contents
