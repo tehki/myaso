@@ -1,0 +1,52 @@
+name: R2 external WAN staged acceptance (no deploy)
+on:
+  push:
+    branches:
+      - test/r2-cloud-wan-acceptance-20261020
+permissions:
+  contents: read
+concurrency:
+  group: myaso-r2-cloud-wan-acceptance
+  cancel-in-progress: false
+jobs:
+  independent-wan-chromium:
+    name: Independent hosted WAN browser
+    runs-on: ubuntu-24.04
+    timeout-minutes: 9
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+      - name: Prove immutable game source and browser tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD^)" = "7c5fe9b08e86254cff9e05ae07c1d0d572cb7879"
+          test "$(git diff HEAD^ HEAD -- web src server)" = ""
+          command -v chromedriver
+          chromedriver --version
+          command -v google-chrome
+          google-chrome --version
+          node --check ops/acceptance/r2-wan-cloud-probe.mjs
+          node --check ops/acceptance/r2-wan-cloud-w3c.mjs
+      - name: Register external WAN source via outbound discovery only
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "R2_EXTERNAL_WAN_EGRESS_IPV4=$(curl --ipv4 -fsS --connect-timeout 8 --max-time 15 https://api.ipify.org)"
+          node ops/acceptance/r2-wan-cloud-probe.mjs
+      - name: Give Windows client time to join same staged realm
+        run: sleep 12
+      - name: Strict cloud native W3C test against exact inactive VPS binary
+        env:
+          CHROME_LOG_FILE: cloud-chromedriver.log
+        run: node ops/acceptance/r2-wan-cloud-w3c.mjs
+      - name: Upload evidence even on strict failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: r2-independent-wan-cloud-native-acceptance
+          path: |
+            R2-WAN-CLOUD-W3C-*.json
+          if-no-files-found: ignore
+          retention-days: 7
