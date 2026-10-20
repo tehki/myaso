@@ -70,3 +70,19 @@ test("M142 real W3C geometry correction cannot accidentally double-tap dash",()=
  assert.ok(section.includes("cannot stage genuine ordered attack geometry"));
  assert.ok(!section.includes("dispatchEvent("));
 });
+
+
+test("R2 M142 FFA uses one real release-to-light before the jump chord while keeping two-strike evidence", () => {
+  const source=readFileSync(new URL("../scripts/pvp_browser_flight_runner.mjs",import.meta.url),"utf8");
+  const start=source.indexOf("async function runOnlineUiJumpFfaThreatFlight(");
+  const section=source.slice(start,source.indexOf("\nasync function ",start+25));
+  const light=section.indexOf("await performArenaAttackBurst(right, 1, 0, 0);");
+  const jump=section.indexOf("await pressArenaJumpAttackChord(left, leftArena, 200);");
+  assert.ok(light>0&&jump>light,"one native short LMB release precedes genuine Space+LMB jump");
+  assert.ok(!section.includes("performArenaAttackBurst(right, 3, 0, 8)"),"obsolete three-tap light must not mistime authoritative attack");
+  assert.ok(section.includes('{ primary: "JUMP STRIKE", secondary: "STRIKE", state: "strike" }'));
+  assert.ok(section.includes('{ primary: "STRIKE", secondary: "JUMP STRIKE", state: "strike" }'));
+  assert.ok(section.includes('event.count === "2 THREATS"'));
+  assert.ok(section.includes("leftState.playerHp !== 100 || leftState.playerGuard !== 100"));
+  assert.ok(!section.includes("dispatchEvent(")&&!section.includes("new PointerEvent("));
+});
