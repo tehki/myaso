@@ -52,9 +52,15 @@ fn d5_twenty_thousand_edge_biased_queries_match_browser_digests() {
                 map = GeometryMap::Moonvale;
                 (x, y) = match side {
                     0 => (building.x + off, building.y + (d % length_y) as f32 / 4.0),
-                    1 => (building.x + building.w + off, building.y + (d % length_y) as f32 / 4.0),
+                    1 => (
+                        building.x + building.w + off,
+                        building.y + (d % length_y) as f32 / 4.0,
+                    ),
                     2 => (building.x + (d % length_x) as f32 / 4.0, building.y + off),
-                    _ => (building.x + (d % length_x) as f32 / 4.0, building.y + building.h + off),
+                    _ => (
+                        building.x + (d % length_x) as f32 / 4.0,
+                        building.y + building.h + off,
+                    ),
                 };
             }
             2 => {
@@ -75,9 +81,15 @@ fn d5_twenty_thousand_edge_biased_queries_match_browser_digests() {
                 map = GeometryMap::RedLionInn;
                 (x, y) = match side {
                     0 => (furniture.x + off, furniture.y + (d % length_y) as f32 / 4.0),
-                    1 => (furniture.x + furniture.w + off, furniture.y + (d % length_y) as f32 / 4.0),
+                    1 => (
+                        furniture.x + furniture.w + off,
+                        furniture.y + (d % length_y) as f32 / 4.0,
+                    ),
                     2 => (furniture.x + (d % length_x) as f32 / 4.0, furniture.y + off),
-                    _ => (furniture.x + (d % length_x) as f32 / 4.0, furniture.y + furniture.h + off),
+                    _ => (
+                        furniture.x + (d % length_x) as f32 / 4.0,
+                        furniture.y + furniture.h + off,
+                    ),
                 };
             }
             _ => {
@@ -88,14 +100,23 @@ fn d5_twenty_thousand_edge_biased_queries_match_browser_digests() {
         }
         let walk = is_walkable(map, x, y, radius);
         totals[bucket] += 1;
-        if !walk { blocked[bucket] += 1; }
+        if !walk {
+            blocked[bucket] += 1;
+        }
         hashes[bucket] = (hashes[bucket] ^ u32::from(walk)).wrapping_mul(16_777_619);
     }
 
     const NAMES: [&str; 5] = [
-        "city-walls", "building-edges", "river-bridges", "inn-furniture", "world-uniform",
+        "city-walls",
+        "building-edges",
+        "river-bridges",
+        "inn-furniture",
+        "world-uniform",
     ];
-    let lines: Vec<&str> = EXPECTED.lines().filter(|line| !line.starts_with('#') && !line.is_empty()).collect();
+    let lines: Vec<&str> = EXPECTED
+        .lines()
+        .filter(|line| !line.starts_with('#') && !line.is_empty())
+        .collect();
     assert_eq!(lines.len(), NAMES.len(), "missing D5 boundary categories");
     for (bucket, line) in lines.iter().enumerate() {
         let parts: Vec<&str> = line.split(',').collect();
@@ -104,9 +125,21 @@ fn d5_twenty_thousand_edge_biased_queries_match_browser_digests() {
         let count = parts[1].parse::<u32>().expect("count");
         let expected_blocked = parts[2].parse::<u32>().expect("blocked");
         let expected_hash = u32::from_str_radix(parts[3], 16).expect("FNV32");
-        assert_eq!(totals[bucket], count, "query count changed in {}", NAMES[bucket]);
-        assert_eq!(blocked[bucket], expected_blocked, "Rust/browser classification mismatch in {}", NAMES[bucket]);
-        assert_eq!(hashes[bucket], expected_hash, "Rust/browser sequence divergence in {}", NAMES[bucket]);
+        assert_eq!(
+            totals[bucket], count,
+            "query count changed in {}",
+            NAMES[bucket]
+        );
+        assert_eq!(
+            blocked[bucket], expected_blocked,
+            "Rust/browser classification mismatch in {}",
+            NAMES[bucket]
+        );
+        assert_eq!(
+            hashes[bucket], expected_hash,
+            "Rust/browser sequence divergence in {}",
+            NAMES[bucket]
+        );
         assert_eq!(totals[bucket], 4_000);
     }
 }
