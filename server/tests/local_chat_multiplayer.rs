@@ -30,6 +30,7 @@ fn start_server() -> (TestServer, String, Sha256Digest) {
     std::thread::spawn(move || {
         let mut url = None;
         let mut digest = None;
+        let mut announced = false;
         for line in BufReader::new(output).lines().map_while(Result::ok) {
             eprintln!("real-server: {line}");
             if let Some(value) = line.split("listening on ").nth(1) {
@@ -38,9 +39,9 @@ fn start_server() -> (TestServer, String, Sha256Digest) {
             if let Some(value) = line.split("development certificate SHA-256: ").nth(1) {
                 digest = Some(value.trim().parse::<Sha256Digest>().expect("cert digest"));
             }
-            if url.is_some() && digest.is_some() {
+            if !announced && url.is_some() && digest.is_some() {
                 let _ = sender.send((url.take().expect("URL"), digest.take().expect("digest")));
-                break;
+                announced = true;
             }
         }
     });
