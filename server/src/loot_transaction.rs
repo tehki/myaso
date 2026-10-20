@@ -367,6 +367,243 @@ mod tests {
     }
 
     #[test]
+    fn naked_player_equip_unequip_drop_other_player_pickup_and_equip_is_durable() {
+        use crate::magic_checkpoint::load_joint;
+
+        let mut world = World::new(800.0, 600.0);
+        assert!(world.add_player_at(1, 200.0, 200.0, 0.0));
+        assert!(world.add_player_at(2, 218.0, 200.0, 0.0));
+        let mut zones = ZoneAuthority::new();
+        zones.register(1).unwrap();
+        zones.register(2).unwrap();
+        let mut identity = SessionIdentityRegistry::new();
+        let one = CharacterId::new(1).unwrap();
+        let two = CharacterId::new(2).unwrap();
+        identity.bind_verified(lease(1), one).unwrap();
+        identity.bind_verified(lease(2), two).unwrap();
+
+        let mut loot = LootAuthority::new();
+        loot.register(1).unwrap();
+        loot.register(2).unwrap();
+        assert_eq!(loot.inventory(1).unwrap().stack_count(), 0);
+        assert!(loot.inventory(1).unwrap().equipped(EquipmentSlot::Body).is_none());
+        assert!(loot.inventory(2).unwrap().equipped(EquipmentSlot::Body).is_none());
+
+        // Server-only item creation; no starter gear is minted during spawn.
+        let armor = loot.grant(1, ItemKind::ChainmailArmor, 1).unwrap();
+        let shield = loot.grant(1, ItemKind::WoodenShield, 1).unwrap();
+        let magic = MagicAuthority::new();
+        let path = checkpoint_path();
+        let equip_armor = commit_verified_equipment(
+            &path,
+            &mut loot,
+            &magic,
+            &identity,
+            PickupWorldTick {
+                world: &world,
+                completed_tick: world.tick,
+                zones: &zones,
+            },
+            VerifiedLootOperation { lease: lease(1), sequence: 1 },
+            VerifiedEquipmentAction::Equip {
+                item_id: armor,
+                slot: EquipmentSlot::Body,
+            },
+        )
+        .unwrap();
+        assert_eq!(
+            equip_armor,
+            EquipmentActionResult::Equipped {
+                item_id: armor,
+                slot: EquipmentSlot::Body
+            }
+        );
+        commit_verified_equipment(
+            &path, &mut loot, &magic, &identity,
+            PickupWorldTick {
+                world: &world,
+                completed_tick: world.tick,
+                zones: &zones,
+            },
+            VerifiedLootOperation { lease: lease(1), sequence: 2 },
+            VerifiedEquipmentAction::Equip {
+                item_id: shield,
+                slot: EquipmentSlot::OffHand,
+            },
+        )
+        .unwrap();
+        assert_eq!(loot.inventory(1).unwrap().stack_count(), 2);
+        assert!(loot.inventory(1).unwrap().backpack().is_empty());
+
+        // Explicit unequip precedes dropping gear; item identity is conserved.
+        commit_verified_equipment(
+            &path, &mut loot, &magic, &identity,
+            PickupWorldTick {
+                world: &world,
+                completed_tick: world.tick,
+                zones: &zones,
+            },
+            VerifiedLootOperation { lease: lease(1), sequence: 3 },
+            VerifiedEquipmentAction::Unequip {
+                slot: EquipmentSlot::Body,
+            },
+        )
+        .unwrap();
+        let dropped = commit_verified_equipment(
+            &path, &mut loot, &magic, &identity,
+            PickupWorldTick {
+                world: &world,
+                completed_tick: world.tick,
+                zones: &zones,
+            },
+            VerifiedLootOperation { lease: lease(1), sequence: 4 },
+            VerifiedEquipmentAction::Drop {
+                item_id: armor,
+                amount: 1,
+            },
+        )
+        .unwrap();
+        let entity = match dropped {
+            EquipmentActionResult::Dropped { entity_id } => entity_id,
+            _ => panic!("expected physical ground drop"),
+        };
+        assert_eq!(loot.ground()[&entity].item.id, armor);
+        assert!(loot.inventory(1).unwrap().equipped(EquipmentSlot::Body).is_none());
+
+        let taken = commit_verified_pickup(
+            &path, &mut loot, &magic, &identity,
+            PickupWorldTick {
+                world: &world,
+                completed_tick: world.tick,
+                zones: &zones,
+            },
+            VerifiedLootOperation { lease: lease(2), sequence: 1 },
+            VerifiedPickupSelection::Ground {
+                entity_id: entity,
+                amount: 1,
+            },
+        )
+        .unwrap();
+        assert_eq!(taken.id, armor);
+        commit_verified_equipment(
+            &path, &mut loot, &magic, &identity,
+            PickupWorldTick {
+                world: &world,
+                completed_tick: world.tick,
+                zones: &zones,
+            },
+            VerifiedLootOperation { lease: lease(2), sequence: 2 },
+            VerifiedEquipmentAction::Equip {
+                item_id: armor,
+                slot: EquipmentSlot::Body,
+            },
+        )
+        .unwrap();
+        assert!(!loot.ground().contains_key(&entity));
+        assert_eq!(loot.inventory(2).unwrap().equipped(EquipmentSlot::Body).unwrap().id, armor);
+        assert_eq!(loot.inventory(1).unwrap().equipped(EquipmentSlot::OffHand).unwrap().id, shield);
+
+        let (persisted, _) = load_joint(&path).unwrap();
+        assert_eq!(persisted.parked_inventory(two).unwrap().equipped(EquipmentSlot::Body).unwrap().id, armor);
+        assert_eq!(persisted.parked_inventory(one).unwrap().equipped(EquipmentSlot::OffHand).unwrap().id, shield);
+        assert_eq!(persisted.committed_operation_sequence(one), Some(4));
+        assert_eq!(persisted.committed_operation_sequence(two), Some(2));
+        let _ = fs::remove_file(&path);
+    }
+
+    #[test]
+    fn forged_equipment_actor_wrong_slot_and_failed_write_cannot_change_gear() {
+        let mut world = World::new(800.0, 600.0);
+        world.add_player_at(1, 200.0, 200.0, 0.0);
+        let mut zones = ZoneAuthority::new();
+        zones.register(1).unwrap();
+        let mut identity = SessionIdentityRegistry::new();
+        let character = CharacterId::new(11).unwrap();
+        identity.bind_verified(lease(1), character).unwrap();
+        let mut loot = LootAuthority::new();
+        loot.register(1).unwrap();
+        let helmet = loot.grant(1, ItemKind::IronHelmet, 1).unwrap();
+        let magic = MagicAuthority::new();
+        let path = checkpoint_path();
+        let action = VerifiedEquipmentAction::Equip {
+            item_id: helmet,
+            slot: EquipmentSlot::Head,
+        };
+        let mismatched = commit_verified_equipment(
+            &path, &mut loot, &magic, &identity,
+            PickupWorldTick {
+                world: &world,
+                completed_tick: world.tick,
+                zones: &zones,
+            },
+            VerifiedLootOperation {
+                lease: SessionLease::new(1, 2).unwrap(),
+                sequence: 7,
+            },
+            action,
+        );
+        assert!(matches!(mismatched, Err(PickupCommitError::UnverifiedSession)));
+        let wrong_slot = commit_verified_equipment(
+            &path, &mut loot, &magic, &identity,
+            PickupWorldTick {
+                world: &world,
+                completed_tick: world.tick,
+                zones: &zones,
+            },
+            VerifiedLootOperation { lease: lease(1), sequence: 7 },
+            VerifiedEquipmentAction::Equip {
+                item_id: helmet,
+                slot: EquipmentSlot::Feet,
+            },
+        );
+        assert!(matches!(wrong_slot, Err(PickupCommitError::Loot(LootError::WrongSlot))));
+        let nonexistent_parent = path.with_extension("not-a-real-dir").join("state.bin");
+        let failed_write = commit_verified_equipment(
+            &nonexistent_parent, &mut loot, &magic, &identity,
+            PickupWorldTick {
+                world: &world,
+                completed_tick: world.tick,
+                zones: &zones,
+            },
+            VerifiedLootOperation { lease: lease(1), sequence: 7 },
+            action,
+        );
+        assert!(matches!(failed_write, Err(PickupCommitError::Io(CheckpointError::Io(_)))));
+        assert!(loot.inventory(1).unwrap().equipped(EquipmentSlot::Head).is_none());
+        assert_eq!(loot.inventory(1).unwrap().backpack()[0].id, helmet);
+        assert_eq!(loot.committed_operation_sequence(character), None);
+        assert!(!path.exists());
+
+        commit_verified_equipment(
+            &path, &mut loot, &magic, &identity,
+            PickupWorldTick {
+                world: &world,
+                completed_tick: world.tick,
+                zones: &zones,
+            },
+            VerifiedLootOperation { lease: lease(1), sequence: 7 },
+            action,
+        )
+        .unwrap();
+        assert_eq!(loot.inventory(1).unwrap().equipped(EquipmentSlot::Head).unwrap().id, helmet);
+        let replay = commit_verified_equipment(
+            &path, &mut loot, &magic, &identity,
+            PickupWorldTick {
+                world: &world,
+                completed_tick: world.tick,
+                zones: &zones,
+            },
+            VerifiedLootOperation { lease: lease(1), sequence: 7 },
+            VerifiedEquipmentAction::Unequip {
+                slot: EquipmentSlot::Head,
+            },
+        );
+        assert!(matches!(replay, Err(PickupCommitError::Loot(LootError::ReplayOperation))));
+        assert!(loot.inventory(1).unwrap().equipped(EquipmentSlot::Head).is_some());
+        let _ = fs::remove_file(&path);
+    }
+
+    #[test]
     fn typed_ground_pickup_preserves_magic_and_rejects_replay_after_recovery() {
         use crate::magic::{Lesson, LessonAward, LessonSource, Rune};
         use crate::magic_checkpoint::load_joint;
