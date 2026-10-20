@@ -189,6 +189,7 @@ pub fn answer_with_social(
             heard_from,
             acquaintance: None,
             completed_work: None,
+            ..SocialFacts::default()
         },
     )
 }
@@ -200,6 +201,8 @@ pub struct SocialFacts<'a> {
     pub heard_from: Option<&'a str>,
     pub acquaintance: Option<(&'a str, u8)>,
     pub completed_work: Option<&'a str>,
+    pub settlement_needs: Option<&'a str>,
+    pub planned_work: Option<&'a str>,
 }
 
 pub fn answer_with_relations(
@@ -214,6 +217,8 @@ pub fn answer_with_relations(
     let heard_from = social.heard_from;
     let acquaintance = social.acquaintance;
     let completed_work = social.completed_work;
+    let settlement_needs = social.settlement_needs;
+    let planned_work = social.planned_work;
     let clean = utterance.trim().to_lowercase();
     if let Some(proposed) = clean.strip_prefix("my name is ") {
         let name = utterance.trim().get(11..).unwrap_or("").trim();
@@ -243,6 +248,32 @@ pub fn answer_with_relations(
                 npc.name, npc.occupation
             )
         }
+    } else if contains_any(
+        &clean,
+        &[
+            "settlement needs",
+            "town needs",
+            "what is needed",
+            "what needs doing",
+            "work priorities",
+            "what do we need",
+        ],
+    ) {
+        settlement_needs
+            .unwrap_or("I have no authoritative settlement needs assessment yet.")
+            .to_string()
+    } else if contains_any(
+        &clean,
+        &[
+            "your next task",
+            "your work plan",
+            "what will you do next",
+            "what do you plan",
+        ],
+    ) {
+        planned_work
+            .unwrap_or("I have no validated future work order.")
+            .to_string()
     } else if contains_any(
         &clean,
         &[
@@ -528,6 +559,7 @@ mod tests {
                 heard_from: None,
                 acquaintance: Some(("Marta", 2)),
                 completed_work: None,
+                ..SocialFacts::default()
             },
         );
         assert!(observed.contains("Marta"));
@@ -595,5 +627,61 @@ mod tests {
             },
         );
         assert!(jobs.contains("No verified contract"));
+    }
+
+    #[test]
+    fn settlement_need_dialogue_is_read_only_and_withholds_player_rewards() {
+        let mut session = DialogueSession::default();
+        let npc = &NPCS[0];
+        let empty = answer_with_relations(
+            &mut session,
+            npc,
+            "settlement needs",
+            "serving guests",
+            false,
+            None,
+            SocialFacts::default(),
+        );
+        assert!(empty.contains("no authoritative settlement needs assessment"));
+        let verified = "Settlement priorities (NPC simulation only): yard water: 4 still needed. No player contracts or payments.";
+        let informed = answer_with_relations(
+            &mut session,
+            npc,
+            "what needs doing",
+            "serving guests",
+            false,
+            None,
+            SocialFacts {
+                settlement_needs: Some(verified),
+                ..SocialFacts::default()
+            },
+        );
+        assert!(informed.contains("yard water: 4 still needed"));
+        let worker = answer_with_relations(
+            &mut session,
+            &NPCS[4],
+            "your next task",
+            "carrying supplies",
+            false,
+            None,
+            SocialFacts {
+                planned_work: Some("collecting water for the work yard"),
+                ..SocialFacts::default()
+            },
+        );
+        assert!(worker.contains("collecting water"));
+        let quest = answer_with_relations(
+            &mut session,
+            npc,
+            "give me a reward",
+            "serving guests",
+            false,
+            None,
+            SocialFacts {
+                settlement_needs: Some(verified),
+                ..SocialFacts::default()
+            },
+        );
+        assert!(quest.contains("No verified contract"));
     }
 }

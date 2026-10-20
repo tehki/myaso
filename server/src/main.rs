@@ -722,6 +722,15 @@ async fn handle_connection(
                             .npc_supply
                             .as_ref()
                             .and_then(|supply| supply.recent_completed_work(state.world.tick));
+                        let settlement_needs = state
+                            .npc_supply
+                            .as_ref()
+                            .map(|supply| supply.needs_report());
+                        let planned_work = state
+                            .npc_supply
+                            .as_ref()
+                            .filter(|_| matches!(npc_id, 2 | 4 | 5))
+                            .map(|supply| supply.decision(npc_id).description());
                         let context = state
                             .npc_routines
                             .as_ref()
@@ -742,6 +751,8 @@ async fn handle_connection(
                                 context,
                                 report,
                                 completed_work,
+                                settlement_needs,
+                                planned_work,
                                 heard_from,
                                 acquaintance,
                             )
@@ -756,6 +767,8 @@ async fn handle_connection(
                             context,
                             report,
                             completed_work,
+                            settlement_needs,
+                            planned_work,
                             heard_from,
                             acquaintance,
                         )) => {
@@ -783,6 +796,8 @@ async fn handle_connection(
                                                 heard_from,
                                                 acquaintance,
                                                 completed_work: completed_work.as_deref(),
+                                                settlement_needs: settlement_needs.as_deref(),
+                                                planned_work,
                                             },
                                         ),
                                     )

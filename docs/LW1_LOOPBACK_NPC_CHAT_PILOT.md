@@ -283,3 +283,44 @@ This does not imply real NPC motivation, persistent occupations, player
 jobs, market sales, object ownership, chat-based execution or trade. The
 simulation still uses the loopback staging world and is disconnected from
 real account identity, item entities, Moon Coin and production.
+
+## LW-1J — Need-driven finite NPC work (loopback-only)
+
+The pilot's forge/porter jobs are **actually selected from current
+server-authoritative finite stocks** instead of blindly consuming all
+inputs each repeating cycle. Explicit demo settlement targets are: four
+water buckets at the yard, four food rations at the market and three
+bundles of nails at the forge. Tomas collects and delivers water only
+while water is needed; Elara handles provisions; Marta forges only while
+nails are needed. Stocks already carried are reserved against the
+appropriate collection target, and carrying/delivery has precedence so
+unfinished cargo cannot disappear or be repeatedly collected.
+
+The schedule still provides bounded opportunities to act (forge at
+tick phase 300, pickup at 600, delivery at 1800 of a 2400-tick
+cycle), but **every action now checks an independently derived
+`WorkDecision` from server stocks at that authoritative tick**. Each
+committed action retains the previous provenance-backed, 12-event
+server ledger. Once all targets are fulfilled, everyone is idle:
+the remaining *four* well buckets, *four* depot rations and *three*
+iron bars are **not consumed**, and no replenishment or player-facing
+items are created. Total resources remain conserved.
+
+All players in the loopback pilot can ask `settlement needs`,
+`what needs doing`, or `work priorities`. The answer is a ranked
+read-only board of unmet work, including work currently carried en
+route and resource shortages; alternatively they can ask a worker
+`your next task` to learn its current validated intention. Neither
+question creates, accepts or completes any work order. Contracts,
+rewards, currencies, player inventory and real world-object ownership
+remain unavailable. This is server-staged resource balancing, **not a
+global player economy or fully autonomous NPC planning**.
+
+Tests cover demand recomputation, carried-resource reservation,
+never assigning NPC jobs outside authorized professions, changing
+decisions at delivery boundaries, resource conservation, preserving
+reserves after many cycles, deterministic idle state after all
+goals, read-only queries, and existing supply packets. No combat
+movement/physics, browser protocol, player position or production
+configuration changes. True Greyhaven tasks will require the separate
+authoritative World & Gameplay and Economics interfaces.

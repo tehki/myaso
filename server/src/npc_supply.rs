@@ -14,6 +14,37 @@ const WATER_TOTAL: u16 = 8;
 const FOOD_TOTAL: u16 = 8;
 const IRON_TOTAL: u16 = 6;
 
+// Explicit demo-only demand targets. Reserves are kept untouched so
+// the NPC pilot cannot consume all world inputs on a fixed timer.
+const TARGET_YARD_WATER: u8 = 4;
+const TARGET_MARKET_FOOD: u8 = 4;
+const TARGET_FORGE_NAILS: u8 = 3;
+
+/// An NPC's decision is recomputed only from conserved server stocks;
+/// a chat request can read it but never submit or execute it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum WorkDecision {
+    Rest,
+    ForgeNails,
+    CollectWater,
+    DeliverWater,
+    CollectFood,
+    DeliverFood,
+}
+
+impl WorkDecision {
+    pub const fn description(self) -> &'static str {
+        match self {
+            Self::Rest => "resting: no currently feasible settlement task",
+            Self::ForgeNails => "forging a needed bundle of nails",
+            Self::CollectWater => "collecting water for the work yard",
+            Self::DeliverWater => "delivering carried water to the work yard",
+            Self::CollectFood => "collecting provisions for the market",
+            Self::DeliverFood => "delivering carried provisions to the market",
+        }
+    }
+}
+
 /// All containers belong to the server's pilot world; players cannot edit them.
 /// Water and food move without changing totals. Iron becomes nails at 1:1.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -102,6 +133,82 @@ impl NpcSupplyWorld {
         &self.history
     }
 
+    /// Finite, need-driven assignment with deterministic profession ownership.
+    /// Inventory already in transit is reserved against demand to prevent
+    /// over-collection; delivery of carried goods always takes precedence.
+    pub fn decision(&self, actor: u8) -> WorkDecision {
+        let s = self.stocks;
+        match actor {
+            2 if s.forge_iron > 0 && s.forge_nails < TARGET_FORGE_NAILS => WorkDecision::ForgeNails,
+            5 if s.tomas_water > 0 => WorkDecision::DeliverWater,
+            5 if s.well_water > 0
+                && s.yard_water.saturating_add(s.tomas_water) < TARGET_YARD_WATER =>
+            {
+                WorkDecision::CollectWater
+            }
+            4 if s.elara_food > 0 => WorkDecision::DeliverFood,
+            4 if s.depot_food > 0
+                && s.stall_food.saturating_add(s.elara_food) < TARGET_MARKET_FOOD =>
+            {
+                WorkDecision::CollectFood
+            }
+            _ => WorkDecision::Rest,
+        }
+    }
+
+    /// Concise ordered summary of genuine shortages and finite constraints.
+    /// Read-only; none of these tasks can become a player job or reward.
+    pub fn needs_report(&self) -> String {
+        let s = self.stocks;
+        let mut shortages = [
+            (
+                "yard water",
+                TARGET_YARD_WATER.saturating_sub(s.yard_water),
+                s.well_water,
+                5,
+            ),
+            (
+                "market provisions",
+                TARGET_MARKET_FOOD.saturating_sub(s.stall_food),
+                s.depot_food,
+                4,
+            ),
+            (
+                "forge nails",
+                TARGET_FORGE_NAILS.saturating_sub(s.forge_nails),
+                s.forge_iron,
+                2,
+            ),
+        ];
+        // Three constant-sized needs, ranked by largest observed shortfall.
+        shortages.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.3.cmp(&b.3)));
+        let mut summary = String::from("Settlement priorities (NPC simulation only): ");
+        let mut first = true;
+        for (name, deficit, available, actor) in shortages {
+            if deficit == 0 {
+                continue;
+            }
+            if !first {
+                summary.push_str("; ");
+            }
+            first = false;
+            let assignment = self.decision(actor);
+            let label = if assignment != WorkDecision::Rest {
+                assignment.description()
+            } else if available == 0 {
+                "blocked: source empty"
+            } else {
+                "no feasible task at this time"
+            };
+            summary.push_str(&format!("{name}: {deficit} still needed ({label})"));
+        }
+        if first {
+            summary.push_str("all finite demand targets met; no new tasks");
+        }
+        summary.push_str(". No player contracts or payments.");
+        summary
+    }
+
     /// Invoked by the server world clock, never by chat or a client command.
     /// The simulation advances one authoritative tick at a time. Repetition
     /// and discontinuous call sequences fail closed, not duplicating stock.
@@ -118,31 +225,31 @@ impl NpcSupplyWorld {
         }
         match tick % CYCLE {
             FORGE => {
-                if self.stocks.forge_iron > 0 {
+                if self.decision(2) == WorkDecision::ForgeNails {
                     self.stocks.forge_iron -= 1;
                     self.stocks.forge_nails += 1;
                     self.record(tick, 2, 5);
                 }
             }
             PICKUP => {
-                if self.stocks.well_water > 0 && self.stocks.tomas_water == 0 {
+                if self.decision(5) == WorkDecision::CollectWater {
                     self.stocks.well_water -= 1;
                     self.stocks.tomas_water += 1;
                     self.record(tick, 5, 1);
                 }
-                if self.stocks.depot_food > 0 && self.stocks.elara_food == 0 {
+                if self.decision(4) == WorkDecision::CollectFood {
                     self.stocks.depot_food -= 1;
                     self.stocks.elara_food += 1;
                     self.record(tick, 4, 3);
                 }
             }
             DROP_OFF => {
-                if self.stocks.tomas_water > 0 {
+                if self.decision(5) == WorkDecision::DeliverWater {
                     self.stocks.tomas_water -= 1;
                     self.stocks.yard_water += 1;
                     self.record(tick, 5, 2);
                 }
-                if self.stocks.elara_food > 0 {
+                if self.decision(4) == WorkDecision::DeliverFood {
                     self.stocks.elara_food -= 1;
                     self.stocks.stall_food += 1;
                     self.record(tick, 4, 4);
@@ -281,16 +388,16 @@ mod tests {
     }
 
     #[test]
-    fn fixed_supply_exhausts_without_refills_and_history_is_bounded() {
+    fn finite_demand_preserves_reserves_and_history_is_bounded() {
         let mut world = NpcSupplyWorld::default();
         run_until(&mut world, 0, 40_000);
         let stock = world.stocks();
-        assert_eq!(stock.well_water, 0);
-        assert_eq!(stock.yard_water, 8);
-        assert_eq!(stock.depot_food, 0);
-        assert_eq!(stock.stall_food, 8);
-        assert_eq!(stock.forge_iron, 0);
-        assert_eq!(stock.forge_nails, 6);
+        assert_eq!(stock.well_water, 4);
+        assert_eq!(stock.yard_water, TARGET_YARD_WATER);
+        assert_eq!(stock.depot_food, 4);
+        assert_eq!(stock.stall_food, TARGET_MARKET_FOOD);
+        assert_eq!(stock.forge_iron, 3);
+        assert_eq!(stock.forge_nails, TARGET_FORGE_NAILS);
         assert!(stock.conserved());
         assert_eq!(world.history().len(), HISTORY_LIMIT);
         assert!(world
@@ -363,5 +470,65 @@ mod tests {
         // Unknown op/actor combinations are not independently trusted.
         town.record(601, 5, 4);
         assert!(town.recent_completed_work(601).is_none());
+    }
+
+    #[test]
+    fn actors_select_feasible_work_from_live_demand_and_reserve_in_transit() {
+        let mut world = NpcSupplyWorld::default();
+        assert_eq!(world.decision(2), WorkDecision::ForgeNails);
+        assert_eq!(world.decision(4), WorkDecision::CollectFood);
+        assert_eq!(world.decision(5), WorkDecision::CollectWater);
+        assert_eq!(world.decision(1), WorkDecision::Rest);
+        assert!(world
+            .needs_report()
+            .contains("market provisions: 4 still needed"));
+        assert!(world.needs_report().contains("yard water: 4 still needed"));
+        run_until(&mut world, 0, 600);
+        assert_eq!(world.decision(2), WorkDecision::ForgeNails);
+        assert_eq!(world.decision(4), WorkDecision::DeliverFood);
+        assert_eq!(world.decision(5), WorkDecision::DeliverWater);
+        assert!(world.needs_report().contains("delivering carried water"));
+        assert!(world
+            .needs_report()
+            .contains("delivering carried provisions"));
+        assert_eq!(world.stocks().yard_water, 0);
+        assert_eq!(world.stocks().stall_food, 0);
+        run_until(&mut world, 601, 1800);
+        assert_eq!(world.decision(4), WorkDecision::CollectFood);
+        assert_eq!(world.decision(5), WorkDecision::CollectWater);
+        assert_eq!(world.stocks().yard_water, 1);
+        assert_eq!(world.stocks().stall_food, 1);
+        assert!(world.stocks().conserved());
+    }
+
+    #[test]
+    fn workers_stop_after_feasible_goals_and_preserve_finite_reserves() {
+        let mut world = NpcSupplyWorld::default();
+        run_until(&mut world, 0, 40_000);
+        assert_eq!(world.decision(2), WorkDecision::Rest);
+        assert_eq!(world.decision(4), WorkDecision::Rest);
+        assert_eq!(world.decision(5), WorkDecision::Rest);
+        let stocks = world.stocks();
+        assert_eq!(stocks.wire(), [4, 0, 4, 4, 0, 4, 3, 3]);
+        assert!(world
+            .needs_report()
+            .contains("all finite demand targets met"));
+        let count = world.history().back().unwrap().sequence;
+        run_until(&mut world, 40_001, 120_000);
+        assert_eq!(world.stocks(), stocks);
+        assert_eq!(world.history().back().unwrap().sequence, count);
+        assert!(world.stocks().conserved());
+    }
+
+    #[test]
+    fn chat_need_queries_cannot_commit_a_supply_action() {
+        let world = NpcSupplyWorld::default();
+        let old = world.stocks();
+        let plan = world.needs_report();
+        let decision = world.decision(5);
+        assert!(plan.contains("No player contracts or payments"));
+        assert_eq!(decision, WorkDecision::CollectWater);
+        assert_eq!(world.stocks(), old);
+        assert!(world.history().is_empty());
     }
 }
