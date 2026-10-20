@@ -9,13 +9,16 @@ use crate::loot_persistence::{atomic_write, CheckpointError};
 use crate::loot_transaction::VerifiedLootOperation;
 use crate::magic::{MagicAuthority, MagicError, Spell};
 use crate::magic_checkpoint::{bundle, JointCheckpointError};
-use crate::simulation::{Action, Fighter};
+use crate::simulation::{Action, Fighter, World};
 use crate::zone::{ZoneAuthority, ZoneId};
 use std::path::Path;
 
 #[derive(Debug)]
 pub enum CastError {
     UnverifiedSession,
+    StaleWorldTick,
+    MissingWorldFighter,
+    InvalidWorldTime,
     WrongFighter,
     UnknownZone,
     CombatLocked,
@@ -109,6 +112,45 @@ pub fn commit_ember_cost(
     })
 }
 
+/// Non-activated adapter for an authenticated, serialized World writer.
+/// The operation lease and sequence must be minted/validated by Core, and the
+/// World must be the exact same completed authoritative tick as the inventory
+/// and zone snapshot. No client-supplied Fighter, position or heading is used.
+#[derive(Clone, Copy)]
+pub struct WorldEmberCostTick<'a> {
+    pub operation: VerifiedLootOperation,
+    pub world: &'a World,
+    pub completed_tick: u32,
+}
+
+/// Record a durable Ember cost + pending intent using the actual World Fighter.
+/// A resource receipt is NOT a spell hit, Combat receipt or projectile event.
+/// This adapter cannot itself prove a world lock, event provenance or durable
+/// Combat effect atomicity; Core 8B/8C integration remains a release blocker.
+pub fn commit_world_ember_cost(
+    path: &Path,
+    loot: &mut LootAuthority,
+    magic: &mut MagicAuthority,
+    identity: &SessionIdentityRegistry,
+    zones: &ZoneAuthority,
+    tick: WorldEmberCostTick<'_>,
+) -> Result<EmberCostReceipt, CastError> {
+    if tick.completed_tick == 0 || tick.world.tick != tick.completed_tick {
+        return Err(CastError::StaleWorldTick);
+    }
+    if !tick.world.now_ms.is_finite()
+        || tick.world.now_ms < 0.0
+        || tick.world.now_ms >= u64::MAX as f32
+    {
+        return Err(CastError::InvalidWorldTime);
+    }
+    let fighter = tick
+        .world
+        .fighter(tick.operation.lease.server_session())
+        .ok_or(CastError::MissingWorldFighter)?;
+    commit_ember_cost(path, loot, magic, identity, zones, tick.operation, fighter)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -176,6 +218,179 @@ mod tests {
         let book = loot.grant(1, ItemKind::Spellbook, 1).unwrap();
         loot.equip(1, book, EquipmentSlot::OffHand).unwrap();
         loot.grant(1, ItemKind::SulfurAsh, quantity).unwrap();
+    }
+
+    #[test]
+    fn world_tick_ember_spend_and_replay_survive_joint_recovery() {
+        let (mut loot, mut magic, identity, zones, character) = setup();
+        stock(&mut loot, 3);
+        let mut world = World::new(800.0, 600.0);
+        world.add_player_at(1, 200.0, 200.0, 0.0);
+        world.step();
+        let checkpoint = path();
+        let tick = WorldEmberCostTick {
+            operation: op(45),
+            world: &world,
+            completed_tick: world.tick,
+        };
+        let receipt =
+            commit_world_ember_cost(&checkpoint, &mut loot, &mut magic, &identity, &zones, tick)
+                .unwrap();
+        assert_eq!(receipt.mana_spent, 15);
+        assert_eq!(receipt.sulfur_ash_spent, 1);
+        assert_eq!(magic.mana(character), 85);
+        assert_eq!(loot.inventory(1).unwrap().backpack()[0].amount, 2);
+        assert!(matches!(
+            commit_world_ember_cost(&checkpoint, &mut loot, &mut magic, &identity, &zones, tick,),
+            Err(CastError::Loot(LootError::ReplayOperation))
+        ));
+        let (recovered_loot, recovered_magic) = load_joint(&checkpoint).unwrap();
+        assert_eq!(
+            recovered_loot.committed_operation_sequence(character),
+            Some(45)
+        );
+        assert_eq!(
+            recovered_loot
+                .parked_inventory(character)
+                .unwrap()
+                .backpack()[0]
+                .amount,
+            2
+        );
+        assert_eq!(recovered_magic.mana(character), 85);
+        let intent = recovered_magic.pending_ember_intents().next().unwrap();
+        assert_eq!(intent.origin_x(), 200.0);
+        assert_eq!(intent.origin_y(), 200.0);
+        assert_eq!(intent.sequence, 45);
+        assert_eq!(recovered_magic.pending_ember_intents().count(), 1);
+        let _ = fs::remove_file(&checkpoint);
+    }
+
+    #[test]
+    fn world_tick_ember_rejects_stale_world_time_and_unverified_actor_without_spending() {
+        let (mut loot, mut magic, identity, zones, character) = setup();
+        stock(&mut loot, 2);
+        let mut world = World::new(800.0, 600.0);
+        world.add_player_at(1, 200.0, 200.0, 0.0);
+        world.step();
+        let checkpoint = path();
+        for tick_number in [0, world.tick + 1] {
+            assert!(matches!(
+                commit_world_ember_cost(
+                    &checkpoint,
+                    &mut loot,
+                    &mut magic,
+                    &identity,
+                    &zones,
+                    WorldEmberCostTick {
+                        operation: op(12),
+                        world: &world,
+                        completed_tick: tick_number,
+                    },
+                ),
+                Err(CastError::StaleWorldTick)
+            ));
+        }
+        let mut empty_world = World::new(800.0, 600.0);
+        empty_world.step();
+        assert!(matches!(
+            commit_world_ember_cost(
+                &checkpoint,
+                &mut loot,
+                &mut magic,
+                &identity,
+                &zones,
+                WorldEmberCostTick {
+                    operation: op(12),
+                    world: &empty_world,
+                    completed_tick: empty_world.tick,
+                },
+            ),
+            Err(CastError::MissingWorldFighter)
+        ));
+        for invalid_time in [-1.0, f32::NAN, f32::INFINITY, f32::MAX] {
+            let mut invalid_world = world.clone();
+            invalid_world.now_ms = invalid_time;
+            assert!(matches!(
+                commit_world_ember_cost(
+                    &checkpoint,
+                    &mut loot,
+                    &mut magic,
+                    &identity,
+                    &zones,
+                    WorldEmberCostTick {
+                        operation: op(12),
+                        world: &invalid_world,
+                        completed_tick: invalid_world.tick,
+                    },
+                ),
+                Err(CastError::InvalidWorldTime)
+            ));
+        }
+        assert!(matches!(
+            commit_world_ember_cost(
+                &checkpoint,
+                &mut loot,
+                &mut magic,
+                &identity,
+                &zones,
+                WorldEmberCostTick {
+                    operation: VerifiedLootOperation {
+                        lease: SessionLease::new(1, 2).unwrap(),
+                        sequence: 12,
+                    },
+                    world: &world,
+                    completed_tick: world.tick,
+                },
+            ),
+            Err(CastError::UnverifiedSession)
+        ));
+        assert!(!checkpoint.exists());
+        assert_eq!(magic.mana(character), 100);
+        assert_eq!(loot.inventory(1).unwrap().backpack()[0].amount, 2);
+        assert_eq!(loot.committed_operation_sequence(character), None);
+        assert_eq!(magic.pending_ember_intents().count(), 0);
+    }
+
+    #[test]
+    fn world_tick_ember_requires_physical_spellbook_and_reagent() {
+        let (mut loot, mut magic, identity, zones, character) = setup();
+        let mut world = World::new(800.0, 600.0);
+        world.add_player_at(1, 200.0, 200.0, 0.0);
+        world.step();
+        let checkpoint = path();
+        let tick = WorldEmberCostTick {
+            operation: op(30),
+            world: &world,
+            completed_tick: world.tick,
+        };
+        assert!(matches!(
+            commit_world_ember_cost(&checkpoint, &mut loot, &mut magic, &identity, &zones, tick,),
+            Err(CastError::Magic(MagicError::MissingSpellbook))
+        ));
+        stock(&mut loot, 1);
+        let receipt =
+            commit_world_ember_cost(&checkpoint, &mut loot, &mut magic, &identity, &zones, tick)
+                .unwrap();
+        assert_eq!(receipt.sequence, 30);
+        assert!(matches!(
+            commit_world_ember_cost(
+                &checkpoint,
+                &mut loot,
+                &mut magic,
+                &identity,
+                &zones,
+                WorldEmberCostTick {
+                    operation: op(31),
+                    ..tick
+                },
+            ),
+            Err(CastError::Magic(MagicError::MissingReagent))
+        ));
+        assert_eq!(magic.mana(character), 85);
+        assert_eq!(loot.committed_operation_sequence(character), Some(30));
+        assert_eq!(magic.pending_ember_intents().count(), 1);
+        let _ = fs::remove_file(&checkpoint);
     }
 
     #[test]
