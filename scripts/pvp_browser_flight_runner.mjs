@@ -26,6 +26,7 @@ import { verifyM209DualKnockdownServerPunish } from "./m209-dual-knockdown-proof
 import { verifyM211DualRecoveryServerProof } from "./m211-dual-recovery-phase-proof.mjs";
 import { planM203W3cPointerPause } from "./m203-w3c-wheel-ack.mjs";
 import { planM225ThreatDistanceStaging } from "./m225-ffa-threat-distance.mjs";
+import { qualifyM150ParryGeometry } from "./m150-replicated-geometry.mjs";
 import { awaitM223HeavyWindup, planM223WheelDelay } from "./m223-server-heavy-windup.mjs";
 import { dispatchM212AttackLedShortBlock } from "./m212-attack-led-short-block.mjs";
 import { createM221TrustedWheelRegistry } from "./m221-trusted-wheel-attestation.mjs";
@@ -8132,7 +8133,7 @@ async function runOnlineUiParryPunishFfaFocusFlight(entries, convert = false) {
   await sleep(80);
   let baseline = await Promise.all(entries.map(readUiEvidence));
   let defenderBefore = baseline.find((entry) => entry.browser === defender.name);
-  for (let attempt = 0; attempt < 4 && defenderBefore?.focusLabel !== `NEAREST #${closerId}`; attempt += 1) {
+  for (let attempt = 0; attempt < (convert ? 0 : 4) && defenderBefore?.focusLabel !== `NEAREST #${closerId}`; attempt += 1) {
     // M321: genuine W3C correction must not activate the R2 240ms dash,
     // including across the two nearest-focus staging correction loops.
     await sleep(300);
@@ -8141,7 +8142,7 @@ async function runOnlineUiParryPunishFfaFocusFlight(entries, convert = false) {
     baseline = await Promise.all(entries.map(readUiEvidence));
     defenderBefore = baseline.find((entry) => entry.browser === defender.name);
   }
-  if (defenderBefore?.focusLabel !== `NEAREST #${closerId}`) {
+  if (!convert && defenderBefore?.focusLabel !== `NEAREST #${closerId}`) {
     throw new Error(`${milestone} did not establish #${closerId} as ordinary nearest focus: ${JSON.stringify(baseline)}`);
   }
 
@@ -8166,7 +8167,7 @@ async function runOnlineUiParryPunishFfaFocusFlight(entries, convert = false) {
   await sleep(60);
   let staged = await Promise.all(entries.map(readUiEvidence));
   let stagedDefender = staged.find((entry) => entry.browser === defender.name);
-  for (let attempt = 0; attempt < 3 && stagedDefender?.focusLabel !== `NEAREST #${closerId}`; attempt += 1) {
+  for (let attempt = 0; attempt < (convert ? 0 : 3) && stagedDefender?.focusLabel !== `NEAREST #${closerId}`; attempt += 1) {
     // M321: genuine W3C correction must not activate the R2 240ms dash,
     // including across the two nearest-focus staging correction loops.
     await sleep(300);
@@ -8175,8 +8176,64 @@ async function runOnlineUiParryPunishFfaFocusFlight(entries, convert = false) {
     staged = await Promise.all(entries.map(readUiEvidence));
     stagedDefender = staged.find((entry) => entry.browser === defender.name);
   }
-  if (stagedDefender?.focusLabel !== `NEAREST #${closerId}`) {
+  if (!convert && stagedDefender?.focusLabel !== `NEAREST #${closerId}`) {
     throw new Error(`${milestone} could not preserve #${closerId} as nearer idle rival before parry: ${JSON.stringify(staged)}`);
+  }
+
+  // M150: use server-replicated positions, not an assumed 30ms/key pulse,
+  // for the authentic three-player conversion. No injected world positions:
+  // each correction is one real W3C WASD press; samples arrive via ordinary
+  // authoritative WebTransport snapshots. Leave M147's original staging alone.
+  if (convert) {
+    const relativeTarget = (defenderFighter, id) => ({
+      x: defenderFighter.x + (id === attackerId ? (attackRight ? -88 : 88) : 0),
+      y: defenderFighter.y + (id === attackerId ? 0 : 60),
+    });
+    const moveToReplicatedTarget = async (client, ownId, label) => {
+      let last = null;
+      for (let step = 0; step < 18; step += 1) {
+        const sample = await readUiEvidence(defender);
+        const fighters = sample.acceptance?.fighters ?? [];
+        const own = fighters.find((f) => f.netId === ownId);
+        const anchor = fighters.find((f) => f.netId === defenderId);
+        if (!own || !anchor || ![own.x, own.y, anchor.x, anchor.y].every(Number.isFinite)) {
+          throw new Error(`${milestone} missing authoritative geometry for ${label}: ${JSON.stringify(sample.acceptance)}`);
+        }
+        const target = relativeTarget(anchor, ownId);
+        const dx = target.x - own.x;
+        const dy = target.y - own.y;
+        last = { own, anchor, target, dx, dy, step };
+        if (Math.abs(dx) <= 4 && Math.abs(dy) <= 4) return last;
+        const horizontal = Math.abs(dx) >= Math.abs(dy);
+        const delta = horizontal ? dx : dy;
+        const key = horizontal ? (delta > 0 ? "d" : "a") : (delta > 0 ? "s" : "w");
+        const holdMs = Math.max(35, Math.min(175,
+          Math.round(Math.abs(delta) / COMBAT.moveSpeed * 1000 * 0.75)));
+        await pulseMovementKey(client, key, holdMs);
+        // Deliberately beyond the 240ms genuine R2 double-tap dash window;
+        // a staging correction must not secretly become a combat dash.
+        await sleep(260);
+      }
+      throw new Error(`${milestone} could not stage ${label} against replicated fighter coordinates: ${JSON.stringify(last)}`);
+    };
+    await moveToReplicatedTarget(attacker, attackerId, "parried attacker");
+    await moveToReplicatedTarget(closerIdle, closerId, "closer idle rival");
+    await sleep(75);
+    staged = await Promise.all(entries.map(readUiEvidence));
+    stagedDefender = staged.find((entry) => entry.browser === defender.name);
+    const fighters = stagedDefender?.acceptance?.fighters ?? [];
+    const defenderFighter = fighters.find((f) => f.netId === defenderId);
+    const attackerFighter = fighters.find((f) => f.netId === attackerId);
+    const closerFighter = fighters.find((f) => f.netId === closerId);
+    const geometry = qualifyM150ParryGeometry({
+      attacker: attackerFighter, defender: defenderFighter, closer: closerFighter,
+      reach: COMBAT.attack.reach, radius: COMBAT.fighterRadius,
+    });
+    if (!geometry.qualified || stagedDefender?.focusLabel !== `NEAREST #${closerId}`) {
+      throw new Error(`${milestone} authoritative three-way spacing not qualified: ${JSON.stringify({
+        ...geometry, fighters, focus: stagedDefender?.focusLabel,
+      })}`);
+    }
   }
 
   const attackerBefore = staged.find((entry) => entry.browser === attacker.name);

@@ -431,7 +431,8 @@ function recordAcceptanceState(state, ownId) {
       acceptance.serverTick,
     );
   }
-  if (acceptanceScenario === "uirollknockdownbounded"
+  if (acceptanceScenario === "uiparrypunishffahit"
+    || acceptanceScenario === "uirollknockdownbounded"
     || acceptanceScenario === "uimultiknockdownffa"
     || acceptanceScenario === "uimultiknockdownffahit"
     || acceptanceScenario === "uijumpffaprimary"
