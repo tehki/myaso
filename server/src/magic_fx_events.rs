@@ -141,8 +141,7 @@ impl SemanticEffectBroker {
         if self.events.len() >= MAX_PENDING_FX_EVENTS {
             return Err(FxError::OverloadedRealm);
         }
-        if self.spatial.count_zone(spec.zone_id) >= MAX_FX_EVENTS_PER_ZONE
-        {
+        if self.spatial.count_zone(spec.zone_id) >= MAX_FX_EVENTS_PER_ZONE {
             return Err(FxError::OverloadedZone);
         }
         if self.next_event_id == u32::MAX {
@@ -233,7 +232,6 @@ impl SemanticEffectBroker {
             .copied()
             .collect()
     }
-
 }
 
 fn element_wire(element: Element) -> u8 {

@@ -7,8 +7,8 @@ use std::time::Instant;
 
 use myaso_server::elemental_physics::Element;
 use myaso_server::magic_fx_events::{
-    SemanticEffect, SemanticEffectBroker, TrustedEffectSpec, ViewerInterest, MAX_VIEWER_FX_EVENTS,
-    MAGIC_FX_PACKET_BYTES,
+    SemanticEffect, SemanticEffectBroker, TrustedEffectSpec, ViewerInterest, MAGIC_FX_PACKET_BYTES,
+    MAX_VIEWER_FX_EVENTS,
 };
 
 const VIEWERS: usize = 512;
@@ -36,9 +36,7 @@ fn baseline<'a>(
             }
             let dx = event.spec.x - view.x;
             let dy = event.spec.y - view.y;
-            dx.abs() <= view.radius
-                && dy.abs() <= view.radius
-                && dx * dx + dy * dy <= radius_sq
+            dx.abs() <= view.radius && dy.abs() <= view.radius && dx * dx + dy * dy <= radius_sq
         })
         .take(MAX_VIEWER_FX_EVENTS)
 }
@@ -53,7 +51,9 @@ fn main() {
     let mut broker = SemanticEffectBroker::new();
     let mut reference = Vec::new();
     for tick in 1u64..=20 {
-        broker.advance(tick).expect("strictly increasing synthetic tick");
+        broker
+            .advance(tick)
+            .expect("strictly increasing synthetic tick");
         for slot in 0..12u32 {
             let index = ((tick - 1) as u32) * 12 + slot;
             let spec = TrustedEffectSpec {

@@ -185,7 +185,10 @@ mod tests {
         broker.admit_trusted(1, spec(7, 0.0, 0.0)).unwrap();
         let q = viewer(7, 0.0, 0.0, 1500.0);
         let results = broker.interest_snapshot(q, 0, 16);
-        assert_eq!(results.iter().map(|e| e.event_id).collect::<Vec<_>>(), [1, 2, 3]);
+        assert_eq!(
+            results.iter().map(|e| e.event_id).collect::<Vec<_>>(),
+            [1, 2, 3]
+        );
         assert_eq!(broker.interest_snapshot(q, 1, 16).len(), 2);
         assert_eq!(broker.interest_snapshot(q, 0, 2).len(), 2);
     }
@@ -203,8 +206,18 @@ mod tests {
         broker.advance(101).unwrap();
         assert_eq!(broker.index_stats().total_events, 1);
         assert_eq!(broker.index_stats().active_cells, 1);
-        assert_eq!(broker.interest_snapshot(viewer(7, 100.0, 200.0, 700.0), 0, 16).len(), 0);
-        assert_eq!(broker.interest_snapshot(viewer(8, -100.0, -200.0, 700.0), 0, 16).len(), 1);
+        assert_eq!(
+            broker
+                .interest_snapshot(viewer(7, 100.0, 200.0, 700.0), 0, 16)
+                .len(),
+            0
+        );
+        assert_eq!(
+            broker
+                .interest_snapshot(viewer(8, -100.0, -200.0, 700.0), 0, 16)
+                .len(),
+            1
+        );
         broker.advance(220).unwrap();
         assert_eq!(broker.index_stats().total_events, 0);
         assert_eq!(broker.index_stats().active_cells, 0);
