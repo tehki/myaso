@@ -475,6 +475,43 @@ mod tests {
     }
 
     #[test]
+    fn rejects_nonzero_reserved_input_header_byte() {
+        let mut packet = sample_packet();
+        packet[3] = 1;
+        assert_eq!(
+            decode_input_packet(&packet),
+            Err(DecodeError::NonZeroReservedHeader(1))
+        );
+        packet[3] = u8::MAX;
+        assert_eq!(
+            decode_input_packet(&packet),
+            Err(DecodeError::NonZeroReservedHeader(u8::MAX))
+        );
+    }
+
+    #[test]
+    fn rejects_out_of_range_axes_in_every_redundant_sample() {
+        for sample_index in 0..INPUT_REDUNDANCY_MAX {
+            for axis_byte_offset in [1_usize, 2_usize] {
+                let mut packet = sample_packet();
+                packet[INPUT_HEADER_BYTES + sample_index * INPUT_SAMPLE_BYTES + axis_byte_offset] =
+                    i8::MIN as u8;
+                assert_eq!(
+                    decode_input_packet(&packet),
+                    Err(DecodeError::InvalidMovementAxis { sample_index }),
+                );
+            }
+        }
+        // Both extremes of the valid v1 client quantization remain accepted.
+        let mut valid = sample_packet();
+        valid[INPUT_HEADER_BYTES + 1] = (-127_i8) as u8;
+        valid[INPUT_HEADER_BYTES + 2] = 127_u8;
+        let decoded = decode_input_packet(&valid).expect("valid signed 7-bit axes");
+        assert_eq!(decoded.samples()[0].move_x, -1.0);
+        assert_eq!(decoded.samples()[0].move_y, 1.0);
+    }
+
+    #[test]
     fn ingress_deduplicates_redundant_samples_and_accepts_reordering() {
         let first = decode_input_packet(&sample_packet()).expect("first packet");
         let mut ingress = InputIngressWindow::new(10);
