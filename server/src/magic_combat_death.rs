@@ -165,9 +165,10 @@ pub fn commit_world_death_loot(
         return Err(CombatDeathCheckpointError::StaleWorldTick);
     }
     let victim = tick.lease.server_session();
-    let mut events = tick.combat_events.iter().filter(|event| {
-        matches!(event, CombatEvent::Death { fighter, .. } if *fighter == victim)
-    });
+    let mut events = tick
+        .combat_events
+        .iter()
+        .filter(|event| matches!(event, CombatEvent::Death { fighter, .. } if *fighter == victim));
     let event = events
         .next()
         .ok_or(CombatDeathCheckpointError::MissingDeathEvent)?;
