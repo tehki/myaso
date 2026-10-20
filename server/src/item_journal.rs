@@ -583,17 +583,37 @@ mod tests {
         let root = Root::new();
         let mut journal = root.open();
         journal
-            .apply(txn(1), &[OwnershipOp::Create { item: item(77), at: inv(1) }])
+            .apply(
+                txn(1),
+                &[OwnershipOp::Create {
+                    item: item(77),
+                    at: inv(1),
+                }],
+            )
             .expect("create");
         journal
-            .apply(txn(2), &[OwnershipOp::Destroy { item: item(77), from: inv(1) }])
+            .apply(
+                txn(2),
+                &[OwnershipOp::Destroy {
+                    item: item(77),
+                    from: inv(1),
+                }],
+            )
             .expect("destroy");
         drop(journal);
         let mut restarted = root.open();
         assert_eq!(restarted.location(item(77)), None);
         assert!(matches!(
-            restarted.apply(txn(3), &[OwnershipOp::Create { item: item(77), at: inv(2) }]),
-            Err(ItemJournalError::InvalidTransaction(OwnershipError::ItemAlreadyExists))
+            restarted.apply(
+                txn(3),
+                &[OwnershipOp::Create {
+                    item: item(77),
+                    at: inv(2)
+                }]
+            ),
+            Err(ItemJournalError::InvalidTransaction(
+                OwnershipError::ItemAlreadyExists
+            ))
         ));
         assert!(!root.record(3).exists());
     }
