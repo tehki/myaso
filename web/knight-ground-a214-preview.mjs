@@ -1,4 +1,4 @@
-// Standalone A2.14 source-only visual QA: never imported by online-game.mjs.
+// Standalone A2.14 source-only visual QA: not used by the gameplay runtime.
 const $=id=>document.getElementById(id);
 let original=null,draws=0;
 const feetControl=$("feet"),switchControl=$("switches");
