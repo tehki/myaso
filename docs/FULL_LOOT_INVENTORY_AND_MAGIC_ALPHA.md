@@ -40,6 +40,12 @@ Status: **domain foundation only — NOT live-game enabled**. Approved design di
 - Read-only Ember preparation verifies the exact authenticated session lease, learned Fire rune and Ember spell, equipped lootable Spellbook, Sulfur Ash reagent and mana. It costs 15 mana and one Sulfur Ash if eventually cast, but the preview consumes nothing and produces no effects.
 - Tests cover no-free-magic spawn, rewards, replayed receipts, casting prerequisites and rune/spell knowledge surviving full-loot death when the spellbook is taken. The knowledge ledger is **in memory only** and must be persisted transactionally with items before activating NPC lessons or spells. No live Magic integration, projectiles or combat changes.
 
+## Combat-derived Ember interruption (isolated, no effects)
+
+- Added `server/src/magic_combat_interrupt.rs`, a staged, checkpointed no-damage resolution bridge. It resolves the exact authenticated SessionLease, matching authoritative Fighter ID, active inventory, pending intent, committed operation watermark, current ZoneAuthority membership and finite in-bounds Combat position. It **derives** rather than accepts the outcome: Stunned/Knockdown → Interrupted, Dead/HP-zero/loot-dead → Cancelled. Any other action cannot force a cancellation, and wrong/stale actors fail closed.
+- The bridge calls the existing `resolve_ember_without_damage` joint-checkpoint path, retaining the paid resource cost and operation tombstone across recovery. It does not execute projectiles, damage, death or loot transfers. Tests cover stunned recovery and double-resolution denial, death cancellation, idle/stale/cross-zone refusal, and I/O failure rollback.
+- Activation requires a real World tick callback under the same single-writer world lock as Combat, plus durable damage/effect transaction handling and post-rename crash recovery; this is not connected to the live server.
+
 ## Verified target leases and revalidated Ember handoff
 
 - The isolated Ember Combat preview now binds each potential target to an independently verified **durable CharacterId plus exact SessionLease incarnation**, not merely a temporary fighter ID. Dead/unregistered or unauthenticated targets cannot be proposed, even when geometry places them closest. Deterministic distance ties use the durable character identity.
