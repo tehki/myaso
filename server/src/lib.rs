@@ -11,6 +11,7 @@ pub mod simulation;
 pub mod snapshot;
 pub mod zone;
 pub mod zone_lease;
+pub mod world_mutation_contract;
 
 pub const PROTOCOL_VERSION: u8 = 1;
 pub const INPUT_PACKET_TYPE: u8 = 1;
