@@ -120,11 +120,16 @@ test("damaged checksums, reserved bytes and zero identity fail closed", () => {
   assert.throws(() => decode8bRecord(zero), RangeError);
 });
 
-test("8C database worker, zone, epoch and revisions fit signed positive SQL bigint", () => {
+test("8C worker/zone/epoch are positive; expected world revision may be zero", () => {
   assert.equal(BigInt(fixture.postgres_layout.integer_max), MAX_SQL_BIGINT);
-  const admissible = value => typeof value === "bigint" && value > 0n && value <= MAX_SQL_BIGINT;
-  assert.ok(admissible(MAX_SQL_BIGINT));
-  assert.ok(!admissible(BigInt(fixture.negative_cases.postgres_integer_overflow)));
-  assert.ok(!admissible(BigInt(fixture.negative_cases.postgres_integer_zero)));
-  assert.ok(!admissible(MAX_U64));
+  const positive = value => typeof value === "bigint" && value > 0n && value <= MAX_SQL_BIGINT;
+  const expectedRevision = value => typeof value === "bigint" && value >= 0n && value <= MAX_SQL_BIGINT;
+  assert.ok(positive(MAX_SQL_BIGINT));
+  assert.ok(!positive(BigInt(fixture.negative_cases.postgres_integer_overflow)));
+  assert.ok(!positive(BigInt(fixture.negative_cases.postgres_integer_zero)));
+  assert.ok(!positive(MAX_U64));
+  assert.ok(expectedRevision(0n)); // New entity has no previously committed world state.
+  assert.ok(expectedRevision(MAX_SQL_BIGINT));
+  assert.ok(!expectedRevision(-1n));
+  assert.ok(!expectedRevision(MAX_SQL_BIGINT + 1n));
 });
