@@ -886,9 +886,7 @@ fn begin_requested_action(
         {
             return; // READY: advance_action commits the charged hit this tick.
         }
-        if (input.attack && !input.heavy_attack)
-            || (input.heavy_attack && !input.attack)
-        {
+        if (input.attack && !input.heavy_attack) || (input.heavy_attack && !input.attack) {
             if input.jump
                 && spend_stamina(
                     now_ms,
@@ -2039,9 +2037,7 @@ mod r2_combat_control_tests {
                 world.step();
             }
             assert!(world.fighter(1).unwrap().charging_heavy);
-            assert!(
-                world.fighter(1).unwrap().action_elapsed_ms < HEAVY_ATTACK_WINDUP_MS
-            );
+            assert!(world.fighter(1).unwrap().action_elapsed_ms < HEAVY_ATTACK_WINDUP_MS);
 
             // Malicious or reordered release claims a heavy even though this
             // authoritative hold was only five 60Hz ticks long.
