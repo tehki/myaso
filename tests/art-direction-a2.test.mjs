@@ -61,3 +61,18 @@ test('A2 tavern and street barrels have non-overlapping outer iron hoops', () =>
   assert.match(author, /bpy\.data\.objects\.remove\(ob, do_unlink=True\)/);
   assert.match(author, /assert edge_gap >= BARREL_MIN_GAP/);
 });
+
+
+test('A2 knight/building scale review only reads approved A3 GLBs and keeps render offline', () => {
+  const qa = readFileSync(new URL('../tools/art/compare_a3_knights_to_greyhaven.py', import.meta.url), 'utf8');
+  assert.match(qa, /bpy\.ops\.import_scene\.gltf/);
+  assert.match(qa, /bpy\.ops\.wm\.open_mainfile/);
+  assert.match(qa, /len\(r\.data\.bones\)/);
+  assert.match(qa, /rollAuthoritativeMs": 170/);
+  assert.match(qa, /recoveryAuthoritativeMs": 180/);
+  assert.match(qa, /"changesGameplay": False/);
+  assert.match(qa, /"actualBrowserSpriteComparisonDone": False/);
+  assert.match(qa, /"modelSourcesStoredInRepository": False/);
+  assert.match(qa, /"nativeBlenderSceneCommitted": False/);
+  assert.doesNotMatch(qa, /export_scene\.gltf|requests\.|urlretrieve\(/);
+});
