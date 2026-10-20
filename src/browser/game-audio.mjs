@@ -307,6 +307,7 @@ export function createGameAudio({ AudioContextImpl = globalThis.AudioContext ?? 
     isMuted: () => muted, getVolume: () => volume, isUnlocked: () => context !== null,
     isMusicEnabled: () => musicEnabled, getMusicVolume: () => musicVolume,
     isMusicPlaying: () => Boolean(musicTrack && !musicTrack.paused),
+    getPlaybackClock: () => context?.currentTime ?? null,
     loadedFoleyCount: () => loadedSamples.size });
 }
 

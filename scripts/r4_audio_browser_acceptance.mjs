@@ -256,7 +256,19 @@ async function run(browser, port) {
     const deathStatus = await script('return document.querySelector("#status").textContent');
     assert.match(deathStatus, /Playing Death \(recorded variant\)/,
       browser + " must play the recorded human death cue, not the creak fallback");
-    await delay(350); // Real cue cooldown before second recorded Death variant.
+    // A fixed wall-clock sleep isn't sufficient in headless Firefox: the
+    // AudioContext clock can advance more slowly after the real W3C gesture.
+    // Respect the original 300 ms *audio-time* cooldown; never bypass it.
+    const firstDeathClock = await script("return window.__r4AuditionAudio.getPlaybackClock()");
+    assert.ok(Number.isFinite(firstDeathClock), browser + " death clock unavailable");
+    let replayClock = firstDeathClock;
+    for (let n = 0; n < 75; n++) {
+      await delay(120);
+      replayClock = await script("return window.__r4AuditionAudio.getPlaybackClock()");
+      if (replayClock - firstDeathClock >= .38) break;
+    }
+    assert.ok(replayClock - firstDeathClock >= .38,
+      browser + " audio clock failed to reach the genuine Death cooldown");
     await click("[data-cue=death]");
     assert.match(await script('return document.querySelector("#status").textContent'),
       /Playing Death \(recorded variant\)/);

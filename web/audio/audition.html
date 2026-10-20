@@ -59,6 +59,7 @@
   <script type="module">
     import { createGameAudio, installGameAudioControls } from "../../src/browser/game-audio.mjs";
     const audio = createGameAudio({ storage: null });
+    window.__r4AuditionAudio = audio; // Sound-only review clock for strict native acceptance.
     installGameAudioControls(audio);
     const prepare = document.querySelector("#prepare");
     const status = document.querySelector("#status");

@@ -78,8 +78,10 @@ test("R4 natural foley decodes asynchronously, uses OGG rather than oscillator o
   const audio = createGameAudio({ AudioContextImpl: Context, AudioElementImpl: MusicTrack,
     fetchImpl, random: () => 0.5, storage: null });
   assert.equal(audio.play("step"), false);
+  assert.equal(audio.getPlaybackClock(), null, "clock cannot advance before user audio activation");
   assert.equal(audio.loadedFoleyCount(), 0);
   assert.equal(audio.unlock(), true);
+  assert.equal(typeof audio.getPlaybackClock(), "number");
   for (let i = 0; i < 30 && audio.loadedFoleyCount() < 24; i++) {
     await new Promise(resolve => setTimeout(resolve, 0));
   }
