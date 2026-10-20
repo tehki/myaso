@@ -165,3 +165,28 @@ test('A2.2 batches roof and facade detail without introducing unbounded object c
   assert.match(art, /"browserFrameTimeMeasured":False/);
   assert.match(art, /scene\.cycles\.device="CPU"/);
 });
+
+
+test('A2.3 uses explicit roof names, never broad gable tags, and stays review-only', () => {
+  const src=readFileSync(new URL('../tools/art/render_greyhaven_a23_layers.py',import.meta.url),'utf8');
+  assert.match(src,/def is_actual_roof\(ob\):/);
+  assert.match(src,/ROOF_SUFFIXES=/);
+  assert.match(src,/assert "Red Lion \/ gables" in base_names/);
+  assert.match(src,/assert "Gable Merchant \/ plaster walls" in base_names/);
+  assert.match(src,/assert "Gable Merchant \/ roof occlusion" in roof_names/);
+  assert.match(src,/ob\.hide_render=original\[ob\.name\] or/);
+  assert.match(src,/scene\.render\.film_transparent=True/);
+  assert.match(src,/scene\.render\.image_settings\.color_mode="RGBA"/);
+  assert.match(src,/"roofOcclusionRuntimeActive":False/);
+  assert.match(src,/"sourceSceneSaved":False/);
+});
+test('A2.3 WebP exporter validates lossless alpha, visible pixels and composite error', () => {
+  const src=readFileSync(new URL('../tools/art/encode_greyhaven_a23_webp.py',import.meta.url),'utf8');
+  assert.match(src,/lossless=True,method=6,exact=True/);
+  assert.match(src,/ImageChops\.difference/);
+  assert.match(src,/transparent_fraction/);
+  assert.match(src,/greyhaven_a23_layer_composite_preview\.png/);
+  assert.match(src,/compositeRGBMeanAbsoluteErrorVsFullRender/);
+  assert.match(src,/"performanceFPSMeasured":False/);
+  assert.doesNotMatch(src,/requests\.|urlretrieve\(|subprocess\.|shutil\.rmtree/);
+});
