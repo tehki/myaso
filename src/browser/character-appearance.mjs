@@ -7,19 +7,33 @@ export const ADULT_BODY_PRESENTATIONS = Object.freeze([
   "adult-masculine",
   "adult-feminine",
 ]);
-export const VISIBLE_EQUIPMENT_SLOTS = Object.freeze(["body", "offHand", "mainHand"]);
 
-// Matches the three equippable kinds in Magic & Items' *isolated* loot domain.
-// Any new garment/armor slot or kind must be agreed with the authoritative owner
-// before it can be included here, rather than silently inventing equipment.
+// Staged Magic & Items #424 authoritative EquipmentSlot names.
+// Ordered for symbolic asset composition only; 3A owns direction-dependent
+// actual image overlap and art pivots (e.g., a shield behind a facing torso).
+export const VISIBLE_EQUIPMENT_SLOTS = Object.freeze([
+  "body", "feet", "head", "offHand", "mainHand",
+]);
+
+// Matches ItemKind::fits in Magic & Items draft PR #424 (not on live main).
+// Unsupported new physical items must be added here explicitly: never make a
+// player appear unclothed by ignoring equipment the server says is equipped.
 export const VISUAL_EQUIPMENT = Object.freeze({
   LeatherArmor: Object.freeze({ slot: "body", assetKey: "equipment/leather-armor" }),
+  ChainmailArmor: Object.freeze({ slot: "body", assetKey: "equipment/chainmail-armor" }),
+  LeatherBoots: Object.freeze({ slot: "feet", assetKey: "equipment/leather-boots" }),
+  IronHelmet: Object.freeze({ slot: "head", assetKey: "equipment/iron-helmet" }),
   Spellbook: Object.freeze({ slot: "offHand", assetKey: "equipment/spellbook" }),
+  WoodenShield: Object.freeze({ slot: "offHand", assetKey: "equipment/wooden-shield" }),
   RustySword: Object.freeze({ slot: "mainHand", assetKey: "equipment/rusty-sword" }),
+  IronSword: Object.freeze({ slot: "mainHand", assetKey: "equipment/iron-sword" }),
+  WoodenClub: Object.freeze({ slot: "mainHand", assetKey: "equipment/wooden-club" }),
 });
 
 const EMPTY_EQUIPMENT = Object.freeze({
   body: null,
+  feet: null,
+  head: null,
   offHand: null,
   mainHand: null,
 });
@@ -29,7 +43,7 @@ function acceptedBody(bodyPresentation) {
 }
 
 // Appearance is not a character identity or a server equipment record.
-// A new character has a visible body and *no equipped clothing or weapons*.
+// A new character has a visible adult body and *no equipped clothing or weapons*.
 export function createUnequippedAdultAppearance(bodyPresentation) {
   if (!acceptedBody(bodyPresentation)) {
     throw new RangeError("an approved adult body presentation is required");
@@ -50,9 +64,9 @@ function invalid(reason) {
 }
 
 // Produces symbolic, deterministic draw layers, NOT URLs or loaded textures.
-// 3A must provide real adult base-body atlases before this can render anything.
-// Unknown / ill-fitting equipped items force legacy fallback: never present a
-// character as unclothed while known to have unsupported physical equipment.
+// 3A must provide real adult base-body/gear atlases before this can render.
+// Unknown/ill-fitting equipped items force legacy fallback, rather than
+// depicting an armored character as naked through partial atlas coverage.
 export function planAdultCharacterLayers(appearance, { concealUnclothedBody = false } = {}) {
   if (typeof concealUnclothedBody !== "boolean") {
     return invalid("invalid-privacy-setting");
