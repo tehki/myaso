@@ -49,6 +49,13 @@ pub enum EquipmentSlot {
     Body,
 }
 
+/// Server-resolved corpse and item selection; IDs are never authority alone.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct CorpseItemRef {
+    pub corpse_id: u64,
+    pub item_id: u64,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ItemStack {
     pub id: u64,
@@ -669,8 +676,7 @@ impl LootAuthority {
         authenticated_id: u32,
         fighter: &Fighter,
         zone: ZoneId,
-        corpse_id: u64,
-        item_id: u64,
+        selection: CorpseItemRef,
         amount: u16,
         now_ms: u64,
     ) -> Result<ItemStack, LootError> {
@@ -682,7 +688,7 @@ impl LootAuthority {
         if !at.in_zone(zone) {
             return Err(LootError::InvalidPosition);
         }
-        let corpse = self.corpses.get(&corpse_id).ok_or(LootError::NotFound)?;
+        let corpse = self.corpses.get(&selection.corpse_id).ok_or(LootError::NotFound)?;
         if corpse.expires_at_ms <= now_ms {
             return Err(LootError::NotFound);
         }
@@ -695,7 +701,7 @@ impl LootAuthority {
         let source = corpse
             .items
             .iter()
-            .find(|item| item.id == item_id)
+            .find(|item| item.id == selection.item_id)
             .ok_or(LootError::NotFound)?;
         if amount > source.amount || (!source.kind.stackable() && amount != source.amount) {
             return Err(LootError::InvalidStack);
@@ -704,14 +710,21 @@ impl LootAuthority {
             return Err(LootError::InventoryFull);
         }
         if amount == source.amount {
-            return self.take_corpse(authenticated_id, fighter, zone, corpse_id, item_id, now_ms);
+            return self.take_corpse(
+                authenticated_id,
+                fighter,
+                zone,
+                selection.corpse_id,
+                selection.item_id,
+                now_ms,
+            );
         }
         let fragment_id = self.allocate_id()?;
-        let corpse = self.corpses.get_mut(&corpse_id).expect("checked");
+        let corpse = self.corpses.get_mut(&selection.corpse_id).expect("checked");
         let source = corpse
             .items
             .iter_mut()
-            .find(|item| item.id == item_id)
+            .find(|item| item.id == selection.item_id)
             .expect("checked");
         source.amount -= amount;
         let fragment = ItemStack {
@@ -1014,8 +1027,10 @@ mod tests {
                 2,
                 &fighter(2, 200.0, 200.0, false),
                 ZoneId::Moonvale,
-                corpse_id,
-                gold_id,
+                CorpseItemRef {
+                    corpse_id,
+                    item_id: gold_id,
+                },
                 5,
                 1,
             )
@@ -1027,8 +1042,10 @@ mod tests {
                 3,
                 &fighter(3, 200.0, 200.0, false),
                 ZoneId::Moonvale,
-                corpse_id,
-                gold_id,
+                CorpseItemRef {
+                    corpse_id,
+                    item_id: gold_id,
+                },
                 4,
                 2,
             ),
@@ -1040,8 +1057,10 @@ mod tests {
                 3,
                 &fighter(3, 200.0, 200.0, false),
                 ZoneId::Moonvale,
-                corpse_id,
-                gold_id,
+                CorpseItemRef {
+                    corpse_id,
+                    item_id: gold_id,
+                },
                 3,
                 3,
             )
