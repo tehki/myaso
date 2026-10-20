@@ -841,3 +841,42 @@ show that querying tick 60000, replaying a tick or requesting a
 nonconsecutive tick cannot advance the server-only detour.
 Full-cycle retirement, other NPC motion, finite supply conservation,
 and default-off isolation continue to be checked.
+
+## LW-1U — Bounded deterministic guard-route sampling
+
+The optional localhost-only LW-1S/T detour now **prepares its route
+distances exactly once** when the trusted pilot server path is
+created. The precomputed `PilotInspectionPath` stores a bounded
+maximum of 128 verified waypoints, cumulative **integer fixed-point
+arc lengths at 1/1024 pilot world-unit precision**, and a total route
+length. All segment-length square roots are integer square roots;
+invalid zero-length segments, oversized routes and integer distance
+overflow are refused at construction.
+
+On every authorized 60Hz server movement tick, Rowan's actual
+position is computed by **one binary search through the immutable
+cumulative lengths and integer-only interpolation**. This avoids
+the previous per-tick repeated floating-point full-path length
+summation and per-segment floating-point distance calculation.
+Path preparation is the only point at which the route and its
+small cumulative-distance index are allocated; asking for an NPC
+position allocates nothing. All movement still advances only on
+accepted consecutive world ticks, so requested future positions
+cannot move the guard. Reversing decrements the same committed
+progress and traverses precisely the same immutable route, never
+replanning from client input or teleporting.
+
+Tests compare each of the 601 sampled positions against the
+previous float-based staging reference (at most one pilot coordinate
+unit of difference), check authored pilot line-of-sight and
+per-tick movement bounds, exact endpoints, capped progress,
+determinism, zero/duplicate/129-point invalid routes, and extreme
+distance overflow. The prior real closure/reopening scenario and
+patrol-phase continuity tests also remain intact.
+
+**Scope:** fixed authored *pilot collision* only. This is NOT
+authoritative realm/door geometry; the World & Gameplay preview
+collision and zone-ACK PRs are still unmerged. All detours remain
+off without all three explicit loopback flags. The browser keeps
+the exact existing 38-byte type-8 NPC state format. No production
+world actors, combat, money, items, persistence or deployment change.

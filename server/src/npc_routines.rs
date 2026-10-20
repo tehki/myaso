@@ -68,7 +68,7 @@ struct GuardDetour {
     site_id: u8,
     revision: u32,
     start_tick: u32,
-    route: Vec<(u16, u16)>,
+    route: npc_navigation::PilotInspectionPath,
     reversing: Option<(u32, u32)>, // reverse started tick, path progress at reversal
     route_progress: u32,           // only updated from accepted server ticks
 }
@@ -139,8 +139,7 @@ impl NpcRoutines {
             return Self::position(id, tick);
         }
         if let Some(detour) = &self.guard_detour {
-            let (x, y) =
-                npc_navigation::pilot_inspection_position(&detour.route, detour.route_progress)?;
+            let (x, y) = detour.route.position(detour.route_progress);
             return Some(NpcState {
                 id,
                 x,
@@ -213,7 +212,7 @@ impl NpcRoutines {
         // This planner is a strictly server-authored miniature pilot
         // collision test window. No live-world collision authority yet.
         let Some(route) =
-            npc_navigation::pilot_inspection_route((origin.x, origin.y), (site.x, site.y))
+            npc_navigation::pilot_inspection_plan((origin.x, origin.y), (site.x, site.y))
         else {
             return;
         };

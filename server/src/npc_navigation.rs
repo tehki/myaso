@@ -169,6 +169,84 @@ pub fn pilot_inspection_route(from: (u16, u16), to: (u16, u16)) -> Option<Vec<(u
     Some(result)
 }
 
+/// LW-1U: an immutable deterministic, bounded pilot path prepared once,
+/// never allocating or summing floating-point distances on each world tick.
+/// Fixed 1/1024-world-unit arc lengths are derived using integer square root.
+#[derive(Debug, Clone)]
+pub struct PilotInspectionPath {
+    points: Vec<(u16, u16)>,
+    cumulative: Vec<u32>,
+    total: u32,
+}
+
+impl std::ops::Deref for PilotInspectionPath {
+    type Target = [(u16, u16)];
+    fn deref(&self) -> &Self::Target {
+        &self.points
+    }
+}
+
+impl PilotInspectionPath {
+    fn prepare(points: Vec<(u16, u16)>) -> Option<Self> {
+        if points.is_empty() || points.len() > 128 {
+            return None;
+        }
+        let mut cumulative = Vec::with_capacity(points.len());
+        cumulative.push(0_u32);
+        let mut total = 0_u32;
+        for pair in points.windows(2) {
+            let dx = (i64::from(pair[1].0) - i64::from(pair[0].0)) * 1024;
+            let dy = (i64::from(pair[1].1) - i64::from(pair[0].1)) * 1024;
+            let squared = u64::try_from(dx * dx + dy * dy).ok()?;
+            let distance = u32::try_from(squared.isqrt()).ok()?;
+            if distance == 0 {
+                return None;
+            }
+            total = total.checked_add(distance)?;
+            cumulative.push(total);
+        }
+        Some(Self {
+            points,
+            cumulative,
+            total,
+        })
+    }
+
+    /// One binary search + integer interpolation per query. A reversed
+    /// detour simply decreases the same committed progress, not a new path.
+    pub fn position(&self, progress: u32) -> (u16, u16) {
+        if progress == 0 || self.total == 0 {
+            return self.points[0];
+        }
+        if progress >= WALK_TICKS {
+            return *self.points.last().expect("bounded path");
+        }
+        let target = (u64::from(self.total) * u64::from(progress) / u64::from(WALK_TICKS)) as u32;
+        let index = self
+            .cumulative
+            .partition_point(|&v| v < target)
+            .max(1)
+            .min(self.points.len() - 1);
+        let start = self.points[index - 1];
+        let end = self.points[index];
+        let distance = u64::from(self.cumulative[index] - self.cumulative[index - 1]);
+        let travelled = u64::from(target - self.cumulative[index - 1]);
+        let coordinate = |a: u16, b: u16| -> u16 {
+            let numerator = (i64::from(b) - i64::from(a)) * travelled as i64;
+            let magnitude = (numerator.unsigned_abs() + distance / 2) / distance;
+            let displacement = magnitude as i64 * if numerator < 0 { -1 } else { 1 };
+            (i64::from(a) + displacement) as u16
+        };
+        (coordinate(start.0, end.0), coordinate(start.1, end.1))
+    }
+}
+
+/// Construct exclusively from the same trusted pilot collision/LOS planner.
+/// This is not a gateway for client-authored geometry or live world maps.
+pub fn pilot_inspection_plan(from: (u16, u16), to: (u16, u16)) -> Option<PilotInspectionPath> {
+    PilotInspectionPath::prepare(pilot_inspection_route(from, to)?)
+}
+
 /// Follow immutable pilot route over 600 simulation ticks. Reversing its
 /// progress produces precisely the same safe waypoints in reverse.
 pub fn pilot_inspection_position(path: &[(u16, u16)], progress: u32) -> Option<(u16, u16)> {
@@ -351,5 +429,59 @@ mod tests {
             pilot_inspection_position(&[(270, 220)], 120),
             Some((270, 220))
         );
+    }
+
+    #[test]
+    fn prepared_pilot_detour_is_deterministic_and_stays_clear_at_every_tick() {
+        let start = crate::npc_routines::NpcRoutines::position(3, 1380).unwrap();
+        let planned = pilot_inspection_plan((start.x, start.y), (270, 220)).unwrap();
+        assert_eq!(planned.cumulative.len(), planned.points.len());
+        assert_eq!(planned.first().copied(), Some((start.x, start.y)));
+        assert_eq!(planned.last().copied(), Some((270, 220)));
+        assert!(planned.total > 0);
+        assert!(planned.cumulative.windows(2).all(|part| part[1] > part[0]));
+        assert_eq!(planned.position(0), (start.x, start.y));
+        assert_eq!(planned.position(WALK_TICKS), (270, 220));
+        assert_eq!(planned.position(WALK_TICKS + 1), (270, 220));
+        for tick in 0..=WALK_TICKS {
+            let sampled = planned.position(tick);
+            let again = planned.position(tick);
+            let old = pilot_inspection_position(&planned, tick).unwrap();
+            assert_eq!(sampled, again);
+            assert!(pilot_line_of_sight(sampled, sampled));
+            assert!((i32::from(sampled.0) - i32::from(old.0)).abs() <= 1);
+            assert!((i32::from(sampled.1) - i32::from(old.1)).abs() <= 1);
+            if tick > 0 {
+                let prev = planned.position(tick - 1);
+                assert!((i32::from(sampled.0) - i32::from(prev.0)).abs() <= 2);
+                assert!((i32::from(sampled.1) - i32::from(prev.1)).abs() <= 2);
+            }
+        }
+    }
+
+    #[test]
+    fn fixed_point_precomputation_rejects_bad_and_unbounded_routes() {
+        assert!(PilotInspectionPath::prepare(Vec::new()).is_none());
+        assert!(PilotInspectionPath::prepare(vec![(10, 10), (10, 10)]).is_none());
+        assert!(PilotInspectionPath::prepare(vec![(10, 10); 129]).is_none());
+        // Extreme but individually representable steps exceed bounded
+        // aggregate u32 distance; construction must fail without wrapping.
+        let huge: Vec<_> = (0..128)
+            .map(|i| {
+                if i % 2 == 0 {
+                    (0, 0)
+                } else {
+                    (u16::MAX, u16::MAX)
+                }
+            })
+            .collect();
+        assert!(PilotInspectionPath::prepare(huge).is_none());
+        let still = PilotInspectionPath::prepare(vec![(270, 220)]).unwrap();
+        assert_eq!(still.position(0), (270, 220));
+        assert_eq!(still.position(600), (270, 220));
+        let diagonal = PilotInspectionPath::prepare(vec![(100, 100), (105, 105)]).unwrap();
+        assert_eq!(diagonal.position(300), (103, 103));
+        assert_eq!(diagonal.position(600), (105, 105));
+        assert!(pilot_inspection_plan((270, 220), (300, 230)).is_none());
     }
 }
