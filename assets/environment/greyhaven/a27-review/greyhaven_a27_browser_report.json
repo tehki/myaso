@@ -1,0 +1,73 @@
+{
+  "milestone": "Blood & Iron A2.7 standalone browser art viewer acceptance",
+  "browser": "Chrome/154.0.8037.99",
+  "testedURLPath": "/web/greyhaven-a27-art-preview.html",
+  "screenshotType": "Real Chrome via local HTTP; 1220x960 DPR 1",
+  "loaded": {
+    "red_lion": {
+      "loadedBuilding": "red_lion",
+      "status": "ready",
+      "roofOpacity": 1,
+      "roofFront": true,
+      "markerShown": true,
+      "lastCanvasRenderMs": 18.100000143051147,
+      "decodeMs": 19,
+      "artOnly": true,
+      "gameXYCompatible": false,
+      "authoritativePortalIntegrated": false
+    },
+    "gable_merchant": {
+      "loadedBuilding": "gable_merchant",
+      "status": "ready",
+      "roofOpacity": 1,
+      "roofFront": true,
+      "markerShown": true,
+      "lastCanvasRenderMs": 0.2999999523162842,
+      "decodeMs": 15.700000047683716,
+      "artOnly": true,
+      "gameXYCompatible": false,
+      "authoritativePortalIntegrated": false
+    },
+    "blacksmith": {
+      "loadedBuilding": "blacksmith",
+      "status": "ready",
+      "roofOpacity": 1,
+      "roofFront": true,
+      "markerShown": true,
+      "lastCanvasRenderMs": 0.2999999523162842,
+      "decodeMs": 20.700000047683716,
+      "artOnly": true,
+      "gameXYCompatible": false,
+      "authoritativePortalIntegrated": false
+    }
+  },
+  "faded": {
+    "loadedBuilding": "blacksmith",
+    "status": "ready",
+    "roofOpacity": 0.25,
+    "roofFront": false,
+    "markerShown": true,
+    "lastCanvasRenderMs": 0.2999999523162842,
+    "decodeMs": 20.700000047683716,
+    "artOnly": true,
+    "gameXYCompatible": false,
+    "authoritativePortalIntegrated": false
+  },
+  "reset": {
+    "loadedBuilding": "blacksmith",
+    "status": "ready",
+    "roofOpacity": 1,
+    "roofFront": true,
+    "markerShown": true,
+    "lastCanvasRenderMs": 0.19999980926513672,
+    "decodeMs": 20.700000047683716,
+    "artOnly": true,
+    "gameXYCompatible": false,
+    "authoritativePortalIntegrated": false
+  },
+  "browserErrors": [],
+  "noCombatRuntime": true,
+  "noRealGameFrameTimeTest": true,
+  "notProductionApproved": true,
+  "caveat": "Decoded PNG/WebP performance here is a static preview, not in-game FPS/VRAM."
+}
