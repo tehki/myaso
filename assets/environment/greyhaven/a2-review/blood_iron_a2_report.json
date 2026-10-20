@@ -1,0 +1,26 @@
+{
+  "milestone": "Blood & Iron A2 environment look-dev (not game integrated)",
+  "sourceA1": "red_lion_blockout.obj",
+  "metersPerWorldUnit": 0.025,
+  "editableSource": "blood_iron_greyhaven_a2.blend",
+  "renderer": "Cycles CPU",
+  "samples": 4,
+  "sceneMeshes": 267,
+  "materialCount": 24,
+  "batchedCobblestones": 1032,
+  "buildings": [
+    "Red Lion A1 enhanced",
+    "Gable Merchant",
+    "Tanner's Cottage",
+    "Stone Weaver",
+    "Blacksmith"
+  ],
+  "textures": "100% procedural Blender shader nodes; no external reference assets",
+  "renderResolution": [
+    1120,
+    720
+  ],
+  "occlusion": "Candidate tags only; no runtime occlusion or portal implementation",
+  "knights": "Not imported in A2 composition; integration/comparison still required",
+  "artOnly": true
+}
