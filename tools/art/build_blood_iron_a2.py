@@ -226,7 +226,10 @@ house("Blacksmith", 12.6,10.0,5.9,5.0,3.65,1.5,plaster,slate,math.pi,chimney=Tru
 # Forge x bounds [8.65,9.95], anvil x bounds [10.275,11.125]:
 # 0.325 m separation. Door is centered x=12.6, y≈7.37.
 box("Blacksmith / open forge hearth",(9.3,6.05,.62),(1.3,.8,1.1),stone,.1)
-box("Blacksmith / orange embers",(9.3,5.70,.92),(.78,.08,.31),ember)
+# Dark rectangular opening and exposed embers on the FRONT of the stone forge.
+# The orange slab must not be buried inside its stone AABB (front Y=5.65).
+box("Blacksmith / firebox mouth",(9.3,5.60,.90),(.92,.06,.40),iron,.01)
+box("Blacksmith / orange embers",(9.3,5.54,.92),(.78,.08,.31),ember)
 box("Blacksmith / anvil",(10.7,6.4,.92),(.85,.46,.27),iron,.06)
 box("Blacksmith / anvil stand",(10.7,6.4,.51),(.45,.42,.63),timber,.05)
 
