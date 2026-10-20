@@ -39,6 +39,11 @@ def inv(character):
     return ("01" + ("%032x" % character) + "00" * 9)
 
 
+def equipped(character, slot):
+    check(0 <= slot <= 255, "equipment slot must fit one byte")
+    return "02" + ("%032x" % character) + ("%02x" % slot) + "00" * 8
+
+
 def ground(zone, x=100, y=-200):
     return "04" + ("%016x" % zone) + "00" * 9 + (
         (x & 0xFFFFFFFF).to_bytes(4, "big") + (y & 0xFFFFFFFF).to_bytes(4, "big")
@@ -267,6 +272,74 @@ def test_cross_domain_idempotency_and_cross_entity_collision():
     print("PASS: independent entities contending for same item ID yield one world+item winner")
 
 
+def test_global_equipment_slot_uniqueness_and_release():
+    # Independent C4c authority entities must never equip different item IDs
+    # into the same (character ID, slot), even when world rows do not conflict.
+    for entity in (109, 110, 111, 112):
+        register(entity)
+    sword = equipped(109, 3)
+    shield = equipped(109, 4)
+    check(mutation(13001, 14001, 109, 911, 1, 0, None, sword).startswith("1|1|"),
+          "initial equipped item")
+    mutation(13002, 14002, 110, 912, 1, 0, None, sword, fails=True)
+    check(world_revision(110) == "", "losing world revision must roll back")
+    check(item_state(912) == "", "loser cannot commit second equipped item")
+    check(counts(110, 912) == ("0", "0", "0"), "no losing outbox or receipt")
+
+    check(mutation(13003, 14003, 110, 913, 1, 0, None, shield).startswith("1|1|"),
+          "different slot is permitted")
+    mutation(13004, 14004, 110, 913, 2, 1, shield, sword, world_rev=1, fails=True)
+    check(item_state(913) == "1|" + shield, "failed move keeps original equipment")
+    check(world_revision(110) == "1", "failed move does not advance world")
+    check(counts(110, 913) == ("1", "1", "1"), "failed move rolls back event/receipt")
+
+    check(mutation(13005, 14005, 109, 911, 3, 1, sword, None, world_rev=1)
+          .startswith("2|2|"), "destroy original and free slot")
+    check(item_state(911) == "2|retired", "destroyed equipped item tombstone")
+    check(mutation(13002, 14002, 110, 912, 1, 0, None, sword, world_rev=1)
+          .startswith("2|1|"), "same previously rejected operation can commit after slot release")
+    mutation(13006, 14006, 109, 911, 1, 0, None, sword, world_rev=2, fails=True)
+    check(item_state(911) == "2|retired", "freed slot does not resurrect old item ID")
+
+    # Simultaneous independent world entities race two different item IDs
+    # for ONE equipment slot. Item key uniqueness cannot solve this race.
+    target_slot = equipped(109, 5)
+    gate = threading.Barrier(3)
+
+    def attempt(entity, op, item):
+        gate.wait(timeout=10)
+        statement = (
+            "SELECT * FROM core_zone.commit_item_world_mutation("
+            f"{bid(op)}, {bid(op+1000)}, 1::smallint, {bid(entity)},"
+            f"1,1,1,0,{payload('equipment-race')},{bid(item)},1::smallint,"
+            f"0,NULL::bytea,{literal(target_slot)});"
+        )
+        result = subprocess.run(
+            ["psql", "-X", "-A", "-t", "-v", "ON_ERROR_STOP=1", "-c", statement],
+            capture_output=True, text=True, timeout=20,
+        )
+        return result.returncode == 0
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
+        a = executor.submit(attempt, 111, 15001, 914)
+        b = executor.submit(attempt, 112, 15002, 915)
+        gate.wait(timeout=10)
+        winners = [a.result(timeout=20), b.result(timeout=20)]
+    check(winners.count(True) == 1, "unique index must select one equipped item")
+    check(sorted((world_revision(111), world_revision(112))) == ["", "1"],
+          "losing independent world entity must roll back fully")
+    check(sql("SELECT count(*) FROM core_zone.item_state "
+              f"WHERE NOT retired AND location={literal(target_slot)};") == "1",
+          "only one equipped item occupies contested slot")
+    check(sql("SELECT count(*) FROM core_zone.item_world_outbox "
+              f"WHERE item_id IN ({bid(914)}, {bid(915)});") == "1",
+          "only one linked item event committed")
+    check(sql("SELECT count(*) FROM core_zone.item_world_receipts "
+              f"WHERE item_id IN ({bid(914)}, {bid(915)});") == "1",
+          "only one immutable item receipt committed")
+    print("PASS: global equipment slot uniqueness, failed move rollback, release and independent races")
+
+
 def test_restricted_db_role():
     register(105)
     role = "myaso_c3g_restricted"
@@ -298,6 +371,7 @@ def main():
     test_competing_writers_and_rollback()
     test_crashed_uncommitted_writer()
     test_cross_domain_idempotency_and_cross_entity_collision()
+    test_global_equipment_slot_uniqueness_and_release()
     test_restricted_db_role()
     print("C3G ITEM + WORLD + RECEIPT + OUTBOX ATOMIC POSTGRES ACCEPTANCE PASSED")
 
