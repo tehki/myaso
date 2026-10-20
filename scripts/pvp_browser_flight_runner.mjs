@@ -31,6 +31,7 @@ import { awaitM223HeavyWindup, planM223WheelDelay } from "./m223-server-heavy-wi
 import { dispatchM212AttackLedShortBlock } from "./m212-attack-led-short-block.mjs";
 import { createM221TrustedWheelRegistry } from "./m221-trusted-wheel-attestation.mjs";
 import { attachM325TrustedWheelSocket } from "./m325-trusted-wheel-socket.mjs";
+import { requiresM338GuardBreakWheelSocket } from "./m338-guard-break-wheel-scenarios.mjs";
 import { createM227TrustedLightRegistry } from "./m227-trusted-light-pointer.mjs";
 import { planM197KnockdownClusterNudge } from "./m197-knockdown-cluster.mjs";
 import { isTickNewer32 } from "../src/browser/reconciliation.mjs";
@@ -12645,10 +12646,17 @@ async function installUiObserver(session) {
     const threatGuardArc = document.querySelector('#threat-guard-arc');
     if (!target || !arena || !arenaStage || !overlay || !recovery || !focusLabel || !threat || !threatCount || !threatSecondary || !threatSecondaryBearing || !threatSecondaryPhase || !threatSecondaryGuardArc || !threatBearing || !threatGuardArc) throw new Error('missing online UI flight target');
     const state = { events: [], eventTransitions: [], keys: [], keyTransitions: [], pointers: [], wheels: [], overlayTransitions: [], feedbackTransitions: [], recoveryTransitions: [], focusTransitions: [], threatTransitions: [], recoveryTellMaxPixels: 0, parryTellMaxPixels: 0, online: '', startedAt: performance.now() };
-    // Only the real Firefox M194 flight opens a socket; no production client code.
-    if (${scenario === "uiguardbreak" && session.name === "firefox"}) {
-      window.__MYASO_M325_WHEEL_CHANNEL__ = new WebSocket(
-        "ws://" + location.host + "/__myaso_m325_trusted_wheel");
+    // M338: M151/M152 share the exact M194 guard-break wheel verifier.
+    // Open the same real Firefox-only, localhost trusted-proof socket in all
+    // three scenarios. Parent FFA flights reinstall UI observers: reuse the
+    // existing OPEN/CONNECTING channel rather than leaking another socket.
+    if (${requiresM338GuardBreakWheelSocket(scenario, session.name)}) {
+      const prior = window.__MYASO_M325_WHEEL_CHANNEL__;
+      if (!prior || prior.readyState === WebSocket.CLOSING
+        || prior.readyState === WebSocket.CLOSED) {
+        window.__MYASO_M325_WHEEL_CHANNEL__ = new WebSocket(
+          "ws://" + location.host + "/__myaso_m325_trusted_wheel");
+      }
     }
     const epochEvidence = ['uidodge', 'uirollbuffer', 'uijumpbuffer', 'uijumpattack', 'uijumpattackinputloss', 'uijumpattackpunish', 'uijumpattacktelegraph', 'uijumpffaprimary', 'uijumpffasecondary', 'uijumprecoveryffa', 'uijumppunishffa', 'uimultirecoveryffa', 'uimultirecoveryspatial', 'uimultirecoverypunish', 'uiparrypunishwindow', 'uiparrypunishffa', 'uiparrypunishffahit', 'uiguardbreakpunishffa', 'uiguardbreakpunishffahit', 'uikickknockdownffa', 'uikickknockdownffahit', 'uikickknockdownbounded', 'uirollknockdownbounded', 'uistaminaauth', 'uistaminaexhaustion', 'uistaminafeedback', 'uistaminaconfirmed', 'uifeint', 'uirollknockdownffahit', 'uimultiknockdownffa', 'uimultiknockdownffahit', 'uirollknockdownffa', 'uijumpattackblock', 'uijumpattackparry', 'uijumpattackdodge', 'uijumpattackbuffer', 'uikickbuffer'].includes(new URLSearchParams(location.search).get('scenario'));
     const record = () => {
