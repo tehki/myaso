@@ -40,6 +40,12 @@ Status: **domain foundation only — NOT live-game enabled**. Approved design di
 - Read-only Ember preparation verifies the exact authenticated session lease, learned Fire rune and Ember spell, equipped lootable Spellbook, Sulfur Ash reagent and mana. It costs 15 mana and one Sulfur Ash if eventually cast, but the preview consumes nothing and produces no effects.
 - Tests cover no-free-magic spawn, rewards, replayed receipts, casting prerequisites and rune/spell knowledge surviving full-loot death when the spellbook is taken. The knowledge ledger is **in memory only** and must be persisted transactionally with items before activating NPC lessons or spells. No live Magic integration, projectiles or combat changes.
 
+## Joint loot + magic checkpoint, experimental
+
+- Added a versioned **MYWLD001** combined recovery file in [`server/src/magic_checkpoint.rs`](../server/src/magic_checkpoint.rs). It packages a validated quiescent loot snapshot and the learned-rune/spell/mana/claimed-receipt ledger into one atomically replaced file. Load rejects corruption or unsupported formats without returning partial items or magic. The underlying standalone loot schema remains v3 and is deliberately not interchangeable with the joint file.
+- `transact_lesson` clones MagicAuthority, verifies the authoritative session lease matches the rewarded CharacterId, applies a unique server-minted lesson, saves **both** loot and magic, and only then publishes the new knowledge and receipt in memory. A failed lesson or pre-rename filesystem failure leaves live progression unchanged. Tests cover restart recovery with physical spellbook/reagents intact, duplicate-reward denial after reconnect, invalid sessions and corrupted joint files.
+- **Not production-ready:** caller must provide real NPC/quest eligibility, authenticated durable character binding and an exclusive world lock; standalone loot checkpoint writes must never overwrite joint checkpoints. There is no production schema migration, storage locking, atomic multi-service combat transition, crash reconciliation after rename/fsync errors, or live multiplayer integration. This does **not** activate casting, award gameplay, or production persistence.
+
 ## Magic follows the item foundation
 
 1. Server validates reward and records rune knowledge independent of inventory.
