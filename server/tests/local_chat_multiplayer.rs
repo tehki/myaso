@@ -367,3 +367,47 @@ async fn truncated_chat_payload_times_out_without_closing_gameplay_datagrams() {
     .await
     .expect("game input ACK survives chat-only timeout");
 }
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn interleaved_outbound_chat_does_not_discard_half_read_inbound_frame() {
+    let (_server, url, digest) = start_server();
+    let mut alice = Player::connect(&url, &digest).await;
+    let mut bob = Player::connect(&url, &digest).await;
+
+    let text = "Partly sent message survives another player's chat";
+    let mut payload = vec![0x31, 1, 1];
+    payload.extend_from_slice(&400_u32.to_le_bytes());
+    payload.extend_from_slice(&(text.len() as u16).to_le_bytes());
+    payload.extend_from_slice(text.as_bytes());
+
+    // Alice's QUIC chat frame header arrives, but its body is deliberately
+    // incomplete. Her server task is now in the middle of read_exact().
+    alice
+        .chat_send
+        .write_all(&(payload.len() as u16).to_le_bytes())
+        .await
+        .expect("chat frame length");
+    alice
+        .chat_send
+        .write_all(&payload[..5])
+        .await
+        .expect("partial chat body");
+    tokio::time::sleep(Duration::from_millis(40)).await;
+
+    // Bob sends to Alice while the first read is suspended. Servicing Bob's
+    // outbound delivery must resume (not reconstruct) Alice's partial read.
+    bob.send(201, b"Interleaving incoming chat", 1).await;
+    assert!(assert_result(&bob.receive().await, 201, 0) > 0);
+    assert!(
+        assert_received(&alice.receive().await, 2, "Interleaving incoming chat") > 0
+    );
+
+    alice
+        .chat_send
+        .write_all(&payload[5..])
+        .await
+        .expect("remainder of the original chat frame");
+    let id = assert_result(&alice.receive().await, 400, 0);
+    assert!(id > 0);
+    assert_eq!(assert_received(&bob.receive().await, 1, text), id);
+}
