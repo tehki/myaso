@@ -11,7 +11,7 @@ test("R2 genuine middle pointer hold proves exactly three -38 guard events, 100 
   assert.match(flight, /pointerDown", button: 1/);
   assert.match(flight, /pointerUp", button: 1/);
   assert.match(flight, /const expectedGuards = \[62, 24, 0\]/);
-  assert.match(flight, /performArenaM221GuardBreakClick\(attacker, 10\)/);
+  assert.match(flight, /performArenaM221GuardBreakClick\(attacker, 45\)/);
   assert.match(flight, /defenderState.playerHp !== 100/);
   assert.match(flight, /defenderState.feedbackTransitions.includes\("parry-success"\)/);
   assert.match(flight, /attackerState.feedbackTransitions.includes\("parried"\)/);

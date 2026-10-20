@@ -9503,7 +9503,12 @@ async function runOnlineUiMiddleBlockPressureFlight(entries) {
     await sleep(220);
     const expectedGuards = [62, 24, 0];
     for (let index = 0; index < expectedGuards.length; index++) {
-      await performArenaM221GuardBreakClick(attacker, 10);
+      // M334: release-to-strike requires a real LMB down/up that spans
+      // multiple 60Hz input samples. 10ms CI taps intermittently missed
+      // the newly separate release intent (#39413216936). 45ms remains
+      // a strict short LIGHT hold, far below the unchanged 320ms heavy.
+      // Exact -38 guard, zero HP, no-parry evidence below is unchanged.
+      await performArenaM221GuardBreakClick(attacker, 45);
       const deadline = Date.now() + 1100;
       let good = false;
       while (Date.now() < deadline) {
