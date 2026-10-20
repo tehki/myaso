@@ -887,57 +887,66 @@ async fn run_chat_stream(
     .context("local chat reply stream setup timed out")??;
     let mut violations = 0_u8;
     loop {
-        tokio::select! {
-            frame = read_chat_frame(&mut reader) => {
-                let frame = frame?;
-                let correlation = if frame.len() >= 7 {
-                    u32::from_le_bytes(frame[3..7].try_into().expect("length checked"))
-                } else { 0 };
-                let result = match decode_send(&frame) {
-                    Ok(request) => {
-                        let (tick, positions) = {
-                            // Read ONLY server-owned positions; no chat packet
-                            // carries coordinates, zone, or a sender identity.
-                            let state = game.state.lock().await;
-                            let positions: Vec<ChatPosition> = state.world.fighters().iter()
-                                // Synthetic flight actors have no registered
-                                // chat stream and are filtered by ChatHub.
-                                // Do not filter by numeric IDs: real session
-                                // IDs may legitimately exceed 10_000.
-                                .map(|fighter| ChatPosition {
-                                    player_id: fighter.net_id,
-                                    zone: 0, // Live server currently owns one shared arena.
-                                    x: fighter.x,
-                                    y: fighter.y,
-                                }).collect();
-                            (state.world.tick, positions)
-                        };
-                        game.chat.lock().await.route(
-                            player_id, &request, &positions,
-                            game.chat_radius, tick, Instant::now(),
-                        )
+        // Preserve an in-progress length-prefixed read while servicing queued
+        // outbound chat. read_exact is NOT cancellation-safe: recreating its
+        // future after each send would drop consumed header/body bytes and
+        // desynchronize the next chat frame under bidirectional traffic.
+        let inbound = read_chat_frame(&mut reader);
+        tokio::pin!(inbound);
+        loop {
+            tokio::select! {
+                frame = &mut inbound => {
+                    let frame = frame?;
+                    let correlation = if frame.len() >= 7 {
+                        u32::from_le_bytes(frame[3..7].try_into().expect("length checked"))
+                    } else { 0 };
+                    let result = match decode_send(&frame) {
+                        Ok(request) => {
+                            let (tick, positions) = {
+                                // Read ONLY server-owned positions; no chat packet
+                                // carries coordinates, zone, or a sender identity.
+                                let state = game.state.lock().await;
+                                let positions: Vec<ChatPosition> = state.world.fighters().iter()
+                                    // Synthetic flight actors have no registered
+                                    // chat stream and are filtered by ChatHub.
+                                    // Do not filter by numeric IDs: real session
+                                    // IDs may legitimately exceed 10_000.
+                                    .map(|fighter| ChatPosition {
+                                        player_id: fighter.net_id,
+                                        zone: 0, // Live server currently owns one shared arena.
+                                        x: fighter.x,
+                                        y: fighter.y,
+                                    }).collect();
+                                (state.world.tick, positions)
+                            };
+                            game.chat.lock().await.route(
+                                player_id, &request, &positions,
+                                game.chat_radius, tick, Instant::now(),
+                            )
+                        }
+                        Err(code) => {
+                            violations = violations.saturating_add(1);
+                            ChatResult { correlation, code, message_id: 0 }
+                        }
+                    };
+                    outbound.try_send(encode_result(result))
+                        .map_err(|_| anyhow::anyhow!("chat result queue full or disconnected"))?;
+                    if violations >= 8 {
+                        bail!("too many malformed chat frames");
                     }
-                    Err(code) => {
-                        violations = violations.saturating_add(1);
-                        ChatResult { correlation, code, message_id: 0 }
-                    }
-                };
-                outbound.try_send(encode_result(result))
-                    .map_err(|_| anyhow::anyhow!("chat result queue full or disconnected"))?;
-                if violations >= 8 {
-                    bail!("too many malformed chat frames");
+                    break; // Completed one frame; only now create the next reader.
                 }
-            }
-            maybe = outgoing.recv() => {
-                let Some(payload) = maybe else { break };
-                let length = u16::try_from(payload.len())
-                    .context("chat response length overflow")?;
-                tokio::time::timeout(CHAT_STREAM_WRITE_DEADLINE, async {
-                    writer.write_all(&length.to_le_bytes()).await
-                        .context("write chat reply length")?;
-                    writer.write_all(&payload).await
-                        .context("write chat reply frame")
-                }).await.context("local chat reply write timed out")??;
+                maybe = outgoing.recv() => {
+                    let Some(payload) = maybe else { return Ok(()); };
+                    let length = u16::try_from(payload.len())
+                        .context("chat response length overflow")?;
+                    tokio::time::timeout(CHAT_STREAM_WRITE_DEADLINE, async {
+                        writer.write_all(&length.to_le_bytes()).await
+                            .context("write chat reply length")?;
+                        writer.write_all(&payload).await
+                            .context("write chat reply frame")
+                    }).await.context("local chat reply write timed out")??;
+                }
             }
         }
     }
