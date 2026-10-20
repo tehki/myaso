@@ -5,7 +5,7 @@ import { validateLocalChatText, createLocalChatHistory, CHAT_UI_LIMITS } from ".
 
 test("C1 message length, UTF-8 and control characters fail closed", () => {
   assert.equal(validateLocalChatText("  Greetings, traveler!  "), "Greetings, traveler!");
-  for (const bad of ["", "  ", "x".repeat(281), "🛡️".repeat(260), "hello\u0000there", "\n"]) {
+  for (const bad of ["", "  ", "x".repeat(281), "🛡️".repeat(260), "hello\u0000there", "\n", "spoof\u202eeman"]) {
     assert.throws(() => validateLocalChatText(bad));
   }
   assert.equal(validateLocalChatText("🛡️ Guard the old mill."), "🛡️ Guard the old mill.");
@@ -35,6 +35,9 @@ test("C1 does not allocate wire packet ids or optimistic backend", () => {
   assert.match(js, /serverMessageId/);
   assert.match(js, /Message not sent/);
   assert.match(js, /event\.key !== "Enter"/);
+  assert.match(js, /generation !== sendGeneration/);
+  assert.match(js, /cancelInflight/);
+  assert.match(js, /input\.readOnly = pending/);
   assert.equal(CHAT_UI_LIMITS.history, 60);
 });
 

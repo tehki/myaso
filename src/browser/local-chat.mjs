@@ -9,7 +9,7 @@ export function validateLocalChatText(value) {
   if (typeof value !== "string") throw new Error("Enter a message.");
   const text = value.trim();
   if (!text) throw new Error("Enter a message.");
-  if (/\p{Cc}/u.test(text)) throw new Error("Control characters are not allowed.");
+  if (/\p{Cc}/u.test(text) || /[\u202a-\u202e\u2066-\u2069\u200e\u200f]/iu.test(text)) throw new Error("Control characters are not allowed.");
   if ([...text].length > CHAT_UI_LIMITS.chars || new TextEncoder().encode(text).length > CHAT_UI_LIMITS.bytes) {
     throw new Error("Message is too long.");
   }
@@ -106,6 +106,8 @@ export function installLocalChat(doc, { online = false, adapter = null, idFactor
   let transport = null;
   let unsubscribe = null;
   let pending = false;
+  let generation = 0;
+  let cancelInflight = null;
   let unreadCount = 0;
   let disposed = false;
 
@@ -114,7 +116,9 @@ export function installLocalChat(doc, { online = false, adapter = null, idFactor
     const ready = isReady();
     const changed = root.dataset.connected !== String(ready);
     root.dataset.connected = String(ready);
-    input.disabled = !ready || pending;
+    // Keep the composer focused while an ACK is pending, so Escape still works.
+    input.disabled = !ready;
+    input.readOnly = pending;
     send.disabled = !ready || pending;
     if (changed) status.textContent = ready ? "Local · nearby players only" :
       online ? "Chat unavailable — awaiting Core server support." : "Practice has no multiplayer chat.";
@@ -176,6 +180,11 @@ export function installLocalChat(doc, { online = false, adapter = null, idFactor
       status.textContent = "Message not sent — secure identifier unavailable.";
       return false;
     }
+    const sendGeneration = generation;
+    const sendAdapter = transport;
+    const cancelled = new Promise((_resolve, reject) => {
+      cancelInflight = () => reject(new Error("Connection changed"));
+    });
     pending = true;
     const { item, stateLabel } = messageRow("local", "You", text, "pending");
     input.value = "";
@@ -183,10 +192,14 @@ export function installLocalChat(doc, { online = false, adapter = null, idFactor
     let timeout;
     try {
       const ack = await Promise.race([
-        Promise.resolve().then(() => transport.send({ channel: "local", clientMessageId, text })),
+        Promise.resolve().then(() => {
+          if (disposed || generation !== sendGeneration) throw new Error("Connection changed");
+          return sendAdapter.send({ channel: "local", clientMessageId, text });
+        }),
+        cancelled,
         new Promise((_resolve, reject) => { timeout = setTimeout(() => reject(new Error("No server acknowledgement")), 10000); }),
       ]);
-      if (!ack || ack.ok !== true || ack.clientMessageId !== clientMessageId) {
+      if (disposed || generation !== sendGeneration || !ack || ack.ok !== true || ack.clientMessageId !== clientMessageId) {
         throw new Error("Message rejected by server");
       }
       item.dataset.delivery = "accepted";
@@ -195,24 +208,41 @@ export function installLocalChat(doc, { online = false, adapter = null, idFactor
       return true;
     } catch {
       item.dataset.delivery = "failed";
-      stateLabel.textContent = "Failed";
-      status.textContent = "Message not sent — server rejected or timed out.";
+      if (disposed || generation !== sendGeneration) {
+        stateLabel.textContent = "Not confirmed";
+      } else {
+        stateLabel.textContent = "Failed";
+        status.textContent = "Message not sent — server rejected or timed out.";
+      }
       return false;
     } finally {
       clearTimeout(timeout);
-      pending = false;
-      availability();
+      if (generation === sendGeneration) {
+        cancelInflight = null;
+        pending = false;
+        if (!disposed) availability();
+      }
     }
   }
   function bindAdapter(next) {
+    if (disposed) return;
+    const interrupted = pending;
+    generation += 1;
+    cancelInflight?.();
+    cancelInflight = null;
+    pending = false;
     unsubscribe?.();
     unsubscribe = null;
     transport = online && next && typeof next.send === "function" && typeof next.subscribe === "function" ? next : null;
     if (transport) {
-      const unbind = transport.subscribe(receive);
+      const subscriptionGeneration = generation;
+      // A callback queued by a replaced connection is no longer authoritative.
+      const unbind = transport.subscribe(event =>
+        !disposed && subscriptionGeneration === generation && receive(event));
       unsubscribe = typeof unbind === "function" ? unbind : null;
     }
     availability();
+    if (interrupted) status.textContent = "Connection changed — previous message not confirmed.";
   }
 
   function onArenaKey(event) {
@@ -252,6 +282,9 @@ export function installLocalChat(doc, { online = false, adapter = null, idFactor
     dispose() {
       if (disposed) return;
       disposed = true;
+      generation += 1;
+      cancelInflight?.();
+      cancelInflight = null;
       observer?.disconnect();
       unsubscribe?.();
       canvas.removeEventListener("keydown", onArenaKey, true);

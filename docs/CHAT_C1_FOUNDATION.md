@@ -66,3 +66,10 @@ required at exact head. Rollback drops this PR; it does not mutate
 server/DB, persistent transcripts or assets. **DRAFT, unmerged,
 undeployed** until central review. The separate Core integration
 PR must be independently tested and accepted.
+
+## C1A input and reconnect hardening
+
+- A pending send keeps the composer focused but read-only (no double submissions), so the native Escape key remains usable while waiting for a Core ACK.
+- Adapter replacement, disconnect (`bindAdapter(null)`) or component disposal cancels a pending client wait. A late ACK cannot turn that old delivery into a successful result; the outgoing row is marked **Not confirmed**, not delivered or definitively rejected.
+- Old adapter callbacks are generation-scoped, so queued previous-connection messages cannot contaminate the current transcript. Bidi override controls are rejected in client-composed text to reduce identity spoofing; Core must enforce canonical Unicode policy on the server.
+- No wire packet, telemetry, persistence or game-loop change. Run browser tests using a purpose-built **test-only** injected adapter, never a production query switch.
