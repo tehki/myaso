@@ -1570,3 +1570,25 @@ mod r0_player_cap_tests {
         }
     }
 }
+
+#[cfg(test)]
+mod chat_ingress_budget_tests {
+    use super::{ChatIngressBudget, MAX_CHAT_INGRESS_FRAMES_PER_SECOND};
+    use std::time::{Duration, Instant};
+
+    #[test]
+    fn chat_ingress_budget_caps_work_before_position_scans() {
+        let start = Instant::now();
+        let mut budget = ChatIngressBudget::new(start);
+        for _ in 0..MAX_CHAT_INGRESS_FRAMES_PER_SECOND {
+            assert!(budget.consume(start));
+        }
+        assert!(!budget.consume(start));
+        assert!(!budget.consume(start + Duration::from_millis(999)));
+        assert!(budget.consume(start + Duration::from_secs(1)));
+        for _ in 1..MAX_CHAT_INGRESS_FRAMES_PER_SECOND {
+            assert!(budget.consume(start + Duration::from_secs(1)));
+        }
+        assert!(!budget.consume(start + Duration::from_secs(1)));
+    }
+}
