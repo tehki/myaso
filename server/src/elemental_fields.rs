@@ -83,11 +83,17 @@ fn valid_coord(value: f32) -> bool {
     value.is_finite() && value.abs() <= MAX_COORDINATE
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct ElementalFieldLedger {
     fields: Vec<ActiveField>,
     now_tick: Option<u64>,
     next_id: u64,
+}
+
+impl Default for ElementalFieldLedger {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl ElementalFieldLedger {
