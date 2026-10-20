@@ -73,7 +73,11 @@ fn encode_location(location: Option<ItemLocation>, output: &mut Vec<u8>) {
             bytes[0] = 3;
             bytes[1..17].copy_from_slice(&corpse.get().to_le_bytes());
         }
-        Some(ItemLocation::Ground { zone_id, x_cm, y_cm }) => {
+        Some(ItemLocation::Ground {
+            zone_id,
+            x_cm,
+            y_cm,
+        }) => {
             bytes[0] = 4;
             bytes[1..9].copy_from_slice(&zone_id.get().to_le_bytes());
             bytes[18..22].copy_from_slice(&x_cm.to_le_bytes());
@@ -97,17 +101,25 @@ fn decode_location(bytes: &[u8]) -> Result<Option<ItemLocation>, ItemJournalErro
         1 if unused => CharacterId::new(id)
             .map(ItemLocation::Inventory)
             .map(Some)
-            .ok_or(ItemJournalError::InvalidRecord("invalid inventory character")),
+            .ok_or(ItemJournalError::InvalidRecord(
+                "invalid inventory character",
+            )),
         2 if x_cm == 0 && y_cm == 0 => CharacterId::new(id)
             .map(|character_id| ItemLocation::Equipped { character_id, slot })
             .map(Some)
-            .ok_or(ItemJournalError::InvalidRecord("invalid equipment character")),
+            .ok_or(ItemJournalError::InvalidRecord(
+                "invalid equipment character",
+            )),
         3 if unused => CorpseId::new(id)
             .map(ItemLocation::Corpse)
             .map(Some)
             .ok_or(ItemJournalError::InvalidRecord("invalid corpse ID")),
         4 if slot == 0 && id <= u64::MAX as u128 => ZoneId::new(id as u64)
-            .map(|zone_id| ItemLocation::Ground { zone_id, x_cm, y_cm })
+            .map(|zone_id| ItemLocation::Ground {
+                zone_id,
+                x_cm,
+                y_cm,
+            })
             .map(Some)
             .ok_or(ItemJournalError::InvalidRecord("invalid zone ID")),
         _ => Err(ItemJournalError::InvalidRecord("invalid location fields")),
@@ -140,20 +152,25 @@ fn encode(record: &JournalRecord) -> Vec<u8> {
 
 fn decode(bytes: &[u8]) -> Result<JournalRecord, ItemJournalError> {
     if bytes.len() < HEADER_BYTES + CHECKSUM_BYTES || bytes.len() > MAX_RECORD_BYTES {
-        return Err(ItemJournalError::InvalidRecord("record size outside bounds"));
+        return Err(ItemJournalError::InvalidRecord(
+            "record size outside bounds",
+        ));
     }
     if &bytes[..4] != MAGIC {
         return Err(ItemJournalError::InvalidRecord("invalid magic"));
     }
-    if bytes[4] != VERSION || bytes[5..8].iter().any(|&x| x != 0)
+    if bytes[4] != VERSION
+        || bytes[5..8].iter().any(|&x| x != 0)
         || bytes[34..36].iter().any(|&x| x != 0)
     {
-        return Err(ItemJournalError::InvalidRecord("unsupported version/reserved bits"));
+        return Err(ItemJournalError::InvalidRecord(
+            "unsupported version/reserved bits",
+        ));
     }
     let sequence = u64::from_le_bytes(bytes[8..16].try_into().expect("length checked"));
     let id = u128::from_le_bytes(bytes[16..32].try_into().expect("length checked"));
-    let transaction = OwnershipTxnId::new(id)
-        .ok_or(ItemJournalError::InvalidRecord("zero transaction id"))?;
+    let transaction =
+        OwnershipTxnId::new(id).ok_or(ItemJournalError::InvalidRecord("zero transaction id"))?;
     let count = u16::from_le_bytes(bytes[32..34].try_into().expect("length checked")) as usize;
     if sequence == 0 || count == 0 || count > MAX_OWNERSHIP_OPS {
         return Err(ItemJournalError::InvalidRecord("invalid sequence/count"));
@@ -170,19 +187,26 @@ fn decode(bytes: &[u8]) -> Result<JournalRecord, ItemJournalError> {
     for op_bytes in bytes[HEADER_BYTES..end].chunks_exact(OP_BYTES) {
         let kind = op_bytes[0];
         let raw_item = u128::from_le_bytes(op_bytes[1..17].try_into().expect("length checked"));
-        let item = ItemId::new(raw_item)
-            .ok_or(ItemJournalError::InvalidRecord("zero item id"))?;
+        let item = ItemId::new(raw_item).ok_or(ItemJournalError::InvalidRecord("zero item id"))?;
         let from = decode_location(&op_bytes[17..17 + LOCATION_BYTES])?;
         let to = decode_location(&op_bytes[17 + LOCATION_BYTES..])?;
         let op = match (kind, from, to) {
             (1, None, Some(at)) => OwnershipOp::Create { item, at },
             (2, Some(from), Some(to)) => OwnershipOp::Move { item, from, to },
             (3, Some(from), None) => OwnershipOp::Destroy { item, from },
-            _ => return Err(ItemJournalError::InvalidRecord("bad operation type/locations")),
+            _ => {
+                return Err(ItemJournalError::InvalidRecord(
+                    "bad operation type/locations",
+                ))
+            }
         };
         operations.push(op);
     }
-    Ok(JournalRecord { sequence, transaction, operations })
+    Ok(JournalRecord {
+        sequence,
+        transaction,
+        operations,
+    })
 }
 
 fn canonical_name(sequence: u64) -> String {
@@ -218,7 +242,9 @@ impl DurableItemJournal {
         for entry in fs::read_dir(&root)? {
             let entry = entry?;
             let name = entry.file_name();
-            let name = name.to_str().ok_or(ItemJournalError::InvalidRecord("non-UTF8 filename"))?;
+            let name = name
+                .to_str()
+                .ok_or(ItemJournalError::InvalidRecord("non-UTF8 filename"))?;
             if name.starts_with(".pending-") {
                 continue;
             }
@@ -227,9 +253,12 @@ impl DurableItemJournal {
             }
             let digits = &name[..20];
             if !digits.bytes().all(|digit| digit.is_ascii_digit()) {
-                return Err(ItemJournalError::InvalidRecord("noncanonical sequence filename"));
+                return Err(ItemJournalError::InvalidRecord(
+                    "noncanonical sequence filename",
+                ));
             }
-            let sequence = digits.parse::<u64>()
+            let sequence = digits
+                .parse::<u64>()
                 .map_err(|_| ItemJournalError::InvalidRecord("sequence overflow"))?;
             if sequence == 0 || canonical_name(sequence) != name || !entry.file_type()?.is_file() {
                 return Err(ItemJournalError::InvalidRecord("invalid journal entry"));
@@ -251,19 +280,25 @@ impl DurableItemJournal {
             if record.sequence != sequence {
                 return Err(ItemJournalError::InvalidSequence);
             }
-            let (preview, replay) = ledger.preview(record.transaction, &record.operations)
+            let (preview, replay) = ledger
+                .preview(record.transaction, &record.operations)
                 .map_err(ItemJournalError::InvalidTransaction)?;
             if replay || preview.sequence != sequence {
                 return Err(ItemJournalError::InvalidSequence);
             }
-            let receipt = ledger.apply(record.transaction, &record.operations)
+            let receipt = ledger
+                .apply(record.transaction, &record.operations)
                 .map_err(ItemJournalError::InvalidTransaction)?;
             if receipt.sequence != sequence {
                 return Err(ItemJournalError::InvalidSequence);
             }
             previous = sequence;
         }
-        Ok(Self { root, ledger, poisoned: false })
+        Ok(Self {
+            root,
+            ledger,
+            poisoned: false,
+        })
     }
 
     pub fn location(&self, item: ItemId) -> Option<ItemLocation> {
@@ -282,7 +317,9 @@ impl DurableItemJournal {
         if self.poisoned {
             return Err(ItemJournalError::Poisoned);
         }
-        let (receipt, replay) = self.ledger.preview(transaction, operations)
+        let (receipt, replay) = self
+            .ledger
+            .preview(transaction, operations)
             .map_err(ItemJournalError::InvalidTransaction)?;
         if replay {
             return Ok(receipt);
@@ -298,10 +335,10 @@ impl DurableItemJournal {
             .map_err(|_| ItemJournalError::InvalidRecord("clock before epoch"))?
             .as_nanos();
         let nonce = NEXT_PENDING.fetch_add(1, Ordering::Relaxed);
-        let stage = PendingFile(self.root.join(format!(
-            ".pending-{}-{clock}-{nonce}",
-            std::process::id()
-        )));
+        let stage = PendingFile(
+            self.root
+                .join(format!(".pending-{}-{clock}-{nonce}", std::process::id())),
+        );
 
         // If any step fails, disable all further writes on this instance.
         // Especially after publish, a failed directory sync can mean the
@@ -327,11 +364,10 @@ impl DurableItemJournal {
             return Err(ItemJournalError::Io(error));
         }
         drop(stage);
-        self.ledger.apply(transaction, operations)
-            .map_err(|err| {
-                self.poisoned = true;
-                ItemJournalError::InvalidTransaction(err)
-            })
+        self.ledger.apply(transaction, operations).map_err(|err| {
+            self.poisoned = true;
+            ItemJournalError::InvalidTransaction(err)
+        })
     }
 }
 
@@ -343,9 +379,13 @@ mod tests {
     impl Root {
         fn new() -> Self {
             let nonce = NEXT_PENDING.fetch_add(1, Ordering::Relaxed);
-            let clock = SystemTime::now().duration_since(UNIX_EPOCH).expect("clock").as_nanos();
+            let clock = SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .expect("clock")
+                .as_nanos();
             let path = std::env::temp_dir().join(format!(
-                "myaso-item-journal-{}-{clock}-{nonce}", std::process::id()
+                "myaso-item-journal-{}-{clock}-{nonce}",
+                std::process::id()
             ));
             fs::create_dir(&path).expect("private test directory");
             Self(path)
@@ -363,29 +403,59 @@ mod tests {
         }
     }
 
-    fn item(n: u128) -> ItemId { ItemId::new(n).expect("item") }
-    fn txn(n: u128) -> OwnershipTxnId { OwnershipTxnId::new(n).expect("txn") }
-    fn character(n: u128) -> CharacterId { CharacterId::new(n).expect("char") }
-    fn corpse(n: u128) -> CorpseId { CorpseId::new(n).expect("corpse") }
-    fn inv(n: u128) -> ItemLocation { ItemLocation::Inventory(character(n)) }
+    fn item(n: u128) -> ItemId {
+        ItemId::new(n).expect("item")
+    }
+    fn txn(n: u128) -> OwnershipTxnId {
+        OwnershipTxnId::new(n).expect("txn")
+    }
+    fn character(n: u128) -> CharacterId {
+        CharacterId::new(n).expect("char")
+    }
+    fn corpse(n: u128) -> CorpseId {
+        CorpseId::new(n).expect("corpse")
+    }
+    fn inv(n: u128) -> ItemLocation {
+        ItemLocation::Inventory(character(n))
+    }
     fn equipped(n: u128) -> ItemLocation {
-        ItemLocation::Equipped { character_id: character(n), slot: 3 }
+        ItemLocation::Equipped {
+            character_id: character(n),
+            slot: 3,
+        }
     }
     fn ground() -> ItemLocation {
         ItemLocation::Ground {
-            zone_id: ZoneId::new(8).expect("zone"), x_cm: -290, y_cm: 177,
+            zone_id: ZoneId::new(8).expect("zone"),
+            x_cm: -290,
+            y_cm: 177,
         }
     }
 
     #[test]
     fn versioned_codec_covers_all_location_variants_and_rejects_tampering() {
         let record = JournalRecord {
-            sequence: 7, transaction: txn(100),
+            sequence: 7,
+            transaction: txn(100),
             operations: vec![
-                OwnershipOp::Create { item: item(1), at: inv(1) },
-                OwnershipOp::Move { item: item(2), from: equipped(1), to: ItemLocation::Corpse(corpse(45)) },
-                OwnershipOp::Move { item: item(3), from: inv(1), to: ground() },
-                OwnershipOp::Destroy { item: item(4), from: ground() },
+                OwnershipOp::Create {
+                    item: item(1),
+                    at: inv(1),
+                },
+                OwnershipOp::Move {
+                    item: item(2),
+                    from: equipped(1),
+                    to: ItemLocation::Corpse(corpse(45)),
+                },
+                OwnershipOp::Move {
+                    item: item(3),
+                    from: inv(1),
+                    to: ground(),
+                },
+                OwnershipOp::Destroy {
+                    item: item(4),
+                    from: ground(),
+                },
             ],
         };
         let bytes = encode(&record);
@@ -395,14 +465,26 @@ mod tests {
         assert_eq!(restored.operations, record.operations);
         let mut changed = bytes.clone();
         changed[HEADER_BYTES + 2] ^= 1;
-        assert!(matches!(decode(&changed), Err(ItemJournalError::InvalidRecord(_))));
-        assert!(matches!(decode(&bytes[..bytes.len() - 1]), Err(ItemJournalError::InvalidRecord(_))));
+        assert!(matches!(
+            decode(&changed),
+            Err(ItemJournalError::InvalidRecord(_))
+        ));
+        assert!(matches!(
+            decode(&bytes[..bytes.len() - 1]),
+            Err(ItemJournalError::InvalidRecord(_))
+        ));
         changed = bytes.clone();
         changed[4] = 99;
-        assert!(matches!(decode(&changed), Err(ItemJournalError::InvalidRecord(_))));
+        assert!(matches!(
+            decode(&changed),
+            Err(ItemJournalError::InvalidRecord(_))
+        ));
         changed = bytes.clone();
         changed[5] = 1;
-        assert!(matches!(decode(&changed), Err(ItemJournalError::InvalidRecord(_))));
+        assert!(matches!(
+            decode(&changed),
+            Err(ItemJournalError::InvalidRecord(_))
+        ));
     }
 
     #[test]
@@ -410,27 +492,56 @@ mod tests {
         let root = Root::new();
         let mut store = root.open();
         let initial = [
-            OwnershipOp::Create { item: item(1), at: equipped(1) },
-            OwnershipOp::Create { item: item(2), at: inv(1) },
-            OwnershipOp::Create { item: item(3), at: inv(1) },
+            OwnershipOp::Create {
+                item: item(1),
+                at: equipped(1),
+            },
+            OwnershipOp::Create {
+                item: item(2),
+                at: inv(1),
+            },
+            OwnershipOp::Create {
+                item: item(3),
+                at: inv(1),
+            },
         ];
         store.apply(txn(1), &initial).expect("create items");
         let death = [
-            OwnershipOp::Move { item: item(1), from: equipped(1), to: ItemLocation::Corpse(corpse(8)) },
-            OwnershipOp::Move { item: item(2), from: inv(1), to: ground() },
-            OwnershipOp::Move { item: item(3), from: inv(1), to: ItemLocation::Corpse(corpse(8)) },
+            OwnershipOp::Move {
+                item: item(1),
+                from: equipped(1),
+                to: ItemLocation::Corpse(corpse(8)),
+            },
+            OwnershipOp::Move {
+                item: item(2),
+                from: inv(1),
+                to: ground(),
+            },
+            OwnershipOp::Move {
+                item: item(3),
+                from: inv(1),
+                to: ItemLocation::Corpse(corpse(8)),
+            },
         ];
         let receipt = store.apply(txn(2), &death).expect("durable death");
         assert_eq!(receipt.sequence, 2);
         drop(store);
         let mut recovered = root.open();
         assert_eq!(recovered.item_count(), 3);
-        assert_eq!(recovered.location(item(1)), Some(ItemLocation::Corpse(corpse(8))));
+        assert_eq!(
+            recovered.location(item(1)),
+            Some(ItemLocation::Corpse(corpse(8)))
+        );
         assert_eq!(recovered.location(item(2)), Some(ground()));
-        assert_eq!(recovered.apply(txn(2), &death).expect("exact replay"), receipt);
+        assert_eq!(
+            recovered.apply(txn(2), &death).expect("exact replay"),
+            receipt
+        );
         assert!(matches!(
             recovered.apply(txn(2), &initial),
-            Err(ItemJournalError::InvalidTransaction(OwnershipError::ConflictingReplay))
+            Err(ItemJournalError::InvalidTransaction(
+                OwnershipError::ConflictingReplay
+            ))
         ));
         assert!(!root.record(3).exists());
     }
@@ -440,12 +551,27 @@ mod tests {
         let root = Root::new();
         let mut store = root.open();
         let at = ItemLocation::Corpse(corpse(5));
-        store.apply(txn(1), &[OwnershipOp::Create { item: item(5), at }]).expect("create");
-        let looter = [OwnershipOp::Move { item: item(5), from: at, to: inv(1) }];
+        store
+            .apply(txn(1), &[OwnershipOp::Create { item: item(5), at }])
+            .expect("create");
+        let looter = [OwnershipOp::Move {
+            item: item(5),
+            from: at,
+            to: inv(1),
+        }];
         store.apply(txn(2), &looter).expect("first");
         assert!(matches!(
-            store.apply(txn(3), &[OwnershipOp::Move { item: item(5), from: at, to: inv(2) }]),
-            Err(ItemJournalError::InvalidTransaction(OwnershipError::ExpectedLocationMismatch))
+            store.apply(
+                txn(3),
+                &[OwnershipOp::Move {
+                    item: item(5),
+                    from: at,
+                    to: inv(2)
+                }]
+            ),
+            Err(ItemJournalError::InvalidTransaction(
+                OwnershipError::ExpectedLocationMismatch
+            ))
         ));
         assert!(!root.record(3).exists());
         let restored = root.open();
@@ -456,35 +582,73 @@ mod tests {
     fn orphan_stage_ignored_but_tampered_canonical_record_fails_closed() {
         let root = Root::new();
         let mut store = root.open();
-        store.apply(txn(1), &[OwnershipOp::Create { item: item(4), at: inv(4) }]).expect("create");
-        fs::write(root.0.join(".pending-simulated-power-loss"), b"partial")
-            .expect("orphan stage");
+        store
+            .apply(
+                txn(1),
+                &[OwnershipOp::Create {
+                    item: item(4),
+                    at: inv(4),
+                }],
+            )
+            .expect("create");
+        fs::write(root.0.join(".pending-simulated-power-loss"), b"partial").expect("orphan stage");
         assert_eq!(root.open().location(item(4)), Some(inv(4)));
-        fs::write(root.record(1), b"partially-written-canonical")
-            .expect("simulate damage");
-        assert!(matches!(DurableItemJournal::open(&root.0), Err(ItemJournalError::InvalidRecord(_))));
+        fs::write(root.record(1), b"partially-written-canonical").expect("simulate damage");
+        assert!(matches!(
+            DurableItemJournal::open(&root.0),
+            Err(ItemJournalError::InvalidRecord(_))
+        ));
     }
 
     #[test]
     fn missing_or_reordered_commits_abort_replay() {
         let root = Root::new();
         let mut store = root.open();
-        store.apply(txn(1), &[OwnershipOp::Create { item: item(5), at: inv(1) }]).expect("one");
-        store.apply(txn(2), &[OwnershipOp::Move { item: item(5), from: inv(1), to: inv(2) }])
+        store
+            .apply(
+                txn(1),
+                &[OwnershipOp::Create {
+                    item: item(5),
+                    at: inv(1),
+                }],
+            )
+            .expect("one");
+        store
+            .apply(
+                txn(2),
+                &[OwnershipOp::Move {
+                    item: item(5),
+                    from: inv(1),
+                    to: inv(2),
+                }],
+            )
             .expect("two");
         fs::remove_file(root.record(1)).expect("remove first");
-        assert!(matches!(DurableItemJournal::open(&root.0), Err(ItemJournalError::InvalidSequence)));
+        assert!(matches!(
+            DurableItemJournal::open(&root.0),
+            Err(ItemJournalError::InvalidSequence)
+        ));
     }
 
     #[test]
     fn crash_after_publishing_before_memory_apply_replays_transaction_once() {
         let root = Root::new();
-        let operations = vec![OwnershipOp::Create { item: item(9), at: inv(9) }];
-        let bytes = encode(&JournalRecord { sequence: 1, transaction: txn(9), operations: operations.clone() });
+        let operations = vec![OwnershipOp::Create {
+            item: item(9),
+            at: inv(9),
+        }];
+        let bytes = encode(&JournalRecord {
+            sequence: 1,
+            transaction: txn(9),
+            operations: operations.clone(),
+        });
         fs::write(root.record(1), bytes).expect("simulate durable publish before in-memory apply");
         let mut reopened = root.open();
         assert_eq!(reopened.location(item(9)), Some(inv(9)));
-        assert_eq!(reopened.apply(txn(9), &operations).expect("retry").sequence, 1);
+        assert_eq!(
+            reopened.apply(txn(9), &operations).expect("retry").sequence,
+            1
+        );
         assert!(!root.record(2).exists());
     }
 
@@ -493,9 +657,19 @@ mod tests {
     fn new_transaction_files_have_owner_only_permissions() {
         use std::os::unix::fs::PermissionsExt;
         let root = Root::new();
-        root.open().apply(txn(1), &[OwnershipOp::Create { item: item(1), at: inv(1) }])
+        root.open()
+            .apply(
+                txn(1),
+                &[OwnershipOp::Create {
+                    item: item(1),
+                    at: inv(1),
+                }],
+            )
             .expect("commit");
-        let mode = fs::metadata(root.record(1)).expect("metadata").permissions().mode();
+        let mode = fs::metadata(root.record(1))
+            .expect("metadata")
+            .permissions()
+            .mode();
         assert_eq!(mode & 0o777, 0o600);
     }
 }
