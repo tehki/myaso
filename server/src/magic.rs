@@ -104,7 +104,9 @@ impl MagicAuthority {
     }
 
     pub fn mana(&self, character: CharacterId) -> u16 {
-        self.characters.get(&character).map_or(0, |value| value.mana)
+        self.characters
+            .get(&character)
+            .map_or(0, |value| value.mana)
     }
 
     /// Server-only NPC, quest or rare-reward confirmation. This does NOT
@@ -257,11 +259,13 @@ mod tests {
             magic.grant_lesson(award(1, hero, Lesson::Spell(Spell::Ember))),
             Err(MagicError::PrerequisiteMissing)
         );
-        magic.grant_lesson(award(2, hero, Lesson::Rune(Rune::Fire)))
+        magic
+            .grant_lesson(award(2, hero, Lesson::Rune(Rune::Fire)))
             .unwrap();
         assert_eq!(magic.mana(hero), AWAKENED_MANA);
         assert!(!magic.knows_spell(hero, Spell::Ember));
-        magic.grant_lesson(award(1, hero, Lesson::Spell(Spell::Ember)))
+        magic
+            .grant_lesson(award(1, hero, Lesson::Spell(Spell::Ember)))
             .unwrap();
         assert!(magic.knows_spell(hero, Spell::Ember));
     }
@@ -270,7 +274,8 @@ mod tests {
     fn duplicate_lesson_receipts_and_known_runes_fail_closed() {
         let mut magic = MagicAuthority::new();
         let hero = character(12);
-        magic.grant_lesson(award(1, hero, Lesson::Rune(Rune::Fire)))
+        magic
+            .grant_lesson(award(1, hero, Lesson::Rune(Rune::Fire)))
             .unwrap();
         assert_eq!(
             magic.grant_lesson(award(1, character(13), Lesson::Rune(Rune::Water))),
@@ -287,9 +292,11 @@ mod tests {
     fn ember_preview_checks_verified_lease_spellbook_and_real_reagent() {
         let mut magic = MagicAuthority::new();
         let hero = character(20);
-        magic.grant_lesson(award(1, hero, Lesson::Rune(Rune::Fire)))
+        magic
+            .grant_lesson(award(1, hero, Lesson::Rune(Rune::Fire)))
             .unwrap();
-        magic.grant_lesson(award(2, hero, Lesson::Spell(Spell::Ember)))
+        magic
+            .grant_lesson(award(2, hero, Lesson::Spell(Spell::Ember)))
             .unwrap();
         let mut ids = SessionIdentityRegistry::new();
         ids.bind_verified(lease(1, 1), hero).unwrap();
@@ -310,7 +317,9 @@ mod tests {
             Err(MagicError::MissingReagent)
         );
         loot.grant(1, ItemKind::SulfurAsh, 3).unwrap();
-        let plan = magic.preview_cast(lease(1, 1), &ids, &loot, Spell::Ember).unwrap();
+        let plan = magic
+            .preview_cast(lease(1, 1), &ids, &loot, Spell::Ember)
+            .unwrap();
         assert_eq!(plan.mana_cost, 15);
         assert_eq!(plan.reagent_amount, 1);
         assert_eq!(magic.mana(hero), AWAKENED_MANA);
@@ -321,9 +330,11 @@ mod tests {
     fn death_loots_physical_spellbook_but_not_permanent_rune_knowledge() {
         let mut magic = MagicAuthority::new();
         let hero = character(25);
-        magic.grant_lesson(award(1, hero, Lesson::Rune(Rune::Fire)))
+        magic
+            .grant_lesson(award(1, hero, Lesson::Rune(Rune::Fire)))
             .unwrap();
-        magic.grant_lesson(award(2, hero, Lesson::Spell(Spell::Ember)))
+        magic
+            .grant_lesson(award(2, hero, Lesson::Spell(Spell::Ember)))
             .unwrap();
         let mut ids = SessionIdentityRegistry::new();
         ids.bind_verified(lease(1, 1), hero).unwrap();
@@ -332,8 +343,13 @@ mod tests {
         let book = loot.grant(1, ItemKind::Spellbook, 1).unwrap();
         loot.equip(1, book, EquipmentSlot::OffHand).unwrap();
         loot.grant(1, ItemKind::SulfurAsh, 3).unwrap();
-        let corpse = loot.death(1, &fighter(1, true), ZoneId::Moonvale, 5).unwrap();
-        assert!(loot.corpses()[&corpse].items.iter().any(|item| item.id == book));
+        let corpse = loot
+            .death(1, &fighter(1, true), ZoneId::Moonvale, 5)
+            .unwrap();
+        assert!(loot.corpses()[&corpse]
+            .items
+            .iter()
+            .any(|item| item.id == book));
         assert!(magic.knows_rune(hero, Rune::Fire));
         assert!(magic.knows_spell(hero, Spell::Ember));
         loot.respawn(1, &fighter(1, false)).unwrap();
