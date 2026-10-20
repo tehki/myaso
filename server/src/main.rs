@@ -852,9 +852,16 @@ async fn handle_connection(
 /// Never mix with input datagrams or game snapshot/kill-event reliable frames.
 async fn read_chat_frame(recv: &mut RecvStream) -> Result<Vec<u8>> {
     let mut length = [0_u8; 2];
-    recv.read_exact(&mut length)
+    // The first byte may wait indefinitely for an idle, connected player.
+    // Once the peer begins a frame, it must complete even the length prefix
+    // promptly. Otherwise a single byte can pin its optional chat task.
+    recv.read_exact(&mut length[..1])
         .await
-        .context("read chat length")?;
+        .context("read first chat length byte")?;
+    tokio::time::timeout(CHAT_FRAME_BODY_DEADLINE, recv.read_exact(&mut length[1..]))
+        .await
+        .context("chat frame header timed out")?
+        .context("read remaining chat length byte")?;
     let size = u16::from_le_bytes(length) as usize;
     if !(9..=MAX_CHAT_FRAME).contains(&size) {
         bail!("invalid local chat frame length");
