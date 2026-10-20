@@ -26,6 +26,12 @@ use tokio::sync::{mpsc, Mutex};
 use wtransport::{Connection, Endpoint, Identity, RecvStream, SendStream, ServerConfig, VarInt};
 
 const GAME_PATH: &str = "/game";
+// Chat is an optional, lower-priority QUIC stream. Peer backpressure or a
+// partial frame must never retain its sender/recipient routing indefinitely.
+// An idle chat reader remains allowed to wait for its next *new* frame.
+const CHAT_STREAM_SETUP_DEADLINE: Duration = Duration::from_secs(10);
+const CHAT_FRAME_BODY_DEADLINE: Duration = Duration::from_secs(10);
+const CHAT_STREAM_WRITE_DEADLINE: Duration = Duration::from_secs(10);
 const CLOSE_DATAGRAM_UNAVAILABLE: u32 = 0x11;
 const SNAPSHOT_INTERVAL: Duration = Duration::from_millis(50);
 const SNAPSHOT_EVERY_SERVER_TICKS: u32 = 3;
@@ -854,8 +860,9 @@ async fn read_chat_frame(recv: &mut RecvStream) -> Result<Vec<u8>> {
         bail!("invalid local chat frame length");
     }
     let mut bytes = vec![0; size];
-    recv.read_exact(&mut bytes)
+    tokio::time::timeout(CHAT_FRAME_BODY_DEADLINE, recv.read_exact(&mut bytes))
         .await
+        .context("chat frame body timed out")?
         .context("read bounded chat frame")?;
     Ok(bytes)
 }
@@ -868,12 +875,16 @@ async fn run_chat_stream(
     player_id: u32,
     game: Arc<SharedGame>,
 ) -> Result<()> {
-    let mut writer = connection
-        .open_uni()
-        .await
-        .context("open isolated chat reply stream")?
-        .await
-        .context("initialize isolated chat reply stream")?;
+    let mut writer = tokio::time::timeout(CHAT_STREAM_SETUP_DEADLINE, async {
+        connection
+            .open_uni()
+            .await
+            .context("open isolated chat reply stream")?
+            .await
+            .context("initialize isolated chat reply stream")
+    })
+    .await
+    .context("local chat reply stream setup timed out")??;
     let mut violations = 0_u8;
     loop {
         tokio::select! {
@@ -921,10 +932,12 @@ async fn run_chat_stream(
                 let Some(payload) = maybe else { break };
                 let length = u16::try_from(payload.len())
                     .context("chat response length overflow")?;
-                writer.write_all(&length.to_le_bytes()).await
-                    .context("write chat reply length")?;
-                writer.write_all(&payload).await
-                    .context("write chat reply frame")?;
+                tokio::time::timeout(CHAT_STREAM_WRITE_DEADLINE, async {
+                    writer.write_all(&length.to_le_bytes()).await
+                        .context("write chat reply length")?;
+                    writer.write_all(&payload).await
+                        .context("write chat reply frame")
+                }).await.context("local chat reply write timed out")??;
             }
         }
     }
