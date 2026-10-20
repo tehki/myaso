@@ -90,3 +90,15 @@ test('A2 GLB comparison excludes non-character spheres and samples real roll cli
   assert.match(qa, /roll\.frame_range\[0\] <= args\.roll_frame <= roll\.frame_range\[1\]/);
   assert.match(qa, /"actualBrowserSpriteComparisonDone": False/);
 });
+
+
+test('A2 A3 roll stills keep each knight visible independently of the other', () => {
+  const qa = readFileSync(new URL('../tools/art/compare_a3_knights_to_greyhaven.py', import.meta.url), 'utf8');
+  assert.match(qa, /blood_iron_silver_roll_a2\.png/);
+  assert.match(qa, /blood_iron_sentinel_roll_a2\.png/);
+  assert.match(qa, /for ob in companion\["objects"\]:/);
+  assert.match(qa, /ob\.hide_render = True/);
+  assert.match(qa, /hero\["roll"\]/);
+  assert.match(qa, /scene\.frame_set\(args\.roll_frame\)/);
+  assert.match(qa, /if ob\.type == "MESH" and not is_proxy\(ob\):/);
+});
