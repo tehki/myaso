@@ -12,6 +12,14 @@ The resulting journal has balanced postings: `-price + (price - fee) + fee = 0`.
 
 **Nothing calls this module from production server routes, 60Hz simulation, browser clients, NPCs, housing, or cryptocurrency services.** The only interface to `VerifiedBuyer` here is a placeholder and cannot authenticate anyone. The `Seed` assumes listings were reviewed by a trusted seller-consent authority; the integer consent ID is not a signature. In-memory `&mut self` serializes calls within one process but does **not** lock multiple nodes or provide ACID database guarantees.
 
+## Independently anchored completeness checks (E2c follow-on)
+
+An unmodified prefix of the journal can appear perfectly consistent when replayed from genesis. Deterministic replay alone therefore **cannot** prove that the last committed events are present. The lab now has `JournalAnchor` and `reconstruct_with_anchor(seed, journal, trusted_anchor)`, checking expected final sequence, total credit supply, player-account count, owned-title count and unconsumed-listing count. `Lab::journal_anchor()` constructs test fixtures only; **it is not a durable or authenticated checkpoint**.
+
+Three new tests confirm (a) an empty but otherwise valid journal prefix is rejected when a separately supplied committed sequence expects a purchase, (b) contradictory checkpoint metadata fails closed, and (c) duplicate purchase retries do not inflate the anchored sequence or replayed balances. Combined with the 12 existing tests, **15/15 passed locally**, with strict Clippy and rustfmt.
+
+This is *not* a cryptographic journal commitment. A malicious or broken system that rewrites both journal and checkpoint can bypass the comparison. A production-grade design needs independently authenticated/trusted checkpoint provenance, canonical event encoding, an integrity mechanism such as an authenticated hash chain or signed checkpoint, authoritative stable storage, backup-restore validation, and careful handling of partial writes, rollbacks and schema migrations. A complete-looking suffix cannot be proven complete without a trusted external highest-committed sequence or equivalent anchored state.
+
 ## Prerequisites for genuine durability (E2d, not implemented here)
 
 1. Approve the durable account, character, parcel and approved world-map identities; never derive authoritative parcels from graphic assets, browser pixels or user-provided polygons.
