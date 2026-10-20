@@ -60,3 +60,19 @@ Actual active maximum is min(preset, configured capacity). Incoming cosmetic wor
 ## Rollback
 
 The branch is isolated. Drop the P1 PR without a merge to revert all changes. If eventually merged but inactive, revert the P1 commit(s); no wire/schema migrations or runtime flags require coordinated rollback.
+
+## P2 follow-up — Inactive projected renderer and local-only visual lab (2026-10-20)
+
+P2 extends the **same unmerged draft** with `src/browser/magic-particle-renderer.mjs`: five shape/color languages (fire ember, ice diamond, lightning shard, wind arc, arcane ring), world-coordinate camera projection matching `projectArenaPoint`, zoom scaling, exact viewport rejection and a pooled no-GC draw path. The renderer creates no gameplay/world state.
+
+`web/online-game.mjs` imports the pool and drawing adapter, but `PHYSICS_PARTICLES_ENABLED = false` is a hard-coded, fail-closed gate. No query parameter, click, untrusted event, spell command, reliable packet or server mutation can enable it. If eventually enabled by reviewed source code, rendering occurs after arena zoom restore and before vitals/threat HUD; backgrounding clears transient particles. **There is currently no event source connected to the combat client.**
+
+`web/physics-particles-preview.html` and `web/physics-particles-preview.mjs` provide an explicitly **non-playable, offline-only visual lab** for designers. Local pointer presses create ephemeral cosmetic events, buttons switch the five visual styles and a quality selector exercises budget scaling. This lab has no network calls, account access, spell activation, hit detection or authority. It is not linked from the game's main page. Reviewers may start the normal repository-local HTTP server and open `/web/physics-particles-preview.html` to inspect it without entering the playable build.
+
+`tests/magic-particle-renderer.test.mjs` verifies exact alignment with existing camera projection, distinct shapes, frame context restoration on error, malformed visual culling, fail-closed viewport rejection and a stress fixture of 512 attempted cosmetic effects bounded to 64 active low-quality particles. These tests are included in existing protected `browser-runtime.test.mjs`, without editing CI workflow policy.
+
+**Validation remains outstanding on the final exact PR head:** protected `quality` (including Rust fmt/check/clippy/tests and real browser acceptance). No deployment, PR merge, production enablement or playable build launch in this milestone.
+
+### After P2
+
+The next review boundary is a strictly versioned *server-to-client-only* semantic effect event envelope, interest gating, replay/expiry tests and magic authoritative caster validation. Do not turn visual events into trusted hit/collision data, and do not merge with unmerged Magic & Items or NPC geometry implementations without a separate integration pass.
