@@ -96,7 +96,8 @@ try {
       maxReliableAdvancedEntities = Math.max(maxReliableAdvancedEntities, advanced);
       if (firstBackgroundReliableMs === null && advanced > 0) firstBackgroundReliableMs = now - reliableBaselineAt;
     },
-    onProcessedAck(ack) {
+    onProcessedAck() {
+      const ack = arguments[0];
       // Real ACK receipt and readiness to reconcile are distinct timelines.
       acknowledgements += 1;
       // processedClientTick is from the authoritative server, not local
