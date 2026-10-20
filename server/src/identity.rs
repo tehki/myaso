@@ -189,6 +189,14 @@ impl SessionLeaseRegistry {
         Ok(lease)
     }
 
+    /// Refuse a second character claim on an already bound transport before
+    /// consuming a persisted session generation.
+    pub fn connection_active(&self, connection_id: NonZeroU64) -> bool {
+        self.slots
+            .values()
+            .any(|slot| slot.active_connection == Some(connection_id))
+    }
+
     pub fn is_current(&self, lease: SessionLease) -> bool {
         self.slots.get(&lease.character_id).is_some_and(|slot| {
             slot.generation == lease.generation
