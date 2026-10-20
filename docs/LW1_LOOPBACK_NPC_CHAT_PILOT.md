@@ -798,3 +798,46 @@ wire layout with a genuinely different Rowan coordinate;
 no resource creation or task accounting mutation; and preservation
 of disabled-by-default baseline behavior. Exact-head CI and
 browser/WebTransport acceptance still gate merge.
+
+## LW-1T — Server-tick-committed NPC movement and immediate revocation
+
+The optional, three-flag localhost-only Rowan worksite detour
+(`MYASO_NPC_PILOT=1`, `MYASO_NPC_MAINTENANCE=1`,
+`MYASO_NPC_GUARD_DETOUR=1`) now **moves exclusively on accepted
+consecutive authoritative 60Hz world ticks**. Its staged route
+progress is stored in a small server-only guard state; a caller
+asking for an arbitrary earlier or future NPC position can only
+read the **last committed** detour position, never accelerate the
+actor. Replayed, out-of-order or skipped movement ticks do not
+advance the route or create duplicate movement. Standard NPC
+movement continues unchanged when the detour flag is absent.
+
+After each authoritative world step, the server first adopts any
+scheduled NPC worksite revision, then advances the guard detour
+**on that exact tick**, then calculates NPC social meetings and
+worksite news from the newly committed NPC position. The combat
+simulation still runs separately and before NPC processing.
+A valid server revision that reopens the work yard now begins
+Rowan's return path on the **exact revocation tick**, instead of
+waiting for the next 60-tick social update (previously up to one
+simulated second later). The last forward waypoint is retained
+on the reversal tick, and the guard walks back one unit of
+authorized progress on each subsequent world tick. Patrol phase
+is paused for precisely the accepted detour duration, preserving
+position continuity at the departure point.
+
+This does **not** authorize navigation through an unmerged
+production collider, door or building. Route generation still
+uses the same fixed authored pilot obstacle window, with no
+client-supplied geometry. All player combat, item, economic and
+zone-ownership state are untouched; the existing 38-byte NPC
+position wire format is unchanged.
+
+Tests include a restored work yard at **tick 1501**, before the
+next social update: Rowan reverses immediately at progress 120,
+does not jump forward, returns to his departure at tick 1621,
+and then resumes the original route smoothly. Separate tests
+show that querying tick 60000, replaying a tick or requesting a
+nonconsecutive tick cannot advance the server-only detour.
+Full-cycle retirement, other NPC motion, finite supply conservation,
+and default-off isolation continue to be checked.

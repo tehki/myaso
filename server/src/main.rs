@@ -607,19 +607,33 @@ async fn run_authoritative_clock(game: Arc<SharedGame>, flight_action_proof: boo
         }
         state.record_combat_events(&events);
         let tick = state.world.tick;
-        if let Some(routines) = state.npc_routines.as_mut() {
-            routines.advance_social(tick);
-        }
         if let Some(supply) = state.npc_supply.as_mut() {
             supply.advance(tick);
         }
-        let GameState {
-            npc_routines,
-            npc_supply,
-            ..
-        } = &mut *state;
-        if let (Some(routines), Some(supply)) = (npc_routines.as_mut(), npc_supply.as_ref()) {
-            routines.advance_worksite_social(tick, supply);
+        // NPC movement consumes the exact committed stock/worksite revision
+        // from this authoritative tick, before proximity-based social checks.
+        {
+            let GameState {
+                npc_routines,
+                npc_supply,
+                ..
+            } = &mut *state;
+            if let (Some(routines), Some(supply)) = (npc_routines.as_mut(), npc_supply.as_ref()) {
+                routines.advance_pilot_movement(tick, supply);
+            }
+        }
+        if let Some(routines) = state.npc_routines.as_mut() {
+            routines.advance_social(tick);
+        }
+        {
+            let GameState {
+                npc_routines,
+                npc_supply,
+                ..
+            } = &mut *state;
+            if let (Some(routines), Some(supply)) = (npc_routines.as_mut(), npc_supply.as_ref()) {
+                routines.advance_worksite_social(tick, supply);
+            }
         }
         if state.world.tick % SNAPSHOT_EVERY_SERVER_TICKS == 0 {
             state.refresh_replication_frame();

@@ -69,18 +69,8 @@ struct GuardDetour {
     revision: u32,
     start_tick: u32,
     route: Vec<(u16, u16)>,
-    reversing: Option<(u32, u32)>, // reverse started tick, current path progress
-}
-
-impl GuardDetour {
-    fn progress(&self, tick: u32) -> u32 {
-        match self.reversing {
-            Some((start, at)) => at.saturating_sub(tick.saturating_sub(start)),
-            None => tick
-                .saturating_sub(self.start_tick)
-                .min(npc_navigation::WALK_TICKS),
-        }
-    }
+    reversing: Option<(u32, u32)>, // reverse started tick, path progress at reversal
+    route_progress: u32,           // only updated from accepted server ticks
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -109,6 +99,7 @@ pub struct NpcRoutines {
     detours_enabled: bool,
     guard_detour: Option<GuardDetour>,
     guard_patrol_pause_ticks: u32,
+    last_movement_tick: Option<u32>,
 }
 
 impl NpcRoutines {
@@ -149,7 +140,7 @@ impl NpcRoutines {
         }
         if let Some(detour) = &self.guard_detour {
             let (x, y) =
-                npc_navigation::pilot_inspection_position(&detour.route, detour.progress(tick))?;
+                npc_navigation::pilot_inspection_position(&detour.route, detour.route_progress)?;
             return Some(NpcState {
                 id,
                 x,
@@ -160,7 +151,21 @@ impl NpcRoutines {
         Self::position(id, tick.wrapping_sub(self.guard_patrol_pause_ticks))
     }
 
-    fn advance_detour(&mut self, tick: u32, supply: &NpcSupplyWorld) {
+    /// A movement tick is accepted only when it is the *next* 60Hz
+    /// authoritative world tick. Future-position queries do not advance
+    /// the route. A new site revision reverses on the exact world tick
+    /// at which the server adopted it, not on the next 60-tick social call.
+    pub fn advance_pilot_movement(&mut self, tick: u32, supply: &NpcSupplyWorld) {
+        if !self.detours_enabled {
+            return;
+        }
+        if self
+            .last_movement_tick
+            .is_some_and(|last| tick != last.wrapping_add(1))
+        {
+            return;
+        }
+        self.last_movement_tick = Some(tick);
         let Some(detour) = self.guard_detour.as_mut() else {
             return;
         };
@@ -170,22 +175,20 @@ impl NpcRoutines {
             && (!closed
                 || tick.saturating_sub(detour.start_tick) >= npc_navigation::WALK_TICKS + 300)
         {
-            detour.reversing = Some((
-                tick,
-                tick.saturating_sub(detour.start_tick)
-                    .min(npc_navigation::WALK_TICKS),
-            ));
+            detour.reversing = Some((tick, detour.route_progress));
+        } else if detour.reversing.is_none() {
+            detour.route_progress = detour
+                .route_progress
+                .saturating_add(1)
+                .min(npc_navigation::WALK_TICKS);
+        } else {
+            detour.route_progress = detour.route_progress.saturating_sub(1);
         }
-        if let Some((return_start, reverse_progress)) = detour.reversing {
-            if tick.saturating_sub(return_start) >= reverse_progress {
-                // When the reverse route reaches its exact starting point,
-                // the old patrol resumes from that same point, not today's
-                // baseline position. No fighter or economy entities involved.
-                self.guard_patrol_pause_ticks = self
-                    .guard_patrol_pause_ticks
-                    .wrapping_add(tick.wrapping_sub(detour.start_tick));
-                self.guard_detour = None;
-            }
+        if detour.reversing.is_some() && detour.route_progress == 0 {
+            self.guard_patrol_pause_ticks = self
+                .guard_patrol_pause_ticks
+                .wrapping_add(tick.wrapping_sub(detour.start_tick));
+            self.guard_detour = None;
         }
     }
 
@@ -220,6 +223,7 @@ impl NpcRoutines {
             start_tick: tick,
             route,
             reversing: None,
+            route_progress: 0,
         });
     }
 
@@ -320,7 +324,6 @@ impl NpcRoutines {
             return;
         }
         self.last_worksite_social_tick = Some(tick);
-        self.advance_detour(tick, supply);
         let revision = supply.worksite_revision();
         // A server revision supersedes all old watch assignments, even when
         // the operator's next face-to-face meeting has not happened yet.
@@ -1241,6 +1244,7 @@ mod tests {
         for tick in 0..=1380 {
             supply.advance(tick);
             npcs.advance_social(tick);
+            npcs.advance_pilot_movement(tick, &supply);
             npcs.advance_worksite_social(tick, &supply);
         }
         let start = NpcRoutines::position(3, 1380).unwrap();
@@ -1259,6 +1263,7 @@ mod tests {
         for tick in 1381..=1980 {
             supply.advance(tick);
             npcs.advance_social(tick);
+            npcs.advance_pilot_movement(tick, &supply);
             npcs.advance_worksite_social(tick, &supply);
             let guard = npcs.position_at(3, tick).unwrap();
             assert!(npc_navigation::pilot_line_of_sight(
@@ -1272,6 +1277,7 @@ mod tests {
         for tick in 1981..=2100 {
             supply.advance(tick);
             npcs.advance_social(tick);
+            npcs.advance_pilot_movement(tick, &supply);
             npcs.advance_worksite_social(tick, &supply);
         }
         assert_eq!(supply.worksite_revision(), 3);
@@ -1280,6 +1286,7 @@ mod tests {
         for tick in 2101..=2700 {
             supply.advance(tick);
             npcs.advance_social(tick);
+            npcs.advance_pilot_movement(tick, &supply);
             npcs.advance_worksite_social(tick, &supply);
         }
         assert!(npcs.guard_detour.is_none());
@@ -1301,6 +1308,7 @@ mod tests {
         let mut npcs = NpcRoutines::default();
         for tick in 0..=3000 {
             supply.advance(tick);
+            npcs.advance_pilot_movement(tick, &supply);
             npcs.advance_worksite_social(tick, &supply);
             assert_eq!(npcs.position_at(3, tick), NpcRoutines::position(3, tick));
         }
@@ -1317,6 +1325,7 @@ mod tests {
         for tick in 0..=1500 {
             supply.advance(tick);
             npcs.advance_social(tick);
+            npcs.advance_pilot_movement(tick, &supply);
             npcs.advance_worksite_social(tick, &supply);
         }
         assert!(npcs.guard_detour.is_some());
@@ -1331,21 +1340,30 @@ mod tests {
         for tick in 1501..=1560 {
             supply.advance(tick);
             npcs.advance_social(tick);
+            npcs.advance_pilot_movement(tick, &supply);
             npcs.advance_worksite_social(tick, &supply);
         }
         let before_retreat = npcs.position_at(3, 1560).unwrap();
         assert_ne!(before_retreat, departure);
         assert!(npcs.guard_detour.as_ref().unwrap().reversing.is_some());
         assert!(npcs.guard_watch.is_none());
-        for tick in 1561..=1740 {
+        for tick in 1561..=1621 {
             supply.advance(tick);
             npcs.advance_social(tick);
+            npcs.advance_pilot_movement(tick, &supply);
             npcs.advance_worksite_social(tick, &supply);
         }
         assert!(npcs.guard_detour.is_none());
-        assert_eq!(npcs.position_at(3, 1740), Some(departure));
-        assert_eq!(npcs.guard_patrol_pause_ticks, 360);
-        assert_eq!(npcs.position_at(3, 1800), NpcRoutines::position(3, 1440));
+        assert_eq!(npcs.position_at(3, 1621), Some(departure));
+        assert_eq!(npcs.guard_patrol_pause_ticks, 241);
+        for tick in 1622..=1800 {
+            supply.advance(tick);
+            npcs.advance_social(tick);
+            npcs.advance_pilot_movement(tick, &supply);
+            npcs.advance_worksite_social(tick, &supply);
+        }
+        assert_eq!(npcs.position_at(3, 1740), NpcRoutines::position(3, 1499));
+        assert_eq!(npcs.position_at(3, 1800), NpcRoutines::position(3, 1559));
         assert!(supply.stocks().conserved());
     }
 
@@ -1357,6 +1375,7 @@ mod tests {
         npcs.enable_pilot_guard_detours();
         for tick in 0..=1560 {
             supply.advance(tick);
+            npcs.advance_pilot_movement(tick, &supply);
             npcs.advance_worksite_social(tick, &supply);
         }
         let frame = npcs.state_packet_with_supply(1560, &supply);
@@ -1383,6 +1402,73 @@ mod tests {
             .guard_watch_report(3, 1560, &supply)
             .unwrap()
             .contains("pilot-only inspection detour"));
+        assert!(supply.stocks().conserved());
+    }
+
+    #[test]
+    fn detour_reverses_on_exact_authoritative_reopening_tick_not_social_cadence() {
+        let mut supply = NpcSupplyWorld::default();
+        supply.enable_pilot_maintenance();
+        let mut npcs = NpcRoutines::default();
+        npcs.enable_pilot_guard_detours();
+        for tick in 0..=1500 {
+            supply.advance(tick);
+            npcs.advance_pilot_movement(tick, &supply);
+            npcs.advance_worksite_social(tick, &supply);
+        }
+        let old = npcs.position_at(3, 1500).unwrap();
+        assert_eq!(npcs.guard_detour.as_ref().unwrap().route_progress, 120);
+        let mut flags = [true; 5];
+        flags[1] = true;
+        supply
+            .adopt_server_worksites(crate::zone::ZoneId::Moonvale, 1, 3, flags)
+            .unwrap();
+        supply.advance(1501);
+        npcs.advance_pilot_movement(1501, &supply);
+        let detour = npcs.guard_detour.as_ref().unwrap();
+        assert_eq!(detour.reversing, Some((1501, 120)));
+        assert_eq!(detour.route_progress, 120);
+        assert_eq!(npcs.position_at(3, 1501), Some(old));
+        // Querying a future time does not move an authenticated pilot actor.
+        assert_eq!(npcs.position_at(3, 60_000), Some(old));
+        // The guard's previous watch answer is immediately invalid even
+        // before the next one-second social-memory maintenance tick.
+        assert!(npcs.guard_watch_report(3, 1501, &supply).is_none());
+        assert!(supply.stocks().conserved());
+    }
+
+    #[test]
+    fn replayed_skipped_and_future_ticks_cannot_move_detouring_guard() {
+        let mut supply = NpcSupplyWorld::default();
+        supply.enable_pilot_maintenance();
+        let mut npcs = NpcRoutines::default();
+        npcs.enable_pilot_guard_detours();
+        for tick in 0..=1440 {
+            supply.advance(tick);
+            npcs.advance_pilot_movement(tick, &supply);
+            npcs.advance_worksite_social(tick, &supply);
+        }
+        let before = npcs.position_at(3, 1440).unwrap();
+        let progress = npcs.guard_detour.as_ref().unwrap().route_progress;
+        npcs.advance_pilot_movement(1450, &supply); // discontinuous request
+        npcs.advance_pilot_movement(1440, &supply); // replay
+        assert_eq!(npcs.guard_detour.as_ref().unwrap().route_progress, progress);
+        assert_eq!(npcs.position_at(3, 1450), Some(before));
+        npcs.advance_pilot_movement(1441, &supply);
+        assert_eq!(
+            npcs.guard_detour.as_ref().unwrap().route_progress,
+            progress + 1
+        );
+        npcs.advance_pilot_movement(1441, &supply); // duplicate
+        assert_eq!(
+            npcs.guard_detour.as_ref().unwrap().route_progress,
+            progress + 1
+        );
+        npcs.advance_pilot_movement(1442, &supply);
+        assert_eq!(
+            npcs.guard_detour.as_ref().unwrap().route_progress,
+            progress + 2
+        );
         assert!(supply.stocks().conserved());
     }
 }
