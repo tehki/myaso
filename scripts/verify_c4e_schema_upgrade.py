@@ -49,7 +49,7 @@ def main():
         f"VALUES (1, decode('{ZERO}','hex'), 1, 1, 1);"
     )
     _, stderr = psql("-f", MIGRATION, expect_failure=True)
-    assert "violates check constraint" in stderr, (
+    assert "check constraint" in stderr and "c4e_entities_entity_nonzero" in stderr, (
         "migration must fail specifically on legacy zero-ID data, not unrelated errors: "
         + stderr
     )
