@@ -1,0 +1,22 @@
+/* Native same-origin exit; deliberately outside the input canvas. */
+.focus-hint .arena-lobby-link {
+  display: inline-block;
+  margin-inline-start: 12px;
+  padding: 2px 4px;
+  max-width: 100%;
+  color: #ead49a;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.focus-hint .arena-lobby-link:hover { color: #fff1c8; }
+.focus-hint .arena-lobby-link:focus-visible {
+  outline: 2px solid #e8c77b;
+  outline-offset: 2px;
+}
+@media (max-width: 520px) {
+  .focus-hint .arena-lobby-link { display: block; margin: 6px auto 0; width: fit-content; }
+}
+@media (forced-colors: active) {
+  .focus-hint .arena-lobby-link { color: LinkText; }
+  .focus-hint .arena-lobby-link:focus-visible { outline-color: Highlight; }
+}
