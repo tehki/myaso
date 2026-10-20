@@ -1822,18 +1822,24 @@ mod r2_combat_control_tests {
         ] {
             let mut world = World::new(800.0, 600.0);
             world.add_player_at(1, 250.0, 300.0, 0.0);
-            world.set_input(1, InputIntent {
-                attack: true,
-                heavy_attack: true,
-                ..InputIntent::default()
-            });
+            world.set_input(
+                1,
+                InputIntent {
+                    attack: true,
+                    heavy_attack: true,
+                    ..InputIntent::default()
+                },
+            );
             world.set_input(1, release);
             world.set_input(1, InputIntent::default());
             world.step();
             assert_eq!(world.fighter(1).unwrap().action, expected);
             world.step();
-            assert_eq!(world.fighter(1).unwrap().action, expected,
-                "the release must not repeat or turn into a cancelled charge");
+            assert_eq!(
+                world.fighter(1).unwrap().action,
+                expected,
+                "the release must not repeat or turn into a cancelled charge"
+            );
         }
     }
 
@@ -1841,19 +1847,25 @@ mod r2_combat_control_tests {
     fn server_ready_release_then_neutral_activates_once_but_cancel_stays_idle() {
         let mut world = World::new(800.0, 600.0);
         world.add_player_at(1, 250.0, 300.0, 0.0);
-        world.set_input(1, InputIntent {
-            attack: true,
-            heavy_attack: true,
-            ..InputIntent::default()
-        });
+        world.set_input(
+            1,
+            InputIntent {
+                attack: true,
+                heavy_attack: true,
+                ..InputIntent::default()
+            },
+        );
         for _ in 0..50 {
             world.step();
         }
         assert_eq!(world.fighter(1).unwrap().action, Action::HeavyAttackWindup);
-        world.set_input(1, InputIntent {
-            heavy_attack: true,
-            ..InputIntent::default()
-        });
+        world.set_input(
+            1,
+            InputIntent {
+                heavy_attack: true,
+                ..InputIntent::default()
+            },
+        );
         world.set_input(1, InputIntent::default());
         world.step();
         assert_eq!(world.fighter(1).unwrap().action, Action::HeavyAttackActive);
@@ -1861,15 +1873,21 @@ mod r2_combat_control_tests {
 
         let mut cancelled = World::new(800.0, 600.0);
         cancelled.add_player_at(2, 250.0, 300.0, 0.0);
-        cancelled.set_input(2, InputIntent {
-            attack: true,
-            heavy_attack: true,
-            ..InputIntent::default()
-        });
+        cancelled.set_input(
+            2,
+            InputIntent {
+                attack: true,
+                heavy_attack: true,
+                ..InputIntent::default()
+            },
+        );
         cancelled.set_input(2, InputIntent::default());
         cancelled.step();
-        assert_eq!(cancelled.fighter(2).unwrap().action, Action::Idle,
-            "direct hold -> neutral is cancellation, not an attack");
+        assert_eq!(
+            cancelled.fighter(2).unwrap().action,
+            Action::Idle,
+            "direct hold -> neutral is cancellation, not an attack"
+        );
     }
 
     #[test]
