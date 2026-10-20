@@ -198,7 +198,7 @@ test('A2.4 projection comparator reads true viewport zoom and rejects oblique-to
   const source=readFileSync(new URL('../tools/art/measure_greyhaven_a24_projection.py',import.meta.url),'utf8');
   assert.match(source,/export const ARENA_VIEW_ZOOM/);
   assert.match(source,/world_to_camera_view/);
-  assert.match(source,/scene\.camera/);
+  assert.match(source,/world_to_camera_view\(scene,camera,v\)/);
   assert.match(source,/door_server=\(float\(door_world\["x"\]\),float\(door_world\["y"\]\)\)/);
   assert.match(source,/width\/2\+\(wx-door_server\[0\]\)\*zoom/);
   assert.match(source,/height\/2\+\(wy-door_server\[1\]\)\*zoom/);
