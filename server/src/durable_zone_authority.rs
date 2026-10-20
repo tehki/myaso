@@ -8,8 +8,8 @@
 use crate::{
     identity::CharacterId,
     zone_lease::{
-        AuthorityError, AuthorityLease, HandoffTicket, OwnedEntity, WorkerId,
-        ZoneKey, ZoneLeaseRegistry,
+        AuthorityError, AuthorityLease, HandoffTicket, OwnedEntity, WorkerId, ZoneKey,
+        ZoneLeaseRegistry,
     },
 };
 use std::{
@@ -39,7 +39,9 @@ pub enum DurableAuthorityError {
 }
 
 impl From<io::Error> for DurableAuthorityError {
-    fn from(error: io::Error) -> Self { Self::Io(error) }
+    fn from(error: io::Error) -> Self {
+        Self::Io(error)
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -59,7 +61,9 @@ impl Action {
             3 => Ok(Self::Commit),
             4 => Ok(Self::Abort),
             5 => Ok(Self::Retire),
-            _ => Err(DurableAuthorityError::InvalidRecord("unknown authority action")),
+            _ => Err(DurableAuthorityError::InvalidRecord(
+                "unknown authority action",
+            )),
         }
     }
 }
@@ -141,11 +145,14 @@ impl Event {
         if bytes.len() != RECORD_BYTES {
             return Err(DurableAuthorityError::InvalidRecord("bad record length"));
         }
-        if bytes[..4] != MAGIC || bytes[4] != VERSION
+        if bytes[..4] != MAGIC
+            || bytes[4] != VERSION
             || bytes[5..8].iter().any(|&b| b != 0)
             || bytes[18..20].iter().any(|&b| b != 0)
         {
-            return Err(DurableAuthorityError::InvalidRecord("magic, version or reserved bits"));
+            return Err(DurableAuthorityError::InvalidRecord(
+                "magic, version or reserved bits",
+            ));
         }
         let expected = u32::from_le_bytes(bytes[92..96].try_into().expect("size"));
         if fnv32(&bytes[..92]) != expected {
@@ -156,7 +163,8 @@ impl Event {
         let id = u128::from_le_bytes(bytes[20..36].try_into().expect("size"));
         let entity = match bytes[17] {
             1 => OwnedEntity::Character(
-                CharacterId::new(id).ok_or(DurableAuthorityError::InvalidRecord("zero character"))?
+                CharacterId::new(id)
+                    .ok_or(DurableAuthorityError::InvalidRecord("zero character"))?,
             ),
             2 => OwnedEntity::ground_item(id)
                 .ok_or(DurableAuthorityError::InvalidRecord("zero item"))?,
@@ -175,24 +183,38 @@ impl Event {
         let raw_op = u128::from_le_bytes(bytes[76..92].try_into().expect("size"));
         let operation = NonZeroU128::new(raw_op);
         let is_transfer = matches!(action, Action::Prepare | Action::Commit | Action::Abort);
-        if sequence == 0 || epoch == 0 || (
-            if is_transfer {
+        if sequence == 0
+            || epoch == 0
+            || (if is_transfer {
                 target_worker.is_none() || target_zone.is_none() || operation.is_none()
             } else {
                 target_worker.is_some() || target_zone.is_some() || operation.is_some()
-            }
-        ) {
-            return Err(DurableAuthorityError::InvalidRecord("missing/unexpected fields"));
+            })
+        {
+            return Err(DurableAuthorityError::InvalidRecord(
+                "missing/unexpected fields",
+            ));
         }
         if action == Action::Register && epoch != 1 {
-            return Err(DurableAuthorityError::InvalidRecord("registration epoch not one"));
+            return Err(DurableAuthorityError::InvalidRecord(
+                "registration epoch not one",
+            ));
         }
         let event = Self {
-            sequence, action, entity, worker, zone, epoch,
-            target_worker, target_zone, operation,
+            sequence,
+            action,
+            entity,
+            worker,
+            zone,
+            epoch,
+            target_worker,
+            target_zone,
+            operation,
         };
         if event.encode() != bytes {
-            return Err(DurableAuthorityError::InvalidRecord("noncanonical encoding"));
+            return Err(DurableAuthorityError::InvalidRecord(
+                "noncanonical encoding",
+            ));
         }
         Ok(event)
     }
@@ -216,50 +238,75 @@ impl Drop for Stage {
     }
 }
 
-fn apply_event(registry: &mut ZoneLeaseRegistry, event: Event) -> Result<(), DurableAuthorityError> {
+fn apply_event(
+    registry: &mut ZoneLeaseRegistry,
+    event: Event,
+) -> Result<(), DurableAuthorityError> {
     match event.action {
         Action::Register => {
-            let lease = registry.register(event.entity, event.worker, event.zone)
+            let lease = registry
+                .register(event.entity, event.worker, event.zone)
                 .map_err(DurableAuthorityError::InvalidTransition)?;
             if !event.matches_lease(lease) {
-                return Err(DurableAuthorityError::InvalidRecord("registration mismatch"));
+                return Err(DurableAuthorityError::InvalidRecord(
+                    "registration mismatch",
+                ));
             }
         }
         Action::Prepare => {
-            let source = registry.current(event.entity)
-                .ok_or(DurableAuthorityError::InvalidRecord("prepare missing source"))?;
+            let source =
+                registry
+                    .current(event.entity)
+                    .ok_or(DurableAuthorityError::InvalidRecord(
+                        "prepare missing source",
+                    ))?;
             if !event.matches_lease(source) {
                 return Err(DurableAuthorityError::InvalidRecord("prepare stale lease"));
             }
-            let ticket = registry.prepare(
-                source,
-                event.target_worker.expect("decoded transfer"),
-                event.target_zone.expect("decoded transfer"),
-                event.operation.expect("decoded transfer"),
-            ).map_err(DurableAuthorityError::InvalidTransition)?;
+            let ticket = registry
+                .prepare(
+                    source,
+                    event.target_worker.expect("decoded transfer"),
+                    event.target_zone.expect("decoded transfer"),
+                    event.operation.expect("decoded transfer"),
+                )
+                .map_err(DurableAuthorityError::InvalidTransition)?;
             if !event.matches_ticket(ticket) {
                 return Err(DurableAuthorityError::InvalidRecord("prepare mismatch"));
             }
         }
         Action::Commit | Action::Abort => {
-            let ticket = registry.pending(event.entity)
-                .ok_or(DurableAuthorityError::InvalidRecord("unprepared commit/abort"))?;
+            let ticket =
+                registry
+                    .pending(event.entity)
+                    .ok_or(DurableAuthorityError::InvalidRecord(
+                        "unprepared commit/abort",
+                    ))?;
             if !event.matches_ticket(ticket) {
-                return Err(DurableAuthorityError::InvalidRecord("commit/abort mismatch"));
+                return Err(DurableAuthorityError::InvalidRecord(
+                    "commit/abort mismatch",
+                ));
             }
             if event.action == Action::Commit {
-                registry.commit(ticket).map_err(DurableAuthorityError::InvalidTransition)?;
+                registry
+                    .commit(ticket)
+                    .map_err(DurableAuthorityError::InvalidTransition)?;
             } else {
-                registry.abort(ticket).map_err(DurableAuthorityError::InvalidTransition)?;
+                registry
+                    .abort(ticket)
+                    .map_err(DurableAuthorityError::InvalidTransition)?;
             }
         }
         Action::Retire => {
-            let lease = registry.current(event.entity)
+            let lease = registry
+                .current(event.entity)
                 .ok_or(DurableAuthorityError::InvalidRecord("retire missing lease"))?;
             if !event.matches_lease(lease) {
                 return Err(DurableAuthorityError::InvalidRecord("retire stale lease"));
             }
-            registry.retire(lease).map_err(DurableAuthorityError::InvalidTransition)?;
+            registry
+                .retire(lease)
+                .map_err(DurableAuthorityError::InvalidTransition)?;
         }
     }
     Ok(())
@@ -310,22 +357,25 @@ impl DurableZoneAuthority {
         for entry in fs::read_dir(&root)? {
             let entry = entry?;
             let name = entry.file_name();
-            let name = name.to_str()
+            let name = name
+                .to_str()
                 .ok_or(DurableAuthorityError::InvalidRecord("non-UTF8 name"))?;
             if name == ".zone-authority.lock" || name.starts_with(".pending-zone-") {
                 continue;
             }
-            if name.len() != 25 || !name.ends_with(".myza")
+            if name.len() != 25
+                || !name.ends_with(".myza")
                 || !name[..20].bytes().all(|b| b.is_ascii_digit())
             {
                 return Err(DurableAuthorityError::InvalidRecord("unexpected file"));
             }
-            let sequence = name[..20].parse::<u64>()
+            let sequence = name[..20]
+                .parse::<u64>()
                 .map_err(|_| DurableAuthorityError::InvalidRecord("invalid sequence"))?;
-            if sequence == 0 || canonical_name(sequence) != name
-                || !entry.file_type()?.is_file()
-            {
-                return Err(DurableAuthorityError::InvalidRecord("noncanonical journal file"));
+            if sequence == 0 || canonical_name(sequence) != name || !entry.file_type()?.is_file() {
+                return Err(DurableAuthorityError::InvalidRecord(
+                    "noncanonical journal file",
+                ));
             }
             commits.push((sequence, entry.path()));
         }
@@ -353,37 +403,63 @@ impl DurableZoneAuthority {
             apply_event(&mut registry, event)?;
             sequence = number;
         }
-        Ok(Self { root, _writer_lock: lock, registry, operation_ids, sequence, poisoned: false })
+        Ok(Self {
+            root,
+            _writer_lock: lock,
+            registry,
+            operation_ids,
+            sequence,
+            poisoned: false,
+        })
     }
 
     pub fn current(&self, entity: OwnedEntity) -> Option<AuthorityLease> {
-        if self.poisoned { None } else { self.registry.current(entity) }
+        if self.poisoned {
+            None
+        } else {
+            self.registry.current(entity)
+        }
     }
     pub fn can_mutate(&self, lease: AuthorityLease) -> bool {
         !self.poisoned && self.registry.can_mutate(lease)
     }
     pub fn pending(&self, entity: OwnedEntity) -> Option<HandoffTicket> {
-        if self.poisoned { None } else { self.registry.pending(entity) }
+        if self.poisoned {
+            None
+        } else {
+            self.registry.pending(entity)
+        }
     }
-    pub fn sequence(&self) -> u64 { self.sequence }
+    pub fn sequence(&self) -> u64 {
+        self.sequence
+    }
 
     /// Stage the entire next in-memory state, durably publish one event,
     /// then atomically swap that state. No world update before fsync.
-    fn persist<T>(&mut self, next: ZoneLeaseRegistry, event: Event, result: T)
-        -> Result<T, DurableAuthorityError>
-    {
-        if self.poisoned { return Err(DurableAuthorityError::Poisoned); }
-        let number = self.sequence.checked_add(1)
+    fn persist<T>(
+        &mut self,
+        next: ZoneLeaseRegistry,
+        event: Event,
+        result: T,
+    ) -> Result<T, DurableAuthorityError> {
+        if self.poisoned {
+            return Err(DurableAuthorityError::Poisoned);
+        }
+        let number = self
+            .sequence
+            .checked_add(1)
             .ok_or(DurableAuthorityError::InvalidSequence)?;
         if event.sequence != number {
             return Err(DurableAuthorityError::InvalidSequence);
         }
-        let clock = SystemTime::now().duration_since(UNIX_EPOCH)
+        let clock = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
             .map_err(|_| DurableAuthorityError::InvalidRecord("clock before Unix epoch"))?
             .as_nanos();
         let nonce = NEXT_STAGE.fetch_add(1, Ordering::Relaxed);
         let stage = Stage(self.root.join(format!(
-            ".pending-zone-{}-{clock}-{nonce}", std::process::id()
+            ".pending-zone-{}-{clock}-{nonce}",
+            std::process::id()
         )));
         let bytes = event.encode();
         let committed: io::Result<()> = (|| {
@@ -412,32 +488,46 @@ impl DurableZoneAuthority {
         Ok(result)
     }
 
-    pub fn register(&mut self, entity: OwnedEntity, worker: WorkerId, zone: ZoneKey)
-        -> Result<AuthorityLease, DurableAuthorityError>
-    {
-        if self.poisoned { return Err(DurableAuthorityError::Poisoned); }
+    pub fn register(
+        &mut self,
+        entity: OwnedEntity,
+        worker: WorkerId,
+        zone: ZoneKey,
+    ) -> Result<AuthorityLease, DurableAuthorityError> {
+        if self.poisoned {
+            return Err(DurableAuthorityError::Poisoned);
+        }
         let mut next = self.registry.clone();
-        let lease = next.register(entity, worker, zone)
+        let lease = next
+            .register(entity, worker, zone)
             .map_err(DurableAuthorityError::InvalidTransition)?;
         let event = Event::from_lease(self.sequence.saturating_add(1), Action::Register, lease);
         self.persist(next, event, lease)
     }
     pub fn prepare(
-        &mut self, source: AuthorityLease, target_worker: WorkerId,
-        target_zone: ZoneKey, operation: NonZeroU128,
+        &mut self,
+        source: AuthorityLease,
+        target_worker: WorkerId,
+        target_zone: ZoneKey,
+        operation: NonZeroU128,
     ) -> Result<HandoffTicket, DurableAuthorityError> {
-        if self.poisoned { return Err(DurableAuthorityError::Poisoned); }
+        if self.poisoned {
+            return Err(DurableAuthorityError::Poisoned);
+        }
         // Repeated exact prepare is an idempotent read, not a new event.
         if let Some(previous) = self.registry.pending(source.entity()) {
             let (worker, zone) = previous.destination();
-            if previous.source() == source && worker == target_worker
-                && zone == target_zone && previous.operation() == operation
+            if previous.source() == source
+                && worker == target_worker
+                && zone == target_zone
+                && previous.operation() == operation
             {
                 return Ok(previous);
             }
         }
         let mut next = self.registry.clone();
-        let ticket = next.prepare(source, target_worker, target_zone, operation)
+        let ticket = next
+            .prepare(source, target_worker, target_zone, operation)
             .map_err(DurableAuthorityError::InvalidTransition)?;
         if self.operation_ids.contains(&operation) {
             return Err(DurableAuthorityError::OperationReused);
@@ -450,35 +540,46 @@ impl DurableZoneAuthority {
         self.operation_ids.insert(operation);
         Ok(committed)
     }
-    pub fn commit(&mut self, ticket: HandoffTicket)
-        -> Result<AuthorityLease, DurableAuthorityError>
-    {
-        if self.poisoned { return Err(DurableAuthorityError::Poisoned); }
+    pub fn commit(
+        &mut self,
+        ticket: HandoffTicket,
+    ) -> Result<AuthorityLease, DurableAuthorityError> {
+        if self.poisoned {
+            return Err(DurableAuthorityError::Poisoned);
+        }
         if self.registry.pending(ticket.source().entity()).is_none() {
             // A confirmed repeated ACK is safe only while that exact new
             // lease remains current. Never create a second commit record.
             let mut cloned = self.registry.clone();
-            let receipt = cloned.commit(ticket)
+            let receipt = cloned
+                .commit(ticket)
                 .map_err(DurableAuthorityError::InvalidTransition)?;
             return Ok(receipt);
         }
         let mut next = self.registry.clone();
-        let lease = next.commit(ticket)
+        let lease = next
+            .commit(ticket)
             .map_err(DurableAuthorityError::InvalidTransition)?;
         let event = Event::from_ticket(self.sequence.saturating_add(1), Action::Commit, ticket);
         self.persist(next, event, lease)
     }
     pub fn abort(&mut self, ticket: HandoffTicket) -> Result<(), DurableAuthorityError> {
-        if self.poisoned { return Err(DurableAuthorityError::Poisoned); }
+        if self.poisoned {
+            return Err(DurableAuthorityError::Poisoned);
+        }
         let mut next = self.registry.clone();
-        next.abort(ticket).map_err(DurableAuthorityError::InvalidTransition)?;
+        next.abort(ticket)
+            .map_err(DurableAuthorityError::InvalidTransition)?;
         let event = Event::from_ticket(self.sequence.saturating_add(1), Action::Abort, ticket);
         self.persist(next, event, ())
     }
     pub fn retire(&mut self, lease: AuthorityLease) -> Result<(), DurableAuthorityError> {
-        if self.poisoned { return Err(DurableAuthorityError::Poisoned); }
+        if self.poisoned {
+            return Err(DurableAuthorityError::Poisoned);
+        }
         let mut next = self.registry.clone();
-        next.retire(lease).map_err(DurableAuthorityError::InvalidTransition)?;
+        next.retire(lease)
+            .map_err(DurableAuthorityError::InvalidTransition)?;
         let event = Event::from_lease(self.sequence.saturating_add(1), Action::Retire, lease);
         self.persist(next, event, ())
     }
@@ -493,10 +594,13 @@ mod tests {
     impl Root {
         fn new() -> Self {
             let counter = NEXT_STAGE.fetch_add(1, Ordering::Relaxed);
-            let clock = SystemTime::now().duration_since(UNIX_EPOCH)
-                .expect("clock").as_nanos();
+            let clock = SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .expect("clock")
+                .as_nanos();
             let path = std::env::temp_dir().join(format!(
-                "myaso-c4b-{}-{clock}-{counter}", std::process::id()
+                "myaso-c4b-{}-{clock}-{counter}",
+                std::process::id()
             ));
             fs::create_dir(&path).expect("root");
             Self(path)
@@ -519,16 +623,26 @@ mod tests {
     fn item(n: u128) -> OwnedEntity {
         OwnedEntity::ground_item(n).expect("item")
     }
-    fn worker(n: u64) -> WorkerId { WorkerId::new(n).expect("worker") }
-    fn zone(n: u64) -> ZoneKey { ZoneKey::new(n).expect("zone") }
-    fn op(n: u128) -> NonZeroU128 { NonZeroU128::new(n).expect("op") }
+    fn worker(n: u64) -> WorkerId {
+        WorkerId::new(n).expect("worker")
+    }
+    fn zone(n: u64) -> ZoneKey {
+        ZoneKey::new(n).expect("zone")
+    }
+    fn op(n: u128) -> NonZeroU128 {
+        NonZeroU128::new(n).expect("op")
+    }
 
     #[test]
     fn restart_recovers_committed_owner_epoch_and_invalidates_source() {
         let root = Root::new();
         let mut first = root.open();
-        let source = first.register(entity(1), worker(1), zone(1)).expect("register");
-        let ticket = first.prepare(source, worker(2), zone(3), op(77)).expect("prepare");
+        let source = first
+            .register(entity(1), worker(1), zone(1))
+            .expect("register");
+        let ticket = first
+            .prepare(source, worker(2), zone(3), op(77))
+            .expect("prepare");
         assert!(!first.can_mutate(source));
         let successor = first.commit(ticket).expect("commit");
         assert_eq!(successor.epoch(), 2);
@@ -544,8 +658,12 @@ mod tests {
     fn interrupted_prepare_restart_stays_frozen_until_abort() {
         let root = Root::new();
         let mut initial = root.open();
-        let source = initial.register(entity(1), worker(1), zone(1)).expect("register");
-        let ticket = initial.prepare(source, worker(2), zone(2), op(1)).expect("prepare");
+        let source = initial
+            .register(entity(1), worker(1), zone(1))
+            .expect("register");
+        let ticket = initial
+            .prepare(source, worker(2), zone(2), op(1))
+            .expect("prepare");
         drop(initial);
         let mut restored = root.open();
         assert!(!restored.can_mutate(source));
@@ -559,8 +677,12 @@ mod tests {
     fn committed_transfer_retry_after_restart_never_spends_new_epoch() {
         let root = Root::new();
         let mut journal = root.open();
-        let source = journal.register(item(10), worker(1), zone(1)).expect("register");
-        let t = journal.prepare(source, worker(2), zone(2), op(5)).expect("prepare");
+        let source = journal
+            .register(item(10), worker(1), zone(1))
+            .expect("register");
+        let t = journal
+            .prepare(source, worker(2), zone(2), op(5))
+            .expect("prepare");
         let new = journal.commit(t).expect("commit");
         drop(journal);
         let mut restored = root.open();
@@ -573,8 +695,12 @@ mod tests {
     fn commit_published_before_ack_replays_as_exactly_one_new_owner() {
         let root = Root::new();
         let mut original = root.open();
-        let source = original.register(item(42), worker(1), zone(1)).expect("register");
-        let prepared = original.prepare(source, worker(2), zone(2), op(420)).expect("prepare");
+        let source = original
+            .register(item(42), worker(1), zone(1))
+            .expect("register");
+        let prepared = original
+            .prepare(source, worker(2), zone(2), op(420))
+            .expect("prepare");
         drop(original);
 
         // Simulate a process dying after publishing the canonical commit but
@@ -599,7 +725,9 @@ mod tests {
         let mut store = root.open();
         let one = store.register(item(111), worker(1), zone(1)).expect("one");
         let two = store.register(item(222), worker(1), zone(1)).expect("two");
-        let ticket = store.prepare(one, worker(2), zone(2), op(900)).expect("prepare");
+        let ticket = store
+            .prepare(one, worker(2), zone(2), op(900))
+            .expect("prepare");
         store.abort(ticket).expect("abort");
         assert!(matches!(
             store.prepare(two, worker(3), zone(3), op(900)),
@@ -632,8 +760,12 @@ mod tests {
     fn canonical_corruption_and_missing_commit_fail_closed() {
         let root = Root::new();
         let mut store = root.open();
-        store.register(item(1), worker(1), zone(1)).expect("register");
-        store.register(item(2), worker(1), zone(2)).expect("register");
+        store
+            .register(item(1), worker(1), zone(1))
+            .expect("register");
+        store
+            .register(item(2), worker(1), zone(2))
+            .expect("register");
         drop(store);
         fs::remove_file(root.record(1)).expect("create sequence gap");
         assert!(matches!(
@@ -651,12 +783,17 @@ mod tests {
     fn orphan_stage_ignored_but_unprepared_commit_fails_closed() {
         let root = Root::new();
         let mut original = root.open();
-        let lease = original.register(item(1), worker(1), zone(1)).expect("register");
+        let lease = original
+            .register(item(1), worker(1), zone(1))
+            .expect("register");
         drop(original);
         fs::write(root.0.join(".pending-zone-power-loss"), b"partial").expect("orphan");
         assert!(root.open().can_mutate(lease));
         let forged = Event::from_lease(2, Action::Register, lease);
-        let mut illegal = Event { action: Action::Commit, ..forged };
+        let mut illegal = Event {
+            action: Action::Commit,
+            ..forged
+        };
         illegal.target_worker = Some(worker(2));
         illegal.target_zone = Some(zone(2));
         illegal.operation = Some(op(2));
@@ -671,7 +808,9 @@ mod tests {
     fn dead_entity_ids_remain_retired_after_restart() {
         let root = Root::new();
         let mut store = root.open();
-        let lease = store.register(item(10), worker(1), zone(1)).expect("register");
+        let lease = store
+            .register(item(10), worker(1), zone(1))
+            .expect("register");
         store.retire(lease).expect("retire");
         drop(store);
         let mut recovered = root.open();
@@ -679,7 +818,9 @@ mod tests {
         assert_eq!(recovered.current(item(10)), None);
         assert!(matches!(
             recovered.register(item(10), worker(1), zone(1)),
-            Err(DurableAuthorityError::InvalidTransition(AuthorityError::EntityAlreadyRegistered))
+            Err(DurableAuthorityError::InvalidTransition(
+                AuthorityError::EntityAlreadyRegistered
+            ))
         ));
     }
 
@@ -687,11 +828,17 @@ mod tests {
     fn transfer_conflicts_do_not_create_phantom_commits() {
         let root = Root::new();
         let mut journal = root.open();
-        let source = journal.register(entity(7), worker(1), zone(1)).expect("register");
-        let ticket = journal.prepare(source, worker(2), zone(2), op(1)).expect("prepare");
+        let source = journal
+            .register(entity(7), worker(1), zone(1))
+            .expect("register");
+        let ticket = journal
+            .prepare(source, worker(2), zone(2), op(1))
+            .expect("prepare");
         assert!(matches!(
             journal.prepare(source, worker(3), zone(3), op(1)),
-            Err(DurableAuthorityError::InvalidTransition(AuthorityError::TransferConflict))
+            Err(DurableAuthorityError::InvalidTransition(
+                AuthorityError::TransferConflict
+            ))
         ));
         assert_eq!(journal.sequence(), 2);
         journal.commit(ticket).expect("commit");
@@ -704,8 +851,13 @@ mod tests {
         use std::os::unix::fs::PermissionsExt;
         let root = Root::new();
         let mut journal = root.open();
-        journal.register(item(22), worker(1), zone(1)).expect("register");
-        let mode = fs::metadata(root.record(1)).expect("metadata").permissions().mode();
+        journal
+            .register(item(22), worker(1), zone(1))
+            .expect("register");
+        let mode = fs::metadata(root.record(1))
+            .expect("metadata")
+            .permissions()
+            .mode();
         assert_eq!(mode & 0o777, 0o600);
     }
 
