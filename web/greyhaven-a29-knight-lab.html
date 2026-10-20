@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="icon" href="data:,">
+<title>myaso.io — A2.9 Knight + Red Lion foot alignment QA</title>
+<style>
+:root{color-scheme:dark}*{box-sizing:border-box}
+body{margin:0;background:#151b18;color:#e9e3d4;font:15px/1.5 system-ui,sans-serif}
+header{padding:16px 24px;background:#25312b;border-bottom:1px solid #546257}
+h1{font:700 26px Georgia,serif;margin:0}
+main{max-width:1250px;padding:20px;margin:auto}
+.controls{display:flex;flex-wrap:wrap;gap:13px 23px;background:#263129;border:1px solid #617360;border-radius:10px;padding:12px}
+label{display:flex;align-items:center;gap:7px}
+select,input{background:#354239;color:#f8e8cb;border:1px solid #819177;border-radius:5px;padding:6px}
+input[type=range]{width:128px;accent-color:#e6b87f}
+output{font-variant-numeric:tabular-nums;color:#f0d8a1}
+.grid{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(280px,.8fr);gap:17px;margin-top:16px}
+figure{margin:0;background:#28322a;border:1px solid #586a5a;border-radius:9px;padding:12px}
+canvas{display:block;width:100%;margin:auto;background:#5a6b5c}
+#scene{max-width:640px;aspect-ratio:1}
+#detail{max-width:400px;aspect-ratio:1}
+figcaption{font-size:13px;color:#d4d6c6;padding:8px 0}
+.stats{background:#29372f;border-radius:7px;padding:12px;margin:15px 0;overflow-wrap:anywhere}
+.note{color:#c1c9b9;font-size:13px}.warning{color:#e4bd81}
+@media(max-width:800px){.grid{grid-template-columns:1fr}}
+</style>
+</head><body>
+<header>
+<h1>⚔️ Blood &amp; Iron A2.9 — Knight / Red Lion art alignment</h1>
+<div class="note">Actual unmerged PR #326 knight atlas + A2.6 Red Lion 3/4 layers · LOCAL, visual QA only</div>
+</header>
+<main>
+<div class="controls">
+<label>Character <select id="clip">
+<option value="silver_idle">Silver Knight · idle</option>
+<option value="silver_roll">Silver Knight · A3 forward roll</option>
+<option value="t1_roll">T1 Sentinel · A3 forward roll</option>
+</select></label>
+<label>Direction <select id="direction">
+<option value="0">South</option><option value="1">Southwest</option>
+<option value="2">West</option><option value="3">Northwest</option>
+<option value="4">North</option><option value="5">Northeast</option>
+<option value="6">East</option><option value="7">Southeast</option>
+</select></label>
+<label>Animation frame <input id="frame" type="range" min="0" max="3" step="1" value="0"><output id="frame-value">1 / 4</output></label>
+<label>Roof opacity <input id="roof" type="range" min="0" max="100" step="10" value="40"><output id="roof-value">40%</output></label>
+<label><input id="roof-front" type="checkbox" checked>Roof above knight</label>
+<label><input id="origin" type="checkbox" checked>Show combat origin</label>
+</div>
+<div class="grid">
+<figure><canvas id="scene" width="640" height="640" aria-label="Red Lion 3/4 roof and wall sprites with genuine A3 knight atlas frames"></canvas>
+<figcaption>Red Lion roof/base WebPs remain artistically centered at the proposed doorway. Knight rendering uses PR #326's unaltered 80px standing / 112px roll presentation, and the roof is faded manually.</figcaption></figure>
+<figure><canvas id="detail" width="400" height="400" aria-label="Magnified knight atlas frame with opaque silhouette bounds and origin proxy"></canvas>
+<figcaption>The yellow line is the bottommost sufficiently opaque rendered pixel, <em>not</em> a verified heel, ankle bone, contact sensor or physics collider. The pink line is the screen-space fighter origin.</figcaption></figure>
+</div>
+<p id="result" class="stats" role="status" aria-live="polite">Loading companion knight art and Red Lion wall/roof assets…</p>
+<p class="note warning"><strong>QA limitations:</strong> The PR #326 knight atlases are supplied by a separate localhost-only acceptance harness. They are not copied into PR #350. The game draws around a fighter world-space center, and the 3/4 building ground projection still differs from the flat game camera. This review does not establish correct A3 foot pivots, roll contact, online hitboxes, roof occlusion, FPS or interior portal authority. No multiplayer gameplay is running.</p>
+<p class="note">Run the optional test harness with a separate PR #326 checkout. Merely serving PR #350 with <code>python -m http.server</code> will correctly report missing companion knight atlases; it will not fetch assets across GitHub or activate them.</p>
+</main>
+<script type="module" src="./greyhaven-a29-knight-lab.mjs"></script>
+</body>
+</html>
