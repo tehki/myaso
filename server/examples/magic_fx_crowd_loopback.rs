@@ -205,5 +205,10 @@ async fn main() -> Result<()> {
         connections.len(),
         total_fx_bytes / MAGIC_FX_PACKET_BYTES
     );
+    // Keep QUIC sessions available through the browser measurement/report
+    // window. Closing the whole endpoint immediately after tick 115 caused
+    // spurious "Connection lost" errors despite successful real receipts.
+    // This is a test-only bounded drain; no extra FX or gameplay markers.
+    tokio::time::sleep(Duration::from_millis(1_500)).await;
     Ok(())
 }
