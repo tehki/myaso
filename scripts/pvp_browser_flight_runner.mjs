@@ -10553,19 +10553,22 @@ async function runOnlineUiJumpFfaThreatFlight(entries, mode) {
   const rightPointerOffset = rightBefore.pointers.length;
   const centerThreatOffset = centerBefore.threatTransitions.length;
 
-  // Start the genuine jump chord first in both modes, then introduce the
-  // right-side light 8–20 ms later. This widens the shared windup
-  // interval without depending on cross-browser Promise scheduling. Spatial
-  // distance, not start order, remains the only thing that decides whether the
-  // jump is primary or secondary in each M142 mode.
+  // R2 release-to-strike: the right light does NOT wind up on pointerDown.
+  // Three 10ms taps after the jump chord produced a delayed light, so the
+  // center saw JUMP STRIKE + second WINDUP rather than two real STRIKES.
+  // Send exactly ONE genuine W3C short LMB click first, then commit the real
+  // Space+LMB jump chord. This aligns the unchanged 135ms light and 105ms
+  // jumping windups on the authoritative server without synthetic input or
+  // weakening the two-threat identity/bearing/phase/damage evidence below.
+  // Spatial distance, not which attacker clicked first, determines order.
   const samplesPromise = sampleUiEvidenceWhileActive(entries, 280, 6);
   let jumpHeld = false;
   try {
+    await performArenaAttackBurst(right, 1, 0, 0);
+    await sleep(mode === "primary" ? 5 : 10);
     await pressArenaJumpAttackChord(left, leftArena, 200);
     jumpHeld = true;
-    await sleep(mode === "primary" ? 8 : 20);
-    await performArenaAttackBurst(right, 3, 0, 8);
-    await sleep(16);
+    await sleep(80);
   } finally {
     if (jumpHeld) await releaseArenaJumpAttackChord(left);
   }
