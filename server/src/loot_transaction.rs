@@ -10,7 +10,7 @@
 
 use std::path::Path;
 
-use crate::character_identity::SessionIdentityRegistry;
+use crate::character_identity::{SessionIdentityRegistry, SessionLease};
 use crate::loot::{LootAuthority, LootError, LootStateSnapshot, ParkedInventory};
 use crate::loot_persistence::{save_quiescent, CheckpointError};
 
@@ -19,6 +19,7 @@ pub enum TransactionError {
     Loot(LootError),
     Checkpoint(CheckpointError),
     UnverifiedOwnership,
+    InvalidOperation,
 }
 
 impl From<LootError> for TransactionError {
@@ -86,6 +87,42 @@ where
     Ok(result)
 }
 
+/// A server-owned connection lease plus per-character command sequence.
+/// Never trust client-provided actor IDs or session leases.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct VerifiedLootOperation {
+    pub lease: SessionLease,
+    pub sequence: u64,
+}
+
+/// Stage and checkpoint both the committed sequence and the loot mutation.
+/// A lower or equal sequence is rejected, including after checkpoint recovery.
+/// The caller must serialize actions and binding changes under one world lock.
+pub fn transact_operation<T, F>(
+    path: &Path,
+    loot: &mut LootAuthority,
+    identity: &SessionIdentityRegistry,
+    operation: VerifiedLootOperation,
+    action: F,
+) -> Result<T, TransactionError>
+where
+    F: FnOnce(&mut LootAuthority) -> Result<T, LootError>,
+{
+    if operation.sequence == 0 {
+        return Err(TransactionError::InvalidOperation);
+    }
+    let character = identity
+        .resolve_session(operation.lease)
+        .ok_or(TransactionError::UnverifiedOwnership)?;
+    let mut staged = LootAuthority::restore_state(loot.export_state()?)?;
+    staged.record_operation(character, operation.sequence)?;
+    let result = action(&mut staged)?;
+    let checkpoint = quiescent_verified(staged.export_state()?, identity)?;
+    save_quiescent(path, &checkpoint)?;
+    *loot = staged;
+    Ok(result)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -113,6 +150,105 @@ mod tests {
     fn checkpoint_path() -> PathBuf {
         let index = TEST_SEQ.fetch_add(1, Ordering::Relaxed);
         std::env::temp_dir().join(format!("myaso-transact-{}-{index}.bin", std::process::id()))
+    }
+
+    #[test]
+    fn replay_sequence_is_rejected_even_after_disk_recovery() {
+        let mut loot = LootAuthority::new();
+        let mut identity = SessionIdentityRegistry::new();
+        let character = CharacterId::new(888).unwrap();
+        identity.bind_verified(lease(1), character).unwrap();
+        loot.register(1).unwrap();
+        let path = checkpoint_path();
+        let operation = VerifiedLootOperation {
+            lease: lease(1),
+            sequence: 21,
+        };
+        let item_id = transact_operation(&path, &mut loot, &identity, operation, |staged| {
+            staged.grant(1, ItemKind::Gold, 5)
+        })
+        .unwrap();
+        assert_eq!(loot.committed_operation_sequence(character), Some(21));
+        let replay = transact_operation(&path, &mut loot, &identity, operation, |staged| {
+            staged.grant(1, ItemKind::Gold, 5)
+        });
+        assert!(matches!(
+            replay,
+            Err(TransactionError::Loot(LootError::ReplayOperation))
+        ));
+        let mut recovered = load_quiescent(&path).unwrap();
+        assert_eq!(recovered.committed_operation_sequence(character), Some(21));
+        assert_eq!(identity.release_session(lease(1)), Some(character));
+        let reconnect = SessionLease::new(2, 1).unwrap();
+        identity.bind_verified(reconnect, character).unwrap();
+        recovered.resume_inventory(&identity, reconnect).unwrap();
+        let replay_after_recovery = transact_operation(
+            &path,
+            &mut recovered,
+            &identity,
+            VerifiedLootOperation {
+                lease: reconnect,
+                sequence: 21,
+            },
+            |staged| staged.grant(2, ItemKind::Gold, 5),
+        );
+        assert!(matches!(
+            replay_after_recovery,
+            Err(TransactionError::Loot(LootError::ReplayOperation))
+        ));
+        assert_eq!(recovered.inventory(2).unwrap().backpack()[0].id, item_id);
+        assert_eq!(recovered.inventory(2).unwrap().backpack().len(), 1);
+        let _ = fs::remove_file(&path);
+    }
+
+    #[test]
+    fn failed_mutations_do_not_advance_committed_sequence() {
+        let mut loot = LootAuthority::new();
+        let mut identity = SessionIdentityRegistry::new();
+        let character = CharacterId::new(889).unwrap();
+        identity.bind_verified(lease(1), character).unwrap();
+        loot.register(1).unwrap();
+        let path = checkpoint_path();
+        let operation = VerifiedLootOperation {
+            lease: lease(1),
+            sequence: 8,
+        };
+        let rejected: Result<u64, TransactionError> = transact_operation(
+            &path,
+            &mut loot,
+            &identity,
+            operation,
+            |_staged| Err(LootError::InvalidStack),
+        );
+        assert!(matches!(
+            rejected,
+            Err(TransactionError::Loot(LootError::InvalidStack))
+        ));
+        assert_eq!(loot.committed_operation_sequence(character), None);
+        let invalid_path = path.with_extension("missing-parent").join("file.bin");
+        let rejected_write = transact_operation(
+            &invalid_path,
+            &mut loot,
+            &identity,
+            operation,
+            |staged| staged.grant(1, ItemKind::Gold, 2),
+        );
+        assert!(matches!(
+            rejected_write,
+            Err(TransactionError::Checkpoint(CheckpointError::Io(_)))
+        ));
+        assert_eq!(loot.committed_operation_sequence(character), None);
+        let item_id = transact_operation(
+            &path,
+            &mut loot,
+            &identity,
+            operation,
+            |staged| staged.grant(1, ItemKind::Gold, 2),
+        )
+        .unwrap();
+        assert_eq!(item_id, 1);
+        assert_eq!(loot.committed_operation_sequence(character), Some(8));
+        let _ = fs::remove_file(&path);
     }
 
     #[test]

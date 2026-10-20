@@ -16,10 +16,11 @@ use crate::character_identity::CharacterId;
 use crate::loot::{
     Corpse, EquipmentSlot, GroundDrop, Inventory, ItemKind, ItemStack, LootAuthority,
     LootStateSnapshot, ParkedInventory, Point, LOOT_STATE_SCHEMA_VERSION,
+    MAX_OPERATION_WATERMARKS,
 };
 use crate::zone::ZoneId;
 
-const MAGIC: &[u8; 8] = b"MYASOL02";
+const MAGIC: &[u8; 8] = b"MYASOL03";
 const MAX_FILE_BYTES: usize = 32 * 1024 * 1024;
 const MAX_CHARACTERS: usize = 4096;
 const MAX_WORLD_OBJECTS: usize = 100_000;
@@ -223,6 +224,11 @@ fn encode(snapshot: &LootStateSnapshot) -> Result<Vec<u8>, CheckpointError> {
     writer.0.extend_from_slice(MAGIC);
     writer.u16(snapshot.schema_version);
     writer.u64(snapshot.next_id);
+    writer.u32(snapshot.operation_highwater.len() as u32);
+    for (character, sequence) in &snapshot.operation_highwater {
+        writer.u64(character.get());
+        writer.u64(*sequence);
+    }
     writer.u32(
         snapshot
             .parked
@@ -322,6 +328,15 @@ fn decode(bytes: &[u8]) -> Result<LootStateSnapshot, CheckpointError> {
         return Err(CheckpointError::Corrupt);
     }
     let next_id = reader.u64()?;
+    let mut operation_highwater = BTreeMap::new();
+    let operation_count = reader.count(MAX_OPERATION_WATERMARKS)?;
+    for _ in 0..operation_count {
+        let character = CharacterId::new(reader.u64()?).ok_or(CheckpointError::Corrupt)?;
+        let sequence = reader.u64()?;
+        if sequence == 0 || operation_highwater.insert(character, sequence).is_some() {
+            return Err(CheckpointError::Corrupt);
+        }
+    }
     let mut parked = BTreeMap::new();
     let character_count = reader.count(MAX_CHARACTERS)?;
     for _ in 0..character_count {
@@ -430,6 +445,7 @@ fn decode(bytes: &[u8]) -> Result<LootStateSnapshot, CheckpointError> {
         players: BTreeMap::new(),
         dead: BTreeSet::new(),
         parked,
+        operation_highwater,
         ground,
         corpses,
     };

@@ -16,7 +16,8 @@ pub const MAX_SCATTERED_OBJECTS: usize = 3;
 pub const LOOT_VISIBILITY_REACH: f32 = 550.0;
 pub const MAX_VISIBLE_LOOT_ENTITIES: usize = 128;
 /// In-memory snapshot schema, not a disk or network encoding.
-pub const LOOT_STATE_SCHEMA_VERSION: u16 = 2;
+pub const LOOT_STATE_SCHEMA_VERSION: u16 = 3;
+pub const MAX_OPERATION_WATERMARKS: usize = 4096;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum ItemKind {
@@ -188,6 +189,8 @@ pub enum LootError {
     InvalidState,
     UnverifiedSession,
     AlreadyParked,
+    InvalidOperation,
+    ReplayOperation,
 }
 
 /// Server-owned in-memory character inventory while no session is attached.
@@ -210,6 +213,7 @@ pub struct LootStateSnapshot {
     pub(crate) players: BTreeMap<u32, Inventory>,
     pub(crate) dead: BTreeSet<u32>,
     pub(crate) parked: BTreeMap<CharacterId, ParkedInventory>,
+    pub(crate) operation_highwater: BTreeMap<CharacterId, u64>,
     pub(crate) ground: BTreeMap<u64, GroundDrop>,
     pub(crate) corpses: BTreeMap<u64, Corpse>,
 }
@@ -220,6 +224,7 @@ pub struct LootAuthority {
     players: BTreeMap<u32, Inventory>,
     dead: BTreeSet<u32>,
     parked: BTreeMap<CharacterId, ParkedInventory>,
+    operation_highwater: BTreeMap<CharacterId, u64>,
     ground: BTreeMap<u64, GroundDrop>,
     corpses: BTreeMap<u64, Corpse>,
 }
@@ -231,6 +236,7 @@ impl Default for LootAuthority {
             players: BTreeMap::new(),
             dead: BTreeSet::new(),
             parked: BTreeMap::new(),
+            operation_highwater: BTreeMap::new(),
             ground: BTreeMap::new(),
             corpses: BTreeMap::new(),
         }
@@ -251,6 +257,7 @@ impl LootAuthority {
             players: self.players.clone(),
             dead: self.dead.clone(),
             parked: self.parked.clone(),
+            operation_highwater: self.operation_highwater.clone(),
             ground: self.ground.clone(),
             corpses: self.corpses.clone(),
         };
@@ -268,9 +275,35 @@ impl LootAuthority {
             players: snapshot.players,
             dead: snapshot.dead,
             parked: snapshot.parked,
+            operation_highwater: snapshot.operation_highwater,
             ground: snapshot.ground,
             corpses: snapshot.corpses,
         })
+    }
+
+    /// Server-side staged commit marker. Persist it with the item change.
+    pub(crate) fn record_operation(
+        &mut self,
+        character: CharacterId,
+        sequence: u64,
+    ) -> Result<(), LootError> {
+        if sequence == 0 {
+            return Err(LootError::InvalidOperation);
+        }
+        if self.operation_highwater.get(&character).is_some_and(|last| sequence <= *last) {
+            return Err(LootError::ReplayOperation);
+        }
+        if !self.operation_highwater.contains_key(&character)
+            && self.operation_highwater.len() >= MAX_OPERATION_WATERMARKS
+        {
+            return Err(LootError::InvalidState);
+        }
+        self.operation_highwater.insert(character, sequence);
+        Ok(())
+    }
+
+    pub fn committed_operation_sequence(&self, character: CharacterId) -> Option<u64> {
+        self.operation_highwater.get(&character).copied()
     }
 
     fn allocate_id(&mut self) -> Result<u64, LootError> {
@@ -1105,6 +1138,11 @@ impl LootAuthority {
 impl LootStateSnapshot {
     pub(crate) fn validate(&self) -> Result<(), LootError> {
         if self.schema_version != LOOT_STATE_SCHEMA_VERSION || self.next_id == 0 {
+            return Err(LootError::InvalidState);
+        }
+        if self.operation_highwater.len() > MAX_OPERATION_WATERMARKS
+            || self.operation_highwater.values().any(|sequence| *sequence == 0)
+        {
             return Err(LootError::InvalidState);
         }
         let mut ids = BTreeSet::new();
