@@ -56,5 +56,5 @@ test("A2.14 review is not imported by the game and does not assert real ground c
   assert.match(viewer,/groundContactValidated:false/);
   assert.match(viewer,/physicalBootSoleValidated:false/);
   assert.match(html,/NOT a verified floor/);
-  assert.doesNotMatch(viewer,/new WebSocket|localStorage|online-game|fetch\\(.+POST/);
+  assert.doesNotMatch(viewer,/new WebSocket|localStorage|online-game|XMLHttpRequest/);
 });
