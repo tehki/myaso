@@ -3,28 +3,28 @@
   "browserRuntimeIntegrated": false,
   "buildings": {
     "blacksmith": {
-      "combinedWebPBytes": 113264,
-      "compositeForegroundRGBMeanAbsoluteErrorVsWholeRender": 1.489,
+      "combinedWebPBytes": 116492,
+      "compositeForegroundRGBMeanAbsoluteErrorVsWholeRender": 1.441,
       "gameWorldDoorPositionValidated": false,
       "layers": {
         "base": {
-          "bytes": 65790,
+          "bytes": 69018,
           "cropPixels": [
             362,
-            306
+            341
           ],
           "cropSourceRect": [
             60,
             57,
             422,
-            363
+            398
           ],
           "drawOffsetPixelsFromVisualDoor": [
             -260.0,
             -263.0
           ],
           "filename": "blacksmith_a26_base.webp",
-          "sha256": "32cda979b96b79b011e5f9e24dad05a1d582ced8b561971288b4c38c8c66805c",
+          "sha256": "c262a17d84d131d726fd5bd2a7299b13b591e2b3423ab99f5e62da32172d401c",
           "visiblePixelRoundtrip": true,
           "visualDoorAnchorPixelsInCrop": [
             260.0,

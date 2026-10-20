@@ -1,5 +1,34 @@
 {
   "A3RollChanged": false,
+  "blacksmithWorkyard": {
+    "correctedEmbersCenterXYZ": [
+      9.3,
+      5.54,
+      0.92
+    ],
+    "correctedForgeCenterXYZ": [
+      9.3,
+      6.05,
+      0.62
+    ],
+    "doorAndStepUnmodified": true,
+    "entranceCorridorXYBounds": [
+      11.65,
+      5.65,
+      13.55,
+      7.6
+    ],
+    "forgeToAnvilHorizontalClearanceMeters": 0.325,
+    "forgingPropsInEntranceCorridor": false,
+    "gameCollisionModified": false,
+    "originalBlenderSceneSaved": false,
+    "originalForgeCenterXYZ": [
+      13.3,
+      6.95,
+      0.62
+    ],
+    "visibleFrontFireboxOpening": true
+  },
   "buildings": {
     "blacksmith": {
       "actualCameraEulerRad": [
@@ -23,8 +52,8 @@
       "layers": {
         "base": {
           "master": "blacksmith_a26_base_master.png",
-          "pngBytes": 213958,
-          "renderVisibleMeshes": 25
+          "pngBytes": 219202,
+          "renderVisibleMeshes": 26
         },
         "roof": {
           "master": "blacksmith_a26_roof_master.png",
@@ -33,8 +62,8 @@
         },
         "whole": {
           "master": "blacksmith_a26_whole_master.png",
-          "pngBytes": 255000,
-          "renderVisibleMeshes": 29
+          "pngBytes": 259781,
+          "renderVisibleMeshes": 30
         }
       },
       "maxXYGameProjectionMismatchPixelsPerMeter": 57.255,
