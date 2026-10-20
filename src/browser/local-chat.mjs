@@ -216,7 +216,7 @@ export function installLocalChat(doc, { online = false, adapter = null, idFactor
   }
 
   function onArenaKey(event) {
-    if (event.code !== "Enter" || event.repeat || event.altKey || event.ctrlKey || event.metaKey || !isReady()) return;
+    if (event.key !== "Enter" || event.repeat || event.altKey || event.ctrlKey || event.metaKey || !isReady()) return;
     event.preventDefault();
     event.stopImmediatePropagation();
     setExpanded(true, true);

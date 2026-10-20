@@ -34,6 +34,7 @@ test("C1 does not allocate wire packet ids or optimistic backend", () => {
   assert.match(js, /clientMessageId/);
   assert.match(js, /serverMessageId/);
   assert.match(js, /Message not sent/);
+  assert.match(js, /event\.key !== "Enter"/);
   assert.equal(CHAT_UI_LIMITS.history, 60);
 });
 
