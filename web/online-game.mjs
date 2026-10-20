@@ -12,7 +12,7 @@ import { createReconciliationCamera, createSnapshotRenderClock } from "../src/br
 import { createRenderGapTelemetry } from "../src/browser/render-gap-telemetry.mjs";
 import { ARENA_VIEW_ZOOM, nearbyOffscreenPointers, projectArenaPoint } from "../src/browser/arena-viewport.mjs";
 import { NETWORK } from "../src/network/constants.mjs";
-import { createKnightSpriteRenderer } from "./knight-sprites.mjs";
+import { KNIGHT_PRESENTATION_SCALE, createKnightSpriteRenderer } from "./knight-sprites.mjs";
 import { connectAuthoritativeClient, parseSha256Hex } from "./authoritative-client.mjs";
 
 const canvas = document.querySelector("#arena");
@@ -32,9 +32,15 @@ function updateChargeHud() {
 }
 
 const ctx = canvas.getContext("2d", { alpha: false });
-// Staged graphics rollout. Add &knights=1 to the multiplayer URL; remove it to roll back.
-const knightSprites = new URLSearchParams(window.location.search).get("knights") === "1"
-  ? createKnightSpriteRenderer() : null;
+// Staged graphics rollout. No knight rendering unless &knights=1.
+// Owner-selected A2.11 120% is visual-only; &knightScale=100 restores the
+// former sprite presentation for direct in-game before/after comparison.
+const knightQuery = new URLSearchParams(window.location.search);
+const knightSprites = knightQuery.get("knights") === "1"
+  ? createKnightSpriteRenderer({
+      presentationScale: knightQuery.get("knightScale") === "100"
+        ? 1 : KNIGHT_PRESENTATION_SCALE,
+    }) : null;
 const eventText = document.querySelector("#event-text");
 const arenaStage = document.querySelector(".arena-stage");
 const scoreboardList = document.querySelector("#scoreboard-list");
