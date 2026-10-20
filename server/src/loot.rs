@@ -22,7 +22,13 @@ pub const MAX_OPERATION_WATERMARKS: usize = 4096;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum ItemKind {
     RustySword,
+    IronSword,
+    WoodenClub,
     LeatherArmor,
+    ChainmailArmor,
+    IronHelmet,
+    LeatherBoots,
+    WoodenShield,
     Spellbook,
     FireRuneScroll,
     SulfurAsh,
@@ -46,9 +52,11 @@ impl ItemKind {
     pub const fn fits(self, slot: EquipmentSlot) -> bool {
         matches!(
             (self, slot),
-            (Self::RustySword, EquipmentSlot::MainHand)
-                | (Self::LeatherArmor, EquipmentSlot::Body)
-                | (Self::Spellbook, EquipmentSlot::OffHand)
+            (Self::RustySword | Self::IronSword | Self::WoodenClub, EquipmentSlot::MainHand)
+                | (Self::LeatherArmor | Self::ChainmailArmor, EquipmentSlot::Body)
+                | (Self::IronHelmet, EquipmentSlot::Head)
+                | (Self::LeatherBoots, EquipmentSlot::Feet)
+                | (Self::WoodenShield | Self::Spellbook, EquipmentSlot::OffHand)
         )
     }
 }
@@ -58,6 +66,8 @@ pub enum EquipmentSlot {
     MainHand,
     OffHand,
     Body,
+    Head,
+    Feet,
 }
 
 /// Server-resolved corpse and item selection; IDs are never authority alone.
@@ -1249,6 +1259,56 @@ mod tests {
             fighter.action = Action::Dead;
         }
         fighter
+    }
+
+    #[test]
+    fn fresh_character_starts_with_no_items_and_nothing_equipped() {
+        let mut loot = LootAuthority::new();
+        loot.register(1).unwrap();
+        let new_character = loot.inventory(1).unwrap();
+        assert!(new_character.backpack().is_empty());
+        assert_eq!(new_character.stack_count(), 0);
+        for slot in [
+            EquipmentSlot::MainHand,
+            EquipmentSlot::OffHand,
+            EquipmentSlot::Body,
+            EquipmentSlot::Head,
+            EquipmentSlot::Feet,
+        ] {
+            assert!(new_character.equipped(slot).is_none());
+        }
+    }
+
+    #[test]
+    fn extended_gear_slots_are_exclusive_and_never_mint_equipment() {
+        let mut loot = LootAuthority::new();
+        loot.register(1).unwrap();
+        let catalog = [
+            (ItemKind::RustySword, EquipmentSlot::MainHand),
+            (ItemKind::IronSword, EquipmentSlot::MainHand),
+            (ItemKind::WoodenClub, EquipmentSlot::MainHand),
+            (ItemKind::LeatherArmor, EquipmentSlot::Body),
+            (ItemKind::ChainmailArmor, EquipmentSlot::Body),
+            (ItemKind::IronHelmet, EquipmentSlot::Head),
+            (ItemKind::LeatherBoots, EquipmentSlot::Feet),
+            (ItemKind::WoodenShield, EquipmentSlot::OffHand),
+        ];
+        for (kind, slot) in catalog {
+            assert!(kind.fits(slot));
+            let item = loot.grant(1, kind, 1).unwrap();
+            assert!(!kind.fits(match slot {
+                EquipmentSlot::MainHand => EquipmentSlot::Body,
+                _ => EquipmentSlot::MainHand,
+            }));
+            if loot.inventory(1).unwrap().equipped(slot).is_some() {
+                assert!(matches!(loot.equip(1, item, slot), Err(LootError::SlotOccupied)));
+                assert_eq!(loot.inventory(1).unwrap().backpack().last().unwrap().id, item);
+                loot.unequip(1, slot).unwrap();
+            }
+            loot.equip(1, item, slot).unwrap();
+            assert_eq!(loot.inventory(1).unwrap().equipped(slot).unwrap().id, item);
+        }
+        loot.export_state().unwrap();
     }
 
     #[test]
