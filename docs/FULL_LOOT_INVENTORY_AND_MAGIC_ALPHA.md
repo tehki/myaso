@@ -40,6 +40,12 @@ Status: **domain foundation only — NOT live-game enabled**. Approved design di
 - Read-only Ember preparation verifies the exact authenticated session lease, learned Fire rune and Ember spell, equipped lootable Spellbook, Sulfur Ash reagent and mana. It costs 15 mana and one Sulfur Ash if eventually cast, but the preview consumes nothing and produces no effects.
 - Tests cover no-free-magic spawn, rewards, replayed receipts, casting prerequisites and rune/spell knowledge surviving full-loot death when the spellbook is taken. The knowledge ledger is **in memory only** and must be persisted transactionally with items before activating NPC lessons or spells. No live Magic integration, projectiles or combat changes.
 
+## Ember resource commit (experimental, non-activated)
+
+- The isolated `magic_cast.rs` adds a server-authoritative cost transaction: exact verified session lease, matching Fighter, registered ZoneAuthority and finite in-bounds alive/idle position are mandatory. A staged world must have learned Fire + Ember, an equipped physical Spellbook, one Sulfur Ash and at least 15 mana.
+- The transaction stages a strictly increasing per-character operation sequence, consumes one Sulfur Ash, debits 15 mana, and checkpoints both MagicAuthority and LootAuthority in one MYWLD001 file before publishing the two live in-memory states. Tests cover exact recovery, replay rejection, missing requirements, combat locks, spoofed fighters and failed writes.
+- The returned EmberCostReceipt proves only a resource debit, **not a spell projectile, hit, cooldown or damage effect**. Do not wire into production until combat effects, session admission, death handling, world locking and post-rename crash reconciliation are atomic with this operation.
+
 ## Server-owned NPC teacher eligibility (domain only)
 
 - Added `server/src/magic_teacher.rs` with a trusted NPC spawn registry and typed teacher IDs. A lesson is eligible only when an exact verified session lease matches the server-simulated Fighter, the authoritative ZoneAuthority agrees with the NPC zone, the character has a valid active LootAuthority inventory and is alive/idle, and the server Fighter is within 48 world units of a valid manifested trainer.

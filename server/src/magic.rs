@@ -178,6 +178,27 @@ impl MagicAuthority {
         Ok(receipt)
     }
 
+    /// Debit only a staged, verified character's mana. The surrounding
+    /// transaction must checkpoint this with reagent spend and replay ID.
+    pub(crate) fn spend_mana(
+        &mut self,
+        character: CharacterId,
+        amount: u16,
+    ) -> Result<(), MagicError> {
+        if amount == 0 {
+            return Err(MagicError::InsufficientMana);
+        }
+        let knowledge = self
+            .characters
+            .get_mut(&character)
+            .ok_or(MagicError::UnknownCharacter)?;
+        if knowledge.mana < amount {
+            return Err(MagicError::InsufficientMana);
+        }
+        knowledge.mana -= amount;
+        Ok(())
+    }
+
     /// A read-only server-resolved spell preview. This never spends mana,
     /// consumes reagents or produces damage. No cast packet is enabled.
     pub fn preview_cast(

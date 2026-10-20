@@ -78,7 +78,7 @@ impl From<TeacherError> for JointCheckpointError {
     }
 }
 
-fn bundle(
+pub(crate) fn bundle(
     loot: &LootAuthority,
     identity: &SessionIdentityRegistry,
     magic: &MagicAuthority,
