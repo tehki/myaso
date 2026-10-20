@@ -8,6 +8,7 @@ pub mod elemental_fields;
 pub mod elemental_physics;
 pub mod kill_event;
 pub mod magic_fx_events;
+pub mod magic_fx_spatial;
 pub mod reliable;
 pub mod simulation;
 pub mod snapshot;
