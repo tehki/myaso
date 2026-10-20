@@ -58,8 +58,8 @@ function insideBridgeLane(bridges, x, y, radius) {
     const halfClearHeight = bridge.h / 2 - radius;
     return halfClearHeight > 0
       && Math.abs(y - bridge.y) <= halfClearHeight
-      && x >= bridge.x - bridge.w / 2 - radius
-      && x <= bridge.x + bridge.w / 2 + radius;
+      && x >= bridge.x - bridge.w / 2 - 3 * radius
+      && x <= bridge.x + bridge.w / 2 + 3 * radius;
   });
 }
 
