@@ -42,6 +42,7 @@ pub struct VerifiedWorldAuthority {
 }
 
 impl VerifiedWorldAuthority {
+    #[cfg(test)]
     pub(crate) fn from_trusted_authority(
         entity: OwnedEntity,
         worker: WorkerId,
