@@ -116,6 +116,7 @@ export function installLocalChat(doc, { online = false, adapter = null, idFactor
     const ready = isReady();
     const changed = root.dataset.connected !== String(ready);
     root.dataset.connected = String(ready);
+    connection.textContent = ready ? "Nearby" : online ? "Offline" : "Practice";
     // Keep the composer focused while an ACK is pending, so Escape still works.
     input.disabled = !ready;
     input.readOnly = pending;
