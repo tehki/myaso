@@ -102,3 +102,49 @@ test("optional WebTransport channel handles fragmented network frames separately
   assert.equal(results[0].correlation, 77);
   assert.equal(channel.closed, true);
 });
+
+test("optional chat startup times out when peer never opens a reply stream", async () => {
+  let aborted = 0;
+  const outbound = new WritableStream({ abort() { aborted += 1; } });
+  const transport = {
+    async createUnidirectionalStream() { return outbound; },
+    incomingUnidirectionalStreams: new ReadableStream({ start() {} }),
+  };
+  await assert.rejects(
+    openLocalChat({ kind: "webtransport", transport }, { handshakeTimeoutMs: 20 }),
+    /chat reply stream timed out/,
+  );
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(aborted, 1, "only optional outbound chat stream is aborted");
+  assert.equal(outbound.locked, false, "writer lock is released");
+});
+
+test("late outgoing stream is aborted after bounded startup failure", async () => {
+  let allowOpen, aborted = false;
+  const pending = new Promise(resolve => { allowOpen = resolve; });
+  const transport = {
+    createUnidirectionalStream() { return pending; },
+    incomingUnidirectionalStreams: new ReadableStream({ start() {} }),
+  };
+  await assert.rejects(
+    openLocalChat({ kind: "webtransport", transport }, { handshakeTimeoutMs: 20 }),
+    /chat outgoing stream timed out/,
+  );
+  allowOpen(new WritableStream({ abort() { aborted = true; } }));
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(aborted, true, "late optional stream must not be leaked");
+});
+
+test("invalid chat handshake deadlines fail before starting any network stream", async () => {
+  let attempted = 0;
+  const transport = {
+    async createUnidirectionalStream() { attempted++; return new WritableStream(); },
+  };
+  for (const handshakeTimeoutMs of [-1, 0, 30_001, NaN, 2.5, "20"]) {
+    await assert.rejects(
+      openLocalChat({ kind: "webtransport", transport }, { handshakeTimeoutMs }),
+      RangeError,
+    );
+  }
+  assert.equal(attempted, 0);
+});
