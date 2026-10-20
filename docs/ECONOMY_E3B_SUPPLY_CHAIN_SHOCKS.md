@@ -4,7 +4,7 @@
 
 ## Why this model
 
-The earlier Economics E3 [circulation simulator](ECONOMY_E3_CIRCULATION_SIM.md) was a reproducible toy model of treasury-funded rewards, broad fees, and housing constraints; it did not model physical resources, professions and inventory-side trading together. E3b supplements it with a **separate zero-dependency Rust laboratory** in `server/src/economic_market_lab.rs`.
+The earlier Economics E3 [circulation simulator PR #368](https://github.com/tehki/myaso/pull/368) was a reproducible toy model of treasury-funded rewards, broad fees, and housing constraints; it did not model physical resources, professions and inventory-side trading together. E3b supplements it with a **separate zero-dependency Rust laboratory** in `server/src/economic_market_lab.rs`.
 
 This does **not** import the unpublished E1/E2/E2b/E2c/E3 code or imply those PRs are ready for central integration.
 
