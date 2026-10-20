@@ -31,6 +31,16 @@ export function auditMoonvaleAuthoring({
 }={}) {
   const errors=[];
   const issue=(code,detail)=>errors.push(Object.freeze({code,detail}));
+  // D16 baseline floors: adding world content is welcome, but accidentally
+  // deleting an established manifest must require a deliberate audit update.
+  const floors=[
+    ["landmarks",landmarks,4],["fields",fields,8],["lore",lore,6],
+    ["expeditions",expeditions,3],["trails",trails,7],["threads",threads,2],
+  ];
+  for(const [name,list,min] of floors){
+    if(!Array.isArray(list)||list.length<min)
+      issue("MANIFEST_SHRINK",name+": expected at least "+min);
+  }
   const lists=[["landmark",landmarks],["field",fields],["lore",lore]];
   const all=new Map(),byKind=new Map();
   for (const [kind,sites] of lists) {
