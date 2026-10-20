@@ -1,0 +1,67 @@
+name: Core C4g PostgreSQL client-crash acceptance
+
+on:
+  pull_request:
+    paths:
+      - "scripts/verify_zone_crash_recovery.py"
+      - ".github/workflows/core-c4g-session-crash.yml"
+      - "server/sql/001_zone_authority_postgres.sql"
+      - "server/sql/002_fenced_world_mutations.sql"
+      - "server/sql/003_nonzero_authority_ids.sql"
+  push:
+    branches: [main]
+    paths:
+      - "scripts/verify_zone_crash_recovery.py"
+      - ".github/workflows/core-c4g-session-crash.yml"
+      - "server/sql/001_zone_authority_postgres.sql"
+      - "server/sql/002_fenced_world_mutations.sql"
+      - "server/sql/003_nonzero_authority_ids.sql"
+
+permissions:
+  contents: read
+
+jobs:
+  client-crash:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: myaso_c4g_test
+          POSTGRES_PASSWORD: ephemeral-test-only
+          POSTGRES_DB: myaso_c4g_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U myaso_c4g_test -d myaso_c4g_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    env:
+      PGHOST: 127.0.0.1
+      PGPORT: "5432"
+      PGUSER: myaso_c4g_test
+      PGPASSWORD: ephemeral-test-only
+      PGDATABASE: myaso_c4g_test
+      MYASO_C4G_TEST_ONLY: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: PostgreSQL client and Python syntax
+        run: |
+          if ! command -v psql >/dev/null 2>&1; then
+            sudo apt-get update -qq
+            sudo apt-get install -y postgresql-client
+          fi
+          psql --version
+          python -m py_compile scripts/verify_zone_crash_recovery.py
+      - name: Install isolated C4c C4d C4e schemas
+        run: |
+          psql -X -v ON_ERROR_STOP=1 -f server/sql/001_zone_authority_postgres.sql
+          psql -X -v ON_ERROR_STOP=1 -f server/sql/002_fenced_world_mutations.sql
+          psql -X -v ON_ERROR_STOP=1 -f server/sql/003_nonzero_authority_ids.sql
+      - name: Prove client death and durable handoff fail closed
+        run: python scripts/verify_zone_crash_recovery.py
