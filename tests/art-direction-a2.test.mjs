@@ -187,6 +187,8 @@ test('A2.3 WebP exporter validates lossless alpha, visible pixels and composite 
   assert.match(src,/transparent_fraction/);
   assert.match(src,/greyhaven_a23_layer_composite_preview\.png/);
   assert.match(src,/compositeRGBMeanAbsoluteErrorVsFullRender/);
+  assert.match(src,/compositeForegroundRGBMeanAbsoluteErrorVsFullRender/);
+  assert.match(src,/greyhaven_a23_checkerboard_preview\.png/);
   assert.match(src,/"performanceFPSMeasured":False/);
   assert.doesNotMatch(src,/requests\.|urlretrieve\(|subprocess\.|shutil\.rmtree/);
 });
