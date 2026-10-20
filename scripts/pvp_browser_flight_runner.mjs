@@ -25,7 +25,7 @@ import { verifyM206ServerKnockdownPunish } from "./m206-knockdown-punish-proof.m
 import { verifyM209DualKnockdownServerPunish } from "./m209-dual-knockdown-proof.mjs";
 import { verifyM211DualRecoveryServerProof } from "./m211-dual-recovery-phase-proof.mjs";
 import { planM203W3cPointerPause } from "./m203-w3c-wheel-ack.mjs";
-import { planM225ThreatDistanceStaging } from "./m225-ffa-threat-distance.mjs";
+import { planM225ThreatDistanceStaging, qualifyM340StableThreatGeometry } from "./m225-ffa-threat-distance.mjs";
 import { qualifyM150ParryGeometry } from "./m150-replicated-geometry.mjs";
 import { awaitM223HeavyWindup, planM223WheelDelay } from "./m223-server-heavy-windup.mjs";
 import { dispatchM212AttackLedShortBlock } from "./m212-attack-led-short-block.mjs";
@@ -10560,14 +10560,18 @@ async function runOnlineUiJumpFfaThreatFlight(entries, mode) {
   ]);
   await sleep(60);
 
-  // M225: fixed WebDriver key durations can invert authoritative distance
-  // order under runner load. Observe genuine server-replicated coordinates
-  // at centre and adjust with bounded, ordinary real W3C movement keys.
-  // Never reorder HUD state or weaken the original two-threat assertion.
+  // M225/M340: use only genuine server-replicated player positions.
+  // A single 'ready' geometry sample is not enough under loaded browsers:
+  // merged-main quality #39437391824 captured 64px jump distance and later
+  // observed 82px, beyond the unchanged 66px threat reach. Verify that
+  // authoritative geometry is stable after the real W3C key releases and
+  // final genuine mouse aim, before any jump/attack input is delivered.
+  // Keep real W3C-only WASD correction and >240ms inter-press dash safety.
   let geometryReady = false;
-  for (let geometryAttempt = 1; geometryAttempt <= 4; geometryAttempt += 1) {
+  let qualifiedGeometry = null;
+  for (let geometryAttempt = 1; geometryAttempt <= 6; geometryAttempt += 1) {
     const centerState = await readUiEvidence(center);
-    const stage = planM225ThreatDistanceStaging({
+    let stage = planM225ThreatDistanceStaging({
       fighters: centerState.acceptance?.fighters,
       leftId: ids[0], centerId: ids[1], rightId: ids[2], mode,
     });
@@ -10576,15 +10580,37 @@ async function runOnlineUiJumpFfaThreatFlight(entries, mode) {
       authoritativeTick: centerState.acceptance?.serverTick ?? null,
     }));
     if (stage.ready) {
-      geometryReady = true;
-      break;
+      // Let the actual 30Hz input sampler and 60Hz server finish movement
+      // already submitted by the preceding native W3C movement key release.
+      await sleep(180);
+      await Promise.all([
+        aimArena(left, leftArena, 200),
+        aimArena(right, rightArena, -200),
+      ]);
+      await sleep(85);
+      const confirmedState = await readUiEvidence(center);
+      const confirmed = planM225ThreatDistanceStaging({
+        fighters: confirmedState.acceptance?.fighters,
+        leftId: ids[0], centerId: ids[1], rightId: ids[2], mode,
+      });
+      const stable = qualifyM340StableThreatGeometry(stage, confirmed);
+      console.log("M340_STABLE_THREAT_GEOMETRY " + JSON.stringify({
+        mode, geometryAttempt, ...stable,
+        first: { left: stage.leftDistance, right: stage.rightDistance },
+        confirmed: { left: confirmed.leftDistance, right: confirmed.rightDistance },
+        authoritativeTick: confirmedState.acceptance?.serverTick ?? null,
+      }));
+      if (stable.ready) {
+        qualifiedGeometry = confirmed;
+        geometryReady = true;
+        break;
+      }
+      stage = confirmed;
     }
-    if (geometryAttempt === 4) break;
-    // R2 directional dash: a double WASD keyDown inside 240ms is a real
-    // 42-unit dash, not a fine staging move. M142 #39223717854 recorded
-    // right distance 78 -> 120 -> 162 during tiny correction taps.
-    // Separate all genuine W3C corrections by >240ms, including from the
-    // initial staging gesture. Never change combat reach or strict evidence.
+    if (geometryAttempt === 6) break;
+    // R2 directional dash: any two same-direction WASD keyDown events within
+    // 240ms are a real 42px dash, not a fine positioning correction.
+    // Keep all genuine corrections separated by >240ms and strictly bounded.
     await sleep(300);
     await Promise.all([
       stage.leftMove.ms
@@ -10594,16 +10620,26 @@ async function runOnlineUiJumpFfaThreatFlight(entries, mode) {
         ? pulseMovementKey(right, stage.rightMove.key, stage.rightMove.ms)
         : Promise.resolve(),
     ]);
-    await sleep(75);
+    await sleep(120);
   }
   if (!geometryReady) {
-    throw new Error(`${milestone} cannot stage genuine ordered attack geometry after four bounded attempts`);
+    throw new Error(`${milestone} cannot stage stable real ordered attack geometry after six bounded attempts`);
   }
-  await Promise.all([
-    aimArena(left, leftArena, 200),
-    aimArena(right, rightArena, -200),
-  ]);
-  await sleep(40);
+
+  // Last independent authoritative sample, after final aim, before any
+  // genuine combat chord. Fail closed if it left the 66px jump reach or the
+  // closer-rival / mutual non-hit bands. Never modify actual game state.
+  const certifiedState = await readUiEvidence(center);
+  const certified = planM225ThreatDistanceStaging({
+    fighters: certifiedState.acceptance?.fighters,
+    leftId: ids[0], centerId: ids[1], rightId: ids[2], mode,
+  });
+  const preflight = qualifyM340StableThreatGeometry(qualifiedGeometry, certified);
+  if (!preflight.ready) {
+    throw new Error(`${milestone} authoritative positions drifted after final native aim: ${JSON.stringify({
+      mode, ...preflight, qualifiedGeometry, certified,
+    })}`);
+  }
 
   const baseline = await Promise.all(entries.map(readUiEvidence));
   const leftBefore = baseline.find((entry) => entry.browser === left.name);
