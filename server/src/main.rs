@@ -315,7 +315,22 @@ async fn main() -> Result<()> {
         Err(env::VarError::NotPresent) => parse_npc_maintenance(None, npc_pilot_enabled)?,
         Err(error) => bail!("MYASO_NPC_MAINTENANCE is invalid: {error}"),
     };
+    let npc_detour_enabled = match env::var("MYASO_NPC_GUARD_DETOUR") {
+        Ok(value) => parse_guard_detour(Some(&value), npc_pilot_enabled, npc_maintenance_enabled)?,
+        Err(env::VarError::NotPresent) => {
+            parse_guard_detour(None, npc_pilot_enabled, npc_maintenance_enabled)?
+        }
+        Err(error) => bail!("MYASO_NPC_GUARD_DETOUR is invalid: {error}"),
+    };
     let game = SharedGame::new(flight, npc_pilot_enabled);
+    if npc_detour_enabled {
+        let mut state = game.state.lock().await;
+        state
+            .npc_routines
+            .as_mut()
+            .expect("pilot required for detours")
+            .enable_pilot_guard_detours();
+    }
     if npc_maintenance_enabled {
         let mut state = game.state.lock().await;
         state
@@ -433,6 +448,18 @@ fn parse_npc_maintenance(raw: Option<&str>, npc_pilot_enabled: bool) -> Result<b
     };
     if enabled && !npc_pilot_enabled {
         bail!("NPC maintenance requires an enabled loopback NPC pilot");
+    }
+    Ok(enabled)
+}
+
+fn parse_guard_detour(raw: Option<&str>, pilot: bool, maintenance: bool) -> Result<bool> {
+    let enabled = match raw {
+        None | Some("0") => false,
+        Some("1") => true,
+        Some(_) => bail!("MYASO_NPC_GUARD_DETOUR must be 0 or 1"),
+    };
+    if enabled && !(pilot && maintenance) {
+        bail!("NPC guard detour requires loopback pilot and maintenance fixture");
     }
     Ok(enabled)
 }
@@ -698,10 +725,14 @@ async fn handle_connection(
         );
         let initial_npc_frame = {
             let state = game.state.lock().await;
-            NpcRoutines::state_packet_with_supply(
-                state.world.tick,
-                state.npc_supply.as_ref().expect("pilot supply initialized"),
-            )
+            state
+                .npc_routines
+                .as_ref()
+                .expect("pilot routines initialized")
+                .state_packet_with_supply(
+                    state.world.tick,
+                    state.npc_supply.as_ref().expect("pilot supply initialized"),
+                )
         };
         send_reliable_frame(
             &mut reliable_send,
@@ -1144,7 +1175,8 @@ async fn handle_connection(
                 {
                     let npc_frame = {
                         let state = game.state.lock().await;
-                        NpcRoutines::state_packet_with_supply(
+                        state.npc_routines.as_ref().expect("pilot routines initialized")
+                            .state_packet_with_supply(
                             state.world.tick,
                             state.npc_supply.as_ref().expect("pilot supply initialized"),
                         )
@@ -1470,6 +1502,16 @@ mod tests {
         assert_eq!(supply.stocks().yard_water, 0);
         assert!(supply.stocks().conserved());
         assert!(state.world.fighters().is_empty());
+    }
+
+    #[test]
+    fn guard_detour_requires_all_three_explicit_localhost_opt_ins() {
+        assert!(!parse_guard_detour(None, false, false).unwrap());
+        assert!(!parse_guard_detour(None, true, true).unwrap());
+        assert!(parse_guard_detour(Some("1"), false, false).is_err());
+        assert!(parse_guard_detour(Some("1"), true, false).is_err());
+        assert!(parse_guard_detour(Some("yes"), true, true).is_err());
+        assert!(parse_guard_detour(Some("1"), true, true).unwrap());
     }
 
     #[test]

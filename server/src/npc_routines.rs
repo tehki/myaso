@@ -60,6 +60,29 @@ struct GuardSiteWatch {
     assigned_tick: u32,
 }
 
+/// Optional pilot-only detour uses a server-planned, reversible path.
+/// The original patrol clock is paused and resumes where the guard left it,
+/// never teleporting back to a time-shifted baseline.
+#[derive(Debug, Clone)]
+struct GuardDetour {
+    site_id: u8,
+    revision: u32,
+    start_tick: u32,
+    route: Vec<(u16, u16)>,
+    reversing: Option<(u32, u32)>, // reverse started tick, current path progress
+}
+
+impl GuardDetour {
+    fn progress(&self, tick: u32) -> u32 {
+        match self.reversing {
+            Some((start, at)) => at.saturating_sub(tick.saturating_sub(start)),
+            None => tick
+                .saturating_sub(self.start_tick)
+                .min(npc_navigation::WALK_TICKS),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct NpcState {
     pub id: u8,
@@ -83,6 +106,9 @@ pub struct NpcRoutines {
     last_worksite_social_tick: Option<u32>,
     last_worksite_event_revision: u32,
     guard_watch: Option<GuardSiteWatch>,
+    detours_enabled: bool,
+    guard_detour: Option<GuardDetour>,
+    guard_patrol_pause_ticks: u32,
 }
 
 impl NpcRoutines {
@@ -111,12 +137,98 @@ impl NpcRoutines {
         Some(NpcState { id, x, y, activity })
     }
 
+    /// Explicit third opt-in gate. This still requires the existing
+    /// loopback-only pilot and opt-in staged closure fixture at startup.
+    pub fn enable_pilot_guard_detours(&mut self) {
+        self.detours_enabled = true;
+    }
+
+    pub fn position_at(&self, id: u8, tick: u32) -> Option<NpcState> {
+        if id != 3 {
+            return Self::position(id, tick);
+        }
+        if let Some(detour) = &self.guard_detour {
+            let (x, y) =
+                npc_navigation::pilot_inspection_position(&detour.route, detour.progress(tick))?;
+            return Some(NpcState {
+                id,
+                x,
+                y,
+                activity: 1,
+            });
+        }
+        Self::position(id, tick.wrapping_sub(self.guard_patrol_pause_ticks))
+    }
+
+    fn advance_detour(&mut self, tick: u32, supply: &NpcSupplyWorld) {
+        let Some(detour) = self.guard_detour.as_mut() else {
+            return;
+        };
+        let closed = detour.revision == supply.worksite_revision()
+            && supply.site_is_available(detour.site_id) == Some(false);
+        if detour.reversing.is_none()
+            && (!closed
+                || tick.saturating_sub(detour.start_tick) >= npc_navigation::WALK_TICKS + 300)
+        {
+            detour.reversing = Some((
+                tick,
+                tick.saturating_sub(detour.start_tick)
+                    .min(npc_navigation::WALK_TICKS),
+            ));
+        }
+        if let Some((return_start, reverse_progress)) = detour.reversing {
+            if tick.saturating_sub(return_start) >= reverse_progress {
+                // When the reverse route reaches its exact starting point,
+                // the old patrol resumes from that same point, not today's
+                // baseline position. No fighter or economy entities involved.
+                self.guard_patrol_pause_ticks = self
+                    .guard_patrol_pause_ticks
+                    .wrapping_add(tick.wrapping_sub(detour.start_tick));
+                self.guard_detour = None;
+            }
+        }
+    }
+
+    fn begin_detour_if_allowed(&mut self, tick: u32, supply: &NpcSupplyWorld) {
+        if !self.detours_enabled || self.guard_detour.is_some() {
+            return;
+        }
+        let Some(watch) = self.guard_watch else {
+            return;
+        };
+        if watch.revision != supply.worksite_revision()
+            || supply.site_is_available(watch.site_id) != Some(false)
+        {
+            return;
+        }
+        let Some(site) = WORKSITES.iter().find(|site| site.id == watch.site_id) else {
+            return;
+        };
+        let Some(origin) = self.position_at(3, tick) else {
+            return;
+        };
+        // This planner is a strictly server-authored miniature pilot
+        // collision test window. No live-world collision authority yet.
+        let Some(route) =
+            npc_navigation::pilot_inspection_route((origin.x, origin.y), (site.x, site.y))
+        else {
+            return;
+        };
+        self.guard_detour = Some(GuardDetour {
+            site_id: watch.site_id,
+            revision: watch.revision,
+            start_tick: tick,
+            route,
+            reversing: None,
+        });
+    }
+
     pub fn witness_death(&mut self, tick: u32, x: f32, y: f32) {
         if !x.is_finite() || !y.is_finite() {
             return;
         }
         for (index, npc) in NPCS.iter().enumerate() {
-            let Some(state) = Self::position(npc.id, tick) else {
+            let Some(state) = self.position_at(npc.id, tick) else {
                 continue;
             };
             let dx = x - f32::from(state.x);
@@ -141,8 +253,10 @@ impl NpcRoutines {
             return;
         }
         self.last_social_tick = Some(tick);
-        let positions =
-            NPCS.map(|npc| Self::position(npc.id, tick).expect("authored NPC position"));
+        let positions = NPCS.map(|npc| {
+            self.position_at(npc.id, tick)
+                .expect("authored NPC position")
+        });
         self.record_encounters(tick, &positions);
         // Snapshot firsthand witnesses before choosing recipients. Knowledge
         // shared this tick cannot recursively spread to further NPCs.
@@ -206,6 +320,7 @@ impl NpcRoutines {
             return;
         }
         self.last_worksite_social_tick = Some(tick);
+        self.advance_detour(tick, supply);
         let revision = supply.worksite_revision();
         // A server revision supersedes all old watch assignments, even when
         // the operator's next face-to-face meeting has not happened yet.
@@ -247,7 +362,7 @@ impl NpcRoutines {
                 }
             }
         }
-        let positions = NPCS.map(|npc| Self::position(npc.id, tick).expect("fixed roster"));
+        let positions = NPCS.map(|npc| self.position_at(npc.id, tick).expect("fixed roster"));
         // Snapshot before dissemination: hearing on this tick cannot
         // instantly retransmit on to a third NPC.
         let prior = self.worksite_news;
@@ -288,6 +403,7 @@ impl NpcRoutines {
             }
         }
         self.consider_guard_watch(tick, supply, &positions);
+        self.begin_detour_if_allowed(tick, supply);
     }
 
     /// A colleague's warning may prompt Rowan to prioritize a nearby
@@ -360,8 +476,16 @@ impl NpcRoutines {
         }
         let site = worksite_name(watch.site_id)?;
         let source = NPCS.iter().find(|npc| npc.id == watch.source_id)?.name;
+        let movement =
+            if self.guard_detour.as_ref().is_some_and(|detour| {
+                detour.revision == watch.revision && detour.reversing.is_none()
+            }) {
+                "I am taking a bounded, pilot-only inspection detour. I have not repaired it."
+            } else {
+                "I have not repaired it or changed my normal patrol route."
+            };
         Some(format!(
-            "I marked the {site} for priority attention along my existing patrol              after {source} told me in person. The server still confirms it unavailable              (revision {}). I have not repaired it or changed my route.",
+            "I marked the {site} for priority attention after {source} told me in person.              The server still confirms it unavailable (revision {}). {movement}",
             watch.revision
         ))
     }
@@ -481,7 +605,7 @@ impl NpcRoutines {
 
     pub fn context(&self, id: u8, tick: u32) -> Option<(&'static str, bool)> {
         let index = NPCS.iter().position(|npc| npc.id == id)?;
-        let state = Self::position(id, tick)?;
+        let state = self.position_at(id, tick)?;
         let activity = match (id, state.activity) {
             (1, 0) => "resting after a busy shift",
             (1, _) => "serving guests",
@@ -515,7 +639,7 @@ impl NpcRoutines {
         supply: &NpcSupplyWorld,
     ) -> Option<(&'static str, bool)> {
         let (_, witnessed) = self.context(id, tick)?;
-        let position = Self::position(id, tick)?;
+        let position = self.position_at(id, tick)?;
         let activity = match id {
             2 => match supply.decision(2) {
                 WorkDecision::ForgeNails if position.activity != 0 => "forging needed nails",
@@ -550,12 +674,12 @@ impl NpcRoutines {
     /// Mirrors the existing 38-byte pilot marker format, never player combat
     /// entity state. Stationary workers switch to idle after satisfying needs;
     /// walking workers remain marked walking because routes still move.
-    pub fn state_packet_with_supply(tick: u32, supply: &NpcSupplyWorld) -> Vec<u8> {
+    pub fn state_packet_with_supply(&self, tick: u32, supply: &NpcSupplyWorld) -> Vec<u8> {
         let mut packet = Vec::with_capacity(8 + NPCS.len() * 6);
         packet.extend_from_slice(&[PROTOCOL_VERSION, STATE_TYPE, NPCS.len() as u8, 0]);
         packet.extend_from_slice(&tick.to_le_bytes());
         for npc in NPCS {
-            let state = Self::position(npc.id, tick).expect("authored NPC ID");
+            let state = self.position_at(npc.id, tick).expect("authored NPC ID");
             let activity = match npc.id {
                 2 if supply.decision(2) == WorkDecision::Rest => 0,
                 4 | 5 if supply.decision(npc.id) == WorkDecision::Rest && state.activity == 2 => 0,
@@ -832,7 +956,7 @@ mod tests {
     fn task_aware_state_packet_preserves_position_format_and_exposes_idle() {
         let mut supply = NpcSupplyWorld::default();
         let original = NpcRoutines::state_packet(900);
-        let assigned = NpcRoutines::state_packet_with_supply(900, &supply);
+        let assigned = NpcRoutines::default().state_packet_with_supply(900, &supply);
         assert_eq!(assigned.len(), original.len());
         assert_eq!(assigned.len(), 38);
         // Before finite demand is satisfied the existing duty state remains.
@@ -840,7 +964,7 @@ mod tests {
         for tick in 0..=40_000 {
             supply.advance(tick);
         }
-        let idle = NpcRoutines::state_packet_with_supply(900, &supply);
+        let idle = NpcRoutines::default().state_packet_with_supply(900, &supply);
         assert_eq!(&idle[0..8], &original[0..8]);
         for i in 0..5 {
             let offset = 8 + i * 6;
@@ -883,7 +1007,7 @@ mod tests {
             .0
             .contains("walking"));
         assert_eq!(
-            NpcRoutines::state_packet_with_supply(200, &supply)[8 + 4 * 6 + 5],
+            NpcRoutines::default().state_packet_with_supply(200, &supply)[8 + 4 * 6 + 5],
             1
         );
         assert!(routines
@@ -1105,6 +1229,160 @@ mod tests {
         town.advance_worksite_social(180, &supply);
         assert!(town.guard_watch.is_none());
         assert_eq!(supply.site_is_available(2), Some(false));
+        assert!(supply.stocks().conserved());
+    }
+
+    #[test]
+    fn pilot_detour_moves_rowan_to_server_worksite_and_returns_without_teleport() {
+        let mut supply = NpcSupplyWorld::default();
+        supply.enable_pilot_maintenance();
+        let mut npcs = NpcRoutines::default();
+        npcs.enable_pilot_guard_detours();
+        for tick in 0..=1380 {
+            supply.advance(tick);
+            npcs.advance_social(tick);
+            npcs.advance_worksite_social(tick, &supply);
+        }
+        let start = NpcRoutines::position(3, 1380).unwrap();
+        assert_eq!(npcs.position_at(3, 1380), Some(start));
+        assert!(npcs.guard_detour.is_some());
+        let detour = npcs.guard_detour.as_ref().unwrap();
+        assert_eq!(detour.revision, 2);
+        assert!(detour.route.len() >= 2);
+        assert_eq!(detour.route.first().copied(), Some((start.x, start.y)));
+        assert_eq!(detour.route.last().copied(), Some((270, 220)));
+        assert!(npcs
+            .guard_watch_report(3, 1380, &supply)
+            .unwrap()
+            .contains("pilot-only inspection detour"));
+        let initial_supply = supply.stocks();
+        for tick in 1381..=1980 {
+            supply.advance(tick);
+            npcs.advance_social(tick);
+            npcs.advance_worksite_social(tick, &supply);
+            let guard = npcs.position_at(3, tick).unwrap();
+            assert!(npc_navigation::pilot_line_of_sight(
+                (guard.x, guard.y),
+                (guard.x, guard.y)
+            ));
+        }
+        let arrived = npcs.position_at(3, 1980).unwrap();
+        assert_eq!((arrived.x, arrived.y), (270, 220));
+        assert_ne!((arrived.x, arrived.y), (start.x, start.y));
+        for tick in 1981..=2100 {
+            supply.advance(tick);
+            npcs.advance_social(tick);
+            npcs.advance_worksite_social(tick, &supply);
+        }
+        assert_eq!(supply.worksite_revision(), 3);
+        assert!(npcs.guard_watch.is_none());
+        assert!(npcs.guard_detour.as_ref().unwrap().reversing.is_some());
+        for tick in 2101..=2700 {
+            supply.advance(tick);
+            npcs.advance_social(tick);
+            npcs.advance_worksite_social(tick, &supply);
+        }
+        assert!(npcs.guard_detour.is_none());
+        assert_eq!(npcs.position_at(3, 2700), Some(start));
+        assert_eq!(npcs.guard_patrol_pause_ticks, 1320);
+        // Original authored route resumes with the same local phase that
+        // was paused, rather than snapping to its absolute-world-clock site.
+        assert_eq!(npcs.position_at(3, 2760), NpcRoutines::position(3, 1440));
+        assert_eq!(npcs.position_at(4, 2760), NpcRoutines::position(4, 2760));
+        assert_eq!(npcs.position_at(5, 2760), NpcRoutines::position(5, 2760));
+        assert_eq!(supply.stocks().well_water, initial_supply.well_water);
+        assert!(supply.stocks().conserved());
+    }
+
+    #[test]
+    fn closed_site_without_three_flag_opt_in_cannot_change_guard_patrol_coordinates() {
+        let mut supply = NpcSupplyWorld::default();
+        supply.enable_pilot_maintenance();
+        let mut npcs = NpcRoutines::default();
+        for tick in 0..=3000 {
+            supply.advance(tick);
+            npcs.advance_worksite_social(tick, &supply);
+            assert_eq!(npcs.position_at(3, tick), NpcRoutines::position(3, tick));
+        }
+        assert!(npcs.guard_detour.is_none());
+        assert_eq!(npcs.guard_patrol_pause_ticks, 0);
+    }
+
+    #[test]
+    fn early_server_reopening_reverses_before_reaching_site_without_position_jump() {
+        let mut supply = NpcSupplyWorld::default();
+        supply.enable_pilot_maintenance();
+        let mut npcs = NpcRoutines::default();
+        npcs.enable_pilot_guard_detours();
+        for tick in 0..=1500 {
+            supply.advance(tick);
+            npcs.advance_social(tick);
+            npcs.advance_worksite_social(tick, &supply);
+        }
+        assert!(npcs.guard_detour.is_some());
+        let departure = NpcRoutines::position(3, 1380).unwrap();
+        let at1500 = npcs.position_at(3, 1500).unwrap();
+        assert_ne!(at1500, departure);
+        let mut flags = [true; 5];
+        flags[1] = true; // strictly newer authenticated revision
+        supply
+            .adopt_server_worksites(crate::zone::ZoneId::Moonvale, 1, 3, flags)
+            .unwrap();
+        for tick in 1501..=1560 {
+            supply.advance(tick);
+            npcs.advance_social(tick);
+            npcs.advance_worksite_social(tick, &supply);
+        }
+        let before_retreat = npcs.position_at(3, 1560).unwrap();
+        assert_ne!(before_retreat, departure);
+        assert!(npcs.guard_detour.as_ref().unwrap().reversing.is_some());
+        assert!(npcs.guard_watch.is_none());
+        for tick in 1561..=1740 {
+            supply.advance(tick);
+            npcs.advance_social(tick);
+            npcs.advance_worksite_social(tick, &supply);
+        }
+        assert!(npcs.guard_detour.is_none());
+        assert_eq!(npcs.position_at(3, 1740), Some(departure));
+        assert_eq!(npcs.guard_patrol_pause_ticks, 360);
+        assert_eq!(npcs.position_at(3, 1800), NpcRoutines::position(3, 1440));
+        assert!(supply.stocks().conserved());
+    }
+
+    #[test]
+    fn optional_detour_replicates_real_guard_position_without_changing_wire_format() {
+        let mut supply = NpcSupplyWorld::default();
+        supply.enable_pilot_maintenance();
+        let mut npcs = NpcRoutines::default();
+        npcs.enable_pilot_guard_detours();
+        for tick in 0..=1560 {
+            supply.advance(tick);
+            npcs.advance_worksite_social(tick, &supply);
+        }
+        let frame = npcs.state_packet_with_supply(1560, &supply);
+        let old = NpcRoutines::state_packet(1560);
+        assert_eq!(frame.len(), 38);
+        assert_eq!(&frame[0..8], &old[0..8]);
+        let guard = npcs.position_at(3, 1560).unwrap();
+        let index = 8 + 2 * 6;
+        assert_eq!(
+            u16::from_le_bytes(frame[index + 1..index + 3].try_into().unwrap()),
+            guard.x
+        );
+        assert_eq!(
+            u16::from_le_bytes(frame[index + 3..index + 5].try_into().unwrap()),
+            guard.y
+        );
+        assert_eq!(frame[index + 5], 1);
+        assert_ne!(&frame[index + 1..index + 5], &old[index + 1..index + 5]);
+        for npc_index in [0_usize, 1, 3, 4] {
+            let offset = 8 + 6 * npc_index;
+            assert_eq!(&frame[offset..offset + 5], &old[offset..offset + 5]);
+        }
+        assert!(npcs
+            .guard_watch_report(3, 1560, &supply)
+            .unwrap()
+            .contains("pilot-only inspection detour"));
         assert!(supply.stocks().conserved());
     }
 }

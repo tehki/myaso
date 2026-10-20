@@ -738,3 +738,63 @@ one-assignment-per-revision, exact revision invalidation after
 reopening, player-chat nonauthority, and no extra resource or
 combat changes. The existing reliable client packet types stay
 unchanged; all player-facing queries are read-only.
+
+## LW-1S — Optional reversible guard inspection detour (pilot geometry only)
+
+Rowan now has a **real server-simulated movement proof** that he can
+temporarily divert toward a reported worksite and return smoothly
+without editing combat physics, player actors, terrain or production
+navigation. This feature is behind a **third independent runtime gate**:
+`MYASO_NPC_GUARD_DETOUR=1` is rejected unless the strictly
+loopback-only `MYASO_NPC_PILOT=1` and the separately opted-in
+`MYASO_NPC_MAINTENANCE=1` are both enabled. All three flags default
+to off. Ordinary staging NPCs still follow their earlier fixed routes.
+
+After the server-verified yard closure at tick 900, Tomas can report
+to Rowan in person at around tick 1380. Rowan must first accept the
+LW-1R priority watch from the same current authoritative worksite
+revision and actual near-site, unobstructed lookout. Only then does
+the pilot guard-detour controller generate a route from his **server
+position at that meeting** to the immutable yard worksite. The
+route is planned from the same bounded, server-owned *pilot*
+`CollisionWindow` as the authored NPC obstacle navigation, and all
+waypoints are checked for pilot-obstacle line-of-sight and exact grid
+membership. Starting positions may be snapped by at most two pilot
+units only when the joining segment is unobstructed; unsafe or
+unreachable site positions reject the detour instead of teleporting.
+
+The guard's authoritative pilot marker coordinates move along the
+chosen immutable route over 600 simulation ticks. If the yard is
+still closed, Rowan can pause for a bounded 300-tick lookout and then
+return; if the *server* restores it at tick 2100, he **reverses the
+same valid path**, rather than continuing toward an irrelevant
+destination. An earlier valid restoration triggers an earlier
+reversal from precisely the distance already traveled. On return,
+Rowan resumes the original authored patrol from **the same baseline
+position where he left it**, by pausing his own local patrol phase
+clock during the detour. Other NPCs retain their original positions,
+their jobs, and their finite conserved cargo.
+
+The snapshot remains the exact same 38-byte reliable NPC marker frame
+(type 8). During an opted-in detour the server sends Rowan's actual
+staging position via the same one-second status cadence; the client
+need not trust its own path planner. NPC social encounters, sight
+observations, dialogue and combat-death witnesses use Rowan's
+server-controlled *actual staging position* while detouring, not
+his obsolete fixed schedule. The `guard response` correctly says
+he is on a **pilot-only inspection detour** and explicitly never
+claims to repair a site, affect a fighter or possess building access.
+There is still no live map collision or dynamic production navigation:
+World & Gameplay's authoritative collider/door contract remains
+unmerged and **must not be replaced by the pilot test geometry**.
+
+Regression tests validate protected startup admission; bounded
+path planner rejection for blocked/out-of-bounds targets; safe
+interpolated waypoints and no added colliders; Rowan's initial
+meeting and actual detour; authenticated early site-reopening
+canceling and reverse walking; late reopening; continuity on return;
+unchanged locations of the other four NPCs; unchanged 38-byte
+wire layout with a genuinely different Rowan coordinate;
+no resource creation or task accounting mutation; and preservation
+of disabled-by-default baseline behavior. Exact-head CI and
+browser/WebTransport acceptance still gate merge.

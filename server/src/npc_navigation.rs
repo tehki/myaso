@@ -129,6 +129,85 @@ pub fn position(id: u8, outward_progress: u32) -> Option<(u16, u16)> {
         None => (start.0 as u16, start.1 as u16),
     })
 }
+/// Pilot ONLY, for a guarded detour from a current server NPC position
+/// to an immutable server worksite. It uses the same bounded authored Rust
+/// collision window as baseline staging, never browser art or player input.
+/// Snapping by <= 2 units is permitted only if the short join is unobstructed.
+pub fn pilot_inspection_route(from: (u16, u16), to: (u16, u16)) -> Option<Vec<(u16, u16)>> {
+    let snap = (
+        (i32::from(from.0) + GRID_STEP / 2) / GRID_STEP * GRID_STEP,
+        (i32::from(from.1) + GRID_STEP / 2) / GRID_STEP * GRID_STEP,
+    );
+    if (i32::from(from.0) - snap.0).abs() > 2
+        || (i32::from(from.1) - snap.1).abs() > 2
+        || snap.0 < 0
+        || snap.1 < 0
+        || !pilot_line_of_sight(from, (snap.0 as u16, snap.1 as u16))
+    {
+        return None;
+    }
+    let path = pilot_window()
+        .plan(snap, (i32::from(to.0), i32::from(to.1)))
+        .ok()?;
+    if path.len() > 128 {
+        return None;
+    }
+    let mut result = Vec::with_capacity(path.len() + 1);
+    result.push(from);
+    for (x, y) in path {
+        let next = (u16::try_from(x).ok()?, u16::try_from(y).ok()?);
+        if result.last().copied() != Some(next) {
+            result.push(next);
+        }
+    }
+    if !result
+        .windows(2)
+        .all(|points| pilot_line_of_sight(points[0], points[1]))
+    {
+        return None;
+    }
+    Some(result)
+}
+
+/// Follow immutable pilot route over 600 simulation ticks. Reversing its
+/// progress produces precisely the same safe waypoints in reverse.
+pub fn pilot_inspection_position(path: &[(u16, u16)], progress: u32) -> Option<(u16, u16)> {
+    let first = *path.first()?;
+    if path.len() == 1 {
+        return Some(first);
+    }
+    let total: f32 = path
+        .windows(2)
+        .map(|p| {
+            let dx = f32::from(p[1].0) - f32::from(p[0].0);
+            let dy = f32::from(p[1].1) - f32::from(p[0].1);
+            dx.hypot(dy)
+        })
+        .sum();
+    if total <= f32::EPSILON {
+        return Some(first);
+    }
+    let mut remain = total * progress.min(WALK_TICKS) as f32 / WALK_TICKS as f32;
+    for pair in path.windows(2) {
+        let dx = f32::from(pair[1].0) - f32::from(pair[0].0);
+        let dy = f32::from(pair[1].1) - f32::from(pair[0].1);
+        let segment = dx.hypot(dy);
+        if remain <= segment {
+            let amount = if segment <= f32::EPSILON {
+                0.0
+            } else {
+                remain / segment
+            };
+            return Some((
+                (f32::from(pair[0].0) + dx * amount).round() as u16,
+                (f32::from(pair[0].1) + dy * amount).round() as u16,
+            ));
+        }
+        remain -= segment;
+    }
+    path.last().copied()
+}
+
 pub fn valid_route(id: u8) -> bool {
     ROUTES
         .iter()
@@ -236,5 +315,41 @@ mod tests {
         assert_eq!(packet.len(), 4 + 3 * 8);
         assert_eq!(&packet[..4], &[1, 10, 3, 0]);
         assert_eq!(&packet[4..8], &[195, 0, 180, 0]);
+    }
+
+    #[test]
+    fn inspection_route_uses_trusted_pilot_window_and_reversible_points() {
+        let start = crate::npc_routines::NpcRoutines::position(3, 1380).unwrap();
+        let path = pilot_inspection_route((start.x, start.y), (270, 220)).unwrap();
+        assert!(path.len() < 128);
+        assert_eq!(path.first().copied(), Some((start.x, start.y)));
+        assert_eq!(path.last().copied(), Some((270, 220)));
+        assert_eq!(
+            pilot_inspection_position(&path, 0),
+            Some((start.x, start.y))
+        );
+        assert_eq!(pilot_inspection_position(&path, 600), Some((270, 220)));
+        for tick in 0..=600 {
+            let point = pilot_inspection_position(&path, tick).unwrap();
+            assert!(pilot_line_of_sight(point, point));
+            if tick > 0 {
+                let previous = pilot_inspection_position(&path, tick - 1).unwrap();
+                assert!((i32::from(point.0) - i32::from(previous.0)).abs() <= 2);
+                assert!((i32::from(point.1) - i32::from(previous.1)).abs() <= 2);
+            }
+        }
+        assert_eq!(pilot_inspection_position(&path, 6000), Some((270, 220)));
+    }
+
+    #[test]
+    fn inspection_paths_fail_closed_for_blocked_or_unreachable_endpoints() {
+        assert!(pilot_inspection_route((270, 220), (300, 230)).is_none()); // supply crate
+        assert!(pilot_inspection_route((0, 0), (270, 220)).is_none());
+        assert!(pilot_inspection_route((270, 220), (500, 500)).is_none());
+        assert_eq!(pilot_inspection_position(&[], 120), None);
+        assert_eq!(
+            pilot_inspection_position(&[(270, 220)], 120),
+            Some((270, 220))
+        );
     }
 }
