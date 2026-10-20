@@ -309,6 +309,22 @@ impl DurableItemJournal {
         self.ledger.item_count()
     }
 
+    /// Read-only proof that an exact transaction batch has been committed.
+    /// Missing IDs return None and conflicting ID reuse fails closed.
+    /// This never writes a journal record or consumes a new sequence.
+    pub fn verified_receipt(
+        &self,
+        transaction: OwnershipTxnId,
+        operations: &[OwnershipOp],
+    ) -> Result<Option<OwnershipReceipt>, ItemJournalError> {
+        if self.poisoned {
+            return Err(ItemJournalError::Poisoned);
+        }
+        self.ledger
+            .committed_receipt(transaction, operations)
+            .map_err(ItemJournalError::InvalidTransaction)
+    }
+
     pub fn apply(
         &mut self,
         transaction: OwnershipTxnId,
