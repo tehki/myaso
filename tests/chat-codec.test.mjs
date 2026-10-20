@@ -103,12 +103,17 @@ test("optional WebTransport channel handles fragmented network frames separately
   assert.equal(channel.closed, true);
 });
 
-test("optional chat startup times out when peer never opens a reply stream", async () => {
-  let aborted = 0;
+test("optional chat timeout preserves shared QUIC incoming stream collection", async () => {
+  let aborted = 0, collectionCancelled = 0, gameplayClosed = 0;
   const outbound = new WritableStream({ abort() { aborted += 1; } });
+  const incomingUnidirectionalStreams = new ReadableStream({
+    start() { /* Peer never opens chat reply stream. */ },
+    cancel() { collectionCancelled++; },
+  });
   const transport = {
     async createUnidirectionalStream() { return outbound; },
-    incomingUnidirectionalStreams: new ReadableStream({ start() {} }),
+    incomingUnidirectionalStreams,
+    close() { gameplayClosed++; },
   };
   await assert.rejects(
     openLocalChat({ kind: "webtransport", transport }, { handshakeTimeoutMs: 20 }),
@@ -117,6 +122,14 @@ test("optional chat startup times out when peer never opens a reply stream", asy
   await new Promise(resolve => setImmediate(resolve));
   assert.equal(aborted, 1, "only optional outbound chat stream is aborted");
   assert.equal(outbound.locked, false, "writer lock is released");
+  assert.equal(incomingUnidirectionalStreams.locked, false, "timed-out chat reader releases lock");
+  assert.equal(collectionCancelled, 0, "never cancel shared future QUIC incoming streams");
+  assert.equal(gameplayClosed, 0, "gameplay WebTransport stays open");
+  // Verify the stream collection remains usable by another independent
+  // protocol consumer after chat has failed.
+  const another = incomingUnidirectionalStreams.getReader();
+  assert.equal(incomingUnidirectionalStreams.locked, true);
+  another.releaseLock();
 });
 
 test("late outgoing stream is aborted after bounded startup failure", async () => {
