@@ -22,6 +22,8 @@ cargo test --locked --manifest-path server/Cargo.toml --lib
 cargo clippy --locked --manifest-path server/Cargo.toml --lib -- -D warnings
 ```
 
+**Verified local evidence on the connected Serj Linux runner (Rust 1.89):** `cargo fmt --check` passed; full server `cargo test --lib` passed **93 tests, 0 failed, 1 ignored child helper**, with the child helper executed and passed by the parent process test; strict `cargo clippy --lib -- -D warnings` passed. The new test confirmed same-process and true subprocess lock denial and post-release durable replay.
+
 Exact-head full protected GitHub `quality` is also required.
 
 ## Remaining limitations
