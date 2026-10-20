@@ -3,6 +3,7 @@
 import { MAP_IDS, getAuthoredMap } from "./authored-maps.mjs";
 import { isAuthoredPreviewWalkable } from "./authored-preview-collision.mjs";
 import { localExpeditionProgress } from "./local-expeditions.mjs";
+import { certifiedTrailForNext } from "./local-trails.mjs";
 
 export const WAYFINDING_VERSION = 1;
 export const WAYFINDING_DIRECTIONS = Object.freeze(["N","NE","E","SE","S","SW","W","NW"]);
@@ -64,8 +65,20 @@ export function drawLocalWayfindingSketch(ctx,mapId,x,y,state,size=WAYFINDING_SK
   // Target is shown only for the next selected stage, no hidden-site leakage.
   if(hint){
     const target=localExpeditionProgress(state).nextStep.site;
-    ctx.strokeStyle="#ffcc75";ctx.lineWidth=2;
-    ctx.beginPath();ctx.moveTo(px(x),py(y));ctx.lineTo(px(target.x),py(target.y));ctx.stroke();
+    const trail=certifiedTrailForNext(state,mapId);
+    if(trail){
+      // A certified route connects authored MILESTONES, not the player's
+      // current position. Rejoin it on foot; no player-steering guarantee.
+      ctx.strokeStyle="#f5c06a";ctx.lineWidth=2.5;
+      ctx.beginPath();ctx.moveTo(px(trail.points[0][0]),py(trail.points[0][1]));
+      for(let i=1;i<trail.points.length;i++)
+        ctx.lineTo(px(trail.points[i][0]),py(trail.points[i][1]));
+      ctx.stroke();
+    }else{
+      // Before any milestone, only show the basic D8 straight bearing.
+      ctx.strokeStyle="#9d9c88";ctx.lineWidth=1;
+      ctx.beginPath();ctx.moveTo(px(x),py(y));ctx.lineTo(px(target.x),py(target.y));ctx.stroke();
+    }
     ctx.fillStyle="#ffbf63";ctx.beginPath();ctx.arc(px(target.x),py(target.y),4,0,Math.PI*2);ctx.fill();
   }
   ctx.fillStyle="#ffffff";ctx.beginPath();ctx.arc(px(x),py(y),4,0,Math.PI*2);ctx.fill();
