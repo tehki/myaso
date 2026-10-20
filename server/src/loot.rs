@@ -155,7 +155,7 @@ pub enum LootError {
     IdExhausted,
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct LootAuthority {
     next_id: u64,
     players: BTreeMap<u32, Inventory>,
@@ -164,12 +164,21 @@ pub struct LootAuthority {
     corpses: BTreeMap<u64, Corpse>,
 }
 
-impl LootAuthority {
-    pub fn new() -> Self {
+impl Default for LootAuthority {
+    fn default() -> Self {
         Self {
             next_id: 1,
-            ..Self::default()
+            players: BTreeMap::new(),
+            dead: BTreeSet::new(),
+            ground: BTreeMap::new(),
+            corpses: BTreeMap::new(),
         }
+    }
+}
+
+impl LootAuthority {
+    pub fn new() -> Self {
+        Self::default()
     }
 
     fn allocate_id(&mut self) -> Result<u64, LootError> {
@@ -269,6 +278,26 @@ impl LootAuthority {
         }
         let item = inventory.backpack.remove(index);
         inventory.equipment.insert(slot, item);
+        Ok(())
+    }
+
+    pub fn unequip(
+        &mut self,
+        authenticated_id: u32,
+        slot: EquipmentSlot,
+    ) -> Result<(), LootError> {
+        if self.dead.contains(&authenticated_id) {
+            return Err(LootError::DeadPlayer);
+        }
+        let inventory = self
+            .players
+            .get_mut(&authenticated_id)
+            .ok_or(LootError::UnknownPlayer)?;
+        if inventory.backpack.len() >= BACKPACK_CAPACITY {
+            return Err(LootError::InventoryFull);
+        }
+        let item = inventory.equipment.remove(&slot).ok_or(LootError::NotFound)?;
+        inventory.backpack.push(item);
         Ok(())
     }
 
@@ -383,6 +412,47 @@ impl LootAuthority {
         }
         self.dead.remove(&authenticated_id);
         Ok(())
+    }
+
+    /// Drop one item from the backpack into the physical world.
+    /// Caller MUST source zone and fighter from server-owned state.
+    pub fn drop_backpack(
+        &mut self,
+        authenticated_id: u32,
+        fighter: &Fighter,
+        zone: ZoneId,
+        item_id: u64,
+        now_ms: u64,
+    ) -> Result<u64, LootError> {
+        self.require_alive(authenticated_id, fighter)?;
+        let at = Point::from_fighter(fighter);
+        if !at.in_zone(zone) {
+            return Err(LootError::InvalidPosition);
+        }
+        let inventory = self.players.get(&authenticated_id).expect("checked");
+        let index = inventory
+            .backpack
+            .iter()
+            .position(|item| item.id == item_id)
+            .ok_or(LootError::NotFound)?;
+        let entity_id = self.allocate_id()?;
+        let item = self
+            .players
+            .get_mut(&authenticated_id)
+            .expect("checked")
+            .backpack
+            .remove(index);
+        self.ground.insert(
+            entity_id,
+            GroundDrop {
+                entity_id,
+                zone,
+                at,
+                expires_at_ms: now_ms.saturating_add(GROUND_DECAY_MS),
+                item,
+            },
+        );
+        Ok(entity_id)
     }
 
     /// Caller MUST source zone from ZoneAuthority and fighter from authoritative World.
@@ -649,6 +719,22 @@ mod tests {
             ),
             Err(LootError::NotFound)
         );
+    }
+
+    #[test]
+    fn player_can_deliberately_drop_equipped_items_after_unequipping() {
+        let mut loot = LootAuthority::default();
+        loot.register(1).unwrap();
+        loot.register(2).unwrap();
+        let sword = loot.grant(1, ItemKind::RustySword, 1).unwrap();
+        loot.equip(1, sword, EquipmentSlot::MainHand).unwrap();
+        assert_eq!(loot.drop_backpack(1, &fighter(1, 150.0, 150.0, false), ZoneId::Moonvale, sword, 1), Err(LootError::NotFound));
+        loot.unequip(1, EquipmentSlot::MainHand).unwrap();
+        let drop_id = loot.drop_backpack(1, &fighter(1, 150.0, 150.0, false), ZoneId::Moonvale, sword, 10).unwrap();
+        assert_eq!(loot.inventory(1).unwrap().stack_count(), 0);
+        assert_eq!(loot.take_ground(2, &fighter(2, 150.0, 150.0, false), ZoneId::Moonvale, drop_id, 11).unwrap().id, sword);
+        assert!(!loot.ground().contains_key(&drop_id));
+        assert_eq!(loot.inventory(2).unwrap().backpack()[0].id, sword);
     }
 
     #[test]
