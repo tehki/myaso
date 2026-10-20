@@ -1,0 +1,342 @@
+{
+  "annotationNotActualFootSoleContact": true,
+  "frameCountPerDirection": 8,
+  "frameDirections": [
+    0,
+    6
+  ],
+  "gameCombatChanged": false,
+  "jointTailSampleCount": 32,
+  "milestone": "A2.12 authentic A3 rig foot joint review overlay",
+  "nearOpaqueJointTailCount": 32,
+  "originalAtlasModified": false,
+  "productionApproved": false,
+  "reviewMarkers": "Cyan bone head, yellow bone tail, pink visual fighter origin",
+  "samples": [
+    {
+      "bone": "LeftFoot",
+      "direction": 0,
+      "frame": 0,
+      "nearOpaquePixel3pxRadius": true,
+      "tailPresentationOffsetPx": [
+        11.0098,
+        25.956
+      ]
+    },
+    {
+      "bone": "RightFoot",
+      "direction": 0,
+      "frame": 0,
+      "nearOpaquePixel3pxRadius": true,
+      "tailPresentationOffsetPx": [
+        -17.9444,
+        15.1859
+      ]
+    },
+    {
+      "bone": "LeftFoot",
+      "direction": 0,
+      "frame": 1,
+      "nearOpaquePixel3pxRadius": true,
+      "tailPresentationOffsetPx": [
+        6.2669,
+        21.5038
+      ]
+    },
+    {
+      "bone": "RightFoot",
+      "direction": 0,
+      "frame": 1,
+      "nearOpaquePixel3pxRadius": true,
+      "tailPresentationOffsetPx": [
+        -18.7894,
+        11.2135
+      ]
+    },
+    {
+      "bone": "LeftFoot",
+      "direction": 0,
+      "frame": 2,
+      "nearOpaquePixel3pxRadius": true,
+      "tailPresentationOffsetPx": [
+        -7.4416,
+        1.8091
+      ]
+    },
+    {
+      "bone": "RightFoot",
+      "direction": 0,
+      "frame": 2,
+      "nearOpaquePixel3pxRadius": true,
+      "tailPresentationOffsetPx": [
+        -30.9103,
+        -10.9523
+      ]
+    },
+    {
+      "bone": "LeftFoot",
+      "direction": 0,
+      "frame": 3,
+      "nearOpaquePixel3pxRadius": true,
+      "tailPresentationOffsetPx": [
+        -8.8883,
+        -32.4879
+      ]
+    },
+    {
+      "bone": "RightFoot",
+      "direction": 0,
+      "frame": 3,
+      "nearOpaquePixel3pxRadius": true,
+      "tailPresentationOffsetPx": [
+        -32.1012,
+        -24.5944
+      ]
+    },
+    {
+      "bone": "LeftFoot",
+      "direction": 0,
+      "frame": 4,
+      "nearOpaquePixel3pxRadius": true,
+      "tailPresentationOffsetPx": [
+        -2.4339,
+        16.2934
+      ]
+    },
+    {
+      "bone": "RightFoot",
+      "direction": 0,
+      "frame": 4,
+      "nearOpaquePixel3pxRadius": true,
+      "tailPresentationOffsetPx": [
+        -26.7214,
+        29.0451
+      ]
+    },
+    {
+      "bone": "LeftFoot",
+      "direction": 0,
+      "frame": 5,
+      "nearOpaquePixel3pxRadius": true,
+      "tailPresentationOffsetPx": [
+        5.0862,
+        37.3262
+      ]
+    },
+    {
+      "bone": "RightFoot",
+      "direction": 0,
+      "frame": 5,
+      "nearOpaquePixel3pxRadius": true,
+      "tailPresentationOffsetPx": [
+        -20.5791,
+        42.8573
+      ]
+    },
+    {
+      "bone": "LeftFoot",
+      "direction": 0,
+      "frame": 6,
+      "nearOpaquePixel3pxRadius": true,
+      "tailPresentationOffsetPx": [
+        10.2806,
+        25.3307
+      ]
+    },
+    {
+      "bone": "RightFoot",
+      "direction": 0,
+      "frame": 6,
+      "nearOpaquePixel3pxRadius": true,
+      "tailPresentationOffsetPx": [
+        -18.0397,
+        15.7651
+      ]
+    },
+    {
+      "bone": "LeftFoot",
+      "direction": 0,
+      "frame": 7,
+      "nearOpaquePixel3pxRadius": true,
+      "tailPresentationOffsetPx": [
+        11.0098,
+        25.956
+      ]
+    },
+    {
+      "bone": "RightFoot",
+      "direction": 0,
+      "frame": 7,
+      "nearOpaquePixel3pxRadius": true,
+      "tailPresentationOffsetPx": [
+        -17.9444,
+        15.186
+      ]
+    },
+    {
+      "bone": "LeftFoot",
+      "direction": 6,
+      "frame": 0,
+      "nearOpaquePixel3pxRadius": true,
+      "tailPresentationOffsetPx": [
+        15.8592,
+        8.7113
+      ]
+    },
+    {
+      "bone": "RightFoot",
+      "direction": 6,
+      "frame": 0,
+      "nearOpaquePixel3pxRadius": true,
+      "tailPresentationOffsetPx": [
+        -0.8379,
+        27.2407
+      ]
+    },
+    {
+      "bone": "LeftFoot",
+      "direction": 6,
+      "frame": 1,
+      "nearOpaquePixel3pxRadius": true,
+      "tailPresentationOffsetPx": [
+        7.7622,
+        12.4998
+      ]
+    },
+    {
+      "bone": "RightFoot",
+      "direction": 6,
+      "frame": 1,
+      "nearOpaquePixel3pxRadius": true,
+      "tailPresentationOffsetPx": [
+        -6.4392,
+        27.4055
+      ]
+    },
+    {
+      "bone": "LeftFoot",
+      "direction": 6,
+      "frame": 2,
+      "nearOpaquePixel3pxRadius": true,
+      "tailPresentationOffsetPx": [
+        -17.9529,
+        18.1075
+      ]
+    },
+    {
+      "bone": "RightFoot",
+      "direction": 6,
+      "frame": 2,
+      "nearOpaquePixel3pxRadius": true,
+      "tailPresentationOffsetPx": [
+        -22.0107,
+        23.0129
+      ]
+    },
+    {
+      "bone": "LeftFoot",
+      "direction": 6,
+      "frame": 3,
+      "nearOpaquePixel3pxRadius": true,
+      "tailPresentationOffsetPx": [
+        -14.8103,
+        -17.278
+      ]
+    },
+    {
+      "bone": "RightFoot",
+      "direction": 6,
+      "frame": 3,
+      "nearOpaquePixel3pxRadius": true,
+      "tailPresentationOffsetPx": [
+        -0.6213,
+        -3.5929
+      ]
+    },
+    {
+      "bone": "LeftFoot",
+      "direction": 6,
+      "frame": 4,
+      "nearOpaquePixel3pxRadius": true,
+      "tailPresentationOffsetPx": [
+        41.8119,
+        -8.9798
+      ]
+    },
+    {
+      "bone": "RightFoot",
+      "direction": 6,
+      "frame": 4,
+      "nearOpaquePixel3pxRadius": true,
+      "tailPresentationOffsetPx": [
+        45.9942,
+        16.6756
+      ]
+    },
+    {
+      "bone": "LeftFoot",
+      "direction": 6,
+      "frame": 5,
+      "nearOpaquePixel3pxRadius": true,
+      "tailPresentationOffsetPx": [
+        52.3212,
+        0.4816
+      ]
+    },
+    {
+      "bone": "RightFoot",
+      "direction": 6,
+      "frame": 5,
+      "nearOpaquePixel3pxRadius": true,
+      "tailPresentationOffsetPx": [
+        45.3907,
+        26.933
+      ]
+    },
+    {
+      "bone": "LeftFoot",
+      "direction": 6,
+      "frame": 6,
+      "nearOpaquePixel3pxRadius": true,
+      "tailPresentationOffsetPx": [
+        15.9689,
+        8.4836
+      ]
+    },
+    {
+      "bone": "RightFoot",
+      "direction": 6,
+      "frame": 6,
+      "nearOpaquePixel3pxRadius": true,
+      "tailPresentationOffsetPx": [
+        -0.545,
+        27.6929
+      ]
+    },
+    {
+      "bone": "LeftFoot",
+      "direction": 6,
+      "frame": 7,
+      "nearOpaquePixel3pxRadius": true,
+      "tailPresentationOffsetPx": [
+        15.8592,
+        8.7113
+      ]
+    },
+    {
+      "bone": "RightFoot",
+      "direction": 6,
+      "frame": 7,
+      "nearOpaquePixel3pxRadius": true,
+      "tailPresentationOffsetPx": [
+        -0.8379,
+        27.2407
+      ]
+    }
+  ],
+  "sourceAtlasFilename": "silver_roll.webp",
+  "sourceClip": "silver_roll",
+  "sourceGLBSHA256": "e4a263d480896fb1069ffc81e913e9aaa7324ff344611f5b69829cfee25c5d94",
+  "spritePivotChanged": false,
+  "visualPreview": "silver_roll_a212_foot_joint_overlay.png"
+}
