@@ -59,14 +59,71 @@ fn touches_greyhaven_wall(x: f32, y: f32, radius: f32) -> bool {
     let t = WALL_HALF_THICKNESS;
     let gx = GATE_X;
     let gy = GATE_Y;
-    touches_rect(x, y, radius, left - t, top - t, gx - GATE_X_HALF_WIDTH, top + t)
-        || touches_rect(x, y, radius, gx + GATE_X_HALF_WIDTH, top - t, right + t, top + t)
-        || touches_rect(x, y, radius, left - t, bottom - t, gx - GATE_X_HALF_WIDTH, bottom + t)
-        || touches_rect(x, y, radius, gx + GATE_X_HALF_WIDTH, bottom - t, right + t, bottom + t)
-        || touches_rect(x, y, radius, left - t, top - t, left + t, gy - GATE_Y_HALF_HEIGHT)
-        || touches_rect(x, y, radius, left - t, gy + GATE_Y_HALF_HEIGHT, left + t, bottom + t)
-        || touches_rect(x, y, radius, right - t, top - t, right + t, gy - GATE_Y_HALF_HEIGHT)
-        || touches_rect(x, y, radius, right - t, gy + GATE_Y_HALF_HEIGHT, right + t, bottom + t)
+    touches_rect(
+        x,
+        y,
+        radius,
+        left - t,
+        top - t,
+        gx - GATE_X_HALF_WIDTH,
+        top + t,
+    ) || touches_rect(
+        x,
+        y,
+        radius,
+        gx + GATE_X_HALF_WIDTH,
+        top - t,
+        right + t,
+        top + t,
+    ) || touches_rect(
+        x,
+        y,
+        radius,
+        left - t,
+        bottom - t,
+        gx - GATE_X_HALF_WIDTH,
+        bottom + t,
+    ) || touches_rect(
+        x,
+        y,
+        radius,
+        gx + GATE_X_HALF_WIDTH,
+        bottom - t,
+        right + t,
+        bottom + t,
+    ) || touches_rect(
+        x,
+        y,
+        radius,
+        left - t,
+        top - t,
+        left + t,
+        gy - GATE_Y_HALF_HEIGHT,
+    ) || touches_rect(
+        x,
+        y,
+        radius,
+        left - t,
+        gy + GATE_Y_HALF_HEIGHT,
+        left + t,
+        bottom + t,
+    ) || touches_rect(
+        x,
+        y,
+        radius,
+        right - t,
+        top - t,
+        right + t,
+        gy - GATE_Y_HALF_HEIGHT,
+    ) || touches_rect(
+        x,
+        y,
+        radius,
+        right - t,
+        gy + GATE_Y_HALF_HEIGHT,
+        right + t,
+        bottom + t,
+    )
 }
 
 #[inline]
@@ -170,7 +227,10 @@ mod tests {
     fn shared_golden_fixture_matches_d3_world_geometry() {
         const GOLDEN: &str = include_str!("../../tests/fixtures/world-geometry-parity-v1.csv");
         let mut checked = 0;
-        for line in GOLDEN.lines().filter(|line| !line.is_empty() && !line.starts_with('#')) {
+        for line in GOLDEN
+            .lines()
+            .filter(|line| !line.is_empty() && !line.starts_with('#'))
+        {
             let mut parts = line.split(',');
             let map = match parts.next().unwrap() {
                 "moonvale-overworld" => GeometryMap::Moonvale,
@@ -185,7 +245,11 @@ mod tests {
                 "0" => false,
                 other => panic!("Invalid expected state {other}"),
             };
-            assert_eq!(parts.next(), None, "fixture must contain exactly five fields");
+            assert_eq!(
+                parts.next(),
+                None,
+                "fixture must contain exactly five fields"
+            );
             assert_eq!(is_walkable(map, x, y, radius), expected, "fixture: {line}");
             checked += 1;
         }
@@ -207,9 +271,29 @@ mod tests {
 
     #[test]
     fn player_can_use_only_the_two_authored_moonvale_bridge_corridors() {
-        assert!(is_walkable(GeometryMap::Moonvale, 1980.0, 4240.0, FIGHTER_RADIUS));
-        assert!(is_walkable(GeometryMap::Moonvale, 2100.0, 5500.0, FIGHTER_RADIUS));
-        assert!(!is_walkable(GeometryMap::Moonvale, 1940.0, 3840.0, FIGHTER_RADIUS));
-        assert!(!is_walkable(GeometryMap::Moonvale, 4365.0, 4000.0, FIGHTER_RADIUS));
+        assert!(is_walkable(
+            GeometryMap::Moonvale,
+            1980.0,
+            4240.0,
+            FIGHTER_RADIUS
+        ));
+        assert!(is_walkable(
+            GeometryMap::Moonvale,
+            2100.0,
+            5500.0,
+            FIGHTER_RADIUS
+        ));
+        assert!(!is_walkable(
+            GeometryMap::Moonvale,
+            1940.0,
+            3840.0,
+            FIGHTER_RADIUS
+        ));
+        assert!(!is_walkable(
+            GeometryMap::Moonvale,
+            4365.0,
+            4000.0,
+            FIGHTER_RADIUS
+        ));
     }
 }
