@@ -15,6 +15,7 @@ use myaso_server::magic_fx_handoff::{FxQueueGate, FxRoute, TrustedFxHandoff, Tru
 use myaso_server::magic_fx_shared_transport::{
     plan_shared_dispatch, CoreGameplayDatagram, CoreWriterCapacity, SharedPriority,
 };
+use myaso_server::magic_fx_shared_writer::try_write_shared;
 use std::collections::BTreeMap;
 use std::net::SocketAddr;
 use std::sync::Arc;
@@ -258,17 +259,30 @@ async fn main() -> Result<()> {
             shared_visual_dropped += dispatch.cosmetic_dropped;
             total_gp += dispatch.gameplay_datagrams;
             total_fx_bytes += dispatch.cosmetic_payload_bytes;
-            for payload in &dispatch.ordered {
-                if !handoff.route_current(payload.route) {
-                    bail!("P13 stale route detected at final loopback enqueue");
-                }
-                let (connection, _) = connections
-                    .get(&payload.route.connection_id)
-                    .context("P13 connection missing at final loopback enqueue")?;
-                connection
-                    .send_datagram(payload.bytes)
-                    .context("P13 real shared-connection QUIC datagram")?;
+            // P14 hands P12's plan to a controlled Core-style writer seam.
+            // It checks generation at each send and returns the exact first
+            // unsent gameplay index if the QUIC writer stops accepting.
+            let wrote = try_write_shared(
+                &dispatch,
+                |route| handoff.route_current(route),
+                |route, bytes| {
+                    let (connection, _) = connections
+                        .get(&route.connection_id)
+                        .context("P14 trusted loopback connection missing")?;
+                    connection
+                        .send_datagram(bytes)
+                        .context("P14 real shared-connection QUIC datagram")
+                },
+            );
+            if let Some(error) = wrote.failure {
+                bail!(
+                    "P14 gameplay writer failed after {} test datagrams: {error:?}",
+                    wrote.gameplay_sent
+                );
             }
+            assert_eq!(wrote.gameplay_sent, connections.len());
+            assert_eq!(wrote.cosmetic_sent, dispatch.cosmetic_datagrams);
+            assert_eq!(wrote.cosmetic_not_sent, 0);
         } else {
             total_fx_bytes += plan.cosmetic_payload_bytes;
             for batch in plan.routes {
