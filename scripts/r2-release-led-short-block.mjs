@@ -12,13 +12,15 @@ import { setTimeout as sleepTimer } from "node:timers/promises";
 export async function dispatchR2ReleaseLedShortBlock({
   sendAttackDown, sendWheel, awaitTrustedWheel, sendAttackUp,
   now = () => performance.now(), sleep = sleepTimer,
-  maxHoldMs = 280, receiptGraceMs = 100,
+  maxHoldMs = 280, receiptGraceMs = 100, trustedWheelWaitMs = 0,
 }) {
   if (![sendAttackDown, sendWheel, awaitTrustedWheel, sendAttackUp, now, sleep]
     .every(fn => typeof fn === "function")
     || !Number.isFinite(maxHoldMs) || maxHoldMs < 10 || maxHoldMs >= 320
     || !Number.isFinite(receiptGraceMs) || receiptGraceMs < 0
-    || receiptGraceMs >= maxHoldMs) {
+    || receiptGraceMs >= maxHoldMs
+    || !Number.isFinite(trustedWheelWaitMs) || trustedWheelWaitMs < 0
+    || trustedWheelWaitMs >= maxHoldMs) {
     throw new TypeError("R2 guard-break requires bounded genuine W3C held-release and attestation");
   }
   const startedAt = now();
@@ -52,7 +54,20 @@ export async function dispatchR2ReleaseLedShortBlock({
   // Cap the wait at 100ms so late attestations never prolong the light.
   // Actual trusted wheel-before-pointerUP, no HP, expected guard and no
   // parry remain mandatory, independently of any attestation delay.
-  await Promise.race([attestation, sleep(receiptGraceMs), earlyWheelFailure]);
+  // M194 repeated native proof only: #39453669647 delivered Firefox's
+  // genuine wheel 133ms after Chrome down, AFTER the normal 100ms release.
+  // Wait for the pre-established low-latency trusted WebSocket receipt before
+  // this one LMB-up. A 190ms fail-closed ceiling prevents heavy commitment.
+  // Other scenarios retain their existing 100ms receipt-grace behavior.
+  if (trustedWheelWaitMs > 0) {
+    await Promise.race([
+      attestation,
+      sleep(trustedWheelWaitMs).then(() => { throw new Error("M194 trusted native wheel not delivered within light-release budget"); }),
+      earlyWheelFailure,
+    ]);
+  } else {
+    await Promise.race([attestation, sleep(receiptGraceMs), earlyWheelFailure]);
+  }
   const attackUpDispatchMs = ms();
   if (attackUpDispatchMs - attackDownDispatchMs > maxHoldMs) {
     throw new Error("R2 genuine LMB hold exceeded light-charge budget before release; no strike allowed");

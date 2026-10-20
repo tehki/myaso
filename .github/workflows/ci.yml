@@ -197,6 +197,8 @@ jobs:
       - name: Validate M194 repeated real guard-break block-only pressure
         run: |
           node --check scripts/pvp_browser_flight_runner.mjs
+          node --check scripts/r2-release-led-short-block.mjs
+          node --test tests/r2-m194-trusted-wheel-release.test.mjs
           # Five fresh Chrome/Firefox W3C sessions, with exact -38 guard-pressure,
           # 100 HP, zero parries, and eventual authoritative guard-break.
           for attempt in 1 2 3 4 5; do
