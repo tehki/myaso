@@ -7,6 +7,7 @@
 use std::collections::VecDeque;
 
 use crate::elemental_physics::Element;
+use crate::magic_fx_spatial::{FxQueryStats, MagicFxSpatialIndex};
 
 pub const MAGIC_FX_WIRE_VERSION: u8 = 1;
 pub const MAGIC_FX_PACKET_BYTES: usize = 32;
@@ -48,6 +49,12 @@ pub struct ViewerInterest {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct FxIndexStats {
+    pub total_events: usize,
+    pub active_cells: usize,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum FxError {
     InvalidTick,
     InvalidEffect,
@@ -82,6 +89,7 @@ fn valid_viewer(view: &ViewerInterest) -> bool {
 #[derive(Debug)]
 pub struct SemanticEffectBroker {
     events: VecDeque<SemanticEffect>,
+    spatial: MagicFxSpatialIndex,
     now_tick: Option<u64>,
     next_event_id: u32,
     emitted_this_tick: usize,
@@ -97,6 +105,7 @@ impl SemanticEffectBroker {
     pub fn new() -> Self {
         Self {
             events: VecDeque::new(),
+            spatial: MagicFxSpatialIndex::new(),
             now_tick: None,
             next_event_id: 1,
             emitted_this_tick: 0,
@@ -112,6 +121,8 @@ impl SemanticEffectBroker {
         self.now_tick = Some(tick);
         self.emitted_this_tick = 0;
         self.events.retain(|effect| effect.expires_at > tick);
+        self.spatial.retain_live(tick);
+        debug_assert_eq!(self.events.len(), self.spatial.count_all());
         Ok(())
     }
 
@@ -130,12 +141,7 @@ impl SemanticEffectBroker {
         if self.events.len() >= MAX_PENDING_FX_EVENTS {
             return Err(FxError::OverloadedRealm);
         }
-        if self
-            .events
-            .iter()
-            .filter(|effect| effect.spec.zone_id == spec.zone_id)
-            .count()
-            >= MAX_FX_EVENTS_PER_ZONE
+        if self.spatial.count_zone(spec.zone_id) >= MAX_FX_EVENTS_PER_ZONE
         {
             return Err(FxError::OverloadedZone);
         }
@@ -147,12 +153,15 @@ impl SemanticEffectBroker {
             .ok_or(FxError::InvalidTick)?;
         let event_id = self.next_event_id;
         self.next_event_id += 1;
-        self.events.push_back(SemanticEffect {
+        let event = SemanticEffect {
             event_id,
             server_tick: tick as u32,
             expires_at,
             spec,
-        });
+        };
+        self.events.push_back(event);
+        self.spatial.insert(event);
+        debug_assert_eq!(self.events.len(), self.spatial.count_all());
         self.emitted_this_tick += 1;
         Ok(event_id)
     }
@@ -173,10 +182,40 @@ impl SemanticEffectBroker {
         after_id: u32,
         limit: usize,
     ) -> Vec<SemanticEffect> {
+        self.interest_snapshot_with_stats(viewer, after_id, limit).0
+    }
+
+    /// Deterministic observability for benchmark and acceptance tests.
+    /// These are aggregate cost counters, never player identifiers.
+    pub fn interest_snapshot_with_stats(
+        &self,
+        viewer: ViewerInterest,
+        after_id: u32,
+        limit: usize,
+    ) -> (Vec<SemanticEffect>, FxQueryStats) {
+        if !valid_viewer(&viewer) || limit == 0 {
+            return (Vec::new(), FxQueryStats::default());
+        }
+        self.spatial.query(viewer, after_id, limit)
+    }
+
+    pub fn index_stats(&self) -> FxIndexStats {
+        FxIndexStats {
+            total_events: self.spatial.count_all(),
+            active_cells: self.spatial.active_cells(),
+        }
+    }
+
+    #[cfg(test)]
+    pub(crate) fn linear_reference(
+        &self,
+        viewer: ViewerInterest,
+        after_id: u32,
+        limit: usize,
+    ) -> Vec<SemanticEffect> {
         if !valid_viewer(&viewer) || limit == 0 {
             return Vec::new();
         }
-        let limit = limit.min(MAX_VIEWER_FX_EVENTS);
         let radius_sq = viewer.radius * viewer.radius;
         self.events
             .iter()
@@ -190,10 +229,11 @@ impl SemanticEffectBroker {
                     && dy.abs() <= viewer.radius
                     && dx * dx + dy * dy <= radius_sq
             })
-            .take(limit)
+            .take(limit.min(MAX_VIEWER_FX_EVENTS))
             .copied()
             .collect()
     }
+
 }
 
 fn element_wire(element: Element) -> u8 {
