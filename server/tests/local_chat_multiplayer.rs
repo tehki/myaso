@@ -278,7 +278,7 @@ async fn genuine_realtime_input_ack_coexists_with_reliable_chat() {
     input[17] = 127; // move X
     sender
         .connection
-        .send_datagram(input.to_vec())
+        .send_datagram(input)
         .expect("send genuine game input");
     let acknowledged = timeout(Duration::from_secs(5), async {
         loop {
