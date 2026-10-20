@@ -37,7 +37,7 @@ CREATE INDEX IF NOT EXISTS handoffs_entity_idx
 
 CREATE OR REPLACE FUNCTION core_zone.register_entity(
     p_kind smallint, p_entity bytea, p_worker bigint, p_zone bigint
-) RETURNS bigint LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, core_zone AS $
+) RETURNS bigint LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, core_zone AS $$
 BEGIN
     INSERT INTO core_zone.entities
         (entity_kind, entity_id, owner_worker, owner_zone, authority_epoch)
@@ -59,7 +59,7 @@ CREATE OR REPLACE FUNCTION core_zone.prepare_transfer(
     p_kind smallint, p_entity bytea,
     p_source_worker bigint, p_source_zone bigint, p_source_epoch bigint,
     p_target_worker bigint, p_target_zone bigint
-) RETURNS text LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, core_zone AS $
+) RETURNS text LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, core_zone AS $$
 DECLARE
     h core_zone.handoffs%ROWTYPE;
     e core_zone.entities%ROWTYPE;
@@ -131,7 +131,7 @@ $$;
 
 CREATE OR REPLACE FUNCTION core_zone.commit_transfer(
     p_operation bytea
-) RETURNS bigint LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, core_zone AS $
+) RETURNS bigint LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, core_zone AS $$
 DECLARE
     h core_zone.handoffs%ROWTYPE;
     e core_zone.entities%ROWTYPE;
@@ -176,7 +176,7 @@ $$;
 
 CREATE OR REPLACE FUNCTION core_zone.abort_transfer(
     p_operation bytea
-) RETURNS text LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, core_zone AS $
+) RETURNS text LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, core_zone AS $$
 DECLARE
     h core_zone.handoffs%ROWTYPE;
     e core_zone.entities%ROWTYPE;
@@ -213,7 +213,7 @@ $$;
 CREATE OR REPLACE FUNCTION core_zone.is_current(
     p_kind smallint, p_entity bytea,
     p_worker bigint, p_zone bigint, p_epoch bigint
-) RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = pg_catalog, core_zone AS $
+) RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = pg_catalog, core_zone AS $$
     SELECT EXISTS (
         SELECT 1 FROM core_zone.entities
         WHERE entity_kind = p_kind AND entity_id = p_entity
@@ -228,7 +228,7 @@ $$;
 CREATE OR REPLACE FUNCTION core_zone.assert_mutation_authority(
     p_kind smallint, p_entity bytea,
     p_worker bigint, p_zone bigint, p_epoch bigint
-) RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, core_zone AS $
+) RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, core_zone AS $$
 BEGIN
     PERFORM 1 FROM core_zone.entities
         WHERE entity_kind = p_kind AND entity_id = p_entity
@@ -246,7 +246,7 @@ $$;
 CREATE OR REPLACE FUNCTION core_zone.retire_entity(
     p_kind smallint, p_entity bytea,
     p_worker bigint, p_zone bigint, p_epoch bigint
-) RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, core_zone AS $
+) RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, core_zone AS $$
 BEGIN
     UPDATE core_zone.entities SET retired = true
         WHERE entity_kind = p_kind AND entity_id = p_entity
