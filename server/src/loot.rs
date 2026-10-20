@@ -52,9 +52,13 @@ impl ItemKind {
     pub const fn fits(self, slot: EquipmentSlot) -> bool {
         matches!(
             (self, slot),
-            (Self::RustySword | Self::IronSword | Self::WoodenClub, EquipmentSlot::MainHand)
-                | (Self::LeatherArmor | Self::ChainmailArmor, EquipmentSlot::Body)
-                | (Self::IronHelmet, EquipmentSlot::Head)
+            (
+                Self::RustySword | Self::IronSword | Self::WoodenClub,
+                EquipmentSlot::MainHand
+            ) | (
+                Self::LeatherArmor | Self::ChainmailArmor,
+                EquipmentSlot::Body
+            ) | (Self::IronHelmet, EquipmentSlot::Head)
                 | (Self::LeatherBoots, EquipmentSlot::Feet)
                 | (Self::WoodenShield | Self::Spellbook, EquipmentSlot::OffHand)
         )
@@ -1301,8 +1305,14 @@ mod tests {
                 _ => EquipmentSlot::MainHand,
             }));
             if loot.inventory(1).unwrap().equipped(slot).is_some() {
-                assert!(matches!(loot.equip(1, item, slot), Err(LootError::SlotOccupied)));
-                assert_eq!(loot.inventory(1).unwrap().backpack().last().unwrap().id, item);
+                assert!(matches!(
+                    loot.equip(1, item, slot),
+                    Err(LootError::SlotOccupied)
+                ));
+                assert_eq!(
+                    loot.inventory(1).unwrap().backpack().last().unwrap().id,
+                    item
+                );
                 loot.unequip(1, slot).unwrap();
             }
             loot.equip(1, item, slot).unwrap();
