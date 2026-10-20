@@ -12,6 +12,8 @@ import { isTickNewer32, reconcilePrediction } from "../src/browser/reconciliatio
 import { createReconciliationCamera, createSnapshotRenderClock } from "../src/browser/smooth-motion.mjs";
 import { createRenderGapTelemetry } from "../src/browser/render-gap-telemetry.mjs";
 import { ARENA_VIEW_ZOOM, nearbyOffscreenPointers, projectArenaPoint } from "../src/browser/arena-viewport.mjs";
+import { createAuthoredWorldRenderer } from "../src/browser/authored-world-renderer.mjs";
+import { MAP_IDS } from "../src/world/authored-maps.mjs";
 import { NETWORK } from "../src/network/constants.mjs";
 import { connectAuthoritativeClient, parseSha256Hex } from "./authoritative-client.mjs";
 
@@ -112,6 +114,10 @@ const killFeedSequences = new Set();
 
 const params = new URLSearchParams(window.location.search);
 const diagnosticsVisible = params.get("netstats") === "1";
+// Static map is currently visual-only in authoritative multiplayer. Doors
+// become functional only after server-approved zone transitions are implemented.
+const fixedWorldEnabled = params.get("world") === "1" && !params.has("scenario");
+const authoredWorld = fixedWorldEnabled ? createAuthoredWorldRenderer() : null;
 const renderGapTelemetry = diagnosticsVisible ? createRenderGapTelemetry() : null;
 const diagnosticsPanel = document.querySelector("#network-diagnostics");
 if (diagnosticsPanel) diagnosticsPanel.hidden = !diagnosticsVisible;
@@ -893,6 +899,11 @@ function render(nowMs = performance.now(), impact = combatImpact.sample(nowMs)) 
   ctx.translate(canvas.width / 2, canvas.height / 2);
   ctx.scale(ARENA_VIEW_ZOOM, ARENA_VIEW_ZOOM);
   ctx.translate(-canvas.width / 2, -canvas.height / 2);
+
+  if (authoredWorld && local.initialized) {
+    authoredWorld.draw(ctx, MAP_IDS.overworld, visualCameraPosition,
+      canvas.width, canvas.height, ARENA_VIEW_ZOOM);
+  }
 
   for (const entity of networkClient.state.values()) {
     if (entity.netId === ownId) continue;
