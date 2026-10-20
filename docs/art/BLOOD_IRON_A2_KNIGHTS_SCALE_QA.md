@@ -17,7 +17,9 @@ Build A2 base environment first as documented in [BLOOD_IRON_A2_GREYHAVEN.md](BL
 Output is deliberately local:
 - blood_iron_knights_local_review.blend (owner's source assets inside: **DO NOT COMMIT** until provenance permits).
 - blood_iron_knights_scale_a2.png (actual skinned knight bodies in idle pose next to Red Lion).
-- blood_iron_knights_roll_a2.png (actual owner-approved A3 roll, Blender clip frame 5).
+- blood_iron_silver_roll_a2.png (Silver Knight original A3 roll at imported clip frame 5, T1 hidden from this render).
+- blood_iron_sentinel_roll_a2.png (T1 Sentinel original A3 roll at imported clip frame 5, Silver hidden from this render).
+- The two roll poses are deliberately separated in stills: two simultaneous imports converged/visually overlapped in the first comparison, making shoulder contact unreadable. This is composition-only isolation, not an animation modification.
 - blood_iron_knights_scale_report.json (rig count, source/target scale, feet alignment, clip provenance).
 
 Both rigs have 22 bones. Imported glTF action range for A3 roll is **0.4–8.8 frames** (Blender import), so QA uses frame 5. All imported NLA tracks are muted for explicit pose selection; **source GLBs and A3 approved 350 ms pose timeline remain untouched**. Gameplay roll remains 170 ms plus 180 ms recovery.
