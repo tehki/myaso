@@ -30,7 +30,7 @@ SQLite uses **WAL, synchronous=FULL, foreign keys enabled, an explicit `BEGIN IM
 
 Local authorized Serj development machine (standard Python 3 and SQLite stdlib):
 
-- **30/30 unittest cases passed** using separate real temporary SQLite files after the fixture consent/admission extension (the initial 14-test milestone was passed separately).
+- **44/44 unittest cases passed** using separate real temporary SQLite files after the fixture consent/admission extension (the initial 14-test milestone was passed separately).
 - A normal committed sale survives connection close/reopen with one set of postings, one deed owner and one outbox event.
 - Retrying the same operation ID returns the same canonical receipt, even when the server logical tick moves forward. Reusing an ID with another buyer/payload is rejected.
 - Invalid session identity, stale balance/deed versions, expired/revoked/self sale, overdraft, and title revision overflow fail without partial debits.
@@ -59,6 +59,18 @@ The consumer implementation has injectable failures after updating the read mode
 **Proof limit:** This is exactly-once *application to one local SQLite read model*, NOT exactly-once network delivery or exactly-once effects in other services. It sends **no** events to external consumers. Event digest verification is not an independently authenticated, signed integrity chain and cannot prevent someone with direct database write authority from tampering with both the receipt and event. The production protocol must use a trusted internal consumer identity, a durable asynchronous transport, recipient-side idempotency, backup/recovery and out-of-order multi-parcel event ordering.
 
 Nine additional outbox tests cover initial lag, deduplicated retry, injected rollback, hard process kills before and after consumer COMMIT, lost acknowledgment, competing processes, tampered outbox contents, and invalid sequence/poll budgets. Together with the preceding 21 E2d tests: **30/30 local Python unittest tests passed**, including process-kill tests. Exact-head GitHub Actions CI remains mandatory; earlier CI results must not be applied to this updated commit.
+
+### E2d restore-integrity audit and independently retained checkpoint (21 October 2026)
+
+New stdlib-only `scripts/economics_recovery_audit.py` and `scripts/test_economics_recovery_audit.py` add an **offline** source-of-truth consistency auditor and a SQLite-native backup/restore acceptance fixture. This is not the game's persistence service.
+
+`audit_fixture_database(path)` opens an **existing** SQLite file read-only under one snapshot and fails closed on SQLite page integrity errors, foreign-key violations, incorrectly conserved credited units, invalid treasury/ownership caps, missing committed sequence numbers, mismatched sale receipts, nonzero or missing three-posting groups, missing outbox events, consumed listing/consent disagreement, deed and seller mismatches, and read-model/inbox disagreement. A tampered transaction that preserves *total* credit supply can still be invalid; detailed receipt-to-posting checks catch one class, and an external checkpoint catches otherwise-valid-looking changed credits.
+
+`backup_fixture_database(source, dest)` uses SQLite's supported backup API to create a consistent disposable copy, refuses to overwrite any existing destination and can copy an already committed sale including its read model/inbox state. `anchor_fixture_checkpoint(db)` returns a **test-only** expected committed sequence plus deterministic SHA-256 digest of the database's **logical rows and relevant SQL schema**, excluding storage-specific page numbers; callers must independently retain the expected value outside the database. `verify_against_trusted_anchor(restored_path, trusted_anchor)` verifies both deep internal invariants and the independently supplied expected sequence/digest. Thus, an internally consistent *old* backup is rejected if an **externally preserved later checkpoint** proves a newer purchase was committed. Deleting transaction tail entries, modifying a full-sum-preserving credit split, removing important constraints, or tampering with a posted amount is detected in the covered tests.
+
+**Local acceptance:** **44/44 offline Python unittest tests passed** on the authorized Serj host: the original E2d 30 plus 14 new backup, integrity, and anchoring tests. The workflow's existing required SQLite step was extended to discover both `test_economics_sqlite_lab.py` and `test_economics_recovery_audit.py`; all protected multiplayer and combat checks remain untouched.
+
+**Hard trust limit:** SHA-256 provides a deterministic fingerprint, **not authenticity**. If the expected anchor is generated from the untrusted restored backup, an attacker can make a false “green” comparison; replacing both DB and external checkpoint defeats this lab. No independent authenticated checkpoint store, signature, secure offsite backup, periodic disaster-recovery job, host power-loss validation, or production account/session identity exists. This proves process/backup consistency in a single-node disposable SQLite fixture, **not high-availability or production durability**. A real implementation must select an approved store, canonical account/parcel schema, authenticated independent checkpoint and tested migration/restore procedures under central architectural review.
 
 ### What this does **not** prove
 
