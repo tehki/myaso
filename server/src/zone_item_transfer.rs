@@ -433,11 +433,15 @@ mod tests {
         let mut recovered = root.journal();
         let coordinator = GroundTransferCoordinator::new(&mut recovered);
         assert_eq!(
-            coordinator.confirm_arrival(old).expect("restart historic proof"),
+            coordinator
+                .confirm_arrival(old)
+                .expect("restart historic proof"),
             ArrivalStatus::Superseded
         );
         assert_eq!(
-            coordinator.confirm_arrival(latest).expect("restart latest proof"),
+            coordinator
+                .confirm_arrival(latest)
+                .expect("restart latest proof"),
             ArrivalStatus::Current
         );
     }
