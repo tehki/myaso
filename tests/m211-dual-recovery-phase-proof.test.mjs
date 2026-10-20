@@ -59,7 +59,8 @@ test("M211 preserves real W3C Space+LMB, one light LMB and focus/vitals gates",(
  assert.ok(src.includes('scenario === "uimultirecoveryffa"'));
  assert.ok(src.includes('scenario === "uimultirecoveryspatial"'));
  assert.ok(section.includes("verifyM211DualRecoveryServerProof(m201ServerOutput()"));
- assert.ok(section.includes("performArenaAttackHold(lightAttacker, lightArena, 200, 90)"));
+ // The genuine short LMB must release before the 80ms heavy-upgrade classifier.
+ assert.ok(section.includes("performArenaAttackHold(lightAttacker, lightArena, 200, 45)"));
  assert.ok(section.includes("performArenaJumpAttackChord(jumpAttacker, jumpArena, -200, 90)"));
  assert.ok(section.includes("jumpAttackDowns.length !== 1 || jumpAttackUps.length !== 1"));
  assert.ok(section.includes("lightDowns.length !== 1 || lightUps.length !== 1"));

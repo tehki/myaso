@@ -30,6 +30,7 @@ test("M138 shared calibration measures trusted events but never fakes combat inp
   assert.match(helper, /wheelSamples/);
   assert.match(helper, /COMBAT\.block\.shortBlockMs \+ 130/);
   assert.match(helper, /targetAfterPointerDownMs/);
+  assert.match(helper, /targetAfterPointerDownMs = 50/);
   assert.match(helper, /targetAfterPointerDownMs > 85/);
   assert.match(helper, /Math\.max\(0, -skewMs\)/);
   assert.match(helper, /Math\.max\(0, skewMs\)/);
