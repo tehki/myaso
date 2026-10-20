@@ -160,3 +160,33 @@ The map-aware constructor `CollisionWindow::from_server_collision_manifest(ZoneI
 Tested: Rust contracts for version/zone, nonzero revision, local map windows at real 4k Moonvale coordinates, finite resource bounds, invalid blockers, blocked endpoints, total obstruction, and diagonal corner-cut resistance. The pilot’s original route/obstacle tests still use the same planner. There are no new protocol packet types or JS dependencies in LW-1E.
 
 **Next boundary:** obtain a separately versioned, approved, map-to-Rust **collision** manifest from the World & Buildings integration stream, with doors/portals and occupancy metadata. Bind NPC states and physical interactions to the correct zone, then replan only on server-authorized geometry revisions. Until then, all in-game NPC geometry remains **staging-only**, off by default and loopback-only.
+
+## LW-1F — Revision-pinned NPC movement (future server-world handoff)
+
+The new `RevisionedRoute` is a separate, **not-yet-activated** Rust world-agent
+controller ready for a trusted world/zone server to own. A caller must first
+construct a validated `CollisionWindow` from the server-approved zone collision
+revision and plan a path. The route records the originating zone, collision
+revision, exact current grid cell, and goal. It does not accept browser movement,
+teleport requests, position overrides, or visual-only building footprints.
+
+- Server tick advancement accepts **at most one five-unit waypoint per six
+  authoritative ticks**. Duplicate and stale ticks are ignored; delayed ticks
+  never fast-forward the NPC or skip grid path nodes.
+- The caller must supply the **same zone and revision** that authorized the
+  path on every advance; stale or wrong-zone collision inputs cannot move it.
+- A trusted *newer* collision revision replans from the NPC's current location.
+  Replaying a revision, using a lower revision, or crossing map IDs is rejected.
+- If the new geometry blocks the current position, target or all paths between
+  them, the old path is **discarded and the NPC halts**. It cannot resume through
+  the obsolete collision map. A later newer, traversable revision can recover
+  movement without teleporting, granting items, or changing player state.
+
+These properties have focused Rust tests for monotonic server ticks, no
+duplicate movement, wrong-zone/stale revision, complete new-wall obstruction,
+recovery from a newer collision revision, and successful repathing around
+changed geometry. **The active LW-1D demonstration still follows its original,
+static three NPC pilot routes**; this movement controller intentionally remains
+unspawned until server-owned Greyhaven map collision and cross-zone ownership
+arrive from their independent PR streams. No live combat physics or browser
+protocol changes were made.

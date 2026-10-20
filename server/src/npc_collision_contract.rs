@@ -53,6 +53,8 @@ impl Collider {
 pub enum NavigationError {
     InvalidVersion,
     InvalidRevision,
+    StaleRevision,
+    WrongNavigationSpace,
     InvalidBounds,
     TooManyBlockers,
     InvalidCollider,
@@ -281,6 +283,120 @@ impl CollisionWindow {
     }
 }
 
+/// A future server-side NPC navigation agent pinned to the collision revision
+/// that authorized its path. It is intentionally NOT spawned by the current
+/// pilot; a shared-world collision authority must own its instances.
+///
+/// All movement is derived from a verified CollisionWindow, not browser data.
+/// One five-unit waypoint is consumed at most every six authoritative ticks.
+#[derive(Debug, Clone)]
+pub struct RevisionedRoute {
+    space: NavigationSpace,
+    revision: u32,
+    goal: (i32, i32),
+    current: (i32, i32),
+    path: Vec<(i32, i32)>,
+    next_index: usize,
+    last_tick: Option<u32>,
+    halted: bool,
+}
+
+impl RevisionedRoute {
+    pub fn new(
+        window: &CollisionWindow,
+        start: (i32, i32),
+        goal: (i32, i32),
+    ) -> Result<Self, NavigationError> {
+        let path = window.plan(start, goal)?;
+        Ok(Self {
+            space: window.space(),
+            revision: window.revision(),
+            goal,
+            current: start,
+            path,
+            next_index: 1,
+            last_tick: None,
+            halted: false,
+        })
+    }
+
+    pub fn current(&self) -> (i32, i32) {
+        self.current
+    }
+    pub fn revision(&self) -> u32 {
+        self.revision
+    }
+    pub fn halted(&self) -> bool {
+        self.halted
+    }
+    pub fn at_destination(&self) -> bool {
+        !self.halted && self.current == self.goal
+    }
+
+    /// Apply only a newer verified revision for the same zone. If the new
+    /// map blocks the NPC or destination, discard the old path and halt;
+    /// never quietly continue moving through the outdated wall.
+    pub fn adopt_revision(&mut self, window: &CollisionWindow) -> Result<(), NavigationError> {
+        if window.space() != self.space {
+            return Err(NavigationError::WrongNavigationSpace);
+        }
+        if window.revision() <= self.revision {
+            return Err(NavigationError::StaleRevision);
+        }
+        self.revision = window.revision();
+        match window.plan(self.current, self.goal) {
+            Ok(path) => {
+                self.next_index = 1;
+                self.path = path;
+                self.halted = false;
+                Ok(())
+            }
+            Err(error) => {
+                self.next_index = 0;
+                self.path.clear();
+                self.halted = true;
+                Err(error)
+            }
+        }
+    }
+
+    /// Returns true only for an actually accepted authoritative movement
+    /// step; replayed ticks, delayed calls, mismatched map revisions
+    /// and blocked waypoints cannot advance.
+    pub fn advance(&mut self, window: &CollisionWindow, tick: u32) -> bool {
+        if self.halted || self.space != window.space() || self.revision != window.revision() {
+            return false;
+        }
+        if self.last_tick.is_some_and(|prior| {
+            let delta = tick.wrapping_sub(prior);
+            delta == 0 || delta >= (1 << 31)
+        }) {
+            return false;
+        }
+        self.last_tick = Some(tick);
+        if tick % 6 != 0 {
+            return false;
+        }
+        let Some(next) = self.path.get(self.next_index).copied() else {
+            return false;
+        };
+        if window.contains_obstacle(next.0, next.1) {
+            self.path.clear();
+            self.halted = true;
+            return false;
+        }
+        // Revalidate the target's grid ownership before movement.
+        if window.grid_index(next.0, next.1).is_none() {
+            self.path.clear();
+            self.halted = true;
+            return false;
+        }
+        self.current = next;
+        self.next_index += 1;
+        true
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -455,5 +571,141 @@ mod tests {
                 assert!(!nav.contains_obstacle(b.0, a.1));
             }
         }
+    }
+
+    #[test]
+    fn revisioned_route_advances_once_per_approved_tick_and_never_teleports() {
+        let window = trusted();
+        let mut actor = RevisionedRoute::new(&window, (4250, 4025), (4390, 4025)).unwrap();
+        assert_eq!(actor.current(), (4250, 4025));
+        assert!(!actor.halted());
+        assert!(!actor.advance(&window, 1));
+        assert!(!actor.advance(&window, 1));
+        assert!(actor.advance(&window, 6));
+        assert!(!actor.advance(&window, 6));
+        assert!(!actor.advance(&window, 5));
+        let first = actor.current();
+        assert!((first.0 - 4250).abs() <= GRID_STEP);
+        assert!((first.1 - 4025).abs() <= GRID_STEP);
+        for tick in 7..=1200 {
+            let previous = actor.current();
+            if actor.advance(&window, tick) {
+                let current = actor.current();
+                assert!((current.0 - previous.0).abs() <= GRID_STEP);
+                assert!((current.1 - previous.1).abs() <= GRID_STEP);
+                assert!(!window.contains_obstacle(current.0, current.1));
+            }
+        }
+        assert_eq!(actor.current(), (4390, 4025));
+        assert!(actor.at_destination());
+        assert!(!actor.advance(&window, 1206));
+    }
+
+    #[test]
+    fn revised_map_blocks_npc_until_new_safe_revision_arrives() {
+        let original = trusted();
+        let mut actor = RevisionedRoute::new(&original, (4250, 4050), (4400, 4050)).unwrap();
+        let stripe = Collider {
+            x: 4320,
+            y: 3900,
+            width: 20,
+            height: 300,
+        };
+        let blocked = CollisionWindow::from_server_collision_manifest(
+            ZoneId::Moonvale,
+            1,
+            5,
+            BOUNDS,
+            &[stripe],
+        )
+        .unwrap();
+        assert_eq!(
+            actor.adopt_revision(&blocked),
+            Err(NavigationError::Unreachable)
+        );
+        assert!(actor.halted());
+        assert_eq!(actor.revision(), 5);
+        assert_eq!(actor.current(), (4250, 4050));
+        assert!(!actor.advance(&original, 6));
+        assert!(!actor.advance(&blocked, 12));
+        assert_eq!(
+            actor.adopt_revision(&blocked),
+            Err(NavigationError::StaleRevision)
+        );
+        assert_eq!(
+            actor.adopt_revision(&original),
+            Err(NavigationError::StaleRevision)
+        );
+
+        let clear =
+            CollisionWindow::from_server_collision_manifest(ZoneId::Moonvale, 1, 6, BOUNDS, &[])
+                .unwrap();
+        assert!(actor.adopt_revision(&clear).is_ok());
+        assert!(!actor.halted());
+        assert_eq!(actor.revision(), 6);
+        assert!(actor.advance(&clear, 18));
+        assert_eq!(actor.current().1, 4050);
+        assert!(!actor.advance(&blocked, 24));
+    }
+
+    #[test]
+    fn wrong_zone_and_revision_cannot_change_agent_or_resume_stale_path() {
+        let original = trusted();
+        let mut actor = RevisionedRoute::new(&original, (4250, 4025), (4390, 4025)).unwrap();
+        let indoor = CollisionWindow::from_server_collision_manifest(
+            ZoneId::RedLionInn,
+            1,
+            5,
+            NavBounds {
+                min_x: 50,
+                min_y: 50,
+                max_x: 450,
+                max_y: 350,
+            },
+            &[],
+        )
+        .unwrap();
+        assert_eq!(
+            actor.adopt_revision(&indoor),
+            Err(NavigationError::WrongNavigationSpace)
+        );
+        assert!(!actor.advance(&indoor, 6));
+        assert_eq!(actor.revision(), 4);
+        assert_eq!(actor.current(), (4250, 4025));
+        assert!(actor.advance(&original, 6));
+        assert!(!actor.advance(&original, u32::MAX));
+        assert!(!actor.halted());
+    }
+
+    #[test]
+    fn successful_replan_uses_new_colliders_without_passing_through_them() {
+        let old = trusted();
+        let mut actor = RevisionedRoute::new(&old, (4250, 4025), (4390, 4025)).unwrap();
+        let revision = CollisionWindow::from_server_collision_manifest(
+            ZoneId::Moonvale,
+            1,
+            5,
+            BOUNDS,
+            &[
+                BLOCKER,
+                Collider {
+                    x: 4275,
+                    y: 4070,
+                    width: 30,
+                    height: 35,
+                },
+            ],
+        )
+        .unwrap();
+        assert!(actor.adopt_revision(&revision).is_ok());
+        assert_eq!(actor.revision(), 5);
+        assert!(!actor.advance(&old, 6));
+        for tick in 1..=1200 {
+            if actor.advance(&revision, tick) {
+                let current = actor.current();
+                assert!(!revision.contains_obstacle(current.0, current.1));
+            }
+        }
+        assert!(actor.at_destination());
     }
 }
