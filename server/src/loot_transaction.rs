@@ -12,8 +12,8 @@ use std::path::Path;
 
 use crate::character_identity::{SessionIdentityRegistry, SessionLease};
 use crate::loot::{
-    CorpseItemRef, EquipmentSlot, ItemStack, LootAuthority, LootError, LootStateSnapshot,
-    ParkedInventory,
+    CorpseItemRef, EquipmentSlot, Inventory, ItemStack, LootAuthority, LootError,
+    LootStateSnapshot, ParkedInventory,
 };
 use crate::loot_persistence::{atomic_write, save_quiescent, CheckpointError};
 use crate::magic::MagicAuthority;
@@ -263,6 +263,56 @@ pub fn inspect_verified_corpse(
         .ok_or(PickupCommitError::UnknownZone)?;
     loot.inspect_corpse(actor, fighter, zone, corpse_id, tick.world.now_ms as u64)
         .map_err(PickupCommitError::Loot)
+}
+
+/// Snapshot only the authenticated player's backpack and occupied equipment
+/// slots. Do not accept an actor ID from the client or expose other players'
+/// inventories. Core must hold its authoritative shared identity/world/loot
+/// lock for this read; this does not implement admission, wire framing, or UI.
+/// A detached copy prevents a caller from mutating server-owned items, while
+/// following reads reflect committed equip, pickup, drop and death changes.
+/// This operation neither mints items nor consumes operation sequences.
+pub fn inspect_verified_inventory(
+    loot: &LootAuthority,
+    identity: &SessionIdentityRegistry,
+    tick: PickupWorldTick<'_>,
+    lease: SessionLease,
+) -> Result<Inventory, PickupCommitError> {
+    if tick.world.tick != tick.completed_tick {
+        return Err(PickupCommitError::StaleWorldTick);
+    }
+    if !tick.world.now_ms.is_finite()
+        || tick.world.now_ms < 0.0
+        || tick.world.now_ms >= u64::MAX as f32
+    {
+        return Err(PickupCommitError::InvalidWorldTime);
+    }
+    identity
+        .resolve_session(lease)
+        .ok_or(PickupCommitError::UnverifiedSession)?;
+    let actor = lease.server_session();
+    let fighter = tick
+        .world
+        .fighter(actor)
+        .ok_or(PickupCommitError::MissingWorldFighter)?;
+    let zone = tick
+        .zones
+        .zone_of(actor)
+        .ok_or(PickupCommitError::UnknownZone)?;
+    let (width, height) = zone.bounds();
+    if fighter.net_id != actor
+        || !fighter.x.is_finite()
+        || !fighter.y.is_finite()
+        || fighter.x < 18.0
+        || fighter.y < 18.0
+        || fighter.x > width - 18.0
+        || fighter.y > height - 18.0
+    {
+        return Err(PickupCommitError::Loot(LootError::InvalidPosition));
+    }
+    loot.inventory(actor)
+        .cloned()
+        .ok_or(PickupCommitError::Loot(LootError::UnknownPlayer))
 }
 
 /// A gear request contains only an item/slot selection; the actor identity,
@@ -1012,6 +1062,124 @@ mod tests {
         assert_eq!(item.amount, 2);
         assert!(!loot.ground().contains_key(&ground));
         let _ = fs::remove_file(&checkpoint);
+    }
+
+    #[test]
+    fn verified_inventory_view_is_private_and_tracks_physical_equipment() {
+        let mut world = World::new(800.0, 600.0);
+        assert!(world.add_player_at(1, 200.0, 200.0, 0.0));
+        assert!(world.add_player_at(2, 230.0, 200.0, 0.0));
+        let mut zones = ZoneAuthority::new();
+        zones.register(1).unwrap();
+        zones.register(2).unwrap();
+        let mut identity = SessionIdentityRegistry::new();
+        identity
+            .bind_verified(lease(1), CharacterId::new(101).unwrap())
+            .unwrap();
+        identity
+            .bind_verified(lease(2), CharacterId::new(202).unwrap())
+            .unwrap();
+        let mut loot = LootAuthority::new();
+        loot.register(1).unwrap();
+        loot.register(2).unwrap();
+        let view = |loot: &LootAuthority, lease: SessionLease, tick: u32| {
+            inspect_verified_inventory(
+                loot,
+                &identity,
+                PickupWorldTick {
+                    world: &world,
+                    completed_tick: tick,
+                    zones: &zones,
+                },
+                lease,
+            )
+        };
+        // Naked spawn means no virtual sword, clothing, spellbook or backpack.
+        let empty = view(&loot, lease(1), world.tick).unwrap();
+        assert_eq!(empty.stack_count(), 0);
+        assert!(empty.backpack().is_empty());
+        for slot in [
+            EquipmentSlot::MainHand,
+            EquipmentSlot::OffHand,
+            EquipmentSlot::Body,
+            EquipmentSlot::Head,
+            EquipmentSlot::Feet,
+        ] {
+            assert!(empty.equipped(slot).is_none());
+        }
+
+        let sword = loot.grant(1, ItemKind::RustySword, 1).unwrap();
+        let armor = loot.grant(1, ItemKind::LeatherArmor, 1).unwrap();
+        let other_item = loot.grant(2, ItemKind::IronSword, 1).unwrap();
+        loot.equip(1, sword, EquipmentSlot::MainHand).unwrap();
+
+        let one = view(&loot, lease(1), world.tick).unwrap();
+        assert_eq!(one.backpack().len(), 1);
+        assert_eq!(one.backpack()[0].id, armor);
+        assert_eq!(one.equipped(EquipmentSlot::MainHand).unwrap().id, sword);
+        assert!(!one.backpack().iter().any(|item| item.id == other_item));
+
+        let two = view(&loot, lease(2), world.tick).unwrap();
+        assert_eq!(two.backpack()[0].id, other_item);
+        assert!(two.equipped(EquipmentSlot::MainHand).is_none());
+        assert!(!two.backpack().iter().any(|item| item.id == armor));
+
+        // UI edits to a detached response cannot grant or remove physical gear.
+        let mut forged = one;
+        forged.backpack[0].amount = 999;
+        forged.equipment.clear();
+        let real = view(&loot, lease(1), world.tick).unwrap();
+        assert_eq!(real.backpack()[0].amount, 1);
+        assert_eq!(real.equipped(EquipmentSlot::MainHand).unwrap().id, sword);
+
+        // Subsequent read reflects legitimate mutations; it never duplicates.
+        loot.unequip(1, EquipmentSlot::MainHand).unwrap();
+        let entity = loot
+            .drop_backpack(1, world.fighter(1).unwrap(), ZoneId::Moonvale, sword, 0)
+            .unwrap();
+        let latest = view(&loot, lease(1), world.tick).unwrap();
+        assert!(latest.equipped(EquipmentSlot::MainHand).is_none());
+        assert!(latest.backpack().iter().all(|item| item.id != sword));
+        assert_eq!(loot.ground()[&entity].item.id, sword);
+
+        assert!(matches!(
+            view(&loot, SessionLease::new(1, 2).unwrap(), world.tick),
+            Err(PickupCommitError::UnverifiedSession)
+        ));
+        assert!(matches!(
+            view(&loot, lease(1), world.tick + 1),
+            Err(PickupCommitError::StaleWorldTick)
+        ));
+        assert_eq!(loot.inventory(1).unwrap().stack_count(), 1);
+        assert_eq!(loot.inventory(2).unwrap().stack_count(), 1);
+
+        // Once death has moved the remaining armor into the corpse, an
+        // authenticated self-view must not resurrect it as equipment.
+        let mut dead = world.fighter(1).unwrap().clone();
+        dead.action = Action::Dead;
+        dead.hp = 0.0;
+        let corpse = loot.death(1, &dead, ZoneId::Moonvale, 1).unwrap();
+        assert!(view(&loot, lease(1), world.tick)
+            .unwrap()
+            .backpack()
+            .is_empty());
+        assert_eq!(view(&loot, lease(1), world.tick).unwrap().stack_count(), 0);
+        assert_eq!(loot.corpses()[&corpse].items[0].id, armor);
+
+        world.now_ms = f32::MAX;
+        assert!(matches!(
+            inspect_verified_inventory(
+                &loot,
+                &identity,
+                PickupWorldTick {
+                    world: &world,
+                    completed_tick: world.tick,
+                    zones: &zones
+                },
+                lease(2),
+            ),
+            Err(PickupCommitError::InvalidWorldTime)
+        ));
     }
 
     #[test]
