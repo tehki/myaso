@@ -154,6 +154,30 @@ impl MagicAuthority {
         Ok(())
     }
 
+    /// Generate a unique server-owned receipt across ALL reward types.
+    /// Call only on a staged MagicAuthority under the single world writer.
+    /// The caller must validate NPC eligibility and persist before publishing.
+    pub(crate) fn grant_npc_lesson(
+        &mut self,
+        character: CharacterId,
+        lesson: Lesson,
+    ) -> Result<NonZeroU64, MagicError> {
+        let receipt = self
+            .claimed_receipts
+            .iter()
+            .next_back()
+            .map_or(Some(1), |last| last.get().checked_add(1))
+            .and_then(NonZeroU64::new)
+            .ok_or(MagicError::LimitReached)?;
+        self.grant_lesson(LessonAward {
+            receipt,
+            character,
+            source: LessonSource::NpcTeacher,
+            lesson,
+        })?;
+        Ok(receipt)
+    }
+
     /// A read-only server-resolved spell preview. This never spends mana,
     /// consumes reagents or produces damage. No cast packet is enabled.
     pub fn preview_cast(

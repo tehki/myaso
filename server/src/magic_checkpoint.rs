@@ -10,6 +10,8 @@ use std::fs;
 use std::path::Path;
 
 use crate::character_identity::{SessionIdentityRegistry, SessionLease};
+use crate::magic_teacher::{TeacherAuthority, TeacherError, TeacherRequest};
+use crate::zone::ZoneAuthority;
 use crate::loot::{LootAuthority, LootError};
 use crate::loot_persistence::{
     atomic_write, checksum, decode, encode, CheckpointError, MAX_FILE_BYTES,
@@ -30,6 +32,7 @@ pub enum JointCheckpointError {
     Magic(MagicError),
     MagicSnapshot(MagicSnapshotError),
     UnverifiedCharacter,
+    Teacher(TeacherError),
     Corrupt,
 }
 
@@ -66,6 +69,12 @@ impl From<MagicError> for JointCheckpointError {
 impl From<MagicSnapshotError> for JointCheckpointError {
     fn from(error: MagicSnapshotError) -> Self {
         Self::MagicSnapshot(error)
+    }
+}
+
+impl From<TeacherError> for JointCheckpointError {
+    fn from(error: TeacherError) -> Self {
+        Self::Teacher(error)
     }
 }
 
@@ -169,6 +178,27 @@ pub fn transact_lesson(
     Ok(())
 }
 
+/// Trusted NPC lesson transaction. Server-owned manifest + Fighter + Zone
+/// determine eligibility; the caller must serialize the authoritative tick.
+/// The receipt is newly minted from the persisted, global receipt set.
+pub fn transact_teacher_lesson(
+    path: &Path,
+    loot: &LootAuthority,
+    magic: &mut MagicAuthority,
+    identity: &SessionIdentityRegistry,
+    zones: &ZoneAuthority,
+    teachers: &TeacherAuthority,
+    request: TeacherRequest<'_>,
+) -> Result<std::num::NonZeroU64, JointCheckpointError> {
+    let (character, lesson) = teachers.authorize(request, identity, zones, loot)?;
+    let mut staged = magic.clone();
+    let receipt = staged.grant_npc_lesson(character, lesson)?;
+    let bytes = bundle(loot, identity, &staged)?;
+    atomic_write(path, &bytes)?;
+    *magic = staged;
+    Ok(receipt)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -209,6 +239,135 @@ mod tests {
             .unwrap();
         loot.register(1).unwrap();
         (loot, magic, identity, hero)
+    }
+
+    #[test]
+    fn manifested_teacher_rewards_survive_joint_recovery_and_cannot_repeat() {
+        use crate::magic_teacher::{TeacherId, TeacherSpawn};
+        use crate::simulation::World;
+        use crate::zone::{Position, ZoneAuthority, ZoneId};
+
+        let (loot, mut magic, identity, hero) = fixtures();
+        let mut zones = ZoneAuthority::new();
+        zones.register(1).unwrap();
+        let mut teachers = TeacherAuthority::new();
+        teachers
+            .register_trusted(TeacherSpawn {
+                id: TeacherId::new(100).unwrap(),
+                zone: ZoneId::Moonvale,
+                at: Position { x: 200.0, y: 200.0 },
+                lesson: Lesson::Rune(Rune::Fire),
+            })
+            .unwrap();
+        teachers
+            .register_trusted(TeacherSpawn {
+                id: TeacherId::new(101).unwrap(),
+                zone: ZoneId::Moonvale,
+                at: Position { x: 210.0, y: 200.0 },
+                lesson: Lesson::Spell(Spell::Ember),
+            })
+            .unwrap();
+        let mut world = World::new(800.0, 600.0);
+        world.add_player_at(1, 200.0, 200.0, 0.0);
+        let fighter = world.fighter(1).unwrap().clone();
+        let path = checkpoint_path();
+        let first = transact_teacher_lesson(
+            &path,
+            &loot,
+            &mut magic,
+            &identity,
+            &zones,
+            &teachers,
+            TeacherRequest {
+                lease: SessionLease::new(1, 1).unwrap(),
+                teacher: TeacherId::new(100).unwrap(),
+                fighter: &fighter,
+            },
+        )
+        .unwrap();
+        assert_eq!(first.get(), 1);
+        let second = transact_teacher_lesson(
+            &path,
+            &loot,
+            &mut magic,
+            &identity,
+            &zones,
+            &teachers,
+            TeacherRequest {
+                lease: SessionLease::new(1, 1).unwrap(),
+                teacher: TeacherId::new(101).unwrap(),
+                fighter: &fighter,
+            },
+        )
+        .unwrap();
+        assert_eq!(second.get(), 2);
+        let (_, mut recovered) = load_joint(&path).unwrap();
+        assert!(recovered.knows_rune(hero, Rune::Fire));
+        assert!(recovered.knows_spell(hero, Spell::Ember));
+        assert!(matches!(
+            transact_teacher_lesson(
+                &path,
+                &loot,
+                &mut recovered,
+                &identity,
+                &zones,
+                &teachers,
+                TeacherRequest {
+                    lease: SessionLease::new(1, 1).unwrap(),
+                    teacher: TeacherId::new(100).unwrap(),
+                    fighter: &fighter,
+                },
+            ),
+            Err(JointCheckpointError::Magic(MagicError::AlreadyKnown))
+        ));
+        assert!(matches!(
+            recovered.grant_lesson(award(1, hero, Lesson::Rune(Rune::Water))),
+            Err(MagicError::DuplicateReward)
+        ));
+        let _ = fs::remove_file(&path);
+    }
+
+    #[test]
+    fn forged_or_out_of_range_teacher_request_never_publishes() {
+        use crate::magic_teacher::{TeacherId, TeacherSpawn};
+        use crate::simulation::World;
+        use crate::zone::{Position, ZoneAuthority, ZoneId};
+
+        let (loot, mut magic, identity, hero) = fixtures();
+        let mut zones = ZoneAuthority::new();
+        zones.register(1).unwrap();
+        let mut teachers = TeacherAuthority::new();
+        teachers
+            .register_trusted(TeacherSpawn {
+                id: TeacherId::new(2).unwrap(),
+                zone: ZoneId::Moonvale,
+                at: Position { x: 200.0, y: 200.0 },
+                lesson: Lesson::Rune(Rune::Fire),
+            })
+            .unwrap();
+        let mut world = World::new(800.0, 600.0);
+        world.add_player_at(1, 450.0, 450.0, 0.0);
+        let player = world.fighter(1).unwrap().clone();
+        let path = checkpoint_path();
+        let denied = transact_teacher_lesson(
+            &path,
+            &loot,
+            &mut magic,
+            &identity,
+            &zones,
+            &teachers,
+            TeacherRequest {
+                lease: SessionLease::new(1, 1).unwrap(),
+                teacher: TeacherId::new(2).unwrap(),
+                fighter: &player,
+            },
+        );
+        assert!(matches!(
+            denied,
+            Err(JointCheckpointError::Teacher(TeacherError::TooFarAway))
+        ));
+        assert!(!magic.knows_rune(hero, Rune::Fire));
+        assert!(!path.exists());
     }
 
     #[test]

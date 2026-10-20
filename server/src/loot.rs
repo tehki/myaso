@@ -386,6 +386,11 @@ impl LootAuthority {
         Ok(())
     }
 
+    /// Server-authoritative death guard for non-combat interactions.
+    pub(crate) fn is_dead(&self, authenticated_id: u32) -> bool {
+        self.dead.contains(&authenticated_id)
+    }
+
     pub fn inventory(&self, authenticated_id: u32) -> Option<&Inventory> {
         self.players.get(&authenticated_id)
     }

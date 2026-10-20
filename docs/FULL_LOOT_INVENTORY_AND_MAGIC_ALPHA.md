@@ -40,6 +40,12 @@ Status: **domain foundation only — NOT live-game enabled**. Approved design di
 - Read-only Ember preparation verifies the exact authenticated session lease, learned Fire rune and Ember spell, equipped lootable Spellbook, Sulfur Ash reagent and mana. It costs 15 mana and one Sulfur Ash if eventually cast, but the preview consumes nothing and produces no effects.
 - Tests cover no-free-magic spawn, rewards, replayed receipts, casting prerequisites and rune/spell knowledge surviving full-loot death when the spellbook is taken. The knowledge ledger is **in memory only** and must be persisted transactionally with items before activating NPC lessons or spells. No live Magic integration, projectiles or combat changes.
 
+## Server-owned NPC teacher eligibility (domain only)
+
+- Added `server/src/magic_teacher.rs` with a trusted NPC spawn registry and typed teacher IDs. A lesson is eligible only when an exact verified session lease matches the server-simulated Fighter, the authoritative ZoneAuthority agrees with the NPC zone, the character has a valid active LootAuthority inventory and is alive/idle, and the server Fighter is within 48 world units of a valid manifested trainer.
+- `transact_teacher_lesson` in the joint checkpoint module determines the **lesson from the registered NPC**, never a client-selected reward, mints a unique receipt from the saved MagicAuthority receipt ledger, and atomically stages the lesson + loot + magic recovery bundle before publishing. Lesson prerequisites, duplication and corrupt state fail closed. Tests cover proximity, wrong fighter/session, cross-zone NPCs, dead/combat-locked actors, invalid trainer spawns, recovery and repeat-lesson denial.
+- **No actual NPCs are spawned in the live world** by this module; production content/quest authorization and real server tick locking are mandatory. Do not expose `register_trusted` or lesson receipt creation in a client protocol. Live magic, combat effects and deployment remain disabled.
+
 ## Joint loot + magic checkpoint, experimental
 
 - Added a versioned **MYWLD001** combined recovery file in [`server/src/magic_checkpoint.rs`](../server/src/magic_checkpoint.rs). It packages a validated quiescent loot snapshot and the learned-rune/spell/mana/claimed-receipt ledger into one atomically replaced file. Load rejects corruption or unsupported formats without returning partial items or magic. The underlying standalone loot schema remains v3 and is deliberately not interchangeable with the joint file.
