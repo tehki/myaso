@@ -1,4 +1,6 @@
 import { createFrameBudget } from "../src/browser/frame-budget.mjs";
+import { createMagicParticlePool } from "../src/browser/magic-particle-pool.mjs";
+import { drawMagicParticles } from "../src/browser/magic-particle-renderer.mjs";
 import { recordM233RecoveryHandoff } from "../src/browser/m233-recovery-handoff-trace.mjs";
 import { installRightButtonGesture } from "../src/browser/right-button-gesture.mjs";
 import { createDirectionalDash } from "../src/browser/dash-input.mjs";
@@ -109,6 +111,12 @@ let pendingStaminaDenial = null;
 let matchOver = false;
 const killFeedEntries = [];
 const killFeedSequences = new Set();
+
+// P2: compile-time fail-closed visual gate. No URL or player input can enable
+// unapproved spells, effects or replication in the current combat alpha.
+const PHYSICS_PARTICLES_ENABLED = false;
+const magicParticlePool = PHYSICS_PARTICLES_ENABLED ? createMagicParticlePool() : null;
+let lastMagicFrameMs = null;
 
 const params = new URLSearchParams(window.location.search);
 const diagnosticsVisible = params.get("netstats") === "1";
@@ -911,6 +919,11 @@ function render(nowMs = performance.now(), impact = combatImpact.sample(nowMs)) 
   }
   if (ownId && local.initialized) drawFighterScreen(canvas.width / 2, canvas.height / 2, local, "#e2d5b4", "#51452d");
   ctx.restore();
+  // P2 is strictly read-only presentation, after world zoom and before HUD.
+  // No event source is connected in this inactive foundation.
+  if (magicParticlePool && local.initialized) {
+    drawMagicParticles(ctx, magicParticlePool, visualCameraPosition, canvas.width, canvas.height);
+  }
   // R1 wider view: health/guard bars and player identity badges are UI,
   // not world geometry. Keep their original unscaled 42px/34px readability
   // while placing them above their zoom-projected remote fighter positions.
@@ -1802,6 +1815,10 @@ function createArenaLayer() {
 
 function frame(now) {
   if (document.hidden) return;
+  if (magicParticlePool) {
+    magicParticlePool.advance(lastMagicFrameMs === null ? 0 : Math.max(0, now - lastMagicFrameMs));
+    lastMagicFrameMs = now;
+  }
   frameBudget.advance(now, simulatePrediction);
   updateChargeHud();
   const impact = combatImpact.sample(now);
@@ -1817,6 +1834,9 @@ function frame(now) {
 function handleVisibilityChange() {
   releaseInputs();
   if (document.hidden) {
+    // Cosmetic particles must not survive background suspension.
+    magicParticlePool?.clear();
+    lastMagicFrameMs = null;
     if (animationFrameId) cancelAnimationFrame(animationFrameId);
     animationFrameId = 0;
     frameBudget.reset();
