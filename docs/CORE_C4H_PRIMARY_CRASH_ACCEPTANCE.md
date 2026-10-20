@@ -42,9 +42,23 @@ unrelated container, remote database, live VPS or game player is targeted.
    that prepared a transfer without committing. Post-crash, there can
    be no recorded handoff or frozen authority. A safe retry commits the
    transfer once and fences the old worker.
+5. **Uncommitted transfer commit.** Character 75 has an existing durable
+   prepared handoff. A separate connection executes commit_transfer but
+   does not COMMIT its SQL transaction. After primary SIGKILL/restart,
+   the handoff must still be prepared and both workers frozen; a fresh
+   coordinator can commit it exactly once to epoch 2.
+6. **Uncommitted entity retirement.** Character 76 has an open
+   retirement transaction. On primary restart, it must remain living
+   and writable by its original owner. A later committed retirement
+   permanently tombstones the identity, forbidding re-registration.
+7. **Uncommitted transfer abort.** Character 77 has a durable prepared
+   transfer and an in-flight abort that did not COMMIT. After restart
+   the handoff must remain prepared/frozen; exact abort retry restores
+   the source at epoch 1 with no operation ID reuse.
 
-For both open transactions, the test observes distinct last-statement
-markers in the database's pg_stat_activity with state idle-in-transaction.
+For all five independent open transactions, the test observes distinct
+last-statement markers in the database's pg_stat_activity with state
+idle-in-transaction.
 This proves that each transaction executed but had not committed before
 PostgreSQL is killed; there is no fixed-delay guess.
 
