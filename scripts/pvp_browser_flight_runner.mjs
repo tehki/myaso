@@ -7931,11 +7931,24 @@ async function calibrateNativeParryIngress(
   attacker, defender, attackerElementId, defenderElementId, attackOffset,
   targetAfterPointerDownMs = 50,
 ) {
-  // Measure only trusted input delivery, never synthesize game controls.
-  // Three harmless mouse moves and real isolated wheel-back blocks before
-  // the live combat exchange; each 240ms block expires before next probe.
+  // M334: Calibrate the exact Chrome POINTERDOWN transaction, not the
+  // preceding pointermove. The old probe measured only pointermove delivery;
+  // a second native W3C pointer tick before pointerDown was not accounted
+  // for. Run a genuine short LMB on the inert HUD event-text (<p>) rather
+  // than the arena so calibration cannot initiate a combat attack. Firefox's
+  // genuine wheel-back calibrations still expire before the live exchange.
+  const neutral = await webdriver(attacker.base, "POST",
+    `/session/${attacker.sessionId}/element`, {
+      using: "css selector", value: "#event-text",
+    });
+  const neutralElementId = neutral?.["element-6066-11e4-a52e-4f735466cecf"];
+  if (!neutralElementId) {
+    throw new Error("M334 could not resolve neutral real-browser pointer calibration target");
+  }
+  const neutralOrigin = { "element-6066-11e4-a52e-4f735466cecf": neutralElementId };
   const measure = async (session, eventKind, issue) => {
-    const listener = "const arena=document.querySelector('#arena');"
+    const target = eventKind === "pointerdown" ? "#event-text" : "#arena";
+    const listener = "const arena=document.querySelector(" + JSON.stringify(target) + ");"
       + "const probe={receivedEpochMs:null};window.__MYASO_M33_CALIBRATION__=probe;"
       + "arena.addEventListener(" + JSON.stringify(eventKind) + ",event=>{"
       + "if(event.isTrusted && probe.receivedEpochMs===null"
@@ -7963,8 +7976,19 @@ async function calibrateNativeParryIngress(
   for (let sample = 0; sample < 3; sample += 1) {
     await aimArena(attacker, attackerElementId, attackOffset + (sample % 2 ? -32 : 32));
     const [pointerMs, wheelMs] = await Promise.all([
-      measure(attacker, "pointermove",
-        () => aimArena(attacker, attackerElementId, attackOffset)),
+      measure(attacker, "pointerdown", () => webdriver(attacker.base, "POST",
+        `/session/${attacker.sessionId}/actions`, {
+          actions: [{
+            type: "pointer", id: `mouse-${attacker.name}`,
+            parameters: { pointerType: "mouse" },
+            actions: [
+              { type: "pointerMove", duration: 0, origin: neutralOrigin, x: 0, y: 0 },
+              { type: "pointerDown", button: 0 },
+              { type: "pause", duration: 35 },
+              { type: "pointerUp", button: 0 },
+            ],
+          }],
+        })),
       measure(defender, "wheel",
         () => scrollArenaWheel(defender, defenderElementId, 120, 0)),
     ]);
@@ -7972,25 +7996,17 @@ async function calibrateNativeParryIngress(
     wheelSamples.push(wheelMs);
     await sleep(COMBAT.block.shortBlockMs + 130);
   }
+  // Preserve M332's strict native target (<=85ms) and the server rules.
+  // M334 measures the actual 2-tick W3C pointerDOWN, not pointermove.
   const median = samples => [...samples].sort((a, b) => a - b)[1];
   const pointerMs = median(pointerSamples);
   const wheelMs = median(wheelSamples);
-  // M332: The #348 exact-head M41 run #39318597410 recorded genuine
-  // Chrome pointerDOWN at 182.9ms and Firefox wheel at 331ms: 148ms
-  // later, after the 135ms authoritative light windup. It resolved as
-  // 34 HP damage, not a parry, despite the prior 100ms nominal target.
-  // The two browser W3C drivers have additional unmodeled latency;
-  // aim M33's real wheel 50ms after light pointerDOWN to recover ingress
-  // headroom without touching the 125ms server parry or 240ms block.
-  // Keep a strict 85ms maximum native calibration target. M138's genuine
-  // jump parry still uses its separate 25ms target and 105ms windup.
-  // This is browser-acceptance timing only, no synthetic input or retries.
   if (!Number.isFinite(targetAfterPointerDownMs) || targetAfterPointerDownMs < 0
     || targetAfterPointerDownMs > 85) {
     throw new RangeError("native parry arrival target outside strict window");
   }
   const skewMs = Math.max(-180, Math.min(180,
-    Math.round(pointerMs + 12 + targetAfterPointerDownMs - wheelMs)));
+    Math.round(pointerMs + targetAfterPointerDownMs - wheelMs)));
   const result = { attacker: attacker.name, defender: defender.name,
     pointerSamples, wheelSamples, pointerMs, wheelMs,
     targetAfterPointerDownMs,
@@ -8025,6 +8041,10 @@ async function runOnlineUiParryFlight(entries, postParrySleepMs = 80, roles = nu
   const parryIngress = await calibrateNativeParryIngress(
     attacker, defender, attackerElementId, defenderElementId, attackOffset,
   );
+  // Pointer-down calibration intentionally clicked inert HUD text; restore
+  // actual arena focus before submitting the genuine attacker and wheel.
+  await Promise.all(entries.map((entry) => execute(entry.base, entry.sessionId,
+    "document.querySelector('#arena').focus(); return document.activeElement?.id;")));
   await Promise.all(entries.map(installUiObserver));
   let evidence = null;
   let lastAttemptBaseline = null;
@@ -8033,7 +8053,7 @@ async function runOnlineUiParryFlight(entries, postParrySleepMs = 80, roles = nu
     lastAttemptBaseline = await Promise.all(entries.map(readUiEvidence));
     // M33/M41/M146: use the same genuinely observed browser latencies that
     // are sampled before combat, not hard-coded Chrome/Firefox host delays.
-    // Trusted pointermove and wheel-back are real W3C events; no synthetic
+    // Trusted pointerdown and wheel-back are real W3C events; no synthetic
     // event may enter the arena. Stagger the live Firefox/Chrome actions
     // around the measured delivery time, placing the ONE genuine wheel
     // ~50ms nominal after genuine pointerDOWN to leave W3C driver
