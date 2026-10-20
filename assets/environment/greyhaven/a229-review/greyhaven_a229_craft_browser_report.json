@@ -1,0 +1,557 @@
+{
+  "milestone": "Blood & Iron A2.29 original facade material close-up and DPR1/2 QA",
+  "baselineGraphicsHead": "6d40942b82b24d8596ed55af2850454d00a9165b",
+  "browsers": [
+    {
+      "kind": "chrome",
+      "browserVersion": "Chrome/154.0.8037.99",
+      "dpr": 1,
+      "screenshot": "greyhaven_a229_chrome_dpr1_craft.png",
+      "errors": [],
+      "state": {
+        "ready": true,
+        "sourceHead": "6d40942b82b24d8596ed55af2850454d00a9165b",
+        "sourceArtBlenderEdited": false,
+        "gameZoom": 0.84,
+        "metersPerWorldUnit": 0.025,
+        "originalDoor": {
+          "x": 4365,
+          "y": 4075,
+          "portalId": "red-lion-enter",
+          "status": "proposed-visual-anchor-only"
+        },
+        "roofBytesChanged": false,
+        "visibleVariants": [
+          "source",
+          "day",
+          "dusk"
+        ],
+        "regions": {
+          "door": {
+            "bbox": [
+              291,
+              249,
+              350,
+              331
+            ],
+            "variants": {
+              "day": {
+                "visibleSourcePixels": 4759,
+                "changedVisibleRGB": 3942,
+                "alphaDifferences": 0,
+                "sourceMeanLuma": 112.419,
+                "candidateMeanLuma": 110.16,
+                "stronglyLightened": 373
+              },
+              "dusk": {
+                "visibleSourcePixels": 4759,
+                "changedVisibleRGB": 4759,
+                "alphaDifferences": 0,
+                "sourceMeanLuma": 112.419,
+                "candidateMeanLuma": 100.49,
+                "stronglyLightened": 704
+              }
+            }
+          },
+          "windowWest": {
+            "bbox": [
+              242,
+              249,
+              281,
+              291
+            ],
+            "variants": {
+              "day": {
+                "visibleSourcePixels": 1638,
+                "changedVisibleRGB": 1638,
+                "alphaDifferences": 0,
+                "sourceMeanLuma": 110.728,
+                "candidateMeanLuma": 108.608,
+                "stronglyLightened": 98
+              },
+              "dusk": {
+                "visibleSourcePixels": 1638,
+                "changedVisibleRGB": 1638,
+                "alphaDifferences": 0,
+                "sourceMeanLuma": 110.728,
+                "candidateMeanLuma": 118.931,
+                "stronglyLightened": 964
+              }
+            }
+          },
+          "windowEast": {
+            "bbox": [
+              352,
+              249,
+              393,
+              291
+            ],
+            "variants": {
+              "day": {
+                "visibleSourcePixels": 1722,
+                "changedVisibleRGB": 1722,
+                "alphaDifferences": 0,
+                "sourceMeanLuma": 112.665,
+                "candidateMeanLuma": 110.908,
+                "stronglyLightened": 72
+              },
+              "dusk": {
+                "visibleSourcePixels": 1722,
+                "changedVisibleRGB": 1722,
+                "alphaDifferences": 0,
+                "sourceMeanLuma": 112.665,
+                "candidateMeanLuma": 120.56,
+                "stronglyLightened": 957
+              }
+            }
+          },
+          "plinth": {
+            "bbox": [
+              213,
+              311,
+              428,
+              344
+            ],
+            "variants": {
+              "day": {
+                "visibleSourcePixels": 3581,
+                "changedVisibleRGB": 1401,
+                "alphaDifferences": 0,
+                "sourceMeanLuma": 139.097,
+                "candidateMeanLuma": 136.226,
+                "stronglyLightened": 711
+              },
+              "dusk": {
+                "visibleSourcePixels": 3581,
+                "changedVisibleRGB": 3581,
+                "alphaDifferences": 0,
+                "sourceMeanLuma": 139.097,
+                "candidateMeanLuma": 108.112,
+                "stronglyLightened": 14
+              }
+            }
+          }
+        },
+        "dynamicLightingEngine": false,
+        "runtimeIntegrated": false,
+        "productionApproved": false
+      }
+    },
+    {
+      "kind": "chrome",
+      "browserVersion": "Chrome/154.0.8037.99",
+      "dpr": 2,
+      "screenshot": "greyhaven_a229_chrome_dpr2_craft.png",
+      "errors": [],
+      "state": {
+        "ready": true,
+        "sourceHead": "6d40942b82b24d8596ed55af2850454d00a9165b",
+        "sourceArtBlenderEdited": false,
+        "gameZoom": 0.84,
+        "metersPerWorldUnit": 0.025,
+        "originalDoor": {
+          "x": 4365,
+          "y": 4075,
+          "portalId": "red-lion-enter",
+          "status": "proposed-visual-anchor-only"
+        },
+        "roofBytesChanged": false,
+        "visibleVariants": [
+          "source",
+          "day",
+          "dusk"
+        ],
+        "regions": {
+          "door": {
+            "bbox": [
+              291,
+              249,
+              350,
+              331
+            ],
+            "variants": {
+              "day": {
+                "visibleSourcePixels": 4759,
+                "changedVisibleRGB": 3942,
+                "alphaDifferences": 0,
+                "sourceMeanLuma": 112.419,
+                "candidateMeanLuma": 110.16,
+                "stronglyLightened": 373
+              },
+              "dusk": {
+                "visibleSourcePixels": 4759,
+                "changedVisibleRGB": 4759,
+                "alphaDifferences": 0,
+                "sourceMeanLuma": 112.419,
+                "candidateMeanLuma": 100.49,
+                "stronglyLightened": 704
+              }
+            }
+          },
+          "windowWest": {
+            "bbox": [
+              242,
+              249,
+              281,
+              291
+            ],
+            "variants": {
+              "day": {
+                "visibleSourcePixels": 1638,
+                "changedVisibleRGB": 1638,
+                "alphaDifferences": 0,
+                "sourceMeanLuma": 110.728,
+                "candidateMeanLuma": 108.608,
+                "stronglyLightened": 98
+              },
+              "dusk": {
+                "visibleSourcePixels": 1638,
+                "changedVisibleRGB": 1638,
+                "alphaDifferences": 0,
+                "sourceMeanLuma": 110.728,
+                "candidateMeanLuma": 118.931,
+                "stronglyLightened": 964
+              }
+            }
+          },
+          "windowEast": {
+            "bbox": [
+              352,
+              249,
+              393,
+              291
+            ],
+            "variants": {
+              "day": {
+                "visibleSourcePixels": 1722,
+                "changedVisibleRGB": 1722,
+                "alphaDifferences": 0,
+                "sourceMeanLuma": 112.665,
+                "candidateMeanLuma": 110.908,
+                "stronglyLightened": 72
+              },
+              "dusk": {
+                "visibleSourcePixels": 1722,
+                "changedVisibleRGB": 1722,
+                "alphaDifferences": 0,
+                "sourceMeanLuma": 112.665,
+                "candidateMeanLuma": 120.56,
+                "stronglyLightened": 957
+              }
+            }
+          },
+          "plinth": {
+            "bbox": [
+              213,
+              311,
+              428,
+              344
+            ],
+            "variants": {
+              "day": {
+                "visibleSourcePixels": 3581,
+                "changedVisibleRGB": 1401,
+                "alphaDifferences": 0,
+                "sourceMeanLuma": 139.097,
+                "candidateMeanLuma": 136.226,
+                "stronglyLightened": 711
+              },
+              "dusk": {
+                "visibleSourcePixels": 3581,
+                "changedVisibleRGB": 3581,
+                "alphaDifferences": 0,
+                "sourceMeanLuma": 139.097,
+                "candidateMeanLuma": 108.112,
+                "stronglyLightened": 14
+              }
+            }
+          }
+        },
+        "dynamicLightingEngine": false,
+        "runtimeIntegrated": false,
+        "productionApproved": false
+      }
+    },
+    {
+      "kind": "firefox",
+      "browserVersion": "firefox/153.4.0",
+      "dpr": 1,
+      "screenshot": "greyhaven_a229_firefox_dpr1_craft.png",
+      "errors": [],
+      "state": {
+        "ready": true,
+        "sourceHead": "6d40942b82b24d8596ed55af2850454d00a9165b",
+        "sourceArtBlenderEdited": false,
+        "gameZoom": 0.84,
+        "metersPerWorldUnit": 0.025,
+        "originalDoor": {
+          "x": 4365,
+          "y": 4075,
+          "portalId": "red-lion-enter",
+          "status": "proposed-visual-anchor-only"
+        },
+        "roofBytesChanged": false,
+        "visibleVariants": [
+          "source",
+          "day",
+          "dusk"
+        ],
+        "regions": {
+          "door": {
+            "bbox": [
+              291,
+              249,
+              350,
+              331
+            ],
+            "variants": {
+              "day": {
+                "visibleSourcePixels": 4759,
+                "changedVisibleRGB": 3942,
+                "alphaDifferences": 0,
+                "sourceMeanLuma": 112.427,
+                "candidateMeanLuma": 110.168,
+                "stronglyLightened": 373
+              },
+              "dusk": {
+                "visibleSourcePixels": 4759,
+                "changedVisibleRGB": 4759,
+                "alphaDifferences": 0,
+                "sourceMeanLuma": 112.427,
+                "candidateMeanLuma": 100.498,
+                "stronglyLightened": 704
+              }
+            }
+          },
+          "windowWest": {
+            "bbox": [
+              242,
+              249,
+              281,
+              291
+            ],
+            "variants": {
+              "day": {
+                "visibleSourcePixels": 1638,
+                "changedVisibleRGB": 1638,
+                "alphaDifferences": 0,
+                "sourceMeanLuma": 110.728,
+                "candidateMeanLuma": 108.608,
+                "stronglyLightened": 98
+              },
+              "dusk": {
+                "visibleSourcePixels": 1638,
+                "changedVisibleRGB": 1638,
+                "alphaDifferences": 0,
+                "sourceMeanLuma": 110.728,
+                "candidateMeanLuma": 118.931,
+                "stronglyLightened": 964
+              }
+            }
+          },
+          "windowEast": {
+            "bbox": [
+              352,
+              249,
+              393,
+              291
+            ],
+            "variants": {
+              "day": {
+                "visibleSourcePixels": 1722,
+                "changedVisibleRGB": 1722,
+                "alphaDifferences": 0,
+                "sourceMeanLuma": 112.665,
+                "candidateMeanLuma": 110.908,
+                "stronglyLightened": 72
+              },
+              "dusk": {
+                "visibleSourcePixels": 1722,
+                "changedVisibleRGB": 1722,
+                "alphaDifferences": 0,
+                "sourceMeanLuma": 112.665,
+                "candidateMeanLuma": 120.56,
+                "stronglyLightened": 957
+              }
+            }
+          },
+          "plinth": {
+            "bbox": [
+              213,
+              311,
+              428,
+              344
+            ],
+            "variants": {
+              "day": {
+                "visibleSourcePixels": 3581,
+                "changedVisibleRGB": 1401,
+                "alphaDifferences": 0,
+                "sourceMeanLuma": 139.255,
+                "candidateMeanLuma": 136.374,
+                "stronglyLightened": 711
+              },
+              "dusk": {
+                "visibleSourcePixels": 3581,
+                "changedVisibleRGB": 3581,
+                "alphaDifferences": 0,
+                "sourceMeanLuma": 139.255,
+                "candidateMeanLuma": 108.255,
+                "stronglyLightened": 15
+              }
+            }
+          }
+        },
+        "dynamicLightingEngine": false,
+        "runtimeIntegrated": false,
+        "productionApproved": false
+      }
+    },
+    {
+      "kind": "firefox",
+      "browserVersion": "firefox/153.4.0",
+      "dpr": 2,
+      "screenshot": "greyhaven_a229_firefox_dpr2_craft.png",
+      "errors": [],
+      "state": {
+        "ready": true,
+        "sourceHead": "6d40942b82b24d8596ed55af2850454d00a9165b",
+        "sourceArtBlenderEdited": false,
+        "gameZoom": 0.84,
+        "metersPerWorldUnit": 0.025,
+        "originalDoor": {
+          "x": 4365,
+          "y": 4075,
+          "portalId": "red-lion-enter",
+          "status": "proposed-visual-anchor-only"
+        },
+        "roofBytesChanged": false,
+        "visibleVariants": [
+          "source",
+          "day",
+          "dusk"
+        ],
+        "regions": {
+          "door": {
+            "bbox": [
+              291,
+              249,
+              350,
+              331
+            ],
+            "variants": {
+              "day": {
+                "visibleSourcePixels": 4759,
+                "changedVisibleRGB": 3942,
+                "alphaDifferences": 0,
+                "sourceMeanLuma": 112.427,
+                "candidateMeanLuma": 110.168,
+                "stronglyLightened": 373
+              },
+              "dusk": {
+                "visibleSourcePixels": 4759,
+                "changedVisibleRGB": 4759,
+                "alphaDifferences": 0,
+                "sourceMeanLuma": 112.427,
+                "candidateMeanLuma": 100.498,
+                "stronglyLightened": 704
+              }
+            }
+          },
+          "windowWest": {
+            "bbox": [
+              242,
+              249,
+              281,
+              291
+            ],
+            "variants": {
+              "day": {
+                "visibleSourcePixels": 1638,
+                "changedVisibleRGB": 1638,
+                "alphaDifferences": 0,
+                "sourceMeanLuma": 110.728,
+                "candidateMeanLuma": 108.608,
+                "stronglyLightened": 98
+              },
+              "dusk": {
+                "visibleSourcePixels": 1638,
+                "changedVisibleRGB": 1638,
+                "alphaDifferences": 0,
+                "sourceMeanLuma": 110.728,
+                "candidateMeanLuma": 118.931,
+                "stronglyLightened": 964
+              }
+            }
+          },
+          "windowEast": {
+            "bbox": [
+              352,
+              249,
+              393,
+              291
+            ],
+            "variants": {
+              "day": {
+                "visibleSourcePixels": 1722,
+                "changedVisibleRGB": 1722,
+                "alphaDifferences": 0,
+                "sourceMeanLuma": 112.665,
+                "candidateMeanLuma": 110.908,
+                "stronglyLightened": 72
+              },
+              "dusk": {
+                "visibleSourcePixels": 1722,
+                "changedVisibleRGB": 1722,
+                "alphaDifferences": 0,
+                "sourceMeanLuma": 112.665,
+                "candidateMeanLuma": 120.56,
+                "stronglyLightened": 957
+              }
+            }
+          },
+          "plinth": {
+            "bbox": [
+              213,
+              311,
+              428,
+              344
+            ],
+            "variants": {
+              "day": {
+                "visibleSourcePixels": 3581,
+                "changedVisibleRGB": 1401,
+                "alphaDifferences": 0,
+                "sourceMeanLuma": 139.255,
+                "candidateMeanLuma": 136.374,
+                "stronglyLightened": 711
+              },
+              "dusk": {
+                "visibleSourcePixels": 3581,
+                "changedVisibleRGB": 3581,
+                "alphaDifferences": 0,
+                "sourceMeanLuma": 139.255,
+                "candidateMeanLuma": 108.255,
+                "stronglyLightened": 15
+              }
+            }
+          }
+        },
+        "dynamicLightingEngine": false,
+        "runtimeIntegrated": false,
+        "productionApproved": false
+      }
+    }
+  ],
+  "sourceHashes": {
+    "a224-review/red_lion_a224_base.webp": "b9d8e1888c26a63cb11b69381db81c352cb45750ea32ad3c7d567d60b2f244ff",
+    "a228-review/red_lion_a228_facade_day.webp": "52e173ee65b112bf3d4b989bcbda8ac7539eeadcbc7a7477ba646c44527ded03",
+    "a228-review/red_lion_a228_facade_dusk.webp": "65845e26b69d3b36815dc8e0adc3a3166d75833adddb2f7ede5e0d4a5663e8bf"
+  },
+  "trueGameCapture": false,
+  "roofEdited": false,
+  "dynamicAtmosphereLightingValidated": false,
+  "fighterReadabilityValidated": false,
+  "liveFrameTimingMeasured": false,
+  "productionApproved": false
+}
