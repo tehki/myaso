@@ -52,6 +52,9 @@ const ROUTES: [AuthoredRoute; 3] = [
 ];
 type Path = Vec<(i32, i32)>;
 static PATHS: OnceLock<[Option<Path>; 3]> = OnceLock::new();
+// One fixed-point arc-length index per trusted, authored route. Read-only
+// after first construction, shared among all five NPCs and all sessions.
+static CACHED_ROUTES: OnceLock<[Option<PilotInspectionPath>; 3]> = OnceLock::new();
 
 fn pilot_window() -> CollisionWindow {
     let colliders = PILOT_BARRIERS.map(|rect| Collider {
@@ -87,6 +90,7 @@ fn routes() -> &'static [Option<Path>; 3] {
     PATHS.get_or_init(|| ROUTES.map(|(_, start, end)| shortest_route(start, end)))
 }
 
+#[cfg(test)]
 fn path_point(path: &[(i32, i32)], progress: u32) -> (u16, u16) {
     if path.len() < 2 {
         return (path[0].0 as u16, path[0].1 as u16);
@@ -119,15 +123,34 @@ fn path_point(path: &[(i32, i32)], progress: u32) -> (u16, u16) {
     (destination.0 as u16, destination.1 as u16)
 }
 
-/// Returns the safe position along the outwards route or its reverse.
-/// If the small authored test map becomes inconsistent, fail closed at start.
+/// Build and validate a bounded, integer-only movement index once for each
+/// authored route. If the source route is unavailable or outside the bounded
+/// pilot sampler, fail closed at the NPC's authored start location.
+fn cached_routes() -> &'static [Option<PilotInspectionPath>; 3] {
+    CACHED_ROUTES.get_or_init(|| {
+        routes().each_ref().map(|path| {
+            let points: Vec<_> = path
+                .as_ref()?
+                .iter()
+                .map(|&(x, y)| Some((u16::try_from(x).ok()?, u16::try_from(y).ok()?)))
+                .collect::<Option<_>>()?;
+            PilotInspectionPath::prepare(points)
+        })
+    })
+}
+
+/// Returns a pure read-only position along the existing pilot route.
+/// Includes Tomas/Elara's fixed pickup/dropoff endpoints at ticks 600/1800.
 pub fn position(id: u8, outward_progress: u32) -> Option<(u16, u16)> {
     let slot = ROUTES.iter().position(|route| route.0 == id)?;
     let (start, _) = (ROUTES[slot].1, ROUTES[slot].2);
-    Some(match &routes()[slot] {
-        Some(path) => path_point(path, outward_progress),
-        None => (start.0 as u16, start.1 as u16),
-    })
+    Some(
+        cached_routes()[slot]
+            .as_ref()
+            .map_or((start.0 as u16, start.1 as u16), |route| {
+                route.position(outward_progress)
+            }),
+    )
 }
 /// Pilot ONLY, for a guarded detour from a current server NPC position
 /// to an immutable server worksite. It uses the same bounded authored Rust
@@ -290,7 +313,7 @@ pub fn valid_route(id: u8) -> bool {
     ROUTES
         .iter()
         .position(|route| route.0 == id)
-        .is_some_and(|slot| routes()[slot].is_some())
+        .is_some_and(|slot| cached_routes()[slot].is_some())
 }
 
 /// Tiny, allocation-free line check through authored *pilot* obstacles only.
@@ -483,5 +506,62 @@ mod tests {
         assert_eq!(diagonal.position(300), (103, 103));
         assert_eq!(diagonal.position(600), (105, 105));
         assert!(pilot_inspection_plan((270, 220), (300, 230)).is_none());
+    }
+
+    #[test]
+    fn all_authored_npc_routes_use_cached_integer_positions_without_changing_stops() {
+        let prepared = cached_routes();
+        assert!(std::ptr::eq(prepared, cached_routes()));
+        for (slot, &(id, start, end)) in ROUTES.iter().enumerate() {
+            let fixed = prepared[slot].as_ref().expect("authored route");
+            let reference = routes()[slot].as_ref().expect("authored reference");
+            assert_eq!(
+                fixed.first().copied(),
+                Some((start.0 as u16, start.1 as u16))
+            );
+            assert_eq!(fixed.last().copied(), Some((end.0 as u16, end.1 as u16)));
+            assert!(fixed.len() <= 128);
+            assert!(fixed
+                .cumulative
+                .windows(2)
+                .all(|window| window[0] < window[1]));
+            assert_eq!(position(id, 0), Some((start.0 as u16, start.1 as u16)));
+            assert_eq!(position(id, WALK_TICKS), Some((end.0 as u16, end.1 as u16)));
+            for tick in 0..=WALK_TICKS {
+                let actual = position(id, tick).unwrap();
+                let baseline = path_point(reference, tick);
+                assert!(
+                    (i32::from(actual.0) - i32::from(baseline.0)).abs() <= 1,
+                    "id={id} tick={tick} x"
+                );
+                assert!(
+                    (i32::from(actual.1) - i32::from(baseline.1)).abs() <= 1,
+                    "id={id} tick={tick} y"
+                );
+                assert_eq!(Some(actual), position(id, tick));
+                assert!(!blocked(i32::from(actual.0), i32::from(actual.1)));
+                if tick > 0 {
+                    let previous = position(id, tick - 1).unwrap();
+                    assert!((i32::from(actual.0) - i32::from(previous.0)).abs() <= 2);
+                    assert!((i32::from(actual.1) - i32::from(previous.1)).abs() <= 2);
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn worker_pickup_delivery_and_forge_posts_remain_exact_at_authorized_ticks() {
+        // Supply execution is gated by each trusted worksite's fixed reach.
+        // Cached-route rounding must preserve exact pilot end positions.
+        assert_eq!(position(5, 600), Some((340, 255)));
+        assert_eq!(position(5, 0), Some((270, 220)));
+        assert_eq!(position(4, 600), Some((395, 150)));
+        assert_eq!(position(4, 0), Some((315, 110)));
+        assert_eq!(position(3, 600), Some((275, 190)));
+        assert_eq!(position(3, 0), Some((155, 205)));
+        assert!(pilot_line_of_sight(position(5, 600).unwrap(), (340, 255)));
+        assert!(pilot_line_of_sight(position(4, 600).unwrap(), (395, 150)));
+        assert!(valid_route(3) && valid_route(4) && valid_route(5));
+        assert!(!valid_route(1) && !valid_route(2) && !valid_route(99));
     }
 }

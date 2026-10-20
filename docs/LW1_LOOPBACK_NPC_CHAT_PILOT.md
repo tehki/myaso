@@ -880,3 +880,43 @@ collision and zone-ACK PRs are still unmerged. All detours remain
 off without all three explicit loopback flags. The browser keeps
 the exact existing 38-byte type-8 NPC state format. No production
 world actors, combat, money, items, persistence or deployment change.
+
+## LW-1V — Cached integer movement for all authored pilot NPC routes
+
+The prior LW-1U optimization covered Rowan's exceptional inspection
+detour only. LW-1V brings the same fixed-point, deterministic movement
+to the *normal authored routes of all three walking NPCs*: Rowan's
+standard guard patrol, Elara's market/depot rounds, and Tomas's
+yard/well rounds. The trusted server still builds its collision-safe
+pilot shortest-path waypoints just once in `OnceLock`; it now also
+constructs a single immutable `PilotInspectionPath` per route,
+with validated 1/1024-unit integer arc-length indices. Existing pilot
+worker route queries use one binary search and integer interpolation,
+instead of summing floating-point segment lengths again on each query.
+
+**Safety and compatibility:** Invalid, excessively long or unpreparable
+authored paths fail closed to that NPC's existing authored starting
+position. No dynamic geometry, player-authored obstacle or packet can
+enter these caches. The normal schedule remains 600 ticks outbound,
+600 at post, 600 inbound and 600 at base, with the same real clock,
+same server stocks and untouched NPC activity codes. Marta and Aldric
+remain stationary. The opt-in three-flag Rowan inspection detour still
+uses its distinct preprepared reversible path and committed-tick rules.
+
+For every one of the three moving NPCs, tests compare **all 601
+outbound positions** against the previous floating-point reference
+(up to one pilot coordinate unit tolerance), verify deterministic
+repeatability and no sampled position inside authored obstacles,
+and bound per-tick coordinate motion. The 600-tick source posts and
+zero-tick destination posts remain **exactly the original coordinates**:
+Tomas well (340,255) / yard (270,220), Elara supply depot (395,150) /
+market (315,110), Rowan watch route (275,190) / (155,205).
+This preserves the site-proximity authority used for conserving and
+delivering finite NPC cargo.
+
+Tests also verify the cache's once-per-process identity, bounded
+monotonic route distances, valid pilot route IDs and absent
+worker routes for immobile professions. No change to the 38-byte
+read-only NPC state wire frame, Combat, Physics, Economy, player
+inventory, zoning, actual buildings, doors or production deployment.
+**Preview-only World & Gameplay collision remains untrusted and unmerged.**
