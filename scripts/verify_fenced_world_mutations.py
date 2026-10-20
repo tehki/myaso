@@ -67,6 +67,20 @@ def outbox(i):
               f"WHERE entity_kind=1 AND entity_id={ident(i)};")
 
 
+def test_zero_mutation_identifiers_fail_closed():
+    register(20)
+    world(0, 20, error=True)
+    world(2010, 0, error=True)
+    check(state(20) == "", "invalid IDs must not create world state")
+    check(outbox(20) == "0", "invalid IDs must not create world events")
+    check(
+        db(f"SELECT count(*) FROM core_zone.world_mutation_receipts "
+           f"WHERE mutation_id={ident(0)};") == "0",
+        "zero mutation ID must not create a receipt",
+    )
+    print("PASS: zero mutation/entity IDs reject without state or receipts")
+
+
 def test_commit_and_handoff():
     register(11)
     first = world(1001, 11)
@@ -188,6 +202,7 @@ def test_restricted_executor():
 def main():
     check(os.environ.get("MYASO_C4D_TEST_ONLY") == "1", "test-only approval required")
     check(os.environ.get("PGDATABASE") == "myaso_c4d_test", "disposable database required")
+    test_zero_mutation_identifiers_fail_closed()
     test_commit_and_handoff()
     test_independent_competing_writers()
     test_transaction_locks_out_handoff()

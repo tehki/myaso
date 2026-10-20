@@ -91,6 +91,24 @@ def assert_can_mutate(n: int, worker: int, zone: int, epoch: int,
     )
 
 
+def test_zero_ids_fail_closed() -> None:
+    # SQL must reject what Rust's NonZeroU128 ID types cannot represent.
+    call(f"SELECT core_zone.register_entity(1::smallint, {entity(0)}, 1, 1);",
+         expect_failure=True)
+    require(
+        call(f"SELECT count(*) FROM core_zone.entities WHERE entity_id={entity(0)};") == "0",
+        "zero entity ID must never be registered",
+    )
+    register(98)
+    prepare(0, 98, 1, 1, 1, 2, 2, expect_failure=True)
+    require(is_current(98, 1, 1, 1), "zero handoff ID must not freeze authority")
+    require(
+        call(f"SELECT count(*) FROM core_zone.handoffs WHERE operation_id={operation(0)};") == "0",
+        "zero handoff must not be recorded",
+    )
+    print("PASS: zero character/item and handoff identifiers fail closed")
+
+
 def test_authority_recovery() -> None:
     register(1)
     require(is_current(1, 1, 1, 1), "initial worker must be current")
@@ -249,6 +267,7 @@ def main() -> None:
     require(os.environ.get("PGDATABASE"), "PGDATABASE required: isolated database only")
     require(os.environ.get("MYASO_C4C_TEST_ONLY") == "1",
             "explicit test-only environment required")
+    test_zero_ids_fail_closed()
     test_authority_recovery()
     test_competing_independent_clients()
     test_row_lock_protects_mutation()

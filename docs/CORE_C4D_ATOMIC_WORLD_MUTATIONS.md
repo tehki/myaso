@@ -20,7 +20,7 @@ row-locking mutation gate. C4d puts the consequential state transition
 - `core_zone.world_state`: one versioned, opaque, bounded
   (1–4096-byte) world-state payload per typed character/ground-item ID.
 - `core_zone.world_mutation_receipts`: immutable complete request,
-  globally unique 16-byte mutation ID, verified worker/zone/authority
+  globally unique nonzero 16-byte mutation ID (SQL and Rust both reject all-zero IDs), verified worker/zone/authority
   generation, expected revision and committed state/outbox receipt.
 - `core_zone.world_event_outbox`: append-only event with its committed
   state revision, same mutation ID, payload and authoritative generation.
@@ -92,6 +92,23 @@ schemas and runs `scripts/verify_fenced_world_mutations.py` with separate
 The Rust isolated harness compiles `identity.rs`, `zone_lease.rs` and the
 new binding contract and covers zero/untrusted claims, big-endian ID layout,
 signed conversion, payload bounds and receipt parsing.
+
+### C4e legacy-schema upgrade path
+
+After applying 001 and 002, `server/sql/003_nonzero_authority_ids.sql`
+adds named nonzero-ID CHECK constraints to **all eight** authority, handoff,
+world-state, receipt and outbox identifier columns. Simply rerunning
+`CREATE TABLE IF NOT EXISTS` from 001/002 **does not upgrade existing
+tables**. The versioned migration is a single transaction, validates
+preexisting rows, and fails without deleting or rewriting bad legacy IDs.
+It is idempotent when rerun. Before any approved deployment, inventory
+preexisting rows, arrange a controlled maintenance/locking window,
+verify backups and test rollback; it is **not approved for production use**.
+
+The dedicated C4d workflow first simulates a legacy invalid row inside
+its disposable PostgreSQL database. It proves the upgrade fails closed
+and rolls back, removes the test-only bad row, applies the upgrade twice,
+and verifies all constraints and normal mutation acceptance.
 
 The full existing `quality` suite must pass at the exact PR head in
 addition to this dedicated PostgreSQL acceptance.

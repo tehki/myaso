@@ -53,7 +53,7 @@ role with minimum necessary privileges rather than a superuser. A later
 deployment must establish narrowly scoped service roles, TLS, secret rotation,
 connection restrictions, audit trails and role ownership verification.
 
-The entity IDs are opaque 16-byte identifiers. Before Rust integration,
+The entity and handoff-operation IDs are opaque, nonzero 16-byte identifiers. SQL rejects the all-zero value to match Rust `NonZeroU128`/`CharacterId` contracts. Before Rust integration,
 define one canonical serialization convention for `CharacterId`/item IDs,
 including byte order, and prove Rust-to-SQL round trips. The SQL
 `bigint` worker, zone and epoch fields limit IDs to positive signed 63-bit

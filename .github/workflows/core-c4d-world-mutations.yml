@@ -4,12 +4,16 @@ on:
   pull_request:
     paths:
       - "server/sql/002_fenced_world_mutations.sql"
+      - "server/sql/003_nonzero_authority_ids.sql"
+      - "scripts/verify_c4e_schema_upgrade.py"
       - "scripts/verify_fenced_world_mutations.py"
       - ".github/workflows/core-c4d-world-mutations.yml"
   push:
     branches: [main]
     paths:
       - "server/sql/002_fenced_world_mutations.sql"
+      - "server/sql/003_nonzero_authority_ids.sql"
+      - "scripts/verify_c4e_schema_upgrade.py"
       - "scripts/verify_fenced_world_mutations.py"
       - ".github/workflows/core-c4d-world-mutations.yml"
 
@@ -54,10 +58,12 @@ jobs:
           fi
           psql --version
       - name: Compile isolated acceptance
-        run: python -m py_compile scripts/verify_fenced_world_mutations.py
+        run: python -m py_compile scripts/verify_fenced_world_mutations.py scripts/verify_c4e_schema_upgrade.py
       - name: Install authority and world-mutation schema
         run: |
           psql -X -v ON_ERROR_STOP=1 -f server/sql/001_zone_authority_postgres.sql
           psql -X -v ON_ERROR_STOP=1 -f server/sql/002_fenced_world_mutations.sql
+      - name: Validate legacy nonzero-ID migration fail-closed and idempotent
+        run: python scripts/verify_c4e_schema_upgrade.py
       - name: Prove fenced world state, receipt and outbox atomicity
         run: python scripts/verify_fenced_world_mutations.py
