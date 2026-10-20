@@ -1,8 +1,8 @@
 //! Dormant local write-ahead item journal with exactly-once replay semantics.
 //!
-//! Single writer, trusted directory, local atomic hard-link + directory fsync
-//! only. No cross-process locking, distributed CAS, game-server integration,
-//! item authorization, shared-store safety, or production rollout is implied.
+//! One cooperating OS writer on a trusted local Unix filesystem, immutable
+//! hard-link commits and directory fsync. No distributed CAS, untrusted path
+//! hardening, shared NFS, live authorization or production rollout is implied.
 
 use crate::{
     identity::CharacterId,
@@ -19,6 +19,40 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 
+// Match Core C4b's dependency-free POSIX advisory lock pattern. Rust's
+// standard File::try_lock is newer than the server's 1.88 minimum version.
+// Only trusted local Unix directories with working flock are supported.
+#[cfg(unix)]
+unsafe extern "C" {
+    fn flock(fd: std::os::raw::c_int, operation: std::os::raw::c_int) -> std::os::raw::c_int;
+}
+
+#[cfg(unix)]
+fn lock_exclusive_nonblocking(file: &File) -> io::Result<bool> {
+    use std::os::fd::AsRawFd;
+    // Linux/POSIX flock: LOCK_EX = 2, LOCK_NB = 4. The held File remains
+    // alive for the entire journal handle lifetime; closing it releases lock.
+    // SAFETY: the descriptor is owned by the live File during this call.
+    if unsafe { flock(file.as_raw_fd(), 2 | 4) } == 0 {
+        Ok(true)
+    } else {
+        let error = io::Error::last_os_error();
+        if error.kind() == io::ErrorKind::WouldBlock {
+            Ok(false)
+        } else {
+            Err(error)
+        }
+    }
+}
+
+#[cfg(not(unix))]
+fn lock_exclusive_nonblocking(_file: &File) -> io::Result<bool> {
+    Err(io::Error::new(
+        io::ErrorKind::Unsupported,
+        "local item journal writer locking requires Unix",
+    ))
+}
+
 const MAGIC: &[u8; 4] = b"MYTX";
 const VERSION: u8 = 1;
 const HEADER_BYTES: usize = 36;
@@ -30,6 +64,7 @@ static NEXT_PENDING: AtomicU64 = AtomicU64::new(0);
 
 #[derive(Debug)]
 pub enum ItemJournalError {
+    WriterBusy,
     Io(io::Error),
     InvalidRecord(&'static str),
     InvalidSequence,
@@ -229,6 +264,8 @@ impl Drop for PendingFile {
 /// subsystem invokes this journal until durable multi-worker storage exists.
 #[derive(Debug)]
 pub struct DurableItemJournal {
+    /// Held across replay and every write; released automatically at close.
+    _writer_lock: File,
     root: PathBuf,
     ledger: ItemOwnershipLedger,
     poisoned: bool,
@@ -238,6 +275,19 @@ impl DurableItemJournal {
     pub fn open(root: impl AsRef<Path>) -> Result<Self, ItemJournalError> {
         fs::create_dir_all(root.as_ref())?;
         let root = root.as_ref().to_path_buf();
+        let mut options = OpenOptions::new();
+        options.create(true).read(true).write(true);
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::OpenOptionsExt;
+            options.mode(0o600);
+        }
+        let lock = options.open(root.join(".item-journal-writer.lock"))?;
+        match lock_exclusive_nonblocking(&lock) {
+            Ok(true) => {}
+            Ok(false) => return Err(ItemJournalError::WriterBusy),
+            Err(error) => return Err(ItemJournalError::Io(error)),
+        }
         let mut indexed = Vec::new();
         for entry in fs::read_dir(&root)? {
             let entry = entry?;
@@ -245,7 +295,7 @@ impl DurableItemJournal {
             let name = name
                 .to_str()
                 .ok_or(ItemJournalError::InvalidRecord("non-UTF8 filename"))?;
-            if name.starts_with(".pending-") {
+            if name == ".item-journal-writer.lock" || name.starts_with(".pending-") {
                 continue;
             }
             if name.len() != 25 || !name.ends_with(".mytx") {
@@ -295,6 +345,7 @@ impl DurableItemJournal {
             previous = sequence;
         }
         Ok(Self {
+            _writer_lock: lock,
             root,
             ledger,
             poisoned: false,
@@ -452,6 +503,55 @@ mod tests {
             x_cm: -290,
             y_cm: 177,
         }
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn exclusive_writer_denies_second_handle_and_independent_process() {
+        use std::process::Command;
+
+        let root = Root::new();
+        let original = root.open();
+        assert!(matches!(
+            DurableItemJournal::open(&root.0),
+            Err(ItemJournalError::WriterBusy)
+        ));
+        let status = Command::new(std::env::current_exe().expect("test binary"))
+            .arg("--ignored")
+            .arg("--exact")
+            .arg("item_journal::tests::subprocess_writer_lock_probe")
+            .arg("--nocapture")
+            .env("MYASO_ITEM_JOURNAL_LOCK_PROBE", &root.0)
+            .status()
+            .expect("launch distinct process");
+        assert!(status.success(), "other process must reject busy writer");
+        drop(original);
+
+        let mut successor = root.open();
+        successor
+            .apply(
+                txn(1),
+                &[OwnershipOp::Create {
+                    item: item(99),
+                    at: inv(1),
+                }],
+            )
+            .expect("new owner commits after prior process releases");
+        drop(successor);
+        assert_eq!(root.open().location(item(99)), Some(inv(1)));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    #[ignore = "executed by exclusive_writer_denies_second_handle_and_independent_process"]
+    fn subprocess_writer_lock_probe() {
+        let Some(root) = std::env::var_os("MYASO_ITEM_JOURNAL_LOCK_PROBE") else {
+            return;
+        };
+        assert!(matches!(
+            DurableItemJournal::open(PathBuf::from(root)),
+            Err(ItemJournalError::WriterBusy)
+        ));
     }
 
     #[test]
