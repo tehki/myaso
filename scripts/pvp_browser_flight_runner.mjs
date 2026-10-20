@@ -9034,7 +9034,11 @@ async function runOnlineUiHeavyGuardBreakPunishFlight(entries) {
   // The in-page observer timestamps both event-text and overlay mutations. That
   // provides stronger ordering evidence than repeated WebDriver reads and does
   // not perturb Firefox while the real Chrome action sequence is executing.
-  await performArenaAttackBurst(attacker, 9, initialPauseMs, 20);
+  // A single authentic short LMB release must hit exactly once. The former
+  // nine-tap burst mixed repeated charged-hold flags with releases and CI
+  // #39412048012 resolved an unintended 46HP heavy instead of 34HP light.
+  // Preserve all stun, HP, parry and recovery fail-closed proofs below.
+  await performArenaAttackBurst(attacker, 1, initialPauseMs, 0);
 
   const attackerDeadline = Date.now() + 260;
   let attackerResult = null;

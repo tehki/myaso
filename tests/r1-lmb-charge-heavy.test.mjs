@@ -166,3 +166,17 @@ test("existing server-authoritative heavy windup and reach remain unchanged", ()
   assert.match(model, /windupMs: 320,\s*activeMs: 100,\s*recoveryMs: 420,\s*reach: 82/);
   assert.match(server, /HEAVY_ATTACK_WINDUP_MS: f32 = 320\.0/);
 });
+
+test("M111 one genuine LMB release gives exactly one 34HP guard-break punish", () => {
+  const source = readFileSync(new URL("../scripts/pvp_browser_flight_runner.mjs", import.meta.url), "utf8");
+  const start = source.indexOf("async function runOnlineUiHeavyGuardBreakPunishFlight(");
+  const end = source.indexOf("\nasync function ", start + 40);
+  assert.ok(start >= 0 && end > start);
+  const proof = source.slice(start, end);
+  assert.match(proof, /performArenaAttackBurst\(attacker, 1, initialPauseMs, 0\)/);
+  assert.doesNotMatch(proof, /performArenaAttackBurst\(attacker, 9/);
+  assert.match(proof, /Opponent hit - 34 HP\./);
+  assert.match(proof, /Hit taken - 34 HP\./);
+  assert.match(proof, /hitDuringStun/);
+  assert.match(proof, /punishLightThreatTransitions/);
+});
