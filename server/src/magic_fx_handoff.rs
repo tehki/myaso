@@ -166,6 +166,17 @@ impl TrustedFxHandoff {
             .is_some_and(|entry| entry.generation == route.generation)
     }
 
+    /// P12: authoritative zone lookup for an *existing, current* route.
+    /// FX payloads cannot authorize their own zone; this is the Core-side
+    /// trusted comparison used by the inactive shared-transport planner.
+    pub fn authorized_zone(&self, route: FxRoute) -> Option<u32> {
+        let entry = self.routes.get(&route.connection_id)?;
+        if entry.generation != route.generation {
+            return None;
+        }
+        Some(entry.session.zone_id)
+    }
+
     fn get_current(&self, route: FxRoute) -> Result<&Registration, FxHandoffError> {
         let entry = self
             .routes
