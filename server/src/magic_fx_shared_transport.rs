@@ -133,8 +133,9 @@ pub fn plan_shared_dispatch<'a>(
         gameplay_bytes += item.bytes.len();
     }
 
-    let mut ordered = Vec::with_capacity(gameplay.len() + MAX_FX_PAYLOAD_BYTES_GLOBAL_TICK
-        / MAGIC_FX_PACKET_BYTES);
+    let mut ordered = Vec::with_capacity(
+        gameplay.len() + MAX_FX_PAYLOAD_BYTES_GLOBAL_TICK / MAGIC_FX_PACKET_BYTES,
+    );
     for item in gameplay {
         ordered.push(SharedDispatchDatagram {
             route: item.route,
@@ -156,7 +157,8 @@ pub fn plan_shared_dispatch<'a>(
             };
             // The exact 32-byte ME envelope and zone are server-originated,
             // but are rechecked at the Core/FX boundary as defense in depth.
-            let packet_zone = u32::from_le_bytes(packet[4..8].try_into().expect("fixed 32-byte FX"));
+            let packet_zone =
+                u32::from_le_bytes(packet[4..8].try_into().expect("fixed 32-byte FX"));
             if packet[..2] != *b"ME" || packet[2] != 1 || packet_zone != zone_id {
                 dropped += 1;
                 continue;
@@ -241,10 +243,19 @@ mod tests {
         let mut registry = TrustedFxHandoff::new();
         let r = registry.register_trusted(42, 17, 2).unwrap();
         let game = vec![
-            CoreGameplayDatagram { route: r, bytes: b"snapshot".to_vec() },
-            CoreGameplayDatagram { route: r, bytes: b"processed-ACK".to_vec() },
+            CoreGameplayDatagram {
+                route: r,
+                bytes: b"snapshot".to_vec(),
+            },
+            CoreGameplayDatagram {
+                route: r,
+                bytes: b"processed-ACK".to_vec(),
+            },
         ];
-        let visuals = handoff(vec![FxRoutedBatch { route: r, packets: vec![fx(2), fx(2)] }]);
+        let visuals = handoff(vec![FxRoutedBatch {
+            route: r,
+            packets: vec![fx(2), fx(2)],
+        }]);
         let planned = plan_shared_dispatch(&registry, &game, &visuals, &[writer(r, 3)]).unwrap();
         assert_eq!(planned.gameplay_datagrams, 2);
         assert_eq!(planned.cosmetic_datagrams, 1);
@@ -254,8 +265,16 @@ mod tests {
         assert_eq!(planned.ordered[1].bytes, b"processed-ACK");
         assert_eq!(planned.ordered[2].bytes, fx(2));
         assert_eq!(
-            planned.ordered.iter().map(|item| item.priority).collect::<Vec<_>>(),
-            [SharedPriority::Gameplay, SharedPriority::Gameplay, SharedPriority::Cosmetic]
+            planned
+                .ordered
+                .iter()
+                .map(|item| item.priority)
+                .collect::<Vec<_>>(),
+            [
+                SharedPriority::Gameplay,
+                SharedPriority::Gameplay,
+                SharedPriority::Cosmetic
+            ]
         );
         assert_eq!(game[0].bytes, b"snapshot");
         assert_eq!(game[1].bytes, b"processed-ACK");
@@ -266,10 +285,19 @@ mod tests {
         let mut registry = TrustedFxHandoff::new();
         let r = registry.register_trusted(1, 1, 1).unwrap();
         let game = vec![
-            CoreGameplayDatagram { route: r, bytes: vec![1] },
-            CoreGameplayDatagram { route: r, bytes: vec![2] },
+            CoreGameplayDatagram {
+                route: r,
+                bytes: vec![1],
+            },
+            CoreGameplayDatagram {
+                route: r,
+                bytes: vec![2],
+            },
         ];
-        let visuals = handoff(vec![FxRoutedBatch { route: r, packets: vec![fx(1)] }]);
+        let visuals = handoff(vec![FxRoutedBatch {
+            route: r,
+            packets: vec![fx(1)],
+        }]);
         assert_eq!(
             plan_shared_dispatch(&registry, &game, &visuals, &[writer(r, 1)]),
             Err(SharedDispatchError::InsufficientGameplayCapacity)
@@ -283,7 +311,10 @@ mod tests {
     fn independent_gameplay_backlog_or_writer_pressure_suppresses_only_fx() {
         let mut registry = TrustedFxHandoff::new();
         let r = registry.register_trusted(3, 3, 1).unwrap();
-        let visuals = handoff(vec![FxRoutedBatch { route: r, packets: vec![fx(1)] }]);
+        let visuals = handoff(vec![FxRoutedBatch {
+            route: r,
+            packets: vec![fx(1)],
+        }]);
         let mut w = writer(r, 2);
         w.gameplay_waiting = true;
         let out = plan_shared_dispatch(&registry, &[], &visuals, &[w]).unwrap();
@@ -300,7 +331,10 @@ mod tests {
     fn trusted_zone_transfer_or_recycled_socket_cannot_leak_old_effects() {
         let mut registry = TrustedFxHandoff::new();
         let old = registry.register_trusted(5, 5, 1).unwrap();
-        let visuals = handoff(vec![FxRoutedBatch { route: old, packets: vec![fx(1)] }]);
+        let visuals = handoff(vec![FxRoutedBatch {
+            route: old,
+            packets: vec![fx(1)],
+        }]);
         let moved = registry.transfer_trusted(old, 2).unwrap();
         let result = plan_shared_dispatch(&registry, &[], &visuals, &[writer(old, 1)]).unwrap();
         assert_eq!(result.stale_cosmetic_dropped, 1);
@@ -308,7 +342,8 @@ mod tests {
         registry.unregister_trusted(moved).unwrap();
         let recycled = registry.register_trusted(5, 5, 1).unwrap();
         assert_ne!(old.generation, recycled.generation);
-        let result = plan_shared_dispatch(&registry, &[], &visuals, &[writer(recycled, 1)]).unwrap();
+        let result =
+            plan_shared_dispatch(&registry, &[], &visuals, &[writer(recycled, 1)]).unwrap();
         assert_eq!(result.stale_cosmetic_dropped, 1);
     }
 
@@ -319,7 +354,8 @@ mod tests {
         let mut malformed = fx(2);
         malformed[0] = b'X';
         let visuals = handoff(vec![FxRoutedBatch {
-            route, packets: vec![fx(1), malformed, fx(2)],
+            route,
+            packets: vec![fx(1), malformed, fx(2)],
         }]);
         let out = plan_shared_dispatch(&registry, &[], &visuals, &[writer(route, 3)]).unwrap();
         assert_eq!(out.cosmetic_datagrams, 1);
@@ -331,15 +367,24 @@ mod tests {
     fn game_payload_or_auth_failure_never_downgrades_to_fx_only() {
         let mut registry = TrustedFxHandoff::new();
         let route = registry.register_trusted(2, 2, 1).unwrap();
-        let visuals = handoff(vec![FxRoutedBatch { route, packets: vec![fx(1)] }]);
+        let visuals = handoff(vec![FxRoutedBatch {
+            route,
+            packets: vec![fx(1)],
+        }]);
         for invalid in [vec![], vec![0; CONSERVATIVE_DATAGRAM_BYTES + 1]] {
-            let game = [CoreGameplayDatagram { route, bytes: invalid }];
+            let game = [CoreGameplayDatagram {
+                route,
+                bytes: invalid,
+            }];
             assert_eq!(
                 plan_shared_dispatch(&registry, &game, &visuals, &[writer(route, 2)]),
                 Err(SharedDispatchError::InvalidGameplayDatagram)
             );
         }
-        let game = [CoreGameplayDatagram { route, bytes: vec![7] }];
+        let game = [CoreGameplayDatagram {
+            route,
+            bytes: vec![7],
+        }];
         assert_eq!(
             plan_shared_dispatch(&registry, &game, &visuals, &[]),
             Err(SharedDispatchError::MissingGameplayWriter)
@@ -359,7 +404,10 @@ mod tests {
         for id in 1..=1_024 {
             let zone = (id - 1) % 4 + 1;
             let route = registry.register_trusted(id as u64, id, zone).unwrap();
-            batches.push(FxRoutedBatch { route, packets: vec![fx(zone)] });
+            batches.push(FxRoutedBatch {
+                route,
+                packets: vec![fx(zone)],
+            });
             writers.push(writer(route, 1));
         }
         let fx_plan = handoff(batches);
@@ -367,7 +415,10 @@ mod tests {
         assert_eq!(out.cosmetic_datagrams, 512);
         assert_eq!(out.cosmetic_payload_bytes, MAX_FX_PAYLOAD_BYTES_GLOBAL_TICK);
         assert_eq!(out.cosmetic_dropped, 512);
-        assert!(out.ordered.iter().all(|msg| msg.priority == SharedPriority::Cosmetic));
+        assert!(out
+            .ordered
+            .iter()
+            .all(|msg| msg.priority == SharedPriority::Cosmetic));
     }
 
     #[test]
@@ -376,16 +427,27 @@ mod tests {
         let a = registry.register_trusted(1, 1, 1).unwrap();
         let b = registry.register_trusted(2, 2, 2).unwrap();
         let game = vec![
-            CoreGameplayDatagram { route: b, bytes: vec![8, 8] },
-            CoreGameplayDatagram { route: a, bytes: vec![1, 1] },
+            CoreGameplayDatagram {
+                route: b,
+                bytes: vec![8, 8],
+            },
+            CoreGameplayDatagram {
+                route: a,
+                bytes: vec![1, 1],
+            },
         ];
         let visuals = handoff(vec![
-            FxRoutedBatch { route: a, packets: vec![fx(1)] },
-            FxRoutedBatch { route: b, packets: vec![fx(2)] },
+            FxRoutedBatch {
+                route: a,
+                packets: vec![fx(1)],
+            },
+            FxRoutedBatch {
+                route: b,
+                packets: vec![fx(2)],
+            },
         ]);
-        let out = plan_shared_dispatch(
-            &registry, &game, &visuals, &[writer(a, 2), writer(b, 2)]
-        ).unwrap();
+        let out = plan_shared_dispatch(&registry, &game, &visuals, &[writer(a, 2), writer(b, 2)])
+            .unwrap();
         assert_eq!(out.gameplay_datagrams, 2);
         assert_eq!(out.cosmetic_datagrams, 2);
         assert_eq!(out.cosmetic_dropped, 0);
