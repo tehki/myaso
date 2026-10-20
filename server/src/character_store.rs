@@ -211,8 +211,12 @@ mod tests {
         let mut store = root.store();
         let initial = store.create(id).expect("create identity");
         assert_eq!(initial.session_generation, 0);
-        let first = store.advance_generation(initial).expect("first committed epoch");
-        let second = store.advance_generation(first).expect("second committed epoch");
+        let first = store
+            .advance_generation(initial)
+            .expect("first committed epoch");
+        let second = store
+            .advance_generation(first)
+            .expect("second committed epoch");
         assert_eq!(second.session_generation, 2);
         drop(store);
 
@@ -228,7 +232,10 @@ mod tests {
         let mut store = root.store();
         assert!(matches!(store.load(id), Err(CharacterStoreError::Missing)));
         let initial = store.create(id).expect("provision");
-        assert!(matches!(store.create(id), Err(CharacterStoreError::AlreadyExists)));
+        assert!(matches!(
+            store.create(id),
+            Err(CharacterStoreError::AlreadyExists)
+        ));
         let first = store.advance_generation(initial).expect("commit");
         assert!(matches!(
             store.advance_generation(initial),
@@ -252,7 +259,10 @@ mod tests {
         let other = character(124);
         let mut store = root.store();
         let _ = store.create(id).expect("create");
-        assert!(matches!(store.load(other), Err(CharacterStoreError::Missing)));
+        assert!(matches!(
+            store.load(other),
+            Err(CharacterStoreError::Missing)
+        ));
 
         fs::write(store.record_path(id), CharacterRecord::new(other).encode())
             .expect("inject conflicting valid record");
@@ -283,8 +293,7 @@ mod tests {
         let mut store = root.store();
         let initial = store.create(id).expect("create");
         let first = store.advance_generation(initial).expect("commit first");
-        fs::write(root.0.join(".987.pending-interrupted"), b"partial")
-            .expect("simulate orphan");
+        fs::write(root.0.join(".987.pending-interrupted"), b"partial").expect("simulate orphan");
         let restored = root.store().load(id).expect("canonical record");
         assert_eq!(restored, first);
     }
