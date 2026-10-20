@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="icon" href="data:,">
+<title>Blood & Iron A2.10 — Knight scale review</title>
+<style>
+:root{color-scheme:dark}*{box-sizing:border-box}
+body{margin:0;background:#161d19;color:#ece4d4;font:15px/1.5 system-ui,sans-serif}
+header{background:#273129;padding:15px 24px;border-bottom:1px solid #586c56}
+h1{font:700 27px Georgia,serif;margin:0}
+main{margin:auto;max-width:1620px;padding:18px}
+.controls{display:flex;flex-wrap:wrap;align-items:center;gap:16px;border:1px solid #687568;border-radius:8px;padding:12px;background:#283329}
+label{display:flex;gap:8px;align-items:center}
+select,input{background:#3a453a;color:#f6e6c9;padding:6px;border:1px solid #819178;border-radius:5px}
+input[type=range]{max-width:145px;accent-color:#deb57f}
+.grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin:14px 0}
+figure{margin:0;padding:10px;background:#243027;border:1px solid #687765;border-radius:9px}
+canvas{display:block;width:100%;aspect-ratio:1;background:#536450}
+figcaption{font-size:14px;padding:8px 0;color:#e1d6bc}
+.stat{padding:10px 14px;border-radius:7px;background:#28392e;margin:10px 0}
+.note{font-size:13px;color:#c1c9bb}.warning{color:#eed0a1}
+@media(max-width:950px){.grid{grid-template-columns:1fr}}
+</style></head><body>
+<header><h1>⚔️ Greyhaven — A2.10 Knight scale calibration</h1>
+<div class="note">Same actual PR #326 knight frame beside the same Red Lion door · three proposed visual sizes · no gameplay changes</div></header>
+<main>
+<div class="controls">
+<label>Animation <select id="clip">
+<option value="silver_idle">Silver Knight — standing</option>
+<option value="silver_roll">Silver Knight — A3 roll</option>
+<option value="t1_roll">T1 Sentinel — A3 roll</option></select></label>
+<label>Direction <select id="direction"><option value="0">South</option><option value="2">West</option><option value="4">North</option><option value="6">East</option></select></label>
+<label>Frame <input id="frame" type="range" min="0" max="3" value="0" step="1"><output id="frame-num">1/4</output></label>
+<label>Roof transparency <input id="roof" type="range" min="0" max="100" value="35" step="5"><output id="roof-num">35%</output></label>
+<label><input id="origin" type="checkbox" checked>Show visual door marker</label>
+</div>
+<div class="grid">
+<figure><canvas id="baseline" width="640" height="640" aria-label="Baseline knight size beside original Red Lion"></canvas>
+<figcaption><strong>Current — 100%</strong><div id="baseline-info"></div></figcaption></figure>
+<figure><canvas id="moderate" width="640" height="640" aria-label="112.5 percent knight size beside original Red Lion"></canvas>
+<figcaption><strong>Candidate A — 112.5%</strong><div id="moderate-info"></div></figcaption></figure>
+<figure><canvas id="larger" width="640" height="640" aria-label="120 percent knight size beside original Red Lion"></canvas>
+<figcaption><strong>Candidate B — 120%</strong><div id="larger-info"></div></figcaption></figure>
+</div>
+<div class="stat" id="status" role="status">Loading first-party source art from the separate PR #326 checkout…</div>
+<p class="note warning"><strong>Art review only.</strong> These sizes change canvas draw transforms solely in this page. The world-space fighter center, true anatomical foot pivot, hitboxes, hit timing, collision, A3 playback, multiplayer net authority and production renderer remain unchanged. Red Lion remains 3/4 cinematic art, not flat game-XY registered. This scene uses an identical <em>illustrative</em> offset next to the visual doorway in each comparison; it is not the real fighter position in the world.</p>
+<p class="note">This standalone view requires the local A2.10 Chrome harness serving an independently checked out PR #326. Ordinary Python HTTP serving PR #350 will correctly show a missing-companion message.</p>
+</main><script type="module" src="./greyhaven-a210-scale-lab.mjs"></script>
+</body></html>
