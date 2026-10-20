@@ -225,6 +225,12 @@ jobs:
           node --check src/world/chronicle-atlas.mjs
           node --test tests/world-chronicle-atlas.test.mjs
 
+      - name: Validate D16 authored world cross-system integrity
+        run: |
+          node --check scripts/audit-world-authoring.mjs
+          node scripts/audit-world-authoring.mjs
+          node --test tests/world-authoring-audit.test.mjs
+
       - name: Validate M188 repeated real heavy counterplay windows
         run: |
           # Three fresh Chrome/Firefox sessions for each real defensive read.
