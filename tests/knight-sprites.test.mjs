@@ -203,7 +203,7 @@ test("fallback resets old roll before a separate roll starts", () => {
   const drawn = [];
   class MockImage {
     set src(url) {
-      const name = url.match(/([^/]+)\\.webp$/)?.[1];
+      const name = new URL(url).pathname.split("/").at(-1)?.replace(".webp", "");
       this.naturalWidth = (KNIGHT_CLIPS[name] ?? 0) * KNIGHT_FRAME_PX;
       this.naturalHeight = 8 * KNIGHT_FRAME_PX;
       this.onload?.();
