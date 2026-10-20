@@ -43,6 +43,7 @@ kbd{border-radius:4px;border:1px solid #677354;background:#303a2d;color:#fff2d2;
 #trail-progress{color:#d1d7b9;font-size:12px;margin-top:7px;min-height:17px}
 #trail-progress-bar{display:block;width:100%;max-width:248px;height:7px;margin:6px 0 0;accent-color:#ebc77e}
 #trail-progress-bar[hidden]{display:none}
+#trail-rejoin{font-size:12px;margin-top:5px;color:#b9d5c0}
 </style></head><body>
 <header><div><h1>⚔️ Moonvale — World & Buildings v1.0</h1>
 <div class="sub">A fixed medieval world, with a separate, deliberately larger tavern interior</div></div>
@@ -76,6 +77,7 @@ The geography, town names, buildings and roads are fixed and identical for all p
 <div class="wayfinding-note">Straight-line compass only. Surveyed trails connect authored milestones, not your current position. Nearness does not guarantee a safe rejoin. Press <kbd>M</kbd> to toggle the sketch.</div>
 <div id="trail-progress" role="status" aria-live="off">No active surveyed trail.</div>
 <progress id="trail-progress-bar" max="100" value="0" aria-label="Nearest point along selected milestone trail" hidden></progress>
+<div id="trail-rejoin" role="status" aria-live="off"></div>
 <canvas id="wayfinding-map" width="248" height="248" aria-label="Moonvale sketch map, white player and amber destination" hidden></canvas>
 </div>
 </section>
@@ -90,6 +92,7 @@ import { MOONVALE_EXPEDITIONS, createLocalExpeditionState, chooseLocalExpedition
 import { localWayfindingHint, drawLocalWayfindingSketch } from "../src/world/local-wayfinding.mjs";
 import { certifiedTrailForNext } from "../src/world/local-trails.mjs";
 import { localTrailPosition } from "../src/world/local-trail-progress.mjs";
+import { localSampledTrailRejoin } from "../src/world/local-rejoin.mjs";
 import { MOONVALE_FIELD_SITES, createLocalFieldNotebook, nearbyLocalFieldSite,
   observeLocalFieldSite, localFieldSurveyProgress } from "../src/world/field-survey.mjs";
 const canvas=document.querySelector("#arena");
@@ -123,6 +126,7 @@ const wayfindingMap=document.querySelector("#wayfinding-map");
 const wayfindingContext=wayfindingMap.getContext("2d",{alpha:false});
 const trailProgress=document.querySelector("#trail-progress");
 const trailProgressBar=document.querySelector("#trail-progress-bar");
+const trailRejoin=document.querySelector("#trail-rejoin");
 let wayfindingVisible=false;
 let nextWayfindingAt=0;
 function refreshWayfinding(now){
@@ -145,6 +149,13 @@ function refreshWayfinding(now){
   }else{
     trailProgress.textContent="No active surveyed trail.";
   }
+  const rejoin=position && !position.nearTrail
+    ? localSampledTrailRejoin(expeditionState,mapId,player.x,player.y) : null;
+  trailRejoin.textContent=!position || position.nearTrail ? ""
+    : rejoin
+      ? "Sampled-clear direct approach "+rejoin.direction+" · "+Math.round(rejoin.distance)
+        +" units. Static preview geometry only."
+      : "No sampled-clear direct rejoin nearby — follow walkable roads.";
   wayfindingMap.hidden=!wayfindingVisible || mapId!==MAP_IDS.overworld;
   if(!wayfindingMap.hidden){
     drawLocalWayfindingSketch(wayfindingContext,mapId,player.x,player.y,expeditionState);
