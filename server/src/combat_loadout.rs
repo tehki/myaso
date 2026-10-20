@@ -257,8 +257,7 @@ mod tests {
 
         let mut dead_fighter = world.fighter(1).unwrap().clone();
         dead_fighter.action = Action::Dead;
-        loot.death(1, &dead_fighter, ZoneId::Moonvale, 10)
-            .unwrap();
+        loot.death(1, &dead_fighter, ZoneId::Moonvale, 10).unwrap();
         assert_eq!(
             resolve_verified_session_loadout(&identity, current, &world, &loot),
             Err(CombatLoadoutError::DeadFighter)
