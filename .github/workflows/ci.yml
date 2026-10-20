@@ -210,6 +210,11 @@ jobs:
           node --check src/world/local-rejoin-sketch.mjs
           node --test tests/world-rejoin-sketch.test.mjs
 
+      - name: Validate D13 authored roadside lore and F interaction arbitration
+        run: |
+          node --check src/world/roadside-lore.mjs
+          node --test tests/world-roadside-lore.test.mjs
+
       - name: Validate M188 repeated real heavy counterplay windows
         run: |
           # Three fresh Chrome/Firefox sessions for each real defensive read.
