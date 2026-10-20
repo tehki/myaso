@@ -66,7 +66,7 @@ const out = [
   "",
 ].join("\n");
 if (process.argv.includes("--check")) {
-  if (readFileSync(destination, "utf8") !== out) {
+  if (readFileSync(destination, "utf8").replace(/\r\n/g, "\n") !== out) {
     console.error("World geometry generated Rust constants are stale.");
     process.exitCode = 1;
   } else {
