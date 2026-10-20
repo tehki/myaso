@@ -58,7 +58,7 @@ CREATE TABLE metadata (
 CREATE TABLE admission_mutations (
     revision INTEGER PRIMARY KEY CHECK(revision>0),
     operation_id TEXT NOT NULL UNIQUE CHECK(length(operation_id) BETWEEN 1 AND 64),
-    mutation_kind TEXT NOT NULL CHECK(mutation_kind IN ('session_revoke','listing_revoke')),
+    mutation_kind TEXT NOT NULL CHECK(mutation_kind IN ('session_issue','session_revoke','listing_revoke','title_cap_change')),
     target_id INTEGER NOT NULL CHECK(target_id>0),
     target_epoch INTEGER NOT NULL CHECK(target_epoch>=0)
 );
