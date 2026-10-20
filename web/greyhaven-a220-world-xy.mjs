@@ -133,7 +133,7 @@ try{
     camera.gameZoom!==ARENA_VIEW_ZOOM||
     camera.productionApproved!==false||
     cinematicMeta.gameXYProjectionMatched!==false||
-    overhead.gameWorldPlacementApproved!==false||
+    overhead.productionApproved!==false||
     cinematic.browserGameXYAligned!==false||
     cinematic.browserRuntimeIntegrated!==false||
     cinematic.productionApproved!==false||
