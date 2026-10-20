@@ -9,15 +9,12 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use crate::magic_fx_events::MAGIC_FX_PACKET_BYTES;
-use crate::magic_fx_handoff::{
-    FxHandoffPlan, FxRoute, FxRoutedBatch, TrustedFxHandoff,
-};
+use crate::magic_fx_handoff::{FxHandoffPlan, FxRoute, FxRoutedBatch, TrustedFxHandoff};
 use crate::magic_fx_shared_transport::{
     plan_shared_dispatch, CoreGameplayDatagram, CoreWriterCapacity,
 };
 use crate::magic_fx_shared_writer::{
-    try_write_core_guarded, CoreAuthenticatedWriter, CoreGuardedEnqueueError,
-    SharedWriteFailure,
+    try_write_core_guarded, CoreAuthenticatedWriter, CoreGuardedEnqueueError, SharedWriteFailure,
 };
 
 const CONNECTION: u64 = 42;
@@ -25,9 +22,20 @@ const NET_ID: u32 = 7;
 
 #[derive(Clone, Copy)]
 enum Fault {
-    Transfer { after: usize, route: FxRoute, zone: u32 },
-    Recycle { after: usize, route: FxRoute, zone: u32 },
-    Disconnect { after: usize, route: FxRoute },
+    Transfer {
+        after: usize,
+        route: FxRoute,
+        zone: u32,
+    },
+    Recycle {
+        after: usize,
+        route: FxRoute,
+        zone: u32,
+    },
+    Disconnect {
+        after: usize,
+        route: FxRoute,
+    },
 }
 
 struct FencedWriter {
@@ -67,20 +75,38 @@ impl CoreAuthenticatedWriter for FencedWriter {
         let count = self.accepted.len();
         if let Some(fault) = self.fault.take() {
             match fault {
-                Fault::Transfer { after, route: target, zone } if count == after => {
+                Fault::Transfer {
+                    after,
+                    route: target,
+                    zone,
+                } if count == after => {
                     self.replacement = Some(
-                        registry.transfer_trusted(target, zone).expect("Core zone migration"),
+                        registry
+                            .transfer_trusted(target, zone)
+                            .expect("Core zone migration"),
                     );
                 }
-                Fault::Recycle { after, route: target, zone } if count == after => {
-                    registry.unregister_trusted(target).expect("Core disconnect");
+                Fault::Recycle {
+                    after,
+                    route: target,
+                    zone,
+                } if count == after => {
+                    registry
+                        .unregister_trusted(target)
+                        .expect("Core disconnect");
                     self.replacement = Some(
-                        registry.register_trusted(CONNECTION, NET_ID, zone)
+                        registry
+                            .register_trusted(CONNECTION, NET_ID, zone)
                             .expect("Core trusted replacement"),
                     );
                 }
-                Fault::Disconnect { after, route: target } if count == after => {
-                    registry.unregister_trusted(target).expect("Core disconnect");
+                Fault::Disconnect {
+                    after,
+                    route: target,
+                } if count == after => {
+                    registry
+                        .unregister_trusted(target)
+                        .expect("Core disconnect");
                 }
                 other => self.fault = Some(other),
             }
@@ -131,14 +157,21 @@ fn writer(route: FxRoute, slots: usize) -> CoreWriterCapacity {
 #[test]
 fn p17_zone_transfer_between_two_gameplay_packets_stops_at_exact_unsent_packet() {
     let owner = Rc::new(RefCell::new(TrustedFxHandoff::new()));
-    let old = owner.borrow_mut().register_trusted(CONNECTION, NET_ID, 1).unwrap();
+    let old = owner
+        .borrow_mut()
+        .register_trusted(CONNECTION, NET_ID, 1)
+        .unwrap();
     let game = [gameplay(old, b"snapshot"), gameplay(old, b"ack")];
     let effects = fx(old, 1);
     let plan = plan_shared_dispatch(&owner.borrow(), &game, &effects, &[writer(old, 3)])
         .expect("trusted P12 plan");
     let mut core = FencedWriter::new(
         Rc::clone(&owner),
-        Some(Fault::Transfer { after: 1, route: old, zone: 2 }),
+        Some(Fault::Transfer {
+            after: 1,
+            route: old,
+            zone: 2,
+        }),
     );
     let report = try_write_core_guarded(&plan, &mut core);
     let moved = core.replacement.expect("fenced transfer");
@@ -163,13 +196,22 @@ fn p17_zone_transfer_between_two_gameplay_packets_stops_at_exact_unsent_packet()
 #[test]
 fn p17_zone_transfer_after_gameplay_drops_old_fx_without_touching_other_client() {
     let owner = Rc::new(RefCell::new(TrustedFxHandoff::new()));
-    let a = owner.borrow_mut().register_trusted(CONNECTION, NET_ID, 1).unwrap();
+    let a = owner
+        .borrow_mut()
+        .register_trusted(CONNECTION, NET_ID, 1)
+        .unwrap();
     let b = owner.borrow_mut().register_trusted(43, 8, 2).unwrap();
     let game = [gameplay(a, b"player A"), gameplay(b, b"player B")];
     let effects = FxHandoffPlan {
         routes: vec![
-            FxRoutedBatch { route: a, packets: vec![visual(1)] },
-            FxRoutedBatch { route: b, packets: vec![visual(2)] },
+            FxRoutedBatch {
+                route: a,
+                packets: vec![visual(1)],
+            },
+            FxRoutedBatch {
+                route: b,
+                packets: vec![visual(2)],
+            },
         ],
         registered: 2,
         eligible: 2,
@@ -181,10 +223,15 @@ fn p17_zone_transfer_after_gameplay_drops_old_fx_without_touching_other_client()
         &game,
         &effects,
         &[writer(a, 2), writer(b, 2)],
-    ).unwrap();
+    )
+    .unwrap();
     let mut core = FencedWriter::new(
         Rc::clone(&owner),
-        Some(Fault::Transfer { after: 2, route: a, zone: 2 }),
+        Some(Fault::Transfer {
+            after: 2,
+            route: a,
+            zone: 2,
+        }),
     );
     let report = try_write_core_guarded(&plan, &mut core);
     assert!(owner.borrow().route_current(b));
@@ -204,14 +251,20 @@ fn p17_zone_transfer_after_gameplay_drops_old_fx_without_touching_other_client()
 #[test]
 fn p17_disconnect_and_recycle_same_connection_and_net_id_never_replays_old_visuals() {
     let owner = Rc::new(RefCell::new(TrustedFxHandoff::new()));
-    let old = owner.borrow_mut().register_trusted(CONNECTION, NET_ID, 1).unwrap();
+    let old = owner
+        .borrow_mut()
+        .register_trusted(CONNECTION, NET_ID, 1)
+        .unwrap();
     let game = [gameplay(old, b"before reconnect")];
     let effects = fx(old, 1);
-    let plan = plan_shared_dispatch(&owner.borrow(), &game, &effects, &[writer(old, 2)])
-        .unwrap();
+    let plan = plan_shared_dispatch(&owner.borrow(), &game, &effects, &[writer(old, 2)]).unwrap();
     let mut core = FencedWriter::new(
         Rc::clone(&owner),
-        Some(Fault::Recycle { after: 1, route: old, zone: 2 }),
+        Some(Fault::Recycle {
+            after: 1,
+            route: old,
+            zone: 2,
+        }),
     );
     let report = try_write_core_guarded(&plan, &mut core);
     let fresh = core.replacement.expect("reconnected");
@@ -232,29 +285,36 @@ fn p17_disconnect_and_recycle_same_connection_and_net_id_never_replays_old_visua
         &renewed_game,
         &renewed_visuals,
         &[writer(fresh, 2)],
-    ).unwrap();
+    )
+    .unwrap();
     let second = try_write_core_guarded(&renewed_plan, &mut core);
     assert_eq!(second.gameplay_sent, 1);
     assert_eq!(second.cosmetic_sent, 1);
     assert_eq!(second.failure, None);
     assert_eq!(core.accepted[1], (fresh, b"after reconnect".to_vec()));
     assert_eq!(core.accepted[2], (fresh, visual(2).to_vec()));
-    assert!(core.accepted.iter().all(|(r, bytes)| {
-        r.generation == old.generation || bytes.as_slice() != visual(1)
-    }));
+    assert!(core
+        .accepted
+        .iter()
+        .all(|(r, bytes)| { r.generation == old.generation || bytes.as_slice() != visual(1) }));
 }
 
 #[test]
 fn p17_disconnect_between_gameplay_packets_preserves_first_unsent_index() {
     let owner = Rc::new(RefCell::new(TrustedFxHandoff::new()));
-    let old = owner.borrow_mut().register_trusted(CONNECTION, NET_ID, 1).unwrap();
+    let old = owner
+        .borrow_mut()
+        .register_trusted(CONNECTION, NET_ID, 1)
+        .unwrap();
     let game = [gameplay(old, b"first"), gameplay(old, b"second")];
     let effects = fx(old, 1);
-    let plan = plan_shared_dispatch(&owner.borrow(), &game, &effects, &[writer(old, 3)])
-        .unwrap();
+    let plan = plan_shared_dispatch(&owner.borrow(), &game, &effects, &[writer(old, 3)]).unwrap();
     let mut core = FencedWriter::new(
         Rc::clone(&owner),
-        Some(Fault::Disconnect { after: 1, route: old }),
+        Some(Fault::Disconnect {
+            after: 1,
+            route: old,
+        }),
     );
     let result = try_write_core_guarded(&plan, &mut core);
     assert_eq!(owner.borrow().registered(), 0);
@@ -269,16 +329,15 @@ fn p17_disconnect_between_gameplay_packets_preserves_first_unsent_index() {
 #[test]
 fn p17_old_zone_fx_is_discarded_during_transfer_and_replanned_only_in_new_zone() {
     let owner = Rc::new(RefCell::new(TrustedFxHandoff::new()));
-    let old = owner.borrow_mut().register_trusted(CONNECTION, NET_ID, 1).unwrap();
+    let old = owner
+        .borrow_mut()
+        .register_trusted(CONNECTION, NET_ID, 1)
+        .unwrap();
     let moved = owner.borrow_mut().transfer_trusted(old, 2).unwrap();
     let game = [gameplay(moved, b"new-zone snapshot")];
     let effects = fx(old, 1);
-    let planned = plan_shared_dispatch(
-        &owner.borrow(),
-        &game,
-        &effects,
-        &[writer(moved, 2)],
-    ).unwrap();
+    let planned =
+        plan_shared_dispatch(&owner.borrow(), &game, &effects, &[writer(moved, 2)]).unwrap();
     assert_eq!(planned.gameplay_datagrams, 1);
     assert_eq!(planned.cosmetic_datagrams, 0);
     assert_eq!(planned.stale_cosmetic_dropped, 1);
