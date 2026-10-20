@@ -48,17 +48,34 @@ async fn main() -> Result<()> {
     println!("P9_CERT_SHA256 {cert_hash}");
     let next_id = Arc::new(AtomicU32::new(1));
 
+    // Match the proven main.rs server: each QUIC handshake has a separate
+    // task. A stalled, rejected or speculative browser connection must NEVER
+    // monopolize the endpoint accept loop and block another HTTP/3 session.
     loop {
         let incoming = endpoint.accept().await;
-        let request = incoming.await.context("P9 WebTransport handshake")?;
-        if request.path() != LAB_PATH {
-            request.not_found().await;
-            continue;
-        }
-        let connection = request.accept().await.context("accept P9 WebTransport")?;
-        let id = next_id.fetch_add(1, Ordering::Relaxed);
-        println!("P9_LAB_ACCEPTED test_connection_id={id}");
+        let next_id = Arc::clone(&next_id);
         tokio::spawn(async move {
+            let request = match incoming.await {
+                Ok(request) => request,
+                Err(error) => {
+                    eprintln!("P9_LAB_HANDSHAKE_FAILED {error}");
+                    return;
+                }
+            };
+            if request.path() != LAB_PATH {
+                eprintln!("P9_LAB_WRONG_PATH {}", request.path());
+                request.not_found().await;
+                return;
+            }
+            let connection = match request.accept().await {
+                Ok(connection) => connection,
+                Err(error) => {
+                    eprintln!("P9_LAB_SESSION_ACCEPT_FAILED {error}");
+                    return;
+                }
+            };
+            let id = next_id.fetch_add(1, Ordering::Relaxed);
+            println!("P9_LAB_ACCEPTED test_connection_id={id}");
             if let Err(error) = run_lab_connection(connection, id).await {
                 eprintln!("P9 loopback client session ended: {error:#}");
             }
