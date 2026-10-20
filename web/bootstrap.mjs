@@ -1,4 +1,4 @@
-const params = new URLSearchParams(window.location.search);
+import { installLocalChat } from "../src/browser/local-chat.mjs";\nconst params = new URLSearchParams(window.location.search);\ninstallLocalChat(document, { online: params.has("server") });
 
 if (params.has("server")) {
   try {
