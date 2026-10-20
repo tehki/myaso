@@ -162,6 +162,9 @@ pub struct ItemOwnershipLedger {
     /// Destroyed IDs stay retired to prevent resurrection under a new transaction.
     retired: BTreeSet<ItemId>,
     equipped: BTreeMap<EquipmentSlot, ItemId>,
+    /// Updated on every committed item operation, including destruction.
+    /// Prevents an old arrival receipt becoming current after an A-B-C-B cycle.
+    last_mutation: BTreeMap<ItemId, u64>,
     applied: BTreeMap<OwnershipTxnId, AppliedTransaction>,
     sequence: u64,
 }
@@ -169,6 +172,12 @@ pub struct ItemOwnershipLedger {
 impl ItemOwnershipLedger {
     pub fn location(&self, item: ItemId) -> Option<ItemLocation> {
         self.items.get(&item).copied()
+    }
+
+    /// Sequence of the most recent committed operation touching this item.
+    /// Remains available for retired items and is rebuilt by journal replay.
+    pub fn last_mutation_sequence(&self, item: ItemId) -> Option<u64> {
+        self.last_mutation.get(&item).copied()
     }
 
     pub fn equipped_item(&self, character: CharacterId, slot: u8) -> Option<ItemId> {
@@ -300,6 +309,9 @@ impl ItemOwnershipLedger {
                     self.retired.insert(item);
                 }
             }
+        }
+        for &op in operations {
+            self.last_mutation.insert(op.item(), receipt.sequence);
         }
         self.sequence = receipt.sequence;
         self.applied.insert(
