@@ -138,11 +138,13 @@ fn fair_scheduling_is_independent_of_input_slice_order() {
     let mut ascending = sessions(512, 4);
     let mut descending = ascending.clone();
     descending.reverse();
+    let ascending_views = viewers(&ascending);
+    let descending_views = viewers(&descending);
     let a = hub_a
-        .schedule_fair_tick(4, &mut ascending, &viewers(&ascending.clone()))
+        .schedule_fair_tick(4, &mut ascending, &ascending_views)
         .unwrap();
     let b = hub_b
-        .schedule_fair_tick(4, &mut descending, &viewers(&descending.clone()))
+        .schedule_fair_tick(4, &mut descending, &descending_views)
         .unwrap();
     let id_sequence = |report: &crate::magic_fx_delivery::FairFxDispatch| {
         report.batches.iter().map(|batch| batch.authenticated_net_id).collect::<Vec<_>>()
