@@ -12,9 +12,7 @@ use anyhow::{Context, Result};
 use myaso_server::elemental_physics::Element;
 use myaso_server::magic_fx_delivery::ShardedMagicFxHub;
 use myaso_server::magic_fx_events::{TrustedEffectSpec, ViewerInterest};
-use myaso_server::magic_fx_handoff::{
-    FxQueueGate, TrustedFxHandoff, TrustedFxViewer,
-};
+use myaso_server::magic_fx_handoff::{FxQueueGate, TrustedFxHandoff, TrustedFxViewer};
 use std::net::SocketAddr;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
@@ -68,7 +66,8 @@ async fn main() -> Result<()> {
 
 async fn run_lab_connection(connection: Connection, id: u32) -> Result<()> {
     let mut hub = ShardedMagicFxHub::new();
-    hub.register_zone(LAB_ZONE_ID).expect("trusted P9 test zone");
+    hub.register_zone(LAB_ZONE_ID)
+        .expect("trusted P9 test zone");
     let mut handoff = TrustedFxHandoff::new();
     // These are test-only server-owned identities and known fixture positions.
     // They do NOT represent real game authentication.
