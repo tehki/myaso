@@ -295,3 +295,31 @@ This uses 512 **synthetic** registered sessions in four zones over 16 authoritat
 The Core & Multiplayer department must provide: an already-authenticated registration API tied to its live connection lifecycle; actual authoritative viewer positions and approved zone transfers; **hard game-message priority** in the WebTransport outgoing queue; independent bounded cosmetic buffer, queue-slot accounting and backpressure; last-moment `route_current` validation; version negotiation for the separate P4 `ME` effect contract; server-side no-spoof/no-leak tests; and real connected-player load measurements (throughput, p95/p99 input latency, dropped visual events, render FPS, network overhead). Actual mixed gameplay + magic stress and device-tier accessibility signoff with Combat/Graphics/Magic/World remain gates.
 
 **P8 is intentionally passive: no active FX transport or gameplay spell behavior is enabled. PR stays draft, unmerged, undeployed.**
+
+## P9 — real loopback WebTransport semantic FX/browser acceptance (2026-10-20)
+
+P9 adds the **first intentionally separate real network smoke fixture** for the Physics stream, while keeping the production game unchanged. Its scope is precisely a loopback QUIC/WebTransport handshake, actual browser-received 32-byte FX datagrams and test-only gameplay-style marker traffic, and browser-measured PI/PO ping RTT. It is **not** an active magic feature or a 512-connected-player load result.
+
+### Isolated and opt-in by construction
+
+- `server/examples/magic_fx_loopback.rs` always binds `127.0.0.1:0`, issues an ephemeral self-signed test identity and only accepts WebTransport requests on `/physics-fx-lab`. The experiment does not use the live arena's `/game` endpoint, does not change `server/src/main.rs`, does not authenticate real players or accept client spell commands, and does not depend on production secrets.
+- Each accepted *test* connection receives a server-assigned identity, a fixed zone/position and 115 monotonic 30 ms fixture ticks. The server sends a compact test-only `GP` marker datagram before optional P4 `ME` FX. `PI`/ `PO` are only ephemeral four-byte ping sequence echoes for real browser RTT measurement, **not gameplay inputs**. The isolated session uses existing P6–P8 budgets, fair scheduling and gameplay-first gate; every 7th tick intentionally suppresses optional FX after sending its test gameplay marker. FX begins at fixture tick 31 to give a baseline ping measurement without FX.
+- `web/physics-fx-real-flight.html` is an unlinked, non-playable browser laboratory page. It uses the actual WebTransport browser API with the throwaway certificate's exact SHA-256, decodes genuine incoming P4 `ME` bytes via the existing JS decoder, passes validated visual events to the P1 capped particle pool, counts gameplay-style marker arrivals and measures ping RTT. It does **not** import the live arena, create actual combat actions, or activate any server-side spell.
+- `scripts/physics_fx_real_browser_flight.mjs` opens a test-only loopback HTTP file server serving an explicit three-file allowlist, starts the Rust sidecar, and runs separate **headless Chrome and Firefox WebDriver sessions**. It fails acceptance unless each browser receives at least 50 test gameplay markers, 12 exact 32-byte semantic FX, 8 ping replies and zero malformed FX packets. The script prints browser ping p95, gameplay-marker gap p95, cosmetic payload bytes and receipt counts.
+- `.github/workflows/ci.yml` includes a dedicated **Validate P9 real loopback semantic FX WebTransport** step after the unchanged protected Rust checks and before existing combat browser qualifications. No existing acceptance or Combat gate is skipped or weakened.
+
+### Measurements and truthful limitations
+
+The PI/PO RTT and browser marker gaps are measured from genuine QUIC/WebTransport datagrams **within one CI host's loopback interface**, not an independent WAN. A simulated `GP` marker is **not** an actual combat snapshot and cannot prove that the real game's input-to-hit latency remains unaffected. Browser page tracks cosmetic particle creation, but does **not** render a production GPU scene or measure gameplay FPS. No network throughput, 512 genuine concurrent sessions, sustained connection churn, real packet-loss behavior or real-world latency claims are made.
+
+A useful command after the Rust toolchain and Chrome/Firefox WebDriver are installed:
+
+```sh
+node scripts/physics_fx_real_browser_flight.mjs
+```
+
+The earliest exact-head P9 CI run, its step-level outcomes, and per-browser JSON printed in that run are the source of truth. **Only claim an actual real-browser pass or numeric p95 after the step succeeds and its logs have been inspected.**
+
+### Future sign-off
+
+Core & Multiplayer still owns actual `/game` transport scheduling, authenticated registration, player zone authority, reconnection generation validation, real gameplay ACK/latency, QUIC congestion discipline and multi-host acceptance. Magic & Items owns spellcasting authority; Graphics owns GPU/canvas FPS and visual accessibility. This separate sidecar cannot be substituted for those integrations. The production FX gate remains disabled, PR draft, unmerged and undeployed.
