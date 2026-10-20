@@ -22,7 +22,7 @@ cargo test --locked --manifest-path server/Cargo.toml --lib
 cargo clippy --locked --manifest-path server/Cargo.toml --lib -- -D warnings
 ```
 
-**Verified local evidence on the connected Serj Linux runner (Rust 1.89):** `cargo fmt --check` passed; full server `cargo test --lib` passed **93 tests, 0 failed, 1 ignored child helper**, with the child helper executed and passed by the parent process test; strict `cargo clippy --lib -- -D warnings` passed. The new test confirmed same-process and true subprocess lock denial and post-release durable replay.
+**Verified local evidence on the connected Serj Linux runner (Rust 1.89):** `cargo fmt --check` passed; full server `cargo test --lib` passed **94 tests, 0 failed, 2 ignored child helpers**, each executed and passed by a parent subprocess acceptance test; strict `cargo clippy --lib -- -D warnings` passed. The new tests confirm same-process and independent-process lock denial, post-release durable replay, and **real OS SIGKILL** of the writer after fsync/commit followed by recovery of the item and its exact original idempotency receipt in a fresh process. The two ignored helpers are intentionally not run unconditionally because one deliberately parks until killed.
 
 Exact-head full protected GitHub `quality` is also required.
 
