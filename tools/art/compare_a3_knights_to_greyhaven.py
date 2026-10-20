@@ -28,7 +28,7 @@ parser.add_argument("--sentinel", type=Path, required=True)
 parser.add_argument("--out-dir", type=Path, required=True)
 parser.add_argument("--render", action="store_true")
 parser.add_argument("--samples", type=int, default=4)
-parser.add_argument("--roll-frame", type=int, default=12)
+parser.add_argument("--roll-frame", type=int, default=5)  # Blender 4.5 glTF roll range 0.4–8.8
 args = parser.parse_args(args_from_cli)
 assert all(path.is_file() for path in (args.scene, args.silver, args.sentinel))
 args.out_dir.mkdir(parents=True, exist_ok=True)
