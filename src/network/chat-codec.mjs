@@ -104,8 +104,10 @@ async function boundedChatHandshake(promise, timeoutMs, phase, { onTimeout, onLa
   const timeout = new Promise((_, reject) => {
     timer = setTimeout(() => {
       expired = true;
-      try { onTimeout?.(); } catch { /* timeout remains authoritative */ }
+      // Reject the timeout before cancelling the pending read, otherwise a
+      // synchronous cancel may win Promise.race with a misleading EOF result.
       reject(new Error("local chat " + phase + " timed out"));
+      try { onTimeout?.(); } catch { /* timeout remains authoritative */ }
     }, timeoutMs);
   });
   try { return await Promise.race([operation, timeout]); }
