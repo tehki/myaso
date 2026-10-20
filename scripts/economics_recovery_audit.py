@@ -36,10 +36,12 @@ class AuditReport:
     receipts: int
     inbox_events: int
     logical_sha256: str
+    mutation_revision: int
 
 
 TABLES = (
     ("metadata", "singleton"),
+    ("admission_mutations", "revision"),
     ("accounts", "id"),
     ("titles", "parcel_id"),
     ("listings", "id"),
@@ -99,12 +101,12 @@ def _audit(db: sqlite3.Connection) -> AuditReport:
         _reject("Foreign-key constraint check failed")
 
     meta = _one(
-        db, "SELECT sequence,issued_units,title_cap FROM metadata WHERE singleton=1"
+        db, "SELECT sequence,issued_units,title_cap,mutation_revision FROM metadata WHERE singleton=1"
     )
     if db.execute("SELECT count(*) FROM metadata").fetchone()[0] != 1:
         _reject("Additional metadata records")
-    seq, issued, cap = meta
-    if seq < 0 or issued < 0 or cap <= 0:
+    seq, issued, cap, mutation_revision = meta
+    if seq < 0 or issued < 0 or cap <= 0 or mutation_revision < 0:
         _reject("Invalid committed policy")
 
     accounts = db.execute(
@@ -143,6 +145,40 @@ def _audit(db: sqlite3.Connection) -> AuditReport:
         "price,fee_bps,expires_tick,state FROM seller_consents ORDER BY id"
     ).fetchall()
     consents_by_id = {consent[0]: consent for consent in consents}
+
+    mutations = db.execute(
+        "SELECT revision,operation_id,mutation_kind,target_id,target_epoch"
+        " FROM admission_mutations ORDER BY revision"
+    ).fetchall()
+    if len(mutations) != mutation_revision or [row[0] for row in mutations] != list(
+        range(1, mutation_revision + 1)
+    ):
+        _reject("Admission mutation revision chain is incomplete")
+    if len({row[1] for row in mutations}) != len(mutations):
+        _reject("Duplicate admission mutation operation IDs")
+    for revision, operation_id, kind, target, epoch in mutations:
+        if kind == "session_revoke":
+            recorded = db.execute(
+                "SELECT state FROM admitted_sessions WHERE player_id=? AND epoch=?",
+                (target, epoch),
+            ).fetchone()
+            if recorded != ("revoked",):
+                _reject("Committed session revocation missing from admission table")
+        elif kind == "listing_revoke":
+            listing_state = db.execute(
+                "SELECT state,approved_consent FROM listings WHERE id=?",
+                (target,),
+            ).fetchone()
+            if listing_state is None or listing_state[0] != "revoked":
+                _reject("Committed listing revocation missing from registry")
+            consent_state = db.execute(
+                "SELECT state FROM seller_consents WHERE id=?",
+                (listing_state[1],),
+            ).fetchone()
+            if consent_state != ("revoked",):
+                _reject("Committed seller-consent revocation missing")
+        else:
+            _reject("Unknown mutation kind")
 
     receipts = db.execute(
         "SELECT op_id,payload,buyer_id,sequence,receipt"
@@ -309,6 +345,7 @@ def _audit(db: sqlite3.Connection) -> AuditReport:
         receipts=len(receipts),
         inbox_events=len(inbox),
         logical_sha256=digest,
+        mutation_revision=mutation_revision,
     )
 
 
