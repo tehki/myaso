@@ -362,7 +362,8 @@ mod tests {
             batches.push(FxRoutedBatch { route, packets: vec![fx(zone)] });
             writers.push(writer(route, 1));
         }
-        let out = plan_shared_dispatch(&registry, &[], &handoff(batches), &writers).unwrap();
+        let fx_plan = handoff(batches);
+        let out = plan_shared_dispatch(&registry, &[], &fx_plan, &writers).unwrap();
         assert_eq!(out.cosmetic_datagrams, 512);
         assert_eq!(out.cosmetic_payload_bytes, MAX_FX_PAYLOAD_BYTES_GLOBAL_TICK);
         assert_eq!(out.cosmetic_dropped, 512);
@@ -386,9 +387,11 @@ mod tests {
             &registry, &game, &visuals, &[writer(a, 2), writer(b, 2)]
         ).unwrap();
         assert_eq!(out.gameplay_datagrams, 2);
-        assert_eq!(out.cosmetic_datagrams, 0);
-        assert_eq!(out.cosmetic_dropped, 2);
+        assert_eq!(out.cosmetic_datagrams, 2);
+        assert_eq!(out.cosmetic_dropped, 0);
         assert_eq!(out.ordered[0].bytes, [8, 8]);
         assert_eq!(out.ordered[1].bytes, [1, 1]);
+        assert_eq!(out.ordered[2].priority, SharedPriority::Cosmetic);
+        assert_eq!(out.ordered[3].priority, SharedPriority::Cosmetic);
     }
 }
