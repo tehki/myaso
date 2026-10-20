@@ -42,7 +42,7 @@ try{
  let port,cert;
  for(let i=0;i<130;i++){
   port=out.match(/server listening on https:\/\/127\.0\.0\.1:(\d+)\/game/)?.[1];
-  cert=out.match(/development certificate SHA-256:\s*([0-9a-f]{64})/i)?.[1];
+  cert=out.match(/development certificate SHA-256:\s*([0-9a-f:]{64,95})/i)?.[1]?.replace(/:/g, "");
   if(port&&cert)break;if(game.exitCode!==null)throw Error("Server exited: "+err);await pause(100);
  }
  if(!port||!cert)throw Error("Server startup/cert timeout: "+out+" "+err);
