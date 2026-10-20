@@ -402,10 +402,9 @@ mod tests {
         loot.register(2).unwrap();
         loot.record_operation(hero, 50).unwrap();
         loot.record_operation(other, 70).unwrap();
-        for (character, fire_receipt, ember_receipt, sequence) in [
-            (hero, 1, 2, 50),
-            (other, 3, 4, 70),
-        ] {
+        for (character, fire_receipt, ember_receipt, sequence) in
+            [(hero, 1, 2, 50), (other, 3, 4, 70)]
+        {
             magic
                 .grant_lesson(award(fire_receipt, character, Lesson::Rune(Rune::Fire)))
                 .unwrap();
@@ -413,14 +412,7 @@ mod tests {
                 .grant_lesson(award(ember_receipt, character, Lesson::Spell(Spell::Ember)))
                 .unwrap();
             magic
-                .stage_ember_intent(
-                    character,
-                    sequence,
-                    ZoneId::Moonvale,
-                    200.0,
-                    200.0,
-                    0.0,
-                )
+                .stage_ember_intent(character, sequence, ZoneId::Moonvale, 200.0, 200.0, 0.0)
                 .unwrap();
         }
         let file = checkpoint_path();
@@ -487,9 +479,10 @@ mod tests {
             },
         )
         .unwrap();
-        assert!(inspect_joint_ember_recovery_holds(&file).unwrap().is_empty());
-        let (restored_loot, recovered_magic) =
-            load_joint_without_pending_ember(&file).unwrap();
+        assert!(inspect_joint_ember_recovery_holds(&file)
+            .unwrap()
+            .is_empty());
+        let (restored_loot, recovered_magic) = load_joint_without_pending_ember(&file).unwrap();
         assert_eq!(restored_loot.committed_operation_sequence(hero), Some(30));
         assert_eq!(recovered_magic.pending_ember_intents().count(), 0);
         assert_eq!(recovered_magic.resolved_ember_intents().count(), 1);
