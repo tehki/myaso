@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""C4g: kill disposable psql CLIENT processes while their SQL transactions sleep.
+"""C4g: kill disposable psql CLIENT processes while their SQL transactions are open.
 
 This verifies rollback after a lost client, durable prepared handoffs across
 connections, and idempotent mutation retry. It does NOT stop PostgreSQL,
@@ -74,40 +74,41 @@ def count(table, column, identifier):
 
 
 def kill_precommit_transaction(operation, marker):
-    # The marker is a static test-only literal; SQL in this harness is
-    # never constructed from user data. The sleeping SELECT executes AFTER
-    # the mutation and BEFORE COMMIT. Killing only the psql client forces
-    # PostgreSQL to roll back its uncommitted transaction.
-    command = (
-        "BEGIN; "
-        f"{operation} "
-        f"SELECT pg_sleep(45) /* {marker} */; "
-        "COMMIT;"
-    )
+    # Send separate SQL statements through a live psql stdin stream.
+    # The backend is idle *inside* BEGIN after our marker; unlike a long
+    # pg_sleep running in the backend, a disconnected client is noticed
+    # promptly and the uncommitted transaction is rolled back.
     client = subprocess.Popen(
-        ["psql", "-X", "-q", "-A", "-t", "-v", "ON_ERROR_STOP=1", "-c", command],
-        stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True,
+        ["psql", "-X", "-q", "-A", "-t", "-v", "ON_ERROR_STOP=1"],
+        stdin=subprocess.PIPE, stdout=subprocess.DEVNULL,
+        stderr=subprocess.PIPE, text=True, bufsize=1,
     )
     try:
+        require(client.stdin is not None, "psql stdin must be writable")
+        client.stdin.write("BEGIN;\\n")
+        client.stdin.write(operation + "\\n")
+        client.stdin.write(f"SELECT '{marker}';\\n")
+        client.stdin.flush()
         observed = False
         for _ in range(100):
             if client.poll() is not None:
                 detail = client.stderr.read() if client.stderr else ""
                 raise AssertionError(f"client exited before crash injection: {detail}")
-            # We do not rely on an in-memory mock or timer: PgSleep confirms
-            # the SQL operation has run inside the open transaction.
+            # Confirm the marker was the last executed SQL statement and
+            # PostgreSQL is waiting for another command in that SAME open
+            # transaction. This is stronger than assuming a fixed delay.
             ready = sql(
                 "SELECT count(*) FROM pg_catalog.pg_stat_activity "
                 "WHERE datname = current_database() "
                 "AND pid <> pg_backend_pid() "
-                "AND wait_event = 'PgSleep' "
+                "AND state = 'idle in transaction' "
                 f"AND query LIKE '%{marker}%';"
             )
             if ready == "1":
                 observed = True
                 break
             time.sleep(0.1)
-        require(observed, f"database transaction did not reach sleep: {marker}")
+        require(observed, f"transaction did not reach idle-in-transaction: {marker}")
     finally:
         if client.poll() is None:
             client.kill()
