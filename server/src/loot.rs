@@ -636,7 +636,8 @@ impl LootAuthority {
         if !at.near(drop.at) {
             return Err(LootError::OutOfReach);
         }
-        if amount > drop.item.amount || (!drop.item.kind.stackable() && amount != drop.item.amount) {
+        if amount > drop.item.amount || (!drop.item.kind.stackable() && amount != drop.item.amount)
+        {
             return Err(LootError::InvalidStack);
         }
         if self.players[&authenticated_id].backpack.len() >= BACKPACK_CAPACITY {
@@ -703,14 +704,7 @@ impl LootAuthority {
             return Err(LootError::InventoryFull);
         }
         if amount == source.amount {
-            return self.take_corpse(
-                authenticated_id,
-                fighter,
-                zone,
-                corpse_id,
-                item_id,
-                now_ms,
-            );
+            return self.take_corpse(authenticated_id, fighter, zone, corpse_id, item_id, now_ms);
         }
         let fragment_id = self.allocate_id()?;
         let corpse = self.corpses.get_mut(&corpse_id).expect("checked");
@@ -946,7 +940,6 @@ mod tests {
         assert_eq!(loot.inventory(2).unwrap().backpack()[0].id, sword);
     }
 
-
     #[test]
     fn splitting_ground_stack_preserves_every_unit_across_competing_looters() {
         let mut loot = LootAuthority::new();
@@ -1064,7 +1057,13 @@ mod tests {
         loot.register(2).unwrap();
         let sword = loot.grant(1, ItemKind::RustySword, 1).unwrap();
         let drop_id = loot
-            .drop_backpack(1, &fighter(1, 200.0, 200.0, false), ZoneId::Moonvale, sword, 0)
+            .drop_backpack(
+                1,
+                &fighter(1, 200.0, 200.0, false),
+                ZoneId::Moonvale,
+                sword,
+                0,
+            )
             .unwrap();
         let nearby = fighter(2, 200.0, 200.0, false);
         assert_eq!(
