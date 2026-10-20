@@ -258,3 +258,28 @@ system, economic effects or persistence. Future authoritative building
 obstructions and zone membership must replace the pilot geometry before
 any production social simulations. The feature remains behind the existing
 loopback-only `MYASO_NPC_PILOT` flag and draft PR #353.
+
+## LW-1I — Verified settlement work histories (loopback-only)
+
+NPCs can now answer a player's **"what work was completed"**, **"latest task"**,
+**"who has been working"**, and **"settlement progress"** questions with the
+most recent **completed** task in the existing finite authoritative supply
+ledger. The report names the NPC from its fixed server task mapping and includes
+the operation's original ledger sequence and server tick. Its wording makes
+clear that it is a **ledger-confirmed NPC task**, not something the speaker
+personally witnessed, a player quest or a player reward.
+
+Only successful supply mutations create task evidence. Supported completions:
+Marta forges one nail bundle from an iron bar, Tomas delivers water to the
+work yard, and Elara delivers a ration to the market stall. Merely **picking
+up** supplies, simulated walking, or a chat request cannot produce completion
+evidence. The query is read-only and cannot mutate any stock or event records.
+If the ledger has no recent completion (within the last 120 simulated seconds),
+the NPC truthfully reports no recently completed work. A bounded 12-event
+action ring and finite starting resources ensure reporting stays cheap and
+that no activity or resources are manufactured indefinitely.
+
+This does not imply real NPC motivation, persistent occupations, player
+jobs, market sales, object ownership, chat-based execution or trade. The
+simulation still uses the loopback staging world and is disconnected from
+real account identity, item entities, Moon Coin and production.

@@ -718,6 +718,10 @@ async fn handle_connection(
                             .npc_supply
                             .as_ref()
                             .and_then(|stock| stock.report(npc_id));
+                        let completed_work = state
+                            .npc_supply
+                            .as_ref()
+                            .and_then(|supply| supply.recent_completed_work(state.world.tick));
                         let context = state
                             .npc_routines
                             .as_ref()
@@ -737,13 +741,24 @@ async fn handle_connection(
                                 state.world.tick,
                                 context,
                                 report,
+                                completed_work,
                                 heard_from,
                                 acquaintance,
                             )
                         })
                     };
                     match viewer {
-                        Some((x, y, alive, tick, context, report, heard_from, acquaintance)) => {
+                        Some((
+                            x,
+                            y,
+                            alive,
+                            tick,
+                            context,
+                            report,
+                            completed_work,
+                            heard_from,
+                            acquaintance,
+                        )) => {
                             let npc = NpcRoutines::position(npc_id, tick).and_then(|position| {
                                 living_world::nearby_npc_at(
                                     npc_id, x, y, alive, position.x, position.y,
@@ -767,6 +782,7 @@ async fn handle_connection(
                                             living_world::SocialFacts {
                                                 heard_from,
                                                 acquaintance,
+                                                completed_work: completed_work.as_deref(),
                                             },
                                         ),
                                     )

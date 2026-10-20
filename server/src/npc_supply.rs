@@ -9,6 +9,7 @@ const PICKUP: u32 = 600;
 const DROP_OFF: u32 = 1_800;
 const FORGE: u32 = 300;
 const HISTORY_LIMIT: usize = 12;
+const COMPLETED_WORK_TTL_TICKS: u32 = 120 * 60;
 const WATER_TOTAL: u16 = 8;
 const FOOD_TOTAL: u16 = 8;
 const IRON_TOTAL: u16 = 6;
@@ -180,6 +181,28 @@ impl NpcSupplyWorld {
         bytes
     }
 
+    /// A verified, read-only proof of the most recent *completed* NPC task.
+    /// Collection alone is not delivery. Every line comes from a committed
+    /// stock mutation, never from an NPC chat request or model output.
+    pub fn recent_completed_work(&self, tick: u32) -> Option<String> {
+        self.history.iter().rev().find_map(|event| {
+            if tick.wrapping_sub(event.tick) > COMPLETED_WORK_TTL_TICKS {
+                return None;
+            }
+            let outcome = match (event.actor, event.operation) {
+                (2, 5) => "Marta forged one bundle of nails from available iron",
+                (5, 2) => "Tomas delivered one water bucket to the work yard",
+                (4, 4) => "Elara delivered one ration to the market stall",
+                // Picking up stock is not a completed delivery.
+                _ => return None,
+            };
+            Some(format!(
+                "The settlement ledger confirms: {outcome} (task #{}, server tick {}). This is an NPC task, not a player contract.",
+                event.sequence, event.tick
+            ))
+        })
+    }
+
     pub fn report(&self, npc_id: u8) -> Option<String> {
         let stocks = self.stocks;
         match npc_id {
@@ -294,5 +317,51 @@ mod tests {
         assert_eq!(&packet[20..], &[2, 5]);
         assert!(world.report(2).unwrap().contains("1 bundle of nails"));
         assert!(world.report(3).is_none());
+    }
+    #[test]
+    fn work_proofs_are_only_from_committed_completed_inventory_tasks() {
+        let mut town = NpcSupplyWorld::default();
+        assert!(town.recent_completed_work(0).is_none());
+        run_until(&mut town, 0, 300);
+        let proof = town
+            .recent_completed_work(300)
+            .expect("forge action committed");
+        assert!(proof.contains("Marta forged one bundle of nails"));
+        assert!(proof.contains("task #1, server tick 300"));
+        let before = town.stocks();
+        assert_eq!(town.recent_completed_work(300).unwrap(), proof);
+        assert_eq!(town.stocks(), before);
+
+        run_until(&mut town, 301, 600);
+        // Collection is not a completed delivery, so Marta remains the
+        // most recent confirmed completed task at tick 600.
+        assert!(town
+            .recent_completed_work(600)
+            .unwrap()
+            .contains("Marta forged"));
+        run_until(&mut town, 601, 1800);
+        let delivered = town.recent_completed_work(1800).unwrap();
+        assert!(delivered.contains("Elara delivered one ration to the market stall"));
+        assert!(delivered.contains("task #5, server tick 1800"));
+        assert_eq!(town.stocks().stall_food, 1);
+        assert_eq!(town.stocks().yard_water, 1);
+        assert!(town.stocks().conserved());
+
+        // This conversation fact is time-bounded; historical state remains
+        // available to the simulation but is not presented as recent news.
+        assert!(town
+            .recent_completed_work(1800 + COMPLETED_WORK_TTL_TICKS + 1)
+            .is_none());
+    }
+
+    #[test]
+    fn no_completed_delivery_is_fabricated_from_pickup_only() {
+        let mut town = NpcSupplyWorld::default();
+        town.record(600, 5, 1);
+        town.record(600, 4, 3);
+        assert!(town.recent_completed_work(600).is_none());
+        // Unknown op/actor combinations are not independently trusted.
+        town.record(601, 5, 4);
+        assert!(town.recent_completed_work(601).is_none());
     }
 }

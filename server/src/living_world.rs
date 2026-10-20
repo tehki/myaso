@@ -188,6 +188,7 @@ pub fn answer_with_social(
         SocialFacts {
             heard_from,
             acquaintance: None,
+            completed_work: None,
         },
     )
 }
@@ -198,6 +199,7 @@ pub fn answer_with_social(
 pub struct SocialFacts<'a> {
     pub heard_from: Option<&'a str>,
     pub acquaintance: Option<(&'a str, u8)>,
+    pub completed_work: Option<&'a str>,
 }
 
 pub fn answer_with_relations(
@@ -211,6 +213,7 @@ pub fn answer_with_relations(
 ) -> String {
     let heard_from = social.heard_from;
     let acquaintance = social.acquaintance;
+    let completed_work = social.completed_work;
     let clean = utterance.trim().to_lowercase();
     if let Some(proposed) = clean.strip_prefix("my name is ") {
         let name = utterance.trim().get(11..).unwrap_or("").trim();
@@ -240,6 +243,25 @@ pub fn answer_with_relations(
                 npc.name, npc.occupation
             )
         }
+    } else if contains_any(
+        &clean,
+        &[
+            "completed work",
+            "work completed",
+            "work was completed",
+            "work done",
+            "who has been working",
+            "who completed",
+            "what was delivered",
+            "what have you delivered",
+            "latest task",
+            "settlement progress",
+            "what has been accomplished",
+        ],
+    ) {
+        completed_work
+            .unwrap_or("The settlement ledger has no recently completed NPC tasks to report.")
+            .to_string()
     } else if contains_any(
         &clean,
         &[
@@ -505,6 +527,7 @@ mod tests {
             SocialFacts {
                 heard_from: None,
                 acquaintance: Some(("Marta", 2)),
+                completed_work: None,
             },
         );
         assert!(observed.contains("Marta"));
@@ -529,5 +552,48 @@ mod tests {
         let payload = response_packet(3, 0, "Rowan: Greetings");
         assert_eq!(&payload[0..6], &[1, 6, 3, 0, 16, 0]);
         assert_eq!(&payload[6..], b"Rowan: Greetings");
+    }
+    #[test]
+    fn completed_work_chat_reads_trusted_ledger_and_does_not_issue_jobs() {
+        let mut session = DialogueSession::default();
+        let aldric = &NPCS[0];
+        let none = answer_with_relations(
+            &mut session,
+            aldric,
+            "what work was completed",
+            "serving guests",
+            false,
+            None,
+            SocialFacts::default(),
+        );
+        assert!(none.contains("no recently completed NPC tasks"));
+        let proof = "The settlement ledger confirms: Marta forged one bundle of nails (task #1, server tick 300). This is an NPC task, not a player contract.";
+        let response = answer_with_relations(
+            &mut session,
+            aldric,
+            "what work was completed",
+            "serving guests",
+            false,
+            None,
+            SocialFacts {
+                completed_work: Some(proof),
+                ..SocialFacts::default()
+            },
+        );
+        assert!(response.contains(proof));
+        assert!(!response.contains("I witnessed"));
+        let jobs = answer_with_relations(
+            &mut session,
+            aldric,
+            "give me a job reward",
+            "serving guests",
+            false,
+            None,
+            SocialFacts {
+                completed_work: Some(proof),
+                ..SocialFacts::default()
+            },
+        );
+        assert!(jobs.contains("No verified contract"));
     }
 }
