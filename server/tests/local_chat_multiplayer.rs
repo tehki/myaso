@@ -23,7 +23,7 @@ fn start_server() -> (TestServer, String, Sha256Digest) {
         .env("MYASO_CHAT_RADIUS", "160")
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
-        .stderr(Stdio::null())
+        .stderr(Stdio::inherit())
         .spawn().expect("start actual game server");
     let output = process.stdout.take().expect("server output");
     let (sender, receiver) = mpsc::channel();
@@ -31,6 +31,7 @@ fn start_server() -> (TestServer, String, Sha256Digest) {
         let mut url = None;
         let mut digest = None;
         for line in BufReader::new(output).lines().map_while(Result::ok) {
+            eprintln!("real-server: {line}");
             if let Some(value) = line.split("listening on ").nth(1) {
                 url = Some(value.trim().to_owned());
             }
