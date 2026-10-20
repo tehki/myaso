@@ -21,8 +21,8 @@ transaction rollback when a client connection disappears.
 PostgreSQL 16 service from `.github/workflows/core-c4g-session-crash.yml`.
 
 1. Register a fresh character at epoch 1. Run `prepare_transfer` inside
-   `BEGIN` and then deliberately sleep before `COMMIT`. Confirm from
-   `pg_stat_activity` the backend reached `PgSleep` after the write.
+   `BEGIN` and then leave its transaction open **without COMMIT**. Confirm from
+   `pg_stat_activity` the backend is `idle in transaction` after the write.
    Kill **only that spawned `psql` client**. Verify the invisible insert
    and freeze rolled back; source still owns epoch 1; identical operation
    can be retried and committed once to epoch 2; the old worker is fenced.
@@ -31,8 +31,8 @@ PostgreSQL 16 service from `.github/workflows/core-c4g-session-crash.yml`.
    can only resolve it with an explicit, authorized abort; the source
    resumes at the same epoch; the old operation ID cannot be reused;
    a separate operation can hand off to a third worker.
-3. Execute `commit_world_mutation` in `BEGIN`, wait inside `pg_sleep`
-   after the mutation, then terminate its `psql` client before COMMIT.
+3. Execute `commit_world_mutation` in `BEGIN`, leave the transaction open after the mutation, then terminate
+   the waiting `psql` client before COMMIT.
    The uncommitted state, receipt and outbox all roll back. Repeating
    the exact mutation ID commits once, then returns its unchanged
    historical receipt and does not duplicate outbox events.
@@ -46,9 +46,10 @@ PostgreSQL 16 service from `.github/workflows/core-c4g-session-crash.yml`.
   No game, prod VPS, remote server, production secret or worker is
   targeted. It uses fixed test IDs and synthetic tiny world payloads.
 - The only deliberate SIGKILL is to a `Popen` child `psql`
-  process that this script created.
-- Backends are distinguished by `pg_stat_activity.wait_event='PgSleep'`,
-  not by an unbounded timing guess. Child processes are reaped in `finally`.
+  process that this script created. Its PostgreSQL backend is not killed.
+- Backends are distinguished by the last SQL marker and
+  `pg_stat_activity.state='idle in transaction'`, not by an
+  unbounded timing guess or a long-running server-side sleep. Child processes are reaped in `finally`.
 - No synchronous database round trip is added to the 60 Hz game tick.
 - Core 8A/8B must still supply genuine session authentication, Core 8C must
   prove independent-host partition/failover behavior, and Development Center
