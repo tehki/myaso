@@ -148,8 +148,12 @@ mod tests {
         assert_eq!(lease(100, 4).server_session(), 100);
         assert_eq!(lease(100, 4).epoch(), 4);
         let mut registry = SessionIdentityRegistry::new();
-        registry.bind_verified(lease(100, 4), character(55)).unwrap();
-        registry.bind_verified(lease(200, 1), character(66)).unwrap();
+        registry
+            .bind_verified(lease(100, 4), character(55))
+            .unwrap();
+        registry
+            .bind_verified(lease(200, 1), character(66))
+            .unwrap();
         assert_eq!(registry.resolve_session(lease(100, 4)), Some(character(55)));
         assert_eq!(registry.resolve_session(lease(100, 3)), None);
         assert_eq!(registry.active_session(character(66)), Some(lease(200, 1)));
@@ -192,8 +196,13 @@ mod tests {
     #[test]
     fn replayed_old_lease_cannot_bind_again_after_disconnect() {
         let mut registry = SessionIdentityRegistry::new();
-        registry.bind_verified(lease(100, 10), character(10)).unwrap();
-        assert_eq!(registry.release_session(lease(100, 10)), Some(character(10)));
+        registry
+            .bind_verified(lease(100, 10), character(10))
+            .unwrap();
+        assert_eq!(
+            registry.release_session(lease(100, 10)),
+            Some(character(10))
+        );
         assert_eq!(
             registry.bind_verified(lease(100, 9), character(10)),
             Err(IdentityError::StaleLease)
@@ -202,12 +211,17 @@ mod tests {
             registry.bind_verified(lease(100, 10), character(10)),
             Err(IdentityError::StaleLease)
         );
-        registry.bind_verified(lease(100, 11), character(10)).unwrap();
+        registry
+            .bind_verified(lease(100, 11), character(10))
+            .unwrap();
         assert_eq!(
             registry.bind_verified(lease(100, 12), character(20)),
             Err(IdentityError::SessionAlreadyBound)
         );
-        assert_eq!(registry.release_session(lease(100, 11)), Some(character(10)));
+        assert_eq!(
+            registry.release_session(lease(100, 11)),
+            Some(character(10))
+        );
         assert_eq!(registry.active_count(), 0);
     }
 
