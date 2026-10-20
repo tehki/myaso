@@ -116,6 +116,7 @@ pub fn commit_ember_cost(
 /// The operation lease and sequence must be minted/validated by Core, and the
 /// World must be the exact same completed authoritative tick as the inventory
 /// and zone snapshot. No client-supplied Fighter, position or heading is used.
+#[derive(Clone, Copy)]
 pub struct WorldEmberCostTick<'a> {
     pub operation: VerifiedLootOperation,
     pub world: &'a World,
