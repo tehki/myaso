@@ -15,11 +15,11 @@ use crate::loot_persistence::{
     atomic_write, checksum, decode, encode, CheckpointError, MAX_FILE_BYTES,
 };
 use crate::loot_transaction::{quiescent_verified, TransactionError};
-use crate::magic::{LessonAward, MagicAuthority, MagicError, MagicSnapshotError};
+use crate::magic::{EmberEffectStatus, LessonAward, MagicAuthority, MagicError, MagicSnapshotError};
 use crate::magic_teacher::{TeacherAuthority, TeacherError, TeacherRequest};
 use crate::zone::ZoneAuthority;
 
-const HEADER: &[u8; 8] = b"MYWLD002";
+const HEADER: &[u8; 8] = b"MYWLD003";
 const MAGIC_MAX_BYTES: usize = 1024 * 1024;
 const MAX_BUNDLE_BYTES: usize = MAX_FILE_BYTES + MAGIC_MAX_BYTES + 24;
 
@@ -33,6 +33,7 @@ pub enum JointCheckpointError {
     MagicSnapshot(MagicSnapshotError),
     UnverifiedCharacter,
     Teacher(TeacherError),
+    WrongZone,
     Corrupt,
 }
 
@@ -85,7 +86,7 @@ fn verify_intent_watermarks(
     loot: &LootAuthority,
     magic: &MagicAuthority,
 ) -> Result<(), JointCheckpointError> {
-    for intent in magic.pending_ember_intents() {
+    for intent in magic.all_ember_intents() {
         if loot
             .committed_operation_sequence(intent.character)
             .is_none_or(|committed| committed < intent.sequence)
@@ -217,6 +218,37 @@ pub fn transact_teacher_lesson(
     atomic_write(path, &bytes)?;
     *magic = staged;
     Ok(receipt)
+}
+
+/// Persist an authoritative "NO EFFECT" decision before publishing it.
+/// Interrupt/Cancel never applies damage; only a future Combat transaction
+/// may mark an effect as actually applied, together with all world effects.
+/// Requires a trusted serial world lock and a server-issued session lease.
+pub fn resolve_ember_without_damage(
+    path: &Path,
+    loot: &LootAuthority,
+    magic: &mut MagicAuthority,
+    identity: &SessionIdentityRegistry,
+    zones: &ZoneAuthority,
+    lease: SessionLease,
+    sequence: u64,
+    decision: EmberEffectStatus,
+) -> Result<(), JointCheckpointError> {
+    let character = identity
+        .resolve_session(lease)
+        .ok_or(JointCheckpointError::UnverifiedCharacter)?;
+    let intent = magic
+        .ember_intent(character, sequence)
+        .ok_or(MagicError::UnknownEffectIntent)?;
+    if zones.zone_of(lease.server_session()) != Some(intent.zone) {
+        return Err(JointCheckpointError::WrongZone);
+    }
+    let mut staged = magic.clone();
+    staged.resolve_ember_without_effect(character, sequence, decision)?;
+    let bytes = bundle(loot, identity, &staged)?;
+    atomic_write(path, &bytes)?;
+    *magic = staged;
+    Ok(())
 }
 
 #[cfg(test)]
@@ -511,6 +543,104 @@ mod tests {
             bundle(&loot, &identity, &magic),
             Err(JointCheckpointError::Corrupt)
         ));
+    }
+
+    #[test]
+    fn interrupt_checkpoint_keeps_cost_and_prevents_reactivation_after_restart() {
+        let (mut loot, mut magic, identity, hero) = fixtures();
+        let mut zones = ZoneAuthority::new();
+        zones.register(1).unwrap();
+        loot.record_operation(hero, 50).unwrap();
+        magic
+            .grant_lesson(award(1, hero, Lesson::Rune(Rune::Fire)))
+            .unwrap();
+        magic
+            .grant_lesson(award(2, hero, Lesson::Spell(Spell::Ember)))
+            .unwrap();
+        magic
+            .stage_ember_intent(hero, 50, ZoneId::Moonvale, 200.0, 200.0, 0.0)
+            .unwrap();
+        let path = checkpoint_path();
+        save_joint(&path, &loot, &identity, &magic).unwrap();
+        resolve_ember_without_damage(
+            &path,
+            &loot,
+            &mut magic,
+            &identity,
+            &zones,
+            SessionLease::new(1, 1).unwrap(),
+            50,
+            EmberEffectStatus::Interrupted,
+        )
+        .unwrap();
+        let (restored_loot, mut recovered_magic) = load_joint(&path).unwrap();
+        assert_eq!(restored_loot.committed_operation_sequence(hero), Some(50));
+        assert_eq!(recovered_magic.pending_ember_intents().count(), 0);
+        assert_eq!(recovered_magic.resolved_ember_intents().count(), 1);
+        assert_eq!(
+            recovered_magic.ember_intent(hero, 50).unwrap().status,
+            EmberEffectStatus::Interrupted
+        );
+        assert!(matches!(
+            resolve_ember_without_damage(
+                &path,
+                &loot,
+                &mut recovered_magic,
+                &identity,
+                &zones,
+                SessionLease::new(1, 1).unwrap(),
+                50,
+                EmberEffectStatus::Cancelled,
+            ),
+            Err(JointCheckpointError::Magic(MagicError::EffectAlreadyResolved))
+        ));
+        let _ = fs::remove_file(&path);
+    }
+
+    #[test]
+    fn wrong_session_or_zone_refuses_resolution_without_disk_write() {
+        let (mut loot, mut magic, identity, hero) = fixtures();
+        loot.record_operation(hero, 51).unwrap();
+        magic
+            .grant_lesson(award(1, hero, Lesson::Rune(Rune::Fire)))
+            .unwrap();
+        magic
+            .grant_lesson(award(2, hero, Lesson::Spell(Spell::Ember)))
+            .unwrap();
+        magic
+            .stage_ember_intent(hero, 51, ZoneId::RedLionInn, 200.0, 200.0, 0.0)
+            .unwrap();
+        let mut zones = ZoneAuthority::new();
+        zones.register(1).unwrap();
+        let path = checkpoint_path();
+        assert!(matches!(
+            resolve_ember_without_damage(
+                &path,
+                &loot,
+                &mut magic,
+                &identity,
+                &zones,
+                SessionLease::new(1, 2).unwrap(),
+                51,
+                EmberEffectStatus::Interrupted,
+            ),
+            Err(JointCheckpointError::UnverifiedCharacter)
+        ));
+        assert!(matches!(
+            resolve_ember_without_damage(
+                &path,
+                &loot,
+                &mut magic,
+                &identity,
+                &zones,
+                SessionLease::new(1, 1).unwrap(),
+                51,
+                EmberEffectStatus::Cancelled,
+            ),
+            Err(JointCheckpointError::WrongZone)
+        ));
+        assert_eq!(magic.pending_ember_intents().count(), 1);
+        assert!(!path.exists());
     }
 
     #[test]

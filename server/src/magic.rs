@@ -65,6 +65,8 @@ pub enum MagicError {
     MissingInventory,
     InsufficientMana,
     InvalidEffectIntent,
+    UnknownEffectIntent,
+    EffectAlreadyResolved,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -75,11 +77,21 @@ pub struct SpellPlan {
     pub reagent_amount: u16,
 }
 
+/// Durable no-effect outcome. "Applied" does not exist until Combat can
+/// atomically persist damage/death/world events with the intent transition.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum EmberEffectStatus {
+    Pending,
+    Interrupted,
+    Cancelled,
+}
+
 /// Durable intent for a future Combat resolver. Coordinates/facing are raw
 /// finite f32 bits so serialization is deterministic and the struct is Eq.
 /// An intent is NOT an applied projectile, damage event or acknowledgement.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct EmberEffectIntent {
+    pub status: EmberEffectStatus,
     pub character: CharacterId,
     pub sequence: u64,
     pub zone: ZoneId,
@@ -245,7 +257,53 @@ impl MagicAuthority {
     /// by reading these intents. A future resolver must persist completion
     /// transactionally before replaying/retrying any side effect.
     pub fn pending_ember_intents(&self) -> impl Iterator<Item = &EmberEffectIntent> {
+        self.pending_ember
+            .values()
+            .filter(|intent| intent.status == EmberEffectStatus::Pending)
+    }
+
+    pub fn resolved_ember_intents(&self) -> impl Iterator<Item = &EmberEffectIntent> {
+        self.pending_ember
+            .values()
+            .filter(|intent| intent.status != EmberEffectStatus::Pending)
+    }
+
+    /// All historical intent identities, including terminal tombstones.
+    /// Retention is intentionally bounded until a durable GC/receipt protocol
+    /// exists; terminal records must not become pending again after a restart.
+    pub(crate) fn all_ember_intents(&self) -> impl Iterator<Item = &EmberEffectIntent> {
         self.pending_ember.values()
+    }
+
+    pub fn ember_intent(
+        &self,
+        character: CharacterId,
+        sequence: u64,
+    ) -> Option<&EmberEffectIntent> {
+        self.pending_ember.get(&(character, sequence))
+    }
+
+    /// Server-only no-effect completion on a staged ledger. The caller must
+    /// independently verify the interrupt/cancel event and checkpoint it
+    /// with the loot state before publishing. No client may invoke it.
+    pub(crate) fn resolve_ember_without_effect(
+        &mut self,
+        character: CharacterId,
+        sequence: u64,
+        resolution: EmberEffectStatus,
+    ) -> Result<(), MagicError> {
+        if resolution == EmberEffectStatus::Pending {
+            return Err(MagicError::InvalidEffectIntent);
+        }
+        let intent = self
+            .pending_ember
+            .get_mut(&(character, sequence))
+            .ok_or(MagicError::UnknownEffectIntent)?;
+        if intent.status != EmberEffectStatus::Pending {
+            return Err(MagicError::EffectAlreadyResolved);
+        }
+        intent.status = resolution;
+        Ok(())
     }
 
     /// Called ONLY on a staged, authoritative MagicAuthority, after the
@@ -264,6 +322,7 @@ impl MagicAuthority {
             return Err(MagicError::PrerequisiteMissing);
         }
         let intent = EmberEffectIntent {
+            status: EmberEffectStatus::Pending,
             character,
             sequence,
             zone,
@@ -343,7 +402,7 @@ const fn spell_plan(spell: Spell) -> SpellPlan {
     }
 }
 
-const PROGRESSION_MAGIC: &[u8; 8] = b"MYMAG002";
+const PROGRESSION_MAGIC: &[u8; 8] = b"MYMAG003";
 const ALL_RUNES: [Rune; 6] = [
     Rune::Fire,
     Rune::Water,
@@ -466,6 +525,11 @@ impl MagicAuthority {
             {
                 return Err(MagicSnapshotError::InvalidState);
             }
+            bytes.push(match intent.status {
+                EmberEffectStatus::Pending => 0,
+                EmberEffectStatus::Interrupted => 1,
+                EmberEffectStatus::Cancelled => 2,
+            });
             bytes.extend_from_slice(&intent.character.get().to_le_bytes());
             bytes.extend_from_slice(&intent.sequence.to_le_bytes());
             bytes.push(match intent.zone {
@@ -539,6 +603,12 @@ impl MagicAuthority {
         }
         let mut pending_ember = BTreeMap::new();
         for _ in 0..intent_count {
+            let status = match reader.u8()? {
+                0 => EmberEffectStatus::Pending,
+                1 => EmberEffectStatus::Interrupted,
+                2 => EmberEffectStatus::Cancelled,
+                _ => return Err(MagicSnapshotError::Corrupt),
+            };
             let character = CharacterId::new(reader.u64()?).ok_or(MagicSnapshotError::Corrupt)?;
             let sequence = reader.u64()?;
             let zone = match reader.u8()? {
@@ -547,6 +617,7 @@ impl MagicAuthority {
                 _ => return Err(MagicSnapshotError::Corrupt),
             };
             let intent = EmberEffectIntent {
+                status,
                 character,
                 sequence,
                 zone,
@@ -721,6 +792,77 @@ mod tests {
             magic.stage_ember_intent(hero, 1, ZoneId::Moonvale, 200.0, 200.0, 0.0),
             Err(MagicError::InvalidEffectIntent)
         );
+        assert_eq!(magic.pending_ember_intents().count(), 1);
+    }
+
+    #[test]
+    fn interrupt_and_cancel_become_durable_tombstones_not_pending_effects() {
+        let mut magic = MagicAuthority::new();
+        let hero = character(720);
+        magic
+            .grant_lesson(award(1, hero, Lesson::Rune(Rune::Fire)))
+            .unwrap();
+        magic
+            .grant_lesson(award(2, hero, Lesson::Spell(Spell::Ember)))
+            .unwrap();
+        magic
+            .stage_ember_intent(hero, 20, ZoneId::Moonvale, 200.0, 200.0, 0.0)
+            .unwrap();
+        magic
+            .stage_ember_intent(hero, 21, ZoneId::Moonvale, 200.0, 200.0, 0.0)
+            .unwrap();
+        magic
+            .resolve_ember_without_effect(hero, 20, EmberEffectStatus::Interrupted)
+            .unwrap();
+        magic
+            .resolve_ember_without_effect(hero, 21, EmberEffectStatus::Cancelled)
+            .unwrap();
+        assert_eq!(magic.pending_ember_intents().count(), 0);
+        assert_eq!(magic.resolved_ember_intents().count(), 2);
+        let bytes = magic.encode_progression().unwrap();
+        let mut restored = MagicAuthority::decode_progression(&bytes).unwrap();
+        assert_eq!(restored.ember_intent(hero, 20).unwrap().status, EmberEffectStatus::Interrupted);
+        assert_eq!(restored.ember_intent(hero, 21).unwrap().status, EmberEffectStatus::Cancelled);
+        assert_eq!(restored.pending_ember_intents().count(), 0);
+        assert_eq!(
+            restored.resolve_ember_without_effect(hero, 20, EmberEffectStatus::Cancelled),
+            Err(MagicError::EffectAlreadyResolved)
+        );
+        assert_eq!(
+            restored.stage_ember_intent(hero, 20, ZoneId::Moonvale, 200.0, 200.0, 0.0),
+            Err(MagicError::InvalidEffectIntent)
+        );
+    }
+
+    #[test]
+    fn forged_terminal_status_and_nonexistent_resolution_fail_closed() {
+        let mut magic = MagicAuthority::new();
+        let hero = character(721);
+        assert_eq!(
+            magic.resolve_ember_without_effect(hero, 10, EmberEffectStatus::Interrupted),
+            Err(MagicError::UnknownEffectIntent)
+        );
+        magic
+            .grant_lesson(award(1, hero, Lesson::Rune(Rune::Fire)))
+            .unwrap();
+        magic
+            .grant_lesson(award(2, hero, Lesson::Spell(Spell::Ember)))
+            .unwrap();
+        magic
+            .stage_ember_intent(hero, 9, ZoneId::Moonvale, 200.0, 200.0, 0.0)
+            .unwrap();
+        assert_eq!(
+            magic.resolve_ember_without_effect(hero, 9, EmberEffectStatus::Pending),
+            Err(MagicError::InvalidEffectIntent)
+        );
+        let mut bytes = magic.encode_progression().unwrap();
+        // Each record ends with 29 bytes after the one-byte status.
+        let status_index = bytes.len() - 30;
+        bytes[status_index] = 255;
+        assert!(matches!(
+            MagicAuthority::decode_progression(&bytes),
+            Err(MagicSnapshotError::Corrupt)
+        ));
         assert_eq!(magic.pending_ember_intents().count(), 1);
     }
 

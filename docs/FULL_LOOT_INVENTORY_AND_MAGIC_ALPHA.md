@@ -40,6 +40,13 @@ Status: **domain foundation only — NOT live-game enabled**. Approved design di
 - Read-only Ember preparation verifies the exact authenticated session lease, learned Fire rune and Ember spell, equipped lootable Spellbook, Sulfur Ash reagent and mana. It costs 15 mana and one Sulfur Ash if eventually cast, but the preview consumes nothing and produces no effects.
 - Tests cover no-free-magic spawn, rewards, replayed receipts, casting prerequisites and rune/spell knowledge surviving full-loot death when the spellbook is taken. The knowledge ledger is **in memory only** and must be persisted transactionally with items before activating NPC lessons or spells. No live Magic integration, projectiles or combat changes.
 
+## Durable no-damage Ember resolution (domain only)
+
+- The outbox now retains distinct `Pending`, `Interrupted`, and `Cancelled` statuses for each Ember intent ID. Interrupt/Cancel are terminal **no-effect** outcomes: the record and committed operation sequence survive recovery, so the same intent cannot become pending again or be cancelled twice.
+- The trusted offline-only `resolve_ember_without_damage` operation verifies an exact server-issued SessionLease and the authoritative ZoneAuthority zone, stages a terminal status, and writes a new joint loot-and-magic checkpoint **before** publishing in-memory state. Corrupt status codes, wrong sessions, wrong zones and repeated transitions fail closed.
+- Magic progression is versioned `MYMAG003` and the combined checkpoint is `MYWLD003`. Previous experimental versions need a reviewed migration; standalone loot format remains `MYASOL03`. No records can be discarded without a durable retention/garbage-collection policy; the global 4096-intent limit remains.
+- **Applied damage is not representable yet.** Combat must persist damage, death/loot, effect resolution and player feedback as one coordinated world transaction before that terminal state is allowed. This module never applies effects and is not wired to WebTransport.
+
 ## Durable pending Ember intent (non-activated)
 
 - The MagicAuthority progression ledger now holds a bounded outbox of pending Ember effects keyed by durable CharacterId and committed operation sequence. Each record includes a server-verified ZoneId, finite in-bounds origin and facing, encoded deterministically without applying projectile collision or damage.
