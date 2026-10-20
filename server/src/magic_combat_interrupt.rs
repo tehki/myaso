@@ -10,7 +10,7 @@ use std::path::Path;
 
 use crate::character_identity::{SessionIdentityRegistry, SessionLease};
 use crate::loot::LootAuthority;
-use crate::magic::{EmberEffectStatus, MagicAuthority, MagicError};
+use crate::magic::{EmberEffectStatus, MagicAuthority};
 use crate::magic_checkpoint::{
     resolve_ember_without_damage, EmberNoEffectDecision, JointCheckpointError,
 };
@@ -227,6 +227,7 @@ mod tests {
     #[test]
     fn authoritative_death_cancels_but_never_refunds_resources() {
         let (loot, mut magic, identity, zones, hero, mut fighter) = fixture();
+        magic.spend_mana(hero, 15).unwrap();
         let checkpoint = path();
         fighter.action = Action::Dead;
         assert!(matches!(
@@ -240,9 +241,10 @@ mod tests {
             ),
             Ok(EmberEffectStatus::Cancelled)
         ));
-        assert_eq!(magic.mana(hero), 100);
+        assert_eq!(magic.mana(hero), 85);
         assert_eq!(magic.resolved_ember_intents().count(), 1);
         let (_, restored) = load_joint(&checkpoint).unwrap();
+        assert_eq!(restored.mana(hero), 85);
         assert_eq!(restored.pending_ember_intents().count(), 0);
         assert_eq!(
             restored.ember_intent(hero, 30).unwrap().status,
