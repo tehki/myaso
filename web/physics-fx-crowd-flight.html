@@ -14,6 +14,7 @@ const qs = new URLSearchParams(location.search);
 const endpoint = qs.get("server");
 const cert = qs.get("cert");
 const count = Number(qs.get("sessions") ?? "16");
+const windowMs = Number(qs.get("windowMs") ?? "4200");
 const started = performance.now();
 const timeout = (promise, ms, reason) => Promise.race([
   promise,
@@ -35,6 +36,9 @@ const handles = [];
   }
   if (!Number.isInteger(count) || count < 2 || count > 64) {
     throw new Error("P10 test-only session count must be 2..64");
+  }
+  if (!Number.isInteger(windowMs) || windowMs < 4200 || windowMs > 10500) {
+    throw new Error("P10 test-only observation window must be 4200..10500ms");
   }
   if (typeof WebTransport !== "function") throw new Error("WebTransport unavailable");
   const hash = Uint8Array.from(cert.match(/../g), (part) => Number.parseInt(part, 16));
@@ -117,7 +121,7 @@ const handles = [];
   window.__P10_STAGE__ = `handshaking 0/${count}`;
   await Promise.all(tasks);
   window.__P10_STAGE__ = `collecting ${count} concurrent real QUIC connections`;
-  await new Promise((resolve) => setTimeout(resolve, 4_200));
+  await new Promise((resolve) => setTimeout(resolve, windowMs));
 
   const perSession = handles
     .sort((a, b) => a.session - b.session)
