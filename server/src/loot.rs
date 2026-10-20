@@ -1254,10 +1254,7 @@ mod tests {
             }
         );
         assert_eq!(visible[1].entity_id, corpse_id);
-        assert_eq!(
-            visible[1].appearance,
-            LootAppearance::Corpse { victim: 4 }
-        );
+        assert_eq!(visible[1].appearance, LootAppearance::Corpse { victim: 4 });
         assert_ne!(visible[1].entity_id, corpse_item_id);
         assert_eq!(
             loot.visible_loot(1, &fighter(2, 200.0, 200.0, false), ZoneId::Moonvale, 1),
