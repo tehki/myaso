@@ -64,6 +64,7 @@ const playerInputState = {
 const inputs = { player: playerInputState, bot: null };
 const sparringAi = createSparringAi();
 let attackRequested = false;
+let runningAttackRequested = false;
 let committedLightMove = null;
 let heavyAttackRequested = false;
 let rollRequested = false;
@@ -75,6 +76,9 @@ const leftButtonCharge = createLeftButtonCharge({
   onLight() {
     attackRequested = true;
     committedLightMove = captureLightAttackMovement(keys);
+    if (rightButtonGesture.isRunning() && ["KeyW", "KeyA", "KeyS", "KeyD"].some(code => keys.has(code))) {
+      runningAttackRequested = true;
+    }
   },
   onHeavy() { heavyAttackRequested = true; },
 });
@@ -121,6 +125,29 @@ function onLeftPointerUp(event) {
   leftButtonCharge.release(event.pointerId);
 }
 canvas.addEventListener("pointerup", onLeftPointerUp);
+// W3C Pointer Events fire pointerdown/up only on transitions between zero
+// and any pressed mouse button. With RMB held, additional LMB down/up
+// produces mouse events but no pointer events: preserve running attacks.
+const CHORDED_LEFT_POINTER_ID = -1;
+let chordedLeftDown = false;
+canvas.addEventListener("mousedown", (event) => {
+  if (event.button !== 0 || !(event.buttons & 2) || leftButtonCharge.isPressed()) return;
+  canvas.focus();
+  updateMouse(event);
+  chordedLeftDown = true;
+  leftButtonCharge.press(CHORDED_LEFT_POINTER_ID, {
+    immediate: player.action === "jump" || jumpRequested || keys.has("Space"),
+  });
+});
+function onChordedLeftMouseUp(event) {
+  if (event.button !== 0 || !chordedLeftDown) return;
+  chordedLeftDown = false;
+  updateMouse(event);
+  leftButtonCharge.release(CHORDED_LEFT_POINTER_ID);
+}
+canvas.addEventListener("mouseup", onChordedLeftMouseUp);
+window.addEventListener("mouseup", onChordedLeftMouseUp);
+
 window.addEventListener("pointerup", onLeftPointerUp);
 canvas.addEventListener("pointercancel", (event) => {
   if (event.button === 1) middleBlockHeld = false;
@@ -128,7 +155,7 @@ canvas.addEventListener("pointercancel", (event) => {
 });
 canvas.addEventListener("lostpointercapture", (event) => {
   if (event.button === 1) middleBlockHeld = false;
-  leftButtonCharge.cancel(event.pointerId);
+  if (!(event.buttons & 1)) leftButtonCharge.cancel(event.pointerId);
 });
 canvas.addEventListener("wheel", (event) => {
   event.preventDefault();
@@ -163,8 +190,10 @@ function releaseInputs() {
   dashRequested = false;
   dashMove = null;
   attackRequested = false;
+  runningAttackRequested = false;
   committedLightMove = null;
   leftButtonCharge.cancel();
+  chordedLeftDown = false;
   heavyAttackRequested = false;
   rollRequested = false;
   kickRequested = false;
@@ -191,9 +220,10 @@ function playerInput() {
   playerInputState.dodge = rollRequested;
   playerInputState.dash = dashRequested;
   playerInputState.kick = kickRequested;
-  playerInputState.run = rightButtonGesture.isRunning();
+  playerInputState.run = rightButtonGesture.isRunning() || runningAttackRequested;
   playerInputState.jump = jumpRequested;
   attackRequested = false;
+  runningAttackRequested = false;
   committedLightMove = null;
   heavyAttackRequested = false;
   rollRequested = false;
@@ -301,7 +331,7 @@ function actionHint() {
   if (player.action === "running_attack_windup") return "RUNNING STRIKE — momentum committed; opponents can read the lane.";
   if (player.action === "running_attack_active") return "RUNNING STRIKE — carry the lunge through contact.";
   if (player.action === "running_attack_recovery") return "RUNNING RECOVERY — missed lunges are punishable.";
-  if (player.action === "heavy_attack_windup") return "Heavy committed — the long tell can be dodged or parried.";
+  if (player.action === "heavy_attack_windup") return "Heavy strike winding up after release — enemies can dodge or parry.";
   if (player.action === "attack_recovery") return "Recovery — this is where careless attacks get punished.";
   if (player.action === "heavy_attack_recovery") return "Heavy recovery — you are very punishable now.";
   if (player.action === "feint_recovery") return "FEINT — attack cancelled; short recovery before you can act again.";
@@ -313,8 +343,8 @@ function actionHint() {
   if (player.action === "dodge") return "ROLL — i-frames plus collision knockdown.";
   if (player.action === "knockdown") return "KNOCKED DOWN — short recovery before control returns.";
   if (rightButtonGesture.isRunning()) return "RUNNING — stamina drains while sprinting.";
-  if (leftButtonCharge.progress() > 0) return "CHARGING HEAVY — hold LMB, aim with mouse, release to strike.";
-  return "Tap LMB light · hold LMB heavy · RMB tap shove · RMB hold run · wheel roll/parry · Space jump.";
+  if (leftButtonCharge.progress() > 0) return "CHARGING HEAVY — hold until READY, then release to strike.";
+  return "Release LMB early: light · hold to READY and release: heavy · hold RMB and tap LMB: running strike.";
 }
 
 function render(impact = combatImpact.sample(performance.now())) {

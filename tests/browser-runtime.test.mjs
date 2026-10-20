@@ -318,7 +318,10 @@ test("right-button capture loss, blur and pointercancel never trigger a kick", (
 
   canvas.dispatchEvent(rightPointer("pointerdown", 4));
   canvas.dispatchEvent(rightPointer("lostpointercapture", 4));
+  nowMs += 200;
+  assert.equal(gesture.isRunning(), true, "capture loss during LMB must not end RMB sprint");
   windowTarget.dispatchEvent(rightPointer("pointerup", 4));
+  assert.equal(gesture.isRunning(), false);
   assert.equal(kicks, 0);
 
   canvas.dispatchEvent(rightPointer("pointerdown", 5));
