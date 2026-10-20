@@ -185,6 +185,14 @@ jobs:
           cargo check --locked --manifest-path server/Cargo.toml --example magic_fx_crowd_loopback
           node scripts/physics_fx_crowd_browser_flight.mjs
 
+      # P11 runs REAL /game authoritative ACK/snapshot/browser-frame
+      # acceptance while a separate 16-connection QUIC FX fixture loads
+      # the same CI host. Does not activate magic on gameplay sockets.
+      - name: Validate P11 real game input ACK under concurrent FX host load
+        run: |
+          node --check scripts/physics_fx_authoritative_overlap.mjs
+          node scripts/physics_fx_authoritative_overlap.mjs
+
       - name: Validate M188 repeated real heavy counterplay windows
         run: |
           # Three fresh Chrome/Firefox sessions for each real defensive read.
