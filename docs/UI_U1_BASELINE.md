@@ -63,3 +63,26 @@ full genuine browser/Rust quality workflow on exact PR head. Also smoke
 keyboard disclosure activation and mobile wrapping in a real browser.
 Revert the bootstrap module install to return to the original full legend.
 Do not merge/deploy independently; submit to Moon Games Development Center.
+
+## Chromium acceptance and M35 run outcome
+
+Verified independently on X230i using an isolated clone of the U1 branch,
+Chromium headless and native W3C WebDriver actions:
+
+- Initial collapsed `details` hides all 14 original binding labels.
+- Genuine keyboard Enter on focused `summary` expands and collapses it.
+- All 14 labels remain available after expansion.
+- Expanded layout at 390px viewport has no horizontal overflow.
+- Game canvas remains present throughout.
+
+Browser smoke revealed and motivated an explicit
+`.control-guide:not([open]) > .controls { display: none; }` override because
+the existing `.controls { display: flex; }` defeated user-agent hiding.
+A Node regression assertion locks this requirement.
+
+Initial exact-head protected quality #39466258763 passed governance, R2
+controls (including UI tests), browser runtime and Rust gates before failing
+the preexisting M35 native short-click parry timing acceptance: Chrome landed
+34HP damage rather than the required Firefox parry. This is not evidence of
+a UI input change; nor is a passing isolated UI smoke proof that M35 is fixed.
+Retain the fail-closed gate and investigate/requalify on new exact head.

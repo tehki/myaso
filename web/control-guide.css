@@ -43,3 +43,6 @@
 @media (max-width: 760px) {
   .control-guide { margin-left: 0; }
 }
+
+/* The original legend uses display:flex; native details alone does not hide it. */
+.control-guide:not([open]) > .controls { display: none; }

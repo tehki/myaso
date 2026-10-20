@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { installControlGuide } from "../src/browser/control-guide.mjs";
 
 function element(tagName) {
@@ -82,4 +83,9 @@ test("pages without the arena instructions are untouched", () => {
   assert.equal(installControlGuide(doc), null);
   assert.equal(masthead.children.length, 0);
   assert.equal(head.children.length, 0);
+});
+
+test("closed disclosure hides flex-based instructions without removing them", () => {
+  const css = readFileSync(new URL("../web/control-guide.css", import.meta.url), "utf8");
+  assert.match(css, /\.control-guide:not\(\[open\]\)\s*>\s*\.controls\s*\{\s*display:\s*none\s*;\s*\}/);
 });
