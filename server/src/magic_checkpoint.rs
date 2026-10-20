@@ -15,7 +15,9 @@ use crate::loot_persistence::{
     atomic_write, checksum, decode, encode, CheckpointError, MAX_FILE_BYTES,
 };
 use crate::loot_transaction::{quiescent_verified, TransactionError};
-use crate::magic::{EmberEffectStatus, LessonAward, MagicAuthority, MagicError, MagicSnapshotError};
+use crate::magic::{
+    EmberEffectStatus, LessonAward, MagicAuthority, MagicError, MagicSnapshotError,
+};
 use crate::magic_teacher::{TeacherAuthority, TeacherError, TeacherRequest};
 use crate::zone::ZoneAuthority;
 
@@ -592,7 +594,9 @@ mod tests {
                 50,
                 EmberEffectStatus::Cancelled,
             ),
-            Err(JointCheckpointError::Magic(MagicError::EffectAlreadyResolved))
+            Err(JointCheckpointError::Magic(
+                MagicError::EffectAlreadyResolved
+            ))
         ));
         let _ = fs::remove_file(&path);
     }

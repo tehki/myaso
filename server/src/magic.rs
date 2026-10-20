@@ -821,8 +821,14 @@ mod tests {
         assert_eq!(magic.resolved_ember_intents().count(), 2);
         let bytes = magic.encode_progression().unwrap();
         let mut restored = MagicAuthority::decode_progression(&bytes).unwrap();
-        assert_eq!(restored.ember_intent(hero, 20).unwrap().status, EmberEffectStatus::Interrupted);
-        assert_eq!(restored.ember_intent(hero, 21).unwrap().status, EmberEffectStatus::Cancelled);
+        assert_eq!(
+            restored.ember_intent(hero, 20).unwrap().status,
+            EmberEffectStatus::Interrupted
+        );
+        assert_eq!(
+            restored.ember_intent(hero, 21).unwrap().status,
+            EmberEffectStatus::Cancelled
+        );
         assert_eq!(restored.pending_ember_intents().count(), 0);
         assert_eq!(
             restored.resolve_ember_without_effect(hero, 20, EmberEffectStatus::Cancelled),
