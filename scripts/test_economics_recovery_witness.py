@@ -152,11 +152,13 @@ class WitnessTests(unittest.TestCase):
                 "UPDATE title_projection SET owner_id=20, revision=1,"
                 " last_sequence=0 WHERE parcel_id=42"
             )
-        # A stale UI read model is internally permitted but cannot overwrite
-        # the separately witnessed projection progress.
-        old_projection = self.seal()
-        with self.assertRaises(WitnessConflict):
-            self.observe(old_projection)
+        # The new global journal catches the deleted projection receipt
+        # *even before* witness verification.
+        from economics_recovery_audit import CorruptState, audit_fixture_database
+        with self.assertRaises(CorruptState):
+            audit_fixture_database(self.live)
+        with self.assertRaises((InvalidCheckpoint, WitnessConflict, CorruptState)):
+            self.observe()
         self.assertEqual(read_fixture_witness_tip(self.witness)[1:3], (1, 1))
 
     def test_same_progress_different_data_is_not_silently_rewitnessed(self):
