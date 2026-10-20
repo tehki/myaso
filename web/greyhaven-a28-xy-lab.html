@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="icon" href="data:,">
+<title>myaso.io — A2.8 world XY visual alignment laboratory</title>
+<style>
+:root{color-scheme:dark}*{box-sizing:border-box}
+body{margin:0;background:#151a18;color:#ebe7da;font:15px/1.5 system-ui,sans-serif}
+header{padding:15px 24px;background:#26312c;border-bottom:1px solid #4d5c52}
+h1{margin:0;font:700 27px Georgia,serif}
+main{padding:18px;max-width:1370px;margin:0 auto}
+fieldset{border:1px solid #536658;border-radius:8px;padding:10px 14px}
+legend{padding:0 6px;color:#edc990}
+.controls{display:flex;gap:22px;align-items:center;flex-wrap:wrap}
+label{display:flex;gap:9px;align-items:center}
+input[type=range]{accent-color:#deb273}
+.card-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;margin:18px 0}
+figure{margin:0;background:#242e29;border:1px solid #62715f;border-radius:9px;padding:9px}
+canvas{display:block;width:100%;aspect-ratio:1;max-width:640px;margin:auto;background:#576558}
+figcaption{font-size:13px;color:#cbd1c3;padding:7px 4px}
+.stat{padding:10px 12px;border-radius:8px;background:#29372f;margin-top:8px;overflow-wrap:anywhere}
+.alert{color:#f2cba2}.note{color:#bcc6b8;font-size:13px}
+code{color:#f1dca4}output{font-variant-numeric:tabular-nums}
+@media(max-width:860px){.card-grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<header><h1>⚔️ Greyhaven A2.8 — XY placement laboratory</h1>
+<div class="note">Original Blood &amp; Iron Red Lion art · calibrated image vs cinematic 3/4 image · isolated localhost visual acceptance</div></header>
+<main>
+<fieldset>
+<legend>Read-only world-origin reference</legend>
+<div class="controls">
+<label for="east">X offset from proposed tavern door, world units <input id="east" type="range" min="-120" max="120" step="20" value="40"><output id="east-out">+40</output></label>
+<label for="south">Y offset from proposed tavern door, world units <input id="south" type="range" min="-120" max="120" step="20" value="40"><output id="south-out">+40</output></label>
+<label for="roof">Roof opacity <input id="roof" type="range" min="0" max="100" step="10" value="60"><output id="roof-out">60%</output></label>
+<label for="source"><input id="source" type="checkbox" checked>Show Blender-implied marker</label>
+</div>
+</fieldset>
+<div class="card-grid">
+<figure><canvas id="calibrated" width="640" height="640" aria-label="Calibrated top-down Blender game XY review"></canvas>
+<figcaption><strong>A2.5 game-XY overhead</strong> · measured 33.6 px/m in both axes; correctly aligns the original character-origin reference, but hides the attractive front facade.</figcaption></figure>
+<figure><canvas id="cinematic" width="640" height="640" aria-label="Cinematic 3/4 Red Lion with projected ground position mismatch"></canvas>
+<figcaption><strong>A2.6 cinematic 3/4</strong> · attractive medieval architecture; yellow marker estimates where Blender puts the same point. Pink ring is the actual browser world-origin formula. The difference is intentional and visible.</figcaption></figure>
+</div>
+<div class="stat" id="measurements" role="status" aria-live="polite">Loading original baked WebPs and measured Blender camera reports…</div>
+<p class="note alert"><strong>Not a playable world.</strong> Yellow and pink markers are synthetic test references, not player avatars or approved knight foot pivots. Red Lion's proposed door game coordinate is from the unactivated A1 art manifest. The online game currently draws a combat-disc origin; we have not verified an A3 knight's foot pivot, portal authority, roof occlusion, map placement or frame-time performance. This page never sends combat inputs or changes the game client.</p>
+<p class="note">Run from the repo root: <code>python -m http.server 8080</code>, then visit <code>/web/greyhaven-a28-xy-lab.html</code>. This opt-in page is standalone and does not alter live world rendering.</p>
+</main>
+<script type="module" src="./greyhaven-a28-xy-lab.mjs"></script>
+</body>
+</html>
