@@ -259,3 +259,39 @@ P6 correctly isolated per-zone and global **cosmetic-only** byte quotas, but seq
 This tests **synthetic scheduler data** and tight deterministic invariants, not 1024 real clients, 512-player browser FPS, network congestion, GPU performance, packet loss, or production QoS. Before enabling any server-to-client effect channel, the Core & Multiplayer department must integrate the scheduler with authenticated connection registries and actual transport priority, perform real connection/perf soak, test login/portal transitions, protect combat/gameplay messages, and review bandwidth including framing and encryption overhead.
 
 **All P7 APIs are inactive / draft / unmerged / undeployed.**
+
+## P8 — authenticated-connection handoff boundary and backpressure-first FX admission (2026-10-20)
+
+P8 adds `server/src/magic_fx_handoff.rs`, a **pure, inactive Core-facing API**. It consumes P7's planned cosmetic batches but has no WebTransport sender, no real player admission and no integration with the authoritative game tick. The active `server/src/main.rs` and existing wire protocol are unchanged.
+
+### Connection generation and routing
+
+- `TrustedFxHandoff::register_trusted(connection_id, authenticated_net_id, zone_id)` is **only** intended for Core after an already-authenticated server connection has been admitted, with all identifiers from server-owned state. The registry rejects duplicate connection IDs, duplicate net IDs, zero IDs and more than 1024 registered FX sessions.
+- Each registration receives a **server-minted monotonic `FxRoute { connection_id, generation }`**. A trusted zone transfer issues a new generation and resets P7's zone-local event cursor. An authorized disconnect removes the registration. A reused connection ID therefore receives a different generation; `route_current` rejects previously planned batches. A generation is never sourced from an incoming player payload.
+- This does **not** create a new authentication system, login protocol or cryptographic token. The future Core runtime must check the route generation **again immediately before writing to a socket**; an asynchronous stale batch cannot be handed to a new player. The FX planner cannot validate real transport identity on its own.
+
+### Fail-closed traffic priority
+
+- Core supplies `TrustedFxViewer { route, view, gate }`, where `view` is the authoritative zone/position and `FxQueueGate` is server-owned transport state: whether gameplay/snapshot traffic is pending, whether the cosmetic writer is backpressured, and whether the cosmetic queue has a free slot.
+- **Any gameplay backlog, backpressured writer or zero cosmetic queue space means zero cosmetic work for that session.** That viewer's FX cursor does not move and no FX payload budget is consumed.
+- `plan_trusted_tick` validates **all** supplied active views first (current route generation, unique connection identity, matching authoritative zone, valid geometry and bounded batch length). Invalid views fail before any cosmetic bytes are planned. The hub's strict tick and P7 fair preflight continue to apply.
+- Only eligible sessions are copied into the fair scheduler, and results are translated back to the active `FxRoute` for Core routing. The returned `FxHandoffPlan` stores aggregate registered/eligible/suppressed counts and **payload-only** byte totals; it performs no enqueue, socket write, instrumentation export or gameplay mutation.
+- The P6 global/zone/viewer caps remain in effect. The P8 gate adds an additional *pre-admission* layer to avoid useless visual work when game state delivery has priority. It is not a complete QUIC congestion controller and does not reserve real datagram capacity.
+
+### Deterministic regression cases
+
+Rust module tests cover route invalidation on server-approved zone transfer, socket ID recycling and disconnect, immutable authentication ownership, rejection of malformed/view-forged batches, and 512 synthetic FX connections with a 64-session gameplay backlog. Results assert no route leak and that backpressured viewers get priority once they become eligible.
+
+Optional standalone benchmark, without any real connections:
+
+```sh
+cargo run --locked --release --manifest-path server/Cargo.toml --example magic_fx_handoff_bench
+```
+
+This uses 512 **synthetic** registered sessions in four zones over 16 authoritative ticks; it adds deterministic gameplay-pending/writer-backpressure states and a trusted mid-run zone transfer. It reports p95 **whole-handoff round** time, budgeted cosmetic payload, suppressed polls and stale-route rejections. No speed, 512 real-client capacity, packet-loss, browser FPS, energy budget, or gameplay latency claim is justified until actual execution and a separate end-to-end network experiment.
+
+### Unmet release requirements
+
+The Core & Multiplayer department must provide: an already-authenticated registration API tied to its live connection lifecycle; actual authoritative viewer positions and approved zone transfers; **hard game-message priority** in the WebTransport outgoing queue; independent bounded cosmetic buffer, queue-slot accounting and backpressure; last-moment `route_current` validation; version negotiation for the separate P4 `ME` effect contract; server-side no-spoof/no-leak tests; and real connected-player load measurements (throughput, p95/p99 input latency, dropped visual events, render FPS, network overhead). Actual mixed gameplay + magic stress and device-tier accessibility signoff with Combat/Graphics/Magic/World remain gates.
+
+**P8 is intentionally passive: no active FX transport or gameplay spell behavior is enabled. PR stays draft, unmerged, undeployed.**
