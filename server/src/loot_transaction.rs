@@ -290,7 +290,11 @@ pub fn commit_verified_equipment(
     {
         return Err(PickupCommitError::Loot(LootError::InvalidPosition));
     }
-    if fighter.action == Action::Dead || fighter.hp <= 0.0 || loot.is_dead(actor) {
+    if fighter.action == Action::Dead
+        || !fighter.hp.is_finite()
+        || fighter.hp <= 0.0
+        || loot.is_dead(actor)
+    {
         return Err(PickupCommitError::Loot(LootError::DeadPlayer));
     }
     let mut staged =
