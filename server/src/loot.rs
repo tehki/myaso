@@ -412,10 +412,11 @@ mod tests {
         assert_eq!((scattered.item.kind, scattered.item.amount), (ItemKind::SulfurAsh, 1));
         assert_eq!(loot.corpses()[&corpse_id].items.iter().find(|i| i.id == reagent).unwrap().amount, 11);
         assert_eq!(loot.death(1, &fighter(1, 200.0, 200.0, true), ZoneId::Moonvale, 110), Err(LootError::AlreadyDead));
+        let drop_id = scattered.entity_id;
         let thief = fighter(2, 200.0, 200.0, false);
-        let stolen = loot.take_ground(2, &thief, ZoneId::Moonvale, scattered.entity_id, 200).unwrap();
+        let stolen = loot.take_ground(2, &thief, ZoneId::Moonvale, drop_id, 200).unwrap();
         assert_eq!(stolen.amount, 1);
-        assert_eq!(loot.take_ground(2, &thief, ZoneId::Moonvale, scattered.entity_id, 201), Err(LootError::NotFound));
+        assert_eq!(loot.take_ground(2, &thief, ZoneId::Moonvale, drop_id, 201), Err(LootError::NotFound));
         for item_id in [weapon, armor, reagent] {
             loot.take_corpse(2, &thief, ZoneId::Moonvale, corpse_id, item_id, 200).unwrap();
         }
