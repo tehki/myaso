@@ -137,3 +137,31 @@ test('A2.1 retains superseded A1 roof courses but hides their protruding render 
   assert.match(art,/"legacyRoofCoursesRetainedButHidden": bool\(legacy_courses\.hide_render\)/);
   assert.match(art,/assert all\(name in scene\.objects for name in originals\)/);
 });
+
+
+test('A2.2 adds four roof families without altering A2.1 game or approved barrels', () => {
+  const art = readFileSync(new URL('../tools/art/polish_greyhaven_a22.py', import.meta.url), 'utf8');
+  for (const building of ['Gable Merchant', "Tanner's Cottage", 'Stone Weaver', 'Blacksmith']) {
+    assert.ok(art.includes('"' + building + '"'));
+  }
+  assert.match(art, /len\(roof\.data\.polygons\)==5/);
+  assert.match(art, /roof\.matrix_world @ roof\.data\.vertices\[i\]\.co/);
+  assert.match(art, /"roof-occlusion-candidate"/);
+  assert.match(art, /assert len\(oldcourses\)==14/);
+  assert.match(art, /"originalBarrelsPreserved":len\(barrels\)/);
+  assert.match(art, /"combatChanged":False/);
+  assert.match(art, /"portalChanged":False/);
+  assert.match(art, /"A3RollChanged":False/);
+  assert.doesNotMatch(art,/requests\.|urlretrieve\(|export_scene\.gltf|subprocess\./);
+});
+
+test('A2.2 batches roof and facade detail without introducing unbounded object counts', () => {
+  const art = readFileSync(new URL('../tools/art/polish_greyhaven_a22.py', import.meta.url), 'utf8');
+  assert.match(art, /"newMeshObjects":5/);
+  assert.match(art, /"oakDoorPlanks":planks_count/);
+  assert.match(art, /len\(roof_objs\)==4/);
+  assert.match(art, /planks_count==28 and hinges_count==8/);
+  assert.match(art, /"textureAtlasBaked":False/);
+  assert.match(art, /"browserFrameTimeMeasured":False/);
+  assert.match(art, /scene\.cycles\.device="CPU"/);
+});
