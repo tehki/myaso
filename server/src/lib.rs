@@ -20,6 +20,8 @@ pub mod zone;
 
 #[cfg(test)]
 mod magic_fx_fair_tests;
+#[cfg(test)]
+mod magic_fx_fault_tests;
 
 pub const PROTOCOL_VERSION: u8 = 1;
 pub const INPUT_PACKET_TYPE: u8 = 1;
