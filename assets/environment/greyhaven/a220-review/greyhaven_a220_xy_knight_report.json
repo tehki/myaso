@@ -1,0 +1,136 @@
+{
+  "milestone": "Blood & Iron A2.20 real knight XY against game-compatible and cinematic Red Lion",
+  "browser": "Chrome/154.0.8037.99",
+  "companionKnightSourceHead": "c74fcf90e227f3bc4788728f000cfe6aa083c7ef",
+  "companionSpriteSha256": {
+    "silver_idle": "828cf05dd873d0c8f35e887f5e46c35af87f084ac321977e358c985e7a2106b4",
+    "silver_roll": "31c774ac930a5cf1060640f1fc2914b02d6d5ddccd7d56591123efd098909426",
+    "t1_roll": "16ea4b62867e95e1be7a4c18b3b48cc427b8338badae882692e6b1e051f0a24f"
+  },
+  "gameCoordinateSource": "src/browser/arena-viewport.mjs",
+  "calibrationSource": "A2.5 authored top-down and A2.6 original cinematic camera",
+  "screenshots": 3,
+  "atDoor": {
+    "ready": true,
+    "clip": "silver_idle",
+    "dx": 0,
+    "dy": 0,
+    "roof": 0.4,
+    "sourceKnightPrHead": "c74fcf90e227f3bc4788728f000cfe6aa083c7ef",
+    "sourceGraphicPrHead": "a9f188c31ea671120e05ed5e61e8c8a7b63745cb",
+    "sourceGameZoom": 0.84,
+    "gamePoint": [
+      320,
+      320
+    ],
+    "authoredOverheadPoint": [
+      320,
+      320
+    ],
+    "authoredCinematicPoint": [
+      320,
+      320
+    ],
+    "overheadErrorPx": 0,
+    "cinematicErrorPx": 0,
+    "knightDraw": {
+      "w": 96,
+      "h": 96,
+      "x": -48,
+      "y": -62.4
+    },
+    "roofAlpha": 0.4,
+    "activePortalValidated": false,
+    "gameRuntimeModified": false,
+    "worldAuthorityChanged": false,
+    "knightSourceAssetsCopied": false,
+    "correctedThreeQuarterCamera": false,
+    "liveMultiplayerValidated": false
+  },
+  "southeast": {
+    "ready": true,
+    "clip": "silver_idle",
+    "dx": 120,
+    "dy": -80,
+    "roof": 0.2,
+    "sourceKnightPrHead": "c74fcf90e227f3bc4788728f000cfe6aa083c7ef",
+    "sourceGraphicPrHead": "a9f188c31ea671120e05ed5e61e8c8a7b63745cb",
+    "sourceGameZoom": 0.84,
+    "gamePoint": [
+      420.8,
+      252.8
+    ],
+    "authoredOverheadPoint": [
+      420.800018,
+      252.79998799999998
+    ],
+    "authoredCinematicPoint": [
+      161.83252,
+      331.85904
+    ],
+    "overheadErrorPx": 0.000021633307676992724,
+    "cinematicErrorPx": 270.7664814988591,
+    "knightDraw": {
+      "w": 96,
+      "h": 96,
+      "x": -48,
+      "y": -62.4
+    },
+    "roofAlpha": 0.2,
+    "activePortalValidated": false,
+    "gameRuntimeModified": false,
+    "worldAuthorityChanged": false,
+    "knightSourceAssetsCopied": false,
+    "correctedThreeQuarterCamera": false,
+    "liveMultiplayerValidated": false
+  },
+  "roll": {
+    "ready": true,
+    "clip": "silver_roll",
+    "dx": 40,
+    "dy": 40,
+    "roof": 0,
+    "sourceKnightPrHead": "c74fcf90e227f3bc4788728f000cfe6aa083c7ef",
+    "sourceGraphicPrHead": "a9f188c31ea671120e05ed5e61e8c8a7b63745cb",
+    "sourceGameZoom": 0.84,
+    "gamePoint": [
+      353.6,
+      353.6
+    ],
+    "authoredOverheadPoint": [
+      353.600006,
+      353.600006
+    ],
+    "authoredCinematicPoint": [
+      317.72964,
+      348.95003
+    ],
+    "overheadErrorPx": 0.000008485281352815295,
+    "cinematicErrorPx": 36.17049830359682,
+    "knightDraw": {
+      "w": 134,
+      "h": 134,
+      "x": -67,
+      "y": -78
+    },
+    "roofAlpha": 0,
+    "activePortalValidated": false,
+    "gameRuntimeModified": false,
+    "worldAuthorityChanged": false,
+    "knightSourceAssetsCopied": false,
+    "correctedThreeQuarterCamera": false,
+    "liveMultiplayerValidated": false
+  },
+  "errors": [],
+  "skinnedFootContactValidated": false,
+  "visualPortalOnly": true,
+  "actualAuthoritativePortalValidated": false,
+  "actualGameRuntimeIntegrated": false,
+  "actualMultiplayerFPSMeasured": false,
+  "roofOcclusionValidated": false,
+  "atlasCopiedToGraphicsBranch": false,
+  "approved120ScalePreserved": true,
+  "gameAuthorityOrCollisionChanged": false,
+  "productionApproved": false,
+  "caveat": "Same exact world XY and original 120% knight art. The calibrated overhead follows the game camera; cinematic 3/4 exterior has incompatible ground basis. This is offline art QA, NOT live game collision or a portal."
+}
