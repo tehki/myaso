@@ -398,9 +398,7 @@ async fn interleaved_outbound_chat_does_not_discard_half_read_inbound_frame() {
     // outbound delivery must resume (not reconstruct) Alice's partial read.
     bob.send(201, b"Interleaving incoming chat", 1).await;
     assert!(assert_result(&bob.receive().await, 201, 0) > 0);
-    assert!(
-        assert_received(&alice.receive().await, 2, "Interleaving incoming chat") > 0
-    );
+    assert!(assert_received(&alice.receive().await, 2, "Interleaving incoming chat") > 0);
 
     alice
         .chat_send
