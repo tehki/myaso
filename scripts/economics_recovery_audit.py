@@ -37,10 +37,12 @@ class AuditReport:
     inbox_events: int
     logical_sha256: str
     mutation_revision: int
+    global_revision: int
 
 
 TABLES = (
     ("metadata", "singleton"),
+    ("global_events", "revision"),
     ("admission_mutations", "revision"),
     ("accounts", "id"),
     ("titles", "parcel_id"),
@@ -101,12 +103,13 @@ def _audit(db: sqlite3.Connection) -> AuditReport:
         _reject("Foreign-key constraint check failed")
 
     meta = _one(
-        db, "SELECT sequence,issued_units,title_cap,mutation_revision FROM metadata WHERE singleton=1"
+        db, "SELECT sequence,issued_units,title_cap,mutation_revision,global_revision FROM metadata WHERE singleton=1"
     )
     if db.execute("SELECT count(*) FROM metadata").fetchone()[0] != 1:
         _reject("Additional metadata records")
-    seq, issued, cap, mutation_revision = meta
-    if seq < 0 or issued < 0 or cap <= 0 or mutation_revision < 0:
+    seq, issued, cap, mutation_revision, global_revision = meta
+    if (seq < 0 or issued < 0 or cap <= 0
+        or mutation_revision < 0 or global_revision < 0):
         _reject("Invalid committed policy")
 
     accounts = db.execute(
@@ -336,6 +339,27 @@ def _audit(db: sqlite3.Connection) -> AuditReport:
     if {p[0] for p in projections} != set(title_by_parcel):
         _reject("Missing/stale parcel projection")
 
+    # Independently reconcile each modeled source commit to exactly one
+    # gap-free global event envelope and enforce purchase-before-projection.
+    events = db.execute(
+        "SELECT revision,event_kind,local_revision FROM global_events ORDER BY revision"
+    ).fetchall()
+    if (len(events) != global_revision
+        or [event[0] for event in events] != list(range(1, global_revision + 1))):
+        _reject("Incomplete cross-domain transaction envelope")
+    expected_events = (
+        {("purchase", record[3]) for record in receipts}
+        | {("projection", record[0]) for record in inbox}
+        | {("mutation", record[0]) for record in mutations}
+    )
+    actual_events = {(kind, local) for _, kind, local in events}
+    if actual_events != expected_events or len(actual_events) != len(events):
+        _reject("Global event envelope disagrees with source commits")
+    order = {(kind, local): rev for rev, kind, local in events}
+    for (kind, local) in expected_events:
+        if kind == "projection" and order[("purchase", local)] >= order[("projection", local)]:
+            _reject("Projected title before corresponding committed purchase")
+
     # Logical checkpoint includes every persisted row, excluding SQLite's
     # nondeterministic page order / WAL bytes. Store expected anchor OUTSIDE DB.
     material = [
@@ -364,6 +388,7 @@ def _audit(db: sqlite3.Connection) -> AuditReport:
         inbox_events=len(inbox),
         logical_sha256=digest,
         mutation_revision=mutation_revision,
+        global_revision=global_revision,
     )
 
 
