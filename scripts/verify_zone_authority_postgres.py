@@ -43,7 +43,7 @@ def operation(n: int) -> str:
 
 def register(n: int, worker=1, zone=1) -> None:
     require(
-        call(f"SELECT core_zone.register_entity(1, {entity(n)}, {worker}, {zone});") == "1",
+        call(f"SELECT core_zone.register_entity(1::smallint, {entity(n)}, {worker}, {zone});") == "1",
         "fresh entity should start at epoch 1",
     )
 
@@ -53,7 +53,7 @@ def prepare(transaction: int, n: int, src_worker: int, src_zone: int,
             *, expect_failure=False) -> str:
     return call(
         "SELECT core_zone.prepare_transfer("
-        f"{operation(transaction)}, 1, {entity(n)}, "
+        f"{operation(transaction)}, 1::smallint, {entity(n)}, "
         f"{src_worker}, {src_zone}, {epoch}, {target_worker}, {target_zone});",
         expect_failure=expect_failure,
     )
@@ -75,14 +75,14 @@ def abort(transaction: int, *, expect_failure=False) -> str:
 
 def is_current(n: int, worker: int, zone: int, epoch: int) -> bool:
     return call(
-        f"SELECT core_zone.is_current(1, {entity(n)}, {worker}, {zone}, {epoch});"
+        f"SELECT core_zone.is_current(1::smallint, {entity(n)}, {worker}, {zone}, {epoch});"
     ) == "t"
 
 
 def assert_can_mutate(n: int, worker: int, zone: int, epoch: int,
                       *, expect_failure=False) -> None:
     call(
-        f"SELECT core_zone.assert_mutation_authority(1, {entity(n)}, "
+        f"SELECT core_zone.assert_mutation_authority(1::smallint, {entity(n)}, "
         f"{worker}, {zone}, {epoch});",
         expect_failure=expect_failure,
     )
@@ -123,9 +123,9 @@ def test_authority_recovery() -> None:
     abort(200, expect_failure=True)  # historical ACK cannot claim current authority
 
     # Persistent ID cannot be registered again; retirement is irreversible.
-    call(f"SELECT core_zone.retire_entity(1, {entity(2)}, 3, 3, 2);")
+    call(f"SELECT core_zone.retire_entity(1::smallint, {entity(2)}, 3, 3, 2);")
     require(not is_current(2, 3, 3, 2), "retirement revoked authority")
-    call(f"SELECT core_zone.register_entity(1, {entity(2)}, 3, 3);",
+    call(f"SELECT core_zone.register_entity(1::smallint, {entity(2)}, 3, 3);",
          expect_failure=True)
     print("PASS: committed and aborted transfer receipts, stale fences, retirement")
 
@@ -138,7 +138,7 @@ def test_competing_independent_clients() -> None:
         start.wait(timeout=5)
         statement = (
             "SELECT core_zone.prepare_transfer("
-            f"{operation(op)}, 1, {entity(3)}, 1, 1, 1, {worker}, 2);"
+            f"{operation(op)}, 1::smallint, {entity(3)}, 1, 1, 1, {worker}, 2);"
         )
         result = subprocess.run(
             ["psql", "-X", "-A", "-t", "-v", "ON_ERROR_STOP=1", "-c", statement],
@@ -176,7 +176,7 @@ def test_row_lock_protects_mutation() -> None:
     try:
         session.stdin.write(
             "BEGIN;\n"
-            f"SELECT core_zone.assert_mutation_authority(1, {entity(4)}, 1, 1, 1);\n"
+            f"SELECT core_zone.assert_mutation_authority(1::smallint, {entity(4)}, 1, 1, 1);\n"
             "SELECT 'AUTHORITY_ROW_LOCKED';\n"
         )
         session.stdin.flush()
