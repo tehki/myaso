@@ -6,6 +6,7 @@ use std::sync::{
 pub mod identity;
 pub mod item_journal;
 pub mod item_ownership;
+pub mod item_pg_codec;
 pub mod kill_event;
 pub mod reliable;
 pub mod simulation;
