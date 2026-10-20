@@ -447,11 +447,11 @@ test("R2 fast trusted wheel releases real held LMB then waits for wheel ACK", as
     sendAttackUp:()=>{events.push("native-up");time=23;},
   });
   await new Promise(setImmediate);
-  assert.deepEqual(events,["native-down","timer:45","native-wheel"]);
+  assert.deepEqual(events,["native-down","timer:70","native-wheel"]);
   time=18;
   trusted.resolve({trusted:true,deltaY:120});
   await new Promise(setImmediate);
-  assert.deepEqual(events,["native-down","timer:45","native-wheel","native-up"]);
+  assert.deepEqual(events,["native-down","timer:70","native-wheel","native-up"]);
   let settled=false;
   flight.then(()=>{settled=true;});
   await new Promise(setImmediate);
@@ -477,11 +477,11 @@ test("R2 delayed receipt never stretches a real held LMB past bounded grace", as
     sendAttackUp:()=>{events.push("up");time=55;},
   });
   await new Promise(setImmediate);
-  assert.deepEqual(events,["down","grace:45","wheel"]);
-  time=50;
+  assert.deepEqual(events,["down","grace:70","wheel"]);
+  time=75;
   timer.resolve();
   await new Promise(setImmediate);
-  assert.deepEqual(events,["down","grace:45","wheel","up"]);
+  assert.deepEqual(events,["down","grace:70","wheel","up"]);
   let settled=false;
   flight.then(()=>{settled=true;});
   await new Promise(setImmediate);
@@ -490,10 +490,38 @@ test("R2 delayed receipt never stretches a real held LMB past bounded grace", as
   await new Promise(setImmediate);
   time=171; wheel.resolve();
   const proof=await flight;
-  assert.equal(proof.attackUpDispatchMs,50);
+  assert.equal(proof.attackUpDispatchMs,75);
   assert.equal(proof.trustedWheelObservedMs,150);
   assert.equal(proof.wheelAckMs,171);
-  assert.equal(proof.clickHoldMs,50);
+  assert.equal(proof.clickHoldMs,75);
+});
+
+test("R2 genuine 59ms wheel attestation wins before 70ms grace and releases once",async()=>{
+  const trusted=deferred(),wheel=deferred(),timer=deferred();
+  const events=[]; let time=0;
+  const flight=dispatchR2ReleaseLedShortBlock({
+    now:()=>time,
+    sleep:ms=>{events.push("grace:"+ms);return timer.promise;},
+    sendAttackDown:()=>{events.push("down");time=5;},
+    sendWheel:()=>{events.push("wheel");return wheel.promise;},
+    awaitTrustedWheel:()=>trusted.promise,
+    sendAttackUp:()=>{events.push("up");},
+  });
+  await new Promise(setImmediate);
+  assert.deepEqual(events,["down","grace:70","wheel"]);
+  time=59;
+  trusted.resolve({trusted:true,deltaY:120});
+  await new Promise(setImmediate);
+  assert.deepEqual(events,["down","grace:70","wheel","up"]);
+  // The still-unresolved timeout must not issue an extra release.
+  time=70;timer.resolve();
+  await new Promise(setImmediate);
+  assert.equal(events.filter(x=>x==="up").length,1);
+  time=83;wheel.resolve();
+  const evidence=await flight;
+  assert.equal(evidence.attackUpDispatchMs,59);
+  assert.equal(evidence.trustedWheelObservedMs,59);
+  assert.equal(evidence.wheelAckMs,83);
 });
 
 test("R2 invalid early trusted Firefox wheel fails before native mouseUP",async()=>{

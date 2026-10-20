@@ -12,7 +12,7 @@ import { setTimeout as sleepTimer } from "node:timers/promises";
 export async function dispatchR2ReleaseLedShortBlock({
   sendAttackDown, sendWheel, awaitTrustedWheel, sendAttackUp,
   now = () => performance.now(), sleep = sleepTimer,
-  maxHoldMs = 280, receiptGraceMs = 45,
+  maxHoldMs = 280, receiptGraceMs = 70,
 }) {
   if (![sendAttackDown, sendWheel, awaitTrustedWheel, sendAttackUp, now, sleep]
     .every(fn => typeof fn === "function")
@@ -45,6 +45,10 @@ export async function dispatchR2ReleaseLedShortBlock({
   // On a fast native delivery release immediately. On a slow *receipt* release
   // at the bounded grace, then verify actual DOM ordering and required
   // attestation in the caller. Never silently accept missing/bad wheel.
+  // A 45ms grace in quality #39423835786 released Chrome just 2ms BEFORE
+  // Firefox's native wheel, correctly failing strict M334. At 70ms genuine
+  // slow wheel delivery can precede release without waiting for delayed
+  // attestation transport. Original 135ms attack / 240ms block are intact.
   await Promise.race([attestation, sleep(receiptGraceMs), earlyWheelFailure]);
   const attackUpDispatchMs = ms();
   if (attackUpDispatchMs - attackDownDispatchMs > maxHoldMs) {
