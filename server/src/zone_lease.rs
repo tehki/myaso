@@ -144,6 +144,14 @@ impl ZoneLeaseRegistry {
             .and_then(|slot| (!slot.retired).then_some(slot.lease))
     }
 
+    /// Read-only pending proof for replay validation. No commit record may
+    /// materialize a handoff that was not previously durably prepared.
+    pub fn pending(&self, entity: OwnedEntity) -> Option<HandoffTicket> {
+        self.slots.get(&entity).and_then(|slot| {
+            if slot.retired { None } else { slot.pending }
+        })
+    }
+
     /// Pending handoff denies source and destination all game mutations,
     /// so no two workers are ever authorized by this registry concurrently.
     pub fn can_mutate(&self, lease: AuthorityLease) -> bool {
