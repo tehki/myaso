@@ -1,0 +1,49 @@
+{
+  "actualAuthoritativeDoorOrCollision": false,
+  "artifact": "greyhaven_a222_roof_before_after_knight.png",
+  "gameplayPhysicsOrMultiplayerChanged": false,
+  "groundBasisPixelsPerSourceMeter": {
+    "x": [
+      33.600006,
+      0.0
+    ],
+    "y": [
+      0.0,
+      33.600006
+    ]
+  },
+  "groundXYDrift": 0,
+  "highRoofAndGableVerticesCompressed": 1778,
+  "knightDrawPixels": [
+    96,
+    96
+  ],
+  "knightSourceCopied": false,
+  "knightSpriteSha256": "828cf05dd873d0c8f35e887f5e46c35af87f084ac321977e358c985e7a2106b4",
+  "maxVisualRiseReductionPx": 25.132809677124,
+  "milestone": "Blood & Iron A2.22 original XY roof proportion comparison",
+  "newRoofAlphaBounds": [
+    204,
+    40,
+    436,
+    231
+  ],
+  "oldRoofAlphaBounds": [
+    204,
+    15,
+    436,
+    230
+  ],
+  "originalApprovedKnightsEdited": false,
+  "originalRedLionBlenderSceneEdited": false,
+  "productionApproved": false,
+  "roofAlphaBottomShiftPx": 1,
+  "roofAlphaTopMovedDownPx": 25,
+  "roofRuntimeOcclusionApproved": false,
+  "sourceKnightWebP": "silver_idle.webp",
+  "sourceVerticesEditedInMemory": 4318,
+  "visualDoorAnchorPixels": [
+    320,
+    320
+  ]
+}
