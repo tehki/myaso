@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Greyhaven A2.23 — Real Knight & Roof Chrome Acceptance</title><link rel="icon" href="data:,">
+<style>
+:root{color-scheme:dark}*{box-sizing:border-box}body{margin:0;background:#18221b;color:#efe1c9;font:14px/1.55 system-ui,sans-serif}
+header{background:#2b382e;padding:16px 20px;border-bottom:1px solid #74836d}
+h1{font:700 26px Georgia,serif;margin:0}
+main{max-width:1500px;margin:0 auto;padding:16px}
+.controls{display:flex;gap:14px;flex-wrap:wrap;align-items:center;padding:12px;background:#2b3b30;border-radius:8px}
+label{display:flex;align-items:center;gap:8px}input{accent-color:#e6be77}
+input[type=range]{width:112px}select{background:#384939;color:#fff;border:1px solid #819177;padding:6px}
+.panels{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:15px;margin:16px 0}
+figure{background:#2a382e;border:1px solid #687c68;border-radius:8px;padding:10px;margin:0}
+canvas{display:block;width:100%;aspect-ratio:1;background:#78887c}
+figcaption{padding-top:8px}.status{padding:12px;background:#314235;border-radius:6px}
+.note{font-size:12px;color:#c8d4c1}.warning{color:#e8c697}
+@media(max-width:800px){.panels{grid-template-columns:1fr}}
+</style></head>
+<body><header><h1>Blood &amp; Iron A2.23 — Real Chrome roof acceptance</h1>
+<div class="note">The exact game XY projection · original Red Lion artwork · owner-approved 120% knight WebPs from separate PR #326</div></header>
+<main><div class="controls">
+<label>East <input id="east" type="range" min="-120" max="120" step="10" value="120"><output id="east-out">120</output></label>
+<label>South <input id="south" type="range" min="-120" max="120" step="10" value="-80"><output id="south-out">-80</output></label>
+<label>Character <select id="clip">
+<option value="silver_idle">Silver Knight idle · 96px</option>
+<option value="silver_roll">Silver Knight A3 roll · 134px</option>
+<option value="t1_roll">T1 Sentinel A3 roll · 134px</option></select></label>
+<label>Roof visibility <input id="roof" type="range" min="0" max="100" value="75" step="5"><output id="roof-out">75%</output></label>
+<label><input type="checkbox" id="markers" checked> Show world XY markers</label>
+</div><div class="panels">
+<figure><canvas id="baseline" width="640" height="640" aria-label="A2.21 Red Lion with approved original knight"></canvas>
+<figcaption><strong>A2.21 original roof</strong> — source-authored Red Lion, same ground basis and visual door</figcaption></figure>
+<figure><canvas id="refined" width="640" height="640" aria-label="A2.22 shallower Red Lion roof with approved original knight"></canvas>
+<figcaption><strong>A2.22 compressed roof pitch</strong> — ridge 25px lower, ground geometry and doorway unchanged</figcaption></figure>
+</div><p id="status" class="status" role="status">Checking source art and companion knight frames…</p>
+<p class="note warning"><strong>Offline graphical inspection only.</strong> Neither roof is activated in multiplayer; alpha is a manual review control, not server-authoritative occlusion. Door (4365,4075) is art-only, not a verified in-game portal. The 120% knight WebPs are supplied from a separate pinned checkout and are not copied into PR #350. No gameplay physics, world/network authority, original Blender scene or animation changes.</p>
+</main><script type="module" src="./greyhaven-a223-roof-browser.mjs"></script></body></html>
