@@ -225,3 +225,36 @@ This is not production hearing, visibility, or full dialogue AI. Physical
 Greyhaven LOS, obstructions, crowds and interiors remain dependent on the
 separate authoritative world collision/door PRs. The experiment remains
 off by default, loopback-only, combat-independent and unmerged.
+
+## LW-1H — Evidence-based NPC acquaintances (loopback-only)
+
+The five test NPCs now have a **bounded, server-owned record of confirmed
+NPC-to-NPC meetings**. Every second, during the same authoritative social
+update used for verified news, the server compares the five current pilot
+positions. A meeting requires the two NPCs to be within 105 world units
+and the authored pilot barrier check to show an unobstructed line between
+them. There are only 10 unique NPC pairs: their records fit into a
+fixed-size array, with no database, external AI inference or player identifiers.
+
+A pair's first meeting records one encounter and a server tick.
+Continuously standing together does **not** accrue more encounters:
+the pair must first separate beyond 125 units and meet again. Counts cap
+at eight to prevent inflation, and an acquaintance stops being reported
+two minutes after the last confirmed meeting. All encounter state disappears
+when the pilot server restarts. The NPC world does not collect the player
+nickname, chat transcript, account identity, location history or any
+player-to-player reputation.
+
+The dialogue route is read-only. When asked `who have you met`,
+`who do you know`, `friends` or `acquaintances`, NPCs report only the
+**most recent actual NPC encounter** and the verified number of meetings;
+otherwise they say no recent encounter is verified. They explicitly decline
+to infer friendship, loyalty or trust from mere proximity. A self-declared
+player nickname cannot fabricate an NPC acquaintance.
+
+This is a small **social evidence substrate**, not autonomous psychology,
+relationship scoring or roleplaying AI. It has no player rewards, emotion
+system, economic effects or persistence. Future authoritative building
+obstructions and zone membership must replace the pilot geometry before
+any production social simulations. The feature remains behind the existing
+loopback-only `MYASO_NPC_PILOT` flag and draft PR #353.

@@ -726,6 +726,9 @@ async fn handle_connection(
                             .npc_routines
                             .as_ref()
                             .and_then(|routines| routines.rumor_source(npc_id, state.world.tick));
+                        let acquaintance = state.npc_routines.as_ref().and_then(|routines| {
+                            routines.recent_acquaintance(npc_id, state.world.tick)
+                        });
                         state.world.fighter(player_id).map(|fighter| {
                             (
                                 fighter.x,
@@ -735,11 +738,12 @@ async fn handle_connection(
                                 context,
                                 report,
                                 heard_from,
+                                acquaintance,
                             )
                         })
                     };
                     match viewer {
-                        Some((x, y, alive, tick, context, report, heard_from)) => {
+                        Some((x, y, alive, tick, context, report, heard_from, acquaintance)) => {
                             let npc = NpcRoutines::position(npc_id, tick).and_then(|position| {
                                 living_world::nearby_npc_at(
                                     npc_id, x, y, alive, position.x, position.y,
@@ -753,14 +757,17 @@ async fn handle_connection(
                                     living_world::response_packet(
                                         npc_id,
                                         0,
-                                        &living_world::answer_with_social(
+                                        &living_world::answer_with_relations(
                                             &mut dialogue,
                                             npc,
                                             utterance,
                                             activity,
                                             witnessed,
                                             report.as_deref(),
-                                            heard_from,
+                                            living_world::SocialFacts {
+                                                heard_from,
+                                                acquaintance,
+                                            },
                                         ),
                                     )
                                 }

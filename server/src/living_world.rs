@@ -178,6 +178,39 @@ pub fn answer_with_social(
     supply_report: Option<&str>,
     heard_from: Option<&str>,
 ) -> String {
+    answer_with_relations(
+        session,
+        npc,
+        utterance,
+        activity,
+        witnessed_death,
+        supply_report,
+        SocialFacts {
+            heard_from,
+            acquaintance: None,
+        },
+    )
+}
+
+/// All context is read-only from the trusted NPC world state; neither a
+/// conversation nor the claimed player nickname can create relationships.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct SocialFacts<'a> {
+    pub heard_from: Option<&'a str>,
+    pub acquaintance: Option<(&'a str, u8)>,
+}
+
+pub fn answer_with_relations(
+    session: &mut DialogueSession,
+    npc: &Npc,
+    utterance: &str,
+    activity: &str,
+    witnessed_death: bool,
+    supply_report: Option<&str>,
+    social: SocialFacts<'_>,
+) -> String {
+    let heard_from = social.heard_from;
+    let acquaintance = social.acquaintance;
     let clean = utterance.trim().to_lowercase();
     if let Some(proposed) = clean.strip_prefix("my name is ") {
         let name = utterance.trim().get(11..).unwrap_or("").trim();
@@ -238,6 +271,23 @@ pub fn answer_with_social(
     } else if contains_any(&clean, &["quest", "job", "work", "reward"]) {
         "No verified contract is available yet. I won't promise rewards that do not exist."
             .to_string()
+    } else if contains_any(
+        &clean,
+        &[
+            "who have you met",
+            "who do you know",
+            "friends",
+            "acquaintances",
+            "met anyone",
+        ],
+    ) {
+        match acquaintance {
+            Some((name, times)) => format!(
+                "I crossed paths with {name} here recently ({times} verified {} this session). That does not prove we are friends.",
+                if times == 1 { "meeting" } else { "meetings" }
+            ),
+            None => "I have no verified recent meetings with another NPC to report.".to_string(),
+        }
     } else if contains_any(&clean, &["bandit", "merchant missing"]) {
         "I have no verified information about that specific claim.".to_string()
     } else if contains_any(&clean, &["rumor", "news", "any deaths"]) {
@@ -429,6 +479,49 @@ mod tests {
             answer_with_social(&mut session, marta, "news", "working", false, None, None,)
                 .contains("haven't witnessed")
         );
+    }
+
+    #[test]
+    fn acquaintance_dialogue_requires_recorded_meeting_and_no_claimed_friendship() {
+        let npc = &NPCS[0];
+        let mut session = DialogueSession::default();
+        let absent = answer_with_relations(
+            &mut session,
+            npc,
+            "who have you met",
+            "serving guests",
+            false,
+            None,
+            SocialFacts::default(),
+        );
+        assert!(absent.contains("no verified recent meetings"));
+        let observed = answer_with_relations(
+            &mut session,
+            npc,
+            "who do you know",
+            "serving guests",
+            false,
+            None,
+            SocialFacts {
+                heard_from: None,
+                acquaintance: Some(("Marta", 2)),
+            },
+        );
+        assert!(observed.contains("Marta"));
+        assert!(observed.contains("2 verified meetings"));
+        assert!(observed.contains("does not prove we are friends"));
+        // Self-declared player nicknames cannot become social evidence.
+        let _ = answer(&mut session, npc, "my name is Rose");
+        assert!(answer_with_relations(
+            &mut session,
+            npc,
+            "friends",
+            "serving guests",
+            false,
+            None,
+            SocialFacts::default(),
+        )
+        .contains("no verified recent meetings"));
     }
 
     #[test]

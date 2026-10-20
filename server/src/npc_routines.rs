@@ -13,6 +13,19 @@ const WITNESS_RADIUS: f32 = 235.0;
 const WITNESS_MEMORY_TICKS: u32 = 120 * 60;
 const GOSSIP_RADIUS: f32 = 105.0;
 const SOCIAL_INTERVAL_TICKS: u32 = 60;
+const MEETING_RADIUS: f32 = 105.0;
+const MEETING_REARM_RADIUS: f32 = 125.0;
+const MEETING_FRESH_TICKS: u32 = 120 * 60;
+// Five fixed NPCs have ten unique unordered pairs, never player identities.
+const NPC_PAIR_COUNT: usize = NPCS.len() * (NPCS.len() - 1) / 2;
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+struct Encounter {
+    last_met_tick: Option<u32>,
+    count: u8,
+    // Edge-triggered: staying side by side cannot manufacture more meetings.
+    in_contact: bool,
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 struct HeardReport {
@@ -38,6 +51,8 @@ pub struct NpcRoutines {
     // Neither recipient nor source can create a new combat event or reward.
     heard_report: [Option<HeardReport>; NPCS.len()],
     last_social_tick: Option<u32>,
+    // Fixed-size NPC-only encounter evidence. No chat or player/account data.
+    encounters: [Encounter; NPC_PAIR_COUNT],
 }
 
 impl NpcRoutines {
@@ -98,6 +113,7 @@ impl NpcRoutines {
         self.last_social_tick = Some(tick);
         let positions =
             NPCS.map(|npc| Self::position(npc.id, tick).expect("authored NPC position"));
+        self.record_encounters(tick, &positions);
         // Snapshot firsthand witnesses before choosing recipients. Knowledge
         // shared this tick cannot recursively spread to further NPCs.
         for (source_index, source) in NPCS.iter().enumerate() {
@@ -143,6 +159,62 @@ impl NpcRoutines {
                 }
             }
         }
+    }
+
+    fn pair_index(a: usize, b: usize) -> usize {
+        debug_assert!(a < b && b < NPCS.len());
+        a * (2 * NPCS.len() - a - 1) / 2 + (b - a - 1)
+    }
+
+    fn record_encounters(&mut self, tick: u32, positions: &[NpcState; NPCS.len()]) {
+        for i in 0..NPCS.len() {
+            for j in (i + 1)..NPCS.len() {
+                let x = f32::from(positions[i].x) - f32::from(positions[j].x);
+                let y = f32::from(positions[i].y) - f32::from(positions[j].y);
+                let distance_squared = x * x + y * y;
+                let record = &mut self.encounters[Self::pair_index(i, j)];
+                if distance_squared > MEETING_REARM_RADIUS * MEETING_REARM_RADIUS {
+                    record.in_contact = false;
+                } else if !record.in_contact
+                    && distance_squared <= MEETING_RADIUS * MEETING_RADIUS
+                    && npc_navigation::pilot_line_of_sight(
+                        (positions[i].x, positions[i].y),
+                        (positions[j].x, positions[j].y),
+                    )
+                {
+                    record.last_met_tick = Some(tick);
+                    record.count = record.count.saturating_add(1).min(8);
+                    record.in_contact = true;
+                }
+            }
+        }
+    }
+
+    /// Deterministic account-free NPC social context. Never describes an
+    /// unseen friendship or a connection outside a verified nearby meeting.
+    pub fn recent_acquaintance(&self, id: u8, tick: u32) -> Option<(&'static str, u8)> {
+        let origin = NPCS.iter().position(|npc| npc.id == id)?;
+        let mut best: Option<(u32, usize, u8)> = None;
+        for (other, npc) in NPCS.iter().enumerate() {
+            if other == origin {
+                continue;
+            }
+            let pair = Self::pair_index(origin.min(other), origin.max(other));
+            let evidence = self.encounters[pair];
+            let Some(observed) = evidence.last_met_tick else {
+                continue;
+            };
+            let age = tick.wrapping_sub(observed);
+            if age > MEETING_FRESH_TICKS {
+                continue;
+            }
+            if best.is_none_or(|(old_age, old, _)| {
+                age < old_age || (age == old_age && npc.id < NPCS[old].id)
+            }) {
+                best = Some((age, other, evidence.count));
+            }
+        }
+        best.map(|(_, other, count)| (NPCS[other].name, count))
     }
 
     /// Returned name is from the trusted fixed NPC roster, never a claimed
@@ -305,5 +377,89 @@ mod tests {
         town.advance_social(60);
         assert_eq!(town.rumor_source(2, 60), Some("Aldric"));
         assert_eq!(town.rumor_source(2, 60 + WITNESS_MEMORY_TICKS + 100), None);
+    }
+
+    #[test]
+    fn npc_acquaintance_requires_real_meeting_and_is_not_faked_by_staying_nearby() {
+        let mut town = NpcRoutines::default();
+        assert_eq!(town.recent_acquaintance(1, 59), None);
+        town.advance_social(59);
+        assert_eq!(town.recent_acquaintance(1, 59), None);
+        town.advance_social(60);
+        assert_eq!(town.recent_acquaintance(1, 60), Some(("Marta", 1)));
+        assert_eq!(town.recent_acquaintance(2, 60), Some(("Aldric", 1)));
+        let pair = NpcRoutines::pair_index(0, 1);
+        assert_eq!(town.encounters[pair].count, 1);
+        for tick in (120..=2400).step_by(60) {
+            town.advance_social(tick);
+        }
+        assert_eq!(town.encounters[pair].count, 1);
+        assert_eq!(
+            town.recent_acquaintance(1, 60 + MEETING_FRESH_TICKS + 1),
+            None
+        );
+        assert_eq!(NpcRoutines::default().recent_acquaintance(1, 60), None);
+    }
+
+    #[test]
+    fn only_separation_and_new_los_meeting_can_increment_bounded_contact_count() {
+        let mut town = NpcRoutines::default();
+        let mut states = NPCS.map(|npc| NpcState {
+            id: npc.id,
+            x: npc.x,
+            y: npc.y,
+            activity: 1,
+        });
+        town.record_encounters(60, &states);
+        let pair = NpcRoutines::pair_index(0, 1);
+        assert_eq!(town.encounters[pair].count, 1);
+        town.record_encounters(120, &states);
+        assert_eq!(town.encounters[pair].count, 1);
+        states[1].x = 460;
+        states[1].y = 310;
+        town.record_encounters(180, &states);
+        assert!(!town.encounters[pair].in_contact);
+        states[1].x = 210;
+        states[1].y = 65;
+        town.record_encounters(240, &states);
+        assert_eq!(town.encounters[pair].count, 2);
+        assert_eq!(town.recent_acquaintance(1, 240), Some(("Marta", 2)));
+
+        // Two other NPCs are geographically close, but the pilot supply
+        // crate separates their line of sight: don't invent a meeting.
+        states[2].x = 275;
+        states[2].y = 190;
+        states[4].x = 340;
+        states[4].y = 255;
+        town.record_encounters(300, &states);
+        let blocked = NpcRoutines::pair_index(2, 4);
+        assert_eq!(town.encounters[blocked].count, 0);
+    }
+
+    #[test]
+    fn npc_acquaintance_counter_saturates_and_sources_are_fixed_roster() {
+        let mut town = NpcRoutines::default();
+        let mut states = NPCS.map(|npc| NpcState {
+            id: npc.id,
+            x: npc.x,
+            y: npc.y,
+            activity: 1,
+        });
+        let pair = NpcRoutines::pair_index(0, 1);
+        for i in 0..20 {
+            let tick = 60 + i * 180;
+            town.record_encounters(tick, &states);
+            states[1].x = 460;
+            states[1].y = 310;
+            town.record_encounters(tick + 60, &states);
+            states[1].x = 210;
+            states[1].y = 65;
+        }
+        assert_eq!(town.encounters[pair].count, 8);
+        assert_eq!(
+            town.recent_acquaintance(1, 60 + 19 * 180),
+            Some(("Marta", 8))
+        );
+        assert_eq!(town.recent_acquaintance(99, 6000), None);
     }
 }
