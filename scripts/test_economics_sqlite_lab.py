@@ -11,6 +11,7 @@ import unittest
 from economics_sqlite_lab import (
     Denied, InjectedFailure, PurchaseIntent, VerifiedSession,
     bootstrap_fixture, purchase, snapshot, MAX_INT,
+    pending_title_events, project_title_event,
 )
 
 
@@ -283,6 +284,131 @@ class E2dDatabaseTests(unittest.TestCase):
         self.assertTrue(before["conserved"])
         self.execute()
         self.assertEqual(self.state(), before)
+
+
+    def projection_child(self, point):
+        code = (
+            "from economics_sqlite_lab import project_title_event; "
+            f"project_title_event({self.path!r},1,failpoint={point!r})"
+        )
+        return subprocess.run(
+            [sys.executable, "-c", code],
+            env={**os.environ, "PYTHONPATH": str(Path(__file__).parent)},
+            capture_output=True, text=True, timeout=10, check=False,
+        )
+
+    def test_outbox_projection_lags_until_consumed(self):
+        self.assertEqual(pending_title_events(self.path), [])
+        self.assertEqual(self.state()["read_model"], (20, 1, 0))
+        self.execute()
+        after_commit = self.state()
+        self.assertEqual(after_commit["title"], (10, 2))
+        self.assertEqual(after_commit["read_model"], (20, 1, 0))
+        self.assertEqual((after_commit["pending_events"], after_commit["consumed_events"]), (1, 0))
+        events = pending_title_events(self.path)
+        self.assertEqual(len(events), 1)
+        self.assertEqual(events[0]["sequence"], 1)
+        self.assertEqual(events[0]["event_kind"], "title_transferred")
+        self.assertEqual(project_title_event(self.path, 1), "applied")
+        read = self.state()
+        self.assertEqual(read["read_model"], (10, 2, 1))
+        self.assertEqual((read["pending_events"], read["consumed_events"]), (0, 1))
+        self.assertEqual(pending_title_events(self.path), [])
+        self.assertTrue(read["conserved"])
+
+    def test_duplicate_outbox_delivery_is_idempotent(self):
+        self.execute()
+        self.assertEqual(project_title_event(self.path, 1), "applied")
+        after = self.state()
+        self.assertEqual(project_title_event(self.path, 1), "already_applied")
+        self.assertEqual(self.state(), after)
+        self.assertEqual(self.state()["consumed_events"], 1)
+
+    def test_consumer_failures_before_commit_roll_back_projection_and_ack(self):
+        self.execute()
+        original = self.state()
+        for point in ("after_projection", "before_commit"):
+            with self.subTest(point=point):
+                with self.assertRaises(InjectedFailure):
+                    project_title_event(self.path, 1, failpoint=point)
+                self.assertEqual(self.state(), original)
+        self.assertEqual(project_title_event(self.path, 1), "applied")
+        self.assertTrue(self.state()["conserved"])
+
+    def test_consumer_hard_kills_before_commit_do_not_ack(self):
+        self.execute()
+        original = self.state()
+        for point in ("hard_exit_after_projection", "hard_exit_before_commit"):
+            with self.subTest(point=point):
+                child = self.projection_child(point)
+                self.assertEqual(child.returncode, 91, child.stderr)
+                self.assertEqual(self.state(), original)
+        self.assertEqual(self.state()["pending_events"], 1)
+
+    def test_consumer_hard_kill_after_commit_resumes_without_double_projection(self):
+        self.execute()
+        child = self.projection_child("hard_exit_after_commit")
+        self.assertEqual(child.returncode, 91, child.stderr)
+        stable = self.state()
+        self.assertEqual(stable["read_model"], (10, 2, 1))
+        self.assertEqual(stable["consumed_events"], 1)
+        self.assertEqual(project_title_event(self.path, 1), "already_applied")
+        self.assertEqual(self.state(), stable)
+        self.assertTrue(stable["conserved"])
+
+    def test_consumer_lost_acknowledgment_returns_durable_idempotency(self):
+        self.execute()
+        with self.assertRaises(InjectedFailure):
+            project_title_event(self.path, 1, failpoint="after_commit")
+        stable = self.state()
+        self.assertEqual(stable["read_model"], (10, 2, 1))
+        self.assertEqual(project_title_event(self.path, 1), "already_applied")
+        self.assertEqual(self.state(), stable)
+
+    def test_two_real_processes_project_once(self):
+        self.execute()
+        command = (
+            "from economics_sqlite_lab import project_title_event; "
+            f"project_title_event({self.path!r},1)"
+        )
+        env = {**os.environ, "PYTHONPATH": str(Path(__file__).parent)}
+        processes = [
+            subprocess.Popen([sys.executable, "-c", command], env=env,
+                             stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+            for _ in range(2)
+        ]
+        results = [p.communicate(timeout=10) for p in processes]
+        self.assertTrue(all(p.returncode == 0 for p in processes), results)
+        snapshot_after = self.state()
+        self.assertEqual(snapshot_after["read_model"], (10, 2, 1))
+        self.assertEqual(snapshot_after["consumed_events"], 1)
+        self.assertEqual(snapshot_after["pending_events"], 0)
+        self.assertTrue(snapshot_after["conserved"])
+
+    def test_tampered_outbox_is_not_applied_or_accepted_on_retry(self):
+        self.execute()
+        with sqlite3.connect(self.path) as db:
+            db.execute(
+                "UPDATE outbox SET event_payload='{}' WHERE sequence=1"
+            )
+        original = self.state()
+        with self.assertRaises(Denied):
+            project_title_event(self.path, 1)
+        self.assertEqual(self.state(), original)
+        self.assertEqual(self.state()["read_model"], (20, 1, 0))
+
+    def test_forged_sequence_or_bad_poll_budget_is_denied(self):
+        self.execute()
+        for seq in (0, -1, 2):
+            with self.subTest(seq=seq):
+                with self.assertRaises(Denied):
+                    project_title_event(self.path, seq)
+        for lim in (0, 1001, True):
+            with self.subTest(limit=lim):
+                with self.assertRaises(ValueError):
+                    pending_title_events(self.path, limit=lim)
+        self.assertEqual(len(pending_title_events(self.path, limit=1)), 1)
+        self.assertEqual(self.state()["read_model"], (20, 1, 0))
 
     def test_title_revision_overflow_rolls_back_everything(self):
         with sqlite3.connect(self.path) as db:
