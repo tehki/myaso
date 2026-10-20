@@ -40,6 +40,12 @@ Status: **domain foundation only — NOT live-game enabled**. Approved design di
 - Read-only Ember preparation verifies the exact authenticated session lease, learned Fire rune and Ember spell, equipped lootable Spellbook, Sulfur Ash reagent and mana. It costs 15 mana and one Sulfur Ash if eventually cast, but the preview consumes nothing and produces no effects.
 - Tests cover no-free-magic spawn, rewards, replayed receipts, casting prerequisites and rune/spell knowledge surviving full-loot death when the spellbook is taken. The knowledge ledger is **in memory only** and must be persisted transactionally with items before activating NPC lessons or spells. No live Magic integration, projectiles or combat changes.
 
+## Verified target leases and revalidated Ember handoff
+
+- The isolated Ember Combat preview now binds each potential target to an independently verified **durable CharacterId plus exact SessionLease incarnation**, not merely a temporary fighter ID. Dead/unregistered or unauthenticated targets cannot be proposed, even when geometry places them closest. Deterministic distance ties use the durable character identity.
+- The preview also captures its authoritative World tick. `revalidate_ember_target` recomputes the proposal against the current identity, inventory, zones, live fighters and pending intent; a changed target, reused fighter ID or stale world tick fails closed. Additional regression tests cover forged target identity, target reconnect/session reuse and missing target authentication.
+- This is still a **read-only Combat handoff**, not a completed spell effect. Revalidation must take place under the same server-wide world lock as the eventual durable Combat state transition, which is not yet implemented. No damage, kill events, loot transfers or live gameplay changes.
+
 ## Read-only Combat impact handoff (provisional)
 
 - New `server/src/magic_combat_preview.rs` provides a deterministic, **non-mutating** Ember target proposal from a pending, already-checkpointed effect. It requires the exact authenticated session lease, matching current World caster, non-dead inventory state, same authoritative zone, and a committed operation watermark. Target candidates must be living fighters in the same zone and within a provisional forward 260-unit by 28-unit corridor projected from the durable Ember origin/facing; ties resolve deterministically.

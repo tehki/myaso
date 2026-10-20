@@ -109,6 +109,17 @@ impl SessionIdentityRegistry {
             .and_then(|(active, character)| (*active == lease).then_some(*character))
     }
 
+    /// Server-only lookup of the exact active session incarnation for a
+    /// fighter ID in the authoritative simulation. Never use a client-provided
+    /// fighter ID to authenticate a command; this is ONLY for internal target
+    /// binding inside the already-authenticated world tick.
+    pub(crate) fn verified_fighter(
+        &self,
+        server_session: u32,
+    ) -> Option<(SessionLease, CharacterId)> {
+        self.by_session.get(&server_session).copied()
+    }
+
     pub fn active_session(&self, character: CharacterId) -> Option<SessionLease> {
         self.by_character.get(&character).copied()
     }
