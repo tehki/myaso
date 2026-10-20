@@ -32,6 +32,10 @@ impl OwnershipTxnId {
     pub fn new(value: u128) -> Option<Self> {
         (value != 0).then_some(Self(value))
     }
+
+    pub fn get(self) -> u128 {
+        self.0
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd)]
@@ -41,6 +45,10 @@ impl CorpseId {
     pub fn new(value: u128) -> Option<Self> {
         (value != 0).then_some(Self(value))
     }
+
+    pub fn get(self) -> u128 {
+        self.0
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd)]
@@ -49,6 +57,10 @@ pub struct ZoneId(u64);
 impl ZoneId {
     pub fn new(value: u64) -> Option<Self> {
         (value != 0).then_some(Self(value))
+    }
+
+    pub fn get(self) -> u64 {
+        self.0
     }
 }
 
@@ -165,16 +177,18 @@ impl ItemOwnershipLedger {
         self.items.len()
     }
 
-    pub fn apply(
-        &mut self,
+    /// Validate an entire transaction without touching mutable state. The
+    /// returned receipt also identifies exact, previously committed retries.
+    /// This is used by the dormant write-ahead journal to verify *before*
+    /// publishing the durable commit.
+    pub fn preview(
+        &self,
         transaction: OwnershipTxnId,
         operations: &[OwnershipOp],
-    ) -> Result<OwnershipReceipt, OwnershipError> {
-        // Compare complete payload bytes semantically, not a short hash with
-        // possible collisions. Identical replay returns the original receipt.
+    ) -> Result<(OwnershipReceipt, bool), OwnershipError> {
         if let Some(previous) = self.applied.get(&transaction) {
             return if previous.operations == operations {
-                Ok(previous.receipt)
+                Ok((previous.receipt, true))
             } else {
                 Err(OwnershipError::ConflictingReplay)
             };
@@ -194,7 +208,6 @@ impl ItemOwnershipLedger {
         let mut outgoing_slots = BTreeSet::new();
         let mut incoming_slots = BTreeMap::new();
 
-        // Stage and validate every expected precondition before mutation.
         for &op in operations {
             let item = op.item();
             if !touched.insert(item) {
@@ -224,19 +237,36 @@ impl ItemOwnershipLedger {
                 }
             }
         }
-
-        // A slot occupied by an item NOT leaving the slot in this batch
-        // cannot be taken. Simultaneous equipment swaps are legal.
         for slot in incoming_slots.keys() {
             if self.equipped.contains_key(slot) && !outgoing_slots.contains(slot) {
                 return Err(OwnershipError::EquipmentSlotOccupied);
             }
         }
+        Ok((
+            OwnershipReceipt {
+                sequence: next_sequence,
+                operation_count: operations.len(),
+            },
+            false,
+        ))
+    }
 
-        // No fallible checks remain after this point. First clear outgoing
-        // equipment slots, then publish all final states and incoming slots.
-        for slot in outgoing_slots {
-            self.equipped.remove(&slot);
+    pub fn apply(
+        &mut self,
+        transaction: OwnershipTxnId,
+        operations: &[OwnershipOp],
+    ) -> Result<OwnershipReceipt, OwnershipError> {
+        let (receipt, replay) = self.preview(transaction, operations)?;
+        if replay {
+            return Ok(receipt);
+        }
+
+        // Preview established all preconditions and slot uniqueness.
+        for &op in operations {
+            let item = op.item();
+            if let Some(old_slot) = self.location(item).and_then(ItemLocation::equipment_slot) {
+                self.equipped.remove(&old_slot);
+            }
         }
         for &op in operations {
             let item = op.item();
@@ -252,11 +282,7 @@ impl ItemOwnershipLedger {
                 }
             }
         }
-        self.sequence = next_sequence;
-        let receipt = OwnershipReceipt {
-            sequence: next_sequence,
-            operation_count: operations.len(),
-        };
+        self.sequence = receipt.sequence;
         self.applied.insert(
             transaction,
             AppliedTransaction {
