@@ -326,7 +326,9 @@ canvas.addEventListener("keydown", (event) => {
   if (firstAudioGesture && !event.repeat && event.code === "Space") audio.play("jump");
 });
 canvas.addEventListener("keyup", (event) => keys.delete(event.code));
-window.addEventListener("blur", releaseInputs);\n// Native chat focus must not strand held authoritative movement/attack input.\ncanvas.addEventListener("blur", releaseInputs);
+window.addEventListener("blur", releaseInputs);
+// Native chat focus must not strand held authoritative movement/attack input.
+canvas.addEventListener("blur", releaseInputs);
 document.addEventListener("visibilitychange", handleVisibilityChange);
 
 setStatus("Connecting to authoritative server…");

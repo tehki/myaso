@@ -175,7 +175,9 @@ canvas.addEventListener("wheel", (event) => {
   else if (event.deltaY > 0) { shortBlockUntil = Math.max(shortBlockUntil, world.nowMs + COMBAT.block.shortBlockMs); audio.play("guard"); }
 }, { passive: false });
 canvas.addEventListener("pointermove", updateMouse);
-window.addEventListener("blur", releaseInputs);\n// Real canvas focus loss (e.g. composing chat) must release held movement/combat inputs.\ncanvas.addEventListener("blur", releaseInputs);
+window.addEventListener("blur", releaseInputs);
+// Real canvas focus loss (e.g. composing chat) must release held movement/combat inputs.
+canvas.addEventListener("blur", releaseInputs);
 canvas.addEventListener("keydown", (event) => {
   const firstAudioGesture = !audio.isUnlocked();
   if (["KeyW", "KeyA", "KeyS", "KeyD", "KeyE", "Space"].includes(event.code)) event.preventDefault();
