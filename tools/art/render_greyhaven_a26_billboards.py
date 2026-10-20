@@ -107,7 +107,15 @@ for slug,name,door_name in BUILDINGS:
        0))
     # At a fixed 3/4 camera orientation, point the optical axis at the
     # visual door-ground pivot for each building, NOT world-authoritative XY.
-    camera.location=anchor+rotation.to_quaternion()@Vector((0,0,40))
+    # Blacksmith was deliberately rotated 180 degrees to face the street
+    # in the fixed authored world; from the original shared art camera its
+    # blank REAR facade was visible. Face its actual front for an isolated
+    # visual billboard without rotating the building or changing game XY.
+    facade_turn=math.pi if slug=="blacksmith" else 0.0
+    from mathutils import Quaternion
+    face_rotation=Quaternion((0,0,1),facade_turn) @ rotation.to_quaternion()
+    camera.rotation_euler=face_rotation.to_euler()
+    camera.location=anchor+face_rotation@Vector((0,0,40))
     bpy.context.view_layer.update()
     origin=camera_pixel(anchor)
     assert abs(origin[0]-args.canvas/2)<.01
@@ -150,6 +158,8 @@ for slug,name,door_name in BUILDINGS:
       "anchorPixels":[round(v,5) for v in origin],
       "blenderGroundBasisX":[round(v,5) for v in xv],
       "blenderGroundBasisY":[round(v,5) for v in yv],
+      "facadeRelativeCameraTurnDegrees":round(math.degrees(facade_turn),3),
+      "actualCameraEulerRad":[round(v,6) for v in camera.rotation_euler],
       "maxXYGameProjectionMismatchPixelsPerMeter":round(max(mismatches),3),
       "runtimeDoorOrPivotValidated":False,
       "layers":results,
