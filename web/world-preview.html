@@ -53,6 +53,12 @@ kbd{border-radius:4px;border:1px solid #677354;background:#303a2d;color:#fff2d2;
 .lore-panel li{color:#eadcc7;line-height:1.45}
 .lore-panel li.unseen{color:#a89a85}
 #lore-notice{margin-bottom:8px;color:#f1cc91;font-weight:600}
+.chronicle-threads{border-top:1px solid #62533a;margin-top:12px;padding-top:11px}
+.chronicle-threads h3{font:600 14px Georgia,serif;color:#eecfa1;margin:0 0 8px}
+.chronicle-threads article{border-left:2px solid #776649;padding:4px 10px;margin:9px 0;font-size:12px;line-height:1.55}
+.chronicle-threads article.completed{border-left-color:#a1c3a0}
+.chronicle-threads article strong{color:#ead9b5}
+.chronicle-threads article p{margin:4px 0 0;color:#c8bdab}
 </style></head><body>
 <header><div><h1>⚔️ Moonvale — World & Buildings v1.0</h1>
 <div class="sub">A fixed medieval world, with a separate, deliberately larger tavern interior</div></div>
@@ -78,7 +84,11 @@ The geography, town names, buildings and roads are fixed and identical for all p
 <section class="lore-panel" aria-label="Roadside lore">
 <div id="lore-notice" role="status" aria-live="polite" hidden></div>
 <details><summary>Roadside chronicles · <span id="lore-progress">0 / 6 accounts read</span></summary>
-<ol id="lore-journal"></ol></details>
+<ol id="lore-journal"></ol>
+<div class="chronicle-threads" aria-label="Connected historical chronicles">
+<h3>Linked tales · <span id="chronicle-thread-progress">0 / 2 complete</span></h3>
+<div id="chronicle-thread-list"></div>
+</div></details>
 </section>
 <section class="expedition-panel" aria-label="Explorer's expeditions">
 <h2>Explorer's expeditions</h2>
@@ -110,6 +120,7 @@ import { localTrailPosition } from "../src/world/local-trail-progress.mjs";
 import { localSampledTrailRejoin } from "../src/world/local-rejoin.mjs";
 import { MOONVALE_ROADSIDE_LORE, createLocalLoreJournal, nearbyLocalLoreSite,
   readLocalLore, localLoreProgress } from "../src/world/roadside-lore.mjs";
+import { localChronicleThreadSummaries, localChronicleThreadProgress } from "../src/world/chronicle-threads.mjs";
 import { drawLocalRejoinSketch } from "../src/world/local-rejoin-sketch.mjs";
 import { MOONVALE_FIELD_SITES, createLocalFieldNotebook, nearbyLocalFieldSite,
   observeLocalFieldSite, localFieldSurveyProgress } from "../src/world/field-survey.mjs";
@@ -129,6 +140,8 @@ const loreJournal=createLocalLoreJournal();
 const loreList=document.querySelector("#lore-journal");
 const loreProgress=document.querySelector("#lore-progress");
 const loreNotice=document.querySelector("#lore-notice");
+const chronicleThreadList=document.querySelector("#chronicle-thread-list");
+const chronicleThreadProgress=document.querySelector("#chronicle-thread-progress");
 let loreNoticeUntil=0;
 function refreshLoreJournal(){
   const fragment=document.createDocumentFragment();
@@ -142,6 +155,22 @@ function refreshLoreJournal(){
   loreList.replaceChildren(fragment);
   const progress=localLoreProgress(loreJournal);
   loreProgress.textContent=progress.documented+" / "+progress.total+" accounts read";
+  const threadFragment=document.createDocumentFragment();
+  for(const thread of localChronicleThreadSummaries(loreJournal)){
+    const article=document.createElement("article");
+    article.className=thread.done?"completed":"incomplete";
+    const header=document.createElement("strong");
+    header.textContent=thread.title+" · "+thread.read+" / "+thread.total;
+    const detail=document.createElement("p");
+    detail.textContent=thread.done
+      ? "Connected history: "+thread.resolution
+      : thread.subtitle+" Next clue: "+thread.nextClue;
+    article.append(header,detail);
+    threadFragment.appendChild(article);
+  }
+  chronicleThreadList.replaceChildren(threadFragment);
+  const threads=localChronicleThreadProgress(loreJournal);
+  chronicleThreadProgress.textContent=threads.completed+" / "+threads.total+" complete";
 }
 refreshLoreJournal();
 const discoveryJournal=createLocalDiscoveryJournal();
