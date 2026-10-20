@@ -682,3 +682,59 @@ events separately gated by `MYASO_NPC_MAINTENANCE=1`.
 World & Gameplay's real server colliders/doors and true physical NPC
 actors are **not yet connected**; do not treat these miniature fixtures
 as production Greyhaven.
+
+## LW-1R — Guard patrol attention after a verified colleague warning
+
+In the opt-in Greyhaven NPC pilot, **Rowan can now take a bounded work
+decision in response to a colleague's information**. A report is a
+*proposal to pay extra attention*, never authority to edit a world
+object. First, Tomas must receive a genuine revisioned server notice
+that his assigned work yard is unavailable. Only a real local encounter
+and pilot line of sight can transmit that first-hand notice to Rowan,
+as in LW-1Q. Then at a later legitimate 60-tick social update Rowan
+independently verifies that the site is **still unavailable in
+`NpcSupplyWorld` at the exact same worksite revision**, that his
+current fixed pilot patrol position is within **80 world units** of
+the reported site, and that the pilot line-of-sight to the site is
+unobstructed. Only then does the server create a small one-entry
+**priority watch assignment**: site ID, revision, trusted colleague's
+fixed NPC ID, and original assignment tick.
+
+The normal staging geometry creates a reproducible example: Tomas and
+Rowan meet while the yard is closed around **server tick 1380**. Their
+positions and the unobstructed sightline allow Rowan to put the yard on
+his priority-watch list. A player can ask Rowan `patrol priority`,
+`guard response`, or `what are you watching`, and he will say
+he is paying priority attention to the site following Tomas's
+face-to-face report. His answer explicitly says the server still
+confirms closure, with the revision, and **does not claim he repaired
+it or changed his route**. His `what are you doing` response also
+reflects this assignment while it is valid.
+
+When the authoritative yard status reopens at tick 2100, or a newer
+server revision supersedes the evidence, Rowan's watch immediately
+becomes invalid and is cleared on the next social update. A stale
+notice, a closed-site claim when the server actually says open,
+no verified face-to-face meeting, an out-of-range or blocked
+patrol lookout, a disallowed NPC, an expired assignment, or player
+chat cannot generate or sustain a guard decision. Guards do not
+retell secondhand information as firsthand evidence.
+
+The assignment affects only a tiny server-owned NPC duty/memory
+record and its read-only dialogue. **It neither changes Rowan's
+patrol path nor a physical actor's position**, and cannot mutate the
+worksite status, source inventory, NPC supply ledger, player
+inventory, economic balances, combat collision, access control or
+navigation geometry. A real dynamic escort/investigation movement
+must await World & Gameplay's authoritative collision and object
+interfaces. The existing static pilot patrol continues to run.
+All maintenance scenarios remain separately gated behind
+`MYASO_NPC_PILOT=1` and
+`MYASO_NPC_MAINTENANCE=1` on the loopback-only server.
+
+Tests cover the real meeting and lookout, source attribution,
+blocked/no-change server status, wrong-range site visits,
+one-assignment-per-revision, exact revision invalidation after
+reopening, player-chat nonauthority, and no extra resource or
+combat changes. The existing reliable client packet types stay
+unchanged; all player-facing queries are read-only.

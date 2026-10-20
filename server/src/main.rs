@@ -819,6 +819,11 @@ async fn handle_connection(
                         let acquaintance = state.npc_routines.as_ref().and_then(|routines| {
                             routines.recent_acquaintance(npc_id, state.world.tick)
                         });
+                        let guard_watch = state.npc_routines.as_ref().and_then(|routines| {
+                            state.npc_supply.as_ref().and_then(|supply| {
+                                routines.guard_watch_report(npc_id, state.world.tick, supply)
+                            })
+                        });
                         let worksite_hearsay = state.npc_routines.as_ref().and_then(|routines| {
                             state.npc_supply.as_ref().and_then(|supply| {
                                 routines.worksite_social_report(
@@ -843,6 +848,7 @@ async fn handle_connection(
                                 heard_from,
                                 acquaintance,
                                 worksite_hearsay,
+                                guard_watch,
                             )
                         })
                     };
@@ -861,6 +867,7 @@ async fn handle_connection(
                             heard_from,
                             acquaintance,
                             worksite_hearsay,
+                            guard_watch,
                         )) => {
                             let npc = NpcRoutines::position(npc_id, tick).and_then(|position| {
                                 living_world::nearby_npc_at(
@@ -890,6 +897,7 @@ async fn handle_connection(
                                                 settlement_needs: settlement_needs.as_deref(),
                                                 planned_work,
                                                 worksite_hearsay: worksite_hearsay.as_deref(),
+                                                guard_watch: guard_watch.as_deref(),
                                             },
                                         ),
                                     )

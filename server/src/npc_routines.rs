@@ -18,6 +18,7 @@ const SOCIAL_INTERVAL_TICKS: u32 = 60;
 const MEETING_RADIUS: f32 = 105.0;
 const MEETING_REARM_RADIUS: f32 = 125.0;
 const MEETING_FRESH_TICKS: u32 = 120 * 60;
+const GUARD_WATCH_RADIUS: i32 = 80;
 // Five fixed NPCs have ten unique unordered pairs, never player identities.
 const NPC_PAIR_COUNT: usize = NPCS.len() * (NPCS.len() - 1) / 2;
 
@@ -49,6 +50,16 @@ struct WorksiteNews {
     source_id: Option<u8>,
 }
 
+/// A bounded *assignment*, not a proof a building has been inspected or
+/// repaired. The guard's existing route and server fighter state are unchanged.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct GuardSiteWatch {
+    site_id: u8,
+    revision: u32,
+    source_id: u8,
+    assigned_tick: u32,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct NpcState {
     pub id: u8,
@@ -71,6 +82,7 @@ pub struct NpcRoutines {
     worksite_news: [Option<WorksiteNews>; NPCS.len()],
     last_worksite_social_tick: Option<u32>,
     last_worksite_event_revision: u32,
+    guard_watch: Option<GuardSiteWatch>,
 }
 
 impl NpcRoutines {
@@ -195,6 +207,14 @@ impl NpcRoutines {
         }
         self.last_worksite_social_tick = Some(tick);
         let revision = supply.worksite_revision();
+        // A server revision supersedes all old watch assignments, even when
+        // the operator's next face-to-face meeting has not happened yet.
+        if self
+            .guard_watch
+            .is_some_and(|watch| watch.revision != revision)
+        {
+            self.guard_watch = None;
+        }
         if let Some(event) = supply.latest_worksite_event(tick) {
             // Only the first social cadence after an actual accepted
             // transition may create operator knowledge. A late caller
@@ -267,6 +287,83 @@ impl NpcRoutines {
                 // One reliable operator source per NPC per revision.
             }
         }
+        self.consider_guard_watch(tick, supply, &positions);
+    }
+
+    /// A colleague's warning may prompt Rowan to prioritize a nearby
+    /// worksite, but ONLY if the current server registry independently
+    /// confirms it is unavailable and Rowan is on a clear nearby pilot route.
+    /// This never edits the task ledger, site manifest, or patrol coordinates.
+    fn consider_guard_watch(
+        &mut self,
+        tick: u32,
+        supply: &NpcSupplyWorld,
+        positions: &[NpcState; NPCS.len()],
+    ) {
+        let Some(guard_index) = NPCS.iter().position(|npc| npc.id == 3) else {
+            return;
+        };
+        let Some(news) = self.worksite_news[guard_index] else {
+            return;
+        };
+        let Some(source_id) = news.source_id else {
+            return;
+        };
+        if news.active
+            || news.revision != supply.worksite_revision()
+            || tick < news.learned_tick
+            || tick < news.event_tick
+            || tick - news.event_tick > MEETING_FRESH_TICKS
+            || supply.site_is_available(news.site_id) != Some(false)
+        {
+            return;
+        }
+        let Some(site) = WORKSITES.iter().find(|site| site.id == news.site_id) else {
+            return;
+        };
+        let guard = positions[guard_index];
+        let dx = i32::from(guard.x) - i32::from(site.x);
+        let dy = i32::from(guard.y) - i32::from(site.y);
+        if dx * dx + dy * dy > GUARD_WATCH_RADIUS * GUARD_WATCH_RADIUS
+            || !npc_navigation::pilot_line_of_sight((guard.x, guard.y), (site.x, site.y))
+        {
+            return;
+        }
+        if self.guard_watch.is_none() {
+            self.guard_watch = Some(GuardSiteWatch {
+                site_id: news.site_id,
+                revision: news.revision,
+                source_id,
+                assigned_tick: tick,
+            });
+        }
+    }
+
+    /// Read-only priority watch declaration grounded in a prior in-person
+    /// notice, current live site closure, and actual guard/site reach.
+    pub fn guard_watch_report(
+        &self,
+        npc_id: u8,
+        tick: u32,
+        supply: &NpcSupplyWorld,
+    ) -> Option<String> {
+        if npc_id != 3 {
+            return None;
+        }
+        let watch = self.guard_watch?;
+        if watch.revision != supply.worksite_revision()
+            || supply.site_is_available(watch.site_id) != Some(false)
+            || tick < watch.assigned_tick
+            || tick - watch.assigned_tick > MEETING_FRESH_TICKS
+        {
+            return None;
+        }
+        let site = worksite_name(watch.site_id)?;
+        let source = NPCS.iter().find(|npc| npc.id == watch.source_id)?.name;
+        Some(format!(
+            "I marked the {site} for priority attention along my existing patrol              after {source} told me in person. The server still confirms it unavailable              (revision {}). I have not repaired it or changed my route.",
+            watch.revision
+        ))
     }
 
     /// NPC-local report only: direct operational notice vs one-hop hearsay.
@@ -442,6 +539,9 @@ impl NpcRoutines {
                 _ if position.activity == 1 => "walking the well route without an active job",
                 _ => "waiting for an available water delivery task",
             },
+            3 if self.guard_watch_report(3, tick, supply).is_some() => {
+                "giving priority attention to a confirmed worksite outage along my existing patrol"
+            }
             _ => return self.context(id, tick),
         };
         Some((activity, witnessed))
@@ -904,5 +1004,107 @@ mod tests {
             .unwrap()
             .contains("heard that from Tomas"));
         assert_eq!(npcs.worksite_social_report(1, 120, 2), None);
+    }
+
+    #[test]
+    fn rowan_marks_verified_outage_for_watch_only_after_tomas_meeting_and_site_recheck() {
+        let mut supply = NpcSupplyWorld::default();
+        supply.enable_pilot_maintenance();
+        let mut town = NpcRoutines::default();
+        for tick in 0..=1200 {
+            supply.advance(tick);
+            town.advance_worksite_social(tick, &supply);
+        }
+        assert!(town.guard_watch_report(3, 1200, &supply).is_none());
+        // Site closure alone does not assign Rowan; he needs the in-person
+        // report *and* to be near the actual still-closed site on his route.
+        for tick in 1201..=1380 {
+            supply.advance(tick);
+            town.advance_worksite_social(tick, &supply);
+        }
+        let watch = town
+            .guard_watch_report(3, 1380, &supply)
+            .expect("real meet and lookout");
+        assert!(watch.contains("after Tomas told me in person"));
+        assert!(watch.contains("revision 2"));
+        assert!(watch.contains("not repaired"));
+        let first = town.guard_watch.unwrap();
+        assert_eq!(first.site_id, 2);
+        assert_eq!(first.source_id, 5);
+        assert_eq!(first.revision, 2);
+        town.advance_worksite_social(1380, &supply);
+        assert_eq!(town.guard_watch, Some(first));
+        assert!(town
+            .context_with_supply(3, 1380, &supply)
+            .unwrap()
+            .0
+            .contains("priority attention"));
+        assert!(town.guard_watch_report(5, 1380, &supply).is_none());
+        assert_eq!(supply.stocks().tomas_water, 1);
+        assert!(supply.stocks().conserved());
+    }
+
+    #[test]
+    fn stale_guard_watch_is_cancelled_on_reopening_without_moving_fighters_or_creating_a_repair() {
+        let mut supply = NpcSupplyWorld::default();
+        supply.enable_pilot_maintenance();
+        let mut town = NpcRoutines::default();
+        for tick in 0..=1380 {
+            supply.advance(tick);
+            town.advance_worksite_social(tick, &supply);
+        }
+        assert!(town.guard_watch.is_some());
+        for tick in 1381..=2100 {
+            supply.advance(tick);
+            town.advance_worksite_social(tick, &supply);
+        }
+        assert_eq!(supply.worksite_revision(), 3);
+        assert!(town.guard_watch.is_none());
+        assert!(town.guard_watch_report(3, 2100, &supply).is_none());
+        assert!(!town
+            .context_with_supply(3, 2100, &supply)
+            .unwrap()
+            .0
+            .contains("priority attention"));
+        assert!(supply.stocks().conserved());
+    }
+
+    #[test]
+    fn forged_hearsay_cannot_cause_guard_assignment_without_live_server_closure_or_proximity() {
+        let mut supply = NpcSupplyWorld::default();
+        let mut town = NpcRoutines::default();
+        town.worksite_news[2] = Some(WorksiteNews {
+            event_tick: 60,
+            learned_tick: 60,
+            revision: 1,
+            site_id: 2,
+            active: false,
+            source_id: Some(5),
+        });
+        // Even near the staged yard, a forged report about an open site does
+        // not count as a decision or update authoritative availability.
+        town.advance_worksite_social(120, &supply);
+        assert!(town.guard_watch_report(3, 120, &supply).is_none());
+        assert!(town.guard_watch.is_none());
+        assert_eq!(supply.site_is_available(2), Some(true));
+        // A different source update (not originating from user chat) still
+        // requires Rowan's physical proximity. Tick 120 is far from yard.
+        let mut active = [true; 5];
+        active[1] = false;
+        supply
+            .adopt_server_worksites(crate::zone::ZoneId::Moonvale, 1, 2, active)
+            .unwrap();
+        town.worksite_news[2] = Some(WorksiteNews {
+            event_tick: 120,
+            learned_tick: 120,
+            revision: 2,
+            site_id: 2,
+            active: false,
+            source_id: Some(5),
+        });
+        town.advance_worksite_social(180, &supply);
+        assert!(town.guard_watch.is_none());
+        assert_eq!(supply.site_is_available(2), Some(false));
+        assert!(supply.stocks().conserved());
     }
 }

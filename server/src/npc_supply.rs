@@ -285,6 +285,12 @@ impl NpcSupplyWorld {
         })
     }
 
+    /// Fixed-registry status read for a guard decision, never an actor action.
+    pub fn site_is_available(&self, site_id: u8) -> Option<bool> {
+        let index = usize::from(site_id.checked_sub(1)?);
+        self.sites.active_flags().get(index).copied()
+    }
+
     pub fn worksite_revision(&self) -> u32 {
         self.sites.revision()
     }

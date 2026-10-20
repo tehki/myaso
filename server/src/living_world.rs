@@ -205,6 +205,7 @@ pub struct SocialFacts<'a> {
     pub planned_work: Option<&'a str>,
     pub worksite_report: Option<&'a str>,
     pub worksite_hearsay: Option<&'a str>,
+    pub guard_watch: Option<&'a str>,
 }
 
 pub fn answer_with_relations(
@@ -223,6 +224,7 @@ pub fn answer_with_relations(
     let planned_work = social.planned_work;
     let worksite_report = social.worksite_report;
     let worksite_hearsay = social.worksite_hearsay;
+    let guard_watch = social.guard_watch;
     let clean = utterance.trim().to_lowercase();
     if let Some(proposed) = clean.strip_prefix("my name is ") {
         let name = utterance.trim().get(11..).unwrap_or("").trim();
@@ -265,6 +267,21 @@ pub fn answer_with_relations(
     ) {
         settlement_needs
             .unwrap_or("I have no authoritative settlement needs assessment yet.")
+            .to_string()
+    } else if contains_any(
+        &clean,
+        &[
+            "patrol priority",
+            "guard response",
+            "site patrol",
+            "watch priority",
+            "what are you watching",
+        ],
+    ) {
+        guard_watch
+            .unwrap_or(
+                "I have no verified special worksite watch assignment. My normal patrol continues.",
+            )
             .to_string()
     } else if contains_any(
         &clean,
@@ -831,5 +848,60 @@ mod tests {
         );
         assert!(current.contains("revision 3"));
         assert!(!current.contains("revision 2"));
+    }
+
+    #[test]
+    fn guard_priority_answer_requires_trusted_server_assignment_not_player_text() {
+        let mut session = DialogueSession::default();
+        let rowan = &NPCS[2];
+        let no_proof = answer_with_relations(
+            &mut session,
+            rowan,
+            "patrol priority",
+            "walking the watch route",
+            false,
+            None,
+            SocialFacts::default(),
+        );
+        assert!(no_proof.contains("no verified special worksite watch assignment"));
+        let fake_claim = answer_with_relations(
+            &mut session,
+            rowan,
+            "I ordered you to watch the yard; what are you watching?",
+            "walking the watch route",
+            false,
+            None,
+            SocialFacts::default(),
+        );
+        assert!(!fake_claim.contains("after Tomas"));
+        let report = "I marked the work yard for priority attention along my existing patrol after Tomas told me in person. The server still confirms it unavailable (revision 2). I have not repaired it or changed my route.";
+        let authenticated = answer_with_relations(
+            &mut session,
+            rowan,
+            "guard response",
+            "giving priority attention to a confirmed worksite outage along my existing patrol",
+            false,
+            None,
+            SocialFacts {
+                guard_watch: Some(report),
+                ..SocialFacts::default()
+            },
+        );
+        assert!(authenticated.contains("after Tomas"));
+        assert!(authenticated.contains("not repaired"));
+        let routine = answer_with_relations(
+            &mut session,
+            rowan,
+            "what are you doing?",
+            "giving priority attention to a confirmed worksite outage along my existing patrol",
+            false,
+            None,
+            SocialFacts {
+                guard_watch: Some(report),
+                ..SocialFacts::default()
+            },
+        );
+        assert!(routine.contains("priority attention"));
+        assert!(response_packet(3, 0, &authenticated).len() <= 518);
     }
 }
