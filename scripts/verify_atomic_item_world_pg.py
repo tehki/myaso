@@ -215,6 +215,58 @@ def test_crashed_uncommitted_writer():
     print("PASS: real SIGKILL of uncommitted writer + retry after rollback")
 
 
+def test_cross_domain_idempotency_and_cross_entity_collision():
+    register(106)
+    # World-only C4d receipt exists; C3g must not let the SAME world ID
+    # authorize a new item even if the caller reproduces all world args.
+    sql("SELECT * FROM core_zone.commit_world_mutation("
+        f"{bid(10001)}, 1::smallint, {bid(106)}, 1,1,1,0,"
+        f"{payload('world-only')});")
+    mutation(10002, 10001, 106, 909, 1, 0, None, inv(106),
+             world_rev=0, world_data="world-only", fails=True)
+    check(item_state(909) == "", "world-only replay cannot allocate an item")
+    check(counts(106, 909) == ("1", "0", "0"),
+          "world-only replay cannot forge companion item receipt/outbox")
+    check(mutation(10003, 10004, 106, 909, 1, 0, None, inv(106),
+                   world_rev=1).startswith("2|1|"),
+          "new distinct world mutation succeeds")
+    print("PASS: existing C4d world-only receipt cannot authorize a new item")
+
+    register(107)
+    register(108)
+    race = threading.Barrier(3)
+
+    def create_for(entity, op, world_op):
+        race.wait(timeout=10)
+        statement = (
+            "SELECT * FROM core_zone.commit_item_world_mutation("
+            f"{bid(op)}, {bid(world_op)}, 1::smallint, {bid(entity)},"
+            f"1,1,1,0,{payload('one-shared-item')},{bid(910)},1::smallint,"
+            f"0,NULL::bytea,{literal(inv(entity))});"
+        )
+        p = subprocess.run(
+            ["psql", "-X", "-A", "-t", "-v", "ON_ERROR_STOP=1", "-c", statement],
+            capture_output=True, text=True, timeout=20,
+        )
+        return p.returncode == 0
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=2) as pool:
+        a = pool.submit(create_for, 107, 11001, 12001)
+        b = pool.submit(create_for, 108, 11002, 12002)
+        race.wait(timeout=10)
+        results = [a.result(timeout=20), b.result(timeout=20)]
+    check(results.count(True) == 1, "only one entity can ever create the same item ID")
+    check(sorted((world_revision(107), world_revision(108))) == ["", "1"],
+          "loser's unrelated world transaction must roll back too")
+    check(sql("SELECT count(*) FROM core_zone.item_world_outbox "
+              f"WHERE item_id={bid(910)};") == "1", "exactly one item event globally")
+    check(sql("SELECT count(*) FROM core_zone.item_world_receipts "
+              f"WHERE item_id={bid(910)};") == "1", "exactly one item receipt globally")
+    check(item_state(910) in ("1|" + inv(107), "1|" + inv(108)),
+          "one authoritative item location remains")
+    print("PASS: independent entities contending for same item ID yield one world+item winner")
+
+
 def test_restricted_db_role():
     register(105)
     role = "myaso_c3g_restricted"
@@ -245,6 +297,7 @@ def main():
     test_create_move_destroy_retries_and_handoff()
     test_competing_writers_and_rollback()
     test_crashed_uncommitted_writer()
+    test_cross_domain_idempotency_and_cross_entity_collision()
     test_restricted_db_role()
     print("C3G ITEM + WORLD + RECEIPT + OUTBOX ATOMIC POSTGRES ACCEPTANCE PASSED")
 
