@@ -143,8 +143,14 @@ impl<'a> GroundTransferCoordinator<'a> {
             None => Err(TransferError::NotCommitted),
             Some(receipt) if receipt != proof.receipt => Err(TransferError::ReceiptMismatch),
             Some(_) => {
-                if self.journal.location(proof.transfer.item)
-                    == Some(proof.transfer.destination.as_location())
+                // Checking only the current location would accept an old
+                // A -> B proof after a subsequent B -> C -> B cycle (ABA).
+                // A matching durable receipt must still be the last write
+                // affecting THIS item, not merely the last global write.
+                if self.journal.last_mutation_sequence(proof.transfer.item)
+                    == Some(receipt.sequence)
+                    && self.journal.location(proof.transfer.item)
+                        == Some(proof.transfer.destination.as_location())
                 {
                     Ok(ArrivalStatus::Current)
                 } else {
@@ -387,6 +393,85 @@ mod tests {
         );
         assert_eq!(
             verifier.confirm_arrival(second).expect("restored second"),
+            ArrivalStatus::Current
+        );
+    }
+
+    #[test]
+    fn historic_arrival_proof_never_revives_after_return_to_same_location() {
+        let root = TestRoot::new();
+        let source = point(1, 1, 1);
+        let destination = point(2, 2, 2);
+        let detour = point(3, 3, 3);
+        let mut journal = initial(&root, 17, source);
+        let (old, latest) = {
+            let mut coordinator = GroundTransferCoordinator::new(&mut journal);
+            let old = coordinator
+                .commit(transfer(2, 17, source, destination))
+                .expect("initial handoff");
+            let middle = coordinator
+                .commit(transfer(3, 17, destination, detour))
+                .expect("move away");
+            let latest = coordinator
+                .commit(transfer(4, 17, detour, destination))
+                .expect("return to same destination");
+            assert_eq!(
+                coordinator.confirm_arrival(old).expect("historic proof"),
+                ArrivalStatus::Superseded
+            );
+            assert_eq!(
+                coordinator.confirm_arrival(middle).expect("middle proof"),
+                ArrivalStatus::Superseded
+            );
+            assert_eq!(
+                coordinator.confirm_arrival(latest).expect("latest proof"),
+                ArrivalStatus::Current
+            );
+            (old, latest)
+        };
+        drop(journal);
+        let mut recovered = root.journal();
+        let coordinator = GroundTransferCoordinator::new(&mut recovered);
+        assert_eq!(
+            coordinator.confirm_arrival(old).expect("restart historic proof"),
+            ArrivalStatus::Superseded
+        );
+        assert_eq!(
+            coordinator.confirm_arrival(latest).expect("restart latest proof"),
+            ArrivalStatus::Current
+        );
+    }
+
+    #[test]
+    fn unrelated_item_commit_does_not_supersede_valid_arrival() {
+        let root = TestRoot::new();
+        let source = point(1, 4, 4);
+        let destination = point(2, 5, 5);
+        let mut journal = initial(&root, 18, source);
+        let proof = GroundTransferCoordinator::new(&mut journal)
+            .commit(transfer(2, 18, source, destination))
+            .expect("handoff");
+        journal
+            .apply(
+                txn(3),
+                &[OwnershipOp::Create {
+                    item: item(19),
+                    at: point(4, 6, 6).as_location(),
+                }],
+            )
+            .expect("unrelated durable write");
+        assert_eq!(
+            GroundTransferCoordinator::new(&mut journal)
+                .confirm_arrival(proof)
+                .expect("same item unchanged"),
+            ArrivalStatus::Current
+        );
+        drop(journal);
+        let mut recovered = root.journal();
+        assert_eq!(
+            GroundTransferCoordinator::new(&mut recovered)
+                .confirm_arrival(proof)
+                .expect("restart same item unchanged"),
             ArrivalStatus::Current
         );
     }
