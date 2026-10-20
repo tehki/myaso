@@ -323,3 +323,23 @@ The earliest exact-head P9 CI run, its step-level outcomes, and per-browser JSON
 ### Future sign-off
 
 Core & Multiplayer still owns actual `/game` transport scheduling, authenticated registration, player zone authority, reconnection generation validation, real gameplay ACK/latency, QUIC congestion discipline and multi-host acceptance. Magic & Items owns spellcasting authority; Graphics owns GPU/canvas FPS and visual accessibility. This separate sidecar cannot be substituted for those integrations. The production FX gate remains disabled, PR draft, unmerged and undeployed.
+
+## P10 — real concurrent WebTransport crowd, shared FX quota (2026-10-21)
+
+P9 proved a **single** real WebTransport browser/sidecar session in Chrome and Firefox. It did not prove that its cosmetic byte budget applied across sessions: each P9 test connection had its own in-memory hub. P10 introduces a deliberately isolated **shared-process** concurrency flight to close that acceptance gap. It is still an engineering test, not live magic or the production game transport.
+
+- `server/examples/magic_fx_crowd_loopback.rs` always binds an ephemeral UDP port on `127.0.0.1`, issues a throwaway certificate, and accepts only `/physics-fx-crowd`. The fixture accepts a bounded command-line count **2–64**, default **16**; it makes no calls to active game or combat state. Each real QUIC handshake runs in its own task, preserving the P9 Firefox interoperability fix. A barrier waits for exactly the configured number of **accepted real sessions** before starting 115 shared 30ms test ticks.
+- Critically, **one `ShardedMagicFxHub`, one P8 `TrustedFxHandoff`, one fixed test zone and one 30ms server tick** govern *all* sessions. The hub's 4096-byte per-zone/tick and 16,384-byte per-process/tick semantic quotas are asserted on every planning round, not duplicated per connection. The fixture also honors the one-visual-event/viewer/round P7 scheduler.
+- Each accepted client has a server-assigned fixture connection ID, an immutable fixed-zone trusted test viewer and a dedicated QUIC `PI` → `PO` ping echo reader. Every tick first sends a six-byte `GP` **gameplay-style test marker** to every connection, then conditionally plans cosmetic FX from the shared hub. A periodic artificial gameplay-pending flag suppresses FX without suppressing `GP`; no actual snapshots, movement, hits or spellcasting are exercised.
+- `web/physics-fx-crowd-flight.html` creates **16 genuine simultaneous browser WebTransport connections** to the fixture in its acceptance configuration. Every connection has its own receiver, low-quality particle pool and ping measurements. It fails if *any* session is missing at least 55 markers, 12 received FX packets, five ping replies, creates no particles, sees malformed effects or lacks finite browser-side p95 marker-gap / RTT measurements. Results retain per-session diagnostics, not merely an average that can hide a starved player.
+- `scripts/physics_fx_crowd_browser_flight.mjs` starts a **fresh** loopback server for Chrome and then Firefox (16 concurrent connections per run), using the repository's W3C WebDriver conventions. It asserts the real session count and each-browser minimum evidence, prints `P10_REAL_CROWD_BROWSER` / `P10_REAL_CROWD_SUMMARY` JSON, and tears down the sidecar. `quality` adds a dedicated protected **P10 concurrent real WebTransport FX crowd** step after P9 and before all unchanged Combat browser qualifications.
+
+Reproduction on a runner with Rust, Chrome/Firefox and drivers:
+
+```sh
+node scripts/physics_fx_crowd_browser_flight.mjs
+```
+
+**What P10 can prove if the step is green:** 16 real simultaneous WebTransport sessions in Chrome and separately 16 in Firefox, against a single local host, test datagrams received across all sessions and bounded shared **semantic payload** budgeting. This is **not** 32 simultaneously connected cross-browser sessions (browsers run sequentially), not 512 actual players, not a second independent network, not real game input-to-damage latency, not on-wire/encrypted byte totals, and not sustained live FPS/GPU performance. Timing measurements are loopback and runner-specific, not service-level objectives. The previous synthetic 512/1024-viewer fairness tests remain separate Rust tests, not evidence of real connections.
+
+Before activating FX inside live `/game` transport, Core & Multiplayer must own the real authenticated connection table, per-client gameplay priority, actual network queue reservation/drop policy and real load/latency tests. Combat, Magic & Items, World, Graphics and Deployment must sign off. The P10 fixture does not modify `server/src/main.rs` or `web/online-game.mjs`, and PR #357 remains draft/unmerged/undeployed.
