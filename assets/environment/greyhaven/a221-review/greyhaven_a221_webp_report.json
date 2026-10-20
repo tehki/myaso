@@ -1,0 +1,67 @@
+{
+  "actualGameRenderIntegrated": false,
+  "collisionOrPortalActivated": false,
+  "decorativeHeightRisePixelsPerMeter": [
+    0.0,
+    -28.560009
+  ],
+  "layers": {
+    "base": {
+      "bytes": 45846,
+      "croppedPixels": [
+        228,
+        319
+      ],
+      "drawOffsetFromVisualDoorPixels": [
+        -114.0,
+        -291.0
+      ],
+      "file": "red_lion_a221_base.webp",
+      "flippedIntoGamePositiveYDown": true,
+      "roundtripExactRGBA": true,
+      "sha256": "f52a4028b4c37bd1048e9284ee1c352fc08fef74040702e61df49d11efd65bce",
+      "visualDoorAnchorInCropPixels": [
+        114.0,
+        291.0
+      ]
+    },
+    "roof": {
+      "bytes": 41788,
+      "croppedPixels": [
+        238,
+        221
+      ],
+      "drawOffsetFromVisualDoorPixels": [
+        -119.0,
+        -308.0
+      ],
+      "file": "red_lion_a221_roof.webp",
+      "flippedIntoGamePositiveYDown": true,
+      "roundtripExactRGBA": true,
+      "sha256": "df1ca5dc2bc97dfa17b41feb40bb0aeef1c6324eb08426078662b9e8e6321e1d",
+      "visualDoorAnchorInCropPixels": [
+        119.0,
+        308.0
+      ]
+    }
+  },
+  "milestone": "Blood & Iron A2.21 source-authentic game-XY ground/elevated decorative art",
+  "originalGameGroundBasisPixelsPerMeter": {
+    "x": [
+      33.600006,
+      0.0
+    ],
+    "y": [
+      0.0,
+      33.600006
+    ]
+  },
+  "originalGroundVerticesMovedXY": false,
+  "originalSceneOrKnightSourcesChanged": false,
+  "preview": "red_lion_a221_review.png",
+  "productionApproved": false,
+  "visualDoorPivotPx": [
+    320.0,
+    320.0
+  ]
+}

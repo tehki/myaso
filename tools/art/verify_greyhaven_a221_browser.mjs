@@ -78,7 +78,7 @@ try {
 
  async function capture(clip,dx,dy,roof,name){
   const state=await page.evaluate(async ({clip,dx,dy,roof})=>{
-    for(const [name,value] of Object.entries({pose:clip,east:dx,south:dy,roof})){
+    for(const [name,value] of Object.entries({clip,east:dx,south:dy,roof})){
       const el=document.getElementById(name);
       el.value=String(value);
       el.dispatchEvent(new Event("input",{bubbles:true}));

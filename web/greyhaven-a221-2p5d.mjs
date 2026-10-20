@@ -117,7 +117,7 @@ function render(){
 function queue(){if(!queued){queued=true;requestAnimationFrame(render);}}
 for(const name of ["east","south","roof","clip","markers"])
  $(name).addEventListener("input",queue);
-window.__a221WorldXY=()=>rendered;
+window.__a221Review=()=>rendered;
 try{
  const [manifest,camera,elevated,cinematicMeta,cinematic,knights,geometry]=await Promise.all([
   getJson(artRoot+"art-manifest.v1.json"),
