@@ -53,6 +53,11 @@ jobs:
           node --check src/browser/game-audio.mjs
           node --test tests/r3-combat-audio.test.mjs
 
+      - name: Validate R2 bounded session cleanup and neutral hidden-tab liveness
+        run: |
+          node --check src/browser/neutral-background-input.mjs
+          node --test tests/r2-session-liveness.test.mjs
+
       - name: Validate R2 responsive controls, server-style dash and combat geometry
         run: |
           node --check src/browser/dash-input.mjs
@@ -168,6 +173,20 @@ jobs:
           cargo clippy --locked --manifest-path server/Cargo.toml --all-targets -- -D warnings
           cargo test --locked --manifest-path server/Cargo.toml
 
+      - name: Validate R2 real Chrome abrupt-close admission cleanup (2-player cap)
+        run: |
+          cargo build --locked --manifest-path server/Cargo.toml --bin myaso-server
+          node --check scripts/r2-abrupt-close-acceptance.mjs
+          node scripts/r2-abrupt-close-acceptance.mjs
+
+      - name: Upload R2 session-cleanup W3C evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: r2-abrupt-close-session-evidence
+          path: r2-session-cleanup-w3c-evidence.json
+          if-no-files-found: ignore
+          retention-days: 7
       - name: Validate M188 repeated real heavy counterplay windows
         run: |
           # Three fresh Chrome/Firefox sessions for each real defensive read.

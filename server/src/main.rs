@@ -23,6 +23,11 @@ use wtransport::{Connection, Endpoint, Identity, SendStream, ServerConfig, VarIn
 
 const GAME_PATH: &str = "/game";
 const CLOSE_DATAGRAM_UNAVAILABLE: u32 = 0x11;
+const CLOSE_CLIENT_INACTIVITY: u32 = 0x12;
+// Expire authenticated sessions with no valid input, even when QUIC keepalives
+// prevent a transport timeout. Releases the fighter and admission permit.
+const CLIENT_INPUT_IDLE_TIMEOUT: Duration = Duration::from_secs(30);
+const RELIABLE_OPEN_TIMEOUT: Duration = Duration::from_secs(10);
 const SNAPSHOT_INTERVAL: Duration = Duration::from_millis(50);
 const SNAPSHOT_EVERY_SERVER_TICKS: u32 = 3;
 const INPUT_ACK_PACKET_TYPE: u8 = 3;
@@ -228,6 +233,10 @@ impl SharedGame {
             }
         }
     }
+}
+
+fn next_client_input_deadline(now: tokio::time::Instant) -> tokio::time::Instant {
+    now + CLIENT_INPUT_IDLE_TIMEOUT
 }
 
 fn should_enqueue_reliable_catchup(
@@ -533,10 +542,13 @@ async fn handle_connection(
     let mut last_input_sequence = None;
     let mut dropped_action_ticks = VecDeque::with_capacity(MAX_DROPPED_ACTION_TICKS);
     let mut pending_input_acks = VecDeque::with_capacity(MAX_PENDING_INPUT_ACKS);
-    let (mut reliable_send, _reliable_recv) = connection
-        .accept_bi()
-        .await
-        .context("accept reliable game stream")?;
+    let (mut reliable_send, _reliable_recv) = tokio::time::timeout(
+        RELIABLE_OPEN_TIMEOUT,
+        connection.accept_bi(),
+    )
+    .await
+    .context("timed out accepting reliable game stream")?
+    .context("accept reliable game stream")?;
     let (initial_frame, mut next_kill_event_sequence) = {
         let state = game.state.lock().await;
         (
@@ -596,9 +608,21 @@ async fn handle_connection(
     });
     let mut snapshot_interval = tokio::time::interval(SNAPSHOT_INTERVAL);
     snapshot_interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+    let input_idle_timeout = tokio::time::sleep(CLIENT_INPUT_IDLE_TIMEOUT);
+    tokio::pin!(input_idle_timeout);
 
     loop {
         tokio::select! {
+            _ = &mut input_idle_timeout => {
+                // A dead browser may leave QUIC keepalives flowing. Only valid
+                // authenticated gameplay datagrams reset this deadline.
+                connection.close(
+                    VarInt::from_u32(CLOSE_CLIENT_INACTIVITY),
+                    b"client input inactivity",
+                );
+                reliable_writer.abort();
+                bail!("client input inactivity exceeded {}s", CLIENT_INPUT_IDLE_TIMEOUT.as_secs());
+            }
             writer_result = &mut reliable_writer => {
                 match writer_result {
                     Ok(Ok(())) => bail!("reliable writer ended unexpectedly"),
@@ -615,6 +639,7 @@ async fn handle_connection(
                         continue;
                     }
                 };
+                input_idle_timeout.as_mut().reset(next_client_input_deadline(tokio::time::Instant::now()));
 
                 if game.drop_new_action_datagrams {
                     if let Some(action_tick) =
@@ -927,6 +952,18 @@ mod tests {
             jump: false,
             dash: false,
         }
+    }
+
+    #[test]
+    fn inactive_session_cleanup_deadline_is_bounded_and_renews_only_on_input() {
+        let initial = tokio::time::Instant::now();
+        let deadline = next_client_input_deadline(initial);
+        assert_eq!(deadline - initial, Duration::from_secs(30));
+        let last_authenticated_input = initial + Duration::from_secs(18);
+        let extended = next_client_input_deadline(last_authenticated_input);
+        assert_eq!(extended - deadline, Duration::from_secs(18));
+        assert!(RELIABLE_OPEN_TIMEOUT < CLIENT_INPUT_IDLE_TIMEOUT);
+        assert!(CLIENT_INPUT_IDLE_TIMEOUT > Duration::from_secs(5));
     }
 
     #[test]
