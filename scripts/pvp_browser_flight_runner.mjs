@@ -9742,6 +9742,11 @@ async function runOnlineUiGuardBreakFlight(entries, { onGuardBroken = null } = {
         // (read-only epoch evidence below), and require the wheel W3C ACK.
         // Neither the 125/240ms defense nor 34HP/-38 guard assertions change.
         m212Exchange = await dispatchR2ReleaseLedShortBlock({
+          // M194 main-push #39453669647: the actual trusted Firefox wheel
+          // arrived after the fixed 100ms Chrome release on attempt 5/5.
+          // Require trusted native wheel BEFORE release for M194 only, with
+          // the same unchanged server parry/guard/damage and strict W3C gates.
+          trustedWheelWaitMs: scenario === "uiguardbreak" ? 190 : 0,
           sendAttackDown: () => setArenaAttackButton(attacker, true),
           sendWheel: () => scrollArenaWheel(defender, defenderElementId, 120, 0),
           awaitTrustedWheel: () => challenge.wait(),
