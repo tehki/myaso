@@ -40,6 +40,12 @@ Status: **domain foundation only — NOT live-game enabled**. Approved design di
 - Read-only Ember preparation verifies the exact authenticated session lease, learned Fire rune and Ember spell, equipped lootable Spellbook, Sulfur Ash reagent and mana. It costs 15 mana and one Sulfur Ash if eventually cast, but the preview consumes nothing and produces no effects.
 - Tests cover no-free-magic spawn, rewards, replayed receipts, casting prerequisites and rune/spell knowledge surviving full-loot death when the spellbook is taken. The knowledge ledger is **in memory only** and must be persisted transactionally with items before activating NPC lessons or spells. No live Magic integration, projectiles or combat changes.
 
+## Read-only Combat impact handoff (provisional)
+
+- New `server/src/magic_combat_preview.rs` provides a deterministic, **non-mutating** Ember target proposal from a pending, already-checkpointed effect. It requires the exact authenticated session lease, matching current World caster, non-dead inventory state, same authoritative zone, and a committed operation watermark. Target candidates must be living fighters in the same zone and within a provisional forward 260-unit by 28-unit corridor projected from the durable Ember origin/facing; ties resolve deterministically.
+- The preview never deals damage, interrupts a spell, spends resources, modifies world state, or marks a spell as applied. It intentionally does **not** claim line-of-sight/terrain collision, final combat defenses, target permissions or exact hit registration: Combat must design and approve those behaviors and commit any effects/death/full-loot transfer as one durable world transaction.
+- Isolated Rust tests cover nearest valid target, stale session/replayed or terminal intent denial, mismatched zone/caster, uncommitted effects, off-axis/out-of-reach actors and no target selected without an authoritative zone record. No live network or combat code is changed.
+
 ## Durable no-damage Ember resolution (domain only)
 
 - The outbox now retains distinct `Pending`, `Interrupted`, and `Cancelled` statuses for each Ember intent ID. Interrupt/Cancel are terminal **no-effect** outcomes: the record and committed operation sequence survive recovery, so the same intent cannot become pending again or be cancelled twice.

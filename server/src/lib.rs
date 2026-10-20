@@ -10,6 +10,7 @@ pub mod loot_persistence;
 pub mod loot_transaction;
 pub mod magic;
 pub mod magic_cast;
+pub mod magic_combat_preview;
 pub mod magic_checkpoint;
 pub mod magic_teacher;
 pub mod reliable;
