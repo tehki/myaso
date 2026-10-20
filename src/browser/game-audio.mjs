@@ -17,32 +17,132 @@ const CUES = Object.freeze({
   ui: { start: 720, end: 920, duration: .07, gain: .075, noise: 0, filter: 1200, wave: "sine", minMs: 75 },
 });
 
+// R4: physically recorded CC0 foley has priority over synthetic fallback.
+// Small randomized playback-rate differences avoid robotic repetition.
+const RECORDED_FOLEY = Object.freeze({
+  light: ["knifeSlice", "knifeSlice2", "drawKnife1"],
+  heavy: ["chop", "drawKnife2"],
+  kick: ["dropLeather", "chop"],
+  roll: ["cloth1", "cloth2", "cloth3"],
+  guard: ["beltHandle1", "cloth4"],
+  parry: ["metalClick", "metalPot1"],
+  jump: ["cloth2", "cloth3"],
+  step: ["footstep00", "footstep01", "footstep02", "footstep03", "footstep04",
+    "footstep05", "footstep06", "footstep07", "footstep08", "footstep09"],
+  hit: ["chop", "metalPot2"],
+  damage: ["dropLeather", "cloth1"],
+  block: ["metalPot1", "metalPot2", "metalClick"],
+  guardbreak: ["metalPot3", "metalPot2"],
+  death: ["creak1", "dropLeather"],
+});
+const AMBIENT_TRACK = new URL("../../web/audio/music/cathedral-in-the-forest.ogg", import.meta.url).href;
 const SETTINGS_KEY = "myaso.audio.v1";
 const clamp = (value, low, high) => Math.max(low, Math.min(high, value));
 
 export function createGameAudio({ AudioContextImpl = globalThis.AudioContext ?? globalThis.webkitAudioContext,
+  AudioElementImpl = globalThis.Audio,
+  fetchImpl = typeof globalThis.fetch === "function" ? globalThis.fetch.bind(globalThis) : null,
+  random = Math.random,
   storage = readStorage(), defaultVolume = 0.55 } = {}) {
   let context = null;
   let master = null;
   let noiseBuffer = null;
   let muted = false;
   let volume = clamp(defaultVolume, 0, 1);
+  let musicEnabled = false; // Explicit opt-in: no music autoplay on combat input.
+  let musicVolume = 0.35; // Scaled down further by the ambient headroom factor.
+  let musicTrack = null;
+  const loadedSamples = new Map();
+  const pendingSamples = new Map();
+  let warmupStarted = false;
   const lastPlayed = new Map();
+  const variantCursor = new Map();
 
   try {
     const saved = JSON.parse(storage?.getItem(SETTINGS_KEY) ?? "null");
     if (typeof saved?.muted === "boolean") muted = saved.muted;
     if (Number.isFinite(saved?.volume)) volume = clamp(saved.volume, 0, 1);
+    if (typeof saved?.musicEnabled === "boolean") musicEnabled = saved.musicEnabled;
+    if (Number.isFinite(saved?.musicVolume)) musicVolume = clamp(saved.musicVolume, 0, 1);
   } catch { /* Storage can be disabled in private contexts. */ }
 
   function persist() {
-    try { storage?.setItem(SETTINGS_KEY, JSON.stringify({ muted, volume })); }
+    try { storage?.setItem(SETTINGS_KEY, JSON.stringify({ muted, volume, musicEnabled, musicVolume })); }
     catch { /* Sound remains usable without persistence. */ }
   }
   function updateMaster() {
     if (master) master.gain.value = muted ? 0 : volume;
   }
+  function ensureFoleyWarmup() {
+    if (warmupStarted || !fetchImpl || !context || typeof context.decodeAudioData !== "function") return;
+    warmupStarted = true;
+    // At most two background decodes per client. A busy 3-player browser CI
+    // must not suddenly launch 78 fetch/decode tasks next to timed native input.
+    // Missing/corrupt OGG always leaves the existing R3 fallback available.
+    const names = [...new Set(Object.values(RECORDED_FOLEY).flat())];
+    let next = 0;
+    async function worker() {
+      while (next < names.length) {
+        const name = names[next++];
+        const url = new URL(`../../web/audio/foley/${name}.ogg`, import.meta.url).href;
+        const load = Promise.resolve().then(() => fetchImpl(url))
+          .then((response) => response?.ok ? response.arrayBuffer() : null)
+          .then((bytes) => bytes ? context.decodeAudioData(bytes) : null)
+          .then((buffer) => { if (buffer) loadedSamples.set(name, buffer); })
+          .catch(() => { /* Missing sample must never become an input error. */ })
+          .finally(() => pendingSamples.delete(name));
+        pendingSamples.set(name, load);
+        await load;
+      }
+    }
+    // After the genuine input callback has completed, start bounded work.
+    for (let i = 0; i < 2; i++) Promise.resolve().then(worker);
+  }
+  function makeMusicTrack() {
+    if (!musicTrack && AudioElementImpl) {
+      try {
+        musicTrack = new AudioElementImpl(AMBIENT_TRACK);
+        musicTrack.loop = true;
+        musicTrack.preload = "none";
+        musicTrack.volume = musicVolume * .30; // Keep effects readable at any slider setting.
+      } catch { musicTrack = null; }
+    }
+    return musicTrack;
+  }
+  function syncMusic() {
+    const track = musicTrack;
+    if (!track) return;
+    track.volume = musicVolume * .30;
+    if (!musicEnabled || globalThis.document?.hidden || musicVolume <= 0) {
+      try { track.pause(); } catch { /* No effect on input. */ }
+      return;
+    }
+    try {
+      const started = track.play();
+      if (started?.catch) started.catch(() => {
+        // Browser policy or missing source: do not claim music is audible.
+        // The next explicit Music on click can try again.
+      });
+    } catch { /* Autoplay remains user-gesture gated. */ }
+  }
+  function setMusicEnabled(value) {
+    musicEnabled = Boolean(value);
+    if (musicEnabled) makeMusicTrack();
+    syncMusic();
+    persist();
+  }
+  function setMusicVolume(value) {
+    if (!Number.isFinite(value)) return;
+    musicVolume = clamp(value, 0, 1);
+    syncMusic();
+    persist();
+  }
+  function suspendMusicWhenHidden() { syncMusic(); }
+
   function unlock() {
+    // A previously enabled ambient track may resume only on the next real
+    // player gesture in a new session, never automatically during bootstrap.
+    if (musicEnabled && !musicTrack) { makeMusicTrack(); syncMusic(); }
     if (!AudioContextImpl) return false;
     if (!context) {
       try {
@@ -65,6 +165,8 @@ export function createGameAudio({ AudioContextImpl = globalThis.AudioContext ?? 
     if (context.state === "suspended") {
       try { context.resume().catch(() => {}); } catch { /* Browser gesture gate. */ }
     }
+    // Schedule file fetch + decode asynchronously after returning from unlock.
+    ensureFoleyWarmup();
     return true;
   }
   function setMuted(value) {
@@ -92,6 +194,28 @@ export function createGameAudio({ AudioContextImpl = globalThis.AudioContext ?? 
       if (output.pan) output.pan.value = clamp(pan, -1, 1);
       output.connect(master);
 
+      const variants = RECORDED_FOLEY[name] ?? [];
+      const ready = variants.filter((variant) => loadedSamples.has(variant));
+      if (ready.length && typeof context.createBufferSource === "function") {
+        const cursor = variantCursor.get(name) ?? 0;
+        variantCursor.set(name, cursor + 1);
+        const sample = context.createBufferSource();
+        sample.buffer = loadedSamples.get(ready[cursor % ready.length]);
+        if (sample.playbackRate) {
+          sample.playbackRate.value = .96 + clamp(random(), 0, 1) * .08;
+        }
+        const envelope = context.createGain();
+        const peak = Math.max(.0002, amplitude * (name === "step" ? .46 : .64));
+        envelope.gain.setValueAtTime(peak, now);
+        sample.connect(envelope);
+        envelope.connect(output);
+        sample.start(now);
+        sample.onended = () => { sample.disconnect(); envelope.disconnect(); output.disconnect(); };
+        return true;
+      }
+
+      // R3 synthesis is a fail-silent fallback while recordings decode or
+      // if a device/browser cannot play OGG. Never blocks combat input.
       const osc = context.createOscillator();
       osc.type = spec.wave;
       osc.frequency.setValueAtTime(spec.start, now);
@@ -126,7 +250,11 @@ export function createGameAudio({ AudioContextImpl = globalThis.AudioContext ?? 
     } catch { return false; } // Audio must never interfere with combat/input.
   }
   return Object.freeze({ unlock, play, setMuted, setVolume,
-    isMuted: () => muted, getVolume: () => volume, isUnlocked: () => context !== null });
+    setMusicEnabled, setMusicVolume, suspendMusicWhenHidden,
+    isMuted: () => muted, getVolume: () => volume, isUnlocked: () => context !== null,
+    isMusicEnabled: () => musicEnabled, getMusicVolume: () => musicVolume,
+    isMusicPlaying: () => Boolean(musicTrack && !musicTrack.paused),
+    loadedFoleyCount: () => loadedSamples.size });
 }
 
 function readStorage() {
@@ -137,11 +265,18 @@ function readStorage() {
 export function installGameAudioControls(audio, root = globalThis.document) {
   const toggle = root?.querySelector("#audio-toggle");
   const slider = root?.querySelector("#audio-volume");
+  const musicToggle = root?.querySelector("#music-toggle");
+  const musicSlider = root?.querySelector("#music-volume");
   if (!toggle || !slider) return;
   function sync() {
-    toggle.textContent = audio.isMuted() ? "Sound off" : "Sound on";
+    toggle.textContent = audio.isMuted() ? "Effects off" : "Effects on";
     toggle.setAttribute("aria-pressed", String(!audio.isMuted()));
     slider.value = String(Math.round(audio.getVolume() * 100));
+    if (musicToggle) {
+      musicToggle.textContent = audio.isMusicEnabled() ? "Music on" : "Music off";
+      musicToggle.setAttribute("aria-pressed", String(audio.isMusicEnabled()));
+    }
+    if (musicSlider) musicSlider.value = String(Math.round(audio.getMusicVolume() * 100));
   }
   toggle.addEventListener("click", () => {
     audio.unlock();
@@ -154,6 +289,16 @@ export function installGameAudioControls(audio, root = globalThis.document) {
     audio.setVolume(Number(slider.value) / 100);
     sync();
   });
+  // Ambient soundtrack is always a separate, explicit, user-controlled layer.
+  musicToggle?.addEventListener("click", () => {
+    audio.setMusicEnabled(!audio.isMusicEnabled());
+    sync();
+  });
+  musicSlider?.addEventListener("input", () => {
+    audio.setMusicVolume(Number(musicSlider.value) / 100);
+    sync();
+  });
+  root?.addEventListener?.("visibilitychange", () => audio.suspendMusicWhenHidden());
   sync();
 }
 
