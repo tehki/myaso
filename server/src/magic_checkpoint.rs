@@ -9,7 +9,7 @@
 use std::fs;
 use std::path::Path;
 
-use crate::character_identity::{SessionIdentityRegistry, SessionLease};
+use crate::character_identity::{CharacterId, SessionIdentityRegistry, SessionLease};
 use crate::loot::{LootAuthority, LootError};
 use crate::loot_persistence::{
     atomic_write, checksum, decode, encode, CheckpointError, MAX_FILE_BYTES,
@@ -19,7 +19,7 @@ use crate::magic::{
     EmberEffectStatus, LessonAward, MagicAuthority, MagicError, MagicSnapshotError,
 };
 use crate::magic_teacher::{TeacherAuthority, TeacherError, TeacherRequest};
-use crate::zone::ZoneAuthority;
+use crate::zone::{ZoneAuthority, ZoneId};
 
 const HEADER: &[u8; 8] = b"MYWLD003";
 const MAGIC_MAX_BYTES: usize = 1024 * 1024;
@@ -36,6 +36,7 @@ pub enum JointCheckpointError {
     UnverifiedCharacter,
     Teacher(TeacherError),
     WrongZone,
+    UnreconciledEmberEffects,
     Corrupt,
 }
 
@@ -176,6 +177,54 @@ pub fn load_joint(path: &Path) -> Result<(LootAuthority, MagicAuthority), JointC
     unbundle(&bytes)
 }
 
+/// A paid Ember intent remains unresolved after checkpoint recovery. The
+/// joint MYWLD003 checkpoint proves a committed cost and pending intent, NOT
+/// whether Combat applied world damage before a crash. It must not be replayed
+/// or silently cancelled without a future durable Combat/world effect receipt.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct EmberRecoveryHold {
+    pub character: CharacterId,
+    pub sequence: u64,
+    pub zone: ZoneId,
+}
+
+/// Inspect only *unresolved* Ember identities in a verified joint checkpoint.
+/// BTreeMap-ordered records give a deterministic reconciliation queue, but
+/// nothing is replayed, cancelled, emitted as a projectile or modified on disk.
+/// An invalid checksum, loot/magic watermark or snapshot fails closed.
+pub fn inspect_joint_ember_recovery_holds(
+    path: &Path,
+) -> Result<Vec<EmberRecoveryHold>, JointCheckpointError> {
+    let (_, magic) = load_joint(path)?;
+    Ok(magic
+        .pending_ember_intents()
+        .map(|intent| EmberRecoveryHold {
+            character: intent.character,
+            sequence: intent.sequence,
+            zone: intent.zone,
+        })
+        .collect())
+}
+
+/// A narrow fail-closed offline recovery gate: only return loot/progression
+/// when there are no outstanding Ember effect intents to reconcile.
+///
+/// Do NOT use the ordinary load_joint result as authorization to re-execute
+/// paid spells after restart. This check is *not* sufficient to activate live
+/// gameplay: a journal containing the authoritative World/Combat HP outcome,
+/// Core 8B/8C writer fencing and independent identity are still mandatory.
+/// Unresolved effects are intentionally left untouched so no unpaid refunds,
+/// duplicate damage or false "cancelled" receipts are fabricated.
+pub fn load_joint_without_pending_ember(
+    path: &Path,
+) -> Result<(LootAuthority, MagicAuthority), JointCheckpointError> {
+    let (loot, magic) = load_joint(path)?;
+    if magic.pending_ember_intents().next().is_some() {
+        return Err(JointCheckpointError::UnreconciledEmberEffects);
+    }
+    Ok((loot, magic))
+}
+
 /// Server-internal staged lesson transaction. The trusted admission service
 /// supplies the actual connection lease, and teacher/quest service confirms
 /// that this character is eligible for this server-minted reward receipt.
@@ -299,6 +348,150 @@ mod tests {
             .unwrap();
         loot.register(1).unwrap();
         (loot, magic, identity, hero)
+    }
+
+    #[test]
+    fn unresolved_paid_ember_is_inspectable_but_blocks_effect_free_recovery() {
+        let (mut loot, mut magic, identity, hero) = fixtures();
+        loot.record_operation(hero, 20).unwrap();
+        magic
+            .grant_lesson(award(1, hero, Lesson::Rune(Rune::Fire)))
+            .unwrap();
+        magic
+            .grant_lesson(award(2, hero, Lesson::Spell(Spell::Ember)))
+            .unwrap();
+        magic.spend_mana(hero, 15).unwrap();
+        magic
+            .stage_ember_intent(hero, 20, ZoneId::Moonvale, 200.0, 200.0, 0.0)
+            .unwrap();
+        let file = checkpoint_path();
+        save_joint(&file, &loot, &identity, &magic).unwrap();
+        let bytes_before = fs::read(&file).unwrap();
+
+        assert_eq!(
+            inspect_joint_ember_recovery_holds(&file).unwrap(),
+            vec![EmberRecoveryHold {
+                character: hero,
+                sequence: 20,
+                zone: ZoneId::Moonvale,
+            }]
+        );
+        assert!(matches!(
+            load_joint_without_pending_ember(&file),
+            Err(JointCheckpointError::UnreconciledEmberEffects)
+        ));
+        assert_eq!(fs::read(&file).unwrap(), bytes_before);
+        let (recovered_loot, recovered_magic) = load_joint(&file).unwrap();
+        assert_eq!(recovered_magic.mana(hero), 85);
+        assert_eq!(recovered_magic.pending_ember_intents().count(), 1);
+        assert_eq!(recovered_loot.committed_operation_sequence(hero), Some(20));
+        assert!(matches!(
+            load_joint_without_pending_ember(&file),
+            Err(JointCheckpointError::UnreconciledEmberEffects)
+        ));
+        let _ = fs::remove_file(&file);
+    }
+
+    #[test]
+    fn recovery_holds_are_ordered_and_cannot_mask_missing_cost_watermarks() {
+        let (mut loot, mut magic, mut identity, hero) = fixtures();
+        let other = CharacterId::new(701).unwrap();
+        identity
+            .bind_verified(SessionLease::new(2, 1).unwrap(), other)
+            .unwrap();
+        loot.register(2).unwrap();
+        loot.record_operation(hero, 50).unwrap();
+        loot.record_operation(other, 70).unwrap();
+        for (character, fire_receipt, ember_receipt, sequence) in [
+            (hero, 1, 2, 50),
+            (other, 3, 4, 70),
+        ] {
+            magic
+                .grant_lesson(award(fire_receipt, character, Lesson::Rune(Rune::Fire)))
+                .unwrap();
+            magic
+                .grant_lesson(award(ember_receipt, character, Lesson::Spell(Spell::Ember)))
+                .unwrap();
+            magic
+                .stage_ember_intent(
+                    character,
+                    sequence,
+                    ZoneId::Moonvale,
+                    200.0,
+                    200.0,
+                    0.0,
+                )
+                .unwrap();
+        }
+        let file = checkpoint_path();
+        save_joint(&file, &loot, &identity, &magic).unwrap();
+        assert_eq!(
+            inspect_joint_ember_recovery_holds(&file).unwrap(),
+            vec![
+                EmberRecoveryHold {
+                    character: hero,
+                    sequence: 50,
+                    zone: ZoneId::Moonvale,
+                },
+                EmberRecoveryHold {
+                    character: other,
+                    sequence: 70,
+                    zone: ZoneId::Moonvale,
+                },
+            ]
+        );
+        assert!(matches!(
+            load_joint_without_pending_ember(&file),
+            Err(JointCheckpointError::UnreconciledEmberEffects)
+        ));
+
+        let (mut uncommitted_loot, magic) = load_joint(&file).unwrap();
+        uncommitted_loot.record_operation(hero, 51).unwrap();
+        assert_eq!(magic.pending_ember_intents().count(), 2);
+        let _ = fs::remove_file(&file);
+    }
+
+    #[test]
+    fn resolved_terminal_ember_can_pass_effect_free_recovery_gate() {
+        let (mut loot, mut magic, identity, hero) = fixtures();
+        loot.record_operation(hero, 30).unwrap();
+        magic
+            .grant_lesson(award(1, hero, Lesson::Rune(Rune::Fire)))
+            .unwrap();
+        magic
+            .grant_lesson(award(2, hero, Lesson::Spell(Spell::Ember)))
+            .unwrap();
+        magic
+            .stage_ember_intent(hero, 30, ZoneId::Moonvale, 200.0, 200.0, 0.0)
+            .unwrap();
+        let file = checkpoint_path();
+        save_joint(&file, &loot, &identity, &magic).unwrap();
+        let mut zones = ZoneAuthority::new();
+        zones.register(1).unwrap();
+        resolve_ember_without_damage(
+            &file,
+            &loot,
+            &mut magic,
+            &identity,
+            &zones,
+            EmberNoEffectDecision {
+                lease: SessionLease::new(1, 1).unwrap(),
+                sequence: 30,
+                outcome: EmberEffectStatus::Interrupted,
+            },
+        )
+        .unwrap();
+        assert!(inspect_joint_ember_recovery_holds(&file).unwrap().is_empty());
+        let (restored_loot, recovered_magic) =
+            load_joint_without_pending_ember(&file).unwrap();
+        assert_eq!(restored_loot.committed_operation_sequence(hero), Some(30));
+        assert_eq!(recovered_magic.pending_ember_intents().count(), 0);
+        assert_eq!(recovered_magic.resolved_ember_intents().count(), 1);
+        assert_eq!(
+            recovered_magic.ember_intent(hero, 30).unwrap().status,
+            EmberEffectStatus::Interrupted
+        );
+        let _ = fs::remove_file(&file);
     }
 
     #[test]
