@@ -889,7 +889,10 @@ async fn run_chat_stream(
                             // carries coordinates, zone, or a sender identity.
                             let state = game.state.lock().await;
                             let positions: Vec<ChatPosition> = state.world.fighters().iter()
-                                .filter(|fighter| fighter.net_id < FLIGHT_BACKGROUND_NET_ID_BASE)
+                                // Synthetic flight actors have no registered
+                                // chat stream and are filtered by ChatHub.
+                                // Do not filter by numeric IDs: real session
+                                // IDs may legitimately exceed 10_000.
                                 .map(|fighter| ChatPosition {
                                     player_id: fighter.net_id,
                                     zone: 0, // Live server currently owns one shared arena.
