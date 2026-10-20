@@ -336,6 +336,18 @@ impl Fighter {
     }
 
     fn latch_action_edges(&mut self, input: InputIntent) {
+        // A completed LMB charge sends ONE of the release modes below. When
+        // press and release arrive between two server ticks, pending edges
+        // must not OR the prior dual-bit HOLD back into this newer input.
+        // Otherwise a 10ms authentic light release can be interpreted as an
+        // endless heavy charge and cause no guard/damage contact at all.
+        if self.latest_input.attack
+            && self.latest_input.heavy_attack
+            && !(input.attack && input.heavy_attack)
+        {
+            self.pending_attack = false;
+            self.pending_heavy_attack = false;
+        }
         self.pending_attack |= input.attack && !self.latest_input.attack;
         self.pending_heavy_attack |= input.heavy_attack && !self.latest_input.heavy_attack;
         self.pending_dodge |= input.dodge && !self.latest_input.dodge;
@@ -1741,6 +1753,43 @@ mod r2_combat_control_tests {
         );
         world.step();
         assert_eq!(world.fighter(1).unwrap().action, Action::HeavyAttackWindup);
+    }
+
+    #[test]
+    fn same_tick_charge_release_keeps_newest_light_heavy_or_cancel_mode() {
+        for (release, expected) in [
+            (InputIntent { attack: true, ..InputIntent::default() }, Action::AttackWindup),
+            (InputIntent { heavy_attack: true, ..InputIntent::default() }, Action::HeavyAttackWindup),
+            (InputIntent::default(), Action::Idle),
+        ] {
+            let mut world = World::new(800.0, 600.0);
+            assert!(world.add_player_at(1, 250.0, 300.0, 0.0));
+            assert!(world.set_input(1, InputIntent {
+                attack: true, heavy_attack: true, ..InputIntent::default()
+            }));
+            // Both WebTransport datagrams arrived before one 60Hz world.step.
+            assert!(world.set_input(1, release));
+            world.step();
+            assert_eq!(world.fighter(1).unwrap().action, expected,
+                "latest release intent must beat pending held bits");
+        }
+    }
+
+    #[test]
+    fn releasing_after_one_server_charge_tick_commits_exactly_one_light() {
+        let mut world = World::new(800.0, 600.0);
+        world.add_player_at(1, 250.0, 300.0, 0.0);
+        world.set_input(1, InputIntent {
+            attack: true, heavy_attack: true, ..InputIntent::default()
+        });
+        world.step();
+        assert_eq!(world.fighter(1).unwrap().action, Action::HeavyAttackWindup);
+        world.set_input(1, InputIntent { attack: true, ..InputIntent::default() });
+        world.step();
+        assert_eq!(world.fighter(1).unwrap().action, Action::AttackWindup);
+        world.set_input(1, InputIntent::default());
+        world.step();
+        assert_eq!(world.fighter(1).unwrap().action, Action::AttackWindup);
     }
 
     #[test]
