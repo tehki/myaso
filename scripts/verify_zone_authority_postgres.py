@@ -212,6 +212,35 @@ def test_row_lock_protects_mutation() -> None:
     print("PASS: in-transaction authority row locks exclude competing handoffs")
 
 
+def test_least_privilege_role() -> None:
+    # Production needs a dedicated NOLOGIN function owner and an authenticated
+    # application role with EXECUTE only; this acceptance creates an ephemeral
+    # restricted role without raw table read/write privileges.
+    role = "myaso_c4c_executor_test"
+    call(f"CREATE ROLE {role} NOLOGIN;")
+    call(f"GRANT USAGE ON SCHEMA core_zone TO {role};")
+    call(f"GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA core_zone TO {role};")
+    call(f"SET ROLE {role}; SELECT core_zone.register_entity("
+         f"1::smallint, {entity(99)}, 1, 1);")
+    call(f"SET ROLE {role}; SELECT * FROM core_zone.entities;",
+         expect_failure=True)
+    call(f"SET ROLE {role}; UPDATE core_zone.entities SET owner_worker = 9;",
+         expect_failure=True)
+    require(
+        call(f"SET ROLE {role}; SELECT core_zone.prepare_transfer("
+             f"{operation(990)}, 1::smallint, {entity(99)}, 1, 1, 1, 2, 2);")
+        == "prepared",
+        "restricted service role must use trusted database function",
+    )
+    require(
+        call(f"SET ROLE {role}; SELECT core_zone.commit_transfer({operation(990)});")
+        == "2",
+        "restricted service role can commit after compare-and-swap",
+    )
+    require(is_current(99, 2, 2, 2), "restricted operation updated committed authority")
+    print("PASS: restricted service role has function access, not table bypass")
+
+
 def main() -> None:
     require(shutil.which("psql") is not None, "PostgreSQL client not found")
     require(os.environ.get("PGDATABASE"), "PGDATABASE required: isolated database only")
@@ -220,6 +249,7 @@ def main() -> None:
     test_authority_recovery()
     test_competing_independent_clients()
     test_row_lock_protects_mutation()
+    test_least_privilege_role()
     print("C4C POSTGRES ACCEPTANCE PASSED (one primary; not WAN/partition proof)")
 
 
