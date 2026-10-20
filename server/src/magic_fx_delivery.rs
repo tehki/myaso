@@ -5,7 +5,7 @@
 //! This planner NEVER writes to sockets, processes input, or changes combat.
 //! Gameplay messages remain outside all FX budgets.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use crate::magic_fx_events::{
     encode_magic_fx, FxError, SemanticEffectBroker, TrustedEffectSpec, ViewerInterest,
@@ -13,6 +13,7 @@ use crate::magic_fx_events::{
 };
 
 pub const MAX_FX_ZONE_SHARDS: usize = 16;
+pub const MAX_FX_SCHEDULED_SESSIONS: usize = 1_024;
 pub const MAX_FX_DELIVERY_PER_VIEWER: usize = 6;
 pub const MAX_FX_PAYLOAD_BYTES_PER_VIEWER_TICK: usize =
     MAX_FX_DELIVERY_PER_VIEWER * MAGIC_FX_PACKET_BYTES;
@@ -30,6 +31,9 @@ pub enum ShardError {
     InvalidSession,
     WrongSessionZone,
     SessionAlreadyPolled,
+    DuplicateSession,
+    InvalidViewerBatch,
+    SessionCapacity,
     UnencodableEvent,
     Broker(FxError),
 }
@@ -85,9 +89,27 @@ pub struct ShardBudgetStats {
     pub max_global_payload_bytes_per_tick: usize,
 }
 
+/// An FX packet batch addressed exclusively to a trusted connection ID.
+/// Core must route it by its authenticated session registry, not a client ID.
+#[derive(Debug, PartialEq, Eq)]
+pub struct FairFxPacketBatch {
+    pub authenticated_net_id: u32,
+    pub packets: Vec<[u8; MAGIC_FX_PACKET_BYTES]>,
+}
+
+/// Cosmetic-only fair scheduler diagnostics, excluding socket framing.
+#[derive(Debug, PartialEq, Eq)]
+pub struct FairFxDispatch {
+    pub batches: Vec<FairFxPacketBatch>,
+    pub considered_sessions: usize,
+    pub served_sessions: usize,
+    pub payload_bytes: usize,
+}
+
 #[derive(Debug, Default)]
 pub struct ShardedMagicFxHub {
     shards: BTreeMap<u32, ZoneShard>,
+    fair_last_served: BTreeMap<u32, u64>,
     current_tick: Option<u64>,
     global_payload_bytes_this_tick: usize,
 }
@@ -170,6 +192,21 @@ impl ShardedMagicFxHub {
         session: &mut FxDeliverySession,
         trusted_viewer: ViewerInterest,
     ) -> Result<Vec<[u8; MAGIC_FX_PACKET_BYTES]>, ShardError> {
+        self.plan_delivery_limited(
+            trusted_tick,
+            session,
+            trusted_viewer,
+            MAX_FX_DELIVERY_PER_VIEWER,
+        )
+    }
+
+    fn plan_delivery_limited(
+        &mut self,
+        trusted_tick: u64,
+        session: &mut FxDeliverySession,
+        trusted_viewer: ViewerInterest,
+        per_viewer_limit: usize,
+    ) -> Result<Vec<[u8; MAGIC_FX_PACKET_BYTES]>, ShardError> {
         if self.current_tick != Some(trusted_tick) {
             return Err(ShardError::InvalidTick);
         }
@@ -204,7 +241,8 @@ impl ShardedMagicFxHub {
             MAX_FX_PAYLOAD_BYTES_GLOBAL_TICK - self.global_payload_bytes_this_tick;
         let limit = (per_zone_remaining / MAGIC_FX_PACKET_BYTES)
             .min(global_remaining / MAGIC_FX_PACKET_BYTES)
-            .min(MAX_FX_DELIVERY_PER_VIEWER);
+            .min(MAX_FX_DELIVERY_PER_VIEWER)
+            .min(per_viewer_limit);
 
         let mut packets = Vec::with_capacity(limit);
         let mut newest = session.last_event_id;
@@ -222,6 +260,108 @@ impl ShardedMagicFxHub {
         session.last_event_id = newest;
         session.last_poll_tick = Some(trusted_tick);
         Ok(packets)
+    }
+
+    /// Deterministic, deficit-aware server-only FX scheduler.
+    ///
+    /// Preflight validates every distinct authenticated session/view pair
+    /// BEFORE polling anything, so malformed batches cannot cause partial
+    /// delivery or consume budgets. Order is oldest successful FX delivery
+    /// first (then stable net ID): sessions denied by cosmetic byte caps are
+    /// served ahead of already-served sessions on following ticks.
+    ///
+    /// Fairness is best-effort under finite event lifetimes, distance and
+    /// zone quotas. There is no guaranteed packet delivery, and routing /
+    /// authentication remain with Core & Multiplayer. Do not mix this method
+    /// and ad hoc plan_delivery for the same sessions within a tick.
+    pub fn schedule_fair_tick(
+        &mut self,
+        trusted_tick: u64,
+        sessions: &mut [FxDeliverySession],
+        trusted_views: &[ViewerInterest],
+    ) -> Result<FairFxDispatch, ShardError> {
+        if self.current_tick != Some(trusted_tick) {
+            return Err(ShardError::InvalidTick);
+        }
+        if sessions.len() != trusted_views.len() {
+            return Err(ShardError::InvalidViewerBatch);
+        }
+        if sessions.len() > MAX_FX_SCHEDULED_SESSIONS {
+            return Err(ShardError::SessionCapacity);
+        }
+
+        let mut current_ids = BTreeSet::new();
+        for (session, view) in sessions.iter().zip(trusted_views) {
+            if session.authenticated_net_id == 0 || session.zone_id == 0 {
+                return Err(ShardError::InvalidSession);
+            }
+            if !current_ids.insert(session.authenticated_net_id) {
+                return Err(ShardError::DuplicateSession);
+            }
+            if view.zone_id != session.zone_id {
+                return Err(ShardError::WrongSessionZone);
+            }
+            if !view.x.is_finite()
+                || !view.y.is_finite()
+                || view.x.abs() > 1_000_000.0
+                || view.y.abs() > 1_000_000.0
+                || !view.radius.is_finite()
+                || !(0.0..=MAX_VIEWER_RADIUS).contains(&view.radius)
+            {
+                return Err(ShardError::InvalidViewer);
+            }
+            if session
+                .last_poll_tick
+                .is_some_and(|previous| trusted_tick <= previous)
+            {
+                return Err(ShardError::SessionAlreadyPolled);
+            }
+            if !self.shards.contains_key(&session.zone_id) {
+                return Err(ShardError::UnknownZone);
+            }
+        }
+
+        // Disconnected sessions must not retain scheduler state indefinitely.
+        self.fair_last_served
+            .retain(|id, _| current_ids.contains(id));
+        let mut order: Vec<usize> = (0..sessions.len()).collect();
+        order.sort_unstable_by_key(|index| {
+            let id = sessions[*index].authenticated_net_id;
+            (
+                self.fair_last_served.get(&id).copied().unwrap_or(0),
+                id,
+            )
+        });
+
+        let mut batches = Vec::new();
+        let mut payload_bytes = 0;
+        for index in order {
+            let session = &mut sessions[index];
+            let packets = self.plan_delivery_limited(
+                trusted_tick,
+                session,
+                trusted_views[index],
+                1, // At most ONE cosmetic event per viewer per round.
+            )?;
+            if !packets.is_empty() {
+                payload_bytes += packets.len() * MAGIC_FX_PACKET_BYTES;
+                self.fair_last_served
+                    .insert(session.authenticated_net_id, trusted_tick);
+                batches.push(FairFxPacketBatch {
+                    authenticated_net_id: session.authenticated_net_id,
+                    packets,
+                });
+            }
+        }
+
+        let served_sessions = batches.len();
+        debug_assert_eq!(payload_bytes, served_sessions * MAGIC_FX_PACKET_BYTES);
+        Ok(FairFxDispatch {
+            batches,
+            considered_sessions: sessions.len(),
+            served_sessions,
+            payload_bytes,
+        })
     }
 
     pub fn zone_payload_bytes_this_tick(&self, zone_id: u32) -> Option<usize> {
