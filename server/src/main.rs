@@ -688,10 +688,17 @@ async fn handle_connection(
                 .try_into()
                 .expect("four revision bytes"),
         );
+        let initial_npc_frame = {
+            let state = game.state.lock().await;
+            NpcRoutines::state_packet_with_supply(
+                state.world.tick,
+                state.npc_supply.as_ref().expect("pilot supply initialized"),
+            )
+        };
         send_reliable_frame(
             &mut reliable_send,
             &mut reliable_frame_buffer,
-            &NpcRoutines::state_packet(initial_frame.server_tick()),
+            &initial_npc_frame,
         )
         .await?;
         let initial_supply = {
@@ -792,10 +799,11 @@ async fn handle_connection(
                             .as_ref()
                             .filter(|_| matches!(npc_id, 2 | 4 | 5))
                             .map(|supply| supply.decision(npc_id).description());
-                        let context = state
-                            .npc_routines
-                            .as_ref()
-                            .and_then(|routines| routines.context(npc_id, state.world.tick));
+                        let context = state.npc_routines.as_ref().and_then(|routines| {
+                            state.npc_supply.as_ref().and_then(|supply| {
+                                routines.context_with_supply(npc_id, state.world.tick, supply)
+                            })
+                        });
                         let heard_from = state
                             .npc_routines
                             .as_ref()
@@ -1106,8 +1114,15 @@ async fn handle_connection(
                 if game.npc_pilot_enabled
                     && server_tick.wrapping_sub(last_npc_state_tick) >= STATE_INTERVAL_TICKS
                 {
+                    let npc_frame = {
+                        let state = game.state.lock().await;
+                        NpcRoutines::state_packet_with_supply(
+                            state.world.tick,
+                            state.npc_supply.as_ref().expect("pilot supply initialized"),
+                        )
+                    };
                     match try_enqueue_reliable(&reliable_tx, || {
-                        ReliablePayload::Bytes(NpcRoutines::state_packet(server_tick))
+                        ReliablePayload::Bytes(npc_frame)
                     }) {
                         Ok(true) => last_npc_state_tick = server_tick,
                         Ok(false) => {}

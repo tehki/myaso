@@ -3,6 +3,7 @@
 //! This module never drives a physics actor and stores no conversation bodies.
 use crate::living_world::NPCS;
 use crate::npc_navigation;
+use crate::npc_supply::{NpcSupplyWorld, WorkDecision};
 use crate::PROTOCOL_VERSION;
 
 pub const STATE_TYPE: u8 = 8;
@@ -262,6 +263,68 @@ impl NpcRoutines {
         Some((activity, saw))
     }
 
+    /// Task-aware duty description from the *same* finite authoritative
+    /// ledger that controls actual pickup/forge/delivery. A worker is never
+    /// described as carrying a resource whose carried stock is zero, nor
+    /// working at a closed site. No player message can schedule work.
+    pub fn context_with_supply(
+        &self,
+        id: u8,
+        tick: u32,
+        supply: &NpcSupplyWorld,
+    ) -> Option<(&'static str, bool)> {
+        let (_, witnessed) = self.context(id, tick)?;
+        let position = Self::position(id, tick)?;
+        let activity = match id {
+            2 => match supply.decision(2) {
+                WorkDecision::ForgeNails if position.activity != 0 => "forging needed nails",
+                _ => "waiting for a feasible forge task",
+            },
+            4 => match supply.decision(4) {
+                WorkDecision::CollectFood => "travelling to collect provisions for the market",
+                WorkDecision::DeliverFood => "carrying provisions to the market",
+                _ if supply.stocks().elara_food > 0 => {
+                    "holding provisions until the market can receive them"
+                }
+                _ if position.activity == 1 => "walking the market route without an active job",
+                _ => "waiting for an available market supply task",
+            },
+            5 => match supply.decision(5) {
+                WorkDecision::CollectWater => "travelling to collect water for the work yard",
+                WorkDecision::DeliverWater => "carrying water to the work yard",
+                _ if supply.stocks().tomas_water > 0 => {
+                    "holding water until the work yard can receive it"
+                }
+                _ if position.activity == 1 => "walking the well route without an active job",
+                _ => "waiting for an available water delivery task",
+            },
+            _ => return self.context(id, tick),
+        };
+        Some((activity, witnessed))
+    }
+
+    /// Mirrors the existing 38-byte pilot marker format, never player combat
+    /// entity state. Stationary workers switch to idle after satisfying needs;
+    /// walking workers remain marked walking because routes still move.
+    pub fn state_packet_with_supply(tick: u32, supply: &NpcSupplyWorld) -> Vec<u8> {
+        let mut packet = Vec::with_capacity(8 + NPCS.len() * 6);
+        packet.extend_from_slice(&[PROTOCOL_VERSION, STATE_TYPE, NPCS.len() as u8, 0]);
+        packet.extend_from_slice(&tick.to_le_bytes());
+        for npc in NPCS {
+            let state = Self::position(npc.id, tick).expect("authored NPC ID");
+            let activity = match npc.id {
+                2 if supply.decision(2) == WorkDecision::Rest => 0,
+                4 | 5 if supply.decision(npc.id) == WorkDecision::Rest && state.activity == 2 => 0,
+                _ => state.activity,
+            };
+            packet.push(state.id);
+            packet.extend_from_slice(&state.x.to_le_bytes());
+            packet.extend_from_slice(&state.y.to_le_bytes());
+            packet.push(activity);
+        }
+        packet
+    }
+
     pub fn state_packet(tick: u32) -> Vec<u8> {
         let mut packet = Vec::with_capacity(8 + NPCS.len() * 6);
         packet.extend_from_slice(&[PROTOCOL_VERSION, STATE_TYPE, NPCS.len() as u8, 0]);
@@ -461,5 +524,132 @@ mod tests {
             Some(("Marta", 8))
         );
         assert_eq!(town.recent_acquaintance(99, 6000), None);
+    }
+
+    #[test]
+    fn duty_descriptions_follow_verified_cargo_and_worksite_closure() {
+        let routines = NpcRoutines::default();
+        let mut supply = NpcSupplyWorld::default();
+        let (before, _) = routines.context_with_supply(5, 0, &supply).unwrap();
+        assert!(before.contains("travelling to collect water"));
+        assert!(!before.contains("carrying"));
+        assert!(routines
+            .context_with_supply(4, 0, &supply)
+            .unwrap()
+            .0
+            .contains("collect provisions"));
+        for tick in 0..=600 {
+            supply.advance(tick);
+        }
+        assert!(routines
+            .context_with_supply(5, 600, &supply)
+            .unwrap()
+            .0
+            .contains("carrying water"));
+        assert!(routines
+            .context_with_supply(4, 600, &supply)
+            .unwrap()
+            .0
+            .contains("carrying provisions"));
+        supply.enable_pilot_maintenance();
+        for tick in 601..=900 {
+            supply.advance(tick);
+        }
+        assert!(routines
+            .context_with_supply(5, 900, &supply)
+            .unwrap()
+            .0
+            .contains("holding water"));
+        assert!(!routines
+            .context_with_supply(5, 900, &supply)
+            .unwrap()
+            .0
+            .contains("carrying"));
+        assert!(routines
+            .context_with_supply(4, 900, &supply)
+            .unwrap()
+            .0
+            .contains("carrying provisions"));
+        // Default worksite status is not rewritten by the player or dialogue.
+        assert_eq!(supply.worksite_revision(), 2);
+        for tick in 901..=2100 {
+            supply.advance(tick);
+        }
+        assert!(routines
+            .context_with_supply(5, 2100, &supply)
+            .unwrap()
+            .0
+            .contains("carrying water"));
+        assert_eq!(supply.worksite_revision(), 3);
+        assert!(supply.stocks().conserved());
+    }
+
+    #[test]
+    fn task_aware_state_packet_preserves_position_format_and_exposes_idle() {
+        let mut supply = NpcSupplyWorld::default();
+        let original = NpcRoutines::state_packet(900);
+        let assigned = NpcRoutines::state_packet_with_supply(900, &supply);
+        assert_eq!(assigned.len(), original.len());
+        assert_eq!(assigned.len(), 38);
+        // Before finite demand is satisfied the existing duty state remains.
+        assert_eq!(assigned, original);
+        for tick in 0..=40_000 {
+            supply.advance(tick);
+        }
+        let idle = NpcRoutines::state_packet_with_supply(900, &supply);
+        assert_eq!(&idle[0..8], &original[0..8]);
+        for i in 0..5 {
+            let offset = 8 + i * 6;
+            assert_eq!(&idle[offset..offset + 5], &original[offset..offset + 5]);
+        }
+        // Marta, Elara and Tomas no longer claim to be actively working at a
+        // stationary post after real demand has been fulfilled.
+        assert_eq!(idle[8 + 6 + 5], 0);
+        assert_eq!(idle[8 + 3 * 6 + 5], 0);
+        assert_eq!(idle[8 + 4 * 6 + 5], 0);
+        let routines = NpcRoutines::default();
+        assert!(routines
+            .context_with_supply(2, 900, &supply)
+            .unwrap()
+            .0
+            .contains("waiting"));
+        assert!(routines
+            .context_with_supply(5, 900, &supply)
+            .unwrap()
+            .0
+            .contains("waiting"));
+        assert_eq!(supply.decision(2), WorkDecision::Rest);
+        assert_eq!(supply.decision(4), WorkDecision::Rest);
+        assert_eq!(supply.decision(5), WorkDecision::Rest);
+        assert!(supply.stocks().conserved());
+    }
+
+    #[test]
+    fn no_assignment_does_not_hide_real_patrol_or_fabricate_personal_witness() {
+        let mut supply = NpcSupplyWorld::default();
+        let mut routines = NpcRoutines::default();
+        for tick in 0..=40_000 {
+            supply.advance(tick);
+        }
+        // The same stable route still moves; it must be described as
+        // unassigned walking rather than carrying fabricated resources.
+        assert!(routines
+            .context_with_supply(5, 200, &supply)
+            .unwrap()
+            .0
+            .contains("walking"));
+        assert_eq!(
+            NpcRoutines::state_packet_with_supply(200, &supply)[8 + 4 * 6 + 5],
+            1
+        );
+        assert!(routines
+            .context_with_supply(3, 200, &supply)
+            .unwrap()
+            .0
+            .contains("walking the watch"));
+        routines.witness_death(201, 0.0, 0.0);
+        assert!(routines.context_with_supply(1, 201, &supply).unwrap().1);
+        assert!(!routines.context_with_supply(5, 201, &supply).unwrap().1);
+        assert!(routines.context_with_supply(99, 200, &supply).is_none());
     }
 }

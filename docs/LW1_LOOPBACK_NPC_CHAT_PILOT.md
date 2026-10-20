@@ -568,3 +568,57 @@ TTL, exact provenance labels, unverified causes, multisite updates,
 no-op revisions, rejected manifests, read-only NPC chat, and conserved
 resources. Protected CI and real-browser verification remain the
 required acceptance gates for PR #353.
+
+## LW-1P — Task-aware NPC duty state and truthful work dialogue
+
+The NPC pilot now derives **visible worker activity and direct
+`what are you doing?` answers** from the same authoritative
+`NpcSupplyWorld::decision` and conserved cargo that govern resource
+pickup/delivery. Prior static activity labels could falsely describe
+Marta forging after all nail demand was met, or Tomas carrying water
+before he had any. This phase corrects the NPC *presentation and speech*,
+not the movement mechanics.
+
+At every low-priority server-owned type-8 NPC-state snapshot, the
+normal 38-byte wire shape, NPC IDs, authoritative world tick and
+collision-aware pilot route coordinates remain unchanged. Marta is now
+reported as idle when she has no feasible forge job; moving workers
+are reported idle **only when actually standing without an assignment**.
+When they are visibly walking a staging route without an active
+job, their movement indicator remains walking—the server must not
+claim that a moving object is stationary. No combat actor, pathfinding
+physics, collider, player input or high-frequency tick processing
+was added.
+
+The server's read-only dialogue context is also synchronized with
+the current stock and availability revision. Elara only says she is
+**carrying market provisions** if her server-owned carried food
+inventory and destination justify a delivery. Tomas only says he is
+**carrying water** if he actually holds it and the work yard can
+receive it. During the opt-in maintenance closure, he instead reports
+**holding water until the work yard can receive it**, and after
+reopening reverts to the verified delivery description. Marta says
+she is waiting for a feasible forge job when her demand is met or
+her worksite is unavailable, rather than claiming to produce nails.
+An idle moving porter can say they are **walking an unassigned
+route**, acknowledging the pilot has not yet connected physical
+movement decisions to the real world-task graph. Aldric and Rowan's
+existing roles and firsthand combat-witness reports are unchanged.
+
+The initial joined client and subsequent authoritative 60Hz-clock
+snapshots use the same shared server stock state to compute duties;
+the 38-byte protocol and client-side decoder need no changes.
+Calculations are read-only and run with the existing one-second
+NPC snapshot cadence. Chats read the same source and never
+trigger movement, inventory changes, rewards, repairs or work
+assignments.
+
+Tests cover unloaded carrying claims, actual pickup, the mid-transit
+maintenance outage, restoration, workers stopping once finite
+demand is filled, unchanged packet positions and format,
+real moving route labels, fixed NPC roles, and retained combat
+witness provenance. This remains behind the existing loopback-only
+`MYASO_NPC_PILOT` flag, with optional maintenance as a separate
+flag; it does not make NPC markers physical multiplayer entities
+or introduce autonomous planning, quests, persistence, money,
+AI provider calls or World & Gameplay collisions.
