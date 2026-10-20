@@ -8,6 +8,7 @@ import { setTimeout as sleep } from "node:timers/promises";
 
 const root = process.cwd();
 const extendedWindowMs = process.env.P10_WINDOW_MS ?? "4200";
+const p13Shared = process.env.P13_SHARED_DISPATCH === "1";
 if (!/^\d+$/.test(extendedWindowMs) || Number(extendedWindowMs) < 4200 || Number(extendedWindowMs) > 10500) throw new Error("P10_WINDOW_MS must be 4200..10500");
 const children = new Set();
 const files = new Map([
@@ -75,6 +76,19 @@ try {
           || result.minPingReplies < 5 || result.malformedFx !== 0) {
         throw new Error(`P10 ${browser.name} concurrent QUIC receipt failed: ${JSON.stringify(result)}`);
       }
+      if (p13Shared) {
+        // Only P13 opt-in: verify server-side queue/drop evidence and exact
+        // per-client receipt of every 115 real test gameplay marker.
+        const proof = lab.sharedProof();
+        if (!proof || proof.connections !== 16 || proof.ticks !== 115
+            || proof.gameplay_sent !== 16 * 115
+            || proof.fx_sent <= 0 || proof.cosmetic_dropped <= 0
+            || proof.congestion_ticks !== 23
+            || result.minGameplayMarkers !== 115) {
+          throw new Error(`P13 ${browser.name} shared-dispatch evidence invalid: ${JSON.stringify({proof, minGameplayMarkers: result.minGameplayMarkers})}`);
+        }
+        console.log(`P13_REAL_SHARED_BROWSER ${JSON.stringify({browser: browser.name, ...proof, minGameplayMarkers: result.minGameplayMarkers, minFxPackets: result.minFxPackets, malformedFx: result.malformedFx})}`);
+      }
       results.push({ browser: browser.name, ...result });
       console.log(`P10_REAL_CROWD_BROWSER ${JSON.stringify(results.at(-1))}`);
     } finally {
@@ -82,6 +96,9 @@ try {
     }
   }
   console.log(`P10_REAL_CROWD_SUMMARY ${JSON.stringify({ ok: true, results })}`);
+  if (p13Shared) {
+    console.log(`P13_REAL_SHARED_SUMMARY ${JSON.stringify({ ok: true, browsers: results.map(({browser, realConcurrentSessions, minGameplayMarkers, minFxPackets}) => ({browser, realConcurrentSessions, minGameplayMarkers, minFxPackets})) })}`);
+  }
 } finally {
   for (const child of children) terminate(child);
   if (staticServer) await new Promise((resolve) => staticServer.close(resolve));
@@ -97,6 +114,7 @@ async function startLab() {
   let cert = null;
   let buffer = "";
   let stderr = "";
+  let sharedProof = null;
   child.stdout.setEncoding("utf8");
   child.stderr.setEncoding("utf8");
   child.stderr.on("data", (value) => { stderr += value; process.stderr.write(value); });
@@ -107,6 +125,10 @@ async function startLab() {
     for (const line of buffer.split(/\r?\n/)) {
       const e = line.match(/P10_LOOPBACK_LISTENING (https:\/\/127\.0\.0\.1:\d+\/physics-fx-crowd)/);
       if (e) endpoint = e[1];
+      if (line.startsWith("P13_SHARED_DISPATCH_SUMMARY ")) {
+        const entries = [...line.matchAll(/([a-z_]+)=(\d+)/g)].map((match) => [match[1], Number(match[2])]);
+        sharedProof = Object.fromEntries(entries);
+      }
       if (line.includes("P10_CERT_SHA256 ")) {
         const hex = line.split("P10_CERT_SHA256 ").at(-1).trim()
           .replace(/[^0-9a-fA-F]/g, "").toLowerCase();
@@ -120,7 +142,7 @@ async function startLab() {
     await sleep(100);
   }
   if (!endpoint || !cert) throw new Error(`P10 crowd lab startup timed out: ${buffer}\n${stderr}`);
-  return { endpoint, cert, child };
+  return { endpoint, cert, child, sharedProof: () => sharedProof };
 }
 
 async function runBrowser(browser, lab, staticPort) {
