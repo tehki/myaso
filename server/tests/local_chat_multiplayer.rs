@@ -326,9 +326,12 @@ async fn truncated_chat_payload_times_out_without_closing_gameplay_datagrams() {
         .expect("send only partial chat body");
 
     let mut buffer = [0_u8; 1];
-    let outcome = timeout(Duration::from_secs(14), player.chat_recv.read_exact(&mut buffer))
-        .await
-        .expect("chat reply must close after bounded partial-body deadline");
+    let outcome = timeout(
+        Duration::from_secs(14),
+        player.chat_recv.read_exact(&mut buffer),
+    )
+    .await
+    .expect("chat reply must close after bounded partial-body deadline");
     assert!(
         outcome.is_err(),
         "partial chat body must end optional server chat stream"
@@ -356,10 +359,7 @@ async fn truncated_chat_payload_times_out_without_closing_gameplay_datagrams() {
                 .await
                 .expect("gameplay still receives snapshots and input ACKs");
             if packet.len() == 16 && packet[0] == 1 && packet[1] == 3 {
-                assert_eq!(
-                    u32::from_le_bytes(packet[4..8].try_into().unwrap()),
-                    101
-                );
+                assert_eq!(u32::from_le_bytes(packet[4..8].try_into().unwrap()), 101);
                 break;
             }
         }
