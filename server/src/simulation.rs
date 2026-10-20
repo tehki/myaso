@@ -345,8 +345,12 @@ impl Fighter {
             && self.latest_input.heavy_attack
             && !(input.attack && input.heavy_attack)
         {
-            self.pending_attack = false;
-            self.pending_heavy_attack = false;
+            // Preserve the chosen release as a one-tick pulse. A following
+            // neutral input can arrive before world.step() and must not erase
+            // an authentic short LMB click or completed heavy release.
+            // An all-zero transition is still cancellation, never a strike.
+            self.pending_attack = input.attack;
+            self.pending_heavy_attack = input.heavy_attack;
         }
         self.pending_attack |= input.attack && !self.latest_input.attack;
         self.pending_heavy_attack |= input.heavy_attack && !self.latest_input.heavy_attack;
@@ -1793,6 +1797,79 @@ mod r2_combat_control_tests {
                 "latest release intent must beat pending held bits"
             );
         }
+    }
+
+    #[test]
+    fn release_edge_survives_following_neutral_sample_before_server_tick() {
+        // WebTransport carries redundant samples and multiple distinct 60 Hz
+        // client inputs may be consumed before one authoritative world tick.
+        // Hold -> release -> neutral must resolve exactly once, not cancel.
+        for (release, expected) in [
+            (
+                InputIntent {
+                    attack: true,
+                    ..InputIntent::default()
+                },
+                Action::AttackWindup,
+            ),
+            (
+                InputIntent {
+                    heavy_attack: true,
+                    ..InputIntent::default()
+                },
+                Action::HeavyAttackWindup,
+            ),
+        ] {
+            let mut world = World::new(800.0, 600.0);
+            world.add_player_at(1, 250.0, 300.0, 0.0);
+            world.set_input(1, InputIntent {
+                attack: true,
+                heavy_attack: true,
+                ..InputIntent::default()
+            });
+            world.set_input(1, release);
+            world.set_input(1, InputIntent::default());
+            world.step();
+            assert_eq!(world.fighter(1).unwrap().action, expected);
+            world.step();
+            assert_eq!(world.fighter(1).unwrap().action, expected,
+                "the release must not repeat or turn into a cancelled charge");
+        }
+    }
+
+    #[test]
+    fn server_ready_release_then_neutral_activates_once_but_cancel_stays_idle() {
+        let mut world = World::new(800.0, 600.0);
+        world.add_player_at(1, 250.0, 300.0, 0.0);
+        world.set_input(1, InputIntent {
+            attack: true,
+            heavy_attack: true,
+            ..InputIntent::default()
+        });
+        for _ in 0..50 {
+            world.step();
+        }
+        assert_eq!(world.fighter(1).unwrap().action, Action::HeavyAttackWindup);
+        world.set_input(1, InputIntent {
+            heavy_attack: true,
+            ..InputIntent::default()
+        });
+        world.set_input(1, InputIntent::default());
+        world.step();
+        assert_eq!(world.fighter(1).unwrap().action, Action::HeavyAttackActive);
+        assert!(!world.fighter(1).unwrap().charging_heavy);
+
+        let mut cancelled = World::new(800.0, 600.0);
+        cancelled.add_player_at(2, 250.0, 300.0, 0.0);
+        cancelled.set_input(2, InputIntent {
+            attack: true,
+            heavy_attack: true,
+            ..InputIntent::default()
+        });
+        cancelled.set_input(2, InputIntent::default());
+        cancelled.step();
+        assert_eq!(cancelled.fighter(2).unwrap().action, Action::Idle,
+            "direct hold -> neutral is cancellation, not an attack");
     }
 
     #[test]
