@@ -17,7 +17,7 @@ use crate::loot::{LootAuthority, LootError};
 use crate::loot_persistence::{atomic_write, CheckpointError};
 use crate::magic::{EmberEffectStatus, MagicAuthority, MagicError};
 use crate::magic_checkpoint::{bundle, JointCheckpointError};
-use crate::simulation::{Action, CombatEvent, Fighter};
+use crate::simulation::{Action, CombatEvent, Fighter, World};
 use crate::zone::ZoneAuthority;
 
 #[derive(Debug)]
@@ -28,6 +28,11 @@ pub enum CombatDeathCheckpointError {
     NotDead,
     UnknownZone,
     WrongPosition,
+    StaleWorldTick,
+    MissingWorldFighter,
+    MissingDeathEvent,
+    DuplicateDeathEvent,
+    InvalidWorldTime,
     Loot(LootError),
     Magic(MagicError),
     Checkpoint(JointCheckpointError),
@@ -61,7 +66,7 @@ pub struct CommittedDeathLoot {
 /// On any pre-commit error the caller's in-memory loot and magic are unchanged.
 /// A second Death event fails on the persisted dead/inventory state rather
 /// than duplicating a corpse or scattering more items.
-pub fn commit_combat_death_loot(
+pub(crate) fn commit_combat_death_loot(
     path: &Path,
     loot: &mut LootAuthority,
     magic: &mut MagicAuthority,
@@ -129,6 +134,66 @@ pub fn commit_combat_death_loot(
         corpse_entity_id,
         cancelled_ember_intents: pending.len(),
     })
+}
+
+/// A narrow authoritative server-tick handoff. The caller provides the
+/// World AND the CombatEvent batch obtained from that SAME completed step.
+/// Neither the Fighter, timestamp nor the event victim is client-supplied.
+/// This API cannot cryptographically attest to event-batch provenance: the
+/// world caller must hold its single writer lock through the disk commit.
+pub struct WorldDeathTick<'a> {
+    pub lease: SessionLease,
+    pub world: &'a World,
+    pub completed_tick: u32,
+    pub combat_events: &'a [CombatEvent],
+    pub zones: &'a ZoneAuthority,
+}
+
+/// Fail closed on mismatched world ticks or duplicate/missing Death events,
+/// and read the actual dying Fighter and time from the authoritative World.
+///
+/// The persisted joint checkpoint STILL DOES NOT store the World or its HP,
+/// so crash recovery cannot yet reconstruct a complete Combat tick.
+pub fn commit_world_death_loot(
+    path: &Path,
+    loot: &mut LootAuthority,
+    magic: &mut MagicAuthority,
+    identity: &SessionIdentityRegistry,
+    tick: WorldDeathTick<'_>,
+) -> Result<CommittedDeathLoot, CombatDeathCheckpointError> {
+    if tick.world.tick != tick.completed_tick {
+        return Err(CombatDeathCheckpointError::StaleWorldTick);
+    }
+    let victim = tick.lease.server_session();
+    let mut events = tick.combat_events.iter().filter(|event| {
+        matches!(event, CombatEvent::Death { fighter, .. } if *fighter == victim)
+    });
+    let event = events
+        .next()
+        .ok_or(CombatDeathCheckpointError::MissingDeathEvent)?;
+    if events.next().is_some() {
+        return Err(CombatDeathCheckpointError::DuplicateDeathEvent);
+    }
+    let fighter = tick
+        .world
+        .fighter(victim)
+        .ok_or(CombatDeathCheckpointError::MissingWorldFighter)?;
+    if !tick.world.now_ms.is_finite() || tick.world.now_ms < 0.0 {
+        return Err(CombatDeathCheckpointError::InvalidWorldTime);
+    }
+    commit_combat_death_loot(
+        path,
+        loot,
+        magic,
+        identity,
+        CombatDeathContext {
+            lease: tick.lease,
+            event,
+            fighter,
+            zones: tick.zones,
+            now_ms: tick.world.now_ms as u64,
+        },
+    )
 }
 
 #[cfg(test)]
@@ -217,6 +282,114 @@ mod tests {
                 killer: 2,
             }
         }
+    }
+
+    #[test]
+    fn world_tick_adapter_rejects_stale_and_missing_or_duplicate_death_events() {
+        let mut state = Fixture::new();
+        let mut world = World::new(800.0, 600.0);
+        world.add_player_at(1, 200.0, 200.0, 0.0);
+        let death = Fixture::death_event();
+        let events = [death.clone(), death];
+        let checkpoint = path();
+        let lease = SessionLease::new(1, 1).unwrap();
+        assert!(matches!(
+            commit_world_death_loot(
+                &checkpoint,
+                &mut state.loot,
+                &mut state.magic,
+                &state.identity,
+                WorldDeathTick {
+                    lease,
+                    world: &world,
+                    completed_tick: 1,
+                    combat_events: &events,
+                    zones: &state.zones,
+                },
+            ),
+            Err(CombatDeathCheckpointError::StaleWorldTick)
+        ));
+        assert!(matches!(
+            commit_world_death_loot(
+                &checkpoint,
+                &mut state.loot,
+                &mut state.magic,
+                &state.identity,
+                WorldDeathTick {
+                    lease,
+                    world: &world,
+                    completed_tick: world.tick,
+                    combat_events: &[],
+                    zones: &state.zones,
+                },
+            ),
+            Err(CombatDeathCheckpointError::MissingDeathEvent)
+        ));
+        assert!(matches!(
+            commit_world_death_loot(
+                &checkpoint,
+                &mut state.loot,
+                &mut state.magic,
+                &state.identity,
+                WorldDeathTick {
+                    lease,
+                    world: &world,
+                    completed_tick: world.tick,
+                    combat_events: &events,
+                    zones: &state.zones,
+                },
+            ),
+            Err(CombatDeathCheckpointError::DuplicateDeathEvent)
+        ));
+        assert_eq!(state.loot.corpses().len(), 0);
+        assert_eq!(state.magic.pending_ember_intents().count(), 2);
+        assert!(!checkpoint.exists());
+    }
+
+    #[test]
+    fn world_tick_adapter_rejects_unmatched_live_fighter_and_absent_victim() {
+        let mut state = Fixture::new();
+        let checkpoint = path();
+        let mut world = World::new(800.0, 600.0);
+        world.add_player_at(1, 200.0, 200.0, 0.0);
+        let death = [Fixture::death_event()];
+        let lease = SessionLease::new(1, 1).unwrap();
+        assert!(matches!(
+            commit_world_death_loot(
+                &checkpoint,
+                &mut state.loot,
+                &mut state.magic,
+                &state.identity,
+                WorldDeathTick {
+                    lease,
+                    world: &world,
+                    completed_tick: world.tick,
+                    combat_events: &death,
+                    zones: &state.zones,
+                },
+            ),
+            Err(CombatDeathCheckpointError::NotDead)
+        ));
+        world.remove_player(1);
+        assert!(matches!(
+            commit_world_death_loot(
+                &checkpoint,
+                &mut state.loot,
+                &mut state.magic,
+                &state.identity,
+                WorldDeathTick {
+                    lease,
+                    world: &world,
+                    completed_tick: world.tick,
+                    combat_events: &death,
+                    zones: &state.zones,
+                },
+            ),
+            Err(CombatDeathCheckpointError::MissingWorldFighter)
+        ));
+        assert!(state.loot.corpses().is_empty());
+        assert_eq!(state.magic.pending_ember_intents().count(), 2);
+        assert!(!checkpoint.exists());
     }
 
     #[test]

@@ -40,6 +40,12 @@ Status: **domain foundation only — NOT live-game enabled**. Approved design di
 - Read-only Ember preparation verifies the exact authenticated session lease, learned Fire rune and Ember spell, equipped lootable Spellbook, Sulfur Ash reagent and mana. It costs 15 mana and one Sulfur Ash if eventually cast, but the preview consumes nothing and produces no effects.
 - Tests cover no-free-magic spawn, rewards, replayed receipts, casting prerequisites and rune/spell knowledge surviving full-loot death when the spellbook is taken. The knowledge ledger is **in memory only** and must be persisted transactionally with items before activating NPC lessons or spells. No live Magic integration, projectiles or combat changes.
 
+## World-tick-verified Combat death handoff (non-activated)
+
+- Introduced `commit_world_death_loot` as the safer public server-domain entry point for the experimental death bridge. Its `WorldDeathTick` supplies the actual authoritative `World`, completed world tick, corresponding CombatEvent batch, ZoneAuthority and verified SessionLease. The handler derives the victim Fighter and server time from `World`, refuses a stale world tick, missing/duplicate victim Death event, absent fighter, or a fighter who remains alive.
+- The lower-level `commit_combat_death_loot` is internal-only to this module. Added two Rust regressions for stale/duplicate/missing events, live versus dead Fighter discrepancy, missing victim and absence of state mutations on denial.
+- A trusted server caller must still ensure that the CombatEvent batch came from the same locked tick; this API is not a cryptographic event provenance proof or a persisted World snapshot. It does not activate a live World-event handler, spell, damage, or deployment.
+
 ## Combat Death → Full Loot and Ember cancellation (offline checkpoint)
 
 - Added `server/src/magic_combat_death.rs` as a trusted Combat Death-event handoff. It requires the exact verified victim SessionLease, matching `CombatEvent::Death` fighter ID, a server-owned Fighter in a dead/HP-zero state, and a finite in-bounds ZoneAuthority position. It stages full-loot `LootAuthority::death` and **cancellation of every still-pending Ember effect for the victim**, then saves them together with earned rune knowledge and replay watermarks in the **same MYWLD003 joint checkpoint** before publishing either in-memory state.
