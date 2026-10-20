@@ -11,6 +11,7 @@ Do not run this against any production account/property data.
 from __future__ import annotations
 
 from dataclasses import dataclass
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -120,6 +121,18 @@ CREATE TABLE outbox (
     event_kind TEXT NOT NULL,
     event_payload TEXT NOT NULL
 );
+-- A fictional read-side projection; NOT source of truth for ownership.
+CREATE TABLE title_projection (
+    parcel_id INTEGER PRIMARY KEY REFERENCES titles(parcel_id),
+    owner_id INTEGER NOT NULL REFERENCES accounts(id),
+    revision INTEGER NOT NULL CHECK(revision>=1),
+    last_sequence INTEGER NOT NULL CHECK(last_sequence>=0)
+);
+-- The consumer's durable idempotency inbox. No external event delivery.
+CREATE TABLE projection_inbox (
+    sequence INTEGER PRIMARY KEY REFERENCES outbox(sequence),
+    payload_sha256 TEXT NOT NULL CHECK(length(payload_sha256)=64)
+);
 """
 
 
@@ -179,6 +192,10 @@ def bootstrap_fixture(db_path: str | Path) -> None:
             "INSERT INTO seller_consents(id,listing_id,seller_id,parcel_id,"
             "title_revision,map_revision,price,fee_bps,expires_tick,state)"
             " VALUES('TEST_FIXTURE_ONLY',50,20,42,1,7,500,200,100,'approved')"
+        )
+        db.execute(
+            "INSERT INTO title_projection(parcel_id,owner_id,revision,last_sequence)"
+            " VALUES(42,20,1,0)"
         )
         db.commit()
     except BaseException:
@@ -397,6 +414,140 @@ def purchase(
         db.close()
 
 
+
+def pending_title_events(db_path: str | Path, *, limit: int = 100) -> list[dict]:
+    """Read undelivered *local fixture* outbox items in committed sequence order.
+
+    This does NOT publish events to network clients, Telegram, queues, or
+    external applications. The read model may legitimately lag the ledger.
+    """
+    if not isinstance(limit, int) or isinstance(limit, bool) or not 1 <= limit <= 1000:
+        raise ValueError("Offline poll limit must be in [1, 1000]")
+    db = _connect(db_path)
+    try:
+        rows = db.execute(
+            "SELECT o.sequence,o.event_kind,o.event_payload"
+            " FROM outbox o LEFT JOIN projection_inbox i ON i.sequence=o.sequence"
+            " WHERE i.sequence IS NULL ORDER BY o.sequence ASC LIMIT ?",
+            (limit,),
+        ).fetchall()
+        return [
+            {"sequence": seq, "event_kind": kind, "payload": data}
+            for seq, kind, data in rows
+        ]
+    finally:
+        db.close()
+
+
+def project_title_event(
+    db_path: str | Path,
+    sequence: int,
+    *,
+    failpoint: str | None = None,
+) -> str:
+    """Apply one committed *test* outbox event idempotently to a read model.
+
+    A transactional projection/inbox can be retried safely after a hard exit.
+    External side effects (e.g. network sends) are NOT exactly-once and are
+    deliberately absent. Only a trusted internal consumer should ever invoke
+    this hypothetical service, which has NO authentication or game endpoint.
+    """
+    if not _positive(sequence):
+        raise Denied("Invalid projection sequence")
+    allowed = (
+        None, "after_projection", "before_commit", "after_commit",
+        "hard_exit_after_projection", "hard_exit_before_commit",
+        "hard_exit_after_commit",
+    )
+    if failpoint not in allowed:
+        raise ValueError("Invalid offline consumer failpoint")
+    db = _connect(db_path)
+    committed = False
+    try:
+        db.execute("BEGIN IMMEDIATE")
+        row = db.execute(
+            "SELECT o.event_kind,o.event_payload,r.receipt,r.buyer_id"
+            " FROM outbox o JOIN receipts r ON r.sequence=o.sequence"
+            " WHERE o.sequence=?", (sequence,),
+        ).fetchone()
+        if row is None:
+            raise Denied("No committed event with receipt")
+        kind, event_json, receipt_json, buyer_id = row
+        if kind != "title_transferred" or event_json != receipt_json:
+            raise Denied("Outbox does not match committed receipt")
+        digest = hashlib.sha256(event_json.encode("utf-8")).hexdigest()
+        existing = db.execute(
+            "SELECT payload_sha256 FROM projection_inbox WHERE sequence=?",
+            (sequence,),
+        ).fetchone()
+        if existing is not None:
+            if existing[0] != digest:
+                raise Denied("Processed event no longer matches acknowledged digest")
+            db.commit()
+            committed = True
+            return "already_applied"
+        try:
+            event = json.loads(event_json)
+        except (ValueError, TypeError) as exc:
+            raise Denied("Malformed event payload") from exc
+        if (not isinstance(event, dict)
+            or not _positive(event.get("parcel_id"))
+            or not _positive(event.get("buyer_id"))
+            or not _positive(event.get("title_version"))
+            or not _positive(event.get("sequence"))
+            or event["sequence"] != sequence
+            or event["buyer_id"] != buyer_id):
+            raise Denied("Invalid event identity or contents")
+        projection = db.execute(
+            "SELECT owner_id,revision,last_sequence FROM title_projection"
+            " WHERE parcel_id=?", (event["parcel_id"],),
+        ).fetchone()
+        if (projection is None or projection[1] != event["title_version"] - 1
+            or projection[2] >= sequence):
+            raise Denied("Projection out of order or missing canonical title")
+        # Read model cannot advance past the true committed deed revision.
+        canonical = db.execute(
+            "SELECT revision FROM titles WHERE parcel_id=?",
+            (event["parcel_id"],),
+        ).fetchone()
+        if canonical is None or canonical[0] < event["title_version"]:
+            raise Denied("Event claims uncommitted title version")
+        if db.execute(
+            "UPDATE title_projection"
+            " SET owner_id=?,revision=?,last_sequence=?"
+            " WHERE parcel_id=? AND revision=? AND last_sequence=?",
+            (
+                event["buyer_id"], event["title_version"], sequence,
+                event["parcel_id"], projection[1], projection[2],
+            ),
+        ).rowcount != 1:
+            raise Denied("Concurrent projection update")
+        if failpoint == "hard_exit_after_projection":
+            os._exit(91)  # Offline child-process fault injection only.
+        if failpoint == "after_projection":
+            raise InjectedFailure("Read model updated but inbox not committed")
+        db.execute(
+            "INSERT INTO projection_inbox(sequence,payload_sha256) VALUES(?,?)",
+            (sequence, digest),
+        )
+        if failpoint == "hard_exit_before_commit":
+            os._exit(91)
+        if failpoint == "before_commit":
+            raise InjectedFailure("Projection and inbox not committed")
+        db.commit()
+        committed = True
+        if failpoint == "hard_exit_after_commit":
+            os._exit(91)
+        if failpoint == "after_commit":
+            raise InjectedFailure("Projection committed, ack lost")
+        return "applied"
+    except BaseException:
+        if not committed:
+            db.rollback()
+        raise
+    finally:
+        db.close()
+
 def snapshot(db_path: str | Path) -> dict:
     """Inspect persisted test state after closing/reopening the SQLite file."""
     db = _connect(db_path)
@@ -423,11 +574,23 @@ def snapshot(db_path: str | Path) -> dict:
         admitted_sessions = db.execute(
             "SELECT player_id,epoch,state FROM admitted_sessions ORDER BY player_id,epoch"
         ).fetchall()
+        read_model = db.execute(
+            "SELECT owner_id,revision,last_sequence FROM title_projection"
+            " WHERE parcel_id=42"
+        ).fetchone()
+        consumed_events = db.execute("SELECT count(*) FROM projection_inbox").fetchone()[0]
+        pending_events = db.execute(
+            "SELECT count(*) FROM outbox o"
+            " LEFT JOIN projection_inbox i ON i.sequence=o.sequence"
+            " WHERE i.sequence IS NULL"
+        ).fetchone()[0]
         return {
             "accounts": accounts, "title": owner, "listing": listing[0],
             "sequence": meta[0], "issued": meta[1], "receipts": receipts,
             "postings": postings, "outbox": outbox,
             "consent": consent_state, "sessions": admitted_sessions,
+            "read_model": read_model, "consumed_events": consumed_events,
+            "pending_events": pending_events,
             "conserved": sum(a[1] for a in accounts) == meta[1]
                 and all(total == 0 and n == 3 for _, total, n in postings)
                 and receipts == meta[0] and outbox == receipts
