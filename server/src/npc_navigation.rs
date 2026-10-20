@@ -1,21 +1,16 @@
 //! Deterministic LW-1D NPC pilot navigation over explicitly authored test obstacles.
 //! These rectangles are *not* live Greyhaven/world combat collision geometry.
 //! The paths are computed on a bounded grid once per process; no user inputs.
+pub use crate::npc_collision_contract::GRID_STEP;
+use crate::npc_collision_contract::{Collider, CollisionWindow, NavBounds};
 use crate::PROTOCOL_VERSION;
-use std::cmp::Reverse;
-use std::collections::BinaryHeap;
 use std::sync::OnceLock;
 
 pub const OBSTACLE_PACKET_TYPE: u8 = 10;
-pub const GRID_STEP: i32 = 5;
 const MIN_X: i32 = 60;
 const MIN_Y: i32 = 30;
 const MAX_X: i32 = 460;
 const MAX_Y: i32 = 320;
-const GRID_WIDTH: usize = ((MAX_X - MIN_X) / GRID_STEP + 1) as usize;
-const GRID_HEIGHT: usize = ((MAX_Y - MIN_Y) / GRID_STEP + 1) as usize;
-const GRID_SIZE: usize = GRID_WIDTH * GRID_HEIGHT;
-const PERSONAL_SPACE: i32 = 8;
 pub const WALK_TICKS: u32 = 600;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -58,96 +53,34 @@ const ROUTES: [AuthoredRoute; 3] = [
 type Path = Vec<(i32, i32)>;
 static PATHS: OnceLock<[Option<Path>; 3]> = OnceLock::new();
 
-fn position_for(index: usize) -> (i32, i32) {
-    (
-        MIN_X + (index % GRID_WIDTH) as i32 * GRID_STEP,
-        MIN_Y + (index / GRID_WIDTH) as i32 * GRID_STEP,
+fn pilot_window() -> CollisionWindow {
+    let colliders = PILOT_BARRIERS.map(|rect| Collider {
+        x: i32::from(rect.x),
+        y: i32::from(rect.y),
+        width: i32::from(rect.width),
+        height: i32::from(rect.height),
+    });
+    CollisionWindow::pilot(
+        NavBounds {
+            min_x: MIN_X,
+            min_y: MIN_Y,
+            max_x: MAX_X,
+            max_y: MAX_Y,
+        },
+        &colliders,
     )
+    .expect("authored pilot rectangle geometry is valid")
 }
-fn index_for(x: i32, y: i32) -> Option<usize> {
-    if !(MIN_X..=MAX_X).contains(&x)
-        || !(MIN_Y..=MAX_Y).contains(&y)
-        || (x - MIN_X) % GRID_STEP != 0
-        || (y - MIN_Y) % GRID_STEP != 0
-    {
-        return None;
-    }
-    Some(((y - MIN_Y) / GRID_STEP) as usize * GRID_WIDTH + ((x - MIN_X) / GRID_STEP) as usize)
-}
+
+#[cfg(test)]
 fn blocked(x: i32, y: i32) -> bool {
-    PILOT_BARRIERS.iter().any(|barrier| {
-        x >= i32::from(barrier.x) - PERSONAL_SPACE
-            && y >= i32::from(barrier.y) - PERSONAL_SPACE
-            && x <= i32::from(barrier.x + barrier.width) + PERSONAL_SPACE
-            && y <= i32::from(barrier.y + barrier.height) + PERSONAL_SPACE
-    })
+    pilot_window().contains_obstacle(x, y)
 }
 
-fn shortest_route(start: (i32, i32), end: (i32, i32)) -> Option<Path> {
-    let source = index_for(start.0, start.1)?;
-    let target = index_for(end.0, end.1)?;
-    if blocked(start.0, start.1) || blocked(end.0, end.1) {
-        return None;
-    }
-
-    let mut distance = vec![u32::MAX; GRID_SIZE];
-    let mut previous = vec![None; GRID_SIZE];
-    let mut frontier = BinaryHeap::new();
-    distance[source] = 0;
-    frontier.push(Reverse((0_u32, source)));
-    const STEPS: [(i32, i32, u32); 8] = [
-        (1, 0, 10),
-        (0, 1, 10),
-        (-1, 0, 10),
-        (0, -1, 10),
-        (1, 1, 14),
-        (-1, 1, 14),
-        (-1, -1, 14),
-        (1, -1, 14),
-    ];
-    while let Some(Reverse((cost, index))) = frontier.pop() {
-        if index == target {
-            break;
-        }
-        if cost != distance[index] {
-            continue;
-        }
-        let (x, y) = position_for(index);
-        for (dx, dy, step_cost) in STEPS {
-            let next_x = x + dx * GRID_STEP;
-            let next_y = y + dy * GRID_STEP;
-            let Some(neighbor) = index_for(next_x, next_y) else {
-                continue;
-            };
-            if blocked(next_x, next_y)
-                || (dx != 0
-                    && dy != 0
-                    && (blocked(x + dx * GRID_STEP, y) || blocked(x, y + dy * GRID_STEP)))
-            {
-                continue;
-            }
-            let next_cost = cost + step_cost;
-            if next_cost < distance[neighbor] {
-                distance[neighbor] = next_cost;
-                previous[neighbor] = Some(index);
-                frontier.push(Reverse((next_cost, neighbor)));
-            }
-        }
-    }
-    if distance[target] == u32::MAX {
-        return None;
-    }
-    let mut path = vec![end];
-    let mut cursor = target;
-    while cursor != source {
-        cursor = previous[cursor]?;
-        path.push(position_for(cursor));
-        if path.len() > GRID_SIZE {
-            return None;
-        }
-    }
-    path.reverse();
-    Some(path)
+fn shortest_route(start: GridPoint, end: GridPoint) -> Option<Path> {
+    // The navigation contract can plan validated, bounded server-owned
+    // collision windows. Runtime staging still uses its own pilot geometry.
+    pilot_window().plan(start, end).ok()
 }
 
 fn routes() -> &'static [Option<Path>; 3] {

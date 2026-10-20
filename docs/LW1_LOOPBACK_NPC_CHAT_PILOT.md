@@ -149,3 +149,14 @@ outside expanded obstacle rectangles, diagonal paths cannot cut through
 corners, and pilot geometry uses the separate bounded packet type 10.
 The browser decoder validates rectangle count, dimensions and in-bounds
 coordinates before showing a barrier.
+## LW-1E — Bounded authoritative collider input contract
+
+Phase A of World & Buildings ([PR #336](https://github.com/tehki/myaso/pull/336)) carries *visual-only* building footprints. Phase B2 / C1 are in separate active PRs; they are **not** active map/door collision authority in this NPC branch. Therefore no building scenery is treated as a server-verified wall or used to authorize NPC or player passage.
+
+The NPC pilot now routes through one reusable Rust pathfinding implementation: `server/src/npc_collision_contract.rs`. It accepts only an explicitly **server-owned collision input** (there is no client/network entry point), validates the source zone, format version 1, nonzero revision, exact finite local grid bounds, rectangle dimensions and maximum blockers, and returns either a deterministic obstacle-avoiding path or a typed error. Grid spacing is 5 world units, clearance 8 units, up to 48 blockers and up to 101×101 cells per local window. An unavailable/invalid start or destination, blocked endpoints, fully divided passage, wrong zone or unsupported revision fail closed. Diagonal path corners must have two orthogonally free neighbors.
+
+The map-aware constructor `CollisionWindow::from_server_collision_manifest(ZoneId, version, revision, bounds, blockers)` is **not yet called by live gameplay**. Its future caller must be the approved authoritative **Rust world/door collision pipeline**, not browser-authored display data. The prototype navigation reuses the same implementation through an explicit `NavigationSpace::Pilot` input for three existing **nonphysical** test barriers. Precomputed pilot routes retain previous positions and animations; no world hot-path Dijkstra execution, combat collision or actor mutations were added.
+
+Tested: Rust contracts for version/zone, nonzero revision, local map windows at real 4k Moonvale coordinates, finite resource bounds, invalid blockers, blocked endpoints, total obstruction, and diagonal corner-cut resistance. The pilot’s original route/obstacle tests still use the same planner. There are no new protocol packet types or JS dependencies in LW-1E.
+
+**Next boundary:** obtain a separately versioned, approved, map-to-Rust **collision** manifest from the World & Buildings integration stream, with doors/portals and occupancy metadata. Bind NPC states and physical interactions to the correct zone, then replan only on server-authorized geometry revisions. Until then, all in-game NPC geometry remains **staging-only**, off by default and loopback-only.
