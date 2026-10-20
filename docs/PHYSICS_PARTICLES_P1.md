@@ -455,3 +455,21 @@ P16 hardens the *inactive* `server/src/magic_fx_shared_writer.rs` boundary again
 These are **defense-in-depth** checks for a future Core adapter, not a new authority source. The apparent packet zone is still untrusted for authorization; P12 and Core 8C must bind it to the actual authenticated server-owned zone and fenced epoch before enqueue. P16's caps are *semantic payload* caps, not actual encrypted QUIC bytes, and no client-driven control can call the inactive module.
 
 No `server/src/main.rs`, live `/game` sender, production authentication, spell, combat, world or deployment is changed. Prior P9/P10/P11/P13/P15 and every protected Combat gate remain enabled. Cross-department sign-off and complete green exact-head CI are required before proposing a merge or activation. PR #357 remains DRAFT / UNMERGED / UNDEPLOYED.
+
+## P17 — deterministic guarded-writer reconnection and zone fault injection (2026-10-21)
+
+**Precondition:** P16 exact-head [CI #39515467392](https://github.com/tehki/myaso/actions/runs/39515467392) passed strict Rust and all Physics P9/P10/P11/P13/P15 acceptance but **overall CI failed** at the unrelated existing protected Combat **M145 spatial recovery handoff** scenario. Earlier P15 [#39511931671](https://github.com/tehki/myaso/actions/runs/39511931671) failed at Combat **M147 actionable FFA recovery punish**. Both gates remain blockers; neither is waived, softened or inferred to be caused by Physics.
+
+P17 adds `server/src/magic_fx_fault_tests.rs` as **test-only code** registered under `#[cfg(test)]` in `server/src/lib.rs`. It uses the real inactive P8 trusted route registry, P12 gameplay-first planner, and P15 `try_write_core_guarded` interface. A deterministic `FencedWriter` mock holds a mutable *Core-like server-owned registry* and injects route changes immediately after an accepted local enqueue; the subsequent enqueue must check the new generation before admitting any bytes. This tests important boundary behavior, not production transport locking or live QUIC reconnection.
+
+P17's five fault scenarios enforce:
+
+1. **Zone transfer between two gameplay sends**: the first authoritative-style packet is accepted, the second reports the precise `next_unsent_gameplay_index=1`, and all queued old-zone FX is withheld.
+2. **Zone transfer after gameplay, before FX**: accepted gameplay for one client remains intact; its stale visual event is discarded without affecting another connection's gameplay and valid cosmetic event.
+3. **Trusted disconnect and reused server connection ID / net ID**: a newly minted generation in a new zone never receives an old-generation effect; only an explicitly new gameplay/FX plan using the newly registered route is admitted.
+4. **Disconnect between gameplay packets**: no implicit replay to a new occupant, no dropped unsent gameplay hidden by FX delivery, and the original second packet remains in Core-owned input storage.
+5. **Already-authorized zone transfer before planning**: P12 rejects the stale cosmetic route while preserving the new-zone authoritative-style gameplay packet.
+
+All injected actions are deterministic and server-owned; no untrusted browser message causes a transfer, changes credentials or supplies its own authoritative zone. Tests assert byte-identity, accepted vs unsent cursors, cosmetic drop classification, and no cross-session leakage. No existing Combat gate or Physics browser-flight threshold is touched. P17 is **not** real transport/disconnect/churn evidence: production 8A/8B/8C must still serialize connection fencing and socket enqueue, test genuine generation switches on actual multi-host connections, validate real Combat latency/ACKs and approve protocol negotiation before any activation.
+
+**P17 stays DRAFT / UNMERGED / UNDEPLOYED; live `server/src/main.rs`, `/game`, magic casting, gameplay, and deployed instances remain unchanged.**
