@@ -570,15 +570,25 @@ mod tests {
             },
             selection,
         );
-        assert!(matches!(loser, Err(PickupCommitError::Loot(LootError::NotFound))));
+        assert!(matches!(
+            loser,
+            Err(PickupCommitError::Loot(LootError::NotFound))
+        ));
         assert_eq!(loot.committed_operation_sequence(winner), Some(1));
         assert_eq!(loot.committed_operation_sequence(other), None);
         assert!(loot.inventory(3).unwrap().backpack().is_empty());
 
         let (stored, _) = load_joint(&checkpoint).unwrap();
         assert!(stored.corpses()[&corpse].items.is_empty());
-        assert_eq!(stored.parked_inventory(winner).unwrap().backpack()[0].id, sword);
-        assert!(stored.parked_inventory(other).unwrap().backpack().is_empty());
+        assert_eq!(
+            stored.parked_inventory(winner).unwrap().backpack()[0].id,
+            sword
+        );
+        assert!(stored
+            .parked_inventory(other)
+            .unwrap()
+            .backpack()
+            .is_empty());
         assert_eq!(stored.committed_operation_sequence(other), None);
         let _ = fs::remove_file(&checkpoint);
     }
@@ -595,7 +605,9 @@ mod tests {
         zones.register(2).unwrap();
         let mut identity = SessionIdentityRegistry::new();
         let character = CharacterId::new(22).unwrap();
-        identity.bind_verified(lease(1), CharacterId::new(11).unwrap()).unwrap();
+        identity
+            .bind_verified(lease(1), CharacterId::new(11).unwrap())
+            .unwrap();
         identity.bind_verified(lease(2), character).unwrap();
         let mut loot = LootAuthority::new();
         loot.register(1).unwrap();
@@ -628,7 +640,10 @@ mod tests {
                 amount: 1,
             },
         );
-        assert!(matches!(result, Err(PickupCommitError::Loot(LootError::OutOfReach))));
+        assert!(matches!(
+            result,
+            Err(PickupCommitError::Loot(LootError::OutOfReach))
+        ));
         assert_eq!(loot.corpses()[&corpse].items[0].id, sword);
         assert!(loot.inventory(2).unwrap().backpack().is_empty());
         assert_eq!(loot.committed_operation_sequence(character), None);
