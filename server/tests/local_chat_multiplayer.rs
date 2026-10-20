@@ -8,7 +8,7 @@ use std::{
     time::Duration,
 };
 use tokio::time::timeout;
-use wtransport::{ClientConfig, Connection, Endpoint, RecvStream, SendStream};
+use wtransport::{ClientConfig, Connection, Endpoint, RecvStream, SendStream, tls::Sha256Digest, endpoint::endpoint_side};
 
 struct TestServer(Child);
 impl Drop for TestServer {
@@ -17,7 +17,7 @@ impl Drop for TestServer {
         let _ = self.0.wait();
     }
 }
-fn start_server() -> (TestServer, String) {
+fn start_server() -> (TestServer, String, Sha256Digest) {
     let mut process = Command::new(env!("CARGO_BIN_EXE_myaso-server"))
         .env("MYASO_BIND", "127.0.0.1:0")
         .env("MYASO_CHAT_RADIUS", "160")
@@ -28,21 +28,29 @@ fn start_server() -> (TestServer, String) {
     let output = process.stdout.take().expect("server output");
     let (sender, receiver) = mpsc::channel();
     std::thread::spawn(move || {
+        let mut url = None;
+        let mut digest = None;
         for line in BufReader::new(output).lines().map_while(Result::ok) {
-            if let Some(url) = line.split("listening on ").nth(1) {
-                let _ = sender.send(url.trim().to_owned());
+            if let Some(value) = line.split("listening on ").nth(1) {
+                url = Some(value.trim().to_owned());
+            }
+            if let Some(value) = line.split("development certificate SHA-256: ").nth(1) {
+                digest = Some(value.trim().parse::<Sha256Digest>().expect("cert digest"));
+            }
+            if let (Some(url), Some(digest)) = (url.take(), digest.take()) {
+                let _ = sender.send((url, digest));
                 break;
             }
         }
     });
-    let url = receiver.recv_timeout(Duration::from_secs(15))
-        .expect("actual game server listening URL");
+    let (url, digest) = receiver.recv_timeout(Duration::from_secs(15))
+        .expect("actual game server listening URL and pinned TLS cert");
     assert!(url.starts_with("https://127.0.0.1:"));
-    (TestServer(process), url)
+    (TestServer(process), url, digest)
 }
 
 struct Player {
-    _endpoint: Endpoint,
+    _endpoint: Endpoint<endpoint_side::Client>,
     connection: Connection,
     _game_send: SendStream,
     _game_recv: RecvStream,
@@ -50,12 +58,11 @@ struct Player {
     chat_recv: RecvStream,
 }
 impl Player {
-    async fn connect(url: &str) -> Self {
-        // Self-signed certificate bypass is permitted solely in this loopback
-        // test harness, never in production player/browser connections.
+    async fn connect(url: &str, digest: &Sha256Digest) -> Self {
+        // Pin the actual short-lived server certificate even in loopback tests.
         let endpoint = Endpoint::client(ClientConfig::builder()
             .with_bind_default()
-            .with_no_cert_validation()
+            .with_server_certificate_hashes([digest.clone()])
             .build()).expect("test endpoint");
         let connection = timeout(Duration::from_secs(8), endpoint.connect(url))
             .await.expect("connect timeout").expect("connect");
@@ -118,10 +125,10 @@ fn assert_received(frame: &[u8], sender: u32, text: &str) -> u64 {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn real_three_connection_local_chat_and_distant_isolation() {
-    let (_server, url) = start_server();
-    let mut alice = Player::connect(&url).await;
-    let mut bob = Player::connect(&url).await;
-    let mut distant = Player::connect(&url).await;
+    let (_server, url, digest) = start_server();
+    let mut alice = Player::connect(&url, &digest).await;
+    let mut bob = Player::connect(&url, &digest).await;
+    let mut distant = Player::connect(&url, &digest).await;
 
     // Server-assigned IDs are 1, 2, 3, with spawn X=42, 138, 234.
     // A-B separation is 96 units, A-C separation is 192.
