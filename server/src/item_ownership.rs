@@ -608,13 +608,31 @@ mod tests {
     fn destroyed_item_ids_cannot_be_resurrected_with_new_transaction_ids() {
         let mut ledger = ItemOwnershipLedger::default();
         ledger
-            .apply(txn(1), &[OwnershipOp::Create { item: item(8), at: bag(1) }])
+            .apply(
+                txn(1),
+                &[OwnershipOp::Create {
+                    item: item(8),
+                    at: bag(1),
+                }],
+            )
             .expect("mint once");
         ledger
-            .apply(txn(2), &[OwnershipOp::Destroy { item: item(8), from: bag(1) }])
+            .apply(
+                txn(2),
+                &[OwnershipOp::Destroy {
+                    item: item(8),
+                    from: bag(1),
+                }],
+            )
             .expect("destroy");
         assert_eq!(
-            ledger.apply(txn(3), &[OwnershipOp::Create { item: item(8), at: bag(1) }]),
+            ledger.apply(
+                txn(3),
+                &[OwnershipOp::Create {
+                    item: item(8),
+                    at: bag(1)
+                }]
+            ),
             Err(OwnershipError::ItemAlreadyExists)
         );
         assert_eq!(ledger.location(item(8)), None);
