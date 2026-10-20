@@ -56,6 +56,33 @@ test("input packet keeps three redundant samples in 34 self-contained bytes", ()
   assert.ok(Math.abs(decoded.samples[1].moveX - 0.5) < 0.01);
 });
 
+test("v1 input decoder rejects reserved header bits and impossible axes in any sample", () => {
+  const valid = encodeInputPacket({
+    sequence: 10,
+    clientTick: 100,
+    samples: [
+      { tick: 100, moveX: -1, moveY: 1 },
+      { tick: 99, moveX: 0, moveY: 0 },
+      { tick: 98, moveX: 1, moveY: -1 },
+    ],
+  });
+  assert.equal(decodeInputPacket(valid).samples[0].moveX, -1);
+  assert.equal(decodeInputPacket(valid).samples[0].moveY, 1);
+
+  for (const reserved of [1, 255]) {
+    const malformed = new Uint8Array(valid.slice(0));
+    malformed[3] = reserved;
+    assert.throws(() => decodeInputPacket(malformed), /reserved input header/);
+  }
+  for (let index = 0; index < 3; index += 1) {
+    for (const axisOffset of [1, 2]) {
+      const malformed = new Uint8Array(valid.slice(0));
+      malformed[16 + index * 6 + axisOffset] = 0x80;
+      assert.throws(() => decodeInputPacket(malformed), /normalized movement axis/);
+    }
+  }
+});
+
 test("heavy attack uses a spare input bit without expanding the packet", () => {
   const packet = encodeInputPacket({
     sequence: 42,
