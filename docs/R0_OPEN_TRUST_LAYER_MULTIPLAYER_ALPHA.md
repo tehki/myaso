@@ -70,13 +70,28 @@ R0 as invite-locked or account-authenticated until those controls exist.
    (installer is in the checked-out trusted PR/source). This creates a
    dedicated `myaso-alpha` user and release path under
    `/srv/myaso/alpha`, and stages an inactive release symlink. Certificate
-   generation and changes to the active release are deferred to activation. **Stage mode does not change Caddy, rotate certificates, modify the current
+   generation and changes to the active release are deferred to activation. When
+   an existing WebTransport certificate remains valid for at least three days,
+   stage also writes the corresponding **public, certificate-pinned**
+   `game-config.json` **only into the inactive release**. On first installation
+   or an expiring certificate, config generation waits for `--activate`.
+   **Stage mode does not change Caddy, rotate certificates, modify the current
    release, open UDP/4433 or enable the game service**, and can run before the DNS record exists.
 5. Verify the DNS A record resolves publicly to `168.113.210.63`, then run
    `bash install-vps.sh --activate PACKAGE PACKAGE.sha256`. It verifies DNS,
    validates Caddy before reload, adds an **isolated** hostname-only site,
    enables the dedicated game systemd service and daily cert-rotation timer,
    and permits only **4433/udp** as a new UFW rule.
+**Release safety:** Do not treat a bare `current` symlink switch as a complete
+activation: the packaged archive does not contain the runtime-generated
+`game-config.json`. Always use the verified activation procedure or ensure a
+staged config matching the live certificate exists *before* switching. After
+switching, require `/game-config.json` HTTP 200 and the matching certificate pin
+as well as the UDP/4433 listener; revert the symlink and restart **only
+`myaso-alpha.service`** if any gate fails. An Oct 19 R2 trial exposed this
+failure mode (HTTP 404) and was immediately rolled back before the corrected
+activation and genuine two-browser join check.
+
 6. Smoke checks: `systemctl is-active myaso-alpha.service`,
    `ss -lun | grep 4433`, `curl -fsSI https://game.open-trust-layer.org/web/alpha.html`,
    `curl -fsS https://game.open-trust-layer.org/game-config.json`

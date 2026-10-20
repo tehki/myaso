@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { readFileSync } from "node:fs";
+import { readFileSync, writeFileSync, mkdirSync, mkdtempSync, rmSync, existsSync, statSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import { createHash } from "node:crypto";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { parseAlphaConfig, alphaPlayPath } from "../web/alpha-config.mjs";
 
 const trusted = {
@@ -44,4 +48,64 @@ test("R0 launcher offers a real online route; existing local practice remains se
   assert.match(bootstrap, /params\.has\("server"\)/);
   assert.match(bootstrap, /Multiplayer connection failed/);
   assert.match(bootstrap, /\/web\/alpha\.html/);
+});
+
+function withTempStage(callback) {
+  const temp = mkdtempSync(join(tmpdir(), "myaso-r0-stage-config-"));
+  const stage = join(temp, "staged-public");
+  const live = join(temp, "live-public");
+  mkdirSync(join(stage, "web"), { recursive: true });
+  mkdirSync(live);
+  writeFileSync(join(stage, "web", "alpha.html"), "<!doctype html>");
+  writeFileSync(join(live, "game-config.json"), "LIVE_UNCHANGED");
+  try { callback({ temp, stage, live }); }
+  finally { rmSync(temp, { recursive: true, force: true }); }
+}
+
+function generateStageCert(temp, days) {
+  const cert = join(temp, "cert.pem");
+  const key = join(temp, "key.pem");
+  execFileSync("openssl", ["req", "-new", "-x509", "-nodes", "-days", String(days),
+    "-sha256", "-newkey", "ec", "-pkeyopt", "ec_paramgen_curve:P-256",
+    "-subj", "/CN=game.open-trust-layer.org",
+    "-addext", "subjectAltName=DNS:game.open-trust-layer.org",
+    "-keyout", key, "-out", cert], { stdio: "ignore" });
+  return cert;
+}
+
+test("R2 stage pre-seeds an inactive release with actual sha256 certificate pin, preserving live config", () => {
+  withTempStage(({ temp, stage, live }) => {
+    const cert = generateStageCert(temp, 10);
+    const helper = new URL("../ops/alpha/write-staged-config.sh", import.meta.url).pathname;
+    execFileSync("bash", [helper, stage, cert], { stdio: "pipe" });
+    const config = JSON.parse(readFileSync(join(stage, "game-config.json"), "utf8"));
+    const der = execFileSync("openssl", ["x509", "-in", cert, "-outform", "DER"]);
+    const expected = createHash("sha256").update(der).digest("hex");
+    assert.equal(config.certificateSha256, expected);
+    assert.deepEqual(parseAlphaConfig(config), config);
+    assert.equal(statSync(join(stage, "game-config.json")).mode & 0o777, 0o644);
+    assert.equal(readFileSync(join(live, "game-config.json"), "utf8"), "LIVE_UNCHANGED");
+  });
+});
+
+test("R2 stage skips missing or soon-expiring TLS certificates instead of inventing a pin", () => {
+  withTempStage(({ temp, stage }) => {
+    const helper = new URL("../ops/alpha/write-staged-config.sh", import.meta.url).pathname;
+    execFileSync("bash", [helper, stage, join(temp, "absent.pem")], { stdio: "pipe" });
+    assert.equal(existsSync(join(stage, "game-config.json")), false);
+    const cert = generateStageCert(temp, 1);
+    execFileSync("bash", [helper, stage, cert], { stdio: "pipe" });
+    assert.equal(existsSync(join(stage, "game-config.json")), false);
+  });
+});
+
+test("R2 installer invokes inactive config preseed only at --stage; --activate retains certificate generation", () => {
+  const script = readFileSync(new URL("../ops/alpha/install-vps.sh", import.meta.url), "utf8");
+  const stage = script.slice(script.indexOf('if [[ "$mode" == --stage ]]'), script.indexOf("exit 0", script.indexOf('if [[ "$mode" == --stage ]]')));
+  assert.match(stage, /write-staged-config\.sh/);
+  assert.match(stage, /"\$release\/public"/);
+  assert.doesNotMatch(stage, /systemctl|ufw|caddy reload|rotate-cert\.sh/);
+  const activate = script.slice(script.indexOf("previous_release="));
+  assert.match(activate, /rotate-cert\.sh/);
+  assert.match(activate, /systemctl is-active/);
 });
