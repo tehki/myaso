@@ -171,7 +171,7 @@ try{
   const radius=manifest.coordinateConvention.fighterRadiusWorldUnits;
   if (manifest.coordinateConvention.cameraZoom!==ARENA_VIEW_ZOOM ||
       calibration.gameZoom!==ARENA_VIEW_ZOOM ||
-      calibration.gamePixelsPerAuthoringMeter!==ARENA_VIEW_ZOOM/meters ||
+      Math.abs(calibration.gamePixelsPerAuthoringMeter-ARENA_VIEW_ZOOM/meters)>.00001 ||
       calibration.productionApproved!==false ||
       cinematicReport.gameXYProjectionMatched!==false ||
       cinematic.browserRuntimeIntegrated!==false ||
