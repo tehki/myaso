@@ -24,7 +24,8 @@ CREATE TABLE witness_head (
     realm TEXT NOT NULL,
     sequence INTEGER NOT NULL CHECK (sequence>=0),
     projected_events INTEGER NOT NULL CHECK (projected_events>=0),
-    logical_sha256 TEXT NOT NULL CHECK(length(logical_sha256)=64)
+    logical_sha256 TEXT NOT NULL CHECK(length(logical_sha256)=64),
+    mutation_revision INTEGER NOT NULL DEFAULT 0 CHECK(mutation_revision>=0)
 );
 """
 
@@ -51,26 +52,27 @@ def _open_witness(path: str | Path) -> sqlite3.Connection:
     return db
 
 
-def _head(db: sqlite3.Connection) -> tuple[str, int, int, str]:
+def _head(db: sqlite3.Connection) -> tuple[str, int, int, str, int]:
     if db.execute("PRAGMA integrity_check").fetchone() != ("ok",):
         raise WitnessConflict("Witness storage integrity failed")
     rows = db.execute(
-        "SELECT realm,sequence,projected_events,logical_sha256"
+        "SELECT realm,sequence,projected_events,logical_sha256,mutation_revision"
         " FROM witness_head WHERE singleton=1"
     ).fetchall()
     if len(rows) != 1 or db.execute(
         "SELECT count(*) FROM witness_head"
     ).fetchone()[0] != 1:
         raise WitnessConflict("Witness has no unique committed tip")
-    realm, sequence, projected, digest = rows[0]
+    realm, sequence, projected, digest, mutation_revision = rows[0]
     if (
         not isinstance(realm, str) or not realm
         or type(sequence) is not int or sequence < 0
         or type(projected) is not int or projected < 0
+        or type(mutation_revision) is not int or mutation_revision < 0
         or not isinstance(digest, str) or len(digest) != 64
     ):
         raise WitnessConflict("Malformed persisted witness state")
-    return realm, sequence, projected, digest
+    return realm, sequence, projected, digest, mutation_revision
 
 
 def initialize_fixture_witness(
@@ -109,8 +111,8 @@ def initialize_fixture_witness(
         db.execute("BEGIN IMMEDIATE")
         db.execute(
             "INSERT INTO witness_head(singleton,realm,sequence,"
-            "projected_events,logical_sha256) VALUES(1,?,?,?,?)",
-            (realm, 0, 0, report.logical_sha256),
+            "projected_events,logical_sha256,mutation_revision) VALUES(1,?,?,?,?,?)",
+            (realm, 0, 0, report.logical_sha256, 0),
         )
         db.commit()
     except BaseException:
@@ -138,10 +140,9 @@ def observe_fixture_checkpoint(
 ) -> str:
     """Advance one independent witness tip following full live DB validation.
 
-    Progress is lexicographic on (committed transaction sequence, applied
-    outbox count). Same progress with a different digest is rejected; changes
-    to sessions/listings that do not advance either clock cannot be witnessed
-    by this reference and must be separately versioned in production.
+    Progress is monotonic independently across (committed purchase sequence,
+    applied outbox count, admitted revocation revision). Direct SQL edits that
+    bypass those clocks are rejected at unchanged progress, not authorized.
 
     Deliberate hard_exit failpoints may terminate a disposable test process.
     """
@@ -155,16 +156,16 @@ def observe_fixture_checkpoint(
     committed = False
     try:
         db.execute("BEGIN IMMEDIATE")
-        existing_realm, sequence, projected, digest = _head(db)
+        existing_realm, sequence, projected, digest, mutation_revision = _head(db)
         if existing_realm != realm:
             raise WitnessConflict("Witness registered for another realm")
         report = verify_fixture_checkpoint(
             current_db_path, checkpoint, expected_realm=realm,
             trusted_keys=trusted_keys, minimum_committed_sequence=sequence,
         )
-        next_progress = (report.sequence, report.inbox_events)
-        old_progress = (sequence, projected)
-        if next_progress < old_progress or report.inbox_events < projected:
+        next_progress = (report.sequence, report.inbox_events, report.mutation_revision)
+        old_progress = (sequence, projected, mutation_revision)
+        if any(new < old for new, old in zip(next_progress, old_progress)):
             raise WitnessConflict("Committed/projection watermark rollback")
         if next_progress == old_progress:
             if report.logical_sha256 != digest:
@@ -174,10 +175,10 @@ def observe_fixture_checkpoint(
             return "unchanged"
         if db.execute(
             "UPDATE witness_head SET sequence=?, projected_events=?,"
-            "logical_sha256=? WHERE singleton=1 AND sequence=?"
-            " AND projected_events=? AND logical_sha256=?",
+            "logical_sha256=?, mutation_revision=? WHERE singleton=1 AND sequence=?"
+            " AND projected_events=? AND logical_sha256=? AND mutation_revision=?",
             (report.sequence, report.inbox_events, report.logical_sha256,
-             sequence, projected, digest),
+             report.mutation_revision, sequence, projected, digest, mutation_revision),
         ).rowcount != 1:
             raise WitnessConflict("Concurrent witness changed during update")
         if failpoint == "hard_exit_before_commit":
@@ -217,7 +218,7 @@ def verify_restore_with_witness(
     db = _open_witness(witness_path)
     try:
         db.execute("BEGIN IMMEDIATE")
-        expected_realm, sequence, projected, digest = _head(db)
+        expected_realm, sequence, projected, digest, mutation_revision = _head(db)
         if expected_realm != realm:
             raise WitnessConflict("Witness realm mismatch")
         report = verify_fixture_checkpoint(
@@ -227,6 +228,7 @@ def verify_restore_with_witness(
         if (
             report.sequence != sequence
             or report.inbox_events != projected
+            or report.mutation_revision != mutation_revision
             or report.logical_sha256 != digest
         ):
             raise WitnessConflict("Restore does not match separately committed tip")
@@ -246,7 +248,22 @@ def read_fixture_witness_tip(path: str | Path) -> tuple[str, int, int, str]:
         db.execute("BEGIN IMMEDIATE")
         tip = _head(db)
         db.commit()
-        return tip
+        return tip[:4]
+    except BaseException:
+        db.rollback()
+        raise
+    finally:
+        db.close()
+
+
+def read_fixture_witness_mutation_revision(path: str | Path) -> int:
+    """Read the additional witnessed revocation revision, fixture-only."""
+    db = _open_witness(path)
+    try:
+        db.execute("BEGIN IMMEDIATE")
+        revision = _head(db)[4]
+        db.commit()
+        return revision
     except BaseException:
         db.rollback()
         raise
