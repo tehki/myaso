@@ -162,6 +162,13 @@ tiles=batch("Red Lion A2.1 / batched individually coloured clay roof tiles",
            tile_verts,tile_faces,clay_tiles,tile_ids,"roof-occlusion-candidate")
 tiles["tile_count"]=tile_count
 tiles["single_draw_mesh"]=True
+# A1 wooden roof course placeholders visibly protrude through the new clay
+# tiles. Keep the object and mesh in the derived .blend for rollback, but hide
+# the obsolete course render layer. The original A2 .blend is not modified.
+legacy_courses = bpy.data.objects.get("Red Lion / roof_tile_courses")
+assert legacy_courses is not None and legacy_courses.type == "MESH"
+legacy_courses.hide_render = True
+legacy_courses["a21_hidden_in_derived_scene"] = "superseded by batched clay tiles"
 
 # 2) Hand-dressed limestone at the front and left visible foundation.
 # Existing A1 foundation remains as backing, so this is shallow face relief,
@@ -221,6 +228,7 @@ report={
     "artOnly":True,"productionApproved":False,"physicsChanged":False,
     "doorPortalChanged":False,"combatChanged":False,"rollChanged":False,
     "originalMeshObjectsPreserved":len(originals),
+    "legacyRoofCoursesRetainedButHidden": bool(legacy_courses.hide_render),
     "roof":{"tileCount":tile_count,"meshBatches":1,"materialVariants":len(clay_tiles),
             "occlusionLayer":"roof-occlusion-candidate"},
     "stoneFoundation":{"faceBlocks":stone_count,"meshBatches":1},
