@@ -1,0 +1,28 @@
+{
+  "anatomicalFootPivotValidated": false,
+  "authoredDoorHeightMeters": 2.39,
+  "cameraSource": "A2 / Red Lion hero / 3-4 angle",
+  "canvas": [
+    640,
+    640
+  ],
+  "cinematicThreeQuarterOnly": true,
+  "doorGroundPixel": [
+    320.0,
+    320.0
+  ],
+  "doorObject": "Red Lion / door_front",
+  "gameXYMatched": false,
+  "gameplayModified": false,
+  "milestone": "Blood & Iron A2.10 visual door measurement",
+  "productionSpriteScaleApproved": false,
+  "projectedDoorBoundingHeightPx": 119.587,
+  "projectedDoorBoundsPx": [
+    291.25,
+    208.34,
+    348.75,
+    327.926
+  ],
+  "sourceBlendModified": false,
+  "sourceScene": "blood_iron_greyhaven_a22.blend"
+}
