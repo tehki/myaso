@@ -232,3 +232,30 @@ Every shard owns an independent P4 `SemanticEffectBroker` and P5 spatial index. 
 Core & Multiplayer must provide authenticated viewer identity, zone ownership, fair subscription/order, server tick and bandwidth scheduling. Magic & Items owns rune/mana/reagent/cooldown validation; World supplies trusted collision geometry and zone manifests; Graphics handles client visual quality and accessibility. Multi-process ownership, persistent shard lifecycle, cross-shard transfers, reconnect epochs, true sequencing/ACKs, live transport prioritization, metrics and end-to-end 512 real-client load validation remain outstanding.
 
 No P6 activation, merge or deployment is authorized.
+
+## P7 — deterministic fair cosmetic scheduling under crowd pressure (2026-10-20)
+
+P6 correctly isolated per-zone and global **cosmetic-only** byte quotas, but sequentially polling viewers with up to six FX packets each allowed early viewers to use the entire budget. P7 adds an **inactive server-internal** `ShardedMagicFxHub::schedule_fair_tick` method to coordinate an entire authenticated viewer slice. It does **not** register packet types or send WebTransport data.
+
+### Fairness contract
+
+- Input: a bounded array of up to **1024** `FxDeliverySession` values and an equal-length parallel array of **Core-derived authoritative** `ViewerInterest` values for the hub's exact current server tick. The caller is responsible for authentication, authoritative world position and list membership. This method does NOT authenticate players.
+- Preflight checks every pair and rejects duplicate net IDs, zero IDs, invalid coordinates/radius, mismatched zone ownership, unknown zones, repeated same-tick polling, oversized batches, unequal lengths or stale server ticks **before debit of any FX byte quota**. The method never accepts network packets from the browser.
+- It orders sessions by **oldest last successful cosmetic delivery**, with stable authenticated net ID as the deterministic tie breaker. It returns **at most one 32-byte semantic FX packet per viewer per scheduling round**, rather than allowing the earliest viewers to consume six immediately.
+- Sessions receiving no packet because a zone/global cosmetic cap is saturated remain older and gain priority on the next tick; successful sessions are marked with that server tick. Forgotten/disconnected IDs are pruned from the bounded priority state each scheduling pass.
+- Effects preserve all P4/P5 semantic validation: zone, interest radius, expiry, ordered event IDs, no per-particle replication, and transient session cursor. This is **best-effort** priority, not reliable packet delivery, guaranteed fairness for viewers without valid nearby effects, or an always-on backend scheduler. A short-lived visual event can expire before a viewer's turn; that is acceptable for purely optional VFX, never gameplay telegraphs.
+- Output is an in-memory `FairFxDispatch` containing packet batches and server-owned session IDs for a future authenticated Core transport integration, plus aggregate `considered_sessions`, `served_sessions` and **payload-only** byte counts. No networking is performed.
+- The older single-session `plan_delivery` API remains available for isolated testing, but **must not be mixed with `schedule_fair_tick` for the same sessions within a tick**. Fairness guarantees are specific to the coordinated batch API.
+
+### Regression evidence and scenarios
+
+`server/src/magic_fx_fair_tests.rs` is registered in protected Rust tests and exercises:
+
+- **512 virtual viewers across 4 zones:** one FX packet each (16,384 payload bytes in total), no zone over 4096 bytes.
+- **512 virtual viewers in 1 fully saturated zone:** 128 served/tick, with all 512 obtaining one effect over four ticks; no repeated service while eligible viewers remain unserved.
+- **1024 virtual viewers across 8 zones:** global 16,384-byte quota serves 512 viewers per tick; the next tick serves the previously unserved 512, assuming all effects remain active.
+- Input-order invariance, duplicate IDs, forged zones, invalid viewer coordinates and atomic batch preflight, strict tick and batch capacity, and harmless cosmetic-only quota exhaustion.
+
+This tests **synthetic scheduler data** and tight deterministic invariants, not 1024 real clients, 512-player browser FPS, network congestion, GPU performance, packet loss, or production QoS. Before enabling any server-to-client effect channel, the Core & Multiplayer department must integrate the scheduler with authenticated connection registries and actual transport priority, perform real connection/perf soak, test login/portal transitions, protect combat/gameplay messages, and review bandwidth including framing and encryption overhead.
+
+**All P7 APIs are inactive / draft / unmerged / undeployed.**
