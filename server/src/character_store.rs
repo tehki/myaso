@@ -75,7 +75,7 @@ impl CharacterRecordStore {
         };
         // Bound corrupt/untrusted on-disk records to 37 bytes before decode.
         let mut bytes = Vec::with_capacity(CHARACTER_RECORD_BYTES + 1);
-        file.by_ref()
+        Read::by_ref(&mut file)
             .take((CHARACTER_RECORD_BYTES + 1) as u64)
             .read_to_end(&mut bytes)?;
         let record = CharacterRecord::decode(&bytes)?;
