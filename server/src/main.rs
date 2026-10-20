@@ -1,5 +1,9 @@
 use anyhow::{bail, Context, Result};
 use myaso_server::{
+    chat::{
+        decode_send, encode_result, ChatPosition, ChatResult, LocalChatHub, MAX_CHAT_FRAME,
+        OUTBOUND_QUEUE,
+    },
     coalesce_accepted_input_batch, decode_input_packet, is_sequence_newer16, is_tick_newer32,
     kill_event::{encode_kill_event, KillEventPacket},
     reliable::{try_enqueue_reliable, ReliableQueueError},
@@ -16,10 +20,10 @@ use std::{
         atomic::{AtomicU32, Ordering},
         Arc,
     },
-    time::Duration,
+    time::{Duration, Instant},
 };
 use tokio::sync::{mpsc, Mutex};
-use wtransport::{Connection, Endpoint, Identity, SendStream, ServerConfig, VarInt};
+use wtransport::{Connection, Endpoint, Identity, RecvStream, SendStream, ServerConfig, VarInt};
 
 const GAME_PATH: &str = "/game";
 const CLOSE_DATAGRAM_UNAVAILABLE: u32 = 0x11;
@@ -202,18 +206,22 @@ impl GameState {
 
 struct SharedGame {
     state: Mutex<GameState>,
+    chat: Mutex<LocalChatHub>,
+    chat_radius: f32,
     next_player_id: AtomicU32,
     reliable_write_delay: Duration,
     drop_new_action_datagrams: bool,
 }
 
 impl SharedGame {
-    fn new(flight: LoopbackFlightConfig) -> Arc<Self> {
+    fn new(flight: LoopbackFlightConfig, chat_radius: f32) -> Arc<Self> {
         Arc::new(Self {
             state: Mutex::new(GameState::new(
                 flight.background_players,
                 flight.near_pressure_players,
             )),
+            chat: Mutex::new(LocalChatHub::default()),
+            chat_radius,
             next_player_id: AtomicU32::new(1),
             reliable_write_delay: flight.reliable_write_delay,
             drop_new_action_datagrams: flight.drop_new_action_datagrams,
@@ -280,7 +288,14 @@ async fn main() -> Result<()> {
     }
     let gate = AdmissionGate::new(player_cap - flight.background_players);
     println!("myaso admission cap: {player_cap} concurrent players");
-    let game = SharedGame::new(flight);
+    let chat_radius: f32 = env::var("MYASO_CHAT_RADIUS")
+        .unwrap_or_else(|_| "160".to_owned())
+        .parse()
+        .context("MYASO_CHAT_RADIUS must be a valid floating point radius")?;
+    if !chat_radius.is_finite() || !(32.0..=512.0).contains(&chat_radius) {
+        bail!("MYASO_CHAT_RADIUS must be within 32..=512 game units");
+    }
+    let game = SharedGame::new(flight, chat_radius);
     // Accept server-side diagnostic output only on loopback and only when
     // explicitly requested by the real-browser M201 acceptance fixture.
     let flight_action_proof = match env::var("MYASO_FLIGHT_ACTION_PROOF").as_deref() {
@@ -346,6 +361,7 @@ async fn main() -> Result<()> {
             }
 
             let result = handle_connection(connection, player_id, Arc::clone(&game)).await;
+            game.chat.lock().await.unregister(player_id);
             {
                 let mut state = game.state.lock().await;
                 state.world.remove_player(player_id);
@@ -594,11 +610,34 @@ async fn handle_connection(
         }
         Ok::<(), anyhow::Error>(())
     });
+    let mut chat_started = false;
     let mut snapshot_interval = tokio::time::interval(SNAPSHOT_INTERVAL);
     snapshot_interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
 
     loop {
         tokio::select! {
+            incoming_chat = connection.accept_uni(), if !chat_started => {
+                // Legacy browsers never open a chat stream and keep their
+                // existing game protocol/stream topology unchanged.
+                let incoming_chat = incoming_chat.context("accept local chat stream")?;
+                chat_started = true;
+                let (chat_tx, chat_rx) = mpsc::channel(OUTBOUND_QUEUE);
+                if !game.chat.lock().await.register(player_id, chat_tx.clone(), Instant::now()) {
+                    bail!("chat stream already registered for player");
+                }
+                let chat_game = Arc::clone(&game);
+                let chat_connection = connection.clone();
+                tokio::spawn(async move {
+                    let outcome = run_chat_stream(chat_connection, incoming_chat, chat_tx,
+                        chat_rx, player_id, Arc::clone(&chat_game)).await;
+                    chat_game.chat.lock().await.unregister(player_id);
+                    if let Err(error) = outcome {
+                        // No user text is logged, and failure does not close
+                        // or delay the authenticated combat connection.
+                        eprintln!("player {player_id} local chat stream ended: {error:#}");
+                    }
+                });
+            }
             writer_result = &mut reliable_writer => {
                 match writer_result {
                     Ok(Ok(())) => bail!("reliable writer ended unexpectedly"),
@@ -801,6 +840,95 @@ async fn handle_connection(
             }
         }
     }
+}
+
+/// A single bounded, versioned chat frame on its own reliable QUIC stream.
+/// Never mix with input datagrams or game snapshot/kill-event reliable frames.
+async fn read_chat_frame(recv: &mut RecvStream) -> Result<Vec<u8>> {
+    let mut length = [0_u8; 2];
+    recv.read_exact(&mut length)
+        .await
+        .context("read chat length")?;
+    let size = u16::from_le_bytes(length) as usize;
+    if !(9..=MAX_CHAT_FRAME).contains(&size) {
+        bail!("invalid local chat frame length");
+    }
+    let mut bytes = vec![0; size];
+    recv.read_exact(&mut bytes)
+        .await
+        .context("read bounded chat frame")?;
+    Ok(bytes)
+}
+
+async fn run_chat_stream(
+    connection: Connection,
+    mut reader: RecvStream,
+    outbound: mpsc::Sender<Vec<u8>>,
+    mut outgoing: mpsc::Receiver<Vec<u8>>,
+    player_id: u32,
+    game: Arc<SharedGame>,
+) -> Result<()> {
+    let mut writer = connection
+        .open_uni()
+        .await
+        .context("open isolated chat reply stream")?
+        .await
+        .context("initialize isolated chat reply stream")?;
+    let mut violations = 0_u8;
+    loop {
+        tokio::select! {
+            frame = read_chat_frame(&mut reader) => {
+                let frame = frame?;
+                let correlation = if frame.len() >= 7 {
+                    u32::from_le_bytes(frame[3..7].try_into().expect("length checked"))
+                } else { 0 };
+                let result = match decode_send(&frame) {
+                    Ok(request) => {
+                        let (tick, positions) = {
+                            // Read ONLY server-owned positions; no chat packet
+                            // carries coordinates, zone, or a sender identity.
+                            let state = game.state.lock().await;
+                            let positions: Vec<ChatPosition> = state.world.fighters().iter()
+                                // Synthetic flight actors have no registered
+                                // chat stream and are filtered by ChatHub.
+                                // Do not filter by numeric IDs: real session
+                                // IDs may legitimately exceed 10_000.
+                                .map(|fighter| ChatPosition {
+                                    player_id: fighter.net_id,
+                                    zone: 0, // Live server currently owns one shared arena.
+                                    x: fighter.x,
+                                    y: fighter.y,
+                                }).collect();
+                            (state.world.tick, positions)
+                        };
+                        game.chat.lock().await.route(
+                            player_id, &request, &positions,
+                            game.chat_radius, tick, Instant::now(),
+                        )
+                    }
+                    Err(code) => {
+                        violations = violations.saturating_add(1);
+                        ChatResult { correlation, code, message_id: 0 }
+                    }
+                };
+                outbound.try_send(encode_result(result))
+                    .map_err(|_| anyhow::anyhow!("chat result queue full or disconnected"))?;
+                if violations >= 8 {
+                    bail!("too many malformed chat frames");
+                }
+            }
+            maybe = outgoing.recv() => {
+                let Some(payload) = maybe else { break };
+                let length = u16::try_from(payload.len())
+                    .context("chat response length overflow")?;
+                writer.write_all(&length.to_le_bytes()).await
+                    .context("write chat reply length")?;
+                writer.write_all(&payload).await
+                    .context("write chat reply frame")?;
+            }
+        }
+    }
+    Ok(())
 }
 
 fn prepare_reliable_frame(framed: &mut Vec<u8>, payload: &[u8]) -> Result<()> {
