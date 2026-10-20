@@ -35,10 +35,16 @@ export async function awaitM223HeavyWindup({
 // Median genuine W3C calibration is noisy across hosted Chrome/Firefox.
 // Observed CI #38582705600: a 103ms calibration median over-predicted actual
 // wheel ingress (~31ms), so subtracting all 103ms expired short block early.
+// For restored short-reach heavy, the independent M107 155ms lead yielded
+// authoritative block at tick 2643, expiry 2656 and 46HP hit at tick 2660.
+// The explicitly qualified 255ms block target centers genuine guard before
+// lunge contact; 365ms genuine parry arrived seven server ticks before
+// impact and still guarded. 405ms aims near five ticks. Retain fail-closed
+// real parry assertions and unchanged authoritative 125ms parry duration.
 // Keep the planned defender activation safely between parry and block expiry.
 // Wrong authoritative outcome still fails the existing strict M107 checks.
 export function planM223WheelDelay({ targetAfterWindupMs, sampledWheelIngressMs }) {
-  if (![155, 285].includes(targetAfterWindupMs)
+  if (![155, 255, 285, 365, 405].includes(targetAfterWindupMs)
     || !Number.isFinite(sampledWheelIngressMs)
     || sampledWheelIngressMs < 0 || sampledWheelIngressMs > 750) {
     throw new TypeError("M223 requires genuine bounded heavy wheel calibration");
