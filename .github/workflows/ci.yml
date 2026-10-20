@@ -160,6 +160,12 @@ jobs:
           node scripts/generate-world-geometry.mjs --check
           node --test tests/authored-world.test.mjs tests/world-landmark-discovery.test.mjs tests/world-preview-collision.test.mjs tests/world-geometry-parity.test.mjs
 
+      - name: Validate D4 dormant movement parity and generated fixtures
+        run: |
+          node scripts/generate-world-movement-fixtures.mjs --check
+          node --test tests/world-movement-parity.test.mjs
+          cargo test --locked --manifest-path server/Cargo.toml world_movement
+
       - name: Validate M188 repeated real heavy counterplay windows
         run: |
           # Three fresh Chrome/Firefox sessions for each real defensive read.
