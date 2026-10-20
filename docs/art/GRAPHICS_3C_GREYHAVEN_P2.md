@@ -58,3 +58,31 @@ Reproduce the **isolated planner benchmark** by checking out exact original P2.1
 On Windows Machine Node v24.19.0 (x64), nine alternating A/B runs, 800 calls per run across four authored tiles, both variants yield **143,000 features summed across 800 plans**. The first comparison had a previous median **200.061 ms** vs optimized **173.722 ms** (13.2% faster). A repeated comparison had previous **122.093 ms** vs optimized **101.448 ms** (16.9% faster); the repo JSON records the second run. Both are *CPU-only material planner* microbenchmarks and must not be reported as gameplay frame-rate improvements. Measured runtime depends on system load.
 
 The repeated Chrome 154 cold-six-chunk benchmark had baseline PR #336 median **26.4 ms** vs optimized candidate median **27.4 ms** (+1.0ms, ~3.8%) and no browser page errors. This measurement is noisy compared with the earlier P2.1 session (16.1ms vs 21.2ms). Real-world chunk-frame performance **remains unqualified**, with no claim of full FPS or production readiness. No multiplayer visual CI was changed, and the M41 parry-tell failure in original #419 exact-head quality 39511746799 is recorded for central Combat triage, not bypassed.
+
+
+## P2.3 — conservative chunk-local visual culling (2026-10-21)
+
+**Scope:** Graphics-only optimization of the existing authored-world Canvas chunk renderer. No new renderer or cache, no geography, door, portal, physics or Combat changes. A conservative world-coordinate box test skips painting fields, authored roads, bridges, trees, buildings, wall groups and portal indicators outside each 512-unit cache tile, with explicit padding for shadows, roofs, roads and crowns. River and fixed town labels remain unchanged. Existing 3C material planner remains untouched.
+
+**Visual acceptance:** real Chrome 154.0.8037.99 on Windows Machine, Intel Core i7-2700K, NVIDIA GeForce GT 630; offline World preview at 960x600 DPR 1, fixed zoom per scene. Independent localhost comparison to pinned P2.2 head 73ca332cdaab123bd9c75a3321ff5b3dea6f2c7f. Eight scenes: Red Lion/Greyhaven, bridge, grove, Briarford, Stonebrook, farmland, wilderness and city north. All eight pairs of actual Chrome Canvas PNGs are bytewise-equivalent in their decoded RGBA pixels (Pillow ImageChops); browser page errors zero. The source-pinned JSON report also records matching per-scene RGBA hashes.
+
+**First Chrome cold-chunk benchmark pass** (not multiplayer FPS):
+
+| Scene | Tiles | P2.2 cold ms | P2.3 cold ms |
+| --- | ---: | ---: | ---: |
+| Greyhaven | 6 | 51.9 | 50.9 |
+| Bridge | 6 | 31.4 | 17.9 |
+| Grove | 6 | 24.0 | 16.6 |
+| Briarford | 6 | 33.3 | 17.0 |
+| Stonebrook | 9 | 37.8 | 24.2 |
+| Farmland | 8 | 39.9 | 25.9 |
+| Wilderness | 8 | 24.8 | 15.0 |
+| Greyhaven north | 4 | 20.8 | 22.6 |
+
+Across the eight scenes, median new-chunk work **32.35 ms baseline vs 20.25 ms candidate**, ~37.4% less in this one pass. Measurements are load-dependent and must not be claimed as multiplayer, frame-duration or live realm performance. Subsequent run is separately recorded when available.
+
+**Automated regression:** new tests/greyhaven-environment-3c-culling.test.mjs checks that empty remote wilderness chunks omit distant tree/city art while city and grove art still appear. Existing World + 3C tests and chunk budget invariants preserved; CI job adds only a new focused test command. The browser parity tool is tools/art/verify_greyhaven_3c_culling_browser.mjs and requires two localhost URLs and an approved Chrome executable.
+
+**Integration:** PR #419 remains draft and stacked on World #336; Red Lion 3B/knights unchanged. The prior exact-head P2.2 quality run #39513838610 failed at the protected M171 Combat browser acceptance; do not bypass it. Fresh exact-head quality is required before review, with cross-PR character/building scale and low-end camera travel acceptance still pending.
+
+**Second independent Chrome pass:** eight image pairs again have matching RGBA hashes and zero page JS exceptions, with original P2.2 scene-median cold work **17.3ms** vs P2.3 **13.8ms** (~20.2% less). First pass was ~37.4% lower; the range demonstrates measurement sensitivity to device load/JIT. Both exact source reports are committed as p23_culling_chrome.json and p23_culling_chrome_second_pass.json. Pixel-perfect comparison with Pillow ImageChops was performed on all eight first-pass PNG pairs and found zero differences. Preserve the reports instead of selecting only the faster run.

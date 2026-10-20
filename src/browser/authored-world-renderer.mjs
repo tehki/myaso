@@ -7,6 +7,26 @@ export const WORLD_TILE_SIZE = 512;
 export const WORLD_CACHE_CAP = 24;
 const TAU = Math.PI * 2;
 
+// Graphics 3C P2.3: conservative chunk-only culling of authored visual props.
+// The padding contains painted shadows, stroke widths and tree crowns.
+// This is render presentation only: world placements and physics are unchanged.
+function visibleBounds(tile, x, y, width, height, padding=0) {
+  return x - padding <= tile.x + tile.width
+    && y - padding <= tile.y + tile.height
+    && x + width + padding >= tile.x
+    && y + height + padding >= tile.y;
+}
+
+function visiblePath(tile, points, padding) {
+  // Authored polylines retain their original vertices and stroke widths.
+  let minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
+  for(const [x,y] of points) {
+    if(x<minX)minX=x;if(x>maxX)maxX=x;
+    if(y<minY)minY=y;if(y>maxY)maxY=y;
+  }
+  return visibleBounds(tile,minX,minY,maxX-minX,maxY-minY,padding);
+}
+
 function strokePolyline(ctx, points, width, color) {
   ctx.beginPath();
   ctx.moveTo(points[0][0],points[0][1]);
@@ -88,6 +108,7 @@ function paintOverworld(ctx,map,tileBounds) {
   ctx.fillStyle="#627751";ctx.fillRect(0,0,map.width,map.height);
   // Authored agricultural plots, not generated terrain.
   for(const f of map.fields){
+    if(!visibleBounds(tileBounds,f.x,f.y,f.w,f.h,12))continue;
     ctx.fillStyle=f.color;ctx.fillRect(f.x,f.y,f.w,f.h);
     ctx.strokeStyle="rgba(49,74,39,.22)";ctx.lineWidth=8;
     for(let y=f.y+34;y<f.y+f.h;y+=45){
@@ -99,6 +120,7 @@ function paintOverworld(ctx,map,tileBounds) {
   strokePolyline(ctx,map.river.points,map.river.width*.42,"rgba(184,216,207,.25)");
   // Road layout is explicit: no per-session random placement.
   for(const road of map.roads){
+    if(!visiblePath(tileBounds,road.points,(road.width+15)/2+4))continue;
     strokePolyline(ctx,road.points,road.width+15,"rgba(75,62,43,.38)");
     strokePolyline(ctx,road.points,road.width,"#b7a17d");
     strokePolyline(ctx,road.points,road.width*.58,"#c4ae8c");
@@ -106,6 +128,7 @@ function paintOverworld(ctx,map,tileBounds) {
   // Static, bounded Graphics 3C material layer on the same cached Canvas tiles.
   paintGreyhavenGroundDetails(ctx,map,tileBounds);
   for(const bridge of map.bridges){
+    if(!visibleBounds(tileBounds,bridge.x-bridge.w/2,bridge.y-bridge.h/2,bridge.w,bridge.h,12))continue;
     ctx.fillStyle="#766e5c";
     ctx.fillRect(bridge.x-bridge.w/2,bridge.y-bridge.h/2-5,bridge.w,bridge.h+10);
     ctx.fillStyle="#c3b096";
@@ -117,10 +140,16 @@ function paintOverworld(ctx,map,tileBounds) {
     }
   }
   for(const grove of map.groves)
-    for(const [dx,dy] of grove.trees)paintTree(ctx,grove.x+dx,grove.y+dy);
-  paintCityWalls(ctx,map.city);
-  for(const b of map.buildings)paintBuilding(ctx,b);
+    for(const [dx,dy] of grove.trees){
+      const x=grove.x+dx,y=grove.y+dy;
+      if(visibleBounds(tileBounds,x,y,0,0,40))paintTree(ctx,x,y);
+    }
+  if(visibleBounds(tileBounds,map.city.x,map.city.y,map.city.w,map.city.h,100))
+    paintCityWalls(ctx,map.city);
+  for(const b of map.buildings)
+    if(visibleBounds(tileBounds,b.x,b.y,b.w,b.h,45))paintBuilding(ctx,b);
   for(const p of map.portals){
+    if(!visibleBounds(tileBounds,p.x,p.y,0,0,23))continue;
     ctx.strokeStyle="#e9cf7c";ctx.lineWidth=4;
     ctx.beginPath();ctx.arc(p.x,p.y,17,Math.PI*.05,Math.PI*.95);ctx.stroke();
   }
