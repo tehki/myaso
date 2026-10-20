@@ -193,14 +193,7 @@ mod tests {
             }
             for sequence in [21, 22] {
                 magic
-                    .stage_ember_intent(
-                        character,
-                        sequence,
-                        ZoneId::Moonvale,
-                        200.0,
-                        200.0,
-                        0.0,
-                    )
+                    .stage_ember_intent(character, sequence, ZoneId::Moonvale, 200.0, 200.0, 0.0)
                     .unwrap();
             }
             let mut world = World::new(800.0, 600.0);
@@ -260,16 +253,16 @@ mod tests {
         assert!(state.loot.is_dead(1));
         let (persisted_loot, persisted_magic) = load_joint(&path).unwrap();
         assert_eq!(
-            persisted_loot
-                .corpses()[&receipt.corpse_entity_id]
-                .items[0]
-                .id,
+            persisted_loot.corpses()[&receipt.corpse_entity_id].items[0].id,
             equipped_id
         );
         assert_eq!(persisted_magic.pending_ember_intents().count(), 0);
         assert_eq!(persisted_magic.resolved_ember_intents().count(), 2);
         assert!(persisted_magic.knows_spell(state.character, Spell::Ember));
-        assert_eq!(persisted_loot.committed_operation_sequence(state.character), Some(22));
+        assert_eq!(
+            persisted_loot.committed_operation_sequence(state.character),
+            Some(22)
+        );
         let repeat = commit_combat_death_loot(
             &path,
             &mut state.loot,
@@ -377,7 +370,12 @@ mod tests {
         ));
         assert!(!state.loot.is_dead(1));
         assert!(state.loot.corpses().is_empty());
-        assert!(state.loot.inventory(1).unwrap().equipped(EquipmentSlot::OffHand).is_some());
+        assert!(state
+            .loot
+            .inventory(1)
+            .unwrap()
+            .equipped(EquipmentSlot::OffHand)
+            .is_some());
         assert_eq!(state.magic.pending_ember_intents().count(), 2);
         assert!(!path.exists());
     }
