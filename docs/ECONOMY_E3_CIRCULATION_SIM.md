@@ -38,6 +38,16 @@ Deterministic tests include:
 
 The protected full GitHub quality workflow must also pass unrelated Combat/Core browser acceptance; do not bypass existing gates to integrate this module. The authoring module is inert and contains no runtime path.
 
+## E3 housing-access diagnostic extension (20 October 2026)
+
+A read-only `Economy::housing_access()` report, calculated off the live game tick, now separates **cash affordability** from **land supply**. It reports the count of players with/without a plot, multi-property holders, landless players with enough current sandbox credits for a *first* plot, landless players below the sticker price, and the subset of cash-qualified first-home purchases the remaining plots could theoretically accommodate. The latter is a **capacity bound**, not a reservation or a promise that plots are in safe locations or actually for sale.
+
+It also calculates the share of all *owned* plots held by the highest-holding ten percent of the simulated population, returning `None` when there are no owners. That figure is **land concentration**, distinct from the separate top-ten-percent **credit wealth** measure. The simulator cannot establish beneficial ownership across alt accounts, real housing eligibility, property location desirability or actual rental affordability.
+
+Under a 10-player / 1-plot test, all ten players have sufficient test credits but only one first home is initially possible, and nine remain supply-constrained. Under a different test, one player holds two of three claimed plots and the land-concentration statistic reflects that share. Other tests verify that twelve empty plots do not help players whose current credits are below the nominal house price, and that aggregate metrics remain internally consistent after a 1,000-agent / 90-day simulation. These are mathematical regression fixtures, **not policy calibration or player-research evidence**.
+
+**Verified locally:** 12/12 Rust unit tests (8 original + 4 added), exact source rustfmt and strict Clippy with warnings denied, on an authorized development machine. These local checks are not a substitute for protected GitHub quality CI at the updated exact head.
+
 ## Next planned E3+ work
 
 - Calibrate simulator with player archetypes (new adventurer, gatherer, crafter, PvP, merchant, bot), actual item durability and resource flow, and finite NPC orders.
