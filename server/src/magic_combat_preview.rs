@@ -130,13 +130,15 @@ pub fn preview_ember_target(
             best = Some((target.net_id, forward));
         }
     }
-    Ok(best.map(|(target_net_id, distance_along_ray)| EmberTargetProposal {
-        character,
-        sequence: ctx.sequence,
-        zone: intent.zone,
-        target_net_id,
-        distance_along_ray,
-    }))
+    Ok(
+        best.map(|(target_net_id, distance_along_ray)| EmberTargetProposal {
+            character,
+            sequence: ctx.sequence,
+            zone: intent.zone,
+            target_net_id,
+            distance_along_ray,
+        }),
+    )
 }
 
 #[cfg(test)]
@@ -202,7 +204,11 @@ mod tests {
             }
         }
 
-        fn preview(&self, session: SessionLease, sequence: u64) -> Result<Option<EmberTargetProposal>, EmberPreviewError> {
+        fn preview(
+            &self,
+            session: SessionLease,
+            sequence: u64,
+        ) -> Result<Option<EmberTargetProposal>, EmberPreviewError> {
             preview_ember_target(EmberCombatContext {
                 lease: session,
                 sequence,
@@ -224,7 +230,10 @@ mod tests {
         assert_eq!(proposal.distance_along_ray, 90.0);
         assert_eq!(fixture.world.fighter(3).unwrap().hp, 100.0);
         assert_eq!(fixture.magic.pending_ember_intents().count(), 1);
-        assert_eq!(fixture.loot.committed_operation_sequence(fixture.character), Some(10));
+        assert_eq!(
+            fixture.loot.committed_operation_sequence(fixture.character),
+            Some(10)
+        );
     }
 
     #[test]
@@ -251,7 +260,10 @@ mod tests {
     #[test]
     fn rejects_uncommitted_effect_and_cross_zone_or_absent_caster() {
         let mut fixture = Fixture::new();
-        fixture.loot.record_operation(fixture.character, 11).unwrap();
+        fixture
+            .loot
+            .record_operation(fixture.character, 11)
+            .unwrap();
         fixture
             .magic
             .stage_ember_intent(fixture.character, 12, ZoneId::Moonvale, 200.0, 200.0, 0.0)
