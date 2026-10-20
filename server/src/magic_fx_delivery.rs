@@ -355,7 +355,8 @@ mod tests {
         let mut total = 0usize;
         let mut served = 0usize;
         for session in &mut sessions {
-            let packets = hub.plan_delivery(4, session, viewer(session.zone_id)).unwrap();
+            let zone_id = session.zone_id;
+            let packets = hub.plan_delivery(4, session, viewer(zone_id)).unwrap();
             assert!(packets.len() * MAGIC_FX_PACKET_BYTES <= MAX_FX_PAYLOAD_BYTES_PER_VIEWER_TICK);
             if !packets.is_empty() {
                 served += 1;
@@ -376,6 +377,33 @@ mod tests {
         hub.advance(5).unwrap();
         assert_eq!(hub.stats().global_payload_bytes_this_tick, 0);
         assert_eq!(hub.zone_payload_bytes_this_tick(1), Some(0));
+    }
+
+    #[test]
+    fn global_payload_cap_is_independent_from_zone_caps() {
+        let mut hub = ShardedMagicFxHub::new();
+        for zone in 1..=8 {
+            hub.register_zone(zone).unwrap();
+        }
+        for tick in 1..=4 {
+            hub.advance(tick).unwrap();
+            for zone in 1..=8 {
+                for i in 0..MAX_FX_EVENTS_PER_TICK {
+                    hub.admit_trusted(tick, spec(zone, i as f32)).unwrap();
+                }
+            }
+        }
+        let mut sent = 0usize;
+        for zone in 1..=8 {
+            for i in 1..=64 {
+                let mut session = FxDeliverySession::new(zone * 1_000 + i, zone).unwrap();
+                sent += hub.plan_delivery(4, &mut session, viewer(zone)).unwrap().len()
+                    * MAGIC_FX_PACKET_BYTES;
+            }
+        }
+        assert_eq!(sent, MAX_FX_PAYLOAD_BYTES_GLOBAL_TICK);
+        assert_eq!(hub.stats().global_payload_bytes_this_tick, sent);
+        assert_eq!(hub.zone_payload_bytes_this_tick(8), Some(0));
     }
 
     #[test]
