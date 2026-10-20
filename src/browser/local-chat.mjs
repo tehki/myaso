@@ -3,7 +3,7 @@
 // No live adapter is installed in this milestone; an injected adapter must
 // return explicit server acknowledgement before an outgoing row is accepted.
 const INSTANCES = new WeakMap();
-export const CHAT_UI_LIMITS = Object.freeze({ history: 60, chars: 280, bytes: 512 });
+export const CHAT_UI_LIMITS = Object.freeze({ history: 60, chars: 240, bytes: 240 });
 
 export function validateLocalChatText(value) {
   if (typeof value !== "string") throw new Error("Enter a message.");

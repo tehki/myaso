@@ -26,7 +26,7 @@ the arena's lower left (moves below canvas on narrow displays), with:
   This is a **UI-facing interface**, not a server packet specification;
 - pending, accepted-by-server (NOT delivered-to-recipient), failed and
   disconnected states. A single in-flight message limits UI queue growth;
-  client validation of 280 codepoints/512 UTF-8 bytes is only an early
+  client validation of 240 codepoints/240 UTF-8 bytes is only an early
   guard; the server must independently validate.
 - Enter from focused canvas opens composer **only when Core adapter ready**;
   Enter in input submits and Escape cancels/returns canvas focus.
@@ -73,3 +73,7 @@ PR must be independently tested and accepted.
 - Adapter replacement, disconnect (`bindAdapter(null)`) or component disposal cancels a pending client wait. A late ACK cannot turn that old delivery into a successful result; the outgoing row is marked **Not confirmed**, not delivered or definitively rejected.
 - Old adapter callbacks are generation-scoped, so queued previous-connection messages cannot contaminate the current transcript. Bidi override controls are rejected in client-composed text to reduce identity spoofing; Core must enforce canonical Unicode policy on the server.
 - No wire packet, telemetry, persistence or game-loop change. Run browser tests using a purpose-built **test-only** injected adapter, never a production query switch.
+
+## Core-approved v1 composer limit
+
+Core PR #399 and bridge #403 allocate **240 UTF-8 bytes maximum**, independent of the number of Unicode characters. Composer validation now matches this limit and verifies 240-byte accepted / 241-byte rejected cases for ASCII, accented letters and emoji. This is still **defense-in-depth UI validation**, not server authorization. Actual stream wiring and real near/near/far browser acceptance live in a separate stacked integration change; no preview flag or live network enablement is shipped by this foundation PR.
