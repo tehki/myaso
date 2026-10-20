@@ -172,6 +172,11 @@ jobs:
           node --test tests/world-boundary-parity.test.mjs
           cargo test --locked --manifest-path server/Cargo.toml d5_twenty_thousand_edge_biased_queries_match_browser_digests
 
+      - name: Validate D6 local-only Moonvale field survey
+        run: |
+          node --check src/world/field-survey.mjs
+          node --test tests/world-field-survey.test.mjs tests/world-landmark-discovery.test.mjs
+
       - name: Validate M188 repeated real heavy counterplay windows
         run: |
           # Three fresh Chrome/Firefox sessions for each real defensive read.

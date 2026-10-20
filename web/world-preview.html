@@ -18,15 +18,23 @@ kbd{border-radius:4px;border:1px solid #677354;background:#303a2d;color:#fff2d2;
 .discovery-panel li{color:#c4cbb9;line-height:1.45}
 .discovery-panel li.unseen{color:#929f8b}
 #discovery-notice{margin-bottom:9px;color:#efcb87;font-weight:600}
+#survey{color:#b9dbb1;font-weight:700}
+.survey-panel{margin-top:11px;padding:13px 17px;border:1px solid #4d634c;border-radius:9px;background:#1c2922}
+.survey-panel summary{cursor:pointer;color:#bce6c2;font-weight:600}
+.survey-panel ol{margin:10px 0 0;padding-left:23px;display:grid;gap:5px}
+.survey-panel li{color:#c4d0bd;line-height:1.45}
+.survey-panel li.unseen{color:#929f8b}
+#survey-notice{margin-bottom:9px;color:#bddb99;font-weight:600}
 </style></head><body>
 <header><div><h1>⚔️ Moonvale — World & Buildings v1.0</h1>
 <div class="sub">A fixed medieval world, with a separate, deliberately larger tavern interior</div></div>
 <div>🌕⚡️🚀</div></header>
 <div class="shell"><canvas id="arena" width="1100" height="688"></canvas>
-<div class="hud"><span><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> move · <kbd>E</kbd> enter/exit · mouse wheel zoom · <kbd>R</kbd> reset</span>
-<span id="place">Moonvale</span><span id="door"></span></div>
+<div class="hud"><span><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> move · <kbd>E</kbd> enter/exit · <kbd>F</kbd> inspect · mouse wheel zoom · <kbd>R</kbd> reset</span>
+<span id="place">Moonvale</span><span id="door"></span><span id="survey"></span></div>
 <div class="notice">LOCAL DESIGN PREVIEW only: door transitions are simulated here to demonstrate map links.
 This preview locally collides with buildings, city walls, tavern furniture and rivers (cross at bridges).
+Press F at marked natural sites to write a session-only field note; no harvesting, items or currency.
 Authoritative multiplayer collision and transfers are NOT enabled on the live server.
 The geography, town names, buildings and roads are fixed and identical for all players.</div>
 <section class="discovery-panel" aria-label="Explorer's journal">
@@ -34,12 +42,19 @@ The geography, town names, buildings and roads are fixed and identical for all p
 <details open><summary>Explorer's journal · <span id="discovery-progress">0 / 4 places discovered</span></summary>
 <ol id="discovery-journal"></ol></details>
 </section>
+<section class="survey-panel" aria-label="Naturalist's field notebook">
+<div id="survey-notice" role="status" aria-live="polite" hidden></div>
+<details><summary>Field notebook · <span id="survey-progress">0 / 8 sites inspected</span></summary>
+<ol id="survey-journal"></ol></details>
+</section>
 </div>
 <script type="module">
 import { MAP_IDS, getAuthoredMap, nearbyAuthoredPortal, previewPortalDestination } from "../src/world/authored-maps.mjs";
 import { createAuthoredWorldRenderer } from "../src/browser/authored-world-renderer.mjs";
 import { MOONVALE_LANDMARKS, createLocalDiscoveryJournal, recordLocalDiscoveries, localDiscoveryProgress } from "../src/world/landmark-discovery.mjs";
 import { moveAuthoredPreview, isAuthoredPreviewWalkable } from "../src/world/authored-preview-collision.mjs";
+import { MOONVALE_FIELD_SITES, createLocalFieldNotebook, nearbyLocalFieldSite,
+  observeLocalFieldSite, localFieldSurveyProgress } from "../src/world/field-survey.mjs";
 const canvas=document.querySelector("#arena");
 const ctx=canvas.getContext("2d");
 const world=createAuthoredWorldRenderer();
@@ -50,11 +65,31 @@ let player=interiorQA ? {x:390,y:480} : {x:4365,y:4150};
 let zoom=interiorQA ? 1 : .86;
 let last=performance.now(), cooldown=0;
 const place=document.querySelector("#place"),door=document.querySelector("#door");
+const survey=document.querySelector("#survey");
 const discoveryJournal=createLocalDiscoveryJournal();
 const discoveryList=document.querySelector("#discovery-journal");
 const discoveryProgress=document.querySelector("#discovery-progress");
 const discoveryNotice=document.querySelector("#discovery-notice");
 let discoveryNoticeUntil=0;
+const fieldNotebook=createLocalFieldNotebook();
+const surveyList=document.querySelector("#survey-journal");
+const surveyProgress=document.querySelector("#survey-progress");
+const surveyNotice=document.querySelector("#survey-notice");
+let surveyNoticeUntil=0;
+function refreshFieldNotebook(){
+  const fragment=document.createDocumentFragment();
+  for(const site of MOONVALE_FIELD_SITES){
+    const inspected=fieldNotebook.has(site.id);
+    const line=document.createElement("li");
+    line.className=inspected?"found":"unseen";
+    line.textContent=inspected?site.name+" — "+site.observation:"Unsurveyed — "+site.clue;
+    fragment.appendChild(line);
+  }
+  surveyList.replaceChildren(fragment);
+  const progress=localFieldSurveyProgress(fieldNotebook);
+  surveyProgress.textContent=progress.documented+" / "+progress.total+" sites inspected";
+}
+refreshFieldNotebook();
 function refreshDiscoveryJournal(){
   const fragment=document.createDocumentFragment();
   for(const site of MOONVALE_LANDMARKS){
@@ -74,6 +109,15 @@ document.addEventListener("keydown",e=>{
   if(["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Space"].includes(e.code))e.preventDefault();
   keys.add(e.code);
   if(e.code==="KeyR")reset();
+  if(e.code==="KeyF"&&!e.repeat){
+    const note=observeLocalFieldSite(fieldNotebook,mapId,player.x,player.y);
+    if(note){
+      refreshFieldNotebook();
+      surveyNotice.textContent="Field note: "+note.name+" — "+note.observation;
+      surveyNotice.hidden=false;
+      surveyNoticeUntil=performance.now()+5000;
+    }
+  }
   if(e.code==="KeyE"&&!e.repeat&&performance.now()>cooldown){
     const portal=nearbyAuthoredPortal(mapId,player.x,player.y,16);
     const target=portal&&previewPortalDestination(mapId,portal.id);
@@ -108,10 +152,25 @@ function tick(now){
   ctx.setTransform(1,0,0,1,0,0);ctx.clearRect(0,0,canvas.width,canvas.height);
   ctx.save();ctx.translate(canvas.width/2,canvas.height/2);ctx.scale(zoom,zoom);ctx.translate(-canvas.width/2,-canvas.height/2);
   world.draw(ctx,mapId,camera,canvas.width,canvas.height,zoom);
+  // A bounded, lightweight local-only overlay: eight fixed natural-site rings,
+  // not replicated loot/resources nor interactive world entities on the server.
+  if(mapId===MAP_IDS.overworld){
+    for(const site of MOONVALE_FIELD_SITES){
+      const dx=site.x-camera.x,dy=site.y-camera.y;
+      if(Math.abs(dx)>700||Math.abs(dy)>500)continue;
+      const sx=canvas.width/2+dx,sy=canvas.height/2+dy;
+      ctx.strokeStyle=fieldNotebook.has(site.id)?"#78937b":"#e0cb82";
+      ctx.lineWidth=3;ctx.beginPath();ctx.arc(sx,sy,11,0,Math.PI*2);ctx.stroke();
+      ctx.fillStyle=fieldNotebook.has(site.id)?"#78937b":"#ede4bd";
+      ctx.beginPath();ctx.arc(sx,sy,3,0,Math.PI*2);ctx.fill();
+    }
+  }
   drawKnight(canvas.width/2,canvas.height/2,Math.atan2(my,mx));
   ctx.restore();
   const nearby=nearbyAuthoredPortal(mapId,player.x,player.y,16);
   door.textContent=nearby?"Press E — "+(map.kind==="outdoor"?"Enter The Red Lion Inn":"Return to Greyhaven"):"";
+  const nearSurvey=nearbyLocalFieldSite(mapId,player.x,player.y);
+  survey.textContent=nearSurvey?(fieldNotebook.has(nearSurvey.id)?"Recorded — ":"Press F — Inspect ")+nearSurvey.name:"";
   const discoveries=recordLocalDiscoveries(discoveryJournal,mapId,player.x,player.y);
   if(discoveries.length){
     refreshDiscoveryJournal();
@@ -120,6 +179,7 @@ function tick(now){
     discoveryNoticeUntil=now+4000;
   }
   if(now>discoveryNoticeUntil)discoveryNotice.hidden=true;
+  if(now>surveyNoticeUntil)surveyNotice.hidden=true;
   place.textContent=map.name+" · "+Math.round(player.x)+","+Math.round(player.y)+" · cached "+world.stats.cached+"/24";
   requestAnimationFrame(tick);
 }
