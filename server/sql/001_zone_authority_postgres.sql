@@ -8,19 +8,33 @@ REVOKE ALL ON SCHEMA core_zone FROM PUBLIC;
 
 CREATE TABLE IF NOT EXISTS core_zone.entities (
     entity_kind smallint NOT NULL CHECK (entity_kind IN (1, 2)),
-    entity_id bytea NOT NULL CHECK (octet_length(entity_id) = 16),
+    entity_id bytea NOT NULL CHECK (
+        octet_length(entity_id) = 16
+        AND entity_id <> decode('00000000000000000000000000000000', 'hex')
+    ),
     owner_worker bigint NOT NULL CHECK (owner_worker > 0),
     owner_zone bigint NOT NULL CHECK (owner_zone > 0),
     authority_epoch bigint NOT NULL CHECK (authority_epoch > 0),
-    pending_operation bytea CHECK (pending_operation IS NULL OR octet_length(pending_operation) = 16),
+    pending_operation bytea CHECK (
+        pending_operation IS NULL OR (
+            octet_length(pending_operation) = 16
+            AND pending_operation <> decode('00000000000000000000000000000000', 'hex')
+        )
+    ),
     retired boolean NOT NULL DEFAULT false,
     PRIMARY KEY (entity_kind, entity_id)
 );
 
 CREATE TABLE IF NOT EXISTS core_zone.handoffs (
-    operation_id bytea PRIMARY KEY CHECK (octet_length(operation_id) = 16),
+    operation_id bytea PRIMARY KEY CHECK (
+        octet_length(operation_id) = 16
+        AND operation_id <> decode('00000000000000000000000000000000', 'hex')
+    ),
     entity_kind smallint NOT NULL CHECK (entity_kind IN (1, 2)),
-    entity_id bytea NOT NULL CHECK (octet_length(entity_id) = 16),
+    entity_id bytea NOT NULL CHECK (
+        octet_length(entity_id) = 16
+        AND entity_id <> decode('00000000000000000000000000000000', 'hex')
+    ),
     source_worker bigint NOT NULL CHECK (source_worker > 0),
     source_zone bigint NOT NULL CHECK (source_zone > 0),
     source_epoch bigint NOT NULL CHECK (source_epoch > 0),
@@ -64,7 +78,8 @@ DECLARE
     h core_zone.handoffs%ROWTYPE;
     e core_zone.entities%ROWTYPE;
 BEGIN
-    IF p_operation IS NULL OR octet_length(p_operation) != 16 THEN
+    IF p_operation IS NULL OR octet_length(p_operation) != 16
+        OR p_operation = decode('00000000000000000000000000000000', 'hex') THEN
         RAISE EXCEPTION 'invalid operation ID';
     END IF;
     IF p_source_worker = p_target_worker AND p_source_zone = p_target_zone THEN
