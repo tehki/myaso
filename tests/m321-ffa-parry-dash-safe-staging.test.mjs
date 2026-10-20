@@ -13,8 +13,8 @@ test("M321 both M147/M150 corrective W3C W loops avoid accidental R2 dash", () =
   assert.equal(DASH_DOUBLE_TAP_MS, 240);
   const pulse = 'await pulseMovementKey(closerIdle, "w", 30);';
   const starts = [
-    "for (let attempt = 0; attempt < 4 && defenderBefore?.focusLabel",
-    "for (let attempt = 0; attempt < 3 && stagedDefender?.focusLabel",
+    "for (let attempt = 0; attempt < (convert ? 0 : 4) && defenderBefore?.focusLabel",
+    "for (let attempt = 0; attempt < (convert ? 0 : 3) && stagedDefender?.focusLabel",
   ];
   assert.equal(flight.split(pulse).length - 1, 2, "both genuine staging loops preserved");
   for (const start of starts) {
@@ -24,8 +24,13 @@ test("M321 both M147/M150 corrective W3C W loops avoid accidental R2 dash", () =
     const between = flight.slice(pos, next);
     assert.ok(between.includes("await sleep(300);"), "300ms ahead of each W tap");
   }
-  assert.ok(flight.includes("if (stagedDefender?.focusLabel !== "));
-  assert.ok(flight.includes("if (defenderBefore?.focusLabel !== "));
+  assert.ok(flight.includes("if (!convert && stagedDefender?.focusLabel !== "));
+  assert.ok(flight.includes("if (!convert && defenderBefore?.focusLabel !== "));
+  // M150 replaces W nudges with bounded real WASD correction against
+  // replicated authoritative fighter positions, always outside dash window.
+  assert.ok(flight.includes("await pulseMovementKey(client, key, holdMs);"));
+  assert.ok(flight.includes("await sleep(260);"));
+  assert.ok(flight.includes('qualifyM150ParryGeometry({'));
   assert.ok(flight.includes("currentCloser.playerHp < 100"));
   assert.ok(flight.includes("currentAttacker?.playerHp === 66"));
   assert.ok(!flight.includes("dispatchEvent("));

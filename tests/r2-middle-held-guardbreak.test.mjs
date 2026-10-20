@@ -27,4 +27,5 @@ test("R2 adds hold-block acceptance WITHOUT disabling original strict M194 wheel
   assert.match(workflow, /Validate M194 repeated real guard-break block-only pressure/);
   assert.match(workflow, /for attempt in 1 2 3 4 5/);
   assert.match(source, /wheelHeadStartMs: 0/);
+  assert.match(source, /postTrustedWheelMs: 45/);
 });

@@ -26,9 +26,12 @@ import { verifyM209DualKnockdownServerPunish } from "./m209-dual-knockdown-proof
 import { verifyM211DualRecoveryServerProof } from "./m211-dual-recovery-phase-proof.mjs";
 import { planM203W3cPointerPause } from "./m203-w3c-wheel-ack.mjs";
 import { planM225ThreatDistanceStaging } from "./m225-ffa-threat-distance.mjs";
+import { qualifyM150ParryGeometry } from "./m150-replicated-geometry.mjs";
 import { awaitM223HeavyWindup, planM223WheelDelay } from "./m223-server-heavy-windup.mjs";
 import { dispatchM212AttackLedShortBlock } from "./m212-attack-led-short-block.mjs";
 import { createM221TrustedWheelRegistry } from "./m221-trusted-wheel-attestation.mjs";
+import { attachM325TrustedWheelSocket } from "./m325-trusted-wheel-socket.mjs";
+import { requiresM338GuardBreakWheelSocket } from "./m338-guard-break-wheel-scenarios.mjs";
 import { createM227TrustedLightRegistry } from "./m227-trusted-light-pointer.mjs";
 import { planM197KnockdownClusterNudge } from "./m197-knockdown-cluster.mjs";
 import { isTickNewer32 } from "../src/browser/reconciliation.mjs";
@@ -133,6 +136,7 @@ if (scenario === "uimultiknockdownffahit") {
 const children = new Set();
 const sessions = [];
 let staticServer;
+let m325Dispose = () => {};
 let gameServer;
 let m201ServerOutput = () => "";
 const m221Registry = createM221TrustedWheelRegistry();
@@ -455,6 +459,7 @@ try {
     try { await webdriver(session.base, "DELETE", `/session/${session.sessionId}`); } catch {}
   }
   for (const child of children) terminate(child);
+  m325Dispose(); // Drain upgraded localhost browser proof sockets before HTTP close.
   if (staticServer) await new Promise((resolve) => staticServer.close(resolve));
 }
 
@@ -503,6 +508,9 @@ async function startStaticServer() {
       send(response, error?.code === "ENOENT" ? 404 : 500, "not found");
     }
   });
+  // M325: receive a genuine Firefox wheel from a pre-connected local socket.
+  // Unlike a per-wheel fetch, it does not need to establish HTTP transport.
+  m325Dispose = attachM325TrustedWheelSocket(server, m221Registry);
   await new Promise((resolve, reject) => {
     server.once("error", reject);
     server.listen(staticPort, "127.0.0.1", resolve);
@@ -8126,7 +8134,7 @@ async function runOnlineUiParryPunishFfaFocusFlight(entries, convert = false) {
   await sleep(80);
   let baseline = await Promise.all(entries.map(readUiEvidence));
   let defenderBefore = baseline.find((entry) => entry.browser === defender.name);
-  for (let attempt = 0; attempt < 4 && defenderBefore?.focusLabel !== `NEAREST #${closerId}`; attempt += 1) {
+  for (let attempt = 0; attempt < (convert ? 0 : 4) && defenderBefore?.focusLabel !== `NEAREST #${closerId}`; attempt += 1) {
     // M321: genuine W3C correction must not activate the R2 240ms dash,
     // including across the two nearest-focus staging correction loops.
     await sleep(300);
@@ -8135,7 +8143,7 @@ async function runOnlineUiParryPunishFfaFocusFlight(entries, convert = false) {
     baseline = await Promise.all(entries.map(readUiEvidence));
     defenderBefore = baseline.find((entry) => entry.browser === defender.name);
   }
-  if (defenderBefore?.focusLabel !== `NEAREST #${closerId}`) {
+  if (!convert && defenderBefore?.focusLabel !== `NEAREST #${closerId}`) {
     throw new Error(`${milestone} did not establish #${closerId} as ordinary nearest focus: ${JSON.stringify(baseline)}`);
   }
 
@@ -8160,7 +8168,7 @@ async function runOnlineUiParryPunishFfaFocusFlight(entries, convert = false) {
   await sleep(60);
   let staged = await Promise.all(entries.map(readUiEvidence));
   let stagedDefender = staged.find((entry) => entry.browser === defender.name);
-  for (let attempt = 0; attempt < 3 && stagedDefender?.focusLabel !== `NEAREST #${closerId}`; attempt += 1) {
+  for (let attempt = 0; attempt < (convert ? 0 : 3) && stagedDefender?.focusLabel !== `NEAREST #${closerId}`; attempt += 1) {
     // M321: genuine W3C correction must not activate the R2 240ms dash,
     // including across the two nearest-focus staging correction loops.
     await sleep(300);
@@ -8169,8 +8177,64 @@ async function runOnlineUiParryPunishFfaFocusFlight(entries, convert = false) {
     staged = await Promise.all(entries.map(readUiEvidence));
     stagedDefender = staged.find((entry) => entry.browser === defender.name);
   }
-  if (stagedDefender?.focusLabel !== `NEAREST #${closerId}`) {
+  if (!convert && stagedDefender?.focusLabel !== `NEAREST #${closerId}`) {
     throw new Error(`${milestone} could not preserve #${closerId} as nearer idle rival before parry: ${JSON.stringify(staged)}`);
+  }
+
+  // M150: use server-replicated positions, not an assumed 30ms/key pulse,
+  // for the authentic three-player conversion. No injected world positions:
+  // each correction is one real W3C WASD press; samples arrive via ordinary
+  // authoritative WebTransport snapshots. Leave M147's original staging alone.
+  if (convert) {
+    const relativeTarget = (defenderFighter, id) => ({
+      x: defenderFighter.x + (id === attackerId ? (attackRight ? -88 : 88) : 0),
+      y: defenderFighter.y + (id === attackerId ? 0 : 60),
+    });
+    const moveToReplicatedTarget = async (client, ownId, label) => {
+      let last = null;
+      for (let step = 0; step < 18; step += 1) {
+        const sample = await readUiEvidence(defender);
+        const fighters = sample.acceptance?.fighters ?? [];
+        const own = fighters.find((f) => f.netId === ownId);
+        const anchor = fighters.find((f) => f.netId === defenderId);
+        if (!own || !anchor || ![own.x, own.y, anchor.x, anchor.y].every(Number.isFinite)) {
+          throw new Error(`${milestone} missing authoritative geometry for ${label}: ${JSON.stringify(sample.acceptance)}`);
+        }
+        const target = relativeTarget(anchor, ownId);
+        const dx = target.x - own.x;
+        const dy = target.y - own.y;
+        last = { own, anchor, target, dx, dy, step };
+        if (Math.abs(dx) <= 4 && Math.abs(dy) <= 4) return last;
+        const horizontal = Math.abs(dx) >= Math.abs(dy);
+        const delta = horizontal ? dx : dy;
+        const key = horizontal ? (delta > 0 ? "d" : "a") : (delta > 0 ? "s" : "w");
+        const holdMs = Math.max(35, Math.min(175,
+          Math.round(Math.abs(delta) / COMBAT.moveSpeed * 1000 * 0.75)));
+        await pulseMovementKey(client, key, holdMs);
+        // Deliberately beyond the 240ms genuine R2 double-tap dash window;
+        // a staging correction must not secretly become a combat dash.
+        await sleep(260);
+      }
+      throw new Error(`${milestone} could not stage ${label} against replicated fighter coordinates: ${JSON.stringify(last)}`);
+    };
+    await moveToReplicatedTarget(attacker, attackerId, "parried attacker");
+    await moveToReplicatedTarget(closerIdle, closerId, "closer idle rival");
+    await sleep(75);
+    staged = await Promise.all(entries.map(readUiEvidence));
+    stagedDefender = staged.find((entry) => entry.browser === defender.name);
+    const fighters = stagedDefender?.acceptance?.fighters ?? [];
+    const defenderFighter = fighters.find((f) => f.netId === defenderId);
+    const attackerFighter = fighters.find((f) => f.netId === attackerId);
+    const closerFighter = fighters.find((f) => f.netId === closerId);
+    const geometry = qualifyM150ParryGeometry({
+      attacker: attackerFighter, defender: defenderFighter, closer: closerFighter,
+      reach: COMBAT.attack.reach, radius: COMBAT.fighterRadius,
+    });
+    if (!geometry.qualified || stagedDefender?.focusLabel !== `NEAREST #${closerId}`) {
+      throw new Error(`${milestone} authoritative three-way spacing not qualified: ${JSON.stringify({
+        ...geometry, fighters, focus: stagedDefender?.focusLabel,
+      })}`);
+    }
   }
 
   const attackerBefore = staged.find((entry) => entry.browser === attacker.name);
@@ -9572,6 +9636,16 @@ async function runOnlineUiGuardBreakFlight(entries, { onGuardBroken = null } = {
   const attackOffset = attackRight ? 200 : -200;
   const blockOffset = attackRight ? -200 : 200;
 
+  // M325: ensure Firefox's test-only localhost socket is already connected.
+  // Fail before combat if we cannot certify a genuine native wheel promptly.
+  let m325ChannelReady = false;
+  for (let poll = 0; poll < 25 && !m325ChannelReady; poll += 1) {
+    m325ChannelReady = await execute(defender.base, defender.sessionId,
+      "return window.__MYASO_M325_WHEEL_CHANNEL__?.readyState === WebSocket.OPEN;");
+    if (!m325ChannelReady) await sleep(30);
+  }
+  if (!m325ChannelReady) throw new Error("M325 trusted Firefox wheel socket did not open");
+
   await Promise.all(entries.map((entry) => execute(entry.base, entry.sessionId, "document.querySelector('#arena').focus(); return document.activeElement?.id;")));
   const attackerElementId = await resolveArenaElement(attacker, "M34 attacker");
   const defenderElementId = await resolveArenaElement(defender, "M34 defender");
@@ -10725,10 +10799,15 @@ async function runOnlineUiJumpRecoveryFfaFocusFlight(entries) {
   // Turn #1 180 degrees away from the observer and commit a genuine Space+LMB
   // jump attack. It must whiff cleanly, yet its authoritative 290 ms recovery
   // must temporarily outrank the closer idle #3 in the HUD focus.
+  // M337: M143's old single-W3C-chord included an extra pointerMove tick;
+  // exact-head CI #39420078938 measured real Space -> LMB = 67ms, violating
+  // unchanged <=60ms genuine key/mouse onset. This pre-aim occurs while idle.
+  // Reuse the qualified M335 genuine pointer-first one-tick chord; preserve
+  // the real click, authoritative jump-attack phases, 100HP and HUD gates.
   await aimArena(jumpAttacker, jumpArena, -200);
   await sleep(40);
   await Promise.all([
-    performArenaJumpAttackChord(jumpAttacker, jumpArena, -200, 90),
+    performArenaPreAimedJumpAttackChord(jumpAttacker, 90),
     sampleUiEvidenceWhileActive(entries, 720, 8),
   ]);
 
@@ -11136,6 +11215,13 @@ async function runOnlineUiMultiRecoveryFfaFocusFlight(entries, spatial = false) 
     throw new Error(`${milestone} staging changed authoritative vitals: ${JSON.stringify(baseline)}`);
   }
 
+  // M334: aim the genuine native mouse before any light timing begins.
+  // A movement in the previous multi-source jump action delayed real LMB
+  // behind Space by 62ms on loaded Chromium, breaching the original <=60ms
+  // same-tick requirement. Pre-aim while idle; press both in the first W3C
+  // tick without synthetic events or acceptance-window changes.
+  await aimArena(jumpAttacker, jumpArena, -200);
+
   const jumpKeyOffset = jumpBefore.keyTransitions.length;
   const jumpPointerOffset = jumpBefore.pointers.length;
   const lightPointerOffset = lightBefore.pointers.length;
@@ -11161,23 +11247,23 @@ async function runOnlineUiMultiRecoveryFfaFocusFlight(entries, spatial = false) 
   // Dispatch one genuine 45ms short click instead, below the 80ms classifier.
   // Preserve real pointerDOWN/UP, M144 60..200ms release-to-jump and M145
   // 70..150ms pointerDOWN-to-jump, server phases, HP and pixel assertions.
-  // M235: one real Chrome2/Chrome pair delivered 212ms release-to-jump lead
-  // despite the former 185ms timer, breaching M144's unchanged 200ms cap.
-  // Center the M144-only trusted-down timer at 155ms to leave 30ms more
-  // W3C driver / event-loop headroom; do NOT widen the original 60..200ms
-  // actual-input gate or change the 90ms click or any combat action lifetime.
-  // M326: a genuine M145 native Chromium jump input arrived at +152ms
-  // after the trusted Chrome2 LMB down on merged-main quality #39288349455.
-  // The prior 100ms dispatch delay left too little room for W3C/driver queue
-  // skew (+52ms observed). Dispatch at +80ms instead, preserving the original
-  // measured 70..150ms real input lead window, no synthetic events or retries,
-  // and all authoritative three-stage focus/zero-damage assertions.
-  // M144 retains its independent 155ms release-to-jump choreography.
-  const jumpInputDelayMs = spatial ? 80 : 155;
-  const lightChallenge = m227Registry.issue();
+  // M144 anchors the genuine jump to the authenticated light release:
+  // 70ms after release instead of a timer drifting after pointerDOWN.
+  // M145 retains its independent 100ms trusted-down choreography and the
+  // original measured 70..150ms spatial input lead gate unchanged.
+  // Spatial M145 remains anchored to genuine light DOWN. M144 anchors to
+  // genuine light UP, when the R1 short attack is already classified, so
+  // WebDriver/HTTP startup jitter cannot consume its recovery overlap.
+  // Both unchanged strict 60..200ms and 70..150ms windows are checked below.
+  // M326: stage the genuine M145 W3C chord 20ms earlier after the trusted
+  // light pointerDOWN receipt. Keep the strict measured 70..150ms lead gate,
+  // genuine native Space/LMB inputs, and independent M144 release delay intact.
+  const jumpInputDelayMs = spatial ? 80 : 70;
+  const lightChallenge = m227Registry.issue({ type: spatial ? "pointerdown" : "pointerup" });
   if (lightChallenge) {
     await execute(lightAttacker.base, lightAttacker.sessionId,
       "window.__MYASO_M227_LIGHT_TOKEN__ = " + JSON.stringify(lightChallenge.token)
+        + "; window.__MYASO_M227_LIGHT_TOKEN_TYPE__ = " + JSON.stringify(spatial ? "pointerdown" : "pointerup")
         + "; return true;");
   }
   let spatialSamples = [];
@@ -11188,12 +11274,17 @@ async function runOnlineUiMultiRecoveryFfaFocusFlight(entries, spatial = false) 
       (async () => {
         if (lightChallenge) {
           const receipt = await lightChallenge.wait();
-          console.log((spatial ? "M234_TRUSTED_SPATIAL_LIGHT_ONSET " : "M227_TRUSTED_LIGHT_ONSET ") + JSON.stringify({
+          console.log((spatial ? "M234_TRUSTED_SPATIAL_LIGHT_ONSET " : "M227_TRUSTED_LIGHT_RELEASE ") + JSON.stringify({
             milestone, scenario: expectedScenario, ...receipt,
           }));
         }
         await sleep(jumpInputDelayMs);
-        await performArenaJumpAttackChord(jumpAttacker, jumpArena, -200, 90);
+        // M336: on CI #39418435711 M145's genuine 1ms-synchronized
+        // Space+LMB was delivered to DOM but #1 never sent an authoritative
+        // action. Hold the *same* one real W3C chord through more 30Hz input
+        // sampling frames. M144 stays at 90ms; all original 60/70/150/200ms
+        // onset/recovery, damage and focus gates remain unchanged.
+        await performArenaPreAimedJumpAttackChord(jumpAttacker, spatial ? 180 : 90);
       })(),
       // R1 M144: light commits on release and its 185ms delayed jump now
       // correctly yields #3 recovery before #1 recovery. Observe long enough
@@ -12320,6 +12411,40 @@ async function performArenaJumpAttackChord(session, elementId, xOffset = 200, ho
   });
 }
 
+// M335 acceptance-only: genuine pointer first, keyboard second, same FIRST
+// WebDriver action tick. Exact-head CI #39415462650 measured Space 64ms ahead
+// of LMB despite genuine pre-aim. Direct local ChromeDriver native-input
+// measurements delivered <=1ms onset gap in pointer-first order, compared
+// with 2..5ms keyboard-first without CI contention. Original <=60ms actual
+// event gate stays strict. The client legitimately handles Space after LMB
+// down by committing its light, so the jump attack still fires just once.
+async function performArenaPreAimedJumpAttackChord(session, holdMs = 90) {
+  const boundedHoldMs = Math.max(50, Math.min(180, Math.trunc(holdMs)));
+  await webdriver(session.base, "POST", `/session/${session.sessionId}/actions`, {
+    actions: [
+      {
+        type: "pointer",
+        id: `mouse-${session.name}`,
+        parameters: { pointerType: "mouse" },
+        actions: [
+          { type: "pointerDown", button: 0 },
+          { type: "pause", duration: boundedHoldMs },
+          { type: "pointerUp", button: 0 },
+        ],
+      },
+      {
+        type: "key",
+        id: `keyboard-${session.name}`,
+        actions: [
+          { type: "keyDown", value: " " },
+          { type: "pause", duration: boundedHoldMs },
+          { type: "keyUp", value: " " },
+        ],
+      },
+    ],
+  });
+}
+
 async function performArenaJumpPress(session, holdMs = 45) {
   const boundedHoldMs = Math.max(25, Math.min(120, Math.trunc(holdMs)));
   await webdriver(session.base, "POST", `/session/${session.sessionId}/actions`, {
@@ -12521,6 +12646,18 @@ async function installUiObserver(session) {
     const threatGuardArc = document.querySelector('#threat-guard-arc');
     if (!target || !arena || !arenaStage || !overlay || !recovery || !focusLabel || !threat || !threatCount || !threatSecondary || !threatSecondaryBearing || !threatSecondaryPhase || !threatSecondaryGuardArc || !threatBearing || !threatGuardArc) throw new Error('missing online UI flight target');
     const state = { events: [], eventTransitions: [], keys: [], keyTransitions: [], pointers: [], wheels: [], overlayTransitions: [], feedbackTransitions: [], recoveryTransitions: [], focusTransitions: [], threatTransitions: [], recoveryTellMaxPixels: 0, parryTellMaxPixels: 0, online: '', startedAt: performance.now() };
+    // M338/M339: M151/M152 and M40 share the exact M194 guard-break wheel verifier.
+    // Open the same real Firefox-only, localhost trusted-proof socket in all
+    // four scenarios. Parent FFA flights reinstall UI observers: reuse the
+    // existing OPEN/CONNECTING channel rather than leaking another socket.
+    if (${requiresM338GuardBreakWheelSocket(scenario, session.name)}) {
+      const prior = window.__MYASO_M325_WHEEL_CHANNEL__;
+      if (!prior || prior.readyState === WebSocket.CLOSING
+        || prior.readyState === WebSocket.CLOSED) {
+        window.__MYASO_M325_WHEEL_CHANNEL__ = new WebSocket(
+          "ws://" + location.host + "/__myaso_m325_trusted_wheel");
+      }
+    }
     const epochEvidence = ['uidodge', 'uirollbuffer', 'uijumpbuffer', 'uijumpattack', 'uijumpattackinputloss', 'uijumpattackpunish', 'uijumpattacktelegraph', 'uijumpffaprimary', 'uijumpffasecondary', 'uijumprecoveryffa', 'uijumppunishffa', 'uimultirecoveryffa', 'uimultirecoveryspatial', 'uimultirecoverypunish', 'uiparrypunishwindow', 'uiparrypunishffa', 'uiparrypunishffahit', 'uiguardbreakpunishffa', 'uiguardbreakpunishffahit', 'uikickknockdownffa', 'uikickknockdownffahit', 'uikickknockdownbounded', 'uirollknockdownbounded', 'uistaminaauth', 'uistaminaexhaustion', 'uistaminafeedback', 'uistaminaconfirmed', 'uifeint', 'uirollknockdownffahit', 'uimultiknockdownffa', 'uimultiknockdownffahit', 'uirollknockdownffa', 'uijumpattackblock', 'uijumpattackparry', 'uijumpattackdodge', 'uijumpattackbuffer', 'uikickbuffer'].includes(new URLSearchParams(location.search).get('scenario'));
     const record = () => {
       const text = target.textContent?.trim() ?? '';
@@ -12618,11 +12755,12 @@ async function installUiObserver(session) {
         };
         if (epochEvidence) entry.epochMs = Date.now();
         state.pointers.push(entry);
-        // M227: receipt of the actual trusted W3C light down on Chrome2.
-        // No DOM input emission, handler cancellation or gameplay mutation.
-        if (type === 'pointerdown' && event.isTrusted === true && event.button === 0) {
+        // M227/M234: capture the selected real W3C light down (M145) or
+        // release (M144). This emits proof only; never synthesizes input.
+        if (event.isTrusted === true && event.button === 0) {
           const token = window.__MYASO_M227_LIGHT_TOKEN__;
-          if (token) {
+          const expectedType = window.__MYASO_M227_LIGHT_TOKEN_TYPE__ || 'pointerdown';
+          if (token && type === expectedType) {
             window.__MYASO_M227_LIGHT_TOKEN__ = null;
             fetch('/__myaso_m227_trusted_light', {
               method: 'POST',
@@ -12646,12 +12784,19 @@ async function installUiObserver(session) {
       const challenge = window.__MYASO_M221_WHEEL_TOKEN__;
       if (challenge && event.isTrusted === true && event.deltaY > 0) {
         window.__MYASO_M221_WHEEL_TOKEN__ = null;
-        fetch('/__myaso_m221_trusted_wheel', {
-          method: 'POST',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ token: challenge, trusted: event.isTrusted === true, deltaY: event.deltaY }),
-          keepalive: true,
-        }).catch(() => {});
+        const receipt = JSON.stringify({
+          token: challenge, trusted: event.isTrusted === true, deltaY: event.deltaY,
+        });
+        const channel = window.__MYASO_M325_WHEEL_CHANNEL__;
+        if (channel) {
+          if (channel.readyState === WebSocket.OPEN) channel.send(receipt);
+        } else {
+          // Preserve original M221 HTTP attestation for other acceptance lanes.
+          fetch('/__myaso_m221_trusted_wheel', {
+            method: 'POST', headers: { 'content-type': 'application/json' },
+            body: receipt, keepalive: true,
+          }).catch(() => {});
+        }
       }
     }, { capture: true });
     record();
@@ -13770,6 +13915,9 @@ async function readUiEvidence(session) {
       wheels: (state.wheels ?? []).slice(),
       acceptance: window.__MYASO_ACCEPTANCE_STATE__ ? {
         scenario: window.__MYASO_ACCEPTANCE_STATE__.scenario ?? '',
+        lastSubmittedClientTick: window.__MYASO_ACCEPTANCE_STATE__.lastSubmittedClientTick ?? null,
+        lastSubmittedAtEpochMs: window.__MYASO_ACCEPTANCE_STATE__.lastSubmittedAtEpochMs ?? null,
+        inputSubmissions: (window.__MYASO_ACCEPTANCE_STATE__.inputSubmissions ?? []).slice(-32).map((entry) => ({ ...entry })),
         playerNetId: Number(window.__MYASO_ACCEPTANCE_STATE__.playerNetId ?? 0),
         focusNetId: Number(window.__MYASO_ACCEPTANCE_STATE__.focusNetId ?? 0),
         serverTick: Number(window.__MYASO_ACCEPTANCE_STATE__.serverTick ?? 0),

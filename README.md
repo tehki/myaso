@@ -51,6 +51,16 @@ Then open `http://localhost:8000/web/`.
 
 Controls: **WASD** move, **mouse** aim, **left mouse** attack (**strafe + left mouse** selects a left/right sweep lane), **E** heavy attack, **mouse wheel forward** roll, **mouse wheel backward** parry/short block (or early attack feint), **right-click tap** kick/shove, **right-click hold** run, **right-click hold + WASD + left mouse** running attack, **Space** jump, and **Space + left mouse** jumping attack. Running, running attacks, rolling, kicking, and jumping consume stamina.
 
+## Sound (R3)
+
+Browser combat uses procedural Web Audio effects, without external media downloads.
+Left-click strikes sound on pointer-down, while heavy upgrades, kicks, rolls,
+parries, jumps, footsteps, hit/guard feedback and nearby remote players have
+distinct cues. Audio starts only after a real click/key gesture (browser autoplay
+policy); the Sound toggle and Volume slider remember their values when storage
+is available. Server-authoritative events drive online hit confirmation; sound
+never changes combat simulation, input sends or damage.
+
 ## Tests
 
 ```bash
