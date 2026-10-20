@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="icon" href="data:,">
+<title>myaso.io Graphics 3A — Adult movement A1</title><style>
+:root{color-scheme:dark}body{background:#181f23;color:#f1e6d6;font:15px/1.5 system-ui;margin:0;padding:20px}
+main{max-width:1000px;margin:auto}h1{font:700 26px Georgia,serif}
+.controls{display:flex;align-items:center;flex-wrap:wrap;gap:17px;padding:13px;border:1px solid #697980}
+select{background:#354b53;color:white;border:1px solid #778c92;border-radius:3px;padding:7px}
+canvas{max-width:100%;display:block;background:#26373f;margin:16px auto;border:1px solid #64777a}
+.note{color:#b6c9c8;font-size:13px}
+</style></head><body><main>
+<h1>myaso.io — adult body walk &amp; run A1</h1>
+<p>Original Blender 4.5 first-party armature animation, 8-direction RGBA atlases. Bare, unarmed and unequipped adult masculine/feminine character studies. This is a nonauthoritative visual preview, not gameplay or final animation approval.</p>
+<div class="controls">
+<label>Body <select id="body"><option value="adult-masculine">Adult masculine</option><option value="adult-feminine">Adult feminine</option></select></label>
+<label>Motion <select id="clip"><option value="idle">Idle (A0)</option><option value="walk" selected>Walk (A1)</option><option value="run">Run (A1)</option></select></label>
+<label>Facing <select id="direction"><option value="0">South</option><option value="1">Southwest</option><option value="2">West</option><option value="3">Northwest</option><option value="4">North</option><option value="5">Northeast</option><option value="6">East</option><option value="7">Southeast</option></select></label>
+<span id="ready">Loading 6 atlas files…</span>
+</div>
+<canvas id="stage" width="960" height="510" aria-label="Original adult humanoid movement sprite comparison"></canvas>
+<p class="note">96px standing visual destination; 160px original source frames. Actual foot ground contact, rig deformation and weapon/armor attachments await art review. Bare body and separate server-owned equipment contract remain intact. No Combat, network, camera or hitboxes are altered.</p>
+</main><script type="module">
+import {createUnequippedAdultAppearance,planAdultCharacterLayers} from "../src/browser/character-appearance.mjs";
+const body=document.querySelector("#body"),clip=document.querySelector("#clip"),direction=document.querySelector("#direction");
+const ctx=document.querySelector("#stage").getContext("2d");const images={};const errors=[];let loaded=0,frame=0,drawDirection=0;
+for(const b of ["adult-masculine","adult-feminine"]){
+ for(const c of ["idle","walk","run"]){
+  const key=b+":"+c,img=new Image();images[key]=img;
+  img.onload=()=>{
+   if(img.naturalWidth!==640||img.naturalHeight!==1280){errors.push(key+": incorrect atlas dimensions");return;}
+   loaded++;document.querySelector("#ready").textContent=loaded===6?"6 / 6 original atlases loaded":loaded+"/6 atlas files";
+  };
+  img.onerror=()=>errors.push(key+": failed to load");
+  img.src="./assets/adults/"+b+"_"+c+".webp";
+ }
+}
+function paint(now){
+ const type=body.value,action=clip.value;
+ const appearance=planAdultCharacterLayers(createUnequippedAdultAppearance(type));
+ if(!appearance.supported||appearance.layers.length!==1){if(errors.length<10)errors.push("appearance layering invalid");}
+ drawDirection=Number(direction.value);frame=Math.floor(now/(action==="run"?125:action==="walk"?220:280))%4;
+ ctx.fillStyle="#293b43";ctx.fillRect(0,0,960,510);
+ ctx.fillStyle="#4b555a";ctx.fillRect(0,399,960,111);
+ ctx.fillStyle="#9b8a76";ctx.fillRect(0,398,960,2);
+ for(const a of [{b:"adult-masculine",x:330},{b:"adult-feminine",x:630}]){
+  ctx.save();ctx.translate(a.x,398);
+  ctx.fillStyle="rgba(0,0,0,.35)";ctx.beginPath();ctx.ellipse(0,7,19,7,0,0,Math.PI*2);ctx.fill();
+  const img=images[a.b+":"+action];
+  if(img.complete&&img.naturalWidth===640){
+   ctx.imageSmoothingEnabled=true;
+   ctx.drawImage(img,frame*160,drawDirection*160,160,160,-48,-62.4,96,96);
+  }
+  ctx.restore();
+  ctx.font="15px sans-serif";ctx.fillStyle="#f7e9d4";ctx.textAlign="center";
+  ctx.fillText(a.b,a.x,464);
+ }
+ requestAnimationFrame(paint);
+}
+requestAnimationFrame(paint);
+window.__ADULT_A1_PREVIEW__=()=>{
+ const plan=planAdultCharacterLayers(createUnequippedAdultAppearance(body.value));
+ return {loaded,errors:[...new Set(errors)],body:body.value,clip:clip.value,direction:drawDirection,frame,
+  layering:plan.layers.map(layer=>layer.kind),source:[160,160],destination:[96,96],
+  onlineGameplay:false,inventoryGranted:false,knightArtChanged:false};
+};
+</script></body></html>
