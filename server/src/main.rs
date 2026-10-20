@@ -32,6 +32,33 @@ const GAME_PATH: &str = "/game";
 const CHAT_STREAM_SETUP_DEADLINE: Duration = Duration::from_secs(10);
 const CHAT_FRAME_BODY_DEADLINE: Duration = Duration::from_secs(10);
 const CHAT_STREAM_WRITE_DEADLINE: Duration = Duration::from_secs(10);
+// A malicious opted-in peer can send fast *valid* requests after exhausting
+// ChatHub rate tokens. Cap per-chat ingress BEFORE scanning live world fighters.
+const MAX_CHAT_INGRESS_FRAMES_PER_SECOND: u16 = 64;
+
+struct ChatIngressBudget {
+    window_start: Instant,
+    frames: u16,
+}
+
+impl ChatIngressBudget {
+    fn new(now: Instant) -> Self {
+        Self { window_start: now, frames: 0 }
+    }
+
+    fn consume(&mut self, now: Instant) -> bool {
+        if now.saturating_duration_since(self.window_start) >= Duration::from_secs(1) {
+            self.window_start = now;
+            self.frames = 0;
+        }
+        if self.frames >= MAX_CHAT_INGRESS_FRAMES_PER_SECOND {
+            return false;
+        }
+        self.frames += 1;
+        true
+    }
+}
+
 const CLOSE_DATAGRAM_UNAVAILABLE: u32 = 0x11;
 const SNAPSHOT_INTERVAL: Duration = Duration::from_millis(50);
 const SNAPSHOT_EVERY_SERVER_TICKS: u32 = 3;
@@ -893,6 +920,7 @@ async fn run_chat_stream(
     .await
     .context("local chat reply stream setup timed out")??;
     let mut violations = 0_u8;
+    let mut ingress_budget = ChatIngressBudget::new(Instant::now());
     loop {
         // Preserve an in-progress length-prefixed read while servicing queued
         // outbound chat. read_exact is NOT cancellation-safe: recreating its
@@ -904,6 +932,11 @@ async fn run_chat_stream(
             tokio::select! {
                 frame = &mut inbound => {
                     let frame = frame?;
+                    if !ingress_budget.consume(Instant::now()) {
+                        // Isolate abusive chat traffic without closing the
+                        // realtime combat datagram/gameplay stream.
+                        bail!("local chat ingress frame budget exceeded");
+                    }
                     let correlation = if frame.len() >= 7 {
                         u32::from_le_bytes(frame[3..7].try_into().expect("length checked"))
                     } else { 0 };
