@@ -188,6 +188,102 @@ class E2dDatabaseTests(unittest.TestCase):
             self.execute(op="")
         self.assertTrue(self.state()["conserved"])
 
+    def test_revoke_admitted_session_denies_new_purchase_and_old_receipt_retrieval(self):
+        previous = self.execute()
+        self.assertEqual(previous["sequence"], 1)
+        with sqlite3.connect(self.path) as db:
+            db.execute(
+                "UPDATE admitted_sessions SET state='revoked'"
+                " WHERE player_id=10 AND epoch=8"
+            )
+        current = self.state()
+        with self.assertRaises(Denied):
+            self.execute()
+        self.assertEqual(self.state(), current)
+        self.assertTrue(self.state()["conserved"])
+
+    def test_unknown_or_revoked_session_epoch_fails_before_a_charge(self):
+        with self.assertRaises(Denied):
+            purchase(self.path, VerifiedSession(10, 9),
+                     PurchaseIntent("op-A", 10, 50, 1, 1), 20)
+        with sqlite3.connect(self.path) as db:
+            db.execute(
+                "UPDATE admitted_sessions SET state='revoked'"
+                " WHERE player_id=10 AND epoch=8"
+            )
+        before = self.state()
+        with self.assertRaises(Denied):
+            self.execute()
+        self.assertEqual(self.state(), before)
+        self.assertEqual(self.state()["sequence"], 0)
+
+    def test_revoked_seller_consent_rejects_active_listing_before_transfer(self):
+        with sqlite3.connect(self.path) as db:
+            db.execute(
+                "UPDATE seller_consents SET state='revoked'"
+                " WHERE id='TEST_FIXTURE_ONLY'"
+            )
+        before = self.state()
+        with self.assertRaises(Denied):
+            self.execute()
+        self.assertEqual(self.state(), before)
+        self.assertEqual(self.state()["title"], (20, 1))
+        self.assertTrue(self.state()["conserved"])
+
+    def test_price_title_map_and_fee_must_match_admitted_consent(self):
+        for field, value in (("price", 501), ("title_revision", 2),
+                             ("map_revision", 8), ("fee_bps", 300),
+                             ("expires_tick", 101), ("seller_id", 30)):
+            with self.subTest(field=field):
+                with sqlite3.connect(self.path) as db:
+                    db.execute(
+                        f"UPDATE seller_consents SET {field}=?"
+                        " WHERE id='TEST_FIXTURE_ONLY'", (value,)
+                    )
+                before = self.state()
+                with self.assertRaises(Denied):
+                    self.execute()
+                self.assertEqual(self.state(), before)
+                self.assertTrue(self.state()["conserved"])
+                with sqlite3.connect(self.path) as db:
+                    db.execute(
+                        f"UPDATE seller_consents SET {field}=?"
+                        " WHERE id='TEST_FIXTURE_ONLY'",
+                        ({"price": 500, "title_revision": 1, "map_revision": 7,
+                         "fee_bps": 200, "expires_tick": 100, "seller_id": 20}[field],),
+                    )
+
+    def test_missing_consent_reference_is_not_approval(self):
+        with sqlite3.connect(self.path) as db:
+            db.execute(
+                "UPDATE listings SET approved_consent='FAKE_VALUE' WHERE id=50"
+            )
+        before = self.state()
+        with self.assertRaises(Denied):
+            self.execute()
+        self.assertEqual(self.state(), before)
+        self.assertTrue(self.state()["conserved"])
+
+    def test_purchase_consumes_both_listing_and_matching_consent_once(self):
+        first = self.execute()
+        self.assertEqual(self.state()["consent"], "consumed")
+        self.assertEqual(self.state()["listing"], "consumed")
+        self.assertEqual(self.execute(), first)
+        self.assertEqual(self.state()["receipts"], 1)
+        with self.assertRaises(Denied):
+            self.execute(op="new-op")
+        self.assertEqual(self.state()["sequence"], 1)
+        self.assertTrue(self.state()["conserved"])
+
+    def test_hard_kill_after_commit_recovers_consumed_consent_too(self):
+        child = self.crash_child(10, "op-A", "hard_exit_after_commit")
+        self.assertEqual(child.returncode, 91, child.stderr)
+        before = self.state()
+        self.assertEqual(before["consent"], "consumed")
+        self.assertTrue(before["conserved"])
+        self.execute()
+        self.assertEqual(self.state(), before)
+
     def test_title_revision_overflow_rolls_back_everything(self):
         with sqlite3.connect(self.path) as db:
             db.execute('UPDATE titles SET revision=? WHERE parcel_id=42',
