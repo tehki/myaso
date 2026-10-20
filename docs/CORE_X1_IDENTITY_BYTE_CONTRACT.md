@@ -30,8 +30,9 @@ Baseline reviewed: `main` SHA
   same nonzero `u128` identity into a **big-endian** 16-byte PostgreSQL
   `bytea`, alongside entity kind `1` (character) / `2` (ground item).
   A mutation operation ID is likewise a nonzero **big-endian** 16-byte
-  `bytea`. Worker, zone, epoch and SQL revision parameters must fit
-  PostgreSQL **positive signed 63-bit** `bigint`.
+  `bytea`. Worker, zone and authority epoch must fit PostgreSQL
+  **positive signed 63-bit** `bigint`; the expected world revision may be
+  **zero** for a new entity, but must never be negative or exceed signed 63 bits.
 - **Magic [PR #354](https://github.com/tehki/myaso/pull/354):**
   `server/src/character_identity.rs::CharacterId(NonZeroU64)` and a
   separate `SessionIdentityRegistry` cannot represent the entire 8B ID
@@ -53,7 +54,9 @@ set. These include the exact 8B durable record, 8B little-endian stored ID,
 - Fail-closed zero, malformed hexadecimal, damaged/checksum-invalid and
   nonzero reserved-byte records.
 - Rejecting overflow when a high-half ID is forced into 64 bits.
-- Rejecting zero, negative and out-of-range worker/zone/epoch SQL integers.
+- Rejecting zero/negative/out-of-range worker, zone and authority epochs;
+  allowing zero only for an initial expected world-state revision, and rejecting
+  negative or overflowing expected revisions.
 
 Run with:
 
@@ -77,7 +80,8 @@ A future adapter (owned by 8B for identity, 8C for DB binding) shall:
    verify record checksum/version, then convert the numeric ID to 16-byte
    **big-endian** when binding the PostgreSQL entity key.
 3. Bind entity kind explicitly and retain nonzero 128-bit operation IDs.
-4. Reject signed-`bigint` overflow for worker/zone/epoch/revision.
+4. Reject nonpositive worker/zone/epoch and signed-`bigint` overflow;
+   accept initial expected world revision zero, but reject negative revisions.
 5. Check a **durably committed session generation** and a current,
    authoritative, fenced zone worker in the same trusted admission/mutation
    workflow. No historical mutation receipt grants fresh authority.
