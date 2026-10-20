@@ -1,0 +1,43 @@
+{
+  "alphaOrderingValidatedInGame": false,
+  "byteSavings": 22756,
+  "coordinateSpace": "UNSCALED A2.3 Blender review camera pixel frame. NOT game world/camera position",
+  "cropSourceRectPixels": [
+    106,
+    37,
+    1063,
+    569
+  ],
+  "croppedCanvasPixels": [
+    957,
+    532
+  ],
+  "croppedWebpBytes": 122468,
+  "croppedWebpSha256": "317ca3be7e9420e77b5a8867f16f1f14df5040929308f1f899d88ec33cecd16f",
+  "drawOffsetPixels": [
+    106,
+    37
+  ],
+  "license": "derived from authored A2.3 roof pass; no external assets",
+  "milestone": "Blood & Iron A2.4 cropped lossless roof alpha placement trial",
+  "originalAlphaBoundingBox": [
+    108,
+    39,
+    1061,
+    567
+  ],
+  "originalWebpBytes": 145224,
+  "paddingPixels": 2,
+  "productionApproved": false,
+  "referenceCanvasPixelRoundtrip": true,
+  "relativeBytes": 0.843304,
+  "reviewOnly": true,
+  "roofOcclusionInBrowserValidated": false,
+  "runtimeIntegrated": false,
+  "sourceCanvas": [
+    1120,
+    720
+  ],
+  "sourceFile": "greyhaven_a23_roof.webp",
+  "stableGameWorldPivotValidated": false
+}

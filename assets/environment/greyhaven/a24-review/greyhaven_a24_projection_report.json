@@ -1,0 +1,181 @@
+{
+  "a22Scene": "blood_iron_greyhaven_a22.blend",
+  "artOnly": true,
+  "blenderBasisPxPerMeterX": [
+    -20.58755,
+    8.89794
+  ],
+  "blenderBasisPxPerMeterY": [
+    15.95537,
+    11.48123
+  ],
+  "blenderGroundAxesAngleDegrees": 120.888,
+  "blenderOrthographic": true,
+  "browserComparisonViewportPixels": [
+    1120,
+    720
+  ],
+  "browserRendererModified": false,
+  "camera": "A2 / street review / 3-4 angle",
+  "caveat": "Door world XY are proposed A1 manifest coordinates, NOT a validated server-authoritative portal; the runtime is a flat XY camera. Review only.",
+  "directSingleLayerPlacementApproved": false,
+  "doorAlignedSamples": [
+    {
+      "blenderDoorAlignedPixel": [
+        560.0,
+        360.0
+      ],
+      "blenderPixel": [
+        500.965,
+        339.14
+      ],
+      "browserPixel": [
+        560.0,
+        360.0
+      ],
+      "id": "door",
+      "meters": [
+        0.0,
+        0.0
+      ],
+      "registrationErrorPx": 0.0
+    },
+    {
+      "blenderDoorAlignedPixel": [
+        539.412,
+        368.898
+      ],
+      "blenderPixel": [
+        480.378,
+        348.038
+      ],
+      "browserPixel": [
+        593.6,
+        360.0
+      ],
+      "id": "east-1m",
+      "meters": [
+        1.0,
+        0.0
+      ],
+      "registrationErrorPx": 54.913
+    },
+    {
+      "blenderDoorAlignedPixel": [
+        580.588,
+        351.102
+      ],
+      "blenderPixel": [
+        521.553,
+        330.242
+      ],
+      "browserPixel": [
+        526.4,
+        360.0
+      ],
+      "id": "west-1m",
+      "meters": [
+        -1.0,
+        0.0
+      ],
+      "registrationErrorPx": 54.913
+    },
+    {
+      "blenderDoorAlignedPixel": [
+        575.955,
+        371.481
+      ],
+      "blenderPixel": [
+        516.921,
+        350.621
+      ],
+      "browserPixel": [
+        560.0,
+        393.6
+      ],
+      "id": "south-1m",
+      "meters": [
+        0.0,
+        1.0
+      ],
+      "registrationErrorPx": 27.273
+    },
+    {
+      "blenderDoorAlignedPixel": [
+        544.045,
+        348.519
+      ],
+      "blenderPixel": [
+        485.01,
+        327.659
+      ],
+      "browserPixel": [
+        560.0,
+        326.4
+      ],
+      "id": "north-1m",
+      "meters": [
+        0.0,
+        -1.0
+      ],
+      "registrationErrorPx": 27.273
+    },
+    {
+      "blenderDoorAlignedPixel": [
+        550.736,
+        400.758
+      ],
+      "blenderPixel": [
+        491.701,
+        379.898
+      ],
+      "browserPixel": [
+        627.2,
+        427.2
+      ],
+      "id": "southeast-2m",
+      "meters": [
+        2.0,
+        2.0
+      ],
+      "registrationErrorPx": 80.907
+    },
+    {
+      "blenderDoorAlignedPixel": [
+        569.264,
+        319.242
+      ],
+      "blenderPixel": [
+        510.23,
+        298.382
+      ],
+      "browserPixel": [
+        492.8,
+        292.8
+      ],
+      "id": "northwest-2m",
+      "meters": [
+        -2.0,
+        -2.0
+      ],
+      "registrationErrorPx": 80.907
+    }
+  ],
+  "expectedGamePixelsPerMeter": 33.599999999999994,
+  "gameWorldUnitsPerMeter": 40.0,
+  "gameZoom": 0.84,
+  "manifestDoorGameXY": [
+    4365.0,
+    4075.0
+  ],
+  "maxSampleErrorPx": 80.907,
+  "milestone": "Blood & Iron A2.4 browser XY vs Blender projection acceptance diagnostic",
+  "productionApproved": false,
+  "requiresCameraMatchedRerender": true,
+  "viewportSource": "arena-viewport.mjs",
+  "visualDoorOriginInBlenderMeters": [
+    0.0,
+    -1.7,
+    0.0
+  ]
+}
