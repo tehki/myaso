@@ -1,6 +1,6 @@
 use anyhow::{bail, Context, Result};
 use myaso_server::{
-    chat::{decode_send, encode_result, ChatCode, ChatPosition, ChatResult, LocalChatHub,
+    chat::{decode_send, encode_result, ChatPosition, ChatResult, LocalChatHub,
            MAX_CHAT_FRAME, OUTBOUND_QUEUE},
     coalesce_accepted_input_batch, decode_input_packet, is_sequence_newer16, is_tick_newer32,
     kill_event::{encode_kill_event, KillEventPacket},
