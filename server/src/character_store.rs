@@ -140,10 +140,15 @@ impl CharacterRecordStore {
             record.character_id.get(),
             std::process::id()
         ));
-        let mut file = OpenOptions::new()
-            .write(true)
-            .create_new(true)
-            .open(&path)?;
+        let mut options = OpenOptions::new();
+        options.write(true).create_new(true);
+        // Private identity metadata must not be world-readable on Unix.
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::OpenOptionsExt;
+            options.mode(0o600);
+        }
+        let mut file = options.open(&path)?;
         let staged = StagedFile { path };
         file.write_all(&record.encode())?;
         file.sync_all()?;
@@ -296,6 +301,22 @@ mod tests {
         fs::write(root.0.join(".987.pending-interrupted"), b"partial").expect("simulate orphan");
         let restored = root.store().load(id).expect("canonical record");
         assert_eq!(restored, first);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn newly_provisioned_identity_is_private_to_its_owner() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let root = TestDirectory::new();
+        let mut store = root.store();
+        let id = character(1337);
+        store.create(id).expect("create private record");
+        let mode = fs::metadata(store.record_path(id))
+            .expect("record metadata")
+            .permissions()
+            .mode();
+        assert_eq!(mode & 0o777, 0o600);
     }
 
     #[test]
