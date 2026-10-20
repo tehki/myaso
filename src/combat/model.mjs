@@ -147,6 +147,7 @@ export function createFighter({ id, x, y, facing = 0, spawnX = x, spawnY = y }) 
     actionDurationMs: 0,
     attackInputWasDown: false,
     heavyAttackInputWasDown: false,
+    chargingHeavy: false,
     blockInputWasDown: false,
     dodgeInputWasDown: false,
     dashInputWasDown: false,
@@ -444,6 +445,30 @@ function beginRequestedAction(world, fighter, input, attackPressed, heavyAttackP
     return;
   }
 
+  // Combined attack+heavy bits represent an LMB held charge. Never land
+  // while held, even after 320ms: the server chooses activation on release.
+  if (fighter.chargingHeavy) {
+    if (input.attack && input.heavyAttack) return;
+    fighter.chargingHeavy = false;
+    if (input.heavyAttack && !input.attack) {
+      return; // advanceAction waits out the remaining server-authoritative windup.
+    }
+    if (input.attack && !input.heavyAttack) {
+      if (input.jump && spendStamina(world, fighter, COMBAT.jump.staminaCost + COMBAT.jumpAttack.staminaCost)) {
+        beginJumpAttack(fighter);
+      } else if (input.run && Math.hypot(input.moveX, input.moveY) >= 0.5) {
+        if (spendStamina(world, fighter, COMBAT.runningAttack.staminaCost)) {
+          fighter.attackHitTargets.clear();
+          setAction(fighter, "running_attack_windup", COMBAT.runningAttack.windupMs);
+        } else setAction(fighter, "idle", 0);
+      } else {
+        beginLightAttack(fighter, lightAttackLateral(fighter, input.moveX, input.moveY));
+      }
+      return;
+    }
+    setAction(fighter, "idle", 0); // blur/cancel never attacks.
+    return;
+  }
   if (fighter.action === "jump" && attackPressed && spendStamina(world, fighter, COMBAT.jumpAttack.staminaCost)) {
     beginJumpAttack(fighter);
     return;
@@ -517,6 +542,12 @@ function beginRequestedAction(world, fighter, input, attackPressed, heavyAttackP
   if (jumpPressed && attackPressed && fighter.action === "idle") return;
 
   const moving = Math.hypot(input.moveX, input.moveY) >= 0.5;
+  if (fighter.action === "idle" && input.attack && input.heavyAttack && attackPressed) {
+    fighter.attackHitTargets.clear();
+    setAction(fighter, "heavy_attack_windup", COMBAT.heavyAttack.windupMs);
+    fighter.chargingHeavy = true;
+    return;
+  }
   if (attackPressed && input.run && moving && fighter.action === "idle") {
     if (spendStamina(world, fighter, COMBAT.runningAttack.staminaCost)) {
       fighter.attackHitTargets.clear();
@@ -632,6 +663,11 @@ function moveFighter(world, fighter, input, dtMs) {
 function advanceAction(world, fighter, input, dtMs) {
   if (fighter.action === "idle" || fighter.action === "dead") return;
   fighter.actionElapsedMs += dtMs;
+
+  if (fighter.action === "heavy_attack_windup" && fighter.chargingHeavy) {
+    fighter.actionElapsedMs = Math.min(fighter.actionElapsedMs, COMBAT.heavyAttack.windupMs);
+    return; // Full charge remains READY, no automatic heavy impact.
+  }
 
   if (fighter.action === "block") {
     if (!input.block) setAction(fighter, "idle", 0);
@@ -931,6 +967,9 @@ function respawnFighter(fighter) {
 }
 
 function setAction(fighter, action, durationMs) {
+  if (action !== "heavy_attack_windup") {
+    fighter.chargingHeavy = false;
+  }
   if (action !== "attack_recovery" && action !== "attack_left_recovery" && action !== "attack_right_recovery") {
     clearRecoveryInputBuffer(fighter);
   }

@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 
 test("M109 late release-to-light commit is recognized before a clean retry, without weakening authoritative result", () => {
-  const source = readFileSync(new URL("../scripts/pvp_browser_flight_runner.mjs", import.meta.url), "utf8");
+  const source = readFileSync(new URL("../scripts/pvp_browser_flight_runner.mjs", import.meta.url), "utf8").replace(/\r\n/g, "\n");
   const start = source.indexOf("async function runOnlineUiHeavyWhiffPunishFlight(");
   const end = source.indexOf("\nasync function runOnlineUiDodgeFeedbackFlight(", start + 20);
   assert.ok(start >= 0 && end > start);

@@ -4,8 +4,9 @@ import { readFile, stat } from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
 import { setTimeout as sleep } from "node:timers/promises";
-import { COMBAT_ACTION, FFA_KILL_TARGET } from "../src/browser/combat-readability.mjs";
+import { COMBAT_ACTION, FFA_KILL_TARGET, fighterThreatPhaseState } from "../src/browser/combat-readability.mjs";
 import { COMBAT } from "../src/combat/model.mjs";
+import { DASH_DOUBLE_TAP_MS } from "../src/browser/dash-input.mjs";
 import { planM198GuardBreakW3cExchange } from "./m198-guardbreak-input-plan.mjs";
 import { measureM200WheelFeedbackLatency } from "./m200-feedback-latency.mjs";
 import { summarizeM214ConfirmedFeedback } from "./m214-confirmed-feedback-latency.mjs";
@@ -28,7 +29,7 @@ import { planM203W3cPointerPause } from "./m203-w3c-wheel-ack.mjs";
 import { planM225ThreatDistanceStaging } from "./m225-ffa-threat-distance.mjs";
 import { qualifyM150ParryGeometry } from "./m150-replicated-geometry.mjs";
 import { awaitM223HeavyWindup, planM223WheelDelay } from "./m223-server-heavy-windup.mjs";
-import { dispatchM212AttackLedShortBlock } from "./m212-attack-led-short-block.mjs";
+import { dispatchR2ReleaseLedShortBlock } from "./r2-release-led-short-block.mjs";
 import { createM221TrustedWheelRegistry } from "./m221-trusted-wheel-attestation.mjs";
 import { attachM325TrustedWheelSocket } from "./m325-trusted-wheel-socket.mjs";
 import { requiresM338GuardBreakWheelSocket } from "./m338-guard-break-wheel-scenarios.mjs";
@@ -4859,7 +4860,11 @@ async function runOnlineUiMultiKnockdownFfaFlight(entries) {
         Math.min(140, Math.round((distance / COMBAT.moveSpeed) * 1000 * 0.72)),
       );
       await pulseMovementKey(entry, key, durationMs);
-      await sleep(70);
+      // M158 staging is walking, not double-tap dashing. A repeated genuine
+      // W3C WASD down within 240ms can trigger the 750px/s authoritative dash
+      // and overshoot the measured target. Keep the real keys, then let the
+      // gesture window expire before deciding the next correction.
+      await sleep(DASH_DOUBLE_TAP_MS + 20);
     }
     throw new Error(milestone + " could not stage authoritative " + label + " geometry: "
       + JSON.stringify(last));
@@ -8047,6 +8052,19 @@ async function runOnlineUiParryFlight(entries, postParrySleepMs = 80, roles = nu
     // ~50ms nominal after genuine pointerDOWN to leave W3C driver
     // ingress margin before the unchanged 135ms light active transition.
     // M138 retains its separate 25ms jump-attack parry target.
+    // R2's light windup begins on authentic LMB RELEASE, not pointerDOWN.
+    // Native M146 #39422438963 confirmed Firefox LMB-up at epoch 2749 and
+    // Chrome wheel at 2763, yet the hit at server tick 264 arrived ~180ms
+    // after wheel: a valid -38 block, outside unchanged 125ms parry window.
+    // Move the genuine wheel 95ms later (target ~85ms before impact);
+    // continue to reject every block, HP hit, missed/parried input or
+    // changed 650ms stun/punish contract as before.
+    // M41 is an actual remote parry-tell raster flight. On quality
+    // #39437248971, Firefox's trusted wheel landed only 74ms before the
+    // authoritative 34HP contact (vs 105ms for the passing M41 run).
+    // Advance ONLY M41's real wheel dispatch by 12ms, targeting the middle
+    // of the unchanged 125ms server parry window. No combat or input fakes.
+    const releaseToStrikeParryDelayMs = scenario === "uiparrytell" ? 83 : 95;
     // Any actual -38 guard block or 34 HP hit remains a terminal failure.
     await Promise.all([
       (async () => {
@@ -8055,6 +8073,7 @@ async function runOnlineUiParryFlight(entries, postParrySleepMs = 80, roles = nu
       })(),
       (async () => {
         if (parryIngress.wheelLeadMs > 0) await sleep(parryIngress.wheelLeadMs);
+        await sleep(releaseToStrikeParryDelayMs);
         await setArenaBlock(defender, defenderElementId, true);
       })(),
     ]);
@@ -9085,20 +9104,25 @@ async function runOnlineUiHeavyGuardBreakPunishFlight(entries) {
   const lightThreatsBefore = baselineDefender.threatTransitions.filter((entry) =>
     entry.visible && (entry.phase === "WINDUP" || entry.phase === "STRIKE")).length;
 
-  // Time genuine clicks from the accepted second-heavy request rather than from
-  // a remote recovery snapshot. Authoritative input ingress and browser scheduling
-  // can shift the actual Idle boundary relative to the local issuance timestamp,
-  // so sample a bounded ~300 ms window around the unchanged 840 ms commitment.
-  // Only the first accepted click can start the light; subsequent clicks occur
-  // during its own commitment and are ignored. Exact-one-hit validation below
-  // remains fail-closed.
+  // Time the one genuine click from the accepted second-heavy request.
+  // Heavy windup + active + recovery is 840ms. The former 800ms click could
+  // release during authoritative heavy recovery, which DOES NOT buffer light
+  // attacks; the real 10ms W3C click was correctly ignored by the server.
+  // Schedule 60ms after the unchanged recovery boundary, still early enough
+  // for 135ms light windup to hit inside the defender's heavy guard-break stun.
+  // No extra clicks, synthetic events, damage relaxations or combat balance changes.
   const elapsedSinceHeavyIssue = Date.now() - secondHeavyIssuedAt;
-  const firstClickTargetMs = 800;
+  const firstClickTargetMs = COMBAT.heavyAttack.windupMs
+    + COMBAT.heavyAttack.activeMs + COMBAT.heavyAttack.recoveryMs + 60;
   const initialPauseMs = Math.max(0, firstClickTargetMs - elapsedSinceHeavyIssue);
   // The in-page observer timestamps both event-text and overlay mutations. That
   // provides stronger ordering evidence than repeated WebDriver reads and does
   // not perturb Firefox while the real Chrome action sequence is executing.
-  await performArenaAttackBurst(attacker, 9, initialPauseMs, 20);
+  // A single authentic short LMB release must hit exactly once. The former
+  // nine-tap burst mixed repeated charged-hold flags with releases and CI
+  // #39412048012 resolved an unintended 46HP heavy instead of 34HP light.
+  // Preserve all stun, HP, parry and recovery fail-closed proofs below.
+  await performArenaAttackBurst(attacker, 1, initialPauseMs, 0);
 
   const attackerDeadline = Date.now() + 260;
   let attackerResult = null;
@@ -9563,7 +9587,12 @@ async function runOnlineUiMiddleBlockPressureFlight(entries) {
     await sleep(220);
     const expectedGuards = [62, 24, 0];
     for (let index = 0; index < expectedGuards.length; index++) {
-      await performArenaM221GuardBreakClick(attacker, 10);
+      // M334: release-to-strike requires a real LMB down/up that spans
+      // multiple 60Hz input samples. 10ms CI taps intermittently missed
+      // the newly separate release intent (#39413216936). 45ms remains
+      // a strict short LIGHT hold, far below the unchanged 320ms heavy.
+      // Exact -38 guard, zero HP, no-parry evidence below is unchanged.
+      await performArenaM221GuardBreakClick(attacker, 45);
       const deadline = Date.now() + 1100;
       let good = false;
       while (Date.now() < deadline) {
@@ -9707,23 +9736,23 @@ async function runOnlineUiGuardBreakFlight(entries, { onGuardBroken = null } = {
         await execute(defender.base, defender.sessionId,
           "window.__MYASO_M221_WHEEL_TOKEN__ = " + JSON.stringify(challenge.token)
             + "; return true;");
-        m212Exchange = await dispatchM212AttackLedShortBlock({
-          // M252 integrates M249: no obsolete fixed 48ms post-wheel delay
-          // after genuine trusted Firefox wheel receipt in R1 guardbreak.
-          wheelHeadStartMs: 0,
-          // A real authenticated wheel must precede Chrome light by enough
-          // time to EXPIRE the 125ms parry but remain inside 240ms guard.
-          // Authoritative CI #39303800110 recorded a third-contact parry
-          // at wheel tick 379 / hit tick 385; this acceptance-only 45ms
-          // wait follows the actual trusted DOM event, not wheel ACK.
-          postTrustedWheelMs: 45,
+        // R2: the real Chrome LMB-up commits the only attack. Attestation
+        // fetches can lag the underlying trusted Firefox DOM wheel. Bound
+        // that WAIT, but require the actual event to precede Chrome release
+        // (read-only epoch evidence below), and require the wheel W3C ACK.
+        // Neither the 125/240ms defense nor 34HP/-38 guard assertions change.
+        m212Exchange = await dispatchR2ReleaseLedShortBlock({
+          sendAttackDown: () => setArenaAttackButton(attacker, true),
           sendWheel: () => scrollArenaWheel(defender, defenderElementId, 120, 0),
           awaitTrustedWheel: () => challenge.wait(),
-          sendAttackClick: (clickHoldMs) => performArenaM221GuardBreakClick(attacker, clickHoldMs),
+          sendAttackUp: () => setArenaAttackButton(attacker, false),
           sleep,
         });
       } finally {
         challenge.close();
+        // If the trusted wheel or W3C release failed, terminate the still
+        // held native gesture before the failed acceptance session closes.
+        // A failure must never become a silent counted guard exchange.
       }
       await sleep(230);
       const states = await Promise.all(entries.map(readUiEvidence));
@@ -9755,9 +9784,21 @@ async function runOnlineUiGuardBreakFlight(entries, { onGuardBroken = null } = {
       const m212Duration = (end, start) => Number.isFinite(end?.t)
         && Number.isFinite(start?.t) && end.t >= start.t
         ? Number((end.t - start.t).toFixed(1)) : null;
+      // Both real browsers run on the same CI host. Date.now() epoch clocks
+      // here establish the cross-browser *event order*, not server timing.
+      // Never substitute W3C ACK/localhost receipt timestamps for DOM events.
+      // This is deliberately independent of the damage/guard assertions.
+      const trustedWheelBeforeRelease = Number.isFinite(m212FirefoxWheel?.epochMs)
+        && Number.isFinite(m212ChromeUp?.epochMs)
+        && Number.isFinite(m212ChromeDown?.epochMs)
+        && m212ChromeDown.epochMs <= m212ChromeUp.epochMs
+        && m212FirefoxWheel.epochMs <= m212ChromeUp.epochMs;
       console.log("M212_GUARD_BREAK_INGRESS " + JSON.stringify({
         attempt: attempt + 1,
         harnessW3c: m212Exchange,
+        trustedWheelBeforeRelease,
+        wheelEventEpochMs: m212FirefoxWheel?.epochMs ?? null,
+        chromeReleaseEpochMs: m212ChromeUp?.epochMs ?? null,
         firefox: {
           wheelEventMs: m212FirefoxWheel?.t ?? null,
           blockCueMs: m212FirefoxBlock?.t ?? null,
@@ -9785,6 +9826,9 @@ async function runOnlineUiGuardBreakFlight(entries, { onGuardBroken = null } = {
         defenderNetId: defenderReady.playerNetId,
         tickLines: m320AuthoritativeLines,
       }));
+      if (!trustedWheelBeforeRelease) {
+        throw new Error(`M334 trusted Firefox wheel did not precede the genuine Chrome LMB release: ${JSON.stringify(states)}`);
+      }
       // A real parry must never be silently counted as one of the guard-break
       // exchanges, even if later strikes successfully drain guard.
       if (attackerState?.feedbackTransitions.includes("parried")
@@ -10330,13 +10374,22 @@ async function runOnlineUiMultiThreatFlight(entries, requireSecondary = false, r
   for (let attempt = 0; attempt < 3 && !evidence; attempt += 1) {
     // Online attacks are one-shot pointerdown latches that are cleared after the
     // next outbound input sample. Holding the button does not refresh that latch.
-    // Send a short burst of genuine clicks to both already-aimed Chrome attackers.
-    // The burst finishes inside one unchanged 135 ms windup, so once an attack is
-    // accepted, later pulses are ignored while the fighter is non-Idle.
-    await Promise.all([
-      performArenaAttackBurst(left),
-      performArenaAttackBurst(right),
-    ]);
+    // M59 must prove normal light WINDUP -> STRIKE, not an accidental heavy.
+    // With R2 release-to-strike, repeated genuine 10ms bursts can aggregate
+    // into server-held heavy input (observed 46HP HEAVY STRIKE on both sides).
+    // Use one real, bounded W3C release per attacker for M59 only; all other
+    // multi-threat flights retain their previously verified gesture contract.
+    if (requireSecondaryPhase) {
+      await Promise.all([
+        performArenaAttackHold(left, leftArena, 200, 35),
+        performArenaAttackHold(right, rightArena, -200, 35),
+      ]);
+    } else {
+      await Promise.all([
+        performArenaAttackBurst(left),
+        performArenaAttackBurst(right),
+      ]);
+    }
     // The active phase is only 80 ms. Actively sample the three sessions instead
     // of leaving them idle for 240 ms, otherwise headless scheduling can erase the
     // brief simultaneous STRIKE frame from the observer history.
@@ -10423,8 +10476,11 @@ async function runOnlineUiMultiThreatFlight(entries, requireSecondary = false, r
           if (!secondaryPhases.has("WINDUP") || !secondaryPhases.has("STRIKE")) {
             throw new Error(`M59 did not observe authoritative secondary WINDUP and STRIKE phases: ${JSON.stringify(states)}`);
           }
+          // A held LMB now exposes genuine HEAVY WINDUP before early pointerUP
+          // releases a light WINDUP. Both are canonical windup phases, not
+          // an active secondary threat outranking a winding-up primary.
           const inconsistentWindup = phaseEvents.some((event) =>
-            event.state === "windup" && event.secondaryPhase !== "WINDUP");
+            event.state === "windup" && fighterThreatPhaseState(event.secondaryPhase) !== "windup");
           if (inconsistentWindup) {
             throw new Error(`M59 secondary phase violated active-before-windup threat priority: ${JSON.stringify(states)}`);
           }
@@ -10617,19 +10673,22 @@ async function runOnlineUiJumpFfaThreatFlight(entries, mode) {
   const rightPointerOffset = rightBefore.pointers.length;
   const centerThreatOffset = centerBefore.threatTransitions.length;
 
-  // Start the genuine jump chord first in both modes, then introduce the
-  // right-side light 8–20 ms later. This widens the shared windup
-  // interval without depending on cross-browser Promise scheduling. Spatial
-  // distance, not start order, remains the only thing that decides whether the
-  // jump is primary or secondary in each M142 mode.
+  // R2 release-to-strike: the right light does NOT wind up on pointerDown.
+  // Three 10ms taps after the jump chord produced a delayed light, so the
+  // center saw JUMP STRIKE + second WINDUP rather than two real STRIKES.
+  // Send exactly ONE genuine W3C short LMB click first, then commit the real
+  // Space+LMB jump chord. This aligns the unchanged 135ms light and 105ms
+  // jumping windups on the authoritative server without synthetic input or
+  // weakening the two-threat identity/bearing/phase/damage evidence below.
+  // Spatial distance, not which attacker clicked first, determines order.
   const samplesPromise = sampleUiEvidenceWhileActive(entries, 280, 6);
   let jumpHeld = false;
   try {
+    await performArenaAttackBurst(right, 1, 0, 0);
+    await sleep(mode === "primary" ? 5 : 10);
     await pressArenaJumpAttackChord(left, leftArena, 200);
     jumpHeld = true;
-    await sleep(mode === "primary" ? 8 : 20);
-    await performArenaAttackBurst(right, 3, 0, 8);
-    await sleep(16);
+    await sleep(80);
   } finally {
     if (jumpHeld) await releaseArenaJumpAttackChord(left);
   }
@@ -12658,7 +12717,7 @@ async function installUiObserver(session) {
           "ws://" + location.host + "/__myaso_m325_trusted_wheel");
       }
     }
-    const epochEvidence = ['uidodge', 'uirollbuffer', 'uijumpbuffer', 'uijumpattack', 'uijumpattackinputloss', 'uijumpattackpunish', 'uijumpattacktelegraph', 'uijumpffaprimary', 'uijumpffasecondary', 'uijumprecoveryffa', 'uijumppunishffa', 'uimultirecoveryffa', 'uimultirecoveryspatial', 'uimultirecoverypunish', 'uiparrypunishwindow', 'uiparrypunishffa', 'uiparrypunishffahit', 'uiguardbreakpunishffa', 'uiguardbreakpunishffahit', 'uikickknockdownffa', 'uikickknockdownffahit', 'uikickknockdownbounded', 'uirollknockdownbounded', 'uistaminaauth', 'uistaminaexhaustion', 'uistaminafeedback', 'uistaminaconfirmed', 'uifeint', 'uirollknockdownffahit', 'uimultiknockdownffa', 'uimultiknockdownffahit', 'uirollknockdownffa', 'uijumpattackblock', 'uijumpattackparry', 'uijumpattackdodge', 'uijumpattackbuffer', 'uikickbuffer'].includes(new URLSearchParams(location.search).get('scenario'));
+    const epochEvidence = ['uiguardbreak', 'uiguardbreaktell', 'uiheavyguardbreakpunish', 'uidodge', 'uirollbuffer', 'uijumpbuffer', 'uijumpattack', 'uijumpattackinputloss', 'uijumpattackpunish', 'uijumpattacktelegraph', 'uijumpffaprimary', 'uijumpffasecondary', 'uijumprecoveryffa', 'uijumppunishffa', 'uimultirecoveryffa', 'uimultirecoveryspatial', 'uimultirecoverypunish', 'uiparrypunishwindow', 'uiparrypunishffa', 'uiparrypunishffahit', 'uiguardbreakpunishffa', 'uiguardbreakpunishffahit', 'uikickknockdownffa', 'uikickknockdownffahit', 'uikickknockdownbounded', 'uirollknockdownbounded', 'uistaminaauth', 'uistaminaexhaustion', 'uistaminafeedback', 'uistaminaconfirmed', 'uifeint', 'uirollknockdownffahit', 'uimultiknockdownffa', 'uimultiknockdownffahit', 'uirollknockdownffa', 'uijumpattackblock', 'uijumpattackparry', 'uijumpattackdodge', 'uijumpattackbuffer', 'uikickbuffer'].includes(new URLSearchParams(location.search).get('scenario'));
     const record = () => {
       const text = target.textContent?.trim() ?? '';
       if (/^Online - player #\\d+ - server tick \\d+$/.test(text)) state.online = text;

@@ -35,7 +35,8 @@ export function installRightButtonGesture(
   canvas.addEventListener("pointerup", onPointerUp);
   eventTarget.addEventListener("pointerup", onPointerUp);
   canvas.addEventListener("pointercancel", onPointerCancel);
-  canvas.addEventListener("lostpointercapture", onPointerCancel);
+  // RMB does not own canvas capture; left-click can trigger lost capture while RMB stays down.
+  // Keep running until a real RMB pointerup, pointercancel, or blur.
   eventTarget.addEventListener("blur", () => cancel());
 
   return {

@@ -40,8 +40,11 @@ test("M320 reports bounded server evidence before unchanged fatal M194 parry/dam
   assert.match(flight, /\.slice\(-16\)/, "diagnostics remain bounded per exchange");
   assert.match(flight, /attackerNetId: attackerReady\.playerNetId/);
   assert.match(flight, /defenderNetId: defenderReady\.playerNetId/);
-  assert.match(flight, /wheelHeadStartMs: 0/);
-  assert.match(flight, /postTrustedWheelMs: 45/);
+  const r2 = readFileSync(new URL("../scripts/r2-release-led-short-block.mjs", import.meta.url), "utf8");
+  assert.match(flight, /dispatchR2ReleaseLedShortBlock\(\{/);
+  assert.match(r2, /wheelHeadStartMs: 0/);
+  assert.match(r2, /receiptGraceMs = 100/);
+  assert.match(r2, /postTrustedWheelMs: 0/);
   assert.match(flight, /awaitTrustedWheel: \(\) => challenge\.wait\(\)/);
   assert.match(flight, /defenderState\?\.playerHp !== 100/);
   assert.match(flight, /defenderResult\.playerGuard !== 0/);
