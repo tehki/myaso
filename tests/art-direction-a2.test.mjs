@@ -128,3 +128,12 @@ test('A2.1 materials remain three batched geometry surfaces with a separate roof
   assert.match(art, /"roof-occlusion-candidate"/);
   assert.match(art, /scene\.cycles\.device = "CPU"/);
 });
+
+
+test('A2.1 retains superseded A1 roof courses but hides their protruding render layer', () => {
+  const art = readFileSync(new URL('../tools/art/polish_red_lion_a21.py', import.meta.url), 'utf8');
+  assert.match(art,/bpy\.data\.objects\.get\("Red Lion \/ roof_tile_courses"\)/);
+  assert.match(art,/legacy_courses\.hide_render = True/);
+  assert.match(art,/"legacyRoofCoursesRetainedButHidden": bool\(legacy_courses\.hide_render\)/);
+  assert.match(art,/assert all\(name in scene\.objects for name in originals\)/);
+});
