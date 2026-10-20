@@ -147,7 +147,11 @@ fn fair_scheduling_is_independent_of_input_slice_order() {
         .schedule_fair_tick(4, &mut descending, &descending_views)
         .unwrap();
     let id_sequence = |report: &crate::magic_fx_delivery::FairFxDispatch| {
-        report.batches.iter().map(|batch| batch.authenticated_net_id).collect::<Vec<_>>()
+        report
+            .batches
+            .iter()
+            .map(|batch| batch.authenticated_net_id)
+            .collect::<Vec<_>>()
     };
     assert_eq!(id_sequence(&a), id_sequence(&b));
     assert_eq!(a.payload_bytes, b.payload_bytes);
@@ -218,11 +222,17 @@ fn transparent_cosmetic_drop_can_never_debit_non_fx_gameplay_budget() {
     let views = viewers(&clients);
     let report = hub.schedule_fair_tick(4, &mut clients, &views).unwrap();
     assert_eq!(report.payload_bytes, 128 * MAGIC_FX_PACKET_BYTES);
-    assert_eq!(hub.stats().global_payload_bytes_this_tick, report.payload_bytes);
+    assert_eq!(
+        hub.stats().global_payload_bytes_this_tick,
+        report.payload_bytes
+    );
     // This module has NO movement, combat or snapshot access: even exhausted
     // visual quotas only return fewer optional packets.
     let mut other = FxDeliverySession::new(9999, 1).unwrap();
     let empty = hub.plan_delivery(4, &mut other, views[0]).unwrap();
     assert!(empty.is_empty());
-    assert_eq!(hub.stats().global_payload_bytes_this_tick, report.payload_bytes);
+    assert_eq!(
+        hub.stats().global_payload_bytes_this_tick,
+        report.payload_bytes
+    );
 }

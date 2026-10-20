@@ -327,10 +327,7 @@ impl ShardedMagicFxHub {
         let mut order: Vec<usize> = (0..sessions.len()).collect();
         order.sort_unstable_by_key(|index| {
             let id = sessions[*index].authenticated_net_id;
-            (
-                self.fair_last_served.get(&id).copied().unwrap_or(0),
-                id,
-            )
+            (self.fair_last_served.get(&id).copied().unwrap_or(0), id)
         });
 
         let mut batches = Vec::new();
