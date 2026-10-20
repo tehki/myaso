@@ -144,6 +144,46 @@ pub fn try_write_shared<E>(
     report
 }
 
+/// P15 Core-owned, *single-operation* enqueue verdict. The writer must
+/// validate authenticated connection generation and reserve/send bytes under
+/// the SAME Core lifecycle guard; a separate check then send is insufficient.
+#[derive(Debug, PartialEq, Eq)]
+pub enum CoreGuardedEnqueueError<E> {
+    StaleGeneration,
+    WriterRejected(E),
+}
+
+/// The canonical 8A transport adapter will implement this interface. Its
+/// method must synchronize route-generation validation with socket enqueue.
+/// A trait declaration cannot enforce locking, so Core's implementation
+/// needs a concurrency/teardown audit before production use.
+pub trait CoreAuthenticatedWriter {
+    type Error;
+
+    fn enqueue_if_current(
+        &mut self,
+        route: FxRoute,
+        bytes: &[u8],
+    ) -> Result<(), CoreGuardedEnqueueError<Self::Error>>;
+}
+
+/// P15 inactive authenticated Core writer seam. Unlike P14's two callbacks,
+/// this only exposes ONE Core-owned check+enqueue operation per datagram.
+/// It reuses all P14 plan preflight, gameplay-before-FX, and precise unsent
+/// gameplay tracking. A stale generation is a typed writer error so callers
+/// can explicitly fence the old session without replaying accepted packets.
+///
+/// Success means only locally accepted QUIC datagram bytes, NOT browser
+/// delivery or an acknowledged/reliable gameplay transaction.
+pub fn try_write_core_guarded<W: CoreAuthenticatedWriter>(
+    plan: &SharedDispatchPlan<'_>,
+    writer: &mut W,
+) -> SharedWriteReport<CoreGuardedEnqueueError<W::Error>> {
+    try_write_shared(plan, |_| true, |route, bytes| {
+        writer.enqueue_if_current(route, bytes)
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
