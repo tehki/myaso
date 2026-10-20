@@ -62,6 +62,62 @@ BARRELS={o.name:tuple(round(v,6) for v in o.location)
          for o in scene.objects if o.name.startswith("Oak ale barrel /")}
 assert len(BARRELS)==7
 
+# A2.7.1 visually relocate ONLY the authored forge prop pair. Existing
+# previously committed A2.2 Blender source remains unchanged and recoverable.
+# This accepts either the historical source .blend or a future Blender scene
+# built from the corrected A2 generator, so rebuilds are idempotent.
+workyard_source={
+    "Blacksmith / open forge hearth":(13.3,6.95,.62),
+    "Blacksmith / orange embers":(13.3,6.48,.92),
+}
+workyard_target={
+    "Blacksmith / open forge hearth":(9.3,6.05,.62),
+    "Blacksmith / orange embers":(9.3,5.70,.92),
+}
+workyard_previous={}
+for name,target in workyard_target.items():
+    obj=bpy.data.objects.get(name)
+    assert obj is not None and obj.type=="MESH",name
+    pos=tuple(round(x,3) for x in obj.location)
+    workyard_previous[name]=list(pos)
+    assert pos in (workyard_source[name],target), (
+        name+" has unreviewed prior art coordinates "+str(pos))
+    obj.location=target
+bpy.context.view_layer.update()
+
+def xy_bounds(ob):
+    pts=[ob.matrix_world @ Vector(v) for v in ob.bound_box]
+    return (min(p.x for p in pts),min(p.y for p in pts),
+            max(p.x for p in pts),max(p.y for p in pts))
+
+forge=xy_bounds(bpy.data.objects["Blacksmith / open forge hearth"])
+anvil=xy_bounds(bpy.data.objects["Blacksmith / anvil"])
+door=xy_bounds(bpy.data.objects["Blacksmith / oak door"])
+step=xy_bounds(bpy.data.objects["Blacksmith / doorstep"])
+forge_anvil_gap=anvil[0]-forge[2]
+# The door approach corridor is centered on the real door opening at x=12.6,
+# 1.90m wide and extends from the workyard up past the entry step.
+entrance_lane=(11.65,5.65,13.55,7.6)
+def intersects(a,b):
+    return a[0]<b[2] and a[2]>b[0] and a[1]<b[3] and a[3]>b[1]
+assert .25<=forge_anvil_gap<=.5,forge_anvil_gap
+assert not intersects(forge,entrance_lane),"Forge obstructs Blacksmith entrance corridor"
+assert not intersects(anvil,entrance_lane),"Anvil obstructs Blacksmith entrance corridor"
+assert not intersects(forge,door) and not intersects(forge,step)
+assert not intersects(anvil,door) and not intersects(anvil,step)
+assert tuple(round(x,3) for x in bpy.data.objects["Blacksmith / anvil"].location)==(10.7,6.4,.92)
+workyard_qa={
+    "correctedForgeCenterXYZ":[9.3,6.05,.62],
+    "correctedEmbersCenterXYZ":[9.3,5.7,.92],
+    "originalForgeCenterXYZ":workyard_previous["Blacksmith / open forge hearth"],
+    "forgeToAnvilHorizontalClearanceMeters":round(forge_anvil_gap,3),
+    "forgingPropsInEntranceCorridor":False,
+    "entranceCorridorXYBounds":[*entrance_lane],
+    "doorAndStepUnmodified":True,
+    "gameCollisionModified":False,
+    "originalBlenderSceneSaved":False,
+}
+
 def member(ob,name):
     return ob.type=="MESH" and (ob.name.startswith(name+" /") or
                                 ob.name.startswith(name+" A2."))
@@ -95,6 +151,7 @@ report={
   "A3RollChanged":False,
   "productionApproved":False,
   "drawInBrowserApproved":False,
+  "blacksmithWorkyard":workyard_qa,
   "buildings":{}
 }
 for slug,name,door_name in BUILDINGS:
