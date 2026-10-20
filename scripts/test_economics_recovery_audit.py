@@ -170,6 +170,16 @@ class RecoveryAuditTests(unittest.TestCase):
         with self.assertRaises(CorruptState):
             self.validate()
 
+    def test_trusted_anchor_detects_missing_database_uniqueness_index(self):
+        trusted = anchor_fixture_checkpoint(self.db)
+        with sqlite3.connect(self.db) as conn:
+            conn.execute("DROP INDEX one_active_listing_per_parcel")
+        # Existing data are still internally consistent, but future admission
+        # would be unsafe without the required uniqueness constraint.
+        self.assertEqual(audit_fixture_database(self.db).sequence, 0)
+        with self.assertRaises(CorruptState):
+            verify_against_trusted_anchor(self.db, trusted)
+
     def test_bad_external_anchor_and_nonexistent_db_fail_closed(self):
         self.buy()
         anchor = anchor_fixture_checkpoint(self.db)
