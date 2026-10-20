@@ -17,7 +17,7 @@ test("M144 retains exact real 60..200ms light-release lead gate with earlier tru
   const genuineLightClickMs = 45;
   assert.ok(genuineLightClickMs < LEFT_HEAVY_CHARGE_MS);
   assert.ok(flight.includes(`performArenaAttackHold(lightAttacker, lightArena, 200, ${genuineLightClickMs})`));
-  assert.ok(flight.includes("performArenaJumpAttackChord(jumpAttacker, jumpArena, -200, 90)"));
+  assert.ok(flight.includes("performArenaPreAimedJumpAttackChord(jumpAttacker, 90)"));
   assert.ok(flight.includes("jumpAttackDowns[0].epochMs - lightUps[0].epochMs"));
   assert.ok(flight.includes("const minLeadMs = spatial ? 70 : 60;"));
   assert.ok(flight.includes("const maxLeadMs = spatial ? 150 : 200;"));

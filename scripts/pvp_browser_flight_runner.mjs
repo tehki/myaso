@@ -11209,6 +11209,13 @@ async function runOnlineUiMultiRecoveryFfaFocusFlight(entries, spatial = false) 
     throw new Error(`${milestone} staging changed authoritative vitals: ${JSON.stringify(baseline)}`);
   }
 
+  // M334: aim the genuine native mouse before any light timing begins.
+  // A movement in the previous multi-source jump action delayed real LMB
+  // behind Space by 62ms on loaded Chromium, breaching the original <=60ms
+  // same-tick requirement. Pre-aim while idle; press both in the first W3C
+  // tick without synthetic events or acceptance-window changes.
+  await aimArena(jumpAttacker, jumpArena, -200);
+
   const jumpKeyOffset = jumpBefore.keyTransitions.length;
   const jumpPointerOffset = jumpBefore.pointers.length;
   const lightPointerOffset = lightBefore.pointers.length;
@@ -11266,7 +11273,7 @@ async function runOnlineUiMultiRecoveryFfaFocusFlight(entries, spatial = false) 
           }));
         }
         await sleep(jumpInputDelayMs);
-        await performArenaJumpAttackChord(jumpAttacker, jumpArena, -200, 90);
+        await performArenaPreAimedJumpAttackChord(jumpAttacker, 90);
       })(),
       // R1 M144: light commits on release and its 185ms delayed jump now
       // correctly yields #3 recovery before #1 recovery. Observe long enough
@@ -12384,6 +12391,36 @@ async function performArenaJumpAttackChord(session, elementId, xOffset = 200, ho
         parameters: { pointerType: "mouse" },
         actions: [
           { type: "pointerMove", duration: 0, origin, x: xOffset, y: 0 },
+          { type: "pointerDown", button: 0 },
+          { type: "pause", duration: boundedHoldMs },
+          { type: "pointerUp", button: 0 },
+        ],
+      },
+    ],
+  });
+}
+
+// M334 acceptance-only: pointer was genuinely positioned by aimArena
+// before timing began. Native Space and LMB share the FIRST W3C action tick;
+// no pointerMove is interleaved between them. Other chords stay unchanged.
+async function performArenaPreAimedJumpAttackChord(session, holdMs = 90) {
+  const boundedHoldMs = Math.max(50, Math.min(180, Math.trunc(holdMs)));
+  await webdriver(session.base, "POST", `/session/${session.sessionId}/actions`, {
+    actions: [
+      {
+        type: "key",
+        id: `keyboard-${session.name}`,
+        actions: [
+          { type: "keyDown", value: " " },
+          { type: "pause", duration: boundedHoldMs },
+          { type: "keyUp", value: " " },
+        ],
+      },
+      {
+        type: "pointer",
+        id: `mouse-${session.name}`,
+        parameters: { pointerType: "mouse" },
+        actions: [
           { type: "pointerDown", button: 0 },
           { type: "pause", duration: boundedHoldMs },
           { type: "pointerUp", button: 0 },
