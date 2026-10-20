@@ -13,6 +13,7 @@ use crate::{
     },
 };
 use std::{
+    collections::BTreeSet,
     fs::{self, File, OpenOptions},
     io::{self, Read, Write},
     num::NonZeroU128,
@@ -34,6 +35,7 @@ pub enum DurableAuthorityError {
     InvalidSequence,
     InvalidTransition(AuthorityError),
     Poisoned,
+    OperationReused,
 }
 
 impl From<io::Error> for DurableAuthorityError {
@@ -272,6 +274,7 @@ pub struct DurableZoneAuthority {
     root: PathBuf,
     _writer_lock: File,
     registry: ZoneLeaseRegistry,
+    operation_ids: BTreeSet<NonZeroU128>,
     sequence: u64,
     poisoned: bool,
 }
@@ -321,6 +324,7 @@ impl DurableZoneAuthority {
         commits.sort_unstable_by_key(|x| x.0);
         let mut sequence = 0_u64;
         let mut registry = ZoneLeaseRegistry::new();
+        let mut operation_ids = BTreeSet::new();
         for (number, path) in commits {
             if sequence.checked_add(1) != Some(number) {
                 return Err(DurableAuthorityError::InvalidSequence);
@@ -333,10 +337,15 @@ impl DurableZoneAuthority {
             if event.sequence != number {
                 return Err(DurableAuthorityError::InvalidSequence);
             }
+            if event.action == Action::Prepare
+                && !operation_ids.insert(event.operation.expect("validated transfer"))
+            {
+                return Err(DurableAuthorityError::InvalidRecord("reused operation ID"));
+            }
             apply_event(&mut registry, event)?;
             sequence = number;
         }
-        Ok(Self { root, _writer_lock: lock, registry, sequence, poisoned: false })
+        Ok(Self { root, _writer_lock: lock, registry, operation_ids, sequence, poisoned: false })
     }
 
     pub fn current(&self, entity: OwnedEntity) -> Option<AuthorityLease> {
@@ -419,10 +428,19 @@ impl DurableZoneAuthority {
                 return Ok(previous);
             }
         }
+        if self.operation_ids.contains(&operation) {
+            return Err(DurableAuthorityError::OperationReused);
+        }
         let mut next = self.registry.clone();
         let ticket = next.prepare(source, target_worker, target_zone, operation)
             .map_err(DurableAuthorityError::InvalidTransition)?;
-        self.persist(next, Event::from_ticket(self.sequence.saturating_add(1), Action::Prepare, ticket), ticket)
+        let committed = self.persist(
+            next,
+            Event::from_ticket(self.sequence.saturating_add(1), Action::Prepare, ticket),
+            ticket,
+        )?;
+        self.operation_ids.insert(operation);
+        Ok(committed)
     }
     pub fn commit(&mut self, ticket: HandoffTicket)
         -> Result<AuthorityLease, DurableAuthorityError>
@@ -565,6 +583,29 @@ mod tests {
         assert_eq!(recovered.commit(prepared).expect("ACK retry"), new);
         assert_eq!(recovered.sequence(), 3);
         assert!(!root.record(4).exists());
+    }
+
+    #[test]
+    fn operation_id_reuse_after_abort_or_restart_fails_closed() {
+        let root = Root::new();
+        let mut store = root.open();
+        let one = store.register(item(111), worker(1), zone(1)).expect("one");
+        let two = store.register(item(222), worker(1), zone(1)).expect("two");
+        let ticket = store.prepare(one, worker(2), zone(2), op(900)).expect("prepare");
+        store.abort(ticket).expect("abort");
+        assert!(matches!(
+            store.prepare(two, worker(3), zone(3), op(900)),
+            Err(DurableAuthorityError::OperationReused)
+        ));
+        assert_eq!(store.sequence(), 4);
+        drop(store);
+        let mut restarted = root.open();
+        assert!(matches!(
+            restarted.prepare(two, worker(3), zone(3), op(900)),
+            Err(DurableAuthorityError::OperationReused)
+        ));
+        assert!(restarted.can_mutate(two));
+        assert_eq!(restarted.sequence(), 4);
     }
 
     #[test]
