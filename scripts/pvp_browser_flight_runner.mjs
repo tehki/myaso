@@ -10374,13 +10374,22 @@ async function runOnlineUiMultiThreatFlight(entries, requireSecondary = false, r
   for (let attempt = 0; attempt < 3 && !evidence; attempt += 1) {
     // Online attacks are one-shot pointerdown latches that are cleared after the
     // next outbound input sample. Holding the button does not refresh that latch.
-    // Send a short burst of genuine clicks to both already-aimed Chrome attackers.
-    // The burst finishes inside one unchanged 135 ms windup, so once an attack is
-    // accepted, later pulses are ignored while the fighter is non-Idle.
-    await Promise.all([
-      performArenaAttackBurst(left),
-      performArenaAttackBurst(right),
-    ]);
+    // M59 must prove normal light WINDUP -> STRIKE, not an accidental heavy.
+    // With R2 release-to-strike, repeated genuine 10ms bursts can aggregate
+    // into server-held heavy input (observed 46HP HEAVY STRIKE on both sides).
+    // Use one real, bounded W3C release per attacker for M59 only; all other
+    // multi-threat flights retain their previously verified gesture contract.
+    if (requireSecondaryPhase) {
+      await Promise.all([
+        performArenaAttackHold(left, leftArena, 200, 35),
+        performArenaAttackHold(right, rightArena, -200, 35),
+      ]);
+    } else {
+      await Promise.all([
+        performArenaAttackBurst(left),
+        performArenaAttackBurst(right),
+      ]);
+    }
     // The active phase is only 80 ms. Actively sample the three sessions instead
     // of leaving them idle for 240 ms, otherwise headless scheduling can erase the
     // brief simultaneous STRIKE frame from the observer history.
