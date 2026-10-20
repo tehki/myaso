@@ -416,7 +416,11 @@ test("M325 runner uses a bounded real-wheel head start and preserves strict fail
   const flight = s.slice(begin, end);
   const scheduling = flight.indexOf("m212Exchange = await dispatchR2ReleaseLedShortBlock({");
   assert.ok(scheduling > 0);
-  const options = flight.slice(scheduling, scheduling + 900);
+  // This is the complete actual native W3C dispatch options object, not an
+  // arbitrary character prefix that shifts whenever safety comments grow.
+  const closing = flight.indexOf("\n        });", scheduling);
+  assert.ok(closing > scheduling, "R2 dispatch option closure must exist");
+  const options = flight.slice(scheduling, closing + "\n        });".length);
   assert.ok(options.includes("awaitTrustedWheel: () => challenge.wait()"));
   assert.ok(options.includes("sendAttackDown: () => setArenaAttackButton(attacker, true)"));
   assert.ok(options.includes("awaitTrustedWheel: () => challenge.wait()"));
