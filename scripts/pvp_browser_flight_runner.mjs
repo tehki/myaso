@@ -10798,10 +10798,15 @@ async function runOnlineUiJumpRecoveryFfaFocusFlight(entries) {
   // Turn #1 180 degrees away from the observer and commit a genuine Space+LMB
   // jump attack. It must whiff cleanly, yet its authoritative 290 ms recovery
   // must temporarily outrank the closer idle #3 in the HUD focus.
+  // M337: M143's old single-W3C-chord included an extra pointerMove tick;
+  // exact-head CI #39420078938 measured real Space -> LMB = 67ms, violating
+  // unchanged <=60ms genuine key/mouse onset. This pre-aim occurs while idle.
+  // Reuse the qualified M335 genuine pointer-first one-tick chord; preserve
+  // the real click, authoritative jump-attack phases, 100HP and HUD gates.
   await aimArena(jumpAttacker, jumpArena, -200);
   await sleep(40);
   await Promise.all([
-    performArenaJumpAttackChord(jumpAttacker, jumpArena, -200, 90),
+    performArenaPreAimedJumpAttackChord(jumpAttacker, 90),
     sampleUiEvidenceWhileActive(entries, 720, 8),
   ]);
 
