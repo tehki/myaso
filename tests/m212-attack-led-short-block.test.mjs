@@ -430,75 +430,136 @@ test("M249 runner changes only R1 M194 call-site head start and preserves strict
 });
 
 
-// R2's real click timing is a DOWN -> trusted wheel -> UP sequence.
-// Only the native release is a strike; the legacy M212 path is still
-// exercised separately above for compatibility and historical diagnostics.
+// R2 acceptance requires genuine DOWN, Firefox wheel, Chrome UP, both
+// subsequent attestation and W3C ACK, and native DOM event ordering.
 import { dispatchR2ReleaseLedShortBlock } from "../scripts/r2-release-led-short-block.mjs";
 
-test("R2 holds a real LMB before wheel, commits only after trusted wheel, and still awaits W3C ACK", async()=>{
+test("R2 fast trusted wheel releases real held LMB then waits for wheel ACK", async () => {
   const wheel=deferred(),trusted=deferred();
-  let time=0;
   const events=[];
+  let time=0;
   const flight=dispatchR2ReleaseLedShortBlock({
     now:()=>time,
+    sleep:ms=>{events.push("timer:"+ms);return new Promise(()=>{});},
     sendAttackDown:()=>{events.push("native-down");time=5;},
     sendWheel:()=>{events.push("native-wheel");return wheel.promise;},
     awaitTrustedWheel:()=>trusted.promise,
-    sendAttackUp:()=>{events.push("native-up");time=90;},
+    sendAttackUp:()=>{events.push("native-up");time=23;},
   });
   await new Promise(setImmediate);
-  assert.deepEqual(events,["native-down","native-wheel"]);
-  time=77;
+  assert.deepEqual(events,["native-down","timer:45","native-wheel"]);
+  time=18;
   trusted.resolve({trusted:true,deltaY:120});
   await new Promise(setImmediate);
-  assert.deepEqual(events,["native-down","native-wheel","native-up"]);
-  let done=false;
-  flight.then(()=>{done=true;});
+  assert.deepEqual(events,["native-down","timer:45","native-wheel","native-up"]);
+  let settled=false;
+  flight.then(()=>{settled=true;});
   await new Promise(setImmediate);
-  assert.equal(done,false,"late geckodriver rejection must remain fatal");
-  time=110;
+  assert.equal(settled,false,"W3C wheel ACK is still mandatory");
+  time=39;
   wheel.resolve();
-  const data=await flight;
-  assert.equal(data.trustedWheelObservedMs,77);
-  assert.equal(data.attackDownAckMs,5);
-  assert.equal(data.attackUpDispatchMs,77);
-  assert.equal(data.wheelAckMs,110);
-  assert.equal(data.clickHoldMs,77);
-  assert.equal(data.wheelHeadStartMs,0);
-  assert.equal(data.postTrustedWheelMs,0);
+  const proof=await flight;
+  assert.equal(proof.attackUpDispatchMs,18);
+  assert.equal(proof.trustedWheelObservedMs,18);
+  assert.equal(proof.wheelAckMs,39);
+  assert.equal(proof.clickHoldMs,18);
 });
 
-test("R2 never releases LMB without the genuinely trusted wheel event",async()=>{
-  let downs=0,ups=0;
+test("R2 delayed receipt never stretches a real held LMB past bounded grace", async()=>{
+  const wheel=deferred(), trusted=deferred(),timer=deferred();
+  const events=[]; let time=0;
+  const flight=dispatchR2ReleaseLedShortBlock({
+    now:()=>time,
+    sleep:ms=>{events.push("grace:"+ms);return timer.promise;},
+    sendAttackDown:()=>{events.push("down");time=5;},
+    sendWheel:()=>{events.push("wheel");return wheel.promise;},
+    awaitTrustedWheel:()=>trusted.promise,
+    sendAttackUp:()=>{events.push("up");time=55;},
+  });
+  await new Promise(setImmediate);
+  assert.deepEqual(events,["down","grace:45","wheel"]);
+  time=50;
+  timer.resolve();
+  await new Promise(setImmediate);
+  assert.deepEqual(events,["down","grace:45","wheel","up"]);
+  let settled=false;
+  flight.then(()=>{settled=true;});
+  await new Promise(setImmediate);
+  assert.equal(settled,false,"late real Firefox receipt must still be validated");
+  time=150; trusted.resolve({trusted:true,deltaY:120});
+  await new Promise(setImmediate);
+  time=171; wheel.resolve();
+  const proof=await flight;
+  assert.equal(proof.attackUpDispatchMs,50);
+  assert.equal(proof.trustedWheelObservedMs,150);
+  assert.equal(proof.wheelAckMs,171);
+  assert.equal(proof.clickHoldMs,50);
+});
+
+test("R2 invalid early trusted Firefox wheel fails before native mouseUP",async()=>{
+  let ups=0;
   await assert.rejects(()=>dispatchR2ReleaseLedShortBlock({
-    sendAttackDown:()=>{downs++;},
+    sleep:()=>new Promise(()=>{}),
+    sendAttackDown:()=>{},
     sendWheel:()=>{},
     awaitTrustedWheel:()=>({trusted:false,deltaY:120}),
     sendAttackUp:()=>{ups++;},
   }),/trusted real Firefox/);
-  assert.equal(downs,1);
   assert.equal(ups,0);
 });
 
-test("R2 refuses a prolonged hold that could fabricate a heavy release",async()=>{
+test("R2 missing late attestation cannot pass even after a bounded native release",async()=>{
+  const trusted=deferred();let ups=0;
+  const run=dispatchR2ReleaseLedShortBlock({
+    sleep:()=>Promise.resolve(),
+    sendAttackDown:()=>{},
+    sendWheel:()=>{},
+    awaitTrustedWheel:()=>trusted.promise,
+    sendAttackUp:()=>{ups++;},
+  });
+  await new Promise(setImmediate);
+  assert.equal(ups,1);
+  trusted.reject(Error("wheel receipt missing"));
+  await assert.rejects(run,/wheel receipt missing/);
+});
+
+test("R2 refuses any held native release past the server charge budget",async()=>{
   let time=0,ups=0;
   await assert.rejects(()=>dispatchR2ReleaseLedShortBlock({
     now:()=>time,
+    sleep:()=>{time=320;return Promise.resolve();},
     sendAttackDown:()=>{time=5;},
     sendWheel:()=>{},
-    awaitTrustedWheel:()=>{time=320;return {trusted:true,deltaY:120};},
+    awaitTrustedWheel:()=>new Promise(()=>{}),
     sendAttackUp:()=>{ups++;},
   }),/exceeded light-charge budget/);
   assert.equal(ups,0);
 });
 
-test("R2 rejects genuine W3C wheel errors before a light release",async()=>{
+test("R2 real wheel transport failure is fatal before LMB release",async()=>{
   let ups=0;
   await assert.rejects(()=>dispatchR2ReleaseLedShortBlock({
+    sleep:()=>new Promise(()=>{}),
     sendAttackDown:()=>{},
     sendWheel:()=>Promise.reject(Error("wheel transport rejected")),
     awaitTrustedWheel:()=>new Promise(()=>{}),
     sendAttackUp:()=>{ups++;},
   }),/wheel transport rejected/);
   assert.equal(ups,0);
+});
+
+test("R2 native acceptance validates trusted wheel epoch preceding Chrome UP and strict HP/guard/parry",()=>{
+  const runner=readFileSync(new URL("../scripts/pvp_browser_flight_runner.mjs",import.meta.url),"utf8");
+  const begin=runner.indexOf("async function runOnlineUiGuardBreakFlight(");
+  const end=runner.indexOf("\nasync function runOnlineUiGuardBreakTellFlight(",begin);
+  const section=runner.slice(begin,end);
+  assert.ok(section.includes("m212FirefoxWheel.epochMs <= m212ChromeUp.epochMs"));
+  assert.ok(section.includes("if (!trustedWheelBeforeRelease)"));
+  assert.ok(section.includes("M334 trusted Firefox wheel did not precede"));
+  assert.ok(section.includes("defenderState?.playerHp !== 100"));
+  assert.ok(section.includes('feedbackTransitions.includes("parried")'));
+  assert.ok(section.includes("defenderResult.playerGuard !== 0"));
+  assert.ok(section.includes("defenderResult.playerHp !== 100"));
+  assert.ok(section.includes("sendAttackUp: () => setArenaAttackButton(attacker, false)"));
+  assert.ok(section.includes("awaitTrustedWheel: () => challenge.wait()"));
 });

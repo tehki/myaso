@@ -9643,17 +9643,17 @@ async function runOnlineUiGuardBreakFlight(entries, { onGuardBroken = null } = {
         await execute(defender.base, defender.sessionId,
           "window.__MYASO_M221_WHEEL_TOKEN__ = " + JSON.stringify(challenge.token)
             + "; return true;");
-        // R2: arm authentic Chrome LMB first. It charges but cannot strike
-        // until released; Firefox's trusted wheel-back must arrive before
-        // the ONLY light commitment (Chrome pointerUP). A delayed Firefox
-        // receipt no longer postpones a whole additional 10ms W3C click
-        // beyond the original 240ms block window. Keep all fail-closed HP,
-        // parry, guard and W3C-provenance assertions below unchanged.
+        // R2: the real Chrome LMB-up commits the only attack. Attestation
+        // fetches can lag the underlying trusted Firefox DOM wheel. Bound
+        // that WAIT, but require the actual event to precede Chrome release
+        // (read-only epoch evidence below), and require the wheel W3C ACK.
+        // Neither the 125/240ms defense nor 34HP/-38 guard assertions change.
         m212Exchange = await dispatchR2ReleaseLedShortBlock({
           sendAttackDown: () => setArenaAttackButton(attacker, true),
           sendWheel: () => scrollArenaWheel(defender, defenderElementId, 120, 0),
           awaitTrustedWheel: () => challenge.wait(),
           sendAttackUp: () => setArenaAttackButton(attacker, false),
+          sleep,
         });
       } finally {
         challenge.close();
@@ -9691,9 +9691,21 @@ async function runOnlineUiGuardBreakFlight(entries, { onGuardBroken = null } = {
       const m212Duration = (end, start) => Number.isFinite(end?.t)
         && Number.isFinite(start?.t) && end.t >= start.t
         ? Number((end.t - start.t).toFixed(1)) : null;
+      // Both real browsers run on the same CI host. Date.now() epoch clocks
+      // here establish the cross-browser *event order*, not server timing.
+      // Never substitute W3C ACK/localhost receipt timestamps for DOM events.
+      // This is deliberately independent of the damage/guard assertions.
+      const trustedWheelBeforeRelease = Number.isFinite(m212FirefoxWheel?.epochMs)
+        && Number.isFinite(m212ChromeUp?.epochMs)
+        && Number.isFinite(m212ChromeDown?.epochMs)
+        && m212ChromeDown.epochMs <= m212ChromeUp.epochMs
+        && m212FirefoxWheel.epochMs <= m212ChromeUp.epochMs;
       console.log("M212_GUARD_BREAK_INGRESS " + JSON.stringify({
         attempt: attempt + 1,
         harnessW3c: m212Exchange,
+        trustedWheelBeforeRelease,
+        wheelEventEpochMs: m212FirefoxWheel?.epochMs ?? null,
+        chromeReleaseEpochMs: m212ChromeUp?.epochMs ?? null,
         firefox: {
           wheelEventMs: m212FirefoxWheel?.t ?? null,
           blockCueMs: m212FirefoxBlock?.t ?? null,
@@ -9721,6 +9733,9 @@ async function runOnlineUiGuardBreakFlight(entries, { onGuardBroken = null } = {
         defenderNetId: defenderReady.playerNetId,
         tickLines: m320AuthoritativeLines,
       }));
+      if (!trustedWheelBeforeRelease) {
+        throw new Error(`M334 trusted Firefox wheel did not precede the genuine Chrome LMB release: ${JSON.stringify(states)}`);
+      }
       // A real parry must never be silently counted as one of the guard-break
       // exchanges, even if later strikes successfully drain guard.
       if (attackerState?.feedbackTransitions.includes("parried")
@@ -12534,7 +12549,7 @@ async function installUiObserver(session) {
     const threatGuardArc = document.querySelector('#threat-guard-arc');
     if (!target || !arena || !arenaStage || !overlay || !recovery || !focusLabel || !threat || !threatCount || !threatSecondary || !threatSecondaryBearing || !threatSecondaryPhase || !threatSecondaryGuardArc || !threatBearing || !threatGuardArc) throw new Error('missing online UI flight target');
     const state = { events: [], eventTransitions: [], keys: [], keyTransitions: [], pointers: [], wheels: [], overlayTransitions: [], feedbackTransitions: [], recoveryTransitions: [], focusTransitions: [], threatTransitions: [], recoveryTellMaxPixels: 0, parryTellMaxPixels: 0, online: '', startedAt: performance.now() };
-    const epochEvidence = ['uidodge', 'uirollbuffer', 'uijumpbuffer', 'uijumpattack', 'uijumpattackinputloss', 'uijumpattackpunish', 'uijumpattacktelegraph', 'uijumpffaprimary', 'uijumpffasecondary', 'uijumprecoveryffa', 'uijumppunishffa', 'uimultirecoveryffa', 'uimultirecoveryspatial', 'uimultirecoverypunish', 'uiparrypunishwindow', 'uiparrypunishffa', 'uiparrypunishffahit', 'uiguardbreakpunishffa', 'uiguardbreakpunishffahit', 'uikickknockdownffa', 'uikickknockdownffahit', 'uikickknockdownbounded', 'uirollknockdownbounded', 'uistaminaauth', 'uistaminaexhaustion', 'uistaminafeedback', 'uistaminaconfirmed', 'uifeint', 'uirollknockdownffahit', 'uimultiknockdownffa', 'uimultiknockdownffahit', 'uirollknockdownffa', 'uijumpattackblock', 'uijumpattackparry', 'uijumpattackdodge', 'uijumpattackbuffer', 'uikickbuffer'].includes(new URLSearchParams(location.search).get('scenario'));
+    const epochEvidence = ['uiguardbreak', 'uiguardbreaktell', 'uiheavyguardbreakpunish', 'uidodge', 'uirollbuffer', 'uijumpbuffer', 'uijumpattack', 'uijumpattackinputloss', 'uijumpattackpunish', 'uijumpattacktelegraph', 'uijumpffaprimary', 'uijumpffasecondary', 'uijumprecoveryffa', 'uijumppunishffa', 'uimultirecoveryffa', 'uimultirecoveryspatial', 'uimultirecoverypunish', 'uiparrypunishwindow', 'uiparrypunishffa', 'uiparrypunishffahit', 'uiguardbreakpunishffa', 'uiguardbreakpunishffahit', 'uikickknockdownffa', 'uikickknockdownffahit', 'uikickknockdownbounded', 'uirollknockdownbounded', 'uistaminaauth', 'uistaminaexhaustion', 'uistaminafeedback', 'uistaminaconfirmed', 'uifeint', 'uirollknockdownffahit', 'uimultiknockdownffa', 'uimultiknockdownffahit', 'uirollknockdownffa', 'uijumpattackblock', 'uijumpattackparry', 'uijumpattackdodge', 'uijumpattackbuffer', 'uikickbuffer'].includes(new URLSearchParams(location.search).get('scenario'));
     const record = () => {
       const text = target.textContent?.trim() ?? '';
       if (/^Online - player #\\d+ - server tick \\d+$/.test(text)) state.online = text;

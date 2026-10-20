@@ -36,6 +36,7 @@ test("R2 adds hold-block acceptance WITHOUT disabling original strict M194 wheel
   assert.match(guardBreak, /dispatchR2ReleaseLedShortBlock\(\{/);
   assert.match(guardBreak, /sendAttackDown: \(\) => setArenaAttackButton\(attacker, true\)/);
   assert.match(guardBreak, /awaitTrustedWheel: \(\) => challenge\.wait\(\)/);
+  assert.match(guardBreak, /if \(!trustedWheelBeforeRelease\)/);
   assert.match(guardBreak, /sendAttackUp: \(\) => setArenaAttackButton\(attacker, false\)/);
   assert.match(guardBreak, /defenderState\?\.playerHp !== 100/);
   assert.match(guardBreak, /defenderResult\.playerGuard !== 0/);
