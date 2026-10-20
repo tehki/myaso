@@ -14,6 +14,8 @@ pub const MAX_SCATTERED_OBJECTS: usize = 3;
 /// Domain-only visibility envelope, not a public replication protocol.
 pub const LOOT_VISIBILITY_REACH: f32 = 550.0;
 pub const MAX_VISIBLE_LOOT_ENTITIES: usize = 128;
+/// In-memory snapshot schema, not a disk or network encoding.
+pub const LOOT_STATE_SCHEMA_VERSION: u16 = 1;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum ItemKind {
@@ -182,6 +184,21 @@ pub enum LootError {
     SlotOccupied,
     WrongSlot,
     IdExhausted,
+    InvalidState,
+}
+
+/// An isolated, validated copy of loot authority. This is NOT persistent
+/// storage: player keys are still ephemeral session IDs, and a future storage
+/// adapter must bind a durable authenticated character identity and write
+/// inventory/world changes transactionally before permitting live loot.
+#[derive(Debug, Clone, PartialEq)]
+pub struct LootStateSnapshot {
+    schema_version: u16,
+    next_id: u64,
+    players: BTreeMap<u32, Inventory>,
+    dead: BTreeSet<u32>,
+    ground: BTreeMap<u64, GroundDrop>,
+    corpses: BTreeMap<u64, Corpse>,
 }
 
 #[derive(Debug)]
@@ -208,6 +225,35 @@ impl Default for LootAuthority {
 impl LootAuthority {
     pub fn new() -> Self {
         Self::default()
+    }
+
+    /// Create an integrity-checked in-memory snapshot. This does not flush
+    /// state to disk, authenticate users, or establish crash-safe storage.
+    pub fn export_state(&self) -> Result<LootStateSnapshot, LootError> {
+        let snapshot = LootStateSnapshot {
+            schema_version: LOOT_STATE_SCHEMA_VERSION,
+            next_id: self.next_id,
+            players: self.players.clone(),
+            dead: self.dead.clone(),
+            ground: self.ground.clone(),
+            corpses: self.corpses.clone(),
+        };
+        snapshot.validate()?;
+        Ok(snapshot)
+    }
+
+    /// Restore a previously authenticated/trusted internal snapshot only.
+    /// Invalid identities, duplicate items, impossible stacks, or invalid
+    /// world positions fail closed without constructing partial state.
+    pub fn restore_state(snapshot: LootStateSnapshot) -> Result<Self, LootError> {
+        snapshot.validate()?;
+        Ok(Self {
+            next_id: snapshot.next_id,
+            players: snapshot.players,
+            dead: snapshot.dead,
+            ground: snapshot.ground,
+            corpses: snapshot.corpses,
+        })
     }
 
     fn allocate_id(&mut self) -> Result<u64, LootError> {
@@ -980,6 +1026,78 @@ impl LootAuthority {
     }
 }
 
+impl LootStateSnapshot {
+    fn validate(&self) -> Result<(), LootError> {
+        if self.schema_version != LOOT_STATE_SCHEMA_VERSION || self.next_id == 0 {
+            return Err(LootError::InvalidState);
+        }
+        let mut ids = BTreeSet::new();
+        for (player_id, inventory) in &self.players {
+            if *player_id == 0 || inventory.backpack.len() > BACKPACK_CAPACITY {
+                return Err(LootError::InvalidState);
+            }
+            if self.dead.contains(player_id) && inventory.stack_count() != 0 {
+                return Err(LootError::InvalidState);
+            }
+            for stack in &inventory.backpack {
+                validate_stack_identity(stack, &mut ids, self.next_id)?;
+            }
+            for (slot, stack) in &inventory.equipment {
+                if !stack.kind.fits(*slot) {
+                    return Err(LootError::InvalidState);
+                }
+                validate_stack_identity(stack, &mut ids, self.next_id)?;
+            }
+        }
+        if self.dead.iter().any(|id| !self.players.contains_key(id)) {
+            return Err(LootError::InvalidState);
+        }
+        for (entity_id, drop) in &self.ground {
+            validate_unique_id(*entity_id, &mut ids, self.next_id)?;
+            if drop.entity_id != *entity_id || !drop.at.in_zone(drop.zone) {
+                return Err(LootError::InvalidState);
+            }
+            validate_stack_identity(&drop.item, &mut ids, self.next_id)?;
+        }
+        for (entity_id, corpse) in &self.corpses {
+            validate_unique_id(*entity_id, &mut ids, self.next_id)?;
+            if corpse.entity_id != *entity_id
+                || corpse.victim == 0
+                || !corpse.at.in_zone(corpse.zone)
+                || corpse.items.len() > BACKPACK_CAPACITY + 3
+            {
+                return Err(LootError::InvalidState);
+            }
+            for stack in &corpse.items {
+                validate_stack_identity(stack, &mut ids, self.next_id)?;
+            }
+        }
+        Ok(())
+    }
+}
+
+fn validate_unique_id(
+    id: u64,
+    known: &mut BTreeSet<u64>,
+    next_id: u64,
+) -> Result<(), LootError> {
+    if id == 0 || id >= next_id || !known.insert(id) {
+        return Err(LootError::InvalidState);
+    }
+    Ok(())
+}
+
+fn validate_stack_identity(
+    stack: &ItemStack,
+    known: &mut BTreeSet<u64>,
+    next_id: u64,
+) -> Result<(), LootError> {
+    if stack.amount == 0 || (stack.amount != 1 && !stack.kind.stackable()) {
+        return Err(LootError::InvalidState);
+    }
+    validate_unique_id(stack.id, known, next_id)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1182,6 +1300,130 @@ mod tests {
         );
         assert!(!loot.ground().contains_key(&drop_id));
         assert_eq!(loot.inventory(2).unwrap().backpack()[0].id, sword);
+    }
+
+    #[test]
+    fn trusted_snapshot_roundtrip_preserves_loot_and_id_allocator() {
+        let mut loot = LootAuthority::new();
+        loot.register(1).unwrap();
+        loot.register(2).unwrap();
+        let gold = loot.grant(1, ItemKind::Gold, 12).unwrap();
+        let sword = loot.grant(1, ItemKind::RustySword, 1).unwrap();
+        loot.equip(1, sword, EquipmentSlot::MainHand).unwrap();
+        let dropped = loot
+            .drop_backpack_amount(
+                1,
+                &fighter(1, 200.0, 200.0, false),
+                ZoneId::Moonvale,
+                gold,
+                3,
+                10,
+            )
+            .unwrap();
+        let corpse = loot
+            .death(1, &fighter(1, 200.0, 200.0, true), ZoneId::Moonvale, 11)
+            .unwrap();
+        let snap = loot.export_state().unwrap();
+        let mut restored = LootAuthority::restore_state(snap.clone()).unwrap();
+        assert_eq!(restored.export_state().unwrap(), snap);
+        assert!(restored.ground().contains_key(&dropped));
+        assert!(restored.corpses().contains_key(&corpse));
+        let next_before = snap.next_id;
+        let picked = restored
+            .take_ground_amount(
+                2,
+                &fighter(2, 200.0, 200.0, false),
+                ZoneId::Moonvale,
+                dropped,
+                1,
+                12,
+            )
+            .unwrap();
+        assert_eq!(picked.id, next_before);
+        assert_eq!(picked.amount, 1);
+        assert_eq!(restored.ground()[&dropped].item.amount, 2);
+        assert_eq!(restored.export_state().unwrap().next_id, next_before + 1);
+    }
+
+    #[test]
+    fn corrupt_snapshots_cannot_restore_duplicate_items_or_reused_ids() {
+        let mut loot = LootAuthority::new();
+        loot.register(1).unwrap();
+        loot.register(2).unwrap();
+        let id = loot.grant(1, ItemKind::Gold, 7).unwrap();
+        let snap = loot.export_state().unwrap();
+        let mut duplicate = snap.clone();
+        duplicate.players.get_mut(&2).unwrap().backpack.push(
+            duplicate.players[&1].backpack[0].clone()
+        );
+        assert!(matches!(
+            LootAuthority::restore_state(duplicate),
+            Err(LootError::InvalidState)
+        ));
+        let mut reused_next = snap.clone();
+        reused_next.next_id = id;
+        assert!(matches!(
+            LootAuthority::restore_state(reused_next),
+            Err(LootError::InvalidState)
+        ));
+        let mut impossible_quantity = snap.clone();
+        impossible_quantity.players.get_mut(&1).unwrap().backpack[0].amount = 0;
+        assert!(matches!(
+            LootAuthority::restore_state(impossible_quantity),
+            Err(LootError::InvalidState)
+        ));
+        let mut impossible_dead = snap.clone();
+        impossible_dead.dead.insert(1);
+        assert!(matches!(
+            LootAuthority::restore_state(impossible_dead),
+            Err(LootError::InvalidState)
+        ));
+        let mut wrong_version = snap;
+        wrong_version.schema_version += 1;
+        assert!(matches!(
+            LootAuthority::restore_state(wrong_version),
+            Err(LootError::InvalidState)
+        ));
+    }
+
+    #[test]
+    fn malformed_world_entities_are_rejected_during_restore() {
+        let mut loot = LootAuthority::new();
+        loot.register(1).unwrap();
+        let item_id = loot.grant(1, ItemKind::Gold, 2).unwrap();
+        let world_id = loot
+            .drop_backpack(
+                1,
+                &fighter(1, 200.0, 200.0, false),
+                ZoneId::Moonvale,
+                item_id,
+                0,
+            )
+            .unwrap();
+        let snap = loot.export_state().unwrap();
+        let mut bad_world = snap.clone();
+        bad_world.ground.get_mut(&world_id).unwrap().at.x = f32::NAN;
+        assert!(matches!(
+            LootAuthority::restore_state(bad_world),
+            Err(LootError::InvalidState)
+        ));
+        let mut miskeyed = snap.clone();
+        miskeyed.ground.get_mut(&world_id).unwrap().entity_id = item_id;
+        assert!(matches!(
+            LootAuthority::restore_state(miskeyed),
+            Err(LootError::InvalidState)
+        ));
+        let mut duplicate_world_item = snap;
+        duplicate_world_item
+            .ground
+            .get_mut(&world_id)
+            .unwrap()
+            .item
+            .id = world_id;
+        assert!(matches!(
+            LootAuthority::restore_state(duplicate_world_item),
+            Err(LootError::InvalidState)
+        ));
     }
 
     #[test]
