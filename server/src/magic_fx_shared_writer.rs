@@ -179,9 +179,24 @@ pub fn try_write_core_guarded<W: CoreAuthenticatedWriter>(
     plan: &SharedDispatchPlan<'_>,
     writer: &mut W,
 ) -> SharedWriteReport<CoreGuardedEnqueueError<W::Error>> {
-    try_write_shared(plan, |_| true, |route, bytes| {
-        writer.enqueue_if_current(route, bytes)
-    })
+    let mut gameplay_attempts = 0usize;
+    let mut stale_optional = 0usize;
+    let mut result = try_write_shared(plan, |_| true, |route, bytes| {
+        let is_gameplay = gameplay_attempts < plan.gameplay_datagrams;
+        if is_gameplay {
+            gameplay_attempts += 1;
+        }
+        let outcome = writer.enqueue_if_current(route, bytes);
+        if !is_gameplay && matches!(outcome, Err(CoreGuardedEnqueueError::StaleGeneration)) {
+            stale_optional += 1;
+        }
+        outcome
+    });
+    // Retain the real reason for discarding FX from a fenced generation
+    // rather than misreporting these as socket congestion failures.
+    result.cosmetic_send_failed -= stale_optional;
+    result.stale_cosmetic_skipped += stale_optional;
+    result
 }
 
 #[cfg(test)]
@@ -453,5 +468,165 @@ mod tests {
         assert_eq!(report.gameplay_sent, 0);
         assert_eq!(report.next_unsent_gameplay_index, 0);
         assert_eq!(report.failure, Some(SharedWriteFailure::InvalidPlan));
+    }
+
+    /// Simulates Core owning route generation and send acceptance inside ONE
+    /// method; the lifetime fence can flip only between entire operations.
+    struct CoreMock {
+        generation: u64,
+        accepted: Vec<Vec<u8>>,
+        rotate_after: Option<usize>,
+        reject_first_byte: Option<u8>,
+        calls: usize,
+    }
+
+    impl CoreMock {
+        fn new(route: FxRoute) -> Self {
+            Self {
+                generation: route.generation,
+                accepted: Vec::new(),
+                rotate_after: None,
+                reject_first_byte: None,
+                calls: 0,
+            }
+        }
+    }
+
+    impl CoreAuthenticatedWriter for CoreMock {
+        type Error = &'static str;
+
+        fn enqueue_if_current(
+            &mut self,
+            route: FxRoute,
+            bytes: &[u8],
+        ) -> Result<(), CoreGuardedEnqueueError<Self::Error>> {
+            self.calls += 1;
+            if route.generation != self.generation {
+                return Err(CoreGuardedEnqueueError::StaleGeneration);
+            }
+            if self.reject_first_byte == bytes.first().copied() {
+                return Err(CoreGuardedEnqueueError::WriterRejected("writer full"));
+            }
+            self.accepted.push(bytes.to_vec());
+            if self.rotate_after == Some(self.accepted.len()) {
+                self.generation += 1;
+            }
+            Ok(())
+        }
+    }
+
+    #[test]
+    fn p15_generation_rotates_between_gameplay_packets_and_all_later_writes_stop() {
+        let mut registry = TrustedFxHandoff::new();
+        let route = registry.register_trusted(7, 7, 7).unwrap();
+        let gameplay = vec![
+            CoreGameplayDatagram { route, bytes: vec![11] },
+            CoreGameplayDatagram { route, bytes: vec![12] },
+        ];
+        let fx = fx_plan(route, 1);
+        let plan = composed(&registry, route, &gameplay, &fx, 3);
+        let mut core = CoreMock::new(route);
+        core.rotate_after = Some(1);
+        let report = try_write_core_guarded(&plan, &mut core);
+        assert_eq!(core.accepted, vec![vec![11]]);
+        assert_eq!(core.calls, 2);
+        assert_eq!(report.gameplay_sent, 1);
+        assert_eq!(report.next_unsent_gameplay_index, 1);
+        assert_eq!(report.cosmetic_not_sent, 1);
+        assert_eq!(
+            report.failure,
+            Some(SharedWriteFailure::GameplaySendFailed {
+                index: 1,
+                cause: CoreGuardedEnqueueError::StaleGeneration,
+            })
+        );
+    }
+
+    #[test]
+    fn p15_generation_rotates_after_gameplay_and_only_discards_old_fx() {
+        let mut registry = TrustedFxHandoff::new();
+        let route = registry.register_trusted(7, 7, 7).unwrap();
+        let gameplay = vec![CoreGameplayDatagram { route, bytes: vec![11] }];
+        let fx = fx_plan(route, 2);
+        let plan = composed(&registry, route, &gameplay, &fx, 3);
+        let mut core = CoreMock::new(route);
+        core.rotate_after = Some(1);
+        let report = try_write_core_guarded(&plan, &mut core);
+        assert_eq!(core.accepted, vec![vec![11]]);
+        assert_eq!(core.calls, 3);
+        assert_eq!(report.gameplay_sent, 1);
+        assert_eq!(report.cosmetic_sent, 0);
+        assert_eq!(report.cosmetic_not_sent, 2);
+        assert_eq!(report.stale_cosmetic_skipped, 2);
+        assert_eq!(report.cosmetic_send_failed, 0);
+        assert_eq!(report.failure, None);
+    }
+
+    #[test]
+    fn p15_gameplay_queue_rejection_preserves_first_unsent_index() {
+        let mut registry = TrustedFxHandoff::new();
+        let route = registry.register_trusted(7, 7, 7).unwrap();
+        let gameplay = vec![
+            CoreGameplayDatagram { route, bytes: vec![11] },
+            CoreGameplayDatagram { route, bytes: vec![12] },
+        ];
+        let fx = fx_plan(route, 1);
+        let plan = composed(&registry, route, &gameplay, &fx, 3);
+        let mut core = CoreMock::new(route);
+        core.reject_first_byte = Some(12);
+        let report = try_write_core_guarded(&plan, &mut core);
+        assert_eq!(core.accepted, vec![vec![11]]);
+        assert_eq!(core.calls, 2);
+        assert_eq!(report.gameplay_sent, 1);
+        assert_eq!(report.next_unsent_gameplay_index, 1);
+        assert_eq!(report.cosmetic_sent, 0);
+        assert_eq!(
+            report.failure,
+            Some(SharedWriteFailure::GameplaySendFailed {
+                index: 1,
+                cause: CoreGuardedEnqueueError::WriterRejected("writer full"),
+            })
+        );
+    }
+
+    #[test]
+    fn p15_optional_queue_rejection_cannot_rollback_accepted_gameplay() {
+        let mut registry = TrustedFxHandoff::new();
+        let route = registry.register_trusted(7, 7, 7).unwrap();
+        let gameplay = vec![CoreGameplayDatagram { route, bytes: vec![11] }];
+        let fx = fx_plan(route, 2);
+        let plan = composed(&registry, route, &gameplay, &fx, 3);
+        let mut core = CoreMock::new(route);
+        core.reject_first_byte = Some(b'M');
+        let report = try_write_core_guarded(&plan, &mut core);
+        assert_eq!(core.accepted, vec![vec![11]]);
+        assert_eq!(report.gameplay_sent, 1);
+        assert_eq!(report.cosmetic_send_failed, 2);
+        assert_eq!(report.stale_cosmetic_skipped, 0);
+        assert_eq!(report.cosmetic_not_sent, 2);
+        assert_eq!(report.failure, None);
+    }
+
+    #[test]
+    fn p15_preflight_failure_never_calls_core_atomic_gate() {
+        let route = FxRoute { connection_id: 7, generation: 1 };
+        let effect = effect(7);
+        let game = [1u8];
+        let invalid = SharedDispatchPlan {
+            ordered: vec![
+                SharedDispatchDatagram { route, priority: SharedPriority::Cosmetic, bytes: &effect },
+                SharedDispatchDatagram { route, priority: SharedPriority::Gameplay, bytes: &game },
+            ],
+            gameplay_datagrams: 1,
+            gameplay_payload_bytes: 1,
+            cosmetic_datagrams: 1,
+            cosmetic_payload_bytes: MAGIC_FX_PACKET_BYTES,
+            cosmetic_dropped: 0,
+            stale_cosmetic_dropped: 0,
+        };
+        let mut core = CoreMock::new(route);
+        let result = try_write_core_guarded(&invalid, &mut core);
+        assert_eq!(core.calls, 0);
+        assert_eq!(result.failure, Some(SharedWriteFailure::InvalidPlan));
     }
 }
