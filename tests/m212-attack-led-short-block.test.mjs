@@ -408,7 +408,7 @@ test("M249 R1 zero fixed head start still gates the only genuine click on truste
   assert.deepEqual(events, ["wheel-start", "real-click:10"]);
 });
 
-test("M249 runner changes only R1 M194 call-site head start and preserves strict fail-closed guards", () => {
+test("M325 runner uses a bounded real-wheel head start and preserves strict fail-closed guards", () => {
   const s = readFileSync(new URL("../scripts/pvp_browser_flight_runner.mjs", import.meta.url), "utf8");
   const begin = s.indexOf("async function runOnlineUiGuardBreakFlight(");
   const end = s.indexOf("async function waitForUiGuardBreakEvidence(", begin);

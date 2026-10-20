@@ -13,6 +13,11 @@ body { margin: 0; min-width: 320px; background: radial-gradient(circle at top, #
 h1 { margin: 0; font-size: clamp(36px, 7vw, 72px); line-height: .9; letter-spacing: -.055em; }
 .tagline { margin: 10px 0 0; color: #bdb6a6; }
 .controls { display: flex; flex-wrap: wrap; gap: 8px 14px; max-width: 560px; justify-content: flex-end; color: #c7c0b1; font-size: 13px; }
+.audio-controls { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; color: #c7c0b1; font-size: 12px; }
+.audio-controls button { padding: 6px 10px; border: 1px solid #817047; border-radius: 7px; background: #2d281f; color: #f0e6cc; font: inherit; cursor: pointer; }
+.audio-controls button[aria-pressed="false"] { color: #b1a897; border-color: #504b42; }
+.audio-controls button:focus-visible, .audio-controls input:focus-visible { outline: 2px solid #e8c77b; outline-offset: 2px; }
+.audio-controls input[type="range"] { width: 110px; accent-color: #c1a15a; }
 kbd { border: 1px solid #575144; border-bottom-width: 2px; border-radius: 5px; background: #24211b; padding: 3px 6px; color: #f4eddd; }
 .hud { display: grid; grid-template-columns: minmax(220px, 1fr) minmax(180px, .8fr) minmax(220px, 1fr); gap: 12px; align-items: center; margin-bottom: 12px; }
 .fighter-card { border: 1px solid #373228; background: rgba(24, 22, 18, .9); border-radius: 10px; padding: 10px 12px; }

@@ -41,4 +41,8 @@ test("R2 adds hold-block acceptance WITHOUT disabling original strict M194 wheel
   assert.match(guardBreak, /defenderState\?\.playerHp !== 100/);
   assert.match(guardBreak, /defenderResult\.playerGuard !== 0/);
   assert.match(guardBreak, /feedbackTransitions\.includes\("parried"\)/);
+  const heldRelease = readFileSync(new URL("../scripts/r2-release-led-short-block.mjs", import.meta.url), "utf8");
+  assert.match(heldRelease, /wheelHeadStartMs: 0/);
+  assert.match(heldRelease, /postTrustedWheelMs: 0/);
+  assert.match(heldRelease, /receiptGraceMs = 100/);
 });

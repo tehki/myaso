@@ -5,6 +5,7 @@ import { createDirectionalDash } from "../src/browser/dash-input.mjs";
 import { createLeftButtonCharge } from "../src/browser/left-button-charge.mjs";
 import { captureLightAttackMovement, resolveLightAttackReleaseMovement } from "../src/browser/light-attack-movement.mjs";
 import { createCombatImpactController } from "../src/browser/combat-impact.mjs";
+import { createGameAudio, installGameAudioControls, soundForCombatFeedback, createRemoteActionAudioTracker } from "../src/browser/game-audio.mjs";
 import { COMBAT_ACTION, blockSpatialPresentation, combatActionHint, combatOverlayPresentation, createCombatReadabilityTracker, createRemoteDamageTracker, fighterFocusNetId, fighterGuardBreakPunishNetId, guardBreakPunishRangeCue, fighterKnockdownPunishNetId, knockdownPunishRangeCue, fighterParryPunishNetId, parryPunishRangeCue, fighterRecoveryNetId, recoveryPunishRangeCue, punishRangeCueIntent, fighterIdentityPresentation, fighterThreatBearingLabel, fighterThreatGuardArcLabel, fighterThreatNetId, fighterThreatPhaseLabel, fighterThreatPhaseState, fighterMatchPointPresentation, fighterMatchPresentation, fighterScoreboardPresentation, FFA_KILL_TARGET, fighterVitalsPresentation, guardBreakSpatialPresentation, killFeedPresentation, opponentRecoveryPresentation, parrySpatialPresentation, staminaDenialPresentation, ownCombatReadinessPresentation } from "../src/browser/combat-readability.mjs";
 import { COMBAT } from "../src/combat/model.mjs";
 import { isTickNewer32, reconcilePrediction } from "../src/browser/reconciliation.mjs";
@@ -144,6 +145,9 @@ const webTransportOptions = cert
   : undefined;
 
 const keys = new Set();
+const audio = createGameAudio();
+installGameAudioControls(audio);
+const remoteActionAudio = createRemoteActionAudioTracker();
 const dashGesture = createDirectionalDash();
 let dashRequested = false;
 let dashMove = null;
@@ -189,12 +193,14 @@ const leftButtonCharge = createLeftButtonCharge({
       runningAttackRequested = true;
       queueStaminaDenial("running-attack");
     }
+    audio.play("light");
   },
-  onHeavy() { heavyAttackRequested = true; leftButtonPressMovement = null; },
+  onHeavy() { heavyAttackRequested = true; leftButtonPressMovement = null; audio.play("heavy"); },
 });
 const rightButtonGesture = installRightButtonGesture(canvas, {
   onKick: () => {
     kickRequested = true;
+    audio.play("kick");
     queueStaminaDenial("kick");
   },
 });
@@ -218,6 +224,7 @@ canvas.addEventListener("pointerdown", (event) => {
     leftButtonCharge.press(event.pointerId, {
       immediate: local.action === COMBAT_ACTION.jump || jumpRequested || keys.has("Space"),
     });
+    return;
   }
 });
 function onLeftPointerUp(event) {
@@ -228,8 +235,13 @@ function onLeftPointerUp(event) {
   if (event.button !== 0) return;
   leftButtonDown = false;
   updateMouse(event);
-  leftButtonCharge.release(event.pointerId);
+  const committed = leftButtonCharge.release(event.pointerId);
   leftButtonPressMovement = null;
+  if (committed && !audio.isUnlocked()) {
+    // Audio startup follows native pointer release, not attack classification.
+    audio.unlock();
+    audio.play(committed === "heavy" ? "heavy" : "light");
+  }
 }
 canvas.addEventListener("pointerup", onLeftPointerUp);
 // W3C Pointer Events fire pointerdown/up only on transitions between zero
@@ -280,28 +292,38 @@ canvas.addEventListener("wheel", (event) => {
   canvas.focus();
   if (event.deltaY < 0) {
     rollRequested = true;
+    audio.play("roll");
     queueStaminaDenial("roll");
   } else if (event.deltaY > 0) {
     shortBlockUntil = Math.max(shortBlockUntil, performance.now() + COMBAT.block.shortBlockMs);
+    audio.play("guard");
   }
 }, { passive: false });
 canvas.addEventListener("pointermove", updateMouse);
 canvas.addEventListener("keydown", (event) => {
+  const firstAudioGesture = !audio.isUnlocked();
   if (["KeyW", "KeyA", "KeyS", "KeyD", "KeyE", "Space"].includes(event.code)) event.preventDefault();
   if (["KeyW", "KeyA", "KeyS", "KeyD"].includes(event.code) && !keys.has(event.code)) {
     const direction = dashGesture.press(event.code, performance.now(), event.repeat);
     if (direction && local.action === COMBAT_ACTION.idle
       && local.stamina >= COMBAT.dash.staminaCost) {
       dashRequested = true; dashMove = direction;
+      audio.play("roll");
     }
   }
   keys.add(event.code);
   if (event.code === "KeyE" && !event.repeat) heavyAttackRequested = true;
+  if (event.code === "KeyE" && !event.repeat) audio.play("heavy");
   if (event.code === "Space" && !event.repeat) {
     jumpRequested = true;
+    audio.play("jump");
     queueStaminaDenial("jump");
     if (leftButtonDown) leftButtonCharge.commitLight();
   }
+  // Keyboard input also wins over the one-time audio unlock.
+  audio.unlock();
+  if (firstAudioGesture && !event.repeat && event.code === "KeyE") audio.play("heavy");
+  if (firstAudioGesture && !event.repeat && event.code === "Space") audio.play("jump");
 });
 canvas.addEventListener("keyup", (event) => keys.delete(event.code));
 window.addEventListener("blur", releaseInputs);
@@ -377,6 +399,7 @@ function observeCombatState(state) {
   }
   const now = performance.now();
   remoteDamage.observe(state, ownId, now);
+  remoteActionAudio.observe(state, ownId, (cue, options) => audio.play(cue, options));
   const event = combatReadability.observe(state, ownId);
   if (!event) return;
   combatMessage = event.text;
@@ -437,7 +460,8 @@ function recordAcceptanceState(state, ownId) {
       acceptance.serverTick,
     );
   }
-  if (acceptanceScenario === "uirollknockdownbounded"
+  if (acceptanceScenario === "uiparrypunishffahit"
+    || acceptanceScenario === "uirollknockdownbounded"
     || acceptanceScenario === "uimultiknockdownffa"
     || acceptanceScenario === "uimultiknockdownffahit"
     || acceptanceScenario === "uijumpffaprimary"
@@ -483,6 +507,7 @@ function recordKillEvent(event) {
   if (!presentation.visible) return;
   killFeedSequences.add(event.sequence);
   killFeedEntries.unshift({ sequence: event.sequence, ...presentation });
+  if (presentation.victimOwn) audio.play("death");
   while (killFeedEntries.length > 4) {
     const removed = killFeedEntries.pop();
     killFeedSequences.delete(removed.sequence);
@@ -510,6 +535,8 @@ function clearKillFeed() {
 
 function showCombatFeedback(feedback) {
   if (!feedback || !arenaStage) return;
+  const cue = soundForCombatFeedback(feedback);
+  if (cue) audio.play(cue);
   combatImpact.trigger(feedback, performance.now());
   if (combatFeedbackTimer) clearTimeout(combatFeedbackTimer);
   delete arenaStage.dataset.combatFeedback;
@@ -712,6 +739,9 @@ function sampleInput() {
   currentInput.kick = kickRequested;
   currentInput.run = rightButtonGesture.isRunning() || runningAttackRequested;
   currentInput.jump = jumpRequested;
+  if (local.action === COMBAT_ACTION.idle && (currentInput.moveX || currentInput.moveY)) {
+    audio.play("step", { level: currentInput.run ? .90 : .55 });
+  }
 }
 
 function simulatePrediction(stepMs) {
@@ -721,6 +751,27 @@ function simulatePrediction(stepMs) {
   if (predictionStep % 2 === 0 && networkClient) {
     const outgoingTick = clientTick;
     markStaminaDenialSubmitted(outgoingTick, currentInput);
+    // M336: read-only, scenario-scoped input-plane provenance. A real DOM
+    // Space+LMB without authoritative action may mean no 30Hz input sampled
+    // during the genuine W3C hold. Record what the production sender actually
+    // submitted, with no replay, network payload or gameplay change.
+    if (acceptanceScenario === "uimultirecoveryspatial") {
+      const debug = window.__MYASO_ACCEPTANCE_STATE__;
+      if (debug) {
+        debug.lastSubmittedClientTick = outgoingTick;
+        debug.lastSubmittedAtEpochMs = Date.now();
+        if (currentInput.attack || currentInput.jump || currentInput.heavyAttack) {
+          debug.inputSubmissions ??= [];
+          debug.inputSubmissions.push({
+            clientTick: outgoingTick, epochMs: debug.lastSubmittedAtEpochMs,
+            attack: Boolean(currentInput.attack),
+            jump: Boolean(currentInput.jump),
+            heavyAttack: Boolean(currentInput.heavyAttack),
+          });
+          if (debug.inputSubmissions.length > 32) debug.inputSubmissions.shift();
+        }
+      }
+    }
     networkClient.sendInput({ tick: outgoingTick, ...currentInput });
     clientTick = (clientTick + 1) >>> 0;
     attackRequested = false;
