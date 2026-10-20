@@ -91,16 +91,14 @@ pub fn record_ember_combat_interruption(
     {
         return Err(CombatInterruptionError::InvalidFighter);
     }
-    let outcome = if event.fighter.action == Action::Dead
-        || event.fighter.hp <= 0.0
-        || loot.is_dead(actor)
-    {
-        EmberEffectStatus::Cancelled
-    } else if matches!(event.fighter.action, Action::Stunned | Action::Knockdown) {
-        EmberEffectStatus::Interrupted
-    } else {
-        return Err(CombatInterruptionError::NotInterrupted);
-    };
+    let outcome =
+        if event.fighter.action == Action::Dead || event.fighter.hp <= 0.0 || loot.is_dead(actor) {
+            EmberEffectStatus::Cancelled
+        } else if matches!(event.fighter.action, Action::Stunned | Action::Knockdown) {
+            EmberEffectStatus::Interrupted
+        } else {
+            return Err(CombatInterruptionError::NotInterrupted);
+        };
 
     resolve_ember_without_damage(
         path,
@@ -134,7 +132,10 @@ mod tests {
 
     fn path() -> std::path::PathBuf {
         let number = TEST_SEQUENCE.fetch_add(1, Ordering::Relaxed);
-        std::env::temp_dir().join(format!("myaso-combat-interrupt-{}-{number}.bin", std::process::id()))
+        std::env::temp_dir().join(format!(
+            "myaso-combat-interrupt-{}-{number}.bin",
+            std::process::id()
+        ))
     }
 
     fn fixture() -> (
@@ -193,7 +194,12 @@ mod tests {
         save_joint(&checkpoint, &loot, &identity, &magic).unwrap();
         assert!(matches!(
             record_ember_combat_interruption(
-                &checkpoint, &loot, &mut magic, &identity, &zones, event(&fighter),
+                &checkpoint,
+                &loot,
+                &mut magic,
+                &identity,
+                &zones,
+                event(&fighter),
             ),
             Ok(EmberEffectStatus::Interrupted)
         ));
@@ -206,7 +212,12 @@ mod tests {
         );
         assert!(matches!(
             record_ember_combat_interruption(
-                &checkpoint, &loot, &mut recovered, &identity, &zones, event(&fighter),
+                &checkpoint,
+                &loot,
+                &mut recovered,
+                &identity,
+                &zones,
+                event(&fighter),
             ),
             Err(CombatInterruptionError::IntentAlreadyResolved)
         ));
@@ -220,7 +231,12 @@ mod tests {
         fighter.action = Action::Dead;
         assert!(matches!(
             record_ember_combat_interruption(
-                &checkpoint, &loot, &mut magic, &identity, &zones, event(&fighter),
+                &checkpoint,
+                &loot,
+                &mut magic,
+                &identity,
+                &zones,
+                event(&fighter),
             ),
             Ok(EmberEffectStatus::Cancelled)
         ));
@@ -241,7 +257,12 @@ mod tests {
         let checkpoint = path();
         assert!(matches!(
             record_ember_combat_interruption(
-                &checkpoint, &loot, &mut magic, &identity, &zones, event(&fighter),
+                &checkpoint,
+                &loot,
+                &mut magic,
+                &identity,
+                &zones,
+                event(&fighter),
             ),
             Err(CombatInterruptionError::NotInterrupted)
         ));
@@ -253,11 +274,21 @@ mod tests {
         );
         assert!(matches!(
             record_ember_combat_interruption(
-                &checkpoint, &loot, &mut magic, &identity, &zones, event(&stunned),
+                &checkpoint,
+                &loot,
+                &mut magic,
+                &identity,
+                &zones,
+                event(&stunned),
             ),
             Err(CombatInterruptionError::UnverifiedSession)
         ));
-        identity.bind_verified(SessionLease::new(1, 2).unwrap(), CharacterId::new(803).unwrap()).unwrap();
+        identity
+            .bind_verified(
+                SessionLease::new(1, 2).unwrap(),
+                CharacterId::new(803).unwrap(),
+            )
+            .unwrap();
         zones.unregister(1);
         assert!(matches!(
             record_ember_combat_interruption(
@@ -286,7 +317,12 @@ mod tests {
         let impossible = checkpoint.with_extension("missing").join("state");
         assert!(matches!(
             record_ember_combat_interruption(
-                &impossible, &loot, &mut magic, &identity, &zones, event(&fighter),
+                &impossible,
+                &loot,
+                &mut magic,
+                &identity,
+                &zones,
+                event(&fighter),
             ),
             Err(CombatInterruptionError::Commit(
                 JointCheckpointError::Checkpoint(crate::loot_persistence::CheckpointError::Io(_))
