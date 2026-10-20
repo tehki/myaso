@@ -15,8 +15,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use crate::character_identity::CharacterId;
 use crate::loot::{
     Corpse, EquipmentSlot, GroundDrop, Inventory, ItemKind, ItemStack, LootAuthority,
-    LootStateSnapshot, ParkedInventory, Point, LOOT_STATE_SCHEMA_VERSION,
-    MAX_OPERATION_WATERMARKS,
+    LootStateSnapshot, ParkedInventory, Point, LOOT_STATE_SCHEMA_VERSION, MAX_OPERATION_WATERMARKS,
 };
 use crate::zone::ZoneId;
 

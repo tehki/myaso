@@ -290,7 +290,11 @@ impl LootAuthority {
         if sequence == 0 {
             return Err(LootError::InvalidOperation);
         }
-        if self.operation_highwater.get(&character).is_some_and(|last| sequence <= *last) {
+        if self
+            .operation_highwater
+            .get(&character)
+            .is_some_and(|last| sequence <= *last)
+        {
             return Err(LootError::ReplayOperation);
         }
         if !self.operation_highwater.contains_key(&character)
@@ -1141,7 +1145,10 @@ impl LootStateSnapshot {
             return Err(LootError::InvalidState);
         }
         if self.operation_highwater.len() > MAX_OPERATION_WATERMARKS
-            || self.operation_highwater.values().any(|sequence| *sequence == 0)
+            || self
+                .operation_highwater
+                .values()
+                .any(|sequence| *sequence == 0)
         {
             return Err(LootError::InvalidState);
         }

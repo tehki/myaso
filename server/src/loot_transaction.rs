@@ -213,38 +213,28 @@ mod tests {
             lease: lease(1),
             sequence: 8,
         };
-        let rejected: Result<u64, TransactionError> = transact_operation(
-            &path,
-            &mut loot,
-            &identity,
-            operation,
-            |_staged| Err(LootError::InvalidStack),
-        );
+        let rejected: Result<u64, TransactionError> =
+            transact_operation(&path, &mut loot, &identity, operation, |_staged| {
+                Err(LootError::InvalidStack)
+            });
         assert!(matches!(
             rejected,
             Err(TransactionError::Loot(LootError::InvalidStack))
         ));
         assert_eq!(loot.committed_operation_sequence(character), None);
         let invalid_path = path.with_extension("missing-parent").join("file.bin");
-        let rejected_write = transact_operation(
-            &invalid_path,
-            &mut loot,
-            &identity,
-            operation,
-            |staged| staged.grant(1, ItemKind::Gold, 2),
-        );
+        let rejected_write =
+            transact_operation(&invalid_path, &mut loot, &identity, operation, |staged| {
+                staged.grant(1, ItemKind::Gold, 2)
+            });
         assert!(matches!(
             rejected_write,
             Err(TransactionError::Checkpoint(CheckpointError::Io(_)))
         ));
         assert_eq!(loot.committed_operation_sequence(character), None);
-        let item_id = transact_operation(
-            &path,
-            &mut loot,
-            &identity,
-            operation,
-            |staged| staged.grant(1, ItemKind::Gold, 2),
-        )
+        let item_id = transact_operation(&path, &mut loot, &identity, operation, |staged| {
+            staged.grant(1, ItemKind::Gold, 2)
+        })
         .unwrap();
         assert_eq!(item_id, 1);
         assert_eq!(loot.committed_operation_sequence(character), Some(8));
