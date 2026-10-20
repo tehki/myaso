@@ -61,6 +61,10 @@ try{
     await page.waitForFunction(want=>window.__greyhavenArtReview().loadedBuilding===want,
       {timeout:30000},slug);
     results[slug]=await page.evaluate(()=>window.__greyhavenArtReview());
+    if(slug==="blacksmith") {
+      assert.deepEqual(results[slug].testSilhouetteOffsetFromVisualDoor,{x:98,y:58},
+        "The default visual test silhouette must not obstruct the Blacksmith doorway");
+    }
     await page.screenshot({path:join(out,"greyhaven_a27_browser_"+slug+".png"),fullPage:true});
   }
   await page.$eval("#roof",el=>{
