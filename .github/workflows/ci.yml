@@ -200,6 +200,11 @@ jobs:
           node --check src/world/local-trail-progress.mjs
           node --test tests/world-trail-progress.test.mjs
 
+      - name: Validate D11 sampled-clear local trail rejoins
+        run: |
+          node --check src/world/local-rejoin.mjs
+          node --test tests/world-safe-rejoin.test.mjs
+
       - name: Validate M188 repeated real heavy counterplay windows
         run: |
           # Three fresh Chrome/Firefox sessions for each real defensive read.
