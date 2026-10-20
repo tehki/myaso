@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { NETWORK } from "../src/network/constants.mjs";
-import { encodeNpcRequest, decodeNpcRoster, decodeNpcResponse, decodeNpcState } from "../src/network/npc-chat-codec.mjs";
+import { encodeNpcRequest, decodeNpcRoster, decodeNpcResponse, decodeNpcState, decodeNpcSupplies } from "../src/network/npc-chat-codec.mjs";
 import { encodeInputPacket, decodeInputPacket, inputPacketBytes } from "../src/network/input-codec.mjs";
 import { SpatialInterestGrid } from "../src/network/interest-grid.mjs";
 import { InputIngressWindow } from "../src/network/input-ingress.mjs";
@@ -599,5 +599,38 @@ test("NPC deterministic schedule updates are strict, compact and separate from c
   assert.throws(() => decodeNpcState(make(600, [...records.slice(0, 4), records[0]])), /duplicate/);
   assert.throws(() => decodeNpcState(make(600, records.map((s, i) => i ? s : { ...s, activity: 3 }))), /state value/);
   assert.throws(() => decodeNpcState(make(600, records.map((s, i) => i ? s : { ...s, x: 8200 }))), /state value/);
+  assert.equal(NETWORK.protocolVersion, 1);
+});
+
+test("NPC supply snapshots preserve exact finite totals and reject forged provenance", () => {
+  const baseline = new Uint8Array([
+    1, 9, 0, 0, 0,0,0,0, 0,0,0,0, 8,0,0,8,0,0,6,0, 0,0,
+  ]);
+  assert.deepEqual(decodeNpcSupplies(baseline), {
+    tick: 0, sequence: 0,
+    stocks: {
+      wellWater: 8, tomasWater: 0, yardWater: 0,
+      depotFood: 8, elaraFood: 0, stallFood: 0,
+      forgeIron: 6, forgeNails: 0,
+    },
+    lastActor: 0, lastOperation: 0,
+  });
+  const atForge = new Uint8Array([
+    1, 9, 0, 0, 44,1,0,0, 1,0,0,0, 8,0,0,8,0,0,5,1, 2,5,
+  ]);
+  assert.deepEqual(decodeNpcSupplies(atForge).stocks, {
+    wellWater: 8, tomasWater: 0, yardWater: 0,
+    depotFood: 8, elaraFood: 0, stallFood: 0,
+    forgeIron: 5, forgeNails: 1,
+  });
+  for (const invalid of [
+    atForge.subarray(0, 21),
+    Uint8Array.from(atForge, (n, i) => i === 2 ? 1 : n),
+    Uint8Array.from(atForge, (n, i) => i === 12 ? 9 : n),
+    Uint8Array.from(atForge, (n, i) => i === 20 ? 4 : n),
+    Uint8Array.from(baseline, (n, i) => i === 21 ? 5 : n),
+  ]) {
+    assert.throws(() => decodeNpcSupplies(invalid), /NPC supply|NPC supplies/);
+  }
   assert.equal(NETWORK.protocolVersion, 1);
 });

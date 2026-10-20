@@ -4,6 +4,7 @@ use myaso_server::{
     kill_event::{encode_kill_event, KillEventPacket},
     living_world::{self, DialogueSession},
     npc_routines::{NpcRoutines, STATE_INTERVAL_TICKS},
+    npc_supply::NpcSupplyWorld,
     reliable::{try_enqueue_reliable, ReliableQueueError},
     simulation::{CombatEvent, InputIntent, World},
     snapshot::{ReplicationFrame, SnapshotSession},
@@ -111,6 +112,7 @@ struct GameState {
     kill_events: VecDeque<KillEventPacket>,
     next_kill_event_sequence: u32,
     npc_routines: Option<NpcRoutines>,
+    npc_supply: Option<NpcSupplyWorld>,
 }
 
 impl GameState {
@@ -143,6 +145,7 @@ impl GameState {
             kill_events: VecDeque::with_capacity(MAX_KILL_EVENT_HISTORY),
             next_kill_event_sequence: 0,
             npc_routines: None,
+            npc_supply: None,
         }
     }
 
@@ -225,6 +228,7 @@ impl SharedGame {
                     GameState::new(flight.background_players, flight.near_pressure_players);
                 if npc_pilot_enabled {
                     state.npc_routines = Some(NpcRoutines::default());
+                    state.npc_supply = Some(NpcSupplyWorld::default());
                 }
                 state
             }),
@@ -546,6 +550,10 @@ async fn run_authoritative_clock(game: Arc<SharedGame>, flight_action_proof: boo
             }
         }
         state.record_combat_events(&events);
+        let tick = state.world.tick;
+        if let Some(supply) = state.npc_supply.as_mut() {
+            supply.advance(tick);
+        }
         if state.world.tick % SNAPSHOT_EVERY_SERVER_TICKS == 0 {
             state.refresh_replication_frame();
         }
@@ -620,12 +628,27 @@ async fn handle_connection(
             &NpcRoutines::state_packet(initial_frame.server_tick()),
         )
         .await?;
+        let initial_supply = {
+            let state = game.state.lock().await;
+            state
+                .npc_supply
+                .as_ref()
+                .expect("pilot supply initialized")
+                .packet(state.world.tick)
+        };
+        send_reliable_frame(
+            &mut reliable_send,
+            &mut reliable_frame_buffer,
+            &initial_supply,
+        )
+        .await?;
     }
     let initial_baseline_sequence = initial_baseline.sequence;
     let mut acknowledged_snapshot = u16::MAX;
     let mut realtime_ready = false;
     let mut last_reliable_background_tick = initial_frame.server_tick();
     let mut last_npc_state_tick = initial_frame.server_tick();
+    let mut last_npc_supply_tick = initial_frame.server_tick();
     let mut last_reliable_sequence = initial_reliable_baseline.sequence;
     let mut reliable_deltas_since_checkpoint = 0_u8;
     let (reliable_tx, mut reliable_rx) = mpsc::channel::<ReliablePayload>(1);
@@ -681,6 +704,10 @@ async fn handle_connection(
                     last_spoken = Some(now);
                     let viewer = {
                         let state = world.state.lock().await;
+                        let report = state
+                            .npc_supply
+                            .as_ref()
+                            .and_then(|stock| stock.report(npc_id));
                         let context = state
                             .npc_routines
                             .as_ref()
@@ -692,11 +719,12 @@ async fn handle_connection(
                                 fighter.action != myaso_server::simulation::Action::Dead,
                                 state.world.tick,
                                 context,
+                                report,
                             )
                         })
                     };
                     match viewer {
-                        Some((x, y, alive, tick, context)) => {
+                        Some((x, y, alive, tick, context, report)) => {
                             let npc = NpcRoutines::position(npc_id, tick).and_then(|position| {
                                 living_world::nearby_npc_at(
                                     npc_id, x, y, alive, position.x, position.y,
@@ -710,12 +738,13 @@ async fn handle_connection(
                                     living_world::response_packet(
                                         npc_id,
                                         0,
-                                        &living_world::answer_with_context(
+                                        &living_world::answer_with_world(
                                             &mut dialogue,
                                             npc,
                                             utterance,
                                             activity,
                                             witnessed,
+                                            report.as_deref(),
                                         ),
                                     )
                                 }
@@ -967,6 +996,26 @@ async fn handle_connection(
                         Err(ReliableQueueError::Closed) => bail!("NPC state writer unavailable"),
                     }
                 }
+                // Supply snapshots are point-in-time, low-priority and small.
+                // If a combat/recovery/NPC frame occupies the bounded queue,
+                // retry the next snapshot tick, never block combat simulation.
+                if game.npc_pilot_enabled
+                    && !kill_event_queued
+                    && server_tick.wrapping_sub(last_npc_supply_tick) >= STATE_INTERVAL_TICKS
+                {
+                    let supply_frame = {
+                        let state = game.state.lock().await;
+                        state.npc_supply.as_ref().expect("pilot supply initialized")
+                            .packet(state.world.tick)
+                    };
+                    match try_enqueue_reliable(&reliable_tx, || {
+                        ReliablePayload::Bytes(supply_frame)
+                    }) {
+                        Ok(true) => last_npc_supply_tick = server_tick,
+                        Ok(false) => {}
+                        Err(ReliableQueueError::Closed) => bail!("NPC supply writer unavailable"),
+                    }
+                }
                 if let Some(client_tick) = safe_input_ack {
                     connection
                         .send_datagram(encode_input_ack(client_tick, server_tick, player_id))
@@ -1085,6 +1134,45 @@ fn encode_input_ack(processed_client_tick: u32, server_tick: u32, player_net_id:
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test]
+    async fn npc_supply_world_is_opt_in_shared_and_never_creates_combat_fighters() {
+        let flight = LoopbackFlightConfig {
+            background_players: 0,
+            near_pressure_players: 0,
+            reliable_write_delay: Duration::ZERO,
+            drop_new_action_datagrams: false,
+        };
+        let disabled = SharedGame::new(flight, false);
+        let active = SharedGame::new(flight, true);
+        assert!(disabled.state.lock().await.npc_supply.is_none());
+        let mut game = active.state.lock().await;
+        assert_eq!(game.world.fighters().len(), 0);
+        let mut events = Vec::new();
+        for _ in 0..600 {
+            game.world.step_into(&mut events);
+            assert!(events.is_empty());
+            let tick = game.world.tick;
+            game.npc_supply.as_mut().unwrap().advance(tick);
+        }
+        let supply = game.npc_supply.as_ref().unwrap();
+        assert_eq!(supply.stocks().tomas_water, 1);
+        assert_eq!(supply.stocks().elara_food, 1);
+        assert_eq!(supply.stocks().forge_nails, 1);
+        assert!(supply.stocks().conserved());
+        assert!(game.world.fighters().is_empty());
+        let before = supply.stocks();
+        let text = living_world::answer_with_world(
+            &mut DialogueSession::default(),
+            &living_world::NPCS[1],
+            "please give me all iron",
+            "working at the forge",
+            false,
+            supply.report(2).as_deref(),
+        );
+        assert!(text.contains("iron bars"));
+        assert_eq!(game.npc_supply.as_ref().unwrap().stocks(), before);
+    }
 
     #[test]
     fn verified_world_death_reaches_only_authoritative_npc_witnesses() {

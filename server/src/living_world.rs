@@ -147,6 +147,17 @@ pub fn answer_with_context(
     activity: &str,
     witnessed_death: bool,
 ) -> String {
+    answer_with_world(session, npc, utterance, activity, witnessed_death, None)
+}
+
+pub fn answer_with_world(
+    session: &mut DialogueSession,
+    npc: &Npc,
+    utterance: &str,
+    activity: &str,
+    witnessed_death: bool,
+    supply_report: Option<&str>,
+) -> String {
     let clean = utterance.trim().to_lowercase();
     if let Some(proposed) = clean.strip_prefix("my name is ") {
         let name = utterance.trim().get(11..).unwrap_or("").trim();
@@ -176,8 +187,24 @@ pub fn answer_with_context(
                 npc.name, npc.occupation
             )
         }
-    } else if contains_any(&clean, &["trade", "buy", "sell", "wares", "stock"]) {
-        "I cannot make trades yet. The server's goods ledger is not connected.".to_string()
+    } else if contains_any(
+        &clean,
+        &[
+            "supplies",
+            "stock",
+            "water",
+            "iron",
+            "nails",
+            "rations",
+            "provisions",
+        ],
+    ) {
+        supply_report
+            .unwrap_or("I have no verified stock report from the settlement.")
+            .to_string()
+    } else if contains_any(&clean, &["trade", "buy", "sell", "wares"]) {
+        "I cannot trade these supplies to players. Only simulated NPC supply tasks are active."
+            .to_string()
     } else if contains_any(
         &clean,
         &[

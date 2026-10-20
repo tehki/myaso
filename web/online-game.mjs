@@ -354,6 +354,9 @@ networkClient = await connectAuthoritativeClient({
   onNpcState(snapshot) {
     npcUI?.updateState(snapshot);
   },
+  onNpcSupplies(snapshot) {
+    npcUI?.updateSupplies(snapshot);
+  },
   onNpcReply(reply) {
     npcUI?.receive(reply);
   },

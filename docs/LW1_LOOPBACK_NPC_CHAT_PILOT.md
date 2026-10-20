@@ -27,12 +27,12 @@ To disable the feature, unset `MYASO_NPC_PILOT` or set it to `0`. Starting with 
 
 ## Runtime limits
 
-- Staging map markers **are not** movable/collidable fighter entities, NPC routines, learned relationships or completed Greyhaven art. Their positions are fixed, server-advertised read-only anchors.
+- Staging map markers **are not** collidable fighter entities, persistent relationships or completed Greyhaven art. Their coordinates follow bounded server-timed routes, but they do not use navmeshes or collision.
 - Requests: max **240 UTF-8 bytes**, one line, strict framing and version checks. Packet request type 5, NPC answer type 6, NPC roster type 7; the existing protocol version (1) and combat packet types (1–4) are unchanged. Reliable frames are length-prefixed with a u16 LE count.
 - Responses are point-to-point and bounded; the server enforces per-connection cooldown (850ms) and can fail its reader on malformed framing. The session-local NPC reader uses a separate async task and never waits for a model or storage inside the 60 Hz world tick.
 - NPC memory is a small in-process per-connection acquaintance set and optional self-declared *cosmetic* nickname. It is never a verified user name or cross-session identity and cannot authorize purchases, rewards or private information disclosure.
 - The browser shows up to 12 recent lines during the active chat session using `textContent`. The server writes no chat bodies, prompts or nicknames to logs or persistent storage. The UI state disappears when the tab/session ends.
-- The full, persistent living-world architecture remains the roadmap in `docs/MOON_LIVING_WORLD_AI.md`; LW-0 identity/consent, actual world objects/navigation, scheduled NPC simulation, persistent event/relationship storage, and AI provider are still separate future tasks.
+- The full, persistent living-world architecture remains the roadmap in `docs/MOON_LIVING_WORLD_AI.md`; LW-0 identity/consent, collidable world objects/navigation, real economy integration, persistent event/relationship storage, and AI provider are still separate future tasks.
 
 ## Test expectations and nonclaims
 
@@ -74,5 +74,46 @@ memory.
 
 As before, the feature must be explicitly activated on loopback, and the
 production default stays off. No AI inference provider is contacted. This
-pilot has no generic world-action capabilities; future abilities need separate
+pilot has no player-executable world-action capabilities; future abilities need separate
 server validation and audited account/retention policies.
+
+## LW-1C — Deterministic local NPC supply ledger (loopback-only)
+
+The pilot now includes a finite **shared, server-owned** micro-world supply model.
+There is no player inventory, currency, loot, persistence, off-world trade, resource
+respawn, procedural quest, NPC collision or client-authorized mutation.
+
+Initial stock is intentionally authored for the staging test:
+- **8 water buckets** at the well; Tomas picks up at route tick 600 and
+  delivers to the work yard when he returns at tick 1800.
+- **8 rations** at the depot; Elara picks up and delivers to the market stall
+  on the same out-and-back schedule.
+- **6 iron bars** at the forge; Marta converts one iron bar into one unit of
+  finished nails at her work-shift tick 300, up to the existing finite supply.
+
+All updates are performed by the trusted 60 Hz Rust world clock, and only after
+the correct NPC task milestone. There is no refill. Every transfer preserves
+the total supply in each resource group (water 8; provisions 8; iron+nails 6).
+An accidental repeated tick or a discontinuity does not duplicate inventory.
+A bounded 12-entry **nonpersonal, session-local** action ledger records tick,
+event sequence, NPC actor and operation. Neither client messages nor an LLM
+have a write path to the stock model.
+
+The server broadcasts a strict **22-byte NPC-supply packet (type 9)** on the
+existing reliable stream at low priority, after combat kill notifications,
+snapshot catchup and NPC position updates. It contains an authoritative
+server tick, global event sequence, eight fixed-order resource counts,
+and the last actor/operation code. The browser validates exact length,
+header, resource conservation and provenance, then renders the observed counts
+in the NPC panel. A late packet cannot overwrite a newer world snapshot.
+
+Ask Marta about **iron**, Elara about **rations**, Tomas about **water**, or
+Aldric about **supplies**; each reads actual current shared server stocks.
+Asking an NPC to give resources, trade with a player or invent new stock has
+**no effect** on the ledger. This is a small verified, observable NPC world
+interaction, not a playable economy.
+
+The next integration boundary remains a physically navigable Greyhaven world,
+actual resource objects, stable verified player identities and separately
+permissioned/transactional player interaction. These are intentionally not
+claimed by LW-1C.

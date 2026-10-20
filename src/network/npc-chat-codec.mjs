@@ -1,7 +1,7 @@
 // LW-1 loopback NPC pilot on the existing reliable stream; never on combat datagrams.
 // These packet types are separate from the frozen v1 input/snapshot/kill-event payloads.
 export const NPC_WIRE = Object.freeze({
-  request: 5, response: 6, roster: 7, state: 8, maxTextBytes: 240,
+  request: 5, response: 6, roster: 7, state: 8, supplies: 9, maxTextBytes: 240,
 });
 const encoder = new TextEncoder();
 const decoder = new TextDecoder("utf-8", { fatal: true });
@@ -87,4 +87,34 @@ export function decodeNpcState(bytes) {
     states.push(Object.freeze({ id, x, y, activity }));
   }
   return Object.freeze({ tick, states: Object.freeze(states) });
+}
+
+const SUPPLY_EVENT_ACTOR = Object.freeze({ 1: 5, 2: 5, 3: 4, 4: 4, 5: 2 });
+
+export function decodeNpcSupplies(bytes) {
+  const payload = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
+  if (payload.length !== 22 || payload[0] !== 1 || payload[1] !== NPC_WIRE.supplies
+      || payload[2] !== 0 || payload[3] !== 0) {
+    throw new TypeError("invalid NPC supply packet");
+  }
+  const view = new DataView(payload.buffer, payload.byteOffset, payload.byteLength);
+  const tick = view.getUint32(4, true);
+  const sequence = view.getUint32(8, true);
+  const stocks = Array.from(payload.subarray(12, 20));
+  const [wellWater, tomasWater, yardWater, depotFood, elaraFood, stallFood, forgeIron, forgeNails] = stocks;
+  if (wellWater + tomasWater + yardWater !== 8
+    || depotFood + elaraFood + stallFood !== 8
+    || forgeIron + forgeNails !== 6
+    || (sequence === 0 && (payload[20] !== 0 || payload[21] !== 0))
+    || (sequence !== 0 && SUPPLY_EVENT_ACTOR[payload[21]] !== payload[20])) {
+    throw new TypeError("NPC supplies violate conservation or event provenance");
+  }
+  return Object.freeze({
+    tick, sequence,
+    stocks: Object.freeze({
+      wellWater, tomasWater, yardWater, depotFood, elaraFood, stallFood, forgeIron, forgeNails,
+    }),
+    lastActor: payload[20],
+    lastOperation: payload[21],
+  });
 }

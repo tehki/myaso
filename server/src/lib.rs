@@ -6,6 +6,7 @@ use std::sync::{
 pub mod kill_event;
 pub mod living_world;
 pub mod npc_routines;
+pub mod npc_supply;
 pub mod reliable;
 pub mod simulation;
 pub mod snapshot;

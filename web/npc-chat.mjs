@@ -11,6 +11,9 @@ export function createNpcChatPanel({ onSend, onFocus }) {
   description.textContent = "Staging characters · scripted dialogue · memories last this session only.";
   const roster = document.createElement("select");
   roster.setAttribute("aria-label", "Choose a nearby NPC");
+  const supplies = document.createElement("p");
+  supplies.className = "npc-pilot-supplies";
+  supplies.textContent = "Settlement supplies: awaiting verified server report.";
   const history = document.createElement("ol");
   history.setAttribute("aria-label", "NPC conversation");
   history.setAttribute("aria-live", "polite");
@@ -25,10 +28,11 @@ export function createNpcChatPanel({ onSend, onFocus }) {
   submit.type = "submit";
   submit.textContent = "Speak";
   form.append(input, submit);
-  panel.append(heading, description, roster, history, form);
+  panel.append(heading, description, roster, supplies, history, form);
   document.querySelector(".arena-wrap")?.append(panel);
   let npcs = [];
   let lastStateTick = null;
+  let lastSuppliesTick = null;
 
   function appendLine(text) {
     const li = document.createElement("li");
@@ -49,6 +53,8 @@ export function createNpcChatPanel({ onSend, onFocus }) {
     }
     panel.hidden = !entries.length;
     lastStateTick = null;
+    lastSuppliesTick = null;
+    supplies.textContent = "Settlement supplies: awaiting verified server report.";
   }
   function updateState({ tick, states }) {
     if (panel.hidden || states.length !== npcs.length) return;
@@ -64,6 +70,22 @@ export function createNpcChatPanel({ onSend, onFocus }) {
       const label = ["resting", "working / traveling", "at post"][npc.activity] ?? "working";
       roster.options[i].textContent = `${npc.name} · ${npc.role} · ${label}`;
     }
+  }
+  function updateSupplies({ tick, sequence, stocks, lastActor, lastOperation }) {
+    if (panel.hidden) return;
+    if (lastSuppliesTick !== null) {
+      const difference = (tick - lastSuppliesTick) >>> 0;
+      if (difference === 0 || difference >= 0x80000000) return;
+    }
+    lastSuppliesTick = tick;
+    const summary = `Well ${stocks.wellWater} · Yard water ${stocks.yardWater} · Depot rations ${stocks.depotFood} · Market rations ${stocks.stallFood} · Forge iron ${stocks.forgeIron} · Nails ${stocks.forgeNails}`;
+    const actor = { 2: "Marta", 4: "Elara", 5: "Tomas" }[lastActor];
+    const action = {
+      1: "collected water", 2: "delivered water", 3: "collected rations",
+      4: "delivered rations", 5: "forged nails",
+    }[lastOperation];
+    supplies.textContent = `Server stocks · ${summary}`
+      + (sequence && actor && action ? ` · Latest #${sequence}: ${actor} ${action}` : "");
   }
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
@@ -95,6 +117,7 @@ export function createNpcChatPanel({ onSend, onFocus }) {
     get npcs() { return npcs; },
     setRoster,
     updateState,
+    updateSupplies,
     receive({ text }) { appendLine(text); },
     focus() { if (!panel.hidden) { onFocus(); input.focus(); } },
     get enabled() { return !panel.hidden; },
