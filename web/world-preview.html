@@ -12,6 +12,12 @@ canvas{display:block;width:100%;aspect-ratio:16/10;background:#627751;border:1px
 kbd{border-radius:4px;border:1px solid #677354;background:#303a2d;color:#fff2d2;padding:2px 6px}
 #door{color:#e8c777;font-weight:700}
 .notice{font-size:12px;color:#a1aa91;line-height:1.5}
+.discovery-panel{margin-top:13px;padding:13px 17px;border:1px solid #48543e;border-radius:9px;background:#20291f}
+.discovery-panel summary{cursor:pointer;color:#f0ddb2;font-weight:600}
+.discovery-panel ol{margin:10px 0 0;padding-left:23px;display:grid;gap:6px}
+.discovery-panel li{color:#c4cbb9;line-height:1.45}
+.discovery-panel li.unseen{color:#929f8b}
+#discovery-notice{margin-bottom:9px;color:#efcb87;font-weight:600}
 </style></head><body>
 <header><div><h1>⚔️ Moonvale — World & Buildings v1.0</h1>
 <div class="sub">A fixed medieval world, with a separate, deliberately larger tavern interior</div></div>
@@ -22,10 +28,16 @@ kbd{border-radius:4px;border:1px solid #677354;background:#303a2d;color:#fff2d2;
 <div class="notice">LOCAL DESIGN PREVIEW only: door transitions are simulated here to demonstrate map links.
 Authoritative multiplayer transfers and building collisions are not enabled on the live server.
 The geography, town names, buildings and roads are fixed and identical for all players.</div>
+<section class="discovery-panel" aria-label="Explorer's journal">
+<div id="discovery-notice" role="status" aria-live="polite" hidden></div>
+<details open><summary>Explorer's journal · <span id="discovery-progress">0 / 4 places discovered</span></summary>
+<ol id="discovery-journal"></ol></details>
+</section>
 </div>
 <script type="module">
 import { MAP_IDS, getAuthoredMap, nearbyAuthoredPortal, previewPortalDestination } from "../src/world/authored-maps.mjs";
 import { createAuthoredWorldRenderer } from "../src/browser/authored-world-renderer.mjs";
+import { MOONVALE_LANDMARKS, createLocalDiscoveryJournal, recordLocalDiscoveries, localDiscoveryProgress } from "../src/world/landmark-discovery.mjs";
 const canvas=document.querySelector("#arena");
 const ctx=canvas.getContext("2d");
 const world=createAuthoredWorldRenderer();
@@ -36,6 +48,25 @@ let player=interiorQA ? {x:390,y:480} : {x:4365,y:4150};
 let zoom=interiorQA ? 1 : .86;
 let last=performance.now(), cooldown=0;
 const place=document.querySelector("#place"),door=document.querySelector("#door");
+const discoveryJournal=createLocalDiscoveryJournal();
+const discoveryList=document.querySelector("#discovery-journal");
+const discoveryProgress=document.querySelector("#discovery-progress");
+const discoveryNotice=document.querySelector("#discovery-notice");
+let discoveryNoticeUntil=0;
+function refreshDiscoveryJournal(){
+  const fragment=document.createDocumentFragment();
+  for(const site of MOONVALE_LANDMARKS){
+    const found=discoveryJournal.has(site.id);
+    const line=document.createElement("li");
+    line.className=found?"found":"unseen";
+    line.textContent=found?site.name+" — "+site.story:"Undiscovered — "+site.clue;
+    fragment.appendChild(line);
+  }
+  discoveryList.replaceChildren(fragment);
+  const progress=localDiscoveryProgress(discoveryJournal);
+  discoveryProgress.textContent=progress.visited+" / "+progress.total+" places discovered";
+}
+refreshDiscoveryJournal();
 const reset=()=>{mapId=MAP_IDS.overworld;player={x:4365,y:4150};zoom=.86;world.clear();};
 document.addEventListener("keydown",e=>{
   if(["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Space"].includes(e.code))e.preventDefault();
@@ -76,6 +107,14 @@ function tick(now){
   ctx.restore();
   const nearby=nearbyAuthoredPortal(mapId,player.x,player.y,16);
   door.textContent=nearby?"Press E — "+(map.kind==="outdoor"?"Enter The Red Lion Inn":"Return to Greyhaven"):"";
+  const discoveries=recordLocalDiscoveries(discoveryJournal,mapId,player.x,player.y);
+  if(discoveries.length){
+    refreshDiscoveryJournal();
+    discoveryNotice.textContent="Discovered: "+discoveries.map(site=>site.name).join(", ");
+    discoveryNotice.hidden=false;
+    discoveryNoticeUntil=now+4000;
+  }
+  if(now>discoveryNoticeUntil)discoveryNotice.hidden=true;
   place.textContent=map.name+" · "+Math.round(player.x)+","+Math.round(player.y)+" · cached "+world.stats.cached+"/24";
   requestAnimationFrame(tick);
 }
