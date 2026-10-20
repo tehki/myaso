@@ -304,10 +304,8 @@ impl LootAuthority {
         }
         let inventory = self.players.remove(&session_id).expect("checked");
         let dead = self.dead.remove(&session_id);
-        self.parked.insert(
-            character,
-            ParkedInventory { inventory, dead },
-        );
+        self.parked
+            .insert(character, ParkedInventory { inventory, dead });
         Ok(())
     }
 
@@ -1481,14 +1479,13 @@ mod tests {
         assert_eq!(identities.release_session(old), Some(character));
         identities.bind_verified(new, character).unwrap();
         loot.resume_inventory(&identities, new).unwrap();
-        assert_eq!(
-            loot.grant(2, ItemKind::Gold, 1),
-            Err(LootError::DeadPlayer)
-        );
+        assert_eq!(loot.grant(2, ItemKind::Gold, 1), Err(LootError::DeadPlayer));
         assert_eq!(loot.inventory(2).unwrap().stack_count(), 0);
-        assert!(loot.corpses()[&corpse_id].items.iter().any(|x| x.id == item));
-        loot.respawn(2, &fighter(2, 200.0, 200.0, false))
-            .unwrap();
+        assert!(loot.corpses()[&corpse_id]
+            .items
+            .iter()
+            .any(|x| x.id == item));
+        loot.respawn(2, &fighter(2, 200.0, 200.0, false)).unwrap();
         loot.grant(2, ItemKind::Gold, 1).unwrap();
         loot.export_state().unwrap();
     }
@@ -1507,7 +1504,12 @@ mod tests {
         let snap = loot.export_state().unwrap();
         let mut corrupt = snap.clone();
         let duplicate = corrupt.parked[&character].inventory.backpack[0].clone();
-        corrupt.players.get_mut(&5).unwrap().backpack.push(duplicate);
+        corrupt
+            .players
+            .get_mut(&5)
+            .unwrap()
+            .backpack
+            .push(duplicate);
         assert!(matches!(
             LootAuthority::restore_state(corrupt),
             Err(LootError::InvalidState)
