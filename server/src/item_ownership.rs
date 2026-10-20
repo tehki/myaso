@@ -179,6 +179,20 @@ impl ItemOwnershipLedger {
         self.items.len()
     }
 
+    /// Read an already committed receipt without running any new mutation.
+    /// This is the safe verification boundary for cross-zone handoff ACKs.
+    pub fn committed_receipt(
+        &self,
+        transaction: OwnershipTxnId,
+        operations: &[OwnershipOp],
+    ) -> Result<Option<OwnershipReceipt>, OwnershipError> {
+        match self.applied.get(&transaction) {
+            Some(previous) if previous.operations == operations => Ok(Some(previous.receipt)),
+            Some(_) => Err(OwnershipError::ConflictingReplay),
+            None => Ok(None),
+        }
+    }
+
     /// Validate an entire transaction without touching mutable state. The
     /// returned receipt also identifies exact, previously committed retries.
     /// This is used by the dormant write-ahead journal to verify *before*
