@@ -1076,11 +1076,7 @@ impl LootStateSnapshot {
     }
 }
 
-fn validate_unique_id(
-    id: u64,
-    known: &mut BTreeSet<u64>,
-    next_id: u64,
-) -> Result<(), LootError> {
+fn validate_unique_id(id: u64, known: &mut BTreeSet<u64>, next_id: u64) -> Result<(), LootError> {
     if id == 0 || id >= next_id || !known.insert(id) {
         return Err(LootError::InvalidState);
     }
