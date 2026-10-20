@@ -53,7 +53,7 @@ installed or activated here. No network authentication,
 cryptographic session attestation, DB driver, worker registration,
 primary failover or multi-host partition test is supplied.
 
-The `AuthorizedWorkerSessions` permission method is entity-specific:
+The `AuthenticatedWorkerSessions` permission method is entity-specific:
 a peer cannot gain authority to a different character or physical item
 just by knowing its ID. Full player-account ownership and ACL policies
 remain a Core 8B integration requirement.
