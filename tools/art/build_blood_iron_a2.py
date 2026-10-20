@@ -194,8 +194,16 @@ def house(name,x,y,w,d,eave,rise,wallmat,roofmat,rot=0,chimney=False):
 
 # Red Lion: keep original A1 scale and material IDs, but enhance shaders.
 pre=set(bpy.context.scene.objects)
-bpy.ops.wm.obj_import(filepath=str(args.a1_obj.resolve()), forward_axis="Y", up_axis="Z")
+# Import by Blender OBJ group so the original A1 barrel cluster can be replaced
+# art-side, without editing the historical A1 OBJ or any portal geometry.
+bpy.ops.wm.obj_import(filepath=str(args.a1_obj.resolve()), forward_axis="Y",
+                      up_axis="Z", use_split_groups=True)
 imported=[obj for obj in scene.objects if obj not in pre]
+a1_barrel_groups=[obj for obj in imported if obj.name=="tavern_barn_accessories"]
+assert len(a1_barrel_groups)==1, "A1 barrel group must remain independently importable"
+for ob in a1_barrel_groups:
+    bpy.data.objects.remove(ob, do_unlink=True)
+imported=[obj for obj in imported if obj not in a1_barrel_groups]
 replaced={"limestone":stone,"limewash":plaster,"old_timber":timber,
           "roof_tile":tile,"dark_wood":oak,"window":glass,
           "iron":iron,"red_lion":red}
@@ -275,10 +283,32 @@ for x in (5.05,6.73):
     for y in (-2.12,-.78):
         cylinder("Handcart / wheel",(x,y,.48),.45,.14,oak,16,rot=(math.pi/2,0,0))
         cylinder("Handcart / hub",(x,y,.48),.12,.16,iron,12,rot=(math.pi/2,0,0))
-for n,(x,y) in enumerate([(-5.1,-1.45),(-5.5,-1.25),(-4.65,-1.3),(16.8,7.6)]):
-    cylinder(f"Oak ale barrel {n}",(x,y,.51),.30,.92,timber,12)
-    cylinder(f"Barrel iron band {n}",(x,y,.77),.315,.07,iron,12)
-    cylinder(f"Barrel iron foot {n}",(x,y,.26),.315,.06,iron,12)
+# Outer iron band is wider than the barrel body; use its diameter for
+# separation. These replace the original overlapping A1 cluster and the
+# earlier overlapping street trio. All coordinates are authoring meters.
+BARREL_OUTER_RADIUS = .315
+BARREL_MIN_GAP = .10
+BARREL_LAYOUT = (
+    ("red-lion-left-1", -2.42, -1.53),
+    ("red-lion-left-2", -3.21, -1.54),
+    ("red-lion-right", 2.45, -1.45),
+    ("street-left-1", -5.05, -1.45),
+    ("street-left-2", -5.83, -1.52),
+    ("street-left-3", -4.58, -2.28),
+    ("blacksmith", 16.8, 7.6),
+)
+barrel_min_clearance = float("inf")
+for i, (name, x, y) in enumerate(BARREL_LAYOUT):
+    for other_name, ox, oy in BARREL_LAYOUT[:i]:
+        edge_gap = math.hypot(x-ox,y-oy) - 2 * BARREL_OUTER_RADIUS
+        barrel_min_clearance = min(barrel_min_clearance, edge_gap)
+        assert edge_gap >= BARREL_MIN_GAP-1e-9, (
+            f"Barrels overlap / too close: {name} and {other_name} "
+            f"have only {edge_gap:.3f} m edge clearance"
+        )
+    cylinder(f"Oak ale barrel / {name}",(x,y,.51),.30,.92,timber,12)
+    cylinder(f"Barrel iron band / {name}",(x,y,.77),BARREL_OUTER_RADIUS,.07,iron,12)
+    cylinder(f"Barrel iron foot / {name}",(x,y,.26),BARREL_OUTER_RADIUS,.06,iron,12)
 
 # Atmospheric but legible, neutral daylight. All lighting is render-only.
 world=scene.world
@@ -327,6 +357,10 @@ report={
     "editableSource":blend.name,"renderer":"Cycles CPU","samples":scene.cycles.samples,
     "sceneMeshes":len([o for o in scene.objects if o.type=="MESH"]),
     "materialCount":len(bpy.data.materials),"batchedCobblestones":stones,
+    "barrels":{"count":len(BARREL_LAYOUT),"outerRadiusMeters":BARREL_OUTER_RADIUS,
+               "minimumRequiredGapMeters":BARREL_MIN_GAP,
+               "measuredMinimumEdgeClearanceMeters":round(barrel_min_clearance,3),
+               "removedOverlappingSourceGroup":True},
     "buildings":["Red Lion A1 enhanced","Gable Merchant","Tanner's Cottage",
                  "Stone Weaver","Blacksmith"],
     "textures":"100% procedural Blender shader nodes; no external reference assets",
