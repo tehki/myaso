@@ -210,9 +210,7 @@ mod tests {
         // Only the server-authoritative death event is allowed to move gear.
         let mut dead_fighter = world.fighter(1).unwrap().clone();
         dead_fighter.action = Action::Dead;
-        let corpse = loot
-            .death(1, &dead_fighter, ZoneId::Moonvale, 100)
-            .unwrap();
+        let corpse = loot.death(1, &dead_fighter, ZoneId::Moonvale, 100).unwrap();
         assert_eq!(
             resolve_server_owned_loadout(&loot, 1).unwrap().main_hand,
             MainHandCombatItem::Unarmed
