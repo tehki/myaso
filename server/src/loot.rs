@@ -219,6 +219,7 @@ pub struct LootAuthority {
     next_id: u64,
     players: BTreeMap<u32, Inventory>,
     dead: BTreeSet<u32>,
+    parked: BTreeMap<CharacterId, ParkedInventory>,
     ground: BTreeMap<u64, GroundDrop>,
     corpses: BTreeMap<u64, Corpse>,
 }
