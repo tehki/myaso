@@ -566,11 +566,7 @@ mod tests {
 
     #[test]
     fn p16_fabricated_fx_over_viewer_zone_or_global_limit_fails_atomically() {
-        let limits = [
-            (7usize, 1usize, 1u32),
-            (129, 129, 1),
-            (513, 513, 5),
-        ];
+        let limits = [(7usize, 1usize, 1u32), (129, 129, 1), (513, 513, 5)];
         for (count, distinct_routes, zones) in limits {
             let encoded: Vec<[u8; MAGIC_FX_PACKET_BYTES]> = (0..count)
                 .map(|index| effect((index as u32 % zones) + 1))
