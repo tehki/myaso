@@ -1,4 +1,5 @@
-import "./chat-c1-foundation.test.mjs";\nimport test from "node:test";
+import "./chat-c1-foundation.test.mjs";
+import test from "node:test";
 import assert from "node:assert/strict";
 import { createFrameBudget } from "../src/browser/frame-budget.mjs";
 import { installRightButtonGesture } from "../src/browser/right-button-gesture.mjs";
