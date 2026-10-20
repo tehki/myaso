@@ -1,0 +1,269 @@
+{
+  "anatomicalHeelOrOutsoleVerified": false,
+  "authoritativeGameFloorUnknown": true,
+  "blender": "4.5.14 LTS",
+  "clip": "t1_roll",
+  "gameplayOrNetworkingModified": false,
+  "knightPresentation120PercentUnchanged": true,
+  "landmarksAreHeuristicFootRegionsNotConfirmedOutsoles": true,
+  "markerSphereRadiusSourceModelUnits": 0.033,
+  "milestone": "Blood & Iron A2.19 original evaluated A3 foot-region 3D closeup QA",
+  "originalA3TimingModified": false,
+  "originalGLBOrAtlasModified": false,
+  "originalSourceFrame60fps": [
+    1,
+    7,
+    22
+  ],
+  "productionApproved": false,
+  "records": [
+    {
+      "originalEvaluatedSourceVertices": [
+        {
+          "candidate": "heelSide",
+          "evaluatedWorldNormalXYZ": [
+            -0.07748,
+            0.0154,
+            -0.99687
+          ],
+          "evaluatedWorldXYZ": [
+            0.13207,
+            -0.06571,
+            0.00887
+          ],
+          "normalIsNotSoleProof": true,
+          "side": "LeftFoot",
+          "sourceVertexIndex": 6073,
+          "worldNormalDotZ": -0.99687
+        },
+        {
+          "candidate": "toeSide",
+          "evaluatedWorldNormalXYZ": [
+            0.08672,
+            -0.02853,
+            -0.99582
+          ],
+          "evaluatedWorldXYZ": [
+            0.15153,
+            -0.20164,
+            -0.02072
+          ],
+          "normalIsNotSoleProof": true,
+          "side": "LeftFoot",
+          "sourceVertexIndex": 192,
+          "worldNormalDotZ": -0.99582
+        },
+        {
+          "candidate": "heelSide",
+          "evaluatedWorldNormalXYZ": [
+            0.07254,
+            0.02003,
+            -0.99716
+          ],
+          "evaluatedWorldXYZ": [
+            -0.11159,
+            0.14424,
+            -0.0082
+          ],
+          "normalIsNotSoleProof": true,
+          "side": "RightFoot",
+          "sourceVertexIndex": 21619,
+          "worldNormalDotZ": -0.99716
+        },
+        {
+          "candidate": "toeSide",
+          "evaluatedWorldNormalXYZ": [
+            -0.0043,
+            -0.02469,
+            -0.99969
+          ],
+          "evaluatedWorldXYZ": [
+            -0.2258,
+            0.05822,
+            -0.0315
+          ],
+          "normalIsNotSoleProof": true,
+          "side": "RightFoot",
+          "sourceVertexIndex": 14705,
+          "worldNormalDotZ": -0.99969
+        }
+      ],
+      "reviewCameraFocusWorldXYZ": [
+        -0.01345,
+        -0.01622,
+        -0.01289
+      ],
+      "reviewCameraOrthoScale": 1.15,
+      "sourceFrame60fps": 1
+    },
+    {
+      "originalEvaluatedSourceVertices": [
+        {
+          "candidate": "heelSide",
+          "evaluatedWorldNormalXYZ": [
+            -0.34397,
+            0.08079,
+            0.9355
+          ],
+          "evaluatedWorldXYZ": [
+            0.09561,
+            -0.17858,
+            0.49013
+          ],
+          "normalIsNotSoleProof": true,
+          "side": "LeftFoot",
+          "sourceVertexIndex": 6073,
+          "worldNormalDotZ": 0.9355
+        },
+        {
+          "candidate": "toeSide",
+          "evaluatedWorldNormalXYZ": [
+            -0.2277,
+            0.31419,
+            0.92165
+          ],
+          "evaluatedWorldXYZ": [
+            0.10363,
+            -0.03551,
+            0.49346
+          ],
+          "normalIsNotSoleProof": true,
+          "side": "LeftFoot",
+          "sourceVertexIndex": 192,
+          "worldNormalDotZ": 0.92165
+        },
+        {
+          "candidate": "heelSide",
+          "evaluatedWorldNormalXYZ": [
+            0.09403,
+            0.22208,
+            0.97048
+          ],
+          "evaluatedWorldXYZ": [
+            -0.07857,
+            -0.27071,
+            0.55058
+          ],
+          "normalIsNotSoleProof": true,
+          "side": "RightFoot",
+          "sourceVertexIndex": 21619,
+          "worldNormalDotZ": 0.97048
+        },
+        {
+          "candidate": "toeSide",
+          "evaluatedWorldNormalXYZ": [
+            -0.13323,
+            0.32283,
+            0.93703
+          ],
+          "evaluatedWorldXYZ": [
+            -0.22199,
+            -0.21283,
+            0.54925
+          ],
+          "normalIsNotSoleProof": true,
+          "side": "RightFoot",
+          "sourceVertexIndex": 14705,
+          "worldNormalDotZ": 0.93703
+        }
+      ],
+      "reviewCameraFocusWorldXYZ": [
+        -0.02533,
+        -0.17441,
+        0.52085
+      ],
+      "reviewCameraOrthoScale": 1.15,
+      "sourceFrame60fps": 7
+    },
+    {
+      "originalEvaluatedSourceVertices": [
+        {
+          "candidate": "heelSide",
+          "evaluatedWorldNormalXYZ": [
+            -0.07748,
+            0.0154,
+            -0.99687
+          ],
+          "evaluatedWorldXYZ": [
+            0.13207,
+            -0.06571,
+            0.00887
+          ],
+          "normalIsNotSoleProof": true,
+          "side": "LeftFoot",
+          "sourceVertexIndex": 6073,
+          "worldNormalDotZ": -0.99687
+        },
+        {
+          "candidate": "toeSide",
+          "evaluatedWorldNormalXYZ": [
+            0.08672,
+            -0.02853,
+            -0.99582
+          ],
+          "evaluatedWorldXYZ": [
+            0.15153,
+            -0.20164,
+            -0.02072
+          ],
+          "normalIsNotSoleProof": true,
+          "side": "LeftFoot",
+          "sourceVertexIndex": 192,
+          "worldNormalDotZ": -0.99582
+        },
+        {
+          "candidate": "heelSide",
+          "evaluatedWorldNormalXYZ": [
+            0.07254,
+            0.02003,
+            -0.99716
+          ],
+          "evaluatedWorldXYZ": [
+            -0.11159,
+            0.14424,
+            -0.0082
+          ],
+          "normalIsNotSoleProof": true,
+          "side": "RightFoot",
+          "sourceVertexIndex": 21619,
+          "worldNormalDotZ": -0.99716
+        },
+        {
+          "candidate": "toeSide",
+          "evaluatedWorldNormalXYZ": [
+            -0.0043,
+            -0.0247,
+            -0.99969
+          ],
+          "evaluatedWorldXYZ": [
+            -0.2258,
+            0.05822,
+            -0.0315
+          ],
+          "normalIsNotSoleProof": true,
+          "side": "RightFoot",
+          "sourceVertexIndex": 14705,
+          "worldNormalDotZ": -0.99969
+        }
+      ],
+      "reviewCameraFocusWorldXYZ": [
+        -0.01345,
+        -0.01622,
+        -0.01289
+      ],
+      "reviewCameraOrthoScale": 1.15,
+      "sourceFrame60fps": 22
+    }
+  ],
+  "renderedImages": 9,
+  "reviewViews": [
+    "front",
+    "side",
+    "low"
+  ],
+  "sourceGLBBasename": "t1-sentinel-roll-A3.glb",
+  "sourceGLBSHA256": "b89432a621d1f0956b7c06449035e0a055d11b17d6ceb34c9b26264eadcb6aed",
+  "sourceMeshName": "material",
+  "workbenchRenderingOnly": true,
+  "worldNormalDotZIsNotGameFloorContact": true
+}
