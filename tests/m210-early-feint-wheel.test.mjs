@@ -14,22 +14,22 @@ function extractActions(id){
  const end=gesture.indexOf("]",b);
  return gesture.slice(b,end+1);
 }
-test("R1 preserves one genuine short W3C LMB held for 20ms then released",()=>{
+test("M333 preserves genuine short W3C LMB with zero extra hold and real pointer release",()=>{
  const pointer=extractActions("mouse");
  assert.equal((pointer.match(/type: "pointerDown"/g)||[]).length,1);
  assert.equal((pointer.match(/type: "pointerUp"/g)||[]).length,1);
  assert.ok(pointer.indexOf("pointerDown")<pointer.indexOf("pointerUp"));
- assert.match(pointer,/duration: 20/);
+ assert.ok(!pointer.includes("duration: 20"), "never schedule the 20ms hold which became 85ms on CI");
  assert.match(pointer,/duration: 0/);
- assert.ok(pointer.indexOf("duration: 20")<pointer.indexOf("pointerUp"));
+ assert.ok(pointer.indexOf("duration: 0")<pointer.indexOf("pointerUp"));
  assert.match(pointer,/pointerUp", button: 0 },?\s*\]$/);
 });
 test("M331 wheel-back precedes held LMB release in one genuine W3C batch", () => {
  const wheel = extractActions("wheel");
  assert.equal((wheel.match(/type: "scroll"/g) || []).length, 1);
- assert.ok(wheel.indexOf('type: "scroll"') < wheel.indexOf('duration: 20'));
+ assert.ok(wheel.indexOf('type: "scroll"') < wheel.lastIndexOf('type: "pause"'));
  assert.ok(!wheel.includes("duration: 85"));
- assert.match(wheel, /type: "scroll"[^\n]*deltaY: 120[^\n]*},\s*{ type: "pause", duration: 20 }/);
+ assert.match(wheel, /type: "scroll"[^\n]*deltaY: 120[^\n]*},\s*{ type: "pause", duration: 0 }/);
 });
 test("M210 preserves unchanged 70ms feint, strict 100HP and one observed recovery",()=>{
  assert.ok(flight.includes("await performArenaFeint(attacker, attackerElementId, attackOffset)"));
@@ -55,8 +55,8 @@ test("M331 W3C scroll follows pointerDOWN and precedes pointerUP with strict fei
  assert.deepEqual(wheelKinds, ["pause", "pause", "scroll", "pause", "pause"]);
  assert.ok(pointerKinds.indexOf("pointerDown") < wheelKinds.indexOf("scroll"));
  assert.ok(wheelKinds.indexOf("scroll") < pointerKinds.indexOf("pointerUp"));
- assert.match(p, /pause", duration: 0 },\s*{ type: "pause", duration: 20 },\s*{ type: "pointerUp"/);
- assert.match(w, /deltaY: 120[^\n]*},\s*{ type: "pause", duration: 20 }/);
+ assert.match(p, /pause", duration: 0 },\s*{ type: "pause", duration: 0 },\s*{ type: "pointerUp"/);
+ assert.match(w, /deltaY: 120[^\n]*},\s*{ type: "pause", duration: 0 }/);
  assert.doesNotMatch(gesture, /dispatchEvent\(|window\.__MYASO/);
  assert.ok(flight.includes('!attemptDefender.feedbackTransitions.includes("damage-taken")'));
  assert.ok(flight.includes("M117 feint attempt"));
