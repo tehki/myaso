@@ -1,0 +1,61 @@
+name: Core C4c PostgreSQL acceptance
+
+on:
+  pull_request:
+    paths:
+      - "server/sql/001_zone_authority_postgres.sql"
+      - "scripts/verify_zone_authority_postgres.py"
+      - ".github/workflows/core-c4c-postgres.yml"
+  push:
+    branches: [main]
+    paths:
+      - "server/sql/001_zone_authority_postgres.sql"
+      - "scripts/verify_zone_authority_postgres.py"
+      - ".github/workflows/core-c4c-postgres.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  postgres-fencing:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: myaso_c4c_test
+          POSTGRES_PASSWORD: ephemeral-test-only
+          POSTGRES_DB: myaso_c4c_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U myaso_c4c_test -d myaso_c4c_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    env:
+      PGHOST: 127.0.0.1
+      PGPORT: "5432"
+      PGUSER: myaso_c4c_test
+      PGPASSWORD: ephemeral-test-only
+      PGDATABASE: myaso_c4c_test
+      MYASO_C4C_TEST_ONLY: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: PostgreSQL client
+        run: |
+          if ! command -v psql >/dev/null 2>&1; then
+            sudo apt-get update -qq
+            sudo apt-get install -y postgresql-client
+          fi
+          psql --version
+      - name: Compile acceptance harness
+        run: python -m py_compile scripts/verify_zone_authority_postgres.py
+      - name: Initialize isolated authority schema
+        run: psql -X -v ON_ERROR_STOP=1 -f server/sql/001_zone_authority_postgres.sql
+      - name: Verify cross-client fencing and restart-safe transactions
+        run: python scripts/verify_zone_authority_postgres.py
