@@ -185,6 +185,71 @@ mod tests {
     }
 
     #[test]
+    fn full_loot_death_removes_weapon_from_victim_and_allows_only_looter_to_re_equip() {
+        use crate::simulation::{Action, World};
+        use crate::zone::ZoneId;
+
+        let mut world = World::new(800.0, 600.0);
+        assert!(world.add_player_at(1, 200.0, 200.0, 0.0));
+        assert!(world.add_player_at(2, 205.0, 200.0, 0.0));
+        let mut loot = LootAuthority::new();
+        loot.register(1).unwrap();
+        loot.register(2).unwrap();
+
+        let sword = loot.grant(1, ItemKind::RustySword, 1).unwrap();
+        loot.equip(1, sword, EquipmentSlot::MainHand).unwrap();
+        assert_eq!(
+            resolve_server_owned_loadout(&loot, 1).unwrap().main_hand,
+            MainHandCombatItem::RustySword(sword)
+        );
+        assert_eq!(
+            resolve_server_owned_loadout(&loot, 2).unwrap().main_hand,
+            MainHandCombatItem::Unarmed
+        );
+
+        // Only the server-authoritative death event is allowed to move gear.
+        let mut dead_fighter = world.fighter(1).unwrap().clone();
+        dead_fighter.action = Action::Dead;
+        let corpse = loot
+            .death(1, &dead_fighter, ZoneId::Moonvale, 100)
+            .unwrap();
+        assert_eq!(
+            resolve_server_owned_loadout(&loot, 1).unwrap().main_hand,
+            MainHandCombatItem::Unarmed
+        );
+        assert_eq!(loot.inventory(1).unwrap().stack_count(), 0);
+        assert!(loot.corpses()[&corpse]
+            .items
+            .iter()
+            .any(|item| item.id == sword));
+
+        loot.take_corpse(
+            2,
+            world.fighter(2).unwrap(),
+            ZoneId::Moonvale,
+            corpse,
+            sword,
+            101,
+        )
+        .unwrap();
+        // A sword in another character's backpack is NOT equipped.
+        assert_eq!(
+            resolve_server_owned_loadout(&loot, 2).unwrap().main_hand,
+            MainHandCombatItem::Unarmed
+        );
+        loot.equip(2, sword, EquipmentSlot::MainHand).unwrap();
+        assert_eq!(
+            resolve_server_owned_loadout(&loot, 2).unwrap().main_hand,
+            MainHandCombatItem::RustySword(sword)
+        );
+        assert_eq!(
+            resolve_server_owned_loadout(&loot, 1).unwrap().main_hand,
+            MainHandCombatItem::Unarmed
+        );
+        loot.export_state().unwrap();
+    }
+
+    #[test]
     fn forged_or_duplicate_equipped_items_fail_closed() {
         let mut inventory = Inventory::default();
         inventory.equipment.insert(
