@@ -91,7 +91,7 @@ limestone = [
 ]
 oak = material("A2.1 | end-grain oak",(.26,.145,.082),.86,15,.17)
 dark_oak = material("A2.1 | tarred oak / wet joints",(.13,.089,.066),.86,22,.09)
-moss = material("A2.1 | subdued damp mortar",(.22,.27,.155),.99,12,.23)
+
 
 def batch(name, verts, faces, materials, ids=None, layer="world-base-candidate"):
     mesh = bpy.data.meshes.new(name)
@@ -205,16 +205,6 @@ pegs=batch("Red Lion A2.1 / batched oak joinery pegs",
 assert peg_count==12
 pegs["peg_count"]=peg_count
 
-# 4) Soot/damp detailing is shader-only: keep the original plaster surfaces.
-# A soft, weathered roof gable treatment uses restrained procedural colours.
-weathered = material("A2.1 | aged damp timber",(.18,.11,.073),.92,11,.22)
-gable = bpy.data.objects["Red Lion / gables"]
-for old in gable.data.materials:
-    if "timber" in old.name.lower():
-        # Legacy A1 materials remain available for rollback in the base .blend.
-        # We don't swap the mesh: this polish layer is additive only.
-        break
-
 # Validate no mutation of original meshes and barrel positions.
 assert all(name in scene.objects for name in originals)
 assert all(tuple(round(v,6) for v in scene.objects[name].location)==pos
@@ -235,7 +225,7 @@ report={
             "occlusionLayer":"roof-occlusion-candidate"},
     "stoneFoundation":{"faceBlocks":stone_count,"meshBatches":1},
     "timberJoinery":{"pegs":peg_count,"meshBatches":1},
-    "newArtMeshes":3,"materialsAdded":len(clay_tiles)+len(limestone)+3,
+    "newArtMeshes":3,"materialsAdded":len(clay_tiles)+len(limestone)+2,
     "barrelsUnchanged":len(original_barrels),
     "renderer":"Cycles CPU","samples":scene.cycles.samples,
     "renderSize":[scene.render.resolution_x,scene.render.resolution_y],
