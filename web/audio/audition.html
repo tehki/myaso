@@ -52,7 +52,11 @@
       <label for="audio-volume">Effects <input id="audio-volume" type="range" min="0" max="100" step="1" value="55"></label></div>
     <div class="row" style="margin-top: .8rem"><button id="music-toggle" type="button">Music off</button>
       <label for="music-volume">Music <input id="music-volume" type="range" min="0" max="100" step="1" value="35"></label></div>
-    <p class="note">Music is disabled until explicitly enabled. It loops independently, remains quiet under effects, and pauses when this tab is hidden. These settings do not change your gameplay audio preferences.</p>
+    <div class="row" style="margin-top: .8rem">
+      <button id="music-next" type="button">Next track</button>
+      <output id="music-track-title" role="status" aria-live="polite">Moonlight Sonata — Adagio sostenuto</output>
+    </div>
+    <p class="note">Four MP3 recordings from your Windows Music folder play one at a time, advancing automatically and returning to the first after track four. Next track allows quick listening without waiting for full songs. Music is opt-in, quiet under effects, and pauses when hidden. The audition never changes gameplay preferences.</p>
   </section>
 
   <footer>Local CC0 recordings and source credits: <a href="./SOURCES.md">SOURCES.md</a>. This is a manual listening aid, not a playable game or a replacement for verified Chrome/Firefox native audio acceptance.</footer>
@@ -61,6 +65,16 @@
     const audio = createGameAudio({ storage: null });
     window.__r4AuditionAudio = audio; // Sound-only review clock for strict native acceptance.
     installGameAudioControls(audio);
+    const trackTitle = document.querySelector("#music-track-title");
+    const updateTrackTitle = () => {
+      trackTitle.textContent = (audio.getMusicTrackIndex() + 1) + " / " +
+        audio.getMusicTrackCount() + " — " + audio.getMusicTrackTitle();
+    };
+    audio.onMusicTrackChanged(updateTrackTitle);
+    document.querySelector("#music-next").addEventListener("click", () => {
+      audio.nextMusicTrack();
+    });
+    updateTrackTitle();
     const prepare = document.querySelector("#prepare");
     const status = document.querySelector("#status");
     const counter = document.querySelector("#counter");

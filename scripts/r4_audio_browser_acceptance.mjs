@@ -16,6 +16,7 @@ const server = createServer(async (req, res) => {
     if (!absolute.startsWith(root + path.sep)) { res.writeHead(403).end(); return; }
     if (!(await stat(absolute)).isFile()) { res.writeHead(404).end(); return; }
     const type = absolute.endsWith(".ogg") ? "audio/ogg"
+      : absolute.endsWith(".mp3") ? "audio/mpeg"
       : absolute.endsWith(".mjs") || absolute.endsWith(".js") ? "text/javascript; charset=utf-8"
       : absolute.endsWith(".html") ? "text/html; charset=utf-8"
       : absolute.endsWith(".css") ? "text/css; charset=utf-8" : "application/octet-stream";
@@ -126,20 +127,33 @@ async function run(browser, port) {
     const preflight = await script(`
       return Promise.all(["/web/audio/foley/footstep01.ogg",
         "/web/audio/foley/deathFall1.ogg",
-        "/web/audio/music/moonlit-melody.ogg"].map(async (url) => {
+        "/web/audio/music/moonlight-sonata-adagio.mp3",
+        "/web/audio/music/vivaldi-autumn-adagio.mp3",
+        "/web/audio/music/vivaldi-winter.mp3",
+        "/web/audio/music/track-04-untitled.mp3"].map(async (url) => {
         const r = await fetch(url);
-        const bytes = await r.arrayBuffer();
+        const bytes = new Uint8Array(await r.arrayBuffer());
         return { url, status: r.status, type: r.headers.get("content-type"),
-          ogg: new TextDecoder().decode(bytes.slice(0, 4)), size: bytes.byteLength };
+          ogg: new TextDecoder().decode(bytes.slice(0, 4)), head: [...bytes.slice(0, 3)],
+          size: bytes.byteLength };
       }));
     `);
-    assert.equal(preflight.length, 3);
+    assert.equal(preflight.length, 6);
     for (const media of preflight) {
       assert.equal(media.status, 200, media.url);
-      assert.equal(media.type, "audio/ogg", media.url);
-      assert.equal(media.ogg, "OggS", media.url);
+      if (media.url.endsWith(".ogg")) {
+        assert.equal(media.type, "audio/ogg", media.url);
+        assert.equal(media.ogg, "OggS", media.url);
+      } else {
+        assert.equal(media.type, "audio/mpeg", media.url);
+        assert.ok(media.head[0] === 73 && media.head[1] === 68 && media.head[2] === 51 ||
+          (media.head[0] === 255 && (media.head[1] & 224) === 224),
+          media.url + " does not have MPEG audio framing");
+      }
       assert.ok(media.size > 1000, media.url);
     }
+    assert.notEqual(await script("return document.createElement('audio').canPlayType('audio/mpeg')"),
+      "", browser + " cannot play MP3");
     await click("#music-toggle");
     assert.equal(await script('return document.querySelector("#music-toggle").getAttribute("aria-pressed")'), "true");
     await click("#audio-toggle");
@@ -209,6 +223,7 @@ async function run(browser, port) {
         return { unlocked: window.__r4Unlock, state: window.__r4Context.state,
           played, sources: window.__r4SourceStarts - before, rms, musicIndependent,
           musicPaused, musicLoop: window.__r4Music.loop,
+          playlistCount: a.getMusicTrackCount(), playlistIndex: a.getMusicTrackIndex(),
           musicVolume: window.__r4Music.volume,
           musicPlaying: !window.__r4Music.paused };
       })();
@@ -220,7 +235,9 @@ async function run(browser, port) {
     assert.ok(result.rms > 0.0001, browser + " decoded recording is silent");
     assert.equal(result.musicIndependent, true);
     assert.equal(result.musicPaused, true);
-    assert.equal(result.musicLoop, true);
+    assert.equal(result.musicLoop, false, "MP3 playlist uses ended events, not single-track loop");
+    assert.equal(result.playlistCount, 4);
+    assert.equal(result.playlistIndex, 0);
     assert.ok(result.musicVolume <= 0.3);
     assert.equal(result.musicPlaying, true);
     let playbackTime = 0;
@@ -230,7 +247,25 @@ async function run(browser, port) {
       await delay(100);
     }
     assert.ok(playbackTime > 0.08, browser + " music did not advance through decoded media");
-    console.log("R4_NATIVE_AUDIO " + JSON.stringify({ browser, decoded: loaded, ...result, playbackTime }));
+    // Simulate the HTMLMediaElement 'ended' notification to verify the
+    // playlist moves to a new real MP3 URL without creating a second player.
+    const advanced = await script(`
+      const a = window.__r4Audio;
+      const sameElement = window.__r4Music;
+      const initial = sameElement.src;
+      sameElement.onended();
+      return { sameElement: window.__r4Music === sameElement, initial,
+        next: sameElement.src, index: a.getMusicTrackIndex(),
+        count: a.getMusicTrackCount(), loop: sameElement.loop };
+    `);
+    assert.equal(advanced.sameElement, true, browser + " created overlapping music elements");
+    assert.equal(advanced.count, 4);
+    assert.equal(advanced.index, 1);
+    assert.ok(advanced.initial.endsWith("moonlight-sonata-adagio.mp3"));
+    assert.ok(advanced.next.endsWith("vivaldi-autumn-adagio.mp3"));
+    assert.equal(advanced.loop, false);
+    console.log("R4_NATIVE_AUDIO " + JSON.stringify({ browser, decoded: loaded, ...result,
+      playbackTime, playlistNext: advanced.next }));
     // Release native media/context resources before closing browser.
     await script("window.__r4Audio.dispose(); return true;");
 
@@ -274,8 +309,17 @@ async function run(browser, port) {
       /Playing Death \(recorded variant\)/);
     await click("#music-toggle");
     assert.equal(await script('return document.querySelector("#music-toggle").getAttribute("aria-pressed")'), "true");
+    assert.match(await script('return document.querySelector("#music-track-title").textContent'),
+      /^1 \/ 4.*Moonlight Sonata/);
+    await click("#music-next");
+    assert.match(await script('return document.querySelector("#music-track-title").textContent'),
+      /^2 \/ 4.*Vivaldi/);
+    for (let n = 0; n < 3; n++) await click("#music-next");
+    assert.match(await script('return document.querySelector("#music-track-title").textContent'),
+      /^1 \/ 4.*Moonlight Sonata/, "manual four-track navigation must wrap");
     console.log("R4_AUDITION " + JSON.stringify({ browser, decoded: 24,
-      recordedCuePlayed: true, independentMusicEnabled: true, noGameplay: true }));
+      recordedCuePlayed: true, independentMusicEnabled: true, playlistCount: 4,
+      manualWrap: true, noGameplay: true }));
   } finally {
     if (session) await command(base, "DELETE", "/session/" + session).catch(() => {});
     child.kill("SIGTERM");

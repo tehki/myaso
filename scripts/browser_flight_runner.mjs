@@ -268,6 +268,7 @@ function contentType(filename) {
   if (filename.endsWith(".mjs") || filename.endsWith(".js")) return "text/javascript; charset=utf-8";
   if (filename.endsWith(".css")) return "text/css; charset=utf-8";
   if (filename.endsWith(".ogg")) return "audio/ogg";
+  if (filename.endsWith(".mp3")) return "audio/mpeg";
   if (filename.endsWith(".json")) return "application/json; charset=utf-8";
   return "application/octet-stream";
 }

@@ -61,12 +61,20 @@ test("R4 CC0 recorded foley and ambient loop are bundled locally", () => {
     assert.match(file, /^[\w]+\.ogg$/);
     assert.equal(readFileSync(new URL("../web/audio/foley/" + file, import.meta.url)).subarray(0, 4).toString(), "OggS");
   }
-  const ambient = readFileSync(new URL("../web/audio/music/moonlit-melody.ogg", import.meta.url));
-  assert.equal(ambient.subarray(0, 4).toString(), "OggS");
-  assert.ok(ambient.byteLength > 30_000 && ambient.byteLength < 1_500_000, "minimal sparse soundtrack stays lightweight");
+  const mp3Names = ["moonlight-sonata-adagio.mp3", "vivaldi-autumn-adagio.mp3",
+    "vivaldi-winter.mp3", "track-04-untitled.mp3"];
+  assert.deepEqual(readdirSync(new URL("../web/audio/music/", import.meta.url)).sort(),
+    [...mp3Names].sort(), "only the 4 user-supplied MP3s should remain in the playlist");
+  for (const name of mp3Names) {
+    const bytes = readFileSync(new URL("../web/audio/music/" + name, import.meta.url));
+    assert.ok(bytes.length > 1_000_000, name + " must be a full original recording");
+    assert.ok(bytes.subarray(0, 3).toString() === "ID3" ||
+      (bytes[0] === 0xff && (bytes[1] & 0xe0) === 0xe0), name + " is not valid MP3 framing");
+  }
   const source = readFileSync(new URL("../web/audio/SOURCES.md", import.meta.url), "utf8");
   assert.match(source, /Kenney.*CC0/);
-  assert.match(source, /Moonlit Melody[\s\S]*?original/i);
+  assert.match(source, /user-provided/i);
+  assert.match(source, /recording-specific/i);
 });
 
 test("R4 natural foley decodes asynchronously, uses OGG rather than oscillator once loaded, and preserves cooldown", async () => {
@@ -113,9 +121,11 @@ test("R4 music is opt-in, separate from effects, quiet, looping, and persistent"
   audio.setMusicEnabled(true);
   assert.equal(MusicTrack.created.length, initial + 1);
   const track = MusicTrack.created.at(-1);
-  assert.ok(track.src.endsWith("/web/audio/music/moonlit-melody.ogg"));
-  assert.equal(track.loop, true);
+  assert.ok(track.src.endsWith("/web/audio/music/moonlight-sonata-adagio.mp3"));
+  assert.equal(track.loop, false, "each track ends before playlist advances");
   assert.equal(track.preload, "none");
+  assert.equal(audio.getMusicTrackCount(), 4);
+  assert.equal(audio.getMusicTrackIndex(), 0);
   assert.equal(audio.isMusicPlaying(), true);
   assert.equal(track.volume, 0.35 * 0.30, "ambient mix should leave headroom for combat");
   audio.setMuted(true);
@@ -293,6 +303,8 @@ test("R4 sound-only audition gates recorded playback on 24 decoded OGGs", () => 
   assert.doesNotMatch(html, /<script[^>]+src=|\/web\/(?:game|online-game)\.mjs/);
   const harness = readFileSync(new URL("../scripts/r4_audio_browser_acceptance.mjs", import.meta.url), "utf8");
   assert.match(harness, /R4_AUDITION/);
+  assert.match(harness, /audio\/mpeg/);
+  assert.match(harness, /music-track-title/);
 });
 
 test("R4.1 owner listening feedback removes shrill pots and dampens both guard break variants", async () => {
@@ -332,23 +344,17 @@ test("R4.1 owner listening feedback removes shrill pots and dampens both guard b
   audio.dispose();
 });
 
-test("R4.2 original music arranges melodic phrases and soft short harmonies without drones", () => {
-  const track = readFileSync(new URL("../web/audio/music/moonlit-melody.ogg", import.meta.url));
-  assert.equal(track.subarray(0, 4).toString(), "OggS");
-  assert.ok(track.length < 1_500_000, "original sparse track remains lightweight");
-  const generator = readFileSync(new URL("../scripts/generate_moonlit_notes.py", import.meta.url), "utf8");
-  assert.match(generator, /SECONDS = 96/);
-  assert.match(generator, /SAMPLE_RATE = 24_000/);
-  assert.match(generator, /exp\(-decay \* t\)/, "short exponentially decaying notes");
-  assert.match(generator, /release = min\(1\.0/, "each note fades fully to silence");
-  assert.match(generator, /for phrase_id, phrase in enumerate\(PHRASES\):/, "distinct arranged melodic phrases");
-  assert.match(generator, /BEAT_SECONDS = 0\.75/, "80 BPM melodic phrasing");
-  assert.match(generator, /ROOTS = \[/, "discrete lower harmony voice");
-  assert.match(generator, /RESPONSES = \[/, "answering harmonic voice");
-  assert.match(generator, /len\(PHRASES\)/, "stable eight-phrase render output");
+test("R4.3 playback uses only four user-provided MP3s, not placeholder generated music", () => {
   const audioSource = readFileSync(new URL("../src/browser/game-audio.mjs", import.meta.url), "utf8");
-  assert.ok(audioSource.includes("moonlit-melody.ogg"));
-  assert.ok(!audioSource.includes("cathedral-in-the-forest.ogg"));
+  for (const file of ["moonlight-sonata-adagio.mp3", "vivaldi-autumn-adagio.mp3",
+    "vivaldi-winter.mp3", "track-04-untitled.mp3"]) assert.ok(audioSource.includes(file));
+  assert.doesNotMatch(audioSource, /moonlit-melody|moonlit-notes|cathedral-in-the-forest/);
+  assert.match(audioSource, /musicTrack\.loop = false/);
+  assert.match(audioSource, /musicTrack\.onended = \(\) => \{ nextMusicTrack\(\); \}/);
+  const audition = readFileSync(new URL("../web/audio/audition.html", import.meta.url), "utf8");
+  assert.match(audition, /id="music-next"/);
+  assert.match(audition, /id="music-track-title"/);
+  assert.match(audition, /audio\.nextMusicTrack\(\)/);
 });
 
 test("R4.2 Death uses two real CC0 human grunts with short low falls, never creaks", async () => {
@@ -366,7 +372,7 @@ test("R4.2 Death uses two real CC0 human grunts with short low falls, never crea
   assert.match(source, /name === "death" \? 1250/, "death low-pass removes shrill upper harmonics");
   const doc = readFileSync(new URL("../web/audio/SOURCES.md", import.meta.url), "utf8");
   assert.match(doc, /Exewin[\s\S]*?CC0/i);
-  assert.match(doc, /real \*\*human dying\/grunt/i);
+  assert.match(doc, /human[\s\S]*?death-grunt/i);
   const audio = createGameAudio({
     AudioContextImpl: Context, AudioElementImpl: MusicTrack, storage: null, random: () => .5,
     fetchImpl: async () => ({
@@ -389,4 +395,46 @@ test("R4.2 Death uses two real CC0 human grunts with short low falls, never crea
     assert.equal(ctx.filters.at(-1).type, "lowpass");
   }
   audio.dispose();
+});
+
+test("R4 four-song playlist advances on ended, wraps, and never overlaps or autoplays", () => {
+  const audio = createGameAudio({ AudioContextImpl: Context, AudioElementImpl: MusicTrack,
+    storage: null, fetchImpl: null });
+  const created = MusicTrack.created.length;
+  assert.equal(audio.getMusicTrackCount(), 4);
+  assert.equal(audio.getMusicTrackIndex(), 0);
+  assert.equal(audio.isMusicEnabled(), false);
+  assert.equal(audio.nextMusicTrack(), true); // Preselect without starting music.
+  assert.equal(audio.getMusicTrackIndex(), 1);
+  assert.equal(MusicTrack.created.length, created, "next while off must not create media");
+  assert.equal(audio.getMusicTrackTitle(), "Vivaldi — Autumn: Adagio molto");
+  const changed = [];
+  const detach = audio.onMusicTrackChanged(i => changed.push(i));
+  audio.setMusicEnabled(true);
+  const track = MusicTrack.created.at(-1);
+  assert.ok(track.src.endsWith("vivaldi-autumn-adagio.mp3"));
+  assert.equal(track.playCalls, 1);
+  assert.equal(track.loop, false);
+  track.onended();
+  assert.equal(audio.getMusicTrackIndex(), 2);
+  assert.ok(track.src.endsWith("vivaldi-winter.mp3"));
+  assert.equal(track.playCalls, 2);
+  track.onended();
+  assert.equal(audio.getMusicTrackIndex(), 3);
+  assert.ok(track.src.endsWith("track-04-untitled.mp3"));
+  track.onended();
+  assert.equal(audio.getMusicTrackIndex(), 0);
+  assert.ok(track.src.endsWith("moonlight-sonata-adagio.mp3"));
+  assert.equal(MusicTrack.created.length, created + 1, "one media element for all four songs");
+  assert.deepEqual(changed, [2, 3, 0]);
+  audio.setMusicEnabled(false);
+  const pausedAt = track.playCalls;
+  track.onended(); // A late callback cannot silently restart muted music.
+  assert.equal(audio.getMusicTrackIndex(), 1);
+  assert.equal(track.playCalls, pausedAt, "music off blocks next-track autoplay");
+  assert.equal(track.paused, true);
+  detach();
+  audio.dispose();
+  assert.equal(track.onended, null, "disposed audio never advances on stale events");
+  assert.equal(audio.nextMusicTrack(), false);
 });

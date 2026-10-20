@@ -42,7 +42,14 @@ const RECORDED_FOLEY = Object.freeze({
 const FOLEY_GAIN_TRIM = Object.freeze({
   drawKnife1: 8, drawKnife2: 8, metalClick: 4, cloth4: 2,
 });
-const AMBIENT_TRACK = new URL("../../web/audio/music/moonlit-melody.ogg", import.meta.url).href;
+// User-provided original MP3 recordings. One media element, four sequential
+// tracks, no overlap, no automatic playback until explicitly opted in.
+const MUSIC_TRACKS = Object.freeze([
+  { title: "Moonlight Sonata — Adagio sostenuto", url: new URL("../../web/audio/music/moonlight-sonata-adagio.mp3", import.meta.url).href },
+  { title: "Vivaldi — Autumn: Adagio molto", url: new URL("../../web/audio/music/vivaldi-autumn-adagio.mp3", import.meta.url).href },
+  { title: "Vivaldi — Winter", url: new URL("../../web/audio/music/vivaldi-winter.mp3", import.meta.url).href },
+  { title: "Untitled fourth composition", url: new URL("../../web/audio/music/track-04-untitled.mp3", import.meta.url).href },
+]);
 const SETTINGS_KEY = "myaso.audio.v1";
 const clamp = (value, low, high) => Math.max(low, Math.min(high, value));
 
@@ -59,6 +66,8 @@ export function createGameAudio({ AudioContextImpl = globalThis.AudioContext ?? 
   let musicEnabled = false; // Explicit opt-in: no music autoplay on combat input.
   let musicVolume = 0.35; // Scaled down further by the ambient headroom factor.
   let musicTrack = null;
+  let musicIndex = 0;
+  const musicTrackListeners = new Set();
   const loadedSamples = new Map();
   const pendingSamples = new Map();
   let warmupStarted = false;
@@ -114,13 +123,35 @@ export function createGameAudio({ AudioContextImpl = globalThis.AudioContext ?? 
   function makeMusicTrack() {
     if (!musicTrack && AudioElementImpl) {
       try {
-        musicTrack = new AudioElementImpl(AMBIENT_TRACK);
-        musicTrack.loop = true;
+        musicTrack = new AudioElementImpl(MUSIC_TRACKS[musicIndex].url);
+        musicTrack.loop = false; // Ended advances the 4-track playlist.
         musicTrack.preload = "none";
         musicTrack.volume = musicVolume * .30; // Keep effects readable at any slider setting.
+        musicTrack.onended = () => { nextMusicTrack(); };
       } catch { musicTrack = null; }
     }
     return musicTrack;
+  }
+  function nextMusicTrack() {
+    if (disposed) return false;
+    musicIndex = (musicIndex + 1) % MUSIC_TRACKS.length;
+    if (musicTrack) {
+      try {
+        musicTrack.pause();
+        musicTrack.src = MUSIC_TRACKS[musicIndex].url;
+        // Do not call load() while off or hidden: never preload future songs.
+      } catch { /* A missing output device must not impact combat. */ }
+      syncMusic();
+    }
+    for (const callback of musicTrackListeners) {
+      try { callback(musicIndex); } catch { /* UI observers cannot affect audio. */ }
+    }
+    return true;
+  }
+  function onMusicTrackChanged(callback) {
+    if (typeof callback !== "function" || disposed) return () => {};
+    musicTrackListeners.add(callback);
+    return () => musicTrackListeners.delete(callback);
   }
   function syncMusic() {
     const track = musicTrack;
@@ -289,6 +320,8 @@ export function createGameAudio({ AudioContextImpl = globalThis.AudioContext ?? 
     if (disposed) return;
     disposed = true;
     abortFoley?.abort();
+    if (musicTrack) musicTrack.onended = null;
+    musicTrackListeners.clear();
     try { musicTrack?.pause(); } catch { /* Already stopped or unavailable. */ }
     const closingContext = context;
     context = null;
@@ -303,10 +336,14 @@ export function createGameAudio({ AudioContextImpl = globalThis.AudioContext ?? 
     musicTrack = null;
   }
   return Object.freeze({ unlock, play, dispose, setMuted, setVolume,
-    setMusicEnabled, setMusicVolume, suspendMusicWhenHidden,
+    setMusicEnabled, setMusicVolume, nextMusicTrack, onMusicTrackChanged,
+    suspendMusicWhenHidden,
     isMuted: () => muted, getVolume: () => volume, isUnlocked: () => context !== null,
     isMusicEnabled: () => musicEnabled, getMusicVolume: () => musicVolume,
     isMusicPlaying: () => Boolean(musicTrack && !musicTrack.paused),
+    getMusicTrackIndex: () => musicIndex,
+    getMusicTrackTitle: () => MUSIC_TRACKS[musicIndex].title,
+    getMusicTrackCount: () => MUSIC_TRACKS.length,
     getPlaybackClock: () => context?.currentTime ?? null,
     loadedFoleyCount: () => loadedSamples.size });
 }
