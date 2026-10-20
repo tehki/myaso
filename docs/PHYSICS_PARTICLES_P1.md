@@ -110,3 +110,58 @@ The fixed 128-field cap is intentionally conservative and temporary; it is not p
 - Exact-head `quality` CI must pass Rust formatting/check/clippy/tests **and** real Chromium/Firefox combat acceptance. No reduction or skipping of existing M194/M144/other gates.
 - Previous P2 [quality run #39463504399](https://github.com/tehki/myaso/actions/runs/39463504399) failed **M194 real guard-break block-only pressure**: a genuine third browser exchange parried rather than blocking. Physics changes are hard-disabled, and P3 does not touch that combat path. The Combat department must investigate independently; full PR stays red until authoritative CI is green.
 - Do not merge or deploy the draft or expose P3 to client packets. Rollback remains dropping/reverting the isolated physics branch.
+
+## P4 — server-selected semantic FX, interest filtering and replay protection (2026-10-20)
+
+**Transport-agnostic proposal, not a protocol rollout.** `server/src/magic_fx_events.rs` defines an independent, pending server-owned `SemanticEffectBroker` for future spell visuals. It requires the trusted server to strictly advance an authoritative `u64` tick; `admit_trusted(tick, spec)` accepts only finite world coordinates, nonzero zone ID, nonzero visual intensity, and 1–120-tick lifetime. It requires a **separately verified authoritative cast or impact** before the caller may create an effect. The module deliberately has no caster identity verification, mana/reagents, spell activation, or socket call. Those belong to Magic & Items and Core & Multiplayer integration.
+
+### Bounded authority-side work
+
+| Contract | P4 initial limit |
+| --- | ---: |
+| Pending semantic FX per process | 256 |
+| New semantic FX per authoritative tick | 12 |
+| Pending FX per zone | 48 |
+| Semantic FX returned per viewer poll | 16 |
+| Viewer interest radius | 1500 world units |
+| Max effect TTL | 120 server ticks |
+| Wire encoding | 32 bytes/effect (fixed-size proposal) |
+
+All caps fail closed: a full queue rejects new cosmetic events rather than evicting gameplay data. Expired events are pruned by `advance` without asynchronous work. `interest_snapshot(viewer, after_id, limit)` filters by a *trusted viewer zone and world position* **before** data would be serialized. Wrong-zone events, out-of-interest origins, invalid view geometry, stale IDs and oversized per-viewer batches are withheld. The caller must never derive `viewer.zone_id` or coordinates from an untrusted client payload. This is a bounded scan suitable as a P4 reference; **a 256-element queue is not an accepted region-scale architecture**. A future zone/chunk sharded interest-index and bandwidth measurements are mandatory.
+
+### Explicit, unregistered binary contract
+
+The optional `encode_magic_fx` emits exactly 32 bytes, distinct from existing packet IDs:
+
+| Bytes (zero-based) | Field |
+| --- | --- |
+| 0–1 | ASCII `ME` marker |
+| 2 | Magic FX version = 1 |
+| 3 | Element kind (fire 0 / ice 1 / lightning 2 / wind 3 / arcane 4) |
+| 4–7 | Server-owned zone ID `u32` little-endian |
+| 8–11 | Monotonic event ID `u32` LE |
+| 12–15 | Server authoritative tick modulo `2^32` (LE) |
+| 16–19 | Server-selected deterministic visual seed `u32` LE |
+| 20–23 | World X signed `i32` LE in quarter-units |
+| 24–27 | World Y signed `i32` LE in quarter-units |
+| 28 | Cosmetic intensity `u8` from 1 to 255 |
+| 29 | Event TTL 1–120 server ticks |
+| 30–31 | Reserved zeros, MUST reject nonzero |
+
+P4 does **not** add an active `PACKET_TYPE`, alter any live snapshot encoding, send packets, register WebTransport handlers or modify gameplay network budgets. Transport sequencing, interest subscriptions, reliable/unreliable semantics, authorization, zone changes and protocol negotiation require a reviewed integration version.
+
+### Browser-only defensive receiver
+
+`src/browser/magic-effect-receiver.mjs` exports `decodeMagicEffectPacket` and `createMagicEffectReceiver(pool)`. The decoder enforces exact framing, supported elements, version, canonical reserved bytes and bounded values. The receiver validates **authoritatively obtained viewer zone/camera/server tick**, distance, TTL, +3-tick bounded future skew, event ID duplicate/replay rules (256-ID bounded memory) and explicit reset on reconnect/zone transition. Only then can it pass `{kind,x,y,seed,intensity}` into the existing budgeted P1 particle pool. It is not imported by `web/online-game.mjs`: production spells remain disabled. No new commands flow client-to-server. The receiver stores only transient, aggregate diagnostic counters; no persistence.
+
+**Golden-vector tests:** `server/src/magic_fx_events.rs` and `tests/magic-effect-receiver.test.mjs` use the same fixed Rust/JavaScript 32-byte LE fixture; tests cover malformed packets, cross-zone hiding, expired and future packets, replay dedup, bounded visual bursts, per-viewer caps and reconnect resets. Browser test suite imports the JS tests via `tests/browser-runtime.test.mjs`.
+
+### Remaining required milestones
+
+1. Introduce an approved, authenticated Magic & Items cast authorization (caster, rune, mana, reagents, cooldown and spell semantics). Only accepted **server** actions may request events.
+2. Integrate trusted zone/chunk interest indices with event output and a reviewed versioned server-to-client-only packet type. Never expose zone visibility from user-provided event coordinates.
+3. Clarify multi-zone and reconnect event IDs, expiry clocks, reliable transport semantics and fixed limit enforcement per subscriber.
+4. Benchmark p50/p95 CPU, bandwidth, worst-case crowded realms with up to 512 players per map and realistic multi-zone distribution. Measure dropped *cosmetic* events separately; no gameplay action can be dropped or delayed by VFX.
+5. Keep all effects disabled on the live arena until cross-department sign-off, exact-head `quality` passing and coordinated production release.
+
+P4 remains **DRAFT / UNMERGED / UNDEPLOYED**; the existing game is unaffected.
