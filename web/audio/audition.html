@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>myaso.io — R4 Sound Audition</title>
+  <style>
+    :root { color-scheme: dark; font-family: system-ui, sans-serif; background: #101319; color: #f1f0ec; }
+    body { max-width: 800px; margin: 0 auto; padding: 2.2rem 1.2rem 5rem; line-height: 1.55; }
+    h1 { font-size: clamp(1.5rem, 4vw, 2.4rem); line-height: 1.2; margin-bottom: .4rem; }
+    p, .note { color: #c1c8d2; }
+    .eyebrow { color: #f3d188; letter-spacing: .12em; font-size: .78rem; text-transform: uppercase; }
+    section { border: 1px solid #3a4350; border-radius: 1rem; padding: 1.2rem; margin-top: 1rem; }
+    .row { display: flex; gap: .75rem; flex-wrap: wrap; align-items: center; }
+    .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(138px, 1fr)); gap: .65rem; margin-top: 1rem; }
+    button { padding: .75rem 1rem; cursor: pointer; border: 1px solid #75859c; color: #fff; background: #243246; border-radius: .55rem; font: inherit; }
+    button:hover:not(:disabled), button:focus-visible { background: #364e6e; outline-color: #f3d188; }
+    button:disabled { cursor: not-allowed; opacity: .5; }
+    button[aria-pressed="true"] { background: #3d594a; border-color: #99d4af; }
+    .primary { background: #775c24; border-color: #eac175; color: #fff7e5; }
+    label { display: inline-flex; align-items: center; gap: .6rem; }
+    input[type="range"] { accent-color: #f1c97d; max-width: 160px; }
+    output, #status { font-variant-numeric: tabular-nums; }
+    #status { display: block; margin-top: 1rem; min-height: 1.5em; color: #f3d188; }
+    footer { margin-top: 1.5rem; font-size: .88rem; color: #c1c8d2; }
+  </style>
+</head>
+<body>
+  <div class="eyebrow">Moon Games · Sound review · R4</div>
+  <h1>myaso.io — Natural Sound Audition</h1>
+  <p>Listen to the exact recorded foley mixer used by the game, without loading gameplay, networking, physics, or character assets. Use headphones at a comfortable level. No sounds autoplay.</p>
+
+  <section aria-label="Prepare recorded audio">
+    <h2>1. Prepare recordings</h2>
+    <div class="row"><button id="prepare" class="primary" type="button">Prepare 24 recordings</button>
+      <span id="counter">0 / 24 decoded</span></div>
+    <output id="status" role="status" aria-live="polite">Press Prepare to unlock audio and load the local recordings.</output>
+    <p class="note">Audio loads in two small background workers. If a recording cannot decode, this audition fails closed rather than silently substituting a synthesized sound.</p>
+  </section>
+
+  <section aria-label="Audition combat sounds">
+    <h2>2. Try physical effects</h2>
+    <p class="note">Click a cue several times to hear its recorded variants and their calibrated loudness. All buttons stay disabled until all recordings decode.</p>
+    <div class="row"><label for="pan">Stereo position <input id="pan" type="range" min="-100" max="100" step="10" value="0" aria-label="Sound position"></label>
+      <output id="pan-value">Center</output></div>
+    <div class="tiles" id="cues"></div>
+  </section>
+
+  <section aria-label="Adjust independent sound layers">
+    <h2>3. Check the music balance</h2>
+    <div class="row"><button id="audio-toggle" type="button">Effects on</button>
+      <label for="audio-volume">Effects <input id="audio-volume" type="range" min="0" max="100" step="1" value="55"></label></div>
+    <div class="row" style="margin-top: .8rem"><button id="music-toggle" type="button">Music off</button>
+      <label for="music-volume">Music <input id="music-volume" type="range" min="0" max="100" step="1" value="35"></label></div>
+    <div class="row" style="margin-top: .8rem">
+      <button id="music-next" type="button">Next track</button>
+      <output id="music-track-title" role="status" aria-live="polite">Moonlight Sonata — Adagio sostenuto</output>
+    </div>
+    <p class="note">Four MP3 recordings from your Windows Music folder play one at a time, advancing automatically and returning to the first after track four. Next track allows quick listening without waiting for full songs. Music is opt-in, quiet under effects, and pauses when hidden. The audition never changes gameplay preferences.</p>
+  </section>
+
+  <footer>Music and foley attribution: <a href="./credits.html">Soundtrack credits</a>. Developer provenance and license review: <a href="./SOURCES.md">SOURCES.md</a>. This is a manual listening aid, not a playable game or a replacement for verified Chrome/Firefox native audio acceptance.</footer>
+  <script type="module">
+    import { createGameAudio, installGameAudioControls } from "../../src/browser/game-audio.mjs";
+    const audio = createGameAudio({ storage: null });
+    window.__r4AuditionAudio = audio; // Sound-only review clock for strict native acceptance.
+    installGameAudioControls(audio);
+    const trackTitle = document.querySelector("#music-track-title");
+    const updateTrackTitle = () => {
+      trackTitle.textContent = (audio.getMusicTrackIndex() + 1) + " / " +
+        audio.getMusicTrackCount() + " — " + audio.getMusicTrackTitle();
+    };
+    audio.onMusicTrackChanged(updateTrackTitle);
+    document.querySelector("#music-next").addEventListener("click", () => {
+      audio.nextMusicTrack();
+    });
+    updateTrackTitle();
+    const prepare = document.querySelector("#prepare");
+    const status = document.querySelector("#status");
+    const counter = document.querySelector("#counter");
+    const container = document.querySelector("#cues");
+    const panSlider = document.querySelector("#pan");
+    const panLabel = document.querySelector("#pan-value");
+    const cueNames = ["light", "heavy", "kick", "roll", "guard", "parry",
+      "jump", "step", "hit", "damage", "block", "guardbreak", "death"];
+    let ready = false;
+    let pollId = null;
+    for (const cue of cueNames) {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.disabled = true;
+      button.textContent = cue === "guardbreak" ? "Guard break" : cue[0].toUpperCase() + cue.slice(1);
+      button.dataset.cue = cue;
+      button.addEventListener("click", () => {
+        if (!ready) return;
+        audio.unlock();
+        const played = audio.play(cue, { pan: Number(panSlider.value) / 100 });
+        status.textContent = played ? "Playing " + button.textContent + " (recorded variant)" : "Effect not played — check volume or tab visibility.";
+      });
+      container.appendChild(button);
+    }
+    panSlider.addEventListener("input", () => {
+      const val = Number(panSlider.value);
+      panLabel.textContent = val === 0 ? "Center" : val < 0 ? "Left " + Math.abs(val) + "%" : "Right " + val + "%";
+    });
+    prepare.addEventListener("click", () => {
+      if (!audio.unlock()) {
+        status.textContent = "Web Audio is unavailable in this browser.";
+        return;
+      }
+      prepare.disabled = true;
+      status.textContent = "Decoding local CC0 recordings…";
+      if (pollId !== null) return;
+      pollId = setInterval(() => {
+        const count = audio.loadedFoleyCount();
+        counter.textContent = count + " / 24 decoded";
+        if (count !== 24) return;
+        clearInterval(pollId);
+        pollId = null;
+        ready = true;
+        for (const button of container.querySelectorAll("button")) button.disabled = false;
+        status.textContent = "Ready: 24/24 recorded sounds decoded. Try repeated cues and the music layer.";
+      }, 100);
+    });
+    window.addEventListener("pagehide", () => {
+      if (pollId !== null) clearInterval(pollId);
+      audio.dispose();
+    }, { once: true });
+  </script>
+</body>
+</html>
