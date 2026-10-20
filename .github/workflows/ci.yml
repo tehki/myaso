@@ -182,6 +182,11 @@ jobs:
           node --check src/world/local-expeditions.mjs
           node --test tests/world-local-expeditions.test.mjs
 
+      - name: Validate D8 offline wayfinding sketch and compass
+        run: |
+          node --check src/world/local-wayfinding.mjs
+          node --test tests/world-wayfinding.test.mjs
+
       - name: Validate M188 repeated real heavy counterplay windows
         run: |
           # Three fresh Chrome/Firefox sessions for each real defensive read.

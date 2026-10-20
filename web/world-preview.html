@@ -34,6 +34,12 @@ kbd{border-radius:4px;border:1px solid #677354;background:#303a2d;color:#fff2d2;
 #expedition-progress{margin-top:10px;color:#e6d8b7;font-weight:600}
 #expedition-next{margin-top:5px;color:#b8b9a6;line-height:1.45}
 #expedition-notice{margin-top:8px;color:#efcd90;font-weight:600}
+.wayfinding-panel{margin-top:10px;border-top:1px solid #594e3e;padding-top:9px}
+#wayfinding-compass{color:#efdcab;font-weight:600}
+#wayfinding-map{display:block;margin-top:9px;width:248px;height:248px;max-width:100%;
+  border:1px solid #6c604b;border-radius:6px}
+#wayfinding-map[hidden]{display:none}
+.wayfinding-note{font-size:12px;color:#afaa95;margin-top:5px}
 </style></head><body>
 <header><div><h1>⚔️ Moonvale — World & Buildings v1.0</h1>
 <div class="sub">A fixed medieval world, with a separate, deliberately larger tavern interior</div></div>
@@ -62,6 +68,11 @@ The geography, town names, buildings and roads are fixed and identical for all p
 <div id="expedition-progress" role="status">Choose a journey to begin.</div>
 <div id="expedition-next">Travel to a landmark or inspect a natural site when asked. No rewards or persistent progress.</div>
 <div id="expedition-notice" role="status" aria-live="polite" hidden></div>
+<div class="wayfinding-panel" aria-label="Traveler's compass and sketch">
+<div id="wayfinding-compass" role="status">Choose an expedition to see a bearing.</div>
+<div class="wayfinding-note">Straight-line compass only. Follow roads and use bridges. Press <kbd>M</kbd> to show or hide the sketch map.</div>
+<canvas id="wayfinding-map" width="248" height="248" aria-label="Moonvale sketch map, white player and amber destination" hidden></canvas>
+</div>
 </section>
 </div>
 <script type="module">
@@ -71,6 +82,7 @@ import { MOONVALE_LANDMARKS, createLocalDiscoveryJournal, recordLocalDiscoveries
 import { moveAuthoredPreview, isAuthoredPreviewWalkable } from "../src/world/authored-preview-collision.mjs";
 import { MOONVALE_EXPEDITIONS, createLocalExpeditionState, chooseLocalExpedition,
   localExpeditionProgress, advanceLocalExpedition } from "../src/world/local-expeditions.mjs";
+import { localWayfindingHint, drawLocalWayfindingSketch } from "../src/world/local-wayfinding.mjs";
 import { MOONVALE_FIELD_SITES, createLocalFieldNotebook, nearbyLocalFieldSite,
   observeLocalFieldSite, localFieldSurveyProgress } from "../src/world/field-survey.mjs";
 const canvas=document.querySelector("#arena");
@@ -99,6 +111,23 @@ const expeditionChoices=document.querySelector("#expedition-choices");
 const expeditionProgress=document.querySelector("#expedition-progress");
 const expeditionNext=document.querySelector("#expedition-next");
 const expeditionNotice=document.querySelector("#expedition-notice");
+const wayfindingCompass=document.querySelector("#wayfinding-compass");
+const wayfindingMap=document.querySelector("#wayfinding-map");
+const wayfindingContext=wayfindingMap.getContext("2d",{alpha:false});
+let wayfindingVisible=false;
+let nextWayfindingAt=0;
+function refreshWayfinding(now){
+  if(now<nextWayfindingAt)return;
+  nextWayfindingAt=now+250;
+  const hint=localWayfindingHint(expeditionState,mapId,player.x,player.y);
+  wayfindingCompass.textContent=hint
+    ? "Bearing "+hint.direction+" · "+Math.round(hint.distance)+" units to "+hint.targetName
+    : "No active overworld expedition bearing.";
+  wayfindingMap.hidden=!wayfindingVisible || mapId!==MAP_IDS.overworld;
+  if(!wayfindingMap.hidden){
+    drawLocalWayfindingSketch(wayfindingContext,mapId,player.x,player.y,expeditionState);
+  }
+}
 let expeditionNoticeUntil=0;
 function refreshExpedition(){
   const progress=localExpeditionProgress(expeditionState);
@@ -125,6 +154,8 @@ for(const route of MOONVALE_EXPEDITIONS){
     if(chooseLocalExpedition(expeditionState,route.id)){
       expeditionNotice.hidden=true;
       refreshExpedition();
+      nextWayfindingAt=0;
+      refreshWayfinding(performance.now());
     }
   });
   expeditionChoices.appendChild(button);
@@ -136,6 +167,7 @@ function recordExpeditionMilestone(result,now){
   expeditionNotice.hidden=false;
   expeditionNoticeUntil=now+4500;
   refreshExpedition();
+  nextWayfindingAt=0;
 }
 refreshExpedition();
 function refreshFieldNotebook(){
@@ -171,6 +203,11 @@ document.addEventListener("keydown",e=>{
   if(["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Space"].includes(e.code))e.preventDefault();
   keys.add(e.code);
   if(e.code==="KeyR")reset();
+  if(e.code==="KeyM"&&!e.repeat){
+    wayfindingVisible=!wayfindingVisible;
+    nextWayfindingAt=0;
+    refreshWayfinding(performance.now());
+  }
   if(e.code==="KeyF"&&!e.repeat){
     recordExpeditionMilestone(advanceLocalExpedition(expeditionState,mapId,player.x,player.y,"inspect"),performance.now());
     const note=observeLocalFieldSite(fieldNotebook,mapId,player.x,player.y);
@@ -245,6 +282,7 @@ function tick(now){
   if(now>discoveryNoticeUntil)discoveryNotice.hidden=true;
   if(now>surveyNoticeUntil)surveyNotice.hidden=true;
   if(now>expeditionNoticeUntil)expeditionNotice.hidden=true;
+  refreshWayfinding(now);
   place.textContent=map.name+" · "+Math.round(player.x)+","+Math.round(player.y)+" · cached "+world.stats.cached+"/24";
   requestAnimationFrame(tick);
 }
