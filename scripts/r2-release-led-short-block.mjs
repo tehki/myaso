@@ -12,7 +12,7 @@ import { setTimeout as sleepTimer } from "node:timers/promises";
 export async function dispatchR2ReleaseLedShortBlock({
   sendAttackDown, sendWheel, awaitTrustedWheel, sendAttackUp,
   now = () => performance.now(), sleep = sleepTimer,
-  maxHoldMs = 280, receiptGraceMs = 200,
+  maxHoldMs = 280, receiptGraceMs = 100,
 }) {
   if (![sendAttackDown, sendWheel, awaitTrustedWheel, sendAttackUp, now, sleep]
     .every(fn => typeof fn === "function")
@@ -45,11 +45,13 @@ export async function dispatchR2ReleaseLedShortBlock({
   // On a fast native delivery release immediately. On a slow *receipt* release
   // at the bounded grace, then verify actual DOM ordering and required
   // attestation in the caller. Never silently accept missing/bad wheel.
-  // Quality #39430978668 saw a real Firefox wheel 20ms AFTER Chrome UP
-  // with only 70ms grace (trusted wheel arrived 145ms after DOWN).
-  // The 200ms grace admits that genuine W3C delivery yet remains under
-  // the 280ms maximum light-charge budget. A delayed/absent trusted receipt
-  // cannot bypass native ordering or strict HP/guard/parry checks.
+  // Quality #39430978668 proved 70ms grace released before a 94ms native
+  // Firefox wheel. Quality #39434360024 proved 200ms grace can delay the
+  // actual 135ms light until AFTER the unchanged 240ms short block expires,
+  // even when wheel DOM arrives early but its HTTP attestation is delayed.
+  // Cap the wait at 100ms so late attestations never prolong the light.
+  // Actual trusted wheel-before-pointerUP, no HP, expected guard and no
+  // parry remain mandatory, independently of any attestation delay.
   await Promise.race([attestation, sleep(receiptGraceMs), earlyWheelFailure]);
   const attackUpDispatchMs = ms();
   if (attackUpDispatchMs - attackDownDispatchMs > maxHoldMs) {

@@ -447,11 +447,11 @@ test("R2 fast trusted wheel releases real held LMB then waits for wheel ACK", as
     sendAttackUp:()=>{events.push("native-up");time=23;},
   });
   await new Promise(setImmediate);
-  assert.deepEqual(events,["native-down","timer:200","native-wheel"]);
+  assert.deepEqual(events,["native-down","timer:100","native-wheel"]);
   time=18;
   trusted.resolve({trusted:true,deltaY:120});
   await new Promise(setImmediate);
-  assert.deepEqual(events,["native-down","timer:200","native-wheel","native-up"]);
+  assert.deepEqual(events,["native-down","timer:100","native-wheel","native-up"]);
   let settled=false;
   flight.then(()=>{settled=true;});
   await new Promise(setImmediate);
@@ -465,7 +465,7 @@ test("R2 fast trusted wheel releases real held LMB then waits for wheel ACK", as
   assert.equal(proof.clickHoldMs,18);
 });
 
-test("R2 delayed receipt never stretches a real held LMB past bounded 200ms grace", async()=>{
+test("R2 delayed receipt never stretches a real held LMB past bounded 100ms grace", async()=>{
   const wheel=deferred(), trusted=deferred(),timer=deferred();
   const events=[]; let time=0;
   const flight=dispatchR2ReleaseLedShortBlock({
@@ -474,14 +474,14 @@ test("R2 delayed receipt never stretches a real held LMB past bounded 200ms grac
     sendAttackDown:()=>{events.push("down");time=5;},
     sendWheel:()=>{events.push("wheel");return wheel.promise;},
     awaitTrustedWheel:()=>trusted.promise,
-    sendAttackUp:()=>{events.push("up");time=215;},
+    sendAttackUp:()=>{events.push("up");time=115;},
   });
   await new Promise(setImmediate);
-  assert.deepEqual(events,["down","grace:200","wheel"]);
-  time=205;
+  assert.deepEqual(events,["down","grace:100","wheel"]);
+  time=105;
   timer.resolve();
   await new Promise(setImmediate);
-  assert.deepEqual(events,["down","grace:200","wheel","up"]);
+  assert.deepEqual(events,["down","grace:100","wheel","up"]);
   let settled=false;
   flight.then(()=>{settled=true;});
   await new Promise(setImmediate);
@@ -490,13 +490,13 @@ test("R2 delayed receipt never stretches a real held LMB past bounded 200ms grac
   await new Promise(setImmediate);
   time=271; wheel.resolve();
   const proof=await flight;
-  assert.equal(proof.attackUpDispatchMs,205);
+  assert.equal(proof.attackUpDispatchMs,105);
   assert.equal(proof.trustedWheelObservedMs,255);
   assert.equal(proof.wheelAckMs,271);
-  assert.equal(proof.clickHoldMs,205);
+  assert.equal(proof.clickHoldMs,105);
 });
 
-test("R2 genuine 59ms wheel attestation wins before 200ms grace and releases once",async()=>{
+test("R2 genuine 59ms wheel attestation wins before 100ms grace and releases once",async()=>{
   const trusted=deferred(),wheel=deferred(),timer=deferred();
   const events=[]; let time=0;
   const flight=dispatchR2ReleaseLedShortBlock({
@@ -508,23 +508,23 @@ test("R2 genuine 59ms wheel attestation wins before 200ms grace and releases onc
     sendAttackUp:()=>{events.push("up");},
   });
   await new Promise(setImmediate);
-  assert.deepEqual(events,["down","grace:200","wheel"]);
+  assert.deepEqual(events,["down","grace:100","wheel"]);
   time=59;
   trusted.resolve({trusted:true,deltaY:120});
   await new Promise(setImmediate);
-  assert.deepEqual(events,["down","grace:200","wheel","up"]);
+  assert.deepEqual(events,["down","grace:100","wheel","up"]);
   // The still-unresolved timeout must not issue an extra release.
-  time=200;timer.resolve();
+  time=100;timer.resolve();
   await new Promise(setImmediate);
   assert.equal(events.filter(x=>x==="up").length,1);
-  time=83;wheel.resolve();
+  time=105;wheel.resolve();
   const evidence=await flight;
   assert.equal(evidence.attackUpDispatchMs,59);
   assert.equal(evidence.trustedWheelObservedMs,59);
-  assert.equal(evidence.wheelAckMs,83);
+  assert.equal(evidence.wheelAckMs,105);
 });
 
-test("R2 genuine 145ms Firefox receipt precedes the single Chrome LMB release", async () => {
+test("R2 145ms wheel attestation cannot delay light past the 100ms block-window grace", async () => {
   const trusted=deferred(), wheel=deferred(), timer=deferred();
   const events=[]; let time=0;
   const flight=dispatchR2ReleaseLedShortBlock({
@@ -536,20 +536,24 @@ test("R2 genuine 145ms Firefox receipt precedes the single Chrome LMB release", 
     sendAttackUp:()=>{events.push("up");},
   });
   await new Promise(setImmediate);
-  assert.deepEqual(events,["down","grace:200","wheel"]);
-  time=145;
-  trusted.resolve({trusted:true,deltaY:120});
+  assert.deepEqual(events,["down","grace:100","wheel"]);
+  time=100; timer.resolve();
   await new Promise(setImmediate);
-  assert.deepEqual(events,["down","grace:200","wheel","up"]);
-  time=200; timer.resolve();
+  assert.deepEqual(events,["down","grace:100","wheel","up"]);
+  let settled=false;
+  flight.then(()=>{settled=true;});
+  await new Promise(setImmediate);
+  assert.equal(settled,false,"trusted DOM attestation must still arrive before acceptance");
+  time=145; trusted.resolve({trusted:true,deltaY:120});
   await new Promise(setImmediate);
   assert.equal(events.filter(e=>e==="up").length,1);
-  time=210; wheel.resolve();
+  time=170; wheel.resolve();
   const result=await flight;
   assert.equal(result.trustedWheelObservedMs,145);
-  assert.equal(result.attackUpDispatchMs,145);
-  assert.equal(result.clickHoldMs,145);
-  assert.equal(result.wheelAckMs,210);
+  assert.equal(result.attackUpDispatchMs,100);
+  assert.equal(result.clickHoldMs,100);
+  assert.equal(result.wheelAckMs,170);
+  assert.equal(result.receiptGraceMs,100);
 });
 
 test("R2 invalid early trusted Firefox wheel fails before native mouseUP",async()=>{
