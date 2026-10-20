@@ -309,6 +309,12 @@ impl DurableItemJournal {
         self.ledger.item_count()
     }
 
+    /// Last durable sequence touching this item, reconstructed on restart.
+    /// Read-only: unrelated item transactions do not advance this watermark.
+    pub fn last_mutation_sequence(&self, item: ItemId) -> Option<u64> {
+        self.ledger.last_mutation_sequence(item)
+    }
+
     /// Read-only proof that an exact transaction batch has been committed.
     /// Missing IDs return None and conflicting ID reuse fails closed.
     /// This never writes a journal record or consumes a new sequence.
