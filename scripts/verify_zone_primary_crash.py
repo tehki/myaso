@@ -10,7 +10,13 @@ import subprocess
 import time
 
 TEST_DB = "myaso_c4h_test"
-MARKERS = ("C4H_OPEN_WORLD_7301", "C4H_OPEN_HANDOFF_7401")
+MARKERS = (
+    "C4H_OPEN_WORLD_7301",
+    "C4H_OPEN_HANDOFF_7401",
+    "C4H_OPEN_COMMIT_7501",
+    "C4H_OPEN_RETIRE_7601",
+    "C4H_OPEN_ABORT_7701",
+)
 
 
 def require(condition, message):
@@ -178,6 +184,13 @@ def seed():
             "both workers frozen by persisted prepare")
     register(73)
     register(74)
+    register(75)
+    require(sql(prepare(7501, 75)) == "prepared",
+            "durably prepared handoff for interrupted commit")
+    register(76)
+    register(77)
+    require(sql(prepare(7701, 77, target=4)) == "prepared",
+            "durably prepared handoff for interrupted abort")
 
 
 def verify_after_primary_restart():
@@ -242,6 +255,47 @@ def verify_after_primary_restart():
             "source fenced after recovery")
     print("PASS: in-flight prepare/freeze rolled back on primary crash")
 
+    require(not current(75) and not current(75, 2, 2),
+            "uncommitted transfer COMMIT must remain durably prepared/frozen")
+    require(sql(f"SELECT phase FROM core_zone.handoffs "
+                f"WHERE operation_id={ident(7501)};") == "prepared",
+            "in-flight committed-phase transition must roll back")
+    require(sql(f"SELECT core_zone.commit_transfer({ident(7501)});") == "2",
+            "retied commit must advance once after primary restart")
+    require(sql(f"SELECT core_zone.commit_transfer({ident(7501)});") == "2",
+            "historical handoff ACK cannot advance epoch twice")
+    require(current(75, 2, 2) and not current(75),
+            "new worker alone owns committed transfer")
+    print("PASS: in-flight handoff commit rolled back to durable freeze")
+
+    require(current(76), "uncommitted retirement cannot revoke living entity")
+    require(sql(f"SELECT retired FROM core_zone.entities "
+                f"WHERE entity_id={ident(76)};") == "f",
+            "primary crash must roll back retirement tombstone")
+    sql(f"SELECT core_zone.retire_entity(1::smallint, {ident(76)}, 1, 1, 1);")
+    require(not current(76), "new committed retirement revokes authority")
+    sql(f"SELECT core_zone.register_entity(1::smallint, {ident(76)}, 1, 1);",
+        expect_failure=True)
+    require(sql(f"SELECT retired FROM core_zone.entities "
+                f"WHERE entity_id={ident(76)};") == "t",
+            "committed tombstone must remain irreversible")
+    print("PASS: in-flight retirement rolls back; committed tombstone permanent")
+
+    require(not current(77) and not current(77, 4, 2),
+            "uncommitted abort must NOT unfreeze prepared handoff")
+    require(sql(f"SELECT phase FROM core_zone.handoffs "
+                f"WHERE operation_id={ident(7701)};") == "prepared",
+            "interrupted abort must leave durable prepared operation")
+    require(sql(f"SELECT core_zone.abort_transfer({ident(7701)});") == "aborted",
+            "authorized abort replay can safely resolve frozen source")
+    require(sql(f"SELECT core_zone.abort_transfer({ident(7701)});") == "aborted",
+            "abort ACK replay returns same result")
+    require(current(77), "resolved abort restores same source epoch")
+    sql(prepare(7701, 77, target=4), expect_failure=True)
+    require(count("handoffs", "operation_id", 7701) == 1,
+            "aborted operation cannot be reused or duplicated")
+    print("PASS: in-flight handoff abort rolled back to durable freeze")
+
 
 def main():
     container = guarded_container()
@@ -253,6 +307,16 @@ def main():
         ))
         clients.append(open_uncommitted_transaction(
             prepare(7401, 74), MARKERS[1],
+        ))
+        clients.append(open_uncommitted_transaction(
+            f"SELECT core_zone.commit_transfer({ident(7501)});", MARKERS[2],
+        ))
+        clients.append(open_uncommitted_transaction(
+            f"SELECT core_zone.retire_entity(1::smallint, {ident(76)}, 1, 1, 1);",
+            MARKERS[3],
+        ))
+        clients.append(open_uncommitted_transaction(
+            f"SELECT core_zone.abort_transfer({ident(7701)});", MARKERS[4],
         ))
         # Only the exact prevalidated ephemeral CI PostgreSQL service is
         # killed. Do not kill any client, production server or host process.
