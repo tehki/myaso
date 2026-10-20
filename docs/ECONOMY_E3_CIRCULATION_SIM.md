@@ -48,6 +48,23 @@ Under a 10-player / 1-plot test, all ten players have sufficient test credits bu
 
 **Verified locally:** 12/12 Rust unit tests (8 original + 4 added), exact source rustfmt and strict Clippy with warnings denied, on an authorized development machine. These local checks are not a substitute for protected GitHub quality CI at the updated exact head.
 
+## E3c — bounded policy comparison (20 October 2026)
+
+New `server/src/economic_scenarios.rs` provides an **offline**, deterministic `compare_housing_scenarios(&[HousingScenario])` harness. It compares a specified population with different authored scenario inputs: starting player credits, seeded activity, pre-funded treasury, available plots, initial house price, ownership cap and other pre-existing `Policy` values. Each result contains the initial and final `HousingAccess` and final `Snapshot` measures. It changes **no live game state**, creates no parcels, and cannot approve policy.
+
+We can distinguish:
+
+- **Supply shortage:** 120 imaginary players each start with 120 test credits and a plot price of 80; with zero plots available, all 120 are immediately land-supply constrained, while with 100 plots, only 20 are initially supply constrained. These are *capacity bounds*, not predicted homeowners.
+- **Sticker-price shock:** Keeping 100 empty plots but raising the fictional house price from 80 to 10,000 makes all 120 initially cash-ineligible even though land exists. Economic fairness cannot be inferred from plot supply alone.
+- **One-home versus two-home title limit:** Scenarios model both caps and verify no simulated owner violates the one-home constraint. This does not establish a real-world solution to multiple accounts, price manipulation or alternate-character ownership.
+- **Liquidity/accounting:** Each scenario confirms that `circulating + treasury = total issued` and `owned + vacant = authored plot capacity`, with ownership and first-home eligibility totals reconciling. Results are reproducible from identical seeds and inputs.
+
+**Workload bounds:** at most 24 scenarios, 20,000 simulated players per scenario, 730 simulated days per scenario, and 2,000,000 **aggregate agent-days** per requested sweep. Invalid, repeated and excessive inputs are rejected instead of consuming unbounded compute. This is meant for offline research, not the server's 60Hz simulation or a player-accessible API.
+
+Eight new unit tests cover scarcity, unaffordability, single-title caps, reproducibility, conservation, invalid/duplicate IDs, workload budgets and bad policy. Combined with the prior 12 E3 tests: **20/20 passed locally**, plus strict Rust formatting and Clippy with warnings denied on the authorized development host. This does not supersede exact-head protected quality CI.
+
+The scenario world remains intentionally unrealistic: scripted behaviors, no property desirability or geography, no real income trajectories or land auctions, no anti-bot model, no multiple-account linking, no physical loot/equipment pricing, and no calibrated exchange/market rates. The comparisons demonstrate **directional logic and invariants**, not guaranteed economic outcomes or launch-ready balancing.
+
 ## Next planned E3+ work
 
 - Calibrate simulator with player archetypes (new adventurer, gatherer, crafter, PvP, merchant, bot), actual item durability and resource flow, and finite NPC orders.
