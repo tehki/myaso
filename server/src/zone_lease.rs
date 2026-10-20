@@ -353,7 +353,8 @@ mod tests {
         }
         gate.wait();
         let successes = handles.into_iter()
-            .filter(|handle| handle.join().expect("worker").is_ok())
+            .map(|handle| handle.join().expect("worker"))
+            .filter(Result::is_ok)
             .count();
         assert_eq!(successes, 1);
         assert!(!registry.lock().expect("registry").can_mutate(first));
