@@ -279,6 +279,14 @@ pub struct DurableZoneAuthority {
     poisoned: bool,
 }
 
+impl Drop for DurableZoneAuthority {
+    fn drop(&mut self) {
+        // Release immediately on normal shutdown. The operating system also
+        // releases this advisory lock when the owning process terminates.
+        let _ = self._writer_lock.unlock();
+    }
+}
+
 impl DurableZoneAuthority {
     pub fn open(root: impl AsRef<Path>) -> Result<Self, DurableAuthorityError> {
         fs::create_dir_all(root.as_ref())?;
@@ -428,12 +436,12 @@ impl DurableZoneAuthority {
                 return Ok(previous);
             }
         }
-        if self.operation_ids.contains(&operation) {
-            return Err(DurableAuthorityError::OperationReused);
-        }
         let mut next = self.registry.clone();
         let ticket = next.prepare(source, target_worker, target_zone, operation)
             .map_err(DurableAuthorityError::InvalidTransition)?;
+        if self.operation_ids.contains(&operation) {
+            return Err(DurableAuthorityError::OperationReused);
+        }
         let committed = self.persist(
             next,
             Event::from_ticket(self.sequence.saturating_add(1), Action::Prepare, ticket),
