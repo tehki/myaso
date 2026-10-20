@@ -73,7 +73,7 @@ workyard_source={
 }
 workyard_target={
     "Blacksmith / open forge hearth":(9.3,6.05,.62),
-    "Blacksmith / orange embers":(9.3,5.70,.92),
+    "Blacksmith / orange embers":(9.3,5.54,.92),
 }
 workyard_previous={}
 for name,target in workyard_target.items():
@@ -84,6 +84,23 @@ for name,target in workyard_target.items():
     assert pos in (workyard_source[name],target), (
         name+" has unreviewed prior art coordinates "+str(pos))
     obj.location=target
+# Show a recognisable firebox rather than a blank stone cube: the ember
+# face belongs OUTSIDE the forge front (Y=5.65), with a dark iron surround.
+# Existing owner-authored .blend is read-only; added viewport-only meshes
+# exist only in the in-memory isolated art render.
+mouth=bpy.data.objects.get("Blacksmith / firebox mouth")
+if mouth is None:
+    bpy.ops.mesh.primitive_cube_add(size=1,location=(9.3,5.60,.90))
+    mouth=bpy.context.object
+    mouth.name="Blacksmith / firebox mouth"
+    mouth.dimensions=(.92,.06,.40)
+    bpy.ops.object.transform_apply(location=False,rotation=False,scale=True)
+    forged_iron=bpy.data.materials.get("A2 | forged black iron")
+    assert forged_iron, "Required first-party forge iron material missing"
+    mouth.data.materials.append(forged_iron)
+    ORIGINAL[mouth.name]=False
+else:
+    assert tuple(round(v,3) for v in mouth.location)==(9.3,5.60,.90)
 bpy.context.view_layer.update()
 
 def xy_bounds(ob):
@@ -109,12 +126,13 @@ assert not intersects(anvil,door) and not intersects(anvil,step)
 assert tuple(round(x,3) for x in bpy.data.objects["Blacksmith / anvil"].location)==(10.7,6.4,.92)
 workyard_qa={
     "correctedForgeCenterXYZ":[9.3,6.05,.62],
-    "correctedEmbersCenterXYZ":[9.3,5.7,.92],
+    "correctedEmbersCenterXYZ":[9.3,5.54,.92],
     "originalForgeCenterXYZ":workyard_previous["Blacksmith / open forge hearth"],
     "forgeToAnvilHorizontalClearanceMeters":round(forge_anvil_gap,3),
     "forgingPropsInEntranceCorridor":False,
     "entranceCorridorXYBounds":[*entrance_lane],
     "doorAndStepUnmodified":True,
+    "visibleFrontFireboxOpening":True,
     "gameCollisionModified":False,
     "originalBlenderSceneSaved":False,
 }
