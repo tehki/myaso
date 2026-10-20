@@ -1,0 +1,250 @@
+{
+  "chrome": "Chrome/154.0.8037.99",
+  "headRef": "ff74af212d606f4fb8aa11336cc5633dd54fe181",
+  "viewport": {
+    "width": 960,
+    "height": 600,
+    "deviceScaleFactor": 1
+  },
+  "source": "two offline localhost world-preview pages; cold Canvas chunk captures; no multiplayer",
+  "stable": [
+    "bridge",
+    "grove",
+    "briarford",
+    "stonebrook",
+    "farmland",
+    "wilderness"
+  ],
+  "changed": [
+    "red-lion-door",
+    "greyhaven",
+    "market-front",
+    "chapel-front"
+  ],
+  "samples": {
+    "baseline": {
+      "httpStatus": 200,
+      "pageErrors": [],
+      "measurements": {
+        "red-lion-door": {
+          "coldMs": 22.7,
+          "created": 6,
+          "coldFrames": 2,
+          "cached": 6,
+          "rgbaHash": [
+            1973905990,
+            759408319
+          ]
+        },
+        "greyhaven": {
+          "coldMs": 21.3,
+          "created": 6,
+          "coldFrames": 2,
+          "cached": 6,
+          "rgbaHash": [
+            1287280777,
+            4206281544
+          ]
+        },
+        "market-front": {
+          "coldMs": 21.1,
+          "created": 6,
+          "coldFrames": 2,
+          "cached": 6,
+          "rgbaHash": [
+            978522948,
+            3205591046
+          ]
+        },
+        "chapel-front": {
+          "coldMs": 5.9,
+          "created": 2,
+          "coldFrames": 1,
+          "cached": 2,
+          "rgbaHash": [
+            2562901252,
+            2890576380
+          ]
+        },
+        "bridge": {
+          "coldMs": 11.4,
+          "created": 6,
+          "coldFrames": 2,
+          "cached": 6,
+          "rgbaHash": [
+            1246196530,
+            4110307628
+          ]
+        },
+        "grove": {
+          "coldMs": 12.4,
+          "created": 6,
+          "coldFrames": 2,
+          "cached": 6,
+          "rgbaHash": [
+            3260398106,
+            1817588425
+          ]
+        },
+        "briarford": {
+          "coldMs": 14.4,
+          "created": 6,
+          "coldFrames": 2,
+          "cached": 6,
+          "rgbaHash": [
+            2215458230,
+            3382869946
+          ]
+        },
+        "stonebrook": {
+          "coldMs": 14.3,
+          "created": 9,
+          "coldFrames": 3,
+          "cached": 9,
+          "rgbaHash": [
+            855836529,
+            3199416253
+          ]
+        },
+        "farmland": {
+          "coldMs": 12.3,
+          "created": 8,
+          "coldFrames": 3,
+          "cached": 8,
+          "rgbaHash": [
+            1154323039,
+            912083252
+          ]
+        },
+        "wilderness": {
+          "coldMs": 10.7,
+          "created": 8,
+          "coldFrames": 3,
+          "cached": 8,
+          "rgbaHash": [
+            2067260341,
+            194732776
+          ]
+        }
+      }
+    },
+    "candidate": {
+      "httpStatus": 200,
+      "pageErrors": [],
+      "measurements": {
+        "red-lion-door": {
+          "coldMs": 45,
+          "created": 6,
+          "coldFrames": 2,
+          "cached": 6,
+          "rgbaHash": [
+            4084752077,
+            867377561
+          ]
+        },
+        "greyhaven": {
+          "coldMs": 49.5,
+          "created": 6,
+          "coldFrames": 2,
+          "cached": 6,
+          "rgbaHash": [
+            4227513991,
+            4260245753
+          ]
+        },
+        "market-front": {
+          "coldMs": 31.1,
+          "created": 6,
+          "coldFrames": 2,
+          "cached": 6,
+          "rgbaHash": [
+            788425432,
+            3262246644
+          ]
+        },
+        "chapel-front": {
+          "coldMs": 9.2,
+          "created": 2,
+          "coldFrames": 1,
+          "cached": 2,
+          "rgbaHash": [
+            2565243842,
+            2929821374
+          ]
+        },
+        "bridge": {
+          "coldMs": 13,
+          "created": 6,
+          "coldFrames": 2,
+          "cached": 6,
+          "rgbaHash": [
+            1246196530,
+            4110307628
+          ]
+        },
+        "grove": {
+          "coldMs": 17.2,
+          "created": 6,
+          "coldFrames": 2,
+          "cached": 6,
+          "rgbaHash": [
+            3260398106,
+            1817588425
+          ]
+        },
+        "briarford": {
+          "coldMs": 16.1,
+          "created": 6,
+          "coldFrames": 2,
+          "cached": 6,
+          "rgbaHash": [
+            2215458230,
+            3382869946
+          ]
+        },
+        "stonebrook": {
+          "coldMs": 17.7,
+          "created": 9,
+          "coldFrames": 3,
+          "cached": 9,
+          "rgbaHash": [
+            855836529,
+            3199416253
+          ]
+        },
+        "farmland": {
+          "coldMs": 14.6,
+          "created": 8,
+          "coldFrames": 3,
+          "cached": 8,
+          "rgbaHash": [
+            1154323039,
+            912083252
+          ]
+        },
+        "wilderness": {
+          "coldMs": 12.2,
+          "created": 8,
+          "coldFrames": 3,
+          "cached": 8,
+          "rgbaHash": [
+            2067260341,
+            194732776
+          ]
+        }
+      }
+    }
+  },
+  "parity": {
+    "red-lion-door": false,
+    "greyhaven": false,
+    "market-front": false,
+    "chapel-front": false,
+    "bridge": true,
+    "grove": true,
+    "briarford": true,
+    "stonebrook": true,
+    "farmland": true,
+    "wilderness": true
+  }
+}

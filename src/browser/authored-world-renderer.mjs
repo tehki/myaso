@@ -2,6 +2,7 @@
 // Loading an interior in the offline preview does not grant a network zone transfer.
 import { AUTHORED_MAPS, MAP_IDS, getAuthoredMap } from "../world/authored-maps.mjs";
 import { paintGreyhavenGroundDetails } from "./greyhaven-terrain-materials.mjs";
+import { paintGreyhavenLightingPools, paintGreyhavenLightingFixtures } from "./greyhaven-atmosphere.mjs";
 
 export const WORLD_TILE_SIZE = 512;
 export const WORLD_CACHE_CAP = 24;
@@ -127,6 +128,9 @@ function paintOverworld(ctx,map,tileBounds) {
   }
   // Static, bounded Graphics 3C material layer on the same cached Canvas tiles.
   paintGreyhavenGroundDetails(ctx,map,tileBounds);
+  // Warm practical spill is baked into the SAME cached terrain tile.
+  // Cosmetic only; does not change any gameplay visibility or lighting rule.
+  paintGreyhavenLightingPools(ctx,map,tileBounds);
   for(const bridge of map.bridges){
     if(!visibleBounds(tileBounds,bridge.x-bridge.w/2,bridge.y-bridge.h/2,bridge.w,bridge.h,12))continue;
     ctx.fillStyle="#766e5c";
@@ -148,6 +152,7 @@ function paintOverworld(ctx,map,tileBounds) {
     paintCityWalls(ctx,map.city);
   for(const b of map.buildings)
     if(visibleBounds(tileBounds,b.x,b.y,b.w,b.h,45))paintBuilding(ctx,b);
+  paintGreyhavenLightingFixtures(ctx,map,tileBounds);
   for(const p of map.portals){
     if(!visibleBounds(tileBounds,p.x,p.y,0,0,23))continue;
     ctx.strokeStyle="#e9cf7c";ctx.lineWidth=4;
