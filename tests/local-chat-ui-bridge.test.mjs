@@ -114,3 +114,16 @@ test("reader failure and faulty UI callback cannot forge delivery or break subsc
   f.wire.result(1, 0, 10n);
   assert.equal(count, 1);
 });
+
+test("closing in the same turn suppresses an unsent old-session message", async () => {
+  const f = fixture();
+  const ui = await openLocalChatUiBridge({}, { openChannel: f.openChannel });
+  const unsent = ui.send({ channel: "local", clientMessageId: "cancelled-uuid", text: "do not send" });
+  // The transport dispatch is intentionally queued on a microtask; a
+  // disconnect before that dispatch must cancel both the ACK and the write.
+  await ui.close();
+  await assert.rejects(unsent, /closed/);
+  await flush();
+  assert.equal(f.wire.calls.length, 0, "retired session cannot send queued chat");
+  assert.equal(ui.ready, false);
+});
