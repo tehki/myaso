@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {readFileSync} from "node:fs";
 import {spawnSync} from "node:child_process";
+import {fileURLToPath} from "node:url";
 import {MAP_IDS} from "../src/world/authored-maps.mjs";
 import {MOONVALE_LANDMARKS} from "../src/world/landmark-discovery.mjs";
 import {MOONVALE_FIELD_SITES} from "../src/world/field-survey.mjs";
@@ -101,7 +102,7 @@ test("D16 linked stories must reference every site exactly once without invented
 
 test("D16 CLI is a strict deterministic build gate without writes or online dependencies",()=>{
   const file=new URL("../scripts/audit-world-authoring.mjs",import.meta.url);
-  const result=spawnSync(process.execPath,[file.pathname],{encoding:"utf8",timeout:10000});
+  const result=spawnSync(process.execPath,[fileURLToPath(file)],{encoding:"utf8",timeout:10000});
   assert.equal(result.status,0,result.stderr);
   assert.match(result.stdout,/^World authoring audit PASS: 4 landmarks, 8 field sites, 6 lore sites, 3 expeditions, 7 certified legs, 2 story threads\./);
   const source=readFileSync(file,"utf8");
