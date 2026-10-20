@@ -165,3 +165,28 @@ P4 does **not** add an active `PACKET_TYPE`, alter any live snapshot encoding, s
 5. Keep all effects disabled on the live arena until cross-department sign-off, exact-head `quality` passing and coordinated production release.
 
 P4 remains **DRAFT / UNMERGED / UNDEPLOYED**; the existing game is unaffected.
+
+## P5 — bounded spatial interest and synthetic 512-viewer bench (2026-10-20)
+
+The previously passing P4 implementation retained at most 256 server-side semantic effects but inspected the full queue for every interested viewer. P5 changes this query path **without** activating effects in the playable realm:
+
+- `server/src/magic_fx_spatial.rs` stores only accepted semantic events in zone-keyed **512-unit grid buckets** (not pixels/particles). The broker maintains one matching queue for monotonic event IDs/expiry and a bucket index for viewer lookups. Zone admission counts are read from the index.
+- Queries visit cells intersecting the trusted viewer's 0–1500-unit radius, at most 64 cells by a conservative fixed bound; they never visit another zone's buckets. Exact circular filtering still applies; this broadphase introduces no cross-cell false negatives, including at negative coordinates and precise boundaries.
+- Nearby candidates are sorted by monotonic event ID before limiting to 16, preserving original P4 delivery/cursor order independent of grid walk order. Incorrect viewer geometry still fails closed *before* entering the index.
+- Expiry and tick progression remove stale events from both index and original broker queue, reclaim empty cells and zone counters, and assert both collection counts remain equal.
+- `interest_snapshot_with_stats` publishes aggregate `visited_cells`, `examined_events`, and `in_radius` counters. This is developer-side telemetry only, not a player event trace or analytics service.
+- A protected deterministic unit test fills **240 semantic events across five zones** (48 each) and compares **512 synthetic viewers** against the previous linear implementation with exact event equality, ordering and eligibility. Includes expiry, negative-cell boundaries, cursor and overflow budgets.
+
+### Optional performance exercise
+
+`server/examples/magic_fx_interest_bench.rs` is an executable, opt-in benchmark (no network, credentials or deployment):
+
+```sh
+cargo run --locked --release --manifest-path server/Cargo.toml --example magic_fx_interest_bench
+```
+
+It builds 240 trusted synthetic semantic events across five zones, queries 512 virtual viewers for 32 rounds, checks every viewer result against a full-scan oracle, and reports `indexed_p95_us`, `linear_p95_us`, `candidate_events_read`, `full_scan_equivalent`, and `semantic_payload_bytes`. All figures are machine-dependent; **no throughput or speedup is asserted until the example has actually run and the environment/measurements are recorded**. It excludes actual network transport, clients, GPU/canvas effects, colliders, actor dynamics and 512 genuine connections. No flaky wall-clock CI success threshold is imposed.
+
+### Limits / follow-up
+
+P5 is a **reference spatial index only**: the broker still has a global max of 256 pending effects and 48 per zone. It is not a horizontally sharded multi-server world, not a scene collision broadphase, and not tested on thousands of live players. Before shipping, Core & Multiplayer must own authoritative zone identity, active shard boundaries, delivery lifecycle, per-subscriber throughput and observability; Graphics owns crowd-tier presentation; Magic & Items owns validated spell semantics. The existing active packet protocol is unchanged. No P5 runtime activation, merge or deployment is authorized.
