@@ -128,3 +128,50 @@ test("closing in the same turn suppresses an unsent old-session message", async 
   assert.equal(f.wire.calls.length, 0, "retired session cannot send queued chat");
   assert.equal(ui.ready, false);
 });
+
+test("missing server ACK retires only chat after bounded deadline", async () => {
+  const f = fixture();
+  const reasons = [];
+  const ui = await openLocalChatUiBridge({}, {
+    openChannel: f.openChannel, ackTimeoutMs: 20,
+    onDisconnect: error => reasons.push(error.message),
+  });
+  const pending = ui.send({ channel: "local", clientMessageId: "unacked", text: "hello" });
+  await assert.rejects(pending, /No authoritative chat acknowledgement/);
+  await flush();
+  assert.equal(f.wire.calls.length, 1, "one bounded chat send was attempted");
+  assert.equal(f.wire.closed, true, "only optional chat stream must be closed");
+  assert.equal(ui.ready, false);
+  assert.deepEqual(reasons, ["No authoritative chat acknowledgement"]);
+  await assert.rejects(ui.send({
+    channel: "local", clientMessageId: "second", text: "retry",
+  }), /session unavailable/i);
+  f.wire.result(1, 0, 9n);
+  assert.equal(reasons.length, 1, "late ACK must not resurrect a retired session");
+});
+
+test("failed optional chat write retires adapter rather than stacking blocked sends", async () => {
+  const f = fixture();
+  f.wire.send = async () => { throw new Error("optional QUIC stream write failed"); };
+  const ui = await openLocalChatUiBridge({}, {openChannel: f.openChannel});
+  await assert.rejects(ui.send({
+    channel: "local", clientMessageId: "write-failure", text: "hello",
+  }), /optional QUIC stream write failed/);
+  await flush();
+  assert.equal(f.wire.closed, true);
+  assert.equal(ui.ready, false);
+  await assert.rejects(ui.send({
+    channel: "local", clientMessageId: "again", text: "more",
+  }), /session unavailable/i);
+});
+
+test("invalid ACK deadlines cannot open an optional chat stream", async () => {
+  let opened = 0;
+  const openChannel = () => { opened++; throw new Error("must not open"); };
+  for (const ackTimeoutMs of [0, -1, 9001, 1.2, NaN, "10"]) {
+    await assert.rejects(
+      openLocalChatUiBridge({}, {openChannel, ackTimeoutMs}), RangeError,
+    );
+  }
+  assert.equal(opened, 0);
+});
