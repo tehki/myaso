@@ -226,27 +226,32 @@ pub fn transact_teacher_lesson(
 /// Interrupt/Cancel never applies damage; only a future Combat transaction
 /// may mark an effect as actually applied, together with all world effects.
 /// Requires a trusted serial world lock and a server-issued session lease.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct EmberNoEffectDecision {
+    pub lease: SessionLease,
+    pub sequence: u64,
+    pub outcome: EmberEffectStatus,
+}
+
 pub fn resolve_ember_without_damage(
     path: &Path,
     loot: &LootAuthority,
     magic: &mut MagicAuthority,
     identity: &SessionIdentityRegistry,
     zones: &ZoneAuthority,
-    lease: SessionLease,
-    sequence: u64,
-    decision: EmberEffectStatus,
+    decision: EmberNoEffectDecision,
 ) -> Result<(), JointCheckpointError> {
     let character = identity
-        .resolve_session(lease)
+        .resolve_session(decision.lease)
         .ok_or(JointCheckpointError::UnverifiedCharacter)?;
     let intent = magic
-        .ember_intent(character, sequence)
+        .ember_intent(character, decision.sequence)
         .ok_or(MagicError::UnknownEffectIntent)?;
-    if zones.zone_of(lease.server_session()) != Some(intent.zone) {
+    if zones.zone_of(decision.lease.server_session()) != Some(intent.zone) {
         return Err(JointCheckpointError::WrongZone);
     }
     let mut staged = magic.clone();
-    staged.resolve_ember_without_effect(character, sequence, decision)?;
+    staged.resolve_ember_without_effect(character, decision.sequence, decision.outcome)?;
     let bytes = bundle(loot, identity, &staged)?;
     atomic_write(path, &bytes)?;
     *magic = staged;
@@ -570,9 +575,11 @@ mod tests {
             &mut magic,
             &identity,
             &zones,
-            SessionLease::new(1, 1).unwrap(),
-            50,
-            EmberEffectStatus::Interrupted,
+            EmberNoEffectDecision {
+                lease: SessionLease::new(1, 1).unwrap(),
+                sequence: 50,
+                outcome: EmberEffectStatus::Interrupted,
+            },
         )
         .unwrap();
         let (restored_loot, mut recovered_magic) = load_joint(&path).unwrap();
@@ -590,9 +597,11 @@ mod tests {
                 &mut recovered_magic,
                 &identity,
                 &zones,
-                SessionLease::new(1, 1).unwrap(),
-                50,
-                EmberEffectStatus::Cancelled,
+                EmberNoEffectDecision {
+                    lease: SessionLease::new(1, 1).unwrap(),
+                    sequence: 50,
+                    outcome: EmberEffectStatus::Cancelled,
+                },
             ),
             Err(JointCheckpointError::Magic(
                 MagicError::EffectAlreadyResolved
@@ -624,9 +633,11 @@ mod tests {
                 &mut magic,
                 &identity,
                 &zones,
-                SessionLease::new(1, 2).unwrap(),
-                51,
-                EmberEffectStatus::Interrupted,
+                EmberNoEffectDecision {
+                    lease: SessionLease::new(1, 2).unwrap(),
+                    sequence: 51,
+                    outcome: EmberEffectStatus::Interrupted,
+                },
             ),
             Err(JointCheckpointError::UnverifiedCharacter)
         ));
@@ -637,9 +648,11 @@ mod tests {
                 &mut magic,
                 &identity,
                 &zones,
-                SessionLease::new(1, 1).unwrap(),
-                51,
-                EmberEffectStatus::Cancelled,
+                EmberNoEffectDecision {
+                    lease: SessionLease::new(1, 1).unwrap(),
+                    sequence: 51,
+                    outcome: EmberEffectStatus::Cancelled,
+                },
             ),
             Err(JointCheckpointError::WrongZone)
         ));
