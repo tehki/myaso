@@ -696,6 +696,7 @@ mod tests {
             ))
         ));
         assert!(!root.record(3).exists());
+        drop(store);
         let restored = root.open();
         assert_eq!(restored.location(item(5)), Some(inv(1)));
     }
@@ -754,7 +755,10 @@ mod tests {
             )
             .expect("create");
         fs::write(root.0.join(".pending-simulated-power-loss"), b"partial").expect("orphan stage");
-        assert_eq!(root.open().location(item(4)), Some(inv(4)));
+        drop(store);
+        let recovered = root.open();
+        assert_eq!(recovered.location(item(4)), Some(inv(4)));
+        drop(recovered);
         fs::write(root.record(1), b"partially-written-canonical").expect("simulate damage");
         assert!(matches!(
             DurableItemJournal::open(&root.0),
@@ -785,6 +789,7 @@ mod tests {
                 }],
             )
             .expect("two");
+        drop(store);
         fs::remove_file(root.record(1)).expect("remove first");
         assert!(matches!(
             DurableItemJournal::open(&root.0),
