@@ -36,7 +36,7 @@ impl From<CheckpointError> for TransactionError {
 
 /// Prepare a RECOVERY copy using only verified character IDs, not ephemeral
 /// fighter IDs. An incomplete binding map must never produce a saved world.
-fn quiescent_verified(
+pub(crate) fn quiescent_verified(
     mut state: LootStateSnapshot,
     identity: &SessionIdentityRegistry,
 ) -> Result<LootAuthority, TransactionError> {
