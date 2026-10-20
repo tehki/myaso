@@ -26,5 +26,18 @@ test("R2 adds hold-block acceptance WITHOUT disabling original strict M194 wheel
   assert.match(workflow, /MYASO_PVP_SCENARIO: "uimiddleblockpressure"/);
   assert.match(workflow, /Validate M194 repeated real guard-break block-only pressure/);
   assert.match(workflow, /for attempt in 1 2 3 4 5/);
-  assert.match(source, /wheelHeadStartMs: 0/);
+  // R2 no longer uses the obsolete wheel-first timed click. The unchanged
+  // M194 suite must exercise authentic LMB-down, trusted Firefox wheel, and
+  // LMB-up release-to-strike while retaining strict guard/parry/HP checks.
+  const start = source.indexOf("async function runOnlineUiGuardBreakFlight(");
+  const end = source.indexOf("\nasync function runOnlineUiGuardBreakTellFlight(", start);
+  assert.ok(start >= 0 && end > start);
+  const guardBreak = source.slice(start, end);
+  assert.match(guardBreak, /dispatchR2ReleaseLedShortBlock\(\{/);
+  assert.match(guardBreak, /sendAttackDown: \(\) => setArenaAttackButton\(attacker, true\)/);
+  assert.match(guardBreak, /awaitTrustedWheel: \(\) => challenge\.wait\(\)/);
+  assert.match(guardBreak, /sendAttackUp: \(\) => setArenaAttackButton\(attacker, false\)/);
+  assert.match(guardBreak, /defenderState\?\.playerHp !== 100/);
+  assert.match(guardBreak, /defenderResult\.playerGuard !== 0/);
+  assert.match(guardBreak, /feedbackTransitions\.includes\("parried"\)/);
 });
