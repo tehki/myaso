@@ -64,7 +64,7 @@ const out = [
   emit("RIVER_POINTS", "Point", moonvale.river.points.map(point)),
   emit("BRIDGES", "Rect", moonvale.bridges.map(rect)),
   "",
-].join("\n");
+].join("\n").replace(/\n+$/, "\n");
 if (process.argv.includes("--check")) {
   if (readFileSync(destination, "utf8").replace(/\r\n/g, "\n") !== out) {
     console.error("World geometry generated Rust constants are stale.");
