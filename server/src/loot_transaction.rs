@@ -12,12 +12,13 @@ use std::path::Path;
 
 use crate::character_identity::{SessionIdentityRegistry, SessionLease};
 use crate::loot::{
-    CorpseItemRef, ItemStack, LootAuthority, LootError, LootStateSnapshot, ParkedInventory,
+    CorpseItemRef, EquipmentSlot, ItemStack, LootAuthority, LootError, LootStateSnapshot,
+    ParkedInventory,
 };
 use crate::loot_persistence::{atomic_write, save_quiescent, CheckpointError};
 use crate::magic::MagicAuthority;
 use crate::magic_checkpoint::{bundle, JointCheckpointError};
-use crate::simulation::World;
+use crate::simulation::{Action, World};
 use crate::zone::ZoneAuthority;
 
 #[derive(Debug)]
@@ -224,6 +225,115 @@ pub fn commit_verified_pickup(
     atomic_write(path, &bytes).map_err(PickupCommitError::Io)?;
     *loot = staged;
     Ok(item)
+}
+
+/// A gear request contains only an item/slot selection; the actor identity,
+/// position, authoritative tick and zone never come from a packet.
+/// Dropping equipped gear requires explicit unequip first.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum VerifiedEquipmentAction {
+    Equip { item_id: u64, slot: EquipmentSlot },
+    Unequip { slot: EquipmentSlot },
+    Drop { item_id: u64, amount: u16 },
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum EquipmentActionResult {
+    Equipped { item_id: u64, slot: EquipmentSlot },
+    Unequipped { item_id: u64, slot: EquipmentSlot },
+    Dropped { entity_id: u64 },
+}
+
+/// Offline server-side gear transaction. Core must hold one exclusive
+/// World/Zone/Identity/Loot/Magic tick lock. Stages item changes and a replay
+/// watermark, then checkpoints all Loot and Magic before publishing RAM.
+///
+/// This is not a live network handler, combat damage/mitigation adapter, real
+/// account authenticator, or post-rename I/O recovery mechanism.
+pub fn commit_verified_equipment(
+    path: &Path,
+    loot: &mut LootAuthority,
+    magic: &MagicAuthority,
+    identity: &SessionIdentityRegistry,
+    tick: PickupWorldTick<'_>,
+    operation: VerifiedLootOperation,
+    action: VerifiedEquipmentAction,
+) -> Result<EquipmentActionResult, PickupCommitError> {
+    if tick.world.tick != tick.completed_tick {
+        return Err(PickupCommitError::StaleWorldTick);
+    }
+    if !tick.world.now_ms.is_finite()
+        || tick.world.now_ms < 0.0
+        || tick.world.now_ms >= u64::MAX as f32
+    {
+        return Err(PickupCommitError::InvalidWorldTime);
+    }
+    let character = identity
+        .resolve_session(operation.lease)
+        .ok_or(PickupCommitError::UnverifiedSession)?;
+    let actor = operation.lease.server_session();
+    let fighter = tick
+        .world
+        .fighter(actor)
+        .ok_or(PickupCommitError::MissingWorldFighter)?;
+    let zone = tick
+        .zones
+        .zone_of(actor)
+        .ok_or(PickupCommitError::UnknownZone)?;
+    let (width, height) = zone.bounds();
+    if !fighter.x.is_finite()
+        || !fighter.y.is_finite()
+        || fighter.x < 18.0
+        || fighter.y < 18.0
+        || fighter.x > width - 18.0
+        || fighter.y > height - 18.0
+    {
+        return Err(PickupCommitError::Loot(LootError::InvalidPosition));
+    }
+    if fighter.action == Action::Dead || fighter.hp <= 0.0 || loot.is_dead(actor) {
+        return Err(PickupCommitError::Loot(LootError::DeadPlayer));
+    }
+    let mut staged =
+        LootAuthority::restore_state(loot.export_state().map_err(PickupCommitError::Loot)?)
+            .map_err(PickupCommitError::Loot)?;
+    staged
+        .record_operation(character, operation.sequence)
+        .map_err(PickupCommitError::Loot)?;
+    let result = match action {
+        VerifiedEquipmentAction::Equip { item_id, slot } => {
+            staged
+                .equip(actor, item_id, slot)
+                .map_err(PickupCommitError::Loot)?;
+            EquipmentActionResult::Equipped { item_id, slot }
+        }
+        VerifiedEquipmentAction::Unequip { slot } => {
+            let item_id = staged
+                .inventory(actor)
+                .ok_or(PickupCommitError::Loot(LootError::UnknownPlayer))?
+                .equipped(slot)
+                .ok_or(PickupCommitError::Loot(LootError::NotFound))?
+                .id;
+            staged.unequip(actor, slot).map_err(PickupCommitError::Loot)?;
+            EquipmentActionResult::Unequipped { item_id, slot }
+        }
+        VerifiedEquipmentAction::Drop { item_id, amount } => {
+            let entity_id = staged
+                .drop_backpack_amount(
+                    actor,
+                    fighter,
+                    zone,
+                    item_id,
+                    amount,
+                    tick.world.now_ms as u64,
+                )
+                .map_err(PickupCommitError::Loot)?;
+            EquipmentActionResult::Dropped { entity_id }
+        }
+    };
+    let bytes = bundle(&staged, identity, magic).map_err(PickupCommitError::JointCheckpoint)?;
+    atomic_write(path, &bytes).map_err(PickupCommitError::Io)?;
+    *loot = staged;
+    Ok(result)
 }
 
 #[cfg(test)]
