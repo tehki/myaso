@@ -51,11 +51,19 @@ camera.data.ortho_scale = 14.4
 
 # Source GLBs use distinct unit origins; match at the real mesh-feet bounds,
 # rather than moving the armature's origin or changing the animation keys.
+def is_proxy(ob):
+    # The supplied GLBs both include a 42-vertex, untextured Icosphere
+    # (2 m bounding diameter). It is NOT the skinned knight body and must
+    # not determine fighter scale, floor contact or review renders.
+    return (ob.type == "MESH" and ob.name.startswith("Icosphere")
+            and len(ob.data.vertices) <= 64
+            and not any(ob.data.materials))
+
 def bounds(objects):
     depsgraph = bpy.context.evaluated_depsgraph_get()
     points = []
     for ob in objects:
-        if ob.type != "MESH":
+        if ob.type != "MESH" or is_proxy(ob):
             continue
         ev = ob.evaluated_get(depsgraph)
         mesh = ev.to_mesh()
@@ -79,6 +87,27 @@ def load_character(label, source, world_xy, target_height_m):
     )
     rigs = [o for o in imported if o.type == "ARMATURE"]
     assert sum(len(r.data.bones) for r in rigs) >= 22, label
+    proxies = [ob for ob in imported if is_proxy(ob)]
+    assert len(proxies) == 1, f"{label}: expected one non-character Icosphere proxy"
+    for ob in proxies:
+        ob.hide_render = True
+        ob.hide_set(True)
+    new_actions = [a for a in bpy.data.actions if a not in old_actions]
+    idle = next((a for a in new_actions if a.name == "idle"
+                 or a.name.startswith("idle.")), None)
+    roll = next((a for a in new_actions if a.name == "roll"
+                 or a.name.startswith("roll.")), None)
+    assert idle is not None and roll is not None, f"{label}: missing idle/roll clips"
+    assert roll.frame_range[0] <= args.roll_frame <= roll.frame_range[1], (
+        f"{label}: roll preview frame outside approved animation clip"
+    )
+    for rig in rigs:
+        if rig.animation_data is None:
+            rig.animation_data_create()
+        # Imported NLA tracks can otherwise play death instead of idle.
+        for track in rig.animation_data.nla_tracks:
+            track.mute = True
+        rig.animation_data.action = idle
     scene.frame_set(1)
     before = bounds(imported)
     width = before["maxs"][0]-before["mins"][0]
@@ -116,8 +145,14 @@ def load_character(label, source, world_xy, target_height_m):
         "reviewHeightMeters": target_height_m,
         "feetZ": round(floor_z, 6),
         "worldXYForCompositionMeters": list(world_xy),
-        "newActionNames": sorted(a.name for a in bpy.data.actions if a not in old_actions),
+        "newActionNames": sorted(a.name for a in new_actions),
+        "proxyObjectsHidden": len(proxies),
+        "idleAction": idle.name,
+        "rollAction": roll.name,
+        "rollClipFrameRange": [round(v,2) for v in roll.frame_range],
         "objects": imported,
+        "rigs": rigs,
+        "roll": roll,
     }
 
 # Red Lion entrance steps (A1 +Y facing) are at approx Y=-1.1m.
@@ -141,8 +176,8 @@ report = {
     "rollDurationVisualMs": 350,
     "rollAuthoritativeMs": 170,
     "recoveryAuthoritativeMs": 180,
-    "silver": {k:v for k,v in silver.items() if k!="objects"},
-    "sentinel": {k:v for k,v in sentinel.items() if k!="objects"},
+    "silver": {k:v for k,v in silver.items() if k not in ("objects","rigs","roll")},
+    "sentinel": {k:v for k,v in sentinel.items() if k not in ("objects","rigs","roll")},
     "renderEngine": "Cycles CPU",
     "renderSamples": scene.cycles.samples,
     "targetRollFrame": args.roll_frame,
@@ -156,6 +191,9 @@ bpy.ops.wm.save_as_mainfile(filepath=str(args.out_dir/"blood_iron_knights_local_
 if args.render:
     scene.render.filepath = str(args.out_dir/"blood_iron_knights_scale_a2.png")
     bpy.ops.render.render(write_still=True)
+    for fighter in (silver, sentinel):
+        for rig in fighter["rigs"]:
+            rig.animation_data.action = fighter["roll"]
     scene.frame_set(args.roll_frame)
     scene.render.filepath = str(args.out_dir/"blood_iron_knights_roll_a2.png")
     bpy.ops.render.render(write_still=True)
