@@ -136,7 +136,7 @@ test("A2.11 approved 120% affects only the optional sprite draw rectangle", () =
 test("A2.11 baseline 100% rollback and approved 120% keep identical atlas frames and world-origin center",()=>{
   class MockImage{
     set src(url){
-      const clip=url.match(/([^/]+)\\.webp$/)?.[1];
+      const clip = new URL(url).pathname.split("/").at(-1)?.replace(".webp","");
       this.naturalWidth=(KNIGHT_CLIPS[clip]??0)*KNIGHT_FRAME_PX;
       this.naturalHeight=8*KNIGHT_FRAME_PX;
       this.onload?.();
