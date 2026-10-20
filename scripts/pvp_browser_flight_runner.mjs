@@ -12162,13 +12162,14 @@ async function performArenaHeavyFeint(session, elementId, xOffset = 200) {
 
 async function performArenaFeint(session, elementId, xOffset = 200) {
   const origin = { "element-6066-11e4-a52e-4f735466cecf": elementId };
-  // M331: one genuine W3C multi-source action. Start wheel-back in the
-  // zero-duration tick AFTER pointerDOWN and BEFORE the 20ms LMB hold/up.
-  // M324 dispatched the wheel in the pointerUP tick; exact-head CI
-  // #39312313079 measured 81ms from real pointerDOWN to real wheel despite
-  // the 20ms W3C hold, causing an authoritative 34HP hit, not a feint.
-  // Advancing one tick preserves actual mouse down/up, one trusted wheel,
-  // and the unchanged 70ms server-feint gate. No synthetic events or retries.
+  // M333: one genuine W3C multi-source action. Issue wheel-back in the
+  // tick AFTER pointerDOWN and BEFORE pointerUP, with zero extra hold.
+  // On #39387402890 Chrome stretched the former 20ms requested hold to an
+  // observed 85ms real press, upgrading the exhausted 34HP light to heavy
+  // under the unchanged 80ms heavy classifier. Do not add wall-clock hold:
+  // WebDriver's ordered ticks already yield a genuine nonzero mouse press.
+  // Keep one trusted wheel inside the unchanged 70ms server-feint window;
+  // reject a real heavy upgrade or lost input rather than passing it.
   try {
     await webdriver(session.base, "POST", `/session/${session.sessionId}/actions`, {
       actions: [
@@ -12180,7 +12181,7 @@ async function performArenaFeint(session, elementId, xOffset = 200) {
             { type: "pointerMove", duration: 0, origin, x: xOffset, y: 0 },
             { type: "pointerDown", button: 0 },
             { type: "pause", duration: 0 },
-            { type: "pause", duration: 20 },
+            { type: "pause", duration: 0 },
             { type: "pointerUp", button: 0 },
           ],
         },
@@ -12191,7 +12192,7 @@ async function performArenaFeint(session, elementId, xOffset = 200) {
             { type: "pause", duration: 0 },
             { type: "pause", duration: 0 },
             { type: "scroll", x: 0, y: 0, deltaX: 0, deltaY: 120, duration: 0, origin },
-            { type: "pause", duration: 20 },
+            { type: "pause", duration: 0 },
             { type: "pause", duration: 0 },
           ],
         },
