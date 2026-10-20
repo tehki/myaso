@@ -6,6 +6,7 @@ use std::sync::{
 pub mod character_identity;
 pub mod kill_event;
 pub mod loot;
+pub mod loot_persistence;
 pub mod reliable;
 pub mod simulation;
 pub mod snapshot;

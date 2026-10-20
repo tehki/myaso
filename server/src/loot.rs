@@ -75,8 +75,8 @@ pub struct ItemStack {
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Inventory {
-    backpack: Vec<ItemStack>,
-    equipment: BTreeMap<EquipmentSlot, ItemStack>,
+    pub(crate) backpack: Vec<ItemStack>,
+    pub(crate) equipment: BTreeMap<EquipmentSlot, ItemStack>,
 }
 
 impl Inventory {
@@ -194,9 +194,9 @@ pub enum LootError {
 /// An offline character remains part of global item ID validation; objects
 /// may never be copied into both an active and parked inventory.
 #[derive(Debug, Clone, PartialEq, Eq)]
-struct ParkedInventory {
-    inventory: Inventory,
-    dead: bool,
+pub(crate) struct ParkedInventory {
+    pub(crate) inventory: Inventory,
+    pub(crate) dead: bool,
 }
 
 /// An isolated, validated copy of loot authority. This is NOT persistent
@@ -205,13 +205,13 @@ struct ParkedInventory {
 /// inventory/world changes transactionally before permitting live loot.
 #[derive(Debug, Clone, PartialEq)]
 pub struct LootStateSnapshot {
-    schema_version: u16,
-    next_id: u64,
-    players: BTreeMap<u32, Inventory>,
-    dead: BTreeSet<u32>,
-    parked: BTreeMap<CharacterId, ParkedInventory>,
-    ground: BTreeMap<u64, GroundDrop>,
-    corpses: BTreeMap<u64, Corpse>,
+    pub(crate) schema_version: u16,
+    pub(crate) next_id: u64,
+    pub(crate) players: BTreeMap<u32, Inventory>,
+    pub(crate) dead: BTreeSet<u32>,
+    pub(crate) parked: BTreeMap<CharacterId, ParkedInventory>,
+    pub(crate) ground: BTreeMap<u64, GroundDrop>,
+    pub(crate) corpses: BTreeMap<u64, Corpse>,
 }
 
 #[derive(Debug)]
@@ -1103,7 +1103,7 @@ impl LootAuthority {
 }
 
 impl LootStateSnapshot {
-    fn validate(&self) -> Result<(), LootError> {
+    pub(crate) fn validate(&self) -> Result<(), LootError> {
         if self.schema_version != LOOT_STATE_SCHEMA_VERSION || self.next_id == 0 {
             return Err(LootError::InvalidState);
         }
