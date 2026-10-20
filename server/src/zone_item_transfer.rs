@@ -142,7 +142,7 @@ impl<'a> GroundTransferCoordinator<'a> {
         match exact {
             None => Err(TransferError::NotCommitted),
             Some(receipt) if receipt != proof.receipt => Err(TransferError::ReceiptMismatch),
-            Some(_) => {
+            Some(receipt) => {
                 // Checking only the current location would accept an old
                 // A -> B proof after a subsequent B -> C -> B cycle (ABA).
                 // A matching durable receipt must still be the last write
