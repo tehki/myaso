@@ -42,6 +42,23 @@ pub struct VerifiedWorldAuthority {
 }
 
 impl VerifiedWorldAuthority {
+    /// Only server-installed admission code may construct this after resolving
+    /// the actual authenticated session and trusted authority snapshot.
+    /// The PostgreSQL transactional fence MUST still check live ownership.
+    pub(crate) fn from_admitted_authority(
+        entity: OwnedEntity,
+        worker: WorkerId,
+        zone: ZoneKey,
+        epoch: NonZeroU64,
+    ) -> Self {
+        Self {
+            entity,
+            worker,
+            zone,
+            epoch,
+        }
+    }
+
     #[cfg(test)]
     pub(crate) fn from_trusted_authority(
         entity: OwnedEntity,
