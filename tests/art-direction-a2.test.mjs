@@ -217,3 +217,33 @@ test('A2.4 cropped roof layer roundtrips pixel-identically and is explicitly off
   assert.match(source,/"runtimeIntegrated":False/);
   assert.match(source,/"stableGameWorldPivotValidated":False/);
 });
+
+
+test('A2.5 overhead bake uses real browser zoom and a deliberately game-XY compatible camera',()=>{
+  const source=readFileSync(new URL('../tools/art/render_greyhaven_a25_xy_slices.py',import.meta.url),'utf8');
+  assert.match(source,/export const ARENA_VIEW_ZOOM/);
+  assert.match(source,/camera\.data\.ortho_scale=args\.pixels\/pixels_per_meter/);
+  assert.match(source,/camera\.data\.type="ORTHO"/);
+  assert.match(source,/camera_add\(location=\(0,0,30\),rotation=\(0,0,0\)\)/);
+  assert.match(source,/max_err<\.01/);
+  assert.match(source,/gameAlignedPixelsPerMeterYAfterFlip/);
+  assert.match(source,/"authoritativeWorldPlacementVerified":False/);
+  assert.match(source,/"browserSpritePivotVerified":False/);
+  assert.match(source,/"sourceBlenderSaved":False/);
+  assert.match(source,/"gameplayModified":False/);
+  assert.match(source,/"A3RollModified":False/);
+  assert.doesNotMatch(source,/save_as_mainfile|export_scene\.gltf|subprocess\.|requests\./);
+});
+
+test('A2.5 WebP encoder flips Y, crops independently and guards roundtrip without activating sprites',()=>{
+  const source=readFileSync(new URL('../tools/art/encode_greyhaven_a25_xy_webp.py',import.meta.url),'utf8');
+  assert.match(source,/Image\.Transpose\.FLIP_TOP_BOTTOM/);
+  assert.match(source,/lossless=True,method=6,exact=True/);
+  assert.match(source,/ImageChops\.difference\(restored,benchmark\)/);
+  assert.match(source,/drawOffsetFromVisualDoorPixels/);
+  assert.match(source,/visualDoorAnchorPixelsInCroppedImage/);
+  assert.match(source,/"roofOcclusionRuntimeEnabled":False/);
+  assert.match(source,/"doorPortalAuthorityVerified":False/);
+  assert.match(source,/"browserPerformanceMeasured":False/);
+  assert.doesNotMatch(source,/requests\.|subprocess\.|shutil\.rmtree/);
+});
