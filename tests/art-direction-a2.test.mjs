@@ -86,7 +86,7 @@ test('A2 GLB comparison excludes non-character spheres and samples real roll cli
   assert.match(qa, /if ob\.type != "MESH" or is_proxy\(ob\)/);
   assert.match(qa, /default=5\)/);
   assert.match(qa, /rig\.animation_data\.action = idle/);
-  assert.match(qa, /rig\.animation_data\.action = fighter\["roll"\]/);
+  assert.match(qa, /rig\.animation_data\.action = hero\["roll"\]/);
   assert.match(qa, /roll\.frame_range\[0\] <= args\.roll_frame <= roll\.frame_range\[1\]/);
   assert.match(qa, /"actualBrowserSpriteComparisonDone": False/);
 });
