@@ -112,10 +112,7 @@ mod tests {
 
     fn checkpoint_path() -> PathBuf {
         let index = TEST_SEQ.fetch_add(1, Ordering::Relaxed);
-        std::env::temp_dir().join(format!(
-            "myaso-transact-{}-{index}.bin",
-            std::process::id()
-        ))
+        std::env::temp_dir().join(format!("myaso-transact-{}-{index}.bin", std::process::id()))
     }
 
     #[test]
