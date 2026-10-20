@@ -26,7 +26,8 @@ kbd{border-radius:4px;border:1px solid #677354;background:#303a2d;color:#fff2d2;
 <div class="hud"><span><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> move · <kbd>E</kbd> enter/exit · mouse wheel zoom · <kbd>R</kbd> reset</span>
 <span id="place">Moonvale</span><span id="door"></span></div>
 <div class="notice">LOCAL DESIGN PREVIEW only: door transitions are simulated here to demonstrate map links.
-Authoritative multiplayer transfers and building collisions are not enabled on the live server.
+This preview locally collides with buildings, city walls, tavern furniture and rivers (cross at bridges).
+Authoritative multiplayer collision and transfers are NOT enabled on the live server.
 The geography, town names, buildings and roads are fixed and identical for all players.</div>
 <section class="discovery-panel" aria-label="Explorer's journal">
 <div id="discovery-notice" role="status" aria-live="polite" hidden></div>
@@ -38,6 +39,7 @@ The geography, town names, buildings and roads are fixed and identical for all p
 import { MAP_IDS, getAuthoredMap, nearbyAuthoredPortal, previewPortalDestination } from "../src/world/authored-maps.mjs";
 import { createAuthoredWorldRenderer } from "../src/browser/authored-world-renderer.mjs";
 import { MOONVALE_LANDMARKS, createLocalDiscoveryJournal, recordLocalDiscoveries, localDiscoveryProgress } from "../src/world/landmark-discovery.mjs";
+import { moveAuthoredPreview, isAuthoredPreviewWalkable } from "../src/world/authored-preview-collision.mjs";
 const canvas=document.querySelector("#arena");
 const ctx=canvas.getContext("2d");
 const world=createAuthoredWorldRenderer();
@@ -75,7 +77,11 @@ document.addEventListener("keydown",e=>{
   if(e.code==="KeyE"&&!e.repeat&&performance.now()>cooldown){
     const portal=nearbyAuthoredPortal(mapId,player.x,player.y,16);
     const target=portal&&previewPortalDestination(mapId,portal.id);
-    if(target){mapId=target.mapId;player={x:target.x,y:target.y};cooldown=performance.now()+550;zoom=mapId===MAP_IDS.tavern?1:.86;}
+    // A local design transition is still guarded against impossible target anchors.
+    if(target&&isAuthoredPreviewWalkable(target.mapId,target.x,target.y)){
+      mapId=target.mapId;player={x:target.x,y:target.y};
+      cooldown=performance.now()+550;zoom=mapId===MAP_IDS.tavern?1:.86;
+    }
   }
 });
 document.addEventListener("keyup",e=>keys.delete(e.code));
@@ -97,8 +103,7 @@ function tick(now){
   const my=Number(keys.has("KeyS")||keys.has("ArrowDown"))-Number(keys.has("KeyW")||keys.has("ArrowUp"));
   const mag=Math.hypot(mx,my)||1, speed=230;
   const map=getAuthoredMap(mapId);
-  player.x=Math.max(45,Math.min(map.width-45,player.x+mx/mag*speed*dt));
-  player.y=Math.max(45,Math.min(map.height-45,player.y+my/mag*speed*dt));
+  player=moveAuthoredPreview(mapId,player,mx/mag*speed*dt,my/mag*speed*dt);
   const camera=player;
   ctx.setTransform(1,0,0,1,0,0);ctx.clearRect(0,0,canvas.width,canvas.height);
   ctx.save();ctx.translate(canvas.width/2,canvas.height/2);ctx.scale(zoom,zoom);ctx.translate(-canvas.width/2,-canvas.height/2);
