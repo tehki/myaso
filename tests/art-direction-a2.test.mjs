@@ -254,7 +254,8 @@ test('A2.6 preserves oblique 3/4 architectural view while isolating roof and fac
   assert.match(src,/A2 \/ Red Lion hero \/ 3-4 angle/);
   assert.match(src,/camera\.rotation_euler=rotation/);
   assert.match(src,/camera\.data\.ortho_scale=scale/);
-  assert.match(src,/camera\.location=anchor\+rotation\.to_quaternion\(\)@Vector\(\(0,0,40\)\)/);
+  assert.match(src,/camera\.location=anchor\+face_rotation@Vector\(\(0,0,40\)\)/);
+  assert.match(src,/facade_turn=math\.pi if slug=="blacksmith" else 0\.0/);
   assert.match(src,/for layer in \("base","roof","whole"\)/);
   assert.match(src,/ORIGINAL\[ob\.name\] or not visible/);
   assert.match(src,/max\(mismatches\)>10/);
