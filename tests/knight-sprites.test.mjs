@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { COMBAT_ACTION } from "../src/browser/combat-readability.mjs";
-import { KNIGHT_CLIPS, KNIGHT_FRAME_PX, knightDirectionIndex, knightClip,
+import { KNIGHT_CLIPS, KNIGHT_FRAME_PX, KNIGHT_ROLL_PRESENTATION_MS, knightDirectionIndex, knightClip,
   spriteAtlasRect, createKnightSpriteRenderer } from "../web/knight-sprites.mjs";
 
 test("eight directions agree with mouse-facing screen coordinates", () => {
@@ -29,6 +29,11 @@ test("graphics states use Silver locally and Sentinel remotely", () => {
   assert.equal(knightClip(COMBAT_ACTION.block,true), "t1_block");
   assert.equal(knightClip(COMBAT_ACTION.attackActive,true), "t1_attack");
   assert.equal(knightClip(COMBAT_ACTION.idle,true), "t1_walk");
+  assert.equal(knightClip(COMBAT_ACTION.dodge,false), "silver_roll");
+  assert.equal(knightClip(COMBAT_ACTION.dodgeRecovery,false), "silver_roll");
+  assert.equal(knightClip(COMBAT_ACTION.dodge,true), "t1_roll");
+  assert.equal(knightClip(COMBAT_ACTION.dodgeRecovery,true), "t1_roll");
+  assert.equal(knightClip(COMBAT_ACTION.dash,true), null);
   assert.equal(knightClip(COMBAT_ACTION.dead,true), null);
   assert.equal(knightClip(COMBAT_ACTION.knockdown,false), null);
 });
@@ -57,4 +62,57 @@ test("one atlas per clip is shared across fighters, failures use original graphi
     {nowMs:1016}),false);
   assert.equal(renderer.draw(ctx,{...fighter,action:COMBAT_ACTION.dead},
     {nowMs:1032}),false);
+});
+
+test("roll preserves one 350ms presentation cycle across active/recovery states", () => {
+  assert.equal(KNIGHT_ROLL_PRESENTATION_MS,350);
+  assert.equal(KNIGHT_CLIPS.silver_roll,8);
+  assert.equal(KNIGHT_CLIPS.t1_roll,8);
+  const seen=[];
+  class MockImage {
+    set src(url) {
+      const clip = url.match(/([^/]+)\.webp$/)?.[1];
+      this.naturalWidth = (KNIGHT_CLIPS[clip] ?? 0) * KNIGHT_FRAME_PX;
+      this.naturalHeight = 8 * KNIGHT_FRAME_PX;
+      this.onload?.();
+    }
+  }
+  const sprites=createKnightSpriteRenderer({ImageCtor:MockImage,
+    assetBase:new URL("https://example.test/knights/")});
+  const ctx={save(){},restore(){},rotate(){},beginPath(){},ellipse(){},fill(){},
+    drawImage(...args){seen.push(args);}};
+  const fighter={x:80,y:90,facing:Math.PI/2,action:COMBAT_ACTION.dodge};
+  assert.equal(sprites.draw(ctx,fighter,{nowMs:1000}),true);
+  const first=seen.at(-1);
+  assert.equal(first[1],0);
+  assert.deepEqual(first.slice(5),[-56,-65,112,112]);
+  fighter.action=COMBAT_ACTION.dodgeRecovery;
+  assert.equal(sprites.draw(ctx,fighter,{nowMs:1180}),true);
+  assert.equal(seen.at(-1)[1],4*KNIGHT_FRAME_PX,
+    "recovery must not restart clip at frame zero");
+  assert.equal(sprites.draw(ctx,fighter,{nowMs:1400}),true);
+  assert.equal(seen.at(-1)[1],7*KNIGHT_FRAME_PX,
+    "roll must hold the final frame until recovery ends");
+  const remote={...fighter,netId:47,action:COMBAT_ACTION.dodge};
+  assert.equal(sprites.draw(ctx,remote,{nowMs:1500,remote:true}),true);
+  assert.equal(seen.at(-1)[1],0);
+  remote.action=COMBAT_ACTION.dodgeRecovery;
+  assert.equal(sprites.draw(ctx,remote,{nowMs:1670,remote:true}),true);
+  assert.equal(seen.at(-1)[1],3*KNIGHT_FRAME_PX);
+});
+import { readFileSync } from "node:fs";
+
+// The public game consumes these real WebP files; a report alone is not enough.
+test("both A3 roll atlases exist as RIFF/WebP and match the published asset contract", () => {
+  const manifest=JSON.parse(readFileSync(new URL("../web/assets/knights/asset-build-report.json",import.meta.url),"utf8"));
+  for (const name of ["silver_roll","t1_roll"]) {
+    assert.equal(manifest[name].frames,KNIGHT_CLIPS[name]);
+    assert.equal(manifest[name].visualDurationMs,KNIGHT_ROLL_PRESENTATION_MS);
+    assert.deepEqual(manifest[name].sourceKeyframes,[1,3,5,7,9,11,15,22]);
+    const file=readFileSync(new URL("../web/assets/knights/"+name+".webp",import.meta.url));
+    assert.equal(file.subarray(0,4).toString("ascii"),"RIFF");
+    assert.equal(file.subarray(8,12).toString("ascii"),"WEBP");
+    assert.equal(file.length,manifest[name].bytes);
+    assert.ok(file.length>4096);
+  }
 });

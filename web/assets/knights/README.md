@@ -28,3 +28,19 @@ The existing world coordinates, hitboxes, combat state, authoritative simulation
 prediction/reconciliation and network protocol remain unchanged.
 
 Renderer tests: `node --test tests/knight-sprites.test.mjs`.
+
+### Forward roll A3 (opt-in prototype)
+- New local `silver_roll.webp` and remote `t1_roll.webp`: 8 directions x 8 phases each.
+- Source motion authored in Blender 4.5 with 22-bone Mixamo rig; knee bend, hands/shoulder contact, forward tumble and recovery.
+- Renderer uses the same 350 ms presentation across authoritative dodge (170 ms) and dodgeRecovery (180 ms). No physics, i-frame or network protocol changes.
+- Source owner-provided models are *not* committed. A3 Blender/GLB editing files remain on the authorized Windows workstation.
+- Recreate A3 GLB from the original local model with `tools/art/author_knight_forward_roll.py` and Blender Python. Bake 8 x 8 PNG frames with `tools/art/render_knight_roll_sprites.py` (set FPS=60 before GLB import), then pack using `tools/art/pack_knight_roll_sprites.py` and Python Pillow.
+- Sprite atlas rows: south, southwest, west, northwest, north, northeast, east, southeast; columns: motion samples 1, 3, 5, 7, 9, 11, 15, 22 at 60 FPS.
+- Graphics are staged behind `&knights=1`, with a fallback if textures fail to load. Check the in-repo `web/knight-preview.html` roll buttons before any release.
+- **Not yet production approved:** user confirmed A3 motion direction, but in-game optical flow, multiplayer performance, browser and release acceptance still need checking.
+
+#### Reproducible local bake notes
+- Silver Knight camera height offset: 0 (asset source has ground near -0.5 m).
+- T1 Sentinel camera height offset: `--height-offset 0.67` (T1 has a different model-space origin). Without this the Sentinel is clipped at the top for some facings.
+- Each roll bake: `--samples 2` CPU Cycles; 64 transparent 160x160 PNG tiles; the packing tool requires no clipped silhouettes and produces a 1280x1280 WebP.
+- Keep Blender source, its export validation JSON, and original owner models off GitHub unless provenance, size budgets and permission are reviewed.

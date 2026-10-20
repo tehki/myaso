@@ -3,12 +3,13 @@
 import { COMBAT_ACTION } from "../src/browser/combat-readability.mjs";
 
 export const KNIGHT_FRAME_PX = 160;
+export const KNIGHT_ROLL_PRESENTATION_MS = 350;
 export const KNIGHT_DIRECTIONS = Object.freeze([
   "south", "southwest", "west", "northwest", "north", "northeast", "east", "southeast",
 ]);
 export const KNIGHT_CLIPS = Object.freeze({
-  silver_walk: 8, silver_idle: 4, silver_sprint: 8, silver_jump: 6,
-  t1_walk: 8, t1_attack: 8, t1_block: 4,
+  silver_walk: 8, silver_idle: 4, silver_sprint: 8, silver_jump: 6, silver_roll: 8,
+  t1_walk: 8, t1_attack: 8, t1_block: 4, t1_roll: 8,
 });
 const ATTACKS = new Set([
   COMBAT_ACTION.attackWindup, COMBAT_ACTION.attackActive, COMBAT_ACTION.attackRecovery,
@@ -31,7 +32,10 @@ export function knightDirectionIndex(facing) {
 
 export function knightClip(action, remote, speed = 0, moving = false) {
   if (action === COMBAT_ACTION.dead || action === COMBAT_ACTION.knockdown
-    || action === COMBAT_ACTION.dodge || action === COMBAT_ACTION.dash) return null;
+    || action === COMBAT_ACTION.dash) return null;
+  if (action === COMBAT_ACTION.dodge || action === COMBAT_ACTION.dodgeRecovery) {
+    return remote ? "t1_roll" : "silver_roll";
+  }
   if (remote) {
     if (action === COMBAT_ACTION.block) return "t1_block";
     if (ATTACKS.has(action)) return "t1_attack";
@@ -103,8 +107,8 @@ export function createKnightSpriteRenderer({ ImageCtor = Image,
       } else if (clip === "silver_idle") {
         frame = Math.floor(nowMs / 300) % frames;
       } else {
-        const duration = clip === "silver_jump" ? 430
-          : clip === "t1_block" ? 240 : 470;
+        const duration = clip.endsWith("_roll") ? KNIGHT_ROLL_PRESENTATION_MS
+          : clip === "silver_jump" ? 430 : clip === "t1_block" ? 240 : 470;
         frame = Math.min(frames - 1, Math.floor((nowMs - state.clipStartedMs) / duration * frames));
       }
       const src = spriteAtlasRect(fighter.facing ?? 0, frame, frames);
@@ -118,7 +122,12 @@ export function createKnightSpriteRenderer({ ImageCtor = Image,
       ctx.fill();
       ctx.imageSmoothingEnabled = true;
       ctx.imageSmoothingQuality = "high";
-      ctx.drawImage(atlas.image, src.x, src.y, src.width, src.height, -40, -52, 80, 80);
+      // This A3 roll bake uses a wider camera to retain the full shoulder
+      // contact silhouette; scale its presentation to match the idle knight.
+      const rolling = clip.endsWith("_roll");
+      ctx.drawImage(atlas.image, src.x, src.y, src.width, src.height,
+        rolling ? -56 : -40, rolling ? -65 : -52,
+        rolling ? 112 : 80, rolling ? 112 : 80);
       ctx.restore();
       // Bounded cache: disconnected remote identities do not accumulate forever.
       if (states.size > 600) {

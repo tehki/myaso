@@ -40,5 +40,63 @@
     "sourceFrameSize": 256,
     "outputFrameSize": 160,
     "bytes": 95110
+  },
+  "silver_roll": {
+    "frames": 8,
+    "sourceFrameSize": 160,
+    "outputFrameSize": 160,
+    "bytes": 67306,
+    "directionOrder": [
+      "south",
+      "southwest",
+      "west",
+      "northwest",
+      "north",
+      "northeast",
+      "east",
+      "southeast"
+    ],
+    "sourceAnimation": "roll",
+    "sourceModel": "owner-supplied A3 Blender GLB",
+    "visualDurationMs": 350,
+    "sourceKeyframes": [
+      1,
+      3,
+      5,
+      7,
+      9,
+      11,
+      15,
+      22
+    ]
+  },
+  "t1_roll": {
+    "frames": 8,
+    "sourceFrameSize": 160,
+    "outputFrameSize": 160,
+    "bytes": 80344,
+    "directionOrder": [
+      "south",
+      "southwest",
+      "west",
+      "northwest",
+      "north",
+      "northeast",
+      "east",
+      "southeast"
+    ],
+    "sourceAnimation": "roll",
+    "sourceModel": "owner-supplied A3 Blender GLB",
+    "visualDurationMs": 350,
+    "sourceKeyframes": [
+      1,
+      3,
+      5,
+      7,
+      9,
+      11,
+      15,
+      22
+    ]
   }
 }
