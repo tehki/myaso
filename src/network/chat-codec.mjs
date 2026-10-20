@@ -163,6 +163,20 @@ export async function openLocalChat(gameConnection, {
     throw error;
   }
   let closed = false;
+  let outgoingStopped = false;
+  // Chat is optional, and its writer must never survive its receive loop.
+  // Abort only this stream; the WebTransport connection carries live combat.
+  function abortChatWriter() {
+    if (outgoingStopped) return;
+    outgoingStopped = true;
+    try {
+      Promise.resolve(writer.abort(new Error("local chat stream closed")))
+        .catch(() => {})
+        .finally(() => { try { writer.releaseLock(); } catch { /* already released */ } });
+    } catch {
+      try { writer.releaseLock(); } catch { /* already released */ }
+    }
+  }
   let pending = new Uint8Array(0);
   const reading = (async () => {
     try {
@@ -187,6 +201,7 @@ export async function openLocalChat(gameConnection, {
       }
     } finally {
       closed = true;
+      abortChatWriter();
       reader.releaseLock();
     }
   })();
@@ -199,8 +214,12 @@ export async function openLocalChat(gameConnection, {
       await writer.write(frame);
     },
     async close() {
+      // Do not await QUIC backpressure or a peer-held reader. Cancellation
+      // wakes our pending reader.read() and the reading finally releases it.
       closed = true;
-      try { await writer.close(); } finally { writer.releaseLock(); }
+      try { Promise.resolve(reader.cancel("local chat closed")).catch(() => {}); }
+      catch { /* cancellation failure must not affect gameplay */ }
+      abortChatWriter();
     },
     get closed() { return closed; },
     reading,
