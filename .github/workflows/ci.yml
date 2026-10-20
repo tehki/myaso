@@ -220,6 +220,11 @@ jobs:
           node --check src/world/chronicle-threads.mjs
           node --test tests/world-chronicle-threads.test.mjs
 
+      - name: Validate D15 optional chronicle clue atlas pins
+        run: |
+          node --check src/world/chronicle-atlas.mjs
+          node --test tests/world-chronicle-atlas.test.mjs
+
       - name: Validate M188 repeated real heavy counterplay windows
         run: |
           # Three fresh Chrome/Firefox sessions for each real defensive read.
