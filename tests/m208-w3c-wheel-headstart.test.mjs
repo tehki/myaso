@@ -76,9 +76,9 @@ test("M208 helper remains testable but M221 runner uses wheel-first batched genu
   const source=readFileSync(new URL("../scripts/pvp_browser_flight_runner.mjs",import.meta.url),"utf8");
   const segment=source.slice(source.indexOf("async function runOnlineUiGuardBreakFlight("),
     source.indexOf("async function waitForUiGuardBreakEvidence("));
-  assert.ok(segment.includes("dispatchM212AttackLedShortBlock({"));
+  assert.ok(segment.includes("dispatchR2ReleaseLedShortBlock({"));
   assert.ok(segment.includes("sendWheel: () => scrollArenaWheel(defender, defenderElementId, 120, 0)"));
-  assert.ok(segment.includes("sendAttackClick: (clickHoldMs) => performArenaM221GuardBreakClick(attacker, clickHoldMs)"));
+  assert.ok(segment.includes("sendAttackUp: () => setArenaAttackButton(attacker, false)"));
   assert.ok(segment.includes("feedbackTransitions.includes(\"parried\")"));
   assert.ok(segment.includes("defenderState?.playerHp !== 100"));
   assert.ok(segment.includes("defenderResult.playerGuard !== 0"));

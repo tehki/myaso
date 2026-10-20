@@ -27,8 +27,8 @@ test("M203 helper remains stable while M221 orders real wheel before one genuine
   const section=source.slice(source.indexOf("async function runOnlineUiGuardBreakFlight("),
     source.indexOf("async function waitForUiGuardBreakEvidence("));
   assert.ok(section.includes("sendWheel: () => scrollArenaWheel(defender, defenderElementId, 120, 0)"));
-  assert.ok(section.includes("dispatchM212AttackLedShortBlock({"));
-  assert.ok(section.includes("sendAttackClick: (clickHoldMs) => performArenaM221GuardBreakClick(attacker, clickHoldMs)"));
+  assert.ok(section.includes("dispatchR2ReleaseLedShortBlock({"));
+  assert.ok(section.includes("sendAttackUp: () => setArenaAttackButton(attacker, false)"));
   assert.ok(section.includes("defenderState?.playerHp !== 100"));
   assert.ok(section.includes('feedbackTransitions.includes("parried")'));
   assert.ok(section.includes("defenderResult.playerGuard !== 0"));

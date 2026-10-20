@@ -27,7 +27,7 @@ import { verifyM211DualRecoveryServerProof } from "./m211-dual-recovery-phase-pr
 import { planM203W3cPointerPause } from "./m203-w3c-wheel-ack.mjs";
 import { planM225ThreatDistanceStaging } from "./m225-ffa-threat-distance.mjs";
 import { awaitM223HeavyWindup, planM223WheelDelay } from "./m223-server-heavy-windup.mjs";
-import { dispatchM212AttackLedShortBlock } from "./m212-attack-led-short-block.mjs";
+import { dispatchR2ReleaseLedShortBlock } from "./r2-release-led-short-block.mjs";
 import { createM221TrustedWheelRegistry } from "./m221-trusted-wheel-attestation.mjs";
 import { createM227TrustedLightRegistry } from "./m227-trusted-light-pointer.mjs";
 import { planM197KnockdownClusterNudge } from "./m197-knockdown-cluster.mjs";
@@ -9643,23 +9643,23 @@ async function runOnlineUiGuardBreakFlight(entries, { onGuardBroken = null } = {
         await execute(defender.base, defender.sessionId,
           "window.__MYASO_M221_WHEEL_TOKEN__ = " + JSON.stringify(challenge.token)
             + "; return true;");
-        m212Exchange = await dispatchM212AttackLedShortBlock({
-          // M252 integrates M249: no obsolete fixed 48ms post-wheel delay
-          // after genuine trusted Firefox wheel receipt in R1 guardbreak.
-          wheelHeadStartMs: 0,
-          // A real authenticated wheel must precede Chrome light by enough
-          // time to EXPIRE the 125ms parry but remain inside 240ms guard.
-          // Authoritative CI #39303800110 recorded a third-contact parry
-          // at wheel tick 379 / hit tick 385; this acceptance-only 45ms
-          // wait follows the actual trusted DOM event, not wheel ACK.
-          postTrustedWheelMs: 45,
+        // R2: arm authentic Chrome LMB first. It charges but cannot strike
+        // until released; Firefox's trusted wheel-back must arrive before
+        // the ONLY light commitment (Chrome pointerUP). A delayed Firefox
+        // receipt no longer postpones a whole additional 10ms W3C click
+        // beyond the original 240ms block window. Keep all fail-closed HP,
+        // parry, guard and W3C-provenance assertions below unchanged.
+        m212Exchange = await dispatchR2ReleaseLedShortBlock({
+          sendAttackDown: () => setArenaAttackButton(attacker, true),
           sendWheel: () => scrollArenaWheel(defender, defenderElementId, 120, 0),
           awaitTrustedWheel: () => challenge.wait(),
-          sendAttackClick: (clickHoldMs) => performArenaM221GuardBreakClick(attacker, clickHoldMs),
-          sleep,
+          sendAttackUp: () => setArenaAttackButton(attacker, false),
         });
       } finally {
         challenge.close();
+        // If the trusted wheel or W3C release failed, terminate the still
+        // held native gesture before the failed acceptance session closes.
+        // A failure must never become a silent counted guard exchange.
       }
       await sleep(230);
       const states = await Promise.all(entries.map(readUiEvidence));

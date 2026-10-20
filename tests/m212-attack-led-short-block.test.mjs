@@ -130,14 +130,13 @@ test("M221 runner preserves real wheel/W3C down-up and original no-parry/no-HP g
   const source = readFileSync(new URL("../scripts/pvp_browser_flight_runner.mjs", import.meta.url), "utf8");
   const segment = source.slice(source.indexOf("async function runOnlineUiGuardBreakFlight("),
     source.indexOf("async function waitForUiGuardBreakEvidence("));
-  assert.ok(segment.includes("dispatchM212AttackLedShortBlock({"));
+  assert.ok(segment.includes("dispatchR2ReleaseLedShortBlock({"));
   assert.ok(segment.includes("sendWheel: () => scrollArenaWheel(defender, defenderElementId, 120, 0)"));
-  assert.ok(segment.includes("sendAttackClick: (clickHoldMs) => performArenaM221GuardBreakClick(attacker, clickHoldMs)"));
-  const w3cClick = source.slice(source.indexOf("async function performArenaM221GuardBreakClick("),
-    source.indexOf("async function setArenaAttackButton("));
-  assert.ok(w3cClick.includes('{ type: "pointerDown", button: 0 }'));
-  assert.ok(w3cClick.includes('{ type: "pause", duration: clickHoldMs }'));
-  assert.ok(w3cClick.includes('{ type: "pointerUp", button: 0 }'));
+  assert.ok(segment.includes("sendAttackUp: () => setArenaAttackButton(attacker, false)"));
+  const w3cClick = source.slice(source.indexOf("async function setArenaAttackButton("),
+    source.indexOf("async function performArenaAttackBurst("));
+  assert.ok(w3cClick.includes('pressed ? "pointerDown" : "pointerUp"'));
+  assert.ok(w3cClick.includes("button: 0"));
   assert.ok(w3cClick.includes('/session/${session.sessionId}/actions'));
   // The real failure must log both W3C harness-clock ingress and Firefox/
   // Chrome-local observations BEFORE the original fatal guard assertions.
@@ -415,17 +414,91 @@ test("M249 runner changes only R1 M194 call-site head start and preserves strict
   const end = s.indexOf("async function waitForUiGuardBreakEvidence(", begin);
   assert.ok(begin >= 0 && end > begin);
   const flight = s.slice(begin, end);
-  const scheduling = flight.indexOf("m212Exchange = await dispatchM212AttackLedShortBlock({");
+  const scheduling = flight.indexOf("m212Exchange = await dispatchR2ReleaseLedShortBlock({");
   assert.ok(scheduling > 0);
   const options = flight.slice(scheduling, scheduling + 900);
-  assert.ok(options.includes("wheelHeadStartMs: 0"));
-  assert.ok(options.includes("postTrustedWheelMs: 45"));
+  assert.ok(options.includes("awaitTrustedWheel: () => challenge.wait()"));
+  assert.ok(options.includes("sendAttackDown: () => setArenaAttackButton(attacker, true)"));
   assert.ok(options.includes("awaitTrustedWheel: () => challenge.wait()"));
   assert.ok(options.includes("sendWheel: () => scrollArenaWheel(defender, defenderElementId, 120, 0)"));
-  assert.ok(options.includes("sendAttackClick: (clickHoldMs) => performArenaM221GuardBreakClick(attacker, clickHoldMs)"));
+  assert.ok(options.includes("sendAttackUp: () => setArenaAttackButton(attacker, false)"));
   assert.ok(flight.includes('defenderState?.playerHp !== 100'));
   assert.ok(flight.includes('feedbackTransitions.includes("parried")'));
   assert.ok(flight.includes('defenderResult.playerGuard !== 0'));
   assert.ok(flight.includes('defenderResult.playerHp !== 100'));
   assert.ok(flight.includes('console.log("M212_GUARD_BREAK_INGRESS "'));
+});
+
+
+// R2's real click timing is a DOWN -> trusted wheel -> UP sequence.
+// Only the native release is a strike; the legacy M212 path is still
+// exercised separately above for compatibility and historical diagnostics.
+import { dispatchR2ReleaseLedShortBlock } from "../scripts/r2-release-led-short-block.mjs";
+
+test("R2 holds a real LMB before wheel, commits only after trusted wheel, and still awaits W3C ACK", async()=>{
+  const wheel=deferred(),trusted=deferred();
+  let time=0;
+  const events=[];
+  const flight=dispatchR2ReleaseLedShortBlock({
+    now:()=>time,
+    sendAttackDown:()=>{events.push("native-down");time=5;},
+    sendWheel:()=>{events.push("native-wheel");return wheel.promise;},
+    awaitTrustedWheel:()=>trusted.promise,
+    sendAttackUp:()=>{events.push("native-up");time=90;},
+  });
+  await new Promise(setImmediate);
+  assert.deepEqual(events,["native-down","native-wheel"]);
+  time=77;
+  trusted.resolve({trusted:true,deltaY:120});
+  await new Promise(setImmediate);
+  assert.deepEqual(events,["native-down","native-wheel","native-up"]);
+  let done=false;
+  flight.then(()=>{done=true;});
+  await new Promise(setImmediate);
+  assert.equal(done,false,"late geckodriver rejection must remain fatal");
+  time=110;
+  wheel.resolve();
+  const data=await flight;
+  assert.equal(data.trustedWheelObservedMs,77);
+  assert.equal(data.attackDownAckMs,5);
+  assert.equal(data.attackUpDispatchMs,77);
+  assert.equal(data.wheelAckMs,110);
+  assert.equal(data.clickHoldMs,77);
+  assert.equal(data.wheelHeadStartMs,0);
+  assert.equal(data.postTrustedWheelMs,0);
+});
+
+test("R2 never releases LMB without the genuinely trusted wheel event",async()=>{
+  let downs=0,ups=0;
+  await assert.rejects(()=>dispatchR2ReleaseLedShortBlock({
+    sendAttackDown:()=>{downs++;},
+    sendWheel:()=>{},
+    awaitTrustedWheel:()=>({trusted:false,deltaY:120}),
+    sendAttackUp:()=>{ups++;},
+  }),/trusted real Firefox/);
+  assert.equal(downs,1);
+  assert.equal(ups,0);
+});
+
+test("R2 refuses a prolonged hold that could fabricate a heavy release",async()=>{
+  let time=0,ups=0;
+  await assert.rejects(()=>dispatchR2ReleaseLedShortBlock({
+    now:()=>time,
+    sendAttackDown:()=>{time=5;},
+    sendWheel:()=>{},
+    awaitTrustedWheel:()=>{time=320;return {trusted:true,deltaY:120};},
+    sendAttackUp:()=>{ups++;},
+  }),/exceeded light-charge budget/);
+  assert.equal(ups,0);
+});
+
+test("R2 rejects genuine W3C wheel errors before a light release",async()=>{
+  let ups=0;
+  await assert.rejects(()=>dispatchR2ReleaseLedShortBlock({
+    sendAttackDown:()=>{},
+    sendWheel:()=>Promise.reject(Error("wheel transport rejected")),
+    awaitTrustedWheel:()=>new Promise(()=>{}),
+    sendAttackUp:()=>{ups++;},
+  }),/wheel transport rejected/);
+  assert.equal(ups,0);
 });
