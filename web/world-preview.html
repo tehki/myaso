@@ -70,7 +70,7 @@ The geography, town names, buildings and roads are fixed and identical for all p
 <div id="expedition-notice" role="status" aria-live="polite" hidden></div>
 <div class="wayfinding-panel" aria-label="Traveler's compass and sketch">
 <div id="wayfinding-compass" role="status">Choose an expedition to see a bearing.</div>
-<div class="wayfinding-note">Straight-line compass only. Follow roads and use bridges. Press <kbd>M</kbd> to show or hide the sketch map.</div>
+<div class="wayfinding-note">Straight-line compass only. When a surveyed trail is shown, it connects previous and next milestones—not your current position. Rejoin on foot. Press <kbd>M</kbd> to toggle the sketch.</div>
 <canvas id="wayfinding-map" width="248" height="248" aria-label="Moonvale sketch map, white player and amber destination" hidden></canvas>
 </div>
 </section>
@@ -83,6 +83,7 @@ import { moveAuthoredPreview, isAuthoredPreviewWalkable } from "../src/world/aut
 import { MOONVALE_EXPEDITIONS, createLocalExpeditionState, chooseLocalExpedition,
   localExpeditionProgress, advanceLocalExpedition } from "../src/world/local-expeditions.mjs";
 import { localWayfindingHint, drawLocalWayfindingSketch } from "../src/world/local-wayfinding.mjs";
+import { certifiedTrailForNext } from "../src/world/local-trails.mjs";
 import { MOONVALE_FIELD_SITES, createLocalFieldNotebook, nearbyLocalFieldSite,
   observeLocalFieldSite, localFieldSurveyProgress } from "../src/world/field-survey.mjs";
 const canvas=document.querySelector("#arena");
@@ -120,8 +121,10 @@ function refreshWayfinding(now){
   if(now<nextWayfindingAt)return;
   nextWayfindingAt=now+250;
   const hint=localWayfindingHint(expeditionState,mapId,player.x,player.y);
+  const trail=certifiedTrailForNext(expeditionState,mapId);
   wayfindingCompass.textContent=hint
     ? "Bearing "+hint.direction+" · "+Math.round(hint.distance)+" units to "+hint.targetName
+      +(trail?" · surveyed trail: "+trail.points.length+" waypoints":" · direct bearing only")
     : "No active overworld expedition bearing.";
   wayfindingMap.hidden=!wayfindingVisible || mapId!==MAP_IDS.overworld;
   if(!wayfindingMap.hidden){
