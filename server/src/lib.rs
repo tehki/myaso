@@ -7,6 +7,7 @@ pub mod elemental_collision;
 pub mod elemental_fields;
 pub mod elemental_physics;
 pub mod kill_event;
+pub mod magic_fx_delivery;
 pub mod magic_fx_events;
 pub mod magic_fx_spatial;
 pub mod reliable;
