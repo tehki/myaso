@@ -125,7 +125,7 @@ async function run(browser, port) {
     `);
     const preflight = await script(`
       return Promise.all(["/web/audio/foley/footstep01.ogg",
-        "/web/audio/music/cathedral-in-the-forest.ogg"].map(async (url) => {
+        "/web/audio/music/moonlit-notes.ogg"].map(async (url) => {
         const r = await fetch(url);
         const bytes = await r.arrayBuffer();
         return { url, status: r.status, type: r.headers.get("content-type"),
@@ -150,10 +150,10 @@ async function run(browser, port) {
     let loaded = 0;
     for (let n = 0; n < 100; n++) {
       loaded = await script("return window.__r4Audio.loadedFoleyCount()");
-      if (loaded === 26) break;
+      if (loaded === 23) break;
       await delay(100);
     }
-    if (loaded !== 26) {
+    if (loaded !== 23) {
       const diagnostics = await script(`
         return (async () => {
           let directDecode;
@@ -177,7 +177,7 @@ async function run(browser, port) {
           };
         })();
       `);
-      throw new Error(browser + " decoded " + loaded + "/26 OGG assets: " + JSON.stringify(diagnostics));
+      throw new Error(browser + " decoded " + loaded + "/23 OGG assets: " + JSON.stringify(diagnostics));
     }
     let audioState = await script("return window.__r4Context.state");
     if (audioState !== "running") {
@@ -242,18 +242,18 @@ async function run(browser, port) {
     await click("#prepare");
     let auditionLoaded = false;
     for (let n = 0; n < 120; n++) {
-      auditionLoaded = await script('return document.querySelector("#counter").textContent === "26 / 26 decoded"');
+      auditionLoaded = await script('return document.querySelector("#counter").textContent === "23 / 23 decoded"');
       if (auditionLoaded) break;
       await delay(100);
     }
-    assert.equal(auditionLoaded, true, browser + " sound audition did not decode all 26 OGGs");
+    assert.equal(auditionLoaded, true, browser + " sound audition did not decode all 23 OGGs");
     assert.equal(await script('return document.querySelector("[data-cue=light]").disabled'), false);
     await click("[data-cue=light]");
     const auditionStatus = await script('return document.querySelector("#status").textContent');
     assert.match(auditionStatus, /Playing Light \(recorded variant\)/);
     await click("#music-toggle");
     assert.equal(await script('return document.querySelector("#music-toggle").getAttribute("aria-pressed")'), "true");
-    console.log("R4_AUDITION " + JSON.stringify({ browser, decoded: 26,
+    console.log("R4_AUDITION " + JSON.stringify({ browser, decoded: 23,
       recordedCuePlayed: true, independentMusicEnabled: true, noGameplay: true }));
   } finally {
     if (session) await command(base, "DELETE", "/session/" + session).catch(() => {});

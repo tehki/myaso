@@ -1,72 +1,87 @@
-# myaso.io audio sources and sound direction
+# myaso.io Sound R4.1 — sources and listening direction
 
-## Recorded foley — CC0
+## Physical combat sound effects — CC0
 
-**Kenney, RPG Audio (2014), Creative Commons CC0 1.0**
-- Official: https://kenney.nl/assets/rpg-audio
-- Archived bundle: https://opengameart.org/content/50-rpg-sound-effects
-- Original distribution: https://opengameart.org/sites/default/files/RPGsounds_Kenney.zip
+**Kenney, RPG Audio (2014), CC0 1.0**
+- https://kenney.nl/assets/rpg-audio
+- https://opengameart.org/content/50-rpg-sound-effects
+- Distribution: https://opengameart.org/sites/default/files/RPGsounds_Kenney.zip
 
-The 26 included `web/audio/foley/*.ogg` files are **unchanged originals** from the `OGG/` directory of this bundle (the audio itself, not the .sfk waveform sidecars). They cover knife swishes, metallic contact, clothing/leather movement, steps and physical impacts. We retain per-event randomized pitch and variant rotation to avoid a mechanical repeating sound.
+The 23 bundled `web/audio/foley/*.ogg` files are unchanged recordings
+from the original Kenney OGG set. They include blade movement, leathery
+impacts, soft fabric shifts, physical footfalls and a short restrained
+metal click. Playback uses subtle randomized rates and gain calibration.
 
-## Ambient music — CC0
+**R4.1 listening-driven safety correction:** the three resonant
+`metalPot1/2/3.ogg` files were removed. They sounded sharp or squealing,
+especially as Guard Break variants. **Guard Break now rotates only between
+low, dry leather and cloth recordings**, slowed down and passed through a
+950 Hz low-pass filter at reduced volume. Block and parry use similarly
+damped recordings with a 1750 Hz low-pass filter. A softened procedural
+fallback remains available if a browser cannot decode OGG.
 
-**congusbongus, "Cathedral in the forest (ambient loop)" (2022), Creative Commons CC0 1.0**
-- Author/source: https://opengameart.org/content/cathedral-in-the-forest-ambient-loop
-- Included original: `web/audio/music/cathedral-in-the-forest.ogg` (the source's `forest_2.ogg` renamed, otherwise unchanged, 136.97 seconds)
-- 2:17 seamless loop of subdued dark atmospheric pads and bells; not combat music
+The quiet draw-knife recordings require small gain compensation (8x);
+`metalClick` receives a 4x trim, and `cloth4` 2x. These corrections are
+controlled by final per-cue volume. There is no real-time audio analysis
+or synchronous asset loading on combat input.
 
-All included media are confirmed CC0 as published on their original asset pages. Attribution is optional; credit is included for transparency. They are bundled locally and never streamed from a third-party host during gameplay.
+## Original minimal Moonlit Notes music (R4.1)
 
-## R4 playback loudness calibration
+- File: `web/audio/music/moonlit-notes.ogg`
+- Source: `scripts/generate_moonlit_notes.py` (reproducible PCM score)
+- Original composition for myaso.io; **no third-party music recording**
+- 96-second quiet loop, 24 short pentatonic notes, true silence between
+  notes and at loop boundaries, no sustained chords, organs, pads or drone
+- Standard 48 kHz stereo Vorbis OGG (~287 KB) resampled from 24 kHz mono score; served locally
 
-Objective `ffmpeg volumedetect` measurements on the original bundled OGGs showed
-`drawKnife1.ogg` at -44.7 dBFS mean versus `knifeSlice.ogg` at -21.5 dBFS,
-and `drawKnife2.ogg` at -41.3 dBFS mean versus `chop.ogg` at -18.5 dBFS.
-Untrimmed rotation could make consecutive blade cues differ by roughly 23 dB.
-The very short `metalClick` is also quieter than the resonant `metalPot`
-recordings. The Web Audio player applies small **per-recording gain trims**
-(8x boost for both draw-knife files; 4x for metalClick; attenuation on
-metalPot1/2/3; 2x for cloth4). Source files remain byte-for-byte unchanged.
-The boosted knife clip peaks remain below full scale at the standard mix gain.
-No waveform scans, network requests, or normalizations run during player input.
-These instrumented gain trims improve consistent attack readability but do
-not replace subjective listening tests for material character or final mix.
+The previous 137-second `Cathedral in the forest` CC0 recording was removed
+in response to listening feedback: its constantly sustained organ-like
+texture competed with the game's natural sounds. The new track is
+intentionally simple: a few low soft notes with room for silence.
 
+Regenerate from the repository root:
 
-## Mixing principles
+```bash
+python3 scripts/generate_moonlit_notes.py /tmp/myaso-moonlit-notes.wav
+ffmpeg -y -i /tmp/myaso-moonlit-notes.wav -ar 48000 -ac 2 -c:a libvorbis -q:a 3 web/audio/music/moonlit-notes.ogg
+```
 
-- **Combat and world foley:** physical recordings first. For missing files/OGG-decoding failures the previous lightweight procedural cues remain as fail-silent fallbacks. Sound is neither authoritative gameplay nor a source of input latency.
-- **Ambient music:** quiet background atmosphere, not synchronized to fights and never a loud combat-theme interruption. A dedicated Music on/off control is opt-in; a separate level defaults to 35% on a 30%-headroom bus. The page and network simulation never force audio autoplay.
-- **Space:** positional nearby remote cues, distance reduction, 1-cue-per-action onset, and no distant sounds. Avoid needless sound overlap.
-- **Future:** swap region-appropriate biome/weather loops at the music boundary and add in-world distance-reduced NPC, environment and inventory sounds without changing authoritative game mechanics.
+Music remains independently opt-in; at the default Music setting of
+35%, the media element is limited to 10.5% of full-scale playback. Sound
+effects and music have separate controls and persist independently. No
+automatic music starts on combat input; hidden tabs pause playback.
 
-## Sound-only listening review (no playable game)
+## Sound-only listening review
 
-The standalone `web/audio/audition.html` uses **the same
-`src/browser/game-audio.mjs` mixer as gameplay**, including measured CC0
-recording trims, randomized playback speed, pan, game effects slider and
-independent low-level ambient music. There is no combat simulation or game
-connection on this page. Effects stay disabled until all 26 local OGG files
-decode; the page never silently substitutes synthetic sounds during review.
+The standalone `web/audio/audition.html` uses the identical mixer from
+`src/browser/game-audio.mjs` without loading or simulating the game.
+Buttons are disabled until **23 / 23 decoded** local CC0 effects are ready.
+The page does not silently play synthesized replacements during a review.
 
-From the repository root on Windows, serve the current Sound branch locally:
+From a Sound R4.1 branch checkout:
 
 ```powershell
 py -m http.server 8000
 ```
 
-Then open `http://localhost:8000/web/audio/audition.html`. Click **Prepare 26
-recordings**, wait for **26 / 26 decoded**, and use the cue buttons. Try each
-cue a few times to hear variant loudness, then turn on the independent ambient
-music and compare attacks and blocks over it. Pan the sound left/right to
-audition remote spatial placement. Use comfortable headphone levels.
+Then open `http://127.0.0.1:8000/web/audio/audition.html`; click
+**Prepare 23 recordings**, wait for all 23 to decode, and try Guard Break
+multiple times. Compare Parry/Block, Light/Heavy and the quiet Moonlit Notes
+music. Pan the sound to test spatial placement. Use comfortable headphone
+levels at first.
 
-Before Sound R4 can be called *subjectively accepted*, a human listener
-should verify that light/heavy blades are distinguishable and convincingly
-physical, parry/block metal is not painfully sharp, footsteps and cloth
-movement sound proportional, death and damage are readable, and music remains
-background atmosphere without dominating combat. The listening reviewer
-should explicitly report approval or concrete changes needed. Native CI
-automatically tests correct decoding/playback/UI but does not claim human
-listening approval.
+Before R4.1 is subjectively accepted, a human listener should confirm
+**no shrill/squeaky Guard Break variant**, dull but legible hit and block
+feedback, blade motion that remains physical, and only sparse simple notes
+in the background. The automated Chromium/Firefox native media tests
+prove playback and controls, not whether the audio sounds good to a person.
+
+## Technical constraints
+
+- Client audio is optional, nonauthoritative and never blocks input,
+  rendering, networking, death, loot, or server simulation.
+- The two OGG decode workers are bounded per browser; audio stays local.
+- Distant opponents are attenuated, replayed packets remain silent, and
+  speculative local attacks are never treated as confirmed remote hits.
+- All 23 foley samples remain CC0, with source credits above; the new
+  Moonlit Notes music is original to this project.

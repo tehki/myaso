@@ -18,6 +18,7 @@ class Context {
   oscillators = 0;
   samples = [];
   gainNodes = [];
+  filters = [];
   destination = new Node();
   constructor() { Context.created++; Context.instances.push(this); }
   createGain() {
@@ -28,7 +29,11 @@ class Context {
   createStereoPanner() { return Object.assign(new Node(), { pan: new Param() }); }
   createOscillator() { this.oscillators++; return Object.assign(new Node(), { frequency: new Param(), start() {}, stop() {} }); }
   createBuffer(_channels, length) { return { getChannelData() { return new Float32Array(length); } }; }
-  createBiquadFilter() { return Object.assign(new Node(), { frequency: new Param() }); }
+  createBiquadFilter() {
+    const filter = Object.assign(new Node(), { frequency: new Param() });
+    this.filters.push(filter);
+    return filter;
+  }
   createBufferSource() {
     const sample = Object.assign(new Node(), { playbackRate: new Param(), start() {}, stop() {} });
     this.samples.push(sample);
@@ -51,17 +56,17 @@ class MusicTrack {
 
 test("R4 CC0 recorded foley and ambient loop are bundled locally", () => {
   const files = readdirSync(new URL("../web/audio/foley/", import.meta.url));
-  assert.equal(files.length, 26);
+  assert.equal(files.length, 23);
   for (const file of files) {
     assert.match(file, /^[\w]+\.ogg$/);
     assert.equal(readFileSync(new URL("../web/audio/foley/" + file, import.meta.url)).subarray(0, 4).toString(), "OggS");
   }
-  const ambient = readFileSync(new URL("../web/audio/music/cathedral-in-the-forest.ogg", import.meta.url));
+  const ambient = readFileSync(new URL("../web/audio/music/moonlit-notes.ogg", import.meta.url));
   assert.equal(ambient.subarray(0, 4).toString(), "OggS");
-  assert.ok(ambient.byteLength > 100_000 && ambient.byteLength < 5_000_000);
+  assert.ok(ambient.byteLength > 30_000 && ambient.byteLength < 450_000, "minimal sparse soundtrack stays lightweight");
   const source = readFileSync(new URL("../web/audio/SOURCES.md", import.meta.url), "utf8");
   assert.match(source, /Kenney.*CC0/);
-  assert.match(source, /congusbongus[\s\S]*?CC0/);
+  assert.match(source, /Moonlit Notes[\s\S]*?original/i);
 });
 
 test("R4 natural foley decodes asynchronously, uses OGG rather than oscillator once loaded, and preserves cooldown", async () => {
@@ -75,13 +80,13 @@ test("R4 natural foley decodes asynchronously, uses OGG rather than oscillator o
   assert.equal(audio.play("step"), false);
   assert.equal(audio.loadedFoleyCount(), 0);
   assert.equal(audio.unlock(), true);
-  for (let i = 0; i < 30 && audio.loadedFoleyCount() < 26; i++) {
+  for (let i = 0; i < 30 && audio.loadedFoleyCount() < 23; i++) {
     await new Promise(resolve => setTimeout(resolve, 0));
   }
-  assert.equal(audio.loadedFoleyCount(), 26);
-  assert.equal(requested.length, 26);
+  assert.equal(audio.loadedFoleyCount(), 23);
+  assert.equal(requested.length, 23);
   assert.ok(requested.every(u => u.includes("/web/audio/foley/") && u.endsWith(".ogg")));
-  assert.equal(new Set(requested).size, 26, "each real recording is decoded once");
+  assert.equal(new Set(requested).size, 23, "each real recording is decoded once");
   const ctx = Context.instances.at(-1);
   assert.equal(audio.play("light"), true);
   assert.equal(audio.play("light"), false, "same-simulation-tick events cannot duplicate sound");
@@ -92,7 +97,7 @@ test("R4 natural foley decodes asynchronously, uses OGG rather than oscillator o
   assert.equal(ctx.samples.length, 3);
   assert.equal(ctx.samples[0].playbackRate.value, 1);
   assert.ok(ctx.samples.every(sample => sample.buffer.length === 4));
-  assert.equal(requested.length, 26, "combat playback never fetches media synchronously");
+  assert.equal(requested.length, 23, "combat playback never fetches media synchronously");
 });
 
 test("R4 music is opt-in, separate from effects, quiet, looping, and persistent", () => {
@@ -106,7 +111,7 @@ test("R4 music is opt-in, separate from effects, quiet, looping, and persistent"
   audio.setMusicEnabled(true);
   assert.equal(MusicTrack.created.length, initial + 1);
   const track = MusicTrack.created.at(-1);
-  assert.ok(track.src.endsWith("/web/audio/music/cathedral-in-the-forest.ogg"));
+  assert.ok(track.src.endsWith("/web/audio/music/moonlit-notes.ogg"));
   assert.equal(track.loop, true);
   assert.equal(track.preload, "none");
   assert.equal(audio.isMusicPlaying(), true);
@@ -235,7 +240,7 @@ test("R4 native browser servers declare OGG MIME and CI runs genuine browser aud
   assert.match(harness, /assert\.equal\(result\.sources, 1/);
 });
 
-test("R4 per-recording gain trims stabilize quiet blade variants and tame metal impacts", async () => {
+test("R4 recorded effects calibrate blade loudness while avoiding shrill metal impacts", async () => {
   const audio = createGameAudio({
     AudioContextImpl: Context, AudioElementImpl: MusicTrack, storage: null,
     random: () => .5,
@@ -245,10 +250,10 @@ test("R4 per-recording gain trims stabilize quiet blade variants and tame metal 
     }),
   });
   assert.equal(audio.unlock(), true);
-  for (let i = 0; i < 30 && audio.loadedFoleyCount() < 26; i++) {
+  for (let i = 0; i < 30 && audio.loadedFoleyCount() < 23; i++) {
     await new Promise(resolve => setTimeout(resolve, 0));
   }
-  assert.equal(audio.loadedFoleyCount(), 26);
+  assert.equal(audio.loadedFoleyCount(), 23);
   const ctx = Context.instances.at(-1);
   function nextGain(cue) {
     ctx.currentTime += .35; // Preserve the real per-cue dedupe window.
@@ -263,7 +268,7 @@ test("R4 per-recording gain trims stabilize quiet blade variants and tame metal 
   assert.ok(Math.abs(heavies[1] / heavies[0] - 8) < 1e-9);
   const parries = [nextGain("parry"), nextGain("parry")];
   assert.ok(parries[0] > parries[1],
-    "quiet metallic click is boosted while resonant metal pot is attenuated");
+    "quiet metallic click is boosted, but filtered to suppress high resonances");
   const blocks = [nextGain("block"), nextGain("block"), nextGain("block")];
   assert.ok(blocks[0] < .64 && blocks[1] < .64 && blocks[2] > .64);
   // An 8x boost on the quietest measured knife variant stays below full scale
@@ -272,11 +277,11 @@ test("R4 per-recording gain trims stabilize quiet blade variants and tame metal 
   audio.dispose();
 });
 
-test("R4 sound-only audition gates recorded playback on 26 decoded OGGs", () => {
+test("R4 sound-only audition gates recorded playback on 23 decoded OGGs", () => {
   const html = readFileSync(new URL("../web/audio/audition.html", import.meta.url), "utf8");
   assert.match(html, /createGameAudio, installGameAudioControls/);
   assert.match(html, /audio\.loadedFoleyCount\(\)/);
-  assert.match(html, /if \(count !== 26\) return/);
+  assert.match(html, /if \(count !== 23\) return/);
   assert.match(html, /button\.disabled = true/);
   assert.match(html, /button\.disabled = false/);
   assert.match(html, /audio\.play\(cue, \{ pan: Number\(panSlider\.value\) \/ 100 \}\)/);
@@ -286,4 +291,56 @@ test("R4 sound-only audition gates recorded playback on 26 decoded OGGs", () => 
   assert.doesNotMatch(html, /<script[^>]+src=|\/web\/(?:game|online-game)\.mjs/);
   const harness = readFileSync(new URL("../scripts/r4_audio_browser_acceptance.mjs", import.meta.url), "utf8");
   assert.match(harness, /R4_AUDITION/);
+});
+
+test("R4.1 owner listening feedback removes shrill pots and dampens both guard break variants", async () => {
+  const files = readdirSync(new URL("../web/audio/foley/", import.meta.url));
+  assert.equal(files.length, 23);
+  assert.ok(files.every(file => !file.startsWith("metalPot")),
+    "all squealing resonant metal-pot recordings must be removed, not just made quieter");
+  const source = readFileSync(new URL("../src/browser/game-audio.mjs", import.meta.url), "utf8");
+  assert.match(source, /guardbreak: \["dropLeather", "cloth1"\]/);
+  assert.match(source, /name === "guardbreak" \? 950/);
+  const audio = createGameAudio({
+    AudioContextImpl: Context, AudioElementImpl: MusicTrack, storage: null,
+    random: () => .5,
+    fetchImpl: async () => ({
+      ok: true, arrayBuffer: async () => Uint8Array.of(0x4f, 0x67, 0x67, 0x53).buffer,
+    }),
+  });
+  assert.equal(audio.unlock(), true);
+  for (let n = 0; n < 30 && audio.loadedFoleyCount() !== 23; n++) {
+    await new Promise(resolve => setTimeout(resolve, 0));
+  }
+  assert.equal(audio.loadedFoleyCount(), 23);
+  const ctx = Context.instances.at(-1);
+  for (let n = 0; n < 2; n++) {
+    ctx.currentTime += .4;
+    assert.equal(audio.play("guardbreak"), true);
+    assert.ok(ctx.samples.at(-1).playbackRate.value >= .80 &&
+      ctx.samples.at(-1).playbackRate.value <= .85, "low physical-impact pitch");
+    assert.ok(ctx.gainNodes.at(-1).gain.value <= .34, "safely reduced impact gain");
+    assert.equal(ctx.filters.at(-1).frequency.value, 950, "high frequencies suppressed");
+    assert.equal(ctx.filters.at(-1).type, "lowpass");
+  }
+  ctx.currentTime += .4;
+  assert.equal(audio.play("parry"), true);
+  assert.equal(ctx.filters.at(-1).frequency.value, 1750,
+    "parry metallic recording is filtered instead of painfully bright");
+  audio.dispose();
+});
+
+test("R4.1 original ambient source has short notes, silence and no recorded organ loop", () => {
+  const track = readFileSync(new URL("../web/audio/music/moonlit-notes.ogg", import.meta.url));
+  assert.equal(track.subarray(0, 4).toString(), "OggS");
+  assert.ok(track.length < 450_000, "original sparse track remains lightweight");
+  const generator = readFileSync(new URL("../scripts/generate_moonlit_notes.py", import.meta.url), "utf8");
+  assert.match(generator, /SECONDS = 96/);
+  assert.match(generator, /SAMPLE_RATE = 24_000/);
+  assert.match(generator, /exp\(-2\.65 \* t\)/, "short exponentially decaying notes");
+  assert.match(generator, /release = min\(1\.0/, "each note fades fully to silence");
+  assert.match(generator, /for start, pitch, emphasis in NOTES:/, "only scheduled plucked notes are mixed");
+  const audioSource = readFileSync(new URL("../src/browser/game-audio.mjs", import.meta.url), "utf8");
+  assert.ok(audioSource.includes("moonlit-notes.ogg"));
+  assert.ok(!audioSource.includes("cathedral-in-the-forest.ogg"));
 });

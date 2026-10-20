@@ -6,13 +6,13 @@ const CUES = Object.freeze({
   kick: { start: 185, end: 55, duration: .125, gain: .26, noise: .15, filter: 600, wave: "triangle", minMs: 90 },
   roll: { start: 240, end: 110, duration: .17, gain: .08, noise: .24, filter: 1250, wave: "sine", minMs: 130 },
   guard: { start: 460, end: 260, duration: .065, gain: .075, noise: .045, filter: 1200, wave: "sine", minMs: 100 },
-  parry: { start: 1180, end: 740, duration: .14, gain: .18, noise: .10, filter: 2900, wave: "triangle", minMs: 100 },
+  parry: { start: 760, end: 340, duration: .11, gain: .11, noise: .035, filter: 1250, wave: "triangle", minMs: 100 },
   jump: { start: 290, end: 520, duration: .11, gain: .10, noise: .045, filter: 1550, wave: "sine", minMs: 120 },
   step: { start: 140, end: 65, duration: .070, gain: .045, noise: .080, filter: 410, wave: "triangle", minMs: 200 },
   hit: { start: 165, end: 38, duration: .19, gain: .33, noise: .23, filter: 880, wave: "sawtooth", minMs: 60 },
   damage: { start: 110, end: 38, duration: .22, gain: .33, noise: .27, filter: 550, wave: "triangle", minMs: 60 },
-  block: { start: 500, end: 160, duration: .13, gain: .19, noise: .17, filter: 1900, wave: "square", minMs: 80 },
-  guardbreak: { start: 380, end: 55, duration: .26, gain: .34, noise: .23, filter: 1400, wave: "sawtooth", minMs: 130 },
+  block: { start: 390, end: 140, duration: .13, gain: .10, noise: .045, filter: 950, wave: "triangle", minMs: 80 },
+  guardbreak: { start: 220, end: 65, duration: .24, gain: .14, noise: .04, filter: 650, wave: "triangle", minMs: 130 },
   death: { start: 155, end: 35, duration: .30, gain: .20, noise: .11, filter: 500, wave: "triangle", minMs: 300 },
   ui: { start: 720, end: 920, duration: .07, gain: .075, noise: 0, filter: 1200, wave: "sine", minMs: 75 },
 });
@@ -25,27 +25,24 @@ const RECORDED_FOLEY = Object.freeze({
   kick: ["dropLeather", "chop"],
   roll: ["cloth1", "cloth2", "cloth3"],
   guard: ["beltHandle1", "cloth4"],
-  parry: ["metalClick", "metalPot1"],
+  parry: ["metalClick", "beltHandle1"],
   jump: ["cloth2", "cloth3"],
   step: ["footstep00", "footstep01", "footstep02", "footstep03", "footstep04",
     "footstep05", "footstep06", "footstep07", "footstep08", "footstep09"],
-  hit: ["chop", "metalPot2"],
+  hit: ["chop", "dropLeather"],
   damage: ["dropLeather", "cloth1"],
-  block: ["metalPot1", "metalPot2", "metalClick"],
-  guardbreak: ["metalPot3", "metalPot2"],
+  block: ["beltHandle1", "dropLeather", "metalClick"],
+  guardbreak: ["dropLeather", "cloth1"],
   death: ["creak1", "dropLeather"],
 });
-// Recorded source loudness varies sharply: the two draw-knife clips measure
-// ~22-23 dB below the main blade clips, while resonant pot hits are hot.
-// Playback-only trims measured from the unchanged CC0 OGGs tame variant jumps;
-// no per-frame RMS scan or decode-time normalization is needed on the input path.
+// Owner listening review: the original metal pot resonances squeal, with the
+// worst variant in Guard Break. Exclude those files entirely rather than
+// relying on a small volume reduction to hide painful frequency peaks.
+// Correct quiet knife variants with measured playback-only gain trims.
 const FOLEY_GAIN_TRIM = Object.freeze({
-  drawKnife1: 8, drawKnife2: 8,
-  metalClick: 4,
-  metalPot1: .56, metalPot2: .46, metalPot3: .35,
-  cloth4: 2,
+  drawKnife1: 8, drawKnife2: 8, metalClick: 4, cloth4: 2,
 });
-const AMBIENT_TRACK = new URL("../../web/audio/music/cathedral-in-the-forest.ogg", import.meta.url).href;
+const AMBIENT_TRACK = new URL("../../web/audio/music/moonlit-notes.ogg", import.meta.url).href;
 const SETTINGS_KEY = "myaso.audio.v1";
 const clamp = (value, low, high) => Math.max(low, Math.min(high, value));
 
@@ -223,16 +220,30 @@ export function createGameAudio({ AudioContextImpl = globalThis.AudioContext ?? 
         const variant = ready[cursor % ready.length];
         sample.buffer = loadedSamples.get(variant);
         if (sample.playbackRate) {
-          sample.playbackRate.value = .96 + clamp(random(), 0, 1) * .08;
+          sample.playbackRate.value = name === "guardbreak"
+            ? .80 + clamp(random(), 0, 1) * .05
+            : .96 + clamp(random(), 0, 1) * .08;
         }
         const envelope = context.createGain();
-        const peak = Math.max(.0002, amplitude * (name === "step" ? .46 : .64)
-          * (FOLEY_GAIN_TRIM[variant] ?? 1));
+        const cueGain = name === "step" ? .46
+          : name === "guardbreak" ? .34
+          : name === "parry" || name === "block" ? .44 : .64;
+        const peak = Math.max(.0002, amplitude * cueGain * (FOLEY_GAIN_TRIM[variant] ?? 1));
         envelope.gain.setValueAtTime(peak, now);
-        sample.connect(envelope);
+        // Short dull impact rather than a screaming resonant ring. A single
+        // local biquad per very short defensive cue does not touch simulation.
+        const cutoff = name === "guardbreak" ? 950
+          : name === "parry" || name === "block" ? 1750 : null;
+        const filter = cutoff !== null ? context.createBiquadFilter() : null;
+        if (filter) {
+          filter.type = "lowpass";
+          filter.frequency.value = cutoff;
+          sample.connect(filter);
+          filter.connect(envelope);
+        } else sample.connect(envelope);
         envelope.connect(output);
         sample.start(now);
-        sample.onended = () => { sample.disconnect(); envelope.disconnect(); output.disconnect(); };
+        sample.onended = () => { sample.disconnect(); filter?.disconnect(); envelope.disconnect(); output.disconnect(); };
         return true;
       }
 
