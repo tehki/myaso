@@ -11,7 +11,10 @@ from pathlib import Path
 import os
 import sqlite3
 
-from economics_sqlite_lab import Denied, InjectedFailure, MAX_INT, OP_ID_RE, _connect, _positive
+from economics_sqlite_lab import (
+    Denied, InjectedFailure, MAX_INT, OP_ID_RE, _connect, _positive,
+    _record_global_event,
+)
 
 _ALLOWED_FAULTS = (
     None, "before_commit", "after_commit",
@@ -132,6 +135,7 @@ def _fixture_mutation(
             " VALUES(?,?,?,?,?)",
             (revision, operation_id, kind, target_id, target_epoch),
         )
+        _record_global_event(db, "mutation", revision)
         if failpoint == "hard_exit_before_commit":
             os._exit(91)  # Disposable test child process ONLY.
         if failpoint == "before_commit":
