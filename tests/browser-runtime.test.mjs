@@ -1,3 +1,5 @@
+// Include the isolated P1 visuals suite in existing protected browser CI.
+import "./magic-particle-pool.test.mjs";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { createFrameBudget } from "../src/browser/frame-budget.mjs";
