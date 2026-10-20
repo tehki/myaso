@@ -7,9 +7,17 @@
 //! Core MUST retain original gameplay buffers until its own transport accepts
 //! them. QUIC datagram send acceptance is not reliable remote delivery.
 
-use crate::magic_fx_events::MAGIC_FX_PACKET_BYTES;
+use std::collections::BTreeMap;
+
+use crate::magic_fx_delivery::{
+    MAX_FX_PAYLOAD_BYTES_GLOBAL_TICK, MAX_FX_PAYLOAD_BYTES_PER_VIEWER_TICK,
+    MAX_FX_PAYLOAD_BYTES_PER_ZONE_TICK,
+};
+use crate::magic_fx_events::{MAGIC_FX_PACKET_BYTES, MAGIC_FX_WIRE_VERSION};
 use crate::magic_fx_handoff::FxRoute;
-use crate::magic_fx_shared_transport::{SharedDispatchPlan, SharedPriority};
+use crate::magic_fx_shared_transport::{
+    SharedDispatchPlan, SharedPriority, MAX_CORE_GAMEPLAY_BATCH_DATAGRAMS,
+};
 use crate::CONSERVATIVE_DATAGRAM_BYTES;
 
 #[derive(Debug, PartialEq, Eq)]
@@ -57,7 +65,16 @@ pub fn try_write_shared<E>(
     let mut gameplay_bytes = 0usize;
     let mut cosmetic_bytes = 0usize;
     let mut seen_cosmetic = false;
-    let mut valid = true;
+    // P16: public dispatch plans are not proof of having passed the P12
+    // scheduler. Recheck all semantic bytes and caps BEFORE ANY send callback.
+    let mut zone_fx_bytes = BTreeMap::<u32, usize>::new();
+    let mut viewer_fx_bytes = BTreeMap::<FxRoute, usize>::new();
+    let mut valid = plan.gameplay_datagrams <= MAX_CORE_GAMEPLAY_BATCH_DATAGRAMS
+        && plan.cosmetic_datagrams <= MAX_FX_PAYLOAD_BYTES_GLOBAL_TICK / MAGIC_FX_PACKET_BYTES
+        && plan.cosmetic_payload_bytes <= MAX_FX_PAYLOAD_BYTES_GLOBAL_TICK
+        && plan.ordered.len()
+            <= MAX_CORE_GAMEPLAY_BATCH_DATAGRAMS
+                + MAX_FX_PAYLOAD_BYTES_GLOBAL_TICK / MAGIC_FX_PACKET_BYTES;
 
     // A public plan may be fabricated by a future caller. Reject malformed
     // order/count/length claims BEFORE sending any authoritative packet.
@@ -76,7 +93,36 @@ pub fn try_write_shared<E>(
             SharedPriority::Cosmetic => {
                 seen_cosmetic = true;
                 cosmetics_count += 1;
-                valid &= item.bytes.len() == MAGIC_FX_PACKET_BYTES;
+                if item.bytes.len() != MAGIC_FX_PACKET_BYTES {
+                    valid = false;
+                    continue;
+                }
+                if item.bytes[..2] != *b"ME"
+                    || item.bytes[2] != MAGIC_FX_WIRE_VERSION
+                    || item.bytes[30] != 0
+                    || item.bytes[31] != 0
+                {
+                    valid = false;
+                }
+                let zone_id =
+                    u32::from_le_bytes(item.bytes[4..8].try_into().expect("fixed-size FX"));
+                if zone_id == 0 {
+                    valid = false;
+                }
+                let zone_bytes = zone_fx_bytes.entry(zone_id).or_default();
+                let viewer_bytes = viewer_fx_bytes.entry(item.route).or_default();
+                let Some(next_zone) = zone_bytes.checked_add(MAGIC_FX_PACKET_BYTES) else {
+                    valid = false;
+                    continue;
+                };
+                let Some(next_viewer) = viewer_bytes.checked_add(MAGIC_FX_PACKET_BYTES) else {
+                    valid = false;
+                    continue;
+                };
+                *zone_bytes = next_zone;
+                *viewer_bytes = next_viewer;
+                valid &= next_zone <= MAX_FX_PAYLOAD_BYTES_PER_ZONE_TICK
+                    && next_viewer <= MAX_FX_PAYLOAD_BYTES_PER_VIEWER_TICK;
                 if let Some(next) = cosmetic_bytes.checked_add(item.bytes.len()) {
                     cosmetic_bytes = next;
                 } else {
@@ -472,6 +518,134 @@ mod tests {
         assert_eq!(report.gameplay_sent, 0);
         assert_eq!(report.next_unsent_gameplay_index, 0);
         assert_eq!(report.failure, Some(SharedWriteFailure::InvalidPlan));
+    }
+
+    #[test]
+    fn p16_fabricated_cosmetic_header_version_or_reserved_bytes_never_reach_writer() {
+        let route = FxRoute {
+            connection_id: 7,
+            generation: 1,
+        };
+        for offset in [0usize, 2, 30, 31] {
+            let mut payload = effect(7);
+            payload[offset] = if offset == 0 { b'X' } else { 2 };
+            let game = [42u8];
+            let plan = SharedDispatchPlan {
+                ordered: vec![
+                    SharedDispatchDatagram {
+                        route,
+                        priority: SharedPriority::Gameplay,
+                        bytes: &game,
+                    },
+                    SharedDispatchDatagram {
+                        route,
+                        priority: SharedPriority::Cosmetic,
+                        bytes: &payload,
+                    },
+                ],
+                gameplay_datagrams: 1,
+                gameplay_payload_bytes: 1,
+                cosmetic_datagrams: 1,
+                cosmetic_payload_bytes: MAGIC_FX_PACKET_BYTES,
+                cosmetic_dropped: 0,
+                stale_cosmetic_dropped: 0,
+            };
+            let called = Cell::new(0);
+            let report = try_write_shared(
+                &plan,
+                |_| true,
+                |_, _| {
+                    called.set(called.get() + 1);
+                    Ok::<_, ()>(())
+                },
+            );
+            assert_eq!(called.get(), 0);
+            assert_eq!(report.failure, Some(SharedWriteFailure::InvalidPlan));
+        }
+    }
+
+    #[test]
+    fn p16_fabricated_fx_over_viewer_zone_or_global_limit_fails_atomically() {
+        let limits = [
+            (7usize, 1usize, 1u32),
+            (129, 129, 1),
+            (513, 513, 5),
+        ];
+        for (count, distinct_routes, zones) in limits {
+            let encoded: Vec<[u8; MAGIC_FX_PACKET_BYTES]> = (0..count)
+                .map(|index| effect((index as u32 % zones) + 1))
+                .collect();
+            let ordered: Vec<SharedDispatchDatagram<'_>> = encoded
+                .iter()
+                .enumerate()
+                .map(|(index, bytes)| SharedDispatchDatagram {
+                    route: FxRoute {
+                        connection_id: (index % distinct_routes) as u64 + 1,
+                        generation: 1,
+                    },
+                    priority: SharedPriority::Cosmetic,
+                    bytes,
+                })
+                .collect();
+            let plan = SharedDispatchPlan {
+                ordered,
+                gameplay_datagrams: 0,
+                gameplay_payload_bytes: 0,
+                cosmetic_datagrams: count,
+                cosmetic_payload_bytes: count * MAGIC_FX_PACKET_BYTES,
+                cosmetic_dropped: 0,
+                stale_cosmetic_dropped: 0,
+            };
+            let calls = Cell::new(0);
+            let report = try_write_shared(
+                &plan,
+                |_| true,
+                |_, _| {
+                    calls.set(calls.get() + 1);
+                    Ok::<_, ()>(())
+                },
+            );
+            assert_eq!(calls.get(), 0, "limit fixture count={count}");
+            assert_eq!(report.failure, Some(SharedWriteFailure::InvalidPlan));
+            assert_eq!(report.cosmetic_not_sent, count);
+        }
+    }
+
+    #[test]
+    fn p16_fabricated_overlong_gameplay_batch_fails_before_enqueue() {
+        let route = FxRoute {
+            connection_id: 1,
+            generation: 1,
+        };
+        let gameplay = [7u8];
+        let ordered = (0..=MAX_CORE_GAMEPLAY_BATCH_DATAGRAMS)
+            .map(|_| SharedDispatchDatagram {
+                route,
+                priority: SharedPriority::Gameplay,
+                bytes: &gameplay,
+            })
+            .collect();
+        let plan = SharedDispatchPlan {
+            ordered,
+            gameplay_datagrams: MAX_CORE_GAMEPLAY_BATCH_DATAGRAMS + 1,
+            gameplay_payload_bytes: MAX_CORE_GAMEPLAY_BATCH_DATAGRAMS + 1,
+            cosmetic_datagrams: 0,
+            cosmetic_payload_bytes: 0,
+            cosmetic_dropped: 0,
+            stale_cosmetic_dropped: 0,
+        };
+        let called = Cell::new(0);
+        let report = try_write_shared(
+            &plan,
+            |_| true,
+            |_, _| {
+                called.set(called.get() + 1);
+                Ok::<_, ()>(())
+            },
+        );
+        assert_eq!(called.get(), 0);
+        assert_eq!(report.failure, Some(SharedWriteFailure::InvalidPlan));
+        assert_eq!(report.next_unsent_gameplay_index, 0);
     }
 
     /// Simulates Core owning route generation and send acceptance inside ONE
