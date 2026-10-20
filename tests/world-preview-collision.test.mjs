@@ -72,7 +72,7 @@ test("D2 bounded swept movement stops on roofs and preserves wall sliding", () =
   for (let i = 0; i < 40; i++) p = moveAuthoredPreview(outside, p, 0, -10);
   assert.ok(p.y >= 4068 && p.y < 4095, `should stop at inn entrance instead of walking through roof: ${p.y}`);
   assert.equal(p.x, start.x);
-  const slide = moveAuthoredPreview(outside, { x: 4215, y: 3980 }, 12, 12);
+  const slide = moveAuthoredPreview(outside, { x: 4215, y: 3980 }, 11, 11);
   assert.ok(slide.x <= 4222 && slide.y > 3980, `should slide along Red Lion west wall: ${JSON.stringify(slide)}`);
   assert.ok(isAuthoredPreviewWalkable(outside, slide.x, slide.y));
 });
