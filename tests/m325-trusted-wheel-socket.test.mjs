@@ -75,7 +75,8 @@ test("M325 leaves M194's authoritative guard, HP and parry gates strict", () => 
   assert.ok(source.includes("event.isTrusted === true && event.deltaY > 0"));
   assert.ok(source.includes("if (channel.readyState === WebSocket.OPEN) channel.send(receipt);"));
   assert.ok(flight.includes("M325 trusted Firefox wheel socket did not open"));
-  assert.ok(flight.includes("wheelHeadStartMs: 25"));
+  assert.ok(flight.includes("wheelHeadStartMs: 0"));
+  assert.ok(flight.includes("postTrustedWheelMs: 45"));
   assert.ok(flight.includes("awaitTrustedWheel: () => challenge.wait()"));
   assert.ok(flight.includes("sendWheel: () => scrollArenaWheel(defender, defenderElementId, 120, 0)"));
   assert.ok(flight.includes("sendAttackClick: (clickHoldMs) => performArenaM221GuardBreakClick(attacker, clickHoldMs)"));

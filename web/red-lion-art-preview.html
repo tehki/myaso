@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="ru"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>myaso.io — Blood & Iron / Red Lion A1</title>
+<style>
+:root{color-scheme:dark}*{box-sizing:border-box}
+body{margin:0;background:#151915;color:#e1dccb;font:15px/1.5 system-ui,sans-serif}
+header{background:#262b24;padding:13px 24px;border-bottom:1px solid #4b523f;display:flex;justify-content:space-between;align-items:center;gap:15px}
+h1{font:700 23px Georgia,serif;margin:0}.sub{font-size:12px;color:#acb09b}
+main{max-width:1220px;padding:18px;margin:auto}canvas{display:block;width:100%;background:#65724f;aspect-ratio:16/9;border-radius:10px;border:1px solid #869076;box-shadow:0 12px 40px #0009}
+.controls{display:flex;gap:18px;flex-wrap:wrap;align-items:center;margin-top:15px;color:#c9c3b0}
+label{display:flex;gap:8px;align-items:center;white-space:nowrap}
+input[type=range]{accent-color:#be8f67}button{border:1px solid #807967;border-radius:6px;background:#374033;color:white;padding:6px 12px;cursor:pointer}
+.note{font-size:13px;color:#aeb49f;margin-top:13px}code{color:#e6c592}#status{margin-left:auto;font-size:12px;color:#d6be93}
+</style></head><body>
+<header><div><h1>⚔️ Blood & Iron — Red Lion</h1><div class="sub">A1 — 3D architectural blockout / ручное авторство / не финальная графика</div></div>🌕⚡️🚀</header>
+<main><canvas id="preview" width="1152" height="648" aria-label="Interactive 3D tavern model"></canvas>
+<div class="controls">
+<label>Угол здания <input id="yaw" type="range" min="-180" max="180" value="-27" step="1"/><output id="yawVal">−27°</output></label>
+<label>Высота камеры <input id="pitch" type="range" min="15" max="90" value="59" step="1"/><output id="pitchVal">59°</output></label>
+<label>Приближение <input id="zoom" type="range" min="40" max="105" value="68" step="1"/><output id="zoomVal">68</output></label>
+<button id="reset">Сброс</button><span id="status">Загрузка OBJ…</span>
+</div>
+<p class="note">Это обзор <strong>настоящего OBJ-исходника из GitHub</strong> с временными цветовыми материалами. Параметры 3D-камеры интерактивные — официальный bake-ракурс будет утверждён позже рядом с игровыми рыцарями. Масштаб внешнего строения <code>6.25 × 4.25 м</code>; интерьер Red Lion — отдельная большая карта, не часть этого файла.</p>
+</main>
+<script type="module">
+const canvas=document.querySelector("#preview"),ctx=canvas.getContext("2d");
+const yawInput=document.querySelector("#yaw"),pitchInput=document.querySelector("#pitch"),zoomInput=document.querySelector("#zoom");
+const palette={old_timber:"#71523c",limewash:"#d4c9b2",limestone:"#a39a85",roof_tile:"#884f3f",dark_wood:"#423226",window:"#403c32",iron:"#4c4945",red_lion:"#b45f4a"};
+let vertices=[],faces=[],status=document.querySelector("#status");
+function parseOBJ(text){
+  let material="limestone";vertices=[];faces=[];
+  for(const line of text.split(/\r?\n/)){
+    if(line.startsWith("v ")){
+      const v=line.trim().split(/\s+/).slice(1).map(Number);
+      if(v.length===3&&v.every(Number.isFinite))vertices.push(v);
+    }else if(line.startsWith("usemtl ")){
+      material=line.slice(7).trim();
+    }else if(line.startsWith("f ")){
+      const indices=line.trim().split(/\s+/).slice(1).map(v=>Number(v.split("/")[0])-1);
+      if(indices.length>=3&&indices.every(i=>Number.isInteger(i)&&i>=0&&i<vertices.length)){
+        faces.push({material,indices});
+      }
+    }
+  }
+}
+function color(hex,brightness){
+  let result=[];for(let i=1;i<7;i+=2)result.push(Math.max(0,Math.min(255,Math.round(parseInt(hex.slice(i,i+2),16)*brightness))));
+  return "rgb("+result.join(",")+")";
+}
+function render(){
+  const yaw=Number(yawInput.value)*Math.PI/180;
+  const pitch=Number(pitchInput.value)*Math.PI/180;
+  const scale=Number(zoomInput.value);
+  document.querySelector("#yawVal").textContent=yawInput.value+"°";
+  document.querySelector("#pitchVal").textContent=pitchInput.value+"°";
+  document.querySelector("#zoomVal").textContent=zoomInput.value;
+  const sw=canvas.width,sh=canvas.height;
+  ctx.clearRect(0,0,sw,sh);
+  ctx.fillStyle="#687a53";ctx.fillRect(0,0,sw,sh);
+  const co=Math.cos(yaw),si=Math.sin(yaw),cp=Math.cos(pitch),sp=Math.sin(pitch);
+  const project=([x,y,z])=>{
+    const rx=x*co-y*si,ry=x*si+y*co;
+    return {x:sw*.5+rx*scale,y:sh*.65+(ry*sp-z*cp)*scale,depth:ry*cp+z*sp};
+  };
+  // Ground grid is visual reference only, in authored metres.
+  for(let p=-12;p<=12;p++){
+    ctx.strokeStyle="rgba(32,53,26,.15)";ctx.lineWidth=1;
+    for(const row of [true,false]){
+      const a=project(row?[p,-12,0]:[-12,p,0]),b=project(row?[p,12,0]:[12,p,0]);
+      ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.stroke();
+    }
+  }
+  const polys=[];
+  for(const face of faces){
+    const a=vertices[face.indices[0]],b=vertices[face.indices[1]],c=vertices[face.indices[2]];
+    const ux=b[0]-a[0],uy=b[1]-a[1],uz=b[2]-a[2],vx=c[0]-a[0],vy=c[1]-a[1],vz=c[2]-a[2];
+    const nx=uy*vz-uz*vy,ny=uz*vx-ux*vz,nz=ux*vy-uy*vx;
+    const length=Math.hypot(nx,ny,nz)||1;
+    const light=Math.max(.52,Math.min(1.13,.79+.25*(nx*.25-ny*.35+nz*.91)/length));
+    const projected=face.indices.map(idx=>project(vertices[idx]));
+    polys.push({projected,depth:projected.reduce((s,v)=>s+v.depth,0)/projected.length,brightness:light,material:face.material});
+  }
+  polys.sort((a,b)=>a.depth-b.depth);
+  for(const face of polys){
+    ctx.beginPath();ctx.moveTo(face.projected[0].x,face.projected[0].y);
+    for(const p of face.projected.slice(1))ctx.lineTo(p.x,p.y);
+    ctx.closePath();ctx.fillStyle=color(palette[face.material]||"#b9a990",face.brightness);ctx.fill();
+    ctx.strokeStyle="rgba(34,26,24,.16)";ctx.lineWidth=.6;ctx.stroke();
+  }
+  // Ground-contact scale reference: 18 game units = 0.45m fighter radius.
+  const foot=project([3.85,2.85,0]),head=project([3.85,2.85,1.73]);
+  ctx.strokeStyle="#e7dfd1";ctx.lineWidth=8;ctx.lineCap="round";
+  ctx.beginPath();ctx.moveTo(foot.x,foot.y);ctx.lineTo(head.x,head.y);ctx.stroke();
+  ctx.fillStyle="#dfd3b0";ctx.beginPath();ctx.arc(head.x,head.y,8,0,Math.PI*2);ctx.fill();
+  ctx.font="13px system-ui";ctx.fillStyle="#fff7dc";ctx.fillText("Рост 1.73 м",head.x+15,head.y);
+  if(vertices.length)status.textContent=vertices.length+" вершин · "+faces.length+" граней · исходник OBJ";
+}
+for(const element of [yawInput,pitchInput,zoomInput])element.addEventListener("input",render);
+document.querySelector("#reset").addEventListener("click",()=>{yawInput.value=-27;pitchInput.value=59;zoomInput.value=68;render();});
+try {
+  const response=await fetch("../assets/environment/greyhaven/red_lion_blockout.obj");
+  if(!response.ok)throw new Error("HTTP "+response.status);
+  parseOBJ(await response.text());
+  render();
+} catch(err){
+  status.textContent="Не удалось открыть OBJ: "+err.message;
+  ctx.fillStyle="#fff";ctx.font="18px system-ui";
+  ctx.fillText("Запустите preview через HTTP из корня репозитория: python3 -m http.server 8080",40,80);
+}
+</script>
+</body></html>

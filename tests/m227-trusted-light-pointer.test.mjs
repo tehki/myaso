@@ -35,7 +35,7 @@ test("M227 ties genuine M144 pointerdown receipt to the one W3C jump chord witho
   assert.ok(s.includes('m227Registry.receive(packet)'));
   assert.ok(fn.includes('m227Registry.issue({ type: spatial ? "pointerdown" : "pointerup" })'));
   assert.ok(fn.includes('lightChallenge.wait()'));
-  assert.ok(fn.includes('performArenaAttackHold(lightAttacker, lightArena, 200, 90)'));
+  assert.ok(fn.includes('performArenaAttackHold(lightAttacker, lightArena, 200, 45)'));
   assert.ok(fn.includes('performArenaJumpAttackChord(jumpAttacker, jumpArena, -200, 90)'));
   assert.ok(fn.includes('const jumpInputDelayMs = spatial ? 80 : 70;'));
   assert.ok(fn.includes('const minLeadMs = spatial ? 70 : 60;'));

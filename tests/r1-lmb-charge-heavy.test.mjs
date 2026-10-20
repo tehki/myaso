@@ -107,15 +107,17 @@ test("R1 preserves original RMB sprint/kick, E heavy, and space/run attack input
   assert.match(html, /RMB hold/);
 });
 
-test("M324 genuine wheel+LMB release in same W3C tick", () => {
+test("M333 genuine W3C wheel starts after LMB down but before zero-extra-hold LMB release", () => {
   const runner = readFileSync(new URL("../scripts/pvp_browser_flight_runner.mjs", import.meta.url), "utf8");
   const start = runner.indexOf("async function performArenaFeint(");
   const end = runner.indexOf("async function performArenaRecoveryBufferedRoll(", start);
   assert.ok(start > 0 && end > start, "genuine Firefox/Chrome feint command remains present");
   const body = runner.slice(start, end);
-  assert.match(body, /{ type: "pointerDown", button: 0 },\s*{ type: "pause", duration: 20 },\s*{ type: "pointerUp", button: 0 }/);
-  assert.match(body, /{ type: "pause", duration: 20 },\s*{ type: "scroll", x: 0, y: 0, deltaX: 0, deltaY: 120/);
+  assert.match(body, /{ type: "pointerDown", button: 0 },\s*{ type: "pause", duration: 0 },\s*{ type: "pause", duration: 0 },\s*{ type: "pointerUp", button: 0 }/);
+  assert.match(body, /{ type: "pause", duration: 0 },\s*{ type: "pause", duration: 0 },\s*{ type: "scroll", x: 0, y: 0, deltaX: 0, deltaY: 120/);
+  assert.match(body, /deltaY: 120[^\n]*},\s*{ type: "pause", duration: 0 }/);
   assert.match(body, /W3C multi-source action/);
+  assert.doesNotMatch(body, /duration: 20|duration: 85/, "genuine W3C feint must not wait into 80ms heavy upgrade");
   assert.doesNotMatch(body, /window\.__MYASO|dispatchEvent\(/, "only real browser-owned actions can prove feint");
 });
 

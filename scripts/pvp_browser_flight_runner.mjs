@@ -7289,8 +7289,12 @@ async function runOnlineUiFeintFlight(entries) {
     || !Number.isFinite(exhaustedLightUp.epochMs)
     || !Number.isFinite(exhaustedWheelBack.epochMs)
     || exhaustedLightUp.epochMs <= exhaustedLightDown.epochMs
-    || exhaustedWheelBack.epochMs < exhaustedLightUp.epochMs
-    || exhaustedWheelBack.epochMs - exhaustedLightUp.epochMs > 80) {
+    // M331 sends a genuine wheel in the first W3C tick after pointerDOWN,
+    // before the 20ms held-pointer release. Check the actual DOM ordering;
+    // do not require the former wheel-after-pointerUP choreography.
+    || exhaustedWheelBack.epochMs < exhaustedLightDown.epochMs
+    || exhaustedWheelBack.epochMs > exhaustedLightUp.epochMs
+    || exhaustedWheelBack.epochMs - exhaustedLightDown.epochMs > COMBAT.feint.lightWindowMs) {
     throw new Error("M170 exhausted feint did not deliver the same genuine early LMB+wheel-back chord: "
       + JSON.stringify({ pointers: exhaustedPointers, wheels: exhaustedWheels }));
   }
@@ -7907,7 +7911,7 @@ async function runM176BlockAttackArbitrationPhase(
 
 async function calibrateNativeParryIngress(
   attacker, defender, attackerElementId, defenderElementId, attackOffset,
-  targetAfterPointerDownMs = 70,
+  targetAfterPointerDownMs = 50,
 ) {
   // Measure only trusted input delivery, never synthesize game controls.
   // Three harmless mouse moves and real isolated wheel-back blocks before
@@ -7953,9 +7957,16 @@ async function calibrateNativeParryIngress(
   const median = samples => [...samples].sort((a, b) => a - b)[1];
   const pointerMs = median(pointerSamples);
   const wheelMs = median(wheelSamples);
-  // M33 light active follows pointerDOWN in 135ms; M138 jump attack
-  // follows Space+LMB in only 105ms. Choose the scenario's requested wheel
-  // arrival relative to *genuine* pointerDOWN, never widen either parry.
+  // M332: The #348 exact-head M41 run #39318597410 recorded genuine
+  // Chrome pointerDOWN at 182.9ms and Firefox wheel at 331ms: 148ms
+  // later, after the 135ms authoritative light windup. It resolved as
+  // 34 HP damage, not a parry, despite the prior 100ms nominal target.
+  // The two browser W3C drivers have additional unmodeled latency;
+  // aim M33's real wheel 50ms after light pointerDOWN to recover ingress
+  // headroom without touching the 125ms server parry or 240ms block.
+  // Keep a strict 85ms maximum native calibration target. M138's genuine
+  // jump parry still uses its separate 25ms target and 105ms windup.
+  // This is browser-acceptance timing only, no synthetic input or retries.
   if (!Number.isFinite(targetAfterPointerDownMs) || targetAfterPointerDownMs < 0
     || targetAfterPointerDownMs > 85) {
     throw new RangeError("native parry arrival target outside strict window");
@@ -8007,7 +8018,9 @@ async function runOnlineUiParryFlight(entries, postParrySleepMs = 80, roles = nu
     // Trusted pointermove and wheel-back are real W3C events; no synthetic
     // event may enter the arena. Stagger the live Firefox/Chrome actions
     // around the measured delivery time, placing the ONE genuine wheel
-    // ~70ms after true light pointerdown, inside unchanged 125ms parry.
+    // ~50ms nominal after genuine pointerDOWN to leave W3C driver
+    // ingress margin before the unchanged 135ms light active transition.
+    // M138 retains its separate 25ms jump-attack parry target.
     // Any actual -38 guard block or 34 HP hit remains a terminal failure.
     await Promise.all([
       (async () => {
@@ -9613,10 +9626,15 @@ async function runOnlineUiGuardBreakFlight(entries, { onGuardBroken = null } = {
           "window.__MYASO_M221_WHEEL_TOKEN__ = " + JSON.stringify(challenge.token)
             + "; return true;");
         m212Exchange = await dispatchM212AttackLedShortBlock({
-          // M325: wait only the remaining part of a bounded 25ms genuine
-          // wheel-command lead. The preconnected trusted receipt avoids per-
-          // event HTTP overhead; strict real parry/guard/HP checks still own truth.
-          wheelHeadStartMs: 25,
+          // M252 integrates M249: no obsolete fixed 48ms post-wheel delay
+          // after genuine trusted Firefox wheel receipt in R1 guardbreak.
+          wheelHeadStartMs: 0,
+          // A real authenticated wheel must precede Chrome light by enough
+          // time to EXPIRE the 125ms parry but remain inside 240ms guard.
+          // Authoritative CI #39303800110 recorded a third-contact parry
+          // at wheel tick 379 / hit tick 385; this acceptance-only 45ms
+          // wait follows the actual trusted DOM event, not wheel ACK.
+          postTrustedWheelMs: 45,
           sendWheel: () => scrollArenaWheel(defender, defenderElementId, 120, 0),
           awaitTrustedWheel: () => challenge.wait(),
           sendAttackClick: (clickHoldMs) => performArenaM221GuardBreakClick(attacker, clickHoldMs),
@@ -11128,14 +11146,15 @@ async function runOnlineUiMultiRecoveryFfaFocusFlight(entries, spatial = false) 
   // actually observed the light attack. Under load that could shift the
   // genuine 70..150ms M145 overlap window. Keep both original delays and
   // all actual-input, 100 HP, 3-stage HUD and server assertions unchanged.
-  // R1: light now commits on pointerup, not pointerdown. M144 must stage the
-  // jump after the genuine 90ms light tap RELEASE so that #3 exits recovery
-  // first, then #1, preserving the strict three-stage observer proof.
-  // M235: one real Chrome2/Chrome pair delivered 212ms release-to-jump lead
-  // despite the former 185ms timer, breaching M144's unchanged 200ms cap.
-  // Center the M144-only trusted-down timer at 155ms to leave 30ms more
-  // W3C driver / event-loop headroom; do NOT widen the original 60..200ms
-  // actual-input gate or change the 90ms click or any combat action lifetime.
+  // M328: genuine Chrome2 LMB held 90ms crossed the R2 80ms heavy-upgrade
+  // classifier on exact-head CI #39303383627: #3 transitioned light
+  // windup(1) -> heavy windup(9) -> active(10) -> recovery(11). That made
+  // #1 recover BEFORE #3, correctly failing strict M144 focus order.
+  // Dispatch one genuine 45ms short click instead, below the 80ms classifier.
+  // Preserve real pointerDOWN/UP, M144 60..200ms release-to-jump and M145
+  // 70..150ms pointerDOWN-to-jump, server phases, HP and pixel assertions.
+  // M144 anchors the genuine jump to the authenticated light release:
+  // 70ms after release instead of a timer drifting after pointerDOWN.
   // M145 retains its independent 100ms trusted-down choreography and the
   // original measured 70..150ms spatial input lead gate unchanged.
   // Spatial M145 remains anchored to genuine light DOWN. M144 anchors to
@@ -11157,7 +11176,7 @@ async function runOnlineUiMultiRecoveryFfaFocusFlight(entries, spatial = false) 
   if (spatial) await armRecoveryHandoffSampler(observer);
   try {
     await Promise.all([
-      performArenaAttackHold(lightAttacker, lightArena, 200, 90),
+      performArenaAttackHold(lightAttacker, lightArena, 200, 45),
       (async () => {
         if (lightChallenge) {
           const receipt = await lightChallenge.wait();
@@ -12159,11 +12178,14 @@ async function performArenaHeavyFeint(session, elementId, xOffset = 200) {
 
 async function performArenaFeint(session, elementId, xOffset = 200) {
   const origin = { "element-6066-11e4-a52e-4f735466cecf": elementId };
-  // M324: authentic W3C multi-source action; LMB release and wheel-back share the
-  // same W3C tick after its 20ms hold. A separate wheel-only tick previously
-  // arrived 70-78ms after pointerDown under driver contention, too late
-  // for the unchanged server-authoritative 70ms feint window.
-  // No synthetic DOM events, extra timed wait, or combat-rule relaxation.
+  // M333: one genuine W3C multi-source action. Issue wheel-back in the
+  // tick AFTER pointerDOWN and BEFORE pointerUP, with zero extra hold.
+  // On #39387402890 Chrome stretched the former 20ms requested hold to an
+  // observed 85ms real press, upgrading the exhausted 34HP light to heavy
+  // under the unchanged 80ms heavy classifier. Do not add wall-clock hold:
+  // WebDriver's ordered ticks already yield a genuine nonzero mouse press.
+  // Keep one trusted wheel inside the unchanged 70ms server-feint window;
+  // reject a real heavy upgrade or lost input rather than passing it.
   try {
     await webdriver(session.base, "POST", `/session/${session.sessionId}/actions`, {
       actions: [
@@ -12174,7 +12196,8 @@ async function performArenaFeint(session, elementId, xOffset = 200) {
           actions: [
             { type: "pointerMove", duration: 0, origin, x: xOffset, y: 0 },
             { type: "pointerDown", button: 0 },
-            { type: "pause", duration: 20 },
+            { type: "pause", duration: 0 },
+            { type: "pause", duration: 0 },
             { type: "pointerUp", button: 0 },
           ],
         },
@@ -12184,8 +12207,9 @@ async function performArenaFeint(session, elementId, xOffset = 200) {
           actions: [
             { type: "pause", duration: 0 },
             { type: "pause", duration: 0 },
-            { type: "pause", duration: 20 },
             { type: "scroll", x: 0, y: 0, deltaX: 0, deltaY: 120, duration: 0, origin },
+            { type: "pause", duration: 0 },
+            { type: "pause", duration: 0 },
           ],
         },
       ],
