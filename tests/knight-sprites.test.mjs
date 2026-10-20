@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { COMBAT_ACTION } from "../src/browser/combat-readability.mjs";
-import { KNIGHT_CLIPS, KNIGHT_FRAME_PX, KNIGHT_ROLL_PRESENTATION_MS, knightDirectionIndex, knightClip,
+import { KNIGHT_CLIPS, KNIGHT_FRAME_PX, KNIGHT_ROLL_PRESENTATION_MS,
+  KNIGHT_PRESENTATION_SCALE, knightPresentationRect, knightDirectionIndex, knightClip,
   spriteAtlasRect, createKnightSpriteRenderer } from "../web/knight-sprites.mjs";
 
 test("eight directions agree with mouse-facing screen coordinates", () => {
@@ -85,7 +86,7 @@ test("roll preserves one 350ms presentation cycle across active/recovery states"
   assert.equal(sprites.draw(ctx,fighter,{nowMs:1000}),true);
   const first=seen.at(-1);
   assert.equal(first[1],0);
-  assert.deepEqual(first.slice(5),[-56,-65,112,112]);
+  assert.deepEqual(first.slice(5),[-67,-78,134,134]);
   fighter.action=COMBAT_ACTION.dodgeRecovery;
   assert.equal(sprites.draw(ctx,fighter,{nowMs:1180}),true);
   assert.equal(seen.at(-1)[1],4*KNIGHT_FRAME_PX,
@@ -115,4 +116,57 @@ test("both A3 roll atlases exist as RIFF/WebP and match the published asset cont
     assert.equal(file.length,manifest[name].bytes);
     assert.ok(file.length>4096);
   }
+});
+
+
+test("A2.11 approved 120% affects only the optional sprite draw rectangle", () => {
+  assert.equal(KNIGHT_PRESENTATION_SCALE,1.2);
+  assert.deepEqual(knightPresentationRect(false,1),
+    {x:-40,y:-52,width:80,height:80});
+  assert.deepEqual(knightPresentationRect(true,1),
+    {x:-56,y:-65,width:112,height:112});
+  assert.deepEqual(knightPresentationRect(false),
+    {x:-48,y:-62.4,width:96,height:96});
+  assert.deepEqual(knightPresentationRect(true),
+    {x:-67,y:-78,width:134,height:134});
+  assert.throws(()=>knightPresentationRect(true,1.4),RangeError);
+  assert.throws(()=>knightPresentationRect(false,0),RangeError);
+});
+
+test("A2.11 baseline 100% rollback and approved 120% keep identical atlas frames and world-origin center",()=>{
+  class MockImage{
+    set src(url){
+      const clip=url.match(/([^/]+)\\.webp$/)?.[1];
+      this.naturalWidth=(KNIGHT_CLIPS[clip]??0)*KNIGHT_FRAME_PX;
+      this.naturalHeight=8*KNIGHT_FRAME_PX;
+      this.onload?.();
+    }
+  }
+  function testDraw(scale,action){
+    const draws=[],ellipses=[];
+    const ctx={save(){},restore(){},rotate(){},beginPath(){},
+      ellipse(...args){ellipses.push(args);},fill(){},
+      drawImage(...args){draws.push(args);}};
+    const renderer=createKnightSpriteRenderer({ImageCtor:MockImage,
+      presentationScale:scale,
+      assetBase:new URL("https://example.test/knights/")});
+    const actor={x:50,y:75,facing:Math.PI/2,action};
+    assert.equal(renderer.draw(ctx,actor,{nowMs:1000}),true);
+    return {draw:draws[0],shadow:ellipses[0]};
+  }
+  for(const action of [COMBAT_ACTION.idle,COMBAT_ACTION.dodge]){
+    const before=testDraw(1,action),after=testDraw(1.2,action);
+    assert.deepEqual(after.draw.slice(1,5),before.draw.slice(1,5),
+      "Atlas coordinates and source frame must remain unchanged");
+    assert.equal(after.draw[5]+after.draw[7]/2,0,
+      "Knight remains horizontally centered on exact fighter origin");
+    assert.equal(before.draw[5]+before.draw[7]/2,0);
+    assert.equal(after.draw[7],Math.round(before.draw[7]*1.2));
+    assert.equal(after.draw[8],Math.round(before.draw[8]*1.2));
+    assert.equal(after.shadow[0],before.shadow[0]);
+    assert.equal(after.shadow[2],before.shadow[2]*1.2);
+    assert.equal(after.shadow[3],before.shadow[3]*1.2);
+  }
+  assert.throws(()=>createKnightSpriteRenderer({ImageCtor:MockImage,
+    presentationScale:1.5}),RangeError);
 });
