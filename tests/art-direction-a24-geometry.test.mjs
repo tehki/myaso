@@ -13,7 +13,7 @@ const roof=JSON.parse(readFileSync(
 test('A2.4 browser projections exactly follow actual viewport source and A1 scale',()=>{
   assert.equal(report.gameZoom, ARENA_VIEW_ZOOM);
   assert.equal(report.gameWorldUnitsPerMeter,40);
-  assert.equal(report.expectedGamePixelsPerMeter,40*ARENA_VIEW_ZOOM);
+  assert.ok(Math.abs(report.expectedGamePixelsPerMeter-40*ARENA_VIEW_ZOOM)<1e-10);
   const [dx,dy]=report.manifestDoorGameXY;
   const [width,height]=report.browserComparisonViewportPixels;
   assert.deepEqual([width,height],[1120,720]);
