@@ -1,0 +1,31 @@
+name: Core X1 identity byte contract
+
+on:
+  pull_request:
+    paths:
+      - "tests/fixtures/core-x1-character-id-v1.json"
+      - "tests/core-x1-identity-wire.test.mjs"
+      - "docs/CORE_X1_IDENTITY_BYTE_CONTRACT.md"
+      - ".github/workflows/core-x1-identity.yml"
+  push:
+    branches: [main]
+    paths:
+      - "tests/fixtures/core-x1-character-id-v1.json"
+      - "tests/core-x1-identity-wire.test.mjs"
+      - "docs/CORE_X1_IDENTITY_BYTE_CONTRACT.md"
+      - ".github/workflows/core-x1-identity.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  identity-vectors:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate fixture and reference contract
+        run: |
+          node --version
+          node --check tests/core-x1-identity-wire.test.mjs
+          node --test tests/core-x1-identity-wire.test.mjs
