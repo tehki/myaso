@@ -306,3 +306,64 @@ async fn genuine_realtime_input_ack_coexists_with_reliable_chat() {
     assert!(assert_result(&neighbor.receive().await, 11, 0) > 0);
     assert!(assert_received(&sender.receive().await, 2, "Movement still works") > 0);
 }
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn truncated_chat_payload_times_out_without_closing_gameplay_datagrams() {
+    let (_server, url, digest) = start_server();
+    let mut player = Player::connect(&url, &digest).await;
+
+    // An admitted peer announces a valid-sized frame, sends only two body
+    // bytes, and never completes it. This must not pin its chat task forever.
+    player
+        .chat_send
+        .write_all(&(20_u16).to_le_bytes())
+        .await
+        .expect("announce partial chat frame");
+    player
+        .chat_send
+        .write_all(&[0x31, 1])
+        .await
+        .expect("send only partial chat body");
+
+    let mut buffer = [0_u8; 1];
+    let outcome = timeout(Duration::from_secs(14), player.chat_recv.read_exact(&mut buffer))
+        .await
+        .expect("chat reply must close after bounded partial-body deadline");
+    assert!(
+        outcome.is_err(),
+        "partial chat body must end optional server chat stream"
+    );
+
+    // The existing game QUIC connection remains usable after the isolated
+    // malformed/stalled chat stream is torn down.
+    let mut input = [0_u8; 22];
+    input[0] = 1; // game protocol
+    input[1] = 1; // INPUT type
+    input[2] = 1; // sample count
+    input[4..6].copy_from_slice(&1_u16.to_le_bytes());
+    input[6..8].copy_from_slice(&u16::MAX.to_le_bytes());
+    input[8..12].copy_from_slice(&101_u32.to_le_bytes());
+    input[17] = 127; // movement X
+    player
+        .connection
+        .send_datagram(input)
+        .expect("gameplay datagram after chat-only timeout");
+    timeout(Duration::from_secs(5), async {
+        loop {
+            let packet = player
+                .connection
+                .receive_datagram()
+                .await
+                .expect("gameplay still receives snapshots and input ACKs");
+            if packet.len() == 16 && packet[0] == 1 && packet[1] == 3 {
+                assert_eq!(
+                    u32::from_le_bytes(packet[4..8].try_into().unwrap()),
+                    101
+                );
+                break;
+            }
+        }
+    })
+    .await
+    .expect("game input ACK survives chat-only timeout");
+}
