@@ -29,4 +29,6 @@ cargo test --locked --manifest-path server/Cargo.toml --lib
 cargo clippy --locked --manifest-path server/Cargo.toml --lib -- -D warnings
 ```
 
+**Verified local acceptance (connected Serj Linux, Rust 1.89):** the 6 focused `item_pg_codec` unit tests passed; complete Cargo lib suite **100 passed, 0 failed, 2 intentionally ignored child helpers** (both used by parent tests); `cargo fmt --check` and strict Clippy `-D warnings` passed. This validation covers the Rust codec only, not real PostgreSQL mutations or multi-host operation.
+
 Full protected exact-head `quality` CI must pass before integration. The earlier C3e #406 first quality attempt failed unrelated protected M194 combat/browser; retry on the **same** C3e exact head was initiated with no test weakening.
