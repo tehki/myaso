@@ -1,0 +1,6 @@
+/* Passive focus status. No overlay, motion or gameplay event interception. */
+.focus-hint[data-arena-focus="awaiting"] { color: #d3c4a8; }
+.focus-hint[data-arena-focus="active"] {
+  color: #b7d9b5;
+  background: rgba(27, 49, 34, .45);
+}
