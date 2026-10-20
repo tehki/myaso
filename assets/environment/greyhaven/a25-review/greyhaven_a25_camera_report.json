@@ -1,0 +1,125 @@
+{
+  "A3RollModified": false,
+  "alphaLayerSemantics": "fixed overhead review; no runtime roof fading or sprite depth order",
+  "browserSource": "arena-viewport.mjs",
+  "buildings": {
+    "gable_merchant": {
+      "authoritativeWorldPlacementVerified": false,
+      "basis": {
+        "blenderPixelsPerMeterX": [
+          33.600006,
+          0.0
+        ],
+        "blenderPixelsPerMeterY": [
+          0.0,
+          -33.600006
+        ],
+        "gameAlignedPixelsPerMeterXAfterFlip": [
+          33.600006,
+          -0.0
+        ],
+        "gameAlignedPixelsPerMeterYAfterFlip": [
+          0.0,
+          33.600006
+        ],
+        "maximumBasisErrorPxPerMeter": 6e-06
+      },
+      "browserSpritePivotVerified": false,
+      "layers": {
+        "base": {
+          "rawPNG": "gable_merchant_a25_base_blender.png",
+          "rawPngBytes": 138741,
+          "visibleSourceMeshes": 23
+        },
+        "roof": {
+          "rawPNG": "gable_merchant_a25_roof_blender.png",
+          "rawPngBytes": 158163,
+          "visibleSourceMeshes": 2
+        }
+      },
+      "proposedManifestDoorGameXY": null,
+      "slug": "gable_merchant",
+      "visualDoorAnchorMeters": [
+        -12.8,
+        -2.02
+      ],
+      "visualDoorPixelAnchorAfterFlip": [
+        320.0,
+        320.0
+      ],
+      "visualDoorPixelAnchorBeforeFlip": [
+        320.0,
+        320.0
+      ]
+    },
+    "red_lion": {
+      "authoritativeWorldPlacementVerified": false,
+      "basis": {
+        "blenderPixelsPerMeterX": [
+          33.600006,
+          0.0
+        ],
+        "blenderPixelsPerMeterY": [
+          0.0,
+          -33.600006
+        ],
+        "gameAlignedPixelsPerMeterXAfterFlip": [
+          33.600006,
+          -0.0
+        ],
+        "gameAlignedPixelsPerMeterYAfterFlip": [
+          0.0,
+          33.600006
+        ],
+        "maximumBasisErrorPxPerMeter": 6e-06
+      },
+      "browserSpritePivotVerified": false,
+      "layers": {
+        "base": {
+          "rawPNG": "red_lion_a25_base_blender.png",
+          "rawPngBytes": 148390,
+          "visibleSourceMeshes": 13
+        },
+        "roof": {
+          "rawPNG": "red_lion_a25_roof_blender.png",
+          "rawPngBytes": 161559,
+          "visibleSourceMeshes": 3
+        }
+      },
+      "proposedManifestDoorGameXY": [
+        4365.0,
+        4075.0
+      ],
+      "slug": "red_lion",
+      "visualDoorAnchorMeters": [
+        0.0,
+        -1.865
+      ],
+      "visualDoorPixelAnchorAfterFlip": [
+        320.0,
+        320.0
+      ],
+      "visualDoorPixelAnchorBeforeFlip": [
+        320.0,
+        320.0
+      ]
+    }
+  },
+  "cameraProjection": "vertical orthographic; Blender PNG requires vertical flip",
+  "canvas": [
+    640,
+    640
+  ],
+  "frameAndPivot": "visual door-ground pixel anchor, NOT authoritative portal or collider",
+  "gamePixelsPerAuthoringMeter": 33.599999999999994,
+  "gameZoom": 0.84,
+  "gameplayModified": false,
+  "manifest": "art-manifest.v1.json",
+  "metersPerWorldUnit": 0.025,
+  "milestone": "Blood & Iron A2.5 offline game-XY camera compatible slice",
+  "productionApproved": false,
+  "renderEngine": "Cycles CPU",
+  "samples": 4,
+  "sourceBlender": "blood_iron_greyhaven_a22.blend",
+  "sourceBlenderSaved": false
+}
