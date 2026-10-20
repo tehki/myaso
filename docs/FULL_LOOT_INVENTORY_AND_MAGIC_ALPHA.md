@@ -40,6 +40,12 @@ Status: **domain foundation only — NOT live-game enabled**. Approved design di
 - Read-only Ember preparation verifies the exact authenticated session lease, learned Fire rune and Ember spell, equipped lootable Spellbook, Sulfur Ash reagent and mana. It costs 15 mana and one Sulfur Ash if eventually cast, but the preview consumes nothing and produces no effects.
 - Tests cover no-free-magic spawn, rewards, replayed receipts, casting prerequisites and rune/spell knowledge surviving full-loot death when the spellbook is taken. The knowledge ledger is **in memory only** and must be persisted transactionally with items before activating NPC lessons or spells. No live Magic integration, projectiles or combat changes.
 
+## Durable pending Ember intent (non-activated)
+
+- The MagicAuthority progression ledger now holds a bounded outbox of pending Ember effects keyed by durable CharacterId and committed operation sequence. Each record includes a server-verified ZoneId, finite in-bounds origin and facing, encoded deterministically without applying projectile collision or damage.
+- `commit_ember_cost` stages its intent **together** with replay watermark, mana and Sulfur Ash in the same joint loot+magic checkpoint. Recovery restores pending intent without executing it. Invalid geometry, duplicated intents and corrupt/unknown zone data fail closed. A future Combat resolver must persist completion/failure and coordinate exactly-once application before effect activation; no consumer or acknowledgement path is enabled yet.
+- Magic progression format bumps from `MYMAG001` to `MYMAG002`, joint checkpoint from `MYWLD001` to `MYWLD002`; the old nonproduction format needs an explicit migration if any stored saves are retained. Standalone loot-only format `MYASOL03` is unchanged. Pending intents are bounded to 4096 globally and intentionally cannot be pruned without a durable resolution protocol.
+
 ## Ember resource commit (experimental, non-activated)
 
 - The isolated `magic_cast.rs` adds a server-authoritative cost transaction: exact verified session lease, matching Fighter, registered ZoneAuthority and finite in-bounds alive/idle position are mandatory. A staged world must have learned Fire + Ember, an equipped physical Spellbook, one Sulfur Ash and at least 15 mana.

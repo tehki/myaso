@@ -8,10 +8,12 @@ use std::num::NonZeroU64;
 
 use crate::character_identity::{CharacterId, SessionIdentityRegistry, SessionLease};
 use crate::loot::{EquipmentSlot, ItemKind, LootAuthority};
+use crate::zone::ZoneId;
 
 pub const AWAKENED_MANA: u16 = 100;
 pub const MAX_MAGIC_CHARACTERS: usize = 4096;
 pub const MAX_LESSON_RECEIPTS: usize = 65_536;
+pub const MAX_PENDING_EMBER_INTENTS: usize = 4096;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Rune {
@@ -62,6 +64,7 @@ pub enum MagicError {
     MissingReagent,
     MissingInventory,
     InsufficientMana,
+    InvalidEffectIntent,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -70,6 +73,44 @@ pub struct SpellPlan {
     pub mana_cost: u16,
     pub reagent: ItemKind,
     pub reagent_amount: u16,
+}
+
+/// Durable intent for a future Combat resolver. Coordinates/facing are raw
+/// finite f32 bits so serialization is deterministic and the struct is Eq.
+/// An intent is NOT an applied projectile, damage event or acknowledgement.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct EmberEffectIntent {
+    pub character: CharacterId,
+    pub sequence: u64,
+    pub zone: ZoneId,
+    pub origin_x_bits: u32,
+    pub origin_y_bits: u32,
+    pub facing_bits: u32,
+}
+
+impl EmberEffectIntent {
+    pub fn origin_x(self) -> f32 {
+        f32::from_bits(self.origin_x_bits)
+    }
+
+    pub fn origin_y(self) -> f32 {
+        f32::from_bits(self.origin_y_bits)
+    }
+
+    pub fn facing(self) -> f32 {
+        f32::from_bits(self.facing_bits)
+    }
+
+    fn valid(self) -> bool {
+        let (width, height) = self.zone.bounds();
+        self.sequence != 0
+            && self.origin_x().is_finite()
+            && self.origin_y().is_finite()
+            && self.facing().is_finite()
+            && (18.0..=width - 18.0).contains(&self.origin_x())
+            && (18.0..=height - 18.0).contains(&self.origin_y())
+            && self.facing().abs() <= std::f32::consts::TAU
+    }
 }
 
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
@@ -85,6 +126,7 @@ struct CharacterMagic {
 pub struct MagicAuthority {
     characters: BTreeMap<CharacterId, CharacterMagic>,
     claimed_receipts: BTreeSet<NonZeroU64>,
+    pending_ember: BTreeMap<(CharacterId, u64), EmberEffectIntent>,
 }
 
 impl MagicAuthority {
@@ -199,6 +241,48 @@ impl MagicAuthority {
         Ok(())
     }
 
+    /// Pending, not-yet-resolved effect outbox. No combat or damage is done
+    /// by reading these intents. A future resolver must persist completion
+    /// transactionally before replaying/retrying any side effect.
+    pub fn pending_ember_intents(&self) -> impl Iterator<Item = &EmberEffectIntent> {
+        self.pending_ember.values()
+    }
+
+    /// Called ONLY on a staged, authoritative MagicAuthority, after the
+    /// exact command sequence and resource cost were checked. No client
+    /// may construct or submit an EmberEffectIntent directly.
+    pub(crate) fn stage_ember_intent(
+        &mut self,
+        character: CharacterId,
+        sequence: u64,
+        zone: ZoneId,
+        x: f32,
+        y: f32,
+        facing: f32,
+    ) -> Result<(), MagicError> {
+        if !self.knows_rune(character, Rune::Fire)
+            || !self.knows_spell(character, Spell::Ember)
+        {
+            return Err(MagicError::PrerequisiteMissing);
+        }
+        let intent = EmberEffectIntent {
+            character,
+            sequence,
+            zone,
+            origin_x_bits: x.to_bits(),
+            origin_y_bits: y.to_bits(),
+            facing_bits: facing.to_bits(),
+        };
+        if !intent.valid() || self.pending_ember.contains_key(&(character, sequence)) {
+            return Err(MagicError::InvalidEffectIntent);
+        }
+        if self.pending_ember.len() >= MAX_PENDING_EMBER_INTENTS {
+            return Err(MagicError::LimitReached);
+        }
+        self.pending_ember.insert((character, sequence), intent);
+        Ok(())
+    }
+
     /// A read-only server-resolved spell preview. This never spends mana,
     /// consumes reagents or produces damage. No cast packet is enabled.
     pub fn preview_cast(
@@ -261,7 +345,7 @@ const fn spell_plan(spell: Spell) -> SpellPlan {
     }
 }
 
-const PROGRESSION_MAGIC: &[u8; 8] = b"MYMAG001";
+const PROGRESSION_MAGIC: &[u8; 8] = b"MYMAG002";
 const ALL_RUNES: [Rune; 6] = [
     Rune::Fire,
     Rune::Water,
@@ -372,6 +456,28 @@ impl MagicAuthority {
         for receipt in &self.claimed_receipts {
             bytes.extend_from_slice(&receipt.get().to_le_bytes());
         }
+        if self.pending_ember.len() > MAX_PENDING_EMBER_INTENTS {
+            return Err(MagicSnapshotError::TooLarge);
+        }
+        bytes.extend_from_slice(&(self.pending_ember.len() as u32).to_le_bytes());
+        for (key, intent) in &self.pending_ember {
+            if *key != (intent.character, intent.sequence)
+                || !intent.valid()
+                || !self.knows_rune(intent.character, Rune::Fire)
+                || !self.knows_spell(intent.character, Spell::Ember)
+            {
+                return Err(MagicSnapshotError::InvalidState);
+            }
+            bytes.extend_from_slice(&intent.character.get().to_le_bytes());
+            bytes.extend_from_slice(&intent.sequence.to_le_bytes());
+            bytes.push(match intent.zone {
+                ZoneId::Moonvale => 0,
+                ZoneId::RedLionInn => 1,
+            });
+            bytes.extend_from_slice(&intent.origin_x_bits.to_le_bytes());
+            bytes.extend_from_slice(&intent.origin_y_bits.to_le_bytes());
+            bytes.extend_from_slice(&intent.facing_bits.to_le_bytes());
+        }
         Ok(bytes)
     }
 
@@ -429,10 +535,36 @@ impl MagicAuthority {
                 return Err(MagicSnapshotError::Corrupt);
             }
         }
+        let intent_count = reader.u32()? as usize;
+        if intent_count > MAX_PENDING_EMBER_INTENTS {
+            return Err(MagicSnapshotError::TooLarge);
+        }
+        let mut pending_ember = BTreeMap::new();
+        for _ in 0..intent_count {
+            let character = CharacterId::new(reader.u64()?).ok_or(MagicSnapshotError::Corrupt)?;
+            let sequence = reader.u64()?;
+            let zone = match reader.u8()? {
+                0 => ZoneId::Moonvale,
+                1 => ZoneId::RedLionInn,
+                _ => return Err(MagicSnapshotError::Corrupt),
+            };
+            let intent = EmberEffectIntent {
+                character,
+                sequence,
+                zone,
+                origin_x_bits: reader.u32()?,
+                origin_y_bits: reader.u32()?,
+                facing_bits: reader.u32()?,
+            };
+            if !intent.valid() || pending_ember.insert((character, sequence), intent).is_some() {
+                return Err(MagicSnapshotError::Corrupt);
+            }
+        }
         reader.finish()?;
         let result = Self {
             characters,
             claimed_receipts,
+            pending_ember,
         };
         result
             .encode_progression()
@@ -518,6 +650,72 @@ mod tests {
             MagicAuthority::decode_progression(&impossible_mana),
             Err(MagicSnapshotError::Corrupt)
         ));
+    }
+
+    #[test]
+    fn ember_intent_roundtrip_rejects_forged_geometry_and_invalid_zone() {
+        let mut magic = MagicAuthority::new();
+        let hero = character(411);
+        magic
+            .grant_lesson(award(1, hero, Lesson::Rune(Rune::Fire)))
+            .unwrap();
+        magic
+            .grant_lesson(award(2, hero, Lesson::Spell(Spell::Ember)))
+            .unwrap();
+        magic
+            .stage_ember_intent(hero, 25, ZoneId::Moonvale, 200.0, 200.0, 0.5)
+            .unwrap();
+        assert_eq!(magic.pending_ember_intents().count(), 1);
+        let record = *magic.pending_ember_intents().next().unwrap();
+        assert_eq!(record.sequence, 25);
+        assert_eq!(record.origin_x(), 200.0);
+        assert_eq!(record.facing(), 0.5);
+        let bytes = magic.encode_progression().unwrap();
+        assert_eq!(MagicAuthority::decode_progression(&bytes).unwrap(), magic);
+
+        let mut wrong_zone = bytes.clone();
+        let zone_offset = bytes.len() - 13;
+        wrong_zone[zone_offset] = 255;
+        assert!(matches!(
+            MagicAuthority::decode_progression(&wrong_zone),
+            Err(MagicSnapshotError::Corrupt)
+        ));
+        let mut nan_facing = bytes;
+        nan_facing[zone_offset + 9..].copy_from_slice(&f32::NAN.to_bits().to_le_bytes());
+        assert!(matches!(
+            MagicAuthority::decode_progression(&nan_facing),
+            Err(MagicSnapshotError::Corrupt)
+        ));
+    }
+
+    #[test]
+    fn invalid_or_duplicate_intent_never_changes_magic_state() {
+        let mut magic = MagicAuthority::new();
+        let hero = character(412);
+        assert_eq!(
+            magic.stage_ember_intent(hero, 10, ZoneId::Moonvale, 200.0, 200.0, 0.0),
+            Err(MagicError::PrerequisiteMissing)
+        );
+        magic
+            .grant_lesson(award(1, hero, Lesson::Rune(Rune::Fire)))
+            .unwrap();
+        magic
+            .grant_lesson(award(2, hero, Lesson::Spell(Spell::Ember)))
+            .unwrap();
+        for (sequence, x, heading) in [(0, 200.0, 0.0), (1, f32::NAN, 0.0), (1, 200.0, f32::INFINITY)] {
+            assert_eq!(
+                magic.stage_ember_intent(hero, sequence, ZoneId::Moonvale, x, 200.0, heading),
+                Err(MagicError::InvalidEffectIntent)
+            );
+        }
+        magic
+            .stage_ember_intent(hero, 1, ZoneId::Moonvale, 200.0, 200.0, 0.0)
+            .unwrap();
+        assert_eq!(
+            magic.stage_ember_intent(hero, 1, ZoneId::Moonvale, 200.0, 200.0, 0.0),
+            Err(MagicError::InvalidEffectIntent)
+        );
+        assert_eq!(magic.pending_ember_intents().count(), 1);
     }
 
     #[test]

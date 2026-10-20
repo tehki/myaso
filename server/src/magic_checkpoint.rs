@@ -5,7 +5,7 @@
 //! rewards, and independently verify eligibility of NPC/quest receipts.
 //! A failed sync AFTER rename may leave disk ahead of memory: production
 //! requires a journal/fencing and crash-reconciliation protocol.
-//! Standalone MYASOL03 checkpoints must NEVER overwrite MYWLD001 bundles.
+//! Standalone MYASOL03 checkpoints must NEVER overwrite MYWLD002 bundles.
 use std::fs;
 use std::path::Path;
 
@@ -19,7 +19,7 @@ use crate::magic::{LessonAward, MagicAuthority, MagicError, MagicSnapshotError};
 use crate::magic_teacher::{TeacherAuthority, TeacherError, TeacherRequest};
 use crate::zone::ZoneAuthority;
 
-const HEADER: &[u8; 8] = b"MYWLD001";
+const HEADER: &[u8; 8] = b"MYWLD002";
 const MAGIC_MAX_BYTES: usize = 1024 * 1024;
 const MAX_BUNDLE_BYTES: usize = MAX_FILE_BYTES + MAGIC_MAX_BYTES + 24;
 

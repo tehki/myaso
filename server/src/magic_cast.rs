@@ -62,6 +62,7 @@ pub fn commit_ember_cost(
     let (width, height) = zone.bounds();
     if !fighter.x.is_finite()
         || !fighter.y.is_finite()
+        || !fighter.facing.is_finite()
         || fighter.x < 18.0
         || fighter.y < 18.0
         || fighter.x > width - 18.0
@@ -84,6 +85,16 @@ pub fn commit_ember_cost(
         .map_err(CastError::Loot)?;
     staged_magic
         .spend_mana(character, plan.mana_cost)
+        .map_err(CastError::Magic)?;
+    staged_magic
+        .stage_ember_intent(
+            character,
+            op.sequence,
+            zone,
+            fighter.x,
+            fighter.y,
+            fighter.facing,
+        )
         .map_err(CastError::Magic)?;
     let bytes = bundle(&staged_loot, identity, &staged_magic).map_err(CastError::Checkpoint)?;
     atomic_write(path, &bytes).map_err(CastError::Io)?;
@@ -202,6 +213,12 @@ mod tests {
         ));
         let (recovered_loot, recovered_magic) = load_joint(&file).unwrap();
         assert_eq!(recovered_magic.mana(character), 70);
+        assert_eq!(recovered_magic.pending_ember_intents().count(), 2);
+        let intents: Vec<_> = recovered_magic.pending_ember_intents().collect();
+        assert_eq!(intents[0].sequence, 10);
+        assert_eq!(intents[1].sequence, 11);
+        assert_eq!(intents[0].origin_x(), 200.0);
+        assert_eq!(intents[0].origin_y(), 200.0);
         assert_eq!(
             recovered_loot.committed_operation_sequence(character),
             Some(11)
@@ -312,5 +329,6 @@ mod tests {
         assert_eq!(loot.committed_operation_sequence(character), None);
         assert_eq!(loot.inventory(1).unwrap().backpack()[0].amount, 2);
         assert!(!file.exists());
+        assert_eq!(magic.pending_ember_intents().count(), 0);
     }
 }
