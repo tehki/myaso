@@ -53,7 +53,15 @@ CREATE TABLE metadata (
     sequence INTEGER NOT NULL CHECK(sequence>=0),
     issued_units INTEGER NOT NULL CHECK(issued_units>=0),
     title_cap INTEGER NOT NULL CHECK(title_cap>=1),
-    mutation_revision INTEGER NOT NULL DEFAULT 0 CHECK(mutation_revision>=0)
+    mutation_revision INTEGER NOT NULL DEFAULT 0 CHECK(mutation_revision>=0),
+    global_revision INTEGER NOT NULL DEFAULT 0 CHECK(global_revision>=0)
+);
+-- Ordered envelope for modeled source commits, not a production game journal.
+CREATE TABLE global_events (
+    revision INTEGER PRIMARY KEY CHECK(revision>0),
+    event_kind TEXT NOT NULL CHECK(event_kind IN ('purchase','projection','mutation')),
+    local_revision INTEGER NOT NULL CHECK(local_revision>0),
+    UNIQUE(event_kind,local_revision)
 );
 CREATE TABLE admission_mutations (
     revision INTEGER PRIMARY KEY CHECK(revision>0),
@@ -159,6 +167,26 @@ def _connect(db_path: str | Path) -> sqlite3.Connection:
     db.execute("PRAGMA journal_mode=WAL")
     db.execute("PRAGMA synchronous=FULL")
     return db
+
+
+def _record_global_event(db: sqlite3.Connection, kind: str, local_revision: int) -> int:
+    """Append a modeled event atomically inside the caller's active transaction."""
+    if kind not in ("purchase", "projection", "mutation") or not _positive(local_revision):
+        raise Denied("Invalid global event")
+    row = db.execute("SELECT global_revision FROM metadata WHERE singleton=1").fetchone()
+    if row is None or row[0] >= MAX_INT:
+        raise Denied("Global event revision unavailable")
+    next_revision = row[0] + 1
+    if db.execute(
+        "UPDATE metadata SET global_revision=? WHERE singleton=1 AND global_revision=?",
+        (next_revision, row[0]),
+    ).rowcount != 1:
+        raise Denied("Concurrent global event revision")
+    db.execute(
+        "INSERT INTO global_events(revision,event_kind,local_revision) VALUES(?,?,?)",
+        (next_revision, kind, local_revision),
+    )
+    return next_revision
 
 
 def bootstrap_fixture(db_path: str | Path) -> None:
@@ -403,6 +431,7 @@ def purchase(
             "INSERT INTO outbox(sequence,event_kind,event_payload)"
             " VALUES(?, 'title_transferred',?)", (seq, receipt_json)
         )
+        _record_global_event(db, "purchase", seq)
         if failpoint == "hard_exit_before_commit":
             os._exit(91)  # Intentional offline process-kill acceptance only.
         if failpoint == "before_commit":
@@ -538,6 +567,7 @@ def project_title_event(
             "INSERT INTO projection_inbox(sequence,payload_sha256) VALUES(?,?)",
             (sequence, digest),
         )
+        _record_global_event(db, "projection", sequence)
         if failpoint == "hard_exit_before_commit":
             os._exit(91)
         if failpoint == "before_commit":
