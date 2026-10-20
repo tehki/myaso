@@ -182,7 +182,8 @@ mod tests {
                 &zones,
                 op(sequence),
                 &fighter,
-            ).unwrap();
+            )
+            .unwrap();
             assert_eq!(receipt.mana_spent, 15);
             assert_eq!(receipt.sulfur_ash_spent, 1);
             assert_eq!(magic.mana(character), expected);
@@ -271,7 +272,7 @@ mod tests {
             op(1),
             &actor(),
         )
-            .unwrap();
+        .unwrap();
         assert!(matches!(
             commit_ember_cost(
                 &file,
