@@ -841,6 +841,39 @@ impl LootAuthority {
         Ok(item)
     }
 
+    /// Return physical contents only for an explicitly opened, nearby corpse.
+    /// The caller MUST use a server-authenticated fighter and authoritative
+    /// zone/time. General loot visibility must never include these item IDs.
+    /// This is a read-only domain query, not an activated network response.
+    pub fn inspect_corpse(
+        &self,
+        authenticated_id: u32,
+        fighter: &Fighter,
+        zone: ZoneId,
+        corpse_id: u64,
+        now_ms: u64,
+    ) -> Result<Vec<ItemStack>, LootError> {
+        self.require_alive(authenticated_id, fighter)?;
+        if !fighter.hp.is_finite() || fighter.hp <= 0.0 {
+            return Err(LootError::DeadPlayer);
+        }
+        let at = Point::from_fighter(fighter);
+        if !at.in_zone(zone) {
+            return Err(LootError::InvalidPosition);
+        }
+        let corpse = self.corpses.get(&corpse_id).ok_or(LootError::NotFound)?;
+        if corpse.expires_at_ms <= now_ms {
+            return Err(LootError::NotFound);
+        }
+        if corpse.zone != zone {
+            return Err(LootError::WrongZone);
+        }
+        if !at.near(corpse.at) {
+            return Err(LootError::OutOfReach);
+        }
+        Ok(corpse.items.clone())
+    }
+
     pub fn take_corpse(
         &mut self,
         authenticated_id: u32,
