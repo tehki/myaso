@@ -18,6 +18,11 @@ const imageCache = new Map();
 let report = null;
 let current = null;
 let marker = {x: 0, y: 0};
+// Don't put the illustrative silhouette across Blacksmith's visual doorway.
+// A separate cross still marks the measured visual door-ground reference.
+function initialMarkerPosition(slug) {
+  return slug === "blacksmith" ? {x: 98, y: 58} : {x: 0, y: 0};
+}
 let dragging = false;
 let scheduled = false;
 let lastDrawMs = 0;
@@ -147,7 +152,7 @@ async function selectBuilding(slug) {
     roof: {image: roofImage, layer: data.layers.roof}
   };
   building.value = slug;
-  marker = {x:0, y:0};
+  marker = initialMarkerPosition(slug);
   requestRender();
   const byteCount = data.combinedWebPBytes;
   const failNote = "Visual pivot ONLY; world XY, real roof occlusion and FPS unverified.";
@@ -189,7 +194,7 @@ reset.addEventListener("click", () => {
   roofValue.value = "100%";
   markerToggle.checked = true;
   roofFront.checked = true;
-  marker = {x:0,y:0};
+  marker = initialMarkerPosition(current?.slug);
   requestRender();
 });
 function atCanvas(event) {
@@ -221,6 +226,7 @@ window.__greyhavenArtReview = () => ({
   roofOpacity: Number(roofSlider.value)/100,
   roofFront: roofFront.checked,
   markerShown: markerToggle.checked,
+  testSilhouetteOffsetFromVisualDoor: {...marker},
   lastCanvasRenderMs: lastDrawMs,
   decodeMs: currentDecodeMs,
   artOnly: true,
