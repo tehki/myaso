@@ -3,7 +3,8 @@
 //! This module never drives a physics actor and stores no conversation bodies.
 use crate::living_world::NPCS;
 use crate::npc_navigation;
-use crate::npc_supply::{NpcSupplyWorld, WorkDecision};
+use crate::npc_supply::{worksite_name, NpcSupplyWorld, WorkDecision};
+use crate::npc_worksites::WORKSITES;
 use crate::PROTOCOL_VERSION;
 
 pub const STATE_TYPE: u8 = 8;
@@ -35,6 +36,19 @@ struct HeardReport {
     source_id: u8,
 }
 
+/// Tiny bounded knowledge slot per fixed NPC; source_id=None means the
+/// operator received the server-verified notice for their own assigned site,
+/// NOT that they watched a door or building being repaired in the world.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct WorksiteNews {
+    event_tick: u32,
+    learned_tick: u32,
+    revision: u32,
+    site_id: u8,
+    active: bool,
+    source_id: Option<u8>,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct NpcState {
     pub id: u8,
@@ -54,6 +68,9 @@ pub struct NpcRoutines {
     last_social_tick: Option<u32>,
     // Fixed-size NPC-only encounter evidence. No chat or player/account data.
     encounters: [Encounter; NPC_PAIR_COUNT],
+    worksite_news: [Option<WorksiteNews>; NPCS.len()],
+    last_worksite_social_tick: Option<u32>,
+    last_worksite_event_revision: u32,
 }
 
 impl NpcRoutines {
@@ -160,6 +177,133 @@ impl NpcRoutines {
                 }
             }
         }
+    }
+
+    /// Real, server-owned worksite news is learned first by its assigned NPC
+    /// operator, then by exactly one-hop face-to-face communication within
+    /// the pilot social radius and line-of-sight. No client action, secondhand
+    /// retransmission or unseen friendship can generate knowledge.
+    /// Invoke *after* NpcSupplyWorld::advance on the authoritative server tick.
+    pub fn advance_worksite_social(&mut self, tick: u32, supply: &NpcSupplyWorld) {
+        if tick == 0
+            || tick % SOCIAL_INTERVAL_TICKS != 0
+            || self.last_worksite_social_tick.is_some_and(|old| {
+                tick.wrapping_sub(old) == 0 || tick.wrapping_sub(old) >= (1 << 31)
+            })
+        {
+            return;
+        }
+        self.last_worksite_social_tick = Some(tick);
+        let revision = supply.worksite_revision();
+        if let Some(event) = supply.latest_worksite_event(tick) {
+            // Only the first social cadence after an actual accepted
+            // transition may create operator knowledge. A late caller
+            // cannot retroactively fabricate a meeting at the incident.
+            if event.revision > self.last_worksite_event_revision
+                && tick >= event.tick
+                && tick - event.tick < SOCIAL_INTERVAL_TICKS
+            {
+                self.last_worksite_event_revision = event.revision;
+                self.worksite_news.fill(None);
+                for site in WORKSITES {
+                    let Some(active) = event.changed_site(site.id) else {
+                        continue;
+                    };
+                    let Some(operator) = NPCS.iter().position(|npc| npc.id == site.actor) else {
+                        continue;
+                    };
+                    // In a multi-site update choose the lowest matching site,
+                    // never allocate one slot per event or per player.
+                    if self.worksite_news[operator].is_none() {
+                        self.worksite_news[operator] = Some(WorksiteNews {
+                            event_tick: event.tick,
+                            learned_tick: tick,
+                            revision,
+                            site_id: site.id,
+                            active,
+                            source_id: None,
+                        });
+                    }
+                }
+            }
+        }
+        let positions = NPCS.map(|npc| Self::position(npc.id, tick).expect("fixed roster"));
+        // Snapshot before dissemination: hearing on this tick cannot
+        // instantly retransmit on to a third NPC.
+        let prior = self.worksite_news;
+        for (source_index, candidate) in prior.iter().enumerate() {
+            let Some(news) = candidate else { continue };
+            if news.source_id.is_some()
+                || news.revision != revision
+                || tick < news.event_tick
+                || tick - news.event_tick > MEETING_FRESH_TICKS
+            {
+                continue;
+            }
+            for receiver_index in 0..NPCS.len() {
+                if receiver_index == source_index
+                    || self.worksite_news[receiver_index]
+                        .is_some_and(|known| known.revision >= revision)
+                {
+                    continue;
+                }
+                let dx =
+                    i32::from(positions[source_index].x) - i32::from(positions[receiver_index].x);
+                let dy =
+                    i32::from(positions[source_index].y) - i32::from(positions[receiver_index].y);
+                if dx * dx + dy * dy > (GOSSIP_RADIUS as i32).pow(2)
+                    || !npc_navigation::pilot_line_of_sight(
+                        (positions[source_index].x, positions[source_index].y),
+                        (positions[receiver_index].x, positions[receiver_index].y),
+                    )
+                {
+                    continue;
+                }
+                self.worksite_news[receiver_index] = Some(WorksiteNews {
+                    learned_tick: tick,
+                    source_id: Some(NPCS[source_index].id),
+                    ..*news
+                });
+                // One reliable operator source per NPC per revision.
+            }
+        }
+    }
+
+    /// NPC-local report only: direct operational notice vs one-hop hearsay.
+    /// Current status can still be requested separately from the server
+    /// ledger; this ephemeral story must not outlive its event or revision.
+    pub fn worksite_social_report(
+        &self,
+        npc_id: u8,
+        tick: u32,
+        current_revision: u32,
+    ) -> Option<String> {
+        let index = NPCS.iter().position(|npc| npc.id == npc_id)?;
+        let news = self.worksite_news[index]?;
+        if news.revision != current_revision
+            || tick < news.event_tick
+            || tick - news.event_tick > MEETING_FRESH_TICKS
+            || tick < news.learned_tick
+        {
+            return None;
+        }
+        let name = worksite_name(news.site_id)?;
+        let verb = if news.active {
+            "became available"
+        } else {
+            "became unavailable"
+        };
+        let provenance = match news.source_id {
+            None => "I received a verified server notice about my assigned worksite.".to_string(),
+            Some(source_id) => {
+                let source = NPCS.iter().find(|npc| npc.id == source_id)?.name;
+                format!("I heard that from {source} in person, not from the server directly.")
+            }
+        };
+        Some(format!(
+            "{name} {verb} at server tick {} (revision {}). {provenance} Cause not verified.",
+            news.event_tick, news.revision
+        ))
     }
 
     fn pair_index(a: usize, b: usize) -> usize {
@@ -651,5 +795,114 @@ mod tests {
         assert!(routines.context_with_supply(1, 201, &supply).unwrap().1);
         assert!(!routines.context_with_supply(5, 201, &supply).unwrap().1);
         assert!(routines.context_with_supply(99, 200, &supply).is_none());
+    }
+
+    #[test]
+    fn operator_news_reaches_rowan_only_after_real_pilot_meeting() {
+        let mut town = NpcSupplyWorld::default();
+        town.enable_pilot_maintenance();
+        let mut npcs = NpcRoutines::default();
+        for tick in 0..=900 {
+            town.advance(tick);
+            npcs.advance_worksite_social(tick, &town);
+        }
+        let direct = npcs.worksite_social_report(5, 900, 2).unwrap();
+        assert!(direct.contains("work yard became unavailable"));
+        assert!(direct.contains("verified server notice"));
+        assert_eq!(npcs.worksite_social_report(3, 900, 2), None);
+        assert_eq!(npcs.worksite_social_report(4, 900, 2), None);
+        assert_eq!(npcs.worksite_social_report(99, 900, 2), None);
+        // The supply crate blocks the shortcut between Tomas and Rowan.
+        for tick in 901..=1200 {
+            town.advance(tick);
+            npcs.advance_worksite_social(tick, &town);
+        }
+        assert!(npcs.worksite_social_report(3, 1200, 2).is_none());
+        for tick in 1201..=1380 {
+            town.advance(tick);
+            npcs.advance_worksite_social(tick, &town);
+        }
+        let heard = npcs.worksite_social_report(3, 1380, 2).unwrap();
+        assert!(heard.contains("heard that from Tomas in person"));
+        assert!(heard.contains("tick 900 (revision 2)"));
+        assert!(!heard.contains("I received a verified server notice"));
+        // A secondhand Rowan cannot create another verified source.
+        assert_eq!(npcs.worksite_social_report(1, 1380, 2), None);
+        assert_eq!(npcs.worksite_news[2].unwrap().source_id, Some(5));
+        assert_eq!(npcs.worksite_news[4].unwrap().source_id, None);
+    }
+
+    #[test]
+    fn newer_reopening_supersedes_closed_hearsay_without_retransmitting_it() {
+        let mut town = NpcSupplyWorld::default();
+        town.enable_pilot_maintenance();
+        let mut npcs = NpcRoutines::default();
+        for tick in 0..=2100 {
+            town.advance(tick);
+            npcs.advance_worksite_social(tick, &town);
+        }
+        assert_eq!(town.worksite_revision(), 3);
+        let operator = npcs.worksite_social_report(5, 2100, 3).unwrap();
+        assert!(operator.contains("work yard became available"));
+        assert!(operator.contains("revision 3"));
+        assert!(!operator.contains("became unavailable"));
+        // No old news may leak during the exact reopening window.
+        assert!(npcs.worksite_social_report(3, 2100, 3).is_none());
+        assert!(npcs.worksite_social_report(3, 2100, 2).is_none());
+        for tick in 2101..=2580 {
+            town.advance(tick);
+            npcs.advance_worksite_social(tick, &town);
+        }
+        let heard = npcs.worksite_social_report(3, 2580, 3).unwrap();
+        assert!(heard.contains("work yard became available"));
+        assert!(heard.contains("heard that from Tomas"));
+        assert!(!heard.contains("became unavailable"));
+        assert!(npcs.worksite_social_report(3, 2100 + 7201, 3).is_none());
+        assert!(town.stocks().conserved());
+    }
+
+    #[test]
+    fn no_player_claim_or_repeated_social_tick_can_fabricate_worksite_news() {
+        let mut town = NpcSupplyWorld::default();
+        let mut npcs = NpcRoutines::default();
+        for tick in 0..=900 {
+            town.advance(tick);
+            npcs.advance_worksite_social(tick, &town);
+        }
+        assert!(npcs.worksite_social_report(5, 900, 1).is_none());
+        let mut active = [true; 5];
+        active[1] = false;
+        assert!(town
+            .adopt_server_worksites(crate::zone::ZoneId::RedLionInn, 1, 2, active)
+            .is_err());
+        npcs.advance_worksite_social(900, &town);
+        assert!(npcs.worksite_social_report(5, 900, 1).is_none());
+        town.adopt_server_worksites(crate::zone::ZoneId::Moonvale, 1, 2, active)
+            .unwrap();
+        // Notice is not arbitrarily learned from an old update at tick 960.
+        npcs.advance_worksite_social(960, &town);
+        assert!(npcs.worksite_social_report(5, 960, 2).is_none());
+        assert!(town.stocks().conserved());
+    }
+
+    #[test]
+    fn secondhand_sources_never_relay_or_claim_to_be_direct_operators() {
+        let town = NpcSupplyWorld::default();
+        let mut npcs = NpcRoutines::default();
+        npcs.worksite_news[0] = Some(WorksiteNews {
+            event_tick: 60,
+            learned_tick: 60,
+            revision: 1,
+            site_id: 2,
+            active: false,
+            source_id: Some(5),
+        });
+        npcs.advance_worksite_social(120, &town);
+        assert_eq!(npcs.worksite_news[1], None);
+        assert!(npcs
+            .worksite_social_report(1, 120, 1)
+            .unwrap()
+            .contains("heard that from Tomas"));
+        assert_eq!(npcs.worksite_social_report(1, 120, 2), None);
     }
 }

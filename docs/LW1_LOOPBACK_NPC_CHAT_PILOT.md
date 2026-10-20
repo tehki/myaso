@@ -622,3 +622,63 @@ witness provenance. This remains behind the existing loopback-only
 flag; it does not make NPC markers physical multiplayer entities
 or introduce autonomous planning, quests, persistence, money,
 AI provider calls or World & Gameplay collisions.
+
+## LW-1Q — One-hop NPC social news from verified worksite events
+
+The NPC pilot now has **bounded, independent worksite-related social knowledge**
+for each of the five fixed NPCs. This does not grant a global NPC news feed,
+player memory, building damage, persistent social graph, gameplay authority,
+or AI-generated facts. The source is the existing trusted
+`NpcSupplyWorld::latest_worksite_event`, which exposes only the most recent
+successfully accepted, availability-changing Moonvale site revision
+(event tick, immutable revision, five-site changed mask and availability mask).
+Rejected stale/cross-zone manifests, revision-only no-ops, player chat or
+client packets cannot create a social event.
+
+At the next deterministic 60-tick NPC social cadence, a relevant worksite
+**operator** can receive an authoritative operational notice for a site
+assigned to their profession. This is **not described as physically
+witnessing building damage**: the cause remains unknown. For the opt-in
+LW-1N closure at world tick 900, Tomas receives the first-hand server
+notice that the work yard became unavailable (revision 2). He can
+then pass that report to another NPC **only at a verified local meeting**
+within 105 pilot units and with pilot-obstacle line of sight. In the
+existing collision-aware staging routes, Rowan encounters Tomas near
+world tick 1380 and can subsequently answer questions about the
+work yard with an explicit **"heard from Tomas in person"** attribution.
+At tick 2100 the work yard's authoritative reopening (revision 3)
+supersedes the earlier report, and Rowan can learn the newer news
+at another local meeting around tick 2520.
+
+The social record is one fixed-size slot per NPC: original event tick,
+source site ID, availability, current revision, learned tick and optional
+first-hand NPC source ID. Only an **original assigned-site operator**
+can share the verified notice; secondhand recipients may **not relay**
+it on to other characters or claim to have directly witnessed the
+event. Newer revisions invalidate old reports; even a previously
+heard closure cannot survive a subsequent reopening revision. Memory
+is transient, account-free, and expires after 120 simulated seconds.
+Unknown/expired information prompts NPCs to state that they have no
+verified personal report. Ordinary `worksite status` questions still
+read current global server availability and should not be confused
+with personally learned worksite news.
+
+Players may ask `worksite rumors`, `heard about the work yard`,
+`who told you about the yard` or `word from other NPCs`.
+All answers read from authenticated server NPC knowledge only.
+No client command, chat body or LLM can create a meeting, reopen a site,
+award goods, fake provenance, cause a maintenance incident or alter an
+NPC's position. The existing physical pilot line-of-sight blockers,
+normal timed route, resource conservation and first-person combat
+gossip remain distinct.
+
+Regression tests assert actual Tomas–Rowan contacts, absence of
+unwitnessed or line-of-sight-blocked news, replacement after reopening,
+expiry, no cross-zone/player forgery, no secondhand retransmission,
+deterministic fixed-roster attribution and unchanged Rust and JS
+protocols. The simulation is still strictly localhost-only and is
+opt-in via `MYASO_NPC_PILOT=1`, with deterministic maintenance
+events separately gated by `MYASO_NPC_MAINTENANCE=1`.
+World & Gameplay's real server colliders/doors and true physical NPC
+actors are **not yet connected**; do not treat these miniature fixtures
+as production Greyhaven.

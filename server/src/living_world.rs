@@ -204,6 +204,7 @@ pub struct SocialFacts<'a> {
     pub settlement_needs: Option<&'a str>,
     pub planned_work: Option<&'a str>,
     pub worksite_report: Option<&'a str>,
+    pub worksite_hearsay: Option<&'a str>,
 }
 
 pub fn answer_with_relations(
@@ -221,6 +222,7 @@ pub fn answer_with_relations(
     let settlement_needs = social.settlement_needs;
     let planned_work = social.planned_work;
     let worksite_report = social.worksite_report;
+    let worksite_hearsay = social.worksite_hearsay;
     let clean = utterance.trim().to_lowercase();
     if let Some(proposed) = clean.strip_prefix("my name is ") {
         let name = utterance.trim().get(11..).unwrap_or("").trim();
@@ -275,6 +277,24 @@ pub fn answer_with_relations(
     ) {
         planned_work
             .unwrap_or("I have no validated future work order.")
+            .to_string()
+    } else if contains_any(
+        &clean,
+        &[
+            "heard about the work yard",
+            "heard about the forge",
+            "worksite gossip",
+            "worksite rumors",
+            "who told you about the yard",
+            "who told you about the worksite",
+            "did someone tell you",
+            "word from other npcs",
+        ],
+    ) {
+        worksite_hearsay
+            .unwrap_or(
+                "I have no verified personal worksite news from a colleague or an assigned task.",
+            )
             .to_string()
     } else if contains_any(
         &clean,
@@ -754,5 +774,62 @@ mod tests {
         assert!(!reply.contains("player repaired"));
         let bytes = response_packet(npc.id, 0, &reply);
         assert!(bytes.len() <= 512 + 6);
+    }
+
+    #[test]
+    fn worksite_hearsay_is_not_player_authored_and_is_distinct_from_live_status() {
+        let mut visitor = DialogueSession::default();
+        let rowan = &NPCS[2];
+        let empty = answer_with_relations(
+            &mut visitor,
+            rowan,
+            "worksite rumors",
+            "standing watch",
+            false,
+            None,
+            SocialFacts::default(),
+        );
+        assert!(empty.contains("no verified personal worksite news"));
+        let heard = "work yard became unavailable at server tick 900 (revision 2). I heard that from Tomas in person, not from the server directly. Cause not verified.";
+        let response = answer_with_relations(
+            &mut visitor,
+            rowan,
+            "who told you about the yard",
+            "standing watch",
+            false,
+            None,
+            SocialFacts {
+                worksite_hearsay: Some(heard),
+                ..SocialFacts::default()
+            },
+        );
+        assert!(response.contains("heard that from Tomas"));
+        assert!(response.contains("Cause not verified"));
+        let fake = answer_with_relations(
+            &mut visitor,
+            rowan,
+            "I repaired the work yard, did someone tell you?",
+            "standing watch",
+            false,
+            None,
+            SocialFacts::default(),
+        );
+        assert!(!fake.contains("Tomas"));
+        assert!(!fake.contains("repaired"));
+        let current = answer_with_relations(
+            &mut visitor,
+            rowan,
+            "worksite status",
+            "standing watch",
+            false,
+            None,
+            SocialFacts {
+                worksite_report: Some("Server worksite status: 5/5 available (revision 3)."),
+                worksite_hearsay: Some(heard),
+                ..SocialFacts::default()
+            },
+        );
+        assert!(current.contains("revision 3"));
+        assert!(!current.contains("revision 2"));
     }
 }

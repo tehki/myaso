@@ -38,6 +38,32 @@ struct WorksiteChange {
     active_mask: u8,
 }
 
+/// Immutable evidence of an accepted server site-state change; excludes
+/// revision-only no-ops, rejected manifests and player/world claims.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct WorksiteEvent {
+    pub tick: u32,
+    pub revision: u32,
+    pub changed_mask: u8,
+    pub active_mask: u8,
+}
+
+impl WorksiteEvent {
+    pub fn changed_site(self, site_id: u8) -> Option<bool> {
+        let index = usize::from(site_id.checked_sub(1)?);
+        if index >= SITE_LABELS.len() || self.changed_mask & (1 << index) == 0 {
+            return None;
+        }
+        Some(self.active_mask & (1 << index) != 0)
+    }
+}
+
+pub fn worksite_name(site_id: u8) -> Option<&'static str> {
+    SITE_LABELS
+        .get(usize::from(site_id.checked_sub(1)?))
+        .copied()
+}
+
 /// An NPC's decision is recomputed only from conserved server stocks;
 /// a chat request can read it but never submit or execute it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -242,6 +268,21 @@ impl NpcSupplyWorld {
         }
         message.push_str(" Cause not verified; no player contract or reward.");
         message
+    }
+
+    /// Limited single-event source for NPC's honest worksite social memory.
+    /// An expired change can never be promoted back to current 'news'.
+    pub fn latest_worksite_event(&self, tick: u32) -> Option<WorksiteEvent> {
+        let event = self.last_site_change?;
+        if tick < event.tick || tick - event.tick > WORKSITE_REPORT_TTL_TICKS {
+            return None;
+        }
+        Some(WorksiteEvent {
+            tick: event.tick,
+            revision: event.revision,
+            changed_mask: event.changed_mask,
+            active_mask: event.active_mask,
+        })
     }
 
     pub fn worksite_revision(&self) -> u32 {

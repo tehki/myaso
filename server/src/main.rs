@@ -586,6 +586,14 @@ async fn run_authoritative_clock(game: Arc<SharedGame>, flight_action_proof: boo
         if let Some(supply) = state.npc_supply.as_mut() {
             supply.advance(tick);
         }
+        let GameState {
+            npc_routines,
+            npc_supply,
+            ..
+        } = &mut *state;
+        if let (Some(routines), Some(supply)) = (npc_routines.as_mut(), npc_supply.as_ref()) {
+            routines.advance_worksite_social(tick, supply);
+        }
         if state.world.tick % SNAPSHOT_EVERY_SERVER_TICKS == 0 {
             state.refresh_replication_frame();
         }
@@ -811,6 +819,15 @@ async fn handle_connection(
                         let acquaintance = state.npc_routines.as_ref().and_then(|routines| {
                             routines.recent_acquaintance(npc_id, state.world.tick)
                         });
+                        let worksite_hearsay = state.npc_routines.as_ref().and_then(|routines| {
+                            state.npc_supply.as_ref().and_then(|supply| {
+                                routines.worksite_social_report(
+                                    npc_id,
+                                    state.world.tick,
+                                    supply.worksite_revision(),
+                                )
+                            })
+                        });
                         state.world.fighter(player_id).map(|fighter| {
                             (
                                 fighter.x,
@@ -825,6 +842,7 @@ async fn handle_connection(
                                 planned_work,
                                 heard_from,
                                 acquaintance,
+                                worksite_hearsay,
                             )
                         })
                     };
@@ -842,6 +860,7 @@ async fn handle_connection(
                             planned_work,
                             heard_from,
                             acquaintance,
+                            worksite_hearsay,
                         )) => {
                             let npc = NpcRoutines::position(npc_id, tick).and_then(|position| {
                                 living_world::nearby_npc_at(
@@ -870,6 +889,7 @@ async fn handle_connection(
                                                 worksite_report: worksite_report.as_deref(),
                                                 settlement_needs: settlement_needs.as_deref(),
                                                 planned_work,
+                                                worksite_hearsay: worksite_hearsay.as_deref(),
                                             },
                                         ),
                                     )
