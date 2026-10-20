@@ -185,6 +185,15 @@ jobs:
           cargo check --locked --manifest-path server/Cargo.toml --example magic_fx_crowd_loopback
           node scripts/physics_fx_crowd_browser_flight.mjs
 
+      # P13 opt-in: P12 validates/dispatches both test GP and ME bytes on
+      # the SAME real QUIC connection. Gameplay always takes reserved slots.
+      # Unlike P10, P13 proves optional FX drops under synthetic congestion.
+      - name: Validate P13 real shared-connection gameplay-first FX dispatch
+        run: |
+          node --check scripts/physics_fx_crowd_browser_flight.mjs
+          cargo check --locked --manifest-path server/Cargo.toml --example magic_fx_crowd_loopback
+          P13_SHARED_DISPATCH=1 node scripts/physics_fx_crowd_browser_flight.mjs
+
       # P11 runs REAL /game authoritative ACK/snapshot/browser-frame
       # acceptance while a separate 16-connection QUIC FX fixture loads
       # the same CI host. Does not activate magic on gameplay sockets.
