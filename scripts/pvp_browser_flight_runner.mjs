@@ -6,6 +6,7 @@ import process from "node:process";
 import { setTimeout as sleep } from "node:timers/promises";
 import { COMBAT_ACTION, FFA_KILL_TARGET, fighterThreatPhaseState } from "../src/browser/combat-readability.mjs";
 import { COMBAT } from "../src/combat/model.mjs";
+import { DASH_DOUBLE_TAP_MS } from "../src/browser/dash-input.mjs";
 import { planM198GuardBreakW3cExchange } from "./m198-guardbreak-input-plan.mjs";
 import { measureM200WheelFeedbackLatency } from "./m200-feedback-latency.mjs";
 import { summarizeM214ConfirmedFeedback } from "./m214-confirmed-feedback-latency.mjs";
@@ -4859,7 +4860,11 @@ async function runOnlineUiMultiKnockdownFfaFlight(entries) {
         Math.min(140, Math.round((distance / COMBAT.moveSpeed) * 1000 * 0.72)),
       );
       await pulseMovementKey(entry, key, durationMs);
-      await sleep(70);
+      // M158 staging is walking, not double-tap dashing. A repeated genuine
+      // W3C WASD down within 240ms can trigger the 750px/s authoritative dash
+      // and overshoot the measured target. Keep the real keys, then let the
+      // gesture window expire before deciding the next correction.
+      await sleep(DASH_DOUBLE_TAP_MS + 20);
     }
     throw new Error(milestone + " could not stage authoritative " + label + " geometry: "
       + JSON.stringify(last));
