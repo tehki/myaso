@@ -40,8 +40,7 @@ pub fn transaction_id_to_pg(transaction: OwnershipTxnId) -> [u8; 16] {
 }
 
 pub fn transaction_id_from_pg(bytes: &[u8]) -> Result<OwnershipTxnId, ItemPgCodecError> {
-    OwnershipTxnId::new(decode_nonzero_u128(bytes)?)
-        .ok_or(ItemPgCodecError::InvalidIdentity)
+    OwnershipTxnId::new(decode_nonzero_u128(bytes)?).ok_or(ItemPgCodecError::InvalidIdentity)
 }
 
 fn decode_nonzero_u128(bytes: &[u8]) -> Result<u128, ItemPgCodecError> {
@@ -77,7 +76,11 @@ pub fn location_to_pg(location: ItemLocation) -> [u8; PG_ITEM_LOCATION_BYTES] {
             bytes[0] = 3;
             bytes[1..17].copy_from_slice(&corpse.get().to_be_bytes());
         }
-        ItemLocation::Ground { zone_id, x_cm, y_cm } => {
+        ItemLocation::Ground {
+            zone_id,
+            x_cm,
+            y_cm,
+        } => {
             bytes[0] = 4;
             bytes[1..9].copy_from_slice(&zone_id.get().to_be_bytes());
             bytes[18..22].copy_from_slice(&x_cm.to_be_bytes());
@@ -132,7 +135,11 @@ pub fn location_from_pg(bytes: &[u8]) -> Result<ItemLocation, ItemPgCodecError> 
             let zone_id = ZoneId::new(zone).ok_or(ItemPgCodecError::InvalidIdentity)?;
             let x_cm = i32::from_be_bytes(bytes[18..22].try_into().expect("length checked"));
             let y_cm = i32::from_be_bytes(bytes[22..26].try_into().expect("length checked"));
-            Ok(ItemLocation::Ground { zone_id, x_cm, y_cm })
+            Ok(ItemLocation::Ground {
+                zone_id,
+                x_cm,
+                y_cm,
+            })
         }
         _ => Err(ItemPgCodecError::InvalidTag),
     }
@@ -157,15 +164,17 @@ mod tests {
         let numeric = 0x0102_0304_0506_0708_090a_0b0c_0d0e_0f10;
         let item = ItemId::new(numeric).unwrap();
         let tx = OwnershipTxnId::new(numeric).unwrap();
-        let expected: [u8; 16] = [
-            1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16,
-        ];
+        let expected: [u8; 16] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16];
         assert_eq!(PG_GROUND_ITEM_ENTITY_KIND, 2);
         assert_eq!(item_id_to_pg(item), expected);
         assert_eq!(transaction_id_to_pg(tx), expected);
         assert_eq!(item_id_from_pg(&expected), Ok(item));
         assert_eq!(transaction_id_from_pg(&expected), Ok(tx));
-        assert_ne!(numeric.to_le_bytes(), expected, "journal format is not SQL format");
+        assert_ne!(
+            numeric.to_le_bytes(),
+            expected,
+            "journal format is not SQL format"
+        );
     }
 
     #[test]
@@ -173,9 +182,16 @@ mod tests {
         let id = character(0x0102_0304_0506_0708_090a_0b0c_0d0e_0f10);
         let all = [
             ItemLocation::Inventory(id),
-            ItemLocation::Equipped { character_id: id, slot: 255 },
+            ItemLocation::Equipped {
+                character_id: id,
+                slot: 255,
+            },
             ItemLocation::Corpse(corpse(u128::MAX)),
-            ItemLocation::Ground { zone_id: zone(u64::MAX), x_cm: i32::MIN, y_cm: i32::MAX },
+            ItemLocation::Ground {
+                zone_id: zone(u64::MAX),
+                x_cm: i32::MIN,
+                y_cm: i32::MAX,
+            },
         ];
         for location in all {
             assert_eq!(location_from_pg(&location_to_pg(location)), Ok(location));
@@ -184,9 +200,10 @@ mod tests {
         assert_eq!(location_to_pg(all[1])[17], 255);
         assert_eq!(location_to_pg(all[2])[0], 3);
         assert_eq!(location_to_pg(all[3])[0], 4);
-        assert_eq!(&location_to_pg(all[0])[1..17], &[
-            1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16,
-        ]);
+        assert_eq!(
+            &location_to_pg(all[0])[1..17],
+            &[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16,]
+        );
     }
 
     #[test]
@@ -205,18 +222,42 @@ mod tests {
 
     #[test]
     fn reject_zero_identity_bad_length_and_invalid_tags() {
-        assert_eq!(item_id_from_pg(&[0; 16]), Err(ItemPgCodecError::InvalidIdentity));
-        assert_eq!(transaction_id_from_pg(&[0; 16]), Err(ItemPgCodecError::InvalidIdentity));
-        assert_eq!(item_id_from_pg(&[1; 15]), Err(ItemPgCodecError::InvalidLength));
-        assert_eq!(location_from_pg(&[1; 25]), Err(ItemPgCodecError::InvalidLength));
-        assert_eq!(location_from_pg(&[1; 27]), Err(ItemPgCodecError::InvalidLength));
-        assert_eq!(location_from_pg(&[0; 26]), Err(ItemPgCodecError::InvalidTag));
-        assert_eq!(location_from_pg(&[5; 26]), Err(ItemPgCodecError::InvalidTag));
+        assert_eq!(
+            item_id_from_pg(&[0; 16]),
+            Err(ItemPgCodecError::InvalidIdentity)
+        );
+        assert_eq!(
+            transaction_id_from_pg(&[0; 16]),
+            Err(ItemPgCodecError::InvalidIdentity)
+        );
+        assert_eq!(
+            item_id_from_pg(&[1; 15]),
+            Err(ItemPgCodecError::InvalidLength)
+        );
+        assert_eq!(
+            location_from_pg(&[1; 25]),
+            Err(ItemPgCodecError::InvalidLength)
+        );
+        assert_eq!(
+            location_from_pg(&[1; 27]),
+            Err(ItemPgCodecError::InvalidLength)
+        );
+        assert_eq!(
+            location_from_pg(&[0; 26]),
+            Err(ItemPgCodecError::InvalidTag)
+        );
+        assert_eq!(
+            location_from_pg(&[5; 26]),
+            Err(ItemPgCodecError::InvalidTag)
+        );
 
         for tag in [1_u8, 2, 3, 4] {
             let mut bytes = [0; PG_ITEM_LOCATION_BYTES];
             bytes[0] = tag;
-            assert_eq!(location_from_pg(&bytes), Err(ItemPgCodecError::InvalidIdentity));
+            assert_eq!(
+                location_from_pg(&bytes),
+                Err(ItemPgCodecError::InvalidIdentity)
+            );
         }
     }
 
@@ -225,9 +266,16 @@ mod tests {
         let id = character(1);
         for location in [
             ItemLocation::Inventory(id),
-            ItemLocation::Equipped { character_id: id, slot: 1 },
+            ItemLocation::Equipped {
+                character_id: id,
+                slot: 1,
+            },
             ItemLocation::Corpse(corpse(1)),
-            ItemLocation::Ground { zone_id: zone(1), x_cm: 1, y_cm: -1 },
+            ItemLocation::Ground {
+                zone_id: zone(1),
+                x_cm: 1,
+                y_cm: -1,
+            },
         ] {
             let mut bytes = location_to_pg(location);
             let reserved = match location {
@@ -236,7 +284,10 @@ mod tests {
                 ItemLocation::Ground { .. } => 9,
             };
             bytes[reserved] = 0xff;
-            assert_eq!(location_from_pg(&bytes), Err(ItemPgCodecError::NonCanonicalPadding));
+            assert_eq!(
+                location_from_pg(&bytes),
+                Err(ItemPgCodecError::NonCanonicalPadding)
+            );
         }
     }
 
@@ -248,9 +299,16 @@ mod tests {
             let id = character(n);
             for loc in [
                 ItemLocation::Inventory(id),
-                ItemLocation::Equipped { character_id: id, slot: 3 },
+                ItemLocation::Equipped {
+                    character_id: id,
+                    slot: 3,
+                },
                 ItemLocation::Corpse(corpse(n)),
-                ItemLocation::Ground { zone_id: zone(n as u64), x_cm: n as i32, y_cm: -(n as i32) },
+                ItemLocation::Ground {
+                    zone_id: zone(n as u64),
+                    x_cm: n as i32,
+                    y_cm: -(n as i32),
+                },
             ] {
                 assert!(unique.insert(location_to_pg(loc)));
             }
