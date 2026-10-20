@@ -950,7 +950,6 @@ async fn run_chat_stream(
             }
         }
     }
-    Ok(())
 }
 
 fn prepare_reliable_frame(framed: &mut Vec<u8>, payload: &[u8]) -> Result<()> {
