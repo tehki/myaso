@@ -8,9 +8,7 @@ use std::time::Instant;
 use myaso_server::elemental_physics::Element;
 use myaso_server::magic_fx_delivery::ShardedMagicFxHub;
 use myaso_server::magic_fx_events::{TrustedEffectSpec, ViewerInterest, MAGIC_FX_PACKET_BYTES};
-use myaso_server::magic_fx_handoff::{
-    FxQueueGate, TrustedFxHandoff, TrustedFxViewer,
-};
+use myaso_server::magic_fx_handoff::{FxQueueGate, TrustedFxHandoff, TrustedFxViewer};
 
 const CONNECTIONS: u32 = 512;
 const ZONES: u32 = 4;
@@ -31,15 +29,19 @@ fn main() {
         hub.advance(tick).unwrap();
         for zone in 1..=ZONES {
             for offset in 0..12 {
-                hub.admit_trusted(tick, TrustedEffectSpec {
-                    zone_id: zone,
-                    x: offset as f32 * 5.0,
-                    y: 20.0,
-                    element: Element::Arcane,
-                    seed: zone * 100 + offset,
-                    intensity: 160,
-                    ttl_ticks: 120,
-                }).unwrap();
+                hub.admit_trusted(
+                    tick,
+                    TrustedEffectSpec {
+                        zone_id: zone,
+                        x: offset as f32 * 5.0,
+                        y: 20.0,
+                        element: Element::Arcane,
+                        seed: zone * 100 + offset,
+                        intensity: 160,
+                        ttl_ticks: 120,
+                    },
+                )
+                .unwrap();
             }
         }
     }
@@ -48,7 +50,9 @@ fn main() {
     let mut viewers = Vec::new();
     for index in 1..=CONNECTIONS {
         let zone = 1 + (index - 1) % ZONES;
-        let route = registry.register_trusted(u64::from(index), index, zone).unwrap();
+        let route = registry
+            .register_trusted(u64::from(index), index, zone)
+            .unwrap();
         viewers.push(TrustedFxViewer {
             route,
             view: ViewerInterest {
@@ -81,13 +85,18 @@ fn main() {
         }
 
         let started = Instant::now();
-        let plan = registry.plan_trusted_tick(&mut hub, tick, &viewers).unwrap();
+        let plan = registry
+            .plan_trusted_tick(&mut hub, tick, &viewers)
+            .unwrap();
         times.push(started.elapsed().as_nanos());
         suppressed += plan.suppressed_by_gameplay_or_backpressure;
         packets += plan.cosmetic_payload_bytes / MAGIC_FX_PACKET_BYTES;
         assert_eq!(
             plan.cosmetic_payload_bytes,
-            plan.routes.iter().map(|batch| batch.packets.len() * MAGIC_FX_PACKET_BYTES).sum()
+            plan.routes
+                .iter()
+                .map(|batch| batch.packets.len() * MAGIC_FX_PACKET_BYTES)
+                .sum()
         );
         for batch in &plan.routes {
             assert!(registry.route_current(batch.route));
@@ -108,7 +117,10 @@ fn main() {
     }
     println!("scenario=synthetic_p8_authenticated_handoff connections={CONNECTIONS} zones={ZONES} rounds={ROUNDS}");
     println!("full_handoff_round_p95_us={:.3}", p95_us(&mut times));
-    println!("routed_semantic_fx_packets={packets} cosmetic_payload_bytes={}", packets * MAGIC_FX_PACKET_BYTES);
+    println!(
+        "routed_semantic_fx_packets={packets} cosmetic_payload_bytes={}",
+        packets * MAGIC_FX_PACKET_BYTES
+    );
     println!("suppressed_cosmetic_connection_polls={suppressed} stale_routes_discarded={stale_routes_discarded}");
     println!("NOTE: no real WebTransport connection, packet write, real frame rate or gameplay latency measured.");
 }

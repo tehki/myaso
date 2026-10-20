@@ -127,7 +127,10 @@ impl TrustedFxHandoff {
         if self.routes.contains_key(&server_connection_id) {
             return Err(FxHandoffError::DuplicateConnection);
         }
-        if self.connections_by_net_id.contains_key(&authenticated_net_id) {
+        if self
+            .connections_by_net_id
+            .contains_key(&authenticated_net_id)
+        {
             return Err(FxHandoffError::DuplicateNetId);
         }
         if self.routes.len() >= MAX_REGISTERED_FX_CONNECTIONS {
@@ -136,10 +139,13 @@ impl TrustedFxHandoff {
         let session = FxDeliverySession::new(authenticated_net_id, server_zone_id)
             .map_err(FxHandoffError::Scheduler)?;
         let generation = self.mint_generation()?;
-        self.routes.insert(server_connection_id, Registration {
-            generation,
-            session,
-        });
+        self.routes.insert(
+            server_connection_id,
+            Registration {
+                generation,
+                session,
+            },
+        );
         self.connections_by_net_id
             .insert(authenticated_net_id, server_connection_id);
         Ok(FxRoute {
@@ -302,15 +308,19 @@ mod tests {
             hub.advance(tick).unwrap();
             for zone in 1..=zones {
                 for n in 0..12 {
-                    hub.admit_trusted(tick, TrustedEffectSpec {
-                        zone_id: zone,
-                        x: n as f32 * 5.0,
-                        y: 20.0,
-                        element: Element::Fire,
-                        seed: n,
-                        intensity: 170,
-                        ttl_ticks: 120,
-                    }).unwrap();
+                    hub.admit_trusted(
+                        tick,
+                        TrustedEffectSpec {
+                            zone_id: zone,
+                            x: n as f32 * 5.0,
+                            y: 20.0,
+                            element: Element::Fire,
+                            seed: n,
+                            intensity: 170,
+                            ttl_ticks: 120,
+                        },
+                    )
+                    .unwrap();
                 }
             }
         }
@@ -340,21 +350,30 @@ mod tests {
     fn recycled_connection_and_zone_transfer_invalidate_queued_routes() {
         let (mut hub, mut handoff) = setup(2);
         let old = handoff.register_trusted(11, 42, 1).unwrap();
-        let planned = handoff.plan_trusted_tick(&mut hub, 4, &[view(old, 1, READY)]).unwrap();
+        let planned = handoff
+            .plan_trusted_tick(&mut hub, 4, &[view(old, 1, READY)])
+            .unwrap();
         assert_eq!(planned.routes.len(), 1);
         let batch = &planned.routes[0];
         assert!(handoff.route_current(batch.route));
 
         let moved = handoff.transfer_trusted(old, 2).unwrap();
         assert!(!handoff.route_current(batch.route));
-        assert_eq!(handoff.unregister_trusted(old), Err(FxHandoffError::StaleRoute));
-        assert_eq!(handoff.plan_trusted_tick(&mut hub, 4, &[view(old, 1, READY)]),
-            Err(FxHandoffError::StaleRoute));
+        assert_eq!(
+            handoff.unregister_trusted(old),
+            Err(FxHandoffError::StaleRoute)
+        );
+        assert_eq!(
+            handoff.plan_trusted_tick(&mut hub, 4, &[view(old, 1, READY)]),
+            Err(FxHandoffError::StaleRoute)
+        );
         handoff.unregister_trusted(moved).unwrap();
         let next = handoff.register_trusted(11, 42, 1).unwrap();
         assert_ne!(next.generation, old.generation);
         assert!(!handoff.route_current(moved));
-        let other = handoff.plan_trusted_tick(&mut hub, 4, &[view(next, 1, READY)]).unwrap();
+        let other = handoff
+            .plan_trusted_tick(&mut hub, 4, &[view(next, 1, READY)])
+            .unwrap();
         assert_eq!(other.routes.len(), 1);
     }
 
@@ -363,22 +382,34 @@ mod tests {
         let (mut hub, mut handoff) = setup(1);
         let a = handoff.register_trusted(100, 1, 1).unwrap();
         let b = handoff.register_trusted(101, 2, 1).unwrap();
-        let block = FxQueueGate { gameplay_pending: true, ..READY };
-        let pressure = FxQueueGate { writer_backpressured: true, ..READY };
-        let empty = FxQueueGate { cosmetic_slots: 0, ..READY };
-        let skipped = handoff.plan_trusted_tick(&mut hub, 4,
-            &[view(a, 1, block), view(b, 1, pressure)]).unwrap();
+        let block = FxQueueGate {
+            gameplay_pending: true,
+            ..READY
+        };
+        let pressure = FxQueueGate {
+            writer_backpressured: true,
+            ..READY
+        };
+        let empty = FxQueueGate {
+            cosmetic_slots: 0,
+            ..READY
+        };
+        let skipped = handoff
+            .plan_trusted_tick(&mut hub, 4, &[view(a, 1, block), view(b, 1, pressure)])
+            .unwrap();
         assert_eq!(skipped.eligible, 0);
         assert_eq!(skipped.suppressed_by_gameplay_or_backpressure, 2);
         assert_eq!(skipped.cosmetic_payload_bytes, 0);
         hub.advance(5).unwrap();
-        let second = handoff.plan_trusted_tick(&mut hub, 5,
-            &[view(a, 1, empty), view(b, 1, READY)]).unwrap();
+        let second = handoff
+            .plan_trusted_tick(&mut hub, 5, &[view(a, 1, empty), view(b, 1, READY)])
+            .unwrap();
         assert_eq!(second.routes.len(), 1);
         assert_eq!(second.routes[0].route, b);
         hub.advance(6).unwrap();
-        let third = handoff.plan_trusted_tick(&mut hub, 6,
-            &[view(a, 1, READY), view(b, 1, READY)]).unwrap();
+        let third = handoff
+            .plan_trusted_tick(&mut hub, 6, &[view(a, 1, READY), view(b, 1, READY)])
+            .unwrap();
         assert_eq!(third.routes.len(), 2);
         assert_eq!(third.routes[0].route, a);
         assert_eq!(third.routes[0].packets[0][8..12], [1, 0, 0, 0]);
@@ -389,10 +420,22 @@ mod tests {
         let (mut hub, mut handoff) = setup(1);
         let a = handoff.register_trusted(1, 1, 1).unwrap();
         let b = handoff.register_trusted(2, 2, 1).unwrap();
-        assert_eq!(handoff.register_trusted(1, 3, 1), Err(FxHandoffError::DuplicateConnection));
-        assert_eq!(handoff.register_trusted(3, 2, 1), Err(FxHandoffError::DuplicateNetId));
-        assert_eq!(handoff.register_trusted(0, 3, 1), Err(FxHandoffError::InvalidConnection));
-        assert_eq!(handoff.transfer_trusted(a, 0), Err(FxHandoffError::WrongZone));
+        assert_eq!(
+            handoff.register_trusted(1, 3, 1),
+            Err(FxHandoffError::DuplicateConnection)
+        );
+        assert_eq!(
+            handoff.register_trusted(3, 2, 1),
+            Err(FxHandoffError::DuplicateNetId)
+        );
+        assert_eq!(
+            handoff.register_trusted(0, 3, 1),
+            Err(FxHandoffError::InvalidConnection)
+        );
+        assert_eq!(
+            handoff.transfer_trusted(a, 0),
+            Err(FxHandoffError::WrongZone)
+        );
         let mut forged = view(b, 1, READY);
         forged.view.x = f32::NAN;
         assert_eq!(
@@ -408,7 +451,9 @@ mod tests {
             Err(FxHandoffError::WrongZone)
         );
         assert_eq!(hub.stats().global_payload_bytes_this_tick, 0);
-        let good = handoff.plan_trusted_tick(&mut hub, 4, &[view(a, 1, READY), view(b, 1, READY)]).unwrap();
+        let good = handoff
+            .plan_trusted_tick(&mut hub, 4, &[view(a, 1, READY), view(b, 1, READY)])
+            .unwrap();
         assert_eq!(good.routes.len(), 2);
     }
 
@@ -420,7 +465,10 @@ mod tests {
             let zone = 1 + (id - 1) % 4;
             let handle = handoff.register_trusted(u64::from(id), id, zone).unwrap();
             let gate = if id % 8 == 0 {
-                FxQueueGate { gameplay_pending: true, ..READY }
+                FxQueueGate {
+                    gameplay_pending: true,
+                    ..READY
+                }
             } else {
                 READY
             };
