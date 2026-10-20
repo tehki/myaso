@@ -80,7 +80,7 @@ export function nearbyLocalFieldSite(mapId, x, y) {
   for (const site of MOONVALE_FIELD_SITES) {
     const dx = site.x - x, dy = site.y - y;
     const d2 = dx * dx + dy * dy;
-    if (d2 < distance && isAuthoredPreviewWalkable(mapId, site.x, site.y,
+    if (d2 <= distance && (chosen === null || d2 < distance)\n      && isAuthoredPreviewWalkable(mapId, site.x, site.y,
       PREVIEW_FIGHTER_RADIUS)) {
       chosen = site;
       distance = d2;
