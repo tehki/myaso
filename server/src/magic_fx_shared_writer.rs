@@ -164,13 +164,13 @@ mod tests {
         result
     }
 
-    fn composed(
+    fn composed<'a>(
         registry: &TrustedFxHandoff,
         route: FxRoute,
-        gameplay: &[CoreGameplayDatagram],
-        fx: &FxHandoffPlan,
+        gameplay: &'a [CoreGameplayDatagram],
+        fx: &'a FxHandoffPlan,
         slots: usize,
-    ) -> SharedDispatchPlan<'_> {
+    ) -> SharedDispatchPlan<'a> {
         plan_shared_dispatch(
             registry,
             gameplay,
@@ -213,7 +213,7 @@ mod tests {
             sent.push(bytes.to_vec());
             Ok::<_, ()>(())
         });
-        assert_eq!(sent, vec![vec![1, 2], vec![3, 4], effect(7), effect(7)]);
+        assert_eq!(sent, vec![vec![1, 2], vec![3, 4], effect(7).to_vec(), effect(7).to_vec()]);
         assert_eq!(output.gameplay_sent, 2);
         assert_eq!(output.next_unsent_gameplay_index, 2);
         assert_eq!(output.cosmetic_sent, 2);
