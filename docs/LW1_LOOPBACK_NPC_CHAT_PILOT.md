@@ -324,3 +324,46 @@ goals, read-only queries, and existing supply packets. No combat
 movement/physics, browser protocol, player position or production
 configuration changes. True Greyhaven tasks will require the separate
 authoritative World & Gameplay and Economics interfaces.
+
+## LW-1K — Physical pilot-worksite interaction gate (localhost-only)
+
+**Server-owned staging resource objects** now have explicit immutable site IDs,
+worker/operation mappings and positions: well (Tomas, 340/255), work yard
+(Tomas, 270/220), supply depot (Elara, 395/150), market (Elara, 315/110)
+and forge (Marta, 210/65). These coordinates are *local Greyhaven pilot
+fixtures*, not the real Greyhaven map or world item system.
+
+Each NPC supply mutation first checks the server simulation's current
+`NpcRoutines::position(actor, tick)` against the expected site, allowed
+profession, exact operation and an eight-direction nav-validated staging
+route. It requires a distance of ten units or less and an unobstructed
+pilot line-of-sight. This is in addition to the existing server tick
+schedule, finite demand targets, cargo reservation and conservation:
+travel to the source (outward at phase 600), collect, travel back
+(inward at phase 1800) and deliver; stationary Marta works at her
+forge during phase 300. Failed validation **does not mutate stocks**,
+create audit events or award player resources. Client-supplied coordinates
+or claimed worksite IDs never reach the mutation path.
+
+Five objects are exposed to the opt-in browser as **read-only worksite
+markers** (reliable packet type 11, 34 bytes) with an exact static
+site/actor/coordinate decoder. They are separately drawn as small teal
+squares and labels, without adding combat colliders, player object
+interactions, physics, live economy, terrain ownership, loot or new
+datagrams. The packet's exact length, version, count, IDs, roles
+and coordinates are validated before the client accepts it.
+
+Unit tests enforce valid phase/site/worker associations and fail-closed
+wrong worker, wrong operation, wrong worksite or wrong arrival phase;
+the full Rust and JavaScript suites check all existing resource accounting
+and protocol invariants. **Browser smoke has not been completed for this
+head** because the authorized Serj Linux host's Chromium currently
+exits with a SIGTRAP even for `--headless --dump-dom about:blank`.
+Do not classify the live browser check as passed; GitHub exact-head
+quality CI must provide the separate browser/transport gate.
+
+Actual physical/NPC world-entity integration depends on the separate
+World & Gameplay D2 authoritative server collider/door contract, and
+on properly modeled server-side object entity ownership. Preview
+collision art is not trusted as production physics. The pilot remains
+off by default, strictly loopback-only, and unmerged.

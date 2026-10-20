@@ -1,6 +1,6 @@
 //! LW-1C local-only micro-world: bounded NPC-to-NPC supply transfers.
 //! No player inventory, money, crafting entitlement, persistence, or client mutation.
-use crate::PROTOCOL_VERSION;
+use crate::{npc_worksites, PROTOCOL_VERSION};
 use std::collections::VecDeque;
 
 pub const SUPPLY_PACKET_TYPE: u8 = 9;
@@ -225,31 +225,40 @@ impl NpcSupplyWorld {
         }
         match tick % CYCLE {
             FORGE => {
-                if self.decision(2) == WorkDecision::ForgeNails {
+                if self.decision(2) == WorkDecision::ForgeNails && npc_worksites::allows(2, 5, tick)
+                {
                     self.stocks.forge_iron -= 1;
                     self.stocks.forge_nails += 1;
                     self.record(tick, 2, 5);
                 }
             }
             PICKUP => {
-                if self.decision(5) == WorkDecision::CollectWater {
+                if self.decision(5) == WorkDecision::CollectWater
+                    && npc_worksites::allows(5, 1, tick)
+                {
                     self.stocks.well_water -= 1;
                     self.stocks.tomas_water += 1;
                     self.record(tick, 5, 1);
                 }
-                if self.decision(4) == WorkDecision::CollectFood {
+                if self.decision(4) == WorkDecision::CollectFood
+                    && npc_worksites::allows(4, 3, tick)
+                {
                     self.stocks.depot_food -= 1;
                     self.stocks.elara_food += 1;
                     self.record(tick, 4, 3);
                 }
             }
             DROP_OFF => {
-                if self.decision(5) == WorkDecision::DeliverWater {
+                if self.decision(5) == WorkDecision::DeliverWater
+                    && npc_worksites::allows(5, 2, tick)
+                {
                     self.stocks.tomas_water -= 1;
                     self.stocks.yard_water += 1;
                     self.record(tick, 5, 2);
                 }
-                if self.decision(4) == WorkDecision::DeliverFood {
+                if self.decision(4) == WorkDecision::DeliverFood
+                    && npc_worksites::allows(4, 4, tick)
+                {
                     self.stocks.elara_food -= 1;
                     self.stocks.stall_food += 1;
                     self.record(tick, 4, 4);

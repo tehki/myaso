@@ -1,7 +1,7 @@
 // LW-1 loopback NPC pilot on the existing reliable stream; never on combat datagrams.
 // These packet types are separate from the frozen v1 input/snapshot/kill-event payloads.
 export const NPC_WIRE = Object.freeze({
-  request: 5, response: 6, roster: 7, state: 8, supplies: 9, obstacles: 10, maxTextBytes: 240,
+  request: 5, response: 6, roster: 7, state: 8, supplies: 9, obstacles: 10, worksites: 11, maxTextBytes: 240,
 });
 const encoder = new TextEncoder();
 const decoder = new TextDecoder("utf-8", { fatal: true });
@@ -137,4 +137,34 @@ export function decodeNpcObstacles(bytes) {
     boxes.push(Object.freeze({ x, y, width, height }));
   }
   return Object.freeze(boxes);
+}
+
+
+// LW-1K: immutable server-owned loopback worksite anchors. Not loot or
+// gameplay collision. Authoritative server uses the same fixed site IDs.
+const PILOT_SITES = Object.freeze([
+  [1, 5, 340, 255, "Well"],
+  [2, 5, 270, 220, "Work yard"],
+  [3, 4, 395, 150, "Supply depot"],
+  [4, 4, 315, 110, "Market"],
+  [5, 2, 210, 65, "Forge"],
+]);
+
+export function decodeNpcWorksites(bytes) {
+  const payload = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
+  if (payload.length !== 34 || payload[0] !== 1 || payload[1] !== NPC_WIRE.worksites
+      || payload[2] !== PILOT_SITES.length || payload[3] !== 0) {
+    throw new TypeError("invalid NPC pilot worksite header");
+  }
+  const view = new DataView(payload.buffer, payload.byteOffset, payload.byteLength);
+  const sites = PILOT_SITES.map(([id, actor, x, y, name], i) => {
+    const offset = 4 + i * 6;
+    if (payload[offset] !== id || payload[offset + 1] !== actor
+      || view.getUint16(offset + 2, true) !== x
+      || view.getUint16(offset + 4, true) !== y) {
+      throw new TypeError("invalid NPC pilot worksite registry");
+    }
+    return Object.freeze({ id, actor, x, y, name });
+  });
+  return Object.freeze(sites);
 }

@@ -6,6 +6,7 @@ use myaso_server::{
     npc_navigation,
     npc_routines::{NpcRoutines, STATE_INTERVAL_TICKS},
     npc_supply::NpcSupplyWorld,
+    npc_worksites,
     reliable::{try_enqueue_reliable, ReliableQueueError},
     simulation::{CombatEvent, InputIntent, World},
     snapshot::{ReplicationFrame, SnapshotSession},
@@ -630,6 +631,12 @@ async fn handle_connection(
             &mut reliable_send,
             &mut reliable_frame_buffer,
             &npc_navigation::obstacle_packet(),
+        )
+        .await?;
+        send_reliable_frame(
+            &mut reliable_send,
+            &mut reliable_frame_buffer,
+            &npc_worksites::packet(),
         )
         .await?;
         send_reliable_frame(

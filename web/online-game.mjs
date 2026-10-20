@@ -360,6 +360,9 @@ networkClient = await connectAuthoritativeClient({
   onNpcObstacles(barriers) {
     npcUI?.setObstacles(barriers);
   },
+  onNpcWorksites(sites) {
+    npcUI?.setWorksites(sites);
+  },
   onNpcReply(reply) {
     npcUI?.receive(reply);
   },
@@ -1083,6 +1086,19 @@ function drawNpcPilotMarkers() {
   }
   ctx.setLineDash([]);
   ctx.textAlign = "center";
+  ctx.font = "10px sans-serif";
+  for (const site of npcUI.worksites) {
+    const p = projectArenaPoint(site.x, site.y, visualCameraPosition.x,
+      visualCameraPosition.y, canvas.width, canvas.height);
+    if (p.x < -80 || p.x > canvas.width + 80
+      || p.y < -50 || p.y > canvas.height + 50) continue;
+    ctx.fillStyle = "#668f98";
+    ctx.beginPath();
+    ctx.rect(p.x - 4, p.y - 4, 8, 8);
+    ctx.fill();
+    ctx.fillStyle = "#a6d1d2";
+    ctx.fillText(site.name, p.x, p.y + 18);
+  }
   ctx.font = "bold 11px sans-serif";
   for (const npc of npcUI.npcs) {
     const p = projectArenaPoint(npc.x, npc.y, visualCameraPosition.x,

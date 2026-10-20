@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { NETWORK } from "../src/network/constants.mjs";
-import { encodeNpcRequest, decodeNpcRoster, decodeNpcResponse, decodeNpcState, decodeNpcSupplies, decodeNpcObstacles } from "../src/network/npc-chat-codec.mjs";
+import { encodeNpcRequest, decodeNpcRoster, decodeNpcResponse, decodeNpcState, decodeNpcSupplies, decodeNpcObstacles, decodeNpcWorksites } from "../src/network/npc-chat-codec.mjs";
 import { encodeInputPacket, decodeInputPacket, inputPacketBytes } from "../src/network/input-codec.mjs";
 import { SpatialInterestGrid } from "../src/network/interest-grid.mjs";
 import { InputIngressWindow } from "../src/network/input-ingress.mjs";
@@ -650,4 +650,24 @@ test("NPC pilot navigation barriers are server-advertised, bounded and fail clos
   assert.throws(() => decodeNpcObstacles(Uint8Array.from(packet, (n,i) => i===2 ? 2 : n)), /obstacle geometry/);
   assert.throws(() => decodeNpcObstacles(Uint8Array.from(packet, (n,i) => i===8 ? 0 : n)), /obstacle bounds/);
   assert.equal(NETWORK.protocolVersion, 1);
+});
+
+test("NPC pilot resource sites use exact immutable server site identities", () => {
+  const packet = Uint8Array.from([
+    1,11,5,0,
+    1,5,84,1,255,0,
+    2,5,14,1,220,0,
+    3,4,139,1,150,0,
+    4,4,59,1,110,0,
+    5,2,210,0,65,0,
+  ]);
+  const sites = decodeNpcWorksites(packet);
+  assert.equal(sites.length, 5);
+  assert.deepEqual(sites.map(s => s.name), ["Well","Work yard","Supply depot","Market","Forge"]);
+  assert.ok(Object.isFrozen(sites) && Object.isFrozen(sites[0]));
+  assert.throws(() => decodeNpcWorksites(packet.subarray(0, 33)), /worksite header/);
+  assert.throws(() => decodeNpcWorksites(Uint8Array.from(packet, (b,i) => i === 1 ? 9 : b)), /worksite header/);
+  assert.throws(() => decodeNpcWorksites(Uint8Array.from(packet, (b,i) => i === 4 ? 2 : b)), /worksite registry/);
+  assert.throws(() => decodeNpcWorksites(Uint8Array.from(packet, (b,i) => i === 29 ? 3 : b)), /worksite registry/);
+  assert.throws(() => decodeNpcWorksites(Uint8Array.from(packet, (b,i) => i === 8 ? 0 : b)), /worksite registry/);
 });

@@ -9,6 +9,7 @@ pub mod npc_collision_contract;
 pub mod npc_navigation;
 pub mod npc_routines;
 pub mod npc_supply;
+pub mod npc_worksites;
 pub mod reliable;
 pub mod simulation;
 pub mod snapshot;
