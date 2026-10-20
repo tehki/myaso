@@ -1233,7 +1233,24 @@ async function performHeavyCounterplayWindowWheel(
 }
 
 async function runOnlineUiHeavyBlockFlight(entries) {
-  const staged = await prepareHeavyCounterplayFlight(entries, "M107 heavy block");
+  // R2 restored heavy reach 130 -> 82 with a physical 24px active lunge.
+  // The old 180ms approach left the victim outside the restored 82px arc;
+  // the server completed 240ms Block before the late physically lunged hit.
+  // A 290ms approach was also insufficient (second native M188 red confirmed
+  // the same 46HP contact just after block expiry). Close the FULL 48px
+  // difference between old 130 and current 82 reach with genuine 215px/s
+  // movement before the exchange, to hit in the early active phase.
+  // A genuine two-browser CI trace (M223 windup tick 2635, block tick 2643,
+  // heavy hit tick 2660) proved the 155ms lead expires the unchanged 240ms
+  // block before contact: block ended at tick 2656 and 46HP leaked.
+  // Shift only this genuine wheel's target to 255ms after server-observed
+  // heavy windup. The ~100ms shift centers an ~180ms block-to-impact gap
+  // inside unchanged 125-240ms guard-only window. Never widen a proof gate.
+  // Keep M223 genuine server-windup timing, exact -64 guard, 100HP and
+  // parry/late-block failure gates unchanged.
+  const staged = await prepareHeavyCounterplayFlight(
+    entries, "M107 heavy block", { movementMs: 400 },
+  );
   const { attacker, defender, attackerElementId, defenderElementId, movementCode } = staged;
   const attackRight = movementCode === "KeyD";
   const attackOffset = attackRight ? 200 : -200;
@@ -1251,7 +1268,7 @@ async function runOnlineUiHeavyBlockFlight(entries) {
     // A parry, missed block, or HP leak remains a terminal CI failure.
     await performHeavyCounterplayWindowWheel(
       attacker, defender, attackerElementId, defenderElementId,
-      attackOffset, blockOffset, 155,
+      attackOffset, blockOffset, 255,
     );
     await sleep(470);
 
@@ -1321,7 +1338,11 @@ async function runOnlineUiHeavyBlockFlight(entries) {
 }
 
 async function runOnlineUiHeavyParryFlight(entries) {
-  const staged = await prepareHeavyCounterplayFlight(entries, "M107 heavy parry");
+  // Parry likewise needs the target within restored 82px impact reach at the
+  // *start* of heavy active; do not silently compensate via old 130px radius.
+  const staged = await prepareHeavyCounterplayFlight(
+    entries, "M107 heavy parry", { movementMs: 400 },
+  );
   const { attacker, defender, attackerElementId, defenderElementId, movementCode } = staged;
   const attackRight = movementCode === "KeyD";
   const attackOffset = attackRight ? 200 : -200;
@@ -1334,15 +1355,18 @@ async function runOnlineUiHeavyParryFlight(entries) {
   // pristine case. Any evidence that a heavy actually committed, hit, blocked,
   // or otherwise resolved makes the attempt terminal and therefore fail-closed.
   for (let attempt = 1; attempt <= 3 && !evidence; attempt += 1) {
-    // M226: use the final part of genuine server windup for parry. Across
-    // repeated hosted CI runs the previous 265ms W3C plan started real
-    // authoritative Block ~6 server ticks before heavy Active, and some
-    // impacts occurred just beyond the unchanged 125ms parry interval.
-    // Aim 20ms later, still before the 320ms heavy active commitment.
-    // Real stun / zero HP and guard cost remain mandatory, fail closed.
+    // Restored 82px heavy reach moves actual contact to the lunge's late
+    // active phase. Genuine CI: windup tick 590, wheel block tick 605, hit
+    // tick 615 = 167ms block-to-contact, outside the unchanged 125ms parry.
+    // On exact-head native CI the 365ms lead still resolved as guard:
+    // windup tick 522, block tick 540, 46HP hit replaced by an authoritative
+    // BLOCK tick 547. Seven ticks (about 117ms) straddle the strict 125ms
+    // parry edge due to server input/impact phase. Move the genuine wheel
+    // dispatch 40ms later toward a five-tick parry gap. Keep authentic
+    // server-confirmed stun, zero HP/guard change, and all failure gates.
     await performHeavyCounterplayWindowWheel(
       attacker, defender, attackerElementId, defenderElementId,
-      attackOffset, blockOffset, 285,
+      attackOffset, blockOffset, 405,
     );
     await sleep(220);
 
