@@ -148,3 +148,54 @@ test("invalid chat handshake deadlines fail before starting any network stream",
   }
   assert.equal(attempted, 0);
 });
+
+test("closing idle chat releases both optional streams without closing gameplay", async () => {
+  let readCancelled = 0, writeAborted = 0, gameplayClosed = 0;
+  const reply = new ReadableStream({
+    start() { /* Deliberately open forever until optional chat closes. */ },
+    cancel() { readCancelled++; },
+  });
+  const outgoing = new WritableStream({ abort() { writeAborted++; } });
+  const transport = {
+    createUnidirectionalStream: async () => outgoing,
+    incomingUnidirectionalStreams: new ReadableStream({
+      start(controller) { controller.enqueue(reply); controller.close(); },
+    }),
+    close() { gameplayClosed++; },
+  };
+  const chat = await openLocalChat({ kind: "webtransport", transport });
+  await chat.close();
+  await chat.reading;
+  await chat.close(); // Idempotent: no second QUIC reset.
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(chat.closed, true);
+  assert.equal(readCancelled, 1);
+  assert.equal(writeAborted, 1);
+  assert.equal(outgoing.locked, false);
+  assert.equal(reply.locked, false);
+  assert.equal(gameplayClosed, 0, "gameplay transport must stay open");
+});
+
+test("malformed incoming chat frame closes optional writer, not gameplay transport", async () => {
+  let replyController, writeAborted = 0, gameplayClosed = 0;
+  const reply = new ReadableStream({
+    start(controller) { replyController = controller; },
+  });
+  const outgoing = new WritableStream({ abort() { writeAborted++; } });
+  const transport = {
+    createUnidirectionalStream: async () => outgoing,
+    incomingUnidirectionalStreams: new ReadableStream({
+      start(controller) { controller.enqueue(reply); controller.close(); },
+    }),
+    close() { gameplayClosed++; },
+  };
+  const chat = await openLocalChat({ kind: "webtransport", transport });
+  replyController.enqueue(new Uint8Array([2, 0, 1, 1]));
+  await assert.rejects(chat.reading, /chat frame length invalid/);
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(chat.closed, true);
+  assert.equal(writeAborted, 1);
+  assert.equal(outgoing.locked, false);
+  assert.equal(reply.locked, false);
+  assert.equal(gameplayClosed, 0);
+});
