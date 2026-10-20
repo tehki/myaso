@@ -11,7 +11,7 @@ test("R2 genuine middle pointer hold proves exactly three -38 guard events, 100 
   assert.match(flight, /pointerDown", button: 1/);
   assert.match(flight, /pointerUp", button: 1/);
   assert.match(flight, /const expectedGuards = \[62, 24, 0\]/);
-  assert.match(flight, /performArenaM221GuardBreakClick\(attacker, 10\)/);
+  assert.match(flight, /performArenaM221GuardBreakClick\(attacker, 45\)/);
   assert.match(flight, /defenderState.playerHp !== 100/);
   assert.match(flight, /defenderState.feedbackTransitions.includes\("parry-success"\)/);
   assert.match(flight, /attackerState.feedbackTransitions.includes\("parried"\)/);
@@ -26,6 +26,23 @@ test("R2 adds hold-block acceptance WITHOUT disabling original strict M194 wheel
   assert.match(workflow, /MYASO_PVP_SCENARIO: "uimiddleblockpressure"/);
   assert.match(workflow, /Validate M194 repeated real guard-break block-only pressure/);
   assert.match(workflow, /for attempt in 1 2 3 4 5/);
-  assert.match(source, /wheelHeadStartMs: 0/);
-  assert.match(source, /postTrustedWheelMs: 45/);
+  // R2 no longer uses the obsolete wheel-first timed click. The unchanged
+  // M194 suite must exercise authentic LMB-down, trusted Firefox wheel, and
+  // LMB-up release-to-strike while retaining strict guard/parry/HP checks.
+  const start = source.indexOf("async function runOnlineUiGuardBreakFlight(");
+  const end = source.indexOf("\nasync function runOnlineUiGuardBreakTellFlight(", start);
+  assert.ok(start >= 0 && end > start);
+  const guardBreak = source.slice(start, end);
+  assert.match(guardBreak, /dispatchR2ReleaseLedShortBlock\(\{/);
+  assert.match(guardBreak, /sendAttackDown: \(\) => setArenaAttackButton\(attacker, true\)/);
+  assert.match(guardBreak, /awaitTrustedWheel: \(\) => challenge\.wait\(\)/);
+  assert.match(guardBreak, /if \(!trustedWheelBeforeRelease\)/);
+  assert.match(guardBreak, /sendAttackUp: \(\) => setArenaAttackButton\(attacker, false\)/);
+  assert.match(guardBreak, /defenderState\?\.playerHp !== 100/);
+  assert.match(guardBreak, /defenderResult\.playerGuard !== 0/);
+  assert.match(guardBreak, /feedbackTransitions\.includes\("parried"\)/);
+  const heldRelease = readFileSync(new URL("../scripts/r2-release-led-short-block.mjs", import.meta.url), "utf8");
+  assert.match(heldRelease, /wheelHeadStartMs: 0/);
+  assert.match(heldRelease, /postTrustedWheelMs: 0/);
+  assert.match(heldRelease, /receiptGraceMs = 100/);
 });

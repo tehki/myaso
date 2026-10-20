@@ -122,3 +122,45 @@ test("R2 native light flight uses a real short tap instead of accidental heavy h
   assert.match(helper,/pointerUp", button: 0/);
   assert.match(helper,/pause", duration: boundedHoldMs/);
 });
+
+test("held heavy stays READY forever and only hits after server-authorized release", () => {
+  const a = createFighter({ id: "a", x: 220, y: 260, facing: 0 });
+  const b = createFighter({ id: "b", x: 295, y: 260, facing: Math.PI });
+  const w = createWorld({ width: 800, height: 540, fighters: [a, b] });
+  for (let i = 0; i < 7; i += 1) {
+    stepWorld(w, { a: { attack: true, heavyAttack: true, aimX: 450, aimY: 260 } }, 100);
+    assert.equal(a.action, "heavy_attack_windup", "holding must not auto-land");
+    assert.equal(b.hp, 100, "charging cannot damage a target");
+  }
+  assert.equal(a.actionElapsedMs, 320, "authoritative windup clamps at READY");
+  stepWorld(w, { a: { heavyAttack: true, aimX: 450, aimY: 260 } }, 1000 / 120);
+  assert.equal(a.action, "heavy_attack_active");
+  assert.equal(b.hp, 54, "release lands exactly one completed heavy");
+  stepWorld(w, { a: { aimX: 450, aimY: 260 } }, 1000 / 120);
+  assert.equal(b.hp, 54, "active frames cannot deal duplicate damage");
+});
+
+test("early release turns the held charge into light, or running strike with held RMB", () => {
+  const a = createFighter({ id: "a", x: 220, y: 260, facing: 0 });
+  const w = createWorld({ width: 800, height: 540, fighters: [a] });
+  stepWorld(w, { a: { attack: true, heavyAttack: true, aimX: 450, aimY: 260 } }, 100);
+  assert.equal(a.action, "heavy_attack_windup");
+  stepWorld(w, { a: { attack: true, aimX: 450, aimY: 260 } }, 1000 / 120);
+  assert.equal(a.action, "attack_windup", "undercharged release is not heavy");
+  const runner = createFighter({ id: "runner", x: 320, y: 260, facing: 0 });
+  const ww = createWorld({ width: 800, height: 540, fighters: [runner] });
+  stepWorld(ww, { runner: { attack: true, heavyAttack: true, run: true, moveX: 1, aimX: 450, aimY: 260 } }, 100);
+  assert.equal(runner.action, "heavy_attack_windup");
+  stepWorld(ww, { runner: { attack: true, run: true, moveX: 1, aimX: 450, aimY: 260 } }, 1000 / 120);
+  assert.equal(runner.action, "running_attack_windup", "held RMB and moving + LMB release should attack");
+});
+
+test("cancel held charge without attacking, standalone E retains original windup", () => {
+  const f = createFighter({ id: "a", x: 220, y: 260 });
+  const world = createWorld({ fighters: [f] });
+  stepWorld(world, { a: { attack: true, heavyAttack: true } }, 50);
+  stepWorld(world, { a: {} }, 1000 / 120);
+  assert.equal(f.action, "idle");
+  stepWorld(world, { a: { heavyAttack: true } }, 1000 / 120);
+  assert.equal(f.action, "heavy_attack_windup");
+});

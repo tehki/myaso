@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import test from "node:test";
 import { COMBAT_ACTION, FFA_KILL_TARGET, blockSpatialPresentation, combatActionHint, combatLifePresentation, combatOverlayPresentation, createCombatReadabilityTracker, createRemoteDamageTracker, fighterFocusNetId, fighterGuardBreakPunishNetId, guardBreakPunishRangeCue, fighterKnockdownPunishNetId, knockdownPunishRangeCue, fighterParryPunishNetId, parryPunishRangeCue, fighterRecoveryNetId, recoveryPunishRangeCue, punishRangeCueIntent, fighterIdentityPresentation, fighterThreatBearingLabel, fighterThreatGuardArcLabel, fighterThreatNetId, fighterThreatPhaseLabel, fighterThreatPhaseState, fighterMatchPointPresentation, fighterMatchPresentation, fighterScoreboardPresentation, fighterVitalsPresentation, guardBreakSpatialPresentation, killFeedPresentation, opponentRecoveryPresentation, parrySpatialPresentation, staminaDenialPresentation } from "../src/browser/combat-readability.mjs";
 
@@ -1064,4 +1065,28 @@ test("M186 punish geometry cue signals readiness separately from actionable repo
   assert.equal(punishRangeCueIntent(""), "");
   assert.equal(punishRangeCueIntent("PUNISH"), "");
   assert.equal(punishRangeCueIntent(null), "");
+});
+
+test("M59 R2 genuine held LMB heavy-charge windup preserves active-before-windup priority", () => {
+  const realR2Sequence = [
+    { state: "windup", secondaryPhase: "HEAVY WINDUP" },
+    { state: "windup", secondaryPhase: "WINDUP" },
+    { state: "strike", secondaryPhase: "STRIKE" },
+  ];
+  const violatesPriority = events => events.some(event =>
+    event.state === "windup" && fighterThreatPhaseState(event.secondaryPhase) !== "windup");
+
+  assert.equal(violatesPriority(realR2Sequence), false,
+    "authoritative HEAVY WINDUP and normal WINDUP both precede STRIKE");
+  assert.equal(violatesPriority([{ state: "windup", secondaryPhase: "STRIKE" }]), true,
+    "active secondary must never be ordered behind a winding-up primary");
+  assert.equal(violatesPriority([{ state: "windup", secondaryPhase: "HEAVY STRIKE" }]), true,
+    "a genuine heavy active strike must also take primary priority");
+  assert.equal(violatesPriority([{ state: "windup", secondaryPhase: "UNKNOWN" }]), true,
+    "unknown secondary phases cannot silently pass");
+
+  const runner = readFileSync(new URL("../scripts/pvp_browser_flight_runner.mjs", import.meta.url), "utf8");
+  assert.ok(runner.includes('fighterThreatPhaseState(event.secondaryPhase) !== "windup"'));
+  assert.ok(runner.includes('!secondaryPhases.has("WINDUP") || !secondaryPhases.has("STRIKE")'),
+    "native M59 must still observe both fully-committed normal WINDUP and STRIKE");
 });

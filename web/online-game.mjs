@@ -171,6 +171,7 @@ let animationFrameId = 0;
 let predictionStep = 0;
 let clientTick = 0;
 let attackRequested = false;
+let runningAttackRequested = false;
 let committedLightMove = null;
 let leftButtonPressMovement = null;
 let leftButtonDown = false;
@@ -189,6 +190,7 @@ const leftButtonCharge = createLeftButtonCharge({
     if (local.action === COMBAT_ACTION.jump) queueStaminaDenial("jump-attack");
     else if (!pendingStaminaDenial && (jumpRequested || keys.has("Space"))) queueStaminaDenial("jump-attack-chord");
     else if (rightButtonGesture.isRunning() && ["KeyW", "KeyA", "KeyS", "KeyD"].some((code) => keys.has(code))) {
+      runningAttackRequested = true;
       queueStaminaDenial("running-attack");
     }
     audio.play("light");
@@ -242,6 +244,33 @@ function onLeftPointerUp(event) {
   }
 }
 canvas.addEventListener("pointerup", onLeftPointerUp);
+// W3C Pointer Events fire pointerdown/up only on transitions between zero
+// and any pressed mouse button. With RMB held, additional LMB down/up
+// produces mouse events but no pointer events: preserve running attacks.
+const CHORDED_LEFT_POINTER_ID = -1;
+let chordedLeftDown = false;
+canvas.addEventListener("mousedown", (event) => {
+  if (event.button !== 0 || !(event.buttons & 2) || leftButtonCharge.isPressed()) return;
+  canvas.focus();
+  updateMouse(event);
+  leftButtonDown = true;
+  leftButtonPressMovement = captureLightAttackMovement(keys);
+  chordedLeftDown = true;
+  leftButtonCharge.press(CHORDED_LEFT_POINTER_ID, {
+    immediate: local.action === COMBAT_ACTION.jump || jumpRequested || keys.has("Space"),
+  });
+});
+function onChordedLeftMouseUp(event) {
+  if (event.button !== 0 || !chordedLeftDown) return;
+  chordedLeftDown = false;
+  leftButtonDown = false;
+  updateMouse(event);
+  leftButtonCharge.release(CHORDED_LEFT_POINTER_ID);
+  leftButtonPressMovement = null;
+}
+canvas.addEventListener("mouseup", onChordedLeftMouseUp);
+window.addEventListener("mouseup", onChordedLeftMouseUp);
+
 window.addEventListener("pointerup", onLeftPointerUp);
 canvas.addEventListener("pointercancel", (event) => {
   if (event.button === 1) middleBlockHeld = false;
@@ -253,7 +282,7 @@ canvas.addEventListener("pointercancel", (event) => {
 });
 canvas.addEventListener("lostpointercapture", (event) => {
   if (event.button === 1) middleBlockHeld = false;
-  if (event.pointerId !== undefined) {
+  if (event.pointerId !== undefined && !(event.buttons & 1)) {
     leftButtonPressMovement = null;
     leftButtonCharge.cancel(event.pointerId);
   }
@@ -666,10 +695,12 @@ function releaseInputs() {
   dashRequested = false;
   dashMove = null;
   attackRequested = false;
+  runningAttackRequested = false;
   committedLightMove = null;
   leftButtonDown = false;
   leftButtonPressMovement = null;
   leftButtonCharge.cancel();
+  chordedLeftDown = false;
   heavyAttackRequested = false;
   rollRequested = false;
   kickRequested = false;
@@ -699,13 +730,14 @@ function sampleInput() {
   currentInput.moveY = dashRequested && dashMove ? dashMove.y : attackRequested && committedLightMove
     ? committedLightMove.moveY : (keys.has("KeyS") ? 1 : 0) - (keys.has("KeyW") ? 1 : 0);
   currentInput.facing = Math.atan2(mouse.y - canvas.height / 2, mouse.x - canvas.width / 2);
-  currentInput.attack = attackRequested;
-  currentInput.heavyAttack = heavyAttackRequested;
+  const leftChargeHeld = leftButtonCharge.isCharging();
+  currentInput.attack = attackRequested || leftChargeHeld;
+  currentInput.heavyAttack = heavyAttackRequested || leftChargeHeld;
   currentInput.dodge = rollRequested;
   currentInput.dash = dashRequested;
   currentInput.block = middleBlockHeld || performance.now() < shortBlockUntil;
   currentInput.kick = kickRequested;
-  currentInput.run = rightButtonGesture.isRunning();
+  currentInput.run = rightButtonGesture.isRunning() || runningAttackRequested;
   currentInput.jump = jumpRequested;
   if (local.action === COMBAT_ACTION.idle && (currentInput.moveX || currentInput.moveY)) {
     audio.play("step", { level: currentInput.run ? .90 : .55 });
@@ -743,6 +775,7 @@ function simulatePrediction(stepMs) {
     networkClient.sendInput({ tick: outgoingTick, ...currentInput });
     clientTick = (clientTick + 1) >>> 0;
     attackRequested = false;
+    runningAttackRequested = false;
     committedLightMove = null;
     heavyAttackRequested = false;
     rollRequested = false;
