@@ -4,15 +4,15 @@
 // native browsers its attestation fetch can arrive far later than the actual
 // DOM wheel event. Do not keep LMB held until a delayed receipt: doing so
 // stretches the unchanged 135ms light hit beyond the 240ms short block.
-// After a bounded wheel-dispatch grace, release the same real button once;
-// require the trusted receipt, real wheel ACK and cross-browser native-event
-// ordering before accepting the strict HP/guard/parry proof in the caller.
+// Allow a bounded interval for Firefox's actual trusted wheel delivery before
+// releasing the same real button once. Require trusted receipt, wheel ACK and
+// native cross-browser event ordering before accepting HP/guard/parry proof.
 import { setTimeout as sleepTimer } from "node:timers/promises";
 
 export async function dispatchR2ReleaseLedShortBlock({
   sendAttackDown, sendWheel, awaitTrustedWheel, sendAttackUp,
   now = () => performance.now(), sleep = sleepTimer,
-  maxHoldMs = 280, receiptGraceMs = 70,
+  maxHoldMs = 280, receiptGraceMs = 200,
 }) {
   if (![sendAttackDown, sendWheel, awaitTrustedWheel, sendAttackUp, now, sleep]
     .every(fn => typeof fn === "function")
@@ -45,10 +45,11 @@ export async function dispatchR2ReleaseLedShortBlock({
   // On a fast native delivery release immediately. On a slow *receipt* release
   // at the bounded grace, then verify actual DOM ordering and required
   // attestation in the caller. Never silently accept missing/bad wheel.
-  // A 45ms grace in quality #39423835786 released Chrome just 2ms BEFORE
-  // Firefox's native wheel, correctly failing strict M334. At 70ms genuine
-  // slow wheel delivery can precede release without waiting for delayed
-  // attestation transport. Original 135ms attack / 240ms block are intact.
+  // Quality #39430978668 saw a real Firefox wheel 20ms AFTER Chrome UP
+  // with only 70ms grace (trusted wheel arrived 145ms after DOWN).
+  // The 200ms grace admits that genuine W3C delivery yet remains under
+  // the 280ms maximum light-charge budget. A delayed/absent trusted receipt
+  // cannot bypass native ordering or strict HP/guard/parry checks.
   await Promise.race([attestation, sleep(receiptGraceMs), earlyWheelFailure]);
   const attackUpDispatchMs = ms();
   if (attackUpDispatchMs - attackDownDispatchMs > maxHoldMs) {
