@@ -100,7 +100,7 @@ async fn main() -> Result<()> {
             .context("P10 accept worker ended")?;
         let route = handoff
             .register_trusted(id as u64, id as u32, ZONE)
-            .context("P10 trusted fixture registration")?;
+            .expect("P10 trusted fixture registration");
         let connection = Arc::new(connection);
         let reader = Arc::clone(&connection);
         tokio::spawn(async move {
