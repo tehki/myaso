@@ -3,6 +3,7 @@
 //! Do not expose grants, item IDs or positions as client-controlled authority.
 use std::collections::{BTreeMap, BTreeSet};
 
+use crate::character_identity::{CharacterId, SessionIdentityRegistry, SessionLease};
 use crate::simulation::{Action, Fighter};
 use crate::zone::ZoneId;
 
@@ -15,7 +16,7 @@ pub const MAX_SCATTERED_OBJECTS: usize = 3;
 pub const LOOT_VISIBILITY_REACH: f32 = 550.0;
 pub const MAX_VISIBLE_LOOT_ENTITIES: usize = 128;
 /// In-memory snapshot schema, not a disk or network encoding.
-pub const LOOT_STATE_SCHEMA_VERSION: u16 = 1;
+pub const LOOT_STATE_SCHEMA_VERSION: u16 = 2;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum ItemKind {
@@ -185,6 +186,17 @@ pub enum LootError {
     WrongSlot,
     IdExhausted,
     InvalidState,
+    UnverifiedSession,
+    AlreadyParked,
+}
+
+/// Server-owned in-memory character inventory while no session is attached.
+/// An offline character remains part of global item ID validation; objects
+/// may never be copied into both an active and parked inventory.
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct ParkedInventory {
+    inventory: Inventory,
+    dead: bool,
 }
 
 /// An isolated, validated copy of loot authority. This is NOT persistent
@@ -197,6 +209,7 @@ pub struct LootStateSnapshot {
     next_id: u64,
     players: BTreeMap<u32, Inventory>,
     dead: BTreeSet<u32>,
+    parked: BTreeMap<CharacterId, ParkedInventory>,
     ground: BTreeMap<u64, GroundDrop>,
     corpses: BTreeMap<u64, Corpse>,
 }
@@ -216,6 +229,7 @@ impl Default for LootAuthority {
             next_id: 1,
             players: BTreeMap::new(),
             dead: BTreeSet::new(),
+            parked: BTreeMap::new(),
             ground: BTreeMap::new(),
             corpses: BTreeMap::new(),
         }
@@ -235,6 +249,7 @@ impl LootAuthority {
             next_id: self.next_id,
             players: self.players.clone(),
             dead: self.dead.clone(),
+            parked: self.parked.clone(),
             ground: self.ground.clone(),
             corpses: self.corpses.clone(),
         };
@@ -251,6 +266,7 @@ impl LootAuthority {
             next_id: snapshot.next_id,
             players: snapshot.players,
             dead: snapshot.dead,
+            parked: snapshot.parked,
             ground: snapshot.ground,
             corpses: snapshot.corpses,
         })
@@ -260,6 +276,67 @@ impl LootAuthority {
         let id = self.next_id;
         self.next_id = id.checked_add(1).ok_or(LootError::IdExhausted)?;
         Ok(id)
+    }
+
+    /// Detach an authenticated character's entire inventory before releasing
+    /// their server connection. Move semantics preserve global item identity
+    /// and prevent duplicate live/parked ownership. Called only by a trusted
+    /// serialized disconnect path using its exact server-owned SessionLease.
+    ///
+    /// The caller must guarantee no further loot actions can execute on the
+    /// old session, then persist the resulting full state transactionally
+    /// before promising crash safety. This domain currently does NEITHER.
+    pub fn park_inventory(
+        &mut self,
+        identity: &SessionIdentityRegistry,
+        lease: SessionLease,
+    ) -> Result<(), LootError> {
+        let character = identity
+            .resolve_session(lease)
+            .ok_or(LootError::UnverifiedSession)?;
+        let session_id = lease.server_session();
+        if self.parked.contains_key(&character) {
+            return Err(LootError::AlreadyParked);
+        }
+        if !self.players.contains_key(&session_id) {
+            return Err(LootError::UnknownPlayer);
+        }
+        let inventory = self.players.remove(&session_id).expect("checked");
+        let dead = self.dead.remove(&session_id);
+        self.parked.insert(
+            character,
+            ParkedInventory { inventory, dead },
+        );
+        Ok(())
+    }
+
+    /// Re-attach the exact parked inventory to a newly verified connection.
+    /// Does not mint items, reset the death state, or reclaim loot that other
+    /// players lawfully removed from a previous corpse.
+    pub fn resume_inventory(
+        &mut self,
+        identity: &SessionIdentityRegistry,
+        lease: SessionLease,
+    ) -> Result<(), LootError> {
+        let character = identity
+            .resolve_session(lease)
+            .ok_or(LootError::UnverifiedSession)?;
+        let session_id = lease.server_session();
+        if self.players.contains_key(&session_id) {
+            return Err(LootError::DuplicatePlayer);
+        }
+        let parked = self.parked.remove(&character).ok_or(LootError::NotFound)?;
+        self.players.insert(session_id, parked.inventory);
+        if parked.dead {
+            self.dead.insert(session_id);
+        }
+        Ok(())
+    }
+
+    /// Read-only check useful for recovery tests and future lifecycle wiring.
+    /// The returned inventory is still in server-owned memory, NOT on disk.
+    pub fn parked_inventory(&self, character: CharacterId) -> Option<&Inventory> {
+        self.parked.get(&character).map(|stored| &stored.inventory)
     }
 
     pub fn register(&mut self, authenticated_id: u32) -> Result<(), LootError> {
@@ -1049,6 +1126,22 @@ impl LootStateSnapshot {
                 validate_stack_identity(stack, &mut ids, self.next_id)?;
             }
         }
+        for parked in self.parked.values() {
+            if parked.inventory.backpack.len() > BACKPACK_CAPACITY
+                || (parked.dead && parked.inventory.stack_count() != 0)
+            {
+                return Err(LootError::InvalidState);
+            }
+            for stack in &parked.inventory.backpack {
+                validate_stack_identity(stack, &mut ids, self.next_id)?;
+            }
+            for (slot, stack) in &parked.inventory.equipment {
+                if !stack.kind.fits(*slot) {
+                    return Err(LootError::InvalidState);
+                }
+                validate_stack_identity(stack, &mut ids, self.next_id)?;
+            }
+        }
         if self.dead.iter().any(|id| !self.players.contains_key(id)) {
             return Err(LootError::InvalidState);
         }
@@ -1296,6 +1389,134 @@ mod tests {
         );
         assert!(!loot.ground().contains_key(&drop_id));
         assert_eq!(loot.inventory(2).unwrap().backpack()[0].id, sword);
+    }
+
+    #[test]
+    fn verified_reconnection_preserves_every_item_and_unique_ids() {
+        let mut loot = LootAuthority::new();
+        let mut identities = SessionIdentityRegistry::new();
+        let old = SessionLease::new(10, 1).unwrap();
+        let current = SessionLease::new(20, 1).unwrap();
+        let character = CharacterId::new(555).unwrap();
+        identities.bind_verified(old, character).unwrap();
+        loot.register(10).unwrap();
+        let gold = loot.grant(10, ItemKind::Gold, 18).unwrap();
+        let sword = loot.grant(10, ItemKind::RustySword, 1).unwrap();
+        loot.equip(10, sword, EquipmentSlot::MainHand).unwrap();
+
+        loot.park_inventory(&identities, old).unwrap();
+        assert!(loot.inventory(10).is_none());
+        assert_eq!(loot.parked_inventory(character).unwrap().stack_count(), 2);
+        let snap = loot.export_state().unwrap();
+        let mut loot = LootAuthority::restore_state(snap.clone()).unwrap();
+        assert_eq!(loot.export_state().unwrap(), snap);
+
+        assert_eq!(identities.release_session(old), Some(character));
+        identities.bind_verified(current, character).unwrap();
+        loot.resume_inventory(&identities, current).unwrap();
+        assert!(loot.parked_inventory(character).is_none());
+        let bag = loot.inventory(20).unwrap();
+        assert_eq!(bag.backpack()[0].id, gold);
+        assert_eq!(bag.backpack()[0].amount, 18);
+        assert_eq!(bag.equipped(EquipmentSlot::MainHand).unwrap().id, sword);
+        let newer = loot.grant(20, ItemKind::SulfurAsh, 2).unwrap();
+        assert!(newer > gold && newer > sword);
+        loot.export_state().unwrap();
+    }
+
+    #[test]
+    fn stale_leases_and_double_attaches_fail_without_losing_inventory() {
+        let mut loot = LootAuthority::new();
+        let mut identities = SessionIdentityRegistry::new();
+        let character = CharacterId::new(8).unwrap();
+        let old = SessionLease::new(3, 1).unwrap();
+        let new = SessionLease::new(3, 2).unwrap();
+        identities.bind_verified(old, character).unwrap();
+        loot.register(3).unwrap();
+        let item = loot.grant(3, ItemKind::Gold, 7).unwrap();
+        let wrong = SessionLease::new(3, 99).unwrap();
+        assert_eq!(
+            loot.park_inventory(&identities, wrong),
+            Err(LootError::UnverifiedSession)
+        );
+        assert_eq!(loot.inventory(3).unwrap().backpack()[0].id, item);
+        loot.park_inventory(&identities, old).unwrap();
+        assert_eq!(
+            loot.park_inventory(&identities, old),
+            Err(LootError::AlreadyParked)
+        );
+        assert_eq!(identities.release_session(old), Some(character));
+        identities.bind_verified(new, character).unwrap();
+        assert_eq!(
+            loot.resume_inventory(&identities, old),
+            Err(LootError::UnverifiedSession)
+        );
+        loot.resume_inventory(&identities, new).unwrap();
+        assert_eq!(
+            loot.resume_inventory(&identities, new),
+            Err(LootError::DuplicatePlayer)
+        );
+        assert_eq!(loot.inventory(3).unwrap().backpack()[0].id, item);
+        assert_eq!(loot.inventory(3).unwrap().backpack()[0].amount, 7);
+        loot.export_state().unwrap();
+    }
+
+    #[test]
+    fn dead_character_reconnect_stays_dead_and_never_regains_lost_items() {
+        let mut loot = LootAuthority::new();
+        let mut identities = SessionIdentityRegistry::new();
+        let character = CharacterId::new(19).unwrap();
+        let old = SessionLease::new(1, 1).unwrap();
+        let new = SessionLease::new(2, 1).unwrap();
+        identities.bind_verified(old, character).unwrap();
+        loot.register(1).unwrap();
+        let item = loot.grant(1, ItemKind::Spellbook, 1).unwrap();
+        let corpse_id = loot
+            .death(1, &fighter(1, 200.0, 200.0, true), ZoneId::Moonvale, 100)
+            .unwrap();
+        loot.park_inventory(&identities, old).unwrap();
+        assert_eq!(loot.parked_inventory(character).unwrap().stack_count(), 0);
+        loot.export_state().unwrap();
+        assert_eq!(identities.release_session(old), Some(character));
+        identities.bind_verified(new, character).unwrap();
+        loot.resume_inventory(&identities, new).unwrap();
+        assert_eq!(
+            loot.grant(2, ItemKind::Gold, 1),
+            Err(LootError::DeadPlayer)
+        );
+        assert_eq!(loot.inventory(2).unwrap().stack_count(), 0);
+        assert!(loot.corpses()[&corpse_id].items.iter().any(|x| x.id == item));
+        loot.respawn(2, &fighter(2, 200.0, 200.0, false))
+            .unwrap();
+        loot.grant(2, ItemKind::Gold, 1).unwrap();
+        loot.export_state().unwrap();
+    }
+
+    #[test]
+    fn corrupt_snapshot_rejects_duplicate_active_and_parked_item_id() {
+        let mut loot = LootAuthority::new();
+        let mut identities = SessionIdentityRegistry::new();
+        let character = CharacterId::new(44).unwrap();
+        let lease = SessionLease::new(4, 1).unwrap();
+        identities.bind_verified(lease, character).unwrap();
+        loot.register(4).unwrap();
+        loot.register(5).unwrap();
+        loot.grant(4, ItemKind::Gold, 2).unwrap();
+        loot.park_inventory(&identities, lease).unwrap();
+        let snap = loot.export_state().unwrap();
+        let mut corrupt = snap.clone();
+        let duplicate = corrupt.parked[&character].inventory.backpack[0].clone();
+        corrupt.players.get_mut(&5).unwrap().backpack.push(duplicate);
+        assert!(matches!(
+            LootAuthority::restore_state(corrupt),
+            Err(LootError::InvalidState)
+        ));
+        let mut impossible = snap;
+        impossible.parked.get_mut(&character).unwrap().dead = true;
+        assert!(matches!(
+            LootAuthority::restore_state(impossible),
+            Err(LootError::InvalidState)
+        ));
     }
 
     #[test]
