@@ -233,10 +233,16 @@ mod tests {
         assert_eq!(bytes[4], RECORD_VERSION);
         assert_eq!(&bytes[8..24], &record.character_id.get().to_le_bytes());
         assert_eq!(CharacterRecord::decode(&bytes), Ok(record));
-        assert_eq!(CharacterRecord::decode(&bytes[..35]), Err(CharacterRecordError::InvalidLength));
+        assert_eq!(
+            CharacterRecord::decode(&bytes[..35]),
+            Err(CharacterRecordError::InvalidLength)
+        );
         let mut extra = bytes.to_vec();
         extra.push(0);
-        assert_eq!(CharacterRecord::decode(&extra), Err(CharacterRecordError::InvalidLength));
+        assert_eq!(
+            CharacterRecord::decode(&extra),
+            Err(CharacterRecordError::InvalidLength)
+        );
     }
 
     #[test]
@@ -244,21 +250,36 @@ mod tests {
         let good = CharacterRecord::new(character(42)).encode();
         let mut bad = good;
         bad[0] ^= 1;
-        assert_eq!(CharacterRecord::decode(&bad), Err(CharacterRecordError::InvalidMagic));
+        assert_eq!(
+            CharacterRecord::decode(&bad),
+            Err(CharacterRecordError::InvalidMagic)
+        );
         bad = good;
         bad[4] = 2;
-        assert_eq!(CharacterRecord::decode(&bad), Err(CharacterRecordError::UnsupportedVersion(2)));
+        assert_eq!(
+            CharacterRecord::decode(&bad),
+            Err(CharacterRecordError::UnsupportedVersion(2))
+        );
         bad = good;
         bad[7] = 1;
-        assert_eq!(CharacterRecord::decode(&bad), Err(CharacterRecordError::NonZeroReserved));
+        assert_eq!(
+            CharacterRecord::decode(&bad),
+            Err(CharacterRecordError::NonZeroReserved)
+        );
         bad = good;
         bad[8] ^= 1;
-        assert_eq!(CharacterRecord::decode(&bad), Err(CharacterRecordError::ChecksumMismatch));
+        assert_eq!(
+            CharacterRecord::decode(&bad),
+            Err(CharacterRecordError::ChecksumMismatch)
+        );
         bad = good;
         bad[8..24].fill(0);
         let checksum = fnv1a32(&bad[..32]);
         bad[32..36].copy_from_slice(&checksum.to_le_bytes());
-        assert_eq!(CharacterRecord::decode(&bad), Err(CharacterRecordError::InvalidCharacterId));
+        assert_eq!(
+            CharacterRecord::decode(&bad),
+            Err(CharacterRecordError::InvalidCharacterId)
+        );
         assert!(CharacterId::new(0).is_none());
     }
 
@@ -269,39 +290,78 @@ mod tests {
         let first = initial.next_generation().expect("first");
         assert_eq!(first.session_generation, 1);
         let restored = CharacterRecord::decode(&first.encode()).expect("restored committed state");
-        assert_eq!(restored.next_generation().expect("second").session_generation, 2);
-        let exhausted = CharacterRecord { session_generation: u64::MAX, ..initial };
-        assert_eq!(exhausted.next_generation(), Err(CharacterRecordError::GenerationExhausted));
+        assert_eq!(
+            restored
+                .next_generation()
+                .expect("second")
+                .session_generation,
+            2
+        );
+        let exhausted = CharacterRecord {
+            session_generation: u64::MAX,
+            ..initial
+        };
+        assert_eq!(
+            exhausted.next_generation(),
+            Err(CharacterRecordError::GenerationExhausted)
+        );
     }
 
     #[test]
     fn fencing_rejects_duplicate_stale_and_released_generations() {
         let mut registry = SessionLeaseRegistry::default();
         let original = CharacterRecord::new(character(7));
-        assert_eq!(registry.activate_committed(original, connection(1)), Err(LeaseError::UncommittedGeneration));
+        assert_eq!(
+            registry.activate_committed(original, connection(1)),
+            Err(LeaseError::UncommittedGeneration)
+        );
         let first_record = original.next_generation().expect("epoch one");
-        let first = registry.activate_committed(first_record, connection(1)).expect("first");
+        let first = registry
+            .activate_committed(first_record, connection(1))
+            .expect("first");
         assert!(registry.is_current(first));
-        assert_eq!(registry.activate_committed(first_record, connection(2)), Err(LeaseError::StaleOrDuplicateGeneration));
+        assert_eq!(
+            registry.activate_committed(first_record, connection(2)),
+            Err(LeaseError::StaleOrDuplicateGeneration)
+        );
         let second_record = first_record.next_generation().expect("epoch two");
-        let second = registry.activate_committed(second_record, connection(2)).expect("takeover");
+        let second = registry
+            .activate_committed(second_record, connection(2))
+            .expect("takeover");
         assert!(!registry.is_current(first));
         assert!(!registry.release(first));
         assert!(registry.is_current(second));
         assert!(registry.release(second));
         assert!(!registry.is_current(second));
-        assert_eq!(registry.activate_committed(second_record, connection(3)), Err(LeaseError::StaleOrDuplicateGeneration));
-        let third = registry.activate_committed(second_record.next_generation().expect("third"), connection(3)).expect("third");
+        assert_eq!(
+            registry.activate_committed(second_record, connection(3)),
+            Err(LeaseError::StaleOrDuplicateGeneration)
+        );
+        let third = registry
+            .activate_committed(
+                second_record.next_generation().expect("third"),
+                connection(3),
+            )
+            .expect("third");
         assert!(registry.is_current(third));
     }
 
     #[test]
     fn one_connection_cannot_claim_two_characters() {
         let mut registry = SessionLeaseRegistry::default();
-        let first = CharacterRecord::new(character(1)).next_generation().expect("epoch one");
-        let second = CharacterRecord::new(character(2)).next_generation().expect("epoch one");
-        let first_lease = registry.activate_committed(first, connection(51)).expect("first");
-        assert_eq!(registry.activate_committed(second, connection(51)), Err(LeaseError::ConnectionAlreadyActive));
+        let first = CharacterRecord::new(character(1))
+            .next_generation()
+            .expect("epoch one");
+        let second = CharacterRecord::new(character(2))
+            .next_generation()
+            .expect("epoch one");
+        let first_lease = registry
+            .activate_committed(first, connection(51))
+            .expect("first");
+        assert_eq!(
+            registry.activate_committed(second, connection(51)),
+            Err(LeaseError::ConnectionAlreadyActive)
+        );
         assert!(registry.is_current(first_lease));
         assert!(registry.activate_committed(second, connection(52)).is_ok());
     }
