@@ -24,6 +24,19 @@ const TARGET_FORGE_NAILS: u8 = 3;
 const MAINTENANCE_CLOSE_TICK: u32 = 900;
 const MAINTENANCE_REOPEN_TICK: u32 = 2100;
 const WORK_YARD_CLOSED: [bool; npc_worksites::WORKSITES.len()] = [true, false, true, true, true];
+const WORKSITE_REPORT_TTL_TICKS: u32 = 120 * 60;
+const SITE_LABELS: [&str; npc_worksites::WORKSITES.len()] =
+    ["well", "work yard", "supply depot", "market", "forge"];
+
+/// The latest confirmed *change*, not a player complaint or an inferred
+/// cause. Full current status is always independently read from the authority.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct WorksiteChange {
+    tick: u32,
+    revision: u32,
+    changed_mask: u8,
+    active_mask: u8,
+}
 
 /// An NPC's decision is recomputed only from conserved server stocks;
 /// a chat request can read it but never submit or execute it.
@@ -121,6 +134,7 @@ pub struct NpcSupplyWorld {
     sequence: u32,
     sites: npc_worksites::WorksiteAuthority,
     pilot_maintenance: bool,
+    last_site_change: Option<WorksiteChange>,
 }
 
 impl Default for NpcSupplyWorld {
@@ -132,6 +146,7 @@ impl Default for NpcSupplyWorld {
             sequence: 0,
             sites: npc_worksites::WorksiteAuthority::default(),
             pilot_maintenance: false,
+            last_site_change: None,
         }
     }
 }
@@ -154,8 +169,79 @@ impl NpcSupplyWorld {
         revision: u32,
         active: [bool; npc_worksites::WORKSITES.len()],
     ) -> Result<(), npc_worksites::WorksiteRevisionError> {
+        let old = self.sites.active_flags();
         self.sites
-            .adopt_server_manifest(zone, version, revision, active)
+            .adopt_server_manifest(zone, version, revision, active)?;
+        let mut changed_mask = 0_u8;
+        let mut active_mask = 0_u8;
+        for (index, (&before, &after)) in old.iter().zip(active.iter()).enumerate() {
+            if before != after {
+                changed_mask |= 1 << index;
+            }
+            if after {
+                active_mask |= 1 << index;
+            }
+        }
+        // Revision-only no-op changes should not fake a closure/reopening.
+        if changed_mask != 0 {
+            self.last_site_change = Some(WorksiteChange {
+                tick: self.last_step.unwrap_or(0),
+                revision,
+                changed_mask,
+                active_mask,
+            });
+        }
+        Ok(())
+    }
+
+    /// Server-confirmed current availability plus bounded original transition
+    /// evidence. Does not claim to know the *cause* of a world-object outage.
+    /// Reads immutable worksite labels and conserved stock only.
+    pub fn worksite_report(&self, tick: u32) -> String {
+        let status = self.sites.active_flags();
+        let count = status.iter().filter(|&&up| up).count();
+        let mut message = format!(
+            "Server worksite status: {count}/5 available (revision {}).",
+            self.sites.revision()
+        );
+        let closed: Vec<&str> = SITE_LABELS
+            .iter()
+            .zip(status.iter())
+            .filter_map(|(name, up)| (!up).then_some(*name))
+            .collect();
+        if !closed.is_empty() {
+            message.push_str(&format!(" Unavailable: {}.", closed.join(", ")));
+        }
+        if let Some(event) = self.last_site_change {
+            // Only genuine, recent transitions may be called 'recent'; a
+            // future/invalid query tick is never a valid historical witness.
+            if tick >= event.tick && tick - event.tick <= WORKSITE_REPORT_TTL_TICKS {
+                let mut changes = Vec::with_capacity(SITE_LABELS.len());
+                for (i, name) in SITE_LABELS.iter().enumerate() {
+                    if event.changed_mask & (1 << i) != 0 {
+                        let verb = if event.active_mask & (1 << i) != 0 {
+                            "became available"
+                        } else {
+                            "became unavailable"
+                        };
+                        changes.push(format!("{name} {verb}"));
+                    }
+                }
+                message.push_str(&format!(
+                    " Verified server change at tick {}, revision {}: {}.",
+                    event.tick,
+                    event.revision,
+                    changes.join(", ")
+                ));
+            }
+        } else {
+            message.push_str(" No verified status changes this session.");
+        }
+        if !status[1] && self.stocks.tomas_water > 0 {
+            message.push_str(" Tomas is retaining his water until delivery is possible.");
+        }
+        message.push_str(" Cause not verified; no player contract or reward.");
+        message
     }
 
     pub fn worksite_revision(&self) -> u32 {
@@ -825,5 +911,76 @@ mod tests {
             MAINTENANCE_REOPEN_TICK,
         );
         assert_eq!(town.worksite_revision(), 3);
+    }
+
+    #[test]
+    fn maintenance_events_produce_grounded_npc_outage_and_reopening_report() {
+        let mut town = NpcSupplyWorld::default();
+        assert!(town
+            .worksite_report(0)
+            .contains("5/5 available (revision 1)"));
+        assert!(town
+            .worksite_report(0)
+            .contains("No verified status changes"));
+        town.enable_pilot_maintenance();
+        run_until(&mut town, 0, 900);
+        let outage = town.worksite_report(900);
+        assert!(outage.contains("4/5 available (revision 2)"));
+        assert!(outage.contains("work yard became unavailable"));
+        assert!(outage.contains("tick 900, revision 2"));
+        assert!(outage.contains("Tomas is retaining his water"));
+        assert!(outage.contains("Cause not verified"));
+        assert!(!outage.contains("player repaired"));
+        assert!(outage.len() <= 512);
+
+        run_until(&mut town, 901, 2100);
+        let restored = town.worksite_report(2100);
+        assert!(restored.contains("5/5 available (revision 3)"));
+        assert!(restored.contains("work yard became available"));
+        assert!(!restored.contains("became unavailable"));
+        assert!(!restored.contains("Tomas is retaining"));
+        assert!(restored.len() <= 512);
+        let stale = town.worksite_report(2100 + WORKSITE_REPORT_TTL_TICKS + 1);
+        assert!(stale.contains("5/5 available (revision 3)"));
+        assert!(!stale.contains("Verified server change"));
+        assert!(town.stocks().conserved());
+    }
+
+    #[test]
+    fn invalid_stale_noop_and_batch_server_manifests_cannot_invent_world_events() {
+        use crate::zone::ZoneId;
+        let mut town = NpcSupplyWorld::default();
+        run_until(&mut town, 0, 300);
+        let old = town.stocks();
+        let mut changed = [true; npc_worksites::WORKSITES.len()];
+        changed[0] = false;
+        changed[4] = false;
+        assert!(town
+            .adopt_server_worksites(ZoneId::RedLionInn, 1, 2, changed)
+            .is_err());
+        assert!(town
+            .adopt_server_worksites(ZoneId::Moonvale, 2, 2, changed)
+            .is_err());
+        assert!(town
+            .worksite_report(300)
+            .contains("No verified status changes"));
+        town.adopt_server_worksites(ZoneId::Moonvale, 1, 2, changed)
+            .unwrap();
+        let accepted = town.worksite_report(300);
+        assert!(accepted.contains("well became unavailable"));
+        assert!(accepted.contains("forge became unavailable"));
+        assert!(accepted.contains("3/5 available (revision 2)"));
+        assert_eq!(town.last_site_change.unwrap().changed_mask, 0b10001);
+        assert!(town
+            .adopt_server_worksites(ZoneId::Moonvale, 1, 2, [true; 5])
+            .is_err());
+        assert_eq!(town.worksite_report(300), accepted);
+        town.adopt_server_worksites(ZoneId::Moonvale, 1, 3, changed)
+            .unwrap();
+        assert_eq!(town.worksite_revision(), 3);
+        assert!(town.worksite_report(300).contains("Verified server change"));
+        assert_eq!(town.last_site_change.unwrap().revision, 2);
+        assert_eq!(town.stocks(), old);
+        assert!(town.stocks().conserved());
     }
 }

@@ -521,3 +521,50 @@ game loading. Full protected exact-head CI remains mandatory.
 This is **not** an integration with the still-open World & Gameplay
 collision/door PRs, nor production server world entities or active
 economics. Disable maintenance before any eventual realm deployment.
+
+## LW-1O — Grounded NPC responses to server worksite changes
+
+NPCs can now discuss the latest **verified server-owned worksite change**
+through read-only dialogue. Try `worksite news`,
+`what happened at the work yard`, `worksite status`,
+`why is the yard closed`, `forge open` or `site closures`.
+The speaker reads the very same `NpcSupplyWorld` and immutable five-site
+registry that gate NPC supply transfers and produce reliable type-12 status.
+Each reply always identifies the **current active worksite count and
+authoritative revision**, and names any currently unavailable locations.
+
+Only a **successfully adopted, changing** authoritative worksite manifest
+records the latest worksite event. The event is a tiny bounded snapshot
+(revision, original server tick, five-bit changed-site mask, five-bit
+availability mask), not an open-ended memory, generated narrative, chat
+history, or user-supplied claim. Rejected stale, wrong-zone and
+unsupported-version updates cannot fabricate events. A revision-only
+snapshot that changes no object availability cannot fabricate an outage.
+When a real change is less than 120 simulated seconds old, NPCs can
+report the specific sites that became available/unavailable, with the
+original tick and revision. After expiry only the current live status
+remains. The latest event is transient and replaces the prior event;
+no persistent incident archive or player identity is created.
+
+When the work yard is closed and Tomas is genuinely still carrying a
+bucket, NPCs may also explain that he **retains the water until it can
+be delivered**. That claim is read directly from the conserved stocks;
+the NPC cannot give, drop, duplicate or sell the water. A reopening
+changes the status and verified event, but never claims a player
+repaired a building or knows *why* it was closed. Replies explicitly
+identify the cause as unverified, without offering player contracts
+or rewards.
+
+This builds on LW-1N's **independently opt-in, localhost-only** maintenance
+simulation: tick 900 records the work yard becoming unavailable,
+tick 2100 records it becoming available again. The normal opt-out
+pilot reports no prior changes. No new client-to-server packet type,
+new world objects, combat colliders, map/door authority, currency,
+persistence or production activation was introduced. The World &
+Gameplay preview/collision/door branches remain separate.
+
+Regression tests confirm the first closure and later reopening, event
+TTL, exact provenance labels, unverified causes, multisite updates,
+no-op revisions, rejected manifests, read-only NPC chat, and conserved
+resources. Protected CI and real-browser verification remain the
+required acceptance gates for PR #353.

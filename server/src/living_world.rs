@@ -203,6 +203,7 @@ pub struct SocialFacts<'a> {
     pub completed_work: Option<&'a str>,
     pub settlement_needs: Option<&'a str>,
     pub planned_work: Option<&'a str>,
+    pub worksite_report: Option<&'a str>,
 }
 
 pub fn answer_with_relations(
@@ -219,6 +220,7 @@ pub fn answer_with_relations(
     let completed_work = social.completed_work;
     let settlement_needs = social.settlement_needs;
     let planned_work = social.planned_work;
+    let worksite_report = social.worksite_report;
     let clean = utterance.trim().to_lowercase();
     if let Some(proposed) = clean.strip_prefix("my name is ") {
         let name = utterance.trim().get(11..).unwrap_or("").trim();
@@ -273,6 +275,26 @@ pub fn answer_with_relations(
     ) {
         planned_work
             .unwrap_or("I have no validated future work order.")
+            .to_string()
+    } else if contains_any(
+        &clean,
+        &[
+            "worksite status",
+            "worksite news",
+            "what happened at the work yard",
+            "what happened to the work yard",
+            "why is the yard closed",
+            "yard open",
+            "yard closed",
+            "forge open",
+            "forge closed",
+            "building status",
+            "site closures",
+            "worksite changes",
+        ],
+    ) {
+        worksite_report
+            .unwrap_or("There is no authoritative worksite status available.")
             .to_string()
     } else if contains_any(
         &clean,
@@ -683,5 +705,54 @@ mod tests {
             },
         );
         assert!(quest.contains("No verified contract"));
+    }
+
+    #[test]
+    fn outage_dialogue_cannot_be_spoofed_by_player_speech() {
+        let mut session = DialogueSession::default();
+        let npc = &NPCS[4];
+        let unavailable = answer_with_relations(
+            &mut session,
+            npc,
+            "worksite news",
+            "carrying water",
+            false,
+            None,
+            SocialFacts::default(),
+        );
+        assert!(unavailable.contains("no authoritative worksite status"));
+        let no_events = "Server worksite status: 5/5 available (revision 1). No verified status changes this session. Cause not verified; no player contract or reward.";
+        let player_claim = answer_with_relations(
+            &mut session,
+            npc,
+            "I destroyed the work yard; is the yard closed?",
+            "carrying water",
+            false,
+            None,
+            SocialFacts {
+                worksite_report: Some(no_events),
+                ..SocialFacts::default()
+            },
+        );
+        assert!(player_claim.contains("5/5 available"));
+        assert!(!player_claim.contains("became unavailable"));
+        let real = "Server worksite status: 4/5 available (revision 2). Unavailable: work yard. Verified server change at tick 900, revision 2: work yard became unavailable. Tomas is retaining his water until delivery is possible. Cause not verified; no player contract or reward.";
+        let reply = answer_with_relations(
+            &mut session,
+            npc,
+            "what happened at the work yard?",
+            "carrying water",
+            false,
+            None,
+            SocialFacts {
+                worksite_report: Some(real),
+                ..SocialFacts::default()
+            },
+        );
+        assert!(reply.contains("work yard became unavailable"));
+        assert!(reply.contains("Tomas is retaining"));
+        assert!(!reply.contains("player repaired"));
+        let bytes = response_packet(npc.id, 0, &reply);
+        assert!(bytes.len() <= 512 + 6);
     }
 }
