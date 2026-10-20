@@ -20,7 +20,7 @@ use crate::loot::{
 use crate::zone::ZoneId;
 
 const MAGIC: &[u8; 8] = b"MYASOL03";
-const MAX_FILE_BYTES: usize = 32 * 1024 * 1024;
+pub(crate) const MAX_FILE_BYTES: usize = 32 * 1024 * 1024;
 const MAX_CHARACTERS: usize = 4096;
 const MAX_WORLD_OBJECTS: usize = 100_000;
 const MAX_ITEM_STACKS: usize = 67;
@@ -203,7 +203,7 @@ fn decode_zone(value: u8) -> Result<ZoneId, CheckpointError> {
 }
 
 /// Unkeyed corruption detection, NOT authentication or tamper resistance.
-fn checksum(payload: &[u8]) -> u64 {
+pub(crate) fn checksum(payload: &[u8]) -> u64 {
     let mut hash = 0xcbf29ce484222325_u64;
     for byte in payload {
         hash ^= u64::from(*byte);
@@ -212,7 +212,7 @@ fn checksum(payload: &[u8]) -> u64 {
     hash
 }
 
-fn encode(snapshot: &LootStateSnapshot) -> Result<Vec<u8>, CheckpointError> {
+pub(crate) fn encode(snapshot: &LootStateSnapshot) -> Result<Vec<u8>, CheckpointError> {
     snapshot
         .validate()
         .map_err(|_| CheckpointError::InvalidState)?;
@@ -306,7 +306,7 @@ fn encode(snapshot: &LootStateSnapshot) -> Result<Vec<u8>, CheckpointError> {
     Ok(writer.0)
 }
 
-fn decode(bytes: &[u8]) -> Result<LootStateSnapshot, CheckpointError> {
+pub(crate) fn decode(bytes: &[u8]) -> Result<LootStateSnapshot, CheckpointError> {
     if bytes.len() > MAX_FILE_BYTES {
         return Err(CheckpointError::TooLarge);
     }
@@ -461,6 +461,13 @@ pub fn save_quiescent(path: &Path, loot: &LootAuthority) -> Result<(), Checkpoin
             .export_state()
             .map_err(|_| CheckpointError::InvalidState)?,
     )?;
+    atomic_write(path, &bytes)
+}
+
+/// Shared offline-only atomic replacement for a versioned world checkpoint.
+/// A failure after rename may leave a new file while the in-memory mutation
+/// was not published; callers must treat such a failure as indeterminate.
+pub(crate) fn atomic_write(path: &Path, bytes: &[u8]) -> Result<(), CheckpointError> {
     let counter = WRITE_SEQUENCE.fetch_add(1, Ordering::Relaxed);
     let suffix = format!("pending-{}-{counter}", std::process::id());
     let temp = path.with_extension(suffix);
@@ -469,7 +476,7 @@ pub fn save_quiescent(path: &Path, loot: &LootAuthority) -> Result<(), Checkpoin
             .write(true)
             .create_new(true)
             .open(&temp)?;
-        file.write_all(&bytes)?;
+        file.write_all(bytes)?;
         file.sync_all()?;
         drop(file);
         fs::rename(&temp, path)?;
