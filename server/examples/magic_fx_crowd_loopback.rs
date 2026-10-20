@@ -15,7 +15,10 @@ use myaso_server::magic_fx_handoff::{FxQueueGate, FxRoute, TrustedFxHandoff, Tru
 use myaso_server::magic_fx_shared_transport::{
     plan_shared_dispatch, CoreGameplayDatagram, CoreWriterCapacity, SharedPriority,
 };
-use myaso_server::magic_fx_shared_writer::try_write_shared;
+use myaso_server::magic_fx_shared_writer::{
+    try_write_core_guarded, try_write_shared, CoreAuthenticatedWriter,
+    CoreGuardedEnqueueError,
+};
 use std::collections::BTreeMap;
 use std::net::SocketAddr;
 use std::sync::Arc;
@@ -30,6 +33,38 @@ const DEFAULT_TICKS: u64 = 115;
 const MAX_TICKS: u64 = 350;
 const FX_START_TICK: u64 = 21;
 const MAX_LAB_CONNECTIONS: usize = 64;
+
+/// P15's fake Core writer is confined to this loopback acceptance process.
+struct LabCoreWriter<'a> {
+    handoff: &'a TrustedFxHandoff,
+    connections: &'a BTreeMap<u64, (Arc<Connection>, FxRoute)>,
+}
+
+impl CoreAuthenticatedWriter for LabCoreWriter<'_> {
+    type Error = anyhow::Error;
+
+    fn enqueue_if_current(
+        &mut self,
+        route: FxRoute,
+        bytes: &[u8],
+    ) -> Result<(), CoreGuardedEnqueueError<Self::Error>> {
+        // On the single lab clock task no teardown can interleave between
+        // these checks and enqueue. Production Core must protect its own
+        // lifecycle and writer under a real shared critical section.
+        if !self.handoff.route_current(route) {
+            return Err(CoreGuardedEnqueueError::StaleGeneration);
+        }
+        let Some((connection, registered_route)) = self.connections.get(&route.connection_id) else {
+            return Err(CoreGuardedEnqueueError::StaleGeneration);
+        };
+        if *registered_route != route {
+            return Err(CoreGuardedEnqueueError::StaleGeneration);
+        }
+        connection
+            .send_datagram(bytes)
+            .map_err(|error| CoreGuardedEnqueueError::WriterRejected(error.into()))
+    }
+}
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -60,6 +95,15 @@ async fn main() -> Result<()> {
         Err(std::env::VarError::NotPresent) => false,
         _ => bail!("P13_SHARED_DISPATCH must be 0 or 1"),
     };
+    let guarded_core = match std::env::var("P15_CORE_GUARD") {
+        Ok(value) if value == "1" => true,
+        Ok(value) if value == "0" => false,
+        Err(std::env::VarError::NotPresent) => false,
+        _ => bail!("P15_CORE_GUARD must be 0 or 1"),
+    };
+    if guarded_core && !shared_dispatch {
+        bail!("P15_CORE_GUARD requires P13_SHARED_DISPATCH=1");
+    }
     let addr: SocketAddr = "127.0.0.1:0".parse().expect("loopback literal");
     let identity = Identity::self_signed(["localhost", "127.0.0.1", "::1"])
         .context("P10 ephemeral loopback identity")?;
@@ -262,27 +306,43 @@ async fn main() -> Result<()> {
             // P14 hands P12's plan to a controlled Core-style writer seam.
             // It checks generation at each send and returns the exact first
             // unsent gameplay index if the QUIC writer stops accepting.
-            let wrote = try_write_shared(
-                &dispatch,
-                |route| handoff.route_current(route),
-                |route, bytes| {
-                    let (connection, _) = connections
-                        .get(&route.connection_id)
-                        .context("P14 trusted loopback connection missing")?;
-                    connection
-                        .send_datagram(bytes)
-                        .context("P14 real shared-connection QUIC datagram")
-                },
-            );
-            if let Some(error) = wrote.failure {
-                bail!(
-                    "P14 gameplay writer failed after {} test datagrams: {error:?}",
-                    wrote.gameplay_sent
+            let (wrote_gameplay, wrote_cosmetic, not_sent) = if guarded_core {
+                let mut core = LabCoreWriter {
+                    handoff: &handoff,
+                    connections: &connections,
+                };
+                let wrote = try_write_core_guarded(&dispatch, &mut core);
+                if let Some(error) = wrote.failure {
+                    bail!(
+                        "P15 guarded Core gameplay failed after {} test datagrams: {error:?}",
+                        wrote.gameplay_sent
+                    );
+                }
+                (wrote.gameplay_sent, wrote.cosmetic_sent, wrote.cosmetic_not_sent)
+            } else {
+                let wrote = try_write_shared(
+                    &dispatch,
+                    |route| handoff.route_current(route),
+                    |route, bytes| {
+                        let (connection, _) = connections
+                            .get(&route.connection_id)
+                            .context("P14 trusted loopback connection missing")?;
+                        connection
+                            .send_datagram(bytes)
+                            .context("P14 real shared-connection QUIC datagram")
+                    },
                 );
-            }
-            assert_eq!(wrote.gameplay_sent, connections.len());
-            assert_eq!(wrote.cosmetic_sent, dispatch.cosmetic_datagrams);
-            assert_eq!(wrote.cosmetic_not_sent, 0);
+                if let Some(error) = wrote.failure {
+                    bail!(
+                        "P14 gameplay writer failed after {} test datagrams: {error:?}",
+                        wrote.gameplay_sent
+                    );
+                }
+                (wrote.gameplay_sent, wrote.cosmetic_sent, wrote.cosmetic_not_sent)
+            };
+            assert_eq!(wrote_gameplay, connections.len());
+            assert_eq!(wrote_cosmetic, dispatch.cosmetic_datagrams);
+            assert_eq!(not_sent, 0);
         } else {
             total_fx_bytes += plan.cosmetic_payload_bytes;
             for batch in plan.routes {
@@ -311,6 +371,13 @@ async fn main() -> Result<()> {
         assert!(shared_congested_ticks > 0);
         println!(
             "P13_SHARED_DISPATCH_SUMMARY connections={expected} ticks={total_ticks} gameplay_sent={shared_gameplay_sent} fx_sent={shared_visual_sent} cosmetic_dropped={shared_visual_dropped} congestion_ticks={shared_congested_ticks}"
+        );
+    }
+    if guarded_core {
+        assert_eq!(shared_gameplay_sent, expected * total_ticks as usize);
+        assert!(shared_visual_dropped > 0);
+        println!(
+            "P15_CORE_GUARD_SUMMARY connections={expected} ticks={total_ticks} gameplay_sent={shared_gameplay_sent} fx_sent={shared_visual_sent} cosmetic_dropped={shared_visual_dropped} guarded_enqueues_verified=1"
         );
     }
     // Keep QUIC sessions available through the browser measurement/report
