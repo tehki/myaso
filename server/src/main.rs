@@ -542,13 +542,11 @@ async fn handle_connection(
     let mut last_input_sequence = None;
     let mut dropped_action_ticks = VecDeque::with_capacity(MAX_DROPPED_ACTION_TICKS);
     let mut pending_input_acks = VecDeque::with_capacity(MAX_PENDING_INPUT_ACKS);
-    let (mut reliable_send, _reliable_recv) = tokio::time::timeout(
-        RELIABLE_OPEN_TIMEOUT,
-        connection.accept_bi(),
-    )
-    .await
-    .context("timed out accepting reliable game stream")?
-    .context("accept reliable game stream")?;
+    let (mut reliable_send, _reliable_recv) =
+        tokio::time::timeout(RELIABLE_OPEN_TIMEOUT, connection.accept_bi())
+            .await
+            .context("timed out accepting reliable game stream")?
+            .context("accept reliable game stream")?;
     let (initial_frame, mut next_kill_event_sequence) = {
         let state = game.state.lock().await;
         (
