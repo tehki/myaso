@@ -312,6 +312,29 @@ mod tests {
     }
 
     #[test]
+    fn p1_radial_impulse_can_be_clipped_without_changing_fighter_state() {
+        use crate::elemental_physics::{radial_impulse, AuthoritativeImpulse, Element};
+
+        let source = AuthoritativeImpulse {
+            zone_id: 7,
+            origin_x: 100.0,
+            origin_y: 100.0,
+            radius: 90.0,
+            displacement: 40.0,
+            seed: 1,
+            element: Element::Wind,
+        };
+        let t = target();
+        let before = (t.x, t.y);
+        let proposal = radial_impulse(&source, &t).unwrap();
+        let resolved = clip_radial_impulse(&proposal, &t, &window(&[WALL]), 91).unwrap();
+        assert!(resolved.blocked);
+        assert!(resolved.dx > 0.0);
+        assert!(resolved.dx < proposal.dx);
+        assert_eq!((t.x, t.y), before);
+    }
+
+    #[test]
     fn target_and_proposal_must_refer_to_same_mobile_entity() {
         let mut target = target();
         target.mobile = false;
