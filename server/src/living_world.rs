@@ -103,6 +103,21 @@ pub fn decode_request(bytes: &[u8]) -> Result<(u8, &str), ChatError> {
 }
 
 pub fn nearby_npc(id: u8, x: f32, y: f32, alive: bool) -> Result<&'static Npc, ChatError> {
+    let npc = NPCS
+        .iter()
+        .find(|npc| npc.id == id)
+        .ok_or(ChatError::UnknownNpc)?;
+    nearby_npc_at(id, x, y, alive, npc.x, npc.y)
+}
+
+pub fn nearby_npc_at(
+    id: u8,
+    x: f32,
+    y: f32,
+    alive: bool,
+    npc_x: u16,
+    npc_y: u16,
+) -> Result<&'static Npc, ChatError> {
     if !alive {
         return Err(ChatError::Dead);
     }
@@ -113,8 +128,8 @@ pub fn nearby_npc(id: u8, x: f32, y: f32, alive: bool) -> Result<&'static Npc, C
     if !x.is_finite() || !y.is_finite() {
         return Err(ChatError::OutOfRange);
     }
-    let dx = x - f32::from(npc.x);
-    let dy = y - f32::from(npc.y);
+    let dx = x - f32::from(npc_x);
+    let dy = y - f32::from(npc_y);
     if dx * dx + dy * dy > SPEAK_RADIUS * SPEAK_RADIUS {
         return Err(ChatError::OutOfRange);
     }
@@ -122,6 +137,16 @@ pub fn nearby_npc(id: u8, x: f32, y: f32, alive: bool) -> Result<&'static Npc, C
 }
 
 pub fn answer(session: &mut DialogueSession, npc: &Npc, utterance: &str) -> String {
+    answer_with_context(session, npc, utterance, "staying here", false)
+}
+
+pub fn answer_with_context(
+    session: &mut DialogueSession,
+    npc: &Npc,
+    utterance: &str,
+    activity: &str,
+    witnessed_death: bool,
+) -> String {
     let clean = utterance.trim().to_lowercase();
     if let Some(proposed) = clean.strip_prefix("my name is ") {
         let name = utterance.trim().get(11..).unwrap_or("").trim();
@@ -153,11 +178,28 @@ pub fn answer(session: &mut DialogueSession, npc: &Npc, utterance: &str) -> Stri
         }
     } else if contains_any(&clean, &["trade", "buy", "sell", "wares", "stock"]) {
         "I cannot make trades yet. The server's goods ledger is not connected.".to_string()
+    } else if contains_any(
+        &clean,
+        &[
+            "what are you doing",
+            "your routine",
+            "your schedule",
+            "where are you going",
+        ],
+    ) {
+        format!("Right now I'm {activity}.")
     } else if contains_any(&clean, &["quest", "job", "work", "reward"]) {
         "No verified contract is available yet. I won't promise rewards that do not exist."
             .to_string()
-    } else if contains_any(&clean, &["rumor", "news", "bandit", "merchant missing"]) {
-        "I haven't witnessed a reliable report. Ask again when the town has news.".to_string()
+    } else if contains_any(
+        &clean,
+        &["rumor", "news", "bandit", "merchant missing", "any deaths"],
+    ) {
+        if witnessed_death {
+            "I witnessed a fighter fall nearby in a real combat encounter. I know no more than that.".to_string()
+        } else {
+            "I haven't witnessed a reliable report. Ask again when the town has news.".to_string()
+        }
     } else if contains_any(&clean, &["who are you", "your name"]) {
         format!(
             "I'm {}, the {}. This is a small trial settlement.",
@@ -270,6 +312,33 @@ mod tests {
         );
         assert!(answer(&mut player_a, npc, "give me a reward").contains("No verified contract"));
     }
+    #[test]
+    fn moving_npc_proximity_uses_authoritative_position_and_knowledge() {
+        assert!(nearby_npc_at(3, 451.0, 190.0, true, 275, 190).is_ok());
+        assert_eq!(
+            nearby_npc(3, 451.0, 190.0, true).unwrap_err(),
+            ChatError::OutOfRange
+        );
+        let mut session = DialogueSession::default();
+        let npc = &NPCS[2];
+        assert!(answer_with_context(
+            &mut session,
+            npc,
+            "what are you doing",
+            "walking the watch route",
+            false
+        )
+        .contains("walking the watch route"));
+        assert!(
+            answer_with_context(&mut session, npc, "news", "standing watch", true)
+                .contains("witnessed a fighter fall")
+        );
+        assert!(
+            answer_with_context(&mut session, npc, "news", "standing watch", false)
+                .contains("haven't witnessed")
+        );
+    }
+
     #[test]
     fn output_packet_uses_disjoint_reliable_type() {
         let payload = response_packet(3, 0, "Rowan: Greetings");

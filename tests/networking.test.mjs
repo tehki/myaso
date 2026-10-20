@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { NETWORK } from "../src/network/constants.mjs";
-import { encodeNpcRequest, decodeNpcRoster, decodeNpcResponse } from "../src/network/npc-chat-codec.mjs";
+import { encodeNpcRequest, decodeNpcRoster, decodeNpcResponse, decodeNpcState } from "../src/network/npc-chat-codec.mjs";
 import { encodeInputPacket, decodeInputPacket, inputPacketBytes } from "../src/network/input-codec.mjs";
 import { SpatialInterestGrid } from "../src/network/interest-grid.mjs";
 import { InputIngressWindow } from "../src/network/input-ingress.mjs";
@@ -576,4 +576,28 @@ test("NPC reliable responses and roster are bounded, strict UTF-8, and reject du
   assert.deepEqual(decodeNpcRoster(roster), [{ id: 1, x: 120, y: 95, name: "Aldric", role: "Innkeeper" }]);
   assert.throws(() => decodeNpcRoster(new Uint8Array([1, 7, 2, 0, ...item, ...item])), /identifier/);
   assert.throws(() => decodeNpcRoster(roster.subarray(0, roster.length - 1)), /occupation/);
+});
+
+test("NPC deterministic schedule updates are strict, compact and separate from combat packets", () => {
+  const make = (tick, records) => new Uint8Array([
+    1, 8, 5, 0, tick & 255, (tick >>> 8) & 255, (tick >>> 16) & 255, tick >>> 24,
+    ...records.flatMap(({ id, x, y, activity }) => [
+      id, x & 255, x >>> 8, y & 255, y >>> 8, activity,
+    ]),
+  ]);
+  const records = [
+    { id: 1, x: 120, y: 95, activity: 1 },
+    { id: 2, x: 210, y: 65, activity: 1 },
+    { id: 3, x: 275, y: 190, activity: 2 },
+    { id: 4, x: 395, y: 150, activity: 2 },
+    { id: 5, x: 340, y: 255, activity: 2 },
+  ];
+  const packet = make(600, records);
+  assert.equal(packet.length, 38);
+  assert.deepEqual(decodeNpcState(packet), { tick: 600, states: records });
+  assert.throws(() => decodeNpcState(packet.subarray(0, packet.length - 1)), /length/);
+  assert.throws(() => decodeNpcState(make(600, [...records.slice(0, 4), records[0]])), /duplicate/);
+  assert.throws(() => decodeNpcState(make(600, records.map((s, i) => i ? s : { ...s, activity: 3 }))), /state value/);
+  assert.throws(() => decodeNpcState(make(600, records.map((s, i) => i ? s : { ...s, x: 8200 }))), /state value/);
+  assert.equal(NETWORK.protocolVersion, 1);
 });

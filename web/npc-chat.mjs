@@ -28,6 +28,7 @@ export function createNpcChatPanel({ onSend, onFocus }) {
   panel.append(heading, description, roster, history, form);
   document.querySelector(".arena-wrap")?.append(panel);
   let npcs = [];
+  let lastStateTick = null;
 
   function appendLine(text) {
     const li = document.createElement("li");
@@ -47,6 +48,22 @@ export function createNpcChatPanel({ onSend, onFocus }) {
       roster.append(option);
     }
     panel.hidden = !entries.length;
+    lastStateTick = null;
+  }
+  function updateState({ tick, states }) {
+    if (panel.hidden || states.length !== npcs.length) return;
+    if (lastStateTick !== null) {
+      const difference = (tick - lastStateTick) >>> 0;
+      if (difference === 0 || difference >= 0x80000000) return;
+    }
+    const stateById = new Map(states.map((npc) => [npc.id, npc]));
+    if (npcs.some((npc) => !stateById.has(npc.id))) return;
+    npcs = npcs.map((npc) => ({ ...npc, ...stateById.get(npc.id) }));
+    lastStateTick = tick;
+    for (const [i, npc] of npcs.entries()) {
+      const label = ["resting", "working / traveling", "at post"][npc.activity] ?? "working";
+      roster.options[i].textContent = `${npc.name} · ${npc.role} · ${label}`;
+    }
   }
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
@@ -77,6 +94,7 @@ export function createNpcChatPanel({ onSend, onFocus }) {
   return {
     get npcs() { return npcs; },
     setRoster,
+    updateState,
     receive({ text }) { appendLine(text); },
     focus() { if (!panel.hidden) { onFocus(); input.focus(); } },
     get enabled() { return !panel.hidden; },

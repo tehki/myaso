@@ -168,13 +168,19 @@ const visualCameraPosition = { x: 0, y: 0 };
 const fixedStepMs = 1000 / NETWORK.clientPredictionHz;
 const frameBudget = createFrameBudget({ stepMs: fixedStepMs, maxFrameDeltaMs: 50, maxStepsPerFrame: 6 });
 let networkClient = null;
-const npcUI = createNpcChatPanel({
-  onSend(id, message) {
-    if (!networkClient) throw new Error("NPC session is not connected");
-    return networkClient.sendNpcChat(id, message);
-  },
-  onFocus() { releaseInputs(); },
-});
+let npcUI = null;
+function ensureNpcUI() {
+  // Do not touch the DOM or combat input paths unless a gated server
+  // explicitly advertises the pilot roster over the reliable channel.
+  npcUI ??= createNpcChatPanel({
+    onSend(id, message) {
+      if (!networkClient) throw new Error("NPC session is not connected");
+      return networkClient.sendNpcChat(id, message);
+    },
+    onFocus() { releaseInputs(); },
+  });
+  return npcUI;
+}
 let animationFrameId = 0;
 let predictionStep = 0;
 let clientTick = 0;
@@ -280,7 +286,7 @@ canvas.addEventListener("wheel", (event) => {
 }, { passive: false });
 canvas.addEventListener("pointermove", updateMouse);
 canvas.addEventListener("keydown", (event) => {
-  if (event.code === "Enter" && npcUI.enabled) {
+  if (event.code === "Enter" && npcUI?.enabled) {
     event.preventDefault();
     npcUI.focus();
     return;
@@ -343,10 +349,13 @@ networkClient = await connectAuthoritativeClient({
     recordKillEvent(event);
   },
   onNpcRoster(roster) {
-    npcUI.setRoster(roster);
+    ensureNpcUI().setRoster(roster);
+  },
+  onNpcState(snapshot) {
+    npcUI?.updateState(snapshot);
   },
   onNpcReply(reply) {
-    npcUI.receive(reply);
+    npcUI?.receive(reply);
   },
   onAck(ack) {
     const ownId = networkClient?.playerNetId;
@@ -1050,7 +1059,7 @@ function drawThreatMarker(bearing, secondary) {
 
 // Read-only presentation of static staging NPC anchors; not combat fighters.
 function drawNpcPilotMarkers() {
-  if (!local.initialized || !npcUI.enabled) return;
+  if (!local.initialized || !npcUI?.enabled) return;
   ctx.save();
   ctx.textAlign = "center";
   ctx.font = "bold 11px sans-serif";

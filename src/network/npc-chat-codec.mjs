@@ -1,7 +1,7 @@
 // LW-1 loopback NPC pilot on the existing reliable stream; never on combat datagrams.
 // These packet types are separate from the frozen v1 input/snapshot/kill-event payloads.
 export const NPC_WIRE = Object.freeze({
-  request: 5, response: 6, roster: 7, maxTextBytes: 240,
+  request: 5, response: 6, roster: 7, state: 8, maxTextBytes: 240,
 });
 const encoder = new TextEncoder();
 const decoder = new TextDecoder("utf-8", { fatal: true });
@@ -63,4 +63,28 @@ export function decodeNpcRoster(bytes) {
   }
   if (cursor !== payload.length) throw new TypeError("unexpected NPC roster suffix");
   return Object.freeze(roster);
+}
+
+export function decodeNpcState(bytes) {
+  const payload = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
+  if (payload.length < 8 || payload[0] !== 1 || payload[1] !== NPC_WIRE.state
+      || payload[2] !== 5 || payload[3] !== 0 || payload.length !== 8 + payload[2] * 6) {
+    throw new TypeError("invalid NPC state header or length");
+  }
+  const tick = new DataView(payload.buffer, payload.byteOffset, payload.byteLength).getUint32(4, true);
+  const states = [];
+  const ids = new Set();
+  for (let i = 0; i < payload[2]; i++) {
+    const index = 8 + i * 6;
+    const id = payload[index];
+    const x = payload[index + 1] | (payload[index + 2] << 8);
+    const y = payload[index + 3] | (payload[index + 4] << 8);
+    const activity = payload[index + 5];
+    if (!id || id > 5 || ids.has(id) || x > 8192 || y > 8192 || activity > 2) {
+      throw new TypeError("invalid NPC state value or duplicate NPC identifier");
+    }
+    ids.add(id);
+    states.push(Object.freeze({ id, x, y, activity }));
+  }
+  return Object.freeze({ tick, states: Object.freeze(states) });
 }

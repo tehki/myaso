@@ -44,3 +44,35 @@ To disable the feature, unset `MYASO_NPC_PILOT` or set it to `0`. Starting with 
 - Full protected GitHub `quality` and authentic browser acceptance before merging.
 
 Nothing in this pilot indicates that hosted inference, durable player memory, NPC travel, inventories, quests, voice, free-for-all loot or live Greyhaven state is present. Do not deploy this experimental path to the shared production VPS.
+
+## LW-1B — Deterministic routines and verified witnesses (loopback-only)
+
+The same pilot also supports an **accelerated 40-second staging schedule**. Rowan,
+Elara and Tomas traverse short **server-authoritative marker routes** between
+authored anchors; Aldric and Marta stay at their workplaces and alternate
+between work/rest labels. These are **not** navmesh or collidable NPC actors:
+they cannot block players, fight, open doors, trade or manipulate objects.
+
+The authoritative Rust world tick computes marker positions. Once per second,
+the server offers a bounded, 38-byte reliable NPC-state frame (**type 8**,
+version 1, server tick + five {id, x, y, activity} records). Browser markers
+and occupation labels update from this state; stale/out-of-order updates,
+duplicate IDs, bad coordinates or activity codes are rejected. Actual chat
+proximity is checked against the *current server position*, not the older
+browser marker. NPC-state packets are best-effort and are enqueued **after**
+combat kill notifications and reliable snapshot recovery. Combat packets,
+reliable snapshots, input timings and the combat simulation remain unchanged.
+
+A simulated NPC may remember **only** a nearby **server-recorded real
+CombatEvent::Death**, within a bounded 235-unit witness radius. If asked about
+news, a witness may say it saw a fighter fall; an NPC that did not witness
+the event says it has no verified news. Neither one invents a named killer,
+victim, caravan incident, reward or quest. Witness knowledge is an in-memory
+server-side timestamp with a **two-minute TTL**, lost on restart; no player
+chat transcripts or actor IDs are persisted. It is not NPC gossip or durable
+memory.
+
+As before, the feature must be explicitly activated on loopback, and the
+production default stays off. No AI inference provider is contacted. This
+pilot has no generic world-action capabilities; future abilities need separate
+server validation and audited account/retention policies.

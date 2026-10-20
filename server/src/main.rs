@@ -3,6 +3,7 @@ use myaso_server::{
     coalesce_accepted_input_batch, decode_input_packet, is_sequence_newer16, is_tick_newer32,
     kill_event::{encode_kill_event, KillEventPacket},
     living_world::{self, DialogueSession},
+    npc_routines::{NpcRoutines, STATE_INTERVAL_TICKS},
     reliable::{try_enqueue_reliable, ReliableQueueError},
     simulation::{CombatEvent, InputIntent, World},
     snapshot::{ReplicationFrame, SnapshotSession},
@@ -109,6 +110,7 @@ struct GameState {
     flight_background_ids: Vec<u32>,
     kill_events: VecDeque<KillEventPacket>,
     next_kill_event_sequence: u32,
+    npc_routines: Option<NpcRoutines>,
 }
 
 impl GameState {
@@ -140,6 +142,7 @@ impl GameState {
             flight_background_ids,
             kill_events: VecDeque::with_capacity(MAX_KILL_EVENT_HISTORY),
             next_kill_event_sequence: 0,
+            npc_routines: None,
         }
     }
 
@@ -179,6 +182,11 @@ impl GameState {
                 victim: *fighter,
             };
             self.next_kill_event_sequence = self.next_kill_event_sequence.wrapping_add(1);
+            if let (Some(routines), Some(victim)) =
+                (self.npc_routines.as_mut(), self.world.fighter(*fighter))
+            {
+                routines.witness_death(self.world.tick, victim.x, victim.y);
+            }
             self.kill_events.push_back(packet);
             while self.kill_events.len() > MAX_KILL_EVENT_HISTORY {
                 self.kill_events.pop_front();
@@ -212,10 +220,14 @@ struct SharedGame {
 impl SharedGame {
     fn new(flight: LoopbackFlightConfig, npc_pilot_enabled: bool) -> Arc<Self> {
         Arc::new(Self {
-            state: Mutex::new(GameState::new(
-                flight.background_players,
-                flight.near_pressure_players,
-            )),
+            state: Mutex::new({
+                let mut state =
+                    GameState::new(flight.background_players, flight.near_pressure_players);
+                if npc_pilot_enabled {
+                    state.npc_routines = Some(NpcRoutines::default());
+                }
+                state
+            }),
             next_player_id: AtomicU32::new(1),
             reliable_write_delay: flight.reliable_write_delay,
             drop_new_action_datagrams: flight.drop_new_action_datagrams,
@@ -602,11 +614,18 @@ async fn handle_connection(
             &living_world::roster_packet(),
         )
         .await?;
+        send_reliable_frame(
+            &mut reliable_send,
+            &mut reliable_frame_buffer,
+            &NpcRoutines::state_packet(initial_frame.server_tick()),
+        )
+        .await?;
     }
     let initial_baseline_sequence = initial_baseline.sequence;
     let mut acknowledged_snapshot = u16::MAX;
     let mut realtime_ready = false;
     let mut last_reliable_background_tick = initial_frame.server_tick();
+    let mut last_npc_state_tick = initial_frame.server_tick();
     let mut last_reliable_sequence = initial_reliable_baseline.sequence;
     let mut reliable_deltas_since_checkpoint = 0_u8;
     let (reliable_tx, mut reliable_rx) = mpsc::channel::<ReliablePayload>(1);
@@ -662,23 +681,45 @@ async fn handle_connection(
                     last_spoken = Some(now);
                     let viewer = {
                         let state = world.state.lock().await;
+                        let context = state
+                            .npc_routines
+                            .as_ref()
+                            .and_then(|routines| routines.context(npc_id, state.world.tick));
                         state.world.fighter(player_id).map(|fighter| {
                             (
                                 fighter.x,
                                 fighter.y,
                                 fighter.action != myaso_server::simulation::Action::Dead,
+                                state.world.tick,
+                                context,
                             )
                         })
                     };
                     match viewer {
-                        Some((x, y, alive)) => {
-                            match living_world::nearby_npc(npc_id, x, y, alive) {
-                                Ok(npc) => living_world::response_packet(
-                                    npc_id,
-                                    0,
-                                    &living_world::answer(&mut dialogue, npc, utterance),
-                                ),
-                                Err(_) => living_world::response_packet(
+                        Some((x, y, alive, tick, context)) => {
+                            let npc = NpcRoutines::position(npc_id, tick).and_then(|position| {
+                                living_world::nearby_npc_at(
+                                    npc_id, x, y, alive, position.x, position.y,
+                                )
+                                .ok()
+                            });
+                            match npc {
+                                Some(npc) => {
+                                    let (activity, witnessed) =
+                                        context.unwrap_or(("working", false));
+                                    living_world::response_packet(
+                                        npc_id,
+                                        0,
+                                        &living_world::answer_with_context(
+                                            &mut dialogue,
+                                            npc,
+                                            utterance,
+                                            activity,
+                                            witnessed,
+                                        ),
+                                    )
+                                }
+                                None => living_world::response_packet(
                                     npc_id,
                                     1,
                                     "Move closer to this NPC to speak.",
@@ -913,6 +954,19 @@ async fn handle_connection(
                         }
                     }
                 }
+                // Best effort, only after combat kill notifications and reliable
+                // snapshot recovery had first opportunity to reserve the queue.
+                if game.npc_pilot_enabled
+                    && server_tick.wrapping_sub(last_npc_state_tick) >= STATE_INTERVAL_TICKS
+                {
+                    match try_enqueue_reliable(&reliable_tx, || {
+                        ReliablePayload::Bytes(NpcRoutines::state_packet(server_tick))
+                    }) {
+                        Ok(true) => last_npc_state_tick = server_tick,
+                        Ok(false) => {}
+                        Err(ReliableQueueError::Closed) => bail!("NPC state writer unavailable"),
+                    }
+                }
                 if let Some(client_tick) = safe_input_ack {
                     connection
                         .send_datagram(encode_input_ack(client_tick, server_tick, player_id))
@@ -1031,6 +1085,38 @@ fn encode_input_ack(processed_client_tick: u32, server_tick: u32, player_net_id:
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn verified_world_death_reaches_only_authoritative_npc_witnesses() {
+        let mut state = GameState::new(0, 0);
+        state.npc_routines = Some(NpcRoutines::default());
+        assert!(state.world.add_player_at(1, 50.0, 50.0, 0.0));
+        assert!(state.world.add_player_at(2, 120.0, 95.0, 0.0));
+        state.record_combat_events(&[CombatEvent::Death {
+            fighter: 2,
+            killer: 1,
+        }]);
+        assert!(
+            state
+                .npc_routines
+                .as_ref()
+                .unwrap()
+                .context(1, 0)
+                .unwrap()
+                .1
+        );
+        assert_eq!(state.kill_events.len(), 1);
+
+        let mut disabled = GameState::new(0, 0);
+        assert!(disabled.world.add_player_at(1, 50.0, 50.0, 0.0));
+        assert!(disabled.world.add_player_at(2, 120.0, 95.0, 0.0));
+        disabled.record_combat_events(&[CombatEvent::Death {
+            fighter: 2,
+            killer: 1,
+        }]);
+        assert!(disabled.npc_routines.is_none());
+        assert_eq!(disabled.kill_events.len(), 1);
+    }
 
     #[test]
     fn npc_pilot_is_opt_in_and_rejects_public_binds() {
