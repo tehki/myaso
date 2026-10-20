@@ -1,0 +1,63 @@
+name: Core C4d world mutation acceptance
+
+on:
+  pull_request:
+    paths:
+      - "server/sql/002_fenced_world_mutations.sql"
+      - "scripts/verify_fenced_world_mutations.py"
+      - ".github/workflows/core-c4d-world-mutations.yml"
+  push:
+    branches: [main]
+    paths:
+      - "server/sql/002_fenced_world_mutations.sql"
+      - "scripts/verify_fenced_world_mutations.py"
+      - ".github/workflows/core-c4d-world-mutations.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  transactional-world:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: myaso_c4d_test
+          POSTGRES_PASSWORD: ephemeral-test-only
+          POSTGRES_DB: myaso_c4d_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U myaso_c4d_test -d myaso_c4d_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    env:
+      PGHOST: 127.0.0.1
+      PGPORT: "5432"
+      PGUSER: myaso_c4d_test
+      PGPASSWORD: ephemeral-test-only
+      PGDATABASE: myaso_c4d_test
+      MYASO_C4D_TEST_ONLY: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: PostgreSQL client
+        run: |
+          if ! command -v psql >/dev/null 2>&1; then
+            sudo apt-get update -qq
+            sudo apt-get install -y postgresql-client
+          fi
+          psql --version
+      - name: Compile isolated acceptance
+        run: python -m py_compile scripts/verify_fenced_world_mutations.py
+      - name: Install authority and world-mutation schema
+        run: |
+          psql -X -v ON_ERROR_STOP=1 -f server/sql/001_zone_authority_postgres.sql
+          psql -X -v ON_ERROR_STOP=1 -f server/sql/002_fenced_world_mutations.sql
+      - name: Prove fenced world state, receipt and outbox atomicity
+        run: python scripts/verify_fenced_world_mutations.py
