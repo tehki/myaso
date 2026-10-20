@@ -17,9 +17,14 @@ class Context {
   sampleRate = 8000;
   oscillators = 0;
   samples = [];
+  gainNodes = [];
   destination = new Node();
   constructor() { Context.created++; Context.instances.push(this); }
-  createGain() { return Object.assign(new Node(), { gain: new Param() }); }
+  createGain() {
+    const node = Object.assign(new Node(), { gain: new Param() });
+    this.gainNodes.push(node);
+    return node;
+  }
   createStereoPanner() { return Object.assign(new Node(), { pan: new Param() }); }
   createOscillator() { this.oscillators++; return Object.assign(new Node(), { frequency: new Param(), start() {}, stop() {} }); }
   createBuffer(_channels, length) { return { getChannelData() { return new Float32Array(length); } }; }
@@ -228,4 +233,41 @@ test("R4 native browser servers declare OGG MIME and CI runs genuine browser aud
   const harness = readFileSync(new URL("../scripts/r4_audio_browser_acceptance.mjs", import.meta.url), "utf8");
   assert.match(harness, /r4-audio-probe/);
   assert.match(harness, /assert\.equal\(result\.sources, 1/);
+});
+
+test("R4 per-recording gain trims stabilize quiet blade variants and tame metal impacts", async () => {
+  const audio = createGameAudio({
+    AudioContextImpl: Context, AudioElementImpl: MusicTrack, storage: null,
+    random: () => .5,
+    fetchImpl: async () => ({
+      ok: true,
+      arrayBuffer: async () => Uint8Array.of(0x4f, 0x67, 0x67, 0x53).buffer,
+    }),
+  });
+  assert.equal(audio.unlock(), true);
+  for (let i = 0; i < 30 && audio.loadedFoleyCount() < 26; i++) {
+    await new Promise(resolve => setTimeout(resolve, 0));
+  }
+  assert.equal(audio.loadedFoleyCount(), 26);
+  const ctx = Context.instances.at(-1);
+  function nextGain(cue) {
+    ctx.currentTime += .35; // Preserve the real per-cue dedupe window.
+    assert.equal(audio.play(cue), true);
+    return ctx.gainNodes.at(-1).gain.value;
+  }
+  const blades = [nextGain("light"), nextGain("light"), nextGain("light")];
+  assert.ok(Math.abs(blades[0] - blades[1]) < 1e-9);
+  assert.ok(Math.abs(blades[2] / blades[0] - 8) < 1e-9,
+    "quiet knife-draw should not disappear among knife slices");
+  const heavies = [nextGain("heavy"), nextGain("heavy")];
+  assert.ok(Math.abs(heavies[1] / heavies[0] - 8) < 1e-9);
+  const parries = [nextGain("parry"), nextGain("parry")];
+  assert.ok(parries[0] > parries[1],
+    "quiet metallic click is boosted while resonant metal pot is attenuated");
+  const blocks = [nextGain("block"), nextGain("block"), nextGain("block")];
+  assert.ok(blocks[0] < .64 && blocks[1] < .64 && blocks[2] > .64);
+  // An 8x boost on the quietest measured knife variant stays below full scale
+  // with default master/envelope gain and the original -24.3 dBFS source peak.
+  assert.ok(.55 * .64 * 8 * 10 ** (-24.3 / 20) < 1);
+  audio.dispose();
 });

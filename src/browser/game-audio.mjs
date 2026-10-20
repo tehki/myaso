@@ -35,6 +35,16 @@ const RECORDED_FOLEY = Object.freeze({
   guardbreak: ["metalPot3", "metalPot2"],
   death: ["creak1", "dropLeather"],
 });
+// Recorded source loudness varies sharply: the two draw-knife clips measure
+// ~22-23 dB below the main blade clips, while resonant pot hits are hot.
+// Playback-only trims measured from the unchanged CC0 OGGs tame variant jumps;
+// no per-frame RMS scan or decode-time normalization is needed on the input path.
+const FOLEY_GAIN_TRIM = Object.freeze({
+  drawKnife1: 8, drawKnife2: 8,
+  metalClick: 4,
+  metalPot1: .56, metalPot2: .46, metalPot3: .35,
+  cloth4: 2,
+});
 const AMBIENT_TRACK = new URL("../../web/audio/music/cathedral-in-the-forest.ogg", import.meta.url).href;
 const SETTINGS_KEY = "myaso.audio.v1";
 const clamp = (value, low, high) => Math.max(low, Math.min(high, value));
@@ -210,12 +220,14 @@ export function createGameAudio({ AudioContextImpl = globalThis.AudioContext ?? 
         const cursor = variantCursor.get(name) ?? 0;
         variantCursor.set(name, cursor + 1);
         const sample = context.createBufferSource();
-        sample.buffer = loadedSamples.get(ready[cursor % ready.length]);
+        const variant = ready[cursor % ready.length];
+        sample.buffer = loadedSamples.get(variant);
         if (sample.playbackRate) {
           sample.playbackRate.value = .96 + clamp(random(), 0, 1) * .08;
         }
         const envelope = context.createGain();
-        const peak = Math.max(.0002, amplitude * (name === "step" ? .46 : .64));
+        const peak = Math.max(.0002, amplitude * (name === "step" ? .46 : .64)
+          * (FOLEY_GAIN_TRIM[variant] ?? 1));
         envelope.gain.setValueAtTime(peak, now);
         sample.connect(envelope);
         envelope.connect(output);

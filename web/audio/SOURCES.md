@@ -18,6 +18,22 @@ The 26 included `web/audio/foley/*.ogg` files are **unchanged originals** from t
 
 All included media are confirmed CC0 as published on their original asset pages. Attribution is optional; credit is included for transparency. They are bundled locally and never streamed from a third-party host during gameplay.
 
+## R4 playback loudness calibration
+
+Objective `ffmpeg volumedetect` measurements on the original bundled OGGs showed
+`drawKnife1.ogg` at -44.7 dBFS mean versus `knifeSlice.ogg` at -21.5 dBFS,
+and `drawKnife2.ogg` at -41.3 dBFS mean versus `chop.ogg` at -18.5 dBFS.
+Untrimmed rotation could make consecutive blade cues differ by roughly 23 dB.
+The very short `metalClick` is also quieter than the resonant `metalPot`
+recordings. The Web Audio player applies small **per-recording gain trims**
+(8x boost for both draw-knife files; 4x for metalClick; attenuation on
+metalPot1/2/3; 2x for cloth4). Source files remain byte-for-byte unchanged.
+The boosted knife clip peaks remain below full scale at the standard mix gain.
+No waveform scans, network requests, or normalizations run during player input.
+These instrumented gain trims improve consistent attack readability but do
+not replace subjective listening tests for material character or final mix.
+
+
 ## Mixing principles
 
 - **Combat and world foley:** physical recordings first. For missing files/OGG-decoding failures the previous lightweight procedural cues remain as fail-silent fallbacks. Sound is neither authoritative gameplay nor a source of input latency.
