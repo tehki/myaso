@@ -352,7 +352,7 @@ impl DurableZoneAuthority {
 
     /// Stage the entire next in-memory state, durably publish one event,
     /// then atomically swap that state. No world update before fsync.
-    fn persist<T>(&mut self, mut next: ZoneLeaseRegistry, event: Event, result: T)
+    fn persist<T>(&mut self, next: ZoneLeaseRegistry, event: Event, result: T)
         -> Result<T, DurableAuthorityError>
     {
         if self.poisoned { return Err(DurableAuthorityError::Poisoned); }
@@ -361,8 +361,6 @@ impl DurableZoneAuthority {
         if event.sequence != number {
             return Err(DurableAuthorityError::InvalidSequence);
         }
-        // Avoid unused_mut diagnostic in the complete game crate.
-        let _ = &mut next;
         let clock = SystemTime::now().duration_since(UNIX_EPOCH)
             .map_err(|_| DurableAuthorityError::InvalidRecord("clock before Unix epoch"))?
             .as_nanos();
@@ -543,6 +541,30 @@ mod tests {
         assert_eq!(restored.commit(t).expect("idempotent ACK"), new);
         assert_eq!(restored.sequence(), 3);
         assert_eq!(restored.current(item(10)), Some(new));
+    }
+
+    #[test]
+    fn commit_published_before_ack_replays_as_exactly_one_new_owner() {
+        let root = Root::new();
+        let mut original = root.open();
+        let source = original.register(item(42), worker(1), zone(1)).expect("register");
+        let prepared = original.prepare(source, worker(2), zone(2), op(420)).expect("prepare");
+        drop(original);
+
+        // Simulate a process dying after publishing the canonical commit but
+        // before applying it in memory or acknowledging the new worker.
+        let event = Event::from_ticket(3, Action::Commit, prepared);
+        fs::write(root.record(3), event.encode()).expect("simulate committed event");
+        let mut recovered = root.open();
+        let new = recovered.current(item(42)).expect("durable successor");
+        assert_eq!(new.worker(), worker(2));
+        assert_eq!(new.zone(), zone(2));
+        assert_eq!(new.epoch(), 2);
+        assert!(!recovered.can_mutate(source));
+        assert!(recovered.can_mutate(new));
+        assert_eq!(recovered.commit(prepared).expect("ACK retry"), new);
+        assert_eq!(recovered.sequence(), 3);
+        assert!(!root.record(4).exists());
     }
 
     #[test]
