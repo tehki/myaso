@@ -12,14 +12,14 @@ function uint32(value, name, nonzero = false) {
   }
 }
 
-function checkReceipt(value) {
+export function validateHitReceipt(value) {
   if (!value || typeof value !== "object") throw new TypeError("hit receipt must be an object");
   uint32(value.sequence, "sequence");
   uint32(value.serverTick, "serverTick");
   uint32(value.attacker, "attacker", true);
   uint32(value.target, "target", true);
   if (value.attacker === value.target) throw new RangeError("attacker and target must differ");
-  if (!Number.isFinite(value.damage) || value.damage <= 0 || !Number.isFinite(Math.fround(value.damage))) {
+  if (!Number.isFinite(value.damage) || value.damage <= 0 || (!Number.isFinite(Math.fround(value.damage)) || Math.fround(value.damage) <= 0)) {
     throw new RangeError("damage must be a positive finite f32");
   }
   if (!Number.isFinite(value.targetHp) || value.targetHp < 0 || !Number.isFinite(Math.fround(value.targetHp))) {
@@ -36,7 +36,7 @@ function dataView(packet) {
 }
 
 export function encodeHitReceipt(value) {
-  const receipt = checkReceipt(value);
+  const receipt = validateHitReceipt(value);
   const buffer = new ArrayBuffer(HIT_RECEIPT_BYTES);
   const view = new DataView(buffer);
   view.setUint8(0, NETWORK.protocolVersion);
@@ -56,7 +56,7 @@ export function decodeHitReceipt(packet) {
   if (view.getUint8(0) !== NETWORK.protocolVersion) throw new Error("unsupported protocol version");
   if (view.getUint8(1) !== HIT_RECEIPT_TYPE_PROPOSAL) throw new Error("not a hit receipt");
   if (view.getUint16(2, true) !== 0) throw new Error("reserved hit receipt flags must be zero");
-  return checkReceipt({
+  return validateHitReceipt({
     sequence: view.getUint32(4, true),
     serverTick: view.getUint32(8, true),
     attacker: view.getUint32(12, true),
