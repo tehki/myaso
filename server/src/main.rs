@@ -591,7 +591,8 @@ async fn handle_connection(
             &mut reliable_send,
             &mut reliable_frame_buffer,
             &living_world::roster_packet(),
-        ).await?;
+        )
+        .await?;
     }
     let initial_baseline_sequence = initial_baseline.sequence;
     let mut acknowledged_snapshot = u16::MAX;
@@ -624,13 +625,19 @@ async fn handle_connection(
             let mut last_spoken = None;
             loop {
                 let mut header = [0_u8; 2];
-                reliable_recv.read_exact(&mut header).await.context("read NPC frame header")?;
+                reliable_recv
+                    .read_exact(&mut header)
+                    .await
+                    .context("read NPC frame header")?;
                 let length = usize::from(u16::from_le_bytes(header));
                 if !(6..=living_world::MAX_WIRE_BYTES).contains(&length) {
                     bail!("invalid NPC frame length");
                 }
                 let mut payload = vec![0_u8; length];
-                reliable_recv.read_exact(&mut payload).await.context("read NPC frame body")?;
+                reliable_recv
+                    .read_exact(&mut payload)
+                    .await
+                    .context("read NPC frame body")?;
                 let (npc_id, utterance) = match living_world::decode_request(&payload) {
                     Ok(request) => request,
                     Err(_) => bail!("invalid NPC request"),
@@ -646,29 +653,39 @@ async fn handle_connection(
                     last_spoken = Some(now);
                     let viewer = {
                         let state = world.state.lock().await;
-                        state.world.fighter(player_id).map(|fighter| (
-                            fighter.x, fighter.y,
-                            fighter.action != myaso_server::simulation::Action::Dead,
-                        ))
+                        state.world.fighter(player_id).map(|fighter| {
+                            (
+                                fighter.x,
+                                fighter.y,
+                                fighter.action != myaso_server::simulation::Action::Dead,
+                            )
+                        })
                     };
-                    let answer = match viewer {
-                        Some((x, y, alive)) => match living_world::nearby_npc(npc_id, x, y, alive) {
-                            Ok(npc) => living_world::response_packet(
-                                npc_id, 0, &living_world::answer(&mut dialogue, npc, utterance)
-                            ),
-                            Err(_) => living_world::response_packet(
-                                npc_id, 1, "Move closer to this NPC to speak."
-                            ),
-                        },
+                    match viewer {
+                        Some((x, y, alive)) => {
+                            match living_world::nearby_npc(npc_id, x, y, alive) {
+                                Ok(npc) => living_world::response_packet(
+                                    npc_id,
+                                    0,
+                                    &living_world::answer(&mut dialogue, npc, utterance),
+                                ),
+                                Err(_) => living_world::response_packet(
+                                    npc_id,
+                                    1,
+                                    "Move closer to this NPC to speak.",
+                                ),
+                            }
+                        }
                         None => living_world::response_packet(npc_id, 1, "Player unavailable."),
-                    };
-                    answer
+                    }
                 };
                 tokio::time::timeout(
                     Duration::from_secs(2),
                     reply_tx.send(ReliablePayload::Bytes(reply)),
-                ).await.context("NPC reply send timed out")?
-                    .map_err(|_| anyhow::anyhow!("NPC reply writer unavailable"))?;
+                )
+                .await
+                .context("NPC reply send timed out")?
+                .map_err(|_| anyhow::anyhow!("NPC reply writer unavailable"))?;
             }
             #[allow(unreachable_code)]
             Ok::<(), anyhow::Error>(())

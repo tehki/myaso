@@ -1,6 +1,6 @@
 # Moon Living World AI — myaso.io living NPCs (RFC v0.1)
 
-**Status:** Proposed design, not an implemented or deployed feature.
+**Status:** Living-world RFC. A separate **loopback-only, scripted NPC chat pilot** is implemented in draft PR #353 (see `docs/LW1_LOOPBACK_NPC_CHAT_PILOT.md`); persistent AI, schedules, world actions and production activation are **not** implemented.
 **Location:** Fixed authored world, Greyhaven / Red Lion Street / Red Lion Tavern.
 **Goal:** A persistent-feeling medieval society with conversational, autonomous NPCs whose grounded memories and server-validated actions evolve with the multiplayer world.
 

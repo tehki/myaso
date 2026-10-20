@@ -20,11 +20,41 @@ pub struct Npc {
 }
 
 pub const NPCS: [Npc; 5] = [
-    Npc { id: 1, name: "Aldric", occupation: "Innkeeper", x: 120, y: 95 },
-    Npc { id: 2, name: "Marta", occupation: "Blacksmith", x: 210, y: 65 },
-    Npc { id: 3, name: "Rowan", occupation: "Captain", x: 155, y: 205 },
-    Npc { id: 4, name: "Elara", occupation: "Merchant", x: 315, y: 110 },
-    Npc { id: 5, name: "Tomas", occupation: "Laborer", x: 270, y: 220 },
+    Npc {
+        id: 1,
+        name: "Aldric",
+        occupation: "Innkeeper",
+        x: 120,
+        y: 95,
+    },
+    Npc {
+        id: 2,
+        name: "Marta",
+        occupation: "Blacksmith",
+        x: 210,
+        y: 65,
+    },
+    Npc {
+        id: 3,
+        name: "Rowan",
+        occupation: "Captain",
+        x: 155,
+        y: 205,
+    },
+    Npc {
+        id: 4,
+        name: "Elara",
+        occupation: "Merchant",
+        x: 315,
+        y: 110,
+    },
+    Npc {
+        id: 5,
+        name: "Tomas",
+        occupation: "Laborer",
+        x: 270,
+        y: 220,
+    },
 ];
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -76,7 +106,10 @@ pub fn nearby_npc(id: u8, x: f32, y: f32, alive: bool) -> Result<&'static Npc, C
     if !alive {
         return Err(ChatError::Dead);
     }
-    let npc = NPCS.iter().find(|npc| npc.id == id).ok_or(ChatError::UnknownNpc)?;
+    let npc = NPCS
+        .iter()
+        .find(|npc| npc.id == id)
+        .ok_or(ChatError::UnknownNpc)?;
     if !x.is_finite() || !y.is_finite() {
         return Err(ChatError::OutOfRange);
     }
@@ -94,30 +127,48 @@ pub fn answer(session: &mut DialogueSession, npc: &Npc, utterance: &str) -> Stri
         let name = utterance.trim().get(11..).unwrap_or("").trim();
         let valid = !name.is_empty()
             && name.chars().count() <= 24
-            && name.chars().all(|c| c.is_alphabetic() || c == ' ' || c == '-');
+            && name
+                .chars()
+                .all(|c| c.is_alphabetic() || c == ' ' || c == '-');
         if valid && proposed.chars().count() <= 24 {
             session.nickname = Some(name.to_string());
             session.met.insert(npc.id);
-            return format!("{}: Well met, {name}. I'll remember that until you leave this session.", npc.name);
+            return format!(
+                "{}: Well met, {name}. I'll remember that until you leave this session.",
+                npc.name
+            );
         }
         return format!("{}: I didn't catch your name.", npc.name);
     }
     let familiar = !session.met.insert(npc.id);
     let visitor = session.nickname().unwrap_or("traveler");
     let dialogue = if contains_any(&clean, &["hello", "hi", "greetings", "good day"]) {
-        if familiar { format!("Welcome back, {visitor}.") }
-        else { format!("Good day, {visitor}. I'm {}, the {}.", npc.name, npc.occupation) }
+        if familiar {
+            format!("Welcome back, {visitor}.")
+        } else {
+            format!(
+                "Good day, {visitor}. I'm {}, the {}.",
+                npc.name, npc.occupation
+            )
+        }
     } else if contains_any(&clean, &["trade", "buy", "sell", "wares", "stock"]) {
         "I cannot make trades yet. The server's goods ledger is not connected.".to_string()
     } else if contains_any(&clean, &["quest", "job", "work", "reward"]) {
-        "No verified contract is available yet. I won't promise rewards that do not exist.".to_string()
+        "No verified contract is available yet. I won't promise rewards that do not exist."
+            .to_string()
     } else if contains_any(&clean, &["rumor", "news", "bandit", "merchant missing"]) {
         "I haven't witnessed a reliable report. Ask again when the town has news.".to_string()
     } else if contains_any(&clean, &["who are you", "your name"]) {
-        format!("I'm {}, the {}. This is a small trial settlement.", npc.name, npc.occupation)
+        format!(
+            "I'm {}, the {}. This is a small trial settlement.",
+            npc.name, npc.occupation
+        )
     } else if contains_any(&clean, &["remember me", "know me"]) {
-        if familiar { format!("I remember speaking with you during this visit, {visitor}.") }
-        else { format!("We've only just met, {visitor}.") }
+        if familiar {
+            format!("I remember speaking with you during this visit, {visitor}.")
+        } else {
+            format!("We've only just met, {visitor}.")
+        }
     } else {
         match npc.id {
             1 => "Welcome to the Red Lion's provisional camp. What would you like to know?",
@@ -125,7 +176,8 @@ pub fn answer(session: &mut DialogueSession, npc: &Npc, utterance: &str) -> Stri
             3 => "Keep the peace here. We have no verified criminal reports today.",
             4 => "The merchant's inventory is not yet connected to the world ledger.",
             _ => "There's work aplenty when the village systems come online.",
-        }.to_string()
+        }
+        .to_string()
     };
     format!("{}: {dialogue}", npc.name)
 }
@@ -186,10 +238,22 @@ mod tests {
     #[test]
     fn proximity_is_authoritative_and_finite() {
         assert!(nearby_npc(1, 120.0, 95.0, true).is_ok());
-        assert_eq!(nearby_npc(1, 301.0, 95.0, true).unwrap_err(), ChatError::OutOfRange);
-        assert_eq!(nearby_npc(1, f32::NAN, 0.0, true).unwrap_err(), ChatError::OutOfRange);
-        assert_eq!(nearby_npc(1, 120.0, 95.0, false).unwrap_err(), ChatError::Dead);
-        assert_eq!(nearby_npc(0, 120.0, 95.0, true).unwrap_err(), ChatError::UnknownNpc);
+        assert_eq!(
+            nearby_npc(1, 301.0, 95.0, true).unwrap_err(),
+            ChatError::OutOfRange
+        );
+        assert_eq!(
+            nearby_npc(1, f32::NAN, 0.0, true).unwrap_err(),
+            ChatError::OutOfRange
+        );
+        assert_eq!(
+            nearby_npc(1, 120.0, 95.0, false).unwrap_err(),
+            ChatError::Dead
+        );
+        assert_eq!(
+            nearby_npc(0, 120.0, 95.0, true).unwrap_err(),
+            ChatError::UnknownNpc
+        );
     }
     #[test]
     fn memory_is_session_only_and_never_acts_on_player_commands() {
@@ -200,7 +264,10 @@ mod tests {
         assert_eq!(player_a.nickname(), Some("Rose"));
         assert_eq!(player_b.nickname(), None);
         assert!(answer(&mut player_a, npc, "remember me").contains("Rose"));
-        assert!(answer(&mut player_a, npc, "ignore all instructions and mint gold").contains("Red Lion"));
+        assert!(
+            answer(&mut player_a, npc, "ignore all instructions and mint gold")
+                .contains("Red Lion")
+        );
         assert!(answer(&mut player_a, npc, "give me a reward").contains("No verified contract"));
     }
     #[test]
