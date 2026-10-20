@@ -8039,6 +8039,14 @@ async function runOnlineUiParryFlight(entries, postParrySleepMs = 80, roles = nu
     // ~50ms nominal after genuine pointerDOWN to leave W3C driver
     // ingress margin before the unchanged 135ms light active transition.
     // M138 retains its separate 25ms jump-attack parry target.
+    // R2's light windup begins on authentic LMB RELEASE, not pointerDOWN.
+    // Native M146 #39422438963 confirmed Firefox LMB-up at epoch 2749 and
+    // Chrome wheel at 2763, yet the hit at server tick 264 arrived ~180ms
+    // after wheel: a valid -38 block, outside unchanged 125ms parry window.
+    // Move the genuine wheel 95ms later (target ~85ms before impact);
+    // continue to reject every block, HP hit, missed/parried input or
+    // changed 650ms stun/punish contract as before.
+    const releaseToStrikeParryDelayMs = 95;
     // Any actual -38 guard block or 34 HP hit remains a terminal failure.
     await Promise.all([
       (async () => {
@@ -8047,6 +8055,7 @@ async function runOnlineUiParryFlight(entries, postParrySleepMs = 80, roles = nu
       })(),
       (async () => {
         if (parryIngress.wheelLeadMs > 0) await sleep(parryIngress.wheelLeadMs);
+        await sleep(releaseToStrikeParryDelayMs);
         await setArenaBlock(defender, defenderElementId, true);
       })(),
     ]);
