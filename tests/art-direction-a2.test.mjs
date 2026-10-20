@@ -247,3 +247,31 @@ test('A2.5 WebP encoder flips Y, crops independently and guards roundtrip withou
   assert.match(source,/"browserPerformanceMeasured":False/);
   assert.doesNotMatch(source,/requests\.|subprocess\.|shutil\.rmtree/);
 });
+
+
+test('A2.6 preserves oblique 3/4 architectural view while isolating roof and facade layers',()=>{
+  const src=readFileSync(new URL('../tools/art/render_greyhaven_a26_billboards.py',import.meta.url),'utf8');
+  assert.match(src,/A2 \/ Red Lion hero \/ 3-4 angle/);
+  assert.match(src,/camera\.rotation_euler=rotation/);
+  assert.match(src,/camera\.data\.ortho_scale=scale/);
+  assert.match(src,/camera\.location=anchor\+rotation\.to_quaternion\(\)@Vector\(\(0,0,40\)\)/);
+  assert.match(src,/for layer in \("base","roof","whole"\)/);
+  assert.match(src,/ORIGINAL\[ob\.name\] or not visible/);
+  assert.match(src,/max\(mismatches\)>10/);
+  assert.match(src,/"gameXYProjectionMatched":False/);
+  assert.match(src,/"gameplayChanged":False/);
+  assert.match(src,/"A3RollChanged":False/);
+  assert.match(src,/"productionApproved":False/);
+  assert.doesNotMatch(src,/save_as_mainfile|export_scene\.gltf|subprocess\.|requests\./);
+});
+test('A2.6 per-building lossless cropped roof/walls do not imply runtime game XY coordinates',()=>{
+  const src=readFileSync(new URL('../tools/art/encode_greyhaven_a26_webp.py',import.meta.url),'utf8');
+  assert.match(src,/lossless=True,method=6,exact=True/);
+  assert.match(src,/ImageChops\.difference\(restored,original\)/);
+  assert.match(src,/drawOffsetPixelsFromVisualDoor/);
+  assert.match(src,/compositeForegroundRGBMeanAbsoluteErrorVsWholeRender/);
+  assert.match(src,/"browserGameXYAligned":False/);
+  assert.match(src,/"roofOcclusionValidated":False/);
+  assert.match(src,/"gameWorldDoorPositionValidated":False/);
+  assert.match(src,/"productionApproved":False/);
+});
