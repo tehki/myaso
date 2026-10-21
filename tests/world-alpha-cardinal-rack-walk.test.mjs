@@ -122,3 +122,38 @@ test("P0 closer stand candidate is within prototype reach even with 18-unit arri
       closerY-WORLD_ALPHA_SWORD_RACK_SOCKETS[i+1].y
     ),50);
 });
+
+test("P0 four closer navigation arrivals do NOT by themselves guarantee dynamic actor clearance",()=>{
+  // Original World #639 proposed y4068 only as a geometric pickup
+  // envelope candidate. A radius18 station tolerance is NOT sufficient
+  // to prove four genuinely separate radius18 actors can all stand there.
+  // This test is a NEGATIVE fixture; it does not modify the server solver.
+  const arrivalRadius=18;
+  const actorDiameter=2*fighterRadius;
+  const targets=WORLD_ALPHA_SWORD_RACK_SOCKETS.map(s=>({x:s.x,y:4068}));
+  assert.equal(targets.length,4);
+  assert.deepEqual(targets.map(p=>p.x),[3740,3780,3820,3860]);
+  const separation=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
+  const noOverlap=(ps)=>ps.every((p,i)=>ps.every((q,j)=>
+    i===j||separation(p,q)>=actorDiameter));
+  assert.equal(noOverlap(targets),true,"nominal targets are 40 apart, diameter36");
+  const acceptedButCrowded=[
+    {x:targets[0].x+arrivalRadius,y:4068},
+    {x:targets[1].x-arrivalRadius,y:4068},
+    targets[2],
+    targets[3],
+  ];
+  assert.equal(separation(acceptedButCrowded[0],acceptedButCrowded[1]),4);
+  assert.ok(acceptedButCrowded.every((p,i)=>
+    separation(p,targets[i])<=arrivalRadius),
+    "each actor would meet the currently reviewed individual arrival gate");
+  assert.equal(noOverlap(acceptedButCrowded),false,
+    "four individually valid navigation arrivals can interpenetrate");
+  // Even each selected nominal socket remains within REVIEWED offline
+  // Items reach56. Neither reach nor arrival implies dynamic occupancy.
+  assert.ok(acceptedButCrowded.every((p,i)=>
+    separation(p,WORLD_ALPHA_SWORD_RACK_SOCKETS[i])<=56));
+  // Four server-observed exact actor centers need their OWN signed
+  // same-tick, radius/occupancy validation. Do not trust an array
+  // supplied by clients or retarget automatically to an adjacent sword.
+});
