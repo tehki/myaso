@@ -80,6 +80,15 @@ offline conversion planner, with no real approved namespace values:
 - A 4-sword fixture verifies all legacy source IDs 201–204 map
   to stable, distinct Core `ItemId(u128)` values; reuse of the same
   `u64` raw ID in another domain cannot alias an item.
+- A **four-row physical sword manifest preflight** takes only source
+  records extracted from a trusted, fully inventoried legacy checkpoint.
+  It requires four distinct, previously registered ownership rows and
+  preserves the explicit item-kind code: **RustySword (0)** or
+  **IronSword (8)**. Missing owners, repeated IDs, zero IDs,
+  WoodenClub (9), and unsupported/unknown item kinds fail closed.
+  This is offline metadata validation, **not** proof of signed
+  checkpoint provenance, real rack position, valid ownership zone,
+  visual clicking, server-distance checks or a playable gear adapter.
 - There is **NO** database insert, live migration, network route,
   authorized sword grant, equipment transition, or writer switch.
 
@@ -100,15 +109,17 @@ cargo test --locked --manifest-path server/Cargo.toml --lib
 cargo clippy --locked --manifest-path server/Cargo.toml --lib -- -D warnings
 ```
 
-**6/6 focused P0 preflight tests passed; entire server library 102 passed,
-0 failed, 2 existing intentionally ignored subprocess helpers; format
-and strict Clippy passed.** This verifies the typed contract against
+**8/8 focused P0 preflight tests passed; 2/2 four-sword ownership tests
+passed; entire server library 104 passed, 0 failed, 2 existing
+intentionally ignored subprocess helpers; format and strict Clippy passed.** This verifies the typed contract against
 our Core code plus manually source-checked Magic code names. It is
 NOT a bundled cross-department source/ABI test, nor real browser
 alpha, nor proof that live databases have been enumerated.
 
-After correcting the four-sword slot, rerun the exact-head Rust tests
-and mandatory full protected Chrome/Firefox/Combat `quality`.
+At implementation head `7aa42da0d4cb96f61aa78c5174d5bb7f16916cc0`,
+the revised four-sword manifest and MainHand tests passed locally.
+Mandatory full protected Chrome/Firefox/Combat `quality` on the final
+PR head remains a **separate gate**.
 
 ## Remaining P0 cross-department sign-offs
 
