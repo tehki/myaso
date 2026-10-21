@@ -1,0 +1,39 @@
+name: R2 independent-host acceptance preflight
+
+on:
+  pull_request:
+    paths:
+      - "scripts/r2-remote-acceptance-config.mjs"
+      - "scripts/r2-remote-abrupt-close-acceptance.mjs"
+      - "tests/r2-remote-acceptance-config.test.mjs"
+      - "docs/CORE_R2_TWO_HOST_RELEASE_ACCEPTANCE.md"
+      - ".github/workflows/r2-two-host-preflight.yml"
+  push:
+    branches: [main]
+    paths:
+      - "scripts/r2-remote-acceptance-config.mjs"
+      - "scripts/r2-remote-abrupt-close-acceptance.mjs"
+      - "tests/r2-remote-acceptance-config.test.mjs"
+      - ".github/workflows/r2-two-host-preflight.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  staging-guard:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fail-closed independent-host staging acceptance configuration
+        run: |
+          node --version
+          node --check scripts/r2-remote-acceptance-config.mjs
+          node --check scripts/r2-remote-abrupt-close-acceptance.mjs
+          node --test tests/r2-remote-acceptance-config.test.mjs
+      - name: Confirm no automatic deployment
+        run: |
+          if grep -E 'game=spawn|MYASO_BIND:|MYASO_MAX_PLAYERS:' scripts/r2-remote-abrupt-close-acceptance.mjs; then
+            echo 'Remote acceptance must not launch or configure the game server.'
+            exit 1
+          fi
