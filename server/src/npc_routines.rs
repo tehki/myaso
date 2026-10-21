@@ -149,7 +149,24 @@ impl NpcRoutines {
         let npc = self
             .position_at(id, tick)
             .ok_or(crate::living_world::ChatError::UnknownNpc)?;
-        crate::living_world::nearby_npc_at(id, player_x, player_y, alive, npc.x, npc.y)
+        // Preserve the established liveness, finite-coordinate and
+        // 180-unit distance guards before checking authored pilot occlusion.
+        let target =
+            crate::living_world::nearby_npc_at(id, player_x, player_y, alive, npc.x, npc.y)?;
+        // Do not let float-to-integer saturation create a fake world
+        // position outside the unsigned pilot collision domain.
+        if player_x < 0.0
+            || player_y < 0.0
+            || player_x > f32::from(u16::MAX)
+            || player_y > f32::from(u16::MAX)
+        {
+            return Err(crate::living_world::ChatError::OutOfRange);
+        }
+        let from = (player_x.round() as u16, player_y.round() as u16);
+        if !npc_navigation::pilot_line_of_sight(from, (npc.x, npc.y)) {
+            return Err(crate::living_world::ChatError::OutOfRange);
+        }
+        Ok(target)
     }
 
     pub fn position_at(&self, id: u8, tick: u32) -> Option<NpcState> {
@@ -1512,12 +1529,13 @@ mod tests {
         assert_eq!((original.x, original.y), (155, 205));
 
         // A player at the *real detouring* NPC can speak, despite the
-        // original static schedule now being >180 units away.
-        let npc = moving.speaking_target(3, 1980, 449.0, 220.0, true).unwrap();
+        // original static schedule now being >180 units away. The unobstructed
+        // approach is 175 units from the real detouring Rowan.
+        let npc = moving.speaking_target(3, 1980, 270.0, 45.0, true).unwrap();
         assert_eq!(npc.id, 3);
         assert_eq!(
             ordinary
-                .speaking_target(3, 1980, 449.0, 220.0, true)
+                .speaking_target(3, 1980, 270.0, 45.0, true)
                 .unwrap_err(),
             ChatError::OutOfRange
         );
@@ -1626,5 +1644,72 @@ mod tests {
             supply.stocks().well_water + supply.stocks().tomas_water + supply.stocks().yard_water,
             8
         );
+    }
+
+    #[test]
+    fn pilot_chat_rejects_hidden_npcs_even_when_within_speaking_radius() {
+        use crate::living_world::{ChatError, SPEAK_RADIUS};
+        let npcs = NpcRoutines::default();
+        assert_eq!(SPEAK_RADIUS, 180.0);
+        // Rowan's default route starts west of a 35x35 watch barricade.
+        // This player is merely 90 world units away, but a pilot wall
+        // cuts across the line between them.
+        assert_eq!(
+            npcs.speaking_target(3, 0, 245.0, 205.0, true).unwrap_err(),
+            ChatError::OutOfRange
+        );
+        assert!(npcs.speaking_target(3, 0, 155.0, 100.0, true).is_ok());
+        // The supply crate blocks a nearby approach to Tomas.
+        assert_eq!(
+            npcs.speaking_target(5, 0, 325.0, 220.0, true).unwrap_err(),
+            ChatError::OutOfRange
+        );
+        assert!(npcs.speaking_target(5, 0, 270.0, 160.0, true).is_ok());
+        // The market stall likewise blocks an apparent shortcut to Elara.
+        assert_eq!(
+            npcs.speaking_target(4, 0, 395.0, 110.0, true).unwrap_err(),
+            ChatError::OutOfRange
+        );
+        assert!(npcs.speaking_target(4, 0, 315.0, 65.0, true).is_ok());
+        // Reject an invalid negative fighter position instead of creating a
+        // saturated pilot grid coordinate from a float-to-u16 cast.
+        assert_eq!(
+            npcs.speaking_target(3, 0, -1.0, 205.0, true).unwrap_err(),
+            ChatError::OutOfRange
+        );
+    }
+
+    #[test]
+    fn detouring_rowan_requires_both_current_location_and_clear_line_of_sight() {
+        use crate::living_world::ChatError;
+        let mut supply = NpcSupplyWorld::default();
+        supply.enable_pilot_maintenance();
+        let mut npcs = NpcRoutines::default();
+        npcs.enable_pilot_guard_detours();
+        for tick in 0..=1980 {
+            supply.advance(tick);
+            npcs.advance_pilot_movement(tick, &supply);
+            npcs.advance_worksite_social(tick, &supply);
+        }
+        let actual = npcs.position_at(3, 1980).unwrap();
+        assert_eq!((actual.x, actual.y), (270, 220));
+        // 90 units away, but the crate at x294..318 occludes speaking.
+        assert_eq!(
+            npcs.speaking_target(3, 1980, 360.0, 220.0, true)
+                .unwrap_err(),
+            ChatError::OutOfRange
+        );
+        // 175 units away and on a clear vertical approach.
+        assert!(npcs.speaking_target(3, 1980, 270.0, 45.0, true).is_ok());
+        // The guard's abandoned static position is not an alternate target.
+        assert_eq!(
+            npcs.speaking_target(3, 1980, 60.0, 205.0, true)
+                .unwrap_err(),
+            ChatError::OutOfRange
+        );
+        // An unsuccessful request has not moved NPCs or spent carried water.
+        assert_eq!(npcs.position_at(3, 1980), Some(actual));
+        assert_eq!(supply.stocks().tomas_water, 1);
+        assert!(supply.stocks().conserved());
     }
 }

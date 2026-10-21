@@ -947,7 +947,7 @@ async fn handle_connection(
                             None => living_world::response_packet(
                                 npc_id,
                                 1,
-                                "Move closer to this NPC to speak.",
+                                "Move closer with a clear line of sight to this NPC.",
                             ),
                         },
                         None => living_world::response_packet(npc_id, 1, "Player unavailable."),

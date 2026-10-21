@@ -966,3 +966,42 @@ a loopback-only text reply with no world mutations, new wire
 messages, collision changes, quests, items, money, accounts or
 production enablement. The main World & Gameplay door and
 collision interfaces remain separate and unmerged.
+
+## LW-1X — Player/NPC conversation requires clear pilot line of sight
+
+NPC chat admission now checks **both server-authenticated distance and
+line of sight** using the same server-owned *pilot* obstacles as NPC
+meetings. Prior to this phase a player could be within the 180-unit
+speaking radius on the opposite side of the watch barricade, market
+stall or supply crate and still talk *through* the obstacle, while
+NPC-to-NPC encounters already required a clear sightline.
+
+After the existing verified player-fighter liveness, finite-coordinate,
+fixed NPC ID and unchanged 180-unit distance gates, the server
+converts the actual fighter coordinates to pilot grid coordinates only
+when they lie in the nonnegative unsigned 16-bit domain (no saturating
+casts or fake positions) and checks
+\`npc_navigation::pilot_line_of_sight\` from that fighter point to
+the current committed \`NpcRoutines::position_at\` location. This is
+the exact server-owned NPC position used by the type-8 replicated
+marker, witnessed events and NPC-to-NPC social meetings. If the pilot
+line intersects a pilot blocker, the reliable request is denied with
+no dialogue/session side effects or gameplay mutations. The user gets
+the regular denied status and a useful prompt to move closer with a
+clear line of sight. No new wire type or client authority is created.
+
+Regression tests verify that players can speak to an unobstructed
+Rowan, Tomas and Elara but not across each of the three authored
+barriers even when inside speaking radius. They cover Rowan's
+real opted-in worksite detour at tick 1980, where a player 90 units
+away behind the supply crate is denied but a player 175 units away
+via a clear approach succeeds. The abandoned static patrol position
+remains unusable. Existing dead-player, NaN/infinite coordinate and
+unknown-NPC denial tests continue to pass, and resource stocks are
+unaffected.
+
+This visibility check applies **only to the opt-in loopback pilot**:
+the three authored rectangles are not Greyhaven's live collision or
+doors. Do not enable or use the pilot's LOS as production world
+collision authority. World & Gameplay's collision and door contracts
+must be approved and server-integrated independently before live use.
