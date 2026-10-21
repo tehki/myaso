@@ -86,6 +86,59 @@ impl CurrentFourRackCandidates {
     }
 }
 
+/// Untrusted exact-click selector. This remains a read-only local-journal
+/// preflight, NOT session/epoch/LOS authorization or a fenced item commit.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct ProposedExactRackSelection<'a> {
+    pub socket_id: &'a str,
+    pub canonical_ground_entity: u128,
+    pub canonical_item: ItemId,
+    pub observed_item_mutation_sequence: u64,
+}
+
+#[derive(Debug)]
+pub enum ExactRackSelectionError {
+    MappingOrJournal(RackBindingReadError),
+    UnknownSocket,
+    ItemAbsent,
+    GroundEntityMismatch,
+    PhysicalItemMismatch,
+    StaleItemRevision,
+}
+
+/// Match all independently typed physical target fields against CURRENT
+/// canonical journal state, never a nearest-item guess or historical receipt.
+/// 56-world-unit pickup reach includes two adjacent swords at midpoints.
+/// Returned candidates MUST be rechecked atomically with a future exclusive
+/// writer/8C epoch/Physics commit; this API does not mutate or approve pickup.
+pub fn preflight_exact_current_rack_selection(
+    journal: &DurableItemJournal,
+    source: [ProposedRackSource; 4],
+    imported: &LegacyImportPreflight,
+    mapping: ProposedWorldToCentimeter,
+    selection: ProposedExactRackSelection<'_>,
+) -> Result<CurrentRackCandidate, ExactRackSelectionError> {
+    let current = read_proposed_current_four_rack_items(journal, source, imported, mapping)
+        .map_err(ExactRackSelectionError::MappingOrJournal)?;
+    let index = crate::alpha_armory_mapping_preflight::GREYHAVEN_RACK_V1
+        .iter()
+        .position(|(socket, _, _)| *socket == selection.socket_id)
+        .ok_or(ExactRackSelectionError::UnknownSocket)?;
+    let candidate = current.slots[index].ok_or(ExactRackSelectionError::ItemAbsent)?;
+    if candidate.canonical_ground_entity != selection.canonical_ground_entity {
+        return Err(ExactRackSelectionError::GroundEntityMismatch);
+    }
+    if candidate.canonical_item != selection.canonical_item {
+        return Err(ExactRackSelectionError::PhysicalItemMismatch);
+    }
+    if selection.observed_item_mutation_sequence == 0
+        || candidate.item_mutation_sequence != selection.observed_item_mutation_sequence
+    {
+        return Err(ExactRackSelectionError::StaleItemRevision);
+    }
+    Ok(candidate)
+}
+
 /// Offline, source-verified four-rack membership at ONE immutable local
 /// C3e journal head. Re-checks each proposed canonical item ID and exact
 /// Ground location against current journal owner, not a historical receipt.
@@ -408,5 +461,213 @@ mod tests {
         let view =
             read_proposed_current_four_rack_items(&journal, rows(), &imported, incorrect).unwrap();
         assert!(view.slots().iter().all(Option::is_none));
+    }
+
+    #[test]
+    fn exact_click_rejects_neighbor_substitution_and_pickup_return_aba() {
+        let root = Root::new();
+        let imported = registered();
+        let mut journal = root.open();
+        let ground = seed(&mut journal, &imported);
+        let current =
+            read_proposed_current_four_rack_items(&journal, rows(), &imported, cm_mapping())
+                .unwrap();
+        let candidates = current.slots().map(|slot| slot.unwrap());
+        let select = |candidate: CurrentRackCandidate| ProposedExactRackSelection {
+            socket_id: candidate.socket_id(),
+            canonical_ground_entity: candidate.canonical_ground_entity(),
+            canonical_item: candidate.canonical_item(),
+            observed_item_mutation_sequence: candidate.item_mutation_sequence(),
+        };
+        for candidate in candidates {
+            assert_eq!(
+                preflight_exact_current_rack_selection(
+                    &journal,
+                    rows(),
+                    &imported,
+                    cm_mapping(),
+                    select(candidate)
+                )
+                .unwrap(),
+                candidate
+            );
+        }
+        let first = candidates[0];
+        assert!(matches!(
+            preflight_exact_current_rack_selection(
+                &journal,
+                rows(),
+                &imported,
+                cm_mapping(),
+                ProposedExactRackSelection {
+                    socket_id: "unknown",
+                    ..select(first)
+                }
+            ),
+            Err(ExactRackSelectionError::UnknownSocket)
+        ));
+        assert!(matches!(
+            preflight_exact_current_rack_selection(
+                &journal,
+                rows(),
+                &imported,
+                cm_mapping(),
+                ProposedExactRackSelection {
+                    canonical_ground_entity: candidates[1].canonical_ground_entity(),
+                    ..select(first)
+                }
+            ),
+            Err(ExactRackSelectionError::GroundEntityMismatch)
+        ));
+        assert!(matches!(
+            preflight_exact_current_rack_selection(
+                &journal,
+                rows(),
+                &imported,
+                cm_mapping(),
+                ProposedExactRackSelection {
+                    canonical_item: candidates[1].canonical_item(),
+                    ..select(first)
+                }
+            ),
+            Err(ExactRackSelectionError::PhysicalItemMismatch)
+        ));
+        assert!(matches!(
+            preflight_exact_current_rack_selection(
+                &journal,
+                rows(),
+                &imported,
+                cm_mapping(),
+                ProposedExactRackSelection {
+                    observed_item_mutation_sequence: 0,
+                    ..select(first)
+                }
+            ),
+            Err(ExactRackSelectionError::StaleItemRevision)
+        ));
+        journal
+            .apply(
+                txn(2),
+                &[OwnershipOp::Move {
+                    item: first.canonical_item(),
+                    from: ground[0],
+                    to: hand(9),
+                }],
+            )
+            .unwrap();
+        assert!(matches!(
+            preflight_exact_current_rack_selection(
+                &journal,
+                rows(),
+                &imported,
+                cm_mapping(),
+                select(first)
+            ),
+            Err(ExactRackSelectionError::ItemAbsent)
+        ));
+        journal
+            .apply(
+                txn(3),
+                &[OwnershipOp::Move {
+                    item: first.canonical_item(),
+                    from: hand(9),
+                    to: ground[0],
+                }],
+            )
+            .unwrap();
+        assert!(matches!(
+            preflight_exact_current_rack_selection(
+                &journal,
+                rows(),
+                &imported,
+                cm_mapping(),
+                select(first)
+            ),
+            Err(ExactRackSelectionError::StaleItemRevision)
+        ));
+        let after =
+            read_proposed_current_four_rack_items(&journal, rows(), &imported, cm_mapping())
+                .unwrap()
+                .slots()[0]
+                .unwrap();
+        assert!(after.item_mutation_sequence() > first.item_mutation_sequence());
+        assert_eq!(
+            preflight_exact_current_rack_selection(
+                &journal,
+                rows(),
+                &imported,
+                cm_mapping(),
+                select(after)
+            )
+            .unwrap(),
+            after
+        );
+        assert_eq!(journal.item_count(), 4);
+    }
+
+    #[test]
+    fn unrelated_commit_preserves_item_revision_but_forged_source_fails_closed() {
+        let root = Root::new();
+        let imported = registered();
+        let mut journal = root.open();
+        let ground = seed(&mut journal, &imported);
+        let first =
+            read_proposed_current_four_rack_items(&journal, rows(), &imported, cm_mapping())
+                .unwrap()
+                .slots()[0]
+                .unwrap();
+        let selection = ProposedExactRackSelection {
+            socket_id: first.socket_id(),
+            canonical_ground_entity: first.canonical_ground_entity(),
+            canonical_item: first.canonical_item(),
+            observed_item_mutation_sequence: first.item_mutation_sequence(),
+        };
+        journal
+            .apply(
+                txn(2),
+                &[OwnershipOp::Move {
+                    item: imported.core_item(102).unwrap(),
+                    from: ground[1],
+                    to: hand(2),
+                }],
+            )
+            .unwrap();
+        assert_eq!(
+            preflight_exact_current_rack_selection(
+                &journal,
+                rows(),
+                &imported,
+                cm_mapping(),
+                selection
+            )
+            .unwrap(),
+            first
+        );
+        let mut swapped = rows();
+        swapped[0].legacy_item_id = 102;
+        swapped[1].legacy_item_id = 101;
+        assert!(matches!(
+            preflight_exact_current_rack_selection(
+                &journal,
+                swapped,
+                &imported,
+                cm_mapping(),
+                selection
+            ),
+            Err(ExactRackSelectionError::ItemAbsent)
+        ));
+        drop(journal);
+        let recovered = root.open();
+        assert_eq!(
+            preflight_exact_current_rack_selection(
+                &recovered,
+                rows(),
+                &imported,
+                cm_mapping(),
+                selection
+            )
+            .unwrap(),
+            first
+        );
     }
 }
