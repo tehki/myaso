@@ -164,3 +164,47 @@ or wallet settlement authorized. Report via
 [First Playable #480](https://github.com/tehki/myaso/issues/480),
 [canonical contract #432](https://github.com/tehki/myaso/issues/432),
 and [Development Center #360](https://github.com/tehki/myaso/issues/360).
+
+## P0 CI writer-lock handoff stabilization — 2026-10-21
+
+A later exact-head protected [quality #39593554397](https://github.com/tehki/myaso/actions/runs/39593554397)
+**FAILED the Rust library stage**, not Combat: during parallel
+subprocess tests, `four_rack_swords_equip_drop_transfer_recover_without_clone_or_false_ack`
+encountered `WriterBusy` while reopening its own previously closed,
+private journal. A local 16-thread stress sequence subsequently
+reproduced a second failure in the separate journal corruption fixture:
+it expected `InvalidRecord` from a deliberately damaged canonical
+record, but reopening was temporarily blocked by `WriterBusy`.
+
+The latest source makes a **test-only**, bounded 500ms/5ms-poll handoff
+when a *test fixture* reopens a recently released writer. It never
+retries `InvalidRecord`, `Io` or other failures; a persistent
+`WriterBusy` after the bounded deadline still fails the test.
+**Production `DurableItemJournal::open` retains nonblocking
+`flock(LOCK_EX|LOCK_NB)` and immediately returns `WriterBusy`
+for a competing live process.**
+
+The expanded fixture explicitly asserts that a second simultaneous
+journal open is rejected immediately. Corrupted committed history is
+still required to produce `InvalidRecord`, not a false success.
+Actual SIGKILL, immutable receipts, double-click denial, full
+ownership conservation and replay tests remain unchanged.
+
+**Verified locally, Serj Linux Rust 1.89 on source
+`13904675a16ce681430516e4e52e2b5febc064a2`:**
+
+- Full Rust library: **112 passed, 0 failed, 3 intentionally ignored**
+  subprocess helpers (invoked by their real test parents)
+- Strict formatting and `cargo clippy --lib -- -D warnings`: **PASS**
+- **40 consecutive full library runs** at **16 test threads** each:
+  **PASS** with real child-process lock/crash tests active (not skipped)
+- Earlier 16-thread stress without the recovery fixture fix reproduced
+  `WriterBusy` interfering with a strict corruption assertion at
+  iteration 15; the final revision did not reproduce either failure.
+
+This is evidence of fixture-level stability, **not proof of the
+underlying OS scheduling root cause**, multi-host lock safety or
+integration into the multiplayer server. The new exact-head protected
+[quality #39594338186](https://github.com/tehki/myaso/actions/runs/39594338186)
+remains a mandatory independent gate. Prior different-head full CI
+failed a real M194 Combat parry/guard assertion; never weaken it.
