@@ -614,7 +614,6 @@ mod tests {
         );
     }
 
-
     #[test]
     fn all_five_equipment_slots_survive_quiescent_checkpoint_and_keep_item_ids() {
         let mut loot = LootAuthority::new();
@@ -656,7 +655,10 @@ mod tests {
             assert!(restored_ids.insert(item.id));
         }
         assert_eq!(restored_ids, ids);
-        assert_eq!(restored.export_state().unwrap(), loot.export_state().unwrap());
+        assert_eq!(
+            restored.export_state().unwrap(),
+            loot.export_state().unwrap()
+        );
     }
 
     #[test]
