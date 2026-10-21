@@ -1,0 +1,1259 @@
+//! Dormant local write-ahead item journal with exactly-once replay semantics.
+//!
+//! One cooperating OS writer on a trusted local Unix filesystem, immutable
+//! hard-link commits and directory fsync. No distributed CAS, untrusted path
+//! hardening, shared NFS, live authorization or production rollout is implied.
+
+use crate::{
+    alpha_bound_pickup::{ProposedRackPickupEnvelope, PICKUP_ENVELOPE_V2_BYTES},
+    identity::CharacterId,
+    item_ownership::{
+        CorpseId, ItemId, ItemLocation, ItemOwnershipLedger, OwnershipError, OwnershipOp,
+        OwnershipReceipt, OwnershipTxnId, ZoneId, MAX_OWNERSHIP_OPS,
+    },
+};
+use std::{
+    collections::{
+        BTreeMap,
+        Bound::{Excluded, Unbounded},
+    },
+    fs::{self, File, OpenOptions},
+    io::{self, Read, Write},
+    path::{Path, PathBuf},
+    sync::atomic::{AtomicU64, Ordering},
+    time::{SystemTime, UNIX_EPOCH},
+};
+
+// Match Core C4b's dependency-free POSIX advisory lock pattern. Rust's
+// standard File::try_lock is newer than the server's 1.88 minimum version.
+// Only trusted local Unix directories with working flock are supported.
+#[cfg(unix)]
+unsafe extern "C" {
+    fn flock(fd: std::os::raw::c_int, operation: std::os::raw::c_int) -> std::os::raw::c_int;
+}
+
+#[cfg(unix)]
+fn lock_exclusive_nonblocking(file: &File) -> io::Result<bool> {
+    use std::os::fd::AsRawFd;
+    // Linux/POSIX flock: LOCK_EX = 2, LOCK_NB = 4. The held File remains
+    // alive for the entire journal handle lifetime; closing it releases lock.
+    // SAFETY: the descriptor is owned by the live File during this call.
+    if unsafe { flock(file.as_raw_fd(), 2 | 4) } == 0 {
+        Ok(true)
+    } else {
+        let error = io::Error::last_os_error();
+        if error.kind() == io::ErrorKind::WouldBlock {
+            Ok(false)
+        } else {
+            Err(error)
+        }
+    }
+}
+
+#[cfg(not(unix))]
+fn lock_exclusive_nonblocking(_file: &File) -> io::Result<bool> {
+    Err(io::Error::new(
+        io::ErrorKind::Unsupported,
+        "local item journal writer locking requires Unix",
+    ))
+}
+
+const MAGIC: &[u8; 4] = b"MYTX";
+const VERSION: u8 = 1;
+const BOUND_PICKUP_VERSION: u8 = 2;
+const HEADER_BYTES: usize = 36;
+const LOCATION_BYTES: usize = 26;
+const OP_BYTES: usize = 1 + 16 + 2 * LOCATION_BYTES;
+const CHECKSUM_BYTES: usize = 4;
+const MAX_RECORD_BYTES: usize =
+    HEADER_BYTES + OP_BYTES * MAX_OWNERSHIP_OPS + PICKUP_ENVELOPE_V2_BYTES + CHECKSUM_BYTES;
+static NEXT_PENDING: AtomicU64 = AtomicU64::new(0);
+
+#[derive(Debug)]
+pub enum ItemJournalError {
+    WriterBusy,
+    Io(io::Error),
+    InvalidRecord(&'static str),
+    InvalidSequence,
+    InvalidTransaction(OwnershipError),
+    Poisoned,
+    BoundPickupMismatch,
+    InvalidBoundPickup(&'static str),
+}
+
+impl From<io::Error> for ItemJournalError {
+    fn from(e: io::Error) -> Self {
+        Self::Io(e)
+    }
+}
+
+#[derive(Debug)]
+struct JournalRecord {
+    sequence: u64,
+    transaction: OwnershipTxnId,
+    operations: Vec<OwnershipOp>,
+    bound_pickup: Option<ProposedRackPickupEnvelope>,
+}
+
+fn checksum(bytes: &[u8]) -> u32 {
+    bytes.iter().fold(0x811c_9dc5_u32, |acc, &byte| {
+        (acc ^ u32::from(byte)).wrapping_mul(0x0100_0193)
+    })
+}
+
+fn encode_location(location: Option<ItemLocation>, output: &mut Vec<u8>) {
+    let mut bytes = [0_u8; LOCATION_BYTES];
+    match location {
+        None => {}
+        Some(ItemLocation::Inventory(character)) => {
+            bytes[0] = 1;
+            bytes[1..17].copy_from_slice(&character.get().to_le_bytes());
+        }
+        Some(ItemLocation::Equipped { character_id, slot }) => {
+            bytes[0] = 2;
+            bytes[1..17].copy_from_slice(&character_id.get().to_le_bytes());
+            bytes[17] = slot;
+        }
+        Some(ItemLocation::Corpse(corpse)) => {
+            bytes[0] = 3;
+            bytes[1..17].copy_from_slice(&corpse.get().to_le_bytes());
+        }
+        Some(ItemLocation::Ground {
+            zone_id,
+            x_cm,
+            y_cm,
+        }) => {
+            bytes[0] = 4;
+            bytes[1..9].copy_from_slice(&zone_id.get().to_le_bytes());
+            bytes[18..22].copy_from_slice(&x_cm.to_le_bytes());
+            bytes[22..26].copy_from_slice(&y_cm.to_le_bytes());
+        }
+    }
+    output.extend_from_slice(&bytes);
+}
+
+fn decode_location(bytes: &[u8]) -> Result<Option<ItemLocation>, ItemJournalError> {
+    if bytes.len() != LOCATION_BYTES {
+        return Err(ItemJournalError::InvalidRecord("bad location length"));
+    }
+    let id = u128::from_le_bytes(bytes[1..17].try_into().expect("length checked"));
+    let slot = bytes[17];
+    let x_cm = i32::from_le_bytes(bytes[18..22].try_into().expect("length checked"));
+    let y_cm = i32::from_le_bytes(bytes[22..26].try_into().expect("length checked"));
+    let unused = slot == 0 && x_cm == 0 && y_cm == 0;
+    match bytes[0] {
+        0 if bytes.iter().all(|&b| b == 0) => Ok(None),
+        1 if unused => CharacterId::new(id)
+            .map(ItemLocation::Inventory)
+            .map(Some)
+            .ok_or(ItemJournalError::InvalidRecord(
+                "invalid inventory character",
+            )),
+        2 if x_cm == 0 && y_cm == 0 => CharacterId::new(id)
+            .map(|character_id| ItemLocation::Equipped { character_id, slot })
+            .map(Some)
+            .ok_or(ItemJournalError::InvalidRecord(
+                "invalid equipment character",
+            )),
+        3 if unused => CorpseId::new(id)
+            .map(ItemLocation::Corpse)
+            .map(Some)
+            .ok_or(ItemJournalError::InvalidRecord("invalid corpse ID")),
+        4 if slot == 0 && id <= u64::MAX as u128 => ZoneId::new(id as u64)
+            .map(|zone_id| ItemLocation::Ground {
+                zone_id,
+                x_cm,
+                y_cm,
+            })
+            .map(Some)
+            .ok_or(ItemJournalError::InvalidRecord("invalid zone ID")),
+        _ => Err(ItemJournalError::InvalidRecord("invalid location fields")),
+    }
+}
+
+fn encode(record: &JournalRecord) -> Vec<u8> {
+    let extra = if record.bound_pickup.is_some() {
+        PICKUP_ENVELOPE_V2_BYTES
+    } else {
+        0
+    };
+    let mut bytes = Vec::with_capacity(
+        HEADER_BYTES + record.operations.len() * OP_BYTES + extra + CHECKSUM_BYTES,
+    );
+    bytes.extend_from_slice(MAGIC);
+    bytes.extend_from_slice(&[
+        if record.bound_pickup.is_some() {
+            BOUND_PICKUP_VERSION
+        } else {
+            VERSION
+        },
+        0,
+        0,
+        0,
+    ]);
+    bytes.extend_from_slice(&record.sequence.to_le_bytes());
+    bytes.extend_from_slice(&record.transaction.get().to_le_bytes());
+    bytes.extend_from_slice(&(record.operations.len() as u16).to_le_bytes());
+    bytes.extend_from_slice(&[0, 0]);
+    for &op in &record.operations {
+        let (kind, from, to) = match op {
+            OwnershipOp::Create { at, .. } => (1, None, Some(at)),
+            OwnershipOp::Move { from, to, .. } => (2, Some(from), Some(to)),
+            OwnershipOp::Destroy { from, .. } => (3, Some(from), None),
+        };
+        bytes.push(kind);
+        bytes.extend_from_slice(&op.item().get().to_le_bytes());
+        encode_location(from, &mut bytes);
+        encode_location(to, &mut bytes);
+    }
+    if let Some(metadata) = record.bound_pickup {
+        bytes.extend_from_slice(&metadata.encode());
+    }
+    let sum = checksum(&bytes);
+    bytes.extend_from_slice(&sum.to_le_bytes());
+    bytes
+}
+
+fn decode(bytes: &[u8]) -> Result<JournalRecord, ItemJournalError> {
+    if bytes.len() < HEADER_BYTES + CHECKSUM_BYTES || bytes.len() > MAX_RECORD_BYTES {
+        return Err(ItemJournalError::InvalidRecord(
+            "record size outside bounds",
+        ));
+    }
+    if &bytes[..4] != MAGIC {
+        return Err(ItemJournalError::InvalidRecord("invalid magic"));
+    }
+    if ![VERSION, BOUND_PICKUP_VERSION].contains(&bytes[4])
+        || bytes[5..8].iter().any(|&x| x != 0)
+        || bytes[34..36].iter().any(|&x| x != 0)
+    {
+        return Err(ItemJournalError::InvalidRecord(
+            "unsupported version/reserved bits",
+        ));
+    }
+    let sequence = u64::from_le_bytes(bytes[8..16].try_into().expect("length checked"));
+    let id = u128::from_le_bytes(bytes[16..32].try_into().expect("length checked"));
+    let transaction =
+        OwnershipTxnId::new(id).ok_or(ItemJournalError::InvalidRecord("zero transaction id"))?;
+    let count = u16::from_le_bytes(bytes[32..34].try_into().expect("length checked")) as usize;
+    if sequence == 0 || count == 0 || count > MAX_OWNERSHIP_OPS {
+        return Err(ItemJournalError::InvalidRecord("invalid sequence/count"));
+    }
+    let operations_end = HEADER_BYTES + count * OP_BYTES;
+    let extra = if bytes[4] == BOUND_PICKUP_VERSION {
+        PICKUP_ENVELOPE_V2_BYTES
+    } else {
+        0
+    };
+    if bytes.len() != operations_end + extra + CHECKSUM_BYTES {
+        return Err(ItemJournalError::InvalidRecord("unexpected record length"));
+    }
+    let end = bytes.len() - CHECKSUM_BYTES;
+    let expected = u32::from_le_bytes(bytes[end..].try_into().expect("length checked"));
+    if checksum(&bytes[..end]) != expected {
+        return Err(ItemJournalError::InvalidRecord("checksum mismatch"));
+    }
+    let mut operations = Vec::with_capacity(count);
+    for op_bytes in bytes[HEADER_BYTES..operations_end].chunks_exact(OP_BYTES) {
+        let kind = op_bytes[0];
+        let raw_item = u128::from_le_bytes(op_bytes[1..17].try_into().expect("length checked"));
+        let item = ItemId::new(raw_item).ok_or(ItemJournalError::InvalidRecord("zero item id"))?;
+        let from = decode_location(&op_bytes[17..17 + LOCATION_BYTES])?;
+        let to = decode_location(&op_bytes[17 + LOCATION_BYTES..])?;
+        let op = match (kind, from, to) {
+            (1, None, Some(at)) => OwnershipOp::Create { item, at },
+            (2, Some(from), Some(to)) => OwnershipOp::Move { item, from, to },
+            (3, Some(from), None) => OwnershipOp::Destroy { item, from },
+            _ => {
+                return Err(ItemJournalError::InvalidRecord(
+                    "bad operation type/locations",
+                ))
+            }
+        };
+        operations.push(op);
+    }
+    let bound_pickup = if bytes[4] == BOUND_PICKUP_VERSION {
+        if operations.len() != 1 {
+            return Err(ItemJournalError::InvalidRecord(
+                "bound pickup requires one move",
+            ));
+        }
+        let metadata = ProposedRackPickupEnvelope::decode(&bytes[operations_end..end])
+            .map_err(ItemJournalError::InvalidBoundPickup)?;
+        metadata
+            .validate_shape(operations[0])
+            .map_err(ItemJournalError::InvalidBoundPickup)?;
+        Some(metadata)
+    } else {
+        None
+    };
+    Ok(JournalRecord {
+        sequence,
+        transaction,
+        operations,
+        bound_pickup,
+    })
+}
+
+fn canonical_name(sequence: u64) -> String {
+    format!("{sequence:020}.mytx")
+}
+
+fn sync_directory(path: &Path) -> io::Result<()> {
+    File::open(path)?.sync_all()
+}
+
+struct PendingFile(PathBuf);
+impl Drop for PendingFile {
+    fn drop(&mut self) {
+        let _ = fs::remove_file(&self.0);
+    }
+}
+
+/// A committed, historical V2 pickup event reconstructed from its canonical
+/// fsynced MYTX record. NOT proof of current equipment or a delivered ACK.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct ProposedBoundPickupObserverEvent {
+    pub journal_sequence: u64,
+    pub transaction: OwnershipTxnId,
+    pub operation: OwnershipOp,
+    pub envelope: ProposedRackPickupEnvelope,
+}
+
+/// A bounded, immutable local source view. Consumers must separately
+/// authenticate, deduplicate, and deliver using one global authority epoch.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ProposedBoundPickupObserverPage {
+    pub journal_head: u64,
+    pub events: Vec<ProposedBoundPickupObserverEvent>,
+}
+
+pub const MAX_BOUND_PICKUP_OBSERVER_PAGE: usize = 64;
+
+/// Fail-closed on any malformed canonical record or sequence gap. Dot-prefixed
+/// interrupted staging files are not authoritative. No networking or gameplay
+/// subsystem invokes this journal until durable multi-worker storage exists.
+#[derive(Debug)]
+pub struct DurableItemJournal {
+    /// Held across replay and every write; released automatically at close.
+    _writer_lock: File,
+    root: PathBuf,
+    ledger: ItemOwnershipLedger,
+    /// Stored inside the same canonical MYTX record as the item mutation.
+    bound_pickups: BTreeMap<OwnershipTxnId, ProposedRackPickupEnvelope>,
+    bound_pickup_events: BTreeMap<u64, ProposedBoundPickupObserverEvent>,
+    poisoned: bool,
+}
+
+impl DurableItemJournal {
+    pub fn open(root: impl AsRef<Path>) -> Result<Self, ItemJournalError> {
+        fs::create_dir_all(root.as_ref())?;
+        let root = root.as_ref().to_path_buf();
+        let mut options = OpenOptions::new();
+        options.create(true).read(true).write(true);
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::OpenOptionsExt;
+            options.mode(0o600);
+        }
+        let lock = options.open(root.join(".item-journal-writer.lock"))?;
+        match lock_exclusive_nonblocking(&lock) {
+            Ok(true) => {}
+            Ok(false) => return Err(ItemJournalError::WriterBusy),
+            Err(error) => return Err(ItemJournalError::Io(error)),
+        }
+        let mut indexed = Vec::new();
+        for entry in fs::read_dir(&root)? {
+            let entry = entry?;
+            let name = entry.file_name();
+            let name = name
+                .to_str()
+                .ok_or(ItemJournalError::InvalidRecord("non-UTF8 filename"))?;
+            if name == ".item-journal-writer.lock" || name.starts_with(".pending-") {
+                continue;
+            }
+            if name.len() != 25 || !name.ends_with(".mytx") {
+                return Err(ItemJournalError::InvalidRecord("unexpected journal file"));
+            }
+            let digits = &name[..20];
+            if !digits.bytes().all(|digit| digit.is_ascii_digit()) {
+                return Err(ItemJournalError::InvalidRecord(
+                    "noncanonical sequence filename",
+                ));
+            }
+            let sequence = digits
+                .parse::<u64>()
+                .map_err(|_| ItemJournalError::InvalidRecord("sequence overflow"))?;
+            if sequence == 0 || canonical_name(sequence) != name || !entry.file_type()?.is_file() {
+                return Err(ItemJournalError::InvalidRecord("invalid journal entry"));
+            }
+            indexed.push((sequence, entry.path()));
+        }
+        indexed.sort_unstable_by_key(|(sequence, _)| *sequence);
+        let mut ledger = ItemOwnershipLedger::default();
+        let mut bound_pickups = BTreeMap::new();
+        let mut bound_pickup_events = BTreeMap::new();
+        let mut previous = 0_u64;
+        for (sequence, path) in indexed {
+            if previous.checked_add(1) != Some(sequence) {
+                return Err(ItemJournalError::InvalidSequence);
+            }
+            let mut bytes = Vec::new();
+            Read::by_ref(&mut File::open(&path)?)
+                .take((MAX_RECORD_BYTES + 1) as u64)
+                .read_to_end(&mut bytes)?;
+            let record = decode(&bytes)?;
+            if record.sequence != sequence {
+                return Err(ItemJournalError::InvalidSequence);
+            }
+            if let Some(metadata) = record.bound_pickup {
+                let OwnershipOp::Move { item, from, .. } = record.operations[0] else {
+                    return Err(ItemJournalError::InvalidRecord(
+                        "invalid bound operation on replay",
+                    ));
+                };
+                if ledger.location(item) != Some(from)
+                    || ledger.last_mutation_sequence(item)
+                        != Some(metadata.observed_item_mutation_sequence)
+                    || bound_pickups.contains_key(&record.transaction)
+                {
+                    return Err(ItemJournalError::InvalidRecord(
+                        "invalid bound source revision on replay",
+                    ));
+                }
+            }
+            let (preview, replay) = ledger
+                .preview(record.transaction, &record.operations)
+                .map_err(ItemJournalError::InvalidTransaction)?;
+            if replay || preview.sequence != sequence {
+                return Err(ItemJournalError::InvalidSequence);
+            }
+            let receipt = ledger
+                .apply(record.transaction, &record.operations)
+                .map_err(ItemJournalError::InvalidTransaction)?;
+            if receipt.sequence != sequence {
+                return Err(ItemJournalError::InvalidSequence);
+            }
+            if let Some(metadata) = record.bound_pickup {
+                bound_pickup_events.insert(
+                    sequence,
+                    ProposedBoundPickupObserverEvent {
+                        journal_sequence: sequence,
+                        transaction: record.transaction,
+                        operation: record.operations[0],
+                        envelope: metadata,
+                    },
+                );
+                bound_pickups.insert(record.transaction, metadata);
+            }
+            previous = sequence;
+        }
+        Ok(Self {
+            _writer_lock: lock,
+            root,
+            ledger,
+            bound_pickups,
+            bound_pickup_events,
+            poisoned: false,
+        })
+    }
+
+    /// ONE read-only, internally consistent local journal projection of the
+    /// server-verified character's proposed MainHand slot. No item kind, wire
+    /// identity, authentication, world tick, or 8C authority is inferred.
+    /// Even an empty hand has the full journal commit watermark, so a newer
+    /// drop cannot be overwritten by an older equip snapshot. The sequence
+    /// is meaningful only in this same single-writer journal lineage.
+    pub(crate) fn committed_mainhand_components(
+        &self,
+        character: CharacterId,
+    ) -> Result<(u64, Option<(ItemId, u64)>), ItemJournalError> {
+        if self.poisoned {
+            return Err(ItemJournalError::Poisoned);
+        }
+        let sequence = self.ledger.committed_sequence();
+        let item = self.ledger.equipped_item(character, 0);
+        let currently_equipped = if let Some(item_id) = item {
+            let last = self.ledger.last_mutation_sequence(item_id).ok_or(
+                ItemJournalError::InvalidRecord("equipped item without mutation"),
+            )?;
+            if last == 0
+                || last > sequence
+                || self.ledger.location(item_id)
+                    != Some(ItemLocation::Equipped {
+                        character_id: character,
+                        slot: 0,
+                    })
+            {
+                return Err(ItemJournalError::InvalidRecord(
+                    "inconsistent equipped item revision or owner",
+                ));
+            }
+            Some((item_id, last))
+        } else {
+            None
+        };
+        Ok((sequence, currently_equipped))
+    }
+
+    /// Read-only current membership of ONE proposed reviewed Ground item.
+    /// A later pickup or drop elsewhere returns None, even though older
+    /// durable receipts still exist. Every result carries the full local
+    /// journal head, including the absence state after mutation.
+    ///
+    /// This is NOT a world epoch, actor permission, geometry signature,
+    /// ground-entity lease or an approved production writer. It is safe
+    /// only within ONE local exclusive journal lineage.
+    pub(crate) fn checked_ground_membership(
+        &self,
+        item: ItemId,
+        expected: ItemLocation,
+    ) -> Result<(u64, Option<u64>), ItemJournalError> {
+        if self.poisoned {
+            return Err(ItemJournalError::Poisoned);
+        }
+        if !matches!(expected, ItemLocation::Ground { .. }) {
+            return Err(ItemJournalError::InvalidRecord(
+                "proposed ground binding not Ground",
+            ));
+        }
+        let sequence = self.ledger.committed_sequence();
+        if self.ledger.location(item) != Some(expected) {
+            return Ok((sequence, None));
+        }
+        let mutation =
+            self.ledger
+                .last_mutation_sequence(item)
+                .ok_or(ItemJournalError::InvalidRecord(
+                    "current ground item without mutation",
+                ))?;
+        if mutation == 0 || mutation > sequence {
+            return Err(ItemJournalError::InvalidRecord(
+                "inconsistent ground item mutation revision",
+            ));
+        }
+        Ok((sequence, Some(mutation)))
+    }
+
+    /// OFFLINE reviewed rack helper: accept the expected physical Ground
+    /// item only when NO other canonical item in this same MYTX journal
+    /// occupies its exact Ground zone/coordinates. A second item may be a
+    /// sword, club, reagent or unknown kind: the generic journal stores no
+    /// kind, so fail closed rather than silently selecting the known ID.
+    /// This is a read of ONE local journal, not a World/Items/Physics proof.
+    pub(crate) fn checked_unique_ground_membership(
+        &self,
+        item: ItemId,
+        expected: ItemLocation,
+    ) -> Result<(u64, Option<u64>), ItemJournalError> {
+        let observed = self.checked_ground_membership(item, expected)?;
+        if observed.1.is_some() && self.ledger.ground_occupants_at(expected) != 1 {
+            return Err(ItemJournalError::InvalidRecord(
+                "ambiguous physical rack ground occupancy",
+            ));
+        }
+        Ok(observed)
+    }
+
+    pub fn location(&self, item: ItemId) -> Option<ItemLocation> {
+        self.ledger.location(item)
+    }
+
+    pub fn item_count(&self) -> usize {
+        self.ledger.item_count()
+    }
+
+    /// Last durable sequence touching this item, reconstructed on restart.
+    /// Read-only: unrelated item transactions do not advance this watermark.
+    pub fn last_mutation_sequence(&self, item: ItemId) -> Option<u64> {
+        self.ledger.last_mutation_sequence(item)
+    }
+
+    /// Read-only proof that an exact transaction batch has been committed.
+    /// Missing IDs return None and conflicting ID reuse fails closed.
+    /// This never writes a journal record or consumes a new sequence.
+    pub fn verified_receipt(
+        &self,
+        transaction: OwnershipTxnId,
+        operations: &[OwnershipOp],
+    ) -> Result<Option<OwnershipReceipt>, ItemJournalError> {
+        if self.poisoned {
+            return Err(ItemJournalError::Poisoned);
+        }
+        self.ledger
+            .committed_receipt(transaction, operations)
+            .map_err(ItemJournalError::InvalidTransaction)
+    }
+
+    /// Read-only projection of historical V2 pickup events, sourced ONLY
+    /// from the same committed MYTX records as the physical item transfers.
+    /// This has no delivery cursor storage, authenticated wire or live outbox.
+    /// A missing newer event never means the sword is currently equipped.
+    pub fn proposed_bound_pickup_observer_page(
+        &self,
+        after_sequence: u64,
+        max_events: usize,
+    ) -> Result<ProposedBoundPickupObserverPage, ItemJournalError> {
+        if self.poisoned {
+            return Err(ItemJournalError::Poisoned);
+        }
+        if !(1..=MAX_BOUND_PICKUP_OBSERVER_PAGE).contains(&max_events) {
+            return Err(ItemJournalError::InvalidRecord(
+                "invalid observer page limit",
+            ));
+        }
+        let events = self
+            .bound_pickup_events
+            .range((Excluded(after_sequence), Unbounded))
+            .take(max_events)
+            .map(|(_, event)| *event)
+            .collect();
+        Ok(ProposedBoundPickupObserverPage {
+            journal_head: self.ledger.committed_sequence(),
+            events,
+        })
+    }
+
+    /// Commit the original proposed rack request metadata IN the canonical
+    /// ownership MYTX record; this is NOT 8A login, 8C/Physics geometry proof,
+    /// a distributed epoch fence, or a live/public TryPickup API.
+    pub fn apply_proposed_bound_rack_pickup(
+        &mut self,
+        transaction: OwnershipTxnId,
+        operation: OwnershipOp,
+        envelope: ProposedRackPickupEnvelope,
+    ) -> Result<OwnershipReceipt, ItemJournalError> {
+        self.apply_internal(transaction, &[operation], Some(envelope))
+    }
+
+    /// Historical byte-identical request envelope correlated to the durable
+    /// operation receipt. It does not prove the sword remains equipped.
+    pub fn verified_bound_rack_pickup(
+        &self,
+        transaction: OwnershipTxnId,
+        operation: OwnershipOp,
+        envelope: ProposedRackPickupEnvelope,
+    ) -> Result<Option<OwnershipReceipt>, ItemJournalError> {
+        let receipt = self.verified_receipt(transaction, &[operation])?;
+        match receipt {
+            None => Ok(None),
+            Some(found) if self.bound_pickups.get(&transaction) == Some(&envelope) => {
+                Ok(Some(found))
+            }
+            Some(_) => Err(ItemJournalError::BoundPickupMismatch),
+        }
+    }
+
+    pub fn apply(
+        &mut self,
+        transaction: OwnershipTxnId,
+        operations: &[OwnershipOp],
+    ) -> Result<OwnershipReceipt, ItemJournalError> {
+        self.apply_internal(transaction, operations, None)
+    }
+
+    fn apply_internal(
+        &mut self,
+        transaction: OwnershipTxnId,
+        operations: &[OwnershipOp],
+        bound_pickup: Option<ProposedRackPickupEnvelope>,
+    ) -> Result<OwnershipReceipt, ItemJournalError> {
+        if self.poisoned {
+            return Err(ItemJournalError::Poisoned);
+        }
+        if let Some(envelope) = bound_pickup {
+            if operations.len() != 1 {
+                return Err(ItemJournalError::InvalidBoundPickup(
+                    "exactly one move required",
+                ));
+            }
+            envelope
+                .validate_shape(operations[0])
+                .map_err(ItemJournalError::InvalidBoundPickup)?;
+        }
+        let (receipt, replay) = self
+            .ledger
+            .preview(transaction, operations)
+            .map_err(ItemJournalError::InvalidTransaction)?;
+        if replay {
+            if self.bound_pickups.get(&transaction) != bound_pickup.as_ref() {
+                return Err(ItemJournalError::BoundPickupMismatch);
+            }
+            return Ok(receipt);
+        }
+        if let Some(envelope) = bound_pickup {
+            let OwnershipOp::Move { item, from, .. } = operations[0] else {
+                return Err(ItemJournalError::InvalidBoundPickup(
+                    "ground-to-hand move required",
+                ));
+            };
+            if self.ledger.location(item) != Some(from)
+                || self.ledger.last_mutation_sequence(item)
+                    != Some(envelope.observed_item_mutation_sequence)
+            {
+                return Err(ItemJournalError::InvalidBoundPickup(
+                    "stale physical item revision",
+                ));
+            }
+        }
+        let record = JournalRecord {
+            sequence: receipt.sequence,
+            transaction,
+            operations: operations.to_vec(),
+            bound_pickup,
+        };
+        let bytes = encode(&record);
+        let clock = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map_err(|_| ItemJournalError::InvalidRecord("clock before epoch"))?
+            .as_nanos();
+        let nonce = NEXT_PENDING.fetch_add(1, Ordering::Relaxed);
+        let stage = PendingFile(
+            self.root
+                .join(format!(".pending-{}-{clock}-{nonce}", std::process::id())),
+        );
+
+        // If any step fails, disable all further writes on this instance.
+        // Especially after publish, a failed directory sync can mean the
+        // transaction may be committed: reload before any retry.
+        let persisted: Result<(), io::Error> = (|| {
+            let mut options = OpenOptions::new();
+            options.create_new(true).write(true);
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::OpenOptionsExt;
+                options.mode(0o600);
+            }
+            let mut file = options.open(&stage.0)?;
+            file.write_all(&bytes)?;
+            file.sync_all()?;
+            drop(file);
+            fs::hard_link(&stage.0, self.root.join(canonical_name(receipt.sequence)))?;
+            sync_directory(&self.root)?;
+            Ok(())
+        })();
+        if let Err(error) = persisted {
+            self.poisoned = true;
+            return Err(ItemJournalError::Io(error));
+        }
+        drop(stage);
+        let receipt = self.ledger.apply(transaction, operations).map_err(|err| {
+            self.poisoned = true;
+            ItemJournalError::InvalidTransaction(err)
+        })?;
+        if let Some(envelope) = bound_pickup {
+            self.bound_pickup_events.insert(
+                receipt.sequence,
+                ProposedBoundPickupObserverEvent {
+                    journal_sequence: receipt.sequence,
+                    transaction,
+                    operation: operations[0],
+                    envelope,
+                },
+            );
+            self.bound_pickups.insert(transaction, envelope);
+        }
+        Ok(receipt)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    struct Root(PathBuf);
+    impl Root {
+        fn new() -> Self {
+            let nonce = NEXT_PENDING.fetch_add(1, Ordering::Relaxed);
+            let clock = SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .expect("clock")
+                .as_nanos();
+            let path = std::env::temp_dir().join(format!(
+                "myaso-item-journal-{}-{clock}-{nonce}",
+                std::process::id()
+            ));
+            fs::create_dir(&path).expect("private test directory");
+            Self(path)
+        }
+        /// Used only after test-controlled writer handoff. Concurrent
+        /// subprocess tests may be in fork/exec descriptor teardown;
+        /// postpone recovery parsing briefly until the OS lock clears.
+        /// Never change production DurableItemJournal::open fail-fast.
+        fn open_after_handoff(&self) -> Result<DurableItemJournal, ItemJournalError> {
+            let deadline = std::time::Instant::now() + std::time::Duration::from_millis(500);
+            loop {
+                match DurableItemJournal::open(&self.0) {
+                    Err(ItemJournalError::WriterBusy) if std::time::Instant::now() < deadline => {
+                        std::thread::sleep(std::time::Duration::from_millis(5));
+                    }
+                    result => return result,
+                }
+            }
+        }
+        fn open(&self) -> DurableItemJournal {
+            self.open_after_handoff().expect("open journal")
+        }
+        fn record(&self, seq: u64) -> PathBuf {
+            self.0.join(canonical_name(seq))
+        }
+    }
+    impl Drop for Root {
+        fn drop(&mut self) {
+            let _ = fs::remove_dir_all(&self.0);
+        }
+    }
+
+    fn item(n: u128) -> ItemId {
+        ItemId::new(n).expect("item")
+    }
+    fn txn(n: u128) -> OwnershipTxnId {
+        OwnershipTxnId::new(n).expect("txn")
+    }
+    fn character(n: u128) -> CharacterId {
+        CharacterId::new(n).expect("char")
+    }
+    fn corpse(n: u128) -> CorpseId {
+        CorpseId::new(n).expect("corpse")
+    }
+    fn inv(n: u128) -> ItemLocation {
+        ItemLocation::Inventory(character(n))
+    }
+    fn equipped(n: u128) -> ItemLocation {
+        ItemLocation::Equipped {
+            character_id: character(n),
+            slot: 3,
+        }
+    }
+    fn ground() -> ItemLocation {
+        ItemLocation::Ground {
+            zone_id: ZoneId::new(8).expect("zone"),
+            x_cm: -290,
+            y_cm: 177,
+        }
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn exclusive_writer_denies_second_handle_and_independent_process() {
+        use std::process::Command;
+
+        let root = Root::new();
+        let original = root.open();
+        assert!(matches!(
+            DurableItemJournal::open(&root.0),
+            Err(ItemJournalError::WriterBusy)
+        ));
+        let status = Command::new(std::env::current_exe().expect("test binary"))
+            .arg("--ignored")
+            .arg("--exact")
+            .arg("item_journal::tests::subprocess_writer_lock_probe")
+            .arg("--nocapture")
+            .env("MYASO_ITEM_JOURNAL_LOCK_PROBE", &root.0)
+            .status()
+            .expect("launch distinct process");
+        assert!(status.success(), "other process must reject busy writer");
+        drop(original);
+
+        let mut successor = root.open();
+        successor
+            .apply(
+                txn(1),
+                &[OwnershipOp::Create {
+                    item: item(99),
+                    at: inv(1),
+                }],
+            )
+            .expect("new owner commits after prior process releases");
+        drop(successor);
+        assert_eq!(root.open().location(item(99)), Some(inv(1)));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    #[ignore = "executed by exclusive_writer_denies_second_handle_and_independent_process"]
+    fn subprocess_writer_lock_probe() {
+        let Some(root) = std::env::var_os("MYASO_ITEM_JOURNAL_LOCK_PROBE") else {
+            return;
+        };
+        assert!(matches!(
+            DurableItemJournal::open(PathBuf::from(root)),
+            Err(ItemJournalError::WriterBusy)
+        ));
+    }
+
+    /// Real OS crash acceptance: a durable journal survives SIGKILL and
+    /// a new process recovers both the item and its idempotency receipt.
+    #[cfg(unix)]
+    #[test]
+    fn killed_writer_releases_lock_and_preserves_committed_receipt() {
+        use std::{process::Command, thread, time::Duration};
+
+        let root = Root::new();
+        let ready = root.0.with_extension("writer-ready");
+        let mut child = Command::new(std::env::current_exe().expect("test executable"))
+            .arg("--ignored")
+            .arg("--exact")
+            .arg("item_journal::tests::subprocess_crash_writer_probe")
+            .arg("--nocapture")
+            .env("MYASO_ITEM_JOURNAL_CRASH_ROOT", &root.0)
+            .env("MYASO_ITEM_JOURNAL_CRASH_READY", &ready)
+            .spawn()
+            .expect("spawn separate writer process");
+
+        let mut ready_seen = false;
+        for _ in 0..500 {
+            if ready.exists() {
+                ready_seen = true;
+                break;
+            }
+            if child.try_wait().expect("check child").is_some() {
+                break;
+            }
+            thread::sleep(Duration::from_millis(20));
+        }
+        let blocked = matches!(
+            DurableItemJournal::open(&root.0),
+            Err(ItemJournalError::WriterBusy)
+        );
+        // Explicit OS process termination rather than gracefully dropping the
+        // journal; always reap the child before any assertions can panic.
+        let _ = child.kill();
+        let _ = child.wait();
+        assert!(ready_seen, "writer must durably commit before forced kill");
+        assert!(blocked, "live crashed-process candidate must hold OS lock");
+
+        let mut recovered = root.open();
+        assert_eq!(recovered.location(item(101)), Some(inv(7)));
+        let receipt = recovered
+            .apply(
+                txn(501),
+                &[OwnershipOp::Create {
+                    item: item(101),
+                    at: inv(7),
+                }],
+            )
+            .expect("lost ACK retry returns original committed receipt");
+        assert_eq!(receipt.sequence, 1);
+        assert!(!root.record(2).exists(), "retry must not duplicate commit");
+        drop(recovered);
+        let _ = fs::remove_file(ready);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    #[ignore = "executed by killed_writer_releases_lock_and_preserves_committed_receipt"]
+    fn subprocess_crash_writer_probe() {
+        let (Some(root), Some(ready)) = (
+            std::env::var_os("MYASO_ITEM_JOURNAL_CRASH_ROOT"),
+            std::env::var_os("MYASO_ITEM_JOURNAL_CRASH_READY"),
+        ) else {
+            return;
+        };
+        let mut store = DurableItemJournal::open(PathBuf::from(root))
+            .expect("child must acquire exclusive lock");
+        let receipt = store
+            .apply(
+                txn(501),
+                &[OwnershipOp::Create {
+                    item: item(101),
+                    at: inv(7),
+                }],
+            )
+            .expect("child commits before crash");
+        assert_eq!(receipt.sequence, 1);
+        fs::write(ready, b"committed").expect("signal parent after durable commit");
+        // Keep the journal handle alive until the parent kills this process.
+        loop {
+            std::thread::park();
+        }
+    }
+
+    #[test]
+    fn versioned_codec_covers_all_location_variants_and_rejects_tampering() {
+        let record = JournalRecord {
+            sequence: 7,
+            transaction: txn(100),
+            operations: vec![
+                OwnershipOp::Create {
+                    item: item(1),
+                    at: inv(1),
+                },
+                OwnershipOp::Move {
+                    item: item(2),
+                    from: equipped(1),
+                    to: ItemLocation::Corpse(corpse(45)),
+                },
+                OwnershipOp::Move {
+                    item: item(3),
+                    from: inv(1),
+                    to: ground(),
+                },
+                OwnershipOp::Destroy {
+                    item: item(4),
+                    from: ground(),
+                },
+            ],
+            bound_pickup: None,
+        };
+        let bytes = encode(&record);
+        let restored = decode(&bytes).expect("round trip");
+        assert_eq!(restored.sequence, 7);
+        assert_eq!(restored.transaction, txn(100));
+        assert_eq!(restored.operations, record.operations);
+        let mut changed = bytes.clone();
+        changed[HEADER_BYTES + 2] ^= 1;
+        assert!(matches!(
+            decode(&changed),
+            Err(ItemJournalError::InvalidRecord(_))
+        ));
+        assert!(matches!(
+            decode(&bytes[..bytes.len() - 1]),
+            Err(ItemJournalError::InvalidRecord(_))
+        ));
+        changed = bytes.clone();
+        changed[4] = 99;
+        assert!(matches!(
+            decode(&changed),
+            Err(ItemJournalError::InvalidRecord(_))
+        ));
+        changed = bytes.clone();
+        changed[5] = 1;
+        assert!(matches!(
+            decode(&changed),
+            Err(ItemJournalError::InvalidRecord(_))
+        ));
+    }
+
+    #[test]
+    fn full_loot_death_and_idempotency_survive_restart() {
+        let root = Root::new();
+        let mut store = root.open();
+        let initial = [
+            OwnershipOp::Create {
+                item: item(1),
+                at: equipped(1),
+            },
+            OwnershipOp::Create {
+                item: item(2),
+                at: inv(1),
+            },
+            OwnershipOp::Create {
+                item: item(3),
+                at: inv(1),
+            },
+        ];
+        store.apply(txn(1), &initial).expect("create items");
+        let death = [
+            OwnershipOp::Move {
+                item: item(1),
+                from: equipped(1),
+                to: ItemLocation::Corpse(corpse(8)),
+            },
+            OwnershipOp::Move {
+                item: item(2),
+                from: inv(1),
+                to: ground(),
+            },
+            OwnershipOp::Move {
+                item: item(3),
+                from: inv(1),
+                to: ItemLocation::Corpse(corpse(8)),
+            },
+        ];
+        let receipt = store.apply(txn(2), &death).expect("durable death");
+        assert_eq!(receipt.sequence, 2);
+        drop(store);
+        let mut recovered = root.open();
+        assert_eq!(recovered.item_count(), 3);
+        assert_eq!(
+            recovered.location(item(1)),
+            Some(ItemLocation::Corpse(corpse(8)))
+        );
+        assert_eq!(recovered.location(item(2)), Some(ground()));
+        assert_eq!(
+            recovered.apply(txn(2), &death).expect("exact replay"),
+            receipt
+        );
+        assert!(matches!(
+            recovered.apply(txn(2), &initial),
+            Err(ItemJournalError::InvalidTransaction(
+                OwnershipError::ConflictingReplay
+            ))
+        ));
+        assert!(!root.record(3).exists());
+    }
+
+    #[test]
+    fn two_looters_and_invalid_death_batch_never_duplicate() {
+        let root = Root::new();
+        let mut store = root.open();
+        let at = ItemLocation::Corpse(corpse(5));
+        store
+            .apply(txn(1), &[OwnershipOp::Create { item: item(5), at }])
+            .expect("create");
+        let looter = [OwnershipOp::Move {
+            item: item(5),
+            from: at,
+            to: inv(1),
+        }];
+        store.apply(txn(2), &looter).expect("first");
+        assert!(matches!(
+            store.apply(
+                txn(3),
+                &[OwnershipOp::Move {
+                    item: item(5),
+                    from: at,
+                    to: inv(2)
+                }]
+            ),
+            Err(ItemJournalError::InvalidTransaction(
+                OwnershipError::ExpectedLocationMismatch
+            ))
+        ));
+        assert!(!root.record(3).exists());
+        drop(store);
+        let restored = root.open();
+        assert_eq!(restored.location(item(5)), Some(inv(1)));
+    }
+
+    #[test]
+    fn destroyed_item_identity_cannot_be_reissued_after_restart() {
+        let root = Root::new();
+        let mut journal = root.open();
+        journal
+            .apply(
+                txn(1),
+                &[OwnershipOp::Create {
+                    item: item(77),
+                    at: inv(1),
+                }],
+            )
+            .expect("create");
+        journal
+            .apply(
+                txn(2),
+                &[OwnershipOp::Destroy {
+                    item: item(77),
+                    from: inv(1),
+                }],
+            )
+            .expect("destroy");
+        drop(journal);
+        let mut restarted = root.open();
+        assert_eq!(restarted.location(item(77)), None);
+        assert!(matches!(
+            restarted.apply(
+                txn(3),
+                &[OwnershipOp::Create {
+                    item: item(77),
+                    at: inv(2)
+                }]
+            ),
+            Err(ItemJournalError::InvalidTransaction(
+                OwnershipError::ItemAlreadyExists
+            ))
+        ));
+        assert!(!root.record(3).exists());
+    }
+
+    #[test]
+    fn orphan_stage_ignored_but_tampered_canonical_record_fails_closed() {
+        let root = Root::new();
+        let mut store = root.open();
+        store
+            .apply(
+                txn(1),
+                &[OwnershipOp::Create {
+                    item: item(4),
+                    at: inv(4),
+                }],
+            )
+            .expect("create");
+        fs::write(root.0.join(".pending-simulated-power-loss"), b"partial").expect("orphan stage");
+        drop(store);
+        let recovered = root.open();
+        assert_eq!(recovered.location(item(4)), Some(inv(4)));
+        drop(recovered);
+        fs::write(root.record(1), b"partially-written-canonical").expect("simulate damage");
+        assert!(matches!(
+            root.open_after_handoff(),
+            Err(ItemJournalError::InvalidRecord(_))
+        ));
+    }
+
+    #[test]
+    fn missing_or_reordered_commits_abort_replay() {
+        let root = Root::new();
+        let mut store = root.open();
+        store
+            .apply(
+                txn(1),
+                &[OwnershipOp::Create {
+                    item: item(5),
+                    at: inv(1),
+                }],
+            )
+            .expect("one");
+        store
+            .apply(
+                txn(2),
+                &[OwnershipOp::Move {
+                    item: item(5),
+                    from: inv(1),
+                    to: inv(2),
+                }],
+            )
+            .expect("two");
+        drop(store);
+        fs::remove_file(root.record(1)).expect("remove first");
+        assert!(matches!(
+            DurableItemJournal::open(&root.0),
+            Err(ItemJournalError::InvalidSequence)
+        ));
+    }
+
+    #[test]
+    fn crash_after_publishing_before_memory_apply_replays_transaction_once() {
+        let root = Root::new();
+        let operations = vec![OwnershipOp::Create {
+            item: item(9),
+            at: inv(9),
+        }];
+        let bytes = encode(&JournalRecord {
+            sequence: 1,
+            transaction: txn(9),
+            operations: operations.clone(),
+            bound_pickup: None,
+        });
+        fs::write(root.record(1), bytes).expect("simulate durable publish before in-memory apply");
+        let mut reopened = root.open();
+        assert_eq!(reopened.location(item(9)), Some(inv(9)));
+        assert_eq!(
+            reopened.apply(txn(9), &operations).expect("retry").sequence,
+            1
+        );
+        assert!(!root.record(2).exists());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn new_transaction_files_have_owner_only_permissions() {
+        use std::os::unix::fs::PermissionsExt;
+        let root = Root::new();
+        root.open()
+            .apply(
+                txn(1),
+                &[OwnershipOp::Create {
+                    item: item(1),
+                    at: inv(1),
+                }],
+            )
+            .expect("commit");
+        let mode = fs::metadata(root.record(1))
+            .expect("metadata")
+            .permissions()
+            .mode();
+        assert_eq!(mode & 0o777, 0o600);
+    }
+}
