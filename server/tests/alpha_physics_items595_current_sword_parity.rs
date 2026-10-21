@@ -785,3 +785,131 @@ fn proposed_waypoint_18_tolerance_guarantees_own_reach_not_unique_target() {
     );
     assert_eq!(original_loot.export_state().unwrap(), snapshot);
 }
+
+#[test]
+fn authoritative_fighter_separation_rechecks_exact_adjacent_sword_reach() {
+    // Core 8A #646's W3C arrival tolerance is 18 around proposed x,4068.
+    // Two valid approaching players may be 14 apart (fighter diameter=36)
+    // and the actual server World solver can separate them at NEXT tick.
+    // A previously reachable adjacent item is NOT a same-tick pickup grant.
+    let (_, loot, sockets, current) = create_real_items_world();
+    let mut world = World::new(8192.0, 8192.0);
+    let starts = [
+        (5_u32, 3753.0_f32, 4080.0_f32),
+        (6, 3767.0, 4080.0),
+        (7, 3820.0, 4068.0),
+        (8, 3860.0, 4068.0),
+    ];
+    for (id, x, y) in starts {
+        let own_x = SOCKET_X[(id - 5) as usize];
+        let dx = x - own_x;
+        let dy = y - 4068.0;
+        assert!(dx * dx + dy * dy <= 18.0 * 18.0);
+        assert!(world.add_player_at(id, x, y, 0.0));
+    }
+    let solids = core_solids();
+    let static_fixture = test_window(&solids, true); // test-only fiction
+    let source = loot.ground().get(&current[1].ground_entity_id).unwrap();
+    assert_eq!(source.item.id, current[1].item_id);
+    let sword = p(source.at.x, source.at.y);
+    let before_tick = world.tick;
+    let before = world.fighter(5).unwrap().clone();
+    assert_eq!((before.x, before.y), (3753.0, 4080.0));
+    assert_eq!(
+        verify_pickup_geometry_at_completed_tick(
+            p(before.x, before.y),
+            sword,
+            &static_fixture,
+            TEST_FENCE,
+            PICKUP_REACH,
+            TEST_TICKS
+        ),
+        Ok(()),
+        "adjacent exact physical sword is initially geometrically eligible"
+    );
+    let before_distance_sq = (sword.x - before.x).powi(2) + (sword.y - before.y).powi(2);
+    assert!(before_distance_sq < PICKUP_REACH * PICKUP_REACH);
+
+    // This is the ACTUAL World::step() player-body separation, not a hand-
+    // modified fighter coordinate. Before and after are different COMPLETED
+    // simulation ticks and any old selected-sword reach needs rechecking.
+    world.step();
+    assert_eq!(world.tick, before_tick + 1);
+    let after = world.fighter(5).unwrap();
+    let neighbor = world.fighter(6).unwrap();
+    assert_eq!((after.x, after.y), (3742.0, 4080.0));
+    assert_eq!((neighbor.x, neighbor.y), (3778.0, 4080.0));
+    assert_eq!(
+        verify_pickup_geometry_at_completed_tick(
+            p(before.x, before.y),
+            sword,
+            &static_fixture,
+            TEST_FENCE,
+            PICKUP_REACH,
+            PickupTickFence {
+                actor_tick: 899,
+                ..TEST_TICKS
+            }
+        ),
+        Err(PickupGeometryReject::StaleWorldTick),
+        "an older actor observation MUST be rejected on a later operation tick"
+    );
+    assert_eq!(
+        verify_pickup_geometry_at_completed_tick(
+            p(after.x, after.y), sword, &static_fixture,
+            TEST_FENCE, PICKUP_REACH, TEST_TICKS
+        ),
+        Err(PickupGeometryReject::OutOfRange),
+        "previously eligible selected adjacent sword must become disallowed after authoritative body separation"
+    );
+
+    // The physical current item has not changed: only the actor's TRUE
+    // authoritative position at completed World tick changes eligibility.
+    assert_eq!(
+        loot.proposed_current_rack_swords(ZoneId::Moonvale, sockets, 11)
+            .unwrap()[1],
+        Some(current[1])
+    );
+    let mut before_items = LootAuthority::restore_state(loot.export_state().unwrap()).unwrap();
+    assert_eq!(
+        before_items
+            .take_ground(
+                5,
+                &before,
+                ZoneId::Moonvale,
+                current[1].ground_entity_id,
+                20
+            )
+            .unwrap()
+            .id,
+        current[1].item_id
+    );
+    let mut after_items = LootAuthority::restore_state(loot.export_state().unwrap()).unwrap();
+    assert_eq!(
+        after_items.take_ground(5, after, ZoneId::Moonvale, current[1].ground_entity_id, 20),
+        Err(LootError::OutOfReach),
+        "real Items validator MUST use the current server fighter, not a previous browser-authoritative arrival snapshot"
+    );
+
+    // Both actors remain within the proposed waypoint tolerance after the
+    // server separates them. Reaching *own* sword is still true, but that
+    // does not rescue the previously selected adjacent sword identity.
+    for i in [0_usize, 1] {
+        let f = world.fighter(i as u32 + 5).unwrap();
+        let dx = f.x - SOCKET_X[i];
+        let dy = f.y - 4068.0;
+        assert!(dx * dx + dy * dy <= 18.0 * 18.0);
+        let own = loot.ground().get(&current[i].ground_entity_id).unwrap();
+        assert_eq!(
+            verify_pickup_geometry_at_completed_tick(
+                p(f.x, f.y),
+                p(own.at.x, own.at.y),
+                &static_fixture,
+                TEST_FENCE,
+                PICKUP_REACH,
+                TEST_TICKS
+            ),
+            Ok(())
+        );
+    }
+}
