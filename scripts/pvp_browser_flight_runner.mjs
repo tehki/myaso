@@ -30,7 +30,7 @@ import { planM225ThreatDistanceStaging } from "./m225-ffa-threat-distance.mjs";
 import { qualifyM150ParryGeometry } from "./m150-replicated-geometry.mjs";
 import { awaitM223HeavyWindup, planM223WheelDelay } from "./m223-server-heavy-windup.mjs";
 import { dispatchR2ReleaseLedShortBlock } from "./r2-release-led-short-block.mjs";
-import { dispatchM41NativeParryAfterRelease } from "./m41-native-parry-after-release.mjs";
+import { dispatchM41NativeParryOnLightOnset } from "./m41-authoritative-light-onset.mjs";
 import { createM221TrustedWheelRegistry } from "./m221-trusted-wheel-attestation.mjs";
 import { attachM325TrustedWheelSocket } from "./m325-trusted-wheel-socket.mjs";
 import { requiresM338GuardBreakWheelSocket } from "./m338-guard-break-wheel-scenarios.mjs";
@@ -8073,11 +8073,15 @@ async function runOnlineUiParryFlight(entries, postParrySleepMs = 80, roles = nu
     const m41AuthLogStart = scenario === "uiparrytell" ? m201ServerOutput().length : 0;
     // Any actual -38 guard block or 34 HP hit remains a terminal failure.
     if (scenario === "uiparrytell") {
-      await dispatchM41NativeParryAfterRelease({
+      const m41Proof = await dispatchM41NativeParryOnLightOnset({
+        readOutput: m201ServerOutput, afterOffset: m41AuthLogStart,
+        fighterId: attackerReady.playerNetId,
         sendAttack: () => performArenaAttackHold(attacker, attackerElementId, attackOffset, 35),
         sendWheel: () => setArenaBlock(defender, defenderElementId, true),
-        wheelAfterReleaseMs: 10,
+        wheelAfterLightMs: 18,
+        sleep,
       });
+      console.log("M41_AUTHORITATIVE_LIGHT_WINDUP " + JSON.stringify(m41Proof));
     } else {
       await Promise.all([
         (async () => {

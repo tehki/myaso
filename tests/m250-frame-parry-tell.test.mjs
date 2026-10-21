@@ -64,12 +64,14 @@ test("M255 waits for real raster frames after authoritative parry, without fakin
   assert.match(flight, /finally \{\s*await Promise\.all\(entries\.map\(stopParryTellSampler\)\)/);
 });
 
-test("M41 uses release-ACK-led genuine W3C wheel without changing M33/M146 or strict raster proof", () => {
+test("M41 uses server-onset-led genuine W3C wheel without changing M33/M146 or strict raster proof", () => {
   const parry = section("async function runOnlineUiParryFlight(", "async function runOnlineUiParryPunishFfaFocusFlight(");
   const flight = section("async function runOnlineUiParryTellFlight(", "async function runOnlineUiBlockFacingTellFlight(");
   assert.ok(parry.includes('if (scenario === "uiparrytell") {'));
-  assert.ok(parry.includes("await dispatchM41NativeParryAfterRelease({"));
-  assert.ok(parry.includes("wheelAfterReleaseMs: 10"));
+  assert.ok(parry.includes("await dispatchM41NativeParryOnLightOnset({"));
+  assert.ok(parry.includes("readOutput: m201ServerOutput, afterOffset: m41AuthLogStart"));
+  assert.ok(parry.includes("fighterId: attackerReady.playerNetId"));
+  assert.ok(parry.includes("wheelAfterLightMs: 18"));
   assert.ok(parry.includes("sendAttack: () => performArenaAttackHold(attacker, attackerElementId, attackOffset, 35)"));
   assert.ok(parry.includes("sendWheel: () => setArenaBlock(defender, defenderElementId, true)"));
   assert.ok(parry.includes("const releaseToStrikeParryDelayMs = 95"));

@@ -220,8 +220,18 @@ jobs:
           # authoritative 125ms parry -> strict >=24 remote-only raster pixels.
           # The original M41 gate later in the suite remains unchanged.
           node --check scripts/m41-native-parry-after-release.mjs
-          node --test tests/m41-native-release-led-parry.test.mjs
+          node --check scripts/m41-authoritative-light-onset.mjs
+          node --test tests/m41-native-release-led-parry.test.mjs tests/m41-authoritative-light-onset.test.mjs
           node scripts/pvp_browser_flight_runner.mjs
+      - name: Validate M41 second independent native parry before unrelated long gates
+        env:
+          MYASO_PVP_SCENARIO: "uiparrytell"
+        run: |
+          # Independent true W3C Chrome/Firefox parry exercise. Preserve the
+          # original M41 late gate after the long combat acceptance sequence.
+          # A red M121/other milestone must not mask M41's immediate status.
+          node scripts/pvp_browser_flight_runner.mjs
+
       - name: Validate M188 repeated real heavy counterplay windows
         run: |
           # Three fresh Chrome/Firefox sessions for each real defensive read.
