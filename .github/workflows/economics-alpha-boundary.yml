@@ -4,9 +4,8 @@ on:
   pull_request:
     paths:
       - server/src/**
-      - web/bootstrap.mjs
-      - web/online-game.mjs
-      - src/browser/**
+      - web/**
+      - src/**
       - scripts/verify_alpha_economy_boundary.py
       - scripts/test_alpha_economy_boundary.py
       - .github/workflows/economics-alpha-boundary.yml
@@ -14,9 +13,8 @@ on:
     branches: [main]
     paths:
       - server/src/**
-      - web/bootstrap.mjs
-      - web/online-game.mjs
-      - src/browser/**
+      - web/**
+      - src/**
       - scripts/verify_alpha_economy_boundary.py
       - scripts/test_alpha_economy_boundary.py
       - .github/workflows/economics-alpha-boundary.yml
