@@ -161,11 +161,7 @@ fn actual_core_static_solver_preserves_four_native_west_first_armory_routes() {
         // time-stepped input arrival or any sword authorization.
     }
     assert_eq!(
-        swept_circle_hits_known_static_solid(
-            (4110.0, 4020.0),
-            (3820.0, 4020.0),
-            FIGHTER_RADIUS,
-        ),
+        swept_circle_hits_known_static_solid((4110.0, 4020.0), (3820.0, 4020.0), FIGHTER_RADIUS,),
         Ok(true),
         "north-first Smith wall shortcut MUST remain blocked"
     );
