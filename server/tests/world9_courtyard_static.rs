@@ -4,8 +4,8 @@
 //! live revision/zone/epoch/LOS or dynamic collisions. No production code change.
 
 use myaso_server::alpha_greyhaven_geometry::{
-    overlaps_known_static_solid, swept_circle_hits_known_static_solid,
-    STATIC_LAYOUT_ID, STATIC_SOLIDS, STATIC_SOLIDS_SHA256,
+    overlaps_known_static_solid, swept_circle_hits_known_static_solid, STATIC_LAYOUT_ID,
+    STATIC_SOLIDS, STATIC_SOLIDS_SHA256,
 };
 
 type Point = (f32, f32);
@@ -57,13 +57,21 @@ fn actual_core_static_solver_accepts_all_32_world9_courtyard_route_pairs() {
     let mut pairs = 0;
     for (i, spawn) in WORLD9_SPAWNS.into_iter().enumerate() {
         for (j, destination) in WORLD9_COURTYARD_QA_STATIONS.into_iter().enumerate() {
-            assert_static_segment_clear(spawn, destination, &format!("Core spawn {i} -> station {j}"));
+            assert_static_segment_clear(
+                spawn,
+                destination,
+                &format!("Core spawn {i} -> station {j}"),
+            );
             pairs += 1;
         }
     }
     for (i, stand) in WORLD9_RACK_STANDS.into_iter().enumerate() {
         for (j, destination) in WORLD9_COURTYARD_QA_STATIONS.into_iter().enumerate() {
-            assert_static_segment_clear(stand, destination, &format!("World rack {i} -> station {j}"));
+            assert_static_segment_clear(
+                stand,
+                destination,
+                &format!("World rack {i} -> station {j}"),
+            );
             pairs += 1;
         }
     }
