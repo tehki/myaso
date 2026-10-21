@@ -1401,6 +1401,18 @@ mod tests {
 
     #[tokio::test]
     async fn first_playable_combat_and_replication_are_identical_with_npc_pilot_off() {
+        assert_first_playable_npc_combat_isolation(2).await;
+    }
+
+    #[tokio::test]
+    async fn first_playable_four_players_stay_authoritative_with_npc_pilot_off() {
+        // The first integrated alpha targets four independent player slots,
+        // with optional NPCs incapable of claiming a fighter identity.
+        assert_first_playable_npc_combat_isolation(4).await;
+    }
+
+    async fn assert_first_playable_npc_combat_isolation(player_count: usize) {
+        assert!(player_count == 2 || player_count == 4);
         // A direct alpha compatibility comparison: identical real server
         // player inputs with an NPC pilot disabled/enabled locally must
         // produce identical combat events, fighters, and replication ticks.
@@ -1418,6 +1430,12 @@ mod tests {
         for state in [&mut *normal, &mut *npc] {
             assert!(state.world.add_player_at(11, 130.0, 120.0, 0.0));
             assert!(state.world.add_player_at(12, 162.0, 120.0, 0.0));
+            if player_count == 4 {
+                assert!(state.world.add_player_at(13, 430.0, 280.0, 0.0));
+                assert!(state
+                    .world
+                    .add_player_at(14, 462.0, 280.0, std::f32::consts::PI));
+            }
         }
         let mut normal_events = Vec::new();
         let mut npc_events = Vec::new();
@@ -1437,9 +1455,27 @@ mod tests {
                 dodge: step % 127 == 15,
                 ..InputIntent::default()
             };
+            let second_attacker = InputIntent {
+                move_y: if step % 180 < 90 { 1.0 } else { -1.0 },
+                facing_radians: 0.0,
+                attack: step % 91 == 10,
+                run: step % 200 < 70,
+                ..InputIntent::default()
+            };
+            let second_defender = InputIntent {
+                move_y: if step % 180 < 90 { -1.0 } else { 1.0 },
+                facing_radians: std::f32::consts::PI,
+                block: step % 83 < 26,
+                kick: step % 109 == 14,
+                ..InputIntent::default()
+            };
             for state in [&mut *normal, &mut *npc] {
                 assert!(state.world.set_input(11, attacker));
                 assert!(state.world.set_input(12, defender));
+                if player_count == 4 {
+                    assert!(state.world.set_input(13, second_attacker));
+                    assert!(state.world.set_input(14, second_defender));
+                }
             }
             normal.world.step_into(&mut normal_events);
             npc.world.step_into(&mut npc_events);
@@ -1486,7 +1522,21 @@ mod tests {
                 normal.replication_frame.server_tick(),
                 npc.replication_frame.server_tick()
             );
-            assert_eq!(normal.world.fighters().len(), 2);
+            assert_eq!(normal.world.fighters().len(), player_count);
+            assert_eq!(
+                normal
+                    .world
+                    .fighters()
+                    .iter()
+                    .map(|fighter| fighter.net_id)
+                    .collect::<Vec<_>>(),
+                if player_count == 4 {
+                    vec![11, 12, 13, 14]
+                } else {
+                    vec![11, 12]
+                },
+                "only authentic player fighter identities may appear"
+            );
             assert!(normal.npc_routines.is_none() && normal.npc_supply.is_none());
         }
         assert!(!baseline.npc_pilot_enabled);

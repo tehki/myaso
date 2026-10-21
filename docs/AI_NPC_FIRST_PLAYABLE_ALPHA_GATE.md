@@ -72,3 +72,37 @@ the Main Orchestrator's independent acceptance gates pass.
 **Rollback:** Keep existing stable \`main\` unchanged; close or hold PR #353.
 For an isolated localhost evaluation, unset all three NPC pilot environment
 flags and restart only that ephemeral test instance—never production.
+
+## P0 roster update — four players, visible rack swords, NPCs optional
+
+The Main Orchestrator's owner-specific P0 [armory acceptance #488](https://github.com/tehki/myaso/issues/488)
+requires **four independent human players** sharing the same authored city,
+each able to click a **visible individual sword** on a reachable rack, with
+server-authoritative exclusive pickup and equipped-hand replication.
+Unarmed players punch. This cannot be satisfied by NPC dialogue,
+invented equipment or an inventory menu.
+
+Department 1 does not own rack geometry, item identity, gesture-to-pickup
+routing, player equipment or melee damage. If an armorer NPC is eventually
+included, it is **optional ambience only**, never a prerequisite for getting
+the sword. The accepted First Playable role/art split is **human player:
+Silver Knight** and **NPC (if present): T1 Sentinel**; adult human models
+remain a separate active development preview. Role-to-art and render assets
+belong to Graphics, not this department.
+
+To keep optional NPC code from disrupting the four-player experience,
+the P0 server parity test now executes **both 2-player and 4-player
+deterministic authoritative scenarios**, each for 600 ticks. Both sides
+receive identical real game-simulation movement, attacks, block, dodge,
+kick and run inputs and advance the same combat engine. The opt-in
+control side additionally runs NPC finite supply, social updates and
+movement ticks. At every tick, equality is required for combat events,
+entire fighter states, replication tick and exact real-player fighter
+IDs; the NPC-disabled side must keep both NPC allocations absent. No
+fake fighter ID may be introduced by pilot NPCs.
+
+This test is **not** proof of four independent browsers, sword rendering
+or equipment ownership. Those are cross-department real-acceptance
+gates under #488/#480 and cannot be bypassed. PR #353 remains
+experimental, draft and nonrequired for First Playable; production
+NPC activation, merges and deployments remain on HOLD.
