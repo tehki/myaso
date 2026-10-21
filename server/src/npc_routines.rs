@@ -153,17 +153,10 @@ impl NpcRoutines {
         // 180-unit distance guards before checking authored pilot occlusion.
         let target =
             crate::living_world::nearby_npc_at(id, player_x, player_y, alive, npc.x, npc.y)?;
-        // Do not let float-to-integer saturation create a fake world
-        // position outside the unsigned pilot collision domain.
-        if player_x < 0.0
-            || player_y < 0.0
-            || player_x > f32::from(u16::MAX)
-            || player_y > f32::from(u16::MAX)
-        {
-            return Err(crate::living_world::ChatError::OutOfRange);
-        }
-        let from = (player_x.round() as u16, player_y.round() as u16);
-        if !npc_navigation::pilot_line_of_sight(from, (npc.x, npc.y)) {
+        // Continuous collision avoids five-unit sampling gaps and rounded
+        // fighter coordinates accidentally piercing a barrier corner.
+        // Includes the finite and unsigned pilot-domain input checks.
+        if !npc_navigation::pilot_chat_line_of_sight((player_x, player_y), (npc.x, npc.y)) {
             return Err(crate::living_world::ChatError::OutOfRange);
         }
         Ok(target)
@@ -1711,5 +1704,27 @@ mod tests {
         assert_eq!(npcs.position_at(3, 1980), Some(actual));
         assert_eq!(supply.stocks().tomas_water, 1);
         assert!(supply.stocks().conserved());
+    }
+
+    #[test]
+    fn chat_cannot_authorize_obstacle_corner_crossings_between_coarse_samples() {
+        use crate::living_world::ChatError;
+        let npcs = NpcRoutines::default();
+        let previously_missed = [
+            (3_u8, (257.174_f32, 142.377_f32)), // Rowan: watch barricade
+            (5, (178.291, 129.519)),            // Tomas: watch barricade
+            (4, (369.496, 182.511)),            // Elara: market stall
+        ];
+        for (id, (player_x, player_y)) in previously_missed {
+            assert_eq!(
+                npcs.speaking_target(id, 0, player_x, player_y, true)
+                    .unwrap_err(),
+                ChatError::OutOfRange,
+                "server speaking authority must not pierce a pilot obstacle"
+            );
+        }
+        assert!(npcs.speaking_target(3, 0, 155.0, 100.0, true).is_ok());
+        assert!(npcs.speaking_target(5, 0, 270.0, 160.0, true).is_ok());
+        assert!(npcs.speaking_target(4, 0, 315.0, 65.0, true).is_ok());
     }
 }

@@ -1005,3 +1005,35 @@ the three authored rectangles are not Greyhaven's live collision or
 doors. Do not enable or use the pilot's LOS as production world
 collision authority. World & Gameplay's collision and door contracts
 must be approved and server-integrated independently before live use.
+
+## LW-1Y — Continuous collision for pilot player/NPC dialogue rays
+
+LW-1X introduced server-side pilot line of sight, but its inherited
+five-unit waypoint sampler can miss an obstacle when a player-to-NPC
+segment clips a rectangle corner **between sample points**.
+This could authorize talking through a thin portion of the authored
+watch barricade, market stall or supply crate.
+
+For **player-to-NPC conversations only**, the admission check now
+performs an exact continuous segment-vs-closed-rectangle (slab)
+intersection, using f64 arithmetic promoted from the authenticated
+f32 fighter location and the server-committed NPC coordinate. It
+requires both the unchanged 180-unit radius and a completely clear
+segment through all three immutable authored pilot obstacles.
+Touching an obstacle edge or corner is obstructed. Nonfinite,
+negative and out-of-u16-domain player coordinates fail closed.
+The check is O(three obstacles) and allocation-free, with no player
+control over geometry.
+
+Tests include four concrete corner-grazing rays proven to have
+escaped the old five-unit sampled LOS, all three obstacles,
+boundary/endpoint contact, real player admission through the
+existing \`NpcRoutines::speaking_target\`, unchanged clear
+approaches, and the previously established Rowan detour,
+liveness, inventory conservation and authoritative position gates.
+
+**This is not a production Greyhaven LOS algorithm** and does not
+change NPC-to-NPC meetings, pilot route planning, fighters,
+colliders, zone or door authority, client protocol, or trading.
+Those systems await authoritative World & Gameplay interfaces.
+The isolated NPC pilot remains off by default and loopback-only.

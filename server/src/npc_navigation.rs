@@ -319,6 +319,50 @@ pub fn valid_route(id: u8) -> bool {
 /// Tiny, allocation-free line check through authored *pilot* obstacles only.
 /// Meeting events must not pass through the staged wall/crate. This is not
 /// production zone visibility or combat line-of-sight.
+/// Exact player/NPC conversation visibility for *authored pilot* rectangles.
+///
+/// Unlike the coarse 5-unit navigation/social sampling, this checks the
+/// continuous segment in f64 (f32 server fighter coordinates are exact on
+/// promotion). Grazing a rectangle edge or corner counts as obstructed.
+/// O(3), allocation-free; no authoritative Greyhaven world/door claims.
+pub fn pilot_chat_line_of_sight(from: (f32, f32), to: (u16, u16)) -> bool {
+    if !from.0.is_finite()
+        || !from.1.is_finite()
+        || from.0 < 0.0
+        || from.1 < 0.0
+        || from.0 > f32::from(u16::MAX)
+        || from.1 > f32::from(u16::MAX)
+    {
+        return false;
+    }
+    let (x, y) = (f64::from(from.0), f64::from(from.1));
+    let (dx, dy) = (f64::from(to.0) - x, f64::from(to.1) - y);
+    !PILOT_BARRIERS.iter().any(|r| {
+        // Slab intersection of t in [0,1] with the CLOSED rectangle.
+        let mut entry = 0.0_f64;
+        let mut exit = 1.0_f64;
+        for (start, delta, min, max) in [
+            (x, dx, f64::from(r.x), f64::from(r.x + r.width)),
+            (y, dy, f64::from(r.y), f64::from(r.y + r.height)),
+        ] {
+            if delta == 0.0 {
+                if start < min || start > max {
+                    return false;
+                }
+            } else {
+                let a = (min - start) / delta;
+                let b = (max - start) / delta;
+                entry = entry.max(a.min(b));
+                exit = exit.min(a.max(b));
+                if entry > exit {
+                    return false;
+                }
+            }
+        }
+        entry <= exit
+    })
+}
+
 pub fn pilot_line_of_sight(from: (u16, u16), to: (u16, u16)) -> bool {
     let dx = i32::from(to.0) - i32::from(from.0);
     let dy = i32::from(to.1) - i32::from(from.1);
@@ -563,5 +607,50 @@ mod tests {
         assert!(pilot_line_of_sight(position(4, 600).unwrap(), (395, 150)));
         assert!(valid_route(3) && valid_route(4) && valid_route(5));
         assert!(!valid_route(1) && !valid_route(2) && !valid_route(99));
+    }
+
+    #[test]
+    fn continuous_chat_rays_reject_corner_grazes_missed_by_five_unit_sampling() {
+        // These narrow crossings are between the old 5-unit samples, so
+        // previously an unobstructed *false positive* could be authorized.
+        // Every endpoint is inside the established 180-unit speak circle.
+        let cases = [
+            ((257.174_f32, 142.377_f32), (155_u16, 205_u16)), // watch barricade
+            ((178.291, 129.519), (270, 220)),                 // same barricade
+            ((369.496, 182.511), (315, 110)),                 // market stall
+            ((283.455, 223.230), (395, 150)),                 // supply crate
+        ];
+        for (from, to) in cases {
+            assert!(
+                pilot_line_of_sight((from.0.round() as u16, from.1.round() as u16), to),
+                "test fixture must expose coarse-sampling miss: {from:?} -> {to:?}"
+            );
+            assert!(
+                !pilot_chat_line_of_sight(from, to),
+                "continuous collision must block: {from:?} -> {to:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn exact_chat_rays_preserve_clear_approaches_and_boundary_denials() {
+        assert!(pilot_chat_line_of_sight((270.0, 45.0), (270, 220)));
+        assert!(pilot_chat_line_of_sight((155.0, 100.0), (155, 205)));
+        assert!(pilot_chat_line_of_sight((315.0, 65.0), (315, 110)));
+        assert!(pilot_chat_line_of_sight((270.0, 220.0), (270, 220)));
+        // Closed rectangle: exactly touching a corner counts as obstructed,
+        // including if the source begins on the obstacle's edge.
+        assert!(!pilot_chat_line_of_sight((195.0, 180.0), (155, 205)));
+        assert!(!pilot_chat_line_of_sight((230.0, 215.0), (155, 205)));
+        assert!(!pilot_chat_line_of_sight((210.0, 195.0), (210, 195)));
+        // Outside our pilot integer world, invalid fighter floats fail closed.
+        for from in [
+            (-1.0, 205.0),
+            (f32::NAN, 205.0),
+            (155.0, f32::INFINITY),
+            (65536.0, 205.0),
+        ] {
+            assert!(!pilot_chat_line_of_sight(from, (155, 205)));
+        }
     }
 }
