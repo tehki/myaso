@@ -59,6 +59,26 @@ unrelated container, remote database, live VPS or game player is targeted.
 For all five independent open transactions, the test observes distinct
 last-statement markers in the database's pg_stat_activity with state
 idle-in-transaction.
+
+## Post-crash concurrent fencing
+
+After the same primary process restarts and completes its seven recovery
+checks, two independently connected PostgreSQL clients are released through
+a Python thread barrier at the same time. This tests **database transactional
+serialization**, not synthetic sequential authorization.
+
+- **Character 78:** both callers hold the same worker, authority epoch
+  and expected revision zero, but different immutable mutation IDs.
+  Exactly one wins revision one. The loser must fail the revision CAS
+  and leave **no receipt or outbox**; winner replay is historical-only.
+- **Character 79:** after one durable ownership transfer to worker 2 at
+  epoch 2, retired worker 1 and new owner 2 race with the same expected
+  revision zero. Only worker 2 may commit. The old source cannot leave
+  any receipt or outbox, even when retried after the valid commit.
+
+These are **two additional post-restart races**, not two independent primary
+crashes. Both callers use real `psql` connections to the same disposable
+database. There is no test-only bypass to the SQL fencing function.
 This proves that each transaction executed but had not committed before
 PostgreSQL is killed; there is no fixed-delay guess.
 
