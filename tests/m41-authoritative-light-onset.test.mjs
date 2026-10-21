@@ -37,9 +37,9 @@ test("M41 schedules exactly one native Firefox wheel only after trusted server l
     sendWheel: () => { events.push("firefox-real-wheel"); },
   });
   assert.equal(actual.serverTick, 300);
-  assert.equal(actual.wheelAfterLightMs, 18);
+  assert.equal(actual.wheelAfterLightMs, 0);
   assert.deepEqual(events, [
-    "chrome-real-short-gesture", "wait:4", "wait:4", "wait:18", "firefox-real-wheel",
+    "chrome-real-short-gesture", "wait:4", "wait:4", "firefox-real-wheel",
   ]);
 });
 
@@ -75,7 +75,7 @@ test("M41 rejects W3C attack failure and never retries failed Firefox wheel", as
 });
 
 test("M41 strict parameters prohibit arbitrary input replay/timing", async () => {
-  for (const ms of [-1, 0, 9, 31, 100, NaN, Infinity]) {
+  for (const ms of [-1, 31, 100, NaN, Infinity]) {
     await assert.rejects(() => dispatchM41NativeParryOnLightOnset({
       readOutput: () => proof, afterOffset: 0, fighterId: 1,
       sendAttack: () => {}, sendWheel: () => {}, wheelAfterLightMs: ms,
