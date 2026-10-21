@@ -878,6 +878,7 @@ mod tests {
     /// live rack/pointer, Core u128 ledger, Combat or network acceptance test.
     #[test]
     fn four_physical_swords_and_verified_transfer_require_zero_spell_progression() {
+        use crate::loot::LootError;
         use crate::loot_transaction::{
             commit_verified_equipment, commit_verified_pickup, EquipmentActionResult,
             PickupCommitError, PickupWorldTick, VerifiedEquipmentAction, VerifiedLootOperation,
