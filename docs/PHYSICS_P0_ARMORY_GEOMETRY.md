@@ -22,7 +22,8 @@ Module: `server/src/alpha_armory_physics.rs`.
 
 - Maximum 128 complete solid AABBs per query. Incomplete/oversized windows fail closed; **caller may not pass a truncated list claiming complete**.
 - All geometry and positions must be finite and within ±1,000,000; valid rects have nonzero width/height. Endpoints must be inside window bounds.
-- Positive worker epoch must fit Core signed 63-bit range; world revision zero is valid for an initial state record. Legacy single-arena zone ID zero remains representable; future live 8C zone IDs remain under Core authority.
+- **Core 8C zone identity compatibility:** `GeometryFence.zone_id` and `WorldPoint.zone_id` use `u64`, not the ephemeral `u32` network player ID. This matches typed Core C4d `ZoneKey(NonZeroU64)` storage (positive signed 63-bit range in PostgreSQL). Values **above `i64::MAX` reject**, and zone keys above `u32::MAX` must round-trip without truncation or false equality. Two new Rust tests check this and the exact signed-highest-key boundary. A zero zone ID is still representable **only for the existing test/legacy arena**; verified distributed Core 8C zone leases must be nonzero. **No caller may substitute a `u32` fighter/session/net ID for a Core `ZoneKey`.**
+- Positive worker epoch must fit Core signed 63-bit range; world revision zero is valid for an initial state record. Future live 8C zone IDs remain under Core authority.
 - Rectangles are **closed** for conservative LOS: wall grazing, sword on barrier boundary and actor inside a wall are occluded. An approved door must be represented by two physically separated solids.
 - This is 2D LOS at server-resolved world positions, not camera-ray, zoom, pixel alpha, counter surface height, cover, body-radius movement collision, or full 3D clearance.
 - The API `expected_current` is a *comparison witness*, not a security capability. Supplying it from the same untrusted request is insecure. The caller must read current Core 8C epoch/revision, verify session/actor/item, and enforce fencing at the **same commit boundary**. An isolated successful geometry result must not outlive the tick/ownership check.
@@ -41,7 +42,7 @@ Module: `server/src/alpha_armory_physics.rs`.
 
 ## Test contract
 
-Twelve focused Rust unit tests check reach, wall block, open doorway, tangent occlusion, stale epoch/revision, cross-zone denial, invalid/incomplete/over-budget geometry, nonfinite/oversized input, read-only behavior, and legacy zero-zone/zero-revision compatibility.
+Fourteen focused Rust unit tests check reach, wall block, open doorway, tangent occlusion, stale epoch/revision, cross-zone denial, invalid/incomplete/over-budget geometry, nonfinite/oversized input, read-only behavior, and legacy zero-zone/zero-revision compatibility.
 
 **World #493 exact contract fixture (source-only):** A new Rust test uses the *proposed* single-zone open-front smith solid footprint (3710,3850)-(3892,4012), frozen sockets at x=3740/3780/3820/3860, y=4038, and walkable stands y=4088. All four proposed pickups at distance 50 must have clear LOS when the south front is open; an actor inside the solid shop footprint attempting a grab must be rejected as occluded. This duplicates World-authored **proposal coordinates in a test only**, it does not copy live collision geometry into production. World [#493](https://github.com/tehki/myaso/pull/493) remains stacked on unmerged World foundation #336. World 9 + Core 8C must approve the final complete authoritative geometry and revise the fixture together if sockets/solids change.
 
