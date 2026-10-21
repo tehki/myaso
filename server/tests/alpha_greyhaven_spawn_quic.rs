@@ -499,14 +499,26 @@ async fn four_live_quic_players_each_reach_a_distinct_blacksmith_rack_approach()
         sessions.push((connection, _send, recv, snapshot.sequence, start));
     }
 
-    for (index, session) in sessions.iter().enumerate() {
+    // All four independently controlled players must ACTUALLY move
+    // concurrently on a shared server. Keeping four sessions connected
+    // while driving their movement sequentially is insufficient M1 proof.
+    // Separate futures read their own genuine QUIC snapshot streams.
+    let route_for = |index: usize| {
+        let target = BLACKSMITH_RACK_APPROACHES[index];
+        [(3990.0, 4180.0), (3980.0, 4090.0), target]
+    };
+    let routes = [route_for(0), route_for(1), route_for(2), route_for(3)];
+    let (player1, player2, player3, player4) = tokio::try_join!(
+        drive_real_quic_fighter_to(&sessions[0].0, sessions[0].3, 1, sessions[0].4, &routes[0]),
+        drive_real_quic_fighter_to(&sessions[1].0, sessions[1].3, 2, sessions[1].4, &routes[1]),
+        drive_real_quic_fighter_to(&sessions[2].0, sessions[2].3, 3, sessions[2].4, &routes[2]),
+        drive_real_quic_fighter_to(&sessions[3].0, sessions[3].3, 4, sessions[3].4, &routes[3]),
+    )?;
+    for (index, final_position) in [player1, player2, player3, player4].into_iter().enumerate() {
         let id = index as u32 + 1;
         let target = BLACKSMITH_RACK_APPROACHES[index];
-        let route = [(3990.0, 4180.0), (3980.0, 4090.0), target];
-        let final_position =
-            drive_real_quic_fighter_to(&session.0, session.3, id, session.4, &route).await?;
         if (final_position.0 - target.0).hypot(final_position.1 - target.1) > 18.0 {
-            bail!("player {id} failed individual Blacksmith approach target {target:?}: {final_position:?}");
+            bail!("player {id} failed simultaneous Blacksmith approach target {target:?}: {final_position:?}");
         }
         println!(
             "ALPHA_8C_REAL_QUIC_RACK_APPROACH id={id} x={:.2} y={:.2} target_x={} target_y={}",

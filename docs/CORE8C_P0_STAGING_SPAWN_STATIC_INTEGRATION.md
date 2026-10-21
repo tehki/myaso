@@ -113,7 +113,10 @@ transport, no direct Rust simulator-position mutation:
 
 1. Open four separate certificate-pinned QUIC
    sessions, verify authoritative server-owned immutable spawn baselines.
-2. Move each server-assigned player along the approved public waypoints
+2. Move **all four players concurrently** on the same authoritative game
+   tick stream, using four independently polled QUIC input/snapshot futures,
+   not four sequential walks under otherwise idle connections. Each follows
+   the approved public waypoints
    `(3990,4180)`, `(3980,4090)` and one **distinct** rack approach at
    `(3740,4088)`, `(3780,4088)`, `(3820,4088)`, `(3860,4088)`.
    Read each arrival only from actual replicated QUIC position datagrams;
@@ -128,6 +131,8 @@ proves four *socket approaches* only. It does **not** prove physical sword
 target pixels, click, pickup LOS/range, one-winner u64/u128 item ownership,
 actual equipped MainHand, real browser user inputs or separate computers.
 The loopback-only isolation remains in force. No live map/revision capability.
+The concurrent four-client movement proof checks actual on-wire server
+positions; it does not emulate independent browser event loops or two-host WAN.
 
 ## Nonclaims and release HOLD
 
