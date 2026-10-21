@@ -82,8 +82,10 @@ fn start_actual_server() -> Result<(TestServer, String, Sha256Digest)> {
         if line == "myaso admission cap: 4 concurrent players" {
             admission_cap = true;
         }
-        if address.is_some() && certificate.is_some() && admission_cap {
-            return Ok((guarded, address.unwrap(), certificate.unwrap()));
+        if admission_cap {
+            if let (Some(url), Some(pin)) = (&address, &certificate) {
+                return Ok((guarded, url.clone(), pin.clone()));
+            }
         }
     }
     bail!("server startup never proved explicit cap 4 and pinned loopback TLS")
@@ -140,7 +142,7 @@ async fn actual_server_preserves_four_distinct_players_and_denies_fifth() -> Res
             let mut header = [0_u8; 2];
             recv.read_exact(&mut header).await?;
             let body_len = u16::from_le_bytes(header) as usize;
-            if body_len < 14 || body_len > 4096 {
+            if !(14..=4096).contains(&body_len) {
                 bail!("invalid reliable game baseline length {body_len}");
             }
             let mut body = vec![0_u8; body_len];
