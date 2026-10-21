@@ -109,8 +109,14 @@ BEGIN
         RAISE EXCEPTION 'conflicting transaction ID';
     END IF;
 
+    -- The new handoff's FOREIGN KEY already acquires KEY SHARE on this
+    -- parent entity. Distinct operation IDs can each hold KEY SHARE;
+    -- upgrading both to FOR UPDATE deadlocks instead of fencing one.
+    -- NO KEY UPDATE is compatible with the FK KEY SHARE, while conflicting
+    -- with concurrent mutation writers and any handoff/retire update.
+    -- This function never changes the entity's primary key.
     SELECT * INTO STRICT e FROM core_zone.entities
-        WHERE entity_kind = p_kind AND entity_id = p_entity FOR UPDATE;
+        WHERE entity_kind = p_kind AND entity_id = p_entity FOR NO KEY UPDATE;
     IF h.phase = 'committed' THEN
         IF e.retired OR e.pending_operation IS NOT NULL
             OR e.owner_worker != h.target_worker
