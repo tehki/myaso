@@ -1,0 +1,82 @@
+name: Core 8 P0 authored Greyhaven Blacksmith native integration
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/core8-p0-rack-world-native-integration.yml"
+      - "scripts/alpha_m1_four_real_browser_flight.mjs"
+      - "scripts/alpha_p0_rack_walk_math.mjs"
+      - "scripts/alpha_p0_four_native_rendered_greyhaven.mjs"
+      - "scripts/alpha_p0_four_native_armory_rack_preview.mjs"
+      - "src/browser/armory-optin-live-rack.mjs"
+      - "src/world/alpha-armory.mjs"
+      - "src/world/alpha-combat-space.mjs"
+      - "web/online-game.mjs"
+
+permissions:
+  contents: read
+
+jobs:
+  rendered-greyhaven-four-real-browsers:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fail-closed real authored World and HUD checks
+        run: |
+          node --check web/online-game.mjs
+          node --check scripts/alpha_p0_four_native_rendered_greyhaven.mjs
+          node --test tests/alpha_p0_native_world_liveness.test.mjs
+          node scripts/verify-core8c-greyhaven-geometry.mjs
+          node --test tests/alpha_p0_rack_walk_math.test.mjs
+      - name: Prove genuine Chrome and Firefox drivers exist
+        run: |
+          google-chrome --version
+          chromedriver --version
+          firefox --version
+          geckodriver --version
+      - name: Build exact authoritative Rust WebTransport server
+        run: cargo build --locked --manifest-path server/Cargo.toml --bin myaso-server
+      - name: Four real browsers render genuine Greyhaven and advancing server HUD
+        run: timeout --signal=TERM --kill-after=5s 180s node scripts/alpha_p0_four_native_rendered_greyhaven.mjs
+      - name: Preserve genuine rendered browser evidence
+        if: always()
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: core8-world-rack-integration-authored-four-browsers
+          path: alpha-p0-real-greyhaven-visual-evidence/*
+          if-no-files-found: ignore
+          retention-days: 3
+
+  blacksmith-empty-rack-four-real-browsers:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fail-closed exact original art no fake sword and World geometry
+        run: |
+          node --check src/browser/armory-optin-live-rack.mjs
+          node --check scripts/alpha_p0_four_native_armory_rack_preview.mjs
+          node --test tests/armory-optin-live-rack.test.mjs
+          node scripts/verify-core8c-greyhaven-geometry.mjs
+          node --test tests/world-alpha-combat-space.test.mjs tests/world-alpha-rack-selection-range.test.mjs
+      - name: Prove genuine Chrome and Firefox drivers exist
+        run: |
+          google-chrome --version
+          chromedriver --version
+          firefox --version
+          geckodriver --version
+      - name: Build exact authoritative Rust WebTransport server
+        run: cargo build --locked --manifest-path server/Cargo.toml --bin myaso-server
+      - name: Four real browsers show one original rack, zero invented swords
+        run: timeout --signal=TERM --kill-after=5s 180s node scripts/alpha_p0_four_native_armory_rack_preview.mjs
+      - name: Preserve genuine rack browser screenshots
+        if: always()
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: core8-world-rack-integration-empty-rack-four-browsers
+          path: alpha-p0-real-greyhaven-armory-preview-evidence/*
+          if-no-files-found: ignore
+          retention-days: 3

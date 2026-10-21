@@ -1,0 +1,51 @@
+name: Core 8A P0 four native Blacksmith rack approaches
+
+on:
+  pull_request:
+    paths:
+      - "scripts/alpha_m1_four_real_browser_flight.mjs"
+      - "scripts/alpha_p0_rack_walk_math.mjs"
+      - "tests/alpha_p0_rack_walk_math.test.mjs"
+      - ".github/workflows/core8a-p0-native-four-rack-approach.yml"
+      - "src/world/alpha-armory.mjs"
+      - "server/src/**"
+
+permissions:
+  contents: read
+
+jobs:
+  four-real-blacksmith-rack-approaches:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Prove reviewed World targets and bounded keyboard planner offline
+        run: |
+          node --check scripts/alpha_m1_four_real_browser_flight.mjs
+          node --check scripts/alpha_p0_rack_walk_math.mjs
+          node --test tests/alpha_p0_rack_walk_math.test.mjs
+          node scripts/verify-core8c-greyhaven-geometry.mjs
+          node scripts/verify-world-alpha-solid-artifact.mjs
+      - name: Confirm four genuine native Chrome Firefox drivers
+        run: |
+          google-chrome --version
+          chromium --version || true
+          chromedriver --version
+          firefox --version
+          geckodriver --version
+      - name: Build actual server QUIC and collision authority
+        run: cargo build --locked --manifest-path server/Cargo.toml --bin myaso-server
+      - name: Four real W3C actors physically walk from exact Greyhaven spawn to each original rack approach
+        env:
+          MYASO_ALPHA_NATIVE_GREYHAVEN: "1"
+          MYASO_ALPHA_NATIVE_RACK_WALK: "1"
+        run: timeout --signal=TERM --kill-after=5s 180s node scripts/alpha_m1_four_real_browser_flight.mjs
+      - name: Retain actual browser screenshots (if Actions storage permits)
+        if: always()
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: core8a-four-real-native-blacksmith-rack-approach
+          path: alpha-m1-four-browser-evidence/*.png
+          if-no-files-found: ignore
+          retention-days: 3
