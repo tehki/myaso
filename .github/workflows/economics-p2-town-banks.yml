@@ -1,0 +1,25 @@
+name: Economics P2 Local Town Banks Lab
+
+on:
+  pull_request:
+    paths:
+      - scripts/economics_town_banks_lab.py
+      - scripts/test_economics_town_banks_lab.py
+      - docs/ECONOMICS_P2_LOCAL_TOWN_BANKS.md
+      - .github/workflows/economics-p2-town-banks.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  fictional-local-banks:
+    name: NPC town bank nonredeemable model (offline only)
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify stand-alone local bank model and 29 tests
+        run: |
+          python3 -m py_compile scripts/economics_town_banks_lab.py scripts/test_economics_town_banks_lab.py
+          python3 -m unittest discover -s scripts -p 'test_economics_town_banks_lab.py' -v
