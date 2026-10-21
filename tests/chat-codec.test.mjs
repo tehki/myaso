@@ -102,3 +102,238 @@ test("optional WebTransport channel handles fragmented network frames separately
   assert.equal(results[0].correlation, 77);
   assert.equal(channel.closed, true);
 });
+
+test("optional chat timeout preserves shared QUIC incoming stream collection", async () => {
+  let aborted = 0, collectionCancelled = 0, gameplayClosed = 0;
+  const outbound = new WritableStream({ abort() { aborted += 1; } });
+  const incomingUnidirectionalStreams = new ReadableStream({
+    start() { /* Peer never opens chat reply stream. */ },
+    cancel() { collectionCancelled++; },
+  });
+  const transport = {
+    async createUnidirectionalStream() { return outbound; },
+    incomingUnidirectionalStreams,
+    close() { gameplayClosed++; },
+  };
+  await assert.rejects(
+    openLocalChat({ kind: "webtransport", transport }, { handshakeTimeoutMs: 20 }),
+    /chat reply stream timed out/,
+  );
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(aborted, 1, "only optional outbound chat stream is aborted");
+  assert.equal(outbound.locked, false, "writer lock is released");
+  assert.equal(incomingUnidirectionalStreams.locked, false, "timed-out chat reader releases lock");
+  assert.equal(collectionCancelled, 0, "never cancel shared future QUIC incoming streams");
+  assert.equal(gameplayClosed, 0, "gameplay WebTransport stays open");
+  // Verify the stream collection remains usable by another independent
+  // protocol consumer after chat has failed.
+  const another = incomingUnidirectionalStreams.getReader();
+  assert.equal(incomingUnidirectionalStreams.locked, true);
+  another.releaseLock();
+});
+
+test("late outgoing stream is aborted after bounded startup failure", async () => {
+  let allowOpen, aborted = false;
+  const pending = new Promise(resolve => { allowOpen = resolve; });
+  const transport = {
+    createUnidirectionalStream() { return pending; },
+    incomingUnidirectionalStreams: new ReadableStream({ start() {} }),
+  };
+  await assert.rejects(
+    openLocalChat({ kind: "webtransport", transport }, { handshakeTimeoutMs: 20 }),
+    /chat outgoing stream timed out/,
+  );
+  allowOpen(new WritableStream({ abort() { aborted = true; } }));
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(aborted, true, "late optional stream must not be leaked");
+});
+
+test("invalid chat handshake deadlines fail before starting any network stream", async () => {
+  let attempted = 0;
+  const transport = {
+    async createUnidirectionalStream() { attempted++; return new WritableStream(); },
+  };
+  for (const handshakeTimeoutMs of [-1, 0, 30_001, NaN, 2.5, "20"]) {
+    await assert.rejects(
+      openLocalChat({ kind: "webtransport", transport }, { handshakeTimeoutMs }),
+      RangeError,
+    );
+  }
+  assert.equal(attempted, 0);
+});
+
+test("closing idle chat releases both optional streams without closing gameplay", async () => {
+  let readCancelled = 0, writeAborted = 0, gameplayClosed = 0;
+  const reply = new ReadableStream({
+    start() { /* Deliberately open forever until optional chat closes. */ },
+    cancel() { readCancelled++; },
+  });
+  const outgoing = new WritableStream({ abort() { writeAborted++; } });
+  const transport = {
+    createUnidirectionalStream: async () => outgoing,
+    incomingUnidirectionalStreams: new ReadableStream({
+      start(controller) { controller.enqueue(reply); controller.close(); },
+    }),
+    close() { gameplayClosed++; },
+  };
+  const chat = await openLocalChat({ kind: "webtransport", transport });
+  await chat.close();
+  await chat.reading;
+  await chat.close(); // Idempotent: no second QUIC reset.
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(chat.closed, true);
+  assert.equal(readCancelled, 1);
+  assert.equal(writeAborted, 1);
+  assert.equal(outgoing.locked, false);
+  assert.equal(reply.locked, false);
+  assert.equal(gameplayClosed, 0, "gameplay transport must stay open");
+});
+
+test("malformed incoming chat frame closes optional writer, not gameplay transport", async () => {
+  let replyController, writeAborted = 0, gameplayClosed = 0;
+  const reply = new ReadableStream({
+    start(controller) { replyController = controller; },
+  });
+  const outgoing = new WritableStream({ abort() { writeAborted++; } });
+  const transport = {
+    createUnidirectionalStream: async () => outgoing,
+    incomingUnidirectionalStreams: new ReadableStream({
+      start(controller) { controller.enqueue(reply); controller.close(); },
+    }),
+    close() { gameplayClosed++; },
+  };
+  const chat = await openLocalChat({ kind: "webtransport", transport });
+  replyController.enqueue(new Uint8Array([2, 0, 1, 1]));
+  await assert.rejects(chat.reading, /chat frame length invalid/);
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(chat.closed, true);
+  assert.equal(writeAborted, 1);
+  assert.equal(outgoing.locked, false);
+  assert.equal(reply.locked, false);
+  assert.equal(gameplayClosed, 0);
+});
+
+test("coalesced valid chat frames over 4096 bytes decode with one bounded frame buffer", async () => {
+  const text = "🌕".repeat(60); // 240 UTF-8 bytes, largest valid local chat payload
+  const packets = Array.from({ length: 32 }, (_, i) => frame(makeReceived({
+    sender: i + 1, messageId: BigInt(i + 1), text,
+  })));
+  const bytes = new Uint8Array(packets.reduce((sum, packet) => sum + packet.length, 0));
+  let pos = 0;
+  for (const packet of packets) {
+    bytes.set(packet, pos);
+    pos += packet.length;
+  }
+  assert.ok(bytes.length > 4096, "the combined transport chunk exceeds old buffer limit");
+  let gameplayClosed = 0;
+  const reply = new ReadableStream({
+    start(controller) { controller.enqueue(bytes); controller.close(); },
+  });
+  const transport = {
+    createUnidirectionalStream: async () => new WritableStream(),
+    incomingUnidirectionalStreams: new ReadableStream({
+      start(controller) { controller.enqueue(reply); controller.close(); },
+    }),
+    close() { gameplayClosed++; },
+  };
+  const events = [];
+  const chat = await openLocalChat({ kind: "webtransport", transport }, {
+    onReceived(event) { events.push(event); },
+  });
+  await chat.reading;
+  assert.equal(events.length, 32);
+  for (let i = 0; i < events.length; i++) {
+    assert.equal(events[i].messageId, BigInt(i + 1));
+    assert.equal(events[i].senderId, i + 1);
+    assert.equal(events[i].text, text);
+  }
+  assert.equal(chat.closed, true);
+  assert.equal(gameplayClosed, 0, "only optional chat stream may close");
+});
+
+test("fragmented and coalesced chat frames still reject invalid length prefixes", async () => {
+  const reply = new ReadableStream({
+    start(controller) {
+      controller.enqueue(frame(makeResult()).slice(0, 1));
+      const goodTail = frame(makeResult()).slice(1);
+      const batch = new Uint8Array(goodTail.length + 2);
+      batch.set(goodTail, 0);
+      batch.set([0xff, 0xff], goodTail.length);
+      controller.enqueue(batch);
+      controller.close();
+    },
+  });
+  const transport = {
+    createUnidirectionalStream: async () => new WritableStream(),
+    incomingUnidirectionalStreams: new ReadableStream({
+      start(controller) { controller.enqueue(reply); controller.close(); },
+    }),
+  };
+  const results = [];
+  const chat = await openLocalChat({ kind: "webtransport", transport }, {
+    onResult(event) { results.push(event); },
+  });
+  await assert.rejects(chat.reading, /chat frame length invalid/);
+  assert.equal(results.length, 1, "valid first frame remains delivered");
+  assert.equal(results[0].correlation, 77);
+  assert.equal(chat.closed, true);
+});
+
+test("server EOF inside a chat frame rejects only the optional channel", async () => {
+  const valid = frame(makeReceived({ text: "full payload" }));
+  for (const prefixBytes of [1, 2, 7, valid.length - 1]) {
+    let gameplayClosed = 0;
+    const reply = new ReadableStream({
+      start(controller) {
+        controller.enqueue(valid.subarray(0, prefixBytes));
+        controller.close();
+      },
+    });
+    const transport = {
+      createUnidirectionalStream: async () => new WritableStream(),
+      incomingUnidirectionalStreams: new ReadableStream({
+        start(controller) { controller.enqueue(reply); controller.close(); },
+      }),
+      close() { gameplayClosed++; },
+    };
+    const events = [];
+    const chat = await openLocalChat({ kind: "webtransport", transport }, {
+      onReceived(event) { events.push(event); },
+    });
+    await assert.rejects(chat.reading, /truncated chat frame at stream end/);
+    assert.equal(chat.closed, true);
+    assert.equal(events.length, 0, "a truncated frame cannot be shown as a delivered message");
+    assert.equal(gameplayClosed, 0, "chat errors must not close the game transport");
+  }
+});
+
+test("closing chat during one coalesced chunk suppresses subsequent callbacks", async () => {
+  let controller, gameplayClosed = 0;
+  const reply = new ReadableStream({ start(c) { controller = c; } });
+  const transport = {
+    createUnidirectionalStream: async () => new WritableStream(),
+    incomingUnidirectionalStreams: new ReadableStream({
+      start(c) { c.enqueue(reply); c.close(); },
+    }),
+    close() { gameplayClosed++; },
+  };
+  let chat;
+  const events = [];
+  chat = await openLocalChat({ kind: "webtransport", transport }, {
+    onReceived(event) {
+      events.push(event);
+      void chat.close();
+    },
+  });
+  const first = frame(makeReceived({ messageId: 101n }));
+  const second = frame(makeReceived({ messageId: 102n }));
+  const chunk = new Uint8Array(first.length + second.length);
+  chunk.set(first, 0);
+  chunk.set(second, first.length);
+  controller.enqueue(chunk);
+  await chat.reading;
+  assert.equal(events.length, 1, "a closed chat channel cannot emit queued follow-up events");
+  assert.equal(events[0].messageId, 101n);
+  assert.equal(chat.closed, true);
+  assert.equal(gameplayClosed, 0);
+});

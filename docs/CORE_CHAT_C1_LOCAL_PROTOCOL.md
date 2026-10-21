@@ -112,7 +112,12 @@ reliable storage, or guaranteed delivery when recipient queues saturate.
   messages**. A full recipient queue drops eligible **chat** only;
   gameplay snapshots, combat and inventory queues cannot be displaced.
 - Each sender has a four-message burst with one token replenished every
-  **600 ms**. Duplicate correlation IDs are retained in a bounded
+  **600 ms**. Independently, each opted-in chat stream is limited to **64
+  inbound frames per second** before any authoritative world-position scan;
+  exceeding this abusive-stream ceiling terminates only the chat channel,
+  without affecting realtime game input/snapshots. Normal rate-limited
+  responses below this ingress limit remain unchanged.
+  Duplicate correlation IDs are retained in a bounded
   **32-result ring** per chat stream and cannot cause repeat delivery.
 - Control characters and Unicode bidi overrides/isolation controls are
   rejected. No raw message text or credential is emitted in routine logs.

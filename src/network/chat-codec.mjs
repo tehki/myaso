@@ -86,6 +86,34 @@ function frameReliable(payload) {
   return frame;
 }
 
+
+// A chat stream is optional. A missing peer reply must not leave the UI
+// pending forever or hold the shared session's incoming-stream reader.
+// A late outgoing stream is aborted without closing the gameplay transport.
+async function boundedChatHandshake(promise, timeoutMs, phase, { onTimeout, onLate } = {}) {
+  let expired = false;
+  let timer;
+  const operation = Promise.resolve(promise);
+  if (onLate) {
+    operation.then(value => {
+      if (expired) {
+        try { Promise.resolve(onLate(value)).catch(() => {}); } catch { /* cleanup only */ }
+      }
+    }, () => {});
+  }
+  const timeout = new Promise((_, reject) => {
+    timer = setTimeout(() => {
+      expired = true;
+      // Reject the timeout before cancelling the pending read, otherwise a
+      // synchronous cancel may win Promise.race with a misleading EOF result.
+      reject(new Error("local chat " + phase + " timed out"));
+      try { onTimeout?.(); } catch { /* timeout remains authoritative */ }
+    }, timeoutMs);
+  });
+  try { return await Promise.race([operation, timeout]); }
+  finally { clearTimeout(timer); }
+}
+
 /**
  * Opt-in separate WebTransport streams attached to an already connected game
  * session. No separate WebSocket/account/channel service is started.
@@ -94,43 +122,107 @@ function frameReliable(payload) {
  * Its authoritatively assigned player ID comes from the existing game session;
  * sender IDs or coordinate claims never appear in ChatSend.
  */
-export async function openLocalChat(gameConnection, { onReceived, onResult } = {}) {
+export async function openLocalChat(gameConnection, {
+  onReceived, onResult, handshakeTimeoutMs = 10_000,
+} = {}) {
   if (gameConnection?.kind !== "webtransport" || !gameConnection.transport) {
     throw new Error("local chat requires active WebTransport game connection");
   }
+  if (!Number.isInteger(handshakeTimeoutMs) || handshakeTimeoutMs < 1 || handshakeTimeoutMs > 30_000) {
+    throw new RangeError("invalid local chat handshake deadline");
+  }
   const transport = gameConnection.transport;
-  const outgoing = await transport.createUnidirectionalStream();
-  const writer = outgoing.getWriter();
-  const incoming = transport.incomingUnidirectionalStreams.getReader();
-  const channel = await incoming.read();
-  incoming.releaseLock();
-  if (channel.done || !channel.value) throw new Error("chat reply stream unavailable");
-  const reader = channel.value.getReader();
+  let writer;
+  let reader;
+  try {
+    const outgoing = await boundedChatHandshake(
+      transport.createUnidirectionalStream(), handshakeTimeoutMs, "outgoing stream",
+      { onLate: stream => stream?.abort?.(new Error("late local chat stream")) },
+    );
+    writer = outgoing.getWriter();
+    const incoming = transport.incomingUnidirectionalStreams.getReader();
+    const pendingRead = incoming.read();
+    // Release the reader after the reply or failure. On a timeout, release
+    // the pending reader lock (rejecting its read) instead of cancelling the
+    // *shared* incomingUnidirectionalStreams collection. A cancelled
+    // collection would also prevent unrelated/future QUIC incoming streams.
+    pendingRead.then(
+      () => { try { incoming.releaseLock(); } catch { /* best effort */ } },
+      () => { try { incoming.releaseLock(); } catch { /* best effort */ } },
+    );
+    const channel = await boundedChatHandshake(
+      pendingRead, handshakeTimeoutMs, "reply stream",
+      { onTimeout: () => {
+        try { incoming.releaseLock(); } catch { /* best effort */ }
+      } },
+    );
+    if (channel.done || !channel.value) throw new Error("chat reply stream unavailable");
+    reader = channel.value.getReader();
+  } catch (error) {
+    // Never close the shared WebTransport connection used by realtime combat.
+    if (writer) {
+      try { void writer.abort(error).catch(() => {}); } catch { /* best effort */ }
+      try { writer.releaseLock(); } catch { /* best effort */ }
+    }
+    throw error;
+  }
   let closed = false;
-  let pending = new Uint8Array(0);
+  let outgoingStopped = false;
+  // Chat is optional, and its writer must never survive its receive loop.
+  // Abort only this stream; the WebTransport connection carries live combat.
+  function abortChatWriter() {
+    if (outgoingStopped) return;
+    outgoingStopped = true;
+    try {
+      Promise.resolve(writer.abort(new Error("local chat stream closed")))
+        .catch(() => {})
+        .finally(() => { try { writer.releaseLock(); } catch { /* already released */ } });
+    } catch {
+      try { writer.releaseLock(); } catch { /* already released */ }
+    }
+  }
+  // A WebTransport read is free to coalesce many *complete* frames into
+  // one chunk. Only buffer the single partial frame being decoded: rejecting
+  // a large but valid chunk, or allocating it wholesale, is unnecessary.
+  const pending = new Uint8Array(CHAT.maxFrameBytes + 2);
+  let buffered = 0;
   const reading = (async () => {
     try {
       while (!closed) {
         const { done, value } = await reader.read();
         if (done) break;
         const chunk = checkedBytes(value);
-        if (pending.length + chunk.length > 4096) throw new RangeError("chat receive buffer overflow");
-        const next = new Uint8Array(pending.length + chunk.length);
-        next.set(pending);
-        next.set(chunk, pending.length);
-        pending = next;
-        while (pending.length >= 2) {
+        let offset = 0;
+        while (!closed && offset < chunk.length) {
+          if (buffered < 2) {
+            const take = Math.min(2 - buffered, chunk.length - offset);
+            pending.set(chunk.subarray(offset, offset + take), buffered);
+            buffered += take;
+            offset += take;
+            if (buffered < 2) continue;
+          }
           const length = pending[0] | (pending[1] << 8);
-          if (length < 9 || length > CHAT.maxFrameBytes) throw new RangeError("chat frame length invalid");
-          if (pending.length < length + 2) break;
-          const event = decodeChatServerFrame(pending.slice(2, length + 2));
-          pending = pending.slice(length + 2);
-          if (event.kind === "result") onResult?.(event);
-          else onReceived?.(event);
+          if (length < 9 || length > CHAT.maxFrameBytes) {
+            throw new RangeError("chat frame length invalid");
+          }
+          const take = Math.min(length + 2 - buffered, chunk.length - offset);
+          pending.set(chunk.subarray(offset, offset + take), buffered);
+          buffered += take;
+          offset += take;
+          if (buffered === length + 2) {
+            const event = decodeChatServerFrame(pending.slice(2, buffered));
+            buffered = 0;
+            if (event.kind === "result") onResult?.(event);
+            else onReceived?.(event);
+          }
         }
+      }
+      if (!closed && buffered !== 0) {
+        throw new RangeError("truncated chat frame at stream end");
       }
     } finally {
       closed = true;
+      abortChatWriter();
       reader.releaseLock();
     }
   })();
@@ -143,8 +235,12 @@ export async function openLocalChat(gameConnection, { onReceived, onResult } = {
       await writer.write(frame);
     },
     async close() {
+      // Do not await QUIC backpressure or a peer-held reader. Cancellation
+      // wakes our pending reader.read() and the reading finally releases it.
       closed = true;
-      try { await writer.close(); } finally { writer.releaseLock(); }
+      try { Promise.resolve(reader.cancel("local chat closed")).catch(() => {}); }
+      catch { /* cancellation failure must not affect gameplay */ }
+      abortChatWriter();
     },
     get closed() { return closed; },
     reading,
