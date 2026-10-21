@@ -1,0 +1,52 @@
+name: Core 8 P0 four genuine browsers in Greyhaven staging
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/core8-p0-native-greyhaven-browser.yml"
+      - "scripts/alpha_m1_four_real_browser_flight.mjs"
+      - "server/src/main.rs"
+      - "server/src/alpha_spawn.rs"
+      - "server/src/simulation.rs"
+      - "web/online-game.mjs"
+      - "docs/CORE8_P0_GREYHAVEN_NATIVE_BROWSER_FLIGHT.md"
+
+permissions:
+  contents: read
+
+jobs:
+  four-native-greyhaven:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Source syntax and no-unreviewed-activation guard
+        run: |
+          node --check scripts/alpha_m1_four_real_browser_flight.mjs
+          if MYASO_ALPHA_BROWSER_GREYHAVEN=unreviewed node scripts/alpha_m1_four_real_browser_flight.mjs > "$RUNNER_TEMP/rejected-profile.log" 2>&1; then
+            echo "Unsafe staging option unexpectedly accepted"
+            exit 1
+          fi
+          grep -q 'must be unset or reviewed-static-only' "$RUNNER_TEMP/rejected-profile.log"
+      - name: Verify native Chrome and Firefox WebDriver availability
+        run: |
+          node --version
+          chromedriver --version
+          geckodriver --version
+          google-chrome --version
+          firefox --version
+      - name: Build actual merged authoritative Rust server
+        run: cargo build --locked --manifest-path server/Cargo.toml --bin myaso-server
+      - name: Four actual Chrome Firefox browsers in server-owned Greyhaven with collision and crash rejoin
+        env:
+          MYASO_ALPHA_BROWSER_GREYHAVEN: reviewed-static-only
+        run: timeout --signal=TERM --kill-after=5s 190s node scripts/alpha_m1_four_real_browser_flight.mjs
+      - name: Retain real browser evidence if artifact quota allows
+        if: always()
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: core8-p0-greyhaven-real-browser-w3c
+          path: alpha-m1-four-browser-evidence/*.png
+          if-no-files-found: ignore
+          retention-days: 3
