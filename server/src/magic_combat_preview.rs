@@ -372,6 +372,26 @@ mod tests {
                 fixture.world.tick,
                 initial,
             ),
+            Err(EmberPreviewError::StaleWorldTick)
+        );
+        let forged = EmberTargetProposal {
+            world_tick: fixture.world.tick,
+            ..initial
+        };
+        assert_eq!(
+            revalidate_ember_target_for_completed_tick(
+                EmberCombatContext {
+                    lease: lease(1, 1),
+                    sequence: 10,
+                    identity: &fixture.identity,
+                    loot: &fixture.loot,
+                    magic: &fixture.magic,
+                    zones: &fixture.zones,
+                    world: &fixture.world,
+                },
+                fixture.world.tick,
+                forged,
+            ),
             Err(EmberPreviewError::CasterInterrupted)
         );
         assert_eq!(fixture.magic.pending_ember_intents().count(), 1);
