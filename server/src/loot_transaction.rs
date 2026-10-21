@@ -13,7 +13,7 @@ use std::path::Path;
 use crate::character_identity::{SessionIdentityRegistry, SessionLease};
 use crate::loot::{
     CorpseItemRef, EquipmentSlot, ItemStack, LootAuthority, LootError, LootStateSnapshot,
-    ParkedInventory, PICKUP_REACH,
+    ParkedInventory, BACKPACK_CAPACITY, PICKUP_REACH,
 };
 #[cfg(test)]
 use crate::loot_persistence::save_quiescent;
@@ -318,7 +318,10 @@ pub struct VerifiedGroundSwordTarget {
 /// *interaction candidate* query, NOT the wider world-render visibility list:
 /// only swords at or within the authoritative 56-unit pickup reach appear.
 /// Distant but visually rendered swords remain in LootAuthority::visible_loot
-/// and MUST NOT be presented by the UI as selectable pickup targets.
+/// and MUST NOT be presented by the UI as selectable pickup targets. Likewise,
+/// the atomic ground→MainHand commit cannot succeed while MainHand is occupied
+/// or while the backpack is full, so those actors receive no pickup selectors.
+/// These policy gates never hide swords from other viewers or the world renderer.
 /// Non-swords, backpack/equipment and corpse contents are excluded. The query
 /// also inherits existing liveness, zone and expiry rules.
 ///
@@ -356,6 +359,18 @@ pub fn inspect_verified_ground_sword_targets(
     let visible = loot
         .visible_loot(actor, fighter, zone, tick.world.now_ms as u64)
         .map_err(PickupCommitError::Loot)?;
+    // After session, World and liveness verification, apply the same slot
+    // and backpack-capacity constraints as the atomic take+equip operation.
+    // This suppresses doomed interaction targets without suppressing the
+    // server-owned ground sword's normal render-visible appearance.
+    let inventory = loot
+        .inventory(actor)
+        .ok_or(PickupCommitError::Loot(LootError::UnknownPlayer))?;
+    if inventory.equipped(EquipmentSlot::MainHand).is_some()
+        || inventory.backpack().len() >= BACKPACK_CAPACITY
+    {
+        return Ok(Vec::new());
+    }
     let mut swords = Vec::new();
     for preview in visible {
         if let crate::loot::LootAppearance::Ground { kind, amount: 1 } = preview.appearance {
@@ -917,6 +932,144 @@ mod tests {
     }
 
     #[test]
+    fn occupied_mainhand_or_full_backpack_never_offer_false_sword_pickup() {
+        let mut world = World::new(900.0, 700.0);
+        for (id, x, y) in [
+            (1, 200.0, 200.0),
+            (2, 222.0, 200.0),
+            (3, 230.0, 200.0),
+            (4, 800.0, 600.0),
+        ] {
+            assert!(world.add_player_at(id, x, y, 0.0));
+        }
+        let mut zones = ZoneAuthority::new();
+        let mut identity = SessionIdentityRegistry::new();
+        let mut loot = LootAuthority::new();
+        for actor in 1..=4 {
+            zones.register(actor).unwrap();
+            identity
+                .bind_verified(lease(actor), CharacterId::new(u64::from(actor)).unwrap())
+                .unwrap();
+            loot.register(actor).unwrap();
+        }
+        let sword = loot.grant(1, ItemKind::RustySword, 1).unwrap();
+        let entity = loot
+            .drop_backpack(1, world.fighter(1).unwrap(), ZoneId::Moonvale, sword, 0)
+            .unwrap();
+        let tick = || PickupWorldTick {
+            world: &world,
+            completed_tick: world.tick,
+            zones: &zones,
+        };
+        let candidates = |loot: &LootAuthority, actor| {
+            inspect_verified_ground_sword_targets(loot, &identity, tick(), lease(actor))
+        };
+        assert_eq!(candidates(&loot, 2).unwrap().len(), 1);
+        assert_eq!(candidates(&loot, 3).unwrap().len(), 1);
+        let club = loot.grant(2, ItemKind::WoodenClub, 1).unwrap();
+        loot.equip(2, club, EquipmentSlot::MainHand).unwrap();
+
+        // A player with occupied MainHand can still see the sword, but cannot
+        // select it for a doomed atomic ground→MainHand operation.
+        assert!(candidates(&loot, 2).unwrap().is_empty());
+        assert_eq!(
+            candidates(&loot, 3).unwrap()[0].selection.expected_item_id,
+            sword
+        );
+        assert_eq!(
+            loot.visible_loot(2, world.fighter(2).unwrap(), ZoneId::Moonvale, 0)
+                .unwrap()
+                .len(),
+            1
+        );
+        let path = checkpoint_path();
+        let magic = MagicAuthority::new();
+        assert!(matches!(
+            commit_verified_ground_sword_equip_checked(
+                GroundSwordAuthority {
+                    path: &path,
+                    loot: &mut loot,
+                    magic: &magic,
+                    identity: &identity,
+                    tick: tick(),
+                    operation: VerifiedLootOperation {
+                        lease: lease(2),
+                        sequence: 1
+                    },
+                },
+                GroundSwordSelection {
+                    ground_entity_id: entity,
+                    expected_item_id: sword
+                },
+                |_, _, _| Ok(())
+            ),
+            Err(PickupCommitError::Loot(LootError::SlotOccupied))
+        ));
+        assert!(!path.exists());
+        assert!(loot.ground().contains_key(&entity));
+        assert_eq!(
+            loot.committed_operation_sequence(CharacterId::new(2).unwrap()),
+            None
+        );
+
+        // Removing the weapon frees MainHand and restores exactly the same
+        // physical target. An additional full backpack still blocks pickup.
+        loot.unequip(2, EquipmentSlot::MainHand).unwrap();
+        assert_eq!(candidates(&loot, 2).unwrap().len(), 1);
+        for _ in 1..BACKPACK_CAPACITY {
+            loot.grant(2, ItemKind::Gold, 1).unwrap();
+        }
+        assert_eq!(
+            loot.inventory(2).unwrap().backpack().len(),
+            BACKPACK_CAPACITY
+        );
+        assert!(candidates(&loot, 2).unwrap().is_empty());
+        assert_eq!(candidates(&loot, 3).unwrap().len(), 1);
+        assert_eq!(
+            loot.visible_loot(2, world.fighter(2).unwrap(), ZoneId::Moonvale, 0)
+                .unwrap()
+                .len(),
+            1
+        );
+        assert!(matches!(
+            commit_verified_ground_sword_equip_checked(
+                GroundSwordAuthority {
+                    path: &path,
+                    loot: &mut loot,
+                    magic: &magic,
+                    identity: &identity,
+                    tick: tick(),
+                    operation: VerifiedLootOperation {
+                        lease: lease(2),
+                        sequence: 1
+                    },
+                },
+                GroundSwordSelection {
+                    ground_entity_id: entity,
+                    expected_item_id: sword
+                },
+                |_, _, _| Ok(())
+            ),
+            Err(PickupCommitError::Loot(LootError::InventoryFull))
+        ));
+        assert_eq!(
+            loot.committed_operation_sequence(CharacterId::new(2).unwrap()),
+            None
+        );
+        assert!(!path.exists());
+        assert!(loot.ground().contains_key(&entity));
+        assert!(matches!(
+            inspect_verified_ground_sword_targets(
+                &loot,
+                &identity,
+                tick(),
+                SessionLease::new(2, 2).unwrap()
+            ),
+            Err(PickupCommitError::UnverifiedSession)
+        ));
+    }
+
+    #[test]
     fn sword_interaction_candidates_enforce_exact_physical_reach_boundary() {
         let mut world = World::new(900.0, 700.0);
         for (id, x, y) in [
@@ -1154,9 +1307,24 @@ mod tests {
         )
         .unwrap();
         assert_eq!(obtained.id, rusty);
+        // Pickup successfully equipped MainHand. The remaining IronSword
+        // stays present and visible in the shared world, but is not an
+        // actionable target for an actor whose MainHand is now occupied.
         let after = preview(lease(2), &world, &loot, world.tick).unwrap();
-        assert_eq!(after.len(), 1);
-        assert_eq!(after[0].selection.expected_item_id, iron);
+        assert!(after.is_empty());
+        let unarmed_view = preview(lease(1), &world, &loot, world.tick).unwrap();
+        assert_eq!(unarmed_view.len(), 1);
+        assert_eq!(unarmed_view[0].selection.expected_item_id, iron);
+        assert!(loot
+            .visible_loot(
+                2,
+                world.fighter(2).unwrap(),
+                ZoneId::Moonvale,
+                world.now_ms as u64
+            )
+            .unwrap()
+            .iter()
+            .any(|item| item.entity_id == second));
         assert_eq!(
             loot.inventory(2)
                 .unwrap()
