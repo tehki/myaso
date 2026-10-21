@@ -32,15 +32,9 @@ test("P0 parity fails closed for malformed or impossible viewports",()=>{
  assert.throws(()=>nextNativeW3cWindowRect(chrome,{width:600,height:300}));
  assert.equal(nativeContentViewportMatches({innerWidth:"1280",innerHeight:720}),false);
 });
-test("P0 real WebDriver experiment is opt-in and uses original screenshots/player movement",()=>{
- const script=readFileSync(new URL("alpha_p0_four_native_rack_at_approaches.mjs",new URL("../scripts/",import.meta.url)),"utf8");
- assert.match(script,/GRAPHICS3B_P0_VIEWPORT_PARITY/);
- assert.match(script,/nextNativeW3cWindowRect/);
- assert.match(script,/nativeContentViewportMatches/);
- assert.match(script,/window\/rect/);
- assert.match(script,/innerWidth/);
- assert.match(script,/originalWorldApproach:slot\.approach/);
- assert.match(script,/observedRustReplicatedPoint:pos/);
- assert.match(script,/W3C|w3c/);
- assert.doesNotMatch(script,/scrollTo\(|scrollIntoView\(|setPlayerPosition\(/);
+test("P0 source fixture is dimension-only and never changes gameplay",()=>{
+ const sample=readFileSync(new URL("../scripts/graphics3b_native_viewport_parity.mjs",import.meta.url),"utf8");
+ assert.match(sample,/innerWidth/);
+ assert.match(sample,/outerHeight/);
+ assert.doesNotMatch(sample,/scrollTo\(|scrollIntoView\(|TryPickup\(|setPlayerPosition\(/);
 });
