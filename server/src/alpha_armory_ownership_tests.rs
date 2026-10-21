@@ -160,12 +160,12 @@ fn four_rack_swords_equip_drop_transfer_recover_without_clone_or_false_ack() {
     assert_eq!(journal.item_count(), 4);
 
     // Drop is world-visible in the ownership truth, not reminted as a new ID.
-    let drop = [OwnershipOp::Move {
+    let drop_op = [OwnershipOp::Move {
         item: id(201),
         from: equipped(1),
         to: rack(4),
     }];
-    let drop_receipt = journal.apply(txn(108), &drop).unwrap();
+    let drop_receipt = journal.apply(txn(108), &drop_op).unwrap();
     assert_eq!(journal.location(id(201)), Some(rack(4)));
     assert_ne!(journal.location(id(201)), Some(equipped(1)));
 
@@ -204,7 +204,7 @@ fn four_rack_swords_equip_drop_transfer_recover_without_clone_or_false_ack() {
     assert_eq!(restored.location(id(204)), Some(equipped(4)));
     assert_eq!(
         restored
-            .apply(txn(108), &drop)
+            .apply(txn(108), &drop_op)
             .expect("historical ACK retry"),
         drop_receipt
     );
