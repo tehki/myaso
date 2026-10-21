@@ -13,6 +13,7 @@ import { createReconciliationCamera, createSnapshotRenderClock } from "../src/br
 import { createRenderGapTelemetry } from "../src/browser/render-gap-telemetry.mjs";
 import { ARENA_VIEW_ZOOM, nearbyOffscreenPointers, projectArenaPoint } from "../src/browser/arena-viewport.mjs";
 import { createAuthoredWorldRenderer } from "../src/browser/authored-world-renderer.mjs";
+import { createWorldLivenessProbe, isWorldLivenessProbeEnabled } from "../src/browser/world-liveness-probe.mjs";
 import { MAP_IDS } from "../src/world/authored-maps.mjs";
 import { NETWORK } from "../src/network/constants.mjs";
 import { connectAuthoritativeClient, parseSha256Hex } from "./authoritative-client.mjs";
@@ -119,6 +120,10 @@ const diagnosticsVisible = params.get("netstats") === "1";
 // become functional only after server-approved zone transitions are implemented.
 const fixedWorldEnabled = params.get("world") === "1" && !params.has("scenario");
 const authoredWorld = fixedWorldEnabled ? createAuthoredWorldRenderer() : null;
+// Never expose diagnostics on public origins or without the explicit local preview flag.
+// Read-only counters measure network receipt, world canvas paint and status independently.
+const worldLivenessProbe = isWorldLivenessProbeEnabled(window.location) ? createWorldLivenessProbe() : null;
+if (worldLivenessProbe) window.__MYASO_WORLD_LIVENESS__ = worldLivenessProbe;
 const renderGapTelemetry = diagnosticsVisible ? createRenderGapTelemetry() : null;
 const diagnosticsPanel = document.querySelector("#network-diagnostics");
 if (diagnosticsPanel) diagnosticsPanel.hidden = !diagnosticsVisible;
@@ -351,6 +356,8 @@ networkClient = await connectAuthoritativeClient({
     if (!ownId) return;
     const own = state.get(ownId);
     if (own) {
+      // Count only received authoritative network snapshots; no synthetic tick increments.
+      worldLivenessProbe?.recordSnapshot(networkClient.latestServerTick, Date.now());
       // Initial player state is available before the first aligned input ACK.
       if (networkStatus.startsWith("Connecting")) {
         networkStatus = `Online - player #${ownId} - server tick ${networkClient.latestServerTick}`;
@@ -904,8 +911,11 @@ function render(nowMs = performance.now(), impact = combatImpact.sample(nowMs)) 
   ctx.translate(-canvas.width / 2, -canvas.height / 2);
 
   if (authoredWorld && local.initialized) {
+    const worldPaintStart = worldLivenessProbe ? performance.now() : 0;
+    worldLivenessProbe?.startPaint(Date.now());
     authoredWorld.draw(ctx, MAP_IDS.overworld, visualCameraPosition,
       canvas.width, canvas.height, ARENA_VIEW_ZOOM);
+    worldLivenessProbe?.endPaint(Date.now(), performance.now() - worldPaintStart, authoredWorld.stats);
   }
 
   for (const entity of networkClient.state.values()) {
@@ -1785,6 +1795,7 @@ function setStatus(text) {
   if (hudCache.status === text) return;
   hudCache.status = text;
   eventText.textContent = text;
+  worldLivenessProbe?.recordStatus(text, Date.now());
 }
 
 function createArenaLayer() {
@@ -1825,6 +1836,7 @@ function frame(now) {
   } else {
     render(now, impact);
   }
+  worldLivenessProbe?.recordFrame(Date.now());
   animationFrameId = requestAnimationFrame(frame);
 }
 
