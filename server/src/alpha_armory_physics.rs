@@ -532,6 +532,70 @@ mod tests {
     }
 
     #[test]
+    fn core_8c_corner_skirt_has_disjoint_slab_intervals_and_must_stay_open() {
+        // Core 8C #519 separately inflates the World #502 smith solid by
+        // fighter radius=18. This is the exact inflated AABB. A swept actor
+        // past its south-east corner has disjoint x/y intersection intervals,
+        // despite each coordinate range overlapping an AABB axis separately.
+        // No diagonal false-positive wall should block an otherwise safe route.
+        let inflated_smith = SolidRect {
+            min_x: 3692.0,
+            min_y: 3832.0,
+            max_x: 3910.0,
+            max_y: 4030.0,
+        };
+        let clear_from = WorldPoint {
+            zone_id: CURRENT.zone_id,
+            x: 3900.0,
+            y: 4038.0,
+        };
+        let clear_to = WorldPoint {
+            zone_id: CURRENT.zone_id,
+            x: 3960.0,
+            y: 4000.0,
+        };
+        let fixture = GeometryWindow {
+            fence: CURRENT,
+            complete: true,
+            bounds: SolidRect {
+                min_x: 3850.0,
+                min_y: 3950.0,
+                max_x: 4000.0,
+                max_y: 4100.0,
+            },
+            solids: &[inflated_smith],
+        };
+        assert!(!crosses_solid(clear_from, clear_to, &inflated_smith));
+        assert_eq!(
+            verify_pickup_geometry(clear_from, clear_to, &fixture, CURRENT, 96.0),
+            Ok(())
+        );
+        // Conversely, real radius-inflated intersections and closed tangency
+        // must still block, exactly as the active 8C movement kernel should.
+        let colliding_to = WorldPoint {
+            x: 3905.0,
+            y: 4000.0,
+            ..clear_to
+        };
+        assert_eq!(
+            verify_pickup_geometry(clear_from, colliding_to, &fixture, CURRENT, 96.0),
+            Err(PickupGeometryReject::Occluded)
+        );
+        let grazing_from = WorldPoint {
+            y: 4030.0,
+            ..clear_from
+        };
+        let grazing_to = WorldPoint {
+            y: 4030.0,
+            ..clear_to
+        };
+        assert_eq!(
+            verify_pickup_geometry(grazing_from, grazing_to, &fixture, CURRENT, 96.0),
+            Err(PickupGeometryReject::Occluded)
+        );
+    }
+
+    #[test]
     fn core_8c_u64_zone_key_is_not_truncated_to_32_bits() {
         // Core C4d #393 stores ZoneKey(NonZeroU64) in a positive signed
         // 63-bit SQL bigint, not an ephemeral u32 network actor ID.
