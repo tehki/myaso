@@ -12,7 +12,8 @@ test("read-only actual network state probe requires localhost original rack plus
  assert.match(game,/\["localhost","127\.0\.0\.1","\[::1\]"\]/);
  assert.match(game,/window\.__MYASO_NATIVE_RACK_WALK_READONLY__/);
  assert.match(game,/Object\.freeze\(\[\.\.\.networkClient\.state\.values\(\)\]/);
- assert.doesNotMatch(flight,/__MYASO_ACCEPTANCE_STATE__/);
+ assert.match(flight,/acceptance:!!window\\.__MYASO_ACCEPTANCE_STATE__/);
+ assert.match(flight,/!s\\.scenario&&!s\\.acceptance/);
 });
 
 test("actual original rack flight creates four genuine native drivers and no synthetic sword objects",()=>{
