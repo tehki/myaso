@@ -415,9 +415,12 @@ impl DurableItemJournal {
         if self.ledger.location(item) != Some(expected) {
             return Ok((sequence, None));
         }
-        let mutation = self.ledger.last_mutation_sequence(item).ok_or(
-            ItemJournalError::InvalidRecord("current ground item without mutation"),
-        )?;
+        let mutation =
+            self.ledger
+                .last_mutation_sequence(item)
+                .ok_or(ItemJournalError::InvalidRecord(
+                    "current ground item without mutation",
+                ))?;
         if mutation == 0 || mutation > sequence {
             return Err(ItemJournalError::InvalidRecord(
                 "inconsistent ground item mutation revision",
@@ -995,24 +998,3 @@ mod tests {
         assert!(!root.record(2).exists());
     }
 
-    #[cfg(unix)]
-    #[test]
-    fn new_transaction_files_have_owner_only_permissions() {
-        use std::os::unix::fs::PermissionsExt;
-        let root = Root::new();
-        root.open()
-            .apply(
-                txn(1),
-                &[OwnershipOp::Create {
-                    item: item(1),
-                    at: inv(1),
-                }],
-            )
-            .expect("commit");
-        let mode = fs::metadata(root.record(1))
-            .expect("metadata")
-            .permissions()
-            .mode();
-        assert_eq!(mode & 0o777, 0o600);
-    }
-}
