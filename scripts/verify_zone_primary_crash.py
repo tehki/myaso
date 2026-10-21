@@ -519,6 +519,64 @@ def test_forced_handoff_fk_lock_contention():
             client.wait(timeout=6)
 
 
+def test_simultaneous_duplicate_operation_retries_after_primary_restart():
+    # Both callers use the SAME immutable mutation ID and exact request.
+    # This is the lost-ACK retry race, not the different-ID revision CAS case.
+    register(83)
+    left, right = racing_mutations(mutate(8301, 83), mutate(8301, 83))
+    require(left.returncode == 0 and right.returncode == 0,
+            f"duplicate mutation retries must both return receipts: {left.stderr} {right.stderr}")
+    received = [left.stdout.strip(), right.stdout.strip()]
+    require(all(receipt.startswith("1|") for receipt in received)
+            and sorted(receipt.rsplit("|", 1)[-1] for receipt in received) == ["f", "t"],
+            f"exactly one new mutation and one historical replay: {received}")
+    require(received[0].split("|", 2)[1] == received[1].split("|", 2)[1],
+            "both callers must receive the identical durable outbox sequence")
+    require(count("world_mutation_receipts", "mutation_id", 8301) == 1
+            and count("world_event_outbox", "entity_id", 83) == 1
+            and count("world_state", "entity_id", 83) == 1,
+            "simultaneous retries cannot insert extra state, receipts or events")
+    require(sql(mutate(8301, 83)).endswith("|t"),
+            "subsequent retry remains purely historical")
+    conflicting_payload = mutate(8301, 83).replace(
+        "decode('7374617465', 'hex')", "decode('6368616e676564', 'hex')")
+    require(conflicting_payload != mutate(8301, 83), "payload conflict must differ")
+    sql(conflicting_payload, expect_failure=True)
+    require(count("world_mutation_receipts", "mutation_id", 8301) == 1
+            and count("world_event_outbox", "entity_id", 83) == 1,
+            "conflicting same operation ID must not rewrite durable result")
+    print("PASS: simultaneous identical mutation retries share one receipt/outbox")
+
+    # Two independent connections concurrently prepare one handoff operation
+    # ID, then concurrently commit it. Prepared and committed ACK loss must
+    # never advance an extra epoch or accidentally grant both owners.
+    register(84)
+    left, right = racing_mutations(
+        prepare(8401, 84, target=3),
+        prepare(8401, 84, target=3),
+    )
+    require(left.returncode == 0 and right.returncode == 0
+            and left.stdout.strip() == "prepared"
+            and right.stdout.strip() == "prepared",
+            f"duplicate prepare must be idempotent: {left.stderr} {right.stderr}")
+    require(count("handoffs", "operation_id", 8401) == 1
+            and not current(84) and not current(84, 3, 2),
+            "single durable prepare freezes both candidate workers")
+    commit = f"SELECT core_zone.commit_transfer({ident(8401)});"
+    left, right = racing_mutations(commit, commit)
+    require(left.returncode == 0 and right.returncode == 0
+            and left.stdout.strip() == "2" and right.stdout.strip() == "2",
+            f"duplicate commit must return one epoch: {left.stderr} {right.stderr}")
+    require(current(84, 3, 2) and not current(84)
+            and count("handoffs", "operation_id", 8401) == 1,
+            "simultaneous handoff retries must grant target only once")
+    sql(prepare(8401, 84, target=2), expect_failure=True)
+    require(sql(commit) == "2"
+            and not current(84, 3, 3),
+            "conflicting reuse is denied and historical ACK cannot advance epoch")
+    print("PASS: simultaneous identical prepare/commit retries advance epoch once")
+
+
 def main():
     container = guarded_container()
     seed()
@@ -558,6 +616,7 @@ def main():
     test_concurrent_fencing_after_primary_restart()
     test_racing_handoff_operations_after_primary_restart()
     test_forced_handoff_fk_lock_contention()
+    test_simultaneous_duplicate_operation_retries_after_primary_restart()
     print("C4H PRIMARY CRASH ACCEPTANCE PASSED (one disposable PG16 primary)")
 
 
