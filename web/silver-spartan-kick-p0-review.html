@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="icon" href="data:,">
+<title>Graphics 3A | Original Silver Knight Spartan-style power kick</title>
+<style>
+:root{color-scheme:dark} body{margin:0;background:#1a302e;color:#ede9dc;font:15px/1.45 system-ui}
+header{background:#2b4840;padding:16px 20px;border-bottom:1px solid #799589}
+h1{font:700 24px Georgia,serif;margin:0 0 5px}.hold{color:#f0bf85}
+main{max-width:1370px;margin:auto;padding:14px}
+.controls{display:flex;gap:12px;align-items:center;background:#2b4840;padding:12px;flex-wrap:wrap}
+.controls button,.controls select,.controls input{background:#416357;color:white;border:1px solid #9faea3;padding:6px}
+canvas{width:100%;display:block;background:#9aac9f;border:1px solid #a3baaa;margin:12px 0}
+small{color:#becec4} #report{color:#ebcc9c;font:13px/1.5 ui-monospace,monospace}
+</style>
+</head>
+<body>
+<header><h1>Silver Knight | SPARTAN-style high-knee front push kick</h1>
+<div class="hold">SOURCE-ART VISUAL HOLD | Real original Blender Silver Knight | Not Greyhaven gameplay, physics, server hit, or approved animation</div>
+</header>
+<main>
+<div class="controls">
+<button id="play">Pause 380ms loop</button><button id="prev">Previous frame</button><button id="next">Next frame</button>
+<label>Frame <input type="range" id="frame" min="0" max="7" value="0"></label>
+<output id="phase">1/8</output>
+<label>Speed <select id="speed"><option value="1">100%</option><option value="0.5">50%</option><option value="0.25">25%</option></select></label>
+</div>
+<canvas id="compare" width="1340" height="461" aria-label="Eight-direction before and after actual Blender source Silver Knight front push kick"></canvas>
+<div id="report"></div>
+<p><strong>Top:</strong> original Silver Knight grounded source kick from PR #585.
+<strong>Bottom:</strong> new original high-knee chamber, explosive boot thrust at the 90-160ms active phase, and weighted knee recoil. Both rows contain authentic transparent Blender-rendered 160px Silver Knight poses in all eight facings.</p>
+<p>Artwork proves authored pose differences, not actual damage. A big target hit reaction, impact sound or knockback must await server-verified Combat events. The source foot-toe anchor is not a validated Greyhaven boot sole or center of mass. The server-owned fighter root, hitboxes, attack phase timing and 140ms dash are unchanged.</p>
+<small>Human visual approval, world camera/ground check, and authenticated local/remote multiplayer synchronization still required.</small>
+</main>
+<script type="module" src="./silver-spartan-kick-p0-review.mjs"></script>
+</body></html>

@@ -1,0 +1,43 @@
+{
+  "sourceHead": "c3aa140998fdd4a1873172bdf18a1b0cf28794c4",
+  "priorPlantedKickAtlasSha256": "e339c6d63410342e08d71a480607806c7ad5ebef0796b5386d9ff78da4ba82fc",
+  "newSpartanKickAtlasSha256": "8e8fe3aaab06f428a51cfb7ca6a54ee18c908df05518da02050d073ec32fc909",
+  "spartanComparisonGifSha256": "a847ae137ec9162d749843c447297a570741e6c7c4bedcb145e5d8f586dbbbef",
+  "sourceDrawCount": 64,
+  "sourceFramesPerFacing": 8,
+  "directionCount": 8,
+  "sourceFramePx": [
+    160,
+    160
+  ],
+  "atlasPx": [
+    1280,
+    1280
+  ],
+  "kickVisualBudgetMs": 380,
+  "timingsMs": [
+    20,
+    40,
+    50,
+    40,
+    50,
+    65,
+    70,
+    45
+  ],
+  "pixelChangesPerFacing": [
+    163905,
+    158012,
+    160796,
+    160507,
+    163359,
+    164889,
+    167373,
+    162838
+  ],
+  "approvedHumanVisual": false,
+  "verifiedRealGround": false,
+  "gameplayEnabled": false,
+  "serverOrHitboxChanged": false,
+  "dashOriginalUnchanged": true
+}
