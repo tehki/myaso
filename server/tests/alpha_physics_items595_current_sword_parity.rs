@@ -540,3 +540,75 @@ fn items_pickup_reach_matches_physics_for_dense_original_sword_boundary() {
     );
     assert_eq!(loot.export_state().unwrap(), original_loot);
 }
+
+#[test]
+fn current_corpse_at_selected_rack_blocks_source_even_when_los_is_clear() {
+    use myaso_server::simulation::Action;
+    let (mut world, mut loot, sockets, original) = create_real_items_world();
+    let owner = world.fighter(5).unwrap().clone();
+    let sword = loot.ground().get(&original[0].ground_entity_id).unwrap();
+    let target = p(sword.at.x, sword.at.y);
+    let actor = p(owner.x, owner.y);
+    assert_eq!(
+        verify_pickup_geometry_at_completed_tick(
+            actor,
+            target,
+            &test_window(&core_solids(), true),
+            TEST_FENCE,
+            PICKUP_REACH,
+            TEST_TICKS
+        ),
+        Ok(()),
+        "a clear static ray is intentionally insufficient to grant a selected item"
+    );
+    assert_eq!(
+        loot.proposed_current_rack_swords(ZoneId::Moonvale, sockets, 11)
+            .unwrap()[0],
+        Some(original[0])
+    );
+
+    // Generate a REAL Items-domain corpse, not a mocked extra rectangle or
+    // fabricated snapshot field. The corpse and separate current sword are
+    // both physical interaction targets at the SAME World-authored socket.
+    assert!(world.add_player_at(9, sockets[0].at.x, sockets[0].at.y, 0.0));
+    loot.register(9).unwrap();
+    loot.grant(9, ItemKind::Gold, 1).unwrap();
+    let mut dead = world.fighter(9).unwrap().clone();
+    dead.action = Action::Dead;
+    let corpse_id = loot.death(9, &dead, ZoneId::Moonvale, 12).unwrap();
+    assert_eq!(loot.corpses()[&corpse_id].at, sockets[0].at);
+    let before = loot.export_state().unwrap();
+    assert_eq!(
+        loot.proposed_current_rack_swords(ZoneId::Moonvale, sockets, 13),
+        Err(LootError::InvalidState),
+        "the entire CURRENT rack projection must fail closed on a live corpse overlap"
+    );
+    assert_eq!(loot.export_state().unwrap(), before);
+    assert!(loot.ground().contains_key(&original[0].ground_entity_id));
+
+    // Geometry is still read-only and sees no extra CURRENT collider in the
+    // pinned 23-static table. An Ok here deliberately PROVES NOTHING about
+    // rack identity or item/corpse overlap and may never call TryPickup.
+    assert_eq!(
+        verify_pickup_geometry_at_completed_tick(
+            actor,
+            target,
+            &test_window(&core_solids(), true),
+            TEST_FENCE,
+            PICKUP_REACH,
+            TEST_TICKS
+        ),
+        Ok(())
+    );
+    assert_eq!(
+        verify_pickup_geometry_at_completed_tick(
+            actor,
+            target,
+            &test_window(&core_solids(), false),
+            TEST_FENCE,
+            PICKUP_REACH,
+            TEST_TICKS
+        ),
+        Err(PickupGeometryReject::IncompleteGeometry)
+    );
+}

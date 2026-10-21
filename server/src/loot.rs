@@ -484,6 +484,19 @@ impl LootAuthority {
                 break;
             }
         }
+        // Corpses are independently selectable world loot objects, not
+        // ground sword stacks. A living corpse at the EXACT authored rack
+        // point makes that socket physically ambiguous even if there is
+        // otherwise exactly one valid sword. Do not render/authorize the
+        // sword while ignoring the second physical object.
+        for corpse in self.corpses.values() {
+            if corpse.zone != zone || corpse.expires_at_ms <= now_ms {
+                continue;
+            }
+            if sockets.iter().any(|socket| socket.at == corpse.at) {
+                return Err(LootError::InvalidState);
+            }
+        }
         Ok(slots)
     }
 
@@ -1500,6 +1513,44 @@ mod tests {
             Err(LootError::InvalidState),
             "non-sword at authored rack coordinates must not pass as a sword"
         );
+        // Real server-owned death produces an independently lootable Corpse
+        // at the authored sword point. Existing GroundDrop-only inspection
+        // would falsely report a clean rack even though TWO different world
+        // objects occupy one exact socket. Fail the WHOLE projection closed.
+        assert!(world.add_player_at(2, sockets[1].at.x, sockets[1].at.y, 0.0));
+        loot.register(2).unwrap();
+        loot.grant(2, ItemKind::Gold, 1).unwrap();
+        let mut dead_fighter = world.fighter(2).unwrap().clone();
+        dead_fighter.action = Action::Dead;
+        let corpse_id = loot.death(2, &dead_fighter, zone, 21).unwrap();
+        assert_eq!(loot.corpses()[&corpse_id].at, sockets[1].at);
+        assert_eq!(
+            loot.proposed_current_rack_swords(zone, sockets, 21),
+            Err(LootError::InvalidState),
+            "a nonexpired real corpse on a rack sword is ambiguous"
+        );
+        // Expired corpse must not suppress otherwise current rack ground
+        // items; no corpse cleanup/minting is needed for this read.
+        let mut expired = loot.export_state().unwrap();
+        expired.corpses.get_mut(&corpse_id).unwrap().expires_at_ms = 22;
+        let expired = LootAuthority::restore_state(expired).unwrap();
+        assert_eq!(
+            expired
+                .proposed_current_rack_swords(zone, sockets, 22)
+                .unwrap(),
+            next,
+            "expired corpse no longer hides the original three swords"
+        );
+        // A corpse on an EMPTY rack point is still an ambiguous physical
+        // rack projection, rather than a false available/empty assertion.
+        let mut empty_overlap = loot.export_state().unwrap();
+        empty_overlap.corpses.get_mut(&corpse_id).unwrap().at = sockets[0].at;
+        let empty_overlap = LootAuthority::restore_state(empty_overlap).unwrap();
+        assert_eq!(
+            empty_overlap.proposed_current_rack_swords(zone, sockets, 21),
+            Err(LootError::InvalidState)
+        );
+
         let mut duplicate_sockets = sockets;
         duplicate_sockets[3] = duplicate_sockets[0];
         assert_eq!(
