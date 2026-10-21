@@ -131,8 +131,14 @@ BEGIN
         RETURN;
     END IF;
 
+    -- Receipt INSERT already holds a foreign-key KEY SHARE on this entity.
+    -- Distinct mutation IDs can both hold KEY SHARE; upgrading both to
+    -- FOR UPDATE deadlocks before either can run the revision CAS.
+    -- FOR NO KEY UPDATE conflicts with competing writers/handoffs but is
+    -- compatible with FK KEY SHARE, so revisions still serialize safely.
+    -- No path in this transaction mutates the entity's primary key.
     SELECT * INTO STRICT owned FROM core_zone.entities
-    WHERE entity_kind = p_kind AND entity_id = p_entity FOR UPDATE;
+    WHERE entity_kind = p_kind AND entity_id = p_entity FOR NO KEY UPDATE;
 
     IF owned.retired OR owned.pending_operation IS NOT NULL
         OR owned.owner_worker != p_worker
