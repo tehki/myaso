@@ -154,8 +154,62 @@ try{
    assert.ok(narrowed.width<=390);
    const img2="armory_world493_ui503_"+engine+"_dpr2.png";
    await page.screenshot({path:join(out,img2),fullPage:true});
+   // First Playable demands FOUR independently clickable physical swords,
+   // not merely repeated proofs on rack sword #1. Exercise each original
+   // World socket and genuine Blender alpha through the hardened UI pointer
+   // handler in BOTH CSS-scaled DPR2 and original 640px backing views.
+   const maskOverlap=await page.evaluate(()=>window.__p0WorldUiSourceMaskOverlap());
+   const stableHit=await page.evaluate(()=>window.__alphaSamplerInfo().stableSourcePixel);
+   assert.equal(stableHit.radius,2);
+   assert.equal(stableHit.qaLandmarkOnly,true);
+   assert.equal(stableHit.expandsHitBox,false);
+   assert.equal(maskOverlap.count,4);
+   assert.equal(maskOverlap.pairs.length,6);
+   assert.equal(maskOverlap.maxOverlap,0);
+   const allSwordClicks=[];
+   for(const [mode,w,h,dpr] of [["scaled-dpr2",390,780,2],["desktop",1140,860,1]]){
+    await page.setViewport({width:w,height:h,deviceScaleFactor:dpr});
+    const region=await page.$eval("#scene",el=>{
+     const b=el.getBoundingClientRect();
+     return{x:b.x,y:b.y,width:b.width,height:b.height};
+    });
+    const start=await page.evaluate(()=>window.__p0WorldUiReview());
+    assert.equal(start.swordCount,4);
+    const expectedIds=start.swordRects.map(s=>s.id);
+    assert.equal(new Set(expectedIds).size,4);
+    for(const [index,sword] of start.swordRects.entries()){
+     const px=sword.x+stableHit.x+.5,py=sword.y+stableHit.y+.5;
+     const actual=await page.evaluate(([x,y])=>window.__p0WorldUiPixelCandidate(x,y),[px,py]);
+     assert.equal(actual,sword.id,"Distinct visual source candidate "+mode+" #"+index);
+     const prior=await page.evaluate(()=>window.__p0WorldUiReview());
+     await page.mouse.click(region.x+px*region.width/640,
+                            region.y+py*region.height/640);
+     const result=await page.evaluate(()=>window.__p0WorldUiReview());
+     if(result.visualIntents.length!==prior.visualIntents.length+1)
+       console.log("FOUR_SWORD_MISMATCH="+JSON.stringify({engine,mode,index,sword,px,py,region,
+         resultBefore:{intents:prior.visualIntents.length,fallthrough:prior.combatFallback,
+           cancelled:prior.cancelled,events:prior.browserPointerEvents?.slice(-4)},
+         resultAfter:{intents:result.visualIntents.length,fallthrough:result.combatFallback,
+           cancelled:result.cancelled,events:result.browserPointerEvents?.slice(-4),
+           upHandled:result.upHandled,upCandidate:result.upCandidate,downHandled:result.downHandled}}));
+     assert.equal(result.visualIntents.length,prior.visualIntents.length+1);
+     assert.equal(result.visualIntents.at(-1),sword.id);
+     assert.equal(result.combatFallback,1);
+     assert.equal(result.cancelled,3);
+     assert.equal(result.actualServerEvents,0);
+     allSwordClicks.push({mode,index,itemId:sword.id,
+      pointerCanvasXY:[px,py],cssWidth:region.width,
+      visualIntentOnly:true,realPickupCommitted:false});
+    }
+    assert.deepEqual(allSwordClicks.filter(x=>x.mode===mode).map(x=>x.itemId),expectedIds);
+   }
+   const afterAll=await page.evaluate(()=>window.__p0WorldUiReview());
+   assert.equal(afterAll.visualIntents.length,10);
+   assert.equal(afterAll.combatFallback,1);
+   assert.equal(afterAll.cancelled,3);
    assert.deepEqual(errors,[]);
-   results.push({engine,version:await browser.version(),errors,
+   results.push({engine,version:await browser.version(),errors,maskOverlap,stableHit,allSwordClicks,
+     afterAllFourSourcePixelClicks:afterAll,
      sourcePins:initial.sourceWorldSocketPositions,opaqueSourcePixel:[20,13],
      adversarial:ad,alphaSampler,initial,afterOpaque,afterClear,afterDrag,afterRevision,
      afterItemRemoval:removed,afterDpr2:afterScaled,

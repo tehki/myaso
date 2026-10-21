@@ -23,6 +23,286 @@
       "engine": "chrome",
       "version": "Chrome/154.0.8037.99",
       "errors": [],
+      "maskOverlap": {
+        "count": 4,
+        "pairs": [
+          {
+            "ids": [
+              "ART-ONLY-NO-SERVER-0",
+              "ART-ONLY-NO-SERVER-1"
+            ],
+            "sourceMaskOverlapPixels": 0
+          },
+          {
+            "ids": [
+              "ART-ONLY-NO-SERVER-0",
+              "ART-ONLY-NO-SERVER-2"
+            ],
+            "sourceMaskOverlapPixels": 0
+          },
+          {
+            "ids": [
+              "ART-ONLY-NO-SERVER-0",
+              "ART-ONLY-NO-SERVER-3"
+            ],
+            "sourceMaskOverlapPixels": 0
+          },
+          {
+            "ids": [
+              "ART-ONLY-NO-SERVER-1",
+              "ART-ONLY-NO-SERVER-2"
+            ],
+            "sourceMaskOverlapPixels": 0
+          },
+          {
+            "ids": [
+              "ART-ONLY-NO-SERVER-1",
+              "ART-ONLY-NO-SERVER-3"
+            ],
+            "sourceMaskOverlapPixels": 0
+          },
+          {
+            "ids": [
+              "ART-ONLY-NO-SERVER-2",
+              "ART-ONLY-NO-SERVER-3"
+            ],
+            "sourceMaskOverlapPixels": 0
+          }
+        ],
+        "maxOverlap": 0,
+        "sourceMaskOnly": true,
+        "liveRenderedGameOcclusionValidated": false
+      },
+      "stableHit": {
+        "x": 20,
+        "y": 55,
+        "radius": 2,
+        "minimumNeighborhoodAlpha": 224,
+        "qaLandmarkOnly": true,
+        "expandsHitBox": false
+      },
+      "allSwordClicks": [
+        {
+          "mode": "scaled-dpr2",
+          "index": 0,
+          "itemId": "ART-ONLY-NO-SERVER-0",
+          "pointerCanvasXY": [
+            269.1,
+            260.5
+          ],
+          "cssWidth": 358,
+          "visualIntentOnly": true,
+          "realPickupCommitted": false
+        },
+        {
+          "mode": "scaled-dpr2",
+          "index": 1,
+          "itemId": "ART-ONLY-NO-SERVER-1",
+          "pointerCanvasXY": [
+            302.7,
+            260.5
+          ],
+          "cssWidth": 358,
+          "visualIntentOnly": true,
+          "realPickupCommitted": false
+        },
+        {
+          "mode": "scaled-dpr2",
+          "index": 2,
+          "itemId": "ART-ONLY-NO-SERVER-2",
+          "pointerCanvasXY": [
+            336.3,
+            260.5
+          ],
+          "cssWidth": 358,
+          "visualIntentOnly": true,
+          "realPickupCommitted": false
+        },
+        {
+          "mode": "scaled-dpr2",
+          "index": 3,
+          "itemId": "ART-ONLY-NO-SERVER-3",
+          "pointerCanvasXY": [
+            369.9,
+            260.5
+          ],
+          "cssWidth": 358,
+          "visualIntentOnly": true,
+          "realPickupCommitted": false
+        },
+        {
+          "mode": "desktop",
+          "index": 0,
+          "itemId": "ART-ONLY-NO-SERVER-0",
+          "pointerCanvasXY": [
+            269.1,
+            260.5
+          ],
+          "cssWidth": 640,
+          "visualIntentOnly": true,
+          "realPickupCommitted": false
+        },
+        {
+          "mode": "desktop",
+          "index": 1,
+          "itemId": "ART-ONLY-NO-SERVER-1",
+          "pointerCanvasXY": [
+            302.7,
+            260.5
+          ],
+          "cssWidth": 640,
+          "visualIntentOnly": true,
+          "realPickupCommitted": false
+        },
+        {
+          "mode": "desktop",
+          "index": 2,
+          "itemId": "ART-ONLY-NO-SERVER-2",
+          "pointerCanvasXY": [
+            336.3,
+            260.5
+          ],
+          "cssWidth": 640,
+          "visualIntentOnly": true,
+          "realPickupCommitted": false
+        },
+        {
+          "mode": "desktop",
+          "index": 3,
+          "itemId": "ART-ONLY-NO-SERVER-3",
+          "pointerCanvasXY": [
+            369.9,
+            260.5
+          ],
+          "cssWidth": 640,
+          "visualIntentOnly": true,
+          "realPickupCommitted": false
+        }
+      ],
+      "afterAllFourSourcePixelClicks": {
+        "ready": true,
+        "worldHead": "07060f981b8a1dac89184b621b6893dd970a08ae",
+        "uiHead": "8d500d8ddeb4058f15dbc704bf78d685d1ca31ef",
+        "originalWorldImported": true,
+        "originalUiGestureImported": true,
+        "sourceWorldSocketPositions": [
+          [
+            3740,
+            4038
+          ],
+          [
+            3780,
+            4038
+          ],
+          [
+            3820,
+            4038
+          ],
+          [
+            3860,
+            4038
+          ]
+        ],
+        "lastPresentedFrameId": 10,
+        "frameId": 10,
+        "visibleIds": [
+          "ART-ONLY-NO-SERVER-0",
+          "ART-ONLY-NO-SERVER-1",
+          "ART-ONLY-NO-SERVER-2",
+          "ART-ONLY-NO-SERVER-3"
+        ],
+        "swordRects": [
+          {
+            "id": "ART-ONLY-NO-SERVER-0",
+            "x": 248.60000000000002,
+            "y": 205,
+            "width": 42,
+            "height": 115,
+            "socketId": "greyhaven-rack-1",
+            "revision": 0
+          },
+          {
+            "id": "ART-ONLY-NO-SERVER-1",
+            "x": 282.2,
+            "y": 205,
+            "width": 42,
+            "height": 115,
+            "socketId": "greyhaven-rack-2",
+            "revision": 0
+          },
+          {
+            "id": "ART-ONLY-NO-SERVER-2",
+            "x": 315.8,
+            "y": 205,
+            "width": 42,
+            "height": 115,
+            "socketId": "greyhaven-rack-3",
+            "revision": 0
+          },
+          {
+            "id": "ART-ONLY-NO-SERVER-3",
+            "x": 349.4,
+            "y": 205,
+            "width": 42,
+            "height": 115,
+            "socketId": "greyhaven-rack-4",
+            "revision": 0
+          }
+        ],
+        "swordCount": 4,
+        "visualIntents": [
+          "ART-ONLY-NO-SERVER-0",
+          "ART-ONLY-NO-SERVER-0",
+          "ART-ONLY-NO-SERVER-0",
+          "ART-ONLY-NO-SERVER-1",
+          "ART-ONLY-NO-SERVER-2",
+          "ART-ONLY-NO-SERVER-3",
+          "ART-ONLY-NO-SERVER-0",
+          "ART-ONLY-NO-SERVER-1",
+          "ART-ONLY-NO-SERVER-2",
+          "ART-ONLY-NO-SERVER-3"
+        ],
+        "combatFallback": 1,
+        "cancelled": 3,
+        "browserPointerEvents": [
+          "down:mouse:1",
+          "up:mouse:1",
+          "down:mouse:1",
+          "up:mouse:1",
+          "down:mouse:1",
+          "up:mouse:1",
+          "down:mouse:1",
+          "up:mouse:1",
+          "down:mouse:1",
+          "up:mouse:1",
+          "down:mouse:1",
+          "up:mouse:1",
+          "down:mouse:1",
+          "up:mouse:1",
+          "down:mouse:1",
+          "up:mouse:1",
+          "down:mouse:1",
+          "up:mouse:1",
+          "down:mouse:1",
+          "up:mouse:1",
+          "down:mouse:1",
+          "up:mouse:1",
+          "down:mouse:1",
+          "up:mouse:1",
+          "down:mouse:1",
+          "up:mouse:1",
+          "down:mouse:1",
+          "up:mouse:1"
+        ],
+        "actualServerEvents": 0,
+        "serverAuthenticatedItems": false,
+        "serverOwnedItemIds": false,
+        "combatHandlerActuallyCalled": false,
+        "gameClientIntegrated": false,
+        "productionApproved": false,
+        "upHandled": true,
+        "upCandidate": "ART-ONLY-NO-SERVER-3"
+      },
       "sourcePins": [
         [
           3740,
@@ -67,6 +347,14 @@
       "alphaSampler": {
         "visiblePixels": 1082,
         "clickablePixels": 1007,
+        "stableSourcePixel": {
+          "x": 20,
+          "y": 55,
+          "radius": 2,
+          "minimumNeighborhoodAlpha": 224,
+          "qaLandmarkOnly": true,
+          "expandsHitBox": false
+        },
         "sourceShaExpected": "795874620d07652e55f5e8a76952d2075f17196fc892eff88d46b165638a3b31",
         "alphaOpaquePixel": 159,
         "alphaTransparentPixel": 0,
@@ -725,6 +1013,286 @@
       "engine": "firefox",
       "version": "firefox/153.4.0",
       "errors": [],
+      "maskOverlap": {
+        "count": 4,
+        "pairs": [
+          {
+            "ids": [
+              "ART-ONLY-NO-SERVER-0",
+              "ART-ONLY-NO-SERVER-1"
+            ],
+            "sourceMaskOverlapPixels": 0
+          },
+          {
+            "ids": [
+              "ART-ONLY-NO-SERVER-0",
+              "ART-ONLY-NO-SERVER-2"
+            ],
+            "sourceMaskOverlapPixels": 0
+          },
+          {
+            "ids": [
+              "ART-ONLY-NO-SERVER-0",
+              "ART-ONLY-NO-SERVER-3"
+            ],
+            "sourceMaskOverlapPixels": 0
+          },
+          {
+            "ids": [
+              "ART-ONLY-NO-SERVER-1",
+              "ART-ONLY-NO-SERVER-2"
+            ],
+            "sourceMaskOverlapPixels": 0
+          },
+          {
+            "ids": [
+              "ART-ONLY-NO-SERVER-1",
+              "ART-ONLY-NO-SERVER-3"
+            ],
+            "sourceMaskOverlapPixels": 0
+          },
+          {
+            "ids": [
+              "ART-ONLY-NO-SERVER-2",
+              "ART-ONLY-NO-SERVER-3"
+            ],
+            "sourceMaskOverlapPixels": 0
+          }
+        ],
+        "maxOverlap": 0,
+        "sourceMaskOnly": true,
+        "liveRenderedGameOcclusionValidated": false
+      },
+      "stableHit": {
+        "x": 20,
+        "y": 55,
+        "radius": 2,
+        "minimumNeighborhoodAlpha": 224,
+        "qaLandmarkOnly": true,
+        "expandsHitBox": false
+      },
+      "allSwordClicks": [
+        {
+          "mode": "scaled-dpr2",
+          "index": 0,
+          "itemId": "ART-ONLY-NO-SERVER-0",
+          "pointerCanvasXY": [
+            269.1,
+            260.5
+          ],
+          "cssWidth": 358,
+          "visualIntentOnly": true,
+          "realPickupCommitted": false
+        },
+        {
+          "mode": "scaled-dpr2",
+          "index": 1,
+          "itemId": "ART-ONLY-NO-SERVER-1",
+          "pointerCanvasXY": [
+            302.7,
+            260.5
+          ],
+          "cssWidth": 358,
+          "visualIntentOnly": true,
+          "realPickupCommitted": false
+        },
+        {
+          "mode": "scaled-dpr2",
+          "index": 2,
+          "itemId": "ART-ONLY-NO-SERVER-2",
+          "pointerCanvasXY": [
+            336.3,
+            260.5
+          ],
+          "cssWidth": 358,
+          "visualIntentOnly": true,
+          "realPickupCommitted": false
+        },
+        {
+          "mode": "scaled-dpr2",
+          "index": 3,
+          "itemId": "ART-ONLY-NO-SERVER-3",
+          "pointerCanvasXY": [
+            369.9,
+            260.5
+          ],
+          "cssWidth": 358,
+          "visualIntentOnly": true,
+          "realPickupCommitted": false
+        },
+        {
+          "mode": "desktop",
+          "index": 0,
+          "itemId": "ART-ONLY-NO-SERVER-0",
+          "pointerCanvasXY": [
+            269.1,
+            260.5
+          ],
+          "cssWidth": 640,
+          "visualIntentOnly": true,
+          "realPickupCommitted": false
+        },
+        {
+          "mode": "desktop",
+          "index": 1,
+          "itemId": "ART-ONLY-NO-SERVER-1",
+          "pointerCanvasXY": [
+            302.7,
+            260.5
+          ],
+          "cssWidth": 640,
+          "visualIntentOnly": true,
+          "realPickupCommitted": false
+        },
+        {
+          "mode": "desktop",
+          "index": 2,
+          "itemId": "ART-ONLY-NO-SERVER-2",
+          "pointerCanvasXY": [
+            336.3,
+            260.5
+          ],
+          "cssWidth": 640,
+          "visualIntentOnly": true,
+          "realPickupCommitted": false
+        },
+        {
+          "mode": "desktop",
+          "index": 3,
+          "itemId": "ART-ONLY-NO-SERVER-3",
+          "pointerCanvasXY": [
+            369.9,
+            260.5
+          ],
+          "cssWidth": 640,
+          "visualIntentOnly": true,
+          "realPickupCommitted": false
+        }
+      ],
+      "afterAllFourSourcePixelClicks": {
+        "ready": true,
+        "worldHead": "07060f981b8a1dac89184b621b6893dd970a08ae",
+        "uiHead": "8d500d8ddeb4058f15dbc704bf78d685d1ca31ef",
+        "originalWorldImported": true,
+        "originalUiGestureImported": true,
+        "sourceWorldSocketPositions": [
+          [
+            3740,
+            4038
+          ],
+          [
+            3780,
+            4038
+          ],
+          [
+            3820,
+            4038
+          ],
+          [
+            3860,
+            4038
+          ]
+        ],
+        "lastPresentedFrameId": 10,
+        "frameId": 10,
+        "visibleIds": [
+          "ART-ONLY-NO-SERVER-0",
+          "ART-ONLY-NO-SERVER-1",
+          "ART-ONLY-NO-SERVER-2",
+          "ART-ONLY-NO-SERVER-3"
+        ],
+        "swordRects": [
+          {
+            "id": "ART-ONLY-NO-SERVER-0",
+            "x": 248.60000000000002,
+            "y": 205,
+            "width": 42,
+            "height": 115,
+            "socketId": "greyhaven-rack-1",
+            "revision": 0
+          },
+          {
+            "id": "ART-ONLY-NO-SERVER-1",
+            "x": 282.2,
+            "y": 205,
+            "width": 42,
+            "height": 115,
+            "socketId": "greyhaven-rack-2",
+            "revision": 0
+          },
+          {
+            "id": "ART-ONLY-NO-SERVER-2",
+            "x": 315.8,
+            "y": 205,
+            "width": 42,
+            "height": 115,
+            "socketId": "greyhaven-rack-3",
+            "revision": 0
+          },
+          {
+            "id": "ART-ONLY-NO-SERVER-3",
+            "x": 349.4,
+            "y": 205,
+            "width": 42,
+            "height": 115,
+            "socketId": "greyhaven-rack-4",
+            "revision": 0
+          }
+        ],
+        "swordCount": 4,
+        "visualIntents": [
+          "ART-ONLY-NO-SERVER-0",
+          "ART-ONLY-NO-SERVER-0",
+          "ART-ONLY-NO-SERVER-0",
+          "ART-ONLY-NO-SERVER-1",
+          "ART-ONLY-NO-SERVER-2",
+          "ART-ONLY-NO-SERVER-3",
+          "ART-ONLY-NO-SERVER-0",
+          "ART-ONLY-NO-SERVER-1",
+          "ART-ONLY-NO-SERVER-2",
+          "ART-ONLY-NO-SERVER-3"
+        ],
+        "combatFallback": 1,
+        "cancelled": 3,
+        "browserPointerEvents": [
+          "down:mouse:0",
+          "up:mouse:0",
+          "down:mouse:0",
+          "up:mouse:0",
+          "down:mouse:0",
+          "up:mouse:0",
+          "down:mouse:0",
+          "up:mouse:0",
+          "down:mouse:0",
+          "up:mouse:0",
+          "down:mouse:0",
+          "up:mouse:0",
+          "down:mouse:0",
+          "up:mouse:0",
+          "down:mouse:0",
+          "up:mouse:0",
+          "down:mouse:0",
+          "up:mouse:0",
+          "down:mouse:0",
+          "up:mouse:0",
+          "down:mouse:0",
+          "up:mouse:0",
+          "down:mouse:0",
+          "up:mouse:0",
+          "down:mouse:0",
+          "up:mouse:0",
+          "down:mouse:0",
+          "up:mouse:0"
+        ],
+        "actualServerEvents": 0,
+        "serverAuthenticatedItems": false,
+        "serverOwnedItemIds": false,
+        "combatHandlerActuallyCalled": false,
+        "gameClientIntegrated": false,
+        "productionApproved": false,
+        "upHandled": true,
+        "upCandidate": "ART-ONLY-NO-SERVER-3"
+      },
       "sourcePins": [
         [
           3740,
@@ -769,6 +1337,14 @@
       "alphaSampler": {
         "visiblePixels": 1082,
         "clickablePixels": 1007,
+        "stableSourcePixel": {
+          "x": 20,
+          "y": 55,
+          "radius": 2,
+          "minimumNeighborhoodAlpha": 224,
+          "qaLandmarkOnly": true,
+          "expandsHitBox": false
+        },
         "sourceShaExpected": "795874620d07652e55f5e8a76952d2075f17196fc892eff88d46b165638a3b31",
         "alphaOpaquePixel": 159,
         "alphaTransparentPixel": 0,

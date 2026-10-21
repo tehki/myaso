@@ -8,7 +8,7 @@ const image={complete:true,naturalWidth:42,naturalHeight:115,
  currentSrc:"http://localhost/assets/environment/greyhaven/armory-p0/armory_sword.webp"};
 const originalSource=new URL("../assets/environment/greyhaven/armory-p0/armory_sword.webp",import.meta.url);
 const sourceBytes=readFileSync(originalSource);
-function factory(pixels=[[20,13,159],[21,14,64],[0,0,0]]) {
+function factory(pixels=[[20,13,159],[21,14,64],...Array.from({length:25},(_,i)=>[19+i%5,53+Math.floor(i/5),255])]) {
  const rgba=new Uint8ClampedArray(42*115*4);
  for(const [x,y,a] of pixels)rgba[(y*42+x)*4+3]=a;
  return ()=>({
@@ -33,8 +33,14 @@ test("P0 sword decoder only samples original 42x115 source RGBA, with no mutable
  assert.equal(mask.sourceShaExpected,ARMORY_RACK_ART.swordSha256);
  assert.equal(mask.width,42);
  assert.equal(mask.height,115);
- assert.equal(mask.visiblePixels,2);
- assert.equal(mask.clickablePixels,2);
+ assert.equal(mask.visiblePixels,27);
+ assert.equal(mask.clickablePixels,27);
+ assert.equal(mask.stableSourcePixel.radius,2);
+ assert.equal(mask.stableSourcePixel.minimumNeighborhoodAlpha,224);
+ assert.equal(mask.stableSourcePixel.expandsHitBox,false);
+ for(let dy=-2;dy<=2;dy++)for(let dx=-2;dx<=2;dx++)
+  assert.ok(mask.sampleAlpha(ARMORY_RACK_ART.swordSource,
+   mask.stableSourcePixel.x+dx,mask.stableSourcePixel.y+dy)>=224);
  assert.equal(mask.sampleAlpha(ARMORY_RACK_ART.swordSource,20,13),159);
  assert.equal(mask.sampleAlpha(ARMORY_RACK_ART.swordSource,21,14),64);
  assert.equal(mask.sampleAlpha(ARMORY_RACK_ART.swordSource,0,0),0);
