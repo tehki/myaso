@@ -1,0 +1,32 @@
+name: Core 8C four real QUIC Greyhaven static staging
+
+on:
+  pull_request:
+    paths:
+      - "server/src/main.rs"
+      - "server/src/alpha_spawn.rs"
+      - "server/src/simulation.rs"
+      - "server/src/alpha_greyhaven_geometry.rs"
+      - "server/tests/alpha_greyhaven_spawn_quic.rs"
+      - ".github/workflows/core8c-p0-staging-quic-static.yml"
+      - "docs/CORE8C_P0_STAGING_SPAWN_STATIC_INTEGRATION.md"
+
+permissions:
+  contents: read
+
+jobs:
+  staging-quic-static:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify pinned World geometry parity
+        run: node scripts/verify-core8c-greyhaven-geometry.mjs
+      - name: Verify rustfmt and strict Clippy
+        run: |
+          cargo fmt --manifest-path server/Cargo.toml -- --check
+          cargo clippy --locked --manifest-path server/Cargo.toml --all-targets -- -D warnings
+      - name: Four real QUIC clients on default and static-on staging
+        run: cargo test --locked --manifest-path server/Cargo.toml --test alpha_greyhaven_spawn_quic -- --nocapture
+      - name: All server regressions
+        run: cargo test --locked --manifest-path server/Cargo.toml -- --quiet
