@@ -1,0 +1,27 @@
+{
+  "visualQAOnly": true,
+  "realGameplay": false,
+  "humanApproved": false,
+  "sourceModel": "Original Silver Knight A3 roll",
+  "swordModel": "Original 3B Blender six Sword meshes with original object world transform",
+  "authoritativeEquipment": false,
+  "newArtActivated": false,
+  "bone": "mixamorig:RightHand",
+  "originalWebpSha256": "31c774ac930a5cf1060640f1fc2914b02d6d5ddccd7d56591123efd098909426",
+  "atlasOriginalReviewSha256": "a492ab658af312b7293aa3b92c1c3cd0dee876e0ec7794e1e94ad3f5ed8dcacc",
+  "atlasRigSwordReviewSha256": "a70918a0a8ee56ed01f0f2eb536413b54c0eec9e286e129b8362e874149a72bf",
+  "animatedGifSha256": "b49d506d037e8e2fdd9d25b2e73b5a5d3e6c11fd7dfe2e0829304f9953800cd5",
+  "sourceFramePx": 224,
+  "sourceAtlasPx": [
+    1792,
+    1792
+  ],
+  "framesPerDirection": 8,
+  "directions": 8,
+  "visualRollMs": 350,
+  "previewArtwork": [
+    "silver_roll_original_bone_gripped_sword_review.webp",
+    "silver_roll_unarmed_original_reference.webp",
+    "silver_8direction_bone_grip_350ms.gif"
+  ]
+}

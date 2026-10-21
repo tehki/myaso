@@ -1,0 +1,20 @@
+{
+  "engine": "firefox",
+  "browser": "firefox/153.4.0",
+  "checks": 64,
+  "renderedAtlasKinds": 2,
+  "directions": 8,
+  "frames": 8,
+  "loopMs": 350,
+  "sourceOnly": true,
+  "actualGreyhaven": false,
+  "authenticatedItem": false,
+  "humanVisualApproved": false,
+  "errors": [],
+  "screenshots": [
+    "silver_rig_grip_firefox_frame0.png",
+    "silver_rig_grip_firefox_frame3.png",
+    "silver_rig_grip_firefox_frame5.png",
+    "silver_rig_grip_firefox_frame7.png"
+  ]
+}

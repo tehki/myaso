@@ -1,0 +1,103 @@
+{
+  "kind": "Art-only relative Z envelope \u2014 cannot prove Greyhaven physical clearance",
+  "sourceSwordBlendSha256": "db5f256c7d0e6e3f9e026966cdbe475bc16b532f77a8858e15345870e7b68dd6",
+  "noLiveGame": true,
+  "worldCollisionVerified": false,
+  "characterRootMotionVerified": false,
+  "sourceReferencePlaneZ": 0,
+  "sourceZ0IsVerifiedGround": false,
+  "reference": "Relative skinned-geometry lowest Z is useful only as studio diagnostic, not floor",
+  "sourceFrames": [
+    1,
+    3,
+    5,
+    7,
+    9,
+    11,
+    15,
+    22
+  ],
+  "poseSamples": [
+    {
+      "frameIndex": 0,
+      "sourceFrame": 1,
+      "swordMinSourceZ": -0.7607,
+      "swordMaxSourceZ": -0.0217,
+      "rightHandSourceZ": -0.1111,
+      "bodyLowestSourceZ": -0.5122,
+      "swordLowerThanBodyBottomBy": -0.2485,
+      "swordBelowSourceZ0": true
+    },
+    {
+      "frameIndex": 1,
+      "sourceFrame": 3,
+      "swordMinSourceZ": -0.9281,
+      "swordMaxSourceZ": -0.1373,
+      "rightHandSourceZ": -0.2305,
+      "bodyLowestSourceZ": -0.5122,
+      "swordLowerThanBodyBottomBy": -0.4159,
+      "swordBelowSourceZ0": true
+    },
+    {
+      "frameIndex": 2,
+      "sourceFrame": 5,
+      "swordMinSourceZ": -0.6527,
+      "swordMaxSourceZ": -0.1605,
+      "rightHandSourceZ": -0.2334,
+      "bodyLowestSourceZ": -0.5122,
+      "swordLowerThanBodyBottomBy": -0.1405,
+      "swordBelowSourceZ0": true
+    },
+    {
+      "frameIndex": 3,
+      "sourceFrame": 7,
+      "swordMinSourceZ": -0.2082,
+      "swordMaxSourceZ": 0.4208,
+      "rightHandSourceZ": -0.1268,
+      "bodyLowestSourceZ": -0.5122,
+      "swordLowerThanBodyBottomBy": 0.304,
+      "swordBelowSourceZ0": true
+    },
+    {
+      "frameIndex": 4,
+      "sourceFrame": 9,
+      "swordMinSourceZ": -0.359,
+      "swordMaxSourceZ": 0.0353,
+      "rightHandSourceZ": -0.2923,
+      "bodyLowestSourceZ": -0.5122,
+      "swordLowerThanBodyBottomBy": 0.1532,
+      "swordBelowSourceZ0": true
+    },
+    {
+      "frameIndex": 5,
+      "sourceFrame": 11,
+      "swordMinSourceZ": -0.5886,
+      "swordMaxSourceZ": -0.2072,
+      "rightHandSourceZ": -0.2731,
+      "bodyLowestSourceZ": -0.5122,
+      "swordLowerThanBodyBottomBy": -0.0763,
+      "swordBelowSourceZ0": true
+    },
+    {
+      "frameIndex": 6,
+      "sourceFrame": 15,
+      "swordMinSourceZ": -0.8244,
+      "swordMaxSourceZ": -0.0737,
+      "rightHandSourceZ": -0.1635,
+      "bodyLowestSourceZ": -0.5152,
+      "swordLowerThanBodyBottomBy": -0.3092,
+      "swordBelowSourceZ0": true
+    },
+    {
+      "frameIndex": 7,
+      "sourceFrame": 22,
+      "swordMinSourceZ": -0.7607,
+      "swordMaxSourceZ": -0.0217,
+      "rightHandSourceZ": -0.1111,
+      "bodyLowestSourceZ": -0.5122,
+      "swordLowerThanBodyBottomBy": -0.2485,
+      "swordBelowSourceZ0": true
+    }
+  ],
+  "belowReferencePlaneCount": 8
+}

@@ -1,0 +1,182 @@
+{
+  "sourceBlendSha256": "db5f256c7d0e6e3f9e026966cdbe475bc16b532f77a8858e15345870e7b68dd6",
+  "source": "Original Graphics 3B blacksmith_armory_p0_source.blend",
+  "purpose": "Recover original 3B object transforms when Blender library object append resets transform",
+  "originalMeshesUnmodified": true,
+  "objects": {
+    "Sword brass guard trim": {
+      "worldMatrix": [
+        [
+          1.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          1.0,
+          0.0,
+          -0.068999998
+        ],
+        [
+          0.0,
+          0.0,
+          1.0,
+          0.675000012
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      ],
+      "vertices": 56
+    },
+    "Sword faceted pommel": {
+      "worldMatrix": [
+        [
+          0.104999997,
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.100000001,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          0.104999997,
+          0.159999996
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      ],
+      "vertices": 62
+    },
+    "Sword forged crossguard": {
+      "worldMatrix": [
+        [
+          1.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          1.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          1.0,
+          0.670000017
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      ],
+      "vertices": 56
+    },
+    "Sword leather-wrapped tang": {
+      "worldMatrix": [
+        [
+          1.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          1.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          1.0,
+          0.419999987
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      ],
+      "vertices": 56
+    },
+    "Sword narrow blade fuller": {
+      "worldMatrix": [
+        [
+          1.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          1.0,
+          0.0,
+          -0.050000001
+        ],
+        [
+          0.0,
+          0.0,
+          1.0,
+          1.120000005
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      ],
+      "vertices": 56
+    },
+    "Sword sword-shaped tapered iron blade": {
+      "worldMatrix": [
+        [
+          1.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          1.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          1.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      ],
+      "vertices": 9
+    }
+  }
+}

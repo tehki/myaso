@@ -1,0 +1,413 @@
+{
+  "kind": "Experimental right-hand-bone Sword source render; NOT real in-game",
+  "model": "Original owner-supplied Silver Knight A3 roll GLB, not committed",
+  "sword": "Original Graphics 3B blacksmith_armory_p0_source.blend; six Sword meshes",
+  "swordScale": 0.42,
+  "renderPx": [
+    224,
+    224
+  ],
+  "orthoScale": 2.3,
+  "facingCount": 8,
+  "sourceFrames": [
+    1,
+    3,
+    5,
+    7,
+    9,
+    11,
+    15,
+    22
+  ],
+  "combatVisualBudgetMs": 350,
+  "humanArtApproved": false,
+  "serverItemsPresent": false,
+  "realGameplay": false,
+  "samples": 1,
+  "images": [
+    {
+      "direction": 0,
+      "frameIndex": 0,
+      "sourceFrame": 1,
+      "bytes": 36740
+    },
+    {
+      "direction": 0,
+      "frameIndex": 1,
+      "sourceFrame": 3,
+      "bytes": 33837
+    },
+    {
+      "direction": 0,
+      "frameIndex": 2,
+      "sourceFrame": 5,
+      "bytes": 33516
+    },
+    {
+      "direction": 0,
+      "frameIndex": 3,
+      "sourceFrame": 7,
+      "bytes": 34525
+    },
+    {
+      "direction": 0,
+      "frameIndex": 4,
+      "sourceFrame": 9,
+      "bytes": 34229
+    },
+    {
+      "direction": 0,
+      "frameIndex": 5,
+      "sourceFrame": 11,
+      "bytes": 37042
+    },
+    {
+      "direction": 0,
+      "frameIndex": 6,
+      "sourceFrame": 15,
+      "bytes": 35189
+    },
+    {
+      "direction": 0,
+      "frameIndex": 7,
+      "sourceFrame": 22,
+      "bytes": 36758
+    },
+    {
+      "direction": 1,
+      "frameIndex": 0,
+      "sourceFrame": 1,
+      "bytes": 35340
+    },
+    {
+      "direction": 1,
+      "frameIndex": 1,
+      "sourceFrame": 3,
+      "bytes": 33808
+    },
+    {
+      "direction": 1,
+      "frameIndex": 2,
+      "sourceFrame": 5,
+      "bytes": 32715
+    },
+    {
+      "direction": 1,
+      "frameIndex": 3,
+      "sourceFrame": 7,
+      "bytes": 33725
+    },
+    {
+      "direction": 1,
+      "frameIndex": 4,
+      "sourceFrame": 9,
+      "bytes": 35045
+    },
+    {
+      "direction": 1,
+      "frameIndex": 5,
+      "sourceFrame": 11,
+      "bytes": 35683
+    },
+    {
+      "direction": 1,
+      "frameIndex": 6,
+      "sourceFrame": 15,
+      "bytes": 34847
+    },
+    {
+      "direction": 1,
+      "frameIndex": 7,
+      "sourceFrame": 22,
+      "bytes": 35340
+    },
+    {
+      "direction": 2,
+      "frameIndex": 0,
+      "sourceFrame": 1,
+      "bytes": 34179
+    },
+    {
+      "direction": 2,
+      "frameIndex": 1,
+      "sourceFrame": 3,
+      "bytes": 34351
+    },
+    {
+      "direction": 2,
+      "frameIndex": 2,
+      "sourceFrame": 5,
+      "bytes": 33289
+    },
+    {
+      "direction": 2,
+      "frameIndex": 3,
+      "sourceFrame": 7,
+      "bytes": 34836
+    },
+    {
+      "direction": 2,
+      "frameIndex": 4,
+      "sourceFrame": 9,
+      "bytes": 35270
+    },
+    {
+      "direction": 2,
+      "frameIndex": 5,
+      "sourceFrame": 11,
+      "bytes": 34947
+    },
+    {
+      "direction": 2,
+      "frameIndex": 6,
+      "sourceFrame": 15,
+      "bytes": 35130
+    },
+    {
+      "direction": 2,
+      "frameIndex": 7,
+      "sourceFrame": 22,
+      "bytes": 34179
+    },
+    {
+      "direction": 3,
+      "frameIndex": 0,
+      "sourceFrame": 1,
+      "bytes": 34450
+    },
+    {
+      "direction": 3,
+      "frameIndex": 1,
+      "sourceFrame": 3,
+      "bytes": 34494
+    },
+    {
+      "direction": 3,
+      "frameIndex": 2,
+      "sourceFrame": 5,
+      "bytes": 34783
+    },
+    {
+      "direction": 3,
+      "frameIndex": 3,
+      "sourceFrame": 7,
+      "bytes": 35127
+    },
+    {
+      "direction": 3,
+      "frameIndex": 4,
+      "sourceFrame": 9,
+      "bytes": 33989
+    },
+    {
+      "direction": 3,
+      "frameIndex": 5,
+      "sourceFrame": 11,
+      "bytes": 32851
+    },
+    {
+      "direction": 3,
+      "frameIndex": 6,
+      "sourceFrame": 15,
+      "bytes": 34395
+    },
+    {
+      "direction": 3,
+      "frameIndex": 7,
+      "sourceFrame": 22,
+      "bytes": 34454
+    },
+    {
+      "direction": 4,
+      "frameIndex": 0,
+      "sourceFrame": 1,
+      "bytes": 34517
+    },
+    {
+      "direction": 4,
+      "frameIndex": 1,
+      "sourceFrame": 3,
+      "bytes": 34708
+    },
+    {
+      "direction": 4,
+      "frameIndex": 2,
+      "sourceFrame": 5,
+      "bytes": 35094
+    },
+    {
+      "direction": 4,
+      "frameIndex": 3,
+      "sourceFrame": 7,
+      "bytes": 34434
+    },
+    {
+      "direction": 4,
+      "frameIndex": 4,
+      "sourceFrame": 9,
+      "bytes": 35086
+    },
+    {
+      "direction": 4,
+      "frameIndex": 5,
+      "sourceFrame": 11,
+      "bytes": 31888
+    },
+    {
+      "direction": 4,
+      "frameIndex": 6,
+      "sourceFrame": 15,
+      "bytes": 34557
+    },
+    {
+      "direction": 4,
+      "frameIndex": 7,
+      "sourceFrame": 22,
+      "bytes": 34499
+    },
+    {
+      "direction": 5,
+      "frameIndex": 0,
+      "sourceFrame": 1,
+      "bytes": 35370
+    },
+    {
+      "direction": 5,
+      "frameIndex": 1,
+      "sourceFrame": 3,
+      "bytes": 35289
+    },
+    {
+      "direction": 5,
+      "frameIndex": 2,
+      "sourceFrame": 5,
+      "bytes": 34865
+    },
+    {
+      "direction": 5,
+      "frameIndex": 3,
+      "sourceFrame": 7,
+      "bytes": 34168
+    },
+    {
+      "direction": 5,
+      "frameIndex": 4,
+      "sourceFrame": 9,
+      "bytes": 36555
+    },
+    {
+      "direction": 5,
+      "frameIndex": 5,
+      "sourceFrame": 11,
+      "bytes": 33507
+    },
+    {
+      "direction": 5,
+      "frameIndex": 6,
+      "sourceFrame": 15,
+      "bytes": 35605
+    },
+    {
+      "direction": 5,
+      "frameIndex": 7,
+      "sourceFrame": 22,
+      "bytes": 35366
+    },
+    {
+      "direction": 6,
+      "frameIndex": 0,
+      "sourceFrame": 1,
+      "bytes": 35814
+    },
+    {
+      "direction": 6,
+      "frameIndex": 1,
+      "sourceFrame": 3,
+      "bytes": 34824
+    },
+    {
+      "direction": 6,
+      "frameIndex": 2,
+      "sourceFrame": 5,
+      "bytes": 35107
+    },
+    {
+      "direction": 6,
+      "frameIndex": 3,
+      "sourceFrame": 7,
+      "bytes": 33570
+    },
+    {
+      "direction": 6,
+      "frameIndex": 4,
+      "sourceFrame": 9,
+      "bytes": 35738
+    },
+    {
+      "direction": 6,
+      "frameIndex": 5,
+      "sourceFrame": 11,
+      "bytes": 36190
+    },
+    {
+      "direction": 6,
+      "frameIndex": 6,
+      "sourceFrame": 15,
+      "bytes": 36029
+    },
+    {
+      "direction": 6,
+      "frameIndex": 7,
+      "sourceFrame": 22,
+      "bytes": 35816
+    },
+    {
+      "direction": 7,
+      "frameIndex": 0,
+      "sourceFrame": 1,
+      "bytes": 36808
+    },
+    {
+      "direction": 7,
+      "frameIndex": 1,
+      "sourceFrame": 3,
+      "bytes": 34146
+    },
+    {
+      "direction": 7,
+      "frameIndex": 2,
+      "sourceFrame": 5,
+      "bytes": 34833
+    },
+    {
+      "direction": 7,
+      "frameIndex": 3,
+      "sourceFrame": 7,
+      "bytes": 33842
+    },
+    {
+      "direction": 7,
+      "frameIndex": 4,
+      "sourceFrame": 9,
+      "bytes": 34871
+    },
+    {
+      "direction": 7,
+      "frameIndex": 5,
+      "sourceFrame": 11,
+      "bytes": 37649
+    },
+    {
+      "direction": 7,
+      "frameIndex": 6,
+      "sourceFrame": 15,
+      "bytes": 35957
+    },
+    {
+      "direction": 7,
+      "frameIndex": 7,
+      "sourceFrame": 22,
+      "bytes": 36834
+    }
+  ]
+}
