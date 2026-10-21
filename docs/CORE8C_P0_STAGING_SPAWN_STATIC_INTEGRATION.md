@@ -272,6 +272,21 @@ server accepted the attack** (a full light windup + active + recovery
 cycle). All four fighters must remain exactly **100HP** at each client.
 The server also proves that all four sessions remain input-authorized
 via current, individually addressed QUIC INPUT_ACKs afterward.
+The original first-death test's delta-baseline update also now
+**requires an actual server INPUT_ACK** for every per-client Dead
+snapshot acknowledgment, with the source server tick. The input
+channel uses datagrams, so an unconfirmed baseline-update packet can
+be lost even though the server continues running. Missing a real
+network-confirmed ACK must fail the test; it cannot silently count as
+successful death→respawn delta synchronization. No timeout, damage,
+HP, action or original-spawn assertion was lowered.
+The negative-control test preserves the button-down edge until all four
+observers have confirmed actual server AttackActive; only then does it
+release the button. This is essential because sending the release
+immediately after the input ACK can cause the server to coalesce both
+samples in a single tick and never execute the attempted attack. An
+unexecuted attack must not be counted as a valid out-of-range miss;
+the original AttackActive and zero-damage gates stay mandatory.
 
 This distinguishes an accepted miss from a dropped input and adds a
 genuine four-peer no-damage witness. The paired existing positive test
@@ -470,6 +485,43 @@ multi-host native browser acceptance, genuine clicked sword ownership,
 or complete World/Physics map authority. The staging server remains
 a disposable 127.0.0.1 certificate-pinned instance with the original
 default-OFF reviewed-static collision opt-in and original gates intact.
+
+## Core 8C — real QUIC dead-player movement and attack input fence
+
+The test-only child of #598 adds a deliberate **invalid gameplay
+action while Dead** to the same exact four-session second-kill sequence.
+The fresh net ID #5 was killed by three authentic heavy-fist hits,
+and all four current players independently saw 0HP / Dead and the
+reliable new event sequence 1. The test performs the attempted action promptly after the real kill
+notification, before the server's ordinary 75-tick respawn timer.
+
+Before #5's genuine server-timed respawn, **its OWN still-authorized
+QUIC connection** sends one ordinary, syntactically valid gameplay
+INPUT packet carrying both eastward movement and the existing heavy
+attack button. It contains the *actual observed Dead snapshot sequence
+and authoritative server tick* as ACKs, not fabricated server state.
+The real server returns an individually addressed input ACK for the
+request. However, the server must continue to treat the entity as
+0HP / Dead and ignore gameplay control: after the genuine Dead
+snapshot is ACKed as the replica baseline, its network delta stream
+must show **no position update, no HP restoration, and no transition
+to an attack/action state** for at least **12 additional independent
+authoritative server ticks** before the ordinary respawn timer fires.
+This checks server execution and replication, not a client-side
+disabled button or mere dropped input. The test releases the held
+commands while still Dead using current authenticated ACK values.
+The surviving killer then clears the original spawn's 44-unit physical
+admission/separation radius via normal gameplay movement.
+
+All four players must subsequently see #5's original server-authored
+100HP / Idle / exact spawn (4206,4160) no sooner than 60 ticks after
+death, and all four retain their live authenticated post-respawn
+input ACK flow. This is intentionally scoped to a genuine,
+well-formed, authenticated Dead-state input. It does not test
+arbitrary malformed datagrams, account takeover, inventory, real
+browser controls or remote two-host staging. Only the Rust QUIC test
+and evidence documentation change, never runtime Combat or the
+production transport.
 
 ## Nonclaims and release HOLD
 
