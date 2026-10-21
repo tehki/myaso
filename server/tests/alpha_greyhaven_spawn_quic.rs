@@ -1355,7 +1355,10 @@ async fn four_real_quic_players_observe_kill_and_immutable_greyhaven_respawn() -
         observe_real_quic_dead_target(&sessions[2].0, 4, 5),
         observe_real_quic_dead_target(&replacement, 5, 5)
     )?;
-    println!("ALPHA_8C_QUIC_SECOND_DEATH_TICKS [{dead1},{dead3},{dead4},{dead5}]");
+    println!(
+        "ALPHA_8C_QUIC_SECOND_DEATH_TICKS [{:?},{:?},{:?},{:?}]",
+        dead1.0, dead3.0, dead4.0, dead5.0
+    );
     for (index, session) in sessions.iter_mut().enumerate() {
         let observer = [1, 3, 4][index];
         let event = receive_real_quic_kill_event(&mut session.2, observer).await?;
@@ -1369,8 +1372,67 @@ async fn four_real_quic_players_observe_kill_and_immutable_greyhaven_respawn() -
         bail!("new spectator replayed a stale kill or missed fresh kill: {next:?}");
     }
     println!("ALPHA_8C_QUIC_NEW_KILL observer=5 sequence=1 killer=1 victim=5");
+
+    // The killer still occupies x~4174, only 32 units from #5's original
+    // 4206 anchor. The real server's fighter separation would push the
+    // newly respawned victim by a few units. Clear this physical overlap
+    // using real westward movement BEFORE expecting exact anchor bytes;
+    // never turn off collision or adjust the expected server coordinate.
+    send_held_direction(&sessions[0].0, sessions[0].3, 70_500, (-127, 0))?;
+    let clearance_deadline = Instant::now() + Duration::from_millis(900);
+    let clear_position = loop {
+        let observed = next_authoritative_position(&sessions[0].0, 1, clearance_deadline).await?;
+        if observed.0 <= 4120.0 {
+            break observed;
+        }
+    };
+    send_held_direction(&sessions[0].0, sessions[0].3, 70_501, (0, 0))?;
+    if (clear_position.0 - SPAWNS[1].0).hypot(clear_position.1 - SPAWNS[1].1) < 44.0 {
+        bail!("killer still overlaps new victim's immutable anchor: {clear_position:?}");
+    }
     println!(
-        "ALPHA_8C_QUIC_KILL_HISTORY_FENCE_PASS old_seq=0 new_seq=1          late_join_id=5 old_replays=0 new_event_fanout=4"
+        "ALPHA_8C_SECOND_RESPAWN_ANCHOR_CLEAR x={:.1} y={:.1}",
+        clear_position.0, clear_position.1
+    );
+
+    // Verify that this is not a terminal notification: all FOUR existing
+    // sessions must progress from the newly joined victim's actual Dead
+    // snapshot to the server's timed original-anchor respawn. ACK each real
+    // Dead snapshot sequence to fence delta baseline compression, and
+    // require individually addressed post-respawn input ACKs as well.
+    for (index, session) in sessions.iter().enumerate() {
+        let observer = [1, 3, 4][index];
+        let (_, dead_sequence) = [dead1, dead3, dead4][index];
+        send_held_direction(&session.0, dead_sequence, 71_000 + observer, (0, 0))?;
+    }
+    send_held_direction(&replacement, dead5.1, 71_005, (0, 0))?;
+    let (respawn1, respawn3, respawn4, respawn5) = tokio::try_join!(
+        observe_real_quic_respawned_target(&sessions[0].0, 1, 5, dead1.0),
+        observe_real_quic_respawned_target(&sessions[1].0, 3, 5, dead3.0),
+        observe_real_quic_respawned_target(&sessions[2].0, 4, 5, dead4.0),
+        observe_real_quic_respawned_target(&replacement, 5, 5, dead5.0)
+    )?;
+    println!(
+        "ALPHA_8C_QUIC_SECOND_RESPAWN_TICKS [{},{},{},{}]",
+        respawn1.0, respawn3.0, respawn4.0, respawn5.0
+    );
+    for (index, session) in sessions.iter().enumerate() {
+        let observer = [1, 3, 4][index];
+        let respawn_sequence = [respawn1, respawn3, respawn4][index].1;
+        let respawn_tick = [respawn1, respawn3, respawn4][index].0;
+        send_held_direction_with_server_ack(
+            &session.0,
+            respawn_sequence,
+            72_000 + observer,
+            respawn_tick,
+            (0, 0),
+        )?;
+        require_quic_input_ack(&session.0, 72_000 + observer, observer).await?;
+    }
+    send_held_direction_with_server_ack(&replacement, respawn5.1, 72_005, respawn5.0, (0, 0))?;
+    require_quic_input_ack(&replacement, 72_005, 5).await?;
+    println!(
+        "ALPHA_8C_QUIC_KILL_HISTORY_FENCE_PASS old_seq=0 new_seq=1          late_join_id=5 old_replays=0 new_event_fanout=4 respawn_peers=4 live_postrespawn_acks=4"
     );
     Ok(())
 }
@@ -1381,7 +1443,7 @@ async fn observe_real_quic_dead_target(
     connection: &wtransport::Connection,
     observer: u32,
     target: u32,
-) -> Result<u32> {
+) -> Result<(u32, u16)> {
     let deadline = Instant::now() + Duration::from_secs(5);
     let mut hp = 100_u8;
     let mut action = 0_u8;
@@ -1418,7 +1480,78 @@ async fn observe_real_quic_dead_target(
                 "ALPHA_8C_QUIC_SECOND_DEATH observer={observer} target={target} tick={}",
                 snapshot.server_tick
             );
-            return Ok(snapshot.server_tick);
+            return Ok((snapshot.server_tick, snapshot.sequence));
+        }
+    }
+}
+
+/// Read a real server-owned, original-anchor respawn AFTER a specific
+/// observed Dead frame, without creating or modifying any Rust World object.
+async fn observe_real_quic_respawned_target(
+    connection: &wtransport::Connection,
+    observer: u32,
+    target: u32,
+    death_tick: u32,
+) -> Result<(u32, u16)> {
+    let deadline = Instant::now() + Duration::from_secs(5);
+    let mut hp = 0_u8;
+    let mut action = 8_u8;
+    let mut position = None::<(f32, f32)>;
+    let mut latest_tick = 0_u32;
+    let mut frames = 0_usize;
+    loop {
+        let remaining = deadline.saturating_duration_since(Instant::now());
+        if remaining.is_zero() {
+            bail!(
+                "observer {observer} failed live target {target} respawn: hp={hp} action={action} position={position:?}"
+            );
+        }
+        let incoming = match timeout(remaining, connection.receive_datagram()).await {
+            Ok(Ok(incoming)) => incoming,
+            Ok(Err(error)) => bail!("observer {observer} lost QUIC during new respawn: {error:#}"),
+            Err(_) => bail!("observer {observer} second respawn timeout: hp={hp}, action={action}, position={position:?}, latest_tick={latest_tick}, death_tick={death_tick}, frames={frames}"),
+        };
+        let bytes = incoming.as_ref();
+        if bytes.len() < 14 || bytes[0] != 1 || bytes[1] != 2 {
+            continue;
+        }
+        let snapshot = decode_snapshot(bytes)
+            .map_err(|e| anyhow::anyhow!("second respawn snapshot invalid: {e:?}"))?;
+        latest_tick = snapshot.server_tick;
+        frames += 1;
+        for record in &snapshot.records {
+            if record.net_id == 2
+                && snapshot.server_tick >= death_tick
+                && record.mask & myaso_server::snapshot::SNAPSHOT_FIELD_REMOVED == 0
+            {
+                bail!("observer {observer} saw departed network identity #2 at second death/respawn tick {}", snapshot.server_tick);
+            }
+            if record.net_id != target {
+                continue;
+            }
+            if record.mask & myaso_server::snapshot::SNAPSHOT_FIELD_VITALS != 0 {
+                hp = record.hp;
+            }
+            if record.mask & myaso_server::snapshot::SNAPSHOT_FIELD_ACTION != 0 {
+                action = record.action;
+            }
+            if record.mask & SNAPSHOT_FIELD_POSITION != 0 {
+                position = Some((record.x as f32 / 4.0, record.y as f32 / 4.0));
+            }
+        }
+        if snapshot.server_tick > death_tick
+            && hp == 100
+            && action == 0
+            && position == Some(SPAWNS[1])
+        {
+            if snapshot.server_tick < death_tick + 60 {
+                bail!("observer {observer} saw server victim {target} respawn too early");
+            }
+            println!(
+                "ALPHA_8C_QUIC_SECOND_RESPAWN observer={observer} target={target} tick={}",
+                snapshot.server_tick
+            );
+            return Ok((snapshot.server_tick, snapshot.sequence));
         }
     }
 }
@@ -1656,6 +1789,19 @@ fn send_held_direction(
     client_tick: u32,
     direction: (i8, i8),
 ) -> Result<()> {
+    send_held_direction_with_server_ack(connection, initial_sequence, client_tick, 0, direction)
+}
+
+/// Pass a genuine on-wire server tick alongside the snapshot sequence.
+/// The existing non-ACK experiment calls use zero, while post-respawn
+/// liveness must show CURRENT server tick ACK (avoid false stale warnings).
+fn send_held_direction_with_server_ack(
+    connection: &wtransport::Connection,
+    initial_sequence: u16,
+    client_tick: u32,
+    server_ack_tick: u32,
+    direction: (i8, i8),
+) -> Result<()> {
     let mut input = vec![0_u8; INPUT_HEADER_BYTES + INPUT_SAMPLE_BYTES];
     input[0] = 1; // wire protocol version
     input[1] = 1; // INPUT packet
@@ -1663,6 +1809,7 @@ fn send_held_direction(
     input[4..6].copy_from_slice(&(client_tick as u16).to_le_bytes());
     input[6..8].copy_from_slice(&initial_sequence.to_le_bytes());
     input[8..12].copy_from_slice(&client_tick.to_le_bytes());
+    input[12..16].copy_from_slice(&server_ack_tick.to_le_bytes());
     input[16] = 0;
     input[17] = direction.0 as u8;
     input[18] = direction.1 as u8;
