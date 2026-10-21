@@ -462,3 +462,30 @@ test("NPC pilot validates real UTF-8 wire size before queueing or sending", asyn
     restore();
   }
 });
+
+
+test("P0 revoked NPC pilot returns focus from selector and submit button to game", () => {
+  const { stage, canvas, restore } = installDocument();
+  try {
+    const npc = createNpcChatPanel({
+      onSend: async () => { throw new Error("should not send"); },
+      onFocus() {},
+    });
+    const panel = stage.children[0];
+    const selector = panel.children[2];
+    const button = panel.children[6].children[1];
+    for (const control of [selector, button]) {
+      npc.setRoster([{ id: 3, name: "Rowan", role: "Sentinel" }]);
+      assert.equal(npc.enabled, true);
+      control.focus();
+      assert.equal(globalThis.document.activeElement, control);
+      npc.setRoster([]);
+      assert.equal(panel.hidden, true);
+      assert.equal(npc.enabled, false);
+      assert.equal(globalThis.document.activeElement, canvas,
+        "no revoked pilot control may retain keyboard focus");
+    }
+  } finally {
+    restore();
+  }
+});

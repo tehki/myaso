@@ -66,9 +66,13 @@ export function createNpcChatPanel({ onSend, onFocus }) {
     input.value = "";
     submit.disabled = false;
     if (!entries.length) {
-      const wasFocused = document.activeElement === input;
-      input.blur();
-      if (wasFocused) document.querySelector("#arena")?.focus();
+      // A revoked pilot must return keyboard controls to the actual game,
+      // even when the NPC selector or Speak button held focus instead of input.
+      const active = document.activeElement;
+      if (active === input || active === roster || active === submit) {
+        active.blur();
+        document.querySelector("#arena")?.focus();
+      }
     }
     roster.replaceChildren();
     for (const npc of entries) {
