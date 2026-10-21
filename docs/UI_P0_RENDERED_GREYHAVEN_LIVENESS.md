@@ -26,3 +26,16 @@ The original strict `scripts/alpha_p0_four_native_rendered_greyhaven.mjs` now pa
 Interpretation: increasing server snapshots with static completed RAFs indicates main-thread/render blockage; increasing RAFs with static status indicates UI status/ACK presentation lag; static snapshots and RAFs together require WebTransport/main-thread investigation; a long pending tile paint plus Firefox SWGL timeout points to Graphics 3C tile performance. These are diagnostic hypotheses, not yet confirmed outcomes.
 
 **Not a release gate substitute:** Four separately operated computers, actual visible player Knights, physical click-to-pickup four rack swords, authoritative MainHand and unarmed/sword PvP remain unverified.
+
+
+## Actual four-Chrome reproduced result and minimal HUD correction
+
+A single-machine four-genuine-Chrome run of a **scratch Chrome×4 copy** of the unmodified original native browser flight reproduced the failure with the **exact original PR #587 Rust/client source** before the status correction:
+
+- Server-owned Greyhaven admissions: four real players [1,2,3,4], original green map painted successfully, static swept solids enabled.
+- Player 4 on-screen HUD `server tick 351` stopped changing while the actual network callback advanced through `snapshotTick 1224`, `snapshots 293`, and world drawing completed `759` RAF frames / `756` map paints. Reported last paint ~0ms, max ~33ms and snapshot age ~50ms. Players 2 and 3 showed the same independent status-vs-snapshot discrepancy.
+- The unchanged strict **visible-status** acceptance failed, as it must. This proves the local four-Chrome case had a client HUD status refresh gap, **not** an authoritative WebTransport stream stop or a frozen renderer. Original Firefox SWGL timeout remains a separately observed possible problem and is not disproven.
+
+Source inspection found `onSnapshot` updated `networkStatus` only during initial Connecting, while `onAck` updated it during gameplay. The minimal correction is to refresh `networkStatus` from the **actual `networkClient.latestServerTick` on every valid own-entity snapshot**, preserving current Combat-message/hint priority. Pure `authoritativeOnlineStatus` only formats a valid uint32 server tick and player ID; there is no timer, prediction/extrapolation, replacement HUD value, new network writer, or Combat/Physics/World server mutation. Missing authority is rejected. A separate test proves formatting using genuinely supplied 351 -> 1224 ticks and invalid input rejection.
+
+The committed native rendered-city gate still requires **the real four-browser full roster, physical painted city pixels, actual W3C gesture, and a newer visible HUD tick**—no acceptance relaxation. The reproduced four-Chrome failure and post-fix CI qualification must be judged separately from the exact-source integrated Chat C1 Grehaven staging tests; those tests previously used the legacy arena painter. The corrected branch still needs native Chrome and Firefox exact-head requalification and review by Core 8A, Graphics 3C, Main Orchestrator and Combat.

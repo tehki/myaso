@@ -14,6 +14,7 @@ import { createRenderGapTelemetry } from "../src/browser/render-gap-telemetry.mj
 import { ARENA_VIEW_ZOOM, nearbyOffscreenPointers, projectArenaPoint } from "../src/browser/arena-viewport.mjs";
 import { createAuthoredWorldRenderer } from "../src/browser/authored-world-renderer.mjs";
 import { createWorldLivenessProbe, isWorldLivenessProbeEnabled } from "../src/browser/world-liveness-probe.mjs";
+import { authoritativeOnlineStatus } from "../src/browser/authoritative-status.mjs";
 import { MAP_IDS } from "../src/world/authored-maps.mjs";
 import { NETWORK } from "../src/network/constants.mjs";
 import { connectAuthoritativeClient, parseSha256Hex } from "./authoritative-client.mjs";
@@ -358,10 +359,10 @@ networkClient = await connectAuthoritativeClient({
     if (own) {
       // Count only received authoritative network snapshots; no synthetic tick increments.
       worldLivenessProbe?.recordSnapshot(networkClient.latestServerTick, Date.now());
-      // Initial player state is available before the first aligned input ACK.
-      if (networkStatus.startsWith("Connecting")) {
-        networkStatus = `Online - player #${ownId} - server tick ${networkClient.latestServerTick}`;
-      }
+      // Genuine snapshot receipt advances the player-facing status even when
+      // the ACK callback is delayed. Never synthesize ticks or change Combat.
+      const observedStatus = authoritativeOnlineStatus(ownId, networkClient.latestServerTick);
+      if (observedStatus) networkStatus = observedStatus;
       if (Number.isFinite(own.stamina)) authoritativeStamina = own.stamina;
       if (!local.initialized) restoreAuthoritative(own);
       else if (Number.isFinite(own.stamina)) local.stamina = own.stamina;
@@ -393,7 +394,8 @@ networkClient = await connectAuthoritativeClient({
       networkClient.diagnostics.noteReconciliation(ack, own, correction.distance);
     }
     confirmStaminaDenial(own);
-    networkStatus = `Online - player #${ownId} - server tick ${networkClient.latestServerTick}`;
+    const observedStatus = authoritativeOnlineStatus(ownId, networkClient.latestServerTick);
+    if (observedStatus) networkStatus = observedStatus;
   },
 });
 
