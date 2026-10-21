@@ -203,23 +203,27 @@ class TownBanksOfflineTests(unittest.TestCase):
         self.assertEqual(self.lab.carried_gold("robber"), 0)
 
     def test_cannot_overfill_carried_gold_limit_on_withdrawal(self):
-        self.lab.deposit("alice", "greyhaven", "deposit", 200)
-        self.lab.travel_fixture("alice", "redlion")
-        self.lab.deposit("alice", "redlion", "red-deposit", 100)
-        self.lab.travel_fixture("alice", "greyhaven")
-        # The simulated carrying limit is enforced in the transaction.
-        # Use a separate low-limit fixture with enough carrying gold.
+        # A bank claimant may acquire physical gold after their deposit;
+        # withdrawing the old claim must not bypass item-weight capacity.
         lab = LocalTownBanksLab(
-            {"greyhaven": 500},
-            {"alice": 95},
-            {"alice": "greyhaven"},
-            carry_limit=100,
+            {"greyhaven": 500}, {"alice": 95},
+            {"alice": "greyhaven"}, carry_limit=100,
         )
         lab.deposit("alice", "greyhaven", "initial", 90)
         self.assertEqual(lab.carried_gold("alice"), 5)
-        # Cannot exceed limit because withdrawal is bounded by deposit claim;
-        # another actor could carry more, but here the same owner deposited it.
-        self.assertEqual(lab.withdraw("alice", "greyhaven", "return", 90).carried_gold_after, 95)
+        breach = VaultBreachFixture(
+            event_id="test-physical-raid", town="greyhaven",
+            vault_id="greyhaven-vault", actor="alice", stolen_gold=60,
+            vault_open=True, guards_overcome=True, zone_epoch=3,
+        )
+        lab.robbery_fixture("alice", "greyhaven", "raid", breach)
+        self.assertEqual(lab.carried_gold("alice"), 65)
+        before = lab.town_state("greyhaven")
+        with self.assertRaises(BankDenied):
+            lab.withdraw("alice", "greyhaven", "too-heavy", 90)
+        self.assertEqual(lab.town_state("greyhaven"), before)
+        self.assertEqual(lab.at_town_balance("alice", "greyhaven"), 90)
+        lab.assert_invariants()
 
     def test_cannot_overfill_carried_gold_limit_on_robbery(self):
         lab = LocalTownBanksLab(
