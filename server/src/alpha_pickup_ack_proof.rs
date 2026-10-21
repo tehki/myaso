@@ -187,7 +187,7 @@ mod tests {
         fs,
         path::PathBuf,
         sync::atomic::{AtomicU64, Ordering},
-        time::{SystemTime, UNIX_EPOCH},
+        time::{Duration, Instant, SystemTime, UNIX_EPOCH},
     };
 
     struct Root(PathBuf);
@@ -207,7 +207,18 @@ mod tests {
             Self(path)
         }
         fn open(&self) -> DurableItemJournal {
-            DurableItemJournal::open(&self.0).unwrap()
+            // Preserve exclusive writer semantics while tolerating a short
+            // lock-release handoff delay in the test fixture only.
+            let deadline = Instant::now() + Duration::from_millis(500);
+            loop {
+                match DurableItemJournal::open(&self.0) {
+                    Ok(journal) => return journal,
+                    Err(ItemJournalError::WriterBusy) if Instant::now() < deadline => {
+                        std::thread::sleep(Duration::from_millis(5));
+                    }
+                    Err(error) => panic!("test journal reopen did not acquire writer: {error:?}"),
+                }
+            }
         }
     }
     impl Drop for Root {
