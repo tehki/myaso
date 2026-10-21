@@ -751,6 +751,51 @@ two-machine browser flight. No production ingress, Combat,
 identity, reliable writer, wire format, collision, physics,
 listen-address or CI release gate changes.
 
+## Core 8C — real 30-second QUIC stale-lease expiration and slot reuse
+
+This child adds a genuine Rust/WebTransport server-process test on
+127.0.0.1 (four-player cap, certificate-pinned TLS and explicitly
+opted-in Greyhaven 23-solid static preview). This extends Core8A's
+unit-level input freshness lease fix with **actual network** evidence.
+
+Four original independent sessions receive genuine reliable full
+identity/spawn snapshots. Three spectators (#1,#3,#4) each must
+observe and acknowledge #2's original position; for later joiners
+#3 and #4 this is already in their reliable FULL baseline, not an
+unnecessary second delta for a stationary actor. Fighter #2 sends
+one valid accepted neutral tick 90002 with an actual input ACK.
+Its SAME still-established QUIC connection then repeatedly sends
+valid binary packets with ever-changing packet sequence numbers
+but the same *already consumed* client gameplay tick **90002**
+and identical buttons/motion. **No new accepted gameplay input**
+should renew that unchanged server-owned 30-second fighter lease.
+
+Meanwhile all three active spectators submit fresh real neutral
+gameplay input ticks every ~210 milliseconds. Each independently
+drains the real network datagram stream at a rate exceeding the
+server's snapshot cadence and MUST observe a genuine server-issued
+SNAPSHOT_FIELD_REMOVED record for the expired #2. Passing requires
+at least 60 transmitted stale packets, at least 26 seconds elapsed,
+a packet transmitted within two seconds of actual expiry and all
+three removal tombstones within a strict 39-second deadline.
+
+The client deliberately never calls QUIC close for #2. The unchanged
+server must remove #2 when its *fresh-input inactivity lease* expires,
+even though transport continues. A new fifth certificate-pinned
+QUIC session must be admitted with server-owned identity **#5**,
+an exact four-member reliable full roster **{1,3,4,5}**,
+and #2's original vacated anchor **(4206,4160)**. All three surviving
+original sessions must then demonstrate separately addressed fresh
+INPUT_ACKs even after #5 replaces #2.
+
+Initial genuine proof: **135 stale packets** sent over ~30.53 seconds,
+all three tombstones independently recorded at server ticks 1812–1821,
+and new #5 correctly admitted. This is strictly an authorized
+single-loopback-server acceptance, NOT multi-host browser testing,
+durable subject identity, arbitrary loss testing, or proof against
+new genuinely fresh malicious input ticks. No production server,
+protocol, Combat, timer, network policy, or collision map is altered.
+
 ## Nonclaims and release HOLD
 
 This is **not** full geometry authority. World #509's 23 static AABBs omit
