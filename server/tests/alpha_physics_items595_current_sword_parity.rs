@@ -612,3 +612,176 @@ fn current_corpse_at_selected_rack_blocks_source_even_when_los_is_clear() {
         Err(PickupGeometryReject::IncompleteGeometry)
     );
 }
+
+#[test]
+fn proposed_4068_four_player_waypoint_has_ten_physical_sword_targets_not_four() {
+    // World 9 #639 proposed y4068 as a review-only point; Core 8A #646
+    // independently qualified native four-browser approach within 18.
+    // Neither source asserts authenticated current GroundDrop/complete LOS.
+    const WAYPOINT_Y: f32 = 4068.0;
+    let (mut world, mut loot, sockets, current) = create_real_items_world();
+    let zone = ZoneId::Moonvale;
+    let static_solids = core_solids();
+    let static_fixture = test_window(&static_solids, true); // synthetic, NOT real World completion
+    let mut reachable = 0_usize;
+    let mut denied = 0_usize;
+
+    for (actor_i, x) in SOCKET_X.into_iter().enumerate() {
+        let actor_id = 20 + actor_i as u32;
+        assert!(world.add_player_at(actor_id, x, WAYPOINT_Y, 0.0));
+        loot.register(actor_id).unwrap();
+        let f = world.fighter(actor_id).unwrap();
+        let actor = p(f.x, f.y);
+        let current_rack = loot
+            .proposed_current_rack_swords(zone, sockets, 11)
+            .unwrap();
+        for (sword_i, selection) in current.into_iter().enumerate() {
+            assert_eq!(current_rack[sword_i], Some(selection));
+            let ground = loot.ground().get(&selection.ground_entity_id).unwrap();
+            assert_eq!(ground.item.id, selection.item_id);
+            let item = p(ground.at.x, ground.at.y);
+            let expected = actor_i.abs_diff(sword_i) <= 1;
+            let physics = verify_pickup_geometry_at_completed_tick(
+                actor,
+                item,
+                &static_fixture,
+                TEST_FENCE,
+                PICKUP_REACH,
+                TEST_TICKS,
+            );
+            assert_eq!(
+                physics,
+                if expected {
+                    Ok(())
+                } else {
+                    Err(PickupGeometryReject::OutOfRange)
+                },
+                "candidate actor {actor_i} selecting precise ground entity for sword {sword_i}"
+            );
+            // Compare the ACTUAL Items-domain pickup validator without
+            // mutating the current rack: one fresh restored world each time.
+            let mut independent =
+                LootAuthority::restore_state(loot.export_state().unwrap()).unwrap();
+            let taken = independent.take_ground(actor_id, f, zone, selection.ground_entity_id, 20);
+            assert_eq!(taken.is_ok(), expected);
+            if expected {
+                assert_eq!(taken.unwrap().id, selection.item_id);
+                reachable += 1;
+            } else {
+                assert_eq!(taken, Err(LootError::OutOfReach));
+                denied += 1;
+            }
+        }
+    }
+    // 4 own + 6 directed adjacent are eligible; far targets do not.
+    assert_eq!((reachable, denied), (10, 6));
+    // All items still exist in the live source; geometry is a read only
+    // prerequisite, NEVER an automatic nearest-item ownership decision.
+    assert_eq!(
+        loot.proposed_current_rack_swords(zone, sockets, 21)
+            .unwrap()
+            .map(|x| x.unwrap()),
+        current
+    );
+
+    // Explicitly choose player20's ADJACENT sword 1 instead of the nearer
+    // sword 0. Current exact ground-entity selection, not just coordinates,
+    // determines which real Items ID changes domain ownership.
+    let actor = world.fighter(20).unwrap();
+    let adjacent = current[1];
+    let got = loot
+        .take_ground(20, actor, zone, adjacent.ground_entity_id, 22)
+        .unwrap();
+    assert_eq!(got.id, adjacent.item_id);
+    assert!(loot.ground().contains_key(&current[0].ground_entity_id));
+    assert!(!loot.ground().contains_key(&adjacent.ground_entity_id));
+    assert!(loot
+        .proposed_current_rack_swords(zone, sockets, 23)
+        .unwrap()[1]
+        .is_none());
+    assert_eq!(
+        loot.take_ground(20, actor, zone, adjacent.ground_entity_id, 24),
+        Err(LootError::NotFound)
+    );
+}
+
+#[test]
+fn proposed_waypoint_18_tolerance_guarantees_own_reach_not_unique_target() {
+    // A bounded four-browser position tolerance is NOT a physical selection
+    // guarantee. Sweep every integer-offset pose inside a circle radius18
+    // around all four proposed x,4068 waypoints, preserving exact Items f32
+    // eligibility rather than using visual/UI nearest-sword approximations.
+    const WAYPOINT_Y: f32 = 4068.0;
+    let (world, original_loot, _, swords) = create_real_items_world();
+    let snapshot = original_loot.export_state().unwrap();
+    let static_solids = core_solids();
+    let static_fixture = test_window(&static_solids, true);
+    let mut total_samples = 0_usize;
+    let mut adjacent_pass = 0_usize;
+    let mut adjacent_denied = 0_usize;
+    for (i, x) in SOCKET_X.into_iter().enumerate() {
+        let template = world.fighter(i as u32 + 5).unwrap();
+        for dx in -18_i32..=18 {
+            for dy in -18_i32..=18 {
+                if dx * dx + dy * dy > 18 * 18 {
+                    continue;
+                }
+                total_samples += 1;
+                let mut actor = template.clone();
+                actor.x = x + dx as f32;
+                actor.y = WAYPOINT_Y + dy as f32;
+                for (j, sword) in swords.into_iter().enumerate() {
+                    let ground = original_loot.ground().get(&sword.ground_entity_id).unwrap();
+                    let source = p(ground.at.x, ground.at.y);
+                    let geometry = verify_pickup_geometry_at_completed_tick(
+                        p(actor.x, actor.y),
+                        source,
+                        &static_fixture,
+                        TEST_FENCE,
+                        PICKUP_REACH,
+                        TEST_TICKS,
+                    );
+                    let mut copy = LootAuthority::restore_state(snapshot.clone()).unwrap();
+                    let items = copy.take_ground(
+                        i as u32 + 5,
+                        &actor,
+                        ZoneId::Moonvale,
+                        sword.ground_entity_id,
+                        20,
+                    );
+                    assert_eq!(
+                        geometry.is_ok(),items.is_ok(),
+                        "Physics and Items diverged for waypoint actor {i} offset ({dx},{dy}) sword {j}"
+                    );
+                    if i == j {
+                        assert_eq!(
+                            geometry,
+                            Ok(()),
+                            "own sword MUST be reachable at <=18 waypoint tolerance"
+                        );
+                    } else if i.abs_diff(j) >= 2 {
+                        assert_eq!(
+                            geometry,
+                            Err(PickupGeometryReject::OutOfRange),
+                            "a second-neighbor sword MUST be out of 56 reach"
+                        );
+                    } else if geometry.is_ok() {
+                        adjacent_pass += 1;
+                    } else {
+                        adjacent_denied += 1;
+                    }
+                }
+            }
+        }
+    }
+    assert_eq!(total_samples, 4 * 1009);
+    assert!(
+        adjacent_pass > 0,
+        "some adjacent swords physically reachable"
+    );
+    assert!(
+        adjacent_denied > 0,
+        "some adjacent swords outside reach at 18-unit tolerance"
+    );
+    assert_eq!(original_loot.export_state().unwrap(), snapshot);
+}
