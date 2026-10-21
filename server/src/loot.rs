@@ -1794,6 +1794,163 @@ mod tests {
     }
 
     #[test]
+    fn exact_adjacent_rack_click_preview_never_substitutes_closer_sword() {
+        // Four REAL physical original ground items, each with independent
+        // item ID and ground entity ID. The reviewed y4068 waypoints
+        // (30 world units from their own rack sword) make adjacent sword
+        // ALSO reachable at sqrt(40²+30²)=50 under Items reach=56.
+        // This is local geometry only; NOT an 8C completed tick/Physics LOS.
+        let sockets = [3740.0_f32, 3780.0, 3820.0, 3860.0].map(|x| ProposedRackSocket {
+            at: Point { x, y: 4038.0 },
+        });
+        let zone = ZoneId::Moonvale;
+        let mut loot = LootAuthority::new();
+        let mut world = World::new(8192.0, 8192.0);
+        let mut physical = Vec::new();
+        for (i, socket) in sockets.iter().enumerate() {
+            let donor = i as u32 + 1;
+            assert!(world.add_player_at(donor, socket.at.x, socket.at.y, 0.0));
+            loot.register(donor).unwrap();
+            let sword = loot
+                .grant(
+                    donor,
+                    if i % 2 == 0 {
+                        ItemKind::RustySword
+                    } else {
+                        ItemKind::IronSword
+                    },
+                    1,
+                )
+                .unwrap();
+            let entity = loot
+                .drop_backpack(donor, world.fighter(donor).unwrap(), zone, sword, 1)
+                .unwrap();
+            assert_ne!(
+                entity, sword,
+                "ground entity and physical item are distinct"
+            );
+            physical.push((entity, sword));
+            let receiver = i as u32 + 11;
+            assert!(world.add_player_at(receiver, socket.at.x, 4068.0, 0.0));
+            loot.register(receiver).unwrap();
+        }
+        let before = loot.export_state().unwrap();
+        let mut successful = 0;
+        let mut out_of_range = 0;
+        for i in 0_usize..4 {
+            let player = i as u32 + 11;
+            let fighter = world.fighter(player).unwrap();
+            for (j, &(ground_entity_id, item_id)) in physical.iter().enumerate() {
+                let selection = ProposedRackMainHandSelection {
+                    socket_id: j as u8 + 1,
+                    ground_entity_id,
+                    item_id,
+                };
+                let result = loot.preview_rack_sword_direct_mainhand(
+                    player, fighter, zone, sockets, selection, 2,
+                );
+                if i.abs_diff(j) <= 1 {
+                    let selected = result.expect("exact selected sword is physically reachable");
+                    assert_eq!(selected.ground_entity_id, ground_entity_id);
+                    assert_eq!(selected.item_id, item_id);
+                    successful += 1;
+                } else {
+                    assert_eq!(result, Err(LootError::OutOfReach));
+                    out_of_range += 1;
+                }
+            }
+        }
+        assert_eq!((successful, out_of_range), (10, 6));
+        assert_eq!(
+            loot.export_state().unwrap(),
+            before,
+            "sixteen reads never move a sword"
+        );
+
+        // Actor #12 is nearer its OWN rack sword #2 (30u), but explicitly
+        // clicks sword #1 at 50u. Correct selection is #1, not nearest #2.
+        let receiver = 12;
+        let fighter = world.fighter(receiver).unwrap();
+        let (selected_entity, selected_item) = physical[0];
+        let clicked = ProposedRackMainHandSelection {
+            socket_id: 1,
+            ground_entity_id: selected_entity,
+            item_id: selected_item,
+        };
+        assert_eq!(
+            loot.preview_rack_sword_direct_mainhand(receiver, fighter, zone, sockets, clicked, 3,)
+                .unwrap()
+                .item_id,
+            selected_item
+        );
+        // A regular existing server-domain pickup is used ONLY as a
+        // deterministic competing-claim mutation to invalidate a read-only
+        // preview. It moves to backpack, not MainHand; there is NO new writer
+        // and no claim that preview+take is an authorized atomic click.
+        let obtained = loot
+            .take_ground(receiver, fighter, zone, selected_entity, 3)
+            .unwrap();
+        assert_eq!(obtained.id, selected_item);
+        assert_eq!(
+            loot.inventory(receiver)
+                .unwrap()
+                .backpack()
+                .iter()
+                .filter(|item| item.id == selected_item)
+                .count(),
+            1
+        );
+        let updated = loot.proposed_current_rack_swords(zone, sockets, 4).unwrap();
+        assert!(
+            updated[0].is_none(),
+            "clicked sword removed from its exact socket"
+        );
+        assert_eq!(
+            updated[1].unwrap().item_id,
+            physical[1].1,
+            "closer own sword remains"
+        );
+        assert_eq!(
+            loot.preview_rack_sword_direct_mainhand(
+                11,
+                world.fighter(11).unwrap(),
+                zone,
+                sockets,
+                clicked,
+                4,
+            ),
+            Err(LootError::NotFound),
+            "stale preview of physical sword cannot survive a competing owner move"
+        );
+        assert_eq!(
+            loot.preview_rack_sword_direct_mainhand(
+                receiver,
+                fighter,
+                zone,
+                sockets,
+                ProposedRackMainHandSelection {
+                    socket_id: 2,
+                    ground_entity_id: physical[1].0,
+                    item_id: physical[1].1,
+                },
+                4,
+            )
+            .unwrap()
+            .item_id,
+            physical[1].1,
+            "another original sword stays independently selectable"
+        );
+        // No second writer, no network receipt, no unearned MainHand owner.
+        for i in 0_usize..4 {
+            assert!(loot
+                .inventory(i as u32 + 11)
+                .unwrap()
+                .equipped(EquipmentSlot::MainHand)
+                .is_none());
+        }
+    }
+
+    #[test]
     fn fresh_character_starts_with_no_items_and_nothing_equipped() {
         let mut loot = LootAuthority::new();
         loot.register(1).unwrap();
