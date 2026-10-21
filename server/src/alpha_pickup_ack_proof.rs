@@ -30,6 +30,101 @@ impl From<ItemJournalError> for PickupProofError {
     }
 }
 
+/// An exact durable record that a specific pickup committed in the past.
+/// It is deliberately NOT a claim that the sword is currently equipped.
+/// An authenticated 8A retry may report this historical transaction outcome,
+/// but its owner/equipped status must come from separately current state.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct HistoricalPickupProof {
+    request_id: OwnershipTxnId,
+    item_id: ItemId,
+    owner: CharacterId,
+    equipped_at_commit: ItemLocation,
+    journal_sequence: u64,
+}
+
+impl HistoricalPickupProof {
+    pub fn request_id(self) -> OwnershipTxnId {
+        self.request_id
+    }
+
+    pub fn item_id(self) -> ItemId {
+        self.item_id
+    }
+
+    pub fn owner_at_commit(self) -> CharacterId {
+        self.owner
+    }
+
+    pub fn journal_sequence(self) -> u64 {
+        self.journal_sequence
+    }
+
+    /// Recheck the item-specific watermark; another item changing does not
+    /// invalidate this receipt. A drop+re-pick to the identical hand DOES.
+    pub fn still_current(self, journal: &DurableItemJournal) -> bool {
+        journal.last_mutation_sequence(self.item_id) == Some(self.journal_sequence)
+            && journal.location(self.item_id) == Some(self.equipped_at_commit)
+    }
+
+    /// A positive result is only a snapshot, never a fenced live ACK.
+    pub fn current_view(
+        self,
+        journal: &DurableItemJournal,
+    ) -> Result<CommittedPickupView, PickupProofError> {
+        if journal.last_mutation_sequence(self.item_id) != Some(self.journal_sequence) {
+            return Err(PickupProofError::HistoricalReceiptNoLongerCurrent);
+        }
+        if journal.location(self.item_id) != Some(self.equipped_at_commit) {
+            return Err(PickupProofError::WrongCurrentLocation);
+        }
+        Ok(CommittedPickupView {
+            request_id: self.request_id,
+            item_id: self.item_id,
+            owner: self.owner,
+            location: self.equipped_at_commit,
+            journal_sequence: self.journal_sequence,
+        })
+    }
+}
+
+/// Verify an immutable EXACT historical one-item Ground→MainHand receipt,
+/// even if later legitimate transactions moved the item elsewhere.
+/// Historical success must never be presented as current gear ownership.
+pub fn historical_committed_rack_pickup(
+    journal: &DurableItemJournal,
+    request_id: OwnershipTxnId,
+    item_id: ItemId,
+    from_ground: ItemLocation,
+    owner: CharacterId,
+) -> Result<HistoricalPickupProof, PickupProofError> {
+    if !matches!(from_ground, ItemLocation::Ground { .. }) {
+        return Err(PickupProofError::NotGroundSource);
+    }
+    let equipped_at_commit = ItemLocation::Equipped {
+        character_id: owner,
+        slot: LegacyEquipmentSlot::MainHand.proposed_core_slot(),
+    };
+    let exact_operation = [OwnershipOp::Move {
+        item: item_id,
+        from: from_ground,
+        to: equipped_at_commit,
+    }];
+    let receipt: OwnershipReceipt = journal
+        .verified_receipt(request_id, &exact_operation)?
+        .ok_or(PickupProofError::MissingCommittedReceipt)?;
+    if receipt.operation_count != 1 {
+        return Err(PickupProofError::MissingCommittedReceipt);
+    }
+    Ok(HistoricalPickupProof {
+        request_id,
+        item_id,
+        owner,
+        equipped_at_commit,
+        journal_sequence: receipt.sequence,
+    })
+}
+
 /// An immutable read-only projection of ONE receipt and CURRENT item owner.
 /// Private fields prevent an arbitrary request from constructing a plausible
 /// accepted pickup projection outside this module.
@@ -80,38 +175,8 @@ pub fn current_committed_rack_pickup(
     from_ground: ItemLocation,
     owner: CharacterId,
 ) -> Result<CommittedPickupView, PickupProofError> {
-    if !matches!(from_ground, ItemLocation::Ground { .. }) {
-        return Err(PickupProofError::NotGroundSource);
-    }
-    let location = ItemLocation::Equipped {
-        character_id: owner,
-        slot: LegacyEquipmentSlot::MainHand.proposed_core_slot(),
-    };
-    let exact_operation = [OwnershipOp::Move {
-        item: item_id,
-        from: from_ground,
-        to: location,
-    }];
-    let receipt: OwnershipReceipt = journal
-        .verified_receipt(request_id, &exact_operation)?
-        .ok_or(PickupProofError::MissingCommittedReceipt)?;
-    // This projection only represents ONE sword per single atomic pickup.
-    if receipt.operation_count != 1 {
-        return Err(PickupProofError::MissingCommittedReceipt);
-    }
-    if journal.last_mutation_sequence(item_id) != Some(receipt.sequence) {
-        return Err(PickupProofError::HistoricalReceiptNoLongerCurrent);
-    }
-    if journal.location(item_id) != Some(location) {
-        return Err(PickupProofError::WrongCurrentLocation);
-    }
-    Ok(CommittedPickupView {
-        request_id,
-        item_id,
-        owner,
-        location,
-        journal_sequence: receipt.sequence,
-    })
+    historical_committed_rack_pickup(journal, request_id, item_id, from_ground, owner)?
+        .current_view(journal)
 }
 
 #[cfg(test)]
@@ -431,6 +496,103 @@ mod tests {
         loop {
             std::thread::park();
         }
+    }
+
+    #[test]
+    fn committed_history_survives_drop_transfer_and_reconnect_without_ghost_gear() {
+        let root = Root::new();
+        let mut journal = root.open();
+        seed(&mut journal);
+        assert!(matches!(
+            historical_committed_rack_pickup(&journal, txn(2001), item(201), rack(0), owner(1)),
+            Err(PickupProofError::MissingCommittedReceipt)
+        ));
+        let original = journal
+            .apply(
+                txn(2001),
+                &[OwnershipOp::Move {
+                    item: item(201),
+                    from: rack(0),
+                    to: equip(1),
+                }],
+            )
+            .unwrap();
+        let history = historical_committed_rack_pickup(
+            &journal,
+            txn(2001),
+            item(201),
+            rack(0),
+            owner(1),
+        )
+        .unwrap();
+        assert_eq!(history.journal_sequence(), original.sequence);
+        assert_eq!(history.owner_at_commit(), owner(1));
+        assert_eq!(history.item_id(), item(201));
+        assert_eq!(history.request_id(), txn(2001));
+        assert!(history.still_current(&journal));
+        assert_eq!(
+            history.current_view(&journal).unwrap().journal_sequence(),
+            original.sequence
+        );
+
+        // The player drops it, then a *different* player picks up that
+        // exact same physical item ID. The original commit remains true,
+        // but it cannot represent the previous player's current equipment.
+        journal
+            .apply(
+                txn(2002),
+                &[OwnershipOp::Move {
+                    item: item(201),
+                    from: equip(1),
+                    to: rack(0),
+                }],
+            )
+            .unwrap();
+        journal
+            .apply(
+                txn(2003),
+                &[OwnershipOp::Move {
+                    item: item(201),
+                    from: rack(0),
+                    to: equip(2),
+                }],
+            )
+            .unwrap();
+        assert!(!history.still_current(&journal));
+        assert!(matches!(
+            history.current_view(&journal),
+            Err(PickupProofError::HistoricalReceiptNoLongerCurrent)
+        ));
+        assert_eq!(
+            historical_committed_rack_pickup(&journal, txn(2001), item(201), rack(0), owner(1))
+                .unwrap(),
+            history,
+            "same request still has its committed historical outcome"
+        );
+        assert!(matches!(
+            historical_committed_rack_pickup(&journal, txn(2001), item(201), rack(0), owner(2)),
+            Err(PickupProofError::Journal(
+                ItemJournalError::InvalidTransaction(OwnershipError::ConflictingReplay)
+            ))
+        ));
+        assert!(matches!(
+            historical_committed_rack_pickup(&journal, txn(2001), item(202), rack(1), owner(1)),
+            Err(PickupProofError::Journal(
+                ItemJournalError::InvalidTransaction(OwnershipError::ConflictingReplay)
+            ))
+        ));
+
+        drop(journal);
+        let reopened = root.open();
+        assert_eq!(
+            historical_committed_rack_pickup(&reopened, txn(2001), item(201), rack(0), owner(1))
+                .unwrap(),
+            history,
+            "historical retry can be reconciled after a server restart"
+        );
+        assert!(!history.still_current(&reopened));
+        assert_eq!(reopened.location(item(201)), Some(equip(2)));
+        assert_eq!(reopened.item_count(), 4);
     }
 
     #[test]
