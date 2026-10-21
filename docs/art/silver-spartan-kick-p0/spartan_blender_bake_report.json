@@ -1,0 +1,572 @@
+{
+  "source": "Owner Silver original 22-bone GLB (not bundled or modified)",
+  "sourceSha256": "d679fccd00df868d600b4c5e2fcf8a4a46cc062dbd432be5b6a7f533eb30141f",
+  "clipKeyframesMs": {
+    "silver_kick_p0": [
+      0,
+      45,
+      90,
+      125,
+      160,
+      208,
+      283,
+      380
+    ],
+    "silver_dash_p0": [
+      0,
+      18,
+      45,
+      65,
+      83,
+      110,
+      122,
+      140
+    ]
+  },
+  "authoritativePhases": {
+    "kickMs": [
+      90,
+      70,
+      220
+    ],
+    "dashMs": 140
+  },
+  "framesPerDirection": 8,
+  "directions": 8,
+  "sourceFramePx": 160,
+  "sourceRigBones": 22,
+  "spartanHighKneeKickOptIn": true,
+  "worldGroundValidated": false,
+  "originalArtReplaced": false,
+  "realGreyhaven": false,
+  "humanVisualApproved": false,
+  "trueServerEvent": false,
+  "sourceEditableBlend": true,
+  "kickSupportFootSourceOnly": {
+    "method": "Blender original 22-bone LeftToeBase held by source Hips pose origin correction; not World IK",
+    "sampleCount": 29,
+    "originalKickToeMaxDeviation": 0.041021,
+    "plantedKickToeMaxDeviation": 2.3e-05,
+    "sourceFootAnchor": [
+      0.136,
+      -0.19469,
+      -0.50461
+    ],
+    "serverRootTranslation": false,
+    "actualFloorProven": false
+  },
+  "rendered": [
+    {
+      "clip": "silver_kick_p0",
+      "direction": 0,
+      "phase": 0,
+      "sourceFrame": 1,
+      "sampledBlenderFrame": 1,
+      "bytes": 22381
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 0,
+      "phase": 1,
+      "sourceFrame": 3.7,
+      "sampledBlenderFrame": 3.7,
+      "bytes": 22811
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 0,
+      "phase": 2,
+      "sourceFrame": 6.4,
+      "sampledBlenderFrame": 6.4,
+      "bytes": 23398
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 0,
+      "phase": 3,
+      "sourceFrame": 8.5,
+      "sampledBlenderFrame": 8.5,
+      "bytes": 24188
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 0,
+      "phase": 4,
+      "sourceFrame": 10.6,
+      "sampledBlenderFrame": 10.6,
+      "bytes": 24390
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 0,
+      "phase": 5,
+      "sourceFrame": 13.5,
+      "sampledBlenderFrame": 13.5,
+      "bytes": 22962
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 0,
+      "phase": 6,
+      "sourceFrame": 18.0,
+      "sampledBlenderFrame": 18.0,
+      "bytes": 22708
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 0,
+      "phase": 7,
+      "sourceFrame": 23.8,
+      "sampledBlenderFrame": 23.8,
+      "bytes": 22381
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 1,
+      "phase": 0,
+      "sourceFrame": 1,
+      "sampledBlenderFrame": 1,
+      "bytes": 20686
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 1,
+      "phase": 1,
+      "sourceFrame": 3.7,
+      "sampledBlenderFrame": 3.7,
+      "bytes": 21437
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 1,
+      "phase": 2,
+      "sourceFrame": 6.4,
+      "sampledBlenderFrame": 6.4,
+      "bytes": 22330
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 1,
+      "phase": 3,
+      "sourceFrame": 8.5,
+      "sampledBlenderFrame": 8.5,
+      "bytes": 23015
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 1,
+      "phase": 4,
+      "sourceFrame": 10.6,
+      "sampledBlenderFrame": 10.6,
+      "bytes": 23198
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 1,
+      "phase": 5,
+      "sourceFrame": 13.5,
+      "sampledBlenderFrame": 13.5,
+      "bytes": 21423
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 1,
+      "phase": 6,
+      "sourceFrame": 18.0,
+      "sampledBlenderFrame": 18.0,
+      "bytes": 20963
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 1,
+      "phase": 7,
+      "sourceFrame": 23.8,
+      "sampledBlenderFrame": 23.8,
+      "bytes": 20686
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 2,
+      "phase": 0,
+      "sourceFrame": 1,
+      "sampledBlenderFrame": 1,
+      "bytes": 20693
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 2,
+      "phase": 1,
+      "sourceFrame": 3.7,
+      "sampledBlenderFrame": 3.7,
+      "bytes": 20349
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 2,
+      "phase": 2,
+      "sourceFrame": 6.4,
+      "sampledBlenderFrame": 6.4,
+      "bytes": 20886
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 2,
+      "phase": 3,
+      "sourceFrame": 8.5,
+      "sampledBlenderFrame": 8.5,
+      "bytes": 21644
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 2,
+      "phase": 4,
+      "sourceFrame": 10.6,
+      "sampledBlenderFrame": 10.6,
+      "bytes": 21407
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 2,
+      "phase": 5,
+      "sourceFrame": 13.5,
+      "sampledBlenderFrame": 13.5,
+      "bytes": 20597
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 2,
+      "phase": 6,
+      "sourceFrame": 18.0,
+      "sampledBlenderFrame": 18.0,
+      "bytes": 20963
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 2,
+      "phase": 7,
+      "sourceFrame": 23.8,
+      "sampledBlenderFrame": 23.8,
+      "bytes": 20693
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 3,
+      "phase": 0,
+      "sourceFrame": 1,
+      "sampledBlenderFrame": 1,
+      "bytes": 21333
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 3,
+      "phase": 1,
+      "sourceFrame": 3.7,
+      "sampledBlenderFrame": 3.7,
+      "bytes": 21310
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 3,
+      "phase": 2,
+      "sourceFrame": 6.4,
+      "sampledBlenderFrame": 6.4,
+      "bytes": 20991
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 3,
+      "phase": 3,
+      "sourceFrame": 8.5,
+      "sampledBlenderFrame": 8.5,
+      "bytes": 20999
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 3,
+      "phase": 4,
+      "sourceFrame": 10.6,
+      "sampledBlenderFrame": 10.6,
+      "bytes": 20848
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 3,
+      "phase": 5,
+      "sourceFrame": 13.5,
+      "sampledBlenderFrame": 13.5,
+      "bytes": 21570
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 3,
+      "phase": 6,
+      "sourceFrame": 18.0,
+      "sampledBlenderFrame": 18.0,
+      "bytes": 21821
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 3,
+      "phase": 7,
+      "sourceFrame": 23.8,
+      "sampledBlenderFrame": 23.8,
+      "bytes": 21333
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 4,
+      "phase": 0,
+      "sourceFrame": 1,
+      "sampledBlenderFrame": 1,
+      "bytes": 21061
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 4,
+      "phase": 1,
+      "sourceFrame": 3.7,
+      "sampledBlenderFrame": 3.7,
+      "bytes": 21199
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 4,
+      "phase": 2,
+      "sourceFrame": 6.4,
+      "sampledBlenderFrame": 6.4,
+      "bytes": 20833
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 4,
+      "phase": 3,
+      "sourceFrame": 8.5,
+      "sampledBlenderFrame": 8.5,
+      "bytes": 20262
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 4,
+      "phase": 4,
+      "sourceFrame": 10.6,
+      "sampledBlenderFrame": 10.6,
+      "bytes": 20326
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 4,
+      "phase": 5,
+      "sourceFrame": 13.5,
+      "sampledBlenderFrame": 13.5,
+      "bytes": 21039
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 4,
+      "phase": 6,
+      "sourceFrame": 18.0,
+      "sampledBlenderFrame": 18.0,
+      "bytes": 21325
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 4,
+      "phase": 7,
+      "sourceFrame": 23.8,
+      "sampledBlenderFrame": 23.8,
+      "bytes": 21061
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 5,
+      "phase": 0,
+      "sourceFrame": 1,
+      "sampledBlenderFrame": 1,
+      "bytes": 20705
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 5,
+      "phase": 1,
+      "sourceFrame": 3.7,
+      "sampledBlenderFrame": 3.7,
+      "bytes": 21017
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 5,
+      "phase": 2,
+      "sourceFrame": 6.4,
+      "sampledBlenderFrame": 6.4,
+      "bytes": 20361
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 5,
+      "phase": 3,
+      "sourceFrame": 8.5,
+      "sampledBlenderFrame": 8.5,
+      "bytes": 20454
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 5,
+      "phase": 4,
+      "sourceFrame": 10.6,
+      "sampledBlenderFrame": 10.6,
+      "bytes": 20205
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 5,
+      "phase": 5,
+      "sourceFrame": 13.5,
+      "sampledBlenderFrame": 13.5,
+      "bytes": 20919
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 5,
+      "phase": 6,
+      "sourceFrame": 18.0,
+      "sampledBlenderFrame": 18.0,
+      "bytes": 20857
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 5,
+      "phase": 7,
+      "sourceFrame": 23.8,
+      "sampledBlenderFrame": 23.8,
+      "bytes": 20705
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 6,
+      "phase": 0,
+      "sourceFrame": 1,
+      "sampledBlenderFrame": 1,
+      "bytes": 20949
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 6,
+      "phase": 1,
+      "sourceFrame": 3.7,
+      "sampledBlenderFrame": 3.7,
+      "bytes": 21115
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 6,
+      "phase": 2,
+      "sourceFrame": 6.4,
+      "sampledBlenderFrame": 6.4,
+      "bytes": 20928
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 6,
+      "phase": 3,
+      "sourceFrame": 8.5,
+      "sampledBlenderFrame": 8.5,
+      "bytes": 21119
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 6,
+      "phase": 4,
+      "sourceFrame": 10.6,
+      "sampledBlenderFrame": 10.6,
+      "bytes": 21212
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 6,
+      "phase": 5,
+      "sourceFrame": 13.5,
+      "sampledBlenderFrame": 13.5,
+      "bytes": 21243
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 6,
+      "phase": 6,
+      "sourceFrame": 18.0,
+      "sampledBlenderFrame": 18.0,
+      "bytes": 21246
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 6,
+      "phase": 7,
+      "sourceFrame": 23.8,
+      "sampledBlenderFrame": 23.8,
+      "bytes": 20949
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 7,
+      "phase": 0,
+      "sourceFrame": 1,
+      "sampledBlenderFrame": 1,
+      "bytes": 22184
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 7,
+      "phase": 1,
+      "sourceFrame": 3.7,
+      "sampledBlenderFrame": 3.7,
+      "bytes": 22621
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 7,
+      "phase": 2,
+      "sourceFrame": 6.4,
+      "sampledBlenderFrame": 6.4,
+      "bytes": 23142
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 7,
+      "phase": 3,
+      "sourceFrame": 8.5,
+      "sampledBlenderFrame": 8.5,
+      "bytes": 23673
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 7,
+      "phase": 4,
+      "sourceFrame": 10.6,
+      "sampledBlenderFrame": 10.6,
+      "bytes": 23844
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 7,
+      "phase": 5,
+      "sourceFrame": 13.5,
+      "sampledBlenderFrame": 13.5,
+      "bytes": 22950
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 7,
+      "phase": 6,
+      "sourceFrame": 18.0,
+      "sampledBlenderFrame": 18.0,
+      "bytes": 22589
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 7,
+      "phase": 7,
+      "sourceFrame": 23.8,
+      "sampledBlenderFrame": 23.8,
+      "bytes": 22184
+    }
+  ]
+}
