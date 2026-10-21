@@ -1,0 +1,124 @@
+{
+  "author": "Graphics 3A offline Blender 4.5 first-party Silver pose actions",
+  "originalSilverGlbBundled": false,
+  "gameplayActivated": false,
+  "newServerPackets": false,
+  "realGroundContactValidated": false,
+  "humanVisualApproved": false,
+  "assets": {
+    "silver_kick_p0": {
+      "atlas": "silver_kick_p0.webp",
+      "gif": "silver_kick_p0_8direction_loop.gif",
+      "atlasPx": [
+        1280,
+        1280
+      ],
+      "frames": 8,
+      "directions": 8,
+      "framePx": [
+        160,
+        160
+      ],
+      "durationMs": 380,
+      "sampleTimingsMs": [
+        0,
+        45,
+        90,
+        125,
+        160,
+        208,
+        283,
+        380
+      ],
+      "gifTimingsMs": [
+        20,
+        40,
+        50,
+        40,
+        50,
+        65,
+        70,
+        45
+      ],
+      "phasesMs": {
+        "windup": 90,
+        "active": 70,
+        "recovery": 220
+      },
+      "perDirectionChangedPixels": [
+        3482,
+        2941,
+        2820,
+        3264,
+        3167,
+        2842,
+        2958,
+        3470
+      ],
+      "sha256": {
+        "atlas": "dceaa6382a7b456705ea565d95e8be24a392ef1fd0ef0e988d5679f75bd5167f",
+        "gif": "b0722384aac63864e4633dc6a895a61f5a09311a6a07cfd3f14d62b4be6a8140"
+      },
+      "authored": true,
+      "humanApproved": false,
+      "integrationReady": false,
+      "realGreyhaven": false
+    },
+    "silver_dash_p0": {
+      "atlas": "silver_dash_p0.webp",
+      "gif": "silver_dash_p0_8direction_loop.gif",
+      "atlasPx": [
+        1280,
+        1280
+      ],
+      "frames": 8,
+      "directions": 8,
+      "framePx": [
+        160,
+        160
+      ],
+      "durationMs": 140,
+      "sampleTimingsMs": [
+        0,
+        18,
+        45,
+        65,
+        83,
+        110,
+        122,
+        140
+      ],
+      "gifTimingsMs": [
+        20,
+        20,
+        20,
+        20,
+        20,
+        20,
+        10,
+        10
+      ],
+      "phasesMs": {
+        "dash": 140
+      },
+      "perDirectionChangedPixels": [
+        2735,
+        2296,
+        2980,
+        3503,
+        3298,
+        2921,
+        2706,
+        2803
+      ],
+      "sha256": {
+        "atlas": "b3152d729e3a7065eced1ab4da99d710479e75a2b3109007a95b9fce305629a5",
+        "gif": "ea430c9b93341989519253ad82335343cb6e269db4e44328c3ede0150619f11e"
+      },
+      "authored": true,
+      "humanApproved": false,
+      "integrationReady": false,
+      "realGreyhaven": false
+    }
+  }
+}
