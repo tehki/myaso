@@ -47,7 +47,16 @@ export async function dispatchM41NativeParryOnLightOnset({
   // Chrome W3C is still one authentic mouse transaction, 20–35 ms short
   // hold. Observe the resulting real Rust light action without awaiting
   // WebDriver's variable response latency, then send ONE W3C Firefox wheel.
-  const attackOutcome = Promise.resolve().then(sendAttack).then(
+  // Start the genuine Chrome W3C request synchronously before reading
+  // any server proof. A deferred microtask can poll a stale trace first.
+  // The request's HTTP ACK may still arrive after the server light onset.
+  let attackRequest;
+  try {
+    attackRequest = sendAttack();
+  } catch (error) {
+    throw error;
+  }
+  const attackOutcome = Promise.resolve(attackRequest).then(
     () => ({ ok: true }),
     error => ({ ok: false, error }),
   );
