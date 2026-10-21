@@ -1,0 +1,77 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Original Blacksmith WebP load vs exact World module graph</title><link rel="icon" href="data:,"></head><body><output id="status">Source-load diagnostic, no real gameplay</output><script>
+window.__graphProbe={phase:"boot",done:false,log:[],error:null,
+ originalWorldDrawn:false,productionApproved:false,serverItemsAuthenticated:false};
+(async()=>{
+ const probe=window.__graphProbe, t=()=>performance.now();
+ const record=(stage,other={})=>probe.log.push({stage,at:t(),...other});
+ const params=new URL(location.href).searchParams;
+ const mode=params.get("mode");
+ if(!["minimal","graph","draw"].includes(mode))throw Error("Unknown mode");
+ record("boot",{mode});
+ let original=null;
+ if(mode!=="minimal"){
+  record("graph:begin");
+  const mod=await import("./armory-p0-graph-load-probe.mjs");
+  original=window.__graphProbeGraphics;
+  if(!original)throw Error("Missing original World/Graphics exports");
+ }
+ record("image:begin");
+ const load=async(name,expected)=>{
+  const url="/assets/environment/greyhaven/armory-p0/"+name+".webp";
+  const img=new Image();
+  const start=t();
+  record(name+":begin");
+  img.src=url;
+  const onload=new Promise((resolve,reject)=>{
+   img.onload=resolve;img.onerror=()=>reject(Error("image onerror "+name));
+  });
+  await onload;
+  record(name+":onload",{ms:t()-start,naturalWidth:img.naturalWidth,naturalHeight:img.naturalHeight});
+  await img.decode();
+  record(name+":decoded",{ms:t()-start});
+  if(img.naturalWidth!==expected[0]||img.naturalHeight!==expected[1])throw Error("Wrong source "+name+" shape");
+  return img;
+ };
+ const [rack,sword]=await Promise.all([load("armory_rack",[240,166]),load("armory_sword",[42,115])]);
+ record("image:both-decoded");
+ if(mode==="draw"){
+  const camera={x:3800,y:4038},map=original.getAuthoredMap(original.MAP_IDS.overworld);
+  const canvas=document.createElement("canvas");canvas.width=640;canvas.height=640;
+  const ctx=canvas.getContext("2d");
+  const world=original.createAuthoredWorldRenderer({cacheCap:24,buildLimit:8});
+  const syntheticItems=original.WORLD_ALPHA_ARMORY.rackSockets.map((s,i)=>({
+   socketId:s.socketId,itemId:"ART-ONLY-NO-SERVER-"+i,
+   zoneId:s.mapId,visualKind:"sword",location:"rack",revision:0
+  }));
+  const alpha=original.createArmorySwordAlphaSampler(sword);
+  const plan=original.createWorld493RackArtPlan({
+   worldArmory:original.WORLD_ALPHA_ARMORY,authoredMap:map,
+   layoutVersion:original.WORLD_ALPHA_ARMORY_VERSION,
+   committedWorldItems:syntheticItems,camera
+  });
+  const draws=Number(params.get("draws")||1);
+  if(![1,6].includes(draws))throw Error("Invalid draw budget");
+  for(let i=0;i<draws;i++){
+   const mark=t();record("draw:begin",{index:i});
+   ctx.save();ctx.translate(320,320);ctx.scale(.84,.84);ctx.translate(-320,-320);
+   world.draw(ctx,original.MAP_IDS.overworld,camera,640,640,.84);
+   ctx.restore();
+   const painted=original.paintArmoryRackPresentedFrame({
+    ctx,plan,rackImage:rack,swordImage:sword,alphaSampler:alpha,frameId:i+1
+   });
+   if(painted.drawnSwordCount!==4)throw Error("Not all four swords painted");
+   record("draw:complete",{index:i,ms:t()-mark,tilesCached:world.stats.cached});
+  }
+  probe.originalWorldDrawn=true;
+ }
+ record("DONE");
+ probe.phase="DONE";probe.done=true;
+ document.querySelector("#status").textContent="Original source diagnostic completed ("+mode+")";
+})().catch(e=>{
+ const p=window.__graphProbe;
+ p.phase="ERROR";p.error=String(e.stack||e);p.done=true;
+ p.log.push({stage:"ERROR",message:String(e),at:performance.now()});
+ document.querySelector("#status").textContent="Diagnostic failure: "+e.message;
+ console.error(e);
+});
+</script></body></html>
