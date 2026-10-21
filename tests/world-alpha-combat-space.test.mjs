@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import {readFileSync} from "node:fs";
 import {MAP_IDS,getAuthoredMap} from "../src/world/authored-maps.mjs";
 import {WORLD_ALPHA_SPAWN_COORDINATES,WORLD_ALPHA_SWORD_RACK_SOCKETS} from "../src/world/alpha-armory.mjs";
 import {
@@ -94,6 +95,50 @@ test("P0 exact swept collision rejects thin between-sample solids and tangent to
   "inflated AABB tangency is blocked");
  assert.equal(segmentIntersectsInflatedSolid({x:0,y:18.26},{x:10,y:18.26},thin,18),false);
  assert.equal(segmentIntersectsInflatedSolid({x:0,y:25},{x:10,y:25},thin,18),false);
+});
+
+// Cross-owner static-source proof. Import the actual server-owned staging
+// positions from the Core 8C Rust admission source, never a duplicated test
+// constant or client-provided coordinates. Reject unfamiliar source shapes
+// rather than guessing that World and Core still have the same four spawns.
+const coreStagingSpawnsFromSource=(source)=>{
+ const declaration=/const\s+GREYHAVEN_SPAWNS\s*:\s*\[\s*\(\s*f32\s*,\s*f32\s*\)\s*;\s*4\s*\]\s*=\s*\[([\s\S]*?)\];/g;
+ const blocks=[...source.matchAll(declaration)];
+ assert.equal(blocks.length,1,"expected one reviewed Core 8C four-spawn declaration");
+ const body=blocks[0][1];
+ const tuple=/\(\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*\)\s*,?/g;
+ const rows=[...body.matchAll(tuple)].map(v=>({x:Number(v[1]),y:Number(v[2])}));
+ assert.equal(body.replace(tuple,"").trim(),"","unreviewed Core 8C spawn expression");
+ assert.equal(rows.length,4,"Core 8C must expose exactly four numeric spawns");
+ assert.ok(rows.every(p=>Number.isSafeInteger(p.x)&&Number.isSafeInteger(p.y)),
+  "staging World-compatible coordinates must be integer values");
+ assert.equal(new Set(rows.map(p=>p.x+","+p.y)).size,4,
+  "Core 8C cannot silently duplicate a staging position");
+ assert.match(source,/GREYHAVEN_SPAWNS\.iter\(\)\.copied\(\)\.find\(/,
+  "server admission must use the declared staging positions");
+ return rows;
+};
+
+test("P0 World spawn-to-courtyard routes pin the ACTUAL Core 8C server admission coordinates",()=>{
+ const source=readFileSync(new URL("../server/src/alpha_spawn.rs",import.meta.url),"utf8");
+ const actual=coreStagingSpawnsFromSource(source);
+ assert.deepEqual(actual,WORLD_ALPHA_SPAWN_COORDINATES.map(p=>({x:p.x,y:p.y})));
+ // Tampering controls: a future server respawn move cannot leave World
+ // route proof green, and duplicate/removed/floating source must fail closed.
+ const moved=source.replace("(4206.0, 4256.0)","(4207.0, 4256.0)");
+ assert.notEqual(moved,source);
+ assert.notDeepEqual(coreStagingSpawnsFromSource(moved),actual);
+ const duplicate=source.replace("(4206.0, 4256.0)","(4110.0, 4160.0)");
+ assert.notEqual(duplicate,source);
+ assert.throws(()=>coreStagingSpawnsFromSource(duplicate));
+ const omitted=source.replace("(4206.0, 4256.0),","");
+ assert.notEqual(omitted,source);
+ assert.throws(()=>coreStagingSpawnsFromSource(omitted));
+ const renamed=source.replace("const GREYHAVEN_SPAWNS:","const OTHER_SPAWNS:");
+ assert.notEqual(renamed,source);
+ assert.throws(()=>coreStagingSpawnsFromSource(renamed));
+ // This checks a static, opt-in staging contract only; it does not assert
+ // current server lease/zone/epoch, successful admission or real path motion.
 });
 
 test("P0 all four server-designated city spawn fixtures can walk straight to every courtyard station",()=>{
