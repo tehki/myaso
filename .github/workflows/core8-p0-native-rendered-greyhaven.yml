@@ -1,0 +1,44 @@
+name: Core 8A P0 four native rendered Greyhaven clients
+
+on:
+  pull_request:
+    paths:
+      - "scripts/alpha_p0_four_native_rendered_greyhaven.mjs"
+      - ".github/workflows/core8-p0-native-rendered-greyhaven.yml"
+      - "docs/CORE8A_P0_FOUR_NATIVE_RENDERED_GREYHAVEN.md"
+      - "src/browser/authored-world-renderer.mjs"
+      - "web/online-game.mjs"
+
+permissions:
+  contents: read
+
+jobs:
+  four-genuine-authored-world-browsers:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check original world renderer and native runner without game mutations
+        run: |
+          node --check src/browser/authored-world-renderer.mjs
+          node --check scripts/alpha_p0_four_native_rendered_greyhaven.mjs
+          node scripts/verify-core8c-greyhaven-geometry.mjs
+      - name: Verify real Chrome Firefox W3C programs
+        run: |
+          chromedriver --version
+          geckodriver --version
+          google-chrome --version
+          firefox --version
+      - name: Build exact server for local-only four-client authored-world smoke
+        run: cargo build --locked --manifest-path server/Cargo.toml --bin myaso-server
+      - name: Four real browsers render original authored Greyhaven with live Rust QUIC
+        run: timeout --signal=TERM --kill-after=5s 180s node scripts/alpha_p0_four_native_rendered_greyhaven.mjs
+      - name: Retain raw genuine browser screenshots and report
+        if: always()
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: core8-original-rendered-greyhaven-four-browser-screenshots
+          path: alpha-p0-real-greyhaven-visual-evidence/*
+          if-no-files-found: ignore
+          retention-days: 3
