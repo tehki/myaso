@@ -19,7 +19,7 @@ use std::{
 use tokio::time::timeout;
 use wtransport::{
     tls::{Sha256Digest, Sha256DigestFmt},
-    ClientConfig, Endpoint,
+    ClientConfig, Endpoint, VarInt,
 };
 
 const SPAWNS: [(f32, f32); 4] = [
@@ -232,6 +232,211 @@ async fn exercise_real_four_quic_clients(static_preview: bool) -> Result<()> {
         "ALPHA_8C_FOUR_QUIC_GREYHAVEN_PASS cap=4 no_fifth=yes static_preview={static_preview}"
     );
     Ok(())
+}
+
+/// Real-session disconnect/rejoin proof (not persistent account recovery):
+/// the old QUIC identity is removed, its server-owned immutable respawn
+/// anchor can be reclaimed by a new *different* network identity, and the
+/// three survivors retain one shared authoritative World. Still loopback.
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn four_quic_players_reclaim_only_departed_greyhaven_slot_after_abrupt_leave() -> Result<()> {
+    let (_server, url, pin) = start_private_staging_server(true)?;
+    let endpoint = Endpoint::client(
+        ClientConfig::builder()
+            .with_bind_default()
+            .with_server_certificate_hashes([pin])
+            .build(),
+    )?;
+    let mut sessions = Vec::new();
+    for (index, spawn) in SPAWNS.into_iter().enumerate() {
+        let connection = timeout(Duration::from_secs(6), endpoint.connect(url.as_str()))
+            .await
+            .context("pre-leave join connect timeout")?
+            .context("pre-leave connection rejected")?;
+        let (send, mut recv) = timeout(Duration::from_secs(5), connection.open_bi())
+            .await
+            .context("pre-leave game stream timeout")??
+            .await
+            .context("pre-leave game stream rejected")?;
+        let mut header = [0_u8; 2];
+        timeout(Duration::from_secs(5), recv.read_exact(&mut header))
+            .await
+            .context("pre-leave baseline length timeout")??;
+        let size = u16::from_le_bytes(header) as usize;
+        if !(14..=4096).contains(&size) {
+            bail!("pre-leave invalid baseline length {size}");
+        }
+        let mut bytes = vec![0_u8; size];
+        timeout(Duration::from_secs(5), recv.read_exact(&mut bytes))
+            .await
+            .context("pre-leave baseline receive timeout")??;
+        let snapshot = decode_snapshot(&bytes)
+            .map_err(|e| anyhow::anyhow!("pre-leave invalid snapshot: {e:?}"))?;
+        if !snapshot.full || snapshot.records.len() != index + 1 {
+            bail!("pre-leave player {} did not join same World", index + 1);
+        }
+        let own = snapshot
+            .records
+            .iter()
+            .find(|record| record.net_id == (index + 1) as u32)
+            .context("pre-leave identity missing from server baseline")?;
+        let observed = (own.x as f32 / 4.0, own.y as f32 / 4.0);
+        if observed != spawn {
+            bail!(
+                "pre-leave player {} at {observed:?} instead of {spawn:?}",
+                index + 1
+            );
+        }
+        sessions.push((connection, send, recv, snapshot.sequence));
+    }
+    // Vacate player #1's visual spawn coordinates WITHOUT relinquishing
+    // its immutable respawn anchor. Admission must not reclaim this now
+    // visually empty first slot while its original owner is still alive.
+    let first = &sessions[0].0;
+    send_held_direction(first, sessions[0].3, 10_900, (-127, 0))?;
+    let move_deadline = Instant::now() + Duration::from_secs(3);
+    let moved = loop {
+        let position = next_authoritative_position(first, 1, move_deadline).await?;
+        if position.0 <= 4058.0 {
+            break position;
+        }
+    };
+    send_held_direction(first, sessions[0].3, 10_901, (0, 0))?;
+    if moved.0 >= SPAWNS[0].0 - 44.0 || (moved.1 - SPAWNS[0].1).abs() > 6.0 {
+        bail!("pre-leave fighter #1 never vacated visual spawn coordinates: {moved:?}");
+    }
+
+    // No fifth actual connection while all four slots are occupied.
+    if let Ok(Ok(extra)) = timeout(Duration::from_secs(3), endpoint.connect(url.as_str())).await {
+        extra.close(VarInt::from_u32(0), b"rejoin cap violation");
+        bail!("pre-leave server admitted a fifth player");
+    }
+
+    // Drop player #2 and its reliable stream, explicitly closing only this
+    // player's QUIC connection. The three existing users stay connected.
+    let (departed, departed_send, departed_recv, _) = sessions.remove(1);
+    departed.close(VarInt::from_u32(0), b"private alpha slot release");
+    drop((departed_send, departed_recv));
+    drop(departed);
+
+    // Wait for the server to process the real transport leave and revoke its
+    // world slot and admission permit, never mutate the Rust World from test.
+    let deadline = Instant::now() + Duration::from_secs(5);
+    let replacement = loop {
+        if Instant::now() >= deadline {
+            bail!("authoritative QUIC leave did not free exactly one admission slot");
+        }
+        match timeout(Duration::from_millis(900), endpoint.connect(url.as_str())).await {
+            Ok(Ok(connection)) => break connection,
+            Ok(Err(_)) | Err(_) => tokio::time::sleep(Duration::from_millis(50)).await,
+        }
+    };
+    let (replacement_send, mut replacement_recv) =
+        timeout(Duration::from_secs(5), replacement.open_bi())
+            .await
+            .context("replacement reliable stream timeout")??
+            .await
+            .context("replacement reliable stream rejected")?;
+    let mut length = [0_u8; 2];
+    timeout(
+        Duration::from_secs(5),
+        replacement_recv.read_exact(&mut length),
+    )
+    .await
+    .context("replacement baseline length timeout")??;
+    let len = u16::from_le_bytes(length) as usize;
+    if !(14..=4096).contains(&len) {
+        bail!("replacement received invalid baseline len {len}");
+    }
+    let mut bytes = vec![0_u8; len];
+    timeout(
+        Duration::from_secs(5),
+        replacement_recv.read_exact(&mut bytes),
+    )
+    .await
+    .context("replacement baseline body timeout")??;
+    let snapshot = decode_snapshot(&bytes)
+        .map_err(|e| anyhow::anyhow!("replacement initial baseline invalid: {e:?}"))?;
+    if !snapshot.full || snapshot.records.len() != 4 {
+        bail!("replacement did not see three survivors and itself");
+    }
+    let ids: BTreeSet<u32> = snapshot
+        .records
+        .iter()
+        .map(|record| record.net_id)
+        .collect();
+    let expected = BTreeSet::from([1, 3, 4, 5]);
+    if ids != expected {
+        bail!(
+            "old departed identity retained or survivors lost: ids={ids:?}, expected={expected:?}"
+        );
+    }
+    for record in &snapshot.records {
+        let actual = (record.x as f32 / 4.0, record.y as f32 / 4.0);
+        if record.net_id == 1 {
+            if actual.0 > SPAWNS[0].0 - 44.0 || (actual.1 - SPAWNS[0].1).abs() > 6.0 {
+                bail!("existing player #1 lost its valid post-movement coordinate {actual:?}");
+            }
+            continue;
+        }
+        let expected_anchor = match record.net_id {
+            3 => SPAWNS[2],
+            4 => SPAWNS[3],
+            5 => SPAWNS[1],
+            other => bail!("unexpected replacement player net id {other}"),
+        };
+        if actual != expected_anchor {
+            bail!("player {} changed authoritative spawn after slot replacement: {actual:?} expected {expected_anchor:?}", record.net_id);
+        }
+    }
+    if let Ok(Ok(extra)) = timeout(Duration::from_secs(3), endpoint.connect(url.as_str())).await {
+        extra.close(VarInt::from_u32(0), b"replacement overcap violation");
+        bail!("replacement bypassed four-player cap");
+    }
+
+    // Every continuing user AND the new fifth session must still receive its
+    // own correctly fenced real server-input ACK. This cannot pass if users
+    // were moved to independent isolated Worlds.
+    for (index, (connection, _, _, initial_seq)) in sessions.iter().enumerate() {
+        let owner = [1, 3, 4][index];
+        let tick = 11_000 + owner;
+        send_held_direction(connection, *initial_seq, tick, (0, 0))?;
+        require_quic_input_ack(connection, tick, owner).await?;
+    }
+    send_held_direction(&replacement, snapshot.sequence, 11_005, (0, 0))?;
+    require_quic_input_ack(&replacement, 11_005, 5).await?;
+    println!(
+        "ALPHA_8C_FOUR_QUIC_RECLAIM_PASS departed=2 replacement=5          reclaimed_x={} reclaimed_y={} survivor1_vacated_spawn=yes cap=4",
+        SPAWNS[1].0, SPAWNS[1].1
+    );
+    drop((replacement_send, replacement_recv));
+    Ok(())
+}
+
+async fn require_quic_input_ack(
+    connection: &wtransport::Connection,
+    client_tick: u32,
+    expected_id: u32,
+) -> Result<()> {
+    let deadline = Instant::now() + Duration::from_secs(5);
+    loop {
+        let remaining = deadline.saturating_duration_since(Instant::now());
+        if remaining.is_zero() {
+            bail!("player {expected_id} missing current ACK for tick {client_tick}");
+        }
+        let incoming = timeout(remaining, connection.receive_datagram())
+            .await
+            .context("current player ACK timeout")??;
+        let data = incoming.as_ref();
+        if data.len() == 16
+            && data[0] == 1
+            && data[1] == 3
+            && u32::from_le_bytes(data[4..8].try_into().unwrap()) == client_tick
+            && u32::from_le_bytes(data[12..16].try_into().unwrap()) == expected_id
+        {
+            return Ok(());
+        }
+    }
 }
 
 /// Test the *real* authoritative QUIC stream and replicated state. No direct

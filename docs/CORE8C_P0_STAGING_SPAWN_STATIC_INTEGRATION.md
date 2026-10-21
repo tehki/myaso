@@ -152,6 +152,34 @@ The concurrent four-client movement proof checks actual on-wire server
 positions and per-connection replication deltas. It does not emulate
 independent browser event loops or independent-host WebTransport.
 
+## Real four-session QUIC disconnect and slot-authority regression
+
+The isolated four_quic_players_reclaim_only_departed_greyhaven_slot_after_abrupt_leave
+test runs a real loopback WebTransport server with the exact pinned
+reviewed-static-collision mode, and opens four certificate-pinned QUIC
+sessions at distinct immutable server spawn locations.
+
+Before disconnect, player #1 walks more than 44 units from its spawn
+using actual input packets. Its original respawn anchor must remain
+reserved for this existing player, although visually empty. A fifth
+connection is refused at full capacity. The test closes player #2's
+actual QUIC transport, while preserving sessions #1, #3 and #4; the
+server removes net ID #2 and frees its admission permit. A newly
+admitted player receives a distinct new net ID #5 and ONLY #2's freed
+anchor (4206,4160); player #1 keeps its moved position and #3/#4
+remain at their original locations. The new reliable server baseline
+must contain exactly {1,3,4,5}, with the departed #2 absent. Another
+fifth connection is refused. Each of the four live sessions separately
+receives a current server-generated and correctly addressed INPUT_ACK.
+
+No test directly calls remove_player or add_player: admission and
+cleanup occur in the original server connection lifecycle. This does
+NOT prove persistent player identity recovery: the replacement is a
+NEW network identity, with no authenticated account/inventory/gear
+restore. It proves bounded World slot and admission ownership, not
+independent-host M5 or persistent crash recovery. No public listener
+or production settings are changed.
+
 ## Nonclaims and release HOLD
 
 This is **not** full geometry authority. World #509's 23 static AABBs omit
