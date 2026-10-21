@@ -62,7 +62,8 @@ test("M41 retains original authentic native W3C combat/raster strictness", () =>
   assert.match(segment,/if \(scenario === "uiparrytell"\) \{/);
   assert.match(segment,/sendAttack: \(\) => performArenaAttackHold\(attacker, attackerElementId, attackOffset, 35\)/);
   assert.match(segment,/sendWheel: \(\) => setArenaBlock\(defender, defenderElementId, true\)/);
-  assert.match(segment,/await dispatchM41NativeParryAfterRelease\(\{/);
+  assert.match(segment,/await dispatchM41NativeParryOnLightOnset\(\{/);
+  assert.match(segment,/readOutput: m201ServerOutput, afterOffset: m41AuthLogStart/);
   assert.match(segment,/M33 genuine short-click parry resolved unexpectedly/);
   assert.match(segment,/if \(!pristine\)/);
   assert.match(segment,/stagedDefender\?\.playerHp === defenderBefore\?\.playerHp/);
