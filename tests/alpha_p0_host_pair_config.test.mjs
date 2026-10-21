@@ -3,7 +3,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {parseHostPairConfig,privateIpv4} from "../scripts/alpha_p0_host_pair_config.mjs";
-import {verifyPairEvidence,verifyCaptureFiles} from "../scripts/alpha_p0_host_pair_verify.mjs";
+import {verifyPairEvidence,verifyCaptureFiles,verifyServerAdmissionLog} from "../scripts/alpha_p0_host_pair_verify.mjs";
 import {createHash} from "node:crypto";
 import {mkdtemp,mkdir,writeFile,rm} from "node:fs/promises";
 import {tmpdir} from "node:os";
@@ -143,6 +143,38 @@ test("offline verifier rejects moving but divergent four-browser authoritative p
   const a=fixture("A"),b=fixture("B");
   b.observed[0].find(f=>f.netId===3).x+=4;
   assert.doesNotThrow(()=>verifyPairEvidence(a,b));
+});
+
+test("scoped real-format SERVER log must confirm two actual IPs and four assigned IDs (synthetic fixtures)",()=>{
+  const a=fixture("A"),b=fixture("B");
+  const lines=[
+    "session 101 assigned player 1 from 192.168.2.128:40001",
+    "session 102 assigned player 2 from 192.168.2.128:40002",
+    "session 103 assigned player 3 from 192.168.2.130:40103",
+    "session 104 assigned player 4 from 192.168.2.130:40104",
+  ];
+  const valid=lines.join("\n");
+  const correlated=verifyServerAdmissionLog(valid,a,b);
+  assert.equal(correlated.admissions,4);
+  assert.equal(correlated.notReleaseApproval,true);
+  assert.equal(correlated.physicalHostAttestationStillRequired,true);
+  assert.deepEqual(correlated.playerNetIds,[1,2,3,4]);
+  for(const invalid of [
+    valid.replace("192.168.2.130:40104","192.168.2.128:40104"),
+    valid.replace("player 4","player 5"),
+    valid.replace("session 104","session 103"),
+    valid.replace("player 4","player 3"),
+    valid.replace("192.168.2.130:40104","8.8.8.8:40104"),
+    valid.replace("192.168.2.130:40104","192.168.2.130:65536"),
+    valid.replace("session 104","session 0"),
+    valid.replace("session 104 assigned","garbage assigned"),
+    lines.slice(1).join("\n"),
+    valid+"\n"+"session 105 assigned player 5 from 192.168.2.130:40105",
+    "",
+    "x".repeat(2_000_001),
+  ]) assert.throws(()=>verifyServerAdmissionLog(invalid,a,b));
+  const timestamped=lines.map(s=>"2026-10-21T16:00:00Z "+s).join("\n");
+  assert.equal(verifyServerAdmissionLog(timestamped,a,b).admissions,4);
 });
 
 test("capture-file verifier hashes real disk bytes, rejects missing/tampered PNG (synthetic fixture)",async()=>{
