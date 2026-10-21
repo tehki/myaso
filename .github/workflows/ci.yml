@@ -245,6 +245,7 @@ jobs:
           node --check src/world/alpha-armory.mjs
           node --test tests/world-alpha-armory.test.mjs tests/authored-world.test.mjs
           node --test tests/world-alpha-rack-selection-range.test.mjs
+          node --test tests/world-alpha-cardinal-rack-walk.test.mjs
           node --check src/world/alpha-combat-space.mjs
           node --test tests/world-alpha-combat-space.test.mjs
           cargo test --locked --manifest-path server/Cargo.toml --test world9_courtyard_static
