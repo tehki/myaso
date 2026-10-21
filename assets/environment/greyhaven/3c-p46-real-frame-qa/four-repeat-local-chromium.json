@@ -1,0 +1,172 @@
+{
+  "type": "P46 actual client+Rust local authoritative smoke and RAF gap telemetry",
+  "sourceHead": "0a1e622a356007c70030bff190dd7abf44df4501",
+  "serverBinary": "myaso-server",
+  "host": "127.0.0.1",
+  "browsersIndependentHosts": false,
+  "serverAuthoritative": true,
+  "worldFlag": true,
+  "clientsRequested": 4,
+  "measureMs": 6000,
+  "results": [
+    {
+      "index": 1,
+      "errors": [],
+      "client": {
+        "status": "Online - player #1 - server tick 108",
+        "canvasOpaque": true,
+        "title": "myaso.io — Browser Combat Prototype"
+      },
+      "measurement": {
+        "status": "Online - player #1 - server tick 618",
+        "scoreboard": [
+          "#10",
+          "#20",
+          "#30",
+          "#40"
+        ],
+        "diagnostics": "Input→ACK p50 64ms · p95 108ms | Jitter p95 58ms | Snapshots p50 50ms · p95 72ms | Camera correction p95 12.3u | Stale-own ACKs 273 | Deferred reconciles 568 | Render catch-ups 171 | Extra render lag p50 0ms · p95 28ms | >33ms 4.2% (96 samples) | Samples 96",
+        "opaqueCanvas": true,
+        "tileCanvasDrawCalls": 2656,
+        "rAFGapP50Ms": 16.7,
+        "rAFGapP95Ms": 16.8,
+        "rAFGapMaxMs": 133.3000000000011,
+        "rAFSamples": 331,
+        "actualGameFrameP50Ms": 0.6,
+        "actualGameFrameP95Ms": 3,
+        "actualGameFrameMaxMs": 10,
+        "actualGameFrameSamples": 332,
+        "worldTileBlitMs": 41.1,
+        "worldTileBlitCalls": 2656,
+        "measuredCallbackNames": [
+          "collect",
+          "frame"
+        ],
+        "documentHidden": false,
+        "note": "Game frame synchronous JS callback measured by requestAnimationFrame wrapper; NOT GPU presented frame time or true FPS"
+      }
+    },
+    {
+      "index": 2,
+      "errors": [],
+      "client": {
+        "status": "Online - player #2 - server tick 201",
+        "canvasOpaque": true,
+        "title": "myaso.io — Browser Combat Prototype"
+      },
+      "measurement": {
+        "status": "Online - player #2 - server tick 627",
+        "scoreboard": [
+          "#10",
+          "#20",
+          "#30",
+          "#40"
+        ],
+        "diagnostics": "Input→ACK p50 33ms · p95 80ms | Jitter p95 54ms | Snapshots p50 50ms · p95 68ms | Camera correction p95 8.9u | Stale-own ACKs 230 | Deferred reconciles 477 | Render catch-ups 112 | Extra render lag p50 0ms · p95 75ms | >33ms 6.3% (96 samples) | Samples 96",
+        "opaqueCanvas": true,
+        "tileCanvasDrawCalls": 2760,
+        "rAFGapP50Ms": 16.7,
+        "rAFGapP95Ms": 16.8,
+        "rAFGapMaxMs": 83.30000000000109,
+        "rAFSamples": 344,
+        "actualGameFrameP50Ms": 0.6,
+        "actualGameFrameP95Ms": 2.9,
+        "actualGameFrameMaxMs": 20.6,
+        "actualGameFrameSamples": 345,
+        "worldTileBlitMs": 26.3,
+        "worldTileBlitCalls": 2760,
+        "measuredCallbackNames": [
+          "collect",
+          "frame"
+        ],
+        "documentHidden": false,
+        "note": "Game frame synchronous JS callback measured by requestAnimationFrame wrapper; NOT GPU presented frame time or true FPS"
+      }
+    },
+    {
+      "index": 3,
+      "errors": [],
+      "client": {
+        "status": "Online - player #3 - server tick 339",
+        "canvasOpaque": true,
+        "title": "myaso.io — Browser Combat Prototype"
+      },
+      "measurement": {
+        "status": "Online - player #3 - server tick 684",
+        "scoreboard": [
+          "#10",
+          "#20",
+          "#30",
+          "#40"
+        ],
+        "diagnostics": "Input→ACK p50 25ms · p95 95ms | Jitter p95 67ms | Snapshots p50 50ms · p95 69ms | Camera correction p95 8.2u | Stale-own ACKs 196 | Deferred reconciles 402 | Render catch-ups 92 | Extra render lag p50 0ms · p95 28ms | >33ms 4.2% (96 samples) | Samples 96",
+        "opaqueCanvas": true,
+        "tileCanvasDrawCalls": 3006,
+        "rAFGapP50Ms": 16.7,
+        "rAFGapP95Ms": 16.8,
+        "rAFGapMaxMs": 83.39999999999964,
+        "rAFSamples": 333,
+        "actualGameFrameP50Ms": 0.6,
+        "actualGameFrameP95Ms": 2.9,
+        "actualGameFrameMaxMs": 7.4,
+        "actualGameFrameSamples": 334,
+        "worldTileBlitMs": 38.6,
+        "worldTileBlitCalls": 3006,
+        "measuredCallbackNames": [
+          "collect",
+          "frame"
+        ],
+        "documentHidden": false,
+        "note": "Game frame synchronous JS callback measured by requestAnimationFrame wrapper; NOT GPU presented frame time or true FPS"
+      }
+    },
+    {
+      "index": 4,
+      "errors": [],
+      "client": {
+        "status": "Online - player #4 - server tick 474",
+        "canvasOpaque": true,
+        "title": "myaso.io — Browser Combat Prototype"
+      },
+      "measurement": {
+        "status": "Online - player #4 - server tick 687",
+        "scoreboard": [
+          "#10",
+          "#20",
+          "#30",
+          "#40"
+        ],
+        "diagnostics": "Input→ACK p50 31ms · p95 122ms | Jitter p95 111ms | Snapshots p50 50ms · p95 71ms | Camera correction p95 12.3u | Stale-own ACKs 161 | Deferred reconciles 333 | Render catch-ups 77 | Extra render lag p50 0ms · p95 22ms | >33ms 3.4% (89 samples) | Samples 96",
+        "opaqueCanvas": true,
+        "tileCanvasDrawCalls": 1950,
+        "rAFGapP50Ms": 16.7,
+        "rAFGapP95Ms": 16.8,
+        "rAFGapMaxMs": 150,
+        "rAFSamples": 324,
+        "actualGameFrameP50Ms": 0.6,
+        "actualGameFrameP95Ms": 3.1,
+        "actualGameFrameMaxMs": 8.5,
+        "actualGameFrameSamples": 325,
+        "worldTileBlitMs": 21,
+        "worldTileBlitCalls": 1950,
+        "measuredCallbackNames": [
+          "collect",
+          "frame"
+        ],
+        "documentHidden": false,
+        "note": "Game frame synchronous JS callback measured by requestAnimationFrame wrapper; NOT GPU presented frame time or true FPS"
+      }
+    }
+  ],
+  "errors": [],
+  "serverSummary": {
+    "endpointLoopback": true,
+    "admittedPlayerIds": [
+      1,
+      2,
+      3,
+      4
+    ],
+    "clientCount": 4
+  }
+}
