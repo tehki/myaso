@@ -78,7 +78,7 @@ test("World P0 building solids are the WHOLE existing authored collision footpri
  assert.deepEqual([byId("building:red-lion").min_x,byId("building:red-lion").min_y,
   byId("building:red-lion").max_x,byId("building:red-lion").max_y],
   [4240,3880,4490,4050]);
- assert.strictEqual(deriveAlphaGreyhavenStaticSolids(),solids.map(s=>s).length?deriveAlphaGreyhavenStaticSolids():null);
+ assert.deepEqual(deriveAlphaGreyhavenStaticSolids(),solids);
 });
 test("World P0 gates stay OPEN at exact D2 Greyhaven geometry, walls stay solid",()=>{
  const expected={
