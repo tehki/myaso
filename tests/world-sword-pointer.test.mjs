@@ -20,7 +20,7 @@ test("top rendered sword wins overlapping target by painting order", () => {
 });
 test("malformed IDs or bounds, invalid pointer and excessive list fail closed", () => {
   assert.equal(pickRenderedSword({x:1,y:2}, [sword("",0,0)]), null);
-  assert.equal(pickRenderedSword({x:1,y:2}, [sword("a/b",0,0)]), null);
+  assert.equal(pickRenderedSword({x:1,y:2}, [sword("x".repeat(161),0,0)]), null);
   assert.equal(pickRenderedSword({x:1,y:2}, [sword("3",0,0,{bounds:{x:0,y:0,width:Infinity,height:20}})]), null);
   assert.equal(pickRenderedSword({x:NaN,y:0}, [sword("3",0,0)]), null);
   assert.equal(pickRenderedSword({x:1,y:2}, Array(257).fill(sword("3",0,0))), null);
@@ -49,4 +49,22 @@ test("drag, changed sprite, cancel, blur/reset never turn pickup into attack", (
   assert.equal(g.up({button:0,pointerId:2,x:55,y:35},[a,b]).handled,false);
   g.down({button:0,pointerId:-1,x:55,y:35},[a,b]); g.reset();
   assert.equal(g.up({button:0,pointerId:-1,x:55,y:35},[a,b]).handled,false);
+});
+test("opaque 160-character canonical item IDs survive visual hit and gesture unchanged", () => {
+  const id = "item:u128/" + "x".repeat(150);
+  assert.equal(id.length, 160);
+  const sprites = [sword(id, 0, 0)];
+  assert.equal(pickRenderedSword({x:2,y:2}, sprites), id);
+  const g = createSwordPointerGate();
+  assert.equal(g.down({button:0,pointerId:7,x:2,y:2},sprites).handled, true);
+  assert.deepEqual(g.up({button:0,pointerId:7,x:2,y:2},sprites),{handled:true,itemId:id});
+});
+test("repeated same-pointer down cannot retarget an already reserved sword", () => {
+  const a=sword("sword-A",0,0), b=sword("sword-B",30,0), g=createSwordPointerGate();
+  assert.equal(g.down({button:0,pointerId:9,x:2,y:2},[a,b]).handled,true);
+  assert.deepEqual(g.down({button:0,pointerId:9,x:32,y:2},[a,b]),{handled:true,itemId:null});
+  assert.deepEqual(g.up({button:0,pointerId:9,x:32,y:2},[a,b]),{handled:true,itemId:null});
+  assert.equal(g.down({button:0,pointerId:9,x:2,y:2},[a,b]).handled,true);
+  g.down({button:0,pointerId:9,x:32,y:2},[a,b]);
+  assert.deepEqual(g.up({button:0,pointerId:9,x:2,y:2},[a,b]),{handled:true,itemId:"sword-A"});
 });

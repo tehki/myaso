@@ -11,3 +11,9 @@ This PR **does not connect to online-game, modify LMB controls, manufacture swor
 - Node-only focused tests assert no rack/occluded hits; stable painted ordering; bounds validation; exactly-once intent; Combat fallback; drag, pointercancel and reset.
 
 **Classification:** isolated IMPLEMENTED/TESTED helper only. Not INTEGRATED or PLAYABLE. Do not merge until main protected quality is healthy and UI/Core/Combat/Graphics contract owners approve.
+
+## UI / Graphics integration update (October 21)
+
+The fallback rectangle helper accepts **opaque nonempty string IDs up to 160 characters**, matching Graphics #500 and the specialist UI alpha gesture #503, without truncation or local ASCII-only remapping. A repeated pointer-down on an already reserved pointer ID cannot retarget the action. Node regression tests exercise these cases.
+
+**Single gate only:** UI #503's stricter source-WebP-alpha resolver is the planned sole runtime classifier; do not install both the rectangle helper and alpha resolver as competing native LMB handlers. All helpers remain unconnected to live `web/online-game.mjs` and cannot mint/equip swords.
