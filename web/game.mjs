@@ -176,6 +176,8 @@ canvas.addEventListener("wheel", (event) => {
 }, { passive: false });
 canvas.addEventListener("pointermove", updateMouse);
 window.addEventListener("blur", releaseInputs);
+// Real canvas focus loss (e.g. composing chat) must release held movement/combat inputs.
+canvas.addEventListener("blur", releaseInputs);
 canvas.addEventListener("keydown", (event) => {
   const firstAudioGesture = !audio.isUnlocked();
   if (["KeyW", "KeyA", "KeyS", "KeyD", "KeyE", "Space"].includes(event.code)) event.preventDefault();

@@ -327,6 +327,8 @@ canvas.addEventListener("keydown", (event) => {
 });
 canvas.addEventListener("keyup", (event) => keys.delete(event.code));
 window.addEventListener("blur", releaseInputs);
+// Native chat focus must not strand held authoritative movement/attack input.
+canvas.addEventListener("blur", releaseInputs);
 document.addEventListener("visibilitychange", handleVisibilityChange);
 
 setStatus("Connecting to authoritative server…");
@@ -380,6 +382,17 @@ networkClient = await connectAuthoritativeClient({
     networkStatus = `Online - player #${ownId} - server tick ${networkClient.latestServerTick}`;
   },
 });
+
+// Local Chat C1 preview is opt-in and *only* accessible from loopback pages.
+// Lazy import avoids any extra chat networking work in live/normal gameplay.
+if (["localhost", "127.0.0.1", "[::1]"].includes(window.location.hostname)
+  && window.location.protocol === "http:"
+  && new URLSearchParams(window.location.search).get("chatC1Preview") === "1") {
+  void import("../src/browser/chat-c1-activation.mjs")
+    .then(({ activateChatC1Preview }) =>
+      activateChatC1Preview({ doc: document, location: window.location, gameClient: networkClient }))
+    .catch(error => console.warn("Local chat preview unavailable", error));
+}
 
 function observeCombatState(state) {
   const ownId = networkClient?.playerNetId;
