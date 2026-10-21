@@ -227,6 +227,77 @@ pub fn commit_verified_pickup(
     Ok(item)
 }
 
+/// P0 armory domain primitive: physically take ONE nearby server-owned ground
+/// sword and equip MainHand as ONE staged, checkpointed operation. A client may
+/// select a visible ground entity but cannot choose actor, zone, origin, time,
+/// equipment slot, item kind or owner. A failed take/equip/receipt/I/O never
+/// publishes half-equipped state or consumes a command sequence in RAM.
+///
+/// This is NOT a live TryPickup handler. Core must prove rack entity identity,
+/// authoritative server collision/LOS, canonical Core 8B item IDs, fencing,
+/// atomic durable receipt/outbox and post-commit-ACK recovery BEFORE exposure.
+/// Caller holds the common World/Zone/Identity/Loot/Magic writer lock.
+pub fn commit_verified_ground_sword_equip(
+    path: &Path,
+    loot: &mut LootAuthority,
+    magic: &MagicAuthority,
+    identity: &SessionIdentityRegistry,
+    tick: PickupWorldTick<'_>,
+    operation: VerifiedLootOperation,
+    ground_entity_id: u64,
+) -> Result<ItemStack, PickupCommitError> {
+    if tick.world.tick != tick.completed_tick {
+        return Err(PickupCommitError::StaleWorldTick);
+    }
+    if !tick.world.now_ms.is_finite()
+        || tick.world.now_ms < 0.0
+        || tick.world.now_ms >= u64::MAX as f32
+    {
+        return Err(PickupCommitError::InvalidWorldTime);
+    }
+    let character = identity
+        .resolve_session(operation.lease)
+        .ok_or(PickupCommitError::UnverifiedSession)?;
+    let actor = operation.lease.server_session();
+    let fighter = tick
+        .world
+        .fighter(actor)
+        .ok_or(PickupCommitError::MissingWorldFighter)?;
+    let zone = tick
+        .zones
+        .zone_of(actor)
+        .ok_or(PickupCommitError::UnknownZone)?;
+    let mut staged =
+        LootAuthority::restore_state(loot.export_state().map_err(PickupCommitError::Loot)?)
+            .map_err(PickupCommitError::Loot)?;
+    staged
+        .record_operation(character, operation.sequence)
+        .map_err(PickupCommitError::Loot)?;
+    let item = staged
+        .take_ground_amount(
+            actor,
+            fighter,
+            zone,
+            ground_entity_id,
+            1,
+            tick.world.now_ms as u64,
+        )
+        .map_err(PickupCommitError::Loot)?;
+    if !matches!(
+        item.kind,
+        crate::loot::ItemKind::RustySword | crate::loot::ItemKind::IronSword
+    ) {
+        return Err(PickupCommitError::Loot(LootError::WrongSlot));
+    }
+    staged
+        .equip(actor, item.id, EquipmentSlot::MainHand)
+        .map_err(PickupCommitError::Loot)?;
+    let bytes = bundle(&staged, identity, magic).map_err(PickupCommitError::JointCheckpoint)?;
+    atomic_write(path, &bytes).map_err(PickupCommitError::Io)?;
+    *loot = staged;
+    Ok(item)
+}
+
 /// A gear request contains only an item/slot selection; the actor identity,
 /// position, authoritative tick and zone never come from a packet.
 /// Dropping equipped gear requires explicit unequip first.
@@ -370,6 +441,327 @@ mod tests {
     fn checkpoint_path() -> PathBuf {
         let index = TEST_SEQ.fetch_add(1, Ordering::Relaxed);
         std::env::temp_dir().join(format!("myaso-transact-{}-{index}.bin", std::process::id()))
+    }
+
+    #[test]
+    fn rack_equipment_denies_forged_stale_far_expired_and_non_sword_requests() {
+        let mut world = World::new(800.0, 600.0);
+        assert!(world.add_player_at(1, 200.0, 200.0, 0.0));
+        assert!(world.add_player_at(2, 700.0, 500.0, 0.0));
+        let mut zones = ZoneAuthority::new();
+        zones.register(1).unwrap();
+        zones.register(2).unwrap();
+        let mut identity = SessionIdentityRegistry::new();
+        identity
+            .bind_verified(lease(1), CharacterId::new(1).unwrap())
+            .unwrap();
+        identity
+            .bind_verified(lease(2), CharacterId::new(2).unwrap())
+            .unwrap();
+        let mut loot = LootAuthority::new();
+        loot.register(1).unwrap();
+        loot.register(2).unwrap();
+        let sword = loot.grant(1, ItemKind::RustySword, 1).unwrap();
+        let rack = loot
+            .drop_backpack(1, world.fighter(1).unwrap(), ZoneId::Moonvale, sword, 0)
+            .unwrap();
+        let shield = loot.grant(1, ItemKind::WoodenShield, 1).unwrap();
+        let rack_shield = loot
+            .drop_backpack(1, world.fighter(1).unwrap(), ZoneId::Moonvale, shield, 0)
+            .unwrap();
+        let path = checkpoint_path();
+        let magic = MagicAuthority::new();
+        let operation = |lease| VerifiedLootOperation { lease, sequence: 1 };
+        fn server_tick<'a>(
+            world: &'a World,
+            zones: &'a ZoneAuthority,
+            completed_tick: u32,
+        ) -> PickupWorldTick<'a> {
+            PickupWorldTick {
+                world,
+                completed_tick,
+                zones,
+            }
+        }
+
+        assert!(matches!(
+            commit_verified_ground_sword_equip(
+                &path,
+                &mut loot,
+                &magic,
+                &identity,
+                server_tick(&world, &zones, world.tick),
+                operation(SessionLease::new(2, 2).unwrap()),
+                rack
+            ),
+            Err(PickupCommitError::UnverifiedSession)
+        ));
+        assert!(matches!(
+            commit_verified_ground_sword_equip(
+                &path,
+                &mut loot,
+                &magic,
+                &identity,
+                server_tick(&world, &zones, world.tick.wrapping_add(1)),
+                operation(lease(2)),
+                rack
+            ),
+            Err(PickupCommitError::StaleWorldTick)
+        ));
+        assert!(matches!(
+            commit_verified_ground_sword_equip(
+                &path,
+                &mut loot,
+                &magic,
+                &identity,
+                server_tick(&world, &zones, world.tick),
+                operation(lease(2)),
+                rack
+            ),
+            Err(PickupCommitError::Loot(LootError::OutOfReach))
+        ));
+        assert!(world.remove_player(2));
+        assert!(world.add_player_at(2, 215.0, 200.0, 0.0));
+        assert!(matches!(
+            commit_verified_ground_sword_equip(
+                &path,
+                &mut loot,
+                &magic,
+                &identity,
+                server_tick(&world, &zones, world.tick),
+                operation(lease(2)),
+                rack_shield
+            ),
+            Err(PickupCommitError::Loot(LootError::WrongSlot))
+        ));
+        assert!(loot.ground().contains_key(&rack_shield));
+        world.now_ms = (crate::loot::GROUND_DECAY_MS + 1) as f32;
+        assert!(matches!(
+            commit_verified_ground_sword_equip(
+                &path,
+                &mut loot,
+                &magic,
+                &identity,
+                server_tick(&world, &zones, world.tick),
+                operation(lease(2)),
+                rack
+            ),
+            Err(PickupCommitError::Loot(LootError::NotFound))
+        ));
+        world.now_ms = f32::NAN;
+        assert!(matches!(
+            commit_verified_ground_sword_equip(
+                &path,
+                &mut loot,
+                &magic,
+                &identity,
+                server_tick(&world, &zones, world.tick),
+                operation(lease(2)),
+                rack
+            ),
+            Err(PickupCommitError::InvalidWorldTime)
+        ));
+        world.now_ms = 0.0;
+        let mut dead = world.fighter(2).unwrap().clone();
+        dead.hp = 0.0;
+        dead.action = Action::Dead;
+        loot.death(2, &dead, ZoneId::Moonvale, 0).unwrap();
+        assert!(matches!(
+            commit_verified_ground_sword_equip(
+                &path,
+                &mut loot,
+                &magic,
+                &identity,
+                server_tick(&world, &zones, world.tick),
+                operation(lease(2)),
+                rack
+            ),
+            Err(PickupCommitError::Loot(LootError::DeadPlayer))
+        ));
+        assert!(loot.ground().contains_key(&rack));
+        assert!(loot.ground().contains_key(&rack_shield));
+        assert_eq!(
+            loot.committed_operation_sequence(CharacterId::new(2).unwrap()),
+            None
+        );
+        assert!(!path.exists());
+    }
+
+    #[test]
+    fn four_player_ground_swords_equip_without_duplication_or_partial_commit() {
+        use crate::magic_checkpoint::load_joint;
+
+        let mut world = World::new(800.0, 600.0);
+        let mut zones = ZoneAuthority::new();
+        let mut identity = SessionIdentityRegistry::new();
+        let mut loot = LootAuthority::new();
+        for (id, x) in [(1, 200.0), (2, 215.0), (3, 228.0), (4, 240.0)] {
+            assert!(world.add_player_at(id, x, 200.0, 0.0));
+            zones.register(id).unwrap();
+            identity
+                .bind_verified(lease(id), CharacterId::new(u64::from(id)).unwrap())
+                .unwrap();
+            loot.register(id).unwrap();
+            assert_eq!(loot.inventory(id).unwrap().stack_count(), 0);
+        }
+        let mut swords = Vec::new();
+        for kind in [
+            ItemKind::RustySword,
+            ItemKind::IronSword,
+            ItemKind::RustySword,
+            ItemKind::IronSword,
+        ] {
+            let id = loot.grant(1, kind, 1).unwrap();
+            let entity = loot
+                .drop_backpack(1, world.fighter(1).unwrap(), ZoneId::Moonvale, id, 0)
+                .unwrap();
+            swords.push((id, entity));
+        }
+        assert_eq!(loot.ground().len(), 4);
+        let magic = MagicAuthority::new();
+        let path = checkpoint_path();
+        let tick = || PickupWorldTick {
+            world: &world,
+            completed_tick: world.tick,
+            zones: &zones,
+        };
+        let operation = |actor, sequence| VerifiedLootOperation {
+            lease: lease(actor),
+            sequence,
+        };
+        let (sword_one, rack_one) = swords[0];
+        let winning = commit_verified_ground_sword_equip(
+            &path,
+            &mut loot,
+            &magic,
+            &identity,
+            tick(),
+            operation(2, 1),
+            rack_one,
+        )
+        .unwrap();
+        assert_eq!(winning.id, sword_one);
+        assert_eq!(
+            loot.inventory(2)
+                .unwrap()
+                .equipped(EquipmentSlot::MainHand)
+                .unwrap()
+                .id,
+            sword_one
+        );
+        assert!(!loot.ground().contains_key(&rack_one));
+
+        // A simultaneous contender serialized after the winner never sees a
+        // second sword; its operation receipt does not advance.
+        assert!(matches!(
+            commit_verified_ground_sword_equip(
+                &path,
+                &mut loot,
+                &magic,
+                &identity,
+                tick(),
+                operation(3, 1),
+                rack_one
+            ),
+            Err(PickupCommitError::Loot(LootError::NotFound))
+        ));
+        assert_eq!(
+            loot.committed_operation_sequence(CharacterId::new(3).unwrap()),
+            None
+        );
+
+        // Trying a second weapon with a full MainHand must not remove rack stock.
+        assert!(matches!(
+            commit_verified_ground_sword_equip(
+                &path,
+                &mut loot,
+                &magic,
+                &identity,
+                tick(),
+                operation(2, 2),
+                swords[1].1
+            ),
+            Err(PickupCommitError::Loot(LootError::SlotOccupied))
+        ));
+        assert!(loot.ground().contains_key(&swords[1].1));
+        assert_eq!(
+            loot.committed_operation_sequence(CharacterId::new(2).unwrap()),
+            Some(1)
+        );
+
+        // Failed disk write cannot publish an unequipped backpack or partial transfer.
+        let bad_path = PathBuf::from("/nonexistent-myaso-items2b-alpha-rack-dir/item.bin");
+        assert!(matches!(
+            commit_verified_ground_sword_equip(
+                &bad_path,
+                &mut loot,
+                &magic,
+                &identity,
+                tick(),
+                operation(3, 1),
+                swords[1].1
+            ),
+            Err(PickupCommitError::Io(_))
+        ));
+        assert!(loot.ground().contains_key(&swords[1].1));
+        assert_eq!(loot.inventory(3).unwrap().stack_count(), 0);
+
+        for (actor, (item_id, entity)) in [(3, swords[1]), (4, swords[2]), (1, swords[3])] {
+            assert_eq!(
+                commit_verified_ground_sword_equip(
+                    &path,
+                    &mut loot,
+                    &magic,
+                    &identity,
+                    tick(),
+                    operation(actor, 1),
+                    entity
+                )
+                .unwrap()
+                .id,
+                item_id
+            );
+        }
+        assert!(loot.ground().is_empty());
+        let mut observed = std::collections::BTreeSet::new();
+        for actor in 1..=4 {
+            let owned = loot.inventory(actor).unwrap();
+            assert!(owned.backpack().is_empty());
+            let item = owned.equipped(EquipmentSlot::MainHand).unwrap();
+            assert!(observed.insert(item.id));
+        }
+        assert_eq!(observed.len(), 4);
+        assert_eq!(observed, swords.iter().map(|(id, _)| *id).collect());
+
+        let (restored, _) = load_joint(&path).unwrap();
+        for actor in 1..=4 {
+            assert_eq!(
+                restored
+                    .parked_inventory(CharacterId::new(u64::from(actor)).unwrap())
+                    .unwrap()
+                    .equipped(EquipmentSlot::MainHand)
+                    .unwrap()
+                    .id,
+                loot.inventory(actor)
+                    .unwrap()
+                    .equipped(EquipmentSlot::MainHand)
+                    .unwrap()
+                    .id
+            );
+        }
+        assert!(matches!(
+            commit_verified_ground_sword_equip(
+                &path,
+                &mut loot,
+                &magic,
+                &identity,
+                tick(),
+                operation(2, 1),
+                rack_one
+            ),
+            Err(PickupCommitError::Loot(LootError::ReplayOperation))
+        ));
+        let _ = fs::remove_file(path);
     }
 
     #[test]
