@@ -89,6 +89,10 @@ test("verifier rejects same host, overlap, wrong remote mover, different QUIC ce
     (a,b)=>b.allIds=[1,2,3,5],
     (a,b)=>b.peerHostId="someone-else",
     (a,b)=>b.start=a.start+1000,
+    (a,b)=>{a.url="https://8.8.8.8:44321/game";b.url=a.url},
+    (a,b)=>{a.url="https://192.168.2.128:44321/game";b.url=a.url},
+    (a,b)=>a.localIpv4=["8.8.8.8"],
+    (a,b)=>a.localIpv4=["192.168.2.85"],
   ]){
     const a=fixture("A"),b=fixture("B");mutate(a,b);
     assert.throws(()=>verifyPairEvidence(a,b));
