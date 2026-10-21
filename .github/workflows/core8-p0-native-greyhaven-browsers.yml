@@ -1,0 +1,50 @@
+name: Core 8A P0 four native browsers in authoritative Greyhaven
+
+on:
+  pull_request:
+    paths:
+      - "scripts/alpha_m1_four_real_browser_flight.mjs"
+      - ".github/workflows/core8-p0-native-greyhaven-browsers.yml"
+      - "docs/CORE8A_P0_NATIVE_GREYHAVEN_BROWSER_ACCEPTANCE.md"
+      - "server/src/**"
+  push:
+    branches: [main]
+    paths:
+      - "scripts/alpha_m1_four_real_browser_flight.mjs"
+      - ".github/workflows/core8-p0-native-greyhaven-browsers.yml"
+      - "server/src/**"
+
+permissions:
+  contents: read
+
+jobs:
+  four-real-greyhaven-browsers:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate authored static city contract and test source
+        run: |
+          node --check scripts/alpha_m1_four_real_browser_flight.mjs
+          node scripts/verify-core8c-greyhaven-geometry.mjs
+      - name: Verify installed real Chrome and Firefox WebDrivers
+        run: |
+          chromedriver --version
+          geckodriver --version
+          google-chrome --version
+          firefox --version
+      - name: Build authoritative Rust server at exact checkout
+        run: cargo build --locked --manifest-path server/Cargo.toml --bin myaso-server
+      - name: Prove four REAL Chrome Firefox browsers share Greyhaven spawns and rejoin
+        env:
+          MYASO_ALPHA_NATIVE_GREYHAVEN: "1"
+        run: timeout --signal=TERM --kill-after=5s 180s node scripts/alpha_m1_four_real_browser_flight.mjs
+      - name: Retain genuine W3C browser screenshots if Actions storage permits
+        if: always()
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: core8-p0-native-greyhaven-spawns-evidence
+          path: alpha-m1-four-browser-evidence/*.png
+          if-no-files-found: ignore
+          retention-days: 3
