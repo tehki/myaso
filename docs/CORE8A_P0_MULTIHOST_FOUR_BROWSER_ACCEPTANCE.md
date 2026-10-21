@@ -10,7 +10,7 @@ Two **independently operated, distinct client machines** (host A and host B) eac
 
 An approved future UTC barrier lets role A's real Chrome player move first; role B's real Chrome moves later. Chrome and Firefox on **both** machines independently capture authoritative snapshots before/after, requiring **both their local player and a real opposite-host player to move** while the four identities remain constant and authoritative server ticks advance.
 
-Each machine writes its own locally captured report. A separate offline verifier cross-checks identical server URL/certificate/epoch, four unique disjoint client IDs, two reported private client networks/OS hostnames, two local real browser families per machine, synchronized native-movement windows, fresh server ticks and the **exact other host's Chrome player** as the observed remote mover. Fake samples in the unit tests are labeled synthetic and never accepted as live network evidence.
+Each machine writes its own locally captured report **and two genuine W3C browser screenshots** under `alpha-p0-hostpair-evidence/pair-a-chrome.png`, `pair-a-firefox.png` (or `pair-b-*` on host B). Each report includes browser-native W3C session ID, driver OS PID, screenshot filename, file length and SHA-256. A separate offline verifier cross-checks identical server URL/certificate/epoch, four unique disjoint client IDs, two reported private client networks/OS hostnames, two distinct local native W3C/browser driver identities and screenshot hashes per machine, two local real browser families per machine, synchronized native-movement windows, fresh server ticks and the **exact other host's Chrome player** as the observed remote mover. Fake samples in the unit tests are labeled synthetic and never accepted as live network evidence.
 
 **Limitations:** two JSON files are self-reported and can be forged; distinct hostnames/IPs are not cryptographic device attestation. An operator must inspect OS/process evidence, synchronized timestamps and **server-side QUIC session/movement logs at the exact build SHA**, and verify two physically independent machines plus an approved third server. A structurally valid evidence pair **is not release approval**. It does not exercise cross-host power loss, WAN/NAT, 8C Greyhaven static collision, sword/pickup state or Combat.
 
@@ -52,7 +52,7 @@ node scripts/alpha_p0_host_pair_flight.mjs
 
 Both scripts start exactly two real browsers, connect to the server pinned by the provided hash and terminate their local W3C sessions/processes after the test. They **do not coordinate by forging input**, carry no server-side authority, and never write a success file on failure.
 
-Collect `alpha-p0-pair-a-evidence.json` from host A and `alpha-p0-pair-b-evidence.json` from host B on an authorized reviewer machine. Run:
+Collect `alpha-p0-pair-a-evidence.json` from host A and `alpha-p0-pair-b-evidence.json` from host B, **plus both original PNG files from each host**, on an authorized reviewer machine. Verify their actual SHA-256 file digests match the two corresponding JSON `screenshots[].sha256` entries and inspect the rendered browser frames for the expected four-person arena and HUD. Inspect native OS process/driver evidence; filenames, PID values and hashes in untrusted JSON are not sufficient by themselves. Run:
 
 ```sh
 node scripts/alpha_p0_host_pair_verify.mjs \
