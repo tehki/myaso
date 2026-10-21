@@ -14,6 +14,49 @@ Each machine writes its own locally captured report **and two genuine W3C browse
 
 **Limitations:** two JSON files are self-reported and can be forged; distinct hostnames/IPs are not cryptographic device attestation. An operator must inspect OS/process evidence, synchronized timestamps and **server-side QUIC session/movement logs at the exact build SHA**, and verify two physically independent machines plus an approved third server. A structurally valid evidence pair **is not release approval**. It does not exercise cross-host power loss, WAN/NAT, 8C Greyhaven static collision, sword/pickup state or Combat.
 
+## Native browser/driver prerequisites — inspect before staging
+
+Every client host requires **both** Chrome/Chromium and Firefox, plus
+matching ChromeDriver and an installed GeckoDriver binary on `PATH`.
+Installed graphical browsers alone are insufficient.
+
+Run this **read-only** command on each proposed client host:
+
+```sh
+node scripts/alpha_p0_host_pair_capability_preflight.mjs
+```
+
+The command performs bounded local browser/driver version probes and
+Windows default-path checks only. It never opens a network listener, contacts
+another host, downloads packages, modifies routing, or launches WebDriver
+sessions. The actual pair-flight repeats this preflight before starting its
+local page listener and refuses missing tools. Exit status `1` means BLOCKED,
+not authorization to install software or change system security settings.
+
+**Device inventory (read-only, 2026-10-21):**
+
+| Client host | Chrome/Chromium | Firefox | ChromeDriver | GeckoDriver | Stage client readiness |
+| --- | --- | --- | --- | --- | --- |
+| X230i (Linux) | Chromium 152 | Missing | 152 | Missing | **BLOCKED** |
+| Serj (Linux) | Chromium 152 | Missing | 152 | Missing | **BLOCKED** |
+| Machine (Windows) | Installed | Installed | Not on PATH | Not on PATH | **BLOCKED** |
+
+X230i's exact-source executable returned
+`MYASO_P0_PAIR_LOCAL_CAPABILITY_BLOCKED`: the only missing prerequisites
+were Firefox and GeckoDriver; installed Chromium and ChromeDriver shared
+major version 152. Windows binary locations were checked without opening
+native browser sessions. This inventory is point-in-time; repeat before
+any staging flight and validate real native WebDriver sessions afterward.
+
+**Separate network/staging blocker:** no isolated, explicitly approved
+third private WebTransport server and usable private QUIC path have yet
+been established for the proposed two-client-host flight. The previously
+tested X230i↔Serj private VPN UDP path timed out. Two hosts visible on the
+same LAN do not prove that an authorized third server is reachable.
+Do not modify VPN/firewall, widen bind interfaces or deploy production
+to force a green result. The owner must approve the private server, its
+TLS pin, cap four and rollback before the live test.
+
 ## Prerequisites — authorized operator only
 
 1. Obtain **explicit staging-owner/network-owner approval** for an isolated **nonproduction** private IPv4 QUIC server, cap exactly **4**, no background/AI/synthetic player slots, no active users. Choose a third independent private host that is different from both client machines. No production domains, VPN/firewall changes, public ingress, production cookies, wallets or persistent services.
