@@ -83,7 +83,11 @@ mod tests {
             (3820.0, 4088.0),
             (3860.0, 4088.0),
         ] {
-            assert_eq!(overlaps_known_static_solid(x, y, 18.0), Ok(false), "{x},{y}");
+            assert_eq!(
+                overlaps_known_static_solid(x, y, 18.0),
+                Ok(false),
+                "{x},{y}"
+            );
         }
     }
 
