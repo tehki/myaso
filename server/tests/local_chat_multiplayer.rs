@@ -236,6 +236,33 @@ async fn real_three_connection_local_chat_and_distant_isolation() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn versioned_client_preface_is_not_chat_and_legacy_peer_still_receives() {
+    let (_server, url, digest) = start_server();
+    let mut firefox_style = Player::connect(&url, &digest).await;
+    let mut legacy_peer = Player::connect(&url, &digest).await;
+    // A real nonempty 4-byte QUIC stream-open marker: length 2, 0x30, v1.
+    // It MUST NOT consume a sender correlation or deliver a blank message.
+    firefox_style.send_raw(&[0x30, 1]).await;
+    assert!(
+        timeout(Duration::from_millis(250), legacy_peer.receive())
+            .await
+            .is_err(),
+        "stream preface must not fan out a chat message"
+    );
+    firefox_style.send(702, b"Hello from Firefox", 1).await;
+    assert_ne!(assert_result(&firefox_style.receive().await, 702, 0), 0);
+    let received = legacy_peer.receive().await;
+    assert_eq!(assert_received(&received, 1, "Hello from Firefox"), 1);
+    // Legacy client without any preface can reply on its existing stream.
+    legacy_peer.send(703, b"Hello from legacy", 1).await;
+    assert_ne!(assert_result(&legacy_peer.receive().await, 703, 0), 0);
+    assert_eq!(
+        assert_received(&firefox_style.receive().await, 2, "Hello from legacy"),
+        2
+    );
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn reconnect_binds_new_sender_without_reusing_an_old_chat_session() {
     let (_server, url, digest) = start_server();
     let mut original = Player::connect(&url, &digest).await;

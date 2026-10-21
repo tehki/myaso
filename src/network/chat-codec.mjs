@@ -2,6 +2,7 @@
 // UI department owns rendering/composer; this is a transport-only contract.
 export const CHAT = Object.freeze({
   version: 1,
+  hello: 0x30,
   channelLocal: 1,
   send: 0x31,
   received: 0x32,
@@ -140,6 +141,17 @@ export async function openLocalChat(gameConnection, {
       { onLate: stream => stream?.abort?.(new Error("late local chat stream")) },
     );
     writer = outgoing.getWriter();
+    // Firefox may defer QUIC STREAM creation until a nonempty first write.
+    // This bounded versioned preface materializes only the optional chat stream.
+    // It does not send user text, claim a sender or touch gameplay datagrams.
+    await boundedChatHandshake(
+      writer.write(frameReliable(new Uint8Array([CHAT.hello, CHAT.version]))),
+      handshakeTimeoutMs, "client preface write",
+      { onTimeout: () => {
+        try { void writer.abort(new Error("chat preface timed out")).catch(() => {}); }
+        catch { /* chat-only stream; gameplay stays live */ }
+      } },
+    );
     const incoming = transport.incomingUnidirectionalStreams.getReader();
     const pendingRead = incoming.read();
     // Release the reader after the reply or failure. On a timeout, release
