@@ -276,7 +276,8 @@ mod tests {
             max_x: 3892.0,
             max_y: 4012.0,
         };
-        let window = window(&[smith]);
+        let solids = [smith];
+        let window = window(&solids);
         let ticks = PickupTickFence {
             operation_tick: 900,
             actor_tick: 900,
@@ -309,7 +310,8 @@ mod tests {
             max_x: 3892.0,
             max_y: 4012.0,
         };
-        let window = window(&[smith]);
+        let solids = [smith];
+        let window = window(&solids);
         let ticks = PickupTickFence {
             operation_tick: 901,
             actor_tick: 901,
