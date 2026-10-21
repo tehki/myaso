@@ -1491,10 +1491,116 @@ async fn four_real_quic_players_observe_kill_and_immutable_greyhaven_respawn() -
     send_held_direction_with_server_ack(&replacement, move5.1, 73_006, move5.2, (0, 0))?;
     require_quic_input_ack(&replacement, 73_006, 5).await?;
 
+    // The original Dead-state abuse test tried a heavy attack from #5,
+    // which the server must ignore while Dead. Prove the complement:
+    // the SAME authentic net ID #5, on the SAME QUIC connection, may now
+    // perform a normal heavy attack after server-owned respawn.
+    // Attacker #5 at (>=4230,4160) faces WEST toward living opponent #1
+    // near (4116,4160) within normal 130-unit heavy reach. #3/#4 remain
+    // outside the west-facing heavy arc and must remain unharmed.
+    let heavy_tick = 74_005_u32;
+    let mut reborn_attack = vec![0_u8; INPUT_HEADER_BYTES + INPUT_SAMPLE_BYTES];
+    reborn_attack[0] = 1;
+    reborn_attack[1] = 1;
+    reborn_attack[2] = 1;
+    reborn_attack[4..6].copy_from_slice(&(heavy_tick as u16).to_le_bytes());
+    reborn_attack[6..8].copy_from_slice(&move5.1.to_le_bytes());
+    reborn_attack[8..12].copy_from_slice(&heavy_tick.to_le_bytes());
+    reborn_attack[12..16].copy_from_slice(&move5.2.to_le_bytes());
+    reborn_attack[19..21].copy_from_slice(&32768_u16.to_le_bytes()); // face west (PI)
+    reborn_attack[21] = 0b1000; // actual heavy unarmed action
+    replacement.send_datagram(reborn_attack)?;
+    require_quic_input_ack(&replacement, heavy_tick, 5).await?;
+    let (hit1, hit3, hit4, hit5) = tokio::try_join!(
+        observe_reborn_heavy_fist_hit(&sessions[0].0, 1, respawn1.0),
+        observe_reborn_heavy_fist_hit(&sessions[1].0, 3, respawn3.0),
+        observe_reborn_heavy_fist_hit(&sessions[2].0, 4, respawn4.0),
+        observe_reborn_heavy_fist_hit(&replacement, 5, respawn5.0),
+    )?;
     println!(
-        "ALPHA_8C_QUIC_KILL_HISTORY_FENCE_PASS old_seq=0 new_seq=1          late_join_id=5 old_replays=0 new_event_fanout=4 respawn_peers=4 live_postrespawn_acks=4 reborn_movement_peers=4"
+        "ALPHA_8C_QUIC_REBORN_FIST_ALL_PEERS victim=1 hp=54 witnesses=4 ticks={hit1},{hit3},{hit4},{hit5}"
+    );
+    // Do not prematurely release the action edge: all four must first
+    // observe committed heavy animation AND actual 46HP victim damage.
+    send_held_direction_with_server_ack(&replacement, move5.1, 74_006, hit5, (0, 0))?;
+    require_quic_input_ack(&replacement, 74_006, 5).await?;
+
+    println!(
+        "ALPHA_8C_QUIC_KILL_HISTORY_FENCE_PASS old_seq=0 new_seq=1          late_join_id=5 old_replays=0 new_event_fanout=4 respawn_peers=4 live_postrespawn_acks=4 reborn_movement_peers=4 reborn_heavy_hit_witnesses=4"
     );
     Ok(())
+}
+
+/// The positive complement to the Dead actor's rejected heavy request.
+/// Every independently connected QUIC client MUST observe real committed
+/// Heavy state for resurrected #5 and its real 46HP damage to player #1.
+/// None of the witness clients may derive HP from an attack input.
+async fn observe_reborn_heavy_fist_hit(
+    connection: &wtransport::Connection,
+    observer: u32,
+    after_respawn_tick: u32,
+) -> Result<u32> {
+    use myaso_server::snapshot::{SNAPSHOT_FIELD_ACTION, SNAPSHOT_FIELD_VITALS};
+    let deadline = Instant::now() + Duration::from_secs(5);
+    let mut committed_heavy = false;
+    let mut observed_hp = None::<u8>;
+    let mut frames = 0_usize;
+    loop {
+        let remaining = deadline.saturating_duration_since(Instant::now());
+        if remaining.is_zero() {
+            bail!(
+                "observer {observer} missing rebuilt fighter's authentic heavy hit:                  committed={committed_heavy}, hp={observed_hp:?}, frames={frames}"
+            );
+        }
+        let incoming = timeout(remaining, connection.receive_datagram())
+            .await
+            .context("postrespawn real heavy snapshot timeout")??;
+        let bytes = incoming.as_ref();
+        if bytes.len() < 14 || bytes[0] != 1 || bytes[1] != 2 {
+            continue;
+        }
+        let snapshot = decode_snapshot(bytes)
+            .map_err(|e| anyhow::anyhow!("postrespawn heavy snapshot invalid: {e:?}"))?;
+        if snapshot.server_tick <= after_respawn_tick {
+            continue;
+        }
+        frames += 1;
+        for record in snapshot.records {
+            if record.mask & SNAPSHOT_FIELD_ACTION != 0
+                && record.net_id == 5
+                && [9, 10, 11].contains(&record.action)
+            {
+                committed_heavy = true;
+            }
+            if record.mask & SNAPSHOT_FIELD_VITALS != 0 {
+                if record.net_id == 1 {
+                    if record.hp < 54 {
+                        bail!(
+                            "observer {observer} saw excess reborn heavy damage: {}",
+                            record.hp
+                        );
+                    }
+                    if record.hp == 54 {
+                        observed_hp = Some(record.hp);
+                    }
+                }
+                if [3, 4, 5].contains(&record.net_id) && record.hp != 100 {
+                    bail!(
+                        "observer {observer} saw collateral heavy damage: actor={} hp={}",
+                        record.net_id,
+                        record.hp
+                    );
+                }
+            }
+        }
+        if committed_heavy && observed_hp == Some(54) {
+            println!(
+                "ALPHA_8C_QUIC_REBORN_HEAVY observer={observer} attacker=5 victim=1                  damage=46 victim_hp=54 tick={}",
+                snapshot.server_tick
+            );
+            return Ok(snapshot.server_tick);
+        }
+    }
 }
 
 /// Genuine client DATAGRAM observation of the newly respawned fighter's
@@ -1926,6 +2032,9 @@ async fn observe_quic_target_death_and_respawn(
     let mut victim_action = 0_u8;
     let mut victim_position = None::<(f32, f32)>;
     let mut death_tick = None;
+    let mut death_ack_confirmed = false;
+    let mut respawn_tick = None;
+    let own_dead_ack_tick = 65_000 + observer_id;
     loop {
         let remaining = deadline.saturating_duration_since(Instant::now());
         if remaining.is_zero() {
@@ -1937,6 +2046,23 @@ async fn observe_quic_target_death_and_respawn(
             .await
             .context("live four-peer death/respawn timeout")??;
         let bytes = message.as_ref();
+        if bytes.len() == 16
+            && bytes[0] == 1
+            && bytes[1] == 3
+            && u32::from_le_bytes(bytes[4..8].try_into().unwrap()) == own_dead_ack_tick
+            && u32::from_le_bytes(bytes[12..16].try_into().unwrap()) == observer_id
+        {
+            death_ack_confirmed = true;
+            if let (Some(death), Some(respawn)) = (death_tick, respawn_tick) {
+                if respawn > death {
+                    println!(
+                        "ALPHA_8C_QUIC_RESPAWN observer={observer_id} victim=2 server_tick={respawn} ack_confirmed=yes"
+                    );
+                    return Ok((death, respawn));
+                }
+            }
+            continue;
+        }
         if bytes.len() < 14 || bytes[0] != 1 || bytes[1] != 2 {
             continue;
         }
@@ -1960,15 +2086,17 @@ async fn observe_quic_target_death_and_respawn(
             // leave the server on the pre-death baseline, causing a false
             // missing-respawn delta because Idle/100HP equals that baseline.
             // This preserves the original all-four real respawn assertion.
-            let ack_tick = 65_000 + observer_id;
             send_held_direction_with_server_ack(
                 connection,
                 snapshot.sequence,
-                ack_tick,
+                own_dead_ack_tick,
                 snapshot.server_tick,
                 (0, 0),
             )?;
-            require_quic_input_ack(connection, ack_tick, observer_id).await?;
+            // Do NOT use a separate ACK waiter on this same datagram
+            // stream. It may consume (and silently discard) the brief
+            // 100HP/Idle respawn snapshot while waiting for the ACK.
+            // Handle BOTH frames in this one observable stream instead.
             println!(
                 "ALPHA_8C_QUIC_DEAD observer={observer_id} victim=2 server_tick={}",
                 snapshot.server_tick
@@ -1980,11 +2108,14 @@ async fn observe_quic_target_death_and_respawn(
                 && victim_hp == 100
                 && victim_position == Some(SPAWNS[1])
             {
-                println!(
-                    "ALPHA_8C_QUIC_RESPAWN observer={observer_id} victim=2 server_tick={}",
-                    snapshot.server_tick
-                );
-                return Ok((death, snapshot.server_tick));
+                respawn_tick = Some(snapshot.server_tick);
+                if death_ack_confirmed {
+                    println!(
+                        "ALPHA_8C_QUIC_RESPAWN observer={observer_id} victim=2 server_tick={} ack_confirmed=yes",
+                        snapshot.server_tick
+                    );
+                    return Ok((death, snapshot.server_tick));
+                }
             }
         }
     }
