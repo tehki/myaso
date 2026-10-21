@@ -1,0 +1,1331 @@
+{
+  "milestone": "Blood & Iron A2.32 source-image actor silhouette vs A2.30 threshold 69px alpha risk",
+  "original3BSourceHead": "0cbf33adf70beda55b8fcb8bef4ba2efb36084e5",
+  "authentic3AKnightHead": "c74fcf90e227f3bc4788728f000cfe6aa083c7ef",
+  "authentic3AAdultHead": "91f1c2c4737b8f0275bb22bfbca4acc1501daa00",
+  "spriteSources": [
+    {
+      "name": "silver-knight",
+      "sha256": "828cf05dd873d0c8f35e887f5e46c35af87f084ac321977e358c985e7a2106b4",
+      "sourceAtlasPx": [
+        640,
+        1280
+      ],
+      "sourceFramePx": [
+        160,
+        160
+      ],
+      "drawPx": [
+        96,
+        96
+      ]
+    },
+    {
+      "name": "adult-masculine",
+      "sha256": "ba1918e5dd3fb4d00738d18ab4f708b6c54789ac09893bd06aed9eac2a65aa8b",
+      "sourceAtlasPx": [
+        640,
+        1280
+      ],
+      "sourceFramePx": [
+        160,
+        160
+      ],
+      "drawPx": [
+        96,
+        96
+      ]
+    },
+    {
+      "name": "adult-feminine",
+      "sha256": "d0112058a5a1a85b688854f1c1bf6e6f4f37edca682971c4f353e6067dcf8e15",
+      "sourceAtlasPx": [
+        640,
+        1280
+      ],
+      "sourceFramePx": [
+        160,
+        160
+      ],
+      "drawPx": [
+        96,
+        96
+      ]
+    }
+  ],
+  "sourceFacadeAlphaHazard": {
+    "count": 69,
+    "newlyVisible": 51,
+    "partiallyChanged": 18,
+    "bboxInclusive": [
+      289,
+      321,
+      350,
+      331
+    ]
+  },
+  "projection": {
+    "cameraZoom": 0.84,
+    "metersPerWorldUnit": 0.025,
+    "visualDoorWorldXY": [
+      4365,
+      4075
+    ],
+    "gameDoorCanvasPx": [
+      320,
+      320
+    ],
+    "actorDrawAnchorYSubtract": 62.4
+  },
+  "cases": [
+    {
+      "sprite": "silver-knight",
+      "scenario": "at-art-door",
+      "offsetWorldXY": [
+        0,
+        0
+      ],
+      "actorCanvasRectPx": [
+        272,
+        258,
+        96,
+        96
+      ],
+      "changedAlphaPixelsUnderActor": 0,
+      "newlyVisibleFacadePixelsUnderActor": 0,
+      "compositedAlphaDifferenceUpperBoundEquivalentPixels": 0,
+      "affectedXY": []
+    },
+    {
+      "sprite": "silver-knight",
+      "scenario": "north-threshold",
+      "offsetWorldXY": [
+        0,
+        -16
+      ],
+      "actorCanvasRectPx": [
+        272,
+        244,
+        96,
+        96
+      ],
+      "changedAlphaPixelsUnderActor": 0,
+      "newlyVisibleFacadePixelsUnderActor": 0,
+      "compositedAlphaDifferenceUpperBoundEquivalentPixels": 0,
+      "affectedXY": []
+    },
+    {
+      "sprite": "silver-knight",
+      "scenario": "south-threshold",
+      "offsetWorldXY": [
+        0,
+        16
+      ],
+      "actorCanvasRectPx": [
+        272,
+        271,
+        96,
+        96
+      ],
+      "changedAlphaPixelsUnderActor": 0,
+      "newlyVisibleFacadePixelsUnderActor": 0,
+      "compositedAlphaDifferenceUpperBoundEquivalentPixels": 0,
+      "affectedXY": []
+    },
+    {
+      "sprite": "silver-knight",
+      "scenario": "west-threshold",
+      "offsetWorldXY": [
+        -25,
+        0
+      ],
+      "actorCanvasRectPx": [
+        251,
+        258,
+        96,
+        96
+      ],
+      "changedAlphaPixelsUnderActor": 32,
+      "newlyVisibleFacadePixelsUnderActor": 25,
+      "compositedAlphaDifferenceUpperBoundEquivalentPixels": 22.14584,
+      "affectedXY": [
+        [
+          290,
+          321
+        ],
+        [
+          291,
+          321
+        ],
+        [
+          292,
+          321
+        ],
+        [
+          293,
+          321
+        ],
+        [
+          294,
+          321
+        ],
+        [
+          295,
+          321
+        ],
+        [
+          289,
+          322
+        ],
+        [
+          290,
+          322
+        ],
+        [
+          291,
+          322
+        ],
+        [
+          292,
+          322
+        ],
+        [
+          293,
+          322
+        ],
+        [
+          294,
+          322
+        ],
+        [
+          289,
+          323
+        ],
+        [
+          290,
+          323
+        ],
+        [
+          291,
+          323
+        ],
+        [
+          292,
+          323
+        ],
+        [
+          293,
+          323
+        ],
+        [
+          294,
+          323
+        ],
+        [
+          289,
+          324
+        ],
+        [
+          290,
+          324
+        ],
+        [
+          291,
+          324
+        ],
+        [
+          292,
+          324
+        ],
+        [
+          293,
+          324
+        ],
+        [
+          294,
+          324
+        ],
+        [
+          293,
+          328
+        ],
+        [
+          294,
+          328
+        ],
+        [
+          295,
+          328
+        ],
+        [
+          293,
+          329
+        ],
+        [
+          294,
+          329
+        ],
+        [
+          293,
+          330
+        ],
+        [
+          294,
+          330
+        ],
+        [
+          295,
+          330
+        ]
+      ]
+    },
+    {
+      "sprite": "silver-knight",
+      "scenario": "east-threshold",
+      "offsetWorldXY": [
+        25,
+        0
+      ],
+      "actorCanvasRectPx": [
+        293,
+        258,
+        96,
+        96
+      ],
+      "changedAlphaPixelsUnderActor": 37,
+      "newlyVisibleFacadePixelsUnderActor": 26,
+      "compositedAlphaDifferenceUpperBoundEquivalentPixels": 25.26104,
+      "affectedXY": [
+        [
+          345,
+          321
+        ],
+        [
+          346,
+          321
+        ],
+        [
+          347,
+          321
+        ],
+        [
+          348,
+          321
+        ],
+        [
+          349,
+          321
+        ],
+        [
+          350,
+          321
+        ],
+        [
+          345,
+          322
+        ],
+        [
+          346,
+          322
+        ],
+        [
+          347,
+          322
+        ],
+        [
+          348,
+          322
+        ],
+        [
+          349,
+          322
+        ],
+        [
+          350,
+          322
+        ],
+        [
+          345,
+          323
+        ],
+        [
+          346,
+          323
+        ],
+        [
+          347,
+          323
+        ],
+        [
+          348,
+          323
+        ],
+        [
+          349,
+          323
+        ],
+        [
+          350,
+          323
+        ],
+        [
+          345,
+          324
+        ],
+        [
+          346,
+          324
+        ],
+        [
+          347,
+          324
+        ],
+        [
+          348,
+          324
+        ],
+        [
+          349,
+          324
+        ],
+        [
+          350,
+          324
+        ],
+        [
+          345,
+          325
+        ],
+        [
+          346,
+          325
+        ],
+        [
+          349,
+          325
+        ],
+        [
+          344,
+          328
+        ],
+        [
+          345,
+          328
+        ],
+        [
+          346,
+          328
+        ],
+        [
+          345,
+          329
+        ],
+        [
+          346,
+          329
+        ],
+        [
+          345,
+          330
+        ],
+        [
+          346,
+          330
+        ],
+        [
+          344,
+          331
+        ],
+        [
+          345,
+          331
+        ],
+        [
+          346,
+          331
+        ]
+      ]
+    },
+    {
+      "sprite": "silver-knight",
+      "scenario": "oblique-street",
+      "offsetWorldXY": [
+        80,
+        -10
+      ],
+      "actorCanvasRectPx": [
+        339,
+        249,
+        96,
+        96
+      ],
+      "changedAlphaPixelsUnderActor": 0,
+      "newlyVisibleFacadePixelsUnderActor": 0,
+      "compositedAlphaDifferenceUpperBoundEquivalentPixels": 0,
+      "affectedXY": []
+    },
+    {
+      "sprite": "adult-masculine",
+      "scenario": "at-art-door",
+      "offsetWorldXY": [
+        0,
+        0
+      ],
+      "actorCanvasRectPx": [
+        272,
+        258,
+        96,
+        96
+      ],
+      "changedAlphaPixelsUnderActor": 0,
+      "newlyVisibleFacadePixelsUnderActor": 0,
+      "compositedAlphaDifferenceUpperBoundEquivalentPixels": 0,
+      "affectedXY": []
+    },
+    {
+      "sprite": "adult-masculine",
+      "scenario": "north-threshold",
+      "offsetWorldXY": [
+        0,
+        -16
+      ],
+      "actorCanvasRectPx": [
+        272,
+        244,
+        96,
+        96
+      ],
+      "changedAlphaPixelsUnderActor": 0,
+      "newlyVisibleFacadePixelsUnderActor": 0,
+      "compositedAlphaDifferenceUpperBoundEquivalentPixels": 0,
+      "affectedXY": []
+    },
+    {
+      "sprite": "adult-masculine",
+      "scenario": "south-threshold",
+      "offsetWorldXY": [
+        0,
+        16
+      ],
+      "actorCanvasRectPx": [
+        272,
+        271,
+        96,
+        96
+      ],
+      "changedAlphaPixelsUnderActor": 10,
+      "newlyVisibleFacadePixelsUnderActor": 6,
+      "compositedAlphaDifferenceUpperBoundEquivalentPixels": 1.13952,
+      "affectedXY": [
+        [
+          294,
+          321
+        ],
+        [
+          295,
+          321
+        ],
+        [
+          345,
+          321
+        ],
+        [
+          294,
+          322
+        ],
+        [
+          345,
+          322
+        ],
+        [
+          294,
+          323
+        ],
+        [
+          345,
+          323
+        ],
+        [
+          294,
+          324
+        ],
+        [
+          345,
+          324
+        ],
+        [
+          345,
+          325
+        ]
+      ]
+    },
+    {
+      "sprite": "adult-masculine",
+      "scenario": "west-threshold",
+      "offsetWorldXY": [
+        -25,
+        0
+      ],
+      "actorCanvasRectPx": [
+        251,
+        258,
+        96,
+        96
+      ],
+      "changedAlphaPixelsUnderActor": 32,
+      "newlyVisibleFacadePixelsUnderActor": 25,
+      "compositedAlphaDifferenceUpperBoundEquivalentPixels": 22.8173,
+      "affectedXY": [
+        [
+          290,
+          321
+        ],
+        [
+          291,
+          321
+        ],
+        [
+          292,
+          321
+        ],
+        [
+          293,
+          321
+        ],
+        [
+          294,
+          321
+        ],
+        [
+          295,
+          321
+        ],
+        [
+          289,
+          322
+        ],
+        [
+          290,
+          322
+        ],
+        [
+          291,
+          322
+        ],
+        [
+          292,
+          322
+        ],
+        [
+          293,
+          322
+        ],
+        [
+          294,
+          322
+        ],
+        [
+          289,
+          323
+        ],
+        [
+          290,
+          323
+        ],
+        [
+          291,
+          323
+        ],
+        [
+          292,
+          323
+        ],
+        [
+          293,
+          323
+        ],
+        [
+          294,
+          323
+        ],
+        [
+          289,
+          324
+        ],
+        [
+          290,
+          324
+        ],
+        [
+          291,
+          324
+        ],
+        [
+          292,
+          324
+        ],
+        [
+          293,
+          324
+        ],
+        [
+          294,
+          324
+        ],
+        [
+          293,
+          328
+        ],
+        [
+          294,
+          328
+        ],
+        [
+          295,
+          328
+        ],
+        [
+          293,
+          329
+        ],
+        [
+          294,
+          329
+        ],
+        [
+          293,
+          330
+        ],
+        [
+          294,
+          330
+        ],
+        [
+          295,
+          330
+        ]
+      ]
+    },
+    {
+      "sprite": "adult-masculine",
+      "scenario": "east-threshold",
+      "offsetWorldXY": [
+        25,
+        0
+      ],
+      "actorCanvasRectPx": [
+        293,
+        258,
+        96,
+        96
+      ],
+      "changedAlphaPixelsUnderActor": 37,
+      "newlyVisibleFacadePixelsUnderActor": 26,
+      "compositedAlphaDifferenceUpperBoundEquivalentPixels": 24.92623,
+      "affectedXY": [
+        [
+          345,
+          321
+        ],
+        [
+          346,
+          321
+        ],
+        [
+          347,
+          321
+        ],
+        [
+          348,
+          321
+        ],
+        [
+          349,
+          321
+        ],
+        [
+          350,
+          321
+        ],
+        [
+          345,
+          322
+        ],
+        [
+          346,
+          322
+        ],
+        [
+          347,
+          322
+        ],
+        [
+          348,
+          322
+        ],
+        [
+          349,
+          322
+        ],
+        [
+          350,
+          322
+        ],
+        [
+          345,
+          323
+        ],
+        [
+          346,
+          323
+        ],
+        [
+          347,
+          323
+        ],
+        [
+          348,
+          323
+        ],
+        [
+          349,
+          323
+        ],
+        [
+          350,
+          323
+        ],
+        [
+          345,
+          324
+        ],
+        [
+          346,
+          324
+        ],
+        [
+          347,
+          324
+        ],
+        [
+          348,
+          324
+        ],
+        [
+          349,
+          324
+        ],
+        [
+          350,
+          324
+        ],
+        [
+          345,
+          325
+        ],
+        [
+          346,
+          325
+        ],
+        [
+          349,
+          325
+        ],
+        [
+          344,
+          328
+        ],
+        [
+          345,
+          328
+        ],
+        [
+          346,
+          328
+        ],
+        [
+          345,
+          329
+        ],
+        [
+          346,
+          329
+        ],
+        [
+          345,
+          330
+        ],
+        [
+          346,
+          330
+        ],
+        [
+          344,
+          331
+        ],
+        [
+          345,
+          331
+        ],
+        [
+          346,
+          331
+        ]
+      ]
+    },
+    {
+      "sprite": "adult-masculine",
+      "scenario": "oblique-street",
+      "offsetWorldXY": [
+        80,
+        -10
+      ],
+      "actorCanvasRectPx": [
+        339,
+        249,
+        96,
+        96
+      ],
+      "changedAlphaPixelsUnderActor": 0,
+      "newlyVisibleFacadePixelsUnderActor": 0,
+      "compositedAlphaDifferenceUpperBoundEquivalentPixels": 0,
+      "affectedXY": []
+    },
+    {
+      "sprite": "adult-feminine",
+      "scenario": "at-art-door",
+      "offsetWorldXY": [
+        0,
+        0
+      ],
+      "actorCanvasRectPx": [
+        272,
+        258,
+        96,
+        96
+      ],
+      "changedAlphaPixelsUnderActor": 0,
+      "newlyVisibleFacadePixelsUnderActor": 0,
+      "compositedAlphaDifferenceUpperBoundEquivalentPixels": 0,
+      "affectedXY": []
+    },
+    {
+      "sprite": "adult-feminine",
+      "scenario": "north-threshold",
+      "offsetWorldXY": [
+        0,
+        -16
+      ],
+      "actorCanvasRectPx": [
+        272,
+        244,
+        96,
+        96
+      ],
+      "changedAlphaPixelsUnderActor": 0,
+      "newlyVisibleFacadePixelsUnderActor": 0,
+      "compositedAlphaDifferenceUpperBoundEquivalentPixels": 0,
+      "affectedXY": []
+    },
+    {
+      "sprite": "adult-feminine",
+      "scenario": "south-threshold",
+      "offsetWorldXY": [
+        0,
+        16
+      ],
+      "actorCanvasRectPx": [
+        272,
+        271,
+        96,
+        96
+      ],
+      "changedAlphaPixelsUnderActor": 10,
+      "newlyVisibleFacadePixelsUnderActor": 6,
+      "compositedAlphaDifferenceUpperBoundEquivalentPixels": 1.13952,
+      "affectedXY": [
+        [
+          294,
+          321
+        ],
+        [
+          295,
+          321
+        ],
+        [
+          345,
+          321
+        ],
+        [
+          294,
+          322
+        ],
+        [
+          345,
+          322
+        ],
+        [
+          294,
+          323
+        ],
+        [
+          345,
+          323
+        ],
+        [
+          294,
+          324
+        ],
+        [
+          345,
+          324
+        ],
+        [
+          345,
+          325
+        ]
+      ]
+    },
+    {
+      "sprite": "adult-feminine",
+      "scenario": "west-threshold",
+      "offsetWorldXY": [
+        -25,
+        0
+      ],
+      "actorCanvasRectPx": [
+        251,
+        258,
+        96,
+        96
+      ],
+      "changedAlphaPixelsUnderActor": 32,
+      "newlyVisibleFacadePixelsUnderActor": 25,
+      "compositedAlphaDifferenceUpperBoundEquivalentPixels": 22.8173,
+      "affectedXY": [
+        [
+          290,
+          321
+        ],
+        [
+          291,
+          321
+        ],
+        [
+          292,
+          321
+        ],
+        [
+          293,
+          321
+        ],
+        [
+          294,
+          321
+        ],
+        [
+          295,
+          321
+        ],
+        [
+          289,
+          322
+        ],
+        [
+          290,
+          322
+        ],
+        [
+          291,
+          322
+        ],
+        [
+          292,
+          322
+        ],
+        [
+          293,
+          322
+        ],
+        [
+          294,
+          322
+        ],
+        [
+          289,
+          323
+        ],
+        [
+          290,
+          323
+        ],
+        [
+          291,
+          323
+        ],
+        [
+          292,
+          323
+        ],
+        [
+          293,
+          323
+        ],
+        [
+          294,
+          323
+        ],
+        [
+          289,
+          324
+        ],
+        [
+          290,
+          324
+        ],
+        [
+          291,
+          324
+        ],
+        [
+          292,
+          324
+        ],
+        [
+          293,
+          324
+        ],
+        [
+          294,
+          324
+        ],
+        [
+          293,
+          328
+        ],
+        [
+          294,
+          328
+        ],
+        [
+          295,
+          328
+        ],
+        [
+          293,
+          329
+        ],
+        [
+          294,
+          329
+        ],
+        [
+          293,
+          330
+        ],
+        [
+          294,
+          330
+        ],
+        [
+          295,
+          330
+        ]
+      ]
+    },
+    {
+      "sprite": "adult-feminine",
+      "scenario": "east-threshold",
+      "offsetWorldXY": [
+        25,
+        0
+      ],
+      "actorCanvasRectPx": [
+        293,
+        258,
+        96,
+        96
+      ],
+      "changedAlphaPixelsUnderActor": 37,
+      "newlyVisibleFacadePixelsUnderActor": 26,
+      "compositedAlphaDifferenceUpperBoundEquivalentPixels": 24.97616,
+      "affectedXY": [
+        [
+          345,
+          321
+        ],
+        [
+          346,
+          321
+        ],
+        [
+          347,
+          321
+        ],
+        [
+          348,
+          321
+        ],
+        [
+          349,
+          321
+        ],
+        [
+          350,
+          321
+        ],
+        [
+          345,
+          322
+        ],
+        [
+          346,
+          322
+        ],
+        [
+          347,
+          322
+        ],
+        [
+          348,
+          322
+        ],
+        [
+          349,
+          322
+        ],
+        [
+          350,
+          322
+        ],
+        [
+          345,
+          323
+        ],
+        [
+          346,
+          323
+        ],
+        [
+          347,
+          323
+        ],
+        [
+          348,
+          323
+        ],
+        [
+          349,
+          323
+        ],
+        [
+          350,
+          323
+        ],
+        [
+          345,
+          324
+        ],
+        [
+          346,
+          324
+        ],
+        [
+          347,
+          324
+        ],
+        [
+          348,
+          324
+        ],
+        [
+          349,
+          324
+        ],
+        [
+          350,
+          324
+        ],
+        [
+          345,
+          325
+        ],
+        [
+          346,
+          325
+        ],
+        [
+          349,
+          325
+        ],
+        [
+          344,
+          328
+        ],
+        [
+          345,
+          328
+        ],
+        [
+          346,
+          328
+        ],
+        [
+          345,
+          329
+        ],
+        [
+          346,
+          329
+        ],
+        [
+          345,
+          330
+        ],
+        [
+          346,
+          330
+        ],
+        [
+          344,
+          331
+        ],
+        [
+          345,
+          331
+        ],
+        [
+          346,
+          331
+        ]
+      ]
+    },
+    {
+      "sprite": "adult-feminine",
+      "scenario": "oblique-street",
+      "offsetWorldXY": [
+        80,
+        -10
+      ],
+      "actorCanvasRectPx": [
+        339,
+        249,
+        96,
+        96
+      ],
+      "changedAlphaPixelsUnderActor": 0,
+      "newlyVisibleFacadePixelsUnderActor": 0,
+      "compositedAlphaDifferenceUpperBoundEquivalentPixels": 0,
+      "affectedXY": []
+    }
+  ],
+  "comparison": "greyhaven_a232_original_actor_alpha_review.png",
+  "unchangedRoofSha256": "f65554286ea1bb8b80562c72539d82172fd3ea8cc97e6b9d0d3203057a1aedc1",
+  "sameRoofBytesAsA230": true,
+  "approval": "SOURCE-ONLY REVIEW; NOT AUTHORITATIVE OCCLUSION OR MULTIPLAYER",
+  "serverCollisionApproved": false,
+  "runtimeOcclusionValidated": false,
+  "livePhysicsCombatValidated": false,
+  "originalSourceArtworkChanged": false,
+  "productionApproved": false
+}

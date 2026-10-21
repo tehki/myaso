@@ -1,0 +1,40 @@
+{
+  "trialCountPerMode": 1,
+  "baselineCommit": "0cbf33adf70beda55b8fcb8bef4ba2efb36084e5",
+  "baselineCanvasContext": "willReadFrequently:true",
+  "candidateCanvasContext": "default context hint",
+  "baseline": {
+    "chrome": {
+      "p50CanvasDayMs": 0.20000004768371582,
+      "p95CanvasDayMs": 0.3000001907348633,
+      "p50CanvasDuskMs": 0.10000014305114746,
+      "p95CanvasDuskMs": 0.2999999523162842
+    },
+    "firefox": {
+      "p50CanvasDayMs": 8,
+      "p95CanvasDayMs": 13,
+      "p50CanvasDuskMs": 12,
+      "p95CanvasDuskMs": 22
+    }
+  },
+  "candidate": {
+    "chrome": {
+      "p50CanvasDayMs": 0.20000004768371582,
+      "p95CanvasDayMs": 0.2999999523162842,
+      "p50CanvasDuskMs": 0.10000014305114746,
+      "p95CanvasDuskMs": 0.20000004768371582
+    },
+    "firefox": {
+      "p50CanvasDayMs": 7,
+      "p95CanvasDayMs": 11,
+      "p50CanvasDuskMs": 11,
+      "p95CanvasDuskMs": 28
+    }
+  },
+  "baselineFireFoxDuskP95Ms": 22,
+  "candidateFireFoxDuskP95Ms": 28,
+  "rejected": true,
+  "candidateVariantPersisted": false,
+  "productionOrRuntimeOptimizationClaimed": false,
+  "caveat": "Only one non-interleaved standalone review draw-timing trial per mode; not statistically conclusive, not game FPS."
+}
