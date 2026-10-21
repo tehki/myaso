@@ -8,6 +8,13 @@ export const KNIGHT_ROLL_PRESENTATION_MS = 350;
 // knight sprite renderer, not gameplay positions, roll physics or hitboxes.
 // &knights=1 uses 120%; &knights=1&knightScale=100 previews the old presentation.
 export const KNIGHT_PRESENTATION_SCALE = 1.2;
+// While the temporary Knight art is opt-in and there is no authenticated
+// MainHand snapshot in the live client, do not paint the arena prototype's
+// unconditional sword-shaped bar over the fallback circle. This does NOT
+// provide an equipped sword sprite or turn visual art into item ownership.
+export function showPrototypeWeaponStroke(knightVisualOptIn) {
+  return knightVisualOptIn !== true;
+}
 export function knightPresentationRect(rolling, scale = KNIGHT_PRESENTATION_SCALE) {
   if (scale !== 1 && scale !== KNIGHT_PRESENTATION_SCALE) {
     throw new RangeError("Only approved baseline/120% knight visual scales are supported");

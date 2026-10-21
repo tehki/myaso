@@ -12,7 +12,8 @@ import { createReconciliationCamera, createSnapshotRenderClock } from "../src/br
 import { createRenderGapTelemetry } from "../src/browser/render-gap-telemetry.mjs";
 import { ARENA_VIEW_ZOOM, nearbyOffscreenPointers, projectArenaPoint } from "../src/browser/arena-viewport.mjs";
 import { NETWORK } from "../src/network/constants.mjs";
-import { KNIGHT_PRESENTATION_SCALE, createKnightSpriteRenderer } from "./knight-sprites.mjs";
+import { KNIGHT_PRESENTATION_SCALE, createKnightSpriteRenderer,
+  showPrototypeWeaponStroke } from "./knight-sprites.mjs";
 import { connectAuthoritativeClient, parseSha256Hex } from "./authoritative-client.mjs";
 
 const canvas = document.querySelector("#arena");
@@ -1068,8 +1069,15 @@ function drawFighterScreen(x, y, fighter, body, shadow, remote = false, damageTe
     ctx.beginPath();
     ctx.arc(7, -5, 3, 0, Math.PI * 2);
     ctx.fill();
-    ctx.fillStyle = "#c8b684";
-    ctx.fillRect(12, -2, 26, 4);
+    // The bare Combat-circle fallback historically paints a sword-shaped
+    // prototype stroke even when the server has not equipped a MainHand.
+    // Keep existing default visuals unchanged. In explicit Knight preview
+    // mode show the unarmed body shape; actual weapon attachment must later
+    // depend on a committed replicated MainHand receipt from Core/Items.
+    if (showPrototypeWeaponStroke(Boolean(knightSprites))) {
+      ctx.fillStyle = "#c8b684";
+      ctx.fillRect(12, -2, 26, 4);
+    }
   }
   if (remote && action !== COMBAT_ACTION.dead && damageTell) {
     drawDamageTell();

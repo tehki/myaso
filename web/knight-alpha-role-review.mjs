@@ -51,7 +51,9 @@ function draw(){
   if(!did){
    ctx.beginPath();ctx.arc(0,0,19,0,Math.PI*2);
    ctx.fillStyle="#dcab7b";ctx.fill();
-   ctx.fillStyle="#412e28";ctx.fillRect(8,-2,30,4);
+   // The Knight opt-in has no server-confirmed MainHand yet: no decorative
+   // sword stroke in the truthful unarmed fallback circle.
+
   }
   ctx.restore();
   results.push({name:a.name,kind:a.kind,remote:a.remote,

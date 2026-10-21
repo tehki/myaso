@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { COMBAT_ACTION } from "../src/browser/combat-readability.mjs";
 import { KNIGHT_CLIPS, KNIGHT_FRAME_PX, knightClip,
-  createKnightSpriteRenderer } from "../web/knight-sprites.mjs";
+  createKnightSpriteRenderer, showPrototypeWeaponStroke } from "../web/knight-sprites.mjs";
 
 class InstantAtlas {
   set src(uri) {
@@ -103,4 +103,14 @@ test("missing or undecoded Silver atlas returns original Combat fallback",()=>{
  assert.equal(r.draw(ctx,fighter(1),{actorKind:"player",nowMs:1000}),false);
  assert.equal(r.draw(ctx,fighter(2),{actorKind:"player",remote:true,nowMs:1000}),false);
  assert.equal(seen.length,0);
+});
+
+
+test("optional Silver alpha never paints a fake equipped prototype weapon stroke",()=>{
+  // Existing unopted default game visuals are intentionally untouched.
+  assert.equal(showPrototypeWeaponStroke(false),true);
+  assert.equal(showPrototypeWeaponStroke(true),false);
+  assert.equal(showPrototypeWeaponStroke(undefined),true);
+  assert.equal(showPrototypeWeaponStroke(null),true);
+  // This is a visual-only suppression, NOT Core/Items MainHand evidence.
 });

@@ -49,3 +49,11 @@ This tests 6 review scenarios × 8 directions **48 per browser**, three humans +
 5. **CI and governance:** exact-head protected full quality must pass. Only Development Center [#360](https://github.com/tehki/myaso/issues/360) and First Playable [#480](https://github.com/tehki/myaso/issues/480) can coordinate staging/merges/rollback; local and isolated browser tests do not imply playable acceptance.
 
 **Readiness:** IMPLEMENTED (render-role correction), TESTED (isolated), **BLOCKED for INTEGRATION-READY**, NOT INTEGRATED, NOT PLAYABLE as a full four-player city/armory game. Adult anatomical/CMU roll drafts remain in development, visually unapproved and not enabled as Alpha skins.
+
+## Alpha unarmed fallback: prototype sword stroke suppression
+
+The original source Silver Knight (owner-supplied GLB) is a **single ~105,842-vertex skinned mesh** with 9,654 tiny disconnected pieces and only one generic material. It is **not** a separately authored and verified sword mesh that could safely be switched by item ownership. A 4-facing enlarged source atlas review showed no clearly held sword in idle, so editing/removing unrelated Knight geometry would be an unjustified art change. The original owner-supplied GLB and all nine committed WebP atlases are **byte-unchanged**.
+
+One genuine existing source bug was established: the old default circle fallback in `web/online-game.mjs` **always** called `ctx.fillRect(12,-2,26,4)` as a decorative sword-like stroke, even while empty-handed. This follow-up changes **only the Knight-opted fallback** to omit that fake bar. The default non-Knight path still draws its legacy bar to avoid changing incumbent baseline/Combat visual acceptance. A pure `showPrototypeWeaponStroke()` function is tested in three states. The offline review fixture's unsupported attack screenshot shows the actual no-bar preview.
+
+This does **not** make the existing legacy Combat attack trail a fist-specific animation; no authoritative MainHand stream is integrated in this PR. The future Core/Items equipment adapter must use server-committed MainHand plus correct anchored sword art to distinguish punches/sword attacks on *all observers*. Do not claim this narrow prototype stroke suppression completes #488.
