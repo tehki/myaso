@@ -1,0 +1,430 @@
+{
+  "engine": "firefox",
+  "browser": "firefox/153.4.0",
+  "source": "Graphics 3A original Silver and 3B pinned sword",
+  "clipCount": 5,
+  "directionCount": 8,
+  "validatedCases": 68,
+  "validatedFacingSlots": 544,
+  "screenshots": [
+    "silver_mainhand_firefox_silver_idle_committed.png",
+    "silver_mainhand_firefox_silver_walk_committed.png",
+    "silver_mainhand_firefox_silver_roll_committed.png",
+    "silver_mainhand_firefox_silver_idle_pending.png"
+  ],
+  "errors": [],
+  "realServer": false,
+  "actualItems": false,
+  "assertedLiveReceipt": false,
+  "approved": false,
+  "cases": [
+    {
+      "clip": "silver_idle",
+      "frame": 0,
+      "receipt": "committed",
+      "held": 8
+    },
+    {
+      "clip": "silver_idle",
+      "frame": 0,
+      "receipt": "pending",
+      "held": 0
+    },
+    {
+      "clip": "silver_idle",
+      "frame": 1,
+      "receipt": "committed",
+      "held": 8
+    },
+    {
+      "clip": "silver_idle",
+      "frame": 1,
+      "receipt": "pending",
+      "held": 0
+    },
+    {
+      "clip": "silver_idle",
+      "frame": 2,
+      "receipt": "committed",
+      "held": 8
+    },
+    {
+      "clip": "silver_idle",
+      "frame": 2,
+      "receipt": "pending",
+      "held": 0
+    },
+    {
+      "clip": "silver_idle",
+      "frame": 3,
+      "receipt": "committed",
+      "held": 8
+    },
+    {
+      "clip": "silver_idle",
+      "frame": 3,
+      "receipt": "pending",
+      "held": 0
+    },
+    {
+      "clip": "silver_walk",
+      "frame": 0,
+      "receipt": "committed",
+      "held": 8
+    },
+    {
+      "clip": "silver_walk",
+      "frame": 0,
+      "receipt": "pending",
+      "held": 0
+    },
+    {
+      "clip": "silver_walk",
+      "frame": 1,
+      "receipt": "committed",
+      "held": 8
+    },
+    {
+      "clip": "silver_walk",
+      "frame": 1,
+      "receipt": "pending",
+      "held": 0
+    },
+    {
+      "clip": "silver_walk",
+      "frame": 2,
+      "receipt": "committed",
+      "held": 8
+    },
+    {
+      "clip": "silver_walk",
+      "frame": 2,
+      "receipt": "pending",
+      "held": 0
+    },
+    {
+      "clip": "silver_walk",
+      "frame": 3,
+      "receipt": "committed",
+      "held": 8
+    },
+    {
+      "clip": "silver_walk",
+      "frame": 3,
+      "receipt": "pending",
+      "held": 0
+    },
+    {
+      "clip": "silver_walk",
+      "frame": 4,
+      "receipt": "committed",
+      "held": 8
+    },
+    {
+      "clip": "silver_walk",
+      "frame": 4,
+      "receipt": "pending",
+      "held": 0
+    },
+    {
+      "clip": "silver_walk",
+      "frame": 5,
+      "receipt": "committed",
+      "held": 8
+    },
+    {
+      "clip": "silver_walk",
+      "frame": 5,
+      "receipt": "pending",
+      "held": 0
+    },
+    {
+      "clip": "silver_walk",
+      "frame": 6,
+      "receipt": "committed",
+      "held": 8
+    },
+    {
+      "clip": "silver_walk",
+      "frame": 6,
+      "receipt": "pending",
+      "held": 0
+    },
+    {
+      "clip": "silver_walk",
+      "frame": 7,
+      "receipt": "committed",
+      "held": 8
+    },
+    {
+      "clip": "silver_walk",
+      "frame": 7,
+      "receipt": "pending",
+      "held": 0
+    },
+    {
+      "clip": "silver_sprint",
+      "frame": 0,
+      "receipt": "committed",
+      "held": 8
+    },
+    {
+      "clip": "silver_sprint",
+      "frame": 0,
+      "receipt": "pending",
+      "held": 0
+    },
+    {
+      "clip": "silver_sprint",
+      "frame": 1,
+      "receipt": "committed",
+      "held": 8
+    },
+    {
+      "clip": "silver_sprint",
+      "frame": 1,
+      "receipt": "pending",
+      "held": 0
+    },
+    {
+      "clip": "silver_sprint",
+      "frame": 2,
+      "receipt": "committed",
+      "held": 8
+    },
+    {
+      "clip": "silver_sprint",
+      "frame": 2,
+      "receipt": "pending",
+      "held": 0
+    },
+    {
+      "clip": "silver_sprint",
+      "frame": 3,
+      "receipt": "committed",
+      "held": 8
+    },
+    {
+      "clip": "silver_sprint",
+      "frame": 3,
+      "receipt": "pending",
+      "held": 0
+    },
+    {
+      "clip": "silver_sprint",
+      "frame": 4,
+      "receipt": "committed",
+      "held": 8
+    },
+    {
+      "clip": "silver_sprint",
+      "frame": 4,
+      "receipt": "pending",
+      "held": 0
+    },
+    {
+      "clip": "silver_sprint",
+      "frame": 5,
+      "receipt": "committed",
+      "held": 8
+    },
+    {
+      "clip": "silver_sprint",
+      "frame": 5,
+      "receipt": "pending",
+      "held": 0
+    },
+    {
+      "clip": "silver_sprint",
+      "frame": 6,
+      "receipt": "committed",
+      "held": 8
+    },
+    {
+      "clip": "silver_sprint",
+      "frame": 6,
+      "receipt": "pending",
+      "held": 0
+    },
+    {
+      "clip": "silver_sprint",
+      "frame": 7,
+      "receipt": "committed",
+      "held": 8
+    },
+    {
+      "clip": "silver_sprint",
+      "frame": 7,
+      "receipt": "pending",
+      "held": 0
+    },
+    {
+      "clip": "silver_jump",
+      "frame": 0,
+      "receipt": "committed",
+      "held": 0
+    },
+    {
+      "clip": "silver_jump",
+      "frame": 0,
+      "receipt": "pending",
+      "held": 0
+    },
+    {
+      "clip": "silver_jump",
+      "frame": 1,
+      "receipt": "committed",
+      "held": 0
+    },
+    {
+      "clip": "silver_jump",
+      "frame": 1,
+      "receipt": "pending",
+      "held": 0
+    },
+    {
+      "clip": "silver_jump",
+      "frame": 2,
+      "receipt": "committed",
+      "held": 0
+    },
+    {
+      "clip": "silver_jump",
+      "frame": 2,
+      "receipt": "pending",
+      "held": 0
+    },
+    {
+      "clip": "silver_jump",
+      "frame": 3,
+      "receipt": "committed",
+      "held": 0
+    },
+    {
+      "clip": "silver_jump",
+      "frame": 3,
+      "receipt": "pending",
+      "held": 0
+    },
+    {
+      "clip": "silver_jump",
+      "frame": 4,
+      "receipt": "committed",
+      "held": 0
+    },
+    {
+      "clip": "silver_jump",
+      "frame": 4,
+      "receipt": "pending",
+      "held": 0
+    },
+    {
+      "clip": "silver_jump",
+      "frame": 5,
+      "receipt": "committed",
+      "held": 0
+    },
+    {
+      "clip": "silver_jump",
+      "frame": 5,
+      "receipt": "pending",
+      "held": 0
+    },
+    {
+      "clip": "silver_roll",
+      "frame": 0,
+      "receipt": "committed",
+      "held": 0
+    },
+    {
+      "clip": "silver_roll",
+      "frame": 0,
+      "receipt": "pending",
+      "held": 0
+    },
+    {
+      "clip": "silver_roll",
+      "frame": 1,
+      "receipt": "committed",
+      "held": 0
+    },
+    {
+      "clip": "silver_roll",
+      "frame": 1,
+      "receipt": "pending",
+      "held": 0
+    },
+    {
+      "clip": "silver_roll",
+      "frame": 2,
+      "receipt": "committed",
+      "held": 0
+    },
+    {
+      "clip": "silver_roll",
+      "frame": 2,
+      "receipt": "pending",
+      "held": 0
+    },
+    {
+      "clip": "silver_roll",
+      "frame": 3,
+      "receipt": "committed",
+      "held": 0
+    },
+    {
+      "clip": "silver_roll",
+      "frame": 3,
+      "receipt": "pending",
+      "held": 0
+    },
+    {
+      "clip": "silver_roll",
+      "frame": 4,
+      "receipt": "committed",
+      "held": 0
+    },
+    {
+      "clip": "silver_roll",
+      "frame": 4,
+      "receipt": "pending",
+      "held": 0
+    },
+    {
+      "clip": "silver_roll",
+      "frame": 5,
+      "receipt": "committed",
+      "held": 0
+    },
+    {
+      "clip": "silver_roll",
+      "frame": 5,
+      "receipt": "pending",
+      "held": 0
+    },
+    {
+      "clip": "silver_roll",
+      "frame": 6,
+      "receipt": "committed",
+      "held": 0
+    },
+    {
+      "clip": "silver_roll",
+      "frame": 6,
+      "receipt": "pending",
+      "held": 0
+    },
+    {
+      "clip": "silver_roll",
+      "frame": 7,
+      "receipt": "committed",
+      "held": 0
+    },
+    {
+      "clip": "silver_roll",
+      "frame": 7,
+      "receipt": "pending",
+      "held": 0
+    }
+  ]
+}
