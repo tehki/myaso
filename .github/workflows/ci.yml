@@ -478,6 +478,7 @@ jobs:
           MYASO_PVP_SCENARIO: "uidirectionallight"
         run: |
           node --check scripts/pvp_browser_flight_runner.mjs
+          node --test tests/m121-native-directional-strafe.test.mjs
           node scripts/pvp_browser_flight_runner.mjs
 
       - name: Validate M129 real recovery roll buffer
