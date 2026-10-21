@@ -104,6 +104,31 @@ private staging profile with a pinned certificate, bounded cap, safe
 firewall route and nonproduction rollback. Until then, **real four-client
 same-world QUIC loopback acceptance is not independent-host acceptance**.
 
+## Live four-client Greyhaven-to-Blacksmith approach witness (child of #527)
+
+Core Architect [#527](https://github.com/tehki/myaso/pull/527) verifies
+**16/16** radius-18 spawn-to-rack approach routes against the pinned static
+AABBs. This child then sends real QUIC input over the existing server
+transport, no direct Rust simulator-position mutation:
+
+1. Open four separate certificate-pinned QUIC
+   sessions, verify authoritative server-owned immutable spawn baselines.
+2. Move each server-assigned player along the approved public waypoints
+   `(3990,4180)`, `(3980,4090)` and one **distinct** rack approach at
+   `(3740,4088)`, `(3780,4088)`, `(3820,4088)`, `(3860,4088)`.
+   Read each arrival only from actual replicated QUIC position datagrams;
+   require bounded continuous movement and forbid intersection with all
+   23 reviewed solids. The original sword visuals remain at `y=4038`.
+3. Verify **four final session-specific input ACKs** after the last arrival
+   so a fallen/missing connection cannot pass as four live users. Keep one
+   real shared authoritative game process (not four simulated Worlds).
+
+Acceptance marker `ALPHA_8C_FOUR_QUIC_DISTINCT_RACK_ROUTES_PASS`
+proves four *socket approaches* only. It does **not** prove physical sword
+target pixels, click, pickup LOS/range, one-winner u64/u128 item ownership,
+actual equipped MainHand, real browser user inputs or separate computers.
+The loopback-only isolation remains in force. No live map/revision capability.
+
 ## Nonclaims and release HOLD
 
 This is **not** full geometry authority. World #509's 23 static AABBs omit

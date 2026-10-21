@@ -379,6 +379,171 @@ async fn exercise_real_quic_smith_wall(static_preview: bool) -> Result<()> {
     Ok(())
 }
 
+/// The server-owned spawn-to-rack paths were validated for all 16 pairs
+/// against the pinned 23 static solids in Core #527. This extends the M1/M2
+/// proof across actual QUIC INPUT packets and authoritative replicated
+/// positions for one distinct rack approach per simultaneous client.
+const BLACKSMITH_RACK_APPROACHES: [(f32, f32); 4] = [
+    (3740.0, 4088.0),
+    (3780.0, 4088.0),
+    (3820.0, 4088.0),
+    (3860.0, 4088.0),
+];
+
+async fn drive_real_quic_fighter_to(
+    connection: &wtransport::Connection,
+    baseline_sequence: u16,
+    id: u32,
+    initial_position: (f32, f32),
+    goals: &[(f32, f32)],
+) -> Result<(f32, f32)> {
+    let mut at = initial_position;
+    let mut tick = 1000 + id * 10;
+    let mut total_samples = 0_usize;
+    for &goal in goals {
+        let deadline = Instant::now() + Duration::from_secs(6);
+        let mut route_samples = 0_usize;
+        while (at.0 - goal.0).hypot(at.1 - goal.1) > 14.0 {
+            if Instant::now() >= deadline {
+                bail!("player {id} cannot reach approach waypoint {goal:?}; at={at:?}, samples={route_samples}");
+            }
+            let dx = goal.0 - at.0;
+            let dy = goal.1 - at.1;
+            let distance = dx.hypot(dy);
+            let dir_x = ((dx / distance * 127.0).round() as i32).clamp(-127, 127) as i8;
+            let dir_y = ((dy / distance * 127.0).round() as i32).clamp(-127, 127) as i8;
+            tick += 1;
+            send_held_direction(connection, baseline_sequence, tick, (dir_x, dir_y))?;
+            let next = next_authoritative_position(connection, id, deadline).await?;
+            if !next.0.is_finite()
+                || !next.1.is_finite()
+                || next.0 < 0.0
+                || next.0 > 8192.0
+                || next.1 < 0.0
+                || next.1 > 8192.0
+                || (next.0 - at.0).hypot(next.1 - at.1) > 80.0
+            {
+                bail!("player {id} received untrusted or discontinuous authoritative motion {at:?}->{next:?}");
+            }
+            if myaso_server::alpha_greyhaven_geometry::overlaps_known_static_solid(
+                next.0, next.1, 18.0,
+            ) != Ok(false)
+            {
+                bail!("player {id} was replicated *inside* a reviewed static obstacle at {next:?}");
+            }
+            route_samples += 1;
+            total_samples += 1;
+            at = next;
+        }
+        tick += 1;
+        send_held_direction(connection, baseline_sequence, tick, (0, 0))?;
+        if route_samples == 0 && (at.0 - goal.0).hypot(at.1 - goal.1) > 2.0 {
+            bail!("player {id} skipped evidence for route waypoint {goal:?}");
+        }
+    }
+    if total_samples < 15 {
+        bail!("player {id} supplied too few real on-wire movements: {total_samples}");
+    }
+    Ok(at)
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn four_live_quic_players_each_reach_a_distinct_blacksmith_rack_approach() -> Result<()> {
+    let (_server, url, pin) = start_private_staging_server(true)?;
+    let endpoint = Endpoint::client(
+        ClientConfig::builder()
+            .with_bind_default()
+            .with_server_certificate_hashes([pin])
+            .build(),
+    )?;
+    let mut sessions = Vec::new();
+    for (index, &spawn) in SPAWNS.iter().enumerate() {
+        let connection = timeout(Duration::from_secs(6), endpoint.connect(url.as_str()))
+            .await
+            .context("rack route QUIC connection timeout")?
+            .context("rack route QUIC client refused")?;
+        let (_send, mut recv) = timeout(Duration::from_secs(5), connection.open_bi())
+            .await
+            .context("rack route reliable handshake timeout")??
+            .await
+            .context("rack route reliable stream rejected")?;
+        let mut length = [0; 2];
+        timeout(Duration::from_secs(5), recv.read_exact(&mut length))
+            .await
+            .context("rack route baseline length timeout")??;
+        let size = u16::from_le_bytes(length) as usize;
+        if !(14..=4096).contains(&size) {
+            bail!("invalid rack route baseline size {size}");
+        }
+        let mut packet = vec![0; size];
+        timeout(Duration::from_secs(5), recv.read_exact(&mut packet))
+            .await
+            .context("rack route baseline payload timeout")??;
+        let snapshot = decode_snapshot(&packet)
+            .map_err(|e| anyhow::anyhow!("rack route baseline decode: {e:?}"))?;
+        if !snapshot.full || snapshot.records.len() != index + 1 {
+            bail!(
+                "rack route client {} has incomplete initial authoritative roster",
+                index + 1
+            );
+        }
+        let owner = snapshot
+            .records
+            .iter()
+            .find(|record| record.net_id == index as u32 + 1)
+            .context("rack route own real server identity absent")?;
+        let start = (owner.x as f32 / 4.0, owner.y as f32 / 4.0);
+        if (start.0 - spawn.0).abs() > 0.5 || (start.1 - spawn.1).abs() > 0.5 {
+            bail!("rack route did not start at Core-approved immutable spawn");
+        }
+        sessions.push((connection, _send, recv, snapshot.sequence, start));
+    }
+
+    for (index, session) in sessions.iter().enumerate() {
+        let id = index as u32 + 1;
+        let target = BLACKSMITH_RACK_APPROACHES[index];
+        let route = [(3990.0, 4180.0), (3980.0, 4090.0), target];
+        let final_position =
+            drive_real_quic_fighter_to(&session.0, session.3, id, session.4, &route).await?;
+        if (final_position.0 - target.0).hypot(final_position.1 - target.1) > 18.0 {
+            bail!("player {id} failed individual Blacksmith approach target {target:?}: {final_position:?}");
+        }
+        println!(
+            "ALPHA_8C_REAL_QUIC_RACK_APPROACH id={id} x={:.2} y={:.2} target_x={} target_y={}",
+            final_position.0, final_position.1, target.0, target.1
+        );
+    }
+    // All four QUIC sessions must remain alive and input-authorized after
+    // the entire city-to-rack journey, rather than merely having connected.
+    // This also proves server ticks keep making progress after the 4th arrival.
+    for (index, session) in sessions.iter().enumerate() {
+        let id = index as u32 + 1;
+        let proof_tick = 10_000 + id;
+        send_held_direction(&session.0, session.3, proof_tick, (0, 0))?;
+        let deadline = Instant::now() + Duration::from_secs(5);
+        loop {
+            let remaining = deadline.saturating_duration_since(Instant::now());
+            if remaining.is_zero() {
+                bail!("player {id} lost final authoritative input ACK after rack arrival");
+            }
+            let datagram = timeout(remaining, session.0.receive_datagram())
+                .await
+                .context("final on-wire QUIC proof ACK timed out")??;
+            let data = datagram.as_ref();
+            if data.len() == 16
+                && data[0] == 1
+                && data[1] == 3
+                && u32::from_le_bytes(data[4..8].try_into().unwrap()) == proof_tick
+                && u32::from_le_bytes(data[12..16].try_into().unwrap()) == id
+            {
+                break;
+            }
+        }
+    }
+    println!("ALPHA_8C_FOUR_QUIC_DISTINCT_RACK_ROUTES_PASS players=4 unique_approaches=4 surviving_input_acks=4 geometry=reviewed-static-only");
+    Ok(())
+}
+
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn four_real_quic_players_static_on_cannot_walk_through_blacksmith() -> Result<()> {
     exercise_real_quic_smith_wall(true).await
