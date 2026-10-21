@@ -1,5 +1,46 @@
 # myaso.io — Magic & Items Shared Integration Contract V1 (PROPOSED)
 
+
+> **P0 OWNER AMENDMENT — 2026-10-21, CURRENT AND SUPERSEDING.** The Main Development & Deployment Orchestrator has adopted mandatory [M1–M5 City → Blacksmith Armory → four sword pickups → armed/unarmed PvP #480](https://github.com/tehki/myaso/issues/480) and the [physical sword-click integration contract #488](https://github.com/tehki/myaso/issues/488). This **replaces** the earlier unarmed-only recommendation in historical Section 7 and any statement below that *physical swords, pickups or equipping are optional P2 for First Playable*. Advanced Fire/Ember, reagent casting, trading, housing, full inventory UI, wallets and MOCMP remain P2 unless explicitly changed. This is a coordination/acceptance document, not live network or production configuration.
+
+## 0. Mandatory P0 sword ownership and player-action contract (latest)
+
+### Gameplay acceptance: 4 real players, one shared city, four separate physical swords
+
+1. **M1 Greyhaven arrival:** four independent network sessions with server-derived character and Fighter identity occupy one authoritative walkable city zone. Their backpack and MainHand are initially empty, and Magic abilities are **not** required.
+2. **M2 real Blacksmith sword rack:** use the [World #493](https://github.com/tehki/myaso/pull/493) location design and [Core 8C spawn #486](https://github.com/tehki/myaso/pull/486) for review, NOT as client authority. The exact Blacksmith rack sockets, server collision, range and line-of-sight still need joint World/Physics/8C sign-off. At least four distinct instances of the approved RustySword/IronSword kinds each have **one Core 8B canonical nonzero item identity** and one authoritative rack-ground position; free sandbox creation is a **trusted server operation**, never a client grant.
+3. **Actual rendered-sword click:** Graphics/UI presents a geometrically aligned per-sword hit region; an LMB pointer gesture selecting the *actual visible sword pixels* creates one **intent**, never an immediate inventory change. UI/Combat must deterministically route one gesture either to `TryPickup` or the preexisting combat light/heavy input (never both); preserve pointer-down/up/cancel, RMB chords, canvas drag, facing, mousewheel roll/parry and Space semantics. All unknown, stale, dragged-away or canceled selections reject without phantom strikes.
+4. **Exactly one authoritative acquisition:** Core 8A verifies the current authenticated session and transmits the opaque request ID plus selected item ID; Core 8C derives current Fighter, completed world tick, zone, position, range, line of sight and active writer epoch; Items checks item `GroundAtRack` presence, amount, equip eligibility, capacity and empty `MainHand`; Core 8B commits the **rack → equipped** move and corresponding receipt/outbox *once* under **one fenced canonical writer**. Do **not** use a local `u64` prototype checkpoint as a second live item writer, or stage a separate accepted pickup before equipment if failure could publish half of the event. A simultaneous second click loses deterministically.
+5. **Correlated outcome:** only after durable commit, the requester receives `PickupAccepted` identifying the canonical item, MainHand and authoritative world revision; competing/invalid requests receive a reasoned `PickupRejected`, and duplicate request ID is answered from the previous durable receipt. The server replicates rack disappearance + equipped-hand ownership from the **same committed revision** to all four players. UI cannot predict success by animating a sword into the hand.
+6. **M3/M4 real fighting:** Combat resolves actual `UNARMED` (fists with shorter reach and appropriate damage/recovery) vs `SWORD_EQUIPPED` (actual owned MainHand sword ID with reviewed reach/damage/parry). No default invisible sword or client-specified damage bonus. Death, drop, disconnect/rejoin and another player's pickup preserve a *single item owner/location and stable canonical ID*.
+7. **M5 real continuity:** independent Chrome/Firefox browsers on separately operated machines prove four-player join, walk to armory, click physical rack sprites, authoritative ACK and observer convergence, sword/fist combat, death/respawn, reconnect, stale epoch rejection and recovery after an ambiguous ACK/crash. Full protected CI and exact package SHA/rollback remain central Main Orchestrator gates. Never substitute offline Rust/domain fixtures, local tabs, a method-invoked click, screenshots or animation-only simulations.
+
+### Minimal interoperable request/receipt design — proposed, NOT a deployed wire schema
+
+| Stage | Trusted producer | Minimum requirements |
+| --- | --- | --- |
+| Renderable rack appearance | World 9 + Graphics, from Core 8C committed world item | Immutable canonical per-sword ID reference, current zone/world revision, sword kind and render pick geometry. A browser may *display* an ID, never mint/authorize it |
+| `TryPickup` intent | UI → Core 8A | Item ID + unique client operation/request ID; selected sword only. **No trusted actor, zone, inventory, range, position, hit, damage or session lease in a client field** |
+| Single-writer admission | Core 8A/8C/8B + Items 2B | Authenticated current character/epoch, authoritative World tick, valid reach/LOS/zone, live Fighter, vacant MainHand, exact expected rack source and absent previous committed move |
+| Receipt | Core 8B authoritative writer | Accepted OR reasoned rejected, immutable operation identity, resulting location/equipment/owner and revision; durable ACK replay, fencing, crash recovery |
+| Replication | Core 8A → Graphics/UI/Combat | Only committed item/rack removal and hand equip in the same order/revision for all four clients; Combat loadout uses this same stable ID |
+| Rollback/recovery | Core 8B/8C + Combat | Precommit errors publish nothing; postcommit lost ACK returns existing result; stale worker and reboot cannot duplicate sword or resurrect rack entity |
+
+**Do not fix unapproved canonical enum bytes by guessing.** The existing Items prototype uses `ItemStack.id: u64` and `MainHand` enum; Core 8B uses `ItemId: u128` and numeric equipped slots. Assigning slot tag `1` or widening `u64` is **not approved** without a versioned collision-safe namespace/slot mapping in [Core integration gate #432](https://github.com/tehki/myaso/issues/432). Existing [Items 2B atomic pickup/equip draft #495](https://github.com/tehki/myaso/pull/495) tests local MYWLD003 mutation/recovery and [Core 8B four-sword journal fixture #492](https://github.com/tehki/myaso/pull/492) tests canonical item ownership/races, but these are **different isolated authorities** and may not be joined by double-writing their local checkpoints.
+
+### Mandatory ownership and blocker routing
+
+- **Items 2B** implements physical item/equipment domain and one rack→MainHand operation using Core's chosen writer, coordinating existing [#495](https://github.com/tehki/myaso/pull/495) rather than independently implementing a new inventory service.
+- **Core 8B** owns canonical 128-bit IDs, versioned item/slot namespaces, ledger atomicity, receipts, restart/duplication and one durable writer ([#492](https://github.com/tehki/myaso/pull/492), [#432](https://github.com/tehki/myaso/issues/432)).
+- **Core 8C/World/Physics** jointly certify the **same rack coordinates and reach/LOS/collision** under fenced server ticks, not a browser pointer or offline portal; World #493 and Core spawn #486 are review inputs only.
+- **Core 8A** owns the authenticated command, replay-proof ACK and four-way observer replication; **UI+Combat** own pointer arbitration and real fists/sword damage; **Graphics 3A/B/C** owns sword sprites/hand meshes/pick-region fidelity; **Sound** plays confirmed cues.
+- **Magic 2A** is strictly **nonblocking** for the armory. Knowledge, teachers, physical Spellbook/reagent and Ember cost can continue independently in [#467](https://github.com/tehki/myaso/pull/467) / [#476](https://github.com/tehki/myaso/pull/476), but a fresh character must be able to obtain and use a sword with **zero runes, spells and mana**.
+- **Orchestrator** owns this contract, [#460](https://github.com/tehki/myaso/issues/460) independent-client acceptance, [#488](https://github.com/tehki/myaso/issues/488) clickable sword input gate, [#432](https://github.com/tehki/myaso/issues/432) identity compatibility and escalation to [#360](https://github.com/tehki/myaso/issues/360) / [#480](https://github.com/tehki/myaso/issues/480). Only Main Orchestrator owns merge, release and production GO.
+
+**Live readiness: BLOCKED.** Existing source is IMPLEMENTED and isolated tests are partly TESTED; real four-client rack pickup, canonical ID bridge, network command/replication, armed+unarmed server Combat and genuine World collision/LOS are **not yet integrated/playable**. Do not merge experimental chain or deploy until approved and independently verified.
+
+---
+
 **Owner:** Department 2 Magic & Items Orchestrator (shared integration only).
 **Reviewers:** Magic 2A, Items 2B, Core 8A/8B/8C, Combat, Graphics 3A, UI, World, Economics.
 **Status:** Design and compatibility gate, **not** a live protocol, approved migration, Combat implementation, or permission to merge.
@@ -95,7 +136,7 @@ All Magic branches remain drafts. Passing nested child CI **does not** replace a
 - **Performance:** bounded zone loot queries, no whole-world disk writes per trivial pickup as a final performance design without Core 8B/8C measurement, conservative Combat tick latency.
 
 
-## 7. First Playable Alpha alignment — priority amendment (2026-10-21)
+## 7. HISTORICAL First Playable alignment — unarmed-only directive superseded by Section 0
 
 **Directive:** [P0 First Playable central gate #480](https://github.com/tehki/myaso/issues/480), coordinated through [#360](https://github.com/tehki/myaso/issues/360). This amendment **does not change Item/Magic ownership, durable guarantees or future gameplay approval**. It decouples unfinished features from a genuinely enjoyable *initial* shared-world release. First Playable itself is NOT yet accepted.
 
