@@ -109,6 +109,48 @@ export function verifyPairEvidence(first,second){
   });
 }
 // Report JSON alone is insufficient: hash the original screenshots on disk.
+// Optional bounded SOURCE-SERVER admission-log correlation.
+// Only a separately collected Rust/WebTransport server log can establish
+// which authenticated net IDs actually arrived from which client-host IP.
+// The log is still operator-provided text, not cryptographic host attestation.
+export function verifyServerAdmissionLog(contents,first,second){
+  const pair=verifyPairEvidence(first,second);
+  if(typeof contents!=="string"||contents.length===0||contents.length>2_000_000)
+    fail("missing or oversized scoped original server admission log");
+  const roles=new Map([[first.role,first],[second.role,second]]);
+  const A=roles.get("A"),B=roles.get("B");
+  const expected=new Map();
+  for(const host of [A,B])for(const netId of host.localIds)expected.set(netId,host);
+  const seenPlayers=new Set(),seenSessions=new Set(),seenHosts=new Set();
+  let count=0;
+  for(const line of contents.split(/\r?\n/)){
+    if(!line.includes("assigned player"))continue;
+    // Exact server/src/main.rs format; only an optional timestamp prefix is
+    // permitted. Refuse log lines that resemble an admission but differ.
+    const m=/^(?:[^\r\n]{0,120}\s)?session ([1-9][0-9]*) assigned player ([1-9][0-9]*) from ((?:[0-9]{1,3}\.){3}[0-9]{1,3}):([0-9]{1,5})$/.exec(line.trim());
+    if(!m)fail("malformed or unsupported authoritative admission line");
+    const [,sessionId,playerText,ip,portText]=m;
+    const player=Number(playerText),port=Number(portText);
+    if(!Number.isSafeInteger(player)||!expected.has(player)||!privateIpv4(ip)
+      ||port<1||port>65535||seenSessions.has(sessionId)||seenPlayers.has(player))
+      fail("duplicate, foreign or malformed server admission");
+    const host=expected.get(player);
+    if(!host.localIpv4.includes(ip))fail("server source IP does not match client's reported private address");
+    seenSessions.add(sessionId);seenPlayers.add(player);seenHosts.add(host.role);
+    count++;
+  }
+  if(count!==4||seenPlayers.size!==4||seenHosts.size!==2)
+    fail("server log must contain exactly four distinct current-session admissions");
+  return Object.freeze({
+    status:"SERVER_ADMISSIONS_CORRELATED_REQUIRES_REAL_HOST_AND_INPUT_ATTESTATION",
+    server:pair.server,admissions:count,
+    playerNetIds:[...seenPlayers].sort((a,b)=>a-b),
+    physicalHostAttestationStillRequired:true,
+    serverMovementLogReviewStillRequired:true,
+    notReleaseApproval:true,
+  });
+}
+
 export async function verifyCaptureFiles(report,reportFile){
   if(!report || !Array.isArray(report.screenshots) || report.screenshots.length!==2)
     fail("missing two native screenshot records");
@@ -129,7 +171,7 @@ export async function verifyCaptureFiles(report,reportFile){
   return Object.freeze(verified);
 }
 if(process.argv[1]&&pathToFileURL(resolve(process.argv[1])).href===import.meta.url){
-  if(process.argv.length!==4){console.error("Usage: node scripts/alpha_p0_host_pair_verify.mjs <A-evidence.json> <B-evidence.json>");process.exitCode=2}
+  if(process.argv.length!==4&&process.argv.length!==5){console.error("Usage: node scripts/alpha_p0_host_pair_verify.mjs <A-evidence.json> <B-evidence.json> [scoped-server-log.txt]");process.exitCode=2}
   else try{
     const a=JSON.parse(await readFile(process.argv[2],"utf8"));
     const b=JSON.parse(await readFile(process.argv[3],"utf8"));
@@ -138,5 +180,10 @@ if(process.argv[1]&&pathToFileURL(resolve(process.argv[1])).href===import.meta.u
     const screenshotsB=await verifyCaptureFiles(b,process.argv[3]);
     console.log("MYASO_P0_PAIR_EVIDENCE_FILES_VERIFIED "+JSON.stringify({screenshotsA,screenshotsB}));
     console.log("MYASO_P0_PAIR_STRUCTURAL_CHECK "+JSON.stringify(structural));
+    if(process.argv[4]){
+      const log=await readFile(process.argv[4],"utf8");
+      console.log("MYASO_P0_PAIR_SERVER_ADMISSION_CORRELATION "+JSON.stringify(
+        verifyServerAdmissionLog(log,a,b)));
+    }
   }catch(e){console.error("MYASO_P0_PAIR_STRUCTURAL_FAIL "+e.message);process.exitCode=1}
 }
