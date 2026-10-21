@@ -572,14 +572,11 @@ pub fn commit_verified_equipped_sword_drop_checked(
         return Err(PickupCommitError::Loot(LootError::WrongSlot));
     }
 
-    // No separate published "unequipped" intermediate state. The ordinary
-    // Loot domain drop validates trusted Fighter liveness and zone position;
-    // any subsequent failure discards this entire staged copy.
-    staged
-        .unequip(actor, EquipmentSlot::MainHand)
-        .map_err(PickupCommitError::Loot)?;
+    // Direct MainHand -> ground preserves physical ID without requiring a
+    // free backpack slot. No intermediate inventory state can be published;
+    // later geometry/checkpoint failure discards the entire staged snapshot.
     let ground_entity_id = staged
-        .drop_backpack(actor, fighter, zone, sword.id, tick.world.now_ms as u64)
+        .drop_mainhand_sword(actor, fighter, zone, tick.world.now_ms as u64)
         .map_err(PickupCommitError::Loot)?;
     // Core/Physics must approve the final placement against current,
     // complete, same-tick collision geometry and fenced zone authority.
@@ -1031,6 +1028,15 @@ mod tests {
         }
         let item_id = loot.grant(1, ItemKind::RustySword, 1).unwrap();
         loot.equip(1, item_id, EquipmentSlot::MainHand).unwrap();
+        // Fill all backpack slots with distinct physical items. A real
+        // MainHand -> ground transfer must remain valid at exact capacity.
+        for _ in 0..crate::loot::BACKPACK_CAPACITY {
+            loot.grant(1, ItemKind::Gold, 1).unwrap();
+        }
+        assert_eq!(
+            loot.inventory(1).unwrap().backpack().len(),
+            crate::loot::BACKPACK_CAPACITY
+        );
         let magic = MagicAuthority::new();
         let path = checkpoint_path();
         macro_rules! authority {
@@ -1091,7 +1097,11 @@ mod tests {
             .unwrap()
             .equipped(EquipmentSlot::MainHand)
             .is_none());
-        assert!(loot.inventory(1).unwrap().backpack().is_empty());
+        assert_eq!(
+            loot.inventory(1).unwrap().backpack().len(),
+            crate::loot::BACKPACK_CAPACITY,
+            "dropping a sword must not consume, split or lose backpack items"
+        );
         assert_eq!(loot.ground().len(), 1);
         assert_eq!(loot.ground()[&dropped.ground_entity_id].item.id, item_id);
         assert!(matches!(
@@ -1145,6 +1155,14 @@ mod tests {
             .unwrap()
             .equipped(EquipmentSlot::MainHand)
             .is_none());
+        assert_eq!(
+            recovered
+                .parked_inventory(CharacterId::new(1).unwrap())
+                .unwrap()
+                .backpack()
+                .len(),
+            crate::loot::BACKPACK_CAPACITY
+        );
         assert_eq!(
             recovered.committed_operation_sequence(CharacterId::new(1).unwrap()),
             Some(1)
