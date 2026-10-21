@@ -473,3 +473,27 @@ P17's five fault scenarios enforce:
 All injected actions are deterministic and server-owned; no untrusted browser message causes a transfer, changes credentials or supplies its own authoritative zone. Tests assert byte-identity, accepted vs unsent cursors, cosmetic drop classification, and no cross-session leakage. No existing Combat gate or Physics browser-flight threshold is touched. P17 is **not** real transport/disconnect/churn evidence: production 8A/8B/8C must still serialize connection fencing and socket enqueue, test genuine generation switches on actual multi-host connections, validate real Combat latency/ACKs and approve protocol negotiation before any activation.
 
 **P17 stays DRAFT / UNMERGED / UNDEPLOYED; live `server/src/main.rs`, `/game`, magic casting, gameplay, and deployed instances remain unchanged.**
+
+## P18 — real Chrome/Firefox QUIC close/reconnect and trusted zone transfer (2026-10-21)
+
+P17's previous exact-head [CI #39518349192](https://github.com/tehki/myaso/actions/runs/39518349192) passed all Physics Rust/WebTransport/gameplay-ACK checks, while the full Combat pipeline was still underway at the last verified checkpoint. Do not infer green overall until the run completes. Earlier protected Combat **M145/M147** failures remain explicit merge blockers whenever they recur.
+
+P18 introduces **three new unlinked test-only artifacts** plus a protected CI gate: `server/examples/magic_fx_reconnect_loopback.rs`, `web/physics-fx-reconnect-flight.html`, and `scripts/physics_fx_reconnect_browser_flight.mjs`. The new server always binds an ephemeral **127.0.0.1 UDP port** with a throwaway pinned self-signed certificate, accepts only `/physics-fx-reconnect`, and cannot receive a player login, spellcast, movement action or client-owned zone assignment. It is **not imported from live `server/src/main.rs`**.
+
+This tests **two actual sequential WebTransport connections per browser**, Chrome and Firefox in separately launched lab instances. Session A is server-registered with a test-only connection ID/net ID in **zone 7**. The server sends 25 test-only six-byte gameplay-style GP markers plus best-effort 32-byte server-owned ME effects through the actual P8 handoff, P12 shared-dispatch planner and P15 guarded writer.
+
+Next the **server alone** calls `transfer_trusted` to zone 8, minting a new generation on the same real QUIC connection. A P12 FX batch prepared **before** that transfer is passed to P15 **after** the transfer and must be rejected as stale without socket write. Session A then receives 25 more GP/effect test ticks in zone 8. After a server-owned end marker, the **browser calls `WebTransport.close()`**, and the test server waits for the real connection closure before unregistering its original trusted generation.
+
+Session B performs a **fresh QUIC handshake** and is registered using the **same numeric test-only connection/net ID**, but with a **new server-minted generation in zone 9**. Old generations remain invalid. Another old-zone visual packet is passed through P15 to the newly opened connection and must again be dropped as stale. Only a newly admitted zone-9 effect and gameplay-style marker may flow on session B. The server emits `P18_REAL_CHURN_SUMMARY` including accepted real connections (2), observed real browser close (1), authorized migration (1), recycled identity (1), two stale-FX drops and distinct generation values.
+
+The browser independently requires zone-7 and zone-8 effects on A, zone-9 effects **only** on B, actual phase/end markers, minimum GP/FX receipt and no malformed FX or cross-zone leakage. The W3C WebDriver runner checks Chrome and Firefox separately and also requires exact server proof of GP counts and generation distinction. The acceptance is additional to P9/P10/P11/P13/P15 and all protected Combat gates; no thresholds are weakened.
+
+Local reproduction with Rust, Chrome and Firefox drivers:
+
+```sh
+node scripts/physics_fx_reconnect_browser_flight.mjs
+```
+
+**Limitations:** This qualifies a real browser-side close/reopen and a real loopback QUIC session, but the authoritative zone transfer and registry fencing still come from an **isolated test server**, not the live Core 8A/8B/8C production lifecycle. GP markers are **not real snapshots or gameplay input ACKs**. Reconnect is *sequential*, not two simultaneous sessions, and delivery remains best effort due to QUIC datagrams. No cross-host WAN churn, 512 players, reliable gameplay replay/ack, actual hit latency or production lock atomicity is proven. Production integration requires Core ownership/signoff, full green quality, genuine multi-host network checks, staged rollback and independent gameplay/Combat/Graphics/Magic review.
+
+**P18 remains DRAFT · UNMERGED · UNDEPLOYED, with live magic disabled.**
