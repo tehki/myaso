@@ -1017,7 +1017,8 @@ mod tests {
                     .id,
                 taken.id
             );
-            assert!(loot.inventory(actor)
+            assert!(loot
+                .inventory(actor)
                 .unwrap()
                 .equipped(EquipmentSlot::OffHand)
                 .is_none());
