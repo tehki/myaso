@@ -145,7 +145,9 @@ async function startRealGameServer() {
   child.stderr.on("data",chunk=>process.stderr.write("[actual-rust-server-err] "+chunk));
   await waitFor(async()=>{
     if (child.exitCode !== null) throw Error("server exited "+child.exitCode);
-    return {ok:!!url && !!hash && output.includes("myaso admission cap: 4 concurrent players"),
+    return {ok:!!url && !!hash && output.includes("myaso admission cap: 4 concurrent players")
+      && (!greyhavenMode || (output.includes("staging-only Greyhaven spawn selected")
+        && output.includes("staging-only Greyhaven fixed static sweep enabled"))),
       value:{url,hash}};
   }, "real server pinned localhost / cap four",45_000);
   assert(url.startsWith("https://127.0.0.1:") && url.endsWith("/game"),"server must bind loopback");
