@@ -642,6 +642,155 @@ async fn three_live_quic_peers_receive_departed_tombstone_and_new_player() -> Re
     Ok(())
 }
 
+/// Cross-disciplinary P0 proof: actual four-session WebTransport QUIC,
+/// server-owned movement and unarmed hit results replicated to every peer.
+/// No Combat code or server authority override; merely test existing wire.
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn four_live_quic_players_share_one_authoritative_fist_hit() -> Result<()> {
+    use myaso_server::snapshot::SNAPSHOT_FIELD_VITALS;
+    let (_server, url, pin) = start_private_staging_server(true)?;
+    let endpoint = Endpoint::client(
+        ClientConfig::builder()
+            .with_bind_default()
+            .with_server_certificate_hashes([pin])
+            .build(),
+    )?;
+    let mut sessions = Vec::new();
+    for (index, &spawn) in SPAWNS.iter().enumerate() {
+        let connection = timeout(Duration::from_secs(6), endpoint.connect(url.as_str()))
+            .await
+            .context("four-fist connect timeout")?
+            .context("four-fist connection refused")?;
+        let (send, mut recv) = timeout(Duration::from_secs(5), connection.open_bi())
+            .await
+            .context("four-fist reliable handshake timeout")??
+            .await
+            .context("four-fist reliable handshake rejected")?;
+        let mut header = [0_u8; 2];
+        timeout(Duration::from_secs(5), recv.read_exact(&mut header))
+            .await
+            .context("four-fist baseline header timeout")??;
+        let size = u16::from_le_bytes(header) as usize;
+        if !(14..=4096).contains(&size) {
+            bail!("four-fist invalid reliable baseline {size}");
+        }
+        let mut payload = vec![0; size];
+        timeout(Duration::from_secs(5), recv.read_exact(&mut payload))
+            .await
+            .context("four-fist baseline payload timeout")??;
+        let snapshot = decode_snapshot(&payload)
+            .map_err(|e| anyhow::anyhow!("four-fist baseline corrupt: {e:?}"))?;
+        if !snapshot.full || snapshot.records.len() != index + 1 {
+            bail!(
+                "four-fist client {} does not see same authoritative world",
+                index + 1
+            );
+        }
+        let self_record = snapshot
+            .records
+            .iter()
+            .find(|record| record.net_id == (index + 1) as u32)
+            .context("four-fist missing own server identity")?;
+        if (self_record.x as f32 / 4.0, self_record.y as f32 / 4.0) != spawn {
+            bail!(
+                "four-fist initial server spawn mismatch for player {}",
+                index + 1
+            );
+        }
+        sessions.push((connection, send, recv, snapshot.sequence));
+    }
+    // Explicitly prime live datagram replication for all four clients.
+    for (index, session) in sessions.iter().enumerate() {
+        let player = index as u32 + 1;
+        send_held_direction(&session.0, session.3, 5000 + player, (0, 0))?;
+        require_quic_input_ack(&session.0, 5000 + player, player).await?;
+    }
+
+    // Player #1 approaches #2 only by normal movement INPUT packets; distance
+    // shrinks from 96 to ~64 world units, within the unarmed light's 76 reach
+    // but outside the radius-18 two-fighter collision buffer. Players #3,#4
+    // stay well outside reach. All static solids stay server-authoritative.
+    send_held_direction(&sessions[0].0, sessions[0].3, 6001, (127, 0))?;
+    let deadline = Instant::now() + Duration::from_secs(4);
+    let mut attacker_position = SPAWNS[0];
+    while attacker_position.0 < 4142.0 {
+        if Instant::now() >= deadline {
+            bail!("attacker never reached authoritative melee test distance");
+        }
+        attacker_position = next_authoritative_position(&sessions[0].0, 1, deadline).await?;
+    }
+    send_held_direction(&sessions[0].0, sessions[0].3, 6002, (0, 0))?;
+    if !(4142.0..=4154.0).contains(&attacker_position.0)
+        || (attacker_position.1 - SPAWNS[0].1).abs() > 5.0
+    {
+        bail!("server-authoritative melee geometry invalid: {attacker_position:?}");
+    }
+    // One genuine edge-triggered *fist* light attack facing east: the normal
+    // 1-bit attack button at the existing wire sample offset. The test does
+    // not invoke any Combat implementation directly.
+    let mut light = vec![0_u8; INPUT_HEADER_BYTES + INPUT_SAMPLE_BYTES];
+    light[0] = 1;
+    light[1] = 1;
+    light[2] = 1;
+    light[4..6].copy_from_slice(&6003_u16.to_le_bytes());
+    light[6..8].copy_from_slice(&sessions[0].3.to_le_bytes());
+    light[8..12].copy_from_slice(&6003_u32.to_le_bytes());
+    light[21] = 1;
+    sessions[0].0.send_datagram(light)?;
+
+    // Every player must independently SEE the same hit in its own real QUIC
+    // snapshot stream. The expected 66HP is the existing server's 34HP light
+    // damage against a 100HP unarmored target, not fabricated client damage.
+    for (index, session) in sessions.iter().enumerate() {
+        let observer = index as u32 + 1;
+        let deadline = Instant::now() + Duration::from_secs(4);
+        let mut seen_damage = None;
+        loop {
+            let remaining = deadline.saturating_duration_since(Instant::now());
+            if remaining.is_zero() {
+                bail!("observer {observer} never saw server-authoritative 34HP fist hit: {seen_damage:?}");
+            }
+            let received = timeout(remaining, session.0.receive_datagram())
+                .await
+                .context("fist damage replication timed out")??;
+            let bytes = received.as_ref();
+            if bytes.len() < 14 || bytes[0] != 1 || bytes[1] != 2 {
+                continue;
+            }
+            let snapshot = decode_snapshot(bytes)
+                .map_err(|e| anyhow::anyhow!("fist damage snapshot corrupt: {e:?}"))?;
+            for record in &snapshot.records {
+                if record.net_id != 2 || record.mask & SNAPSHOT_FIELD_VITALS == 0 {
+                    continue;
+                }
+                seen_damage = Some(record.hp);
+                if record.hp == 66 {
+                    println!(
+                        "ALPHA_8C_REAL_QUIC_PVP_HIT observer={observer} attacker=1 target=2                          target_hp=66 server_tick={}",
+                        snapshot.server_tick
+                    );
+                    break;
+                }
+                if record.hp < 66 {
+                    bail!("target HP dropped below single light strike: {}", record.hp);
+                }
+            }
+            if seen_damage == Some(66) {
+                break;
+            }
+        }
+    }
+    // Successful combat must not disconnect any other survivor or route its
+    // input ACK through the attacker's identity.
+    for (index, session) in sessions.iter().enumerate() {
+        let actor = index as u32 + 1;
+        send_held_direction(&session.0, session.3, 8000 + actor, (0, 0))?;
+        require_quic_input_ack(&session.0, 8000 + actor, actor).await?;
+    }
+    println!("ALPHA_8C_FOUR_QUIC_REAL_FIST_PASS clients=4 attacker=1 target=2 damage=34 hp=66");
+    Ok(())
+}
+
 /// Test the *real* authoritative QUIC stream and replicated state. No direct
 /// Rust simulation calls or client-controlled teleports are used. The matched
 /// OFF run is a negative control; the ON run must stop before the smith wall.
