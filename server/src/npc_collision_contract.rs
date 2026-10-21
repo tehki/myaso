@@ -596,7 +596,9 @@ mod tests {
             &corner,
         )
         .unwrap();
-        let path = nav.plan((4160, 4000), (4205, 4010)).unwrap();
+        // The previous destination at x=4205 overlaps the new 18-unit
+        // zone clearance. Preserve this corner-cut proof with a free goal.
+        let path = nav.plan((4160, 4000), (4230, 4010)).unwrap();
         for pair in path.windows(2) {
             let (a, b) = (pair[0], pair[1]);
             if a.0 != b.0 && a.1 != b.1 {
