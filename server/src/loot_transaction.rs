@@ -353,6 +353,57 @@ pub fn inspect_verified_inventory(
         .ok_or(PickupCommitError::Loot(LootError::UnknownPlayer))
 }
 
+/// One read-only, same-tick item frame for the authenticated character.
+/// No backpack/ground item can be fabricated by combining client-selected
+/// views from different ticks. The caller MUST hold a common authoritative
+/// World/Zone/Identity/Loot read lock throughout this call; this method does
+/// not acquire a lock, serialize packets, or persist anything. A dead viewer
+/// cannot query nearby loot. Corpse *contents* are never included.
+#[derive(Debug, Clone, PartialEq)]
+pub struct VerifiedLootReadFrame {
+    pub completed_tick: u32,
+    pub world_time_ms: u64,
+    pub inventory: Inventory,
+    pub visible_world_loot: Vec<VisibleLoot>,
+}
+
+/// Build one coherent UI read response from the same trusted server tick.
+/// Uses the existing independently verified inventory and visibility gates
+/// instead of inventing a new actor, zone or second inventory authority.
+pub fn inspect_verified_loot_frame(
+    loot: &LootAuthority,
+    identity: &SessionIdentityRegistry,
+    tick: PickupWorldTick<'_>,
+    lease: SessionLease,
+) -> Result<VerifiedLootReadFrame, PickupCommitError> {
+    let inventory = inspect_verified_inventory(
+        loot,
+        identity,
+        PickupWorldTick {
+            world: tick.world,
+            completed_tick: tick.completed_tick,
+            zones: tick.zones,
+        },
+        lease,
+    )?;
+    let visible_world_loot = inspect_verified_visible_loot(
+        loot,
+        identity,
+        PickupWorldTick {
+            world: tick.world,
+            completed_tick: tick.completed_tick,
+            zones: tick.zones,
+        },
+        lease,
+    )?;
+    Ok(VerifiedLootReadFrame {
+        completed_tick: tick.completed_tick,
+        world_time_ms: tick.world.now_ms as u64,
+        inventory,
+        visible_world_loot,
+    })
+}
+
 /// A gear request contains only an item/slot selection; the actor identity,
 /// position, authoritative tick and zone never come from a packet.
 /// Dropping equipped gear requires explicit unequip first.
@@ -1100,6 +1151,110 @@ mod tests {
         assert_eq!(item.amount, 2);
         assert!(!loot.ground().contains_key(&ground));
         let _ = fs::remove_file(&checkpoint);
+    }
+
+    #[test]
+    fn verified_read_frame_keeps_world_and_inventory_in_sync() {
+        use crate::loot::LootAppearance;
+
+        let mut world = World::new(800.0, 600.0);
+        for (id, x, y) in [(1, 200.0, 200.0), (2, 220.0, 200.0), (3, 700.0, 550.0)] {
+            assert!(world.add_player_at(id, x, y, 0.0));
+        }
+        let mut identity = SessionIdentityRegistry::new();
+        let mut zones = ZoneAuthority::new();
+        let mut loot = LootAuthority::new();
+        for id in 1..=3 {
+            identity
+                .bind_verified(lease(id), CharacterId::new(u64::from(id)).unwrap())
+                .unwrap();
+            zones.register(id).unwrap();
+            loot.register(id).unwrap();
+        }
+        let sword = loot.grant(1, ItemKind::RustySword, 1).unwrap();
+        let ground = loot
+            .drop_backpack(1, world.fighter(1).unwrap(), ZoneId::Moonvale, sword, 0)
+            .unwrap();
+
+        let read =
+            |loot: &LootAuthority, lease: SessionLease, completed_tick: u32, world: &World| {
+                inspect_verified_loot_frame(
+                    loot,
+                    &identity,
+                    PickupWorldTick {
+                        world,
+                        completed_tick,
+                        zones: &zones,
+                    },
+                    lease,
+                )
+            };
+        let before = read(&loot, lease(2), world.tick, &world).unwrap();
+        assert_eq!(before.completed_tick, world.tick);
+        assert_eq!(before.world_time_ms, 0);
+        assert!(before.inventory.backpack().is_empty());
+        assert_eq!(before.visible_world_loot.len(), 1);
+        assert_eq!(before.visible_world_loot[0].entity_id, ground);
+        assert!(matches!(
+            before.visible_world_loot[0].appearance,
+            LootAppearance::Ground {
+                kind: ItemKind::RustySword,
+                amount: 1
+            }
+        ));
+
+        // A remote client never gets a different verified player's viewpoint.
+        assert!(read(&loot, lease(3), world.tick, &world)
+            .unwrap()
+            .visible_world_loot
+            .is_empty());
+        assert!(read(&loot, lease(1), world.tick, &world)
+            .unwrap()
+            .inventory
+            .backpack()
+            .is_empty());
+
+        loot.take_ground(2, world.fighter(2).unwrap(), ZoneId::Moonvale, ground, 0)
+            .unwrap();
+        let after = read(&loot, lease(2), world.tick, &world).unwrap();
+        assert!(after.visible_world_loot.is_empty());
+        assert_eq!(after.inventory.backpack().len(), 1);
+        assert_eq!(after.inventory.backpack()[0].id, sword);
+
+        let mut tampered_response = after;
+        tampered_response.inventory.backpack[0].amount = 100;
+        tampered_response
+            .visible_world_loot
+            .push(before.visible_world_loot[0]);
+        let authoritative = read(&loot, lease(2), world.tick, &world).unwrap();
+        assert_eq!(authoritative.inventory.backpack()[0].amount, 1);
+        assert!(authoritative.visible_world_loot.is_empty());
+
+        assert!(matches!(
+            read(&loot, SessionLease::new(2, 2).unwrap(), world.tick, &world),
+            Err(PickupCommitError::UnverifiedSession)
+        ));
+        assert!(matches!(
+            read(&loot, lease(2), world.tick.wrapping_add(1), &world),
+            Err(PickupCommitError::StaleWorldTick)
+        ));
+        world.now_ms = f32::NAN;
+        assert!(matches!(
+            read(&loot, lease(2), world.tick, &world),
+            Err(PickupCommitError::InvalidWorldTime)
+        ));
+
+        // Dead players may still be represented in their own inventory view,
+        // but may not use a combined read-frame to scout live corpse loot.
+        world.now_ms = 0.0;
+        let mut dead = world.fighter(2).unwrap().clone();
+        dead.action = Action::Dead;
+        dead.hp = 0.0;
+        loot.death(2, &dead, ZoneId::Moonvale, 0).unwrap();
+        assert!(matches!(
+            read(&loot, lease(2), world.tick, &world),
+            Err(PickupCommitError::Loot(LootError::DeadPlayer))
+        ));
     }
 
     #[test]
