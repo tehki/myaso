@@ -67,7 +67,8 @@ test("Chrome and Firefox Windows default installation alone do not waive missing
   assert.equal(r.ready,false);
   assert.equal(r.chrome.found,true);
   assert.equal(r.firefox.found,true);
-  assert.equal(r.chrome.method,"WINDOWS_INSTALL_PATH_ONLY");
+  assert.equal(r.chrome.method,"WINDOWS_INSTALL_PATH_VERSION_UNVERIFIED");
+  assert(r.missing.includes("Chrome/Chromium version cannot be verified"));
   assert(r.missing.includes("chromedriver on PATH"));
   assert(r.missing.includes("geckodriver on PATH"));
 });
@@ -76,12 +77,15 @@ test("Windows browser default paths plus valid real-driver versions are only loc
     "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
     "C:\\Program Files\\Mozilla Firefox\\firefox.exe",
   ]);
-  const r=checked({chromedriver:good.chromedriver,geckodriver:good.geckodriver},{
+  const r=checked({chromedriver:"ChromeDriver 154.0.8037.99",
+    geckodriver:good.geckodriver},{
     platform:"win32",env:{PROGRAMFILES:"C:\\Program Files"},
-    exists:p=>files.has(p)
+    exists:p=>files.has(p),
+    fileVersion:p=>p.includes("Google")?"154.0.8037.99":"153.4.0"
   });
   assert.equal(r.ready,true);
-  assert.equal(r.chromeDriverMajorChecked,false);
+  assert.equal(r.chromeDriverMajorChecked,true);
+  assert.equal(r.chromeDriverMajorMatch,true);
   assert.equal(r.noNetworkConnectivityChecked,true);
 });
 test("unsupported Node.js version and driver execution failures are rejected",()=>{
@@ -92,4 +96,29 @@ test("unsupported Node.js version and driver execution failures are rejected",()
   }});
   assert.equal(r.ready,false);
   assert(r.missing.includes("chromedriver on PATH"));
+});
+
+test("Windows read-only Chrome 154 PE metadata rejects driver 152 even if files installed",()=>{
+  const file="C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe";
+  const fox="C:\\Program Files\\Mozilla Firefox\\firefox.exe";
+  const r=checked({chromedriver:good.chromedriver,geckodriver:good.geckodriver},{
+    platform:"win32",env:{PROGRAMFILES:"C:\\Program Files"},
+    exists:p=>p===file||p===fox,
+    fileVersion:p=>p===file?"154.0.8037.99":"153.4.0"
+  });
+  assert.equal(r.ready,false);
+  assert.equal(r.chromeDriverMajorChecked,true);
+  assert.equal(r.chromeDriverMajorMatch,false);
+  assert(r.missing.some(x=>x.includes("major does not match")));
+});
+test("Windows browser installed without readable PE version is not ready",()=>{
+  const file="C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe";
+  const fox="C:\\Program Files\\Mozilla Firefox\\firefox.exe";
+  const r=checked({chromedriver:"ChromeDriver 154.0.8037.99",geckodriver:good.geckodriver},{
+    platform:"win32",env:{PROGRAMFILES:"C:\\Program Files"},
+    exists:p=>p===file||p===fox,
+    fileVersion:()=>null
+  });
+  assert.equal(r.ready,false);
+  assert(r.missing.includes("Chrome/Chromium version cannot be verified"));
 });
