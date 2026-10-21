@@ -19,6 +19,7 @@ pub mod character_identity;
 pub mod chat;
 pub mod identity;
 pub mod identity_disguise;
+pub mod idr_claim_journal;
 pub mod item_journal;
 pub mod item_ownership;
 pub mod kill_event;

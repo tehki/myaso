@@ -161,6 +161,30 @@ impl CanonicalIdrBridge {
         }
     }
 
+    /// Offline-only typed claim preflight for the dormant MYID WAL.
+    /// Requires the CURRENT authenticated canonical lease and a known
+    /// recipient. The named claim is NEVER verified evidence. The World/LOS
+    /// recipient check is a missing future trusted-server integration gate.
+    pub(crate) fn preflight_offline_unverified_claim(
+        &self,
+        speaker: CharacterId,
+        lease: SessionLease,
+        leases: &SessionLeaseRegistry,
+        observer: CharacterId,
+        claimed_name: &str,
+    ) -> Result<(), CanonicalIdrError> {
+        self.require_current_player(speaker, lease, leases)?;
+        if !self.canonical.contains_key(&observer) {
+            return Err(CanonicalIdrError::UnknownCanonicalActor);
+        }
+        if speaker == observer || !crate::identity_disguise::valid_name(claimed_name) {
+            return Err(CanonicalIdrError::DormantIdr(
+                crate::identity_disguise::IdentityError::InvalidName,
+            ));
+        }
+        Ok(())
+    }
+
     /// Optional verbal self-introduction: a player may lie, and no observer
     /// becomes Verified. LOS/recipient selection remain trusted 8C duties.
     pub fn propose_unverified_introduction(

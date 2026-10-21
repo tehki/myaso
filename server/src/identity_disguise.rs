@@ -65,7 +65,7 @@ pub struct IdentityRegistry {
     subjects: BTreeMap<SubjectId, Subject>,
     knowledge: BTreeMap<(SubjectId, SubjectId), Knowledge>,
 }
-fn valid_name(value: &str) -> bool {
+pub(crate) fn valid_name(value: &str) -> bool {
     let chars = value.chars().count();
     if chars == 0 || chars > MAX_NAME_CHARS || value.trim() != value {
         return false;
