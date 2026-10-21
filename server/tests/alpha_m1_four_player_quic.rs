@@ -47,8 +47,12 @@ fn start_actual_server() -> Result<(TestServer, String, Sha256Digest)> {
     thread::spawn(move || {
         for line in BufReader::new(stdout).lines() {
             match line {
-                Ok(line) if tx.send(line).is_ok() => {}
-                _ => break,
+                Ok(line) => {
+                    if tx.send(line).is_err() {
+                        break;
+                    }
+                }
+                Err(_) => break,
             }
         }
     });
