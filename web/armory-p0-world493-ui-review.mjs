@@ -45,7 +45,7 @@ window.__p0WorldUiSourceMaskOverlap=()=>{
 };
 function snapshot(extra={}){
  const p=scene?.plan;
- state={ready:!!scene,worldHead:"07060f981b8a1dac89184b621b6893dd970a08ae",
+ state={ready:!!scene,worldHead:window.__expectedPinnedWorldHead??"07060f981b8a1dac89184b621b6893dd970a08ae",
  uiHead:"8d500d8ddeb4058f15dbc704bf78d685d1ca31ef",
  originalWorldImported:true,originalUiGestureImported:true,
  sourceWorldSocketPositions:WORLD_ALPHA_ARMORY.rackSockets.map(x=>[x.x,x.y]),

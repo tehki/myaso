@@ -14,7 +14,11 @@ const repo=resolve(fileURLToPath(new URL("../../",import.meta.url)));
 assert.ok(process.argv[2]&&process.argv[3],"Need external World493 and UI503 exact pinned source paths");
 const world=resolve(process.argv[2]),ui=resolve(process.argv[3]);
 const out=resolve(process.argv[4]||join(repo,".p0-three-source-review"));
-const heads={world:"07060f981b8a1dac89184b621b6893dd970a08ae",
+const worldHead=process.env.P0_WORLD_SOURCE_HEAD||"07060f981b8a1dac89184b621b6893dd970a08ae";
+const consolidatedWorld=worldHead==="3178b9aad8757ceb3594ff04b9e3099dced6b729";
+assert.ok(consolidatedWorld||worldHead==="07060f981b8a1dac89184b621b6893dd970a08ae",
+ "Only two explicitly reviewed original World source heads permitted");
+const heads={world:worldHead,
  ui:"8d500d8ddeb4058f15dbc704bf78d685d1ca31ef",
  graphicsParent:"2a11b923591a682bbae3cffe6d9f70b0d2036de8"};
 for(const [k,dir] of [["world",world],["ui",ui]])
@@ -28,8 +32,28 @@ const xref={
  "/__world493__/src/browser/authored-world-renderer.mjs":join(world,"src/browser/authored-world-renderer.mjs"),
  "/__ui503__/src/browser/alpha-sword-gesture.mjs":join(ui,"src/browser/alpha-sword-gesture.mjs"),
  "/__ui503__/src/browser/sword-canvas-pointer.mjs":join(ui,"src/browser/sword-canvas-pointer.mjs")};
+if(consolidatedWorld)xref["/__world493__/src/world/building-presentation.mjs"]=
+ join(world,"src/world/building-presentation.mjs");
 const readHash=async(p)=>createHash("sha256").update(await readFile(p)).digest("hex");
 const fileHashes=Object.fromEntries(await Promise.all(Object.entries(xref).map(async([url,path])=>[url,await readHash(path)])));
+const consolidatedSourceHashes=consolidatedWorld?{
+ "src/world/alpha-solid-geometry.mjs":await readHash(join(world,"src/world/alpha-solid-geometry.mjs")),
+ "assets/world/greyhaven-alpha-solids-v1.json":await readHash(join(world,"assets/world/greyhaven-alpha-solids-v1.json"))
+}:null;
+if(consolidatedWorld){
+ assert.equal(fileHashes["/__world493__/src/world/alpha-armory.mjs"],
+  "305a7764d67af9115d85000bde5e922cbae64db2455e15fbf7d3d22b01c5c3bf");
+ assert.equal(fileHashes["/__world493__/src/world/authored-maps.mjs"],
+  "21e7663303b14cc89f7dece7d73fda3b7e1fd4b70cc97b8753cd2c793209e144");
+ assert.equal(fileHashes["/__world493__/src/browser/authored-world-renderer.mjs"],
+  "2006dbff24401cc5e262363fb11f89546bbf769cb11bcffddcbeb8819dd4ca7a");
+ assert.equal(fileHashes["/__world493__/src/world/building-presentation.mjs"],
+  "c2e2ad0350fbc5d0c8408a48a151c280b4cc85500c53f4b8e705b21e97147e33");
+ assert.equal(consolidatedSourceHashes["src/world/alpha-solid-geometry.mjs"],
+  "e49fe3e3937849f3b46c5539ab0361025fc510db201695a7dbaaad69bf895ddf");
+ assert.equal(consolidatedSourceHashes["assets/world/greyhaven-alpha-solids-v1.json"],
+  "186c9f6966749f25c26840dd26bd53771daf677ffe486702afcaa4a054482ebe");
+}
 const graphicsSourceHashes={
  "src/browser/armory-rack-visual.mjs":"3eec34073d4056411df063677e4b435bafa9ad0c684bed450e8c319f91cf5fdc",
  "src/browser/armory-world493-visual-bridge.mjs":"f7862e3931a150c5b8ac2e11054183d8de12ef498ab22be5cca192f819d46f69",
@@ -76,6 +100,7 @@ try{
    else{opts.browser="firefox";opts.protocol="webDriverBiDi";}
    browser=await puppeteer.launch(opts);
    const page=await browser.newPage(),errors=[];
+   await page.evaluateOnNewDocument(head=>{window.__expectedPinnedWorldHead=head;},heads.world);
    page.on("pageerror",x=>errors.push(x.message));
    page.on("response",r=>{if(r.status()>=400)errors.push("HTTP "+r.status()+" "+r.url());});
    await page.setViewport({width:1140,height:860,deviceScaleFactor:1});
@@ -83,6 +108,12 @@ try{
    try{await page.waitForFunction(()=>window.__p0WorldUiReview?.()?.ready,{timeout:20000});}
    catch(e){console.log("LOAD_ERROR="+JSON.stringify({engine,errors,status:await page.$eval("#status",el=>el.textContent)}));throw e;}
    const initial=await page.evaluate(()=>window.__p0WorldUiReview());
+   assert.equal(initial.worldHead,heads.world);
+   if(consolidatedWorld){
+    await page.evaluate(()=>{document.title="Moon Games P0 consolidated World #521 + original 3B/UI swords";
+     document.querySelector("h1").textContent="World #521 consolidation / Graphics #529 / UI #503";});
+    assert.equal(initial.swordCount,4);
+   }
    const alphaSampler=await page.evaluate(()=>window.__alphaSamplerInfo());
    assert.equal(alphaSampler.alphaOpaquePixel,159);
    assert.equal(alphaSampler.alphaTransparentPixel,0);
@@ -103,7 +134,7 @@ try{
    });
    const first=initial.swordRects[0];
    const p=clientPoint(first,20,13),clear=clientPoint(first,0,0);
-   const img1="armory_world493_ui503_"+engine+"_initial.png";
+   const img1="armory_"+(consolidatedWorld?"world521":"world493")+"_ui503_"+engine+"_initial.png";
    await page.screenshot({path:join(out,img1),fullPage:true});
    const ad=await page.evaluate(()=>JSON.parse(JSON.stringify(window.__p0WorldUiAdversarial())));
    for(const n of ["outside","mismatch","transparent","frame"])assert.equal(ad[n].handled,false);
@@ -158,7 +189,7 @@ try{
    assert.equal(afterScaled.combatFallback,1);
    assert.equal(afterScaled.cancelled,3);
    assert.ok(narrowed.width<=390);
-   const img2="armory_world493_ui503_"+engine+"_dpr2.png";
+   const img2="armory_"+(consolidatedWorld?"world521":"world493")+"_ui503_"+engine+"_dpr2.png";
    await page.screenshot({path:join(out,img2),fullPage:true});
    // First Playable demands FOUR independently clickable physical swords,
    // not merely repeated proofs on rack sword #1. Exercise each original
@@ -215,6 +246,32 @@ try{
    assert.equal(afterAll.cancelled,3);
    assert.deepEqual(errors,[]);
    results.push({engine,version:await browser.version(),errors,maskOverlap,stableHit,allSwordClicks,
+     world521BuildingPresentationCheck:consolidatedWorld?await page.evaluate(async()=>{
+       const {createAuthoredWorldRenderer}=await import("/__world493__/src/browser/authored-world-renderer.mjs");
+       const {MAP_IDS}=await import("/__world493__/src/world/authored-maps.mjs");
+       const {normalizeWorldBuildingReplacementIds}=await import("/__world493__/src/world/building-presentation.mjs");
+       let smithRejected=false;
+       try{normalizeWorldBuildingReplacementIds(MAP_IDS.overworld,["smith"]);}
+       catch{smithRejected=true;}
+       const camera={x:4365,y:4075};
+       function pixels(replacement,cam){
+         const c=document.createElement("canvas");c.width=c.height=640;
+         const cx=c.getContext("2d",{willReadFrequently:true});
+         const w=createAuthoredWorldRenderer({cacheCap:24,buildLimit:8,replacedBuildingIds:replacement});
+         cx.save();cx.translate(320,320);cx.scale(.84,.84);cx.translate(-320,-320);
+         w.draw(cx,MAP_IDS.overworld,cam,640,640,.84);cx.restore();
+         return cx.getImageData(0,0,640,640).data;
+       }
+       function changed(a,b){let n=0;for(let i=0;i<a.length;i+=4)
+         if(a[i]!==b[i]||a[i+1]!==b[i+1]||a[i+2]!==b[i+2]||a[i+3]!==b[i+3])n++;
+         return n;}
+       const redLionDiff=changed(pixels([],camera),pixels(["red-lion"],camera));
+       const smithCamera={x:3800,y:4038};
+       const smithDiff=changed(pixels([],smithCamera),pixels(["red-lion"],smithCamera));
+       return{smithReplacementForbidden:smithRejected,redLionVisibleDifferencePixels:redLionDiff,
+         blacksmithPixelsChangedByRedLionReplacement:smithDiff,
+         observedGameRendererIntegration:false,productionApproved:false};
+     }):null,
      afterAllFourSourcePixelClicks:afterAll,
      sourcePins:initial.sourceWorldSocketPositions,opaqueSourcePixel:[20,13],
      adversarial:ad,alphaSampler,initial,afterOpaque,afterClear,afterDrag,afterRevision,
@@ -226,12 +283,18 @@ try{
      authoritativeItemOwnership:false,productionApproved:false});
   }finally{await browser?.close();}
  }
- const report={milestone:"Graphics 3B First Playable World493+Graphics508+UI503 exact native alpha pointer compatibility",
+ const report={milestone:consolidatedWorld?
+   "Graphics 3B First Playable exact consolidated World #521 + original Blender + UI503 native pointer compatibility":
+   "Graphics 3B First Playable World493+Graphics508+UI503 exact native alpha pointer compatibility",
    sourceHeads:heads,externalSourceHashes:fileHashes,graphicsSourceHashes,
+   consolidatedSourceHashes,
+   consolidatedWorld521Candidate:consolidatedWorld,
    browserResults:results,screenshots:results.reduce((sum,r)=>sum+r.screenshots.length,0),
    realGameClientExecuted:false,realMultiplayerUsers:0,realServerTryPickup:false,
    combatHandlerExecuted:false,allSourcesUnchanged:true,productionApproved:false};
- await writeFile(join(out,"armory_p0_world493_ui503_native_report.json"),JSON.stringify(report,null,2)+"\n");
+ await writeFile(join(out,consolidatedWorld?
+  "armory_p0_world521_ui503_native_report.json":
+  "armory_p0_world493_ui503_native_report.json"),JSON.stringify(report,null,2)+"\n");
  console.log("WORLD_UI_NATIVE="+JSON.stringify(results.map(r=>({engine:r.engine,version:r.version,
   intents:r.afterDpr2.visualIntents.length,fallthrough:r.afterDpr2.combatFallback,
   cancellations:r.afterDpr2.cancelled,events:r.realInputEvents,errors:r.errors}))));
