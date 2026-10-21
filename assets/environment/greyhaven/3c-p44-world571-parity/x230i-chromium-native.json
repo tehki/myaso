@@ -1,0 +1,107 @@
+{
+  "purpose": "Original P43 Graphics 3C vs integrated P44 renderer city and Red Lion visual pixel parity",
+  "heads": {
+    "baseline": "ef78df8b065a03399c0047e785587e707852bc07",
+    "integrationBase": "9139ce3b4290bd7b1a5efe4b90b3edcc8d15db59",
+    "integrationCurrent": "9139ce3b4290bd7b1a5efe4b90b3edcc8d15db59"
+  },
+  "originalWorldMapsMatch": true,
+  "enginesRequested": [
+    "chrome"
+  ],
+  "fullChromeFirefoxMatrix": false,
+  "originalUnmodified": true,
+  "serverAuthoritative": false,
+  "players": 0,
+  "sourceHashes": {
+    "/baseline/src/browser/authored-world-renderer.mjs": "07bb0e63631ac1423fcf7c607a341aa9a1c26f05ea5924350d553a57d0bb05b3",
+    "/baseline/src/browser/greyhaven-terrain-materials.mjs": "4042774508d331e945ce3e1f62f442580180d5fedd7635baa070d69564903238",
+    "/baseline/src/browser/greyhaven-atmosphere.mjs": "452a11ed33ed842372ea39d11e532083c71177cb18261328b8a14ecf1312622f",
+    "/baseline/src/world/authored-maps.mjs": "d48c495f3a23881154ce6c93452c44cb7587ebd3707f9434098439d1a67d1987",
+    "/baseline/src/world/building-presentation.mjs": "6122ebf28eb9470669e57da9f60251c79fc377a002b59cc67c51203b41934256",
+    "/candidate/src/browser/authored-world-renderer.mjs": "9528b5485a2feb86af72b650271c5b8e7886f391372228e41fc7c6d721222961",
+    "/candidate/src/browser/greyhaven-terrain-materials.mjs": "4042774508d331e945ce3e1f62f442580180d5fedd7635baa070d69564903238",
+    "/candidate/src/browser/greyhaven-atmosphere.mjs": "452a11ed33ed842372ea39d11e532083c71177cb18261328b8a14ecf1312622f",
+    "/candidate/src/world/authored-maps.mjs": "d48c495f3a23881154ce6c93452c44cb7587ebd3707f9434098439d1a67d1987",
+    "/candidate/src/world/building-presentation.mjs": "6122ebf28eb9470669e57da9f60251c79fc377a002b59cc67c51203b41934256"
+  },
+  "results": [
+    {
+      "engine": "chrome",
+      "version": "Chrome/152.0.7977.82",
+      "errors": [],
+      "cases": [
+        {
+          "id": "tavern-day",
+          "zoom": 0.84,
+          "replaced": false,
+          "baselineCached": 6,
+          "candidateCached": 6,
+          "baselineReplacements": [],
+          "candidateReplacements": [],
+          "changedBytes": 0,
+          "changedPixels": 0
+        },
+        {
+          "id": "tavern-replaced",
+          "zoom": 0.84,
+          "replaced": true,
+          "baselineCached": 6,
+          "candidateCached": 6,
+          "baselineReplacements": [
+            "red-lion"
+          ],
+          "candidateReplacements": [
+            "red-lion"
+          ],
+          "changedBytes": 0,
+          "changedPixels": 0
+        },
+        {
+          "id": "tavern-pan",
+          "zoom": 1,
+          "replaced": false,
+          "baselineCached": 4,
+          "candidateCached": 4,
+          "baselineReplacements": [],
+          "candidateReplacements": [],
+          "changedBytes": 0,
+          "changedPixels": 0
+        },
+        {
+          "id": "blacksmith",
+          "zoom": 0.84,
+          "replaced": false,
+          "baselineCached": 6,
+          "candidateCached": 6,
+          "baselineReplacements": [],
+          "candidateReplacements": [],
+          "changedBytes": 0,
+          "changedPixels": 0
+        },
+        {
+          "id": "south-city",
+          "zoom": 1.2,
+          "replaced": false,
+          "baselineCached": 4,
+          "candidateCached": 4,
+          "baselineReplacements": [],
+          "candidateReplacements": [],
+          "changedBytes": 0,
+          "changedPixels": 0
+        },
+        {
+          "id": "northern-wilderness",
+          "zoom": 0.84,
+          "replaced": false,
+          "baselineCached": 4,
+          "candidateCached": 4,
+          "baselineReplacements": [],
+          "candidateReplacements": [],
+          "changedBytes": 0,
+          "changedPixels": 0
+        }
+      ]
+    }
+  ]
+}
