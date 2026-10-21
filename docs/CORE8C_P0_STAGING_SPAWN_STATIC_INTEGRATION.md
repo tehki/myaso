@@ -427,6 +427,50 @@ or a two-physical-host browser run. The server remains a disposable
 loopback-only explicitly opted-in reviewed-static fixture. No runtime
 Combat, reliable-stream implementation or release gate was changed.
 
+## Core 8C — second authenticated kill completes a fresh joiner's respawn cycle
+
+The child of #586 extends its existing real-server **second** kill
+test beyond the new reliable KillEvent sequence 1. Four current,
+separately pinned WebTransport sessions (#1,#3,#4 and newcomer #5)
+already prove that historical sequence 0 was never replayed to the
+newcomer, but that genuine server-authored next event sequence 1
+(killer #1, victim #5) reached all four on their *own* original
+reliable streams after three committed heavy-fist hits (victim #5
+HP 100→54→8→0).
+
+New: each original QUIC session returns its real **Dead snapshot sequence**
+from its own datagram stream, sends an ordinary input acknowledging
+that actual death frame, and keeps receiving authoritative snapshots
+until server-calculated **100HP + Idle** at the *exact* immutable
+Greyhaven respawn **(4206,4160)** for net ID #5, no sooner than 60
+authoritative simulation ticks after death. The four independent
+old/new clients must each observe the respawn. They must also each
+send their **own latest actual respawn snapshot sequence and server
+tick ACK** and obtain their correctly scoped post-respawn INPUT_ACK
+on the existing session, without reconnecting, changing identity, or
+receiving a synthetic resurrection.
+
+The test uncovered a genuine staging physical-collision interaction:
+attacker #1 can be standing only 32 world units from #5's respawn
+anchor after a heavy melee kill, and the real server will physically
+separate the newly spawned player. Before testing the precise
+unoccupied immutable anchor, the test moves #1 west through ordinary
+client INPUT to a genuinely server-observed clearance of at least
+44 world units. It does NOT disable physical collision, change the
+server's respawn logic, accept an incorrect respawn coordinate, or
+privilege the test to modify Rust fighters. Periodically repeated
+SNAPSHOT_FIELD_REMOVED tombstones for already-left player #2 are
+accepted as real delta-replication metadata, while a **live** record
+for that retired net ID at the newer death/respawn ticks fails the test.
+
+This demonstrates a complete second kill → sequenced reliable fanout
+→ timed respawn → four independent postrespawn ACK sequence. It does
+NOT imply persistent authenticated account recovery, saved gear,
+multi-host native browser acceptance, genuine clicked sword ownership,
+or complete World/Physics map authority. The staging server remains
+a disposable 127.0.0.1 certificate-pinned instance with the original
+default-OFF reviewed-static collision opt-in and original gates intact.
+
 ## Nonclaims and release HOLD
 
 This is **not** full geometry authority. World #509's 23 static AABBs omit
