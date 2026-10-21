@@ -146,7 +146,9 @@ function updateNetworkDiagnostics(nowMs) {
     + ` | Render catch-ups ${snapshotRenderClock.metrics().boundedCatchups}`
     + ` | Extra render lag p50 ${time(renderGap.p50Ms)} · p95 ${time(renderGap.p95Ms)}`
     + ` | >33ms ${renderGap.overThresholdPct === null ? "collecting…" : renderGap.overThresholdPct + "%"} (${renderGap.samples} samples)`
-    + ` | Samples ${s.inputAckSamples}`;
+    + ` | Samples ${s.inputAckSamples}`
+    + ` | ACKs ${s.ackCount}`
+    + ` | Rx snapshots ${s.snapshots}`;
 }
 const acceptanceScenario = params.get("scenario");
 const server = params.get("server");

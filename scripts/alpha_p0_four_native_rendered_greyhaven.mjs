@@ -7,6 +7,7 @@ import {createHash} from "node:crypto";
 import {readFile,stat,mkdir,writeFile} from "node:fs/promises";
 import path from "node:path";
 import {setTimeout as sleep} from "node:timers/promises";
+import {parseNativeWorldLiveness,nativeWorldLivenessAdvanced} from "./alpha_p0_native_world_liveness.mjs";
 const root=process.cwd(),deadline=Date.now()+160000;
 const children=new Set(),clients=[];
 let http;
@@ -85,17 +86,21 @@ const snapshotCode=[
  "const id=r=>Number((r?.querySelector('span')?.textContent??'').match(/^#(\\d+)$/)?.[1]??0);",
  "const own=rows.filter(r=>r.dataset.own==='true');",
  "const status=document.querySelector('#event-text')?.textContent??'';",
+ "const telemetry=document.querySelector('#network-diagnostics')?.textContent??'';",
  "let green=0;",
  "if(ctx)for(let y=65;y<c.height-65;y+=67)for(let x=65;x<c.width-65;x+=67){",
  "const p=ctx.getImageData(x,y,1,1).data;",
  "if(p[1]>p[0]+8&&p[1]>p[2]+8&&p[1]>=55&&p[1]<=195)green++;}",
  "const search=new URL(location.href).searchParams;",
  "const liveness=window.__MYASO_WORLD_LIVENESS__?.snapshot(Date.now())??null;",
- "return {liveness,own:own.length===1?id(own[0]):0,ownCount:own.length,ids:rows.map(id).sort((a,b)=>a-b),tick:Number(status.match(/server tick (\\d+)/)?.[1]??0),green,width:c?.width??0,height:c?.height??0,world:search.get('world')==='1',scenario:search.has('scenario'),acceptance:!!window.__MYASO_ACCEPTANCE_STATE__};"
+ "return {liveness,own:own.length===1?id(own[0]):0,ownCount:own.length,ids:rows.map(id).sort((a,b)=>a-b),tick:Number(status.match(/server tick (\\d+)/)?.[1]??0),telemetry,green,width:c?.width??0,height:c?.height??0,world:search.get('world')==='1',scenario:search.has('scenario'),acceptance:!!window.__MYASO_ACCEPTANCE_STATE__};"
 ].join("\n");
-async function snapshot(s){return execute(s,snapshotCode)}
+async function snapshot(s){
+ const values=await execute(s,snapshotCode);
+ return {...values,...parseNativeWorldLiveness(values.telemetry)};
+}
 function valid(s,id){
- return s.own===id&&s.ownCount===1&&s.ids.join(",")==="1,2,3,4"&&s.tick>0&&s.green>=8&&s.width>=800&&s.height>=500&&s.world&&!s.scenario&&!s.acceptance;
+ return s.own===id&&s.ownCount===1&&s.ids.join(",")==="1,2,3,4"&&s.valid===true&&s.tick>0&&s.green>=8&&s.width>=800&&s.height>=500&&s.world&&!s.scenario&&!s.acceptance;
 }
 async function screenshot(s){
  const raw=await w3c(s,"GET","/session/"+s.id+"/screenshot");
@@ -122,11 +127,11 @@ async function run(){
   const s=await driver(browsers[i]);
   const u=new URL("http://127.0.0.1:"+http.address().port+"/web/index.html");
   u.searchParams.set("server",game.url);u.searchParams.set("cert",game.hash);u.searchParams.set("world","1");
-  // Local read-only staging counters diagnose a stale HUD vs stalled snapshots/paint.
+  u.searchParams.set("netstats","1");
   u.searchParams.set("uiLivenessProbe","1");
   check(!u.searchParams.has("scenario"),"must render genuine world without acceptance scenario");
   await w3c(s,"POST","/session/"+s.id+"/url",{url:u.href},30000);
-  await poll(async()=>{const x=await snapshot(s);return{ok:x.own===i+1&&x.tick>0,value:x}},s.name+" authentic QUIC roster",19000);
+  await poll(async()=>{const x=await snapshot(s);return{ok:x.own===i+1&&x.valid===true,value:x}},s.name+" authentic QUIC roster",19000);
  }
  const before=await Promise.all(clients.map((s,i)=>poll(async()=>{
   const v=await snapshot(s);return {ok:valid(v,i+1),value:v};
@@ -139,7 +144,7 @@ async function run(){
  try {
   after=await Promise.all(clients.map((s,i)=>poll(async()=>{
    const v=await snapshot(s);
-   return {ok:valid(v,i+1)&&v.tick>before[i].tick,value:v};
+   return {ok:valid(v,i+1)&&nativeWorldLivenessAdvanced(before[i],v)&&v.tick>before[i].tick,value:v};
   },s.name+" living city after actual W3C gesture",12000)));
  } catch(error) {
   // Preserve the original strict HUD/tick requirement. Never accept a newer
@@ -156,7 +161,12 @@ async function run(){
  const proof={realRustAuthority:true,sourceAuthoredWorldRenderer:true,
   trueWorldQueryWithoutScenario:true,genuineFourChromeFirefoxW3cClients:true,
   allFourSharedAuthoritativeRoster:[1,2,3,4],
-  trueNativeKeyboardGesture:true,independentFreshServerTicks:after.map(x=>x.tick),
+  trueNativeKeyboardGesture:true,
+  independentFreshNetworkProgress:after.map((x,i)=>({
+    id:x.own,ackCountBefore:before[i].ackCount,ackCountAfter:x.ackCount,
+    receivedSnapshotsBefore:before[i].snapshotCount,
+    receivedSnapshotsAfter:x.snapshotCount,statusTickForContextOnly:x.tick,
+  })),
   renderedGreenSampleCounts:before.map(x=>x.green),captures,
   serverOwnedGreyhavenProfile:true,reviewed23StaticSolids:true,
   scope:"single-host loopback canvas art + real QUIC; NOT sword art, armed PvP, identity gear or independent hosts"};
