@@ -250,6 +250,18 @@ jobs:
           node --test tests/m194-native-block-age.test.mjs
           node scripts/pvp_browser_flight_runner.mjs
 
+      - name: Validate First Playable M144 real jump-chord recovery before unrelated gates
+        env:
+          MYASO_PVP_SCENARIO: "uimultirecoveryffa"
+        run: |
+          # Additional authentic THREE-browser / server FFA acceptance.
+          # Preserve the original M144 late protected gate unchanged.
+          # On RED, M337 telemetry proves real submitted client intent;
+          # admission/simulation proof is independent and cannot be faked.
+          node --check web/online-game.mjs
+          node --test tests/m337-first-playable-jump-input-proof.test.mjs tests/r1-m144-lead-headroom.test.mjs
+          node scripts/pvp_browser_flight_runner.mjs
+
       - name: Validate M188 repeated real heavy counterplay windows
         run: |
           # Three fresh Chrome/Firefox sessions for each real defensive read.
