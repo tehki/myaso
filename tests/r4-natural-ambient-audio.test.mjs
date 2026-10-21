@@ -1,0 +1,474 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
+import { readFileSync, readdirSync } from "node:fs";
+import { createGameAudio } from "../src/browser/game-audio.mjs";
+
+class Param {
+  value = 0;
+  setValueAtTime(v) { this.value = v; }
+  exponentialRampToValueAtTime(v) { this.value = v; }
+}
+class Node { connect() { return this; } disconnect() {} }
+class Context {
+  static created = 0;
+  static instances = [];
+  currentTime = 0;
+  state = "running";
+  sampleRate = 8000;
+  oscillators = 0;
+  samples = [];
+  gainNodes = [];
+  filters = [];
+  destination = new Node();
+  constructor() { Context.created++; Context.instances.push(this); }
+  createGain() {
+    const node = Object.assign(new Node(), { gain: new Param() });
+    this.gainNodes.push(node);
+    return node;
+  }
+  createStereoPanner() { return Object.assign(new Node(), { pan: new Param() }); }
+  createOscillator() { this.oscillators++; return Object.assign(new Node(), { frequency: new Param(), start() {}, stop() {} }); }
+  createBuffer(_channels, length) { return { getChannelData() { return new Float32Array(length); } }; }
+  createBiquadFilter() {
+    const filter = Object.assign(new Node(), { frequency: new Param() });
+    this.filters.push(filter);
+    return filter;
+  }
+  createBufferSource() {
+    const sample = Object.assign(new Node(), { playbackRate: new Param(), start() {}, stop() {} });
+    this.samples.push(sample);
+    return sample;
+  }
+  async decodeAudioData(bytes) { return { length: bytes.byteLength, duration: 0.5 }; }
+  resume() { return Promise.resolve(); }
+}
+
+class MusicTrack {
+  static created = [];
+  constructor(src) {
+    this.src = src; this.loop = false; this.paused = true; this.volume = 0;
+    this.playCalls = 0; this.pauseCalls = 0;
+    MusicTrack.created.push(this);
+  }
+  play() { this.playCalls++; this.paused = false; return Promise.resolve(); }
+  pause() { this.pauseCalls++; this.paused = true; }
+}
+
+test("R4 CC0 recorded foley and ambient loop are bundled locally", () => {
+  const files = readdirSync(new URL("../web/audio/foley/", import.meta.url));
+  assert.equal(files.length, 24);
+  for (const file of files) {
+    assert.match(file, /^[\w]+\.ogg$/);
+    assert.equal(readFileSync(new URL("../web/audio/foley/" + file, import.meta.url)).subarray(0, 4).toString(), "OggS");
+  }
+  const mp3Names = ["moonlight-sonata-adagio.mp3", "vivaldi-autumn-adagio.mp3",
+    "vivaldi-winter.mp3", "track-04-untitled.mp3"];
+  assert.deepEqual(readdirSync(new URL("../web/audio/music/", import.meta.url)).sort(),
+    [...mp3Names].sort(), "only the 4 user-supplied MP3s should remain in the playlist");
+  for (const name of mp3Names) {
+    const bytes = readFileSync(new URL("../web/audio/music/" + name, import.meta.url));
+    assert.ok(bytes.length > 1_000_000, name + " must be a full original recording");
+    assert.ok(bytes.subarray(0, 3).toString() === "ID3" ||
+      (bytes[0] === 0xff && (bytes[1] & 0xe0) === 0xe0), name + " is not valid MP3 framing");
+  }
+  const source = readFileSync(new URL("../web/audio/SOURCES.md", import.meta.url), "utf8");
+  assert.match(source, /Kenney.*CC0/);
+  assert.match(source, /user-provided/i);
+  assert.match(source, /recording-specific/i);
+});
+
+test("R4 natural foley decodes asynchronously, uses OGG rather than oscillator once loaded, and preserves cooldown", async () => {
+  const requested = [];
+  const fetchImpl = async (url) => {
+    requested.push(url);
+    return { ok: true, arrayBuffer: async () => Uint8Array.of(0x4f,0x67,0x67,0x53).buffer };
+  };
+  const audio = createGameAudio({ AudioContextImpl: Context, AudioElementImpl: MusicTrack,
+    fetchImpl, random: () => 0.5, storage: null });
+  assert.equal(audio.play("step"), false);
+  assert.equal(audio.getPlaybackClock(), null, "clock cannot advance before user audio activation");
+  assert.equal(audio.loadedFoleyCount(), 0);
+  assert.equal(audio.unlock(), true);
+  assert.equal(typeof audio.getPlaybackClock(), "number");
+  for (let i = 0; i < 30 && audio.loadedFoleyCount() < 24; i++) {
+    await new Promise(resolve => setTimeout(resolve, 0));
+  }
+  assert.equal(audio.loadedFoleyCount(), 24);
+  assert.equal(requested.length, 24);
+  assert.ok(requested.every(u => u.includes("/web/audio/foley/") && u.endsWith(".ogg")));
+  assert.equal(new Set(requested).size, 24, "each real recording is decoded once");
+  const ctx = Context.instances.at(-1);
+  assert.equal(audio.play("light"), true);
+  assert.equal(audio.play("light"), false, "same-simulation-tick events cannot duplicate sound");
+  assert.equal(audio.play("step"), true);
+  assert.equal(audio.play("block"), true);
+  // No oscillator-based game sound is created once recorded assets decode.
+  assert.equal(ctx.oscillators, 0);
+  assert.equal(ctx.samples.length, 3);
+  assert.equal(ctx.samples[0].playbackRate.value, 1);
+  assert.ok(ctx.samples.every(sample => sample.buffer.length === 4));
+  assert.equal(requested.length, 24, "combat playback never fetches media synchronously");
+});
+
+test("R4 music is opt-in, separate from effects, quiet, looping, and persistent", () => {
+  const values = new Map();
+  const storage = { getItem: k => values.get(k), setItem: (k, v) => values.set(k, v) };
+  const audio = createGameAudio({ AudioContextImpl: Context, AudioElementImpl: MusicTrack,
+    fetchImpl: null, storage });
+  const initial = MusicTrack.created.length;
+  assert.equal(audio.isMusicEnabled(), false);
+  assert.equal(MusicTrack.created.length, initial, "must not create/stream music before consent");
+  audio.setMusicEnabled(true);
+  assert.equal(MusicTrack.created.length, initial + 1);
+  const track = MusicTrack.created.at(-1);
+  assert.ok(track.src.endsWith("/web/audio/music/moonlight-sonata-adagio.mp3"));
+  assert.equal(track.loop, false, "each track ends before playlist advances");
+  assert.equal(track.preload, "none");
+  assert.equal(audio.getMusicTrackCount(), 4);
+  assert.equal(audio.getMusicTrackIndex(), 0);
+  assert.equal(audio.isMusicPlaying(), true);
+  assert.equal(track.volume, 0.35 * 0.30, "ambient mix should leave headroom for combat");
+  audio.setMuted(true);
+  assert.equal(track.paused, false, "muting combat foley does not mute ambient music");
+  audio.setMusicVolume(0.8);
+  assert.equal(track.volume, 0.8 * 0.30);
+  audio.setMusicEnabled(false);
+  assert.equal(track.paused, true);
+  audio.setMusicEnabled(true);
+  assert.equal(MusicTrack.created.length, initial + 1, "one looping media element, no stacked tracks");
+  const restored = createGameAudio({ AudioContextImpl: Context, AudioElementImpl: MusicTrack,
+    fetchImpl: null, storage });
+  assert.equal(restored.isMuted(), true);
+  assert.equal(restored.isMusicEnabled(), true);
+  assert.equal(restored.getMusicVolume(), 0.8);
+  assert.equal(MusicTrack.created.length, initial + 1, "restore must not autoplay without gesture");
+  assert.equal(restored.unlock(), true);
+  assert.equal(MusicTrack.created.length, initial + 2, "saved preference resumes only after a fresh player gesture");
+  assert.equal(MusicTrack.created.at(-1).paused, false);
+  restored.setMusicEnabled(false);
+});
+
+test("R4 mute, slider and separate Music buttons are shared by online and offline clients", () => {
+  const html = readFileSync(new URL("../web/index.html", import.meta.url), "utf8");
+  for (const id of ["audio-toggle", "audio-volume", "music-toggle", "music-volume"]) {
+    assert.ok(html.includes('id="' + id + '"'));
+  }
+  const audioSource = readFileSync(new URL("../src/browser/game-audio.mjs", import.meta.url), "utf8");
+  assert.match(audioSource, /musicToggle\?\.addEventListener\("click"/);
+  assert.match(audioSource, /musicSlider\?\.addEventListener\("input"/);
+  assert.match(audioSource, /root\?\.addEventListener\?\.\("visibilitychange"/);
+  for (const client of ["game", "online-game"]) {
+    const code = readFileSync(new URL("../web/" + client + ".mjs", import.meta.url), "utf8");
+    assert.match(code, /installGameAudioControls\(audio\)/);
+    assert.match(code, /audio\.play\("step"/);
+    assert.doesNotMatch(code, /setMusicEnabled\(true\)/, "combat/input never starts music");
+  }
+});
+
+test("R4 media slider changes do not retrigger playback; hidden tabs pause and resume only when visible", () => {
+  const previous = globalThis.document;
+  globalThis.document = { hidden: false };
+  try {
+    const audio = createGameAudio({ AudioContextImpl: Context, AudioElementImpl: MusicTrack,
+      fetchImpl: null, storage: null });
+    audio.setMusicEnabled(true);
+    const track = MusicTrack.created.at(-1);
+    assert.equal(track.playCalls, 1);
+    audio.setMusicVolume(0.5);
+    audio.setMusicVolume(0.65);
+    assert.equal(track.playCalls, 1, "changing music volume must not restart an active loop");
+    globalThis.document.hidden = true;
+    audio.suspendMusicWhenHidden();
+    assert.equal(track.paused, true);
+    const started = track.playCalls;
+    audio.setMusicEnabled(true);
+    assert.equal(track.playCalls, started, "hidden tab must never start playback");
+    globalThis.document.hidden = false;
+    audio.suspendMusicWhenHidden();
+    assert.equal(track.paused, false);
+    assert.equal(track.playCalls, started + 1, "returning to visible resumes exactly once");
+    audio.suspendMusicWhenHidden();
+    assert.equal(track.playCalls, started + 1, "duplicate visibility events cannot stack playback");
+    audio.dispose();
+    assert.equal(track.paused, true);
+    assert.equal(audio.unlock(), false);
+    assert.equal(audio.play("light"), false);
+    audio.setMusicEnabled(true);
+    assert.equal(audio.isMusicEnabled(), true, "dispose never silently overwrites saved preferences");
+  } finally {
+    if (previous === undefined) delete globalThis.document;
+    else globalThis.document = previous;
+  }
+});
+
+test("R4 unreadable recordings use nonblocking fallback and disposal cancels in-flight loads", async () => {
+  let attempts = 0;
+  let aborts = 0;
+  class ClosingContext extends Context {
+    close() { this.closed = true; return Promise.resolve(); }
+  }
+  const broken = createGameAudio({ AudioContextImpl: ClosingContext, AudioElementImpl: MusicTrack,
+    fetchImpl: async () => ({ ok: false }), storage: null });
+  assert.equal(broken.unlock(), true);
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.equal(broken.loadedFoleyCount(), 0);
+  assert.equal(broken.play("heavy"), true, "missing OGG must preserve gameplay-independent fallback");
+  assert.equal(Context.instances.at(-1).oscillators, 1);
+  broken.dispose();
+  assert.equal(Context.instances.at(-1).closed, true);
+
+  const pending = createGameAudio({ AudioContextImpl: ClosingContext, AudioElementImpl: MusicTrack,
+    storage: null, fetchImpl: (_url, options) => {
+      attempts++;
+      return new Promise((_resolve, reject) => {
+        options?.signal?.addEventListener("abort", () => {
+          aborts++;
+          reject(new Error("aborted"));
+        }, { once: true });
+      });
+    },
+  });
+  pending.unlock();
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.equal(attempts, 2, "only two concurrent media requests");
+  pending.dispose();
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.equal(aborts, 2);
+  assert.equal(pending.loadedFoleyCount(), 0);
+  assert.equal(pending.unlock(), false, "disposed instance cannot recreate AudioContext");
+  pending.dispose(); // idempotent
+});
+
+test("R4 native browser servers declare OGG MIME and CI runs genuine browser audio proof", () => {
+  for (const runner of ["browser_flight_runner.mjs", "pvp_browser_flight_runner.mjs"]) {
+    const source = readFileSync(new URL("../scripts/" + runner, import.meta.url), "utf8");
+    assert.match(source, /filename\.endsWith\("\.ogg"\)\) return "audio\/ogg"/);
+  }
+  const workflow = readFileSync(new URL("../.github/workflows/ci.yml", import.meta.url), "utf8");
+  assert.match(workflow, /node --test tests\/r4-natural-ambient-audio\.test\.mjs/);
+  assert.match(workflow, /node scripts\/r4_audio_browser_acceptance\.mjs/);
+  const harness = readFileSync(new URL("../scripts/r4_audio_browser_acceptance.mjs", import.meta.url), "utf8");
+  assert.match(harness, /r4-audio-probe/);
+  assert.match(harness, /assert\.equal\(result\.sources, 1/);
+});
+
+test("R4 recorded effects calibrate blade loudness while avoiding shrill metal impacts", async () => {
+  const audio = createGameAudio({
+    AudioContextImpl: Context, AudioElementImpl: MusicTrack, storage: null,
+    random: () => .5,
+    fetchImpl: async () => ({
+      ok: true,
+      arrayBuffer: async () => Uint8Array.of(0x4f, 0x67, 0x67, 0x53).buffer,
+    }),
+  });
+  assert.equal(audio.unlock(), true);
+  for (let i = 0; i < 30 && audio.loadedFoleyCount() < 24; i++) {
+    await new Promise(resolve => setTimeout(resolve, 0));
+  }
+  assert.equal(audio.loadedFoleyCount(), 24);
+  const ctx = Context.instances.at(-1);
+  function nextGain(cue) {
+    ctx.currentTime += .35; // Preserve the real per-cue dedupe window.
+    assert.equal(audio.play(cue), true);
+    return ctx.gainNodes.at(-1).gain.value;
+  }
+  const blades = [nextGain("light"), nextGain("light"), nextGain("light")];
+  assert.ok(Math.abs(blades[0] - blades[1]) < 1e-9);
+  assert.ok(Math.abs(blades[2] / blades[0] - 8) < 1e-9,
+    "quiet knife-draw should not disappear among knife slices");
+  const heavies = [nextGain("heavy"), nextGain("heavy")];
+  assert.ok(Math.abs(heavies[1] / heavies[0] - 8) < 1e-9);
+  const parries = [nextGain("parry"), nextGain("parry")];
+  assert.ok(parries[0] > parries[1],
+    "quiet metallic click is boosted, but filtered to suppress high resonances");
+  const blocks = [nextGain("block"), nextGain("block"), nextGain("block")];
+  assert.ok(blocks[0] < .64 && blocks[1] < .64 && blocks[2] > .64);
+  // An 8x boost on the quietest measured knife variant stays below full scale
+  // with default master/envelope gain and the original -24.3 dBFS source peak.
+  assert.ok(.55 * .64 * 8 * 10 ** (-24.3 / 20) < 1);
+  audio.dispose();
+});
+
+test("R4 sound-only audition gates recorded playback on 24 decoded OGGs", () => {
+  const html = readFileSync(new URL("../web/audio/audition.html", import.meta.url), "utf8");
+  assert.match(html, /createGameAudio, installGameAudioControls/);
+  assert.match(html, /audio\.loadedFoleyCount\(\)/);
+  assert.match(html, /if \(count !== 24\) return/);
+  assert.match(html, /button\.disabled = true/);
+  assert.match(html, /button\.disabled = false/);
+  assert.match(html, /audio\.play\(cue, \{ pan: Number\(panSlider\.value\) \/ 100 \}\)/);
+  assert.match(html, /createGameAudio\(\{ storage: null \}\)/,
+    "manual audition must not alter gameplay audio preferences");
+  assert.match(html, /window\.addEventListener\("pagehide"/);
+  assert.doesNotMatch(html, /<script[^>]+src=|\/web\/(?:game|online-game)\.mjs/);
+  const harness = readFileSync(new URL("../scripts/r4_audio_browser_acceptance.mjs", import.meta.url), "utf8");
+  assert.match(harness, /R4_AUDITION/);
+  assert.match(harness, /audio\/mpeg/);
+  assert.match(harness, /music-track-title/);
+});
+
+test("R4.1 owner listening feedback removes shrill pots and dampens both guard break variants", async () => {
+  const files = readdirSync(new URL("../web/audio/foley/", import.meta.url));
+  assert.equal(files.length, 24);
+  assert.ok(files.every(file => !file.startsWith("metalPot")),
+    "all squealing resonant metal-pot recordings must be removed, not just made quieter");
+  const source = readFileSync(new URL("../src/browser/game-audio.mjs", import.meta.url), "utf8");
+  assert.match(source, /guardbreak: \["dropLeather", "cloth1"\]/);
+  assert.match(source, /name === "guardbreak" \? 950/);
+  const audio = createGameAudio({
+    AudioContextImpl: Context, AudioElementImpl: MusicTrack, storage: null,
+    random: () => .5,
+    fetchImpl: async () => ({
+      ok: true, arrayBuffer: async () => Uint8Array.of(0x4f, 0x67, 0x67, 0x53).buffer,
+    }),
+  });
+  assert.equal(audio.unlock(), true);
+  for (let n = 0; n < 30 && audio.loadedFoleyCount() !== 24; n++) {
+    await new Promise(resolve => setTimeout(resolve, 0));
+  }
+  assert.equal(audio.loadedFoleyCount(), 24);
+  const ctx = Context.instances.at(-1);
+  for (let n = 0; n < 2; n++) {
+    ctx.currentTime += .4;
+    assert.equal(audio.play("guardbreak"), true);
+    assert.ok(ctx.samples.at(-1).playbackRate.value >= .80 &&
+      ctx.samples.at(-1).playbackRate.value <= .85, "low physical-impact pitch");
+    assert.ok(ctx.gainNodes.at(-1).gain.value <= .34, "safely reduced impact gain");
+    assert.equal(ctx.filters.at(-1).frequency.value, 950, "high frequencies suppressed");
+    assert.equal(ctx.filters.at(-1).type, "lowpass");
+  }
+  ctx.currentTime += .4;
+  assert.equal(audio.play("parry"), true);
+  assert.equal(ctx.filters.at(-1).frequency.value, 1750,
+    "parry metallic recording is filtered instead of painfully bright");
+  audio.dispose();
+});
+
+test("R4.3 playback uses only four user-provided MP3s, not placeholder generated music", () => {
+  const audioSource = readFileSync(new URL("../src/browser/game-audio.mjs", import.meta.url), "utf8");
+  for (const file of ["moonlight-sonata-adagio.mp3", "vivaldi-autumn-adagio.mp3",
+    "vivaldi-winter.mp3", "track-04-untitled.mp3"]) assert.ok(audioSource.includes(file));
+  assert.doesNotMatch(audioSource, /moonlit-melody|moonlit-notes|cathedral-in-the-forest/);
+  assert.match(audioSource, /musicTrack\.loop = false/);
+  assert.match(audioSource, /musicTrack\.onended = \(\) => \{ nextMusicTrack\(\); \}/);
+  const audition = readFileSync(new URL("../web/audio/audition.html", import.meta.url), "utf8");
+  assert.match(audition, /id="music-next"/);
+  assert.match(audition, /id="music-track-title"/);
+  assert.match(audition, /audio\.nextMusicTrack\(\)/);
+});
+
+test("R4.2 Death uses two real CC0 human grunts with short low falls, never creaks", async () => {
+  const files = readdirSync(new URL("../web/audio/foley/", import.meta.url));
+  assert.equal(files.length, 24);
+  assert.ok(!files.includes("creak1.ogg"), "shrill wooden creak must be removed from package");
+  for (const clip of ["deathFall1", "deathFall2"]) {
+    const bytes = readFileSync(new URL("../web/audio/foley/" + clip + ".ogg", import.meta.url));
+    assert.equal(bytes.subarray(0, 4).toString(), "OggS");
+    assert.ok(bytes.length > 7_000 && bytes.length < 80_000);
+  }
+  const source = readFileSync(new URL("../src/browser/game-audio.mjs", import.meta.url), "utf8");
+  assert.match(source, /death: \["deathFall1", "deathFall2"\]/);
+  assert.doesNotMatch(source, /creak1/);
+  assert.match(source, /name === "death" \? 1250/, "death low-pass removes shrill upper harmonics");
+  const doc = readFileSync(new URL("../web/audio/SOURCES.md", import.meta.url), "utf8");
+  assert.match(doc, /Exewin[\s\S]*?CC0/i);
+  assert.match(doc, /real \*\*human dying\/grunt\*\*/i);
+  const audio = createGameAudio({
+    AudioContextImpl: Context, AudioElementImpl: MusicTrack, storage: null, random: () => .5,
+    fetchImpl: async () => ({
+      ok: true, arrayBuffer: async () => Uint8Array.of(0x4f, 0x67, 0x67, 0x53).buffer,
+    }),
+  });
+  assert.equal(audio.unlock(), true);
+  for (let n = 0; n < 30 && audio.loadedFoleyCount() !== 24; n++) {
+    await new Promise(resolve => setTimeout(resolve, 0));
+  }
+  assert.equal(audio.loadedFoleyCount(), 24);
+  const ctx = Context.instances.at(-1);
+  for (let n = 0; n < 2; n++) {
+    ctx.currentTime += .45;
+    assert.equal(audio.play("death"), true);
+    assert.ok(ctx.samples.at(-1).playbackRate.value >= .94 &&
+      ctx.samples.at(-1).playbackRate.value <= .98);
+    assert.equal(ctx.gainNodes.at(-1).gain.value, .50);
+    assert.equal(ctx.filters.at(-1).frequency.value, 1250);
+    assert.equal(ctx.filters.at(-1).type, "lowpass");
+  }
+  audio.dispose();
+});
+
+test("R4 four-song playlist advances on ended, wraps, and never overlaps or autoplays", () => {
+  const audio = createGameAudio({ AudioContextImpl: Context, AudioElementImpl: MusicTrack,
+    storage: null, fetchImpl: null });
+  const created = MusicTrack.created.length;
+  assert.equal(audio.getMusicTrackCount(), 4);
+  assert.equal(audio.getMusicTrackIndex(), 0);
+  assert.equal(audio.isMusicEnabled(), false);
+  assert.equal(audio.nextMusicTrack(), true); // Preselect without starting music.
+  assert.equal(audio.getMusicTrackIndex(), 1);
+  assert.equal(MusicTrack.created.length, created, "next while off must not create media");
+  assert.equal(audio.getMusicTrackTitle(), "Vivaldi — Autumn: Adagio molto");
+  const changed = [];
+  const detach = audio.onMusicTrackChanged(i => changed.push(i));
+  audio.setMusicEnabled(true);
+  const track = MusicTrack.created.at(-1);
+  assert.ok(track.src.endsWith("vivaldi-autumn-adagio.mp3"));
+  assert.equal(track.playCalls, 1);
+  assert.equal(track.loop, false);
+  track.onended();
+  assert.equal(audio.getMusicTrackIndex(), 2);
+  assert.ok(track.src.endsWith("vivaldi-winter.mp3"));
+  assert.equal(track.playCalls, 2);
+  track.onended();
+  assert.equal(audio.getMusicTrackIndex(), 3);
+  assert.ok(track.src.endsWith("track-04-untitled.mp3"));
+  track.onended();
+  assert.equal(audio.getMusicTrackIndex(), 0);
+  assert.ok(track.src.endsWith("moonlight-sonata-adagio.mp3"));
+  assert.equal(MusicTrack.created.length, created + 1, "one media element for all four songs");
+  assert.deepEqual(changed, [2, 3, 0]);
+  audio.setMusicEnabled(false);
+  const pausedAt = track.playCalls;
+  track.onended(); // A late callback cannot silently restart muted music.
+  assert.equal(audio.getMusicTrackIndex(), 1);
+  assert.equal(track.playCalls, pausedAt, "music off blocks next-track autoplay");
+  assert.equal(track.paused, true);
+  detach();
+  audio.dispose();
+  assert.equal(track.onended, null, "disposed audio never advances on stale events");
+  assert.equal(audio.nextMusicTrack(), false);
+});
+
+test("R4 source evidence preserves exact Musopen download IDs, sound credits, licensing, and bytes", () => {
+  const source = readFileSync(new URL("../web/audio/SOURCES.md", import.meta.url), "utf8");
+  const html = readFileSync(new URL("../web/audio/credits.html", import.meta.url), "utf8");
+  const gameHtml = readFileSync(new URL("../web/index.html", import.meta.url), "utf8");
+  const audition = readFileSync(new URL("../web/audio/audition.html", import.meta.url), "utf8");
+  const items = [
+    ["moonlight-sonata-adagio.mp3", "4689d506-fb06-439a-878b-0a80e9722084",
+      "04fd810bc2dad1aa5f2dd5c8703c068c5830b4f1c2540aaea7b2451ee775015a"],
+    ["vivaldi-autumn-adagio.mp3", "616970c4-72d3-43e6-b680-5fa879330b18",
+      "2191f3ac31bd6214c4040df7be181deaf9751f621d079c58577f81bacf5ad911"],
+    ["vivaldi-winter.mp3", "edc962f5-6cc9-40ab-ae28-c2bfcb859ae6",
+      "6ae40350af0ca7458b66711478a47cb1acc793adb338c51f11f4ee8f4da37438"],
+    ["track-04-untitled.mp3", "3274b502-2ab0-4506-9d49-d2442a02699b",
+      "5d4547cccaf97fb17f7160bf7d165de5ad11ec3819cc6a1a05ef5f054942b54c"],
+  ];
+  for (const [name, id, checksum] of items) {
+    const bytes = readFileSync(new URL("../web/audio/music/" + name, import.meta.url));
+    assert.equal(createHash("sha256").update(bytes).digest("hex"), checksum,
+      name + " changed from the unmodified original recording");
+    assert.ok(source.includes(id) && source.includes(checksum),
+      name + " must retain original Windows-download provenance");
+    assert.ok(html.includes(id), name + " must have accessible credits");
+  }
+  assert.match(source, /Creative Commons Attribution ShareAlike 1\.0/);
+  assert.match(source, /John Harrison[\s\S]*?Robert Turizziani/);
+  assert.match(source, /Do not label Autumn as CC0 or public domain/);
+  assert.match(source, /Untitled \(#4\)[\s\S]*?unverified/);
+  assert.match(html, /creativecommons\.org\/licenses\/by-sa\/1\.0/);
+  assert.match(html, /The specific performer and recording license have not yet been confirmed/);
+  assert.match(gameHtml, /href="\/web\/audio\/credits\.html"/);
+  assert.match(audition, /href="\.\/credits\.html"/);
+});
