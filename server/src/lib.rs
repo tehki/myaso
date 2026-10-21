@@ -12,6 +12,7 @@ pub mod alpha_bound_pickup;
 pub mod alpha_current_rack_bindings;
 pub mod alpha_mainhand_snapshot;
 pub mod alpha_pickup_ack_proof;
+pub mod alpha_quiescent_rack_handoff;
 pub mod character_identity;
 pub mod identity;
 pub mod item_journal;
