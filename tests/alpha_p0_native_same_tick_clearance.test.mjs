@@ -57,11 +57,6 @@ test("four real-browser evidence must be one coherent authoritative roster with 
   for(const mutate of cases){
     const data=structuredClone(base);mutate(data);
     const result=assessNativeSameTickRackClearance(data,slots,"initial");
-    // Most invalid conditions must fail before non-overlap qualification.
-    // Unexpected extra scoreboard #5 is separately checked by strict roster
-    // in runtime, while this function validates exact positive identities.
-    if(data[0].scoreboard.some(x=>x.startsWith("#5")))
-      continue;
     assert.equal(result.ok,false);
   }
   assert.equal(assessNativeSameTickRackClearance(base,slots.slice(1),"initial").ok,false);
