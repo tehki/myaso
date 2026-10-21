@@ -52,14 +52,14 @@ node scripts/alpha_p0_host_pair_flight.mjs
 
 Both scripts start exactly two real browsers, connect to the server pinned by the provided hash and terminate their local W3C sessions/processes after the test. They **do not coordinate by forging input**, carry no server-side authority, and never write a success file on failure.
 
-Collect `alpha-p0-pair-a-evidence.json` from host A and `alpha-p0-pair-b-evidence.json` from host B, **plus both original PNG files from each host**, on an authorized reviewer machine. Verify their actual SHA-256 file digests match the two corresponding JSON `screenshots[].sha256` entries and inspect the rendered browser frames for the expected four-person arena and HUD. Inspect native OS process/driver evidence; filenames, PID values and hashes in untrusted JSON are not sufficient by themselves. Run:
+Collect `alpha-p0-pair-a-evidence.json` from host A and `alpha-p0-pair-b-evidence.json` from host B, **plus both original PNG files from each host**, on an authorized reviewer machine. Preserve the `alpha-p0-hostpair-evidence/` subdirectory relative to **each** report JSON. The verifier now **actually reads all four original PNG files and requires matching byte length, PNG signature and SHA-256**, failing closed on missing/tampered files; it does not trust JSON hashes alone. Inspect the rendered browser frames for the expected four-person arena and HUD, and the native OS process/driver evidence; filenames, PID values and hashes in untrusted JSON are not sufficient by themselves. Run:
 
 ```sh
 node scripts/alpha_p0_host_pair_verify.mjs \
   alpha-p0-pair-a-evidence.json alpha-p0-pair-b-evidence.json
 ```
 
-An accepted result deliberately says `EVIDENCE_STRUCTURALLY_CONSISTENT_REQUIRES_SERVER_LOGS`. **Only the orchestrator** may inspect genuine host/session/server evidence, cross-check build/source pins and decide release readiness. Any missing host evidence, cross-host UDP timeout, 5th admission, failed movement or unexpected server state is **BLOCKED**.
+The CLI prints `MYASO_P0_PAIR_EVIDENCE_FILES_VERIFIED` only after reading and hashing all four PNG files and subsequently returns `EVIDENCE_STRUCTURALLY_CONSISTENT_REQUIRES_SERVER_LOGS`. **Only the orchestrator** may inspect genuine host/session/server evidence, cross-check build/source pins and decide release readiness. Any missing host evidence, cross-host UDP timeout, 5th admission, failed movement or unexpected server state is **BLOCKED**.
 
 ## Offline-only developer verification
 
