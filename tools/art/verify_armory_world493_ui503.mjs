@@ -40,6 +40,7 @@ for(const [file,sha] of Object.entries(graphicsSourceHashes))
 const local=new Set([
  "web/armory-p0-world493-ui-review.html","web/armory-p0-world493-ui-review.mjs",
  "src/browser/armory-world493-visual-bridge.mjs","src/browser/armory-rack-visual.mjs",
+ "src/browser/armory-sword-alpha-sampler.mjs",
  "src/browser/arena-viewport.mjs",
  "assets/environment/greyhaven/armory-p0/armory_rack.webp",
  "assets/environment/greyhaven/armory-p0/armory_sword.webp"
@@ -81,6 +82,11 @@ try{
    try{await page.waitForFunction(()=>window.__p0WorldUiReview?.()?.ready,{timeout:20000});}
    catch(e){console.log("LOAD_ERROR="+JSON.stringify({engine,errors,status:await page.$eval("#status",el=>el.textContent)}));throw e;}
    const initial=await page.evaluate(()=>window.__p0WorldUiReview());
+   const alphaSampler=await page.evaluate(()=>window.__alphaSamplerInfo());
+   assert.equal(alphaSampler.alphaOpaquePixel,159);
+   assert.equal(alphaSampler.alphaTransparentPixel,0);
+   assert.equal(alphaSampler.visiblePixels,1082);
+   assert.equal(alphaSampler.productionApproved,false);
    assert.equal(initial.swordCount,4);
    assert.deepEqual(initial.sourceWorldSocketPositions,[[3740,4038],[3780,4038],[3820,4038],[3860,4038]]);
    assert.equal(initial.serverAuthenticatedItems,false);
@@ -151,7 +157,7 @@ try{
    assert.deepEqual(errors,[]);
    results.push({engine,version:await browser.version(),errors,
      sourcePins:initial.sourceWorldSocketPositions,opaqueSourcePixel:[20,13],
-     adversarial:ad,initial,afterOpaque,afterClear,afterDrag,afterRevision,
+     adversarial:ad,alphaSampler,initial,afterOpaque,afterClear,afterDrag,afterRevision,
      afterItemRemoval:removed,afterDpr2:afterScaled,
      cssCanvasWidth:narrowed.width,deviceScaleFactor:2,
      screenshots:[img1,img2],

@@ -64,6 +64,14 @@
         },
         "sourceTransparentAlpha": 0
       },
+      "alphaSampler": {
+        "visiblePixels": 1082,
+        "clickablePixels": 1007,
+        "sourceShaExpected": "795874620d07652e55f5e8a76952d2075f17196fc892eff88d46b165638a3b31",
+        "alphaOpaquePixel": 159,
+        "alphaTransparentPixel": 0,
+        "productionApproved": false
+      },
       "initial": {
         "ready": true,
         "worldHead": "07060f981b8a1dac89184b621b6893dd970a08ae",
@@ -757,6 +765,14 @@
           "itemId": null
         },
         "sourceTransparentAlpha": 0
+      },
+      "alphaSampler": {
+        "visiblePixels": 1082,
+        "clickablePixels": 1007,
+        "sourceShaExpected": "795874620d07652e55f5e8a76952d2075f17196fc892eff88d46b165638a3b31",
+        "alphaOpaquePixel": 159,
+        "alphaTransparentPixel": 0,
+        "productionApproved": false
       },
       "initial": {
         "ready": true,

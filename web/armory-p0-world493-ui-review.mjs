@@ -3,6 +3,7 @@ import {WORLD_ALPHA_ARMORY,WORLD_ALPHA_ARMORY_VERSION,validateWorldAlphaArmoryLa
 import {MAP_IDS,getAuthoredMap} from "/__world493__/src/world/authored-maps.mjs";
 import {createWorld493RackArtPlan} from "../src/browser/armory-world493-visual-bridge.mjs";
 import {hitTestVisibleSwordAlpha,ARMORY_RACK_ART} from "../src/browser/armory-rack-visual.mjs";
+import {createArmorySwordAlphaSampler} from "../src/browser/armory-sword-alpha-sampler.mjs";
 import {createAlphaSwordGestureGate} from "/__ui503__/src/browser/alpha-sword-gesture.mjs";
 import {swordPointerCanvasPoint} from "/__ui503__/src/browser/sword-canvas-pointer.mjs";
 const canvas=document.getElementById("scene"),ctx=canvas.getContext("2d");
@@ -75,13 +76,13 @@ try{
  if(rack.width!==240||rack.height!==166||sword.width!==42||sword.height!==115)
   throw Error("Original Blender assets do not match");
  window.__rackImage=rack;window.__swordImage=sword;
- const buf=document.createElement("canvas");buf.width=42;buf.height=115;
- const bc=buf.getContext("2d",{willReadFrequently:true});
- bc.drawImage(sword,0,0);
- const rgba=bc.getImageData(0,0,42,115).data;
- sourceAlpha=(asset,x,y)=>asset===ARMORY_RACK_ART.swordSource&&
-  Number.isInteger(x)&&Number.isInteger(y)&&x>=0&&y>=0&&x<42&&y<115
-    ?rgba[4*(42*y+x)+3]:0;
+ const decoder=createArmorySwordAlphaSampler(sword);
+ sourceAlpha=decoder.sampleAlpha;
+ window.__alphaSamplerInfo=()=>({visiblePixels:decoder.visiblePixels,
+  clickablePixels:decoder.clickablePixels,sourceShaExpected:decoder.sourceShaExpected,
+  alphaOpaquePixel:sourceAlpha(ARMORY_RACK_ART.swordSource,20,13),
+  alphaTransparentPixel:sourceAlpha(ARMORY_RACK_ART.swordSource,0,0),
+  productionApproved:decoder.productionApproved});
  originalWorld=createAuthoredWorldRenderer({buildLimit:3,cacheCap:24});
  items=WORLD_ALPHA_ARMORY.rackSockets.map((s,i)=>({
   itemId:"ART-ONLY-NO-SERVER-"+i,socketId:s.socketId,
