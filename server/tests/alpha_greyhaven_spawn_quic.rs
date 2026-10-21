@@ -388,3 +388,116 @@ async fn four_real_quic_players_static_on_cannot_walk_through_blacksmith() -> Re
 async fn four_real_quic_players_static_off_preserve_legacy_smith_passage() -> Result<()> {
     exercise_real_quic_smith_wall(false).await
 }
+
+
+/// Four independently authenticated transport sessions issue real input
+/// datagrams while the same server ticks. Each position is observed from
+/// authoritative snapshot traffic; no direct World::step/teleport or browser
+/// coordinate claim is used. Strictly a loopback/QUIC M1 staging proof.
+async fn observe_westward_authoritative_motion(
+    connection: &wtransport::Connection,
+    player_id: u32,
+    start: (f32, f32),
+    sequence: u16,
+) -> Result<(f32, f32)> {
+    let deadline = Instant::now() + Duration::from_secs(10);
+    let mut observed_positions = 0_usize;
+    loop {
+        let at = next_authoritative_position(connection, player_id, deadline).await?;
+        observed_positions += 1;
+        if (at.1 - start.1).abs() > 12.0 {
+            bail!(
+                "player {player_id} unexpectedly drifted on Y during westward input: {:?} -> {:?}",
+                start, at
+            );
+        }
+        if at.0 < start.0 - 85.0 {
+            // Stop through the SAME real gameplay datagram API, not a
+            // direct server/world mutation or synthetic state replacement.
+            send_held_direction(connection, sequence, 1800 + player_id, (0, 0))?;
+            if at.0 >= start.0 - 450.0 && observed_positions >= 2 {
+                println!(
+                    "ALPHA_8C_FOUR_REAL_QUIC_MOVE id={player_id} start_x={:.1} observed_x={:.1} \
+                     observed_y={:.1} samples={observed_positions}",
+                    start.0, at.0, at.1
+                );
+                return Ok(at);
+            }
+            bail!(
+                "player {player_id} movement violated bounded replicated displacement: {at:?}"
+            );
+        }
+    }
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn four_real_quic_players_concurrently_move_under_static_collision() -> Result<()> {
+    let (_server, url, pin) = start_private_staging_server(true)?;
+    let endpoint = Endpoint::client(
+        ClientConfig::builder()
+            .with_bind_default()
+            .with_server_certificate_hashes([pin])
+            .build(),
+    )?;
+    let mut sessions = Vec::new();
+    for player in 1..=4 {
+        let connection = timeout(Duration::from_secs(6), endpoint.connect(url.as_str()))
+            .await
+            .context("real four-player movement QUIC connect timeout")?
+            .context("real four-player movement QUIC connect failed")?;
+        let (send, mut recv) = timeout(Duration::from_secs(5), connection.open_bi())
+            .await
+            .context("open game stream timed out")??
+            .await
+            .context("negotiating game stream failed")?;
+        let mut length = [0_u8; 2];
+        timeout(Duration::from_secs(5), recv.read_exact(&mut length))
+            .await
+            .context("read authoritative baseline header timeout")??;
+        let length = u16::from_le_bytes(length) as usize;
+        if !(14..=4096).contains(&length) {
+            bail!("client {player}: invalid initial snapshot length {length}");
+        }
+        let mut bytes = vec![0_u8; length];
+        timeout(Duration::from_secs(5), recv.read_exact(&mut bytes))
+            .await
+            .context("read authoritative baseline body timeout")??;
+        let snapshot =
+            decode_snapshot(&bytes).map_err(|e| anyhow::anyhow!("bad baseline: {e:?}"))?;
+        if !snapshot.full || snapshot.records.len() != player {
+            bail!("client {player}: not all prior players present in full baseline");
+        }
+        for record in &snapshot.records {
+            let (expected_x, expected_y) = SPAWNS[record.net_id as usize - 1];
+            if ((record.x as f32 / 4.0) - expected_x).abs() > 0.5
+                || ((record.y as f32 / 4.0) - expected_y).abs() > 0.5
+            {
+                bail!("client {player}: bad authoritative peer spawn for {}", record.net_id);
+            }
+        }
+        sessions.push((connection, send, recv, snapshot.sequence));
+    }
+
+    // All four clients submit their own unmodified version-1 movement
+    // packets before any one observer waits for its replicated displacement.
+    for (index, session) in sessions.iter().enumerate() {
+        send_held_direction(&session.0, session.3, 1700 + index as u32, (-127, 0))?;
+    }
+    let (one, two, three, four) = tokio::join!(
+        observe_westward_authoritative_motion(&sessions[0].0, 1, SPAWNS[0], sessions[0].3),
+        observe_westward_authoritative_motion(&sessions[1].0, 2, SPAWNS[1], sessions[1].3),
+        observe_westward_authoritative_motion(&sessions[2].0, 3, SPAWNS[2], sessions[2].3),
+        observe_westward_authoritative_motion(&sessions[3].0, 4, SPAWNS[3], sessions[3].3),
+    );
+    let moved = [one?, two?, three?, four?];
+    for (i, at) in moved.iter().enumerate() {
+        if at.0 >= SPAWNS[i].0 - 85.0 {
+            bail!("player {} has no genuine authoritative westward motion", i + 1);
+        }
+    }
+    println!(
+        "ALPHA_8C_FOUR_CONCURRENT_REAL_QUIC_MOVE_PASS clients=4 static_preview=on \
+         same_authoritative_server=yes"
+    );
+    Ok(())
+}
