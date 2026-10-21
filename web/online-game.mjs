@@ -205,6 +205,24 @@ const visualCameraPosition = { x: 0, y: 0 };
 const fixedStepMs = 1000 / NETWORK.clientPredictionHz;
 const frameBudget = createFrameBudget({ stepMs: fixedStepMs, maxFrameDeltaMs: 50, maxStepsPerFrame: 6 });
 let networkClient = null;
+// QA-ONLY: real four-browser rendered Blacksmith walk reads *received Rust
+// snapshots* while normal city/rack Canvas is painted. Default OFF and
+// available ONLY on localhost under the explicit original empty-rack preview.
+// This returns copies, NEVER the mutable state Map or an input/ownership API.
+const nativeRackWalkProbeEnabled = armoryRackReviewEnabled
+  && params.get("nativeRackWalkProbe") === "1" && !params.has("scenario");
+if (nativeRackWalkProbeEnabled) {
+  window.__MYASO_NATIVE_RACK_WALK_READONLY__ = () => {
+    if (!networkClient?.playerNetId || !networkClient?.latestServerTick) return null;
+    return Object.freeze({
+      id:networkClient.playerNetId,
+      tick:networkClient.latestServerTick,
+      fighters:Object.freeze([...networkClient.state.values()].map(entity=>Object.freeze({
+        netId:entity.netId,x:entity.x,y:entity.y,
+      }))),
+    });
+  };
+}
 let animationFrameId = 0;
 let predictionStep = 0;
 let clientTick = 0;
