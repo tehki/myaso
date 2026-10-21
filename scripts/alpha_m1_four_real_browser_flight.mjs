@@ -464,6 +464,11 @@ async function nativeFourRackApproaches(views) {
       JSON.stringify(witnessed[witnessed.length-1]));
     await saveScreenshot(s,nativeRackReach?"rack-proposed-reach-"+id:"rack-approach-"+id);
   }
+  // All four final owner-witnessed walk ticks must precede each viewer's
+  // later real Rust snapshot. Waiting for fresh frames is STRICTER than
+  // accepting a stale view; do not infer freshness from wall-clock sleep.
+  const newestActualArrivalTick=nativeRackReach
+    ? Math.max(...witnessed.map(w=>w.proposedReach.serverTick)) : 0;
   const peers=await Promise.all(sessions.map(s=>waitFor(async()=>{
     const value=await snapshot(s);
     const all=WORLD_ALPHA_SWORD_RACK_SOCKETS.every((slot,i)=>
@@ -471,12 +476,13 @@ async function nativeFourRackApproaches(views) {
         ? nativeRackArrived(fighter(value,i+1),proposedNativeRackReachPoint(slot))
           &&nativeRackWithinProposedReach(fighter(value,i+1),slot)
         : nativeRackArrived(fighter(value,i+1),slot.approach));
-    return {ok:fourVisible(value)&&all,value};
-  },s.name+(nativeRackReach?" all four proposed near-sword positions visible"
+    return {ok:fourVisible(value)
+      &&(!nativeRackReach||value.tick>newestActualArrivalTick)&&all,value};
+  },s.name+(nativeRackReach?" all four FRESH proposed near-sword positions visible"
     :" all four physical rack approaches visible"),7500)));
-  const peerConsensus=nativeRackReach
-    ? verifyNativeRackPeerConsensus(peers,witnessed,WORLD_ALPHA_SWORD_RACK_SOCKETS)
-    : null;
+  // Evidence is read-only. Record the single-tick radius-18 body
+  // disposition before the independent own-arrival/peer replication gate
+  // might throw, so a genuine overlap cannot disappear from CI logs.
   if(sameTickClearance){
     const report=assessNativeSameTickRackClearance(peers,
       WORLD_ALPHA_SWORD_RACK_SOCKETS,"initial");
@@ -484,6 +490,9 @@ async function nativeFourRackApproaches(views) {
     console.log("ALPHA_P0_NATIVE_RACK_SAME_TICK_CLEARANCE_OBSERVATION "+
       JSON.stringify(report));
   }
+  const peerConsensus=nativeRackReach
+    ? verifyNativeRackPeerConsensus(peers,witnessed,WORLD_ALPHA_SWORD_RACK_SOCKETS)
+    : null;
   console.log((nativeRackReach?"ALPHA_P0_FOUR_NATIVE_GREYHAVEN_PROPOSED_REACH_PASS "
     :"ALPHA_P0_FOUR_NATIVE_GREYHAVEN_RACK_APPROACH_PASS ")+JSON.stringify({
     actualBrowsers:sessions.map(s=>s.name),witnessed,
