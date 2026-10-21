@@ -7,7 +7,9 @@ It does NOT test host power loss, promotion, WAN partitions, or production.
 import json
 import os
 import subprocess
+import threading
 import time
+from concurrent.futures import ThreadPoolExecutor
 
 TEST_DB = "myaso_c4h_test"
 MARKERS = (
@@ -191,6 +193,8 @@ def seed():
     register(77)
     require(sql(prepare(7701, 77, target=4)) == "prepared",
             "durably prepared handoff for interrupted abort")
+    register(78)
+    register(79)
 
 
 def verify_after_primary_restart():
@@ -297,6 +301,82 @@ def verify_after_primary_restart():
     print("PASS: in-flight handoff abort rolled back to durable freeze")
 
 
+def racing_mutations(*statements):
+    """Release two independent psql callers together; inspect BOTH outcomes."""
+    require(len(statements) == 2, "exactly two contenders required")
+    barrier = threading.Barrier(2)
+
+    def contender(statement):
+        barrier.wait(timeout=6)
+        return subprocess.run(
+            ["psql", "-X", "-q", "-A", "-t", "-v", "ON_ERROR_STOP=1",
+             "-c", statement],
+            capture_output=True, text=True, check=False, timeout=12,
+        )
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        left = pool.submit(contender, statements[0])
+        right = pool.submit(contender, statements[1])
+        return left.result(timeout=20), right.result(timeout=20)
+
+
+def test_concurrent_fencing_after_primary_restart():
+    # Both operations are valid individually, but commit_world_mutation must
+    # serialize on the SAME entity authority row and allow just one revision 1.
+    left, right = racing_mutations(mutate(7801, 78), mutate(7802, 78))
+    require(sum(result.returncode == 0 for result in (left, right)) == 1,
+            f"exactly one same-revision winner required: {left.stderr} {right.stderr}")
+    winner_op = 7801 if left.returncode == 0 else 7802
+    loser_op = 7802 if winner_op == 7801 else 7801
+    loser = right if winner_op == 7801 else left
+    require("world state revision conflict" in loser.stderr,
+            f"loser must be rejected by revision CAS, not transport: {loser.stderr}")
+    winner_receipt = sql(mutate(winner_op, 78))
+    require(winner_receipt.startswith("1|") and winner_receipt.endswith("|t"),
+            f"winner replay immutable: {winner_receipt}")
+    require(count("world_mutation_receipts", "mutation_id", winner_op) == 1
+            and count("world_mutation_receipts", "mutation_id", loser_op) == 0,
+            "losing request must roll back provisional receipt")
+    require(count("world_event_outbox", "entity_id", 78) == 1,
+            "same-revision concurrent writers must not duplicate outbox")
+    require(sql(f"SELECT revision FROM core_zone.world_state "
+                f"WHERE entity_id={ident(78)};") == "1",
+            "one authoritative revision after concurrent writes")
+    sql(mutate(loser_op, 78), expect_failure=True)
+    require(count("world_event_outbox", "entity_id", 78) == 1,
+            "retrying stale expected revision must not insert any outbox")
+    print("PASS: post-crash concurrent same-epoch CAS commits exactly one revision")
+
+    # Different workers can race at the next revision after a durable handoff.
+    # The old epoch is fenced independently of connection arrival ordering.
+    require(sql(prepare(7900, 79)) == "prepared",
+            "fresh post-crash handoff can freeze new entity")
+    require(sql(f"SELECT core_zone.commit_transfer({ident(7900)});") == "2",
+            "successor receives epoch 2 once")
+    require(not current(79) and current(79, 2, 2),
+            "old source revoked before concurrent requests")
+    stale, successor = racing_mutations(
+        mutate(7901, 79, 1, 1, 0),
+        mutate(7902, 79, 2, 2, 0),
+    )
+    require(stale.returncode != 0
+            and "stale or frozen world mutation authority" in stale.stderr,
+            f"retired worker must be transaction-fenced: {stale.stderr}")
+    require(successor.returncode == 0
+            and successor.stdout.strip().startswith("1|")
+            and successor.stdout.strip().endswith("|f"),
+            f"new owner must commit exactly once: {successor.stderr} {successor.stdout}")
+    require(count("world_event_outbox", "entity_id", 79) == 1
+            and count("world_mutation_receipts", "mutation_id", 7901) == 0,
+            "stale source cannot leave an outbox or receipt")
+    require(sql(mutate(7902, 79, 2, 2, 0)).endswith("|t"),
+            "new owner can replay its one historical receipt")
+    sql(mutate(7901, 79, 1, 1, 0), expect_failure=True)
+    require(count("world_event_outbox", "entity_id", 79) == 1,
+            "stale retry cannot publish")
+    print("PASS: post-crash racing stale/new epochs allow successor only")
+
+
 def main():
     container = guarded_container()
     seed()
@@ -333,6 +413,7 @@ def main():
             docker("start", container)
     wait_for_primary()
     verify_after_primary_restart()
+    test_concurrent_fencing_after_primary_restart()
     print("C4H PRIMARY CRASH ACCEPTANCE PASSED (one disposable PG16 primary)")
 
 
