@@ -12198,38 +12198,23 @@ async function setArenaAttack(session, elementId, pressed, xOffset = 200) {
 }
 
 async function performArenaDirectionalLight(session, elementId, strafeKey, xOffset = 200) {
-  const origin = { "element-6066-11e4-a52e-4f735466cecf": elementId };
-  await webdriver(session.base, "POST", `/session/${session.sessionId}/actions`, {
-    actions: [
-      {
-        type: "key",
-        id: `keyboard-${session.name}`,
-        actions: [
-          { type: "keyDown", value: strafeKey },
-          { type: "pause", duration: 0 },
-          { type: "pause", duration: 0 },
-          { type: "pause", duration: 0 },
-          { type: "pause", duration: 0 },
-          { type: "keyUp", value: strafeKey },
-        ],
-      },
-      {
-        type: "pointer",
-        id: `mouse-${session.name}`,
-        parameters: { pointerType: "mouse" },
-        actions: [
-          { type: "pointerMove", duration: 0, origin, x: xOffset, y: 0 },
-          { type: "pause", duration: 30 },
-          { type: "pointerDown", button: 0 },
-          { type: "pause", duration: 40 },
-          { type: "pointerUp", button: 0 },
-          { type: "pause", duration: 150 },
-        ],
-      },
-    ],
-  });
+  // M121: the former combined key+mouse W3C multi-source tick occasionally
+  // released the strafe key before the browser captured lateral movement at
+  // genuine pointerUP. In that case Rust produced an ordinary 34HP hit,
+  // without the required LEFT SWEEP and directional recovery. Keep exactly
+  // one native W3C keyDOWN held across one native LMB tap and send keyUP in
+  // finally; never set browser key state through script or fake combat input.
+  await setMovementKey(session, strafeKey, true);
+  try {
+    // Allow one actual 30Hz input frame of genuine held strafe before tap;
+    // unlike a shared WebDriver sources array this is an ACKed keyDOWN,
+    // not a guessed ordering between independently scheduled input sources.
+    await sleep(35);
+    await performArenaAttackHold(session, elementId, xOffset, 35);
+  } finally {
+    await setMovementKey(session, strafeKey, false);
+  }
 }
-
 
 async function performArenaRunHold(session, elementId, movementKey, xOffset = 200, holdMs = 900) {
   const origin = { "element-6066-11e4-a52e-4f735466cecf": elementId };

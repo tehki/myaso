@@ -232,6 +232,15 @@ jobs:
           # A red M121/other milestone must not mask M41's immediate status.
           node scripts/pvp_browser_flight_runner.mjs
 
+      - name: Validate M121 genuine held-strafe directional light before unrelated gates
+        env:
+          MYASO_PVP_SCENARIO: "uidirectionallight"
+        run: |
+          # Additive focused qualification. Preserve the original strict M121
+          # at its late position to retain contention/recovery coverage.
+          node --test tests/m121-native-directional-strafe.test.mjs
+          node scripts/pvp_browser_flight_runner.mjs
+
       - name: Validate M188 repeated real heavy counterplay windows
         run: |
           # Three fresh Chrome/Firefox sessions for each real defensive read.
@@ -478,6 +487,7 @@ jobs:
           MYASO_PVP_SCENARIO: "uidirectionallight"
         run: |
           node --check scripts/pvp_browser_flight_runner.mjs
+          node --test tests/m121-native-directional-strafe.test.mjs
           node scripts/pvp_browser_flight_runner.mjs
 
       - name: Validate M129 real recovery roll buffer
