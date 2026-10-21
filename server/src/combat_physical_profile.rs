@@ -146,10 +146,31 @@ fn propose_for_loadout(loadout: CombatLoadout, action: Action) -> Option<Propose
     })
 }
 
-/// **NOT LIVE:** resolve a candidate attack from an exact verified session and
-/// physical server-owned equipment, never from a client-selected weapon ID or
-/// an attacker-side HP delta. Core must hold the World/Loot tick fence.
-pub fn proposed_strike_for_verified_session(
+/// **NOT LIVE:** resolve from the actual server-side World fighter Action AND
+/// canonical physical MainHand, both under a future single-writer Core
+/// World/Loot/Identity tick fence. No caller may pick HeavyAttackActive or
+/// SwordEquipped through a separate argument. The current Loot domain remains
+/// a *draft writer*; this function alone does not prove canonical ownership.
+pub fn proposed_strike_for_actual_server_action(
+    identity: &SessionIdentityRegistry,
+    lease: SessionLease,
+    world: &World,
+    loot: &LootAuthority,
+) -> Result<Option<ProposedPhysicalStrike>, CombatLoadoutError> {
+    // Validate live exact session and living fighter BEFORE resolving action.
+    let loadout = resolve_verified_session_loadout(identity, lease, world, loot)?;
+    let server_action = world
+        .fighter(lease.server_session())
+        .ok_or(CombatLoadoutError::MissingWorldFighter)?
+        .action;
+    Ok(propose_for_loadout(loadout, server_action))
+}
+
+/// Test-only explicit Action selector for exercising all candidate families
+/// on synthetic idle Worlds. Never a production API; production can derive
+/// the family only from the actual live World fighter action above.
+#[cfg(test)]
+fn proposed_strike_for_verified_session(
     identity: &SessionIdentityRegistry,
     lease: SessionLease,
     world: &World,
@@ -165,6 +186,7 @@ mod tests {
     use super::*;
     use crate::character_identity::CharacterId;
     use crate::loot::{EquipmentSlot, ItemKind};
+    use crate::simulation::InputIntent;
     use crate::zone::ZoneId;
 
     fn setup_actor() -> (SessionIdentityRegistry, SessionLease, World, LootAuthority) {
@@ -190,6 +212,101 @@ mod tests {
         proposed_strike_for_verified_session(identity, lease, world, loot, action)
             .unwrap()
             .expect("physical strike action")
+    }
+
+    #[test]
+    fn production_strike_family_follows_actual_server_fighter_action_not_caller_choice() {
+        let (identity, lease, mut world, mut loot) = setup_actor();
+        assert_eq!(world.fighter(1).unwrap().action, Action::Idle);
+        assert_eq!(
+            proposed_strike_for_actual_server_action(&identity, lease, &world, &loot),
+            Ok(None)
+        );
+
+        // A backpack sword never upgrades the attack of an idle fighter.
+        let sword_id = loot.grant(1, ItemKind::IronSword, 1).unwrap();
+        assert_eq!(
+            proposed_strike_for_actual_server_action(&identity, lease, &world, &loot),
+            Ok(None)
+        );
+        assert!(world.set_input(
+            1,
+            InputIntent {
+                attack: true,
+                ..InputIntent::default()
+            }
+        ));
+        // This is real deterministic Rust World combat, not an arbitrary
+        // Action::AttackActive supplied by a caller.
+        let mut entered_active = false;
+        for _ in 0..60 {
+            world.step();
+            if world.fighter(1).unwrap().action == Action::AttackActive {
+                entered_active = true;
+                break;
+            }
+        }
+        assert!(
+            entered_active,
+            "Rust server never entered a genuine light-active state"
+        );
+        let fist = proposed_strike_for_actual_server_action(&identity, lease, &world, &loot)
+            .unwrap()
+            .expect("server light active authorizes candidate fists");
+        assert_eq!(fist.mode, PhysicalCombatMode::Unarmed);
+        assert_eq!(fist.family, PhysicalAttackFamily::Light);
+        assert_eq!(fist.source_item_id, None);
+
+        // Preview-only demonstration: world action stays active while actual
+        // Loot-equipment ownership changes. The eventual production adapter
+        // must hold World/Loot in ONE atomic writer tick to admit this read.
+        loot.equip(1, sword_id, EquipmentSlot::MainHand).unwrap();
+        let armed = proposed_strike_for_actual_server_action(&identity, lease, &world, &loot)
+            .unwrap()
+            .expect("actual server light and committed item");
+        assert_eq!(armed.mode, PhysicalCombatMode::SwordEquipped);
+        assert_eq!(armed.source_item_id, Some(sword_id));
+        assert_eq!(armed.family, PhysicalAttackFamily::Light);
+        assert_ne!(armed.stats.damage, fist.stats.damage);
+
+        // The fighter's real later non-active state must NEVER reuse a prior
+        // active weapon bonus, even if the item remains equipped.
+        for _ in 0..60 {
+            world.step();
+            if world.fighter(1).unwrap().action != Action::AttackActive {
+                break;
+            }
+        }
+        assert_ne!(world.fighter(1).unwrap().action, Action::AttackActive);
+        assert_eq!(
+            proposed_strike_for_actual_server_action(&identity, lease, &world, &loot),
+            Ok(None)
+        );
+    }
+
+    #[test]
+    fn production_strike_resolver_fail_closes_stale_lease_and_missing_fighter() {
+        let (mut identity, lease, mut world, loot) = setup_actor();
+        let stale = SessionLease::new(1, 2).unwrap();
+        assert_eq!(
+            proposed_strike_for_actual_server_action(&identity, stale, &world, &loot),
+            Err(CombatLoadoutError::UnverifiedSession)
+        );
+        identity.release_session(lease);
+        assert_eq!(
+            proposed_strike_for_actual_server_action(&identity, lease, &world, &loot),
+            Err(CombatLoadoutError::UnverifiedSession)
+        );
+        // Release fences generation 1. Rebinding that revoked lease is
+        // correctly stale; only the NEW server-issued generation may bind.
+        identity
+            .bind_verified(stale, CharacterId::new(101).unwrap())
+            .unwrap();
+        assert!(world.remove_player(1));
+        assert_eq!(
+            proposed_strike_for_actual_server_action(&identity, stale, &world, &loot),
+            Err(CombatLoadoutError::MissingWorldFighter)
+        );
     }
 
     #[test]
