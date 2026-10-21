@@ -88,12 +88,9 @@ impl HitReceiptJournal {
             }
         }
         for event in events {
-            if let Some(receipt) = HitReceipt::from_combat_event(
-                self.next_sequence,
-                server_tick,
-                event,
-            )
-            .map_err(HitJournalError::InvalidEvent)?
+            if let Some(receipt) =
+                HitReceipt::from_combat_event(self.next_sequence, server_tick, event)
+                    .map_err(HitJournalError::InvalidEvent)?
             {
                 self.next_sequence = self.next_sequence.wrapping_add(1);
                 if self.receipts.len() == self.limit {
@@ -176,14 +173,15 @@ mod tests {
     fn real_three_actor_hit_is_visible_to_attacker_and_victim_but_not_spectator() {
         let mut journal = HitReceiptJournal::new(4).unwrap();
         let start = journal.next_cursor();
-        assert_eq!(
-            journal.record_tick(375, &[hit(2, 1, 34, 66)]),
-            Ok(1)
-        );
+        assert_eq!(journal.record_tick(375, &[hit(2, 1, 34, 66)]), Ok(1));
         let attacker = journal.read_for_actor(2, start).unwrap();
         let victim = journal.read_for_actor(1, start).unwrap();
         let spectator = journal.read_for_actor(3, start).unwrap();
-        let HitJournalRead::Delivered { receipt, next_cursor } = attacker else {
+        let HitJournalRead::Delivered {
+            receipt,
+            next_cursor,
+        } = attacker
+        else {
             panic!("attacker must see the committed server hit");
         };
         assert_eq!(receipt.attacker, 2);
@@ -250,7 +248,10 @@ mod tests {
         let mut journal = HitReceiptJournal::new(2).unwrap();
         let initial = journal.next_cursor();
         journal
-            .record_tick(5, &[hit(2, 1, 34, 66), hit(2, 3, 34, 66), hit(2, 4, 34, 66)])
+            .record_tick(
+                5,
+                &[hit(2, 1, 34, 66), hit(2, 3, 34, 66), hit(2, 4, 34, 66)],
+            )
             .unwrap();
         assert_eq!(journal.len(), 2);
         assert_eq!(
@@ -275,16 +276,23 @@ mod tests {
         journal.next_sequence = u32::MAX - 1;
         let cursor = journal.next_cursor();
         journal
-            .record_tick(21, &[hit(2, 1, 34, 66), hit(3, 1, 34, 32), hit(2, 1, 32, 0)])
+            .record_tick(
+                21,
+                &[hit(2, 1, 34, 66), hit(3, 1, 34, 32), hit(2, 1, 32, 0)],
+            )
             .unwrap();
-        let HitJournalRead::Delivered { receipt: first, next_cursor } =
-            journal.read_for_actor(2, cursor).unwrap()
+        let HitJournalRead::Delivered {
+            receipt: first,
+            next_cursor,
+        } = journal.read_for_actor(2, cursor).unwrap()
         else {
             panic!("pre-wrap hit missing");
         };
         assert_eq!(first.sequence, u32::MAX - 1);
-        let HitJournalRead::Delivered { receipt: last, next_cursor: end } =
-            journal.read_for_actor(2, next_cursor).unwrap()
+        let HitJournalRead::Delivered {
+            receipt: last,
+            next_cursor: end,
+        } = journal.read_for_actor(2, next_cursor).unwrap()
         else {
             panic!("post-wrap hit missing");
         };
@@ -312,7 +320,10 @@ mod tests {
             journal.read_for_actor(2, next),
             Ok(HitJournalRead::CaughtUp { next_cursor: next })
         );
-        assert_eq!(HitReceiptJournal::new(0).err(), Some(HitJournalError::InvalidCapacity));
+        assert_eq!(
+            HitReceiptJournal::new(0).err(),
+            Some(HitJournalError::InvalidCapacity)
+        );
         assert_eq!(
             HitReceiptJournal::new(MAX_HIT_HISTORY + 1).err(),
             Some(HitJournalError::InvalidCapacity)
