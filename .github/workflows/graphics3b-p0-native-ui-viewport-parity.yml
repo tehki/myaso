@@ -34,7 +34,7 @@ jobs:
           firefox --version
           chromedriver --version
           geckodriver --version
-      - name: Reproduce original myaso UI at the SAME native 1280 by 720 content viewport
+      - name: Reproduce original myaso UI at BOTH native 1280x720 and 1366x682 content viewports
         run: timeout --signal=TERM --kill-after=5s 180s node scripts/graphics3b_native_layout_parity.mjs
       - name: Preserve authentic Chrome Firefox page layout screenshots and CSS metrics
         if: always()
