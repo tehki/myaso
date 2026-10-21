@@ -166,6 +166,17 @@ jobs:
           node scripts/verify-world-alpha-solid-artifact.mjs
           node --test tests/world-alpha-pinned-solid-artifact.test.mjs
 
+      - name: Validate Alpha World named Red Lion facade replacement contract
+        run: |
+          node --check src/world/building-presentation.mjs
+          node --check src/browser/authored-world-renderer.mjs
+          node --test tests/world-building-presentation.test.mjs tests/authored-world.test.mjs
+
+      - name: Validate P0 Greyhaven Blacksmith four-sword armory sockets
+        run: |
+          node --check src/world/alpha-armory.mjs
+          node --test tests/world-alpha-armory.test.mjs tests/authored-world.test.mjs
+
       - name: Validate M188 repeated real heavy counterplay windows
         run: |
           # Three fresh Chrome/Firefox sessions for each real defensive read.
