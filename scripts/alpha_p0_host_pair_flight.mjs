@@ -2,6 +2,7 @@
 // This script NEVER starts a game server, opens a port beyond localhost,
 // changes routing, or asserts that preflight alone proves cross-host play.
 import {spawn} from "node:child_process";
+import {createHash} from "node:crypto";
 import {createServer} from "node:http";
 import {readFile,stat,writeFile,mkdir} from "node:fs/promises";
 import {hostname,networkInterfaces} from "node:os";
@@ -125,6 +126,28 @@ async function move(s){
   try{await sleep(950)}
   finally{await w3c(s,"POST",uri,{actions:[{type:"key",id:"pair-native",actions:[{type:"keyUp",value:"d"}]}]})}
 }
+// Screenshots are genuine W3C browser renderings, not synthetic mock frames.
+async function collectVisualEvidence(){
+  const directory=path.join(root,"alpha-p0-hostpair-evidence");
+  await mkdir(directory,{recursive:true});
+  const out=[];
+  for(const s of sessions){
+    const encoded=await w3c(s,"GET",`/session/${s.id}/screenshot`,undefined,12000);
+    assert(typeof encoded==="string"&&encoded.length>512,
+      s.family+" did not return a real WebDriver screenshot");
+    const png=Buffer.from(encoded,"base64");
+    assert(png.length>256 && png.subarray(0,8).equals(Buffer.from("89504e470d0a1a0a","hex")),
+      s.family+" screenshot is not PNG bytes");
+    const relativeFile=`alpha-p0-hostpair-evidence/pair-${cfg.role.toLowerCase()}-${s.family}.png`;
+    await writeFile(path.join(root,relativeFile),png);
+    out.push({
+      family:s.family,relativeFile,bytes:png.length,
+      sha256:createHash("sha256").update(png).digest("hex"),
+      driverPid:s.child.pid,w3cSessionId:s.id,
+    });
+  }
+  return out;
+}
 async function untilUtc(when){
   if(Date.now()>when+900)throw Error("coordinated UTC time missed: "+when);
   await sleep(Math.max(0,when-Date.now()));
@@ -165,6 +188,7 @@ async function run(){
       &&moved(baseline[i],s,localIds[0]));
     return {ok:ok&&candidates.length===1,value:{states,candidates}};
   },cfg.role+" genuine opposite-host movement in both browsers",15000);
+  const screenshots=await collectVisualEvidence();
   const marker="MYASO_P0_PAIR_LIVE_REMOTE_MOVE_PASS";
   Object.assign(evidence,{
     marker,kind:"P0_REAL_W3C_PAIR_STAGING",scope:"NOT production / Greyhaven / swords / WAN qualification",
@@ -176,7 +200,7 @@ async function run(){
     movedAt:actedAt,serverTicksBefore:baseline.map(s=>s.tick),
     serverTicksAfter:proof.states.map(s=>s.tick),
     baseline:baseline.map(s=>s.fighters),observed:proof.states.map(s=>s.fighters),
-    twoNativeIndependentW3cClients:true,authenticatedRemoteQuic:true,
+    screenshots,twoNativeIndependentW3cClients:true,authenticatedRemoteQuic:true,
     crossHostMovementSeenByChromeAndFirefox:true,
   });
   console.log(marker+" "+JSON.stringify(evidence));
