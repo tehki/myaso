@@ -83,7 +83,7 @@ export async function run(mode, options, io = console) {
     const begin = process.hrtime.bigint();
     const result = await new Promise((accept, reject) => {
       const timer = setTimeout(() => {expired=true; accept(false);}, LIFETIME_MS);
-      const done = good => {clearTimeout(timer); accept(good);};
+      const done = good => {expired=true; clearTimeout(timer); accept(good);};
       socket.on("error", error => { clearTimeout(timer); reject(error); });
       socket.on("message", (bytes, remote) => {
         if (remote.address !== options.peer) return;
@@ -119,7 +119,7 @@ export async function run(mode, options, io = console) {
         void schedule().catch(reject);
       }
     });
-    if (mode === "listen") evidence.routeProven = result;
+    if (mode === "listen") evidence.oneWayReceiveConfirmed = result;
     evidence.result = result ? (mode === "listen" ? "PING_RECEIVED_ACK_SENT" : "ACK_RECEIVED") : "NO_VERIFIED_ACK";
     io.log("MYASO_R2_PRIVATE_UDP_EVIDENCE=" + JSON.stringify(evidence));
     return evidence;
@@ -132,7 +132,7 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   try {
     const mode = process.argv[2]?.replace(/^--/, "");
     const results = await run(mode, config(process.env));
-    if (!results.routeProven) process.exitCode = 2;
+    if (results.result === "NO_VERIFIED_ACK") process.exitCode = 2;
   } catch (error) {
     console.error("MYASO_R2_PRIVATE_UDP_BLOCKED=" + error.message);
     process.exitCode = 1;
