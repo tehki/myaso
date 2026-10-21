@@ -51,6 +51,60 @@ pub fn overlaps_known_static_solid(
     }))
 }
 
+/// Conservative swept-circle vs every reviewed *static* AABB, including
+/// endpoints and grazing contact. An inflated AABB is intentionally more
+/// restrictive than an exact rounded-corner Minkowski shape: false-positive
+/// blocking is acceptable; tunneling through a wall is not.
+/// This does NOT cover the river, actors or dynamic obstacles.
+pub fn swept_circle_hits_known_static_solid(
+    from: (f32, f32),
+    to: (f32, f32),
+    radius: f32,
+) -> Result<bool, StaticGeometryError> {
+    if !radius.is_finite()
+        || radius <= 0.0
+        || radius > 1024.0
+        || [from.0, from.1, to.0, to.1]
+            .iter()
+            .any(|v| !v.is_finite() || !(0.0..=8192.0).contains(v))
+    {
+        return Err(StaticGeometryError::InvalidQuery);
+    }
+    Ok(STATIC_SOLIDS.iter().any(|rect| {
+        let mut entry = 0.0_f32;
+        let mut exit = 1.0_f32;
+        for (origin, delta, low, high) in [
+            (
+                from.0,
+                to.0 - from.0,
+                rect.min_x - radius,
+                rect.max_x + radius,
+            ),
+            (
+                from.1,
+                to.1 - from.1,
+                rect.min_y - radius,
+                rect.max_y + radius,
+            ),
+        ] {
+            if delta == 0.0 {
+                if origin < low || origin > high {
+                    return false;
+                }
+            } else {
+                let t0 = (low - origin) / delta;
+                let t1 = (high - origin) / delta;
+                entry = entry.max(t0.min(t1));
+                exit = exit.min(t0.max(t1));
+                if entry > exit {
+                    return false;
+                }
+            }
+        }
+        true
+    }))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -96,6 +150,48 @@ mod tests {
         assert_eq!(overlaps_known_static_solid(3800.0, 3920.0, 18.0), Ok(true));
         assert_eq!(overlaps_known_static_solid(3520.0, 4000.0, 18.0), Ok(true));
         assert_eq!(overlaps_known_static_solid(3520.0, 4180.0, 18.0), Ok(false));
+    }
+
+    #[test]
+    fn continuous_sweep_blocks_fast_wall_tunneling_but_preserves_real_gate() {
+        // A fast >100-unit displacement must not jump the 37-unit wall.
+        assert_eq!(
+            swept_circle_hits_known_static_solid((3450.0, 4000.0), (3600.0, 4000.0), 18.0),
+            Ok(true)
+        );
+        assert_eq!(
+            swept_circle_hits_known_static_solid((3450.0, 4180.0), (3600.0, 4180.0), 18.0),
+            Ok(false)
+        );
+        // South exterior Blacksmith rack: walking into the solid is forbidden.
+        assert_eq!(
+            swept_circle_hits_known_static_solid((3740.0, 4088.0), (3740.0, 3930.0), 18.0),
+            Ok(true)
+        );
+        assert_eq!(
+            swept_circle_hits_known_static_solid((3740.0, 4088.0), (3860.0, 4088.0), 18.0),
+            Ok(false)
+        );
+    }
+
+    #[test]
+    fn swept_tangent_closed_endpoint_and_invalid_values_fail_closed() {
+        assert_eq!(
+            swept_circle_hits_known_static_solid((3650.0, 4030.0), (3950.0, 4030.0), 18.0),
+            Ok(true)
+        );
+        assert_eq!(
+            swept_circle_hits_known_static_solid((3740.0, 4030.0), (3740.0, 4088.0), 18.0),
+            Ok(true)
+        );
+        assert_eq!(
+            swept_circle_hits_known_static_solid((3450.0, 4180.0), (f32::NAN, 4180.0), 18.0),
+            Err(StaticGeometryError::InvalidQuery)
+        );
+        assert_eq!(
+            swept_circle_hits_known_static_solid((3450.0, 4180.0), (3600.0, 4180.0), 0.0),
+            Err(StaticGeometryError::InvalidQuery)
+        );
     }
 
     #[test]
