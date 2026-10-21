@@ -276,9 +276,14 @@ The original first-death test's delta-baseline update also now
 **requires an actual server INPUT_ACK** for every per-client Dead
 snapshot acknowledgment, with the source server tick. The input
 channel uses datagrams, so an unconfirmed baseline-update packet can
-be lost even though the server continues running. Missing a real
-network-confirmed ACK must fail the test; it cannot silently count as
-successful death→respawn delta synchronization. No timeout, damage,
+be lost even though the server continues running. The ACK and the
+100HP/Idle respawn snapshot must now be observed on the **same**
+per-client QUIC datagram reader, in either arrival order. The previous
+separate blocking ACK waiter could consume and silently discard the
+only fresh respawn delta while searching for its ACK: that made the
+test intermittently time out despite server success. This replacement
+reader independently records both facts before returning. Missing a
+real ACK or a genuine respawn must still fail. No timeout, damage,
 HP, action or original-spawn assertion was lowered.
 The negative-control test preserves the button-down edge until all four
 observers have confirmed actual server AttackActive; only then does it
@@ -556,6 +561,50 @@ equipped swords, account persistence, full authored obstacle physics,
 or multiple remote hosts. The server executable, authoritative
 movement logic, Combat damage, snapshot protocol, original CI gates
 and default-off/loopback-only collision staging settings are unchanged.
+
+## Core 8C — restored actual unarmed Combat authority after respawn
+
+The test-only child of the four-peer postrespawn movement proof verifies
+that a defeated user's server-authoritative **attack authority**, not
+merely movement, returns after the timed respawn on the **same original
+authenticated QUIC session**. This matters because previous acceptance
+deliberately sent a syntactically correct heavy-attack and movement input
+from the 0HP/Dead net ID #5; the real server individually ACKed it but
+proved that neither action nor position could execute while Dead.
+
+The existing four live certificate-pinned QUIC sessions (#1,#3,#4,#5)
+first independently prove #5 has returned to 100HP/Idle at original
+Greyhaven anchor (4206,4160), and each observes genuine server movement
+to x >= 4230 at 100HP, with all input acknowledgments bound to actual
+server tick and snapshot sequences. Only **after** the same revived
+actor #5 has released movement and the server ACKed that release does
+its client send a new, ordinarily framed **heavy-attack** INPUT packet.
+Its original server snapshot sequence and tick are included, and the
+existing input sample uses the standard heavy-attack button bit and
+a quantized **west** facing angle (32768/65535 turns), aiming at
+surviving fighter #1 near x4116. The two untouched spectators #3/#4
+are outside that authorized attack's west-facing arc.
+
+The real Rust server (not the test) accepts that request as net ID #5,
+executes the original heavy attack and calculates exactly 46 HP of
+unarmed damage to fighter #1: **100HP -> 54HP**. All four original
+independent live QUIC snapshot streams must each actually witness
+both server-authored committed heavy-action state for net ID #5
+(action wire 9/10/11) and the same 54HP vitals delta for net ID #1
+after their own postrespawn observations; they must also refuse any
+unexpected HP loss to fighters #3, #4 or #5. The attacking user
+releases its heavy button only **after all four independent committed
+attack and damage witnesses succeed**, avoiding a false unexecuted
+attack from coalesced opposite inputs. The release receives its own
+correctly addressed real input ACK.
+
+This creates an end-to-end **Dead gameplay rejected → timed server
+respawn → movement restored → heavy Combat restored** witness for
+the same actual QUIC identity, with four independent replicated
+damage observations. The test does not change combat, damage values,
+physics, protocol, client UIs, game equipment, account persistence,
+or default-OFF / loopback-only staging network configuration. It
+does NOT claim physical clicked swords or a multi-host browser playtest.
 
 ## Nonclaims and release HOLD
 
