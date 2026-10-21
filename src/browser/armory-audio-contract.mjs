@@ -15,6 +15,18 @@ const ATTACK_CUES = Object.freeze({
 });
 const idValid = value => typeof value === "string"
   && value.length > 0 && value.length <= 160 && /^[A-Za-z0-9_.:-]+$/.test(value);
+const MAX_U64 = (1n << 64n) - 1n;
+// A Core/Items journal revision is u64, not necessarily a JS safe integer.
+// Accept canonical decimal strings losslessly; small safe numeric fixtures
+// remain supported until the normalized Core transport shape is approved.
+function canonicalItemRevision(value) {
+  if (typeof value === "number") {
+    return Number.isSafeInteger(value) && value > 0 ? BigInt(value) : null;
+  }
+  if (typeof value !== "string" || !/^[1-9][0-9]{0,19}$/.test(value)) return null;
+  const revision = BigInt(value);
+  return revision <= MAX_U64 ? revision : null;
+}
 
 /**
  * A cue choice only. Caller MUST get equipment from authoritative actor
@@ -38,7 +50,8 @@ export function cueForAuthoritativeStrike(equipment, action) {
  * The proposed receipt has:
  * {source:"authoritative", status:"COMMITTED", sessionEpoch:string,
  *  receiptId:string, actorNetId:positive int, itemId:string,
- *  itemRevision:positive int, operation:"PICKUP"|"EQUIP"|"DROP"}.
+ *  itemRevision:canonical decimal u64 string (or safe positive integer fixture),
+ *  operation:"PICKUP"|"EQUIP"|"DROP"}.
  *
  * source/status are presentation contracts, NOT cryptographic proofs.
  * Core must verify origin, ownership, monotonicity and event semantics before
@@ -67,19 +80,21 @@ export function createConfirmedArmoryCueGate({ maxItems = 128 } = {}) {
         || receipt?.source !== "authoritative" || receipt?.status !== "COMMITTED"
         || !Object.hasOwn(ITEM_CUES, receipt?.operation)
         || !idValid(receipt?.itemId) || !idValid(receipt?.receiptId)
-        || !Number.isSafeInteger(receipt?.actorNetId) || receipt.actorNetId <= 0
-        || !Number.isSafeInteger(receipt?.itemRevision) || receipt.itemRevision <= 0) return null;
+        || !Number.isSafeInteger(receipt?.actorNetId) || receipt.actorNetId <= 0) return null;
+      const itemRevision = canonicalItemRevision(receipt.itemRevision);
+      if (itemRevision === null) return null;
       const lastRevision = revisionByItem.get(receipt.itemId);
-      if (lastRevision !== undefined && receipt.itemRevision <= lastRevision) return null;
+      if (lastRevision !== undefined && itemRevision <= lastRevision) return null;
       // Fail silent when exhausted rather than evicting old receipts and
       // accidentally replaying stale sounds during long sessions.
       if (lastRevision === undefined && revisionByItem.size >= limit) return null;
-      revisionByItem.set(receipt.itemId, receipt.itemRevision);
+      revisionByItem.set(receipt.itemId, itemRevision);
       return Object.freeze({
         cue: ITEM_CUES[receipt.operation],
         actorNetId: receipt.actorNetId,
         itemId: receipt.itemId,
-        itemRevision: receipt.itemRevision,
+        // Output a lossless decimal; never serialize a JS BigInt into JSON.
+        itemRevision: itemRevision.toString(),
         receiptId: receipt.receiptId,
       });
     },
