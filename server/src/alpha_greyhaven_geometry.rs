@@ -146,6 +146,72 @@ mod tests {
     }
 
     #[test]
+    fn all_four_core_spawns_reach_all_four_world_blacksmith_approaches_with_pinned_static_sweeps() {
+        // P0 First Playable M1/M2: Core #486's four server-owned spawn
+        // anchors and World #493's four rack *approaches* (not item IDs).
+        // World-owned rack visual/item anchors are at y=4038, but players
+        // must stand south of the building at y=4088; never path through
+        // the smith's collidable rectangle to reach the sword sprites.
+        //
+        // All 16 pairs are checked against the EXACT embedded World #509
+        // 23-solid SHA, not a separately reimplemented JS collision model.
+        // This is STATIC route evidence only: river, dynamic actors, range,
+        // line-of-sight, server-side item pickup, and independent machines
+        // remain separate integration requirements.
+        assert_eq!(STATIC_LAYOUT_ID, "moonvale-greyhaven-v10-solids-v1");
+        assert_eq!(
+            STATIC_SOLIDS_SHA256,
+            "9bb023c95d86821f219113d71b6e480789a72df064f083790e746d79423b3f43"
+        );
+        let spawns = [
+            (4110.0_f32, 4160.0_f32),
+            (4206.0, 4160.0),
+            (4110.0, 4256.0),
+            (4206.0, 4256.0),
+        ];
+        let rack_approaches = [
+            (3740.0_f32, 4088.0_f32),
+            (3780.0, 4088.0),
+            (3820.0, 4088.0),
+            (3860.0, 4088.0),
+        ];
+        let city_detour = [(3990.0_f32, 4180.0_f32), (3980.0, 4090.0)];
+        let player_radius = 18.0_f32;
+        let mut checked = 0_usize;
+        for (spawn_index, spawn) in spawns.iter().copied().enumerate() {
+            for (rack_index, stand) in rack_approaches.iter().copied().enumerate() {
+                let mut previous = spawn;
+                assert_eq!(
+                    overlaps_known_static_solid(previous.0, previous.1, player_radius),
+                    Ok(false),
+                    "spawn {} overlaps a pinned solid",
+                    spawn_index + 1
+                );
+                for next in city_detour.into_iter().chain(std::iter::once(stand)) {
+                    assert_eq!(
+                        overlaps_known_static_solid(next.0, next.1, player_radius),
+                        Ok(false),
+                        "rack {} route waypoint intersects a solid",
+                        rack_index + 1
+                    );
+                    assert_eq!(
+                        swept_circle_hits_known_static_solid(previous, next, player_radius),
+                        Ok(false),
+                        "spawn {} to rack {} static route blocked at {:?} -> {:?}",
+                        spawn_index + 1,
+                        rack_index + 1,
+                        previous,
+                        next
+                    );
+                    previous = next;
+                }
+                checked += 1;
+            }
+        }
+        assert_eq!(checked, 16);
+    }
+
+    #[test]
     fn smith_footprint_and_real_west_wall_gap_have_precise_collision() {
         assert_eq!(overlaps_known_static_solid(3800.0, 3920.0, 18.0), Ok(true));
         assert_eq!(overlaps_known_static_solid(3520.0, 4000.0, 18.0), Ok(true));
