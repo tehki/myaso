@@ -866,7 +866,11 @@ async fn four_live_quic_players_see_real_out_of_range_fist_miss() -> Result<()> 
     attack[21] = 1;
     sessions[0].0.send_datagram(attack)?;
 
-    // Wait for explicit server INPUT_ACK of the attack, then release LMB.
+    // Wait for the real server INPUT_ACK, but DO NOT send a button release
+    // before the server commits the attack state. The real server can
+    // coalesce opposite input datagrams in one tick. A premature release
+    // could erase the valid rising edge and falsely label a dropped
+    // attack as a miss. The per-client AttackActive witness is mandatory.
     // Only the server can choose combat action state and target HP.
     let ack_deadline = Instant::now() + Duration::from_secs(5);
     let attack_server_tick = loop {
@@ -887,7 +891,6 @@ async fn four_live_quic_players_see_real_out_of_range_fist_miss() -> Result<()> 
             break u32::from_le_bytes(bytes[8..12].try_into().unwrap());
         }
     };
-    send_held_direction(&sessions[0].0, sessions[0].3, 51_002, (0, 0))?;
     // Observe each real QUIC client independently: active light attack
     // action 2 must have occurred, but every replicated HP field must
     // remain 100 until >40 server ticks after the accepted attack.
@@ -939,6 +942,9 @@ async fn four_live_quic_players_see_real_out_of_range_fist_miss() -> Result<()> 
             }
         }
     }
+    // Release the held button only AFTER the accepted attack was observed
+    // as actually active and out of reach in all four independent views.
+    send_held_direction(&sessions[0].0, sessions[0].3, 51_002, (0, 0))?;
     for (index, session) in sessions.iter().enumerate() {
         let id = index as u32 + 1;
         send_held_direction(&session.0, session.3, 52_000 + id, (0, 0))?;
@@ -1373,6 +1379,32 @@ async fn four_real_quic_players_observe_kill_and_immutable_greyhaven_respawn() -
     }
     println!("ALPHA_8C_QUIC_NEW_KILL observer=5 sequence=1 killer=1 victim=5");
 
+    // This authenticated newcomer is still Dead. Deliberately submit an
+    // otherwise valid heavy-attack + eastward-movement sample on its OWN
+    // live QUIC session. The server must ACK the input but must neither
+    // execute an attack nor move a Dead actor before its respawn timer.
+    let mut dead_probe = vec![0_u8; INPUT_HEADER_BYTES + INPUT_SAMPLE_BYTES];
+    dead_probe[0] = 1;
+    dead_probe[1] = 1;
+    dead_probe[2] = 1;
+    dead_probe[4..6].copy_from_slice(&(70_850_u32 as u16).to_le_bytes());
+    dead_probe[6..8].copy_from_slice(&dead5.1.to_le_bytes());
+    dead_probe[8..12].copy_from_slice(&70_850_u32.to_le_bytes());
+    dead_probe[12..16].copy_from_slice(&dead5.0.to_le_bytes());
+    dead_probe[17] = 127; // request unauthorized eastward displacement
+    dead_probe[21] = 0b1000; // request unauthorized heavy attack
+    replacement.send_datagram(dead_probe)?;
+    require_quic_input_ack(&replacement, 70_850, 5).await?;
+    let (dead_probe_sequence, dead_probe_tick) =
+        observe_fenced_dead_quic_input(&replacement, 5, dead5.0).await?;
+    send_held_direction_with_server_ack(
+        &replacement,
+        dead_probe_sequence,
+        70_851,
+        dead_probe_tick,
+        (0, 0),
+    )?;
+
     // The killer still occupies x~4174, only 32 units from #5's original
     // 4206 anchor. The real server's fighter separation would push the
     // newly respawned victim by a few units. Clear this physical overlap
@@ -1405,7 +1437,13 @@ async fn four_real_quic_players_observe_kill_and_immutable_greyhaven_respawn() -
         let (_, dead_sequence) = [dead1, dead3, dead4][index];
         send_held_direction(&session.0, dead_sequence, 71_000 + observer, (0, 0))?;
     }
-    send_held_direction(&replacement, dead5.1, 71_005, (0, 0))?;
+    send_held_direction_with_server_ack(
+        &replacement,
+        dead_probe_sequence,
+        71_005,
+        dead_probe_tick,
+        (0, 0),
+    )?;
     let (respawn1, respawn3, respawn4, respawn5) = tokio::try_join!(
         observe_real_quic_respawned_target(&sessions[0].0, 1, 5, dead1.0),
         observe_real_quic_respawned_target(&sessions[1].0, 3, 5, dead3.0),
@@ -1435,6 +1473,82 @@ async fn four_real_quic_players_observe_kill_and_immutable_greyhaven_respawn() -
         "ALPHA_8C_QUIC_KILL_HISTORY_FENCE_PASS old_seq=0 new_seq=1          late_join_id=5 old_replays=0 new_event_fanout=4 respawn_peers=4 live_postrespawn_acks=4"
     );
     Ok(())
+}
+
+/// A valid input ACK alone isn't proof that gameplay accepted a heavy
+/// command. Through a real server-produced delta stream, establish that
+/// this defeated fighter stays Dead, HP=0, and emits NO position change
+/// while 12 new authoritative ticks elapse after the rejected attempt.
+/// The client ACKed the real Dead baseline, so absence of position deltas
+/// means server-owned coordinates stayed put (not a mocked empty feed).
+async fn observe_fenced_dead_quic_input(
+    connection: &wtransport::Connection,
+    victim: u32,
+    death_tick: u32,
+) -> Result<(u16, u32)> {
+    use myaso_server::snapshot::{SNAPSHOT_FIELD_ACTION, SNAPSHOT_FIELD_VITALS};
+
+    let deadline = Instant::now() + Duration::from_secs(3);
+    let mut first_tick = None;
+    let mut last = (0_u16, 0_u32);
+    let mut packets = 0_usize;
+    loop {
+        let remaining = deadline.saturating_duration_since(Instant::now());
+        if remaining.is_zero() {
+            bail!(
+                "dead QUIC input was not observably fenced: victim={victim} packets={packets} first_tick={first_tick:?} last_tick={}",
+                last.1
+            );
+        }
+        let incoming = timeout(remaining, connection.receive_datagram())
+            .await
+            .context("dead-input authoritative snapshot timeout")??;
+        let bytes = incoming.as_ref();
+        if bytes.len() < 14 || bytes[0] != 1 || bytes[1] != 2 {
+            continue;
+        }
+        let snapshot = decode_snapshot(bytes)
+            .map_err(|e| anyhow::anyhow!("dead-input snapshot invalid: {e:?}"))?;
+        if snapshot.server_tick <= death_tick {
+            continue;
+        }
+        if snapshot.server_tick >= death_tick + 60 {
+            bail!(
+                "dead-input fence attempted too late to prove pre-respawn state: death={death_tick}, current={}",
+                snapshot.server_tick
+            );
+        }
+        for record in &snapshot.records {
+            if record.net_id != victim {
+                continue;
+            }
+            if record.mask & SNAPSHOT_FIELD_POSITION != 0 {
+                bail!("server moved a dead player {victim} after valid movement input");
+            }
+            if record.mask & SNAPSHOT_FIELD_VITALS != 0 && record.hp != 0 {
+                bail!(
+                    "server changed dead victim {victim} HP to {} before respawn",
+                    record.hp
+                );
+            }
+            if record.mask & SNAPSHOT_FIELD_ACTION != 0 && record.action != 8 {
+                bail!(
+                    "server executed defeated player {victim} action {}",
+                    record.action
+                );
+            }
+        }
+        let current_tick = snapshot.server_tick;
+        first_tick.get_or_insert(current_tick);
+        last = (snapshot.sequence, current_tick);
+        packets += 1;
+        if current_tick >= first_tick.unwrap() + 12 {
+            println!(
+                "ALPHA_8C_QUIC_DEAD_INPUT_FENCED victim={victim} input_acked=yes blocked_movement=yes blocked_heavy=yes ticks=12"
+            );
+            return Ok(last);
+        }
+    }
 }
 
 /// Match a *new* authenticated attack against actual network-published
@@ -1755,10 +1869,20 @@ async fn observe_quic_target_death_and_respawn(
         }
         if death_tick.is_none() && victim_hp == 0 && victim_action == 8 {
             death_tick = Some(snapshot.server_tick);
-            // Explicitly ACK each observer's authenticated Dead snapshot.
-            // Otherwise the existing delta protocol can legitimately
-            // omit a return to 100HP/Idle identical to its baseline.
-            send_held_direction(connection, snapshot.sequence, 65_000 + observer_id, (0, 0))?;
+            // ACK the real Dead baseline and REQUIRE the server to process
+            // that input packet. A lossy unconfirmed acknowledgment could
+            // leave the server on the pre-death baseline, causing a false
+            // missing-respawn delta because Idle/100HP equals that baseline.
+            // This preserves the original all-four real respawn assertion.
+            let ack_tick = 65_000 + observer_id;
+            send_held_direction_with_server_ack(
+                connection,
+                snapshot.sequence,
+                ack_tick,
+                snapshot.server_tick,
+                (0, 0),
+            )?;
+            require_quic_input_ack(connection, ack_tick, observer_id).await?;
             println!(
                 "ALPHA_8C_QUIC_DEAD observer={observer_id} victim=2 server_tick={}",
                 snapshot.server_tick
