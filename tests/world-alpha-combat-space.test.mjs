@@ -22,14 +22,31 @@ const staticallyClear=(p)=>solids.every(s=>!overlap(p,radius,s));
 const inside=(p,r=radius)=>p.x-r>=area.bounds.min_x&&
  p.x+r<=area.bounds.max_x&&p.y-r>=area.bounds.min_y&&
  p.y+r<=area.bounds.max_y;
-const sweptStaticClear=(from,to)=>{
- const steps=Math.max(1,Math.ceil(Math.hypot(to.x-from.x,to.y-from.y)/4));
- for(let i=0;i<=steps;i++){
-  const t=i/steps,p={x:from.x+(to.x-from.x)*t,y:from.y+(to.y-from.y)*t};
-  if(!staticallyClear(p))return false;
+// Exact segment intersection against a conservative fighter-radius-expanded
+// fixed AABB. Includes tangency and endpoints: never approve a narrow solid
+// merely because it falls between sampled movement points. Square inflation
+// is intentionally stricter at corners than circle-vs-rectangle collision.
+const segmentIntersectsInflatedSolid=(from,to,solid,r=radius)=>{
+ let entry=0,exit=1;
+ for(const [axis,min,max] of [
+  ["x",solid.min_x-r,solid.max_x+r],
+  ["y",solid.min_y-r,solid.max_y+r],
+ ]){
+  const direction=to[axis]-from[axis];
+  if(direction===0){
+   if(from[axis]<min||from[axis]>max)return false;
+   continue;
+  }
+  const tA=(min-from[axis])/direction;
+  const tB=(max-from[axis])/direction;
+  entry=Math.max(entry,Math.min(tA,tB));
+  exit=Math.min(exit,Math.max(tA,tB));
+  if(entry>exit)return false;
  }
- return true;
+ return entry<=exit;
 };
+const sweptStaticClear=(from,to)=>solids.every(s=>
+ !segmentIntersectsInflatedSolid(from,to,s));
 
 test("P0 Blacksmith combat clearing remains in the same authored Greyhaven map",()=>{
  assert.equal(WORLD_ALPHA_COMBAT_SPACE_VERSION,1);
@@ -63,6 +80,20 @@ test("P0 entire combat clearing is outside all 23 fixed solids with fighter-radi
    assert.ok(distanceSquared(a,area.stations[j])>(radius*2)**2,
     "four combat stations must support simultaneous nonoverlapping players");
  }
+});
+
+test("P0 exact swept collision rejects thin between-sample solids and tangent touch",()=>{
+ // From x=0 to x=10 a thin obstacle spans x=1.1..1.2. A legacy 4-unit
+ // sampling scheme misses this obstacle, but exact continuous sweep does not.
+ const thin={min_x:1.1,max_x:1.2,min_y:-0.25,max_y:0.25};
+ const from={x:0,y:0},to={x:10,y:0};
+ assert.equal(segmentIntersectsInflatedSolid(from,to,thin,0),true);
+ assert.equal(segmentIntersectsInflatedSolid(to,from,thin,0),true);
+ assert.equal(segmentIntersectsInflatedSolid(from,to,thin,18),true);
+ assert.equal(segmentIntersectsInflatedSolid({x:0,y:18.25},{x:10,y:18.25},thin,18),true,
+  "inflated AABB tangency is blocked");
+ assert.equal(segmentIntersectsInflatedSolid({x:0,y:18.26},{x:10,y:18.26},thin,18),false);
+ assert.equal(segmentIntersectsInflatedSolid({x:0,y:25},{x:10,y:25},thin,18),false);
 });
 
 test("P0 each of four sword approaches has a fixed-solid-clear route to all four melee stations",()=>{
