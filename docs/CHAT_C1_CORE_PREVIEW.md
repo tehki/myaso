@@ -96,3 +96,7 @@ The separate, additive opt-in PR CI workflow at
 ubuntu-latest with the actual Rust binary, ChromeDriver and three native
 Chrome sessions. It is *not* a production chat feature toggle, does not
 replace Combat quality, and does not prove Firefox/independent-host.
+
+The browser workflow additionally requires a genuine Chrome / Firefox /
+Chrome run using the same script and a fresh real Rust local server; each
+mode must satisfy identical near/far, UTF-8, Escape and gameplay-ACK gates.
