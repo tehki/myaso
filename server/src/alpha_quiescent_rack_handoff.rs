@@ -366,6 +366,89 @@ mod tests {
         );
     }
 
+    /// SCRATCH-ONLY cross-owner regression. Core C3ad's single-checkpoint
+    /// source must inherit Items #637's physical non-expired corpse overlap
+    /// check. A structurally valid and checksum-correct file is insufficient
+    /// to authorize a clean four-rack canonical ID import.
+    #[test]
+    fn actual_death_corpse_overlapping_sword_blocks_offline_canonical_import() {
+        use crate::{
+            loot::{ItemKind, LootError},
+            simulation::Action,
+        };
+        let f = fixture();
+        let mut state = crate::loot_persistence::load_quiescent(&f.checkpoint).unwrap();
+        let (_, x, y) = GREYHAVEN_RACK_V1[1];
+        let mut world = World::new(8192.0, 8192.0);
+        assert!(world.add_player_at(9, x as f32, y as f32, 0.0));
+        state.register(9).unwrap();
+        state.grant(9, ItemKind::Gold, 1).unwrap();
+        let mut dead = world.fighter(9).unwrap().clone();
+        dead.action = Action::Dead;
+        let corpse = state.death(9, &dead, ItemsZoneId::Moonvale, 2).unwrap();
+        assert_eq!(
+            state.corpses()[&corpse].at,
+            Point {
+                x: x as f32,
+                y: y as f32,
+            }
+        );
+        let mut identity = SessionIdentityRegistry::new();
+        let lease = SessionLease::new(9, 1).unwrap();
+        identity
+            .bind_verified(lease, ItemsCharacterId::new(9).unwrap())
+            .unwrap();
+        state.park_inventory(&identity, lease).unwrap();
+        let with_corpse = f.dir.join("live-corpse-overlap.chk");
+        save_quiescent(&with_corpse, &state).unwrap();
+        assert!(matches!(
+            review_offline_quiescent_greyhaven_rack(&with_corpse, &f.imported, mapping(), 3,),
+            Err(OfflineRackReviewError::Checkpoint(
+                CheckpointError::RackProjection(LootError::InvalidState)
+            ))
+        ));
+        // This denial is a valid physical ambiguity, not invalid file bytes.
+        // The same checkpoint can deserialize correctly into LootAuthority.
+        let valid = crate::loot_persistence::load_quiescent(&with_corpse).unwrap();
+        assert_eq!(valid.corpses().len(), 1);
+        assert_eq!(valid.ground().len(), 4);
+        // Real lifecycle: corpse expires after 20 minutes but ground swords
+        // expire after 15. At corpse expiry the original swords are ALSO
+        // gone: reject missing sword instead of resurrecting an old identity.
+        assert!(matches!(
+            review_offline_quiescent_greyhaven_rack(
+                &with_corpse,
+                &f.imported,
+                mapping(),
+                crate::loot::CORPSE_DECAY_MS + 2,
+            ),
+            Err(OfflineRackReviewError::MissingSword { socket: 1 })
+        ));
+        // Separate synthetic expiry-boundary fixture: shorten only this
+        // corpse TTL, retaining all four original ground IDs. This probes
+        // whether the corpse filter is time-scoped; not a natural death TTL.
+        let mut shortened = valid.export_state().unwrap();
+        shortened.corpses.get_mut(&corpse).unwrap().expires_at_ms = 4;
+        let shortened = LootAuthority::restore_state(shortened).unwrap();
+        let shortened_path = f.dir.join("short-lived-corpse-expiry-fixture.chk");
+        save_quiescent(&shortened_path, &shortened).unwrap();
+        let after_synthetic_expiration =
+            review_offline_quiescent_greyhaven_rack(&shortened_path, &f.imported, mapping(), 4)
+                .unwrap();
+        for (i, row) in after_synthetic_expiration
+            .proposed_core_swords
+            .iter()
+            .enumerate()
+        {
+            assert_eq!(
+                row.canonical_item,
+                f.imported.core_item(f.actual_item_ids[i]).unwrap(),
+            );
+        }
+        // This is still only a proposed/replayable OFFLINE mapping, never a
+        // live signature, approved epoch, LOS or item mutation authority.
+    }
+
     #[test]
     fn corrupt_checkpoint_fails_before_source_registry_preflight() {
         let f = fixture();
