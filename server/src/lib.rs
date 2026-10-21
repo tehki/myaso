@@ -3,6 +3,7 @@ use std::sync::{
     Arc,
 };
 
+pub mod corpse_loot_admission;
 pub mod durable_zone_authority;
 pub mod identity;
 pub mod kill_event;
