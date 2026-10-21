@@ -58,3 +58,25 @@ for(const file of reports){
   }
  });
 }
+
+test("P43 low-end X230i Chromium-only proof never claims Firefox/complete two-browser acceptance",()=>{
+ const x=JSON.parse(readFileSync(new URL(prefix+"x230i-chromium-native.json",root),"utf8"));
+ assert.equal(x.noSourceEdits,true);
+ assert.equal(x.onlineGameContextPinned,true);
+ assert.equal(x.gameClientRunning,false);
+ assert.equal(x.completeTwoBrowserMatrix,false);
+ assert.deepEqual(x.browserEngineSelection,["chrome"]);
+ assert.equal(x.runs.length,1);
+ assert.equal(x.runs[0].engine,"chrome");
+ assert.match(x.runs[0].version,/^Chrome\/152\./);
+ assert.deepEqual(x.runs[0].errors,[]);
+ assert.equal(x.runs[0].results.filter(r=>r.phase==="timing").length,16);
+ const zoom=x.runs[0].results.filter(r=>r.phase==="pixel"&&r.zoom===.84);
+ assert.deepEqual(zoom.map(r=>r.name),["opaque-readfrequent","prior-qa-transparent-readfrequent","default-transparent"]);
+ assert.equal(zoom[0].differingBytes,0);
+ assert.ok(zoom[1].differingBytes>1000);
+ assert.ok(zoom[2].differingBytes>1000);
+ const opaque=x.runs[0].results.filter(r=>r.phase==="timing"&&r.name==="shipping-opaque"&&r.zoom===.84);
+ assert.equal(opaque.length,2);
+ assert.ok(opaque.every(r=>r.samples.length===48&&r.warmFrames>0&&Number.isFinite(r.warmTotalMs)));
+});
