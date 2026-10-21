@@ -998,3 +998,24 @@ mod tests {
         assert!(!root.record(2).exists());
     }
 
+    #[cfg(unix)]
+    #[test]
+    fn new_transaction_files_have_owner_only_permissions() {
+        use std::os::unix::fs::PermissionsExt;
+        let root = Root::new();
+        root.open()
+            .apply(
+                txn(1),
+                &[OwnershipOp::Create {
+                    item: item(1),
+                    at: inv(1),
+                }],
+            )
+            .expect("commit");
+        let mode = fs::metadata(root.record(1))
+            .expect("metadata")
+            .permissions()
+            .mode();
+        assert_eq!(mode & 0o777, 0o600);
+    }
+}
