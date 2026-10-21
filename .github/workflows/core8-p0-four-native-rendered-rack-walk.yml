@@ -1,0 +1,46 @@
+name: Core 8 P0 four real rendered Blacksmith walks
+
+on:
+  pull_request:
+    paths:
+      - "scripts/alpha_p0_four_native_rendered_rack_walk.mjs"
+      - "scripts/alpha_p0_rack_walk_math.mjs"
+      - "tests/core8-real-rendered-rack-walk-contract.test.mjs"
+      - "web/online-game.mjs"
+      - ".github/workflows/core8-p0-four-native-rendered-rack-walk.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  four-real-rendered-blacksmith-walk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fail-closed read-only actual fighter preview and original sword socket contract
+        run: |
+          node --check web/online-game.mjs
+          node --check scripts/alpha_p0_four_native_rendered_rack_walk.mjs
+          node --check scripts/alpha_p0_rack_walk_math.mjs
+          node --test tests/core8-real-rendered-rack-walk-contract.test.mjs tests/alpha_p0_rack_walk_math.test.mjs tests/armory-optin-live-rack.test.mjs
+          node scripts/verify-core8c-greyhaven-geometry.mjs
+      - name: Four genuine Chrome and Firefox driver preflight
+        run: |
+          google-chrome --version
+          chromedriver --version
+          firefox --version
+          geckodriver --version
+      - name: Build actual authoritative Rust WebTransport server
+        run: cargo build --locked --manifest-path server/Cargo.toml --bin myaso-server
+      - name: Four real Chrome Firefox browsers render city and rack then walk to four original sword stations
+        run: timeout --signal=TERM --kill-after=5s 265s node scripts/alpha_p0_four_native_rendered_rack_walk.mjs
+      - name: Retain original real rendered browser and rack-arrival screenshots
+        if: always()
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: core8-four-native-rendered-rack-walk-real-source
+          path: alpha-p0-real-greyhaven-armory-preview-evidence/*
+          if-no-files-found: ignore
+          retention-days: 3
