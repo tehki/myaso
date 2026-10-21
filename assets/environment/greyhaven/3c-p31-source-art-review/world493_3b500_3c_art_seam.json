@@ -1,0 +1,127 @@
+{
+  "status": "NON_AUTHORITATIVE_GRAPHICS_QA_ONLY",
+  "pinnedWorldCommit": "07060f981b8a1dac89184b621b6893dd970a08ae",
+  "pinnedGraphics3BCommit": "82b9755891e620b28d53b03cb6b1bfb4c532c1e0",
+  "graphics3CHead": "77c42dca1c69eb3467e3c15763837a98720caac1",
+  "originalAssetHashes": {
+    "rack": {
+      "sha256": "83d0d228785f80e95efd18fa6ef46a77d4ce8500a3fd5cf777d0f1f5ee3917b8",
+      "bytes": 15428
+    },
+    "sword": {
+      "sha256": "795874620d07652e55f5e8a76952d2075f17196fc892eff88d46b165638a3b31",
+      "bytes": 2682
+    }
+  },
+  "worldContractMissing": {
+    "rackOrigin": true,
+    "authoritativeRackVersion": true,
+    "serverZoneId": true
+  },
+  "presentationAdapterOnly": {
+    "source": "World fixture objects mapped id/socketId, worldX/x, worldY/y",
+    "origin": "Arithmetic four-anchor midpoint FOR QA ONLY; NOT World-approved",
+    "zone": "ART QA NOT SERVER ZONE",
+    "version": "ART QA NOT WORLD REVISION"
+  },
+  "sampleCamera": {
+    "x": 3800,
+    "y": 4050
+  },
+  "screen": {
+    "width": 1100,
+    "height": 688,
+    "zoom": 0.84
+  },
+  "projected": [
+    {
+      "socketId": "greyhaven-rack-1",
+      "worldAnchor": {
+        "x": 3740,
+        "y": 4038
+      },
+      "screenAnchor": {
+        "x": 499.6,
+        "y": 333.92
+      },
+      "theoreticalSwordSpriteBounds": {
+        "x": 478.6,
+        "y": 218.92000000000002,
+        "width": 42,
+        "height": 115
+      }
+    },
+    {
+      "socketId": "greyhaven-rack-2",
+      "worldAnchor": {
+        "x": 3780,
+        "y": 4038
+      },
+      "screenAnchor": {
+        "x": 533.2,
+        "y": 333.92
+      },
+      "theoreticalSwordSpriteBounds": {
+        "x": 512.2,
+        "y": 218.92000000000002,
+        "width": 42,
+        "height": 115
+      }
+    },
+    {
+      "socketId": "greyhaven-rack-3",
+      "worldAnchor": {
+        "x": 3820,
+        "y": 4038
+      },
+      "screenAnchor": {
+        "x": 566.8,
+        "y": 333.92
+      },
+      "theoreticalSwordSpriteBounds": {
+        "x": 545.8,
+        "y": 218.92000000000002,
+        "width": 42,
+        "height": 115
+      }
+    },
+    {
+      "socketId": "greyhaven-rack-4",
+      "worldAnchor": {
+        "x": 3860,
+        "y": 4038
+      },
+      "screenAnchor": {
+        "x": 600.4,
+        "y": 333.92
+      },
+      "theoreticalSwordSpriteBounds": {
+        "x": 579.4,
+        "y": 218.92000000000002,
+        "width": 42,
+        "height": 115
+      }
+    }
+  ],
+  "swordSourcePixels": {
+    "w": 42,
+    "h": 115
+  },
+  "adjacentSwordScreenSpacingPx": 33.60000000000002,
+  "adjacentTransparentRectangleOverlapPx": 8.399999999999977,
+  "alphaActualOverlapPixels": "MUST MEASURE FROM ACTUAL SOURCE IMAGE; NOT DERIVED FROM BOUNDING BOX",
+  "zeroAuthoritativeCommittedItemsPlan": {
+    "rackVisibleAsStaticArt": true,
+    "swordCount": 0,
+    "alphaHitReturnsNull": true,
+    "mayApprovePickup": false
+  },
+  "graphics3CBlacksmithFixture": {
+    "x": 3801,
+    "y": 4007
+  },
+  "finalGamePickValidated": false,
+  "actualItemsRendered": false,
+  "actualServerPickupValidated": false,
+  "integrationGate": "BLOCKED until World/Core supply authoritative rack origin/zone/revision & Core/Items snapshots; UI chooses true sword alpha with real browser"
+}

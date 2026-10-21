@@ -1,0 +1,62 @@
+{
+  "status": "ART_SOURCE_ALPHA_SPACING_PASS_ONLY",
+  "sourceWebpSha256": "795874620d07652e55f5e8a76952d2075f17196fc892eff88d46b165638a3b31",
+  "sourceSize": [
+    42,
+    115
+  ],
+  "hitThresholdAlpha": 64,
+  "opaqueBoundingBoxSource": [
+    7,
+    11,
+    35,
+    109
+  ],
+  "countOpaqueSourcePixels": 1007,
+  "adjacentPairs": [
+    {
+      "anchorGapPx": 33.60000000000002,
+      "overlappingRectWidthPx": 8.399999999999977,
+      "testPixelOffsets": [
+        33,
+        34
+      ],
+      "ambiguousOpaquePixels": {
+        "33": 0,
+        "34": 0
+      }
+    },
+    {
+      "anchorGapPx": 33.59999999999991,
+      "overlappingRectWidthPx": 8.400000000000091,
+      "testPixelOffsets": [
+        33,
+        34
+      ],
+      "ambiguousOpaquePixels": {
+        "33": 0,
+        "34": 0
+      }
+    },
+    {
+      "anchorGapPx": 33.60000000000002,
+      "overlappingRectWidthPx": 8.399999999999977,
+      "testPixelOffsets": [
+        33,
+        34
+      ],
+      "ambiguousOpaquePixels": {
+        "33": 0,
+        "34": 0
+      }
+    }
+  ],
+  "doesNotProve": [
+    "actual painter depth/occlusion",
+    "real canvas click",
+    "authoritative ItemId",
+    "server pickup",
+    "Chrome+Firefox gameplay"
+  ],
+  "integrationReady": false
+}
