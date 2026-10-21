@@ -1732,6 +1732,185 @@ mod tests {
     }
 
     #[test]
+    fn four_greyhaven_rack_views_select_and_equip_only_each_own_physical_sword() {
+        use crate::loot::{GroundDrop, Point, GROUND_DECAY_MS};
+        use crate::magic_checkpoint::load_joint;
+        use std::collections::BTreeSet;
+
+        // World #493-authored ground positions (units) and four legal approach
+        // stands. The seeded source is test-only; Core must mint the live
+        // canonical u128 item IDs and authorize real rack spawns.
+        let xs = [3740.0_f32, 3780.0, 3820.0, 3860.0];
+        let mut world = World::new(8192.0, 8192.0);
+        let mut zones = ZoneAuthority::new();
+        let mut identity = SessionIdentityRegistry::new();
+        let mut loot = LootAuthority::new();
+        for (offset, x) in xs.iter().enumerate() {
+            let actor = (offset + 1) as u32;
+            assert!(world.add_player_at(actor, *x, 4088.0, 0.0));
+            zones.register(actor).unwrap();
+            identity
+                .bind_verified(lease(actor), CharacterId::new(u64::from(actor)).unwrap())
+                .unwrap();
+            loot.register(actor).unwrap();
+        }
+
+        let mut snapshot = loot.export_state().unwrap();
+        snapshot.next_id = 2000;
+        for (offset, x) in xs.iter().enumerate() {
+            let physical_item = 1101 + offset as u64;
+            let ground_entity = 1201 + offset as u64;
+            assert!(snapshot
+                .ground
+                .insert(
+                    ground_entity,
+                    GroundDrop {
+                        entity_id: ground_entity,
+                        zone: ZoneId::Moonvale,
+                        at: Point { x: *x, y: 4038.0 },
+                        expires_at_ms: GROUND_DECAY_MS,
+                        item: ItemStack {
+                            id: physical_item,
+                            kind: if offset % 2 == 0 {
+                                ItemKind::RustySword
+                            } else {
+                                ItemKind::IronSword
+                            },
+                            amount: 1,
+                        },
+                    },
+                )
+                .is_none());
+        }
+        loot = LootAuthority::restore_state(snapshot).unwrap();
+        let magic = MagicAuthority::new();
+        let path = checkpoint_path();
+
+        // Every fighter can visually see all four sword world entities, but
+        // their actionable selector is uniquely the sword directly above
+        // their approach stand, exactly 50 world units away. Neighbor sword
+        // distance sqrt(40^2+50^2)=64.03 is outside the 56-unit pickup bound.
+        for actor in 1_u32..=4 {
+            let visible = loot
+                .visible_loot(actor, world.fighter(actor).unwrap(), ZoneId::Moonvale, 0)
+                .unwrap();
+            assert_eq!(visible.len(), 4);
+            let eligible = inspect_verified_ground_sword_targets(
+                &loot,
+                &identity,
+                PickupWorldTick {
+                    world: &world,
+                    completed_tick: world.tick,
+                    zones: &zones,
+                },
+                lease(actor),
+            )
+            .unwrap();
+            assert_eq!(eligible.len(), 1);
+            assert_eq!(
+                eligible[0].selection.ground_entity_id,
+                1200 + u64::from(actor)
+            );
+            assert_eq!(
+                eligible[0].selection.expected_item_id,
+                1100 + u64::from(actor)
+            );
+            assert_eq!(eligible[0].at.y, 4038.0);
+        }
+
+        // Arbitrary request order cannot alter which physical sword is owned:
+        // each separately verified actor selects precisely one matching rack
+        // entity and transfers it to MainHand using the same exact selection.
+        for actor in [4_u32, 2, 1, 3] {
+            let candidates = inspect_verified_ground_sword_targets(
+                &loot,
+                &identity,
+                PickupWorldTick {
+                    world: &world,
+                    completed_tick: world.tick,
+                    zones: &zones,
+                },
+                lease(actor),
+            )
+            .unwrap();
+            assert_eq!(candidates.len(), 1);
+            let sword = commit_verified_ground_sword_equip_checked(
+                GroundSwordAuthority {
+                    path: &path,
+                    loot: &mut loot,
+                    magic: &magic,
+                    identity: &identity,
+                    tick: PickupWorldTick {
+                        world: &world,
+                        completed_tick: world.tick,
+                        zones: &zones,
+                    },
+                    operation: VerifiedLootOperation {
+                        lease: lease(actor),
+                        sequence: 1,
+                    },
+                },
+                candidates[0].selection,
+                |fighter, ground, zone| {
+                    // Input provenance only. This is not the current complete
+                    // Core 8C / Physics #494 LOS + epoch proof.
+                    assert_eq!(fighter.net_id, actor);
+                    assert_eq!(ground.zone, zone);
+                    assert_eq!(fighter.x, ground.at.x);
+                    assert_eq!(fighter.y - ground.at.y, 50.0);
+                    assert_eq!(ground.item.id, 1100 + u64::from(actor));
+                    Ok(())
+                },
+            )
+            .unwrap();
+            assert_eq!(sword.id, 1100 + u64::from(actor));
+            assert!(
+                inspect_verified_ground_sword_targets(
+                    &loot,
+                    &identity,
+                    PickupWorldTick {
+                        world: &world,
+                        completed_tick: world.tick,
+                        zones: &zones
+                    },
+                    lease(actor)
+                )
+                .unwrap()
+                .is_empty(),
+                "armed actor must not have another pickup target"
+            );
+            assert_eq!(
+                loot.inventory(actor)
+                    .unwrap()
+                    .equipped(EquipmentSlot::MainHand)
+                    .unwrap()
+                    .id,
+                sword.id
+            );
+            assert_eq!(
+                loot.committed_operation_sequence(CharacterId::new(u64::from(actor)).unwrap()),
+                Some(1)
+            );
+        }
+        assert!(loot.ground().is_empty());
+
+        let (recovered, _) = load_joint(&path).unwrap();
+        assert!(recovered.ground().is_empty());
+        let mut physical_owners = BTreeSet::new();
+        for actor in 1_u32..=4 {
+            let character = CharacterId::new(u64::from(actor)).unwrap();
+            let inventory = recovered.parked_inventory(character).unwrap();
+            assert!(inventory.backpack().is_empty());
+            let item = inventory.equipped(EquipmentSlot::MainHand).unwrap();
+            assert_eq!(item.id, 1100 + u64::from(actor));
+            assert!(physical_owners.insert(item.id));
+            assert_eq!(recovered.committed_operation_sequence(character), Some(1));
+        }
+        assert_eq!(physical_owners, BTreeSet::from([1101, 1102, 1103, 1104]));
+        let _ = fs::remove_file(path);
+    }
+
+    #[test]
     fn world_p0_greyhaven_four_distinct_sockets_accept_real_ground_item_positions() {
         use crate::loot::{GroundDrop, Point, PICKUP_REACH};
         use crate::magic_checkpoint::load_joint;
