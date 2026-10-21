@@ -66,6 +66,7 @@ const local=new Set([
  "src/browser/armory-world493-visual-bridge.mjs","src/browser/armory-rack-visual.mjs",
  "src/browser/armory-sword-alpha-sampler.mjs",
  "src/browser/armory-rack-presented-frame.mjs",
+ "src/browser/armory-current-rack-visual-stream.mjs",
  "src/browser/arena-viewport.mjs",
  "assets/environment/greyhaven/armory-p0/armory_rack.webp",
  "assets/environment/greyhaven/armory-p0/armory_sword.webp"
@@ -245,7 +246,79 @@ try{
    assert.equal(afterAll.combatFallback,1);
    assert.equal(afterAll.cancelled,3);
    assert.deepEqual(errors,[]);
+   // Core8B #577 proposes a READ-ONLY local journal slot candidate view.
+   // Fixture is deliberately ART-ONLY-NO-SERVER, NOT an authenticated
+   // Core network message or actual journal reader. Exercise 4→3→0→4
+   // through the original World, Blender painter and hardened UI gesture.
+   const proposedSnapshot=(sequence,present=[0,1,2,3],mutation="1")=>({
+    scopeKey:"ART-ONLY-LOCAL-JOURNAL-FIXTURE",journalSequence:String(sequence),
+    slots:[0,1,2,3].map(i=>present.includes(i)?{
+      socketId:"greyhaven-rack-"+(i+1),
+      itemId:"ART-ONLY-NO-SERVER-"+i,
+      groundEntityId:"ART-ONLY-NO-GROUND-"+i,
+      itemMutationSequence:String(mutation)
+    }:null)
+   });
+   const sequenceSteps=[],journalScreenshots=[];
+   async function displayJournal(sequence,present,mutation,suffix){
+    const candidate=proposedSnapshot(sequence,present,mutation);
+    const result=await page.evaluate(x=>window.__p0RackSequenceApply(x),candidate);
+    const scene=await page.evaluate(()=>window.__p0WorldUiReview());
+    sequenceSteps.push({sequence:String(sequence),status:result.status,
+      visibleIds:result.visibleIds,frameId:result.frameId,
+      displayedCount:scene.drawnSwordCount,journal:scene.proposedJournalSequence,
+      serverDataConnected:false});
+    assert.equal(result.status,"accepted");
+    assert.equal(scene.swordCount,present.length);
+    assert.equal(scene.drawnSwordCount,present.length);
+    assert.equal(scene.proposedJournalSequence,String(sequence));
+    assert.equal(scene.serverAuthenticatedItems,false);
+    if(suffix){
+     const file="armory_current_"+(consolidatedWorld?"world521":"world493")+"_"+engine+"_"+suffix+".png";
+     await page.screenshot({path:join(out,file),fullPage:true});
+     journalScreenshots.push(file);
+    }
+    return scene;
+   }
+   const proposalFour=await displayJournal(1,[0,1,2,3],"1","four");
+   const target=proposalFour.swordRects.find(s=>s.id==="ART-ONLY-NO-SERVER-0");
+   const rect=await page.$eval("#scene",el=>{
+    const b=el.getBoundingClientRect();return{x:b.x,y:b.y,width:b.width,height:b.height};
+   });
+   const hit=clientPoint(target,stableHit.x,stableHit.y,rect);
+   await page.mouse.move(hit.x,hit.y);await page.mouse.down();
+   const proposalThree=await displayJournal(2,[1,2,3],"1","three");
+   await page.mouse.up();
+   const postReserved=await page.evaluate(()=>window.__p0WorldUiReview());
+   assert.equal(postReserved.cancelled,afterAll.cancelled+1);
+   assert.equal(postReserved.combatFallback,afterAll.combatFallback);
+   assert.equal(postReserved.visualIntents.length,afterAll.visualIntents.length);
+   assert.equal(proposalThree.visibleIds.includes("ART-ONLY-NO-SERVER-0"),false);
+   const stale=await page.evaluate(x=>window.__p0RackSequenceApply(x),
+     proposedSnapshot(1,[0,1,2,3],"1"));
+   assert.equal(stale.status,"stale");
+   assert.equal(stale.frameId,postReserved.frameId);
+   assert.deepEqual(stale.visibleIds,postReserved.visibleIds);
+   const proposalEmpty=await displayJournal(3,[],"1","empty");
+   assert.equal(proposalEmpty.drawnRackCount,1);
+   await page.mouse.click(hit.x,hit.y);
+   const afterEmpty=await page.evaluate(()=>window.__p0WorldUiReview());
+   assert.equal(afterEmpty.visualIntents.length,afterAll.visualIntents.length);
+   assert.equal(afterEmpty.combatFallback,afterAll.combatFallback+1);
+   const proposalRestore=await displayJournal(4,[0,1,2,3],"4","return");
+   assert.equal(proposalRestore.swordRects.find(s=>s.id===target.id).revision,4);
+   await page.mouse.click(hit.x,hit.y);
+   const afterRestore=await page.evaluate(()=>window.__p0WorldUiReview());
+   assert.equal(afterRestore.visualIntents.length,afterAll.visualIntents.length+1);
+   assert.equal(afterRestore.visualIntents.at(-1),"ART-ONLY-NO-SERVER-0");
+   assert.equal(afterRestore.actualServerEvents,0);
+   assert.deepEqual(errors,[]);
    results.push({engine,version:await browser.version(),errors,maskOverlap,stableHit,allSwordClicks,
+     proposedJournalVisualTimeline:sequenceSteps,
+     proposedJournalStaleRejection:{status:stale.status,frameId:stale.frameId},
+     journalScreenshots,postReserved,afterEmpty,afterRestore,
+     actualCore577ReaderInvoked:false,
+     actualCanonicalItemNetworkPackets:0,
      world521BuildingPresentationCheck:consolidatedWorld?await page.evaluate(async()=>{
        const {createAuthoredWorldRenderer}=await import("/__world493__/src/browser/authored-world-renderer.mjs");
        const {MAP_IDS}=await import("/__world493__/src/world/authored-maps.mjs");
