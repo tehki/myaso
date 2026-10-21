@@ -425,6 +425,118 @@ mod tests {
     }
 
     #[test]
+    fn world_p0_four_rack_stands_can_reach_only_their_own_sword_at_64() {
+        // World #493 / #502 candidate. A 64-unit server reach admits a 50-unit
+        // own-socket ray but rejects a neighbor: sqrt(40^2 + 50^2) > 64.
+        // The 96-unit API cap is NOT the selected gameplay reach.
+        let smith = SolidRect {
+            min_x: 3710.0,
+            min_y: 3850.0,
+            max_x: 3892.0,
+            max_y: 4012.0,
+        };
+        let bounds = SolidRect {
+            min_x: 3650.0,
+            min_y: 3800.0,
+            max_x: 4000.0,
+            max_y: 4200.0,
+        };
+        let fixture = GeometryWindow {
+            fence: CURRENT,
+            complete: true,
+            bounds,
+            solids: &[smith],
+        };
+        let xs = [3740.0, 3780.0, 3820.0, 3860.0];
+        for (i, stand_x) in xs.iter().copied().enumerate() {
+            let stand = WorldPoint {
+                zone_id: CURRENT.zone_id,
+                x: stand_x,
+                y: 4088.0,
+            };
+            for (j, sword_x) in xs.iter().copied().enumerate() {
+                let sword = WorldPoint {
+                    zone_id: CURRENT.zone_id,
+                    x: sword_x,
+                    y: 4038.0,
+                };
+                assert_eq!(
+                    verify_pickup_geometry(stand, sword, &fixture, CURRENT, 64.0),
+                    if i == j {
+                        Ok(())
+                    } else {
+                        Err(PickupGeometryReject::OutOfRange)
+                    },
+                    "a rack stand must not geometrically authorize its neighboring sword"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn world_p0_greyhaven_west_gate_remains_open_without_phasing_through_wall() {
+        // Two exact authored wall spans from World #502 (static design).
+        // This is NOT a complete authoritative city/river/dynamic manifest.
+        let north = SolidRect {
+            min_x: 3501.5,
+            min_y: 3441.5,
+            max_x: 3538.5,
+            max_y: 4112.0,
+        };
+        let south = SolidRect {
+            min_x: 3501.5,
+            min_y: 4248.0,
+            max_x: 3538.5,
+            max_y: 4768.5,
+        };
+        let fixture = GeometryWindow {
+            fence: CURRENT,
+            complete: true,
+            bounds: SolidRect {
+                min_x: 3400.0,
+                min_y: 3900.0,
+                max_x: 3650.0,
+                max_y: 4400.0,
+            },
+            solids: &[north, south],
+        };
+        let origin = WorldPoint {
+            zone_id: CURRENT.zone_id,
+            x: 3480.0,
+            y: 4180.0,
+        };
+        let destination = WorldPoint {
+            zone_id: CURRENT.zone_id,
+            x: 3560.0,
+            y: 4180.0,
+        };
+        assert_eq!(
+            verify_pickup_geometry(origin, destination, &fixture, CURRENT, 96.0),
+            Ok(()),
+            "do not fill the real west city-gate gap with an opaque wall"
+        );
+        let closed_origin = WorldPoint {
+            y: 4000.0,
+            ..origin
+        };
+        let closed_destination = WorldPoint {
+            y: 4000.0,
+            ..destination
+        };
+        assert_eq!(
+            verify_pickup_geometry(
+                closed_origin,
+                closed_destination,
+                &fixture,
+                CURRENT,
+                96.0,
+            ),
+            Err(PickupGeometryReject::Occluded),
+            "the solid wall beside the gate must block pickup line of sight"
+        );
+    }
+
+    #[test]
     fn legacy_zone_zero_and_new_world_revision_zero_are_supported() {
         let legacy = GeometryFence {
             zone_id: 0,
