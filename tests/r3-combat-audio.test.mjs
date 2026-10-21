@@ -153,3 +153,51 @@ test("R3 shared audio is wired to both runtimes without delaying light attacks",
   assert.match(online, /remoteActionAudio\.observe/);
   assert.match(online, /soundForCombatFeedback\(feedback\)/);
 });
+
+test("Sound A1 first-playable remote cues reset on disconnect and player identity changes", () => {
+  const tracker = createRemoteActionAudioTracker({ hearingRadius: 120 });
+  const events = [];
+  const emit = (cue, options) => events.push({ cue, ...options });
+  const fighter = (netId, x, y, action) => ({ netId, x, y, action });
+  const snapshot = (ownId, ...fighters) =>
+    tracker.observe(new Map(fighters.map(f => [f.netId, f])), ownId, emit);
+
+  const own = fighter(1, 0, 0, 0);
+  const right = (action, x = 30) => fighter(2, x, 0, action);
+  const left = (action, x = -40) => fighter(3, x, 0, action);
+
+  // First authoritative view seeds actions, it never replays existing combat.
+  snapshot(1, own, right(0), left(0));
+  assert.equal(events.length, 0);
+  snapshot(1, own, right(1), left(9));
+  assert.deepEqual(events.map(e => e.cue), ["light", "heavy"]);
+  assert.ok(events[0].pan > 0 && events[1].pan < 0, "remote right/left pan must be distinct");
+  assert.ok(events.every(e => e.level > 0 && e.level <= .65));
+
+  snapshot(1, own, right(1), left(9)); // Duplicate/reordered action state.
+  assert.equal(events.length, 2, "repeated authoritative actions must not double-play");
+  snapshot(1, own, right(3), left(3)); // Recovery is not an onset.
+  snapshot(1, own, right(12, 120), left(4, -130));
+  assert.equal(events.length, 2, "fighters on or beyond hearing radius are inaudible");
+
+  // Missing own fighter is a session gap: invalidate all remembered actions.
+  snapshot(1, right(1), left(9));
+  snapshot(1, own, right(1), left(9));
+  assert.equal(events.length, 2, "first post-gap snapshot must be silent");
+  snapshot(1, own, right(3), left(3));
+  snapshot(1, own, right(12), left(15));
+  assert.deepEqual(events.slice(2).map(e => e.cue), ["kick", "jump"]);
+
+  // New own net ID can reuse an old remote ID; seed instead of hallucinating an onset.
+  snapshot(2, fighter(2, 0, 0, 0), fighter(1, -30, 0, 1));
+  assert.equal(events.length, 4);
+  snapshot(2, fighter(2, 0, 0, 0), fighter(1, -30, 0, 3));
+  snapshot(2, fighter(2, 0, 0, 0), fighter(1, -30, 0, 12));
+  assert.equal(events.at(-1).cue, "kick");
+  assert.ok(events.at(-1).pan < 0);
+
+  tracker.reset();
+  const before = events.length;
+  snapshot(2, fighter(2, 0, 0, 0), fighter(1, -30, 0, 9));
+  assert.equal(events.length, before, "explicit session reset must seed without playback");
+});
