@@ -1,0 +1,34 @@
+name: UI Pre-Alpha 0.1 four native Silver Knights (NONRELEASE)
+
+on:
+  pull_request:
+    paths:
+      - "scripts/ui_prealpha_four_native_silver.mjs"
+      - ".github/workflows/ui-prealpha-silver-four-native.yml"
+      - "web/knight-sprites.mjs"
+      - "web/online-game.mjs"
+      - "web/assets/knights/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  native-four-silver-authenticated:
+    runs-on: ubuntu-latest
+    timeout-minutes: 17
+    steps:
+      - name: Checkout candidate commit
+        uses: actions/checkout@v4
+      - name: Verify original Silver source and WebDriver runtime
+        run: |
+          node --check scripts/ui_prealpha_four_native_silver.mjs
+          node --test tests/prealpha-silver-knight.test.mjs
+          google-chrome --version
+          firefox --version
+          chromedriver --version
+          geckodriver --version
+      - name: Build real authoritative Combat Rust server
+        run: cargo build --locked --manifest-path server/Cargo.toml --bin myaso-server
+      - name: Four actual Silver Knights in native Chrome Firefox
+        run: timeout --signal=TERM --kill-after=5s 180s node scripts/ui_prealpha_four_native_silver.mjs
