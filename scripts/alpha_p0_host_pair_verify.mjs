@@ -20,6 +20,21 @@ function checkOne(e,role){
     ||e.twoNativeIndependentW3cClients!==true||e.authenticatedRemoteQuic!==true
     ||e.crossHostMovementSeenByChromeAndFirefox!==true)fail(role+" invalid flight marker");
   if(!Array.isArray(e.clientFamilies)||ids(e.clientFamilies)!=="chrome,firefox")fail(role+" wrong real browser families");
+  // The JSON report alone cannot attest pixels or operating-system identity;
+  // an operator must compare these SHA-256 digests to actual local PNG files.
+  if(!Array.isArray(e.screenshots)||e.screenshots.length!==2
+    ||e.screenshots.some((p,i)=>
+      p.family!==["chrome","firefox"][i]
+      ||p.relativeFile!==`alpha-p0-hostpair-evidence/pair-${role.toLowerCase()}-${p.family}.png`
+      ||!Number.isSafeInteger(p.bytes)||p.bytes<=256
+      ||!(/^[a-f0-9]{64}$/.test(p.sha256||""))
+      ||!Number.isSafeInteger(p.driverPid)||p.driverPid<=0
+      ||!(/^[a-z0-9-]{16,80}$/i.test(p.w3cSessionId||""))))
+    fail(role+" missing genuine browser screenshot/process references");
+  if(e.screenshots[0].w3cSessionId===e.screenshots[1].w3cSessionId
+    ||e.screenshots[0].driverPid===e.screenshots[1].driverPid
+    ||e.screenshots[0].sha256===e.screenshots[1].sha256)
+    fail(role+" duplicate WebDriver/process/screenshots");
   if(!Array.isArray(e.localIds)||e.localIds.length!==2
     ||new Set(e.localIds).size!==2||!e.localIds.every(x=>Number.isSafeInteger(x)&&x>0))fail(role+" bad local identities");
   if(!Array.isArray(e.allIds)||e.allIds.length!==4||new Set(e.allIds).size!==4)fail(role+" no four fighters");
