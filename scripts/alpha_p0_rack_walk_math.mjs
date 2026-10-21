@@ -10,9 +10,9 @@ export function nextNativeWalkPulse(from,to){
   const holdMs=Math.max(75,Math.min(550,Math.round(Math.abs(delta)*2.4)));
   return Object.freeze({done:false,key:delta<0?"negative":"positive",holdMs,distance:Math.abs(delta)});
 }
-export function nativeRackArrived(current,target,tolerance=14){
+export function nativeRackArrived(current,target,tolerance=18){
   return !!current&&!!target&&Number.isFinite(current.x)&&Number.isFinite(current.y)
     &&Number.isFinite(target.x)&&Number.isFinite(target.y)
-    &&Number.isFinite(tolerance)&&tolerance>=0&&tolerance<=14
+    &&Number.isFinite(tolerance)&&tolerance>=0&&tolerance<=18
     &&Math.hypot(current.x-target.x,current.y-target.y)<=tolerance;
 }
