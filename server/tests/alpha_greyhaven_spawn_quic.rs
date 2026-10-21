@@ -1394,7 +1394,7 @@ async fn four_real_quic_players_observe_kill_and_immutable_greyhaven_respawn() -
     dead_probe[17] = 127; // request unauthorized eastward displacement
     dead_probe[19..21].copy_from_slice(&32768_u16.to_le_bytes()); // WEST toward living #1
     dead_probe[21] = 0b1000; // request unauthorized heavy attack
-    replacement.send_datagram(dead_probe)?;
+    replacement.send_datagram(dead_probe.clone())?;
     require_quic_input_ack(&replacement, 70_850, 5).await?;
     // Every actual peer must verify that the attempted WEST-facing heavy
     // cannot hurt living #1 at <130 world units. This is a real in-range
@@ -1504,6 +1504,23 @@ async fn four_real_quic_players_observe_kill_and_immutable_greyhaven_respawn() -
     send_held_direction_with_server_ack(&replacement, move5.1, 73_006, move5.2, (0, 0))?;
     require_quic_input_ack(&replacement, 73_006, 5).await?;
 
+    // Re-send the EXACT same original authenticated attack+move bytes
+    // previously received while fighter #5 was Dead. A delayed/replayed
+    // client packet must never become a newly executable heavy strike
+    // merely because that same session has now respawned and is alive.
+    // Do NOT assert a new input ACK: duplicate ingress is supposed to
+    // ignore this exact old sample, and a new ACK would be misleading.
+    replacement.send_datagram(dead_probe)?;
+    let (replay1, replay3, replay4, replay5) = tokio::try_join!(
+        observe_no_stale_dead_attack_reexecution(&sessions[0].0, 1, move1.2),
+        observe_no_stale_dead_attack_reexecution(&sessions[1].0, 3, move3.2),
+        observe_no_stale_dead_attack_reexecution(&sessions[2].0, 4, move4.2),
+        observe_no_stale_dead_attack_reexecution(&replacement, 5, move5.2),
+    )?;
+    println!(
+        "ALPHA_8C_REPLAYED_DEAD_HEAVY_FENCED peer_ticks={replay1},{replay3},{replay4},{replay5} witnesses=4 victim1_hp=100"
+    );
+
     // The original Dead-state abuse test tried a heavy attack from #5,
     // which the server must ignore while Dead. Prove the complement:
     // the SAME authentic net ID #5, on the SAME QUIC connection, may now
@@ -1542,6 +1559,65 @@ async fn four_real_quic_players_observe_kill_and_immutable_greyhaven_respawn() -
         "ALPHA_8C_QUIC_KILL_HISTORY_FENCE_PASS old_seq=0 new_seq=1          late_join_id=5 old_replays=0 new_event_fanout=4 respawn_peers=4 live_postrespawn_acks=4 reborn_movement_peers=4 reborn_heavy_hit_witnesses=4"
     );
     Ok(())
+}
+
+/// Negative control: exact replay of the previously server-ACKed
+/// Dead-phase heavy+move datagram must never execute after the same
+/// authenticated player has genuinely respawned and regained control.
+/// Witness 28 real ticks (>unchanged heavy windup) independently on
+/// all four original QUIC connections, rejecting action or damage.
+async fn observe_no_stale_dead_attack_reexecution(
+    connection: &wtransport::Connection,
+    observer: u32,
+    after_movement_tick: u32,
+) -> Result<u32> {
+    use myaso_server::snapshot::{SNAPSHOT_FIELD_ACTION, SNAPSHOT_FIELD_VITALS};
+    let deadline = Instant::now() + Duration::from_secs(3);
+    let mut first_tick = None;
+    let mut packets = 0_usize;
+    loop {
+        let remaining = deadline.saturating_duration_since(Instant::now());
+        if remaining.is_zero() {
+            bail!("observer {observer} never completed a 28-tick revived replay fence: packets={packets}");
+        }
+        let incoming = timeout(remaining, connection.receive_datagram())
+            .await
+            .context("revived old-input replay snapshot timeout")??;
+        let bytes = incoming.as_ref();
+        if bytes.len() < 14 || bytes[0] != 1 || bytes[1] != 2 {
+            continue;
+        }
+        let snapshot = decode_snapshot(bytes)
+            .map_err(|e| anyhow::anyhow!("revived old-input replay snapshot invalid: {e:?}"))?;
+        if snapshot.server_tick <= after_movement_tick {
+            continue;
+        }
+        packets += 1;
+        for record in &snapshot.records {
+            if record.net_id == 1 && record.mask & SNAPSHOT_FIELD_VITALS != 0 && record.hp != 100 {
+                bail!(
+                    "observer {observer} saw replayed stale Dead attack hurt living #1: hp={}",
+                    record.hp
+                );
+            }
+            if record.net_id == 5 {
+                if record.mask & SNAPSHOT_FIELD_VITALS != 0 && record.hp != 100 {
+                    bail!("observer {observer} saw revived #5 HP !=100 during stale-input replay");
+                }
+                if record.mask & SNAPSHOT_FIELD_ACTION != 0 && [9, 10, 11].contains(&record.action)
+                {
+                    bail!("observer {observer} saw old Dead heavy execute after #5 respawn");
+                }
+            }
+        }
+        first_tick.get_or_insert(snapshot.server_tick);
+        if snapshot.server_tick >= first_tick.unwrap() + 28 {
+            println!(
+                "ALPHA_8C_REPLAYED_DEAD_HEAVY_DENIED observer={observer} alive=5 victim=1 hp=100 ticks=28"
+            );
+            return Ok(snapshot.server_tick);
+        }
+    }
 }
 
 /// The positive complement to the Dead actor's rejected heavy request.

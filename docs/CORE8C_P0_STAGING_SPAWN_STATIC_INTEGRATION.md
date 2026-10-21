@@ -654,6 +654,48 @@ The test is still only a loopback real-QUIC network acceptance;
 it does not validate real native-browser controls on two hosts,
 persistent accounts, equipped swords, or full dynamic World/Physics.
 
+## Core 8C — predeath QUIC attack replay must not execute after respawn
+
+This test-only descendant of the four-peer genuine in-range Dead-state
+damage fence adds a **real network-ingress replay regression**: a client
+that was legitimately admitted and then defeated must not be able to
+resurrect an attack recorded *while Dead* by replaying the exact old
+datagram after its server-controlled respawn.
+
+During its genuine second death, original net ID #5 submits a normal,
+authenticated, west-facing heavy-attack plus eastward movement INPUT
+with its actual Dead snapshot and authoritative server tick ACK. The
+server individually acknowledges that valid transport packet. All four
+current independently certificate-pinned QUIC clients verify that the
+attack cannot hurt nearby living fighter #1 (100HP) and #5 remains Dead.
+
+After real timed respawn (100HP/Idle at exactly 4206,4160), all four
+sessions see #5 resume normal movement at x>=4230 and all four still
+receive server input ACKs. The *identical saved original INPUT bytes*
+(previous sequence, sample tick, facing and buttons, not a newly minted
+action) are then sent again over the *same* authenticated #5 QUIC
+connection. The test intentionally does not expect a new input ACK
+for replayed/deduplicated input. Each of the four original independent
+network clients must observe **28 more authoritative simulation ticks**
+after postrespawn movement without a new committed heavy action for #5,
+without damage to fighter #1 (remains 100HP), and with #5 remaining
+alive at 100HP. A dropped/no-snapshot shortcut cannot satisfy the
+real server tick progression check; one unexpected committed heavy
+or #1 HP delta fails the test.
+
+Finally the original #5 connection sends a **fresh** valid west-facing
+heavy attack with a new sample tick and genuine latest server
+acknowledgment. All four independent clients must then witness the
+existing server's committed heavy-action state and exactly 46HP
+damage to #1 (100→54HP), preserving the positive proof that normal
+postrespawn combat was not accidentally disabled. This pair proves
+duplicate/replayed Dead-phase inputs do not become live actions,
+while fresh valid postrespawn inputs still work. It does not claim
+cryptographic per-packet freshness, multi-host replay resistance,
+persistent account recovery, physical swords or browser input controls.
+No runtime Combat or transport code, packet format, CI rules, staging
+listener, physics or authentication configuration is changed.
+
 ## Nonclaims and release HOLD
 
 This is **not** full geometry authority. World #509's 23 static AABBs omit
