@@ -815,6 +815,220 @@ mod tests {
     }
 
     #[test]
+    fn alpha_reused_session_cannot_steal_previous_characters_sword() {
+        use crate::magic_checkpoint::load_joint;
+
+        let mut world = World::new(800.0, 600.0);
+        assert!(world.add_player_at(1, 200.0, 200.0, 0.0));
+        assert!(world.add_player_at(2, 215.0, 200.0, 0.0));
+        let mut zones = ZoneAuthority::new();
+        zones.register(1).unwrap();
+        zones.register(2).unwrap();
+
+        let old_character = CharacterId::new(202).unwrap();
+        let new_character = CharacterId::new(303).unwrap();
+        let old_lease = lease(2);
+        let replacement_lease = SessionLease::new(2, 2).unwrap();
+        let restored_lease = SessionLease::new(2, 3).unwrap();
+        let mut identity = SessionIdentityRegistry::new();
+        identity
+            .bind_verified(lease(1), CharacterId::new(101).unwrap())
+            .unwrap();
+        identity.bind_verified(old_lease, old_character).unwrap();
+
+        let mut loot = LootAuthority::new();
+        loot.register(1).unwrap();
+        loot.register(2).unwrap();
+        let first_sword = loot.grant(1, ItemKind::RustySword, 1).unwrap();
+        let first_entity = loot
+            .drop_backpack(
+                1,
+                world.fighter(1).unwrap(),
+                ZoneId::Moonvale,
+                first_sword,
+                0,
+            )
+            .unwrap();
+        let second_sword = loot.grant(1, ItemKind::IronSword, 1).unwrap();
+        let second_entity = loot
+            .drop_backpack(
+                1,
+                world.fighter(1).unwrap(),
+                ZoneId::Moonvale,
+                second_sword,
+                0,
+            )
+            .unwrap();
+        let path = checkpoint_path();
+        let magic = MagicAuthority::new();
+
+        macro_rules! pickup {
+            ($lease:expr, $sequence:expr, $entity:expr, $item:expr) => {
+                commit_verified_ground_sword_equip_checked(
+                    GroundSwordAuthority {
+                        path: &path,
+                        loot: &mut loot,
+                        magic: &magic,
+                        identity: &identity,
+                        tick: PickupWorldTick {
+                            world: &world,
+                            completed_tick: world.tick,
+                            zones: &zones,
+                        },
+                        operation: VerifiedLootOperation {
+                            lease: $lease,
+                            sequence: $sequence,
+                        },
+                    },
+                    GroundSwordSelection {
+                        ground_entity_id: $entity,
+                        expected_item_id: $item,
+                    },
+                    |fighter, ground, zone| {
+                        // Test fixture: verify authoritative argument provenance;
+                        // real Core 8C must call current Physics LOS and fence it.
+                        assert_eq!(fighter.net_id, 2);
+                        assert_eq!(ground.zone, zone);
+                        assert_eq!(ground.at.x, 200.0);
+                        assert_eq!(ground.at.y, 200.0);
+                        Ok(())
+                    },
+                )
+            };
+        }
+        assert_eq!(
+            pickup!(old_lease, 1, first_entity, first_sword).unwrap().id,
+            first_sword
+        );
+        assert_eq!(
+            loot.inventory(2)
+                .unwrap()
+                .equipped(EquipmentSlot::MainHand)
+                .unwrap()
+                .id,
+            first_sword
+        );
+        assert_eq!(loot.committed_operation_sequence(old_character), Some(1));
+
+        // Exact old lease parks the sword; reused numeric fighter ID must be
+        // independently admitted to a different *character* and empty hands.
+        loot.park_inventory(&identity, old_lease).unwrap();
+        assert_eq!(identity.release_session(old_lease), Some(old_character));
+        assert!(world.remove_player(2));
+        assert!(world.add_player_at(2, 215.0, 200.0, 0.0));
+        identity
+            .bind_verified(replacement_lease, new_character)
+            .unwrap();
+        loot.register(2).unwrap();
+        assert!(loot
+            .inventory(2)
+            .unwrap()
+            .equipped(EquipmentSlot::MainHand)
+            .is_none());
+        assert_eq!(
+            loot.parked_inventory(old_character)
+                .unwrap()
+                .equipped(EquipmentSlot::MainHand)
+                .unwrap()
+                .id,
+            first_sword
+        );
+
+        // A late packet from the previous epoch must not steal another sword
+        // or consume the new character's command sequence.
+        assert!(matches!(
+            pickup!(old_lease, 2, second_entity, second_sword),
+            Err(PickupCommitError::UnverifiedSession)
+        ));
+        assert!(loot.ground().contains_key(&second_entity));
+        assert_eq!(loot.committed_operation_sequence(new_character), None);
+        assert_eq!(
+            pickup!(replacement_lease, 1, second_entity, second_sword)
+                .unwrap()
+                .id,
+            second_sword
+        );
+        assert_eq!(
+            loot.inventory(2)
+                .unwrap()
+                .equipped(EquipmentSlot::MainHand)
+                .unwrap()
+                .id,
+            second_sword
+        );
+        assert_eq!(loot.committed_operation_sequence(new_character), Some(1));
+
+        // Reconnected first character gets *only their original sword*, not
+        // the second character's newly acquired weapon, even with same ID 2.
+        loot.park_inventory(&identity, replacement_lease).unwrap();
+        assert_eq!(
+            identity.release_session(replacement_lease),
+            Some(new_character)
+        );
+        assert!(world.remove_player(2));
+        assert!(world.add_player_at(2, 215.0, 200.0, 0.0));
+        identity
+            .bind_verified(restored_lease, old_character)
+            .unwrap();
+        loot.resume_inventory(&identity, restored_lease).unwrap();
+        assert_eq!(
+            loot.inventory(2)
+                .unwrap()
+                .equipped(EquipmentSlot::MainHand)
+                .unwrap()
+                .id,
+            first_sword
+        );
+        assert_eq!(
+            loot.parked_inventory(new_character)
+                .unwrap()
+                .equipped(EquipmentSlot::MainHand)
+                .unwrap()
+                .id,
+            second_sword
+        );
+        assert_eq!(loot.committed_operation_sequence(old_character), Some(1));
+        assert!(matches!(
+            pickup!(old_lease, 2, second_entity, second_sword),
+            Err(PickupCommitError::UnverifiedSession)
+        ));
+
+        // Force one complete trusted checkpoint and verify its parked recovery
+        // keeps each sword in exactly one character's equipment, no ground copy.
+        let bytes = bundle(&loot, &identity, &magic).unwrap();
+        atomic_write(&path, &bytes).unwrap();
+        let (recovered, _) = load_joint(&path).unwrap();
+        assert_eq!(
+            recovered
+                .parked_inventory(old_character)
+                .unwrap()
+                .equipped(EquipmentSlot::MainHand)
+                .unwrap()
+                .id,
+            first_sword
+        );
+        assert_eq!(
+            recovered
+                .parked_inventory(new_character)
+                .unwrap()
+                .equipped(EquipmentSlot::MainHand)
+                .unwrap()
+                .id,
+            second_sword
+        );
+        assert_eq!(
+            recovered.committed_operation_sequence(old_character),
+            Some(1)
+        );
+        assert_eq!(
+            recovered.committed_operation_sequence(new_character),
+            Some(1)
+        );
+        assert!(recovered.ground().is_empty());
+        let _ = fs::remove_file(path);
+    }
+
+    #[test]
     fn world_p0_greyhaven_four_distinct_sockets_accept_real_ground_item_positions() {
         use crate::loot::{GroundDrop, Point, PICKUP_REACH};
         use crate::magic_checkpoint::load_joint;
