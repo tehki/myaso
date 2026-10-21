@@ -312,6 +312,9 @@ pub fn preflight_four_armory_swords(
     let mut seen = BTreeSet::new();
     let mut canonical = Vec::with_capacity(4);
     for row in records {
+        if row.legacy_item_id == 0 {
+            return Err(LegacyMigrationError::ZeroLegacyId);
+        }
         let kind = LegacyItemKind::require_checkpoint_kind(row.checkpoint_kind_code)?;
         if !kind.is_alpha_sword() {
             return Err(LegacyMigrationError::NonSwordRackItem);
@@ -508,7 +511,7 @@ mod tests {
         zero[0].legacy_item_id = 0;
         assert_eq!(
             preflight_four_armory_swords(&import, zero),
-            Err(LegacyMigrationError::UnregisteredSourceIdentity)
+            Err(LegacyMigrationError::ZeroLegacyId)
         );
     }
 
