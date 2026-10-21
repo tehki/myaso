@@ -1,0 +1,34 @@
+name: Core 8C Greyhaven static swept collision
+
+on:
+  pull_request:
+    paths:
+      - "server/src/alpha_greyhaven_geometry.rs"
+      - "server/src/alpha_greyhaven_solids_generated.rs"
+      - "server/src/simulation.rs"
+      - "server/src/lib.rs"
+      - ".github/workflows/core8c-p0-swept-collision.yml"
+      - "docs/CORE8C_P0_GREYHAVEN_SWEPT_COLLISION.md"
+  push:
+    branches: [main]
+    paths:
+      - "server/src/alpha_greyhaven_geometry.rs"
+      - "server/src/simulation.rs"
+      - ".github/workflows/core8c-p0-swept-collision.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  scoped-authoritative-tick-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify immutable World-authored fixed-solid parity
+        run: node scripts/verify-core8c-greyhaven-geometry.mjs
+      - name: Strict Rust formatting, lint and all server tests
+        run: |
+          cargo fmt --manifest-path server/Cargo.toml -- --check
+          cargo clippy --locked --manifest-path server/Cargo.toml --all-targets -- -D warnings
+          cargo test --locked --manifest-path server/Cargo.toml

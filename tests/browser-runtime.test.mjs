@@ -1,3 +1,6 @@
+import "./chat-c1-core-preview.test.mjs";
+import "./chat-c1-adapter-lifecycle.test.mjs";
+import "./chat-c1-foundation.test.mjs";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { createFrameBudget } from "../src/browser/frame-budget.mjs";

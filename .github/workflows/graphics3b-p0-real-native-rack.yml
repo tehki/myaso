@@ -1,0 +1,51 @@
+name: Graphics 3B P0 real four-player Greyhaven empty-armory rack preview
+
+on:
+  pull_request:
+    paths:
+      - "src/browser/armory-optin-live-rack.mjs"
+      - "src/browser/armory-rack-visual.mjs"
+      - "src/browser/armory-rack-presented-frame.mjs"
+      - "src/browser/armory-sword-alpha-sampler.mjs"
+      - "src/browser/armory-world493-visual-bridge.mjs"
+      - "src/world/alpha-armory.mjs"
+      - "web/online-game.mjs"
+      - "scripts/alpha_p0_four_native_armory_rack_preview.mjs"
+      - "tests/armory-optin-live-rack.test.mjs"
+      - ".github/workflows/graphics3b-p0-real-native-rack.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  four-genuine-world-clients-source-rack:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Original 3B World and localhost-only opt-in guard tests
+        run: |
+          node --check src/browser/armory-optin-live-rack.mjs
+          node --check web/online-game.mjs
+          node --check scripts/alpha_p0_four_native_armory_rack_preview.mjs
+          node --test tests/armory-optin-live-rack.test.mjs
+          node scripts/verify-core8c-greyhaven-geometry.mjs
+      - name: Check genuine Chrome Firefox W3C drivers
+        run: |
+          chromedriver --version
+          geckodriver --version
+          google-chrome --version
+          firefox --version
+      - name: Build same local Rust WebTransport authority
+        run: cargo build --locked --manifest-path server/Cargo.toml --bin myaso-server
+      - name: Four real authenticated native browsers actually paint source-authentic empty rack
+        run: timeout --signal=TERM --kill-after=5s 180s node scripts/alpha_p0_four_native_armory_rack_preview.mjs
+      - name: Retain original native four-player world rack screenshots
+        if: always()
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: graphics3b-original-empty-rack-four-real-browsers
+          path: alpha-p0-real-greyhaven-armory-preview-evidence/*
+          if-no-files-found: ignore
+          retention-days: 3

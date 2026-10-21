@@ -12,10 +12,18 @@ import { isTickNewer32, reconcilePrediction } from "../src/browser/reconciliatio
 import { createReconciliationCamera, createSnapshotRenderClock } from "../src/browser/smooth-motion.mjs";
 import { createRenderGapTelemetry } from "../src/browser/render-gap-telemetry.mjs";
 import { ARENA_VIEW_ZOOM, nearbyOffscreenPointers, projectArenaPoint } from "../src/browser/arena-viewport.mjs";
+import { createAuthoredWorldRenderer } from "../src/browser/authored-world-renderer.mjs";
+import { createWorldLivenessProbe, isWorldLivenessProbeEnabled } from "../src/browser/world-liveness-probe.mjs";
+import { authoritativeOnlineStatus } from "../src/browser/authoritative-status.mjs";
+import { idrScoreboardRows, idrFocusText, idrKillFeedText, idrStatusText, isIdrPreviewEligible } from "../src/browser/identity-visibility.mjs";
+import { MAP_IDS } from "../src/world/authored-maps.mjs";
 import { NETWORK } from "../src/network/constants.mjs";
 import { connectAuthoritativeClient, parseSha256Hex } from "./authoritative-client.mjs";
+import { neutralBackgroundInput } from "../src/browser/neutral-background-input.mjs";
 
 const canvas = document.querySelector("#arena");
+// Reviewer-only anonymity preview. No trusted identity evidence is on the wire.
+const idrPreview = isIdrPreviewEligible(window.location);
 const chargeHud = {
   root: document.querySelector("#heavy-charge-indicator"),
   value: document.querySelector("#heavy-charge-value"),
@@ -112,6 +120,37 @@ const killFeedSequences = new Set();
 
 const params = new URLSearchParams(window.location.search);
 const diagnosticsVisible = params.get("netstats") === "1";
+// Static map is currently visual-only in authoritative multiplayer. Doors
+// become functional only after server-approved zone transitions are implemented.
+const fixedWorldEnabled = params.get("world") === "1" && !params.has("scenario");
+const authoredWorld = fixedWorldEnabled ? createAuthoredWorldRenderer() : null;
+// 3B original rack preview is loopback-only and DEFAULT OFF. Dynamic import
+// deliberately avoids loading Blender assets, source modules, or doing source
+// work in normal games/Combat acceptance. Core has NO approved item feed yet.
+const armoryRackReviewEnabled = fixedWorldEnabled
+  && params.get("armoryart") === "1"
+  && ["localhost","127.0.0.1","[::1]"].includes(window.location.hostname);
+let armoryRackReview = null;
+let armoryRackReviewFailure = false;
+if (armoryRackReviewEnabled) {
+  window.__MYASO_ARMORY_RACK_REVIEW__ = () => Object.freeze({
+    ready:!!armoryRackReview,
+    failure:armoryRackReviewFailure,
+    painted:armoryRackReview?.status()?.renderedFrames ?? 0,
+    drawnSwords:armoryRackReview?.status()?.drawnSwordCount ?? 0,
+    actualCanvas:!!armoryRackReview?.status()?.actualGameRender,
+    canonicalItems:false,serverTryPickup:false,productionApproved:false
+  });
+  void import("../src/browser/armory-optin-live-rack.mjs")
+    .then(({loadOriginalBlacksmithRackPreview}) =>
+      loadOriginalBlacksmithRackPreview())
+    .then(view=>{armoryRackReview=view;})
+    .catch(()=>{armoryRackReviewFailure=true;armoryRackReview=null;});
+}
+// Never expose diagnostics on public origins or without the explicit local preview flag.
+// Read-only counters measure network receipt, world canvas paint and status independently.
+const worldLivenessProbe = isWorldLivenessProbeEnabled(window.location) ? createWorldLivenessProbe() : null;
+if (worldLivenessProbe) window.__MYASO_WORLD_LIVENESS__ = worldLivenessProbe;
 const renderGapTelemetry = diagnosticsVisible ? createRenderGapTelemetry() : null;
 const diagnosticsPanel = document.querySelector("#network-diagnostics");
 if (diagnosticsPanel) diagnosticsPanel.hidden = !diagnosticsVisible;
@@ -133,7 +172,9 @@ function updateNetworkDiagnostics(nowMs) {
     + ` | Render catch-ups ${snapshotRenderClock.metrics().boundedCatchups}`
     + ` | Extra render lag p50 ${time(renderGap.p50Ms)} · p95 ${time(renderGap.p95Ms)}`
     + ` | >33ms ${renderGap.overThresholdPct === null ? "collecting…" : renderGap.overThresholdPct + "%"} (${renderGap.samples} samples)`
-    + ` | Samples ${s.inputAckSamples}`;
+    + ` | Samples ${s.inputAckSamples}`
+    + ` | ACKs ${s.ackCount}`
+    + ` | Rx snapshots ${s.snapshots}`;
 }
 const acceptanceScenario = params.get("scenario");
 const server = params.get("server");
@@ -170,6 +211,8 @@ let networkClient = null;
 let animationFrameId = 0;
 let predictionStep = 0;
 let clientTick = 0;
+const BACKGROUND_LIVENESS_INTERVAL_MS = 5000;
+let backgroundLivenessTimer = null;
 let attackRequested = false;
 let runningAttackRequested = false;
 let committedLightMove = null;
@@ -327,6 +370,8 @@ canvas.addEventListener("keydown", (event) => {
 });
 canvas.addEventListener("keyup", (event) => keys.delete(event.code));
 window.addEventListener("blur", releaseInputs);
+// Native chat focus must not strand held authoritative movement/attack input.
+canvas.addEventListener("blur", releaseInputs);
 document.addEventListener("visibilitychange", handleVisibilityChange);
 
 setStatus("Connecting to authoritative server…");
@@ -342,10 +387,12 @@ networkClient = await connectAuthoritativeClient({
     if (!ownId) return;
     const own = state.get(ownId);
     if (own) {
-      // Initial player state is available before the first aligned input ACK.
-      if (networkStatus.startsWith("Connecting")) {
-        networkStatus = `Online - player #${ownId} - server tick ${networkClient.latestServerTick}`;
-      }
+      // Count only received authoritative network snapshots; no synthetic tick increments.
+      worldLivenessProbe?.recordSnapshot(networkClient.latestServerTick, Date.now());
+      // Genuine snapshot receipt advances the player-facing status even when
+      // the ACK callback is delayed. Never synthesize ticks or change Combat.
+      const observedStatus = authoritativeOnlineStatus(ownId, networkClient.latestServerTick);
+      if (observedStatus) networkStatus = observedStatus;
       if (Number.isFinite(own.stamina)) authoritativeStamina = own.stamina;
       if (!local.initialized) restoreAuthoritative(own);
       else if (Number.isFinite(own.stamina)) local.stamina = own.stamina;
@@ -377,9 +424,21 @@ networkClient = await connectAuthoritativeClient({
       networkClient.diagnostics.noteReconciliation(ack, own, correction.distance);
     }
     confirmStaminaDenial(own);
-    networkStatus = `Online - player #${ownId} - server tick ${networkClient.latestServerTick}`;
+    const observedStatus = authoritativeOnlineStatus(ownId, networkClient.latestServerTick);
+    if (observedStatus) networkStatus = observedStatus;
   },
 });
+
+// Local Chat C1 preview is opt-in and *only* accessible from loopback pages.
+// Lazy import avoids any extra chat networking work in live/normal gameplay.
+if (["localhost", "127.0.0.1", "[::1]"].includes(window.location.hostname)
+  && window.location.protocol === "http:"
+  && new URLSearchParams(window.location.search).get("chatC1Preview") === "1") {
+  void import("../src/browser/chat-c1-activation.mjs")
+    .then(({ activateChatC1Preview }) =>
+      activateChatC1Preview({ doc: document, location: window.location, gameClient: networkClient }))
+    .catch(error => console.warn("Local chat preview unavailable", error));
+}
 
 function observeCombatState(state) {
   const ownId = networkClient?.playerNetId;
@@ -506,7 +565,8 @@ function recordKillEvent(event) {
   const presentation = killFeedPresentation(event, ownId);
   if (!presentation.visible) return;
   killFeedSequences.add(event.sequence);
-  killFeedEntries.unshift({ sequence: event.sequence, ...presentation });
+  killFeedEntries.unshift({ sequence: event.sequence, ...presentation,
+    text: idrPreview ? idrKillFeedText(event, ownId) : presentation.text });
   if (presentation.victimOwn) audio.play("death");
   while (killFeedEntries.length > 4) {
     const removed = killFeedEntries.pop();
@@ -893,6 +953,35 @@ function render(nowMs = performance.now(), impact = combatImpact.sample(nowMs)) 
   ctx.translate(canvas.width / 2, canvas.height / 2);
   ctx.scale(ARENA_VIEW_ZOOM, ARENA_VIEW_ZOOM);
   ctx.translate(-canvas.width / 2, -canvas.height / 2);
+
+  if (authoredWorld && local.initialized) {
+    const worldPaintStart = worldLivenessProbe ? performance.now() : 0;
+    worldLivenessProbe?.startPaint(Date.now());
+    authoredWorld.draw(ctx, MAP_IDS.overworld, visualCameraPosition,
+      canvas.width, canvas.height, ARENA_VIEW_ZOOM);
+    worldLivenessProbe?.endPaint(Date.now(), performance.now() - worldPaintStart, authoredWorld.stats);
+    // The first-party World painter works inside a zoom transform. Original
+    // 3B source sprites are already projected into screen-space pixels;
+    // invert just that transform, then restore before any remote fighter.
+    // No rack swords are painted without an actual server item feed.
+    if (armoryRackReview) {
+      ctx.save();
+      try {
+        ctx.translate(canvas.width / 2, canvas.height / 2);
+        ctx.scale(1 / ARENA_VIEW_ZOOM, 1 / ARENA_VIEW_ZOOM);
+        ctx.translate(-canvas.width / 2, -canvas.height / 2);
+        armoryRackReview.draw({
+          ctx,camera:visualCameraPosition,
+          width:canvas.width,height:canvas.height,zoom:ARENA_VIEW_ZOOM
+        });
+      } catch {
+        // Later Canvas/device loss: subsequent frames use unchanged World.
+        // This is preview-only, not proof of atomic same-frame recovery.
+        armoryRackReview=null;
+        armoryRackReviewFailure=true;
+      } finally { ctx.restore(); }
+    }
+  }
 
   for (const entity of networkClient.state.values()) {
     if (entity.netId === ownId) continue;
@@ -1716,7 +1805,8 @@ function updateOpponentRecovery(remote, focusMode = "nearest", own = null) {
 
 function updateScoreboard(ownId) {
   if (!scoreboardList || !networkClient) return;
-  const rows = fighterScoreboardPresentation(networkClient.state.values(), ownId);
+  const originalRows = fighterScoreboardPresentation(networkClient.state.values(), ownId);
+  const rows = idrPreview ? idrScoreboardRows(originalRows) : originalRows;
   const point = fighterMatchPointPresentation(networkClient.state.values(), ownId);
   const signature = rows.map((row) => `${row.netId}:${row.kills}:${row.own ? 1 : 0}`).join("|");
   if (scoreboardTitle && scoreboardTitle.textContent !== `FIRST TO ${FFA_KILL_TARGET}`) {
@@ -1726,7 +1816,8 @@ function updateScoreboard(ownId) {
   if (matchPoint && hudCache.matchPoint !== pointSignature) {
     hudCache.matchPoint = pointSignature;
     matchPoint.hidden = !point.visible;
-    if (point.visible) matchPoint.textContent = `${point.title} · ${point.detail}`;
+    if (point.visible) matchPoint.textContent = idrPreview
+      ? idrStatusText(`${point.title} · ${point.detail}`) : `${point.title} · ${point.detail}`;
   }
   if (hudCache.scoreboard === signature) return;
   hudCache.scoreboard = signature;
@@ -1746,6 +1837,10 @@ function setFocusTarget(netId, mode = "nearest") {
   if (!hud.focusLabel || (hudCache.focusNetId === netId && hudCache.focusMode === mode)) return;
   hudCache.focusNetId = netId;
   hudCache.focusMode = mode;
+  if (idrPreview) {
+    hud.focusLabel.textContent = idrFocusText(mode, Boolean(netId));
+    return;
+  }
   hud.focusLabel.textContent = netId
     ? (mode === "guard-break"
       ? `GUARD BREAK #${netId}`
@@ -1768,9 +1863,11 @@ function setMeter(cacheKey, bar, label, value) {
 }
 
 function setStatus(text) {
-  if (hudCache.status === text) return;
-  hudCache.status = text;
-  eventText.textContent = text;
+  const shown = idrPreview ? idrStatusText(text) : text;
+  if (hudCache.status === shown) return;
+  hudCache.status = shown;
+  eventText.textContent = shown;
+  worldLivenessProbe?.recordStatus(shown, Date.now());
 }
 
 function createArenaLayer() {
@@ -1811,7 +1908,16 @@ function frame(now) {
   } else {
     render(now, impact);
   }
+  worldLivenessProbe?.recordFrame(Date.now());
   animationFrameId = requestAnimationFrame(frame);
+}
+
+function sendBackgroundLiveness() {
+  if (!document.hidden || !networkClient) return;
+  // The render-driven 30Hz input loop pauses in a hidden tab. Continue only
+  // neutral input keepalives; never replay held actions from the visible tab.
+  networkClient.sendInput(neutralBackgroundInput(clientTick));
+  clientTick = (clientTick + 1) >>> 0;
 }
 
 function handleVisibilityChange() {
@@ -1823,7 +1929,15 @@ function handleVisibilityChange() {
     snapshotRenderClock.reset();
     if (renderGapTelemetry) renderGapTelemetry.reset();
     visualCamera.reset();
+    if (!backgroundLivenessTimer) {
+      backgroundLivenessTimer = window.setInterval(sendBackgroundLiveness, BACKGROUND_LIVENESS_INTERVAL_MS);
+    }
+    sendBackgroundLiveness();
     return;
+  }
+  if (backgroundLivenessTimer) {
+    clearInterval(backgroundLivenessTimer);
+    backgroundLivenessTimer = null;
   }
   frameBudget.reset(performance.now());
   snapshotRenderClock.reset();

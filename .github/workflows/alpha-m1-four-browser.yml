@@ -1,0 +1,44 @@
+name: Alpha M1 four real browsers shared-world flight
+
+on:
+  pull_request:
+    paths:
+      - "scripts/alpha_m1_four_real_browser_flight.mjs"
+      - ".github/workflows/alpha-m1-four-browser.yml"
+  push:
+    branches: [main]
+    paths:
+      - "scripts/alpha_m1_four_real_browser_flight.mjs"
+      - ".github/workflows/alpha-m1-four-browser.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  four-real-browsers:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate browser acceptance harness
+        run: node --check scripts/alpha_m1_four_real_browser_flight.mjs
+      - name: Verify available native W3C browser drivers
+        run: |
+          node --version
+          chromedriver --version
+          geckodriver --version
+          google-chrome --version
+          firefox --version
+      - name: Build real authoritative Rust game server
+        run: cargo build --locked --manifest-path server/Cargo.toml --bin myaso-server
+      - name: Run four independent Chrome/Firefox WebDriver sessions on real QUIC
+        run: timeout --signal=TERM --kill-after=5s 180s node scripts/alpha_m1_four_real_browser_flight.mjs
+      - name: Retain genuine browser screenshots when artifact quota allows
+        if: always()
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: alpha-m1-four-real-browser-shared-world
+          path: alpha-m1-four-browser-evidence/*.png
+          if-no-files-found: ignore
+          retention-days: 3
