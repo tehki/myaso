@@ -404,7 +404,9 @@ mod tests {
     fn network_order_and_journal_order_must_never_be_mixed() {
         let mut preflight = LegacyImportPreflight::new(namespaces(), []).unwrap();
         let source_id = 0x0102_0304_0506_0708;
-        let mapped = preflight.stage_owner(LegacyDomain::Item, source_id).unwrap();
+        let mapped = preflight
+            .stage_owner(LegacyDomain::Item, source_id)
+            .unwrap();
         let be = mapped.to_be_bytes();
         let le = mapped.to_le_bytes();
         assert_eq!(&be[..8], &0x4D59_4153_0000_0002_u64.to_be_bytes());
