@@ -105,10 +105,13 @@ async function run(browserName,variant){
   const options={headless:true,
     executablePath:browserName==="chrome"?process.env.CHROME_EXECUTABLE:process.env.FIREFOX_EXECUTABLE};
   assert.ok(options.executablePath,"Required browser executable missing: "+browserName);
-  if(browserName==="chrome")options.args=["--no-sandbox","--disable-gpu-sandbox",
-    ...(process.env.P0_QA_DISABLE_GPU==="1"?["--disable-gpu","--disable-dev-shm-usage"]:[])];
-  if(process.env.P0_QA_DISABLE_GPU==="1")options.protocolTimeout=90000;
-  else{options.browser="firefox";options.protocol="webDriverBiDi";}
+  if(browserName==="chrome"){
+   options.args=["--no-sandbox","--disable-gpu-sandbox",
+     ...(process.env.P0_QA_DISABLE_GPU==="1"?["--disable-gpu","--disable-dev-shm-usage"]:[])];
+   if(process.env.P0_QA_DISABLE_GPU==="1")options.protocolTimeout=90000;
+  }else{
+   options.browser="firefox";options.protocol="webDriverBiDi";
+  }
   browser=await puppeteer.launch(options);
   const page=await browser.newPage(),errors=[];
   page.on("pageerror",e=>errors.push(String(e)));
@@ -134,8 +137,12 @@ async function run(browserName,variant){
   // CDP Page.captureScreenshot. A *separate* explicitly no-screenshot smoke
   // reads the actual Canvas pixel bytes via 2D getImageData and exercises
   // native pointer input; NEVER claim a screenshot or full visual acceptance.
-  const noScreenshot=process.env.P0_QA_NO_SCREENSHOT==="1";
-  const canvasFNV=await page.$eval("#scene",c=>{
+  const lightweight=process.env.P0_QA_LIGHTWEIGHT==="1";
+  const noScreenshot=lightweight||process.env.P0_QA_NO_SCREENSHOT==="1";
+  // Lightweight independent-host smoke skips screenshot AND RGBA readback.
+  // This proves page/source readiness and native art-only gesture behavior,
+  // NOT final scene pixel differences, occlusion or GPU budget.
+  const canvasFNV=lightweight?null:await page.$eval("#scene",c=>{
    const d=c.getContext("2d",{willReadFrequently:true}).getImageData(0,0,640,640).data;
    let hash=2166136261;
    for(let i=0;i<d.length;i++)hash=Math.imul(hash^d[i],16777619);
@@ -169,7 +176,9 @@ async function run(browserName,variant){
   report.cases.push({browser:browserName,browserVersion:await browser.version(),
     variant,pinnedRendererHash:sourceHashes[variant==="world493"?"worldPainter":"graphics3cPainter"],
     canvasSha256:canvasSHA256,canvasPixelFnv32:canvasFNV,
-    screenshotsCaptured:!noScreenshot,screenCaptured:canvasImg,fullScreenshot:image,
+    screenshotsCaptured:!noScreenshot,
+    rgbaReadbackPerformed:!lightweight,
+    screenCaptured:canvasImg,fullScreenshot:image,
     cachedTiles:initial.cachedTiles,createdTiles:initial.createdTiles,
     rackRect:initial.rackRect,swordRects:initial.swordRects,
     syntheticArtItems:4,realCommittedItems:0,
@@ -188,13 +197,20 @@ try{
  for(const browser of engines){
   const cases=report.cases.filter(c=>c.browser===browser);
   assert.equal(cases.length,2);
-  if(process.env.P0_QA_NO_SCREENSHOT==="1")
+  if(process.env.P0_QA_LIGHTWEIGHT==="1"){
+   assert.equal(cases[0].rgbaReadbackPerformed,false);
+   assert.equal(cases[1].rgbaReadbackPerformed,false);
+   assert.notEqual(cases[0].pinnedRendererHash,cases[1].pinnedRendererHash,
+     "World and 3C source must still be distinct in lightweight read-only QA");
+  }else if(process.env.P0_QA_NO_SCREENSHOT==="1")
    assert.notEqual(cases[0].canvasPixelFnv32,cases[1].canvasPixelFnv32,
      "Expected actual Canvas pixel readback to differ when 3C environment is enabled");
   else assert.notEqual(cases[0].canvasSha256,cases[1].canvasSha256,
     "Expected visible Graphics 3C changes to World-only authored background, not identical screenshot");
  }
- report.status=process.env.P0_QA_NO_SCREENSHOT==="1"
+ report.status=process.env.P0_QA_LIGHTWEIGHT==="1"
+   ?"ART_ONLY_SOURCE_AND_GESTURE_SMOKE_NO_PIXELS":
+   process.env.P0_QA_NO_SCREENSHOT==="1"
    ?"ART_ONLY_NO_SCREENSHOT_INPUT_PASS":
    engines.includes("chrome")&&engines.includes("firefox")
    ?"ART_ONLY_CROSS_BROWSER_COMPOSITE_PASS":"ART_ONLY_SINGLE_ENGINE_COMPOSITE_PASS";
