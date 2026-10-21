@@ -1,0 +1,263 @@
+{
+  "engine": "chrome",
+  "browser": "Chrome/154.0.8037.99",
+  "scenarios": 40,
+  "perScenarioDirections": 8,
+  "checkedFacingOutcomes": 320,
+  "screenshots": [
+    "revision_chrome_silver_idle_equip.png",
+    "revision_chrome_silver_idle_drop.png",
+    "revision_chrome_silver_idle_late.png",
+    "revision_chrome_silver_idle_lateAfterReEquip.png",
+    "revision_chrome_silver_idle_lateDropAfterReEquip.png",
+    "revision_chrome_silver_idle_conflict.png",
+    "revision_chrome_silver_roll_equip.png"
+  ],
+  "errors": [],
+  "sourceOriginal": true,
+  "fixturesOnly": true,
+  "realAuthenticatedItems": false,
+  "realMultiplayer": false,
+  "tests": [
+    {
+      "clip": "silver_idle",
+      "scenario": "equip",
+      "visible": 8,
+      "reason": "new-revision"
+    },
+    {
+      "clip": "silver_idle",
+      "scenario": "drop",
+      "visible": 0,
+      "reason": "new-revision-or-session"
+    },
+    {
+      "clip": "silver_idle",
+      "scenario": "late",
+      "visible": 0,
+      "reason": "stale-revision-or-tick"
+    },
+    {
+      "clip": "silver_idle",
+      "scenario": "reEquip",
+      "visible": 8,
+      "reason": "new-revision-or-session"
+    },
+    {
+      "clip": "silver_idle",
+      "scenario": "lateAfterReEquip",
+      "visible": 8,
+      "reason": "stale-revision-or-tick"
+    },
+    {
+      "clip": "silver_idle",
+      "scenario": "lateDropAfterReEquip",
+      "visible": 8,
+      "reason": "stale-revision-or-tick"
+    },
+    {
+      "clip": "silver_idle",
+      "scenario": "conflict",
+      "visible": 0,
+      "reason": "conflicting-same-revision"
+    },
+    {
+      "clip": "silver_idle",
+      "scenario": "oldEpoch",
+      "visible": 0,
+      "reason": "stale-session"
+    },
+    {
+      "clip": "silver_walk",
+      "scenario": "equip",
+      "visible": 8,
+      "reason": "new-revision"
+    },
+    {
+      "clip": "silver_walk",
+      "scenario": "drop",
+      "visible": 0,
+      "reason": "new-revision-or-session"
+    },
+    {
+      "clip": "silver_walk",
+      "scenario": "late",
+      "visible": 0,
+      "reason": "stale-revision-or-tick"
+    },
+    {
+      "clip": "silver_walk",
+      "scenario": "reEquip",
+      "visible": 8,
+      "reason": "new-revision-or-session"
+    },
+    {
+      "clip": "silver_walk",
+      "scenario": "lateAfterReEquip",
+      "visible": 8,
+      "reason": "stale-revision-or-tick"
+    },
+    {
+      "clip": "silver_walk",
+      "scenario": "lateDropAfterReEquip",
+      "visible": 8,
+      "reason": "stale-revision-or-tick"
+    },
+    {
+      "clip": "silver_walk",
+      "scenario": "conflict",
+      "visible": 0,
+      "reason": "conflicting-same-revision"
+    },
+    {
+      "clip": "silver_walk",
+      "scenario": "oldEpoch",
+      "visible": 0,
+      "reason": "stale-session"
+    },
+    {
+      "clip": "silver_sprint",
+      "scenario": "equip",
+      "visible": 8,
+      "reason": "new-revision"
+    },
+    {
+      "clip": "silver_sprint",
+      "scenario": "drop",
+      "visible": 0,
+      "reason": "new-revision-or-session"
+    },
+    {
+      "clip": "silver_sprint",
+      "scenario": "late",
+      "visible": 0,
+      "reason": "stale-revision-or-tick"
+    },
+    {
+      "clip": "silver_sprint",
+      "scenario": "reEquip",
+      "visible": 8,
+      "reason": "new-revision-or-session"
+    },
+    {
+      "clip": "silver_sprint",
+      "scenario": "lateAfterReEquip",
+      "visible": 8,
+      "reason": "stale-revision-or-tick"
+    },
+    {
+      "clip": "silver_sprint",
+      "scenario": "lateDropAfterReEquip",
+      "visible": 8,
+      "reason": "stale-revision-or-tick"
+    },
+    {
+      "clip": "silver_sprint",
+      "scenario": "conflict",
+      "visible": 0,
+      "reason": "conflicting-same-revision"
+    },
+    {
+      "clip": "silver_sprint",
+      "scenario": "oldEpoch",
+      "visible": 0,
+      "reason": "stale-session"
+    },
+    {
+      "clip": "silver_jump",
+      "scenario": "equip",
+      "visible": 0,
+      "reason": "new-revision"
+    },
+    {
+      "clip": "silver_jump",
+      "scenario": "drop",
+      "visible": 0,
+      "reason": "new-revision-or-session"
+    },
+    {
+      "clip": "silver_jump",
+      "scenario": "late",
+      "visible": 0,
+      "reason": "stale-revision-or-tick"
+    },
+    {
+      "clip": "silver_jump",
+      "scenario": "reEquip",
+      "visible": 0,
+      "reason": "new-revision-or-session"
+    },
+    {
+      "clip": "silver_jump",
+      "scenario": "lateAfterReEquip",
+      "visible": 0,
+      "reason": "stale-revision-or-tick"
+    },
+    {
+      "clip": "silver_jump",
+      "scenario": "lateDropAfterReEquip",
+      "visible": 0,
+      "reason": "stale-revision-or-tick"
+    },
+    {
+      "clip": "silver_jump",
+      "scenario": "conflict",
+      "visible": 0,
+      "reason": "conflicting-same-revision"
+    },
+    {
+      "clip": "silver_jump",
+      "scenario": "oldEpoch",
+      "visible": 0,
+      "reason": "stale-session"
+    },
+    {
+      "clip": "silver_roll",
+      "scenario": "equip",
+      "visible": 0,
+      "reason": "new-revision"
+    },
+    {
+      "clip": "silver_roll",
+      "scenario": "drop",
+      "visible": 0,
+      "reason": "new-revision-or-session"
+    },
+    {
+      "clip": "silver_roll",
+      "scenario": "late",
+      "visible": 0,
+      "reason": "stale-revision-or-tick"
+    },
+    {
+      "clip": "silver_roll",
+      "scenario": "reEquip",
+      "visible": 0,
+      "reason": "new-revision-or-session"
+    },
+    {
+      "clip": "silver_roll",
+      "scenario": "lateAfterReEquip",
+      "visible": 0,
+      "reason": "stale-revision-or-tick"
+    },
+    {
+      "clip": "silver_roll",
+      "scenario": "lateDropAfterReEquip",
+      "visible": 0,
+      "reason": "stale-revision-or-tick"
+    },
+    {
+      "clip": "silver_roll",
+      "scenario": "conflict",
+      "visible": 0,
+      "reason": "conflicting-same-revision"
+    },
+    {
+      "clip": "silver_roll",
+      "scenario": "oldEpoch",
+      "visible": 0,
+      "reason": "stale-session"
+    }
+  ]
+}
