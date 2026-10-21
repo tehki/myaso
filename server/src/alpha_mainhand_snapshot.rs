@@ -59,9 +59,7 @@ pub fn read_current_mainhand(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::item_ownership::{
-        ItemLocation, OwnershipOp, OwnershipTxnId, ZoneId,
-    };
+    use crate::item_ownership::{ItemLocation, OwnershipOp, OwnershipTxnId, ZoneId};
     use std::{
         fs,
         path::PathBuf,
@@ -130,12 +128,25 @@ mod tests {
         j.apply(
             txn(1),
             &[
-                OwnershipOp::Create { item: sword(201), at: rack(0) },
-                OwnershipOp::Create { item: sword(202), at: rack(1) },
-                OwnershipOp::Create { item: sword(203), at: rack(2) },
-                OwnershipOp::Create { item: sword(204), at: rack(3) },
+                OwnershipOp::Create {
+                    item: sword(201),
+                    at: rack(0),
+                },
+                OwnershipOp::Create {
+                    item: sword(202),
+                    at: rack(1),
+                },
+                OwnershipOp::Create {
+                    item: sword(203),
+                    at: rack(2),
+                },
+                OwnershipOp::Create {
+                    item: sword(204),
+                    at: rack(3),
+                },
             ],
-        ).unwrap();
+        )
+        .unwrap();
     }
 
     #[test]
@@ -157,31 +168,55 @@ mod tests {
         let empty1 = read_current_mainhand(&j, char_id(1)).unwrap();
         assert_eq!(empty1.item_id(), None);
         assert_eq!(empty1.journal_sequence(), 1);
-        let equip_receipt = j.apply(
-            txn(2),
-            &[OwnershipOp::Move { item: sword(201), from: rack(0), to: hand(1) }],
-        ).unwrap();
+        let equip_receipt = j
+            .apply(
+                txn(2),
+                &[OwnershipOp::Move {
+                    item: sword(201),
+                    from: rack(0),
+                    to: hand(1),
+                }],
+            )
+            .unwrap();
         let equipped = read_current_mainhand(&j, char_id(1)).unwrap();
         assert_eq!(equipped.journal_sequence(), equip_receipt.sequence);
-        assert_eq!(equipped.item_mutation_sequence(), Some(equip_receipt.sequence));
+        assert_eq!(
+            equipped.item_mutation_sequence(),
+            Some(equip_receipt.sequence)
+        );
         assert_eq!(equipped.item_id(), Some(sword(201)));
 
-        let drop_receipt = j.apply(
-            txn(3),
-            &[OwnershipOp::Move { item: sword(201), from: hand(1), to: rack(4) }],
-        ).unwrap();
+        let drop_receipt = j
+            .apply(
+                txn(3),
+                &[OwnershipOp::Move {
+                    item: sword(201),
+                    from: hand(1),
+                    to: rack(4),
+                }],
+            )
+            .unwrap();
         let empty_again = read_current_mainhand(&j, char_id(1)).unwrap();
         assert_eq!(empty_again.item_id(), None);
         assert_eq!(empty_again.item_mutation_sequence(), None);
         assert!(empty_again.journal_sequence() > equipped.journal_sequence());
         assert_eq!(empty_again.journal_sequence(), drop_receipt.sequence);
-        let second_receipt = j.apply(
-            txn(4),
-            &[OwnershipOp::Move { item: sword(201), from: rack(4), to: hand(2) }],
-        ).unwrap();
+        let second_receipt = j
+            .apply(
+                txn(4),
+                &[OwnershipOp::Move {
+                    item: sword(201),
+                    from: rack(4),
+                    to: hand(2),
+                }],
+            )
+            .unwrap();
         let new_owner = read_current_mainhand(&j, char_id(2)).unwrap();
         assert_eq!(new_owner.item_id(), Some(sword(201)));
-        assert_eq!(new_owner.item_mutation_sequence(), Some(second_receipt.sequence));
+        assert_eq!(
+            new_owner.item_mutation_sequence(),
+            Some(second_receipt.sequence)
+        );
         let former_owner = read_current_mainhand(&j, char_id(1)).unwrap();
         assert_eq!(former_owner.item_id(), None);
         assert!(former_owner.journal_sequence() > empty_again.journal_sequence());
@@ -190,8 +225,14 @@ mod tests {
 
         drop(j);
         let restarted = root.open();
-        assert_eq!(read_current_mainhand(&restarted, char_id(1)).unwrap(), former_owner);
-        assert_eq!(read_current_mainhand(&restarted, char_id(2)).unwrap(), new_owner);
+        assert_eq!(
+            read_current_mainhand(&restarted, char_id(1)).unwrap(),
+            former_owner
+        );
+        assert_eq!(
+            read_current_mainhand(&restarted, char_id(2)).unwrap(),
+            new_owner
+        );
     }
 
     #[test]
@@ -201,17 +242,32 @@ mod tests {
         seed(&mut j);
         j.apply(
             txn(2),
-            &[OwnershipOp::Move { item: sword(201), from: rack(0), to: hand(1) }],
-        ).unwrap();
+            &[OwnershipOp::Move {
+                item: sword(201),
+                from: rack(0),
+                to: hand(1),
+            }],
+        )
+        .unwrap();
         let first = read_current_mainhand(&j, char_id(1)).unwrap();
         j.apply(
             txn(3),
-            &[OwnershipOp::Move { item: sword(201), from: hand(1), to: rack(0) }],
-        ).unwrap();
+            &[OwnershipOp::Move {
+                item: sword(201),
+                from: hand(1),
+                to: rack(0),
+            }],
+        )
+        .unwrap();
         j.apply(
             txn(4),
-            &[OwnershipOp::Move { item: sword(201), from: rack(0), to: hand(1) }],
-        ).unwrap();
+            &[OwnershipOp::Move {
+                item: sword(201),
+                from: rack(0),
+                to: hand(1),
+            }],
+        )
+        .unwrap();
         let second = read_current_mainhand(&j, char_id(1)).unwrap();
         assert_eq!(first.item_id(), second.item_id());
         assert!(second.journal_sequence() > first.journal_sequence());
@@ -220,10 +276,18 @@ mod tests {
         // not the 201-specific revision: conservative for renderer freshness.
         j.apply(
             txn(5),
-            &[OwnershipOp::Move { item: sword(202), from: rack(1), to: hand(2) }],
-        ).unwrap();
+            &[OwnershipOp::Move {
+                item: sword(202),
+                from: rack(1),
+                to: hand(2),
+            }],
+        )
+        .unwrap();
         let after_unrelated = read_current_mainhand(&j, char_id(1)).unwrap();
-        assert_eq!(after_unrelated.item_mutation_sequence(), second.item_mutation_sequence());
+        assert_eq!(
+            after_unrelated.item_mutation_sequence(),
+            second.item_mutation_sequence()
+        );
         assert!(after_unrelated.journal_sequence() > second.journal_sequence());
     }
 }
