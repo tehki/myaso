@@ -15,10 +15,14 @@ use crate::loot::{
     CorpseItemRef, EquipmentSlot, ItemStack, LootAuthority, LootError, LootStateSnapshot,
     ParkedInventory,
 };
-use crate::loot_persistence::{atomic_write, save_quiescent, CheckpointError};
+#[cfg(test)]
+use crate::loot_persistence::save_quiescent;
+use crate::loot_persistence::{atomic_write, CheckpointError};
 use crate::magic::MagicAuthority;
 use crate::magic_checkpoint::{bundle, JointCheckpointError};
-use crate::simulation::{Action, World};
+#[cfg(test)]
+use crate::simulation::Action;
+use crate::simulation::World;
 use crate::zone::ZoneAuthority;
 
 #[derive(Debug)]
@@ -69,6 +73,9 @@ pub(crate) fn quiescent_verified(
     Ok(LootAuthority::restore_state(state)?)
 }
 
+/// OFFLINE TEST-ONLY mutation primitive. Unrestricted closures bypass the
+/// single canonical u128 item ledger and checked Physics geometry. This
+/// function MUST NOT be present in production or exposed as a network API.
 /// Stage one mutation, validate the whole resulting loot world, save an
 /// authenticated-character-keyed recovery copy, THEN publish the live copy.
 ///
@@ -77,7 +84,8 @@ pub(crate) fn quiescent_verified(
 /// Action closures must have no effects outside the staged LootAuthority,
 /// including messages, remote writes or player mutations in other services.
 /// This is a stepping stone, not a safe live per-action protocol.
-pub fn transact_verified<T, F>(
+#[cfg(test)]
+pub(crate) fn transact_verified<T, F>(
     path: &Path,
     loot: &mut LootAuthority,
     identity: &SessionIdentityRegistry,
@@ -102,10 +110,13 @@ pub struct VerifiedLootOperation {
     pub sequence: u64,
 }
 
+/// OFFLINE TEST-ONLY mutation primitive. Arbitrary staged closures are NOT
+/// a Core 8B writer, authoritative LOS proof or real ACK/receipt path.
 /// Stage and checkpoint both the committed sequence and the loot mutation.
 /// A lower or equal sequence is rejected, including after checkpoint recovery.
 /// The caller must serialize actions and binding changes under one world lock.
-pub fn transact_operation<T, F>(
+#[cfg(test)]
+pub(crate) fn transact_operation<T, F>(
     path: &Path,
     loot: &mut LootAuthority,
     identity: &SessionIdentityRegistry,
@@ -165,6 +176,9 @@ pub enum PickupCommitError {
     Io(CheckpointError),
 }
 
+/// OFFLINE TEST-ONLY legacy pickup. A direct ground/corpse command bypasses
+/// the P0 sword-specific exact-ID and Physics check and cannot be linked into
+/// production; recovery tests retain this code under cfg(test).
 /// Experimental server-internal, typed physical pickup: derive actor, Fighter,
 /// position, zone and time from trusted authority, never from packet arguments.
 /// One copy-on-write MYWLD003 checkpoint preserves *both* item ownership and
@@ -175,7 +189,8 @@ pub enum PickupCommitError {
 /// persistent account admission or an authenticated wire protocol. Never
 /// expose this method as a live handler until Core's durable transaction
 /// contract and single-writer exclusion are proven.
-pub fn commit_verified_pickup(
+#[cfg(test)]
+pub(crate) fn commit_verified_pickup(
     path: &Path,
     loot: &mut LootAuthority,
     magic: &MagicAuthority,
@@ -404,13 +419,16 @@ pub enum EquipmentActionResult {
     Dropped { entity_id: u64 },
 }
 
+/// OFFLINE TEST-ONLY legacy gear transaction. This cannot be paired with
+/// generic ground pickup to bypass the canonical P0 sword+geometry receipt.
 /// Offline server-side gear transaction. Core must hold one exclusive
 /// World/Zone/Identity/Loot/Magic tick lock. Stages item changes and a replay
 /// watermark, then checkpoints all Loot and Magic before publishing RAM.
 ///
 /// This is not a live network handler, combat damage/mitigation adapter, real
 /// account authenticator, or post-rename I/O recovery mechanism.
-pub fn commit_verified_equipment(
+#[cfg(test)]
+pub(crate) fn commit_verified_equipment(
     path: &Path,
     loot: &mut LootAuthority,
     magic: &MagicAuthority,
