@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {readFileSync} from "node:fs";
 import {createHash} from "node:crypto";
+import {pinnedSourceLineEndingDigests} from "../tools/art/pinned-source-line-endings-p0.mjs";
 const base=new URL("../",import.meta.url);
 const read=p=>readFileSync(new URL(p,base));
 const digest=p=>createHash("sha256").update(read(p)).digest("hex");
@@ -21,8 +22,16 @@ test("P0 three-source native review pins actual World and hardened UI heads, not
   "/__ui503__/src/browser/alpha-sword-gesture.mjs":"a8b6a85fe17b1cab6ab1f2033002c1fb0526b287fb81a234264df1cb288b081c",
   "/__ui503__/src/browser/sword-canvas-pointer.mjs":"cc4b60779cc744a66ccf4ca20be1b6243c8ee935a86a795ed425c3b6f796efd6"
  });
- for(const [path,sha] of Object.entries(report.graphicsSourceHashes))
-  assert.equal(digest(path),sha);
+ for(const [path,sha] of Object.entries(report.graphicsSourceHashes)){
+  // Historical browser source report was SHA-pinned on Windows CRLF bytes.
+  // Runtime/source bytes are not changed; only exact LF/CRLF equivalence is
+  // verified for JS text. Original WebP remains strictly byte-for-byte pinned.
+  const nativeBytes=read(path);
+  const nativeDigest=path.endsWith(".mjs")
+    ?pinnedSourceLineEndingDigests(nativeBytes,path).canonicalCrLfSha256
+    :digest(path);
+  assert.equal(nativeDigest,sha,"Original 3B first-party asset/source changed: "+path);
+ }
 });
 
 test("P0 strict Chrome/Firefox native W3C pointer events + actual WebP alpha and stale interaction rules",()=>{
