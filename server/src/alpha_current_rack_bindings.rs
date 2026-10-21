@@ -138,9 +138,7 @@ mod tests {
         alpha_armory_mapping_preflight::GREYHAVEN_RACK_V1,
         identity::CharacterId,
         item_ownership::{OwnershipOp, OwnershipTxnId, ZoneId},
-        legacy_gear_preflight::{
-            LegacyDomain, LegacyMigrationError, ProposedLegacyNamespaces,
-        },
+        legacy_gear_preflight::{LegacyDomain, LegacyMigrationError, ProposedLegacyNamespaces},
     };
     use std::{
         fs,
@@ -208,7 +206,9 @@ mod tests {
         .unwrap();
         let mut imported = LegacyImportPreflight::new(namespaces, []).unwrap();
         for n in 0..4 {
-            imported.stage_owner(LegacyDomain::GroundEntity, 201 + n).unwrap();
+            imported
+                .stage_owner(LegacyDomain::GroundEntity, 201 + n)
+                .unwrap();
             imported.stage_owner(LegacyDomain::Item, 101 + n).unwrap();
         }
         imported
@@ -271,12 +271,20 @@ mod tests {
             assert_eq!(current.socket_id(), GREYHAVEN_RACK_V1[i].0);
             assert_eq!(current.ground(), grounds[i]);
             assert_eq!(current.item_mutation_sequence(), 1);
-            assert_eq!(current.canonical_item(), imported.core_item(101 + i as u64).unwrap());
+            assert_eq!(
+                current.canonical_item(),
+                imported.core_item(101 + i as u64).unwrap()
+            );
             assert_eq!(
                 current.canonical_ground_entity(),
-                imported.resolve_registered(LegacyDomain::GroundEntity, 201 + i as u64).unwrap()
+                imported
+                    .resolve_registered(LegacyDomain::GroundEntity, 201 + i as u64)
+                    .unwrap()
             );
-            assert_ne!(current.canonical_item().get(), current.canonical_ground_entity());
+            assert_ne!(
+                current.canonical_item().get(),
+                current.canonical_ground_entity()
+            );
         }
         assert_eq!(journal.item_count(), 4);
     }
@@ -288,32 +296,59 @@ mod tests {
         let mut journal = root.open();
         let grounds = seed(&mut journal, &imported);
         let item = imported.core_item(101).unwrap();
-        let before = read_proposed_current_four_rack_items(&journal, rows(), &imported, cm_mapping())
-            .unwrap();
+        let before =
+            read_proposed_current_four_rack_items(&journal, rows(), &imported, cm_mapping())
+                .unwrap();
         journal
-            .apply(txn(2), &[OwnershipOp::Move { item, from: grounds[0], to: hand(1) }])
+            .apply(
+                txn(2),
+                &[OwnershipOp::Move {
+                    item,
+                    from: grounds[0],
+                    to: hand(1),
+                }],
+            )
             .unwrap();
-        let picked = read_proposed_current_four_rack_items(&journal, rows(), &imported, cm_mapping())
-            .unwrap();
+        let picked =
+            read_proposed_current_four_rack_items(&journal, rows(), &imported, cm_mapping())
+                .unwrap();
         assert!(picked.slots()[0].is_none());
         assert!(picked.slots()[1..].iter().all(Option::is_some));
         assert!(picked.journal_sequence() > before.journal_sequence());
         // Original pickup success history remains, but source no longer owns the sword.
         let another_ground = cm_mapping().propose_ground(3720, 4000).unwrap();
         journal
-            .apply(txn(3), &[OwnershipOp::Move { item, from: hand(1), to: another_ground }])
+            .apply(
+                txn(3),
+                &[OwnershipOp::Move {
+                    item,
+                    from: hand(1),
+                    to: another_ground,
+                }],
+            )
             .unwrap();
-        let dropped = read_proposed_current_four_rack_items(&journal, rows(), &imported, cm_mapping())
-            .unwrap();
+        let dropped =
+            read_proposed_current_four_rack_items(&journal, rows(), &imported, cm_mapping())
+                .unwrap();
         assert!(dropped.slots()[0].is_none());
         journal
-            .apply(txn(4), &[OwnershipOp::Move { item, from: another_ground, to: grounds[0] }])
+            .apply(
+                txn(4),
+                &[OwnershipOp::Move {
+                    item,
+                    from: another_ground,
+                    to: grounds[0],
+                }],
+            )
             .unwrap();
-        let returned = read_proposed_current_four_rack_items(&journal, rows(), &imported, cm_mapping())
-            .unwrap();
+        let returned =
+            read_proposed_current_four_rack_items(&journal, rows(), &imported, cm_mapping())
+                .unwrap();
         assert_eq!(returned.slots()[0].unwrap().canonical_item(), item);
-        assert!(returned.slots()[0].unwrap().item_mutation_sequence()
-            > before.slots()[0].unwrap().item_mutation_sequence());
+        assert!(
+            returned.slots()[0].unwrap().item_mutation_sequence()
+                > before.slots()[0].unwrap().item_mutation_sequence()
+        );
         assert_eq!(journal.item_count(), 4);
         drop(journal);
         let recovered = root.open();
@@ -370,8 +405,8 @@ mod tests {
             offset_x_cm: 5,
             ..cm_mapping()
         };
-        let view = read_proposed_current_four_rack_items(&journal, rows(), &imported, incorrect)
-            .unwrap();
+        let view =
+            read_proposed_current_four_rack_items(&journal, rows(), &imported, incorrect).unwrap();
         assert!(view.slots().iter().all(Option::is_none));
     }
 }
