@@ -1,0 +1,83 @@
+{
+  "status": "INSTRUMENTED_READY",
+  "variant": "world493",
+  "maxWarmups": 6,
+  "heads": {
+    "world": "07060f981b8a1dac89184b621b6893dd970a08ae",
+    "art": "2a11b923591a682bbae3cffe6d9f70b0d2036de8"
+  },
+  "host": {
+    "platform": "win32",
+    "cpu": "Intel(R) Core(TM) i7-2700K CPU @ 3.50GHz"
+  },
+  "injectedLogsInMemory": true,
+  "productionEdited": false,
+  "realItemOwnershipTested": false,
+  "screenshotAttempted": false,
+  "pixelsRead": false,
+  "frameBudgetClaim": false,
+  "trace": [
+    "P0_TRACE image:begin 313",
+    "html HTTP 200",
+    "P0_TRACE image:decoded 339.40000009536743",
+    "P0_TRACE draw:begin 0 341.40000009536743",
+    "P0_TRACE draw:end 0 121.20000004768372 cached 3",
+    "P0_TRACE draw:begin 1 462.90000009536743",
+    "P0_TRACE draw:end 1 11.400000095367432 cached 6",
+    "P0_TRACE draw:begin 2 474.5",
+    "P0_TRACE draw:end 2 1 cached 6",
+    "P0_TRACE draw:begin 3 475.80000019073486",
+    "P0_TRACE draw:end 3 1 cached 6",
+    "P0_TRACE draw:begin 4 477",
+    "P0_TRACE draw:end 4 0.7000000476837158 cached 6",
+    "P0_TRACE draw:begin 5 477.80000019073486",
+    "P0_TRACE draw:end 5 0.7999999523162842 cached 6"
+  ],
+  "served": [
+    {
+      "path": "/web/armory-p0-world493-review.html",
+      "at": 1792585869710
+    },
+    {
+      "path": "/web/armory-p0-world493-review.mjs",
+      "at": 1792585869816
+    },
+    {
+      "path": "/__world493__/src/browser/authored-world-renderer.mjs",
+      "at": 1792585869824
+    },
+    {
+      "path": "/__world493__/src/world/alpha-armory.mjs",
+      "at": 1792585869825
+    },
+    {
+      "path": "/__world493__/src/world/authored-maps.mjs",
+      "at": 1792585869825
+    },
+    {
+      "path": "/src/browser/armory-world493-visual-bridge.mjs",
+      "at": 1792585869827
+    },
+    {
+      "path": "/src/browser/armory-rack-visual.mjs",
+      "at": 1792585869828
+    },
+    {
+      "path": "/src/browser/arena-viewport.mjs",
+      "at": 1792585869891
+    },
+    {
+      "path": "/assets/environment/greyhaven/armory-p0/armory_rack.webp",
+      "at": 1792585869906
+    },
+    {
+      "path": "/assets/environment/greyhaven/armory-p0/armory_sword.webp",
+      "at": 1792585869907
+    }
+  ],
+  "errors": [],
+  "cachedTiles": 6,
+  "createdTiles": 0,
+  "renderedArtOnlySwords": 4,
+  "chrome": "Chrome/154.0.8037.99"
+}
