@@ -880,8 +880,8 @@ mod tests {
     fn four_physical_swords_and_verified_transfer_require_zero_spell_progression() {
         use crate::loot_transaction::{
             commit_verified_equipment, commit_verified_pickup, EquipmentActionResult,
-            PickupCommitError, PickupWorldTick, VerifiedEquipmentAction,
-            VerifiedLootOperation, VerifiedPickupSelection,
+            PickupCommitError, PickupWorldTick, VerifiedEquipmentAction, VerifiedLootOperation,
+            VerifiedPickupSelection,
         };
         use crate::magic_checkpoint::load_joint;
         use crate::zone::ZoneAuthority;
@@ -960,7 +960,8 @@ mod tests {
                     .id,
                 sword
             );
-            assert!(loot.inventory(id)
+            assert!(loot
+                .inventory(id)
                 .unwrap()
                 .equipped(EquipmentSlot::OffHand)
                 .is_none());
@@ -1108,8 +1109,11 @@ mod tests {
             assert_eq!(saved_magic.mana(c), 0);
             assert!(!saved_magic.knows_spell(c, Spell::Ember));
         }
-        assert!(saved_loot.parked_inventory(character(1)).unwrap()
-            .equipped(EquipmentSlot::MainHand).is_none());
+        assert!(saved_loot
+            .parked_inventory(character(1))
+            .unwrap()
+            .equipped(EquipmentSlot::MainHand)
+            .is_none());
         assert_eq!(
             saved_loot
                 .parked_inventory(character(2))
@@ -1131,8 +1135,14 @@ mod tests {
             );
         }
         assert!(!saved_loot.ground().contains_key(&entity_id));
-        assert_eq!(saved_loot.committed_operation_sequence(character(1)), Some(3));
-        assert_eq!(saved_loot.committed_operation_sequence(character(2)), Some(4));
+        assert_eq!(
+            saved_loot.committed_operation_sequence(character(1)),
+            Some(3)
+        );
+        assert_eq!(
+            saved_loot.committed_operation_sequence(character(2)),
+            Some(4)
+        );
         let _ = std::fs::remove_file(&path);
     }
 
