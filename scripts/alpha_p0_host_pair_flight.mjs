@@ -9,6 +9,7 @@ import {hostname,networkInterfaces} from "node:os";
 import path from "node:path";
 import {setTimeout as sleep} from "node:timers/promises";
 import {parseHostPairConfig,privateIpv4} from "./alpha_p0_host_pair_config.mjs";
+import {probeHostCapabilities} from "./alpha_p0_host_pair_capability_preflight.mjs";
 
 const interfaces=Object.values(networkInterfaces()).flat().filter(Boolean);
 const localAddresses=interfaces.filter(x=>x.family==="IPv4"&&!x.internal).map(x=>x.address);
@@ -153,6 +154,14 @@ async function untilUtc(when){
   await sleep(Math.max(0,when-Date.now()));
 }
 async function run(){
+  // Verify BOTH actual browsers and W3C driver programs BEFORE opening even
+  // a localhost page listener. No capability bypass via stage environment.
+  const tools=probeHostCapabilities();
+  if(!tools.ready)throw Error("LOCAL_BROWSER_PREREQUISITES_BLOCKED "+
+    JSON.stringify({host:tools.host,missing:tools.missing}));
+  console.log("MYASO_P0_PAIR_LOCAL_CAPABILITY_READY "+
+    JSON.stringify({host:tools.host,platform:tools.platform,
+      driverMajorChecked:tools.chromeDriverMajorChecked}));
   console.log("MYASO_P0_PAIR_START "+JSON.stringify({
     role:cfg.role,hostId:cfg.hostId,osHost:hostname(),server:cfg.url,
     utcBarrier:cfg.start,clientIpv4:localAddresses.filter(privateIpv4)}));
