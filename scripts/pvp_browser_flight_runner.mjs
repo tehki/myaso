@@ -4616,6 +4616,10 @@ async function runOnlineUiKickKnockdownFfaHitFlight(entries) {
         attempt,
         punishPointerOffset,
         knockdownTransition,
+        // Preserve the one genuine authenticated Chrome2 recovery cue across
+        // the attempted-conversion lexical scope. Never re-read, fabricate,
+        // or substitute a victim/third-client timestamp as cue proof.
+        nativeCueObservation: observed,
       };
 
 
@@ -4745,7 +4749,7 @@ async function runOnlineUiKickKnockdownFfaHitFlight(entries) {
   // at epoch4036 and physically clicked at4044; the victim's separate Chrome
   // replica was received at4064, 20ms AFTER that real click. Do not use
   // unrelated client snapshot-arrival wall epochs as a server action fence.
-  const nativeCueProof = verifyM155RealCueBeforeNativePunish(observed, {
+  const nativeCueProof = verifyM155RealCueBeforeNativePunish(conversion.nativeCueObservation, {
     punisherId, defenderId, pointerDownEpochMs: punishDown.epochMs,
     cueDeadlineMs: COMBAT.kick.knockdownMs,
   });
