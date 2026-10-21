@@ -75,3 +75,36 @@ measured p95/p99 production loads or network-isolated hosts.
 ## Native Firefox protocol dependency
 
 The mixed Chrome/Firefox/Chrome real-server acceptance requires the explicit C1 v1 preface under [Core draft #455](https://github.com/tehki/myaso/pull/455), itself stacked on 8A #403. The older stream-opening behavior is not interoperable with Firefox: gameplay works, but chat reply stream negotiation times out. Do **not** turn on public chat unless the client + Core server are deployed atomically, full protected Combat gates pass, and the mixed/browser acceptance is rerun on the integrated main build. This UI change remains disabled outside local preview.
+
+
+## Native UTF-8 boundary and combat focus acceptance (UI 10 follow-up)
+
+The manual original-source three-browser runner also verifies genuine
+240-byte UTF-8 (é×120) acceptance and nearby B delivery with far C
+excluded, followed by a deliberately over-limit 242-byte (é×121)
+browser composer (set programmatically only to bypass native maxLength)
+that must create no pending/sent row and no B delivery. Native Escape clears
+that rejected draft and returns focus to the arena before the existing
+native movement and server gameplay-ACK continuity check. This is an
+acceptance-script-only extension; normal users still cannot type 241
+characters past the HTML input limit. It remains a loopback-only, real
+Rust WebTransport test and does not prove combat-under-chat or public
+activation. No mocks, no production protocol or game client change.
+
+The separate, additive opt-in PR CI workflow at
+.github/workflows/chat-c1-ui-browser.yml runs this acceptance on GitHub
+ubuntu-latest with the actual Rust binary, ChromeDriver and three native
+Chrome sessions. It is *not* a production chat feature toggle, does not
+replace Combat quality, and does not prove Firefox/independent-host.
+
+The browser workflow additionally requires a genuine Chrome / Firefox /
+Chrome run using the same script and a fresh real Rust local server; each
+mode must satisfy identical near/far, UTF-8, Escape and gameplay-ACK gates.
+
+Native browser ACK diagnostics expose a bounded 96-item RTT history, not a
+monotonic lifetime ACK count. When the history reaches 96 samples during a
+slow Firefox startup, the acceptance runner now requires newer authoritative
+server ticks after real native W movement with nonempty ACK telemetry.
+Without that fallback it incorrectly requires 98 samples from 96 slots.
+This fallback demonstrates authoritative gameplay progress, not proof of
+a particular individual input ACK; full Combat/Core gates remain required.
