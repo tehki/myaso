@@ -33,6 +33,7 @@ import { dispatchR2ReleaseLedShortBlock } from "./r2-release-led-short-block.mjs
 import { dispatchM41NativeParryOnLightOnset } from "./m41-authoritative-light-onset.mjs";
 import { readM161OpeningKickProof } from "./m161-opening-kick-proof.mjs";
 import { readM171RejectedFeintProof } from "./m171-rejected-feint-proof.mjs";
+import { dispatchM107NativeDodge } from "./m107-native-dodge-plan.mjs";
 import { createM221TrustedWheelRegistry } from "./m221-trusted-wheel-attestation.mjs";
 import { attachM325TrustedWheelSocket } from "./m325-trusted-wheel-socket.mjs";
 import { requiresM338GuardBreakWheelSocket } from "./m338-guard-break-wheel-scenarios.mjs";
@@ -1463,6 +1464,12 @@ async function runOnlineUiHeavyDodgeFlight(entries) {
   );
   const { attacker, defender, defenderElementId, movementCode } = staged;
 
+  // Aim the real pointer before heavy commitment. Run39577405173 inserted
+  // pointerMove into the timed wheel sequence: actual Dodge286 followed the
+  // damaging HeavyActive285. The timed exchange delivers S and wheel without
+  // a pointer-motion or down-acknowledgement dependency on its host deadline.
+  await aimArena(defender, defenderElementId, 0, 180);
+
   let committedObserved = false;
   let lastCommitEvidence = null;
   for (let attempt = 1; attempt <= 3 && !committedObserved; attempt += 1) {
@@ -1474,51 +1481,25 @@ async function runOnlineUiHeavyDodgeFlight(entries) {
     // The loopback-only M201_ACTION proof binds this to the authoritative
     // fighter and 60Hz tick; never infer commitment from a WebDriver ACK.
     const serverLogOffset = m201ServerOutput().length;
-    const eResult = setMovementKey(attacker, "e", true).then(
-      () => ({ ok: true }), error => ({ ok: false, error }),
-    );
-    try {
-      let windup;
-      try {
-        windup = await awaitM223HeavyWindup({
-          readOutput: m201ServerOutput, afterOffset: serverLogOffset,
-          fighterId: beforeAttacker.playerNetId, sleep, timeoutMs: 550,
-        });
-      } catch (error) {
-        const delivered = await eResult;
-        if (!delivered.ok) throw delivered.error;
-        throw error;
-      }
-      const windupObservedEpochMs = Date.now();
-      const delivered = await eResult;
-      if (!delivered.ok) throw delivered.error;
-      committedObserved = true;
-      // Schedule one real W3C pointer-owned roll ~170ms after server windup
-      // is observed. Approx. 60ms browser+network receipt then positions
-      // its ~125ms i-frame around the 320ms heavy active contact, WITHOUT
-      // modifying either combat timer, heavy reach, 46HP or test assertions.
-      // Date.now() absolute scheduling avoids accumulating Chrome KeyS
-      // WebDriver ACK latency before the wheel and keeps heavy E held.
-      const wheelTargetEpochMs = windupObservedEpochMs + 170;
-      await setMovementKey(defender, "s", true);
-      try {
-        const remainingMs = wheelTargetEpochMs - Date.now();
-        if (remainingMs > 0) await sleep(remainingMs);
-        const wheelIssuedEpochMs = Date.now();
-        await performArenaTimedPointerDodge(defender, defenderElementId, 15);
-        console.log("M204_SERVER_WINDUP_NATIVE_DODGE " + JSON.stringify({
-          fighterId: beforeAttacker.playerNetId, serverWindupTick: windup.serverTick,
-          windupObservedAfterMs: windup.observedAfterMs,
-          plannedAfterWindupMs: 170,
-          wheelIssuedAfterObservedMs: wheelIssuedEpochMs - windupObservedEpochMs,
-        }));
-      } finally {
-        await setMovementKey(defender, "s", false);
-      }
-    } finally {
-      await eResult;
-      await setMovementKey(attacker, "e", false);
-    }
+    const exchange = await dispatchM107NativeDodge({
+      sendHeavyDown: () => setMovementKey(attacker, "e", true),
+      sendPerpendicularDown: () => setMovementKey(defender, "s", true),
+      awaitWindup: () => awaitM223HeavyWindup({
+        readOutput: m201ServerOutput, afterOffset: serverLogOffset,
+        fighterId: beforeAttacker.playerNetId, sleep, timeoutMs: 550,
+      }),
+      sendWheel: () => scrollArenaWheel(defender, defenderElementId, -120),
+      sendPerpendicularUp: () => setMovementKey(defender, "s", false),
+      sendHeavyUp: () => setMovementKey(attacker, "e", false),
+      sleep,
+    });
+    committedObserved = true;
+    console.log("M204_SERVER_WINDUP_NATIVE_DODGE " + JSON.stringify({
+      fighterId: beforeAttacker.playerNetId, serverWindupTick: exchange.windup.serverTick,
+      windupObservedAfterMs: exchange.windup.observedAfterMs,
+      plannedAfterWindupMs: exchange.plannedAfterWindupMs,
+      wheelIssuedAfterObservedMs: exchange.wheelIssuedAfterObservedMs,
+    }));
     if (committedObserved) break;
 
     lastCommitEvidence = await Promise.all(entries.map(readUiEvidence));
