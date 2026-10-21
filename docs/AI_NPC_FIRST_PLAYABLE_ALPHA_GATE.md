@@ -428,3 +428,30 @@ full revisioned colliders, dynamic doors/river/characters, zone/worker
 epoch and approved spawn/patrol anchors before any live NPC movement.
 No real World #521 or Core #532 data is imported, no permanent rack-blocking
 position is selected, and no NPC pilot/runtime flag is enabled.
+
+
+## Pre-authority NPC navigation arithmetic fail-closed (extreme coordinates)
+
+A Rust debug test exposed two panics in the *isolated pilot* collision
+planner even though it accepted the window as valid: an expanded
+rectangle near `i32::MAX` overflowed while computing its padded right
+or lower edge, and shortest-path expansion from a valid grid cell at
+`i32::MAX` overflowed while examining an out-of-window east/north
+neighbor. The current authored loopback fixture uses small
+coordinates; this was a **bounded-contract safety bug**, not evidence
+of an exploited multiplayer endpoint.
+
+The planner now compares the expanded obstacle edges as `i64` and
+uses `checked_add` when considering an adjacent grid cell.
+Out-of-range steps are simply skipped. A new regression constructs a
+valid 11x11-cell pilot window whose max coordinates equal
+`i32::MAX`, checks an obstacle extending to the upper edge, verifies
+blocked endpoints are rejected, and proves a valid full route can
+begin at the upper corner without wrapping or panicking.
+
+The previous collision revision, zone, collider-count, clearance and
+path-budget gates are retained. This changes no protocol, Combat,
+movement authority, real map, world items, or production flag. It is
+still **not** a complete authenticated live map snapshot, dynamic
+obstacle list, or an approved Sentinel collision body: Physics 6 and
+Core 8C must own those before patrol activation.
