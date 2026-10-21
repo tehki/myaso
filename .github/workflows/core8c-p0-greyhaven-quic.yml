@@ -1,0 +1,35 @@
+name: Core 8C P0 real QUIC Greyhaven spawns
+
+on:
+  pull_request:
+    paths:
+      - "server/tests/alpha_greyhaven_spawn_quic.rs"
+      - "server/src/alpha_spawn.rs"
+      - "server/src/main.rs"
+      - ".github/workflows/core8c-p0-greyhaven-quic.yml"
+  push:
+    branches: [main]
+    paths:
+      - "server/tests/alpha_greyhaven_spawn_quic.rs"
+      - "server/src/alpha_spawn.rs"
+      - "server/src/main.rs"
+      - ".github/workflows/core8c-p0-greyhaven-quic.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  four-real-quic-greyhaven-spawns:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify Rust compiler and formatting
+        run: |
+          rustc --version
+          cargo --version
+          cargo fmt --manifest-path server/Cargo.toml -- --check
+      - name: Strict Rust server lint
+        run: cargo clippy --locked --manifest-path server/Cargo.toml --all-targets -- -D warnings
+      - name: Four real loopback QUIC clients receive authoritative Greyhaven spawns
+        run: cargo test --locked --manifest-path server/Cargo.toml --test alpha_greyhaven_spawn_quic -- --nocapture
