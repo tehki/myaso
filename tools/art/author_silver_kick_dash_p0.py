@@ -15,6 +15,7 @@ p.add_argument("--kick-only",action="store_true",help="Bake corrected kick only;
 p.add_argument("--no-render",action="store_true",help="Validate independently saved original-source Blender actions before spending time on sprite baking")
 p.add_argument("--plant-kick",action="store_true",help="Correct original Blender pose-action hip center to hold the original support toe; source-only, not actual Greyhaven floor proof")
 p.add_argument("--spartan-kick",action="store_true",help="Opt-in cinematic high-knee front push-kick, grounded source-only; unchanged Combat authority")
+p.add_argument("--spartan-high-forward",action="store_true",help="Owner-approved silhouette: higher knee-to-chest chamber and farther boot thrust using natural 22-bone hip drive; preview only")
 p.add_argument("--samples",type=int,default=1)
 p.add_argument("--engine",choices=["CYCLES","BLENDER_EEVEE_NEXT"],default="CYCLES")
 args=p.parse_args(argv)
@@ -104,6 +105,26 @@ spartaContact={**spartaGuard,"RightUpLeg":(1.36,-.02,-.05),"RightLeg":(-.08,0,0)
 spartaRetract={**spartaGuard,"RightUpLeg":(.82,0,-.07),"RightLeg":(-.98,0,0),
  "RightFoot":(.05,0,0),"LeftUpLeg":(-.08,0,0),"LeftLeg":(.17,0,0),
  "Spine":(.01,0,-.02),"Spine1":(-.04,0,0),"Hips":(.01,0,-.03)}
+# Second revision, authored specifically against owner's approved higher-knee,
+# more-forward kick silhouette. Thigh fold + pelvis drive lengthens the visual
+# stride relative to planted left toe; neither bone length nor actor root moves.
+# Torso counter-rotates to brace the armored knight, preventing a flat lean.
+spartaHighChamberV2={**spartaGuard,
+ "RightUpLeg":(2.08,-.02,-.08),"RightLeg":(-1.62,0,0),
+ "RightFoot":(.20,0,.04),"LeftUpLeg":(-.14,0,-.03),"LeftLeg":(.24,0,0),
+ "Hips":(.03,0,.01),"Spine":(-.11,0,.04),"Spine1":(-.11,0,-.03)}
+spartaThrustV2={**spartaGuard,
+ "RightUpLeg":(1.91,-.02,-.06),"RightLeg":(-.27,0,0),
+ "RightFoot":(-.30,0,.05),"LeftUpLeg":(-.16,0,-.04),"LeftLeg":(.27,0,0),
+ "Hips":(.26,0,.03),"Spine":(-.26,0,.02),"Spine1":(-.13,0,-.02)}
+spartaFullContactV2={**spartaGuard,
+ "RightUpLeg":(2.02,-.02,-.06),"RightLeg":(-.12,0,0),
+ "RightFoot":(-.35,0,.05),"LeftUpLeg":(-.18,0,-.04),"LeftLeg":(.28,0,0),
+ "Hips":(.35,0,.04),"Spine":(-.31,0,.03),"Spine1":(-.13,0,-.03)}
+spartaRecoilingV2={**spartaGuard,
+ "RightUpLeg":(1.11,-.02,-.06),"RightLeg":(-1.28,0,0),
+ "RightFoot":(.08,0,.02),"LeftUpLeg":(-.10,0,-.02),"LeftLeg":(.18,0,0),
+ "Hips":(.09,0,.01),"Spine":(-.04,0,0),"Spine1":(-.05,0,-.02)}
 # Dash: separate 140ms short forward lean. No rig root translation;
 # true movement is always server authoritative (750 world unit/s).
 dashReady={"Spine":(.12,0,0),"Spine1":(.11,0,-.02),
@@ -136,6 +157,16 @@ if args.spartan_kick:
   (10.6,spartaContact,(0,0,-.022)),
   (13.5,spartaRetract,(0,0,-.026)),
   (18.0,spartaGuard,(0,0,-.008)),
+  (23.8,{},(0,0,0))]
+if args.spartan_high_forward:
+ assert args.spartan_kick and args.plant_kick,"High forward Silver source requires both Spartan original action and support-toe stabilizer"
+ kickKeys=[(1,{},(0,0,0)),
+  (3.7,spartaLift,(0,0,-.018)),
+  (6.4,spartaHighChamberV2,(0,0,-.034)),
+  (8.5,spartaThrustV2,(0,0,-.020)),
+  (10.6,spartaFullContactV2,(0,0,-.017)),
+  (13.5,spartaRecoilingV2,(0,0,-.023)),
+  (18.0,spartaGuard,(0,0,-.007)),
   (23.8,{},(0,0,0))]
 dashKeys=[(1,{},(0,0,0)),
  (2.1,dashReady,(0,0,-.025)),
@@ -274,7 +305,7 @@ if not (args.smoke or args.smoke_fast):
  arm.animation_data.action=kick
  arm.animation_data.action_slot=kick.slots[0]
  for act in actions.values():act.use_fake_user=True
- blend=out/("Graphics3A_Silver_Spartan_Power_Kick_action_source.blend" if args.spartan_kick else "Graphics3A_Silver_Kick_Dash_grounded_action_source.blend" if args.plant_kick else "Graphics3A_Silver_Kick_Dash_action_source.blend")
+ blend=out/("Graphics3A_Silver_Spartan_Higher_Forward_Kick_source.blend" if args.spartan_high_forward else "Graphics3A_Silver_Spartan_Power_Kick_action_source.blend" if args.spartan_kick else "Graphics3A_Silver_Kick_Dash_grounded_action_source.blend" if args.plant_kick else "Graphics3A_Silver_Kick_Dash_action_source.blend")
  bpy.ops.wm.save_as_mainfile(filepath=str(blend))
  assert blend.stat().st_size>30000
  print("ACTION_BLEND_SOURCE",blend.stat().st_size,flush=True)
@@ -286,6 +317,7 @@ if not (args.smoke or args.smoke_fast):
  "authoritativePhases":{"kickMs":[90,70,220],"dashMs":140},
  "framesPerDirection":8,"directions":8,"sourceFramePx":160,
  "sourceRigBones":22,"spartanHighKneeKickOptIn":args.spartan_kick,
+ "spartanHighForwardRevisionOptIn":args.spartan_high_forward,
  "worldGroundValidated":False,
  "originalArtReplaced":False,"realGreyhaven":False,"humanVisualApproved":False,
  "trueServerEvent":False,"sourceEditableBlend":not args.smoke,

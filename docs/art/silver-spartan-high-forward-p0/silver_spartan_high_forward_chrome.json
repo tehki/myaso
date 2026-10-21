@@ -1,0 +1,18 @@
+{
+  "engine": "chrome",
+  "browser": "Chrome/154.0.8037.99",
+  "checks": 64,
+  "frameCount": 8,
+  "allFacings": 8,
+  "originalFirstPartyWebP": true,
+  "neutralStudioOnly": true,
+  "realGameplay": false,
+  "humanApproved": false,
+  "errors": [],
+  "screenshots": [
+    "silver_spartan_high_forward_chrome_frame0.png",
+    "silver_spartan_high_forward_chrome_frame2.png",
+    "silver_spartan_high_forward_chrome_frame4.png",
+    "silver_spartan_high_forward_chrome_frame7.png"
+  ]
+}
