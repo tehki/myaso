@@ -3,12 +3,17 @@ import assert from "node:assert/strict";
 import { createInputSendClock } from "../src/browser/input-send-clock.mjs";
 import { encodeInputPacket, decodeInputPacket } from "../src/network/input-codec.mjs";
 
-function scheduler() {
+function scheduler({ quantize = false } = {}) {
   let clock = 0, serial = 0;
   const jobs = new Map();
   return {
     jobs,
-    schedule(callback, delay) { const id = ++serial; jobs.set(id, { callback, at: clock + delay }); return id; },
+    now() { return clock; },
+    schedule(callback, delay) {
+      const id = ++serial;
+      jobs.set(id, { callback, at: clock + (quantize ? Math.trunc(delay) : delay) });
+      return id;
+    },
     cancel(id) { jobs.delete(id); },
     wakeAt(time) {
       clock = time;
@@ -58,6 +63,16 @@ test("a late timer emits one fresh sample, never render-style catch-up packets",
   assert.equal(sent, 1);
   timers.wakeAt(197);
   assert.equal(sent, 2);
+  clock.stop();
+});
+
+test("integer browser timer delays preserve nominal 60Hz input cadence", () => {
+  const timers = scheduler({ quantize: true });
+  let sent = 0;
+  const clock = createInputSendClock({ ...timers, send: () => sent++, shouldSend: () => true });
+  clock.start();
+  for (let time = 1; time <= 1000; time++) timers.wakeAt(time);
+  assert.ok(sent >= 59 && sent <= 60, "60Hz must not become a 62.5Hz sender");
   clock.stop();
 });
 
