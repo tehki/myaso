@@ -170,9 +170,14 @@ export function createNpcChatPanel({ onSend, onFocus }) {
       if (requestGeneration === rosterGeneration) submit.disabled = false;
     }
   });
-  input.addEventListener("focus", () => {
-    if (!panel.hidden) onFocus();
-  });
+  // Every focusable NPC control must release held arena inputs. Otherwise
+  // clicking the selector or Speak while holding movement can leave the
+  // canvas without receiving the matching native keyup event.
+  for (const control of [roster, input, submit]) {
+    control.addEventListener("focus", () => {
+      if (!panel.hidden) onFocus();
+    });
+  }
   input.addEventListener("keydown", (event) => {
     event.stopPropagation();
     if (event.key === "Escape") {

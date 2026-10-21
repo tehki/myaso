@@ -14,11 +14,14 @@ const html = `<!doctype html><meta charset="utf-8"><div class="arena-wrap">
 <canvas id="arena" tabindex="0" width="640" height="480"></canvas></div>
 <script type="module">
 import { createNpcChatPanel } from "/web/npc-chat.mjs";
-const p = { sent: [], gameKeys: [], focused: 0, resolve: null };
+const p = { sent: [], gameKeys: [], heldKeys: [], focused: 0, resolve: null };
 const arena = document.querySelector("#arena");
-arena.addEventListener("keydown", e => p.gameKeys.push(e.key));
+arena.addEventListener("keydown", e => {
+ p.gameKeys.push(e.key);
+ if ("wasd".includes(e.key)) p.heldKeys.push(e.key);
+});
 const npc = createNpcChatPanel({
- onFocus() { p.focused++; },
+ onFocus() { p.focused++; p.heldKeys.length = 0; },
  onSend(id,text) {
   p.sent.push({id,text});
   return new Promise(resolve => { p.resolve = resolve; });
@@ -30,7 +33,7 @@ p.snapshot = () => ({
  hidden: document.querySelector(".npc-pilot").hidden,
  active: document.activeElement?.id || document.activeElement?.tagName,
  focused: p.focused, sent: [...p.sent],
- gameKeys: [...p.gameKeys],
+ gameKeys: [...p.gameKeys], heldKeys: [...p.heldKeys],
  disabled: document.querySelector(".npc-pilot button").disabled,
  history: [...document.querySelectorAll(".npc-pilot ol li")].map(x => x.textContent)
 });
@@ -162,9 +165,22 @@ try {
  ]) {
   await execute("window.__probe.roster([{id:3,name:'Rowan',role:'Guard',x:155,y:205}]);");
   const control = await element(selector);
+  // Genuine browser input is held before entering NPC controls; a focus
+  // callback must release gameplay input even if the native keyup no longer
+  // reaches the canvas.
+  await request(base,"POST",e+"/element/"+canvas+"/click",{});
+  await keys(canvas,gameKey);
+  let beforeControl = await snapshot();
+  assert.ok(beforeControl.heldKeys.includes(gameKey),
+    "native canvas press must be held before entering "+tag);
   await request(base,"POST",e+"/element/"+control+"/click",{});
-  assert.equal((await snapshot()).active,tag,
+  const entered = await snapshot();
+  assert.equal(entered.active,tag,
     "native click must focus "+tag+" before roster revocation");
+  assert.equal(entered.focused,beforeControl.focused + 1,
+    "entering "+tag+" must invoke combat-input release callback");
+  assert.deepEqual(entered.heldKeys,[],
+    "entering "+tag+" must clear held movement without canvas keyup");
   await execute("window.__probe.roster([]);");
   const restored = await snapshot();
   assert.equal(restored.hidden,true);
@@ -178,6 +194,7 @@ try {
   ok:true,engine:"Chromium W3C",nativeKeyboard:true,nativeEnter:true,
   npcOffHidden:true,earlyReplyOrdered:true,revocationRestoresFocus:true,
   nativeSelectorRevokeRestoresFocus:true,nativeSubmitRevokeRestoresFocus:true,
+  nativeSelectorReleasesHeldInput:true,nativeSubmitReleasesHeldInput:true,
   serverConnection:false,independentHost:false
  }));
 } finally {

@@ -424,3 +424,35 @@ actions, wire messages, item pickup, Core session epochs or Combat changes.
 Chrome/Firefox and four independent WebTransport clients still require real
 browser acceptance. NPC pilot remains disabled by default; this stacked
 change must not promote experimental PR #353 into First Playable.
+
+
+## P0 optional NPC focus entry — do not strand arena inputs
+
+The original optional chat overlay called `onFocus → releaseInputs()`
+when its *text input* gained focus, but not when the native selector or
+Speak button gained focus. A player holding WASD / another combat key
+could move focus from the canvas to those controls without delivering
+the game's matching keyup to the canvas. Moving focus back later may
+leave the local input state artificially held.
+
+All three optional focusable NPC controls (selector, input, submit)
+now invoke the existing game-provided release callback only when the
+server roster has explicitly activated the overlay. This contains a
+pilot-only input hazard without adding a new keyboard listener,
+changing any Combat action, weapon interaction, pointer gesture or
+Core input packet. Roster revocation still returns control to the
+arena canvas through the parent focus-restoration fix.
+
+Exact-source tests include an isolated DOM focus-callback assertion
+for all three controls, including hidden/revoked UI, and real native
+Chromium W3C clicks on selector and Speak **after native movement
+keypresses on the canvas**. The native harness confirms the callback
+fires and clears its held-input probe even though no canvas keyup
+was sent; it additionally confirms gameplay keyboard recovers after
+roster removal. This is isolated browser input-containment evidence,
+not a live multiplayer client, server acknowledgment, physical sword
+pickup, or Firefox / independent-host acceptance.
+
+For First Playable, leave the NPC pilot OFF; parent #353 and stacked
+review branches remain draft / unmerged until the orchestrator
+reviews Core 8A session dispatch, trusted zones and real gameplay.
