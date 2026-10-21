@@ -65,3 +65,21 @@ production bindings, migrations and `main` are unchanged.
 First Playable remains HOLD pending actual visible swords,
 canonical owner/epoch, authenticated pixel-click TryPickup,
 single-writer atomic equipment receipts and true multi-host proof.
+
+## 2026-10-21 integration target: exact fully protected-green Core8A/8C
+
+This standalone Core8A **test-only** head is now based for PR review
+against the existing Core8A/8C integrated branch
+`integration/core8c-p0-four-browser-stale-lease-fence-20261021`
+at qualified original [#683](https://github.com/tehki/myaso/pull/683)
+commit `81662c91d121a45ef29a146a46a145c839f596dd`
+(12/12 exact-head workflows including full protected quality pass).
+GitHub's PR patch still changes only the same five acceptance-only files.
+This is a PR-base review integration, NOT a gameplay backport and NOT
+equivalent to merging either PR into `main`. The original source-real
+red same-tick [#39659769597](https://github.com/tehki/myaso/actions/runs/39659769597)
+at tick2976 remains immutable failing evidence. New exact-head checks
+must independently prove (or still disprove) four-player clearance on
+the actual merged #683 runtime, especially before a Physics6 correction
+is available. The Physics6 source solver candidate in [#690](https://github.com/tehki/myaso/issues/690)
+is local-only and explicitly NOT part of this branch.
