@@ -668,6 +668,8 @@ jobs:
         run: |
           node --check web/online-game.mjs
           node --check scripts/pvp_browser_flight_runner.mjs
+          node --check scripts/m147-recovery-cue-receipt.mjs
+          node --test tests/m147-recovery-cue-receipt.test.mjs
           node --test --test-name-pattern="FFA recovery focus|authoritative opponent recovery" tests/m29-combat-readability.test.mjs
           node scripts/pvp_browser_flight_runner.mjs
 

@@ -23,6 +23,8 @@ import { summarizeM220KnockdownFocusTimeline } from "./m220-knockdown-focus-time
 import { mustAwaitM202GuardConvergence } from "./m202-guardbreak-convergence.mjs";
 import { verifyM201ServerPunishProof } from "./m201-authoritative-phase-proof.mjs";
 import { verifyM206ServerKnockdownPunish } from "./m206-knockdown-punish-proof.mjs";
+import { createM147RecoveryCueReceipt, dispatchM147CuePunish,
+  planM147OrdinaryFocusRetreat, M147_BROWSER_CUE_OBSERVER } from "./m147-recovery-cue-receipt.mjs";
 import { verifyM156RollKnockdownPunish } from "./m156-roll-knockdown-proof.mjs";
 import { verifyM209DualKnockdownServerPunish } from "./m209-dual-knockdown-proof.mjs";
 import { verifyM211DualRecoveryServerProof } from "./m211-dual-recovery-phase-proof.mjs";
@@ -149,6 +151,7 @@ let staticServer;
 let m325Dispose = () => {};
 let gameServer;
 let m201ServerOutput = () => "";
+const m147CueReceipt = createM147RecoveryCueReceipt();
 const m221Registry = createM221TrustedWheelRegistry();
 const m227Registry = createM227TrustedLightRegistry();
 
@@ -465,6 +468,7 @@ try {
     console.log(`${label} ${JSON.stringify({ ok: true, droppedActionDatagrams, results })}`);
   }
 } finally {
+  m147CueReceipt.dispose();
   for (const session of sessions) {
     try { await webdriver(session.base, "DELETE", `/session/${session.sessionId}`); } catch {}
   }
@@ -520,7 +524,9 @@ async function startStaticServer() {
   });
   // M325: receive a genuine Firefox wheel from a pre-connected local socket.
   // Unlike a per-wheel fetch, it does not need to establish HTTP transport.
-  m325Dispose = attachM325TrustedWheelSocket(server, m221Registry);
+  m325Dispose = attachM325TrustedWheelSocket(server, m221Registry, {
+    m147Receipt: scenario === "uijumppunishffa" ? m147CueReceipt : null,
+  });
   await new Promise((resolve, reject) => {
     server.once("error", reject);
     server.listen(staticPort, "127.0.0.1", resolve);
@@ -11134,12 +11140,24 @@ async function runOnlineUiJumpRecoveryFfaPunishFlight(entries) {
 
   let baseline = await Promise.all(entries.map(readUiEvidence));
   let observerBefore = baseline.find((entry) => entry.browser === observer.name);
-  for (let attempt = 0; attempt < 3 && observerBefore?.focusLabel !== `NEAREST #${closerId}`; attempt += 1) {
-    await pulseMovementKey(closerIdle, "a", 45);
-    await sleep(55);
+  if (observerBefore?.focusLabel !== `NEAREST #${closerId}`) {
+    const plan = planM147OrdinaryFocusRetreat(observerBefore?.acceptance?.fighters,
+      { jumpId, observerId, closerId });
+    if (plan) {
+      // One genuine retreat of #1 opens the collision tie. Repeated inward
+      // A taps on #3 cannot break the tie and can accidentally request a dash.
+      await webdriver(jumpAttacker.base, "POST", `/session/${jumpAttacker.sessionId}/actions`, {
+        actions: [{ type: "key", id: `keyboard-${jumpAttacker.name}`, actions: [
+          { type: "keyDown", value: plan.key }, { type: "pause", duration: plan.holdMs },
+          { type: "keyUp", value: plan.key },
+        ] }],
+      });
+    }
+    await sleep(80);
     baseline = await Promise.all(entries.map(readUiEvidence));
     observerBefore = baseline.find((entry) => entry.browser === observer.name);
   }
+  console.log("M147_NATIVE_STAGING " + JSON.stringify(observerBefore?.acceptance));
   const jumpBefore = baseline.find((entry) => entry.browser === jumpAttacker.name);
   const closerBefore = baseline.find((entry) => entry.browser === closerIdle.name);
   if (!jumpBefore || !observerBefore || !closerBefore) {
@@ -11147,6 +11165,9 @@ async function runOnlineUiJumpRecoveryFfaPunishFlight(entries) {
   }
   if (observerBefore.focusLabel !== `NEAREST #${closerId}`) {
     throw new Error(`${milestone} did not establish closer idle #${closerId} as ordinary focus: ${JSON.stringify(baseline)}`);
+  }
+  if (planM147OrdinaryFocusRetreat(observerBefore.acceptance?.fighters, { jumpId, observerId, closerId })) {
+    throw new Error(`${milestone} ordinary focus did not match actual idle distances: ${JSON.stringify(baseline)}`);
   }
   if (baseline.some((entry) => entry.playerHp !== 100 || entry.playerGuard !== 100)) {
     throw new Error(`${milestone} staging changed authoritative vitals: ${JSON.stringify(baseline)}`);
@@ -11162,51 +11183,27 @@ async function runOnlineUiJumpRecoveryFfaPunishFlight(entries) {
   // hit by Firefox's normal light attack, while #3 remains closer on the right.
   await aimArena(jumpAttacker, jumpArena, -200);
   await sleep(40);
-  await performArenaJumpAttackChord(jumpAttacker, jumpArena, -200, 90);
-
-  let recoveryEvidence = null;
-  let recoveryCue = null;
-  const recoveryDeadline = Date.now() + 900;
-  while (Date.now() < recoveryDeadline) {
-    const states = await Promise.all(entries.map(readUiEvidence));
-    const jumpState = states.find((entry) => entry.browser === jumpAttacker.name);
-    const observerState = states.find((entry) => entry.browser === observer.name);
-    const closerState = states.find((entry) => entry.browser === closerIdle.name);
-    const ownTransitions = jumpState?.acceptance?.ownActionTransitions ?? [];
-    const recoveryIndex = ownTransitions.findIndex((entry) =>
-      entry.action === COMBAT_ACTION.jumpAttackRecovery && Number.isFinite(entry.epochMs));
-    const cue = observerState?.recoveryTransitions.slice(observerRecoveryOffset).find((entry) =>
-      entry.visible
-      && entry.state === "jump-attack-recovery"
-      && entry.label === "PUNISH"
-      && entry.detail === "Jump attack recovery");
-    const pristine = jumpState?.playerHp === 100
-      && observerState?.playerHp === 100
-      && closerState?.playerHp === 100
-      && jumpState?.playerGuard === 100
-      && observerState?.playerGuard === 100
-      && closerState?.playerGuard === 100;
-    if (recoveryIndex >= 0
-      && observerState?.focusLabel === `PUNISH TARGET #${jumpId}`
-      && cue
-      && pristine) {
-      recoveryEvidence = states;
-      recoveryCue = cue;
-      break;
-    }
-    if (!pristine && Number.isFinite(jumpState?.playerHp)) {
-      throw new Error(`${milestone} jump attack failed to whiff cleanly: ${JSON.stringify(states)}`);
-    }
-    await sleep(8);
+  await aimArena(observer, observerArena, -200);
+  // Arm a read-only cue notification before the native attacker command.
+  // No outstanding Firefox execute/async command may delay its actual click.
+  const cueLease = m147CueReceipt.arm({ observerId, targetId: jumpId, ids });
+  let observed;
+  try {
+    observed = await dispatchM147CuePunish({
+      lease: cueLease,
+      armBrowser: () => webdriver(observer.base, "POST", `/session/${observer.sessionId}/execute/async`, {
+        script: M147_BROWSER_CUE_OBSERVER,
+        args: [cueLease.token, jumpId, observerRecoveryOffset],
+      }),
+      performJump: () => performArenaJumpAttackChord(jumpAttacker, jumpArena, -200, 90),
+      performPunish: () => performArenaM221GuardBreakClick(observer, 90),
+    });
+  } catch (error) {
+    throw new Error(`${milestone}: ${error.message}: ${JSON.stringify(await Promise.all(entries.map(readUiEvidence)))}`,
+      { cause: error });
   }
-  if (!recoveryEvidence || !recoveryCue) {
-    throw new Error(`${milestone} never exposed #${jumpId} as the actionable recovery target: ${JSON.stringify(await Promise.all(entries.map(readUiEvidence)))}`);
-  }
-
-  // Act on the cue. Firefox aims left at #1 and commits one genuine LMB while
-  // #1 is still in authoritative jump-attack recovery. Idle #3 remains closer
-  // on the opposite side and must not take damage.
-  await performArenaAttackHold(observer, observerArena, -200, 90);
+  const recoveryCue = observed.cue;
+  console.log("M147_NATIVE_CUE_OBSERVATION " + JSON.stringify(observed));
 
   let hitEvidence = null;
   const hitDeadline = Date.now() + 800;

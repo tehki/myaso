@@ -490,7 +490,8 @@ function recordAcceptanceState(state, ownId) {
       acceptance.serverTick,
     );
   }
-  if (acceptanceScenario === "uiparrypunishffahit"
+  if (acceptanceScenario === "uijumppunishffa"
+    || acceptanceScenario === "uiparrypunishffahit"
     || acceptanceScenario === "uirollknockdownbounded"
     || acceptanceScenario === "uimultiknockdownffa"
     || acceptanceScenario === "uimultiknockdownffahit"
@@ -501,6 +502,8 @@ function recordAcceptanceState(state, ownId) {
       x: fighter.x,
       y: fighter.y,
       action: fighter.action,
+      hp: fighter.hp,
+      guard: fighter.guard,
     }));
   }
   const epochMs = Date.now();
