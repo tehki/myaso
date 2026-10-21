@@ -784,9 +784,14 @@ server must remove #2 when its *fresh-input inactivity lease* expires,
 even though transport continues. A new fifth certificate-pinned
 QUIC session must be admitted with server-owned identity **#5**,
 an exact four-member reliable full roster **{1,3,4,5}**,
-and #2's original vacated anchor **(4206,4160)**. All three surviving
-original sessions must then demonstrate separately addressed fresh
-INPUT_ACKs even after #5 replaces #2.
+and #2's original vacated anchor **(4206,4160)**. The *original #2 QUIC connection itself* must terminate with the
+server-issued **application close code 0x12** and reason
+\`client input inactivity\`, not a client-initiated close,
+socket disappearance or only a replicated tombstone. New #5 must
+receive its own correctly addressed real INPUT_ACK for fresh input
+after admission. All three surviving original sessions must likewise
+demonstrate separately addressed fresh INPUT_ACKs even after #5
+replaces #2.
 
 Initial genuine proof: **135 stale packets** sent over ~30.53 seconds,
 all three tombstones independently recorded at server ticks 1812–1821,

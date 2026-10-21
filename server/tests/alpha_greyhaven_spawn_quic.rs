@@ -443,6 +443,27 @@ async fn four_live_quic_peers_expire_stale_replay_lease_and_admit_replacement() 
             last_replay.elapsed().as_secs_f32()
         );
     }
+    // The genuine original #2 connection must be closed BY the server,
+    // with its precise inactivity code/reason, not by this test or a
+    // network timeout. A mere tombstone without session closure is not
+    // sufficient proof that stale QUIC replay has been denied.
+    let stale_close = timeout(Duration::from_secs(3), doomed.closed())
+        .await
+        .context("expired #2 still holds its original live QUIC connection")?;
+    match stale_close {
+        wtransport::error::ConnectionError::ApplicationClosed(reason)
+            if reason.code() == VarInt::from_u32(0x12)
+                && reason.reason() == b"client input inactivity" =>
+        {
+            println!(
+                "ALPHA_8C_QUIC_ORIGINAL_LEASE_CLOSED actor=2 code=0x12 reason=client_input_inactivity"
+            );
+        }
+        other => bail!(
+            "old #2 QUIC connection ended for wrong reason, not authoritative 30s inactivity: {other:?}"
+        ),
+    }
+
     // The timeout must have ended the replaying session, not merely
     // removed a display: it must vacate the authoritative FOUR-slot cap.
     let replacement = timeout(Duration::from_secs(6), endpoint.connect(url.as_str()))
@@ -481,6 +502,17 @@ async fn four_live_quic_peers_expire_stale_replay_lease_and_admit_replacement() 
     if spawn != SPAWNS[1] {
         bail!("replacement #5 did not inherit exactly vacated #2 anchor: {spawn:?}");
     }
+    // The replacement itself must have real gameplay authority after
+    // the old QUIC session was closed, not only a decorative full roster.
+    send_held_direction_with_server_ack(
+        &replacement,
+        frame.sequence,
+        160_005,
+        frame.server_tick,
+        (0, 0),
+    )?;
+    require_quic_input_ack(&replacement, 160_005, 5).await?;
+
     // Each original survivor must keep receiving its OWN real INPUT_ACK
     // after old #2 expires and new #5 occupies the authoritative slot.
     for (slot, id) in [1_u32, 3, 4].into_iter().enumerate() {
@@ -496,7 +528,7 @@ async fn four_live_quic_peers_expire_stale_replay_lease_and_admit_replacement() 
     }
     println!(
         "ALPHA_8C_QUIC_REAL_STALE_LEASE_PASS replay_packets={} seconds={:.2} \
-         tombstone_peers=3 kept_alive=1,3,4 survivor_acks=3 replacement=5 original_spawn=yes",
+         tombstone_peers=3 kept_alive=1,3,4 survivor_acks=3 replacement=5 replacement_ack=yes close_code=0x12 original_spawn=yes",
         replayed,
         start.elapsed().as_secs_f32()
     );
