@@ -9,7 +9,7 @@ import path from "node:path";
 import process from "node:process";
 import { setTimeout as sleep } from "node:timers/promises";
 import {WORLD_ALPHA_SWORD_RACK_SOCKETS,validateWorldAlphaArmoryLayout} from "../src/world/alpha-armory.mjs";
-import {nextNativeWalkPulse,nativeRackArrived,proposedNativeRackReachPoint,nativeRackWithinProposedReach} from "./alpha_p0_rack_walk_math.mjs";
+import {nextNativeWalkPulse,nativeRackArrived,proposedNativeRackReachPoint,nativeRackWithinProposedReach,verifyNativeRackPeerConsensus} from "./alpha_p0_rack_walk_math.mjs";
 
 const root = process.cwd();
 const greyhavenModeValue = process.env.MYASO_ALPHA_NATIVE_GREYHAVEN;
@@ -444,10 +444,14 @@ async function nativeFourRackApproaches(views) {
     return {ok:fourVisible(value)&&all,value};
   },s.name+(nativeRackReach?" all four proposed near-sword positions visible"
     :" all four physical rack approaches visible"),7500)));
+  const peerConsensus=nativeRackReach
+    ? verifyNativeRackPeerConsensus(peers,witnessed,WORLD_ALPHA_SWORD_RACK_SOCKETS)
+    : null;
   console.log((nativeRackReach?"ALPHA_P0_FOUR_NATIVE_GREYHAVEN_PROPOSED_REACH_PASS "
     :"ALPHA_P0_FOUR_NATIVE_GREYHAVEN_RACK_APPROACH_PASS ")+JSON.stringify({
     actualBrowsers:sessions.map(s=>s.name),witnessed,
     peerSnapshots:peers.map(v=>({viewer:v.id,tick:v.tick})),
+    peerConsensus,
     worldFixtureAuthoritativeForPlacement:true,
     realRustPositions:true,proposedReachOnly:nativeRackReach,
     liveSwordItemsProven:false,physicalSwordClickProven:false,
