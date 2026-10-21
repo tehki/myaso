@@ -404,3 +404,27 @@ receipt, live NPC avatar, or production spawn was exercised.
 The Main Orchestrator's #480 P0 native Core/World/Items/Combat
 acceptance still applies separately, and the optional NPC pilot
 stays OFF for First Playable.
+
+
+## Provisional shared-world NPC collision clearance (P0 fail-closed handoff)
+
+The dormant `CollisionWindow::from_server_collision_manifest` future-zone
+constructor previously inherited the isolated pilot's **8-unit** obstacle
+buffer. Core 8C's proposed Greyhaven static-route tests and player actor
+radius use **18 units** (the 16 spawn-to-rack path matrix in Core #516/#532).
+Applying the pilot's narrower offset to physical Sentinels could permit a
+route closer to pinned buildings than the currently verified player collider.
+
+This experimental candidate keeps **8** exclusively for
+`NavigationSpace::Pilot`, and conservatively expands known obstacles by
+**18** for `NavigationSpace::Zone`, including world-edge clearance.
+A focused Rust test checks that a point 15 units from a wall is rejected
+for future-zone navigation but remains permitted by the deliberately
+isolated pilot geometry, and that route construction fails closed.
+
+**These are provisional safe bounds, not an approved Sentinel body size.**
+Physics 6, Core 8C and World 9 must review actual Sentinel radius and
+full revisioned colliders, dynamic doors/river/characters, zone/worker
+epoch and approved spawn/patrol anchors before any live NPC movement.
+No real World #521 or Core #532 data is imported, no permanent rack-blocking
+position is selected, and no NPC pilot/runtime flag is enabled.
