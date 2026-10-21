@@ -23,6 +23,7 @@ import { summarizeM220KnockdownFocusTimeline } from "./m220-knockdown-focus-time
 import { mustAwaitM202GuardConvergence } from "./m202-guardbreak-convergence.mjs";
 import { verifyM201ServerPunishProof } from "./m201-authoritative-phase-proof.mjs";
 import { verifyM206ServerKnockdownPunish } from "./m206-knockdown-punish-proof.mjs";
+import { verifyM156RollKnockdownPunish } from "./m156-roll-knockdown-proof.mjs";
 import { verifyM209DualKnockdownServerPunish } from "./m209-dual-knockdown-proof.mjs";
 import { verifyM211DualRecoveryServerProof } from "./m211-dual-recovery-phase-proof.mjs";
 import { planM203W3cPointerPause } from "./m203-w3c-wheel-ack.mjs";
@@ -543,6 +544,7 @@ async function startGameServer() {
         || scenario === "uiheavyblock" || scenario === "uiheavyparry"
         || scenario === "uiheavydodge"
         || scenario === "uikickknockdownffahit"
+        || scenario === "uirollknockdownffahit"
         || scenario === "uikickknockdownbounded"
         || scenario === "uimultiknockdownffahit"
         || scenario === "uimultirecoveryffa"
@@ -5663,6 +5665,7 @@ async function runOnlineUiRollKnockdownFfaHitFlight(entries) {
     // action nor authoritative state is synthesized or modified here.
     const knockdownTimeoutMs = COMBAT.dodge.durationMs
       + COMBAT.dodge.collisionKnockdownMs + 220;
+    const rollAuthOffset = m201ServerOutput().length;
     const knockdownWatcher = waitForDefenderKnockdown(
       defenderActionOffset,
       knockdownTimeoutMs,
@@ -5689,6 +5692,7 @@ async function runOnlineUiRollKnockdownFfaHitFlight(entries) {
       if (!rollResult.ok) throw rollResult.error;
       conversion = {
         attempt,
+        rollAuthOffset,
         punishPointerOffset,
         knockdownTransition,
       };
@@ -5837,8 +5841,8 @@ async function runOnlineUiRollKnockdownFfaHitFlight(entries) {
       && entry.epochMs >= punishWindup.epochMs)
     : null;
 
-  // The HP=66 snapshot above already proves the authoritative hit landed
-  // while #2 was still in knockdown. The attacker's own action replication can
+  // The HP=66 snapshot proves damage; server chronology below must separately
+  // prove that hit preceded recovery. The attacker's own action replication can
   // trail that victim snapshot by a network frame, so give it a short bounded
   // observation window instead of requiring attackActive in the same read.
   const activeObservationDeadline = Date.now() + 220;
@@ -5870,7 +5874,7 @@ async function runOnlineUiRollKnockdownFfaHitFlight(entries) {
   // 10–20 ms apart to actions processed in the *same authoritative tick*.
   // Compare server ticks for cross-fighter ordering. A same-tick boundary is
   // valid only if the server confirms exactly one 34 HP victim hit, while the
-  // attack must still precede the original knockdown's 260 ms end bound.
+  // attack must still precede the original knockdown's simulation-time bound.
   const verifiedSameTickHit = defenderRecovery
     && Number.isFinite(punishActive.serverTick)
     && punishActive.serverTick === defenderRecovery.serverTick
@@ -5880,7 +5884,12 @@ async function runOnlineUiRollKnockdownFfaHitFlight(entries) {
     || (Number.isFinite(punishActive.serverTick) && Number.isFinite(defenderRecovery.serverTick)
       ? punishActive.serverTick < defenderRecovery.serverTick || verifiedSameTickHit
       : punishActive.epochMs < defenderRecovery.epochMs);
-  if (punishActive.epochMs >= knockdownEndEpochMs || !attackPrecedesRecovery) {
+  // Keep actual replicated/native readability checks, but measure the fixed
+  // combat deadline from server action/HIT ticks, not cross-browser delivery.
+  const authoritativePunish = verifyM156RollKnockdownPunish(
+    m201ServerOutput().slice(conversion.rollAuthOffset), { rollerId, defenderId, punisherId });
+  console.log("M156_AUTHORITATIVE_ROLL_PUNISH " + JSON.stringify(authoritativePunish));
+  if (!attackPrecedesRecovery) {
     throw new Error(milestone + " authoritative ordering did not prove #"
       + punisherId + " became active before #" + defenderId + " recovered: "
       + JSON.stringify({
@@ -5889,6 +5898,7 @@ async function runOnlineUiRollKnockdownFfaHitFlight(entries) {
         punishWindup,
         punishActive,
         defenderRecovery,
+        authoritativePunish,
       }));
   }
   // Keep source attribution on authoritative input/action/vitals evidence.
