@@ -8,6 +8,8 @@ import { readFile, stat, mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
 import { setTimeout as sleep } from "node:timers/promises";
+import {WORLD_ALPHA_SWORD_RACK_SOCKETS,validateWorldAlphaArmoryLayout} from "../src/world/alpha-armory.mjs";
+import {nextNativeWalkPulse,nativeRackArrived} from "./alpha_p0_rack_walk_math.mjs";
 
 const root = process.cwd();
 const greyhavenModeValue = process.env.MYASO_ALPHA_NATIVE_GREYHAVEN;
@@ -15,6 +17,12 @@ if (greyhavenModeValue !== undefined && !["0","1"].includes(greyhavenModeValue))
   throw Error("MYASO_ALPHA_NATIVE_GREYHAVEN must be unset, 0 or 1");
 }
 const greyhavenMode = greyhavenModeValue === "1";
+const nativeRackWalkValue = process.env.MYASO_ALPHA_NATIVE_RACK_WALK;
+if(nativeRackWalkValue !== undefined && !["0","1"].includes(nativeRackWalkValue)) {
+  throw Error("MYASO_ALPHA_NATIVE_RACK_WALK must be unset, 0 or 1");
+}
+const nativeRackWalk = nativeRackWalkValue === "1";
+if(nativeRackWalk && !greyhavenMode)throw Error("rack walking requires explicit Greyhaven server authority");
 const GREYHAVEN_SPAWNS = new Map([
   [1,{x:4110,y:4160}],[2,{x:4206,y:4160}],
   [3,{x:4110,y:4256}],[4,{x:4206,y:4256}],
@@ -324,7 +332,92 @@ async function crashAndRejoin(game, staticPort) {
     scope:"isolated localhost CI only; no independent host, visual Greyhaven, armory sword or Combat release",
   }));
 }
-async function run() {
+
+async function pressActualMovementKey(s,key,holdMs) {
+  assert(["w","a","s","d"].includes(key), "W3C keys must be WASD only");
+  assert(Number.isFinite(holdMs)&&holdMs>=75&&holdMs<=550,"unsafe keyboard hold");
+  const url=`/session/${s.id}/actions`;
+  await webdriver(s.base,"POST",url,{actions:[{type:"key",id:"rack-walk-"+s.name,
+    actions:[{type:"keyDown",value:key}]}]});
+  try{await sleep(holdMs)}
+  finally{await webdriver(s.base,"POST",url,{actions:[{type:"key",id:"rack-walk-"+s.name,
+    actions:[{type:"keyUp",value:key}]}]});}
+}
+async function walkActualBrowserAxis(s,playerId,axis,target) {
+  assert(axis==="x"||axis==="y","unauthorized walk axis");
+  let noProgress=0;
+  const samples=[];
+  for(let attempt=0;attempt<24;attempt++){
+    const before=await snapshot(s),p=fighter(before,playerId);
+    assert(p&&fourVisible(before), "missing actual server player/roster during rack approach");
+    const step=nextNativeWalkPulse(p[axis],target);
+    if(step.done)return samples;
+    const key=axis==="x"?(step.key==="negative"?"a":"d"):
+      (step.key==="negative"?"w":"s");
+    await pressActualMovementKey(s,key,step.holdMs);
+    const after=await waitFor(async()=>{
+      const value=await snapshot(s),next=fighter(value,playerId);
+      return {ok:fourVisible(value)&&value.tick>before.tick&&!!next,value};
+    },s.name+" server-authoritative "+axis+" rack approach tick",2800);
+    const newPosition=fighter(after,playerId),gain=Math.abs(p[axis]-target)-Math.abs(newPosition[axis]-target);
+    samples.push({attempt,key,holdMs:step.holdMs,before:p[axis],after:newPosition[axis],
+      target,tick:after.tick,gain});
+    if(gain<=1)noProgress++;
+    else noProgress=0;
+    if(noProgress>=3)throw Error(s.name+" authoritative rack path blocked on "+axis+" "+
+      JSON.stringify(samples.slice(-4)));
+  }
+  throw Error(s.name+" did not reach rack "+axis+" target: "+JSON.stringify(samples.slice(-8)));
+}
+async function nativeFourRackApproaches(views) {
+  assert(greyhavenMode&&nativeRackWalk,"rack acceptance requires explicit reviewed server flag");
+  assert(validateWorldAlphaArmoryLayout()&&WORLD_ALPHA_SWORD_RACK_SOCKETS.length===4,
+    "original World four-rack geometry invalid or substituted");
+  const witnessed=[];
+  // Four distinct real browser W3C actors, never puppeteered via generated
+  // state, simulated input or write APIs; pure read of authoritative state.
+  for(let i=0;i<4;i++){
+    const s=sessions[i],slot=WORLD_ALPHA_SWORD_RACK_SOCKETS[i],id=i+1;
+    assert(views[i].id===id,"unreviewed actor assignment");
+    const found=await webdriver(s.base,"POST",`/session/${s.id}/element`,
+      {using:"css selector",value:"#arena"});
+    const target=found["element-6066-11e4-a52e-4f735466cecf"];
+    assert(target,"original game canvas missing");
+    await webdriver(s.base,"POST",`/session/${s.id}/element/${target}/click`,{});
+    // Original click focuses canvas and may initiate unarmed swing. Allow the
+    // actual server to finish recovery; never set synthetic action/position.
+    await sleep(750);
+    const vertical=await walkActualBrowserAxis(s,id,"y",slot.approach.y);
+    const horizontal=await walkActualBrowserAxis(s,id,"x",slot.approach.x);
+    const at=await waitFor(async()=>{
+      const state=await snapshot(s),p=fighter(state,id);
+      return {ok:fourVisible(state)&&nativeRackArrived(p,slot.approach),value:state};
+    },s.name+" server-owned arrival at original World rack "+slot.socketId,3500);
+    witnessed.push({id,browser:s.name,socketId:slot.socketId,
+      originalWorldApproach:slot.approach,
+      actualRustPosition:fighter(at,id),serverTick:at.tick,
+      w3cVerticalPulses:vertical,w3cHorizontalPulses:horizontal});
+    console.log("ALPHA_P0_REAL_NATIVE_RACK_APPROACH "+
+      JSON.stringify(witnessed[witnessed.length-1]));
+    await saveScreenshot(s,"rack-approach-"+id);
+  }
+  const peers=await Promise.all(sessions.map(s=>waitFor(async()=>{
+    const value=await snapshot(s);
+    const all=WORLD_ALPHA_SWORD_RACK_SOCKETS.every((slot,i)=>
+      nativeRackArrived(fighter(value,i+1),slot.approach));
+    return {ok:fourVisible(value)&&all,value};
+  },s.name+" all four physical rack approaches visible",7500)));
+  console.log("ALPHA_P0_FOUR_NATIVE_GREYHAVEN_RACK_APPROACH_PASS "+JSON.stringify({
+    actualBrowsers:sessions.map(s=>s.name),witnessed,
+    peerSnapshots:peers.map(v=>({viewer:v.id,tick:v.tick})),
+    worldFixtureAuthoritativeForPlacement:true,
+    realRustPositions:true,liveSwordItemsProven:false,
+    physicalSwordClickProven:false,
+    actualRenderedWorldProven:false,
+    scope:"one loopback CI host, no sword item ownership or independent computers"
+  }));
+}
+\nasync function run() {
   await mkdir(evidenceDir,{recursive:true});
   staticServer=await httpServer();
   const game=await startRealGameServer();
@@ -338,6 +431,10 @@ async function run() {
     const value=await snapshot(s);return{ok:fourVisible(value),value};
   },s.name+" four authoritative identities+scoreboard",25_000)));
   assertServerOwnedGreyhavenRoster(views,"initial-four");
+  if(nativeRackWalk){
+    await nativeFourRackApproaches(views);
+    return;
+  }
   for (let i=0;i<sessions.length;i++){
     await saveScreenshot(sessions[i],"four-visible");
     console.log("ALPHA_M1_FOUR_BROWSER_VISIBLE "+JSON.stringify({
