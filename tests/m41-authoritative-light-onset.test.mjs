@@ -104,3 +104,22 @@ test("M41 still runs genuine Chrome W3C, Firefox wheel and strict 34HP/-38 guard
   assert.match(raster, /if \(observerMax < 24\)/);
   assert.match(raster, /if \(localMax !== 0\)/);
 });
+
+test("M41 strictly bounds read-only real Firefox input-sampling diagnostics", () => {
+  const game = readFileSync(new URL("../web/online-game.mjs", import.meta.url), "utf8");
+  const runner = readFileSync(new URL("../scripts/pvp_browser_flight_runner.mjs", import.meta.url), "utf8");
+  const sendStart = game.indexOf("function submitPlayerInput()");
+  const sent = game.indexOf("networkClient.sendInput({ tick: outgoingTick, ...currentInput });", sendStart);
+  const trace = game.indexOf('if (acceptanceScenario === "uiparrytell") {', sendStart);
+  assert.ok(sendStart >= 0 && trace > sendStart && sent > trace);
+  const excerpt = game.slice(trace, sent);
+  assert.match(excerpt, /__MYASO_M41_INPUT_SUBMISSIONS__/);
+  assert.match(excerpt, /block: Boolean\(currentInput\.block\)/);
+  assert.match(excerpt, /rows\.length > 64/);
+  assert.doesNotMatch(excerpt, /\.sendInput\(|dispatchEvent\(/);
+  const native = runner.slice(runner.indexOf("async function runOnlineUiParryFlight("),
+    runner.indexOf("async function runOnlineUiParryPunishFfaFocusFlight("));
+  assert.match(native, /m41InputSubmissions = await execute\(defender\.base/);
+  assert.match(native, /m41InputSubmissions,/);
+  assert.match(native, /M41_M33_CAUSAL_TRACE/);
+});
