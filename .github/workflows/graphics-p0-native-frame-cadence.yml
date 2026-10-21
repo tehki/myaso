@@ -1,0 +1,48 @@
+name: Graphics P0 real four-browser frame cadence QA
+
+on:
+  pull_request:
+    paths:
+      - "scripts/graphics_p0_four_browser_frame_cadence.mjs"
+      - "scripts/alpha_p0_four_native_rendered_greyhaven.mjs"
+      - "tests/graphics-p0-four-browser-frame-cadence.test.mjs"
+      - ".github/workflows/graphics-p0-native-frame-cadence.yml"
+      - "docs/art/GRAPHICS_P0_FOUR_BROWSER_FRAME_CADENCE.md"
+
+permissions:
+  contents: read
+
+jobs:
+  genuine-native-raf-qa:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate test-only source and source-derived frame reports
+        run: |
+          node --check scripts/graphics_p0_four_browser_frame_cadence.mjs
+          node --check scripts/alpha_p0_four_native_rendered_greyhaven.mjs
+          node --test tests/graphics-p0-four-browser-frame-cadence.test.mjs
+          node --test tests/alpha_p0_native_world_liveness.test.mjs
+          node scripts/verify-core8c-greyhaven-geometry.mjs
+      - name: Check original real Chrome and Firefox WebDriver availability
+        run: |
+          chromedriver --version
+          geckodriver --version
+          google-chrome --version
+          firefox --version
+      - name: Build unchanged Rust authority for localhost-only First Playable review
+        run: cargo build --locked --manifest-path server/Cargo.toml --bin myaso-server
+      - name: Measure actual four-player Greyhaven page RAF callbacks without gameplay modifications
+        env:
+          MYASO_P0_GRAPHICS_RAF_QA: "1"
+        run: timeout --signal=TERM --kill-after=5s 180s node scripts/alpha_p0_four_native_rendered_greyhaven.mjs
+      - name: Retain actual four-native-browser screenshots and frame sample reports
+        if: always()
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: graphics-p0-native-four-browser-raf-and-raw-screenshots
+          path: alpha-p0-real-greyhaven-visual-evidence/*
+          if-no-files-found: ignore
+          retention-days: 3
