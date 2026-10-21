@@ -43,11 +43,18 @@ fn start_actual_server() -> Result<(TestServer, String, Sha256Digest)> {
         .spawn()
         .context("launch exact Cargo-built authoritative myaso-server")?;
     let stdout = child.stdout.take().context("server stdout unavailable")?;
+    let stderr = child.stderr.take().context("server stderr unavailable")?;
+    thread::spawn(move || {
+        for line in BufReader::new(stderr).lines().map_while(Result::ok) {
+            eprintln!("ALPHA_M1_SERVER_STDERR {line}");
+        }
+    });
     let (tx, rx) = mpsc::channel::<String>();
     thread::spawn(move || {
         for line in BufReader::new(stdout).lines() {
             match line {
                 Ok(line) => {
+                    eprintln!("ALPHA_M1_SERVER_STDOUT {line}");
                     if tx.send(line).is_err() {
                         break;
                     }
@@ -131,13 +138,18 @@ async fn actual_server_preserves_four_distinct_players_and_denies_fifth() -> Res
     let mut live = Vec::with_capacity(FOUR_PLAYERS);
 
     for index in 0..FOUR_PLAYERS {
+        println!("ALPHA_M1_CONNECT_START id={}", index + 1);
         let connection = timeout(Duration::from_secs(6), endpoint.connect(url.as_str()))
             .await
-            .context("pinned QUIC client connection timeout")??;
+            .with_context(|| format!("player {} pinned QUIC connection timeout", index + 1))?
+            .with_context(|| format!("player {} actual QUIC admission failure", index + 1))?;
+        println!("ALPHA_M1_CONNECTED id={}", index + 1);
         let (send, mut recv) = timeout(Duration::from_secs(4), connection.open_bi())
             .await
-            .context("reliable game stream creation timeout")??
-            .await?;
+            .context("reliable game stream creation timeout")?
+            .with_context(|| format!("player {} failed to request reliable stream", index + 1))?
+            .await
+            .with_context(|| format!("player {} failed to open reliable stream", index + 1))?;
         let baseline = timeout(Duration::from_secs(4), async {
             let mut header = [0_u8; 2];
             recv.read_exact(&mut header).await?;
