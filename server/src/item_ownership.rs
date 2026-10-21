@@ -170,6 +170,13 @@ pub struct ItemOwnershipLedger {
 }
 
 impl ItemOwnershipLedger {
+    /// Entire-commit sequence, including changes to an empty MainHand.
+    /// Reconstructed from durable C3e receipts; only ordered within ONE
+    /// journal writer lineage. This is not an 8C world epoch or net revision.
+    pub(crate) fn committed_sequence(&self) -> u64 {
+        self.sequence
+    }
+
     pub fn location(&self, item: ItemId) -> Option<ItemLocation> {
         self.items.get(&item).copied()
     }
