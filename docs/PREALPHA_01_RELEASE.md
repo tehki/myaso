@@ -7,10 +7,18 @@ Minimal existing arena, two to four independently controlled real human players,
 real Rust authoritative multiplayer, current movement/kick/roll/parry/block/jump,
 stamina, damage, death/respawn and reconnect.
 
+**OWNER AMENDMENT — ONE AUTHENTIC SILVER KNIGHT CHARACTER TYPE:** All human
+players in the existing multiplayer arena must use the five original source-
+qualified Silver Knight idle/walk/sprint/roll/jump atlases. Unsupported attacks,
+kicks, guard, damage, knockdown and death keep the original truthful Combat
+telegraphs/fallback. Local practice mode is a separate non-release demo.
+The authentic Spartan kick from Graphics #611/#617 remains visual HOLD and
+cannot be substituted by idle/walk or enabled without genuine client qualification.
+
 **EXCLUDED AS RELEASE DEPENDENCIES:** Greyhaven and World 9, items and swords,
-NPCs, magic, Blender assets, economy, IDR and world persistence. Continue the
-complete First Playable Alpha separately via #480/#488. This release does not
-remove any unfinished feature branches.
+Sentinels/NPCs, magic, all other Blender or new character assets, economy, IDR
+and world persistence. Continue the complete First Playable Alpha separately
+via #480/#488. Do not remove any unfinished feature branches.
 
 ## Current baseline and one mandatory Combat correction
 

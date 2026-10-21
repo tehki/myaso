@@ -28,5 +28,8 @@ export function alphaPlayPath(config) {
   return "/web/?" + new URLSearchParams({
     server: config.serverUrl,
     cert: config.certificateSha256,
+    // The official Pre-Alpha 0.1 lobby always gives every human a Silver Knight.
+    // Direct legacy Combat acceptance URLs retain their original pixel baseline.
+    knights: "1",
   });
 }

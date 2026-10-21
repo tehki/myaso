@@ -13,6 +13,7 @@ import { createReconciliationCamera, createSnapshotRenderClock } from "../src/br
 import { createRenderGapTelemetry } from "../src/browser/render-gap-telemetry.mjs";
 import { ARENA_VIEW_ZOOM, nearbyOffscreenPointers, projectArenaPoint } from "../src/browser/arena-viewport.mjs";
 import { NETWORK } from "../src/network/constants.mjs";
+import { createKnightSpriteRenderer, showPrototypeWeaponStroke } from "./knight-sprites.mjs";
 import { connectAuthoritativeClient, parseSha256Hex } from "./authoritative-client.mjs";
 
 const canvas = document.querySelector("#arena");
@@ -111,6 +112,11 @@ const killFeedEntries = [];
 const killFeedSequences = new Set();
 
 const params = new URLSearchParams(window.location.search);
+// Combat Pre-Alpha 0.1: all authenticated arena fighters are human Silver
+// Knights via the official lobby knights=1. Direct legacy Combat test URLs
+// and rollback without this flag keep original Combat-circle visuals.
+// Unsupported Silver animations always fall back to the original tells.
+const knightSprites = params.get("knights") === "1" ? createKnightSpriteRenderer() : null;
 const diagnosticsVisible = params.get("netstats") === "1";
 const renderGapTelemetry = diagnosticsVisible ? createRenderGapTelemetry() : null;
 const diagnosticsPanel = document.querySelector("#network-diagnostics");
@@ -1082,7 +1088,10 @@ function drawFighterScreen(x, y, fighter, body, shadow, remote = false, damageTe
   const knockedDown = action === COMBAT_ACTION.knockdown;
   const lift = airborne ? 18 : 0;
   ctx.translate(x, y - lift);
-  ctx.rotate((fighter.facing ?? 0) + (action === COMBAT_ACTION.dodge ? Math.PI * 0.35 : 0) + (knockedDown ? Math.PI / 2 : 0));
+  const presentationRotation = (fighter.facing ?? 0)
+    + (action === COMBAT_ACTION.dodge ? Math.PI * 0.35 : 0)
+    + (knockedDown ? Math.PI / 2 : 0);
+  ctx.rotate(presentationRotation);
   const localCharge = remote ? 0 : leftButtonCharge.progress();
   const heavyWindup = action === COMBAT_ACTION.heavyAttackWindup;
   const heavyActive = action === COMBAT_ACTION.heavyAttackActive;
@@ -1120,20 +1129,32 @@ function drawFighterScreen(x, y, fighter, body, shadow, remote = false, damageTe
   }
   if (remote && guardBreakSpatialPresentation(fighter).visible) drawGuardBreakTell();
   if (remote && recoveryTell) drawRecoveryTell();
-  ctx.fillStyle = shadow;
-  ctx.beginPath();
-  ctx.ellipse(-2, 8, 20, 13, 0, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.fillStyle = body;
-  ctx.beginPath();
-  ctx.arc(0, 0, COMBAT.fighterRadius, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.fillStyle = "#13110d";
-  ctx.beginPath();
-  ctx.arc(7, -5, 3, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.fillStyle = "#c8b684";
-  ctx.fillRect(12, -2, 26, 4);
+  // Only the already-authenticated player roster is passed here. Remote
+  // is a viewpoint, never an NPC role. No costume or weapon ownership is
+  // generated; source-missing actions retain the original honest Combat tell.
+  const drewKnight = knightSprites?.draw(ctx, fighter, {
+    remote, actorKind: "player", rotation: presentationRotation, nowMs: performance.now(),
+  }) ?? false;
+  if (!drewKnight) {
+    ctx.fillStyle = shadow;
+    ctx.beginPath();
+    ctx.ellipse(-2, 8, 20, 13, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = body;
+    ctx.beginPath();
+    ctx.arc(0, 0, COMBAT.fighterRadius, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "#13110d";
+    ctx.beginPath();
+    ctx.arc(7, -5, 3, 0, Math.PI * 2);
+    ctx.fill();
+    // No physical sword exists in this release; omit the legacy prototype
+    // sword-shaped rectangle while the Silver Knight feature is enabled.
+    if (showPrototypeWeaponStroke(Boolean(knightSprites))) {
+      ctx.fillStyle = "#c8b684";
+      ctx.fillRect(12, -2, 26, 4);
+    }
+  }
   if (remote && action !== COMBAT_ACTION.dead && damageTell) {
     drawDamageTell();
   }
