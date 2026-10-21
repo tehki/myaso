@@ -24,6 +24,9 @@ pub(crate) const MAX_FILE_BYTES: usize = 32 * 1024 * 1024;
 const MAX_CHARACTERS: usize = 4096;
 const MAX_WORLD_OBJECTS: usize = 100_000;
 const MAX_ITEM_STACKS: usize = 67;
+// Checkpoint v3 contains five named equipment slots: MainHand, OffHand,
+// Body, Head, Feet. Keep the old 0..2 on-disk codes unchanged.
+const MAX_EQUIPPED_SLOTS: usize = 5;
 static WRITE_SEQUENCE: AtomicU64 = AtomicU64::new(1);
 
 #[derive(Debug)]
@@ -370,7 +373,7 @@ pub(crate) fn decode(bytes: &[u8]) -> Result<LootStateSnapshot, CheckpointError>
             backpack.push(reader.item()?);
         }
         let equipped = usize::from(reader.u8()?);
-        if equipped > 3 {
+        if equipped > MAX_EQUIPPED_SLOTS {
             return Err(CheckpointError::Corrupt);
         }
         let mut equipment = BTreeMap::new();
@@ -609,6 +612,110 @@ mod tests {
             restored.export_state().unwrap(),
             loot.export_state().unwrap()
         );
+    }
+
+    #[test]
+    fn all_five_equipment_slots_survive_quiescent_checkpoint_and_keep_item_ids() {
+        let mut loot = LootAuthority::new();
+        let mut identities = SessionIdentityRegistry::new();
+        let character = CharacterId::new(901).unwrap();
+        let lease = SessionLease::new(9, 1).unwrap();
+        identities.bind_verified(lease, character).unwrap();
+        loot.register(9).unwrap();
+
+        let equipment = [
+            (ItemKind::IronSword, EquipmentSlot::MainHand),
+            (ItemKind::WoodenShield, EquipmentSlot::OffHand),
+            (ItemKind::ChainmailArmor, EquipmentSlot::Body),
+            (ItemKind::IronHelmet, EquipmentSlot::Head),
+            (ItemKind::LeatherBoots, EquipmentSlot::Feet),
+        ];
+        let mut ids = BTreeSet::new();
+        for (kind, slot) in equipment {
+            let item_id = loot.grant(9, kind, 1).unwrap();
+            assert!(ids.insert(item_id));
+            loot.equip(9, item_id, slot).unwrap();
+        }
+        assert_eq!(ids.len(), MAX_EQUIPPED_SLOTS);
+        assert!(loot.inventory(9).unwrap().backpack().is_empty());
+        loot.park_inventory(&identities, lease).unwrap();
+
+        let path = checkpoint_path();
+        save_quiescent(&path, &loot).unwrap();
+        let restored = load_quiescent(&path).unwrap();
+        let _ = fs::remove_file(&path);
+
+        let parked = restored.parked_inventory(character).unwrap();
+        assert!(parked.backpack().is_empty());
+        let mut restored_ids = BTreeSet::new();
+        for (kind, slot) in equipment {
+            let item = parked.equipped(slot).expect("slot must survive recovery");
+            assert_eq!(item.kind, kind);
+            assert_eq!(item.amount, 1);
+            assert!(restored_ids.insert(item.id));
+        }
+        assert_eq!(restored_ids, ids);
+        assert_eq!(
+            restored.export_state().unwrap(),
+            loot.export_state().unwrap()
+        );
+    }
+
+    #[test]
+    fn existing_three_slot_checkpoints_remain_readable_without_schema_change() {
+        let mut loot = LootAuthority::new();
+        let mut identities = SessionIdentityRegistry::new();
+        let character = CharacterId::new(903).unwrap();
+        let lease = SessionLease::new(11, 1).unwrap();
+        identities.bind_verified(lease, character).unwrap();
+        loot.register(11).unwrap();
+
+        for (kind, slot) in [
+            (ItemKind::RustySword, EquipmentSlot::MainHand),
+            (ItemKind::Spellbook, EquipmentSlot::OffHand),
+            (ItemKind::LeatherArmor, EquipmentSlot::Body),
+        ] {
+            let item_id = loot.grant(11, kind, 1).unwrap();
+            loot.equip(11, item_id, slot).unwrap();
+        }
+        let reagent = loot.grant(11, ItemKind::SulfurAsh, 2).unwrap();
+        loot.park_inventory(&identities, lease).unwrap();
+
+        let path = checkpoint_path();
+        save_quiescent(&path, &loot).unwrap();
+        let recovered = load_quiescent(&path).unwrap();
+        let _ = fs::remove_file(&path);
+
+        let inventory = recovered.parked_inventory(character).unwrap();
+        assert_eq!(inventory.backpack()[0].id, reagent);
+        assert_eq!(
+            recovered.export_state().unwrap(),
+            loot.export_state().unwrap()
+        );
+    }
+
+    #[test]
+    fn checkpoint_rejects_six_equipment_slots_with_valid_checksum() {
+        let mut loot = LootAuthority::new();
+        let mut identities = SessionIdentityRegistry::new();
+        let character = CharacterId::new(902).unwrap();
+        let lease = SessionLease::new(10, 1).unwrap();
+        identities.bind_verified(lease, character).unwrap();
+        loot.register(10).unwrap();
+        loot.park_inventory(&identities, lease).unwrap();
+
+        let mut bytes = encode(&loot.export_state().unwrap()).unwrap();
+        // MYASOL03(8) + version(2) + next_id(8) + operation_count(4)
+        // + parked_count(4) + character_id(8) + dead(1) + backpack_count(2).
+        // This fixture has no operation watermark and no backpack stacks.
+        let equipped_count_offset = MAGIC.len() + 2 + 8 + 4 + 4 + 8 + 1 + 2;
+        assert_eq!(bytes[equipped_count_offset], 0);
+        bytes[equipped_count_offset] = (MAX_EQUIPPED_SLOTS + 1) as u8;
+        let digest_offset = bytes.len() - 8;
+        let digest = checksum(&bytes[..digest_offset]);
+        bytes[digest_offset..].copy_from_slice(&digest.to_le_bytes());
+
+        assert!(matches!(decode(&bytes), Err(CheckpointError::Corrupt)));
     }
 
     #[test]
