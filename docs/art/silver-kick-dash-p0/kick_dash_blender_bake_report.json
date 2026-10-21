@@ -1,0 +1,1070 @@
+{
+  "source": "Owner Silver original 22-bone GLB (not bundled or modified)",
+  "sourceSha256": "d679fccd00df868d600b4c5e2fcf8a4a46cc062dbd432be5b6a7f533eb30141f",
+  "clipKeyframesMs": {
+    "silver_kick_p0": [
+      0,
+      45,
+      90,
+      125,
+      160,
+      208,
+      283,
+      380
+    ],
+    "silver_dash_p0": [
+      0,
+      18,
+      45,
+      65,
+      83,
+      110,
+      122,
+      140
+    ]
+  },
+  "authoritativePhases": {
+    "kickMs": [
+      90,
+      70,
+      220
+    ],
+    "dashMs": 140
+  },
+  "framesPerDirection": 8,
+  "directions": 8,
+  "sourceFramePx": 160,
+  "sourceRigBones": 22,
+  "worldGroundValidated": false,
+  "originalArtReplaced": false,
+  "realGreyhaven": false,
+  "humanVisualApproved": false,
+  "trueServerEvent": false,
+  "sourceEditableBlend": true,
+  "rendered": [
+    {
+      "clip": "silver_kick_p0",
+      "direction": 0,
+      "phase": 0,
+      "sourceFrame": 1,
+      "sampledBlenderFrame": 1,
+      "bytes": 22276
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 0,
+      "phase": 1,
+      "sourceFrame": 3.7,
+      "sampledBlenderFrame": 4,
+      "bytes": 22094
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 0,
+      "phase": 2,
+      "sourceFrame": 6.4,
+      "sampledBlenderFrame": 6,
+      "bytes": 22170
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 0,
+      "phase": 3,
+      "sourceFrame": 8.5,
+      "sampledBlenderFrame": 8,
+      "bytes": 24188
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 0,
+      "phase": 4,
+      "sourceFrame": 10.6,
+      "sampledBlenderFrame": 11,
+      "bytes": 24554
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 0,
+      "phase": 5,
+      "sourceFrame": 13.5,
+      "sampledBlenderFrame": 14,
+      "bytes": 22654
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 0,
+      "phase": 6,
+      "sourceFrame": 18.0,
+      "sampledBlenderFrame": 18,
+      "bytes": 22705
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 0,
+      "phase": 7,
+      "sourceFrame": 23.8,
+      "sampledBlenderFrame": 24,
+      "bytes": 22276
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 1,
+      "phase": 0,
+      "sourceFrame": 1,
+      "sampledBlenderFrame": 1,
+      "bytes": 20639
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 1,
+      "phase": 1,
+      "sourceFrame": 3.7,
+      "sampledBlenderFrame": 4,
+      "bytes": 20487
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 1,
+      "phase": 2,
+      "sourceFrame": 6.4,
+      "sampledBlenderFrame": 6,
+      "bytes": 20491
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 1,
+      "phase": 3,
+      "sourceFrame": 8.5,
+      "sampledBlenderFrame": 8,
+      "bytes": 22988
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 1,
+      "phase": 4,
+      "sourceFrame": 10.6,
+      "sampledBlenderFrame": 11,
+      "bytes": 23129
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 1,
+      "phase": 5,
+      "sourceFrame": 13.5,
+      "sampledBlenderFrame": 14,
+      "bytes": 21009
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 1,
+      "phase": 6,
+      "sourceFrame": 18.0,
+      "sampledBlenderFrame": 18,
+      "bytes": 21019
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 1,
+      "phase": 7,
+      "sourceFrame": 23.8,
+      "sampledBlenderFrame": 24,
+      "bytes": 20639
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 2,
+      "phase": 0,
+      "sourceFrame": 1,
+      "sampledBlenderFrame": 1,
+      "bytes": 20624
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 2,
+      "phase": 1,
+      "sourceFrame": 3.7,
+      "sampledBlenderFrame": 4,
+      "bytes": 20287
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 2,
+      "phase": 2,
+      "sourceFrame": 6.4,
+      "sampledBlenderFrame": 6,
+      "bytes": 20446
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 2,
+      "phase": 3,
+      "sourceFrame": 8.5,
+      "sampledBlenderFrame": 8,
+      "bytes": 20997
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 2,
+      "phase": 4,
+      "sourceFrame": 10.6,
+      "sampledBlenderFrame": 11,
+      "bytes": 21078
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 2,
+      "phase": 5,
+      "sourceFrame": 13.5,
+      "sampledBlenderFrame": 14,
+      "bytes": 20731
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 2,
+      "phase": 6,
+      "sourceFrame": 18.0,
+      "sampledBlenderFrame": 18,
+      "bytes": 20980
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 2,
+      "phase": 7,
+      "sourceFrame": 23.8,
+      "sampledBlenderFrame": 24,
+      "bytes": 20624
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 3,
+      "phase": 0,
+      "sourceFrame": 1,
+      "sampledBlenderFrame": 1,
+      "bytes": 21291
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 3,
+      "phase": 1,
+      "sourceFrame": 3.7,
+      "sampledBlenderFrame": 4,
+      "bytes": 21361
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 3,
+      "phase": 2,
+      "sourceFrame": 6.4,
+      "sampledBlenderFrame": 6,
+      "bytes": 21314
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 3,
+      "phase": 3,
+      "sourceFrame": 8.5,
+      "sampledBlenderFrame": 8,
+      "bytes": 20575
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 3,
+      "phase": 4,
+      "sourceFrame": 10.6,
+      "sampledBlenderFrame": 11,
+      "bytes": 20467
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 3,
+      "phase": 5,
+      "sourceFrame": 13.5,
+      "sampledBlenderFrame": 14,
+      "bytes": 21574
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 3,
+      "phase": 6,
+      "sourceFrame": 18.0,
+      "sampledBlenderFrame": 18,
+      "bytes": 21432
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 3,
+      "phase": 7,
+      "sourceFrame": 23.8,
+      "sampledBlenderFrame": 24,
+      "bytes": 21291
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 4,
+      "phase": 0,
+      "sourceFrame": 1,
+      "sampledBlenderFrame": 1,
+      "bytes": 21052
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 4,
+      "phase": 1,
+      "sourceFrame": 3.7,
+      "sampledBlenderFrame": 4,
+      "bytes": 21495
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 4,
+      "phase": 2,
+      "sourceFrame": 6.4,
+      "sampledBlenderFrame": 6,
+      "bytes": 21433
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 4,
+      "phase": 3,
+      "sourceFrame": 8.5,
+      "sampledBlenderFrame": 8,
+      "bytes": 20137
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 4,
+      "phase": 4,
+      "sourceFrame": 10.6,
+      "sampledBlenderFrame": 11,
+      "bytes": 20072
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 4,
+      "phase": 5,
+      "sourceFrame": 13.5,
+      "sampledBlenderFrame": 14,
+      "bytes": 21300
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 4,
+      "phase": 6,
+      "sourceFrame": 18.0,
+      "sampledBlenderFrame": 18,
+      "bytes": 21237
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 4,
+      "phase": 7,
+      "sourceFrame": 23.8,
+      "sampledBlenderFrame": 24,
+      "bytes": 21052
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 5,
+      "phase": 0,
+      "sourceFrame": 1,
+      "sampledBlenderFrame": 1,
+      "bytes": 20592
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 5,
+      "phase": 1,
+      "sourceFrame": 3.7,
+      "sampledBlenderFrame": 4,
+      "bytes": 21455
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 5,
+      "phase": 2,
+      "sourceFrame": 6.4,
+      "sampledBlenderFrame": 6,
+      "bytes": 21298
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 5,
+      "phase": 3,
+      "sourceFrame": 8.5,
+      "sampledBlenderFrame": 8,
+      "bytes": 20496
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 5,
+      "phase": 4,
+      "sourceFrame": 10.6,
+      "sampledBlenderFrame": 11,
+      "bytes": 20459
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 5,
+      "phase": 5,
+      "sourceFrame": 13.5,
+      "sampledBlenderFrame": 14,
+      "bytes": 21130
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 5,
+      "phase": 6,
+      "sourceFrame": 18.0,
+      "sampledBlenderFrame": 18,
+      "bytes": 20765
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 5,
+      "phase": 7,
+      "sourceFrame": 23.8,
+      "sampledBlenderFrame": 24,
+      "bytes": 20592
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 6,
+      "phase": 0,
+      "sourceFrame": 1,
+      "sampledBlenderFrame": 1,
+      "bytes": 20888
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 6,
+      "phase": 1,
+      "sourceFrame": 3.7,
+      "sampledBlenderFrame": 4,
+      "bytes": 21339
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 6,
+      "phase": 2,
+      "sourceFrame": 6.4,
+      "sampledBlenderFrame": 6,
+      "bytes": 21315
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 6,
+      "phase": 3,
+      "sourceFrame": 8.5,
+      "sampledBlenderFrame": 8,
+      "bytes": 21538
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 6,
+      "phase": 4,
+      "sourceFrame": 10.6,
+      "sampledBlenderFrame": 11,
+      "bytes": 21651
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 6,
+      "phase": 5,
+      "sourceFrame": 13.5,
+      "sampledBlenderFrame": 14,
+      "bytes": 20938
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 6,
+      "phase": 6,
+      "sourceFrame": 18.0,
+      "sampledBlenderFrame": 18,
+      "bytes": 21152
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 6,
+      "phase": 7,
+      "sourceFrame": 23.8,
+      "sampledBlenderFrame": 24,
+      "bytes": 20888
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 7,
+      "phase": 0,
+      "sourceFrame": 1,
+      "sampledBlenderFrame": 1,
+      "bytes": 22093
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 7,
+      "phase": 1,
+      "sourceFrame": 3.7,
+      "sampledBlenderFrame": 4,
+      "bytes": 22504
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 7,
+      "phase": 2,
+      "sourceFrame": 6.4,
+      "sampledBlenderFrame": 6,
+      "bytes": 22624
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 7,
+      "phase": 3,
+      "sourceFrame": 8.5,
+      "sampledBlenderFrame": 8,
+      "bytes": 23806
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 7,
+      "phase": 4,
+      "sourceFrame": 10.6,
+      "sampledBlenderFrame": 11,
+      "bytes": 23951
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 7,
+      "phase": 5,
+      "sourceFrame": 13.5,
+      "sampledBlenderFrame": 14,
+      "bytes": 22577
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 7,
+      "phase": 6,
+      "sourceFrame": 18.0,
+      "sampledBlenderFrame": 18,
+      "bytes": 22486
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 7,
+      "phase": 7,
+      "sourceFrame": 23.8,
+      "sampledBlenderFrame": 24,
+      "bytes": 22093
+    },
+    {
+      "clip": "silver_dash_p0",
+      "direction": 0,
+      "phase": 0,
+      "sourceFrame": 1,
+      "sampledBlenderFrame": 1,
+      "bytes": 22276
+    },
+    {
+      "clip": "silver_dash_p0",
+      "direction": 0,
+      "phase": 1,
+      "sourceFrame": 2.1,
+      "sampledBlenderFrame": 2,
+      "bytes": 22081
+    },
+    {
+      "clip": "silver_dash_p0",
+      "direction": 0,
+      "phase": 2,
+      "sourceFrame": 3.7,
+      "sampledBlenderFrame": 4,
+      "bytes": 20822
+    },
+    {
+      "clip": "silver_dash_p0",
+      "direction": 0,
+      "phase": 3,
+      "sourceFrame": 4.9,
+      "sampledBlenderFrame": 5,
+      "bytes": 20867
+    },
+    {
+      "clip": "silver_dash_p0",
+      "direction": 0,
+      "phase": 4,
+      "sourceFrame": 6.0,
+      "sampledBlenderFrame": 6,
+      "bytes": 20955
+    },
+    {
+      "clip": "silver_dash_p0",
+      "direction": 0,
+      "phase": 5,
+      "sourceFrame": 7.6,
+      "sampledBlenderFrame": 8,
+      "bytes": 22069
+    },
+    {
+      "clip": "silver_dash_p0",
+      "direction": 0,
+      "phase": 6,
+      "sourceFrame": 8.3,
+      "sampledBlenderFrame": 8,
+      "bytes": 22069
+    },
+    {
+      "clip": "silver_dash_p0",
+      "direction": 0,
+      "phase": 7,
+      "sourceFrame": 9.4,
+      "sampledBlenderFrame": 9,
+      "bytes": 22335
+    },
+    {
+      "clip": "silver_dash_p0",
+      "direction": 1,
+      "phase": 0,
+      "sourceFrame": 1,
+      "sampledBlenderFrame": 1,
+      "bytes": 20639
+    },
+    {
+      "clip": "silver_dash_p0",
+      "direction": 1,
+      "phase": 1,
+      "sourceFrame": 2.1,
+      "sampledBlenderFrame": 2,
+      "bytes": 20835
+    },
+    {
+      "clip": "silver_dash_p0",
+      "direction": 1,
+      "phase": 2,
+      "sourceFrame": 3.7,
+      "sampledBlenderFrame": 4,
+      "bytes": 20469
+    },
+    {
+      "clip": "silver_dash_p0",
+      "direction": 1,
+      "phase": 3,
+      "sourceFrame": 4.9,
+      "sampledBlenderFrame": 5,
+      "bytes": 20391
+    },
+    {
+      "clip": "silver_dash_p0",
+      "direction": 1,
+      "phase": 4,
+      "sourceFrame": 6.0,
+      "sampledBlenderFrame": 6,
+      "bytes": 20374
+    },
+    {
+      "clip": "silver_dash_p0",
+      "direction": 1,
+      "phase": 5,
+      "sourceFrame": 7.6,
+      "sampledBlenderFrame": 8,
+      "bytes": 20554
+    },
+    {
+      "clip": "silver_dash_p0",
+      "direction": 1,
+      "phase": 6,
+      "sourceFrame": 8.3,
+      "sampledBlenderFrame": 8,
+      "bytes": 20554
+    },
+    {
+      "clip": "silver_dash_p0",
+      "direction": 1,
+      "phase": 7,
+      "sourceFrame": 9.4,
+      "sampledBlenderFrame": 9,
+      "bytes": 20657
+    },
+    {
+      "clip": "silver_dash_p0",
+      "direction": 2,
+      "phase": 0,
+      "sourceFrame": 1,
+      "sampledBlenderFrame": 1,
+      "bytes": 20624
+    },
+    {
+      "clip": "silver_dash_p0",
+      "direction": 2,
+      "phase": 1,
+      "sourceFrame": 2.1,
+      "sampledBlenderFrame": 2,
+      "bytes": 21095
+    },
+    {
+      "clip": "silver_dash_p0",
+      "direction": 2,
+      "phase": 2,
+      "sourceFrame": 3.7,
+      "sampledBlenderFrame": 4,
+      "bytes": 21569
+    },
+    {
+      "clip": "silver_dash_p0",
+      "direction": 2,
+      "phase": 3,
+      "sourceFrame": 4.9,
+      "sampledBlenderFrame": 5,
+      "bytes": 21447
+    },
+    {
+      "clip": "silver_dash_p0",
+      "direction": 2,
+      "phase": 4,
+      "sourceFrame": 6.0,
+      "sampledBlenderFrame": 6,
+      "bytes": 21455
+    },
+    {
+      "clip": "silver_dash_p0",
+      "direction": 2,
+      "phase": 5,
+      "sourceFrame": 7.6,
+      "sampledBlenderFrame": 8,
+      "bytes": 20876
+    },
+    {
+      "clip": "silver_dash_p0",
+      "direction": 2,
+      "phase": 6,
+      "sourceFrame": 8.3,
+      "sampledBlenderFrame": 8,
+      "bytes": 20876
+    },
+    {
+      "clip": "silver_dash_p0",
+      "direction": 2,
+      "phase": 7,
+      "sourceFrame": 9.4,
+      "sampledBlenderFrame": 9,
+      "bytes": 20689
+    },
+    {
+      "clip": "silver_dash_p0",
+      "direction": 3,
+      "phase": 0,
+      "sourceFrame": 1,
+      "sampledBlenderFrame": 1,
+      "bytes": 21291
+    },
+    {
+      "clip": "silver_dash_p0",
+      "direction": 3,
+      "phase": 1,
+      "sourceFrame": 2.1,
+      "sampledBlenderFrame": 2,
+      "bytes": 21321
+    },
+    {
+      "clip": "silver_dash_p0",
+      "direction": 3,
+      "phase": 2,
+      "sourceFrame": 3.7,
+      "sampledBlenderFrame": 4,
+      "bytes": 21809
+    },
+    {
+      "clip": "silver_dash_p0",
+      "direction": 3,
+      "phase": 3,
+      "sourceFrame": 4.9,
+      "sampledBlenderFrame": 5,
+      "bytes": 21640
+    },
+    {
+      "clip": "silver_dash_p0",
+      "direction": 3,
+      "phase": 4,
+      "sourceFrame": 6.0,
+      "sampledBlenderFrame": 6,
+      "bytes": 21696
+    },
+    {
+      "clip": "silver_dash_p0",
+      "direction": 3,
+      "phase": 5,
+      "sourceFrame": 7.6,
+      "sampledBlenderFrame": 8,
+      "bytes": 21294
+    },
+    {
+      "clip": "silver_dash_p0",
+      "direction": 3,
+      "phase": 6,
+      "sourceFrame": 8.3,
+      "sampledBlenderFrame": 8,
+      "bytes": 21294
+    },
+    {
+      "clip": "silver_dash_p0",
+      "direction": 3,
+      "phase": 7,
+      "sourceFrame": 9.4,
+      "sampledBlenderFrame": 9,
+      "bytes": 21429
+    },
+    {
+      "clip": "silver_dash_p0",
+      "direction": 4,
+      "phase": 0,
+      "sourceFrame": 1,
+      "sampledBlenderFrame": 1,
+      "bytes": 21052
+    },
+    {
+      "clip": "silver_dash_p0",
+      "direction": 4,
+      "phase": 1,
+      "sourceFrame": 2.1,
+      "sampledBlenderFrame": 2,
+      "bytes": 21310
+    },
+    {
+      "clip": "silver_dash_p0",
+      "direction": 4,
+      "phase": 2,
+      "sourceFrame": 3.7,
+      "sampledBlenderFrame": 4,
+      "bytes": 21593
+    },
+    {
+      "clip": "silver_dash_p0",
+      "direction": 4,
+      "phase": 3,
+      "sourceFrame": 4.9,
+      "sampledBlenderFrame": 5,
+      "bytes": 21675
+    },
+    {
+      "clip": "silver_dash_p0",
+      "direction": 4,
+      "phase": 4,
+      "sourceFrame": 6.0,
+      "sampledBlenderFrame": 6,
+      "bytes": 21467
+    },
+    {
+      "clip": "silver_dash_p0",
+      "direction": 4,
+      "phase": 5,
+      "sourceFrame": 7.6,
+      "sampledBlenderFrame": 8,
+      "bytes": 21125
+    },
+    {
+      "clip": "silver_dash_p0",
+      "direction": 4,
+      "phase": 6,
+      "sourceFrame": 8.3,
+      "sampledBlenderFrame": 8,
+      "bytes": 21125
+    },
+    {
+      "clip": "silver_dash_p0",
+      "direction": 4,
+      "phase": 7,
+      "sourceFrame": 9.4,
+      "sampledBlenderFrame": 9,
+      "bytes": 21071
+    },
+    {
+      "clip": "silver_dash_p0",
+      "direction": 5,
+      "phase": 0,
+      "sourceFrame": 1,
+      "sampledBlenderFrame": 1,
+      "bytes": 20592
+    },
+    {
+      "clip": "silver_dash_p0",
+      "direction": 5,
+      "phase": 1,
+      "sourceFrame": 2.1,
+      "sampledBlenderFrame": 2,
+      "bytes": 20897
+    },
+    {
+      "clip": "silver_dash_p0",
+      "direction": 5,
+      "phase": 2,
+      "sourceFrame": 3.7,
+      "sampledBlenderFrame": 4,
+      "bytes": 21306
+    },
+    {
+      "clip": "silver_dash_p0",
+      "direction": 5,
+      "phase": 3,
+      "sourceFrame": 4.9,
+      "sampledBlenderFrame": 5,
+      "bytes": 21318
+    },
+    {
+      "clip": "silver_dash_p0",
+      "direction": 5,
+      "phase": 4,
+      "sourceFrame": 6.0,
+      "sampledBlenderFrame": 6,
+      "bytes": 21259
+    },
+    {
+      "clip": "silver_dash_p0",
+      "direction": 5,
+      "phase": 5,
+      "sourceFrame": 7.6,
+      "sampledBlenderFrame": 8,
+      "bytes": 20830
+    },
+    {
+      "clip": "silver_dash_p0",
+      "direction": 5,
+      "phase": 6,
+      "sourceFrame": 8.3,
+      "sampledBlenderFrame": 8,
+      "bytes": 20830
+    },
+    {
+      "clip": "silver_dash_p0",
+      "direction": 5,
+      "phase": 7,
+      "sourceFrame": 9.4,
+      "sampledBlenderFrame": 9,
+      "bytes": 20628
+    },
+    {
+      "clip": "silver_dash_p0",
+      "direction": 6,
+      "phase": 0,
+      "sourceFrame": 1,
+      "sampledBlenderFrame": 1,
+      "bytes": 20888
+    },
+    {
+      "clip": "silver_dash_p0",
+      "direction": 6,
+      "phase": 1,
+      "sourceFrame": 2.1,
+      "sampledBlenderFrame": 2,
+      "bytes": 21089
+    },
+    {
+      "clip": "silver_dash_p0",
+      "direction": 6,
+      "phase": 2,
+      "sourceFrame": 3.7,
+      "sampledBlenderFrame": 4,
+      "bytes": 21246
+    },
+    {
+      "clip": "silver_dash_p0",
+      "direction": 6,
+      "phase": 3,
+      "sourceFrame": 4.9,
+      "sampledBlenderFrame": 5,
+      "bytes": 21254
+    },
+    {
+      "clip": "silver_dash_p0",
+      "direction": 6,
+      "phase": 4,
+      "sourceFrame": 6.0,
+      "sampledBlenderFrame": 6,
+      "bytes": 21214
+    },
+    {
+      "clip": "silver_dash_p0",
+      "direction": 6,
+      "phase": 5,
+      "sourceFrame": 7.6,
+      "sampledBlenderFrame": 8,
+      "bytes": 20857
+    },
+    {
+      "clip": "silver_dash_p0",
+      "direction": 6,
+      "phase": 6,
+      "sourceFrame": 8.3,
+      "sampledBlenderFrame": 8,
+      "bytes": 20857
+    },
+    {
+      "clip": "silver_dash_p0",
+      "direction": 6,
+      "phase": 7,
+      "sourceFrame": 9.4,
+      "sampledBlenderFrame": 9,
+      "bytes": 20861
+    },
+    {
+      "clip": "silver_dash_p0",
+      "direction": 7,
+      "phase": 0,
+      "sourceFrame": 1,
+      "sampledBlenderFrame": 1,
+      "bytes": 22093
+    },
+    {
+      "clip": "silver_dash_p0",
+      "direction": 7,
+      "phase": 1,
+      "sourceFrame": 2.1,
+      "sampledBlenderFrame": 2,
+      "bytes": 21835
+    },
+    {
+      "clip": "silver_dash_p0",
+      "direction": 7,
+      "phase": 2,
+      "sourceFrame": 3.7,
+      "sampledBlenderFrame": 4,
+      "bytes": 20771
+    },
+    {
+      "clip": "silver_dash_p0",
+      "direction": 7,
+      "phase": 3,
+      "sourceFrame": 4.9,
+      "sampledBlenderFrame": 5,
+      "bytes": 20834
+    },
+    {
+      "clip": "silver_dash_p0",
+      "direction": 7,
+      "phase": 4,
+      "sourceFrame": 6.0,
+      "sampledBlenderFrame": 6,
+      "bytes": 20834
+    },
+    {
+      "clip": "silver_dash_p0",
+      "direction": 7,
+      "phase": 5,
+      "sourceFrame": 7.6,
+      "sampledBlenderFrame": 8,
+      "bytes": 21804
+    },
+    {
+      "clip": "silver_dash_p0",
+      "direction": 7,
+      "phase": 6,
+      "sourceFrame": 8.3,
+      "sampledBlenderFrame": 8,
+      "bytes": 21804
+    },
+    {
+      "clip": "silver_dash_p0",
+      "direction": 7,
+      "phase": 7,
+      "sourceFrame": 9.4,
+      "sampledBlenderFrame": 9,
+      "bytes": 22127
+    }
+  ]
+}
