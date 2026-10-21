@@ -105,7 +105,9 @@ async function run(browserName,variant){
   const options={headless:true,
     executablePath:browserName==="chrome"?process.env.CHROME_EXECUTABLE:process.env.FIREFOX_EXECUTABLE};
   assert.ok(options.executablePath,"Required browser executable missing: "+browserName);
-  if(browserName==="chrome")options.args=["--no-sandbox","--disable-gpu-sandbox"];
+  if(browserName==="chrome")options.args=["--no-sandbox","--disable-gpu-sandbox",
+    ...(process.env.P0_QA_DISABLE_GPU==="1"?["--disable-gpu","--disable-dev-shm-usage"]:[])];
+  if(process.env.P0_QA_DISABLE_GPU==="1")options.protocolTimeout=90000;
   else{options.browser="firefox";options.protocol="webDriverBiDi";}
   browser=await puppeteer.launch(options);
   const page=await browser.newPage(),errors=[];
