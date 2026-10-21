@@ -1,0 +1,18 @@
+{
+  "engine": "firefox",
+  "browser": "firefox/153.4.0",
+  "checks": 64,
+  "frameCount": 8,
+  "allFacings": 8,
+  "originalFirstPartyWebP": true,
+  "neutralStudioOnly": true,
+  "realGameplay": false,
+  "humanApproved": false,
+  "errors": [],
+  "screenshots": [
+    "silver_grounded_kick_firefox_frame0.png",
+    "silver_grounded_kick_firefox_frame2.png",
+    "silver_grounded_kick_firefox_frame4.png",
+    "silver_grounded_kick_firefox_frame7.png"
+  ]
+}
