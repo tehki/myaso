@@ -81,7 +81,7 @@ try{
    "const proof={draws:0,maxFrameDraws:0,activeFrame:false,bad:0,assets:{}};",
    "const raf=window.requestAnimationFrame;",
    "window.requestAnimationFrame=function(callback){",
-   "return raf.call(this,function(timestamp){",
+   "return raf.call(window,function(timestamp){",
    "const before=proof.draws;proof.activeFrame=true;",
    "try{return callback(timestamp);}finally{",
    "proof.activeFrame=false;",
