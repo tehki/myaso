@@ -340,7 +340,10 @@ mod tests {
         // The parent kills/reaps the subprocess even if readiness failed.
         let _ = child.kill();
         let _ = child.wait();
-        assert!(committed, "child must commit item before simulated lost ACK");
+        assert!(
+            committed,
+            "child must commit item before simulated lost ACK"
+        );
         assert!(lock_held, "child was independently holding OS writer lock");
 
         let mut recovered = root.open();
@@ -355,15 +358,9 @@ mod tests {
             .expect("durable pickup receipt recovered after SIGKILL");
         assert_eq!(receipt.sequence, 2);
         assert_eq!(
-            current_committed_rack_pickup(
-                &recovered,
-                txn(1001),
-                item(201),
-                rack(0),
-                owner(1)
-            )
-            .unwrap()
-            .journal_sequence(),
+            current_committed_rack_pickup(&recovered, txn(1001), item(201), rack(0), owner(1))
+                .unwrap()
+                .journal_sequence(),
             receipt.sequence
         );
         assert_eq!(
@@ -383,7 +380,9 @@ mod tests {
             ))
         ));
         assert_eq!(
-            recovered.verified_receipt(txn(1002), &losing_attempt).unwrap(),
+            recovered
+                .verified_receipt(txn(1002), &losing_attempt)
+                .unwrap(),
             None,
             "losing rival must not acquire a committed receipt"
         );
@@ -394,16 +393,14 @@ mod tests {
 
         let verified_again = root.open();
         assert_eq!(verified_again.item_count(), 4);
-        assert!(
-            current_committed_rack_pickup(
-                &verified_again,
-                txn(1001),
-                item(201),
-                rack(0),
-                owner(1)
-            )
-            .is_ok()
-        );
+        assert!(current_committed_rack_pickup(
+            &verified_again,
+            txn(1001),
+            item(201),
+            rack(0),
+            owner(1)
+        )
+        .is_ok());
     }
 
     #[cfg(unix)]
