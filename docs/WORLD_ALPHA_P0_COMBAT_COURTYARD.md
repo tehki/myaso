@@ -55,6 +55,23 @@ Core [#527](https://github.com/tehki/myaso/pull/527)'s separate
 **16 spawn-to-rack** routes, or [#532](https://github.com/tehki/myaso/pull/532)'s
 actual four-session loopback transport test.
 
+## Real server static-collision solver cross-check
+
+`server/tests/world9_courtyard_static.rs` now runs the **actual compiled
+Core 8C Rust `swept_circle_hits_known_static_solid` query** against the
+original 23 fixed static solids, not a second JavaScript collision algorithm.
+It verifies all **32 spawn/rack-to-courtyard pairings, in both directions**,
+eight independent 64-unit mouse-heading probes, blocked movement through the
+Blacksmith wall, and invalid-query rejection. The shared World station fixture
+and Core server spawn source are explicitly pinned. The existing mandatory
+World CI Blacksmith step includes this specific Cargo integration test in
+addition to the full authoritative Rust server test suite.
+
+Both the Rust and JavaScript proofs cover **fixed authored rectangles only**;
+a geometry-clear response does not approve live movement, river crossings,
+same-tick dynamic LOS, physical item pickup or Combat damage. This QA test
+must never be used as a client-supplied authority proof.
+
 ## Remaining acceptance boundaries
 
 Only authored, *known static* 23-rectangle geometry is covered.
