@@ -1,0 +1,18 @@
+{
+  "body": "adult-masculine",
+  "clip": "roll",
+  "directionCount": 8,
+  "frameCount": 8,
+  "framePx": 160,
+  "atlasPx": [
+    1280,
+    1280
+  ],
+  "bytes": 114488,
+  "sha256": "aaae680d59ca42ce5e92681fb74e42648829fb5420de5f64fc712c2f2433c592",
+  "source": "CMU motion capture 128_10 pose retarget + CC0 MakeHuman anatomical body",
+  "authoritativeMovementModified": false,
+  "groundContactVerifiedInGame": false,
+  "artApproved": false,
+  "productionEnabled": false
+}

@@ -1,0 +1,18 @@
+{
+  "body": "adult-feminine",
+  "clip": "roll",
+  "directionCount": 8,
+  "frameCount": 8,
+  "framePx": 160,
+  "atlasPx": [
+    1280,
+    1280
+  ],
+  "bytes": 115498,
+  "sha256": "fdbf804de69de670b5173d53ff6a39808228e7c3331cf6c671e73292deaf13cb",
+  "source": "CMU motion capture 128_10 pose retarget + CC0 MakeHuman anatomical body",
+  "authoritativeMovementModified": false,
+  "groundContactVerifiedInGame": false,
+  "artApproved": false,
+  "productionEnabled": false
+}
