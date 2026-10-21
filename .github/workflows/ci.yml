@@ -231,6 +231,12 @@ jobs:
           node scripts/audit-world-authoring.mjs
           node --test tests/world-authoring-audit.test.mjs
 
+      - name: Validate D17 static full-world connectivity
+        run: |
+          node --check scripts/audit-world-connectivity.mjs
+          node scripts/audit-world-connectivity.mjs
+          node --test tests/world-connectivity-audit.test.mjs
+
       - name: Validate M188 repeated real heavy counterplay windows
         run: |
           # Three fresh Chrome/Firefox sessions for each real defensive read.
