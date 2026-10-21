@@ -4,8 +4,10 @@ on:
   pull_request:
     paths:
       - "scripts/graphics3b_native_viewport_parity.mjs"
+      - "scripts/graphics3b_gameplay_fold_budget.mjs"
       - "scripts/graphics3b_native_layout_parity.mjs"
       - "tests/graphics3b-native-viewport-parity.test.mjs"
+      - "tests/graphics3b-gameplay-fold-budget.test.mjs"
       - "tests/graphics3b-native-layout-parity.test.mjs"
       - "web/index.html"
       - "web/styles.css"
@@ -23,8 +25,9 @@ jobs:
       - name: Check strict native viewport instrumentation and source contract
         run: |
           node --check scripts/graphics3b_native_viewport_parity.mjs
+          node --check scripts/graphics3b_gameplay_fold_budget.mjs
           node --check scripts/graphics3b_native_layout_parity.mjs
-          node --test tests/graphics3b-native-viewport-parity.test.mjs tests/graphics3b-native-layout-parity.test.mjs
+          node --test tests/graphics3b-native-viewport-parity.test.mjs tests/graphics3b-native-layout-parity.test.mjs tests/graphics3b-gameplay-fold-budget.test.mjs
       - name: Require both genuine Chrome and Firefox W3C browser engines
         run: |
           google-chrome --version
