@@ -1360,6 +1360,141 @@ mod tests {
     use super::*;
 
     #[tokio::test]
+    async fn first_playable_alpha_has_no_npc_state_without_explicit_loopback_opt_in() {
+        let public_v4: SocketAddr = "0.0.0.0:4433".parse().unwrap();
+        let public_v6: SocketAddr = "[::]:4433".parse().unwrap();
+        let loopback_v4: SocketAddr = "127.0.0.1:4433".parse().unwrap();
+        let loopback_v6: SocketAddr = "[::1]:4433".parse().unwrap();
+        // Real First Playable multiplayer uses non-loopback addressing;
+        // no NPC-related variable should be needed for normal operation.
+        for bind in [public_v4, public_v6, loopback_v4, loopback_v6] {
+            assert!(!parse_npc_pilot(None, bind).unwrap());
+            assert!(!parse_npc_pilot(Some("0"), bind).unwrap());
+        }
+        for bind in [public_v4, public_v6] {
+            assert!(parse_npc_pilot(Some("1"), bind).is_err());
+        }
+        assert!(parse_npc_pilot(Some("1"), loopback_v4).unwrap());
+        assert!(parse_npc_pilot(Some("1"), loopback_v6).unwrap());
+        assert!(!parse_npc_maintenance(None, false).unwrap());
+        assert!(!parse_guard_detour(None, false, false).unwrap());
+        assert!(parse_npc_maintenance(Some("1"), false).is_err());
+        assert!(parse_guard_detour(Some("1"), false, false).is_err());
+        assert!(parse_guard_detour(Some("1"), true, false).is_err());
+
+        let baseline = SharedGame::new(
+            LoopbackFlightConfig {
+                background_players: 0,
+                near_pressure_players: 0,
+                reliable_write_delay: Duration::ZERO,
+                drop_new_action_datagrams: false,
+            },
+            false,
+        );
+        assert!(!baseline.npc_pilot_enabled);
+        let state = baseline.state.lock().await;
+        assert!(state.npc_routines.is_none());
+        assert!(state.npc_supply.is_none());
+        assert_eq!(state.world.fighters().len(), 0);
+        assert_eq!(state.replication_frame.server_tick(), 0);
+    }
+
+    #[tokio::test]
+    async fn first_playable_combat_and_replication_are_identical_with_npc_pilot_off() {
+        // A direct alpha compatibility comparison: identical real server
+        // player inputs with an NPC pilot disabled/enabled locally must
+        // produce identical combat events, fighters, and replication ticks.
+        // No fake NPC fighter may appear on either side.
+        let flight = LoopbackFlightConfig {
+            background_players: 0,
+            near_pressure_players: 0,
+            reliable_write_delay: Duration::ZERO,
+            drop_new_action_datagrams: false,
+        };
+        let baseline = SharedGame::new(flight, false);
+        let pilot = SharedGame::new(flight, true);
+        let mut normal = baseline.state.lock().await;
+        let mut npc = pilot.state.lock().await;
+        for state in [&mut *normal, &mut *npc] {
+            assert!(state.world.add_player_at(11, 130.0, 120.0, 0.0));
+            assert!(state.world.add_player_at(12, 162.0, 120.0, 0.0));
+        }
+        let mut normal_events = Vec::new();
+        let mut npc_events = Vec::new();
+        for step in 0..600 {
+            let move_x = if step % 240 < 120 { 1.0 } else { -1.0 };
+            let attacker = InputIntent {
+                move_x,
+                facing_radians: 0.0,
+                attack: step % 75 == 5,
+                block: step % 90 >= 40 && step % 90 < 65,
+                ..InputIntent::default()
+            };
+            let defender = InputIntent {
+                move_x: -move_x,
+                facing_radians: std::f32::consts::PI,
+                attack: step % 113 == 40,
+                dodge: step % 127 == 15,
+                ..InputIntent::default()
+            };
+            for state in [&mut *normal, &mut *npc] {
+                assert!(state.world.set_input(11, attacker));
+                assert!(state.world.set_input(12, defender));
+            }
+            normal.world.step_into(&mut normal_events);
+            npc.world.step_into(&mut npc_events);
+            assert_eq!(normal_events, npc_events, "combat events at step {step}");
+            normal.record_combat_events(&normal_events);
+            npc.record_combat_events(&npc_events);
+            let tick = npc.world.tick;
+            if let Some(supply) = npc.npc_supply.as_mut() {
+                supply.advance(tick);
+            }
+            {
+                let GameState {
+                    npc_routines,
+                    npc_supply,
+                    ..
+                } = &mut *npc;
+                if let (Some(routines), Some(supply)) = (npc_routines.as_mut(), npc_supply.as_ref())
+                {
+                    routines.advance_pilot_movement(tick, supply);
+                }
+            }
+            if let Some(routines) = npc.npc_routines.as_mut() {
+                routines.advance_social(tick);
+            }
+            {
+                let GameState {
+                    npc_routines,
+                    npc_supply,
+                    ..
+                } = &mut *npc;
+                if let (Some(routines), Some(supply)) = (npc_routines.as_mut(), npc_supply.as_ref())
+                {
+                    routines.advance_worksite_social(tick, supply);
+                }
+            }
+            normal.refresh_replication_frame();
+            npc.refresh_replication_frame();
+            assert_eq!(
+                normal.world.fighters(),
+                npc.world.fighters(),
+                "server combat state at step {step}"
+            );
+            assert_eq!(
+                normal.replication_frame.server_tick(),
+                npc.replication_frame.server_tick()
+            );
+            assert_eq!(normal.world.fighters().len(), 2);
+            assert!(normal.npc_routines.is_none() && normal.npc_supply.is_none());
+        }
+        assert!(!baseline.npc_pilot_enabled);
+        assert!(pilot.npc_pilot_enabled);
+        assert_eq!(normal.world.tick, npc.world.tick);
+    }
+
+    #[tokio::test]
     async fn npc_supply_world_is_opt_in_shared_and_never_creates_combat_fighters() {
         let flight = LoopbackFlightConfig {
             background_players: 0,
