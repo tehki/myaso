@@ -267,10 +267,9 @@ impl CollisionWindow {
                 // Bounds are validated, but stepping *outside* a valid
                 // window near i32::MAX must not overflow before the grid
                 // bounds check has a chance to reject the candidate.
-                let (Some(next_x), Some(next_y)) = (
-                    x.checked_add(dx * GRID_STEP),
-                    y.checked_add(dy * GRID_STEP),
-                ) else {
+                let (Some(next_x), Some(next_y)) =
+                    (x.checked_add(dx * GRID_STEP), y.checked_add(dy * GRID_STEP))
+                else {
                     continue;
                 };
                 let Some(neighbor) = self.grid_index(next_x, next_y) else {
@@ -279,8 +278,7 @@ impl CollisionWindow {
                 if self.contains_obstacle(next_x, next_y)
                     || (dx != 0
                         && dy != 0
-                        && (self.contains_obstacle(next_x, y)
-                            || self.contains_obstacle(x, next_y)))
+                        && (self.contains_obstacle(next_x, y) || self.contains_obstacle(x, next_y)))
                 {
                     continue;
                 }
@@ -608,10 +606,10 @@ mod tests {
         let route = open.plan(from, goal).unwrap();
         assert_eq!(route.first().copied(), Some(from));
         assert_eq!(route.last().copied(), Some(goal));
-        assert!(route
-            .iter()
-            .all(|&(x, y)| x >= bounds.min_x && y >= bounds.min_y
-                && x <= bounds.max_x && y <= bounds.max_y));
+        assert!(route.iter().all(|&(x, y)| x >= bounds.min_x
+            && y >= bounds.min_y
+            && x <= bounds.max_x
+            && y <= bounds.max_y));
         // The upper boundary is valid; a north/east expansion from it
         // must simply be rejected rather than overflowing an i32.
     }
