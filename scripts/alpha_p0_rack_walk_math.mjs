@@ -86,3 +86,53 @@ export function verifyNativeRackPeerConsensus(views,witnessed,slots){
     maxPeerDrift,worldUnitBound:8,readOnly:true,
     itemPickupApproved:false,productionApproval:false});
 }
+
+/** Genuine replacement-browser acceptance ONLY. Does not persist swords or
+ * authenticate a resumed character: Rust must issue a NEW net ID. */
+export function verifyNativeRackRecoveryPeerConsensus(views,slots,rejoinTick){
+  const fail=(why)=>{throw Error("native rack crash recovery: "+why)};
+  const ids=[1,3,4,5];
+  const socketByPlayer=new Map([[1,0],[3,2],[4,3],[5,1]]);
+  if(!Array.isArray(views)||views.length!==4||!Array.isArray(slots)
+    ||slots.length!==4||!Number.isSafeInteger(rejoinTick)||rejoinTick<=0)
+    fail("exact real four-observer/sockets/rejoin tick required");
+  const positions=new Map(ids.map(id=>[id,[]]));
+  for(let i=0;i<4;i++){
+    const v=views[i];
+    if(v?.id!==ids[i]||!Number.isSafeInteger(v.tick)
+      ||v.tick<=rejoinTick||!Array.isArray(v.fighters)
+      ||v.fighters.length!==4
+      ||!Array.isArray(v.scoreboard))
+      fail("missing, stale, duplicate or illegitimate recovery viewer");
+    const seen=new Set();
+    for(const fighter of v.fighters){
+      const id=fighter?.netId,slot=slots[socketByPlayer.get(id)];
+      if(!ids.includes(id)||seen.has(id)||!slot
+        ||![fighter.x,fighter.y].every(Number.isFinite)
+        ||!nativeRackArrived(fighter,proposedNativeRackReachPoint(slot))
+        ||!nativeRackWithinProposedReach(fighter,slot))
+        fail("stale dead player, unexpected actor or incorrect nominal rack socket");
+      seen.add(id);
+      positions.get(id).push(fighter);
+    }
+    if(seen.size!==4||v.scoreboard.some(row=>row.startsWith("#2"))
+      ||ids.some(id=>!v.scoreboard.some(row=>row.startsWith("#"+id))))
+      fail("stale dead-player scoreboard or missing new session");
+  }
+  let maxPeerDrift=0;
+  for(const [id,points] of positions){
+    if(points.length!==4)fail("not all browser peers saw new live fighter "+id);
+    for(let i=0;i<4;i++)for(let j=i+1;j<4;j++){
+      const d=Math.hypot(points[i].x-points[j].x,points[i].y-points[j].y);
+      if(d>8)fail("inconsistent actual surviving/replacement Rust position "+id);
+      maxPeerDrift=Math.max(d,maxPeerDrift);
+    }
+  }
+  return Object.freeze({
+    realBrowserViewers:4,liveIds:Object.freeze([...ids]),
+    rejectedGhostPlayerId:2,issuedReplacementPlayerId:5,
+    maxPeerDrift,worldUnitBound:8,
+    sameHostOnly:true,liveSwordOwnershipProven:false,
+    characterIdentityRecoveryProven:false,releaseApproval:false,
+  });
+}
