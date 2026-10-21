@@ -173,3 +173,35 @@ and a subsequent genuine W must reach the arena. The typing action must
 never create an outgoing chat row. This is browser-event focus ownership
 evidence, not a standalone proof that the authoritative server received
 neutral inputs throughout an active 4-human combat fight.
+
+## Joined Core/World Greyhaven staging chat receipt (UI 10 integration QA)
+
+Only on the unmerged exact Core8A+8C/World9 plus Chat C1 compatibility
+merge branch can the additional real-browser acceptance invoke the
+scripts/chat_c1_four_greyhaven_acceptance.mjs runner. The test launches an
+unchanged real Rust WebTransport server on an ephemeral loopback port
+with explicit MYASO_ALPHA_SPAWN=greyhaven, MYASO_MAX_PLAYERS=4,
+MYASO_ALPHA_STATIC_COLLISION=reviewed-static-only, and the approved
+bounds-valid chat radius MYASO_CHAT_RADIUS=100. The test insists on
+server-side staging spawn/static-sweep confirmation before connecting four
+independent TLS-pinned browser sessions (Chrome / Firefox / Chrome / Chrome).
+
+For server-owned fixed staging coordinates A=(4110,4160),
+B=(4206,4160), C=(4110,4256), D=(4206,4256), distance96 orthogonal
+neighbors can hear each other, while distance135.76 diagonals cannot.
+A-to-B/C accepted and A-to-D excluded; C-to-A/D accepted and C-to-B
+excluded. Both senders require authentic ChatResult and receivers require
+true server-derived Player #1/#3 labels. The same HTML-as-inert-text,
+240/242-byte UTF-8, native Enter/Escape combat-key ownership, and
+ongoing gameplay-ACK/snapshot gates still run.
+
+An initial standalone four-real-Chrome checkout of the exact integrated
+Rust server, with this script, passed on Serj Linux (one server + four
+browser processes, not four network hosts). That native run did NOT
+validate Firefox; GitHub's mixed-engine job must complete before
+claiming Firefox here. The online browser currently presents the
+legacy arena canvas even while its authoritative server uses Greyhaven
+P0 staging coordinates: this is NOT the completed authored 3D/Canvas
+city world renderer, four independent human users across computers,
+physical item pickup, real MainHand, fist-vs-sword Combat, or public chat.
+No release eligibility follows from this focused feature acceptance.
