@@ -75,5 +75,76 @@ class AlphaEconomyPerimeterTests(unittest.TestCase):
         self.assertEqual(violations(self.root, ("web/bootstrap.mjs",)), [])
 
 
+    def test_actual_alpha_lobby_module_is_discovered_from_html(self):
+        self.write("web/alpha.html", '<script type="module" src="/web/alpha.mjs"></script>')
+        self.write("web/alpha.mjs", 'import "./alpha-practice.mjs";')
+        self.write("web/alpha-practice.mjs", "export const x = 1;")
+        files = active_source_files(self.root, ("web/alpha.html",))
+        self.assertEqual(
+            {p.relative_to(self.root).as_posix() for p in files},
+            {"web/alpha.html", "web/alpha.mjs", "web/alpha-practice.mjs"},
+        )
+
+    def test_economy_module_reachable_only_from_alpha_lobby_is_rejected(self):
+        self.write("web/alpha.html", '<script type="module" src="/web/alpha.mjs"></script>')
+        self.write("web/alpha.mjs", "import './wallet-fixture.mjs';")
+        self.write("web/wallet-fixture.mjs", "export const unused = false;")
+        self.assertTrue(violations(self.root, ("web/alpha.html",)))
+
+    def test_added_secondary_html_module_is_checked(self):
+        self.write("web/index.html",
+                   '<script type="module" src="./bootstrap.mjs"></script>'
+                   '<script type="module" src="./economics_ui.mjs"></script>')
+        self.write("web/bootstrap.mjs", "export const ready = true;")
+        self.write("web/economics_ui.mjs", "export const bad = true;")
+        self.assertTrue(violations(self.root, ("web/index.html",)))
+
+    def test_unreviewed_inline_html_runtime_script_fails_closed(self):
+        self.write("web/alpha.html", '<script type="module">import "/web/wallet.mjs";</script>')
+        with self.assertRaisesRegex(ValueError, "inline"):
+            active_source_files(self.root, ("web/alpha.html",))
+
+    def test_external_html_script_fails_closed(self):
+        self.write("web/alpha.html",
+                   '<script type="module" src="https://example.test/remote.mjs"></script>')
+        with self.assertRaisesRegex(ValueError, "external"):
+            active_source_files(self.root, ("web/alpha.html",))
+
+    def test_missing_html_script_is_not_silently_accepted(self):
+        self.write("web/alpha.html", "<div>Lobby without module</div>")
+        with self.assertRaisesRegex(ValueError, "No runtime scripts"):
+            active_source_files(self.root, ("web/alpha.html",))
+
+    def test_root_relative_js_import_is_followed(self):
+        self.write("web/bootstrap.mjs", 'await import("/web/secret-wallet.mjs");')
+        self.write("web/secret-wallet.mjs", "export const x = 1;")
+        self.assertTrue(violations(self.root, ("web/bootstrap.mjs",)))
+
+    def test_html_js_query_suffix_resolves_actual_file(self):
+        self.write("web/alpha.html",
+                   '<script type="module" src="/web/alpha.mjs?v=3"></script>')
+        self.write("web/alpha.mjs", "export const x = 1;")
+        files = active_source_files(self.root, ("web/alpha.html",))
+        self.assertEqual(len(files), 2)
+
+    def test_rust_path_attribute_dependency_is_followed(self):
+        self.write("server/src/lib.rs", '#[path = "alternate.rs"]\nmod wired;\n')
+        self.write("server/src/alternate.rs", "fn f() { wallet::send(); }\n")
+        self.assertTrue(violations(self.root, ("server/src/lib.rs",)))
+
+    def test_rust_path_escape_repo_fails_closed(self):
+        self.write("server/src/lib.rs",
+                   '#[path = "../../../outside.rs"]\nmod unusual;\n')
+        with self.assertRaisesRegex(ValueError, "escapes repository"):
+            active_source_files(self.root, ("server/src/lib.rs",))
+
+    def test_html_plain_text_mention_of_wallet_is_not_runtime_import(self):
+        self.write("web/index.html",
+                   '<p>No wallet is offered in first playable</p>'
+                   '<script type="module" src="./bootstrap.mjs"></script>')
+        self.write("web/bootstrap.mjs", "export const ready = true;")
+        self.assertEqual(violations(self.root, ("web/index.html",)), [])
+
+
 if __name__ == "__main__":
     unittest.main()
