@@ -17,7 +17,7 @@ export const WORLD_ALPHA_SPAWN_COORDINATES=Object.freeze([
 const makeSocket=(index,x)=>Object.freeze({
   socketId:"greyhaven-rack-"+index,
   // This is a fixture *socket*, not a sword, an item ID or a click hitbox.
-  itemKind:"practice-sword",
+  displayCategory:"sword",
   mapId:MAP_IDS.overworld,
   x,y:4038,
   approach:Object.freeze({x,y:4088}),
