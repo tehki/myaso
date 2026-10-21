@@ -91,7 +91,7 @@ test("D18 malformed portal or physically blocked portal cannot pass",()=>{
 
 test("D18 blocked transfer landing is rejected independently from valid trigger",()=>{
   const result=auditPreviewPortals(synthetic({walkable:(id,x,y)=>
-    free(id,x,y)&&!(id===MAP_IDS.tavern&&x===192&&y===26)}));
+    free(id,x,y)&&!(id===MAP_IDS.tavern&&x===192&&y===58)}));
   has(result,"BLOCKED_PORTAL_LANDING");
 });
 
