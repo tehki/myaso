@@ -36,7 +36,7 @@ export async function awaitM41AuthoritativeLight({
 
 export async function dispatchM41NativeParryOnLightOnset({
   readOutput, afterOffset, fighterId, sendAttack, sendWheel,
-  sleep = sleepTimer, now = () => Date.now(), wheelAfterLightMs = 0,
+  sleep = sleepTimer, now = () => Date.now(), wheelAfterLightMs = 8,
 }) {
   if (typeof sendAttack !== "function" || typeof sendWheel !== "function"
     || typeof sleep !== "function" || typeof now !== "function"
@@ -70,10 +70,12 @@ export async function dispatchM41NativeParryOnLightOnset({
     if (!attempted.ok) throw attempted.error;
     throw error; // Never issue a blind wheel without real server light.
   }
-  // Once Rust has actually committed LIGHT, the 135ms windup has already
-  // started. Do not waste 18ms before dispatching the one genuine Firefox
-  // wheel: #39529874983 proved that the resulting Block could land 1 tick
-  // AFTER the real hit. Keep W3C command, ACK, and fatal game assertions.
+  // With real Rust LIGHT at tick T and hit at T+8, Firefox Block must begin
+  // neither too early (T+1 -> guard block) nor too late (T+9 -> 34HP hit).
+  // Actual protected #39530511510: Block T+2 -> PARRY, Block T+1 -> BLOCK.
+  // #39529874983: artificial +18ms could deliver Block T+9 -> 34HP HIT.
+  // Target the intermediate W3C dispatch offset without changing gameplay
+  // or claiming deterministic delivery under loaded independent drivers.
   if (wheelAfterLightMs > 0) await sleep(wheelAfterLightMs);
   let wheelError = null;
   try { await sendWheel(); } catch (error) { wheelError = error; }
