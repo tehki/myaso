@@ -9,7 +9,7 @@ import path from "node:path";
 import process from "node:process";
 import { setTimeout as sleep } from "node:timers/promises";
 import {WORLD_ALPHA_SWORD_RACK_SOCKETS,validateWorldAlphaArmoryLayout} from "../src/world/alpha-armory.mjs";
-import {nextNativeWalkPulse,nativeRackArrived,proposedNativeRackReachPoint,nativeRackWithinProposedReach,verifyNativeRackPeerConsensus} from "./alpha_p0_rack_walk_math.mjs";
+import {nextNativeWalkPulse,nativeRackArrived,proposedNativeRackReachPoint,nativeRackWithinProposedReach,verifyNativeRackPeerConsensus,verifyNativeRackRecoveryPeerConsensus} from "./alpha_p0_rack_walk_math.mjs";
 
 const root = process.cwd();
 const greyhavenModeValue = process.env.MYASO_ALPHA_NATIVE_GREYHAVEN;
@@ -29,6 +29,12 @@ if(nativeRackReachValue!==undefined&&!["0","1"].includes(nativeRackReachValue))
 const nativeRackReach=nativeRackReachValue==="1";
 if(nativeRackReach&&(!nativeRackWalk||!greyhavenMode))
   throw Error("proposed rack reach requires reviewed Greyhaven plus native rack walk");
+const rackCrashValue=process.env.MYASO_ALPHA_NATIVE_RACK_CRASH_REJOIN;
+if(rackCrashValue!==undefined&&!["0","1"].includes(rackCrashValue))
+  throw Error("MYASO_ALPHA_NATIVE_RACK_CRASH_REJOIN must be unset, 0 or 1");
+const rackCrashRejoin=rackCrashValue==="1";
+if(rackCrashRejoin&&!nativeRackReach)
+  throw Error("rack crash/rejoin requires actual native proposed rack reach mode");
 const GREYHAVEN_SPAWNS = new Map([
   [1,{x:4110,y:4160}],[2,{x:4206,y:4160}],
   [3,{x:4110,y:4256}],[4,{x:4206,y:4256}],
@@ -353,13 +359,28 @@ async function pressActualMovementKey(s,key,holdMs) {
   // Never overwrite fighter coordinates or ignore an obstructing solid.
   await sleep(220);
 }
-async function walkActualBrowserAxis(s,playerId,axis,target) {
+// Expected live roster is explicit. The original pre-crash mode remains
+// EXACT 1,2,3,4; only the approved post-SIGKILL mode uses 1,3,4,5.
+function hasExactAuthoritativeRoster(view,expected){
+  if(!view||view.id<=0||!Number.isFinite(view.tick)||view.tick<=0||
+    !Array.isArray(view.fighters)||!Array.isArray(view.scoreboard)||
+    view.fighters.length!==expected.length)return false;
+  const ids=view.fighters.map(f=>f.netId).sort((a,b)=>a-b);
+  return ids.every((id,i)=>id===expected[i])
+    && expected.every(id=>view.scoreboard.some(row=>row.startsWith("#"+id)))
+    && !view.scoreboard.some(row=>/^(?:#2(?:\D|$))/.test(row) && !expected.includes(2));
+}
+async function walkActualBrowserAxis(s,playerId,axis,target,expectedRoster=[1,2,3,4]) {
   assert(axis==="x"||axis==="y","unauthorized walk axis");
+  assert((expectedRoster.join(",")==="1,2,3,4"
+      ||(rackCrashRejoin&&playerId===5&&expectedRoster.join(",")==="1,3,4,5")),
+    "unreviewed authoritative live roster for native movement");
   let noProgress=0;
   const samples=[];
   for(let attempt=0;attempt<24;attempt++){
     const before=await snapshot(s),p=fighter(before,playerId);
-    assert(p&&fourVisible(before), "missing actual server player/roster during rack approach");
+    assert(p&&hasExactAuthoritativeRoster(before,expectedRoster),
+      "missing true Rust fighter or unexpected live roster during rack approach");
     const step=nextNativeWalkPulse(p[axis],target);
     if(step.done)return samples;
     const key=axis==="x"?(step.key==="negative"?"a":"d"):
@@ -367,7 +388,8 @@ async function walkActualBrowserAxis(s,playerId,axis,target) {
     await pressActualMovementKey(s,key,step.holdMs);
     const after=await waitFor(async()=>{
       const value=await snapshot(s),next=fighter(value,playerId);
-      return {ok:fourVisible(value)&&value.tick>before.tick&&!!next,value};
+      return {ok:hasExactAuthoritativeRoster(value,expectedRoster)
+        &&value.tick>before.tick&&!!next,value};
     },s.name+" server-authoritative "+axis+" rack approach tick",2800);
     const newPosition=fighter(after,playerId),gain=Math.abs(p[axis]-target)-Math.abs(newPosition[axis]-target);
     samples.push({attempt,key,holdMs:step.holdMs,before:p[axis],after:newPosition[axis],
@@ -460,6 +482,57 @@ async function nativeFourRackApproaches(views) {
   }));
 }
 
+
+/** REAL W3C Firefox SIGKILL recovery after four independently confirmed rack approaches.
+ * This is same-host, read-only server-state inspection: no item authority. */
+async function nativeRackCrashRecovery() {
+  const replacement=sessions.find(s=>s.name==="firefox-rejoin-5");
+  assert(replacement&&sessions.length===4,
+    "expected authentic new Firefox WebDriver session after abrupt client death");
+  const slot=WORLD_ALPHA_SWORD_RACK_SOCKETS[1];
+  const target=proposedNativeRackReachPoint(slot);
+  const found=await webdriver(replacement.base,"POST",
+    `/session/${replacement.id}/element`,
+    {using:"css selector",value:"#arena"});
+  const element=found["element-6066-11e4-a52e-4f735466cecf"];
+  assert(element,"replacement browser missing original game canvas");
+  await webdriver(replacement.base,"POST",
+    `/session/${replacement.id}/element/${element}/click`,{});
+  await sleep(750);
+  const x=await walkActualBrowserAxis(replacement,5,"x",target.x,[1,3,4,5]);
+  const y=await walkActualBrowserAxis(replacement,5,"y",target.y,[1,3,4,5]);
+  const at=await waitFor(async()=>{
+    const view=await snapshot(replacement),fighter5=fighter(view,5);
+    return {ok:hasExactAuthoritativeRoster(view,[1,3,4,5])
+      &&!!fighter5&&nativeRackArrived(fighter5,target)
+      &&nativeRackWithinProposedReach(fighter5,slot),value:view};
+  },"real replacement Firefox player5 reached vacated rack2 without authoritative shortcut",4000);
+  const afterReplacementTick=at.tick;
+  const peers=await Promise.all(sessions.map(s=>waitFor(async()=>{
+    const v=await snapshot(s);
+    const ids=v.fighters.map(f=>f.netId).sort((a,b)=>a-b);
+    return {ok:v.tick>afterReplacementTick
+      &&ids.join(",")==="1,3,4,5",value:v};
+  },s.name+" full replacement roster and fresh server tick",10000)));
+  const recovered=verifyNativeRackRecoveryPeerConsensus(peers,
+    WORLD_ALPHA_SWORD_RACK_SOCKETS,afterReplacementTick);
+  for(const session of sessions)
+    await saveScreenshot(session,"rack-rejoin-auth-no-ghost");
+  console.log("ALPHA_P0_FOUR_NATIVE_RACK_SIGKILL_REJOIN_PASS "+JSON.stringify({
+    crashedRealBrowser:"firefox-2",removedPlayerId:2,
+    replacementRealBrowser:"firefox-rejoin-5",replacementPlayerId:5,
+    originalThreePlayersStayedNearTheirOwnEmptySockets:true,
+    originalSocketRecoveredByNewRealFirefox:true,
+    genuineW3cReplacementMovement:{x,y},
+    authoritativeRecoveryPosition:fighter(at,5),serverTick:at.tick,
+    originalAuthoredSocket:slot.socketId,peerConsensus:recovered,
+    serverAuthoritativeActors:true,actualLiveSwordItems:false,
+    physicalSwordClick:false,ownershipContinuity:false,
+    independentClientHosts:false,
+    scope:"single localhost Rust/QUIC and four real W3C browser sessions only"
+  }));
+}
+
 async function run() {
   await mkdir(evidenceDir,{recursive:true});
   staticServer=await httpServer();
@@ -476,6 +549,10 @@ async function run() {
   assertServerOwnedGreyhavenRoster(views,"initial-four");
   if(nativeRackWalk){
     await nativeFourRackApproaches(views);
+    if(rackCrashRejoin){
+      await crashAndRejoin(game,staticServer.address().port);
+      await nativeRackCrashRecovery();
+    }
     return;
   }
   for (let i=0;i<sessions.length;i++){
