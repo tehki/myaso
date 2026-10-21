@@ -284,15 +284,11 @@ mod tests {
             geometry_tick: 900,
         };
         assert_eq!(
-            verify_pickup_geometry_at_completed_tick(
-                actor, sword, &window, CURRENT, 56.0, ticks,
-            ),
+            verify_pickup_geometry_at_completed_tick(actor, sword, &window, CURRENT, 56.0, ticks,),
             Ok(())
         );
         assert_eq!(
-            verify_pickup_geometry_at_completed_tick(
-                actor, sword, &window, CURRENT, 55.99, ticks,
-            ),
+            verify_pickup_geometry_at_completed_tick(actor, sword, &window, CURRENT, 55.99, ticks,),
             Err(PickupGeometryReject::OutOfRange)
         );
     }
@@ -328,7 +324,12 @@ mod tests {
             };
             assert_eq!(
                 verify_pickup_geometry_at_completed_tick(
-                    actor, exact_selected_sword, &window, CURRENT, 56.0, ticks,
+                    actor,
+                    exact_selected_sword,
+                    &window,
+                    CURRENT,
+                    56.0,
+                    ticks,
                 ),
                 Ok(())
             );
