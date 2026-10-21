@@ -300,6 +300,95 @@ pub struct GroundSwordSelection {
     pub expected_item_id: u64,
 }
 
+/// Read-only P0 rack click target for the already-authenticated viewer.
+/// This is an ephemeral *domain* snapshot, not a network packet or a promise
+/// that the item will remain available before Core's fenced TryPickup commit.
+/// Exact prototype u64 IDs must be replaced by Core 8B canonical u128 IDs
+/// (never truncated), and Core 8A owns any opaque public wire encoding.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct VerifiedGroundSwordTarget {
+    pub selection: GroundSwordSelection,
+    pub at: crate::loot::Point,
+    pub kind: crate::loot::ItemKind,
+    pub completed_tick: u32,
+}
+
+/// Get the EXACT entity+physical item pairs required by the checked pickup
+/// API, never a forged visual ID or client-supplied position. Only public
+/// ground sword instances are eligible: non-swords, backpack/equipment, and
+/// corpse CONTENTS remain outside this preview. The read is bounded and
+/// inherits authoritative liveness, zone, range and expiry rules.
+///
+/// Core must hold a common authoritative snapshot/read lock while obtaining
+/// this list, and must revalidate under its exclusive item+geometry writer
+/// after any browser intent. No Core epoch, LOS witness, journal, network
+/// receipt, or actor authorization can be inferred from this result alone.
+pub fn inspect_verified_ground_sword_targets(
+    loot: &LootAuthority,
+    identity: &SessionIdentityRegistry,
+    tick: PickupWorldTick<'_>,
+    lease: SessionLease,
+) -> Result<Vec<VerifiedGroundSwordTarget>, PickupCommitError> {
+    if tick.world.tick != tick.completed_tick {
+        return Err(PickupCommitError::StaleWorldTick);
+    }
+    if !tick.world.now_ms.is_finite()
+        || tick.world.now_ms < 0.0
+        || tick.world.now_ms >= u64::MAX as f32
+    {
+        return Err(PickupCommitError::InvalidWorldTime);
+    }
+    identity
+        .resolve_session(lease)
+        .ok_or(PickupCommitError::UnverifiedSession)?;
+    let actor = lease.server_session();
+    let fighter = tick
+        .world
+        .fighter(actor)
+        .ok_or(PickupCommitError::MissingWorldFighter)?;
+    let zone = tick
+        .zones
+        .zone_of(actor)
+        .ok_or(PickupCommitError::UnknownZone)?;
+    let visible = loot
+        .visible_loot(actor, fighter, zone, tick.world.now_ms as u64)
+        .map_err(PickupCommitError::Loot)?;
+    let mut swords = Vec::new();
+    for preview in visible {
+        if let crate::loot::LootAppearance::Ground { kind, amount: 1 } = preview.appearance {
+            if !matches!(
+                kind,
+                crate::loot::ItemKind::RustySword | crate::loot::ItemKind::IronSword
+            ) {
+                continue;
+            }
+            // Resolve exact physical ID only from the SAME trusted loot
+            // instance used for the public appearance, not browser inputs.
+            let Some(drop) = loot.ground().get(&preview.entity_id) else {
+                return Err(PickupCommitError::Loot(LootError::InvalidState));
+            };
+            if drop.item.id == 0
+                || drop.item.kind != kind
+                || drop.item.amount != 1
+                || drop.at != preview.at
+                || drop.zone != zone
+            {
+                return Err(PickupCommitError::Loot(LootError::InvalidState));
+            }
+            swords.push(VerifiedGroundSwordTarget {
+                selection: GroundSwordSelection {
+                    ground_entity_id: drop.entity_id,
+                    expected_item_id: drop.item.id,
+                },
+                at: drop.at,
+                kind,
+                completed_tick: tick.completed_tick,
+            });
+        }
+    }
+    Ok(swords)
+}
+
 /// Offline P0 integration seam. Core must supply a trusted same-tick Physics
 /// check with complete zone solids and current worker/geometry epoch under the
 /// one World/Identity/Loot writer lock. The callback receives ONLY authoritative
@@ -810,6 +899,176 @@ mod tests {
                 "cannot reacquire removed sword"
             )),
             Err(PickupCommitError::Loot(LootError::ReplayOperation))
+        ));
+        let _ = fs::remove_file(path);
+    }
+
+    #[test]
+    fn authenticated_sword_preview_binds_visible_entity_to_exact_physical_id() {
+        use crate::loot::{LootAppearance, Point};
+
+        let mut world = World::new(900.0, 700.0);
+        for (id, x, y) in [
+            (1, 200.0, 200.0),
+            (2, 224.0, 200.0),
+            (3, 800.0, 600.0),
+            (4, 240.0, 200.0),
+        ] {
+            assert!(world.add_player_at(id, x, y, 0.0));
+        }
+        let mut zones = ZoneAuthority::new();
+        let mut identity = SessionIdentityRegistry::new();
+        let mut loot = LootAuthority::new();
+        for id in 1..=4 {
+            zones.register(id).unwrap();
+            identity
+                .bind_verified(lease(id), CharacterId::new(u64::from(id)).unwrap())
+                .unwrap();
+            loot.register(id).unwrap();
+        }
+        let rusty = loot.grant(1, ItemKind::RustySword, 1).unwrap();
+        let first = loot
+            .drop_backpack(1, world.fighter(1).unwrap(), ZoneId::Moonvale, rusty, 0)
+            .unwrap();
+        let iron = loot.grant(1, ItemKind::IronSword, 1).unwrap();
+        let second = loot
+            .drop_backpack(1, world.fighter(1).unwrap(), ZoneId::Moonvale, iron, 0)
+            .unwrap();
+        let gold = loot.grant(1, ItemKind::Gold, 10).unwrap();
+        let gold_entity = loot
+            .drop_backpack(1, world.fighter(1).unwrap(), ZoneId::Moonvale, gold, 0)
+            .unwrap();
+
+        // A real corpse may contain another sword but the preview must
+        // never publish any corpse contents as a selectable ground sword.
+        let corpse_sword = loot.grant(4, ItemKind::RustySword, 1).unwrap();
+        let mut victim = world.fighter(4).unwrap().clone();
+        victim.hp = 0.0;
+        victim.action = Action::Dead;
+        loot.death(4, &victim, ZoneId::Moonvale, 0).unwrap();
+
+        let preview = |lease: SessionLease, world: &World, loot: &LootAuthority, tick: u32| {
+            inspect_verified_ground_sword_targets(
+                loot,
+                &identity,
+                PickupWorldTick {
+                    world,
+                    completed_tick: tick,
+                    zones: &zones,
+                },
+                lease,
+            )
+        };
+        let view = preview(lease(2), &world, &loot, world.tick).unwrap();
+        assert_eq!(view.len(), 2);
+        assert_eq!(
+            view.iter().map(|t| t.selection).collect::<Vec<_>>(),
+            vec![
+                GroundSwordSelection {
+                    ground_entity_id: first,
+                    expected_item_id: rusty
+                },
+                GroundSwordSelection {
+                    ground_entity_id: second,
+                    expected_item_id: iron
+                },
+            ],
+        );
+        assert!(view.iter().all(|t| t.at == Point { x: 200.0, y: 200.0 }));
+        assert!(view.iter().all(|t| t.completed_tick == world.tick));
+        assert!(!view
+            .iter()
+            .any(|t| t.selection.ground_entity_id == gold_entity));
+        assert!(!view
+            .iter()
+            .any(|t| t.selection.expected_item_id == corpse_sword));
+        assert!(loot
+            .visible_loot(2, world.fighter(2).unwrap(), ZoneId::Moonvale, 0)
+            .unwrap()
+            .iter()
+            .any(|v| matches!(v.appearance, LootAppearance::Corpse { .. })));
+
+        assert!(preview(lease(3), &world, &loot, world.tick)
+            .unwrap()
+            .is_empty());
+        assert!(matches!(
+            preview(SessionLease::new(2, 2).unwrap(), &world, &loot, world.tick),
+            Err(PickupCommitError::UnverifiedSession)
+        ));
+        assert!(matches!(
+            preview(lease(2), &world, &loot, world.tick.wrapping_add(1)),
+            Err(PickupCommitError::StaleWorldTick)
+        ));
+        world.now_ms = f32::NAN;
+        assert!(matches!(
+            preview(lease(2), &world, &loot, world.tick),
+            Err(PickupCommitError::InvalidWorldTime)
+        ));
+        world.now_ms = 0.0;
+        assert!(matches!(
+            preview(lease(4), &world, &loot, world.tick),
+            Err(PickupCommitError::Loot(LootError::DeadPlayer))
+        ));
+        let path = checkpoint_path();
+        let magic = MagicAuthority::new();
+        let obtained = commit_verified_ground_sword_equip_checked(
+            GroundSwordAuthority {
+                path: &path,
+                loot: &mut loot,
+                magic: &magic,
+                identity: &identity,
+                tick: PickupWorldTick {
+                    world: &world,
+                    completed_tick: world.tick,
+                    zones: &zones,
+                },
+                operation: VerifiedLootOperation {
+                    lease: lease(2),
+                    sequence: 1,
+                },
+            },
+            view[0].selection,
+            |fighter, ground, zone| {
+                assert_eq!(fighter.net_id, 2);
+                assert_eq!(ground.item.id, rusty);
+                assert_eq!(ground.zone, zone);
+                Ok(())
+            },
+        )
+        .unwrap();
+        assert_eq!(obtained.id, rusty);
+        let after = preview(lease(2), &world, &loot, world.tick).unwrap();
+        assert_eq!(after.len(), 1);
+        assert_eq!(after[0].selection.expected_item_id, iron);
+        assert_eq!(
+            loot.inventory(2)
+                .unwrap()
+                .equipped(EquipmentSlot::MainHand)
+                .unwrap()
+                .id,
+            rusty
+        );
+        assert!(matches!(
+            commit_verified_ground_sword_equip_checked(
+                GroundSwordAuthority {
+                    path: &path,
+                    loot: &mut loot,
+                    magic: &magic,
+                    identity: &identity,
+                    tick: PickupWorldTick {
+                        world: &world,
+                        completed_tick: world.tick,
+                        zones: &zones
+                    },
+                    operation: VerifiedLootOperation {
+                        lease: lease(1),
+                        sequence: 1
+                    },
+                },
+                view[0].selection,
+                |_, _, _| panic!("stale item target must be rejected"),
+            ),
+            Err(PickupCommitError::Loot(LootError::NotFound))
         ));
         let _ = fs::remove_file(path);
     }
