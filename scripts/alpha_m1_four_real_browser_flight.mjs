@@ -359,13 +359,28 @@ async function pressActualMovementKey(s,key,holdMs) {
   // Never overwrite fighter coordinates or ignore an obstructing solid.
   await sleep(220);
 }
-async function walkActualBrowserAxis(s,playerId,axis,target) {
+// Expected live roster is explicit. The original pre-crash mode remains
+// EXACT 1,2,3,4; only the approved post-SIGKILL mode uses 1,3,4,5.
+function hasExactAuthoritativeRoster(view,expected){
+  if(!view||view.id<=0||!Number.isFinite(view.tick)||view.tick<=0||
+    !Array.isArray(view.fighters)||!Array.isArray(view.scoreboard)||
+    view.fighters.length!==expected.length)return false;
+  const ids=view.fighters.map(f=>f.netId).sort((a,b)=>a-b);
+  return ids.every((id,i)=>id===expected[i])
+    && expected.every(id=>view.scoreboard.some(row=>row.startsWith("#"+id)))
+    && !view.scoreboard.some(row=>/^(?:#2(?:\D|$))/.test(row) && !expected.includes(2));
+}
+async function walkActualBrowserAxis(s,playerId,axis,target,expectedRoster=[1,2,3,4]) {
   assert(axis==="x"||axis==="y","unauthorized walk axis");
+  assert((expectedRoster.join(",")==="1,2,3,4"
+      ||(rackCrashRejoin&&playerId===5&&expectedRoster.join(",")==="1,3,4,5")),
+    "unreviewed authoritative live roster for native movement");
   let noProgress=0;
   const samples=[];
   for(let attempt=0;attempt<24;attempt++){
     const before=await snapshot(s),p=fighter(before,playerId);
-    assert(p&&fourVisible(before), "missing actual server player/roster during rack approach");
+    assert(p&&hasExactAuthoritativeRoster(before,expectedRoster),
+      "missing true Rust fighter or unexpected live roster during rack approach");
     const step=nextNativeWalkPulse(p[axis],target);
     if(step.done)return samples;
     const key=axis==="x"?(step.key==="negative"?"a":"d"):
@@ -373,7 +388,8 @@ async function walkActualBrowserAxis(s,playerId,axis,target) {
     await pressActualMovementKey(s,key,step.holdMs);
     const after=await waitFor(async()=>{
       const value=await snapshot(s),next=fighter(value,playerId);
-      return {ok:fourVisible(value)&&value.tick>before.tick&&!!next,value};
+      return {ok:hasExactAuthoritativeRoster(value,expectedRoster)
+        &&value.tick>before.tick&&!!next,value};
     },s.name+" server-authoritative "+axis+" rack approach tick",2800);
     const newPosition=fighter(after,playerId),gain=Math.abs(p[axis]-target)-Math.abs(newPosition[axis]-target);
     samples.push({attempt,key,holdMs:step.holdMs,before:p[axis],after:newPosition[axis],
@@ -483,11 +499,12 @@ async function nativeRackCrashRecovery() {
   await webdriver(replacement.base,"POST",
     `/session/${replacement.id}/element/${element}/click`,{});
   await sleep(750);
-  const x=await walkActualBrowserAxis(replacement,5,"x",target.x);
-  const y=await walkActualBrowserAxis(replacement,5,"y",target.y);
+  const x=await walkActualBrowserAxis(replacement,5,"x",target.x,[1,3,4,5]);
+  const y=await walkActualBrowserAxis(replacement,5,"y",target.y,[1,3,4,5]);
   const at=await waitFor(async()=>{
     const view=await snapshot(replacement),fighter5=fighter(view,5);
-    return {ok:!!fighter5&&nativeRackArrived(fighter5,target)
+    return {ok:hasExactAuthoritativeRoster(view,[1,3,4,5])
+      &&!!fighter5&&nativeRackArrived(fighter5,target)
       &&nativeRackWithinProposedReach(fighter5,slot),value:view};
   },"real replacement Firefox player5 reached vacated rack2 without authoritative shortcut",4000);
   const afterReplacementTick=at.tick;
