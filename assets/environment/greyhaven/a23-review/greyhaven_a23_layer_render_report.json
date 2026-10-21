@@ -1,0 +1,34 @@
+{
+  "A3RollChanged": false,
+  "baseObjectsClassified": 281,
+  "camera": "A2 / street review / 3-4 angle",
+  "canvas": [
+    1120,
+    720
+  ],
+  "classification": "explicit roof names, never the historic gable substring candidate tag",
+  "gameplayChanged": false,
+  "inputScene": "blood_iron_greyhaven_a22.blend",
+  "layers": {
+    "base": {
+      "png": "greyhaven_a23_base.png",
+      "pngBytes": 1023334,
+      "roofMeshes": 0,
+      "visibleMeshes": 229
+    },
+    "roof": {
+      "png": "greyhaven_a23_roof.png",
+      "pngBytes": 343098,
+      "roofMeshes": 11,
+      "visibleMeshes": 11
+    }
+  },
+  "lighting": "separate Cycles CPU passes; shadows and alpha compositing not yet runtime validated",
+  "metersPerWorldUnitValidatedInBrowser": false,
+  "milestone": "Blood & Iron A2.3 offline fixed-camera alpha layer study",
+  "productionApproved": false,
+  "projection": "orthographic review camera, not validated against browser",
+  "roofObjectsClassified": 16,
+  "roofOcclusionRuntimeActive": false,
+  "sourceSceneSaved": false
+}

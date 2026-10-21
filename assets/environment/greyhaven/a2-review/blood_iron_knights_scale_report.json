@@ -1,0 +1,80 @@
+{
+  "status": "A2 preliminary knight/building scale review only",
+  "scene": "blood_iron_greyhaven_a2.blend",
+  "modelSourcesStoredInRepository": false,
+  "nativeBlenderSceneCommitted": false,
+  "actualBrowserSpriteComparisonDone": false,
+  "a1TavernDoorHeightMeters": 2.2,
+  "metersPerGameWorldUnitArtConvention": 0.025,
+  "rollDurationVisualMs": 350,
+  "rollAuthoritativeMs": 170,
+  "recoveryAuthoritativeMs": 180,
+  "silver": {
+    "name": "Silver Knight A3",
+    "source": "silver-knight-roll-A3.glb",
+    "importedObjects": 3,
+    "rigBoneCount": 22,
+    "originalMeshHeightMeters": 0.99289,
+    "originalMeshWidthMeters": 0.56166,
+    "originalMeshDepthMeters": 0.40153,
+    "nonAuthoritativeVisualScale": 1.81289,
+    "reviewHeightMeters": 1.8,
+    "feetZ": 0.0,
+    "worldXYForCompositionMeters": [
+      -1.48,
+      -0.31
+    ],
+    "newActionNames": [
+      "idle",
+      "jump_loop",
+      "roll",
+      "sprint_loop",
+      "walk_loop"
+    ],
+    "proxyObjectsHidden": 1,
+    "idleAction": "idle",
+    "rollAction": "roll",
+    "rollClipFrameRange": [
+      0.4,
+      8.8
+    ]
+  },
+  "sentinel": {
+    "name": "T1 Sentinel A3",
+    "source": "t1-sentinel-roll-A3.glb",
+    "importedObjects": 3,
+    "rigBoneCount": 22,
+    "originalMeshHeightMeters": 0.97944,
+    "originalMeshWidthMeters": 0.45397,
+    "originalMeshDepthMeters": 0.43079,
+    "nonAuthoritativeVisualScale": 1.87862,
+    "reviewHeightMeters": 1.84,
+    "feetZ": 0.0,
+    "worldXYForCompositionMeters": [
+      1.48,
+      -0.31
+    ],
+    "newActionNames": [
+      "death",
+      "hit_chest",
+      "idle.001",
+      "roll.001",
+      "sword_attack",
+      "sword_block",
+      "sword_idle",
+      "walk_loop.001"
+    ],
+    "proxyObjectsHidden": 1,
+    "idleAction": "idle.001",
+    "rollAction": "roll.001",
+    "rollClipFrameRange": [
+      0.4,
+      8.8
+    ]
+  },
+  "renderEngine": "Cycles CPU",
+  "renderSamples": 4,
+  "targetRollFrame": 5,
+  "rollReview": "Two separate single-character stills to prevent visual overlap",
+  "changesGameplay": false
+}

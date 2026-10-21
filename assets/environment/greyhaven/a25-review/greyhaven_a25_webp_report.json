@@ -1,0 +1,169 @@
+{
+  "browserPerformanceMeasured": false,
+  "browserSpritePivotValidated": false,
+  "buildings": {
+    "gable_merchant": {
+      "combinedLosslessWebpBytes": 55292,
+      "gameWorldPlacementApproved": false,
+      "layers": {
+        "base": {
+          "canvasRoundtripExactVisibleRGBA": true,
+          "croppedPixels": [
+            190,
+            198
+          ],
+          "drawOffsetFromVisualDoorPixels": [
+            -95.0,
+            -163.0
+          ],
+          "encodedBytes": 19978,
+          "imageFlippedVerticallyForGamePositiveYDown": true,
+          "sha256": "d703480d2bc7b23d59f5d13767cdd05a65d03bb0d90e83b0e548c1812444507b",
+          "sourceAlphaBoundsPixels": [
+            227,
+            159,
+            413,
+            353
+          ],
+          "sourceRectPixels": [
+            225,
+            157,
+            415,
+            355
+          ],
+          "visualDoorAnchorPixelsInCroppedImage": [
+            95.0,
+            163.0
+          ],
+          "webp": "gable_merchant_a25_base.webp"
+        },
+        "roof": {
+          "canvasRoundtripExactVisibleRGBA": true,
+          "croppedPixels": [
+            198,
+            178
+          ],
+          "drawOffsetFromVisualDoorPixels": [
+            -99.0,
+            -169.0
+          ],
+          "encodedBytes": 35314,
+          "imageFlippedVerticallyForGamePositiveYDown": true,
+          "sha256": "417454bf05c597f276b8031f122ba00f5482df1423f8c7d5b54bb63a229e1459",
+          "sourceAlphaBoundsPixels": [
+            223,
+            153,
+            417,
+            327
+          ],
+          "sourceRectPixels": [
+            221,
+            151,
+            419,
+            329
+          ],
+          "visualDoorAnchorPixelsInCroppedImage": [
+            99.0,
+            169.0
+          ],
+          "webp": "gable_merchant_a25_roof.webp"
+        }
+      },
+      "preview": "gable_merchant_a25_review.png",
+      "proposedManifestDoorGameXY": null,
+      "visualDoorAnchorOriginPixels": [
+        320.0,
+        320.0
+      ]
+    },
+    "red_lion": {
+      "combinedLosslessWebpBytes": 64382,
+      "gameWorldPlacementApproved": false,
+      "layers": {
+        "base": {
+          "canvasRoundtripExactVisibleRGBA": true,
+          "croppedPixels": [
+            226,
+            183
+          ],
+          "drawOffsetFromVisualDoorPixels": [
+            -113.0,
+            -156.0
+          ],
+          "encodedBytes": 26264,
+          "imageFlippedVerticallyForGamePositiveYDown": true,
+          "sha256": "e70a5a72f6d9cb25bc7d34b21cf3a59d40aaf6d13a2b0ad3f9f0a9dbdd06df22",
+          "sourceAlphaBoundsPixels": [
+            209,
+            166,
+            431,
+            345
+          ],
+          "sourceRectPixels": [
+            207,
+            164,
+            433,
+            347
+          ],
+          "visualDoorAnchorPixelsInCroppedImage": [
+            113.0,
+            156.0
+          ],
+          "webp": "red_lion_a25_base.webp"
+        },
+        "roof": {
+          "canvasRoundtripExactVisibleRGBA": true,
+          "croppedPixels": [
+            235,
+            176
+          ],
+          "drawOffsetFromVisualDoorPixels": [
+            -118.0,
+            -163.0
+          ],
+          "encodedBytes": 38118,
+          "imageFlippedVerticallyForGamePositiveYDown": true,
+          "sha256": "6e58ab9d2fe399e202f520f95e72d9fe824ed62e70741ae3897f86092ef1f629",
+          "sourceAlphaBoundsPixels": [
+            204,
+            159,
+            435,
+            331
+          ],
+          "sourceRectPixels": [
+            202,
+            157,
+            437,
+            333
+          ],
+          "visualDoorAnchorPixelsInCroppedImage": [
+            118.0,
+            163.0
+          ],
+          "webp": "red_lion_a25_roof.webp"
+        }
+      },
+      "preview": "red_lion_a25_review.png",
+      "proposedManifestDoorGameXY": [
+        4365.0,
+        4075.0
+      ],
+      "visualDoorAnchorOriginPixels": [
+        320.0,
+        320.0
+      ]
+    }
+  },
+  "canvas": [
+    640,
+    640
+  ],
+  "doorPortalAuthorityVerified": false,
+  "encoding": "lossless RGBA WebP; exact alpha composite full-canvas restore",
+  "gameCameraZoom": 0.84,
+  "milestone": "Blood & Iron A2.5 preview-only game-XY calibrated per-building WebPs",
+  "pixelsPerAuthoringMeter": 33.599999999999994,
+  "productionApproved": false,
+  "renderSource": "blood_iron_greyhaven_a22.blend",
+  "roofOcclusionRuntimeEnabled": false
+}

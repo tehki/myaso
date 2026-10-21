@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="data:,">
+<title>myaso.io — Blood &amp; Iron A2.7 art-layer review</title>
+<style>
+:root{color-scheme:dark}
+*{box-sizing:border-box}
+body{background:#161b19;color:#eae4d8;font:15px/1.5 system-ui,sans-serif;margin:0}
+header{padding:16px clamp(16px,4vw,44px);background:#242b27;border-bottom:1px solid #48564b}
+h1{font:700 clamp(21px,3vw,29px) Georgia,serif;margin:0}
+small,.note{color:#bbc2b8}
+main{max-width:1170px;margin:auto;padding:20px}
+.review{background:#222b27;border:1px solid #526151;border-radius:11px;padding:12px}
+canvas{display:block;width:100%;max-width:960px;margin:auto;aspect-ratio:3/2;background:#5a675a;border-radius:5px;touch-action:none}
+.controls{display:flex;gap:13px;flex-wrap:wrap;align-items:center;margin:16px 0}
+label{display:flex;align-items:center;gap:9px}
+select,button{background:#38433a;color:#f1e6ce;border:1px solid #7c886f;border-radius:6px;padding:8px 12px}
+input[type=range]{accent-color:#b98b58;max-width:150px}
+input[type=checkbox]{accent-color:#c69962}
+button{cursor:pointer}
+.stat{background:#29342c;border-radius:6px;padding:9px 12px;margin-top:12px;font-size:13px;overflow-wrap:anywhere}
+code{color:#ebcd97}
+.note{font-size:13px}
+.warning{color:#ecc68f}
+</style>
+</head>
+<body>
+<header>
+<h1>⚔️ Blood &amp; Iron — Greyhaven A2.7</h1>
+<small>Original A2.6 Blender building art · optional browser-only layer review · no gameplay</small>
+</header>
+<main>
+<div class="review">
+<canvas id="review" width="960" height="640" aria-label="Isolated roof and wall visual preview; no authoritative world coordinates"></canvas>
+</div>
+<div class="controls">
+<label for="building">Building
+<select id="building">
+<option value="red_lion">Red Lion Tavern</option>
+<option value="gable_merchant">Gable Merchant</option>
+<option value="blacksmith">Blacksmith Forge</option>
+</select></label>
+<label for="roof">Roof opacity
+<input id="roof" type="range" min="0" max="100" value="100" step="1">
+<output id="roof-value" for="roof">100%</output></label>
+<label for="marker"><input id="marker" type="checkbox" checked>Show visual door anchor</label>
+<label for="roof-front"><input id="roof-front" type="checkbox" checked>Roof above test silhouette</label>
+<button id="reset" type="button">Reset review</button>
+</div>
+<p id="status" class="stat" role="status" aria-live="polite">Loading locally authored WebP layers…</p>
+<p class="note warning"><strong>Review only:</strong> the 3/4 Blender camera is not aligned with the multiplayer game’s flat XY projection. The marked door is a <em>visual</em> alignment anchor, not a gameplay portal, spawn, collider or knight foot pivot. Roof fading here is manual and has no occlusion logic. Do not treat this page as a gameplay benchmark or deployment approval.</p>
+<p class="note">Drag the gold marker to explore artistic layer ordering. Measurements are from images decoded in this browser; this preview does not run networked combat. Launch over local HTTP from repository root: <code>python -m http.server 8080</code> and open <code>/web/greyhaven-a27-art-preview.html</code>.</p>
+</main>
+<script type="module" src="./greyhaven-a27-art-preview.mjs"></script>
+</body>
+</html>

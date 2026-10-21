@@ -1,0 +1,73 @@
+{
+  "actualAuthoritativeDoorOrCollisionApproved": false,
+  "actualNetworkPlayerIntegrationTested": false,
+  "camera": "Exact overhead orthographic, art-only vertical elevation sheared toward image top",
+  "canvasPx": [
+    640,
+    640
+  ],
+  "decorativeHeightRisePixelsPerSourceMeter": [
+    0.0,
+    -28.560009
+  ],
+  "eavePositionPreserved": true,
+  "facadeAnatomyOrMaterialClaimsChanged": false,
+  "gamePixelsPerSourceMeter": 33.599999999999994,
+  "gameSourceModified": false,
+  "geometry": {
+    "groundVerticesUnmoved": 12,
+    "maxGroundXYDrift": 0.0,
+    "maxRoofVisualRiseReductionPx": 25.132809677124,
+    "roofOrGableVerticesCompressed": 1778,
+    "sourceMeshObjects": 17,
+    "sourceVertices": 4318,
+    "transformedVertices": 4318
+  },
+  "groundBasisPixelsPerSourceMeter": {
+    "x": [
+      33.600006,
+      0.0
+    ],
+    "y": [
+      0.0,
+      33.600006
+    ]
+  },
+  "groundCoordinateInvarianceApprovedForReview": true,
+  "heightLiftFactor": 0.85,
+  "layers": {
+    "base": {
+      "bytes": 185241,
+      "rawPng": "red_lion_a222_base_blender.png",
+      "visibleMeshCount": 13
+    },
+    "roof": {
+      "bytes": 161974,
+      "rawPng": "red_lion_a222_roof_blender.png",
+      "visibleMeshCount": 3
+    }
+  },
+  "metersPerWorldUnit": 0.025,
+  "milestone": "Blood & Iron A2.22 authentic Red Lion XY-grounded decorative facade bake",
+  "productionApproved": false,
+  "proposedDoorGameXY": [
+    4365,
+    4075
+  ],
+  "roofEaveSourceZ": 3.45,
+  "roofOcclusionRuntimeApproved": false,
+  "roofPitchCompression": 0.45,
+  "sourceGameZoom": 0.84,
+  "sourceScene": "blood_iron_greyhaven_a22.blend",
+  "sourceSceneSaved": false,
+  "verticalDepthScale": 0.05,
+  "visualDoorAnchorPixels": [
+    320.0,
+    320.0
+  ],
+  "visualDoorAnchorSourceMeters": [
+    0.0,
+    -1.865,
+    0
+  ]
+}

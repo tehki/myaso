@@ -1,0 +1,60 @@
+{
+  "A3RollChanged": false,
+  "artOnly": true,
+  "batchedFacade": {
+    "ironHingePins": 8,
+    "meshes": 1,
+    "oakDoorPlanks": 28,
+    "stoneFrontBlocks": 92
+  },
+  "browserFrameTimeMeasured": false,
+  "combatChanged": false,
+  "editableOutputScene": "blood_iron_greyhaven_a22.blend",
+  "gameplayChanged": false,
+  "inputBaseScene": "blood_iron_red_lion_a21.blend",
+  "license": "original Python geometry and Blender shader nodes; no third-party assets",
+  "milestone": "Blood & Iron A2.2 Greyhaven neighboring roofs and facades",
+  "newMeshObjects": 5,
+  "originalBarrelsPreserved": 7,
+  "originalMeshObjectsPreserved": 292,
+  "originalProceduralMaterials": 16,
+  "portalChanged": false,
+  "productionApproved": false,
+  "renderResolution": [
+    1120,
+    720
+  ],
+  "renderer": "Cycles CPU",
+  "roofStudies": [
+    {
+      "batches": 1,
+      "building": "Gable Merchant",
+      "cover": "slate",
+      "individualPatches": 468,
+      "oldCoursesPreservedHidden": 14
+    },
+    {
+      "batches": 1,
+      "building": "Tanner's Cottage",
+      "cover": "thatch",
+      "individualPatches": 1242,
+      "oldCoursesPreservedHidden": 14
+    },
+    {
+      "batches": 1,
+      "building": "Stone Weaver",
+      "cover": "clay",
+      "individualPatches": 494,
+      "oldCoursesPreservedHidden": 14
+    },
+    {
+      "batches": 1,
+      "building": "Blacksmith",
+      "cover": "charcoal-slate",
+      "individualPatches": 532,
+      "oldCoursesPreservedHidden": 14
+    }
+  ],
+  "samples": 4,
+  "textureAtlasBaked": false
+}

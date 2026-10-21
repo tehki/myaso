@@ -1,0 +1,189 @@
+{
+  "A3RollChanged": false,
+  "blacksmithWorkyard": {
+    "correctedEmbersCenterXYZ": [
+      9.3,
+      5.54,
+      0.92
+    ],
+    "correctedForgeCenterXYZ": [
+      9.3,
+      6.05,
+      0.62
+    ],
+    "doorAndStepUnmodified": true,
+    "entranceCorridorXYBounds": [
+      11.65,
+      5.65,
+      13.55,
+      7.6
+    ],
+    "forgeToAnvilHorizontalClearanceMeters": 0.325,
+    "forgingPropsInEntranceCorridor": false,
+    "gameCollisionModified": false,
+    "originalBlenderSceneSaved": false,
+    "originalForgeCenterXYZ": [
+      13.3,
+      6.95,
+      0.62
+    ],
+    "visibleFrontFireboxOpening": true
+  },
+  "buildings": {
+    "blacksmith": {
+      "actualCameraEulerRad": [
+        1.091795,
+        0.0,
+        -0.749269
+      ],
+      "anchorPixels": [
+        319.99998,
+        319.99996
+      ],
+      "blenderGroundBasisX": [
+        32.54164,
+        -13.9518
+      ],
+      "blenderGroundBasisY": [
+        -30.2713,
+        -14.99817
+      ],
+      "facadeRelativeCameraTurnDegrees": 180.0,
+      "layers": {
+        "base": {
+          "master": "blacksmith_a26_base_master.png",
+          "pngBytes": 219202,
+          "renderVisibleMeshes": 26
+        },
+        "roof": {
+          "master": "blacksmith_a26_roof_master.png",
+          "pngBytes": 171785,
+          "renderVisibleMeshes": 4
+        },
+        "whole": {
+          "master": "blacksmith_a26_whole_master.png",
+          "pngBytes": 259781,
+          "renderVisibleMeshes": 30
+        }
+      },
+      "maxXYGameProjectionMismatchPixelsPerMeter": 57.255,
+      "runtimeDoorOrPivotValidated": false,
+      "sourceObjectPrefix": "Blacksmith",
+      "visualDoorGroundAnchorMeters": [
+        12.6,
+        7.37,
+        0.0
+      ]
+    },
+    "gable_merchant": {
+      "actualCameraEulerRad": [
+        1.091795,
+        0.0,
+        2.392323
+      ],
+      "anchorPixels": [
+        319.99998,
+        319.99996
+      ],
+      "blenderGroundBasisX": [
+        -32.54166,
+        13.95182
+      ],
+      "blenderGroundBasisY": [
+        30.27128,
+        14.99821
+      ],
+      "facadeRelativeCameraTurnDegrees": 0.0,
+      "layers": {
+        "base": {
+          "master": "gable_merchant_a26_base_master.png",
+          "pngBytes": 200855,
+          "renderVisibleMeshes": 21
+        },
+        "roof": {
+          "master": "gable_merchant_a26_roof_master.png",
+          "pngBytes": 166868,
+          "renderVisibleMeshes": 4
+        },
+        "whole": {
+          "master": "gable_merchant_a26_whole_master.png",
+          "pngBytes": 239120,
+          "renderVisibleMeshes": 25
+        }
+      },
+      "maxXYGameProjectionMismatchPixelsPerMeter": 67.597,
+      "runtimeDoorOrPivotValidated": false,
+      "sourceObjectPrefix": "Gable Merchant",
+      "visualDoorGroundAnchorMeters": [
+        -12.8,
+        -2.02,
+        0.0
+      ]
+    },
+    "red_lion": {
+      "actualCameraEulerRad": [
+        1.091795,
+        0.0,
+        2.392323
+      ],
+      "anchorPixels": [
+        319.99994,
+        319.99996
+      ],
+      "blenderGroundBasisX": [
+        -32.54164,
+        13.95182
+      ],
+      "blenderGroundBasisY": [
+        30.27128,
+        14.99821
+      ],
+      "facadeRelativeCameraTurnDegrees": 0.0,
+      "layers": {
+        "base": {
+          "master": "red_lion_a26_base_master.png",
+          "pngBytes": 229296,
+          "renderVisibleMeshes": 12
+        },
+        "roof": {
+          "master": "red_lion_a26_roof_master.png",
+          "pngBytes": 162977,
+          "renderVisibleMeshes": 4
+        },
+        "whole": {
+          "master": "red_lion_a26_whole_master.png",
+          "pngBytes": 254777,
+          "renderVisibleMeshes": 16
+        }
+      },
+      "maxXYGameProjectionMismatchPixelsPerMeter": 67.597,
+      "runtimeDoorOrPivotValidated": false,
+      "sourceObjectPrefix": "Red Lion",
+      "visualDoorGroundAnchorMeters": [
+        0.0,
+        -1.865,
+        0.0
+      ]
+    }
+  },
+  "cameraRotationEulerRad": [
+    1.091795,
+    0.0,
+    2.392323
+  ],
+  "canvas": [
+    640,
+    640
+  ],
+  "drawInBrowserApproved": false,
+  "gameXYProjectionMatched": false,
+  "gameplayChanged": false,
+  "milestone": "Blood & Iron A2.6 separate 3-4 building billboard masters",
+  "productionApproved": false,
+  "renderEngine": "Cycles CPU",
+  "samples": 4,
+  "scene": "blood_iron_greyhaven_a22.blend",
+  "sourceSceneModified": false,
+  "visualCameraScale": 14.399999618530273,
+  "visualCameraSource": "A2 / Red Lion hero / 3-4 angle"
+}

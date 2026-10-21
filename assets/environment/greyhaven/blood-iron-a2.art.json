@@ -1,0 +1,80 @@
+{
+  "schemaVersion": 1,
+  "milestone": "A2 look-development source (art-review, non-runtime)",
+  "artDirection": "BLOOD & IRON — MEDIEVAL REALISM",
+  "source": "tools/art/build_blood_iron_a2.py",
+  "a1Source": "assets/environment/greyhaven/red_lion_blockout.obj",
+  "license": "Original project-authored Blender geometry and procedural shader nodes; no third-party textures",
+  "sceneBuildings": [
+    {
+      "id": "red-lion",
+      "role": "imported A1 tavern + procedural PBR material enhancement",
+      "unitMeters": [
+        6.25,
+        4.25
+      ],
+      "gameplayPortalMoved": false
+    },
+    {
+      "id": "gable-merchant",
+      "role": "slate-roof half-timber merchant house"
+    },
+    {
+      "id": "tanners-cottage",
+      "role": "weathered thatch cottage"
+    },
+    {
+      "id": "stone-weaver",
+      "role": "stone cottage with red clay roof"
+    },
+    {
+      "id": "blacksmith",
+      "role": "forge, anvil, chimney, emissive embers"
+    }
+  ],
+  "street": {
+    "layout": "fixed look-dev composition; not authoritative Moonvale coordinates",
+    "cobblestones": {
+      "count": 1032,
+      "meshBatches": 1
+    },
+    "oakTrees": 6,
+    "cart": 1,
+    "fenceLines": 2
+  },
+  "geometry": {
+    "metersPerGameUnit": 0.025,
+    "roofLayerTag": "roof-occlusion-candidate",
+    "baseLayerTag": "world-base-candidate",
+    "reusesA1Source": true
+  },
+  "rendering": {
+    "engine": "Cycles",
+    "device": "CPU",
+    "targetPreviewPx": [
+      1120,
+      720
+    ],
+    "samples": 16,
+    "cameraExportLocked": false,
+    "proposedOutputs": [
+      "blood_iron_street_a2.png",
+      "blood_iron_red_lion_a2.png"
+    ],
+    "previewOnly": true
+  },
+  "integration": {
+    "changesGameplay": false,
+    "changesPortalOrAuthority": false,
+    "changesKnights": false,
+    "mergesWithWorldPRs": false,
+    "gameFlag": "not integrated",
+    "productionApproved": false
+  },
+  "outstanding": [
+    "Compare actual Silver Knight/T1 Sentinel sizes and pivots",
+    "Review render side-by-side in real game world",
+    "Bake roof/wall split RGBA WebP atlases and measure browser cost",
+    "Add assets to opt-in renderer only after art owner accepts"
+  ]
+}

@@ -1,0 +1,198 @@
+{
+  "browserGameXYAligned": false,
+  "browserRuntimeIntegrated": false,
+  "buildings": {
+    "blacksmith": {
+      "combinedWebPBytes": 116492,
+      "compositeForegroundRGBMeanAbsoluteErrorVsWholeRender": 1.441,
+      "gameWorldDoorPositionValidated": false,
+      "layers": {
+        "base": {
+          "bytes": 69018,
+          "cropPixels": [
+            362,
+            341
+          ],
+          "cropSourceRect": [
+            60,
+            57,
+            422,
+            398
+          ],
+          "drawOffsetPixelsFromVisualDoor": [
+            -260.0,
+            -263.0
+          ],
+          "filename": "blacksmith_a26_base.webp",
+          "sha256": "c262a17d84d131d726fd5bd2a7299b13b591e2b3423ab99f5e62da32172d401c",
+          "visiblePixelRoundtrip": true,
+          "visualDoorAnchorPixelsInCrop": [
+            260.0,
+            263.0
+          ]
+        },
+        "roof": {
+          "bytes": 47474,
+          "cropPixels": [
+            382,
+            193
+          ],
+          "cropSourceRect": [
+            49,
+            32,
+            431,
+            225
+          ],
+          "drawOffsetPixelsFromVisualDoor": [
+            -271.0,
+            -288.0
+          ],
+          "filename": "blacksmith_a26_roof.webp",
+          "sha256": "8bd7a5a1ccdc381623d0ef0e9a904443afa37eb2ece7f903f5a19ce3f702efde",
+          "visiblePixelRoundtrip": true,
+          "visualDoorAnchorPixelsInCrop": [
+            271.0,
+            288.0
+          ]
+        }
+      },
+      "review": "blacksmith_a26_review.png",
+      "spriteFeetPivotValidatedInBrowser": false,
+      "visualDoorAnchorPixel": [
+        319.99998,
+        319.99996
+      ]
+    },
+    "gable_merchant": {
+      "combinedWebPBytes": 102048,
+      "compositeForegroundRGBMeanAbsoluteErrorVsWholeRender": 0.837,
+      "gameWorldDoorPositionValidated": false,
+      "layers": {
+        "base": {
+          "bytes": 57874,
+          "cropPixels": [
+            324,
+            300
+          ],
+          "cropSourceRect": [
+            87,
+            59,
+            411,
+            359
+          ],
+          "drawOffsetPixelsFromVisualDoor": [
+            -233.0,
+            -261.0
+          ],
+          "filename": "gable_merchant_a26_base.webp",
+          "sha256": "972703393921913917d103e6d5bb0aa2fdbedeb79cfd4c8a21819c56ae8ad4ef",
+          "visiblePixelRoundtrip": true,
+          "visualDoorAnchorPixelsInCrop": [
+            233.0,
+            261.0
+          ]
+        },
+        "roof": {
+          "bytes": 44174,
+          "cropPixels": [
+            344,
+            197
+          ],
+          "cropSourceRect": [
+            76,
+            14,
+            420,
+            211
+          ],
+          "drawOffsetPixelsFromVisualDoor": [
+            -244.0,
+            -306.0
+          ],
+          "filename": "gable_merchant_a26_roof.webp",
+          "sha256": "4baf5267ba1c7085193ed8d88c75a77ee6637e1d3e7407593b56e6df83ebf476",
+          "visiblePixelRoundtrip": true,
+          "visualDoorAnchorPixelsInCrop": [
+            244.0,
+            306.0
+          ]
+        }
+      },
+      "review": "gable_merchant_a26_review.png",
+      "spriteFeetPivotValidatedInBrowser": false,
+      "visualDoorAnchorPixel": [
+        319.99998,
+        319.99996
+      ]
+    },
+    "red_lion": {
+      "combinedWebPBytes": 119516,
+      "compositeForegroundRGBMeanAbsoluteErrorVsWholeRender": 2.001,
+      "gameWorldDoorPositionValidated": false,
+      "layers": {
+        "base": {
+          "bytes": 75228,
+          "cropPixels": [
+            357,
+            307
+          ],
+          "cropSourceRect": [
+            75,
+            60,
+            432,
+            367
+          ],
+          "drawOffsetPixelsFromVisualDoor": [
+            -245.0,
+            -260.0
+          ],
+          "filename": "red_lion_a26_base.webp",
+          "sha256": "04887ef3950f4dd962dc4c99f432b95e004fa080a517b1a615bc07e18842b8ea",
+          "visiblePixelRoundtrip": true,
+          "visualDoorAnchorPixelsInCrop": [
+            245.0,
+            260.0
+          ]
+        },
+        "roof": {
+          "bytes": 44288,
+          "cropPixels": [
+            378,
+            190
+          ],
+          "cropSourceRect": [
+            63,
+            46,
+            441,
+            236
+          ],
+          "drawOffsetPixelsFromVisualDoor": [
+            -257.0,
+            -274.0
+          ],
+          "filename": "red_lion_a26_roof.webp",
+          "sha256": "2a04d2c4520f9c6c83f77103f8c86c0577bda894a1900b1e6da5640b4e925019",
+          "visiblePixelRoundtrip": true,
+          "visualDoorAnchorPixelsInCrop": [
+            257.0,
+            274.0
+          ]
+        }
+      },
+      "review": "red_lion_a26_review.png",
+      "spriteFeetPivotValidatedInBrowser": false,
+      "visualDoorAnchorPixel": [
+        319.99994,
+        319.99996
+      ]
+    }
+  },
+  "canvas": [
+    640,
+    640
+  ],
+  "milestone": "Blood & Iron A2.6 visual 3/4 standalone wall+roof WebP study",
+  "productionApproved": false,
+  "renderSource": "blood_iron_greyhaven_a22.blend",
+  "roofOcclusionValidated": false,
+  "sourceCamera": "A2 3/4, per-building centered visual-door-ground point"
+}

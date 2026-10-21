@@ -1,0 +1,63 @@
+{
+  "camera": "A2 / street review / 3-4 angle",
+  "canvas": [
+    1120,
+    720
+  ],
+  "checkerboardPreview": "greyhaven_a23_checkerboard_preview.png",
+  "compositeForegroundRGBMeanAbsoluteErrorVsFullRender": 1.689,
+  "compositePreview": "greyhaven_a23_layer_composite_preview.png",
+  "compositeRGBMeanAbsoluteErrorVsFullRender": 33.265,
+  "compositingCaveat": "shadow and occlusion differences remain; layer stacking is not pixel-perfect or browser-validated",
+  "gameClientModified": false,
+  "geometryPivotsCalibratedToBrowser": false,
+  "layers": {
+    "base": {
+      "canvas": [
+        1120,
+        720
+      ],
+      "losslessVisiblePixelRoundtrip": true,
+      "losslessWebPBytes": 521196,
+      "nonTransparentBounds": [
+        0,
+        0,
+        1120,
+        720
+      ],
+      "opaquePixels": 584157,
+      "sourcePNG": "greyhaven_a23_base.png",
+      "sourcePngBytes": 1023334,
+      "transparentFraction": 0.27354,
+      "webp": "greyhaven_a23_base.webp",
+      "webpSha256": "53af91a2a6ee6f4945df7d01db6622fab9ffd3eb52f9c14c5263a4094969c093"
+    },
+    "roof": {
+      "canvas": [
+        1120,
+        720
+      ],
+      "losslessVisiblePixelRoundtrip": true,
+      "losslessWebPBytes": 145224,
+      "nonTransparentBounds": [
+        108,
+        39,
+        1061,
+        567
+      ],
+      "opaquePixels": 65141,
+      "sourcePNG": "greyhaven_a23_roof.png",
+      "sourcePngBytes": 343098,
+      "transparentFraction": 0.91656,
+      "webp": "greyhaven_a23_roof.webp",
+      "webpSha256": "bf3812ee866d991d11c2f460fe5acf2a1bdbe8c9f99f8802042295440f62c61f"
+    }
+  },
+  "milestone": "Blood & Iron A2.3 layered WebP measurable offline export",
+  "performanceFPSMeasured": false,
+  "productionApproved": false,
+  "renderSource": "blood_iron_greyhaven_a22.blend",
+  "roofRuntimeEnabled": false,
+  "sourceScenePreserved": true,
+  "webpEncoding": "lossless RGBA WebP; Pillow; no external textures"
+}

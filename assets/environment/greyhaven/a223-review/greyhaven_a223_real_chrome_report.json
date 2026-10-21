@@ -1,0 +1,211 @@
+{
+  "milestone": "Blood & Iron A2.23 real Chrome roof comparison with authentic PR326 knight",
+  "browser": "Chrome/154.0.8037.99",
+  "originalKnightSourceHead": "c74fcf90e227f3bc4788728f000cfe6aa083c7ef",
+  "originalKnightAtlasSha256": {
+    "silver_idle": "828cf05dd873d0c8f35e887f5e46c35af87f084ac321977e358c985e7a2106b4",
+    "silver_roll": "31c774ac930a5cf1060640f1fc2914b02d6d5ddccd7d56591123efd098909426",
+    "t1_roll": "16ea4b62867e95e1be7a4c18b3b48cc427b8338badae882692e6b1e051f0a24f"
+  },
+  "actualGameProjectionModule": "src/browser/arena-viewport.mjs",
+  "screenshots": 4,
+  "atDoor": {
+    "ready": true,
+    "clip": "silver_idle",
+    "dx": 0,
+    "dy": 0,
+    "roof": 1,
+    "gamePoint": [
+      320,
+      320
+    ],
+    "versions": {
+      "baseline": {
+        "groundXYErrorPx": 0,
+        "roofAlphaBounds": [
+          204,
+          15,
+          436,
+          230
+        ]
+      },
+      "refined": {
+        "groundXYErrorPx": 0,
+        "roofAlphaBounds": [
+          204,
+          40,
+          436,
+          231
+        ]
+      }
+    },
+    "originalKnightPrHead": "c74fcf90e227f3bc4788728f000cfe6aa083c7ef",
+    "sourceGameZoom": 0.84,
+    "knightDraw": {
+      "x": -48,
+      "y": -62.4,
+      "w": 96,
+      "h": 96
+    },
+    "roofTopLoweredPx": 25,
+    "roofBottomShiftPx": 1,
+    "originalBlenderSceneModified": false,
+    "productionApproved": false,
+    "multiplayerRuntimeIntegrated": false,
+    "authoritativeDoorOrColliderValidated": false,
+    "dynamicRoofOcclusionValidated": false,
+    "knightAssetsCopiedToGraphics": false
+  },
+  "walk": {
+    "ready": true,
+    "clip": "silver_idle",
+    "dx": 120,
+    "dy": -80,
+    "roof": 0.55,
+    "gamePoint": [
+      420.8,
+      252.8
+    ],
+    "versions": {
+      "baseline": {
+        "groundXYErrorPx": 0.000021633307676992724,
+        "roofAlphaBounds": [
+          204,
+          15,
+          436,
+          230
+        ]
+      },
+      "refined": {
+        "groundXYErrorPx": 0.000021633307676992724,
+        "roofAlphaBounds": [
+          204,
+          40,
+          436,
+          231
+        ]
+      }
+    },
+    "originalKnightPrHead": "c74fcf90e227f3bc4788728f000cfe6aa083c7ef",
+    "sourceGameZoom": 0.84,
+    "knightDraw": {
+      "x": -48,
+      "y": -62.4,
+      "w": 96,
+      "h": 96
+    },
+    "roofTopLoweredPx": 25,
+    "roofBottomShiftPx": 1,
+    "originalBlenderSceneModified": false,
+    "productionApproved": false,
+    "multiplayerRuntimeIntegrated": false,
+    "authoritativeDoorOrColliderValidated": false,
+    "dynamicRoofOcclusionValidated": false,
+    "knightAssetsCopiedToGraphics": false
+  },
+  "rolling": {
+    "ready": true,
+    "clip": "silver_roll",
+    "dx": 40,
+    "dy": 40,
+    "roof": 0,
+    "gamePoint": [
+      353.6,
+      353.6
+    ],
+    "versions": {
+      "baseline": {
+        "groundXYErrorPx": 0.000008485281352815295,
+        "roofAlphaBounds": [
+          204,
+          15,
+          436,
+          230
+        ]
+      },
+      "refined": {
+        "groundXYErrorPx": 0.000008485281352815295,
+        "roofAlphaBounds": [
+          204,
+          40,
+          436,
+          231
+        ]
+      }
+    },
+    "originalKnightPrHead": "c74fcf90e227f3bc4788728f000cfe6aa083c7ef",
+    "sourceGameZoom": 0.84,
+    "knightDraw": {
+      "x": -67,
+      "y": -78,
+      "w": 134,
+      "h": 134
+    },
+    "roofTopLoweredPx": 25,
+    "roofBottomShiftPx": 1,
+    "originalBlenderSceneModified": false,
+    "productionApproved": false,
+    "multiplayerRuntimeIntegrated": false,
+    "authoritativeDoorOrColliderValidated": false,
+    "dynamicRoofOcclusionValidated": false,
+    "knightAssetsCopiedToGraphics": false
+  },
+  "sentinel": {
+    "ready": true,
+    "clip": "t1_roll",
+    "dx": -60,
+    "dy": 70,
+    "roof": 0.8,
+    "gamePoint": [
+      269.6,
+      378.8
+    ],
+    "versions": {
+      "baseline": {
+        "groundXYErrorPx": 0.000013829316688016867,
+        "roofAlphaBounds": [
+          204,
+          15,
+          436,
+          230
+        ]
+      },
+      "refined": {
+        "groundXYErrorPx": 0.000013829316688016867,
+        "roofAlphaBounds": [
+          204,
+          40,
+          436,
+          231
+        ]
+      }
+    },
+    "originalKnightPrHead": "c74fcf90e227f3bc4788728f000cfe6aa083c7ef",
+    "sourceGameZoom": 0.84,
+    "knightDraw": {
+      "x": -67,
+      "y": -78,
+      "w": 134,
+      "h": 134
+    },
+    "roofTopLoweredPx": 25,
+    "roofBottomShiftPx": 1,
+    "originalBlenderSceneModified": false,
+    "productionApproved": false,
+    "multiplayerRuntimeIntegrated": false,
+    "authoritativeDoorOrColliderValidated": false,
+    "dynamicRoofOcclusionValidated": false,
+    "knightAssetsCopiedToGraphics": false
+  },
+  "roofTopLoweredPx": 25,
+  "roofBottomShiftPx": 1,
+  "errors": [],
+  "actualAuthoritativeEntranceValidated": false,
+  "roofOcclusionValidatedInActualGame": false,
+  "liveMultiplayerPerformanceMeasured": false,
+  "knightAtlasesCopiedIntoGraphics": false,
+  "sourceBlenderSceneModified": false,
+  "gameplayOrNetworkModified": false,
+  "productionApproved": false,
+  "caveat": "Real Chrome isolated art-only comparison. Exactly game-compatible ground basis; no actual server-side door/collision, wall-side pixel occlusion or live multiplayer timing."
+}

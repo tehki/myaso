@@ -1,0 +1,305 @@
+{
+  "milestone": "Blood & Iron A2.10 visual scale study using real PR326 atlas and Red Lion",
+  "browser": "Chrome/154.0.8037.99",
+  "doorHeightPx": 119.587,
+  "idle": {
+    "state": "ready",
+    "options": {
+      "baseline": {
+        "scale": 1,
+        "clip": "silver_idle",
+        "direction": 0,
+        "frame": 0,
+        "width": 80,
+        "height": 80,
+        "drawOffset": [
+          -40,
+          -52
+        ],
+        "silhouetteHeightPx": 59,
+        "silhouetteBottomFromCenterPx": 20,
+        "authoredDoorHeightPx": 119.587,
+        "silhouetteToProjectedDoorHeightRatio": 0.4934,
+        "sourceFrameAlphaBounds": {
+          "left": 50,
+          "top": 26,
+          "right": 115,
+          "bottom": 143,
+          "pixels": 4428
+        },
+        "artistPivotOnly": true,
+        "rigFootContactValidated": false,
+        "gameRendererChanged": false
+      },
+      "moderate": {
+        "scale": 1.125,
+        "clip": "silver_idle",
+        "direction": 0,
+        "frame": 0,
+        "width": 90,
+        "height": 90,
+        "drawOffset": [
+          -45,
+          -58.5
+        ],
+        "silhouetteHeightPx": 66.375,
+        "silhouetteBottomFromCenterPx": 22.5,
+        "authoredDoorHeightPx": 119.587,
+        "silhouetteToProjectedDoorHeightRatio": 0.555,
+        "sourceFrameAlphaBounds": {
+          "left": 50,
+          "top": 26,
+          "right": 115,
+          "bottom": 143,
+          "pixels": 4428
+        },
+        "artistPivotOnly": true,
+        "rigFootContactValidated": false,
+        "gameRendererChanged": false
+      },
+      "larger": {
+        "scale": 1.2,
+        "clip": "silver_idle",
+        "direction": 0,
+        "frame": 0,
+        "width": 96,
+        "height": 96,
+        "drawOffset": [
+          -48,
+          -62.4
+        ],
+        "silhouetteHeightPx": 70.8,
+        "silhouetteBottomFromCenterPx": 24,
+        "authoredDoorHeightPx": 119.587,
+        "silhouetteToProjectedDoorHeightRatio": 0.592,
+        "sourceFrameAlphaBounds": {
+          "left": 50,
+          "top": 26,
+          "right": 115,
+          "bottom": 143,
+          "pixels": 4428
+        },
+        "artistPivotOnly": true,
+        "rigFootContactValidated": false,
+        "gameRendererChanged": false
+      }
+    },
+    "clip": "silver_idle",
+    "direction": 0,
+    "frame": 0,
+    "roofOpacity": 0.35,
+    "doorHeightPx": 119.587,
+    "atlasIsActualPr326": true,
+    "gameScaleChanged": false,
+    "physicsChanged": false,
+    "anatomicalFeetValidated": false,
+    "multiplayerFPSMeasured": false,
+    "browserGameXYAligned": false,
+    "drawMs": 4.099999904632568
+  },
+  "silverRoll": {
+    "state": "ready",
+    "options": {
+      "baseline": {
+        "scale": 1,
+        "clip": "silver_roll",
+        "direction": 0,
+        "frame": 3,
+        "width": 112,
+        "height": 112,
+        "drawOffset": [
+          -56,
+          -65
+        ],
+        "silhouetteHeightPx": 37.8,
+        "silhouetteBottomFromCenterPx": 11.3,
+        "authoredDoorHeightPx": 119.587,
+        "silhouetteToProjectedDoorHeightRatio": 0.3161,
+        "sourceFrameAlphaBounds": {
+          "left": 37,
+          "top": 55,
+          "right": 91,
+          "bottom": 108,
+          "pixels": 1755
+        },
+        "artistPivotOnly": true,
+        "rigFootContactValidated": false,
+        "gameRendererChanged": false
+      },
+      "moderate": {
+        "scale": 1.125,
+        "clip": "silver_roll",
+        "direction": 0,
+        "frame": 3,
+        "width": 126,
+        "height": 126,
+        "drawOffset": [
+          -63,
+          -73.125
+        ],
+        "silhouetteHeightPx": 42.525,
+        "silhouetteBottomFromCenterPx": 12.713,
+        "authoredDoorHeightPx": 119.587,
+        "silhouetteToProjectedDoorHeightRatio": 0.3556,
+        "sourceFrameAlphaBounds": {
+          "left": 37,
+          "top": 55,
+          "right": 91,
+          "bottom": 108,
+          "pixels": 1755
+        },
+        "artistPivotOnly": true,
+        "rigFootContactValidated": false,
+        "gameRendererChanged": false
+      },
+      "larger": {
+        "scale": 1.2,
+        "clip": "silver_roll",
+        "direction": 0,
+        "frame": 3,
+        "width": 134,
+        "height": 134,
+        "drawOffset": [
+          -67.2,
+          -78
+        ],
+        "silhouetteHeightPx": 45.225,
+        "silhouetteBottomFromCenterPx": 13.287,
+        "authoredDoorHeightPx": 119.587,
+        "silhouetteToProjectedDoorHeightRatio": 0.3782,
+        "sourceFrameAlphaBounds": {
+          "left": 37,
+          "top": 55,
+          "right": 91,
+          "bottom": 108,
+          "pixels": 1755
+        },
+        "artistPivotOnly": true,
+        "rigFootContactValidated": false,
+        "gameRendererChanged": false
+      }
+    },
+    "clip": "silver_roll",
+    "direction": 0,
+    "frame": 3,
+    "roofOpacity": 0.35,
+    "doorHeightPx": 119.587,
+    "atlasIsActualPr326": true,
+    "gameScaleChanged": false,
+    "physicsChanged": false,
+    "anatomicalFeetValidated": false,
+    "multiplayerFPSMeasured": false,
+    "browserGameXYAligned": false,
+    "drawMs": 48.799999952316284
+  },
+  "t1Roll": {
+    "state": "ready",
+    "options": {
+      "baseline": {
+        "scale": 1,
+        "clip": "t1_roll",
+        "direction": 6,
+        "frame": 5,
+        "width": 112,
+        "height": 112,
+        "drawOffset": [
+          -56,
+          -65
+        ],
+        "silhouetteHeightPx": 43.4,
+        "silhouetteBottomFromCenterPx": 33,
+        "authoredDoorHeightPx": 119.587,
+        "silhouetteToProjectedDoorHeightRatio": 0.3629,
+        "sourceFrameAlphaBounds": {
+          "left": 36,
+          "top": 78,
+          "right": 99,
+          "bottom": 139,
+          "pixels": 1882
+        },
+        "artistPivotOnly": true,
+        "rigFootContactValidated": false,
+        "gameRendererChanged": false
+      },
+      "moderate": {
+        "scale": 1.125,
+        "clip": "t1_roll",
+        "direction": 6,
+        "frame": 5,
+        "width": 126,
+        "height": 126,
+        "drawOffset": [
+          -63,
+          -73.125
+        ],
+        "silhouetteHeightPx": 48.825,
+        "silhouetteBottomFromCenterPx": 37.125,
+        "authoredDoorHeightPx": 119.587,
+        "silhouetteToProjectedDoorHeightRatio": 0.4083,
+        "sourceFrameAlphaBounds": {
+          "left": 36,
+          "top": 78,
+          "right": 99,
+          "bottom": 139,
+          "pixels": 1882
+        },
+        "artistPivotOnly": true,
+        "rigFootContactValidated": false,
+        "gameRendererChanged": false
+      },
+      "larger": {
+        "scale": 1.2,
+        "clip": "t1_roll",
+        "direction": 6,
+        "frame": 5,
+        "width": 134,
+        "height": 134,
+        "drawOffset": [
+          -67.2,
+          -78
+        ],
+        "silhouetteHeightPx": 51.925,
+        "silhouetteBottomFromCenterPx": 39.25,
+        "authoredDoorHeightPx": 119.587,
+        "silhouetteToProjectedDoorHeightRatio": 0.4342,
+        "sourceFrameAlphaBounds": {
+          "left": 36,
+          "top": 78,
+          "right": 99,
+          "bottom": 139,
+          "pixels": 1882
+        },
+        "artistPivotOnly": true,
+        "rigFootContactValidated": false,
+        "gameRendererChanged": false
+      }
+    },
+    "clip": "t1_roll",
+    "direction": 6,
+    "frame": 5,
+    "roofOpacity": 0.35,
+    "doorHeightPx": 119.587,
+    "atlasIsActualPr326": true,
+    "gameScaleChanged": false,
+    "physicsChanged": false,
+    "anatomicalFeetValidated": false,
+    "multiplayerFPSMeasured": false,
+    "browserGameXYAligned": false,
+    "drawMs": 43.40000009536743
+  },
+  "errors": [],
+  "candidates": [
+    1,
+    1.125,
+    1.2
+  ],
+  "sourceProvenance": "Pinned PR326 companion served by A2.9 localhost harness",
+  "sourceAtlasesCopiedIntoGraphicsPR": false,
+  "productionScaleApproved": false,
+  "realGameIntegration": false,
+  "footBoneAnchorMeasured": false,
+  "combatChanged": false,
+  "actualMultiplayerFpsMeasured": false,
+  "deployed": false,
+  "caveat": "Canvas silhouette alpha proxy and projected door bounding mesh: not anatomical scale or authoritative collision."
+}

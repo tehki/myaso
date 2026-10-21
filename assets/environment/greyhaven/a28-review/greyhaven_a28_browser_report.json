@@ -1,0 +1,53 @@
+{
+  "milestone": "Blood & Iron A2.8 real Chrome isolated XY camera comparison",
+  "browser": "Chrome/154.0.8037.99",
+  "viewport": [
+    1480,
+    1030
+  ],
+  "captureDPR": 1,
+  "actualSourceFunction": "src/browser/arena-viewport.mjs projectArenaPoint",
+  "proposedManifestDoorXY": [
+    4365,
+    4075
+  ],
+  "initial": {
+    "ready": true,
+    "gameZoom": 0.84,
+    "eastWorldUnits": 40,
+    "southWorldUnits": 40,
+    "roofOpacity": 0.6,
+    "calibratedErrorPx": 0,
+    "cinematicErrorPx": 36.17,
+    "projectedX": 353.6,
+    "projectedY": 353.6,
+    "syntheticReference": true,
+    "knightFeetPivotValidated": false,
+    "gameIntegrated": false,
+    "portalAuthorityVerified": false,
+    "lastDrawMs": 16.899999856948853
+  },
+  "moved": {
+    "ready": true,
+    "gameZoom": 0.84,
+    "eastWorldUnits": 120,
+    "southWorldUnits": -80,
+    "roofOpacity": 0.2,
+    "calibratedErrorPx": 0,
+    "cinematicErrorPx": 270.766,
+    "projectedX": 420.8,
+    "projectedY": 252.8,
+    "syntheticReference": true,
+    "knightFeetPivotValidated": false,
+    "gameIntegrated": false,
+    "portalAuthorityVerified": false,
+    "lastDrawMs": 1.1000001430511475
+  },
+  "consoleOrNetworkErrors": [],
+  "gameplayChanged": false,
+  "knightFootPivotVerified": false,
+  "worldPortalAuthorityVerified": false,
+  "gameRuntimeFPSMeasured": false,
+  "deployed": false,
+  "caveat": "Isolated actual Chrome rendering of existing art and synthetic world origins. NOT a screenshot/test of the multiplayer game, A3 knight sprites, or authoritative portals."
+}

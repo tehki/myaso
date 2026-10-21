@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="icon" href="data:,"><title>Greyhaven A2.20 — World-XY Knight Integration Review</title>
+<style>
+:root{color-scheme:dark}*{box-sizing:border-box}body{margin:0;background:#17211c;color:#eadfcb;font:14px/1.55 system-ui,sans-serif}
+header{padding:16px 22px;background:#27352a;border-bottom:1px solid #697563}
+h1{font:700 26px Georgia,serif;margin:0}main{margin:0 auto;max-width:1500px;padding:16px}
+.controls{display:flex;gap:16px;flex-wrap:wrap;align-items:center;background:#263328;padding:13px;border:1px solid #61705d;border-radius:8px}
+label{display:flex;align-items:center;gap:7px}
+input,select{accent-color:#dbb275}input[type=range]{width:120px}
+select{padding:7px;background:#33453a;color:#fff;border:1px solid #788c75;border-radius:6px}
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:15px;margin:16px 0}
+figure{margin:0;padding:12px;border:1px solid #58695b;border-radius:8px;background:#243028}
+canvas{display:block;width:100%;aspect-ratio:1;background:#586b61}
+figcaption{padding-top:8px;color:#e4dcc9}
+.status{background:#293c2e;border-radius:7px;padding:12px;margin-top:10px}
+.note{font-size:12px;color:#c0cebd}.warn{color:#efc690}
+@media(max-width:840px){.grid{grid-template-columns:1fr}}
+</style></head><body>
+<header><h1>⚔️ Blood & Iron A2.20 — Actual Knight × Greyhaven World XY</h1>
+<div class="note">Game projection from src/browser/arena-viewport.mjs · real PR #326 120% knight frame · independently baked Greyhaven layers</div>
+</header><main>
+<div class="controls">
+<label>East/West <input id="east" type="range" min="-120" max="120" step="10" value="0"><output id="east-out">0</output></label>
+<label>North/South <input id="south" type="range" min="-120" max="120" step="10" value="0"><output id="south-out">0</output></label>
+<label>Character <select id="pose"><option value="silver_idle">Silver Knight · standing</option><option value="silver_roll">Silver Knight · roll</option><option value="t1_roll">T1 Sentinel · roll</option></select></label>
+<label>Roof <input id="roof" type="range" min="0" max="100" step="10" value="35"><output id="roof-out">35%</output></label>
+<label><input id="vectors" type="checkbox" checked>Show XY disagreement</label>
+</div>
+<div class="grid">
+<figure>
+<canvas id="playable" width="640" height="640" aria-label="Game XY compatible overhead exterior and approved 120 percent knight"></canvas>
+<figcaption><strong>Playable-coordinate candidate</strong> — calibrated overhead building and the game's real flat XY projection. Less cinematic, but the authored ground basis matches.</figcaption>
+</figure>
+<figure>
+<canvas id="cinematic" width="640" height="640" aria-label="Cinematic three-quarter building and identical knight XY trajectory"></canvas>
+<figcaption><strong>Beautiful cinematic study</strong> — unchanged 3/4-view Red Lion. Knight follows the *same* game XY; amber line shows where Blender projects that ground point differently.</figcaption>
+</figure>
+</div>
+<p class="status" id="status" role="status">Loading source-verified art and companion knight frames…</p>
+<p class="note warn"><strong>Preview only.</strong> World coordinate (4365, 4075) is a proposed Red Lion art door, NOT an active authoritative portal. This page does not move online actors, alter physics, set roof occlusion, validate foot bones, modify net/server or enable building collision. The 3/4 layer remains unsuitable for game-XY placement without redesign. Original knight sprites remain in independent PR #326.</p>
+</main><script type="module" src="./greyhaven-a220-world-xy.mjs"></script></body></html>
