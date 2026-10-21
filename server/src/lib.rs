@@ -4,6 +4,7 @@ use std::sync::{
 };
 
 pub mod combat_hit_receipt;
+pub mod combat_hit_journal;
 pub mod kill_event;
 pub mod reliable;
 pub mod simulation;
