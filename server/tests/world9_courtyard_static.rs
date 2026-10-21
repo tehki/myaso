@@ -166,3 +166,28 @@ fn actual_core_static_solver_preserves_four_native_west_first_armory_routes() {
         "north-first Smith wall shortcut MUST remain blocked"
     );
 }
+
+#[test]
+fn actual_core_swept_solver_checks_reach_safe_rack_staging_candidate() {
+    // STATIC source proof only. Reviewed Items prototype reach56 is NOT the
+    // deployed policy, and these positions do not grant item ownership.
+    let source = include_str!("../../src/world/alpha-armory.mjs");
+    assert!(source.contains("x,y:4038"));
+    assert!(source.contains("approach:Object.freeze({x,y:4088})"));
+    for (i, stand) in WORLD9_RACK_STANDS.into_iter().enumerate() {
+        let candidate: Point = (stand.0, 4068.0);
+        assert_eq!(candidate.1 - 4038.0, 30.0);
+        assert!(30.0 + FIGHTER_RADIUS <= 56.0);
+        assert_static_segment_clear(
+            stand,
+            candidate,
+            &format!("socket {} to closer waypoint", i + 1),
+        );
+        let south: Point = (stand.0, WORLD9_SPAWNS[i].1);
+        assert_static_segment_clear(
+            south,
+            candidate,
+            &format!("spawn {} southern leg to closer waypoint", i + 1),
+        );
+    }
+}
