@@ -175,7 +175,9 @@ mod tests {
             imported.stage_owner(LegacyDomain::Item, id).unwrap();
         }
         for id in 201..=204 {
-            imported.stage_owner(LegacyDomain::GroundEntity, id).unwrap();
+            imported
+                .stage_owner(LegacyDomain::GroundEntity, id)
+                .unwrap();
         }
         imported
     }
@@ -207,8 +209,7 @@ mod tests {
     #[test]
     fn world_socket_ground_entity_and_item_are_three_distinct_namespaces() {
         let imported = example_import();
-        let mapped =
-            preflight_greyhaven_rack_v1(rows(), &imported, sample_mapping()).unwrap();
+        let mapped = preflight_greyhaven_rack_v1(rows(), &imported, sample_mapping()).unwrap();
         let mut distinct_items = BTreeSet::new();
         let mut distinct_entities = BTreeSet::new();
         for (idx, row) in mapped.iter().enumerate() {
@@ -242,8 +243,7 @@ mod tests {
     #[test]
     fn previous_core_placeholder_is_not_the_actual_world_blacksmith_rack() {
         let imported = example_import();
-        let mapped =
-            preflight_greyhaven_rack_v1(rows(), &imported, sample_mapping()).unwrap();
+        let mapped = preflight_greyhaven_rack_v1(rows(), &imported, sample_mapping()).unwrap();
         assert_ne!(
             mapped[0].ground,
             ItemLocation::Ground {
