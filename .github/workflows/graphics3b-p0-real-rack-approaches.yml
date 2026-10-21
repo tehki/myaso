@@ -8,8 +8,10 @@ on:
       - "web/online-game.mjs"
       - "scripts/alpha_p0_four_native_rack_at_approaches.mjs"
       - "scripts/alpha_p0_rack_walk_math.mjs"
+      - "scripts/graphics3b_page_visibility_gate.mjs"
       - "tests/armory-optin-four-at-rack.test.mjs"
       - "tests/armory-page-viewport-metrics.test.mjs"
+      - "tests/graphics3b-page-visibility-gate.test.mjs"
       - ".github/workflows/graphics3b-p0-real-rack-approaches.yml"
 
 permissions:
@@ -21,12 +23,13 @@ jobs:
     timeout-minutes: 9
     steps:
       - uses: actions/checkout@v4
-      - name: Validate exact source contract and native WebDriver route
+      - name: Validate exact source and native WebDriver contract
         run: |
           node --check src/browser/armory-optin-live-rack.mjs
           node --check web/online-game.mjs
           node --check scripts/alpha_p0_four_native_rack_at_approaches.mjs
-          node --test tests/armory-optin-live-rack.test.mjs tests/armory-optin-native-flight-contract.test.mjs tests/armory-optin-four-at-rack.test.mjs tests/armory-page-viewport-metrics.test.mjs
+          node --check scripts/graphics3b_page_visibility_gate.mjs
+          node --test tests/armory-optin-live-rack.test.mjs tests/armory-optin-native-flight-contract.test.mjs tests/armory-optin-four-at-rack.test.mjs tests/armory-page-viewport-metrics.test.mjs tests/graphics3b-page-visibility-gate.test.mjs
           node scripts/verify-core8c-greyhaven-geometry.mjs
       - name: Verify all four real Chrome/Firefox W3C driver binaries
         run: |
@@ -38,6 +41,8 @@ jobs:
         run: cargo build --locked --manifest-path server/Cargo.toml --bin myaso-server
       - name: Four REAL WebDriver browsers walk west-first then north to four World racks
         run: timeout --signal=TERM --kill-after=5s 320s node scripts/alpha_p0_four_native_rack_at_approaches.mjs
+      - name: Report actual browser-page visibility separately from successful rack approach (not full Alpha gate)
+        run: node scripts/graphics3b_page_visibility_gate.mjs alpha-p0-real-greyhaven-rack-approach-evidence/rack-approaches-report.json
       - name: Retain actual four first-party rack approaches, screenshots and server positions
         if: always()
         continue-on-error: true
