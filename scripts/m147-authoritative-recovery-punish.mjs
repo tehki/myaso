@@ -4,7 +4,8 @@
 // No gameplay packet, authoritative simulation, or client-hit credit changes.
 const ACTION = /^M201_AUTH_ACTION tick=(\d+) fighter=(\d+) from=(\d+) to=(\d+)$/;
 const HIT = /^M201_AUTH_HIT tick=(\d+) attacker=(\d+) target=(\d+) damage=(\d+) hp=(\d+)$/;
-const TICK_LIMIT = 48; // 800 ms > original 290 ms jump recovery, strictly bounded.
+const TICK_LIMIT = 48; // Bound to 800ms, original jump recovery is 290ms.
+const REPLICA_LAG_TICKS = 6; // Only actual browser snapshot arrival lag, never extend server recovery.
 
 function distance(tick, start) {
   return (tick - start) >>> 0;
@@ -37,22 +38,45 @@ export function verifyM147AuthoritativeRecoveryPunish(output, {
   const ends = events.filter(e => e.type === "action" && e.fighter === victimId && e.from === 18 && e.to === 0);
   const hits = events.filter(e => e.type === "hit");
   if (starts.length !== 1 || ends.length !== 1 || hits.length !== 1
-    || starts[0].tick !== recoveryTick || ends[0].tick !== idleTick
     || hits[0].attacker !== attackerId || hits[0].victim !== victimId
     || hits[0].damage !== 34 || hits[0].hp !== 66) {
     throw new Error("M147 server event identity, phase, exact HIT or uniqueness unproven");
   }
-  const windowTicks = distance(idleTick, recoveryTick);
-  const cueAge = distance(cueTick, recoveryTick);
-  const hitAge = distance(hits[0].tick, recoveryTick);
-  // Tick ordering is the authoritative domain: Chrome's receipt of recovery
-  // may occur after Firefox saw the same recovery and issued its real click.
-  if (windowTicks === 0 || windowTicks > TICK_LIMIT
-    || cueAge >= windowTicks || hitAge >= windowTicks || hitAge < cueAge) {
+  // Rust emits the action ENTRY ticks. Chrome's observed snapshot transition
+  // stores the snapshot tick, which can be T+1/T+2 while faithfully showing
+  // that same phase. Equality between them is NOT a server authority check.
+  const serverRecoveryTick = starts[0].tick;
+  const serverIdleTick = ends[0].tick;
+  const windowTicks = distance(serverIdleTick, serverRecoveryTick);
+  const chromeRecoveryLag = distance(recoveryTick, serverRecoveryTick);
+  const chromeIdleLag = distance(idleTick, serverIdleTick);
+  if (windowTicks === 0 || windowTicks > TICK_LIMIT) {
+    throw new Error("M147 actual attacker HIT outside server-owned recovery window");
+  }
+  // Require TWO genuine Chrome phase observations with bounded monotonic
+  // replication lag. Never use a later receipt to widen the authoritative
+  // server recovery interval or excuse a hit on/after idle.
+  if (chromeRecoveryLag > REPLICA_LAG_TICKS
+    || chromeRecoveryLag >= windowTicks
+    || chromeIdleLag > REPLICA_LAG_TICKS
+    || distance(idleTick, recoveryTick) === 0) {
+    throw new Error("M147 observed Chrome recovery/idle phase too stale or nonmonotonic");
+  }
+  const cueAge = distance(cueTick, serverRecoveryTick);
+  const hitAge = distance(hits[0].tick, serverRecoveryTick);
+  // Actual server event chronology is still strict: Firefox cue must be in
+  // recovery, and the one true 34HP attacker→victim HIT must be in that
+  // ORIGINAL server window (not browser-observed idle + lag).
+  if (cueAge >= windowTicks || hitAge >= windowTicks || hitAge < cueAge) {
     throw new Error("M147 actual attacker HIT outside server-owned recovery window");
   }
   return {
-    attackerId, victimId, recoveryTick, cueTick,
-    hitTick: hits[0].tick, idleTick, damage: 34, victimHp: 66,
+    attackerId, victimId,
+    recoveryTick: serverRecoveryTick,
+    observedRecoveryTick: recoveryTick,
+    cueTick, hitTick: hits[0].tick,
+    idleTick: serverIdleTick,
+    observedIdleTick: idleTick,
+    damage: 34, victimHp: 66,
   };
 }

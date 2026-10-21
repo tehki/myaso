@@ -19,8 +19,41 @@ const verify = (output = sequence, args = valid) => verifyM147AuthoritativeRecov
 
 test("M147 accepts actual Firefox cue before Chrome recovery observation ONLY with exact server hit in recovery", () => {
   assert.deepEqual(verify(), { attackerId: 2, victimId: 1,
-    recoveryTick: 267, cueTick: 267, hitTick: 278,
-    idleTick: 285, damage: 34, victimHp: 66 });
+    recoveryTick: 267, observedRecoveryTick: 267,
+    cueTick: 267, hitTick: 278,
+    idleTick: 285, observedIdleTick: 285, damage: 34, victimHp: 66 });
+});
+
+test("M147 accepts real server hit at recovery penultimate tick with bounded Chrome replica lag", () => {
+  // Reproduced protected red #39647579254 attempt2: Rust enters target
+  // recovery341, genuine Firefox sees cue342, and hits at358 before idle359.
+  // Chrome's observed transition ticks can be342 and360; those cannot move
+  // the actual recovery window even by one tick.
+  const stdout = [
+    "M201_AUTH_ACTION tick=341 fighter=1 from=17 to=18",
+    "M201_AUTH_ACTION tick=346 fighter=2 from=0 to=9",
+    "M201_AUTH_ACTION tick=350 fighter=2 from=9 to=1",
+    "M201_AUTH_ACTION tick=358 fighter=2 from=1 to=2",
+    "M201_AUTH_HIT tick=358 attacker=2 target=1 damage=34 hp=66",
+    "M201_AUTH_ACTION tick=359 fighter=1 from=18 to=0", "",
+  ].join("\n");
+  const proof = verify(stdout, { ...valid,
+    recoveryTick: 342, idleTick: 360, cueTick: 342 });
+  assert.equal(proof.recoveryTick, 341);
+  assert.equal(proof.observedRecoveryTick, 342);
+  assert.equal(proof.hitTick, 358);
+  assert.equal(proof.idleTick, 359);
+  assert.equal(proof.observedIdleTick, 360);
+  // Real Rust idle at359 remains a hard fence even if Chrome observes at360.
+  assert.throws(() => verify(stdout.replace("HIT tick=358", "HIT tick=359"),
+    { ...valid, recoveryTick: 342, idleTick: 360, cueTick: 342 }), /outside server-owned/);
+});
+
+test("M147 rejects Chrome phase lag beyond six true server ticks and phase rollback", () => {
+  assert.throws(() => verify(sequence, { ...valid, recoveryTick: 274 }), /too stale/);
+  assert.throws(() => verify(sequence, { ...valid, idleTick: 292 }), /too stale/);
+  assert.throws(() => verify(sequence, { ...valid, recoveryTick: 266 }), /too stale/);
+  assert.throws(() => verify(sequence, { ...valid, idleTick: 284 }), /too stale/);
 });
 
 test("M147 rejects hit after target recovered, including same tick as idle", () => {
@@ -37,7 +70,7 @@ test("M147 rejects spectator credit, wrong victim, extra hits and wrong damage",
 
 test("M147 fails closed on missing, stale, wrong or duplicated authoritative phases", () => {
   assert.throws(() => verify(sequence.replace("to=18", "to=19")), /identity/);
-  assert.throws(() => verify(sequence.replace("tick=285 fighter=1", "tick=286 fighter=1")), /identity/);
+  assert.throws(() => verify(sequence.replace("tick=285 fighter=1", "tick=286 fighter=1")), /too stale/);
   assert.throws(() => verify(sequence + "M201_AUTH_ACTION tick=290 fighter=1 from=18 to=0\n"), /identity/);
   assert.throws(() => verify(sequence, { ...valid, cueTargetAction: 0 }), /genuine recovery cue/);
   assert.throws(() => verify(sequence, { ...valid, cueTick: 265 }), /outside server-owned/);
