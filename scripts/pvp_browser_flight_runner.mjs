@@ -8101,7 +8101,7 @@ async function runOnlineUiParryFlight(entries, postParrySleepMs = 80, roles = nu
           entry.type === "pointerup" && entry.button === 0).at(-1);
         const wheel = peer?.wheels?.filter((entry) => entry.deltaY > 0).at(-1);
         const auth = m201ServerOutput().slice(m41AuthLogStart)
-          .split(/\\r?\\n/)
+          .split(/\r?\n/)
           .filter((line) => /^M201_AUTH_(ACTION|BLOCK|PARRY|HIT|BREAK) /.test(line))
           .slice(-32);
         console.log("M41_M33_CAUSAL_TRACE " + JSON.stringify({
