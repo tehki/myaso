@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { readFileSync } from "node:fs";
 import { COMBAT_ACTION } from "../src/browser/combat-readability.mjs";
+import { alphaPlayPath } from "../web/alpha-config.mjs";
 import {
   KNIGHT_CLIPS, KNIGHT_PRESENTATION_SCALE, KNIGHT_ROLL_PRESENTATION_MS,
   createKnightSpriteRenderer, knightClip, knightPresentationRect,
@@ -77,7 +78,7 @@ test("same source Silver atlases draw for local and remote authenticated human s
 
 test("actual server-derived Greyhaven-free arena renderer uses Silver for both human viewpoints", () => {
   const src = readFileSync(new URL("../web/online-game.mjs", import.meta.url),"utf8");
-  assert.match(src,/const knightSprites = params\.get\("knights"\) === "0" \? null : createKnightSpriteRenderer\(\)/);
+  assert.match(src,/const knightSprites = params\.get\("knights"\) === "1" \? createKnightSpriteRenderer\(\) : null/);
   assert.match(src,/drawFighterWorld\(sampled,/);
   assert.match(src,/drawFighterScreen\(canvas\.width \/ 2,/);
   assert.match(src,/knightSprites\?\.draw\(ctx, fighter,/);
@@ -92,4 +93,16 @@ test("actual server-derived Greyhaven-free arena renderer uses Silver for both h
   assert.doesNotMatch(src,/actorKind: "npc"/);
   assert.doesNotMatch(src,/knightKickSource/);
   assert.doesNotMatch(src,/\/greyhaven\//);
+});
+
+test("the official Pre-Alpha multiplayer lobby activates Silver for every participant", () => {
+  const url = new URL(alphaPlayPath({
+    serverUrl: "https://game.open-trust-layer.org:4433/game",
+    certificateSha256: "a".repeat(64),
+    maxPlayers: 4,
+  }), "https://game.open-trust-layer.org");
+  assert.equal(url.pathname, "/web/");
+  assert.equal(url.searchParams.get("knights"), "1");
+  assert.equal(url.searchParams.get("server"), "https://game.open-trust-layer.org:4433/game");
+  assert.equal(url.searchParams.get("cert"), "a".repeat(64));
 });

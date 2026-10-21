@@ -113,9 +113,10 @@ const killFeedSequences = new Set();
 
 const params = new URLSearchParams(window.location.search);
 // Combat Pre-Alpha 0.1: all authenticated arena fighters are human Silver
-// Knights. Rollback &knights=0 keeps the merged truthful Combat-circle art.
+// Knights via the official lobby knights=1. Direct legacy Combat test URLs
+// and rollback without this flag keep original Combat-circle visuals.
 // Unsupported Silver animations always fall back to the original tells.
-const knightSprites = params.get("knights") === "0" ? null : createKnightSpriteRenderer();
+const knightSprites = params.get("knights") === "1" ? createKnightSpriteRenderer() : null;
 const diagnosticsVisible = params.get("netstats") === "1";
 const renderGapTelemetry = diagnosticsVisible ? createRenderGapTelemetry() : null;
 const diagnosticsPanel = document.querySelector("#network-diagnostics");
