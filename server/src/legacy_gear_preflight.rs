@@ -148,6 +148,7 @@ pub enum LegacyMigrationError {
     ReusedNamespace,
     ZeroLegacyId,
     ZeroExistingCanonicalId,
+    DuplicateExistingCanonicalId,
     CanonicalIdCollision,
     DuplicateSourceIdentity,
     UnregisteredSourceIdentity,
@@ -205,7 +206,12 @@ impl LegacyImportPreflight {
             if id == 0 {
                 return Err(LegacyMigrationError::ZeroExistingCanonicalId);
             }
-            existing.insert(id);
+            // A source inventory contains one ownership record per actual
+            // canonical object. Never silently squash a duplicate owner row:
+            // a corrupt active+retired source list cannot authorize cutover.
+            if !existing.insert(id) {
+                return Err(LegacyMigrationError::DuplicateExistingCanonicalId);
+            }
         }
         Ok(Self {
             namespaces,
@@ -371,6 +377,33 @@ mod tests {
             preflight.stage_owner(LegacyDomain::Character, 0),
             Err(LegacyMigrationError::ZeroLegacyId)
         );
+    }
+
+    #[test]
+    fn duplicate_canonical_source_inventory_fails_closed_before_any_import() {
+        let known_sword = (0x4D59_4153_0000_0002_u128 << 64) | 201;
+        let other = (0x4D59_4153_0000_0001_u128 << 64) | 55;
+        for records in [
+            vec![known_sword, known_sword],
+            vec![other, known_sword, other],
+            vec![known_sword, other, known_sword],
+        ] {
+            assert!(matches!(
+                LegacyImportPreflight::new(namespaces(), records),
+                Err(LegacyMigrationError::DuplicateExistingCanonicalId)
+            ));
+        }
+        // Other distinct canonical records remain accepted. An item whose
+        // ID is already present in that complete inventory still cannot
+        // be re-imported under a new legacy owner row.
+        let mut allowed = LegacyImportPreflight::new(namespaces(), [known_sword, other]).unwrap();
+        assert_eq!(
+            allowed.stage_owner(LegacyDomain::Item, 201),
+            Err(LegacyMigrationError::CanonicalIdCollision)
+        );
+        assert_eq!(allowed.staged_count(), 0);
+        assert!(allowed.stage_owner(LegacyDomain::Item, 202).is_ok());
+        assert_eq!(allowed.staged_count(), 1);
     }
 
     #[test]

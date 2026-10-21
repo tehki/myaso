@@ -5,6 +5,7 @@ use std::sync::{
     Arc,
 };
 
+pub mod alpha_pickup_ack_proof;
 pub mod identity;
 pub mod item_journal;
 pub mod item_ownership;
