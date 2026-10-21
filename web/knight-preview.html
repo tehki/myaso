@@ -1,6 +1,6 @@
-﻿<!doctype html>
+<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>myaso.io â€” Knight renderer QA</title>
+<link rel="icon" href="data:,"/><title>myaso.io â€” Knight renderer QA</title>
 <style>
 html{font:16px system-ui;background:#141b20;color:#eee5d8}body{max-width:1100px;margin:18px auto;padding:0 14px}
 canvas{width:100%;max-width:960px;background:#243239;border:1px solid #53636a;border-radius:12px}
@@ -49,9 +49,9 @@ function frame(now) {
  ctx.clearRect(0,0,960,500);ctx.fillStyle="#263840";ctx.fillRect(0,0,960,500);
  ctx.strokeStyle="#364e55";for(let i=0;i<960;i+=40){ctx.beginPath();ctx.moveTo(i,0);ctx.lineTo(i,500);ctx.stroke();}
  for(let j=0;j<500;j+=40){ctx.beginPath();ctx.moveTo(0,j);ctx.lineTo(960,j);ctx.stroke();}
- for(const [fighter,remote,name] of [[player,false,"SILVER KNIGHT"],[rival,true,"T1 SENTINEL"]]){
+ for(const [fighter,remote,name,actorKind] of [[player,false,"SILVER KNIGHT","player"],[rival,true,"T1 SENTINEL","npc"]]){
   ctx.save();ctx.translate(fighter.x,fighter.y);
-  const rendered=renderer.draw(ctx,fighter,{remote,rotation:0,nowMs:now});
+  const rendered=renderer.draw(ctx,fighter,{remote,actorKind,rotation:0,nowMs:now});
   if(!rendered){ctx.fillStyle=remote?"#b96350":"#e2d5b4";ctx.beginPath();ctx.arc(0,0,18,0,2*Math.PI);ctx.fill();}
   ctx.restore();ctx.fillStyle="#e9e1ce";ctx.font="bold 13px system-ui";ctx.textAlign="center";ctx.fillText(name,fighter.x,fighter.y-58);
  }
