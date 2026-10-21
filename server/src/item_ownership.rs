@@ -195,6 +195,21 @@ impl ItemOwnershipLedger {
         self.items.len()
     }
 
+    /// Offline-only scan: unlike equipment slots, shared Ground coordinates
+    /// are not globally unique in the generic ledger. A reviewed physical
+    /// sword rack must fail closed if ANY second canonical item overlaps its
+    /// exact authored socket, regardless of item kind or imported source ID.
+    /// This method does not mutate, infer ItemKind, or establish current World.
+    pub(crate) fn ground_occupants_at(&self, ground: ItemLocation) -> usize {
+        if !matches!(ground, ItemLocation::Ground { .. }) {
+            return 0;
+        }
+        self.items
+            .values()
+            .filter(|location| **location == ground)
+            .count()
+    }
+
     /// Read an already committed receipt without running any new mutation.
     /// This is the safe verification boundary for cross-zone handoff ACKs.
     pub fn committed_receipt(
