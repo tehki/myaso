@@ -163,7 +163,7 @@ mod tests {
     use crate::magic::{Lesson, LessonAward, LessonSource, Rune};
     use crate::magic_checkpoint::{
         inspect_joint_ember_recovery_holds, load_joint, load_joint_without_pending_ember,
-        EmberRecoveryHold,
+        transact_world_teacher_lesson, EmberRecoveryHold, WorldTeacherTick,
     };
     use crate::simulation::World;
     use std::fs;
@@ -225,6 +225,130 @@ mod tests {
         let book = loot.grant(1, ItemKind::Spellbook, 1).unwrap();
         loot.equip(1, book, EquipmentSlot::OffHand).unwrap();
         loot.grant(1, ItemKind::SulfurAsh, quantity).unwrap();
+    }
+
+    #[test]
+    fn npc_world_lesson_paid_cast_real_knockdown_and_restart_keep_one_outcome() {
+        use crate::magic_combat_interrupt::{
+            record_world_ember_combat_interruption, WorldCombatInterruption,
+        };
+        use crate::magic_teacher::{TeacherAuthority, TeacherId, TeacherSpawn};
+        use crate::simulation::InputIntent;
+        use crate::zone::Position;
+
+        let (mut loot, _, identity, mut zones, character) = setup();
+        let mut magic = MagicAuthority::new();
+        stock(&mut loot, 2);
+        zones.register(2).unwrap();
+        let mut teachers = TeacherAuthority::new();
+        for (id, lesson) in [
+            (301, Lesson::Rune(Rune::Fire)),
+            (302, Lesson::Spell(Spell::Ember)),
+        ] {
+            teachers
+                .register_trusted(TeacherSpawn {
+                    id: TeacherId::new(id).unwrap(),
+                    zone: ZoneId::Moonvale,
+                    at: Position { x: 200.0, y: 200.0 },
+                    lesson,
+                })
+                .unwrap();
+        }
+
+        let mut world = World::new(800.0, 600.0);
+        assert!(world.add_player_at(1, 200.0, 200.0, 0.0));
+        world.step();
+        let checkpoint = path();
+        let lease = op(45).lease;
+        for teacher in [301, 302] {
+            transact_world_teacher_lesson(
+                &checkpoint,
+                &loot,
+                &mut magic,
+                &identity,
+                &zones,
+                &teachers,
+                WorldTeacherTick {
+                    lease,
+                    teacher: TeacherId::new(teacher).unwrap(),
+                    world: &world,
+                    completed_tick: world.tick,
+                },
+            )
+            .unwrap();
+        }
+        assert!(magic.knows_rune(character, Rune::Fire));
+        assert!(magic.knows_spell(character, Spell::Ember));
+        assert_eq!(magic.mana(character), 100);
+
+        let receipt = commit_world_ember_cost(
+            &checkpoint,
+            &mut loot,
+            &mut magic,
+            &identity,
+            &zones,
+            WorldEmberCostTick {
+                operation: op(45),
+                world: &world,
+                completed_tick: world.tick,
+            },
+        )
+        .unwrap();
+        assert_eq!(receipt.mana_spent, 15);
+        assert_eq!(receipt.sulfur_ash_spent, 1);
+        assert_eq!(magic.mana(character), 85);
+        assert_eq!(loot.inventory(1).unwrap().backpack()[0].amount, 1);
+        assert_eq!(
+            inspect_joint_ember_recovery_holds(&checkpoint).unwrap().len(),
+            1
+        );
+
+        assert!(world.add_player_at(2, 242.0, 200.0, std::f32::consts::PI));
+        assert!(world.set_input(
+            2,
+            InputIntent {
+                kick: true,
+                facing_radians: std::f32::consts::PI,
+                ..InputIntent::default()
+            }
+        ));
+        for _ in 0..7 {
+            world.step_by(35.0);
+            if world.fighter(1).unwrap().action == Action::Knockdown {
+                break;
+            }
+        }
+        assert_eq!(world.fighter(1).unwrap().action, Action::Knockdown);
+        let result = record_world_ember_combat_interruption(
+            &checkpoint,
+            &loot,
+            &mut magic,
+            &identity,
+            &zones,
+            WorldCombatInterruption {
+                lease,
+                sequence: 45,
+                world: &world,
+                completed_tick: world.tick,
+            },
+        );
+        assert!(matches!(result, Ok(crate::magic::EmberEffectStatus::Interrupted)));
+        assert!(inspect_joint_ember_recovery_holds(&checkpoint)
+            .unwrap()
+            .is_empty());
+        let (restored_loot, restored_magic) =
+            load_joint_without_pending_ember(&checkpoint).unwrap();
+        assert_eq!(restored_magic.mana(character), 85);
+        assert!(restored_magic.knows_rune(character, Rune::Fire));
+        assert!(restored_magic.knows_spell(character, Spell::Ember));
+        assert_eq!(restored_magic.pending_ember_intents().count(), 0);
+        assert_eq!(restored_magic.resolved_ember_intents().count(), 1);
+        assert_eq!(restored_loot.committed_operation_sequence(character), Some(45));
+        assert_eq!(
+            restored_loot.parked_inventory(character).unwrap().backpack()[0].amount,
+            1
+        );
+        let _ = fs::remove_file(&checkpoint);
     }
 
     #[test]
