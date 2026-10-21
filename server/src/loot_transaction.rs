@@ -515,8 +515,12 @@ fn commit_ground_sword_equip_inner(
 /// handler. All live integrations MUST use the approved canonical writer.
 pub fn commit_verified_equipped_sword_drop_checked(
     authority: GroundSwordAuthority<'_>,
+    // Client-originating selection is untrusted. A delayed intent must not
+    // drop a replacement sword that now occupies the same MainHand.
+    expected_item_id: u64,
     geometry: impl FnOnce(
         &crate::simulation::Fighter,
+        &crate::loot::GroundDrop,
         crate::zone::ZoneId,
     ) -> Result<(), PickupCommitError>,
 ) -> Result<GroundSwordSelection, PickupCommitError> {
@@ -572,15 +576,18 @@ pub fn commit_verified_equipped_sword_drop_checked(
         return Err(PickupCommitError::Loot(LootError::WrongSlot));
     }
 
+    if expected_item_id == 0 || expected_item_id != sword.id {
+        // Stale or substituted MainHand selection. The staged operation
+        // watermark is discarded with the rejected transaction.
+        return Err(PickupCommitError::Loot(LootError::NotFound));
+    }
+
     // Direct MainHand -> ground preserves physical ID without requiring a
     // free backpack slot. No intermediate inventory state can be published;
     // later geometry/checkpoint failure discards the entire staged snapshot.
     let ground_entity_id = staged
         .drop_mainhand_sword(actor, fighter, zone, tick.world.now_ms as u64)
         .map_err(PickupCommitError::Loot)?;
-    // Core/Physics must approve the final placement against current,
-    // complete, same-tick collision geometry and fenced zone authority.
-    geometry(fighter, zone)?;
     let drop = staged
         .ground()
         .get(&ground_entity_id)
@@ -588,6 +595,10 @@ pub fn commit_verified_equipped_sword_drop_checked(
     if drop.item.id != sword.id || drop.item.amount != 1 || drop.zone != zone {
         return Err(PickupCommitError::Loot(LootError::InvalidState));
     }
+    // Core/Physics sees the ACTUAL staged world entity, position and item ID,
+    // not an independently reconstructed client destination or obsolete
+    // slot projection. No ownership mutation is published before approval.
+    geometry(fighter, drop, zone)?;
 
     let bytes = bundle(&staged, identity, magic).map_err(PickupCommitError::JointCheckpoint)?;
     atomic_write(path, &bytes).map_err(PickupCommitError::Io)?;
@@ -1062,7 +1073,7 @@ mod tests {
         // A blocked ground placement must not unequip, consume sequence,
         // create an item or ground entity, or leave a checkpoint.
         assert!(matches!(
-            commit_verified_equipped_sword_drop_checked(authority!(1, 1), |_, _| {
+            commit_verified_equipped_sword_drop_checked(authority!(1, 1), item_id, |_, _, _| {
                 Err(PickupCommitError::GeometryRejected)
             }),
             Err(PickupCommitError::GeometryRejected)
@@ -1084,13 +1095,20 @@ mod tests {
 
         // Only the successful commit makes the hand empty and materializes
         // exactly one ground entity with the ORIGINAL physical item ID.
-        let dropped =
-            commit_verified_equipped_sword_drop_checked(authority!(1, 1), |fighter, zone| {
+        let dropped = commit_verified_equipped_sword_drop_checked(
+            authority!(1, 1),
+            item_id,
+            |fighter, drop, zone| {
                 assert_eq!((fighter.x, fighter.y), (200.0, 200.0));
+                assert_eq!((drop.at.x, drop.at.y), (fighter.x, fighter.y));
+                assert_eq!(drop.zone, zone);
+                assert_eq!(drop.item.id, item_id);
+                assert_ne!(drop.entity_id, drop.item.id);
                 assert_eq!(zone, ZoneId::Moonvale);
                 Ok(())
-            })
-            .unwrap();
+            },
+        )
+        .unwrap();
         assert_eq!(dropped.expected_item_id, item_id);
         assert!(loot
             .inventory(1)
@@ -1105,7 +1123,7 @@ mod tests {
         assert_eq!(loot.ground().len(), 1);
         assert_eq!(loot.ground()[&dropped.ground_entity_id].item.id, item_id);
         assert!(matches!(
-            commit_verified_equipped_sword_drop_checked(authority!(1, 1), |_, _| {
+            commit_verified_equipped_sword_drop_checked(authority!(1, 1), item_id, |_, _, _| {
                 panic!("replayed command must not reach geometry")
             }),
             Err(PickupCommitError::Loot(LootError::ReplayOperation))
@@ -1169,6 +1187,107 @@ mod tests {
         );
         assert_eq!(
             recovered.committed_operation_sequence(CharacterId::new(2).unwrap()),
+            Some(1)
+        );
+        let _ = fs::remove_file(path);
+    }
+
+    #[test]
+    fn drop_rejects_stale_equipment_selection_after_mainhand_replacement() {
+        let mut world = World::new(800.0, 600.0);
+        assert!(world.add_player_at(1, 200.0, 200.0, 0.0));
+        let mut zones = ZoneAuthority::new();
+        zones.register(1).unwrap();
+        let mut identity = SessionIdentityRegistry::new();
+        identity
+            .bind_verified(lease(1), CharacterId::new(1).unwrap())
+            .unwrap();
+        let mut loot = LootAuthority::new();
+        loot.register(1).unwrap();
+
+        let old_sword = loot.grant(1, ItemKind::RustySword, 1).unwrap();
+        let new_sword = loot.grant(1, ItemKind::IronSword, 1).unwrap();
+        loot.equip(1, old_sword, EquipmentSlot::MainHand).unwrap();
+        // Simulate trusted equipment replacement after a client preview,
+        // before its original delayed (but numerically fresh) drop command.
+        loot.unequip(1, EquipmentSlot::MainHand).unwrap();
+        loot.equip(1, new_sword, EquipmentSlot::MainHand).unwrap();
+        let path = checkpoint_path();
+        let magic = MagicAuthority::new();
+        macro_rules! authority {
+            () => {
+                GroundSwordAuthority {
+                    path: &path,
+                    loot: &mut loot,
+                    magic: &magic,
+                    identity: &identity,
+                    tick: PickupWorldTick {
+                        world: &world,
+                        completed_tick: world.tick,
+                        zones: &zones,
+                    },
+                    operation: VerifiedLootOperation {
+                        lease: lease(1),
+                        sequence: 1,
+                    },
+                }
+            };
+        }
+        for expected in [old_sword, 0] {
+            assert!(matches!(
+                commit_verified_equipped_sword_drop_checked(
+                    authority!(),
+                    expected,
+                    |_, _, _| panic!("stale/zero selection must not reach geometry")
+                ),
+                Err(PickupCommitError::Loot(LootError::NotFound))
+            ));
+            assert!(loot.ground().is_empty());
+            assert_eq!(
+                loot.inventory(1)
+                    .unwrap()
+                    .equipped(EquipmentSlot::MainHand)
+                    .unwrap()
+                    .id,
+                new_sword
+            );
+            assert_eq!(
+                loot.committed_operation_sequence(CharacterId::new(1).unwrap()),
+                None
+            );
+            assert!(!path.exists());
+        }
+        // The actual currently equipped sword can still be dropped once,
+        // with its exact committed entity/item identity given to Physics.
+        let selection = commit_verified_equipped_sword_drop_checked(
+            authority!(),
+            new_sword,
+            |fighter, drop, zone| {
+                assert_eq!((fighter.x, fighter.y), (200.0, 200.0));
+                assert_eq!((drop.at.x, drop.at.y), (200.0, 200.0));
+                assert_eq!(drop.zone, zone);
+                assert_eq!(drop.item.id, new_sword);
+                assert_eq!(drop.item.kind, ItemKind::IronSword);
+                Ok(())
+            },
+        )
+        .unwrap();
+        assert_eq!(selection.expected_item_id, new_sword);
+        assert_eq!(
+            loot.ground()[&selection.ground_entity_id].item.id,
+            new_sword
+        );
+        assert_eq!(
+            loot.inventory(1)
+                .unwrap()
+                .backpack()
+                .iter()
+                .filter(|s| s.id == old_sword)
+                .count(),
+            1
+        );
+        assert_eq!(
+            loot.committed_operation_sequence(CharacterId::new(1).unwrap()),
             Some(1)
         );
         let _ = fs::remove_file(path);
