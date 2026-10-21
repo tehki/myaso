@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {WORLD_ALPHA_SWORD_RACK_SOCKETS,WORLD_ALPHA_SPAWN_COORDINATES,
   validateWorldAlphaArmoryLayout} from "../src/world/alpha-armory.mjs";
-import {nextNativeWalkPulse,nativeRackArrived,proposedNativeRackReachPoint,nativeRackWithinProposedReach} from "../scripts/alpha_p0_rack_walk_math.mjs";
+import {nextNativeWalkPulse,nativeRackArrived,proposedNativeRackReachPoint,nativeRackWithinProposedReach,verifyNativeRackPeerConsensus} from "../scripts/alpha_p0_rack_walk_math.mjs";
 import {WORLD_ALPHA_GREYHAVEN_STATIC_SOLIDS} from "../src/world/alpha-solid-geometry.mjs";
 
 test("four canonical World socket approaches are fixed, distinct and legitimate",()=>{
@@ -108,4 +108,42 @@ test("proposed reach is offline-only, bounded, exact-socket and fail closed",()=
   assert.equal(nativeRackWithinProposedReach({x:slot.x,y:slot.y+57},slot),false);
   assert.throws(()=>proposedNativeRackReachPoint({...slot,approach:{x:slot.x,y:0}}));
   assert.throws(()=>proposedNativeRackReachPoint({x:NaN,y:4038}));
+});
+
+test("four actual-shape snapshot observers must agree on true Rust near-sword actors",()=>{
+  // Offline synthetic NEGATIVE/contract fixtures; actual flight uses W3C only.
+  const slots=WORLD_ALPHA_SWORD_RACK_SOCKETS;
+  const w=slots.map((slot,i)=>({id:i+1,socketId:slot.socketId,
+    proposedReach:{observedPosition:{netId:i+1,x:slot.x,y:4068},serverTick:100+i}}));
+  const frame=()=>slots.map((slot,i)=>({netId:i+1,x:slot.x,y:4068}));
+  const views=[1,2,3,4].map(id=>({id,tick:120+id,fighters:frame()}));
+  const pass=verifyNativeRackPeerConsensus(views,w,slots);
+  assert.equal(pass.realRustFighterCount,4);
+  assert.equal(pass.maxPeerDrift,0);
+  assert.equal(pass.itemPickupApproved,false);
+  const within=structuredClone(views);
+  within[3].fighters[0].x+=4;
+  assert.equal(verifyNativeRackPeerConsensus(within,w,slots).maxPeerDrift,4);
+  const mutations=[
+    x=>{x[3].fighters[1].x+=12}, // all in nominal reach56 but 4 browser disagreement
+    x=>{x[0].fighters[0].x+=10}, // still inside approach tolerance 18
+    x=>{x[1].fighters[1].netId=3}, // ghost/duplicate
+    x=>{x[2].fighters.push({netId:5,x:3820,y:4068})}, // unexpected fifth
+    x=>{x[1].id=1}, // duplicated observer
+    x=>{x[3].tick=103}, // not newer than latest native W3C arrival
+    x=>{x[0].fighters[2].x=NaN}, // invalid coordinate
+    x=>{x[1].fighters[0].y=4088}, // out of proposed bound
+  ];
+  for(const mutate of mutations){
+    const bad=structuredClone(views);
+    mutate(bad);
+    assert.throws(()=>verifyNativeRackPeerConsensus(bad,w,slots),
+      /native rack peer consensus/);
+  }
+  const badWitness=structuredClone(w);
+  badWitness[3].proposedReach.serverTick=200;
+  assert.throws(()=>verifyNativeRackPeerConsensus(views,badWitness,slots),
+    /native rack peer consensus/);
+  assert.throws(()=>verifyNativeRackPeerConsensus(views,w,slots.slice(1)),
+    /native rack peer consensus/);
 });
