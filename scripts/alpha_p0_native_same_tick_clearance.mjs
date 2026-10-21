@@ -23,7 +23,7 @@ export function assessNativeSameTickRackClearance(views,slots,phase){
     if(!ids.includes(view?.id)||viewerIds.has(view.id)
       ||!Number.isSafeInteger(view.tick)||view.tick<1
       ||!Array.isArray(view.fighters)||view.fighters.length!==4
-      ||!Array.isArray(view.scoreboard))
+      ||!Array.isArray(view.scoreboard)||view.scoreboard.length!==4)
       return fail("missing, stale or duplicate real browser snapshot");
     viewerIds.add(view.id);
     const actualIds=view.fighters.map(p=>p?.netId).sort((a,b)=>a-b);
