@@ -815,6 +815,165 @@ mod tests {
     }
 
     #[test]
+    fn four_parallel_verified_sword_claims_commit_exactly_one_winner() {
+        use crate::magic_checkpoint::load_joint;
+        use std::sync::{Arc, Barrier, Mutex};
+
+        // This test executes four concurrent Rust threads, not four QUIC
+        // connections. The complete shared state is behind the same exclusive
+        // lock required of Core 8A/8B/8C's future authoritative operation.
+        struct Authority {
+            world: World,
+            zones: ZoneAuthority,
+            identity: SessionIdentityRegistry,
+            loot: LootAuthority,
+            magic: MagicAuthority,
+        }
+        let mut world = World::new(800.0, 600.0);
+        let mut zones = ZoneAuthority::new();
+        let mut identity = SessionIdentityRegistry::new();
+        let mut loot = LootAuthority::new();
+        for (id, x) in [(1, 180.0), (2, 191.0), (3, 202.0), (4, 213.0)] {
+            assert!(world.add_player_at(id, x, 200.0, 0.0));
+            zones.register(id).unwrap();
+            identity
+                .bind_verified(lease(id), CharacterId::new(u64::from(id)).unwrap())
+                .unwrap();
+            loot.register(id).unwrap();
+        }
+        let item_id = loot.grant(1, ItemKind::RustySword, 1).unwrap();
+        let entity_id = loot
+            .drop_backpack(1, world.fighter(1).unwrap(), ZoneId::Moonvale, item_id, 0)
+            .unwrap();
+        let path = checkpoint_path();
+        let authority = Arc::new(Mutex::new(Authority {
+            world,
+            zones,
+            identity,
+            loot,
+            magic: MagicAuthority::new(),
+        }));
+        let start = Arc::new(Barrier::new(4));
+
+        // Deliberately vary scheduling: no particular actor should be granted
+        // the item merely because of their numeric ID or thread spawn order.
+        let completed = std::thread::scope(|scope| {
+            let mut handles = Vec::new();
+            for id in [4_u32, 2, 1, 3] {
+                let shared = Arc::clone(&authority);
+                let race_start = Arc::clone(&start);
+                let output_path = &path;
+                handles.push(scope.spawn(move || {
+                    race_start.wait();
+                    let mut guard = shared.lock().unwrap();
+                    let Authority {
+                        world,
+                        zones,
+                        identity,
+                        loot,
+                        magic,
+                    } = &mut *guard;
+                    let result = commit_verified_ground_sword_equip_checked(
+                        GroundSwordAuthority {
+                            path: output_path,
+                            loot,
+                            magic,
+                            identity,
+                            tick: PickupWorldTick {
+                                world,
+                                completed_tick: world.tick,
+                                zones,
+                            },
+                            operation: VerifiedLootOperation {
+                                lease: lease(id),
+                                sequence: 1,
+                            },
+                        },
+                        GroundSwordSelection {
+                            ground_entity_id: entity_id,
+                            expected_item_id: item_id,
+                        },
+                        |fighter, drop, zone| {
+                            // These checks demonstrate the authoritative
+                            // provenance of callback input, not actual LOS.
+                            assert_eq!(fighter.net_id, id);
+                            assert_eq!(drop.entity_id, entity_id);
+                            assert_eq!(drop.item.id, item_id);
+                            assert_eq!(drop.zone, zone);
+                            Ok(())
+                        },
+                    );
+                    (id, result)
+                }));
+            }
+            handles
+                .into_iter()
+                .map(|handle| handle.join().expect("contest thread panicked"))
+                .collect::<Vec<_>>()
+        });
+
+        let mut winner = None;
+        let mut loser_count = 0;
+        for (id, result) in completed {
+            match result {
+                Ok(sword) => {
+                    assert!(
+                        winner.replace(id).is_none(),
+                        "more than one claimed the sword"
+                    );
+                    assert_eq!(sword.id, item_id);
+                }
+                Err(PickupCommitError::Loot(LootError::NotFound)) => loser_count += 1,
+                Err(error) => panic!("unexpected contest failure: {error:?}"),
+            }
+        }
+        assert_eq!(loser_count, 3);
+        let winner = winner.expect("one verified player must win");
+        let guard = authority.lock().unwrap();
+        assert!(guard.loot.ground().is_empty());
+        for id in 1..=4 {
+            let equipment = guard.loot.inventory(id).unwrap();
+            let character = CharacterId::new(u64::from(id)).unwrap();
+            if id == winner {
+                assert_eq!(
+                    equipment.equipped(EquipmentSlot::MainHand).unwrap().id,
+                    item_id
+                );
+                assert_eq!(guard.loot.committed_operation_sequence(character), Some(1));
+            } else {
+                assert_eq!(equipment.stack_count(), 0);
+                assert_eq!(guard.loot.committed_operation_sequence(character), None);
+            }
+        }
+        assert!(path.exists(), "only winning transfer should checkpoint");
+        let (recovered, _) = load_joint(&path).unwrap();
+        assert!(recovered.ground().is_empty());
+        let mut physical_count = 0;
+        for id in 1..=4 {
+            let character = CharacterId::new(u64::from(id)).unwrap();
+            let owned = recovered.parked_inventory(character).unwrap();
+            physical_count += owned
+                .backpack()
+                .iter()
+                .filter(|stack| stack.id == item_id)
+                .count();
+            if owned
+                .equipped(EquipmentSlot::MainHand)
+                .is_some_and(|stack| stack.id == item_id)
+            {
+                physical_count += 1;
+                assert_eq!(id, winner);
+            }
+        }
+        assert_eq!(physical_count, 1, "checkpoint duplicated or lost the sword");
+        assert_eq!(
+            recovered.committed_operation_sequence(CharacterId::new(u64::from(winner)).unwrap()),
+            Some(1)
+        );
+        let _ = fs::remove_file(path);
+    }
+
+    #[test]
     fn alpha_reused_session_cannot_steal_previous_characters_sword() {
         use crate::magic_checkpoint::load_joint;
 
