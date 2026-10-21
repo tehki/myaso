@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>P18 real QUIC reconnect and zone fencing test</title></head>
+<body><main><h1>P18 localhost-only QUIC connection lifecycle test</h1>
+<p>Not the playable game. No login, character identity, player commands or spellcasting.</p></main>
+<script type="module">
+import { decodeMagicEffectPacket } from "../src/browser/magic-effect-receiver.mjs";
+
+const args = new URLSearchParams(location.search);
+const server = args.get("server") ?? "";
+const cert = args.get("cert") ?? "";
+const hash = /^[0-9a-f]{64}$/i.test(cert)
+  ? Uint8Array.from(cert.match(/../g), (pair) => Number.parseInt(pair, 16)) : null;
+const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+const bounded = (promise, ms, name) => Promise.race([
+  promise, delay(ms).then(() => { throw new Error(name + " exceeded " + ms + "ms"); }),
+]);
+const observations = [];
+
+async function observe(tag, allowedZones, expectedEndZone) {
+  window.__P18_STAGE__ = tag + ": handshaking";
+  const transport = new WebTransport(server, {
+    serverCertificateHashes: [{ algorithm: "sha-256", value: hash }],
+  });
+  await bounded(transport.ready, 25000, tag + " real handshake");
+  window.__P18_STAGE__ = tag + ": real QUIC connection ready";
+  const reader = transport.datagrams.readable.getReader();
+  const item = {
+    tag, zones: {}, gameplayMarkers: 0, fxPackets: 0, malformedFx: 0,
+    wrongZoneFx: 0, zoneAnnouncements: [], endZone: null,
+    receivedFinalMarker: false,
+  };
+  observations.push(item);
+  try {
+    const done = (async () => {
+      while (true) {
+        const {value, done: closed} = await reader.read();
+        if (closed) throw new Error(tag + " closed before trusted end marker");
+        const wire = value instanceof Uint8Array ? value : new Uint8Array(value ?? []);
+        if (wire.length < 2) continue;
+        if (wire[0] === 90 && wire[1] === 77 && wire.length === 6) {
+          item.zoneAnnouncements.push(wire[2]);
+          window.__P18_STAGE__ = tag + ": server-authorized zone " + wire[2];
+        } else if (wire[0] === 90 && wire[1] === 69 && wire.length === 6) {
+          item.endZone = wire[2];
+          item.receivedFinalMarker = true;
+          return;
+        } else if (wire[0] === 71 && wire[1] === 80 && wire.length === 6) {
+          item.gameplayMarkers++;
+        } else if (wire[0] === 77 && wire[1] === 69) {
+          const packet = decodeMagicEffectPacket(wire);
+          if (!packet) {
+            item.malformedFx++;
+          } else {
+            item.fxPackets++;
+            item.zones[packet.zoneId] = (item.zones[packet.zoneId] ?? 0) + 1;
+            if (!allowedZones.includes(packet.zoneId)) item.wrongZoneFx++;
+          }
+        }
+      }
+    })();
+    await bounded(done, 26000, tag + " phase packets");
+  } finally {
+    transport.close({ closeCode: 0, reason: "P18 real browser lifecycle fixture" });
+    await bounded(transport.closed, 10000, tag + " close handshake");
+    try { await reader.cancel(); } catch {}
+  }
+  if (item.endZone !== expectedEndZone ||
+      item.zoneAnnouncements.length !== allowedZones.length ||
+      allowedZones.some((zone, index) => item.zoneAnnouncements[index] !== zone) ||
+      item.gameplayMarkers < (tag === "A" ? 40 : 30) ||
+      item.fxPackets < (tag === "A" ? 35 : 28) ||
+      item.malformedFx !== 0 || item.wrongZoneFx !== 0 ||
+      allowedZones.some((zone) => (item.zones[zone] ?? 0) < 10)) {
+    throw new Error(tag + " required real traffic / zone proof missing: " + JSON.stringify(item));
+  }
+  return item;
+}
+
+(async () => {
+  if (!/^https:\/\/127\.0\.0\.1:\d+\/physics-fx-reconnect$/.test(server) || !hash) {
+    throw new Error("P18 requires exact loopback endpoint and pinned throwaway cert");
+  }
+  if (typeof WebTransport !== "function") throw new Error("WebTransport is unavailable");
+  const a = await observe("A", [7, 8], 8);
+  window.__P18_STAGE__ = "A closed, opening genuinely new QUIC connection B";
+  const b = await observe("B", [9], 9);
+  // B is a new QUIC connection with recycled Core fixture ID but new
+  // server-owned generation and zone. A never borrows B's receiver state.
+  window.__P18_RESULT__ = {
+    ok: a.receivedFinalMarker && b.receivedFinalMarker &&
+      (a.zones[7] ?? 0) >= 10 && (a.zones[8] ?? 0) >= 10 &&
+      (b.zones[9] ?? 0) >= 10 && b.zones[7] === undefined &&
+      b.zones[8] === undefined,
+    realSequentialConnections: 2,
+    a, b,
+  };
+  window.__P18_STAGE__ = "complete";
+})().catch((error) => { window.__P18_ERROR__ = String(error?.stack ?? error); });
+</script>
+</body>
+</html>
