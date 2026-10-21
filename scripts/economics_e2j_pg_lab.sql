@@ -152,6 +152,17 @@ BEGIN
        OR prev.expected_buyer_revision IS DISTINCT FROM p_buyer_revision
     THEN RAISE EXCEPTION 'Conflicting idempotency intent';
     END IF;
+    -- Historical idempotency MUST NOT be a stale worker read capability.
+    -- Re-check the SAME fenced parcel row even when no new sale occurs.
+    SELECT * INTO f FROM e2j_lab.zone_fences z
+      WHERE z.parcel_key=(
+        SELECT l.parcel_key FROM e2j_lab.listings l
+        WHERE l.listing_id=prev.listing_id
+      ) FOR UPDATE;
+    IF NOT FOUND OR f.frozen OR f.worker<>p_worker
+       OR f.zone<>p_zone OR f.epoch<>p_epoch
+      THEN RAISE EXCEPTION 'Old receipt denied by changed authority';
+    END IF;
     RETURN QUERY SELECT prev.receipt_id, true;
     RETURN;
   END IF;
