@@ -948,6 +948,265 @@ async fn four_live_quic_players_see_real_out_of_range_fist_miss() -> Result<()> 
     Ok(())
 }
 
+/// The existing World death/respawn unit tests cannot prove that four
+/// independent clients receive the SAME real authoritative terminal state.
+/// This test drives three committed HEAVY fists through ordinary QUIC input
+/// to kill player #2, then requires each session to see death and immutable
+/// server-owned respawn. No direct World mutation or sword claim.
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn four_real_quic_players_observe_kill_and_immutable_greyhaven_respawn() -> Result<()> {
+    use myaso_server::snapshot::{SNAPSHOT_FIELD_ACTION, SNAPSHOT_FIELD_VITALS};
+    let (_server, url, pin) = start_private_staging_server(true)?;
+    let endpoint = Endpoint::client(
+        ClientConfig::builder()
+            .with_bind_default()
+            .with_server_certificate_hashes([pin])
+            .build(),
+    )?;
+    let mut sessions = Vec::new();
+    for (index, spawn) in SPAWNS.iter().enumerate() {
+        let connection = timeout(Duration::from_secs(6), endpoint.connect(url.as_str()))
+            .await
+            .context("death/respawn client QUIC connect timeout")?
+            .context("death/respawn client QUIC connection refused")?;
+        let (send, mut recv) = timeout(Duration::from_secs(5), connection.open_bi())
+            .await
+            .context("death/respawn reliable stream timeout")??
+            .await
+            .context("death/respawn reliable stream rejected")?;
+        let mut header = [0_u8; 2];
+        timeout(Duration::from_secs(5), recv.read_exact(&mut header))
+            .await
+            .context("death/respawn initial baseline header timeout")??;
+        let len = u16::from_le_bytes(header) as usize;
+        if !(14..=4096).contains(&len) {
+            bail!("death/respawn invalid reliable baseline bytes {len}");
+        }
+        let mut payload = vec![0; len];
+        timeout(Duration::from_secs(5), recv.read_exact(&mut payload))
+            .await
+            .context("death/respawn baseline body timeout")??;
+        let snapshot = decode_snapshot(&payload)
+            .map_err(|e| anyhow::anyhow!("death/respawn baseline corrupt: {e:?}"))?;
+        if !snapshot.full || snapshot.records.len() != index + 1 {
+            bail!("death/respawn player {} not in shared World", index + 1);
+        }
+        let own = snapshot
+            .records
+            .iter()
+            .find(|record| record.net_id == index as u32 + 1)
+            .context("death/respawn own authority identity missing")?;
+        if (own.x as f32 / 4.0, own.y as f32 / 4.0) != *spawn || own.hp != 100 {
+            bail!("death/respawn player {} baseline mismatch", index + 1);
+        }
+        sessions.push((connection, send, recv, snapshot.sequence));
+    }
+    // Enable actual live datagram replication for all four client sessions.
+    for (index, session) in sessions.iter().enumerate() {
+        let id = index as u32 + 1;
+        send_held_direction(&session.0, session.3, 61_000 + id, (0, 0))?;
+        require_quic_input_ack(&session.0, 61_000 + id, id).await?;
+    }
+    // Only the attacker moves. Position ~4164 gives <76 light and <130
+    // heavy reach to player #2 at (4206,4160); player #4 at (4206,4256)
+    // lies *outside* the normal east-facing heavy attack half-arc.
+    send_held_direction(&sessions[0].0, sessions[0].3, 62_000, (127, 0))?;
+    let deadline = Instant::now() + Duration::from_secs(4);
+    let position = loop {
+        let actual = next_authoritative_position(&sessions[0].0, 1, deadline).await?;
+        if actual.0 >= 4160.0 {
+            break actual;
+        }
+    };
+    send_held_direction(&sessions[0].0, sessions[0].3, 62_001, (0, 0))?;
+    if !(4160.0..=4175.0).contains(&position.0) || (position.1 - 4160.0).abs() > 5.0 {
+        bail!("death/respawn attacker invalid authentic attack location {position:?}");
+    }
+    // The unmodified server has 46 damage per heavy unarmed strike, and
+    // action commitment prevents immediate repeat. Three honest heavy
+    // attacks should reduce 100 -> 54 -> 8 -> 0 (Dead), not an injected kill.
+    for (attempt, expected_hp) in [54_u8, 8].into_iter().enumerate() {
+        let tick = 63_000 + 100 * attempt as u32;
+        send_quic_heavy_fist(&sessions[0].0, sessions[0].3, tick)?;
+        require_quic_input_ack(&sessions[0].0, tick, 1).await?;
+        send_held_direction(&sessions[0].0, sessions[0].3, tick + 1, (0, 0))?;
+        let deadline = Instant::now() + Duration::from_secs(4);
+        let mut saw_committed_attack = false;
+        let mut saw_expected_hp = false;
+        let mut hit_tick = None;
+        let mut latest_tick = 0_u32;
+        let mut count = 0_usize;
+        // Returning to Idle equals the initial ACKed snapshot baseline and
+        // may therefore be intentionally ELIDED by delta compression.
+        // Timebox via authoritative ticks instead of requiring an absent
+        // redundant Idle record from the server.
+        while !(saw_committed_attack && hit_tick.is_some_and(|tick| latest_tick >= tick + 40)) {
+            let remaining = deadline.saturating_duration_since(Instant::now());
+            if remaining.is_zero() {
+                bail!(
+                    "heavy fist #{attempt} never settled: commit={saw_committed_attack},                      target_hp={saw_expected_hp}, hit_tick={hit_tick:?} latest_tick={latest_tick}"
+                );
+            }
+            let incoming = match timeout(remaining, sessions[0].0.receive_datagram()).await {
+                Ok(Ok(incoming)) => incoming,
+                Ok(Err(error)) => bail!("heavy #{attempt} QUIC disconnected: {error:#}"),
+                Err(_) => bail!(
+                    "heavy #{attempt} exhausted result window: frames={count},                      committed={saw_committed_attack}, expected_hp={saw_expected_hp},                      hit_tick={hit_tick:?}, latest_tick={latest_tick}"
+                ),
+            };
+            let bytes = incoming.as_ref();
+            if bytes.len() < 14 || bytes[0] != 1 || bytes[1] != 2 {
+                continue;
+            }
+            let snapshot = decode_snapshot(bytes)
+                .map_err(|e| anyhow::anyhow!("heavy attack snapshot decode failed: {e:?}"))?;
+            count += 1;
+            latest_tick = snapshot.server_tick;
+            for record in snapshot.records {
+                if record.net_id == 1
+                    && record.mask & SNAPSHOT_FIELD_ACTION != 0
+                    && [9, 10, 11].contains(&record.action)
+                {
+                    saw_committed_attack = true;
+                }
+                if record.net_id == 2 && record.mask & SNAPSHOT_FIELD_VITALS != 0 {
+                    if record.hp < expected_hp {
+                        bail!(
+                            "unexpected extra damage on heavy exchange {}: hp={} expected={expected_hp}",
+                            attempt + 1, record.hp
+                        );
+                    }
+                    if record.hp == expected_hp {
+                        saw_expected_hp = true;
+                        hit_tick.get_or_insert(snapshot.server_tick);
+                    }
+                }
+            }
+        }
+        println!(
+            "ALPHA_8C_QUIC_HEAVY_DAMAGE step={} target_hp={expected_hp} committed=yes elapsed_ticks=40",
+            attempt + 1
+        );
+    }
+    // Third real heavy strike should trigger the server's existing Dead
+    // state and timed respawn. Do not drain snapshots through the attacker's
+    // own stream after the third ACK, or we might discard its short Dead
+    // state before starting the four independent observers.
+    let tick = 63_200;
+    send_quic_heavy_fist(&sessions[0].0, sessions[0].3, tick)?;
+    require_quic_input_ack(&sessions[0].0, tick, 1).await?;
+    send_held_direction(&sessions[0].0, sessions[0].3, tick + 1, (0, 0))?;
+
+    // Capture all four viewpoints concurrently: real death lasts only 1.25s.
+    // A local-only kill or a mock respawn cannot satisfy any observer.
+    let (one, two, three, four) = tokio::try_join!(
+        observe_quic_target_death_and_respawn(&sessions[0].0, 1),
+        observe_quic_target_death_and_respawn(&sessions[1].0, 2),
+        observe_quic_target_death_and_respawn(&sessions[2].0, 3),
+        observe_quic_target_death_and_respawn(&sessions[3].0, 4)
+    )?;
+    let server_ticks = [one, two, three, four];
+    for &(death_tick, respawn_tick) in &server_ticks {
+        if respawn_tick < death_tick + 60 {
+            bail!("authoritative respawn occurred implausibly before bounded death delay: {server_ticks:?}");
+        }
+    }
+    println!("ALPHA_8C_QUIC_KILL_RESPAWN_SERVER_TICKS {server_ticks:?}");
+
+    // Critically, all FOUR old connections must remain authorized and live
+    // after death and respawn: no session swap or position spoofing occurs.
+    for (index, session) in sessions.iter().enumerate() {
+        let id = index as u32 + 1;
+        send_held_direction(&session.0, session.3, 66_000 + id, (0, 0))?;
+        require_quic_input_ack(&session.0, 66_000 + id, id).await?;
+    }
+    println!(
+        "ALPHA_8C_FOUR_QUIC_KILL_RESPAWN_PASS players=4 killer=1 victim=2          death_hp=0 respawn_hp=100 spawn_x=4206 spawn_y=4160 same_sessions=4"
+    );
+    Ok(())
+}
+
+fn send_quic_heavy_fist(
+    connection: &wtransport::Connection,
+    baseline_sequence: u16,
+    tick: u32,
+) -> Result<()> {
+    let mut packet = vec![0_u8; INPUT_HEADER_BYTES + INPUT_SAMPLE_BYTES];
+    packet[0] = 1;
+    packet[1] = 1;
+    packet[2] = 1;
+    packet[4..6].copy_from_slice(&(tick as u16).to_le_bytes());
+    packet[6..8].copy_from_slice(&baseline_sequence.to_le_bytes());
+    packet[8..12].copy_from_slice(&tick.to_le_bytes());
+    packet[21] = 0b1000; // existing heavy attack sample button (face east)
+    connection.send_datagram(packet)?;
+    Ok(())
+}
+
+async fn observe_quic_target_death_and_respawn(
+    connection: &wtransport::Connection,
+    observer_id: u32,
+) -> Result<(u32, u32)> {
+    use myaso_server::snapshot::{SNAPSHOT_FIELD_ACTION, SNAPSHOT_FIELD_VITALS};
+    let deadline = Instant::now() + Duration::from_secs(6);
+    let mut victim_hp = 100_u8;
+    let mut victim_action = 0_u8;
+    let mut victim_position = None::<(f32, f32)>;
+    let mut death_tick = None;
+    loop {
+        let remaining = deadline.saturating_duration_since(Instant::now());
+        if remaining.is_zero() {
+            bail!(
+                "QUIC observer {observer_id} never saw genuine Dead->Respawn:                  death_tick={death_tick:?} last_hp={victim_hp} action={victim_action}                  position={victim_position:?}"
+            );
+        }
+        let message = timeout(remaining, connection.receive_datagram())
+            .await
+            .context("live four-peer death/respawn timeout")??;
+        let bytes = message.as_ref();
+        if bytes.len() < 14 || bytes[0] != 1 || bytes[1] != 2 {
+            continue;
+        }
+        let snapshot = decode_snapshot(bytes)
+            .map_err(|e| anyhow::anyhow!("death/respawn snapshot decode failed: {e:?}"))?;
+        for record in snapshot.records.iter().filter(|r| r.net_id == 2) {
+            if record.mask & SNAPSHOT_FIELD_VITALS != 0 {
+                victim_hp = record.hp;
+            }
+            if record.mask & SNAPSHOT_FIELD_ACTION != 0 {
+                victim_action = record.action;
+            }
+            if record.mask & SNAPSHOT_FIELD_POSITION != 0 {
+                victim_position = Some((record.x as f32 / 4.0, record.y as f32 / 4.0));
+            }
+        }
+        if death_tick.is_none() && victim_hp == 0 && victim_action == 8 {
+            death_tick = Some(snapshot.server_tick);
+            // Explicitly ACK each observer's authenticated Dead snapshot.
+            // Otherwise the existing delta protocol can legitimately
+            // omit a return to 100HP/Idle identical to its baseline.
+            send_held_direction(connection, snapshot.sequence, 65_000 + observer_id, (0, 0))?;
+            println!(
+                "ALPHA_8C_QUIC_DEAD observer={observer_id} victim=2 server_tick={}",
+                snapshot.server_tick
+            );
+        }
+        if let Some(death) = death_tick {
+            if snapshot.server_tick > death
+                && victim_action == 0
+                && victim_hp == 100
+                && victim_position == Some(SPAWNS[1])
+            {
+                println!(
+                    "ALPHA_8C_QUIC_RESPAWN observer={observer_id} victim=2 server_tick={}",
+                    snapshot.server_tick
+                );
+                return Ok((death, snapshot.server_tick));
+            }
+        }
+    }
+}
+
 /// Test the *real* authoritative QUIC stream and replicated state. No direct
 /// Rust simulation calls or client-controlled teleports are used. The matched
 /// OFF run is a negative control; the ON run must stop before the smith wall.
