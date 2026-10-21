@@ -18,7 +18,11 @@ left gesture that begins on an opaque *rendered sword* pixel. A
 `visualCandidateOnly` result is **not** authority to mutate equipment.
 
 The adapter checks the server-committed **presentation** item matches the
-plan by opaque item ID, socket ID and item revision. A release is valid only
+plan by opaque item ID, socket ID and item revision. It also independently
+validates the pointer is inside the actual painted sword sprite, its
+source-image pixel matches the Graphics hit witness, and the decoded
+source WebP alpha is opaque enough. This prevents stale or incorrectly
+reported visual hit callbacks from reserving a Combat gesture in air. A release is valid only
 if the same item, socket, revision, rack version and zone are still
 presented and the release pixel is opaque. Otherwise `handled:true` with
 `itemId:null` instructs Combat to **suppress the reserved LMB**, not

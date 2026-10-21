@@ -20,7 +20,7 @@ function presentedScene(scene) {
     && scene.frameId === scene.lastPresentedFrameId
     && typeof scene.sampleAlpha === "function";
 }
-function acceptedCandidate(candidate, scene) {
+function acceptedCandidate(candidate, scene, point) {
   if (!candidate || candidate.visualCandidateOnly !== true
     || candidate.serverPickupCommitted !== false
     || !nonempty(candidate.itemId) || !nonempty(candidate.socketId)
@@ -35,6 +35,27 @@ function acceptedCandidate(candidate, scene) {
     s && s.kind === "sword" && s.id === candidate.itemId
     && s.socketId === candidate.socketId && s.revision === candidate.revision);
   if (!sprite) return null;
+  // Defense in depth against stale/incorrect visual hit callbacks: the
+  // candidate must be the precise decoded source pixel under this actual
+  // painted sprite, not merely an item ID found somewhere in the rack.
+  if (!Number.isFinite(sprite.x) || !Number.isFinite(sprite.y)
+    || !Number.isFinite(sprite.width) || !Number.isFinite(sprite.height)
+    || sprite.width <= 0 || sprite.height <= 0
+    || !Number.isSafeInteger(sprite.sourceWidth)
+    || !Number.isSafeInteger(sprite.sourceHeight)
+    || sprite.sourceWidth <= 0 || sprite.sourceHeight <= 0
+    || !Number.isFinite(point.x) || !Number.isFinite(point.y)
+    || point.x < sprite.x || point.y < sprite.y
+    || point.x >= sprite.x + sprite.width
+    || point.y >= sprite.y + sprite.height) return null;
+  const u = Math.floor((point.x - sprite.x) * sprite.sourceWidth / sprite.width);
+  const v = Math.floor((point.y - sprite.y) * sprite.sourceHeight / sprite.height);
+  if (u < 0 || v < 0 || u >= sprite.sourceWidth || v >= sprite.sourceHeight
+    || candidate.sourcePixel.x !== u || candidate.sourcePixel.y !== v) return null;
+  // Even if the Graphics callback accidentally reports an opaque candidate,
+  // do not reserve Combat over genuinely transparent image source pixels.
+  const actualAlpha = scene.sampleAlpha(sprite.asset, u, v);
+  if (!Number.isFinite(actualAlpha) || actualAlpha < 64) return null;
   return {
     itemId: candidate.itemId,
     socketId: candidate.socketId,
@@ -53,7 +74,7 @@ export function createAlphaSwordGestureGate(hitTestVisibleSwordAlpha) {
     if (!isPoint(point) || !presentedScene(scene)) return null;
     try {
       return acceptedCandidate(
-        hitTestVisibleSwordAlpha(scene.plan, point, scene.sampleAlpha), scene);
+        hitTestVisibleSwordAlpha(scene.plan, point, scene.sampleAlpha), scene, point);
     } catch {
       // Failed decoding, late canvas removal and scene transition are all
       // non-interactions, never reasons to create a speculative pickup.

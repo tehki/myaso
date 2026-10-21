@@ -94,3 +94,27 @@ test("P0 malformed alpha samples/faults cannot reserve any sword",()=>{
   assert.deepEqual(g.down(down(),scene()),{handled:false,itemId:null});
   assert.throws(()=>createAlphaSwordGestureGate(null),TypeError);
 });
+test("P0 rejects alpha callback candidate outside the actual painted sword pixels",()=>{
+  const lyingAlpha=(plan,_p)=>({
+    itemId:plan.swords[0].id,socketId:plan.swords[0].socketId,
+    revision:plan.swords[0].revision,alpha:255,sourcePixel:{x:20,y:13},
+    visualCandidateOnly:true,serverPickupCommitted:false,
+  });
+  const g=createAlphaSwordGestureGate(lyingAlpha),s=scene();
+  assert.deepEqual(g.down(down(9,{x:500,y:250}),s),{handled:false,itemId:null});
+  assert.deepEqual(g.down(down(9,{x:610,y:340}),s),{handled:false,itemId:null},
+    "candidate must match the exact source pixel under the pointer");
+});
+test("P0 independently rechecks Graphics source WebP alpha and sprite dimensions",()=>{
+  const lyingAlpha=(plan,p)=>({
+    itemId:plan.swords[0].id,socketId:plan.swords[0].socketId,
+    revision:plan.swords[0].revision,alpha:255,
+    sourcePixel:{x:Math.floor(p.x-600),y:Math.floor(p.y-300)},
+    visualCandidateOnly:true,serverPickupCommitted:false,
+  });
+  const g=createAlphaSwordGestureGate(lyingAlpha),s=scene({alpha:0});
+  assert.deepEqual(g.down(down(),s),{handled:false,itemId:null},
+    "visually transparent WebP pixel must not reserve Combat even if callback says opaque");
+  assert.deepEqual(g.down(down(),{...scene(),plan:{...scene().plan,
+    swords:[{...scene().plan.swords[0],sourceWidth:0}]} }),{handled:false,itemId:null});
+});
