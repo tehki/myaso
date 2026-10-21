@@ -32,12 +32,12 @@ function terminate(child, signal = "SIGTERM") {
     else process.kill(-child.pid, signal);
   } catch { /* already exited */ }
 }
-async function webdriver(base, method, uri, body) {
+async function webdriver(base, method, uri, body, timeoutMs = 10_000) {
   const response = await fetch(base + uri, {
     method,
     headers: body === undefined ? undefined : { "content-type": "application/json" },
     body: body === undefined ? undefined : JSON.stringify(body),
-    signal: AbortSignal.timeout(10_000),
+    signal: AbortSignal.timeout(timeoutMs),
   });
   const payload = await response.json();
   if (!response.ok || payload.value?.error) {
@@ -158,7 +158,10 @@ async function driver(browser) {
       "--disable-renderer-backgrounding"]}}
     : {browserName:"firefox","moz:firefoxOptions":{args:["-headless"],
       prefs:{"dom.min_background_timeout_value":4,"dom.timeout.enable_budget_timer_throttling":false}}};
-  const created=await webdriver(base,"POST","/session",{capabilities:{alwaysMatch:caps}});
+  console.log("ALPHA_M1_BROWSER_START "+JSON.stringify({browser:browser.name,family:browser.family}));
+  // A headless Firefox session can take >10s to initialize under a busy
+  // GitHub-hosted runner; this does not relax input/replication deadlines.
+  const created=await webdriver(base,"POST","/session",{capabilities:{alwaysMatch:caps}},30_000);
   const id=created.sessionId ?? created.value?.sessionId;
   assert(id, browser.name+" no real WebDriver session ID");
   await webdriver(base,"POST",`/session/${id}/timeouts`,{script:15000,pageLoad:30000,implicit:0});
