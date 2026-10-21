@@ -121,6 +121,13 @@ class E2jPgAcceptance(unittest.TestCase):
         settle(fail=True)
         self.assertEqual(value("SELECT count(*) FROM e2j_lab.receipts"),"1")
 
+    def test_handoff_blocks_historical_receipt_replay_for_old_worker(self):
+        settle()
+        run_sql("UPDATE e2j_lab.zone_fences SET worker=9,epoch=4")
+        settle(fail=True)
+        self.assertEqual(value("SELECT count(*) FROM e2j_lab.receipts"),"1")
+        self.assertEqual(value("SELECT count(*) FROM e2j_lab.outbox"),"1")
+
     def test_wrong_or_frozen_zone_fence_blocks_purchase(self):
         for params in ({"worker":8},{"zone":9},{"epoch":4}):
             with self.subTest(params=params):
