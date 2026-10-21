@@ -1,0 +1,49 @@
+name: UI10 review / Graphics3B P0 four real rack players in short browser page
+
+on:
+  pull_request:
+    paths:
+      - "web/index.html"
+      - "web/styles.css"
+      - "scripts/graphics3b_page_visibility_gate.mjs"
+      - "scripts/alpha_p0_four_native_rack_at_approaches.mjs"
+      - "tests/graphics3b-native-layout-parity.test.mjs"
+      - ".github/workflows/graphics3b-p0-native-game-first-rack.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  four-real-browser-blacksmith-page-visible:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Original source and candidate layout checks
+        run: |
+          node --check web/online-game.mjs
+          node --check scripts/alpha_p0_four_native_rack_at_approaches.mjs
+          node --check scripts/graphics3b_page_visibility_gate.mjs
+          node --test tests/graphics3b-native-layout-parity.test.mjs tests/graphics3b-native-viewport-parity.test.mjs tests/graphics3b-gameplay-fold-budget.test.mjs tests/graphics3b-page-visibility-gate.test.mjs
+          node scripts/verify-core8c-greyhaven-geometry.mjs
+      - name: Require actual native Chrome Firefox WebDriver binaries
+        run: |
+          chromedriver --version
+          geckodriver --version
+          google-chrome --version
+          firefox --version
+      - name: Build real original Rust WebTransport authority
+        run: cargo build --locked --manifest-path server/Cargo.toml --bin myaso-server
+      - name: FOUR real Rust-authenticated native browsers walk to the original EMPTY Blacksmith rack
+        run: timeout --signal=TERM --kill-after=5s 330s node scripts/alpha_p0_four_native_rack_at_approaches.mjs
+      - name: STRICT all-four real player centers AND actual original rack inside browser page
+        run: node scripts/graphics3b_page_visibility_gate.mjs alpha-p0-real-greyhaven-rack-approach-evidence/rack-approaches-report.json --strict
+      - name: Preserve original actual W3C screenshots / real Rust position evidence
+        if: always()
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: ui10-graphics3b-four-real-blacksmith-game-first-strict
+          path: alpha-p0-real-greyhaven-rack-approach-evidence/*
+          if-no-files-found: ignore
+          retention-days: 3

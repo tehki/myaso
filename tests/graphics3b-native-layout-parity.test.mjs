@@ -32,3 +32,33 @@ test("both problematic short CSS viewports use identical measured native browser
  assert.match(probe,/sameCssViewport:true/);
  assert.match(probe,/await measureContentViewport\(browser,target\)/);
 });
+
+test("game-first candidate preserves all exact 14 source controls behind native details",()=>{
+ const html=source("web/index.html");
+ const css=source("web/styles.css");
+ assert.match(html,/<details class="controls-disclosure">/);
+ assert.match(html,/<summary>Controls · movement and combat<\/summary>/);
+ assert.match(html,/<div class="controls" aria-label="Controls">/);
+ const controls=html.match(/<div class="controls" aria-label="Controls">([\s\S]*?)<\/div>/)?.[1];
+ assert.equal((controls?.match(/<span>/g)||[]).length,14);
+ assert.match(css,/\.controls-disclosure > summary:focus-visible/);
+ assert.match(css,/\.controls-disclosure > \.controls/);
+ assert.match(css,/max-height: min\(72dvh, 540px\)/);
+});
+test("game-first candidate uses a real short-viewport media rule and uniform 16:9 ratio",()=>{
+ const css=source("web/styles.css");
+ assert.match(css,/@media \(max-height: 780px\) and \(min-width: 761px\)/);
+ assert.match(css,/\.arena-wrap \{ width: min\(100%, calc\(\(100dvh - 220px\) \* 16 \/ 9\)\);/);
+ assert.match(css,/\.hud \{ gap: 6px; margin-bottom: 6px; \}/);
+ assert.match(css,/\.audio-controls \{ gap: 4px 6px; font-size: 11px; \}/);
+ assert.doesNotMatch(css,/\.controls \{ display: none/);
+});
+test("candidate's actual W3C browser QA requires fully visible Canvas and opening/closing native details",()=>{
+ const probe=source("scripts/graphics3b_native_layout_parity.mjs");
+ assert.match(probe,/MYASO_P0_GAME_FIRST_LAYOUT/);
+ assert.match(probe,/foldBudget\.canvasFullyInPage/);
+ assert.match(probe,/GRAPHICS3B_P0_GAME_FIRST_LAYOUT_ACCEPT/);
+ assert.match(probe,/\.controls-disclosure summary/);
+ assert.match(probe,/opened\.items!==14/);
+ assert.doesNotMatch(probe,/scrollTo\(|scrollIntoView\(|setPlayerPosition\(|sendTryPickup\(/);
+});
