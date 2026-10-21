@@ -307,6 +307,173 @@ mod tests {
         let _ = fs::remove_file(&file);
     }
 
+    /// P0 end-to-end dormant-domain compatibility: an ACTUAL committed cast
+    /// (mana + reagent + pending intent + operation watermark), not a synthetic
+    /// magic fixture, must remain attached to its CharacterId when the caster
+    /// drops a real sword and a different verified character acquires it.
+    #[test]
+    fn committed_ember_cost_remains_with_caster_after_sword_transfer_and_reconnect() {
+        use crate::loot_transaction::{
+            commit_verified_equipped_sword_drop_checked,
+            commit_verified_ground_sword_equip_checked, GroundSwordAuthority, PickupWorldTick,
+        };
+
+        let (mut loot, mut magic, mut identity, mut zones, caster) = setup();
+        let receiver = CharacterId::new(501).unwrap();
+        let receiver_lease = SessionLease::new(2, 1).unwrap();
+        identity.bind_verified(receiver_lease, receiver).unwrap();
+        zones.register(2).unwrap();
+        loot.register(2).unwrap();
+        stock(&mut loot, 2);
+        let sword = loot.grant(1, ItemKind::IronSword, 1).unwrap();
+        loot.equip(1, sword, EquipmentSlot::MainHand).unwrap();
+        let mut world = World::new(800.0, 600.0);
+        assert!(world.add_player_at(1, 200.0, 200.0, 0.0));
+        assert!(world.add_player_at(2, 220.0, 200.0, 0.0));
+        let file = path();
+
+        // This is a real Magic-cost transaction with the original verified
+        // lease and an actual consumed SulfurAsh, unlike manual staging.
+        let cast = commit_ember_cost(
+            &file,
+            &mut loot,
+            &mut magic,
+            &identity,
+            &zones,
+            op(7),
+            world.fighter(1).unwrap(),
+        )
+        .unwrap();
+        assert_eq!(cast.character, caster);
+        assert_eq!(cast.sequence, 7);
+        assert_eq!((cast.mana_spent, cast.sulfur_ash_spent), (15, 1));
+        assert_eq!(magic.mana(caster), 85);
+        assert_eq!(magic.mana(receiver), 0);
+        assert_eq!(magic.pending_ember_intents().count(), 1);
+        let after_cast = magic.encode_progression().unwrap();
+
+        macro_rules! authority {
+            ($lease:expr, $sequence:expr) => {
+                GroundSwordAuthority {
+                    path: &file,
+                    loot: &mut loot,
+                    magic: &magic,
+                    identity: &identity,
+                    tick: PickupWorldTick {
+                        world: &world,
+                        completed_tick: world.tick,
+                        zones: &zones,
+                    },
+                    operation: VerifiedLootOperation {
+                        lease: $lease,
+                        sequence: $sequence,
+                    },
+                }
+            };
+        }
+        let selection = commit_verified_equipped_sword_drop_checked(
+            authority!(op(8).lease, 8),
+            |fighter, zone| {
+                assert_eq!(fighter.net_id, 1);
+                assert_eq!(zone, ZoneId::Moonvale);
+                Ok(())
+            },
+        )
+        .unwrap();
+        assert_eq!(selection.expected_item_id, sword);
+        let taken = commit_verified_ground_sword_equip_checked(
+            authority!(receiver_lease, 1),
+            selection,
+            |fighter, ground, zone| {
+                assert_eq!(fighter.net_id, 2);
+                assert_eq!(ground.item.id, sword);
+                assert_eq!(ground.zone, zone);
+                Ok(())
+            },
+        )
+        .unwrap();
+        assert_eq!(taken.id, sword);
+        assert_eq!(magic.encode_progression().unwrap(), after_cast);
+
+        let (mut recovered_loot, mut recovered_magic) = load_joint(&file).unwrap();
+        assert_eq!(recovered_magic.encode_progression().unwrap(), after_cast);
+        assert_eq!(recovered_magic.mana(caster), 85);
+        assert_eq!(recovered_magic.mana(receiver), 0);
+        assert!(!recovered_magic.knows_rune(receiver, Rune::Fire));
+        assert_eq!(recovered_magic.pending_ember_intents().count(), 1);
+        assert!(recovered_magic.ember_intent(caster, 7).is_some());
+        assert!(recovered_magic.ember_intent(receiver, 7).is_none());
+        assert_eq!(recovered_loot.committed_operation_sequence(caster), Some(8));
+        assert_eq!(
+            recovered_loot.committed_operation_sequence(receiver),
+            Some(1)
+        );
+
+        // Re-authenticate BOTH sides under fresh server sessions, preserving
+        // the one original physical sword and the character-owned cast.
+        let mut new_identity = SessionIdentityRegistry::new();
+        let new_caster_lease = SessionLease::new(101, 2).unwrap();
+        let new_receiver_lease = SessionLease::new(102, 2).unwrap();
+        new_identity
+            .bind_verified(new_caster_lease, caster)
+            .unwrap();
+        new_identity
+            .bind_verified(new_receiver_lease, receiver)
+            .unwrap();
+        recovered_loot
+            .resume_inventory(&new_identity, new_caster_lease)
+            .unwrap();
+        recovered_loot
+            .resume_inventory(&new_identity, new_receiver_lease)
+            .unwrap();
+        assert!(recovered_loot
+            .inventory(101)
+            .unwrap()
+            .equipped(EquipmentSlot::MainHand)
+            .is_none());
+        assert_eq!(
+            recovered_loot
+                .inventory(102)
+                .unwrap()
+                .equipped(EquipmentSlot::MainHand)
+                .unwrap()
+                .id,
+            sword
+        );
+        assert_eq!(
+            recovered_loot.inventory(101).unwrap().backpack()[0].amount,
+            1
+        );
+
+        let mut new_zones = ZoneAuthority::new();
+        new_zones.register(101).unwrap();
+        let mut new_world = World::new(800.0, 600.0);
+        assert!(new_world.add_player_at(101, 200.0, 200.0, 0.0));
+        let replay = commit_ember_cost(
+            &file,
+            &mut recovered_loot,
+            &mut recovered_magic,
+            &new_identity,
+            &new_zones,
+            VerifiedLootOperation {
+                lease: new_caster_lease,
+                sequence: 7,
+            },
+            new_world.fighter(101).unwrap(),
+        );
+        assert!(matches!(
+            replay,
+            Err(CastError::Loot(LootError::ReplayOperation))
+        ));
+        assert_eq!(recovered_magic.encode_progression().unwrap(), after_cast);
+        assert_eq!(recovered_loot.committed_operation_sequence(caster), Some(8));
+        assert_eq!(
+            recovered_loot.inventory(101).unwrap().backpack()[0].amount,
+            1
+        );
+        let _ = fs::remove_file(&file);
+    }
+
     #[test]
     fn failed_precommit_write_does_not_spend_mana_reagent_or_sequence() {
         let (mut loot, mut magic, identity, zones, character) = setup();
