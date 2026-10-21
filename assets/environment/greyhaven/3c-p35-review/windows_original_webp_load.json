@@ -1,0 +1,94 @@
+{
+  "status": "IMAGES_DECODED",
+  "pins": {
+    "art": "2a11b923591a682bbae3cffe6d9f70b0d2036de8"
+  },
+  "hashes": {
+    "armory_rack.webp": "83d0d228785f80e95efd18fa6ef46a77d4ce8500a3fd5cf777d0f1f5ee3917b8",
+    "armory_sword.webp": "795874620d07652e55f5e8a76952d2075f17196fc892eff88d46b165638a3b31"
+  },
+  "bytes": {
+    "armory_rack.webp": 15428,
+    "armory_sword.webp": 2682
+  },
+  "host": {
+    "platform": "win32",
+    "cpu": "Intel(R) Core(TM) i7-2700K CPU @ 3.50GHz",
+    "memTotal": 17129299968,
+    "memFreeAtStart": 871895040
+  },
+  "requests": [
+    {
+      "t": 2775,
+      "path": "/"
+    },
+    {
+      "t": 2819,
+      "path": "/asset/armory_rack.webp"
+    },
+    {
+      "t": 2836,
+      "path": "/asset/armory_sword.webp"
+    },
+    {
+      "t": 2837,
+      "path": "/favicon.ico"
+    }
+  ],
+  "errors": [
+    "console Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "HTTP 404 http://127.0.0.1:62436/favicon.ico"
+  ],
+  "browser": "Chrome/154.0.8037.99",
+  "originalWebPOnly": true,
+  "originalWorldRendererLoaded": false,
+  "canvasDrawTested": false,
+  "pixelScreenshotAttempted": false,
+  "hasItemAuthority": false,
+  "htmlHttp": 200,
+  "browserProbe": {
+    "phase": "DONE",
+    "events": [
+      {
+        "name": "armory_rack.webp",
+        "stage": "begin",
+        "atMs": 120
+      },
+      {
+        "name": "armory_rack.webp",
+        "stage": "onload",
+        "atMs": 127,
+        "ms": 8,
+        "width": 240,
+        "height": 166
+      },
+      {
+        "name": "armory_rack.webp",
+        "stage": "decoded",
+        "atMs": 133,
+        "ms": 14
+      },
+      {
+        "name": "armory_sword.webp",
+        "stage": "begin",
+        "atMs": 133
+      },
+      {
+        "name": "armory_sword.webp",
+        "stage": "onload",
+        "atMs": 144,
+        "ms": 10,
+        "width": 42,
+        "height": 115
+      },
+      {
+        "name": "armory_sword.webp",
+        "stage": "decoded",
+        "atMs": 145,
+        "ms": 12
+      }
+    ],
+    "done": true
+  },
+  "totalMs": 3272
+}

@@ -1,0 +1,92 @@
+{
+  "status": "IMAGES_DECODED",
+  "pins": {
+    "art": "2a11b923591a682bbae3cffe6d9f70b0d2036de8"
+  },
+  "hashes": {
+    "armory_rack.webp": "83d0d228785f80e95efd18fa6ef46a77d4ce8500a3fd5cf777d0f1f5ee3917b8",
+    "armory_sword.webp": "795874620d07652e55f5e8a76952d2075f17196fc892eff88d46b165638a3b31"
+  },
+  "loadMode": "parallel",
+  "bytes": {
+    "armory_rack.webp": 15428,
+    "armory_sword.webp": 2682
+  },
+  "host": {
+    "platform": "linux",
+    "cpu": "Intel(R) Core(TM) i3-2370M CPU @ 2.40GHz",
+    "memTotal": 8001454080,
+    "memFreeAtStart": 2188361728
+  },
+  "requests": [
+    {
+      "t": 1536,
+      "path": "/"
+    },
+    {
+      "t": 1589,
+      "path": "/asset/armory_rack.webp"
+    },
+    {
+      "t": 1602,
+      "path": "/asset/armory_sword.webp"
+    },
+    {
+      "t": 1626,
+      "path": "/favicon.ico"
+    }
+  ],
+  "errors": [],
+  "browser": "Chrome/152.0.7977.82",
+  "originalWebPOnly": true,
+  "originalWorldRendererLoaded": false,
+  "canvasDrawTested": false,
+  "pixelScreenshotAttempted": false,
+  "hasItemAuthority": false,
+  "htmlHttp": 200,
+  "browserProbe": {
+    "phase": "DONE",
+    "events": [
+      {
+        "name": "armory_rack.webp",
+        "stage": "begin",
+        "atMs": 59
+      },
+      {
+        "name": "armory_sword.webp",
+        "stage": "begin",
+        "atMs": 60
+      },
+      {
+        "name": "armory_rack.webp",
+        "stage": "onload",
+        "atMs": 80,
+        "ms": 20,
+        "width": 240,
+        "height": 166
+      },
+      {
+        "name": "armory_sword.webp",
+        "stage": "onload",
+        "atMs": 86,
+        "ms": 26,
+        "width": 42,
+        "height": 115
+      },
+      {
+        "name": "armory_rack.webp",
+        "stage": "decoded",
+        "atMs": 87,
+        "ms": 28
+      },
+      {
+        "name": "armory_sword.webp",
+        "stage": "decoded",
+        "atMs": 89,
+        "ms": 29
+      }
+    ],
+    "done": true
+  },
+  "totalMs": 1950
+}
