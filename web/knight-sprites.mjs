@@ -4,6 +4,25 @@ import { COMBAT_ACTION } from "../src/browser/combat-readability.mjs";
 
 export const KNIGHT_FRAME_PX = 160;
 export const KNIGHT_ROLL_PRESENTATION_MS = 350;
+// Strict opt-in original Silver source kick: visual-only phase fragments.
+// Windup 90ms, active 70ms, recovery 220ms are authored source budgets;
+// clip frames can ONLY follow an already observed server-confirmed action.
+export const KNIGHT_KICK_SOURCE_PHASE_MS = Object.freeze({
+  [COMBAT_ACTION.kickWindup]: 90,
+  [COMBAT_ACTION.kickActive]: 70,
+  [COMBAT_ACTION.kickRecovery]: 220,
+});
+export const KNIGHT_KICK_SOURCE_FRAMES = 8;
+export function knightKickSourceFrame(action, elapsedMs) {
+  // No clip on unconfirmed/rejected or out-of-order action codes.
+  if (!Object.hasOwn(KNIGHT_KICK_SOURCE_PHASE_MS, action)
+    || !Number.isFinite(elapsedMs)) return null;
+  const [start, count] = action === COMBAT_ACTION.kickWindup ? [0,3]
+    : action === COMBAT_ACTION.kickActive ? [3,2] : [5,3];
+  const duration = KNIGHT_KICK_SOURCE_PHASE_MS[action];
+  const clamped = Math.max(0, Math.min(duration-0.001,elapsedMs));
+  return start + Math.min(count-1, Math.floor(clamped/duration*count));
+}
 // Owner-approved A2.10 knight visual scale. This affects ONLY the optional
 // knight sprite renderer, not gameplay positions, roll physics or hitboxes.
 // &knights=1 uses 120%; &knights=1&knightScale=100 previews the old presentation.
@@ -50,7 +69,7 @@ export function knightDirectionIndex(facing) {
 
 // Actor kind must come from a validated Core/AI roster. A network-locality
 // flag is NEVER permission to draw a Sentinel for another human player.
-export function knightClip(action, actorKind, speed = 0, moving = false) {
+export function knightClip(action, actorKind, speed = 0, moving = false, sourceKickPreview = false) {
   if (actorKind !== "player" && actorKind !== "npc") return null;
   if (action === COMBAT_ACTION.dodge || action === COMBAT_ACTION.dodgeRecovery) {
     return actorKind === "npc" ? "t1_roll" : "silver_roll";
@@ -63,6 +82,13 @@ export function knightClip(action, actorKind, speed = 0, moving = false) {
     if (action === COMBAT_ACTION.block) return "t1_block";
     if (ATTACKS.has(action)) return "t1_attack";
     return action === COMBAT_ACTION.idle ? "t1_walk" : null;
+  }
+  // Draw the approved source atlas ONLY when explicitly opted-in and when
+  // the caller presents the authenticated player action from a confirmed
+  // snapshot (local after ACK, remote after interpolation). Never trigger a
+  // visual contact frame from input.kick or an unverified stamina request.
+  if (sourceKickPreview && Object.hasOwn(KNIGHT_KICK_SOURCE_PHASE_MS, action)) {
+    return "silver_kick";
   }
   if (action === COMBAT_ACTION.jump) return "silver_jump";
   if (action !== COMBAT_ACTION.idle) return null;
@@ -79,17 +105,21 @@ export function spriteAtlasRect(facing, frame, frames) {
 
 export function createKnightSpriteRenderer({ ImageCtor = Image,
   assetBase = new URL("./assets/knights/", import.meta.url),
-  presentationScale = KNIGHT_PRESENTATION_SCALE } = {}) {
+  presentationScale = KNIGHT_PRESENTATION_SCALE,
+  sourceKickPreview = false } = {}) {
   // Fail closed for unsupported visual transforms rather than silently
   // scaling A3 source art to arbitrary dimensions.
   knightPresentationRect(false, presentationScale);
   const atlases = new Map();
   const states = new Map();
-  for (const [name] of Object.entries(KNIGHT_CLIPS)) {
+  const clipList = sourceKickPreview
+    ? {...KNIGHT_CLIPS, silver_kick: KNIGHT_KICK_SOURCE_FRAMES}
+    : KNIGHT_CLIPS;
+  for (const [name] of Object.entries(clipList)) {
     const image = new ImageCtor();
     const atlas = { image, ready: false };
     image.onload = () => {
-      atlas.ready = image.naturalWidth === KNIGHT_CLIPS[name] * KNIGHT_FRAME_PX
+      atlas.ready = image.naturalWidth === clipList[name] * KNIGHT_FRAME_PX
         && image.naturalHeight === 8 * KNIGHT_FRAME_PX;
     };
     image.onerror = () => { atlas.ready = false; };
@@ -104,7 +134,8 @@ export function createKnightSpriteRenderer({ ImageCtor = Image,
       let state = states.get(key);
       if (!state) {
         state = { x: fighter.x, y: fighter.y, atMs: nowMs, lastMoveMs: -Infinity,
-          speed: 0, cycle: 0, clip: null, clipStartedMs: nowMs };
+          speed: 0, cycle: 0, clip: null, clipStartedMs: nowMs,
+          kickPhaseAction: null, kickPhaseStartedMs: nowMs };
         states.set(key, state);
       }
       const dt = Math.max(0, nowMs - state.atMs);
@@ -121,11 +152,13 @@ export function createKnightSpriteRenderer({ ImageCtor = Image,
       state.y = fighter.y;
       state.atMs = nowMs;
       const moving = nowMs - state.lastMoveMs < 135;
-      const clip = knightClip(fighter.action ?? COMBAT_ACTION.idle, actorKind, state.speed, moving);
+      const action = fighter.action ?? COMBAT_ACTION.idle;
+      const clip = knightClip(action, actorKind, state.speed, moving, sourceKickPreview);
       if (!clip) {
         // End the previous clip on unsupported states. A future roll must
         // start at frame zero rather than resume its previous final frame.
         state.clip = null;
+        state.kickPhaseAction = null;
         return false;
       }
       const atlas = atlases.get(clip);
@@ -134,9 +167,20 @@ export function createKnightSpriteRenderer({ ImageCtor = Image,
         state.clip = clip;
         state.clipStartedMs = nowMs;
       }
-      const frames = KNIGHT_CLIPS[clip];
+      const frames = clipList[clip];
+      if (clip === "silver_kick" && state.kickPhaseAction !== action) {
+        // Anchor interpolation only after observing the next authenticated
+        // source phase; never let an animation timer promote windup to active.
+        state.kickPhaseAction = action;
+        state.kickPhaseStartedMs = nowMs;
+      } else if (clip !== "silver_kick") {
+        state.kickPhaseAction = null;
+      }
       let frame;
-      if (clip.endsWith("_walk") || clip.endsWith("_sprint")) {
+      if (clip === "silver_kick") {
+        frame = knightKickSourceFrame(action, nowMs - state.kickPhaseStartedMs);
+        if (frame === null) return false;
+      } else if (clip.endsWith("_walk") || clip.endsWith("_sprint")) {
         frame = moving ? Math.floor(state.cycle * frames) : 0;
       } else if (clip === "silver_idle") {
         frame = Math.floor(nowMs / 300) % frames;
