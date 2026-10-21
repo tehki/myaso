@@ -16,6 +16,7 @@ import {ARMORY_RACK_ART} from "./armory-rack-visual.mjs";
 import {createWorld493RackArtPlan} from "./armory-world493-visual-bridge.mjs";
 import {createArmorySwordAlphaSampler} from "./armory-sword-alpha-sampler.mjs";
 import {paintArmoryRackPresentedFrame} from "./armory-rack-presented-frame.mjs";
+import {measureOriginalRackPageVisibility} from "./armory-page-viewport-metrics.mjs";
 
 export const OPTIN_ARMORY_VISUAL_CONTRACT=Object.freeze({
   sourceWorldLayoutVersion:1,
@@ -91,6 +92,8 @@ export async function loadOriginalBlacksmithRackPreview({
     last=Object.freeze({
       renderedFrames:frame,drawnRackCount:presented.drawnRackCount,
       rackScreenRect:rackRect,rackIntersectsViewport,rackFullyWithinViewport,
+      measuredCamera:Object.freeze({x:camera.x,y:camera.y}),
+      measuredCanvas:Object.freeze({width,height,zoom}),
       drawnSwordCount:presented.drawnSwordCount,
       originalWorldSockets:WORLD_ALPHA_ARMORY.rackSockets.length,
       actualGameRender:true,canonicalItemFeedConnected:false,
@@ -101,6 +104,17 @@ export async function loadOriginalBlacksmithRackPreview({
   return Object.freeze({
     draw,
     status:()=>last,
+    measurePage:({canvas,viewportWidth,viewportHeight,observedActors=[]}={})=>{
+      if(!last||!canvas||typeof canvas.getBoundingClientRect!=="function")return null;
+      const b=canvas.getBoundingClientRect();
+      return Object.freeze({...measureOriginalRackPageVisibility({
+        rackScreenRect:last.rackScreenRect,
+        canvasRect:{x:b.left,y:b.top,width:b.width,height:b.height},
+        canvasWidth:last.measuredCanvas.width,canvasHeight:last.measuredCanvas.height,
+        viewportWidth,viewportHeight,camera:last.measuredCamera,
+        zoom:last.measuredCanvas.zoom,observedActors
+      }),measuredFromRealDOM:true});
+    },
     actualClientArt:true,actualAuthenticatedItemFeed:false,
     originalSwordSourceDecoded:true,
     productionApproved:false

@@ -1,0 +1,25 @@
+# 🌕⚡️🚀 Graphics 3B P0 — browser-fold visibility of genuine Blacksmith rack and four real players
+
+**Draft QA child of Graphics 3B #627** · exact parent `a649b03a91bb50f3837f98a7095acc8c6b7255e2` · First Playable #480 / four physical sword interaction #488.
+
+## Actual preexisting evidence, not an illustration
+
+GitHub real native 4-player [run #39645019984](https://github.com/tehki/myaso/actions/runs/39645019984), archived exact original genuine [four-browser artifact](https://github.com/tehki/myaso/actions/runs/39645019984/artifacts/12366004251). Four actual Chrome#1, Firefox#2, Chrome#3, Firefox#4 W3C independent browser processes moved through real pinned Rust WebTransport Greyhaven to approaches and independently saw all peers. The original source Blender rack (wood/iron, 240x166 WebP) was inside the **intrinsic Canvas** for all four, zero swords because no canonical live item writer. Original World approaches x3740/3780/3820/3860, y4088. Actual replicated server points: (3746,4100),(3784,4084),(3816,4098),(3854,4092). One loopback CI host only, NOT four remote computers or live items.
+
+Inspecting the genuine Firefox2 PNG shows a **1366×682 browser viewport** with large page header/controls/HUD above the Canvas: the bottom of the game Canvas, including portions of the four players, sits *below the browser window fold*. Thus source rack `rackFullyWithinViewport:true` in the earlier debug accessor was TRUE only for intrinsic 1080x? Canvas size — **not proof players/rack are fully visible inside browser window**. We preserve the existing World/3B owner acceptance and add a different, honest diagnostic for UI 10.
+
+## Read-only P0 source projector / no layout changes
+
+New `src/browser/armory-page-viewport-metrics.mjs` computes the CSS-screen rectangles from the original **live rack projected Canvas rectangle**, true `canvas.getBoundingClientRect()`, Canvas backing width/height, and `window.innerWidth/Height`. Reports the rack's fractional intersection with the real browser viewport, full-in-window/partial flags, the visible fraction of the Canvas, and the page-viewport centers of each genuine replicated server fighter using the existing first-party `projectArenaPoint`. `centerInsideBrowserViewport` is **not** full actor-pixel, original Silver sprite/animation or HUD-occlusion proof. The result distinguishes browser fold clipping from game Canvas clipping without moving/scrolling the page or altering world/camera coordinates.
+
+New `src/browser/armory-optin-live-rack.mjs` `measurePage(...)` is **opt-in source review only** after an actual art draw. Actual `web/online-game.mjs` read-only localhost `?world=1&armoryart=1` debug getter reports `pageVisibility` from real DOM + actual networkClient snapshot positions. Default public-game behavior and networking, actor movement, Combat, original Blender/WebP assets and authoritative server unchanged. No scrollIntoView/scrollTo or CSS fixes were attempted — **UI10 owns page layout and responsive game/HUD focus**.
+
+The true four-W3C-browser arrival script now writes `browserPageVisibility` alongside real Rust approach positions into `rack-approaches-report.json` and derives `allFightersVisibleInPageViewport` / `allRacksFullyVisibleInBrowserPage` from observations. These are **report fields, not silently waived mandatory World arrival gates or claims of full-screen success**. Existing verified four approaches, W3C input, real Rust QUIC and intrinsic Canvas full source rect requirements stay exactly as strict. Subsequent native CI is required before citing new browser-page metrics.
+
+Five new local unit tests cover real viewport intersection distinct from intrinsic Canvas coverage, CSS scaling, position projection, fail-closed malformed browser/actor input, no URL/scroll/Combat mutation. Existing five live-rack + five real arrival tests remain green: **15/15 focused local tests pass**. Full protected parent #627 quality [#39645019978](https://github.com/tehki/myaso/actions/runs/39645019978) **FAILED M121 real directional light**, despite exact four-native rack CI green. Combat runner saw actual Firefox `FROM LEFT` heavy+light attack state and HP loss 34, but `parryTellMaxPixels:0`; Firefox also logged software compositor mapping warning, not established causality. Combat4/UI10 must diagnose mandatory guard; Graphics 3B cannot waive it.
+
+## Strict First Playable release HOLD
+
+The browser-page fold clipping is a UI responsiveness issue and remains **unfixed**. Original human Knight animation/actual four Silver sprites (#617) is not active in #627 screenshots (still circular placeholder actors). No authenticated signed current rack feed, four sword sprites, source-alpha pickup/equip ACK, hands/MainHand, armed/unarmed PvP, low-end X230i, four separate host machines, respawn/reconnect, main merge or production deployment exists in this QA. Only Main Development Orchestrator may authorize release after separate owners' gates.
+
+**Status: implement/read-only measurements source-tested; genuine modified-head four-browser CI pending, layout & Combat quality blocked; NOT PLAYABLE.**

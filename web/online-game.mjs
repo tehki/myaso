@@ -139,6 +139,14 @@ if (armoryRackReviewEnabled) {
     rackScreenRect:armoryRackReview?.status()?.rackScreenRect ?? null,
     rackIntersectsViewport:armoryRackReview?.status()?.rackIntersectsViewport ?? false,
     rackFullyWithinViewport:armoryRackReview?.status()?.rackFullyWithinViewport ?? false,
+    // Opt-in graphics visibility in actual browser DOM, distinct from
+    // merely fitting the source rack inside the intrinsic Canvas pixels.
+    pageVisibility:armoryRackReview?.measurePage({
+      canvas,viewportWidth:window.innerWidth,viewportHeight:window.innerHeight,
+      observedActors:networkClient?.state
+        ?[...networkClient.state.values()].map(v=>({netId:v.netId,x:v.x,y:v.y}))
+        :[]
+    }) ?? null,
     // Localhost-only read of genuine replicated Rust server fighter state.
     // Never supplied as World/Items authority or used to alter movement.
     observedReplicatedFighters:networkClient?.state

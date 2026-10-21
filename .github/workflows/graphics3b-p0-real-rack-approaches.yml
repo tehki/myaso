@@ -4,10 +4,12 @@ on:
   pull_request:
     paths:
       - "src/browser/armory-optin-live-rack.mjs"
+      - "src/browser/armory-page-viewport-metrics.mjs"
       - "web/online-game.mjs"
       - "scripts/alpha_p0_four_native_rack_at_approaches.mjs"
       - "scripts/alpha_p0_rack_walk_math.mjs"
       - "tests/armory-optin-four-at-rack.test.mjs"
+      - "tests/armory-page-viewport-metrics.test.mjs"
       - ".github/workflows/graphics3b-p0-real-rack-approaches.yml"
 
 permissions:
@@ -24,7 +26,7 @@ jobs:
           node --check src/browser/armory-optin-live-rack.mjs
           node --check web/online-game.mjs
           node --check scripts/alpha_p0_four_native_rack_at_approaches.mjs
-          node --test tests/armory-optin-live-rack.test.mjs tests/armory-optin-native-flight-contract.test.mjs tests/armory-optin-four-at-rack.test.mjs
+          node --test tests/armory-optin-live-rack.test.mjs tests/armory-optin-native-flight-contract.test.mjs tests/armory-optin-four-at-rack.test.mjs tests/armory-page-viewport-metrics.test.mjs
           node scripts/verify-core8c-greyhaven-geometry.mjs
       - name: Verify all four real Chrome/Firefox W3C driver binaries
         run: |

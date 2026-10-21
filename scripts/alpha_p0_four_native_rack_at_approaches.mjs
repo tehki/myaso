@@ -213,6 +213,8 @@ async function fourRealBrowserOriginalRackApproaches(){
    trueOnscreenRackRectangle:arrival.armory.rackScreenRect,
    originalRackProjectedOnscreen:arrival.armory.rackIntersectsViewport,
    rackEntireSourceRectOnscreen:arrival.armory.rackFullyWithinViewport,
+   // Separate browser-page fold visibility from original intrinsic Canvas.
+   browserPageVisibility:arrival.armory.pageVisibility,
    actualCanvasPainted:arrival.armory.painted>0,
    currentVisibleSwords:arrival.armory.drawnSwords,
    w3cHorizontalPulses:horizontal,w3cVerticalPulses:vertical});
@@ -242,12 +244,19 @@ async function fourRealBrowserOriginalRackApproaches(){
  const proof={
   originalWorldFourSockets:true,realFourW3cQuicClients:true,
   genuineRustReplicatedFourPeerPositions:true,allFourOriginalRacksOnscreen:true,eachSourceRackFullyWithinViewport:true,
+  browserFoldVisibilityDiagnosed:peerViews.every(v=>v.armory.pageVisibility?.measuredFromRealDOM===true),
+  allFightersVisibleInPageViewport:peerViews.every(v=>
+    v.armory.pageVisibility?.actorCentersTotal===4&&
+    v.armory.pageVisibility?.actorCentersInsideBrowser===4),
+  allRacksFullyVisibleInBrowserPage:peerViews.every(v=>
+    v.armory.pageVisibility?.rackFullyInBrowserViewport===true),
   noCanonicalServerRackItemSource:true,noSwordsRendered:true,noTryPickup:true,
   authoritativeItemReceiptObserved:false,fullFourPlayerCombatAccepted:false,
   productionApproved:false,
   witnessed,peerViews:peerViews.map((v,i)=>({browser:clients[i].name,
     actualServerHudTick:v.tick,actualPlayerPositions:v.armory.observedReplicatedFighters,
-    originalRackScreenRect:v.armory.rackScreenRect})),captures,
+    originalRackScreenRect:v.armory.rackScreenRect,
+    browserPageVisibility:v.armory.pageVisibility})),captures,
   limitation:"one loopback CI host, original source empty rack; no authoritative sword item or weapon equip"
  };
  await writeFile(path.join(dir,"rack-approaches-report.json"),JSON.stringify(proof,null,2));
