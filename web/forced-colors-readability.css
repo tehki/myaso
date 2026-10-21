@@ -1,0 +1,52 @@
+/* U7: preserve semantic combat cues when Windows/OS forced colors is active.
+   Normal palette and all game input remain unchanged. */
+@media (forced-colors: active) {
+  .fighter-card,
+  .scoreboard,
+  .kill-feed,
+  .network-diagnostics,
+  .threat-cue,
+  .heavy-charge-indicator {
+    border-color: CanvasText;
+    color: CanvasText;
+    background: Canvas;
+  }
+
+  .meter > div {
+    background: Canvas;
+    outline: 1px solid CanvasText;
+    outline-offset: 0;
+  }
+  .meter i {
+    background: Highlight;
+  }
+  .meter > span,
+  .meter b {
+    color: CanvasText;
+  }
+
+  canvas:focus-visible,
+  .control-guide > summary:focus-visible,
+  .arena-lobby-link:focus-visible {
+    outline: 3px solid Highlight;
+    outline-offset: 2px;
+  }
+
+  /* Animated shadows are suppressed in forced colors by browsers.
+     Use a non-animated outline for the existing short-lived state flag. */
+  .arena-stage[data-combat-feedback]::after {
+    animation: none;
+    box-shadow: none;
+    opacity: 1;
+    outline: 4px solid Highlight;
+    outline-offset: -4px;
+  }
+  .arena-stage[data-combat-feedback="damage-taken"]::after,
+  .arena-stage[data-combat-feedback="guard-broken"]::after,
+  .arena-stage[data-combat-feedback="shoved"]::after,
+  .arena-stage[data-combat-feedback="rolled-over"]::after,
+  .arena-stage[data-combat-feedback="stamina-denied"]::after {
+    outline-color: CanvasText;
+    outline-style: dashed;
+  }
+}
