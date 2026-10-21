@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {WORLD_ALPHA_SWORD_RACK_SOCKETS,WORLD_ALPHA_SPAWN_COORDINATES,
   validateWorldAlphaArmoryLayout} from "../src/world/alpha-armory.mjs";
-import {nextNativeWalkPulse,nativeRackArrived,proposedNativeRackReachPoint,nativeRackWithinProposedReach,verifyNativeRackPeerConsensus} from "../scripts/alpha_p0_rack_walk_math.mjs";
+import {nextNativeWalkPulse,nativeRackArrived,proposedNativeRackReachPoint,nativeRackWithinProposedReach,verifyNativeRackPeerConsensus,verifyNativeRackRecoveryPeerConsensus} from "../scripts/alpha_p0_rack_walk_math.mjs";
 import {WORLD_ALPHA_GREYHAVEN_STATIC_SOLIDS} from "../src/world/alpha-solid-geometry.mjs";
 
 test("four canonical World socket approaches are fixed, distinct and legitimate",()=>{
@@ -146,4 +146,41 @@ test("four actual-shape snapshot observers must agree on true Rust near-sword ac
     /native rack peer consensus/);
   assert.throws(()=>verifyNativeRackPeerConsensus(views,w,slots.slice(1)),
     /native rack peer consensus/);
+});
+
+test("single-host REAL Firefox crash recovery fixture must show fresh #5, no #2 ghost, and same four rack sockets",()=>{
+  // Contract fixtures only; real native W3C Rust server acceptance is CI.
+  const ids=[1,3,4,5],sockets=WORLD_ALPHA_SWORD_RACK_SOCKETS;
+  const pick=new Map([[1,0],[3,2],[4,3],[5,1]]);
+  const frame=()=>ids.map(id=>({netId:id,x:sockets[pick.get(id)].x,y:4068}));
+  const rows=ids.map(id=>"#"+id+" - 0");
+  const peers=ids.map((id,i)=>({id,tick:501+i,
+    fighters:frame(),scoreboard:[...rows]}));
+  const result=verifyNativeRackRecoveryPeerConsensus(peers,sockets,500);
+  assert.deepEqual(result.liveIds,ids);
+  assert.equal(result.rejectedGhostPlayerId,2);
+  assert.equal(result.maxPeerDrift,0);
+  assert.equal(result.liveSwordOwnershipProven,false);
+  assert.equal(result.characterIdentityRecoveryProven,false);
+  const cases=[
+    v=>{v[0].fighters[0].x+=9}, // still in nominal 56 but peer mismatch
+    v=>{v[1].fighters[3].netId=2}, // removed Firefox ghost instead of #5
+    v=>{v[2].fighters.push({netId:6,x:3780,y:4068})}, // fifth actor
+    v=>{v[0].id=2}, // dead observer reappeared
+    v=>{v[2].tick=500}, // no fresh authoritative tick
+    v=>{v[3].scoreboard.push("#2 - ghost")}, // scoreboard stale even when state clean
+    v=>{v[3].scoreboard=v[3].scoreboard.filter(x=>!x.startsWith("#5"))},
+    v=>{v[1].fighters[3].x=3820}, // wrong rack #2 vs #3
+    v=>{v[1].fighters[3].y=4100}, // old stand outside reviewed 56 reach
+    v=>{v[2].fighters[0].y=NaN},
+  ];
+  for(const mutate of cases){
+    const bad=structuredClone(peers);mutate(bad);
+    assert.throws(()=>verifyNativeRackRecoveryPeerConsensus(bad,sockets,500),
+      /native rack crash recovery/);
+  }
+  assert.throws(()=>verifyNativeRackRecoveryPeerConsensus(peers,sockets,600),
+    /native rack crash recovery/);
+  assert.throws(()=>verifyNativeRackRecoveryPeerConsensus(peers,sockets.slice(0,3),500),
+    /native rack crash recovery/);
 });
