@@ -232,6 +232,15 @@ jobs:
           # A red M121/other milestone must not mask M41's immediate status.
           node scripts/pvp_browser_flight_runner.mjs
 
+      - name: Validate M194 native block-only pressure after trusted wheel age
+        env:
+          MYASO_PVP_SCENARIO: "uiguardbreak"
+        run: |
+          # Real Chrome/Firefox against unmodified 125/240ms block rules.
+          # Require three real 38-guard blocks; no parry, HP loss or fake input.
+          node --test tests/m194-native-block-age.test.mjs
+          node scripts/pvp_browser_flight_runner.mjs
+
       - name: Validate M188 repeated real heavy counterplay windows
         run: |
           # Three fresh Chrome/Firefox sessions for each real defensive read.
