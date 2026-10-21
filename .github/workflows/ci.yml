@@ -86,10 +86,13 @@ jobs:
       - name: Validate R2 responsive controls, server-style dash and combat geometry
         run: |
           node --check src/browser/dash-input.mjs
+          node --check src/browser/input-send-clock.mjs
           node --check src/browser/left-button-charge.mjs
           node --check web/online-game.mjs
           node --check web/game.mjs
           node --test tests/r2-combat-controls.test.mjs tests/r1-lmb-charge-heavy.test.mjs
+          node --test tests/input-send-clock.test.mjs
+          node --test tests/input-queue-evidence.test.mjs
 
       - name: Validate realtime networking JavaScript
         run: |
@@ -239,6 +242,27 @@ jobs:
           # Additive focused qualification. Preserve the original strict M121
           # at its late position to retain contention/recovery coverage.
           node --test tests/m121-native-directional-strafe.test.mjs
+          node scripts/pvp_browser_flight_runner.mjs
+
+      - name: Validate M194 native block-only pressure after trusted wheel age
+        env:
+          MYASO_PVP_SCENARIO: "uiguardbreak"
+        run: |
+          # Real Chrome/Firefox genuine wheel and LMB, unmodified combat 125/240ms.
+          # Three actual -38 guard exchanges, zero parry/HP loss, no fake inputs.
+          node --test tests/m194-native-block-age.test.mjs
+          node scripts/pvp_browser_flight_runner.mjs
+
+      - name: Validate First Playable M144 real jump-chord recovery before unrelated gates
+        env:
+          MYASO_PVP_SCENARIO: "uimultirecoveryffa"
+        run: |
+          # Additional authentic THREE-browser / server FFA acceptance.
+          # Preserve the original M144 late protected gate unchanged.
+          # On RED, M337 telemetry proves real submitted client intent;
+          # admission/simulation proof is independent and cannot be faked.
+          node --check web/online-game.mjs
+          node --test tests/m337-first-playable-jump-input-proof.test.mjs tests/r1-m144-lead-headroom.test.mjs
           node scripts/pvp_browser_flight_runner.mjs
 
       - name: Validate M188 repeated real heavy counterplay windows
@@ -644,6 +668,8 @@ jobs:
         run: |
           node --check web/online-game.mjs
           node --check scripts/pvp_browser_flight_runner.mjs
+          node --check scripts/m147-recovery-cue-receipt.mjs
+          node --test tests/m147-recovery-cue-receipt.test.mjs
           node --test --test-name-pattern="FFA recovery focus|authoritative opponent recovery" tests/m29-combat-readability.test.mjs
           node scripts/pvp_browser_flight_runner.mjs
 
@@ -677,7 +703,8 @@ jobs:
           node --check scripts/pvp_browser_flight_runner.mjs
           node --check scripts/m201-authoritative-phase-proof.mjs
           node --test tests/m201-authoritative-phase-proof.test.mjs
-          node --test tests/r2-m205-guard-break-sampling.test.mjs\n          node --test tests/m41-native-release-led-parry.test.mjs
+          node --test tests/r2-m205-guard-break-sampling.test.mjs
+          node --test tests/m41-native-release-led-parry.test.mjs
           node --test --test-name-pattern="FFA guard-break punish focus|zero-guard stun|authoritative opponent guard break" tests/m29-combat-readability.test.mjs
           # Fresh actual Chrome/Firefox/Chrome2 processes per iteration. The
           # acceptance runner starts a NEW Rust loopback server and all three
@@ -707,6 +734,8 @@ jobs:
           node --check web/online-game.mjs
           node --check scripts/pvp_browser_flight_runner.mjs
           node --test --test-name-pattern="FFA knockdown punish focus|kick stun|shoved or rolled over|knockdown owns" tests/m29-combat-readability.test.mjs
+          node --check scripts/m155-native-staging.mjs
+          node --test tests/m155-native-staging.test.mjs tests/m147-recovery-cue-receipt.test.mjs tests/m206-knockdown-punish-proof.test.mjs
           node scripts/pvp_browser_flight_runner.mjs
 
       - name: Validate M157 knockdown arbitration contract
@@ -747,6 +776,7 @@ jobs:
         run: |
           node --check web/online-game.mjs
           node --check scripts/pvp_browser_flight_runner.mjs
+          node --test tests/m161-opening-kick-proof.test.mjs
           node --test --test-name-pattern="kick cannot refresh|kick knockdown" tests/combat-model.test.mjs
           node scripts/pvp_browser_flight_runner.mjs
 
@@ -806,6 +836,8 @@ jobs:
           node --check src/browser/combat-readability.mjs
           node --check web/online-game.mjs
           node --check scripts/pvp_browser_flight_runner.mjs
+          node --check scripts/m156-roll-knockdown-proof.mjs
+          node --test tests/m156-roll-knockdown-proof.test.mjs
           node --test tests/r1-m156-knockdown-light-latency.test.mjs tests/r1-m237-m156-short-click-early-commit.test.mjs
           node --test --test-name-pattern="FFA knockdown punish focus|roll collision|knockdown owns" tests/m29-combat-readability.test.mjs
           node scripts/pvp_browser_flight_runner.mjs

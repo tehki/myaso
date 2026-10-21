@@ -9,13 +9,30 @@
 // native cross-browser event ordering before accepting HP/guard/parry proof.
 import { setTimeout as sleepTimer } from "node:timers/promises";
 
+export function planM194TrustedWheelDelay({ eventEpochMs, nowEpochMs, targetAgeMs }) {
+  if (![eventEpochMs, nowEpochMs, targetAgeMs].every(Number.isFinite)
+    || targetAgeMs <= 0 || targetAgeMs > 60) {
+    throw new TypeError("M194 requires the real native wheel epoch and bounded target age");
+  }
+  const receiptAgeMs = nowEpochMs - eventEpochMs;
+  // Same-host browser epoch only schedules native input. It never certifies
+  // server admission. Leave headroom for the unchanged 135ms windup and input
+  // sampling before 240ms expires; stale/future reports cannot start a strike.
+  if (receiptAgeMs < 0 || receiptAgeMs > 70) {
+    throw new Error("M194 trusted wheel receipt is stale or from a future clock");
+  }
+  return { receiptAgeMs, remainingMs: Math.max(0, targetAgeMs - receiptAgeMs) };
+}
+
 export async function dispatchR2ReleaseLedShortBlock({
   sendAttackDown, sendWheel, awaitTrustedWheel, sendAttackUp,
   now = () => performance.now(), sleep = sleepTimer,
   maxHoldMs = 280, receiptGraceMs = 100, trustedWheelWaitMs = 0,
   postTrustedWheelMs = 0,
+  compensateWheelReceipt = false, nowEpoch = () => Date.now(),
+  awaitServerBlock,
 }) {
-  if (![sendAttackDown, sendWheel, awaitTrustedWheel, sendAttackUp, now, sleep]
+  if (![sendAttackDown, sendWheel, awaitTrustedWheel, sendAttackUp, now, sleep, nowEpoch]
     .every(fn => typeof fn === "function")
     || !Number.isFinite(maxHoldMs) || maxHoldMs < 10 || maxHoldMs >= 320
     || !Number.isFinite(receiptGraceMs) || receiptGraceMs < 0
@@ -25,7 +42,11 @@ export async function dispatchR2ReleaseLedShortBlock({
     || !Number.isFinite(postTrustedWheelMs) || postTrustedWheelMs < 0
     || postTrustedWheelMs > 60
     || (postTrustedWheelMs > 0 && trustedWheelWaitMs === 0)
-    || trustedWheelWaitMs + postTrustedWheelMs >= maxHoldMs) {
+    || trustedWheelWaitMs + postTrustedWheelMs >= maxHoldMs
+    || typeof compensateWheelReceipt !== "boolean"
+    || (compensateWheelReceipt && postTrustedWheelMs === 0)
+    || (awaitServerBlock !== undefined && (typeof awaitServerBlock !== "function"
+      || compensateWheelReceipt || trustedWheelWaitMs === 0))) {
     throw new TypeError("R2 guard-break requires bounded genuine W3C held-release and attestation");
   }
   const startedAt = now();
@@ -40,13 +61,20 @@ export async function dispatchR2ReleaseLedShortBlock({
     error => { wheelAckMs = ms(); return { ok: false, error }; },
   );
   let trustedWheelObservedMs = null;
+  let trustedWheelReport = null;
   const attestation = Promise.resolve().then(awaitTrustedWheel).then(report => {
     if (report?.trusted !== true || !(report.deltaY > 0)) {
       throw new Error("R2 guard-break requires a trusted real Firefox wheel-back event");
     }
     trustedWheelObservedMs = ms();
+    trustedWheelReport = report;
     return report;
   });
+  // In admission-led mode the real report may arrive after native release.
+  // Retain rejection as required evidence without an unhandled promise race.
+  const attestationOutcome = attestation.then(
+    () => ({ ok: true }), error => ({ ok: false, error }),
+  );
   const earlyWheelFailure = wheelOutcome.then(result =>
     result.ok ? new Promise(() => {}) : Promise.reject(result.error));
   // On a fast native delivery release immediately. On a slow *receipt* release
@@ -64,7 +92,19 @@ export async function dispatchR2ReleaseLedShortBlock({
   // Wait for the pre-established low-latency trusted WebSocket receipt before
   // this one LMB-up. A 190ms fail-closed ceiling prevents heavy commitment.
   // Other scenarios retain their existing 100ms receipt-grace behavior.
-  if (trustedWheelWaitMs > 0) {
+  let serverBlockProof = null;
+  let serverBlockObservedMs = null;
+  if (awaitServerBlock) {
+    serverBlockProof = await Promise.race([
+      Promise.resolve().then(awaitServerBlock), earlyWheelFailure,
+      sleep(trustedWheelWaitMs).then(() => { throw new Error("M194 server Block not observed within release budget"); }),
+    ]);
+    if (!Number.isSafeInteger(serverBlockProof?.serverTick) || serverBlockProof.serverTick < 0
+      || !Number.isSafeInteger(serverBlockProof?.fighterId) || serverBlockProof.fighterId < 1) {
+      throw new Error("M194 requires actual authoritative Block admission");
+    }
+    serverBlockObservedMs = ms();
+  } else if (trustedWheelWaitMs > 0) {
     await Promise.race([
       attestation,
       sleep(trustedWheelWaitMs).then(() => { throw new Error("M194 trusted native wheel not delivered within light-release budget"); }),
@@ -73,13 +113,21 @@ export async function dispatchR2ReleaseLedShortBlock({
   } else {
     await Promise.race([attestation, sleep(receiptGraceMs), earlyWheelFailure]);
   }
-  // M205 only: on a real W3C wheel receipt, give the genuine defensive
-  // input one bounded sampling interval before committing the single light
-  // release. Prior quality #39498986465 observed a genuine parry at 6
-  // authoritative 60Hz ticks after wheel activation; a guarded hit requires
-  // the unchanged 125..240ms short-block interval. This is scheduling, not
-  // a change to any combat constant, input provenance, or strict assertion.
-  if (postTrustedWheelMs > 0) await sleep(postTrustedWheelMs);
+  // Scoped M194/M205 release immediately after real server Block admission.
+  // Even the earliest next-tick light commitment reaches active after the
+  // unchanged parry interval. A DOM-receipt sampling wait is unnecessary.
+  // Report latency cannot prolong the strike; native attestation still must
+  // complete below, and original HP/guard/parry proof remains mandatory.
+  const wheelReceiptTiming = compensateWheelReceipt ? planM194TrustedWheelDelay({
+    eventEpochMs: trustedWheelReport?.eventEpochMs, nowEpochMs: nowEpoch(),
+    targetAgeMs: postTrustedWheelMs,
+  }) : null;
+  const remainingWheelDelayMs = wheelReceiptTiming?.remainingMs ?? postTrustedWheelMs;
+  if (remainingWheelDelayMs > 0) await sleep(remainingWheelDelayMs);
+  const wheelReleaseAgeMs = compensateWheelReceipt ? planM194TrustedWheelDelay({
+    eventEpochMs: trustedWheelReport.eventEpochMs, nowEpochMs: nowEpoch(),
+    targetAgeMs: postTrustedWheelMs,
+  }).receiptAgeMs : null;
   const attackUpDispatchMs = ms();
   if (attackUpDispatchMs - attackDownDispatchMs > maxHoldMs) {
     throw new Error("R2 genuine LMB hold exceeded light-charge budget before release; no strike allowed");
@@ -89,7 +137,8 @@ export async function dispatchR2ReleaseLedShortBlock({
   // Both external observations remain mandatory even if Chrome already
   // released during a delayed wheel receipt. A rejected W3C wheel or missing
   // trusted DOM event can NEVER produce a passing acceptance run.
-  await attestation;
+  const attested = await attestationOutcome;
+  if (!attested.ok) throw attested.error;
   const wheelResult = await wheelOutcome;
   if (!wheelResult.ok) throw wheelResult.error;
   const rounded = n => Number(n.toFixed(1));
@@ -105,6 +154,10 @@ export async function dispatchR2ReleaseLedShortBlock({
     receiptGraceMs,
     wheelHeadStartMs: 0,
     postTrustedWheelMs: rounded(postTrustedWheelMs),
+    wheelReceiptTiming,
+    wheelReleaseAgeMs,
+    serverBlockProof,
+    serverBlockObservedMs,
     clickHoldMs: rounded(attackUpDispatchMs - attackDownDispatchMs),
   };
 }

@@ -30,8 +30,10 @@ export function createM221TrustedWheelRegistry({ timeoutMs = 750 } = {}) {
       || !(packet.deltaY > 0) || !Number.isFinite(packet.deltaY)) return false;
     const entry = outstanding.get(packet.token);
     if (!entry) return false;
+    if (packet.eventEpochMs !== undefined && !Number.isFinite(packet.eventEpochMs)) return false;
     outstanding.delete(packet.token);
-    entry.resolve({ trusted: true, deltaY: packet.deltaY });
+    entry.resolve({ trusted: true, deltaY: packet.deltaY,
+      ...(packet.eventEpochMs !== undefined ? { eventEpochMs: packet.eventEpochMs } : {}) });
     return true;
   }
   return Object.freeze({ issue, receive });

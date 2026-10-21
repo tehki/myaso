@@ -93,7 +93,9 @@ test("M205 preserves original zero-parry, -38 guard, 34HP server proof and stric
   const source = readFileSync(new URL("../scripts/pvp_browser_flight_runner.mjs", import.meta.url), "utf8");
   const scenario = source.slice(source.indexOf("async function runOnlineUiGuardBreakFlight("),
     source.indexOf("async function waitForUiGuardBreakEvidence("));
-  assert.match(scenario, /postTrustedWheelMs: scenario === "uiguardbreakpunishffahit" \? 40 : 0/);
+  assert.match(scenario, /postTrustedWheelMs:\s*0/);
+  assert.match(scenario, /awaitServerBlock:\s*\["uiguardbreak", "uiguardbreakpunishffahit"\]\.includes\(scenario\)/);
+  assert.match(scenario, /awaitM194ServerBlock\(/);
   for (const required of [
     'if (!trustedWheelBeforeRelease)', 'M193 guard-break exchange',
     'feedbackTransitions.includes("parried")', 'defenderState?.playerHp !== 100',

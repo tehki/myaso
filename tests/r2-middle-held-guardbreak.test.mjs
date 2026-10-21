@@ -45,8 +45,11 @@ test("R2 adds hold-block acceptance WITHOUT disabling original strict M194 wheel
   assert.match(heldRelease, /wheelHeadStartMs: 0/);
   assert.match(heldRelease, /postTrustedWheelMs = 0/);
   assert.match(heldRelease, /postTrustedWheelMs: rounded\(postTrustedWheelMs\)/);
-  // The legacy middle-button and M194 paths preserve zero extra delay;
-  // only M205 uses the attested wheel + bounded native input sample.
-  assert.match(guardBreak, /postTrustedWheelMs: scenario === "uiguardbreakpunishffahit" \? 40 : 0/);
+  // Middle-button hold remains a separate unchanged native pointer path.
+  // Only M194 and M205 use an attested wheel + exact server Block admission,
+  // and their original strict no-parry/-38 guard/100HP gates remain intact.
+  assert.match(guardBreak, /postTrustedWheelMs:\s*0/);
+  assert.match(guardBreak, /awaitServerBlock:\s*\["uiguardbreak", "uiguardbreakpunishffahit"\]\.includes\(scenario\)/);
+  assert.match(guardBreak, /fighterId: defenderReady\.playerNetId/);
   assert.match(heldRelease, /receiptGraceMs = 100/);
 });

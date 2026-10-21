@@ -3,7 +3,7 @@
 // nor this endpoint can inject browser inputs or mutate game/server state.
 import { createHash } from "node:crypto";
 
-export function attachM325TrustedWheelSocket(server, registry) {
+export function attachM325TrustedWheelSocket(server, registry, { m147Receipt = null } = {}) {
   const sockets = new Set();
   server.on("upgrade", (request, socket, head) => {
     try {
@@ -12,7 +12,8 @@ export function attachM325TrustedWheelSocket(server, registry) {
       const local = socket.remoteAddress === "127.0.0.1"
         || socket.remoteAddress === "::1" || socket.remoteAddress === "::ffff:127.0.0.1";
       const url = new URL(request.url ?? "/", "http://127.0.0.1");
-      if (url.pathname !== "/__myaso_m325_trusted_wheel"
+      const isM147 = Boolean(m147Receipt) && url.pathname === "/__myaso_m147_cue";
+      if ((url.pathname !== "/__myaso_m325_trusted_wheel" && !isM147)
         || !local || origin !== "http://" + request.headers.host
         || request.headers.upgrade?.toLowerCase() !== "websocket"
         || request.headers["sec-websocket-version"] !== "13"
@@ -40,7 +41,7 @@ export function attachM325TrustedWheelSocket(server, registry) {
             length = buffer.readUInt16BE(2);
             offset = 4;
           }
-          if (length > 512) return socket.destroy();
+          if (length > (isM147 ? 1024 : 512)) return socket.destroy();
           if (buffer.length < offset + 4 + length) return;
           const mask = buffer.subarray(offset, offset + 4);
           const data = buffer.subarray(offset + 4, offset + 4 + length);
@@ -49,7 +50,8 @@ export function attachM325TrustedWheelSocket(server, registry) {
           buffer = buffer.subarray(offset + 4 + length);
           try {
             const packet = JSON.parse(payload.toString("utf8"));
-            registry.receive(packet); // Rejects stale, untrusted, wrong-direction tokens.
+            // Keep the observational M147 cue separate from wheel provenance.
+            (isM147 ? m147Receipt : registry).receive(packet);
           } catch {
             socket.destroy();
             return;

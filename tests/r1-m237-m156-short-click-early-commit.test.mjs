@@ -17,7 +17,10 @@ test("M237 real M156 light releases in 5ms after authentic victim knockdown", ()
   assert.ok(s.includes("punishUp.epochMs <= punishDown.epochMs"));
   assert.ok(s.includes("punishUp.epochMs - punishDown.epochMs >= 320"));
   assert.ok(s.includes("punishDown.epochMs < conversion.knockdownTransition.epochMs"));
-  assert.ok(s.includes("punishActive.epochMs >= knockdownEndEpochMs || !attackPrecedesRecovery"));
+  assert.ok(s.includes("verifyM156RollKnockdownPunish("));
+  assert.ok(s.includes("m201ServerOutput().slice(conversion.rollAuthOffset)"));
+  assert.ok(s.includes("if (!attackPrecedesRecovery)"));
+  assert.ok(s.includes("punishDown.epochMs >= knockdownEndEpochMs"));
   assert.ok(s.includes("verifiedSameTickHit"));
   assert.ok(s.includes('defenderState.events.includes("Hit taken - 34 HP.")'));
   assert.ok(s.includes("defenderState?.playerHp === 66 && defenderState?.playerGuard === 100"));

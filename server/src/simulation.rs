@@ -242,6 +242,7 @@ pub struct Fighter {
     pub recently_interacted_with: Option<u32>,
     latest_input: InputIntent,
     pending_attack: bool,
+    pending_light_input: Option<InputIntent>,
     pending_heavy_attack: bool,
     pending_dodge: bool,
     pending_kick: bool,
@@ -295,6 +296,7 @@ impl Fighter {
             recently_interacted_with: None,
             latest_input: InputIntent::default(),
             pending_attack: false,
+            pending_light_input: None,
             pending_heavy_attack: false,
             pending_dodge: false,
             pending_kick: false,
@@ -351,6 +353,16 @@ impl Fighter {
             // An all-zero transition is still cancellation, never a strike.
             self.pending_attack = input.attack;
             self.pending_heavy_attack = input.heavy_attack;
+            self.pending_light_input = None;
+        }
+        if input.attack
+            && !input.heavy_attack
+            && (!self.latest_input.attack || self.latest_input.heavy_attack)
+        {
+            // Release commits direction as well as the attack bit. A later
+            // neutral packet before world.step must not turn a real sweep
+            // into an ordinary light or erase its running qualification.
+            self.pending_light_input = Some(input);
         }
         self.pending_attack |= input.attack && !self.latest_input.attack;
         self.pending_heavy_attack |= input.heavy_attack && !self.latest_input.heavy_attack;
@@ -368,11 +380,26 @@ impl Fighter {
         input.kick |= self.pending_kick;
         input.jump |= self.pending_jump;
         input.dash |= self.pending_dash;
+        if input.attack
+            && !input.heavy_attack
+            && !input.dodge
+            && !input.kick
+            && !input.jump
+            && !input.dash
+        {
+            if let Some(committed) = self.pending_light_input {
+                input.move_x = committed.move_x;
+                input.move_y = committed.move_y;
+                input.facing_radians = committed.facing_radians;
+                input.run = committed.run;
+            }
+        }
         input
     }
 
     fn clear_pending_actions(&mut self) {
         self.pending_attack = false;
+        self.pending_light_input = None;
         self.pending_heavy_attack = false;
         self.pending_dodge = false;
         self.pending_kick = false;
@@ -1804,6 +1831,82 @@ mod r2_combat_control_tests {
                 "latest release intent must beat pending held bits"
             );
         }
+    }
+
+    #[test]
+    fn directional_release_survives_neutral_input_before_server_tick() {
+        for sampled_hold in [false, true] {
+            for (move_y, expected) in [
+                (-1.0, Action::AttackLeftWindup),
+                (1.0, Action::AttackRightWindup),
+            ] {
+                let mut world = World::new(800.0, 600.0);
+                world.add_player_at(1, 250.0, 300.0, 0.0);
+                world.set_input(
+                    1,
+                    InputIntent {
+                        attack: true,
+                        heavy_attack: true,
+                        ..InputIntent::default()
+                    },
+                );
+                if sampled_hold {
+                    world.step();
+                }
+                world.set_input(
+                    1,
+                    InputIntent {
+                        attack: true,
+                        move_y,
+                        ..InputIntent::default()
+                    },
+                );
+                // A real key-up/neutral datagram may arrive in the same
+                // server tick as the one-shot, directional LMB release.
+                world.set_input(1, InputIntent::default());
+                world.step();
+                assert_eq!(world.fighter(1).unwrap().action, expected);
+                for _ in 0..100 {
+                    world.step();
+                }
+                assert_eq!(world.fighter(1).unwrap().action, Action::Idle);
+                world.set_input(
+                    1,
+                    InputIntent {
+                        attack: true,
+                        ..InputIntent::default()
+                    },
+                );
+                world.step();
+                assert_eq!(world.fighter(1).unwrap().action, Action::AttackWindup);
+            }
+        }
+    }
+
+    #[test]
+    fn pending_light_context_does_not_redirect_a_newer_roll() {
+        let mut world = World::new(800.0, 600.0);
+        world.add_player_at(1, 250.0, 300.0, 0.0);
+        world.set_input(
+            1,
+            InputIntent {
+                attack: true,
+                move_y: -1.0,
+                ..InputIntent::default()
+            },
+        );
+        world.set_input(
+            1,
+            InputIntent {
+                dodge: true,
+                facing_radians: std::f32::consts::FRAC_PI_2,
+                ..InputIntent::default()
+            },
+        );
+        world.step();
+        let fighter = world.fighter(1).unwrap();
+        assert_eq!(fighter.action, Action::Dodge);
+        assert!(fighter.y > 300.0);
     }
 
     #[test]

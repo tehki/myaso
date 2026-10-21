@@ -1,4 +1,7 @@
+import { recordM161IngressTrace } from "../src/browser/m161-ingress-trace.mjs";
 import { createFrameBudget } from "../src/browser/frame-budget.mjs";
+import { createInputSendClock } from "../src/browser/input-send-clock.mjs";
+import { inputQueueReplacementEvidence } from "../src/browser/input-queue-evidence.mjs";
 import { recordM233RecoveryHandoff } from "../src/browser/m233-recovery-handoff-trace.mjs";
 import { installRightButtonGesture } from "../src/browser/right-button-gesture.mjs";
 import { createDirectionalDash } from "../src/browser/dash-input.mjs";
@@ -169,10 +172,14 @@ const fixedStepMs = 1000 / NETWORK.clientPredictionHz;
 const frameBudget = createFrameBudget({ stepMs: fixedStepMs, maxFrameDeltaMs: 50, maxStepsPerFrame: 6 });
 let networkClient = null;
 let animationFrameId = 0;
-let predictionStep = 0;
 let clientTick = 0;
 const BACKGROUND_LIVENESS_INTERVAL_MS = 5000;
 let backgroundLivenessTimer = null;
+const inputSendClock = createInputSendClock({
+  send: submitPlayerInput,
+  shouldSend: () => Boolean(networkClient) && !document.hidden,
+  intervalMs: 2000 / NETWORK.clientPredictionHz,
+});
 let attackRequested = false;
 let runningAttackRequested = false;
 let committedLightMove = null;
@@ -354,9 +361,11 @@ networkClient = await connectAuthoritativeClient({
       else if (Number.isFinite(own.stamina)) local.stamina = own.stamina;
     }
     observeCombatState(state);
+    captureM161Ingress("datagram", state);
   },
   onReliableSnapshot(_result, state) {
     observeCombatState(state);
+    captureM161Ingress("reliable", state);
   },
   onKillEvent(event) {
     recordKillEvent(event);
@@ -383,6 +392,24 @@ networkClient = await connectAuthoritativeClient({
     networkStatus = `Online - player #${ownId} - server tick ${networkClient.latestServerTick}`;
   },
 });
+
+function captureM161Ingress(source, state) {
+  // Capture actual client-ingested state provenance only for the strict native
+  // M161 flight. This neither affects game state nor fabricates a transition.
+  if (acceptanceScenario !== "uikickknockdownbounded") return;
+  const acceptance = window.__MYASO_ACCEPTANCE_STATE__;
+  const ownId = networkClient?.playerNetId;
+  if (!acceptance || !ownId) return;
+  acceptance.m161Ingress = recordM161IngressTrace(
+    acceptance.m161Ingress ?? [], {
+      source,
+      serverTick: networkClient.latestServerTick,
+      ownAction: state.get(ownId)?.action,
+      focusAction: acceptance.focusNetId ? state.get(acceptance.focusNetId)?.action : null,
+      epochMs: Date.now(),
+    },
+  );
+}
 
 function observeCombatState(state) {
   const ownId = networkClient?.playerNetId;
@@ -425,7 +452,7 @@ function observeThreatCommitment(state, ownId) {
 }
 
 function recordAcceptanceState(state, ownId) {
-  if (!["uirollbuffer", "uijumpbuffer", "uijumpattack", "uijumpattackinputloss", "uijumpattackpunish", "uijumpattacktelegraph", "uijumprecoveryffa", "uijumppunishffa", "uimultirecoveryffa", "uimultirecoveryspatial", "uimultirecoverypunish", "uiparrypunishwindow", "uiparrypunishffa", "uiparrypunishffahit", "uiguardbreakpunishffa", "uiguardbreakpunishffahit", "uikickknockdownffa", "uikickknockdownffahit", "uikickknockdownbounded", "uirollknockdownbounded", "uirollknockdownffahit", "uimultiknockdownffa", "uimultiknockdownffahit", "uirollknockdownffa", "uistaminaauth", "uistaminaexhaustion", "uistaminafeedback", "uistaminaconfirmed", "uifeint", "uiheavyblock", "uiheavyparry", "uijumpffaprimary", "uijumpffasecondary", "uijumpattackblock", "uijumpattackparry", "uijumpattackdodge", "uijumpattackbuffer", "uikickbuffer"].includes(acceptanceScenario)) return;
+  if (!["uirollbuffer", "uijumpbuffer", "uijumpattack", "uijumpattackinputloss", "uijumpattackpunish", "uijumpattacktelegraph", "uijumprecoveryffa", "uijumppunishffa", "uimultirecoveryffa", "uimultirecoveryspatial", "uimultirecoverypunish", "uiparrypunishwindow", "uiparrypunishffa", "uiparrypunishffahit", "uiguardbreakpunishffa", "uiguardbreakpunishffahit", "uikickknockdownffa", "uikickknockdownffahit", "uikickknockdownbounded", "uirollknockdownbounded", "uirollknockdownffahit", "uimultiknockdownffa", "uimultiknockdownffahit", "uirollknockdownffa", "uistaminaauth", "uistaminaexhaustion", "uistaminafeedback", "uistaminaconfirmed", "uifeint", "uiheavyblock", "uiheavyparry", "uijumpffaprimary", "uijumpffasecondary", "uijumpattackblock", "uijumpattackparry", "uijumpattackdodge", "uijumpattackbuffer", "uikickbuffer", "uithreat", "uithreatbearing"].includes(acceptanceScenario)) return;
   const focusNetId = fighterGuardBreakPunishNetId(state, ownId)
     || fighterParryPunishNetId(state, ownId)
     || fighterKnockdownPunishNetId(state, ownId)
@@ -463,7 +490,9 @@ function recordAcceptanceState(state, ownId) {
       acceptance.serverTick,
     );
   }
-  if (acceptanceScenario === "uiparrypunishffahit"
+  if (acceptanceScenario === "uijumppunishffa"
+    || acceptanceScenario === "uikickknockdownffahit"
+    || acceptanceScenario === "uiparrypunishffahit"
     || acceptanceScenario === "uirollknockdownbounded"
     || acceptanceScenario === "uimultiknockdownffa"
     || acceptanceScenario === "uimultiknockdownffahit"
@@ -474,9 +503,22 @@ function recordAcceptanceState(state, ownId) {
       x: fighter.x,
       y: fighter.y,
       action: fighter.action,
+      hp: fighter.hp,
+      guard: fighter.guard,
     }));
   }
   const epochMs = Date.now();
+  if (acceptanceScenario === "uithreat" || acceptanceScenario === "uithreatbearing") {
+    const rows = acceptance.threatReplicaTransitions ??= [];
+    const own = state.get(ownId);
+    for (const peer of state.values()) {
+      if (peer.netId === ownId || rows.findLast(row => row.netId === peer.netId)?.action === peer.action) continue;
+      rows.push({ netId: peer.netId, action: peer.action, x: peer.x, y: peer.y,
+        facing: peer.facing, ownX: own?.x, ownY: own?.y,
+        serverTick: acceptance.serverTick, epochMs });
+      if (rows.length > 64) rows.shift();
+    }
+  }
   recordAcceptanceAction(
     acceptance.ownActionTransitions,
     state.get(ownId)?.action,
@@ -692,7 +734,20 @@ function updateMouse(event) {
   mouse.y = ((event.clientY - rect.top) / rect.height) * canvas.height;
 }
 
-function releaseInputs() {
+function releaseInputs(reason = "lifecycle") {
+  if (acceptanceScenario === "uimultirecoveryspatial" || acceptanceScenario === "uimultirecoveryffa") {
+    const debug = window.__MYASO_ACCEPTANCE_STATE__;
+    if (debug) {
+      debug.clearedInputIntents ??= [];
+      debug.clearedInputIntents.push({
+        epochMs: Date.now(), reason: typeof reason === "string" ? reason : reason?.type,
+        hidden: document.hidden, focused: document.hasFocus(),
+        attack: attackRequested, heavyAttack: heavyAttackRequested,
+        jump: jumpRequested, leftButtonDown,
+      });
+      if (debug.clearedInputIntents.length > 8) debug.clearedInputIntents.shift();
+    }
+  }
   keys.clear();
   dashGesture.clearTaps();
   dashRequested = false;
@@ -750,15 +805,20 @@ function sampleInput() {
 function simulatePrediction(stepMs) {
   sampleInput();
   if (!matchOver && local.initialized) predictMovement(currentInput, stepMs);
-  predictionStep += 1;
-  if (predictionStep % 2 === 0 && networkClient) {
+}
+
+function submitPlayerInput() {
+  if (networkClient && !document.hidden) {
+    sampleInput();
+    const traceInput = acceptanceScenario === "uimultirecoveryspatial" || acceptanceScenario === "uimultirecoveryffa";
+    const queuedBeforeSend = traceInput ? networkClient.transport.latestRealtime : null;
     const outgoingTick = clientTick;
     markStaminaDenialSubmitted(outgoingTick, currentInput);
-    // M336: read-only, scenario-scoped input-plane provenance. A real DOM
-    // Space+LMB without authoritative action may mean no 30Hz input sampled
+    // M336/M337: read-only, scenario-scoped input-plane provenance for BOTH
+    // M144 and M145. This records the actual independent 60Hz input sample
     // during the genuine W3C hold. Record what the production sender actually
     // submitted, with no replay, network payload or gameplay change.
-    if (acceptanceScenario === "uimultirecoveryspatial") {
+    if (acceptanceScenario === "uimultirecoveryspatial" || acceptanceScenario === "uimultirecoveryffa") {
       const debug = window.__MYASO_ACCEPTANCE_STATE__;
       if (debug) {
         debug.lastSubmittedClientTick = outgoingTick;
@@ -786,6 +846,15 @@ function simulatePrediction(stepMs) {
     jumpRequested = false;
     dashRequested = false;
     dashMove = null;
+    if (queuedBeforeSend) {
+      const evidence = inputQueueReplacementEvidence(queuedBeforeSend, networkClient.transport.latestRealtime);
+      const debug = window.__MYASO_ACCEPTANCE_STATE__;
+      if (evidence && debug) {
+        debug.inputQueueLosses ??= [];
+        debug.inputQueueLosses.push({ epochMs: Date.now(), ...evidence });
+        if (debug.inputQueueLosses.length > 8) debug.inputQueueLosses.shift();
+      }
+    }
   }
 }
 
@@ -1828,6 +1897,7 @@ function sendBackgroundLiveness() {
 function handleVisibilityChange() {
   releaseInputs();
   if (document.hidden) {
+    inputSendClock.stop();
     if (animationFrameId) cancelAnimationFrame(animationFrameId);
     animationFrameId = 0;
     frameBudget.reset();
@@ -1848,6 +1918,7 @@ function handleVisibilityChange() {
   snapshotRenderClock.reset();
   if (renderGapTelemetry) renderGapTelemetry.reset();
   visualCamera.reset();
+  inputSendClock.start();
   if (!animationFrameId) animationFrameId = requestAnimationFrame(frame);
 }
 
@@ -1855,6 +1926,7 @@ function clamp(value, min, max) {
   return Math.max(min, Math.min(max, value));
 }
 
+if (!document.hidden) inputSendClock.start();
 render();
 frameBudget.reset(performance.now());
 animationFrameId = requestAnimationFrame(frame);

@@ -354,7 +354,13 @@ async fn main() -> Result<()> {
                 state.refresh_replication_frame();
             }
 
-            let result = handle_connection(connection, player_id, Arc::clone(&game)).await;
+            let result = handle_connection(
+                connection,
+                player_id,
+                Arc::clone(&game),
+                flight_action_proof,
+            )
+            .await;
             {
                 let mut state = game.state.lock().await;
                 state.world.remove_player(player_id);
@@ -531,6 +537,7 @@ async fn handle_connection(
     connection: Connection,
     player_id: u32,
     game: Arc<SharedGame>,
+    flight_action_proof: bool,
 ) -> Result<()> {
     let stable_id = connection.stable_id();
     let remote = connection.remote_address();
@@ -542,6 +549,8 @@ async fn handle_connection(
     let mut last_input_sequence = None;
     let mut dropped_action_ticks = VecDeque::with_capacity(MAX_DROPPED_ACTION_TICKS);
     let mut pending_input_acks = VecDeque::with_capacity(MAX_PENDING_INPUT_ACKS);
+    let mut input_proof_budget = if flight_action_proof { 96_u8 } else { 0 };
+    let mut following_action_packets = 0_u8;
     let (mut reliable_send, _reliable_recv) =
         tokio::time::timeout(RELIABLE_OPEN_TIMEOUT, connection.accept_bi())
             .await
@@ -694,6 +703,23 @@ async fn handle_connection(
                         &mut pending_input_acks,
                     )
                 };
+                // Same loopback-only proof switch as the authoritative action
+                // trace. Observe actual admitted samples and their applied
+                // intent, including the next neutral packets. Never synthesize
+                // input or infer delivery from a browser's send timestamp.
+                if input_proof_budget > 0 {
+                    if accepted.as_slice().iter().any(|sample| one_shot_action_mask(sample) != 0) {
+                        following_action_packets = 3;
+                    }
+                    if following_action_packets > 0 {
+                        println!(
+                            "COMBAT_INPUT_ACCEPTED fighter={player_id} server_tick={server_tick} packet_tick={} sequence={} accepted={:?} applied={coalesced:?}",
+                            packet.client_tick, packet.sequence, accepted.as_slice()
+                        );
+                        following_action_packets -= 1;
+                        input_proof_budget -= 1;
+                    }
+                }
                 if server_tick.wrapping_sub(packet.ack_server_tick) > 600 {
                     eprintln!(
                         "session {stable_id} stale server acknowledgement: client={} server={}",

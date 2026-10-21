@@ -26,8 +26,8 @@ test("M336 M145 holds one authentic Space+LMB across 30Hz sampling; M144 unchang
   assert.doesNotMatch(flight, /dispatchEvent\(|\.click\(\)/);
 });
 
-test("M336 read-only real client input submission evidence does not change packet or controls", () => {
-  const guarded = game.indexOf('if (acceptanceScenario === "uimultirecoveryspatial") {', game.indexOf("function simulatePrediction("));
+test("M336 read-only M144/M145 input submission evidence does not change packet or controls", () => {
+  const guarded = game.indexOf('if (acceptanceScenario === "uimultirecoveryspatial" || acceptanceScenario === "uimultirecoveryffa") {', game.indexOf("function simulatePrediction("));
   const send = game.indexOf("networkClient.sendInput({ tick: outgoingTick, ...currentInput });", guarded);
   const reset = game.indexOf("attackRequested = false;", send);
   assert.ok(guarded >= 0 && send > guarded && reset > send);

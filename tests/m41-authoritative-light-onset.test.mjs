@@ -75,7 +75,7 @@ test("M41 rejects W3C attack failure and never retries failed Firefox wheel", as
 });
 
 test("M41 strict parameters prohibit arbitrary input replay/timing", async () => {
-  for (const ms of [-1, 0, 9, 31, 100, NaN, Infinity]) {
+  for (const ms of [-1, 31, 100, NaN, Infinity]) {
     await assert.rejects(() => dispatchM41NativeParryOnLightOnset({
       readOutput: () => proof, afterOffset: 0, fighterId: 1,
       sendAttack: () => {}, sendWheel: () => {}, wheelAfterLightMs: ms,

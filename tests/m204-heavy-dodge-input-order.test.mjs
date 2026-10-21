@@ -10,23 +10,20 @@ const flight = source.slice(
 );
 
 test("M204 schedules one genuine wheel during the FIRST heavy key hold, before E release", () => {
-  const keyDown = flight.indexOf('setMovementKey(attacker, "e", true).then(');
-  const commit = flight.indexOf("windup = await awaitM223HeavyWindup({");
+  const preAim = flight.indexOf("await aimArena(defender, defenderElementId, 0, 180);");
+  const dispatch = flight.indexOf("await dispatchM107NativeDodge({");
+  assert.ok(preAim >= 0 && dispatch > preAim);
   assert.ok(flight.includes("serverLogOffset = m201ServerOutput().length"));
-  assert.ok(flight.includes("windupObservedEpochMs + 170"));
-  assert.ok(flight.includes("wheelTargetEpochMs - Date.now()"));
-  assert.ok(!flight.includes("await sleep(90);"));
-  assert.ok(!flight.includes("await sleep(120);"));
-  const sDown = flight.indexOf('await setMovementKey(defender, "s", true);');
-  const dodge = flight.indexOf("await performArenaTimedPointerDodge(defender, defenderElementId, 15);");
-  const sUp = flight.indexOf('await setMovementKey(defender, "s", false);');
-  const keyUp = flight.indexOf('await setMovementKey(attacker, "e", false);');
-  assert.ok(keyDown >= 0 && commit > keyDown && sDown > commit
-    && dodge > sDown && sUp > dodge && keyUp > sUp);
-  assert.equal(flight.match(/await performArenaTimedPointerDodge\(/g)?.length, 1);
+  assert.ok(flight.includes('sendHeavyDown: () => setMovementKey(attacker, "e", true)'));
+  assert.ok(flight.includes('sendPerpendicularDown: () => setMovementKey(defender, "s", true)'));
+  assert.ok(flight.includes("awaitWindup: () => awaitM223HeavyWindup({"));
+  assert.ok(flight.includes("sendWheel: () => scrollArenaWheel(defender, defenderElementId, -120)"));
+  assert.ok(flight.includes('sendPerpendicularUp: () => setMovementKey(defender, "s", false)'));
+  assert.ok(flight.includes('sendHeavyUp: () => setMovementKey(attacker, "e", false)'));
+  assert.equal(flight.match(/dispatchM107NativeDodge\(/g)?.length, 1);
+  assert.ok(!flight.includes("await performArenaTimedPointerDodge("));
   assert.ok(!flight.includes("await pressArenaPerpendicularDodgeAfterPause("));
-  assert.ok(flight.includes("finally {"));
-  assert.ok(!flight.includes('await pulseMovementKey(attacker, "e", heavyKeyPulseMs);'));
+
 });
 
 test("M204 preserves clean 100 HP and real perpendicular wheel/keyboard proof", () => {

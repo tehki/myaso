@@ -21,7 +21,10 @@ test("M156 real Chrome2 short click starts after actual Firefox knockdown, not w
   assert.ok(flight.includes("punishDowns.length !== 1 || punishUps.length !== 1"));
   assert.ok(flight.includes("punishUp.epochMs - punishDown.epochMs >= 320"));
   assert.ok(flight.includes("punishDown.epochMs < conversion.knockdownTransition.epochMs"));
-  assert.ok(flight.includes("punishActive.epochMs >= knockdownEndEpochMs || !attackPrecedesRecovery"));
+  assert.ok(flight.includes("verifyM156RollKnockdownPunish("));
+  assert.ok(flight.includes("m201ServerOutput().slice(conversion.rollAuthOffset)"));
+  assert.ok(flight.includes("if (!attackPrecedesRecovery)"));
+  assert.ok(flight.includes("punishDown.epochMs >= knockdownEndEpochMs"));
   assert.ok(flight.includes('defenderState.events.includes("Hit taken - 34 HP.")'));
   assert.ok(flight.includes("defenderState?.playerHp === 66 && defenderState?.playerGuard === 100"));
   assert.ok(flight.includes("punisherState?.playerHp === 100 && punisherState?.playerGuard === 100"));

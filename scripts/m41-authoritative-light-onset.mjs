@@ -40,7 +40,7 @@ export async function dispatchM41NativeParryOnLightOnset({
 }) {
   if (typeof sendAttack !== "function" || typeof sendWheel !== "function"
     || typeof sleep !== "function" || typeof now !== "function"
-    || !Number.isInteger(wheelAfterLightMs) || wheelAfterLightMs < 10
+    || !Number.isInteger(wheelAfterLightMs) || wheelAfterLightMs < 0
     || wheelAfterLightMs > 30) {
     throw new TypeError("M41 needs one native Chrome tap and one native Firefox wheel");
   }
@@ -70,7 +70,14 @@ export async function dispatchM41NativeParryOnLightOnset({
     if (!attempted.ok) throw attempted.error;
     throw error; // Never issue a blind wheel without real server light.
   }
-  await sleep(wheelAfterLightMs);
+  // With real Rust LIGHT at tick T and hit at T+8, Firefox Block must begin
+  // neither too early (T+1 -> 8 inclusive ticks * 16.67ms = 133ms ->
+  // guard block, beyond original 125ms parry) nor too late (T+9 -> HIT).
+  // Actual protected #39530511510: Block T+2 -> PARRY, Block T+1 -> BLOCK.
+  // #39529874983: artificial +18ms could deliver Block T+9 -> 34HP HIT.
+  // Target the intermediate W3C dispatch offset without changing gameplay
+  // or claiming deterministic delivery under loaded independent drivers.
+  if (wheelAfterLightMs > 0) await sleep(wheelAfterLightMs);
   let wheelError = null;
   try { await sendWheel(); } catch (error) { wheelError = error; }
   const attempted = await attackOutcome;
