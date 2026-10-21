@@ -20,6 +20,6 @@ jobs:
       - name: Original rustfmt and source hygiene (no waived checks)
         run: cargo fmt --all --check --manifest-path server/Cargo.toml
       - name: Compile original Rust QUIC binary and prove real decoded replay refusal
-        run: cargo test --locked --manifest-path server/Cargo.toml --bin myaso-server p0_replayed_valid_quic_input_cannot_keep_disconnected_fighter_alive -- --exact --nocapture
+        run: cargo test --locked --manifest-path server/Cargo.toml --bin myaso-server tests::p0_replayed_valid_quic_input_cannot_keep_disconnected_fighter_alive -- --exact --nocapture
       - name: Strict real server Clippy regression
         run: cargo clippy --locked --manifest-path server/Cargo.toml --bin myaso-server -- -D warnings
