@@ -4,6 +4,7 @@
 import {createRequire} from "node:module";
 import {mkdir,writeFile} from "node:fs/promises";
 import {resolve} from "node:path";
+import {cpus,platform,release,arch} from "node:os";
 const require=createRequire(import.meta.url);
 const puppeteer=require(process.env.PUPPETEER_MODULE_PATH||"puppeteer");
 const executablePath=process.env.CHROME_EXECUTABLE;
@@ -22,9 +23,10 @@ const routes=[
 ];
 const result={
   chrome:await browser.version(),baselineHead:"ff74af212d606f4fb8aa11336cc5633dd54fe181",
-  viewport:{width:960,height:600,dpr:1},device:"Windows Machine (i7-2700K, GeForce GT 630), Chrome --disable-gpu",
+  viewport:{width:960,height:600,dpr:1},
+  device:{platform:platform(),release:release(),arch:arch(),cpu:cpus()[0]?.model??"unknown",browserGpuDisabled:true},
   method:"Offline Canvas world.draw only; 72 sequential camera positions per route, forward then reverse (144 draw calls); includes synthetic city tile hops for worst-case cache churn; 3 fresh renderer runs per version in alternating order; NOT full game frame time",
-  runs:[],limits:{maxNewTilesPerDraw:3,maxCacheTiles:24},status:"incomplete"
+  runs:[],limits:{maxNewTilesPerDraw:3,maxCacheTiles:24},status:"not_run"
 };
 const max=vals=>vals.length?Math.max(...vals):0;
 function stats(t){
@@ -98,7 +100,16 @@ try{
     if(errors.length)throw Error(variant+" page errors "+errors);
   }
  }
- result.status="pass";
+ result.status="completed";
+ result.acceptance={targetDrawMs:16.7,
+   baselineDrawsOverBudget:result.runs.filter(r=>r.variant==="baseline")
+     .reduce((n,r)=>n+Object.values(r.routes).reduce((m,v)=>m+v.all.drawCallsOver16_7,0),0),
+   candidateDrawsOverBudget:result.runs.filter(r=>r.variant==="candidate")
+     .reduce((n,r)=>n+Object.values(r.routes).reduce((m,v)=>m+v.all.drawCallsOver16_7,0),0),
+   fullGameValidated:false,
+   note:"Benchmark completion is not budget acceptance; any candidate draw over target keeps performance HOLD."
+ };
+ result.acceptance.canvasBudgetMet=result.acceptance.candidateDrawsOverBudget===0;
 }finally{await browser.close();}
 await writeFile(resolve(outputDir,"p25_moving_camera_benchmark.json"),JSON.stringify(result,null,2)+"\n");
 console.log(JSON.stringify(result,null,2));
