@@ -41,7 +41,9 @@ Module: `server/src/alpha_armory_physics.rs`.
 
 ## Test contract
 
-Nine focused Rust unit tests check reach, wall block, open doorway, tangent occlusion, stale epoch/revision, cross-zone denial, invalid/incomplete/over-budget geometry, nonfinite/oversized input, read-only behavior, and legacy zero-zone/zero-revision compatibility.
+Ten focused Rust unit tests check reach, wall block, open doorway, tangent occlusion, stale epoch/revision, cross-zone denial, invalid/incomplete/over-budget geometry, nonfinite/oversized input, read-only behavior, and legacy zero-zone/zero-revision compatibility.
+
+**World #493 exact contract fixture (source-only):** A new Rust test uses the *proposed* single-zone open-front smith solid footprint (3710,3850)-(3892,4012), frozen sockets at x=3740/3780/3820/3860, y=4038, and walkable stands y=4088. All four proposed pickups at distance 50 must have clear LOS when the south front is open; an actor inside the solid shop footprint attempting a grab must be rejected as occluded. This duplicates World-authored **proposal coordinates in a test only**, it does not copy live collision geometry into production. World [#493](https://github.com/tehki/myaso/pull/493) remains stacked on unmerged World foundation #336. World 9 + Core 8C must approve the final complete authoritative geometry and revise the fixture together if sockets/solids change.
 
 **NOT TESTED here:** production `/game` wiring, actual Greyhaven collision manifest or doorway, cursor/sword pixel parity, transaction idempotency, real four-player race, verified WAN/independent-host gameplay. Those are hard integration gates, not simulated successes.
 
