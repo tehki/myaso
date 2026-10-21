@@ -417,7 +417,8 @@ async function nativeFourRackApproaches(views) {
     scope:"one loopback CI host, no sword item ownership or independent computers"
   }));
 }
-\nasync function run() {
+
+async function run() {
   await mkdir(evidenceDir,{recursive:true});
   staticServer=await httpServer();
   const game=await startRealGameServer();
