@@ -15,8 +15,21 @@ test("M171 proves a real server active edge even when replication skips it", () 
   assert.equal(proof.recovery.tick, 114);
   const heavy = edge(200, A.idle, A.heavyAttackWindup)
     + edge(220, A.heavyAttackWindup, A.heavyAttackActive)
-    + edge(226, A.heavyAttackActive, A.heavyAttackRecovery);
+    + edge(227, A.heavyAttackActive, A.heavyAttackRecovery);
   assert.equal(readM171RejectedFeintProof(heavy, { fighterId: 1, heavy: true }).active.tick, 220);
+});
+
+test("M171 exact CI heavy trace respects existing Rust f32 phase stepping", () => {
+  // Run39576013077: real heavy windup701, active720, recovery727.
+  const output = edge(701, A.idle, A.heavyAttackWindup)
+    + edge(720, A.heavyAttackWindup, A.heavyAttackActive)
+    + edge(727, A.heavyAttackActive, A.heavyAttackRecovery);
+  const proof = readM171RejectedFeintProof(output, { fighterId: 1, heavy: true });
+  assert.equal(proof.recovery.tick - proof.active.tick, 7);
+  for (const wrongTick of [726, 728]) {
+    assert.equal(readM171RejectedFeintProof(output.replace("tick=727", "tick=" + wrongTick),
+      { fighterId: 1, heavy: true }), null);
+  }
 });
 
 test("M171 rejects inferred, wrong-fighter, wrong-kind or out-of-window active proof", () => {
