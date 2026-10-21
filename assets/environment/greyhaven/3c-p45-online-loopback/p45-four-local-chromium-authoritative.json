@@ -1,0 +1,133 @@
+{
+  "type": "P45 actual client+Rust local authoritative smoke and RAF gap telemetry",
+  "sourceHead": "d4f05394f6d45af59ef9cc24f8487d6b5db55f8f",
+  "serverBinary": "myaso-server",
+  "host": "127.0.0.1",
+  "browsersIndependentHosts": false,
+  "serverAuthoritative": true,
+  "worldFlag": true,
+  "clientsRequested": 4,
+  "measureMs": 4500,
+  "results": [
+    {
+      "index": 1,
+      "errors": [],
+      "client": {
+        "status": "Online - player #1 - server tick 57",
+        "canvasOpaque": true,
+        "title": "myaso.io \u2014 Browser Combat Prototype"
+      },
+      "measurement": {
+        "status": "Online - player #1 - server tick 339",
+        "scoreboard": [
+          "#10",
+          "#20",
+          "#30",
+          "#40"
+        ],
+        "diagnostics": "Input\u2192ACK p50 37ms \u00b7 p95 64ms | Jitter p95 35ms | Snapshots p50 50ms \u00b7 p95 61ms | Camera correction p95 10.9u | Stale-own ACKs 180 | Deferred reconciles 360 | Render catch-ups 61 | Extra render lag p50 0ms \u00b7 p95 28ms | >33ms 4.3% (94 samples) | Samples 96",
+        "opaqueCanvas": true,
+        "tileCanvasDrawCalls": 2152,
+        "rAFGapP50Ms": 16.7,
+        "rAFGapP95Ms": 16.8,
+        "rAFGapMaxMs": 33.399999999999636,
+        "rAFSamples": 268,
+        "documentHidden": false,
+        "note": "RAF scheduling gap proxy, instrumented, NOT GPU presented frame time or true FPS"
+      }
+    },
+    {
+      "index": 2,
+      "errors": [],
+      "client": {
+        "status": "Online - player #2 - server tick 114",
+        "canvasOpaque": true,
+        "title": "myaso.io \u2014 Browser Combat Prototype"
+      },
+      "measurement": {
+        "status": "Online - player #2 - server tick 348",
+        "scoreboard": [
+          "#10",
+          "#20",
+          "#30",
+          "#40"
+        ],
+        "diagnostics": "Input\u2192ACK p50 59ms \u00b7 p95 82ms | Jitter p95 26ms | Snapshots p50 50ms \u00b7 p95 61ms | Camera correction p95 10.6u | Stale-own ACKs 151 | Deferred reconciles 306 | Render catch-ups 77 | Extra render lag p50 0ms \u00b7 p95 62ms | >33ms 6% (83 samples) | Samples 96",
+        "opaqueCanvas": true,
+        "tileCanvasDrawCalls": 2256,
+        "rAFGapP50Ms": 16.7,
+        "rAFGapP95Ms": 16.8,
+        "rAFGapMaxMs": 33.30000000000018,
+        "rAFSamples": 281,
+        "documentHidden": false,
+        "note": "RAF scheduling gap proxy, instrumented, NOT GPU presented frame time or true FPS"
+      }
+    },
+    {
+      "index": 3,
+      "errors": [],
+      "client": {
+        "status": "Online - player #3 - server tick 174",
+        "canvasOpaque": true,
+        "title": "myaso.io \u2014 Browser Combat Prototype"
+      },
+      "measurement": {
+        "status": "Online - player #3 - server tick 378",
+        "scoreboard": [
+          "#10",
+          "#20",
+          "#30",
+          "#40"
+        ],
+        "diagnostics": "Input\u2192ACK p50 61ms \u00b7 p95 87ms | Jitter p95 27ms | Snapshots p50 50ms \u00b7 p95 60ms | Camera correction p95 9.6u | Stale-own ACKs 129 | Deferred reconciles 262 | Render catch-ups 49 | Extra render lag p50 0ms \u00b7 p95 48ms | >33ms 5.3% (76 samples) | Samples 96",
+        "opaqueCanvas": true,
+        "tileCanvasDrawCalls": 2529,
+        "rAFGapP50Ms": 16.7,
+        "rAFGapP95Ms": 16.8,
+        "rAFGapMaxMs": 33.400000000000546,
+        "rAFSamples": 280,
+        "documentHidden": false,
+        "note": "RAF scheduling gap proxy, instrumented, NOT GPU presented frame time or true FPS"
+      }
+    },
+    {
+      "index": 4,
+      "errors": [],
+      "client": {
+        "status": "Online - player #4 - server tick 243",
+        "canvasOpaque": true,
+        "title": "myaso.io \u2014 Browser Combat Prototype"
+      },
+      "measurement": {
+        "status": "Online - player #4 - server tick 378",
+        "scoreboard": [
+          "#10",
+          "#20",
+          "#30",
+          "#40"
+        ],
+        "diagnostics": "Input\u2192ACK p50 46ms \u00b7 p95 75ms | Jitter p95 34ms | Snapshots p50 50ms \u00b7 p95 61ms | Camera correction p95 9.3u | Stale-own ACKs 103 | Deferred reconciles 212 | Render catch-ups 69 | Extra render lag p50 0ms \u00b7 p95 174ms | >33ms 14.8% (61 samples) | Samples 96",
+        "opaqueCanvas": true,
+        "tileCanvasDrawCalls": 1662,
+        "rAFGapP50Ms": 16.7,
+        "rAFGapP95Ms": 16.8,
+        "rAFGapMaxMs": 33.40000000000009,
+        "rAFSamples": 276,
+        "documentHidden": false,
+        "note": "RAF scheduling gap proxy, instrumented, NOT GPU presented frame time or true FPS"
+      }
+    }
+  ],
+  "errors": [],
+  "screenshotFile": "p45-client1-actual-authored-greyhaven.png",
+  "serverSummary": {
+    "endpointLoopback": true,
+    "admittedPlayerIds": [
+      1,
+      2,
+      3,
+      4
+    ],
+    "clientCount": 4
+  }
+}
