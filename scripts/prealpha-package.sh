@@ -28,6 +28,11 @@ cleanup() { rm -rf -- "$scratch"; }
 trap cleanup EXIT
 # Pinned source: archive committed HEAD, not a floating branch or remote artifact.
 git -C "$repo" archive --format=tar "$revision" web src ops/alpha | tar -xf - -C "$scratch"
+# QA and authored-city preview HTML are NOT part of the playable arena. Keep
+# original repository source/CI unchanged, but don't publish those development
+# entrypoints on the Pre-Alpha website (no Greyhaven/Red Lion implied).
+rm -f -- "$scratch/web/flight.html" "$scratch/web/pvp-flight.html" \
+  "$scratch/web/pvp-flight.mjs" "$scratch/web/red-lion-art-preview.html"
 # The expanded Pre-Alpha must be a COMPLETE already-qualified small game:
 # preserve original R4 recorded Foley/music, Silver human sprites, the live
 # multiplayer client, HUD and same-origin lobby in the immutable distribution.

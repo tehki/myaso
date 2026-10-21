@@ -57,3 +57,11 @@ test("expanded Pre-Alpha package fails closed without authentic Silver and R4 au
   assert.match(script, /-eq 24/);
   assert.match(script, /ready-content missing/);
 });
+
+test("immutable Pre-Alpha excludes dev browser flights and the unqualified Red Lion preview", () => {
+  assert.match(script, /rm -f -- "\$scratch\/web\/flight\.html"/);
+  assert.match(script, /"\$scratch\/web\/pvp-flight\.html"/);
+  assert.match(script, /"\$scratch\/web\/pvp-flight\.mjs"/);
+  assert.match(script, /"\$scratch\/web\/red-lion-art-preview\.html"/);
+  assert.match(script, /git -C "\$repo" archive --format=tar/);
+});
