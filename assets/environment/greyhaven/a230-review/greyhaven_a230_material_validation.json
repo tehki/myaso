@@ -1,0 +1,66 @@
+{
+  "milestone": "A2.30 real original Blender mesh joinery source/render acceptance",
+  "sourceBlendSha256": "d891665e7202585e99bc0a6a9a6f0b726d68ad0635a9eecc30d13457f6dffe9d",
+  "derivedBlendSha256": "61620d76fafa75bbe26c8fd92fde4da5e79e8cc88132100ebb651fc52e5eef61",
+  "newMeshCount": 35,
+  "sourceMeshCount": 17,
+  "originalSourceVertices": 4318,
+  "sourceBlendUntouched": true,
+  "beforeAlphaBounds": [
+    209,
+    54,
+    431,
+    345
+  ],
+  "afterAlphaBounds": [
+    209,
+    54,
+    431,
+    345
+  ],
+  "changedRGBAVisiblePixels": 15192,
+  "alphaPixelsChanged": 69,
+  "newOutsideOldAlphaPixels": 51,
+  "baselineWebp": {
+    "file": "red_lion_a230_original_base.webp",
+    "sha256": "48b73abaa21d5f992ecc342de6fc2ac2ea99547a6be0f966431da7b13e3cfbfd",
+    "bytes": 43650,
+    "losslessRoundtrip": true
+  },
+  "baseWebp": {
+    "file": "red_lion_a230_dimensional_base.webp",
+    "bytes": 44370,
+    "sha256": "f45ca685364666e7911128b75180eb1dea5636b48ab2ae5538cc37523ec2dfd0",
+    "crop": [
+      228,
+      297
+    ],
+    "drawOffsetFromDoorPixels": [
+      -114,
+      -269
+    ],
+    "losslessRoundtrip": true
+  },
+  "roofWebp": {
+    "file": "red_lion_a230_roof_unchanged.webp",
+    "sha256": "f65554286ea1bb8b80562c72539d82172fd3ea8cc97e6b9d0d3203057a1aedc1",
+    "copiedByteIdentical": true
+  },
+  "sourceCameraZoom": 0.84,
+  "worldMetersPerUnit": 0.025,
+  "doorXY": [
+    4365,
+    4075
+  ],
+  "sourceDoorPivotPx": [
+    320,
+    320
+  ],
+  "comparison": "greyhaven_a230_blender_dimensional_compare.png",
+  "originalBlenderNotRewritten": true,
+  "sourceRoofAndLightingUnchanged": true,
+  "newGeometryArtOnly": true,
+  "actualGameRenderIntegration": false,
+  "authoritativePortalOrCollisionApproved": false,
+  "productionApproved": false
+}
