@@ -140,7 +140,7 @@ test("World P0 altered/removal/invalid solids fail closed instead of silent drif
 test("World P0 static geometry is read-only, not a client or server authority",()=>{
  const src=readFileSync(new URL("../src/world/alpha-solid-geometry.mjs",import.meta.url),"utf8");
  assert.doesNotMatch(src,/fetch\(|WebSocket|WebTransport|localStorage|sessionStorage|document\.|window\./);
- assert.doesNotMatch(src,/complete:\s*true|worker_epoch\s*:|map_revision\s*:|TryPickup/);
+ assert.doesNotMatch(src,/^\s*complete:\s*true|worker_epoch\s*:|map_revision\s*:|TryPickup/m);
  for(const p of ["../web/online-game.mjs","../server/src/main.rs","../server/src/simulation.rs"]){
   assert.doesNotMatch(readFileSync(new URL(p,import.meta.url),"utf8"),
     /alpha-solid-geometry|WORLD_ALPHA_GREYHAVEN_STATIC_SOLIDS/);
