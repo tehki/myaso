@@ -39,7 +39,7 @@ try{
    "/web/silver-mainhand-revision-review.html",{waitUntil:"networkidle0"});
  await page.waitForFunction(()=>window.__GRAPHICS3A_REVISION_QA__?.().originalAtlases===5,{timeout:25000});
  const clips=["silver_idle","silver_walk","silver_sprint","silver_jump","silver_roll"];
- const scenarios=["equip","drop","late","reEquip","conflict","oldEpoch"];
+ const scenarios=["equip","drop","late","reEquip","lateAfterReEquip","lateDropAfterReEquip","conflict","oldEpoch"];
  const results=[];
  for(const clip of clips)for(const scenario of scenarios){
   const state=await page.evaluate(({clip,scenario})=>{
@@ -58,8 +58,12 @@ try{
   assert.deepEqual(state.originalSwordPx,[42,115]);
   assert.equal(state.originalAtlases,5);
   const expected=(!["silver_jump","silver_roll"].includes(clip)&&
-    ["equip","reEquip"].includes(scenario))?8:0;
+    ["equip","reEquip","lateAfterReEquip","lateDropAfterReEquip"].includes(scenario))?8:0;
   assert.equal(state.visible,expected,JSON.stringify({clip,scenario,state}));
+  const shouldId=expected===0?null:
+    scenario==="equip"?"ART-ONLY-SWORD-A":"ART-ONLY-SWORD-B";
+  assert.equal(state.currentItemId,shouldId,
+    "must distinguish sword A from new sword B even though same WebP image");
   assert.equal(state.directions.length,8);
   assert.deepEqual(state.directions.map(x=>x.direction),[0,1,2,3,4,5,6,7]);
   assert.equal(state.received.at(-1)?.accepted,
@@ -72,7 +76,8 @@ try{
  const shots=[];
  for(const [clip,scenario] of [
   ["silver_idle","equip"],["silver_idle","drop"],
-  ["silver_idle","late"],["silver_idle","conflict"],
+  ["silver_idle","late"],["silver_idle","lateAfterReEquip"],
+  ["silver_idle","lateDropAfterReEquip"],["silver_idle","conflict"],
   ["silver_roll","equip"]]){
   await page.evaluate(({clip,scenario})=>{
    for(const [id,val] of [["clip",clip],["scenario",scenario]]){

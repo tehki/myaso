@@ -28,6 +28,7 @@ function fixture(name){
  const newer=snapshot(12,hand("ART-ONLY-SWORD-B",12),1,220);
  const different=snapshot(10,hand("ART-ONLY-SWORD-B",10),1,201);
  const oldWriter=snapshot(999,hand("ART-ONLY-SWORD-A",999),1,9999);
+ const oldDrop=snapshot(11,null,1,210);
  const newEpoch=snapshot(11,null,2,230);
  const cache=createSilverMainHandRevisionGuard(),inbound=[];
  let latest;
@@ -39,6 +40,8 @@ function fixture(name){
  case "drop":take(first);take(empty);break;
  case "late":take(first);take(empty);take(first);break;
  case "reEquip":take(first);take(empty);take(newer);break;
+ case "lateAfterReEquip":take(first);take(empty);take(newer);take(first);break;
+ case "lateDropAfterReEquip":take(first);take(empty);take(newer);take(oldDrop);break;
  case "conflict":take(first);take(different);break;
  case "oldEpoch":take(first);take(newEpoch);take(oldWriter);break;
  default:throw Error("Unknown QA scenario");
@@ -57,7 +60,9 @@ function render(){
  const directions=["S","SW","W","NW","N","NE","E","SE"];
  for(let d=0;d<8;d++){
   const x=79+d*160,y=205;
-  const plan=cache.plan({actorKind:"player",actorKey,equipmentSnapshot:latest,
+  // Delayed packets are ingested, but the picture is planned from the
+  // most recent ACCEPTED value. Never draw directly from the last arrival.
+  const plan=cache.planLatest({actorKind:"player",actorKey,
     clip,frame:0,direction:d,anchors});
   plans.push({direction:d,hasSword:Boolean(plan),itemId:plan?.itemId??null});
   ctx.fillStyle="#b5c3b9";ctx.fillRect(d*160+2,91,156,238);
@@ -74,13 +79,15 @@ function render(){
  ctx.fillStyle="#243d2f";ctx.textAlign="left";ctx.font="13px system-ui";
  ctx.fillText("NO REAL WEBTRANSPORT · drop does NOT change equipment here; all received packets are simulated fixtures",12,378);
  const visible=plans.filter(x=>x.hasSword).length;
- const report={scenario:chosen,clip,received:inbound,visible,
+ const currentItemId=plans.find(x=>x.hasSword)?.itemId??null;
+ const report={scenario:chosen,clip,received:inbound,visible,currentItemId,
   directions:plans,latest:cache.audit(actorKey),originalAtlases:images.size,
   originalSwordPx:[sword.naturalWidth,sword.naturalHeight],
   realGame:false,realReceipts:false,productionEnabled:false};
  latestReport=report;
  $("report").textContent="QA arrival order: "+inbound.map(i=>"rev"+i.revision+"/e"+i.epoch+" "+i.reason).join(" → ")+
-  "\nFinal visible sword slots (8 facings): "+visible+" | Render high-water: "+JSON.stringify(report.latest)+
+  "\nFinal visible sword slots (8 facings): "+visible+" | Current item: "+(report.currentItemId??"EMPTY")+
+  " | Render high-water: "+JSON.stringify(report.latest)+
   "\nApproved? NO. Original asset source and gameplay rules unchanged.";
 }
 $("scenario").addEventListener("change",render);

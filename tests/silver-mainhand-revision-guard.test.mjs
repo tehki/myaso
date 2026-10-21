@@ -119,3 +119,69 @@ test("later revision with earlier tick cannot revive weapon within same session"
  assert.equal(g.ingest(make(11,sword("A",11),1,99),actor).reason,"stale-tick");
  assert.equal(g.plan(props(make(12,sword("B",12),1,110)))?.itemId,"B");
 });
+
+test("last accepted sword B stays visible after late sword A and late empty revision",()=>{
+ const g=createSilverMainHandRevisionGuard();
+ const view=()=>g.planLatest({actorKind:"player",actorKey:actor,
+   clip:"silver_idle",frame:0,direction:2,anchors});
+ assert.equal(g.ingest(make(10,sword("A",10)),actor).accepted,true);
+ assert.equal(view()?.itemId,"A");
+ assert.equal(g.ingest(make(11,null),actor).accepted,true);
+ assert.equal(view(),null);
+ assert.equal(g.ingest(make(12,sword("B",12)),actor).accepted,true);
+ assert.equal(view()?.itemId,"B");
+ assert.equal(g.ingest(make(10,sword("A",10)),actor).accepted,false);
+ assert.equal(view()?.itemId,"B","stale equip cannot blink the newer sword");
+ assert.equal(g.ingest(make(11,null),actor).accepted,false);
+ assert.equal(view()?.itemId,"B","stale drop cannot blink the newer sword");
+ const failedProps={actorKind:"player",actorKey:actor,
+   clip:"silver_idle",frame:0,direction:2,anchors,
+   equipmentSnapshot:make(10,sword("ATTACKER-FAKE",10))};
+ assert.equal(g.planLatest(failedProps)?.itemId,"B",
+   "planLatest ignores forged client/caller equipment property");
+});
+test("last accepted snapshot is a VALUE copy and stays immune to external mutation",()=>{
+ const g=createSilverMainHandRevisionGuard();
+ const source=make(50,sword("ORIGINAL",50));
+ assert.equal(g.ingest(source,actor).accepted,true);
+ const before=g.planLatest({actorKind:"player",actorKey:actor,
+   clip:"silver_walk",frame:3,direction:6,anchors});
+ assert.equal(before.itemId,"ORIGINAL");
+ source.mainHand.itemId="MUTATED";
+ source.mainHand.ownerActorKey="another";
+ source.snapshotRevision=900000;
+ source.provenance="fake";
+ const after=g.planLatest({actorKind:"player",actorKey:actor,
+   clip:"silver_walk",frame:3,direction:6,anchors});
+ assert.equal(after.itemId,"ORIGINAL");
+ assert.equal(after.equipmentRevision,50);
+ assert.equal(after.serverTick,500);
+ assert.equal(g.audit(actor).snapshotRevision,50);
+});
+test("a newer conflicting same-revision packet hides sword until genuine higher revision",()=>{
+ const g=createSilverMainHandRevisionGuard();
+ const view=()=>g.planLatest({actorKind:"player",actorKey:actor,
+   clip:"silver_sprint",frame:0,direction:3,anchors});
+ g.ingest(make(60,sword("A",60)),actor);
+ assert.equal(view()?.itemId,"A");
+ assert.equal(g.ingest(make(60,sword("B",60),1,601),actor).reason,"conflicting-same-revision");
+ assert.equal(view(),null);
+ assert.equal(g.ingest(make(60,sword("A",60),1,602),actor).reason,"quarantined-revision");
+ assert.equal(view(),null);
+ g.ingest(make(61,sword("B",61),1,610),actor);
+ assert.equal(view()?.itemId,"B");
+});
+test("unknown actor, NPC and exhausted cache never render cached sword",()=>{
+ const g=createSilverMainHandRevisionGuard({maxActors:1});
+ const args={actorKind:"player",actorKey:actor,
+   clip:"silver_idle",frame:1,direction:4,anchors};
+ assert.equal(g.planLatest(args),null);
+ g.ingest(make(21,sword("A",21)),actor);
+ assert.ok(g.planLatest(args));
+ assert.equal(g.planLatest({...args,actorKey:"other"}),null);
+ assert.equal(g.planLatest({...args,actorKind:"npc"}),null);
+ assert.equal(g.planLatest({...args,clip:"silver_roll"}),null,
+   "prior visual rejection of rolling sword remains HOLD");
+ assert.equal(g.planLatest({...args,frame:999}),null);
+ assert.equal(g.size(),1);
+});

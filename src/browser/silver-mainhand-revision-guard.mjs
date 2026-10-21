@@ -30,8 +30,20 @@ function parseSnapshot(snapshot,actorKey){
        !natural(item.revision)||!generation(item.committedSequence))
       return null;
   }
+  // Store a typed VALUE COPY, never the externally mutable source object.
+  // A delayed client-side mutation must not rewrite the cached current item.
+  const current=Object.freeze({
+    provenance:"core-items-committed-snapshot",actorKey,
+    snapshotRevision:snapshot.snapshotRevision,
+    serverTick:snapshot.serverTick,sessionEpoch:snapshot.sessionEpoch,
+    mainHand:item===null?null:Object.freeze({
+      slot:"MainHand",location:"equipped",visualKind:"sword",
+      itemId:item.itemId,ownerActorKey:actorKey,
+      revision:item.revision,committedSequence:item.committedSequence
+    })
+  });
   return {epoch:snapshot.sessionEpoch,revision:snapshot.snapshotRevision,
-    tick:snapshot.serverTick,signature:item===null?"EMPTY":
+    tick:snapshot.serverTick,current,signature:item===null?"EMPTY":
       JSON.stringify([item.itemId,item.revision,item.committedSequence,
         item.slot,item.location,item.visualKind,item.ownerActorKey]),
     armed:item!==null};
@@ -102,6 +114,27 @@ export function createSilverMainHandRevisionGuard({maxActors=16}={}){
       return planSilverCommittedSword(props);
     },
     ingest,
+    /**
+     * Draw from LAST ACCEPTED Core-provided view, not from the latest packet.
+     * A delayed/rejected packet therefore cannot visually erase a newer
+     * still-equipped sword. A newer accepted drop does leave MainHand empty.
+     * This must be used ONLY behind a trusted Core decoder; no authentication
+     * is supplied by this local presentation-only map.
+     */
+    planLatest(props){
+      if(!props||props.actorKind!=="player"||!cleanString(props.actorKey))
+        return null;
+      const row=highWater.get(props.actorKey);
+      if(!row||row.conflict||!row.armed)return null;
+      // Never use props.equipmentSnapshot, a stale/click-predicted object;
+      // only the stable frozen typed copy admitted by ingest() can draw.
+      return planSilverCommittedSword({
+        actorKind:"player",actorKey:props.actorKey,
+        equipmentSnapshot:row.current,
+        clip:props.clip,frame:props.frame,direction:props.direction,
+        anchors:props.anchors,presentationScale:props.presentationScale
+      });
+    },
     audit(actorKey){
       const row=highWater.get(actorKey);
       if(!row)return null;
