@@ -160,6 +160,12 @@ jobs:
           node --check src/world/alpha-solid-geometry.mjs
           node --test tests/world-alpha-solid-geometry.test.mjs tests/authored-world.test.mjs
 
+      - name: Validate P0 pinned Greyhaven static solids JSON parity and authority boundary
+        run: |
+          node --check scripts/verify-world-alpha-solid-artifact.mjs
+          node scripts/verify-world-alpha-solid-artifact.mjs
+          node --test tests/world-alpha-pinned-solid-artifact.test.mjs
+
       - name: Validate M188 repeated real heavy counterplay windows
         run: |
           # Three fresh Chrome/Firefox sessions for each real defensive read.
