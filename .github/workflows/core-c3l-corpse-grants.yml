@@ -1,0 +1,75 @@
+name: Core C3l scoped corpse-loot grant PostgreSQL acceptance
+
+on:
+  pull_request:
+    paths:
+      - "server/sql/007_scoped_corpse_loot_grants.sql"
+      - "scripts/verify_scoped_corpse_loot_grants_pg.py"
+      - ".github/workflows/core-c3l-corpse-grants.yml"
+  push:
+    branches: [main]
+    paths:
+      - "server/sql/007_scoped_corpse_loot_grants.sql"
+      - "scripts/verify_scoped_corpse_loot_grants_pg.py"
+      - ".github/workflows/core-c3l-corpse-grants.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  scoped-corpse-loot-grants:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: myaso_c3l_test
+          POSTGRES_PASSWORD: ephemeral-test-only
+          POSTGRES_DB: myaso_c3l_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U myaso_c3l_test -d myaso_c3l_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    env:
+      PGHOST: 127.0.0.1
+      PGPORT: "5432"
+      PGUSER: myaso_c3l_test
+      PGPASSWORD: ephemeral-test-only
+      PGDATABASE: myaso_c3l_test
+      MYASO_C3L_TEST_ONLY: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: PostgreSQL client
+        run: |
+          if ! command -v psql >/dev/null 2>&1; then
+            sudo apt-get update -qq
+            sudo apt-get install -y postgresql-client
+          fi
+          psql --version
+      - name: Validate PostgreSQL Python test harnesses
+        run: |
+          python -m py_compile scripts/verify_atomic_item_world_pg.py
+          python -m py_compile scripts/verify_atomic_equipment_swaps_pg.py
+          python -m py_compile scripts/verify_two_item_corpse_loot_pg.py
+          python -m py_compile scripts/verify_scoped_corpse_loot_grants_pg.py
+      - name: Install full C4c..C3l isolated PostgreSQL migrations
+        run: |
+          for file in \
+            server/sql/001_zone_authority_postgres.sql \
+            server/sql/002_fenced_world_mutations.sql \
+            server/sql/003_atomic_item_world_mutations.sql \
+            server/sql/004_atomic_equipment_swaps.sql \
+            server/sql/005_global_item_operation_ids.sql \
+            server/sql/006_two_item_corpse_loot.sql \
+            server/sql/007_scoped_corpse_loot_grants.sql; do
+            psql -X -v ON_ERROR_STOP=1 -f "$file"
+          done
+      - name: Prove fail-closed grants contention and grant rollback
+        run: python scripts/verify_scoped_corpse_loot_grants_pg.py
