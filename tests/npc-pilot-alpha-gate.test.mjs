@@ -162,6 +162,11 @@ test("pilot roster generation fences stale async sends and recycled UI state", a
     const first = submit();
     assert.equal(sendButton.disabled, true);
     assert.deepEqual(pending.map(({ id, text }) => [id, text]), [[3, "Old session message"]]);
+    // Enter can submit forms while a button is disabled. Do not create a
+    // second reliable NPC write until this one succeeds or fails.
+    await submit();
+    assert.equal(pending.length, 1, "only one outstanding NPC chat per roster");
+    assert.equal(sendButton.disabled, true);
 
     npc.setRoster([]);
     assert.equal(panel.hidden, true);
@@ -185,6 +190,8 @@ test("pilot roster generation fences stale async sends and recycled UI state", a
     const second = submit();
     assert.deepEqual(pending.at(-1) && [pending.at(-1).id, pending.at(-1).text],
       [5, "New session draft"]);
+    await submit();
+    assert.equal(pending.length, 2, "no duplicate while second session send is pending");
     pending.at(-1).resolve();
     await second;
     assert.equal(history.children.length, 1);
@@ -194,6 +201,8 @@ test("pilot roster generation fences stale async sends and recycled UI state", a
     input.value = "Pending old failure";
     const third = submit();
     assert.equal(sendButton.disabled, true);
+    await submit();
+    assert.equal(pending.length, 3);
     npc.setRoster([]);
     npc.setRoster(rowan);
     pending.at(-1).reject(new Error("Connection closed"));
@@ -204,6 +213,42 @@ test("pilot roster generation fences stale async sends and recycled UI state", a
     npc.receive({ text: "Current uncorrelated server response" });
     assert.equal(history.children.length, 1,
       "server replies after a newly active roster are still possible without a wire request epoch");
+  } finally {
+    restore();
+  }
+});
+
+test("pilot chat releases its one-flight gate after same-roster send failure", async () => {
+  const { stage, restore } = installDocument();
+  try {
+    const attempts = [];
+    let fail = true;
+    const npc = createNpcChatPanel({
+      async onSend(id, text) {
+        attempts.push([id, text]);
+        if (fail) throw new Error("reliable stream closed");
+      },
+      onFocus() {},
+    });
+    npc.setRoster([{ id: 2, name: "Marta", role: "Blacksmith" }]);
+    const [,, roster,,, history, form] = stage.children[0].children;
+    const [input, button] = form.children;
+    assert.equal(roster.value, "2");
+    const submit = () => form.listeners.get("submit")({ preventDefault() {} });
+    input.value = "Are swords available?";
+    await submit();
+    assert.equal(button.disabled, false);
+    assert.equal(input.value, "Are swords available?",
+      "failure should not discard the player's draft");
+    assert.equal(history.children.length, 1);
+    assert.equal(history.children[0].textContent, "Unable to send your message.");
+
+    fail = false;
+    await submit();
+    assert.deepEqual(attempts, [[2, "Are swords available?"], [2, "Are swords available?"]]);
+    assert.equal(button.disabled, false);
+    assert.equal(input.value, "");
+    assert.match(history.children[1].textContent, /Marta: Are swords available/);
   } finally {
     restore();
   }

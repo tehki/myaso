@@ -211,3 +211,35 @@ hardening as a substitute for authentic independent-host browser,
 Items ACK, real sword pickup, or reconnect acceptance.
 
 Keep the experimental pilot disabled for First Playable Alpha.
+
+## Pilot chat one-in-flight gate — duplicate submits cannot race reliable writes
+
+The optional \`web/npc-chat.mjs\` panel already disabled its submit
+button while a reliable \`onSend\` promise was unresolved, but a form
+submit triggered by Enter or other UI paths could still invoke its
+handler without consulting the disabled button. This allowed
+duplicate sends to the same selected NPC before the first reliable
+write completed, potentially creating multiple requests or
+out-of-order visible transcript entries.
+
+The handler now refuses a new submission **while its current
+generation's send is pending**, as well as when the roster is
+hidden. The existing roster-replacement fence still clears the
+pending generation and allows a new authenticated roster's
+first send, without waiting for the old request to finish.
+A same-roster rejection re-enables retry and leaves the
+player's draft unchanged. No client-local completion claims
+that the NPC server processed the request; the transport
+still determines delivery.
+
+Dedicated isolated DOM tests submit the form twice while
+unresolved, verify **one** \`onSend\` call, then verify no old
+promise can erase text from the new roster; a separate test
+checks that a failed current-roster write unlocks submission
+for a genuine retry. No multiplayer input, Combat, Items,
+networking protocol, writer ownership or production code
+outside the optional NPC panel was changed.
+
+**P0 status:** NPC pilot remains disabled on the first-playable
+four-player release. A real Core session epoch and one-reader
+reliable dispatcher are still required for eventual NPC integration.

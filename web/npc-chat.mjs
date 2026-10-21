@@ -111,7 +111,9 @@ export function createNpcChatPanel({ onSend, onFocus }) {
   }
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
-    if (panel.hidden) return;
+    // A disabled submit button alone does not protect against Enter
+    // submitting the same form while an earlier async send is pending.
+    if (panel.hidden || submit.disabled) return;
     const text = input.value.trim();
     if (!text) return;
     const id = Number(roster.value);
