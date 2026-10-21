@@ -73,7 +73,22 @@ jobs:
             server/sql/008_immutable_corpse_grant_history.sql; do
             psql -X -v ON_ERROR_STOP=1 -f "$migration"
           done
-      - name: Preserve all existing scoped grant acceptance
-        run: python scripts/verify_scoped_corpse_loot_grants_pg.py
+      - name: Preserve all existing scoped grant acceptance in its own test DB
+        run: |
+          set -euo pipefail
+          createdb myaso_c3l_test
+          for migration in \
+            server/sql/001_zone_authority_postgres.sql \
+            server/sql/002_fenced_world_mutations.sql \
+            server/sql/003_atomic_item_world_mutations.sql \
+            server/sql/004_atomic_equipment_swaps.sql \
+            server/sql/005_global_item_operation_ids.sql \
+            server/sql/006_two_item_corpse_loot.sql \
+            server/sql/007_scoped_corpse_loot_grants.sql \
+            server/sql/008_immutable_corpse_grant_history.sql; do
+            PGDATABASE=myaso_c3l_test psql -X -v ON_ERROR_STOP=1 -f "$migration"
+          done
+          PGDATABASE=myaso_c3l_test python scripts/verify_scoped_corpse_loot_grants_pg.py
+          dropdb myaso_c3l_test
       - name: Prove permanent grant history immutable scope and consumed ID
         run: python scripts/verify_immutable_corpse_grants_pg.py
