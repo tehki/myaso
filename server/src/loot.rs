@@ -760,6 +760,60 @@ impl LootAuthority {
         Ok(())
     }
 
+    /// Items P0 internal domain primitive. Move the actual equipped MainHand
+    /// sword directly to one ground entity; no transient backpack slot is
+    /// needed, so a full backpack cannot prevent a valid sword drop.
+    ///
+    /// This does not grant caller authentication, placement/LOS authority,
+    /// receipts or a live network API. The checked transaction supplies those
+    /// preconditions and stages/persists this mutation atomically.
+    pub(crate) fn drop_mainhand_sword(
+        &mut self,
+        authenticated_id: u32,
+        fighter: &Fighter,
+        zone: ZoneId,
+        now_ms: u64,
+    ) -> Result<u64, LootError> {
+        self.require_alive(authenticated_id, fighter)?;
+        let at = Point::from_fighter(fighter);
+        if !at.in_zone(zone) {
+            return Err(LootError::InvalidPosition);
+        }
+        let inventory = self
+            .players
+            .get(&authenticated_id)
+            .ok_or(LootError::UnknownPlayer)?;
+        let sword = inventory
+            .equipped(EquipmentSlot::MainHand)
+            .ok_or(LootError::NotFound)?;
+        if sword.id == 0
+            || sword.amount != 1
+            || !matches!(sword.kind, ItemKind::RustySword | ItemKind::IronSword)
+        {
+            return Err(LootError::WrongSlot);
+        }
+        // Reserve new entity identity before altering any equipment.
+        let entity_id = self.allocate_id()?;
+        let sword = self
+            .players
+            .get_mut(&authenticated_id)
+            .expect("validated player")
+            .equipment
+            .remove(&EquipmentSlot::MainHand)
+            .expect("validated sword");
+        self.ground.insert(
+            entity_id,
+            GroundDrop {
+                entity_id,
+                zone,
+                at,
+                expires_at_ms: now_ms.saturating_add(GROUND_DECAY_MS),
+                item: sword,
+            },
+        );
+        Ok(entity_id)
+    }
+
     /// Drop one item from the backpack into the physical world.
     /// Caller MUST source zone and fighter from server-owned state.
     pub fn drop_backpack(
