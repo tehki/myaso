@@ -1050,7 +1050,7 @@ mod tests {
         ));
         assert_eq!(magic.encode_progression().unwrap(), before);
 
-        let (recovered, recovered_magic) = load_joint(&path).unwrap();
+        let (mut recovered, recovered_magic) = load_joint(&path).unwrap();
         assert_eq!(recovered_magic.encode_progression().unwrap(), before);
         assert!(recovered_magic.knows_rune(character(1), Rune::Fire));
         assert!(recovered_magic.knows_spell(character(1), Spell::Ember));
@@ -1088,6 +1088,41 @@ mod tests {
                 .len(),
             crate::loot::BACKPACK_CAPACITY
         );
+
+        // A reconnect creates NEW authenticated sessions, not new characters.
+        // Neither the transfer nor reattachment can move earned knowledge or
+        // mint a replacement item for either player's MainHand.
+        let mut fresh_identity = SessionIdentityRegistry::new();
+        fresh_identity
+            .bind_verified(lease(101, 2), character(1))
+            .unwrap();
+        fresh_identity
+            .bind_verified(lease(103, 2), character(3))
+            .unwrap();
+        recovered
+            .resume_inventory(&fresh_identity, lease(101, 2))
+            .unwrap();
+        recovered
+            .resume_inventory(&fresh_identity, lease(103, 2))
+            .unwrap();
+        assert!(recovered
+            .inventory(101)
+            .unwrap()
+            .equipped(EquipmentSlot::MainHand)
+            .is_none());
+        assert_eq!(
+            recovered
+                .inventory(103)
+                .unwrap()
+                .equipped(EquipmentSlot::MainHand)
+                .unwrap()
+                .id,
+            physical_id
+        );
+        assert_eq!(recovered_magic.encode_progression().unwrap(), before);
+        assert_eq!(recovered_magic.mana(character(1)), 37);
+        assert_eq!(recovered_magic.mana(character(3)), 0);
+        assert!(!recovered_magic.knows_spell(character(3), Spell::Ember));
         let _ = std::fs::remove_file(&path);
     }
 
@@ -1271,6 +1306,46 @@ mod tests {
                 .id,
             physical_id
         );
+
+        // The persisted pending Ember intent belongs to the original caster
+        // across BOTH players' authenticated reconnects. A sword changes
+        // owners; neither the intent key nor the spell knowledge changes.
+        let mut fresh_identity = SessionIdentityRegistry::new();
+        fresh_identity
+            .bind_verified(lease(101, 2), character(1))
+            .unwrap();
+        fresh_identity
+            .bind_verified(lease(102, 2), character(2))
+            .unwrap();
+        let mut resumed = recovered;
+        resumed
+            .resume_inventory(&fresh_identity, lease(101, 2))
+            .unwrap();
+        resumed
+            .resume_inventory(&fresh_identity, lease(102, 2))
+            .unwrap();
+        assert!(resumed
+            .inventory(101)
+            .unwrap()
+            .equipped(EquipmentSlot::MainHand)
+            .is_none());
+        assert_eq!(
+            resumed
+                .inventory(102)
+                .unwrap()
+                .equipped(EquipmentSlot::MainHand)
+                .unwrap()
+                .id,
+            physical_id
+        );
+        assert_eq!(recovered_magic.encode_progression().unwrap(), progression);
+        assert_eq!(
+            recovered_magic.ember_intent(character(1), 7),
+            Some(&pending)
+        );
+        assert!(recovered_magic.ember_intent(character(2), 7).is_none());
+        assert_eq!(recovered_magic.pending_ember_intents().count(), 1);
+        assert_eq!(recovered_magic.mana(character(2)), 0);
         let _ = std::fs::remove_file(&path);
     }
 
