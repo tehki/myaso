@@ -8217,6 +8217,16 @@ async function runOnlineUiParryFlight(entries, postParrySleepMs = 80, roles = nu
           .split(/\r?\n/)
           .filter((line) => /^M201_AUTH_(ACTION|BLOCK|PARRY|HIT|BREAK) /.test(line))
           .slice(-32);
+        // Only inspect what Firefox's production 30Hz input sender actually
+        // attempted after the native wheel. This is read-only failure evidence;
+        // never feed it into the verdict, timing, or send another input.
+        let m41InputSubmissions;
+        try {
+          m41InputSubmissions = await execute(defender.base, defender.sessionId,
+            "return (window.__MYASO_M41_INPUT_SUBMISSIONS__ ?? []).slice(-64);");
+        } catch (error) {
+          m41InputSubmissions = { readError: String(error) };
+        }
         console.log("M41_M33_CAUSAL_TRACE " + JSON.stringify({
           attackerNetId: actor?.playerNetId, defenderNetId: peer?.playerNetId,
           chromeReleaseEpochMs: release?.epochMs ?? null,
@@ -8224,6 +8234,7 @@ async function runOnlineUiParryFlight(entries, postParrySleepMs = 80, roles = nu
           wheelMinusReleaseMs: Number.isFinite(release?.epochMs)
             && Number.isFinite(wheel?.epochMs)
             ? wheel.epochMs - release.epochMs : null,
+          m41InputSubmissions,
           browserResults: after.map((entry) => ({
             browser: entry.browser, hp: entry.playerHp,
             guard: entry.playerGuard, feedback: entry.feedbackTransitions,

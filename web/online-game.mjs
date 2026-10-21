@@ -835,6 +835,19 @@ function submitPlayerInput() {
         }
       }
     }
+    // M41 diagnostic only: actual browser input submission timestamps, never
+    // synthetic events or a second transport call. A real Firefox W3C wheel
+    // can precede a server BLOCK by several ticks under compositor/driver
+    // scheduling. Record whether the production 30 Hz sampler submitted it.
+    if (acceptanceScenario === "uiparrytell") {
+      const rows = (window.__MYASO_M41_INPUT_SUBMISSIONS__ ??= []);
+      rows.push({
+        epochMs: Date.now(), clientTick: outgoingTick,
+        serverTick: networkClient.latestServerTick ?? null,
+        block: Boolean(currentInput.block),
+      });
+      if (rows.length > 64) rows.shift();
+    }
     networkClient.sendInput({ tick: outgoingTick, ...currentInput });
     clientTick = (clientTick + 1) >>> 0;
     attackRequested = false;
