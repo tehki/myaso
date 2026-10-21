@@ -151,7 +151,7 @@ def test_competing_claims_single_grant():
           "both items moved by one winner without split")
     check(state(64001) in ("%032x" % 57001, "%032x" % 57002),
           "one durable matching operation consumes grant")
-    check(c3k.receipt_count(57001) + c3k.receipt_count(57002) == "1",
+    check(int(c3k.receipt_count(57001)) + int(c3k.receipt_count(57002)) == 1,
           "only one immutable corpse receipt")
     print("PASS: two independent PostgreSQL clients contend for grant, one complete winner")
 
