@@ -791,6 +791,163 @@ async fn four_live_quic_players_share_one_authoritative_fist_hit() -> Result<()>
     Ok(())
 }
 
+/// Paired NEGATIVE CONTROL for the four-session successful 34HP fist test:
+/// a genuine unarmed swing from the unchanged 96-unit initial separation
+/// must become AttackActive on the real server but damage nobody. This is
+/// not an ignored input or a directly mutated/mock World.
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn four_live_quic_players_see_real_out_of_range_fist_miss() -> Result<()> {
+    use myaso_server::snapshot::{SNAPSHOT_FIELD_ACTION, SNAPSHOT_FIELD_VITALS};
+    let (_server, url, pin) = start_private_staging_server(true)?;
+    let endpoint = Endpoint::client(
+        ClientConfig::builder()
+            .with_bind_default()
+            .with_server_certificate_hashes([pin])
+            .build(),
+    )?;
+    let mut sessions = Vec::new();
+    for (index, &spawn) in SPAWNS.iter().enumerate() {
+        let connection = timeout(Duration::from_secs(6), endpoint.connect(url.as_str()))
+            .await
+            .context("out-of-range client QUIC connect timeout")?
+            .context("out-of-range client QUIC connection refused")?;
+        let (send, mut recv) = timeout(Duration::from_secs(5), connection.open_bi())
+            .await
+            .context("out-of-range baseline reliable stream timeout")??
+            .await
+            .context("out-of-range baseline reliable stream refused")?;
+        let mut header = [0_u8; 2];
+        timeout(Duration::from_secs(5), recv.read_exact(&mut header))
+            .await
+            .context("out-of-range baseline header timeout")??;
+        let size = u16::from_le_bytes(header) as usize;
+        if !(14..=4096).contains(&size) {
+            bail!("out-of-range invalid baseline bytes {size}");
+        }
+        let mut body = vec![0_u8; size];
+        timeout(Duration::from_secs(5), recv.read_exact(&mut body))
+            .await
+            .context("out-of-range baseline payload timeout")??;
+        let baseline = decode_snapshot(&body)
+            .map_err(|e| anyhow::anyhow!("out-of-range baseline corrupt: {e:?}"))?;
+        if !baseline.full || baseline.records.len() != index + 1 {
+            bail!(
+                "out-of-range client {} is not in original authoritative four-player World",
+                index + 1
+            );
+        }
+        let own = baseline
+            .records
+            .iter()
+            .find(|r| r.net_id == index as u32 + 1)
+            .context("out-of-range own server identity missing")?;
+        if (own.x as f32 / 4.0, own.y as f32 / 4.0) != spawn || own.hp != 100 {
+            bail!("out-of-range player {} baseline is incorrect", index + 1);
+        }
+        sessions.push((connection, send, recv, baseline.sequence));
+    }
+    // Prime each distinct client's regular input+snapshot channels.
+    for (index, session) in sessions.iter().enumerate() {
+        let id = index as u32 + 1;
+        send_held_direction(&session.0, session.3, 50_000 + id, (0, 0))?;
+        require_quic_input_ack(&session.0, 50_000 + id, id).await?;
+    }
+    // The server-issued spawns guarantee nearest enemies are 96 apart,
+    // beyond normal light reach 76. Send a REAL attack with face east from
+    // fighter #1 at (4110,4160), aimed toward fighter #2 (4206,4160).
+    // This packet has the exact same attack bit as the positive hit test.
+    let mut attack = vec![0_u8; INPUT_HEADER_BYTES + INPUT_SAMPLE_BYTES];
+    attack[0] = 1;
+    attack[1] = 1;
+    attack[2] = 1;
+    attack[4..6].copy_from_slice(&51_001_u16.to_le_bytes());
+    attack[6..8].copy_from_slice(&sessions[0].3.to_le_bytes());
+    attack[8..12].copy_from_slice(&51_001_u32.to_le_bytes());
+    attack[21] = 1;
+    sessions[0].0.send_datagram(attack)?;
+
+    // Wait for explicit server INPUT_ACK of the attack, then release LMB.
+    // Only the server can choose combat action state and target HP.
+    let ack_deadline = Instant::now() + Duration::from_secs(5);
+    let attack_server_tick = loop {
+        let remaining = ack_deadline.saturating_duration_since(Instant::now());
+        if remaining.is_zero() {
+            bail!("out-of-range attack was never accepted by real server");
+        }
+        let received = timeout(remaining, sessions[0].0.receive_datagram())
+            .await
+            .context("out-of-range attack acknowledgement timeout")??;
+        let bytes = received.as_ref();
+        if bytes.len() == 16
+            && bytes[0] == 1
+            && bytes[1] == 3
+            && u32::from_le_bytes(bytes[4..8].try_into().unwrap()) == 51_001
+            && u32::from_le_bytes(bytes[12..16].try_into().unwrap()) == 1
+        {
+            break u32::from_le_bytes(bytes[8..12].try_into().unwrap());
+        }
+    };
+    send_held_direction(&sessions[0].0, sessions[0].3, 51_002, (0, 0))?;
+    // Observe each real QUIC client independently: active light attack
+    // action 2 must have occurred, but every replicated HP field must
+    // remain 100 until >40 server ticks after the accepted attack.
+    for (index, session) in sessions.iter().enumerate() {
+        let observer = index + 1;
+        let deadline = Instant::now() + Duration::from_secs(5);
+        let mut active_seen = false;
+        let mut latest_tick = 0_u32;
+        let mut hp = [100_u8; 4];
+        loop {
+            let remaining = deadline.saturating_duration_since(Instant::now());
+            if remaining.is_zero() {
+                bail!(
+                    "observer {observer} failed 40-tick real-server miss proof: active={active_seen},                      last_tick={latest_tick}, start_tick={attack_server_tick}, hp={hp:?}"
+                );
+            }
+            let received = timeout(remaining, session.0.receive_datagram())
+                .await
+                .context("out-of-range miss snapshot timed out")??;
+            let bytes = received.as_ref();
+            if bytes.len() < 14 || bytes[0] != 1 || bytes[1] != 2 {
+                continue;
+            }
+            let snapshot = decode_snapshot(bytes)
+                .map_err(|e| anyhow::anyhow!("out-of-range miss invalid snapshot: {e:?}"))?;
+            latest_tick = latest_tick.max(snapshot.server_tick);
+            for record in snapshot.records {
+                if !(1..=4).contains(&record.net_id) {
+                    continue;
+                }
+                if record.net_id == 1
+                    && record.mask & SNAPSHOT_FIELD_ACTION != 0
+                    && record.action == 2
+                {
+                    active_seen = true;
+                }
+                if record.mask & SNAPSHOT_FIELD_VITALS != 0 {
+                    hp[record.net_id as usize - 1] = record.hp;
+                }
+            }
+            if hp != [100; 4] {
+                bail!("observer {observer} saw unauthorized out-of-range fist damage: hp={hp:?}");
+            }
+            if active_seen && latest_tick >= attack_server_tick + 40 {
+                println!(
+                    "ALPHA_8C_REAL_QUIC_FIST_RANGE_MISS observer={observer}                      light_active=yes hp=100,100,100,100 latest_tick={latest_tick}"
+                );
+                break;
+            }
+        }
+    }
+    for (index, session) in sessions.iter().enumerate() {
+        let id = index as u32 + 1;
+        send_held_direction(&session.0, session.3, 52_000 + id, (0, 0))?;
+        require_quic_input_ack(&session.0, 52_000 + id, id).await?;
+    }
+    println!("ALPHA_8C_FOUR_QUIC_FIST_RANGE_FENCE_PASS players=4 miss_outside_76=yes no_victim_hp_change=yes");
+    Ok(())
+}
+
 /// Test the *real* authoritative QUIC stream and replicated state. No direct
 /// Rust simulation calls or client-controlled teleports are used. The matched
 /// OFF run is a negative control; the ON run must stop before the smith wall.

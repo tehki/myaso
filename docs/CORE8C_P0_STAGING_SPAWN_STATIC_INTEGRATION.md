@@ -248,6 +248,39 @@ persistence, server anti-cheat against arbitrary game clients, or the full
 P0 multiplayer playable-alpha user journey. The feature remains OFF
 outside explicitly enabled **loopback-only** static-geometry staging.
 
+## Real four-client out-of-range fist MISS: negative control
+
+The new network-only test
+four_live_quic_players_see_real_out_of_range_fist_miss
+is the **negative control** for the successful 34HP unarmed strike in
+Core 8C #556. It launches one genuine disposable **loopback-only**
+Rust/WebTransport server, four separate certificate-pinned QUIC
+connections, verified server-owned Greyhaven spawn baselines, and four
+independently acknowledged live input channels.
+
+Unlike the hit test, the test sends its real player #1 light-attack
+input **without approaching**. The nearest opponent is player #2 at
+an **actual 96-unit spawn separation**; the existing unarmed attack
+reaches only 76 units. The other two players are also 96+ units away.
+
+Critically, all four individual QUIC observers must actually receive
+the attacker's **server-authored AttackActive action state (wire=2)**,
+so ignoring the attack cannot satisfy the test. For each client, the
+test tracks *every* server-authored HP/vitals update and consumes
+snapshots until at least **40 authoritative server ticks after the
+server accepted the attack** (a full light windup + active + recovery
+cycle). All four fighters must remain exactly **100HP** at each client.
+The server also proves that all four sessions remain input-authorized
+via current, individually addressed QUIC INPUT_ACKs afterward.
+
+This distinguishes an accepted miss from a dropped input and adds a
+genuine four-peer no-damage witness. The paired existing positive test
+requires 100HP->66HP (34HP) after moving inside reach. Neither test
+changes runtime combat decisions, packet formats, server timebase,
+collision authority, client controllers, browser assertions or the
+production listener. No equipped sword, physical click, LOS-complete
+world, separate-host browser or persistent user identity is claimed.
+
 ## Nonclaims and release HOLD
 
 This is **not** full geometry authority. World #509's 23 static AABBs omit
