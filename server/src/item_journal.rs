@@ -368,11 +368,11 @@ impl DurableItemJournal {
         let sequence = self.ledger.committed_sequence();
         let item = self.ledger.equipped_item(character, 0);
         let currently_equipped = if let Some(item_id) = item {
-            let last = self
-                .ledger
-                .last_mutation_sequence(item_id)
-                .ok_or(ItemJournalError::InvalidRecord("equipped item without mutation"))?;
-            if last == 0 || last > sequence
+            let last = self.ledger.last_mutation_sequence(item_id).ok_or(
+                ItemJournalError::InvalidRecord("equipped item without mutation"),
+            )?;
+            if last == 0
+                || last > sequence
                 || self.ledger.location(item_id)
                     != Some(ItemLocation::Equipped {
                         character_id: character,
