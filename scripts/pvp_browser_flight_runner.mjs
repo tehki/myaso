@@ -9790,9 +9790,12 @@ async function runOnlineUiGuardBreakFlight(entries, { onGuardBroken = null } = {
           // Require trusted native wheel BEFORE release for M194 only, with
           // the same unchanged server parry/guard/damage and strict W3C gates.
           trustedWheelWaitMs: ["uiguardbreak", "uiguardbreakpunishffahit"].includes(scenario) ? 190 : 0,
-          // M205: one additional bounded genuine-wheel sampling interval
-          // before the ONLY real Chrome release; never synthesize input.
-          postTrustedWheelMs: scenario === "uiguardbreakpunishffahit" ? 40 : 0,
+          // M194 + M205: one bounded genuine-wheel sampling interval
+          // before the ONLY real Chrome release. Original #39526355920
+          // confirmed real defender Block tick 251 -> Parry tick 257 (<125ms).
+          // This delays the same release input, not the server parry/guard rule.
+          // The exact -38 guard/no-parry/no-HP-loss assertions remain fatal.
+          postTrustedWheelMs: ["uiguardbreak", "uiguardbreakpunishffahit"].includes(scenario) ? 40 : 0,
           sendAttackDown: () => setArenaAttackButton(attacker, true),
           sendWheel: () => scrollArenaWheel(defender, defenderElementId, 120, 0),
           awaitTrustedWheel: () => challenge.wait(),
