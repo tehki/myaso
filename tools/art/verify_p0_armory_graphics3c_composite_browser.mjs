@@ -130,12 +130,26 @@ async function run(browserName,variant){
   assert.ok(initial.cachedTiles>0 && initial.cachedTiles<=24);
   assert.deepEqual(initial.officialSwordAnchors,[[3740,4038],[3780,4038],[3820,4038],[3860,4038]]);
   assert.deepEqual(initial.officialSocketIds,[1,2,3,4].map(i=>"greyhaven-rack-"+i));
-  const image=variant+"_"+browserName+"_real_source_composite.png";
-  await page.screenshot({path:join(output,image),fullPage:true});
-  const canvasImg=variant+"_"+browserName+"_canvas.png";
-  const canvas=await page.$("#scene");
-  const png=await canvas.screenshot({path:join(output,canvasImg)});
-  const canvasSHA256=createHash("sha256").update(png).digest("hex");
+  // Low-end Linux Chromium may load and paint successfully yet deadlock its
+  // CDP Page.captureScreenshot. A *separate* explicitly no-screenshot smoke
+  // reads the actual Canvas pixel bytes via 2D getImageData and exercises
+  // native pointer input; NEVER claim a screenshot or full visual acceptance.
+  const noScreenshot=process.env.P0_QA_NO_SCREENSHOT==="1";
+  const canvasFNV=await page.$eval("#scene",c=>{
+   const d=c.getContext("2d",{willReadFrequently:true}).getImageData(0,0,640,640).data;
+   let hash=2166136261;
+   for(let i=0;i<d.length;i++)hash=Math.imul(hash^d[i],16777619);
+   return (hash>>>0).toString(16).padStart(8,"0");
+  });
+  const image=noScreenshot?null:variant+"_"+browserName+"_real_source_composite.png";
+  const canvasImg=noScreenshot?null:variant+"_"+browserName+"_canvas.png";
+  let canvasSHA256=null;
+  if(!noScreenshot){
+   await page.screenshot({path:join(output,image),fullPage:true});
+   const canvas=await page.$("#scene");
+   const png=await canvas.screenshot({path:join(output,canvasImg)});
+   canvasSHA256=createHash("sha256").update(png).digest("hex");
+  }
   // Genuine opaque source alpha WebP hit with native browser pointer events.
   const first=initial.swordRects.find(x=>x.id==="ART-ONLY-NO-SERVER-0");
   assert.ok(first);
@@ -154,7 +168,8 @@ async function run(browserName,variant){
   assert.deepEqual(errors,[]);
   report.cases.push({browser:browserName,browserVersion:await browser.version(),
     variant,pinnedRendererHash:sourceHashes[variant==="world493"?"worldPainter":"graphics3cPainter"],
-    canvasSha256:canvasSHA256,screenCaptured:canvasImg,fullScreenshot:image,
+    canvasSha256:canvasSHA256,canvasPixelFnv32:canvasFNV,
+    screenshotsCaptured:!noScreenshot,screenCaptured:canvasImg,fullScreenshot:image,
     cachedTiles:initial.cachedTiles,createdTiles:initial.createdTiles,
     rackRect:initial.rackRect,swordRects:initial.swordRects,
     syntheticArtItems:4,realCommittedItems:0,
@@ -173,10 +188,15 @@ try{
  for(const browser of engines){
   const cases=report.cases.filter(c=>c.browser===browser);
   assert.equal(cases.length,2);
-  assert.notEqual(cases[0].canvasSha256,cases[1].canvasSha256,
+  if(process.env.P0_QA_NO_SCREENSHOT==="1")
+   assert.notEqual(cases[0].canvasPixelFnv32,cases[1].canvasPixelFnv32,
+     "Expected actual Canvas pixel readback to differ when 3C environment is enabled");
+  else assert.notEqual(cases[0].canvasSha256,cases[1].canvasSha256,
     "Expected visible Graphics 3C changes to World-only authored background, not identical screenshot");
  }
- report.status=engines.includes("chrome")&&engines.includes("firefox")
+ report.status=process.env.P0_QA_NO_SCREENSHOT==="1"
+   ?"ART_ONLY_NO_SCREENSHOT_INPUT_PASS":
+   engines.includes("chrome")&&engines.includes("firefox")
    ?"ART_ONLY_CROSS_BROWSER_COMPOSITE_PASS":"ART_ONLY_SINGLE_ENGINE_COMPOSITE_PASS";
  await writeFile(join(output,"p32_original_source_composite_browser.json"),
    JSON.stringify(report,null,2)+"\n");
