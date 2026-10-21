@@ -318,6 +318,35 @@ a browser-native two-host flight, complete map/LOS/epoch fencing, or recovery
 from server crash. It neither changes Combat nor bypasses the default-OFF,
 explicit loopback-only reviewed-static staging security boundary.
 
+## Core 8C — all four original QUIC sessions receive the reliable kill feed
+
+The child regression also verifies the actual server-authored **reliable
+kill event stream** for the preceding three-heavy-hit death/respawn.
+The original server exposes an existing length-prefixed binary
+KILL_EVENT packet (wire type=4, exactly 16 bytes) on each authenticated
+bidirectional QUIC reliable stream; this is separate from lossy datagram
+combat snapshots. No new packet type, runtime fanout or client policy is
+introduced.
+
+After all four independently prove server-originated 0HP / Dead and
+100HP / Idle respawn, the acceptance reader resumes each existing
+session's original **unclosed reliable stream**. It reads bounded real
+length-prefixed frames, verifies the protocol byte, refuses unknown or
+invalid event frames, and tolerates correctly decoded type=2 background
+reliable snapshots. All four original clients must each decode **exactly
+the same first server kill-event sequence 0, killer ID 1, victim ID 2**,
+rather than simply seeing a local death animation, or deriving a kill
+announcement from a predicted HP value. The stream belongs to the
+original live session and is never replaced by privileged World access.
+
+This verifies one genuine server-originated kill-feed delivery to four
+connected users in the private loopback world, in addition to already
+tested live death/respawn replication. It is **not** a browser kill-feed
+rendering test, a multi-kill ordering or reliability-under-loss proof,
+account persistence guarantee, or an authorization to enable a wider
+staging bind. The same original controls and production CI gates remain
+mandatory.
+
 ## Nonclaims and release HOLD
 
 This is **not** full geometry authority. World #509's 23 static AABBs omit
