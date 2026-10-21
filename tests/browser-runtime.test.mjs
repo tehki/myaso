@@ -1,3 +1,4 @@
+import "./arena-focus-guide.test.mjs";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { createFrameBudget } from "../src/browser/frame-budget.mjs";

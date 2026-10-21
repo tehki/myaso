@@ -1,7 +1,9 @@
 import { installControlGuide } from "../src/browser/control-guide.mjs";
+import { installArenaFocusGuide } from "../src/browser/arena-focus-guide.mjs";
 installControlGuide(document);
 
 const params = new URLSearchParams(window.location.search);
+installArenaFocusGuide(document, { online: params.has("server") });
 
 if (params.has("server")) {
   try {
