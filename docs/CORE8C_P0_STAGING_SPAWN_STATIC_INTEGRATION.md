@@ -214,6 +214,40 @@ The entire experiment uses the existing loopback-only static-collision
 profile; it does not create, bind or expose a separate public service,
 and makes no 2-host browser or sword pickup claim.
 
+## Core 8C — first real four-client shared-world PvP fist strike
+
+The real-transport test
+four_live_quic_players_share_one_authoritative_fist_hit
+starts the existing isolated, loopback-only, static-review-enabled Rust
+server and opens four separately pinned real WebTransport QUIC connections.
+The existing Rust World owns all four fighter IDs, their initial positions
+and every combat event. Each session primes datagram replication and
+receives a correctly addressed authoritative input ACK.
+
+Without any direct server World calls from the test, player #1 sends
+normal movement samples until its server-replicated x coordinate reaches
+about 4142 in the open Greyhaven spawn courtyard; player #2 is still at
+(4206,4160). This puts the two fighters within the existing unarmed
+light attack reach of 76 world units, but outside their radius-18 physical
+collision separation. Players #3/#4 remain too far away to be hit.
+
+Player #1 then sends the existing normal input packet with its **light
+attack button set**, facing east and without a sword/gear override. The
+unmodified server evaluates the hit and updates authoritative #2 vitals
+from 100HP to 66HP (the existing 34HP light damage). **All four separately
+connected clients must independently receive this exact 66HP server
+snapshot**, not a local client prediction, mock Combat event or untrusted
+input damage value. Each must retain its own QUIC session and receive an
+individually addressed fresh gameplay ACK after the shared hit.
+
+This proves one normal network-driven **unarmed** PvP hit in a four-user
+single-server authoritative world. It does **not** prove equipped sword
+combat, hit visual effects, user-facing real-browser mouse controls,
+death/respawn, latency robustness, remote WAN host independence, inventory
+persistence, server anti-cheat against arbitrary game clients, or the full
+P0 multiplayer playable-alpha user journey. The feature remains OFF
+outside explicitly enabled **loopback-only** static-geometry staging.
+
 ## Nonclaims and release HOLD
 
 This is **not** full geometry authority. World #509's 23 static AABBs omit
