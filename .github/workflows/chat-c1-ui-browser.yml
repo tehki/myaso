@@ -53,3 +53,7 @@ jobs:
         env:
           C1_BROWSER_MATRIX: chrome,firefox,chrome,chrome
         run: node scripts/chat_c1_four_greyhaven_acceptance.mjs
+      - name: Four genuine rendered Greyhaven browsers, chat and fresh HUD
+        env:
+          C1_BROWSER_MATRIX: chrome,firefox,chrome,chrome
+        run: node scripts/chat_c1_four_rendered_greyhaven_acceptance.mjs
