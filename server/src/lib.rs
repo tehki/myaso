@@ -4,6 +4,7 @@ use std::sync::{
 };
 
 pub mod character_identity;
+pub mod combat_loadout;
 pub mod kill_event;
 pub mod loot;
 pub mod loot_persistence;
