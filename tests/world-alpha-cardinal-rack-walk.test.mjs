@@ -87,3 +87,38 @@ test("P0 north-first shortcut is NOT a valid substitute for the reviewed south-s
   // This proves only known STATIC rectangles, never river/doors/players,
   // authoritative position, player input timing or sword ownership.
 });
+
+test("P0 closer stand candidate is within prototype reach even with 18-unit arrival uncertainty",()=>{
+  // World-only math/geometry candidate; NOT a server item, physics LOS check,
+  // live destination or a client-authoritative pickup approval.
+  const reviewedItemsPrototypeReach=56,arrivalTolerance=18;
+  const closerY=4068; // original physical rack sword y=4038
+  const map=getAuthoredMap(MAP_IDS.overworld);
+  const candidates=[];
+  for(const sword of WORLD_ALPHA_SWORD_RACK_SOCKETS){
+    const target={x:sword.x,y:closerY};
+    const gap=Math.hypot(target.x-sword.x,target.y-sword.y);
+    assert.equal(gap,30);
+    assert.equal(gap+arrivalTolerance,48);
+    assert.ok(gap+arrivalTolerance<=reviewedItemsPrototypeReach);
+    assert.ok(inCity(target,map.city));
+    assert.ok(clear(sword.approach,target),
+      "standing point to closer target blocked: "+sword.socketId);
+    assert.ok(clear(target,sword.approach));
+    // Recorded genuine native arrival at the south edge of original y4088
+    // is 68 from the actual y4038 sword, beyond the provisional reach56.
+    assert.equal(Math.hypot(sword.approach.x-sword.x,
+      sword.approach.y+arrivalTolerance-sword.y),68);
+    candidates.push(target);
+  }
+  for(let i=0;i<candidates.length;i++)
+    for(let j=i+1;j<candidates.length;j++)
+      assert.ok(Math.hypot(candidates[i].x-candidates[j].x,
+        candidates[i].y-candidates[j].y)>=fighterRadius*2);
+  // Distinct swords can be eligible simultaneously: no nearest auto-pick.
+  for(let i=0;i<3;i++)
+    assert.equal(Math.hypot(
+      candidates[i].x-WORLD_ALPHA_SWORD_RACK_SOCKETS[i+1].x,
+      closerY-WORLD_ALPHA_SWORD_RACK_SOCKETS[i+1].y
+    ),50);
+});
