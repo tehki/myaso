@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
 test("M121 real strafe key stays held across one genuine short LMB release", () => {
-  const runner = readFileSync(new URL("../scripts/pvp_browser_flight_runner.mjs", import.meta.url), "utf8");
+  const runner = readFileSync(new URL("../scripts/pvp_browser_flight_runner.mjs", import.meta.url), "utf8").replace(/\r\n/g, "\n");
   const from = runner.indexOf("async function performArenaDirectionalLight(");
   const to = runner.indexOf("\n\nasync function ", from + 35);
   assert.ok(from > 0 && to > from, "M121 native helper must exist");

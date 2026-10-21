@@ -686,7 +686,8 @@ jobs:
           node --check scripts/pvp_browser_flight_runner.mjs
           node --check scripts/m201-authoritative-phase-proof.mjs
           node --test tests/m201-authoritative-phase-proof.test.mjs
-          node --test tests/r2-m205-guard-break-sampling.test.mjs\n          node --test tests/m41-native-release-led-parry.test.mjs
+          node --test tests/r2-m205-guard-break-sampling.test.mjs
+          node --test tests/m41-native-release-led-parry.test.mjs
           node --test --test-name-pattern="FFA guard-break punish focus|zero-guard stun|authoritative opponent guard break" tests/m29-combat-readability.test.mjs
           # Fresh actual Chrome/Firefox/Chrome2 processes per iteration. The
           # acceptance runner starts a NEW Rust loopback server and all three
