@@ -15,12 +15,15 @@ import { ARENA_VIEW_ZOOM, nearbyOffscreenPointers, projectArenaPoint } from "../
 import { createAuthoredWorldRenderer } from "../src/browser/authored-world-renderer.mjs";
 import { createWorldLivenessProbe, isWorldLivenessProbeEnabled } from "../src/browser/world-liveness-probe.mjs";
 import { authoritativeOnlineStatus } from "../src/browser/authoritative-status.mjs";
+import { idrScoreboardRows, idrFocusText, idrKillFeedText, idrStatusText, isIdrPreviewEligible } from "../src/browser/identity-visibility.mjs";
 import { MAP_IDS } from "../src/world/authored-maps.mjs";
 import { NETWORK } from "../src/network/constants.mjs";
 import { connectAuthoritativeClient, parseSha256Hex } from "./authoritative-client.mjs";
 import { neutralBackgroundInput } from "../src/browser/neutral-background-input.mjs";
 
 const canvas = document.querySelector("#arena");
+// Reviewer-only anonymity preview. No trusted identity evidence is on the wire.
+const idrPreview = isIdrPreviewEligible(window.location);
 const chargeHud = {
   root: document.querySelector("#heavy-charge-indicator"),
   value: document.querySelector("#heavy-charge-value"),
@@ -562,7 +565,8 @@ function recordKillEvent(event) {
   const presentation = killFeedPresentation(event, ownId);
   if (!presentation.visible) return;
   killFeedSequences.add(event.sequence);
-  killFeedEntries.unshift({ sequence: event.sequence, ...presentation });
+  killFeedEntries.unshift({ sequence: event.sequence, ...presentation,
+    text: idrPreview ? idrKillFeedText(event, ownId) : presentation.text });
   if (presentation.victimOwn) audio.play("death");
   while (killFeedEntries.length > 4) {
     const removed = killFeedEntries.pop();
@@ -1801,7 +1805,8 @@ function updateOpponentRecovery(remote, focusMode = "nearest", own = null) {
 
 function updateScoreboard(ownId) {
   if (!scoreboardList || !networkClient) return;
-  const rows = fighterScoreboardPresentation(networkClient.state.values(), ownId);
+  const originalRows = fighterScoreboardPresentation(networkClient.state.values(), ownId);
+  const rows = idrPreview ? idrScoreboardRows(originalRows) : originalRows;
   const point = fighterMatchPointPresentation(networkClient.state.values(), ownId);
   const signature = rows.map((row) => `${row.netId}:${row.kills}:${row.own ? 1 : 0}`).join("|");
   if (scoreboardTitle && scoreboardTitle.textContent !== `FIRST TO ${FFA_KILL_TARGET}`) {
@@ -1811,7 +1816,8 @@ function updateScoreboard(ownId) {
   if (matchPoint && hudCache.matchPoint !== pointSignature) {
     hudCache.matchPoint = pointSignature;
     matchPoint.hidden = !point.visible;
-    if (point.visible) matchPoint.textContent = `${point.title} · ${point.detail}`;
+    if (point.visible) matchPoint.textContent = idrPreview
+      ? idrStatusText(`${point.title} · ${point.detail}`) : `${point.title} · ${point.detail}`;
   }
   if (hudCache.scoreboard === signature) return;
   hudCache.scoreboard = signature;
@@ -1831,6 +1837,10 @@ function setFocusTarget(netId, mode = "nearest") {
   if (!hud.focusLabel || (hudCache.focusNetId === netId && hudCache.focusMode === mode)) return;
   hudCache.focusNetId = netId;
   hudCache.focusMode = mode;
+  if (idrPreview) {
+    hud.focusLabel.textContent = idrFocusText(mode, Boolean(netId));
+    return;
+  }
   hud.focusLabel.textContent = netId
     ? (mode === "guard-break"
       ? `GUARD BREAK #${netId}`
@@ -1853,10 +1863,11 @@ function setMeter(cacheKey, bar, label, value) {
 }
 
 function setStatus(text) {
-  if (hudCache.status === text) return;
-  hudCache.status = text;
-  eventText.textContent = text;
-  worldLivenessProbe?.recordStatus(text, Date.now());
+  const shown = idrPreview ? idrStatusText(text) : text;
+  if (hudCache.status === shown) return;
+  hudCache.status = shown;
+  eventText.textContent = shown;
+  worldLivenessProbe?.recordStatus(shown, Date.now());
 }
 
 function createArenaLayer() {

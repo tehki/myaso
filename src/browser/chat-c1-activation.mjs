@@ -3,6 +3,7 @@
 // authenticated WebTransport game session; it never owns combat datagrams.
 import { installLocalChat } from "./local-chat.mjs";
 import { openLocalChatUiBridge } from "../network/local-chat-ui-bridge.mjs";
+import { isIdrPreviewEligible } from "./identity-visibility.mjs";
 
 export function isChatC1PreviewEligible(location) {
   if (!location || location.protocol !== "http:") return false;
@@ -19,6 +20,7 @@ export async function activateChatC1Preview({
   if (!panel || gameClient?.transport?.kind !== "webtransport") return null;
   try {
     const adapter = await openBridge(gameClient.transport, {
+      identityPreview: isIdrPreviewEligible(location),
       onDisconnect() { panel.bindAdapter(null); },
     });
     if (panel.root.isConnected === false) {
