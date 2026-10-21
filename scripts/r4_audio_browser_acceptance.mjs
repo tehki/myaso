@@ -266,6 +266,51 @@ async function run(browser, port) {
     assert.equal(advanced.loop, false);
     console.log("R4_NATIVE_AUDIO " + JSON.stringify({ browser, decoded: loaded, ...result,
       playbackTime, playlistNext: advanced.next }));
+
+    // Sound A2: native, real decoded-OGG output for the six dormant fist/armory
+    // cues. The synthetic normalized receipt below is a unit-sized fixture,
+    // NOT proof of Core/Items authentication or of four online players.
+    const a2 = await script(`
+      return import("/src/browser/armory-audio-contract.mjs").then(
+        ({ cueForAuthoritativeStrike, createConfirmedArmoryCueGate }) => {
+          const audio = window.__r4Audio;
+          audio.setMuted(false);
+          const gate = createConfirmedArmoryCueGate();
+          gate.beginSession("browser-a2-fixture");
+          const fixture = {
+            source: "authoritative", status: "COMMITTED", sessionEpoch: "browser-a2-fixture",
+            receiptId: "fixture-tx1", actorNetId: 2,
+            itemId: "fixture-sword-1", itemRevision: 1, operation: "PICKUP"
+          };
+          const denied = gate.consume({ ...fixture, status: "DENIED" });
+          const confirmed = gate.consume(fixture);
+          const replay = gate.consume(fixture);
+          const cues = [
+            cueForAuthoritativeStrike({ kind: "UNARMED", itemId: null }, "light"),
+            cueForAuthoritativeStrike({ kind: "UNARMED", itemId: null }, "heavy"),
+            cueForAuthoritativeStrike({ kind: "UNARMED", itemId: null }, "hit"),
+            confirmed?.cue,
+            "swordEquip", "swordDrop",
+          ];
+          const before = window.__r4SourceStarts;
+          const played = cues.map(cue => audio.play(cue));
+          return { denied, replay, cues, played,
+            recordedStarts: window.__r4SourceStarts - before,
+            decoded: audio.loadedFoleyCount(), contextState: window.__r4Context.state };
+        });
+    `);
+    assert.equal(a2.denied, null, browser + " denied pickup must stay silent");
+    assert.equal(a2.replay, null, browser + " repeated receipt must stay silent");
+    assert.deepEqual(a2.cues, ["fistLight", "fistHeavy", "fistHit",
+      "swordPickup", "swordEquip", "swordDrop"]);
+    assert.deepEqual(a2.played, [true, true, true, true, true, true],
+      browser + " native A2 cues must all play on the already unlocked context");
+    assert.equal(a2.recordedStarts, 6,
+      browser + " A2 cues must use six real decoded recorded samples, not fallback oscillators");
+    assert.equal(a2.decoded, 24, browser + " A2 must reuse the credited local 24 OGGs");
+    assert.equal(a2.contextState, "running");
+    console.log("SOUND_A2_NATIVE_CUES " + JSON.stringify({ browser, recordedStarts: a2.recordedStarts,
+      decoded: a2.decoded, cues: a2.cues, fixtureOnly: true }));
     // Release native media/context resources before closing browser.
     await script("window.__r4Audio.dispose(); return true;");
 

@@ -14,6 +14,14 @@ const CUES = Object.freeze({
   block: { start: 390, end: 140, duration: .13, gain: .10, noise: .045, filter: 950, wave: "triangle", minMs: 80 },
   guardbreak: { start: 220, end: 65, duration: .24, gain: .14, noise: .04, filter: 650, wave: "triangle", minMs: 130 },
   death: { start: 155, end: 48, duration: .36, gain: .13, noise: .05, filter: 450, wave: "triangle", minMs: 300 },
+  // Dormant P0 armory cues: do not use without authoritative equipment/receipt events.
+  // Reuse existing credited local OGGs; avoid slow network requests on combat input.
+  fistLight: { start: 150, end: 55, duration: .11, gain: .14, noise: .10, filter: 530, wave: "triangle", minMs: 55 },
+  fistHeavy: { start: 110, end: 38, duration: .18, gain: .20, noise: .14, filter: 430, wave: "triangle", minMs: 85 },
+  fistHit: { start: 125, end: 42, duration: .15, gain: .18, noise: .13, filter: 510, wave: "triangle", minMs: 60 },
+  swordPickup: { start: 270, end: 130, duration: .12, gain: .10, noise: .04, filter: 840, wave: "sine", minMs: 110 },
+  swordEquip: { start: 390, end: 170, duration: .16, gain: .11, noise: .05, filter: 1020, wave: "triangle", minMs: 110 },
+  swordDrop: { start: 200, end: 65, duration: .17, gain: .16, noise: .11, filter: 650, wave: "triangle", minMs: 110 },
   ui: { start: 720, end: 920, duration: .07, gain: .075, noise: 0, filter: 1200, wave: "sine", minMs: 75 },
 });
 
@@ -34,6 +42,13 @@ const RECORDED_FOLEY = Object.freeze({
   block: ["beltHandle1", "dropLeather", "metalClick"],
   guardbreak: ["dropLeather", "cloth1"],
   death: ["deathFall1", "deathFall2"],
+  // Intentional muted leather/cloth body thuds distinguish fists from blades.
+  fistLight: ["dropLeather", "cloth1"],
+  fistHeavy: ["dropLeather", "cloth2"],
+  fistHit: ["dropLeather", "cloth1"],
+  swordPickup: ["beltHandle1", "cloth4"],
+  swordEquip: ["drawKnife1", "drawKnife2"],
+  swordDrop: ["dropLeather", "cloth2"],
 });
 // Owner listening review: the original metal pot resonances squeal, with the
 // worst variant in Guard Break. Exclude those files entirely rather than
