@@ -161,6 +161,14 @@ The new `scripts/test_economics_core_gateway.py` adds **22 tests** for mandatory
 
 Read the explicit [ECONOMY_E2I_STRICT_SERVER_ADMISSION_GATEWAY.md](./ECONOMY_E2I_STRICT_SERVER_ADMISSION_GATEWAY.md). Real Core 8A/8B must install a genuine account-character/connection verifier, Core 8C must enforce authoritative worker/zone/epoch fencing, and the approved PostgreSQL production transaction must recheck every identity/title/balance/consent condition at COMMIT. Until then, no gameplay purchase route, real balances, wallet, Moon Coin, or automatic merge/deploy is permitted.
 
+### E2j — Dedicated PostgreSQL 16 settlement acceptance (21 October 2026)
+
+E2d–E2i validate an **offline SQLite** purchase model with fictional accounts and mock admission. E2j adds a separate **PostgreSQL 16 test-only** economic settlement schema and function under `scripts/economics_e2j_pg_lab.sql`. Within one real PostgreSQL transaction, the function locks fictional session, current worker/zone/epoch, deed, consent, listing and account rows and atomically applies zero-sum credit postings, an exact title transfer, spent consent/listing, unique immutable receipt and outbox event. A replay with the same full intent returns the original receipt only if the session and the mock worker/epoch authority are still admitted. A stale worker is denied access to old receipts after handoff. A brand-new operation cannot resell consumed property.
+
+The independent `scripts/verify_economics_pg_lab.py` suite runs **15/15 real PostgreSQL 16 test cases**, including two independent SQL clients contending for one listing, rollback, account underfunding and wrong revision, stale/frozen authority, consent mutations, session revocation and post-commit replay. It is limited to an exclusively named **disposable `myaso_e2j_test` database**. The new additive `.github/workflows/economics-e2j-postgres.yml` test gate was **green** for the final 15-test E2j source at [run #39529781711](https://github.com/tehki/myaso/actions/runs/39529781711). No existing full quality gate was disabled.
+
+See [ECONOMY_E2J_POSTGRES_SETTLEMENT_LAB.md](./ECONOMY_E2J_POSTGRES_SETTLEMENT_LAB.md) for the exact acceptance and blockers. This is **not** the actual Core 8C PostgreSQL schema; E2j uses a separate, fixture-seeded mock zone fence and mock session. It has no real account authentication, cryptographic seller consent, production migration, established game server PG connection, role-based restriction for real users, wallet or Moon Coin integration. Core 8B/8C/World central review is required before any real transaction.
+
 ### What this does **not** prove
 
 - **Not a production identity/authentication system:** caller can fabricate `VerifiedSession`. No Telegram/game login, server session keys, durable player IDs, ban/ownership policy, per-account quotas across shards or seller signature/consent verification.
