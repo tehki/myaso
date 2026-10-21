@@ -177,7 +177,7 @@ fn actual_core_swept_solver_checks_reach_safe_rack_staging_candidate() {
     for (i, stand) in WORLD9_RACK_STANDS.into_iter().enumerate() {
         let candidate: Point = (stand.0, 4068.0);
         assert_eq!(candidate.1 - 4038.0, 30.0);
-        assert!(30.0 + FIGHTER_RADIUS <= 56.0);
+        assert!(candidate.1 - 4038.0 + FIGHTER_RADIUS <= 56.0);
         assert_static_segment_clear(
             stand,
             candidate,
