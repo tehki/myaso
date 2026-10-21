@@ -111,20 +111,37 @@ Core Architect [#527](https://github.com/tehki/myaso/pull/527) verifies
 AABBs. This child then sends real QUIC input over the existing server
 transport, no direct Rust simulator-position mutation:
 
-1. Open four separate certificate-pinned QUIC
-   sessions, verify authoritative server-owned immutable spawn baselines.
-2. Move **all four players concurrently** on the same authoritative game
-   tick stream, using four independently polled QUIC input/snapshot futures,
-   not four sequential walks under otherwise idle connections. Each follows
-   the approved public waypoints
-   `(3990,4180)`, `(3980,4090)` and one **distinct** rack approach at
-   `(3740,4088)`, `(3780,4088)`, `(3820,4088)`, `(3860,4088)`.
-   Read each arrival only from actual replicated QUIC position datagrams;
-   require bounded continuous movement and forbid intersection with all
-   23 reviewed solids. The original sword visuals remain at `y=4038`.
-3. Verify **four final session-specific input ACKs** after the last arrival
-   so a fallen/missing connection cannot pass as four live users. Keep one
-   real shared authoritative game process (not four simulated Worlds).
+1. Open four separate certificate-pinned QUIC sessions and verify
+   server-owned immutable spawn baselines and their initial replicated rosters.
+2. Move **all four players simultaneously** under independent QUIC futures
+   in one authoritative server World. Give each player a separate static-safe
+   diagonal corridor from its own spawn to its unique rack approach, with
+   fractional checkpoints along that corridor. The Chief Architect's
+   separate #527 matrix also verifies **16/16** fallback city waypoint routes.
+   The live test does not march all four physical fighters into the same
+   waypoint, because server fighter separation can move them out of position.
+3. Require actual replicated positions near (3740,4088), (3780,4088),
+   (3820,4088), (3860,4088); validate each path's continuous radius-18
+   sweep against the pinned solids, not just final endpoints. The four
+   physical sword *visuals* are still at y=4038 and are not picked up.
+4. After initial arrivals, obtain a late authoritative four-fighter roster,
+   at least 30 server ticks newer than the final session input ACK.
+   A player can be knocked out of its approach by another fighter even
+   after its first valid arrival. If that happens, correct its position using
+   **its own ordinary QUIC movement commands**; never write or teleport a
+   Rust Fighter from the test.
+5. Maintain an independent client-style **delta-replication cache for each
+   of the four QUIC sessions** while they move. An unchanged entity omitted
+   from a later delta remains in the cache, but a removal explicitly clears
+   it. Require four new server-specific post-correction input ACKs, then a
+   sufficiently fresh authoritative snapshot for each observer. Each
+   reconstructed client roster must place **all four peers** within 24
+   world units of their distinct approach locations. This tests actual
+   shared-world visibility, not four isolated local predictions.
+
+The scoped tests also assert the client cache's unchanged-position and
+removal handling. All evidence is obtained through the existing network
+protocol, with no privileged test stream or current-time map authority.
 
 Acceptance marker `ALPHA_8C_FOUR_QUIC_DISTINCT_RACK_ROUTES_PASS`
 proves four *socket approaches* only. It does **not** prove physical sword
@@ -132,7 +149,8 @@ target pixels, click, pickup LOS/range, one-winner u64/u128 item ownership,
 actual equipped MainHand, real browser user inputs or separate computers.
 The loopback-only isolation remains in force. No live map/revision capability.
 The concurrent four-client movement proof checks actual on-wire server
-positions; it does not emulate independent browser event loops or two-host WAN.
+positions and per-connection replication deltas. It does not emulate
+independent browser event loops or independent-host WebTransport.
 
 ## Nonclaims and release HOLD
 

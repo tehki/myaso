@@ -4,6 +4,7 @@
 //! Strictly loopback, certificate-pinned, no browser/gameplay/WAN claim.
 use anyhow::{bail, Context, Result};
 use myaso_server::{
+    is_sequence_newer16,
     snapshot::{decode_snapshot, SNAPSHOT_FIELD_POSITION},
     INPUT_HEADER_BYTES, INPUT_SAMPLE_BYTES,
 };
@@ -256,11 +257,43 @@ fn send_held_direction(
     Ok(())
 }
 
+/// Preserve unchanged peers from delta packets, as a real client does.
+fn fold_quic_peer_positions(
+    state: &mut [Option<(f32, f32)>; 4],
+    records: &[myaso_server::snapshot::SnapshotRecord],
+) {
+    for record in records {
+        if !(1..=4).contains(&record.net_id) {
+            continue;
+        }
+        let slot = record.net_id as usize - 1;
+        if record.mask & myaso_server::snapshot::SNAPSHOT_FIELD_REMOVED != 0 {
+            state[slot] = None;
+        } else if record.mask & SNAPSHOT_FIELD_POSITION != 0 {
+            state[slot] = Some((record.x as f32 / 4.0, record.y as f32 / 4.0));
+        }
+    }
+}
+
 async fn next_authoritative_position(
     connection: &wtransport::Connection,
     entity: u32,
     deadline: Instant,
 ) -> Result<(f32, f32)> {
+    let (position, _) =
+        next_authoritative_position_with_snapshot_ack(connection, entity, deadline, None).await?;
+    Ok(position)
+}
+
+/// Return the actual server snapshot sequence along with the authoritative
+/// own position, so the QUIC acceptance driver ACKs the LATEST received
+/// replication frame instead of endlessly pinning to its initial baseline.
+async fn next_authoritative_position_with_snapshot_ack(
+    connection: &wtransport::Connection,
+    entity: u32,
+    deadline: Instant,
+    mut view: Option<&mut [Option<(f32, f32)>; 4]>,
+) -> Result<((f32, f32), u16)> {
     loop {
         let remaining = deadline.saturating_duration_since(Instant::now());
         if remaining.is_zero() {
@@ -275,12 +308,18 @@ async fn next_authoritative_position(
         }
         let snapshot = decode_snapshot(bytes)
             .map_err(|e| anyhow::anyhow!("invalid authoritative snapshot: {e:?}"))?;
+        if let Some(cache) = view.as_deref_mut() {
+            fold_quic_peer_positions(cache, &snapshot.records);
+        }
         if let Some(record) = snapshot
             .records
             .iter()
             .find(|record| record.net_id == entity && record.mask & SNAPSHOT_FIELD_POSITION != 0)
         {
-            return Ok((record.x as f32 / 4.0, record.y as f32 / 4.0));
+            return Ok((
+                (record.x as f32 / 4.0, record.y as f32 / 4.0),
+                snapshot.sequence,
+            ));
         }
     }
 }
@@ -396,8 +435,10 @@ async fn drive_real_quic_fighter_to(
     id: u32,
     initial_position: (f32, f32),
     goals: &[(f32, f32)],
-) -> Result<(f32, f32)> {
+    mut view: [Option<(f32, f32)>; 4],
+) -> Result<((f32, f32), [Option<(f32, f32)>; 4])> {
     let mut at = initial_position;
+    let mut last_snapshot_ack = baseline_sequence;
     let mut tick = 1000 + id * 10;
     let mut total_samples = 0_usize;
     for &goal in goals {
@@ -413,8 +454,17 @@ async fn drive_real_quic_fighter_to(
             let dir_x = ((dx / distance * 127.0).round() as i32).clamp(-127, 127) as i8;
             let dir_y = ((dy / distance * 127.0).round() as i32).clamp(-127, 127) as i8;
             tick += 1;
-            send_held_direction(connection, baseline_sequence, tick, (dir_x, dir_y))?;
-            let next = next_authoritative_position(connection, id, deadline).await?;
+            send_held_direction(connection, last_snapshot_ack, tick, (dir_x, dir_y))?;
+            let (next, snapshot_sequence) = next_authoritative_position_with_snapshot_ack(
+                connection,
+                id,
+                deadline,
+                Some(&mut view),
+            )
+            .await?;
+            if is_sequence_newer16(snapshot_sequence, last_snapshot_ack) {
+                last_snapshot_ack = snapshot_sequence;
+            }
             if !next.0.is_finite()
                 || !next.1.is_finite()
                 || next.0 < 0.0
@@ -436,7 +486,7 @@ async fn drive_real_quic_fighter_to(
             at = next;
         }
         tick += 1;
-        send_held_direction(connection, baseline_sequence, tick, (0, 0))?;
+        send_held_direction(connection, last_snapshot_ack, tick, (0, 0))?;
         if route_samples == 0 && (at.0 - goal.0).hypot(at.1 - goal.1) > 2.0 {
             bail!("player {id} skipped evidence for route waypoint {goal:?}");
         }
@@ -444,7 +494,103 @@ async fn drive_real_quic_fighter_to(
     if total_samples < 15 {
         bail!("player {id} supplied too few real on-wire movements: {total_samples}");
     }
-    Ok(at)
+    Ok((at, view))
+}
+
+/// Concurrent physical arrivals can push another fighter off a nearby
+/// rack stand. A first matching self-snapshot is not proof of a *stable*
+/// approach. Read late authoritative state, then issue a normal network
+/// correction for any displacement; no privileged teleport/test setter.
+async fn correct_displaced_rack_fighter(
+    connection: &wtransport::Connection,
+    net_id: u32,
+    start: (f32, f32),
+    start_snapshot_sequence: u16,
+    stand: (f32, f32),
+) -> Result<(f32, f32)> {
+    let mut position = start;
+    let mut sequence = start_snapshot_sequence;
+    let mut client_tick = 20_000 + net_id * 100;
+    let deadline = Instant::now() + Duration::from_secs(4);
+    let mut samples = 0_usize;
+    while (position.0 - stand.0).hypot(position.1 - stand.1) > 12.0 {
+        if Instant::now() >= deadline {
+            bail!(
+                "fighter {net_id} unable to correct real physical rack drift                  start={start:?} current={position:?} stand={stand:?} samples={samples}"
+            );
+        }
+        let dx = stand.0 - position.0;
+        let dy = stand.1 - position.1;
+        let magnitude = dx.hypot(dy);
+        let direction = (
+            ((dx / magnitude * 127.0).round() as i32).clamp(-127, 127) as i8,
+            ((dy / magnitude * 127.0).round() as i32).clamp(-127, 127) as i8,
+        );
+        client_tick += 1;
+        send_held_direction(connection, sequence, client_tick, direction)?;
+        let (next, received_sequence) =
+            next_authoritative_position_with_snapshot_ack(connection, net_id, deadline, None)
+                .await?;
+        if is_sequence_newer16(received_sequence, sequence) {
+            sequence = received_sequence;
+        }
+        if (next.0 - position.0).hypot(next.1 - position.1) > 80.0
+            || myaso_server::alpha_greyhaven_geometry::overlaps_known_static_solid(
+                next.0, next.1, 18.0,
+            ) != Ok(false)
+        {
+            bail!("fighter {net_id} received invalid corrected movement {position:?}->{next:?}");
+        }
+        position = next;
+        samples += 1;
+    }
+    client_tick += 1;
+    send_held_direction(connection, sequence, client_tick, (0, 0))?;
+    println!(
+        "ALPHA_8C_QUIC_RACK_PHYSICAL_CORRECTION fighter={net_id} from={start:?}          to={position:?} samples={samples}"
+    );
+    Ok(position)
+}
+
+#[test]
+fn four_player_replica_preserves_unchanged_deltas_and_applies_removals() {
+    use myaso_server::snapshot::{SnapshotRecord, SNAPSHOT_FIELD_REMOVED, SNAPSHOT_FIELD_VITALS};
+    let record = |net_id, mask, x, y| SnapshotRecord {
+        net_id,
+        mask,
+        x,
+        y,
+        facing: 0,
+        hp: 100,
+        guard: 100,
+        stamina: 100,
+        action: 0,
+        flags: 0,
+    };
+    let mut cache = [None; 4];
+    fold_quic_peer_positions(
+        &mut cache,
+        &[
+            record(1, SNAPSHOT_FIELD_POSITION, 15000, 16000),
+            record(2, SNAPSHOT_FIELD_POSITION, 15100, 16000),
+        ],
+    );
+    assert_eq!(cache[0], Some((3750.0, 4000.0)));
+    assert_eq!(cache[1], Some((3775.0, 4000.0)));
+    fold_quic_peer_positions(
+        &mut cache,
+        &[
+            record(1, SNAPSHOT_FIELD_VITALS, 0, 0),
+            record(3, SNAPSHOT_FIELD_POSITION, 15300, 16000),
+        ],
+    );
+    assert_eq!(cache[0], Some((3750.0, 4000.0)));
+    assert_eq!(cache[1], Some((3775.0, 4000.0)));
+    assert_eq!(cache[2], Some((3825.0, 4000.0)));
+    fold_quic_peer_positions(&mut cache, &[record(2, SNAPSHOT_FIELD_REMOVED, 0, 0)]);
+    assert_eq!(cache[1], None, "removed peer must not remain visible");
+    assert_eq!(cache[0], Some((3750.0, 4000.0)));
+    assert_eq!(cache[2], Some((3825.0, 4000.0)));
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
@@ -496,25 +642,88 @@ async fn four_live_quic_players_each_reach_a_distinct_blacksmith_rack_approach()
         if (start.0 - spawn.0).abs() > 0.5 || (start.1 - spawn.1).abs() > 0.5 {
             bail!("rack route did not start at Core-approved immutable spawn");
         }
-        sessions.push((connection, _send, recv, snapshot.sequence, start));
+        let mut initial_view = [None; 4];
+        fold_quic_peer_positions(&mut initial_view, &snapshot.records);
+        sessions.push((
+            connection,
+            _send,
+            recv,
+            snapshot.sequence,
+            start,
+            initial_view,
+        ));
     }
 
     // All four independently controlled players must ACTUALLY move
     // concurrently on a shared server. Keeping four sessions connected
     // while driving their movement sequentially is insufficient M1 proof.
     // Separate futures read their own genuine QUIC snapshot streams.
+    // Shared intermediate checkpoints would temporarily stack all four
+    // physical fighters on the same coordinates. That is a real collision,
+    // and later arrivals can shove an earlier player off its rack stand.
+    // Instead use disjoint diagonal lanes, with two checkpoints on each
+    // individually server-reviewed, static-clear city-to-rack segment.
     let route_for = |index: usize| {
+        let spawn = SPAWNS[index];
         let target = BLACKSMITH_RACK_APPROACHES[index];
-        [(3990.0, 4180.0), (3980.0, 4090.0), target]
+        let waypoint = |f: f32| {
+            (
+                spawn.0 + (target.0 - spawn.0) * f,
+                spawn.1 + (target.1 - spawn.1) * f,
+            )
+        };
+        [waypoint(0.35), waypoint(0.70), target]
     };
     let routes = [route_for(0), route_for(1), route_for(2), route_for(3)];
+    for (index, route) in routes.iter().enumerate() {
+        let mut from = SPAWNS[index];
+        for &to in route {
+            if myaso_server::alpha_greyhaven_geometry::swept_circle_hits_known_static_solid(
+                from, to, 18.0,
+            ) != Ok(false)
+            {
+                bail!("4-QUIC dedicated lane {index} is not clear against reviewed static solids: {from:?} -> {to:?}");
+            }
+            from = to;
+        }
+    }
     let (player1, player2, player3, player4) = tokio::try_join!(
-        drive_real_quic_fighter_to(&sessions[0].0, sessions[0].3, 1, sessions[0].4, &routes[0]),
-        drive_real_quic_fighter_to(&sessions[1].0, sessions[1].3, 2, sessions[1].4, &routes[1]),
-        drive_real_quic_fighter_to(&sessions[2].0, sessions[2].3, 3, sessions[2].4, &routes[2]),
-        drive_real_quic_fighter_to(&sessions[3].0, sessions[3].3, 4, sessions[3].4, &routes[3]),
+        drive_real_quic_fighter_to(
+            &sessions[0].0,
+            sessions[0].3,
+            1,
+            sessions[0].4,
+            &routes[0],
+            sessions[0].5
+        ),
+        drive_real_quic_fighter_to(
+            &sessions[1].0,
+            sessions[1].3,
+            2,
+            sessions[1].4,
+            &routes[1],
+            sessions[1].5
+        ),
+        drive_real_quic_fighter_to(
+            &sessions[2].0,
+            sessions[2].3,
+            3,
+            sessions[2].4,
+            &routes[2],
+            sessions[2].5
+        ),
+        drive_real_quic_fighter_to(
+            &sessions[3].0,
+            sessions[3].3,
+            4,
+            sessions[3].4,
+            &routes[3],
+            sessions[3].5
+        ),
     )?;
-    for (index, final_position) in [player1, player2, player3, player4].into_iter().enumerate() {
+    let arrivals = [player1, player2, player3, player4];
+    let mut peer_caches = arrivals.map(|entry| entry.1);
+    for (index, final_position) in arrivals.map(|entry| entry.0).into_iter().enumerate() {
         let id = index as u32 + 1;
         let target = BLACKSMITH_RACK_APPROACHES[index];
         if (final_position.0 - target.0).hypot(final_position.1 - target.1) > 18.0 {
@@ -528,6 +737,7 @@ async fn four_live_quic_players_each_reach_a_distinct_blacksmith_rack_approach()
     // All four QUIC sessions must remain alive and input-authorized after
     // the entire city-to-rack journey, rather than merely having connected.
     // This also proves server ticks keep making progress after the 4th arrival.
+    let mut final_ack_server_tick = 0_u32;
     for (index, session) in sessions.iter().enumerate() {
         let id = index as u32 + 1;
         let proof_tick = 10_000 + id;
@@ -542,17 +752,190 @@ async fn four_live_quic_players_each_reach_a_distinct_blacksmith_rack_approach()
                 .await
                 .context("final on-wire QUIC proof ACK timed out")??;
             let data = datagram.as_ref();
+            if data.len() >= 14 && data[0] == 1 && data[1] == 2 {
+                let snapshot = decode_snapshot(data)
+                    .map_err(|e| anyhow::anyhow!("initial ACK replica decode: {e:?}"))?;
+                fold_quic_peer_positions(&mut peer_caches[index], &snapshot.records);
+            }
             if data.len() == 16
                 && data[0] == 1
                 && data[1] == 3
                 && u32::from_le_bytes(data[4..8].try_into().unwrap()) == proof_tick
                 && u32::from_le_bytes(data[12..16].try_into().unwrap()) == id
             {
+                let server_tick = u32::from_le_bytes(data[8..12].try_into().unwrap());
+                final_ack_server_tick = final_ack_server_tick.max(server_tick);
                 break;
             }
         }
     }
-    println!("ALPHA_8C_FOUR_QUIC_DISTINCT_RACK_ROUTES_PASS players=4 unique_approaches=4 surviving_input_acks=4 geometry=reviewed-static-only");
+
+    // Do not trust only the first own arrival: the four physical players
+    // can genuinely bump during their simultaneous travel through a city.
+    // Recheck their *late* authoritative server state after all ACKs.
+    // One single authoritative observer can see all four actual server
+    // fighters without accidentally requiring a redundant unchanged OWN
+    // position field in every delta snapshot (delta elision is legitimate).
+    let mut late_positions = [((0.0_f32, 0.0_f32), 0_u16); 4];
+    let deadline = Instant::now() + Duration::from_secs(5);
+    loop {
+        let remaining = deadline.saturating_duration_since(Instant::now());
+        if remaining.is_zero() {
+            bail!("four-player authoritative post-arrival roster never converged");
+        }
+        let incoming = timeout(remaining, sessions[0].0.receive_datagram())
+            .await
+            .context("four-player late roster timeout")??;
+        let bytes = incoming.as_ref();
+        if bytes.len() < 14 || bytes[0] != 1 || bytes[1] != 2 {
+            continue;
+        }
+        let snapshot =
+            decode_snapshot(bytes).map_err(|e| anyhow::anyhow!("late roster decode: {e:?}"))?;
+        if snapshot.server_tick < final_ack_server_tick + 30 {
+            continue;
+        }
+        fold_quic_peer_positions(&mut peer_caches[0], &snapshot.records);
+        let mut seen = [false; 4];
+        for record in snapshot.records.iter().filter(|record| {
+            (1..=4).contains(&record.net_id) && record.mask & SNAPSHOT_FIELD_POSITION != 0
+        }) {
+            let index = record.net_id as usize - 1;
+            seen[index] = true;
+            late_positions[index] = (
+                (record.x as f32 / 4.0, record.y as f32 / 4.0),
+                sessions[index].3,
+            );
+        }
+        if seen.iter().all(|value| *value) {
+            println!(
+                "ALPHA_8C_LATE_ROSTER tick={} authoritative_positions={:?}",
+                snapshot.server_tick,
+                late_positions.map(|state| state.0)
+            );
+            break;
+        }
+    }
+
+    // Repair any genuine collision-related post-arrival displacement using
+    // ordinary QUIC input on that fighter's own session. All other sessions
+    // remain connected; the four stands are radius-18 separated by >=40u.
+    for (index, session) in sessions.iter().enumerate() {
+        let position = late_positions[index].0;
+        let stand = BLACKSMITH_RACK_APPROACHES[index];
+        if (position.0 - stand.0).hypot(position.1 - stand.1) > 18.0 {
+            let corrected_position = correct_displaced_rack_fighter(
+                &session.0,
+                index as u32 + 1,
+                position,
+                late_positions[index].1,
+                stand,
+            )
+            .await?;
+            // This position came from the player's own real server snapshot,
+            // not a prediction. Its unchanged following deltas may be empty.
+            peer_caches[index][index] = Some(corrected_position);
+        }
+    }
+    // Fence mutual visibility after both first arrivals and any corrected
+    // post-arrival positions, with four fresh server-acknowledged stop packets.
+    final_ack_server_tick = 0;
+    for (index, session) in sessions.iter().enumerate() {
+        let id = index as u32 + 1;
+        let proof_tick = 30_000 + id;
+        send_held_direction(&session.0, late_positions[index].1, proof_tick, (0, 0))?;
+        let deadline = Instant::now() + Duration::from_secs(5);
+        loop {
+            let remaining = deadline.saturating_duration_since(Instant::now());
+            if remaining.is_zero() {
+                bail!("fighter {id} lost authoritative post-correction ACK");
+            }
+            let datagram = timeout(remaining, session.0.receive_datagram())
+                .await
+                .context("post-correction proof ACK timeout")??;
+            let data = datagram.as_ref();
+            if data.len() >= 14 && data[0] == 1 && data[1] == 2 {
+                let snapshot = decode_snapshot(data)
+                    .map_err(|e| anyhow::anyhow!("final ACK replica decode: {e:?}"))?;
+                fold_quic_peer_positions(&mut peer_caches[index], &snapshot.records);
+            }
+            if data.len() == 16
+                && data[0] == 1
+                && data[1] == 3
+                && u32::from_le_bytes(data[4..8].try_into().unwrap()) == proof_tick
+                && u32::from_le_bytes(data[12..16].try_into().unwrap()) == id
+            {
+                final_ack_server_tick =
+                    final_ack_server_tick.max(u32::from_le_bytes(data[8..12].try_into().unwrap()));
+                break;
+            }
+        }
+    }
+
+    // Gameplay is multiplayer only if all four distinct clients receive a
+    // fresh server-authored snapshot of the SAME four living players after
+    // all four have reached different rack positions. Client #1 cannot pass
+    // merely by observing itself while the other sessions remain invisible.
+    // Compare snapshots newer than the last post-arrival ACK's server tick;
+    // the baseline sequence is acknowledged via normal input so the server
+    // uses its existing delta replication, not a privileged test channel.
+    for (index, session) in sessions.iter().enumerate() {
+        let id = index as u32 + 1;
+        let deadline = Instant::now() + Duration::from_secs(6);
+        let mut visible = [false; 4];
+        let mut observed_snapshot_tick = 0_u32;
+        let mut snapshot_packets = 0_usize;
+        let mut eligible_packets = 0_usize;
+        let mut observed_records = 0_usize;
+        let mut last_known = [None::<(f32, f32)>; 4];
+        let mut position_counts = [0usize; 4];
+        while !visible.iter().all(|flag| *flag) {
+            let remaining = deadline.saturating_duration_since(Instant::now());
+            if remaining.is_zero() {
+                bail!(
+                    "QUIC observer {id} did not see all four living players after last ACK tick                      {final_ack_server_tick}: visible={visible:?} newest_tick={observed_snapshot_tick}"
+                );
+            }
+            let incoming = match timeout(remaining, session.0.receive_datagram()).await {
+                Ok(Ok(incoming)) => incoming,
+                Ok(Err(error)) => bail!("observer {id} QUIC closed: {error:#}"),
+                Err(_) => bail!(
+                    "observer {id} timed out: seen={visible:?} min_tick={final_ack_server_tick}                     latest_eligible_tick={observed_snapshot_tick}, snapshots={snapshot_packets}                     eligible={eligible_packets} matching_records={observed_records}                     last_known={last_known:?} position_counts={position_counts:?}"
+                )
+            };
+            let bytes = incoming.as_ref();
+            if bytes.len() < 14 || bytes[0] != 1 || bytes[1] != 2 {
+                continue;
+            }
+            let snapshot = decode_snapshot(bytes)
+                .map_err(|e| anyhow::anyhow!("observer {id} received invalid snapshot: {e:?}"))?;
+            snapshot_packets += 1;
+            if snapshot.server_tick < final_ack_server_tick {
+                continue;
+            }
+            observed_snapshot_tick = snapshot.server_tick;
+            eligible_packets += 1;
+            observed_records += snapshot.records.len();
+            fold_quic_peer_positions(&mut peer_caches[index], &snapshot.records);
+            for record in snapshot.records {
+                if !(1..=4).contains(&record.net_id) || record.mask & SNAPSHOT_FIELD_POSITION == 0 {
+                    continue;
+                }
+                let actual = (record.x as f32 / 4.0, record.y as f32 / 4.0);
+                last_known[record.net_id as usize - 1] = Some(actual);
+                position_counts[record.net_id as usize - 1] += 1;
+            }
+            for peer in 0..4 {
+                let target = BLACKSMITH_RACK_APPROACHES[peer];
+                visible[peer] = peer_caches[index][peer]
+                    .is_some_and(|actual| (actual.0 - target.0).hypot(actual.1 - target.1) <= 24.0);
+            }
+        }
+        println!(
+            "ALPHA_8C_QUIC_MUTUAL_RACK_VISIBILITY observer={id} peers=4              server_tick={observed_snapshot_tick} min_tick={final_ack_server_tick}"
+        );
+    }
+    println!("ALPHA_8C_FOUR_QUIC_DISTINCT_RACK_ROUTES_PASS players=4 unique_approaches=4 surviving_input_acks=4 mutual_peer_views=4 geometry=reviewed-static-only");
     Ok(())
 }
 
