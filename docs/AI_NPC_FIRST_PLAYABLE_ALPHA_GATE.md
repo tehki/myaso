@@ -355,3 +355,52 @@ This is an **optional pilot-only UX/parity improvement**.
 The Core-owned reliable reader/session/request epoch and native
 four-player First Playable acceptance remain independent blockers;
 all NPC opt-ins remain OFF for the first alpha.
+
+## LW-2E — genuine Chromium native NPC-off keyboard containment (optional)
+
+The NPC-off and roster-generation protections previously had only
+isolated Node DOM-fixture proof. A new **explicitly invoked**, source-
+authentic optional browser gate, \`scripts/npc_pilot_native_browser_gate.mjs\`,
+now serves the **unmodified production \`web/npc-chat.mjs\`** and its
+actual \`src/network/npc-chat-codec.mjs\` dependency over disposable
+**127.0.0.1** HTTP, using ephemeral ports and the installed matching
+Chromium/ChromeDriver pair. It creates a real W3C browser session,
+uses **real WebDriver element click and keyboard commands** (including
+the actual Enter key), and performs no synthetic DOM-submit events.
+
+Native acceptance checks: pilot hidden and no request/focus intercept
+before roster; real canvas \`w\` key recorded; activating a local
+test roster permits one real Enter chat submission; an early answer
+remains hidden until its controlled local transport promise resolves;
+question then answer render in the correct order; revoking the roster
+hides/clears pilot UI, restores real canvas focus, and another real
+canvas \`a\` key is delivered.
+
+**Observed on authorized Serj Linux:** Chromium **152.0.7977.82**
+and matching ChromeDriver **152.0.7977.82**; exact
+\`NPC_P0_NATIVE_CHROME_GATE {"ok":true,...}\` result with all six
+booleans true. The machine's default /tmp Chrome profile failed
+to write due to host environment restrictions, so repeatable
+invocation used its writable tmpfs:
+
+\`\`\`bash
+TMPDIR=/dev/shm node scripts/npc_pilot_native_browser_gate.mjs
+\`\`\`
+
+The script **fails closed** on any unexpected native result or
+missing/incompatible ChromeDriver, releases its W3C session,
+terminates its disposable driver and closes the localhost server.
+It is **not** added to unconditional protected CI: it requires
+actual installed native browser and driver, and cannot be
+replaced with a mocked DOM result. It changes no live server,
+WebTransport listener, Discord/Telegram service, items,
+Combat, client game runtime, CI assertions or packet types.
+
+**Evidence boundary:** this is one real **Chromium browser**, one
+HTML harness containing the actual pilot panel; no real server
+connection, greyhaven map, four human browsers, Firefox native
+session, independent physical hosts, network RTT, actual pickup
+receipt, live NPC avatar, or production spawn was exercised.
+The Main Orchestrator's #480 P0 native Core/World/Items/Combat
+acceptance still applies separately, and the optional NPC pilot
+stays OFF for First Playable.
