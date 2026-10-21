@@ -71,3 +71,30 @@ node --test tests/alpha_p0_host_pair_config.test.mjs
 ```
 
 The CI workflow `alpha-p0-multihost-pair-preflight.yml` runs only syntax and **offline synthetic negative/security unit tests**, **never** contacts a staging or production network and **never** claims a real two-machine PASS. No branch merging, stage provisioning or production deployment follows automatically from this fixture.
+
+## Optional authoritative server admission correlation (Core 8A child gate)
+
+The original A/B JSON and PNG verification is a **client-report-only structural gate**.
+For an additional, conservative **server-origin check**, collect the exact
+`stdout` admission lines emitted by the *same isolated Rust staging server*
+during the flight, including `session ... assigned player ... from <IPv4>:<port>`.
+Preserve the original full log separately, and provide a scoped text extract
+containing the four admission lines for the current flight (no other sessions).
+The verifier rejects unknown player IDs, duplicate sessions, mismatched
+A/B source IPs, malformed entries or any number other than four admissions:
+
+```sh
+node scripts/alpha_p0_host_pair_verify.mjs \
+  alpha-p0-pair-a-evidence.json alpha-p0-pair-b-evidence.json \
+  scoped-authoritative-server-admissions.txt
+```
+
+This adds a `MYASO_P0_PAIR_SERVER_ADMISSION_CORRELATION` output with status
+`SERVER_ADMISSIONS_CORRELATED_REQUIRES_REAL_HOST_AND_INPUT_ATTESTATION`.
+It is **not** proof of transport input delivery or physical host separation;
+server source IP matching will fail closed under NAT and should not be bypassed
+to obtain green evidence. The operator must still independently validate
+real server process/build SHA, full original timestamped log, client IP
+ownership, movement input/ACK, original browser screenshots and both actual
+machines. These synthetic unit tests never represent actual host flight
+results; no network is opened by the verifier.
