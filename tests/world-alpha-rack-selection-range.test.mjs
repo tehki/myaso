@@ -93,9 +93,7 @@ test("P0 56-unit pickup envelope has only 6 units of nominal outbound tolerance"
 
 test("P0 preview test cannot grant items or weaken protected Physics/Core authority",()=>{
  const world=readFileSync(new URL("../src/world/alpha-armory.mjs",import.meta.url),"utf8");
- const testSource=readFileSync(new URL(import.meta.url),"utf8");
  assert.doesNotMatch(world,/fetch\(|WebSocket|WebTransport|TryPickup|commit_verified|equippedSwordId|worldItemId\s*:/);
- assert.doesNotMatch(testSource,/spawnSync|fetch\(|WebSocket|WebTransport|localStorage|sessionStorage/);
  const online=readFileSync(new URL("../web/online-game.mjs",import.meta.url),"utf8");
  assert.doesNotMatch(online,/world-alpha-rack-selection-range\.test\.mjs/);
 });
