@@ -102,7 +102,8 @@ test("P0 browser probe keeps route allowlist and actual World imports; leaves on
  const html=readFileSync(new URL("../web/armory-p0-graph-load-probe.html",import.meta.url),"utf8");
  assert.match(code,/http\.listen|server\.listen/);
  assert.match(code,/localhostOnly:true/);
- assert.match(code,/actualX230iTested:false/);
+ // Only actual Linux machine hostname X230i qualifies; Windows fixtures remain false.
+ assert.match(code,/actualX230iTested:platform\(\)==="linux"&&hostname\(\)\.toLowerCase\(\)==="x230i"/);
  assert.match(code,/P0_GRAPH_DRAWS/);
  assert.match(script,/createAuthoredWorldRenderer/);
  assert.match(script,/createWorld493RackArtPlan/);

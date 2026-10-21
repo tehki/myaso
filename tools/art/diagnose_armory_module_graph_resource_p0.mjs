@@ -7,11 +7,12 @@
 import assert from "node:assert/strict";
 import {createServer} from "node:http";
 import {readFile,writeFile,mkdir} from "node:fs/promises";
-import {resolve,relative,join,extname} from "node:path";
+import {resolve,relative,join,extname,dirname} from "node:path";
 import {createHash} from "node:crypto";
 import {execFileSync} from "node:child_process";
 import {fileURLToPath} from "node:url";
-import {platform,cpus,totalmem,freemem} from "node:os";
+import {platform,cpus,totalmem,freemem,hostname} from "node:os";
+import {pinnedSourceLineEndingDigests} from "./pinned-source-line-endings-p0.mjs";
 const repo=resolve(fileURLToPath(new URL("../../",import.meta.url)));
 assert.ok(process.argv[2],"Need independently pinned original World #493 or #521 source");
 const world=resolve(process.argv[2]);
@@ -47,7 +48,13 @@ const allow=new Set([
  "assets/environment/greyhaven/armory-p0/armory_sword.webp"
 ]);
 const sha=async(path)=>createHash("sha256").update(await readFile(path)).digest("hex");
-const originals=Object.fromEntries(await Promise.all(Object.entries(xref).map(async([url,path])=>[url,await sha(path)])));
+// The historical reference digests were pinned from CRLF Windows checkouts.
+// Verify *exactly* equivalent native LF or CRLF source bytes before applying
+// those same strict SHA256 pins. Mixed newline/source mutations fail closed.
+const originalSources=Object.fromEntries(await Promise.all(Object.entries(xref).map(async([url,path])=>{
+ return [url,pinnedSourceLineEndingDigests(await readFile(path),url)];
+})));
+const originals=Object.fromEntries(Object.entries(originalSources).map(([url,d])=>[url,d.canonicalCrLfSha256]));
 assert.equal(originals["/__worldsource__/src/world/alpha-armory.mjs"],
  "305a7764d67af9115d85000bde5e922cbae64db2455e15fbf7d3d22b01c5c3bf");
 assert.equal(originals["/__worldsource__/src/world/authored-maps.mjs"],
@@ -100,13 +107,17 @@ assert.ok(Number.isSafeInteger(timeoutMs)&&timeoutMs>=3000&&timeoutMs<=45000,
  "P0_GRAPH_TIMEOUT_MS must be 3000..45000");
 const results=[], report={
  milestone:"P0 Graphics 3B exact #493/#521 first-party images vs isolated World/Graphics module requests",
- sourceHeads:heads,sourceSha256:originals,sourceAssetSha256:originalAssets,
- host:{platform:platform(),cpu:cpus()[0]?.model,totalMemory:totalmem(),
+ sourceHeads:heads,sourceSha256:originals,sourceNativeSha256:Object.fromEntries(
+  Object.entries(originalSources).map(([url,d])=>[url,d.nativeSha256])),
+ sourceLineEndings:Object.fromEntries(Object.entries(originalSources).map(([url,d])=>[url,d.lineEndings])),
+ sourceHashPolicy:"strict original Windows-CRLF SHA256 pins with exact LF/CRLF-only normalization",
+ sourceAssetSha256:originalAssets,
+ host:{platform:platform(),hostname:hostname(),cpu:cpus()[0]?.model,totalMemory:totalmem(),
   availableMemoryAtStart:freemem()},
  conditions:{repeat,variants,drawBudget,browsers:engines,timeoutMs,
   faultInjectionRoute:injectedFailureRoute,
   experimentalFaultInjection:injectedFailureRoute!==null,localhostOnly:true},
- results,requests,actualX230iTested:false,productionEdited:false,
+ results,requests,actualX230iTested:platform()==="linux"&&hostname().toLowerCase()==="x230i",productionEdited:false,
  gameClientExecuted:false,hasServerOwnedItemIds:false,performancePassed:false
 };
 try{
@@ -148,7 +159,7 @@ try{
        fullWorldSourceGraphLoaded:["world","graph","draw"].includes(variant),
        graphicsSourceModulesLoaded:["graphics","graph","draw"].includes(variant),
        worldDrawTested:variant==="draw",
-       genuinelyLowEndHost:false,serverItemEvents:0});
+       genuinelyLowEndHost:report.actualX230iTested,serverItemEvents:0});
       if(parsed.probe.phase!=="DONE"||errors.length)throw Error("Source probe did not complete without browser errors");
      }catch(e){
       if(!results.some(r=>r.engine===engine&&r.repetition===repetition&&r.variant===variant))
@@ -169,7 +180,7 @@ try{
  await new Promise(ok=>server.close(ok));
  report.completedRuns=results.filter(r=>r.probe?.phase==="DONE"&&r.errors.length===0).length;
  report.successfulOnTestedHost=report.completedRuns===engines.length*repeat*variants.length;
- await mkdir(resolve(out,".."),{recursive:true});
+ await mkdir(dirname(out),{recursive:true});
  await writeFile(out,JSON.stringify(report,null,2)+"\n");
 }
 console.log("GRAPH_RESOURCE_DIAG="+JSON.stringify({
@@ -177,6 +188,6 @@ console.log("GRAPH_RESOURCE_DIAG="+JSON.stringify({
  details:results.map(r=>({engine:r.engine,repetition:r.repetition,variant:r.variant,
   wallMs:r.elapsedWallMs,stage:r.probe?.phase,requests:r.responses?.length,
   drawMs:r.probe?.log?.filter(e=>e.stage==="draw:complete").map(e=>e.ms),
-  errors:r.errors})),actualX230iTested:false
+  errors:r.errors})),actualX230iTested:report.actualX230iTested
 }));
 if(!report.successfulOnTestedHost)process.exitCode=1;

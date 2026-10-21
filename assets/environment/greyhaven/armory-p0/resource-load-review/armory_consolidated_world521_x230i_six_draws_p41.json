@@ -1,0 +1,1259 @@
+{
+  "milestone": "P0 Graphics 3B exact #493/#521 first-party images vs isolated World/Graphics module requests",
+  "sourceHeads": {
+    "world": "3178b9aad8757ceb3594ff04b9e3099dced6b729",
+    "graphicsAncestor": "40112c3d3f0eeeb441a3206beba7c5d21e292852"
+  },
+  "sourceSha256": {
+    "/__worldsource__/src/browser/authored-world-renderer.mjs": "2006dbff24401cc5e262363fb11f89546bbf769cb11bcffddcbeb8819dd4ca7a",
+    "/__worldsource__/src/world/alpha-armory.mjs": "305a7764d67af9115d85000bde5e922cbae64db2455e15fbf7d3d22b01c5c3bf",
+    "/__worldsource__/src/world/authored-maps.mjs": "21e7663303b14cc89f7dece7d73fda3b7e1fd4b70cc97b8753cd2c793209e144",
+    "/__worldsource__/src/world/building-presentation.mjs": "c2e2ad0350fbc5d0c8408a48a151c280b4cc85500c53f4b8e705b21e97147e33"
+  },
+  "sourceNativeSha256": {
+    "/__worldsource__/src/browser/authored-world-renderer.mjs": "b62e777abf1e7327078dbfac9340028a31a1dadd0f367bfd8a664f0131671a9c",
+    "/__worldsource__/src/world/alpha-armory.mjs": "f9d68a6750784cbe5fce2dd9c2969d479b3394162ebc20900c9cdf4ab91e797a",
+    "/__worldsource__/src/world/authored-maps.mjs": "d48c495f3a23881154ce6c93452c44cb7587ebd3707f9434098439d1a67d1987",
+    "/__worldsource__/src/world/building-presentation.mjs": "6122ebf28eb9470669e57da9f60251c79fc377a002b59cc67c51203b41934256"
+  },
+  "sourceLineEndings": {
+    "/__worldsource__/src/browser/authored-world-renderer.mjs": "LF",
+    "/__worldsource__/src/world/alpha-armory.mjs": "LF",
+    "/__worldsource__/src/world/authored-maps.mjs": "LF",
+    "/__worldsource__/src/world/building-presentation.mjs": "LF"
+  },
+  "sourceHashPolicy": "strict original Windows-CRLF SHA256 pins with exact LF/CRLF-only normalization",
+  "sourceAssetSha256": {
+    "assets/environment/greyhaven/armory-p0/armory_rack.webp": "83d0d228785f80e95efd18fa6ef46a77d4ce8500a3fd5cf777d0f1f5ee3917b8",
+    "assets/environment/greyhaven/armory-p0/armory_sword.webp": "795874620d07652e55f5e8a76952d2075f17196fc892eff88d46b165638a3b31"
+  },
+  "host": {
+    "platform": "linux",
+    "hostname": "X230i",
+    "cpu": "Intel(R) Core(TM) i3-2370M CPU @ 2.40GHz",
+    "totalMemory": 8001454080,
+    "availableMemoryAtStart": 3072634880
+  },
+  "conditions": {
+    "repeat": 1,
+    "variants": [
+      "minimal",
+      "world",
+      "graphics",
+      "graph",
+      "draw"
+    ],
+    "drawBudget": 6,
+    "browsers": [
+      "chrome"
+    ],
+    "timeoutMs": 12000,
+    "faultInjectionRoute": null,
+    "experimentalFaultInjection": false,
+    "localhostOnly": true
+  },
+  "results": [
+    {
+      "engine": "chrome",
+      "version": "Chrome/152.0.7977.82",
+      "repetition": 1,
+      "variant": "minimal",
+      "elapsedWallMs": 180,
+      "probe": {
+        "phase": "DONE",
+        "done": true,
+        "log": [
+          {
+            "stage": "boot",
+            "at": 76,
+            "mode": "minimal"
+          },
+          {
+            "stage": "image:begin",
+            "at": 76
+          },
+          {
+            "stage": "armory_rack:begin",
+            "at": 77.39999985694885
+          },
+          {
+            "stage": "armory_sword:begin",
+            "at": 77.79999995231628
+          },
+          {
+            "stage": "armory_rack:onload",
+            "at": 121.09999990463257,
+            "ms": 43.799999952316284,
+            "naturalWidth": 240,
+            "naturalHeight": 166
+          },
+          {
+            "stage": "armory_sword:onload",
+            "at": 122.09999990463257,
+            "ms": 44.200000047683716,
+            "naturalWidth": 42,
+            "naturalHeight": 115
+          },
+          {
+            "stage": "armory_rack:decoded",
+            "at": 131.70000004768372,
+            "ms": 54.299999952316284
+          },
+          {
+            "stage": "armory_sword:decoded",
+            "at": 131.79999995231628,
+            "ms": 53.90000009536743
+          },
+          {
+            "stage": "image:both-decoded",
+            "at": 131.79999995231628
+          },
+          {
+            "stage": "DONE",
+            "at": 131.79999995231628
+          }
+        ],
+        "error": null,
+        "originalWorldDrawn": false,
+        "productionApproved": false,
+        "serverItemsAuthenticated": false
+      },
+      "resources": [
+        {
+          "url": "/assets/environment/greyhaven/armory-p0/armory_rack.webp",
+          "durationMs": 15.599999904632568,
+          "transferSize": 15728,
+          "decodedBodySize": 15428,
+          "responseEnd": 94.09999990463257
+        },
+        {
+          "url": "/assets/environment/greyhaven/armory-p0/armory_sword.webp",
+          "durationMs": 22.299999952316284,
+          "transferSize": 2982,
+          "decodedBodySize": 2682,
+          "responseEnd": 101.89999985694885
+        }
+      ],
+      "responses": [
+        {
+          "status": 200,
+          "url": "/web/armory-p0-graph-load-probe.html"
+        },
+        {
+          "status": 200,
+          "url": "/assets/environment/greyhaven/armory-p0/armory_rack.webp"
+        },
+        {
+          "status": 200,
+          "url": "/assets/environment/greyhaven/armory-p0/armory_sword.webp"
+        }
+      ],
+      "errors": [],
+      "fullWorldSourceGraphLoaded": false,
+      "graphicsSourceModulesLoaded": false,
+      "worldDrawTested": false,
+      "genuinelyLowEndHost": true,
+      "serverItemEvents": 0
+    },
+    {
+      "engine": "chrome",
+      "version": "Chrome/152.0.7977.82",
+      "repetition": 1,
+      "variant": "world",
+      "elapsedWallMs": 122,
+      "probe": {
+        "phase": "DONE",
+        "done": true,
+        "log": [
+          {
+            "stage": "boot",
+            "at": 29.200000047683716,
+            "mode": "world"
+          },
+          {
+            "stage": "graph:begin",
+            "at": 29.299999952316284
+          },
+          {
+            "stage": "graph:ready",
+            "at": 86.79999995231628,
+            "loadedWorld": true,
+            "loadedGraphics": false
+          },
+          {
+            "stage": "image:begin",
+            "at": 86.90000009536743
+          },
+          {
+            "stage": "armory_rack:begin",
+            "at": 88.20000004768372
+          },
+          {
+            "stage": "armory_sword:begin",
+            "at": 88.60000014305115
+          },
+          {
+            "stage": "armory_rack:onload",
+            "at": 98.20000004768372,
+            "ms": 9.900000095367432,
+            "naturalWidth": 240,
+            "naturalHeight": 166
+          },
+          {
+            "stage": "armory_sword:onload",
+            "at": 101.20000004768372,
+            "ms": 12.599999904632568,
+            "naturalWidth": 42,
+            "naturalHeight": 115
+          },
+          {
+            "stage": "armory_rack:decoded",
+            "at": 104.79999995231628,
+            "ms": 16.59999990463257
+          },
+          {
+            "stage": "armory_sword:decoded",
+            "at": 104.90000009536743,
+            "ms": 16.299999952316284
+          },
+          {
+            "stage": "image:both-decoded",
+            "at": 105
+          },
+          {
+            "stage": "DONE",
+            "at": 105
+          }
+        ],
+        "error": null,
+        "originalWorldDrawn": false,
+        "productionApproved": false,
+        "serverItemsAuthenticated": false
+      },
+      "resources": [
+        {
+          "url": "/web/armory-p0-graph-load-probe.mjs",
+          "durationMs": 21.5,
+          "transferSize": 2127,
+          "decodedBodySize": 1827,
+          "responseEnd": 52.40000009536743
+        },
+        {
+          "url": "/__worldsource__/src/browser/authored-world-renderer.mjs",
+          "durationMs": 7.299999952316284,
+          "transferSize": 10866,
+          "decodedBodySize": 10566,
+          "responseEnd": 63.5
+        },
+        {
+          "url": "/__worldsource__/src/world/alpha-armory.mjs",
+          "durationMs": 15.799999952316284,
+          "transferSize": 3152,
+          "decodedBodySize": 2852,
+          "responseEnd": 72.40000009536743
+        },
+        {
+          "url": "/__worldsource__/src/world/authored-maps.mjs",
+          "durationMs": 17.5,
+          "transferSize": 6341,
+          "decodedBodySize": 6041,
+          "responseEnd": 74.29999995231628
+        },
+        {
+          "url": "/__worldsource__/src/world/building-presentation.mjs",
+          "durationMs": 12,
+          "transferSize": 3265,
+          "decodedBodySize": 2965,
+          "responseEnd": 81.5
+        },
+        {
+          "url": "/assets/environment/greyhaven/armory-p0/armory_rack.webp",
+          "durationMs": 6,
+          "transferSize": 15728,
+          "decodedBodySize": 15428,
+          "responseEnd": 95
+        },
+        {
+          "url": "/assets/environment/greyhaven/armory-p0/armory_sword.webp",
+          "durationMs": 9.399999856948853,
+          "transferSize": 2982,
+          "decodedBodySize": 2682,
+          "responseEnd": 99
+        }
+      ],
+      "responses": [
+        {
+          "status": 200,
+          "url": "/web/armory-p0-graph-load-probe.html"
+        },
+        {
+          "status": 200,
+          "url": "/web/armory-p0-graph-load-probe.mjs"
+        },
+        {
+          "status": 200,
+          "url": "/__worldsource__/src/browser/authored-world-renderer.mjs"
+        },
+        {
+          "status": 200,
+          "url": "/__worldsource__/src/world/alpha-armory.mjs"
+        },
+        {
+          "status": 200,
+          "url": "/__worldsource__/src/world/authored-maps.mjs"
+        },
+        {
+          "status": 200,
+          "url": "/__worldsource__/src/world/building-presentation.mjs"
+        },
+        {
+          "status": 200,
+          "url": "/assets/environment/greyhaven/armory-p0/armory_rack.webp"
+        },
+        {
+          "status": 200,
+          "url": "/assets/environment/greyhaven/armory-p0/armory_sword.webp"
+        }
+      ],
+      "errors": [],
+      "fullWorldSourceGraphLoaded": true,
+      "graphicsSourceModulesLoaded": false,
+      "worldDrawTested": false,
+      "genuinelyLowEndHost": true,
+      "serverItemEvents": 0
+    },
+    {
+      "engine": "chrome",
+      "version": "Chrome/152.0.7977.82",
+      "repetition": 1,
+      "variant": "graphics",
+      "elapsedWallMs": 204,
+      "probe": {
+        "phase": "DONE",
+        "done": true,
+        "log": [
+          {
+            "stage": "boot",
+            "at": 48.59999990463257,
+            "mode": "graphics"
+          },
+          {
+            "stage": "graph:begin",
+            "at": 48.700000047683716
+          },
+          {
+            "stage": "graph:ready",
+            "at": 164,
+            "loadedWorld": false,
+            "loadedGraphics": true
+          },
+          {
+            "stage": "image:begin",
+            "at": 164.09999990463257
+          },
+          {
+            "stage": "armory_rack:begin",
+            "at": 166.09999990463257
+          },
+          {
+            "stage": "armory_sword:begin",
+            "at": 166.5
+          },
+          {
+            "stage": "armory_sword:onload",
+            "at": 180.29999995231628,
+            "ms": 13.799999952316284,
+            "naturalWidth": 42,
+            "naturalHeight": 115
+          },
+          {
+            "stage": "armory_rack:onload",
+            "at": 180.70000004768372,
+            "ms": 14.700000047683716,
+            "naturalWidth": 240,
+            "naturalHeight": 166
+          },
+          {
+            "stage": "armory_sword:decoded",
+            "at": 183.20000004768372,
+            "ms": 16.59999990463257
+          },
+          {
+            "stage": "armory_rack:decoded",
+            "at": 184.40000009536743,
+            "ms": 18.299999952316284
+          },
+          {
+            "stage": "image:both-decoded",
+            "at": 184.40000009536743
+          },
+          {
+            "stage": "DONE",
+            "at": 184.40000009536743
+          }
+        ],
+        "error": null,
+        "originalWorldDrawn": false,
+        "productionApproved": false,
+        "serverItemsAuthenticated": false
+      },
+      "resources": [
+        {
+          "url": "/web/armory-p0-graph-load-probe.mjs",
+          "durationMs": 11.600000143051147,
+          "transferSize": 2127,
+          "decodedBodySize": 1827,
+          "responseEnd": 63.700000047683716
+        },
+        {
+          "url": "/src/browser/armory-world493-visual-bridge.mjs",
+          "durationMs": 44,
+          "transferSize": 3557,
+          "decodedBodySize": 3257,
+          "responseEnd": 131.70000004768372
+        },
+        {
+          "url": "/src/browser/armory-rack-visual.mjs",
+          "durationMs": 45.40000009536743,
+          "transferSize": 6725,
+          "decodedBodySize": 6425,
+          "responseEnd": 133.5
+        },
+        {
+          "url": "/src/browser/armory-sword-alpha-sampler.mjs",
+          "durationMs": 45.5,
+          "transferSize": 4833,
+          "decodedBodySize": 4533,
+          "responseEnd": 134
+        },
+        {
+          "url": "/src/browser/armory-rack-presented-frame.mjs",
+          "durationMs": 45.60000014305115,
+          "transferSize": 5612,
+          "decodedBodySize": 5312,
+          "responseEnd": 134.40000009536743
+        },
+        {
+          "url": "/src/browser/arena-viewport.mjs",
+          "durationMs": 9.599999904632568,
+          "transferSize": 2869,
+          "decodedBodySize": 2569,
+          "responseEnd": 159.09999990463257
+        },
+        {
+          "url": "/assets/environment/greyhaven/armory-p0/armory_rack.webp",
+          "durationMs": 9.899999856948853,
+          "transferSize": 15728,
+          "decodedBodySize": 15428,
+          "responseEnd": 176.79999995231628
+        },
+        {
+          "url": "/assets/environment/greyhaven/armory-p0/armory_sword.webp",
+          "durationMs": 8.5,
+          "transferSize": 2982,
+          "decodedBodySize": 2682,
+          "responseEnd": 176.29999995231628
+        }
+      ],
+      "responses": [
+        {
+          "status": 200,
+          "url": "/web/armory-p0-graph-load-probe.html"
+        },
+        {
+          "status": 200,
+          "url": "/web/armory-p0-graph-load-probe.mjs"
+        },
+        {
+          "status": 200,
+          "url": "/src/browser/armory-world493-visual-bridge.mjs"
+        },
+        {
+          "status": 200,
+          "url": "/src/browser/armory-sword-alpha-sampler.mjs"
+        },
+        {
+          "status": 200,
+          "url": "/src/browser/armory-rack-presented-frame.mjs"
+        },
+        {
+          "status": 200,
+          "url": "/src/browser/armory-rack-visual.mjs"
+        },
+        {
+          "status": 200,
+          "url": "/src/browser/arena-viewport.mjs"
+        },
+        {
+          "status": 200,
+          "url": "/assets/environment/greyhaven/armory-p0/armory_rack.webp"
+        },
+        {
+          "status": 200,
+          "url": "/assets/environment/greyhaven/armory-p0/armory_sword.webp"
+        }
+      ],
+      "errors": [],
+      "fullWorldSourceGraphLoaded": false,
+      "graphicsSourceModulesLoaded": true,
+      "worldDrawTested": false,
+      "genuinelyLowEndHost": true,
+      "serverItemEvents": 0
+    },
+    {
+      "engine": "chrome",
+      "version": "Chrome/152.0.7977.82",
+      "repetition": 1,
+      "variant": "graph",
+      "elapsedWallMs": 186,
+      "probe": {
+        "phase": "DONE",
+        "done": true,
+        "log": [
+          {
+            "stage": "boot",
+            "at": 38.40000009536743,
+            "mode": "graph"
+          },
+          {
+            "stage": "graph:begin",
+            "at": 38.40000009536743
+          },
+          {
+            "stage": "graph:ready",
+            "at": 147.60000014305115,
+            "loadedWorld": true,
+            "loadedGraphics": true
+          },
+          {
+            "stage": "image:begin",
+            "at": 147.60000014305115
+          },
+          {
+            "stage": "armory_rack:begin",
+            "at": 149.29999995231628
+          },
+          {
+            "stage": "armory_sword:begin",
+            "at": 149.79999995231628
+          },
+          {
+            "stage": "armory_sword:onload",
+            "at": 166,
+            "ms": 16.100000143051147,
+            "naturalWidth": 42,
+            "naturalHeight": 115
+          },
+          {
+            "stage": "armory_rack:onload",
+            "at": 168,
+            "ms": 18.700000047683716,
+            "naturalWidth": 240,
+            "naturalHeight": 166
+          },
+          {
+            "stage": "armory_sword:decoded",
+            "at": 170.10000014305115,
+            "ms": 20.300000190734863
+          },
+          {
+            "stage": "armory_rack:decoded",
+            "at": 172.10000014305115,
+            "ms": 22.700000047683716
+          },
+          {
+            "stage": "image:both-decoded",
+            "at": 172.10000014305115
+          },
+          {
+            "stage": "DONE",
+            "at": 172.10000014305115
+          }
+        ],
+        "error": null,
+        "originalWorldDrawn": false,
+        "productionApproved": false,
+        "serverItemsAuthenticated": false
+      },
+      "resources": [
+        {
+          "url": "/web/armory-p0-graph-load-probe.mjs",
+          "durationMs": 6.8999998569488525,
+          "transferSize": 2127,
+          "decodedBodySize": 1827,
+          "responseEnd": 47
+        },
+        {
+          "url": "/__worldsource__/src/browser/authored-world-renderer.mjs",
+          "durationMs": 13.200000047683716,
+          "transferSize": 10866,
+          "decodedBodySize": 10566,
+          "responseEnd": 74
+        },
+        {
+          "url": "/__worldsource__/src/world/alpha-armory.mjs",
+          "durationMs": 10.899999856948853,
+          "transferSize": 3152,
+          "decodedBodySize": 2852,
+          "responseEnd": 73.29999995231628
+        },
+        {
+          "url": "/__worldsource__/src/world/authored-maps.mjs",
+          "durationMs": 22.800000190734863,
+          "transferSize": 6341,
+          "decodedBodySize": 6041,
+          "responseEnd": 85.60000014305115
+        },
+        {
+          "url": "/__worldsource__/src/world/building-presentation.mjs",
+          "durationMs": 10.799999952316284,
+          "transferSize": 3265,
+          "decodedBodySize": 2965,
+          "responseEnd": 89.79999995231628
+        },
+        {
+          "url": "/src/browser/armory-world493-visual-bridge.mjs",
+          "durationMs": 22.399999856948853,
+          "transferSize": 3557,
+          "decodedBodySize": 3257,
+          "responseEnd": 120
+        },
+        {
+          "url": "/src/browser/armory-rack-visual.mjs",
+          "durationMs": 31.299999952316284,
+          "transferSize": 6725,
+          "decodedBodySize": 6425,
+          "responseEnd": 129.29999995231628
+        },
+        {
+          "url": "/src/browser/armory-sword-alpha-sampler.mjs",
+          "durationMs": 31.299999952316284,
+          "transferSize": 4833,
+          "decodedBodySize": 4533,
+          "responseEnd": 129.70000004768372
+        },
+        {
+          "url": "/src/browser/armory-rack-presented-frame.mjs",
+          "durationMs": 29.59999990463257,
+          "transferSize": 5612,
+          "decodedBodySize": 5312,
+          "responseEnd": 130.70000004768372
+        },
+        {
+          "url": "/src/browser/arena-viewport.mjs",
+          "durationMs": 7.099999904632568,
+          "transferSize": 2869,
+          "decodedBodySize": 2569,
+          "responseEnd": 140.5
+        },
+        {
+          "url": "/assets/environment/greyhaven/armory-p0/armory_rack.webp",
+          "durationMs": 14.799999952316284,
+          "transferSize": 15728,
+          "decodedBodySize": 15428,
+          "responseEnd": 165
+        },
+        {
+          "url": "/assets/environment/greyhaven/armory-p0/armory_sword.webp",
+          "durationMs": 13.600000143051147,
+          "transferSize": 2982,
+          "decodedBodySize": 2682,
+          "responseEnd": 164.10000014305115
+        }
+      ],
+      "responses": [
+        {
+          "status": 200,
+          "url": "/web/armory-p0-graph-load-probe.html"
+        },
+        {
+          "status": 200,
+          "url": "/web/armory-p0-graph-load-probe.mjs"
+        },
+        {
+          "status": 200,
+          "url": "/__worldsource__/src/world/alpha-armory.mjs"
+        },
+        {
+          "status": 200,
+          "url": "/__worldsource__/src/browser/authored-world-renderer.mjs"
+        },
+        {
+          "status": 200,
+          "url": "/__worldsource__/src/world/authored-maps.mjs"
+        },
+        {
+          "status": 200,
+          "url": "/__worldsource__/src/world/building-presentation.mjs"
+        },
+        {
+          "status": 200,
+          "url": "/src/browser/armory-world493-visual-bridge.mjs"
+        },
+        {
+          "status": 200,
+          "url": "/src/browser/armory-rack-visual.mjs"
+        },
+        {
+          "status": 200,
+          "url": "/src/browser/armory-rack-presented-frame.mjs"
+        },
+        {
+          "status": 200,
+          "url": "/src/browser/armory-sword-alpha-sampler.mjs"
+        },
+        {
+          "status": 200,
+          "url": "/src/browser/arena-viewport.mjs"
+        },
+        {
+          "status": 200,
+          "url": "/assets/environment/greyhaven/armory-p0/armory_rack.webp"
+        },
+        {
+          "status": 200,
+          "url": "/assets/environment/greyhaven/armory-p0/armory_sword.webp"
+        }
+      ],
+      "errors": [],
+      "fullWorldSourceGraphLoaded": true,
+      "graphicsSourceModulesLoaded": true,
+      "worldDrawTested": false,
+      "genuinelyLowEndHost": true,
+      "serverItemEvents": 0
+    },
+    {
+      "engine": "chrome",
+      "version": "Chrome/152.0.7977.82",
+      "repetition": 1,
+      "variant": "draw",
+      "elapsedWallMs": 261,
+      "probe": {
+        "phase": "DONE",
+        "done": true,
+        "log": [
+          {
+            "stage": "boot",
+            "at": 58.700000047683716,
+            "mode": "draw"
+          },
+          {
+            "stage": "graph:begin",
+            "at": 58.799999952316284
+          },
+          {
+            "stage": "graph:ready",
+            "at": 140.09999990463257,
+            "loadedWorld": true,
+            "loadedGraphics": true
+          },
+          {
+            "stage": "image:begin",
+            "at": 140.09999990463257
+          },
+          {
+            "stage": "armory_rack:begin",
+            "at": 141.09999990463257
+          },
+          {
+            "stage": "armory_sword:begin",
+            "at": 141.40000009536743
+          },
+          {
+            "stage": "armory_rack:onload",
+            "at": 150.70000004768372,
+            "ms": 9.600000143051147,
+            "naturalWidth": 240,
+            "naturalHeight": 166
+          },
+          {
+            "stage": "armory_sword:onload",
+            "at": 151.20000004768372,
+            "ms": 9.799999952316284,
+            "naturalWidth": 42,
+            "naturalHeight": 115
+          },
+          {
+            "stage": "armory_rack:decoded",
+            "at": 154.90000009536743,
+            "ms": 13.800000190734863
+          },
+          {
+            "stage": "armory_sword:decoded",
+            "at": 155.40000009536743,
+            "ms": 13.899999856948853
+          },
+          {
+            "stage": "image:both-decoded",
+            "at": 155.40000009536743
+          },
+          {
+            "stage": "draw:begin",
+            "at": 179.59999990463257,
+            "index": 0
+          },
+          {
+            "stage": "draw:complete",
+            "at": 219.90000009536743,
+            "index": 0,
+            "ms": 40.200000047683716,
+            "tilesCached": 6
+          },
+          {
+            "stage": "draw:begin",
+            "at": 219.90000009536743,
+            "index": 1
+          },
+          {
+            "stage": "draw:complete",
+            "at": 220.5,
+            "index": 1,
+            "ms": 0.5999999046325684,
+            "tilesCached": 6
+          },
+          {
+            "stage": "draw:begin",
+            "at": 220.5,
+            "index": 2
+          },
+          {
+            "stage": "draw:complete",
+            "at": 220.70000004768372,
+            "index": 2,
+            "ms": 0.20000004768371582,
+            "tilesCached": 6
+          },
+          {
+            "stage": "draw:begin",
+            "at": 220.70000004768372,
+            "index": 3
+          },
+          {
+            "stage": "draw:complete",
+            "at": 221,
+            "index": 3,
+            "ms": 0.2999999523162842,
+            "tilesCached": 6
+          },
+          {
+            "stage": "draw:begin",
+            "at": 221,
+            "index": 4
+          },
+          {
+            "stage": "draw:complete",
+            "at": 221.20000004768372,
+            "index": 4,
+            "ms": 0.20000004768371582,
+            "tilesCached": 6
+          },
+          {
+            "stage": "draw:begin",
+            "at": 221.20000004768372,
+            "index": 5
+          },
+          {
+            "stage": "draw:complete",
+            "at": 221.40000009536743,
+            "index": 5,
+            "ms": 0.20000004768371582,
+            "tilesCached": 6
+          },
+          {
+            "stage": "DONE",
+            "at": 221.40000009536743
+          }
+        ],
+        "error": null,
+        "originalWorldDrawn": true,
+        "productionApproved": false,
+        "serverItemsAuthenticated": false
+      },
+      "resources": [
+        {
+          "url": "/web/armory-p0-graph-load-probe.mjs",
+          "durationMs": 7.5,
+          "transferSize": 2127,
+          "decodedBodySize": 1827,
+          "responseEnd": 68.09999990463257
+        },
+        {
+          "url": "/__worldsource__/src/browser/authored-world-renderer.mjs",
+          "durationMs": 13.399999856948853,
+          "transferSize": 10866,
+          "decodedBodySize": 10566,
+          "responseEnd": 101.29999995231628
+        },
+        {
+          "url": "/__worldsource__/src/world/alpha-armory.mjs",
+          "durationMs": 12.5,
+          "transferSize": 3152,
+          "decodedBodySize": 2852,
+          "responseEnd": 100.90000009536743
+        },
+        {
+          "url": "/__worldsource__/src/world/authored-maps.mjs",
+          "durationMs": 13.5,
+          "transferSize": 6341,
+          "decodedBodySize": 6041,
+          "responseEnd": 102.40000009536743
+        },
+        {
+          "url": "/__worldsource__/src/world/building-presentation.mjs",
+          "durationMs": 6,
+          "transferSize": 3265,
+          "decodedBodySize": 2965,
+          "responseEnd": 113.40000009536743
+        },
+        {
+          "url": "/src/browser/armory-world493-visual-bridge.mjs",
+          "durationMs": 9.099999904632568,
+          "transferSize": 3557,
+          "decodedBodySize": 3257,
+          "responseEnd": 125.09999990463257
+        },
+        {
+          "url": "/src/browser/armory-rack-visual.mjs",
+          "durationMs": 9.600000143051147,
+          "transferSize": 6725,
+          "decodedBodySize": 6425,
+          "responseEnd": 125.90000009536743
+        },
+        {
+          "url": "/src/browser/armory-sword-alpha-sampler.mjs",
+          "durationMs": 16.299999952316284,
+          "transferSize": 4833,
+          "decodedBodySize": 4533,
+          "responseEnd": 133
+        },
+        {
+          "url": "/src/browser/armory-rack-presented-frame.mjs",
+          "durationMs": 16.799999952316284,
+          "transferSize": 5612,
+          "decodedBodySize": 5312,
+          "responseEnd": 133.79999995231628
+        },
+        {
+          "url": "/src/browser/arena-viewport.mjs",
+          "durationMs": 7.6000001430511475,
+          "transferSize": 2869,
+          "decodedBodySize": 2569,
+          "responseEnd": 137.40000009536743
+        },
+        {
+          "url": "/assets/environment/greyhaven/armory-p0/armory_rack.webp",
+          "durationMs": 6.5,
+          "transferSize": 15728,
+          "decodedBodySize": 15428,
+          "responseEnd": 148.09999990463257
+        },
+        {
+          "url": "/assets/environment/greyhaven/armory-p0/armory_sword.webp",
+          "durationMs": 5.900000095367432,
+          "transferSize": 2982,
+          "decodedBodySize": 2682,
+          "responseEnd": 147.70000004768372
+        }
+      ],
+      "responses": [
+        {
+          "status": 200,
+          "url": "/web/armory-p0-graph-load-probe.html"
+        },
+        {
+          "status": 200,
+          "url": "/web/armory-p0-graph-load-probe.mjs"
+        },
+        {
+          "status": 200,
+          "url": "/__worldsource__/src/browser/authored-world-renderer.mjs"
+        },
+        {
+          "status": 200,
+          "url": "/__worldsource__/src/world/alpha-armory.mjs"
+        },
+        {
+          "status": 200,
+          "url": "/__worldsource__/src/world/authored-maps.mjs"
+        },
+        {
+          "status": 200,
+          "url": "/__worldsource__/src/world/building-presentation.mjs"
+        },
+        {
+          "status": 200,
+          "url": "/src/browser/armory-world493-visual-bridge.mjs"
+        },
+        {
+          "status": 200,
+          "url": "/src/browser/armory-rack-visual.mjs"
+        },
+        {
+          "status": 200,
+          "url": "/src/browser/armory-sword-alpha-sampler.mjs"
+        },
+        {
+          "status": 200,
+          "url": "/src/browser/armory-rack-presented-frame.mjs"
+        },
+        {
+          "status": 200,
+          "url": "/src/browser/arena-viewport.mjs"
+        },
+        {
+          "status": 200,
+          "url": "/assets/environment/greyhaven/armory-p0/armory_rack.webp"
+        },
+        {
+          "status": 200,
+          "url": "/assets/environment/greyhaven/armory-p0/armory_sword.webp"
+        }
+      ],
+      "errors": [],
+      "fullWorldSourceGraphLoaded": true,
+      "graphicsSourceModulesLoaded": true,
+      "worldDrawTested": true,
+      "genuinelyLowEndHost": true,
+      "serverItemEvents": 0
+    }
+  ],
+  "requests": [
+    {
+      "path": "/web/armory-p0-graph-load-probe.html",
+      "method": "GET",
+      "atMs": 1792601082807
+    },
+    {
+      "path": "/assets/environment/greyhaven/armory-p0/armory_rack.webp",
+      "method": "GET",
+      "atMs": 1792601082880
+    },
+    {
+      "path": "/assets/environment/greyhaven/armory-p0/armory_sword.webp",
+      "method": "GET",
+      "atMs": 1792601082887
+    },
+    {
+      "path": "/web/armory-p0-graph-load-probe.html",
+      "method": "GET",
+      "atMs": 1792601083061
+    },
+    {
+      "path": "/web/armory-p0-graph-load-probe.mjs",
+      "method": "GET",
+      "atMs": 1792601083107
+    },
+    {
+      "path": "/__worldsource__/src/browser/authored-world-renderer.mjs",
+      "method": "GET",
+      "atMs": 1792601083118
+    },
+    {
+      "path": "/__worldsource__/src/world/alpha-armory.mjs",
+      "method": "GET",
+      "atMs": 1792601083118
+    },
+    {
+      "path": "/__worldsource__/src/world/authored-maps.mjs",
+      "method": "GET",
+      "atMs": 1792601083119
+    },
+    {
+      "path": "/__worldsource__/src/world/building-presentation.mjs",
+      "method": "GET",
+      "atMs": 1792601083133
+    },
+    {
+      "path": "/assets/environment/greyhaven/armory-p0/armory_rack.webp",
+      "method": "GET",
+      "atMs": 1792601083149
+    },
+    {
+      "path": "/assets/environment/greyhaven/armory-p0/armory_sword.webp",
+      "method": "GET",
+      "atMs": 1792601083153
+    },
+    {
+      "path": "/web/armory-p0-graph-load-probe.html",
+      "method": "GET",
+      "atMs": 1792601083280
+    },
+    {
+      "path": "/web/armory-p0-graph-load-probe.mjs",
+      "method": "GET",
+      "atMs": 1792601083335
+    },
+    {
+      "path": "/src/browser/armory-world493-visual-bridge.mjs",
+      "method": "GET",
+      "atMs": 1792601083391
+    },
+    {
+      "path": "/src/browser/armory-rack-visual.mjs",
+      "method": "GET",
+      "atMs": 1792601083391
+    },
+    {
+      "path": "/src/browser/armory-sword-alpha-sampler.mjs",
+      "method": "GET",
+      "atMs": 1792601083393
+    },
+    {
+      "path": "/src/browser/armory-rack-presented-frame.mjs",
+      "method": "GET",
+      "atMs": 1792601083398
+    },
+    {
+      "path": "/src/browser/arena-viewport.mjs",
+      "method": "GET",
+      "atMs": 1792601083432
+    },
+    {
+      "path": "/assets/environment/greyhaven/armory-p0/armory_rack.webp",
+      "method": "GET",
+      "atMs": 1792601083447
+    },
+    {
+      "path": "/assets/environment/greyhaven/armory-p0/armory_sword.webp",
+      "method": "GET",
+      "atMs": 1792601083447
+    },
+    {
+      "path": "/web/armory-p0-graph-load-probe.html",
+      "method": "GET",
+      "atMs": 1792601083570
+    },
+    {
+      "path": "/web/armory-p0-graph-load-probe.mjs",
+      "method": "GET",
+      "atMs": 1792601083607
+    },
+    {
+      "path": "/__worldsource__/src/browser/authored-world-renderer.mjs",
+      "method": "GET",
+      "atMs": 1792601083630
+    },
+    {
+      "path": "/__worldsource__/src/world/alpha-armory.mjs",
+      "method": "GET",
+      "atMs": 1792601083632
+    },
+    {
+      "path": "/__worldsource__/src/world/authored-maps.mjs",
+      "method": "GET",
+      "atMs": 1792601083638
+    },
+    {
+      "path": "/__worldsource__/src/world/building-presentation.mjs",
+      "method": "GET",
+      "atMs": 1792601083651
+    },
+    {
+      "path": "/src/browser/armory-world493-visual-bridge.mjs",
+      "method": "GET",
+      "atMs": 1792601083667
+    },
+    {
+      "path": "/src/browser/armory-rack-visual.mjs",
+      "method": "GET",
+      "atMs": 1792601083669
+    },
+    {
+      "path": "/src/browser/armory-sword-alpha-sampler.mjs",
+      "method": "GET",
+      "atMs": 1792601083685
+    },
+    {
+      "path": "/src/browser/armory-rack-presented-frame.mjs",
+      "method": "GET",
+      "atMs": 1792601083686
+    },
+    {
+      "path": "/src/browser/arena-viewport.mjs",
+      "method": "GET",
+      "atMs": 1792601083701
+    },
+    {
+      "path": "/assets/environment/greyhaven/armory-p0/armory_rack.webp",
+      "method": "GET",
+      "atMs": 1792601083720
+    },
+    {
+      "path": "/assets/environment/greyhaven/armory-p0/armory_sword.webp",
+      "method": "GET",
+      "atMs": 1792601083721
+    },
+    {
+      "path": "/web/armory-p0-graph-load-probe.html",
+      "method": "GET",
+      "atMs": 1792601083927
+    },
+    {
+      "path": "/web/armory-p0-graph-load-probe.mjs",
+      "method": "GET",
+      "atMs": 1792601083982
+    },
+    {
+      "path": "/__worldsource__/src/browser/authored-world-renderer.mjs",
+      "method": "GET",
+      "atMs": 1792601084008
+    },
+    {
+      "path": "/__worldsource__/src/world/alpha-armory.mjs",
+      "method": "GET",
+      "atMs": 1792601084009
+    },
+    {
+      "path": "/__worldsource__/src/world/authored-maps.mjs",
+      "method": "GET",
+      "atMs": 1792601084013
+    },
+    {
+      "path": "/__worldsource__/src/world/building-presentation.mjs",
+      "method": "GET",
+      "atMs": 1792601084027
+    },
+    {
+      "path": "/src/browser/armory-world493-visual-bridge.mjs",
+      "method": "GET",
+      "atMs": 1792601084036
+    },
+    {
+      "path": "/src/browser/armory-rack-visual.mjs",
+      "method": "GET",
+      "atMs": 1792601084038
+    },
+    {
+      "path": "/src/browser/armory-sword-alpha-sampler.mjs",
+      "method": "GET",
+      "atMs": 1792601084043
+    },
+    {
+      "path": "/src/browser/armory-rack-presented-frame.mjs",
+      "method": "GET",
+      "atMs": 1792601084043
+    },
+    {
+      "path": "/src/browser/arena-viewport.mjs",
+      "method": "GET",
+      "atMs": 1792601084050
+    },
+    {
+      "path": "/assets/environment/greyhaven/armory-p0/armory_rack.webp",
+      "method": "GET",
+      "atMs": 1792601084060
+    },
+    {
+      "path": "/assets/environment/greyhaven/armory-p0/armory_sword.webp",
+      "method": "GET",
+      "atMs": 1792601084061
+    }
+  ],
+  "actualX230iTested": true,
+  "productionEdited": false,
+  "gameClientExecuted": false,
+  "hasServerOwnedItemIds": false,
+  "performancePassed": false,
+  "completedRuns": 5,
+  "successfulOnTestedHost": true
+}
