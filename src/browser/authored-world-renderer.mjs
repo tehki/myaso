@@ -1,6 +1,7 @@
 // Visual-only renderer for designer-authored fixed maps.
 // Loading an interior in the offline preview does not grant a network zone transfer.
 import { AUTHORED_MAPS, MAP_IDS, getAuthoredMap } from "../world/authored-maps.mjs";
+import { normalizeWorldBuildingReplacementIds } from "../world/building-presentation.mjs";
 
 export const WORLD_TILE_SIZE = 512;
 export const WORLD_CACHE_CAP = 24;
@@ -83,7 +84,7 @@ function paintCityWalls(ctx,city) {
   ctx.textAlign="center";ctx.fillText(city.name,x+w/2,y+120);
 }
 
-function paintOverworld(ctx,map) {
+function paintOverworld(ctx,map,replacedBuildings) {
   ctx.fillStyle="#627751";ctx.fillRect(0,0,map.width,map.height);
   // Authored agricultural plots, not generated terrain.
   for(const f of map.fields){
@@ -116,7 +117,10 @@ function paintOverworld(ctx,map) {
   for(const grove of map.groves)
     for(const [dx,dy] of grove.trees)paintTree(ctx,grove.x+dx,grove.y+dy);
   paintCityWalls(ctx,map.city);
-  for(const b of map.buildings)paintBuilding(ctx,b);
+  // Opt-in World/Graphics contract: the exact ID's placeholder is omitted
+  // at TILE BUILD TIME, never erased with an opaque rectangle over terrain.
+  // All other building footprints, portals and collision stay authored.
+  for(const b of map.buildings)if(!replacedBuildings.has(b.id))paintBuilding(ctx,b);
   for(const p of map.portals){
     ctx.strokeStyle="#e9cf7c";ctx.lineWidth=4;
     ctx.beginPath();ctx.arc(p.x,p.y,17,Math.PI*.05,Math.PI*.95);ctx.stroke();
@@ -182,10 +186,12 @@ export function visibleWorldTiles(camera,width,height,zoom,tileSize=WORLD_TILE_S
 }
 
 export function createAuthoredWorldRenderer({makeCanvas=()=>document.createElement("canvas"),
-  cacheCap=WORLD_CACHE_CAP,buildLimit=3}={}) {
+  cacheCap=WORLD_CACHE_CAP,buildLimit=3,replacedBuildingIds=[]}={}) {
   if(!Number.isInteger(cacheCap)||cacheCap<1||cacheCap>64
     ||!Number.isInteger(buildLimit)||buildLimit<0||buildLimit>8)
     throw new RangeError("invalid authored world cache");
+  const resolvedIds=normalizeWorldBuildingReplacementIds(MAP_IDS.overworld,replacedBuildingIds);
+  const replacedBuildings=new Set(resolvedIds);
   const cache=new Map();
   const stats={cached:0,created:0,visible:0};
   function makeTile(map,x,y){
@@ -194,11 +200,14 @@ export function createAuthoredWorldRenderer({makeCanvas=()=>document.createEleme
     const c=texture.getContext("2d",{alpha:false});
     if(!c)throw new Error("2D world canvas unavailable");
     c.save();c.translate(-x*WORLD_TILE_SIZE,-y*WORLD_TILE_SIZE);
-    paintOverworld(c,map);c.restore();
+    paintOverworld(c,map,replacedBuildings);c.restore();
     return texture;
   }
   return {
     stats,
+    // Immutable identity for Graphics; rebuilding with new options creates a
+    // new tile cache. Never change an existing cached texture's replacement.
+    replacedBuildingIds:resolvedIds,
     clear(){cache.clear();stats.cached=0;},
     draw(ctx,mapId,camera,width,height,zoom){
       const map=getAuthoredMap(mapId);
