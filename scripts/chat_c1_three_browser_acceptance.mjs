@@ -90,6 +90,49 @@ try {
  console.log("B_ACK",JSON.stringify(bAck));
  const gotA=await poll("A receives B",()=>evaljs(a,"const x=[...document.querySelectorAll('.local-chat-item[data-channel=local]')].map(e=>({name:e.querySelector('.local-chat-sender')?.textContent,text:e.querySelector('.local-chat-text')?.textContent}));return {ok:x.some(m=>m.text===arguments[0]&&m.name==='Player #2'),messages:x};",[reply]));
  console.log("A_RECEIVED",JSON.stringify(gotA));
+
+ // Genuine server validation, not a mock: 120 two-byte UTF-8 codepoints
+ // must reach B under the 240-byte Core limit and never reach distant C.
+ const maxBytes = "é".repeat(120);
+ assert.equal(new TextEncoder().encode(maxBytes).length, 240);
+ await send(a, maxBytes);
+ const maxAck = await poll("240-byte real Core ChatResult",()=>
+  evaljs(a,"return {ok:[...document.querySelectorAll('li[data-delivery=accepted] .local-chat-text')].some(x=>x.textContent===arguments[0])}",[maxBytes]));
+ const maxNear = await poll("240-byte delivered only to nearby B",()=>
+  evaljs(b,"return {ok:[...document.querySelectorAll('.local-chat-item[data-channel=local] .local-chat-text')].some(x=>x.textContent===arguments[0])}",[maxBytes]));
+ const maxFar = await evaljs(c,"return [...document.querySelectorAll('.local-chat-item .local-chat-text')].some(x=>x.textContent===arguments[0])",[maxBytes]);
+ assert.equal(maxAck.ok,true);
+ assert.equal(maxNear.ok,true);
+ assert.equal(maxFar,false,"240-byte message must not reach distant C");
+ console.log("UTF8_240_NATIVE_SERVER_PASS",JSON.stringify({bytes:240,near:true,far:false}));
+
+ // The UI rejects 121x 2-byte Unicode (242 bytes) before any ChatSend.
+ // Set DOM value deliberately (native maxLength would clamp typed input)
+ // then submit with the real keyboard; confirm no phantom pending/sent row.
+ await evaljs(a,"document.querySelector('#arena').focus();");
+ await key(a,"\uE007");
+ const maxOver = "é".repeat(121);
+ assert.equal(new TextEncoder().encode(maxOver).length,242);
+ await evaljs(a,"document.querySelector('.local-chat-input').value=arguments[0]",[maxOver]);
+ await key(a,"\uE007");
+ const rejected = await evaljs(a,
+   "const x=document.querySelector('[data-local-chat]');const text=arguments[0];return {focused:document.activeElement===x.querySelector('input'),error:x.querySelector('.local-chat-status').textContent,outgoing:[...x.querySelectorAll('li.local-chat-item .local-chat-text')].filter(e=>e.textContent===text).length,inputValue:x.querySelector('input').value};",
+   [maxOver]);
+ assert.equal(rejected.focused,true,"failed compose stays editable");
+ assert.match(rejected.error,/too long/i,"oversized payload rejected locally");
+ assert.equal(rejected.outgoing,0,"rejected chat must not create optimistic row");
+ assert.equal(rejected.inputValue,maxOver,"rejected chat remains editable");
+ const remoteInvalid = await evaljs(b,"return [...document.querySelectorAll('.local-chat-item .local-chat-text')].some(x=>x.textContent===arguments[0])",[maxOver]);
+ assert.equal(remoteInvalid,false,"242-byte invalid message never reached B");
+ console.log("UTF8_242_REJECT_PASS",JSON.stringify({bytes:242,error:rejected.error}));
+
+ // A native Escape from a rejected/unsent message returns focus to the
+ // arena and clears input without submitting or leaking gameplay state.
+ await key(a,"\uE00C");
+ const escaped=await evaljs(a,
+   "const x=document.querySelector('[data-local-chat]');return {arenaFocused:document.activeElement?.id==='arena',collapsed:x.dataset.open==='false',draft:x.querySelector('input').value};");
+ assert.deepEqual(escaped,{arenaFocused:true,collapsed:true,draft:""});
+ console.log("ESCAPE_COMBAT_FOCUS_RESTORED",JSON.stringify(escaped));
  // Keep gameplay datagram ACK telemetry moving while the optional reliable
  // chat streams are connected. This is not full combat-under-chat acceptance.
  const ackSamples=async session=>evaljs(session,
