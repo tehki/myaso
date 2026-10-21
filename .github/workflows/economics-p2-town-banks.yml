@@ -4,8 +4,11 @@ on:
   pull_request:
     paths:
       - scripts/economics_town_banks_lab.py
+      - scripts/economics_bank_world_contract.py
+      - scripts/test_economics_bank_world_contract.py
       - scripts/test_economics_town_banks_lab.py
       - docs/ECONOMICS_P2_LOCAL_TOWN_BANKS.md
+      - docs/ECONOMICS_B1_WORLD_VAULT_BREACH_CONTRACT.md
       - .github/workflows/economics-p2-town-banks.yml
   workflow_dispatch:
 
@@ -14,12 +17,12 @@ permissions:
 
 jobs:
   fictional-local-banks:
-    name: NPC town bank nonredeemable model (offline only)
+    name: NPC town bank and untrusted World handoff (offline only)
     runs-on: ubuntu-latest
     timeout-minutes: 3
     steps:
       - uses: actions/checkout@v4
-      - name: Verify stand-alone local bank model and 29 tests
+      - name: Verify isolated banking plus 24 fail-closed World handoff tests
         run: |
-          python3 -m py_compile scripts/economics_town_banks_lab.py scripts/test_economics_town_banks_lab.py
-          python3 -m unittest discover -s scripts -p 'test_economics_town_banks_lab.py' -v
+          python3 -m py_compile scripts/economics_town_banks_lab.py scripts/test_economics_town_banks_lab.py scripts/economics_bank_world_contract.py scripts/test_economics_bank_world_contract.py
+          python3 -m unittest discover -s scripts -p 'test_economics_*bank*py' -v
