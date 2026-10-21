@@ -291,6 +291,151 @@ mod tests {
         ));
     }
 
+    /// A real OS-process crash after fsynced pickup but before sending any
+    /// browser ACK must not remint the sword or allow another player to win.
+    /// This exercises the actual local C3e journal, not network transport or
+    /// a multi-host authority.
+    #[cfg(unix)]
+    #[test]
+    fn sigkill_after_pickup_commit_before_ack_preserves_one_winner() {
+        use std::{
+            process::Command,
+            thread,
+            time::{Duration, Instant},
+        };
+
+        let root = Root::new();
+        let ready = root.0.with_extension("pickup-committed-ready");
+        let mut writer = root.open();
+        seed(&mut writer);
+        drop(writer);
+
+        let mut child = Command::new(std::env::current_exe().expect("test executable"))
+            .arg("--ignored")
+            .arg("--exact")
+            .arg("alpha_pickup_ack_proof::tests::subprocess_pickup_before_ack")
+            .arg("--nocapture")
+            .env("MYASO_C3Q_CRASH_ROOT", &root.0)
+            .env("MYASO_C3Q_CRASH_READY", &ready)
+            .spawn()
+            .expect("launch separate pickup writer");
+
+        let deadline = Instant::now() + Duration::from_secs(10);
+        let mut committed = false;
+        while Instant::now() < deadline {
+            if ready.exists() {
+                committed = true;
+                break;
+            }
+            if child.try_wait().expect("poll child").is_some() {
+                break;
+            }
+            thread::sleep(Duration::from_millis(20));
+        }
+        let lock_held = committed
+            && matches!(
+                DurableItemJournal::open(&root.0),
+                Err(ItemJournalError::WriterBusy)
+            );
+        // The parent kills/reaps the subprocess even if readiness failed.
+        let _ = child.kill();
+        let _ = child.wait();
+        assert!(committed, "child must commit item before simulated lost ACK");
+        assert!(lock_held, "child was independently holding OS writer lock");
+
+        let mut recovered = root.open();
+        let correct = [OwnershipOp::Move {
+            item: item(201),
+            from: rack(0),
+            to: equip(1),
+        }];
+        let receipt = recovered
+            .verified_receipt(txn(1001), &correct)
+            .unwrap()
+            .expect("durable pickup receipt recovered after SIGKILL");
+        assert_eq!(receipt.sequence, 2);
+        assert_eq!(
+            current_committed_rack_pickup(
+                &recovered,
+                txn(1001),
+                item(201),
+                rack(0),
+                owner(1)
+            )
+            .unwrap()
+            .journal_sequence(),
+            receipt.sequence
+        );
+        assert_eq!(
+            recovered.apply(txn(1001), &correct).unwrap(),
+            receipt,
+            "identical lost ACK retry must not mint a second pickup"
+        );
+        let losing_attempt = [OwnershipOp::Move {
+            item: item(201),
+            from: rack(0),
+            to: equip(2),
+        }];
+        assert!(matches!(
+            recovered.apply(txn(1002), &losing_attempt),
+            Err(ItemJournalError::InvalidTransaction(
+                OwnershipError::ExpectedLocationMismatch
+            ))
+        ));
+        assert_eq!(
+            recovered.verified_receipt(txn(1002), &losing_attempt).unwrap(),
+            None,
+            "losing rival must not acquire a committed receipt"
+        );
+        assert_eq!(recovered.item_count(), 4);
+        assert_eq!(recovered.location(item(201)), Some(equip(1)));
+        drop(recovered);
+        let _ = fs::remove_file(ready);
+
+        let verified_again = root.open();
+        assert_eq!(verified_again.item_count(), 4);
+        assert!(
+            current_committed_rack_pickup(
+                &verified_again,
+                txn(1001),
+                item(201),
+                rack(0),
+                owner(1)
+            )
+            .is_ok()
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    #[ignore = "called by sigkill_after_pickup_commit_before_ack_preserves_one_winner"]
+    fn subprocess_pickup_before_ack() {
+        let (Some(root), Some(ready)) = (
+            std::env::var_os("MYASO_C3Q_CRASH_ROOT"),
+            std::env::var_os("MYASO_C3Q_CRASH_READY"),
+        ) else {
+            return;
+        };
+        let mut writer =
+            DurableItemJournal::open(PathBuf::from(root)).expect("child exclusive writer");
+        let receipt = writer
+            .apply(
+                txn(1001),
+                &[OwnershipOp::Move {
+                    item: item(201),
+                    from: rack(0),
+                    to: equip(1),
+                }],
+            )
+            .expect("child durably commits one sword pickup");
+        assert_eq!(receipt.sequence, 2);
+        fs::write(ready, b"pickup committed; ACK not sent").unwrap();
+        // Deliberately keep the OS writer lock until the parent SIGKILLs us.
+        loop {
+            std::thread::park();
+        }
+    }
+
     #[test]
     fn historical_receipt_cannot_claim_current_equipment_after_drop_and_aba() {
         let root = Root::new();
