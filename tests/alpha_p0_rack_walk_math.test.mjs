@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {WORLD_ALPHA_SWORD_RACK_SOCKETS,WORLD_ALPHA_SPAWN_COORDINATES,
   validateWorldAlphaArmoryLayout} from "../src/world/alpha-armory.mjs";
-import {nextNativeWalkPulse,nativeRackArrived} from "../scripts/alpha_p0_rack_walk_math.mjs";
+import {nextNativeWalkPulse,nativeRackArrived,proposedNativeRackReachPoint,nativeRackWithinProposedReach,verifyNativeRackPeerConsensus,verifyNativeRackRecoveryPeerConsensus} from "../scripts/alpha_p0_rack_walk_math.mjs";
 import {WORLD_ALPHA_GREYHAVEN_STATIC_SOLIDS} from "../src/world/alpha-solid-geometry.mjs";
 
 test("four canonical World socket approaches are fixed, distinct and legitimate",()=>{
@@ -77,4 +77,110 @@ test("west-first southern courtyard legs avoid EVERY real server-reviewed static
  // attempted too close to the building. This is a risky path, not permission
  // to disable server collision or fake arrival.
  assert.equal(hit({x:4110,y:4020},{x:3820,y:4020},smith),true);
+});
+
+test("proposed World #639 near-sword target has margin within offline Items 56 reach",()=>{
+  for(const slot of WORLD_ALPHA_SWORD_RACK_SOCKETS){
+    const point=proposedNativeRackReachPoint(slot);
+    assert.deepEqual(point,{x:slot.x,y:slot.y+30});
+    assert(Object.isFrozen(point));
+    assert.equal(nativeRackArrived(point,point),true);
+    assert.equal(nativeRackWithinProposedReach(point,slot),true);
+    // All possible 18-unit arrival errors around the proposed target
+    // remain within 48 < 56 in the same authored coordinate frame.
+    for(const theta of [0,Math.PI/4,Math.PI/2,Math.PI,1.5*Math.PI]){
+      const observed={x:point.x+18*Math.cos(theta),y:point.y+18*Math.sin(theta)};
+      assert.equal(nativeRackArrived(observed,point),true);
+      assert.equal(nativeRackWithinProposedReach(observed,slot),true);
+    }
+    // A successful 18-unit ORIGINAL approach acceptance is NOT necessarily
+    // within reach: 4088+12 = 4100, sword y=4038 => 62 > 56.
+    assert.equal(nativeRackArrived({x:slot.x,y:4100},slot.approach),true);
+    assert.equal(nativeRackWithinProposedReach({x:slot.x,y:4100},slot),false);
+  }
+});
+test("proposed reach is offline-only, bounded, exact-socket and fail closed",()=>{
+  const slot=WORLD_ALPHA_SWORD_RACK_SOCKETS[0];
+  for(const invalid of [null,undefined,{x:NaN,y:4068},{x:3740,y:Infinity}])
+    assert.equal(nativeRackWithinProposedReach(invalid,slot),false);
+  assert.equal(nativeRackWithinProposedReach({x:slot.x,y:slot.y},slot,10000),false);
+  assert.equal(nativeRackWithinProposedReach({x:slot.x,y:slot.y},null),false);
+  assert.equal(nativeRackWithinProposedReach({x:slot.x,y:slot.y+57},slot),false);
+  assert.throws(()=>proposedNativeRackReachPoint({...slot,approach:{x:slot.x,y:0}}));
+  assert.throws(()=>proposedNativeRackReachPoint({x:NaN,y:4038}));
+});
+
+test("four actual-shape snapshot observers must agree on true Rust near-sword actors",()=>{
+  // Offline synthetic NEGATIVE/contract fixtures; actual flight uses W3C only.
+  const slots=WORLD_ALPHA_SWORD_RACK_SOCKETS;
+  const w=slots.map((slot,i)=>({id:i+1,socketId:slot.socketId,
+    proposedReach:{observedPosition:{netId:i+1,x:slot.x,y:4068},serverTick:100+i}}));
+  const frame=()=>slots.map((slot,i)=>({netId:i+1,x:slot.x,y:4068}));
+  const views=[1,2,3,4].map(id=>({id,tick:120+id,fighters:frame()}));
+  const pass=verifyNativeRackPeerConsensus(views,w,slots);
+  assert.equal(pass.realRustFighterCount,4);
+  assert.equal(pass.maxPeerDrift,0);
+  assert.equal(pass.itemPickupApproved,false);
+  const within=structuredClone(views);
+  within[3].fighters[0].x+=4;
+  assert.equal(verifyNativeRackPeerConsensus(within,w,slots).maxPeerDrift,4);
+  const mutations=[
+    x=>{x[3].fighters[1].x+=12}, // all in nominal reach56 but 4 browser disagreement
+    x=>{x[0].fighters[0].x+=10}, // still inside approach tolerance 18
+    x=>{x[1].fighters[1].netId=3}, // ghost/duplicate
+    x=>{x[2].fighters.push({netId:5,x:3820,y:4068})}, // unexpected fifth
+    x=>{x[1].id=1}, // duplicated observer
+    x=>{x[3].tick=103}, // not newer than latest native W3C arrival
+    x=>{x[0].fighters[2].x=NaN}, // invalid coordinate
+    x=>{x[1].fighters[0].y=4088}, // out of proposed bound
+  ];
+  for(const mutate of mutations){
+    const bad=structuredClone(views);
+    mutate(bad);
+    assert.throws(()=>verifyNativeRackPeerConsensus(bad,w,slots),
+      /native rack peer consensus/);
+  }
+  const badWitness=structuredClone(w);
+  badWitness[3].proposedReach.serverTick=200;
+  assert.throws(()=>verifyNativeRackPeerConsensus(views,badWitness,slots),
+    /native rack peer consensus/);
+  assert.throws(()=>verifyNativeRackPeerConsensus(views,w,slots.slice(1)),
+    /native rack peer consensus/);
+});
+
+test("single-host REAL Firefox crash recovery fixture must show fresh #5, no #2 ghost, and same four rack sockets",()=>{
+  // Contract fixtures only; real native W3C Rust server acceptance is CI.
+  const ids=[1,3,4,5],sockets=WORLD_ALPHA_SWORD_RACK_SOCKETS;
+  const pick=new Map([[1,0],[3,2],[4,3],[5,1]]);
+  const frame=()=>ids.map(id=>({netId:id,x:sockets[pick.get(id)].x,y:4068}));
+  const rows=ids.map(id=>"#"+id+" - 0");
+  const peers=ids.map((id,i)=>({id,tick:501+i,
+    fighters:frame(),scoreboard:[...rows]}));
+  const result=verifyNativeRackRecoveryPeerConsensus(peers,sockets,500);
+  assert.deepEqual(result.liveIds,ids);
+  assert.equal(result.rejectedGhostPlayerId,2);
+  assert.equal(result.maxPeerDrift,0);
+  assert.equal(result.liveSwordOwnershipProven,false);
+  assert.equal(result.characterIdentityRecoveryProven,false);
+  const cases=[
+    v=>{v[0].fighters[0].x+=9}, // still in nominal 56 but peer mismatch
+    v=>{v[1].fighters[3].netId=2}, // removed Firefox ghost instead of #5
+    v=>{v[2].fighters.push({netId:6,x:3780,y:4068})}, // fifth actor
+    v=>{v[0].id=2}, // dead observer reappeared
+    v=>{v[2].tick=500}, // no fresh authoritative tick
+    v=>{v[3].scoreboard.push("#2 - ghost")}, // scoreboard stale even when state clean
+    v=>{v[3].scoreboard=v[3].scoreboard.filter(x=>!x.startsWith("#5"))},
+    v=>{v[1].fighters[3].x=3820}, // wrong rack #2 vs #3
+    v=>{v[1].fighters[3].y=4100}, // old stand outside reviewed 56 reach
+    v=>{v[2].fighters[0].y=NaN},
+  ];
+  for(const mutate of cases){
+    const bad=structuredClone(peers);mutate(bad);
+    assert.throws(()=>verifyNativeRackRecoveryPeerConsensus(bad,sockets,500),
+      /native rack crash recovery/);
+  }
+  assert.throws(()=>verifyNativeRackRecoveryPeerConsensus(peers,sockets,600),
+    /native rack crash recovery/);
+  assert.throws(()=>verifyNativeRackRecoveryPeerConsensus(peers,sockets.slice(0,3),500),
+    /native rack crash recovery/);
 });
