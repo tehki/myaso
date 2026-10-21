@@ -127,9 +127,31 @@ test("M155 original real W3C pointer and M206 authoritative hit gates remain man
   const section=source.slice(source.indexOf("async function runOnlineUiKickKnockdownFfaHitFlight("),
     source.indexOf("async function runOnlineUiMultiKnockdownFfaFlight("));
   assert.match(section, /punishDowns\.length !== 1 \|\| punishUps\.length !== 1/);
-  assert.match(section, /verifyM155RealCueBeforeNativePunish\(observed/);
+  assert.match(section, /verifyM155RealCueBeforeNativePunish\(conversion\.cueObservation/);
   assert.match(section, /verifyM206ServerKnockdownPunish\(m201ServerOutput\(\)/);
   assert.match(section, /defenderState\?\.playerHp === 66/);
   assert.doesNotMatch(section, /punishDown\.epochMs < conversion\.knockdownTransition\.epochMs/);
   assert.doesNotMatch(section, /new MouseEvent\(|dispatchEvent\(/);
+});
+
+// Protected #39655184307 supplied a real Rust hit at tick341 before victim
+// recovery tick352 but runner threw ReferenceError("observed is not defined")
+// before reaching M206. The cue is scoped to the *one* actual W3C attempt.
+test("M155 retains the exact genuine punisher cue across one-shot attempt scope", () => {
+  const runner = readFileSync(new URL("../scripts/pvp_browser_flight_runner.mjs", import.meta.url), "utf8");
+  const begin = runner.indexOf("async function runOnlineUiKickKnockdownFfaHitFlight(");
+  const end = runner.indexOf("async function runOnlineUiMultiKnockdownFfaFlight(", begin);
+  assert.ok(begin >= 0 && end > begin);
+  const section = runner.slice(begin, end);
+  const dispatched = section.indexOf("const observed = await dispatchM147CuePunish(");
+  const captured = section.indexOf("cueObservation: observed,");
+  const verified = section.indexOf("verifyM155RealCueBeforeNativePunish(conversion.cueObservation,");
+  const serverProof = section.indexOf("verifyM206ServerKnockdownPunish(m201ServerOutput()");
+  assert.ok(dispatched >= 0 && captured > dispatched && verified > captured && serverProof > verified);
+  assert.doesNotMatch(section.slice(verified, serverProof), /verifyM155RealCueBeforeNativePunish\(observed,/);
+  // No synthetic replacement cue, no second W3C pointer and no change to
+  // the native 360ms promptness and authoritative source HIT acceptance.
+  assert.match(section, /performPunish: \(\) => performArenaM221GuardBreakClick\(punisher, 5\)/);
+  assert.match(section, /cueDeadlineMs: COMBAT\.kick\.knockdownMs/);
+  assert.match(section, /punishDowns\.length !== 1 \|\| punishUps\.length !== 1/);
 });

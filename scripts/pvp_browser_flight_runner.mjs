@@ -4616,6 +4616,10 @@ async function runOnlineUiKickKnockdownFfaHitFlight(entries) {
         attempt,
         punishPointerOffset,
         knockdownTransition,
+        // Capture the ONE already-observed genuine punisher-side cue before
+        // leaving the one-shot native kick/punish attempt scope. Never
+        // reconstruct it from another browser or from later snapshots.
+        cueObservation: observed,
       };
 
 
@@ -4745,7 +4749,7 @@ async function runOnlineUiKickKnockdownFfaHitFlight(entries) {
   // at epoch4036 and physically clicked at4044; the victim's separate Chrome
   // replica was received at4064, 20ms AFTER that real click. Do not use
   // unrelated client snapshot-arrival wall epochs as a server action fence.
-  const nativeCueProof = verifyM155RealCueBeforeNativePunish(observed, {
+  const nativeCueProof = verifyM155RealCueBeforeNativePunish(conversion.cueObservation, {
     punisherId, defenderId, pointerDownEpochMs: punishDown.epochMs,
     cueDeadlineMs: COMBAT.kick.knockdownMs,
   });
