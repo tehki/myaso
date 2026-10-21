@@ -1,0 +1,375 @@
+{
+  "milestone": "Blood & Iron A2.31 facade aperture and 3C lighting handoff",
+  "building": {
+    "id": "red-lion",
+    "x": 4240,
+    "y": 3880,
+    "w": 250,
+    "h": 170,
+    "authoredWorldEntrance": [
+      4365,
+      4060
+    ],
+    "visualArtDoor": [
+      4365,
+      4075
+    ]
+  },
+  "graphics3C": {
+    "sourcePr": 419,
+    "sourceHead": "8e85584b6007b38e1a00155b77473e92b0afec6a",
+    "P24Source": "src/browser/greyhaven-atmosphere.mjs",
+    "worldSource": "src/world/authored-maps.mjs",
+    "fixtureWorldXY": [
+      4365,
+      4045
+    ],
+    "poolWorldXY": [
+      4365,
+      4069
+    ],
+    "radiusWorldUnits": 108,
+    "chunkWorldUnits": 512,
+    "lightingPlanVersion": "3c-p24-1"
+  },
+  "material": {
+    "day": {
+      "file": "red_lion_a231_day_dimensional.webp",
+      "sha256": "f45ca685364666e7911128b75180eb1dea5636b48ab2ae5538cc37523ec2dfd0",
+      "bytes": 44370
+    },
+    "dusk": {
+      "file": "red_lion_a231_dusk_dimensional.webp",
+      "sha256": "4b7d58f1dc3469ec612c3ac861089ed6665c2118fa27eb7b2fbb1914f55776c3",
+      "bytes": 41418
+    },
+    "roof": {
+      "file": "red_lion_a231_roof_unchanged.webp",
+      "sha256": "f65554286ea1bb8b80562c72539d82172fd3ea8cc97e6b9d0d3203057a1aedc1",
+      "bytes": 40746
+    },
+    "croppedPixels": [
+      228,
+      297
+    ],
+    "drawOffsetFromDoorPixels": [
+      -114,
+      -269
+    ],
+    "apertures": [
+      {
+        "name": "west-glazing",
+        "roi": [
+          251,
+          260,
+          275,
+          280
+        ]
+      },
+      {
+        "name": "east-glazing",
+        "roi": [
+          360,
+          260,
+          384,
+          280
+        ]
+      }
+    ],
+    "duskWindowGlowIsBoundedToGlass": true,
+    "extraRadialFacadeGlow": false,
+    "alphaIdenticalBetweenDayDusk": true,
+    "roofByteIdenticalToA226": true
+  },
+  "a230AlphaRisk": {
+    "changedPixels": 69,
+    "addedFromFullyTransparent": 51,
+    "removedToFullyTransparent": 0,
+    "partiallyChanged": 18,
+    "overallBoundsUnchanged": true,
+    "overlay": "greyhaven_a231_alpha_hazard_overlay.png",
+    "fullChangedPixelCoordinates": [
+      [
+        290,
+        321
+      ],
+      [
+        291,
+        321
+      ],
+      [
+        292,
+        321
+      ],
+      [
+        293,
+        321
+      ],
+      [
+        294,
+        321
+      ],
+      [
+        295,
+        321
+      ],
+      [
+        345,
+        321
+      ],
+      [
+        346,
+        321
+      ],
+      [
+        347,
+        321
+      ],
+      [
+        348,
+        321
+      ],
+      [
+        349,
+        321
+      ],
+      [
+        350,
+        321
+      ],
+      [
+        289,
+        322
+      ],
+      [
+        290,
+        322
+      ],
+      [
+        291,
+        322
+      ],
+      [
+        292,
+        322
+      ],
+      [
+        293,
+        322
+      ],
+      [
+        294,
+        322
+      ],
+      [
+        345,
+        322
+      ],
+      [
+        346,
+        322
+      ],
+      [
+        347,
+        322
+      ],
+      [
+        348,
+        322
+      ],
+      [
+        349,
+        322
+      ],
+      [
+        350,
+        322
+      ],
+      [
+        289,
+        323
+      ],
+      [
+        290,
+        323
+      ],
+      [
+        291,
+        323
+      ],
+      [
+        292,
+        323
+      ],
+      [
+        293,
+        323
+      ],
+      [
+        294,
+        323
+      ],
+      [
+        345,
+        323
+      ],
+      [
+        346,
+        323
+      ],
+      [
+        347,
+        323
+      ],
+      [
+        348,
+        323
+      ],
+      [
+        349,
+        323
+      ],
+      [
+        350,
+        323
+      ],
+      [
+        289,
+        324
+      ],
+      [
+        290,
+        324
+      ],
+      [
+        291,
+        324
+      ],
+      [
+        292,
+        324
+      ],
+      [
+        293,
+        324
+      ],
+      [
+        294,
+        324
+      ],
+      [
+        345,
+        324
+      ],
+      [
+        346,
+        324
+      ],
+      [
+        347,
+        324
+      ],
+      [
+        348,
+        324
+      ],
+      [
+        349,
+        324
+      ],
+      [
+        350,
+        324
+      ],
+      [
+        345,
+        325
+      ],
+      [
+        346,
+        325
+      ],
+      [
+        349,
+        325
+      ],
+      [
+        293,
+        328
+      ],
+      [
+        294,
+        328
+      ],
+      [
+        295,
+        328
+      ],
+      [
+        344,
+        328
+      ],
+      [
+        345,
+        328
+      ],
+      [
+        346,
+        328
+      ],
+      [
+        293,
+        329
+      ],
+      [
+        294,
+        329
+      ],
+      [
+        345,
+        329
+      ],
+      [
+        346,
+        329
+      ],
+      [
+        293,
+        330
+      ],
+      [
+        294,
+        330
+      ],
+      [
+        295,
+        330
+      ],
+      [
+        345,
+        330
+      ],
+      [
+        346,
+        330
+      ],
+      [
+        344,
+        331
+      ],
+      [
+        345,
+        331
+      ],
+      [
+        346,
+        331
+      ]
+    ]
+  },
+  "artReviewOnly": true,
+  "dynamicDayNightProtocol": false,
+  "serverPortalOrCollisionChanged": false,
+  "actualWorldRendererIntegrated": false,
+  "approvedForProduction": false
+}

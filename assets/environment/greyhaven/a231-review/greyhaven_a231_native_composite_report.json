@@ -1,0 +1,434 @@
+{
+  "milestone": "Blood & Iron A2.31 genuine 3B + pinned 3C P2.4 practical light compositing",
+  "sources": {
+    "c3": "8e85584b6007b38e1a00155b77473e92b0afec6a",
+    "knights": "c74fcf90e227f3bc4788728f000cfe6aa083c7ef",
+    "adults": "91f1c2c4737b8f0275bb22bfbca4acc1501daa00"
+  },
+  "sourceJsHashes": {
+    "/__a231_3c__/greyhaven-atmosphere.mjs": "ddd5b8ea3111107a8786bc890baec9f740f2fe9de4c8fdd392fe82b227597600",
+    "/__a231_3c__/authored-maps.mjs": "21e7663303b14cc89f7dece7d73fda3b7e1fd4b70cc97b8753cd2c793209e144"
+  },
+  "originalKnightAuthentic": true,
+  "adultPreviewStillDraft": true,
+  "reviews": [
+    {
+      "engine": "chrome",
+      "version": "Chrome/154.0.8037.99",
+      "captures": [
+        {
+          "name": "greyhaven_a231_chrome_door-front.png",
+          "state": {
+            "ready": true,
+            "authoringMode": "isolated cross-branch art composite, NOT actual Greyhaven runtime",
+            "gameZoom": 0.84,
+            "camDx": 0,
+            "camDy": 0,
+            "dx": 0,
+            "dy": 0,
+            "depth": "front",
+            "roofOpacity": 0.55,
+            "artDoor": [
+              4365,
+              4075
+            ],
+            "authoredWorldEntrance": [
+              4365,
+              4060
+            ],
+            "fixtureWorldXY": [
+              4365,
+              4045
+            ],
+            "poolWorldXY": [
+              4365,
+              4069
+            ],
+            "radius": 108,
+            "chunkWorldUnits": 512,
+            "cachedChunks": 2,
+            "coldChunkBuildMs": [
+              16.799999952316284,
+              0.6999998092651367
+            ],
+            "single3CSourceVersion": "3c-p24-1",
+            "redLion3CLightCount": 1,
+            "facade3BApertureNoRadialGlow": true,
+            "originalBlenderGeometryPreserved": true,
+            "alphaHazardPixelCount": 69,
+            "sourceHead": "a71378a42be3408ea4116e8e5333e3b9faeb3faf",
+            "source3CHead": "8e85584b6007b38e1a00155b77473e92b0afec6a",
+            "adultPreviewProductionApproved": false,
+            "sourceKnightHead": "c74fcf90e227f3bc4788728f000cfe6aa083c7ef",
+            "sourceAdultHead": "91f1c2c4737b8f0275bb22bfbca4acc1501daa00",
+            "engineScreenshotOnly": true,
+            "realGameDrawOrderValidated": false,
+            "liveGameFPSMeasured": false,
+            "serverPortalOrCollisionValidated": false,
+            "productionApproved": false,
+            "frameCanvasDrawSamplesMs": {
+              "day": {
+                "drawMs": 0.10000014305114746
+              },
+              "dusk": {
+                "drawMs": 0.19999980926513672
+              }
+            },
+            "drawCount": 2,
+            "playerXYErrorPx": 0
+          }
+        },
+        {
+          "name": "greyhaven_a231_chrome_street-front.png",
+          "state": {
+            "ready": true,
+            "authoringMode": "isolated cross-branch art composite, NOT actual Greyhaven runtime",
+            "gameZoom": 0.84,
+            "camDx": 0,
+            "camDy": 0,
+            "dx": 80,
+            "dy": -10,
+            "depth": "front",
+            "roofOpacity": 0.55,
+            "artDoor": [
+              4365,
+              4075
+            ],
+            "authoredWorldEntrance": [
+              4365,
+              4060
+            ],
+            "fixtureWorldXY": [
+              4365,
+              4045
+            ],
+            "poolWorldXY": [
+              4365,
+              4069
+            ],
+            "radius": 108,
+            "chunkWorldUnits": 512,
+            "cachedChunks": 2,
+            "coldChunkBuildMs": [
+              16.799999952316284,
+              0.6999998092651367
+            ],
+            "single3CSourceVersion": "3c-p24-1",
+            "redLion3CLightCount": 1,
+            "facade3BApertureNoRadialGlow": true,
+            "originalBlenderGeometryPreserved": true,
+            "alphaHazardPixelCount": 69,
+            "sourceHead": "a71378a42be3408ea4116e8e5333e3b9faeb3faf",
+            "source3CHead": "8e85584b6007b38e1a00155b77473e92b0afec6a",
+            "adultPreviewProductionApproved": false,
+            "sourceKnightHead": "c74fcf90e227f3bc4788728f000cfe6aa083c7ef",
+            "sourceAdultHead": "91f1c2c4737b8f0275bb22bfbca4acc1501daa00",
+            "engineScreenshotOnly": true,
+            "realGameDrawOrderValidated": false,
+            "liveGameFPSMeasured": false,
+            "serverPortalOrCollisionValidated": false,
+            "productionApproved": false,
+            "frameCanvasDrawSamplesMs": {
+              "day": {
+                "drawMs": 0.20000004768371582
+              },
+              "dusk": {
+                "drawMs": 0.19999980926513672
+              }
+            },
+            "drawCount": 3,
+            "playerXYErrorPx": 0
+          }
+        },
+        {
+          "name": "greyhaven_a231_chrome_door-behind.png",
+          "state": {
+            "ready": true,
+            "authoringMode": "isolated cross-branch art composite, NOT actual Greyhaven runtime",
+            "gameZoom": 0.84,
+            "camDx": 0,
+            "camDy": 0,
+            "dx": 0,
+            "dy": 0,
+            "depth": "behind",
+            "roofOpacity": 0.55,
+            "artDoor": [
+              4365,
+              4075
+            ],
+            "authoredWorldEntrance": [
+              4365,
+              4060
+            ],
+            "fixtureWorldXY": [
+              4365,
+              4045
+            ],
+            "poolWorldXY": [
+              4365,
+              4069
+            ],
+            "radius": 108,
+            "chunkWorldUnits": 512,
+            "cachedChunks": 2,
+            "coldChunkBuildMs": [
+              16.799999952316284,
+              0.6999998092651367
+            ],
+            "single3CSourceVersion": "3c-p24-1",
+            "redLion3CLightCount": 1,
+            "facade3BApertureNoRadialGlow": true,
+            "originalBlenderGeometryPreserved": true,
+            "alphaHazardPixelCount": 69,
+            "sourceHead": "a71378a42be3408ea4116e8e5333e3b9faeb3faf",
+            "source3CHead": "8e85584b6007b38e1a00155b77473e92b0afec6a",
+            "adultPreviewProductionApproved": false,
+            "sourceKnightHead": "c74fcf90e227f3bc4788728f000cfe6aa083c7ef",
+            "sourceAdultHead": "91f1c2c4737b8f0275bb22bfbca4acc1501daa00",
+            "engineScreenshotOnly": true,
+            "realGameDrawOrderValidated": false,
+            "liveGameFPSMeasured": false,
+            "serverPortalOrCollisionValidated": false,
+            "productionApproved": false,
+            "frameCanvasDrawSamplesMs": {
+              "day": {
+                "drawMs": 0.19999980926513672
+              },
+              "dusk": {
+                "drawMs": 0.10000014305114746
+              }
+            },
+            "drawCount": 4,
+            "playerXYErrorPx": 0
+          }
+        }
+      ],
+      "errors": [],
+      "cameraSamples": 40,
+      "p50CanvasDayMs": 0.20000004768371582,
+      "p95CanvasDayMs": 0.3000001907348633,
+      "p50CanvasDuskMs": 0.10000014305114746,
+      "p95CanvasDuskMs": 0.2999999523162842,
+      "coldChunksMs": [
+        16.799999952316284,
+        0.6999998092651367
+      ],
+      "actualWorldClientFPSMeasured": false,
+      "networkGameplayValidated": false,
+      "productionApproved": false
+    },
+    {
+      "engine": "firefox",
+      "version": "firefox/153.4.0",
+      "captures": [
+        {
+          "name": "greyhaven_a231_firefox_door-front.png",
+          "state": {
+            "ready": true,
+            "authoringMode": "isolated cross-branch art composite, NOT actual Greyhaven runtime",
+            "gameZoom": 0.84,
+            "camDx": 0,
+            "camDy": 0,
+            "dx": 0,
+            "dy": 0,
+            "depth": "front",
+            "roofOpacity": 0.55,
+            "artDoor": [
+              4365,
+              4075
+            ],
+            "authoredWorldEntrance": [
+              4365,
+              4060
+            ],
+            "fixtureWorldXY": [
+              4365,
+              4045
+            ],
+            "poolWorldXY": [
+              4365,
+              4069
+            ],
+            "radius": 108,
+            "chunkWorldUnits": 512,
+            "cachedChunks": 2,
+            "coldChunkBuildMs": [
+              3,
+              1
+            ],
+            "single3CSourceVersion": "3c-p24-1",
+            "redLion3CLightCount": 1,
+            "facade3BApertureNoRadialGlow": true,
+            "originalBlenderGeometryPreserved": true,
+            "alphaHazardPixelCount": 69,
+            "sourceHead": "a71378a42be3408ea4116e8e5333e3b9faeb3faf",
+            "source3CHead": "8e85584b6007b38e1a00155b77473e92b0afec6a",
+            "adultPreviewProductionApproved": false,
+            "sourceKnightHead": "c74fcf90e227f3bc4788728f000cfe6aa083c7ef",
+            "sourceAdultHead": "91f1c2c4737b8f0275bb22bfbca4acc1501daa00",
+            "engineScreenshotOnly": true,
+            "realGameDrawOrderValidated": false,
+            "liveGameFPSMeasured": false,
+            "serverPortalOrCollisionValidated": false,
+            "productionApproved": false,
+            "frameCanvasDrawSamplesMs": {
+              "day": {
+                "drawMs": 5
+              },
+              "dusk": {
+                "drawMs": 6
+              }
+            },
+            "drawCount": 2,
+            "playerXYErrorPx": 0
+          }
+        },
+        {
+          "name": "greyhaven_a231_firefox_street-front.png",
+          "state": {
+            "ready": true,
+            "authoringMode": "isolated cross-branch art composite, NOT actual Greyhaven runtime",
+            "gameZoom": 0.84,
+            "camDx": 0,
+            "camDy": 0,
+            "dx": 80,
+            "dy": -10,
+            "depth": "front",
+            "roofOpacity": 0.55,
+            "artDoor": [
+              4365,
+              4075
+            ],
+            "authoredWorldEntrance": [
+              4365,
+              4060
+            ],
+            "fixtureWorldXY": [
+              4365,
+              4045
+            ],
+            "poolWorldXY": [
+              4365,
+              4069
+            ],
+            "radius": 108,
+            "chunkWorldUnits": 512,
+            "cachedChunks": 2,
+            "coldChunkBuildMs": [
+              3,
+              1
+            ],
+            "single3CSourceVersion": "3c-p24-1",
+            "redLion3CLightCount": 1,
+            "facade3BApertureNoRadialGlow": true,
+            "originalBlenderGeometryPreserved": true,
+            "alphaHazardPixelCount": 69,
+            "sourceHead": "a71378a42be3408ea4116e8e5333e3b9faeb3faf",
+            "source3CHead": "8e85584b6007b38e1a00155b77473e92b0afec6a",
+            "adultPreviewProductionApproved": false,
+            "sourceKnightHead": "c74fcf90e227f3bc4788728f000cfe6aa083c7ef",
+            "sourceAdultHead": "91f1c2c4737b8f0275bb22bfbca4acc1501daa00",
+            "engineScreenshotOnly": true,
+            "realGameDrawOrderValidated": false,
+            "liveGameFPSMeasured": false,
+            "serverPortalOrCollisionValidated": false,
+            "productionApproved": false,
+            "frameCanvasDrawSamplesMs": {
+              "day": {
+                "drawMs": 7
+              },
+              "dusk": {
+                "drawMs": 10
+              }
+            },
+            "drawCount": 3,
+            "playerXYErrorPx": 0
+          }
+        },
+        {
+          "name": "greyhaven_a231_firefox_door-behind.png",
+          "state": {
+            "ready": true,
+            "authoringMode": "isolated cross-branch art composite, NOT actual Greyhaven runtime",
+            "gameZoom": 0.84,
+            "camDx": 0,
+            "camDy": 0,
+            "dx": 0,
+            "dy": 0,
+            "depth": "behind",
+            "roofOpacity": 0.55,
+            "artDoor": [
+              4365,
+              4075
+            ],
+            "authoredWorldEntrance": [
+              4365,
+              4060
+            ],
+            "fixtureWorldXY": [
+              4365,
+              4045
+            ],
+            "poolWorldXY": [
+              4365,
+              4069
+            ],
+            "radius": 108,
+            "chunkWorldUnits": 512,
+            "cachedChunks": 2,
+            "coldChunkBuildMs": [
+              3,
+              1
+            ],
+            "single3CSourceVersion": "3c-p24-1",
+            "redLion3CLightCount": 1,
+            "facade3BApertureNoRadialGlow": true,
+            "originalBlenderGeometryPreserved": true,
+            "alphaHazardPixelCount": 69,
+            "sourceHead": "a71378a42be3408ea4116e8e5333e3b9faeb3faf",
+            "source3CHead": "8e85584b6007b38e1a00155b77473e92b0afec6a",
+            "adultPreviewProductionApproved": false,
+            "sourceKnightHead": "c74fcf90e227f3bc4788728f000cfe6aa083c7ef",
+            "sourceAdultHead": "91f1c2c4737b8f0275bb22bfbca4acc1501daa00",
+            "engineScreenshotOnly": true,
+            "realGameDrawOrderValidated": false,
+            "liveGameFPSMeasured": false,
+            "serverPortalOrCollisionValidated": false,
+            "productionApproved": false,
+            "frameCanvasDrawSamplesMs": {
+              "day": {
+                "drawMs": 6
+              },
+              "dusk": {
+                "drawMs": 9
+              }
+            },
+            "drawCount": 4,
+            "playerXYErrorPx": 0
+          }
+        }
+      ],
+      "errors": [],
+      "cameraSamples": 40,
+      "p50CanvasDayMs": 8,
+      "p95CanvasDayMs": 13,
+      "p50CanvasDuskMs": 12,
+      "p95CanvasDuskMs": 22,
+      "coldChunksMs": [
+        3,
+        1
+      ],
+      "actualWorldClientFPSMeasured": false,
+      "networkGameplayValidated": false,
+      "productionApproved": false
+    }
+  ],
+  "screenshots": 6,
+  "artworkReviewOnly": true,
+  "staticThreeCLightingFromSource": true,
+  "worldChunkRendererIntegrated": false,
+  "dynamicDayNightImplemented": false,
+  "liveCombatOcclusionValidated": false,
+  "fullMultiplayerFPSMeasured": false,
+  "productionApproved": false
+}
