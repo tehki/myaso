@@ -195,6 +195,8 @@ def seed():
             "durably prepared handoff for interrupted abort")
     register(78)
     register(79)
+    register(80)
+    register(81)
 
 
 def verify_after_primary_restart():
@@ -377,6 +379,76 @@ def test_concurrent_fencing_after_primary_restart():
     print("PASS: post-crash racing stale/new epochs allow successor only")
 
 
+def test_racing_handoff_operations_after_primary_restart():
+    # Distinct handoff operation IDs both reference the same entity through
+    # the handoffs FK. Neither may deadlock while securing exclusive mutation
+    # authority; exactly one must freeze the original source.
+    left, right = racing_mutations(
+        prepare(8001, 80, target=2), prepare(8002, 80, target=3),
+    )
+    require(sum(result.returncode == 0 for result in (left, right)) == 1,
+            f"exactly one prepare winner required: {left.stderr} {right.stderr}")
+    winner_op = 8001 if left.returncode == 0 else 8002
+    loser_op = 8002 if winner_op == 8001 else 8001
+    target_worker = 2 if winner_op == 8001 else 3
+    losing_result = right if winner_op == 8001 else left
+    require("stale or already prepared authority" in losing_result.stderr
+            and "deadlock detected" not in losing_result.stderr,
+            f"loser must be fenced by pending handoff, never deadlock: {losing_result.stderr}")
+    require(count("handoffs", "operation_id", winner_op) == 1
+            and count("handoffs", "operation_id", loser_op) == 0,
+            "losing handoff must leave no durable ID")
+    require(not current(80) and not current(80, target_worker, 2),
+            "prepared winner freezes both source and target")
+    require(sql(f"SELECT core_zone.commit_transfer({ident(winner_op)});") == "2",
+            "winner advances epoch once")
+    require(current(80, target_worker, 2) and not current(80),
+            "new owner alone authoritative")
+    sql(prepare(loser_op, 80, target=3 if target_worker == 2 else 2),
+        expect_failure=True)
+    require(count("handoffs", "operation_id", loser_op) == 0,
+            "loser retry must remain fenced")
+    print("PASS: concurrent handoff IDs freeze once without FK row-lock deadlock")
+
+    # A source-state mutation and a different-ID zone prepare contend for the
+    # same live entity. Either the mutation commits before the freeze, or it
+    # is rejected after the freeze; both paths must have one coherent result.
+    mutation, handoff = racing_mutations(
+        mutate(8101, 81), prepare(8102, 81, target=4),
+    )
+    require(handoff.returncode == 0 and handoff.stdout.strip() == "prepared",
+            f"handoff must freeze after any completed earlier mutation: {handoff.stderr}")
+    require(count("handoffs", "operation_id", 8102) == 1,
+            "exactly one durable handoff")
+    require(not current(81) and not current(81, 4, 2),
+            "both workers frozen after concurrent prepare")
+    mutation_committed = mutation.returncode == 0
+    if mutation_committed:
+        require(mutation.stdout.strip().startswith("1|")
+                and mutation.stdout.strip().endswith("|f"),
+                "pre-freeze mutation committed exactly once")
+        require(sql(mutate(8101, 81)).endswith("|t"),
+                "pre-freeze mutation receipt remains historical")
+    else:
+        require("stale or frozen world mutation authority" in mutation.stderr
+                and "deadlock detected" not in mutation.stderr,
+                f"post-freeze mutation must reject stale claim: {mutation.stderr}")
+    require(count("world_event_outbox", "entity_id", 81) == int(mutation_committed)
+            and count("world_mutation_receipts", "mutation_id", 8101) == int(mutation_committed),
+            "no partial receipt/outbox after racing handoff and mutation")
+    require(sql(f"SELECT core_zone.commit_transfer({ident(8102)});") == "2",
+            "target epoch two after concurrent race")
+    require(current(81, 4, 2) and not current(81),
+            "old writer fenced when handoff commits")
+    sql(mutate(8103, 81, 1, 1, int(mutation_committed)), expect_failure=True)
+    fresh = sql(mutate(8104, 81, 4, 2, int(mutation_committed)))
+    require(fresh.endswith("|f"),
+            f"new owner may mutate next revision: {fresh}")
+    require(count("world_event_outbox", "entity_id", 81) == int(mutation_committed) + 1,
+            "successor creates one event, without stale duplication")
+    print("PASS: racing handoff vs mutation serializes and fences old epoch")
+
+
 def main():
     container = guarded_container()
     seed()
@@ -414,6 +486,7 @@ def main():
     wait_for_primary()
     verify_after_primary_restart()
     test_concurrent_fencing_after_primary_restart()
+    test_racing_handoff_operations_after_primary_restart()
     print("C4H PRIMARY CRASH ACCEPTANCE PASSED (one disposable PG16 primary)")
 
 
