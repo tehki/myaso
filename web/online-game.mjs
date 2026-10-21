@@ -327,6 +327,8 @@ canvas.addEventListener("keydown", (event) => {
 });
 canvas.addEventListener("keyup", (event) => keys.delete(event.code));
 window.addEventListener("blur", releaseInputs);
+// Native chat focus must not strand held authoritative movement/attack input.
+canvas.addEventListener("blur", releaseInputs);
 document.addEventListener("visibilitychange", handleVisibilityChange);
 
 setStatus("Connecting to authoritative server…");

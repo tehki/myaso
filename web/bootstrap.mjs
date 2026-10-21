@@ -1,4 +1,6 @@
+import { installLocalChat } from "../src/browser/local-chat.mjs";
 const params = new URLSearchParams(window.location.search);
+installLocalChat(document, { online: params.has("server") });
 
 if (params.has("server")) {
   try {
