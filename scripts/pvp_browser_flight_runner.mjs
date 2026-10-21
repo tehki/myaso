@@ -32,6 +32,7 @@ import { awaitM223HeavyWindup, planM223WheelDelay } from "./m223-server-heavy-wi
 import { dispatchR2ReleaseLedShortBlock } from "./r2-release-led-short-block.mjs";
 import { dispatchM41NativeParryOnLightOnset } from "./m41-authoritative-light-onset.mjs";
 import { readM161OpeningKickProof } from "./m161-opening-kick-proof.mjs";
+import { readM171RejectedFeintProof } from "./m171-rejected-feint-proof.mjs";
 import { createM221TrustedWheelRegistry } from "./m221-trusted-wheel-attestation.mjs";
 import { attachM325TrustedWheelSocket } from "./m325-trusted-wheel-socket.mjs";
 import { requiresM338GuardBreakWheelSocket } from "./m338-guard-break-wheel-scenarios.mjs";
@@ -532,7 +533,7 @@ async function startGameServer() {
       MYASO_FLIGHT_ACTION_PROOF: (scenario === "uiguardbreakpunishffahit"
         || scenario === "uiguardbreak" || scenario === "uiguardbreaktell"
         || scenario === "uiparrytell"
-        || scenario === "uidirectionallight"
+        || scenario === "uidirectionallight" || scenario === "uifeint"
         || scenario === "uiheavyblock" || scenario === "uiheavyparry"
         || scenario === "uiheavydodge"
         || scenario === "uikickknockdownffahit"
@@ -7326,15 +7327,19 @@ async function runOnlineUiFeintFlight(entries) {
   const staminaOffset = exhausted.acceptance.staminaTransitions.length;
   const pointerOffset = exhausted.pointers.length;
   const exhaustedWheelOffset = exhausted.wheels.length;
+  const exhaustedProofOffset = m201ServerOutput().length;
   await performArenaFeint(attacker, attackerElementId, awayOffset);
 
+  let exhaustedServerProof = null;
   const committed = await waitForAttacker(
     (state) => {
       const actions = state.acceptance?.ownActionTransitions?.slice(actionOffset) ?? [];
-      return actions.some((entry) =>
-        entry.action === COMBAT_ACTION.attackActive
-        || entry.action === COMBAT_ACTION.attackLeftActive
-        || entry.action === COMBAT_ACTION.attackRightActive)
+      exhaustedServerProof = readM171RejectedFeintProof(m201ServerOutput().slice(exhaustedProofOffset), {
+        fighterId: attackerResult.playerNetId,
+      });
+      return exhaustedServerProof !== null
+        && actions.some(entry => entry.action === exhaustedServerProof.windup.to)
+        && actions.some(entry => entry.action === exhaustedServerProof.recovery.to)
         && !actions.some((entry) => entry.action === COMBAT_ACTION.feintRecovery);
     },
     900,
@@ -7423,12 +7428,19 @@ async function runOnlineUiFeintFlight(entries) {
   const heavyStaminaOffset = heavyExhausted.acceptance.staminaTransitions.length;
   const heavyKeyOffset = heavyExhausted.keyTransitions.length;
   const heavyWheelOffset = heavyExhausted.wheels.length;
+  const heavyProofOffset = m201ServerOutput().length;
   await performArenaHeavyFeint(attacker, attackerElementId, awayOffset);
 
+  let heavyServerProof = null;
   const heavyCommitted = await waitForAttacker(
     (state) => {
       const actions = state.acceptance?.ownActionTransitions?.slice(heavyActionOffset) ?? [];
-      return actions.some((entry) => entry.action === COMBAT_ACTION.heavyAttackActive)
+      heavyServerProof = readM171RejectedFeintProof(m201ServerOutput().slice(heavyProofOffset), {
+        fighterId: attackerResult.playerNetId, heavy: true,
+      });
+      return heavyServerProof !== null
+        && actions.some(entry => entry.action === heavyServerProof.windup.to)
+        && actions.some(entry => entry.action === heavyServerProof.recovery.to)
         && !actions.some((entry) => entry.action === COMBAT_ACTION.feintRecovery);
     },
     COMBAT.heavyAttack.windupMs + 900,
@@ -7479,11 +7491,13 @@ async function runOnlineUiFeintFlight(entries) {
     m170AttackerId: attackerResult.playerNetId,
     m170DrainHolds: entry.browser === attacker.name ? drainHolds : null,
     m170DeniedAtStamina: entry.browser === attacker.name ? baselineStamina : null,
+    m170ServerCommitment: entry.browser === attacker.name ? exhaustedServerProof : null,
     m170WheelEpochMs: entry.browser === attacker.name ? exhaustedWheelBack.epochMs : null,
     m170CommittedWithoutFeint: entry.browser === attacker.name
       ? !exhaustedActions.some((item) => item.action === COMBAT_ACTION.feintRecovery)
       : null,
     m171HeavyDeniedAtStamina: entry.browser === attacker.name ? heavyBaselineStamina : null,
+    m171ServerCommitment: entry.browser === attacker.name ? heavyServerProof : null,
     m171HeavyWheelEpochMs: entry.browser === attacker.name ? heavyWheelBack.epochMs : null,
     m171HeavyCommittedWithoutFeint: entry.browser === attacker.name
       ? !heavyActions.some((item) => item.action === COMBAT_ACTION.feintRecovery)
