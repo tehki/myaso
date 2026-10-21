@@ -71,3 +71,34 @@ test("P44 screenshot probe is pinned to original sources and not imported by the
   assert.equal(sha(exactLfSource(bytes)),pin,"Source changed after genuine X230i evidence: "+rel);
  }
 });
+
+test("P44 original Windows Chrome154+Firefox153 12-case P43 vs P44 viewport pixel parity",()=>{
+ const x=JSON.parse(readFileSync(new URL(
+  "assets/environment/greyhaven/3c-p44-world571-parity/windows-chrome-firefox-native.json",root),"utf8"));
+ assert.equal(x.originalUnmodified,true);
+ assert.equal(x.serverAuthoritative,false);
+ assert.equal(x.players,0);
+ assert.equal(x.originalWorldMapsMatch,true);
+ assert.deepEqual(x.enginesRequested,["chrome","firefox"]);
+ assert.equal(x.fullChromeFirefoxMatrix,true);
+ assert.equal(x.heads.baseline,"ef78df8b065a03399c0047e785587e707852bc07");
+ assert.equal(x.heads.integrationBase,"9139ce3b4290bd7b1a5efe4b90b3edcc8d15db59");
+ assert.equal(x.heads.integrationCurrent,"729bb11a4933576f99cd416475c4911a06e3fbfd");
+ assert.deepEqual(x.results.map(r=>r.engine),["chrome","firefox"]);
+ assert.match(x.results[0].version,/^Chrome\/154\./);
+ assert.match(x.results[1].version,/^firefox\/153\.4\./);
+ for(const result of x.results){
+  assert.deepEqual(result.errors,[]);
+  assert.equal(result.cases.length,6);
+  assert.deepEqual(result.cases.map(a=>a.id),[
+   "tavern-day","tavern-replaced","tavern-pan","blacksmith","south-city","northern-wilderness"
+  ]);
+  for(const sample of result.cases){
+   assert.equal(sample.changedBytes,0);
+   assert.equal(sample.changedPixels,0);
+   assert.deepEqual(sample.candidateReplacements,sample.baselineReplacements);
+   assert.equal(sample.candidateCached,sample.baselineCached);
+   assert.ok(sample.candidateCached>0&&sample.candidateCached<=24);
+  }
+ }
+});

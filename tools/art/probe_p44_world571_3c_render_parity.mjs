@@ -5,7 +5,7 @@
 import assert from "node:assert/strict";
 import {createServer} from "node:http";
 import {readFile,writeFile,mkdir} from "node:fs/promises";
-import {join,resolve,dirname} from "node:path";
+import {join,resolve,dirname,parse} from "node:path";
 import {fileURLToPath} from "node:url";
 import {createHash} from "node:crypto";
 import {execFileSync} from "node:child_process";
@@ -129,6 +129,7 @@ try{
  }
 }finally{
  await new Promise(ok=>server.close(ok));
- await mkdir(dirname(output),{recursive:true});
+ const parent=dirname(output);
+ if(parent!==parse(output).root)await mkdir(parent,{recursive:true});
  await writeFile(output,JSON.stringify(report,null,2)+"\n");
 }
