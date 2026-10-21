@@ -11,9 +11,7 @@
 use crate::{
     identity::CharacterId,
     item_journal::{DurableItemJournal, ItemJournalError},
-    item_ownership::{
-        ItemId, ItemLocation, OwnershipOp, OwnershipReceipt, OwnershipTxnId,
-    },
+    item_ownership::{ItemId, ItemLocation, OwnershipOp, OwnershipReceipt, OwnershipTxnId},
     legacy_gear_preflight::LegacyEquipmentSlot,
 };
 
@@ -119,9 +117,7 @@ pub fn current_committed_rack_pickup(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        item_ownership::{OwnershipError, ZoneId},
-    };
+    use crate::item_ownership::{OwnershipError, ZoneId};
     use std::{
         fs,
         path::PathBuf,
@@ -339,8 +335,7 @@ mod tests {
             Err(PickupProofError::HistoricalReceiptNoLongerCurrent)
         ));
         assert!(
-            current_committed_rack_pickup(&journal, txn(123), item(201), rack(0), owner(1))
-                .is_ok()
+            current_committed_rack_pickup(&journal, txn(123), item(201), rack(0), owner(1)).is_ok()
         );
         drop(journal);
         let restored = root.open();
