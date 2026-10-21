@@ -153,7 +153,7 @@ pub fn review_offline_rack_against_existing_core(
     let mut revs = [0_u64; 4];
     for (index, row) in offline_source.proposed_core_swords.iter().enumerate() {
         let (current_head, mutation) = journal
-            .checked_ground_membership(row.canonical_item, row.ground)
+            .checked_unique_ground_membership(row.canonical_item, row.ground)
             .map_err(OfflineCoreRackMatchError::Journal)?;
         if let Some(prior) = head {
             if prior != current_head {
@@ -189,7 +189,7 @@ pub fn recheck_original_offline_core_rack_match(
         .enumerate()
     {
         let (head, current_revision) = journal
-            .checked_ground_membership(row.canonical_item, row.ground)
+            .checked_unique_ground_membership(row.canonical_item, row.ground)
             .map_err(OfflineCoreRackMatchError::Journal)?;
         if head != originally.local_journal_head {
             return Err(OfflineCoreRackMatchError::ChangedLocalJournalHead);
@@ -476,6 +476,132 @@ mod tests {
         assert!(matches!(
             review_offline_quiescent_greyhaven_rack(&corrupt, &f.imported, mapping(), 2),
             Err(OfflineRackReviewError::Checkpoint(CheckpointError::Corrupt))
+        ));
+    }
+
+    #[test]
+    fn same_ground_rack_socket_two_canonical_items_must_reject_entire_review_after_restart() {
+        use crate::{
+            item_journal::{DurableItemJournal, ItemJournalError},
+            item_ownership::{ItemId, ItemLocation, OwnershipOp, OwnershipTxnId},
+        };
+        let f = fixture();
+        let root = f.dir.join("one-core-writer-with-ambiguous-rack");
+        let mut journal = DurableItemJournal::open(&root).unwrap();
+        let proposal =
+            review_offline_quiescent_greyhaven_rack(&f.checkpoint, &f.imported, mapping(), 2)
+                .unwrap();
+        let create: Vec<_> = proposal
+            .proposed_core_swords
+            .iter()
+            .map(|row| OwnershipOp::Create {
+                item: row.canonical_item,
+                at: row.ground,
+            })
+            .collect();
+        journal
+            .apply(OwnershipTxnId::new(200).unwrap(), &create)
+            .unwrap();
+
+        let original = review_offline_rack_against_existing_core(
+            &journal,
+            &f.checkpoint,
+            &f.imported,
+            mapping(),
+            2,
+        )
+        .unwrap();
+        assert_eq!(original.local_item_mutation_sequences, [1; 4]);
+        let first = proposal.proposed_core_swords[0];
+        // A fifth canonical item of UNKNOWN item-kind occupies the exact same
+        // authored rack point. Generic Core permits multiple Ground items.
+        // The old matching-by-expected-ID alone incorrectly accepted 4/4.
+        let fifth = ItemId::new((0xfeed_u128 << 64) | 55).unwrap();
+        assert!(proposal
+            .proposed_core_swords
+            .iter()
+            .all(|row| row.canonical_item != fifth));
+        journal
+            .apply(
+                OwnershipTxnId::new(201).unwrap(),
+                &[OwnershipOp::Create {
+                    item: fifth,
+                    at: first.ground,
+                }],
+            )
+            .unwrap();
+        assert_eq!(journal.item_count(), 5);
+        assert_eq!(journal.location(first.canonical_item), Some(first.ground));
+        assert_eq!(
+            journal
+                .checked_ground_membership(first.canonical_item, first.ground)
+                .unwrap()
+                .1,
+            Some(1),
+            "normal membership proves expected sword only, not rack exclusivity"
+        );
+        let ambiguous = review_offline_rack_against_existing_core(
+            &journal,
+            &f.checkpoint,
+            &f.imported,
+            mapping(),
+            2,
+        );
+        assert!(matches!(
+            ambiguous,
+            Err(OfflineCoreRackMatchError::Journal(
+                ItemJournalError::InvalidRecord("ambiguous physical rack ground occupancy")
+            ))
+        ));
+        drop(journal);
+        let mut journal = DurableItemJournal::open(&root).unwrap();
+        assert!(
+            matches!(
+                review_offline_rack_against_existing_core(
+                    &journal,
+                    &f.checkpoint,
+                    &f.imported,
+                    mapping(),
+                    2
+                ),
+                Err(OfflineCoreRackMatchError::Journal(
+                    ItemJournalError::InvalidRecord("ambiguous physical rack ground occupancy")
+                ))
+            ),
+            "the ambiguous fifth owner survives local journal restart"
+        );
+
+        // Moving that fifth item completely away restores unique exact
+        // rack occupancy, but never resurrects an earlier pinned head.
+        let elsewhere = ItemLocation::Ground {
+            zone_id: mapping().zone,
+            x_cm: 1234,
+            y_cm: 5678,
+        };
+        journal
+            .apply(
+                OwnershipTxnId::new(202).unwrap(),
+                &[OwnershipOp::Move {
+                    item: fifth,
+                    from: first.ground,
+                    to: elsewhere,
+                }],
+            )
+            .unwrap();
+        let current = review_offline_rack_against_existing_core(
+            &journal,
+            &f.checkpoint,
+            &f.imported,
+            mapping(),
+            2,
+        )
+        .unwrap();
+        assert_eq!(current.local_item_mutation_sequences, [1; 4]);
+        assert_eq!(current.local_journal_head, 3);
+        recheck_original_offline_core_rack_match(&journal, &current).unwrap();
+        assert!(matches!(
+            recheck_original_offline_core_rack_match(&journal, &original),
+            Err(OfflineCoreRackMatchError::ChangedLocalJournalHead)
         ));
     }
 

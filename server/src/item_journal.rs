@@ -535,6 +535,26 @@ impl DurableItemJournal {
         Ok((sequence, Some(mutation)))
     }
 
+    /// OFFLINE reviewed rack helper: accept the expected physical Ground
+    /// item only when NO other canonical item in this same MYTX journal
+    /// occupies its exact Ground zone/coordinates. A second item may be a
+    /// sword, club, reagent or unknown kind: the generic journal stores no
+    /// kind, so fail closed rather than silently selecting the known ID.
+    /// This is a read of ONE local journal, not a World/Items/Physics proof.
+    pub(crate) fn checked_unique_ground_membership(
+        &self,
+        item: ItemId,
+        expected: ItemLocation,
+    ) -> Result<(u64, Option<u64>), ItemJournalError> {
+        let observed = self.checked_ground_membership(item, expected)?;
+        if observed.1.is_some() && self.ledger.ground_occupants_at(expected) != 1 {
+            return Err(ItemJournalError::InvalidRecord(
+                "ambiguous physical rack ground occupancy",
+            ));
+        }
+        Ok(observed)
+    }
+
     pub fn location(&self, item: ItemId) -> Option<ItemLocation> {
         self.ledger.location(item)
     }
