@@ -49,22 +49,24 @@ try {
  console.log("SERVER_READY",JSON.stringify({url:ready.url,pinLength:ready.cert.replaceAll(":","").length}));
  const httpPort=await randomPort();
  launch("python3",["-m","http.server",String(httpPort),"--bind","127.0.0.1","--directory",root],{stdio:"ignore"});
- const driverPorts={};
- for (const browser of new Set(browserMatrix)) {
-  const port=await randomPort();
-  driverPorts[browser]=port;
-  launch(browser==="chrome"?"chromedriver":(process.env.C1_GECKODRIVER||"geckodriver"),
-   ["--port="+port],{stdio:"ignore"});
-  await poll(browser+" driver",async()=>{const r=await fetch("http://127.0.0.1:"+port+"/status").catch(()=>null);return {ok:!!r?.ok};},6500);
- }
+ // Each genuine browser needs its own driver daemon. GeckoDriver supports
+ // only one active Firefox session per process; a family-shared port fails
+ // the second Firefox before any chat/game assertion can run.
  const url="http://127.0.0.1:"+httpPort+"/web/?server="+encodeURIComponent(ready.url)+"&cert="+encodeURIComponent(ready.cert.replaceAll(":",""))+"&chatC1Preview=1&netstats=1&world=1&armoryart=1&uiLivenessProbe=1";
  for(let i=0;i<browserMatrix.length;i++){
   const browser=browserMatrix[i];
+  const port=await randomPort();
+  launch(browser==="chrome"?"chromedriver":(process.env.C1_GECKODRIVER||"geckodriver"),
+   ["--port="+port],{stdio:"ignore"});
+  await poll(browser+" #"+(i+1)+" driver",async()=>{
+   const r=await fetch("http://127.0.0.1:"+port+"/status").catch(()=>null);
+   return {ok:!!r?.ok};
+  },6500);
   const capabilities=browser==="chrome"
    ? {browserName:"chrome","goog:chromeOptions":{args:["--headless=new","--no-sandbox","--disable-dev-shm-usage","--window-size=1100,780"]}}
    : {browserName:"firefox","moz:firefoxOptions":{args:["-headless"],...(process.env.C1_FIREFOX_BINARY?{binary:process.env.C1_FIREFOX_BINARY}:{})}};
-  const session=(await wd("POST","/session",{capabilities:{alwaysMatch:capabilities}},driverPorts[browser])).sessionId;
-  sessionDriverPorts.set(session,driverPorts[browser]);
+  const session=(await wd("POST","/session",{capabilities:{alwaysMatch:capabilities}},port)).sessionId;
+  sessionDriverPorts.set(session,port);
   sessions.push(session);
   await wd("POST","/session/"+session+"/url",{url});
   const connected=await poll("player "+(i+1),()=>evaljs(session,"const x=document.querySelector('[data-local-chat]');return {ok:x?.dataset.connected==='true',status:x?.querySelector('.local-chat-status')?.textContent,event:document.querySelector('#event-text')?.textContent,connected:x?.dataset.connected};"),15000);
