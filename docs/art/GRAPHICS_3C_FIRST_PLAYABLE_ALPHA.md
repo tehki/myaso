@@ -1,8 +1,8 @@
 # Moon Games — Graphics 3C First Playable Alpha alignment
 
-**Priority:** P0 | **Department:** Graphics → 3C Environment & Atmosphere | **Classification:** BLOCKED  
-**Coordination:** [Moon Games Development Center #360](https://github.com/tehki/myaso/issues/360#issuecomment-6306632832)  
-**Integration authority:** Moon Games Main Development & Deployment Orchestrator  
+**Priority:** P0 | **Department:** Graphics → 3C Environment & Atmosphere | **Classification:** BLOCKED
+**Coordination:** [Moon Games Development Center #360](https://github.com/tehki/myaso/issues/360#issuecomment-6306632832)
+**Integration authority:** Moon Games Main Development & Deployment Orchestrator
 **Repository:** [tehki/myaso](https://github.com/tehki/myaso) | **main** integration target
 
 ## Truthful status, 2026-10-21
