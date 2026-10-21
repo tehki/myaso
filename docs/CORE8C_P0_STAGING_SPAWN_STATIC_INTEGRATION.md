@@ -74,6 +74,36 @@ LAN and wildcard listener hosts, missing spawn mode, overcap, synthetic
 background or unknown string; all checks are pre-bind. Rust simulation
 tests prove actual wall/gate/sweep/knockback/respawn behavior.
 
+## Cross-department M1/M2 four-sword approach conformance
+
+The Chief Architect's **test-only** follow-on adds a deterministic check for
+**all 16** server-spawn-to-Blacksmith-rack-approach combinations. It uses
+World #493's four proposed physical sword **socket** approaches:
+`(3740,4088)`, `(3780,4088)`, `(3820,4088)`, `(3860,4088)`,
+and Core #486's four immutable `(4110/4206,4160/4256)` arrivals.
+For each pair, the route uses city waypoints `(3990,4180)` and
+`(3980,4090)`, applies radius-18 circle and continuous segment tests
+against the **exact embedded World #509 23-AABB map** and asserts its
+existing `solids_sha256` content pin.
+
+This only demonstrates *static* clearance for those **specific 16
+corridors**, not autonomous pathfinding, river/bridge safety, dynamic actor
+collisions, a current trusted zone/map epoch, reach/LOS for `TryPickup`,
+or physical sword-item ownership. The World-designed visual anchor is at
+`y=4038`; the accessible player approach is **`y=4088`**. The
+server-side pickup owner must validate the 50-unit approach gap with the
+actual approved pickup range and same-tick collision/LOS check before any
+ACK. Never turn a source-only route result into a positive pickup result.
+
+**Important independent-network conflict:** this branch's combined static
+collision profile currently requires **loopback-only binding**, while
+the alpha M5 gate requires two independently operated machines. Do not
+relax binding restrictions automatically. The Core 8C + 8A +
+Development Center owners must explicitly approve a separately isolated
+private staging profile with a pinned certificate, bounded cap, safe
+firewall route and nonproduction rollback. Until then, **real four-client
+same-world QUIC loopback acceptance is not independent-host acceptance**.
+
 ## Nonclaims and release HOLD
 
 This is **not** full geometry authority. World #509's 23 static AABBs omit
