@@ -1,3 +1,6 @@
+mod alpha_spawn;
+
+use alpha_spawn::AlphaSpawnProfile;
 use anyhow::{bail, Context, Result};
 use myaso_server::{
     coalesce_accepted_input_batch, decode_input_packet, is_sequence_newer16, is_tick_newer32,
@@ -246,6 +249,29 @@ async fn main() -> Result<()> {
         .context("MYASO_BIND must be a socket address")?;
 
     let flight = load_loopback_flight_config(bind)?;
+
+    // Validate the staging profile before WebTransport binds ANY socket.
+    // Production/public and wildcard addresses are not valid alpha staging
+    // listeners, even with an explicitly set four-player cap.
+    let player_cap_raw = match env::var("MYASO_MAX_PLAYERS") {
+        Ok(value) => Some(value),
+        Err(env::VarError::NotPresent) => None,
+        Err(error) => bail!("MYASO_MAX_PLAYERS is invalid: {error}"),
+    };
+    let player_cap = parse_player_cap(player_cap_raw.as_deref())?;
+    if flight.background_players >= player_cap {
+        bail!("flight background player count must remain below MYASO_MAX_PLAYERS");
+    }
+    let spawn_raw = match env::var("MYASO_ALPHA_SPAWN") {
+        Ok(value) => Some(value),
+        Err(env::VarError::NotPresent) => None,
+        Err(error) => bail!("MYASO_ALPHA_SPAWN is invalid: {error}"),
+    };
+    let alpha_spawn =
+        AlphaSpawnProfile::parse(spawn_raw.as_deref(), player_cap, flight.background_players)?;
+    if alpha_spawn.is_greyhaven() && !AlphaSpawnProfile::staging_bind_allowed(bind.ip()) {
+        bail!("MYASO_ALPHA_SPAWN=greyhaven requires an explicit private or loopback bind");
+    }
     let identity = load_identity(bind).await?;
     let certificate_hash = identity
         .certificate_chain()
@@ -266,20 +292,13 @@ async fn main() -> Result<()> {
         println!("development certificate SHA-256: {hash}");
     }
 
-    // R0 alpha: explicitly cap *real* concurrent players on the shared VPS.
-    // Flight fixtures remain loopback-only, and the default engineering cap
-    // stays unchanged for the existing 512-player acceptance suite.
-    let player_cap_raw = match env::var("MYASO_MAX_PLAYERS") {
-        Ok(value) => Some(value),
-        Err(env::VarError::NotPresent) => None,
-        Err(error) => bail!("MYASO_MAX_PLAYERS is invalid: {error}"),
-    };
-    let player_cap = parse_player_cap(player_cap_raw.as_deref())?;
-    if flight.background_players >= player_cap {
-        bail!("flight background player count must remain below MYASO_MAX_PLAYERS");
-    }
+    // R0 player cap and staged server-owned spawn were validated before
+    // opening the WebTransport listener; legacy default is unchanged.
     let gate = AdmissionGate::new(player_cap - flight.background_players);
     println!("myaso admission cap: {player_cap} concurrent players");
+    if alpha_spawn.is_greyhaven() {
+        println!("staging-only Greyhaven spawn selected; no server obstacle/portal authority");
+    }
     let game = SharedGame::new(flight);
     // Accept server-side diagnostic output only on loopback and only when
     // explicitly requested by the real-browser M201 acceptance fixture.
@@ -338,7 +357,7 @@ async fn main() -> Result<()> {
             let player_id = game.allocate_player_id();
             {
                 let mut state = game.state.lock().await;
-                if !state.world.add_player(player_id) {
+                if !alpha_spawn.admit(&mut state.world, player_id) {
                     eprintln!("failed to add allocated player {player_id}");
                     return;
                 }
