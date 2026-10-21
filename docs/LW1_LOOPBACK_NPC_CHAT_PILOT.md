@@ -1037,3 +1037,44 @@ change NPC-to-NPC meetings, pilot route planning, fighters,
 colliders, zone or door authority, client protocol, or trading.
 Those systems await authoritative World & Gameplay interfaces.
 The isolated NPC pilot remains off by default and loopback-only.
+
+## LW-1Z — One precise visibility rule for NPC-to-NPC social decisions
+
+LW-1Y established continuous closed-rectangle visibility for player-to-NPC
+conversation, but NPC-to-NPC reports, encounter acquaintances, and Rowan's
+worksite watch still used the older five-unit sampled pilot sightline.
+A grazing ray could therefore allow an NPC to report a meeting that a
+player-to-NPC conversation would rightly reject.
+
+All **four existing server-only NPC interaction gates** now share the
+same continuous, allocation-free pilot rectangle intersection:
+firsthand combat-witness social *relay*, one-hop verified worksite news,
+Rowan's physically validated worksite-priority lookout, and periodic
+NPC acquaintance/meeting records. The source and destination are the
+two fixed roster NPCs' actual server staging positions at the accepted
+social update tick; integer points are converted losslessly to the
+same f32 source coordinates used by player-to-NPC chat.
+
+The static pilot *path planner* retains its earlier validated
+navigation-specific waypoint sampling. This is a deliberate boundary:
+the change tightens who can observe and relay a report; it does not
+reroute NPCs, edit the worksite ledger, change combat eyewitness event
+generation, fabricate speech, spend stock, or replace real world
+colliders. Coarse sightline is no longer permitted to authorize an
+NPC meeting or worksite watch, even when within the 105-unit gossip
+radius or 80-unit guard-watch radius.
+
+Tests include four integer pilot corner-grazing rays that the old
+coarse check accepted and continuous geometry blocks, including
+a 75-unit Rowan-to-yard case. A unit-level authenticated server
+revision case shows that an in-range guard cannot accept a special
+watch across the supply crate but can accept it from a clear lookout;
+neither path mutates or repairs the closed site. All prior real
+Tomas/Rowan meetings, opt-in inspection detours, stock conservation,
+chat proximity, exact worksite statuses, and native wire packets
+remain covered by regression tests.
+
+All components still run only inside the disabled-by-default,
+loopback-only NPC pilot. Greyhaven world geometry, real doors and
+server navigation manifests are still unmerged external contracts
+and have not been used as staging collision authority.

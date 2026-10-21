@@ -312,7 +312,7 @@ impl NpcRoutines {
                 let dy =
                     f32::from(positions[source_index].y) - f32::from(positions[receiver_index].y);
                 if dx * dx + dy * dy > GOSSIP_RADIUS * GOSSIP_RADIUS
-                    || !npc_navigation::pilot_line_of_sight(
+                    || !npc_navigation::pilot_social_line_of_sight(
                         (positions[source_index].x, positions[source_index].y),
                         (positions[receiver_index].x, positions[receiver_index].y),
                     )
@@ -417,7 +417,7 @@ impl NpcRoutines {
                 let dy =
                     i32::from(positions[source_index].y) - i32::from(positions[receiver_index].y);
                 if dx * dx + dy * dy > (GOSSIP_RADIUS as i32).pow(2)
-                    || !npc_navigation::pilot_line_of_sight(
+                    || !npc_navigation::pilot_social_line_of_sight(
                         (positions[source_index].x, positions[source_index].y),
                         (positions[receiver_index].x, positions[receiver_index].y),
                     )
@@ -471,7 +471,7 @@ impl NpcRoutines {
         let dx = i32::from(guard.x) - i32::from(site.x);
         let dy = i32::from(guard.y) - i32::from(site.y);
         if dx * dx + dy * dy > GUARD_WATCH_RADIUS * GUARD_WATCH_RADIUS
-            || !npc_navigation::pilot_line_of_sight((guard.x, guard.y), (site.x, site.y))
+            || !npc_navigation::pilot_social_line_of_sight((guard.x, guard.y), (site.x, site.y))
         {
             return;
         }
@@ -573,7 +573,7 @@ impl NpcRoutines {
                     record.in_contact = false;
                 } else if !record.in_contact
                     && distance_squared <= MEETING_RADIUS * MEETING_RADIUS
-                    && npc_navigation::pilot_line_of_sight(
+                    && npc_navigation::pilot_social_line_of_sight(
                         (positions[i].x, positions[i].y),
                         (positions[j].x, positions[j].y),
                     )
@@ -1726,5 +1726,59 @@ mod tests {
         assert!(npcs.speaking_target(3, 0, 155.0, 100.0, true).is_ok());
         assert!(npcs.speaking_target(5, 0, 270.0, 160.0, true).is_ok());
         assert!(npcs.speaking_target(4, 0, 315.0, 65.0, true).is_ok());
+    }
+
+    #[test]
+    fn verified_guard_worksite_watch_rejects_grazing_pilot_crate_corner() {
+        let mut supply = NpcSupplyWorld::default();
+        let mut active = [true; 5];
+        active[1] = false;
+        supply
+            .adopt_server_worksites(crate::zone::ZoneId::Moonvale, 1, 2, active)
+            .unwrap();
+        let mut town = NpcRoutines::default();
+        // Test-only simulation of Rowan's existing attributed in-person
+        // notice. Gameplay must earn this using a genuine trusted meeting.
+        town.worksite_news[2] = Some(WorksiteNews {
+            event_tick: 60,
+            learned_tick: 60,
+            revision: 2,
+            site_id: 2,
+            active: false,
+            source_id: Some(5),
+        });
+        let mut positions = NPCS.map(|npc| NpcRoutines::position(npc.id, 120).unwrap());
+        // <80 world units from the yard; old coarse sampler declared
+        // it clear although a crate corner actually obstructs sight.
+        positions[2] = NpcState {
+            id: 3,
+            x: 320,
+            y: 276,
+            activity: 1,
+        };
+        assert!(npc_navigation::pilot_line_of_sight((320, 276), (270, 220)));
+        assert!(!npc_navigation::pilot_social_line_of_sight(
+            (320, 276),
+            (270, 220)
+        ));
+        town.consider_guard_watch(120, &supply, &positions);
+        assert!(town.guard_watch.is_none());
+        // An unobstructed guard position may accept this same *server*
+        // revisioned notice, without repairing or moving a worksite.
+        positions[2] = NpcState {
+            id: 3,
+            x: 270,
+            y: 275,
+            activity: 1,
+        };
+        assert!(npc_navigation::pilot_social_line_of_sight(
+            (270, 275),
+            (270, 220)
+        ));
+        town.consider_guard_watch(120, &supply, &positions);
+        assert_eq!(town.guard_watch.unwrap().site_id, 2);
+        assert_eq!(town.guard_watch.unwrap().source_id, 5);
+        assert_eq!(supply.site_is_available(2), Some(false));
+        assert!(supply.stocks().conserved());
     }
 }

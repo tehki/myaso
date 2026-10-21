@@ -316,9 +316,6 @@ pub fn valid_route(id: u8) -> bool {
         .is_some_and(|slot| cached_routes()[slot].is_some())
 }
 
-/// Tiny, allocation-free line check through authored *pilot* obstacles only.
-/// Meeting events must not pass through the staged wall/crate. This is not
-/// production zone visibility or combat line-of-sight.
 /// Exact player/NPC conversation visibility for *authored pilot* rectangles.
 ///
 /// Unlike the coarse 5-unit navigation/social sampling, this checks the
@@ -363,6 +360,15 @@ pub fn pilot_chat_line_of_sight(from: (f32, f32), to: (u16, u16)) -> bool {
     })
 }
 
+/// Inter-NPC encounters and guard lookout checks use the identical
+/// closed-rectangle obstruction rule as authenticated player/NPC chat,
+/// but only inside this isolated authored pilot geometry.
+pub fn pilot_social_line_of_sight(from: (u16, u16), to: (u16, u16)) -> bool {
+    pilot_chat_line_of_sight((f32::from(from.0), f32::from(from.1)), to)
+}
+
+/// Coarse sampling retained ONLY for existing staged navigation path checks;
+/// never authorize a conversation, rumor, acquaintance or watch with it.
 pub fn pilot_line_of_sight(from: (u16, u16), to: (u16, u16)) -> bool {
     let dx = i32::from(to.0) - i32::from(from.0);
     let dy = i32::from(to.1) - i32::from(from.1);
@@ -652,5 +658,34 @@ mod tests {
         ] {
             assert!(!pilot_chat_line_of_sight(from, (155, 205)));
         }
+    }
+
+    #[test]
+    fn exact_social_visibility_rejects_corner_grazing_old_pilot_gossip_allowed() {
+        // These *integer* staging positions can be near enough for NPC
+        // gossip, yet the old five-unit sampler misses a closed corner.
+        let cases = [
+            ((293, 245), (314, 272)), // supply crate
+            ((315, 187), (402, 133)), // market stall
+            ((229, 179), (290, 257)), // watch barricade
+            ((320, 276), (270, 220)), // guard-to-work-yard lookout
+        ];
+        for (from, to) in cases {
+            assert!(
+                pilot_line_of_sight(from, to),
+                "coarse reference should miss corner: {from:?}->{to:?}"
+            );
+            assert!(
+                !pilot_social_line_of_sight(from, to),
+                "new social check must block corner: {from:?}->{to:?}"
+            );
+            assert!(
+                !pilot_social_line_of_sight(to, from),
+                "contact must not depend on direction: {to:?}->{from:?}"
+            );
+        }
+        assert!(pilot_social_line_of_sight((270, 275), (270, 220)));
+        assert!(pilot_social_line_of_sight((120, 95), (210, 65)));
+        assert!(!pilot_social_line_of_sight((275, 190), (340, 255)));
     }
 }
