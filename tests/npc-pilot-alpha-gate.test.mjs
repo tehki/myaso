@@ -489,3 +489,41 @@ test("P0 revoked NPC pilot returns focus from selector and submit button to game
     restore();
   }
 });
+
+
+test("P0 entering any visible NPC control releases held gameplay input", () => {
+  const { stage, restore } = installDocument();
+  try {
+    let releases = 0;
+    const npc = createNpcChatPanel({
+      onSend: async () => {},
+      onFocus() { releases += 1; },
+    });
+    const panel = stage.children[0];
+    const selector = panel.children[2];
+    const [input, button] = panel.children[6].children;
+    // The isolated DOM fixture does not synthesize real browser FocusEvents;
+    // dispatch the module's installed handler after explicit focus instead.
+    for (const control of [selector, input, button]) {
+      control.focus();
+      control.listeners.get("focus")();
+      assert.equal(releases, 0, "hidden pilot cannot divert combat controls");
+    }
+    npc.setRoster([{ id: 3, name: "Rowan", role: "Sentinel" }]);
+    for (const control of [selector, input, button]) {
+      control.focus();
+      control.listeners.get("focus")();
+      assert.equal(globalThis.document.activeElement, control);
+    }
+    assert.equal(releases, 3,
+      "each visible focusable NPC control releases gameplay exactly once");
+    npc.setRoster([]);
+    for (const control of [selector, input, button]) {
+      control.focus();
+      control.listeners.get("focus")();
+    }
+    assert.equal(releases, 3, "revoked pilot cannot re-arm input interception");
+  } finally {
+    restore();
+  }
+});
