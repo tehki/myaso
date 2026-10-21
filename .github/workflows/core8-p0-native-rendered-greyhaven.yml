@@ -4,6 +4,8 @@ on:
   pull_request:
     paths:
       - "scripts/alpha_p0_four_native_rendered_greyhaven.mjs"
+      - "scripts/alpha_p0_native_world_liveness.mjs"
+      - "tests/alpha_p0_native_world_liveness.test.mjs"
       - ".github/workflows/core8-p0-native-rendered-greyhaven.yml"
       - "docs/CORE8A_P0_FOUR_NATIVE_RENDERED_GREYHAVEN.md"
       - "src/browser/authored-world-renderer.mjs"
@@ -22,6 +24,8 @@ jobs:
         run: |
           node --check src/browser/authored-world-renderer.mjs
           node --check scripts/alpha_p0_four_native_rendered_greyhaven.mjs
+          node --check scripts/alpha_p0_native_world_liveness.mjs
+          node --test tests/alpha_p0_native_world_liveness.test.mjs
           node scripts/verify-core8c-greyhaven-geometry.mjs
       - name: Verify real Chrome Firefox W3C programs
         run: |
