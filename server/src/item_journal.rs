@@ -5,6 +5,7 @@
 //! hardening, shared NFS, live authorization or production rollout is implied.
 
 use crate::{
+    alpha_bound_pickup::{ProposedRackPickupEnvelope, PICKUP_ENVELOPE_V2_BYTES},
     identity::CharacterId,
     item_ownership::{
         CorpseId, ItemId, ItemLocation, ItemOwnershipLedger, OwnershipError, OwnershipOp,
@@ -12,6 +13,7 @@ use crate::{
     },
 };
 use std::{
+    collections::BTreeMap,
     fs::{self, File, OpenOptions},
     io::{self, Read, Write},
     path::{Path, PathBuf},
@@ -55,11 +57,13 @@ fn lock_exclusive_nonblocking(_file: &File) -> io::Result<bool> {
 
 const MAGIC: &[u8; 4] = b"MYTX";
 const VERSION: u8 = 1;
+const BOUND_PICKUP_VERSION: u8 = 2;
 const HEADER_BYTES: usize = 36;
 const LOCATION_BYTES: usize = 26;
 const OP_BYTES: usize = 1 + 16 + 2 * LOCATION_BYTES;
 const CHECKSUM_BYTES: usize = 4;
-const MAX_RECORD_BYTES: usize = HEADER_BYTES + OP_BYTES * MAX_OWNERSHIP_OPS + CHECKSUM_BYTES;
+const MAX_RECORD_BYTES: usize =
+    HEADER_BYTES + OP_BYTES * MAX_OWNERSHIP_OPS + PICKUP_ENVELOPE_V2_BYTES + CHECKSUM_BYTES;
 static NEXT_PENDING: AtomicU64 = AtomicU64::new(0);
 
 #[derive(Debug)]
@@ -70,6 +74,8 @@ pub enum ItemJournalError {
     InvalidSequence,
     InvalidTransaction(OwnershipError),
     Poisoned,
+    BoundPickupMismatch,
+    InvalidBoundPickup(&'static str),
 }
 
 impl From<io::Error> for ItemJournalError {
@@ -83,6 +89,7 @@ struct JournalRecord {
     sequence: u64,
     transaction: OwnershipTxnId,
     operations: Vec<OwnershipOp>,
+    bound_pickup: Option<ProposedRackPickupEnvelope>,
 }
 
 fn checksum(bytes: &[u8]) -> u32 {
@@ -162,9 +169,25 @@ fn decode_location(bytes: &[u8]) -> Result<Option<ItemLocation>, ItemJournalErro
 }
 
 fn encode(record: &JournalRecord) -> Vec<u8> {
-    let mut bytes = Vec::with_capacity(HEADER_BYTES + record.operations.len() * OP_BYTES + 4);
+    let extra = if record.bound_pickup.is_some() {
+        PICKUP_ENVELOPE_V2_BYTES
+    } else {
+        0
+    };
+    let mut bytes = Vec::with_capacity(
+        HEADER_BYTES + record.operations.len() * OP_BYTES + extra + CHECKSUM_BYTES,
+    );
     bytes.extend_from_slice(MAGIC);
-    bytes.extend_from_slice(&[VERSION, 0, 0, 0]);
+    bytes.extend_from_slice(&[
+        if record.bound_pickup.is_some() {
+            BOUND_PICKUP_VERSION
+        } else {
+            VERSION
+        },
+        0,
+        0,
+        0,
+    ]);
     bytes.extend_from_slice(&record.sequence.to_le_bytes());
     bytes.extend_from_slice(&record.transaction.get().to_le_bytes());
     bytes.extend_from_slice(&(record.operations.len() as u16).to_le_bytes());
@@ -180,6 +203,9 @@ fn encode(record: &JournalRecord) -> Vec<u8> {
         encode_location(from, &mut bytes);
         encode_location(to, &mut bytes);
     }
+    if let Some(metadata) = record.bound_pickup {
+        bytes.extend_from_slice(&metadata.encode());
+    }
     let sum = checksum(&bytes);
     bytes.extend_from_slice(&sum.to_le_bytes());
     bytes
@@ -194,7 +220,7 @@ fn decode(bytes: &[u8]) -> Result<JournalRecord, ItemJournalError> {
     if &bytes[..4] != MAGIC {
         return Err(ItemJournalError::InvalidRecord("invalid magic"));
     }
-    if bytes[4] != VERSION
+    if ![VERSION, BOUND_PICKUP_VERSION].contains(&bytes[4])
         || bytes[5..8].iter().any(|&x| x != 0)
         || bytes[34..36].iter().any(|&x| x != 0)
     {
@@ -210,7 +236,13 @@ fn decode(bytes: &[u8]) -> Result<JournalRecord, ItemJournalError> {
     if sequence == 0 || count == 0 || count > MAX_OWNERSHIP_OPS {
         return Err(ItemJournalError::InvalidRecord("invalid sequence/count"));
     }
-    if bytes.len() != HEADER_BYTES + count * OP_BYTES + CHECKSUM_BYTES {
+    let operations_end = HEADER_BYTES + count * OP_BYTES;
+    let extra = if bytes[4] == BOUND_PICKUP_VERSION {
+        PICKUP_ENVELOPE_V2_BYTES
+    } else {
+        0
+    };
+    if bytes.len() != operations_end + extra + CHECKSUM_BYTES {
         return Err(ItemJournalError::InvalidRecord("unexpected record length"));
     }
     let end = bytes.len() - CHECKSUM_BYTES;
@@ -219,7 +251,7 @@ fn decode(bytes: &[u8]) -> Result<JournalRecord, ItemJournalError> {
         return Err(ItemJournalError::InvalidRecord("checksum mismatch"));
     }
     let mut operations = Vec::with_capacity(count);
-    for op_bytes in bytes[HEADER_BYTES..end].chunks_exact(OP_BYTES) {
+    for op_bytes in bytes[HEADER_BYTES..operations_end].chunks_exact(OP_BYTES) {
         let kind = op_bytes[0];
         let raw_item = u128::from_le_bytes(op_bytes[1..17].try_into().expect("length checked"));
         let item = ItemId::new(raw_item).ok_or(ItemJournalError::InvalidRecord("zero item id"))?;
@@ -237,10 +269,26 @@ fn decode(bytes: &[u8]) -> Result<JournalRecord, ItemJournalError> {
         };
         operations.push(op);
     }
+    let bound_pickup = if bytes[4] == BOUND_PICKUP_VERSION {
+        if operations.len() != 1 {
+            return Err(ItemJournalError::InvalidRecord(
+                "bound pickup requires one move",
+            ));
+        }
+        let metadata = ProposedRackPickupEnvelope::decode(&bytes[operations_end..end])
+            .map_err(ItemJournalError::InvalidBoundPickup)?;
+        metadata
+            .validate_shape(operations[0])
+            .map_err(ItemJournalError::InvalidBoundPickup)?;
+        Some(metadata)
+    } else {
+        None
+    };
     Ok(JournalRecord {
         sequence,
         transaction,
         operations,
+        bound_pickup,
     })
 }
 
@@ -268,6 +316,8 @@ pub struct DurableItemJournal {
     _writer_lock: File,
     root: PathBuf,
     ledger: ItemOwnershipLedger,
+    /// Stored inside the same canonical MYTX record as the item mutation.
+    bound_pickups: BTreeMap<OwnershipTxnId, ProposedRackPickupEnvelope>,
     poisoned: bool,
 }
 
@@ -317,6 +367,7 @@ impl DurableItemJournal {
         }
         indexed.sort_unstable_by_key(|(sequence, _)| *sequence);
         let mut ledger = ItemOwnershipLedger::default();
+        let mut bound_pickups = BTreeMap::new();
         let mut previous = 0_u64;
         for (sequence, path) in indexed {
             if previous.checked_add(1) != Some(sequence) {
@@ -330,6 +381,22 @@ impl DurableItemJournal {
             if record.sequence != sequence {
                 return Err(ItemJournalError::InvalidSequence);
             }
+            if let Some(metadata) = record.bound_pickup {
+                let OwnershipOp::Move { item, from, .. } = record.operations[0] else {
+                    return Err(ItemJournalError::InvalidRecord(
+                        "invalid bound operation on replay",
+                    ));
+                };
+                if ledger.location(item) != Some(from)
+                    || ledger.last_mutation_sequence(item)
+                        != Some(metadata.observed_item_mutation_sequence)
+                    || bound_pickups.contains_key(&record.transaction)
+                {
+                    return Err(ItemJournalError::InvalidRecord(
+                        "invalid bound source revision on replay",
+                    ));
+                }
+            }
             let (preview, replay) = ledger
                 .preview(record.transaction, &record.operations)
                 .map_err(ItemJournalError::InvalidTransaction)?;
@@ -342,12 +409,16 @@ impl DurableItemJournal {
             if receipt.sequence != sequence {
                 return Err(ItemJournalError::InvalidSequence);
             }
+            if let Some(metadata) = record.bound_pickup {
+                bound_pickups.insert(record.transaction, metadata);
+            }
             previous = sequence;
         }
         Ok(Self {
             _writer_lock: lock,
             root,
             ledger,
+            bound_pickups,
             poisoned: false,
         })
     }
@@ -459,25 +530,93 @@ impl DurableItemJournal {
             .map_err(ItemJournalError::InvalidTransaction)
     }
 
+    /// Commit the original proposed rack request metadata IN the canonical
+    /// ownership MYTX record; this is NOT 8A login, 8C/Physics geometry proof,
+    /// a distributed epoch fence, or a live/public TryPickup API.
+    pub fn apply_proposed_bound_rack_pickup(
+        &mut self,
+        transaction: OwnershipTxnId,
+        operation: OwnershipOp,
+        envelope: ProposedRackPickupEnvelope,
+    ) -> Result<OwnershipReceipt, ItemJournalError> {
+        self.apply_internal(transaction, &[operation], Some(envelope))
+    }
+
+    /// Historical byte-identical request envelope correlated to the durable
+    /// operation receipt. It does not prove the sword remains equipped.
+    pub fn verified_bound_rack_pickup(
+        &self,
+        transaction: OwnershipTxnId,
+        operation: OwnershipOp,
+        envelope: ProposedRackPickupEnvelope,
+    ) -> Result<Option<OwnershipReceipt>, ItemJournalError> {
+        let receipt = self.verified_receipt(transaction, &[operation])?;
+        match receipt {
+            None => Ok(None),
+            Some(found) if self.bound_pickups.get(&transaction) == Some(&envelope) => {
+                Ok(Some(found))
+            }
+            Some(_) => Err(ItemJournalError::BoundPickupMismatch),
+        }
+    }
+
     pub fn apply(
         &mut self,
         transaction: OwnershipTxnId,
         operations: &[OwnershipOp],
     ) -> Result<OwnershipReceipt, ItemJournalError> {
+        self.apply_internal(transaction, operations, None)
+    }
+
+    fn apply_internal(
+        &mut self,
+        transaction: OwnershipTxnId,
+        operations: &[OwnershipOp],
+        bound_pickup: Option<ProposedRackPickupEnvelope>,
+    ) -> Result<OwnershipReceipt, ItemJournalError> {
         if self.poisoned {
             return Err(ItemJournalError::Poisoned);
+        }
+        if let Some(envelope) = bound_pickup {
+            if operations.len() != 1 {
+                return Err(ItemJournalError::InvalidBoundPickup(
+                    "exactly one move required",
+                ));
+            }
+            envelope
+                .validate_shape(operations[0])
+                .map_err(ItemJournalError::InvalidBoundPickup)?;
         }
         let (receipt, replay) = self
             .ledger
             .preview(transaction, operations)
             .map_err(ItemJournalError::InvalidTransaction)?;
         if replay {
+            if self.bound_pickups.get(&transaction) != bound_pickup.as_ref() {
+                return Err(ItemJournalError::BoundPickupMismatch);
+            }
             return Ok(receipt);
+        }
+        if let Some(envelope) = bound_pickup {
+            let OwnershipOp::Move { item, from, .. } = operations[0] else {
+                return Err(ItemJournalError::InvalidBoundPickup(
+                    "ground-to-hand move required",
+                ));
+            };
+            if self.ledger.location(item) != Some(from)
+                || self.ledger.last_mutation_sequence(item)
+                    != Some(envelope.observed_item_mutation_sequence)
+            {
+                return Err(ItemJournalError::InvalidBoundPickup(
+                    "stale physical item revision",
+                ));
+            }
         }
         let record = JournalRecord {
             sequence: receipt.sequence,
             transaction,
             operations: operations.to_vec(),
+            bound_pickup,
         };
         let bytes = encode(&record);
         let clock = SystemTime::now()
@@ -514,10 +653,14 @@ impl DurableItemJournal {
             return Err(ItemJournalError::Io(error));
         }
         drop(stage);
-        self.ledger.apply(transaction, operations).map_err(|err| {
+        let receipt = self.ledger.apply(transaction, operations).map_err(|err| {
             self.poisoned = true;
             ItemJournalError::InvalidTransaction(err)
-        })
+        })?;
+        if let Some(envelope) = bound_pickup {
+            self.bound_pickups.insert(transaction, envelope);
+        }
+        Ok(receipt)
     }
 }
 
@@ -758,6 +901,7 @@ mod tests {
                     from: ground(),
                 },
             ],
+            bound_pickup: None,
         };
         let bytes = encode(&record);
         let restored = decode(&bytes).expect("round trip");
@@ -987,6 +1131,7 @@ mod tests {
             sequence: 1,
             transaction: txn(9),
             operations: operations.clone(),
+            bound_pickup: None,
         });
         fs::write(root.record(1), bytes).expect("simulate durable publish before in-memory apply");
         let mut reopened = root.open();

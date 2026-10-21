@@ -1,5 +1,7 @@
 #[cfg(test)]
 mod alpha_armory_ownership_tests;
+#[cfg(test)]
+mod alpha_bound_journal_tests;
 use std::sync::{
     atomic::{AtomicUsize, Ordering},
     Arc,
