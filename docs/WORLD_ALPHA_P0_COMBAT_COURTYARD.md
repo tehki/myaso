@@ -39,9 +39,13 @@ Physics authority, UI pointer selection, animation or Combat timings.
 - Four nonoverlapping human-scale station placements.
 - All **16** nominal socket-approach-to-courtyard-station routes avoid the 23
   pinned fixed solids under exact continuous segment-vs-radius-18-inflated-AABB checks (closed tangencies blocked).
+- **Another 16** direct, reversible server-designated spawn-to-courtyard-station
+  static paths let all four players reach the fist-fighting space without first
+  visiting the rack; every one stays inside the authored Greyhaven city and is
+  conservative radius-18 collision-clear in both directions.
 - Eight 64-unit directional segments plus fighter radius stay unobstructed. A separate thin-obstacle/tangency negative regression proves the sweep does not miss hazards between sampled points.
 
-This is an additional **courtyard traversal matrix**, not a replacement for
+These are two additional **courtyard traversal matrices**, not a replacement for
 Core [#527](https://github.com/tehki/myaso/pull/527)'s separate
 **16 spawn-to-rack** routes, or [#532](https://github.com/tehki/myaso/pull/532)'s
 actual four-session loopback transport test.
