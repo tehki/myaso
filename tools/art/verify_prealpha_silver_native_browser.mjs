@@ -38,7 +38,7 @@ try {
  page.on("pageerror",e=>errors.push(String(e)));
  page.on("response",r=>{if(r.status()>=400)errors.push("HTTP "+r.status()+": "+r.url());});
  await page.goto("http://127.0.0.1:"+server.address().port+
-   "/web/prealpha-silver-source-review.html",{waitUntil:"networkidle0"});
+   "/tests/fixtures/prealpha-silver-source-review.html",{waitUntil:"networkidle0"});
  await page.waitForFunction(()=>window.__GRAPHICS3A_PREALPHA_SOURCE_QA__?.ready(),{timeout:25000});
  const clips={idle:"silver_idle",walk:"silver_walk",sprint:"silver_sprint",
    roll:"silver_roll",jump:"silver_jump"};

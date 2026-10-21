@@ -1,5 +1,5 @@
-import {createKnightSpriteRenderer,KNIGHT_FRAME_PX} from "./knight-sprites.mjs";
-import {COMBAT_ACTION} from "../src/browser/combat-readability.mjs";
+import {createKnightSpriteRenderer,KNIGHT_FRAME_PX} from "../../web/knight-sprites.mjs";
+import {COMBAT_ACTION} from "../../src/browser/combat-readability.mjs";
 const canvas=document.querySelector("#review"),ctx=canvas.getContext("2d");
 const qa=document.querySelector("#qa");
 const renderer=createKnightSpriteRenderer();

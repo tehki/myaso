@@ -41,10 +41,10 @@ test("both native browser reports are source-art only; 40 genuine original sprit
  }
 });
 test("source viewer imports the real Pre-Alpha game renderer, no server or extra sixth clip",()=>{
- const src=at("../web/prealpha-silver-source-review.mjs").toString("utf8");
- const page=at("../web/prealpha-silver-source-review.html").toString("utf8");
+ const src=at("../tests/fixtures/prealpha-silver-source-review.mjs").toString("utf8");
+ const page=at("../tests/fixtures/prealpha-silver-source-review.html").toString("utf8");
  const renderer=at("../web/knight-sprites.mjs").toString("utf8");
- assert.match(src,/import \{createKnightSpriteRenderer,KNIGHT_FRAME_PX\} from "\.\/knight-sprites\.mjs"/);
+ assert.ok(src.includes('from "../../web/knight-sprites.mjs"'));
  assert.match(page,/simulated actor states, NOT real authenticated Rust server PvP/);
  assert.match(src,/trueServer:false/);
  assert.match(src,/authenticatedPlayers:false/);

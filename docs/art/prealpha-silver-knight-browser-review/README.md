@@ -9,7 +9,7 @@
 - **Native Firefox 153.4.0:** same **40/40** source-cell checks, 13/13 fallback checks, no NPC, five screenshots, no errors.
 - Existing Main candidate `tests/prealpha-silver-knight.test.mjs` **4/4** passes; new static proof-integrity tests verify both real browser reports, 10 PNG screenshot byte headers and source hashes.
 
-**Actual source-viewer:** `web/prealpha-silver-source-review.html` imports the genuine candidate `createKnightSpriteRenderer` and unchanged WebPs from `web/assets/knights/`. Source runner `tools/art/verify_prealpha_silver_native_browser.mjs` uses installed native Chrome and Firefox with Puppeteer; runs 5 source clips × 8 directions with simulated actor states and takes screenshots. It is NOT a replacement character, Blender redesign, server client, or artificial generation of gameplay.
+**Actual source-viewer:** `tests/fixtures/prealpha-silver-source-review.html` imports the genuine candidate `createKnightSpriteRenderer` and unchanged WebPs from `web/assets/knights/`. Source runner `tools/art/verify_prealpha_silver_native_browser.mjs` uses installed native Chrome and Firefox with Puppeteer; runs 5 source clips × 8 directions with simulated actor states and takes screenshots. It is NOT a replacement character, Blender redesign, server client, or artificial generation of gameplay.
 
 **See actual first-party browser images:** `prealpha_silver_chrome_{idle,walk,sprint,roll,jump}_8way.png` and corresponding Firefox screenshots in this directory, plus source reports. The original Silver appears relatively dark/small at the approved existing visual scale; final readability must be judged in actual camera/arena, not inferred from source sheets.
 
