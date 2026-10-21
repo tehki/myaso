@@ -327,3 +327,93 @@ test("pilot replies require matching sent NPC and bounded outstanding queue", as
     restore();
   }
 });
+
+test("early NPC reply waits until its locally accepted question is shown", async () => {
+  const { stage, restore } = installDocument();
+  try {
+    const sends = [];
+    const npc = createNpcChatPanel({
+      onSend(id, message) {
+        return new Promise((resolve, reject) => sends.push({ id, message, resolve, reject }));
+      },
+      onFocus() {},
+    });
+    npc.setRoster([{ id: 3, name: "Rowan", role: "Guard" }]);
+    const [,,,,, history, form] = stage.children[0].children;
+    const [input, button] = form.children;
+    const submit = () => form.listeners.get("submit")({ preventDefault() {} });
+    input.value = "Tell me what you saw";
+    const sending = submit();
+    assert.equal(button.disabled, true);
+    assert.equal(sends.length, 1);
+    npc.receive({ id: 3, text: "Rowan: I saw a guard near the yard." });
+    assert.equal(history.children.length, 0,
+      "do not show NPC answer before local send settles");
+    npc.receive({ id: 3, text: "Duplicate early reply" });
+    assert.equal(history.children.length, 0);
+    sends[0].resolve();
+    await sending;
+    assert.equal(history.children.length, 2);
+    assert.match(history.children[0].textContent, /You → Rowan: Tell me what you saw/);
+    assert.equal(history.children[1].textContent, "Rowan: I saw a guard near the yard.");
+    assert.equal(input.value, "");
+    assert.equal(button.disabled, false);
+    npc.receive({ id: 3, text: "Late duplicate" });
+    assert.equal(history.children.length, 2);
+  } finally {
+    restore();
+  }
+});
+
+test("early NPC reply is discarded if the corresponding write rejects or roster expires", async () => {
+  const { stage, restore } = installDocument();
+  try {
+    const sends = [];
+    const npc = createNpcChatPanel({
+      onSend(id, message) {
+        return new Promise((resolve, reject) => sends.push({ id, message, resolve, reject }));
+      },
+      onFocus() {},
+    });
+    const [,,,,, history, form] = stage.children[0].children;
+    const [input, button] = form.children;
+    const submit = () => form.listeners.get("submit")({ preventDefault() {} });
+    npc.setRoster([{ id: 5, name: "Tomas", role: "Laborer" }]);
+    input.value = "First attempted send";
+    const first = submit();
+    npc.receive({ id: 5, text: "Unconfirmed Tomas reply" });
+    assert.equal(history.children.length, 0);
+    sends[0].reject(new Error("Transport write rejected"));
+    await first;
+    assert.deepEqual(history.children.map((li) => li.textContent), [
+      "Unable to send your message.",
+    ]);
+    assert.equal(input.value, "First attempted send");
+    assert.equal(button.disabled, false);
+    npc.receive({ id: 5, text: "Failed-send reply must not display" });
+    assert.equal(history.children.length, 1);
+
+    input.value = "New request on original roster";
+    const second = submit();
+    npc.receive({ id: 5, text: "Another early reply" });
+    npc.setRoster([]);
+    npc.setRoster([{ id: 3, name: "Rowan", role: "Guard" }]);
+    sends[1].resolve();
+    await second;
+    assert.equal(history.children.length, 0,
+      "a successful but revoked request must not resurrect its reply");
+    assert.equal(button.disabled, false);
+    npc.receive({ id: 5, text: "Old roster answer" });
+    assert.equal(history.children.length, 0);
+    input.value = "New current question";
+    const third = submit();
+    sends[2].resolve();
+    await third;
+    npc.receive({ id: 3, text: "Correct current reply" });
+    assert.deepEqual(history.children.map((li) => li.textContent), [
+      "You → Rowan: New current question", "Correct current reply",
+    ]);
+  } finally {
+    restore();
+  }
+});

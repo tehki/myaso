@@ -284,3 +284,42 @@ does not prove real-browser/4-player sword acceptance.
 
 **First Playable:** continue with the NPC pilot flags OFF; do not
 merge experimental #353 into \`main\` without central coordination.
+
+## LW-2C — A response cannot appear before its locally accepted question
+
+The bounded pilot reply FIFO from LW-2B did not previously
+coordinate **incoming server responses with an unresolved local
+\`onSend\` promise**. If a reply arrived first, the UI could show
+the NPC response before \`You → NPC\`; worse, if the write
+subsequently rejected, it could display the reply alongside an
+\`Unable to send\` failure even though the client had not accepted
+that outbound send.
+
+Each roster-scoped expected reply now tracks whether the local
+send has succeeded and whether its response has arrived.
+A response received first is staged (not displayed), one time,
+and appended **only after** the same-generation send resolves
+successfully, directly after the player's outgoing message.
+A rejected send discards any staged response and preserves the
+draft for retry; a revoked roster prevents both lines from
+reappearing in the next conversation. Wrong-ID and duplicate
+responses remain denied by the bounded FIFO. This uses the
+existing frame contents and changes **only the optional NPC UI**,
+not a game-server response, combat, equipment or network writer.
+
+Two additional deterministic DOM tests control deferred send
+resolution/rejection and server reply order; they verify:
+early reply before send completion, duplicate early reply,
+correct question-before-answer rendering, error after staged
+reply, roster invalidation, and a clean subsequently accepted
+new-roster exchange.
+
+**No stronger security claim:** a local \`onSend\` resolution
+means the browser transport accepted the bytes, **not**
+that the server committed dialogue processing. The existing
+reliable NPC reply has no Core-authenticated request ID/session
+epoch; equal-NPC-ID responses across reconnect remain
+ambiguous. A single Core8A stream dispatcher, correlation
+token and connection lifecycle are still prerequisites for
+future integrated NPCs. Keep all pilot opt-ins OFF for P0
+four-player First Playable Alpha.

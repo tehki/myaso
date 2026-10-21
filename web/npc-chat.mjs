@@ -130,13 +130,17 @@ export function createNpcChatPanel({ onSend, onFocus }) {
       return;
     }
     const requestGeneration = rosterGeneration;
-    const expected = { id };
+    // A server reply can race the local send promise. Do not display it
+    // before the player's own submitted line is confirmed for this roster.
+    const expected = { id, sent: false, replied: false, stagedText: null };
     pendingReplies.push(expected);
     submit.disabled = true;
     try {
       await onSend(id, text);
       if (requestGeneration !== rosterGeneration || panel.hidden) return;
       appendLine(`You → ${target.name}: ${text}`);
+      expected.sent = true;
+      if (expected.replied) appendLine(expected.stagedText);
       // Preserve a newer draft entered while the send was pending.
       if (input.value.trim() === text) input.value = "";
     } catch {
@@ -189,8 +193,12 @@ export function createNpcChatPanel({ onSend, onFocus }) {
       // A wrong-NPC or duplicate unsolicited reply must not consume the
       // expected answer for the player’s real current message.
       if (pendingReplies[0].id !== id || !npcs.some((npc) => npc.id === id)) return;
-      pendingReplies.shift();
-      appendLine(text);
+      const expected = pendingReplies.shift();
+      expected.replied = true;
+      // The reliable response might precede onSend resolution. Stage it
+      // until the local write succeeds; on failure the entry is discarded.
+      if (expected.sent) appendLine(text);
+      else expected.stagedText = text;
     },
     focus() { if (!panel.hidden) { onFocus(); input.focus(); } },
     get enabled() { return !panel.hidden; },
