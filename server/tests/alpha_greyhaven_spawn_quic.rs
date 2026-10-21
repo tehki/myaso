@@ -1392,11 +1392,24 @@ async fn four_real_quic_players_observe_kill_and_immutable_greyhaven_respawn() -
     dead_probe[8..12].copy_from_slice(&70_850_u32.to_le_bytes());
     dead_probe[12..16].copy_from_slice(&dead5.0.to_le_bytes());
     dead_probe[17] = 127; // request unauthorized eastward displacement
+    dead_probe[19..21].copy_from_slice(&32768_u16.to_le_bytes()); // WEST toward living #1
     dead_probe[21] = 0b1000; // request unauthorized heavy attack
     replacement.send_datagram(dead_probe)?;
     require_quic_input_ack(&replacement, 70_850, 5).await?;
-    let (dead_probe_sequence, dead_probe_tick) =
-        observe_fenced_dead_quic_input(&replacement, 5, dead5.0).await?;
+    // Every actual peer must verify that the attempted WEST-facing heavy
+    // cannot hurt living #1 at <130 world units. This is a real in-range
+    // negative control: facing east would make the no-damage claim trivial.
+    let (guard1, guard3, guard4, guard5) = tokio::try_join!(
+        observe_fenced_dead_quic_input(&sessions[0].0, 1, dead1.0),
+        observe_fenced_dead_quic_input(&sessions[1].0, 3, dead3.0),
+        observe_fenced_dead_quic_input(&sessions[2].0, 4, dead4.0),
+        observe_fenced_dead_quic_input(&replacement, 5, dead5.0),
+    )?;
+    println!(
+        "ALPHA_8C_NO_POSTMORTEM_DAMAGE witnesses=4 hp1=100 dead_player=5          ticks={},{},{},{}",
+        guard1.1, guard3.1, guard4.1, guard5.1
+    );
+    let (dead_probe_sequence, dead_probe_tick) = guard5;
     send_held_direction_with_server_ack(
         &replacement,
         dead_probe_sequence,
@@ -1670,12 +1683,13 @@ async fn observe_reborn_fighter_live_movement(
 /// A valid input ACK alone isn't proof that gameplay accepted a heavy
 /// command. Through a real server-produced delta stream, establish that
 /// this defeated fighter stays Dead, HP=0, and emits NO position change
-/// while 12 new authoritative ticks elapse after the rejected attempt.
-/// The client ACKed the real Dead baseline, so absence of position deltas
-/// means server-owned coordinates stayed put (not a mocked empty feed).
+/// for 28 new authoritative ticks after the attempted valid attack.
+/// All four independent real-QUIC peers also prohibit damage to a living
+/// in-range target (#1), making a directionally valid Dead attack a
+/// meaningful negative control rather than a harmless attack into space.
 async fn observe_fenced_dead_quic_input(
     connection: &wtransport::Connection,
-    victim: u32,
+    observer: u32,
     death_tick: u32,
 ) -> Result<(u16, u32)> {
     use myaso_server::snapshot::{SNAPSHOT_FIELD_ACTION, SNAPSHOT_FIELD_VITALS};
@@ -1688,7 +1702,7 @@ async fn observe_fenced_dead_quic_input(
         let remaining = deadline.saturating_duration_since(Instant::now());
         if remaining.is_zero() {
             bail!(
-                "dead QUIC input was not observably fenced: victim={victim} packets={packets} first_tick={first_tick:?} last_tick={}",
+                "observer {observer} dead QUIC input was not observably fenced: packets={packets} first_tick={first_tick:?} last_tick={}",
                 last.1
             );
         }
@@ -1711,21 +1725,27 @@ async fn observe_fenced_dead_quic_input(
             );
         }
         for record in &snapshot.records {
-            if record.net_id != victim {
+            if record.net_id == 1 && record.mask & SNAPSHOT_FIELD_VITALS != 0 && record.hp != 100 {
+                bail!(
+                    "observer {observer} saw forbidden postmortem damage to in-range fighter #1: hp={}",
+                    record.hp
+                );
+            }
+            if record.net_id != 5 {
                 continue;
             }
-            if record.mask & SNAPSHOT_FIELD_POSITION != 0 {
-                bail!("server moved a dead player {victim} after valid movement input");
+            if record.mask & SNAPSHOT_FIELD_POSITION != 0 && observer == 5 {
+                bail!("dead fighter #5 saw own movement delta after authenticated input");
             }
             if record.mask & SNAPSHOT_FIELD_VITALS != 0 && record.hp != 0 {
                 bail!(
-                    "server changed dead victim {victim} HP to {} before respawn",
+                    "observer {observer} saw dead fighter #5 regain HP early: {}",
                     record.hp
                 );
             }
             if record.mask & SNAPSHOT_FIELD_ACTION != 0 && record.action != 8 {
                 bail!(
-                    "server executed defeated player {victim} action {}",
+                    "observer {observer} saw dead fighter #5 execute action {}",
                     record.action
                 );
             }
@@ -1734,9 +1754,9 @@ async fn observe_fenced_dead_quic_input(
         first_tick.get_or_insert(current_tick);
         last = (snapshot.sequence, current_tick);
         packets += 1;
-        if current_tick >= first_tick.unwrap() + 12 {
+        if current_tick >= first_tick.unwrap() + 28 {
             println!(
-                "ALPHA_8C_QUIC_DEAD_INPUT_FENCED victim={victim} input_acked=yes blocked_movement=yes blocked_heavy=yes ticks=12"
+                "ALPHA_8C_QUIC_DEAD_INPUT_FENCED observer={observer} victim=5                  near_target=1 hp=100 blocked_movement=yes blocked_heavy=yes ticks=28"
             );
             return Ok(last);
         }
