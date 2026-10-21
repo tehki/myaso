@@ -1,0 +1,40 @@
+{
+  "bodyPresentation": "adult-masculine",
+  "sourceOriginal": "first-party A1 Blender/GLB",
+  "modelBlend": "adult-masculine-roll-a2.blend",
+  "modelGlb": "adult-masculine-roll-a2.glb",
+  "preservedActions": [
+    "idle",
+    "walk",
+    "run"
+  ],
+  "newAction": "roll",
+  "sourceFps": 60,
+  "startFrame": 1,
+  "endFrame": 22,
+  "sourceRollDurationMs": 350,
+  "combatActiveMs": 170,
+  "combatRecoveryMs": 180,
+  "rollSampleFrames": [
+    1,
+    3,
+    5,
+    7,
+    9,
+    11,
+    15,
+    22
+  ],
+  "directions": 8,
+  "framesPerDirection": 8,
+  "sourceFramePx": 160,
+  "renderedFrames": 64,
+  "smoke": false,
+  "rigBoneCount": 22,
+  "authoritativeCombatChanged": false,
+  "gameplayMovementChanged": false,
+  "noArmorOrWeapons": true,
+  "footContactVerified": false,
+  "worldGroundingVerified": false,
+  "productionReady": false
+}

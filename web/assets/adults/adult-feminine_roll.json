@@ -1,0 +1,29 @@
+{
+  "bodyPresentation": "adult-feminine",
+  "clip": "roll",
+  "directions": 8,
+  "framesPerDirection": 8,
+  "sourceFramePx": 160,
+  "atlasWidth": 1280,
+  "atlasHeight": 1280,
+  "bytes": 90334,
+  "sha256": "50a6b30d54d2b0be36db830c2dfbabce4fd1b54c8b291d658e90778d72002aaf",
+  "rgbaTransparency": true,
+  "sourceSampleFrames": [
+    1,
+    3,
+    5,
+    7,
+    9,
+    11,
+    15,
+    22
+  ],
+  "rollVisualMs": 350,
+  "dodgeActiveMs": 170,
+  "recoveryMs": 180,
+  "destinationPx": 134,
+  "gameplayCombatChanged": false,
+  "sourceOriginal": true,
+  "productionActive": false
+}
