@@ -4,16 +4,20 @@ on:
   pull_request:
     paths:
       - "scripts/r2-remote-acceptance-config.mjs"
+      - "scripts/r2-private-udp-proof.mjs"
       - "scripts/r2-remote-abrupt-close-acceptance.mjs"
       - "tests/r2-remote-acceptance-config.test.mjs"
+      - "tests/r2-private-udp-proof.test.mjs"
       - "docs/CORE_R2_TWO_HOST_RELEASE_ACCEPTANCE.md"
       - ".github/workflows/r2-two-host-preflight.yml"
   push:
     branches: [main]
     paths:
       - "scripts/r2-remote-acceptance-config.mjs"
+      - "scripts/r2-private-udp-proof.mjs"
       - "scripts/r2-remote-abrupt-close-acceptance.mjs"
       - "tests/r2-remote-acceptance-config.test.mjs"
+      - "tests/r2-private-udp-proof.test.mjs"
       - ".github/workflows/r2-two-host-preflight.yml"
 
 permissions:
@@ -29,8 +33,9 @@ jobs:
         run: |
           node --version
           node --check scripts/r2-remote-acceptance-config.mjs
+          node --check scripts/r2-private-udp-proof.mjs
           node --check scripts/r2-remote-abrupt-close-acceptance.mjs
-          node --test tests/r2-remote-acceptance-config.test.mjs
+          node --test tests/r2-remote-acceptance-config.test.mjs tests/r2-private-udp-proof.test.mjs
       - name: Confirm no automatic deployment
         run: |
           if grep -E 'game=spawn|MYASO_BIND:|MYASO_MAX_PLAYERS:' scripts/r2-remote-abrupt-close-acceptance.mjs; then
