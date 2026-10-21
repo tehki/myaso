@@ -146,6 +146,102 @@ mod tests {
     }
 
     #[test]
+    fn all_four_core_spawns_reach_all_four_world_blacksmith_approaches_with_pinned_static_sweeps() {
+        // P0 First Playable M1/M2: Core #486's four server-owned spawn
+        // anchors and World #493's four rack *approaches* (not item IDs).
+        // World-owned rack visual/item anchors are at y=4038, but players
+        // must stand south of the building at y=4088; never path through
+        // the smith's collidable rectangle to reach the sword sprites.
+        //
+        // All 16 pairs are checked against the EXACT embedded World #509
+        // 23-solid SHA, not a separately reimplemented JS collision model.
+        // This is STATIC route evidence only: river, dynamic actors, range,
+        // line-of-sight, server-side item pickup, and independent machines
+        // remain separate integration requirements.
+        assert_eq!(STATIC_LAYOUT_ID, "moonvale-greyhaven-v10-solids-v1");
+        assert_eq!(
+            STATIC_SOLIDS_SHA256,
+            "9bb023c95d86821f219113d71b6e480789a72df064f083790e746d79423b3f43"
+        );
+        let spawns = [
+            (4110.0_f32, 4160.0_f32),
+            (4206.0, 4160.0),
+            (4110.0, 4256.0),
+            (4206.0, 4256.0),
+        ];
+        let rack_approaches = [
+            (3740.0_f32, 4088.0_f32),
+            (3780.0, 4088.0),
+            (3820.0, 4088.0),
+            (3860.0, 4088.0),
+        ];
+        let city_detour = [(3990.0_f32, 4180.0_f32), (3980.0, 4090.0)];
+        let player_radius = 18.0_f32;
+        let mut checked = 0_usize;
+        for (spawn_index, spawn) in spawns.iter().copied().enumerate() {
+            for (rack_index, stand) in rack_approaches.iter().copied().enumerate() {
+                let mut previous = spawn;
+                assert_eq!(
+                    overlaps_known_static_solid(previous.0, previous.1, player_radius),
+                    Ok(false),
+                    "spawn {} overlaps a pinned solid",
+                    spawn_index + 1
+                );
+                for next in city_detour.into_iter().chain(std::iter::once(stand)) {
+                    assert_eq!(
+                        overlaps_known_static_solid(next.0, next.1, player_radius),
+                        Ok(false),
+                        "rack {} route waypoint intersects a solid",
+                        rack_index + 1
+                    );
+                    assert_eq!(
+                        swept_circle_hits_known_static_solid(previous, next, player_radius),
+                        Ok(false),
+                        "spawn {} to rack {} static route blocked at {:?} -> {:?}",
+                        spawn_index + 1,
+                        rack_index + 1,
+                        previous,
+                        next
+                    );
+                    previous = next;
+                }
+                checked += 1;
+            }
+        }
+        assert_eq!(checked, 16);
+    }
+
+    #[test]
+    fn blacksmith_sword_centers_have_static_clear_sightline_but_no_through_smith_pickup() {
+        // Cross-owner M2 geometry *preflight*, never a positive pickup
+        // authorization. The physical sword is 50 units north of its
+        // walkable player approach, and the smith footprint ends at y=4012.
+        // Four independent visual anchors, no client-supplied item ID.
+        //
+        // Radius 0.5 checks the known static obstacles only; the actual
+        // gameplay interaction must still authenticate the actor/item,
+        // enforce agreed range, current zone/epoch, complete LOS/dynamic
+        // geometry, exclusive journal commit and a correlated server ACK.
+        for x in [3740.0_f32, 3780.0, 3820.0, 3860.0] {
+            let player_approach = (x, 4088.0_f32);
+            let visible_sword = (x, 4038.0_f32);
+            assert_eq!(player_approach.1 - visible_sword.1, 50.0);
+            assert_eq!(
+                swept_circle_hits_known_static_solid(player_approach, visible_sword, 0.5),
+                Ok(false),
+                "static geometry incorrectly occludes visual sword at x={x}"
+            );
+            // The Blacksmith facade/wall IS solid. A fraudulent click
+            // cannot use this static check to pass an interior target.
+            assert_eq!(
+                swept_circle_hits_known_static_solid(player_approach, (x, 3990.0), 0.5),
+                Ok(true),
+                "static geometry failed to reject sightline through the smith at x={x}"
+            );
+        }
+    }
+
+    #[test]
     fn smith_footprint_and_real_west_wall_gap_have_precise_collision() {
         assert_eq!(overlaps_known_static_solid(3800.0, 3920.0, 18.0), Ok(true));
         assert_eq!(overlaps_known_static_solid(3520.0, 4000.0, 18.0), Ok(true));
