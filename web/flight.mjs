@@ -18,6 +18,10 @@ if (!server) fail(new Error("flight requires ?server=https://host:port/game"));
 
 const frameDeltas = [];
 const corrections = [];
+// P11 diagnostics: only genuine authoritative INPUT_ACK receipt times.
+// No input protocol or client gameplay behavior changes.
+const sentInputAt = new Map();
+const processedInputAckMs = [];
 let longTasks = 0;
 let snapshots = 0;
 let acknowledgements = 0;
@@ -93,8 +97,20 @@ try {
       if (firstBackgroundReliableMs === null && advanced > 0) firstBackgroundReliableMs = now - reliableBaselineAt;
     },
     onProcessedAck() {
+      const ack = arguments[0];
       // Real ACK receipt and readiness to reconcile are distinct timelines.
       acknowledgements += 1;
+      // processedClientTick is from the authoritative server, not local
+      // prediction. Match exact input tick; missing/dropped ACKs are never
+      // inventively given zero latency. Input-map size is bounded.
+      const tick = ack.processedClientTick >>> 0;
+      const sentAt = sentInputAt.get(tick);
+      if (sentAt !== undefined) {
+        processedInputAckMs.push(performance.now() - sentAt);
+      }
+      for (const candidate of sentInputAt.keys()) {
+        if (candidate <= tick) sentInputAt.delete(candidate);
+      }
     },
     onAck() {
       const ownId = client?.playerNetId;
@@ -133,7 +149,10 @@ function frame(now) {
     predictMovement(input, predictionStepMs);
     predictionSteps += 1;
     if (predictionSteps % sendEveryPredictionSteps === 0) {
+      sentInputAt.set(clientTick, performance.now());
       client.sendInput({ tick: clientTick, ...input });
+      // Bound unmatched samples independently from prediction history.
+      if (sentInputAt.size > 128) sentInputAt.delete(sentInputAt.keys().next().value);
       clientTick = (clientTick + 1) >>> 0;
       sentInputs += 1;
       maxPredictionHistory = Math.max(maxPredictionHistory, client.predictionHistory.size);
@@ -268,6 +287,10 @@ function finish(elapsedMs) {
     firstBackgroundReliableMs: firstBackgroundReliableMs === null ? null : round(firstBackgroundReliableMs),
     acknowledgements,
     sentInputs,
+    // P11 latency measurement uses this browser's monotonic clock for
+    // sendInput -> genuine processed-INPUT_ACK receipt (not hit-confirmation).
+    processedInputAckMs: summarize([...processedInputAckMs].sort((a, b) => a - b)),
+    unmatchedInputTicks: sentInputAt.size,
     maxPredictionHistory,
     correctionPx: summarize(sortedCorrections),
     stressEntities,

@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>P9 WebTransport magic FX loopback flight</title></head>
+<body>
+<main><h1>P9 physical WebTransport FX acceptance lab — loopback only</h1>
+<p>Non-playable, no active spells, no real account or combat commands.</p></main>
+<script type="module">
+import { decodeMagicEffectPacket, createMagicEffectReceiver } from "../src/browser/magic-effect-receiver.mjs";
+import { createMagicParticlePool } from "../src/browser/magic-particle-pool.mjs";
+
+const t0 = performance.now();
+const params = new URLSearchParams(location.search);
+const endpoint = params.get("server");
+const hex = params.get("cert");
+const pool = createMagicParticlePool({ quality: "low" });
+const receiver = createMagicEffectReceiver(pool);
+const results = {
+  ok: false,
+  webTransportAvailable: typeof WebTransport === "function",
+  gameplayMarkers: 0,
+  fxPackets: 0,
+  particlesEmitted: 0,
+  pingReplies: 0,
+  sentPings: 0,
+  malformedFx: 0,
+  gameplayGapP95Ms: 0,
+  pingRttP95Ms: 0,
+  baselinePingP95Ms: 0,
+  loadedPingP95Ms: 0,
+  cosmeticPayloadBytes: 0,
+  durationMs: 0,
+};
+function p95(samples) {
+  if (!samples.length) return null;
+  const sorted = samples.toSorted((a, b) => a - b);
+  return sorted[Math.min(sorted.length - 1, Math.ceil(sorted.length * 0.95) - 1)];
+}
+const pingSentAt = new Map();
+const basePings = [];
+const loadedPings = [];
+const gpGaps = [];
+let latestTick = 0;
+let latestGpTime = null;
+const controller = new AbortController();
+
+(async () => {
+  if (!endpoint || !/^https:\/\/127\.0\.0\.1:\d+\/physics-fx-lab$/.test(endpoint)) {
+    throw new Error("P9 requires an exact loopback physics-fx-lab URL");
+  }
+  if (!hex || !/^[a-f0-9]{64}$/i.test(hex)) throw new Error("P9 needs 32-byte test certificate");
+  if (!results.webTransportAvailable) throw new Error("WebTransport is unavailable");
+
+  const certificate = new Uint8Array(hex.match(/../g).map((byte) => Number.parseInt(byte, 16)));
+  const transport = new WebTransport(endpoint, {
+    serverCertificateHashes: [{ algorithm: "sha-256", value: certificate }],
+  });
+  window.__P9_STAGE__ = "waiting-for-transport-ready";
+  await Promise.race([
+    transport.ready,
+    new Promise((_, reject) => setTimeout(() => reject(new Error("WebTransport handshake exceeded 10 seconds")), 10000)),
+  ]);
+  window.__P9_STAGE__ = "transport-ready";
+
+  const reader = transport.datagrams.readable.getReader();
+  const writer = transport.datagrams.writable.getWriter();
+  const pump = (async () => {
+    while (!controller.signal.aborted) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      if (!value || value.byteLength < 2) continue;
+      const bytes = value instanceof Uint8Array ? value : new Uint8Array(value);
+      const now = performance.now();
+      if (bytes[0] === 71 && bytes[1] === 80 && bytes.byteLength === 6) {
+        const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+        const tick = view.getUint32(2, true);
+        results.gameplayMarkers += 1;
+        latestTick = Math.max(latestTick, tick);
+        if (latestGpTime !== null) gpGaps.push(now - latestGpTime);
+        latestGpTime = now;
+      } else if (bytes[0] === 77 && bytes[1] === 69) {
+        const effect = decodeMagicEffectPacket(bytes);
+        if (!effect || effect.zoneId !== 7) { results.malformedFx += 1; continue; }
+        const emitted = receiver.ingest(bytes, {
+          zoneId: 7,
+          x: 12.5,
+          y: -7.25,
+          radius: 700,
+          serverTick: Math.max(latestTick, effect.serverTick),
+        });
+        results.fxPackets += 1;
+        results.particlesEmitted += emitted;
+        results.cosmeticPayloadBytes += bytes.byteLength;
+        pool.advance(30);
+      } else if (bytes[0] === 80 && bytes[1] === 79 && bytes.byteLength === 6) {
+        const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+        const sequence = view.getUint32(2, true);
+        const started = pingSentAt.get(sequence);
+        if (started !== undefined) {
+          const ms = now - started;
+          (latestTick < 31 ? basePings : loadedPings).push(ms);
+          pingSentAt.delete(sequence);
+          results.pingReplies += 1;
+        }
+      }
+    }
+  })();
+
+  let sequence = 1;
+  const sendTimer = setInterval(async () => {
+    if (controller.signal.aborted) return;
+    if (pingSentAt.size > 16) return;
+    const bytes = new Uint8Array(6);
+    bytes[0] = 80;
+    bytes[1] = 73;
+    new DataView(bytes.buffer).setUint32(2, sequence, true);
+    pingSentAt.set(sequence, performance.now());
+    sequence += 1;
+    results.sentPings += 1;
+    try {
+      await writer.ready;
+      await writer.write(bytes);
+    } catch {
+      pingSentAt.clear();
+    }
+  }, 90);
+  // All datagrams come from the trusted, loopback-only *lab*, not the live game.
+  window.__P9_STAGE__ = "collecting-live-datagrams";
+  await new Promise((resolve) => setTimeout(resolve, 4_150));
+  window.__P9_STAGE__ = "calculating-results";
+  clearInterval(sendTimer);
+  results.gameplayGapP95Ms = p95(gpGaps);
+  results.baselinePingP95Ms = p95(basePings);
+  results.loadedPingP95Ms = p95(loadedPings);
+  results.pingRttP95Ms = p95([...basePings, ...loadedPings]);
+  results.durationMs = Math.round(performance.now() - t0);
+  results.cosmeticOnly = true;
+  results.ok =
+    results.gameplayMarkers >= 50 &&
+    results.fxPackets >= 12 &&
+    results.particlesEmitted > 0 &&
+    results.pingReplies >= 8 &&
+    results.malformedFx === 0 &&
+    Number.isFinite(results.pingRttP95Ms) &&
+    Number.isFinite(results.gameplayGapP95Ms);
+  // Report BEFORE cleanup: Firefox may keep a pending QUIC stream cancellation
+  // unresolved after the sidecar's final datagram. Cleanup is best effort.
+  window.__P9_RESULT__ = results;
+  window.__P9_STAGE__ = "reported-results";
+  controller.abort();
+  try { void reader.cancel().catch(() => {}); } catch {}
+  transport.close({ closeCode: 0, reason: "P9 loopback flight complete" });
+  void pump.catch(() => {});
+})().catch((error) => {
+  controller.abort();
+  window.__P9_ERROR__ = String(error?.stack ?? error);
+});
+</script>
+</body>
+</html>

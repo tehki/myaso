@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>myaso.io — Physics &amp; Particles Visual Lab</title>
+  <style>
+    :root { color-scheme: dark; font-family: system-ui, Segoe UI, sans-serif; background: #131a20; color: #ebeadf; }
+    * { box-sizing: border-box; }
+    body { margin: 0; padding: 22px 16px; }
+    main { max-width: 1060px; margin: 0 auto; }
+    .eyebrow { color: #b5b4a6; font-size: 0.78rem; letter-spacing: 0.14em; text-transform: uppercase; }
+    h1 { font-size: clamp(1.5rem, 3vw, 2.6rem); margin: 0.35rem 0; }
+    .note { color: #ccd0c5; line-height: 1.6; max-width: 80ch; }
+    .controls { display: flex; flex-wrap: wrap; gap: 9px; margin: 22px 0 15px; align-items: center; }
+    button, select { background: #23303a; color: #fff; border: 1px solid #53606a; border-radius: 8px; padding: 10px 14px; cursor: pointer; font: inherit; }
+    button:hover, button:focus-visible, select:focus-visible { outline: 2px solid #a2d9ca; outline-offset: 1px; }
+    button[aria-pressed="true"] { border-color: #e9c477; background: #443d30; }
+    select { margin-left: 6px; }
+    label { margin-left: auto; white-space: nowrap; }
+    canvas { display: block; width: 100%; aspect-ratio: 16 / 9; height: auto; background: #1b292f; border: 2px solid #4d605b; border-radius: 14px; touch-action: manipulation; }
+    .metrics { font-variant-numeric: tabular-nums; color: #b9c9c1; margin: 10px 0; }
+    small { color: #aebbb5; }
+    @media (max-width: 700px) { label { margin-left: 0; } button { flex: 1 1 auto; } }
+  </style>
+</head>
+<body>
+  <main>
+    <p class="eyebrow">Moon Games / Experimental visual sandbox</p>
+    <h1>Living Physics · Elemental Particles</h1>
+    <p class="note"><strong>Cosmetic-only lab.</strong> This is not the playable realm, and does not cast spells, deal damage, change physics, send packets, consume mana or access accounts. It previews the same pooled renderer used by the inactive P2 branch.</p>
+    <div class="controls" id="effect-controls">
+      <button type="button" data-kind="fire" aria-pressed="true">Fire</button>
+      <button type="button" data-kind="ice" aria-pressed="false">Ice</button>
+      <button type="button" data-kind="lightning" aria-pressed="false">Lightning</button>
+      <button type="button" data-kind="wind" aria-pressed="false">Wind</button>
+      <button type="button" data-kind="arcane" aria-pressed="false">Arcane</button>
+      <label for="quality">Quality
+        <select id="quality"><option value="low">Low</option><option value="medium" selected>Medium</option><option value="high">High</option></select>
+      </label>
+    </div>
+    <canvas id="magic-preview-canvas" width="960" height="540" aria-label="Interactive particle effects canvas"></canvas>
+    <p class="metrics" id="metrics" aria-live="off">Visual pool ready.</p>
+    <small>Click or tap anywhere in the canvas to create a local visual burst. Effects expire automatically. Backgrounding the tab clears them. No WebTransport connection is made.</small>
+  </main>
+  <script type="module" src="./physics-particles-preview.mjs"></script>
+</body>
+</html>

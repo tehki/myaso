@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>P10 real concurrent WebTransport FX crowd acceptance</title></head>
+<body>
+<main>
+<h1>P10 real-connections Physics crowd lab (loopback only)</h1>
+<p>Non-playable test: no accounts, movement commands, combat or live spells.</p>
+</main>
+<script type="module">
+import { decodeMagicEffectPacket, createMagicEffectReceiver } from "../src/browser/magic-effect-receiver.mjs";
+import { createMagicParticlePool } from "../src/browser/magic-particle-pool.mjs";
+
+const qs = new URLSearchParams(location.search);
+const endpoint = qs.get("server");
+const cert = qs.get("cert");
+const count = Number(qs.get("sessions") ?? "16");
+const windowMs = Number(qs.get("windowMs") ?? "4200");
+const started = performance.now();
+const timeout = (promise, ms, reason) => Promise.race([
+  promise,
+  new Promise((_, reject) => setTimeout(() => reject(new Error(reason)), ms)),
+]);
+const p95 = (items) => {
+  if (!items.length) return null;
+  const sorted = [...items].sort((a, b) => a - b);
+  return sorted[Math.ceil(sorted.length * 0.95) - 1];
+};
+const handles = [];
+
+(async () => {
+  if (!/^https:\/\/127\.0\.0\.1:\d+\/physics-fx-crowd$/.test(endpoint ?? "")) {
+    throw new Error("P10 endpoint must be an exact loopback crowd lab path");
+  }
+  if (!/^[a-f0-9]{64}$/i.test(cert ?? "")) {
+    throw new Error("P10 requires a 32-byte test-only certificate hash");
+  }
+  if (!Number.isInteger(count) || count < 2 || count > 64) {
+    throw new Error("P10 test-only session count must be 2..64");
+  }
+  if (!Number.isInteger(windowMs) || windowMs < 4200 || windowMs > 10500) {
+    throw new Error("P10 test-only observation window must be 4200..10500ms");
+  }
+  if (typeof WebTransport !== "function") throw new Error("WebTransport unavailable");
+  const hash = Uint8Array.from(cert.match(/../g), (part) => Number.parseInt(part, 16));
+  let connected = 0;
+  const tasks = Array.from({ length: count }, (_, i) => (async () => {
+    const session = i + 1;
+    const transport = new WebTransport(endpoint, {
+      serverCertificateHashes: [{ algorithm: "sha-256", value: hash }],
+    });
+    const handle = {
+      transport, session, gameplayMarkers: 0, fxPackets: 0, pingReplies: 0,
+      sentPings: 0, malformedFx: 0, particlesEmitted: 0, cosmeticPayloadBytes: 0,
+      rtts: [], markerGaps: [], lastMarker: null, lastTick: 0, inflight: new Map(),
+      pingSequence: 1, closed: false,
+    };
+    handles.push(handle);
+    await timeout(transport.ready, 35_000, `P10 session ${session} handshake timed out`);
+    connected += 1;
+    window.__P10_STAGE__ = `ready ${connected}/${count}`;
+    const pool = createMagicParticlePool({ quality: "low" });
+    const receiver = createMagicEffectReceiver(pool);
+    const reader = transport.datagrams.readable.getReader();
+    const writer = transport.datagrams.writable.getWriter();
+    handle.reader = reader;
+    handle.pingTimer = setInterval(async () => {
+      if (handle.closed || handle.inflight.size >= 8) return;
+      const wire = new Uint8Array(6);
+      wire[0] = 80; wire[1] = 73;
+      const seq = handle.pingSequence++;
+      new DataView(wire.buffer).setUint32(2, seq, true);
+      handle.inflight.set(seq, performance.now());
+      handle.sentPings += 1;
+      try {
+        await writer.ready;
+        await writer.write(wire);
+      } catch {
+        handle.inflight.delete(seq);
+      }
+    }, 120);
+    handle.pump = (async () => {
+      while (!handle.closed) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        const wire = value instanceof Uint8Array ? value : new Uint8Array(value ?? []);
+        if (wire.byteLength < 2) continue;
+        const now = performance.now();
+        if (wire[0] === 71 && wire[1] === 80 && wire.length === 6) {
+          const tick = new DataView(wire.buffer, wire.byteOffset, wire.byteLength).getUint32(2, true);
+          handle.gameplayMarkers += 1;
+          handle.lastTick = Math.max(handle.lastTick, tick);
+          if (handle.lastMarker !== null) handle.markerGaps.push(now - handle.lastMarker);
+          handle.lastMarker = now;
+        } else if (wire[0] === 77 && wire[1] === 69) {
+          const fx = decodeMagicEffectPacket(wire);
+          if (!fx || fx.zoneId !== 7) {
+            handle.malformedFx += 1;
+            continue;
+          }
+          handle.fxPackets += 1;
+          handle.cosmeticPayloadBytes += wire.byteLength;
+          handle.particlesEmitted += receiver.ingest(wire, {
+            zoneId: 7, x: 12.5, y: -7.25, radius: 700,
+            serverTick: Math.max(handle.lastTick, fx.serverTick),
+          });
+          pool.advance(30);
+        } else if (wire[0] === 80 && wire[1] === 79 && wire.length === 6) {
+          const seq = new DataView(wire.buffer, wire.byteOffset, wire.byteLength).getUint32(2, true);
+          if (handle.inflight.has(seq)) {
+            handle.rtts.push(now - handle.inflight.get(seq));
+            handle.inflight.delete(seq);
+            handle.pingReplies += 1;
+          }
+        }
+      }
+    })();
+    handle.pump.catch((error) => {
+      if (!handle.closed) handle.error = String(error);
+    });
+  })());
+  window.__P10_STAGE__ = `handshaking 0/${count}`;
+  await Promise.all(tasks);
+  window.__P10_STAGE__ = `collecting ${count} concurrent real QUIC connections`;
+  await new Promise((resolve) => setTimeout(resolve, windowMs));
+
+  const perSession = handles
+    .sort((a, b) => a.session - b.session)
+    .map((h) => ({
+      session: h.session, gameplayMarkers: h.gameplayMarkers,
+      fxPackets: h.fxPackets, pingReplies: h.pingReplies,
+      malformedFx: h.malformedFx, particlesEmitted: h.particlesEmitted,
+      cosmeticPayloadBytes: h.cosmeticPayloadBytes, rttP95Ms: p95(h.rtts),
+      markerGapP95Ms: p95(h.markerGaps), error: h.error ?? null,
+    }));
+  const result = {
+    ok: perSession.length === count && perSession.every((h) =>
+      h.gameplayMarkers >= 55 && h.fxPackets >= 12 &&
+      h.pingReplies >= 5 && h.malformedFx === 0 &&
+      h.particlesEmitted > 0 && Number.isFinite(h.rttP95Ms) &&
+      Number.isFinite(h.markerGapP95Ms) && !h.error
+    ),
+    realConcurrentSessions: count,
+    minGameplayMarkers: Math.min(...perSession.map((h) => h.gameplayMarkers)),
+    minFxPackets: Math.min(...perSession.map((h) => h.fxPackets)),
+    minPingReplies: Math.min(...perSession.map((h) => h.pingReplies)),
+    malformedFx: perSession.reduce((sum, h) => sum + h.malformedFx, 0),
+    cosmeticPayloadBytes: perSession.reduce((sum, h) => sum + h.cosmeticPayloadBytes, 0),
+    maxPingRttP95Ms: Math.max(...perSession.map((h) => h.rttP95Ms ?? Infinity)),
+    maxMarkerGapP95Ms: Math.max(...perSession.map((h) => h.markerGapP95Ms ?? Infinity)),
+    durationMs: Math.round(performance.now() - started),
+    perSession,
+  };
+  // Publish BEFORE cleanup to avoid browser-specific reader cancellation stalls.
+  window.__P10_RESULT__ = result;
+  window.__P10_STAGE__ = "completed";
+  for (const h of handles) {
+    h.closed = true;
+    clearInterval(h.pingTimer);
+    try { void h.reader?.cancel().catch(() => {}); } catch {}
+    try { h.transport.close({ closeCode: 0, reason: "P10 lab complete" }); } catch {}
+    void h.pump?.catch(() => {});
+  }
+})().catch((error) => {
+  window.__P10_ERROR__ = String(error?.stack ?? error);
+  for (const h of handles) {
+    h.closed = true;
+    clearInterval(h.pingTimer);
+    try { h.transport.close({ closeCode: 1, reason: "P10 fixture failed" }); } catch {}
+  }
+});
+</script>
+</body>
+</html>

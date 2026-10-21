@@ -191,6 +191,57 @@ jobs:
           cargo clippy --locked --manifest-path server/Cargo.toml --all-targets -- -D warnings
           cargo test --locked --manifest-path server/Cargo.toml
 
+      # P9 runs a separate 127.0.0.1:0 QUIC server with a throwaway test
+      # certificate. It never enables FX in the playable arena or main.rs.
+      - name: Validate P9 real loopback semantic FX WebTransport
+        run: |
+          node --check scripts/physics_fx_real_browser_flight.mjs
+          cargo check --locked --manifest-path server/Cargo.toml --example magic_fx_loopback
+          node scripts/physics_fx_real_browser_flight.mjs
+
+      # P10 requires 16 simultaneously established real QUIC sessions per
+      # browser against ONE shared zone/FX hub, but uses only loopback
+      # GP test markers, not real combat or 512-player production traffic.
+      - name: Validate P10 concurrent real WebTransport FX crowd
+        run: |
+          node --check scripts/physics_fx_crowd_browser_flight.mjs
+          cargo check --locked --manifest-path server/Cargo.toml --example magic_fx_crowd_loopback
+          node scripts/physics_fx_crowd_browser_flight.mjs
+
+      # P13 opt-in: P12 validates/dispatches both test GP and ME bytes on
+      # the SAME real QUIC connection. Gameplay always takes reserved slots.
+      # Unlike P10, P13 proves optional FX drops under synthetic congestion.
+      - name: Validate P13 real shared-connection gameplay-first FX dispatch
+        run: |
+          node --check scripts/physics_fx_crowd_browser_flight.mjs
+          cargo check --locked --manifest-path server/Cargo.toml --example magic_fx_crowd_loopback
+          P13_SHARED_DISPATCH=1 node scripts/physics_fx_crowd_browser_flight.mjs
+
+      # P15 tests the Core-owned fused generation-check + enqueue boundary
+      # against 16 actual browser QUIC sessions per engine; opt-in only.
+      - name: Validate P15 guarded Core writer on real shared WebTransport
+        run: |
+          node --check scripts/physics_fx_crowd_browser_flight.mjs
+          cargo check --locked --manifest-path server/Cargo.toml --example magic_fx_crowd_loopback
+          P13_SHARED_DISPATCH=1 P15_CORE_GUARD=1 node scripts/physics_fx_crowd_browser_flight.mjs
+
+      # P18 runs a SEPARATE 127.0.0.1 real QUIC fixture: server-authorized
+      # zone transfer on A, actual browser WebTransport closure, then new B
+      # handshake reusing the test-only connection ID with a fresh generation.
+      - name: Validate P18 real browser reconnect and zone-transfer FX fencing
+        run: |
+          node --check scripts/physics_fx_reconnect_browser_flight.mjs
+          cargo check --locked --manifest-path server/Cargo.toml --example magic_fx_reconnect_loopback
+          node scripts/physics_fx_reconnect_browser_flight.mjs
+
+      # P11 runs REAL /game authoritative ACK/snapshot/browser-frame
+      # acceptance while a separate 16-connection QUIC FX fixture loads
+      # the same CI host. Does not activate magic on gameplay sockets.
+      - name: Validate P11 real game input ACK under concurrent FX host load
+        run: |
+          node --check scripts/physics_fx_authoritative_overlap.mjs
+          node scripts/physics_fx_authoritative_overlap.mjs
+
       - name: Validate M188 repeated real heavy counterplay windows
         run: |
           # Three fresh Chrome/Firefox sessions for each real defensive read.
