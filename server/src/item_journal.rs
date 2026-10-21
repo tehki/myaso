@@ -13,7 +13,10 @@ use crate::{
     },
 };
 use std::{
-    collections::BTreeMap,
+    collections::{
+        BTreeMap,
+        Bound::{Excluded, Unbounded},
+    },
     fs::{self, File, OpenOptions},
     io::{self, Read, Write},
     path::{Path, PathBuf},
@@ -307,6 +310,26 @@ impl Drop for PendingFile {
     }
 }
 
+/// A committed, historical V2 pickup event reconstructed from its canonical
+/// fsynced MYTX record. NOT proof of current equipment or a delivered ACK.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct ProposedBoundPickupObserverEvent {
+    pub journal_sequence: u64,
+    pub transaction: OwnershipTxnId,
+    pub operation: OwnershipOp,
+    pub envelope: ProposedRackPickupEnvelope,
+}
+
+/// A bounded, immutable local source view. Consumers must separately
+/// authenticate, deduplicate, and deliver using one global authority epoch.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ProposedBoundPickupObserverPage {
+    pub journal_head: u64,
+    pub events: Vec<ProposedBoundPickupObserverEvent>,
+}
+
+pub const MAX_BOUND_PICKUP_OBSERVER_PAGE: usize = 64;
+
 /// Fail-closed on any malformed canonical record or sequence gap. Dot-prefixed
 /// interrupted staging files are not authoritative. No networking or gameplay
 /// subsystem invokes this journal until durable multi-worker storage exists.
@@ -318,6 +341,7 @@ pub struct DurableItemJournal {
     ledger: ItemOwnershipLedger,
     /// Stored inside the same canonical MYTX record as the item mutation.
     bound_pickups: BTreeMap<OwnershipTxnId, ProposedRackPickupEnvelope>,
+    bound_pickup_events: BTreeMap<u64, ProposedBoundPickupObserverEvent>,
     poisoned: bool,
 }
 
@@ -368,6 +392,7 @@ impl DurableItemJournal {
         indexed.sort_unstable_by_key(|(sequence, _)| *sequence);
         let mut ledger = ItemOwnershipLedger::default();
         let mut bound_pickups = BTreeMap::new();
+        let mut bound_pickup_events = BTreeMap::new();
         let mut previous = 0_u64;
         for (sequence, path) in indexed {
             if previous.checked_add(1) != Some(sequence) {
@@ -410,6 +435,15 @@ impl DurableItemJournal {
                 return Err(ItemJournalError::InvalidSequence);
             }
             if let Some(metadata) = record.bound_pickup {
+                bound_pickup_events.insert(
+                    sequence,
+                    ProposedBoundPickupObserverEvent {
+                        journal_sequence: sequence,
+                        transaction: record.transaction,
+                        operation: record.operations[0],
+                        envelope: metadata,
+                    },
+                );
                 bound_pickups.insert(record.transaction, metadata);
             }
             previous = sequence;
@@ -419,6 +453,7 @@ impl DurableItemJournal {
             root,
             ledger,
             bound_pickups,
+            bound_pickup_events,
             poisoned: false,
         })
     }
@@ -528,6 +563,35 @@ impl DurableItemJournal {
         self.ledger
             .committed_receipt(transaction, operations)
             .map_err(ItemJournalError::InvalidTransaction)
+    }
+
+    /// Read-only projection of historical V2 pickup events, sourced ONLY
+    /// from the same committed MYTX records as the physical item transfers.
+    /// This has no delivery cursor storage, authenticated wire or live outbox.
+    /// A missing newer event never means the sword is currently equipped.
+    pub fn proposed_bound_pickup_observer_page(
+        &self,
+        after_sequence: u64,
+        max_events: usize,
+    ) -> Result<ProposedBoundPickupObserverPage, ItemJournalError> {
+        if self.poisoned {
+            return Err(ItemJournalError::Poisoned);
+        }
+        if !(1..=MAX_BOUND_PICKUP_OBSERVER_PAGE).contains(&max_events) {
+            return Err(ItemJournalError::InvalidRecord(
+                "invalid observer page limit",
+            ));
+        }
+        let events = self
+            .bound_pickup_events
+            .range((Excluded(after_sequence), Unbounded))
+            .take(max_events)
+            .map(|(_, event)| *event)
+            .collect();
+        Ok(ProposedBoundPickupObserverPage {
+            journal_head: self.ledger.committed_sequence(),
+            events,
+        })
     }
 
     /// Commit the original proposed rack request metadata IN the canonical
@@ -658,6 +722,15 @@ impl DurableItemJournal {
             ItemJournalError::InvalidTransaction(err)
         })?;
         if let Some(envelope) = bound_pickup {
+            self.bound_pickup_events.insert(
+                receipt.sequence,
+                ProposedBoundPickupObserverEvent {
+                    journal_sequence: receipt.sequence,
+                    transaction,
+                    operation: operations[0],
+                    envelope,
+                },
+            );
             self.bound_pickups.insert(transaction, envelope);
         }
         Ok(receipt)
