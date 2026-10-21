@@ -15,7 +15,7 @@ use std::{
         atomic::{AtomicU64, Ordering},
         Arc, Barrier, Mutex,
     },
-    time::{SystemTime, UNIX_EPOCH},
+    time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
 
 struct IsolatedJournal(PathBuf);
@@ -37,7 +37,22 @@ impl IsolatedJournal {
     }
 
     fn open(&self) -> DurableItemJournal {
-        DurableItemJournal::open(&self.0).expect("one local authoritative writer")
+        // Test-only handoff: Rust's parallel subprocess acceptance exercises
+        // actual POSIX flock while fork/exec and descriptor teardown race.
+        // Give a *recently released* writer a bounded OS scheduling window.
+        // The real DurableItemJournal::open remains fail-fast and exclusive.
+        let deadline = Instant::now() + Duration::from_millis(500);
+        loop {
+            match DurableItemJournal::open(&self.0) {
+                Ok(writer) => return writer,
+                Err(ItemJournalError::WriterBusy) if Instant::now() < deadline => {
+                    std::thread::sleep(Duration::from_millis(5));
+                }
+                Err(error) => {
+                    panic!("one local authoritative writer must become available: {error:?}")
+                }
+            }
+        }
     }
 }
 impl Drop for IsolatedJournal {
@@ -89,6 +104,19 @@ fn four_server_authored_swords(journal: &mut DurableItemJournal) {
     for index in 0..4 {
         assert_eq!(journal.location(id(201 + index as u128)), Some(rack(index)));
     }
+}
+
+#[test]
+fn live_first_writer_still_denies_concurrent_second_handle_immediately() {
+    let root = IsolatedJournal::new();
+    let writer = root.open();
+    assert!(matches!(
+        DurableItemJournal::open(&root.0),
+        Err(ItemJournalError::WriterBusy)
+    ));
+    drop(writer);
+    let recovered = root.open();
+    assert_eq!(recovered.item_count(), 0);
 }
 
 #[test]
