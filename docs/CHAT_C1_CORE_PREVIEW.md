@@ -146,3 +146,19 @@ The DOM may contain no materialized img tags or executed event handler;
 player C outside proximity receives nothing. This is actual Chromium
 and Firefox behavior, not an injected fake chat callback. All content
 is rendered by the original UI textContent code, not innerHTML.
+
+### Four independent browser proximity chain (P0 local preview, not cross-host)
+
+The separate real browser acceptance lane now also runs four genuine
+independent browser WebTransport clients in the same disposable server
+process (Chrome / Firefox / Chrome / Chrome). On the Core C1 arena's
+unchanged deterministic 96-unit successive spawns and local radius 160,
+A reaches B but not C or D; C reaches B and D but not A.
+The test demands all four authenticated chat bridges become connected,
+A-to-D exclusion, C's **genuine server ACK**, B and D actual
+ChatReceived with server label Player #3, and A exclusion. Existing
+Unicode limits, HTML text rendering, native Enter/Escape and gameplay
+ACK/progress assertions remain active. This is an explicit four-browser
+**local C1 arena** acceptance, NOT four independently operated
+Greyhaven/Blacksmith clients across two hosts, a production room,
+a real weapon transfer, or live public chat.

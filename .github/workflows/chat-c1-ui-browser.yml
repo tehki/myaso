@@ -45,3 +45,7 @@ jobs:
         env:
           C1_BROWSER_MATRIX: chrome,firefox,chrome
         run: node scripts/chat_c1_three_browser_acceptance.mjs
+      - name: Four genuine players, mixed Chrome Firefox proximity chain
+        env:
+          C1_BROWSER_MATRIX: chrome,firefox,chrome,chrome
+        run: node scripts/chat_c1_three_browser_acceptance.mjs

@@ -12,8 +12,8 @@ const root=process.cwd(), delay=ms=>new Promise(r=>setTimeout(r,ms));
 const randomPort=()=>new Promise((resolve,reject)=>{const s=createServer();s.on("error",reject);s.listen(0,"127.0.0.1",()=>{const p=s.address().port;s.close(()=>resolve(p));});});
 const processes=[],sessions=[];
 const browserMatrix=(process.env.C1_BROWSER_MATRIX||"chrome,chrome,chrome").split(",").map(x=>x.trim().toLowerCase());
-if (browserMatrix.length !== 3 || browserMatrix.some(x=>!["chrome","firefox"].includes(x))) {
- throw Error("C1_BROWSER_MATRIX must contain exactly three chrome/firefox entries");
+if (![3,4].includes(browserMatrix.length) || browserMatrix.some(x=>!["chrome","firefox"].includes(x))) {
+ throw Error("C1_BROWSER_MATRIX must contain three or four chrome/firefox entries");
 }
 const sessionDriverPorts=new Map();
 const launch=(bin,args,extra={})=>{const p=spawn(bin,args,{...extra,env:{...process.env,...(extra.env||{})}});processes.push(p);return p;};
@@ -53,7 +53,7 @@ try {
   await poll(browser+" driver",async()=>{const r=await fetch("http://127.0.0.1:"+port+"/status").catch(()=>null);return {ok:!!r?.ok};},6500);
  }
  const url="http://127.0.0.1:"+httpPort+"/web/?server="+encodeURIComponent(ready.url)+"&cert="+encodeURIComponent(ready.cert.replaceAll(":",""))+"&chatC1Preview=1&netstats=1";
- for(let i=0;i<3;i++){
+ for(let i=0;i<browserMatrix.length;i++){
   const browser=browserMatrix[i];
   const capabilities=browser==="chrome"
    ? {browserName:"chrome","goog:chromeOptions":{args:["--headless=new","--no-sandbox","--disable-dev-shm-usage","--window-size=1100,780"]}}
@@ -65,7 +65,7 @@ try {
   const connected=await poll("player "+(i+1),()=>evaljs(session,"const x=document.querySelector('[data-local-chat]');return {ok:x?.dataset.connected==='true',status:x?.querySelector('.local-chat-status')?.textContent,event:document.querySelector('#event-text')?.textContent,connected:x?.dataset.connected};"),15000);
   console.log("PLAYER_READY",i+1,JSON.stringify(connected));
  }
- const [a,b,c]=sessions;
+ const [a,b,c,d]=sessions;
  async function send(session,message){
   await evaljs(session,"document.querySelector('#arena').focus();");
   await key(session,"\uE007");
@@ -84,12 +84,42 @@ try {
  await delay(700);
  const far=await evaljs(c,"return [...document.querySelectorAll('.local-chat-item .local-chat-text')].map(e=>e.textContent)");
  console.log("C_FAR",JSON.stringify(far));assert(!far.includes(first),"C outside authoritative radius");
+ if(d) {
+  const farD=await evaljs(d,
+    "return [...document.querySelectorAll('.local-chat-item .local-chat-text')].some(x=>x.textContent===arguments[0])",[first]);
+  assert.equal(farD,false,"fourth player outside A's authoritative proximity cannot see A");
+  console.log("FOURTH_PLAYER_A_DISTANCE_EXCLUSION",JSON.stringify({aToD:false}));
+ }
+
  const reply="Yes — beside the fountain.";
  await send(b,reply);
  const bAck=await poll("B real server ACK",()=>evaljs(b,"return {ok:[...document.querySelectorAll('li[data-delivery=accepted] .local-chat-text')].some(x=>x.textContent===arguments[0]),status:document.querySelector('.local-chat-status').textContent};",[reply]));
  console.log("B_ACK",JSON.stringify(bAck));
  const gotA=await poll("A receives B",()=>evaljs(a,"const x=[...document.querySelectorAll('.local-chat-item[data-channel=local]')].map(e=>({name:e.querySelector('.local-chat-sender')?.textContent,text:e.querySelector('.local-chat-text')?.textContent}));return {ok:x.some(m=>m.text===arguments[0]&&m.name==='Player #2'),messages:x};",[reply]));
  console.log("A_RECEIVED",JSON.stringify(gotA));
+ // A–B–C–D four independent browser flight: actual Rust spawn spacing
+ // is 96 units, with local radius 160. C is 192 from A (excluded) while
+ // B and D are each 96 from C (both valid server recipients).
+ if(d) {
+  const cross="C near B and D — A must not hear";
+  await send(c,cross);
+  const cAck=await poll("C server accepted four-player local message",()=>evaljs(c,
+   "return {ok:[...document.querySelectorAll('li[data-delivery=accepted] .local-chat-text')].some(x=>x.textContent===arguments[0])}",[cross]));
+  const bGot=await poll("B received C as server-issued player #3",()=>evaljs(b,
+   "const e=[...document.querySelectorAll('.local-chat-item[data-channel=local]')].find(e=>e.querySelector('.local-chat-text')?.textContent===arguments[0]);return {ok:!!e,name:e?.querySelector('.local-chat-sender')?.textContent}",[cross]));
+  const dGot=await poll("D received C as server-issued player #3",()=>evaljs(d,
+   "const e=[...document.querySelectorAll('.local-chat-item[data-channel=local]')].find(e=>e.querySelector('.local-chat-text')?.textContent===arguments[0]);return {ok:!!e,name:e?.querySelector('.local-chat-sender')?.textContent}",[cross]));
+  assert.equal(bGot.name,"Player #3");
+  assert.equal(dGot.name,"Player #3");
+  assert.equal(cAck.ok,true);
+  await delay(550);
+  const aGot=await evaljs(a,
+   "return [...document.querySelectorAll('.local-chat-item .local-chat-text')].some(x=>x.textContent===arguments[0])",[cross]);
+  assert.equal(aGot,false,"A beyond 160 cannot receive C's authenticated chat");
+  console.log("FOUR_PLAYER_AUTHENTIC_PROXIMITY_PASS",
+   JSON.stringify({fourSessions:sessions.length,cToB:true,cToD:true,cToA:false,serverAck:true}));
+ }
+
 
  // The untrusted message body must survive actual Rust chat routing but
  // remain inert browser text. Never parse messages as DOM or grant sender
@@ -175,7 +205,7 @@ try {
  console.log("GAMEPLAY_ACK_WITH_CHAT",JSON.stringify({samplesBefore:before.samples,samplesAfter:after.samples,
    serverTickBefore:before.serverTick,serverTickAfter:after.serverTick,
    p95:after.diagnostics.match(/Input→ACK p50[^|]*p95 ([^| ]+)/)?.[1]??"unknown"}));
- console.log("PASS real Rust server and three "+browserMatrix.join("/")+" WebTransport browser connections with pinned TLS: A↔B; C excluded; genuine ChatResult and continuing gameplay input ACKs");
+ console.log("PASS real Rust server and "+sessions.length+" "+browserMatrix.join("/")+" WebTransport browser connections with pinned TLS: A↔B; C excluded from A; genuine ChatResult and continuing gameplay input ACKs");
 }finally{
  for(const session of sessions){try{await wd("DELETE","/session/"+session)}catch{}}
  for(const p of processes){try{p.kill()}catch{}}
