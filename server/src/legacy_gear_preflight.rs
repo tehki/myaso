@@ -396,11 +396,7 @@ mod tests {
         // Other distinct canonical records remain accepted. An item whose
         // ID is already present in that complete inventory still cannot
         // be re-imported under a new legacy owner row.
-        let mut allowed = LegacyImportPreflight::new(
-            namespaces(),
-            [known_sword, other],
-        )
-        .unwrap();
+        let mut allowed = LegacyImportPreflight::new(namespaces(), [known_sword, other]).unwrap();
         assert_eq!(
             allowed.stage_owner(LegacyDomain::Item, 201),
             Err(LegacyMigrationError::CanonicalIdCollision)
