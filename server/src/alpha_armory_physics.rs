@@ -610,13 +610,7 @@ mod tests {
             ..window(&[])
         };
         assert_eq!(
-            verify_pickup_geometry(
-                largest_actor,
-                largest_sword,
-                &largest_window,
-                largest,
-                64.0,
-            ),
+            verify_pickup_geometry(largest_actor, largest_sword, &largest_window, largest, 64.0,),
             Ok(())
         );
     }
