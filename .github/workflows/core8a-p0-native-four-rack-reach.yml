@@ -1,0 +1,51 @@
+name: Core 8A P0 real native four-browser proposed sword-reach review
+
+on:
+  pull_request:
+    paths:
+      - "scripts/alpha_m1_four_real_browser_flight.mjs"
+      - "scripts/alpha_p0_rack_walk_math.mjs"
+      - "tests/alpha_p0_rack_walk_math.test.mjs"
+      - ".github/workflows/core8a-p0-native-four-rack-reach.yml"
+      - "src/world/alpha-armory.mjs"
+      - "server/src/**"
+
+permissions:
+  contents: read
+
+jobs:
+  native-four-player-proposed-reach:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check exact World socket and proposed collision-free reach geometry
+        run: |
+          node --check scripts/alpha_m1_four_real_browser_flight.mjs
+          node --check scripts/alpha_p0_rack_walk_math.mjs
+          node --test tests/alpha_p0_rack_walk_math.test.mjs
+          node scripts/verify-core8c-greyhaven-geometry.mjs
+          node scripts/verify-world-alpha-solid-artifact.mjs
+      - name: Require original native Chrome and Firefox WebDrivers
+        run: |
+          google-chrome --version
+          chromedriver --version
+          firefox --version
+          geckodriver --version
+      - name: Build real certificate-pinned QUIC authoritative server
+        run: cargo build --locked --manifest-path server/Cargo.toml --bin myaso-server
+      - name: Four real W3C browsers walk to authored stands then proposed 56-reach positions
+        env:
+          MYASO_ALPHA_NATIVE_GREYHAVEN: "1"
+          MYASO_ALPHA_NATIVE_RACK_WALK: "1"
+          MYASO_ALPHA_NATIVE_RACK_REACH: "1"
+        run: timeout --signal=TERM --kill-after=5s 180s node scripts/alpha_m1_four_real_browser_flight.mjs
+      - name: Preserve native original four-browser screenshot evidence
+        if: always()
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: core8a-p0-four-native-proposed-rack-reach
+          path: alpha-m1-four-browser-evidence/*.png
+          if-no-files-found: ignore
+          retention-days: 3

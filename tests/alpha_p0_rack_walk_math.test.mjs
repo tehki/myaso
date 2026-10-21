@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {WORLD_ALPHA_SWORD_RACK_SOCKETS,WORLD_ALPHA_SPAWN_COORDINATES,
   validateWorldAlphaArmoryLayout} from "../src/world/alpha-armory.mjs";
-import {nextNativeWalkPulse,nativeRackArrived} from "../scripts/alpha_p0_rack_walk_math.mjs";
+import {nextNativeWalkPulse,nativeRackArrived,proposedNativeRackReachPoint,nativeRackWithinProposedReach} from "../scripts/alpha_p0_rack_walk_math.mjs";
 import {WORLD_ALPHA_GREYHAVEN_STATIC_SOLIDS} from "../src/world/alpha-solid-geometry.mjs";
 
 test("four canonical World socket approaches are fixed, distinct and legitimate",()=>{
@@ -77,4 +77,35 @@ test("west-first southern courtyard legs avoid EVERY real server-reviewed static
  // attempted too close to the building. This is a risky path, not permission
  // to disable server collision or fake arrival.
  assert.equal(hit({x:4110,y:4020},{x:3820,y:4020},smith),true);
+});
+
+test("proposed World #639 near-sword target has margin within offline Items 56 reach",()=>{
+  for(const slot of WORLD_ALPHA_SWORD_RACK_SOCKETS){
+    const point=proposedNativeRackReachPoint(slot);
+    assert.deepEqual(point,{x:slot.x,y:slot.y+30});
+    assert(Object.isFrozen(point));
+    assert.equal(nativeRackArrived(point,point),true);
+    assert.equal(nativeRackWithinProposedReach(point,slot),true);
+    // All possible 18-unit arrival errors around the proposed target
+    // remain within 48 < 56 in the same authored coordinate frame.
+    for(const theta of [0,Math.PI/4,Math.PI/2,Math.PI,1.5*Math.PI]){
+      const observed={x:point.x+18*Math.cos(theta),y:point.y+18*Math.sin(theta)};
+      assert.equal(nativeRackArrived(observed,point),true);
+      assert.equal(nativeRackWithinProposedReach(observed,slot),true);
+    }
+    // A successful 18-unit ORIGINAL approach acceptance is NOT necessarily
+    // within reach: 4088+12 = 4100, sword y=4038 => 62 > 56.
+    assert.equal(nativeRackArrived({x:slot.x,y:4100},slot.approach),true);
+    assert.equal(nativeRackWithinProposedReach({x:slot.x,y:4100},slot),false);
+  }
+});
+test("proposed reach is offline-only, bounded, exact-socket and fail closed",()=>{
+  const slot=WORLD_ALPHA_SWORD_RACK_SOCKETS[0];
+  for(const invalid of [null,undefined,{x:NaN,y:4068},{x:3740,y:Infinity}])
+    assert.equal(nativeRackWithinProposedReach(invalid,slot),false);
+  assert.equal(nativeRackWithinProposedReach({x:slot.x,y:slot.y},slot,10000),false);
+  assert.equal(nativeRackWithinProposedReach({x:slot.x,y:slot.y},null),false);
+  assert.equal(nativeRackWithinProposedReach({x:slot.x,y:slot.y+57},slot),false);
+  assert.throws(()=>proposedNativeRackReachPoint({...slot,approach:{x:slot.x,y:0}}));
+  assert.throws(()=>proposedNativeRackReachPoint({x:NaN,y:4038}));
 });
