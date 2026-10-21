@@ -281,6 +281,43 @@ collision authority, client controllers, browser assertions or the
 production listener. No equipped sword, physical click, LOS-complete
 world, separate-host browser or persistent user identity is claimed.
 
+## Core 8C — four real QUIC players observe server death and respawn
+
+The test `four_real_quic_players_observe_kill_and_immutable_greyhaven_respawn`
+is the next scoped server-authority proof after the unarmed positive and
+negative range controls in Core #556/#561. Four real, independently pinned
+loopback WebTransport connections join one actual disposable Rust server.
+They receive server-issued distinct Greyhaven baseline spawns and activate
+their original authenticated input/replication streams.
+
+Fighter #1 approaches #2 ONLY through ordinary client movement INPUT packets.
+Three independent button edges then trigger three genuine committed heavy
+**unarmed** attacks using the current heavy-input wire bit, not any direct
+Rust World method, test teleport, damage RPC or item/weapon override. The
+existing server calculates 46HP per heavy hit, reducing target #2 from
+**100HP to 54HP to 8HP and finally to 0HP**. The test waits for each
+first/second hit to be observed with an actual heavy Combat action and
+requires at least **40 more authoritative server ticks** before the next
+attack, preserving recovery/commitment and avoiding auto-repeat.
+
+The third hit is observed concurrently by **all four original QUIC peers**.
+Each must receive a server-authored **0HP / Dead (wire action 8)** update
+for #2 and explicitly ACK that snapshot sequence through its OWN ordinary
+input packet; this is necessary because returning to Idle/100HP is identical
+to the initial acknowledged baseline and may otherwise be omitted by delta
+compression. Each independent stream must later observe **100HP / Idle**
+and precise original spawn **(4206,4160)** for the same net ID #2, with
+a minimum bounded gap of 60 authoritative server ticks from its observed
+death to observed respawn. All four original player sessions must remain
+alive and receive newly addressed INPUT_ACK packets after the respawn.
+
+This is a real multiplayer network proof of one server kill + timer-owned
+respawn within a single running process, **not** an equipped sword kill,
+persistent account/gear recovery, inventory drop, client UI controls,
+a browser-native two-host flight, complete map/LOS/epoch fencing, or recovery
+from server crash. It neither changes Combat nor bypasses the default-OFF,
+explicit loopback-only reviewed-static staging security boundary.
+
 ## Nonclaims and release HOLD
 
 This is **not** full geometry authority. World #509's 23 static AABBs omit
