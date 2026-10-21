@@ -4,6 +4,7 @@ import {COMBAT_ACTION} from "../src/browser/combat-readability.mjs";
 // Accepts only actual WebDriver drawImage observations; never substitutes
 // simulated actor state or owner concept art for multiplayer evidence.
 const KICK_WINDUP=COMBAT_ACTION.kickWindup;
+const KICK_ACTIVE=COMBAT_ACTION.kickActive;
 const KICK_RECOVERY=COMBAT_ACTION.kickRecovery;
 const MAX_FRAME=7;
 const phaseOf=frame => frame<=2?"windup":frame<=4?"active":"recovery";
@@ -11,19 +12,22 @@ const phaseOf=frame => frame<=2?"windup":frame<=4?"active":"recovery";
 function demand(ok,detail){
  if(!ok) throw new Error("Graphics3A Spartan real-server flight: "+detail);
 }
-function hasOrderedAction(actions,phase){
- return Array.isArray(actions)&&actions.some(a=>a?.action===phase
-  &&Number.isFinite(a?.epochMs));
+function hasOrderedKickPhases(actions){
+ if(!Array.isArray(actions)) return false;
+ const indices=[KICK_WINDUP,KICK_ACTIVE,KICK_RECOVERY].map((phase)=>
+   actions.findIndex(a=>a?.action===phase && Number.isFinite(a?.epochMs)));
+ if(indices.some(i=>i<0)||!(indices[0]<indices[1]&&indices[1]<indices[2]))
+   return false;
+ const times=indices.map(i=>actions[i].epochMs);
+ return times[0]<times[1]&&times[1]<times[2];
 }
 export function summarizeSpartanConnectedKickFlight({attackerTransitions,
  defenderTransitions,clients}){
  demand(Array.isArray(clients)&&clients.length===2,"requires two separate browser reports");
- demand(hasOrderedAction(attackerTransitions,KICK_WINDUP)
-     &&hasOrderedAction(attackerTransitions,KICK_RECOVERY),
-   "attacker must receive authoritative windup and recovery");
- demand(hasOrderedAction(defenderTransitions,KICK_WINDUP)
-     &&hasOrderedAction(defenderTransitions,KICK_RECOVERY),
-   "defender must receive attacker windup and recovery from network");
+ demand(hasOrderedKickPhases(attackerTransitions),
+   "attacker must receive authoritative ordered windup, active, recovery");
+ demand(hasOrderedKickPhases(defenderTransitions),
+   "defender must receive attacker ordered windup, active, recovery from network");
  const out=[];
  for(const c of clients){
    demand(c && typeof c.engine==="string" && c.engine.length>0,"browser identity required");

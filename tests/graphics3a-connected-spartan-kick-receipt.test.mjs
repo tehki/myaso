@@ -5,7 +5,7 @@ import {readFileSync} from "node:fs";
 
 const transitions=[
  {action:2,epochMs:1000}, {action:12,epochMs:1150},
- {action:14,epochMs:1300},{action:0,epochMs:1540}
+ {action:13,epochMs:1230},{action:14,epochMs:1300},{action:0,epochMs:1540}
 ];
 const base=()=>({
  attackerTransitions:structuredClone(transitions),
@@ -48,8 +48,16 @@ test("real-flight phase evidence rejects stale and forged clip frames",()=>{
  error("out-of-range kick",data=>{data.clients[0].draws[0].frame=8;});
  error("out-of-range direction",data=>{data.clients[0].draws[0].direction=-1;});
  error("browser paint timestamp",data=>{data.clients[0].draws[0].epochMs=NaN;});
- error("defender must receive attacker windup",data=>{data.defenderTransitions=[];});
- error("attacker must receive authoritative windup",data=>{data.attackerTransitions=[];});
+ error("defender must receive attacker ordered",data=>{data.defenderTransitions=[];});
+ error("attacker must receive authoritative ordered",data=>{data.attackerTransitions=[];});
+ error("attacker must receive authoritative ordered",data=>{
+   data.attackerTransitions=[data.attackerTransitions[0],
+     data.attackerTransitions[2],data.attackerTransitions[1],
+     data.attackerTransitions[3],data.attackerTransitions[4]];
+ });
+ error("defender must receive attacker ordered",data=>{
+   data.defenderTransitions=data.defenderTransitions.filter(x=>x.action!==13);
+ });
 });
 test("opt-in flight never silently affects normal M133 PvP browser acceptance",()=>{
  const txt=readFileSync(new URL("../scripts/pvp_browser_flight_runner.mjs",import.meta.url),"utf8");
