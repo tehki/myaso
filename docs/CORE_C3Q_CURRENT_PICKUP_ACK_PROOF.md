@@ -25,8 +25,28 @@ primitives: `DurableItemJournal::verified_receipt`,
 
 `server/src/alpha_pickup_ack_proof.rs` exports:
 
+`historical_committed_rack_pickup(journal, request_id, item_id,
+from_ground, owner) -> Result<HistoricalPickupProof, PickupProofError>`
+
 `current_committed_rack_pickup(journal, request_id, item_id,
 from_ground, owner) -> Result<CommittedPickupView, PickupProofError>`
+
+The first function verifies an **immutable exact historical outcome**,
+regardless of whether that sword moved afterward. A client losing an
+ACK may need to reconcile that original successful operation after a
+reconnect, without reminting the sword or suggesting it is still in hand.
+The `HistoricalPickupProof` has private fields, provides the request,
+item, **owner-at-commit** and durable journal sequence, and can be
+checked against the latest item-specific watermark using
+`still_current(&journal)` / `current_view(&journal)`.
+**Historical success must NOT be interpreted as currently equipped,
+nor as permission to perform another pickup.**
+
+The second function delegates to the first to prove the exact
+historical request, and only returns a current equipment projection
+when the operation still represents the latest item mutation and its
+current equipped location. The two concepts must be separate in
+future 8A ACK/reconnect and 8C observer APIs.
 
 A positive view is possible only if:
 
@@ -71,13 +91,18 @@ simultaneous independent live owners of the same sword.
 
 `cargo test --locked --manifest-path server/Cargo.toml --lib alpha_pickup_ack_proof`
 
-Five focused cases (plus one separately invoked ignored subprocess helper):
+Six focused cases (plus one separately invoked ignored subprocess helper):
 - Missing committed receipt and non-ground source never produce ACK.
 - Accepted exact `Ground → MainHand` yields request/item/owner/
   location/commit-sequence only while latest; same view after journal
   reopen, unaffected by unrelated sword transactions.
 - Competing pickup loser, forged owner, conflicting operation ID
   or mismatched item cannot create a positive view.
+- An exact pickup from a prior player remains a **historically
+  committed** receipt after the sword drops and another player equips
+  the same ID. It cannot form a *currently equipped* proof even
+  after restart; the original request/owner/item/sequence remain
+  immutable and forged owner/item retries are rejected.
 - Committed old pickup → drop → pickup back to the *same exact*
   owner/hand proves **ABA-safe watermark rejection**, including
   after closing and reopening the journal. The fresh receipt
@@ -91,12 +116,18 @@ Five focused cases (plus one separately invoked ignored subprocess helper):
   The helper uses an intentionally ignored test invoked by its parent
   through a separate OS process on Unix; it is not a mocked exception.
 
-On the exact updated source head `2caf3c2820a402ea02986a1a0157b3326f2e7586`,
-Serj Linux Rust 1.89: focused **5/5 PASS**, full server library
-**109 PASS / 0 FAIL / 3 ignored subprocess helpers** (the new helper
-is invoked by its Unix crash parent test), `cargo fmt --check` PASS,
+On exact updated source head `2fb9e0f258be85460d3b4fba64c3a608799187ea`,
+Serj Linux Rust 1.89: **6/6 focused PASS**, full server library
+**110 PASS / 0 FAIL / 3 ignored subprocess helpers** (the new Unix
+child helper is invoked by its parent), `cargo fmt --check` PASS
 and strict `cargo clippy --lib -- -D warnings` PASS. The previous
-code head `e9c61c6` also passed its earlier 4 focused and 108 full lib tests.
+head `60293bf4` passed its initial five focused and 109 full lib
+tests, but full protected quality
+[#39586191002](https://github.com/tehki/myaso/actions/runs/39586191002)
+**FAILED protected M194 browser guard-break** (trace showed an
+authoritative parry during a block-only exchange, outside this module).
+No Combat tests were weakened. The next exact-head full protected
+quality is still a **separate mandatory gate**.
 
 **These are isolated Rust proofs**. They do not establish live
 physical rack clicking, true browser-player authentication, real
