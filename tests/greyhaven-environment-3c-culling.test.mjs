@@ -4,13 +4,13 @@ import {MAP_IDS} from "../src/world/authored-maps.mjs";
 import {createAuthoredWorldRenderer,WORLD_TILE_SIZE,WORLD_CACHE_CAP}
   from "../src/browser/authored-world-renderer.mjs";
 
-function operationsAt(camera,width=600,height=420) {
-  const calls={arcs:0,rects:0,ellipses:0,tiles:0,strokes:0,outerWallStrokes:0};
+function operationsAt(camera) {
+  const calls={arcs:0,rects:0,ellipses:0,tiles:0,strokes:0};
   const tileCtx={
     save(){},restore(){},translate(){},
     fillRect(){},strokeRect(){calls.rects++;},beginPath(){},
     moveTo(){},lineTo(){},arc(){calls.arcs++;},ellipse(){calls.ellipses++;},
-    fill(){},stroke(){calls.strokes++;if(this.strokeStyle==="#494e46")calls.outerWallStrokes++;},fillText(){}
+    fill(){},stroke(){calls.strokes++;},fillText(){}
   };
   const screen={fillRect(){},drawImage(){calls.tiles++;}};
   let canvasCount=0;
@@ -18,7 +18,7 @@ function operationsAt(camera,width=600,height=420) {
     cacheCap:WORLD_CACHE_CAP,buildLimit:8,
     makeCanvas:()=>{canvasCount++;return {width:0,height:0,getContext:()=>tileCtx};}
   });
-  renderer.draw(screen,MAP_IDS.overworld,camera,width,height,1);
+  renderer.draw(screen,MAP_IDS.overworld,camera,600,420,1);
   return {...calls,canvasCount,cached:renderer.stats.cached,created:renderer.stats.created,
     penCap:tileCtx.lineCap,penJoin:tileCtx.lineJoin};
 }
@@ -48,14 +48,4 @@ test("P2.5 culls remote river geometry while retaining Canvas stroke semantics",
   assert.ok(near.strokes>0,"authored river near camera still renders");
   assert.equal(far.penCap,"round");
   assert.equal(far.penJoin,"round");
-});
-
-test("P2.7 skips every invisible Greyhaven wall span inside central chunks",()=>{
-  const center=operationsAt({x:4300,y:3770},120,120);
-  const north=operationsAt({x:3820,y:3500},120,120);
-  assert.equal(center.outerWallStrokes,0,"city interior must not trace distant wall lines");
-  assert.ok(north.outerWallStrokes>0,"visible north authored wall remains painted");
-  assert.equal(center.penCap,"round");
-  assert.equal(center.penJoin,"round");
-  assert.ok(center.created<=8 && north.created<=8);
 });

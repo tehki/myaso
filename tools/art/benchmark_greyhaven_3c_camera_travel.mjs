@@ -22,8 +22,7 @@ const routes=[
   {id:"greyhaven-tile-hops",count:72,kind:"jump",zoom:1.0},
 ];
 const result={
-  chrome:await browser.version(),baselineHead:process.env.GREYHAVEN_BASELINE_SHA||"unspecified",
-  candidateHead:process.env.GREYHAVEN_CANDIDATE_SHA||"working-tree-uncommitted",
+  chrome:await browser.version(),baselineHead:"ff74af212d606f4fb8aa11336cc5633dd54fe181",
   viewport:{width:960,height:600,dpr:1},
   device:{platform:platform(),release:release(),arch:arch(),cpu:cpus()[0]?.model??"unknown",browserGpuDisabled:true},
   method:"Offline Canvas world.draw only; 72 sequential camera positions per route, forward then reverse (144 draw calls); includes synthetic city tile hops for worst-case cache churn; 3 fresh renderer runs per version in alternating order; NOT full game frame time",

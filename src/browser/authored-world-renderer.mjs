@@ -85,14 +85,10 @@ function paintBuilding(ctx,b) {
   }
 }
 
-function paintCityWalls(ctx,city,tileBounds) {
+function paintCityWalls(ctx,city) {
   const {x,y,w,h}=city;
   const verticalGapY=4180, horizontalGateX=4130;
-  // Graphics 3C P2.7: cull per authored wall segment, including rounded
-  // 37-unit stroke ends, without changing placement or gate dimensions.
   const wall=(ax,ay,bx,by)=>{
-    if(!visibleBounds(tileBounds,Math.min(ax,bx),Math.min(ay,by),
-      Math.abs(bx-ax),Math.abs(by-ay),22))return;
     strokePolyline(ctx,[[ax,ay],[bx,by]],37,"#494e46");
     strokePolyline(ctx,[[ax,ay],[bx,by]],26,"#aaa693");
     strokePolyline(ctx,[[ax,ay],[bx,by]],4,"#d5c7a7");
@@ -102,14 +98,9 @@ function paintCityWalls(ctx,city,tileBounds) {
   wall(x+w,y,x+w,verticalGapY-68);wall(x+w,verticalGapY+68,x+w,y+h);
   wall(x,y+h,horizontalGateX-73,y+h);wall(horizontalGateX+73,y+h,x+w,y+h);
   for(const [tx,ty] of [[x,y],[x+w,y],[x,y+h],[x+w,y+h]]){
-    if(!visibleBounds(tileBounds,tx-34,ty-34,68,68,3))continue;
     ctx.fillStyle="#77766b";ctx.fillRect(tx-34,ty-34,68,68);
     ctx.strokeStyle="#d5c7a7";ctx.lineWidth=5;ctx.strokeRect(tx-30,ty-30,60,60);
   }
-  // Original painter always finished in this pen state. Preserve it when
-  // all wall strokes and towers fall outside the cached tile; downstream
-  // buildings use this Canvas context and must not inherit stale styles.
-  ctx.strokeStyle="#d5c7a7";ctx.lineWidth=5;
   ctx.font="bold 30px Georgia,serif";ctx.fillStyle="rgba(233,222,184,.58)";
   ctx.textAlign="center";ctx.fillText(city.name,x+w/2,y+120);
 }
@@ -167,7 +158,7 @@ function paintOverworld(ctx,map,tileBounds) {
       if(visibleBounds(tileBounds,x,y,0,0,40))paintTree(ctx,x,y);
     }
   if(visibleBounds(tileBounds,map.city.x,map.city.y,map.city.w,map.city.h,100))
-    paintCityWalls(ctx,map.city,tileBounds);
+    paintCityWalls(ctx,map.city);
   for(const b of map.buildings)
     if(visibleBounds(tileBounds,b.x,b.y,b.w,b.h,45))paintBuilding(ctx,b);
   paintGreyhavenLightingFixtures(ctx,map,tileBounds);
