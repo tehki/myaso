@@ -171,9 +171,45 @@ def test_direct_registry_writes_denied():
     print("PASS: unprivileged role cannot forge/read/delete global ID reservations")
 
 
+def seed_historical_conflict():
+    """Fixture for a SECOND disposable database where old receipt IDs collide."""
+    loc_a, loc_b = c3i.init_pair(7101, 9101, 9102)
+    c3g.register(7102)
+    check(c3g.mutation(88001, 88101, 7102, 9103, 1, 0, None,
+                       c3g.inv(7102)).startswith("1|1|"),
+          "historical single-item ID committed")
+    check(c3i.swap(88001, 88201, 7101, 9101, 1, loc_a, 9102, 1, loc_b)
+          .startswith("3|2|2|"), "historical swap reused same ID before migration")
+    check(family_count(88001) == ("1", "1"),
+          "pre-migration cross-family collision fixture exists")
+    print("PASS: historical collision fixture committed in second disposable database")
+
+
+def verify_failed_upgrade_rolled_back():
+    # The preceding SQL migration must have exited NONZERO. BEGIN/DO exception
+    # must restore BOTH old receipt families and eliminate all DDL/backfill.
+    check(c3g.sql("SELECT to_regclass('core_zone.item_operation_ids') IS NULL;") == "t",
+          "atomic migration rollback must not leave a partial global registry")
+    check(family_count(88001) == ("1", "1"),
+          "failed migration must not rewrite/delete either historical receipt")
+    check(c3g.world_revision(7101) == "3" and c3g.world_revision(7102) == "1",
+          "failed migration must preserve both committed world histories")
+    check(c3g.item_state(9103) == "1|" + c3g.inv(7102),
+          "failed migration must preserve item ownership")
+    print("PASS: conflicting historical IDs abort entire SQL upgrade without data loss")
+
+
 def main():
     check(os.environ.get("MYASO_C3J_TEST_ONLY") == "1", "C3j disposable test-only gate required")
-    check(os.environ.get("PGDATABASE") == "myaso_c3j_test", "use only disposable C3j database")
+    db = os.environ.get("PGDATABASE")
+    if len(sys.argv) == 2 and sys.argv[1] in ("--seed-conflict", "--verify-failed-upgrade"):
+        check(db == "myaso_c3j_conflict_test", "conflict test requires isolated disposable DB")
+        if sys.argv[1] == "--seed-conflict":
+            seed_historical_conflict()
+        else:
+            verify_failed_upgrade_rolled_back()
+        return
+    check(db == "myaso_c3j_test", "use only disposable C3j database")
     if len(sys.argv) == 2 and sys.argv[1] == "--seed":
         pre_migration_seed()
         return
