@@ -1,0 +1,79 @@
+name: Core C3m immutable corpse-grant history PostgreSQL acceptance
+
+on:
+  pull_request:
+    paths:
+      - "server/sql/008_immutable_corpse_grant_history.sql"
+      - "scripts/verify_immutable_corpse_grants_pg.py"
+      - ".github/workflows/core-c3m-grant-history.yml"
+  push:
+    branches: [main]
+    paths:
+      - "server/sql/008_immutable_corpse_grant_history.sql"
+      - "scripts/verify_immutable_corpse_grants_pg.py"
+      - ".github/workflows/core-c3m-grant-history.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  immutable-grants:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: myaso_c3m_test
+          POSTGRES_PASSWORD: ephemeral-test-only
+          POSTGRES_DB: myaso_c3m_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U myaso_c3m_test -d myaso_c3m_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    env:
+      PGHOST: 127.0.0.1
+      PGPORT: "5432"
+      PGUSER: myaso_c3m_test
+      PGPASSWORD: ephemeral-test-only
+      PGDATABASE: myaso_c3m_test
+      MYASO_C3L_TEST_ONLY: "1"
+      MYASO_C3M_TEST_ONLY: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: PostgreSQL client
+        run: |
+          if ! command -v psql >/dev/null 2>&1; then
+            sudo apt-get update -qq
+            sudo apt-get install -y postgresql-client
+          fi
+          psql --version
+      - name: Validate transaction harness Python syntax
+        run: |
+          python -m py_compile scripts/verify_atomic_item_world_pg.py
+          python -m py_compile scripts/verify_two_item_corpse_loot_pg.py
+          python -m py_compile scripts/verify_scoped_corpse_loot_grants_pg.py
+          python -m py_compile scripts/verify_immutable_corpse_grants_pg.py
+      - name: Install all C4c through C3m PostgreSQL migrations
+        run: |
+          for migration in \
+            server/sql/001_zone_authority_postgres.sql \
+            server/sql/002_fenced_world_mutations.sql \
+            server/sql/003_atomic_item_world_mutations.sql \
+            server/sql/004_atomic_equipment_swaps.sql \
+            server/sql/005_global_item_operation_ids.sql \
+            server/sql/006_two_item_corpse_loot.sql \
+            server/sql/007_scoped_corpse_loot_grants.sql \
+            server/sql/008_immutable_corpse_grant_history.sql; do
+            psql -X -v ON_ERROR_STOP=1 -f "$migration"
+          done
+      - name: Preserve all existing scoped grant acceptance
+        run: python scripts/verify_scoped_corpse_loot_grants_pg.py
+      - name: Prove permanent grant history immutable scope and consumed ID
+        run: python scripts/verify_immutable_corpse_grants_pg.py
