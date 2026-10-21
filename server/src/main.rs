@@ -8,8 +8,8 @@ use myaso_server::{
     reliable::{try_enqueue_reliable, ReliableQueueError},
     simulation::{CombatEvent, InputIntent, World},
     snapshot::{ReplicationFrame, SnapshotSession},
-    AcceptedInputBatch, AdmissionGate, InputIngressWindow, InputSample, CONSERVATIVE_DATAGRAM_BYTES, PROTOCOL_VERSION,
-    TARGET_PLAYERS_PER_MAP,
+    AcceptedInputBatch, AdmissionGate, InputIngressWindow, InputSample,
+    CONSERVATIVE_DATAGRAM_BYTES, PROTOCOL_VERSION, TARGET_PLAYERS_PER_MAP,
 };
 use std::{
     collections::{BTreeMap, VecDeque},
