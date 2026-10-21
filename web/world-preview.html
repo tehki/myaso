@@ -1,0 +1,83 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>myaso.io — Moonvale Village & Buildings Preview</title>
+<style>
+:root{color-scheme:dark}*{box-sizing:border-box}
+body{background:#121610;color:#e9e1ce;font:15px system-ui,sans-serif;margin:0}
+header{display:flex;justify-content:space-between;gap:18px;align-items:center;padding:15px 22px;background:#23281e;border-bottom:1px solid #46513a}
+h1{margin:0;font:600 23px Georgia,serif}.sub{color:#b0b99c;font-size:12px;margin-top:5px}
+.shell{max-width:1190px;margin:18px auto;padding:0 20px}
+canvas{display:block;width:100%;aspect-ratio:16/10;background:#627751;border:1px solid #5d694b;border-radius:10px;box-shadow:0 10px 45px #0009}
+.hud{display:flex;justify-content:space-between;gap:15px;flex-wrap:wrap;margin:11px 0;color:#c6c9b1}
+kbd{border-radius:4px;border:1px solid #677354;background:#303a2d;color:#fff2d2;padding:2px 6px}
+#door{color:#e8c777;font-weight:700}
+.notice{font-size:12px;color:#a1aa91;line-height:1.5}
+</style></head><body>
+<header><div><h1>⚔️ Moonvale — World & Buildings v1.0</h1>
+<div class="sub">A fixed medieval world, with a separate, deliberately larger tavern interior</div></div>
+<div>🌕⚡️🚀</div></header>
+<div class="shell"><canvas id="arena" width="1100" height="688"></canvas>
+<div class="hud"><span><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> move · <kbd>E</kbd> enter/exit · mouse wheel zoom · <kbd>R</kbd> reset</span>
+<span id="place">Moonvale</span><span id="door"></span></div>
+<div class="notice">LOCAL DESIGN PREVIEW only: door transitions are simulated here to demonstrate map links.
+Authoritative multiplayer transfers and building collisions are not enabled on the live server.
+The geography, town names, buildings and roads are fixed and identical for all players.</div>
+</div>
+<script type="module">
+import { MAP_IDS, getAuthoredMap, nearbyAuthoredPortal, previewPortalDestination } from "../src/world/authored-maps.mjs";
+import { createAuthoredWorldRenderer } from "../src/browser/authored-world-renderer.mjs";
+const canvas=document.querySelector("#arena");
+const ctx=canvas.getContext("2d");
+const world=createAuthoredWorldRenderer();
+const keys=new Set();
+const interiorQA = new URLSearchParams(location.search).get("room") === "tavern";
+let mapId=interiorQA ? MAP_IDS.tavern : MAP_IDS.overworld;
+let player=interiorQA ? {x:390,y:480} : {x:4365,y:4150};
+let zoom=interiorQA ? 1 : .86;
+let last=performance.now(), cooldown=0;
+const place=document.querySelector("#place"),door=document.querySelector("#door");
+const reset=()=>{mapId=MAP_IDS.overworld;player={x:4365,y:4150};zoom=.86;world.clear();};
+document.addEventListener("keydown",e=>{
+  if(["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Space"].includes(e.code))e.preventDefault();
+  keys.add(e.code);
+  if(e.code==="KeyR")reset();
+  if(e.code==="KeyE"&&!e.repeat&&performance.now()>cooldown){
+    const portal=nearbyAuthoredPortal(mapId,player.x,player.y,16);
+    const target=portal&&previewPortalDestination(mapId,portal.id);
+    if(target){mapId=target.mapId;player={x:target.x,y:target.y};cooldown=performance.now()+550;zoom=mapId===MAP_IDS.tavern?1:.86;}
+  }
+});
+document.addEventListener("keyup",e=>keys.delete(e.code));
+canvas.addEventListener("wheel",e=>{e.preventDefault();zoom=Math.max(.64,Math.min(1.4,zoom+(e.deltaY<0?.055:-.055)));},{passive:false});
+function drawKnight(x,y,fac){
+  ctx.save();ctx.translate(x,y);ctx.rotate(fac);
+  ctx.fillStyle="rgba(19,23,20,.28)";ctx.beginPath();ctx.ellipse(5,12,23,8,0,0,2*Math.PI);ctx.fill();
+  ctx.fillStyle="#aeb6ae";ctx.strokeStyle="#363a3c";ctx.lineWidth=3;
+  ctx.beginPath();ctx.arc(0,0,18,0,2*Math.PI);ctx.fill();ctx.stroke();
+  ctx.fillStyle="#a93f37";ctx.beginPath();ctx.ellipse(-15,-8,12,15,-.3,0,2*Math.PI);ctx.fill();
+  ctx.strokeStyle="#e0c49f";ctx.lineWidth=2;ctx.stroke();
+  ctx.fillStyle="#d4cba5";ctx.fillRect(15,-3,34,5);
+  ctx.fillStyle="#272e30";ctx.fillRect(4,-9,4,4);
+  ctx.restore();
+}
+function tick(now){
+  const dt=Math.min(.05,(now-last)/1000);last=now;
+  const mx=Number(keys.has("KeyD")||keys.has("ArrowRight"))-Number(keys.has("KeyA")||keys.has("ArrowLeft"));
+  const my=Number(keys.has("KeyS")||keys.has("ArrowDown"))-Number(keys.has("KeyW")||keys.has("ArrowUp"));
+  const mag=Math.hypot(mx,my)||1, speed=230;
+  const map=getAuthoredMap(mapId);
+  player.x=Math.max(45,Math.min(map.width-45,player.x+mx/mag*speed*dt));
+  player.y=Math.max(45,Math.min(map.height-45,player.y+my/mag*speed*dt));
+  const camera=player;
+  ctx.setTransform(1,0,0,1,0,0);ctx.clearRect(0,0,canvas.width,canvas.height);
+  ctx.save();ctx.translate(canvas.width/2,canvas.height/2);ctx.scale(zoom,zoom);ctx.translate(-canvas.width/2,-canvas.height/2);
+  world.draw(ctx,mapId,camera,canvas.width,canvas.height,zoom);
+  drawKnight(canvas.width/2,canvas.height/2,Math.atan2(my,mx));
+  ctx.restore();
+  const nearby=nearbyAuthoredPortal(mapId,player.x,player.y,16);
+  door.textContent=nearby?"Press E — "+(map.kind==="outdoor"?"Enter The Red Lion Inn":"Return to Greyhaven"):"";
+  place.textContent=map.name+" · "+Math.round(player.x)+","+Math.round(player.y)+" · cached "+world.stats.cached+"/24";
+  requestAnimationFrame(tick);
+}
+requestAnimationFrame(tick);
+</script></body></html>
