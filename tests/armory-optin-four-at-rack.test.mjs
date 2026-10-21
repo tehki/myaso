@@ -61,6 +61,8 @@ test("P0 true four-browser route waits for independently observed real replicate
  assert.match(script,/nextNativeWalkPulse/);
  assert.match(script,/nativeRackArrived/);
  assert.match(script,/realW3cPulse/);
+ assert.match(script,/GRAPHICS3B_P0_AUTHENTIC_W3C_BROWSER_STARTED/);
+ assert.match(script,/65000/);
  assert.match(script,/realW3cWalkAxis/);
  assert.match(script,/w3cVerticalPulses/);
  assert.match(script,/originalWorldApproach:slot\.approach/);

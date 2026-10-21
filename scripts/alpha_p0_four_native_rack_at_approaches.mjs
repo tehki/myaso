@@ -77,8 +77,16 @@ async function driver(item){
   try{const r=await fetch(s.base+"/status",{signal:AbortSignal.timeout(700)});return{ok:r.ok,value:r.status}}catch{return{ok:false,value:0}}
  },item.name+" driver",16000);
  const caps=chrome?{browserName:"chrome","goog:chromeOptions":{args:["--headless=new","--no-sandbox","--disable-dev-shm-usage","--window-size=1280,900","--disable-background-timer-throttling","--disable-backgrounding-occluded-windows"]}}:{browserName:"firefox","moz:firefoxOptions":{args:["-headless"],prefs:{"dom.min_background_timeout_value":4,"dom.timeout.enable_budget_timer_throttling":false}}};
- const created=await w3c(s,"POST","/session",{capabilities:{alwaysMatch:caps}},30000);
+ // Real GitHub Linux 4-browser parallel acceptance has occasionally required
+ // >30s for Firefox first session. Extend startup allowance, NOT gameplay
+ // arrival, geometry, authentic W3C or item assertions. Timeout remains RED.
+ const sessionStart=Date.now();
+ const created=await w3c(s,"POST","/session",{capabilities:{alwaysMatch:caps}},65000);
  s.id=created.sessionId??created.value?.sessionId;check(s.id,item.name+" no W3C session");
+ console.log("GRAPHICS3B_P0_AUTHENTIC_W3C_BROWSER_STARTED "+JSON.stringify({
+   browser:item.name,family:item.family,sessionStartupMs:Date.now()-sessionStart,
+   genuineWebDriverSession:true
+ }));
  clients.push(s);
  await w3c(s,"POST","/session/"+s.id+"/timeouts",{script:15000,pageLoad:30000,implicit:0});
  return s;
