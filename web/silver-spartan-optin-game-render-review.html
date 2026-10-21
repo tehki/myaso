@@ -1,0 +1,12 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="icon" href="data:,"><title>Silver Knight Sparta | Client renderer native browser QA</title>
+<style>:root{color-scheme:dark}body{margin:0;background:#182d2b;color:#f1f1e9;font:15px/1.5 system-ui}main{max-width:1190px;margin:auto;padding:16px}h1{margin:0 0 6px;font-family:Georgia,serif} .warning{color:#ffcf89;border-top:1px solid #856d48;margin:0 0 12px;padding-top:10px}
+canvas{max-width:100%;background:#8fa69b;border:1px solid #b9c6bc}p{max-width:90ch}small{color:#c0d0ca}
+</style></head><body><main>
+<h1>Spartan Kick — Original Silver Knight client renderer</h1>
+<p class="warning"><strong>SIMULATED SNAPSHOT STATES.</strong> This is a real Chrome/Firefox test of the actual game-client sprite renderer with fixed stage inputs — NOT a connected game server, NOT real authenticated players, NOT Greyhaven, NOT proof of physical collision/hit.</p>
+<canvas id="stage" width="1120" height="550" aria-label="Two distinct simulated Silver Knight actor drawing calls through game renderer"></canvas>
+<p id="details">Waiting for authentic approved atlas...</p>
+<small>Scale-aligned transparent game atlas derived from SHA-pinned original Silver Knight PR #611 source. Client phase selection constrained by existing authoritative action enums: windup 0–2 / active 3–4 / recovery 5–7. No server timing, damage or movement modified.</small>
+</main><script type="module" src="./silver-spartan-optin-game-render-review.mjs"></script></body></html>

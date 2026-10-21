@@ -1,0 +1,471 @@
+{
+  "browser": "firefox/153.4.0",
+  "engine": "firefox",
+  "checks": 40,
+  "stages": 5,
+  "originalGameSpriteRenderer": true,
+  "actualFirstPartyWebP": true,
+  "actorCount": 2,
+  "simulatedSnapshotInputs": true,
+  "realServer": false,
+  "realPvP": false,
+  "realGreyhaven": false,
+  "pageErrors": [],
+  "images": [
+    "silver_optin_mock_firefox_stage0_dir0.png",
+    "silver_optin_mock_firefox_stage1_dir2.png",
+    "silver_optin_mock_firefox_stage2_dir4.png",
+    "silver_optin_mock_firefox_stage3_dir6.png",
+    "silver_optin_mock_firefox_stage4_dir0.png"
+  ],
+  "sourcePhaseChecks": [
+    {
+      "stage": 0,
+      "direction": 0,
+      "frames": [
+        [
+          2
+        ],
+        [
+          2
+        ]
+      ]
+    },
+    {
+      "stage": 0,
+      "direction": 1,
+      "frames": [
+        [
+          2
+        ],
+        [
+          2
+        ]
+      ]
+    },
+    {
+      "stage": 0,
+      "direction": 2,
+      "frames": [
+        [
+          2
+        ],
+        [
+          2
+        ]
+      ]
+    },
+    {
+      "stage": 0,
+      "direction": 3,
+      "frames": [
+        [
+          2
+        ],
+        [
+          2
+        ]
+      ]
+    },
+    {
+      "stage": 0,
+      "direction": 4,
+      "frames": [
+        [
+          2
+        ],
+        [
+          2
+        ]
+      ]
+    },
+    {
+      "stage": 0,
+      "direction": 5,
+      "frames": [
+        [
+          2
+        ],
+        [
+          2
+        ]
+      ]
+    },
+    {
+      "stage": 0,
+      "direction": 6,
+      "frames": [
+        [
+          2
+        ],
+        [
+          2
+        ]
+      ]
+    },
+    {
+      "stage": 0,
+      "direction": 7,
+      "frames": [
+        [
+          2
+        ],
+        [
+          2
+        ]
+      ]
+    },
+    {
+      "stage": 1,
+      "direction": 0,
+      "frames": [
+        [
+          2
+        ],
+        [
+          3
+        ]
+      ]
+    },
+    {
+      "stage": 1,
+      "direction": 1,
+      "frames": [
+        [
+          2
+        ],
+        [
+          4
+        ]
+      ]
+    },
+    {
+      "stage": 1,
+      "direction": 2,
+      "frames": [
+        [
+          2
+        ],
+        [
+          4
+        ]
+      ]
+    },
+    {
+      "stage": 1,
+      "direction": 3,
+      "frames": [
+        [
+          2
+        ],
+        [
+          4
+        ]
+      ]
+    },
+    {
+      "stage": 1,
+      "direction": 4,
+      "frames": [
+        [
+          2
+        ],
+        [
+          4
+        ]
+      ]
+    },
+    {
+      "stage": 1,
+      "direction": 5,
+      "frames": [
+        [
+          2
+        ],
+        [
+          4
+        ]
+      ]
+    },
+    {
+      "stage": 1,
+      "direction": 6,
+      "frames": [
+        [
+          2
+        ],
+        [
+          4
+        ]
+      ]
+    },
+    {
+      "stage": 1,
+      "direction": 7,
+      "frames": [
+        [
+          2
+        ],
+        [
+          4
+        ]
+      ]
+    },
+    {
+      "stage": 2,
+      "direction": 0,
+      "frames": [
+        [
+          3
+        ],
+        [
+          5
+        ]
+      ]
+    },
+    {
+      "stage": 2,
+      "direction": 1,
+      "frames": [
+        [
+          4
+        ],
+        [
+          6
+        ]
+      ]
+    },
+    {
+      "stage": 2,
+      "direction": 2,
+      "frames": [
+        [
+          4
+        ],
+        [
+          7
+        ]
+      ]
+    },
+    {
+      "stage": 2,
+      "direction": 3,
+      "frames": [
+        [
+          4
+        ],
+        [
+          7
+        ]
+      ]
+    },
+    {
+      "stage": 2,
+      "direction": 4,
+      "frames": [
+        [
+          4
+        ],
+        [
+          7
+        ]
+      ]
+    },
+    {
+      "stage": 2,
+      "direction": 5,
+      "frames": [
+        [
+          4
+        ],
+        [
+          7
+        ]
+      ]
+    },
+    {
+      "stage": 2,
+      "direction": 6,
+      "frames": [
+        [
+          4
+        ],
+        [
+          7
+        ]
+      ]
+    },
+    {
+      "stage": 2,
+      "direction": 7,
+      "frames": [
+        [
+          4
+        ],
+        [
+          7
+        ]
+      ]
+    },
+    {
+      "stage": 3,
+      "direction": 0,
+      "frames": [
+        [
+          5
+        ],
+        [
+          7
+        ]
+      ]
+    },
+    {
+      "stage": 3,
+      "direction": 1,
+      "frames": [
+        [
+          6
+        ],
+        [
+          7
+        ]
+      ]
+    },
+    {
+      "stage": 3,
+      "direction": 2,
+      "frames": [
+        [
+          7
+        ],
+        [
+          7
+        ]
+      ]
+    },
+    {
+      "stage": 3,
+      "direction": 3,
+      "frames": [
+        [
+          7
+        ],
+        [
+          7
+        ]
+      ]
+    },
+    {
+      "stage": 3,
+      "direction": 4,
+      "frames": [
+        [
+          7
+        ],
+        [
+          7
+        ]
+      ]
+    },
+    {
+      "stage": 3,
+      "direction": 5,
+      "frames": [
+        [
+          7
+        ],
+        [
+          7
+        ]
+      ]
+    },
+    {
+      "stage": 3,
+      "direction": 6,
+      "frames": [
+        [
+          7
+        ],
+        [
+          7
+        ]
+      ]
+    },
+    {
+      "stage": 3,
+      "direction": 7,
+      "frames": [
+        [
+          7
+        ],
+        [
+          7
+        ]
+      ]
+    },
+    {
+      "stage": 4,
+      "direction": 0,
+      "frames": [
+        [],
+        []
+      ]
+    },
+    {
+      "stage": 4,
+      "direction": 1,
+      "frames": [
+        [],
+        []
+      ]
+    },
+    {
+      "stage": 4,
+      "direction": 2,
+      "frames": [
+        [],
+        []
+      ]
+    },
+    {
+      "stage": 4,
+      "direction": 3,
+      "frames": [
+        [],
+        []
+      ]
+    },
+    {
+      "stage": 4,
+      "direction": 4,
+      "frames": [
+        [],
+        []
+      ]
+    },
+    {
+      "stage": 4,
+      "direction": 5,
+      "frames": [
+        [],
+        []
+      ]
+    },
+    {
+      "stage": 4,
+      "direction": 6,
+      "frames": [
+        [],
+        []
+      ]
+    },
+    {
+      "stage": 4,
+      "direction": 7,
+      "frames": [
+        [],
+        []
+      ]
+    }
+  ]
+}

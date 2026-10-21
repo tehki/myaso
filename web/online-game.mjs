@@ -41,6 +41,9 @@ const knightSprites = knightQuery.get("knights") === "1"
   ? createKnightSpriteRenderer({
       presentationScale: knightQuery.get("knightScale") === "100"
         ? 1 : KNIGHT_PRESENTATION_SCALE,
+      // True original Spartan source render requires TWO explicit opt-ins.
+      // No default activation while strict Greyhaven/authority gates remain.
+      sourceKickPreview: knightQuery.get("knightKickSource") === "1",
     }) : null;
 const eventText = document.querySelector("#event-text");
 const arenaStage = document.querySelector(".arena-stage");
