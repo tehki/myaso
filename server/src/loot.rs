@@ -183,6 +183,23 @@ pub struct VisibleLoot {
     pub appearance: LootAppearance,
 }
 
+/// A caller-supplied, World-authored physical rack position, not an Items
+/// allocator, a client selection or proof of authoritative map provenance.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct ProposedRackSocket {
+    pub at: Point,
+}
+
+/// Current Items-owned ground reference for a physically present rack sword.
+/// This is an offline, ephemeral u64 projection only: it has NO canonical
+/// u128 mapping, mutation sequence, writer epoch, signed revision or lease.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct CurrentRackSword {
+    pub ground_entity_id: u64,
+    pub item_id: u64,
+    pub kind: ItemKind,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LootError {
     InvalidPlayer,
@@ -411,6 +428,63 @@ impl LootAuthority {
 
     pub fn ground(&self) -> &BTreeMap<u64, GroundDrop> {
         &self.ground
+    }
+
+    /// Offline Items-owned source projection for the four World rack sockets.
+    /// Every result comes from CURRENT validated Loot state, not fabricated
+    /// World/socket IDs, synthetic client data, or stale visual state.
+    ///
+    /// The caller must hold the authoritative read lock and source all
+    /// positions, zone and time from a trusted completed World tick. Missing
+    /// and expired slots are None. Conflicting ground objects on a socket
+    /// fail the WHOLE projection closed rather than picking an arbitrary one.
+    ///
+    /// Must not be published as a signed/current server stream until Core 8B
+    /// owns the sole fenced canonical item writer, epoch+item-mutation receipt
+    /// and Core 8C signs real World→Core coordinates and zone. This method
+    /// issues NO pickup capability and does not update any state.
+    pub fn proposed_current_rack_swords(
+        &self,
+        zone: ZoneId,
+        sockets: [ProposedRackSocket; 4],
+        now_ms: u64,
+    ) -> Result<[Option<CurrentRackSword>; 4], LootError> {
+        for (index, socket) in sockets.iter().enumerate() {
+            if !socket.at.in_zone(zone)
+                || sockets[..index].iter().any(|other| other.at == socket.at)
+            {
+                return Err(LootError::InvalidState);
+            }
+        }
+        let mut slots = [None; 4];
+        for drop in self.ground.values() {
+            if drop.zone != zone || drop.expires_at_ms <= now_ms {
+                continue;
+            }
+            for (index, socket) in sockets.iter().enumerate() {
+                if drop.at != socket.at {
+                    continue;
+                }
+                // Even a club/potion/corpse-like object occupying the one
+                // exact rack point makes that slot ambiguous, never a sword
+                // candidate with silently preferred nearest-ID selection.
+                if slots[index].is_some()
+                    || drop.entity_id == 0
+                    || drop.item.id == 0
+                    || drop.item.amount != 1
+                    || !matches!(drop.item.kind, ItemKind::RustySword | ItemKind::IronSword)
+                {
+                    return Err(LootError::InvalidState);
+                }
+                slots[index] = Some(CurrentRackSword {
+                    ground_entity_id: drop.entity_id,
+                    item_id: drop.item.id,
+                    kind: drop.item.kind,
+                });
+                break;
+            }
+        }
+        Ok(slots)
     }
 
     pub fn corpses(&self) -> &BTreeMap<u64, Corpse> {
@@ -1321,6 +1395,126 @@ mod tests {
             fighter.action = Action::Dead;
         }
         fighter
+    }
+
+    #[test]
+    fn current_four_rack_projection_reads_only_real_live_ground_and_rejects_ambiguity() {
+        let sockets = [3740.0_f32, 3780.0, 3820.0, 3860.0].map(|x| ProposedRackSocket {
+            at: Point { x, y: 4038.0 },
+        });
+        let zone = ZoneId::Moonvale;
+        let mut loot = LootAuthority::new();
+        loot.register(1).unwrap();
+        let mut fixture = loot.export_state().unwrap();
+        fixture.next_id = 1000;
+        for (idx, socket) in sockets.iter().enumerate() {
+            let entity_id = 201 + idx as u64;
+            assert!(fixture
+                .ground
+                .insert(
+                    entity_id,
+                    GroundDrop {
+                        entity_id,
+                        zone,
+                        at: socket.at,
+                        expires_at_ms: 600,
+                        item: ItemStack {
+                            id: 101 + idx as u64,
+                            kind: if idx % 2 == 0 {
+                                ItemKind::RustySword
+                            } else {
+                                ItemKind::IronSword
+                            },
+                            amount: 1,
+                        },
+                    }
+                )
+                .is_none());
+        }
+        loot = LootAuthority::restore_state(fixture).unwrap();
+        let before = loot.export_state().unwrap();
+        let full = loot
+            .proposed_current_rack_swords(zone, sockets, 10)
+            .unwrap();
+        assert_eq!(
+            full.map(|s| s.map(|v| (v.ground_entity_id, v.item_id))),
+            [
+                Some((201, 101)),
+                Some((202, 102)),
+                Some((203, 103)),
+                Some((204, 104))
+            ]
+        );
+        assert_eq!(
+            loot.export_state().unwrap(),
+            before,
+            "read must not mutate state"
+        );
+        assert!(loot
+            .proposed_current_rack_swords(zone, sockets, 600)
+            .unwrap()
+            .iter()
+            .all(Option::is_none));
+
+        // Actually remove one sword through the regular server-owned pickup
+        // path. The next projection MUST clear just that rack, not retain
+        // stale source fixture identities in the visual 4-slot stream.
+        let mut world = World::new(8192.0, 8192.0);
+        assert!(world.add_player_at(1, 3740.0, 4088.0, 0.0));
+        let fighter = world.fighter(1).unwrap();
+        assert_eq!(loot.take_ground(1, fighter, zone, 201, 20).unwrap().id, 101);
+        let next = loot
+            .proposed_current_rack_swords(zone, sockets, 21)
+            .unwrap();
+        assert!(next[0].is_none());
+        assert_eq!(next[1..], full[1..]);
+
+        let mut ambiguous = loot.export_state().unwrap();
+        let entity_id = 301;
+        ambiguous.ground.insert(
+            entity_id,
+            GroundDrop {
+                entity_id,
+                zone,
+                at: sockets[1].at,
+                expires_at_ms: 600,
+                item: ItemStack {
+                    id: 401,
+                    kind: ItemKind::IronSword,
+                    amount: 1,
+                },
+            },
+        );
+        let duplicate = LootAuthority::restore_state(ambiguous).unwrap();
+        assert_eq!(
+            duplicate.proposed_current_rack_swords(zone, sockets, 21),
+            Err(LootError::InvalidState),
+            "two items at one rack location must not choose arbitrarily"
+        );
+
+        let mut wrong_kind = loot.export_state().unwrap();
+        wrong_kind.ground.get_mut(&202).unwrap().item.kind = ItemKind::Gold;
+        let wrong_kind = LootAuthority::restore_state(wrong_kind).unwrap();
+        assert_eq!(
+            wrong_kind.proposed_current_rack_swords(zone, sockets, 21),
+            Err(LootError::InvalidState),
+            "non-sword at authored rack coordinates must not pass as a sword"
+        );
+        let mut duplicate_sockets = sockets;
+        duplicate_sockets[3] = duplicate_sockets[0];
+        assert_eq!(
+            loot.proposed_current_rack_swords(zone, duplicate_sockets, 21),
+            Err(LootError::InvalidState)
+        );
+        let mut invalid_sockets = sockets;
+        invalid_sockets[0].at.x = f32::NAN;
+        assert_eq!(
+            loot.proposed_current_rack_swords(zone, invalid_sockets, 21),
+            Err(LootError::InvalidState)
+        );
+        // No falsely stale/active allocation; read-only rack view cannot
+        // grant, write, or claim pickup receipt authority.
+        assert_eq!(loot.export_state().unwrap().ground.len(), 3);
     }
 
     #[test]
