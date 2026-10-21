@@ -71,7 +71,7 @@ simultaneous independent live owners of the same sword.
 
 `cargo test --locked --manifest-path server/Cargo.toml --lib alpha_pickup_ack_proof`
 
-Four focused cases:
+Five focused cases (plus one separately invoked ignored subprocess helper):
 - Missing committed receipt and non-ground source never produce ACK.
 - Accepted exact `Ground → MainHand` yields request/item/owner/
   location/commit-sequence only while latest; same view after journal
@@ -82,12 +82,21 @@ Four focused cases:
   owner/hand proves **ABA-safe watermark rejection**, including
   after closing and reopening the journal. The fresh receipt
   alone gives a current view.
+- **Real OS subprocess SIGKILL** after an already durable one-sword
+  pickup commit but before any browser ACK, with an independent
+  OS-held writer lock. A fresh journal process restores the exact
+  original receipt and owner; same request replay changes nothing,
+  a competing character's second click is rejected without receipt,
+  and the second reopened writer still finds exactly four sword IDs.
+  The helper uses an intentionally ignored test invoked by its parent
+  through a separate OS process on Unix; it is not a mocked exception.
 
-On exact implementation head `e9c61c6f6e93ee0a206f79efce39f444b46d6c14`,
-Serj Linux Rust 1.89: focused **4/4 PASS**, full server library
-**108 PASS / 0 FAIL / 2 existing intentionally ignored subprocess
-helpers**, `cargo fmt --check` PASS and strict
-`cargo clippy --lib -- -D warnings` PASS.
+On the exact updated source head `2caf3c2820a402ea02986a1a0157b3326f2e7586`,
+Serj Linux Rust 1.89: focused **5/5 PASS**, full server library
+**109 PASS / 0 FAIL / 3 ignored subprocess helpers** (the new helper
+is invoked by its Unix crash parent test), `cargo fmt --check` PASS,
+and strict `cargo clippy --lib -- -D warnings` PASS. The previous
+code head `e9c61c6` also passed its earlier 4 focused and 108 full lib tests.
 
 **These are isolated Rust proofs**. They do not establish live
 physical rack clicking, true browser-player authentication, real
