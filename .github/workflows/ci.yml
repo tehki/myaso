@@ -176,6 +176,7 @@ jobs:
         run: |
           node --check src/world/alpha-armory.mjs
           node --test tests/world-alpha-armory.test.mjs tests/authored-world.test.mjs
+          node --test tests/world-alpha-rack-selection-range.test.mjs
 
       - name: Validate M188 repeated real heavy counterplay windows
         run: |
