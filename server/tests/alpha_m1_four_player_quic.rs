@@ -2,9 +2,7 @@
 //! This is pinned-certificate QUIC loopback regression, not a cross-host/browser
 //! or authored-city walkability qualification. No production-facing toggle.
 use anyhow::{bail, Context, Result};
-use myaso_server::{
-    snapshot::decode_snapshot, INPUT_HEADER_BYTES, INPUT_SAMPLE_BYTES,
-};
+use myaso_server::{snapshot::decode_snapshot, INPUT_HEADER_BYTES, INPUT_SAMPLE_BYTES};
 use std::{
     collections::BTreeSet,
     io::{BufRead, BufReader},
