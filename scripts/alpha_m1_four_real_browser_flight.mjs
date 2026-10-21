@@ -9,7 +9,7 @@ import path from "node:path";
 import process from "node:process";
 import { setTimeout as sleep } from "node:timers/promises";
 import {WORLD_ALPHA_SWORD_RACK_SOCKETS,validateWorldAlphaArmoryLayout} from "../src/world/alpha-armory.mjs";
-import {nextNativeWalkPulse,nativeRackArrived} from "./alpha_p0_rack_walk_math.mjs";
+import {nextNativeWalkPulse,nativeRackArrived,proposedNativeRackReachPoint,nativeRackWithinProposedReach} from "./alpha_p0_rack_walk_math.mjs";
 
 const root = process.cwd();
 const greyhavenModeValue = process.env.MYASO_ALPHA_NATIVE_GREYHAVEN;
@@ -23,6 +23,12 @@ if(nativeRackWalkValue !== undefined && !["0","1"].includes(nativeRackWalkValue)
 }
 const nativeRackWalk = nativeRackWalkValue === "1";
 if(nativeRackWalk && !greyhavenMode)throw Error("rack walking requires explicit Greyhaven server authority");
+const nativeRackReachValue=process.env.MYASO_ALPHA_NATIVE_RACK_REACH;
+if(nativeRackReachValue!==undefined&&!["0","1"].includes(nativeRackReachValue))
+  throw Error("MYASO_ALPHA_NATIVE_RACK_REACH must be unset, 0 or 1");
+const nativeRackReach=nativeRackReachValue==="1";
+if(nativeRackReach&&(!nativeRackWalk||!greyhavenMode))
+  throw Error("proposed rack reach requires reviewed Greyhaven plus native rack walk");
 const GREYHAVEN_SPAWNS = new Map([
   [1,{x:4110,y:4160}],[2,{x:4206,y:4160}],
   [3,{x:4110,y:4256}],[4,{x:4206,y:4256}],
@@ -402,28 +408,51 @@ async function nativeFourRackApproaches(views) {
       const state=await snapshot(s),p=fighter(state,id);
       return {ok:fourVisible(state)&&nativeRackArrived(p,slot.approach),value:state};
     },s.name+" server-owned arrival at original World rack "+slot.socketId,3500);
+    // Optional NEXT step: walk closer using only real W3C "w" input.
+    // This is World #639's REVIEW-ONLY 30-unit nominal-offset proposal.
+    // It cannot create, grant, select or acknowledge any physical sword.
+    let reach=null;
+    if(nativeRackReach){
+      const target=proposedNativeRackReachPoint(slot);
+      const reachPulses=await walkActualBrowserAxis(s,id,"y",target.y);
+      const reached=await waitFor(async()=>{
+        const state=await snapshot(s),p=fighter(state,id);
+        return {ok:fourVisible(state)&&nativeRackArrived(p,target)
+          &&nativeRackWithinProposedReach(p,slot),value:state};
+      },s.name+" actual server-owned position within proposed reach for "+slot.socketId,3500);
+      reach={target,w3cPulses:reachPulses,
+        observedPosition:fighter(reached,id),
+        proposedSocketDistance:Math.hypot(fighter(reached,id).x-slot.x,
+          fighter(reached,id).y-slot.y),serverTick:reached.tick};
+    }
     witnessed.push({id,browser:s.name,socketId:slot.socketId,
       originalWorldApproach:slot.approach,
       actualRustPosition:fighter(at,id),serverTick:at.tick,
-      w3cVerticalPulses:vertical,w3cHorizontalPulses:horizontal});
-    console.log("ALPHA_P0_REAL_NATIVE_RACK_APPROACH "+
+      w3cVerticalPulses:vertical,w3cHorizontalPulses:horizontal,
+      proposedReach:reach});
+    console.log((nativeRackReach?"ALPHA_P0_REAL_NATIVE_PROPOSED_RACK_REACH ":"ALPHA_P0_REAL_NATIVE_RACK_APPROACH ")+
       JSON.stringify(witnessed[witnessed.length-1]));
-    await saveScreenshot(s,"rack-approach-"+id);
+    await saveScreenshot(s,nativeRackReach?"rack-proposed-reach-"+id:"rack-approach-"+id);
   }
   const peers=await Promise.all(sessions.map(s=>waitFor(async()=>{
     const value=await snapshot(s);
     const all=WORLD_ALPHA_SWORD_RACK_SOCKETS.every((slot,i)=>
-      nativeRackArrived(fighter(value,i+1),slot.approach));
+      nativeRackReach
+        ? nativeRackArrived(fighter(value,i+1),proposedNativeRackReachPoint(slot))
+          &&nativeRackWithinProposedReach(fighter(value,i+1),slot)
+        : nativeRackArrived(fighter(value,i+1),slot.approach));
     return {ok:fourVisible(value)&&all,value};
-  },s.name+" all four physical rack approaches visible",7500)));
-  console.log("ALPHA_P0_FOUR_NATIVE_GREYHAVEN_RACK_APPROACH_PASS "+JSON.stringify({
+  },s.name+(nativeRackReach?" all four proposed near-sword positions visible"
+    :" all four physical rack approaches visible"),7500)));
+  console.log((nativeRackReach?"ALPHA_P0_FOUR_NATIVE_GREYHAVEN_PROPOSED_REACH_PASS "
+    :"ALPHA_P0_FOUR_NATIVE_GREYHAVEN_RACK_APPROACH_PASS ")+JSON.stringify({
     actualBrowsers:sessions.map(s=>s.name),witnessed,
     peerSnapshots:peers.map(v=>({viewer:v.id,tick:v.tick})),
     worldFixtureAuthoritativeForPlacement:true,
-    realRustPositions:true,liveSwordItemsProven:false,
-    physicalSwordClickProven:false,
+    realRustPositions:true,proposedReachOnly:nativeRackReach,
+    liveSwordItemsProven:false,physicalSwordClickProven:false,
     actualRenderedWorldProven:false,
-    scope:"one loopback CI host, no sword item ownership or independent computers"
+    scope:"one loopback CI host, read-only prototype distance <=56 to authored empty rack only; no actual pickup or independent computers"
   }));
 }
 
