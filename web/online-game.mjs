@@ -754,11 +754,11 @@ function simulatePrediction(stepMs) {
   if (predictionStep % 2 === 0 && networkClient) {
     const outgoingTick = clientTick;
     markStaminaDenialSubmitted(outgoingTick, currentInput);
-    // M336: read-only, scenario-scoped input-plane provenance. A real DOM
-    // Space+LMB without authoritative action may mean no 30Hz input sampled
+    // M336/M337: read-only, scenario-scoped input-plane provenance for BOTH
+    // M144 and M145. A real DOM Space+LMB without authoritative action may mean no 30Hz input sampled
     // during the genuine W3C hold. Record what the production sender actually
     // submitted, with no replay, network payload or gameplay change.
-    if (acceptanceScenario === "uimultirecoveryspatial") {
+    if (acceptanceScenario === "uimultirecoveryspatial" || acceptanceScenario === "uimultirecoveryffa") {
       const debug = window.__MYASO_ACCEPTANCE_STATE__;
       if (debug) {
         debug.lastSubmittedClientTick = outgoingTick;
