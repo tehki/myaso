@@ -926,8 +926,7 @@ mod tests {
         assert_eq!(magic.mana(character(3)), 0);
 
         let physical_id = loot.grant(1, ItemKind::IronSword, 1).unwrap();
-        loot.equip(1, physical_id, EquipmentSlot::MainHand)
-            .unwrap();
+        loot.equip(1, physical_id, EquipmentSlot::MainHand).unwrap();
         // The Items drop primitive must not require transient backpack space.
         for _ in 0..crate::loot::BACKPACK_CAPACITY {
             loot.grant(1, ItemKind::Gold, 1).unwrap();
@@ -959,10 +958,9 @@ mod tests {
 
         // Failed trusted geometry must not consume a command or leak a sword.
         assert!(matches!(
-            commit_verified_equipped_sword_drop_checked(
-                sword_authority!(1, 1),
-                |_, _| Err(PickupCommitError::GeometryRejected)
-            ),
+            commit_verified_equipped_sword_drop_checked(sword_authority!(1, 1), |_, _| Err(
+                PickupCommitError::GeometryRejected
+            )),
             Err(PickupCommitError::GeometryRejected)
         ));
         assert!(!path.exists());
@@ -980,15 +978,13 @@ mod tests {
 
         // The authoritative prototype drops the ORIGINAL physical sword ID,
         // not an item cloned into a backpack or issued by learned magic.
-        let dropped = commit_verified_equipped_sword_drop_checked(
-            sword_authority!(1, 1),
-            |fighter, zone| {
+        let dropped =
+            commit_verified_equipped_sword_drop_checked(sword_authority!(1, 1), |fighter, zone| {
                 assert_eq!((fighter.x, fighter.y), (200.0, 200.0));
                 assert_eq!(zone, ZoneId::Moonvale);
                 Ok(())
-            },
-        )
-        .unwrap();
+            })
+            .unwrap();
         assert_eq!(dropped.expected_item_id, physical_id);
         assert!(loot
             .inventory(1)
@@ -1004,7 +1000,10 @@ mod tests {
         assert_eq!(magic.encode_progression().unwrap(), before);
         let (after_drop, saved_magic) = load_joint(&path).unwrap();
         assert_eq!(saved_magic.encode_progression().unwrap(), before);
-        assert_eq!(after_drop.committed_operation_sequence(character(1)), Some(1));
+        assert_eq!(
+            after_drop.committed_operation_sequence(character(1)),
+            Some(1)
+        );
         assert!(after_drop
             .parked_inventory(character(1))
             .unwrap()
@@ -1073,8 +1072,14 @@ mod tests {
                 .id,
             physical_id
         );
-        assert_eq!(recovered.committed_operation_sequence(character(1)), Some(1));
-        assert_eq!(recovered.committed_operation_sequence(character(3)), Some(1));
+        assert_eq!(
+            recovered.committed_operation_sequence(character(1)),
+            Some(1)
+        );
+        assert_eq!(
+            recovered.committed_operation_sequence(character(3)),
+            Some(1)
+        );
         assert_eq!(
             recovered
                 .parked_inventory(character(1))
