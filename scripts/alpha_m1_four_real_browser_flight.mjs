@@ -1,6 +1,7 @@
 // Core 8A / P0 M1: four REAL Chrome/Firefox WebDriver browser sessions
 // sharing the actual Rust/WebTransport server. Localhost CI only: NOT WAN,
-// cross-machine, authored Greyhaven city or Combat/item acceptance.
+// cross-machine, rendered Greyhaven city or Combat/item acceptance.
+// Explicit opt-in mode also verifies SERVER-OWNED Greyhaven spawn/recovery.
 import { spawn } from "node:child_process";
 import { createServer } from "node:http";
 import { readFile, stat, mkdir, writeFile } from "node:fs/promises";
@@ -9,6 +10,15 @@ import process from "node:process";
 import { setTimeout as sleep } from "node:timers/promises";
 
 const root = process.cwd();
+const greyhavenModeValue = process.env.MYASO_ALPHA_NATIVE_GREYHAVEN;
+if (greyhavenModeValue !== undefined && !["0","1"].includes(greyhavenModeValue)) {
+  throw Error("MYASO_ALPHA_NATIVE_GREYHAVEN must be unset, 0 or 1");
+}
+const greyhavenMode = greyhavenModeValue === "1";
+const GREYHAVEN_SPAWNS = new Map([
+  [1,{x:4110,y:4160}],[2,{x:4206,y:4160}],
+  [3,{x:4110,y:4256}],[4,{x:4206,y:4256}],
+]);
 const deadlineMs = 155_000;
 const expiry = Date.now() + deadlineMs;
 const children = new Set();
@@ -104,10 +114,17 @@ async function httpServer() {
 async function startRealGameServer() {
   // The focused workflow already builds this exact binary. Spawn it
   // directly so SIGTERM reaps the real server, not just a cargo parent.
+  const gameEnv = { ...process.env, MYASO_BIND:"127.0.0.1:0", MYASO_MAX_PLAYERS:"4",
+    MYASO_FLIGHT_BACKGROUND_PLAYERS:"0", MYASO_FLIGHT_NEAR_PRESSURE_PLAYERS:"0" };
+  // Existing generic arena fixture stays default-OFF for staging features.
+  delete gameEnv.MYASO_ALPHA_SPAWN;
+  delete gameEnv.MYASO_ALPHA_STATIC_COLLISION;
+  if (greyhavenMode) {
+    gameEnv.MYASO_ALPHA_SPAWN = "greyhaven";
+    gameEnv.MYASO_ALPHA_STATIC_COLLISION = "reviewed-static-only";
+  }
   const child = spawn(path.join(root, "server", "target", "debug", "myaso-server"), [], {
-    cwd: root,
-    env: { ...process.env, MYASO_BIND:"127.0.0.1:0", MYASO_MAX_PLAYERS:"4",
-      MYASO_FLIGHT_BACKGROUND_PLAYERS:"0", MYASO_FLIGHT_NEAR_PRESSURE_PLAYERS:"0" },
+    cwd: root, env: gameEnv,
     stdio:["ignore","pipe","pipe"],
     detached: process.platform !== "win32",
   });
@@ -132,6 +149,11 @@ async function startRealGameServer() {
       value:{url,hash}};
   }, "real server pinned localhost / cap four",45_000);
   assert(url.startsWith("https://127.0.0.1:") && url.endsWith("/game"),"server must bind loopback");
+  if (greyhavenMode) {
+    assert(output.includes("staging-only Greyhaven spawn selected")
+      && output.includes("staging-only Greyhaven fixed static sweep enabled"),
+      "explicit reviewed Greyhaven server spawn/static collision opt-in missing");
+  }
   return {url,hash};
 }
 async function driver(browser) {
@@ -185,7 +207,8 @@ async function saveScreenshot(s,tag) {
   const name=path.join(evidenceDir,`${s.name}-${tag}.png`);
   await writeFile(name,Buffer.from(raw,"base64"));
 }
-async function moveGenuinely(s) {
+async function moveGenuinely(s,key="d") {
+  assert(key==="a"||key==="d", "movement test only supports authentic A/D keys");
   const initial=await snapshot(s),before=fighter(initial,initial.id);
   assert(before,"attacker own fighter absent before movement");
   const found=await webdriver(s.base,"POST",`/session/${s.id}/element`,{using:"css selector",value:"#arena"});
@@ -193,10 +216,10 @@ async function moveGenuinely(s) {
   assert(element,"real browser has no arena");
   await webdriver(s.base,"POST",`/session/${s.id}/element/${element}/click`,{});
   const url=`/session/${s.id}/actions`;
-  await webdriver(s.base,"POST",url,{actions:[{type:"key",id:"movement-"+s.name,actions:[{type:"keyDown",value:"d"}]}]});
+  await webdriver(s.base,"POST",url,{actions:[{type:"key",id:"movement-"+s.name,actions:[{type:"keyDown",value:key}]}]});
   try {await sleep(1100);}
   finally {
-    await webdriver(s.base,"POST",url,{actions:[{type:"key",id:"movement-"+s.name,actions:[{type:"keyUp",value:"d"}]}]});
+    await webdriver(s.base,"POST",url,{actions:[{type:"key",id:"movement-"+s.name,actions:[{type:"keyUp",value:key}]}]});
   }
   const own=await waitFor(async()=>{
     const value=await snapshot(s),after=fighter(value,initial.id);
@@ -208,6 +231,23 @@ async function moveGenuinely(s) {
 // no WebTransport.close()) while three Chrome/Firefox peers remain alive.
 // This proves same-host browser crash/authoritative admission recovery only,
 // NOT an independent-host network partition or Greyhaven/sword continuity.
+function assertServerOwnedGreyhavenRoster(states,phase) {
+  if (!greyhavenMode) return;
+  for (const s of states) {
+    for (const [id,point] of GREYHAVEN_SPAWNS) {
+      const p=fighter(s,id);
+      assert(p && Math.hypot(p.x-point.x,p.y-point.y)<=1,
+        phase+" real browser #"+s.id+" did not observe server-owned Greyhaven spawn #"+id
+          +"; fighter="+JSON.stringify(p));
+    }
+  }
+  console.log("ALPHA_P0_FOUR_NATIVE_GREYHAVEN_SPAWN_PASS "+JSON.stringify({
+    phase,authoritativeSpawns:[...GREYHAVEN_SPAWNS],
+    realBrowserWitnesses:states.map(s=>({playerId:s.id,tick:s.tick})),
+    collision:"reviewed-static-only",renderedWorldVerified:false,
+    scope:"one localhost CI host; NOT two hosts, real sword, or visually rendered city"
+  }));
+}
 async function crashAndRejoin(game, staticPort) {
   assert(process.platform === "linux", "process-group crash acceptance requires isolated Linux CI");
   const lost = sessions.splice(1, 1)[0];
@@ -249,6 +289,21 @@ async function crashAndRejoin(game, staticPort) {
   const views = await Promise.all(sessions.map(s=>waitFor(async()=>{
     const state=await snapshot(s);return {ok:validRoster(state),value:state};
   },s.name+" authoritative replacement roster 1,3,4,5",15_000)));
+  if (greyhavenMode) {
+    for (const view of views) {
+      const replacementPosition=fighter(view,5);
+      const freed=GREYHAVEN_SPAWNS.get(2);
+      assert(replacementPosition && Math.hypot(
+        replacementPosition.x-freed.x,replacementPosition.y-freed.y)<=1,
+        "real browser #"+view.id+" did not observe fresh #5 at freed Greyhaven spawn");
+      assert(!fighter(view,2),"abandoned Greyhaven fighter #2 retained after rejoin");
+    }
+    console.log("ALPHA_P0_FOUR_NATIVE_GREYHAVEN_REJOIN_PASS "+JSON.stringify({
+      formerId:2,replacementId:5,freedAnchor:GREYHAVEN_SPAWNS.get(2),
+      actualBrowserWitnesses:views.map(v=>({id:v.id,tick:v.tick})),
+      noGhost:true,independentHosts:false
+    }));
+  }
   await saveScreenshot(replacement,"rejoin-no-ghost");
   await saveScreenshot(surviving[0],"rejoin-observed");
   const before = await Promise.all(surviving.map(snapshot));
@@ -263,7 +318,8 @@ async function crashAndRejoin(game, staticPort) {
     noGracefulClose:true,crashedId:2,replacementId:5,ghostRemovedWithinMs:removalMs,
     authoritativeFourRoster:expectedAfter,realFirefoxMovement:movement,
     independentSurvivorObservations:surviving.map((s,i)=>({browser:s.name,tick:observed[i].tick,player5:fighter(observed[i],5)})),
-    exactClientSource:true,scope:"isolated localhost CI only; not WAN, city, armory, or Combat release",
+    exactClientSource:true,greyhavenAuthorityOptIn:greyhavenMode,
+    scope:"isolated localhost CI only; no independent host, visual Greyhaven, armory sword or Combat release",
   }));
 }
 async function run() {
@@ -279,6 +335,7 @@ async function run() {
   const views=await Promise.all(sessions.map(async s=>waitFor(async()=>{
     const value=await snapshot(s);return{ok:fourVisible(value),value};
   },s.name+" four authoritative identities+scoreboard",25_000)));
+  assertServerOwnedGreyhavenRoster(views,"initial-four");
   for (let i=0;i<sessions.length;i++){
     await saveScreenshot(sessions[i],"four-visible");
     console.log("ALPHA_M1_FOUR_BROWSER_VISIBLE "+JSON.stringify({
@@ -290,7 +347,7 @@ async function run() {
   // browsers must independently receive the authoritative replicated motion.
   const mover=sessions[0],other=views.slice(1);
   const before=fighter(views[0],1);
-  const change=await moveGenuinely(mover);
+  const change=await moveGenuinely(mover,greyhavenMode?"a":"d");
   console.log("ALPHA_M1_FOUR_BROWSER_MOVED "+JSON.stringify({player:1,...change}));
   const observed=[];
   for (let i=1;i<sessions.length;i++) {
@@ -341,7 +398,9 @@ async function run() {
     nativeW3cInput:true,replicatedMovementInOtherThreeBrowsers:true,observed,
     firefoxNativeW3cInput:true,firefoxReplicatedToOtherThreeBrowsers:true,
     firefoxObserved,postActionFourPlayerLiveness:finalStates.map(s=>s.tick),
-    scope:"single GitHub-hosted localhost arena, NOT Greyhaven or independent network",
+    scope:greyhavenMode
+      ? "single localhost server with authoritative Greyhaven spawns and static collision; NOT rendered city, sword or independent host"
+      : "single GitHub-hosted localhost arena, NOT Greyhaven or independent network",
   }));
   await crashAndRejoin(game,staticServer.address().port);
 }
