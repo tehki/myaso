@@ -3,7 +3,11 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {parseHostPairConfig,privateIpv4} from "../scripts/alpha_p0_host_pair_config.mjs";
-import {verifyPairEvidence} from "../scripts/alpha_p0_host_pair_verify.mjs";
+import {verifyPairEvidence,verifyCaptureFiles} from "../scripts/alpha_p0_host_pair_verify.mjs";
+import {createHash} from "node:crypto";
+import {mkdtemp,mkdir,writeFile,rm} from "node:fs/promises";
+import {tmpdir} from "node:os";
+import path from "node:path";
 const now=2_000_000_000_000;
 const defaults={
   MYASO_P0_HOST_PAIR_APPROVED:"YES",MYASO_P0_ISOLATED_STAGE:"1",
@@ -123,4 +127,34 @@ test("verifier rejects cached world state, missing Firefox movement and forged m
     const a=fixture("A"),b=fixture("B");mutate(a);
     assert.throws(()=>verifyPairEvidence(a,b));
   }
+});
+
+test("capture-file verifier hashes real disk bytes, rejects missing/tampered PNG (synthetic fixture)",async()=>{
+  const d=await mkdtemp(path.join(tmpdir(),"core8a-p0-pair-unit-"));
+  try{
+    const a=fixture("A"),b=fixture("B");
+    const dir=path.join(d,"alpha-p0-hostpair-evidence");
+    await mkdir(dir,{recursive:true});
+    for(const e of [a,b]){
+      for(let i=0;i<2;i++){
+        const record=e.screenshots[i];
+        // This is a TEST-ONLY minimal PNG-signature buffer; not a browser image.
+        const synthetic=Buffer.alloc(700,10+((e.role==="A"?0:2)+i));
+        Buffer.from("89504e470d0a1a0a","hex").copy(synthetic,0);
+        record.bytes=synthetic.length;
+        record.sha256=createHash("sha256").update(synthetic).digest("hex");
+        await writeFile(path.join(d,record.relativeFile),synthetic);
+      }
+    }
+    assert.equal(verifyPairEvidence(a,b).mutuallyWitnessedBrowserMovement,true);
+    assert.equal((await verifyCaptureFiles(a,path.join(d,"a.json"))).length,2);
+    assert.equal((await verifyCaptureFiles(b,path.join(d,"b.json"))).length,2);
+    const tamper=path.join(d,b.screenshots[1].relativeFile);
+    const invalid=Buffer.alloc(700,99);
+    Buffer.from("89504e470d0a1a0a","hex").copy(invalid,0);
+    await writeFile(tamper,invalid);
+    await assert.rejects(verifyCaptureFiles(b,path.join(d,"b.json")),/PNG bytes\/hash/);
+    await rm(tamper);
+    await assert.rejects(verifyCaptureFiles(b,path.join(d,"b.json")),/file missing/);
+  }finally{await rm(d,{recursive:true,force:true})}
 });
