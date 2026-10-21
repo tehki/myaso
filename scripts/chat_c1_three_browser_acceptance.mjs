@@ -91,6 +91,25 @@ try {
  const gotA=await poll("A receives B",()=>evaljs(a,"const x=[...document.querySelectorAll('.local-chat-item[data-channel=local]')].map(e=>({name:e.querySelector('.local-chat-sender')?.textContent,text:e.querySelector('.local-chat-text')?.textContent}));return {ok:x.some(m=>m.text===arguments[0]&&m.name==='Player #2'),messages:x};",[reply]));
  console.log("A_RECEIVED",JSON.stringify(gotA));
 
+ // The untrusted message body must survive actual Rust chat routing but
+ // remain inert browser text. Never parse messages as DOM or grant sender
+ // supplied markup control of browser content or authority.
+ const hostileText = '<img src=x onerror=window.__chatC1Injected=true>';
+ await send(a,hostileText);
+ const htmlNear = await poll("untrusted markup received as inert text",()=>evaljs(b,
+   "const rows=[...document.querySelectorAll('.local-chat-item[data-channel=local]')];const text=arguments[0];const matched=rows.find(r=>r.querySelector('.local-chat-text')?.textContent===text);return {ok:!!matched,sender:matched?.querySelector('.local-chat-sender')?.textContent??null,rawHtml:matched?.querySelector('.local-chat-text')?.innerHTML??null,images:document.querySelectorAll('[data-local-chat] img').length,scriptRan:window.__chatC1Injected===true};",
+   [hostileText]));
+ assert.equal(htmlNear.sender,"Player #1","Core-derived sender ID cannot be overridden by chat text");
+ assert.equal(htmlNear.images,0,"browser must not parse untrusted chat as image markup");
+ assert.equal(htmlNear.scriptRan,false,"browser must never execute message attributes");
+ assert(!/<img/i.test(htmlNear.rawHtml),"received markup was rendered as literal HTML");
+ const hostileFar=await evaljs(c,
+   "return [...document.querySelectorAll('.local-chat-item .local-chat-text')].some(x=>x.textContent===arguments[0])",
+   [hostileText]);
+ assert.equal(hostileFar,false,"distant client may not receive hostile text either");
+ console.log("UNTRUSTED_HTML_SERVER_TEXT_ONLY_PASS",
+   JSON.stringify({near:true,sender:htmlNear.sender,images:0,executed:false,far:false}));
+
  // Genuine server validation, not a mock: 120 two-byte UTF-8 codepoints
  // must reach B under the 240-byte Core limit and never reach distant C.
  const maxBytes = "é".repeat(120);
