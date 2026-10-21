@@ -86,6 +86,18 @@ export function verifyPairEvidence(first,second){
   if(A.remoteMovedId!==B.actorId||B.remoteMovedId!==A.actorId
     ||ids(A.remoteIds)!==ids(B.localIds)
     ||ids(B.remoteIds)!==ids(A.localIds))fail("no mutual across-machine mover correlation");
+  // Each of the FOUR native Chrome/Firefox browser witnesses must converge
+  // on the same SERVER-OWNED fighter positions after both gestures settle.
+  // Independent "moved >4" checks alone permit completely divergent worlds.
+  // The 18-world-unit bound is an acceptance tolerance, NOT game authority.
+  const fourWitnesses=[...A.observed,...B.observed];
+  for(const netId of A.allIds){
+    const positions=fourWitnesses.map(frame=>frame.find(f=>f.netId===netId));
+    for(let i=0;i<positions.length;i++)for(let j=i+1;j<positions.length;j++){
+      if(Math.hypot(positions[i].x-positions[j].x,positions[i].y-positions[j].y)>18)
+        fail("native browser observers disagree on authoritative fighter "+netId);
+    }
+  }
   return Object.freeze({
     status:"EVIDENCE_STRUCTURALLY_CONSISTENT_REQUIRES_SERVER_LOGS",
     server:A.url,roles:["A","B"],attestedHosts:[A.hostId,B.hostId],
