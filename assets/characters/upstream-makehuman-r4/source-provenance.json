@@ -1,0 +1,58 @@
+{
+  "purpose": "reproducible local review source inputs; not production game runtime",
+  "sourceModel": "MakeHuman Community MPFB2 CC0 graphical assets",
+  "makeHumanSourceRepository": "https://github.com/makehumancommunity/mpfb2",
+  "makeHumanOriginalPaths": [
+    "src/mpfb/data/3dobjs/base.obj",
+    "src/mpfb/data/targets/macrodetails"
+  ],
+  "makeHumanLicense": "CC0, explicitly declared in original base.obj header",
+  "sourceMocap": "CMU Motion Capture Database Sequence 128, capture 128_10.bvh",
+  "mocapArchive": "https://github.com/Shriinivas/cmubvh/tree/master/Sequence-113-128/128/Data",
+  "mocapTerms": "CMU release for all uses; attributed research motion source",
+  "originalBlenderSoftwareBundled": false,
+  "originalExecutableMPFBCodeBundled": false,
+  "humanVisualApproved": false,
+  "reproducibleFileHashes": [
+    {
+      "path": "assets/characters/upstream-makehuman-r4/3dobjs/base.obj",
+      "sha256": "8e761e6624b8f54536409135d1636da63b32486a90d4897f84e121d144f6fb4c",
+      "bytes": 1749303
+    },
+    {
+      "path": "assets/characters/upstream-makehuman-r4/targets/macrodetails/caucasian-male-young.target.gz",
+      "sha256": "ffe69537e53148edff2776204ba48cf3bf1f3cbc72966592c8a562ab80b07333",
+      "bytes": 127922
+    },
+    {
+      "path": "assets/characters/upstream-makehuman-r4/targets/macrodetails/asian-male-young.target.gz",
+      "sha256": "0928ed8b9f08f60afb9884cf9e9f33a939ed3a85d7f136de9ccc88a76981d6d7",
+      "bytes": 130005
+    },
+    {
+      "path": "assets/characters/upstream-makehuman-r4/targets/macrodetails/african-male-young.target.gz",
+      "sha256": "05ed84d6df36e788cdfa8da0be15376850524b960cf2f17f3e592b9cf7d21c85",
+      "bytes": 132860
+    },
+    {
+      "path": "assets/characters/upstream-makehuman-r4/targets/macrodetails/caucasian-female-young.target.gz",
+      "sha256": "e9d6212373ac5f1e2c596fa145e363385f4d169c3c6c88ede3bab93b681af041",
+      "bytes": 127369
+    },
+    {
+      "path": "assets/characters/upstream-makehuman-r4/targets/macrodetails/asian-female-young.target.gz",
+      "sha256": "ee17da733288434e5b6fa120497f1fa6e72bf7faad5d694b0431d7275139170d",
+      "bytes": 135687
+    },
+    {
+      "path": "assets/characters/upstream-makehuman-r4/targets/macrodetails/african-female-young.target.gz",
+      "sha256": "1147ae55ecb0f66bade3f45176b3af187e265878322db172ad1090e9f3108e84",
+      "bytes": 123654
+    },
+    {
+      "path": "assets/characters/upstream-cmu-r4/128_10.bvh",
+      "sha256": "ca3a53f9d9cfd64bbfe5e7f8ef9155689c308c6fea5f61f18993f6177ffe12c2",
+      "bytes": 329818
+    }
+  ]
+}

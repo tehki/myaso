@@ -1,0 +1,59 @@
+{
+  "bodies": [
+    {
+      "body": "adult-masculine",
+      "clip": "roll",
+      "directionCount": 8,
+      "frameCount": 8,
+      "framePx": 160,
+      "atlasPx": [
+        1280,
+        1280
+      ],
+      "bytes": 114488,
+      "sha256": "aaae680d59ca42ce5e92681fb74e42648829fb5420de5f64fc712c2f2433c592",
+      "source": "CMU motion capture 128_10 pose retarget + CC0 MakeHuman anatomical body",
+      "authoritativeMovementModified": false,
+      "groundContactVerifiedInGame": false,
+      "artApproved": false,
+      "productionEnabled": false
+    },
+    {
+      "body": "adult-feminine",
+      "clip": "roll",
+      "directionCount": 8,
+      "frameCount": 8,
+      "framePx": 160,
+      "atlasPx": [
+        1280,
+        1280
+      ],
+      "bytes": 115498,
+      "sha256": "fdbf804de69de670b5173d53ff6a39808228e7c3331cf6c671e73292deaf13cb",
+      "source": "CMU motion capture 128_10 pose retarget + CC0 MakeHuman anatomical body",
+      "authoritativeMovementModified": false,
+      "groundContactVerifiedInGame": false,
+      "artApproved": false,
+      "productionEnabled": false
+    }
+  ],
+  "loops": [
+    "adult-roll-r4-both-bodies-all-8.gif",
+    "adult-roll-a2-versus-r4-all-8.gif"
+  ],
+  "loopMs": 350,
+  "GIFFrameMs": [
+    40,
+    40,
+    50,
+    40,
+    40,
+    50,
+    40,
+    50
+  ],
+  "groundedInActualGame": false,
+  "multiBrowserVerified": false,
+  "humanVisualApproval": false,
+  "integrationReady": false
+}

@@ -1,0 +1,134 @@
+{
+  "bodyPresentation": "adult-feminine",
+  "geometrySource": "MakeHuman Community official core basemesh and bundled CC0 morphs",
+  "sourceLicense": "CC0-1.0",
+  "sourceRepo": "https://github.com/makehumancommunity/mpfb2",
+  "sourceBaseFile": "src/mpfb/data/3dobjs/base.obj",
+  "morphTargets": [
+    {
+      "name": "caucasian-female-young.target.gz",
+      "weight": 0.3333333333333333,
+      "entries": 19150
+    },
+    {
+      "name": "asian-female-young.target.gz",
+      "weight": 0.3333333333333333,
+      "entries": 19150
+    },
+    {
+      "name": "african-female-young.target.gz",
+      "weight": 0.3333333333333333,
+      "entries": 19158
+    }
+  ],
+  "sourceVertices": 19158,
+  "bodyFaces": 13378,
+  "sourceBoneCount": 22,
+  "actions": [
+    "idle",
+    "walk",
+    "run",
+    "roll_r3_shoulder_ground"
+  ],
+  "rootTrajectory": [
+    {
+      "frame": 1,
+      "rollDegrees": 0,
+      "forwardMeters": 0,
+      "rootHeight": 0.03,
+      "proxyFloorZ": 0.03
+    },
+    {
+      "frame": 2,
+      "rollDegrees": 0,
+      "forwardMeters": 0.025,
+      "rootHeight": 0.0302,
+      "proxyFloorZ": 0.03
+    },
+    {
+      "frame": 3,
+      "rollDegrees": 8,
+      "forwardMeters": 0.08,
+      "rootHeight": 0.037,
+      "proxyFloorZ": 0.03
+    },
+    {
+      "frame": 4,
+      "rollDegrees": 33,
+      "forwardMeters": 0.17,
+      "rootHeight": 0.1309,
+      "proxyFloorZ": 0.03
+    },
+    {
+      "frame": 5,
+      "rollDegrees": 62,
+      "forwardMeters": 0.27,
+      "rootHeight": 0.2271,
+      "proxyFloorZ": 0.03
+    },
+    {
+      "frame": 7,
+      "rollDegrees": 124,
+      "forwardMeters": 0.43,
+      "rootHeight": 1.1323,
+      "proxyFloorZ": 0.03
+    },
+    {
+      "frame": 9,
+      "rollDegrees": 205,
+      "forwardMeters": 0.61,
+      "rootHeight": 1.6687,
+      "proxyFloorZ": 0.03
+    },
+    {
+      "frame": 11,
+      "rollDegrees": 269,
+      "forwardMeters": 0.77,
+      "rootHeight": 0.1581,
+      "proxyFloorZ": 0.03
+    },
+    {
+      "frame": 13,
+      "rollDegrees": 309,
+      "forwardMeters": 0.86,
+      "rootHeight": 0.0546,
+      "proxyFloorZ": 0.03
+    },
+    {
+      "frame": 16,
+      "rollDegrees": 344,
+      "forwardMeters": 0.94,
+      "rootHeight": 0.039,
+      "proxyFloorZ": 0.03
+    },
+    {
+      "frame": 19,
+      "rollDegrees": 356,
+      "forwardMeters": 0.98,
+      "rootHeight": 0.0322,
+      "proxyFloorZ": 0.03
+    },
+    {
+      "frame": 22,
+      "rollDegrees": 360,
+      "forwardMeters": 1.0,
+      "rootHeight": 0.03,
+      "proxyFloorZ": 0.03
+    }
+  ],
+  "forwardTravelMeters": 1,
+  "rollSourceMs": 350,
+  "dodgeActiveMs": 170,
+  "recoveryMs": 180,
+  "groundProxyOnly": true,
+  "trueGroundContactVerified": false,
+  "productionActive": false,
+  "humanVisualApproved": false,
+  "smoke": true,
+  "renderedFrames": {
+    "idle": 4,
+    "walk": 4,
+    "run": 4,
+    "roll": 10
+  }
+}

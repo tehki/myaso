@@ -1,0 +1,119 @@
+{
+  "body": "adult-feminine",
+  "source": "CMU Motion Capture Database 128_10 roll",
+  "sourceLicense": "CMU free for all uses",
+  "sourceBVH": "128_10.bvh",
+  "sourceArchive": "Shriinivas/cmubvh Sequence-113-128/128/Data/128_10.zip",
+  "selectedBVHFrames": [
+    37,
+    73,
+    97,
+    121,
+    157,
+    193,
+    253,
+    313
+  ],
+  "sampledRootContact": [
+    {
+      "keyframe": 1,
+      "sourceBVH": 37,
+      "rootTravelMeters": 0,
+      "contactZ": 0.035,
+      "hipOriginal": [
+        0.1414,
+        -0.3141,
+        0.1486
+      ]
+    },
+    {
+      "keyframe": 3,
+      "sourceBVH": 73,
+      "rootTravelMeters": 0.2474,
+      "contactZ": 0.035,
+      "hipOriginal": [
+        0.0633,
+        -0.1741,
+        0.1711
+      ]
+    },
+    {
+      "keyframe": 5,
+      "sourceBVH": 97,
+      "rootTravelMeters": 0.4436,
+      "contactZ": 0.035,
+      "hipOriginal": [
+        0.0205,
+        -0.0631,
+        0.1436
+      ]
+    },
+    {
+      "keyframe": 7,
+      "sourceBVH": 121,
+      "rootTravelMeters": 0.6086,
+      "contactZ": 0.035,
+      "hipOriginal": [
+        -0.0316,
+        0.0304,
+        0.08
+      ]
+    },
+    {
+      "keyframe": 9,
+      "sourceBVH": 157,
+      "rootTravelMeters": 0.7808,
+      "contactZ": 0.035,
+      "hipOriginal": [
+        -0.0678,
+        0.1278,
+        0.0189
+      ]
+    },
+    {
+      "keyframe": 11,
+      "sourceBVH": 193,
+      "rootTravelMeters": 0.8609,
+      "contactZ": 0.035,
+      "hipOriginal": [
+        -0.0912,
+        0.1732,
+        0.0482
+      ]
+    },
+    {
+      "keyframe": 15,
+      "sourceBVH": 253,
+      "rootTravelMeters": 0.9374,
+      "contactZ": 0.035,
+      "hipOriginal": [
+        -0.1343,
+        0.2165,
+        0.1249
+      ]
+    },
+    {
+      "keyframe": 22,
+      "sourceBVH": 313,
+      "rootTravelMeters": 1,
+      "contactZ": 0.035,
+      "hipOriginal": [
+        -0.1301,
+        0.2519,
+        0.177
+      ]
+    }
+  ],
+  "humanModel": "CC0 MakeHuman R3 anatomical",
+  "rollTargetMs": 350,
+  "dodgeActiveMs": 170,
+  "recoveryMs": 180,
+  "retargetMethod": "bone-local rest basis quaternion correction",
+  "separateSkinMesh": true,
+  "framesRendered": 64,
+  "smoke": false,
+  "poseApproval": false,
+  "liveGroundContactVerified": false,
+  "gameplayChanged": false,
+  "productionActive": false
+}
