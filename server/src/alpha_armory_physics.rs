@@ -48,6 +48,7 @@ pub struct GeometryWindow<'a> {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PickupGeometryReject {
     StaleAuthority,
+    StaleWorldTick,
     IncompleteGeometry,
     InvalidGeometry,
     InvalidInput,
@@ -160,6 +161,47 @@ pub fn verify_pickup_geometry(
         return Err(PickupGeometryReject::Occluded);
     }
     Ok(())
+}
+
+
+/// Source-tick equality prerequisite from the one trusted Core/Items writer.
+///
+/// Each tick MUST be sampled from the committed server-owned state while
+/// holding the SAME operation boundary, never copied from browser input.
+/// Matching numbers alone do not authenticate that lock or the source.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct PickupTickFence {
+    pub operation_tick: u32,
+    pub actor_tick: u32,
+    pub sword_tick: u32,
+    pub geometry_tick: u32,
+}
+
+/// Stronger geometry prerequisite for the checked Items sword transaction.
+///
+/// Core 8C / Items must bind operation_tick to PickupWorldTick.completed_tick,
+/// and obtain the actual Fighter, GroundDrop and complete LOS window from that
+/// exact server tick *under the same exclusive mutation lock*. A visual
+/// preview's older completed_tick cannot authorize a later pickup. A static
+/// map can be stamped with the operation tick only after verifying its current
+/// map revision and complete dynamic blocker coverage. These caller witnesses
+/// are NOT authentication or proof of mutex/lease ownership.
+pub fn verify_pickup_geometry_at_completed_tick(
+    actor: WorldPoint,
+    sword: WorldPoint,
+    window: &GeometryWindow<'_>,
+    expected_current: GeometryFence,
+    reach: f32,
+    ticks: PickupTickFence,
+) -> Result<(), PickupGeometryReject> {
+    if ticks.operation_tick == 0
+        || ticks.actor_tick != ticks.operation_tick
+        || ticks.sword_tick != ticks.operation_tick
+        || ticks.geometry_tick != ticks.operation_tick
+    {
+        return Err(PickupGeometryReject::StaleWorldTick);
+    }
+    verify_pickup_geometry(actor, sword, window, expected_current, reach)
 }
 
 #[cfg(test)]
@@ -676,6 +718,93 @@ mod tests {
         assert_eq!(
             verify_pickup_geometry(largest_actor, largest_sword, &largest_window, largest, 64.0,),
             Ok(())
+        );
+    }
+
+    #[test]
+    fn same_completed_tick_must_bind_actor_sword_geometry_and_operation() {
+        // Core's authoritative PickupWorldTick.completed_tick is u32.
+        // A stale visual preview may have valid IDs but must not be reused.
+        let ticks = PickupTickFence {
+            operation_tick: 123,
+            actor_tick: 123,
+            sword_tick: 123,
+            geometry_tick: 123,
+        };
+        let empty = window(&[]);
+        assert_eq!(
+            verify_pickup_geometry_at_completed_tick(
+                actor(), sword(), &empty, CURRENT, 64.0, ticks,
+            ),
+            Ok(())
+        );
+        for stale in [
+            PickupTickFence {
+                actor_tick: 122,
+                ..ticks
+            },
+            PickupTickFence {
+                sword_tick: 122,
+                ..ticks
+            },
+            PickupTickFence {
+                geometry_tick: 122,
+                ..ticks
+            },
+            PickupTickFence {
+                operation_tick: 124,
+                ..ticks
+            },
+            PickupTickFence {
+                operation_tick: 0,
+                actor_tick: 0,
+                sword_tick: 0,
+                geometry_tick: 0,
+            },
+        ] {
+            assert_eq!(
+                verify_pickup_geometry_at_completed_tick(
+                    actor(), sword(), &empty, CURRENT, 64.0, stale,
+                ),
+                Err(PickupGeometryReject::StaleWorldTick)
+            );
+        }
+    }
+
+    #[test]
+    fn current_completed_tick_does_not_override_los_or_current_map_fence() {
+        let ticks = PickupTickFence {
+            operation_tick: 222,
+            actor_tick: 222,
+            sword_tick: 222,
+            geometry_tick: 222,
+        };
+        let blocked = window(&[WALL]);
+        assert_eq!(
+            verify_pickup_geometry_at_completed_tick(
+                actor(), sword(), &blocked, CURRENT, 64.0, ticks,
+            ),
+            Err(PickupGeometryReject::Occluded)
+        );
+        let incomplete = GeometryWindow {
+            complete: false,
+            ..window(&[])
+        };
+        assert_eq!(
+            verify_pickup_geometry_at_completed_tick(
+                actor(), sword(), &incomplete, CURRENT, 64.0, ticks,
+            ),
+            Err(PickupGeometryReject::IncompleteGeometry)
+        );
+        let previous_revision = GeometryFence {
+            map_revision: CURRENT.map_revision - 1,
+            ..CURRENT
+        };
+        assert_eq!(
+            verify_pickup_geometry_at_completed_tick(
+                actor(), sword(), &window(&[]), previous_revision, 64.0, ticks,
+            ),
+            Err(PickupGeometryReject::StaleAuthority)
         );
     }
 
