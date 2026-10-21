@@ -41,6 +41,7 @@ const local=new Set([
  "web/armory-p0-world493-ui-review.html","web/armory-p0-world493-ui-review.mjs",
  "src/browser/armory-world493-visual-bridge.mjs","src/browser/armory-rack-visual.mjs",
  "src/browser/armory-sword-alpha-sampler.mjs",
+ "src/browser/armory-rack-presented-frame.mjs",
  "src/browser/arena-viewport.mjs",
  "assets/environment/greyhaven/armory-p0/armory_rack.webp",
  "assets/environment/greyhaven/armory-p0/armory_sword.webp"
@@ -88,6 +89,9 @@ try{
    assert.equal(alphaSampler.visiblePixels,1082);
    assert.equal(alphaSampler.productionApproved,false);
    assert.equal(initial.swordCount,4);
+   assert.equal(initial.sourcePaintCompleted,true);
+   assert.equal(initial.drawnRackCount,1);
+   assert.equal(initial.drawnSwordCount,4);
    assert.deepEqual(initial.sourceWorldSocketPositions,[[3740,4038],[3780,4038],[3820,4038],[3860,4038]]);
    assert.equal(initial.serverAuthenticatedItems,false);
    assert.equal(initial.actualServerEvents,0);
@@ -135,6 +139,8 @@ try{
    await page.mouse.up();
    const removed=await page.evaluate(()=>window.__p0WorldUiReview());
    assert.equal(removed.swordCount,3);
+   assert.equal(removed.sourcePaintCompleted,true);
+   assert.equal(removed.drawnSwordCount,3);
    assert.equal(removed.cancelled,3);
    assert.equal(removed.combatFallback,1);
    await page.evaluate(()=>document.getElementById("restore").click());

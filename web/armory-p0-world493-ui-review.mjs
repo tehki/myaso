@@ -4,6 +4,7 @@ import {MAP_IDS,getAuthoredMap} from "/__world493__/src/world/authored-maps.mjs"
 import {createWorld493RackArtPlan} from "../src/browser/armory-world493-visual-bridge.mjs";
 import {hitTestVisibleSwordAlpha,ARMORY_RACK_ART} from "../src/browser/armory-rack-visual.mjs";
 import {createArmorySwordAlphaSampler} from "../src/browser/armory-sword-alpha-sampler.mjs";
+import {paintArmoryRackPresentedFrame} from "../src/browser/armory-rack-presented-frame.mjs";
 import {createAlphaSwordGestureGate} from "/__ui503__/src/browser/alpha-sword-gesture.mjs";
 import {swordPointerCanvasPoint} from "/__ui503__/src/browser/sword-canvas-pointer.mjs";
 const canvas=document.getElementById("scene"),ctx=canvas.getContext("2d");
@@ -52,6 +53,9 @@ function snapshot(extra={}){
  visibleIds:p?.swords.map(s=>s.id)??[],swordRects:p?.swords.map(s=>({
   id:s.id,x:s.x,y:s.y,width:s.width,height:s.height,socketId:s.socketId,revision:s.revision
  }))??[],swordCount:p?.count??0,
+ sourcePaintCompleted:scene?.presentedCanvasCallCompleted??false,
+ drawnRackCount:scene?.drawnRackCount??0,
+ drawnSwordCount:scene?.drawnSwordCount??0,
  visualIntents:[...visualIntents],combatFallback,cancelled,
  browserPointerEvents:[...events],actualServerEvents:0,
  serverAuthenticatedItems:false,serverOwnedItemIds:false,
@@ -59,7 +63,7 @@ function snapshot(extra={}){
  productionApproved:false,...extra};
  return state;
 }
-let drawing=false,sourceAlpha=null,originalWorld=null;
+let sourceAlpha=null,originalWorld=null,originalDecoder=null;
 function repaint(){
  if(!originalWorld||!sourceAlpha)return null;
  const map=getAuthoredMap(MAP_IDS.overworld);
@@ -67,13 +71,15 @@ function repaint(){
   authoredMap:map,layoutVersion:WORLD_ALPHA_ARMORY_VERSION,
   committedWorldItems:items,camera:worldCamera});
  const w=originalWorld, rack=window.__rackImage,sword=window.__swordImage;
+ // Reject click candidates during any incomplete/replaced frame.
+ scene=null;
  ctx.fillStyle="#3a5747";ctx.fillRect(0,0,640,640);
  ctx.save();ctx.translate(320,320);ctx.scale(.84,.84);ctx.translate(-320,-320);
  w.draw(ctx,MAP_IDS.overworld,worldCamera,640,640,.84);ctx.restore();
- ctx.drawImage(rack,plan.rack.x,plan.rack.y);
- for(const v of plan.swords)ctx.drawImage(sword,v.x,v.y);
+ const presented=paintArmoryRackPresentedFrame({ctx,plan,rackImage:rack,
+  swordImage:sword,alphaSampler:originalDecoder,frameId:frame+1});
  frame++;
- scene={plan,sampleAlpha:sourceAlpha,frameId:frame,lastPresentedFrameId:frame};
+ scene=presented;
  snapshot({cachedTiles:w.stats.cached,sourceWorldSocketPositions:WORLD_ALPHA_ARMORY.rackSockets.map(x=>[x.x,x.y])});
  return scene;
 }
@@ -106,6 +112,7 @@ try{
   throw Error("Original Blender assets do not match");
  window.__rackImage=rack;window.__swordImage=sword;
  const decoder=createArmorySwordAlphaSampler(sword);
+ originalDecoder=decoder;
  sourceAlpha=decoder.sampleAlpha;
  window.__alphaSamplerInfo=()=>({visiblePixels:decoder.visiblePixels,
   clickablePixels:decoder.clickablePixels,stableSourcePixel:decoder.stableSourcePixel,
