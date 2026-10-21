@@ -1,0 +1,36 @@
+name: First Playable Economics Perimeter
+
+on:
+  pull_request:
+    paths:
+      - server/src/**
+      - web/**
+      - src/**
+      - scripts/verify_alpha_economy_boundary.py
+      - scripts/test_alpha_economy_boundary.py
+      - .github/workflows/economics-alpha-boundary.yml
+  push:
+    branches: [main]
+    paths:
+      - server/src/**
+      - web/**
+      - src/**
+      - scripts/verify_alpha_economy_boundary.py
+      - scripts/test_alpha_economy_boundary.py
+      - .github/workflows/economics-alpha-boundary.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify-no-economy-in-alpha:
+    name: Alpha runtime excludes experimental economy
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+      - name: Unit-test the perimeter check
+        run: python3 -m unittest discover -s scripts -p 'test_alpha_economy_boundary.py' -v
+      - name: Verify the shipping runtime import graph
+        run: python3 scripts/verify_alpha_economy_boundary.py
