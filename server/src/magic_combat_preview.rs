@@ -27,9 +27,11 @@ pub enum EmberPreviewError {
     NotPending,
     UncommittedIntent,
     CasterDead,
+    CasterInterrupted,
     WrongZone,
     InvalidCaster,
     StaleWorldTick,
+    InvalidWorldTime,
     ChangedTarget,
 }
 
@@ -83,8 +85,19 @@ pub fn preview_ember_target(
     if caster.action == Action::Dead || caster.hp <= 0.0 || ctx.loot.is_dead(caster_id) {
         return Err(EmberPreviewError::CasterDead);
     }
-    if !caster.x.is_finite() || !caster.y.is_finite() || !caster.facing.is_finite() {
+    if !caster.x.is_finite()
+        || !caster.y.is_finite()
+        || !caster.facing.is_finite()
+        || !caster.hp.is_finite()
+    {
         return Err(EmberPreviewError::InvalidCaster);
+    }
+    // A Combat-authoritative stun/knockdown must deny any target handoff even
+    // while its paid Ember outbox record is still Pending. The separate
+    // interruption checkpoint later durably closes that intent; this preview
+    // NEVER invents an interruption or applies damage.
+    if matches!(caster.action, Action::Stunned | Action::Knockdown) {
+        return Err(EmberPreviewError::CasterInterrupted);
     }
     let intent = ctx
         .magic
@@ -113,6 +126,7 @@ pub fn preview_ember_target(
         if target.net_id == caster_id
             || target.action == Action::Dead
             || target.hp <= 0.0
+            || !target.hp.is_finite()
             || !target.x.is_finite()
             || !target.y.is_finite()
             || ctx.zones.zone_of(target.net_id) != Some(intent.zone)
@@ -172,6 +186,44 @@ pub fn revalidate_ember_target(
     }
     if preview_ember_target(ctx)? != Some(proposal) {
         return Err(EmberPreviewError::ChangedTarget);
+    }
+    Ok(())
+}
+
+/// Read-only authoritative World-tick boundary for a future Combat adapter.
+/// Core MUST hold a single writer lock on World, identity, zones, loot and
+/// magic throughout admission, preview/revalidation, and any later Combat
+/// transaction. This function cannot itself verify caller lock provenance.
+/// The tick number is from the *server* tick loop, never a client message.
+///
+/// The result is a candidate only; it does not establish terrain visibility,
+/// projectile collision, PvP permissions, damage, or a durable hit receipt.
+pub fn preview_ember_target_for_completed_tick(
+    ctx: EmberCombatContext<'_>,
+    completed_tick: u32,
+) -> Result<Option<EmberTargetProposal>, EmberPreviewError> {
+    validate_completed_tick(ctx.world, completed_tick)?;
+    preview_ember_target(ctx)
+}
+
+/// Check that the target binding, selection, and complete World tick are
+/// unchanged before Combat considers an effect. No state is ever mutated.
+/// Combat owns all further authoritative hit and defense validation.
+pub fn revalidate_ember_target_for_completed_tick(
+    ctx: EmberCombatContext<'_>,
+    completed_tick: u32,
+    proposal: EmberTargetProposal,
+) -> Result<(), EmberPreviewError> {
+    validate_completed_tick(ctx.world, completed_tick)?;
+    revalidate_ember_target(ctx, proposal)
+}
+
+fn validate_completed_tick(world: &World, completed_tick: u32) -> Result<(), EmberPreviewError> {
+    if completed_tick == 0 || world.tick != completed_tick {
+        return Err(EmberPreviewError::StaleWorldTick);
+    }
+    if !world.now_ms.is_finite() || world.now_ms < 0.0 || world.now_ms >= u64::MAX as f32 {
+        return Err(EmberPreviewError::InvalidWorldTime);
     }
     Ok(())
 }
@@ -262,6 +314,245 @@ mod tests {
                 world: &self.world,
             })
         }
+    }
+
+    #[test]
+    fn genuine_combat_kick_denies_ember_target_handoff_while_pending() {
+        use crate::simulation::InputIntent;
+
+        let mut fixture = Fixture::new();
+        fixture.world.step();
+        let initial = fixture.preview(lease(1, 1), 10).unwrap().unwrap();
+        assert_eq!(initial.target_net_id, 3);
+        assert!(fixture.world.remove_player(3));
+        assert!(fixture
+            .world
+            .add_player_at(3, 242.0, 200.0, std::f32::consts::PI));
+        assert!(fixture.world.set_input(
+            3,
+            InputIntent {
+                kick: true,
+                facing_radians: std::f32::consts::PI,
+                ..InputIntent::default()
+            }
+        ));
+        for _ in 0..7 {
+            fixture.world.step_by(35.0);
+            if fixture.world.fighter(1).unwrap().action == Action::Knockdown {
+                break;
+            }
+        }
+        assert_eq!(fixture.world.fighter(1).unwrap().action, Action::Knockdown);
+        assert_eq!(
+            preview_ember_target_for_completed_tick(
+                EmberCombatContext {
+                    lease: lease(1, 1),
+                    sequence: 10,
+                    identity: &fixture.identity,
+                    loot: &fixture.loot,
+                    magic: &fixture.magic,
+                    zones: &fixture.zones,
+                    world: &fixture.world,
+                },
+                fixture.world.tick,
+            ),
+            Err(EmberPreviewError::CasterInterrupted)
+        );
+        assert_eq!(
+            revalidate_ember_target_for_completed_tick(
+                EmberCombatContext {
+                    lease: lease(1, 1),
+                    sequence: 10,
+                    identity: &fixture.identity,
+                    loot: &fixture.loot,
+                    magic: &fixture.magic,
+                    zones: &fixture.zones,
+                    world: &fixture.world,
+                },
+                fixture.world.tick,
+                initial,
+            ),
+            Err(EmberPreviewError::StaleWorldTick)
+        );
+        let forged = EmberTargetProposal {
+            world_tick: fixture.world.tick,
+            ..initial
+        };
+        assert_eq!(
+            revalidate_ember_target_for_completed_tick(
+                EmberCombatContext {
+                    lease: lease(1, 1),
+                    sequence: 10,
+                    identity: &fixture.identity,
+                    loot: &fixture.loot,
+                    magic: &fixture.magic,
+                    zones: &fixture.zones,
+                    world: &fixture.world,
+                },
+                fixture.world.tick,
+                forged,
+            ),
+            Err(EmberPreviewError::CasterInterrupted)
+        );
+        assert_eq!(fixture.magic.pending_ember_intents().count(), 1);
+        assert_eq!(
+            fixture.loot.committed_operation_sequence(fixture.character),
+            Some(10)
+        );
+    }
+
+    #[test]
+    fn completed_tick_handoff_is_read_only_and_revalidates_real_world_target() {
+        let mut fixture = Fixture::new();
+        fixture.world.step();
+        let hp_before = fixture.world.fighter(3).unwrap().hp;
+        let mana_before = fixture.magic.mana(fixture.character);
+        let pending_before = fixture.magic.pending_ember_intents().count();
+        let context = || EmberCombatContext {
+            lease: lease(1, 1),
+            sequence: 10,
+            identity: &fixture.identity,
+            loot: &fixture.loot,
+            magic: &fixture.magic,
+            zones: &fixture.zones,
+            world: &fixture.world,
+        };
+        let proposal = preview_ember_target_for_completed_tick(context(), fixture.world.tick)
+            .unwrap()
+            .unwrap();
+        assert_eq!(proposal.world_tick, fixture.world.tick);
+        assert_eq!(proposal.target_net_id, 3);
+        assert_eq!(
+            revalidate_ember_target_for_completed_tick(context(), fixture.world.tick, proposal,),
+            Ok(())
+        );
+        assert_eq!(fixture.world.fighter(3).unwrap().hp, hp_before);
+        assert_eq!(fixture.magic.mana(fixture.character), mana_before);
+        assert_eq!(
+            fixture.magic.pending_ember_intents().count(),
+            pending_before
+        );
+        assert_eq!(
+            fixture.loot.committed_operation_sequence(fixture.character),
+            Some(10)
+        );
+    }
+
+    #[test]
+    fn completed_tick_handoff_rejects_zero_stale_and_invalid_world_time() {
+        let mut fixture = Fixture::new();
+        fixture.world.step();
+        for completed_tick in [0, fixture.world.tick + 1] {
+            assert_eq!(
+                preview_ember_target_for_completed_tick(
+                    EmberCombatContext {
+                        lease: lease(1, 1),
+                        sequence: 10,
+                        identity: &fixture.identity,
+                        loot: &fixture.loot,
+                        magic: &fixture.magic,
+                        zones: &fixture.zones,
+                        world: &fixture.world,
+                    },
+                    completed_tick,
+                ),
+                Err(EmberPreviewError::StaleWorldTick)
+            );
+        }
+        for invalid_time in [f32::NAN, f32::INFINITY, -1.0, f32::MAX] {
+            let mut invalid_world = fixture.world.clone();
+            invalid_world.now_ms = invalid_time;
+            assert_eq!(
+                preview_ember_target_for_completed_tick(
+                    EmberCombatContext {
+                        lease: lease(1, 1),
+                        sequence: 10,
+                        identity: &fixture.identity,
+                        loot: &fixture.loot,
+                        magic: &fixture.magic,
+                        zones: &fixture.zones,
+                        world: &invalid_world,
+                    },
+                    invalid_world.tick,
+                ),
+                Err(EmberPreviewError::InvalidWorldTime)
+            );
+        }
+        let current = preview_ember_target_for_completed_tick(
+            EmberCombatContext {
+                lease: lease(1, 1),
+                sequence: 10,
+                identity: &fixture.identity,
+                loot: &fixture.loot,
+                magic: &fixture.magic,
+                zones: &fixture.zones,
+                world: &fixture.world,
+            },
+            fixture.world.tick,
+        )
+        .unwrap()
+        .unwrap();
+        fixture.world.step();
+        assert_eq!(
+            revalidate_ember_target_for_completed_tick(
+                EmberCombatContext {
+                    lease: lease(1, 1),
+                    sequence: 10,
+                    identity: &fixture.identity,
+                    loot: &fixture.loot,
+                    magic: &fixture.magic,
+                    zones: &fixture.zones,
+                    world: &fixture.world,
+                },
+                fixture.world.tick,
+                current,
+            ),
+            Err(EmberPreviewError::StaleWorldTick)
+        );
+        assert_eq!(fixture.magic.pending_ember_intents().count(), 1);
+    }
+
+    #[test]
+    fn completed_tick_revalidation_denies_reused_target_session_without_damage() {
+        let mut fixture = Fixture::new();
+        fixture.world.step();
+        let old = preview_ember_target_for_completed_tick(
+            EmberCombatContext {
+                lease: lease(1, 1),
+                sequence: 10,
+                identity: &fixture.identity,
+                loot: &fixture.loot,
+                magic: &fixture.magic,
+                zones: &fixture.zones,
+                world: &fixture.world,
+            },
+            fixture.world.tick,
+        )
+        .unwrap()
+        .unwrap();
+        fixture.identity.release_session(lease(3, 1)).unwrap();
+        fixture
+            .identity
+            .bind_verified(lease(3, 2), CharacterId::new(730).unwrap())
+            .unwrap();
+        assert_eq!(
+            revalidate_ember_target_for_completed_tick(
+                EmberCombatContext {
+                    lease: lease(1, 1),
+                    sequence: 10,
+                    identity: &fixture.identity,
+                    loot: &fixture.loot,
+                    magic: &fixture.magic,
+                    zones: &fixture.zones,
+                    world: &fixture.world,
+                },
+                fixture.world.tick,
+                old,
+            ),
+            Err(EmberPreviewError::ChangedTarget)
+        );
+        assert_eq!(fixture.world.fighter(3).unwrap().hp, 100.0);
+        assert_eq!(fixture.magic.pending_ember_intents().count(), 1);
     }
 
     #[test]
