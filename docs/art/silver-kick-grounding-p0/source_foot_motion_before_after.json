@@ -1,0 +1,622 @@
+{
+  "label": "Source bone toe motion ONLY: no verified Greyhaven floor, IK, root translation, or multiplayer",
+  "humanApproved": false,
+  "sourceGroundIsActualWorldGround": false,
+  "actorRootMovementChanged": false,
+  "realGameTest": false,
+  "baselineHead": "72afc96514193e8c8c0fa9ac206b277c1e937fc7",
+  "original": {
+    "maxToeXY": 0.092058,
+    "maxToeXYZ": 0.096586,
+    "maxTorsoTilt": 18.976,
+    "sourceActionFrames": [
+      1.0,
+      23.799999237060547
+    ],
+    "sampleCount": 49,
+    "samples": [
+      {
+        "frame": 1.0,
+        "toeXYDisplacement": 0.0,
+        "toeXYZDisplacement": 0.0,
+        "torsoTiltDegrees": 6.57
+      },
+      {
+        "frame": 1.5,
+        "toeXYDisplacement": 0.005699,
+        "toeXYZDisplacement": 0.006083,
+        "torsoTiltDegrees": 7.113
+      },
+      {
+        "frame": 2.0,
+        "toeXYDisplacement": 0.019836,
+        "toeXYZDisplacement": 0.020987,
+        "torsoTiltDegrees": 9.13
+      },
+      {
+        "frame": 2.5,
+        "toeXYDisplacement": 0.037914,
+        "toeXYZDisplacement": 0.039718,
+        "torsoTiltDegrees": 12.374
+      },
+      {
+        "frame": 3.0,
+        "toeXYDisplacement": 0.055325,
+        "toeXYZDisplacement": 0.057483,
+        "torsoTiltDegrees": 15.662
+      },
+      {
+        "frame": 3.5,
+        "toeXYDisplacement": 0.067527,
+        "toeXYZDisplacement": 0.069814,
+        "torsoTiltDegrees": 17.723
+      },
+      {
+        "frame": 3.7,
+        "toeXYDisplacement": 0.069977,
+        "toeXYZDisplacement": 0.072281,
+        "torsoTiltDegrees": 17.939
+      },
+      {
+        "frame": 4.0,
+        "toeXYDisplacement": 0.072595,
+        "toeXYZDisplacement": 0.074914,
+        "torsoTiltDegrees": 17.939
+      },
+      {
+        "frame": 4.5,
+        "toeXYDisplacement": 0.077681,
+        "toeXYZDisplacement": 0.08002,
+        "torsoTiltDegrees": 17.939
+      },
+      {
+        "frame": 5.0,
+        "toeXYDisplacement": 0.083048,
+        "toeXYZDisplacement": 0.085403,
+        "torsoTiltDegrees": 17.939
+      },
+      {
+        "frame": 5.5,
+        "toeXYDisplacement": 0.087841,
+        "toeXYZDisplacement": 0.090206,
+        "torsoTiltDegrees": 17.939
+      },
+      {
+        "frame": 6.0,
+        "toeXYDisplacement": 0.091131,
+        "toeXYZDisplacement": 0.093502,
+        "torsoTiltDegrees": 17.939
+      },
+      {
+        "frame": 6.4,
+        "toeXYDisplacement": 0.092058,
+        "toeXYZDisplacement": 0.094431,
+        "torsoTiltDegrees": 17.939
+      },
+      {
+        "frame": 6.5,
+        "toeXYDisplacement": 0.091376,
+        "toeXYZDisplacement": 0.093708,
+        "torsoTiltDegrees": 17.746
+      },
+      {
+        "frame": 7.0,
+        "toeXYDisplacement": 0.071658,
+        "toeXYZDisplacement": 0.072794,
+        "torsoTiltDegrees": 12.159
+      },
+      {
+        "frame": 7.5,
+        "toeXYDisplacement": 0.037794,
+        "toeXYZDisplacement": 0.037903,
+        "torsoTiltDegrees": 4.577
+      },
+      {
+        "frame": 8.0,
+        "toeXYDisplacement": 0.00857,
+        "toeXYZDisplacement": 0.021291,
+        "torsoTiltDegrees": 10.908
+      },
+      {
+        "frame": 8.5,
+        "toeXYDisplacement": 0.010943,
+        "toeXYZDisplacement": 0.028796,
+        "torsoTiltDegrees": 16.606
+      },
+      {
+        "frame": 9.0,
+        "toeXYDisplacement": 0.010615,
+        "toeXYZDisplacement": 0.027623,
+        "torsoTiltDegrees": 18.262
+      },
+      {
+        "frame": 9.5,
+        "toeXYDisplacement": 0.008225,
+        "toeXYZDisplacement": 0.026042,
+        "torsoTiltDegrees": 18.976
+      },
+      {
+        "frame": 10.0,
+        "toeXYDisplacement": 0.004856,
+        "toeXYZDisplacement": 0.024484,
+        "torsoTiltDegrees": 18.967
+      },
+      {
+        "frame": 10.5,
+        "toeXYDisplacement": 0.001763,
+        "toeXYZDisplacement": 0.023142,
+        "torsoTiltDegrees": 18.442
+      },
+      {
+        "frame": 10.6,
+        "toeXYDisplacement": 0.001389,
+        "toeXYZDisplacement": 0.022879,
+        "torsoTiltDegrees": 18.291
+      },
+      {
+        "frame": 11.0,
+        "toeXYDisplacement": 0.003737,
+        "toeXYZDisplacement": 0.01886,
+        "torsoTiltDegrees": 16.48
+      },
+      {
+        "frame": 11.5,
+        "toeXYDisplacement": 0.020235,
+        "toeXYZDisplacement": 0.021224,
+        "torsoTiltDegrees": 11.66
+      },
+      {
+        "frame": 12.0,
+        "toeXYDisplacement": 0.043621,
+        "toeXYZDisplacement": 0.044385,
+        "torsoTiltDegrees": 5.356
+      },
+      {
+        "frame": 12.5,
+        "toeXYDisplacement": 0.067922,
+        "toeXYZDisplacement": 0.071096,
+        "torsoTiltDegrees": 1.021
+      },
+      {
+        "frame": 13.0,
+        "toeXYDisplacement": 0.086214,
+        "toeXYZDisplacement": 0.091072,
+        "torsoTiltDegrees": 5.844
+      },
+      {
+        "frame": 13.5,
+        "toeXYDisplacement": 0.091226,
+        "toeXYZDisplacement": 0.096586,
+        "torsoTiltDegrees": 7.785
+      },
+      {
+        "frame": 14.0,
+        "toeXYDisplacement": 0.085293,
+        "toeXYZDisplacement": 0.090398,
+        "torsoTiltDegrees": 7.738
+      },
+      {
+        "frame": 14.5,
+        "toeXYDisplacement": 0.076174,
+        "toeXYZDisplacement": 0.080818,
+        "torsoTiltDegrees": 7.615
+      },
+      {
+        "frame": 15.0,
+        "toeXYDisplacement": 0.064895,
+        "toeXYZDisplacement": 0.068889,
+        "torsoTiltDegrees": 7.44
+      },
+      {
+        "frame": 15.5,
+        "toeXYDisplacement": 0.052479,
+        "toeXYZDisplacement": 0.055665,
+        "torsoTiltDegrees": 7.239
+      },
+      {
+        "frame": 16.0,
+        "toeXYDisplacement": 0.039922,
+        "toeXYZDisplacement": 0.042205,
+        "torsoTiltDegrees": 7.036
+      },
+      {
+        "frame": 16.5,
+        "toeXYDisplacement": 0.028184,
+        "toeXYZDisplacement": 0.029571,
+        "torsoTiltDegrees": 6.852
+      },
+      {
+        "frame": 17.0,
+        "toeXYDisplacement": 0.018187,
+        "toeXYZDisplacement": 0.018819,
+        "torsoTiltDegrees": 6.704
+      },
+      {
+        "frame": 17.5,
+        "toeXYDisplacement": 0.010821,
+        "toeXYZDisplacement": 0.010986,
+        "torsoTiltDegrees": 6.606
+      },
+      {
+        "frame": 18.0,
+        "toeXYDisplacement": 0.006966,
+        "toeXYZDisplacement": 0.007,
+        "torsoTiltDegrees": 6.57
+      },
+      {
+        "frame": 18.5,
+        "toeXYDisplacement": 0.005316,
+        "toeXYZDisplacement": 0.005341,
+        "torsoTiltDegrees": 6.57
+      },
+      {
+        "frame": 19.0,
+        "toeXYDisplacement": 0.003949,
+        "toeXYZDisplacement": 0.003968,
+        "torsoTiltDegrees": 6.57
+      },
+      {
+        "frame": 19.5,
+        "toeXYDisplacement": 0.002839,
+        "toeXYZDisplacement": 0.002852,
+        "torsoTiltDegrees": 6.57
+      },
+      {
+        "frame": 20.0,
+        "toeXYDisplacement": 0.001959,
+        "toeXYZDisplacement": 0.001969,
+        "torsoTiltDegrees": 6.57
+      },
+      {
+        "frame": 20.5,
+        "toeXYDisplacement": 0.001283,
+        "toeXYZDisplacement": 0.001289,
+        "torsoTiltDegrees": 6.57
+      },
+      {
+        "frame": 21.0,
+        "toeXYDisplacement": 0.000784,
+        "toeXYZDisplacement": 0.000788,
+        "torsoTiltDegrees": 6.57
+      },
+      {
+        "frame": 21.5,
+        "toeXYDisplacement": 0.000434,
+        "toeXYZDisplacement": 0.000437,
+        "torsoTiltDegrees": 6.57
+      },
+      {
+        "frame": 22.0,
+        "toeXYDisplacement": 0.000208,
+        "toeXYZDisplacement": 0.000209,
+        "torsoTiltDegrees": 6.57
+      },
+      {
+        "frame": 22.5,
+        "toeXYDisplacement": 7.8e-05,
+        "toeXYZDisplacement": 7.9e-05,
+        "torsoTiltDegrees": 6.57
+      },
+      {
+        "frame": 23.0,
+        "toeXYDisplacement": 1.8e-05,
+        "toeXYZDisplacement": 1.8e-05,
+        "torsoTiltDegrees": 6.57
+      },
+      {
+        "frame": 23.8,
+        "toeXYDisplacement": 0.0,
+        "toeXYZDisplacement": 0.0,
+        "torsoTiltDegrees": 6.57
+      }
+    ]
+  },
+  "corrected": {
+    "maxToeXY": 0.000487,
+    "maxToeXYZ": 0.000555,
+    "maxTorsoTilt": 18.976,
+    "sourceActionFrames": [
+      1.0,
+      23.799999237060547
+    ],
+    "sampleCount": 49,
+    "samples": [
+      {
+        "frame": 1.0,
+        "toeXYDisplacement": 0.0,
+        "toeXYZDisplacement": 0.0,
+        "torsoTiltDegrees": 6.57
+      },
+      {
+        "frame": 1.5,
+        "toeXYDisplacement": 9e-06,
+        "toeXYZDisplacement": 2.2e-05,
+        "torsoTiltDegrees": 7.113
+      },
+      {
+        "frame": 2.0,
+        "toeXYDisplacement": 1e-06,
+        "toeXYZDisplacement": 4e-06,
+        "torsoTiltDegrees": 9.13
+      },
+      {
+        "frame": 2.5,
+        "toeXYDisplacement": 2.4e-05,
+        "toeXYZDisplacement": 6.9e-05,
+        "torsoTiltDegrees": 12.374
+      },
+      {
+        "frame": 3.0,
+        "toeXYDisplacement": 3e-06,
+        "toeXYZDisplacement": 3.7e-05,
+        "torsoTiltDegrees": 15.662
+      },
+      {
+        "frame": 3.5,
+        "toeXYDisplacement": 6e-06,
+        "toeXYZDisplacement": 9e-06,
+        "torsoTiltDegrees": 17.723
+      },
+      {
+        "frame": 3.7,
+        "toeXYDisplacement": 7e-06,
+        "toeXYZDisplacement": 1.3e-05,
+        "torsoTiltDegrees": 17.939
+      },
+      {
+        "frame": 4.0,
+        "toeXYDisplacement": 0.0,
+        "toeXYZDisplacement": 1e-06,
+        "torsoTiltDegrees": 17.939
+      },
+      {
+        "frame": 4.5,
+        "toeXYDisplacement": 2e-06,
+        "toeXYZDisplacement": 2e-06,
+        "torsoTiltDegrees": 17.939
+      },
+      {
+        "frame": 5.0,
+        "toeXYDisplacement": 2e-06,
+        "toeXYZDisplacement": 5e-06,
+        "torsoTiltDegrees": 17.939
+      },
+      {
+        "frame": 5.5,
+        "toeXYDisplacement": 2e-06,
+        "toeXYZDisplacement": 8e-06,
+        "torsoTiltDegrees": 17.939
+      },
+      {
+        "frame": 6.0,
+        "toeXYDisplacement": 4e-06,
+        "toeXYZDisplacement": 1e-05,
+        "torsoTiltDegrees": 17.939
+      },
+      {
+        "frame": 6.4,
+        "toeXYDisplacement": 5e-06,
+        "toeXYZDisplacement": 1.3e-05,
+        "torsoTiltDegrees": 17.939
+      },
+      {
+        "frame": 6.5,
+        "toeXYDisplacement": 1.2e-05,
+        "toeXYZDisplacement": 1.3e-05,
+        "torsoTiltDegrees": 17.746
+      },
+      {
+        "frame": 7.0,
+        "toeXYDisplacement": 0.0,
+        "toeXYZDisplacement": 1e-06,
+        "torsoTiltDegrees": 12.159
+      },
+      {
+        "frame": 7.5,
+        "toeXYDisplacement": 0.000238,
+        "toeXYZDisplacement": 0.000555,
+        "torsoTiltDegrees": 4.577
+      },
+      {
+        "frame": 8.0,
+        "toeXYDisplacement": 1e-06,
+        "toeXYZDisplacement": 5e-06,
+        "torsoTiltDegrees": 10.908
+      },
+      {
+        "frame": 8.5,
+        "toeXYDisplacement": 1e-06,
+        "toeXYZDisplacement": 7e-06,
+        "torsoTiltDegrees": 16.606
+      },
+      {
+        "frame": 9.0,
+        "toeXYDisplacement": 0.0,
+        "toeXYZDisplacement": 1e-06,
+        "torsoTiltDegrees": 18.262
+      },
+      {
+        "frame": 9.5,
+        "toeXYDisplacement": 0.000449,
+        "toeXYZDisplacement": 0.000553,
+        "torsoTiltDegrees": 18.976
+      },
+      {
+        "frame": 10.0,
+        "toeXYDisplacement": 3e-06,
+        "toeXYZDisplacement": 4e-06,
+        "torsoTiltDegrees": 18.967
+      },
+      {
+        "frame": 10.5,
+        "toeXYDisplacement": 0.000191,
+        "toeXYZDisplacement": 0.000298,
+        "torsoTiltDegrees": 18.442
+      },
+      {
+        "frame": 10.6,
+        "toeXYDisplacement": 3e-06,
+        "toeXYZDisplacement": 5e-06,
+        "torsoTiltDegrees": 18.291
+      },
+      {
+        "frame": 11.0,
+        "toeXYDisplacement": 1e-06,
+        "toeXYZDisplacement": 1e-06,
+        "torsoTiltDegrees": 16.48
+      },
+      {
+        "frame": 11.5,
+        "toeXYDisplacement": 0.000253,
+        "toeXYZDisplacement": 0.000357,
+        "torsoTiltDegrees": 11.66
+      },
+      {
+        "frame": 12.0,
+        "toeXYDisplacement": 5e-06,
+        "toeXYZDisplacement": 6e-06,
+        "torsoTiltDegrees": 5.356
+      },
+      {
+        "frame": 12.5,
+        "toeXYDisplacement": 0.000487,
+        "toeXYZDisplacement": 0.000494,
+        "torsoTiltDegrees": 1.021
+      },
+      {
+        "frame": 13.0,
+        "toeXYDisplacement": 5e-06,
+        "toeXYZDisplacement": 7e-06,
+        "torsoTiltDegrees": 5.844
+      },
+      {
+        "frame": 13.5,
+        "toeXYDisplacement": 8e-06,
+        "toeXYZDisplacement": 1e-05,
+        "torsoTiltDegrees": 7.785
+      },
+      {
+        "frame": 14.0,
+        "toeXYDisplacement": 0.0,
+        "toeXYZDisplacement": 0.0,
+        "torsoTiltDegrees": 7.738
+      },
+      {
+        "frame": 14.5,
+        "toeXYDisplacement": 0.000446,
+        "toeXYZDisplacement": 0.000463,
+        "torsoTiltDegrees": 7.615
+      },
+      {
+        "frame": 15.0,
+        "toeXYDisplacement": 0.0,
+        "toeXYZDisplacement": 0.0,
+        "torsoTiltDegrees": 7.44
+      },
+      {
+        "frame": 15.5,
+        "toeXYDisplacement": 0.000121,
+        "toeXYZDisplacement": 0.000124,
+        "torsoTiltDegrees": 7.239
+      },
+      {
+        "frame": 16.0,
+        "toeXYDisplacement": 0.0,
+        "toeXYZDisplacement": 0.0,
+        "torsoTiltDegrees": 7.036
+      },
+      {
+        "frame": 16.5,
+        "toeXYDisplacement": 2.9e-05,
+        "toeXYZDisplacement": 3.2e-05,
+        "torsoTiltDegrees": 6.852
+      },
+      {
+        "frame": 17.0,
+        "toeXYDisplacement": 0.0,
+        "toeXYZDisplacement": 0.0,
+        "torsoTiltDegrees": 6.704
+      },
+      {
+        "frame": 17.5,
+        "toeXYDisplacement": 4e-06,
+        "toeXYZDisplacement": 1e-05,
+        "torsoTiltDegrees": 6.606
+      },
+      {
+        "frame": 18.0,
+        "toeXYDisplacement": 1e-06,
+        "toeXYZDisplacement": 4e-06,
+        "torsoTiltDegrees": 6.57
+      },
+      {
+        "frame": 18.5,
+        "toeXYDisplacement": 0.0,
+        "toeXYZDisplacement": 1e-06,
+        "torsoTiltDegrees": 6.57
+      },
+      {
+        "frame": 19.0,
+        "toeXYDisplacement": 0.0,
+        "toeXYZDisplacement": 0.0,
+        "torsoTiltDegrees": 6.57
+      },
+      {
+        "frame": 19.5,
+        "toeXYDisplacement": 0.0,
+        "toeXYZDisplacement": 0.0,
+        "torsoTiltDegrees": 6.57
+      },
+      {
+        "frame": 20.0,
+        "toeXYDisplacement": 0.0,
+        "toeXYZDisplacement": 0.0,
+        "torsoTiltDegrees": 6.57
+      },
+      {
+        "frame": 20.5,
+        "toeXYDisplacement": 0.0,
+        "toeXYZDisplacement": 0.0,
+        "torsoTiltDegrees": 6.57
+      },
+      {
+        "frame": 21.0,
+        "toeXYDisplacement": 0.0,
+        "toeXYZDisplacement": 0.0,
+        "torsoTiltDegrees": 6.57
+      },
+      {
+        "frame": 21.5,
+        "toeXYDisplacement": 0.0,
+        "toeXYZDisplacement": 0.0,
+        "torsoTiltDegrees": 6.57
+      },
+      {
+        "frame": 22.0,
+        "toeXYDisplacement": 0.0,
+        "toeXYZDisplacement": 0.0,
+        "torsoTiltDegrees": 6.57
+      },
+      {
+        "frame": 22.5,
+        "toeXYDisplacement": 0.0,
+        "toeXYZDisplacement": 0.0,
+        "torsoTiltDegrees": 6.57
+      },
+      {
+        "frame": 23.0,
+        "toeXYDisplacement": 0.0,
+        "toeXYZDisplacement": 0.0,
+        "torsoTiltDegrees": 6.57
+      },
+      {
+        "frame": 23.8,
+        "toeXYDisplacement": 0.0,
+        "toeXYZDisplacement": 0.0,
+        "torsoTiltDegrees": 6.57
+      }
+    ]
+  },
+  "relativeXYZReductionPct": 99.4,
+  "relativeXYReductionPct": 99.5
+}

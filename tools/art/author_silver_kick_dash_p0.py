@@ -11,6 +11,9 @@ p.add_argument("--source",required=True)
 p.add_argument("--output",required=True)
 p.add_argument("--smoke",action="store_true")
 p.add_argument("--smoke-fast",action="store_true")
+p.add_argument("--kick-only",action="store_true",help="Bake corrected kick only; retain parent original dash atlas")
+p.add_argument("--no-render",action="store_true",help="Validate independently saved original-source Blender actions before spending time on sprite baking")
+p.add_argument("--plant-kick",action="store_true",help="Correct original Blender pose-action hip center to hold the original support toe; source-only, not actual Greyhaven floor proof")
 p.add_argument("--samples",type=int,default=1)
 p.add_argument("--engine",choices=["CYCLES","BLENDER_EEVEE_NEXT"],default="CYCLES")
 args=p.parse_args(argv)
@@ -111,6 +114,64 @@ dashKeys=[(1,{},(0,0,0)),
 kick=new_action("Graphics3A_P0_Silver_Kick_380ms",kickKeys)
 dash=new_action("Graphics3A_P0_Silver_Dash_140ms",dashKeys)
 actions={"silver_kick_p0":kick,"silver_dash_p0":dash}
+plantSummary=None
+if args.plant_kick:
+ # Original author-rig toe joint is an ART reference, not a collision contact.
+ # Each authored 60fps source tick receives a Hips-origin compensation computed
+ # directly from the original armature pose. This DOES NOT translate the actor
+ # object/world position or influence server movement. It is not a replacement
+ # for a real IK/ground/contact acceptance in Greyhaven.
+ arm.animation_data.action=kick
+ arm.animation_data.action_slot=kick.slots[0]
+ def toe_world():
+  return arm.matrix_world @ arm.pose.bones[rigKey+"LeftToeBase"].head
+ hip=arm.pose.bones[rigKey+"Hips"]
+ sc.frame_set(1);bpy.context.view_layer.update()
+ anchor=toe_world().copy()
+ baseline=[]
+ stabilized=[]
+ # BOTH the integer 60fps tick and ORIGINAL fractional authored
+ # anticipation/strike/recovery pose keys must be stabilized. Previously
+ # fractional keys reset the toe when the action was reopened.
+ sourceKeyFrames=[1.0,3.7,6.4,8.5,10.6,13.5,18.0,23.8]
+ contactFrames=sorted(set(sourceKeyFrames+[float(f) for f in range(1,24)]))
+ for frame in contactFrames:
+  sc.frame_set(int(frame),subframe=frame-int(frame));bpy.context.view_layer.update()
+  before=toe_world().copy()
+  baseline.append(round((before-anchor).length,6))
+  # Numerical 3x3 mapping of hip pose-local translation onto support toe
+  # world placement. Use stable finite differences rather than guessing rig
+  # axes; this guards Blender glTF-imported rotated bones.
+  originalLoc=hip.location.copy()
+  eps=1e-4
+  cols=[]
+  for axis in range(3):
+   hip.location[axis]+=eps
+   bpy.context.view_layer.update()
+   cols.append((toe_world()-before)/eps)
+   hip.location=originalLoc.copy()
+  bpy.context.view_layer.update()
+  from mathutils import Matrix
+  basis3=Matrix(((cols[0].x,cols[1].x,cols[2].x),
+                 (cols[0].y,cols[1].y,cols[2].y),
+                 (cols[0].z,cols[1].z,cols[2].z)))
+  assert abs(basis3.determinant())>1e-7,"Hip-to-toe rig source basis singular"
+  correction=basis3.inverted()@(anchor-before)
+  # Cap suspiciously large corrections instead of producing hidden rig flips.
+  assert correction.length < .22,(frame,tuple(correction))
+  hip.location=originalLoc+correction
+  bpy.context.view_layer.update()
+  after=toe_world()
+  stabilized.append(round((after-anchor).length,6))
+  assert (after-anchor).length < .002,(frame,tuple(after-anchor))
+  hip.keyframe_insert(data_path="location",frame=frame,group=hip.name)
+ plantSummary={"method":"Blender original 22-bone LeftToeBase held by source Hips pose origin correction; not World IK",
+  "sampleCount":len(contactFrames),"originalKickToeMaxDeviation":max(baseline),
+  "plantedKickToeMaxDeviation":max(stabilized),
+  "sourceFootAnchor":[round(x,5) for x in anchor],
+  "serverRootTranslation":False,"actualFloorProven":False}
+ print("SOURCE_KICK_SUPPORT_PLANT",json.dumps(plantSummary),flush=True)
+
 # Preserve original source mesh in Blender only for rendering; output action-
 # only .blend with original source 22-bone skeleton and both actual editable
 # keyframed action blocks, not redistributing original owner GLB art.
@@ -151,6 +212,7 @@ samples={"silver_kick_p0":[1,3.7,6.4,8.5,10.6,13.5,18.0,23.8],
          "silver_dash_p0":[1,2.1,3.7,4.9,6.0,7.6,8.3,9.4]}
 rendered=[]
 for clip,frames in samples.items():
+ if args.no_render or (args.kick_only and clip!="silver_kick_p0"):continue
  act=actions[clip]
  arm.animation_data.action=act
  arm.animation_data.action_slot=act.slots[0]
@@ -180,7 +242,7 @@ if not (args.smoke or args.smoke_fast):
  arm.animation_data.action=kick
  arm.animation_data.action_slot=kick.slots[0]
  for act in actions.values():act.use_fake_user=True
- blend=out/"Graphics3A_Silver_Kick_Dash_action_source.blend"
+ blend=out/("Graphics3A_Silver_Kick_Dash_grounded_action_source.blend" if args.plant_kick else "Graphics3A_Silver_Kick_Dash_action_source.blend")
  bpy.ops.wm.save_as_mainfile(filepath=str(blend))
  assert blend.stat().st_size>30000
  print("ACTION_BLEND_SOURCE",blend.stat().st_size,flush=True)
@@ -194,5 +256,6 @@ if not (args.smoke or args.smoke_fast):
  "sourceRigBones":22,"worldGroundValidated":False,
  "originalArtReplaced":False,"realGreyhaven":False,"humanVisualApproved":False,
  "trueServerEvent":False,"sourceEditableBlend":not args.smoke,
+ "kickSupportFootSourceOnly":plantSummary,
  "rendered":rendered},indent=2)+"\n")
 print("KICK_DASH_BAKE_COMPLETED",len(rendered),flush=True)
