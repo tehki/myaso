@@ -221,9 +221,9 @@ mod tests {
             Ok(())
         );
         let mut below_gap = actor();
-        below_gap.y = 3966.0;
+        below_gap.y = 3978.0;
         assert_eq!(
-            verify_pickup_geometry(below_gap, sword(), &window(&[top, bottom]), CURRENT, 64.0),
+            verify_pickup_geometry(below_gap, sword(), &window(&[top, bottom]), CURRENT, 96.0),
             Err(PickupGeometryReject::Occluded)
         );
     }
