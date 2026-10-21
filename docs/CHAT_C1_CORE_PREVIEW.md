@@ -136,3 +136,13 @@ a genuinely new transport after disconnection still advances the
 deduplication epoch and quarantines stale old callbacks/ACKs. The new
 adapter-lifecycle regression first failed under the former implementation
 and passes after this change. No production network or Core changes.
+
+### Real-server untrusted chat markup and sender-identity acceptance
+
+The authentic three-browser WebTransport run now submits a literal
+image-tag/onerror message from player A over the real Core chat stream.
+Player B must receive the exact text with server-owned Player #1 label.
+The DOM may contain no materialized img tags or executed event handler;
+player C outside proximity receives nothing. This is actual Chromium
+and Firefox behavior, not an injected fake chat callback. All content
+is rendered by the original UI textContent code, not innerHTML.
