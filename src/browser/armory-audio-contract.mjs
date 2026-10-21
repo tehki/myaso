@@ -30,6 +30,8 @@ export function cueForAuthoritativeStrike(equipment, action) {
 
 /**
  * Suppress repeated, stale and cross-session confirmed item audio.
+ * De-duplication uses monotonically advancing per-item revisions and bounded
+ * per-item memory; receipt IDs are validated, but not stored indefinitely.
  * The proposed receipt has:
  * {source:"authoritative", status:"COMMITTED", sessionEpoch:string,
  *  receiptId:string, actorNetId:positive int, itemId:string,
@@ -42,12 +44,10 @@ export function cueForAuthoritativeStrike(equipment, action) {
  */
 export function createConfirmedArmoryCueGate({ maxItems = 128 } = {}) {
   const revisionByItem = new Map();
-  const receiptIds = new Set();
   let currentSessionEpoch = null;
   const limit = Number.isSafeInteger(maxItems) && maxItems > 0 ? maxItems : 128;
   function reset() {
     revisionByItem.clear();
-    receiptIds.clear();
     currentSessionEpoch = null;
   }
   return Object.freeze({
@@ -55,7 +55,6 @@ export function createConfirmedArmoryCueGate({ maxItems = 128 } = {}) {
       if (!idValid(sessionEpoch)) { reset(); return false; }
       if (sessionEpoch !== currentSessionEpoch) {
         revisionByItem.clear();
-        receiptIds.clear();
       }
       currentSessionEpoch = sessionEpoch;
       return true;
@@ -67,13 +66,11 @@ export function createConfirmedArmoryCueGate({ maxItems = 128 } = {}) {
         || !idValid(receipt?.itemId) || !idValid(receipt?.receiptId)
         || !Number.isSafeInteger(receipt?.actorNetId) || receipt.actorNetId <= 0
         || !Number.isSafeInteger(receipt?.itemRevision) || receipt.itemRevision <= 0) return null;
-      if (receiptIds.has(receipt.receiptId)) return null;
       const lastRevision = revisionByItem.get(receipt.itemId);
       if (lastRevision !== undefined && receipt.itemRevision <= lastRevision) return null;
       // Fail silent when exhausted rather than evicting old receipts and
       // accidentally replaying stale sounds during long sessions.
       if (lastRevision === undefined && revisionByItem.size >= limit) return null;
-      receiptIds.add(receipt.receiptId);
       revisionByItem.set(receipt.itemId, receipt.itemRevision);
       return Object.freeze({
         cue: ITEM_CUES[receipt.operation],
