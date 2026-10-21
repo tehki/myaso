@@ -24,6 +24,7 @@ import { summarizeM220KnockdownFocusTimeline } from "./m220-knockdown-focus-time
 import { mustAwaitM202GuardConvergence } from "./m202-guardbreak-convergence.mjs";
 import { verifyM201ServerPunishProof } from "./m201-authoritative-phase-proof.mjs";
 import { verifyM206ServerKnockdownPunish } from "./m206-knockdown-punish-proof.mjs";
+import { verifyM147AuthoritativeRecoveryPunish } from "./m147-authoritative-recovery-punish.mjs";
 import { createM147RecoveryCueReceipt, dispatchM147CuePunish,
   planM147OrdinaryFocusRetreat, M147_BROWSER_CUE_OBSERVER } from "./m147-recovery-cue-receipt.mjs";
 import { verifyM156RollKnockdownPunish } from "./m156-roll-knockdown-proof.mjs";
@@ -545,6 +546,7 @@ async function startGameServer() {
       MYASO_BIND: "127.0.0.1:0",
       MYASO_FLIGHT_ACTION_PROOF: (scenario === "uiguardbreakpunishffahit"
         || scenario === "uiguardbreak" || scenario === "uiguardbreaktell"
+        || scenario === "uijumppunishffa"
         || scenario === "uiparrytell"
         || scenario === "uidirectionallight" || scenario === "uifeint"
         || scenario === "uithreat" || scenario === "uithreatbearing"
@@ -11219,6 +11221,9 @@ async function runOnlineUiJumpRecoveryFfaPunishFlight(entries) {
   await aimArena(jumpAttacker, jumpArena, -200);
   await sleep(40);
   await aimArena(observer, observerArena, -200);
+  // The same loopback-only Rust 60Hz action/HIT proof as M41/M205.
+  // The Firefox rendered cue may precede Chrome's receipt of that same tick.
+  const m147AuthStart = m201ServerOutput().length;
   // Arm a read-only cue notification before the native attacker command.
   // No outstanding Firefox execute/async command may delay its actual click.
   const cueLease = m147CueReceipt.arm({ observerId, targetId: jumpId, ids });
@@ -11325,7 +11330,7 @@ async function runOnlineUiJumpRecoveryFfaPunishFlight(entries) {
     || observerState.acceptance?.scenario !== "uijumppunishffa"
     || closerState.acceptance?.scenario !== "uijumppunishffa"
     || recoveryIndex < 0 || idleIndex <= recoveryIndex
-    || punishDown.epochMs < recovery.epochMs || punishDown.epochMs >= idle.epochMs) {
+    || punishDown.epochMs >= idle.epochMs) {
     throw new Error(`${milestone} Firefox did not commit its real light inside #${jumpId}'s authoritative recovery: ${JSON.stringify({
       punishDown,
       recovery,
@@ -11333,6 +11338,21 @@ async function runOnlineUiJumpRecoveryFfaPunishFlight(entries) {
       lifecycle,
     })}`);
   }
+
+  // A server-authored recovery tick may reach Firefox before Chrome; never
+  // use Chrome's later replica wall-clock timestamp to deny a real click.
+  // Stronger server evidence now requires the exact attacker/target 34HP hit
+  // AFTER real jump recovery started but BEFORE the target returned idle.
+  const authoritativePunish = verifyM147AuthoritativeRecoveryPunish(
+    m201ServerOutput().slice(m147AuthStart), {
+      victimId: jumpId, attackerId: observerId,
+      recoveryTick: recovery.serverTick, idleTick: idle.serverTick,
+      cueTick: observed.serverTick,
+      cueTargetAction: observed.fighters.find((fighter) => fighter.netId === jumpId)?.action,
+      cueEpochMs: recoveryCue.epochMs, pointerDownEpochMs: punishDown.epochMs,
+    },
+  );
+  console.log("M147_AUTHORITATIVE_RECOVERY_PUNISH " + JSON.stringify(authoritativePunish));
 
   const focusTransitions = observerState.focusTransitions.slice(observerFocusOffset);
   const punishFocus = focusTransitions.find((entry) => entry.label === `PUNISH TARGET #${jumpId}`);
