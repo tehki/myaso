@@ -456,10 +456,22 @@ mod tests {
             import.stage_owner(LegacyDomain::Item, raw).unwrap();
         }
         let four = [
-            LegacyRackSword { legacy_item_id: 201, checkpoint_kind_code: 0 },
-            LegacyRackSword { legacy_item_id: 202, checkpoint_kind_code: 8 },
-            LegacyRackSword { legacy_item_id: 203, checkpoint_kind_code: 0 },
-            LegacyRackSword { legacy_item_id: 204, checkpoint_kind_code: 8 },
+            LegacyRackSword {
+                legacy_item_id: 201,
+                checkpoint_kind_code: 0,
+            },
+            LegacyRackSword {
+                legacy_item_id: 202,
+                checkpoint_kind_code: 8,
+            },
+            LegacyRackSword {
+                legacy_item_id: 203,
+                checkpoint_kind_code: 0,
+            },
+            LegacyRackSword {
+                legacy_item_id: 204,
+                checkpoint_kind_code: 8,
+            },
         ];
         let checked = preflight_four_armory_swords(&import, four).unwrap();
         assert_eq!(checked.len(), 4);
@@ -479,10 +491,22 @@ mod tests {
             import.stage_owner(LegacyDomain::Item, raw).unwrap();
         }
         let four = [
-            LegacyRackSword { legacy_item_id: 201, checkpoint_kind_code: 0 },
-            LegacyRackSword { legacy_item_id: 202, checkpoint_kind_code: 8 },
-            LegacyRackSword { legacy_item_id: 203, checkpoint_kind_code: 0 },
-            LegacyRackSword { legacy_item_id: 204, checkpoint_kind_code: 8 },
+            LegacyRackSword {
+                legacy_item_id: 201,
+                checkpoint_kind_code: 0,
+            },
+            LegacyRackSword {
+                legacy_item_id: 202,
+                checkpoint_kind_code: 8,
+            },
+            LegacyRackSword {
+                legacy_item_id: 203,
+                checkpoint_kind_code: 0,
+            },
+            LegacyRackSword {
+                legacy_item_id: 204,
+                checkpoint_kind_code: 8,
+            },
         ];
         assert_eq!(
             preflight_four_armory_swords(&import, four),
