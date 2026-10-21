@@ -1,0 +1,660 @@
+{
+  "milestone": "Blood & Iron A2.34 genuine first-party World #336 canvas renderer and artist-depth integration review",
+  "pinnedHeads": {
+    "world": "260a7b85a33b7a51663a70af8d410e0d33e0e236",
+    "c3": "8e85584b6007b38e1a00155b77473e92b0afec6a",
+    "knight": "c74fcf90e227f3bc4788728f000cfe6aa083c7ef"
+  },
+  "sourceHashes": {
+    "/src/browser/authored-world-renderer.mjs": "db5274b9ad3ea8e28f4a2ef44358cfed247d0625785dc353577a3ee6d136f9e9",
+    "/src/world/authored-maps.mjs": "21e7663303b14cc89f7dece7d73fda3b7e1fd4b70cc97b8753cd2c793209e144",
+    "/__a234_3c__/greyhaven-atmosphere.mjs": "ddd5b8ea3111107a8786bc890baec9f740f2fe9de4c8fdd392fe82b227597600",
+    "/__a234_knights__/silver_idle.webp": "828cf05dd873d0c8f35e887f5e46c35af87f084ac321977e358c985e7a2106b4"
+  },
+  "originalWorldRendererModuleLoaded": true,
+  "originalWorldUnmodified": true,
+  "redLionWorldPlaceholderStillDrawn": true,
+  "realOnlineClientExecuted": false,
+  "actualMultiplayerNetworkConnected": false,
+  "screenshots": 6,
+  "results": [
+    {
+      "engine": "chrome",
+      "version": "Chrome/154.0.8037.99",
+      "errors": [],
+      "captures": [
+        {
+          "screenshot": "greyhaven_a234_chrome_north.png",
+          "state": {
+            "ready": true,
+            "frames": 14,
+            "dy": -20,
+            "cameraEast": 0,
+            "roofOpacity": 0.4,
+            "actorWorldXY": [
+              4357,
+              4055
+            ],
+            "actorScreenXY": [
+              313.28,
+              303.2
+            ],
+            "actorXYErrorPx": 0,
+            "visualDoor": [
+              4365,
+              4075
+            ],
+            "authoredWorldEntrance": [
+              4365,
+              4060
+            ],
+            "threeCFixtureWorldXY": [
+              4365,
+              4045
+            ],
+            "worldSourceHead": "260a7b85a33b7a51663a70af8d410e0d33e0e236",
+            "source3CHead": "8e85584b6007b38e1a00155b77473e92b0afec6a",
+            "realWorld336RendererUsed": true,
+            "world336OptInSourcePresent": true,
+            "placeholderTavernStillDrawnByWorld336": true,
+            "rawWorldBuildingDepthSortingPresent": false,
+            "proposedBehindIds": [
+              "knight"
+            ],
+            "proposedFrontIds": [],
+            "sourceRendererStats": {
+              "world": {
+                "ms": 0.2999999523162842,
+                "tilesCreated": 0,
+                "tilesVisible": 6,
+                "tilesCached": 6
+              },
+              "composite": {
+                "ms": 0.2999999523162842,
+                "tilesCreated": 0,
+                "tilesVisible": 6,
+                "tilesCached": 6
+              }
+            },
+            "warmSamples": {
+              "worldWarmMs": [
+                0.39999985694885254,
+                0.20000004768371582,
+                0.5,
+                0.40000009536743164,
+                0.40000009536743164,
+                0.20000004768371582,
+                0.2999999523162842,
+                0.20000004768371582,
+                0.3000001907348633,
+                0.7000000476837158,
+                0.5999999046325684,
+                0.2999999523162842
+              ],
+              "compositeWarmMs": [
+                0.3000001907348633,
+                0.2999999523162842,
+                0.39999985694885254,
+                0.2999999523162842,
+                0.2999999523162842,
+                0.2999999523162842,
+                0.09999990463256836,
+                0.09999990463256836,
+                0.2999999523162842,
+                0.19999980926513672,
+                0.2999999523162842,
+                0.2999999523162842
+              ]
+            },
+            "actualOnlineGameExecuted": false,
+            "liveServerAttached": false,
+            "portalOrCollisionModified": false,
+            "productionApproved": false
+          }
+        },
+        {
+          "screenshot": "greyhaven_a234_chrome_south.png",
+          "state": {
+            "ready": true,
+            "frames": 20,
+            "dy": 20,
+            "cameraEast": 0,
+            "roofOpacity": 0.4,
+            "actorWorldXY": [
+              4357,
+              4095
+            ],
+            "actorScreenXY": [
+              313.28,
+              336.8
+            ],
+            "actorXYErrorPx": 0,
+            "visualDoor": [
+              4365,
+              4075
+            ],
+            "authoredWorldEntrance": [
+              4365,
+              4060
+            ],
+            "threeCFixtureWorldXY": [
+              4365,
+              4045
+            ],
+            "worldSourceHead": "260a7b85a33b7a51663a70af8d410e0d33e0e236",
+            "source3CHead": "8e85584b6007b38e1a00155b77473e92b0afec6a",
+            "realWorld336RendererUsed": true,
+            "world336OptInSourcePresent": true,
+            "placeholderTavernStillDrawnByWorld336": true,
+            "rawWorldBuildingDepthSortingPresent": false,
+            "proposedBehindIds": [],
+            "proposedFrontIds": [
+              "knight"
+            ],
+            "sourceRendererStats": {
+              "world": {
+                "ms": 0.9000000953674316,
+                "tilesCreated": 0,
+                "tilesVisible": 6,
+                "tilesCached": 6
+              },
+              "composite": {
+                "ms": 0.20000004768371582,
+                "tilesCreated": 0,
+                "tilesVisible": 6,
+                "tilesCached": 6
+              }
+            },
+            "warmSamples": {
+              "worldWarmMs": [
+                0.39999985694885254,
+                0.20000004768371582,
+                0.5,
+                0.40000009536743164,
+                0.40000009536743164,
+                0.20000004768371582,
+                0.2999999523162842,
+                0.20000004768371582,
+                0.3000001907348633,
+                0.7000000476837158,
+                0.5999999046325684,
+                0.2999999523162842,
+                0.7000000476837158,
+                0.20000004768371582,
+                0.19999980926513672,
+                0.20000004768371582,
+                0.3000001907348633,
+                0.9000000953674316
+              ],
+              "compositeWarmMs": [
+                0.3000001907348633,
+                0.2999999523162842,
+                0.39999985694885254,
+                0.2999999523162842,
+                0.2999999523162842,
+                0.2999999523162842,
+                0.09999990463256836,
+                0.09999990463256836,
+                0.2999999523162842,
+                0.19999980926513672,
+                0.2999999523162842,
+                0.2999999523162842,
+                0.5,
+                0.09999990463256836,
+                0.3000001907348633,
+                0.20000004768371582,
+                0.19999980926513672,
+                0.20000004768371582
+              ]
+            },
+            "actualOnlineGameExecuted": false,
+            "liveServerAttached": false,
+            "portalOrCollisionModified": false,
+            "productionApproved": false
+          }
+        },
+        {
+          "screenshot": "greyhaven_a234_chrome_camera-east.png",
+          "state": {
+            "ready": true,
+            "frames": 26,
+            "dy": -20,
+            "cameraEast": 80,
+            "roofOpacity": 0.4,
+            "actorWorldXY": [
+              4357,
+              4055
+            ],
+            "actorScreenXY": [
+              246.07999999999998,
+              303.2
+            ],
+            "actorXYErrorPx": 0,
+            "visualDoor": [
+              4365,
+              4075
+            ],
+            "authoredWorldEntrance": [
+              4365,
+              4060
+            ],
+            "threeCFixtureWorldXY": [
+              4365,
+              4045
+            ],
+            "worldSourceHead": "260a7b85a33b7a51663a70af8d410e0d33e0e236",
+            "source3CHead": "8e85584b6007b38e1a00155b77473e92b0afec6a",
+            "realWorld336RendererUsed": true,
+            "world336OptInSourcePresent": true,
+            "placeholderTavernStillDrawnByWorld336": true,
+            "rawWorldBuildingDepthSortingPresent": false,
+            "proposedBehindIds": [
+              "knight"
+            ],
+            "proposedFrontIds": [],
+            "sourceRendererStats": {
+              "world": {
+                "ms": 0.2999999523162842,
+                "tilesCreated": 0,
+                "tilesVisible": 6,
+                "tilesCached": 6
+              },
+              "composite": {
+                "ms": 0.20000004768371582,
+                "tilesCreated": 0,
+                "tilesVisible": 6,
+                "tilesCached": 6
+              }
+            },
+            "warmSamples": {
+              "worldWarmMs": [
+                0.39999985694885254,
+                0.20000004768371582,
+                0.5,
+                0.40000009536743164,
+                0.40000009536743164,
+                0.20000004768371582,
+                0.2999999523162842,
+                0.20000004768371582,
+                0.3000001907348633,
+                0.7000000476837158,
+                0.5999999046325684,
+                0.2999999523162842,
+                0.7000000476837158,
+                0.20000004768371582,
+                0.19999980926513672,
+                0.20000004768371582,
+                0.3000001907348633,
+                0.9000000953674316,
+                0.10000014305114746,
+                0.3000001907348633,
+                0.20000004768371582,
+                0.2999999523162842,
+                0.19999980926513672,
+                0.2999999523162842
+              ],
+              "compositeWarmMs": [
+                0.3000001907348633,
+                0.2999999523162842,
+                0.39999985694885254,
+                0.2999999523162842,
+                0.2999999523162842,
+                0.2999999523162842,
+                0.09999990463256836,
+                0.09999990463256836,
+                0.2999999523162842,
+                0.19999980926513672,
+                0.2999999523162842,
+                0.2999999523162842,
+                0.5,
+                0.09999990463256836,
+                0.3000001907348633,
+                0.20000004768371582,
+                0.19999980926513672,
+                0.20000004768371582,
+                0.09999990463256836,
+                0.19999980926513672,
+                0.20000004768371582,
+                0.39999985694885254,
+                0.40000009536743164,
+                0.20000004768371582
+              ]
+            },
+            "actualOnlineGameExecuted": false,
+            "liveServerAttached": false,
+            "portalOrCollisionModified": false,
+            "productionApproved": false
+          }
+        }
+      ],
+      "warmSampleCount": 20,
+      "worldWarmP95Ms": 0.2999999523162842,
+      "composedWarmP95Ms": 0.2999999523162842,
+      "worldTilesCreatedMax": 0,
+      "cacheBound": 24,
+      "buildBound": 3,
+      "gameFrameTimeClaimed": false,
+      "liveServerTested": false
+    },
+    {
+      "engine": "firefox",
+      "version": "firefox/153.4.0",
+      "errors": [],
+      "captures": [
+        {
+          "screenshot": "greyhaven_a234_firefox_north.png",
+          "state": {
+            "ready": true,
+            "frames": 14,
+            "dy": -20,
+            "cameraEast": 0,
+            "roofOpacity": 0.4,
+            "actorWorldXY": [
+              4357,
+              4055
+            ],
+            "actorScreenXY": [
+              313.28,
+              303.2
+            ],
+            "actorXYErrorPx": 0,
+            "visualDoor": [
+              4365,
+              4075
+            ],
+            "authoredWorldEntrance": [
+              4365,
+              4060
+            ],
+            "threeCFixtureWorldXY": [
+              4365,
+              4045
+            ],
+            "worldSourceHead": "260a7b85a33b7a51663a70af8d410e0d33e0e236",
+            "source3CHead": "8e85584b6007b38e1a00155b77473e92b0afec6a",
+            "realWorld336RendererUsed": true,
+            "world336OptInSourcePresent": true,
+            "placeholderTavernStillDrawnByWorld336": true,
+            "rawWorldBuildingDepthSortingPresent": false,
+            "proposedBehindIds": [
+              "knight"
+            ],
+            "proposedFrontIds": [],
+            "sourceRendererStats": {
+              "world": {
+                "ms": 10,
+                "tilesCreated": 0,
+                "tilesVisible": 6,
+                "tilesCached": 6
+              },
+              "composite": {
+                "ms": 12,
+                "tilesCreated": 0,
+                "tilesVisible": 6,
+                "tilesCached": 6
+              }
+            },
+            "warmSamples": {
+              "worldWarmMs": [
+                15,
+                7,
+                10,
+                7,
+                14,
+                8,
+                9,
+                18,
+                7,
+                9,
+                11,
+                10
+              ],
+              "compositeWarmMs": [
+                14,
+                11,
+                38,
+                10,
+                43,
+                24,
+                10,
+                28,
+                76,
+                11,
+                50,
+                12
+              ]
+            },
+            "actualOnlineGameExecuted": false,
+            "liveServerAttached": false,
+            "portalOrCollisionModified": false,
+            "productionApproved": false
+          }
+        },
+        {
+          "screenshot": "greyhaven_a234_firefox_south.png",
+          "state": {
+            "ready": true,
+            "frames": 20,
+            "dy": 20,
+            "cameraEast": 0,
+            "roofOpacity": 0.4,
+            "actorWorldXY": [
+              4357,
+              4095
+            ],
+            "actorScreenXY": [
+              313.28,
+              336.8
+            ],
+            "actorXYErrorPx": 0,
+            "visualDoor": [
+              4365,
+              4075
+            ],
+            "authoredWorldEntrance": [
+              4365,
+              4060
+            ],
+            "threeCFixtureWorldXY": [
+              4365,
+              4045
+            ],
+            "worldSourceHead": "260a7b85a33b7a51663a70af8d410e0d33e0e236",
+            "source3CHead": "8e85584b6007b38e1a00155b77473e92b0afec6a",
+            "realWorld336RendererUsed": true,
+            "world336OptInSourcePresent": true,
+            "placeholderTavernStillDrawnByWorld336": true,
+            "rawWorldBuildingDepthSortingPresent": false,
+            "proposedBehindIds": [],
+            "proposedFrontIds": [
+              "knight"
+            ],
+            "sourceRendererStats": {
+              "world": {
+                "ms": 27,
+                "tilesCreated": 0,
+                "tilesVisible": 6,
+                "tilesCached": 6
+              },
+              "composite": {
+                "ms": 10,
+                "tilesCreated": 0,
+                "tilesVisible": 6,
+                "tilesCached": 6
+              }
+            },
+            "warmSamples": {
+              "worldWarmMs": [
+                15,
+                7,
+                10,
+                7,
+                14,
+                8,
+                9,
+                18,
+                7,
+                9,
+                11,
+                10,
+                9,
+                6,
+                6,
+                10,
+                7,
+                27
+              ],
+              "compositeWarmMs": [
+                14,
+                11,
+                38,
+                10,
+                43,
+                24,
+                10,
+                28,
+                76,
+                11,
+                50,
+                12,
+                12,
+                33,
+                9,
+                10,
+                8,
+                10
+              ]
+            },
+            "actualOnlineGameExecuted": false,
+            "liveServerAttached": false,
+            "portalOrCollisionModified": false,
+            "productionApproved": false
+          }
+        },
+        {
+          "screenshot": "greyhaven_a234_firefox_camera-east.png",
+          "state": {
+            "ready": true,
+            "frames": 26,
+            "dy": -20,
+            "cameraEast": 80,
+            "roofOpacity": 0.4,
+            "actorWorldXY": [
+              4357,
+              4055
+            ],
+            "actorScreenXY": [
+              246.07999999999998,
+              303.2
+            ],
+            "actorXYErrorPx": 0,
+            "visualDoor": [
+              4365,
+              4075
+            ],
+            "authoredWorldEntrance": [
+              4365,
+              4060
+            ],
+            "threeCFixtureWorldXY": [
+              4365,
+              4045
+            ],
+            "worldSourceHead": "260a7b85a33b7a51663a70af8d410e0d33e0e236",
+            "source3CHead": "8e85584b6007b38e1a00155b77473e92b0afec6a",
+            "realWorld336RendererUsed": true,
+            "world336OptInSourcePresent": true,
+            "placeholderTavernStillDrawnByWorld336": true,
+            "rawWorldBuildingDepthSortingPresent": false,
+            "proposedBehindIds": [
+              "knight"
+            ],
+            "proposedFrontIds": [],
+            "sourceRendererStats": {
+              "world": {
+                "ms": 8,
+                "tilesCreated": 0,
+                "tilesVisible": 6,
+                "tilesCached": 6
+              },
+              "composite": {
+                "ms": 12,
+                "tilesCreated": 0,
+                "tilesVisible": 6,
+                "tilesCached": 6
+              }
+            },
+            "warmSamples": {
+              "worldWarmMs": [
+                15,
+                7,
+                10,
+                7,
+                14,
+                8,
+                9,
+                18,
+                7,
+                9,
+                11,
+                10,
+                9,
+                6,
+                6,
+                10,
+                7,
+                27,
+                7,
+                6,
+                8,
+                10,
+                6,
+                8
+              ],
+              "compositeWarmMs": [
+                14,
+                11,
+                38,
+                10,
+                43,
+                24,
+                10,
+                28,
+                76,
+                11,
+                50,
+                12,
+                12,
+                33,
+                9,
+                10,
+                8,
+                10,
+                10,
+                10,
+                27,
+                15,
+                13,
+                12
+              ]
+            },
+            "actualOnlineGameExecuted": false,
+            "liveServerAttached": false,
+            "portalOrCollisionModified": false,
+            "productionApproved": false
+          }
+        }
+      ],
+      "warmSampleCount": 20,
+      "worldWarmP95Ms": 11,
+      "composedWarmP95Ms": 37,
+      "worldTilesCreatedMax": 0,
+      "cacheBound": 24,
+      "buildBound": 3,
+      "gameFrameTimeClaimed": false,
+      "liveServerTested": false
+    }
+  ],
+  "unmergedWorldBranchUsed": true,
+  "productionApproved": false
+}
