@@ -106,3 +106,48 @@ or equipment ownership. Those are cross-department real-acceptance
 gates under #488/#480 and cannot be bypassed. PR #353 remains
 experimental, draft and nonrequired for First Playable; production
 NPC activation, merges and deployments remain on HOLD.
+
+## P0 protocol multiplexing integration blocker — Core 8A / Items
+
+The current experimental NPC pilot sends optional **v1 reliable payload
+types 5–12** on the same bidirectional channel on which First Playable
+must eventually accept canonical sword \`TryPickup\` and authoritative
+receipts. The mandatory fighter protocol currently uses payload type
+IDs 1–4. The browser \`web/authoritative-client.mjs\` decodes reliable
+frames by \`bytes[1]\` and routes known NPC IDs before ordinary
+snapshot/kill handling.
+
+More critically, the NPC pilot's \`server/src/main.rs\` creates a
+separate \`npc_reader\` which **exclusively consumes its connection's
+incoming bidirectional stream** when \`MYASO_NPC_PILOT=1\`; it
+interprets every frame as a type-5 NPC request with a 6–246 byte
+envelope and rejects other opcodes as malformed. This reader is
+correct for the isolated legacy localhost pilot, but **cannot
+coexist as-is with Core/Items P0 pickup/receipt requests on the
+same connection**. Treating it as a production item reader could
+reject, misroute or consume canonical sword commands.
+
+**Owner boundary and migration requirement:**
+- **Core 8A** owns the authoritative *one-reader, globally
+  collision-free reliable dispatcher* for the future mandatory
+  request/response protocol. Canonical packet IDs, versioning,
+  admission, ACK/dedup and reliable backpressure sequencing must be
+  centrally assigned, not chosen by this NPC department.
+- **Core 8B/8C + Items 2B** own canonical rack item identities,
+  verified pickup/equip authority, actor and geometry witness,
+  ownership receipts and replay safety.
+- **AI & NPCs** can later provide an optional, bounded registered
+  handler **behind** Core's dispatcher, with any necessary updated
+  NPC type allocation/envelope, only after orchestrated review and
+  versioned real browser acceptance. It must never consume the
+  primary reader or own an item intent or ack.
+- For **First Playable**, leave all NPC flags **OFF** and do not
+  promote #353 wholesale. This eliminates the optional reader
+  from the P0 live pipeline and avoids any NPC protocol dependency
+  on the real four-sword rack interaction.
+
+A new networking regression asserts the *current* v1 core and
+pilot type values are disjoint and in the same byte-sized namespace.
+It intentionally **does not allocate or reserve a future Items tag**.
+The actual integrated protocol type registry remains **BLOCKED on
+Core ownership**, not made ready by this test.

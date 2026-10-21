@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { NETWORK } from "../src/network/constants.mjs";
-import { encodeNpcRequest, decodeNpcRoster, decodeNpcResponse, decodeNpcState, decodeNpcSupplies, decodeNpcObstacles, decodeNpcWorksites, decodeNpcWorksiteStatus } from "../src/network/npc-chat-codec.mjs";
+import { NETWORK, PACKET_TYPE } from "../src/network/constants.mjs";
+import { NPC_WIRE, encodeNpcRequest, decodeNpcRoster, decodeNpcResponse, decodeNpcState, decodeNpcSupplies, decodeNpcObstacles, decodeNpcWorksites, decodeNpcWorksiteStatus } from "../src/network/npc-chat-codec.mjs";
 import { encodeInputPacket, decodeInputPacket, inputPacketBytes } from "../src/network/input-codec.mjs";
 import { SpatialInterestGrid } from "../src/network/interest-grid.mjs";
 import { InputIngressWindow } from "../src/network/input-ingress.mjs";
@@ -552,6 +552,30 @@ test("512-player dense-map replication still produces a bounded datagram", () =>
   const packet = encodeSnapshot({ sequence: 100, baselineSequence: 99, serverTick: 900, records: plan.records, maxBytes: 1100 });
   assert.ok(packet.byteLength <= 1100);
   assert.ok(plan.selected.length < candidates.length, "dense crowd should be priority-limited rather than fragmenting");
+});
+
+test("P0 alpha packet namespace keeps fighter frames distinct from optional NPC traffic", () => {
+  // The reliable channel dispatches by payload[1], not by an outer owner
+  // namespace. Item pickup/receipt MUST receive centrally allocated,
+  // disjoint IDs before being wired. This test checks only existing
+  // v1 tags and MUST NOT be interpreted as reserving future IDs for NPCs.
+  const core = Object.entries(PACKET_TYPE);
+  const optionalPilot = Object.entries(NPC_WIRE)
+    .filter(([name]) => name !== "maxTextBytes");
+  const tags = [...core, ...optionalPilot];
+  assert.equal(NETWORK.protocolVersion, 1);
+  assert.equal(core.length, 4);
+  assert.equal(optionalPilot.length, 8);
+  assert.equal(new Set(tags.map(([, id]) => id)).size, tags.length,
+    "a reliable frame type cannot be both fighter and NPC traffic");
+  assert.ok(tags.every(([, id]) => Number.isInteger(id) && id >= 1 && id <= 255));
+  assert.deepEqual(core.map(([, id]) => id).sort((a, b) => a - b), [1, 2, 3, 4]);
+  assert.deepEqual(optionalPilot.map(([, id]) => id).sort((a, b) => a - b),
+    [5, 6, 7, 8, 9, 10, 11, 12]);
+  const npcRequest = encodeNpcRequest(2, "No sword is gated by NPC dialogue");
+  assert.equal(npcRequest[0], NETWORK.protocolVersion);
+  assert.equal(npcRequest[1], NPC_WIRE.request);
+  assert.ok(!Object.values(PACKET_TYPE).includes(npcRequest[1]));
 });
 
 test("NPC pilot request matches Rust v1 reliable framing without changing combat packets", () => {
