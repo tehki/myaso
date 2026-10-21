@@ -100,3 +100,11 @@ replace Combat quality, and does not prove Firefox/independent-host.
 The browser workflow additionally requires a genuine Chrome / Firefox /
 Chrome run using the same script and a fresh real Rust local server; each
 mode must satisfy identical near/far, UTF-8, Escape and gameplay-ACK gates.
+
+Native browser ACK diagnostics expose a bounded 96-item RTT history, not a
+monotonic lifetime ACK count. When the history reaches 96 samples during a
+slow Firefox startup, the acceptance runner now requires newer authoritative
+server ticks after real native W movement with nonempty ACK telemetry.
+Without that fallback it incorrectly requires 98 samples from 96 slots.
+This fallback demonstrates authoritative gameplay progress, not proof of
+a particular individual input ACK; full Combat/Core gates remain required.

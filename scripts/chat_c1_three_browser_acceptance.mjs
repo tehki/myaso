@@ -136,7 +136,7 @@ try {
  // Keep gameplay datagram ACK telemetry moving while the optional reliable
  // chat streams are connected. This is not full combat-under-chat acceptance.
  const ackSamples=async session=>evaljs(session,
-   "const t=document.querySelector('#network-diagnostics')?.textContent||'';const n=t.match(/Samples (\\d+)/);return {ok:!!n,samples:n?Number(n[1]):0,diagnostics:t};");
+   "const t=document.querySelector('#network-diagnostics')?.textContent||'';const n=t.match(/Samples (\\d+)/);const e=document.querySelector('#event-text')?.textContent||'';const tick=e.match(/server tick ([0-9]+)/);return {ok:!!n&&!!tick,samples:n?Number(n[1]):0,serverTick:tick?Number(tick[1]):null,diagnostics:t,eventText:e};");
  const before=await poll("gameplay ACK diagnostics before movement",()=>ackSamples(a));
  await evaljs(a,"document.querySelector('#arena').focus();");
  await wd("POST","/session/"+a+"/actions",{actions:[{type:"key",id:"movement",actions:[{type:"keyDown",value:"w"}]}]});
@@ -144,9 +144,17 @@ try {
  await wd("POST","/session/"+a+"/actions",{actions:[{type:"key",id:"movement",actions:[{type:"keyUp",value:"w"}]}]});
  const after=await poll("gameplay ACKs continue after local chat",async()=>{
   const data=await ackSamples(a);
-  return {...data,ok:data.ok&&data.samples>before.samples+1};
+  // ACK RTT samples are a capped, 96-element rolling history. On full
+  // history require fresh authoritative server ticks after the native W
+  // movement instead of expecting an impossible 97th RTT sample.
+  const freshSamples = data.samples > before.samples + 1;
+  const cappedWindowProgress = before.samples >= 94 && data.samples === 96
+    && Number.isInteger(data.serverTick)
+    && data.serverTick > before.serverTick + 3;
+  return {...data,ok:data.ok&&(freshSamples||cappedWindowProgress)};
  },5500);
  console.log("GAMEPLAY_ACK_WITH_CHAT",JSON.stringify({samplesBefore:before.samples,samplesAfter:after.samples,
+   serverTickBefore:before.serverTick,serverTickAfter:after.serverTick,
    p95:after.diagnostics.match(/Input→ACK p50[^|]*p95 ([^| ]+)/)?.[1]??"unknown"}));
  console.log("PASS real Rust server and three "+browserMatrix.join("/")+" WebTransport browser connections with pinned TLS: A↔B; C excluded; genuine ChatResult and continuing gameplay input ACKs");
 }finally{
