@@ -662,6 +662,39 @@ mod tests {
     }
 
     #[test]
+    fn existing_three_slot_checkpoints_remain_readable_without_schema_change() {
+        let mut loot = LootAuthority::new();
+        let mut identities = SessionIdentityRegistry::new();
+        let character = CharacterId::new(903).unwrap();
+        let lease = SessionLease::new(11, 1).unwrap();
+        identities.bind_verified(lease, character).unwrap();
+        loot.register(11).unwrap();
+
+        for (kind, slot) in [
+            (ItemKind::RustySword, EquipmentSlot::MainHand),
+            (ItemKind::Spellbook, EquipmentSlot::OffHand),
+            (ItemKind::LeatherArmor, EquipmentSlot::Body),
+        ] {
+            let item_id = loot.grant(11, kind, 1).unwrap();
+            loot.equip(11, item_id, slot).unwrap();
+        }
+        let reagent = loot.grant(11, ItemKind::SulfurAsh, 2).unwrap();
+        loot.park_inventory(&identities, lease).unwrap();
+
+        let path = checkpoint_path();
+        save_quiescent(&path, &loot).unwrap();
+        let recovered = load_quiescent(&path).unwrap();
+        let _ = fs::remove_file(&path);
+
+        let inventory = recovered.parked_inventory(character).unwrap();
+        assert_eq!(inventory.backpack()[0].id, reagent);
+        assert_eq!(
+            recovered.export_state().unwrap(),
+            loot.export_state().unwrap()
+        );
+    }
+
+    #[test]
     fn checkpoint_rejects_six_equipment_slots_with_valid_checksum() {
         let mut loot = LootAuthority::new();
         let mut identities = SessionIdentityRegistry::new();
