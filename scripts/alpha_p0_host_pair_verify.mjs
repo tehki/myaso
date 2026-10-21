@@ -28,9 +28,15 @@ function checkOne(e,role){
   if(e.actorId!==e.localIds[0]||!e.remoteIds.includes(e.remoteMovedId))fail(role+" wrong mover IDs");
   if(typeof e.osHost!=="string"||!e.osHost||typeof e.hostId!=="string"||!e.hostId
     ||typeof e.peerHostId!=="string"||!e.peerHostId)fail(role+" missing host attestation");
-  if(!Array.isArray(e.localIpv4)||!e.localIpv4.some(privateIpv4))fail(role+" no private client address");
-  if(!/^https:\/\/\d+\.\d+\.\d+\.\d+:\d+\/game$/.test(e.url)
-    ||!/^[0-9a-f]{64}$/.test(e.certificateSha256||""))fail(role+" malformed pinned URL");
+  if(!Array.isArray(e.localIpv4)||e.localIpv4.length===0
+    ||!e.localIpv4.every(privateIpv4))fail(role+" invalid private client addresses");
+  let server;
+  try{server=new URL(e.url)}catch{fail(role+" malformed remote server URL")}
+  if(server.protocol!=="https:"||server.pathname!=="/game"||!server.port
+    ||!privateIpv4(server.hostname)||server.username||server.password
+    ||server.search||server.hash||e.localIpv4.includes(server.hostname)
+    ||!/^[0-9a-f]{64}$/.test(e.certificateSha256||""))
+    fail(role+" malformed or untrusted private pinned server URL");
   if(!Number.isSafeInteger(e.start)||!Number.isSafeInteger(e.movedAt)
     ||e.movedAt<e.start+(role==="A"?650:6300)
     ||e.movedAt>e.start+(role==="A"?5000:12000))fail(role+" invalid UTC movement barrier");
