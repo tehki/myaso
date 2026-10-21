@@ -25,7 +25,10 @@ export function cueForAuthoritativeStrike(equipment, action) {
   if (!equipment || !Object.hasOwn(ATTACK_CUES, equipment.kind)) return null;
   if (equipment.kind === "UNARMED" && equipment.itemId != null) return null;
   if (equipment.kind === "SWORD" && !idValid(equipment.itemId)) return null;
-  return ATTACK_CUES[equipment.kind][action] ?? null;
+  // No prototype/inherited names such as "constructor" or "toString"
+  // may become presentation cues when input state is malformed.
+  const choices = ATTACK_CUES[equipment.kind];
+  return Object.hasOwn(choices, action) ? choices[action] : null;
 }
 
 /**
