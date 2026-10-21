@@ -88,8 +88,9 @@ test("optional WebTransport channel handles fragmented network frames separately
     onResult: (event) => results.push(event),
   });
   await channel.send({ correlation: 5, text: "hi" });
-  assert.equal(writes.length, 1);
-  assert.equal(new DataView(writes[0].buffer).getUint16(0, true), 11);
+  assert.equal(writes.length, 2);
+  assert.deepEqual([...writes[0]], [2, 0, CHAT.hello, CHAT.version]);
+  assert.equal(new DataView(writes[1].buffer).getUint16(0, true), 11);
   const output = frame(makeReceived({ text: "hello" }));
   controller.enqueue(output.slice(0, 3));
   controller.enqueue(output.slice(3));

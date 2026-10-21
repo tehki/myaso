@@ -29,6 +29,8 @@ const GAME_PATH: &str = "/game";
 // Chat is an optional, lower-priority QUIC stream. Peer backpressure or a
 // partial frame must never retain its sender/recipient routing indefinitely.
 // An idle chat reader remains allowed to wait for its next *new* frame.
+// C1 v1 optional, one-time chat stream preface (never a player message).
+const CHAT_STREAM_PREFACE: [u8; 2] = [0x30, 1];
 const CHAT_STREAM_SETUP_DEADLINE: Duration = Duration::from_secs(10);
 const CHAT_FRAME_BODY_DEADLINE: Duration = Duration::from_secs(10);
 const CHAT_STREAM_WRITE_DEADLINE: Duration = Duration::from_secs(10);
@@ -893,7 +895,7 @@ async fn read_chat_frame(recv: &mut RecvStream) -> Result<Vec<u8>> {
         .context("chat frame header timed out")?
         .context("read remaining chat length byte")?;
     let size = u16::from_le_bytes(length) as usize;
-    if !(9..=MAX_CHAT_FRAME).contains(&size) {
+    if size != CHAT_STREAM_PREFACE.len() && !(9..=MAX_CHAT_FRAME).contains(&size) {
         bail!("invalid local chat frame length");
     }
     let mut bytes = vec![0; size];
@@ -923,6 +925,7 @@ async fn run_chat_stream(
     .await
     .context("local chat reply stream setup timed out")??;
     let mut violations = 0_u8;
+    let mut first_frame_seen = false;
     let mut ingress_budget = ChatIngressBudget::new(Instant::now());
     loop {
         // Preserve an in-progress length-prefixed read while servicing queued
@@ -935,6 +938,17 @@ async fn run_chat_stream(
             tokio::select! {
                 frame = &mut inbound => {
                     let frame = frame?;
+                    // Accept one no-message preface only before the first
+                    // ChatSend. Legacy clients can send ChatSend directly.
+                    // A preface never costs rate tokens or creates an ACK.
+                    if frame.len() == CHAT_STREAM_PREFACE.len() {
+                        if !first_frame_seen && frame.as_slice() == CHAT_STREAM_PREFACE {
+                            first_frame_seen = true;
+                            break;
+                        }
+                        bail!("invalid or out-of-order chat preface");
+                    }
+                    first_frame_seen = true;
                     if !ingress_budget.consume(Instant::now()) {
                         // Isolate abusive chat traffic without closing the
                         // realtime combat datagram/gameplay stream.
