@@ -5,14 +5,35 @@ import {createWorld493RackArtPlan} from "../src/browser/armory-world493-visual-b
 import {hitTestVisibleSwordAlpha,ARMORY_RACK_ART} from "../src/browser/armory-rack-visual.mjs";
 import {createArmorySwordAlphaSampler} from "../src/browser/armory-sword-alpha-sampler.mjs";
 import {paintArmoryRackPresentedFrame} from "../src/browser/armory-rack-presented-frame.mjs";
+import {createProposedCurrentRackVisualStream} from "../src/browser/armory-current-rack-visual-stream.mjs";
 import {createAlphaSwordGestureGate} from "/__ui503__/src/browser/alpha-sword-gesture.mjs";
 import {swordPointerCanvasPoint} from "/__ui503__/src/browser/sword-canvas-pointer.mjs";
 const canvas=document.getElementById("scene"),ctx=canvas.getContext("2d");
 const status=document.getElementById("status");
 const worldCamera={x:3800,y:4038},uiGate=createAlphaSwordGestureGate(hitTestVisibleSwordAlpha);
 let state=null,scene=null,items=[],frame=0,visualIntents=[],combatFallback=0,cancelled=0,events=[];
+let proposedRackStream=null,proposedPlan=null,proposedJournalSequence=null;
 window.__p0WorldUiReview=()=>state;
 window.__p0WorldUiRepaint=()=>repaint();
+// TEST-ONLY normalized projection akin to offline Core C3u #577. No server
+// stream or wire format. World sockets, source item IDs remain external.
+window.__p0RackSequenceApply=(candidateSnapshot)=>{
+ if(!originalWorld||!originalDecoder)throw Error("Original art has not decoded");
+ if(!proposedRackStream)proposedRackStream=createProposedCurrentRackVisualStream({
+  worldArmory:WORLD_ALPHA_ARMORY,authoredMap:getAuthoredMap(MAP_IDS.overworld),
+  layoutVersion:WORLD_ALPHA_ARMORY_VERSION,camera:worldCamera,
+  scopeKey:"ART-ONLY-LOCAL-JOURNAL-FIXTURE"
+ });
+ const result=proposedRackStream.apply(candidateSnapshot);
+ if(result.status==="accepted"){
+  proposedPlan=result.view.plan;
+  proposedJournalSequence=result.view.journalSequence;
+  repaint();
+ }
+ return{status:result.status,visibleIds:result.view?.visibleIds??[],
+  journalSequence:result.view?.journalSequence??null,
+  frameId:scene?.frameId??null,serverDataConnected:false};
+};
 window.__p0WorldUiAdversarial=()=>adversarial();
 /** Visual-only source alpha inquiry. Not a canonical server pickup target. */
 window.__p0WorldUiPixelCandidate=(x,y)=>
@@ -57,6 +78,7 @@ function snapshot(extra={}){
  drawnRackCount:scene?.drawnRackCount??0,
  drawnSwordCount:scene?.drawnSwordCount??0,
  visualIntents:[...visualIntents],combatFallback,cancelled,
+ proposedJournalSequence,proposedCurrentRackDataAuthentic:false,
  browserPointerEvents:[...events],actualServerEvents:0,
  serverAuthenticatedItems:false,serverOwnedItemIds:false,
  combatHandlerActuallyCalled:false,gameClientIntegrated:false,
@@ -67,7 +89,7 @@ let sourceAlpha=null,originalWorld=null,originalDecoder=null;
 function repaint(){
  if(!originalWorld||!sourceAlpha)return null;
  const map=getAuthoredMap(MAP_IDS.overworld);
- const plan=createWorld493RackArtPlan({worldArmory:WORLD_ALPHA_ARMORY,
+ const plan=proposedPlan??createWorld493RackArtPlan({worldArmory:WORLD_ALPHA_ARMORY,
   authoredMap:map,layoutVersion:WORLD_ALPHA_ARMORY_VERSION,
   committedWorldItems:items,camera:worldCamera});
  const w=originalWorld, rack=window.__rackImage,sword=window.__swordImage;
