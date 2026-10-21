@@ -1145,7 +1145,221 @@ async fn four_real_quic_players_observe_kill_and_immutable_greyhaven_respawn() -
     println!(
         "ALPHA_8C_FOUR_QUIC_KILL_RESPAWN_PASS players=4 killer=1 victim=2          death_hp=0 respawn_hp=100 spawn_x=4206 spawn_y=4160 same_sessions=4"
     );
+
+    // A newly joined fifth network identity must NOT inherit a reliable
+    // death event that occurred BEFORE its session was created. Current
+    // roster authority and historical event delivery are separate fences.
+    let (departed, departed_send, departed_recv, _) = sessions.remove(1);
+    departed.close(VarInt::from_u32(0), b"historical kill-feed scope");
+    drop((departed_send, departed_recv, departed));
+
+    // QUIC transport close acknowledgement happens before the shared World
+    // removal/permit revocation completes. Prove exact authoritative
+    // retirement via each surviving *wire* tombstone before re-admission,
+    // instead of racing the server or directly mutating its player list.
+    for (index, session) in sessions.iter().enumerate() {
+        let observer = [1, 3, 4][index];
+        let deadline = Instant::now() + Duration::from_secs(5);
+        loop {
+            let remaining = deadline.saturating_duration_since(Instant::now());
+            if remaining.is_zero() {
+                bail!("surviving observer {observer} never saw retired #2 before late join");
+            }
+            let incoming = timeout(remaining, session.0.receive_datagram())
+                .await
+                .context("pre-late-join old fighter retirement timed out")??;
+            let bytes = incoming.as_ref();
+            if bytes.len() < 14 || bytes[0] != 1 || bytes[1] != 2 {
+                continue;
+            }
+            let snapshot = decode_snapshot(bytes)
+                .map_err(|e| anyhow::anyhow!("pre-late-join tombstone invalid: {e:?}"))?;
+            if snapshot.records.iter().any(|record| {
+                record.net_id == 2
+                    && record.mask & myaso_server::snapshot::SNAPSHOT_FIELD_REMOVED != 0
+            }) {
+                println!(
+                    "ALPHA_8C_KILL_LATE_JOIN_RETIREMENT observer={observer} removed=2 tick={}",
+                    snapshot.server_tick
+                );
+                break;
+            }
+        }
+    }
+    // Even after an actor is removed, a *physically present* survivor may
+    // temporarily obstruct the free respawn anchor. The Greyhaven admission
+    // profile deliberately requires >=44u clearance from all living player
+    // positions AND their immutable anchors. The killer is still ~40u from
+    // #2's spawn after its last heavy; move it away using ordinary gameplay
+    // input before asking the server to place newcomer #5.
+    send_held_direction(&sessions[0].0, sessions[0].3, 68_001, (-127, 0))?;
+    let move_deadline = Instant::now() + Duration::from_secs(4);
+    let cleared_position = loop {
+        let current = next_authoritative_position(&sessions[0].0, 1, move_deadline).await?;
+        if current.0 <= 4120.0 {
+            break current;
+        }
+    };
+    send_held_direction(&sessions[0].0, sessions[0].3, 68_002, (0, 0))?;
+    if (cleared_position.0 - SPAWNS[1].0).hypot(cleared_position.1 - SPAWNS[1].1) < 44.0 {
+        bail!("rejoin attempted before attacker vacated released fighter's anchor");
+    }
+    println!(
+        "ALPHA_8C_KILL_LATE_JOIN_FREE_ANCHOR fighter=1 x={:.2} y={:.2}          reserved_44u_clearance=yes",
+        cleared_position.0, cleared_position.1
+    );
+
+    let deadline = Instant::now() + Duration::from_secs(5);
+    let replacement = loop {
+        if Instant::now() >= deadline {
+            bail!("departed player #2 never freed the collision-safe admission slot");
+        }
+        match timeout(Duration::from_millis(900), endpoint.connect(url.as_str())).await {
+            Ok(Ok(connection)) => break connection,
+            _ => tokio::time::sleep(Duration::from_millis(50)).await,
+        }
+    };
+    let (_replacement_send, mut replacement_recv) =
+        timeout(Duration::from_secs(5), replacement.open_bi())
+            .await
+            .context("late-join reliable stream timeout")??
+            .await
+            .context("late-join reliable stream rejected")?;
+    let mut header = [0_u8; 2];
+    timeout(
+        Duration::from_secs(5),
+        replacement_recv.read_exact(&mut header),
+    )
+    .await
+    .context("late-join initial reliable length timeout")??;
+    let bytes = u16::from_le_bytes(header) as usize;
+    if !(14..=4096).contains(&bytes) {
+        bail!("late-join invalid authoritative baseline size {bytes}");
+    }
+    let mut body = vec![0_u8; bytes];
+    timeout(
+        Duration::from_secs(5),
+        replacement_recv.read_exact(&mut body),
+    )
+    .await
+    .context("late-join initial reliable body timeout")??;
+    let baseline =
+        decode_snapshot(&body).map_err(|e| anyhow::anyhow!("late-join baseline invalid: {e:?}"))?;
+    let ids: BTreeSet<_> = baseline.records.iter().map(|r| r.net_id).collect();
+    if !baseline.full || ids != BTreeSet::from([1, 3, 4, 5]) {
+        bail!("late-joining observer inherited departed identity: roster={ids:?}");
+    }
+    let newcomer = baseline
+        .records
+        .iter()
+        .find(|r| r.net_id == 5)
+        .context("late-join server failed to assign independent net ID #5")?;
+    if (newcomer.x as f32 / 4.0, newcomer.y as f32 / 4.0) != SPAWNS[1] || newcomer.hp != 100 {
+        bail!("late-join server did not allocate exact freed #2 spawn to new #5");
+    }
+    send_held_direction(&replacement, baseline.sequence, 67_005, (0, 0))?;
+    require_quic_input_ack(&replacement, 67_005, 5).await?;
+    tokio::try_join!(
+        observe_replacement_server_ticks(&replacement, baseline.server_tick, 5),
+        assert_no_retroactive_quic_kill_event(&mut replacement_recv, 5)
+    )?;
+    println!(
+        "ALPHA_8C_QUIC_RELIABLE_KILL_JOIN_SCOPE_PASS event=0 original_peers=4          late_join_id=5 replayed_events=0 current_roster=1,3,4,5"
+    );
     Ok(())
+}
+
+/// Prove the real authoritative World advanced by at least 60 ticks after
+/// new player #5 joined, and that #2 stays removed from its live stream.
+async fn observe_replacement_server_ticks(
+    connection: &wtransport::Connection,
+    initial_server_tick: u32,
+    observer: u32,
+) -> Result<()> {
+    let deadline = Instant::now() + Duration::from_secs(4);
+    // Initial full server baseline already proved #5's position. A later
+    // unchanged position is legitimately omitted by delta replication.
+    loop {
+        let remaining = deadline.saturating_duration_since(Instant::now());
+        if remaining.is_zero() {
+            bail!("late-join client {observer} did not see 60 real server ticks");
+        }
+        let incoming = timeout(remaining, connection.receive_datagram())
+            .await
+            .context("late-join server progress snapshot timeout")??;
+        let bytes = incoming.as_ref();
+        if bytes.len() < 14 || bytes[0] != 1 || bytes[1] != 2 {
+            continue;
+        }
+        let snapshot = decode_snapshot(bytes)
+            .map_err(|e| anyhow::anyhow!("late-join progress snapshot invalid: {e:?}"))?;
+        for record in snapshot.records {
+            if record.net_id == 2 {
+                bail!("late-joining client saw ghost departed player #2");
+            }
+            if record.net_id == observer && record.mask & SNAPSHOT_FIELD_POSITION != 0 {
+                let position = (record.x as f32 / 4.0, record.y as f32 / 4.0);
+                if position != SPAWNS[1] {
+                    bail!("replacement #5 changed spawn without player input: {position:?}");
+                }
+            }
+        }
+        if snapshot.server_tick >= initial_server_tick + 60 {
+            println!(
+                "ALPHA_8C_KILL_LATE_JOIN_WORLD_PROGRESS observer={observer}                  baseline_tick={initial_server_tick} current_tick={}",
+                snapshot.server_tick
+            );
+            return Ok(());
+        }
+    }
+}
+
+/// Consume real reliable frames for >1.2s after the new session is
+/// input-authorized. Ordinary type-2 catch-up is fine; historical type-4
+/// kill delivery is a privacy/chronology violation, not a game notification.
+async fn assert_no_retroactive_quic_kill_event(
+    receiver: &mut wtransport::RecvStream,
+    observer: u32,
+) -> Result<()> {
+    let deadline = Instant::now() + Duration::from_millis(1250);
+    let mut background_frames = 0_usize;
+    loop {
+        let remaining = deadline.saturating_duration_since(Instant::now());
+        if remaining.is_zero() {
+            println!(
+                "ALPHA_8C_KILL_LATE_JOIN_RELIABLE_CLEAR observer={observer}                  background_frames={background_frames}"
+            );
+            return Ok(());
+        }
+        let mut len = [0_u8; 2];
+        let length_read = timeout(remaining, receiver.read_exact(&mut len)).await;
+        match length_read {
+            Err(_) => return Ok(()), // no historic frame within evidence window
+            Ok(Err(error)) => bail!("late-join reliable transport closed: {error:#}"),
+            Ok(Ok(_)) => {}
+        }
+        let size = u16::from_le_bytes(len) as usize;
+        if !(14..=4096).contains(&size) {
+            bail!("late-join reliable frame length invalid: {size}");
+        }
+        let mut frame = vec![0; size];
+        let remaining = deadline.saturating_duration_since(Instant::now());
+        timeout(remaining, receiver.read_exact(&mut frame))
+            .await
+            .context("late-join reliable body incomplete")??;
+        if frame[0] != 1 {
+            bail!("late-join reliable protocol version mismatch");
+        }
+        match frame[1] {
+            2 => {
+                decode_snapshot(&frame)
+                    .map_err(|e| anyhow::anyhow!("late-join catch-up invalid: {e:?}"))?;
+                background_frames += 1;
+            }
+            4 => bail!("late join #5 replayed a kill committed BEFORE its session existed"),
+            other => bail!("late join #5 received unknown reliable type {other}"),
+        }
+    }
 }
 
 /// Read real length-prefixed server reliable frames, rather than forging
