@@ -283,6 +283,8 @@ def purchase(
     *,
     failpoint: str | None = None,
     _test_only_core_assertion: object | None = None,
+    _test_only_server_authorizer: object | None = None,
+    _test_only_server_transport_ref: object | None = None,
 ) -> dict:
     """Commit exactly one file-backed test purchase or no purchase.
 
@@ -314,10 +316,23 @@ def purchase(
         ).fetchone()
         if admitted != ("active",):
             raise Denied("Session not admitted or already revoked")
+        if (_test_only_server_authorizer is None) != (
+            _test_only_server_transport_ref is None
+        ):
+            raise Denied("Incomplete offline trusted-provider configuration")
+        if _test_only_server_authorizer is not None:
+            if _test_only_core_assertion is not None:
+                raise Denied("Cannot combine caller assertion and verifier-backed gateway")
+            # A mock server-owned verifier runs INSIDE the same writer
+            # transaction, before old receipt lookup or any mutable transfer.
+            # There is NO production Core verifier or signed session here.
+            from economics_core_gateway import assert_fixture_server_session_in_transaction
+            assert_fixture_server_session_in_transaction(
+                db, _test_only_server_authorizer, _test_only_server_transport_ref,
+                session, intent,
+            )
         if _test_only_core_assertion is not None:
-            # This is a *fixture SQL consistency guard*, not a real caller
-            # authenticator. It runs under this SAME BEGIN IMMEDIATE writer
-            # transaction as every balance/title/receipt mutation.
+            # This prior optional fixture guard is not authentication.
             from economics_core_binding import assert_fixture_binding_in_transaction
             assert_fixture_binding_in_transaction(
                 db, _test_only_core_assertion, session.player_id, session.epoch
