@@ -65,10 +65,30 @@ export function createArmorySwordAlphaSampler(image,{canvasFactory}={}) {
       x<0||y<0||x>=width||y>=height)return 0;
     return buffer[y*width+x];
   };
+  // A source-derived pointer QA landmark, NOT a larger click box. Find an
+  // actually opaque blade region with a 2-pixel margin so fractional CSS/DPR
+  // pointer rounding cannot accidentally turn a valid test into a miss at
+  // a one-pixel-wide, partly transparent sword tip.
+  const radius=2,robustThreshold=224;
+  let landmark=null,bestDistance=Infinity;
+  for(let y=radius;y<height-radius;y++)for(let x=radius;x<width-radius;x++){
+    let safe=true;
+    for(let dy=-radius;dy<=radius&&safe;dy++)
+      for(let dx=-radius;dx<=radius;dx++)
+        if(buffer[(y+dy)*width+(x+dx)]<robustThreshold){safe=false;break;}
+    if(!safe)continue;
+    const distance=(x-(width-1)/2)**2+(y-height*.48)**2;
+    if(distance<bestDistance){bestDistance=distance;landmark={x,y};}
+  }
+  if(!landmark)throw new TypeError("Sword has no robust visible interaction region");
+  const stableSourcePixel=Object.freeze({
+    ...landmark,radius,minimumNeighborhoodAlpha:robustThreshold,
+    qaLandmarkOnly:true,expandsHitBox:false
+  });
   return Object.freeze({
     asset:source,sourceShaExpected:ARMORY_SWORD_ALPHA_SPEC.sha256,
     width,height,visiblePixels,clickablePixels,
-    sampleAlpha,
+    stableSourcePixel,sampleAlpha,
     presentationOnly:true,
     assetBytesCryptographicallyVerified:false,
     actualServerPickup:false,

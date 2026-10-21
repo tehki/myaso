@@ -13,6 +13,35 @@ let state=null,scene=null,items=[],frame=0,visualIntents=[],combatFallback=0,can
 window.__p0WorldUiReview=()=>state;
 window.__p0WorldUiRepaint=()=>repaint();
 window.__p0WorldUiAdversarial=()=>adversarial();
+/** Visual-only source alpha inquiry. Not a canonical server pickup target. */
+window.__p0WorldUiPixelCandidate=(x,y)=>
+ scene?hitTestVisibleSwordAlpha(scene.plan,{x,y},sourceAlpha)?.itemId??null:null;
+window.__p0WorldUiSourceMaskOverlap=()=>{
+ if(!scene||!sourceAlpha)return null;
+ const sprites=scene.plan.swords;
+ const sources=[];
+ for(const sword of sprites){
+  const covered=new Set();
+  // Use exactly the integer-backed source-coordinate lookup contract, not
+  // arbitrary canvas bounding-box overlap as a click proxy.
+  const left=Math.floor(sword.x),top=Math.floor(sword.y);
+  for(let yy=top;yy<top+sword.height+2;yy++)
+   for(let xx=left;xx<left+sword.width+2;xx++){
+    const sx=Math.floor(xx+.5-sword.x),sy=Math.floor(yy+.5-sword.y);
+    if(sourceAlpha(sword.asset,sx,sy)>=64)
+     covered.add(xx+","+yy);
+   }
+  sources.push(covered);
+ }
+ const pairs=[];
+ for(let i=0;i<sources.length;i++)for(let j=i+1;j<sources.length;j++){
+  let intersection=0;
+  for(const k of sources[i])if(sources[j].has(k))intersection++;
+  pairs.push({ids:[sprites[i].id,sprites[j].id],sourceMaskOverlapPixels:intersection});
+ }
+ return {count:sprites.length,pairs,maxOverlap:Math.max(0,...pairs.map(x=>x.sourceMaskOverlapPixels)),
+  sourceMaskOnly:true,liveRenderedGameOcclusionValidated:false};
+};
 function snapshot(extra={}){
  const p=scene?.plan;
  state={ready:!!scene,worldHead:"07060f981b8a1dac89184b621b6893dd970a08ae",
@@ -79,7 +108,8 @@ try{
  const decoder=createArmorySwordAlphaSampler(sword);
  sourceAlpha=decoder.sampleAlpha;
  window.__alphaSamplerInfo=()=>({visiblePixels:decoder.visiblePixels,
-  clickablePixels:decoder.clickablePixels,sourceShaExpected:decoder.sourceShaExpected,
+  clickablePixels:decoder.clickablePixels,stableSourcePixel:decoder.stableSourcePixel,
+  sourceShaExpected:decoder.sourceShaExpected,
   alphaOpaquePixel:sourceAlpha(ARMORY_RACK_ART.swordSource,20,13),
   alphaTransparentPixel:sourceAlpha(ARMORY_RACK_ART.swordSource,0,0),
   productionApproved:decoder.productionApproved});
