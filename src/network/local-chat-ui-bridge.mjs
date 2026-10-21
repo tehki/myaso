@@ -1,6 +1,7 @@
 // Department 8A: bridge the authenticated Chat C1 stream to Department 10 UI.
 // Draft-only integration seam; do not install in production before release gates.
 import { CHAT, CHAT_RESULT_CODE, encodeChatSend, openLocalChat } from "./chat-codec.mjs";
+import { idrChatSender } from "../browser/identity-visibility.mjs";
 
 const ACK_TIMEOUT_MS = 9000; // Below UI's existing 10-second pending deadline.
 const MAX_RECENT_UI_IDS = 64;
@@ -14,6 +15,7 @@ let nextAdapterInstance = 0;
 export async function openLocalChatUiBridge(gameConnection, {
   openChannel = openLocalChat,
   onDisconnect = () => {},
+  identityPreview = false,
   ackTimeoutMs = ACK_TIMEOUT_MS,
 } = {}) {
   if (!Number.isInteger(ackTimeoutMs) || ackTimeoutMs < 1 || ackTimeoutMs > ACK_TIMEOUT_MS) {
@@ -63,8 +65,11 @@ export async function openLocalChatUiBridge(gameConnection, {
       sender: Object.freeze({ displayName: "Player #" + event.senderId }),
       text: event.text,
     });
+    // Opt-in localhost IDR P0 has no validated observer knowledge feed yet.
+    // It must suppress rather than guess character names from net slots.
+    const visible = identityPreview ? idrChatSender(message) : message;
     for (const listener of listeners) {
-      try { listener(message); } catch { /* Faulty view must not halt chat. */ }
+      try { listener(visible); } catch { /* Faulty view must not halt chat. */ }
     }
   }
   function onResult(event) {
