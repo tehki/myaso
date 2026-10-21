@@ -45,6 +45,7 @@ TABLES = (
     ("global_events", "revision"),
     ("admission_mutations", "revision"),
     ("accounts", "id"),
+    ("core_fixture_bindings", "ledger_account_id"),
     ("titles", "parcel_id"),
     ("listings", "id"),
     ("admitted_sessions", "player_id,epoch"),
@@ -96,6 +97,17 @@ def _all_rows(db: sqlite3.Connection, table: str, order: str) -> list[tuple]:
     return db.execute(f"SELECT * FROM {table} ORDER BY {order}").fetchall()
 
 
+def _canonicalize_sqlite_scalar(value):
+    """Unambiguously encode SQLite BLOBs in the logical audit fingerprint."""
+    if isinstance(value, bytes):
+        return {"__sqlite_blob_hex_v1__": value.hex()}
+    if isinstance(value, (tuple, list)):
+        return [_canonicalize_sqlite_scalar(part) for part in value]
+    if value is None or type(value) in (str, int, float, bool):
+        return value
+    _reject("Unknown SQLite value type in recovery fingerprint")
+
+
 def _audit(db: sqlite3.Connection) -> AuditReport:
     if _one(db, "PRAGMA integrity_check") != ("ok",):
         _reject("SQLite page/index integrity check failed")
@@ -125,6 +137,30 @@ def _audit(db: sqlite3.Connection) -> AuditReport:
         or account_kinds.get(1) != "treasury"
     ):
         _reject("Broken account/issuance conservation or treasury identity")
+
+    bindings = db.execute(
+        "SELECT ledger_account_id,account_key_be,character_key_be,session_generation"
+        " FROM core_fixture_bindings ORDER BY ledger_account_id"
+    ).fetchall()
+    if len(bindings) != sum(kind == "player" for kind in account_kinds.values()):
+        _reject("Fictional Core principal binding count differs from player accounts")
+    for fixture_account, account_key, character_key, generation in bindings:
+        if (
+            account_kinds.get(fixture_account) != "player"
+            or type(account_key) is not bytes or len(account_key) != 16
+            or type(character_key) is not bytes or len(character_key) != 16
+            or int.from_bytes(account_key, "big") == 0
+            or int.from_bytes(character_key, "big") == 0
+            or account_key == character_key
+            or not isinstance(generation, int) or generation <= 0
+        ):
+            _reject("Malformed Core fixture account-character binding")
+        historical_epoch = db.execute(
+            "SELECT 1 FROM admitted_sessions WHERE player_id=? AND epoch=?",
+            (fixture_account, generation),
+        ).fetchone()
+        if historical_epoch is None:
+            _reject("Fictional Core binding generation missing from admitted epochs")
 
     titles = db.execute(
         "SELECT parcel_id,owner_id,revision,map_revision FROM titles ORDER BY parcel_id"
@@ -376,7 +412,8 @@ def _audit(db: sqlite3.Connection) -> AuditReport:
         ).fetchall(),
     ))
     digest = hashlib.sha256(
-        json.dumps(material, separators=(",", ":"), ensure_ascii=True)
+        json.dumps(_canonicalize_sqlite_scalar(material),
+                   separators=(",", ":"), ensure_ascii=True)
         .encode("ascii")
     ).hexdigest()
     return AuditReport(
