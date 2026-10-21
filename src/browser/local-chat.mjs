@@ -235,6 +235,13 @@ export function installLocalChat(doc, { online = false, adapter = null, idFactor
   }
   function bindAdapter(next) {
     if (disposed) return;
+    // Binding the same live authenticated adapter is a refresh, not a new
+    // server identity/session. Never cancel its pending ACK, reset the dedup
+    // epoch, or subscribe to it twice.
+    if (transport && next === transport) {
+      availability();
+      return;
+    }
     const interrupted = pending;
     generation += 1;
     cancelInflight?.();

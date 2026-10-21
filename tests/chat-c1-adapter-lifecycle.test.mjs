@@ -94,6 +94,32 @@ test("C1 reconnect accepts server message ID reused by a new authoritative sessi
   c.dispose();
 });
 
+test("C1 repeated bind of same authenticated adapter is idempotent, no duplicate server ID", async () => {
+  const {doc} = fakeDocument();
+  const c = installLocalChat(doc, {online:true,idFactory:()=>"stable-1"});
+  let inbox, finishSend, subscriptions=0, unsubscribes=0;
+  const transport={ready:true,
+    send(){return new Promise(resolve=>{finishSend=resolve})},
+    subscribe(fn){subscriptions++;inbox=fn;return ()=>{unsubscribes++}}};
+  c.bindAdapter(transport);
+  const evt=text=>({channel:"local",serverMessageId:"1",sender:{displayName:"Player #2"},text});
+  inbox(evt("first"));
+  c.input.value="pending ACK";
+  const send=c.submit();
+  await Promise.resolve(); await Promise.resolve();
+  assert.equal(c.input.readOnly,true);
+  c.bindAdapter(transport); // not a reconnect; same adapter, same session
+  inbox(evt("duplicate should remain suppressed"));
+  assert.equal(c.history.childElementCount,2,"one received and one pending outgoing only");
+  assert.equal(subscriptions,1,"no replacement subscription for same adapter");
+  assert.equal(unsubscribes,0);
+  finishSend({ok:true,clientMessageId:"stable-1"});
+  assert.equal(await send,true,"same-session rebind must not cancel valid server ACK");
+  assert.equal(c.history.lastElementChild.dataset.delivery,"accepted");
+  c.dispose();
+  assert.equal(unsubscribes,1);
+});
+
 test("C1 pending composer Escape returns to canvas and dispose invalidates ACK", async () => {
   const { doc, canvas } = fakeDocument();
   const c = installLocalChat(doc, { online: true, idFactory: () => "dispose-id" });
