@@ -577,6 +577,54 @@ def test_simultaneous_duplicate_operation_retries_after_primary_restart():
     print("PASS: simultaneous identical prepare/commit retries advance epoch once")
 
 
+def test_commit_vs_abort_resolution_race_after_primary_restart():
+    # Recovery coordinators can disagree: one may retry the final commit
+    # while another attempts an abort for the SAME durably prepared handoff.
+    # The handoff row lock must linearize their decisions; exactly one wins
+    # and no two workers can hold mutation authority.
+    register(85)
+    require(sql(prepare(8501, 85, target=3)) == "prepared",
+            "commit-vs-abort race needs one durable prepared handoff")
+    require(not current(85) and not current(85, 3, 2),
+            "neither worker writes during the prepared window")
+    commit_statement = f"SELECT core_zone.commit_transfer({ident(8501)});"
+    abort_statement = f"SELECT core_zone.abort_transfer({ident(8501)});"
+    committed, aborted = racing_mutations(commit_statement, abort_statement)
+    require(sum(result.returncode == 0 for result in (committed, aborted)) == 1,
+            f"commit vs abort must have one successful outcome: "
+            f"{committed.stderr} {aborted.stderr}")
+    require("deadlock detected" not in committed.stderr
+            and "deadlock detected" not in aborted.stderr,
+            "one-operation decision race must serialize without deadlock")
+    phase = sql(f"SELECT phase FROM core_zone.handoffs "
+                f"WHERE operation_id={ident(8501)};")
+    require(count("handoffs", "operation_id", 8501) == 1,
+            "competing resolution cannot duplicate handoff operation")
+    if committed.returncode == 0:
+        require(committed.stdout.strip() == "2"
+                and "cannot abort committed or stale handoff" in aborted.stderr
+                and phase == "committed",
+                "commit winning requires abort to observe committed phase")
+        require(not current(85) and current(85, 3, 2),
+                "committed outcome grants only the target at epoch two")
+        require(sql(commit_statement) == "2",
+                "commit ACK retry cannot advance a second epoch")
+        sql(abort_statement, expect_failure=True)
+    else:
+        require(aborted.stdout.strip() == "aborted"
+                and "unprepared or stale handoff" in committed.stderr
+                and phase == "aborted",
+                "abort winning requires commit to observe aborted phase")
+        require(current(85) and not current(85, 3, 2),
+                "aborted outcome restores only the original source at epoch one")
+        require(sql(abort_statement) == "aborted",
+                "abort ACK retry must return immutable result")
+        sql(commit_statement, expect_failure=True)
+    require(count("world_event_outbox", "entity_id", 85) == 0,
+            "resolution race must not forge or duplicate world events")
+    print("PASS: commit-vs-abort same-handoff race has one permanent authority outcome")
+
+
 def main():
     container = guarded_container()
     seed()
@@ -617,6 +665,7 @@ def main():
     test_racing_handoff_operations_after_primary_restart()
     test_forced_handoff_fk_lock_contention()
     test_simultaneous_duplicate_operation_retries_after_primary_restart()
+    test_commit_vs_abort_resolution_race_after_primary_restart()
     print("C4H PRIMARY CRASH ACCEPTANCE PASSED (one disposable PG16 primary)")
 
 
