@@ -34,6 +34,7 @@ import { dispatchM41NativeParryOnLightOnset } from "./m41-authoritative-light-on
 import { readM161OpeningKickProof } from "./m161-opening-kick-proof.mjs";
 import { readM171RejectedFeintProof } from "./m171-rejected-feint-proof.mjs";
 import { dispatchM107NativeDodge } from "./m107-native-dodge-plan.mjs";
+import { awaitM194ServerBlock } from "./m194-authoritative-block-onset.mjs";
 import { createM221TrustedWheelRegistry } from "./m221-trusted-wheel-attestation.mjs";
 import { attachM325TrustedWheelSocket } from "./m325-trusted-wheel-socket.mjs";
 import { requiresM338GuardBreakWheelSocket } from "./m338-guard-break-wheel-scenarios.mjs";
@@ -9793,8 +9794,8 @@ async function runOnlineUiGuardBreakFlight(entries, { onGuardBroken = null } = {
       // 100HP/-38guard/no-parry proof rejects early, late or missing action.
       // Never fabricate inputs, repeat failed exchanges or alter mechanics.
       // M320: capture ONLY this genuine exchange's authoritative action/event
-      // transitions. The loopback-only server trace is evidence, not a clock
-      // used to schedule attacks or to waive M194's HP/guard/parry assertions.
+      // transitions. Scoped M194/M205 also use actual Block admission to
+      // schedule native release, never to waive HP/guard/parry assertions.
       const m320ServerOutputStart = m201ServerOutput().length;
       const challenge = m221Registry.issue();
       let m212Exchange;
@@ -9816,13 +9817,17 @@ async function runOnlineUiGuardBreakFlight(entries, { onGuardBroken = null } = {
           // Require trusted native wheel BEFORE release for M194 only, with
           // the same unchanged server parry/guard/damage and strict W3C gates.
           trustedWheelWaitMs: ["uiguardbreak", "uiguardbreakpunishffahit"].includes(scenario) ? 190 : 0,
-          // M194 + M205: one bounded genuine-wheel sampling interval
-          // before the ONLY real Chrome release. Original #39526355920
-          // confirmed real defender Block tick 251 -> Parry tick 257 (<125ms).
-          // This delays the same release input, not the server parry/guard rule.
-          // The exact -38 guard/no-parry/no-HP-loss assertions remain fatal.
-          postTrustedWheelMs: ["uiguardbreak", "uiguardbreakpunishffahit"].includes(scenario) ? 40 : 0,
-          compensateWheelReceipt: ["uiguardbreak", "uiguardbreakpunishffahit"].includes(scenario),
+          // M194/M205 now observe actual server Block, rather than waiting
+          // for its potentially late DOM-event report. Release once admission
+          // is proven: native light windup supplies the block-only lead.
+          // Actual wheel-before-release, W3C ACK, -38 guard, zero parry and
+          // unchanged HP remain mandatory. No artificial sampling pause.
+          postTrustedWheelMs: 0,
+          awaitServerBlock: ["uiguardbreak", "uiguardbreakpunishffahit"].includes(scenario)
+            ? () => awaitM194ServerBlock({
+              readOutput: m201ServerOutput, afterOffset: m320ServerOutputStart,
+              fighterId: defenderReady.playerNetId, sleep,
+            }) : undefined,
           sendAttackDown: () => setArenaAttackButton(attacker, true),
           sendWheel: () => scrollArenaWheel(defender, defenderElementId, 120, 0),
           awaitTrustedWheel: () => challenge.wait(),
