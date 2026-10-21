@@ -707,6 +707,30 @@ function sampleInput() {
   currentInput.kick = kickRequested;
   currentInput.run = rightButtonGesture.isRunning();
   currentInput.jump = jumpRequested;
+  // Strict M144/M145 diagnostic only. Observe the actual frame-side input
+  // sampler; genuine DOM Space+LMB can be delivered without a timely sampled
+  // 30Hz packet under headless frame stalls. Never change submitted input.
+  if (acceptanceScenario === "uimultirecoveryffa"
+    || acceptanceScenario === "uimultirecoveryspatial") {
+    const debug = window.__MYASO_ACCEPTANCE_STATE__;
+    if (debug) {
+      const nowEpoch = Date.now();
+      const previousEpoch = debug.lastInputSampleAtEpochMs;
+      if (Number.isFinite(previousEpoch)) {
+        debug.maxInputSampleGapMs = Math.max(debug.maxInputSampleGapMs ?? 0,
+          nowEpoch - previousEpoch);
+      }
+      debug.lastInputSampleAtEpochMs = nowEpoch;
+      debug.inputSampleCount = (debug.inputSampleCount ?? 0) + 1;
+      if (currentInput.jump || currentInput.attack || currentInput.heavyAttack) {
+        debug.actionSamples ??= [];
+        debug.actionSamples.push({ epochMs: nowEpoch,
+          jump: Boolean(currentInput.jump), attack: Boolean(currentInput.attack),
+          heavyAttack: Boolean(currentInput.heavyAttack) });
+        if (debug.actionSamples.length > 32) debug.actionSamples.shift();
+      }
+    }
+  }
   if (local.action === COMBAT_ACTION.idle && (currentInput.moveX || currentInput.moveY)) {
     audio.play("step", { level: currentInput.run ? .90 : .55 });
   }
@@ -723,7 +747,7 @@ function simulatePrediction(stepMs) {
     // Space+LMB without authoritative action may mean no 30Hz input sampled
     // during the genuine W3C hold. Record what the production sender actually
     // submitted, with no replay, network payload or gameplay change.
-    if (acceptanceScenario === "uimultirecoveryspatial") {
+    if (acceptanceScenario === "uimultirecoveryspatial" || acceptanceScenario === "uimultirecoveryffa") {
       const debug = window.__MYASO_ACCEPTANCE_STATE__;
       if (debug) {
         debug.lastSubmittedClientTick = outgoingTick;
