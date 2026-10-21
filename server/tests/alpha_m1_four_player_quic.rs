@@ -166,7 +166,11 @@ async fn actual_server_preserves_four_distinct_players_and_denies_fifth() -> Res
                 expected
             );
         }
-        println!("ALPHA_M1_JOINED id={} baseline_id_count={}", index + 1, observed.len());
+        println!(
+            "ALPHA_M1_JOINED id={} baseline_id_count={}",
+            index + 1,
+            observed.len()
+        );
         // Hold both halves of the reliable game stream for the whole session;
         // dropping it early would make the real server close this player.
         live.push((connection, send, recv));
