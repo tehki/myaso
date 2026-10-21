@@ -159,6 +159,7 @@ pub enum PickupCommitError {
     UnverifiedSession,
     MissingWorldFighter,
     UnknownZone,
+    GeometryRejected,
     Loot(LootError),
     JointCheckpoint(JointCheckpointError),
     Io(CheckpointError),
@@ -246,6 +247,81 @@ pub fn commit_verified_ground_sword_equip(
     operation: VerifiedLootOperation,
     ground_entity_id: u64,
 ) -> Result<ItemStack, PickupCommitError> {
+    commit_ground_sword_equip_inner(
+        GroundSwordAuthority {
+            path,
+            loot,
+            magic,
+            identity,
+            tick,
+            operation,
+        },
+        ground_entity_id,
+        None,
+        |_, _, _| Ok(()),
+    )
+}
+
+/// Server-owned transaction context supplied only under the authoritative
+/// World/Zone/Identity/Loot/Magic writer lock, not decoded from wire data.
+pub struct GroundSwordAuthority<'a> {
+    pub path: &'a Path,
+    pub loot: &'a mut LootAuthority,
+    pub magic: &'a MagicAuthority,
+    pub identity: &'a SessionIdentityRegistry,
+    pub tick: PickupWorldTick<'a>,
+    pub operation: VerifiedLootOperation,
+}
+
+/// Both IDs are untrusted UI selections, never actor or authoritative position.
+/// The u64 values are prototype-only until Core 8B canonical IDs are adopted.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct GroundSwordSelection {
+    pub ground_entity_id: u64,
+    pub expected_item_id: u64,
+}
+
+/// Offline P0 integration seam. Core must supply a trusted same-tick Physics
+/// check with complete zone solids and current worker/geometry epoch under the
+/// one World/Identity/Loot writer lock. The callback receives ONLY authoritative
+/// fighter, pre-pickup ground item and zone, never client coordinates.
+/// This does not itself provide an unforgeable geometry proof, canonical u128
+/// ledger, idempotent network ACK/outbox or a live /game endpoint.
+pub fn commit_verified_ground_sword_equip_checked(
+    authority: GroundSwordAuthority<'_>,
+    selection: GroundSwordSelection,
+    geometry: impl FnOnce(
+        &crate::simulation::Fighter,
+        &crate::loot::GroundDrop,
+        crate::zone::ZoneId,
+    ) -> Result<(), PickupCommitError>,
+) -> Result<ItemStack, PickupCommitError> {
+    commit_ground_sword_equip_inner(
+        authority,
+        selection.ground_entity_id,
+        Some(selection.expected_item_id),
+        geometry,
+    )
+}
+
+fn commit_ground_sword_equip_inner(
+    authority: GroundSwordAuthority<'_>,
+    ground_entity_id: u64,
+    expected_item_id: Option<u64>,
+    geometry: impl FnOnce(
+        &crate::simulation::Fighter,
+        &crate::loot::GroundDrop,
+        crate::zone::ZoneId,
+    ) -> Result<(), PickupCommitError>,
+) -> Result<ItemStack, PickupCommitError> {
+    let GroundSwordAuthority {
+        path,
+        loot,
+        magic,
+        identity,
+        tick,
+        operation,
+    } = authority;
     if tick.world.tick != tick.completed_tick {
         return Err(PickupCommitError::StaleWorldTick);
     }
@@ -273,6 +349,14 @@ pub fn commit_verified_ground_sword_equip(
     staged
         .record_operation(character, operation.sequence)
         .map_err(PickupCommitError::Loot)?;
+    let ground = staged
+        .ground()
+        .get(&ground_entity_id)
+        .cloned()
+        .ok_or(PickupCommitError::Loot(LootError::NotFound))?;
+    if expected_item_id.is_some_and(|id| id == 0 || id != ground.item.id) {
+        return Err(PickupCommitError::Loot(LootError::NotFound));
+    }
     let item = staged
         .take_ground_amount(
             actor,
@@ -289,6 +373,7 @@ pub fn commit_verified_ground_sword_equip(
     ) {
         return Err(PickupCommitError::Loot(LootError::WrongSlot));
     }
+    geometry(fighter, &ground, zone)?;
     staged
         .equip(actor, item.id, EquipmentSlot::MainHand)
         .map_err(PickupCommitError::Loot)?;
@@ -585,6 +670,126 @@ mod tests {
             None
         );
         assert!(!path.exists());
+    }
+
+    #[test]
+    fn checked_sword_pickup_binds_exact_item_and_denied_geometry_is_atomic() {
+        let mut world = World::new(800.0, 600.0);
+        assert!(world.add_player_at(1, 200.0, 200.0, 0.0));
+        assert!(world.add_player_at(2, 212.0, 200.0, 0.0));
+        let mut zones = ZoneAuthority::new();
+        let mut identity = SessionIdentityRegistry::new();
+        let mut loot = LootAuthority::new();
+        for actor in 1..=2 {
+            zones.register(actor).unwrap();
+            identity
+                .bind_verified(lease(actor), CharacterId::new(u64::from(actor)).unwrap())
+                .unwrap();
+            loot.register(actor).unwrap();
+        }
+        let item_id = loot.grant(1, ItemKind::RustySword, 1).unwrap();
+        let entity_id = loot
+            .drop_backpack(1, world.fighter(1).unwrap(), ZoneId::Moonvale, item_id, 0)
+            .unwrap();
+        let path = checkpoint_path();
+        let magic = MagicAuthority::new();
+        macro_rules! ctx {
+            () => {
+                GroundSwordAuthority {
+                    path: &path,
+                    loot: &mut loot,
+                    magic: &magic,
+                    identity: &identity,
+                    tick: PickupWorldTick {
+                        world: &world,
+                        completed_tick: world.tick,
+                        zones: &zones,
+                    },
+                    operation: VerifiedLootOperation {
+                        lease: lease(2),
+                        sequence: 1,
+                    },
+                }
+            };
+        }
+        let choice = GroundSwordSelection {
+            ground_entity_id: entity_id,
+            expected_item_id: item_id,
+        };
+        assert!(matches!(
+            commit_verified_ground_sword_equip_checked(
+                ctx!(),
+                GroundSwordSelection {
+                    expected_item_id: item_id + 1,
+                    ..choice
+                },
+                |_, _, _| panic!("stale sword ID must fail before geometry")
+            ),
+            Err(PickupCommitError::Loot(LootError::NotFound))
+        ));
+        assert!(matches!(
+            commit_verified_ground_sword_equip_checked(
+                ctx!(),
+                GroundSwordSelection {
+                    expected_item_id: 0,
+                    ..choice
+                },
+                |_, _, _| panic!("zero sword ID must fail before geometry")
+            ),
+            Err(PickupCommitError::Loot(LootError::NotFound))
+        ));
+        let mut called = 0;
+        assert!(matches!(
+            commit_verified_ground_sword_equip_checked(ctx!(), choice, |fighter, drop, zone| {
+                called += 1;
+                assert_eq!((fighter.net_id, fighter.x, fighter.y), (2, 212.0, 200.0));
+                assert_eq!((drop.entity_id, drop.item.id), (entity_id, item_id));
+                assert_eq!((drop.at.x, drop.at.y), (200.0, 200.0));
+                assert_eq!(zone, ZoneId::Moonvale);
+                Err(PickupCommitError::GeometryRejected)
+            }),
+            Err(PickupCommitError::GeometryRejected)
+        ));
+        assert_eq!(called, 1);
+        assert_eq!(loot.ground()[&entity_id].item.id, item_id);
+        assert_eq!(loot.inventory(2).unwrap().stack_count(), 0);
+        assert_eq!(
+            loot.committed_operation_sequence(CharacterId::new(2).unwrap()),
+            None
+        );
+        assert!(!path.exists());
+
+        // This is a trusted server callback fixture, not the Physics #494
+        // authoritative solid-window implementation; Core must supply it.
+        let winner =
+            commit_verified_ground_sword_equip_checked(ctx!(), choice, |fighter, drop, zone| {
+                assert_eq!(fighter.net_id, 2);
+                assert_eq!(drop.zone, zone);
+                Ok(())
+            })
+            .unwrap();
+        assert_eq!(winner.id, item_id);
+        assert!(!loot.ground().contains_key(&entity_id));
+        assert_eq!(
+            loot.inventory(2)
+                .unwrap()
+                .equipped(EquipmentSlot::MainHand)
+                .unwrap()
+                .id,
+            item_id
+        );
+        assert_eq!(
+            loot.committed_operation_sequence(CharacterId::new(2).unwrap()),
+            Some(1)
+        );
+
+        assert!(matches!(
+            commit_verified_ground_sword_equip_checked(ctx!(), choice, |_, _, _| panic!(
+                "cannot reacquire removed sword"
+            )),
+            Err(PickupCommitError::Loot(LootError::ReplayOperation))
+        ));
+        let _ = fs::remove_file(path);
     }
 
     #[test]
