@@ -40,7 +40,9 @@ export function verifyWorldAlphaStaticArtifact(raw){
  if(typeof raw!=="string")return false;
  // Byte-exact canonical shape prevents a checked-in artifact from drifting
  // or keeping valid-looking counts/digests while changing numeric obstacles.
- return raw===serializeWorldAlphaStaticArtifact();
+ // Git on Windows may check out text JSON with CRLF; normalize ONLY those
+ // line endings, never reorder entries or accept different values.
+ return raw.replace(/\r\n/g,"\n")===serializeWorldAlphaStaticArtifact();
 }
 
 if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url)){
