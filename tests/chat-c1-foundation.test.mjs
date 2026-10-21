@@ -36,6 +36,26 @@ test("C1 stores only unique, supported server messages with bounded memory", () 
   assert.throws(() => createLocalChatHistory(1000));
 });
 
+test("C1 repeated server message IDs are independent across reconnect sessions", () => {
+  const history = createLocalChatHistory(3);
+  const message = (text, id = "1") => ({ channel: "local",
+    serverMessageId: id, sender: {displayName: "Player #1"}, text });
+  assert.equal(history.push(message("old session")), true);
+  assert.equal(history.push(message("duplicate on old session")), false);
+  history.beginSession();
+  assert.equal(history.push(message("fresh session reuses id 1")), true);
+  assert.equal(history.push(message("duplicate on new session")), false);
+  assert.deepEqual(history.values().map(v => v.text),
+    ["old session", "fresh session reuses id 1"]);
+  assert.equal(history.push(message("new id", "2")), true);
+  // Eviction of the old generation's id 1 must not clear the current
+  // generation's distinct id 1 from the deduplication set.
+  assert.equal(history.push(message("later", "3")), true);
+  assert.equal(history.push(message("duplicate on new session again")), false);
+  assert.deepEqual(history.values().map(v => v.text),
+    ["fresh session reuses id 1", "new id", "later"]);
+});
+
 test("C1 does not allocate wire packet ids or optimistic backend", () => {
   const js = readFileSync(new URL("../src/browser/local-chat.mjs", import.meta.url), "utf8");
   assert.doesNotMatch(js, /innerHTML|insertAdjacentHTML|sendReliable\(|PACKET_TYPE/);

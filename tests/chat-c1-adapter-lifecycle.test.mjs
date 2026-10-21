@@ -66,6 +66,34 @@ test("C1 old adapter ACK and stale inbound callback cannot enter the new chat se
   c.dispose();
 });
 
+test("C1 reconnect accepts server message ID reused by a new authoritative session", () => {
+  const {doc} = fakeDocument();
+  const c = installLocalChat(doc, {online: true});
+  let oldInbound, newInbound;
+  const old = {ready:true,send(){return Promise.resolve()},subscribe(fn){
+    oldInbound=fn;return ()=>{};
+  }};
+  const next = {ready:true,send(){return Promise.resolve()},subscribe(fn){
+    newInbound=fn;return ()=>{};
+  }};
+  const message=(text)=>({channel:"local",serverMessageId:"1",
+    sender:{displayName:"Player #1"},text});
+  c.bindAdapter(old);
+  oldInbound(message("before restart"));
+  oldInbound(message("old duplicate"));
+  assert.equal(c.history.childElementCount,1);
+  c.bindAdapter(null);
+  c.bindAdapter(next);
+  oldInbound(message("stale old transport ignored"));
+  newInbound(message("after reconnect"));
+  newInbound(message("new duplicate"));
+  assert.equal(c.history.childElementCount,2,
+    "same server-issued ID reused on new session is a distinct message");
+  assert.deepEqual(c.history.children.map(n=>n.children[1].textContent),
+    ["before restart","after reconnect"]);
+  c.dispose();
+});
+
 test("C1 pending composer Escape returns to canvas and dispose invalidates ACK", async () => {
   const { doc, canvas } = fakeDocument();
   const c = installLocalChat(doc, { online: true, idFactory: () => "dispose-id" });
