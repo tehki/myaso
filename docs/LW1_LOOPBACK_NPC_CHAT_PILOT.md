@@ -1078,3 +1078,37 @@ All components still run only inside the disabled-by-default,
 loopback-only NPC pilot. Greyhaven world geometry, real doors and
 server navigation manifests are still unmerged external contracts
 and have not been used as staging collision authority.
+
+## LW-2A — Firsthand combat reports require actual pilot sight
+
+The opt-in pilot used to label a server-authenticated combat death as
+personally witnessed by any NPC within \`WITNESS_RADIUS\`, even when
+a watch barricade, market stall or supply crate blocked the sightline.
+After the previous exact-visibility work, such a firsthand claim could
+contradict the same NPC's own chat and social visibility checks.
+
+\`NpcRoutines::witness_death\` now records firsthand knowledge **only
+when both** the current server NPC marker is inside witness radius
+**and** the full unrounded, authenticated f32 victim position has
+an unobstructed continuous line of sight through the same closed
+authored pilot rectangles used by chat and NPC social meetings.
+If the event is occluded, no firsthand timestamp is created and no
+old hearsay is erased. A genuinely visible local death still refreshes
+the one-hop first-person source. The authoritative server Combat
+\`Death\` event, fighter identity, HP/guard, input and combat
+replication are untouched.
+
+Regression fixtures cover all three obstacles, close but occluded
+versus clear NPC/victim positions, a fractional corner-grazing ray
+the old sampled visibility missed, and honest firsthand claims
+following a subsequent clear event. Existing expiry, one-hop
+hearsay, real server death relay, Rowan detour, fighter isolation,
+and finite-resource invariants remain intact.
+
+**P0 scope:** no NPC feature is required for First Playable. This
+is an isolated P2 evidence-integrity fix in experimental draft
+#353, not a live Greyhaven LOS/collision contract and not
+a reason to merge or enable NPCs in the four-player rack-sword
+alpha. No new wire type, loot, sprite, gameplay or production
+activation. Combat #283/M145 acceptance remains a separate
+protected P0 gate owned by Combat/Core.

@@ -264,7 +264,13 @@ impl NpcRoutines {
             };
             let dx = x - f32::from(state.x);
             let dy = y - f32::from(state.y);
-            if dx * dx + dy * dy <= WITNESS_RADIUS * WITNESS_RADIUS {
+            // A death within earshot is not a firsthand visual witness
+            // when an authored pilot wall obstructs the actual victim.
+            // Consume the trusted fighter's full f32 position, not a
+            // rounded point that could skip a barrier's corner.
+            if dx * dx + dy * dy <= WITNESS_RADIUS * WITNESS_RADIUS
+                && npc_navigation::pilot_chat_line_of_sight((x, y), (state.x, state.y))
+            {
                 self.witnessed_death_tick[index] = Some(tick);
                 self.heard_report[index] = None;
             }
@@ -1780,5 +1786,71 @@ mod tests {
         assert_eq!(town.guard_watch.unwrap().source_id, 5);
         assert_eq!(supply.site_is_available(2), Some(false));
         assert!(supply.stocks().conserved());
+    }
+
+    #[test]
+    fn firsthand_combat_witness_requires_actual_clear_server_pilot_sightline() {
+        let blocked = [
+            (3_u8, (245.0_f32, 205.0_f32)), // Rowan / watch barricade
+            (5, (325.0, 220.0)),            // Tomas / supply crate
+            (4, (395.0, 110.0)),            // Elara / market stall
+        ];
+        let clear = [
+            (3_u8, (155.0_f32, 100.0_f32)),
+            (5, (270.0, 160.0)),
+            (4, (315.0, 65.0)),
+        ];
+        for ((id, (victim_x, victim_y)), (clear_id, (clear_x, clear_y))) in
+            blocked.into_iter().zip(clear)
+        {
+            assert_eq!(id, clear_id);
+            let state = NpcRoutines::position(id, 0).unwrap();
+            assert!(
+                (victim_x - f32::from(state.x)).hypot(victim_y - f32::from(state.y))
+                    <= WITNESS_RADIUS
+            );
+            assert!(!npc_navigation::pilot_chat_line_of_sight(
+                (victim_x, victim_y),
+                (state.x, state.y)
+            ));
+            let mut town = NpcRoutines::default();
+            town.witness_death(100, victim_x, victim_y);
+            assert!(
+                !town.context(id, 100).unwrap().1,
+                "cannot claim direct combat witness through obstacle, NPC {id}"
+            );
+            assert_eq!(town.witnessed_death_tick[(id - 1) as usize], None);
+
+            assert!(npc_navigation::pilot_chat_line_of_sight(
+                (clear_x, clear_y),
+                (state.x, state.y)
+            ));
+            town.witness_death(101, clear_x, clear_y);
+            assert_eq!(town.witnessed_death_tick[(id - 1) as usize], Some(101));
+            assert!(town.context(id, 101).unwrap().1);
+        }
+    }
+
+    #[test]
+    fn grazing_pilot_corner_is_not_a_firsthand_death_witness() {
+        // A narrow fractional sight ray the former five-unit LOS sampler
+        // accepted; the fighter location cannot be rounded to dodge cover.
+        let mut town = NpcRoutines::default();
+        let rowan = NpcRoutines::position(3, 0).unwrap();
+        let victim = (257.174_f32, 142.377_f32);
+        assert!(npc_navigation::pilot_line_of_sight(
+            (victim.0.round() as u16, victim.1.round() as u16),
+            (rowan.x, rowan.y)
+        ));
+        assert!(!npc_navigation::pilot_chat_line_of_sight(
+            victim,
+            (rowan.x, rowan.y)
+        ));
+        town.witness_death(60, victim.0, victim.1);
+        assert!(!town.context(3, 60).unwrap().1);
+        assert_eq!(town.rumor_source(3, 60), None);
+        // A nearby, fully clear event can be recorded independently.
+        town.witness_death(61, 155.0, 100.0);
+        assert!(town.context(3, 61).unwrap().1);
     }
 }
