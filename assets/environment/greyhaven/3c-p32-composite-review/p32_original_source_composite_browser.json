@@ -1,0 +1,245 @@
+{
+  "milestone": "First Playable Graphics3C original World493 + 3B508 rendered-source composite QA",
+  "pins": {
+    "world": "07060f981b8a1dac89184b621b6893dd970a08ae",
+    "graphics3b": "2a11b923591a682bbae3cffe6d9f70b0d2036de8",
+    "graphics3c": "590f7a1809039aa9388f46351f2a873a95c3a55b"
+  },
+  "sourceHashes": {
+    "worldModule": "305a7764d67af9115d85000bde5e922cbae64db2455e15fbf7d3d22b01c5c3bf",
+    "worldMap": "21e7663303b14cc89f7dece7d73fda3b7e1fd4b70cc97b8753cd2c793209e144",
+    "worldPainter": "db5274b9ad3ea8e28f4a2ef44358cfed247d0625785dc353577a3ee6d136f9e9",
+    "graphics3cPainter": "79e287f28c7bbe6450fb83dd006d3800026ed41e88c5da353da5618835f6027f",
+    "graphics3cMaterial": "cfc22bbf2c5ab9847ba40ef85773efe7b382041ed27784cd7eee3cc4fdb59a58",
+    "graphics3cAtmosphere": "452a11ed33ed842372ea39d11e532083c71177cb18261328b8a14ecf1312622f",
+    "graphics3bBridge": "f7862e3931a150c5b8ac2e11054183d8de12ef498ab22be5cca192f819d46f69",
+    "graphics3bRack": "83d0d228785f80e95efd18fa6ef46a77d4ce8500a3fd5cf777d0f1f5ee3917b8",
+    "graphics3bSword": "795874620d07652e55f5e8a76952d2075f17196fc892eff88d46b165638a3b31"
+  },
+  "scope": "ART-ONLY-NO-SERVER visual samples. No real item ownership or gameplay.",
+  "release": {
+    "actualServerSwordItems": false,
+    "realFourPlayerAcceptance": false,
+    "nativeOnlineGameIntegrated": false,
+    "productionApproved": false
+  },
+  "cases": [
+    {
+      "browser": "chrome",
+      "browserVersion": "Chrome/154.0.8037.99",
+      "variant": "world493",
+      "pinnedRendererHash": "db5274b9ad3ea8e28f4a2ef44358cfed247d0625785dc353577a3ee6d136f9e9",
+      "canvasSha256": "f55abcb072b8caac472f04acc863763d767513534190d36eb6ea769c66ce5a97",
+      "screenCaptured": "world493_chrome_canvas.png",
+      "fullScreenshot": "world493_chrome_real_source_composite.png",
+      "cachedTiles": 6,
+      "createdTiles": 0,
+      "rackRect": {
+        "x": 200,
+        "y": 154,
+        "width": 240,
+        "height": 166
+      },
+      "swordRects": [
+        {
+          "id": "ART-ONLY-NO-SERVER-0",
+          "x": 248.60000000000002,
+          "y": 205,
+          "width": 42,
+          "height": 115
+        },
+        {
+          "id": "ART-ONLY-NO-SERVER-1",
+          "x": 282.2,
+          "y": 205,
+          "width": 42,
+          "height": 115
+        },
+        {
+          "id": "ART-ONLY-NO-SERVER-2",
+          "x": 315.8,
+          "y": 205,
+          "width": 42,
+          "height": 115
+        },
+        {
+          "id": "ART-ONLY-NO-SERVER-3",
+          "x": 349.4,
+          "y": 205,
+          "width": 42,
+          "height": 115
+        }
+      ],
+      "syntheticArtItems": 4,
+      "realCommittedItems": 0,
+      "actualSwordAlphaClickCandidate": "ART-ONLY-NO-SERVER-0",
+      "transparentClickRejected": true,
+      "actualCombatAttacks": 0,
+      "actualPickupRequests": 0,
+      "pageErrors": []
+    },
+    {
+      "browser": "chrome",
+      "browserVersion": "Chrome/154.0.8037.99",
+      "variant": "graphics3c",
+      "pinnedRendererHash": "79e287f28c7bbe6450fb83dd006d3800026ed41e88c5da353da5618835f6027f",
+      "canvasSha256": "e9304b0e04eea4350173ad998b42e5a5943210973d9b20ed98117ce17c07cc8a",
+      "screenCaptured": "graphics3c_chrome_canvas.png",
+      "fullScreenshot": "graphics3c_chrome_real_source_composite.png",
+      "cachedTiles": 6,
+      "createdTiles": 0,
+      "rackRect": {
+        "x": 200,
+        "y": 154,
+        "width": 240,
+        "height": 166
+      },
+      "swordRects": [
+        {
+          "id": "ART-ONLY-NO-SERVER-0",
+          "x": 248.60000000000002,
+          "y": 205,
+          "width": 42,
+          "height": 115
+        },
+        {
+          "id": "ART-ONLY-NO-SERVER-1",
+          "x": 282.2,
+          "y": 205,
+          "width": 42,
+          "height": 115
+        },
+        {
+          "id": "ART-ONLY-NO-SERVER-2",
+          "x": 315.8,
+          "y": 205,
+          "width": 42,
+          "height": 115
+        },
+        {
+          "id": "ART-ONLY-NO-SERVER-3",
+          "x": 349.4,
+          "y": 205,
+          "width": 42,
+          "height": 115
+        }
+      ],
+      "syntheticArtItems": 4,
+      "realCommittedItems": 0,
+      "actualSwordAlphaClickCandidate": "ART-ONLY-NO-SERVER-0",
+      "transparentClickRejected": true,
+      "actualCombatAttacks": 0,
+      "actualPickupRequests": 0,
+      "pageErrors": []
+    },
+    {
+      "browser": "firefox",
+      "browserVersion": "firefox/153.4.0",
+      "variant": "world493",
+      "pinnedRendererHash": "db5274b9ad3ea8e28f4a2ef44358cfed247d0625785dc353577a3ee6d136f9e9",
+      "canvasSha256": "19e37de25b1e3d5003128eb1adde15480e667a154c82d9114228f6f67f91ce49",
+      "screenCaptured": "world493_firefox_canvas.png",
+      "fullScreenshot": "world493_firefox_real_source_composite.png",
+      "cachedTiles": 6,
+      "createdTiles": 0,
+      "rackRect": {
+        "x": 200,
+        "y": 154,
+        "width": 240,
+        "height": 166
+      },
+      "swordRects": [
+        {
+          "id": "ART-ONLY-NO-SERVER-0",
+          "x": 248.60000000000002,
+          "y": 205,
+          "width": 42,
+          "height": 115
+        },
+        {
+          "id": "ART-ONLY-NO-SERVER-1",
+          "x": 282.2,
+          "y": 205,
+          "width": 42,
+          "height": 115
+        },
+        {
+          "id": "ART-ONLY-NO-SERVER-2",
+          "x": 315.8,
+          "y": 205,
+          "width": 42,
+          "height": 115
+        },
+        {
+          "id": "ART-ONLY-NO-SERVER-3",
+          "x": 349.4,
+          "y": 205,
+          "width": 42,
+          "height": 115
+        }
+      ],
+      "syntheticArtItems": 4,
+      "realCommittedItems": 0,
+      "actualSwordAlphaClickCandidate": "ART-ONLY-NO-SERVER-0",
+      "transparentClickRejected": true,
+      "actualCombatAttacks": 0,
+      "actualPickupRequests": 0,
+      "pageErrors": []
+    },
+    {
+      "browser": "firefox",
+      "browserVersion": "firefox/153.4.0",
+      "variant": "graphics3c",
+      "pinnedRendererHash": "79e287f28c7bbe6450fb83dd006d3800026ed41e88c5da353da5618835f6027f",
+      "canvasSha256": "88f8c621d937356d7ce482447018b9ca626efe3a9c21668db39495c49cca98a8",
+      "screenCaptured": "graphics3c_firefox_canvas.png",
+      "fullScreenshot": "graphics3c_firefox_real_source_composite.png",
+      "cachedTiles": 6,
+      "createdTiles": 0,
+      "rackRect": {
+        "x": 200,
+        "y": 154,
+        "width": 240,
+        "height": 166
+      },
+      "swordRects": [
+        {
+          "id": "ART-ONLY-NO-SERVER-0",
+          "x": 248.60000000000002,
+          "y": 205,
+          "width": 42,
+          "height": 115
+        },
+        {
+          "id": "ART-ONLY-NO-SERVER-1",
+          "x": 282.2,
+          "y": 205,
+          "width": 42,
+          "height": 115
+        },
+        {
+          "id": "ART-ONLY-NO-SERVER-2",
+          "x": 315.8,
+          "y": 205,
+          "width": 42,
+          "height": 115
+        },
+        {
+          "id": "ART-ONLY-NO-SERVER-3",
+          "x": 349.4,
+          "y": 205,
+          "width": 42,
+          "height": 115
+        }
+      ],
+      "syntheticArtItems": 4,
+      "realCommittedItems": 0,
+      "actualSwordAlphaClickCandidate": "ART-ONLY-NO-SERVER-0",
+      "transparentClickRejected": true,
+      "actualCombatAttacks": 0,
+      "actualPickupRequests": 0,
+      "pageErrors": []
+    }
+  ],
+  "status": "ART_ONLY_CROSS_BROWSER_COMPOSITE_PASS"
+}

@@ -1,0 +1,67 @@
+{
+  "status": "GFX3C_ORIGINAL_WEBP_OPAQUE_SWORD_CORE_PASSED",
+  "worldHead": "07060f981b8a1dac89184b621b6893dd970a08ae",
+  "graphics3bHead": "2a11b923591a682bbae3cffe6d9f70b0d2036de8",
+  "graphics3cHeadAtCapture": "590f7a1809039aa9388f46351f2a873a95c3a55b",
+  "sourceSwordSha256": "795874620d07652e55f5e8a76952d2075f17196fc892eff88d46b165638a3b31",
+  "browsers": [
+    {
+      "browser": "chrome",
+      "changedScenePixels": 67056,
+      "opaqueSwordCores": [
+        {
+          "artOnlySwordId": "ART-ONLY-NO-SERVER-0",
+          "verifiedFullyOpaqueInteriorPixels": 284,
+          "changedPixels": 0
+        },
+        {
+          "artOnlySwordId": "ART-ONLY-NO-SERVER-1",
+          "verifiedFullyOpaqueInteriorPixels": 284,
+          "changedPixels": 0
+        },
+        {
+          "artOnlySwordId": "ART-ONLY-NO-SERVER-2",
+          "verifiedFullyOpaqueInteriorPixels": 284,
+          "changedPixels": 0
+        },
+        {
+          "artOnlySwordId": "ART-ONLY-NO-SERVER-3",
+          "verifiedFullyOpaqueInteriorPixels": 284,
+          "changedPixels": 0
+        }
+      ],
+      "serverItemPixelsClaimed": 0,
+      "actualPickupTested": false
+    },
+    {
+      "browser": "firefox",
+      "changedScenePixels": 67705,
+      "opaqueSwordCores": [
+        {
+          "artOnlySwordId": "ART-ONLY-NO-SERVER-0",
+          "verifiedFullyOpaqueInteriorPixels": 284,
+          "changedPixels": 0
+        },
+        {
+          "artOnlySwordId": "ART-ONLY-NO-SERVER-1",
+          "verifiedFullyOpaqueInteriorPixels": 284,
+          "changedPixels": 0
+        },
+        {
+          "artOnlySwordId": "ART-ONLY-NO-SERVER-2",
+          "verifiedFullyOpaqueInteriorPixels": 284,
+          "changedPixels": 0
+        },
+        {
+          "artOnlySwordId": "ART-ONLY-NO-SERVER-3",
+          "verifiedFullyOpaqueInteriorPixels": 284,
+          "changedPixels": 0
+        }
+      ],
+      "serverItemPixelsClaimed": 0,
+      "actualPickupTested": false
+    }
+  ],
+  "limitations": "Art-only sample sprites over real World and 3C cached Canvas; no gameplay equip, collision, source item presence, or authoritative pickup",
+  "integrationReady": false
+}
