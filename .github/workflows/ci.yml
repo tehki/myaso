@@ -220,7 +220,8 @@ jobs:
           # authoritative 125ms parry -> strict >=24 remote-only raster pixels.
           # The original M41 gate later in the suite remains unchanged.
           node --check scripts/m41-native-parry-after-release.mjs
-          node --test tests/m41-native-release-led-parry.test.mjs
+          node --check scripts/m41-authoritative-light-onset.mjs
+          node --test tests/m41-native-release-led-parry.test.mjs tests/m41-authoritative-light-onset.test.mjs
           node scripts/pvp_browser_flight_runner.mjs
       - name: Validate M188 repeated real heavy counterplay windows
         run: |
