@@ -150,7 +150,11 @@ pub fn verify_pickup_geometry(
     }
     let dx = sword.x - actor.x;
     let dy = sword.y - actor.y;
-    if dx.mul_add(dx, dy * dy) > reach * reach {
+    // Match Items `loot::Point::near`'s f32 evaluation order exactly.
+    // Using `mul_add` changes the inclusive 56-unit threshold by one ULP
+    // near the boundary, creating Physics false rejections of Items-eligible
+    // original Blacksmith sword coordinates (see regression below).
+    if dx * dx + dy * dy > reach * reach {
         return Err(PickupGeometryReject::OutOfRange);
     }
     if window
@@ -244,6 +248,90 @@ mod tests {
             complete: true,
             bounds: BOUNDS,
             solids,
+        }
+    }
+
+    #[test]
+    fn items_56_unit_squared_distance_rounding_matches_physics() {
+        // Real f32 Greyhaven world coordinates, verified with rustc 1.89:
+        // Items dx² + dy² is exactly 3136.0, while fused mul_add rounds
+        // to 3136.0002 and previously rejected a legitimate 56-unit pickup.
+        let actor = WorldPoint {
+            zone_id: CURRENT.zone_id,
+            x: 3748.1265,
+            y: 4093.4072,
+        };
+        let sword = WorldPoint {
+            zone_id: CURRENT.zone_id,
+            x: 3740.0,
+            y: 4038.0,
+        };
+        let dx = sword.x - actor.x;
+        let dy = sword.y - actor.y;
+        assert_eq!(dx * dx + dy * dy, 56.0_f32 * 56.0_f32);
+        assert!(dx.mul_add(dx, dy * dy) > 56.0_f32 * 56.0_f32);
+        let smith = SolidRect {
+            min_x: 3710.0,
+            min_y: 3850.0,
+            max_x: 3892.0,
+            max_y: 4012.0,
+        };
+        let window = window(&[smith]);
+        let ticks = PickupTickFence {
+            operation_tick: 900,
+            actor_tick: 900,
+            sword_tick: 900,
+            geometry_tick: 900,
+        };
+        assert_eq!(
+            verify_pickup_geometry_at_completed_tick(
+                actor, sword, &window, CURRENT, 56.0, ticks,
+            ),
+            Ok(())
+        );
+        assert_eq!(
+            verify_pickup_geometry_at_completed_tick(
+                actor, sword, &window, CURRENT, 55.99, ticks,
+            ),
+            Err(PickupGeometryReject::OutOfRange)
+        );
+    }
+
+    #[test]
+    fn midpoint_may_reach_both_swords_but_does_not_choose_a_target() {
+        // World #537: the midpoint between two stands is legitimately in
+        // range of BOTH separate swords. Physics verifies the selected,
+        // exact server GroundDrop from Items; it never picks a nearest ID.
+        let actor = WorldPoint {
+            zone_id: CURRENT.zone_id,
+            x: 3760.0,
+            y: 4088.0,
+        };
+        let smith = SolidRect {
+            min_x: 3710.0,
+            min_y: 3850.0,
+            max_x: 3892.0,
+            max_y: 4012.0,
+        };
+        let window = window(&[smith]);
+        let ticks = PickupTickFence {
+            operation_tick: 901,
+            actor_tick: 901,
+            sword_tick: 901,
+            geometry_tick: 901,
+        };
+        for sword_x in [3740.0, 3780.0] {
+            let exact_selected_sword = WorldPoint {
+                zone_id: CURRENT.zone_id,
+                x: sword_x,
+                y: 4038.0,
+            };
+            assert_eq!(
+                verify_pickup_geometry_at_completed_tick(
+                    actor, exact_selected_sword, &window, CURRENT, 56.0, ticks,
+                ),
+                Ok(())
+            );
         }
     }
 
