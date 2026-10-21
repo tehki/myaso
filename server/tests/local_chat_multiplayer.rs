@@ -475,8 +475,10 @@ async fn repeated_chat_submissions_do_not_starve_authoritative_game_input_ack() 
     // native browser acceptance.
     for round in 0..24_u32 {
         let correlation = 600 + round;
-        let client_tick = 1000 + round;
-        sender.send(correlation, b"Chat beside realtime movement", 1).await;
+        let client_tick = 101 + round;
+        sender
+            .send(correlation, b"Chat beside realtime movement", 1)
+            .await;
 
         let mut input = [0_u8; 22];
         input[0] = 1; // gameplay protocol v1
