@@ -9,13 +9,29 @@
 // native cross-browser event ordering before accepting HP/guard/parry proof.
 import { setTimeout as sleepTimer } from "node:timers/promises";
 
+export function planM194TrustedWheelDelay({ eventEpochMs, nowEpochMs, targetAgeMs }) {
+  if (![eventEpochMs, nowEpochMs, targetAgeMs].every(Number.isFinite)
+    || targetAgeMs <= 0 || targetAgeMs > 60) {
+    throw new TypeError("M194 requires the real native wheel epoch and bounded target age");
+  }
+  const receiptAgeMs = nowEpochMs - eventEpochMs;
+  // Same-host browser epoch only schedules native input. It never certifies
+  // server admission. Leave headroom for the unchanged 135ms windup and input
+  // sampling before 240ms expires; stale/future reports cannot start a strike.
+  if (receiptAgeMs < 0 || receiptAgeMs > 70) {
+    throw new Error("M194 trusted wheel receipt is stale or from a future clock");
+  }
+  return { receiptAgeMs, remainingMs: Math.max(0, targetAgeMs - receiptAgeMs) };
+}
+
 export async function dispatchR2ReleaseLedShortBlock({
   sendAttackDown, sendWheel, awaitTrustedWheel, sendAttackUp,
   now = () => performance.now(), sleep = sleepTimer,
   maxHoldMs = 280, receiptGraceMs = 100, trustedWheelWaitMs = 0,
   postTrustedWheelMs = 0,
+  compensateWheelReceipt = false, nowEpoch = () => Date.now(),
 }) {
-  if (![sendAttackDown, sendWheel, awaitTrustedWheel, sendAttackUp, now, sleep]
+  if (![sendAttackDown, sendWheel, awaitTrustedWheel, sendAttackUp, now, sleep, nowEpoch]
     .every(fn => typeof fn === "function")
     || !Number.isFinite(maxHoldMs) || maxHoldMs < 10 || maxHoldMs >= 320
     || !Number.isFinite(receiptGraceMs) || receiptGraceMs < 0
@@ -25,7 +41,9 @@ export async function dispatchR2ReleaseLedShortBlock({
     || !Number.isFinite(postTrustedWheelMs) || postTrustedWheelMs < 0
     || postTrustedWheelMs > 60
     || (postTrustedWheelMs > 0 && trustedWheelWaitMs === 0)
-    || trustedWheelWaitMs + postTrustedWheelMs >= maxHoldMs) {
+    || trustedWheelWaitMs + postTrustedWheelMs >= maxHoldMs
+    || typeof compensateWheelReceipt !== "boolean"
+    || (compensateWheelReceipt && postTrustedWheelMs === 0)) {
     throw new TypeError("R2 guard-break requires bounded genuine W3C held-release and attestation");
   }
   const startedAt = now();
@@ -40,11 +58,13 @@ export async function dispatchR2ReleaseLedShortBlock({
     error => { wheelAckMs = ms(); return { ok: false, error }; },
   );
   let trustedWheelObservedMs = null;
+  let trustedWheelReport = null;
   const attestation = Promise.resolve().then(awaitTrustedWheel).then(report => {
     if (report?.trusted !== true || !(report.deltaY > 0)) {
       throw new Error("R2 guard-break requires a trusted real Firefox wheel-back event");
     }
     trustedWheelObservedMs = ms();
+    trustedWheelReport = report;
     return report;
   });
   const earlyWheelFailure = wheelOutcome.then(result =>
@@ -73,13 +93,20 @@ export async function dispatchR2ReleaseLedShortBlock({
   } else {
     await Promise.race([attestation, sleep(receiptGraceMs), earlyWheelFailure]);
   }
-  // M205 only: on a real W3C wheel receipt, give the genuine defensive
-  // input one bounded sampling interval before committing the single light
-  // release. Prior quality #39498986465 observed a genuine parry at 6
-  // authoritative 60Hz ticks after wheel activation; a guarded hit requires
-  // the unchanged 125..240ms short-block interval. This is scheduling, not
-  // a change to any combat constant, input provenance, or strict assertion.
-  if (postTrustedWheelMs > 0) await sleep(postTrustedWheelMs);
+  // M194/M205 target native wheel age, not receipt age. Run #39575030403
+  // added 40ms after an already delayed receipt: Block188 expired at the
+  // real hit203. Subtract observed same-host delivery age while preserving
+  // the unchanged 125..240ms window and mandatory server HP/guard proof.
+  const wheelReceiptTiming = compensateWheelReceipt ? planM194TrustedWheelDelay({
+    eventEpochMs: trustedWheelReport?.eventEpochMs, nowEpochMs: nowEpoch(),
+    targetAgeMs: postTrustedWheelMs,
+  }) : null;
+  const remainingWheelDelayMs = wheelReceiptTiming?.remainingMs ?? postTrustedWheelMs;
+  if (remainingWheelDelayMs > 0) await sleep(remainingWheelDelayMs);
+  const wheelReleaseAgeMs = compensateWheelReceipt ? planM194TrustedWheelDelay({
+    eventEpochMs: trustedWheelReport.eventEpochMs, nowEpochMs: nowEpoch(),
+    targetAgeMs: postTrustedWheelMs,
+  }).receiptAgeMs : null;
   const attackUpDispatchMs = ms();
   if (attackUpDispatchMs - attackDownDispatchMs > maxHoldMs) {
     throw new Error("R2 genuine LMB hold exceeded light-charge budget before release; no strike allowed");
@@ -105,6 +132,8 @@ export async function dispatchR2ReleaseLedShortBlock({
     receiptGraceMs,
     wheelHeadStartMs: 0,
     postTrustedWheelMs: rounded(postTrustedWheelMs),
+    wheelReceiptTiming,
+    wheelReleaseAgeMs,
     clickHoldMs: rounded(attackUpDispatchMs - attackDownDispatchMs),
   };
 }

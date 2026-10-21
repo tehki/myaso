@@ -9841,6 +9841,7 @@ async function runOnlineUiGuardBreakFlight(entries, { onGuardBroken = null } = {
           // This delays the same release input, not the server parry/guard rule.
           // The exact -38 guard/no-parry/no-HP-loss assertions remain fatal.
           postTrustedWheelMs: ["uiguardbreak", "uiguardbreakpunishffahit"].includes(scenario) ? 40 : 0,
+          compensateWheelReceipt: ["uiguardbreak", "uiguardbreakpunishffahit"].includes(scenario),
           sendAttackDown: () => setArenaAttackButton(attacker, true),
           sendWheel: () => scrollArenaWheel(defender, defenderElementId, 120, 0),
           awaitTrustedWheel: () => challenge.wait(),
@@ -12940,6 +12941,7 @@ async function installUiObserver(session) {
         window.__MYASO_M221_WHEEL_TOKEN__ = null;
         const receipt = JSON.stringify({
           token: challenge, trusted: event.isTrusted === true, deltaY: event.deltaY,
+          eventEpochMs: entry.epochMs ?? Date.now(),
         });
         const channel = window.__MYASO_M325_WHEEL_CHANNEL__;
         if (channel) {
