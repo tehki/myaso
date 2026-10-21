@@ -26,6 +26,12 @@
 
 `scripts/test_economics_town_banks_lab.py` exercises **29 deterministic tests**, including NPC-only ownership, multiple banks, real reserve movement, cross-town isolation, per-bank ledgers and sequence numbers, deposit/withdraw retry, insufficient gold, two concurrent withdrawal contenders, vault/guard/zone fixture mismatch, one-shot raid events across towns, weight limit, local alarm event, unreduced customer claims, insolvency, and a **deliberately forged test raid** that demonstrates the mock proof is **not authoritative**.
 
+## B1 read-only World → bank contract (21 October 2026)
+
+The next contract is now implemented **without creating any new robbery permission** in [ECONOMICS_B1_WORLD_VAULT_BREACH_CONTRACT.md](./ECONOMICS_B1_WORLD_VAULT_BREACH_CONTRACT.md). `scripts/economics_bank_world_contract.py` accepts only canonical versioned, bounded, nonzero 128-bit Core-shaped vault/character/loot/event identifiers and positive zone/worker/session/epoch fields. The SHA-256 fingerprint is **not an authentication signature**. Its only purported approval function **always refuses settlement**, because real World+Core+Items authority is absent. No JSON payload can debit the vault or mint loot. The contract is a future interoperability proposal, **not** proof that World/Items are connected.
+
+B1 adds **24 tests** to the earlier 29, for **53/53 local offline tests passing** on authorized Serj. Future real robbery needs one Core-authoritative transaction that simultaneously transfers actual world-owned vault items, records the source event exactly once, adjusts bank reserves, leaves depositor legal liabilities intact and emits an auditable receipt/outbox. Do not bypass this with a caller-supplied `VaultBreachFixture` or a parsed event.
+
 ## Security / production blockers — MUST NOT ACTIVATE
 
 This test code is **not a production banking system or account authenticator**. `travel_fixture()` teleports a local test actor; `VaultBreachFixture` is publicly constructible. A malicious caller can fake all its guards/locks/world receipt fields. There is **no authenticated player identity, actual physical gold inventory, Sentinel AI, persistent deposit store, bank NPC, bank building, network route, currency wallet, money contract or crash consistency**. Nothing here may be imported by `server/src` or `web/`, deployed, given economic value, or treated as an authorization decision.
