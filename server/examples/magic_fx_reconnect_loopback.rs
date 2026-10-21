@@ -92,7 +92,8 @@ async fn run_phase(
     let mut fx_sent = 0usize;
     for tick in begin..=end {
         clock.tick().await;
-        hub.advance(tick).expect("monotonic P18 server-owned fixture clock");
+        hub.advance(tick)
+            .expect("monotonic P18 server-owned fixture clock");
         hub.admit_trusted(
             tick,
             TrustedEffectSpec {
@@ -237,11 +238,12 @@ async fn main() -> Result<()> {
     let old = registry
         .register_trusted(CONNECT_ID, NET_ID, OLD_ZONE)
         .expect("trusted fixture client A");
-    println!("P18_ACCEPTED_A generation={} zone={OLD_ZONE}", old.generation);
+    println!(
+        "P18_ACCEPTED_A generation={} zone={OLD_ZONE}",
+        old.generation
+    );
     control(&first, b'M', OLD_ZONE as u8)?;
-    let (gp_old, fx_old) = run_phase(
-        &first, &mut registry, &mut hub, old, OLD_ZONE, 1, 25,
-    ).await?;
+    let (gp_old, fx_old) = run_phase(&first, &mut registry, &mut hub, old, OLD_ZONE, 1, 25).await?;
 
     // Prepare genuine P12 optional FX *before* the server-authorized zone
     // transfer. P15 MUST fence this already-planned stale route at send time.
@@ -278,8 +280,15 @@ async fn main() -> Result<()> {
     );
     control(&first, b'M', TRANSFER_ZONE as u8)?;
     let (gp_moved, fx_moved) = run_phase(
-        &first, &mut registry, &mut hub, moved, TRANSFER_ZONE, 26, 50,
-    ).await?;
+        &first,
+        &mut registry,
+        &mut hub,
+        moved,
+        TRANSFER_ZONE,
+        26,
+        50,
+    )
+    .await?;
 
     // The browser explicitly closes actual connection A before creating B.
     control(&first, b'E', TRANSFER_ZONE as u8)?;
@@ -306,9 +315,8 @@ async fn main() -> Result<()> {
         fresh.generation
     );
     control(&second, b'M', NEW_ZONE as u8)?;
-    let (gp_fresh, fx_fresh) = run_phase(
-        &second, &mut registry, &mut hub, fresh, NEW_ZONE, 51, 90,
-    ).await?;
+    let (gp_fresh, fx_fresh) =
+        run_phase(&second, &mut registry, &mut hub, fresh, NEW_ZONE, 51, 90).await?;
 
     // Recheck old-zone packet after *real* disconnect and registration B.
     // The old ME must not be delivered to B's recycled connection ID.
