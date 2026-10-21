@@ -1,0 +1,4301 @@
+{
+  "browserEngineSelection": [
+    "chrome"
+  ],
+  "completeTwoBrowserMatrix": false,
+  "purpose": "P43 shipping alpha:false vs prior willReadFrequently:true original Canvas timing",
+  "sources": {
+    "gfx3cParent": "b52a787ecb1958b885c4c96fbef737a8e45d7599",
+    "world": "3178b9aad8757ceb3594ff04b9e3099dced6b729"
+  },
+  "onlineGameContextPinned": true,
+  "gameClientRunning": false,
+  "noSourceEdits": true,
+  "runs": [
+    {
+      "engine": "chrome",
+      "version": "Chrome/152.0.7977.82",
+      "errors": [],
+      "results": [
+        {
+          "phase": "pixel",
+          "zoom": 0.84,
+          "name": "opaque-readfrequent",
+          "frames": 16,
+          "differingBytes": 0,
+          "differingFrames": 0,
+          "maxChanged": 0
+        },
+        {
+          "phase": "pixel",
+          "zoom": 0.84,
+          "name": "prior-qa-transparent-readfrequent",
+          "frames": 16,
+          "differingBytes": 148704,
+          "differingFrames": 8,
+          "maxChanged": 49344
+        },
+        {
+          "phase": "pixel",
+          "zoom": 0.84,
+          "name": "default-transparent",
+          "frames": 16,
+          "differingBytes": 148704,
+          "differingFrames": 8,
+          "maxChanged": 49344
+        },
+        {
+          "phase": "timing",
+          "zoom": 0.84,
+          "trial": 0,
+          "name": "shipping-opaque",
+          "attrs": {
+            "alpha": false,
+            "colorSpace": "srgb",
+            "colorType": "unorm8",
+            "desynchronized": false,
+            "toneMapping": {
+              "mode": "standard"
+            },
+            "willReadFrequently": false
+          },
+          "frames": 48,
+          "created": 6,
+          "warmFrames": 46,
+          "warmTotalMs": 5.9,
+          "warmP95Ms": 0.2,
+          "totalMs": 69.4,
+          "samples": [
+            {
+              "ms": 42,
+              "coldTiles": 3,
+              "cached": 3
+            },
+            {
+              "ms": 21.5,
+              "coldTiles": 3,
+              "cached": 6
+            },
+            {
+              "ms": 0.2,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.3,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.2,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.2,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.2,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.2,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.2,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.2,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.2,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.2,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.2,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.2,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.2,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.2,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.2,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.2,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.2,
+              "coldTiles": 0,
+              "cached": 6
+            }
+          ]
+        },
+        {
+          "phase": "timing",
+          "zoom": 0.84,
+          "trial": 0,
+          "name": "opaque-readfrequent",
+          "attrs": {
+            "alpha": false,
+            "colorSpace": "srgb",
+            "colorType": "unorm8",
+            "desynchronized": false,
+            "toneMapping": {
+              "mode": "standard"
+            },
+            "willReadFrequently": true
+          },
+          "frames": 48,
+          "created": 6,
+          "warmFrames": 46,
+          "warmTotalMs": 3.7,
+          "warmP95Ms": 0.2,
+          "totalMs": 64.7,
+          "samples": [
+            {
+              "ms": 32.6,
+              "coldTiles": 3,
+              "cached": 3
+            },
+            {
+              "ms": 28.4,
+              "coldTiles": 3,
+              "cached": 6
+            },
+            {
+              "ms": 0.2,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.2,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.2,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.2,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.2,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.2,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            }
+          ]
+        },
+        {
+          "phase": "timing",
+          "zoom": 0.84,
+          "trial": 0,
+          "name": "prior-qa-transparent-readfrequent",
+          "attrs": {
+            "alpha": true,
+            "colorSpace": "srgb",
+            "colorType": "unorm8",
+            "desynchronized": false,
+            "toneMapping": {
+              "mode": "standard"
+            },
+            "willReadFrequently": true
+          },
+          "frames": 48,
+          "created": 6,
+          "warmFrames": 46,
+          "warmTotalMs": 4.1,
+          "warmP95Ms": 0.2,
+          "totalMs": 55.6,
+          "samples": [
+            {
+              "ms": 29,
+              "coldTiles": 3,
+              "cached": 3
+            },
+            {
+              "ms": 22.5,
+              "coldTiles": 3,
+              "cached": 6
+            },
+            {
+              "ms": 0.2,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.3,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.2,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.2,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.2,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.2,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            }
+          ]
+        },
+        {
+          "phase": "timing",
+          "zoom": 0.84,
+          "trial": 0,
+          "name": "default-transparent",
+          "attrs": {
+            "alpha": true,
+            "colorSpace": "srgb",
+            "colorType": "unorm8",
+            "desynchronized": false,
+            "toneMapping": {
+              "mode": "standard"
+            },
+            "willReadFrequently": false
+          },
+          "frames": 48,
+          "created": 6,
+          "warmFrames": 46,
+          "warmTotalMs": 2.7,
+          "warmP95Ms": 0.2,
+          "totalMs": 35,
+          "samples": [
+            {
+              "ms": 18.9,
+              "coldTiles": 3,
+              "cached": 3
+            },
+            {
+              "ms": 13.4,
+              "coldTiles": 3,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.2,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.2,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.2,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.2,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            }
+          ]
+        },
+        {
+          "phase": "timing",
+          "zoom": 0.84,
+          "trial": 1,
+          "name": "default-transparent",
+          "attrs": {
+            "alpha": true,
+            "colorSpace": "srgb",
+            "colorType": "unorm8",
+            "desynchronized": false,
+            "toneMapping": {
+              "mode": "standard"
+            },
+            "willReadFrequently": false
+          },
+          "frames": 48,
+          "created": 6,
+          "warmFrames": 46,
+          "warmTotalMs": 2,
+          "warmP95Ms": 0.1,
+          "totalMs": 31.7,
+          "samples": [
+            {
+              "ms": 16.3,
+              "coldTiles": 3,
+              "cached": 3
+            },
+            {
+              "ms": 13.4,
+              "coldTiles": 3,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            }
+          ]
+        },
+        {
+          "phase": "timing",
+          "zoom": 0.84,
+          "trial": 1,
+          "name": "prior-qa-transparent-readfrequent",
+          "attrs": {
+            "alpha": true,
+            "colorSpace": "srgb",
+            "colorType": "unorm8",
+            "desynchronized": false,
+            "toneMapping": {
+              "mode": "standard"
+            },
+            "willReadFrequently": true
+          },
+          "frames": 48,
+          "created": 6,
+          "warmFrames": 46,
+          "warmTotalMs": 2.2,
+          "warmP95Ms": 0.1,
+          "totalMs": 30.7,
+          "samples": [
+            {
+              "ms": 15.8,
+              "coldTiles": 3,
+              "cached": 3
+            },
+            {
+              "ms": 12.7,
+              "coldTiles": 3,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            }
+          ]
+        },
+        {
+          "phase": "timing",
+          "zoom": 0.84,
+          "trial": 1,
+          "name": "opaque-readfrequent",
+          "attrs": {
+            "alpha": false,
+            "colorSpace": "srgb",
+            "colorType": "unorm8",
+            "desynchronized": false,
+            "toneMapping": {
+              "mode": "standard"
+            },
+            "willReadFrequently": true
+          },
+          "frames": 48,
+          "created": 6,
+          "warmFrames": 46,
+          "warmTotalMs": 2.3,
+          "warmP95Ms": 0.1,
+          "totalMs": 33.4,
+          "samples": [
+            {
+              "ms": 16.6,
+              "coldTiles": 3,
+              "cached": 3
+            },
+            {
+              "ms": 14.5,
+              "coldTiles": 3,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.2,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.2,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            }
+          ]
+        },
+        {
+          "phase": "timing",
+          "zoom": 0.84,
+          "trial": 1,
+          "name": "shipping-opaque",
+          "attrs": {
+            "alpha": false,
+            "colorSpace": "srgb",
+            "colorType": "unorm8",
+            "desynchronized": false,
+            "toneMapping": {
+              "mode": "standard"
+            },
+            "willReadFrequently": false
+          },
+          "frames": 48,
+          "created": 6,
+          "warmFrames": 46,
+          "warmTotalMs": 1.7,
+          "warmP95Ms": 0.1,
+          "totalMs": 30.4,
+          "samples": [
+            {
+              "ms": 12.9,
+              "coldTiles": 3,
+              "cached": 3
+            },
+            {
+              "ms": 15.8,
+              "coldTiles": 3,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            }
+          ]
+        },
+        {
+          "phase": "pixel",
+          "zoom": 1,
+          "name": "opaque-readfrequent",
+          "frames": 16,
+          "differingBytes": 0,
+          "differingFrames": 0,
+          "maxChanged": 0
+        },
+        {
+          "phase": "pixel",
+          "zoom": 1,
+          "name": "prior-qa-transparent-readfrequent",
+          "frames": 16,
+          "differingBytes": 0,
+          "differingFrames": 0,
+          "maxChanged": 0
+        },
+        {
+          "phase": "pixel",
+          "zoom": 1,
+          "name": "default-transparent",
+          "frames": 16,
+          "differingBytes": 0,
+          "differingFrames": 0,
+          "maxChanged": 0
+        },
+        {
+          "phase": "timing",
+          "zoom": 1,
+          "trial": 0,
+          "name": "shipping-opaque",
+          "attrs": {
+            "alpha": false,
+            "colorSpace": "srgb",
+            "colorType": "unorm8",
+            "desynchronized": false,
+            "toneMapping": {
+              "mode": "standard"
+            },
+            "willReadFrequently": false
+          },
+          "frames": 48,
+          "created": 6,
+          "warmFrames": 46,
+          "warmTotalMs": 2.4,
+          "warmP95Ms": 0.1,
+          "totalMs": 37.7,
+          "samples": [
+            {
+              "ms": 20.3,
+              "coldTiles": 3,
+              "cached": 3
+            },
+            {
+              "ms": 15,
+              "coldTiles": 3,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.2,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            }
+          ]
+        },
+        {
+          "phase": "timing",
+          "zoom": 1,
+          "trial": 0,
+          "name": "opaque-readfrequent",
+          "attrs": {
+            "alpha": false,
+            "colorSpace": "srgb",
+            "colorType": "unorm8",
+            "desynchronized": false,
+            "toneMapping": {
+              "mode": "standard"
+            },
+            "willReadFrequently": true
+          },
+          "frames": 48,
+          "created": 6,
+          "warmFrames": 46,
+          "warmTotalMs": 3.8,
+          "warmP95Ms": 0.2,
+          "totalMs": 40.9,
+          "samples": [
+            {
+              "ms": 22.2,
+              "coldTiles": 3,
+              "cached": 3
+            },
+            {
+              "ms": 14.9,
+              "coldTiles": 3,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.2,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.2,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.2,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.2,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.2,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.2,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.2,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.2,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            }
+          ]
+        },
+        {
+          "phase": "timing",
+          "zoom": 1,
+          "trial": 0,
+          "name": "prior-qa-transparent-readfrequent",
+          "attrs": {
+            "alpha": true,
+            "colorSpace": "srgb",
+            "colorType": "unorm8",
+            "desynchronized": false,
+            "toneMapping": {
+              "mode": "standard"
+            },
+            "willReadFrequently": true
+          },
+          "frames": 48,
+          "created": 6,
+          "warmFrames": 46,
+          "warmTotalMs": 4.3,
+          "warmP95Ms": 0.2,
+          "totalMs": 43.4,
+          "samples": [
+            {
+              "ms": 16.5,
+              "coldTiles": 3,
+              "cached": 3
+            },
+            {
+              "ms": 22.6,
+              "coldTiles": 3,
+              "cached": 6
+            },
+            {
+              "ms": 0.3,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.2,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.2,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.2,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.2,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.2,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.2,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.2,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.2,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.2,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            }
+          ]
+        },
+        {
+          "phase": "timing",
+          "zoom": 1,
+          "trial": 0,
+          "name": "default-transparent",
+          "attrs": {
+            "alpha": true,
+            "colorSpace": "srgb",
+            "colorType": "unorm8",
+            "desynchronized": false,
+            "toneMapping": {
+              "mode": "standard"
+            },
+            "willReadFrequently": false
+          },
+          "frames": 48,
+          "created": 6,
+          "warmFrames": 46,
+          "warmTotalMs": 2.9,
+          "warmP95Ms": 0.2,
+          "totalMs": 34.3,
+          "samples": [
+            {
+              "ms": 17.4,
+              "coldTiles": 3,
+              "cached": 3
+            },
+            {
+              "ms": 14,
+              "coldTiles": 3,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.2,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.2,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.2,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.2,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            }
+          ]
+        },
+        {
+          "phase": "timing",
+          "zoom": 1,
+          "trial": 1,
+          "name": "default-transparent",
+          "attrs": {
+            "alpha": true,
+            "colorSpace": "srgb",
+            "colorType": "unorm8",
+            "desynchronized": false,
+            "toneMapping": {
+              "mode": "standard"
+            },
+            "willReadFrequently": false
+          },
+          "frames": 48,
+          "created": 6,
+          "warmFrames": 46,
+          "warmTotalMs": 2.4,
+          "warmP95Ms": 0.1,
+          "totalMs": 31.7,
+          "samples": [
+            {
+              "ms": 15.5,
+              "coldTiles": 3,
+              "cached": 3
+            },
+            {
+              "ms": 13.8,
+              "coldTiles": 3,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            }
+          ]
+        },
+        {
+          "phase": "timing",
+          "zoom": 1,
+          "trial": 1,
+          "name": "prior-qa-transparent-readfrequent",
+          "attrs": {
+            "alpha": true,
+            "colorSpace": "srgb",
+            "colorType": "unorm8",
+            "desynchronized": false,
+            "toneMapping": {
+              "mode": "standard"
+            },
+            "willReadFrequently": true
+          },
+          "frames": 48,
+          "created": 6,
+          "warmFrames": 46,
+          "warmTotalMs": 2.3,
+          "warmP95Ms": 0.1,
+          "totalMs": 30.4,
+          "samples": [
+            {
+              "ms": 15.5,
+              "coldTiles": 3,
+              "cached": 3
+            },
+            {
+              "ms": 12.6,
+              "coldTiles": 3,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.2,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.2,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            }
+          ]
+        },
+        {
+          "phase": "timing",
+          "zoom": 1,
+          "trial": 1,
+          "name": "opaque-readfrequent",
+          "attrs": {
+            "alpha": false,
+            "colorSpace": "srgb",
+            "colorType": "unorm8",
+            "desynchronized": false,
+            "toneMapping": {
+              "mode": "standard"
+            },
+            "willReadFrequently": true
+          },
+          "frames": 48,
+          "created": 6,
+          "warmFrames": 46,
+          "warmTotalMs": 2.5,
+          "warmP95Ms": 0.1,
+          "totalMs": 35.3,
+          "samples": [
+            {
+              "ms": 15.2,
+              "coldTiles": 3,
+              "cached": 3
+            },
+            {
+              "ms": 17.6,
+              "coldTiles": 3,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.2,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            }
+          ]
+        },
+        {
+          "phase": "timing",
+          "zoom": 1,
+          "trial": 1,
+          "name": "shipping-opaque",
+          "attrs": {
+            "alpha": false,
+            "colorSpace": "srgb",
+            "colorType": "unorm8",
+            "desynchronized": false,
+            "toneMapping": {
+              "mode": "standard"
+            },
+            "willReadFrequently": false
+          },
+          "frames": 48,
+          "created": 6,
+          "warmFrames": 46,
+          "warmTotalMs": 3.6,
+          "warmP95Ms": 0.2,
+          "totalMs": 35.8,
+          "samples": [
+            {
+              "ms": 14.4,
+              "coldTiles": 3,
+              "cached": 3
+            },
+            {
+              "ms": 17.8,
+              "coldTiles": 3,
+              "cached": 6
+            },
+            {
+              "ms": 0.2,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.2,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.2,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.2,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.2,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.2,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0,
+              "coldTiles": 0,
+              "cached": 6
+            },
+            {
+              "ms": 0.1,
+              "coldTiles": 0,
+              "cached": 6
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
