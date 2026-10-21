@@ -1,5 +1,12 @@
+mod alpha_spawn;
+
+use alpha_spawn::AlphaSpawnProfile;
 use anyhow::{bail, Context, Result};
 use myaso_server::{
+    chat::{
+        decode_send, encode_result, ChatPosition, ChatResult, LocalChatHub, MAX_CHAT_FRAME,
+        OUTBOUND_QUEUE,
+    },
     coalesce_accepted_input_batch, decode_input_packet, is_sequence_newer16, is_tick_newer32,
     kill_event::{encode_kill_event, KillEventPacket},
     reliable::{try_enqueue_reliable, ReliableQueueError},
@@ -11,18 +18,61 @@ use myaso_server::{
 use std::{
     collections::{BTreeMap, VecDeque},
     env,
-    net::SocketAddr,
+    net::{IpAddr, SocketAddr},
     sync::{
         atomic::{AtomicU32, Ordering},
         Arc,
     },
-    time::Duration,
+    time::{Duration, Instant},
 };
 use tokio::sync::{mpsc, Mutex};
-use wtransport::{Connection, Endpoint, Identity, SendStream, ServerConfig, VarInt};
+use wtransport::{Connection, Endpoint, Identity, RecvStream, SendStream, ServerConfig, VarInt};
 
 const GAME_PATH: &str = "/game";
+// Chat is an optional, lower-priority QUIC stream. Peer backpressure or a
+// partial frame must never retain its sender/recipient routing indefinitely.
+// An idle chat reader remains allowed to wait for its next *new* frame.
+// C1 v1 optional, one-time chat stream preface (never a player message).
+const CHAT_STREAM_PREFACE: [u8; 2] = [0x30, 1];
+const CHAT_STREAM_SETUP_DEADLINE: Duration = Duration::from_secs(10);
+const CHAT_FRAME_BODY_DEADLINE: Duration = Duration::from_secs(10);
+const CHAT_STREAM_WRITE_DEADLINE: Duration = Duration::from_secs(10);
+// A malicious opted-in peer can send fast *valid* requests after exhausting
+// ChatHub rate tokens. Cap per-chat ingress BEFORE scanning live world fighters.
+const MAX_CHAT_INGRESS_FRAMES_PER_SECOND: u16 = 64;
+
+struct ChatIngressBudget {
+    window_start: Instant,
+    frames: u16,
+}
+
+impl ChatIngressBudget {
+    fn new(now: Instant) -> Self {
+        Self {
+            window_start: now,
+            frames: 0,
+        }
+    }
+
+    fn consume(&mut self, now: Instant) -> bool {
+        if now.saturating_duration_since(self.window_start) >= Duration::from_secs(1) {
+            self.window_start = now;
+            self.frames = 0;
+        }
+        if self.frames >= MAX_CHAT_INGRESS_FRAMES_PER_SECOND {
+            return false;
+        }
+        self.frames += 1;
+        true
+    }
+}
+
 const CLOSE_DATAGRAM_UNAVAILABLE: u32 = 0x11;
+const CLOSE_CLIENT_INACTIVITY: u32 = 0x12;
+// Expire authenticated sessions with no valid input, even when QUIC keepalives
+// prevent a transport timeout. Releases the fighter and admission permit.
+const CLIENT_INPUT_IDLE_TIMEOUT: Duration = Duration::from_secs(30);
+const RELIABLE_OPEN_TIMEOUT: Duration = Duration::from_secs(10);
 const SNAPSHOT_INTERVAL: Duration = Duration::from_millis(50);
 const SNAPSHOT_EVERY_SERVER_TICKS: u32 = 3;
 const INPUT_ACK_PACKET_TYPE: u8 = 3;
@@ -202,18 +252,22 @@ impl GameState {
 
 struct SharedGame {
     state: Mutex<GameState>,
+    chat: Mutex<LocalChatHub>,
+    chat_radius: f32,
     next_player_id: AtomicU32,
     reliable_write_delay: Duration,
     drop_new_action_datagrams: bool,
 }
 
 impl SharedGame {
-    fn new(flight: LoopbackFlightConfig) -> Arc<Self> {
+    fn new(flight: LoopbackFlightConfig, chat_radius: f32) -> Arc<Self> {
         Arc::new(Self {
             state: Mutex::new(GameState::new(
                 flight.background_players,
                 flight.near_pressure_players,
             )),
+            chat: Mutex::new(LocalChatHub::default()),
+            chat_radius,
             next_player_id: AtomicU32::new(1),
             reliable_write_delay: flight.reliable_write_delay,
             drop_new_action_datagrams: flight.drop_new_action_datagrams,
@@ -230,12 +284,42 @@ impl SharedGame {
     }
 }
 
+fn next_client_input_deadline(now: tokio::time::Instant) -> tokio::time::Instant {
+    now + CLIENT_INPUT_IDLE_TIMEOUT
+}
+
 fn should_enqueue_reliable_catchup(
     background_deadline_misses: usize,
     omitted_due_to_budget: usize,
     reliable_write_delay: Duration,
 ) -> bool {
     background_deadline_misses > 0 || (!reliable_write_delay.is_zero() && omitted_due_to_budget > 0)
+}
+
+/// Incomplete World #509 geometry is allowed only for an explicitly
+/// opted-in, private loopback 2-4-player Greyhaven staging experiment.
+/// Never advertise the fixed AABB digest as a live complete map revision.
+fn parse_static_collision_preview(
+    raw: Option<&str>,
+    alpha_spawn: AlphaSpawnProfile,
+    bind: IpAddr,
+    player_cap: usize,
+    background_players: usize,
+) -> Result<bool> {
+    match raw {
+        None => Ok(false),
+        Some("reviewed-static-only") => {
+            if !alpha_spawn.is_greyhaven()
+                || !bind.is_loopback()
+                || !(2..=4).contains(&player_cap)
+                || background_players != 0
+            {
+                bail!("MYASO_ALPHA_STATIC_COLLISION requires loopback Greyhaven spawn, 2..4 real players and no synthetic clients");
+            }
+            Ok(true)
+        }
+        Some(_) => bail!("MYASO_ALPHA_STATIC_COLLISION must be unset or reviewed-static-only"),
+    }
 }
 
 #[tokio::main]
@@ -246,6 +330,65 @@ async fn main() -> Result<()> {
         .context("MYASO_BIND must be a socket address")?;
 
     let flight = load_loopback_flight_config(bind)?;
+
+    // Validate the staging profile before WebTransport binds ANY socket.
+    // Production/public and wildcard addresses are not valid alpha staging
+    // listeners, even with an explicitly set four-player cap.
+    let player_cap_raw = match env::var("MYASO_MAX_PLAYERS") {
+        Ok(value) => Some(value),
+        Err(env::VarError::NotPresent) => None,
+        Err(error) => bail!("MYASO_MAX_PLAYERS is invalid: {error}"),
+    };
+    let player_cap = parse_player_cap(player_cap_raw.as_deref())?;
+    if flight.background_players >= player_cap {
+        bail!("flight background player count must remain below MYASO_MAX_PLAYERS");
+    }
+    let spawn_raw = match env::var("MYASO_ALPHA_SPAWN") {
+        Ok(value) => Some(value),
+        Err(env::VarError::NotPresent) => None,
+        Err(error) => bail!("MYASO_ALPHA_SPAWN is invalid: {error}"),
+    };
+    let alpha_spawn =
+        AlphaSpawnProfile::parse(spawn_raw.as_deref(), player_cap, flight.background_players)?;
+    if alpha_spawn.is_greyhaven() && !AlphaSpawnProfile::staging_bind_allowed(bind.ip()) {
+        bail!("MYASO_ALPHA_SPAWN=greyhaven requires an explicit private or loopback bind");
+    }
+    let static_collision_raw = match env::var("MYASO_ALPHA_STATIC_COLLISION") {
+        Ok(value) => Some(value),
+        Err(env::VarError::NotPresent) => None,
+        Err(error) => bail!("MYASO_ALPHA_STATIC_COLLISION is invalid: {error}"),
+    };
+    let static_preview = parse_static_collision_preview(
+        static_collision_raw.as_deref(),
+        alpha_spawn,
+        bind.ip(),
+        player_cap,
+        flight.background_players,
+    )?;
+    // Validate optional authoritative local chat radius before the
+    // staging world or WebTransport listener exists; this cannot bypass the
+    // Core/World protected spawn and collision profile.
+    let chat_radius: f32 = env::var("MYASO_CHAT_RADIUS")
+        .unwrap_or_else(|_| "160".to_owned())
+        .parse()
+        .context("MYASO_CHAT_RADIUS must be a valid floating point radius")?;
+    if !chat_radius.is_finite() || !(32.0..=512.0).contains(&chat_radius) {
+        bail!("MYASO_CHAT_RADIUS must be within 32..=512 game units");
+    }
+    // The private staging world and every initial spawn are validated BEFORE
+    // the server opens its WebTransport listener, not after first admission.
+    let game = SharedGame::new(flight, chat_radius);
+    if static_preview
+        && !game
+            .state
+            .lock()
+            .await
+            .world
+            .enable_greyhaven_static_collisions()
+    {
+        bail!("reviewed Greyhaven fixed solids reject staging world geometry");
+    }
+
     let identity = load_identity(bind).await?;
     let certificate_hash = identity
         .certificate_chain()
@@ -266,21 +409,16 @@ async fn main() -> Result<()> {
         println!("development certificate SHA-256: {hash}");
     }
 
-    // R0 alpha: explicitly cap *real* concurrent players on the shared VPS.
-    // Flight fixtures remain loopback-only, and the default engineering cap
-    // stays unchanged for the existing 512-player acceptance suite.
-    let player_cap_raw = match env::var("MYASO_MAX_PLAYERS") {
-        Ok(value) => Some(value),
-        Err(env::VarError::NotPresent) => None,
-        Err(error) => bail!("MYASO_MAX_PLAYERS is invalid: {error}"),
-    };
-    let player_cap = parse_player_cap(player_cap_raw.as_deref())?;
-    if flight.background_players >= player_cap {
-        bail!("flight background player count must remain below MYASO_MAX_PLAYERS");
-    }
+    // R0 player cap and staged server-owned spawn were validated before
+    // opening the WebTransport listener; legacy default is unchanged.
     let gate = AdmissionGate::new(player_cap - flight.background_players);
     println!("myaso admission cap: {player_cap} concurrent players");
-    let game = SharedGame::new(flight);
+    if alpha_spawn.is_greyhaven() {
+        println!("staging-only Greyhaven spawn selected; no server obstacle/portal authority");
+    }
+    if static_preview {
+        println!("staging-only Greyhaven fixed static sweep enabled; river/dynamic solids NOT authoritative");
+    }
     // Accept server-side diagnostic output only on loopback and only when
     // explicitly requested by the real-browser M201 acceptance fixture.
     let flight_action_proof = match env::var("MYASO_FLIGHT_ACTION_PROOF").as_deref() {
@@ -338,7 +476,7 @@ async fn main() -> Result<()> {
             let player_id = game.allocate_player_id();
             {
                 let mut state = game.state.lock().await;
-                if !state.world.add_player(player_id) {
+                if !alpha_spawn.admit(&mut state.world, player_id) {
                     eprintln!("failed to add allocated player {player_id}");
                     return;
                 }
@@ -346,6 +484,7 @@ async fn main() -> Result<()> {
             }
 
             let result = handle_connection(connection, player_id, Arc::clone(&game)).await;
+            game.chat.lock().await.unregister(player_id);
             {
                 let mut state = game.state.lock().await;
                 state.world.remove_player(player_id);
@@ -533,10 +672,11 @@ async fn handle_connection(
     let mut last_input_sequence = None;
     let mut dropped_action_ticks = VecDeque::with_capacity(MAX_DROPPED_ACTION_TICKS);
     let mut pending_input_acks = VecDeque::with_capacity(MAX_PENDING_INPUT_ACKS);
-    let (mut reliable_send, _reliable_recv) = connection
-        .accept_bi()
-        .await
-        .context("accept reliable game stream")?;
+    let (mut reliable_send, _reliable_recv) =
+        tokio::time::timeout(RELIABLE_OPEN_TIMEOUT, connection.accept_bi())
+            .await
+            .context("timed out accepting reliable game stream")?
+            .context("accept reliable game stream")?;
     let (initial_frame, mut next_kill_event_sequence) = {
         let state = game.state.lock().await;
         (
@@ -594,11 +734,47 @@ async fn handle_connection(
         }
         Ok::<(), anyhow::Error>(())
     });
+    let mut chat_started = false;
     let mut snapshot_interval = tokio::time::interval(SNAPSHOT_INTERVAL);
     snapshot_interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+    let input_idle_timeout = tokio::time::sleep(CLIENT_INPUT_IDLE_TIMEOUT);
+    tokio::pin!(input_idle_timeout);
 
     loop {
         tokio::select! {
+            _ = &mut input_idle_timeout => {
+                // Dead browsers may retain QUIC keepalives. Chat streams are
+                // not gameplay input; only authenticated gameplay datagrams
+                // may reset this Core 8A inactivity deadline.
+                connection.close(
+                    VarInt::from_u32(CLOSE_CLIENT_INACTIVITY),
+                    b"client input inactivity",
+                );
+                reliable_writer.abort();
+                bail!("client input inactivity exceeded {}s", CLIENT_INPUT_IDLE_TIMEOUT.as_secs());
+            }
+            incoming_chat = connection.accept_uni(), if !chat_started => {
+                // Legacy browsers never open a chat stream and keep their
+                // existing game protocol/stream topology unchanged.
+                let incoming_chat = incoming_chat.context("accept local chat stream")?;
+                chat_started = true;
+                let (chat_tx, chat_rx) = mpsc::channel(OUTBOUND_QUEUE);
+                if !game.chat.lock().await.register(player_id, chat_tx.clone(), Instant::now()) {
+                    bail!("chat stream already registered for player");
+                }
+                let chat_game = Arc::clone(&game);
+                let chat_connection = connection.clone();
+                tokio::spawn(async move {
+                    let outcome = run_chat_stream(chat_connection, incoming_chat, chat_tx,
+                        chat_rx, player_id, Arc::clone(&chat_game)).await;
+                    chat_game.chat.lock().await.unregister(player_id);
+                    if let Err(error) = outcome {
+                        // No user text is logged, and failure does not close
+                        // or delay the authenticated combat connection.
+                        eprintln!("player {player_id} local chat stream ended: {error:#}");
+                    }
+                });
+            }
             writer_result = &mut reliable_writer => {
                 match writer_result {
                     Ok(Ok(())) => bail!("reliable writer ended unexpectedly"),
@@ -615,6 +791,7 @@ async fn handle_connection(
                         continue;
                     }
                 };
+                input_idle_timeout.as_mut().reset(next_client_input_deadline(tokio::time::Instant::now()));
 
                 if game.drop_new_action_datagrams {
                     if let Some(action_tick) =
@@ -803,6 +980,135 @@ async fn handle_connection(
     }
 }
 
+/// A single bounded, versioned chat frame on its own reliable QUIC stream.
+/// Never mix with input datagrams or game snapshot/kill-event reliable frames.
+async fn read_chat_frame(recv: &mut RecvStream) -> Result<Vec<u8>> {
+    let mut length = [0_u8; 2];
+    // The first byte may wait indefinitely for an idle, connected player.
+    // Once the peer begins a frame, it must complete even the length prefix
+    // promptly. Otherwise a single byte can pin its optional chat task.
+    recv.read_exact(&mut length[..1])
+        .await
+        .context("read first chat length byte")?;
+    tokio::time::timeout(CHAT_FRAME_BODY_DEADLINE, recv.read_exact(&mut length[1..]))
+        .await
+        .context("chat frame header timed out")?
+        .context("read remaining chat length byte")?;
+    let size = u16::from_le_bytes(length) as usize;
+    if size != CHAT_STREAM_PREFACE.len() && !(9..=MAX_CHAT_FRAME).contains(&size) {
+        bail!("invalid local chat frame length");
+    }
+    let mut bytes = vec![0; size];
+    tokio::time::timeout(CHAT_FRAME_BODY_DEADLINE, recv.read_exact(&mut bytes))
+        .await
+        .context("chat frame body timed out")?
+        .context("read bounded chat frame")?;
+    Ok(bytes)
+}
+
+async fn run_chat_stream(
+    connection: Connection,
+    mut reader: RecvStream,
+    outbound: mpsc::Sender<Vec<u8>>,
+    mut outgoing: mpsc::Receiver<Vec<u8>>,
+    player_id: u32,
+    game: Arc<SharedGame>,
+) -> Result<()> {
+    let mut writer = tokio::time::timeout(CHAT_STREAM_SETUP_DEADLINE, async {
+        connection
+            .open_uni()
+            .await
+            .context("open isolated chat reply stream")?
+            .await
+            .context("initialize isolated chat reply stream")
+    })
+    .await
+    .context("local chat reply stream setup timed out")??;
+    let mut violations = 0_u8;
+    let mut first_frame_seen = false;
+    let mut ingress_budget = ChatIngressBudget::new(Instant::now());
+    loop {
+        // Preserve an in-progress length-prefixed read while servicing queued
+        // outbound chat. read_exact is NOT cancellation-safe: recreating its
+        // future after each send would drop consumed header/body bytes and
+        // desynchronize the next chat frame under bidirectional traffic.
+        let inbound = read_chat_frame(&mut reader);
+        tokio::pin!(inbound);
+        loop {
+            tokio::select! {
+                frame = &mut inbound => {
+                    let frame = frame?;
+                    // Accept one no-message preface only before the first
+                    // ChatSend. Legacy clients can send ChatSend directly.
+                    // A preface never costs rate tokens or creates an ACK.
+                    if frame.len() == CHAT_STREAM_PREFACE.len() {
+                        if !first_frame_seen && frame.as_slice() == CHAT_STREAM_PREFACE {
+                            first_frame_seen = true;
+                            break;
+                        }
+                        bail!("invalid or out-of-order chat preface");
+                    }
+                    first_frame_seen = true;
+                    if !ingress_budget.consume(Instant::now()) {
+                        // Isolate abusive chat traffic without closing the
+                        // realtime combat datagram/gameplay stream.
+                        bail!("local chat ingress frame budget exceeded");
+                    }
+                    let correlation = if frame.len() >= 7 {
+                        u32::from_le_bytes(frame[3..7].try_into().expect("length checked"))
+                    } else { 0 };
+                    let result = match decode_send(&frame) {
+                        Ok(request) => {
+                            let (tick, positions) = {
+                                // Read ONLY server-owned positions; no chat packet
+                                // carries coordinates, zone, or a sender identity.
+                                let state = game.state.lock().await;
+                                let positions: Vec<ChatPosition> = state.world.fighters().iter()
+                                    // Synthetic flight actors have no registered
+                                    // chat stream and are filtered by ChatHub.
+                                    // Do not filter by numeric IDs: real session
+                                    // IDs may legitimately exceed 10_000.
+                                    .map(|fighter| ChatPosition {
+                                        player_id: fighter.net_id,
+                                        zone: 0, // Live server currently owns one shared arena.
+                                        x: fighter.x,
+                                        y: fighter.y,
+                                    }).collect();
+                                (state.world.tick, positions)
+                            };
+                            game.chat.lock().await.route(
+                                player_id, &request, &positions,
+                                game.chat_radius, tick, Instant::now(),
+                            )
+                        }
+                        Err(code) => {
+                            violations = violations.saturating_add(1);
+                            ChatResult { correlation, code, message_id: 0 }
+                        }
+                    };
+                    outbound.try_send(encode_result(result))
+                        .map_err(|_| anyhow::anyhow!("chat result queue full or disconnected"))?;
+                    if violations >= 8 {
+                        bail!("too many malformed chat frames");
+                    }
+                    break; // Completed one frame; only now create the next reader.
+                }
+                maybe = outgoing.recv() => {
+                    let Some(payload) = maybe else { return Ok(()); };
+                    let length = u16::try_from(payload.len())
+                        .context("chat response length overflow")?;
+                    tokio::time::timeout(CHAT_STREAM_WRITE_DEADLINE, async {
+                        writer.write_all(&length.to_le_bytes()).await
+                            .context("write chat reply length")?;
+                        writer.write_all(&payload).await
+                            .context("write chat reply frame")
+                    }).await.context("local chat reply write timed out")??;
+                }
+            }
+        }
+    }
+}
+
 fn prepare_reliable_frame(framed: &mut Vec<u8>, payload: &[u8]) -> Result<()> {
     if payload.len() > u16::MAX as usize {
         bail!("reliable payload exceeds 65535-byte frame limit");
@@ -912,6 +1218,67 @@ fn encode_input_ack(processed_client_tick: u32, server_tick: u32, player_net_id:
 mod tests {
     use super::*;
 
+    #[test]
+    fn reviewed_static_preview_requires_explicit_private_greyhaven_opt_in() {
+        let loopback: IpAddr = "127.0.0.1".parse().unwrap();
+        let private_lan: IpAddr = "192.168.1.20".parse().unwrap();
+        let public: IpAddr = "8.8.8.8".parse().unwrap();
+        let staging = AlphaSpawnProfile::GreyhavenStaging;
+        let legacy = AlphaSpawnProfile::Existing;
+        assert!(!parse_static_collision_preview(None, staging, loopback, 4, 0).unwrap());
+        assert!(parse_static_collision_preview(
+            Some("reviewed-static-only"),
+            staging,
+            loopback,
+            4,
+            0
+        )
+        .unwrap());
+        for (profile, bind, cap, background) in [
+            (legacy, loopback, 4, 0),
+            (staging, private_lan, 4, 0),
+            (staging, public, 4, 0),
+            (staging, loopback, 5, 0),
+            (staging, loopback, 4, 1),
+        ] {
+            assert!(parse_static_collision_preview(
+                Some("reviewed-static-only"),
+                profile,
+                bind,
+                cap,
+                background
+            )
+            .is_err());
+        }
+        assert!(parse_static_collision_preview(Some("true"), staging, loopback, 4, 0).is_err());
+    }
+
+    #[test]
+    fn authoritative_greyhaven_staging_four_real_spawn_anchors_clear_static_solids() {
+        let mut state = GameState::new(0, 0);
+        assert!(state.world.enable_greyhaven_static_collisions());
+        let spawn = AlphaSpawnProfile::GreyhavenStaging;
+        for id in 1..=4 {
+            assert!(spawn.admit(&mut state.world, id));
+        }
+        assert!(!spawn.admit(&mut state.world, 5));
+        assert!(state.world.fighters().iter().all(|fighter| {
+            myaso_server::alpha_greyhaven_geometry::overlaps_known_static_solid(
+                fighter.x, fighter.y, 18.0,
+            ) == Ok(false)
+        }));
+        assert!(state.world.remove_player(2));
+        assert!(spawn.admit(&mut state.world, 42));
+        assert_eq!(
+            (
+                state.world.fighter(42).unwrap().x,
+                state.world.fighter(42).unwrap().y
+            ),
+            (4206.0, 4160.0)
+        );
+        assert_eq!(state.world.fighters().len(), 4);
+    }
+
     fn action_sample(tick: u32, heavy_attack: bool) -> InputSample {
         InputSample {
             tick,
@@ -927,6 +1294,18 @@ mod tests {
             jump: false,
             dash: false,
         }
+    }
+
+    #[test]
+    fn inactive_session_cleanup_deadline_is_bounded_and_renews_only_on_input() {
+        let initial = tokio::time::Instant::now();
+        let deadline = next_client_input_deadline(initial);
+        assert_eq!(deadline - initial, Duration::from_secs(30));
+        let last_authenticated_input = initial + Duration::from_secs(18);
+        let extended = next_client_input_deadline(last_authenticated_input);
+        assert_eq!(extended - deadline, Duration::from_secs(18));
+        assert!(RELIABLE_OPEN_TIMEOUT < CLIENT_INPUT_IDLE_TIMEOUT);
+        assert!(CLIENT_INPUT_IDLE_TIMEOUT > Duration::from_secs(5));
     }
 
     #[test]
@@ -1379,5 +1758,27 @@ mod r0_player_cap_tests {
                 "unexpected admission cap accepted: {invalid}"
             );
         }
+    }
+}
+
+#[cfg(test)]
+mod chat_ingress_budget_tests {
+    use super::{ChatIngressBudget, MAX_CHAT_INGRESS_FRAMES_PER_SECOND};
+    use std::time::{Duration, Instant};
+
+    #[test]
+    fn chat_ingress_budget_caps_work_before_position_scans() {
+        let start = Instant::now();
+        let mut budget = ChatIngressBudget::new(start);
+        for _ in 0..MAX_CHAT_INGRESS_FRAMES_PER_SECOND {
+            assert!(budget.consume(start));
+        }
+        assert!(!budget.consume(start));
+        assert!(!budget.consume(start + Duration::from_millis(999)));
+        assert!(budget.consume(start + Duration::from_secs(1)));
+        for _ in 1..MAX_CHAT_INGRESS_FRAMES_PER_SECOND {
+            assert!(budget.consume(start + Duration::from_secs(1)));
+        }
+        assert!(!budget.consume(start + Duration::from_secs(1)));
     }
 }

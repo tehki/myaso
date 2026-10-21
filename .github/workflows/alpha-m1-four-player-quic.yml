@@ -1,0 +1,31 @@
+name: Alpha M1 four-player real QUIC admission
+
+on:
+  pull_request:
+    paths:
+      - "server/tests/alpha_m1_four_player_quic.rs"
+      - ".github/workflows/alpha-m1-four-player-quic.yml"
+  push:
+    branches: [main]
+    paths:
+      - "server/tests/alpha_m1_four_player_quic.rs"
+      - ".github/workflows/alpha-m1-four-player-quic.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  alpha-m1-four-player:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify Rust compiler and format
+        run: |
+          rustc --version
+          cargo --version
+          cargo fmt --manifest-path server/Cargo.toml -- --check
+      - name: Strict server lint
+        run: cargo clippy --locked --manifest-path server/Cargo.toml --all-targets -- -D warnings
+      - name: Four genuine authenticated sessions on real Rust game server
+        run: cargo test --locked --manifest-path server/Cargo.toml --test alpha_m1_four_player_quic -- --nocapture

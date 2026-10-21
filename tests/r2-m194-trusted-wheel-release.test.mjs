@@ -87,7 +87,8 @@ test("M194 mode is confined to its genuine guard-break scenario and preserves st
   const runner = readFileSync(new URL("../scripts/pvp_browser_flight_runner.mjs", import.meta.url), "utf8");
   const section = runner.slice(runner.indexOf("async function runOnlineUiGuardBreakFlight("),
     runner.indexOf("async function waitForUiGuardBreakEvidence("));
-  assert.match(section, /trustedWheelWaitMs: scenario === "uiguardbreak" \? 190 : 0/);
+  assert.match(section, /trustedWheelWaitMs: \["uiguardbreak", "uiguardbreakpunishffahit"\]\.includes\(scenario\) \? 190 : 0/);
+  assert.match(section, /postTrustedWheelMs: scenario === "uiguardbreakpunishffahit" \? 40 : 0/);
   assert.match(section, /awaitTrustedWheel: \(\) => challenge\.wait\(\)/);
   assert.match(section, /if \(!trustedWheelBeforeRelease\)/);
   assert.match(section, /M193 guard-break exchange/);

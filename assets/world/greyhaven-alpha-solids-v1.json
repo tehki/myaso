@@ -1,0 +1,197 @@
+{
+  "schema_version": 1,
+  "layout_id": "moonvale-greyhaven-v10-solids-v1",
+  "map_id": "moonvale-overworld",
+  "city_id": "greyhaven",
+  "geometry_kind": "fixed-buildings-and-city-walls",
+  "requires_core_fence": true,
+  "includes_river_or_dynamic_solids": false,
+  "solids_sha256": "9bb023c95d86821f219113d71b6e480789a72df064f083790e746d79423b3f43",
+  "solids_count": 23,
+  "solids": [
+    {
+      "id": "building:red-lion",
+      "kind": "building",
+      "min_x": 4240,
+      "min_y": 3880,
+      "max_x": 4490,
+      "max_y": 4050
+    },
+    {
+      "id": "building:smith",
+      "kind": "building",
+      "min_x": 3710,
+      "min_y": 3850,
+      "max_x": 3892,
+      "max_y": 4012
+    },
+    {
+      "id": "building:market",
+      "kind": "building",
+      "min_x": 4320,
+      "min_y": 4340,
+      "max_x": 4588,
+      "max_y": 4515
+    },
+    {
+      "id": "building:chapel",
+      "kind": "building",
+      "min_x": 4520,
+      "min_y": 3630,
+      "max_x": 4678,
+      "max_y": 3815
+    },
+    {
+      "id": "building:townhouse-a",
+      "kind": "building",
+      "min_x": 3710,
+      "min_y": 4450,
+      "max_x": 3865,
+      "max_y": 4620
+    },
+    {
+      "id": "building:townhouse-b",
+      "kind": "building",
+      "min_x": 3840,
+      "min_y": 3540,
+      "max_x": 3970,
+      "max_y": 3685
+    },
+    {
+      "id": "building:stable",
+      "kind": "building",
+      "min_x": 4480,
+      "min_y": 4580,
+      "max_x": 4665,
+      "max_y": 4678
+    },
+    {
+      "id": "building:mill",
+      "kind": "building",
+      "min_x": 2750,
+      "min_y": 3820,
+      "max_x": 2900,
+      "max_y": 3980
+    },
+    {
+      "id": "building:briarford",
+      "kind": "building",
+      "min_x": 1250,
+      "min_y": 3940,
+      "max_x": 1454,
+      "max_y": 4110
+    },
+    {
+      "id": "building:west-stable",
+      "kind": "building",
+      "min_x": 1460,
+      "min_y": 4360,
+      "max_x": 1614,
+      "max_y": 4475
+    },
+    {
+      "id": "building:stonebrook",
+      "kind": "building",
+      "min_x": 6380,
+      "min_y": 3820,
+      "max_x": 6604,
+      "max_y": 4005
+    },
+    {
+      "id": "building:stonebrook-home",
+      "kind": "building",
+      "min_x": 6770,
+      "min_y": 4140,
+      "max_x": 6918,
+      "max_y": 4256
+    },
+    {
+      "id": "building:farm-east",
+      "kind": "building",
+      "min_x": 5630,
+      "min_y": 4660,
+      "max_x": 5792,
+      "max_y": 4786
+    },
+    {
+      "id": "building:farm-south",
+      "kind": "building",
+      "min_x": 4660,
+      "min_y": 5660,
+      "max_x": 4824,
+      "max_y": 5786
+    },
+    {
+      "id": "building:watch-ruin",
+      "kind": "building",
+      "min_x": 3130,
+      "min_y": 1880,
+      "max_x": 3295,
+      "max_y": 2010
+    },
+    {
+      "id": "wall:north-west",
+      "kind": "city-wall",
+      "min_x": 3501.5,
+      "min_y": 3441.5,
+      "max_x": 4057,
+      "max_y": 3478.5
+    },
+    {
+      "id": "wall:north-east",
+      "kind": "city-wall",
+      "min_x": 4203,
+      "min_y": 3441.5,
+      "max_x": 4778.5,
+      "max_y": 3478.5
+    },
+    {
+      "id": "wall:south-west",
+      "kind": "city-wall",
+      "min_x": 3501.5,
+      "min_y": 4731.5,
+      "max_x": 4057,
+      "max_y": 4768.5
+    },
+    {
+      "id": "wall:south-east",
+      "kind": "city-wall",
+      "min_x": 4203,
+      "min_y": 4731.5,
+      "max_x": 4778.5,
+      "max_y": 4768.5
+    },
+    {
+      "id": "wall:west-north",
+      "kind": "city-wall",
+      "min_x": 3501.5,
+      "min_y": 3441.5,
+      "max_x": 3538.5,
+      "max_y": 4112
+    },
+    {
+      "id": "wall:west-south",
+      "kind": "city-wall",
+      "min_x": 3501.5,
+      "min_y": 4248,
+      "max_x": 3538.5,
+      "max_y": 4768.5
+    },
+    {
+      "id": "wall:east-north",
+      "kind": "city-wall",
+      "min_x": 4741.5,
+      "min_y": 3441.5,
+      "max_x": 4778.5,
+      "max_y": 4112
+    },
+    {
+      "id": "wall:east-south",
+      "kind": "city-wall",
+      "min_x": 4741.5,
+      "min_y": 4248,
+      "max_x": 4778.5,
+      "max_y": 4768.5
+    }
+  ]
+}

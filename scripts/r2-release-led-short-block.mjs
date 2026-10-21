@@ -13,6 +13,7 @@ export async function dispatchR2ReleaseLedShortBlock({
   sendAttackDown, sendWheel, awaitTrustedWheel, sendAttackUp,
   now = () => performance.now(), sleep = sleepTimer,
   maxHoldMs = 280, receiptGraceMs = 100, trustedWheelWaitMs = 0,
+  postTrustedWheelMs = 0,
 }) {
   if (![sendAttackDown, sendWheel, awaitTrustedWheel, sendAttackUp, now, sleep]
     .every(fn => typeof fn === "function")
@@ -20,7 +21,11 @@ export async function dispatchR2ReleaseLedShortBlock({
     || !Number.isFinite(receiptGraceMs) || receiptGraceMs < 0
     || receiptGraceMs >= maxHoldMs
     || !Number.isFinite(trustedWheelWaitMs) || trustedWheelWaitMs < 0
-    || trustedWheelWaitMs >= maxHoldMs) {
+    || trustedWheelWaitMs >= maxHoldMs
+    || !Number.isFinite(postTrustedWheelMs) || postTrustedWheelMs < 0
+    || postTrustedWheelMs > 60
+    || (postTrustedWheelMs > 0 && trustedWheelWaitMs === 0)
+    || trustedWheelWaitMs + postTrustedWheelMs >= maxHoldMs) {
     throw new TypeError("R2 guard-break requires bounded genuine W3C held-release and attestation");
   }
   const startedAt = now();
@@ -68,6 +73,13 @@ export async function dispatchR2ReleaseLedShortBlock({
   } else {
     await Promise.race([attestation, sleep(receiptGraceMs), earlyWheelFailure]);
   }
+  // M205 only: on a real W3C wheel receipt, give the genuine defensive
+  // input one bounded sampling interval before committing the single light
+  // release. Prior quality #39498986465 observed a genuine parry at 6
+  // authoritative 60Hz ticks after wheel activation; a guarded hit requires
+  // the unchanged 125..240ms short-block interval. This is scheduling, not
+  // a change to any combat constant, input provenance, or strict assertion.
+  if (postTrustedWheelMs > 0) await sleep(postTrustedWheelMs);
   const attackUpDispatchMs = ms();
   if (attackUpDispatchMs - attackDownDispatchMs > maxHoldMs) {
     throw new Error("R2 genuine LMB hold exceeded light-charge budget before release; no strike allowed");
@@ -92,7 +104,7 @@ export async function dispatchR2ReleaseLedShortBlock({
     trustedWheelObservedMs: rounded(trustedWheelObservedMs),
     receiptGraceMs,
     wheelHeadStartMs: 0,
-    postTrustedWheelMs: 0,
+    postTrustedWheelMs: rounded(postTrustedWheelMs),
     clickHoldMs: rounded(attackUpDispatchMs - attackDownDispatchMs),
   };
 }

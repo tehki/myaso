@@ -53,6 +53,36 @@ jobs:
           node --check src/browser/game-audio.mjs
           node --test tests/r3-combat-audio.test.mjs
 
+
+      - name: Validate R2 bounded session cleanup and neutral hidden-tab liveness
+        run: |
+          node --check src/browser/neutral-background-input.mjs
+          node --test tests/r2-session-liveness.test.mjs
+
+      # GitHub's headless Linux runner has no hardware speaker. Give Firefox
+      # a real PulseAudio output sink rather than bypassing media playback.
+      - name: Prepare headless Firefox audio output
+        run: |
+          if ! command -v pulseaudio >/dev/null; then
+            sudo apt-get update -qq
+            sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq pulseaudio
+          fi
+          mkdir -p "$RUNNER_TEMP/myaso-r4-audio"
+          chmod 700 "$RUNNER_TEMP/myaso-r4-audio"
+          echo "XDG_RUNTIME_DIR=$RUNNER_TEMP/myaso-r4-audio" >> "$GITHUB_ENV"
+          export XDG_RUNTIME_DIR="$RUNNER_TEMP/myaso-r4-audio"
+          pulseaudio --start --exit-idle-time=-1
+          pactl load-module module-null-sink sink_name=myaso_r4_sound
+          pactl set-default-sink myaso_r4_sound
+          pactl info
+
+      - name: Validate R4 native recorded audio and ambient music
+        run: |
+          node --check scripts/r4_audio_browser_acceptance.mjs
+          node --test tests/r4-natural-ambient-audio.test.mjs
+          node scripts/r4_audio_browser_acceptance.mjs
+
+
       - name: Validate R2 responsive controls, server-style dash and combat geometry
         run: |
           node --check src/browser/dash-input.mjs
@@ -167,6 +197,53 @@ jobs:
           cargo check --locked --manifest-path server/Cargo.toml
           cargo clippy --locked --manifest-path server/Cargo.toml --all-targets -- -D warnings
           cargo test --locked --manifest-path server/Cargo.toml
+
+      - name: Validate R2 real Chrome abrupt-close admission cleanup (2-player cap)
+        run: |
+          cargo build --locked --manifest-path server/Cargo.toml --bin myaso-server
+          node --check scripts/r2-abrupt-close-acceptance.mjs
+          node scripts/r2-abrupt-close-acceptance.mjs
+
+      - name: Upload R2 session-cleanup W3C evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: r2-abrupt-close-session-evidence
+          path: r2-session-cleanup-w3c-evidence.json
+          if-no-files-found: ignore
+          retention-days: 7
+      - name: Validate M41 native-release-led parry before long combat acceptance
+        env:
+          MYASO_PVP_SCENARIO: "uiparrytell"
+        run: |
+          # Issue #402: genuine Chrome release -> native Firefox wheel ->
+          # authoritative 125ms parry -> strict >=24 remote-only raster pixels.
+          # The original M41 gate later in the suite remains unchanged.
+          node --check scripts/m41-native-parry-after-release.mjs
+          node --test tests/m41-native-release-led-parry.test.mjs
+          node scripts/pvp_browser_flight_runner.mjs
+
+      - name: Validate P0 Greyhaven 23-solid World and armory line-of-sight geometry
+        run: |
+          node --check src/world/alpha-solid-geometry.mjs
+          node --test tests/world-alpha-solid-geometry.test.mjs tests/authored-world.test.mjs
+
+      - name: Validate P0 pinned Greyhaven static solids JSON parity and authority boundary
+        run: |
+          node --check scripts/verify-world-alpha-solid-artifact.mjs
+          node scripts/verify-world-alpha-solid-artifact.mjs
+          node --test tests/world-alpha-pinned-solid-artifact.test.mjs
+
+      - name: Validate Alpha World named Red Lion facade replacement contract
+        run: |
+          node --check src/world/building-presentation.mjs
+          node --check src/browser/authored-world-renderer.mjs
+          node --test tests/world-building-presentation.test.mjs tests/authored-world.test.mjs
+
+      - name: Validate P0 Greyhaven Blacksmith four-sword armory sockets
+        run: |
+          node --check src/world/alpha-armory.mjs
+          node --test tests/world-alpha-armory.test.mjs tests/authored-world.test.mjs
 
       - name: Validate M188 repeated real heavy counterplay windows
         run: |
@@ -603,6 +680,7 @@ jobs:
           node --check scripts/pvp_browser_flight_runner.mjs
           node --check scripts/m201-authoritative-phase-proof.mjs
           node --test tests/m201-authoritative-phase-proof.test.mjs
+          node --test tests/r2-m205-guard-break-sampling.test.mjs\n          node --test tests/m41-native-release-led-parry.test.mjs
           node --test --test-name-pattern="FFA guard-break punish focus|zero-guard stun|authoritative opponent guard break" tests/m29-combat-readability.test.mjs
           # Fresh actual Chrome/Firefox/Chrome2 processes per iteration. The
           # acceptance runner starts a NEW Rust loopback server and all three

@@ -30,6 +30,7 @@ import { planM225ThreatDistanceStaging } from "./m225-ffa-threat-distance.mjs";
 import { qualifyM150ParryGeometry } from "./m150-replicated-geometry.mjs";
 import { awaitM223HeavyWindup, planM223WheelDelay } from "./m223-server-heavy-windup.mjs";
 import { dispatchR2ReleaseLedShortBlock } from "./r2-release-led-short-block.mjs";
+import { dispatchM41NativeParryAfterRelease } from "./m41-native-parry-after-release.mjs";
 import { createM221TrustedWheelRegistry } from "./m221-trusted-wheel-attestation.mjs";
 import { attachM325TrustedWheelSocket } from "./m325-trusted-wheel-socket.mjs";
 import { requiresM338GuardBreakWheelSocket } from "./m338-guard-break-wheel-scenarios.mjs";
@@ -8059,24 +8060,33 @@ async function runOnlineUiParryFlight(entries, postParrySleepMs = 80, roles = nu
     // Move the genuine wheel 95ms later (target ~85ms before impact);
     // continue to reject every block, HP hit, missed/parried input or
     // changed 650ms stun/punish contract as before.
-    // M41 is an actual remote parry-tell raster flight. On quality
-    // #39437248971, Firefox's trusted wheel landed only 74ms before the
-    // authoritative 34HP contact (vs 105ms for the passing M41 run).
-    // Advance ONLY M41's real wheel dispatch by 12ms, targeting the middle
-    // of the unchanged 125ms server parry window. No combat or input fakes.
-    const releaseToStrikeParryDelayMs = scenario === "uiparrytell" ? 83 : 95;
+    // M41 #402: Firefox native W3C wheel ingress spread 4..65ms on the
+    // same host while its median was just 4ms. A median-staggered release
+    // gave the server a genuine unblocked 34HP hit. Sequence M41's ONE
+    // wheel after Chrome's ACKed pointerUp instead: no cross-browser clock
+    // prediction, fake input, changed 125ms parry/240ms block, or retries.
+    // Other M33/M146 scenarios preserve their existing calibrated proof.
+    const releaseToStrikeParryDelayMs = 95;
     // Any actual -38 guard block or 34 HP hit remains a terminal failure.
-    await Promise.all([
-      (async () => {
-        if (parryIngress.attackLeadMs > 0) await sleep(parryIngress.attackLeadMs);
-        await performArenaAttackHold(attacker, attackerElementId, attackOffset, 35);
-      })(),
-      (async () => {
-        if (parryIngress.wheelLeadMs > 0) await sleep(parryIngress.wheelLeadMs);
-        await sleep(releaseToStrikeParryDelayMs);
-        await setArenaBlock(defender, defenderElementId, true);
-      })(),
-    ]);
+    if (scenario === "uiparrytell") {
+      await dispatchM41NativeParryAfterRelease({
+        sendAttack: () => performArenaAttackHold(attacker, attackerElementId, attackOffset, 35),
+        sendWheel: () => setArenaBlock(defender, defenderElementId, true),
+        wheelAfterReleaseMs: 10,
+      });
+    } else {
+      await Promise.all([
+        (async () => {
+          if (parryIngress.attackLeadMs > 0) await sleep(parryIngress.attackLeadMs);
+          await performArenaAttackHold(attacker, attackerElementId, attackOffset, 35);
+        })(),
+        (async () => {
+          if (parryIngress.wheelLeadMs > 0) await sleep(parryIngress.wheelLeadMs);
+          await sleep(releaseToStrikeParryDelayMs);
+          await setArenaBlock(defender, defenderElementId, true);
+        })(),
+      ]);
+    }
     evidence = await waitForUiParryEvidence(entries, attacker, defender, 350, false, lastAttemptBaseline);
     if (!evidence) {
       const after = await Promise.all(entries.map(readUiEvidence));
@@ -9746,7 +9756,10 @@ async function runOnlineUiGuardBreakFlight(entries, { onGuardBroken = null } = {
           // arrived after the fixed 100ms Chrome release on attempt 5/5.
           // Require trusted native wheel BEFORE release for M194 only, with
           // the same unchanged server parry/guard/damage and strict W3C gates.
-          trustedWheelWaitMs: scenario === "uiguardbreak" ? 190 : 0,
+          trustedWheelWaitMs: ["uiguardbreak", "uiguardbreakpunishffahit"].includes(scenario) ? 190 : 0,
+          // M205: one additional bounded genuine-wheel sampling interval
+          // before the ONLY real Chrome release; never synthesize input.
+          postTrustedWheelMs: scenario === "uiguardbreakpunishffahit" ? 40 : 0,
           sendAttackDown: () => setArenaAttackButton(attacker, true),
           sendWheel: () => scrollArenaWheel(defender, defenderElementId, 120, 0),
           awaitTrustedWheel: () => challenge.wait(),
@@ -14187,6 +14200,8 @@ function contentType(filename) {
   if (filename.endsWith(".html")) return "text/html; charset=utf-8";
   if (filename.endsWith(".mjs") || filename.endsWith(".js")) return "text/javascript; charset=utf-8";
   if (filename.endsWith(".css")) return "text/css; charset=utf-8";
+  if (filename.endsWith(".ogg")) return "audio/ogg";
+  if (filename.endsWith(".mp3")) return "audio/mpeg";
   if (filename.endsWith(".json")) return "application/json";
   return "application/octet-stream";
 }

@@ -10,11 +10,14 @@ use std::sync::{
 pub mod alpha_armory_mapping_preflight;
 pub mod alpha_bound_pickup;
 pub mod alpha_current_rack_bindings;
+pub mod alpha_greyhaven_geometry;
 pub mod alpha_mainhand_snapshot;
 pub mod alpha_pickup_ack_proof;
 pub mod alpha_quiescent_rack_handoff;
 pub mod character_identity;
+pub mod chat;
 pub mod identity;
+pub mod identity_disguise;
 pub mod item_journal;
 pub mod item_ownership;
 pub mod kill_event;
