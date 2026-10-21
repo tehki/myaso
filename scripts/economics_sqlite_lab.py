@@ -106,6 +106,16 @@ CREATE TABLE admitted_sessions (
 );
 -- Seller consent must bind all material listing terms. Approval is fixture-
 -- seeded, NOT cryptographically signed or admitted by a real seller login.
+-- Fictional Core X1 compatibility keys; not an authenticated account store.
+CREATE TABLE core_fixture_bindings (
+    ledger_account_id INTEGER PRIMARY KEY REFERENCES accounts(id),
+    account_key_be BLOB NOT NULL UNIQUE CHECK(length(account_key_be)=16),
+    character_key_be BLOB NOT NULL UNIQUE CHECK(length(character_key_be)=16),
+    session_generation INTEGER NOT NULL CHECK(session_generation>0),
+    CHECK(account_key_be != zeroblob(16)),
+    CHECK(character_key_be != zeroblob(16)),
+    CHECK(account_key_be != character_key_be)
+);
 CREATE TABLE seller_consents (
     id TEXT PRIMARY KEY CHECK(length(id)>0),
     listing_id INTEGER NOT NULL UNIQUE REFERENCES listings(id),
@@ -229,6 +239,21 @@ def bootstrap_fixture(db_path: str | Path) -> None:
             "title_revision,map_revision,price,fee_bps,expires_tick,state)"
             " VALUES('TEST_FIXTURE_ONLY',50,20,42,1,7,500,200,100,'approved')"
         )
+        # E2h fictional identities are explicitly distinct from both ledger
+        # INTEGER IDs and from each other; not issued by Core authentication.
+        db.executemany(
+            "INSERT INTO core_fixture_bindings("
+            "ledger_account_id,account_key_be,character_key_be,session_generation)"
+            " VALUES(?,?,?,8)",
+            [
+                (10, (0xA10).to_bytes(16, "big"),
+                 int("0102030405060708090a0b0c0d0e0f10", 16).to_bytes(16, "big")),
+                (20, (0xA20).to_bytes(16, "big"),
+                 int("80000000000000000000000000000001", 16).to_bytes(16, "big")),
+                (30, (0xA30).to_bytes(16, "big"),
+                 (0x333).to_bytes(16, "big")),
+            ],
+        )
         db.execute(
             "INSERT INTO title_projection(parcel_id,owner_id,revision,last_sequence)"
             " VALUES(42,20,1,0)"
@@ -257,6 +282,7 @@ def purchase(
     trusted_tick: int,
     *,
     failpoint: str | None = None,
+    _test_only_core_assertion: object | None = None,
 ) -> dict:
     """Commit exactly one file-backed test purchase or no purchase.
 
@@ -288,6 +314,14 @@ def purchase(
         ).fetchone()
         if admitted != ("active",):
             raise Denied("Session not admitted or already revoked")
+        if _test_only_core_assertion is not None:
+            # This is a *fixture SQL consistency guard*, not a real caller
+            # authenticator. It runs under this SAME BEGIN IMMEDIATE writer
+            # transaction as every balance/title/receipt mutation.
+            from economics_core_binding import assert_fixture_binding_in_transaction
+            assert_fixture_binding_in_transaction(
+                db, _test_only_core_assertion, session.player_id, session.epoch
+            )
         previous = db.execute(
             "SELECT payload,receipt FROM receipts WHERE op_id=?", (intent.op_id,)
         ).fetchone()
