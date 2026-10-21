@@ -389,7 +389,6 @@ async fn four_real_quic_players_static_off_preserve_legacy_smith_passage() -> Re
     exercise_real_quic_smith_wall(false).await
 }
 
-
 /// Four independently authenticated transport sessions issue real input
 /// datagrams while the same server ticks. Each position is observed from
 /// authoritative snapshot traffic; no direct World::step/teleport or browser
@@ -408,7 +407,8 @@ async fn observe_westward_authoritative_motion(
         if (at.1 - start.1).abs() > 12.0 {
             bail!(
                 "player {player_id} unexpectedly drifted on Y during westward input: {:?} -> {:?}",
-                start, at
+                start,
+                at
             );
         }
         if at.0 < start.0 - 85.0 {
@@ -423,9 +423,7 @@ async fn observe_westward_authoritative_motion(
                 );
                 return Ok(at);
             }
-            bail!(
-                "player {player_id} movement violated bounded replicated displacement: {at:?}"
-            );
+            bail!("player {player_id} movement violated bounded replicated displacement: {at:?}");
         }
     }
 }
@@ -472,7 +470,10 @@ async fn four_real_quic_players_concurrently_move_under_static_collision() -> Re
             if ((record.x as f32 / 4.0) - expected_x).abs() > 0.5
                 || ((record.y as f32 / 4.0) - expected_y).abs() > 0.5
             {
-                bail!("client {player}: bad authoritative peer spawn for {}", record.net_id);
+                bail!(
+                    "client {player}: bad authoritative peer spawn for {}",
+                    record.net_id
+                );
             }
         }
         sessions.push((connection, send, recv, snapshot.sequence));
@@ -492,7 +493,10 @@ async fn four_real_quic_players_concurrently_move_under_static_collision() -> Re
     let moved = [one?, two?, three?, four?];
     for (i, at) in moved.iter().enumerate() {
         if at.0 >= SPAWNS[i].0 - 85.0 {
-            bail!("player {} has no genuine authoritative westward motion", i + 1);
+            bail!(
+                "player {} has no genuine authoritative westward motion",
+                i + 1
+            );
         }
     }
     println!(
