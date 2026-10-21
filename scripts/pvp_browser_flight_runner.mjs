@@ -11249,10 +11249,14 @@ async function runOnlineUiJumpRecoveryFfaPunishFlight(entries) {
       // joint #39642622311 proved the 90ms LMB first upgrades to heavy
       // windup (action 9), then only later enters light windup (action 1).
       // Its 34HP hit therefore landed AFTER the 18-tick jump recovery.
-      // One authentic 45ms W3C short click (proven under the M144 <80ms
-      // classifier) avoids the unintended heavy and preserves enough actual
-      // hold for the 30Hz input sampler. Do not change the server window.
-      performPunish: () => performArenaM221GuardBreakClick(observer, 45),
+      // CI #39655760486: with genuine 45ms Firefox LMB, the server first
+      // entered charge windup 9 at tick368, then light windup 1 at tick372,
+      // and landed actual 34HP at tick380 == the victim's recovery->idle.
+      // This is a REAL late hit, not a replica arrival problem. Use the
+      // existing M155-proven genuine 5ms W3C LMB light pulse to minimize
+      // time spent in charge windup; one native click, no retry or timer
+      // extension. Strict server HIT must still be BEFORE recovery idle.
+      performPunish: () => performArenaM221GuardBreakClick(observer, 5),
     });
   } catch (error) {
     throw new Error(`${milestone}: ${error.message}: ${JSON.stringify(await Promise.all(entries.map(readUiEvidence)))}`,
