@@ -26,7 +26,7 @@ function artBackground(ctx){
 }
 function fighterDraw(ctx,renderer,fighter,remote,ms){
   ctx.save();ctx.translate(pos.x,pos.y);
-  const success=renderer.draw(ctx,fighter,{remote,nowMs:ms,rotation:0});
+  const success=renderer.draw(ctx,fighter,{remote,actorKind:fighter.previewActorKind,nowMs:ms,rotation:0});
   ctx.restore();
   if(!success)throw new Error("Expected real knight atlas to be decoded");
 }
@@ -44,6 +44,7 @@ function view(kind,pose){
   const rolling=pose!=="idle";
   const fighter={x:200,y:180,facing:Math.PI/2,
     action:rolling?COMBAT_ACTION.dodge:COMBAT_ACTION.idle,
+    previewActorKind:pose==="t1_roll"?"npc":"player",
     ...(remote?{netId:15}:{})};
   if(rolling){
     // Prime the real renderer's roll state on a disposable surface;

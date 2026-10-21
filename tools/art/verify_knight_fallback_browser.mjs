@@ -67,8 +67,8 @@ try {
         dest:[...args.slice(5,9)]});
       nativeDraw(...args);
     };
-    const local={x:120,y:120,facing:Math.PI/2,action:COMBAT_ACTION.idle};
-    const remote={x:120,y:120,facing:Math.PI/2,action:COMBAT_ACTION.idle,netId:987};
+    const local={x:120,y:120,facing:Math.PI/2,action:COMBAT_ACTION.idle,reviewActorKind:"player"};
+    const remote={x:120,y:120,facing:Math.PI/2,action:COMBAT_ACTION.idle,netId:987,reviewActorKind:"npc"};
     const results=[];
     const cases=[
       ["Silver idle",local,COMBAT_ACTION.idle,1000,true],
@@ -88,7 +88,7 @@ try {
       const x=120+(i%5)*235,y=145+Math.floor(i/5)*330;
       const from=draws.length;
       ctx.save();ctx.translate(x,y);
-      const drawn=renderer.draw(ctx,fighter,{remote:fighter===remote,nowMs});
+      const drawn=renderer.draw(ctx,fighter,{remote:fighter===remote,actorKind:fighter.reviewActorKind,nowMs});
       const lastDraw=draws.length>from?draws.at(-1):null;
       if(!drawn){
         // Visual reference only: this canvas placeholder is NOT game artwork.

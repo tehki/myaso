@@ -22,21 +22,21 @@ test("atlas source bounds are exact and negative animation phases wrap", () => {
   }
 });
 
-test("graphics states use Silver locally and Sentinel remotely", () => {
-  assert.equal(knightClip(COMBAT_ACTION.idle,false), "silver_idle");
-  assert.equal(knightClip(COMBAT_ACTION.idle,false,215,true), "silver_walk");
-  assert.equal(knightClip(COMBAT_ACTION.idle,false,333,true), "silver_sprint");
-  assert.equal(knightClip(COMBAT_ACTION.jump,false), "silver_jump");
-  assert.equal(knightClip(COMBAT_ACTION.block,true), "t1_block");
-  assert.equal(knightClip(COMBAT_ACTION.attackActive,true), "t1_attack");
-  assert.equal(knightClip(COMBAT_ACTION.idle,true), "t1_walk");
-  assert.equal(knightClip(COMBAT_ACTION.dodge,false), "silver_roll");
-  assert.equal(knightClip(COMBAT_ACTION.dodgeRecovery,false), "silver_roll");
-  assert.equal(knightClip(COMBAT_ACTION.dodge,true), "t1_roll");
-  assert.equal(knightClip(COMBAT_ACTION.dodgeRecovery,true), "t1_roll");
-  assert.equal(knightClip(COMBAT_ACTION.dash,true), null);
-  assert.equal(knightClip(COMBAT_ACTION.dead,true), null);
-  assert.equal(knightClip(COMBAT_ACTION.knockdown,false), null);
+test("graphics states use Silver for human role and Sentinel only for NPC role", () => {
+  assert.equal(knightClip(COMBAT_ACTION.idle,"player"), "silver_idle");
+  assert.equal(knightClip(COMBAT_ACTION.idle,"player",215,true), "silver_walk");
+  assert.equal(knightClip(COMBAT_ACTION.idle,"player",333,true), "silver_sprint");
+  assert.equal(knightClip(COMBAT_ACTION.jump,"player"), "silver_jump");
+  assert.equal(knightClip(COMBAT_ACTION.block,"npc"), "t1_block");
+  assert.equal(knightClip(COMBAT_ACTION.attackActive,"npc"), "t1_attack");
+  assert.equal(knightClip(COMBAT_ACTION.idle,"npc"), "t1_walk");
+  assert.equal(knightClip(COMBAT_ACTION.dodge,"player"), "silver_roll");
+  assert.equal(knightClip(COMBAT_ACTION.dodgeRecovery,"player"), "silver_roll");
+  assert.equal(knightClip(COMBAT_ACTION.dodge,"npc"), "t1_roll");
+  assert.equal(knightClip(COMBAT_ACTION.dodgeRecovery,"npc"), "t1_roll");
+  assert.equal(knightClip(COMBAT_ACTION.dash,"npc"), null);
+  assert.equal(knightClip(COMBAT_ACTION.dead,"npc"), null);
+  assert.equal(knightClip(COMBAT_ACTION.knockdown,"player"), null);
 });
 
 test("one atlas per clip is shared across fighters, failures use original graphics", () => {
@@ -56,13 +56,13 @@ test("one atlas per clip is shared across fighters, failures use original graphi
   const ctx={save(){},restore(){},rotate(){},beginPath(){},ellipse(){},fill(){},
     drawImage(...args){seen.push(args);}};
   const fighter={x:20,y:30,facing:Math.PI/2,action:COMBAT_ACTION.idle};
-  assert.equal(renderer.draw(ctx,fighter,{nowMs:1000,rotation:0}),true);
+  assert.equal(renderer.draw(ctx,fighter,{actorKind:"player",nowMs:1000,rotation:0}),true);
   assert.equal(seen.length,1);
   assert.equal(seen[0][3],KNIGHT_FRAME_PX);
   assert.equal(renderer.draw(ctx,{...fighter,action:COMBAT_ACTION.jump},
-    {nowMs:1016}),false);
+    {actorKind:"player",nowMs:1016}),false);
   assert.equal(renderer.draw(ctx,{...fighter,action:COMBAT_ACTION.dead},
-    {nowMs:1032}),false);
+    {actorKind:"player",nowMs:1032}),false);
 });
 
 test("roll preserves one 350ms presentation cycle across active/recovery states", () => {
@@ -83,22 +83,22 @@ test("roll preserves one 350ms presentation cycle across active/recovery states"
   const ctx={save(){},restore(){},rotate(){},beginPath(){},ellipse(){},fill(){},
     drawImage(...args){seen.push(args);}};
   const fighter={x:80,y:90,facing:Math.PI/2,action:COMBAT_ACTION.dodge};
-  assert.equal(sprites.draw(ctx,fighter,{nowMs:1000}),true);
+  assert.equal(sprites.draw(ctx,fighter,{actorKind:"player",nowMs:1000}),true);
   const first=seen.at(-1);
   assert.equal(first[1],0);
   assert.deepEqual(first.slice(5),[-67,-78,134,134]);
   fighter.action=COMBAT_ACTION.dodgeRecovery;
-  assert.equal(sprites.draw(ctx,fighter,{nowMs:1180}),true);
+  assert.equal(sprites.draw(ctx,fighter,{actorKind:"player",nowMs:1180}),true);
   assert.equal(seen.at(-1)[1],4*KNIGHT_FRAME_PX,
     "recovery must not restart clip at frame zero");
-  assert.equal(sprites.draw(ctx,fighter,{nowMs:1400}),true);
+  assert.equal(sprites.draw(ctx,fighter,{actorKind:"player",nowMs:1400}),true);
   assert.equal(seen.at(-1)[1],7*KNIGHT_FRAME_PX,
     "roll must hold the final frame until recovery ends");
   const remote={...fighter,netId:47,action:COMBAT_ACTION.dodge};
-  assert.equal(sprites.draw(ctx,remote,{nowMs:1500,remote:true}),true);
+  assert.equal(sprites.draw(ctx,remote,{actorKind:"npc",nowMs:1500,remote:true}),true);
   assert.equal(seen.at(-1)[1],0);
   remote.action=COMBAT_ACTION.dodgeRecovery;
-  assert.equal(sprites.draw(ctx,remote,{nowMs:1670,remote:true}),true);
+  assert.equal(sprites.draw(ctx,remote,{actorKind:"npc",nowMs:1670,remote:true}),true);
   assert.equal(seen.at(-1)[1],3*KNIGHT_FRAME_PX);
 });
 import { readFileSync } from "node:fs";
@@ -151,7 +151,7 @@ test("A2.11 baseline 100% rollback and approved 120% keep identical atlas frames
       presentationScale:scale,
       assetBase:new URL("https://example.test/knights/")});
     const actor={x:50,y:75,facing:Math.PI/2,action};
-    assert.equal(renderer.draw(ctx,actor,{nowMs:1000}),true);
+    assert.equal(renderer.draw(ctx,actor,{actorKind:"player",nowMs:1000}),true);
     return {draw:draws[0],shadow:ellipses[0]};
   }
   for(const action of [COMBAT_ACTION.idle,COMBAT_ACTION.dodge]){
@@ -183,7 +183,7 @@ test("unsupported authoritative actions fall back to original combat artwork", (
     COMBAT_ACTION.knockdown, COMBAT_ACTION.dead, COMBAT_ACTION.dash,
   ];
   for (const action of localFallback) {
-    assert.equal(knightClip(action, false, 320, true), null,
+    assert.equal(knightClip(action, "player", 320, true), null,
       "local action " + action + " must not be depicted as a walking knight");
   }
   for (const action of [
@@ -191,12 +191,12 @@ test("unsupported authoritative actions fall back to original combat artwork", (
     COMBAT_ACTION.jump, COMBAT_ACTION.knockdown,
     COMBAT_ACTION.dead, COMBAT_ACTION.dash,
   ]) {
-    assert.equal(knightClip(action, true, 320, true), null,
+    assert.equal(knightClip(action, "npc", 320, true), null,
       "remote action " + action + " must use original gameplay art");
   }
-  assert.equal(knightClip(COMBAT_ACTION.block, true), "t1_block");
-  assert.equal(knightClip(COMBAT_ACTION.attackActive, true), "t1_attack");
-  assert.equal(knightClip(COMBAT_ACTION.jump, false), "silver_jump");
+  assert.equal(knightClip(COMBAT_ACTION.block, "npc"), "t1_block");
+  assert.equal(knightClip(COMBAT_ACTION.attackActive, "npc"), "t1_attack");
+  assert.equal(knightClip(COMBAT_ACTION.jump, "player"), "silver_jump");
 });
 
 test("fallback resets old roll before a separate roll starts", () => {
@@ -214,16 +214,16 @@ test("fallback resets old roll before a separate roll starts", () => {
   const renderer = createKnightSpriteRenderer({ImageCtor:MockImage,
     assetBase:new URL("https://example.test/knights/")});
   const actor = {x:10,y:20,facing:Math.PI/2,action:COMBAT_ACTION.dodge};
-  assert.equal(renderer.draw(ctx,actor,{nowMs:1000}),true);
+  assert.equal(renderer.draw(ctx,actor,{actorKind:"player",nowMs:1000}),true);
   assert.equal(drawn.at(-1)[1],0);
   actor.action=COMBAT_ACTION.dodgeRecovery;
-  assert.equal(renderer.draw(ctx,actor,{nowMs:1280}),true);
+  assert.equal(renderer.draw(ctx,actor,{actorKind:"player",nowMs:1280}),true);
   assert.equal(drawn.at(-1)[1],6*KNIGHT_FRAME_PX);
   actor.action=COMBAT_ACTION.kickWindup;
-  assert.equal(renderer.draw(ctx,actor,{nowMs:1400}),false);
+  assert.equal(renderer.draw(ctx,actor,{actorKind:"player",nowMs:1400}),false);
   const before=drawn.length;
   actor.action=COMBAT_ACTION.dodge;
-  assert.equal(renderer.draw(ctx,actor,{nowMs:1700}),true);
+  assert.equal(renderer.draw(ctx,actor,{actorKind:"player",nowMs:1700}),true);
   assert.equal(drawn.length,before+1);
   assert.equal(drawn.at(-1)[1],0,"next roll restarts at frame zero");
 });

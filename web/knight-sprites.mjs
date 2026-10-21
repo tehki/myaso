@@ -8,6 +8,13 @@ export const KNIGHT_ROLL_PRESENTATION_MS = 350;
 // knight sprite renderer, not gameplay positions, roll physics or hitboxes.
 // &knights=1 uses 120%; &knights=1&knightScale=100 previews the old presentation.
 export const KNIGHT_PRESENTATION_SCALE = 1.2;
+// While the temporary Knight art is opt-in and there is no authenticated
+// MainHand snapshot in the live client, do not paint the arena prototype's
+// unconditional sword-shaped bar over the fallback circle. This does NOT
+// provide an equipped sword sprite or turn visual art into item ownership.
+export function showPrototypeWeaponStroke(knightVisualOptIn) {
+  return knightVisualOptIn !== true;
+}
 export function knightPresentationRect(rolling, scale = KNIGHT_PRESENTATION_SCALE) {
   if (scale !== 1 && scale !== KNIGHT_PRESENTATION_SCALE) {
     throw new RangeError("Only approved baseline/120% knight visual scales are supported");
@@ -41,15 +48,18 @@ export function knightDirectionIndex(facing) {
   return ((Math.round((facing - Math.PI / 2) / (Math.PI / 4)) % 8) + 8) % 8;
 }
 
-export function knightClip(action, remote, speed = 0, moving = false) {
+// Actor kind must come from a validated Core/AI roster. A network-locality
+// flag is NEVER permission to draw a Sentinel for another human player.
+export function knightClip(action, actorKind, speed = 0, moving = false) {
+  if (actorKind !== "player" && actorKind !== "npc") return null;
   if (action === COMBAT_ACTION.dodge || action === COMBAT_ACTION.dodgeRecovery) {
-    return remote ? "t1_roll" : "silver_roll";
+    return actorKind === "npc" ? "t1_roll" : "silver_roll";
   }
   // The optional atlases cover only a subset of authoritative Combat actions.
   // An unrelated idle/walk pose would falsely depict readiness during kicks,
   // stun, knockdown, jump attacks, or committed local sword attacks. Let the
   // existing combat renderer draw those actions and their truthful tells.
-  if (remote) {
+  if (actorKind === "npc") {
     if (action === COMBAT_ACTION.block) return "t1_block";
     if (ATTACKS.has(action)) return "t1_attack";
     return action === COMBAT_ACTION.idle ? "t1_walk" : null;
@@ -88,8 +98,9 @@ export function createKnightSpriteRenderer({ ImageCtor = Image,
     atlases.set(name, atlas);
   }
   return {
-    draw(ctx, fighter, { remote = false, rotation = 0, nowMs = performance.now() } = {}) {
-      const key = remote ? "remote:" + fighter.netId : "local";
+    draw(ctx, fighter, { remote = false, actorKind = null, rotation = 0, nowMs = performance.now() } = {}) {
+      if (actorKind !== "player" && actorKind !== "npc") return false;
+      const key = remote ? actorKind + ":remote:" + fighter.netId : actorKind + ":local";
       let state = states.get(key);
       if (!state) {
         state = { x: fighter.x, y: fighter.y, atMs: nowMs, lastMoveMs: -Infinity,
@@ -110,7 +121,7 @@ export function createKnightSpriteRenderer({ ImageCtor = Image,
       state.y = fighter.y;
       state.atMs = nowMs;
       const moving = nowMs - state.lastMoveMs < 135;
-      const clip = knightClip(fighter.action ?? COMBAT_ACTION.idle, remote, state.speed, moving);
+      const clip = knightClip(fighter.action ?? COMBAT_ACTION.idle, actorKind, state.speed, moving);
       if (!clip) {
         // End the previous clip on unsupported states. A future roll must
         // start at frame zero rather than resume its previous final frame.
@@ -139,7 +150,7 @@ export function createKnightSpriteRenderer({ ImageCtor = Image,
       // contains an eight-direction facing. Undo only that presentation rotation.
       ctx.save();
       ctx.rotate(-rotation);
-      ctx.fillStyle = remote ? "rgba(55, 32, 26, .45)" : "rgba(49, 38, 28, .45)";
+      ctx.fillStyle = actorKind === "npc" ? "rgba(55, 32, 26, .45)" : "rgba(49, 38, 28, .45)";
       ctx.beginPath();
       ctx.ellipse(0, 11 * presentationScale, 20 * presentationScale,
         8 * presentationScale, 0, 0, Math.PI * 2);

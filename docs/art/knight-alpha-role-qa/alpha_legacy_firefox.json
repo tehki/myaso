@@ -1,0 +1,31 @@
+{
+  "engine": "firefox",
+  "browser": "firefox/153.4.0",
+  "legacy": {
+    "drawnNames": [
+      "silver_idle.webp",
+      "t1_walk.webp"
+    ],
+    "status": "9/9 atlases loaded · 120% visual scale"
+  },
+  "rollbackRect": [
+    80,
+    112
+  ],
+  "approvedRect": [
+    96,
+    134
+  ],
+  "loadedAtlases": {
+    "baseline": 9,
+    "approved": 9
+  },
+  "errors": [],
+  "screenshots": [
+    "alpha_legacy_firefox_preview.png",
+    "alpha_legacy_firefox_scale.png"
+  ],
+  "realGameplay": false,
+  "serverConnection": false,
+  "liveNpcPilot": false
+}
