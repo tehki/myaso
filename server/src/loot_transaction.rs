@@ -13,7 +13,7 @@ use std::path::Path;
 use crate::character_identity::{SessionIdentityRegistry, SessionLease};
 use crate::loot::{
     CorpseItemRef, EquipmentSlot, ItemStack, LootAuthority, LootError, LootStateSnapshot,
-    ParkedInventory,
+    ParkedInventory, PICKUP_REACH,
 };
 #[cfg(test)]
 use crate::loot_persistence::save_quiescent;
@@ -313,11 +313,14 @@ pub struct VerifiedGroundSwordTarget {
     pub completed_tick: u32,
 }
 
-/// Get the EXACT entity+physical item pairs required by the checked pickup
-/// API, never a forged visual ID or client-supplied position. Only public
-/// ground sword instances are eligible: non-swords, backpack/equipment, and
-/// corpse CONTENTS remain outside this preview. The read is bounded and
-/// inherits authoritative liveness, zone, range and expiry rules.
+/// Get EXACT entity+physical item pairs required by the checked pickup API,
+/// never a forged visual ID or client-supplied position. This is an
+/// *interaction candidate* query, NOT the wider world-render visibility list:
+/// only swords at or within the authoritative 56-unit pickup reach appear.
+/// Distant but visually rendered swords remain in LootAuthority::visible_loot
+/// and MUST NOT be presented by the UI as selectable pickup targets.
+/// Non-swords, backpack/equipment and corpse contents are excluded. The query
+/// also inherits existing liveness, zone and expiry rules.
 ///
 /// Core must hold a common authoritative snapshot/read lock while obtaining
 /// this list, and must revalidate under its exclusive item+geometry writer
@@ -374,6 +377,16 @@ pub fn inspect_verified_ground_sword_targets(
                 || drop.zone != zone
             {
                 return Err(PickupCommitError::Loot(LootError::InvalidState));
+            }
+            // LootAuthority::visible_loot is a 550-unit rendering envelope,
+            // whereas a true pickup has a distinct 56-unit physical reach.
+            // Mirror the SAME inclusive squared-distance predicate as
+            // LootAuthority::take_ground_amount, using only server fighter
+            // position and the authoritative physical ground item.
+            let dx = drop.at.x - fighter.x;
+            let dy = drop.at.y - fighter.y;
+            if dx * dx + dy * dy > PICKUP_REACH * PICKUP_REACH {
+                continue;
             }
             swords.push(VerifiedGroundSwordTarget {
                 selection: GroundSwordSelection {
@@ -900,6 +913,110 @@ mod tests {
             )),
             Err(PickupCommitError::Loot(LootError::ReplayOperation))
         ));
+        let _ = fs::remove_file(path);
+    }
+
+    #[test]
+    fn sword_interaction_candidates_enforce_exact_physical_reach_boundary() {
+        let mut world = World::new(900.0, 700.0);
+        for (id, x, y) in [
+            (1, 200.0, 200.0),
+            (2, 200.0 + PICKUP_REACH, 200.0),
+            (3, 200.0 + PICKUP_REACH + 1.0, 200.0),
+            (4, 800.0, 600.0),
+        ] {
+            assert!(world.add_player_at(id, x, y, 0.0));
+        }
+        let mut zones = ZoneAuthority::new();
+        let mut identity = SessionIdentityRegistry::new();
+        let mut loot = LootAuthority::new();
+        for id in 1..=4 {
+            zones.register(id).unwrap();
+            identity
+                .bind_verified(lease(id), CharacterId::new(u64::from(id)).unwrap())
+                .unwrap();
+            loot.register(id).unwrap();
+        }
+        let item_id = loot.grant(1, ItemKind::RustySword, 1).unwrap();
+        let entity_id = loot
+            .drop_backpack(1, world.fighter(1).unwrap(), ZoneId::Moonvale, item_id, 0)
+            .unwrap();
+
+        // Both viewers can *see* the same physical sword through the wider
+        // 550-unit world-visibility contract. Only the exact 56-unit viewer
+        // receives an actionable pickup selector: the one at 57 is too far.
+        for id in [2, 3] {
+            assert_eq!(
+                loot.visible_loot(id, world.fighter(id).unwrap(), ZoneId::Moonvale, 0)
+                    .unwrap()
+                    .len(),
+                1
+            );
+        }
+        let tick = || PickupWorldTick {
+            world: &world,
+            completed_tick: world.tick,
+            zones: &zones,
+        };
+        let nearest =
+            inspect_verified_ground_sword_targets(&loot, &identity, tick(), lease(2)).unwrap();
+        assert_eq!(nearest.len(), 1);
+        assert_eq!(
+            nearest[0].selection,
+            GroundSwordSelection {
+                ground_entity_id: entity_id,
+                expected_item_id: item_id,
+            }
+        );
+        for id in [3, 4] {
+            assert!(
+                inspect_verified_ground_sword_targets(&loot, &identity, tick(), lease(id))
+                    .unwrap()
+                    .is_empty()
+            );
+        }
+
+        // The same physical candidate is eligible for the existing checked
+        // transfer at the inclusive distance boundary (with fixture geometry
+        // approval only; NOT a real Core 8C / Physics 494 LOS certificate).
+        let path = checkpoint_path();
+        let magic = MagicAuthority::new();
+        let result = commit_verified_ground_sword_equip_checked(
+            GroundSwordAuthority {
+                path: &path,
+                loot: &mut loot,
+                magic: &magic,
+                identity: &identity,
+                tick: tick(),
+                operation: VerifiedLootOperation {
+                    lease: lease(2),
+                    sequence: 1,
+                },
+            },
+            nearest[0].selection,
+            |fighter, drop, zone| {
+                assert_eq!(fighter.net_id, 2);
+                assert_eq!(fighter.x - drop.at.x, PICKUP_REACH);
+                assert_eq!(drop.zone, zone);
+                Ok(())
+            },
+        )
+        .unwrap();
+        assert_eq!(result.id, item_id);
+        assert!(loot.ground().is_empty());
+        assert_eq!(
+            loot.inventory(2)
+                .unwrap()
+                .equipped(EquipmentSlot::MainHand)
+                .unwrap()
+                .id,
+            item_id
+        );
+        assert!(
+            inspect_verified_ground_sword_targets(&loot, &identity, tick(), lease(2))
+                .unwrap()
+                .is_empty()
+        );
         let _ = fs::remove_file(path);
     }
 
