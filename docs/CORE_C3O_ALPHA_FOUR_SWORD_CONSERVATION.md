@@ -17,9 +17,9 @@ location still come from the existing `ItemOwnershipLedger`,
 The fixture simulates one candidate armory source with four separately
 committed `ItemId(u128)` values, **201–204**, in the existing canonical
 `ItemLocation::Ground` state. Its zone/coordinates are illustrative,
-**not approved Greyhaven navigation/rack geometry**. Slot code 1 is a
-**test-only placeholder**, NOT approval of the final MainHand enum or
-legacy mapping. The current ledger does not store `ItemKind` at all:
+**not approved Greyhaven navigation/rack geometry**. Slot code **0** follows Magic & Items #424's saved `MainHand` code (slot
+1 is `OffHand`), but the Core mapping remains **proposed** and requires
+explicit #432 sign-off before activation. The current ledger does not store `ItemKind` at all:
 calling these items 'swords' is the **scenario fixture**, not a
 runtime-verified weapon kind.
 
