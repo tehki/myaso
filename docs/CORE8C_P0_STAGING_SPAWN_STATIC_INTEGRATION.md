@@ -347,6 +347,47 @@ account persistence guarantee, or an authorization to enable a wider
 staging bind. The same original controls and production CI gates remain
 mandatory.
 
+## Core 8C — late joiner cannot inherit historic reliable kill-feed events
+
+The additional acceptance in the same real QUIC kill/respawn test enforces
+**join-time event history isolation**, not just fanout to contemporaneous
+players. Original player #2 dies and respawns after legitimate unarmed
+heavy inputs. Each of the original four authenticated QUIC clients
+reads the same server-generated reliable kill event (seq 0, killer #1,
+victim #2) on its actual original reliable stream, plus the expected
+Dead/100HP server snapshots and continued post-respawn input ACKs.
+
+Then #2 closes its original QUIC connection. All three survivors must
+each observe the actual wire SNAPSHOT_FIELD_REMOVED tombstone for #2,
+proving the server has ended that identity. Physical spawn ownership is
+also separately protected: the surviving killer is still initially
+within the Greyhaven staging minimum **44-world-unit** admission radius
+of #2's now-free anchor. The server must **not** place a replacement
+inside an existing fighter; the acceptance drives killer #1 west through
+normal gameplay input until its own server snapshot confirms the spawn
+is clear. It never alters or teleports a server Fighter directly.
+
+A fresh certificate-pinned QUIC session is then admitted as **new
+net ID #5**. Its first real reliable full server roster must contain
+**exactly {1,3,4,5}**, with #5 at #2's now-vacant immutable Greyhaven
+spawn **(4206,4160)** and no old #2. After #5's normal gameplay
+baseline ACK, its authentic server snapshot stream must advance at
+least **60 authoritative server ticks**, never showing old ghost #2.
+In parallel, the acceptance reads the newcomer's original new
+reliable stream for a bounded **1.25-second evidence window**. Ordinary
+decoded reliable type-2 catch-up frames are permitted; a type-4
+kill event from *before #5's join* is forbidden. This verifies that
+the current server's per-session kill-event cursor starts at the
+current history boundary, rather than replaying another person's
+pre-join fight into the newcomer's kill feed.
+
+This is a bounded live server-wire join-history check, not a guarantee
+against arbitrarily delayed delivery under all networking conditions,
+not persistent identity restoration, not sword ownership, and not
+browser-rendered notifications. It retains the explicit default-OFF
+loopback-only reviewed-static staging profile without any server-side
+logic, protocol, release control or production exposure changes.
+
 ## Nonclaims and release HOLD
 
 This is **not** full geometry authority. World #509's 23 static AABBs omit
