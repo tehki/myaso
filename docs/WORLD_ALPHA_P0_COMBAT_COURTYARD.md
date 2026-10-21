@@ -38,8 +38,8 @@ Physics authority, UI pointer selection, animation or Combat timings.
   Greyhaven AABB even after 18-unit fighter-radius inflation.
 - Four nonoverlapping human-scale station placements.
 - All **16** nominal socket-approach-to-courtyard-station routes avoid the 23
-  pinned fixed solids under conservative radius-18 sampled sweeps.
-- Eight 64-unit directional samples plus fighter radius stay unobstructed.
+  pinned fixed solids under exact continuous segment-vs-radius-18-inflated-AABB checks (closed tangencies blocked).
+- Eight 64-unit directional segments plus fighter radius stay unobstructed. A separate thin-obstacle/tangency negative regression proves the sweep does not miss hazards between sampled points.
 
 This is an additional **courtyard traversal matrix**, not a replacement for
 Core [#527](https://github.com/tehki/myaso/pull/527)'s separate
