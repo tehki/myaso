@@ -6,9 +6,7 @@
 use crate::{
     identity::CharacterId,
     item_journal::{DurableItemJournal, ItemJournalError},
-    item_ownership::{
-        ItemId, ItemLocation, OwnershipError, OwnershipOp, OwnershipTxnId, ZoneId,
-    },
+    item_ownership::{ItemId, ItemLocation, OwnershipError, OwnershipOp, OwnershipTxnId, ZoneId},
 };
 use std::{
     fs,
@@ -205,7 +203,9 @@ fn four_rack_swords_equip_drop_transfer_recover_without_clone_or_false_ack() {
     assert_eq!(restored.location(id(203)), Some(equipped(3)));
     assert_eq!(restored.location(id(204)), Some(equipped(4)));
     assert_eq!(
-        restored.apply(txn(108), &drop).expect("historical ACK retry"),
+        restored
+            .apply(txn(108), &drop)
+            .expect("historical ACK retry"),
         drop_receipt
     );
     assert_eq!(
