@@ -193,7 +193,7 @@ export async function openLocalChat(gameConnection, {
         if (done) break;
         const chunk = checkedBytes(value);
         let offset = 0;
-        while (offset < chunk.length) {
+        while (!closed && offset < chunk.length) {
           if (buffered < 2) {
             const take = Math.min(2 - buffered, chunk.length - offset);
             pending.set(chunk.subarray(offset, offset + take), buffered);
@@ -216,6 +216,9 @@ export async function openLocalChat(gameConnection, {
             else onReceived?.(event);
           }
         }
+      }
+      if (!closed && buffered !== 0) {
+        throw new RangeError("truncated chat frame at stream end");
       }
     } finally {
       closed = true;
