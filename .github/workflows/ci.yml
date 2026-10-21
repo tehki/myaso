@@ -237,6 +237,12 @@ jobs:
           node scripts/audit-world-connectivity.mjs
           node --test tests/world-connectivity-audit.test.mjs
 
+      - name: Validate D18 reciprocal Red Lion portal reachability
+        run: |
+          node --check scripts/audit-world-portals.mjs
+          node scripts/audit-world-portals.mjs
+          node --test tests/world-portal-reachability.test.mjs
+
       - name: Validate M188 repeated real heavy counterplay windows
         run: |
           # Three fresh Chrome/Firefox sessions for each real defensive read.
