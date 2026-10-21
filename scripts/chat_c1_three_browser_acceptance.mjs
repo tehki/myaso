@@ -182,6 +182,28 @@ try {
    "const x=document.querySelector('[data-local-chat]');return {arenaFocused:document.activeElement?.id==='arena',collapsed:x.dataset.open==='false',draft:x.querySelector('input').value};");
  assert.deepEqual(escaped,{arenaFocused:true,collapsed:true,draft:""});
  console.log("ESCAPE_COMBAT_FOCUS_RESTORED",JSON.stringify(escaped));
+
+ // Native W3C input ownership: typing actual movement and combat hotkeys
+ // inside the chat composer must never bubble into arena controls.
+ await evaljs(a,
+  "window.__c1NativeKeyboard=[];document.addEventListener('keydown',e=>window.__c1NativeKeyboard.push({key:e.key,target:e.target?.className||e.target?.id}),true);");
+ await key(a,"\uE007"); // genuine Enter opens the opt-in local composer
+ for (const literal of ["w","e"," "]) await key(a,literal);
+ const typing=await evaljs(a,
+  "const x=document.querySelector('[data-local-chat]');return {focused:document.activeElement===x.querySelector('input'),draft:x.querySelector('input').value,keys:window.__c1NativeKeyboard.filter(e=>['w','e',' '].includes(e.key))};");
+ assert.equal(typing.focused,true,"real W/E/Space typing must remain in chat composer");
+ assert.equal(typing.draft,"we ","real keyboard text must reach the composer unmodified");
+ assert.deepEqual(typing.keys.map(e=>e.target),
+   ["local-chat-input","local-chat-input","local-chat-input"],
+   "combat W/E/Space must target only the input, never the arena");
+ await key(a,"\uE00C"); // native Escape restores arena focus
+ await key(a,"w"); // native W now targets the real game canvas
+ const restored=await evaljs(a,
+  "const x=document.querySelector('[data-local-chat]');return {arena:document.activeElement?.id==='arena',closed:x.dataset.open==='false',cleared:x.querySelector('input').value==='',lastW:window.__c1NativeKeyboard.filter(e=>e.key==='w').at(-1)?.target,noMessage:[...document.querySelectorAll('li.local-chat-item .local-chat-text')].every(n=>n.textContent!=='we ')};");
+ assert.deepEqual(restored,{arena:true,closed:true,cleared:true,lastW:"arena",noMessage:true},
+  "Escape must disarm composer and return real native W to gameplay without sending a chat message");
+ console.log("NATIVE_CHAT_COMBAT_KEY_OWNERSHIP_PASS",
+   JSON.stringify({typed:typing.draft,typedTargets:typing.keys.map(e=>e.target),...restored}));
  // Keep gameplay datagram ACK telemetry moving while the optional reliable
  // chat streams are connected. This is not full combat-under-chat acceptance.
  const ackSamples=async session=>evaljs(session,
