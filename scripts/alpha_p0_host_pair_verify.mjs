@@ -1,0 +1,84 @@
+// Offline reviewer for TWO separately collected REAL host-pair flight reports.
+// A valid JSON pair is NOT cryptographic proof of physical host independence;
+// match server-side QUIC logs + actual machine identities before release.
+import {readFile} from "node:fs/promises";
+import {resolve} from "node:path";
+import {pathToFileURL} from "node:url";
+import {privateIpv4} from "./alpha_p0_host_pair_config.mjs";
+
+const fail=(m)=>{throw Error("P0 multi-host evidence: "+m)};
+const ids=x=>[...x].sort((a,b)=>a-b).join(",");
+const validActors=x=>Array.isArray(x)&&x.length===4&&x.every(f=>
+  Number.isSafeInteger(f.netId)&&f.netId>0&&Number.isFinite(f.x)&&Number.isFinite(f.y));
+function moved(from,to,id){
+  const a=from.find(x=>x.netId===id),b=to.find(x=>x.netId===id);
+  return !!a&&!!b&&Math.hypot(a.x-b.x,a.y-b.y)>4;
+}
+function checkOne(e,role){
+  if(!e||e.role!==role||e.marker!=="MYASO_P0_PAIR_LIVE_REMOTE_MOVE_PASS"
+    ||e.kind!=="P0_REAL_W3C_PAIR_STAGING"||e.serverCapAttested!==4
+    ||e.twoNativeIndependentW3cClients!==true||e.authenticatedRemoteQuic!==true
+    ||e.crossHostMovementSeenByChromeAndFirefox!==true)fail(role+" invalid flight marker");
+  if(!Array.isArray(e.clientFamilies)||ids(e.clientFamilies)!=="chrome,firefox")fail(role+" wrong real browser families");
+  if(!Array.isArray(e.localIds)||e.localIds.length!==2
+    ||new Set(e.localIds).size!==2||!e.localIds.every(x=>Number.isSafeInteger(x)&&x>0))fail(role+" bad local identities");
+  if(!Array.isArray(e.allIds)||e.allIds.length!==4||new Set(e.allIds).size!==4)fail(role+" no four fighters");
+  if(!Array.isArray(e.remoteIds)||e.remoteIds.length!==2
+    ||ids([...e.localIds,...e.remoteIds])!==ids(e.allIds))fail(role+" wrong remote identities");
+  if(e.actorId!==e.localIds[0]||!e.remoteIds.includes(e.remoteMovedId))fail(role+" wrong mover IDs");
+  if(typeof e.osHost!=="string"||!e.osHost||typeof e.hostId!=="string"||!e.hostId
+    ||typeof e.peerHostId!=="string"||!e.peerHostId)fail(role+" missing host attestation");
+  if(!Array.isArray(e.localIpv4)||!e.localIpv4.some(privateIpv4))fail(role+" no private client address");
+  if(!/^https:\/\/\d+\.\d+\.\d+\.\d+:\d+\/game$/.test(e.url)
+    ||!/^[0-9a-f]{64}$/.test(e.certificateSha256||""))fail(role+" malformed pinned URL");
+  if(!Number.isSafeInteger(e.start)||!Number.isSafeInteger(e.movedAt)
+    ||e.movedAt<e.start+(role==="A"?650:6300)
+    ||e.movedAt>e.start+(role==="A"?5000:12000))fail(role+" invalid UTC movement barrier");
+  if(!Array.isArray(e.baseline)||!Array.isArray(e.observed)
+    ||e.baseline.length!==2||e.observed.length!==2
+    ||!Array.isArray(e.serverTicksBefore)||!Array.isArray(e.serverTicksAfter)
+    ||e.serverTicksBefore.length!==2||e.serverTicksAfter.length!==2)fail(role+" missing two WebDriver witnesses");
+  for(let i=0;i<2;i++){
+    if(!validActors(e.baseline[i])||!validActors(e.observed[i])
+      ||ids(e.baseline[i].map(f=>f.netId))!==ids(e.allIds)
+      ||ids(e.observed[i].map(f=>f.netId))!==ids(e.allIds)
+      ||!Number.isSafeInteger(e.serverTicksBefore[i])||!Number.isSafeInteger(e.serverTicksAfter[i])
+      ||e.serverTicksAfter[i]<=e.serverTicksBefore[i])fail(role+" stale or mismatched snapshot");
+    if(!moved(e.baseline[i],e.observed[i],e.actorId)
+      ||!moved(e.baseline[i],e.observed[i],e.remoteMovedId))
+      fail(role+" Chrome/Firefox lacks real local and remote movement");
+  }
+}
+export function verifyPairEvidence(first,second){
+  const byRole=new Map([[first?.role,first],[second?.role,second]]);
+  if(byRole.size!==2||!byRole.has("A")||!byRole.has("B"))fail("require one A and one B evidence");
+  const A=byRole.get("A"),B=byRole.get("B");
+  checkOne(A,"A");checkOne(B,"B");
+  if(A.hostId===B.hostId||A.osHost===B.osHost
+    ||A.peerHostId!==B.hostId||B.peerHostId!==A.hostId
+    ||A.localIpv4.some(ip=>B.localIpv4.includes(ip)))fail("host identities/IPs not distinct");
+  if(A.start!==B.start||A.url!==B.url||A.certificateSha256!==B.certificateSha256
+    ||ids(A.allIds)!==ids(B.allIds))fail("client hosts did not observe same pinned authority and four players");
+  if(A.localIds.some(x=>B.localIds.includes(x))
+    ||ids([...A.localIds,...B.localIds])!==ids(A.allIds))fail("client host identity sets overlap");
+  if(A.remoteMovedId!==B.actorId||B.remoteMovedId!==A.actorId
+    ||ids(A.remoteIds)!==ids(B.localIds)
+    ||ids(B.remoteIds)!==ids(A.localIds))fail("no mutual across-machine mover correlation");
+  return Object.freeze({
+    status:"EVIDENCE_STRUCTURALLY_CONSISTENT_REQUIRES_SERVER_LOGS",
+    server:A.url,roles:["A","B"],attestedHosts:[A.hostId,B.hostId],
+    physicalHostAttestationStillRequired:true,
+    fourAuthenticatedQuicClientReports:true,
+    mutuallyWitnessedBrowserMovement:true,
+    serverCapAttestedOnly:true,
+    notReleaseApproval:true
+  });
+}
+if(process.argv[1]&&pathToFileURL(resolve(process.argv[1])).href===import.meta.url){
+  if(process.argv.length!==4){console.error("Usage: node scripts/alpha_p0_host_pair_verify.mjs <A-evidence.json> <B-evidence.json>");process.exitCode=2}
+  else try{
+    const a=JSON.parse(await readFile(process.argv[2],"utf8"));
+    const b=JSON.parse(await readFile(process.argv[3],"utf8"));
+    console.log("MYASO_P0_PAIR_STRUCTURAL_CHECK "+JSON.stringify(verifyPairEvidence(a,b)));
+  }catch(e){console.error("MYASO_P0_PAIR_STRUCTURAL_FAIL "+e.message);process.exitCode=1}
+}
