@@ -1469,10 +1469,96 @@ async fn four_real_quic_players_observe_kill_and_immutable_greyhaven_respawn() -
     }
     send_held_direction_with_server_ack(&replacement, respawn5.1, 72_005, respawn5.0, (0, 0))?;
     require_quic_input_ack(&replacement, 72_005, 5).await?;
+
+    // Dead-state movement denial is only half of the lifecycle contract.
+    // AFTER the real 100HP/Idle respawn and own correctly addressed ACK,
+    // fighter #5 must regain normal movement authority on exactly the
+    // same session and all three survivors must see that server movement.
+    // x=4230 is 24u east of the exact 4206 immutable respawn anchor in
+    // open Greyhaven; no target, direct World mutation or client prediction.
+    send_held_direction_with_server_ack(&replacement, respawn5.1, 73_005, respawn5.0, (127, 0))?;
+    require_quic_input_ack(&replacement, 73_005, 5).await?;
+    let (move1, move3, move4, move5) = tokio::try_join!(
+        observe_reborn_fighter_live_movement(&sessions[0].0, 1, respawn1.0),
+        observe_reborn_fighter_live_movement(&sessions[1].0, 3, respawn3.0),
+        observe_reborn_fighter_live_movement(&sessions[2].0, 4, respawn4.0),
+        observe_reborn_fighter_live_movement(&replacement, 5, respawn5.0),
+    )?;
     println!(
-        "ALPHA_8C_QUIC_KILL_HISTORY_FENCE_PASS old_seq=0 new_seq=1          late_join_id=5 old_replays=0 new_event_fanout=4 respawn_peers=4 live_postrespawn_acks=4"
+        "ALPHA_8C_QUIC_REBORN_MOVEMENT_ALL_PEERS x1={:.1} x3={:.1} x4={:.1} x5={:.1}",
+        move1.0, move3.0, move4.0, move5.0
+    );
+    send_held_direction_with_server_ack(&replacement, move5.1, 73_006, move5.2, (0, 0))?;
+    require_quic_input_ack(&replacement, 73_006, 5).await?;
+
+    println!(
+        "ALPHA_8C_QUIC_KILL_HISTORY_FENCE_PASS old_seq=0 new_seq=1          late_join_id=5 old_replays=0 new_event_fanout=4 respawn_peers=4 live_postrespawn_acks=4 reborn_movement_peers=4"
     );
     Ok(())
+}
+
+/// Genuine client DATAGRAM observation of the newly respawned fighter's
+/// positive movement. This is complementary to the Dead-state negative
+/// input fence, and must pass for each independently connected peer.
+async fn observe_reborn_fighter_live_movement(
+    connection: &wtransport::Connection,
+    observer: u32,
+    after_respawn_tick: u32,
+) -> Result<(f32, u16, u32)> {
+    use myaso_server::snapshot::{SNAPSHOT_FIELD_REMOVED, SNAPSHOT_FIELD_VITALS};
+    let deadline = Instant::now() + Duration::from_secs(4);
+    let mut greatest_x = SPAWNS[1].0;
+    let mut frames = 0_usize;
+    loop {
+        let remaining = deadline.saturating_duration_since(Instant::now());
+        if remaining.is_zero() {
+            bail!(
+                "observer {observer} never saw revived #5 move east through the real server:                  max_x={greatest_x} frames={frames}"
+            );
+        }
+        let incoming = timeout(remaining, connection.receive_datagram())
+            .await
+            .context("revived fighter authoritative movement timeout")??;
+        let bytes = incoming.as_ref();
+        if bytes.len() < 14 || bytes[0] != 1 || bytes[1] != 2 {
+            continue;
+        }
+        let snapshot = decode_snapshot(bytes)
+            .map_err(|e| anyhow::anyhow!("revived movement snapshot invalid: {e:?}"))?;
+        if snapshot.server_tick <= after_respawn_tick {
+            continue;
+        }
+        frames += 1;
+        for record in snapshot.records {
+            if record.net_id != 5 {
+                continue;
+            }
+            if record.mask & SNAPSHOT_FIELD_REMOVED != 0 {
+                bail!("observer {observer} saw revived #5 improperly removed");
+            }
+            if record.mask & SNAPSHOT_FIELD_VITALS != 0 && record.hp != 100 {
+                bail!(
+                    "observer {observer} saw injured revived #5 HP={}",
+                    record.hp
+                );
+            }
+            if record.mask & SNAPSHOT_FIELD_POSITION != 0 {
+                let x = record.x as f32 / 4.0;
+                let y = record.y as f32 / 4.0;
+                if (y - SPAWNS[1].1).abs() > 5.0 {
+                    bail!("observer {observer} saw incorrect postrespawn y={y}");
+                }
+                greatest_x = greatest_x.max(x);
+                if greatest_x >= SPAWNS[1].0 + 24.0 {
+                    println!(
+                        "ALPHA_8C_QUIC_REBORN_MOVEMENT observer={observer}                          player=5 x={greatest_x:.1} hp=100 server_tick={}",
+                        snapshot.server_tick
+                    );
+                    return Ok((greatest_x, snapshot.sequence, snapshot.server_tick));
+                }
+            }
+        }
+    }
 }
 
 /// A valid input ACK alone isn't proof that gameplay accepted a heavy

@@ -523,6 +523,40 @@ browser controls or remote two-host staging. Only the Rust QUIC test
 and evidence documentation change, never runtime Combat or the
 production transport.
 
+## Core 8C — newly respawned client regains real movement authority
+
+The test-only child of #609 adds the **positive** half of an actual
+networked life-cycle control fence. The parent already verified that
+defeated net ID #5 sends a syntactically correct heavy-attack plus
+east-movement command on its own authenticated real QUIC stream,
+receives a genuine server INPUT_ACK, but cannot attack or move
+for at least 12 additional authoritative ticks while still Dead.
+
+After all **four** distinct current users (#1,#3,#4,#5) independently
+observe #5's server-timed original-anchor **100HP / Idle** respawn at
+(4206,4160), and all four send and receive their own current
+server-tick/snapshot ACKs, the exact same resurrected player #5
+submits a **new, normal eastward gameplay movement input** carrying its
+real respawn snapshot ACK sequence and server tick. The server
+individually acknowledges that new input. All four independently
+connected real QUIC peers must decode **newly replicated authoritative
+#5 positions at x >= 4230**, y approximately 4160, after their
+individually witnessed respawn ticks. Their authentic position deltas
+must still have #5 alive at 100HP; no client-side movement prediction
+or Rust World mutation can satisfy the four peer witnesses. The
+newly revived fighter then sends neutral movement release with the
+**actual last observed movement snapshot sequence and server tick**,
+and receives the server's own input ACK without stale-baseline warning.
+
+This is the paired behavior expected for playability: valid gameplay
+commands are inert **while Dead** and start working again **after
+the server-controlled respawn** on the original authenticated session.
+It does not demonstrate a real browser keypress or UI animation,
+equipped swords, account persistence, full authored obstacle physics,
+or multiple remote hosts. The server executable, authoritative
+movement logic, Combat damage, snapshot protocol, original CI gates
+and default-off/loopback-only collision staging settings are unchanged.
+
 ## Nonclaims and release HOLD
 
 This is **not** full geometry authority. World #509's 23 static AABBs omit
