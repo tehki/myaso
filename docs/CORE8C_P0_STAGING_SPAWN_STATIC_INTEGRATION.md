@@ -54,6 +54,21 @@ explicit static experiment each start a TLS-pinned WebTransport endpoint,
 admit four actual simultaneous clients with correct replicated spawn
 snapshots, reject the fifth and preserve the first session's input ACK.
 Processes are disposable/automatically killed on test teardown.
+
+**New real live-wall negative/positive control:** four concurrent real QUIC
+sessions attach to each disposable server. Player #1 uses only normal input
+packets and the replicated position stream: walk west from public spawn into
+Blacksmith's exterior south aisle, then walk north toward the real authored
+smith footprint. Static ON must stop north displacement at radius-18 collision
+(roughly y=4032); OFF must continue into the footprint (roughly y=3842).
+The test reads byte-decoded authoritative QUIC snapshots from the running
+server, NOT a simulated Rust coordinate or a client-supplied teleport. Every
+acceptance requires independently observed position changes before claiming
+that a blocked fighter has stopped; delta-compressed silent updates are never
+accepted as standalone collision evidence. Both modes must pass. This proves
+current fixed-solid motion in a four-session, single-loopback-host process;
+it does NOT prove Web browser controls or two different computers.
+
 Tests in `server/src/main.rs` prove the profile refuses public/private
 LAN and wildcard listener hosts, missing spawn mode, overcap, synthetic
 background or unknown string; all checks are pre-bind. Rust simulation
