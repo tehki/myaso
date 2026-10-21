@@ -1510,7 +1510,7 @@ async fn four_real_quic_players_observe_kill_and_immutable_greyhaven_respawn() -
     // merely because that same session has now respawned and is alive.
     // Do NOT assert a new input ACK: duplicate ingress is supposed to
     // ignore this exact old sample, and a new ACK would be misleading.
-    replacement.send_datagram(dead_probe)?;
+    replacement.send_datagram(dead_probe.clone())?;
     let (replay1, replay3, replay4, replay5) = tokio::try_join!(
         observe_no_stale_dead_attack_reexecution(&sessions[0].0, 1, move1.2),
         observe_no_stale_dead_attack_reexecution(&sessions[1].0, 3, move3.2),
@@ -1519,6 +1519,47 @@ async fn four_real_quic_players_observe_kill_and_immutable_greyhaven_respawn() -
     )?;
     println!(
         "ALPHA_8C_REPLAYED_DEAD_HEAVY_FENCED peer_ticks={replay1},{replay3},{replay4},{replay5} witnesses=4 victim1_hp=100"
+    );
+
+    // Test a STRONGER same-session replay: place the previously seen
+    // Dead-phase INPUT SAMPLE in a NEW packet envelope. Newer packet
+    // sequence, newer header client_tick, and current server ACK do not
+    // turn the old sample tick into a legitimate new gameplay action.
+    // The packet's sample tick_delta=50 still resolves exactly to the
+    // original 70_850 Dead-phase tick, with the same west-heavy+east-move
+    // buttons. Authentic packet/ingress dedup must reject it after #5
+    // is alive again; old bytes alone are not enough coverage.
+    let mut reenveloped = dead_probe;
+    let new_packet_tick = 70_900_u32;
+    let original_dead_tick = 70_850_u32;
+    let delta = new_packet_tick - original_dead_tick;
+    if delta > u8::MAX as u32 {
+        bail!("cannot re-envelope old input outside 8-bit tick delta");
+    }
+    reenveloped[4..6].copy_from_slice(&(73_900_u32 as u16).to_le_bytes());
+    reenveloped[6..8].copy_from_slice(&move5.1.to_le_bytes());
+    reenveloped[8..12].copy_from_slice(&new_packet_tick.to_le_bytes());
+    reenveloped[12..16].copy_from_slice(&replay5.to_le_bytes());
+    reenveloped[16] = delta as u8;
+    let parsed = myaso_server::decode_input_packet(&reenveloped)
+        .map_err(|e| anyhow::anyhow!("reenveloped old attack is not a valid packet: {e:?}"))?;
+    let old_heavy = parsed.samples()[0];
+    if old_heavy.tick != original_dead_tick
+        || !old_heavy.heavy_attack
+        || old_heavy.move_x < 0.9
+        || (old_heavy.facing_radians - std::f32::consts::PI).abs() > 0.01
+    {
+        bail!("reenveloped original Dead-phase sample changed attack semantics");
+    }
+    replacement.send_datagram(reenveloped)?;
+    let (wrapped1, wrapped3, wrapped4, wrapped5) = tokio::try_join!(
+        observe_no_stale_dead_attack_reexecution(&sessions[0].0, 1, replay1),
+        observe_no_stale_dead_attack_reexecution(&sessions[1].0, 3, replay3),
+        observe_no_stale_dead_attack_reexecution(&sessions[2].0, 4, replay4),
+        observe_no_stale_dead_attack_reexecution(&replacement, 5, replay5),
+    )?;
+    println!(
+        "ALPHA_8C_REENVELOPED_DEAD_SAMPLE_FENCED original_sample_tick=70850          new_packet_tick=70900 witnesses=4 victim1_hp=100 peer_ticks={wrapped1},{wrapped3},{wrapped4},{wrapped5}"
     );
 
     // The original Dead-state abuse test tried a heavy attack from #5,
@@ -2131,21 +2172,53 @@ async fn observe_quic_target_death_and_respawn(
     let mut death_ack_confirmed = false;
     let mut respawn_tick = None;
     let own_dead_ack_tick = 65_000 + observer_id;
+    let mut dead_baseline = None::<(u16, u32)>;
+    let mut attempted_ack_ticks = Vec::<u32>::new();
+    let mut last_ack_sent_at = Instant::now();
+    let mut last_server_tick = 0_u32;
     loop {
+        // QUIC DATAGRAM is genuinely lossy. Retry the SAME real Dead
+        // snapshot baseline with a NEW accepted neutral input tick when
+        // the previous ACK/respawn has not been fully witnessed. Read
+        // and validate every packet in this one receiver: never create a
+        // competing ACK waiter that swallows the rare respawn delta.
+        if let Some((dead_sequence, dead_server_tick)) = dead_baseline {
+            if respawn_tick.is_none() && last_ack_sent_at.elapsed() >= Duration::from_millis(250) {
+                let retry_tick = own_dead_ack_tick + attempted_ack_ticks.len() as u32 * 16;
+                send_held_direction_with_server_ack(
+                    connection,
+                    dead_sequence,
+                    retry_tick,
+                    dead_server_tick,
+                    (0, 0),
+                )?;
+                attempted_ack_ticks.push(retry_tick);
+                last_ack_sent_at = Instant::now();
+            }
+        }
         let remaining = deadline.saturating_duration_since(Instant::now());
         if remaining.is_zero() {
             bail!(
-                "QUIC observer {observer_id} never saw genuine Dead->Respawn:                  death_tick={death_tick:?} last_hp={victim_hp} action={victim_action}                  position={victim_position:?}"
+                "QUIC observer {observer_id} never saw genuine Dead->Respawn: death_tick={death_tick:?} last_hp={victim_hp} action={victim_action} position={victim_position:?} ack_confirmed={death_ack_confirmed} attempts={} respawn_tick={respawn_tick:?} last_server_tick={last_server_tick}", attempted_ack_ticks.len()
             );
         }
-        let message = timeout(remaining, connection.receive_datagram())
-            .await
-            .context("live four-peer death/respawn timeout")??;
+        let message = match timeout(
+            remaining.min(Duration::from_millis(120)),
+            connection.receive_datagram(),
+        )
+        .await
+        {
+            Ok(Ok(packet)) => packet,
+            Ok(Err(error)) => {
+                bail!("QUIC observer {observer_id} death/respawn transport error: {error:#}")
+            }
+            Err(_) => continue,
+        };
         let bytes = message.as_ref();
         if bytes.len() == 16
             && bytes[0] == 1
             && bytes[1] == 3
-            && u32::from_le_bytes(bytes[4..8].try_into().unwrap()) == own_dead_ack_tick
+            && attempted_ack_ticks.contains(&u32::from_le_bytes(bytes[4..8].try_into().unwrap()))
             && u32::from_le_bytes(bytes[12..16].try_into().unwrap()) == observer_id
         {
             death_ack_confirmed = true;
@@ -2164,6 +2237,7 @@ async fn observe_quic_target_death_and_respawn(
         }
         let snapshot = decode_snapshot(bytes)
             .map_err(|e| anyhow::anyhow!("death/respawn snapshot decode failed: {e:?}"))?;
+        last_server_tick = snapshot.server_tick;
         for record in snapshot.records.iter().filter(|r| r.net_id == 2) {
             if record.mask & SNAPSHOT_FIELD_VITALS != 0 {
                 victim_hp = record.hp;
@@ -2182,6 +2256,7 @@ async fn observe_quic_target_death_and_respawn(
             // leave the server on the pre-death baseline, causing a false
             // missing-respawn delta because Idle/100HP equals that baseline.
             // This preserves the original all-four real respawn assertion.
+            dead_baseline = Some((snapshot.sequence, snapshot.server_tick));
             send_held_direction_with_server_ack(
                 connection,
                 snapshot.sequence,
@@ -2189,6 +2264,8 @@ async fn observe_quic_target_death_and_respawn(
                 snapshot.server_tick,
                 (0, 0),
             )?;
+            attempted_ack_ticks.push(own_dead_ack_tick);
+            last_ack_sent_at = Instant::now();
             // Do NOT use a separate ACK waiter on this same datagram
             // stream. It may consume (and silently discard) the brief
             // 100HP/Idle respawn snapshot while waiting for the ACK.

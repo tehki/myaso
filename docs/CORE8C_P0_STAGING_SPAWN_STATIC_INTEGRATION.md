@@ -696,6 +696,61 @@ persistent account recovery, physical swords or browser input controls.
 No runtime Combat or transport code, packet format, CI rules, staging
 listener, physics or authentication configuration is changed.
 
+## Core 8C — stale Dead-phase input cannot hide in a newer QUIC packet envelope
+
+The test-only child of the original byte-identical stale-input replay
+regression adds a **distinct sample-level freshness boundary**, after
+the same player's honest server-controlled 100HP/Idle respawn. The
+original #5 Dead-phase ordinary input asked for an in-range,
+WEST-facing heavy fist and EAST movement (sample tick **70850**),
+was individually ACKed by the real server, and was correctly denied
+while Dead. All four actual certificate-pinned QUIC peers already
+prove that resending those identical datagram bytes after respawn
+causes no attack or damage to living #1 over 28 live server ticks.
+
+A stronger *new packet envelope* is then constructed on the SAME
+authenticated #5 connection. The packet's input sequence is **new**
+(73900 modulo u16) and its header client tick advances to **70900**,
+with the latest observed real server ACK tick/sequence. Its normal
+single input sample has tick_delta **50**, which must still decode to
+the identical original **70850 sample tick**, preserving the same
+west-facing heavy button and eastward movement. The integration test
+explicitly decodes its own packet through the **actual Rust wire
+decoder** and refuses accidental changes to that sample's age,
+facing, move intent or attack button.
+
+Once this newly wrapped but previously accepted Dead-phase sample is
+sent, all four currently connected real QUIC clients must witness
+**28 additional authoritative server ticks** without a fresh heavy
+action for #5, without HP loss to in-range #1 (remains 100), and with
+#5 still alive at 100. This tests the existing ingress window's
+**sample-tick deduplication** rather than merely its packet-sequence
+field. The test does not falsely require a gameplay INPUT_ACK for
+the already-seen duplicate sample. The genuine, later postrespawn
+heavy INPUT with a **new sample tick** must still execute on the same
+session and all four peers must independently observe unchanged
+46HP damage to #1 (100→54HP).
+
+The earlier original death→respawn acceptance also now tolerates the
+genuinely unreliable QUIC datagram transport: its **single snapshot
+receiver** maintains the actual observed Dead snapshot sequence and
+server tick and, until the authoritative respawn is observed, may
+retransmit neutral baseline acknowledgments at bounded 250ms
+intervals using new gameplay input ticks. It requires a server
+INPUT_ACK matching **one of those actually issued acknowledgments**,
+plus the server's actual 100HP/Idle and original immutable spawn,
+without extending the original overall six-second deadline or
+running a competing ACK reader that can swallow the respawn delta.
+A missed ACK or missing respawn still fails the original assertion.
+
+This is a scoped same-session original-sample-tick replay check,
+**not** proof against a malicious actor inventing an entirely new
+sample tick, account/session hijack, cryptographic anti-replay,
+network-loss resilience across arbitrary WAN paths, or a completed
+two-machine browser flight. No production ingress, Combat,
+identity, reliable writer, wire format, collision, physics,
+listen-address or CI release gate changes.
+
 ## Nonclaims and release HOLD
 
 This is **not** full geometry authority. World #509's 23 static AABBs omit
