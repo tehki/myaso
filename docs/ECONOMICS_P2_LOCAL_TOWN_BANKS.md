@@ -32,6 +32,10 @@ The next contract is now implemented **without creating any new robbery permissi
 
 B1 adds **24 tests** to the earlier 29, for **53/53 local offline tests passing** on authorized Serj. Future real robbery needs one Core-authoritative transaction that simultaneously transfers actual world-owned vault items, records the source event exactly once, adjusts bank reserves, leaves depositor legal liabilities intact and emits an auditable receipt/outbox. Do not bypass this with a caller-supplied `VaultBreachFixture` or a parsed event.
 
+## B2 offline robbery race hardening (21 October 2026)
+
+The [B2 contention and bounded-ledger acceptance](./ECONOMICS_B2_BANK_ROBBERY_RACE_HARDENING.md) adds **nine tests** for two racing thieves, one World-event consumed once, same-operation conflicting actors, concurrent deposit/raid gold conservation, strict boolean guard fixtures, finite zone epochs and signed-63 accounting caps, and rejected overweight raids leaving state untouched. **62/62 B0+B1+B2 tests passed on the isolated machine.** These are single-process Python mutex tests—not real multiple workers, real player sessions, or physical robbery—and they **do not authorize** even a valid-looking client event.
+
 ## Security / production blockers — MUST NOT ACTIVATE
 
 This test code is **not a production banking system or account authenticator**. `travel_fixture()` teleports a local test actor; `VaultBreachFixture` is publicly constructible. A malicious caller can fake all its guards/locks/world receipt fields. There is **no authenticated player identity, actual physical gold inventory, Sentinel AI, persistent deposit store, bank NPC, bank building, network route, currency wallet, money contract or crash consistency**. Nothing here may be imported by `server/src` or `web/`, deployed, given economic value, or treated as an authorization decision.
