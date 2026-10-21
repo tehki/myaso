@@ -524,13 +524,7 @@ mod tests {
             ..destination
         };
         assert_eq!(
-            verify_pickup_geometry(
-                closed_origin,
-                closed_destination,
-                &fixture,
-                CURRENT,
-                96.0,
-            ),
+            verify_pickup_geometry(closed_origin, closed_destination, &fixture, CURRENT, 96.0,),
             Err(PickupGeometryReject::Occluded),
             "the solid wall beside the gate must block pickup line of sight"
         );
