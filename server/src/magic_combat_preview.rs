@@ -27,6 +27,7 @@ pub enum EmberPreviewError {
     NotPending,
     UncommittedIntent,
     CasterDead,
+    CasterInterrupted,
     WrongZone,
     InvalidCaster,
     StaleWorldTick,
@@ -84,8 +85,19 @@ pub fn preview_ember_target(
     if caster.action == Action::Dead || caster.hp <= 0.0 || ctx.loot.is_dead(caster_id) {
         return Err(EmberPreviewError::CasterDead);
     }
-    if !caster.x.is_finite() || !caster.y.is_finite() || !caster.facing.is_finite() {
+    if !caster.x.is_finite()
+        || !caster.y.is_finite()
+        || !caster.facing.is_finite()
+        || !caster.hp.is_finite()
+    {
         return Err(EmberPreviewError::InvalidCaster);
+    }
+    // A Combat-authoritative stun/knockdown must deny any target handoff even
+    // while its paid Ember outbox record is still Pending. The separate
+    // interruption checkpoint later durably closes that intent; this preview
+    // NEVER invents an interruption or applies damage.
+    if matches!(caster.action, Action::Stunned | Action::Knockdown) {
+        return Err(EmberPreviewError::CasterInterrupted);
     }
     let intent = ctx
         .magic
@@ -114,6 +126,7 @@ pub fn preview_ember_target(
         if target.net_id == caster_id
             || target.action == Action::Dead
             || target.hp <= 0.0
+            || !target.hp.is_finite()
             || !target.x.is_finite()
             || !target.y.is_finite()
             || ctx.zones.zone_of(target.net_id) != Some(intent.zone)
@@ -301,6 +314,71 @@ mod tests {
                 world: &self.world,
             })
         }
+    }
+
+    #[test]
+    fn genuine_combat_kick_denies_ember_target_handoff_while_pending() {
+        use crate::simulation::InputIntent;
+
+        let mut fixture = Fixture::new();
+        fixture.world.step();
+        let initial = fixture.preview(lease(1, 1), 10).unwrap().unwrap();
+        assert_eq!(initial.target_net_id, 3);
+        assert!(fixture.world.remove_player(3));
+        assert!(fixture
+            .world
+            .add_player_at(3, 242.0, 200.0, std::f32::consts::PI));
+        assert!(fixture.world.set_input(
+            3,
+            InputIntent {
+                kick: true,
+                facing_radians: std::f32::consts::PI,
+                ..InputIntent::default()
+            }
+        ));
+        for _ in 0..7 {
+            fixture.world.step_by(35.0);
+            if fixture.world.fighter(1).unwrap().action == Action::Knockdown {
+                break;
+            }
+        }
+        assert_eq!(fixture.world.fighter(1).unwrap().action, Action::Knockdown);
+        assert_eq!(
+            preview_ember_target_for_completed_tick(
+                EmberCombatContext {
+                    lease: lease(1, 1),
+                    sequence: 10,
+                    identity: &fixture.identity,
+                    loot: &fixture.loot,
+                    magic: &fixture.magic,
+                    zones: &fixture.zones,
+                    world: &fixture.world,
+                },
+                fixture.world.tick,
+            ),
+            Err(EmberPreviewError::CasterInterrupted)
+        );
+        assert_eq!(
+            revalidate_ember_target_for_completed_tick(
+                EmberCombatContext {
+                    lease: lease(1, 1),
+                    sequence: 10,
+                    identity: &fixture.identity,
+                    loot: &fixture.loot,
+                    magic: &fixture.magic,
+                    zones: &fixture.zones,
+                    world: &fixture.world,
+                },
+                fixture.world.tick,
+                initial,
+            ),
+            Err(EmberPreviewError::CasterInterrupted)
+        );
+        assert_eq!(fixture.magic.pending_ember_intents().count(), 1);
+        assert_eq!(
+            fixture.loot.committed_operation_sequence(fixture.character),
+            Some(10)
+        );
     }
 
     #[test]
