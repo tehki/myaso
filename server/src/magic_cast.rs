@@ -59,7 +59,11 @@ pub fn commit_ember_cost(
         return Err(CastError::WrongFighter);
     }
     let zone = zones.zone_of(session).ok_or(CastError::UnknownZone)?;
-    if fighter.action != Action::Idle || fighter.hp <= 0.0 || loot.is_dead(session) {
+    if fighter.action != Action::Idle
+        || !fighter.hp.is_finite()
+        || fighter.hp <= 0.0
+        || loot.is_dead(session)
+    {
         return Err(CastError::CombatLocked);
     }
     let (width, height) = zone.bounds();
@@ -157,7 +161,10 @@ mod tests {
     use crate::character_identity::SessionLease;
     use crate::loot::{EquipmentSlot, ItemKind};
     use crate::magic::{Lesson, LessonAward, LessonSource, Rune};
-    use crate::magic_checkpoint::load_joint;
+    use crate::magic_checkpoint::{
+        inspect_joint_ember_recovery_holds, load_joint, load_joint_without_pending_ember,
+        EmberRecoveryHold,
+    };
     use crate::simulation::World;
     use std::fs;
     use std::num::NonZeroU64;
@@ -263,6 +270,19 @@ mod tests {
         assert_eq!(intent.origin_y(), 200.0);
         assert_eq!(intent.sequence, 45);
         assert_eq!(recovered_magic.pending_ember_intents().count(), 1);
+        assert_eq!(
+            inspect_joint_ember_recovery_holds(&checkpoint).unwrap(),
+            vec![EmberRecoveryHold {
+                character,
+                sequence: 45,
+                zone: ZoneId::Moonvale,
+            }]
+        );
+        assert!(matches!(
+            load_joint_without_pending_ember(&checkpoint),
+            Err(JointCheckpointError::UnreconciledEmberEffects)
+        ));
+        assert_eq!(loot.inventory(1).unwrap().backpack()[0].amount, 2);
         let _ = fs::remove_file(&checkpoint);
     }
 
