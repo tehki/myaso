@@ -4,6 +4,7 @@ use std::sync::{
 };
 
 pub mod alpha_greyhaven_geometry;
+pub mod chat;
 pub mod kill_event;
 pub mod reliable;
 pub mod simulation;

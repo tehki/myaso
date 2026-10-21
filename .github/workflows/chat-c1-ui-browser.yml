@@ -1,0 +1,51 @@
+name: Chat C1 real browser UI acceptance
+
+on:
+  pull_request:
+    paths:
+      - "scripts/chat_c1_three_browser_acceptance.mjs"
+      - ".github/workflows/chat-c1-ui-browser.yml"
+      - "src/browser/local-chat.mjs"
+      - "src/browser/chat-c1-activation.mjs"
+      - "web/online-game.mjs"
+      - "src/network/local-chat-ui-bridge.mjs"
+      - "server/src/chat.rs"
+      - "server/src/main.rs"
+      - "server/tests/local_chat_multiplayer.rs"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  real-chat-browser:
+    name: Three authentic browser chat sessions
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout exact PR head
+        uses: actions/checkout@v4
+      - name: Confirm required local browser and toolchain
+        run: |
+          rustc --version
+          cargo --version
+          node --version
+          python3 --version
+          chromedriver --version
+          (google-chrome --version || chromium --version)
+      - name: Build exact-head Rust WebTransport server
+        run: cargo build --locked --manifest-path server/Cargo.toml --bin myaso-server
+      - name: Validate genuine browser acceptance script
+        run: node --check scripts/chat_c1_three_browser_acceptance.mjs
+      - name: Three real browser sessions, Core ACKs and proximity
+        env:
+          C1_BROWSER_MATRIX: chrome,chrome,chrome
+        run: node scripts/chat_c1_three_browser_acceptance.mjs
+      - name: Three mixed Chrome Firefox Chrome sessions
+        env:
+          C1_BROWSER_MATRIX: chrome,firefox,chrome
+        run: node scripts/chat_c1_three_browser_acceptance.mjs
+      - name: Four genuine players, mixed Chrome Firefox proximity chain
+        env:
+          C1_BROWSER_MATRIX: chrome,firefox,chrome,chrome
+        run: node scripts/chat_c1_three_browser_acceptance.mjs
