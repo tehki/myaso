@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import {MAP_IDS} from "../src/world/authored-maps.mjs";
-import {WORLD_ALPHA_SWORD_RACK_SOCKETS} from "../src/world/alpha-armory.mjs";
+import {MAP_IDS,getAuthoredMap} from "../src/world/authored-maps.mjs";
+import {WORLD_ALPHA_SPAWN_COORDINATES,WORLD_ALPHA_SWORD_RACK_SOCKETS} from "../src/world/alpha-armory.mjs";
 import {
  WORLD_ALPHA_GREYHAVEN_STATIC_SOLIDS,
  WORLD_ALPHA_PICKUP_GEOMETRY_SCOPE,
@@ -94,6 +94,32 @@ test("P0 exact swept collision rejects thin between-sample solids and tangent to
   "inflated AABB tangency is blocked");
  assert.equal(segmentIntersectsInflatedSolid({x:0,y:18.26},{x:10,y:18.26},thin,18),false);
  assert.equal(segmentIntersectsInflatedSolid({x:0,y:25},{x:10,y:25},thin,18),false);
+});
+
+test("P0 all four server-designated city spawn fixtures can walk straight to every courtyard station",()=>{
+ // World-authored Core 8C nominal arrival points, never a client-selected
+ // spawn or a promise about real-time players, movement or dynamic blockers.
+ const city=getAuthoredMap(MAP_IDS.overworld)?.city;
+ assert.equal(city?.id,"greyhaven");
+ assert.equal(WORLD_ALPHA_SPAWN_COORDINATES.length,4);
+ assert.equal(area.stations.length,4);
+ const seen=new Set();
+ for(const [i,spawn] of WORLD_ALPHA_SPAWN_COORDINATES.entries()){
+  const key=spawn.x+","+spawn.y;
+  assert.equal(seen.has(key),false,"repeated authored staging spawn");
+  seen.add(key);
+  assert.ok(spawn.x-radius>city.x&&spawn.x+radius<city.x+city.w);
+  assert.ok(spawn.y-radius>city.y&&spawn.y+radius<city.y+city.h);
+  assert.ok(staticallyClear(spawn),"spawn "+i+" overlaps an authored solid");
+  for(const [j,station] of area.stations.entries()){
+   assert.ok(sweptStaticClear(spawn,station),
+    "unarmed fighter from spawn "+i+" cannot reach courtyard station "+j);
+   assert.ok(sweptStaticClear(station,spawn),
+    "courtyard fighter cannot return to arrival "+i+" from station "+j);
+  }
+ }
+ // Static direct routes stay in one convex authored city rectangle. No
+ // portal, server-side pathfinding, dynamic occupancy or respawn is exercised.
 });
 
 test("P0 each of four sword approaches has a fixed-solid-clear route to all four melee stations",()=>{
