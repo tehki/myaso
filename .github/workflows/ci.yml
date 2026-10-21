@@ -202,6 +202,15 @@ jobs:
           cargo check --locked --manifest-path server/Cargo.toml --example magic_fx_crowd_loopback
           P13_SHARED_DISPATCH=1 P15_CORE_GUARD=1 node scripts/physics_fx_crowd_browser_flight.mjs
 
+      # P18 runs a SEPARATE 127.0.0.1 real QUIC fixture: server-authorized
+      # zone transfer on A, actual browser WebTransport closure, then new B
+      # handshake reusing the test-only connection ID with a fresh generation.
+      - name: Validate P18 real browser reconnect and zone-transfer FX fencing
+        run: |
+          node --check scripts/physics_fx_reconnect_browser_flight.mjs
+          cargo check --locked --manifest-path server/Cargo.toml --example magic_fx_reconnect_loopback
+          node scripts/physics_fx_reconnect_browser_flight.mjs
+
       # P11 runs REAL /game authoritative ACK/snapshot/browser-frame
       # acceptance while a separate 16-connection QUIC FX fixture loads
       # the same CI host. Does not activate magic on gameplay sockets.
