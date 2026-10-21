@@ -108,3 +108,31 @@ server ticks after real native W movement with nonempty ACK telemetry.
 Without that fallback it incorrectly requires 98 samples from 96 slots.
 This fallback demonstrates authoritative gameplay progress, not proof of
 a particular individual input ACK; full Combat/Core gates remain required.
+
+## UI reconnect message identity regression — session-scoped dedup
+
+The Core message ID is server-generated but not globally persistent across
+ephemeral server restarts. The UI maintains bounded 60-row history while
+binding a distinct Core adapter generation on each authenticated reconnect.
+Deduplication keys now include that adapter session generation, so a new
+server reusing message ID 1 never silently suppresses the first legitimate
+message from the new session. Previously received rows remain visible and
+pending pre-reconnect sends retain their existing "Not confirmed" state;
+old subscription callbacks and late ACKs remain invalidated before a new
+adapter is trusted. Evicting a prior-session row only deletes its original
+generation's dedup key, never the current session's matching server ID.
+This is presentation-only: the UI neither mints a server message ID nor
+changes authoritative sender identity, transport, ACL, payload, or storage.
+
+### Idempotent same-adapter binding
+
+Rebinding the same authenticated adapter object is not a reconnect.
+Previously every same-adapter bind advanced the history epoch,
+accepted a duplicate server message ID and canceled an in-flight send even
+though the server and session had not changed. UI now only refreshes
+availability for that same adapter: existing subscriber stays active once,
+duplicate IDs stay suppressed and matching server ACK may complete. Binding
+a genuinely new transport after disconnection still advances the
+deduplication epoch and quarantines stale old callbacks/ACKs. The new
+adapter-lifecycle regression first failed under the former implementation
+and passes after this change. No production network or Core changes.

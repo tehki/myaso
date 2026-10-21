@@ -20,19 +20,27 @@ export function createLocalChatHistory(limit = CHAT_UI_LIMITS.history) {
   if (!Number.isInteger(limit) || limit < 1 || limit > 200) throw new RangeError("Invalid chat history limit");
   const entries = [];
   const ids = new Set();
+  // Core server-issued message IDs can restart after a new WebTransport
+  // session (for example when an ephemeral alpha server restarts). Keep
+  // dedup scoped to the authenticated adapter generation, not lifetime UI.
+  let session = 0;
   return {
+    beginSession() { session += 1; },
     push(event) {
       if (!event || !["local", "system"].includes(event.channel)
         || typeof event.serverMessageId !== "string" || !event.serverMessageId || event.serverMessageId.length > 128
         || typeof event.text !== "string" || event.text.length > 1024
         || (event.channel === "local" && (typeof event.sender?.displayName !== "string" || !event.sender.displayName))) return false;
-      if (ids.has(event.serverMessageId)) return false;
-      ids.add(event.serverMessageId);
-      entries.push(event);
-      while (entries.length > limit) ids.delete(entries.shift().serverMessageId);
+      const key = session + ":" + event.serverMessageId;
+      if (ids.has(key)) return false;
+      ids.add(key);
+      entries.push({ event, key });
+      // Evict the *original* session key so an old row never frees an ID
+      // owned by the current session after the server counter restarts.
+      while (entries.length > limit) ids.delete(entries.shift().key);
       return true;
     },
-    values() { return entries.slice(); },
+    values() { return entries.map(entry => entry.event); },
     size() { return entries.length; },
   };
 }
@@ -227,6 +235,13 @@ export function installLocalChat(doc, { online = false, adapter = null, idFactor
   }
   function bindAdapter(next) {
     if (disposed) return;
+    // Binding the same live authenticated adapter is a refresh, not a new
+    // server identity/session. Never cancel its pending ACK, reset the dedup
+    // epoch, or subscribe to it twice.
+    if (transport && next === transport) {
+      availability();
+      return;
+    }
     const interrupted = pending;
     generation += 1;
     cancelInflight?.();
@@ -235,6 +250,9 @@ export function installLocalChat(doc, { online = false, adapter = null, idFactor
     unsubscribe?.();
     unsubscribe = null;
     transport = online && next && typeof next.send === "function" && typeof next.subscribe === "function" ? next : null;
+    // Rebind means a new authenticated session. Continue showing bounded
+    // prior history without letting old server IDs shadow new messages.
+    if (transport) store.beginSession();
     if (transport) {
       const subscriptionGeneration = generation;
       // A callback queued by a replaced connection is no longer authoritative.
