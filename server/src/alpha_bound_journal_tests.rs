@@ -351,3 +351,244 @@ fn bound_transaction_cannot_alias_different_payload_or_same_item_double_winner()
     assert_eq!(journal.item_count(), 1);
     assert_eq!(journal.location(item()), Some(hand()));
 }
+
+#[test]
+fn observer_source_is_a_bounded_sequence_ordered_view_of_only_committed_v2() {
+    use crate::item_journal::MAX_BOUND_PICKUP_OBSERVER_PAGE;
+
+    let root = Root::new();
+    let mut journal = root.open();
+    assert_eq!(
+        journal
+            .proposed_bound_pickup_observer_page(0, 1)
+            .unwrap()
+            .journal_head,
+        0
+    );
+    create(&mut journal); // V1 seq1 does not generate a pickup event.
+    assert!(journal
+        .proposed_bound_pickup_observer_page(0, 5)
+        .unwrap()
+        .events
+        .is_empty());
+    let first = journal
+        .apply_proposed_bound_rack_pickup(id(2), pickup(), metadata(1))
+        .unwrap();
+    let original_event = journal
+        .proposed_bound_pickup_observer_page(0, 1)
+        .unwrap()
+        .events[0];
+    assert_eq!(original_event.journal_sequence, first.sequence);
+    assert_eq!(original_event.transaction, id(2));
+    assert_eq!(original_event.operation, pickup());
+    assert_eq!(original_event.envelope, metadata(1));
+    assert!(matches!(
+        journal.proposed_bound_pickup_observer_page(0, 0),
+        Err(ItemJournalError::InvalidRecord(_))
+    ));
+    assert!(matches!(
+        journal.proposed_bound_pickup_observer_page(0, MAX_BOUND_PICKUP_OBSERVER_PAGE + 1),
+        Err(ItemJournalError::InvalidRecord(_))
+    ));
+
+    journal
+        .apply(
+            id(3),
+            &[OwnershipOp::Move {
+                item: item(),
+                from: hand(),
+                to: rack(),
+            }],
+        )
+        .unwrap(); // V1 seq3, no V2 event.
+    let newer = journal
+        .apply_proposed_bound_rack_pickup(id(4), pickup(), metadata(3))
+        .unwrap(); // V2 seq4.
+    assert_eq!(newer.sequence, 4);
+    assert_eq!(
+        journal
+            .apply_proposed_bound_rack_pickup(id(4), pickup(), metadata(3))
+            .unwrap(),
+        newer,
+        "identical retry cannot duplicate event or item commit"
+    );
+    let full = journal.proposed_bound_pickup_observer_page(0, 64).unwrap();
+    assert_eq!(full.journal_head, 4);
+    assert_eq!(full.events.len(), 2);
+    assert_eq!(full.events[0], original_event);
+    assert_eq!(full.events[1].journal_sequence, 4);
+    assert_eq!(full.events[1].transaction, id(4));
+    assert_eq!(full.events[1].envelope, metadata(3));
+    assert_eq!(
+        journal
+            .proposed_bound_pickup_observer_page(0, 1)
+            .unwrap()
+            .events,
+        vec![original_event]
+    );
+    assert_eq!(
+        journal
+            .proposed_bound_pickup_observer_page(2, 1)
+            .unwrap()
+            .events,
+        vec![full.events[1]]
+    );
+    assert!(journal
+        .proposed_bound_pickup_observer_page(4, 2)
+        .unwrap()
+        .events
+        .is_empty());
+    assert!(journal
+        .proposed_bound_pickup_observer_page(u64::MAX, 1)
+        .unwrap()
+        .events
+        .is_empty());
+
+    // A V1 drop increments journal head but has no matching V2 pickup event.
+    journal
+        .apply(
+            id(5),
+            &[OwnershipOp::Move {
+                item: item(),
+                from: hand(),
+                to: rack(),
+            }],
+        )
+        .unwrap();
+    assert_eq!(journal.location(item()), Some(rack()));
+    let historical = journal.proposed_bound_pickup_observer_page(0, 64).unwrap();
+    assert_eq!(historical.journal_head, 5);
+    assert_eq!(historical.events, full.events);
+    drop(journal);
+
+    let journal = root.open(); // Same immutable source reconstructed from disk.
+    assert_eq!(
+        journal.proposed_bound_pickup_observer_page(0, 64).unwrap(),
+        historical
+    );
+    assert_eq!(
+        journal
+            .proposed_bound_pickup_observer_page(2, 1)
+            .unwrap()
+            .events,
+        vec![full.events[1]]
+    );
+    assert_eq!(journal.location(item()), Some(rack()));
+    assert_ne!(
+        journal.location(item()),
+        Some(hand()),
+        "historical event is not a currently equipped sword"
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn sigkill_after_bound_commit_before_delivery_recovers_exact_event_source() {
+    use std::{
+        process::Command,
+        thread,
+        time::{Duration, Instant},
+    };
+
+    let root = Root::new();
+    let ready = root.0.with_extension("v2-committed-no-delivery");
+    {
+        let mut seed_writer = root.open();
+        create(&mut seed_writer);
+    }
+
+    let mut child = Command::new(std::env::current_exe().expect("test binary"))
+        .arg("--ignored")
+        .arg("--exact")
+        .arg("alpha_bound_journal_tests::subprocess_bound_commit_before_delivery")
+        .arg("--nocapture")
+        .env("MYASO_C3AB_CRASH_ROOT", &root.0)
+        .env("MYASO_C3AB_CRASH_READY", &ready)
+        .spawn()
+        .expect("spawn separate physical pickup journal writer");
+    let deadline = Instant::now() + Duration::from_secs(10);
+    let mut committed = false;
+    while Instant::now() < deadline {
+        if ready.exists() {
+            committed = true;
+            break;
+        }
+        if child.try_wait().expect("poll child").is_some() {
+            break;
+        }
+        thread::sleep(Duration::from_millis(10));
+    }
+    let locked = committed
+        && matches!(
+            DurableItemJournal::open(&root.0),
+            Err(ItemJournalError::WriterBusy)
+        );
+    let _ = child.kill();
+    let _ = child.wait();
+    assert!(
+        committed,
+        "child must publish durable bound V2 before crash"
+    );
+    assert!(locked, "the child held the EXCLUSIVE local writer lock");
+
+    let mut recovered = root.open();
+    let proof = recovered
+        .verified_bound_rack_pickup(id(2), pickup(), metadata(1))
+        .unwrap()
+        .expect("same transaction and original envelope survive SIGKILL");
+    assert_eq!(proof.sequence, 2);
+    let page = recovered.proposed_bound_pickup_observer_page(0, 2).unwrap();
+    assert_eq!(page.journal_head, 2);
+    assert_eq!(page.events.len(), 1);
+    assert_eq!(page.events[0].journal_sequence, proof.sequence);
+    assert_eq!(page.events[0].transaction, id(2));
+    assert_eq!(page.events[0].envelope, metadata(1));
+    assert_eq!(page.events[0].operation, pickup());
+    assert_eq!(
+        recovered
+            .apply_proposed_bound_rack_pickup(id(2), pickup(), metadata(1))
+            .unwrap(),
+        proof
+    );
+    assert_eq!(
+        recovered.proposed_bound_pickup_observer_page(0, 2).unwrap(),
+        page,
+        "lost-ACK retry creates no second event or item owner"
+    );
+    assert!(matches!(
+        recovered.apply_proposed_bound_rack_pickup(
+            id(2),
+            pickup(),
+            ProposedRackPickupEnvelope {
+                session_generation: 99,
+                ..metadata(1)
+            }
+        ),
+        Err(ItemJournalError::BoundPickupMismatch)
+    ));
+    assert_eq!(recovered.item_count(), 1);
+    assert_eq!(recovered.location(item()), Some(hand()));
+    drop(recovered);
+    let _ = fs::remove_file(ready);
+}
+
+#[cfg(unix)]
+#[test]
+#[ignore = "subprocess helper launched by the SIGKILL bound outbox test"]
+fn subprocess_bound_commit_before_delivery() {
+    let (Some(root), Some(ready)) = (
+        std::env::var_os("MYASO_C3AB_CRASH_ROOT"),
+        std::env::var_os("MYASO_C3AB_CRASH_READY"),
+    ) else {
+        return;
+    };
+    let mut writer = DurableItemJournal::open(PathBuf::from(root)).expect("exclusive child writer");
+    let proof = writer
+        .apply_proposed_bound_rack_pickup(id(2), pickup(), metadata(1))
+        .expect("atomic durable V2 publish BEFORE observer delivery");
+    assert_eq!(proof.sequence, 2);
+    fs::write(ready, b"MYTX V2 durable; observer NOT delivered").unwrap();
+    loop {
+        std::thread::park();
+    }
+}
