@@ -212,6 +212,36 @@ mod tests {
     }
 
     #[test]
+    fn blacksmith_sword_centers_have_static_clear_sightline_but_no_through_smith_pickup() {
+        // Cross-owner M2 geometry *preflight*, never a positive pickup
+        // authorization. The physical sword is 50 units north of its
+        // walkable player approach, and the smith footprint ends at y=4012.
+        // Four independent visual anchors, no client-supplied item ID.
+        //
+        // Radius 0.5 checks the known static obstacles only; the actual
+        // gameplay interaction must still authenticate the actor/item,
+        // enforce agreed range, current zone/epoch, complete LOS/dynamic
+        // geometry, exclusive journal commit and a correlated server ACK.
+        for x in [3740.0_f32, 3780.0, 3820.0, 3860.0] {
+            let player_approach = (x, 4088.0_f32);
+            let visible_sword = (x, 4038.0_f32);
+            assert_eq!(player_approach.1 - visible_sword.1, 50.0);
+            assert_eq!(
+                swept_circle_hits_known_static_solid(player_approach, visible_sword, 0.5),
+                Ok(false),
+                "static geometry incorrectly occludes visual sword at x={x}"
+            );
+            // The Blacksmith facade/wall IS solid. A fraudulent click
+            // cannot use this static check to pass an interior target.
+            assert_eq!(
+                swept_circle_hits_known_static_solid(player_approach, (x, 3990.0), 0.5),
+                Ok(true),
+                "static geometry failed to reject sightline through the smith at x={x}"
+            );
+        }
+    }
+
+    #[test]
     fn smith_footprint_and_real_west_wall_gap_have_precise_collision() {
         assert_eq!(overlaps_known_static_solid(3800.0, 3920.0, 18.0), Ok(true));
         assert_eq!(overlaps_known_static_solid(3520.0, 4000.0, 18.0), Ok(true));
