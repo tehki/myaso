@@ -432,3 +432,111 @@ fn previously_taken_or_expired_sword_cannot_be_authorized_by_stale_geometry() {
         "expired data can exist physically in storage and MUST be filtered at query"
     );
 }
+
+#[test]
+fn items_pickup_reach_matches_physics_for_dense_original_sword_boundary() {
+    let (world, loot, _, projected) = create_real_items_world();
+    let selected = projected[0];
+    let ground = loot.ground().get(&selected.ground_entity_id).unwrap();
+    let sword = p(ground.at.x, ground.at.y);
+    let actor = world.fighter(5).unwrap().clone();
+    let original_loot = loot.export_state().unwrap();
+    let statics = core_solids();
+    // Deliberate STATIC-ONLY fixture. Real Core must verify dynamic, river,
+    // current item source and signed same-tick lease before live interaction.
+    let geometry = test_window(&statics, true);
+    let mut accepted = 0usize;
+    let mut denied = 0usize;
+
+    // Dense fixed grid in the physically open southern Blacksmith approach.
+    // Every candidate is tested against a fresh genuine Items-owned domain
+    // snapshot. Never let a successful earlier claim remove the source for
+    // the next independent boundary comparison.
+    for dx in -56..=56 {
+        for dy in 0..=58 {
+            let mut sample_actor = actor.clone();
+            sample_actor.x = sword.x + dx as f32;
+            sample_actor.y = sword.y + dy as f32;
+            let physics = verify_pickup_geometry_at_completed_tick(
+                p(sample_actor.x, sample_actor.y),
+                sword,
+                &geometry,
+                TEST_FENCE,
+                PICKUP_REACH,
+                TEST_TICKS,
+            );
+            let mut independent_items =
+                LootAuthority::restore_state(original_loot.clone()).unwrap();
+            let item = independent_items.take_ground(
+                5,
+                &sample_actor,
+                ZoneId::Moonvale,
+                selected.ground_entity_id,
+                20,
+            );
+            assert_eq!(
+                physics.is_ok(),
+                item.is_ok(),
+                "actual Items/Physics float boundary differs at actor ({}, {}) from original world sword ({}, {})",
+                sample_actor.x,
+                sample_actor.y,
+                sword.x,
+                sword.y
+            );
+            if physics.is_ok() {
+                assert_eq!(item.unwrap().id, selected.item_id);
+                accepted += 1;
+            } else {
+                assert_eq!(physics, Err(PickupGeometryReject::OutOfRange));
+                assert_eq!(item, Err(LootError::OutOfReach));
+                denied += 1;
+            }
+        }
+    }
+
+    // The original 1-ULP reach mismatch from Physics #544 occurred around
+    // this exact real World sword. Probe both sides of its f32 coordinate
+    // bits to catch reintroduction of fused multiplication or altered order.
+    const EDGE_X_BITS: u32 = 3748.1265_f32.to_bits();
+    const EDGE_Y_BITS: u32 = 4093.4072_f32.to_bits();
+    for delta_x in -4_i32..=4 {
+        for delta_y in -4_i32..=4 {
+            let mut sample_actor = actor.clone();
+            sample_actor.x = f32::from_bits(EDGE_X_BITS.checked_add_signed(delta_x).unwrap());
+            sample_actor.y = f32::from_bits(EDGE_Y_BITS.checked_add_signed(delta_y).unwrap());
+            let physics = verify_pickup_geometry_at_completed_tick(
+                p(sample_actor.x, sample_actor.y),
+                sword,
+                &geometry,
+                TEST_FENCE,
+                PICKUP_REACH,
+                TEST_TICKS,
+            );
+            let mut independent_items =
+                LootAuthority::restore_state(original_loot.clone()).unwrap();
+            let item = independent_items.take_ground(
+                5,
+                &sample_actor,
+                ZoneId::Moonvale,
+                selected.ground_entity_id,
+                20,
+            );
+            assert_eq!(
+                physics.is_ok(),
+                item.is_ok(),
+                "ULP boundary parity failed at original sword actor ({},{})",
+                sample_actor.x,
+                sample_actor.y
+            );
+        }
+    }
+    assert!(
+        accepted > 2_000,
+        "must exercise many legitimate source points"
+    );
+    assert!(
+        denied > 1_000,
+        "must exercise many just-outside source points"
+    );
+    assert_eq!(loot.export_state().unwrap(), original_loot);
+}
