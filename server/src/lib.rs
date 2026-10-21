@@ -14,6 +14,7 @@ pub mod alpha_greyhaven_geometry;
 pub mod alpha_mainhand_snapshot;
 pub mod alpha_pickup_ack_proof;
 pub mod alpha_quiescent_rack_handoff;
+pub mod canonical_idr_bridge;
 pub mod character_identity;
 pub mod chat;
 pub mod identity;
