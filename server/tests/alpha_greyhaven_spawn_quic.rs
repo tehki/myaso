@@ -49,8 +49,14 @@ fn start_private_staging_server() -> Result<(DisposableServer, String, Sha256Dig
         .stderr(Stdio::piped())
         .spawn()
         .context("launch exact Cargo-built staging-only myaso-server")?;
-    let stdout = child.stdout.take().context("missing isolated server stdout")?;
-    let stderr = child.stderr.take().context("missing isolated server stderr")?;
+    let stdout = child
+        .stdout
+        .take()
+        .context("missing isolated server stdout")?;
+    let stderr = child
+        .stderr
+        .take()
+        .context("missing isolated server stderr")?;
     thread::spawn(move || {
         for line in BufReader::new(stderr).lines().map_while(|line| line.ok()) {
             eprintln!("ALPHA_8C_SPAWN_SERVER_ERR {line}");
@@ -89,9 +95,7 @@ fn start_private_staging_server() -> Result<(DisposableServer, String, Sha256Dig
         if line == "myaso admission cap: 4 concurrent players" {
             cap = true;
         }
-        if line
-            == "staging-only Greyhaven spawn selected; no server obstacle/portal authority"
-        {
+        if line == "staging-only Greyhaven spawn selected; no server obstacle/portal authority" {
             opted_in = true;
         }
         if cap && opted_in {
@@ -139,7 +143,10 @@ async fn four_real_quic_clients_get_exact_server_owned_greyhaven_spawns() -> Res
         .context("game initial baseline timeout")??;
         let snapshot = decode_snapshot(&body).map_err(|e| anyhow::anyhow!("{e:?}"))?;
         if !snapshot.full {
-            bail!("client {} received delta instead of full baseline", index + 1);
+            bail!(
+                "client {} received delta instead of full baseline",
+                index + 1
+            );
         }
         let observed: BTreeSet<u32> = snapshot.records.iter().map(|r| r.net_id).collect();
         let expected: BTreeSet<u32> = (1..=index as u32 + 1).collect();
@@ -158,7 +165,10 @@ async fn four_real_quic_clients_get_exact_server_owned_greyhaven_spawns() -> Res
                 );
             }
         }
-        println!("ALPHA_8C_QUIC_SPAWN id={} x={expected_x} y={expected_y}", index + 1);
+        println!(
+            "ALPHA_8C_QUIC_SPAWN id={} x={expected_x} y={expected_y}",
+            index + 1
+        );
         live.push((connection, send, recv));
     }
 
