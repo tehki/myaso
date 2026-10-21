@@ -55,9 +55,10 @@ fn start_actual_server() -> Result<(TestServer, String, Sha256Digest)> {
             match line {
                 Ok(line) => {
                     eprintln!("ALPHA_M1_SERVER_STDOUT {line}");
-                    if tx.send(line).is_err() {
-                        break;
-                    }
+                    // Keep draining stdout even after startup drops the
+                    // receiver: otherwise the Rust server panics on its next
+                    // session log write with a broken stdout pipe.
+                    let _ = tx.send(line);
                 }
                 Err(_) => break,
             }
