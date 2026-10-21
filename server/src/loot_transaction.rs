@@ -1732,6 +1732,207 @@ mod tests {
     }
 
     #[test]
+    fn four_rack_pickups_preserve_five_piece_outfits_across_joint_checkpoint_and_rejoin() {
+        use crate::loot::{GroundDrop, Point, GROUND_DECAY_MS};
+        use crate::magic_checkpoint::load_joint;
+        use std::collections::BTreeSet;
+
+        // Four physical server-domain swords and independently authenticated
+        // characters. Exact rack coordinates come from World #493, but this
+        // fixture does not allocate canonical Core 8B u128 IDs or activate UI.
+        let xs = [3740.0_f32, 3780.0, 3820.0, 3860.0];
+        let gear = [
+            (ItemKind::WoodenShield, EquipmentSlot::OffHand),
+            (ItemKind::ChainmailArmor, EquipmentSlot::Body),
+            (ItemKind::IronHelmet, EquipmentSlot::Head),
+            (ItemKind::LeatherBoots, EquipmentSlot::Feet),
+        ];
+        let mut world = World::new(8192.0, 8192.0);
+        let mut zones = ZoneAuthority::new();
+        let mut identity = SessionIdentityRegistry::new();
+        let mut loot = LootAuthority::new();
+        let mut expected = BTreeSet::new();
+        let mut gear_ids = [Vec::new(), Vec::new(), Vec::new(), Vec::new()];
+        for (index, x) in xs.into_iter().enumerate() {
+            let actor = (index + 1) as u32;
+            assert!(world.add_player_at(actor, x, 4088.0, 0.0));
+            zones.register(actor).unwrap();
+            identity
+                .bind_verified(lease(actor), CharacterId::new(u64::from(actor)).unwrap())
+                .unwrap();
+            loot.register(actor).unwrap();
+            for (kind, slot) in gear {
+                let item_id = loot.grant(actor, kind, 1).unwrap();
+                assert!(expected.insert(item_id));
+                gear_ids[index].push(item_id);
+                loot.equip(actor, item_id, slot).unwrap();
+            }
+            assert!(loot.inventory(actor).unwrap().backpack().is_empty());
+            assert!(loot
+                .inventory(actor)
+                .unwrap()
+                .equipped(EquipmentSlot::MainHand)
+                .is_none());
+        }
+
+        // Deliberately use a fixture-only namespace unrelated to live World
+        // socket names or canonical Core item IDs. Active/retired ID mapping
+        // must be reviewed separately before this is connected to network.
+        let mut snapshot = loot.export_state().unwrap();
+        snapshot.next_id = 2000;
+        for (index, x) in xs.into_iter().enumerate() {
+            let sword_id = 1101 + index as u64;
+            let ground_id = 1201 + index as u64;
+            assert!(expected.insert(sword_id));
+            assert!(snapshot
+                .ground
+                .insert(
+                    ground_id,
+                    GroundDrop {
+                        entity_id: ground_id,
+                        zone: ZoneId::Moonvale,
+                        at: Point { x, y: 4038.0 },
+                        expires_at_ms: GROUND_DECAY_MS,
+                        item: ItemStack {
+                            id: sword_id,
+                            kind: if index % 2 == 0 {
+                                ItemKind::RustySword
+                            } else {
+                                ItemKind::IronSword
+                            },
+                            amount: 1,
+                        },
+                    }
+                )
+                .is_none());
+        }
+        loot = LootAuthority::restore_state(snapshot).unwrap();
+
+        let path = checkpoint_path();
+        let magic = MagicAuthority::new();
+        // Verify every intermediate atomic checkpoint can be decoded with
+        // five equipment pieces on the newly equipped actor, while its three
+        // peers still have four (no MainHand until their actual pickup).
+        for actor in [3_u32, 1, 4, 2] {
+            let targets = inspect_verified_ground_sword_targets(
+                &loot,
+                &identity,
+                PickupWorldTick {
+                    world: &world,
+                    completed_tick: world.tick,
+                    zones: &zones,
+                },
+                lease(actor),
+            )
+            .unwrap();
+            assert_eq!(targets.len(), 1);
+            assert_eq!(
+                targets[0].selection.expected_item_id,
+                1100 + u64::from(actor)
+            );
+            assert_eq!(
+                targets[0].selection.ground_entity_id,
+                1200 + u64::from(actor)
+            );
+            let item = commit_verified_ground_sword_equip_checked(
+                GroundSwordAuthority {
+                    path: &path,
+                    loot: &mut loot,
+                    magic: &magic,
+                    identity: &identity,
+                    tick: PickupWorldTick {
+                        world: &world,
+                        completed_tick: world.tick,
+                        zones: &zones,
+                    },
+                    operation: VerifiedLootOperation {
+                        lease: lease(actor),
+                        sequence: 1,
+                    },
+                },
+                targets[0].selection,
+                |fighter, ground, zone| {
+                    assert_eq!(fighter.net_id, actor);
+                    assert_eq!(ground.zone, zone);
+                    assert_eq!(fighter.x, ground.at.x);
+                    assert_eq!(fighter.y - ground.at.y, 50.0);
+                    Ok(())
+                },
+            )
+            .unwrap();
+            assert_eq!(item.id, 1100 + u64::from(actor));
+            let (intermediate, _) = load_joint(&path).unwrap();
+            let parked = intermediate
+                .parked_inventory(CharacterId::new(u64::from(actor)).unwrap())
+                .unwrap();
+            assert!(parked.backpack().is_empty());
+            assert_eq!(
+                parked.equipped(EquipmentSlot::MainHand).unwrap().id,
+                item.id
+            );
+            for ((kind, slot), original_id) in gear.into_iter().zip(&gear_ids[(actor - 1) as usize])
+            {
+                let restored = parked.equipped(slot).unwrap();
+                assert_eq!(restored.kind, kind);
+                assert_eq!(restored.id, *original_id);
+                assert_eq!(restored.amount, 1);
+            }
+            assert_eq!(
+                intermediate
+                    .committed_operation_sequence(CharacterId::new(u64::from(actor)).unwrap()),
+                Some(1)
+            );
+        }
+        assert!(loot.ground().is_empty());
+
+        // Recover all five pieces on each character, then simulate an
+        // authenticated reconnect using the exact server-issued leases.
+        let (mut recovered, recovered_magic) = load_joint(&path).unwrap();
+        assert_eq!(recovered_magic, magic);
+        assert!(recovered.ground().is_empty());
+        let mut actually_owned = BTreeSet::new();
+        for actor in 1_u32..=4 {
+            let character = CharacterId::new(u64::from(actor)).unwrap();
+            let original = recovered.parked_inventory(character).unwrap();
+            assert!(original.backpack().is_empty());
+            assert_eq!(
+                original.equipped(EquipmentSlot::MainHand).unwrap().id,
+                1100 + u64::from(actor)
+            );
+            recovered.resume_inventory(&identity, lease(actor)).unwrap();
+            let rejoined = recovered.inventory(actor).unwrap();
+            assert!(rejoined.backpack().is_empty());
+            let sword = rejoined.equipped(EquipmentSlot::MainHand).unwrap();
+            assert_eq!(sword.id, 1100 + u64::from(actor));
+            assert_eq!(
+                sword.kind,
+                if actor % 2 == 1 {
+                    ItemKind::RustySword
+                } else {
+                    ItemKind::IronSword
+                }
+            );
+            assert!(actually_owned.insert(sword.id));
+            for ((kind, slot), original_id) in gear.into_iter().zip(&gear_ids[(actor - 1) as usize])
+            {
+                let held = rejoined.equipped(slot).unwrap();
+                assert_eq!(held.id, *original_id);
+                assert_eq!(held.kind, kind);
+                assert_eq!(held.amount, 1);
+                assert!(actually_owned.insert(held.id));
+            }
+            assert_eq!(recovered.committed_operation_sequence(character), Some(1));
+            assert!(recovered.parked_inventory(character).is_none());
+        }
+        assert_eq!(
+            actually_owned, expected,
+            "physical item identity was lost or duplicated"
+        );
+        assert_eq!(actually_owned.len(), 20);
+        let _ = fs::remove_file(path);
+    }
+
+    #[test]
     fn four_greyhaven_rack_views_select_and_equip_only_each_own_physical_sword() {
         use crate::loot::{GroundDrop, Point, GROUND_DECAY_MS};
         use crate::magic_checkpoint::load_joint;
