@@ -194,6 +194,35 @@ impl CanonicalIdrBridge {
             .map_err(CanonicalIdrError::DormantIdr)
     }
 
+    /// DORMANT claim read gate: both observer and source must still be
+    /// distinct live authenticated Core canonical players. This binds a
+    /// durable UNVERIFIED belief to the current source session generation
+    /// and server-owned presentation epoch, not a recycled net ID. This
+    /// alone does not certify LOS, World tick or distributed store freshness.
+    pub(crate) fn preflight_current_claim_read(
+        &self,
+        observer: CharacterId,
+        observer_lease: SessionLease,
+        speaker: CharacterId,
+        speaker_lease: SessionLease,
+        leases: &SessionLeaseRegistry,
+    ) -> Result<u64, CanonicalIdrError> {
+        self.require_current_player(observer, observer_lease, leases)?;
+        self.require_current_player(speaker, speaker_lease, leases)?;
+        if observer == speaker {
+            return Err(CanonicalIdrError::DormantIdr(
+                crate::identity_disguise::IdentityError::SameCharacter,
+            ));
+        }
+        self.subjects
+            .observe(
+                subject_for_authenticated_canonical_character(observer),
+                subject_for_authenticated_canonical_character(speaker),
+            )
+            .map(|view| view.presentation_epoch)
+            .map_err(CanonicalIdrError::DormantIdr)
+    }
+
     /// Test ONLY: emulate a transition that will require actual trusted
     /// World8C+Physics validated witnesses and a durable appearance event.
     /// This cannot be compiled into the production server.
