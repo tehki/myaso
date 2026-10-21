@@ -670,4 +670,248 @@ mod tests {
             first
         );
     }
+
+    #[derive(Debug)]
+    enum OfflineCommitError {
+        StaleSession,
+        Selection(ExactRackSelectionError),
+        Journal(ItemJournalError),
+    }
+
+    // TEST-ONLY harness: deliberately serializes inspection and commit while
+    // holding the SAME local C3e journal's mutable borrow. The injected
+    // SessionLeaseRegistry and authored source rows are synthetic fixtures,
+    // NOT a 8A authenticated connection or signed 8C/world/Physics proof.
+    // It cannot be used to activate a public TryPickup handler.
+    fn offline_single_writer_claim(
+        writer: &mut DurableItemJournal,
+        leases: &crate::identity::SessionLeaseRegistry,
+        lease: crate::identity::SessionLease,
+        imported: &LegacyImportPreflight,
+        chosen: CurrentRackCandidate,
+        transaction: OwnershipTxnId,
+    ) -> Result<crate::item_ownership::OwnershipReceipt, OfflineCommitError> {
+        if !leases.is_current(lease) {
+            return Err(OfflineCommitError::StaleSession);
+        }
+        let selection = ProposedExactRackSelection {
+            socket_id: chosen.socket_id(),
+            canonical_ground_entity: chosen.canonical_ground_entity(),
+            canonical_item: chosen.canonical_item(),
+            observed_item_mutation_sequence: chosen.item_mutation_sequence(),
+        };
+        preflight_exact_current_rack_selection(writer, rows(), imported, cm_mapping(), selection)
+            .map_err(OfflineCommitError::Selection)?;
+        let operation = OwnershipOp::Move {
+            item: chosen.canonical_item(),
+            from: chosen.ground(),
+            to: ItemLocation::Equipped {
+                character_id: lease.character_id(),
+                slot: 0,
+            },
+        };
+        writer
+            .apply(transaction, &[operation])
+            .map_err(OfflineCommitError::Journal)
+    }
+
+    #[test]
+    fn local_one_writer_racing_claims_fence_lease_and_recover_exact_receipt() {
+        use crate::{
+            alpha_mainhand_snapshot::read_current_mainhand,
+            identity::{CharacterRecord, SessionLeaseRegistry},
+        };
+        use std::{
+            num::NonZeroU64,
+            sync::{Barrier, Mutex},
+            thread,
+        };
+        let root = Root::new();
+        let imported = registered();
+        let mut writer = root.open();
+        seed(&mut writer, &imported);
+        let four = read_proposed_current_four_rack_items(&writer, rows(), &imported, cm_mapping())
+            .unwrap()
+            .slots()
+            .map(|item| item.unwrap());
+        let chosen = four[0];
+        let one = CharacterId::new((1_u128 << 88) | 101).unwrap();
+        let two = CharacterId::new((1_u128 << 88) | 102).unwrap();
+        let mut leases = SessionLeaseRegistry::default();
+        let one_record = CharacterRecord::new(one).next_generation().unwrap();
+        let two_record = CharacterRecord::new(two).next_generation().unwrap();
+        let lease_one = leases
+            .activate_committed(one_record, NonZeroU64::new(71).unwrap())
+            .unwrap();
+        let lease_two = leases
+            .activate_committed(two_record, NonZeroU64::new(72).unwrap())
+            .unwrap();
+        let shared = Mutex::new(writer);
+        let barrier = Barrier::new(3);
+        // Real competing Rust threads and real journal I/O, not client ACK
+        // assertions. There can be only one committed physical sword owner.
+        let (first, second) = thread::scope(|scope| {
+            let a = scope.spawn(|| {
+                barrier.wait();
+                let mut guard = shared.lock().unwrap();
+                offline_single_writer_claim(
+                    &mut guard,
+                    &leases,
+                    lease_one,
+                    &imported,
+                    chosen,
+                    txn(2),
+                )
+            });
+            let b = scope.spawn(|| {
+                barrier.wait();
+                let mut guard = shared.lock().unwrap();
+                offline_single_writer_claim(
+                    &mut guard,
+                    &leases,
+                    lease_two,
+                    &imported,
+                    chosen,
+                    txn(3),
+                )
+            });
+            barrier.wait();
+            (a.join().unwrap(), b.join().unwrap())
+        });
+        assert_eq!(usize::from(first.is_ok()) + usize::from(second.is_ok()), 1);
+        let (winner, loser, winner_txn, denied, committed) = match (first, second) {
+            (Ok(r), Err(e)) => (lease_one, lease_two, txn(2), e, r),
+            (Err(e), Ok(r)) => (lease_two, lease_one, txn(3), e, r),
+            other => panic!("unexpected concurrent result: {other:?}"),
+        };
+        assert!(matches!(
+            denied,
+            OfflineCommitError::Selection(ExactRackSelectionError::ItemAbsent)
+        ));
+        let mut writer = shared.into_inner().unwrap();
+        assert_eq!(writer.item_count(), 4);
+        let operation = OwnershipOp::Move {
+            item: chosen.canonical_item(),
+            from: chosen.ground(),
+            to: ItemLocation::Equipped {
+                character_id: winner.character_id(),
+                slot: 0,
+            },
+        };
+        // C3e's durable idempotent receipt is keyed by transaction plus
+        // mutation batch; it does NOT bind the full click selector envelope.
+        assert_eq!(
+            writer.verified_receipt(winner_txn, &[operation]).unwrap(),
+            Some(committed)
+        );
+        assert_eq!(writer.apply(winner_txn, &[operation]).unwrap(), committed);
+        assert_eq!(writer.item_count(), 4);
+        assert_eq!(
+            read_current_mainhand(&writer, winner.character_id())
+                .unwrap()
+                .item_id(),
+            Some(chosen.canonical_item())
+        );
+        assert_eq!(
+            read_current_mainhand(&writer, loser.character_id())
+                .unwrap()
+                .item_id(),
+            None
+        );
+
+        // Even with a different available sword, a second MainHand is denied
+        // without any new durable receipt or rack disappearance.
+        let before_slot_conflict =
+            read_proposed_current_four_rack_items(&writer, rows(), &imported, cm_mapping())
+                .unwrap()
+                .journal_sequence();
+        assert!(matches!(
+            offline_single_writer_claim(&mut writer, &leases, winner, &imported, four[1], txn(4)),
+            Err(OfflineCommitError::Journal(
+                ItemJournalError::InvalidTransaction(
+                    crate::item_ownership::OwnershipError::EquipmentSlotOccupied
+                )
+            ))
+        ));
+        assert_eq!(
+            read_proposed_current_four_rack_items(&writer, rows(), &imported, cm_mapping())
+                .unwrap()
+                .journal_sequence(),
+            before_slot_conflict
+        );
+
+        // Supersede loser before it touches another still available sword.
+        let successor_record = if loser.character_id() == one {
+            one_record.next_generation().unwrap()
+        } else {
+            two_record.next_generation().unwrap()
+        };
+        let successor = leases
+            .activate_committed(successor_record, NonZeroU64::new(73).unwrap())
+            .unwrap();
+        assert!(!leases.is_current(loser));
+        assert!(leases.is_current(successor));
+        let watermark =
+            read_proposed_current_four_rack_items(&writer, rows(), &imported, cm_mapping())
+                .unwrap()
+                .journal_sequence();
+        assert!(matches!(
+            offline_single_writer_claim(&mut writer, &leases, loser, &imported, four[1], txn(4)),
+            Err(OfflineCommitError::StaleSession)
+        ));
+        assert_eq!(
+            read_proposed_current_four_rack_items(&writer, rows(), &imported, cm_mapping())
+                .unwrap()
+                .journal_sequence(),
+            watermark
+        );
+        assert!(matches!(
+            writer.apply(
+                txn(5),
+                &[OwnershipOp::Move {
+                    item: chosen.canonical_item(),
+                    from: chosen.ground(),
+                    to: ItemLocation::Equipped {
+                        character_id: loser.character_id(),
+                        slot: 0,
+                    },
+                }]
+            ),
+            Err(ItemJournalError::InvalidTransaction(
+                crate::item_ownership::OwnershipError::ExpectedLocationMismatch
+            ))
+        ));
+        assert_eq!(writer.item_count(), 4);
+        drop(writer);
+        let mut recovered = root.open();
+        assert_eq!(recovered.item_count(), 4);
+        assert_eq!(
+            recovered
+                .verified_receipt(winner_txn, &[operation])
+                .unwrap(),
+            Some(committed)
+        );
+        assert_eq!(
+            recovered.apply(winner_txn, &[operation]).unwrap(),
+            committed
+        );
+        assert_eq!(
+            read_current_mainhand(&recovered, winner.character_id())
+                .unwrap()
+                .item_id(),
+            Some(chosen.canonical_item())
+        );
+        assert_eq!(
+            read_current_mainhand(&recovered, loser.character_id())
+                .unwrap()
+                .item_id(),
+            None
+        );
+        assert_eq!(
+            read_proposed_current_four_rack_items(&recovered, rows(), &imported, cm_mapping())
+                .unwrap()
+                .slots()[0],
+            None
+        );
+    }
 }
