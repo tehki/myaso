@@ -32,6 +32,7 @@ import { awaitM223HeavyWindup, planM223WheelDelay } from "./m223-server-heavy-wi
 import { dispatchR2ReleaseLedShortBlock } from "./r2-release-led-short-block.mjs";
 import { dispatchM41NativeParryOnLightOnset } from "./m41-authoritative-light-onset.mjs";
 import { readM161OpeningKickProof } from "./m161-opening-kick-proof.mjs";
+import { observeM161NativeKnockdown } from "./m161-native-knockdown-observation.mjs";
 import { readM171RejectedFeintProof } from "./m171-rejected-feint-proof.mjs";
 import { dispatchM107NativeDodge } from "./m107-native-dodge-plan.mjs";
 import { awaitM194ServerBlock } from "./m194-authoritative-block-onset.mjs";
@@ -6487,6 +6488,21 @@ async function runOnlineUiBoundedKickKnockdownFlight(entries) {
   let openingKickError = null;
   const openingKickRequest = performArenaRecoveryBufferedKick(opener, openerElementId, openerOffset, 45, true)
     .catch(error => { openingKickError = error; });
+  // Schedule the actual Firefox victim concurrently with the native opener
+  // and suppressor. Reading only after their W3C ACKs can miss the bounded
+  // knockdown entirely in a headless tab. This never fabricates a transition.
+  let stopOpeningVictimObservation = false;
+  let openingVictimReadError = null;
+  const openingVictimObservation = observeM161NativeKnockdown({
+    readOwnActions: () => readOwnActions(defender),
+    startIndex: defenderOffset,
+    isKnockdown: event => event.action === COMBAT_ACTION.knockdown
+      && Number.isFinite(event.epochMs) && Number.isSafeInteger(event.serverTick),
+    deadlineEpochMs: Date.now() + COMBAT.kick.windupMs + COMBAT.kick.activeMs
+      + COMBAT.kick.knockdownMs + 320,
+    shouldStop: () => stopOpeningVictimObservation,
+    sleep,
+  }).catch(error => { openingVictimReadError = error; return null; });
 
   let openingKickProof = null;
   const firstDeadline = Date.now() + COMBAT.kick.windupMs + COMBAT.kick.activeMs + 320;
@@ -6497,6 +6513,8 @@ async function runOnlineUiBoundedKickKnockdownFlight(entries) {
     if (!openingKickProof) await sleep(2);
   }
   if (!openingKickProof || openingKickError) {
+    stopOpeningVictimObservation = true;
+    await openingVictimObservation;
     await openingKickRequest;
     if (openingKickError) throw openingKickError;
     throw new Error(milestone + " opener never produced the first authoritative kick knockdown: "
@@ -6505,14 +6523,22 @@ async function runOnlineUiBoundedKickKnockdownFlight(entries) {
 
   // Issue exactly one genuine short RMB from #3 after actual server-owned
   // contact, while #2 is still down. Both original W3C ACKs remain required.
-  await Promise.all([
-    openingKickRequest,
-    performArenaRecoveryBufferedKick(suppressor, suppressorElementId, suppressorOffset, 45, true),
-  ]);
+  let observedFirstKnockdown = null;
+  try {
+    await Promise.all([
+      openingKickRequest,
+      performArenaRecoveryBufferedKick(suppressor, suppressorElementId, suppressorOffset, 45, true),
+    ]);
+  } finally {
+    stopOpeningVictimObservation = true;
+    observedFirstKnockdown = await openingVictimObservation;
+  }
   if (openingKickError) throw openingKickError;
+  if (openingVictimReadError) throw openingVictimReadError;
   const defenderActionsAfterOpening = await readOwnActions(defender);
-  const firstKnockdown = defenderActionsAfterOpening.slice(defenderOffset).find((entry) =>
-    entry.action === COMBAT_ACTION.knockdown && Number.isFinite(entry.epochMs)) ?? null;
+  const firstKnockdown = observedFirstKnockdown
+    ?? defenderActionsAfterOpening.slice(defenderOffset).find((entry) =>
+      entry.action === COMBAT_ACTION.knockdown && Number.isFinite(entry.epochMs)) ?? null;
   if (!firstKnockdown
     || !Number.isSafeInteger(firstKnockdown.serverTick)
     || firstKnockdown.serverTick < openingKickProof.knockdown.tick
