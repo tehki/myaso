@@ -1,3 +1,4 @@
+import "./arena-lobby-link.test.mjs";
 import "./reduced-motion-feedback.test.mjs";
 import "./hud-announcements.test.mjs";
 import "./arena-focus-guide.test.mjs";

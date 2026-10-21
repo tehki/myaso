@@ -2,12 +2,14 @@ import { installControlGuide } from "../src/browser/control-guide.mjs";
 import { installArenaFocusGuide } from "../src/browser/arena-focus-guide.mjs";
 import { installHudAnnouncements } from "../src/browser/hud-announcements.mjs";
 import { installReducedMotionFeedback } from "../src/browser/reduced-motion-feedback.mjs";
+import { installArenaLobbyLink } from "../src/browser/arena-lobby-link.mjs";
 installControlGuide(document);
 installHudAnnouncements(document);
 installReducedMotionFeedback(document);
 
 const params = new URLSearchParams(window.location.search);
 installArenaFocusGuide(document, { online: params.has("server") });
+installArenaLobbyLink(document, { online: params.has("server") });
 
 if (params.has("server")) {
   try {
