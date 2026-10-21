@@ -872,6 +872,205 @@ mod tests {
         assert_eq!(magic.pending_ember_intents().count(), 1);
     }
 
+    /// P0 acceptance adapter fixture: ground swords are physical Items, not
+    /// Fire/Ember reagents or earned spell rewards. This uses the dormant
+    /// prototype u64 ledger, NOT Core 8B canonical u128 item authority, rack
+    /// pixel clicks, four network clients or real Combat damage.
+    #[test]
+    fn atomic_four_sword_pickup_equip_preserves_zero_magic_progression() {
+        use crate::loot::LootError;
+        use crate::loot_transaction::{
+            commit_verified_ground_sword_equip, PickupCommitError, PickupWorldTick,
+            VerifiedLootOperation,
+        };
+        use crate::magic_checkpoint::load_joint;
+        use crate::zone::ZoneAuthority;
+        use std::collections::BTreeSet;
+        use std::sync::atomic::{AtomicU64, Ordering};
+
+        static CHECKPOINT_SEQUENCE: AtomicU64 = AtomicU64::new(1);
+        let sequence = CHECKPOINT_SEQUENCE.fetch_add(1, Ordering::Relaxed);
+        let path = std::env::temp_dir().join(format!(
+            "myaso-p0-spellless-atomic-swords-{}-{sequence}.bin",
+            std::process::id()
+        ));
+        let mut world = World::new(800.0, 600.0);
+        let mut zones = ZoneAuthority::new();
+        let mut identity = SessionIdentityRegistry::new();
+        let mut loot = LootAuthority::new();
+        let magic = MagicAuthority::new();
+        let unchanged_magic = magic.encode_progression().unwrap();
+
+        for (id, x) in [(1, 200.0), (2, 215.0), (3, 228.0), (4, 240.0)] {
+            assert!(world.add_player_at(id, x, 200.0, 0.0));
+            zones.register(id).unwrap();
+            identity
+                .bind_verified(lease(id, 1), character(u64::from(id)))
+                .unwrap();
+            loot.register(id).unwrap();
+            assert_eq!(loot.inventory(id).unwrap().stack_count(), 0);
+            assert!(loot
+                .inventory(id)
+                .unwrap()
+                .equipped(EquipmentSlot::MainHand)
+                .is_none());
+            assert_eq!(magic.mana(character(u64::from(id))), 0);
+            assert!(!magic.knows_rune(character(u64::from(id)), Rune::Fire));
+            assert!(!magic.knows_spell(character(u64::from(id)), Spell::Ember));
+        }
+
+        // Existing Items prototype mints physical swords server-side. These
+        // ground records are not a rendered Blacksmith rack or pointer proof.
+        let mut swords = Vec::new();
+        for kind in [
+            ItemKind::RustySword,
+            ItemKind::IronSword,
+            ItemKind::RustySword,
+            ItemKind::IronSword,
+        ] {
+            let sword = loot.grant(1, kind, 1).unwrap();
+            let entity = loot
+                .drop_backpack(1, world.fighter(1).unwrap(), ZoneId::Moonvale, sword, 0)
+                .unwrap();
+            swords.push((sword, entity));
+        }
+        assert_eq!(swords.len(), 4);
+        assert_eq!(
+            swords
+                .iter()
+                .map(|(id, _)| *id)
+                .collect::<BTreeSet<_>>()
+                .len(),
+            4
+        );
+
+        let operation = |actor, seq| VerifiedLootOperation {
+            lease: lease(actor, 1),
+            sequence: seq,
+        };
+        // One winner consumes one ground entity and equips MainHand in the
+        // SAME durable commit; the stale second client must not mint a sword.
+        let (first_id, first_entity) = swords[0];
+        assert_eq!(
+            commit_verified_ground_sword_equip(
+                &path,
+                &mut loot,
+                &magic,
+                &identity,
+                PickupWorldTick {
+                    world: &world,
+                    completed_tick: world.tick,
+                    zones: &zones,
+                },
+                operation(2, 1),
+                first_entity,
+            )
+            .unwrap()
+            .id,
+            first_id
+        );
+        assert!(matches!(
+            commit_verified_ground_sword_equip(
+                &path,
+                &mut loot,
+                &magic,
+                &identity,
+                PickupWorldTick {
+                    world: &world,
+                    completed_tick: world.tick,
+                    zones: &zones,
+                },
+                operation(3, 1),
+                first_entity,
+            ),
+            Err(PickupCommitError::Loot(LootError::NotFound))
+        ));
+        assert!(loot.inventory(3).unwrap().backpack().is_empty());
+        assert!(loot
+            .inventory(3)
+            .unwrap()
+            .equipped(EquipmentSlot::MainHand)
+            .is_none());
+
+        for (actor, (sword, entity)) in [(3, swords[1]), (4, swords[2]), (1, swords[3])] {
+            assert_eq!(
+                commit_verified_ground_sword_equip(
+                    &path,
+                    &mut loot,
+                    &magic,
+                    &identity,
+                    PickupWorldTick {
+                        world: &world,
+                        completed_tick: world.tick,
+                        zones: &zones,
+                    },
+                    operation(actor, 1),
+                    entity,
+                )
+                .unwrap()
+                .id,
+                sword
+            );
+        }
+        assert!(loot.ground().is_empty());
+        assert_eq!(magic.encode_progression().unwrap(), unchanged_magic);
+        let mut equipped = BTreeSet::new();
+        for id in 1..=4 {
+            let item = loot
+                .inventory(id)
+                .unwrap()
+                .equipped(EquipmentSlot::MainHand)
+                .unwrap();
+            assert!(equipped.insert(item.id));
+            assert!(loot.inventory(id).unwrap().backpack().is_empty());
+        }
+        assert_eq!(equipped, swords.iter().map(|(id, _)| *id).collect());
+
+        let (restored, restored_magic) = load_joint(&path).unwrap();
+        assert_eq!(
+            restored_magic.encode_progression().unwrap(),
+            unchanged_magic
+        );
+        assert_eq!(restored_magic.pending_ember_intents().count(), 0);
+        for id in 1_u32..=4 {
+            let hero = character(u64::from(id));
+            assert_eq!(restored_magic.mana(hero), 0);
+            assert!(!restored_magic.knows_rune(hero, Rune::Fire));
+            assert!(!restored_magic.knows_spell(hero, Spell::Ember));
+            assert_eq!(
+                restored
+                    .parked_inventory(hero)
+                    .unwrap()
+                    .equipped(EquipmentSlot::MainHand)
+                    .unwrap()
+                    .id,
+                loot.inventory(id)
+                    .unwrap()
+                    .equipped(EquipmentSlot::MainHand)
+                    .unwrap()
+                    .id
+            );
+            assert_eq!(restored.committed_operation_sequence(hero), Some(1));
+        }
+        assert!(matches!(
+            commit_verified_ground_sword_equip(
+                &path,
+                &mut loot,
+                &magic,
+                &identity,
+                PickupWorldTick {
+                    world: &world,
+                    completed_tick: world.tick,
+                    zones: &zones,
+                },
+                operation(2, 1),
+                first_entity,
+            ),
+            Err(PickupCommitError::Loot(LootError::ReplayOperation))
+        ));
+        let _ = std::fs::remove_file(&path);
+    }
+
     #[test]
     fn new_character_has_no_magic_and_spells_must_be_earned() {
         let mut magic = MagicAuthority::new();
