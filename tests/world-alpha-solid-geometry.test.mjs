@@ -148,5 +148,6 @@ test("World P0 static geometry is read-only, not a client or server authority",(
  assert.equal(solids.every(x=>Object.isFrozen(x)),true);
  const sha=createHash("sha256").update(JSON.stringify(solids)).digest("hex");
  assert.match(sha,/^[a-f0-9]{64}$/);
+ assert.equal(sha,"9bb023c95d86821f219113d71b6e480789a72df064f083790e746d79423b3f43","authored solid layout changed without reviewed revision bump");
  console.log("WORLD_ALPHA_SOLIDS_SHA256 "+sha);
 });
