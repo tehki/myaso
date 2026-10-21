@@ -1,0 +1,29 @@
+# E2j — Isolated PostgreSQL 16 economic settlement acceptance
+
+**Status: DRAFT, OFFLINE, FICTIONAL AND UNDEPLOYED.** This is a disposable PostgreSQL research lab, not a production migration or a dependency of the live myaso.io server. It is in [Economics PR #385](https://github.com/tehki/myaso/pull/385) and **must not** be merged/deployed independently of central [Development Center #360](https://github.com/tehki/myaso/issues/360) review.
+
+## Why this increment matters
+
+Earlier E2d–E2i SQLite work proved many atomicity, replay, ledger and identity-boundary invariants, but **SQLite transaction semantics are not PostgreSQL transaction acceptance**. Core 8C's independent draft [C4d #393](https://github.com/tehki/myaso/pull/393) already demonstrates zone-epoch fencing against **one authoritative entity row** with PostgreSQL receipts and outbox. Economics needs a future single PostgreSQL transaction that extends that authority to the **buyer/seller ledger and owned property deed**. E2j tests PostgreSQL 16 behavior against an intentionally **separate namespace and mock zone fence**, without altering Core's unmerged migrations or claiming to integrate them.
+
+## Delivered implementation
+
+- `scripts/economics_e2j_pg_lab.sql`: separate schema `e2j_lab`, never referenced by the server; fictional account balances with `bytea(16)` keys, demo admission/generation, mock parcel authority row, title, listing, exact seller-consent terms, unique immutable settlement receipt, three zero-sum postings and transactional outbox.
+- `e2j_lab.settle_test_purchase`: a **SECURITY INVOKER** PostgreSQL function, guarded by **exact disposable database name** `myaso_e2j_test` and a test-only session flag. That flag is merely a misuse guard (settable by SQL users), **not a security credential**. The function locks the admitted session before even a replay lookup, rejects changed/conflicting intents, locks a fictional current worker/zone/epoch row, verifies the deed revision, exact consent/listing terms and buyer funds/revision, locks the affected accounts in deterministic order, and updates balances, deed, listing, consent, immutable receipt, balanced postings and outbox **in one PostgreSQL transaction**. An error or transaction rollback leaves no partial sale. Post-COMMIT replays return the same receipt without a second transfer. Identity columns are 16-byte values; there is no narrowing to 64-bit character IDs.
+- **Historical replay fencing**: an old committed receipt cannot be read back using the previous worker/zone/epoch after authority handoff; the same mock parcel authority row is locked and checked on the replay path.
+- `scripts/verify_economics_pg_lab.py`: stdlib Python test runner using **independent `psql` subprocesses**. It refuses all database names other than `myaso_e2j_test` or missing `MYASO_E2J_TEST_ONLY=1`. It creates and resets schema/fictional sample records **only inside that disposable database**. Tests cover fee conservation, exact ownership, one-time consent, replay, revoked admission, stale/frozen epoch and worker, price/consent tampering, expiry, wrong balance version, insufficient funds, self-sale, outer-transaction rollback, two simultaneous PostgreSQL clients fighting for the only listing, malformed operation IDs and stale-worker receipt replay.
+- `.github/workflows/economics-e2j-postgres.yml`: independent PostgreSQL **16** GitHub Actions service/container and dedicated disposable database; invokes the real `psql` acceptance suite. The existing full `quality` workflow remains untouched.
+
+## Observed acceptance
+
+**15/15 PostgreSQL-backed tests passed** on the [E2j exact-code acceptance run #39529781711](https://github.com/tehki/myaso/actions/runs/39529781711) after adding stale-worker replay refusal. The earlier [run #39529584024](https://github.com/tehki/myaso/actions/runs/39529584024) passed the initial 14-case version. Python source compilation passed on the authorized Serj development host. Local Serj has `psql` but no running PostgreSQL service; the **actual PG transaction tests ran on the disposable GitHub Actions PostgreSQL 16 service**, not on Serj.
+
+The pre-existing **178/178 offline E2d–E2i tests** remained the baseline at the start of E2j. The **full protected** exact-head `quality` job (Rust, browser, Combat, graphics etc.) must still pass independently and is never overridden by green E2j-only acceptance.
+
+## Trust and architectural omissions
+
+**Do NOT equate green E2j tests with production readiness.** Neither `admissions` nor `zone_fences` is a true Core-authoritative implementation; they are **fixture-seeded**, and a SQL user with write access can fabricate them. The function takes worker IDs as parameters and has no installed Core `TrustedIdentityVerifier`, actual AccountId ownership proof, seller-signed consent, real character session/zone handoff proof, canonical World parcel catalog, inventory or financial authorization.
+
+The production SQL must be designed with Core C4c/C4d/C4f and use **their actual same fenced authority row** (not E2j's test mock table), preserve login/session fencing from an installed trusted Core provider, lock all authoritative buyer/seller/title/consent rows, and respect Core's agreed stable account and `CharacterId(u128)` mapping. It also needs production migrations, fine-grained roles and grants, revocation and expiry policies, secure backup/restore, real DB crash/failover/partition testing, full item trades, anti-abuse caps and outbox dispatch. The PostgreSQL primary's sequence identities may have gaps on rollback and **are not themselves a tamper-evident global journal**. This experiment is restricted to a single primary. No blocking call may run on the live 60Hz authoritative simulation tick.
+
+**There is no connection to real balances, payments, crypto wallet, Moon Coin or production house titles.**
