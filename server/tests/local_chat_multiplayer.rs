@@ -460,3 +460,69 @@ async fn truncated_chat_length_prefix_times_out_but_gameplay_stays_live() {
     .await
     .expect("gameplay input ACK survives stalled chat header");
 }
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn repeated_chat_submissions_do_not_starve_authoritative_game_input_ack() {
+    let (_server, url, digest) = start_server();
+    let mut sender = Player::connect(&url, &digest).await;
+    let _neighbor = Player::connect(&url, &digest).await;
+    let mut accepted = 0;
+    let mut rate_limited = 0;
+
+    // Interleave chat with unchanged v1 gameplay input over the SAME active
+    // connection. Rate-limited chat must not interrupt authoritative INPUT_ACK.
+    // This is genuine loopback QUIC concurrency, not independent-network or
+    // native browser acceptance.
+    for round in 0..24_u32 {
+        let correlation = 600 + round;
+        let client_tick = 1000 + round;
+        sender.send(correlation, b"Chat beside realtime movement", 1).await;
+
+        let mut input = [0_u8; 22];
+        input[0] = 1; // gameplay protocol v1
+        input[1] = 1; // INPUT
+        input[2] = 1; // one input sample
+        input[4..6].copy_from_slice(&1_u16.to_le_bytes());
+        input[6..8].copy_from_slice(&u16::MAX.to_le_bytes());
+        input[8..12].copy_from_slice(&client_tick.to_le_bytes());
+        input[17] = 127; // forward/right movement
+        sender
+            .connection
+            .send_datagram(input)
+            .expect("game input while chat is active");
+
+        let chat_result = sender.receive().await;
+        assert_eq!(&chat_result[..2], &[0x33, 1]);
+        assert_eq!(
+            u32::from_le_bytes(chat_result[2..6].try_into().unwrap()),
+            correlation
+        );
+        match chat_result[6] {
+            0 => accepted += 1,
+            5 => rate_limited += 1,
+            code => panic!("unexpected chat response {code} while combat input is live"),
+        }
+
+        let ack = timeout(Duration::from_secs(5), async {
+            loop {
+                let packet = sender
+                    .connection
+                    .receive_datagram()
+                    .await
+                    .expect("game input acknowledgment channel remains alive");
+                if packet.len() == 16 && packet[0] == 1 && packet[1] == 3 {
+                    break packet;
+                }
+            }
+        })
+        .await
+        .expect("game input ACK must not stall behind chat");
+        assert_eq!(
+            u32::from_le_bytes(ack[4..8].try_into().unwrap()),
+            client_tick,
+            "every chat/input round must retain authoritative ACK"
+        );
+    }
+    assert!(accepted >= 1, "the server accepted initial live chat");
+    assert!(rate_limited >= 1, "chat burst limit is still authoritative");
+}
