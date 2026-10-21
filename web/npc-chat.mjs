@@ -1,3 +1,5 @@
+import { encodeNpcRequest, NPC_WIRE } from "../src/network/npc-chat-codec.mjs";
+
 // An opt-in NPC pilot overlay. Server roster is the only activation signal.
 export function createNpcChatPanel({ onSend, onFocus }) {
   const panel = document.createElement("aside");
@@ -125,6 +127,17 @@ export function createNpcChatPanel({ onSend, onFocus }) {
     const id = Number(roster.value);
     const target = npcs.find((npc) => npc.id === id);
     if (!target) return;
+    // Character count is not UTF-8 byte length: 61 emoji fit a 240-char
+    // browser input but exceed the authoritative 240-byte reliable limit.
+    // Use the exact shared encoder contract before claiming a local send.
+    try {
+      encodeNpcRequest(id, text);
+    } catch (error) {
+      appendLine(error instanceof RangeError
+        ? `Message exceeds ${NPC_WIRE.maxTextBytes} UTF-8 bytes.`
+        : "Enter a valid single-line NPC message.");
+      return;
+    }
     if (pendingReplies.length >= MAX_PENDING_REPLIES) {
       appendLine("Waiting for NPC replies before sending more messages.");
       return;

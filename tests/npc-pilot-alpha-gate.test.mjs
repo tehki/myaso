@@ -417,3 +417,48 @@ test("early NPC reply is discarded if the corresponding write rejects or roster 
     restore();
   }
 });
+
+test("NPC pilot validates real UTF-8 wire size before queueing or sending", async () => {
+  const { stage, restore } = installDocument();
+  try {
+    const sent = [];
+    const npc = createNpcChatPanel({
+      async onSend(id, message) { sent.push({ id, message }); },
+      onFocus() {},
+    });
+    npc.setRoster([{ id: 3, name: "Rowan", role: "Guard" }]);
+    const [,,,,, history, form] = stage.children[0].children;
+    const [input, button] = form.children;
+    const submit = () => form.listeners.get("submit")({ preventDefault() {} });
+
+    // JS maxlength counts UTF-16 code units, but reliable frames limit bytes.
+    input.value = "🔥".repeat(61); // 122 UTF-16 units; 244 UTF-8 bytes
+    await submit();
+    assert.equal(sent.length, 0);
+    assert.match(history.children.at(-1).textContent, /exceeds 240 UTF-8 bytes/);
+    assert.equal(button.disabled, false);
+    assert.equal(input.value, "🔥".repeat(61), "draft must remain editable");
+
+    input.value = "HELLO\nCOMMAND";
+    await submit();
+    assert.equal(sent.length, 0);
+    assert.equal(history.children.at(-1).textContent, "Enter a valid single-line NPC message.");
+
+    // Exactly 240 bytes is accepted by the shared request codec.
+    input.value = "🔥".repeat(60);
+    await submit();
+    assert.equal(sent.length, 1);
+    assert.equal(sent[0].id, 3);
+    assert.equal(new TextEncoder().encode(sent[0].message).length, 240);
+    npc.receive({ id: 3, text: "Accepted by the pilot server" });
+    assert.equal(history.children.at(-1).textContent, "Accepted by the pilot server");
+
+    // A valid 240-byte ASCII request is equally accepted.
+    input.value = "x".repeat(240);
+    await submit();
+    assert.equal(sent.length, 2);
+    assert.equal(sent[1].message.length, 240);
+  } finally {
+    restore();
+  }
+});

@@ -323,3 +323,35 @@ ambiguous. A single Core8A stream dispatcher, correlation
 token and connection lifecycle are still prerequisites for
 future integrated NPCs. Keep all pilot opt-ins OFF for P0
 four-player First Playable Alpha.
+
+## LW-2D — NPC pilot validates exact reliable UTF-8 byte budget before sending
+
+The pilot browser's single-line input has \`maxLength=240\`, but browser
+character/UTF-16 length is not the authoritative \`NPC_WIRE.maxTextBytes=240\`
+UTF-8 byte length. A user could type, for example, **61 fire emoji**
+(122 UTF-16 code units, **244 UTF-8 bytes**) within the HTML limit,
+then receive only a generic send error when the client transport's
+\`encodeNpcRequest\` rejected it.
+
+The optional pilot panel now calls the **existing shared
+\`encodeNpcRequest(id, text)\` validator** before adding a
+reply expectation, disabling submission, or calling the network
+send handler. This checks the exact transport byte budget,
+authenticated roster target numeric ID and single-line framing
+without creating any packet or allocating a new opcode. An over-limit
+draft remains editable and gets \`Message exceeds 240 UTF-8 bytes.\`;
+invalid control characters get a single-line error. An exactly
+240-byte message, whether 60 four-byte emoji or ASCII text,
+continues to submit normally.
+
+One isolated DOM test verifies oversized Unicode/invalid control
+rejection without a queued reply or outgoing network call,
+preservation of the draft and unlocked submit, plus both 240-byte
+boundary approvals with a matched trusted response. Existing
+transport encoding, server security, authoritative combat,
+player items and NPC social/world state are untouched.
+
+This is an **optional pilot-only UX/parity improvement**.
+The Core-owned reliable reader/session/request epoch and native
+four-player First Playable acceptance remain independent blockers;
+all NPC opt-ins remain OFF for the first alpha.
