@@ -13,6 +13,7 @@ import re
 
 _ID = re.compile(r"[a-z][a-z0-9_-]{0,47}\Z")
 _OP = re.compile(r"[A-Za-z0-9_-]{1,64}\Z")
+_MAX_SIGNED_63 = 2**63 - 1
 
 
 class BankDenied(Exception):
@@ -101,7 +102,7 @@ class LocalTownBanksLab:
         carry_limit: int = 1000,
     ):
         if (
-            type(carry_limit) is not int or carry_limit <= 0
+            type(carry_limit) is not int or not 0 < carry_limit <= _MAX_SIGNED_63
             or not isinstance(town_capital, dict) or not town_capital
             or not isinstance(actor_gold, dict) or not actor_gold
             or set(actor_gold) != set(actor_towns)
@@ -229,8 +230,10 @@ class LocalTownBanksLab:
                     evidence is None or not isinstance(evidence, VaultBreachFixture)
                     or evidence.actor != actor or evidence.town != town
                     or evidence.vault_id != bank.vault_id
-                    or not evidence.vault_open or not evidence.guards_overcome
-                    or type(evidence.zone_epoch) is not int or evidence.zone_epoch <= 0
+                    or type(evidence.vault_open) is not bool or not evidence.vault_open
+                    or type(evidence.guards_overcome) is not bool or not evidence.guards_overcome
+                    or type(evidence.zone_epoch) is not int
+                    or not 0 < evidence.zone_epoch <= _MAX_SIGNED_63
                     or not _valid_op(evidence.event_id)
                     or evidence.event_id in self._spent_world_events
                 ):
@@ -246,8 +249,12 @@ class LocalTownBanksLab:
                 raise BankDenied("Unknown fictional bank operation")
             if new_carried > self._carry_limit:
                 raise BankDenied("Carried gold exceeds simulated physical weight limit")
-            if new_reserve < 0 or new_carried < 0 or new_balance < 0:
-                raise BankDenied("Negative physical asset or customer claim")
+            if not all(_nonnegative(value) for value in (
+                new_reserve, new_carried, new_balance,
+            )):
+                raise BankDenied("Gold or customer claim exceeds bounded physical supply")
+            if new_reserve + new_carried != bank.reserve_gold + person.carried_gold:
+                raise BankDenied("Physical gold transfer does not conserve supply")
 
             if kind != "robbery":
                 if new_balance:
@@ -260,6 +267,10 @@ class LocalTownBanksLab:
                 accounts=tuple(sorted(accounts.items())),
                 sequence=bank.sequence + 1,
             )
+            if not _nonnegative(updated.deposit_liability):
+                raise BankDenied("Total town liabilities exceed bounded ledger supply")
+            if updated.sequence > _MAX_SIGNED_63:
+                raise BankDenied("Town event sequence exhausted")
             receipt = BankReceipt(
                 town=town, local_sequence=updated.sequence,
                 operation_id=operation_id, operation=kind, actor=actor,
@@ -287,8 +298,9 @@ class LocalTownBanksLab:
                 raise AssertionError("Gold was created or destroyed during a bank operation")
             for town, bank in self._banks.items():
                 if (
-                    bank.town != town or bank.reserve_gold < 0
-                    or any(gold < 0 or actor not in self._actors for actor, gold in bank.accounts)
+                    bank.town != town or not _nonnegative(bank.reserve_gold)
+                    or not _nonnegative(bank.deposit_liability)
+                    or any(not _nonnegative(gold) or actor not in self._actors for actor, gold in bank.accounts)
                     or bank.accounts != tuple(sorted(bank.accounts))
                     or len(bank.accounts) != len(dict(bank.accounts))
                     or bank.sequence != len(self._events[town])
@@ -296,7 +308,7 @@ class LocalTownBanksLab:
                 ):
                     raise AssertionError("Broken independent local bank ledger")
             for actor in self._actors.values():
-                if actor.carried_gold < 0 or actor.carried_gold > self._carry_limit:
+                if not _nonnegative(actor.carried_gold) or actor.carried_gold > self._carry_limit:
                     raise AssertionError("Broken gold carrying constraints")
 
     def _get_bank(self, town: str) -> _Bank:
