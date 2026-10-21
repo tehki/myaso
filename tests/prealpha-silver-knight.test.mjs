@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
+import { createHash } from "node:crypto";
 import { COMBAT_ACTION } from "../src/browser/combat-readability.mjs";
 import { alphaPlayPath } from "../web/alpha-config.mjs";
 import {
@@ -105,4 +106,23 @@ test("the official Pre-Alpha multiplayer lobby activates Silver for every partic
   assert.equal(url.searchParams.get("knights"), "1");
   assert.equal(url.searchParams.get("server"), "https://game.open-trust-layer.org:4433/game");
   assert.equal(url.searchParams.get("cert"), "a".repeat(64));
+});
+
+test("original Graphics 3A Silver atlases retain exact source SHA-256, no NPC assets", () => {
+  const original = {
+    "silver_idle.webp": "828cf05dd873d0c8f35e887f5e46c35af87f084ac321977e358c985e7a2106b4",
+    "silver_walk.webp": "8fd421ea2d96a38a70afd9e05bec1297e90bffd8fde586a79c6a0907413adbb7",
+    "silver_sprint.webp": "3ec5b5c2b6a24d8bbad3639984f2020bec0519be08f8021be30d8d20b1e9f271",
+    "silver_roll.webp": "31c774ac930a5cf1060640f1fc2914b02d6d5ddccd7d56591123efd098909426",
+    "silver_jump.webp": "b73c506ad886fe68e01c834b36bb18ea951edd8327dfb8532c2eb0450dbc2e14",
+  };
+  const folder = new URL("../web/assets/knights/", import.meta.url);
+  assert.deepEqual(readdirSync(folder).filter(name => name.endsWith(".webp")).sort(),
+    Object.keys(original).sort(), "Pre-Alpha must not include T1 Sentinel or unapproved kick");
+  for (const [filename, expected] of Object.entries(original)) {
+    const bytes = readFileSync(new URL(filename, folder));
+    assert.equal(createHash("sha256").update(bytes).digest("hex"), expected, filename);
+    assert.equal(bytes.subarray(0,4).toString(), "RIFF");
+    assert.equal(bytes.subarray(8,12).toString(), "WEBP");
+  }
 });
