@@ -4,6 +4,8 @@ use std::sync::{
 };
 
 pub mod kill_event;
+// Proposal-only codec: no active ingress, no protocol v1 changes.
+pub mod prealpha_lmb_gesture_proposal;
 pub mod reliable;
 pub mod simulation;
 pub mod snapshot;
