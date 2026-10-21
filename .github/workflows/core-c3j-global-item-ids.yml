@@ -64,6 +64,28 @@ jobs:
           psql -X -v ON_ERROR_STOP=1 -f server/sql/002_fenced_world_mutations.sql
           psql -X -v ON_ERROR_STOP=1 -f server/sql/003_atomic_item_world_mutations.sql
           psql -X -v ON_ERROR_STOP=1 -f server/sql/004_atomic_equipment_swaps.sql
+      - name: Reject conflicting historical receipts without a partial upgrade
+        run: |
+          set -euo pipefail
+          createdb myaso_c3j_conflict_test
+          for migration in \
+            server/sql/001_zone_authority_postgres.sql \
+            server/sql/002_fenced_world_mutations.sql \
+            server/sql/003_atomic_item_world_mutations.sql \
+            server/sql/004_atomic_equipment_swaps.sql; do
+            PGDATABASE=myaso_c3j_conflict_test psql -X -v ON_ERROR_STOP=1 -f "$migration"
+          done
+          PGDATABASE=myaso_c3j_conflict_test python scripts/verify_global_item_operation_ids_pg.py --seed-conflict
+          if PGDATABASE=myaso_c3j_conflict_test psql -X -v ON_ERROR_STOP=1 \
+              -f server/sql/005_global_item_operation_ids.sql \
+              > "$RUNNER_TEMP/c3j-negative-migration.log" 2>&1; then
+            echo "ERROR: colliding legacy protocol IDs were accepted"
+            exit 1
+          fi
+          grep -q "conflicting historical item operation IDs" \
+              "$RUNNER_TEMP/c3j-negative-migration.log"
+          PGDATABASE=myaso_c3j_conflict_test python scripts/verify_global_item_operation_ids_pg.py --verify-failed-upgrade
+          dropdb myaso_c3j_conflict_test
       - name: Seed real historical C3g and C3i receipts before upgrading
         run: python scripts/verify_global_item_operation_ids_pg.py --seed
       - name: Atomically backfill and install shared item operation reservation
