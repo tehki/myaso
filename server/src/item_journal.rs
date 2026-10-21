@@ -352,6 +352,44 @@ impl DurableItemJournal {
         })
     }
 
+    /// ONE read-only, internally consistent local journal projection of the
+    /// server-verified character's proposed MainHand slot. No item kind, wire
+    /// identity, authentication, world tick, or 8C authority is inferred.
+    /// Even an empty hand has the full journal commit watermark, so a newer
+    /// drop cannot be overwritten by an older equip snapshot. The sequence
+    /// is meaningful only in this same single-writer journal lineage.
+    pub(crate) fn committed_mainhand_components(
+        &self,
+        character: CharacterId,
+    ) -> Result<(u64, Option<(ItemId, u64)>), ItemJournalError> {
+        if self.poisoned {
+            return Err(ItemJournalError::Poisoned);
+        }
+        let sequence = self.ledger.committed_sequence();
+        let item = self.ledger.equipped_item(character, 0);
+        let currently_equipped = if let Some(item_id) = item {
+            let last = self.ledger.last_mutation_sequence(item_id).ok_or(
+                ItemJournalError::InvalidRecord("equipped item without mutation"),
+            )?;
+            if last == 0
+                || last > sequence
+                || self.ledger.location(item_id)
+                    != Some(ItemLocation::Equipped {
+                        character_id: character,
+                        slot: 0,
+                    })
+            {
+                return Err(ItemJournalError::InvalidRecord(
+                    "inconsistent equipped item revision or owner",
+                ));
+            }
+            Some((item_id, last))
+        } else {
+            None
+        };
+        Ok((sequence, currently_equipped))
+    }
+
     pub fn location(&self, item: ItemId) -> Option<ItemLocation> {
         self.ledger.location(item)
     }
