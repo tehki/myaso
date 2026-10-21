@@ -234,6 +234,275 @@ async fn exercise_real_four_quic_clients(static_preview: bool) -> Result<()> {
     Ok(())
 }
 
+/// P0 live ingress lease: real QUIC transport keepalives/replayed samples
+/// must NEVER let a stale fighter indefinitely occupy one of four slots.
+/// Unlike the unit-only ingress test, this checks original server process,
+/// 30-second timer, three still-active independent peers' wire tombstones,
+/// and exact new #5 replacement admission without disconnecting the stale
+/// source voluntarily. This intentionally costs just over 30 real seconds.
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn four_live_quic_peers_expire_stale_replay_lease_and_admit_replacement() -> Result<()> {
+    use myaso_server::snapshot::SNAPSHOT_FIELD_REMOVED;
+
+    let (_server, url, pin) = start_private_staging_server(true)?;
+    let endpoint = Endpoint::client(
+        ClientConfig::builder()
+            .with_bind_default()
+            .with_server_certificate_hashes([pin])
+            .build(),
+    )?;
+    // Retain each real reliable stream for its whole actual session.
+    let mut sessions = Vec::new();
+    for index in 0..4 {
+        let connection = timeout(Duration::from_secs(6), endpoint.connect(url.as_str()))
+            .await
+            .context("stale-lease QUIC client connect timeout")?
+            .context("stale-lease QUIC client rejected")?;
+        let (send, mut recv) = timeout(Duration::from_secs(5), connection.open_bi())
+            .await
+            .context("stale-lease reliable open timeout")??
+            .await
+            .context("stale-lease reliable stream unavailable")?;
+        let mut header = [0_u8; 2];
+        timeout(Duration::from_secs(5), recv.read_exact(&mut header))
+            .await
+            .context("stale-lease full-baseline length timeout")??;
+        let size = u16::from_le_bytes(header) as usize;
+        if !(14..=4096).contains(&size) {
+            bail!("stale-lease baseline has invalid frame size {size}");
+        }
+        let mut frame = vec![0; size];
+        timeout(Duration::from_secs(5), recv.read_exact(&mut frame))
+            .await
+            .context("stale-lease full-baseline body timeout")??;
+        let baseline = decode_snapshot(&frame)
+            .map_err(|e| anyhow::anyhow!("stale-lease baseline invalid: {e:?}"))?;
+        if !baseline.full || baseline.records.len() != index + 1 {
+            bail!("stale-lease client {} did not join shared world", index + 1);
+        }
+        let already_saw_two = baseline.records.iter().any(|r| {
+            r.net_id == 2
+                && r.mask & SNAPSHOT_FIELD_POSITION != 0
+                && (r.x as f32 / 4.0, r.y as f32 / 4.0) == SPAWNS[1]
+        });
+        sessions.push((connection, send, recv, baseline.sequence, already_saw_two));
+    }
+
+    // A missing #2 is a valid removal only AFTER each survivor previously
+    // saw #2 on its own real snapshot channel and ACKed that baseline.
+    let mut observer_sequences = [0_u16; 3];
+    let mut observer_server_ticks = [0_u32; 3];
+    for (slot, id) in [1_u32, 3, 4].into_iter().enumerate() {
+        let connection = &sessions[(id - 1) as usize].0;
+        send_held_direction(
+            connection,
+            sessions[(id - 1) as usize].3,
+            80_000 + id,
+            (0, 0),
+        )?;
+        // Later joiners #3 and #4 already saw #2's precise position
+        // in their own authoritative reliable FULL baseline. Do not
+        // demand a second movement delta for a perfectly stationary #2.
+        let observed = if sessions[(id - 1) as usize].4 {
+            sessions[(id - 1) as usize].3
+        } else {
+            let until = Instant::now() + Duration::from_secs(5);
+            loop {
+                let remaining = until.saturating_duration_since(Instant::now());
+                if remaining.is_zero() {
+                    bail!("survivor {id} never saw actual old fighter #2");
+                }
+                let packet = timeout(remaining, connection.receive_datagram())
+                    .await
+                    .with_context(|| format!("survivor {id} old victim #2 roster timeout"))??;
+                if packet.len() < 14 || packet[0] != 1 || packet[1] != 2 {
+                    continue;
+                }
+                let frame = decode_snapshot(packet.as_ref())
+                    .map_err(|e| anyhow::anyhow!("old-victim roster decode: {e:?}"))?;
+                if frame.records.iter().any(|r| {
+                    r.net_id == 2
+                        && r.mask & SNAPSHOT_FIELD_POSITION != 0
+                        && (r.x as f32 / 4.0, r.y as f32 / 4.0) == SPAWNS[1]
+                }) {
+                    break frame.sequence;
+                }
+            }
+        };
+        observer_sequences[slot] = observed;
+        send_held_direction(connection, observed, 80_100 + id, (0, 0))?;
+        require_quic_input_ack(connection, 80_100 + id, id).await?;
+    }
+
+    // Exactly one accepted neutral sample from fighter #2, then *nothing*
+    // new on this authenticated connection for its entire actual 30s lease.
+    // We continue transmitting well-formed datagrams with NEW transport
+    // sequence numbers but the SAME old client sample tick and buttons.
+    let doomed = &sessions[1].0;
+    let original_tick = 90_002_u32;
+    let mut stale = vec![0_u8; INPUT_HEADER_BYTES + INPUT_SAMPLE_BYTES];
+    stale[0] = 1;
+    stale[1] = 1;
+    stale[2] = 1;
+    stale[4..6].copy_from_slice(&(original_tick as u16).to_le_bytes());
+    stale[6..8].copy_from_slice(&sessions[1].3.to_le_bytes());
+    stale[8..12].copy_from_slice(&original_tick.to_le_bytes());
+    doomed.send_datagram(stale.clone())?;
+    require_quic_input_ack(doomed, original_tick, 2).await?;
+
+    let start = Instant::now();
+    let expires_by = start + Duration::from_secs(39);
+    let mut iteration = 0_u32;
+    let mut replayed = 0_u32;
+    let mut tombstone = [None::<u32>; 3];
+    let mut last_replay = start;
+    while tombstone.iter().any(Option::is_none) {
+        if Instant::now() >= expires_by {
+            bail!(
+                "stale QUIC replay kept fighter #2 alive or hid real tombstones: \
+                 age={:.2}s replayed={} observed={tombstone:?}",
+                start.elapsed().as_secs_f32(),
+                replayed
+            );
+        }
+        iteration += 1;
+        // Keep all three survivors legitimately alive through new accepted
+        // sample ticks. This avoids mistaking four idle closures for an
+        // explicit replay-specific eviction of only old fighter #2.
+        for (slot, id) in [1_u32, 3, 4].into_iter().enumerate() {
+            let connection = &sessions[(id - 1) as usize].0;
+            send_held_direction_with_server_ack(
+                connection,
+                observer_sequences[slot],
+                100_000 + id * 1000 + iteration,
+                observer_server_ticks[slot],
+                (0, 0),
+            )?;
+        }
+        stale[4..6].copy_from_slice(
+            &((original_tick as u16).wrapping_add(iteration as u16)).to_le_bytes(),
+        );
+        // Old sample tick 90002, old server ACK, same move/action data:
+        // ONLY the packet sequence is new, so gameplay ingress is stale.
+        match doomed.send_datagram(stale.clone()) {
+            Ok(()) => {
+                replayed += 1;
+                last_replay = Instant::now();
+            }
+            Err(_) if start.elapsed() >= Duration::from_secs(26) => {}
+            Err(error) => return Err(error.into()),
+        }
+
+        for (slot, id) in [1_u32, 3, 4].into_iter().enumerate() {
+            let connection = &sessions[(id - 1) as usize].0;
+            // This server emits ~20 snapshots/s. Consume the actual stream
+            // faster than production, not one frame per 210ms loop. Otherwise
+            // the fixture remains buried behind old snapshots at expiry.
+            for _ in 0..64 {
+                let packet =
+                    match timeout(Duration::from_millis(2), connection.receive_datagram()).await {
+                        Ok(Ok(packet)) => packet,
+                        Ok(Err(error)) => {
+                            return Err(anyhow::anyhow!(
+                            "active survivor {id} closed while stale #2 should expire: {error:#}"
+                        ));
+                        }
+                        Err(_) => break,
+                    };
+                if packet.len() < 14 || packet[0] != 1 || packet[1] != 2 {
+                    continue;
+                }
+                let frame = decode_snapshot(packet.as_ref())
+                    .map_err(|e| anyhow::anyhow!("lease-tombstone decode: {e:?}"))?;
+                observer_sequences[slot] = frame.sequence;
+                observer_server_ticks[slot] = frame.server_tick;
+                if frame
+                    .records
+                    .iter()
+                    .any(|r| r.net_id == 2 && r.mask & SNAPSHOT_FIELD_REMOVED != 0)
+                {
+                    tombstone[slot] = Some(frame.server_tick);
+                    println!(
+                        "ALPHA_8C_QUIC_STALE_LEASE_TOMBSTONE observer={id} old=2 server_tick={}",
+                        frame.server_tick
+                    );
+                    break;
+                }
+            }
+        }
+        tokio::time::sleep(Duration::from_millis(210)).await;
+    }
+    if replayed < 60
+        || start.elapsed() < Duration::from_secs(26)
+        || last_replay.elapsed() > Duration::from_secs(2)
+    {
+        bail!(
+            "stale QUIC expiry lacked sustained replay pressure: \
+             sent={replayed} seconds={:.2} last_replay_age={:.2}",
+            start.elapsed().as_secs_f32(),
+            last_replay.elapsed().as_secs_f32()
+        );
+    }
+    // The timeout must have ended the replaying session, not merely
+    // removed a display: it must vacate the authoritative FOUR-slot cap.
+    let replacement = timeout(Duration::from_secs(6), endpoint.connect(url.as_str()))
+        .await
+        .context("fifth QUIC replacement still blocked by old replay lease")?
+        .context("fifth QUIC replacement was refused")?;
+    let (_send, mut recv) = timeout(Duration::from_secs(5), replacement.open_bi())
+        .await
+        .context("stale-lease replacement stream timeout")??
+        .await
+        .context("stale-lease replacement stream rejected")?;
+    let mut header = [0_u8; 2];
+    timeout(Duration::from_secs(5), recv.read_exact(&mut header))
+        .await
+        .context("stale-lease replacement baseline length timeout")??;
+    let size = u16::from_le_bytes(header) as usize;
+    if !(14..=4096).contains(&size) {
+        bail!("stale-lease replacement baseline length invalid: {size}");
+    }
+    let mut payload = vec![0_u8; size];
+    timeout(Duration::from_secs(5), recv.read_exact(&mut payload))
+        .await
+        .context("stale-lease replacement baseline body timeout")??;
+    let frame = decode_snapshot(&payload)
+        .map_err(|e| anyhow::anyhow!("stale-lease replacement baseline invalid: {e:?}"))?;
+    let ids: BTreeSet<u32> = frame.records.iter().map(|r| r.net_id).collect();
+    if !frame.full || ids != [1, 3, 4, 5].into_iter().collect() {
+        bail!("stale-replay expired slot not honestly released: roster={ids:?}");
+    }
+    let new = frame
+        .records
+        .iter()
+        .find(|r| r.net_id == 5)
+        .context("replacement #5 missing")?;
+    let spawn = (new.x as f32 / 4.0, new.y as f32 / 4.0);
+    if spawn != SPAWNS[1] {
+        bail!("replacement #5 did not inherit exactly vacated #2 anchor: {spawn:?}");
+    }
+    // Each original survivor must keep receiving its OWN real INPUT_ACK
+    // after old #2 expires and new #5 occupies the authoritative slot.
+    for (slot, id) in [1_u32, 3, 4].into_iter().enumerate() {
+        let connection = &sessions[(id - 1) as usize].0;
+        send_held_direction_with_server_ack(
+            connection,
+            observer_sequences[slot],
+            150_000 + id,
+            observer_server_ticks[slot],
+            (0, 0),
+        )?;
+        require_quic_input_ack(connection, 150_000 + id, id).await?;
+    }
+    println!(
+        "ALPHA_8C_QUIC_REAL_STALE_LEASE_PASS replay_packets={} seconds={:.2} \
+         tombstone_peers=3 kept_alive=1,3,4 survivor_acks=3 replacement=5 original_spawn=yes",
+        replayed,
+        start.elapsed().as_secs_f32()
+    );
+    Ok(())
+}
+
 /// Real-session disconnect/rejoin proof (not persistent account recovery):
 /// the old QUIC identity is removed, its server-owned immutable respawn
 /// anchor can be reclaimed by a new *different* network identity, and the
