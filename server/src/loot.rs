@@ -190,6 +190,16 @@ pub struct ProposedRackSocket {
     pub at: Point,
 }
 
+/// Exact proposed sword sprite/socket binding chosen for read-only Items
+/// preflight. An actor/client-provided triple is NOT proof that a currently
+/// authenticated World/Physics item exists or may be taken.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ProposedRackMainHandSelection {
+    pub socket_id: u8,
+    pub ground_entity_id: u64,
+    pub item_id: u64,
+}
+
 /// Current Items-owned ground reference for a physically present rack sword.
 /// This is an offline, ephemeral u64 projection only: it has NO canonical
 /// u128 mapping, mutation sequence, writer epoch, signed revision or lease.
@@ -498,6 +508,64 @@ impl LootAuthority {
             }
         }
         Ok(slots)
+    }
+
+    /// Read-only Items rule preflight for the FIRST PLAYABLE alpha's
+    /// physical sword-click -> direct empty MainHand semantic. This is NOT
+    /// a writer, mutation receipt, reservation, trusted socket source,
+    /// session authentication or Physics line-of-sight certification.
+    ///
+    /// Unlike the legacy Ground -> Backpack -> Equip two-step path this
+    /// permits a full 64-slot backpack because the proposed destination is
+    /// EQUIPMENT, not the backpack. A future ONE globally fenced Core writer
+    /// must atomically revalidate every exact identity, current mutation,
+    /// actor lease, world tick/zone, reach and complete dynamic LOS inside
+    /// its committed Ground -> MainHand operation. Never ACK or expose this
+    /// preview as authority to a browser.
+    pub fn preview_rack_sword_direct_mainhand(
+        &self,
+        authenticated_id: u32,
+        fighter: &Fighter,
+        zone: ZoneId,
+        sockets: [ProposedRackSocket; 4],
+        selection: ProposedRackMainHandSelection,
+        now_ms: u64,
+    ) -> Result<CurrentRackSword, LootError> {
+        self.require_alive(authenticated_id, fighter)?;
+        if !(1..=4).contains(&selection.socket_id)
+            || selection.ground_entity_id == 0
+            || selection.item_id == 0
+        {
+            return Err(LootError::InvalidState);
+        }
+        let at = Point::from_fighter(fighter);
+        if !at.in_zone(zone) {
+            return Err(LootError::InvalidPosition);
+        }
+        // Check the COMPLETE rack source first, not an arbitrary client ID
+        // or a nearest-ground lookup. It rejects live corpse/sword overlap,
+        // duplicate ground objects and invalid authored socket positions.
+        let slots = self.proposed_current_rack_swords(zone, sockets, now_ms)?;
+        let index = usize::from(selection.socket_id - 1);
+        let proposed = slots[index].ok_or(LootError::NotFound)?;
+        if proposed.ground_entity_id != selection.ground_entity_id
+            || proposed.item_id != selection.item_id
+        {
+            return Err(LootError::NotFound);
+        }
+        if !at.near(sockets[index].at) {
+            return Err(LootError::OutOfReach);
+        }
+        if self
+            .players
+            .get(&authenticated_id)
+            .expect("require_alive verified player")
+            .equipped(EquipmentSlot::MainHand)
+            .is_some()
+        {
+            return Err(LootError::SlotOccupied);
+        }
+        Ok(proposed)
     }
 
     pub fn corpses(&self) -> &BTreeMap<u64, Corpse> {
@@ -1566,6 +1634,163 @@ mod tests {
         // No falsely stale/active allocation; read-only rack view cannot
         // grant, write, or claim pickup receipt authority.
         assert_eq!(loot.export_state().unwrap().ground.len(), 3);
+    }
+
+    #[test]
+    fn rack_direct_mainhand_preview_requires_exact_real_sword_and_empty_hand_not_empty_bag() {
+        // Real Items-domain grants and physical World ground drops: source
+        // identity is read from live LootAuthority, not a proposed UI sprite.
+        let sockets = [3740.0_f32, 3780.0, 3820.0, 3860.0].map(|x| ProposedRackSocket {
+            at: Point { x, y: 4038.0 },
+        });
+        let zone = ZoneId::Moonvale;
+        let mut loot = LootAuthority::new();
+        let mut world = World::new(8192.0, 8192.0);
+        let mut physical = Vec::new();
+        for (i, socket) in sockets.iter().enumerate() {
+            let actor = (i + 1) as u32;
+            assert!(world.add_player_at(actor, socket.at.x, socket.at.y, 0.0));
+            loot.register(actor).unwrap();
+            let item_id = loot
+                .grant(
+                    actor,
+                    if i % 2 == 0 {
+                        ItemKind::RustySword
+                    } else {
+                        ItemKind::IronSword
+                    },
+                    1,
+                )
+                .unwrap();
+            let entity_id = loot
+                .drop_backpack(actor, world.fighter(actor).unwrap(), zone, item_id, 1)
+                .unwrap();
+            physical.push((entity_id, item_id));
+        }
+        assert!(world.add_player_at(9, sockets[0].at.x, 4088.0, 0.0));
+        loot.register(9).unwrap();
+        for _ in 0..BACKPACK_CAPACITY {
+            loot.grant(9, ItemKind::Gold, 1).unwrap();
+        }
+        let fighter_copy = world.fighter(9).unwrap().clone();
+        let fighter = &fighter_copy;
+        let (ground_id, item_id) = physical[0];
+        let choose = |socket_id, ground_entity_id, item_id| ProposedRackMainHandSelection {
+            socket_id,
+            ground_entity_id,
+            item_id,
+        };
+        let before = loot.export_state().unwrap();
+        let current = loot
+            .preview_rack_sword_direct_mainhand(
+                9,
+                fighter,
+                zone,
+                sockets,
+                choose(1, ground_id, item_id),
+                2,
+            )
+            .unwrap();
+        assert_eq!(current.ground_entity_id, ground_id);
+        assert_eq!(current.item_id, item_id);
+        assert_eq!(current.kind, ItemKind::RustySword);
+        assert_eq!(
+            loot.take_ground(9, fighter, zone, ground_id, 2),
+            Err(LootError::InventoryFull),
+            "legacy Ground->Backpack requires a free bag slot"
+        );
+        assert_eq!(
+            loot.export_state().unwrap(),
+            before,
+            "read-only direct-to-hand preview and failed legacy pickup are atomic"
+        );
+        for (socket, entity, item, failure) in [
+            (0, ground_id, item_id, LootError::InvalidState),
+            (5, ground_id, item_id, LootError::InvalidState),
+            (1, 0, item_id, LootError::InvalidState),
+            (1, ground_id, 0, LootError::InvalidState),
+            (1, physical[1].0, item_id, LootError::NotFound),
+            (1, ground_id, physical[1].1, LootError::NotFound),
+            (2, physical[1].0, physical[1].1, LootError::OutOfReach),
+        ] {
+            assert_eq!(
+                loot.preview_rack_sword_direct_mainhand(
+                    9,
+                    fighter,
+                    zone,
+                    sockets,
+                    choose(socket, entity, item),
+                    2,
+                ),
+                Err(failure)
+            );
+        }
+        let mut dead = fighter.clone();
+        dead.action = Action::Dead;
+        assert_eq!(
+            loot.preview_rack_sword_direct_mainhand(
+                9,
+                &dead,
+                zone,
+                sockets,
+                choose(1, ground_id, item_id),
+                2,
+            ),
+            Err(LootError::DeadPlayer)
+        );
+        assert!(world.add_player_at(8, 3740.0, 4088.0, 0.0));
+        assert_eq!(
+            loot.preview_rack_sword_direct_mainhand(
+                9,
+                world.fighter(8).unwrap(),
+                zone,
+                sockets,
+                choose(1, ground_id, item_id),
+                2,
+            ),
+            Err(LootError::InvalidPlayer),
+            "actor-to-fighter ID mismatch fails closed"
+        );
+        assert_eq!(
+            loot.preview_rack_sword_direct_mainhand(
+                9,
+                fighter,
+                zone,
+                sockets,
+                choose(1, ground_id, item_id),
+                1 + GROUND_DECAY_MS,
+            ),
+            Err(LootError::NotFound),
+            "an expired physical item cannot be previewed as a pickup"
+        );
+        // A real sword occupying MainHand denies a second pickup even when
+        // the other player's physical sword is a valid close-by ground item.
+        assert!(world.add_player_at(10, 3740.0, 4088.0, 0.0));
+        loot.register(10).unwrap();
+        let occupied = loot.grant(10, ItemKind::RustySword, 1).unwrap();
+        loot.equip(10, occupied, EquipmentSlot::MainHand).unwrap();
+        assert_eq!(
+            loot.preview_rack_sword_direct_mainhand(
+                10,
+                world.fighter(10).unwrap(),
+                zone,
+                sockets,
+                choose(1, ground_id, item_id),
+                2,
+            ),
+            Err(LootError::SlotOccupied)
+        );
+        assert_eq!(
+            loot.inventory(10)
+                .unwrap()
+                .equipped(EquipmentSlot::MainHand)
+                .unwrap()
+                .id,
+            occupied
+        );
+        assert_eq!(loot.ground()[&ground_id].item.id, item_id);
+        // Only authoritative Core commit may do Ground->MainHand: NOTHING
+        // in this test granted an item, minted a second one or wrote a receipt.
     }
 
     #[test]
