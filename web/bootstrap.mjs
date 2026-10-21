@@ -1,6 +1,8 @@
 import { installControlGuide } from "../src/browser/control-guide.mjs";
 import { installArenaFocusGuide } from "../src/browser/arena-focus-guide.mjs";
+import { installHudAnnouncements } from "../src/browser/hud-announcements.mjs";
 installControlGuide(document);
+installHudAnnouncements(document);
 
 const params = new URLSearchParams(window.location.search);
 installArenaFocusGuide(document, { online: params.has("server") });

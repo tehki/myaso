@@ -1,3 +1,4 @@
+import "./hud-announcements.test.mjs";
 import "./arena-focus-guide.test.mjs";
 import test from "node:test";
 import assert from "node:assert/strict";
