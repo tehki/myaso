@@ -1,3 +1,4 @@
+import { recordM161IngressTrace } from "../src/browser/m161-ingress-trace.mjs";
 import { createFrameBudget } from "../src/browser/frame-budget.mjs";
 import { createInputSendClock } from "../src/browser/input-send-clock.mjs";
 import { inputQueueReplacementEvidence } from "../src/browser/input-queue-evidence.mjs";
@@ -360,9 +361,11 @@ networkClient = await connectAuthoritativeClient({
       else if (Number.isFinite(own.stamina)) local.stamina = own.stamina;
     }
     observeCombatState(state);
+    captureM161Ingress("datagram", state);
   },
   onReliableSnapshot(_result, state) {
     observeCombatState(state);
+    captureM161Ingress("reliable", state);
   },
   onKillEvent(event) {
     recordKillEvent(event);
@@ -389,6 +392,24 @@ networkClient = await connectAuthoritativeClient({
     networkStatus = `Online - player #${ownId} - server tick ${networkClient.latestServerTick}`;
   },
 });
+
+function captureM161Ingress(source, state) {
+  // Capture actual client-ingested state provenance only for the strict native
+  // M161 flight. This neither affects game state nor fabricates a transition.
+  if (acceptanceScenario !== "uikickknockdownbounded") return;
+  const acceptance = window.__MYASO_ACCEPTANCE_STATE__;
+  const ownId = networkClient?.playerNetId;
+  if (!acceptance || !ownId) return;
+  acceptance.m161Ingress = recordM161IngressTrace(
+    acceptance.m161Ingress ?? [], {
+      source,
+      serverTick: networkClient.latestServerTick,
+      ownAction: state.get(ownId)?.action,
+      focusAction: acceptance.focusNetId ? state.get(acceptance.focusNetId)?.action : null,
+      epochMs: Date.now(),
+    },
+  );
+}
 
 function observeCombatState(state) {
   const ownId = networkClient?.playerNetId;

@@ -14118,6 +14118,7 @@ async function readUiEvidence(session) {
         staminaDenialTransitions: (window.__MYASO_ACCEPTANCE_STATE__.staminaDenialTransitions ?? []).map((entry) => ({ ...entry })),
         ownActionTransitions: (window.__MYASO_ACCEPTANCE_STATE__.ownActionTransitions ?? []).map((entry) => ({ ...entry })),
         focusActionTransitions: (window.__MYASO_ACCEPTANCE_STATE__.focusActionTransitions ?? []).map((entry) => ({ ...entry })),
+        m161Ingress: (window.__MYASO_ACCEPTANCE_STATE__.m161Ingress ?? []).slice(-96).map((entry) => ({ ...entry })),
         threatReplicaTransitions: (window.__MYASO_ACCEPTANCE_STATE__.threatReplicaTransitions ?? []).slice(-64).map((entry) => ({ ...entry })),
         fighters: (window.__MYASO_ACCEPTANCE_STATE__.fighters ?? []).map((fighter) => ({ ...fighter })),
         m233RecoveryHandoff: (window.__MYASO_ACCEPTANCE_STATE__.m233RecoveryHandoff ?? []).slice(-96).map((entry) => ({
