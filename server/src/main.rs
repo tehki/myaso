@@ -1,3 +1,6 @@
+mod alpha_spawn;
+
+use alpha_spawn::AlphaSpawnProfile;
 use anyhow::{bail, Context, Result};
 use myaso_server::{
     coalesce_accepted_input_batch, decode_input_packet, is_sequence_newer16, is_tick_newer32,
@@ -11,7 +14,7 @@ use myaso_server::{
 use std::{
     collections::{BTreeMap, VecDeque},
     env,
-    net::SocketAddr,
+    net::{IpAddr, SocketAddr},
     sync::{
         atomic::{AtomicU32, Ordering},
         Arc,
@@ -23,6 +26,11 @@ use wtransport::{Connection, Endpoint, Identity, SendStream, ServerConfig, VarIn
 
 const GAME_PATH: &str = "/game";
 const CLOSE_DATAGRAM_UNAVAILABLE: u32 = 0x11;
+const CLOSE_CLIENT_INACTIVITY: u32 = 0x12;
+// Expire authenticated sessions with no valid input, even when QUIC keepalives
+// prevent a transport timeout. Releases the fighter and admission permit.
+const CLIENT_INPUT_IDLE_TIMEOUT: Duration = Duration::from_secs(30);
+const RELIABLE_OPEN_TIMEOUT: Duration = Duration::from_secs(10);
 const SNAPSHOT_INTERVAL: Duration = Duration::from_millis(50);
 const SNAPSHOT_EVERY_SERVER_TICKS: u32 = 3;
 const INPUT_ACK_PACKET_TYPE: u8 = 3;
@@ -230,12 +238,42 @@ impl SharedGame {
     }
 }
 
+fn next_client_input_deadline(now: tokio::time::Instant) -> tokio::time::Instant {
+    now + CLIENT_INPUT_IDLE_TIMEOUT
+}
+
 fn should_enqueue_reliable_catchup(
     background_deadline_misses: usize,
     omitted_due_to_budget: usize,
     reliable_write_delay: Duration,
 ) -> bool {
     background_deadline_misses > 0 || (!reliable_write_delay.is_zero() && omitted_due_to_budget > 0)
+}
+
+/// Incomplete World #509 geometry is allowed only for an explicitly
+/// opted-in, private loopback 2-4-player Greyhaven staging experiment.
+/// Never advertise the fixed AABB digest as a live complete map revision.
+fn parse_static_collision_preview(
+    raw: Option<&str>,
+    alpha_spawn: AlphaSpawnProfile,
+    bind: IpAddr,
+    player_cap: usize,
+    background_players: usize,
+) -> Result<bool> {
+    match raw {
+        None => Ok(false),
+        Some("reviewed-static-only") => {
+            if !alpha_spawn.is_greyhaven()
+                || !bind.is_loopback()
+                || !(2..=4).contains(&player_cap)
+                || background_players != 0
+            {
+                bail!("MYASO_ALPHA_STATIC_COLLISION requires loopback Greyhaven spawn, 2..4 real players and no synthetic clients");
+            }
+            Ok(true)
+        }
+        Some(_) => bail!("MYASO_ALPHA_STATIC_COLLISION must be unset or reviewed-static-only"),
+    }
 }
 
 #[tokio::main]
@@ -246,6 +284,55 @@ async fn main() -> Result<()> {
         .context("MYASO_BIND must be a socket address")?;
 
     let flight = load_loopback_flight_config(bind)?;
+
+    // Validate the staging profile before WebTransport binds ANY socket.
+    // Production/public and wildcard addresses are not valid alpha staging
+    // listeners, even with an explicitly set four-player cap.
+    let player_cap_raw = match env::var("MYASO_MAX_PLAYERS") {
+        Ok(value) => Some(value),
+        Err(env::VarError::NotPresent) => None,
+        Err(error) => bail!("MYASO_MAX_PLAYERS is invalid: {error}"),
+    };
+    let player_cap = parse_player_cap(player_cap_raw.as_deref())?;
+    if flight.background_players >= player_cap {
+        bail!("flight background player count must remain below MYASO_MAX_PLAYERS");
+    }
+    let spawn_raw = match env::var("MYASO_ALPHA_SPAWN") {
+        Ok(value) => Some(value),
+        Err(env::VarError::NotPresent) => None,
+        Err(error) => bail!("MYASO_ALPHA_SPAWN is invalid: {error}"),
+    };
+    let alpha_spawn =
+        AlphaSpawnProfile::parse(spawn_raw.as_deref(), player_cap, flight.background_players)?;
+    if alpha_spawn.is_greyhaven() && !AlphaSpawnProfile::staging_bind_allowed(bind.ip()) {
+        bail!("MYASO_ALPHA_SPAWN=greyhaven requires an explicit private or loopback bind");
+    }
+    let static_collision_raw = match env::var("MYASO_ALPHA_STATIC_COLLISION") {
+        Ok(value) => Some(value),
+        Err(env::VarError::NotPresent) => None,
+        Err(error) => bail!("MYASO_ALPHA_STATIC_COLLISION is invalid: {error}"),
+    };
+    let static_preview = parse_static_collision_preview(
+        static_collision_raw.as_deref(),
+        alpha_spawn,
+        bind.ip(),
+        player_cap,
+        flight.background_players,
+    )?;
+    // The private staging world and every initial spawn are validated BEFORE
+    // the server opens its WebTransport listener, not after first admission.
+    let game = SharedGame::new(flight);
+    if static_preview
+        && !game
+            .state
+            .lock()
+            .await
+            .world
+            .enable_greyhaven_static_collisions()
+    {
+        bail!("reviewed Greyhaven fixed solids reject staging world geometry");
+    }
+
     let identity = load_identity(bind).await?;
     let certificate_hash = identity
         .certificate_chain()
@@ -266,21 +353,16 @@ async fn main() -> Result<()> {
         println!("development certificate SHA-256: {hash}");
     }
 
-    // R0 alpha: explicitly cap *real* concurrent players on the shared VPS.
-    // Flight fixtures remain loopback-only, and the default engineering cap
-    // stays unchanged for the existing 512-player acceptance suite.
-    let player_cap_raw = match env::var("MYASO_MAX_PLAYERS") {
-        Ok(value) => Some(value),
-        Err(env::VarError::NotPresent) => None,
-        Err(error) => bail!("MYASO_MAX_PLAYERS is invalid: {error}"),
-    };
-    let player_cap = parse_player_cap(player_cap_raw.as_deref())?;
-    if flight.background_players >= player_cap {
-        bail!("flight background player count must remain below MYASO_MAX_PLAYERS");
-    }
+    // R0 player cap and staged server-owned spawn were validated before
+    // opening the WebTransport listener; legacy default is unchanged.
     let gate = AdmissionGate::new(player_cap - flight.background_players);
     println!("myaso admission cap: {player_cap} concurrent players");
-    let game = SharedGame::new(flight);
+    if alpha_spawn.is_greyhaven() {
+        println!("staging-only Greyhaven spawn selected; no server obstacle/portal authority");
+    }
+    if static_preview {
+        println!("staging-only Greyhaven fixed static sweep enabled; river/dynamic solids NOT authoritative");
+    }
     // Accept server-side diagnostic output only on loopback and only when
     // explicitly requested by the real-browser M201 acceptance fixture.
     let flight_action_proof = match env::var("MYASO_FLIGHT_ACTION_PROOF").as_deref() {
@@ -338,7 +420,7 @@ async fn main() -> Result<()> {
             let player_id = game.allocate_player_id();
             {
                 let mut state = game.state.lock().await;
-                if !state.world.add_player(player_id) {
+                if !alpha_spawn.admit(&mut state.world, player_id) {
                     eprintln!("failed to add allocated player {player_id}");
                     return;
                 }
@@ -533,10 +615,11 @@ async fn handle_connection(
     let mut last_input_sequence = None;
     let mut dropped_action_ticks = VecDeque::with_capacity(MAX_DROPPED_ACTION_TICKS);
     let mut pending_input_acks = VecDeque::with_capacity(MAX_PENDING_INPUT_ACKS);
-    let (mut reliable_send, _reliable_recv) = connection
-        .accept_bi()
-        .await
-        .context("accept reliable game stream")?;
+    let (mut reliable_send, _reliable_recv) =
+        tokio::time::timeout(RELIABLE_OPEN_TIMEOUT, connection.accept_bi())
+            .await
+            .context("timed out accepting reliable game stream")?
+            .context("accept reliable game stream")?;
     let (initial_frame, mut next_kill_event_sequence) = {
         let state = game.state.lock().await;
         (
@@ -596,9 +679,21 @@ async fn handle_connection(
     });
     let mut snapshot_interval = tokio::time::interval(SNAPSHOT_INTERVAL);
     snapshot_interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+    let input_idle_timeout = tokio::time::sleep(CLIENT_INPUT_IDLE_TIMEOUT);
+    tokio::pin!(input_idle_timeout);
 
     loop {
         tokio::select! {
+            _ = &mut input_idle_timeout => {
+                // A dead browser may leave QUIC keepalives flowing. Only valid
+                // authenticated gameplay datagrams reset this deadline.
+                connection.close(
+                    VarInt::from_u32(CLOSE_CLIENT_INACTIVITY),
+                    b"client input inactivity",
+                );
+                reliable_writer.abort();
+                bail!("client input inactivity exceeded {}s", CLIENT_INPUT_IDLE_TIMEOUT.as_secs());
+            }
             writer_result = &mut reliable_writer => {
                 match writer_result {
                     Ok(Ok(())) => bail!("reliable writer ended unexpectedly"),
@@ -615,6 +710,7 @@ async fn handle_connection(
                         continue;
                     }
                 };
+                input_idle_timeout.as_mut().reset(next_client_input_deadline(tokio::time::Instant::now()));
 
                 if game.drop_new_action_datagrams {
                     if let Some(action_tick) =
@@ -912,6 +1008,67 @@ fn encode_input_ack(processed_client_tick: u32, server_tick: u32, player_net_id:
 mod tests {
     use super::*;
 
+    #[test]
+    fn reviewed_static_preview_requires_explicit_private_greyhaven_opt_in() {
+        let loopback: IpAddr = "127.0.0.1".parse().unwrap();
+        let private_lan: IpAddr = "192.168.1.20".parse().unwrap();
+        let public: IpAddr = "8.8.8.8".parse().unwrap();
+        let staging = AlphaSpawnProfile::GreyhavenStaging;
+        let legacy = AlphaSpawnProfile::Existing;
+        assert!(!parse_static_collision_preview(None, staging, loopback, 4, 0).unwrap());
+        assert!(parse_static_collision_preview(
+            Some("reviewed-static-only"),
+            staging,
+            loopback,
+            4,
+            0
+        )
+        .unwrap());
+        for (profile, bind, cap, background) in [
+            (legacy, loopback, 4, 0),
+            (staging, private_lan, 4, 0),
+            (staging, public, 4, 0),
+            (staging, loopback, 5, 0),
+            (staging, loopback, 4, 1),
+        ] {
+            assert!(parse_static_collision_preview(
+                Some("reviewed-static-only"),
+                profile,
+                bind,
+                cap,
+                background
+            )
+            .is_err());
+        }
+        assert!(parse_static_collision_preview(Some("true"), staging, loopback, 4, 0).is_err());
+    }
+
+    #[test]
+    fn authoritative_greyhaven_staging_four_real_spawn_anchors_clear_static_solids() {
+        let mut state = GameState::new(0, 0);
+        assert!(state.world.enable_greyhaven_static_collisions());
+        let spawn = AlphaSpawnProfile::GreyhavenStaging;
+        for id in 1..=4 {
+            assert!(spawn.admit(&mut state.world, id));
+        }
+        assert!(!spawn.admit(&mut state.world, 5));
+        assert!(state.world.fighters().iter().all(|fighter| {
+            myaso_server::alpha_greyhaven_geometry::overlaps_known_static_solid(
+                fighter.x, fighter.y, 18.0,
+            ) == Ok(false)
+        }));
+        assert!(state.world.remove_player(2));
+        assert!(spawn.admit(&mut state.world, 42));
+        assert_eq!(
+            (
+                state.world.fighter(42).unwrap().x,
+                state.world.fighter(42).unwrap().y
+            ),
+            (4206.0, 4160.0)
+        );
+        assert_eq!(state.world.fighters().len(), 4);
+    }
+
     fn action_sample(tick: u32, heavy_attack: bool) -> InputSample {
         InputSample {
             tick,
@@ -927,6 +1084,18 @@ mod tests {
             jump: false,
             dash: false,
         }
+    }
+
+    #[test]
+    fn inactive_session_cleanup_deadline_is_bounded_and_renews_only_on_input() {
+        let initial = tokio::time::Instant::now();
+        let deadline = next_client_input_deadline(initial);
+        assert_eq!(deadline - initial, Duration::from_secs(30));
+        let last_authenticated_input = initial + Duration::from_secs(18);
+        let extended = next_client_input_deadline(last_authenticated_input);
+        assert_eq!(extended - deadline, Duration::from_secs(18));
+        assert!(RELIABLE_OPEN_TIMEOUT < CLIENT_INPUT_IDLE_TIMEOUT);
+        assert!(CLIENT_INPUT_IDLE_TIMEOUT > Duration::from_secs(5));
     }
 
     #[test]

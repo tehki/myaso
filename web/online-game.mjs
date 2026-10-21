@@ -12,8 +12,11 @@ import { isTickNewer32, reconcilePrediction } from "../src/browser/reconciliatio
 import { createReconciliationCamera, createSnapshotRenderClock } from "../src/browser/smooth-motion.mjs";
 import { createRenderGapTelemetry } from "../src/browser/render-gap-telemetry.mjs";
 import { ARENA_VIEW_ZOOM, nearbyOffscreenPointers, projectArenaPoint } from "../src/browser/arena-viewport.mjs";
+import { createAuthoredWorldRenderer } from "../src/browser/authored-world-renderer.mjs";
+import { MAP_IDS } from "../src/world/authored-maps.mjs";
 import { NETWORK } from "../src/network/constants.mjs";
 import { connectAuthoritativeClient, parseSha256Hex } from "./authoritative-client.mjs";
+import { neutralBackgroundInput } from "../src/browser/neutral-background-input.mjs";
 
 const canvas = document.querySelector("#arena");
 const chargeHud = {
@@ -112,6 +115,10 @@ const killFeedSequences = new Set();
 
 const params = new URLSearchParams(window.location.search);
 const diagnosticsVisible = params.get("netstats") === "1";
+// Static map is currently visual-only in authoritative multiplayer. Doors
+// become functional only after server-approved zone transitions are implemented.
+const fixedWorldEnabled = params.get("world") === "1" && !params.has("scenario");
+const authoredWorld = fixedWorldEnabled ? createAuthoredWorldRenderer() : null;
 const renderGapTelemetry = diagnosticsVisible ? createRenderGapTelemetry() : null;
 const diagnosticsPanel = document.querySelector("#network-diagnostics");
 if (diagnosticsPanel) diagnosticsPanel.hidden = !diagnosticsVisible;
@@ -170,6 +177,8 @@ let networkClient = null;
 let animationFrameId = 0;
 let predictionStep = 0;
 let clientTick = 0;
+const BACKGROUND_LIVENESS_INTERVAL_MS = 5000;
+let backgroundLivenessTimer = null;
 let attackRequested = false;
 let runningAttackRequested = false;
 let committedLightMove = null;
@@ -893,6 +902,11 @@ function render(nowMs = performance.now(), impact = combatImpact.sample(nowMs)) 
   ctx.translate(canvas.width / 2, canvas.height / 2);
   ctx.scale(ARENA_VIEW_ZOOM, ARENA_VIEW_ZOOM);
   ctx.translate(-canvas.width / 2, -canvas.height / 2);
+
+  if (authoredWorld && local.initialized) {
+    authoredWorld.draw(ctx, MAP_IDS.overworld, visualCameraPosition,
+      canvas.width, canvas.height, ARENA_VIEW_ZOOM);
+  }
 
   for (const entity of networkClient.state.values()) {
     if (entity.netId === ownId) continue;
@@ -1814,6 +1828,14 @@ function frame(now) {
   animationFrameId = requestAnimationFrame(frame);
 }
 
+function sendBackgroundLiveness() {
+  if (!document.hidden || !networkClient) return;
+  // The render-driven 30Hz input loop pauses in a hidden tab. Continue only
+  // neutral input keepalives; never replay held actions from the visible tab.
+  networkClient.sendInput(neutralBackgroundInput(clientTick));
+  clientTick = (clientTick + 1) >>> 0;
+}
+
 function handleVisibilityChange() {
   releaseInputs();
   if (document.hidden) {
@@ -1823,7 +1845,15 @@ function handleVisibilityChange() {
     snapshotRenderClock.reset();
     if (renderGapTelemetry) renderGapTelemetry.reset();
     visualCamera.reset();
+    if (!backgroundLivenessTimer) {
+      backgroundLivenessTimer = window.setInterval(sendBackgroundLiveness, BACKGROUND_LIVENESS_INTERVAL_MS);
+    }
+    sendBackgroundLiveness();
     return;
+  }
+  if (backgroundLivenessTimer) {
+    clearInterval(backgroundLivenessTimer);
+    backgroundLivenessTimer = null;
   }
   frameBudget.reset(performance.now());
   snapshotRenderClock.reset();

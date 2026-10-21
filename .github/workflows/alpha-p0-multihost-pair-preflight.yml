@@ -1,0 +1,35 @@
+name: Core 8A P0 multihost four-browser offline preflight
+
+on:
+  pull_request:
+    paths:
+      - "scripts/alpha_p0_host_pair_*.mjs"
+      - "tests/alpha_p0_host_pair_config.test.mjs"
+      - ".github/workflows/alpha-p0-multihost-pair-preflight.yml"
+  push:
+    branches: [main]
+    paths:
+      - "scripts/alpha_p0_host_pair_*.mjs"
+      - "tests/alpha_p0_host_pair_config.test.mjs"
+      - ".github/workflows/alpha-p0-multihost-pair-preflight.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  offline-config-and-correlation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Static syntax of acceptance clients, guards and reviewer
+        run: |
+          node --version
+          node --check scripts/alpha_p0_host_pair_config.mjs
+          node --check scripts/alpha_p0_host_pair_flight.mjs
+          node --check scripts/alpha_p0_host_pair_verify.mjs
+          node --check tests/alpha_p0_host_pair_config.test.mjs
+      - name: Fail-closed isolated staging and SYNTHETIC offline evidence unit tests
+        run: node --test tests/alpha_p0_host_pair_config.test.mjs
+      - name: Assert no remote server traffic is represented by this workflow
+        run: echo 'CORE8A_P0_MULTIHOST_OFFLINE_PREFLIGHT_ONLY_NOT_A_REMOTE_GAME_PASS'
