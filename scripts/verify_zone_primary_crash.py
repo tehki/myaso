@@ -449,6 +449,76 @@ def test_racing_handoff_operations_after_primary_restart():
     print("PASS: racing handoff vs mutation serializes and fences old epoch")
 
 
+def test_forced_handoff_fk_lock_contention():
+    # Deterministically stage two explicit transactions with *different*
+    # handoff operation IDs against one entity. The handoffs FK trigger holds
+    # a compatible KEY SHARE lock on the parent entity for BOTH clients.
+    # They then simultaneously invoke the trusted prepare function while
+    # their own uncommitted handoff IDs are already inserted. This forces
+    # the exact FK KEY SHARE -> authority-row lock-upgrade interleaving.
+    register(82)
+    clients = []
+    choices = ((8201, 2), (8202, 3))
+    try:
+        for op, target in choices:
+            statement = (
+                "INSERT INTO core_zone.handoffs "
+                "(operation_id, entity_kind, entity_id, "
+                "source_worker, source_zone, source_epoch, "
+                "target_worker, target_zone, phase) VALUES ("
+                f"{ident(op)}, 1::smallint, {ident(82)}, "
+                f"1, 1, 1, {target}, {target}, 'prepared');"
+            )
+            client = open_uncommitted_transaction(
+                statement, f"C4H_HELD_HANDOFF_FK_{op}",
+            )
+            clients.append(client)
+        require(len(clients) == 2, "must stage two independent FK locks")
+        def release(index):
+            op, target = choices[index]
+            client = clients[index]
+            require(client.stdin is not None, "staged client pipe required")
+            client.stdin.write(prepare(op, 82, target=target) + "\nCOMMIT;\n")
+            client.stdin.flush()
+            client.stdin.close()
+            client.wait(timeout=12)
+            stderr = client.stderr.read() if client.stderr else ""
+            return (client.returncode, stderr)
+
+        # The test deliberately overlaps the two final statements. Both
+        # transactions already hold their FK KEY SHARE, so even if release
+        # calls are staggered the row-lock conflict is truly simultaneous.
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            left_future = pool.submit(release, 0)
+            right_future = pool.submit(release, 1)
+            left = left_future.result(timeout=16)
+            right = right_future.result(timeout=16)
+        require(sum(result[0] == 0 for result in (left, right)) == 1,
+                f"forced FK contention: one winner required, got {left} {right}")
+        winner_op = 8201 if left[0] == 0 else 8202
+        loser_op = 8202 if winner_op == 8201 else 8201
+        loser = right if winner_op == 8201 else left
+        require("deadlock detected" not in loser[1]
+                and "stale or already prepared authority" in loser[1],
+                f"held-FK loser must see fenced pending handoff: {loser}")
+        target = 2 if winner_op == 8201 else 3
+        require(count("handoffs", "operation_id", winner_op) == 1
+                and count("handoffs", "operation_id", loser_op) == 0,
+                "loser transaction must roll back its staged FK row")
+        require(not current(82) and not current(82, target, 2),
+                "winner leaves both workers frozen")
+        require(sql(f"SELECT core_zone.commit_transfer({ident(winner_op)});") == "2",
+                "only one handoff may transfer to epoch 2")
+        require(current(82, target, 2) and not current(82),
+                "old worker fenced after deterministic FK contention")
+        print("PASS: forced dual-FK handoff race excludes lock-upgrade deadlocks")
+    finally:
+        for client in clients:
+            if client.poll() is None:
+                client.kill()
+            client.wait(timeout=6)
+
+
 def main():
     container = guarded_container()
     seed()
@@ -487,6 +557,7 @@ def main():
     verify_after_primary_restart()
     test_concurrent_fencing_after_primary_restart()
     test_racing_handoff_operations_after_primary_restart()
+    test_forced_handoff_fk_lock_contention()
     print("C4H PRIMARY CRASH ACCEPTANCE PASSED (one disposable PG16 primary)")
 
 
