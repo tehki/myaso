@@ -517,14 +517,9 @@ mod tests {
                 }],
             )
             .unwrap();
-        let history = historical_committed_rack_pickup(
-            &journal,
-            txn(2001),
-            item(201),
-            rack(0),
-            owner(1),
-        )
-        .unwrap();
+        let history =
+            historical_committed_rack_pickup(&journal, txn(2001), item(201), rack(0), owner(1))
+                .unwrap();
         assert_eq!(history.journal_sequence(), original.sequence);
         assert_eq!(history.owner_at_commit(), owner(1));
         assert_eq!(history.item_id(), item(201));
