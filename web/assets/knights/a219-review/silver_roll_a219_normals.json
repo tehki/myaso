@@ -1,0 +1,269 @@
+{
+  "anatomicalHeelOrOutsoleVerified": false,
+  "authoritativeGameFloorUnknown": true,
+  "blender": "4.5.14 LTS",
+  "clip": "silver_roll",
+  "gameplayOrNetworkingModified": false,
+  "knightPresentation120PercentUnchanged": true,
+  "landmarksAreHeuristicFootRegionsNotConfirmedOutsoles": true,
+  "markerSphereRadiusSourceModelUnits": 0.033,
+  "milestone": "Blood & Iron A2.19 original evaluated A3 foot-region 3D closeup QA",
+  "originalA3TimingModified": false,
+  "originalGLBOrAtlasModified": false,
+  "originalSourceFrame60fps": [
+    1,
+    7,
+    22
+  ],
+  "productionApproved": false,
+  "records": [
+    {
+      "originalEvaluatedSourceVertices": [
+        {
+          "candidate": "heelSide",
+          "evaluatedWorldNormalXYZ": [
+            -0.39683,
+            0.62631,
+            -0.67101
+          ],
+          "evaluatedWorldXYZ": [
+            0.10713,
+            -0.04118,
+            -0.47752
+          ],
+          "normalIsNotSoleProof": true,
+          "side": "LeftFoot",
+          "sourceVertexIndex": 71894,
+          "worldNormalDotZ": -0.67101
+        },
+        {
+          "candidate": "toeSide",
+          "evaluatedWorldNormalXYZ": [
+            -0.33523,
+            -0.09202,
+            -0.93763
+          ],
+          "evaluatedWorldXYZ": [
+            0.13596,
+            -0.1739,
+            -0.50606
+          ],
+          "normalIsNotSoleProof": true,
+          "side": "LeftFoot",
+          "sourceVertexIndex": 71908,
+          "worldNormalDotZ": -0.93763
+        },
+        {
+          "candidate": "heelSide",
+          "evaluatedWorldNormalXYZ": [
+            0.50147,
+            0.01003,
+            -0.86512
+          ],
+          "evaluatedWorldXYZ": [
+            -0.08694,
+            0.09384,
+            -0.49322
+          ],
+          "normalIsNotSoleProof": true,
+          "side": "RightFoot",
+          "sourceVertexIndex": 22498,
+          "worldNormalDotZ": -0.86512
+        },
+        {
+          "candidate": "toeSide",
+          "evaluatedWorldNormalXYZ": [
+            0.38841,
+            -0.55662,
+            -0.73438
+          ],
+          "evaluatedWorldXYZ": [
+            -0.15761,
+            0.02334,
+            -0.51224
+          ],
+          "normalIsNotSoleProof": true,
+          "side": "RightFoot",
+          "sourceVertexIndex": 22501,
+          "worldNormalDotZ": -0.73438
+        }
+      ],
+      "reviewCameraFocusWorldXYZ": [
+        -0.00037,
+        -0.02447,
+        -0.49726
+      ],
+      "reviewCameraOrthoScale": 1.15,
+      "sourceFrame60fps": 1
+    },
+    {
+      "originalEvaluatedSourceVertices": [
+        {
+          "candidate": "heelSide",
+          "evaluatedWorldNormalXYZ": [
+            -0.69885,
+            -0.54852,
+            0.45906
+          ],
+          "evaluatedWorldXYZ": [
+            -0.13603,
+            0.02882,
+            0.12308
+          ],
+          "normalIsNotSoleProof": true,
+          "side": "LeftFoot",
+          "sourceVertexIndex": 71894,
+          "worldNormalDotZ": 0.45906
+        },
+        {
+          "candidate": "toeSide",
+          "evaluatedWorldNormalXYZ": [
+            -0.70764,
+            0.35062,
+            0.61344
+          ],
+          "evaluatedWorldXYZ": [
+            -0.1153,
+            0.16338,
+            0.13402
+          ],
+          "normalIsNotSoleProof": true,
+          "side": "LeftFoot",
+          "sourceVertexIndex": 71908,
+          "worldNormalDotZ": 0.61344
+        },
+        {
+          "candidate": "heelSide",
+          "evaluatedWorldNormalXYZ": [
+            0.4557,
+            0.49792,
+            0.73784
+          ],
+          "evaluatedWorldXYZ": [
+            -0.23328,
+            -0.00856,
+            0.15595
+          ],
+          "normalIsNotSoleProof": true,
+          "side": "RightFoot",
+          "sourceVertexIndex": 22498,
+          "worldNormalDotZ": 0.73784
+        },
+        {
+          "candidate": "toeSide",
+          "evaluatedWorldNormalXYZ": [
+            0.03323,
+            0.9009,
+            0.43275
+          ],
+          "evaluatedWorldXYZ": [
+            -0.33299,
+            0.02762,
+            0.15597
+          ],
+          "normalIsNotSoleProof": true,
+          "side": "RightFoot",
+          "sourceVertexIndex": 22501,
+          "worldNormalDotZ": 0.43275
+        }
+      ],
+      "reviewCameraFocusWorldXYZ": [
+        -0.2044,
+        0.05281,
+        0.14225
+      ],
+      "reviewCameraOrthoScale": 1.15,
+      "sourceFrame60fps": 7
+    },
+    {
+      "originalEvaluatedSourceVertices": [
+        {
+          "candidate": "heelSide",
+          "evaluatedWorldNormalXYZ": [
+            -0.39683,
+            0.62631,
+            -0.67101
+          ],
+          "evaluatedWorldXYZ": [
+            0.10713,
+            -0.04118,
+            -0.47752
+          ],
+          "normalIsNotSoleProof": true,
+          "side": "LeftFoot",
+          "sourceVertexIndex": 71894,
+          "worldNormalDotZ": -0.67101
+        },
+        {
+          "candidate": "toeSide",
+          "evaluatedWorldNormalXYZ": [
+            -0.33523,
+            -0.09202,
+            -0.93763
+          ],
+          "evaluatedWorldXYZ": [
+            0.13596,
+            -0.1739,
+            -0.50606
+          ],
+          "normalIsNotSoleProof": true,
+          "side": "LeftFoot",
+          "sourceVertexIndex": 71908,
+          "worldNormalDotZ": -0.93763
+        },
+        {
+          "candidate": "heelSide",
+          "evaluatedWorldNormalXYZ": [
+            0.50147,
+            0.01003,
+            -0.86512
+          ],
+          "evaluatedWorldXYZ": [
+            -0.08694,
+            0.09384,
+            -0.49322
+          ],
+          "normalIsNotSoleProof": true,
+          "side": "RightFoot",
+          "sourceVertexIndex": 22498,
+          "worldNormalDotZ": -0.86512
+        },
+        {
+          "candidate": "toeSide",
+          "evaluatedWorldNormalXYZ": [
+            0.38841,
+            -0.55662,
+            -0.73438
+          ],
+          "evaluatedWorldXYZ": [
+            -0.15761,
+            0.02334,
+            -0.51224
+          ],
+          "normalIsNotSoleProof": true,
+          "side": "RightFoot",
+          "sourceVertexIndex": 22501,
+          "worldNormalDotZ": -0.73438
+        }
+      ],
+      "reviewCameraFocusWorldXYZ": [
+        -0.00037,
+        -0.02447,
+        -0.49726
+      ],
+      "reviewCameraOrthoScale": 1.15,
+      "sourceFrame60fps": 22
+    }
+  ],
+  "renderedImages": 9,
+  "reviewViews": [
+    "front",
+    "side",
+    "low"
+  ],
+  "sourceGLBBasename": "silver-knight-roll-A3.glb",
+  "sourceGLBSHA256": "e4a263d480896fb1069ffc81e913e9aaa7324ff344611f5b69829cfee25c5d94",
+  "sourceMeshName": "geometry_0",
+  "workbenchRenderingOnly": true,
+  "worldNormalDotZIsNotGameFloorContact": true
+}

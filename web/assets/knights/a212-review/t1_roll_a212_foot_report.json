@@ -1,0 +1,4078 @@
+{
+  "authoritativeWorldPivotApproved": false,
+  "blender": "4.5.14 LTS",
+  "blenderOrOriginalGLBModified": false,
+  "boneJointNames": [
+    "mixamorig:LeftFoot",
+    "mixamorig:RightFoot"
+  ],
+  "canvas": [
+    160,
+    160
+  ],
+  "clip": "t1_roll",
+  "directionRows": 8,
+  "footOrSoleContactMeasured": false,
+  "gameCombatOrNetworkChanged": false,
+  "meshIntersectionOrGroundClearanceMeasured": false,
+  "milestone": "Blood & Iron A2.12 actual A3 rig foot-bone pixel projection",
+  "modelHeightOffsetForBake": 0.67,
+  "observations": [
+    {
+      "atlasColumn": 0,
+      "bones": {
+        "LeftFoot": {
+          "headAtlasFramePx": [
+            94.522,
+            119.9718
+          ],
+          "headPresentationOffsetPx": [
+            12.1622,
+            22.4764
+          ],
+          "headWorldXYZ": [
+            0.15067,
+            -0.10987,
+            0.15117
+          ],
+          "tailAtlasFramePx": [
+            93.6092,
+            134.6957
+          ],
+          "tailPresentationOffsetPx": [
+            11.3977,
+            34.8076
+          ],
+          "tailWorldXYZ": [
+            0.1412,
+            -0.23835,
+            0.0595
+          ]
+        },
+        "RightFoot": {
+          "headAtlasFramePx": [
+            66.5394,
+            106.8066
+          ],
+          "headPresentationOffsetPx": [
+            -11.2733,
+            11.4505
+          ],
+          "headWorldXYZ": [
+            -0.13965,
+            0.134,
+            0.12518
+          ],
+          "tailAtlasFramePx": [
+            57.0597,
+            118.3501
+          ],
+          "tailPresentationOffsetPx": [
+            -19.2125,
+            21.1182
+          ],
+          "tailWorldXYZ": [
+            -0.23801,
+            0.0331,
+            0.05346
+          ]
+        }
+      },
+      "direction": 0,
+      "sourceFrame60fps": 1
+    },
+    {
+      "atlasColumn": 1,
+      "bones": {
+        "LeftFoot": {
+          "headAtlasFramePx": [
+            91.1887,
+            125.0879
+          ],
+          "headPresentationOffsetPx": [
+            9.3705,
+            26.7611
+          ],
+          "headWorldXYZ": [
+            0.11608,
+            -0.23373,
+            0.18562
+          ],
+          "tailAtlasFramePx": [
+            91.3029,
+            140.2048
+          ],
+          "tailPresentationOffsetPx": [
+            9.4662,
+            39.4215
+          ],
+          "tailWorldXYZ": [
+            0.11727,
+            -0.31903,
+            0.05249
+          ]
+        },
+        "RightFoot": {
+          "headAtlasFramePx": [
+            67.6208,
+            118.1414
+          ],
+          "headPresentationOffsetPx": [
+            -10.3676,
+            20.9434
+          ],
+          "headWorldXYZ": [
+            -0.12843,
+            -0.06157,
+            0.13551
+          ],
+          "tailAtlasFramePx": [
+            56.5471,
+            128.0167
+          ],
+          "tailPresentationOffsetPx": [
+            -19.6418,
+            29.214
+          ],
+          "tailWorldXYZ": [
+            -0.24332,
+            -0.09966,
+            0.03379
+          ]
+        }
+      },
+      "direction": 0,
+      "sourceFrame60fps": 3
+    },
+    {
+      "atlasColumn": 2,
+      "bones": {
+        "LeftFoot": {
+          "headAtlasFramePx": [
+            92.9568,
+            139.2453
+          ],
+          "headPresentationOffsetPx": [
+            10.8513,
+            38.6179
+          ],
+          "headWorldXYZ": [
+            0.13443,
+            -0.38469,
+            0.12042
+          ],
+          "tailAtlasFramePx": [
+            90.447,
+            148.4451
+          ],
+          "tailPresentationOffsetPx": [
+            8.7494,
+            46.3228
+          ],
+          "tailWorldXYZ": [
+            0.10839,
+            -0.35136,
+            -0.03194
+          ]
+        },
+        "RightFoot": {
+          "headAtlasFramePx": [
+            68.6277,
+            125.6397
+          ],
+          "headPresentationOffsetPx": [
+            -9.5243,
+            27.2232
+          ],
+          "headWorldXYZ": [
+            -0.11799,
+            -0.28258,
+            0.21904
+          ],
+          "tailAtlasFramePx": [
+            55.7524,
+            130.0538
+          ],
+          "tailPresentationOffsetPx": [
+            -20.3074,
+            30.9201
+          ],
+          "tailWorldXYZ": [
+            -0.25157,
+            -0.25744,
+            0.13827
+          ]
+        }
+      },
+      "direction": 0,
+      "sourceFrame60fps": 5
+    },
+    {
+      "atlasColumn": 3,
+      "bones": {
+        "LeftFoot": {
+          "headAtlasFramePx": [
+            94.9396,
+            108.8707
+          ],
+          "headPresentationOffsetPx": [
+            12.5119,
+            13.1792
+          ],
+          "headWorldXYZ": [
+            0.155,
+            -0.17014,
+            0.3518
+          ],
+          "tailAtlasFramePx": [
+            91.8547,
+            96.2301
+          ],
+          "tailPresentationOffsetPx": [
+            9.9283,
+            2.5927
+          ],
+          "tailWorldXYZ": [
+            0.12299,
+            -0.02284,
+            0.39953
+          ]
+        },
+        "RightFoot": {
+          "headAtlasFramePx": [
+            70.5072,
+            110.1079
+          ],
+          "headPresentationOffsetPx": [
+            -7.9502,
+            14.2154
+          ],
+          "headWorldXYZ": [
+            -0.09849,
+            -0.28531,
+            0.43145
+          ],
+          "tailAtlasFramePx": [
+            57.312,
+            103.4998
+          ],
+          "tailPresentationOffsetPx": [
+            -19.0012,
+            8.6811
+          ],
+          "tailWorldXYZ": [
+            -0.23539,
+            -0.21105,
+            0.4587
+          ]
+        }
+      },
+      "direction": 0,
+      "sourceFrame60fps": 7
+    },
+    {
+      "atlasColumn": 4,
+      "bones": {
+        "LeftFoot": {
+          "headAtlasFramePx": [
+            91.151,
+            92.1451
+          ],
+          "headPresentationOffsetPx": [
+            9.339,
+            -0.8285
+          ],
+          "headWorldXYZ": [
+            0.11569,
+            0.15784,
+            0.30359
+          ],
+          "tailAtlasFramePx": [
+            89.7795,
+            84.7993
+          ],
+          "tailPresentationOffsetPx": [
+            8.1903,
+            -6.9806
+          ],
+          "tailWorldXYZ": [
+            0.10146,
+            0.10108,
+            0.45048
+          ]
+        },
+        "RightFoot": {
+          "headAtlasFramePx": [
+            67.0239,
+            107.1595
+          ],
+          "headPresentationOffsetPx": [
+            -10.8675,
+            11.7461
+          ],
+          "headWorldXYZ": [
+            -0.13463,
+            0.04719,
+            0.19306
+          ],
+          "tailAtlasFramePx": [
+            54.8523,
+            103.9491
+          ],
+          "tailPresentationOffsetPx": [
+            -21.0612,
+            9.0574
+          ],
+          "tailWorldXYZ": [
+            -0.26091,
+            0.00022,
+            0.2758
+          ]
+        }
+      },
+      "direction": 0,
+      "sourceFrame60fps": 9
+    },
+    {
+      "atlasColumn": 5,
+      "bones": {
+        "LeftFoot": {
+          "headAtlasFramePx": [
+            89.7012,
+            104.7521
+          ],
+          "headPresentationOffsetPx": [
+            8.1248,
+            9.7299
+          ],
+          "headWorldXYZ": [
+            0.10065,
+            -0.0102,
+            0.27366
+          ],
+          "tailAtlasFramePx": [
+            89.7437,
+            111.7744
+          ],
+          "tailPresentationOffsetPx": [
+            8.1603,
+            15.6111
+          ],
+          "tailWorldXYZ": [
+            0.10109,
+            -0.16457,
+            0.30785
+          ]
+        },
+        "RightFoot": {
+          "headAtlasFramePx": [
+            65.7988,
+            117.0203
+          ],
+          "headPresentationOffsetPx": [
+            -11.8935,
+            20.0045
+          ],
+          "headWorldXYZ": [
+            -0.14734,
+            0.01261,
+            0.0886
+          ],
+          "tailAtlasFramePx": [
+            54.6832,
+            123.5143
+          ],
+          "tailPresentationOffsetPx": [
+            -21.2028,
+            25.4432
+          ],
+          "tailWorldXYZ": [
+            -0.26266,
+            -0.09552,
+            0.09123
+          ]
+        }
+      },
+      "direction": 0,
+      "sourceFrame60fps": 11
+    },
+    {
+      "atlasColumn": 6,
+      "bones": {
+        "LeftFoot": {
+          "headAtlasFramePx": [
+            92.2979,
+            119.8245
+          ],
+          "headPresentationOffsetPx": [
+            10.2995,
+            22.353
+          ],
+          "headWorldXYZ": [
+            0.12759,
+            -0.16084,
+            0.19582
+          ],
+          "tailAtlasFramePx": [
+            92.3726,
+            134.8794
+          ],
+          "tailPresentationOffsetPx": [
+            10.3621,
+            34.9615
+          ],
+          "tailWorldXYZ": [
+            0.12837,
+            -0.27992,
+            0.09181
+          ]
+        },
+        "RightFoot": {
+          "headAtlasFramePx": [
+            66.7107,
+            111.7018
+          ],
+          "headPresentationOffsetPx": [
+            -11.1298,
+            15.5503
+          ],
+          "headWorldXYZ": [
+            -0.13788,
+            0.0522,
+            0.12741
+          ],
+          "tailAtlasFramePx": [
+            56.1417,
+            122.6742
+          ],
+          "tailPresentationOffsetPx": [
+            -19.9813,
+            24.7396
+          ],
+          "tailWorldXYZ": [
+            -0.24753,
+            -0.02387,
+            0.04264
+          ]
+        }
+      },
+      "direction": 0,
+      "sourceFrame60fps": 15
+    },
+    {
+      "atlasColumn": 7,
+      "bones": {
+        "LeftFoot": {
+          "headAtlasFramePx": [
+            94.522,
+            119.9718
+          ],
+          "headPresentationOffsetPx": [
+            12.1622,
+            22.4764
+          ],
+          "headWorldXYZ": [
+            0.15067,
+            -0.10987,
+            0.15117
+          ],
+          "tailAtlasFramePx": [
+            93.6092,
+            134.6957
+          ],
+          "tailPresentationOffsetPx": [
+            11.3977,
+            34.8076
+          ],
+          "tailWorldXYZ": [
+            0.1412,
+            -0.23835,
+            0.0595
+          ]
+        },
+        "RightFoot": {
+          "headAtlasFramePx": [
+            66.5394,
+            106.8066
+          ],
+          "headPresentationOffsetPx": [
+            -11.2733,
+            11.4505
+          ],
+          "headWorldXYZ": [
+            -0.13965,
+            0.134,
+            0.12518
+          ],
+          "tailAtlasFramePx": [
+            57.0597,
+            118.3501
+          ],
+          "tailPresentationOffsetPx": [
+            -19.2125,
+            21.1182
+          ],
+          "tailWorldXYZ": [
+            -0.23801,
+            0.0331,
+            0.05346
+          ]
+        }
+      },
+      "direction": 0,
+      "sourceFrame60fps": 22
+    },
+    {
+      "atlasColumn": 0,
+      "bones": {
+        "LeftFoot": {
+          "headAtlasFramePx": [
+            82.7803,
+            124.5715
+          ],
+          "headPresentationOffsetPx": [
+            2.3285,
+            26.3286
+          ],
+          "headWorldXYZ": [
+            0.15067,
+            -0.10987,
+            0.15117
+          ],
+          "tailAtlasFramePx": [
+            73.3784,
+            136.5533
+          ],
+          "tailPresentationOffsetPx": [
+            -5.5456,
+            36.3634
+          ],
+          "tailWorldXYZ": [
+            0.1412,
+            -0.23835,
+            0.0595
+          ]
+        },
+        "RightFoot": {
+          "headAtlasFramePx": [
+            79.6146,
+            103.1257
+          ],
+          "headPresentationOffsetPx": [
+            -0.3228,
+            8.3678
+          ],
+          "headWorldXYZ": [
+            -0.13965,
+            0.134,
+            0.12518
+          ],
+          "tailAtlasFramePx": [
+            66.0344,
+            108.5388
+          ],
+          "tailPresentationOffsetPx": [
+            -11.6962,
+            12.9012
+          ],
+          "tailWorldXYZ": [
+            -0.23801,
+            0.0331,
+            0.05346
+          ]
+        }
+      },
+      "direction": 1,
+      "sourceFrame60fps": 1
+    },
+    {
+      "atlasColumn": 1,
+      "bones": {
+        "LeftFoot": {
+          "headAtlasFramePx": [
+            71.9816,
+            125.9307
+          ],
+          "headPresentationOffsetPx": [
+            -6.7154,
+            27.467
+          ],
+          "headWorldXYZ": [
+            0.11608,
+            -0.23373,
+            0.18562
+          ],
+          "tailAtlasFramePx": [
+            66.249,
+            139.5539
+          ],
+          "tailPresentationOffsetPx": [
+            -11.5165,
+            38.8764
+          ],
+          "tailWorldXYZ": [
+            0.11727,
+            -0.31903,
+            0.05249
+          ]
+        },
+        "RightFoot": {
+          "headAtlasFramePx": [
+            67.0502,
+            111.4077
+          ],
+          "headPresentationOffsetPx": [
+            -10.8455,
+            15.3039
+          ],
+          "headWorldXYZ": [
+            -0.12843,
+            -0.06157,
+            0.13551
+          ],
+          "tailAtlasFramePx": [
+            56.6237,
+            115.5674
+          ],
+          "tailPresentationOffsetPx": [
+            -19.5777,
+            18.7877
+          ],
+          "tailWorldXYZ": [
+            -0.24332,
+            -0.09966,
+            0.03379
+          ]
+        }
+      },
+      "direction": 1,
+      "sourceFrame60fps": 3
+    },
+    {
+      "atlasColumn": 2,
+      "bones": {
+        "LeftFoot": {
+          "headAtlasFramePx": [
+            62.9434,
+            138.1554
+          ],
+          "headPresentationOffsetPx": [
+            -14.2849,
+            37.7051
+          ],
+          "headWorldXYZ": [
+            0.13443,
+            -0.38469,
+            0.12042
+          ],
+          "tailAtlasFramePx": [
+            63.4399,
+            146.82
+          ],
+          "tailPresentationOffsetPx": [
+            -13.8691,
+            44.9617
+          ],
+          "tailWorldXYZ": [
+            0.10839,
+            -0.35136,
+            -0.03194
+          ]
+        },
+        "RightFoot": {
+          "headAtlasFramePx": [
+            52.6992,
+            115.3586
+          ],
+          "headPresentationOffsetPx": [
+            -22.8644,
+            18.6128
+          ],
+          "headWorldXYZ": [
+            -0.11799,
+            -0.28258,
+            0.21904
+          ],
+          "tailAtlasFramePx": [
+            45.3086,
+            114.3851
+          ],
+          "tailPresentationOffsetPx": [
+            -29.054,
+            17.7975
+          ],
+          "tailWorldXYZ": [
+            -0.25157,
+            -0.25744,
+            0.13827
+          ]
+        }
+      },
+      "direction": 1,
+      "sourceFrame60fps": 5
+    },
+    {
+      "atlasColumn": 3,
+      "bones": {
+        "LeftFoot": {
+          "headAtlasFramePx": [
+            78.9682,
+            112.5681
+          ],
+          "headPresentationOffsetPx": [
+            -0.8641,
+            16.2758
+          ],
+          "headWorldXYZ": [
+            0.155,
+            -0.17014,
+            0.3518
+          ],
+          "tailAtlasFramePx": [
+            86.8261,
+            101.1963
+          ],
+          "tailPresentationOffsetPx": [
+            5.7169,
+            6.7519
+          ],
+          "tailWorldXYZ": [
+            0.12299,
+            -0.02284,
+            0.39953
+          ]
+        },
+        "RightFoot": {
+          "headAtlasFramePx": [
+            53.8424,
+            100.6304
+          ],
+          "headPresentationOffsetPx": [
+            -21.907,
+            6.278
+          ],
+          "headWorldXYZ": [
+            -0.09849,
+            -0.28531,
+            0.43145
+          ],
+          "tailAtlasFramePx": [
+            49.573,
+            89.3794
+          ],
+          "tailPresentationOffsetPx": [
+            -25.4826,
+            -3.1448
+          ],
+          "tailWorldXYZ": [
+            -0.23539,
+            -0.21105,
+            0.4587
+          ]
+        }
+      },
+      "direction": 1,
+      "sourceFrame60fps": 7
+    },
+    {
+      "atlasColumn": 4,
+      "bones": {
+        "LeftFoot": {
+          "headAtlasFramePx": [
+            98.6425,
+            100.0655
+          ],
+          "headPresentationOffsetPx": [
+            15.6131,
+            5.8049
+          ],
+          "headWorldXYZ": [
+            0.11569,
+            0.15784,
+            0.30359
+          ],
+          "tailAtlasFramePx": [
+            93.8041,
+            91.0688
+          ],
+          "tailPresentationOffsetPx": [
+            11.5609,
+            -1.7299
+          ],
+          "tailWorldXYZ": [
+            0.10146,
+            0.10108,
+            0.45048
+          ]
+        },
+        "RightFoot": {
+          "headAtlasFramePx": [
+            74.0406,
+            102.1256
+          ],
+          "headPresentationOffsetPx": [
+            -4.991,
+            7.5302
+          ],
+          "headWorldXYZ": [
+            -0.13463,
+            0.04719,
+            0.19306
+          ],
+          "tailAtlasFramePx": [
+            62.233,
+            92.5404
+          ],
+          "tailPresentationOffsetPx": [
+            -14.8799,
+            -0.4974
+          ],
+          "tailWorldXYZ": [
+            -0.26091,
+            0.00022,
+            0.2758
+          ]
+        }
+      },
+      "direction": 1,
+      "sourceFrame60fps": 9
+    },
+    {
+      "atlasColumn": 5,
+      "bones": {
+        "LeftFoot": {
+          "headAtlasFramePx": [
+            86.1646,
+            108.9699
+          ],
+          "headPresentationOffsetPx": [
+            5.1629,
+            13.2623
+          ],
+          "headWorldXYZ": [
+            0.10065,
+            -0.0102,
+            0.27366
+          ],
+          "tailAtlasFramePx": [
+            75.6734,
+            113.2145
+          ],
+          "tailPresentationOffsetPx": [
+            -3.6235,
+            16.8171
+          ],
+          "tailWorldXYZ": [
+            0.10109,
+            -0.16457,
+            0.30785
+          ]
+        },
+        "RightFoot": {
+          "headAtlasFramePx": [
+            70.8176,
+            110.8039
+          ],
+          "headPresentationOffsetPx": [
+            -7.6903,
+            14.7983
+          ],
+          "headWorldXYZ": [
+            -0.14734,
+            0.01261,
+            0.0886
+          ],
+          "tailAtlasFramePx": [
+            55.5881,
+            110.2941
+          ],
+          "tailPresentationOffsetPx": [
+            -20.445,
+            14.3713
+          ],
+          "tailWorldXYZ": [
+            -0.26266,
+            -0.09552,
+            0.09123
+          ]
+        }
+      },
+      "direction": 1,
+      "sourceFrame60fps": 11
+    },
+    {
+      "atlasColumn": 6,
+      "bones": {
+        "LeftFoot": {
+          "headAtlasFramePx": [
+            77.734,
+            122.4914
+          ],
+          "headPresentationOffsetPx": [
+            -1.8978,
+            24.5865
+          ],
+          "headWorldXYZ": [
+            0.12759,
+            -0.16084,
+            0.19582
+          ],
+          "tailAtlasFramePx": [
+            69.6706,
+            135.4225
+          ],
+          "tailPresentationOffsetPx": [
+            -8.6509,
+            35.4163
+          ],
+          "tailWorldXYZ": [
+            0.12837,
+            -0.27992,
+            0.09181
+          ]
+        },
+        "RightFoot": {
+          "headAtlasFramePx": [
+            74.1608,
+            106.6165
+          ],
+          "headPresentationOffsetPx": [
+            -4.8903,
+            11.2913
+          ],
+          "headWorldXYZ": [
+            -0.13788,
+            0.0522,
+            0.12741
+          ],
+          "tailAtlasFramePx": [
+            61.5025,
+            111.4141
+          ],
+          "tailPresentationOffsetPx": [
+            -15.4917,
+            15.3093
+          ],
+          "tailWorldXYZ": [
+            -0.24753,
+            -0.02387,
+            0.04264
+          ]
+        }
+      },
+      "direction": 1,
+      "sourceFrame60fps": 15
+    },
+    {
+      "atlasColumn": 7,
+      "bones": {
+        "LeftFoot": {
+          "headAtlasFramePx": [
+            82.7803,
+            124.5715
+          ],
+          "headPresentationOffsetPx": [
+            2.3285,
+            26.3286
+          ],
+          "headWorldXYZ": [
+            0.15067,
+            -0.10987,
+            0.15117
+          ],
+          "tailAtlasFramePx": [
+            73.3784,
+            136.5533
+          ],
+          "tailPresentationOffsetPx": [
+            -5.5456,
+            36.3634
+          ],
+          "tailWorldXYZ": [
+            0.1412,
+            -0.23835,
+            0.0595
+          ]
+        },
+        "RightFoot": {
+          "headAtlasFramePx": [
+            79.6146,
+            103.1257
+          ],
+          "headPresentationOffsetPx": [
+            -0.3228,
+            8.3678
+          ],
+          "headWorldXYZ": [
+            -0.13965,
+            0.134,
+            0.12518
+          ],
+          "tailAtlasFramePx": [
+            66.0344,
+            108.5388
+          ],
+          "tailPresentationOffsetPx": [
+            -11.6962,
+            12.9012
+          ],
+          "tailWorldXYZ": [
+            -0.23801,
+            0.0331,
+            0.05346
+          ]
+        }
+      },
+      "direction": 1,
+      "sourceFrame60fps": 22
+    },
+    {
+      "atlasColumn": 0,
+      "bones": {
+        "LeftFoot": {
+          "headAtlasFramePx": [
+            69.4099,
+            122.4954
+          ],
+          "headPresentationOffsetPx": [
+            -8.8692,
+            24.5899
+          ],
+          "headWorldXYZ": [
+            0.15067,
+            -0.10987,
+            0.15117
+          ],
+          "tailAtlasFramePx": [
+            57.0264,
+            128.6857
+          ],
+          "tailPresentationOffsetPx": [
+            -19.2404,
+            29.7743
+          ],
+          "tailWorldXYZ": [
+            0.1412,
+            -0.23835,
+            0.0595
+          ]
+        },
+        "RightFoot": {
+          "headAtlasFramePx": [
+            92.9155,
+            106.4569
+          ],
+          "headPresentationOffsetPx": [
+            10.8167,
+            11.1577
+          ],
+          "headWorldXYZ": [
+            -0.13965,
+            0.134,
+            0.12518
+          ],
+          "tailAtlasFramePx": [
+            83.1901,
+            105.6743
+          ],
+          "tailPresentationOffsetPx": [
+            2.6717,
+            10.5022
+          ],
+          "tailWorldXYZ": [
+            -0.23801,
+            0.0331,
+            0.05346
+          ]
+        }
+      },
+      "direction": 2,
+      "sourceFrame60fps": 1
+    },
+    {
+      "atlasColumn": 1,
+      "bones": {
+        "LeftFoot": {
+          "headAtlasFramePx": [
+            57.4716,
+            117.8101
+          ],
+          "headPresentationOffsetPx": [
+            -18.8675,
+            20.666
+          ],
+          "headWorldXYZ": [
+            0.11608,
+            -0.23373,
+            0.18562
+          ],
+          "tailAtlasFramePx": [
+            49.2502,
+            127.7237
+          ],
+          "tailPresentationOffsetPx": [
+            -25.753,
+            28.9686
+          ],
+          "tailWorldXYZ": [
+            0.11727,
+            -0.31903,
+            0.05249
+          ]
+        },
+        "RightFoot": {
+          "headAtlasFramePx": [
+            74.0654,
+            106.3875
+          ],
+          "headPresentationOffsetPx": [
+            -4.9702,
+            11.0995
+          ],
+          "headWorldXYZ": [
+            -0.12843,
+            -0.06157,
+            0.13551
+          ],
+          "tailAtlasFramePx": [
+            70.3939,
+            106.7992
+          ],
+          "tailPresentationOffsetPx": [
+            -8.0451,
+            11.4443
+          ],
+          "tailWorldXYZ": [
+            -0.24332,
+            -0.09966,
+            0.03379
+          ]
+        }
+      },
+      "direction": 2,
+      "sourceFrame60fps": 3
+    },
+    {
+      "atlasColumn": 2,
+      "bones": {
+        "LeftFoot": {
+          "headAtlasFramePx": [
+            42.9216,
+            123.7639
+          ],
+          "headPresentationOffsetPx": [
+            -31.0532,
+            25.6523
+          ],
+          "headWorldXYZ": [
+            0.13443,
+            -0.38469,
+            0.12042
+          ],
+          "tailAtlasFramePx": [
+            46.1335,
+            133.4144
+          ],
+          "tailPresentationOffsetPx": [
+            -28.3632,
+            33.7346
+          ],
+          "tailWorldXYZ": [
+            0.10839,
+            -0.35136,
+            -0.03194
+          ]
+        },
+        "RightFoot": {
+          "headAtlasFramePx": [
+            52.7632,
+            100.8601
+          ],
+          "headPresentationOffsetPx": [
+            -22.8108,
+            6.4703
+          ],
+          "headWorldXYZ": [
+            -0.11799,
+            -0.28258,
+            0.21904
+          ],
+          "tailAtlasFramePx": [
+            55.1866,
+            98.5661
+          ],
+          "tailPresentationOffsetPx": [
+            -20.7812,
+            4.5491
+          ],
+          "tailWorldXYZ": [
+            -0.25157,
+            -0.25744,
+            0.13827
+          ]
+        }
+      },
+      "direction": 2,
+      "sourceFrame60fps": 5
+    },
+    {
+      "atlasColumn": 3,
+      "bones": {
+        "LeftFoot": {
+          "headAtlasFramePx": [
+            63.6012,
+            107.9343
+          ],
+          "headPresentationOffsetPx": [
+            -13.734,
+            12.395
+          ],
+          "headWorldXYZ": [
+            0.155,
+            -0.17014,
+            0.3518
+          ],
+          "tailAtlasFramePx": [
+            77.7988,
+            102.4259
+          ],
+          "tailPresentationOffsetPx": [
+            -1.8435,
+            7.7817
+          ],
+          "tailWorldXYZ": [
+            0.12299,
+            -0.02284,
+            0.39953
+          ]
+        },
+        "RightFoot": {
+          "headAtlasFramePx": [
+            52.5003,
+            86.3659
+          ],
+          "headPresentationOffsetPx": [
+            -23.031,
+            -5.6686
+          ],
+          "headWorldXYZ": [
+            -0.09849,
+            -0.28531,
+            0.43145
+          ],
+          "tailAtlasFramePx": [
+            59.6577,
+            75.8827
+          ],
+          "tailPresentationOffsetPx": [
+            -17.0367,
+            -14.4482
+          ],
+          "tailWorldXYZ": [
+            -0.23539,
+            -0.21105,
+            0.4587
+          ]
+        }
+      },
+      "direction": 2,
+      "sourceFrame60fps": 7
+    },
+    {
+      "atlasColumn": 4,
+      "bones": {
+        "LeftFoot": {
+          "headAtlasFramePx": [
+            95.2135,
+            109.0661
+          ],
+          "headPresentationOffsetPx": [
+            12.7413,
+            13.3429
+          ],
+          "headWorldXYZ": [
+            0.11569,
+            0.15784,
+            0.30359
+          ],
+          "tailAtlasFramePx": [
+            89.7425,
+            97.3287
+          ],
+          "tailPresentationOffsetPx": [
+            8.1593,
+            3.5128
+          ],
+          "tailWorldXYZ": [
+            0.10146,
+            0.10108,
+            0.45048
+          ]
+        },
+        "RightFoot": {
+          "headAtlasFramePx": [
+            84.5482,
+            101.7505
+          ],
+          "headPresentationOffsetPx": [
+            3.8091,
+            7.216
+          ],
+          "headWorldXYZ": [
+            -0.13463,
+            0.04719,
+            0.19306
+          ],
+          "tailAtlasFramePx": [
+            80.0214,
+            87.8229
+          ],
+          "tailPresentationOffsetPx": [
+            0.0179,
+            -4.4483
+          ],
+          "tailWorldXYZ": [
+            -0.26091,
+            0.00022,
+            0.2758
+          ]
+        }
+      },
+      "direction": 2,
+      "sourceFrame60fps": 9
+    },
+    {
+      "atlasColumn": 5,
+      "bones": {
+        "LeftFoot": {
+          "headAtlasFramePx": [
+            79.017,
+            110.3475
+          ],
+          "headPresentationOffsetPx": [
+            -0.8233,
+            14.416
+          ],
+          "headWorldXYZ": [
+            0.10065,
+            -0.0102,
+            0.27366
+          ],
+          "tailAtlasFramePx": [
+            64.1376,
+            107.8474
+          ],
+          "tailPresentationOffsetPx": [
+            -13.2848,
+            12.3222
+          ],
+          "tailWorldXYZ": [
+            0.10109,
+            -0.16457,
+            0.30785
+          ]
+        },
+        "RightFoot": {
+          "headAtlasFramePx": [
+            81.2153,
+            108.686
+          ],
+          "headPresentationOffsetPx": [
+            1.0178,
+            13.0245
+          ],
+          "headWorldXYZ": [
+            -0.14734,
+            0.01261,
+            0.0886
+          ],
+          "tailAtlasFramePx": [
+            70.7932,
+            101.3569
+          ],
+          "tailPresentationOffsetPx": [
+            -7.7107,
+            6.8864
+          ],
+          "tailWorldXYZ": [
+            -0.26266,
+            -0.09552,
+            0.09123
+          ]
+        }
+      },
+      "direction": 2,
+      "sourceFrame60fps": 11
+    },
+    {
+      "atlasColumn": 6,
+      "bones": {
+        "LeftFoot": {
+          "headAtlasFramePx": [
+            64.4975,
+            117.7678
+          ],
+          "headPresentationOffsetPx": [
+            -12.9833,
+            20.6305
+          ],
+          "headWorldXYZ": [
+            0.12759,
+            -0.16084,
+            0.19582
+          ],
+          "tailAtlasFramePx": [
+            53.0195,
+            125.504
+          ],
+          "tailPresentationOffsetPx": [
+            -22.5962,
+            27.1096
+          ],
+          "tailWorldXYZ": [
+            0.12837,
+            -0.27992,
+            0.09181
+          ]
+        },
+        "RightFoot": {
+          "headAtlasFramePx": [
+            85.0314,
+            106.4019
+          ],
+          "headPresentationOffsetPx": [
+            4.2138,
+            11.1116
+          ],
+          "headWorldXYZ": [
+            -0.13788,
+            0.0522,
+            0.12741
+          ],
+          "tailAtlasFramePx": [
+            77.699,
+            105.8851
+          ],
+          "tailPresentationOffsetPx": [
+            -1.9271,
+            10.6788
+          ],
+          "tailWorldXYZ": [
+            -0.24753,
+            -0.02387,
+            0.04264
+          ]
+        }
+      },
+      "direction": 2,
+      "sourceFrame60fps": 15
+    },
+    {
+      "atlasColumn": 7,
+      "bones": {
+        "LeftFoot": {
+          "headAtlasFramePx": [
+            69.4099,
+            122.4954
+          ],
+          "headPresentationOffsetPx": [
+            -8.8692,
+            24.5899
+          ],
+          "headWorldXYZ": [
+            0.15067,
+            -0.10987,
+            0.15117
+          ],
+          "tailAtlasFramePx": [
+            57.0264,
+            128.6857
+          ],
+          "tailPresentationOffsetPx": [
+            -19.2404,
+            29.7743
+          ],
+          "tailWorldXYZ": [
+            0.1412,
+            -0.23835,
+            0.0595
+          ]
+        },
+        "RightFoot": {
+          "headAtlasFramePx": [
+            92.9155,
+            106.4569
+          ],
+          "headPresentationOffsetPx": [
+            10.8167,
+            11.1577
+          ],
+          "headWorldXYZ": [
+            -0.13965,
+            0.134,
+            0.12518
+          ],
+          "tailAtlasFramePx": [
+            83.1901,
+            105.6743
+          ],
+          "tailPresentationOffsetPx": [
+            2.6717,
+            10.5022
+          ],
+          "tailWorldXYZ": [
+            -0.23801,
+            0.0331,
+            0.05346
+          ]
+        }
+      },
+      "direction": 2,
+      "sourceFrame60fps": 22
+    },
+    {
+      "atlasColumn": 0,
+      "bones": {
+        "LeftFoot": {
+          "headAtlasFramePx": [
+            62.2431,
+            114.9595
+          ],
+          "headPresentationOffsetPx": [
+            -14.8714,
+            18.2786
+          ],
+          "headWorldXYZ": [
+            0.15067,
+            -0.10987,
+            0.15117
+          ],
+          "tailAtlasFramePx": [
+            54.1321,
+            115.7014
+          ],
+          "tailPresentationOffsetPx": [
+            -21.6644,
+            18.8999
+          ],
+          "tailWorldXYZ": [
+            0.1412,
+            -0.23835,
+            0.0595
+          ]
+        },
+        "RightFoot": {
+          "headAtlasFramePx": [
+            98.6507,
+            114.8486
+          ],
+          "headPresentationOffsetPx": [
+            15.62,
+            18.1857
+          ],
+          "headWorldXYZ": [
+            -0.13965,
+            0.134,
+            0.12518
+          ],
+          "tailAtlasFramePx": [
+            98.477,
+            111.4344
+          ],
+          "tailPresentationOffsetPx": [
+            15.4745,
+            15.3263
+          ],
+          "tailWorldXYZ": [
+            -0.23801,
+            0.0331,
+            0.05346
+          ]
+        }
+      },
+      "direction": 3,
+      "sourceFrame60fps": 1
+    },
+    {
+      "atlasColumn": 1,
+      "bones": {
+        "LeftFoot": {
+          "headAtlasFramePx": [
+            56.1585,
+            105.4828
+          ],
+          "headPresentationOffsetPx": [
+            -19.9673,
+            10.3418
+          ],
+          "headWorldXYZ": [
+            0.11608,
+            -0.23373,
+            0.18562
+          ],
+          "tailAtlasFramePx": [
+            50.2643,
+            111.6439
+          ],
+          "tailPresentationOffsetPx": [
+            -24.9036,
+            15.5018
+          ],
+          "tailWorldXYZ": [
+            0.11727,
+            -0.31903,
+            0.05249
+          ]
+        },
+        "RightFoot": {
+          "headAtlasFramePx": [
+            84.557,
+            106.0213
+          ],
+          "headPresentationOffsetPx": [
+            3.8165,
+            10.7928
+          ],
+          "headWorldXYZ": [
+            -0.12843,
+            -0.06157,
+            0.13551
+          ],
+          "tailAtlasFramePx": [
+            89.7912,
+            106.8484
+          ],
+          "tailPresentationOffsetPx": [
+            8.2001,
+            11.4855
+          ],
+          "tailWorldXYZ": [
+            -0.24332,
+            -0.09966,
+            0.03379
+          ]
+        }
+      },
+      "direction": 3,
+      "sourceFrame60fps": 3
+    },
+    {
+      "atlasColumn": 2,
+      "bones": {
+        "LeftFoot": {
+          "headAtlasFramePx": [
+            44.6197,
+            104.5011
+          ],
+          "headPresentationOffsetPx": [
+            -29.631,
+            9.5197
+          ],
+          "headWorldXYZ": [
+            0.13443,
+            -0.38469,
+            0.12042
+          ],
+          "tailAtlasFramePx": [
+            48.6656,
+            116.081
+          ],
+          "tailPresentationOffsetPx": [
+            -26.2426,
+            19.2178
+          ],
+          "tailWorldXYZ": [
+            0.10839,
+            -0.35136,
+            -0.03194
+          ]
+        },
+        "RightFoot": {
+          "headAtlasFramePx": [
+            68.7821,
+            90.6371
+          ],
+          "headPresentationOffsetPx": [
+            -9.395,
+            -2.0914
+          ],
+          "headWorldXYZ": [
+            -0.11799,
+            -0.28258,
+            0.21904
+          ],
+          "tailAtlasFramePx": [
+            79.6,
+            91.8633
+          ],
+          "tailPresentationOffsetPx": [
+            -0.335,
+            -1.0645
+          ],
+          "tailWorldXYZ": [
+            -0.25157,
+            -0.25744,
+            0.13827
+          ]
+        }
+      },
+      "direction": 3,
+      "sourceFrame60fps": 5
+    },
+    {
+      "atlasColumn": 3,
+      "bones": {
+        "LeftFoot": {
+          "headAtlasFramePx": [
+            57.8404,
+            97.6837
+          ],
+          "headPresentationOffsetPx": [
+            -18.5587,
+            3.8101
+          ],
+          "headWorldXYZ": [
+            0.155,
+            -0.17014,
+            0.3518
+          ],
+          "tailAtlasFramePx": [
+            70.061,
+            99.1985
+          ],
+          "tailPresentationOffsetPx": [
+            -8.3239,
+            5.0787
+          ],
+          "tailWorldXYZ": [
+            0.12299,
+            -0.02284,
+            0.39953
+          ]
+        },
+        "RightFoot": {
+          "headAtlasFramePx": [
+            67.2672,
+            75.6703
+          ],
+          "headPresentationOffsetPx": [
+            -10.6637,
+            -14.6261
+          ],
+          "headWorldXYZ": [
+            -0.09849,
+            -0.28531,
+            0.43145
+          ],
+          "tailAtlasFramePx": [
+            81.6586,
+            70.9158
+          ],
+          "tailPresentationOffsetPx": [
+            1.3891,
+            -18.608
+          ],
+          "tailWorldXYZ": [
+            -0.23539,
+            -0.21105,
+            0.4587
+          ]
+        }
+      },
+      "direction": 3,
+      "sourceFrame60fps": 7
+    },
+    {
+      "atlasColumn": 4,
+      "bones": {
+        "LeftFoot": {
+          "headAtlasFramePx": [
+            82.8726,
+            113.8742
+          ],
+          "headPresentationOffsetPx": [
+            2.4058,
+            17.3696
+          ],
+          "headWorldXYZ": [
+            0.11569,
+            0.15784,
+            0.30359
+          ],
+          "tailAtlasFramePx": [
+            79.9738,
+            99.9117
+          ],
+          "tailPresentationOffsetPx": [
+            -0.0219,
+            5.676
+          ],
+          "tailWorldXYZ": [
+            0.10146,
+            0.10108,
+            0.45048
+          ]
+        },
+        "RightFoot": {
+          "headAtlasFramePx": [
+            92.3915,
+            106.2539
+          ],
+          "headPresentationOffsetPx": [
+            10.3779,
+            10.9876
+          ],
+          "headWorldXYZ": [
+            -0.13463,
+            0.04719,
+            0.19306
+          ],
+          "tailAtlasFramePx": [
+            97.7972,
+            92.5599
+          ],
+          "tailPresentationOffsetPx": [
+            14.9052,
+            -0.4811
+          ],
+          "tailWorldXYZ": [
+            -0.26091,
+            0.00022,
+            0.2758
+          ]
+        }
+      },
+      "direction": 3,
+      "sourceFrame60fps": 9
+    },
+    {
+      "atlasColumn": 5,
+      "bones": {
+        "LeftFoot": {
+          "headAtlasFramePx": [
+            72.4451,
+            108.0778
+          ],
+          "headPresentationOffsetPx": [
+            -6.3272,
+            12.5152
+          ],
+          "headWorldXYZ": [
+            0.10065,
+            -0.0102,
+            0.27366
+          ],
+          "tailAtlasFramePx": [
+            61.8938,
+            98.817
+          ],
+          "tailPresentationOffsetPx": [
+            -15.1639,
+            4.7592
+          ],
+          "tailWorldXYZ": [
+            0.10109,
+            -0.16457,
+            0.30785
+          ]
+        },
+        "RightFoot": {
+          "headAtlasFramePx": [
+            90.9011,
+            111.9071
+          ],
+          "headPresentationOffsetPx": [
+            9.1297,
+            15.7222
+          ],
+          "headWorldXYZ": [
+            -0.14734,
+            0.01261,
+            0.0886
+          ],
+          "tailAtlasFramePx": [
+            91.3915,
+            101.9377
+          ],
+          "tailPresentationOffsetPx": [
+            9.5404,
+            7.3728
+          ],
+          "tailWorldXYZ": [
+            -0.26266,
+            -0.09552,
+            0.09123
+          ]
+        }
+      },
+      "direction": 3,
+      "sourceFrame60fps": 11
+    },
+    {
+      "atlasColumn": 6,
+      "bones": {
+        "LeftFoot": {
+          "headAtlasFramePx": [
+            60.3422,
+            108.4206
+          ],
+          "headPresentationOffsetPx": [
+            -16.4634,
+            12.8023
+          ],
+          "headWorldXYZ": [
+            0.12759,
+            -0.16084,
+            0.19582
+          ],
+          "tailAtlasFramePx": [
+            52.1731,
+            110.9337
+          ],
+          "tailPresentationOffsetPx": [
+            -23.305,
+            14.907
+          ],
+          "tailWorldXYZ": [
+            0.12837,
+            -0.27992,
+            0.09181
+          ]
+        },
+        "RightFoot": {
+          "headAtlasFramePx": [
+            92.9547,
+            111.1834
+          ],
+          "headPresentationOffsetPx": [
+            10.8496,
+            15.1161
+          ],
+          "headWorldXYZ": [
+            -0.13788,
+            0.0522,
+            0.12741
+          ],
+          "tailAtlasFramePx": [
+            95.2433,
+            109.3257
+          ],
+          "tailPresentationOffsetPx": [
+            12.7663,
+            13.5603
+          ],
+          "tailWorldXYZ": [
+            -0.24753,
+            -0.02387,
+            0.04264
+          ]
+        }
+      },
+      "direction": 3,
+      "sourceFrame60fps": 15
+    },
+    {
+      "atlasColumn": 7,
+      "bones": {
+        "LeftFoot": {
+          "headAtlasFramePx": [
+            62.2431,
+            114.9595
+          ],
+          "headPresentationOffsetPx": [
+            -14.8714,
+            18.2786
+          ],
+          "headWorldXYZ": [
+            0.15067,
+            -0.10987,
+            0.15117
+          ],
+          "tailAtlasFramePx": [
+            54.1321,
+            115.7014
+          ],
+          "tailPresentationOffsetPx": [
+            -21.6644,
+            18.8999
+          ],
+          "tailWorldXYZ": [
+            0.1412,
+            -0.23835,
+            0.0595
+          ]
+        },
+        "RightFoot": {
+          "headAtlasFramePx": [
+            98.6507,
+            114.8486
+          ],
+          "headPresentationOffsetPx": [
+            15.62,
+            18.1857
+          ],
+          "headWorldXYZ": [
+            -0.13965,
+            0.134,
+            0.12518
+          ],
+          "tailAtlasFramePx": [
+            98.477,
+            111.4344
+          ],
+          "tailPresentationOffsetPx": [
+            15.4745,
+            15.3263
+          ],
+          "tailWorldXYZ": [
+            -0.23801,
+            0.0331,
+            0.05346
+          ]
+        }
+      },
+      "direction": 3,
+      "sourceFrame60fps": 22
+    },
+    {
+      "atlasColumn": 0,
+      "bones": {
+        "LeftFoot": {
+          "headAtlasFramePx": [
+            65.478,
+            106.3784
+          ],
+          "headPresentationOffsetPx": [
+            -12.1622,
+            11.0919
+          ],
+          "headWorldXYZ": [
+            0.15067,
+            -0.10987,
+            0.15117
+          ],
+          "tailAtlasFramePx": [
+            66.3908,
+            105.2067
+          ],
+          "tailPresentationOffsetPx": [
+            -11.3977,
+            10.1106
+          ],
+          "tailWorldXYZ": [
+            0.1412,
+            -0.23835,
+            0.0595
+          ]
+        },
+        "RightFoot": {
+          "headAtlasFramePx": [
+            93.4606,
+            123.3853
+          ],
+          "headPresentationOffsetPx": [
+            11.2733,
+            25.3352
+          ],
+          "headWorldXYZ": [
+            -0.13965,
+            0.134,
+            0.12518
+          ],
+          "tailAtlasFramePx": [
+            102.9404,
+            122.4451
+          ],
+          "tailPresentationOffsetPx": [
+            19.2126,
+            24.5478
+          ],
+          "tailWorldXYZ": [
+            -0.23801,
+            0.0331,
+            0.05346
+          ]
+        }
+      },
+      "direction": 4,
+      "sourceFrame60fps": 1
+    },
+    {
+      "atlasColumn": 1,
+      "bones": {
+        "LeftFoot": {
+          "headAtlasFramePx": [
+            68.8114,
+            96.1703
+          ],
+          "headPresentationOffsetPx": [
+            -9.3705,
+            2.5426
+          ],
+          "headWorldXYZ": [
+            0.11608,
+            -0.23373,
+            0.18562
+          ],
+          "tailAtlasFramePx": [
+            68.6971,
+            100.7341
+          ],
+          "tailPresentationOffsetPx": [
+            -9.4662,
+            6.3648
+          ],
+          "tailWorldXYZ": [
+            0.11727,
+            -0.31903,
+            0.05249
+          ]
+        },
+        "RightFoot": {
+          "headAtlasFramePx": [
+            92.3792,
+            110.5238
+          ],
+          "headPresentationOffsetPx": [
+            10.3676,
+            14.5637
+          ],
+          "headWorldXYZ": [
+            -0.12843,
+            -0.06157,
+            0.13551
+          ],
+          "tailAtlasFramePx": [
+            103.4529,
+            115.6863
+          ],
+          "tailPresentationOffsetPx": [
+            19.6418,
+            18.8873
+          ],
+          "tailWorldXYZ": [
+            -0.24332,
+            -0.09966,
+            0.03379
+          ]
+        }
+      },
+      "direction": 4,
+      "sourceFrame60fps": 3
+    },
+    {
+      "atlasColumn": 2,
+      "bones": {
+        "LeftFoot": {
+          "headAtlasFramePx": [
+            67.0432,
+            91.651
+          ],
+          "headPresentationOffsetPx": [
+            -10.8513,
+            -1.2423
+          ],
+          "headWorldXYZ": [
+            0.13443,
+            -0.38469,
+            0.12042
+          ],
+          "tailAtlasFramePx": [
+            69.553,
+            104.9737
+          ],
+          "tailPresentationOffsetPx": [
+            -8.7494,
+            9.9155
+          ],
+          "tailWorldXYZ": [
+            0.10839,
+            -0.35136,
+            -0.03194
+          ]
+        },
+        "RightFoot": {
+          "headAtlasFramePx": [
+            91.3723,
+            90.6782
+          ],
+          "headPresentationOffsetPx": [
+            9.5243,
+            -2.057
+          ],
+          "headWorldXYZ": [
+            -0.11799,
+            -0.28258,
+            0.21904
+          ],
+          "tailAtlasFramePx": [
+            104.2476,
+            98.2031
+          ],
+          "tailPresentationOffsetPx": [
+            20.3074,
+            4.2451
+          ],
+          "tailWorldXYZ": [
+            -0.25157,
+            -0.25744,
+            0.13827
+          ]
+        }
+      },
+      "direction": 4,
+      "sourceFrame60fps": 5
+    },
+    {
+      "atlasColumn": 3,
+      "bones": {
+        "LeftFoot": {
+          "headAtlasFramePx": [
+            65.0604,
+            87.8212
+          ],
+          "headPresentationOffsetPx": [
+            -12.5119,
+            -4.4497
+          ],
+          "headWorldXYZ": [
+            0.155,
+            -0.17014,
+            0.3518
+          ],
+          "tailAtlasFramePx": [
+            68.1453,
+            93.4048
+          ],
+          "tailPresentationOffsetPx": [
+            -9.9283,
+            0.2265
+          ],
+          "tailWorldXYZ": [
+            0.12299,
+            -0.02284,
+            0.39953
+          ]
+        },
+        "RightFoot": {
+          "headAtlasFramePx": [
+            89.4928,
+            74.809
+          ],
+          "headPresentationOffsetPx": [
+            7.9502,
+            -15.3475
+          ],
+          "headWorldXYZ": [
+            -0.09849,
+            -0.28531,
+            0.43145
+          ],
+          "tailAtlasFramePx": [
+            102.688,
+            77.3883
+          ],
+          "tailPresentationOffsetPx": [
+            19.0012,
+            -13.1873
+          ],
+          "tailWorldXYZ": [
+            -0.23539,
+            -0.21105,
+            0.4587
+          ]
+        }
+      },
+      "direction": 4,
+      "sourceFrame60fps": 7
+    },
+    {
+      "atlasColumn": 4,
+      "bones": {
+        "LeftFoot": {
+          "headAtlasFramePx": [
+            68.849,
+            111.6736
+          ],
+          "headPresentationOffsetPx": [
+            -9.339,
+            15.5266
+          ],
+          "headWorldXYZ": [
+            0.11569,
+            0.15784,
+            0.30359
+          ],
+          "tailAtlasFramePx": [
+            70.2205,
+            97.305
+          ],
+          "tailPresentationOffsetPx": [
+            -8.1903,
+            3.4929
+          ],
+          "tailWorldXYZ": [
+            0.10146,
+            0.10108,
+            0.45048
+          ]
+        },
+        "RightFoot": {
+          "headAtlasFramePx": [
+            92.9761,
+            112.9978
+          ],
+          "headPresentationOffsetPx": [
+            10.8675,
+            16.6357
+          ],
+          "headWorldXYZ": [
+            -0.13463,
+            0.04719,
+            0.19306
+          ],
+          "tailAtlasFramePx": [
+            105.1477,
+            103.9767
+          ],
+          "tailPresentationOffsetPx": [
+            21.0612,
+            9.0805
+          ],
+          "tailWorldXYZ": [
+            -0.26091,
+            0.00022,
+            0.2758
+          ]
+        }
+      },
+      "direction": 4,
+      "sourceFrame60fps": 9
+    },
+    {
+      "atlasColumn": 5,
+      "bones": {
+        "LeftFoot": {
+          "headAtlasFramePx": [
+            70.2988,
+            103.4904
+          ],
+          "headPresentationOffsetPx": [
+            -8.1248,
+            8.6732
+          ],
+          "headWorldXYZ": [
+            0.10065,
+            -0.0102,
+            0.27366
+          ],
+          "tailAtlasFramePx": [
+            70.2563,
+            91.4133
+          ],
+          "tailPresentationOffsetPx": [
+            -8.1603,
+            -1.4414
+          ],
+          "tailWorldXYZ": [
+            0.10109,
+            -0.16457,
+            0.30785
+          ]
+        },
+        "RightFoot": {
+          "headAtlasFramePx": [
+            94.2012,
+            118.5805
+          ],
+          "headPresentationOffsetPx": [
+            11.8935,
+            21.3112
+          ],
+          "headWorldXYZ": [
+            -0.14734,
+            0.01261,
+            0.0886
+          ],
+          "tailAtlasFramePx": [
+            105.3168,
+            111.6965
+          ],
+          "tailPresentationOffsetPx": [
+            21.2028,
+            15.5458
+          ],
+          "tailWorldXYZ": [
+            -0.26266,
+            -0.09552,
+            0.09123
+          ]
+        }
+      },
+      "direction": 4,
+      "sourceFrame60fps": 11
+    },
+    {
+      "atlasColumn": 6,
+      "bones": {
+        "LeftFoot": {
+          "headAtlasFramePx": [
+            67.7021,
+            99.9254
+          ],
+          "headPresentationOffsetPx": [
+            -10.2995,
+            5.6875
+          ],
+          "headWorldXYZ": [
+            0.12759,
+            -0.16084,
+            0.19582
+          ],
+          "tailAtlasFramePx": [
+            67.6274,
+            100.2469
+          ],
+          "tailPresentationOffsetPx": [
+            -10.3621,
+            5.9568
+          ],
+          "tailWorldXYZ": [
+            0.12837,
+            -0.27992,
+            0.09181
+          ]
+        },
+        "RightFoot": {
+          "headAtlasFramePx": [
+            93.2893,
+            118.1603
+          ],
+          "headPresentationOffsetPx": [
+            11.1298,
+            20.9593
+          ],
+          "headWorldXYZ": [
+            -0.13788,
+            0.0522,
+            0.12741
+          ],
+          "tailAtlasFramePx": [
+            103.8583,
+            119.7208
+          ],
+          "tailPresentationOffsetPx": [
+            19.9813,
+            22.2662
+          ],
+          "tailWorldXYZ": [
+            -0.24753,
+            -0.02387,
+            0.04264
+          ]
+        }
+      },
+      "direction": 4,
+      "sourceFrame60fps": 15
+    },
+    {
+      "atlasColumn": 7,
+      "bones": {
+        "LeftFoot": {
+          "headAtlasFramePx": [
+            65.478,
+            106.3784
+          ],
+          "headPresentationOffsetPx": [
+            -12.1622,
+            11.0919
+          ],
+          "headWorldXYZ": [
+            0.15067,
+            -0.10987,
+            0.15117
+          ],
+          "tailAtlasFramePx": [
+            66.3908,
+            105.2066
+          ],
+          "tailPresentationOffsetPx": [
+            -11.3977,
+            10.1105
+          ],
+          "tailWorldXYZ": [
+            0.1412,
+            -0.23835,
+            0.0595
+          ]
+        },
+        "RightFoot": {
+          "headAtlasFramePx": [
+            93.4606,
+            123.3853
+          ],
+          "headPresentationOffsetPx": [
+            11.2733,
+            25.3352
+          ],
+          "headWorldXYZ": [
+            -0.13965,
+            0.134,
+            0.12518
+          ],
+          "tailAtlasFramePx": [
+            102.9404,
+            122.4451
+          ],
+          "tailPresentationOffsetPx": [
+            19.2126,
+            24.5478
+          ],
+          "tailWorldXYZ": [
+            -0.23801,
+            0.0331,
+            0.05346
+          ]
+        }
+      },
+      "direction": 4,
+      "sourceFrame60fps": 22
+    },
+    {
+      "atlasColumn": 0,
+      "bones": {
+        "LeftFoot": {
+          "headAtlasFramePx": [
+            77.2197,
+            101.7785
+          ],
+          "headPresentationOffsetPx": [
+            -2.3285,
+            7.2395
+          ],
+          "headWorldXYZ": [
+            0.15067,
+            -0.10987,
+            0.15117
+          ],
+          "tailAtlasFramePx": [
+            86.6216,
+            103.3489
+          ],
+          "tailPresentationOffsetPx": [
+            5.5456,
+            8.5547
+          ],
+          "tailWorldXYZ": [
+            0.1412,
+            -0.23835,
+            0.0595
+          ]
+        },
+        "RightFoot": {
+          "headAtlasFramePx": [
+            80.3854,
+            127.0661
+          ],
+          "headPresentationOffsetPx": [
+            0.3228,
+            28.4179
+          ],
+          "headWorldXYZ": [
+            -0.13965,
+            0.134,
+            0.12518
+          ],
+          "tailAtlasFramePx": [
+            93.9655,
+            132.2563
+          ],
+          "tailPresentationOffsetPx": [
+            11.6961,
+            32.7647
+          ],
+          "tailWorldXYZ": [
+            -0.23801,
+            0.0331,
+            0.05346
+          ]
+        }
+      },
+      "direction": 5,
+      "sourceFrame60fps": 1
+    },
+    {
+      "atlasColumn": 1,
+      "bones": {
+        "LeftFoot": {
+          "headAtlasFramePx": [
+            88.0184,
+            95.3274
+          ],
+          "headPresentationOffsetPx": [
+            6.7154,
+            1.8367
+          ],
+          "headWorldXYZ": [
+            0.11608,
+            -0.23373,
+            0.18562
+          ],
+          "tailAtlasFramePx": [
+            93.751,
+            101.3848
+          ],
+          "tailPresentationOffsetPx": [
+            11.5165,
+            6.9098
+          ],
+          "tailWorldXYZ": [
+            0.11727,
+            -0.31903,
+            0.05249
+          ]
+        },
+        "RightFoot": {
+          "headAtlasFramePx": [
+            92.9498,
+            117.2573
+          ],
+          "headPresentationOffsetPx": [
+            10.8455,
+            20.203
+          ],
+          "headWorldXYZ": [
+            -0.12843,
+            -0.06157,
+            0.13551
+          ],
+          "tailAtlasFramePx": [
+            103.3763,
+            128.1355
+          ],
+          "tailPresentationOffsetPx": [
+            19.5777,
+            29.3135
+          ],
+          "tailWorldXYZ": [
+            -0.24332,
+            -0.09966,
+            0.03379
+          ]
+        }
+      },
+      "direction": 5,
+      "sourceFrame60fps": 3
+    },
+    {
+      "atlasColumn": 2,
+      "bones": {
+        "LeftFoot": {
+          "headAtlasFramePx": [
+            97.0565,
+            92.7408
+          ],
+          "headPresentationOffsetPx": [
+            14.2848,
+            -0.3296
+          ],
+          "headWorldXYZ": [
+            0.13443,
+            -0.38469,
+            0.12042
+          ],
+          "tailAtlasFramePx": [
+            96.5601,
+            106.5988
+          ],
+          "tailPresentationOffsetPx": [
+            13.8691,
+            11.2765
+          ],
+          "tailWorldXYZ": [
+            0.10839,
+            -0.35136,
+            -0.03194
+          ]
+        },
+        "RightFoot": {
+          "headAtlasFramePx": [
+            107.3008,
+            100.9592
+          ],
+          "headPresentationOffsetPx": [
+            22.8644,
+            6.5533
+          ],
+          "headWorldXYZ": [
+            -0.11799,
+            -0.28258,
+            0.21904
+          ],
+          "tailAtlasFramePx": [
+            114.6913,
+            113.8717
+          ],
+          "tailPresentationOffsetPx": [
+            29.054,
+            17.3675
+          ],
+          "tailWorldXYZ": [
+            -0.25157,
+            -0.25744,
+            0.13827
+          ]
+        }
+      },
+      "direction": 5,
+      "sourceFrame60fps": 5
+    },
+    {
+      "atlasColumn": 3,
+      "bones": {
+        "LeftFoot": {
+          "headAtlasFramePx": [
+            81.0318,
+            84.1237
+          ],
+          "headPresentationOffsetPx": [
+            0.8641,
+            -7.5464
+          ],
+          "headWorldXYZ": [
+            0.155,
+            -0.17014,
+            0.3518
+          ],
+          "tailAtlasFramePx": [
+            73.1739,
+            88.4385
+          ],
+          "tailPresentationOffsetPx": [
+            -5.7169,
+            -3.9328
+          ],
+          "tailWorldXYZ": [
+            0.12299,
+            -0.02284,
+            0.39953
+          ]
+        },
+        "RightFoot": {
+          "headAtlasFramePx": [
+            106.1576,
+            84.2864
+          ],
+          "headPresentationOffsetPx": [
+            21.907,
+            -7.4101
+          ],
+          "headWorldXYZ": [
+            -0.09849,
+            -0.28531,
+            0.43145
+          ],
+          "tailAtlasFramePx": [
+            110.427,
+            91.5086
+          ],
+          "tailPresentationOffsetPx": [
+            25.4826,
+            -1.3615
+          ],
+          "tailWorldXYZ": [
+            -0.23539,
+            -0.21105,
+            0.4587
+          ]
+        }
+      },
+      "direction": 5,
+      "sourceFrame60fps": 7
+    },
+    {
+      "atlasColumn": 4,
+      "bones": {
+        "LeftFoot": {
+          "headAtlasFramePx": [
+            61.3575,
+            103.753
+          ],
+          "headPresentationOffsetPx": [
+            -15.6131,
+            8.8931
+          ],
+          "headWorldXYZ": [
+            0.11569,
+            0.15784,
+            0.30359
+          ],
+          "tailAtlasFramePx": [
+            66.1959,
+            91.0353
+          ],
+          "tailPresentationOffsetPx": [
+            -11.5609,
+            -1.7579
+          ],
+          "tailWorldXYZ": [
+            0.10146,
+            0.10108,
+            0.45048
+          ]
+        },
+        "RightFoot": {
+          "headAtlasFramePx": [
+            85.9594,
+            118.0316
+          ],
+          "headPresentationOffsetPx": [
+            4.991,
+            20.8515
+          ],
+          "headWorldXYZ": [
+            -0.13463,
+            0.04719,
+            0.19306
+          ],
+          "tailAtlasFramePx": [
+            97.767,
+            115.3852
+          ],
+          "tailPresentationOffsetPx": [
+            14.8799,
+            18.6351
+          ],
+          "tailWorldXYZ": [
+            -0.26091,
+            0.00022,
+            0.2758
+          ]
+        }
+      },
+      "direction": 5,
+      "sourceFrame60fps": 9
+    },
+    {
+      "atlasColumn": 5,
+      "bones": {
+        "LeftFoot": {
+          "headAtlasFramePx": [
+            73.8353,
+            99.2725
+          ],
+          "headPresentationOffsetPx": [
+            -5.1629,
+            5.1407
+          ],
+          "headWorldXYZ": [
+            0.10065,
+            -0.0102,
+            0.27366
+          ],
+          "tailAtlasFramePx": [
+            84.3266,
+            89.9731
+          ],
+          "tailPresentationOffsetPx": [
+            3.6235,
+            -2.6475
+          ],
+          "tailWorldXYZ": [
+            0.10109,
+            -0.16457,
+            0.30785
+          ]
+        },
+        "RightFoot": {
+          "headAtlasFramePx": [
+            89.1824,
+            124.7968
+          ],
+          "headPresentationOffsetPx": [
+            7.6903,
+            26.5173
+          ],
+          "headWorldXYZ": [
+            -0.14734,
+            0.01261,
+            0.0886
+          ],
+          "tailAtlasFramePx": [
+            104.4118,
+            124.9165
+          ],
+          "tailPresentationOffsetPx": [
+            20.4449,
+            26.6176
+          ],
+          "tailWorldXYZ": [
+            -0.26266,
+            -0.09552,
+            0.09123
+          ]
+        }
+      },
+      "direction": 5,
+      "sourceFrame60fps": 11
+    },
+    {
+      "atlasColumn": 6,
+      "bones": {
+        "LeftFoot": {
+          "headAtlasFramePx": [
+            82.266,
+            97.2584
+          ],
+          "headPresentationOffsetPx": [
+            1.8978,
+            3.4539
+          ],
+          "headWorldXYZ": [
+            0.12759,
+            -0.16084,
+            0.19582
+          ],
+          "tailAtlasFramePx": [
+            90.3293,
+            99.7036
+          ],
+          "tailPresentationOffsetPx": [
+            8.6508,
+            5.5018
+          ],
+          "tailWorldXYZ": [
+            0.12837,
+            -0.27992,
+            0.09181
+          ]
+        },
+        "RightFoot": {
+          "headAtlasFramePx": [
+            85.8392,
+            123.2454
+          ],
+          "headPresentationOffsetPx": [
+            4.8903,
+            25.218
+          ],
+          "headWorldXYZ": [
+            -0.13788,
+            0.0522,
+            0.12741
+          ],
+          "tailAtlasFramePx": [
+            98.4974,
+            130.9807
+          ],
+          "tailPresentationOffsetPx": [
+            15.4916,
+            31.6963
+          ],
+          "tailWorldXYZ": [
+            -0.24753,
+            -0.02387,
+            0.04264
+          ]
+        }
+      },
+      "direction": 5,
+      "sourceFrame60fps": 15
+    },
+    {
+      "atlasColumn": 7,
+      "bones": {
+        "LeftFoot": {
+          "headAtlasFramePx": [
+            77.2197,
+            101.7785
+          ],
+          "headPresentationOffsetPx": [
+            -2.3285,
+            7.2395
+          ],
+          "headWorldXYZ": [
+            0.15067,
+            -0.10987,
+            0.15117
+          ],
+          "tailAtlasFramePx": [
+            86.6216,
+            103.3489
+          ],
+          "tailPresentationOffsetPx": [
+            5.5456,
+            8.5547
+          ],
+          "tailWorldXYZ": [
+            0.1412,
+            -0.23835,
+            0.0595
+          ]
+        },
+        "RightFoot": {
+          "headAtlasFramePx": [
+            80.3854,
+            127.0661
+          ],
+          "headPresentationOffsetPx": [
+            0.3228,
+            28.4179
+          ],
+          "headWorldXYZ": [
+            -0.13965,
+            0.134,
+            0.12518
+          ],
+          "tailAtlasFramePx": [
+            93.9655,
+            132.2563
+          ],
+          "tailPresentationOffsetPx": [
+            11.6961,
+            32.7647
+          ],
+          "tailWorldXYZ": [
+            -0.23801,
+            0.0331,
+            0.05346
+          ]
+        }
+      },
+      "direction": 5,
+      "sourceFrame60fps": 22
+    },
+    {
+      "atlasColumn": 0,
+      "bones": {
+        "LeftFoot": {
+          "headAtlasFramePx": [
+            90.5901,
+            103.8547
+          ],
+          "headPresentationOffsetPx": [
+            8.8692,
+            8.9783
+          ],
+          "headWorldXYZ": [
+            0.15067,
+            -0.10987,
+            0.15117
+          ],
+          "tailAtlasFramePx": [
+            102.9736,
+            111.2167
+          ],
+          "tailPresentationOffsetPx": [
+            19.2404,
+            15.144
+          ],
+          "tailWorldXYZ": [
+            0.1412,
+            -0.23835,
+            0.0595
+          ]
+        },
+        "RightFoot": {
+          "headAtlasFramePx": [
+            67.0845,
+            123.735
+          ],
+          "headPresentationOffsetPx": [
+            -10.8167,
+            25.6281
+          ],
+          "headWorldXYZ": [
+            -0.13965,
+            0.134,
+            0.12518
+          ],
+          "tailAtlasFramePx": [
+            76.8099,
+            135.1209
+          ],
+          "tailPresentationOffsetPx": [
+            -2.6717,
+            35.1638
+          ],
+          "tailWorldXYZ": [
+            -0.23801,
+            0.0331,
+            0.05346
+          ]
+        }
+      },
+      "direction": 6,
+      "sourceFrame60fps": 1
+    },
+    {
+      "atlasColumn": 1,
+      "bones": {
+        "LeftFoot": {
+          "headAtlasFramePx": [
+            102.5284,
+            103.4481
+          ],
+          "headPresentationOffsetPx": [
+            18.8675,
+            8.6378
+          ],
+          "headWorldXYZ": [
+            0.11608,
+            -0.23373,
+            0.18562
+          ],
+          "tailAtlasFramePx": [
+            110.7498,
+            113.2151
+          ],
+          "tailPresentationOffsetPx": [
+            25.753,
+            16.8176
+          ],
+          "tailWorldXYZ": [
+            0.11727,
+            -0.31903,
+            0.05249
+          ]
+        },
+        "RightFoot": {
+          "headAtlasFramePx": [
+            85.9346,
+            122.2776
+          ],
+          "headPresentationOffsetPx": [
+            4.9702,
+            24.4075
+          ],
+          "headWorldXYZ": [
+            -0.12843,
+            -0.06157,
+            0.13551
+          ],
+          "tailAtlasFramePx": [
+            89.6061,
+            136.9038
+          ],
+          "tailPresentationOffsetPx": [
+            8.0451,
+            36.6569
+          ],
+          "tailWorldXYZ": [
+            -0.24332,
+            -0.09966,
+            0.03379
+          ]
+        }
+      },
+      "direction": 6,
+      "sourceFrame60fps": 3
+    },
+    {
+      "atlasColumn": 2,
+      "bones": {
+        "LeftFoot": {
+          "headAtlasFramePx": [
+            117.0784,
+            107.1323
+          ],
+          "headPresentationOffsetPx": [
+            31.0532,
+            11.7233
+          ],
+          "headWorldXYZ": [
+            0.13443,
+            -0.38469,
+            0.12042
+          ],
+          "tailAtlasFramePx": [
+            113.8665,
+            120.0045
+          ],
+          "tailPresentationOffsetPx": [
+            28.3632,
+            22.5038
+          ],
+          "tailWorldXYZ": [
+            0.10839,
+            -0.35136,
+            -0.03194
+          ]
+        },
+        "RightFoot": {
+          "headAtlasFramePx": [
+            107.2368,
+            115.4578
+          ],
+          "headPresentationOffsetPx": [
+            22.8108,
+            18.6959
+          ],
+          "headWorldXYZ": [
+            -0.11799,
+            -0.28258,
+            0.21904
+          ],
+          "tailAtlasFramePx": [
+            104.8134,
+            129.6907
+          ],
+          "tailPresentationOffsetPx": [
+            20.7812,
+            30.616
+          ],
+          "tailWorldXYZ": [
+            -0.25157,
+            -0.25744,
+            0.13827
+          ]
+        }
+      },
+      "direction": 6,
+      "sourceFrame60fps": 5
+    },
+    {
+      "atlasColumn": 3,
+      "bones": {
+        "LeftFoot": {
+          "headAtlasFramePx": [
+            96.3988,
+            88.7576
+          ],
+          "headPresentationOffsetPx": [
+            13.734,
+            -3.6655
+          ],
+          "headWorldXYZ": [
+            0.155,
+            -0.17014,
+            0.3518
+          ],
+          "tailAtlasFramePx": [
+            82.2012,
+            87.209
+          ],
+          "tailPresentationOffsetPx": [
+            1.8435,
+            -4.9625
+          ],
+          "tailWorldXYZ": [
+            0.12299,
+            -0.02284,
+            0.39953
+          ]
+        },
+        "RightFoot": {
+          "headAtlasFramePx": [
+            107.4997,
+            98.551
+          ],
+          "headPresentationOffsetPx": [
+            23.031,
+            4.5365
+          ],
+          "headWorldXYZ": [
+            -0.09849,
+            -0.28531,
+            0.43145
+          ],
+          "tailAtlasFramePx": [
+            100.3423,
+            105.0054
+          ],
+          "tailPresentationOffsetPx": [
+            17.0367,
+            9.942
+          ],
+          "tailWorldXYZ": [
+            -0.23539,
+            -0.21105,
+            0.4587
+          ]
+        }
+      },
+      "direction": 6,
+      "sourceFrame60fps": 7
+    },
+    {
+      "atlasColumn": 4,
+      "bones": {
+        "LeftFoot": {
+          "headAtlasFramePx": [
+            64.7865,
+            94.7525
+          ],
+          "headPresentationOffsetPx": [
+            -12.7413,
+            1.3552
+          ],
+          "headWorldXYZ": [
+            0.11569,
+            0.15784,
+            0.30359
+          ],
+          "tailAtlasFramePx": [
+            70.2576,
+            84.7755
+          ],
+          "tailPresentationOffsetPx": [
+            -8.1593,
+            -7.0005
+          ],
+          "tailWorldXYZ": [
+            0.10146,
+            0.10108,
+            0.45048
+          ]
+        },
+        "RightFoot": {
+          "headAtlasFramePx": [
+            75.4518,
+            118.4068
+          ],
+          "headPresentationOffsetPx": [
+            -3.8091,
+            21.1657
+          ],
+          "headWorldXYZ": [
+            -0.13463,
+            0.04719,
+            0.19306
+          ],
+          "tailAtlasFramePx": [
+            79.9786,
+            120.1028
+          ],
+          "tailPresentationOffsetPx": [
+            -0.0179,
+            22.5861
+          ],
+          "tailWorldXYZ": [
+            -0.26091,
+            0.00022,
+            0.2758
+          ]
+        }
+      },
+      "direction": 6,
+      "sourceFrame60fps": 9
+    },
+    {
+      "atlasColumn": 5,
+      "bones": {
+        "LeftFoot": {
+          "headAtlasFramePx": [
+            80.983,
+            97.8949
+          ],
+          "headPresentationOffsetPx": [
+            0.8233,
+            3.987
+          ],
+          "headWorldXYZ": [
+            0.10065,
+            -0.0102,
+            0.27366
+          ],
+          "tailAtlasFramePx": [
+            95.8624,
+            95.3403
+          ],
+          "tailPresentationOffsetPx": [
+            13.2848,
+            1.8475
+          ],
+          "tailWorldXYZ": [
+            0.10109,
+            -0.16457,
+            0.30785
+          ]
+        },
+        "RightFoot": {
+          "headAtlasFramePx": [
+            78.7847,
+            126.9148
+          ],
+          "headPresentationOffsetPx": [
+            -1.0178,
+            28.2911
+          ],
+          "headWorldXYZ": [
+            -0.14734,
+            0.01261,
+            0.0886
+          ],
+          "tailAtlasFramePx": [
+            89.2068,
+            133.8539
+          ],
+          "tailPresentationOffsetPx": [
+            7.7107,
+            34.1026
+          ],
+          "tailWorldXYZ": [
+            -0.26266,
+            -0.09552,
+            0.09123
+          ]
+        }
+      },
+      "direction": 6,
+      "sourceFrame60fps": 11
+    },
+    {
+      "atlasColumn": 6,
+      "bones": {
+        "LeftFoot": {
+          "headAtlasFramePx": [
+            95.5025,
+            101.9821
+          ],
+          "headPresentationOffsetPx": [
+            12.9833,
+            7.41
+          ],
+          "headWorldXYZ": [
+            0.12759,
+            -0.16084,
+            0.19582
+          ],
+          "tailAtlasFramePx": [
+            106.9805,
+            109.6223
+          ],
+          "tailPresentationOffsetPx": [
+            22.5962,
+            13.8087
+          ],
+          "tailWorldXYZ": [
+            0.12837,
+            -0.27992,
+            0.09181
+          ]
+        },
+        "RightFoot": {
+          "headAtlasFramePx": [
+            74.9686,
+            123.4602
+          ],
+          "headPresentationOffsetPx": [
+            -4.2138,
+            25.3979
+          ],
+          "headWorldXYZ": [
+            -0.13788,
+            0.0522,
+            0.12741
+          ],
+          "tailAtlasFramePx": [
+            82.301,
+            136.5099
+          ],
+          "tailPresentationOffsetPx": [
+            1.9271,
+            36.327
+          ],
+          "tailWorldXYZ": [
+            -0.24753,
+            -0.02387,
+            0.04264
+          ]
+        }
+      },
+      "direction": 6,
+      "sourceFrame60fps": 15
+    },
+    {
+      "atlasColumn": 7,
+      "bones": {
+        "LeftFoot": {
+          "headAtlasFramePx": [
+            90.5901,
+            103.8547
+          ],
+          "headPresentationOffsetPx": [
+            8.8692,
+            8.9783
+          ],
+          "headWorldXYZ": [
+            0.15067,
+            -0.10987,
+            0.15117
+          ],
+          "tailAtlasFramePx": [
+            102.9736,
+            111.2167
+          ],
+          "tailPresentationOffsetPx": [
+            19.2404,
+            15.144
+          ],
+          "tailWorldXYZ": [
+            0.1412,
+            -0.23835,
+            0.0595
+          ]
+        },
+        "RightFoot": {
+          "headAtlasFramePx": [
+            67.0845,
+            123.735
+          ],
+          "headPresentationOffsetPx": [
+            -10.8167,
+            25.6281
+          ],
+          "headWorldXYZ": [
+            -0.13965,
+            0.134,
+            0.12518
+          ],
+          "tailAtlasFramePx": [
+            76.8099,
+            135.1209
+          ],
+          "tailPresentationOffsetPx": [
+            -2.6717,
+            35.1638
+          ],
+          "tailWorldXYZ": [
+            -0.23801,
+            0.0331,
+            0.05346
+          ]
+        }
+      },
+      "direction": 6,
+      "sourceFrame60fps": 22
+    },
+    {
+      "atlasColumn": 0,
+      "bones": {
+        "LeftFoot": {
+          "headAtlasFramePx": [
+            97.757,
+            111.3906
+          ],
+          "headPresentationOffsetPx": [
+            14.8715,
+            15.2896
+          ],
+          "headWorldXYZ": [
+            0.15067,
+            -0.10987,
+            0.15117
+          ],
+          "tailAtlasFramePx": [
+            105.868,
+            124.2008
+          ],
+          "tailPresentationOffsetPx": [
+            21.6645,
+            26.0182
+          ],
+          "tailWorldXYZ": [
+            0.1412,
+            -0.23835,
+            0.0595
+          ]
+        },
+        "RightFoot": {
+          "headAtlasFramePx": [
+            61.3494,
+            115.3432
+          ],
+          "headPresentationOffsetPx": [
+            -15.6199,
+            18.5999
+          ],
+          "headWorldXYZ": [
+            -0.13965,
+            0.134,
+            0.12518
+          ],
+          "tailAtlasFramePx": [
+            61.523,
+            129.3607
+          ],
+          "tailPresentationOffsetPx": [
+            -15.4745,
+            30.3396
+          ],
+          "tailWorldXYZ": [
+            -0.23801,
+            0.0331,
+            0.05346
+          ]
+        }
+      },
+      "direction": 7,
+      "sourceFrame60fps": 1
+    },
+    {
+      "atlasColumn": 1,
+      "bones": {
+        "LeftFoot": {
+          "headAtlasFramePx": [
+            103.8416,
+            115.7753
+          ],
+          "headPresentationOffsetPx": [
+            19.9673,
+            18.9618
+          ],
+          "headWorldXYZ": [
+            0.11608,
+            -0.23373,
+            0.18562
+          ],
+          "tailAtlasFramePx": [
+            109.7358,
+            129.2948
+          ],
+          "tailPresentationOffsetPx": [
+            24.9037,
+            30.2844
+          ],
+          "tailWorldXYZ": [
+            0.11727,
+            -0.31903,
+            0.05249
+          ]
+        },
+        "RightFoot": {
+          "headAtlasFramePx": [
+            75.443,
+            122.6437
+          ],
+          "headPresentationOffsetPx": [
+            -3.8165,
+            24.7141
+          ],
+          "headWorldXYZ": [
+            -0.12843,
+            -0.06157,
+            0.13551
+          ],
+          "tailAtlasFramePx": [
+            70.2089,
+            136.8545
+          ],
+          "tailPresentationOffsetPx": [
+            -8.2,
+            36.6156
+          ],
+          "tailWorldXYZ": [
+            -0.24332,
+            -0.09966,
+            0.03379
+          ]
+        }
+      },
+      "direction": 7,
+      "sourceFrame60fps": 3
+    },
+    {
+      "atlasColumn": 2,
+      "bones": {
+        "LeftFoot": {
+          "headAtlasFramePx": [
+            115.3803,
+            126.395
+          ],
+          "headPresentationOffsetPx": [
+            29.631,
+            27.8558
+          ],
+          "headWorldXYZ": [
+            0.13443,
+            -0.38469,
+            0.12042
+          ],
+          "tailAtlasFramePx": [
+            111.3344,
+            137.3377
+          ],
+          "tailPresentationOffsetPx": [
+            26.2426,
+            37.0203
+          ],
+          "tailWorldXYZ": [
+            0.10839,
+            -0.35136,
+            -0.03194
+          ]
+        },
+        "RightFoot": {
+          "headAtlasFramePx": [
+            91.2179,
+            125.6807
+          ],
+          "headPresentationOffsetPx": [
+            9.395,
+            27.2576
+          ],
+          "headWorldXYZ": [
+            -0.11799,
+            -0.28258,
+            0.21904
+          ],
+          "tailAtlasFramePx": [
+            80.4001,
+            136.3935
+          ],
+          "tailPresentationOffsetPx": [
+            0.3351,
+            36.2296
+          ],
+          "tailWorldXYZ": [
+            -0.25157,
+            -0.25744,
+            0.13827
+          ]
+        }
+      },
+      "direction": 7,
+      "sourceFrame60fps": 5
+    },
+    {
+      "atlasColumn": 3,
+      "bones": {
+        "LeftFoot": {
+          "headAtlasFramePx": [
+            102.1596,
+            99.008
+          ],
+          "headPresentationOffsetPx": [
+            18.5587,
+            4.9192
+          ],
+          "headWorldXYZ": [
+            0.155,
+            -0.17014,
+            0.3518
+          ],
+          "tailAtlasFramePx": [
+            89.939,
+            90.4363
+          ],
+          "tailPresentationOffsetPx": [
+            8.3239,
+            -2.2596
+          ],
+          "tailWorldXYZ": [
+            0.12299,
+            -0.02284,
+            0.39953
+          ]
+        },
+        "RightFoot": {
+          "headAtlasFramePx": [
+            92.7328,
+            109.2465
+          ],
+          "headPresentationOffsetPx": [
+            10.6637,
+            13.4939
+          ],
+          "headWorldXYZ": [
+            -0.09849,
+            -0.28531,
+            0.43145
+          ],
+          "tailAtlasFramePx": [
+            78.3414,
+            109.9722
+          ],
+          "tailPresentationOffsetPx": [
+            -1.3891,
+            14.1017
+          ],
+          "tailWorldXYZ": [
+            -0.23539,
+            -0.21105,
+            0.4587
+          ]
+        }
+      },
+      "direction": 7,
+      "sourceFrame60fps": 7
+    },
+    {
+      "atlasColumn": 4,
+      "bones": {
+        "LeftFoot": {
+          "headAtlasFramePx": [
+            77.1274,
+            89.9443
+          ],
+          "headPresentationOffsetPx": [
+            -2.4058,
+            -2.6716
+          ],
+          "headWorldXYZ": [
+            0.11569,
+            0.15784,
+            0.30359
+          ],
+          "tailAtlasFramePx": [
+            80.0262,
+            82.1924
+          ],
+          "tailPresentationOffsetPx": [
+            0.0219,
+            -9.1639
+          ],
+          "tailWorldXYZ": [
+            0.10146,
+            0.10108,
+            0.45048
+          ]
+        },
+        "RightFoot": {
+          "headAtlasFramePx": [
+            67.6085,
+            113.9034
+          ],
+          "headPresentationOffsetPx": [
+            -10.3779,
+            17.3941
+          ],
+          "headWorldXYZ": [
+            -0.13463,
+            0.04719,
+            0.19306
+          ],
+          "tailAtlasFramePx": [
+            62.2028,
+            115.3657
+          ],
+          "tailPresentationOffsetPx": [
+            -14.9052,
+            18.6188
+          ],
+          "tailWorldXYZ": [
+            -0.26091,
+            0.00022,
+            0.2758
+          ]
+        }
+      },
+      "direction": 7,
+      "sourceFrame60fps": 9
+    },
+    {
+      "atlasColumn": 5,
+      "bones": {
+        "LeftFoot": {
+          "headAtlasFramePx": [
+            87.5549,
+            100.1646
+          ],
+          "headPresentationOffsetPx": [
+            6.3272,
+            5.8879
+          ],
+          "headWorldXYZ": [
+            0.10065,
+            -0.0102,
+            0.27366
+          ],
+          "tailAtlasFramePx": [
+            98.1063,
+            104.3706
+          ],
+          "tailPresentationOffsetPx": [
+            15.164,
+            9.4104
+          ],
+          "tailWorldXYZ": [
+            0.10109,
+            -0.16457,
+            0.30785
+          ]
+        },
+        "RightFoot": {
+          "headAtlasFramePx": [
+            69.0989,
+            123.6936
+          ],
+          "headPresentationOffsetPx": [
+            -9.1297,
+            25.5934
+          ],
+          "headWorldXYZ": [
+            -0.14734,
+            0.01261,
+            0.0886
+          ],
+          "tailAtlasFramePx": [
+            68.6085,
+            133.273
+          ],
+          "tailPresentationOffsetPx": [
+            -9.5404,
+            33.6161
+          ],
+          "tailWorldXYZ": [
+            -0.26266,
+            -0.09552,
+            0.09123
+          ]
+        }
+      },
+      "direction": 7,
+      "sourceFrame60fps": 11
+    },
+    {
+      "atlasColumn": 6,
+      "bones": {
+        "LeftFoot": {
+          "headAtlasFramePx": [
+            99.6579,
+            111.3292
+          ],
+          "headPresentationOffsetPx": [
+            16.4635,
+            15.2382
+          ],
+          "headWorldXYZ": [
+            0.12759,
+            -0.16084,
+            0.19582
+          ],
+          "tailAtlasFramePx": [
+            107.8269,
+            124.1924
+          ],
+          "tailPresentationOffsetPx": [
+            23.305,
+            26.0111
+          ],
+          "tailWorldXYZ": [
+            0.12837,
+            -0.27992,
+            0.09181
+          ]
+        },
+        "RightFoot": {
+          "headAtlasFramePx": [
+            67.0454,
+            118.6786
+          ],
+          "headPresentationOffsetPx": [
+            -10.8495,
+            21.3933
+          ],
+          "headWorldXYZ": [
+            -0.13788,
+            0.0522,
+            0.12741
+          ],
+          "tailAtlasFramePx": [
+            64.7567,
+            133.0692
+          ],
+          "tailPresentationOffsetPx": [
+            -12.7663,
+            33.4455
+          ],
+          "tailWorldXYZ": [
+            -0.24753,
+            -0.02387,
+            0.04264
+          ]
+        }
+      },
+      "direction": 7,
+      "sourceFrame60fps": 15
+    },
+    {
+      "atlasColumn": 7,
+      "bones": {
+        "LeftFoot": {
+          "headAtlasFramePx": [
+            97.757,
+            111.3906
+          ],
+          "headPresentationOffsetPx": [
+            14.8715,
+            15.2896
+          ],
+          "headWorldXYZ": [
+            0.15067,
+            -0.10987,
+            0.15117
+          ],
+          "tailAtlasFramePx": [
+            105.868,
+            124.2008
+          ],
+          "tailPresentationOffsetPx": [
+            21.6645,
+            26.0182
+          ],
+          "tailWorldXYZ": [
+            0.1412,
+            -0.23835,
+            0.0595
+          ]
+        },
+        "RightFoot": {
+          "headAtlasFramePx": [
+            61.3493,
+            115.3432
+          ],
+          "headPresentationOffsetPx": [
+            -15.62,
+            18.5999
+          ],
+          "headWorldXYZ": [
+            -0.13965,
+            0.134,
+            0.12518
+          ],
+          "tailAtlasFramePx": [
+            61.523,
+            129.3607
+          ],
+          "tailPresentationOffsetPx": [
+            -15.4745,
+            30.3396
+          ],
+          "tailWorldXYZ": [
+            -0.23801,
+            0.0331,
+            0.05346
+          ]
+        }
+      },
+      "direction": 7,
+      "sourceFrame60fps": 22
+    }
+  ],
+  "originalAtlasesModified": false,
+  "productionApproved": false,
+  "renderedRollDimensionsPx": [
+    134,
+    134
+  ],
+  "renderedRollOffsetFromFighterOriginPx": [
+    -67,
+    -78
+  ],
+  "samples": 64,
+  "sourceFrames60fps": [
+    1,
+    3,
+    5,
+    7,
+    9,
+    11,
+    15,
+    22
+  ],
+  "sourceGLBBasename": "t1-sentinel-roll-A3.glb",
+  "sourceSha256": "b89432a621d1f0956b7c06449035e0a055d11b17d6ceb34c9b26264eadcb6aed",
+  "spriteCameraOrthoScale": 1.66
+}

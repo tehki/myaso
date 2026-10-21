@@ -1,0 +1,3685 @@
+{
+  "a3PresentationScale": 1.2,
+  "authoritativeFloorZKnown": false,
+  "blender": "4.5.14 LTS",
+  "canvas": [
+    160,
+    160
+  ],
+  "clip": "t1_roll",
+  "directions": 8,
+  "floorReference": "MIN_OF_FRAME_1_SKIN_WEIGHTED_FOOT_VERTICES_ONLY",
+  "footMeshRegionsAreNotShoeSoles": true,
+  "gameplayPhysicsOrNetworkChanged": false,
+  "groundCollisionContactValidated": false,
+  "meshSelection": [
+    {
+      "baseVertices": 101687,
+      "leftWeightedVertexCount": 8508,
+      "meshName": "material",
+      "rightWeightedVertexCount": 8245
+    }
+  ],
+  "milestone": "Blood & Iron A2.13 evaluated skinned foot-region geometry",
+  "observations": [
+    {
+      "atlasColumn": 0,
+      "direction": 0,
+      "feet": {
+        "LeftFoot": {
+          "lowestSkinWeightedVertexProjection": {
+            "approved120PresentationOffsetPx": [
+              12.2317,
+              37.8715
+            ],
+            "sourceFramePx": [
+              94.605,
+              138.3541
+            ]
+          },
+          "minimumVertexWorldXYZ": [
+            0.15153,
+            -0.20164,
+            -0.02072
+          ],
+          "minimumWorldZ": -0.02072,
+          "p10WorldZ": 0.02002,
+          "relativeClearanceFromFrame1FootMinMeters": 0.01078,
+          "selectedVertexCount": 8508,
+          "sourceMesh": "material",
+          "sourceVertexIndex": 192
+        },
+        "RightFoot": {
+          "lowestSkinWeightedVertexProjection": {
+            "approved120PresentationOffsetPx": [
+              -18.2268,
+              25.0756
+            ],
+            "sourceFramePx": [
+              58.2366,
+              123.0754
+            ]
+          },
+          "minimumVertexWorldXYZ": [
+            -0.2258,
+            0.05822,
+            -0.0315
+          ],
+          "minimumWorldZ": -0.0315,
+          "p10WorldZ": 0.00304,
+          "relativeClearanceFromFrame1FootMinMeters": 0.0,
+          "selectedVertexCount": 8245,
+          "sourceMesh": "material",
+          "sourceVertexIndex": 14705
+        }
+      },
+      "sourceFrame60fps": 1
+    },
+    {
+      "atlasColumn": 1,
+      "direction": 0,
+      "feet": {
+        "LeftFoot": {
+          "lowestSkinWeightedVertexProjection": {
+            "approved120PresentationOffsetPx": [
+              9.6997,
+              40.1441
+            ],
+            "sourceFramePx": [
+              91.5817,
+              141.0675
+            ]
+          },
+          "minimumVertexWorldXYZ": [
+            0.12016,
+            -0.25171,
+            -0.01553
+          ],
+          "minimumWorldZ": -0.01553,
+          "p10WorldZ": 0.05593,
+          "relativeClearanceFromFrame1FootMinMeters": 0.01597,
+          "selectedVertexCount": 8508,
+          "sourceMesh": "material",
+          "sourceVertexIndex": 248
+        },
+        "RightFoot": {
+          "lowestSkinWeightedVertexProjection": {
+            "approved120PresentationOffsetPx": [
+              -17.3202,
+              30.5318
+            ],
+            "sourceFramePx": [
+              59.3192,
+              129.5902
+            ]
+          },
+          "minimumVertexWorldXYZ": [
+            -0.21456,
+            -0.0471,
+            -0.0315
+          ],
+          "minimumWorldZ": -0.0315,
+          "p10WorldZ": 0.02695,
+          "relativeClearanceFromFrame1FootMinMeters": 0.0,
+          "selectedVertexCount": 8245,
+          "sourceMesh": "material",
+          "sourceVertexIndex": 14785
+        }
+      },
+      "sourceFrame60fps": 3
+    },
+    {
+      "atlasColumn": 2,
+      "direction": 0,
+      "feet": {
+        "LeftFoot": {
+          "lowestSkinWeightedVertexProjection": {
+            "approved120PresentationOffsetPx": [
+              7.6649,
+              41.3937
+            ],
+            "sourceFramePx": [
+              89.1522,
+              142.5597
+            ]
+          },
+          "minimumVertexWorldXYZ": [
+            0.09495,
+            -0.25675,
+            -0.0315
+          ],
+          "minimumWorldZ": -0.0315,
+          "p10WorldZ": 0.03362,
+          "relativeClearanceFromFrame1FootMinMeters": 0.0,
+          "selectedVertexCount": 8508,
+          "sourceMesh": "material",
+          "sourceVertexIndex": 277
+        },
+        "RightFoot": {
+          "lowestSkinWeightedVertexProjection": {
+            "approved120PresentationOffsetPx": [
+              -17.6634,
+              27.015
+            ],
+            "sourceFramePx": [
+              58.9094,
+              125.391
+            ]
+          },
+          "minimumVertexWorldXYZ": [
+            -0.21882,
+            -0.1693,
+            0.12759
+          ],
+          "minimumWorldZ": 0.12759,
+          "p10WorldZ": 0.16163,
+          "relativeClearanceFromFrame1FootMinMeters": 0.15909,
+          "selectedVertexCount": 8245,
+          "sourceMesh": "material",
+          "sourceVertexIndex": 14807
+        }
+      },
+      "sourceFrame60fps": 5
+    },
+    {
+      "atlasColumn": 3,
+      "direction": 0,
+      "feet": {
+        "LeftFoot": {
+          "lowestSkinWeightedVertexProjection": {
+            "approved120PresentationOffsetPx": [
+              11.5036,
+              18.0355
+            ],
+            "sourceFramePx": [
+              93.7356,
+              114.6693
+            ]
+          },
+          "minimumVertexWorldXYZ": [
+            0.14251,
+            -0.18355,
+            0.28457
+          ],
+          "minimumWorldZ": 0.28457,
+          "p10WorldZ": 0.33477,
+          "relativeClearanceFromFrame1FootMinMeters": 0.31607,
+          "selectedVertexCount": 8508,
+          "sourceMesh": "material",
+          "sourceVertexIndex": 1368
+        },
+        "RightFoot": {
+          "lowestSkinWeightedVertexProjection": {
+            "approved120PresentationOffsetPx": [
+              -8.6097,
+              18.2769
+            ],
+            "sourceFramePx": [
+              69.7198,
+              114.9575
+            ]
+          },
+          "minimumVertexWorldXYZ": [
+            -0.10666,
+            -0.29652,
+            0.37522
+          ],
+          "minimumWorldZ": 0.37522,
+          "p10WorldZ": 0.41801,
+          "relativeClearanceFromFrame1FootMinMeters": 0.40672,
+          "selectedVertexCount": 8245,
+          "sourceMesh": "material",
+          "sourceVertexIndex": 26016
+        }
+      },
+      "sourceFrame60fps": 7
+    },
+    {
+      "atlasColumn": 4,
+      "direction": 0,
+      "feet": {
+        "LeftFoot": {
+          "lowestSkinWeightedVertexProjection": {
+            "approved120PresentationOffsetPx": [
+              10.0351,
+              10.3337
+            ],
+            "sourceFramePx": [
+              91.9822,
+              105.4731
+            ]
+          },
+          "minimumVertexWorldXYZ": [
+            0.12432,
+            0.02639,
+            0.23329
+          ],
+          "minimumWorldZ": 0.23329,
+          "p10WorldZ": 0.27502,
+          "relativeClearanceFromFrame1FootMinMeters": 0.26479,
+          "selectedVertexCount": 8508,
+          "sourceMesh": "material",
+          "sourceVertexIndex": 1774
+        },
+        "RightFoot": {
+          "lowestSkinWeightedVertexProjection": {
+            "approved120PresentationOffsetPx": [
+              -6.9356,
+              20.6038
+            ],
+            "sourceFramePx": [
+              71.7187,
+              117.7359
+            ]
+          },
+          "minimumVertexWorldXYZ": [
+            -0.08592,
+            -0.05882,
+            0.13869
+          ],
+          "minimumWorldZ": 0.13869,
+          "p10WorldZ": 0.16079,
+          "relativeClearanceFromFrame1FootMinMeters": 0.17019,
+          "selectedVertexCount": 8245,
+          "sourceMesh": "material",
+          "sourceVertexIndex": 15286
+        }
+      },
+      "sourceFrame60fps": 9
+    },
+    {
+      "atlasColumn": 5,
+      "direction": 0,
+      "feet": {
+        "LeftFoot": {
+          "lowestSkinWeightedVertexProjection": {
+            "approved120PresentationOffsetPx": [
+              9.891,
+              19.9497
+            ],
+            "sourceFramePx": [
+              91.8102,
+              116.9549
+            ]
+          },
+          "minimumVertexWorldXYZ": [
+            0.12253,
+            -0.02746,
+            0.12302
+          ],
+          "minimumWorldZ": 0.12302,
+          "p10WorldZ": 0.19668,
+          "relativeClearanceFromFrame1FootMinMeters": 0.15452,
+          "selectedVertexCount": 8508,
+          "sourceMesh": "material",
+          "sourceVertexIndex": 8685
+        },
+        "RightFoot": {
+          "lowestSkinWeightedVertexProjection": {
+            "approved120PresentationOffsetPx": [
+              -11.9794,
+              29.0637
+            ],
+            "sourceFramePx": [
+              65.6962,
+              127.8372
+            ]
+          },
+          "minimumVertexWorldXYZ": [
+            -0.1484,
+            -0.01876,
+            -0.0315
+          ],
+          "minimumWorldZ": -0.0315,
+          "p10WorldZ": 0.005,
+          "relativeClearanceFromFrame1FootMinMeters": 0.0,
+          "selectedVertexCount": 8245,
+          "sourceMesh": "material",
+          "sourceVertexIndex": 19246
+        }
+      },
+      "sourceFrame60fps": 11
+    },
+    {
+      "atlasColumn": 6,
+      "direction": 0,
+      "feet": {
+        "LeftFoot": {
+          "lowestSkinWeightedVertexProjection": {
+            "approved120PresentationOffsetPx": [
+              11.0845,
+              37.5605
+            ],
+            "sourceFramePx": [
+              93.2353,
+              137.9827
+            ]
+          },
+          "minimumVertexWorldXYZ": [
+            0.13732,
+            -0.23323,
+            0.01074
+          ],
+          "minimumWorldZ": 0.01074,
+          "p10WorldZ": 0.06385,
+          "relativeClearanceFromFrame1FootMinMeters": 0.04224,
+          "selectedVertexCount": 8508,
+          "sourceMesh": "material",
+          "sourceVertexIndex": 192
+        },
+        "RightFoot": {
+          "lowestSkinWeightedVertexProjection": {
+            "approved120PresentationOffsetPx": [
+              -18.3367,
+              27.9855
+            ],
+            "sourceFramePx": [
+              58.1054,
+              126.5499
+            ]
+          },
+          "minimumVertexWorldXYZ": [
+            -0.22716,
+            0.00828,
+            -0.03671
+          ],
+          "minimumWorldZ": -0.03671,
+          "p10WorldZ": 0.00999,
+          "relativeClearanceFromFrame1FootMinMeters": -0.00521,
+          "selectedVertexCount": 8245,
+          "sourceMesh": "material",
+          "sourceVertexIndex": 14746
+        }
+      },
+      "sourceFrame60fps": 15
+    },
+    {
+      "atlasColumn": 7,
+      "direction": 0,
+      "feet": {
+        "LeftFoot": {
+          "lowestSkinWeightedVertexProjection": {
+            "approved120PresentationOffsetPx": [
+              12.2317,
+              37.8715
+            ],
+            "sourceFramePx": [
+              94.605,
+              138.3541
+            ]
+          },
+          "minimumVertexWorldXYZ": [
+            0.15153,
+            -0.20164,
+            -0.02072
+          ],
+          "minimumWorldZ": -0.02072,
+          "p10WorldZ": 0.02002,
+          "relativeClearanceFromFrame1FootMinMeters": 0.01078,
+          "selectedVertexCount": 8508,
+          "sourceMesh": "material",
+          "sourceVertexIndex": 192
+        },
+        "RightFoot": {
+          "lowestSkinWeightedVertexProjection": {
+            "approved120PresentationOffsetPx": [
+              -18.2268,
+              25.0756
+            ],
+            "sourceFramePx": [
+              58.2366,
+              123.0754
+            ]
+          },
+          "minimumVertexWorldXYZ": [
+            -0.2258,
+            0.05822,
+            -0.0315
+          ],
+          "minimumWorldZ": -0.0315,
+          "p10WorldZ": 0.00304,
+          "relativeClearanceFromFrame1FootMinMeters": 0.0,
+          "selectedVertexCount": 8245,
+          "sourceMesh": "material",
+          "sourceVertexIndex": 14705
+        }
+      },
+      "sourceFrame60fps": 22
+    },
+    {
+      "atlasColumn": 0,
+      "direction": 1,
+      "feet": {
+        "LeftFoot": {
+          "lowestSkinWeightedVertexProjection": {
+            "approved120PresentationOffsetPx": [
+              -2.8602,
+              40.3629
+            ],
+            "sourceFramePx": [
+              76.5848,
+              141.3288
+            ]
+          },
+          "minimumVertexWorldXYZ": [
+            0.15153,
+            -0.20164,
+            -0.02072
+          ],
+          "minimumWorldZ": -0.02072,
+          "p10WorldZ": 0.02002,
+          "relativeClearanceFromFrame1FootMinMeters": 0.01078,
+          "selectedVertexCount": 8508,
+          "sourceMesh": "material",
+          "sourceVertexIndex": 192
+        },
+        "RightFoot": {
+          "lowestSkinWeightedVertexProjection": {
+            "approved120PresentationOffsetPx": [
+              -9.5653,
+              17.6872
+            ],
+            "sourceFramePx": [
+              68.5788,
+              114.2534
+            ]
+          },
+          "minimumVertexWorldXYZ": [
+            -0.2258,
+            0.05822,
+            -0.0315
+          ],
+          "minimumWorldZ": -0.0315,
+          "p10WorldZ": 0.00304,
+          "relativeClearanceFromFrame1FootMinMeters": 0.0,
+          "selectedVertexCount": 8245,
+          "sourceMesh": "material",
+          "sourceVertexIndex": 14705
+        }
+      },
+      "sourceFrame60fps": 1
+    },
+    {
+      "atlasColumn": 1,
+      "direction": 1,
+      "feet": {
+        "LeftFoot": {
+          "lowestSkinWeightedVertexProjection": {
+            "approved120PresentationOffsetPx": [
+              -7.5089,
+              40.7265
+            ],
+            "sourceFramePx": [
+              71.0342,
+              141.7629
+            ]
+          },
+          "minimumVertexWorldXYZ": [
+            0.12016,
+            -0.25171,
+            -0.01553
+          ],
+          "minimumWorldZ": -0.01553,
+          "p10WorldZ": 0.05593,
+          "relativeClearanceFromFrame1FootMinMeters": 0.01597,
+          "selectedVertexCount": 8508,
+          "sourceMesh": "material",
+          "sourceVertexIndex": 248
+        },
+        "RightFoot": {
+          "lowestSkinWeightedVertexProjection": {
+            "approved120PresentationOffsetPx": [
+              -14.9355,
+              21.9568
+            ],
+            "sourceFramePx": [
+              62.1666,
+              119.3514
+            ]
+          },
+          "minimumVertexWorldXYZ": [
+            -0.21456,
+            -0.0471,
+            -0.0315
+          ],
+          "minimumWorldZ": -0.0315,
+          "p10WorldZ": 0.02695,
+          "relativeClearanceFromFrame1FootMinMeters": 0.0,
+          "selectedVertexCount": 8245,
+          "sourceMesh": "material",
+          "sourceVertexIndex": 14785
+        }
+      },
+      "sourceFrame60fps": 3
+    },
+    {
+      "atlasColumn": 2,
+      "direction": 1,
+      "feet": {
+        "LeftFoot": {
+          "lowestSkinWeightedVertexProjection": {
+            "approved120PresentationOffsetPx": [
+              -9.2352,
+              40.9762
+            ],
+            "sourceFramePx": [
+              68.9729,
+              142.0612
+            ]
+          },
+          "minimumVertexWorldXYZ": [
+            0.09495,
+            -0.25675,
+            -0.0315
+          ],
+          "minimumWorldZ": -0.0315,
+          "p10WorldZ": 0.03362,
+          "relativeClearanceFromFrame1FootMinMeters": 0.0,
+          "selectedVertexCount": 8508,
+          "sourceMesh": "material",
+          "sourceVertexIndex": 277
+        },
+        "RightFoot": {
+          "lowestSkinWeightedVertexProjection": {
+            "approved120PresentationOffsetPx": [
+              -22.1536,
+              16.4298
+            ],
+            "sourceFramePx": [
+              53.5479,
+              112.752
+            ]
+          },
+          "minimumVertexWorldXYZ": [
+            -0.21882,
+            -0.1693,
+            0.12759
+          ],
+          "minimumWorldZ": 0.12759,
+          "p10WorldZ": 0.16163,
+          "relativeClearanceFromFrame1FootMinMeters": 0.15909,
+          "selectedVertexCount": 8245,
+          "sourceMesh": "material",
+          "sourceVertexIndex": 14807
+        }
+      },
+      "sourceFrame60fps": 5
+    },
+    {
+      "atlasColumn": 3,
+      "direction": 1,
+      "feet": {
+        "LeftFoot": {
+          "lowestSkinWeightedVertexProjection": {
+            "approved120PresentationOffsetPx": [
+              -2.3426,
+              20.4709
+            ],
+            "sourceFramePx": [
+              77.2029,
+              117.5772
+            ]
+          },
+          "minimumVertexWorldXYZ": [
+            0.14251,
+            -0.18355,
+            0.28457
+          ],
+          "minimumWorldZ": 0.28457,
+          "p10WorldZ": 0.33477,
+          "relativeClearanceFromFrame1FootMinMeters": 0.31607,
+          "selectedVertexCount": 8508,
+          "sourceMesh": "material",
+          "sourceVertexIndex": 1368
+        },
+        "RightFoot": {
+          "lowestSkinWeightedVertexProjection": {
+            "approved120PresentationOffsetPx": [
+              -23.0132,
+              9.8701
+            ],
+            "sourceFramePx": [
+              52.5216,
+              104.9195
+            ]
+          },
+          "minimumVertexWorldXYZ": [
+            -0.10666,
+            -0.29652,
+            0.37522
+          ],
+          "minimumWorldZ": 0.37522,
+          "p10WorldZ": 0.41801,
+          "relativeClearanceFromFrame1FootMinMeters": 0.40672,
+          "selectedVertexCount": 8245,
+          "sourceMesh": "material",
+          "sourceVertexIndex": 26016
+        }
+      },
+      "sourceFrame60fps": 7
+    },
+    {
+      "atlasColumn": 4,
+      "direction": 1,
+      "feet": {
+        "LeftFoot": {
+          "lowestSkinWeightedVertexProjection": {
+            "approved120PresentationOffsetPx": [
+              8.602,
+              15.2883
+            ],
+            "sourceFramePx": [
+              90.271,
+              111.389
+            ]
+          },
+          "minimumVertexWorldXYZ": [
+            0.12432,
+            0.02639,
+            0.23329
+          ],
+          "minimumWorldZ": 0.23329,
+          "p10WorldZ": 0.27502,
+          "relativeClearanceFromFrame1FootMinMeters": 0.26479,
+          "selectedVertexCount": 8508,
+          "sourceMesh": "material",
+          "sourceVertexIndex": 1774
+        },
+        "RightFoot": {
+          "lowestSkinWeightedVertexProjection": {
+            "approved120PresentationOffsetPx": [
+              -8.2615,
+              16.5637
+            ],
+            "sourceFramePx": [
+              70.1356,
+              112.9119
+            ]
+          },
+          "minimumVertexWorldXYZ": [
+            -0.08592,
+            -0.05882,
+            0.13869
+          ],
+          "minimumWorldZ": 0.13869,
+          "p10WorldZ": 0.16079,
+          "relativeClearanceFromFrame1FootMinMeters": 0.17019,
+          "selectedVertexCount": 8245,
+          "sourceMesh": "material",
+          "sourceVertexIndex": 15286
+        }
+      },
+      "sourceFrame60fps": 9
+    },
+    {
+      "atlasColumn": 5,
+      "direction": 1,
+      "feet": {
+        "LeftFoot": {
+          "lowestSkinWeightedVertexProjection": {
+            "approved120PresentationOffsetPx": [
+              5.4263,
+              24.0217
+            ],
+            "sourceFramePx": [
+              86.4792,
+              121.817
+            ]
+          },
+          "minimumVertexWorldXYZ": [
+            0.12253,
+            -0.02746,
+            0.12302
+          ],
+          "minimumWorldZ": 0.12302,
+          "p10WorldZ": 0.19668,
+          "relativeClearanceFromFrame1FootMinMeters": 0.15452,
+          "selectedVertexCount": 8508,
+          "sourceMesh": "material",
+          "sourceVertexIndex": 8685
+        },
+        "RightFoot": {
+          "lowestSkinWeightedVertexProjection": {
+            "approved120PresentationOffsetPx": [
+              -9.5414,
+              23.3424
+            ],
+            "sourceFramePx": [
+              68.6072,
+              121.0059
+            ]
+          },
+          "minimumVertexWorldXYZ": [
+            -0.1484,
+            -0.01876,
+            -0.0315
+          ],
+          "minimumWorldZ": -0.0315,
+          "p10WorldZ": 0.005,
+          "relativeClearanceFromFrame1FootMinMeters": 0.0,
+          "selectedVertexCount": 8245,
+          "sourceMesh": "material",
+          "sourceVertexIndex": 19246
+        }
+      },
+      "sourceFrame60fps": 11
+    },
+    {
+      "atlasColumn": 6,
+      "direction": 1,
+      "feet": {
+        "LeftFoot": {
+          "lowestSkinWeightedVertexProjection": {
+            "approved120PresentationOffsetPx": [
+              -5.4745,
+              39.0519
+            ],
+            "sourceFramePx": [
+              73.4632,
+              139.7634
+            ]
+          },
+          "minimumVertexWorldXYZ": [
+            0.13732,
+            -0.23323,
+            0.01074
+          ],
+          "minimumWorldZ": 0.01074,
+          "p10WorldZ": 0.06385,
+          "relativeClearanceFromFrame1FootMinMeters": 0.04224,
+          "selectedVertexCount": 8508,
+          "sourceMesh": "material",
+          "sourceVertexIndex": 192
+        },
+        "RightFoot": {
+          "lowestSkinWeightedVertexProjection": {
+            "approved120PresentationOffsetPx": [
+              -12.4932,
+              19.7895
+            ],
+            "sourceFramePx": [
+              65.0827,
+              116.7636
+            ]
+          },
+          "minimumVertexWorldXYZ": [
+            -0.22716,
+            0.00828,
+            -0.03671
+          ],
+          "minimumWorldZ": -0.03671,
+          "p10WorldZ": 0.00999,
+          "relativeClearanceFromFrame1FootMinMeters": -0.00521,
+          "selectedVertexCount": 8245,
+          "sourceMesh": "material",
+          "sourceVertexIndex": 14746
+        }
+      },
+      "sourceFrame60fps": 15
+    },
+    {
+      "atlasColumn": 7,
+      "direction": 1,
+      "feet": {
+        "LeftFoot": {
+          "lowestSkinWeightedVertexProjection": {
+            "approved120PresentationOffsetPx": [
+              -2.8602,
+              40.3629
+            ],
+            "sourceFramePx": [
+              76.5848,
+              141.3288
+            ]
+          },
+          "minimumVertexWorldXYZ": [
+            0.15153,
+            -0.20164,
+            -0.02072
+          ],
+          "minimumWorldZ": -0.02072,
+          "p10WorldZ": 0.02002,
+          "relativeClearanceFromFrame1FootMinMeters": 0.01078,
+          "selectedVertexCount": 8508,
+          "sourceMesh": "material",
+          "sourceVertexIndex": 192
+        },
+        "RightFoot": {
+          "lowestSkinWeightedVertexProjection": {
+            "approved120PresentationOffsetPx": [
+              -9.5653,
+              17.6872
+            ],
+            "sourceFramePx": [
+              68.5788,
+              114.2534
+            ]
+          },
+          "minimumVertexWorldXYZ": [
+            -0.2258,
+            0.05822,
+            -0.0315
+          ],
+          "minimumWorldZ": -0.0315,
+          "p10WorldZ": 0.00304,
+          "relativeClearanceFromFrame1FootMinMeters": 0.0,
+          "selectedVertexCount": 8245,
+          "sourceMesh": "material",
+          "sourceVertexIndex": 14705
+        }
+      },
+      "sourceFrame60fps": 22
+    },
+    {
+      "atlasColumn": 0,
+      "direction": 2,
+      "feet": {
+        "LeftFoot": {
+          "lowestSkinWeightedVertexProjection": {
+            "approved120PresentationOffsetPx": [
+              -16.2766,
+              35.2755
+            ],
+            "sourceFramePx": [
+              60.5652,
+              135.2544
+            ]
+          },
+          "minimumVertexWorldXYZ": [
+            0.15153,
+            -0.20164,
+            -0.02072
+          ],
+          "minimumWorldZ": -0.02072,
+          "p10WorldZ": 0.02002,
+          "relativeClearanceFromFrame1FootMinMeters": 0.01078,
+          "selectedVertexCount": 8508,
+          "sourceMesh": "material",
+          "sourceVertexIndex": 192
+        },
+        "RightFoot": {
+          "lowestSkinWeightedVertexProjection": {
+            "approved120PresentationOffsetPx": [
+              4.6996,
+              16.3938
+            ],
+            "sourceFramePx": [
+              85.6114,
+              112.709
+            ]
+          },
+          "minimumVertexWorldXYZ": [
+            -0.2258,
+            0.05822,
+            -0.0315
+          ],
+          "minimumWorldZ": -0.0315,
+          "p10WorldZ": 0.00304,
+          "relativeClearanceFromFrame1FootMinMeters": 0.0,
+          "selectedVertexCount": 8245,
+          "sourceMesh": "material",
+          "sourceVertexIndex": 14705
+        }
+      },
+      "sourceFrame60fps": 1
+    },
+    {
+      "atlasColumn": 1,
+      "direction": 2,
+      "feet": {
+        "LeftFoot": {
+          "lowestSkinWeightedVertexProjection": {
+            "approved120PresentationOffsetPx": [
+              -20.3188,
+              33.3287
+            ],
+            "sourceFramePx": [
+              55.7388,
+              132.9298
+            ]
+          },
+          "minimumVertexWorldXYZ": [
+            0.12016,
+            -0.25171,
+            -0.01553
+          ],
+          "minimumWorldZ": -0.01553,
+          "p10WorldZ": 0.05593,
+          "relativeClearanceFromFrame1FootMinMeters": 0.01597,
+          "selectedVertexCount": 8508,
+          "sourceMesh": "material",
+          "sourceVertexIndex": 248
+        },
+        "RightFoot": {
+          "lowestSkinWeightedVertexProjection": {
+            "approved120PresentationOffsetPx": [
+              -3.8017,
+              16.9757
+            ],
+            "sourceFramePx": [
+              75.4606,
+              113.4038
+            ]
+          },
+          "minimumVertexWorldXYZ": [
+            -0.21456,
+            -0.0471,
+            -0.0315
+          ],
+          "minimumWorldZ": -0.0315,
+          "p10WorldZ": 0.02695,
+          "relativeClearanceFromFrame1FootMinMeters": 0.0,
+          "selectedVertexCount": 8245,
+          "sourceMesh": "material",
+          "sourceVertexIndex": 14785
+        }
+      },
+      "sourceFrame60fps": 3
+    },
+    {
+      "atlasColumn": 2,
+      "direction": 2,
+      "feet": {
+        "LeftFoot": {
+          "lowestSkinWeightedVertexProjection": {
+            "approved120PresentationOffsetPx": [
+              -20.7255,
+              33.0114
+            ],
+            "sourceFramePx": [
+              55.2532,
+              132.5509
+            ]
+          },
+          "minimumVertexWorldXYZ": [
+            0.09495,
+            -0.25675,
+            -0.0315
+          ],
+          "minimumWorldZ": -0.0315,
+          "p10WorldZ": 0.03362,
+          "relativeClearanceFromFrame1FootMinMeters": 0.0,
+          "selectedVertexCount": 8508,
+          "sourceMesh": "material",
+          "sourceVertexIndex": 277
+        },
+        "RightFoot": {
+          "lowestSkinWeightedVertexProjection": {
+            "approved120PresentationOffsetPx": [
+              -13.6665,
+              6.9073
+            ],
+            "sourceFramePx": [
+              63.6818,
+              101.3818
+            ]
+          },
+          "minimumVertexWorldXYZ": [
+            -0.21882,
+            -0.1693,
+            0.12759
+          ],
+          "minimumWorldZ": 0.12759,
+          "p10WorldZ": 0.16163,
+          "relativeClearanceFromFrame1FootMinMeters": 0.15909,
+          "selectedVertexCount": 8245,
+          "sourceMesh": "material",
+          "sourceVertexIndex": 14807
+        }
+      },
+      "sourceFrame60fps": 5
+    },
+    {
+      "atlasColumn": 3,
+      "direction": 2,
+      "feet": {
+        "LeftFoot": {
+          "lowestSkinWeightedVertexProjection": {
+            "approved120PresentationOffsetPx": [
+              -14.8165,
+              15.9093
+            ],
+            "sourceFramePx": [
+              62.3086,
+              112.1306
+            ]
+          },
+          "minimumVertexWorldXYZ": [
+            0.14251,
+            -0.18355,
+            0.28457
+          ],
+          "minimumWorldZ": 0.28457,
+          "p10WorldZ": 0.33477,
+          "relativeClearanceFromFrame1FootMinMeters": 0.31607,
+          "selectedVertexCount": 8508,
+          "sourceMesh": "material",
+          "sourceVertexIndex": 1368
+        },
+        "RightFoot": {
+          "lowestSkinWeightedVertexProjection": {
+            "approved120PresentationOffsetPx": [
+              -23.9359,
+              -2.611
+            ],
+            "sourceFramePx": [
+              51.4198,
+              90.0167
+            ]
+          },
+          "minimumVertexWorldXYZ": [
+            -0.10666,
+            -0.29652,
+            0.37522
+          ],
+          "minimumWorldZ": 0.37522,
+          "p10WorldZ": 0.41801,
+          "relativeClearanceFromFrame1FootMinMeters": 0.40672,
+          "selectedVertexCount": 8245,
+          "sourceMesh": "material",
+          "sourceVertexIndex": 26016
+        }
+      },
+      "sourceFrame60fps": 7
+    },
+    {
+      "atlasColumn": 4,
+      "direction": 2,
+      "feet": {
+        "LeftFoot": {
+          "lowestSkinWeightedVertexProjection": {
+            "approved120PresentationOffsetPx": [
+              2.13,
+              18.1414
+            ],
+            "sourceFramePx": [
+              82.5432,
+              114.7957
+            ]
+          },
+          "minimumVertexWorldXYZ": [
+            0.12432,
+            0.02639,
+            0.23329
+          ],
+          "minimumWorldZ": 0.23329,
+          "p10WorldZ": 0.27502,
+          "relativeClearanceFromFrame1FootMinMeters": 0.26479,
+          "selectedVertexCount": 8508,
+          "sourceMesh": "material",
+          "sourceVertexIndex": 1774
+        },
+        "RightFoot": {
+          "lowestSkinWeightedVertexProjection": {
+            "approved120PresentationOffsetPx": [
+              -4.7478,
+              13.1053
+            ],
+            "sourceFramePx": [
+              74.3309,
+              108.7825
+            ]
+          },
+          "minimumVertexWorldXYZ": [
+            -0.08592,
+            -0.05882,
+            0.13869
+          ],
+          "minimumWorldZ": 0.13869,
+          "p10WorldZ": 0.16079,
+          "relativeClearanceFromFrame1FootMinMeters": 0.17019,
+          "selectedVertexCount": 8245,
+          "sourceMesh": "material",
+          "sourceVertexIndex": 15286
+        }
+      },
+      "sourceFrame60fps": 9
+    },
+    {
+      "atlasColumn": 5,
+      "direction": 2,
+      "feet": {
+        "LeftFoot": {
+          "lowestSkinWeightedVertexProjection": {
+            "approved120PresentationOffsetPx": [
+              -2.217,
+              24.875
+            ],
+            "sourceFramePx": [
+              77.3529,
+              122.8358
+            ]
+          },
+          "minimumVertexWorldXYZ": [
+            0.12253,
+            -0.02746,
+            0.12302
+          ],
+          "minimumWorldZ": 0.12302,
+          "p10WorldZ": 0.19668,
+          "relativeClearanceFromFrame1FootMinMeters": 0.15452,
+          "selectedVertexCount": 8508,
+          "sourceMesh": "material",
+          "sourceVertexIndex": 8685
+        },
+        "RightFoot": {
+          "lowestSkinWeightedVertexProjection": {
+            "approved120PresentationOffsetPx": [
+              -1.5142,
+              20.4034
+            ],
+            "sourceFramePx": [
+              78.192,
+              117.4966
+            ]
+          },
+          "minimumVertexWorldXYZ": [
+            -0.1484,
+            -0.01876,
+            -0.0315
+          ],
+          "minimumWorldZ": -0.0315,
+          "p10WorldZ": 0.005,
+          "relativeClearanceFromFrame1FootMinMeters": 0.0,
+          "selectedVertexCount": 8245,
+          "sourceMesh": "material",
+          "sourceVertexIndex": 19246
+        }
+      },
+      "sourceFrame60fps": 11
+    },
+    {
+      "atlasColumn": 6,
+      "direction": 2,
+      "feet": {
+        "LeftFoot": {
+          "lowestSkinWeightedVertexProjection": {
+            "approved120PresentationOffsetPx": [
+              -18.8267,
+              32.5916
+            ],
+            "sourceFramePx": [
+              57.5204,
+              132.0497
+            ]
+          },
+          "minimumVertexWorldXYZ": [
+            0.13732,
+            -0.23323,
+            0.01074
+          ],
+          "minimumWorldZ": 0.01074,
+          "p10WorldZ": 0.06385,
+          "relativeClearanceFromFrame1FootMinMeters": 0.04224,
+          "selectedVertexCount": 8508,
+          "sourceMesh": "material",
+          "sourceVertexIndex": 192
+        },
+        "RightFoot": {
+          "lowestSkinWeightedVertexProjection": {
+            "approved120PresentationOffsetPx": [
+              0.6686,
+              16.6461
+            ],
+            "sourceFramePx": [
+              80.7983,
+              113.0102
+            ]
+          },
+          "minimumVertexWorldXYZ": [
+            -0.22716,
+            0.00828,
+            -0.03671
+          ],
+          "minimumWorldZ": -0.03671,
+          "p10WorldZ": 0.00999,
+          "relativeClearanceFromFrame1FootMinMeters": -0.00521,
+          "selectedVertexCount": 8245,
+          "sourceMesh": "material",
+          "sourceVertexIndex": 14746
+        }
+      },
+      "sourceFrame60fps": 15
+    },
+    {
+      "atlasColumn": 7,
+      "direction": 2,
+      "feet": {
+        "LeftFoot": {
+          "lowestSkinWeightedVertexProjection": {
+            "approved120PresentationOffsetPx": [
+              -16.2766,
+              35.2755
+            ],
+            "sourceFramePx": [
+              60.5652,
+              135.2544
+            ]
+          },
+          "minimumVertexWorldXYZ": [
+            0.15153,
+            -0.20164,
+            -0.02072
+          ],
+          "minimumWorldZ": -0.02072,
+          "p10WorldZ": 0.02002,
+          "relativeClearanceFromFrame1FootMinMeters": 0.01078,
+          "selectedVertexCount": 8508,
+          "sourceMesh": "material",
+          "sourceVertexIndex": 192
+        },
+        "RightFoot": {
+          "lowestSkinWeightedVertexProjection": {
+            "approved120PresentationOffsetPx": [
+              4.6996,
+              16.3938
+            ],
+            "sourceFramePx": [
+              85.6114,
+              112.709
+            ]
+          },
+          "minimumVertexWorldXYZ": [
+            -0.2258,
+            0.05822,
+            -0.0315
+          ],
+          "minimumWorldZ": -0.0315,
+          "p10WorldZ": 0.00304,
+          "relativeClearanceFromFrame1FootMinMeters": 0.0,
+          "selectedVertexCount": 8245,
+          "sourceMesh": "material",
+          "sourceVertexIndex": 14705
+        }
+      },
+      "sourceFrame60fps": 22
+    },
+    {
+      "atlasColumn": 0,
+      "direction": 3,
+      "feet": {
+        "LeftFoot": {
+          "lowestSkinWeightedVertexProjection": {
+            "approved120PresentationOffsetPx": [
+              -20.1585,
+              25.5894
+            ],
+            "sourceFramePx": [
+              55.9302,
+              123.6889
+            ]
+          },
+          "minimumVertexWorldXYZ": [
+            0.15153,
+            -0.20164,
+            -0.02072
+          ],
+          "minimumWorldZ": -0.02072,
+          "p10WorldZ": 0.02002,
+          "relativeClearanceFromFrame1FootMinMeters": 0.01078,
+          "selectedVertexCount": 8508,
+          "sourceMesh": "material",
+          "sourceVertexIndex": 192
+        },
+        "RightFoot": {
+          "lowestSkinWeightedVertexProjection": {
+            "approved120PresentationOffsetPx": [
+              16.2114,
+              21.9529
+            ],
+            "sourceFramePx": [
+              99.3569,
+              119.3467
+            ]
+          },
+          "minimumVertexWorldXYZ": [
+            -0.2258,
+            0.05822,
+            -0.0315
+          ],
+          "minimumWorldZ": -0.0315,
+          "p10WorldZ": 0.00304,
+          "relativeClearanceFromFrame1FootMinMeters": 0.0,
+          "selectedVertexCount": 8245,
+          "sourceMesh": "material",
+          "sourceVertexIndex": 14705
+        }
+      },
+      "sourceFrame60fps": 1
+    },
+    {
+      "atlasColumn": 1,
+      "direction": 3,
+      "feet": {
+        "LeftFoot": {
+          "lowestSkinWeightedVertexProjection": {
+            "approved120PresentationOffsetPx": [
+              -21.2262,
+              22.2841
+            ],
+            "sourceFramePx": [
+              54.6552,
+              119.7423
+            ]
+          },
+          "minimumVertexWorldXYZ": [
+            0.12016,
+            -0.25171,
+            -0.01553
+          ],
+          "minimumWorldZ": -0.01553,
+          "p10WorldZ": 0.05593,
+          "relativeClearanceFromFrame1FootMinMeters": 0.01597,
+          "selectedVertexCount": 8508,
+          "sourceMesh": "material",
+          "sourceVertexIndex": 248
+        },
+        "RightFoot": {
+          "lowestSkinWeightedVertexProjection": {
+            "approved120PresentationOffsetPx": [
+              9.559,
+              18.5062
+            ],
+            "sourceFramePx": [
+              91.4137,
+              115.2313
+            ]
+          },
+          "minimumVertexWorldXYZ": [
+            -0.21456,
+            -0.0471,
+            -0.0315
+          ],
+          "minimumWorldZ": -0.0315,
+          "p10WorldZ": 0.02695,
+          "relativeClearanceFromFrame1FootMinMeters": 0.0,
+          "selectedVertexCount": 8245,
+          "sourceMesh": "material",
+          "sourceVertexIndex": 14785
+        }
+      },
+      "sourceFrame60fps": 3
+    },
+    {
+      "atlasColumn": 2,
+      "direction": 3,
+      "feet": {
+        "LeftFoot": {
+          "lowestSkinWeightedVertexProjection": {
+            "approved120PresentationOffsetPx": [
+              -20.075,
+              22.1648
+            ],
+            "sourceFramePx": [
+              56.0298,
+              119.5997
+            ]
+          },
+          "minimumVertexWorldXYZ": [
+            0.09495,
+            -0.25675,
+            -0.0315
+          ],
+          "minimumWorldZ": -0.0315,
+          "p10WorldZ": 0.03362,
+          "relativeClearanceFromFrame1FootMinMeters": 0.0,
+          "selectedVertexCount": 8508,
+          "sourceMesh": "material",
+          "sourceVertexIndex": 277
+        },
+        "RightFoot": {
+          "lowestSkinWeightedVertexProjection": {
+            "approved120PresentationOffsetPx": [
+              2.8262,
+              4.0255
+            ],
+            "sourceFramePx": [
+              83.3746,
+              97.9408
+            ]
+          },
+          "minimumVertexWorldXYZ": [
+            -0.21882,
+            -0.1693,
+            0.12759
+          ],
+          "minimumWorldZ": 0.12759,
+          "p10WorldZ": 0.16163,
+          "relativeClearanceFromFrame1FootMinMeters": 0.15909,
+          "selectedVertexCount": 8245,
+          "sourceMesh": "material",
+          "sourceVertexIndex": 14807
+        }
+      },
+      "sourceFrame60fps": 5
+    },
+    {
+      "atlasColumn": 3,
+      "direction": 3,
+      "feet": {
+        "LeftFoot": {
+          "lowestSkinWeightedVertexProjection": {
+            "approved120PresentationOffsetPx": [
+              -18.6111,
+              7.0227
+            ],
+            "sourceFramePx": [
+              57.7778,
+              101.5197
+            ]
+          },
+          "minimumVertexWorldXYZ": [
+            0.14251,
+            -0.18355,
+            0.28457
+          ],
+          "minimumWorldZ": 0.28457,
+          "p10WorldZ": 0.33477,
+          "relativeClearanceFromFrame1FootMinMeters": 0.31607,
+          "selectedVertexCount": 8508,
+          "sourceMesh": "material",
+          "sourceVertexIndex": 1368
+        },
+        "RightFoot": {
+          "lowestSkinWeightedVertexProjection": {
+            "approved120PresentationOffsetPx": [
+              -10.8373,
+              -11.8553
+            ],
+            "sourceFramePx": [
+              67.06,
+              78.9787
+            ]
+          },
+          "minimumVertexWorldXYZ": [
+            -0.10666,
+            -0.29652,
+            0.37522
+          ],
+          "minimumWorldZ": 0.37522,
+          "p10WorldZ": 0.41801,
+          "relativeClearanceFromFrame1FootMinMeters": 0.40672,
+          "selectedVertexCount": 8245,
+          "sourceMesh": "material",
+          "sourceVertexIndex": 26016
+        }
+      },
+      "sourceFrame60fps": 7
+    },
+    {
+      "atlasColumn": 4,
+      "direction": 3,
+      "feet": {
+        "LeftFoot": {
+          "lowestSkinWeightedVertexProjection": {
+            "approved120PresentationOffsetPx": [
+              -5.5898,
+              17.2216
+            ],
+            "sourceFramePx": [
+              73.3256,
+              113.6974
+            ]
+          },
+          "minimumVertexWorldXYZ": [
+            0.12432,
+            0.02639,
+            0.23329
+          ],
+          "minimumWorldZ": 0.23329,
+          "p10WorldZ": 0.27502,
+          "relativeClearanceFromFrame1FootMinMeters": 0.26479,
+          "selectedVertexCount": 8508,
+          "sourceMesh": "material",
+          "sourceVertexIndex": 1774
+        },
+        "RightFoot": {
+          "lowestSkinWeightedVertexProjection": {
+            "approved120PresentationOffsetPx": [
+              1.547,
+              12.2544
+            ],
+            "sourceFramePx": [
+              81.8472,
+              107.7664
+            ]
+          },
+          "minimumVertexWorldXYZ": [
+            -0.08592,
+            -0.05882,
+            0.13869
+          ],
+          "minimumWorldZ": 0.13869,
+          "p10WorldZ": 0.16079,
+          "relativeClearanceFromFrame1FootMinMeters": 0.17019,
+          "selectedVertexCount": 8245,
+          "sourceMesh": "material",
+          "sourceVertexIndex": 15286
+        }
+      },
+      "sourceFrame60fps": 9
+    },
+    {
+      "atlasColumn": 5,
+      "direction": 3,
+      "feet": {
+        "LeftFoot": {
+          "lowestSkinWeightedVertexProjection": {
+            "approved120PresentationOffsetPx": [
+              -8.5616,
+              22.0095
+            ],
+            "sourceFramePx": [
+              69.7771,
+              119.4144
+            ]
+          },
+          "minimumVertexWorldXYZ": [
+            0.12253,
+            -0.02746,
+            0.12302
+          ],
+          "minimumWorldZ": 0.12302,
+          "p10WorldZ": 0.19668,
+          "relativeClearanceFromFrame1FootMinMeters": 0.15452,
+          "selectedVertexCount": 8508,
+          "sourceMesh": "material",
+          "sourceVertexIndex": 8685
+        },
+        "RightFoot": {
+          "lowestSkinWeightedVertexProjection": {
+            "approved120PresentationOffsetPx": [
+              7.4,
+              21.9681
+            ],
+            "sourceFramePx": [
+              88.8358,
+              119.3649
+            ]
+          },
+          "minimumVertexWorldXYZ": [
+            -0.1484,
+            -0.01876,
+            -0.0315
+          ],
+          "minimumWorldZ": -0.0315,
+          "p10WorldZ": 0.005,
+          "relativeClearanceFromFrame1FootMinMeters": 0.0,
+          "selectedVertexCount": 8245,
+          "sourceMesh": "material",
+          "sourceVertexIndex": 19246
+        }
+      },
+      "sourceFrame60fps": 11
+    },
+    {
+      "atlasColumn": 6,
+      "direction": 3,
+      "feet": {
+        "LeftFoot": {
+          "lowestSkinWeightedVertexProjection": {
+            "approved120PresentationOffsetPx": [
+              -21.1504,
+              21.9639
+            ],
+            "sourceFramePx": [
+              54.7458,
+              119.3598
+            ]
+          },
+          "minimumVertexWorldXYZ": [
+            0.13732,
+            -0.23323,
+            0.01074
+          ],
+          "minimumWorldZ": 0.01074,
+          "p10WorldZ": 0.06385,
+          "relativeClearanceFromFrame1FootMinMeters": 0.04224,
+          "selectedVertexCount": 8508,
+          "sourceMesh": "material",
+          "sourceVertexIndex": 192
+        },
+        "RightFoot": {
+          "lowestSkinWeightedVertexProjection": {
+            "approved120PresentationOffsetPx": [
+              13.4388,
+              20.3964
+            ],
+            "sourceFramePx": [
+              96.0463,
+              117.4883
+            ]
+          },
+          "minimumVertexWorldXYZ": [
+            -0.22716,
+            0.00828,
+            -0.03671
+          ],
+          "minimumWorldZ": -0.03671,
+          "p10WorldZ": 0.00999,
+          "relativeClearanceFromFrame1FootMinMeters": -0.00521,
+          "selectedVertexCount": 8245,
+          "sourceMesh": "material",
+          "sourceVertexIndex": 14746
+        }
+      },
+      "sourceFrame60fps": 15
+    },
+    {
+      "atlasColumn": 7,
+      "direction": 3,
+      "feet": {
+        "LeftFoot": {
+          "lowestSkinWeightedVertexProjection": {
+            "approved120PresentationOffsetPx": [
+              -20.1585,
+              25.5894
+            ],
+            "sourceFramePx": [
+              55.9302,
+              123.6888
+            ]
+          },
+          "minimumVertexWorldXYZ": [
+            0.15153,
+            -0.20164,
+            -0.02072
+          ],
+          "minimumWorldZ": -0.02072,
+          "p10WorldZ": 0.02002,
+          "relativeClearanceFromFrame1FootMinMeters": 0.01078,
+          "selectedVertexCount": 8508,
+          "sourceMesh": "material",
+          "sourceVertexIndex": 192
+        },
+        "RightFoot": {
+          "lowestSkinWeightedVertexProjection": {
+            "approved120PresentationOffsetPx": [
+              16.2114,
+              21.9529
+            ],
+            "sourceFramePx": [
+              99.3569,
+              119.3467
+            ]
+          },
+          "minimumVertexWorldXYZ": [
+            -0.2258,
+            0.05822,
+            -0.0315
+          ],
+          "minimumWorldZ": -0.0315,
+          "p10WorldZ": 0.00304,
+          "relativeClearanceFromFrame1FootMinMeters": 0.0,
+          "selectedVertexCount": 8245,
+          "sourceMesh": "material",
+          "sourceVertexIndex": 14705
+        }
+      },
+      "sourceFrame60fps": 22
+    },
+    {
+      "atlasColumn": 0,
+      "direction": 4,
+      "feet": {
+        "LeftFoot": {
+          "lowestSkinWeightedVertexProjection": {
+            "approved120PresentationOffsetPx": [
+              -12.2317,
+              16.9787
+            ],
+            "sourceFramePx": [
+              65.395,
+              113.4074
+            ]
+          },
+          "minimumVertexWorldXYZ": [
+            0.15153,
+            -0.20164,
+            -0.02072
+          ],
+          "minimumWorldZ": -0.02072,
+          "p10WorldZ": 0.02002,
+          "relativeClearanceFromFrame1FootMinMeters": 0.01078,
+          "selectedVertexCount": 8508,
+          "sourceMesh": "material",
+          "sourceVertexIndex": 192
+        },
+        "RightFoot": {
+          "lowestSkinWeightedVertexProjection": {
+            "approved120PresentationOffsetPx": [
+              18.2269,
+              31.1082
+            ],
+            "sourceFramePx": [
+              101.7634,
+              130.2785
+            ]
+          },
+          "minimumVertexWorldXYZ": [
+            -0.2258,
+            0.05822,
+            -0.0315
+          ],
+          "minimumWorldZ": -0.0315,
+          "p10WorldZ": 0.00304,
+          "relativeClearanceFromFrame1FootMinMeters": 0.0,
+          "selectedVertexCount": 8245,
+          "sourceMesh": "material",
+          "sourceVertexIndex": 14705
+        }
+      },
+      "sourceFrame60fps": 1
+    },
+    {
+      "atlasColumn": 1,
+      "direction": 4,
+      "feet": {
+        "LeftFoot": {
+          "lowestSkinWeightedVertexProjection": {
+            "approved120PresentationOffsetPx": [
+              -9.6996,
+              14.0627
+            ],
+            "sourceFramePx": [
+              68.4183,
+              109.9256
+            ]
+          },
+          "minimumVertexWorldXYZ": [
+            0.12016,
+            -0.25171,
+            -0.01553
+          ],
+          "minimumWorldZ": -0.01553,
+          "p10WorldZ": 0.05593,
+          "relativeClearanceFromFrame1FootMinMeters": 0.01597,
+          "selectedVertexCount": 8508,
+          "sourceMesh": "material",
+          "sourceVertexIndex": 248
+        },
+        "RightFoot": {
+          "lowestSkinWeightedVertexProjection": {
+            "approved120PresentationOffsetPx": [
+              17.3202,
+              25.652
+            ],
+            "sourceFramePx": [
+              100.6809,
+              123.7636
+            ]
+          },
+          "minimumVertexWorldXYZ": [
+            -0.21456,
+            -0.0471,
+            -0.0315
+          ],
+          "minimumWorldZ": -0.0315,
+          "p10WorldZ": 0.02695,
+          "relativeClearanceFromFrame1FootMinMeters": 0.0,
+          "selectedVertexCount": 8245,
+          "sourceMesh": "material",
+          "sourceVertexIndex": 14785
+        }
+      },
+      "sourceFrame60fps": 3
+    },
+    {
+      "atlasColumn": 2,
+      "direction": 4,
+      "feet": {
+        "LeftFoot": {
+          "lowestSkinWeightedVertexProjection": {
+            "approved120PresentationOffsetPx": [
+              -7.6649,
+              14.7903
+            ],
+            "sourceFramePx": [
+              70.8479,
+              110.7944
+            ]
+          },
+          "minimumVertexWorldXYZ": [
+            0.09495,
+            -0.25675,
+            -0.0315
+          ],
+          "minimumWorldZ": -0.0315,
+          "p10WorldZ": 0.03362,
+          "relativeClearanceFromFrame1FootMinMeters": 0.0,
+          "selectedVertexCount": 8508,
+          "sourceMesh": "material",
+          "sourceVertexIndex": 277
+        },
+        "RightFoot": {
+          "lowestSkinWeightedVertexProjection": {
+            "approved120PresentationOffsetPx": [
+              17.6634,
+              9.4726
+            ],
+            "sourceFramePx": [
+              101.0906,
+              104.4449
+            ]
+          },
+          "minimumVertexWorldXYZ": [
+            -0.21882,
+            -0.1693,
+            0.12759
+          ],
+          "minimumWorldZ": 0.12759,
+          "p10WorldZ": 0.16163,
+          "relativeClearanceFromFrame1FootMinMeters": 0.15909,
+          "selectedVertexCount": 8245,
+          "sourceMesh": "material",
+          "sourceVertexIndex": 14807
+        }
+      },
+      "sourceFrame60fps": 5
+    },
+    {
+      "atlasColumn": 3,
+      "direction": 4,
+      "feet": {
+        "LeftFoot": {
+          "lowestSkinWeightedVertexProjection": {
+            "approved120PresentationOffsetPx": [
+              -11.5036,
+              -0.983
+            ],
+            "sourceFramePx": [
+              66.2644,
+              91.9605
+            ]
+          },
+          "minimumVertexWorldXYZ": [
+            0.14251,
+            -0.18355,
+            0.28457
+          ],
+          "minimumWorldZ": 0.28457,
+          "p10WorldZ": 0.33477,
+          "relativeClearanceFromFrame1FootMinMeters": 0.31607,
+          "selectedVertexCount": 8508,
+          "sourceMesh": "material",
+          "sourceVertexIndex": 1368
+        },
+        "RightFoot": {
+          "lowestSkinWeightedVertexProjection": {
+            "approved120PresentationOffsetPx": [
+              8.6097,
+              -12.4474
+            ],
+            "sourceFramePx": [
+              90.2802,
+              78.2717
+            ]
+          },
+          "minimumVertexWorldXYZ": [
+            -0.10666,
+            -0.29652,
+            0.37522
+          ],
+          "minimumWorldZ": 0.37522,
+          "p10WorldZ": 0.41801,
+          "relativeClearanceFromFrame1FootMinMeters": 0.40672,
+          "selectedVertexCount": 8245,
+          "sourceMesh": "material",
+          "sourceVertexIndex": 26016
+        }
+      },
+      "sourceFrame60fps": 7
+    },
+    {
+      "atlasColumn": 4,
+      "direction": 4,
+      "feet": {
+        "LeftFoot": {
+          "lowestSkinWeightedVertexProjection": {
+            "approved120PresentationOffsetPx": [
+              -10.0351,
+              13.0679
+            ],
+            "sourceFramePx": [
+              68.0178,
+              108.7378
+            ]
+          },
+          "minimumVertexWorldXYZ": [
+            0.12432,
+            0.02639,
+            0.23329
+          ],
+          "minimumWorldZ": 0.23329,
+          "p10WorldZ": 0.27502,
+          "relativeClearanceFromFrame1FootMinMeters": 0.26479,
+          "selectedVertexCount": 8508,
+          "sourceMesh": "material",
+          "sourceVertexIndex": 1774
+        },
+        "RightFoot": {
+          "lowestSkinWeightedVertexProjection": {
+            "approved120PresentationOffsetPx": [
+              6.9356,
+              14.5095
+            ],
+            "sourceFramePx": [
+              88.2814,
+              110.4591
+            ]
+          },
+          "minimumVertexWorldXYZ": [
+            -0.08592,
+            -0.05882,
+            0.13869
+          ],
+          "minimumWorldZ": 0.13869,
+          "p10WorldZ": 0.16079,
+          "relativeClearanceFromFrame1FootMinMeters": 0.17019,
+          "selectedVertexCount": 8245,
+          "sourceMesh": "material",
+          "sourceVertexIndex": 15286
+        }
+      },
+      "sourceFrame60fps": 9
+    },
+    {
+      "atlasColumn": 5,
+      "direction": 4,
+      "feet": {
+        "LeftFoot": {
+          "lowestSkinWeightedVertexProjection": {
+            "approved120PresentationOffsetPx": [
+              -9.891,
+              17.1041
+            ],
+            "sourceFramePx": [
+              68.1899,
+              113.5571
+            ]
+          },
+          "minimumVertexWorldXYZ": [
+            0.12253,
+            -0.02746,
+            0.12302
+          ],
+          "minimumWorldZ": 0.12302,
+          "p10WorldZ": 0.19668,
+          "relativeClearanceFromFrame1FootMinMeters": 0.15452,
+          "selectedVertexCount": 8508,
+          "sourceMesh": "material",
+          "sourceVertexIndex": 8685
+        },
+        "RightFoot": {
+          "lowestSkinWeightedVertexProjection": {
+            "approved120PresentationOffsetPx": [
+              11.9794,
+              27.1201
+            ],
+            "sourceFramePx": [
+              94.3038,
+              125.5166
+            ]
+          },
+          "minimumVertexWorldXYZ": [
+            -0.1484,
+            -0.01876,
+            -0.0315
+          ],
+          "minimumWorldZ": -0.0315,
+          "p10WorldZ": 0.005,
+          "relativeClearanceFromFrame1FootMinMeters": 0.0,
+          "selectedVertexCount": 8245,
+          "sourceMesh": "material",
+          "sourceVertexIndex": 19246
+        }
+      },
+      "sourceFrame60fps": 11
+    },
+    {
+      "atlasColumn": 6,
+      "direction": 4,
+      "feet": {
+        "LeftFoot": {
+          "lowestSkinWeightedVertexProjection": {
+            "approved120PresentationOffsetPx": [
+              -11.0845,
+              13.3944
+            ],
+            "sourceFramePx": [
+              66.7648,
+              109.1277
+            ]
+          },
+          "minimumVertexWorldXYZ": [
+            0.13732,
+            -0.23323,
+            0.01074
+          ],
+          "minimumWorldZ": 0.01074,
+          "p10WorldZ": 0.06385,
+          "relativeClearanceFromFrame1FootMinMeters": 0.04224,
+          "selectedVertexCount": 8508,
+          "sourceMesh": "material",
+          "sourceVertexIndex": 192
+        },
+        "RightFoot": {
+          "lowestSkinWeightedVertexProjection": {
+            "approved120PresentationOffsetPx": [
+              18.3367,
+              28.8439
+            ],
+            "sourceFramePx": [
+              101.8946,
+              127.5748
+            ]
+          },
+          "minimumVertexWorldXYZ": [
+            -0.22716,
+            0.00828,
+            -0.03671
+          ],
+          "minimumWorldZ": -0.03671,
+          "p10WorldZ": 0.00999,
+          "relativeClearanceFromFrame1FootMinMeters": -0.00521,
+          "selectedVertexCount": 8245,
+          "sourceMesh": "material",
+          "sourceVertexIndex": 14746
+        }
+      },
+      "sourceFrame60fps": 15
+    },
+    {
+      "atlasColumn": 7,
+      "direction": 4,
+      "feet": {
+        "LeftFoot": {
+          "lowestSkinWeightedVertexProjection": {
+            "approved120PresentationOffsetPx": [
+              -12.2317,
+              16.9787
+            ],
+            "sourceFramePx": [
+              65.395,
+              113.4074
+            ]
+          },
+          "minimumVertexWorldXYZ": [
+            0.15153,
+            -0.20164,
+            -0.02072
+          ],
+          "minimumWorldZ": -0.02072,
+          "p10WorldZ": 0.02002,
+          "relativeClearanceFromFrame1FootMinMeters": 0.01078,
+          "selectedVertexCount": 8508,
+          "sourceMesh": "material",
+          "sourceVertexIndex": 192
+        },
+        "RightFoot": {
+          "lowestSkinWeightedVertexProjection": {
+            "approved120PresentationOffsetPx": [
+              18.2269,
+              31.1082
+            ],
+            "sourceFramePx": [
+              101.7634,
+              130.2785
+            ]
+          },
+          "minimumVertexWorldXYZ": [
+            -0.2258,
+            0.05822,
+            -0.0315
+          ],
+          "minimumWorldZ": -0.0315,
+          "p10WorldZ": 0.00304,
+          "relativeClearanceFromFrame1FootMinMeters": 0.0,
+          "selectedVertexCount": 8245,
+          "sourceMesh": "material",
+          "sourceVertexIndex": 14705
+        }
+      },
+      "sourceFrame60fps": 22
+    },
+    {
+      "atlasColumn": 0,
+      "direction": 5,
+      "feet": {
+        "LeftFoot": {
+          "lowestSkinWeightedVertexProjection": {
+            "approved120PresentationOffsetPx": [
+              2.8602,
+              14.4873
+            ],
+            "sourceFramePx": [
+              83.4152,
+              110.4326
+            ]
+          },
+          "minimumVertexWorldXYZ": [
+            0.15153,
+            -0.20164,
+            -0.02072
+          ],
+          "minimumWorldZ": -0.02072,
+          "p10WorldZ": 0.02002,
+          "relativeClearanceFromFrame1FootMinMeters": 0.01078,
+          "selectedVertexCount": 8508,
+          "sourceMesh": "material",
+          "sourceVertexIndex": 192
+        },
+        "RightFoot": {
+          "lowestSkinWeightedVertexProjection": {
+            "approved120PresentationOffsetPx": [
+              9.5652,
+              38.4965
+            ],
+            "sourceFramePx": [
+              91.4212,
+              139.1003
+            ]
+          },
+          "minimumVertexWorldXYZ": [
+            -0.2258,
+            0.05822,
+            -0.0315
+          ],
+          "minimumWorldZ": -0.0315,
+          "p10WorldZ": 0.00304,
+          "relativeClearanceFromFrame1FootMinMeters": 0.0,
+          "selectedVertexCount": 8245,
+          "sourceMesh": "material",
+          "sourceVertexIndex": 14705
+        }
+      },
+      "sourceFrame60fps": 1
+    },
+    {
+      "atlasColumn": 1,
+      "direction": 5,
+      "feet": {
+        "LeftFoot": {
+          "lowestSkinWeightedVertexProjection": {
+            "approved120PresentationOffsetPx": [
+              7.5088,
+              13.4802
+            ],
+            "sourceFramePx": [
+              88.9658,
+              109.2301
+            ]
+          },
+          "minimumVertexWorldXYZ": [
+            0.12016,
+            -0.25171,
+            -0.01553
+          ],
+          "minimumWorldZ": -0.01553,
+          "p10WorldZ": 0.05593,
+          "relativeClearanceFromFrame1FootMinMeters": 0.01597,
+          "selectedVertexCount": 8508,
+          "sourceMesh": "material",
+          "sourceVertexIndex": 248
+        },
+        "RightFoot": {
+          "lowestSkinWeightedVertexProjection": {
+            "approved120PresentationOffsetPx": [
+              14.9355,
+              34.2269
+            ],
+            "sourceFramePx": [
+              97.8334,
+              134.0023
+            ]
+          },
+          "minimumVertexWorldXYZ": [
+            -0.21456,
+            -0.0471,
+            -0.0315
+          ],
+          "minimumWorldZ": -0.0315,
+          "p10WorldZ": 0.02695,
+          "relativeClearanceFromFrame1FootMinMeters": 0.0,
+          "selectedVertexCount": 8245,
+          "sourceMesh": "material",
+          "sourceVertexIndex": 14785
+        }
+      },
+      "sourceFrame60fps": 3
+    },
+    {
+      "atlasColumn": 2,
+      "direction": 5,
+      "feet": {
+        "LeftFoot": {
+          "lowestSkinWeightedVertexProjection": {
+            "approved120PresentationOffsetPx": [
+              9.2352,
+              15.2077
+            ],
+            "sourceFramePx": [
+              91.0271,
+              111.2928
+            ]
+          },
+          "minimumVertexWorldXYZ": [
+            0.09495,
+            -0.25675,
+            -0.0315
+          ],
+          "minimumWorldZ": -0.0315,
+          "p10WorldZ": 0.03362,
+          "relativeClearanceFromFrame1FootMinMeters": 0.0,
+          "selectedVertexCount": 8508,
+          "sourceMesh": "material",
+          "sourceVertexIndex": 277
+        },
+        "RightFoot": {
+          "lowestSkinWeightedVertexProjection": {
+            "approved120PresentationOffsetPx": [
+              22.1536,
+              20.0577
+            ],
+            "sourceFramePx": [
+              106.452,
+              117.0838
+            ]
+          },
+          "minimumVertexWorldXYZ": [
+            -0.21882,
+            -0.1693,
+            0.12759
+          ],
+          "minimumWorldZ": 0.12759,
+          "p10WorldZ": 0.16163,
+          "relativeClearanceFromFrame1FootMinMeters": 0.15909,
+          "selectedVertexCount": 8245,
+          "sourceMesh": "material",
+          "sourceVertexIndex": 14807
+        }
+      },
+      "sourceFrame60fps": 5
+    },
+    {
+      "atlasColumn": 3,
+      "direction": 5,
+      "feet": {
+        "LeftFoot": {
+          "lowestSkinWeightedVertexProjection": {
+            "approved120PresentationOffsetPx": [
+              2.3426,
+              -3.4185
+            ],
+            "sourceFramePx": [
+              82.7971,
+              89.0525
+            ]
+          },
+          "minimumVertexWorldXYZ": [
+            0.14251,
+            -0.18355,
+            0.28457
+          ],
+          "minimumWorldZ": 0.28457,
+          "p10WorldZ": 0.33477,
+          "relativeClearanceFromFrame1FootMinMeters": 0.31607,
+          "selectedVertexCount": 8508,
+          "sourceMesh": "material",
+          "sourceVertexIndex": 1368
+        },
+        "RightFoot": {
+          "lowestSkinWeightedVertexProjection": {
+            "approved120PresentationOffsetPx": [
+              23.0132,
+              -4.0407
+            ],
+            "sourceFramePx": [
+              107.4784,
+              88.3096
+            ]
+          },
+          "minimumVertexWorldXYZ": [
+            -0.10666,
+            -0.29652,
+            0.37522
+          ],
+          "minimumWorldZ": 0.37522,
+          "p10WorldZ": 0.41801,
+          "relativeClearanceFromFrame1FootMinMeters": 0.40672,
+          "selectedVertexCount": 8245,
+          "sourceMesh": "material",
+          "sourceVertexIndex": 26016
+        }
+      },
+      "sourceFrame60fps": 7
+    },
+    {
+      "atlasColumn": 4,
+      "direction": 5,
+      "feet": {
+        "LeftFoot": {
+          "lowestSkinWeightedVertexProjection": {
+            "approved120PresentationOffsetPx": [
+              -8.602,
+              8.1132
+            ],
+            "sourceFramePx": [
+              69.729,
+              102.8217
+            ]
+          },
+          "minimumVertexWorldXYZ": [
+            0.12432,
+            0.02639,
+            0.23329
+          ],
+          "minimumWorldZ": 0.23329,
+          "p10WorldZ": 0.27502,
+          "relativeClearanceFromFrame1FootMinMeters": 0.26479,
+          "selectedVertexCount": 8508,
+          "sourceMesh": "material",
+          "sourceVertexIndex": 1774
+        },
+        "RightFoot": {
+          "lowestSkinWeightedVertexProjection": {
+            "approved120PresentationOffsetPx": [
+              8.2614,
+              18.5495
+            ],
+            "sourceFramePx": [
+              89.8644,
+              115.283
+            ]
+          },
+          "minimumVertexWorldXYZ": [
+            -0.08592,
+            -0.05882,
+            0.13869
+          ],
+          "minimumWorldZ": 0.13869,
+          "p10WorldZ": 0.16079,
+          "relativeClearanceFromFrame1FootMinMeters": 0.17019,
+          "selectedVertexCount": 8245,
+          "sourceMesh": "material",
+          "sourceVertexIndex": 15286
+        }
+      },
+      "sourceFrame60fps": 9
+    },
+    {
+      "atlasColumn": 5,
+      "direction": 5,
+      "feet": {
+        "LeftFoot": {
+          "lowestSkinWeightedVertexProjection": {
+            "approved120PresentationOffsetPx": [
+              -5.4264,
+              13.0319
+            ],
+            "sourceFramePx": [
+              73.5208,
+              108.6948
+            ]
+          },
+          "minimumVertexWorldXYZ": [
+            0.12253,
+            -0.02746,
+            0.12302
+          ],
+          "minimumWorldZ": 0.12302,
+          "p10WorldZ": 0.19668,
+          "relativeClearanceFromFrame1FootMinMeters": 0.15452,
+          "selectedVertexCount": 8508,
+          "sourceMesh": "material",
+          "sourceVertexIndex": 8685
+        },
+        "RightFoot": {
+          "lowestSkinWeightedVertexProjection": {
+            "approved120PresentationOffsetPx": [
+              9.5414,
+              32.8413
+            ],
+            "sourceFramePx": [
+              91.3927,
+              132.3478
+            ]
+          },
+          "minimumVertexWorldXYZ": [
+            -0.1484,
+            -0.01876,
+            -0.0315
+          ],
+          "minimumWorldZ": -0.0315,
+          "p10WorldZ": 0.005,
+          "relativeClearanceFromFrame1FootMinMeters": 0.0,
+          "selectedVertexCount": 8245,
+          "sourceMesh": "material",
+          "sourceVertexIndex": 19246
+        }
+      },
+      "sourceFrame60fps": 11
+    },
+    {
+      "atlasColumn": 6,
+      "direction": 5,
+      "feet": {
+        "LeftFoot": {
+          "lowestSkinWeightedVertexProjection": {
+            "approved120PresentationOffsetPx": [
+              5.4745,
+              11.9029
+            ],
+            "sourceFramePx": [
+              86.5367,
+              107.3468
+            ]
+          },
+          "minimumVertexWorldXYZ": [
+            0.13732,
+            -0.23323,
+            0.01074
+          ],
+          "minimumWorldZ": 0.01074,
+          "p10WorldZ": 0.06385,
+          "relativeClearanceFromFrame1FootMinMeters": 0.04224,
+          "selectedVertexCount": 8508,
+          "sourceMesh": "material",
+          "sourceVertexIndex": 192
+        },
+        "RightFoot": {
+          "lowestSkinWeightedVertexProjection": {
+            "approved120PresentationOffsetPx": [
+              12.4932,
+              37.0398
+            ],
+            "sourceFramePx": [
+              94.9173,
+              137.361
+            ]
+          },
+          "minimumVertexWorldXYZ": [
+            -0.22716,
+            0.00828,
+            -0.03671
+          ],
+          "minimumWorldZ": -0.03671,
+          "p10WorldZ": 0.00999,
+          "relativeClearanceFromFrame1FootMinMeters": -0.00521,
+          "selectedVertexCount": 8245,
+          "sourceMesh": "material",
+          "sourceVertexIndex": 14746
+        }
+      },
+      "sourceFrame60fps": 15
+    },
+    {
+      "atlasColumn": 7,
+      "direction": 5,
+      "feet": {
+        "LeftFoot": {
+          "lowestSkinWeightedVertexProjection": {
+            "approved120PresentationOffsetPx": [
+              2.8602,
+              14.4873
+            ],
+            "sourceFramePx": [
+              83.4152,
+              110.4325
+            ]
+          },
+          "minimumVertexWorldXYZ": [
+            0.15153,
+            -0.20164,
+            -0.02072
+          ],
+          "minimumWorldZ": -0.02072,
+          "p10WorldZ": 0.02002,
+          "relativeClearanceFromFrame1FootMinMeters": 0.01078,
+          "selectedVertexCount": 8508,
+          "sourceMesh": "material",
+          "sourceVertexIndex": 192
+        },
+        "RightFoot": {
+          "lowestSkinWeightedVertexProjection": {
+            "approved120PresentationOffsetPx": [
+              9.5652,
+              38.4965
+            ],
+            "sourceFramePx": [
+              91.4212,
+              139.1003
+            ]
+          },
+          "minimumVertexWorldXYZ": [
+            -0.2258,
+            0.05822,
+            -0.0315
+          ],
+          "minimumWorldZ": -0.0315,
+          "p10WorldZ": 0.00304,
+          "relativeClearanceFromFrame1FootMinMeters": 0.0,
+          "selectedVertexCount": 8245,
+          "sourceMesh": "material",
+          "sourceVertexIndex": 14705
+        }
+      },
+      "sourceFrame60fps": 22
+    },
+    {
+      "atlasColumn": 0,
+      "direction": 6,
+      "feet": {
+        "LeftFoot": {
+          "lowestSkinWeightedVertexProjection": {
+            "approved120PresentationOffsetPx": [
+              16.2766,
+              19.5747
+            ],
+            "sourceFramePx": [
+              99.4348,
+              116.5071
+            ]
+          },
+          "minimumVertexWorldXYZ": [
+            0.15153,
+            -0.20164,
+            -0.02072
+          ],
+          "minimumWorldZ": -0.02072,
+          "p10WorldZ": 0.02002,
+          "relativeClearanceFromFrame1FootMinMeters": 0.01078,
+          "selectedVertexCount": 8508,
+          "sourceMesh": "material",
+          "sourceVertexIndex": 192
+        },
+        "RightFoot": {
+          "lowestSkinWeightedVertexProjection": {
+            "approved120PresentationOffsetPx": [
+              -4.6996,
+              39.79
+            ],
+            "sourceFramePx": [
+              74.3886,
+              140.6448
+            ]
+          },
+          "minimumVertexWorldXYZ": [
+            -0.2258,
+            0.05822,
+            -0.0315
+          ],
+          "minimumWorldZ": -0.0315,
+          "p10WorldZ": 0.00304,
+          "relativeClearanceFromFrame1FootMinMeters": 0.0,
+          "selectedVertexCount": 8245,
+          "sourceMesh": "material",
+          "sourceVertexIndex": 14705
+        }
+      },
+      "sourceFrame60fps": 1
+    },
+    {
+      "atlasColumn": 1,
+      "direction": 6,
+      "feet": {
+        "LeftFoot": {
+          "lowestSkinWeightedVertexProjection": {
+            "approved120PresentationOffsetPx": [
+              20.3188,
+              20.8781
+            ],
+            "sourceFramePx": [
+              104.2612,
+              118.0634
+            ]
+          },
+          "minimumVertexWorldXYZ": [
+            0.12016,
+            -0.25171,
+            -0.01553
+          ],
+          "minimumWorldZ": -0.01553,
+          "p10WorldZ": 0.05593,
+          "relativeClearanceFromFrame1FootMinMeters": 0.01597,
+          "selectedVertexCount": 8508,
+          "sourceMesh": "material",
+          "sourceVertexIndex": 248
+        },
+        "RightFoot": {
+          "lowestSkinWeightedVertexProjection": {
+            "approved120PresentationOffsetPx": [
+              3.8017,
+              39.2081
+            ],
+            "sourceFramePx": [
+              84.5394,
+              139.95
+            ]
+          },
+          "minimumVertexWorldXYZ": [
+            -0.21456,
+            -0.0471,
+            -0.0315
+          ],
+          "minimumWorldZ": -0.0315,
+          "p10WorldZ": 0.02695,
+          "relativeClearanceFromFrame1FootMinMeters": 0.0,
+          "selectedVertexCount": 8245,
+          "sourceMesh": "material",
+          "sourceVertexIndex": 14785
+        }
+      },
+      "sourceFrame60fps": 3
+    },
+    {
+      "atlasColumn": 2,
+      "direction": 6,
+      "feet": {
+        "LeftFoot": {
+          "lowestSkinWeightedVertexProjection": {
+            "approved120PresentationOffsetPx": [
+              20.7255,
+              23.1726
+            ],
+            "sourceFramePx": [
+              104.7468,
+              120.8031
+            ]
+          },
+          "minimumVertexWorldXYZ": [
+            0.09495,
+            -0.25675,
+            -0.0315
+          ],
+          "minimumWorldZ": -0.0315,
+          "p10WorldZ": 0.03362,
+          "relativeClearanceFromFrame1FootMinMeters": 0.0,
+          "selectedVertexCount": 8508,
+          "sourceMesh": "material",
+          "sourceVertexIndex": 277
+        },
+        "RightFoot": {
+          "lowestSkinWeightedVertexProjection": {
+            "approved120PresentationOffsetPx": [
+              13.6665,
+              29.5803
+            ],
+            "sourceFramePx": [
+              96.3182,
+              128.4541
+            ]
+          },
+          "minimumVertexWorldXYZ": [
+            -0.21882,
+            -0.1693,
+            0.12759
+          ],
+          "minimumWorldZ": 0.12759,
+          "p10WorldZ": 0.16163,
+          "relativeClearanceFromFrame1FootMinMeters": 0.15909,
+          "selectedVertexCount": 8245,
+          "sourceMesh": "material",
+          "sourceVertexIndex": 14807
+        }
+      },
+      "sourceFrame60fps": 5
+    },
+    {
+      "atlasColumn": 3,
+      "direction": 6,
+      "feet": {
+        "LeftFoot": {
+          "lowestSkinWeightedVertexProjection": {
+            "approved120PresentationOffsetPx": [
+              14.8165,
+              1.1431
+            ],
+            "sourceFramePx": [
+              97.6914,
+              94.4993
+            ]
+          },
+          "minimumVertexWorldXYZ": [
+            0.14251,
+            -0.18355,
+            0.28457
+          ],
+          "minimumWorldZ": 0.28457,
+          "p10WorldZ": 0.33477,
+          "relativeClearanceFromFrame1FootMinMeters": 0.31607,
+          "selectedVertexCount": 8508,
+          "sourceMesh": "material",
+          "sourceVertexIndex": 1368
+        },
+        "RightFoot": {
+          "lowestSkinWeightedVertexProjection": {
+            "approved120PresentationOffsetPx": [
+              23.9359,
+              8.4405
+            ],
+            "sourceFramePx": [
+              108.5802,
+              103.2125
+            ]
+          },
+          "minimumVertexWorldXYZ": [
+            -0.10666,
+            -0.29652,
+            0.37522
+          ],
+          "minimumWorldZ": 0.37522,
+          "p10WorldZ": 0.41801,
+          "relativeClearanceFromFrame1FootMinMeters": 0.40672,
+          "selectedVertexCount": 8245,
+          "sourceMesh": "material",
+          "sourceVertexIndex": 26016
+        }
+      },
+      "sourceFrame60fps": 7
+    },
+    {
+      "atlasColumn": 4,
+      "direction": 6,
+      "feet": {
+        "LeftFoot": {
+          "lowestSkinWeightedVertexProjection": {
+            "approved120PresentationOffsetPx": [
+              -2.13,
+              5.2602
+            ],
+            "sourceFramePx": [
+              77.4568,
+              99.4151
+            ]
+          },
+          "minimumVertexWorldXYZ": [
+            0.12432,
+            0.02639,
+            0.23329
+          ],
+          "minimumWorldZ": 0.23329,
+          "p10WorldZ": 0.27502,
+          "relativeClearanceFromFrame1FootMinMeters": 0.26479,
+          "selectedVertexCount": 8508,
+          "sourceMesh": "material",
+          "sourceVertexIndex": 1774
+        },
+        "RightFoot": {
+          "lowestSkinWeightedVertexProjection": {
+            "approved120PresentationOffsetPx": [
+              4.7478,
+              22.008
+            ],
+            "sourceFramePx": [
+              85.6691,
+              119.4125
+            ]
+          },
+          "minimumVertexWorldXYZ": [
+            -0.08592,
+            -0.05882,
+            0.13869
+          ],
+          "minimumWorldZ": 0.13869,
+          "p10WorldZ": 0.16079,
+          "relativeClearanceFromFrame1FootMinMeters": 0.17019,
+          "selectedVertexCount": 8245,
+          "sourceMesh": "material",
+          "sourceVertexIndex": 15286
+        }
+      },
+      "sourceFrame60fps": 9
+    },
+    {
+      "atlasColumn": 5,
+      "direction": 6,
+      "feet": {
+        "LeftFoot": {
+          "lowestSkinWeightedVertexProjection": {
+            "approved120PresentationOffsetPx": [
+              2.217,
+              12.1787
+            ],
+            "sourceFramePx": [
+              82.6471,
+              107.6761
+            ]
+          },
+          "minimumVertexWorldXYZ": [
+            0.12253,
+            -0.02746,
+            0.12302
+          ],
+          "minimumWorldZ": 0.12302,
+          "p10WorldZ": 0.19668,
+          "relativeClearanceFromFrame1FootMinMeters": 0.15452,
+          "selectedVertexCount": 8508,
+          "sourceMesh": "material",
+          "sourceVertexIndex": 8685
+        },
+        "RightFoot": {
+          "lowestSkinWeightedVertexProjection": {
+            "approved120PresentationOffsetPx": [
+              1.5142,
+              35.7804
+            ],
+            "sourceFramePx": [
+              81.808,
+              135.8571
+            ]
+          },
+          "minimumVertexWorldXYZ": [
+            -0.1484,
+            -0.01876,
+            -0.0315
+          ],
+          "minimumWorldZ": -0.0315,
+          "p10WorldZ": 0.005,
+          "relativeClearanceFromFrame1FootMinMeters": 0.0,
+          "selectedVertexCount": 8245,
+          "sourceMesh": "material",
+          "sourceVertexIndex": 19246
+        }
+      },
+      "sourceFrame60fps": 11
+    },
+    {
+      "atlasColumn": 6,
+      "direction": 6,
+      "feet": {
+        "LeftFoot": {
+          "lowestSkinWeightedVertexProjection": {
+            "approved120PresentationOffsetPx": [
+              18.8267,
+              18.3633
+            ],
+            "sourceFramePx": [
+              102.4796,
+              115.0607
+            ]
+          },
+          "minimumVertexWorldXYZ": [
+            0.13732,
+            -0.23323,
+            0.01074
+          ],
+          "minimumWorldZ": 0.01074,
+          "p10WorldZ": 0.06385,
+          "relativeClearanceFromFrame1FootMinMeters": 0.04224,
+          "selectedVertexCount": 8508,
+          "sourceMesh": "material",
+          "sourceVertexIndex": 192
+        },
+        "RightFoot": {
+          "lowestSkinWeightedVertexProjection": {
+            "approved120PresentationOffsetPx": [
+              -0.6686,
+              40.1833
+            ],
+            "sourceFramePx": [
+              79.2017,
+              141.1144
+            ]
+          },
+          "minimumVertexWorldXYZ": [
+            -0.22716,
+            0.00828,
+            -0.03671
+          ],
+          "minimumWorldZ": -0.03671,
+          "p10WorldZ": 0.00999,
+          "relativeClearanceFromFrame1FootMinMeters": -0.00521,
+          "selectedVertexCount": 8245,
+          "sourceMesh": "material",
+          "sourceVertexIndex": 14746
+        }
+      },
+      "sourceFrame60fps": 15
+    },
+    {
+      "atlasColumn": 7,
+      "direction": 6,
+      "feet": {
+        "LeftFoot": {
+          "lowestSkinWeightedVertexProjection": {
+            "approved120PresentationOffsetPx": [
+              16.2766,
+              19.5747
+            ],
+            "sourceFramePx": [
+              99.4348,
+              116.5071
+            ]
+          },
+          "minimumVertexWorldXYZ": [
+            0.15153,
+            -0.20164,
+            -0.02072
+          ],
+          "minimumWorldZ": -0.02072,
+          "p10WorldZ": 0.02002,
+          "relativeClearanceFromFrame1FootMinMeters": 0.01078,
+          "selectedVertexCount": 8508,
+          "sourceMesh": "material",
+          "sourceVertexIndex": 192
+        },
+        "RightFoot": {
+          "lowestSkinWeightedVertexProjection": {
+            "approved120PresentationOffsetPx": [
+              -4.6996,
+              39.79
+            ],
+            "sourceFramePx": [
+              74.3886,
+              140.6448
+            ]
+          },
+          "minimumVertexWorldXYZ": [
+            -0.2258,
+            0.05822,
+            -0.0315
+          ],
+          "minimumWorldZ": -0.0315,
+          "p10WorldZ": 0.00304,
+          "relativeClearanceFromFrame1FootMinMeters": 0.0,
+          "selectedVertexCount": 8245,
+          "sourceMesh": "material",
+          "sourceVertexIndex": 14705
+        }
+      },
+      "sourceFrame60fps": 22
+    },
+    {
+      "atlasColumn": 0,
+      "direction": 7,
+      "feet": {
+        "LeftFoot": {
+          "lowestSkinWeightedVertexProjection": {
+            "approved120PresentationOffsetPx": [
+              20.1585,
+              29.2607
+            ],
+            "sourceFramePx": [
+              104.0698,
+              128.0725
+            ]
+          },
+          "minimumVertexWorldXYZ": [
+            0.15153,
+            -0.20164,
+            -0.02072
+          ],
+          "minimumWorldZ": -0.02072,
+          "p10WorldZ": 0.02002,
+          "relativeClearanceFromFrame1FootMinMeters": 0.01078,
+          "selectedVertexCount": 8508,
+          "sourceMesh": "material",
+          "sourceVertexIndex": 192
+        },
+        "RightFoot": {
+          "lowestSkinWeightedVertexProjection": {
+            "approved120PresentationOffsetPx": [
+              -16.2114,
+              34.2309
+            ],
+            "sourceFramePx": [
+              60.6431,
+              134.007
+            ]
+          },
+          "minimumVertexWorldXYZ": [
+            -0.2258,
+            0.05822,
+            -0.0315
+          ],
+          "minimumWorldZ": -0.0315,
+          "p10WorldZ": 0.00304,
+          "relativeClearanceFromFrame1FootMinMeters": 0.0,
+          "selectedVertexCount": 8245,
+          "sourceMesh": "material",
+          "sourceVertexIndex": 14705
+        }
+      },
+      "sourceFrame60fps": 1
+    },
+    {
+      "atlasColumn": 1,
+      "direction": 7,
+      "feet": {
+        "LeftFoot": {
+          "lowestSkinWeightedVertexProjection": {
+            "approved120PresentationOffsetPx": [
+              21.2263,
+              31.9225
+            ],
+            "sourceFramePx": [
+              105.3448,
+              131.2508
+            ]
+          },
+          "minimumVertexWorldXYZ": [
+            0.12016,
+            -0.25171,
+            -0.01553
+          ],
+          "minimumWorldZ": -0.01553,
+          "p10WorldZ": 0.05593,
+          "relativeClearanceFromFrame1FootMinMeters": 0.01597,
+          "selectedVertexCount": 8508,
+          "sourceMesh": "material",
+          "sourceVertexIndex": 248
+        },
+        "RightFoot": {
+          "lowestSkinWeightedVertexProjection": {
+            "approved120PresentationOffsetPx": [
+              -9.559,
+              37.6775
+            ],
+            "sourceFramePx": [
+              68.5863,
+              138.1224
+            ]
+          },
+          "minimumVertexWorldXYZ": [
+            -0.21456,
+            -0.0471,
+            -0.0315
+          ],
+          "minimumWorldZ": -0.0315,
+          "p10WorldZ": 0.02695,
+          "relativeClearanceFromFrame1FootMinMeters": 0.0,
+          "selectedVertexCount": 8245,
+          "sourceMesh": "material",
+          "sourceVertexIndex": 14785
+        }
+      },
+      "sourceFrame60fps": 3
+    },
+    {
+      "atlasColumn": 2,
+      "direction": 7,
+      "feet": {
+        "LeftFoot": {
+          "lowestSkinWeightedVertexProjection": {
+            "approved120PresentationOffsetPx": [
+              20.0751,
+              34.0191
+            ],
+            "sourceFramePx": [
+              103.9702,
+              133.7542
+            ]
+          },
+          "minimumVertexWorldXYZ": [
+            0.09495,
+            -0.25675,
+            -0.0315
+          ],
+          "minimumWorldZ": -0.0315,
+          "p10WorldZ": 0.03362,
+          "relativeClearanceFromFrame1FootMinMeters": 0.0,
+          "selectedVertexCount": 8508,
+          "sourceMesh": "material",
+          "sourceVertexIndex": 277
+        },
+        "RightFoot": {
+          "lowestSkinWeightedVertexProjection": {
+            "approved120PresentationOffsetPx": [
+              -2.8262,
+              32.462
+            ],
+            "sourceFramePx": [
+              76.6254,
+              131.895
+            ]
+          },
+          "minimumVertexWorldXYZ": [
+            -0.21882,
+            -0.1693,
+            0.12759
+          ],
+          "minimumWorldZ": 0.12759,
+          "p10WorldZ": 0.16163,
+          "relativeClearanceFromFrame1FootMinMeters": 0.15909,
+          "selectedVertexCount": 8245,
+          "sourceMesh": "material",
+          "sourceVertexIndex": 14807
+        }
+      },
+      "sourceFrame60fps": 5
+    },
+    {
+      "atlasColumn": 3,
+      "direction": 7,
+      "feet": {
+        "LeftFoot": {
+          "lowestSkinWeightedVertexProjection": {
+            "approved120PresentationOffsetPx": [
+              18.6112,
+              10.0296
+            ],
+            "sourceFramePx": [
+              102.2223,
+              105.11
+            ]
+          },
+          "minimumVertexWorldXYZ": [
+            0.14251,
+            -0.18355,
+            0.28457
+          ],
+          "minimumWorldZ": 0.28457,
+          "p10WorldZ": 0.33477,
+          "relativeClearanceFromFrame1FootMinMeters": 0.31607,
+          "selectedVertexCount": 8508,
+          "sourceMesh": "material",
+          "sourceVertexIndex": 1368
+        },
+        "RightFoot": {
+          "lowestSkinWeightedVertexProjection": {
+            "approved120PresentationOffsetPx": [
+              10.8373,
+              17.6847
+            ],
+            "sourceFramePx": [
+              92.9401,
+              114.2503
+            ]
+          },
+          "minimumVertexWorldXYZ": [
+            -0.10666,
+            -0.29652,
+            0.37522
+          ],
+          "minimumWorldZ": 0.37522,
+          "p10WorldZ": 0.41801,
+          "relativeClearanceFromFrame1FootMinMeters": 0.40672,
+          "selectedVertexCount": 8245,
+          "sourceMesh": "material",
+          "sourceVertexIndex": 26016
+        }
+      },
+      "sourceFrame60fps": 7
+    },
+    {
+      "atlasColumn": 4,
+      "direction": 7,
+      "feet": {
+        "LeftFoot": {
+          "lowestSkinWeightedVertexProjection": {
+            "approved120PresentationOffsetPx": [
+              5.5898,
+              6.1799
+            ],
+            "sourceFramePx": [
+              86.6744,
+              100.5133
+            ]
+          },
+          "minimumVertexWorldXYZ": [
+            0.12432,
+            0.02639,
+            0.23329
+          ],
+          "minimumWorldZ": 0.23329,
+          "p10WorldZ": 0.27502,
+          "relativeClearanceFromFrame1FootMinMeters": 0.26479,
+          "selectedVertexCount": 8508,
+          "sourceMesh": "material",
+          "sourceVertexIndex": 1774
+        },
+        "RightFoot": {
+          "lowestSkinWeightedVertexProjection": {
+            "approved120PresentationOffsetPx": [
+              -1.547,
+              22.8588
+            ],
+            "sourceFramePx": [
+              78.1529,
+              120.4284
+            ]
+          },
+          "minimumVertexWorldXYZ": [
+            -0.08592,
+            -0.05882,
+            0.13869
+          ],
+          "minimumWorldZ": 0.13869,
+          "p10WorldZ": 0.16079,
+          "relativeClearanceFromFrame1FootMinMeters": 0.17019,
+          "selectedVertexCount": 8245,
+          "sourceMesh": "material",
+          "sourceVertexIndex": 15286
+        }
+      },
+      "sourceFrame60fps": 9
+    },
+    {
+      "atlasColumn": 5,
+      "direction": 7,
+      "feet": {
+        "LeftFoot": {
+          "lowestSkinWeightedVertexProjection": {
+            "approved120PresentationOffsetPx": [
+              8.5617,
+              15.0441
+            ],
+            "sourceFramePx": [
+              90.2229,
+              111.0974
+            ]
+          },
+          "minimumVertexWorldXYZ": [
+            0.12253,
+            -0.02746,
+            0.12302
+          ],
+          "minimumWorldZ": 0.12302,
+          "p10WorldZ": 0.19668,
+          "relativeClearanceFromFrame1FootMinMeters": 0.15452,
+          "selectedVertexCount": 8508,
+          "sourceMesh": "material",
+          "sourceVertexIndex": 8685
+        },
+        "RightFoot": {
+          "lowestSkinWeightedVertexProjection": {
+            "approved120PresentationOffsetPx": [
+              -7.4,
+              34.2156
+            ],
+            "sourceFramePx": [
+              71.1642,
+              133.9887
+            ]
+          },
+          "minimumVertexWorldXYZ": [
+            -0.1484,
+            -0.01876,
+            -0.0315
+          ],
+          "minimumWorldZ": -0.0315,
+          "p10WorldZ": 0.005,
+          "relativeClearanceFromFrame1FootMinMeters": 0.0,
+          "selectedVertexCount": 8245,
+          "sourceMesh": "material",
+          "sourceVertexIndex": 19246
+        }
+      },
+      "sourceFrame60fps": 11
+    },
+    {
+      "atlasColumn": 6,
+      "direction": 7,
+      "feet": {
+        "LeftFoot": {
+          "lowestSkinWeightedVertexProjection": {
+            "approved120PresentationOffsetPx": [
+              21.1505,
+              28.991
+            ],
+            "sourceFramePx": [
+              105.2543,
+              127.7504
+            ]
+          },
+          "minimumVertexWorldXYZ": [
+            0.13732,
+            -0.23323,
+            0.01074
+          ],
+          "minimumWorldZ": 0.01074,
+          "p10WorldZ": 0.06385,
+          "relativeClearanceFromFrame1FootMinMeters": 0.04224,
+          "selectedVertexCount": 8508,
+          "sourceMesh": "material",
+          "sourceVertexIndex": 192
+        },
+        "RightFoot": {
+          "lowestSkinWeightedVertexProjection": {
+            "approved120PresentationOffsetPx": [
+              -13.4388,
+              36.4329
+            ],
+            "sourceFramePx": [
+              63.9537,
+              136.6362
+            ]
+          },
+          "minimumVertexWorldXYZ": [
+            -0.22716,
+            0.00828,
+            -0.03671
+          ],
+          "minimumWorldZ": -0.03671,
+          "p10WorldZ": 0.00999,
+          "relativeClearanceFromFrame1FootMinMeters": -0.00521,
+          "selectedVertexCount": 8245,
+          "sourceMesh": "material",
+          "sourceVertexIndex": 14746
+        }
+      },
+      "sourceFrame60fps": 15
+    },
+    {
+      "atlasColumn": 7,
+      "direction": 7,
+      "feet": {
+        "LeftFoot": {
+          "lowestSkinWeightedVertexProjection": {
+            "approved120PresentationOffsetPx": [
+              20.1585,
+              29.2607
+            ],
+            "sourceFramePx": [
+              104.0698,
+              128.0725
+            ]
+          },
+          "minimumVertexWorldXYZ": [
+            0.15153,
+            -0.20164,
+            -0.02072
+          ],
+          "minimumWorldZ": -0.02072,
+          "p10WorldZ": 0.02002,
+          "relativeClearanceFromFrame1FootMinMeters": 0.01078,
+          "selectedVertexCount": 8508,
+          "sourceMesh": "material",
+          "sourceVertexIndex": 192
+        },
+        "RightFoot": {
+          "lowestSkinWeightedVertexProjection": {
+            "approved120PresentationOffsetPx": [
+              -16.2114,
+              34.2309
+            ],
+            "sourceFramePx": [
+              60.6431,
+              134.007
+            ]
+          },
+          "minimumVertexWorldXYZ": [
+            -0.2258,
+            0.05822,
+            -0.0315
+          ],
+          "minimumWorldZ": -0.0315,
+          "p10WorldZ": 0.00304,
+          "relativeClearanceFromFrame1FootMinMeters": 0.0,
+          "selectedVertexCount": 8245,
+          "sourceMesh": "material",
+          "sourceVertexIndex": 14705
+        }
+      },
+      "sourceFrame60fps": 22
+    }
+  ],
+  "originalBakeCameraScale": 1.66,
+  "originalSourceAssetsModified": false,
+  "productionApproved": false,
+  "referenceFloorProxyWorldZ": -0.0315,
+  "selectedBones": [
+    "LeftFoot",
+    "LeftToeBase",
+    "RightFoot",
+    "RightToeBase"
+  ],
+  "shoeSoleMaterialOrPartIsolated": false,
+  "skinningWeightThreshold": 0.35,
+  "sourceFrames60fps": [
+    1,
+    3,
+    5,
+    7,
+    9,
+    11,
+    15,
+    22
+  ],
+  "sourceGLBBasename": "t1-sentinel-roll-A3.glb",
+  "sourceGLBSHA256": "b89432a621d1f0956b7c06449035e0a055d11b17d6ceb34c9b26264eadcb6aed",
+  "sourcePhaseGeometry": [
+    {
+      "column": 0,
+      "frame60fps": 1,
+      "meshFeet": {
+        "LeftFoot": {
+          "minimumVertexWorldXYZ": [
+            0.15153,
+            -0.20164,
+            -0.02072
+          ],
+          "minimumWorldZ": -0.02072,
+          "p10WorldZ": 0.02002,
+          "selectedVertexCount": 8508,
+          "sourceMesh": "material",
+          "sourceVertexIndex": 192
+        },
+        "RightFoot": {
+          "minimumVertexWorldXYZ": [
+            -0.2258,
+            0.05822,
+            -0.0315
+          ],
+          "minimumWorldZ": -0.0315,
+          "p10WorldZ": 0.00304,
+          "selectedVertexCount": 8245,
+          "sourceMesh": "material",
+          "sourceVertexIndex": 14705
+        }
+      }
+    },
+    {
+      "column": 1,
+      "frame60fps": 3,
+      "meshFeet": {
+        "LeftFoot": {
+          "minimumVertexWorldXYZ": [
+            0.12016,
+            -0.25171,
+            -0.01553
+          ],
+          "minimumWorldZ": -0.01553,
+          "p10WorldZ": 0.05593,
+          "selectedVertexCount": 8508,
+          "sourceMesh": "material",
+          "sourceVertexIndex": 248
+        },
+        "RightFoot": {
+          "minimumVertexWorldXYZ": [
+            -0.21456,
+            -0.0471,
+            -0.0315
+          ],
+          "minimumWorldZ": -0.0315,
+          "p10WorldZ": 0.02695,
+          "selectedVertexCount": 8245,
+          "sourceMesh": "material",
+          "sourceVertexIndex": 14785
+        }
+      }
+    },
+    {
+      "column": 2,
+      "frame60fps": 5,
+      "meshFeet": {
+        "LeftFoot": {
+          "minimumVertexWorldXYZ": [
+            0.09495,
+            -0.25675,
+            -0.0315
+          ],
+          "minimumWorldZ": -0.0315,
+          "p10WorldZ": 0.03362,
+          "selectedVertexCount": 8508,
+          "sourceMesh": "material",
+          "sourceVertexIndex": 277
+        },
+        "RightFoot": {
+          "minimumVertexWorldXYZ": [
+            -0.21882,
+            -0.1693,
+            0.12759
+          ],
+          "minimumWorldZ": 0.12759,
+          "p10WorldZ": 0.16163,
+          "selectedVertexCount": 8245,
+          "sourceMesh": "material",
+          "sourceVertexIndex": 14807
+        }
+      }
+    },
+    {
+      "column": 3,
+      "frame60fps": 7,
+      "meshFeet": {
+        "LeftFoot": {
+          "minimumVertexWorldXYZ": [
+            0.14251,
+            -0.18355,
+            0.28457
+          ],
+          "minimumWorldZ": 0.28457,
+          "p10WorldZ": 0.33477,
+          "selectedVertexCount": 8508,
+          "sourceMesh": "material",
+          "sourceVertexIndex": 1368
+        },
+        "RightFoot": {
+          "minimumVertexWorldXYZ": [
+            -0.10666,
+            -0.29652,
+            0.37522
+          ],
+          "minimumWorldZ": 0.37522,
+          "p10WorldZ": 0.41801,
+          "selectedVertexCount": 8245,
+          "sourceMesh": "material",
+          "sourceVertexIndex": 26016
+        }
+      }
+    },
+    {
+      "column": 4,
+      "frame60fps": 9,
+      "meshFeet": {
+        "LeftFoot": {
+          "minimumVertexWorldXYZ": [
+            0.12432,
+            0.02639,
+            0.23329
+          ],
+          "minimumWorldZ": 0.23329,
+          "p10WorldZ": 0.27502,
+          "selectedVertexCount": 8508,
+          "sourceMesh": "material",
+          "sourceVertexIndex": 1774
+        },
+        "RightFoot": {
+          "minimumVertexWorldXYZ": [
+            -0.08592,
+            -0.05882,
+            0.13869
+          ],
+          "minimumWorldZ": 0.13869,
+          "p10WorldZ": 0.16079,
+          "selectedVertexCount": 8245,
+          "sourceMesh": "material",
+          "sourceVertexIndex": 15286
+        }
+      }
+    },
+    {
+      "column": 5,
+      "frame60fps": 11,
+      "meshFeet": {
+        "LeftFoot": {
+          "minimumVertexWorldXYZ": [
+            0.12253,
+            -0.02746,
+            0.12302
+          ],
+          "minimumWorldZ": 0.12302,
+          "p10WorldZ": 0.19668,
+          "selectedVertexCount": 8508,
+          "sourceMesh": "material",
+          "sourceVertexIndex": 8685
+        },
+        "RightFoot": {
+          "minimumVertexWorldXYZ": [
+            -0.1484,
+            -0.01876,
+            -0.0315
+          ],
+          "minimumWorldZ": -0.0315,
+          "p10WorldZ": 0.005,
+          "selectedVertexCount": 8245,
+          "sourceMesh": "material",
+          "sourceVertexIndex": 19246
+        }
+      }
+    },
+    {
+      "column": 6,
+      "frame60fps": 15,
+      "meshFeet": {
+        "LeftFoot": {
+          "minimumVertexWorldXYZ": [
+            0.13732,
+            -0.23323,
+            0.01074
+          ],
+          "minimumWorldZ": 0.01074,
+          "p10WorldZ": 0.06385,
+          "selectedVertexCount": 8508,
+          "sourceMesh": "material",
+          "sourceVertexIndex": 192
+        },
+        "RightFoot": {
+          "minimumVertexWorldXYZ": [
+            -0.22716,
+            0.00828,
+            -0.03671
+          ],
+          "minimumWorldZ": -0.03671,
+          "p10WorldZ": 0.00999,
+          "selectedVertexCount": 8245,
+          "sourceMesh": "material",
+          "sourceVertexIndex": 14746
+        }
+      }
+    },
+    {
+      "column": 7,
+      "frame60fps": 22,
+      "meshFeet": {
+        "LeftFoot": {
+          "minimumVertexWorldXYZ": [
+            0.15153,
+            -0.20164,
+            -0.02072
+          ],
+          "minimumWorldZ": -0.02072,
+          "p10WorldZ": 0.02002,
+          "selectedVertexCount": 8508,
+          "sourceMesh": "material",
+          "sourceVertexIndex": 192
+        },
+        "RightFoot": {
+          "minimumVertexWorldXYZ": [
+            -0.2258,
+            0.05822,
+            -0.0315
+          ],
+          "minimumWorldZ": -0.0315,
+          "p10WorldZ": 0.00304,
+          "selectedVertexCount": 8245,
+          "sourceMesh": "material",
+          "sourceVertexIndex": 14705
+        }
+      }
+    }
+  ],
+  "spriteOffsetChanged": false
+}

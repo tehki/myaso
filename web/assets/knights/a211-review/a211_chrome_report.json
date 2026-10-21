@@ -1,0 +1,96 @@
+{
+  "milestone": "Blood & Iron A2.11 owner-approved 120 percent opt-in knight renderer",
+  "browser": "Chrome/154.0.8037.99",
+  "visualScale": 1.2,
+  "baselineRollbackUrlFlag": "knights=1&knightScale=100",
+  "approvedUrlFlag": "knights=1",
+  "idle": {
+    "state": "ready",
+    "pose": "idle",
+    "baseline": {
+      "x": -40,
+      "y": -52,
+      "width": 80,
+      "height": 80
+    },
+    "approved": {
+      "x": -48,
+      "y": -62.4,
+      "width": 96,
+      "height": 96
+    },
+    "loadedAtlases": {
+      "baseline": 9,
+      "approved": 9
+    },
+    "draws": 2,
+    "gameplayAltered": false,
+    "anatomicalFootPivotVerified": false,
+    "visualScaleApproved": 1.2,
+    "rollDurationMs": 350,
+    "serverAuthorityChanged": false,
+    "hitboxesChanged": false
+  },
+  "silverRoll": {
+    "state": "ready",
+    "pose": "silver_roll",
+    "baseline": {
+      "x": -56,
+      "y": -65,
+      "width": 112,
+      "height": 112
+    },
+    "approved": {
+      "x": -67,
+      "y": -78,
+      "width": 134,
+      "height": 134
+    },
+    "loadedAtlases": {
+      "baseline": 9,
+      "approved": 9
+    },
+    "draws": 3,
+    "gameplayAltered": false,
+    "anatomicalFootPivotVerified": false,
+    "visualScaleApproved": 1.2,
+    "rollDurationMs": 350,
+    "serverAuthorityChanged": false,
+    "hitboxesChanged": false
+  },
+  "t1Roll": {
+    "state": "ready",
+    "pose": "t1_roll",
+    "baseline": {
+      "x": -56,
+      "y": -65,
+      "width": 112,
+      "height": 112
+    },
+    "approved": {
+      "x": -67,
+      "y": -78,
+      "width": 134,
+      "height": 134
+    },
+    "loadedAtlases": {
+      "baseline": 9,
+      "approved": 9
+    },
+    "draws": 4,
+    "gameplayAltered": false,
+    "anatomicalFootPivotVerified": false,
+    "visualScaleApproved": 1.2,
+    "rollDurationMs": 350,
+    "serverAuthorityChanged": false,
+    "hitboxesChanged": false
+  },
+  "pageErrors": [],
+  "originalKnightWebpsModified": false,
+  "A3RollDurationMs": 350,
+  "hitboxesModified": false,
+  "combatOrServerModified": false,
+  "productionDeployed": false,
+  "actualMultiplayerFpsMeasured": false,
+  "note": "Local visual comparison using real knight renderer and WebPs; not online combat or anatomy proof."
+}

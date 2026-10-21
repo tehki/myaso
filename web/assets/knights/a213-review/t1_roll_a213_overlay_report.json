@@ -1,0 +1,534 @@
+{
+  "atlasFilename": "t1_roll.webp",
+  "boneTailIsNotSole": true,
+  "clip": "t1_roll",
+  "floorReferenceIsNotAuthoritative": true,
+  "footVertexSampleCount": 32,
+  "framesEachDirection": 8,
+  "gamePivotOrPhysicsModified": false,
+  "glbSHA256": "b89432a621d1f0956b7c06449035e0a055d11b17d6ceb34c9b26264eadcb6aed",
+  "meshLowestVertexNearOpaqueCount": 32,
+  "milestone": "A2.13 skinned foot-region mesh vertex vs skeleton tail overlay",
+  "overlayImage": "t1_roll_a213_skinned_foot_overlay.png",
+  "productionApproved": false,
+  "reviewDirections": [
+    0,
+    6
+  ],
+  "samples": [
+    {
+      "atlasColumn": 0,
+      "direction": 0,
+      "jointTailProjectionPx": [
+        93.6092,
+        134.6957
+      ],
+      "lowestMeshVertexProjectionPx": [
+        94.605,
+        138.3541
+      ],
+      "meshMinimumNearOpaque3px": true,
+      "relativeClearanceFromFrame1ProxyMeters": 0.01078,
+      "side": "LeftFoot",
+      "weightedMeshLowestWorldZ": -0.02072
+    },
+    {
+      "atlasColumn": 0,
+      "direction": 0,
+      "jointTailProjectionPx": [
+        57.0597,
+        118.3501
+      ],
+      "lowestMeshVertexProjectionPx": [
+        58.2366,
+        123.0754
+      ],
+      "meshMinimumNearOpaque3px": true,
+      "relativeClearanceFromFrame1ProxyMeters": 0.0,
+      "side": "RightFoot",
+      "weightedMeshLowestWorldZ": -0.0315
+    },
+    {
+      "atlasColumn": 1,
+      "direction": 0,
+      "jointTailProjectionPx": [
+        91.3029,
+        140.2048
+      ],
+      "lowestMeshVertexProjectionPx": [
+        91.5817,
+        141.0675
+      ],
+      "meshMinimumNearOpaque3px": true,
+      "relativeClearanceFromFrame1ProxyMeters": 0.01597,
+      "side": "LeftFoot",
+      "weightedMeshLowestWorldZ": -0.01553
+    },
+    {
+      "atlasColumn": 1,
+      "direction": 0,
+      "jointTailProjectionPx": [
+        56.5471,
+        128.0167
+      ],
+      "lowestMeshVertexProjectionPx": [
+        59.3192,
+        129.5902
+      ],
+      "meshMinimumNearOpaque3px": true,
+      "relativeClearanceFromFrame1ProxyMeters": 0.0,
+      "side": "RightFoot",
+      "weightedMeshLowestWorldZ": -0.0315
+    },
+    {
+      "atlasColumn": 2,
+      "direction": 0,
+      "jointTailProjectionPx": [
+        90.447,
+        148.4451
+      ],
+      "lowestMeshVertexProjectionPx": [
+        89.1522,
+        142.5597
+      ],
+      "meshMinimumNearOpaque3px": true,
+      "relativeClearanceFromFrame1ProxyMeters": 0.0,
+      "side": "LeftFoot",
+      "weightedMeshLowestWorldZ": -0.0315
+    },
+    {
+      "atlasColumn": 2,
+      "direction": 0,
+      "jointTailProjectionPx": [
+        55.7524,
+        130.0538
+      ],
+      "lowestMeshVertexProjectionPx": [
+        58.9094,
+        125.391
+      ],
+      "meshMinimumNearOpaque3px": true,
+      "relativeClearanceFromFrame1ProxyMeters": 0.15909,
+      "side": "RightFoot",
+      "weightedMeshLowestWorldZ": 0.12759
+    },
+    {
+      "atlasColumn": 3,
+      "direction": 0,
+      "jointTailProjectionPx": [
+        91.8547,
+        96.2301
+      ],
+      "lowestMeshVertexProjectionPx": [
+        93.7356,
+        114.6693
+      ],
+      "meshMinimumNearOpaque3px": true,
+      "relativeClearanceFromFrame1ProxyMeters": 0.31607,
+      "side": "LeftFoot",
+      "weightedMeshLowestWorldZ": 0.28457
+    },
+    {
+      "atlasColumn": 3,
+      "direction": 0,
+      "jointTailProjectionPx": [
+        57.312,
+        103.4998
+      ],
+      "lowestMeshVertexProjectionPx": [
+        69.7198,
+        114.9575
+      ],
+      "meshMinimumNearOpaque3px": true,
+      "relativeClearanceFromFrame1ProxyMeters": 0.40672,
+      "side": "RightFoot",
+      "weightedMeshLowestWorldZ": 0.37522
+    },
+    {
+      "atlasColumn": 4,
+      "direction": 0,
+      "jointTailProjectionPx": [
+        89.7795,
+        84.7993
+      ],
+      "lowestMeshVertexProjectionPx": [
+        91.9822,
+        105.4731
+      ],
+      "meshMinimumNearOpaque3px": true,
+      "relativeClearanceFromFrame1ProxyMeters": 0.26479,
+      "side": "LeftFoot",
+      "weightedMeshLowestWorldZ": 0.23329
+    },
+    {
+      "atlasColumn": 4,
+      "direction": 0,
+      "jointTailProjectionPx": [
+        54.8523,
+        103.9491
+      ],
+      "lowestMeshVertexProjectionPx": [
+        71.7187,
+        117.7359
+      ],
+      "meshMinimumNearOpaque3px": true,
+      "relativeClearanceFromFrame1ProxyMeters": 0.17019,
+      "side": "RightFoot",
+      "weightedMeshLowestWorldZ": 0.13869
+    },
+    {
+      "atlasColumn": 5,
+      "direction": 0,
+      "jointTailProjectionPx": [
+        89.7437,
+        111.7744
+      ],
+      "lowestMeshVertexProjectionPx": [
+        91.8102,
+        116.9549
+      ],
+      "meshMinimumNearOpaque3px": true,
+      "relativeClearanceFromFrame1ProxyMeters": 0.15452,
+      "side": "LeftFoot",
+      "weightedMeshLowestWorldZ": 0.12302
+    },
+    {
+      "atlasColumn": 5,
+      "direction": 0,
+      "jointTailProjectionPx": [
+        54.6832,
+        123.5143
+      ],
+      "lowestMeshVertexProjectionPx": [
+        65.6962,
+        127.8372
+      ],
+      "meshMinimumNearOpaque3px": true,
+      "relativeClearanceFromFrame1ProxyMeters": 0.0,
+      "side": "RightFoot",
+      "weightedMeshLowestWorldZ": -0.0315
+    },
+    {
+      "atlasColumn": 6,
+      "direction": 0,
+      "jointTailProjectionPx": [
+        92.3726,
+        134.8794
+      ],
+      "lowestMeshVertexProjectionPx": [
+        93.2353,
+        137.9827
+      ],
+      "meshMinimumNearOpaque3px": true,
+      "relativeClearanceFromFrame1ProxyMeters": 0.04224,
+      "side": "LeftFoot",
+      "weightedMeshLowestWorldZ": 0.01074
+    },
+    {
+      "atlasColumn": 6,
+      "direction": 0,
+      "jointTailProjectionPx": [
+        56.1417,
+        122.6742
+      ],
+      "lowestMeshVertexProjectionPx": [
+        58.1054,
+        126.5499
+      ],
+      "meshMinimumNearOpaque3px": true,
+      "relativeClearanceFromFrame1ProxyMeters": -0.00521,
+      "side": "RightFoot",
+      "weightedMeshLowestWorldZ": -0.03671
+    },
+    {
+      "atlasColumn": 7,
+      "direction": 0,
+      "jointTailProjectionPx": [
+        93.6092,
+        134.6957
+      ],
+      "lowestMeshVertexProjectionPx": [
+        94.605,
+        138.3541
+      ],
+      "meshMinimumNearOpaque3px": true,
+      "relativeClearanceFromFrame1ProxyMeters": 0.01078,
+      "side": "LeftFoot",
+      "weightedMeshLowestWorldZ": -0.02072
+    },
+    {
+      "atlasColumn": 7,
+      "direction": 0,
+      "jointTailProjectionPx": [
+        57.0597,
+        118.3501
+      ],
+      "lowestMeshVertexProjectionPx": [
+        58.2366,
+        123.0754
+      ],
+      "meshMinimumNearOpaque3px": true,
+      "relativeClearanceFromFrame1ProxyMeters": 0.0,
+      "side": "RightFoot",
+      "weightedMeshLowestWorldZ": -0.0315
+    },
+    {
+      "atlasColumn": 0,
+      "direction": 6,
+      "jointTailProjectionPx": [
+        102.9736,
+        111.2167
+      ],
+      "lowestMeshVertexProjectionPx": [
+        99.4348,
+        116.5071
+      ],
+      "meshMinimumNearOpaque3px": true,
+      "relativeClearanceFromFrame1ProxyMeters": 0.01078,
+      "side": "LeftFoot",
+      "weightedMeshLowestWorldZ": -0.02072
+    },
+    {
+      "atlasColumn": 0,
+      "direction": 6,
+      "jointTailProjectionPx": [
+        76.8099,
+        135.1209
+      ],
+      "lowestMeshVertexProjectionPx": [
+        74.3886,
+        140.6448
+      ],
+      "meshMinimumNearOpaque3px": true,
+      "relativeClearanceFromFrame1ProxyMeters": 0.0,
+      "side": "RightFoot",
+      "weightedMeshLowestWorldZ": -0.0315
+    },
+    {
+      "atlasColumn": 1,
+      "direction": 6,
+      "jointTailProjectionPx": [
+        110.7498,
+        113.2151
+      ],
+      "lowestMeshVertexProjectionPx": [
+        104.2612,
+        118.0634
+      ],
+      "meshMinimumNearOpaque3px": true,
+      "relativeClearanceFromFrame1ProxyMeters": 0.01597,
+      "side": "LeftFoot",
+      "weightedMeshLowestWorldZ": -0.01553
+    },
+    {
+      "atlasColumn": 1,
+      "direction": 6,
+      "jointTailProjectionPx": [
+        89.6061,
+        136.9038
+      ],
+      "lowestMeshVertexProjectionPx": [
+        84.5394,
+        139.95
+      ],
+      "meshMinimumNearOpaque3px": true,
+      "relativeClearanceFromFrame1ProxyMeters": 0.0,
+      "side": "RightFoot",
+      "weightedMeshLowestWorldZ": -0.0315
+    },
+    {
+      "atlasColumn": 2,
+      "direction": 6,
+      "jointTailProjectionPx": [
+        113.8665,
+        120.0045
+      ],
+      "lowestMeshVertexProjectionPx": [
+        104.7468,
+        120.8031
+      ],
+      "meshMinimumNearOpaque3px": true,
+      "relativeClearanceFromFrame1ProxyMeters": 0.0,
+      "side": "LeftFoot",
+      "weightedMeshLowestWorldZ": -0.0315
+    },
+    {
+      "atlasColumn": 2,
+      "direction": 6,
+      "jointTailProjectionPx": [
+        104.8134,
+        129.6907
+      ],
+      "lowestMeshVertexProjectionPx": [
+        96.3182,
+        128.4541
+      ],
+      "meshMinimumNearOpaque3px": true,
+      "relativeClearanceFromFrame1ProxyMeters": 0.15909,
+      "side": "RightFoot",
+      "weightedMeshLowestWorldZ": 0.12759
+    },
+    {
+      "atlasColumn": 3,
+      "direction": 6,
+      "jointTailProjectionPx": [
+        82.2012,
+        87.209
+      ],
+      "lowestMeshVertexProjectionPx": [
+        97.6914,
+        94.4993
+      ],
+      "meshMinimumNearOpaque3px": true,
+      "relativeClearanceFromFrame1ProxyMeters": 0.31607,
+      "side": "LeftFoot",
+      "weightedMeshLowestWorldZ": 0.28457
+    },
+    {
+      "atlasColumn": 3,
+      "direction": 6,
+      "jointTailProjectionPx": [
+        100.3423,
+        105.0054
+      ],
+      "lowestMeshVertexProjectionPx": [
+        108.5802,
+        103.2125
+      ],
+      "meshMinimumNearOpaque3px": true,
+      "relativeClearanceFromFrame1ProxyMeters": 0.40672,
+      "side": "RightFoot",
+      "weightedMeshLowestWorldZ": 0.37522
+    },
+    {
+      "atlasColumn": 4,
+      "direction": 6,
+      "jointTailProjectionPx": [
+        70.2576,
+        84.7755
+      ],
+      "lowestMeshVertexProjectionPx": [
+        77.4568,
+        99.4151
+      ],
+      "meshMinimumNearOpaque3px": true,
+      "relativeClearanceFromFrame1ProxyMeters": 0.26479,
+      "side": "LeftFoot",
+      "weightedMeshLowestWorldZ": 0.23329
+    },
+    {
+      "atlasColumn": 4,
+      "direction": 6,
+      "jointTailProjectionPx": [
+        79.9786,
+        120.1028
+      ],
+      "lowestMeshVertexProjectionPx": [
+        85.6691,
+        119.4125
+      ],
+      "meshMinimumNearOpaque3px": true,
+      "relativeClearanceFromFrame1ProxyMeters": 0.17019,
+      "side": "RightFoot",
+      "weightedMeshLowestWorldZ": 0.13869
+    },
+    {
+      "atlasColumn": 5,
+      "direction": 6,
+      "jointTailProjectionPx": [
+        95.8624,
+        95.3403
+      ],
+      "lowestMeshVertexProjectionPx": [
+        82.6471,
+        107.6761
+      ],
+      "meshMinimumNearOpaque3px": true,
+      "relativeClearanceFromFrame1ProxyMeters": 0.15452,
+      "side": "LeftFoot",
+      "weightedMeshLowestWorldZ": 0.12302
+    },
+    {
+      "atlasColumn": 5,
+      "direction": 6,
+      "jointTailProjectionPx": [
+        89.2068,
+        133.8539
+      ],
+      "lowestMeshVertexProjectionPx": [
+        81.808,
+        135.8571
+      ],
+      "meshMinimumNearOpaque3px": true,
+      "relativeClearanceFromFrame1ProxyMeters": 0.0,
+      "side": "RightFoot",
+      "weightedMeshLowestWorldZ": -0.0315
+    },
+    {
+      "atlasColumn": 6,
+      "direction": 6,
+      "jointTailProjectionPx": [
+        106.9805,
+        109.6223
+      ],
+      "lowestMeshVertexProjectionPx": [
+        102.4796,
+        115.0607
+      ],
+      "meshMinimumNearOpaque3px": true,
+      "relativeClearanceFromFrame1ProxyMeters": 0.04224,
+      "side": "LeftFoot",
+      "weightedMeshLowestWorldZ": 0.01074
+    },
+    {
+      "atlasColumn": 6,
+      "direction": 6,
+      "jointTailProjectionPx": [
+        82.301,
+        136.5099
+      ],
+      "lowestMeshVertexProjectionPx": [
+        79.2017,
+        141.1144
+      ],
+      "meshMinimumNearOpaque3px": true,
+      "relativeClearanceFromFrame1ProxyMeters": -0.00521,
+      "side": "RightFoot",
+      "weightedMeshLowestWorldZ": -0.03671
+    },
+    {
+      "atlasColumn": 7,
+      "direction": 6,
+      "jointTailProjectionPx": [
+        102.9736,
+        111.2167
+      ],
+      "lowestMeshVertexProjectionPx": [
+        99.4348,
+        116.5071
+      ],
+      "meshMinimumNearOpaque3px": true,
+      "relativeClearanceFromFrame1ProxyMeters": 0.01078,
+      "side": "LeftFoot",
+      "weightedMeshLowestWorldZ": -0.02072
+    },
+    {
+      "atlasColumn": 7,
+      "direction": 6,
+      "jointTailProjectionPx": [
+        76.8099,
+        135.1209
+      ],
+      "lowestMeshVertexProjectionPx": [
+        74.3886,
+        140.6448
+      ],
+      "meshMinimumNearOpaque3px": true,
+      "relativeClearanceFromFrame1ProxyMeters": 0.0,
+      "side": "RightFoot",
+      "weightedMeshLowestWorldZ": -0.0315
+    }
+  ],
+  "spriteAtlasUnmodified": true,
+  "weightedMeshLowestIsNotProvenBootSole": true
+}

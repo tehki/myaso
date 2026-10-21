@@ -1,0 +1,1087 @@
+{
+  "actualSoleContactValidated": false,
+  "approved120VisualScaleUnchanged": true,
+  "authoritativeFloorOrGameXYValidated": false,
+  "blender": "4.5.14 LTS",
+  "clip": "t1_roll",
+  "combatNetworkOrPhysicsChanged": false,
+  "componentAnalysisIsNotOutsoleSegmentation": true,
+  "footBearingComponentCount": 348,
+  "footBearingComponents": [
+    {
+      "componentRankBySize": 20,
+      "footWeightedVertices": {
+        "LeftFoot": 357,
+        "RightFoot": 0
+      },
+      "localBoundsXYZ": {
+        "max": [
+          0.16565,
+          0.05195,
+          0.24497
+        ],
+        "min": [
+          0.10519,
+          -0.03368,
+          0.06515
+        ]
+      },
+      "minVertexIndex": 47,
+      "vertexCount": 460
+    },
+    {
+      "componentRankBySize": 48,
+      "footWeightedVertices": {
+        "LeftFoot": 328,
+        "RightFoot": 0
+      },
+      "localBoundsXYZ": {
+        "max": [
+          0.18405,
+          0.00102,
+          0.01494
+        ],
+        "min": [
+          0.08083,
+          -0.13981,
+          -0.0
+        ]
+      },
+      "minVertexIndex": 76,
+      "vertexCount": 328
+    },
+    {
+      "componentRankBySize": 52,
+      "footWeightedVertices": {
+        "LeftFoot": 0,
+        "RightFoot": 310
+      },
+      "localBoundsXYZ": {
+        "max": [
+          -0.08637,
+          0.06998,
+          0.11759
+        ],
+        "min": [
+          -0.18893,
+          -0.05684,
+          0.07196
+        ]
+      },
+      "minVertexIndex": 16049,
+      "vertexCount": 310
+    },
+    {
+      "componentRankBySize": 55,
+      "footWeightedVertices": {
+        "LeftFoot": 0,
+        "RightFoot": 302
+      },
+      "localBoundsXYZ": {
+        "max": [
+          -0.13866,
+          -0.03833,
+          0.06299
+        ],
+        "min": [
+          -0.1891,
+          -0.13984,
+          0.00131
+        ]
+      },
+      "minVertexIndex": 14517,
+      "vertexCount": 302
+    },
+    {
+      "componentRankBySize": 27,
+      "footWeightedVertices": {
+        "LeftFoot": 0,
+        "RightFoot": 297
+      },
+      "localBoundsXYZ": {
+        "max": [
+          -0.08937,
+          0.05188,
+          0.23275
+        ],
+        "min": [
+          -0.16817,
+          0.00957,
+          0.0708
+        ]
+      },
+      "minVertexIndex": 14544,
+      "vertexCount": 402
+    },
+    {
+      "componentRankBySize": 59,
+      "footWeightedVertices": {
+        "LeftFoot": 294,
+        "RightFoot": 0
+      },
+      "localBoundsXYZ": {
+        "max": [
+          0.1293,
+          0.06034,
+          0.15009
+        ],
+        "min": [
+          0.0915,
+          -0.01359,
+          0.07203
+        ]
+      },
+      "minVertexIndex": 1256,
+      "vertexCount": 294
+    },
+    {
+      "componentRankBySize": 69,
+      "footWeightedVertices": {
+        "LeftFoot": 0,
+        "RightFoot": 271
+      },
+      "localBoundsXYZ": {
+        "max": [
+          -0.08848,
+          0.00087,
+          0.01486
+        ],
+        "min": [
+          -0.1917,
+          -0.13976,
+          2e-05
+        ]
+      },
+      "minVertexIndex": 14628,
+      "vertexCount": 271
+    },
+    {
+      "componentRankBySize": 73,
+      "footWeightedVertices": {
+        "LeftFoot": 261,
+        "RightFoot": 0
+      },
+      "localBoundsXYZ": {
+        "max": [
+          0.18145,
+          -0.03538,
+          0.06319
+        ],
+        "min": [
+          0.13082,
+          -0.13572,
+          0.01318
+        ]
+      },
+      "minVertexIndex": 900,
+      "vertexCount": 261
+    },
+    {
+      "componentRankBySize": 77,
+      "footWeightedVertices": {
+        "LeftFoot": 255,
+        "RightFoot": 0
+      },
+      "localBoundsXYZ": {
+        "max": [
+          0.13154,
+          -0.03665,
+          0.06232
+        ],
+        "min": [
+          0.08419,
+          -0.13572,
+          0.0133
+        ]
+      },
+      "minVertexIndex": 55,
+      "vertexCount": 255
+    },
+    {
+      "componentRankBySize": 79,
+      "footWeightedVertices": {
+        "LeftFoot": 0,
+        "RightFoot": 253
+      },
+      "localBoundsXYZ": {
+        "max": [
+          -0.09556,
+          0.00961,
+          0.11493
+        ],
+        "min": [
+          -0.137,
+          -0.08135,
+          0.03844
+        ]
+      },
+      "minVertexIndex": 17149,
+      "vertexCount": 253
+    },
+    {
+      "componentRankBySize": 82,
+      "footWeightedVertices": {
+        "LeftFoot": 0,
+        "RightFoot": 234
+      },
+      "localBoundsXYZ": {
+        "max": [
+          -0.0996,
+          0.01896,
+          0.17121
+        ],
+        "min": [
+          -0.13488,
+          -0.04742,
+          0.0811
+        ]
+      },
+      "minVertexIndex": 15990,
+      "vertexCount": 234
+    },
+    {
+      "componentRankBySize": 96,
+      "footWeightedVertices": {
+        "LeftFoot": 0,
+        "RightFoot": 216
+      },
+      "localBoundsXYZ": {
+        "max": [
+          -0.09177,
+          0.05301,
+          0.06839
+        ],
+        "min": [
+          -0.13896,
+          -0.05488,
+          0.01274
+        ]
+      },
+      "minVertexIndex": 15284,
+      "vertexCount": 216
+    },
+    {
+      "componentRankBySize": 97,
+      "footWeightedVertices": {
+        "LeftFoot": 0,
+        "RightFoot": 216
+      },
+      "localBoundsXYZ": {
+        "max": [
+          -0.08296,
+          0.03257,
+          0.18264
+        ],
+        "min": [
+          -0.13093,
+          -0.03835,
+          0.10649
+        ]
+      },
+      "minVertexIndex": 16025,
+      "vertexCount": 216
+    },
+    {
+      "componentRankBySize": 121,
+      "footWeightedVertices": {
+        "LeftFoot": 197,
+        "RightFoot": 0
+      },
+      "localBoundsXYZ": {
+        "max": [
+          0.17475,
+          0.01152,
+          0.10411
+        ],
+        "min": [
+          0.12554,
+          -0.08149,
+          0.04018
+        ]
+      },
+      "minVertexIndex": 2754,
+      "vertexCount": 197
+    },
+    {
+      "componentRankBySize": 112,
+      "footWeightedVertices": {
+        "LeftFoot": 191,
+        "RightFoot": 0
+      },
+      "localBoundsXYZ": {
+        "max": [
+          0.12947,
+          0.05183,
+          0.20832
+        ],
+        "min": [
+          0.08646,
+          0.00306,
+          0.06762
+        ]
+      },
+      "minVertexIndex": 1264,
+      "vertexCount": 201
+    },
+    {
+      "componentRankBySize": 130,
+      "footWeightedVertices": {
+        "LeftFoot": 0,
+        "RightFoot": 187
+      },
+      "localBoundsXYZ": {
+        "max": [
+          -0.13381,
+          0.0079,
+          0.10423
+        ],
+        "min": [
+          -0.18274,
+          -0.08135,
+          0.03997
+        ]
+      },
+      "minVertexIndex": 17456,
+      "vertexCount": 187
+    },
+    {
+      "componentRankBySize": 132,
+      "footWeightedVertices": {
+        "LeftFoot": 0,
+        "RightFoot": 186
+      },
+      "localBoundsXYZ": {
+        "max": [
+          -0.0996,
+          0.06081,
+          0.14979
+        ],
+        "min": [
+          -0.13732,
+          0.00832,
+          0.07196
+        ]
+      },
+      "minVertexIndex": 14624,
+      "vertexCount": 186
+    },
+    {
+      "componentRankBySize": 136,
+      "footWeightedVertices": {
+        "LeftFoot": 180,
+        "RightFoot": 0
+      },
+      "localBoundsXYZ": {
+        "max": [
+          0.12714,
+          0.06532,
+          0.13616
+        ],
+        "min": [
+          0.07855,
+          -0.0567,
+          0.07782
+        ]
+      },
+      "minVertexIndex": 3861,
+      "vertexCount": 180
+    },
+    {
+      "componentRankBySize": 139,
+      "footWeightedVertices": {
+        "LeftFoot": 179,
+        "RightFoot": 0
+      },
+      "localBoundsXYZ": {
+        "max": [
+          0.12905,
+          0.00646,
+          0.10411
+        ],
+        "min": [
+          0.08783,
+          -0.08149,
+          0.03871
+        ]
+      },
+      "minVertexIndex": 5540,
+      "vertexCount": 179
+    },
+    {
+      "componentRankBySize": 142,
+      "footWeightedVertices": {
+        "LeftFoot": 177,
+        "RightFoot": 0
+      },
+      "localBoundsXYZ": {
+        "max": [
+          0.12692,
+          0.00048,
+          0.16384
+        ],
+        "min": [
+          0.09691,
+          -0.04702,
+          0.08771
+        ]
+      },
+      "minVertexIndex": 5954,
+      "vertexCount": 177
+    },
+    {
+      "componentRankBySize": 145,
+      "footWeightedVertices": {
+        "LeftFoot": 0,
+        "RightFoot": 175
+      },
+      "localBoundsXYZ": {
+        "max": [
+          -0.10458,
+          -0.03878,
+          0.0777
+        ],
+        "min": [
+          -0.17539,
+          -0.08135,
+          0.03617
+        ]
+      },
+      "minVertexIndex": 16441,
+      "vertexCount": 175
+    },
+    {
+      "componentRankBySize": 149,
+      "footWeightedVertices": {
+        "LeftFoot": 172,
+        "RightFoot": 0
+      },
+      "localBoundsXYZ": {
+        "max": [
+          0.17898,
+          0.05306,
+          0.06854
+        ],
+        "min": [
+          0.12995,
+          -0.04403,
+          0.0136
+        ]
+      },
+      "minVertexIndex": 920,
+      "vertexCount": 172
+    },
+    {
+      "componentRankBySize": 155,
+      "footWeightedVertices": {
+        "LeftFoot": 0,
+        "RightFoot": 169
+      },
+      "localBoundsXYZ": {
+        "max": [
+          -0.09276,
+          -0.04171,
+          0.0623
+        ],
+        "min": [
+          -0.14027,
+          -0.13984,
+          0.01199
+        ]
+      },
+      "minVertexIndex": 14521,
+      "vertexCount": 169
+    },
+    {
+      "componentRankBySize": 156,
+      "footWeightedVertices": {
+        "LeftFoot": 0,
+        "RightFoot": 169
+      },
+      "localBoundsXYZ": {
+        "max": [
+          -0.15766,
+          0.03319,
+          0.15262
+        ],
+        "min": [
+          -0.17571,
+          -0.01793,
+          0.07697
+        ]
+      },
+      "minVertexIndex": 17679,
+      "vertexCount": 169
+    },
+    {
+      "componentRankBySize": 158,
+      "footWeightedVertices": {
+        "LeftFoot": 0,
+        "RightFoot": 168
+      },
+      "localBoundsXYZ": {
+        "max": [
+          -0.13764,
+          0.05301,
+          0.06859
+        ],
+        "min": [
+          -0.1891,
+          -0.04939,
+          0.01314
+        ]
+      },
+      "minVertexIndex": 14590,
+      "vertexCount": 168
+    },
+    {
+      "componentRankBySize": 164,
+      "footWeightedVertices": {
+        "LeftFoot": 165,
+        "RightFoot": 0
+      },
+      "localBoundsXYZ": {
+        "max": [
+          0.17607,
+          0.07002,
+          0.11155
+        ],
+        "min": [
+          0.08295,
+          0.03301,
+          0.07223
+        ]
+      },
+      "minVertexIndex": 2760,
+      "vertexCount": 165
+    },
+    {
+      "componentRankBySize": 165,
+      "footWeightedVertices": {
+        "LeftFoot": 165,
+        "RightFoot": 0
+      },
+      "localBoundsXYZ": {
+        "max": [
+          0.13117,
+          0.05306,
+          0.06841
+        ],
+        "min": [
+          0.08419,
+          -0.05467,
+          0.01331
+        ]
+      },
+      "minVertexIndex": 5493,
+      "vertexCount": 165
+    },
+    {
+      "componentRankBySize": 167,
+      "footWeightedVertices": {
+        "LeftFoot": 163,
+        "RightFoot": 0
+      },
+      "localBoundsXYZ": {
+        "max": [
+          0.10673,
+          0.01016,
+          0.14295
+        ],
+        "min": [
+          0.09477,
+          -0.03359,
+          0.06301
+        ]
+      },
+      "minVertexIndex": 1234,
+      "vertexCount": 163
+    },
+    {
+      "componentRankBySize": 169,
+      "footWeightedVertices": {
+        "LeftFoot": 0,
+        "RightFoot": 162
+      },
+      "localBoundsXYZ": {
+        "max": [
+          -0.12955,
+          -0.00034,
+          0.17159
+        ],
+        "min": [
+          -0.16632,
+          -0.04742,
+          0.09299
+        ]
+      },
+      "minVertexIndex": 17689,
+      "vertexCount": 162
+    },
+    {
+      "componentRankBySize": 176,
+      "footWeightedVertices": {
+        "LeftFoot": 159,
+        "RightFoot": 0
+      },
+      "localBoundsXYZ": {
+        "max": [
+          0.16791,
+          0.06034,
+          0.15225
+        ],
+        "min": [
+          0.12444,
+          0.00804,
+          0.07684
+        ]
+      },
+      "minVertexIndex": 2603,
+      "vertexCount": 159
+    }
+  ],
+  "footMembership": {
+    "LeftFoot": {
+      "components": [
+        {
+          "componentSize": 460,
+          "rank": 20,
+          "selectedFootVertices": 357
+        },
+        {
+          "componentSize": 328,
+          "rank": 48,
+          "selectedFootVertices": 328
+        },
+        {
+          "componentSize": 294,
+          "rank": 59,
+          "selectedFootVertices": 294
+        },
+        {
+          "componentSize": 261,
+          "rank": 73,
+          "selectedFootVertices": 261
+        },
+        {
+          "componentSize": 255,
+          "rank": 77,
+          "selectedFootVertices": 255
+        },
+        {
+          "componentSize": 197,
+          "rank": 121,
+          "selectedFootVertices": 197
+        },
+        {
+          "componentSize": 201,
+          "rank": 112,
+          "selectedFootVertices": 191
+        },
+        {
+          "componentSize": 180,
+          "rank": 136,
+          "selectedFootVertices": 180
+        },
+        {
+          "componentSize": 179,
+          "rank": 139,
+          "selectedFootVertices": 179
+        },
+        {
+          "componentSize": 177,
+          "rank": 142,
+          "selectedFootVertices": 177
+        },
+        {
+          "componentSize": 172,
+          "rank": 149,
+          "selectedFootVertices": 172
+        },
+        {
+          "componentSize": 165,
+          "rank": 164,
+          "selectedFootVertices": 165
+        },
+        {
+          "componentSize": 165,
+          "rank": 165,
+          "selectedFootVertices": 165
+        },
+        {
+          "componentSize": 163,
+          "rank": 167,
+          "selectedFootVertices": 163
+        },
+        {
+          "componentSize": 159,
+          "rank": 176,
+          "selectedFootVertices": 159
+        },
+        {
+          "componentSize": 152,
+          "rank": 190,
+          "selectedFootVertices": 152
+        },
+        {
+          "componentSize": 145,
+          "rank": 204,
+          "selectedFootVertices": 145
+        },
+        {
+          "componentSize": 144,
+          "rank": 205,
+          "selectedFootVertices": 144
+        },
+        {
+          "componentSize": 144,
+          "rank": 206,
+          "selectedFootVertices": 144
+        },
+        {
+          "componentSize": 144,
+          "rank": 207,
+          "selectedFootVertices": 144
+        }
+      ],
+      "fractionInLargestComponent": 0.041961,
+      "largestSingleComponentWeightedVertices": 357,
+      "touchingTopologyComponentCount": 174,
+      "weightedVertices": 8508
+    },
+    "RightFoot": {
+      "components": [
+        {
+          "componentSize": 310,
+          "rank": 52,
+          "selectedFootVertices": 310
+        },
+        {
+          "componentSize": 302,
+          "rank": 55,
+          "selectedFootVertices": 302
+        },
+        {
+          "componentSize": 402,
+          "rank": 27,
+          "selectedFootVertices": 297
+        },
+        {
+          "componentSize": 271,
+          "rank": 69,
+          "selectedFootVertices": 271
+        },
+        {
+          "componentSize": 253,
+          "rank": 79,
+          "selectedFootVertices": 253
+        },
+        {
+          "componentSize": 234,
+          "rank": 82,
+          "selectedFootVertices": 234
+        },
+        {
+          "componentSize": 216,
+          "rank": 96,
+          "selectedFootVertices": 216
+        },
+        {
+          "componentSize": 216,
+          "rank": 97,
+          "selectedFootVertices": 216
+        },
+        {
+          "componentSize": 187,
+          "rank": 130,
+          "selectedFootVertices": 187
+        },
+        {
+          "componentSize": 186,
+          "rank": 132,
+          "selectedFootVertices": 186
+        },
+        {
+          "componentSize": 175,
+          "rank": 145,
+          "selectedFootVertices": 175
+        },
+        {
+          "componentSize": 169,
+          "rank": 155,
+          "selectedFootVertices": 169
+        },
+        {
+          "componentSize": 169,
+          "rank": 156,
+          "selectedFootVertices": 169
+        },
+        {
+          "componentSize": 168,
+          "rank": 158,
+          "selectedFootVertices": 168
+        },
+        {
+          "componentSize": 162,
+          "rank": 169,
+          "selectedFootVertices": 162
+        },
+        {
+          "componentSize": 149,
+          "rank": 197,
+          "selectedFootVertices": 149
+        },
+        {
+          "componentSize": 146,
+          "rank": 201,
+          "selectedFootVertices": 146
+        },
+        {
+          "componentSize": 141,
+          "rank": 215,
+          "selectedFootVertices": 141
+        },
+        {
+          "componentSize": 128,
+          "rank": 232,
+          "selectedFootVertices": 128
+        },
+        {
+          "componentSize": 126,
+          "rank": 234,
+          "selectedFootVertices": 126
+        }
+      ],
+      "fractionInLargestComponent": 0.037599,
+      "largestSingleComponentWeightedVertices": 310,
+      "touchingTopologyComponentCount": 174,
+      "weightedVertices": 8245
+    }
+  },
+  "materials": [
+    "Material.001"
+  ],
+  "meshEdges": 249720,
+  "meshPolygons": 149880,
+  "meshVertices": 101687,
+  "milestone": "Blood & Iron A2.16 original A3 topology component survey",
+  "originalModelOrAtlasModified": false,
+  "productionApproved": false,
+  "skinWeightThreshold": 0.35,
+  "soleMaterialOrSemanticMeshIsolated": false,
+  "sourceGLBBasename": "t1-sentinel-roll-A3.glb",
+  "sourceGLBSHA256": "b89432a621d1f0956b7c06449035e0a055d11b17d6ceb34c9b26264eadcb6aed",
+  "sourceMesh": "material",
+  "topTenLargestComponents": [
+    {
+      "componentRankBySize": 0,
+      "footWeightedVertices": {
+        "LeftFoot": 0,
+        "RightFoot": 52
+      },
+      "localBoundsXYZ": {
+        "max": [
+          -0.03159,
+          0.05366,
+          0.42569
+        ],
+        "min": [
+          -0.12769,
+          -0.08431,
+          0.14345
+        ]
+      },
+      "minVertexIndex": 15178,
+      "vertexCount": 921
+    },
+    {
+      "componentRankBySize": 1,
+      "footWeightedVertices": {
+        "LeftFoot": 0,
+        "RightFoot": 0
+      },
+      "localBoundsXYZ": {
+        "max": [
+          -0.01051,
+          0.00174,
+          0.53699
+        ],
+        "min": [
+          -0.10235,
+          -0.06399,
+          0.3296
+        ]
+      },
+      "minVertexIndex": 23780,
+      "vertexCount": 752
+    },
+    {
+      "componentRankBySize": 2,
+      "footWeightedVertices": {
+        "LeftFoot": 0,
+        "RightFoot": 0
+      },
+      "localBoundsXYZ": {
+        "max": [
+          -0.0572,
+          0.03986,
+          0.62286
+        ],
+        "min": [
+          -0.13808,
+          -0.04972,
+          0.3899
+        ]
+      },
+      "minVertexIndex": 56374,
+      "vertexCount": 739
+    },
+    {
+      "componentRankBySize": 3,
+      "footWeightedVertices": {
+        "LeftFoot": 0,
+        "RightFoot": 0
+      },
+      "localBoundsXYZ": {
+        "max": [
+          0.03153,
+          -0.06084,
+          0.58362
+        ],
+        "min": [
+          -0.03946,
+          -0.07244,
+          0.28243
+        ]
+      },
+      "minVertexIndex": 59615,
+      "vertexCount": 725
+    },
+    {
+      "componentRankBySize": 4,
+      "footWeightedVertices": {
+        "LeftFoot": 0,
+        "RightFoot": 0
+      },
+      "localBoundsXYZ": {
+        "max": [
+          0.10327,
+          0.05372,
+          0.42551
+        ],
+        "min": [
+          0.02345,
+          -0.08823,
+          0.26284
+        ]
+      },
+      "minVertexIndex": 739,
+      "vertexCount": 686
+    },
+    {
+      "componentRankBySize": 5,
+      "footWeightedVertices": {
+        "LeftFoot": 0,
+        "RightFoot": 0
+      },
+      "localBoundsXYZ": {
+        "max": [
+          0.08616,
+          0.07708,
+          0.85186
+        ],
+        "min": [
+          -0.04282,
+          0.03413,
+          0.71134
+        ]
+      },
+      "minVertexIndex": 79119,
+      "vertexCount": 667
+    },
+    {
+      "componentRankBySize": 6,
+      "footWeightedVertices": {
+        "LeftFoot": 0,
+        "RightFoot": 0
+      },
+      "localBoundsXYZ": {
+        "max": [
+          0.21654,
+          0.01446,
+          0.81859
+        ],
+        "min": [
+          0.07332,
+          -0.03106,
+          0.73415
+        ]
+      },
+      "minVertexIndex": 78279,
+      "vertexCount": 666
+    },
+    {
+      "componentRankBySize": 7,
+      "footWeightedVertices": {
+        "LeftFoot": 0,
+        "RightFoot": 0
+      },
+      "localBoundsXYZ": {
+        "max": [
+          -0.07897,
+          0.06397,
+          0.62892
+        ],
+        "min": [
+          -0.15383,
+          -0.06669,
+          0.52706
+        ]
+      },
+      "minVertexIndex": 60144,
+      "vertexCount": 656
+    },
+    {
+      "componentRankBySize": 8,
+      "footWeightedVertices": {
+        "LeftFoot": 0,
+        "RightFoot": 0
+      },
+      "localBoundsXYZ": {
+        "max": [
+          0.06027,
+          0.07705,
+          0.80959
+        ],
+        "min": [
+          -0.09213,
+          0.01289,
+          0.67937
+        ]
+      },
+      "minVertexIndex": 46721,
+      "vertexCount": 643
+    },
+    {
+      "componentRankBySize": 9,
+      "footWeightedVertices": {
+        "LeftFoot": 0,
+        "RightFoot": 0
+      },
+      "localBoundsXYZ": {
+        "max": [
+          0.52002,
+          0.04041,
+          0.76679
+        ],
+        "min": [
+          0.39444,
+          -0.04761,
+          0.73347
+        ]
+      },
+      "minVertexIndex": 83882,
+      "vertexCount": 623
+    }
+  ],
+  "topologyComponentCount": 2057
+}

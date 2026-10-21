@@ -1,0 +1,64 @@
+{
+  "anatomicalSoleApprovalGranted": false,
+  "clip": "t1_roll",
+  "gameplayContactMeasured": false,
+  "groundPlaneVerified": false,
+  "imagesComposited": 9,
+  "milestone": "Blood & Iron A2.19 original GLB 3D landmark review sheets",
+  "originalModelOrGameSpritesAltered": false,
+  "productionApproved": false,
+  "reviewSheetName": "t1_roll_a219_review_sheet.png",
+  "reviewSheetPixels": [
+    2032,
+    1687
+  ],
+  "sourceFrame60fps": [
+    1,
+    7,
+    22
+  ],
+  "sourceRenderInputs": [
+    {
+      "bytes": 172861,
+      "name": "t1_roll_a219_f1_front.png"
+    },
+    {
+      "bytes": 169769,
+      "name": "t1_roll_a219_f1_side.png"
+    },
+    {
+      "bytes": 179188,
+      "name": "t1_roll_a219_f1_low.png"
+    },
+    {
+      "bytes": 185074,
+      "name": "t1_roll_a219_f7_front.png"
+    },
+    {
+      "bytes": 181140,
+      "name": "t1_roll_a219_f7_side.png"
+    },
+    {
+      "bytes": 171129,
+      "name": "t1_roll_a219_f7_low.png"
+    },
+    {
+      "bytes": 172864,
+      "name": "t1_roll_a219_f22_front.png"
+    },
+    {
+      "bytes": 169772,
+      "name": "t1_roll_a219_f22_side.png"
+    },
+    {
+      "bytes": 179217,
+      "name": "t1_roll_a219_f22_low.png"
+    }
+  ],
+  "sourceSHA256": "b89432a621d1f0956b7c06449035e0a055d11b17d6ceb34c9b26264eadcb6aed",
+  "views": [
+    "front",
+    "side",
+    "low"
+  ]
+}

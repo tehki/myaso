@@ -1,0 +1,4458 @@
+{
+  "anatomicalHeelOrOutsoleVerified": false,
+  "approved120RollDrawRectPx": [
+    -67,
+    -78,
+    134,
+    134
+  ],
+  "atlasModified": false,
+  "blender": "4.5.14 LTS",
+  "candidateGeometricBandsMayContainArmor": true,
+  "clip": "silver_roll",
+  "combatOrNetworkChanged": false,
+  "directionalLandmarks": [
+    {
+      "column": 0,
+      "direction": 0,
+      "feet": {
+        "LeftFoot": {
+          "heelSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                8.6478,
+                16.3604
+              ],
+              "sourceAtlasPx": [
+                90.3258,
+                112.6692
+              ]
+            },
+            "vertexIndex": 71894
+          },
+          "toeSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                10.9751,
+                25.0032
+              ],
+              "sourceAtlasPx": [
+                93.1046,
+                122.9889
+              ]
+            },
+            "vertexIndex": 71908
+          }
+        },
+        "RightFoot": {
+          "heelSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                -7.018,
+                10.3371
+              ],
+              "sourceAtlasPx": [
+                71.6202,
+                105.4772
+              ]
+            },
+            "vertexIndex": 22498
+          },
+          "toeSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                -12.7227,
+                15.167
+              ],
+              "sourceAtlasPx": [
+                64.8087,
+                111.2442
+              ]
+            },
+            "vertexIndex": 22501
+          }
+        }
+      },
+      "sourceFrame60fps": 1
+    },
+    {
+      "column": 1,
+      "direction": 0,
+      "feet": {
+        "LeftFoot": {
+          "heelSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                2.4766,
+                9.8401
+              ],
+              "sourceAtlasPx": [
+                82.9571,
+                104.8837
+              ]
+            },
+            "vertexIndex": 71894
+          },
+          "toeSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                5.8645,
+                20.1541
+              ],
+              "sourceAtlasPx": [
+                87.0024,
+                117.1989
+              ]
+            },
+            "vertexIndex": 71908
+          }
+        },
+        "RightFoot": {
+          "heelSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                -5.9533,
+                7.6952
+              ],
+              "sourceAtlasPx": [
+                72.8916,
+                102.3227
+              ]
+            },
+            "vertexIndex": 22498
+          },
+          "toeSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                -13.2749,
+                11.9982
+              ],
+              "sourceAtlasPx": [
+                64.1494,
+                107.4605
+              ]
+            },
+            "vertexIndex": 22501
+          }
+        }
+      },
+      "sourceFrame60fps": 3
+    },
+    {
+      "column": 2,
+      "direction": 0,
+      "feet": {
+        "LeftFoot": {
+          "heelSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                -9.8498,
+                -8.538
+              ],
+              "sourceAtlasPx": [
+                68.239,
+                82.9397
+              ]
+            },
+            "vertexIndex": 71894
+          },
+          "toeSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                -7.8624,
+                -0.0095
+              ],
+              "sourceAtlasPx": [
+                70.612,
+                93.123
+              ]
+            },
+            "vertexIndex": 71908
+          }
+        },
+        "RightFoot": {
+          "heelSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                -17.6444,
+                -12.5571
+              ],
+              "sourceAtlasPx": [
+                58.932,
+                78.1408
+              ]
+            },
+            "vertexIndex": 22498
+          },
+          "toeSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                -25.6077,
+                -10.1706
+              ],
+              "sourceAtlasPx": [
+                49.4236,
+                80.9903
+              ]
+            },
+            "vertexIndex": 22501
+          }
+        }
+      },
+      "sourceFrame60fps": 5
+    },
+    {
+      "column": 3,
+      "direction": 0,
+      "feet": {
+        "LeftFoot": {
+          "heelSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                -10.9807,
+                -24.4455
+              ],
+              "sourceAtlasPx": [
+                66.8887,
+                63.9457
+              ]
+            },
+            "vertexIndex": 71894
+          },
+          "toeSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                -9.3073,
+                -32.0941
+              ],
+              "sourceAtlasPx": [
+                68.8867,
+                54.8131
+              ]
+            },
+            "vertexIndex": 71908
+          }
+        },
+        "RightFoot": {
+          "heelSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                -18.831,
+                -24.5436
+              ],
+              "sourceAtlasPx": [
+                57.5152,
+                63.8285
+              ]
+            },
+            "vertexIndex": 22498
+          },
+          "toeSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                -26.8799,
+                -26.4193
+              ],
+              "sourceAtlasPx": [
+                47.9046,
+                61.5889
+              ]
+            },
+            "vertexIndex": 22501
+          }
+        }
+      },
+      "sourceFrame60fps": 7
+    },
+    {
+      "column": 4,
+      "direction": 0,
+      "feet": {
+        "LeftFoot": {
+          "heelSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                -5.4924,
+                25.6704
+              ],
+              "sourceAtlasPx": [
+                73.4419,
+                123.7855
+              ]
+            },
+            "vertexIndex": 71894
+          },
+          "toeSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                -2.8544,
+                18.0799
+              ],
+              "sourceAtlasPx": [
+                76.5918,
+                114.7223
+              ]
+            },
+            "vertexIndex": 71908
+          }
+        },
+        "RightFoot": {
+          "heelSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                -13.5752,
+                30.4627
+              ],
+              "sourceAtlasPx": [
+                63.7908,
+                129.5077
+              ]
+            },
+            "vertexIndex": 22498
+          },
+          "toeSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                -21.3012,
+                28.4486
+              ],
+              "sourceAtlasPx": [
+                54.5658,
+                127.1028
+              ]
+            },
+            "vertexIndex": 22501
+          }
+        }
+      },
+      "sourceFrame60fps": 9
+    },
+    {
+      "column": 5,
+      "direction": 0,
+      "feet": {
+        "LeftFoot": {
+          "heelSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                1.3134,
+                36.571
+              ],
+              "sourceAtlasPx": [
+                81.5682,
+                136.8012
+              ]
+            },
+            "vertexIndex": 71894
+          },
+          "toeSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                4.694,
+                38.0308
+              ],
+              "sourceAtlasPx": [
+                85.6048,
+                138.5442
+              ]
+            },
+            "vertexIndex": 71908
+          }
+        },
+        "RightFoot": {
+          "heelSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                -7.7389,
+                41.0913
+              ],
+              "sourceAtlasPx": [
+                70.7595,
+                142.1986
+              ]
+            },
+            "vertexIndex": 22498
+          },
+          "toeSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                -15.0556,
+                43.0457
+              ],
+              "sourceAtlasPx": [
+                62.0231,
+                144.5321
+              ]
+            },
+            "vertexIndex": 22501
+          }
+        }
+      },
+      "sourceFrame60fps": 11
+    },
+    {
+      "column": 6,
+      "direction": 0,
+      "feet": {
+        "LeftFoot": {
+          "heelSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                6.6919,
+                15.2086
+              ],
+              "sourceAtlasPx": [
+                87.9904,
+                111.2938
+              ]
+            },
+            "vertexIndex": 71894
+          },
+          "toeSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                9.9975,
+                24.3257
+              ],
+              "sourceAtlasPx": [
+                91.9374,
+                122.1799
+              ]
+            },
+            "vertexIndex": 71908
+          }
+        },
+        "RightFoot": {
+          "heelSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                -5.6409,
+                11.677
+              ],
+              "sourceAtlasPx": [
+                73.2646,
+                107.077
+              ]
+            },
+            "vertexIndex": 22498
+          },
+          "toeSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                -12.504,
+                16.2374
+              ],
+              "sourceAtlasPx": [
+                65.0699,
+                112.5223
+              ]
+            },
+            "vertexIndex": 22501
+          }
+        }
+      },
+      "sourceFrame60fps": 15
+    },
+    {
+      "column": 7,
+      "direction": 0,
+      "feet": {
+        "LeftFoot": {
+          "heelSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                8.6478,
+                16.3604
+              ],
+              "sourceAtlasPx": [
+                90.3258,
+                112.6692
+              ]
+            },
+            "vertexIndex": 71894
+          },
+          "toeSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                10.9751,
+                25.0032
+              ],
+              "sourceAtlasPx": [
+                93.1046,
+                122.9889
+              ]
+            },
+            "vertexIndex": 71908
+          }
+        },
+        "RightFoot": {
+          "heelSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                -7.018,
+                10.3371
+              ],
+              "sourceAtlasPx": [
+                71.6202,
+                105.4772
+              ]
+            },
+            "vertexIndex": 22498
+          },
+          "toeSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                -12.7227,
+                15.167
+              ],
+              "sourceAtlasPx": [
+                64.8087,
+                111.2442
+              ]
+            },
+            "vertexIndex": 22501
+          }
+        }
+      },
+      "sourceFrame60fps": 22
+    },
+    {
+      "column": 0,
+      "direction": 1,
+      "feet": {
+        "LeftFoot": {
+          "heelSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                3.7644,
+                19.6602
+              ],
+              "sourceAtlasPx": [
+                84.4948,
+                116.6092
+              ]
+            },
+            "vertexIndex": 71894
+          },
+          "toeSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                -2.1656,
+                27.3452
+              ],
+              "sourceAtlasPx": [
+                77.4142,
+                125.7853
+              ]
+            },
+            "vertexIndex": 71908
+          }
+        },
+        "RightFoot": {
+          "heelSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                0.3939,
+                8.5762
+              ],
+              "sourceAtlasPx": [
+                80.4703,
+                103.3746
+              ]
+            },
+            "vertexIndex": 22498
+          },
+          "toeSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                -7.6641,
+                9.7474
+              ],
+              "sourceAtlasPx": [
+                70.8489,
+                104.773
+              ]
+            },
+            "vertexIndex": 22501
+          }
+        }
+      },
+      "sourceFrame60fps": 1
+    },
+    {
+      "column": 1,
+      "direction": 1,
+      "feet": {
+        "LeftFoot": {
+          "heelSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                3.3905,
+                11.3999
+              ],
+              "sourceAtlasPx": [
+                84.0484,
+                106.7461
+              ]
+            },
+            "vertexIndex": 71894
+          },
+          "toeSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                -0.0508,
+                21.6997
+              ],
+              "sourceAtlasPx": [
+                79.9394,
+                119.0444
+              ]
+            },
+            "vertexIndex": 71908
+          }
+        },
+        "RightFoot": {
+          "heelSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                1.4241,
+                6.4913
+              ],
+              "sourceAtlasPx": [
+                81.7005,
+                100.8851
+              ]
+            },
+            "vertexIndex": 22498
+          },
+          "toeSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                -5.3175,
+                7.0555
+              ],
+              "sourceAtlasPx": [
+                73.6507,
+                101.5588
+              ]
+            },
+            "vertexIndex": 22501
+          }
+        }
+      },
+      "sourceFrame60fps": 3
+    },
+    {
+      "column": 2,
+      "direction": 1,
+      "feet": {
+        "LeftFoot": {
+          "heelSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                6.6932,
+                -9.3771
+              ],
+              "sourceAtlasPx": [
+                87.9919,
+                81.9377
+              ]
+            },
+            "vertexIndex": 71894
+          },
+          "toeSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                7.861,
+                -0.0098
+              ],
+              "sourceAtlasPx": [
+                89.3863,
+                93.1227
+              ]
+            },
+            "vertexIndex": 71908
+          }
+        },
+        "RightFoot": {
+          "heelSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                3.5076,
+                -16.3152
+              ],
+              "sourceAtlasPx": [
+                84.1881,
+                73.6534
+              ]
+            },
+            "vertexIndex": 22498
+          },
+          "toeSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                -2.0948,
+                -17.5351
+              ],
+              "sourceAtlasPx": [
+                77.4987,
+                72.1968
+              ]
+            },
+            "vertexIndex": 22501
+          }
+        }
+      },
+      "sourceFrame60fps": 5
+    },
+    {
+      "column": 3,
+      "direction": 1,
+      "feet": {
+        "LeftFoot": {
+          "heelSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                -6.1195,
+                -28.9914
+              ],
+              "sourceAtlasPx": [
+                72.6931,
+                58.5177
+              ]
+            },
+            "vertexIndex": 71894
+          },
+          "toeSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                2.7444,
+                -33.8387
+              ],
+              "sourceAtlasPx": [
+                83.2769,
+                52.7299
+              ]
+            },
+            "vertexIndex": 71908
+          }
+        },
+        "RightFoot": {
+          "heelSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                -13.8041,
+                -33.2195
+              ],
+              "sourceAtlasPx": [
+                63.5174,
+                53.4693
+              ]
+            },
+            "vertexIndex": 22498
+          },
+          "toeSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                -17.4304,
+                -38.199
+              ],
+              "sourceAtlasPx": [
+                59.1876,
+                47.5236
+              ]
+            },
+            "vertexIndex": 22501
+          }
+        }
+      },
+      "sourceFrame60fps": 7
+    },
+    {
+      "column": 4,
+      "direction": 1,
+      "feet": {
+        "LeftFoot": {
+          "heelSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                -33.3802,
+                15.3363
+              ],
+              "sourceAtlasPx": [
+                40.143,
+                111.4464
+              ]
+            },
+            "vertexIndex": 71894
+          },
+          "toeSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                -32.1752,
+                8.7675
+              ],
+              "sourceAtlasPx": [
+                41.5818,
+                103.603
+              ]
+            },
+            "vertexIndex": 71908
+          }
+        },
+        "RightFoot": {
+          "heelSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                -41.7218,
+                15.7623
+              ],
+              "sourceAtlasPx": [
+                30.1829,
+                111.955
+              ]
+            },
+            "vertexIndex": 22498
+          },
+          "toeSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                -47.9224,
+                10.0459
+              ],
+              "sourceAtlasPx": [
+                22.7792,
+                105.1294
+              ]
+            },
+            "vertexIndex": 22501
+          }
+        }
+      },
+      "sourceFrame60fps": 9
+    },
+    {
+      "column": 5,
+      "direction": 1,
+      "feet": {
+        "LeftFoot": {
+          "heelSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                -29.1312,
+                29.1758
+              ],
+              "sourceAtlasPx": [
+                45.2165,
+                127.9711
+              ]
+            },
+            "vertexIndex": 71894
+          },
+          "toeSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                -33.072,
+                30.4867
+              ],
+              "sourceAtlasPx": [
+                40.5111,
+                129.5363
+              ]
+            },
+            "vertexIndex": 71908
+          }
+        },
+        "RightFoot": {
+          "heelSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                -35.0835,
+                29.7072
+              ],
+              "sourceAtlasPx": [
+                38.1093,
+                128.6057
+              ]
+            },
+            "vertexIndex": 22498
+          },
+          "toeSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                -43.2424,
+                27.5475
+              ],
+              "sourceAtlasPx": [
+                28.3672,
+                126.0268
+              ]
+            },
+            "vertexIndex": 22501
+          }
+        }
+      },
+      "sourceFrame60fps": 11
+    },
+    {
+      "column": 6,
+      "direction": 1,
+      "feet": {
+        "LeftFoot": {
+          "heelSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                1.9133,
+                17.4963
+              ],
+              "sourceAtlasPx": [
+                82.2846,
+                114.0254
+              ]
+            },
+            "vertexIndex": 71894
+          },
+          "toeSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                -2.9145,
+                26.2087
+              ],
+              "sourceAtlasPx": [
+                76.52,
+                124.4283
+              ]
+            },
+            "vertexIndex": 71908
+          }
+        },
+        "RightFoot": {
+          "heelSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                -0.6821,
+                9.9961
+              ],
+              "sourceAtlasPx": [
+                79.1856,
+                105.07
+              ]
+            },
+            "vertexIndex": 22498
+          },
+          "toeSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                -8.4889,
+                10.6567
+              ],
+              "sourceAtlasPx": [
+                69.864,
+                105.8587
+              ]
+            },
+            "vertexIndex": 22501
+          }
+        }
+      },
+      "sourceFrame60fps": 15
+    },
+    {
+      "column": 7,
+      "direction": 1,
+      "feet": {
+        "LeftFoot": {
+          "heelSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                3.7644,
+                19.6602
+              ],
+              "sourceAtlasPx": [
+                84.4948,
+                116.6092
+              ]
+            },
+            "vertexIndex": 71894
+          },
+          "toeSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                -2.1656,
+                27.3452
+              ],
+              "sourceAtlasPx": [
+                77.4142,
+                125.7853
+              ]
+            },
+            "vertexIndex": 71908
+          }
+        },
+        "RightFoot": {
+          "heelSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                0.3939,
+                8.5762
+              ],
+              "sourceAtlasPx": [
+                80.4703,
+                103.3746
+              ]
+            },
+            "vertexIndex": 22498
+          },
+          "toeSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                -7.6641,
+                9.7474
+              ],
+              "sourceAtlasPx": [
+                70.8489,
+                104.773
+              ]
+            },
+            "vertexIndex": 22501
+          }
+        }
+      },
+      "sourceFrame60fps": 22
+    },
+    {
+      "column": 0,
+      "direction": 2,
+      "feet": {
+        "LeftFoot": {
+          "heelSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                -3.3242,
+                19.7772
+              ],
+              "sourceAtlasPx": [
+                76.0308,
+                116.7489
+              ]
+            },
+            "vertexIndex": 71894
+          },
+          "toeSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                -14.0377,
+                23.0376
+              ],
+              "sourceAtlasPx": [
+                63.2385,
+                120.6419
+              ]
+            },
+            "vertexIndex": 71908
+          }
+        },
+        "RightFoot": {
+          "heelSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                7.575,
+                10.6946
+              ],
+              "sourceAtlasPx": [
+                89.0448,
+                105.904
+              ]
+            },
+            "vertexIndex": 22498
+          },
+          "toeSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                1.8841,
+                8.2107
+              ],
+              "sourceAtlasPx": [
+                82.2496,
+                102.9381
+              ]
+            },
+            "vertexIndex": 22501
+          }
+        }
+      },
+      "sourceFrame60fps": 1
+    },
+    {
+      "column": 1,
+      "direction": 2,
+      "feet": {
+        "LeftFoot": {
+          "heelSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                2.3184,
+                12.9175
+              ],
+              "sourceAtlasPx": [
+                82.7682,
+                108.5582
+              ]
+            },
+            "vertexIndex": 71894
+          },
+          "toeSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                -5.9364,
+                20.1079
+              ],
+              "sourceAtlasPx": [
+                72.9118,
+                117.1438
+              ]
+            },
+            "vertexIndex": 71908
+          }
+        },
+        "RightFoot": {
+          "heelSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                7.9673,
+                8.9879
+              ],
+              "sourceAtlasPx": [
+                89.5132,
+                103.8661
+              ]
+            },
+            "vertexIndex": 22498
+          },
+          "toeSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                5.7547,
+                7.1717
+              ],
+              "sourceAtlasPx": [
+                86.8713,
+                101.6975
+              ]
+            },
+            "vertexIndex": 22501
+          }
+        }
+      },
+      "sourceFrame60fps": 3
+    },
+    {
+      "column": 2,
+      "direction": 2,
+      "feet": {
+        "LeftFoot": {
+          "heelSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                19.3154,
+                -2.463
+              ],
+              "sourceAtlasPx": [
+                103.0631,
+                90.1935
+              ]
+            },
+            "vertexIndex": 71894
+          },
+          "toeSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                18.9796,
+                7.1256
+              ],
+              "sourceAtlasPx": [
+                102.6622,
+                101.6425
+              ]
+            },
+            "vertexIndex": 71908
+          }
+        },
+        "RightFoot": {
+          "heelSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                22.6048,
+                -9.3735
+              ],
+              "sourceAtlasPx": [
+                106.9908,
+                81.9421
+              ]
+            },
+            "vertexIndex": 22498
+          },
+          "toeSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                22.6452,
+                -12.072
+              ],
+              "sourceAtlasPx": [
+                107.039,
+                78.72
+              ]
+            },
+            "vertexIndex": 22501
+          }
+        }
+      },
+      "sourceFrame60fps": 5
+    },
+    {
+      "column": 3,
+      "direction": 2,
+      "feet": {
+        "LeftFoot": {
+          "heelSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                2.3264,
+                -29.9999
+              ],
+              "sourceAtlasPx": [
+                82.7778,
+                57.3136
+              ]
+            },
+            "vertexIndex": 71894
+          },
+          "toeSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                13.1885,
+                -29.6031
+              ],
+              "sourceAtlasPx": [
+                95.7475,
+                57.7873
+              ]
+            },
+            "vertexIndex": 71908
+          }
+        },
+        "RightFoot": {
+          "heelSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                -0.691,
+                -37.073
+              ],
+              "sourceAtlasPx": [
+                79.1749,
+                48.868
+              ]
+            },
+            "vertexIndex": 22498
+          },
+          "toeSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                2.2296,
+                -42.2401
+              ],
+              "sourceAtlasPx": [
+                82.6622,
+                42.6984
+              ]
+            },
+            "vertexIndex": 22501
+          }
+        }
+      },
+      "sourceFrame60fps": 7
+    },
+    {
+      "column": 4,
+      "direction": 2,
+      "feet": {
+        "LeftFoot": {
+          "heelSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                -41.7144,
+                -4.6273
+              ],
+              "sourceAtlasPx": [
+                30.1918,
+                87.6092
+              ]
+            },
+            "vertexIndex": 71894
+          },
+          "toeSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                -42.6483,
+                -11.124
+              ],
+              "sourceAtlasPx": [
+                29.0766,
+                79.8519
+              ]
+            },
+            "vertexIndex": 71908
+          }
+        },
+        "RightFoot": {
+          "heelSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                -45.4284,
+                -7.4062
+              ],
+              "sourceAtlasPx": [
+                25.7571,
+                84.2911
+              ]
+            },
+            "vertexIndex": 22498
+          },
+          "toeSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                -46.4714,
+                -15.0483
+              ],
+              "sourceAtlasPx": [
+                24.5118,
+                75.1662
+              ]
+            },
+            "vertexIndex": 22501
+          }
+        }
+      },
+      "sourceFrame60fps": 9
+    },
+    {
+      "column": 5,
+      "direction": 2,
+      "feet": {
+        "LeftFoot": {
+          "heelSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                -42.5111,
+                10.13
+              ],
+              "sourceAtlasPx": [
+                29.2405,
+                105.2298
+              ]
+            },
+            "vertexIndex": 71894
+          },
+          "toeSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                -51.4649,
+                8.0129
+              ],
+              "sourceAtlasPx": [
+                18.5494,
+                102.702
+              ]
+            },
+            "vertexIndex": 71908
+          }
+        },
+        "RightFoot": {
+          "heelSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                -41.8766,
+                9.2477
+              ],
+              "sourceAtlasPx": [
+                29.9981,
+                104.1763
+              ]
+            },
+            "vertexIndex": 22498
+          },
+          "toeSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                -46.0984,
+                3.7965
+              ],
+              "sourceAtlasPx": [
+                24.9571,
+                97.6675
+              ]
+            },
+            "vertexIndex": 22501
+          }
+        }
+      },
+      "sourceFrame60fps": 11
+    },
+    {
+      "column": 6,
+      "direction": 2,
+      "feet": {
+        "LeftFoot": {
+          "heelSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                -3.9861,
+                16.9452
+              ],
+              "sourceAtlasPx": [
+                75.2405,
+                113.3674
+              ]
+            },
+            "vertexIndex": 71894
+          },
+          "toeSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                -14.1193,
+                21.6803
+              ],
+              "sourceAtlasPx": [
+                63.1412,
+                119.0213
+              ]
+            },
+            "vertexIndex": 71908
+          }
+        },
+        "RightFoot": {
+          "heelSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                4.6763,
+                11.0578
+              ],
+              "sourceAtlasPx": [
+                85.5836,
+                106.3377
+              ]
+            },
+            "vertexIndex": 22498
+          },
+          "toeSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                0.4989,
+                8.5325
+              ],
+              "sourceAtlasPx": [
+                80.5957,
+                103.3224
+              ]
+            },
+            "vertexIndex": 22501
+          }
+        }
+      },
+      "sourceFrame60fps": 15
+    },
+    {
+      "column": 7,
+      "direction": 2,
+      "feet": {
+        "LeftFoot": {
+          "heelSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                -3.3242,
+                19.7772
+              ],
+              "sourceAtlasPx": [
+                76.0308,
+                116.7489
+              ]
+            },
+            "vertexIndex": 71894
+          },
+          "toeSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                -14.0377,
+                23.0376
+              ],
+              "sourceAtlasPx": [
+                63.2385,
+                120.6419
+              ]
+            },
+            "vertexIndex": 71908
+          }
+        },
+        "RightFoot": {
+          "heelSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                7.575,
+                10.6946
+              ],
+              "sourceAtlasPx": [
+                89.0448,
+                105.904
+              ]
+            },
+            "vertexIndex": 22498
+          },
+          "toeSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                1.8841,
+                8.2107
+              ],
+              "sourceAtlasPx": [
+                82.2496,
+                102.9381
+              ]
+            },
+            "vertexIndex": 22501
+          }
+        }
+      },
+      "sourceFrame60fps": 22
+    },
+    {
+      "column": 0,
+      "direction": 3,
+      "feet": {
+        "LeftFoot": {
+          "heelSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                -8.4655,
+                16.643
+              ],
+              "sourceAtlasPx": [
+                69.892,
+                113.0066
+              ]
+            },
+            "vertexIndex": 71894
+          },
+          "toeSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                -17.6867,
+                14.6038
+              ],
+              "sourceAtlasPx": [
+                58.8816,
+                110.5717
+              ]
+            },
+            "vertexIndex": 71908
+          }
+        },
+        "RightFoot": {
+          "heelSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                10.3189,
+                15.4516
+              ],
+              "sourceAtlasPx": [
+                92.3211,
+                111.5841
+              ]
+            },
+            "vertexIndex": 22498
+          },
+          "toeSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                10.3286,
+                11.4574
+              ],
+              "sourceAtlasPx": [
+                92.3326,
+                106.8148
+              ]
+            },
+            "vertexIndex": 22501
+          }
+        }
+      },
+      "sourceFrame60fps": 1
+    },
+    {
+      "column": 1,
+      "direction": 3,
+      "feet": {
+        "LeftFoot": {
+          "heelSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                -0.1119,
+                13.5041
+              ],
+              "sourceAtlasPx": [
+                79.8664,
+                109.2586
+              ]
+            },
+            "vertexIndex": 71894
+          },
+          "toeSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                -8.3445,
+                16.3115
+              ],
+              "sourceAtlasPx": [
+                70.0365,
+                112.6107
+              ]
+            },
+            "vertexIndex": 71908
+          }
+        },
+        "RightFoot": {
+          "heelSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                9.8434,
+                13.7228
+              ],
+              "sourceAtlasPx": [
+                91.7533,
+                109.5197
+              ]
+            },
+            "vertexIndex": 22498
+          },
+          "toeSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                13.456,
+                12.2788
+              ],
+              "sourceAtlasPx": [
+                96.0668,
+                107.7956
+              ]
+            },
+            "vertexIndex": 22501
+          }
+        }
+      },
+      "sourceFrame60fps": 3
+    },
+    {
+      "column": 2,
+      "direction": 3,
+      "feet": {
+        "LeftFoot": {
+          "heelSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                20.6229,
+                8.1545
+              ],
+              "sourceAtlasPx": [
+                104.6244,
+                102.871
+              ]
+            },
+            "vertexIndex": 71894
+          },
+          "toeSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                18.9802,
+                17.217
+              ],
+              "sourceAtlasPx": [
+                102.6629,
+                113.692
+              ]
+            },
+            "vertexIndex": 71908
+          }
+        },
+        "RightFoot": {
+          "heelSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                28.4605,
+                4.202
+              ],
+              "sourceAtlasPx": [
+                113.9827,
+                98.1517
+              ]
+            },
+            "vertexIndex": 22498
+          },
+          "toeSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                34.12,
+                3.0188
+              ],
+              "sourceAtlasPx": [
+                120.7403,
+                96.7388
+              ]
+            },
+            "vertexIndex": 22501
+          }
+        }
+      },
+      "sourceFrame60fps": 5
+    },
+    {
+      "column": 3,
+      "direction": 3,
+      "feet": {
+        "LeftFoot": {
+          "heelSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                9.4096,
+                -26.8799
+              ],
+              "sourceAtlasPx": [
+                91.2353,
+                61.039
+              ]
+            },
+            "vertexIndex": 71894
+          },
+          "toeSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                15.907,
+                -21.8682
+              ],
+              "sourceAtlasPx": [
+                98.9934,
+                67.0231
+              ]
+            },
+            "vertexIndex": 71908
+          }
+        },
+        "RightFoot": {
+          "heelSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                12.827,
+                -33.8467
+              ],
+              "sourceAtlasPx": [
+                95.3158,
+                52.7203
+              ]
+            },
+            "vertexIndex": 22498
+          },
+          "toeSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                20.5835,
+                -36.1753
+              ],
+              "sourceAtlasPx": [
+                104.5773,
+                49.9399
+              ]
+            },
+            "vertexIndex": 22501
+          }
+        }
+      },
+      "sourceFrame60fps": 7
+    },
+    {
+      "column": 4,
+      "direction": 3,
+      "feet": {
+        "LeftFoot": {
+          "heelSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                -25.6128,
+                -22.5259
+              ],
+              "sourceAtlasPx": [
+                49.4176,
+                66.2378
+              ]
+            },
+            "vertexIndex": 71894
+          },
+          "toeSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                -28.1386,
+                -29.9424
+              ],
+              "sourceAtlasPx": [
+                46.4017,
+                57.3822
+              ]
+            },
+            "vertexIndex": 71908
+          }
+        },
+        "RightFoot": {
+          "heelSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                -22.5236,
+                -25.4709
+              ],
+              "sourceAtlasPx": [
+                53.1061,
+                62.7213
+              ]
+            },
+            "vertexIndex": 22498
+          },
+          "toeSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                -17.798,
+                -32.134
+              ],
+              "sourceAtlasPx": [
+                58.7487,
+                54.7653
+              ]
+            },
+            "vertexIndex": 22501
+          }
+        }
+      },
+      "sourceFrame60fps": 9
+    },
+    {
+      "column": 5,
+      "direction": 3,
+      "feet": {
+        "LeftFoot": {
+          "heelSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                -30.9886,
+                -9.4095
+              ],
+              "sourceAtlasPx": [
+                42.9987,
+                81.8991
+              ]
+            },
+            "vertexIndex": 71894
+          },
+          "toeSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                -39.7103,
+                -16.2256
+              ],
+              "sourceAtlasPx": [
+                32.5847,
+                73.7605
+              ]
+            },
+            "vertexIndex": 71908
+          }
+        },
+        "RightFoot": {
+          "heelSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                -24.139,
+                -8.3022
+              ],
+              "sourceAtlasPx": [
+                51.1773,
+                83.2212
+              ]
+            },
+            "vertexIndex": 22498
+          },
+          "toeSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                -21.9506,
+                -14.2939
+              ],
+              "sourceAtlasPx": [
+                53.7904,
+                76.0669
+              ]
+            },
+            "vertexIndex": 22501
+          }
+        }
+      },
+      "sourceFrame60fps": 11
+    },
+    {
+      "column": 6,
+      "direction": 3,
+      "feet": {
+        "LeftFoot": {
+          "heelSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                -7.5505,
+                13.8783
+              ],
+              "sourceAtlasPx": [
+                70.9845,
+                109.7054
+              ]
+            },
+            "vertexIndex": 71894
+          },
+          "toeSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                -17.0531,
+                13.3933
+              ],
+              "sourceAtlasPx": [
+                59.6381,
+                109.1264
+              ]
+            },
+            "vertexIndex": 71908
+          }
+        },
+        "RightFoot": {
+          "heelSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                7.2954,
+                14.2405
+              ],
+              "sourceAtlasPx": [
+                88.7109,
+                110.1379
+              ]
+            },
+            "vertexIndex": 22498
+          },
+          "toeSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                9.1944,
+                11.1094
+              ],
+              "sourceAtlasPx": [
+                90.9784,
+                106.3993
+              ]
+            },
+            "vertexIndex": 22501
+          }
+        }
+      },
+      "sourceFrame60fps": 15
+    },
+    {
+      "column": 7,
+      "direction": 3,
+      "feet": {
+        "LeftFoot": {
+          "heelSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                -8.4655,
+                16.643
+              ],
+              "sourceAtlasPx": [
+                69.892,
+                113.0066
+              ]
+            },
+            "vertexIndex": 71894
+          },
+          "toeSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                -17.6867,
+                14.6038
+              ],
+              "sourceAtlasPx": [
+                58.8816,
+                110.5717
+              ]
+            },
+            "vertexIndex": 71908
+          }
+        },
+        "RightFoot": {
+          "heelSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                10.3189,
+                15.4516
+              ],
+              "sourceAtlasPx": [
+                92.3211,
+                111.5841
+              ]
+            },
+            "vertexIndex": 22498
+          },
+          "toeSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                10.3286,
+                11.4574
+              ],
+              "sourceAtlasPx": [
+                92.3326,
+                106.8148
+              ]
+            },
+            "vertexIndex": 22501
+          }
+        }
+      },
+      "sourceFrame60fps": 22
+    },
+    {
+      "column": 0,
+      "direction": 4,
+      "feet": {
+        "LeftFoot": {
+          "heelSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                -8.6478,
+                12.0936
+              ],
+              "sourceAtlasPx": [
+                69.6742,
+                107.5744
+              ]
+            },
+            "vertexIndex": 71894
+          },
+          "toeSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                -10.9751,
+                6.9843
+              ],
+              "sourceAtlasPx": [
+                66.8955,
+                101.4738
+              ]
+            },
+            "vertexIndex": 71908
+          }
+        },
+        "RightFoot": {
+          "heelSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                7.0181,
+                20.0607
+              ],
+              "sourceAtlasPx": [
+                88.3798,
+                117.0874
+              ]
+            },
+            "vertexIndex": 22498
+          },
+          "toeSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                12.7228,
+                17.5856
+              ],
+              "sourceAtlasPx": [
+                95.1914,
+                114.132
+              ]
+            },
+            "vertexIndex": 22501
+          }
+        }
+      },
+      "sourceFrame60fps": 1
+    },
+    {
+      "column": 1,
+      "direction": 4,
+      "feet": {
+        "LeftFoot": {
+          "heelSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                -2.4766,
+                12.8161
+              ],
+              "sourceAtlasPx": [
+                77.0429,
+                108.4371
+              ]
+            },
+            "vertexIndex": 71894
+          },
+          "toeSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                -5.8645,
+                12.5342
+              ],
+              "sourceAtlasPx": [
+                72.9976,
+                108.1005
+              ]
+            },
+            "vertexIndex": 71908
+          }
+        },
+        "RightFoot": {
+          "heelSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                5.9533,
+                17.9224
+              ],
+              "sourceAtlasPx": [
+                87.1085,
+                114.5342
+              ]
+            },
+            "vertexIndex": 22498
+          },
+          "toeSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                13.2749,
+                19.3851
+              ],
+              "sourceAtlasPx": [
+                95.8506,
+                116.2808
+              ]
+            },
+            "vertexIndex": 22501
+          }
+        }
+      },
+      "sourceFrame60fps": 3
+    },
+    {
+      "column": 2,
+      "direction": 4,
+      "feet": {
+        "LeftFoot": {
+          "heelSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                9.8498,
+                16.2556
+              ],
+              "sourceAtlasPx": [
+                91.761,
+                112.544
+              ]
+            },
+            "vertexIndex": 71894
+          },
+          "toeSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                7.8624,
+                24.3531
+              ],
+              "sourceAtlasPx": [
+                89.388,
+                122.2126
+              ]
+            },
+            "vertexIndex": 71908
+          }
+        },
+        "RightFoot": {
+          "heelSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                17.6444,
+                16.4589
+              ],
+              "sourceAtlasPx": [
+                101.068,
+                112.7868
+              ]
+            },
+            "vertexIndex": 22498
+          },
+          "toeSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                25.6077,
+                18.8972
+              ],
+              "sourceAtlasPx": [
+                110.5764,
+                115.6981
+              ]
+            },
+            "vertexIndex": 22501
+          }
+        }
+      },
+      "sourceFrame60fps": 5
+    },
+    {
+      "column": 3,
+      "direction": 4,
+      "feet": {
+        "LeftFoot": {
+          "heelSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                10.9808,
+                -21.4591
+              ],
+              "sourceAtlasPx": [
+                93.1114,
+                67.5115
+              ]
+            },
+            "vertexIndex": 71894
+          },
+          "toeSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                9.3074,
+                -15.165
+              ],
+              "sourceAtlasPx": [
+                91.1133,
+                75.0269
+              ]
+            },
+            "vertexIndex": 71908
+          }
+        },
+        "RightFoot": {
+          "heelSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                18.8311,
+                -25.4305
+              ],
+              "sourceAtlasPx": [
+                102.4849,
+                62.7695
+              ]
+            },
+            "vertexIndex": 22498
+          },
+          "toeSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                26.8799,
+                -23.5573
+              ],
+              "sourceAtlasPx": [
+                112.0955,
+                65.0062
+              ]
+            },
+            "vertexIndex": 22501
+          }
+        }
+      },
+      "sourceFrame60fps": 7
+    },
+    {
+      "column": 4,
+      "direction": 4,
+      "feet": {
+        "LeftFoot": {
+          "heelSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                5.4924,
+                -27.8747
+              ],
+              "sourceAtlasPx": [
+                86.5581,
+                59.8511
+              ]
+            },
+            "vertexIndex": 71894
+          },
+          "toeSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                2.8544,
+                -36.664
+              ],
+              "sourceAtlasPx": [
+                83.4082,
+                49.3564
+              ]
+            },
+            "vertexIndex": 71908
+          }
+        },
+        "RightFoot": {
+          "heelSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                13.5752,
+                -27.8498
+              ],
+              "sourceAtlasPx": [
+                96.2092,
+                59.8809
+              ]
+            },
+            "vertexIndex": 22498
+          },
+          "toeSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                21.3012,
+                -31.2026
+              ],
+              "sourceAtlasPx": [
+                105.4343,
+                55.8774
+              ]
+            },
+            "vertexIndex": 22501
+          }
+        }
+      },
+      "sourceFrame60fps": 9
+    },
+    {
+      "column": 5,
+      "direction": 4,
+      "feet": {
+        "LeftFoot": {
+          "heelSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                -1.3133,
+                -17.9968
+              ],
+              "sourceAtlasPx": [
+                78.4318,
+                71.6456
+              ]
+            },
+            "vertexIndex": 71894
+          },
+          "toeSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                -4.694,
+                -28.0302
+              ],
+              "sourceAtlasPx": [
+                74.3952,
+                59.6654
+              ]
+            },
+            "vertexIndex": 71908
+          }
+        },
+        "RightFoot": {
+          "heelSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                7.7389,
+                -12.662
+              ],
+              "sourceAtlasPx": [
+                89.2405,
+                78.0155
+              ]
+            },
+            "vertexIndex": 22498
+          },
+          "toeSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                15.0557,
+                -16.1269
+              ],
+              "sourceAtlasPx": [
+                97.9769,
+                73.8784
+              ]
+            },
+            "vertexIndex": 22501
+          }
+        }
+      },
+      "sourceFrame60fps": 11
+    },
+    {
+      "column": 6,
+      "direction": 4,
+      "feet": {
+        "LeftFoot": {
+          "heelSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                -6.6919,
+                10.0921
+              ],
+              "sourceAtlasPx": [
+                72.0097,
+                105.1846
+              ]
+            },
+            "vertexIndex": 71894
+          },
+          "toeSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                -9.9975,
+                6.2021
+              ],
+              "sourceAtlasPx": [
+                68.0627,
+                100.5398
+              ]
+            },
+            "vertexIndex": 71908
+          }
+        },
+        "RightFoot": {
+          "heelSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                5.6409,
+                17.6796
+              ],
+              "sourceAtlasPx": [
+                86.7354,
+                114.2443
+              ]
+            },
+            "vertexIndex": 22498
+          },
+          "toeSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                12.504,
+                16.8779
+              ],
+              "sourceAtlasPx": [
+                94.9301,
+                113.2871
+              ]
+            },
+            "vertexIndex": 22501
+          }
+        }
+      },
+      "sourceFrame60fps": 15
+    },
+    {
+      "column": 7,
+      "direction": 4,
+      "feet": {
+        "LeftFoot": {
+          "heelSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                -8.6478,
+                12.0936
+              ],
+              "sourceAtlasPx": [
+                69.6742,
+                107.5744
+              ]
+            },
+            "vertexIndex": 71894
+          },
+          "toeSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                -10.9751,
+                6.9843
+              ],
+              "sourceAtlasPx": [
+                66.8955,
+                101.4738
+              ]
+            },
+            "vertexIndex": 71908
+          }
+        },
+        "RightFoot": {
+          "heelSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                7.0181,
+                20.0607
+              ],
+              "sourceAtlasPx": [
+                88.3798,
+                117.0874
+              ]
+            },
+            "vertexIndex": 22498
+          },
+          "toeSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                12.7228,
+                17.5856
+              ],
+              "sourceAtlasPx": [
+                95.1914,
+                114.132
+              ]
+            },
+            "vertexIndex": 22501
+          }
+        }
+      },
+      "sourceFrame60fps": 22
+    },
+    {
+      "column": 0,
+      "direction": 5,
+      "feet": {
+        "LeftFoot": {
+          "heelSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                -3.7644,
+                8.7938
+              ],
+              "sourceAtlasPx": [
+                75.5052,
+                103.6343
+              ]
+            },
+            "vertexIndex": 71894
+          },
+          "toeSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                2.1656,
+                4.6422
+              ],
+              "sourceAtlasPx": [
+                82.5858,
+                98.6773
+              ]
+            },
+            "vertexIndex": 71908
+          }
+        },
+        "RightFoot": {
+          "heelSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                -0.3939,
+                21.8216
+              ],
+              "sourceAtlasPx": [
+                79.5297,
+                119.19
+              ]
+            },
+            "vertexIndex": 22498
+          },
+          "toeSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                7.6641,
+                23.0052
+              ],
+              "sourceAtlasPx": [
+                89.1511,
+                120.6033
+              ]
+            },
+            "vertexIndex": 22501
+          }
+        }
+      },
+      "sourceFrame60fps": 1
+    },
+    {
+      "column": 1,
+      "direction": 5,
+      "feet": {
+        "LeftFoot": {
+          "heelSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                -3.3905,
+                11.2562
+              ],
+              "sourceAtlasPx": [
+                75.9516,
+                106.5746
+              ]
+            },
+            "vertexIndex": 71894
+          },
+          "toeSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                0.0508,
+                10.9885
+              ],
+              "sourceAtlasPx": [
+                80.0606,
+                106.255
+              ]
+            },
+            "vertexIndex": 71908
+          }
+        },
+        "RightFoot": {
+          "heelSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                -1.4242,
+                19.1263
+              ],
+              "sourceAtlasPx": [
+                78.2995,
+                115.9717
+              ]
+            },
+            "vertexIndex": 22498
+          },
+          "toeSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                5.3175,
+                24.3278
+              ],
+              "sourceAtlasPx": [
+                86.3493,
+                122.1824
+              ]
+            },
+            "vertexIndex": 22501
+          }
+        }
+      },
+      "sourceFrame60fps": 3
+    },
+    {
+      "column": 2,
+      "direction": 5,
+      "feet": {
+        "LeftFoot": {
+          "heelSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                -6.6932,
+                17.0947
+              ],
+              "sourceAtlasPx": [
+                72.0081,
+                113.5459
+              ]
+            },
+            "vertexIndex": 71894
+          },
+          "toeSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                -7.861,
+                24.3534
+              ],
+              "sourceAtlasPx": [
+                70.6137,
+                122.213
+              ]
+            },
+            "vertexIndex": 71908
+          }
+        },
+        "RightFoot": {
+          "heelSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                -3.5076,
+                20.217
+              ],
+              "sourceAtlasPx": [
+                75.8119,
+                117.2741
+              ]
+            },
+            "vertexIndex": 22498
+          },
+          "toeSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                2.0948,
+                26.2617
+              ],
+              "sourceAtlasPx": [
+                82.5013,
+                124.4916
+              ]
+            },
+            "vertexIndex": 22501
+          }
+        }
+      },
+      "sourceFrame60fps": 5
+    },
+    {
+      "column": 3,
+      "direction": 5,
+      "feet": {
+        "LeftFoot": {
+          "heelSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                6.1195,
+                -16.9132
+              ],
+              "sourceAtlasPx": [
+                87.3069,
+                72.9395
+              ]
+            },
+            "vertexIndex": 71894
+          },
+          "toeSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                -2.7444,
+                -13.4203
+              ],
+              "sourceAtlasPx": [
+                76.7231,
+                77.11
+              ]
+            },
+            "vertexIndex": 71908
+          }
+        },
+        "RightFoot": {
+          "heelSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                13.8041,
+                -16.7547
+              ],
+              "sourceAtlasPx": [
+                96.4826,
+                73.1288
+              ]
+            },
+            "vertexIndex": 22498
+          },
+          "toeSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                17.4304,
+                -11.7777
+              ],
+              "sourceAtlasPx": [
+                100.8124,
+                79.0714
+              ]
+            },
+            "vertexIndex": 22501
+          }
+        }
+      },
+      "sourceFrame60fps": 7
+    },
+    {
+      "column": 4,
+      "direction": 5,
+      "feet": {
+        "LeftFoot": {
+          "heelSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                33.3802,
+                -17.5407
+              ],
+              "sourceAtlasPx": [
+                119.8569,
+                72.1902
+              ]
+            },
+            "vertexIndex": 71894
+          },
+          "toeSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                32.1752,
+                -27.3516
+              ],
+              "sourceAtlasPx": [
+                118.4182,
+                60.4757
+              ]
+            },
+            "vertexIndex": 71908
+          }
+        },
+        "RightFoot": {
+          "heelSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                41.7218,
+                -13.1494
+              ],
+              "sourceAtlasPx": [
+                129.8171,
+                77.4336
+              ]
+            },
+            "vertexIndex": 22498
+          },
+          "toeSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                47.9224,
+                -12.8
+              ],
+              "sourceAtlasPx": [
+                137.2208,
+                77.8508
+              ]
+            },
+            "vertexIndex": 22501
+          }
+        }
+      },
+      "sourceFrame60fps": 9
+    },
+    {
+      "column": 5,
+      "direction": 5,
+      "feet": {
+        "LeftFoot": {
+          "heelSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                29.1312,
+                -10.6016
+              ],
+              "sourceAtlasPx": [
+                114.7835,
+                80.4757
+              ]
+            },
+            "vertexIndex": 71894
+          },
+          "toeSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                33.072,
+                -20.4862
+              ],
+              "sourceAtlasPx": [
+                119.4889,
+                68.6732
+              ]
+            },
+            "vertexIndex": 71908
+          }
+        },
+        "RightFoot": {
+          "heelSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                35.0835,
+                -1.278
+              ],
+              "sourceAtlasPx": [
+                121.8907,
+                91.6084
+              ]
+            },
+            "vertexIndex": 22498
+          },
+          "toeSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                43.2424,
+                -0.6287
+              ],
+              "sourceAtlasPx": [
+                131.6327,
+                92.3837
+              ]
+            },
+            "vertexIndex": 22501
+          }
+        }
+      },
+      "sourceFrame60fps": 11
+    },
+    {
+      "column": 6,
+      "direction": 5,
+      "feet": {
+        "LeftFoot": {
+          "heelSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                -1.9133,
+                7.8043
+              ],
+              "sourceAtlasPx": [
+                77.7154,
+                102.4529
+              ]
+            },
+            "vertexIndex": 71894
+          },
+          "toeSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                2.9145,
+                4.319
+              ],
+              "sourceAtlasPx": [
+                83.48,
+                98.2914
+              ]
+            },
+            "vertexIndex": 71908
+          }
+        },
+        "RightFoot": {
+          "heelSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                0.6821,
+                19.3605
+              ],
+              "sourceAtlasPx": [
+                80.8144,
+                116.2513
+              ]
+            },
+            "vertexIndex": 22498
+          },
+          "toeSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                8.4889,
+                22.4587
+              ],
+              "sourceAtlasPx": [
+                90.136,
+                119.9507
+              ]
+            },
+            "vertexIndex": 22501
+          }
+        }
+      },
+      "sourceFrame60fps": 15
+    },
+    {
+      "column": 7,
+      "direction": 5,
+      "feet": {
+        "LeftFoot": {
+          "heelSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                -3.7644,
+                8.7938
+              ],
+              "sourceAtlasPx": [
+                75.5052,
+                103.6343
+              ]
+            },
+            "vertexIndex": 71894
+          },
+          "toeSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                2.1656,
+                4.6422
+              ],
+              "sourceAtlasPx": [
+                82.5858,
+                98.6773
+              ]
+            },
+            "vertexIndex": 71908
+          }
+        },
+        "RightFoot": {
+          "heelSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                -0.3939,
+                21.8216
+              ],
+              "sourceAtlasPx": [
+                79.5297,
+                119.19
+              ]
+            },
+            "vertexIndex": 22498
+          },
+          "toeSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                7.6641,
+                23.0052
+              ],
+              "sourceAtlasPx": [
+                89.1511,
+                120.6033
+              ]
+            },
+            "vertexIndex": 22501
+          }
+        }
+      },
+      "sourceFrame60fps": 22
+    },
+    {
+      "column": 0,
+      "direction": 6,
+      "feet": {
+        "LeftFoot": {
+          "heelSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                3.3242,
+                8.6767
+              ],
+              "sourceAtlasPx": [
+                83.9692,
+                103.4946
+              ]
+            },
+            "vertexIndex": 71894
+          },
+          "toeSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                14.0377,
+                8.9498
+              ],
+              "sourceAtlasPx": [
+                96.7615,
+                103.8206
+              ]
+            },
+            "vertexIndex": 71908
+          }
+        },
+        "RightFoot": {
+          "heelSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                -7.575,
+                19.7031
+              ],
+              "sourceAtlasPx": [
+                70.9552,
+                116.6604
+              ]
+            },
+            "vertexIndex": 22498
+          },
+          "toeSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                -1.8841,
+                24.5418
+              ],
+              "sourceAtlasPx": [
+                77.7504,
+                122.438
+              ]
+            },
+            "vertexIndex": 22501
+          }
+        }
+      },
+      "sourceFrame60fps": 1
+    },
+    {
+      "column": 1,
+      "direction": 6,
+      "feet": {
+        "LeftFoot": {
+          "heelSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                -2.3184,
+                9.7385
+              ],
+              "sourceAtlasPx": [
+                77.2318,
+                104.7624
+              ]
+            },
+            "vertexIndex": 71894
+          },
+          "toeSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                5.9364,
+                12.5802
+              ],
+              "sourceAtlasPx": [
+                87.0882,
+                108.1554
+              ]
+            },
+            "vertexIndex": 71908
+          }
+        },
+        "RightFoot": {
+          "heelSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                -7.9673,
+                16.6296
+              ],
+              "sourceAtlasPx": [
+                70.4868,
+                112.9906
+              ]
+            },
+            "vertexIndex": 22498
+          },
+          "toeSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                -5.7547,
+                24.2115
+              ],
+              "sourceAtlasPx": [
+                73.1287,
+                122.0436
+              ]
+            },
+            "vertexIndex": 22501
+          }
+        }
+      },
+      "sourceFrame60fps": 3
+    },
+    {
+      "column": 2,
+      "direction": 6,
+      "feet": {
+        "LeftFoot": {
+          "heelSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                -19.3154,
+                10.1804
+              ],
+              "sourceAtlasPx": [
+                56.9369,
+                105.29
+              ]
+            },
+            "vertexIndex": 71894
+          },
+          "toeSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                -18.9796,
+                17.2179
+              ],
+              "sourceAtlasPx": [
+                57.3378,
+                113.693
+              ]
+            },
+            "vertexIndex": 71908
+          }
+        },
+        "RightFoot": {
+          "heelSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                -22.6048,
+                13.2752
+              ],
+              "sourceAtlasPx": [
+                53.0092,
+                108.9853
+              ]
+            },
+            "vertexIndex": 22498
+          },
+          "toeSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                -22.6452,
+                20.7985
+              ],
+              "sourceAtlasPx": [
+                52.961,
+                117.9683
+              ]
+            },
+            "vertexIndex": 22501
+          }
+        }
+      },
+      "sourceFrame60fps": 5
+    },
+    {
+      "column": 3,
+      "direction": 6,
+      "feet": {
+        "LeftFoot": {
+          "heelSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                -2.3264,
+                -15.9048
+              ],
+              "sourceAtlasPx": [
+                77.2222,
+                74.1435
+              ]
+            },
+            "vertexIndex": 71894
+          },
+          "toeSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                -13.1885,
+                -17.656
+              ],
+              "sourceAtlasPx": [
+                64.2525,
+                72.0525
+              ]
+            },
+            "vertexIndex": 71908
+          }
+        },
+        "RightFoot": {
+          "heelSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                0.691,
+                -12.9012
+              ],
+              "sourceAtlasPx": [
+                80.8251,
+                77.7299
+              ]
+            },
+            "vertexIndex": 22498
+          },
+          "toeSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                -2.2296,
+                -7.7366
+              ],
+              "sourceAtlasPx": [
+                77.3378,
+                83.8966
+              ]
+            },
+            "vertexIndex": 22501
+          }
+        }
+      },
+      "sourceFrame60fps": 7
+    },
+    {
+      "column": 4,
+      "direction": 6,
+      "feet": {
+        "LeftFoot": {
+          "heelSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                41.7144,
+                2.4228
+              ],
+              "sourceAtlasPx": [
+                129.8082,
+                96.0272
+              ]
+            },
+            "vertexIndex": 71894
+          },
+          "toeSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                42.6483,
+                -7.4601
+              ],
+              "sourceAtlasPx": [
+                130.9234,
+                84.2267
+              ]
+            },
+            "vertexIndex": 71908
+          }
+        },
+        "RightFoot": {
+          "heelSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                45.4284,
+                10.0191
+              ],
+              "sourceAtlasPx": [
+                134.2429,
+                105.0974
+              ]
+            },
+            "vertexIndex": 22498
+          },
+          "toeSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                46.4714,
+                12.2942
+              ],
+              "sourceAtlasPx": [
+                135.4882,
+                107.8139
+              ]
+            },
+            "vertexIndex": 22501
+          }
+        }
+      },
+      "sourceFrame60fps": 9
+    },
+    {
+      "column": 5,
+      "direction": 6,
+      "feet": {
+        "LeftFoot": {
+          "heelSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                42.5111,
+                8.4441
+              ],
+              "sourceAtlasPx": [
+                130.7595,
+                103.2169
+              ]
+            },
+            "vertexIndex": 71894
+          },
+          "toeSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                51.4649,
+                1.9875
+              ],
+              "sourceAtlasPx": [
+                141.4506,
+                95.5075
+              ]
+            },
+            "vertexIndex": 71908
+          }
+        },
+        "RightFoot": {
+          "heelSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                41.8766,
+                19.1815
+              ],
+              "sourceAtlasPx": [
+                130.0019,
+                116.0376
+              ]
+            },
+            "vertexIndex": 22498
+          },
+          "toeSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                46.0984,
+                23.1222
+              ],
+              "sourceAtlasPx": [
+                135.0429,
+                120.7429
+              ]
+            },
+            "vertexIndex": 22501
+          }
+        }
+      },
+      "sourceFrame60fps": 11
+    },
+    {
+      "column": 6,
+      "direction": 6,
+      "feet": {
+        "LeftFoot": {
+          "heelSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                3.9861,
+                8.3553
+              ],
+              "sourceAtlasPx": [
+                84.7595,
+                103.1108
+              ]
+            },
+            "vertexIndex": 71894
+          },
+          "toeSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                14.1193,
+                8.8473
+              ],
+              "sourceAtlasPx": [
+                96.8588,
+                103.6983
+              ]
+            },
+            "vertexIndex": 71908
+          }
+        },
+        "RightFoot": {
+          "heelSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                -4.6763,
+                18.2986
+              ],
+              "sourceAtlasPx": [
+                74.4164,
+                114.9834
+              ]
+            },
+            "vertexIndex": 22498
+          },
+          "toeSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                -0.4989,
+                24.5828
+              ],
+              "sourceAtlasPx": [
+                79.4043,
+                122.4869
+              ]
+            },
+            "vertexIndex": 22501
+          }
+        }
+      },
+      "sourceFrame60fps": 15
+    },
+    {
+      "column": 7,
+      "direction": 6,
+      "feet": {
+        "LeftFoot": {
+          "heelSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                3.3242,
+                8.6767
+              ],
+              "sourceAtlasPx": [
+                83.9692,
+                103.4946
+              ]
+            },
+            "vertexIndex": 71894
+          },
+          "toeSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                14.0377,
+                8.9498
+              ],
+              "sourceAtlasPx": [
+                96.7615,
+                103.8206
+              ]
+            },
+            "vertexIndex": 71908
+          }
+        },
+        "RightFoot": {
+          "heelSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                -7.575,
+                19.7031
+              ],
+              "sourceAtlasPx": [
+                70.9552,
+                116.6604
+              ]
+            },
+            "vertexIndex": 22498
+          },
+          "toeSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                -1.8841,
+                24.5418
+              ],
+              "sourceAtlasPx": [
+                77.7504,
+                122.438
+              ]
+            },
+            "vertexIndex": 22501
+          }
+        }
+      },
+      "sourceFrame60fps": 22
+    },
+    {
+      "column": 0,
+      "direction": 7,
+      "feet": {
+        "LeftFoot": {
+          "heelSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                8.4655,
+                11.811
+              ],
+              "sourceAtlasPx": [
+                90.108,
+                107.237
+              ]
+            },
+            "vertexIndex": 71894
+          },
+          "toeSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                17.6867,
+                17.3837
+              ],
+              "sourceAtlasPx": [
+                101.1185,
+                113.8909
+              ]
+            },
+            "vertexIndex": 71908
+          }
+        },
+        "RightFoot": {
+          "heelSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                -10.3189,
+                14.9461
+              ],
+              "sourceAtlasPx": [
+                67.6789,
+                110.9805
+              ]
+            },
+            "vertexIndex": 22498
+          },
+          "toeSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                -10.3286,
+                21.2952
+              ],
+              "sourceAtlasPx": [
+                67.6674,
+                118.5614
+              ]
+            },
+            "vertexIndex": 22501
+          }
+        }
+      },
+      "sourceFrame60fps": 1
+    },
+    {
+      "column": 1,
+      "direction": 7,
+      "feet": {
+        "LeftFoot": {
+          "heelSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                0.1119,
+                9.152
+              ],
+              "sourceAtlasPx": [
+                80.1336,
+                104.0621
+              ]
+            },
+            "vertexIndex": 71894
+          },
+          "toeSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                8.3445,
+                16.3767
+              ],
+              "sourceAtlasPx": [
+                89.9636,
+                112.6886
+              ]
+            },
+            "vertexIndex": 71908
+          }
+        },
+        "RightFoot": {
+          "heelSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                -9.8434,
+                11.8948
+              ],
+              "sourceAtlasPx": [
+                68.2467,
+                107.3371
+              ]
+            },
+            "vertexIndex": 22498
+          },
+          "toeSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                -13.456,
+                19.1045
+              ],
+              "sourceAtlasPx": [
+                63.9332,
+                115.9457
+              ]
+            },
+            "vertexIndex": 22501
+          }
+        }
+      },
+      "sourceFrame60fps": 3
+    },
+    {
+      "column": 2,
+      "direction": 7,
+      "feet": {
+        "LeftFoot": {
+          "heelSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                -20.6229,
+                -0.4369
+              ],
+              "sourceAtlasPx": [
+                55.3756,
+                92.6126
+              ]
+            },
+            "vertexIndex": 71894
+          },
+          "toeSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                -18.9802,
+                7.1266
+              ],
+              "sourceAtlasPx": [
+                57.3371,
+                101.6437
+              ]
+            },
+            "vertexIndex": 71908
+          }
+        },
+        "RightFoot": {
+          "heelSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                -28.4605,
+                -0.3002
+              ],
+              "sourceAtlasPx": [
+                46.0173,
+                92.7758
+              ]
+            },
+            "vertexIndex": 22498
+          },
+          "toeSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                -34.12,
+                5.7078
+              ],
+              "sourceAtlasPx": [
+                39.2597,
+                99.9496
+              ]
+            },
+            "vertexIndex": 22501
+          }
+        }
+      },
+      "sourceFrame60fps": 5
+    },
+    {
+      "column": 3,
+      "direction": 7,
+      "feet": {
+        "LeftFoot": {
+          "heelSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                -9.4096,
+                -19.0247
+              ],
+              "sourceAtlasPx": [
+                68.7647,
+                70.4182
+              ]
+            },
+            "vertexIndex": 71894
+          },
+          "toeSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                -15.907,
+                -25.3909
+              ],
+              "sourceAtlasPx": [
+                61.0066,
+                62.8169
+              ]
+            },
+            "vertexIndex": 71908
+          }
+        },
+        "RightFoot": {
+          "heelSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                -12.827,
+                -16.1275
+              ],
+              "sourceAtlasPx": [
+                64.6842,
+                73.8777
+              ]
+            },
+            "vertexIndex": 22498
+          },
+          "toeSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                -20.5835,
+                -13.8013
+              ],
+              "sourceAtlasPx": [
+                55.4227,
+                76.6551
+              ]
+            },
+            "vertexIndex": 22501
+          }
+        }
+      },
+      "sourceFrame60fps": 7
+    },
+    {
+      "column": 4,
+      "direction": 7,
+      "feet": {
+        "LeftFoot": {
+          "heelSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                25.6128,
+                20.3215
+              ],
+              "sourceAtlasPx": [
+                110.5824,
+                117.3988
+              ]
+            },
+            "vertexIndex": 71894
+          },
+          "toeSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                28.1386,
+                11.3583
+              ],
+              "sourceAtlasPx": [
+                113.5983,
+                106.6965
+              ]
+            },
+            "vertexIndex": 71908
+          }
+        },
+        "RightFoot": {
+          "heelSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                22.5236,
+                28.0839
+              ],
+              "sourceAtlasPx": [
+                106.8939,
+                126.6673
+              ]
+            },
+            "vertexIndex": 22498
+          },
+          "toeSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                17.798,
+                29.3799
+              ],
+              "sourceAtlasPx": [
+                101.2514,
+                128.2149
+              ]
+            },
+            "vertexIndex": 22501
+          }
+        }
+      },
+      "sourceFrame60fps": 9
+    },
+    {
+      "column": 5,
+      "direction": 7,
+      "feet": {
+        "LeftFoot": {
+          "heelSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                30.9886,
+                27.9837
+              ],
+              "sourceAtlasPx": [
+                117.0013,
+                126.5477
+              ]
+            },
+            "vertexIndex": 71894
+          },
+          "toeSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                39.7103,
+                26.2261
+              ],
+              "sourceAtlasPx": [
+                127.4153,
+                124.4491
+              ]
+            },
+            "vertexIndex": 71908
+          }
+        },
+        "RightFoot": {
+          "heelSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                24.139,
+                36.7315
+              ],
+              "sourceAtlasPx": [
+                108.8227,
+                136.9928
+              ]
+            },
+            "vertexIndex": 22498
+          },
+          "toeSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                21.9506,
+                41.2127
+              ],
+              "sourceAtlasPx": [
+                106.2096,
+                142.3436
+              ]
+            },
+            "vertexIndex": 22501
+          }
+        }
+      },
+      "sourceFrame60fps": 11
+    },
+    {
+      "column": 6,
+      "direction": 7,
+      "feet": {
+        "LeftFoot": {
+          "heelSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                7.5505,
+                11.4224
+              ],
+              "sourceAtlasPx": [
+                89.0155,
+                106.773
+              ]
+            },
+            "vertexIndex": 71894
+          },
+          "toeSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                17.0531,
+                17.1345
+              ],
+              "sourceAtlasPx": [
+                100.3619,
+                113.5934
+              ]
+            },
+            "vertexIndex": 71908
+          }
+        },
+        "RightFoot": {
+          "heelSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                -7.2954,
+                15.1161
+              ],
+              "sourceAtlasPx": [
+                71.2891,
+                111.1834
+              ]
+            },
+            "vertexIndex": 22498
+          },
+          "toeSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                -9.1944,
+                22.0059
+              ],
+              "sourceAtlasPx": [
+                69.0216,
+                119.4101
+              ]
+            },
+            "vertexIndex": 22501
+          }
+        }
+      },
+      "sourceFrame60fps": 15
+    },
+    {
+      "column": 7,
+      "direction": 7,
+      "feet": {
+        "LeftFoot": {
+          "heelSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                8.4655,
+                11.811
+              ],
+              "sourceAtlasPx": [
+                90.108,
+                107.237
+              ]
+            },
+            "vertexIndex": 71894
+          },
+          "toeSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                17.6867,
+                17.3837
+              ],
+              "sourceAtlasPx": [
+                101.1185,
+                113.8909
+              ]
+            },
+            "vertexIndex": 71908
+          }
+        },
+        "RightFoot": {
+          "heelSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                -10.3189,
+                14.9461
+              ],
+              "sourceAtlasPx": [
+                67.6789,
+                110.9805
+              ]
+            },
+            "vertexIndex": 22498
+          },
+          "toeSide": {
+            "projection": {
+              "approved120DrawOffsetPx": [
+                -10.3286,
+                21.2952
+              ],
+              "sourceAtlasPx": [
+                67.6674,
+                118.5614
+              ]
+            },
+            "vertexIndex": 22501
+          }
+        }
+      },
+      "sourceFrame60fps": 22
+    }
+  ],
+  "environmentGroundHeightKnown": false,
+  "landmarkSelection": {
+    "LeftFoot": {
+      "frame1AnkleToToeXYUnitAxis": [
+        -0.06934,
+        -0.997593
+      ],
+      "frame1LongitudinalQuartiles": [
+        -0.01513,
+        0.04348
+      ],
+      "heelSide": {
+        "frame1MinZWithinCandidateBand": -0.47752,
+        "frame1PositionAlongFootAxis": -0.02337,
+        "sourceSelection": "BOTTOM_Z_IN_FIRST_LONGITUDINAL_QUARTILE",
+        "vertexIndex": 71894
+      },
+      "toeSide": {
+        "frame1MinZWithinCandidateBand": -0.50606,
+        "frame1PositionAlongFootAxis": 0.10703,
+        "sourceSelection": "BOTTOM_Z_IN_LAST_LONGITUDINAL_QUARTILE",
+        "vertexIndex": 71908
+      },
+      "totalWeightedVertices": 3318
+    },
+    "RightFoot": {
+      "frame1AnkleToToeXYUnitAxis": [
+        -0.708744,
+        -0.705466
+      ],
+      "frame1LongitudinalQuartiles": [
+        -0.00674,
+        0.04303
+      ],
+      "heelSide": {
+        "frame1MinZWithinCandidateBand": -0.49322,
+        "frame1PositionAlongFootAxis": -0.01413,
+        "sourceSelection": "BOTTOM_Z_IN_FIRST_LONGITUDINAL_QUARTILE",
+        "vertexIndex": 22498
+      },
+      "toeSide": {
+        "frame1MinZWithinCandidateBand": -0.51224,
+        "frame1PositionAlongFootAxis": 0.0857,
+        "sourceSelection": "BOTTOM_Z_IN_LAST_LONGITUDINAL_QUARTILE",
+        "vertexIndex": 22501
+      },
+      "totalWeightedVertices": 3390
+    }
+  },
+  "meshName": "geometry_0",
+  "milestone": "Blood & Iron A2.18 persistent foot-region review landmarks",
+  "phaseLandmarks": [
+    {
+      "column": 0,
+      "feet": {
+        "LeftFoot": {
+          "heelSide": {
+            "vertexIndex": 71894,
+            "worldXYZ": [
+              0.10713,
+              -0.04118,
+              -0.47752
+            ]
+          },
+          "toeSide": {
+            "vertexIndex": 71908,
+            "worldXYZ": [
+              0.13596,
+              -0.1739,
+              -0.50606
+            ]
+          }
+        },
+        "RightFoot": {
+          "heelSide": {
+            "vertexIndex": 22498,
+            "worldXYZ": [
+              -0.08694,
+              0.09384,
+              -0.49322
+            ]
+          },
+          "toeSide": {
+            "vertexIndex": 22501,
+            "worldXYZ": [
+              -0.15761,
+              0.02334,
+              -0.51224
+            ]
+          }
+        }
+      },
+      "frame60fps": 1
+    },
+    {
+      "column": 1,
+      "feet": {
+        "LeftFoot": {
+          "heelSide": {
+            "vertexIndex": 71894,
+            "worldXYZ": [
+              0.03068,
+              0.02872,
+              -0.43069
+            ]
+          },
+          "toeSide": {
+            "vertexIndex": 71908,
+            "worldXYZ": [
+              0.07265,
+              -0.07354,
+              -0.51172
+            ]
+          }
+        },
+        "RightFoot": {
+          "heelSide": {
+            "vertexIndex": 22498,
+            "worldXYZ": [
+              -0.07375,
+              0.0987,
+              -0.45461
+            ]
+          },
+          "toeSide": {
+            "vertexIndex": 22501,
+            "worldXYZ": [
+              -0.16445,
+              0.07129,
+              -0.50118
+            ]
+          }
+        }
+      },
+      "frame60fps": 3
+    },
+    {
+      "column": 2,
+      "feet": {
+        "LeftFoot": {
+          "heelSide": {
+            "vertexIndex": 71894,
+            "worldXYZ": [
+              -0.12202,
+              0.23928,
+              -0.31003
+            ]
+          },
+          "toeSide": {
+            "vertexIndex": 71908,
+            "worldXYZ": [
+              -0.0974,
+              0.23512,
+              -0.44432
+            ]
+          }
+        },
+        "RightFoot": {
+          "heelSide": {
+            "vertexIndex": 22498,
+            "worldXYZ": [
+              -0.21858,
+              0.28003,
+              -0.27921
+            ]
+          },
+          "toeSide": {
+            "vertexIndex": 22501,
+            "worldXYZ": [
+              -0.31723,
+              0.28053,
+              -0.31818
+            ]
+          }
+        }
+      },
+      "frame60fps": 5
+    },
+    {
+      "column": 3,
+      "feet": {
+        "LeftFoot": {
+          "heelSide": {
+            "vertexIndex": 71894,
+            "worldXYZ": [
+              -0.13603,
+              0.02882,
+              0.12308
+            ]
+          },
+          "toeSide": {
+            "vertexIndex": 71908,
+            "worldXYZ": [
+              -0.1153,
+              0.16338,
+              0.13402
+            ]
+          }
+        },
+        "RightFoot": {
+          "heelSide": {
+            "vertexIndex": 22498,
+            "worldXYZ": [
+              -0.23328,
+              -0.00856,
+              0.15595
+            ]
+          },
+          "toeSide": {
+            "vertexIndex": 22501,
+            "worldXYZ": [
+              -0.33299,
+              0.02762,
+              0.15597
+            ]
+          }
+        }
+      },
+      "frame60fps": 7
+    },
+    {
+      "column": 4,
+      "feet": {
+        "LeftFoot": {
+          "heelSide": {
+            "vertexIndex": 71894,
+            "worldXYZ": [
+              -0.06804,
+              -0.51676,
+              -0.22989
+            ]
+          },
+          "toeSide": {
+            "vertexIndex": 71908,
+            "worldXYZ": [
+              -0.03536,
+              -0.52833,
+              -0.09759
+            ]
+          }
+        },
+        "RightFoot": {
+          "heelSide": {
+            "vertexIndex": 22498,
+            "worldXYZ": [
+              -0.16817,
+              -0.56277,
+              -0.2688
+            ]
+          },
+          "toeSide": {
+            "vertexIndex": 22501,
+            "worldXYZ": [
+              -0.26388,
+              -0.57569,
+              -0.22545
+            ]
+          }
+        }
+      },
+      "frame60fps": 9
+    },
+    {
+      "column": 5,
+      "feet": {
+        "LeftFoot": {
+          "heelSide": {
+            "vertexIndex": 71894,
+            "worldXYZ": [
+              0.01627,
+              -0.52663,
+              -0.39772
+            ]
+          },
+          "toeSide": {
+            "vertexIndex": 71908,
+            "worldXYZ": [
+              0.05815,
+              -0.63755,
+              -0.32847
+            ]
+          }
+        },
+        "RightFoot": {
+          "heelSide": {
+            "vertexIndex": 22498,
+            "worldXYZ": [
+              -0.09587,
+              -0.51877,
+              -0.47732
+            ]
+          },
+          "toeSide": {
+            "vertexIndex": 22501,
+            "worldXYZ": [
+              -0.18651,
+              -0.57107,
+              -0.46512
+            ]
+          }
+        }
+      },
+      "frame60fps": 11
+    },
+    {
+      "column": 6,
+      "feet": {
+        "LeftFoot": {
+          "heelSide": {
+            "vertexIndex": 71894,
+            "worldXYZ": [
+              0.0829,
+              -0.04938,
+              -0.45205
+            ]
+          },
+          "toeSide": {
+            "vertexIndex": 71908,
+            "worldXYZ": [
+              0.12385,
+              -0.17491,
+              -0.49427
+            ]
+          }
+        },
+        "RightFoot": {
+          "heelSide": {
+            "vertexIndex": 22498,
+            "worldXYZ": [
+              -0.06988,
+              0.05793,
+              -0.48481
+            ]
+          },
+          "toeSide": {
+            "vertexIndex": 22501,
+            "worldXYZ": [
+              -0.1549,
+              0.00618,
+              -0.51517
+            ]
+          }
+        }
+      },
+      "frame60fps": 15
+    },
+    {
+      "column": 7,
+      "feet": {
+        "LeftFoot": {
+          "heelSide": {
+            "vertexIndex": 71894,
+            "worldXYZ": [
+              0.10713,
+              -0.04118,
+              -0.47752
+            ]
+          },
+          "toeSide": {
+            "vertexIndex": 71908,
+            "worldXYZ": [
+              0.13596,
+              -0.1739,
+              -0.50606
+            ]
+          }
+        },
+        "RightFoot": {
+          "heelSide": {
+            "vertexIndex": 22498,
+            "worldXYZ": [
+              -0.08694,
+              0.09384,
+              -0.49322
+            ]
+          },
+          "toeSide": {
+            "vertexIndex": 22501,
+            "worldXYZ": [
+              -0.15761,
+              0.02334,
+              -0.51224
+            ]
+          }
+        }
+      },
+      "frame60fps": 22
+    }
+  ],
+  "productionApproved": false,
+  "rigContactWithGroundVerified": false,
+  "skinningThreshold": 0.35,
+  "sourceFrames60fps": [
+    1,
+    3,
+    5,
+    7,
+    9,
+    11,
+    15,
+    22
+  ],
+  "sourceGLBBasename": "silver-knight-roll-A3.glb",
+  "sourceGLBSHA256": "e4a263d480896fb1069ffc81e913e9aaa7324ff344611f5b69829cfee25c5d94",
+  "sourceMeshVertexCount": 105847,
+  "sourceModelModified": false,
+  "spriteSourceCanvasPx": [
+    160,
+    160
+  ]
+}

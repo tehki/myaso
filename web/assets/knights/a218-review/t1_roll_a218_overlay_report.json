@@ -1,0 +1,852 @@
+{
+  "anatomicalOutsoleVerified": false,
+  "atlasName": "t1_roll.webp",
+  "candidateMarkers": 64,
+  "clip": "t1_roll",
+  "eightFramesPerDirection": 8,
+  "insideImageFrame": 64,
+  "markersNearOpaqueAtlasPixelsWithin3px": 64,
+  "milestone": "Blood & Iron A2.18 original A3 atlas persistent-candidate inspection",
+  "originalGLBSHA256": "b89432a621d1f0956b7c06449035e0a055d11b17d6ceb34c9b26264eadcb6aed",
+  "productionApproved": false,
+  "reviewDirections": [
+    0,
+    6
+  ],
+  "samples": [
+    {
+      "atlasColumn": 0,
+      "candidate": "heelSide",
+      "direction": 0,
+      "insideAtlasFrame": true,
+      "nearOpaquePixelWithin3px": true,
+      "side": "LeftFoot",
+      "sourceFramePx": [
+        92.7296,
+        127.7581
+      ],
+      "sourceVertexIndex": 6073
+    },
+    {
+      "atlasColumn": 0,
+      "candidate": "toeSide",
+      "direction": 0,
+      "insideAtlasFrame": true,
+      "nearOpaquePixelWithin3px": true,
+      "side": "LeftFoot",
+      "sourceFramePx": [
+        94.6053,
+        138.354
+      ],
+      "sourceVertexIndex": 192
+    },
+    {
+      "atlasColumn": 0,
+      "candidate": "heelSide",
+      "direction": 0,
+      "insideAtlasFrame": true,
+      "nearOpaquePixelWithin3px": true,
+      "side": "RightFoot",
+      "sourceFramePx": [
+        69.2443,
+        116.0321
+      ],
+      "sourceVertexIndex": 21619
+    },
+    {
+      "atlasColumn": 0,
+      "candidate": "toeSide",
+      "direction": 0,
+      "insideAtlasFrame": true,
+      "nearOpaquePixelWithin3px": true,
+      "side": "RightFoot",
+      "sourceFramePx": [
+        58.2361,
+        123.0756
+      ],
+      "sourceVertexIndex": 14705
+    },
+    {
+      "atlasColumn": 1,
+      "candidate": "heelSide",
+      "direction": 0,
+      "insideAtlasFrame": true,
+      "nearOpaquePixelWithin3px": true,
+      "side": "LeftFoot",
+      "sourceFramePx": [
+        88.9822,
+        127.7887
+      ],
+      "sourceVertexIndex": 6073
+    },
+    {
+      "atlasColumn": 1,
+      "candidate": "toeSide",
+      "direction": 0,
+      "insideAtlasFrame": true,
+      "nearOpaquePixelWithin3px": true,
+      "side": "LeftFoot",
+      "sourceFramePx": [
+        91.6742,
+        140.9675
+      ],
+      "sourceVertexIndex": 192
+    },
+    {
+      "atlasColumn": 1,
+      "candidate": "heelSide",
+      "direction": 0,
+      "insideAtlasFrame": true,
+      "nearOpaquePixelWithin3px": true,
+      "side": "RightFoot",
+      "sourceFramePx": [
+        72.1648,
+        121.5286
+      ],
+      "sourceVertexIndex": 21619
+    },
+    {
+      "atlasColumn": 1,
+      "candidate": "toeSide",
+      "direction": 0,
+      "insideAtlasFrame": true,
+      "nearOpaquePixelWithin3px": true,
+      "side": "RightFoot",
+      "sourceFramePx": [
+        59.6212,
+        129.2866
+      ],
+      "sourceVertexIndex": 14705
+    },
+    {
+      "atlasColumn": 2,
+      "candidate": "heelSide",
+      "direction": 0,
+      "insideAtlasFrame": true,
+      "nearOpaquePixelWithin3px": true,
+      "side": "LeftFoot",
+      "sourceFramePx": [
+        87.8304,
+        131.1045
+      ],
+      "sourceVertexIndex": 6073
+    },
+    {
+      "atlasColumn": 2,
+      "candidate": "toeSide",
+      "direction": 0,
+      "insideAtlasFrame": true,
+      "nearOpaquePixelWithin3px": true,
+      "side": "LeftFoot",
+      "sourceFramePx": [
+        88.9668,
+        142.3709
+      ],
+      "sourceVertexIndex": 192
+    },
+    {
+      "atlasColumn": 2,
+      "candidate": "heelSide",
+      "direction": 0,
+      "insideAtlasFrame": true,
+      "nearOpaquePixelWithin3px": true,
+      "side": "RightFoot",
+      "sourceFramePx": [
+        71.1065,
+        120.4084
+      ],
+      "sourceVertexIndex": 21619
+    },
+    {
+      "atlasColumn": 2,
+      "candidate": "toeSide",
+      "direction": 0,
+      "insideAtlasFrame": true,
+      "nearOpaquePixelWithin3px": true,
+      "side": "RightFoot",
+      "sourceFramePx": [
+        57.4371,
+        125.0469
+      ],
+      "sourceVertexIndex": 14705
+    },
+    {
+      "atlasColumn": 3,
+      "candidate": "heelSide",
+      "direction": 0,
+      "insideAtlasFrame": true,
+      "nearOpaquePixelWithin3px": true,
+      "side": "LeftFoot",
+      "sourceFramePx": [
+        89.2154,
+        99.1681
+      ],
+      "sourceVertexIndex": 6073
+    },
+    {
+      "atlasColumn": 3,
+      "candidate": "toeSide",
+      "direction": 0,
+      "insideAtlasFrame": true,
+      "nearOpaquePixelWithin3px": true,
+      "side": "LeftFoot",
+      "sourceFramePx": [
+        89.9884,
+        90.0715
+      ],
+      "sourceVertexIndex": 192
+    },
+    {
+      "atlasColumn": 3,
+      "candidate": "heelSide",
+      "direction": 0,
+      "insideAtlasFrame": true,
+      "nearOpaquePixelWithin3px": true,
+      "side": "RightFoot",
+      "sourceFramePx": [
+        72.427,
+        100.3992
+      ],
+      "sourceVertexIndex": 21619
+    },
+    {
+      "atlasColumn": 3,
+      "candidate": "toeSide",
+      "direction": 0,
+      "insideAtlasFrame": true,
+      "nearOpaquePixelWithin3px": true,
+      "side": "RightFoot",
+      "sourceFramePx": [
+        58.6034,
+        96.917
+      ],
+      "sourceVertexIndex": 14705
+    },
+    {
+      "atlasColumn": 4,
+      "candidate": "heelSide",
+      "direction": 0,
+      "insideAtlasFrame": true,
+      "nearOpaquePixelWithin3px": true,
+      "side": "LeftFoot",
+      "sourceFramePx": [
+        87.2289,
+        101.9265
+      ],
+      "sourceVertexIndex": 6073
+    },
+    {
+      "atlasColumn": 4,
+      "candidate": "toeSide",
+      "direction": 0,
+      "insideAtlasFrame": true,
+      "nearOpaquePixelWithin3px": true,
+      "side": "LeftFoot",
+      "sourceFramePx": [
+        89.0805,
+        91.8349
+      ],
+      "sourceVertexIndex": 192
+    },
+    {
+      "atlasColumn": 4,
+      "candidate": "heelSide",
+      "direction": 0,
+      "insideAtlasFrame": true,
+      "nearOpaquePixelWithin3px": true,
+      "side": "RightFoot",
+      "sourceFramePx": [
+        70.3923,
+        113.7306
+      ],
+      "sourceVertexIndex": 21619
+    },
+    {
+      "atlasColumn": 4,
+      "candidate": "toeSide",
+      "direction": 0,
+      "insideAtlasFrame": true,
+      "nearOpaquePixelWithin3px": true,
+      "side": "RightFoot",
+      "sourceFramePx": [
+        57.1431,
+        109.8654
+      ],
+      "sourceVertexIndex": 14705
+    },
+    {
+      "atlasColumn": 5,
+      "candidate": "heelSide",
+      "direction": 0,
+      "insideAtlasFrame": true,
+      "nearOpaquePixelWithin3px": true,
+      "side": "LeftFoot",
+      "sourceFramePx": [
+        87.4795,
+        119.1265
+      ],
+      "sourceVertexIndex": 6073
+    },
+    {
+      "atlasColumn": 5,
+      "candidate": "toeSide",
+      "direction": 0,
+      "insideAtlasFrame": true,
+      "nearOpaquePixelWithin3px": true,
+      "side": "LeftFoot",
+      "sourceFramePx": [
+        90.1243,
+        120.7
+      ],
+      "sourceVertexIndex": 192
+    },
+    {
+      "atlasColumn": 5,
+      "candidate": "heelSide",
+      "direction": 0,
+      "insideAtlasFrame": true,
+      "nearOpaquePixelWithin3px": true,
+      "side": "RightFoot",
+      "sourceFramePx": [
+        70.1253,
+        128.1345
+      ],
+      "sourceVertexIndex": 21619
+    },
+    {
+      "atlasColumn": 5,
+      "candidate": "toeSide",
+      "direction": 0,
+      "insideAtlasFrame": true,
+      "nearOpaquePixelWithin3px": true,
+      "side": "RightFoot",
+      "sourceFramePx": [
+        57.5701,
+        131.6166
+      ],
+      "sourceVertexIndex": 14705
+    },
+    {
+      "atlasColumn": 6,
+      "candidate": "heelSide",
+      "direction": 0,
+      "insideAtlasFrame": true,
+      "nearOpaquePixelWithin3px": true,
+      "side": "LeftFoot",
+      "sourceFramePx": [
+        90.6872,
+        126.4811
+      ],
+      "sourceVertexIndex": 6073
+    },
+    {
+      "atlasColumn": 6,
+      "candidate": "toeSide",
+      "direction": 0,
+      "insideAtlasFrame": true,
+      "nearOpaquePixelWithin3px": true,
+      "side": "LeftFoot",
+      "sourceFramePx": [
+        93.2357,
+        137.9828
+      ],
+      "sourceVertexIndex": 192
+    },
+    {
+      "atlasColumn": 6,
+      "candidate": "heelSide",
+      "direction": 0,
+      "insideAtlasFrame": true,
+      "nearOpaquePixelWithin3px": true,
+      "side": "RightFoot",
+      "sourceFramePx": [
+        70.5118,
+        118.8502
+      ],
+      "sourceVertexIndex": 21619
+    },
+    {
+      "atlasColumn": 6,
+      "candidate": "toeSide",
+      "direction": 0,
+      "insideAtlasFrame": true,
+      "nearOpaquePixelWithin3px": true,
+      "side": "RightFoot",
+      "sourceFramePx": [
+        58.4337,
+        126.3891
+      ],
+      "sourceVertexIndex": 14705
+    },
+    {
+      "atlasColumn": 7,
+      "candidate": "heelSide",
+      "direction": 0,
+      "insideAtlasFrame": true,
+      "nearOpaquePixelWithin3px": true,
+      "side": "LeftFoot",
+      "sourceFramePx": [
+        92.7296,
+        127.7581
+      ],
+      "sourceVertexIndex": 6073
+    },
+    {
+      "atlasColumn": 7,
+      "candidate": "toeSide",
+      "direction": 0,
+      "insideAtlasFrame": true,
+      "nearOpaquePixelWithin3px": true,
+      "side": "LeftFoot",
+      "sourceFramePx": [
+        94.6053,
+        138.354
+      ],
+      "sourceVertexIndex": 192
+    },
+    {
+      "atlasColumn": 7,
+      "candidate": "heelSide",
+      "direction": 0,
+      "insideAtlasFrame": true,
+      "nearOpaquePixelWithin3px": true,
+      "side": "RightFoot",
+      "sourceFramePx": [
+        69.2443,
+        116.0321
+      ],
+      "sourceVertexIndex": 21619
+    },
+    {
+      "atlasColumn": 7,
+      "candidate": "toeSide",
+      "direction": 0,
+      "insideAtlasFrame": true,
+      "nearOpaquePixelWithin3px": true,
+      "side": "RightFoot",
+      "sourceFramePx": [
+        58.2361,
+        123.0756
+      ],
+      "sourceVertexIndex": 14705
+    },
+    {
+      "atlasColumn": 0,
+      "candidate": "heelSide",
+      "direction": 6,
+      "insideAtlasFrame": true,
+      "nearOpaquePixelWithin3px": true,
+      "side": "LeftFoot",
+      "sourceFramePx": [
+        86.3335,
+        115.5233
+      ],
+      "sourceVertexIndex": 6073
+    },
+    {
+      "atlasColumn": 0,
+      "candidate": "toeSide",
+      "direction": 6,
+      "insideAtlasFrame": true,
+      "nearOpaquePixelWithin3px": true,
+      "side": "LeftFoot",
+      "sourceFramePx": [
+        99.4352,
+        116.5066
+      ],
+      "sourceVertexIndex": 192
+    },
+    {
+      "atlasColumn": 0,
+      "candidate": "heelSide",
+      "direction": 6,
+      "insideAtlasFrame": true,
+      "nearOpaquePixelWithin3px": true,
+      "side": "RightFoot",
+      "sourceFramePx": [
+        66.0974,
+        131.8581
+      ],
+      "sourceVertexIndex": 21619
+    },
+    {
+      "atlasColumn": 0,
+      "candidate": "toeSide",
+      "direction": 6,
+      "insideAtlasFrame": true,
+      "nearOpaquePixelWithin3px": true,
+      "side": "RightFoot",
+      "sourceFramePx": [
+        74.3885,
+        140.6454
+      ],
+      "sourceVertexIndex": 14705
+    },
+    {
+      "atlasColumn": 1,
+      "candidate": "heelSide",
+      "direction": 6,
+      "insideAtlasFrame": true,
+      "nearOpaquePixelWithin3px": true,
+      "side": "LeftFoot",
+      "sourceFramePx": [
+        93.3234,
+        113.4729
+      ],
+      "sourceVertexIndex": 6073
+    },
+    {
+      "atlasColumn": 1,
+      "candidate": "toeSide",
+      "direction": 6,
+      "insideAtlasFrame": true,
+      "nearOpaquePixelWithin3px": true,
+      "side": "LeftFoot",
+      "sourceFramePx": [
+        104.1408,
+        117.9813
+      ],
+      "sourceVertexIndex": 192
+    },
+    {
+      "atlasColumn": 1,
+      "candidate": "heelSide",
+      "direction": 6,
+      "insideAtlasFrame": true,
+      "nearOpaquePixelWithin3px": true,
+      "side": "RightFoot",
+      "sourceFramePx": [
+        80.1215,
+        126.4794
+      ],
+      "sourceVertexIndex": 21619
+    },
+    {
+      "atlasColumn": 1,
+      "candidate": "toeSide",
+      "direction": 6,
+      "insideAtlasFrame": true,
+      "nearOpaquePixelWithin3px": true,
+      "side": "RightFoot",
+      "sourceFramePx": [
+        84.2005,
+        139.67
+      ],
+      "sourceVertexIndex": 14705
+    },
+    {
+      "atlasColumn": 2,
+      "candidate": "heelSide",
+      "direction": 6,
+      "insideAtlasFrame": true,
+      "nearOpaquePixelWithin3px": true,
+      "side": "LeftFoot",
+      "sourceFramePx": [
+        103.5008,
+        110.9961
+      ],
+      "sourceVertexIndex": 6073
+    },
+    {
+      "atlasColumn": 2,
+      "candidate": "toeSide",
+      "direction": 6,
+      "insideAtlasFrame": true,
+      "nearOpaquePixelWithin3px": true,
+      "side": "LeftFoot",
+      "sourceFramePx": [
+        104.6632,
+        120.787
+      ],
+      "sourceVertexIndex": 192
+    },
+    {
+      "atlasColumn": 2,
+      "candidate": "heelSide",
+      "direction": 6,
+      "insideAtlasFrame": true,
+      "nearOpaquePixelWithin3px": true,
+      "side": "RightFoot",
+      "sourceFramePx": [
+        96.0588,
+        115.8097
+      ],
+      "sourceVertexIndex": 21619
+    },
+    {
+      "atlasColumn": 2,
+      "candidate": "toeSide",
+      "direction": 6,
+      "insideAtlasFrame": true,
+      "nearOpaquePixelWithin3px": true,
+      "side": "RightFoot",
+      "sourceFramePx": [
+        96.1803,
+        129.1434
+      ],
+      "sourceVertexIndex": 14705
+    },
+    {
+      "atlasColumn": 3,
+      "candidate": "heelSide",
+      "direction": 6,
+      "insideAtlasFrame": true,
+      "nearOpaquePixelWithin3px": true,
+      "side": "LeftFoot",
+      "sourceFramePx": [
+        97.2126,
+        82.2065
+      ],
+      "sourceVertexIndex": 6073
+    },
+    {
+      "atlasColumn": 3,
+      "candidate": "toeSide",
+      "direction": 6,
+      "insideAtlasFrame": true,
+      "nearOpaquePixelWithin3px": true,
+      "side": "LeftFoot",
+      "sourceFramePx": [
+        83.4227,
+        81.4643
+      ],
+      "sourceVertexIndex": 192
+    },
+    {
+      "atlasColumn": 3,
+      "candidate": "heelSide",
+      "direction": 6,
+      "insideAtlasFrame": true,
+      "nearOpaquePixelWithin3px": true,
+      "side": "RightFoot",
+      "sourceFramePx": [
+        106.0926,
+        88.5133
+      ],
+      "sourceVertexIndex": 21619
+    },
+    {
+      "atlasColumn": 3,
+      "candidate": "toeSide",
+      "direction": 6,
+      "insideAtlasFrame": true,
+      "nearOpaquePixelWithin3px": true,
+      "side": "RightFoot",
+      "sourceFramePx": [
+        100.5138,
+        97.4837
+      ],
+      "sourceVertexIndex": 14705
+    },
+    {
+      "atlasColumn": 4,
+      "candidate": "heelSide",
+      "direction": 6,
+      "insideAtlasFrame": true,
+      "nearOpaquePixelWithin3px": true,
+      "side": "LeftFoot",
+      "sourceFramePx": [
+        78.8145,
+        98.0479
+      ],
+      "sourceVertexIndex": 6073
+    },
+    {
+      "atlasColumn": 4,
+      "candidate": "toeSide",
+      "direction": 6,
+      "insideAtlasFrame": true,
+      "nearOpaquePixelWithin3px": true,
+      "side": "LeftFoot",
+      "sourceFramePx": [
+        79.4237,
+        86.3769
+      ],
+      "sourceVertexIndex": 192
+    },
+    {
+      "atlasColumn": 4,
+      "candidate": "heelSide",
+      "direction": 6,
+      "insideAtlasFrame": true,
+      "nearOpaquePixelWithin3px": true,
+      "side": "RightFoot",
+      "sourceFramePx": [
+        86.7056,
+        115.5933
+      ],
+      "sourceVertexIndex": 21619
+    },
+    {
+      "atlasColumn": 4,
+      "candidate": "toeSide",
+      "direction": 6,
+      "insideAtlasFrame": true,
+      "nearOpaquePixelWithin3px": true,
+      "side": "RightFoot",
+      "sourceFramePx": [
+        88.4511,
+        119.1111
+      ],
+      "sourceVertexIndex": 14705
+    },
+    {
+      "atlasColumn": 5,
+      "candidate": "heelSide",
+      "direction": 6,
+      "insideAtlasFrame": true,
+      "nearOpaquePixelWithin3px": true,
+      "side": "LeftFoot",
+      "sourceFramePx": [
+        88.3653,
+        108.9572
+      ],
+      "sourceVertexIndex": 6073
+    },
+    {
+      "atlasColumn": 5,
+      "candidate": "toeSide",
+      "direction": 6,
+      "insideAtlasFrame": true,
+      "nearOpaquePixelWithin3px": true,
+      "side": "LeftFoot",
+      "sourceFramePx": [
+        99.6849,
+        101.5683
+      ],
+      "sourceVertexIndex": 192
+    },
+    {
+      "atlasColumn": 5,
+      "candidate": "heelSide",
+      "direction": 6,
+      "insideAtlasFrame": true,
+      "nearOpaquePixelWithin3px": true,
+      "side": "RightFoot",
+      "sourceFramePx": [
+        85.6877,
+        130.8218
+      ],
+      "sourceVertexIndex": 21619
+    },
+    {
+      "atlasColumn": 5,
+      "candidate": "toeSide",
+      "direction": 6,
+      "insideAtlasFrame": true,
+      "nearOpaquePixelWithin3px": true,
+      "side": "RightFoot",
+      "sourceFramePx": [
+        93.2058,
+        137.5368
+      ],
+      "sourceVertexIndex": 14705
+    },
+    {
+      "atlasColumn": 6,
+      "candidate": "heelSide",
+      "direction": 6,
+      "insideAtlasFrame": true,
+      "nearOpaquePixelWithin3px": true,
+      "side": "LeftFoot",
+      "sourceFramePx": [
+        89.6714,
+        113.4148
+      ],
+      "sourceVertexIndex": 6073
+    },
+    {
+      "atlasColumn": 6,
+      "candidate": "toeSide",
+      "direction": 6,
+      "insideAtlasFrame": true,
+      "nearOpaquePixelWithin3px": true,
+      "side": "LeftFoot",
+      "sourceFramePx": [
+        102.48,
+        115.0603
+      ],
+      "sourceVertexIndex": 192
+    },
+    {
+      "atlasColumn": 6,
+      "candidate": "heelSide",
+      "direction": 6,
+      "insideAtlasFrame": true,
+      "nearOpaquePixelWithin3px": true,
+      "side": "RightFoot",
+      "sourceFramePx": [
+        72.347,
+        129.8516
+      ],
+      "sourceVertexIndex": 21619
+    },
+    {
+      "atlasColumn": 6,
+      "candidate": "toeSide",
+      "direction": 6,
+      "insideAtlasFrame": true,
+      "nearOpaquePixelWithin3px": true,
+      "side": "RightFoot",
+      "sourceFramePx": [
+        78.9581,
+        140.8993
+      ],
+      "sourceVertexIndex": 14705
+    },
+    {
+      "atlasColumn": 7,
+      "candidate": "heelSide",
+      "direction": 6,
+      "insideAtlasFrame": true,
+      "nearOpaquePixelWithin3px": true,
+      "side": "LeftFoot",
+      "sourceFramePx": [
+        86.3335,
+        115.5233
+      ],
+      "sourceVertexIndex": 6073
+    },
+    {
+      "atlasColumn": 7,
+      "candidate": "toeSide",
+      "direction": 6,
+      "insideAtlasFrame": true,
+      "nearOpaquePixelWithin3px": true,
+      "side": "LeftFoot",
+      "sourceFramePx": [
+        99.4352,
+        116.5066
+      ],
+      "sourceVertexIndex": 192
+    },
+    {
+      "atlasColumn": 7,
+      "candidate": "heelSide",
+      "direction": 6,
+      "insideAtlasFrame": true,
+      "nearOpaquePixelWithin3px": true,
+      "side": "RightFoot",
+      "sourceFramePx": [
+        66.0974,
+        131.8581
+      ],
+      "sourceVertexIndex": 21619
+    },
+    {
+      "atlasColumn": 7,
+      "candidate": "toeSide",
+      "direction": 6,
+      "insideAtlasFrame": true,
+      "nearOpaquePixelWithin3px": true,
+      "side": "RightFoot",
+      "sourceFramePx": [
+        74.3885,
+        140.6454
+      ],
+      "sourceVertexIndex": 14705
+    }
+  ],
+  "sourceWebPModified": false,
+  "worldFloorOrPlayerPivotVerified": false
+}

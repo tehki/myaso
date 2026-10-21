@@ -1,0 +1,80 @@
+{
+  "a3RollTimingUnchanged": true,
+  "actualVertexPositionsOrIndicesModified": false,
+  "anyBootSoleGeometryIsolated": false,
+  "approved120VisualScaleUnchanged": true,
+  "authoritativeGroundContactProven": false,
+  "blender": "4.5.14 LTS",
+  "clip": "silver_roll",
+  "coordinateCoincidenceCannotDistinguishArmorFromSole": true,
+  "environmentGroundPlaneKnown": false,
+  "exactRestPositionEquivalence": {
+    "componentReductionFromOriginal": 9635,
+    "componentsAfterHypotheticalCoordinateUnion": 23,
+    "componentsContainingBothLeftAndRightFootWeights": 1,
+    "duplicateCoordinateGroupsBridgingOriginalIndexIslands": 35945,
+    "duplicateIndexCountBeyondFirst": 57834,
+    "hypotheticalUnionOnly": true,
+    "leftRightWeightedVerticesWithinSharedComponents": {
+      "LeftFoot": 3318,
+      "RightFoot": 3390
+    },
+    "perFoot": {
+      "LeftFoot": {
+        "footBearingComponents": 1,
+        "fractionInLargestComponent": 1.0,
+        "largestComponentFootWeightedVertices": 3318,
+        "selectedOriginalWeightedVertices": 3318
+      },
+      "RightFoot": {
+        "footBearingComponents": 1,
+        "fractionInLargestComponent": 1.0,
+        "largestComponentFootWeightedVertices": 3390,
+        "selectedOriginalWeightedVertices": 3390
+      }
+    },
+    "positionGroupsWithDuplicateVertices": 35963,
+    "spatialCoincidenceNotProofOfSole": true
+  },
+  "footSkinWeightThreshold": 0.35,
+  "gameplayOrNetworkingChanged": false,
+  "meshEdges": 195064,
+  "meshPolygons": 98787,
+  "meshVertices": 105847,
+  "milestone": "Blood & Iron A2.17 conservative A3 GLB seam-coincidence diagnostic",
+  "originalSourceAssetsModified": false,
+  "productionApproved": false,
+  "rounded5DecimalRestPositionEquivalence": {
+    "componentReductionFromOriginal": 9635,
+    "componentsAfterHypotheticalCoordinateUnion": 23,
+    "componentsContainingBothLeftAndRightFootWeights": 1,
+    "duplicateCoordinateGroupsBridgingOriginalIndexIslands": 35945,
+    "duplicateIndexCountBeyondFirst": 57834,
+    "hypotheticalUnionOnly": true,
+    "leftRightWeightedVerticesWithinSharedComponents": {
+      "LeftFoot": 3318,
+      "RightFoot": 3390
+    },
+    "perFoot": {
+      "LeftFoot": {
+        "footBearingComponents": 1,
+        "fractionInLargestComponent": 1.0,
+        "largestComponentFootWeightedVertices": 3318,
+        "selectedOriginalWeightedVertices": 3318
+      },
+      "RightFoot": {
+        "footBearingComponents": 1,
+        "fractionInLargestComponent": 1.0,
+        "largestComponentFootWeightedVertices": 3390,
+        "selectedOriginalWeightedVertices": 3390
+      }
+    },
+    "positionGroupsWithDuplicateVertices": 35963,
+    "spatialCoincidenceNotProofOfSole": true
+  },
+  "roundedCoordinatesAreNotEuclideanToleranceTest": true,
+  "sourceGLBBasename": "silver-knight-roll-A3.glb",
+  "sourceGLBSHA256": "e4a263d480896fb1069ffc81e913e9aaa7324ff344611f5b69829cfee25c5d94",
+  "sourceMesh": "geometry_0",
+  "sourceMeshIndexEdgeComponents": 9658
+}

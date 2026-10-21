@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="icon" href="data:,">
+<title>Blood &amp; Iron A2.11 — 120% knight renderer review</title>
+<style>
+:root{color-scheme:dark}*{box-sizing:border-box}
+body{margin:0;background:#151e20;color:#ece6d8;font:15px/1.5 system-ui,sans-serif}
+header{padding:20px 28px;background:#273439;border-bottom:1px solid #546a6d}
+h1{margin:0;font:700 28px Georgia,serif} main{padding:20px;max-width:1190px;margin:auto}
+.controls{display:flex;align-items:center;gap:18px;background:#283a40;padding:12px;border-radius:8px;flex-wrap:wrap}
+select{background:#3b5257;color:#fff;border:1px solid #7e9da4;padding:8px;border-radius:6px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:15px;margin:17px 0}
+figure{background:#283b41;padding:10px;margin:0;border-radius:8px;border:1px solid #64757c}
+canvas{display:block;width:100%;aspect-ratio:6/5;background:#283840}
+figcaption{margin:9px 4px;color:#e4d3b4}
+.note{color:#b9ccce;font-size:13px}.notice{background:#25363b;padding:12px;border-radius:7px}
+@media(max-width:720px){.grid{grid-template-columns:1fr}}
+</style>
+</head><body>
+<header><h1>⚔️ A2.11 — owner-selected 120% knight scale</h1>
+<div class="note">Actual opt-in knight renderer + real atlas frames · exact same world center · no gameplay changes</div>
+</header>
+<main>
+<div class="controls"><label>Pose
+<select id="pose"><option value="idle">Silver Knight — idle</option><option value="silver_roll">Silver Knight — A3 mid-roll</option><option value="t1_roll">T1 Sentinel — A3 mid-roll</option></select></label>
+<span id="ready">Loading authentic knight atlases…</span></div>
+<div class="grid">
+<figure><canvas id="old" width="480" height="400" aria-label="Original knight sprite visual size"></canvas>
+<figcaption><strong>Before — 100%</strong> <span id="old-size">80 × 80 px</span></figcaption></figure>
+<figure><canvas id="new" width="480" height="400" aria-label="Approved knight sprite visual size"></canvas>
+<figcaption><strong>Approved — 120%</strong> <span id="new-size">96 × 96 px</span></figcaption></figure>
+</div>
+<p class="notice">Both sprites use the <strong>same fighter world origin</strong>, same atlas frame, facing and A3 timing. The gold cross marks the visual center. The display enlarges the sprite and its shadow only — not its server hitbox or movement. The Silver Knight standing / rolling sizes are 96 / 134 px in the approved column.</p>
+<p class="note"><strong>Opt-in only:</strong> `&knights=1` uses the approved 120%; add `&knightScale=100` for the original presentation, or remove `knights=1` to restore standard game graphics. Neither size is a validated anatomical foot pivot or world-to-building camera match. This is not a multiplayer benchmark.</p>
+</main><script type="module" src="./knight-scale-a211-preview.mjs"></script>
+</body></html>

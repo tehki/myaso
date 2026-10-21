@@ -1,0 +1,64 @@
+{
+  "anatomicalSoleApprovalGranted": false,
+  "clip": "silver_roll",
+  "gameplayContactMeasured": false,
+  "groundPlaneVerified": false,
+  "imagesComposited": 9,
+  "milestone": "Blood & Iron A2.19 original GLB 3D landmark review sheets",
+  "originalModelOrGameSpritesAltered": false,
+  "productionApproved": false,
+  "reviewSheetName": "silver_roll_a219_review_sheet.png",
+  "reviewSheetPixels": [
+    2032,
+    1687
+  ],
+  "sourceFrame60fps": [
+    1,
+    7,
+    22
+  ],
+  "sourceRenderInputs": [
+    {
+      "bytes": 194009,
+      "name": "silver_roll_a219_f1_front.png"
+    },
+    {
+      "bytes": 176751,
+      "name": "silver_roll_a219_f1_side.png"
+    },
+    {
+      "bytes": 200363,
+      "name": "silver_roll_a219_f1_low.png"
+    },
+    {
+      "bytes": 190191,
+      "name": "silver_roll_a219_f7_front.png"
+    },
+    {
+      "bytes": 191666,
+      "name": "silver_roll_a219_f7_side.png"
+    },
+    {
+      "bytes": 201457,
+      "name": "silver_roll_a219_f7_low.png"
+    },
+    {
+      "bytes": 194017,
+      "name": "silver_roll_a219_f22_front.png"
+    },
+    {
+      "bytes": 176760,
+      "name": "silver_roll_a219_f22_side.png"
+    },
+    {
+      "bytes": 200356,
+      "name": "silver_roll_a219_f22_low.png"
+    }
+  ],
+  "sourceSHA256": "e4a263d480896fb1069ffc81e913e9aaa7324ff344611f5b69829cfee25c5d94",
+  "views": [
+    "front",
+    "side",
+    "low"
+  ]
+}

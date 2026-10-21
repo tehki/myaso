@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="icon" href="data:,">
+<title>Blood &amp; Iron A2.14 — A3 foot-region anchor stability</title>
+<style>
+:root{color-scheme:dark}*{box-sizing:border-box}body{margin:0;background:#151d20;color:#e6e1d3;font:15px/1.5 system-ui,sans-serif}
+header{padding:18px 24px;background:#263339;border-bottom:1px solid #4d626c}
+h1{font:700 26px Georgia,serif;margin:0}main{max-width:1200px;margin:auto;padding:18px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}figure{background:#27363b;border:1px solid #536d74;border-radius:9px;padding:12px;margin:0}
+canvas{display:block;width:100%;aspect-ratio:1.6;background:#233038;border-radius:4px}
+figcaption{padding:8px 0;font-size:14px}.note{color:#bfc9cc;font-size:13px}
+.warn{color:#e6bb85}.stat{background:#263940;padding:14px;border-radius:8px;margin:15px 0}
+table{border-collapse:collapse;width:100%}th,td{padding:8px;text-align:left;border-bottom:1px solid #50636b;font-variant-numeric:tabular-nums}
+.controls{margin:12px 0;display:flex;flex-wrap:wrap;gap:20px}
+label{display:flex;align-items:center;gap:8px}select{padding:7px;background:#334850;color:white;border:1px solid #82939b;border-radius:6px}
+@media(max-width:790px){.grid{grid-template-columns:1fr}}
+</style></head><body>
+<header><h1>⚔️ A2.14 — Lowest boot-region vertex is not a stable pivot</h1>
+<div class="note">Original A3 GLB evaluated skinned geometry; source-model Z relative to frame-1 minimum</div></header>
+<main>
+<div class="controls"><label>Feet <select id="feet"><option value="both">Both feet</option><option value="LeftFoot">Left only</option><option value="RightFoot">Right only</option></select></label>
+<label><input type="checkbox" checked id="switches">Show minimum-vertex identity changes</label></div>
+<div class="grid">
+<figure><canvas id="silver_roll" width="550" height="350" aria-label="Silver Knight foot-height proxy chart"></canvas>
+<figcaption><strong>Silver Knight — A3 roll</strong></figcaption></figure>
+<figure><canvas id="t1_roll" width="550" height="350" aria-label="T1 Sentinel foot-height proxy chart"></canvas>
+<figcaption><strong>T1 Sentinel — A3 roll</strong></figcaption></figure>
+</div>
+<p class="stat" id="report" role="status" aria-live="polite">Loading original Blender measurement reports…</p>
+<p class="note warn"><strong>Do not apply these curves to game physics.</strong> Foot-weighted vertices can belong to boots, armor, cloth or other mesh surfaces. The baseline is the minimum such vertex in source frame 1; it is NOT a verified floor or boot sole. Vertex identity switches are expected when geometry rotates. The display does not measure player collision, skeleton grounding, toe contact, network behavior or authoritative world XY.</p>
+<p class="note">View source: <code>web/assets/knights/a214-review/knight_a214_anchor_stability.json</code>. Only original source measurements are plotted. No knight atlas, source GLB, A3 action, 120% presentation or multiplayer client is modified.</p>
+</main><script type="module" src="./knight-ground-a214-preview.mjs"></script>
+</body></html>
