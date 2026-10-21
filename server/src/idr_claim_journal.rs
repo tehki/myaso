@@ -117,6 +117,26 @@ pub struct OfflineClaimIntent<'a> {
     pub event_id: u128,
 }
 
+/// DORMANT current-viewer read context. Both actor leases must have been
+/// authenticated/activated by Core; packet-provided IDs are never trusted.
+pub struct CurrentClaimRead<'a> {
+    pub bridge: &'a CanonicalIdrBridge,
+    pub leases: &'a SessionLeaseRegistry,
+    pub observer: CharacterId,
+    pub observer_lease: SessionLease,
+    pub speaker: CharacterId,
+    pub speaker_lease: SessionLease,
+}
+
+/// A public-facing projection may say Unknown or Claimed ONLY. Historical
+/// event IDs and canonical actor IDs are intentionally absent. It is not
+/// evidence of a true name, controller type or current World visibility.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum CurrentClaimView {
+    Unknown,
+    Claimed { display_claim: String },
+}
+
 #[derive(Default, Clone)]
 struct Projection {
     claims: BTreeMap<(CharacterId, CharacterId), ObservedClaim>,
@@ -504,6 +524,49 @@ impl OfflineClaimJournal {
     ) -> Result<ClaimReceipt, ClaimJournalError> {
         self.append(event_id, OfflineIdentityEvent::Tombstone { subject })
     }
+    /// This is the ONLY offline claim projection suitable for future
+    /// viewer-facing adapter review. Check BOTH current canonical leases,
+    /// current subject generation and server-owned appearance epoch on EVERY
+    /// read. A historical fsynced claim stays on disk but becomes Unknown
+    /// after source reconnect, disguise change or tombstone. No direct
+    /// `Verified` output is possible, and no live packet is emitted.
+    pub fn read_claim_for_current_viewer(
+        &self,
+        read: CurrentClaimRead<'_>,
+    ) -> Result<CurrentClaimView, ClaimJournalError> {
+        if self.poisoned {
+            return Err(ClaimJournalError::Poisoned);
+        }
+        let actual_epoch = read
+            .bridge
+            .preflight_current_claim_read(
+                read.observer,
+                read.observer_lease,
+                read.speaker,
+                read.speaker_lease,
+                read.leases,
+            )
+            .map_err(ClaimJournalError::Untrusted)?;
+        if self.state.retired.contains(&read.speaker) || self.state.retired.contains(&read.observer)
+        {
+            return Ok(CurrentClaimView::Unknown);
+        }
+        match self.state.claims.get(&(read.observer, read.speaker)) {
+            Some(claim)
+                if claim.session_generation == read.speaker_lease.generation()
+                    && claim.appearance_epoch == actual_epoch =>
+            {
+                Ok(CurrentClaimView::Claimed {
+                    display_claim: claim.name.clone(),
+                })
+            }
+            _ => Ok(CurrentClaimView::Unknown),
+        }
+    }
+
+    /// HISTORICAL INSPECTION ONLY. This unchecked local record is NOT a
+    /// current authenticated observer view, verified identity or subscriber
+    /// message. Use read_claim_for_current_viewer for a gated offline view.
     pub fn observed_unverified_claim(
         &self,
         observer: CharacterId,
@@ -654,6 +717,281 @@ mod tests {
             name: label,
             event_id,
         })
+    }
+
+    fn claim_view(
+        journal: &OfflineClaimJournal,
+        bridge: &CanonicalIdrBridge,
+        leases: &SessionLeaseRegistry,
+        viewer: SessionLease,
+        source: SessionLease,
+    ) -> Result<CurrentClaimView, ClaimJournalError> {
+        journal.read_claim_for_current_viewer(CurrentClaimRead {
+            bridge,
+            leases,
+            observer: viewer.character_id(),
+            observer_lease: viewer,
+            speaker: source.character_id(),
+            speaker_lease: source,
+        })
+    }
+
+    #[test]
+    fn current_claim_read_checks_both_actors_leases_and_source_generation_after_reconnect() {
+        let root = Root::new();
+        let source = actor(0x1234_0000_0000_0001);
+        let viewer = actor(0x1234_0000_0000_0004);
+        let sentinel = actor(0x1234_0000_0000_0002);
+        let mut leases = SessionLeaseRegistry::default();
+        let source_first = leases
+            .activate_committed(
+                CharacterRecord {
+                    character_id: source,
+                    session_generation: 1,
+                },
+                NonZeroU64::new(111).unwrap(),
+            )
+            .unwrap();
+        let viewer_first = leases
+            .activate_committed(
+                CharacterRecord {
+                    character_id: viewer,
+                    session_generation: 1,
+                },
+                NonZeroU64::new(112).unwrap(),
+            )
+            .unwrap();
+        let sentinel_fake = leases
+            .activate_committed(
+                CharacterRecord {
+                    character_id: sentinel,
+                    session_generation: 1,
+                },
+                NonZeroU64::new(113).unwrap(),
+            )
+            .unwrap();
+        let mut bridge = CanonicalIdrBridge::default();
+        bridge
+            .register_authenticated_player(source, source_first, &leases, "Aldric", "hooded-figure")
+            .unwrap();
+        bridge
+            .register_authenticated_player(viewer, viewer_first, &leases, "Elara", "hooded-figure")
+            .unwrap();
+        bridge
+            .register_trusted_sentinel(sentinel, "Sentinel", "hooded-figure")
+            .unwrap();
+        let mut journal = root.open();
+        assert_eq!(
+            claim_view(&journal, &bridge, &leases, viewer_first, source_first).unwrap(),
+            CurrentClaimView::Unknown,
+        );
+        journal
+            .append_unverified_claim(OfflineClaimIntent {
+                bridge: &bridge,
+                leases: &leases,
+                speaker: source,
+                lease: source_first,
+                observer: viewer,
+                appearance_epoch: 1,
+                name: "Tomas",
+                event_id: 1001,
+            })
+            .unwrap();
+        assert_eq!(
+            claim_view(&journal, &bridge, &leases, viewer_first, source_first).unwrap(),
+            CurrentClaimView::Claimed {
+                display_claim: "Tomas".to_string()
+            },
+        );
+        assert!(
+            matches!(
+                claim_view(&journal, &bridge, &leases, sentinel_fake, source_first),
+                Err(ClaimJournalError::Untrusted(_)),
+            ),
+            "NPC controller cannot borrow an authenticated player slot"
+        );
+        drop(journal);
+        let mut journal = root.open();
+        assert_eq!(journal.head(), 1);
+        assert_eq!(
+            claim_view(&journal, &bridge, &leases, viewer_first, source_first).unwrap(),
+            CurrentClaimView::Claimed {
+                display_claim: "Tomas".to_string()
+            },
+        );
+        // A different authenticated viewer never inherits the first
+        // viewer's historical record, even with the same physical source.
+        let newcomer = actor(0x1234_0000_0000_0005);
+        let new_viewer = leases
+            .activate_committed(
+                CharacterRecord {
+                    character_id: newcomer,
+                    session_generation: 1,
+                },
+                NonZeroU64::new(114).unwrap(),
+            )
+            .unwrap();
+        bridge
+            .register_authenticated_player(newcomer, new_viewer, &leases, "Yara", "hooded-figure")
+            .unwrap();
+        assert_eq!(
+            claim_view(&journal, &bridge, &leases, new_viewer, source_first).unwrap(),
+            CurrentClaimView::Unknown,
+        );
+
+        let source_second = leases
+            .activate_committed(
+                CharacterRecord {
+                    character_id: source,
+                    session_generation: 2,
+                },
+                NonZeroU64::new(115).unwrap(),
+            )
+            .unwrap();
+        assert!(
+            matches!(
+                claim_view(&journal, &bridge, &leases, viewer_first, source_first),
+                Err(ClaimJournalError::Untrusted(_)),
+            ),
+            "stale original source lease is never current"
+        );
+        assert!(
+            matches!(
+                claim_view(&journal, &bridge, &leases, viewer_first, source_second),
+                Err(ClaimJournalError::Untrusted(_)),
+            ),
+            "bridge needs authenticated canonical source generation refresh"
+        );
+        bridge
+            .resume_authenticated_player(source, source_second, &leases)
+            .unwrap();
+        assert_eq!(
+            claim_view(&journal, &bridge, &leases, viewer_first, source_second).unwrap(),
+            CurrentClaimView::Unknown,
+            "fsynced historical claim cannot become current after subject reconnect",
+        );
+        assert_eq!(
+            journal
+                .observed_unverified_claim(viewer, source)
+                .unwrap()
+                .name,
+            "Tomas",
+            "history is still present but must not leak as current",
+        );
+        journal
+            .append_unverified_claim(OfflineClaimIntent {
+                bridge: &bridge,
+                leases: &leases,
+                speaker: source,
+                lease: source_second,
+                observer: viewer,
+                appearance_epoch: 1,
+                name: "Tomas Again",
+                event_id: 1002,
+            })
+            .unwrap();
+        assert_eq!(
+            claim_view(&journal, &bridge, &leases, viewer_first, source_second).unwrap(),
+            CurrentClaimView::Claimed {
+                display_claim: "Tomas Again".to_string()
+            },
+        );
+
+        // A disconnected observer cannot consume historical identity data.
+        assert!(leases.release(viewer_first));
+        assert!(matches!(
+            claim_view(&journal, &bridge, &leases, viewer_first, source_second),
+            Err(ClaimJournalError::Untrusted(_))
+        ));
+    }
+
+    #[test]
+    fn current_claim_read_denies_appearance_aba_and_tombstone_without_erasing_history() {
+        let root = Root::new();
+        let source = actor(0x1234_0000_0000_0001);
+        let viewer = actor(0x1234_0000_0000_0004);
+        let mut leases = SessionLeaseRegistry::default();
+        let s = leases
+            .activate_committed(
+                CharacterRecord {
+                    character_id: source,
+                    session_generation: 1,
+                },
+                NonZeroU64::new(121).unwrap(),
+            )
+            .unwrap();
+        let v = leases
+            .activate_committed(
+                CharacterRecord {
+                    character_id: viewer,
+                    session_generation: 1,
+                },
+                NonZeroU64::new(122).unwrap(),
+            )
+            .unwrap();
+        let mut bridge = CanonicalIdrBridge::default();
+        bridge
+            .register_authenticated_player(source, s, &leases, "Aldric", "hooded-figure")
+            .unwrap();
+        bridge
+            .register_authenticated_player(viewer, v, &leases, "Yara", "hooded-figure")
+            .unwrap();
+        let mut j = root.open();
+        j.append_unverified_claim(OfflineClaimIntent {
+            bridge: &bridge,
+            leases: &leases,
+            speaker: source,
+            lease: s,
+            observer: viewer,
+            appearance_epoch: 1,
+            name: "Tomas",
+            event_id: 1101,
+        })
+        .unwrap();
+        assert!(matches!(
+            claim_view(&j, &bridge, &leases, v, s).unwrap(),
+            CurrentClaimView::Claimed { .. },
+        ));
+        bridge
+            .advance_server_appearance_for_claim_journal_test(source)
+            .unwrap();
+        assert_eq!(j.head(), 1);
+        assert_eq!(
+            claim_view(&j, &bridge, &leases, v, s).unwrap(),
+            CurrentClaimView::Unknown,
+            "local server-side disguise transition hides still-fsynced old belief",
+        );
+        j.append_unverified_claim(OfflineClaimIntent {
+            bridge: &bridge,
+            leases: &leases,
+            speaker: source,
+            lease: s,
+            observer: viewer,
+            appearance_epoch: 2,
+            name: "New Face",
+            event_id: 1102,
+        })
+        .unwrap();
+        assert_eq!(
+            claim_view(&j, &bridge, &leases, v, s).unwrap(),
+            CurrentClaimView::Claimed {
+                display_claim: "New Face".to_string()
+            },
+        );
+        j.append_offline_tombstone(source, 1103).unwrap();
+        assert_eq!(
+            claim_view(&j, &bridge, &leases, v, s).unwrap(),
+            CurrentClaimView::Unknown
+        );
+        drop(j);
+        let j = root.open();
+        assert_eq!(j.head(), 3);
+        assert_eq!(
+            claim_view(&j, &bridge, &leases, v, s).unwrap(),
+            CurrentClaimView::Unknown
+        );
+        assert!(j.retired(source));
+        assert!(j.observed_unverified_claim(viewer, source).is_none());
     }
 
     #[test]
