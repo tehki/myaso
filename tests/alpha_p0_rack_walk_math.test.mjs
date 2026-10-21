@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {WORLD_ALPHA_SWORD_RACK_SOCKETS,WORLD_ALPHA_SPAWN_COORDINATES,
   validateWorldAlphaArmoryLayout} from "../src/world/alpha-armory.mjs";
 import {nextNativeWalkPulse,nativeRackArrived} from "../scripts/alpha_p0_rack_walk_math.mjs";
+import {WORLD_ALPHA_GREYHAVEN_STATIC_SOLIDS} from "../src/world/alpha-solid-geometry.mjs";
 
 test("four canonical World socket approaches are fixed, distinct and legitimate",()=>{
  assert.equal(validateWorldAlphaArmoryLayout(),true);
@@ -41,4 +42,39 @@ test("nonfinite, malformed or excessive tolerance cannot substitute for server p
  assert.equal(nativeRackArrived({x:NaN,y:3},{x:0,y:3}),false);
  assert.equal(nativeRackArrived(null,{x:0,y:3}),false);
  assert.equal(nativeRackArrived({x:0,y:0},{x:50,y:50},1000),false);
+});
+
+test("west-first southern courtyard legs avoid EVERY real server-reviewed static AABB",()=>{
+ // Exact segment-vs-inflated-AABB test (radius 18 from source server simulation).
+ const radius=18,solids=WORLD_ALPHA_GREYHAVEN_STATIC_SOLIDS;
+ const hit=(a,b,s)=>{
+  let lo=0,hi=1;
+  for(const [axis,min,max] of [
+   ["x",s.min_x-radius,s.max_x+radius],
+   ["y",s.min_y-radius,s.max_y+radius]
+  ]){
+   const d=b[axis]-a[axis];
+   if(d===0){if(a[axis]<min||a[axis]>max)return false;continue}
+   const t0=(min-a[axis])/d,t1=(max-a[axis])/d;
+   lo=Math.max(lo,Math.min(t0,t1));
+   hi=Math.min(hi,Math.max(t0,t1));
+   if(lo>hi)return false;
+  }
+  return lo<=hi;
+ };
+ const clear=(a,b)=>solids.every(s=>!hit(a,b,s));
+ for(let i=0;i<4;i++){
+  const start=WORLD_ALPHA_SPAWN_COORDINATES[i];
+  const finish=WORLD_ALPHA_SWORD_RACK_SOCKETS[i].approach;
+  const west={x:finish.x,y:start.y};
+  assert(clear(start,west),"original SOUTHERN west-first leg blocked player "+(i+1));
+  assert(clear(west,finish),"original near-rack north leg blocked player "+(i+1));
+ }
+ const smith=solids.find(s=>s.id==="building:smith");
+ assert(smith);
+ // Delayed northward input near y4020 would hit Smith's eastern wall:
+ // actual second native-run failure stopped at x=3914 when westward travel
+ // attempted too close to the building. This is a risky path, not permission
+ // to disable server collision or fake arrival.
+ assert.equal(hit({x:4110,y:4020},{x:3820,y:4020},smith),true);
 });
