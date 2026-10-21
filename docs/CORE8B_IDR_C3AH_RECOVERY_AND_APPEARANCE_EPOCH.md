@@ -1,0 +1,25 @@
+# Core 8B C3ah — protected-CI recovery fixture fix and authoritative local appearance epoch
+
+**Moon Games First Playable Alpha P0 — Core 8B draft child of [#675](https://github.com/tehki/myaso/pull/675); no deployment, live identity use, item mutation or main merge.**
+
+## Exact protected failure and disciplined fix
+
+Parent #675 head `bbdb830f31d211140852788495bc98697c43f96f` protected [quality #39657784065](https://github.com/tehki/myaso/actions/runs/39657784065) **FAILED** in the actual Rust library stage: `persistent_tombstone_corruption_and_missing_sequence_fail_closed` expected `SequenceGap` after deleting first MYID record. Other five dedicated 8A/8C/chat/Greyhaven workflows **PASSED**. Full job log [119422530156](https://github.com/tehki/myaso/actions/runs/39657784065/job/119422530156) shows 275 passed / 1 failed (5 intentional ignored). This is not an inherited Combat failure and must be fixed without skipping the test.
+
+C3ah keeps the same original corruption and sequence-gap assertions and makes the last recovered MYID writer close explicit before deleting the first record, rather than relying on a temporary `root.open().head()` within `assert_eq!`. It also reports the **exact unexpected error variant** (or unexpected success) instead of a generic `matches!` false. Ordinary production MYID lock behavior is unchanged.
+
+A separate long parallel Rust library repetition found another flaky test, `alpha_bound_journal_tests::observer_source_is_a_bounded_sequence_ordered_view_of_only_committed_v2`, with `WriterBusy` from its local test-only `Root::open`. A subsequent repeat also reproduced the MYID test's **exact** failure mode: `WriterBusy` from its fixture `Root::open` during committed-tombstone/corruption recovery. C3ah adds the same 500ms bounded/5ms backoff **to both test fixtures only**, already present in independent C3y armory tests. The IDR fixture uses this retry when *testing* corrupt records, sequence gaps, or externally protected minimum-head denial; a separate test deliberately opens the live child-held writer lock directly (without retry) to prove strict exclusion. Production `DurableItemJournal::open` and `OfflineClaimJournal::open` remain fail-fast and exclusively locked; no threshold, runtime, journal ordering or API is altered. **After both fixture-only changes and the source epoch guard, 100 consecutive complete Rust library suites at 16 threads passed**, 276 passed / 5 ignored per suite.
+
+## Real local authority improvement
+
+Previously dormant `OfflineClaimJournal::append_unverified_claim` used a caller-proposed `appearance_epoch`. An unsound proposal with a future value could erase legitimate old claims via the per-actor epoch high-water before the actual server-controlled `IdentityRegistry` appearance changed.
+
+Now the typed `CanonicalIdrBridge::preflight_offline_unverified_claim` returns the **current server-owned IDR subject presentation epoch**, obtained from `IdentityRegistry::observe(observer, speaker)` after checking actor's current canonical Core8B authenticated lease/generation, known observer and valid bounded unverified claim name. The dormant journal compares that epoch with the proposal and fails **before writing any record** if mismatched, including a forged future epoch or stale past epoch. In tests, only a clearly test-only `#[cfg(test)]` server-owned disguise transition advances the actual IDR presentation epoch; this helper cannot appear in a production server binary. That fixture also verifies that fabricated epoch2 does not erase observer Bob's epoch1 belief or spend an event sequence, whereas an actual IDR state transition does invalidate unwitnessed beliefs.
+
+This **is not** a trusted 8C completed World tick/Physics LOS or persistent appearance event; the in-memory IDR subject epoch can still be lost across crash, and caller-chosen observer proximity remains untrusted. A production IDR verified-evidence authority requires single-writer durable subject appearance epoch, 8C/Physics witness provenance, cryptographic/anti-rollback floor, 8A session-bound delivery, private name encryption/role-gated moderator audit and schema migrations.
+
+## Gate evidence
+
+- Exact parent protected run status and Rust assertion are documented above. This child must pass its own exact-head protected CI; no inherited green claims.
+- Local tests: IDR recovery/tombstone/ABA/SIGKILL as before, additional negative future-epoch guard and explicit test-only owner transition, repeated full 16-thread library suites, strict Clippy `-D warnings`, Rustfmt, git diff, full `cargo test --locked` are required.
+- Physical four original armory swords, Core↔Items split-writer counterexample [#629](https://github.com/tehki/myaso/pull/629), First Playable [#480](https://github.com/tehki/myaso/issues/480), Core8B [#432](https://github.com/tehki/myaso/issues/432) and Main [#360](https://github.com/tehki/myaso/issues/360) retain priority and release authority. No production identity, item writer, network, Combat or World change; IDR OFF.

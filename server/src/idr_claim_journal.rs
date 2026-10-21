@@ -470,7 +470,7 @@ impl OfflineClaimJournal {
         &mut self,
         intent: OfflineClaimIntent<'_>,
     ) -> Result<ClaimReceipt, ClaimJournalError> {
-        intent
+        let actual_epoch = intent
             .bridge
             .preflight_offline_unverified_claim(
                 intent.speaker,
@@ -480,6 +480,9 @@ impl OfflineClaimJournal {
                 intent.name,
             )
             .map_err(ClaimJournalError::Untrusted)?;
+        if intent.appearance_epoch != actual_epoch {
+            return Err(ClaimJournalError::StaleAppearance);
+        }
         self.append(
             intent.event_id,
             OfflineIdentityEvent::Claim {
@@ -563,8 +566,37 @@ mod tests {
             fs::create_dir(&dir).unwrap();
             Self(dir)
         }
+        fn with_bounded_writer_handoff(
+            mut attempt: impl FnMut() -> Result<OfflineClaimJournal, ClaimJournalError>,
+        ) -> Result<OfflineClaimJournal, ClaimJournalError> {
+            // TEST FIXTURE ONLY: a recently dropped writer may retain a
+            // brief POSIX descriptor teardown/scheduling window in parallel
+            // tests. Never turn this into a production lock retry or accept
+            // a second live writer. ALL other errors return immediately.
+            let deadline = std::time::Instant::now() + Duration::from_millis(500);
+            loop {
+                match attempt() {
+                    Err(ClaimJournalError::WriterBusy) if std::time::Instant::now() < deadline => {
+                        std::thread::sleep(Duration::from_millis(5));
+                    }
+                    result => return result,
+                }
+            }
+        }
+
+        fn try_open(&self) -> Result<OfflineClaimJournal, ClaimJournalError> {
+            Self::with_bounded_writer_handoff(|| OfflineClaimJournal::open(&self.0))
+        }
+
         fn open(&self) -> OfflineClaimJournal {
-            OfflineClaimJournal::open(&self.0).unwrap()
+            self.try_open()
+                .expect("one offline IDR writer after bounded test handoff")
+        }
+
+        fn open_with_minimum(&self, floor: u64) -> Result<OfflineClaimJournal, ClaimJournalError> {
+            Self::with_bounded_writer_handoff(|| {
+                OfflineClaimJournal::open_with_minimum_head(&self.0, floor)
+            })
         }
     }
     impl Drop for Root {
@@ -764,6 +796,27 @@ mod tests {
         bridge
             .resume_authenticated_player(first_lease.character_id(), second_lease, &leases)
             .unwrap();
+        // A caller-proposed FUTURE appearance must NOT be able to advance
+        // the persisted subject epoch or erase existing observer knowledge.
+        assert!(matches!(
+            append(
+                &mut j,
+                &bridge,
+                &leases,
+                second_lease,
+                (cara, 2, "Fake Future Face", 3),
+            ),
+            Err(ClaimJournalError::StaleAppearance)
+        ));
+        assert_eq!(j.head(), 1);
+        assert!(j
+            .observed_unverified_claim(bob, first_lease.character_id())
+            .is_some());
+        // The only permitted epoch advance comes from server-owned IDR
+        // subject state. In production World8C+Physics must authorize this.
+        bridge
+            .advance_server_appearance_for_claim_journal_test(first_lease.character_id())
+            .unwrap();
         append(
             &mut j,
             &bridge,
@@ -828,15 +881,10 @@ mod tests {
         fs::remove_file(root.0.join(filename(2))).unwrap();
         assert_eq!(root.open().head(), 1);
         assert!(matches!(
-            OfflineClaimJournal::open_with_minimum_head(&root.0, 2),
+            root.open_with_minimum(2),
             Err(ClaimJournalError::RollbackSuspected)
         ));
-        assert_eq!(
-            OfflineClaimJournal::open_with_minimum_head(&root.0, 1)
-                .unwrap()
-                .head(),
-            1
-        );
+        assert_eq!(root.open_with_minimum(1).unwrap().head(), 1);
         // A stale/forged floor is not trustworthy; future Core authority
         // must durably protect this monotonic value OUTSIDE these files.
     }
@@ -862,7 +910,7 @@ mod tests {
             tomb
         );
         assert!(matches!(
-            append(&mut j, &bridge, &leases, lease, (bob, 2, "Resurrect", 11)),
+            append(&mut j, &bridge, &leases, lease, (bob, 1, "Resurrect", 11)),
             Err(ClaimJournalError::Retired)
         ));
         drop(j);
@@ -873,7 +921,7 @@ mod tests {
             .observed_unverified_claim(bob, lease.character_id())
             .is_none());
         assert!(matches!(
-            append(&mut j, &bridge, &leases, lease, (bob, 2, "Resurrect", 13)),
+            append(&mut j, &bridge, &leases, lease, (bob, 1, "Resurrect", 13)),
             Err(ClaimJournalError::Retired)
         ));
         drop(j);
@@ -883,16 +931,22 @@ mod tests {
         corrupt[32] ^= 4;
         fs::write(&path, &corrupt).unwrap();
         assert!(matches!(
-            OfflineClaimJournal::open(&root.0),
+            root.try_open(),
             Err(ClaimJournalError::Invalid("MYID checksum"))
         ));
         fs::write(&path, &good).unwrap();
-        assert_eq!(root.open().head(), 2);
+        // Explicitly close the recovered writer before intentionally
+        // damaging the underlying directory. Avoid relying on the drop
+        // timing of a temporary expression within assert_eq! on CI.
+        let intact = root.open();
+        assert_eq!(intact.head(), 2);
+        drop(intact);
         fs::remove_file(root.0.join(filename(1))).unwrap();
-        assert!(matches!(
-            OfflineClaimJournal::open(&root.0),
-            Err(ClaimJournalError::SequenceGap)
-        ));
+        match root.try_open() {
+            Err(ClaimJournalError::SequenceGap) => {}
+            Ok(_) => panic!("missing first MYID record unexpectedly recovered"),
+            Err(other) => panic!("expected sequence-gap denial, got {other:?}"),
+        }
     }
 
     #[cfg(unix)]
