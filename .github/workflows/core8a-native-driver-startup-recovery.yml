@@ -1,0 +1,25 @@
+name: Core 8A genuine W3C driver startup recovery boundary
+
+on:
+  pull_request:
+    paths:
+      - "scripts/alpha_m1_four_real_browser_flight.mjs"
+      - "scripts/alpha_p0_native_driver_startup_policy.mjs"
+      - "tests/alpha_p0_native_driver_startup_policy.test.mjs"
+      - ".github/workflows/core8a-native-driver-startup-recovery.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  fail-closed-native-webdriver-policy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@v4
+      - name: Require original genuine WebDriver runner to parse without fake actors
+        run: |
+          node --check scripts/alpha_m1_four_real_browser_flight.mjs
+          node --check scripts/alpha_p0_native_driver_startup_policy.mjs
+      - name: Only one Linux Firefox session timeout retry on separate loopback driver port
+        run: node --test tests/alpha_p0_native_driver_startup_policy.test.mjs
