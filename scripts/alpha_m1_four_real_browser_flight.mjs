@@ -22,10 +22,15 @@ const browsers = [
   { name: "firefox-4", family: "firefox", port: 9654 },
 ];
 const assert = (condition, detail) => { if (!condition) throw Error(detail); };
-function terminate(child) {
-  if (!child || child.exitCode !== null) return;
-  child.kill("SIGTERM");
-  setTimeout(() => { if (child.exitCode === null) child.kill("SIGKILL"); }, 1500).unref();
+// Each WebDriver launches a browser tree. Reap the entire isolated process
+// group, not just chromedriver/geckodriver (which can leave browser workers
+// holding stdio pipes open and hang the CI Node event loop indefinitely).
+function terminate(child, signal = "SIGTERM") {
+  if (!child?.pid) return;
+  try {
+    if (process.platform === "win32") child.kill(signal);
+    else process.kill(-child.pid, signal);
+  } catch { /* already exited */ }
 }
 async function webdriver(base, method, uri, body) {
   const response = await fetch(base + uri, {
@@ -104,6 +109,7 @@ async function startRealGameServer() {
     env: { ...process.env, MYASO_BIND:"127.0.0.1:0", MYASO_MAX_PLAYERS:"4",
       MYASO_FLIGHT_BACKGROUND_PLAYERS:"0", MYASO_FLIGHT_NEAR_PRESSURE_PLAYERS:"0" },
     stdio:["ignore","pipe","pipe"],
+    detached: process.platform !== "win32",
   });
   children.add(child);
   let url,hash,output="";
@@ -134,7 +140,9 @@ async function driver(browser) {
     ? (process.env.CHROMEWEBDRIVER ? path.join(process.env.CHROMEWEBDRIVER,"chromedriver") : "chromedriver")
     : (process.env.GECKOWEBDRIVER ? path.join(process.env.GECKOWEBDRIVER,"geckodriver") : "geckodriver");
   const arguments_=isChrome ? [`--port=${browser.port}`] : ["--host","127.0.0.1","--port",String(browser.port)];
-  const child=spawn(executable,arguments_,{cwd:root,stdio:["ignore","pipe","pipe"]});
+  const child=spawn(executable,arguments_,{
+    cwd:root,stdio:["ignore","pipe","pipe"],detached:process.platform!=="win32",
+  });
   children.add(child);
   child.stderr.on("data",chunk=>process.stderr.write(`[${browser.name}-driver] ${chunk}`));
   const base=`http://127.0.0.1:${browser.port}`;
@@ -243,6 +251,10 @@ catch(error){console.error("ALPHA_M1_FOUR_REAL_BROWSER_FAIL "+(error.stack??erro
 finally {
   for(const s of sessions)try{await webdriver(s.base,"DELETE",`/session/${s.id}`);}catch{}
   for(const child of children)terminate(child);
+  // Give descendants a bounded chance to terminate; then kill any process
+  // group that ignored SIGTERM, regardless of the driver's own exit status.
+  await sleep(1600);
+  for(const child of children)terminate(child, "SIGKILL");
   if (staticServer) {
     staticServer.closeAllConnections?.();
     await Promise.race([
