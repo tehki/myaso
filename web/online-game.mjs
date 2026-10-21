@@ -121,6 +121,29 @@ const diagnosticsVisible = params.get("netstats") === "1";
 // become functional only after server-approved zone transitions are implemented.
 const fixedWorldEnabled = params.get("world") === "1" && !params.has("scenario");
 const authoredWorld = fixedWorldEnabled ? createAuthoredWorldRenderer() : null;
+// 3B original rack preview is loopback-only and DEFAULT OFF. Dynamic import
+// deliberately avoids loading Blender assets, source modules, or doing source
+// work in normal games/Combat acceptance. Core has NO approved item feed yet.
+const armoryRackReviewEnabled = fixedWorldEnabled
+  && params.get("armoryart") === "1"
+  && ["localhost","127.0.0.1","[::1]"].includes(window.location.hostname);
+let armoryRackReview = null;
+let armoryRackReviewFailure = false;
+if (armoryRackReviewEnabled) {
+  window.__MYASO_ARMORY_RACK_REVIEW__ = () => Object.freeze({
+    ready:!!armoryRackReview,
+    failure:armoryRackReviewFailure,
+    painted:armoryRackReview?.status()?.renderedFrames ?? 0,
+    drawnSwords:armoryRackReview?.status()?.drawnSwordCount ?? 0,
+    actualCanvas:!!armoryRackReview?.status()?.actualGameRender,
+    canonicalItems:false,serverTryPickup:false,productionApproved:false
+  });
+  void import("../src/browser/armory-optin-live-rack.mjs")
+    .then(({loadOriginalBlacksmithRackPreview}) =>
+      loadOriginalBlacksmithRackPreview())
+    .then(view=>{armoryRackReview=view;})
+    .catch(()=>{armoryRackReviewFailure=true;armoryRackReview=null;});
+}
 // Never expose diagnostics on public origins or without the explicit local preview flag.
 // Read-only counters measure network receipt, world canvas paint and status independently.
 const worldLivenessProbe = isWorldLivenessProbeEnabled(window.location) ? createWorldLivenessProbe() : null;
@@ -920,6 +943,27 @@ function render(nowMs = performance.now(), impact = combatImpact.sample(nowMs)) 
     authoredWorld.draw(ctx, MAP_IDS.overworld, visualCameraPosition,
       canvas.width, canvas.height, ARENA_VIEW_ZOOM);
     worldLivenessProbe?.endPaint(Date.now(), performance.now() - worldPaintStart, authoredWorld.stats);
+    // The first-party World painter works inside a zoom transform. Original
+    // 3B source sprites are already projected into screen-space pixels;
+    // invert just that transform, then restore before any remote fighter.
+    // No rack swords are painted without an actual server item feed.
+    if (armoryRackReview) {
+      ctx.save();
+      try {
+        ctx.translate(canvas.width / 2, canvas.height / 2);
+        ctx.scale(1 / ARENA_VIEW_ZOOM, 1 / ARENA_VIEW_ZOOM);
+        ctx.translate(-canvas.width / 2, -canvas.height / 2);
+        armoryRackReview.draw({
+          ctx,camera:visualCameraPosition,
+          width:canvas.width,height:canvas.height,zoom:ARENA_VIEW_ZOOM
+        });
+      } catch {
+        // Later Canvas/device loss: subsequent frames use unchanged World.
+        // This is preview-only, not proof of atomic same-frame recovery.
+        armoryRackReview=null;
+        armoryRackReviewFailure=true;
+      } finally { ctx.restore(); }
+    }
   }
 
   for (const entity of networkClient.state.values()) {
