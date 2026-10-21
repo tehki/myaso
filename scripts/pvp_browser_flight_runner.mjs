@@ -3204,6 +3204,10 @@ async function runM172AirborneDenialPhase(entries, attacker, defender, attackerE
     "idle after the successful jump attack",
   );
 
+  // Keep confirmation below conversion cost after ordinary jump recovery.
+  // CI observed24 before jump,10 airborne, then12 at the first gated ACK:
+  // that is correctly no longer a low-stamina confirmation. Narrow setup
+  // rather than changing live feedback or accepting that invalid evidence.
   let ready = null;
   let drainHolds = 0;
   for (let index = 0; index < 8 && !ready; index += 1) {
@@ -3212,7 +3216,7 @@ async function runM172AirborneDenialPhase(entries, attacker, defender, attackerE
     const idle = state.acceptance?.ownActionTransitions?.at(-1)?.action === COMBAT_ACTION.idle;
     if (Number.isFinite(stamina)
       && stamina >= COMBAT.jump.staminaCost
-      && stamina < COMBAT.jump.staminaCost + COMBAT.jumpAttack.staminaCost - 1
+      && stamina < COMBAT.jump.staminaCost + Math.floor(COMBAT.jumpAttack.staminaCost / 2)
       && idle) {
       ready = state;
       break;
@@ -3222,7 +3226,7 @@ async function runM172AirborneDenialPhase(entries, attacker, defender, attackerE
         (candidate) => Number.isFinite(candidate.acceptance?.authoritativeStamina)
           && candidate.acceptance.authoritativeStamina >= COMBAT.jump.staminaCost + 2
           && candidate.acceptance.authoritativeStamina
-            < COMBAT.jump.staminaCost + COMBAT.jumpAttack.staminaCost - 1
+            < COMBAT.jump.staminaCost + Math.floor(COMBAT.jumpAttack.staminaCost / 2)
           && candidate.acceptance?.ownActionTransitions?.at(-1)?.action === COMBAT_ACTION.idle,
         1600,
         "regen into the jump-only stamina window",
@@ -3238,7 +3242,7 @@ async function runM172AirborneDenialPhase(entries, attacker, defender, attackerE
     await sleep(140);
   }
   if (!ready) {
-    throw new Error(milestone + " could not establish 14-25 authoritative stamina: "
+    throw new Error(milestone + " could not establish 14-19 authoritative stamina: "
       + JSON.stringify(await readUiEvidence(attacker)));
   }
 
@@ -3404,7 +3408,7 @@ async function runM173JumpAttackChordDenialPhase(entries, attacker, defender, at
     const idle = state.acceptance?.ownActionTransitions?.at(-1)?.action === COMBAT_ACTION.idle;
     if (Number.isFinite(stamina)
       && stamina >= COMBAT.jump.staminaCost
-      && stamina < COMBAT.jump.staminaCost + COMBAT.jumpAttack.staminaCost
+      && stamina < COMBAT.jump.staminaCost + Math.floor(COMBAT.jumpAttack.staminaCost / 2)
       && idle) {
       ready = state;
       break;
@@ -3414,7 +3418,7 @@ async function runM173JumpAttackChordDenialPhase(entries, attacker, defender, at
         (candidate) => Number.isFinite(candidate.acceptance?.authoritativeStamina)
           && candidate.acceptance.authoritativeStamina >= COMBAT.jump.staminaCost + 2
           && candidate.acceptance.authoritativeStamina
-            < COMBAT.jump.staminaCost + COMBAT.jumpAttack.staminaCost
+            < COMBAT.jump.staminaCost + Math.floor(COMBAT.jumpAttack.staminaCost / 2)
           && candidate.acceptance?.ownActionTransitions?.at(-1)?.action === COMBAT_ACTION.idle,
         1800,
         "regen into the jump-only chord window",
@@ -3430,7 +3434,7 @@ async function runM173JumpAttackChordDenialPhase(entries, attacker, defender, at
     await sleep(140);
   }
   if (!ready) {
-    throw new Error(milestone + " could not establish 14-25 authoritative stamina: "
+    throw new Error(milestone + " could not establish 14-19 authoritative stamina: "
       + JSON.stringify(await readUiEvidence(attacker)));
   }
 
@@ -3445,7 +3449,7 @@ async function runM173JumpAttackChordDenialPhase(entries, attacker, defender, at
   const defenderBefore = await readUiEvidence(defender);
   const focusOffset = defenderBefore.acceptance?.focusActionTransitions?.length ?? 0;
 
-  await performArenaJumpAttackChord(attacker, attackerElementId, awayOffset, 90);
+  await performArenaPreAimedJumpAttackChord(attacker, 90);
 
   const rejected = await waitForAttacker(
     (state) => {
@@ -11221,7 +11225,7 @@ async function runOnlineUiJumpRecoveryFfaPunishFlight(entries) {
         script: M147_BROWSER_CUE_OBSERVER,
         args: [cueLease.token, jumpId, observerRecoveryOffset],
       }),
-      performJump: () => performArenaJumpAttackChord(jumpAttacker, jumpArena, -200, 90),
+      performJump: () => performArenaPreAimedJumpAttackChord(jumpAttacker, 90),
       performPunish: () => performArenaM221GuardBreakClick(observer, 90),
     });
   } catch (error) {
