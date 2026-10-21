@@ -390,6 +390,42 @@ impl DurableItemJournal {
         Ok((sequence, currently_equipped))
     }
 
+    /// Read-only current membership of ONE proposed reviewed Ground item.
+    /// A later pickup or drop elsewhere returns None, even though older
+    /// durable receipts still exist. Every result carries the full local
+    /// journal head, including the absence state after mutation.
+    ///
+    /// This is NOT a world epoch, actor permission, geometry signature,
+    /// ground-entity lease or an approved production writer. It is safe
+    /// only within ONE local exclusive journal lineage.
+    pub(crate) fn checked_ground_membership(
+        &self,
+        item: ItemId,
+        expected: ItemLocation,
+    ) -> Result<(u64, Option<u64>), ItemJournalError> {
+        if self.poisoned {
+            return Err(ItemJournalError::Poisoned);
+        }
+        if !matches!(expected, ItemLocation::Ground { .. }) {
+            return Err(ItemJournalError::InvalidRecord(
+                "proposed ground binding not Ground",
+            ));
+        }
+        let sequence = self.ledger.committed_sequence();
+        if self.ledger.location(item) != Some(expected) {
+            return Ok((sequence, None));
+        }
+        let mutation = self.ledger.last_mutation_sequence(item).ok_or(
+            ItemJournalError::InvalidRecord("current ground item without mutation"),
+        )?;
+        if mutation == 0 || mutation > sequence {
+            return Err(ItemJournalError::InvalidRecord(
+                "inconsistent ground item mutation revision",
+            ));
+        }
+        Ok((sequence, Some(mutation)))
+    }
+
     pub fn location(&self, item: ItemId) -> Option<ItemLocation> {
         self.ledger.location(item)
     }
