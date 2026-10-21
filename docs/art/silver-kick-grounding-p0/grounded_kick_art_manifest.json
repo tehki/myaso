@@ -1,8 +1,8 @@
 {
   "sourceHead": "72afc96514193e8c8c0fa9ac206b277c1e937fc7",
   "originalKickAtlasSha256": "dceaa6382a7b456705ea565d95e8be24a392ef1fd0ef0e988d5679f75bd5167f",
-  "newGroundedKickAtlasSha256": "184601bdfbc5cf7389595921ffcee7641f6699aa5ecfc753d16fb521ce1dcb1f",
-  "comparisonGifSha256": "123b9339d4931cfd33bf0185877bb9b7bea7d0b1f7e33f3bafb1fc1f0e0a568b",
+  "newGroundedKickAtlasSha256": "e339c6d63410342e08d71a480607806c7ad5ebef0796b5386d9ff78da4ba82fc",
+  "comparisonGifSha256": "5b3a7b7a6aee3bc7edb62632e7282de9dc99a61dbc832fcd43cc814457b0ee6f",
   "sourceDrawCount": 64,
   "sourceFramesPerFacing": 8,
   "directionCount": 8,
@@ -26,14 +26,14 @@
     45
   ],
   "pixelChangesPerFacing": [
-    164230,
-    163607,
-    159199,
-    158776,
-    155594,
-    163445,
-    165253,
-    163765
+    167062,
+    165710,
+    160982,
+    160845,
+    157254,
+    164850,
+    167431,
+    167610
   ],
   "approvedHumanVisual": false,
   "verifiedRealGround": false,

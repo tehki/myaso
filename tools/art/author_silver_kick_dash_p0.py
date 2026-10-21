@@ -225,13 +225,13 @@ for clip,frames in samples.items():
   for col,fr in enumerate(frames):
    if args.smoke_fast and col not in (0,4):continue
    if args.smoke and not args.smoke_fast and col not in (0,2,4,6):continue
-   sc.frame_set(round(fr))
+   sc.frame_set(int(fr),subframe=fr-int(fr))
    target=out/f"{clip}_dir{d}_frame{col}.png"
    sc.render.filepath=str(target)
    bpy.ops.render.render(write_still=True)
    assert target.stat().st_size>400,(target,target.stat().st_size if target.exists() else "missing")
    rendered.append({"clip":clip,"direction":d,"phase":col,
-    "sourceFrame":fr,"sampledBlenderFrame":round(fr),"bytes":target.stat().st_size})
+    "sourceFrame":fr,"sampledBlenderFrame":fr,"bytes":target.stat().st_size})
    print("KICK_DASH_RENDER",clip,d,col,flush=True)
 # Save source editable rig actions into separate verified content-rich blend:
 # remove original user mesh, retain 22-bone skeleton and authored keyframes.
