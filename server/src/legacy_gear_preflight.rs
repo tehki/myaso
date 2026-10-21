@@ -153,6 +153,8 @@ pub enum LegacyMigrationError {
     UnregisteredSourceIdentity,
     InvalidSlotCode,
     InvalidKindCode,
+    NonSwordRackItem,
+    DuplicateRackItem,
 }
 
 /// A five-domain high-64 namespace proposal. Do NOT hard-code its values in
@@ -281,6 +283,50 @@ impl LegacyImportPreflight {
     }
 }
 
+/// An offline, owner-reviewed item row extracted from a trusted legacy
+/// checkpoint. These bytes MUST NOT originate directly from a client packet.
+/// This does not validate physical rack geometry or current item location.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct LegacyRackSword {
+    pub legacy_item_id: u64,
+    pub checkpoint_kind_code: u8,
+}
+
+/// One canonical ID and preserved sword kind. No live ledger writes occur.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct CanonicalRackSword {
+    pub item_id: ItemId,
+    pub kind: LegacyItemKind,
+}
+
+/// First Playable demands exactly four independently identifiable sword rows.
+/// Validate source kind, uniqueness and prior owner registration before
+/// exporting candidate IDs for Magic/Items/Core 8C review.
+///
+/// This does NOT verify source checkpoint authenticity, item location, rack
+/// line-of-sight, inventory capacity or the trusted world epoch.
+pub fn preflight_four_armory_swords(
+    import: &LegacyImportPreflight,
+    records: [LegacyRackSword; 4],
+) -> Result<[CanonicalRackSword; 4], LegacyMigrationError> {
+    let mut seen = BTreeSet::new();
+    let mut canonical = Vec::with_capacity(4);
+    for row in records {
+        let kind = LegacyItemKind::require_checkpoint_kind(row.checkpoint_kind_code)?;
+        if !kind.is_alpha_sword() {
+            return Err(LegacyMigrationError::NonSwordRackItem);
+        }
+        if !seen.insert(row.legacy_item_id) {
+            return Err(LegacyMigrationError::DuplicateRackItem);
+        }
+        let item_id = import.core_item(row.legacy_item_id)?;
+        canonical.push(CanonicalRackSword { item_id, kind });
+    }
+    canonical
+        .try_into()
+        .map_err(|_| LegacyMigrationError::DuplicateRackItem)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -397,6 +443,72 @@ mod tests {
         assert_eq!(
             LegacyItemKind::from_checkpoint_code(9),
             Some(LegacyItemKind::WoodenClub)
+        );
+    }
+
+    #[test]
+    fn four_real_swords_preserve_kind_and_one_canonical_id_each() {
+        let mut import = LegacyImportPreflight::new(namespaces(), []).unwrap();
+        for raw in 201..=204 {
+            import.stage_owner(LegacyDomain::Item, raw).unwrap();
+        }
+        let four = [
+            LegacyRackSword { legacy_item_id: 201, checkpoint_kind_code: 0 },
+            LegacyRackSword { legacy_item_id: 202, checkpoint_kind_code: 8 },
+            LegacyRackSword { legacy_item_id: 203, checkpoint_kind_code: 0 },
+            LegacyRackSword { legacy_item_id: 204, checkpoint_kind_code: 8 },
+        ];
+        let checked = preflight_four_armory_swords(&import, four).unwrap();
+        assert_eq!(checked.len(), 4);
+        assert_eq!(checked[0].kind, LegacyItemKind::RustySword);
+        assert_eq!(checked[1].kind, LegacyItemKind::IronSword);
+        let ids: BTreeSet<_> = checked.iter().map(|row| row.item_id.get()).collect();
+        assert_eq!(ids.len(), 4);
+        for (index, row) in checked.iter().enumerate() {
+            assert_eq!(row.item_id, import.core_item(201 + index as u64).unwrap());
+        }
+    }
+
+    #[test]
+    fn rack_manifest_rejects_duplicates_missing_and_non_sword_kinds() {
+        let mut import = LegacyImportPreflight::new(namespaces(), []).unwrap();
+        for raw in 201..=203 {
+            import.stage_owner(LegacyDomain::Item, raw).unwrap();
+        }
+        let four = [
+            LegacyRackSword { legacy_item_id: 201, checkpoint_kind_code: 0 },
+            LegacyRackSword { legacy_item_id: 202, checkpoint_kind_code: 8 },
+            LegacyRackSword { legacy_item_id: 203, checkpoint_kind_code: 0 },
+            LegacyRackSword { legacy_item_id: 204, checkpoint_kind_code: 8 },
+        ];
+        assert_eq!(
+            preflight_four_armory_swords(&import, four),
+            Err(LegacyMigrationError::UnregisteredSourceIdentity)
+        );
+        import.stage_owner(LegacyDomain::Item, 204).unwrap();
+        let mut duplicate = four;
+        duplicate[3].legacy_item_id = 201;
+        assert_eq!(
+            preflight_four_armory_swords(&import, duplicate),
+            Err(LegacyMigrationError::DuplicateRackItem)
+        );
+        let mut club = four;
+        club[1].checkpoint_kind_code = 9;
+        assert_eq!(
+            preflight_four_armory_swords(&import, club),
+            Err(LegacyMigrationError::NonSwordRackItem)
+        );
+        let mut invalid = four;
+        invalid[1].checkpoint_kind_code = 255;
+        assert_eq!(
+            preflight_four_armory_swords(&import, invalid),
+            Err(LegacyMigrationError::InvalidKindCode)
+        );
+        let mut zero = four;
+        zero[0].legacy_item_id = 0;
+        assert_eq!(
+            preflight_four_armory_swords(&import, zero),
+            Err(LegacyMigrationError::UnregisteredSourceIdentity)
         );
     }
 
