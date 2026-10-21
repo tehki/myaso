@@ -306,5 +306,146 @@ class TownBanksOfflineTests(unittest.TestCase):
                          bank["reserve_gold"] - bank["deposit_liabilities"])
 
 
+    def test_two_competing_robbers_cannot_overdraw_same_vault(self):
+        lab = LocalTownBanksLab(
+            {"greyhaven": 100},
+            {"thief_a": 0, "thief_b": 0},
+            {"thief_a": "greyhaven", "thief_b": "greyhaven"},
+            carry_limit=100,
+        )
+        def attempt(name):
+            evidence = VaultBreachFixture(
+                event_id="raid-" + name, town="greyhaven",
+                vault_id="greyhaven-vault", actor=name, stolen_gold=70,
+                vault_open=True, guards_overcome=True, zone_epoch=1,
+            )
+            try:
+                return lab.robbery_fixture(name, "greyhaven", "op-" + name, evidence)
+            except BankDenied:
+                return None
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            results = list(pool.map(attempt, ("thief_a", "thief_b")))
+        self.assertEqual(sum(x is not None for x in results), 1)
+        self.assertEqual(lab.town_state("greyhaven")["reserve_gold"], 30)
+        self.assertEqual(lab.carried_gold("thief_a") + lab.carried_gold("thief_b"), 70)
+        self.assertEqual(len(lab.town_events("greyhaven")), 1)
+        lab.assert_invariants()
+
+    def test_competing_same_event_cannot_commit_twice(self):
+        lab = LocalTownBanksLab(
+            {"greyhaven": 100}, {"robber": 0}, {"robber": "greyhaven"},
+        )
+        evidence = self.proof(gold=70)
+        def attempt(op):
+            try:
+                return lab.robbery_fixture("robber", "greyhaven", op, evidence)
+            except BankDenied:
+                return None
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            results = list(pool.map(attempt, ("op1", "op2")))
+        self.assertEqual(sum(x is not None for x in results), 1)
+        self.assertEqual(lab.town_state("greyhaven")["reserve_gold"], 30)
+        self.assertEqual(lab.carried_gold("robber"), 70)
+        lab.assert_invariants()
+
+    def test_competing_same_operation_with_different_actors_is_conflict(self):
+        lab = LocalTownBanksLab(
+            {"greyhaven": 100},
+            {"thief_a": 0, "thief_b": 0},
+            {"thief_a": "greyhaven", "thief_b": "greyhaven"},
+        )
+        def attempt(name):
+            proof = VaultBreachFixture(
+                event_id="event-" + name, town="greyhaven",
+                vault_id="greyhaven-vault", actor=name, stolen_gold=30,
+                vault_open=True, guards_overcome=True, zone_epoch=1,
+            )
+            try:
+                return lab.robbery_fixture(name, "greyhaven", "same-op", proof)
+            except BankDenied:
+                return None
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            results = list(pool.map(attempt, ("thief_a", "thief_b")))
+        self.assertEqual(sum(x is not None for x in results), 1)
+        self.assertEqual(lab.town_state("greyhaven")["reserve_gold"], 70)
+        self.assertEqual(len(lab.town_events("greyhaven")), 1)
+        lab.assert_invariants()
+
+    def test_concurrent_deposit_and_raid_preserve_local_claim_and_gold(self):
+        lab = LocalTownBanksLab(
+            {"greyhaven": 100},
+            {"alice": 30, "robber": 0},
+            {"alice": "greyhaven", "robber": "greyhaven"},
+        )
+        proof = self.proof(gold=90)
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            f_deposit = pool.submit(lab.deposit, "alice", "greyhaven", "deposit", 30)
+            f_raid = pool.submit(lab.robbery_fixture, "robber", "greyhaven", "raid", proof)
+            self.assertEqual(f_deposit.result().gold, 30)
+            self.assertEqual(f_raid.result().gold, 90)
+        self.assertEqual(lab.town_state("greyhaven")["reserve_gold"], 40)
+        self.assertEqual(lab.at_town_balance("alice", "greyhaven"), 30)
+        self.assertEqual(lab.carried_gold("robber"), 90)
+        self.assertEqual(lab.carried_gold("alice"), 0)
+        lab.assert_invariants()
+
+    def test_truthy_non_boolean_guard_and_vault_flags_rejected(self):
+        for name in ("vault_open", "guards_overcome"):
+            for value in (1, "yes", object(), [], None):
+                with self.subTest(flag=name, val=repr(value)):
+                    fake = replace(self.proof(gold=10), **{name: value})
+                    with self.assertRaises(BankDenied):
+                        self.lab.robbery_fixture("robber", "greyhaven", "raid", fake)
+        self.assertEqual(self.lab.town_state("greyhaven")["local_sequence"], 0)
+        self.assertEqual(self.lab.carried_gold("robber"), 0)
+
+    def test_malformed_or_overflowing_world_epoch_rejected(self):
+        for epoch in (0, -1, True, "3", 2**63):
+            with self.subTest(epoch=epoch):
+                with self.assertRaises(BankDenied):
+                    self.lab.robbery_fixture(
+                        "robber", "greyhaven", "raid", self.proof(epoch=epoch),
+                    )
+        self.assertEqual(self.lab.town_state("greyhaven")["reserve_gold"], 100)
+
+    def test_vault_signed_63_overflow_deposit_is_denied_without_receipt(self):
+        bank = LocalTownBanksLab(
+            {"greyhaven": 2**63 - 2},
+            {"alice": 5},
+            {"alice": "greyhaven"},
+            carry_limit=5,
+        )
+        before = bank.town_state("greyhaven")
+        with self.assertRaises(BankDenied):
+            bank.deposit("alice", "greyhaven", "overflow", 3)
+        self.assertEqual(bank.town_state("greyhaven"), before)
+        self.assertEqual(bank.carried_gold("alice"), 5)
+        self.assertEqual(bank.town_events("greyhaven"), ())
+        bank.assert_invariants()
+
+    def test_oversized_physical_gold_weight_capacity_rejected(self):
+        with self.assertRaises(BankDenied):
+            LocalTownBanksLab(
+                {"greyhaven": 1}, {"alice": 1},
+                {"alice": "greyhaven"}, carry_limit=2**63,
+            )
+
+    def test_denied_overweight_raid_does_not_spend_world_event(self):
+        lab = LocalTownBanksLab(
+            {"greyhaven": 100}, {"robber": 90},
+            {"robber": "greyhaven"}, carry_limit=100,
+        )
+        proof = self.proof(gold=15)
+        with self.assertRaises(BankDenied):
+            lab.robbery_fixture("robber", "greyhaven", "raid", proof)
+        self.assertEqual(lab.town_state("greyhaven")["local_sequence"], 0)
+        lab.deposit("robber", "greyhaven", "free-hands", 20)
+        receipt = lab.robbery_fixture("robber", "greyhaven", "raid", proof)
+        self.assertEqual(receipt.carried_gold_after, 85)
+        self.assertEqual(lab.town_state("greyhaven")["reserve_gold"], 105)
+        self.assertEqual(len(lab.town_events("greyhaven")), 2)
+        lab.assert_invariants()
+
+
 if __name__ == "__main__":
     unittest.main()
