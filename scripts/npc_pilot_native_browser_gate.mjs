@@ -152,9 +152,32 @@ try {
  assert.deepEqual(a.history,[]);
  await keys(canvas,"a");
  assert.ok((await snapshot()).gameKeys.includes("a"),"native game keyboard restored");
+
+ // Exercise the real browser's focus behavior for the selector and Speak
+ // button, not merely simulated DOM focus in the Node fixture. Revoking a
+ // roster must never strand the player in a newly hidden pilot control.
+ for (const [selector, tag, gameKey] of [
+  [".npc-pilot select", "SELECT", "d"],
+  [".npc-pilot button", "BUTTON", "s"],
+ ]) {
+  await execute("window.__probe.roster([{id:3,name:'Rowan',role:'Guard',x:155,y:205}]);");
+  const control = await element(selector);
+  await request(base,"POST",e+"/element/"+control+"/click",{});
+  assert.equal((await snapshot()).active,tag,
+    "native click must focus "+tag+" before roster revocation");
+  await execute("window.__probe.roster([]);");
+  const restored = await snapshot();
+  assert.equal(restored.hidden,true);
+  assert.equal(restored.active,"arena",tag+" revocation must return arena keyboard focus");
+  assert.equal(restored.sent.length,1,"focus test must not send another NPC message");
+  await keys(canvas,gameKey);
+  assert.ok((await snapshot()).gameKeys.includes(gameKey),
+    "native gameplay keyboard still works after revoking "+tag);
+ }
  console.log("NPC_P0_NATIVE_CHROME_GATE "+JSON.stringify({
   ok:true,engine:"Chromium W3C",nativeKeyboard:true,nativeEnter:true,
   npcOffHidden:true,earlyReplyOrdered:true,revocationRestoresFocus:true,
+  nativeSelectorRevokeRestoresFocus:true,nativeSubmitRevokeRestoresFocus:true,
   serverConnection:false,independentHost:false
  }));
 } finally {
