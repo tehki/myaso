@@ -10,6 +10,7 @@ import process from "node:process";
 import { setTimeout as sleep } from "node:timers/promises";
 import {WORLD_ALPHA_SWORD_RACK_SOCKETS,validateWorldAlphaArmoryLayout} from "../src/world/alpha-armory.mjs";
 import {nextNativeWalkPulse,nativeRackArrived,proposedNativeRackReachPoint,nativeRackWithinProposedReach,verifyNativeRackPeerConsensus,verifyNativeRackRecoveryPeerConsensus} from "./alpha_p0_rack_walk_math.mjs";
+import {nativeDriverPortForAttempt,retryNativeFirefoxSession} from "./alpha_p0_native_driver_startup_policy.mjs";
 
 const root = process.cwd();
 const greyhavenModeValue = process.env.MYASO_ALPHA_NATIVE_GREYHAVEN;
@@ -183,18 +184,6 @@ async function driver(browser) {
   const executable=isChrome
     ? (process.env.CHROMEWEBDRIVER ? path.join(process.env.CHROMEWEBDRIVER,"chromedriver") : "chromedriver")
     : (process.env.GECKOWEBDRIVER ? path.join(process.env.GECKOWEBDRIVER,"geckodriver") : "geckodriver");
-  const arguments_=isChrome ? [`--port=${browser.port}`] : ["--host","127.0.0.1","--port",String(browser.port)];
-  const child=spawn(executable,arguments_,{
-    cwd:root,stdio:["ignore","pipe","pipe"],detached:process.platform!=="win32",
-  });
-  children.add(child);
-  child.stderr.on("data",chunk=>process.stderr.write(`[${browser.name}-driver] ${chunk}`));
-  const base=`http://127.0.0.1:${browser.port}`;
-  await waitFor(async()=>{
-    if (child.exitCode !== null) throw Error(browser.name+" driver exited "+child.exitCode);
-    try { const response=await fetch(base+"/status",{signal:AbortSignal.timeout(700)});return {ok:response.ok,value:true}; }
-    catch {return {ok:false,value:false};}
-  }, browser.name+" native WebDriver startup",15_000);
   const caps=isChrome
     ? {browserName:"chrome","goog:chromeOptions":{args:[
       "--headless=new","--no-sandbox","--disable-dev-shm-usage","--window-size=1280,900",
@@ -202,14 +191,62 @@ async function driver(browser) {
       "--disable-renderer-backgrounding"]}}
     : {browserName:"firefox","moz:firefoxOptions":{args:["-headless"],
       prefs:{"dom.min_background_timeout_value":4,"dom.timeout.enable_budget_timer_throttling":false}}};
-  console.log("ALPHA_M1_BROWSER_START "+JSON.stringify({browser:browser.name,family:browser.family}));
-  // A headless Firefox session can take >10s to initialize under a busy
-  // GitHub-hosted runner; this does not relax input/replication deadlines.
-  const created=await webdriver(base,"POST","/session",{capabilities:{alwaysMatch:caps}},30_000);
-  const id=created.sessionId ?? created.value?.sessionId;
-  assert(id, browser.name+" no real WebDriver session ID");
-  await webdriver(base,"POST",`/session/${id}/timeouts`,{script:15000,pageLoad:30000,implicit:0});
-  return {name:browser.name,base,id,driverChild:child};
+  // Real Firefox geckodriver /session startup sometimes hangs at 30s under
+  // CI runner load, before any game admission. Never turn the first hung
+  // browser into a fake successful actor. Kill the whole native process group
+  // before the only allowed Linux Firefox retry, on a NEW localhost port.
+  for(let attempt=0;attempt<=1;attempt++){
+    const port=nativeDriverPortForAttempt(browser,attempt);
+    const arguments_=isChrome ? [`--port=${port}`] : ["--host","127.0.0.1","--port",String(port)];
+    const child=spawn(executable,arguments_,{
+      cwd:root,stdio:["ignore","pipe","pipe"],detached:process.platform!=="win32",
+    });
+    children.add(child);
+    child.stderr.on("data",chunk=>process.stderr.write(`[${browser.name}-driver] ${chunk}`));
+    const base=`http://127.0.0.1:${port}`;
+    try {
+      await waitFor(async()=>{
+        if(child.exitCode!==null||child.signalCode!==null)
+          throw Error(browser.name+" driver exited "+(child.exitCode??child.signalCode));
+        try {
+          const response=await fetch(base+"/status",{signal:AbortSignal.timeout(700)});
+          return {ok:response.ok,value:true};
+        }catch{return {ok:false,value:false};}
+      },browser.name+" native WebDriver startup",15_000);
+      console.log("ALPHA_M1_BROWSER_START "+JSON.stringify({
+        browser:browser.name,family:browser.family,attempt,actualDriverPort:port,
+      }));
+      // A headless Firefox session may need extra startup time under runner
+      // contention. This remains a genuine W3C /session POST, never a mock.
+      const created=await webdriver(base,"POST","/session",
+        {capabilities:{alwaysMatch:caps}},30_000);
+      const id=created.sessionId??created.value?.sessionId;
+      assert(id,browser.name+" no real WebDriver session ID");
+      await webdriver(base,"POST",`/session/${id}/timeouts`,
+        {script:15000,pageLoad:30000,implicit:0});
+      return {name:browser.name,base,id,driverChild:child};
+    }catch(error){
+      const mayRetry=retryNativeFirefoxSession(error,browser,attempt,process.platform);
+      terminate(child,"SIGKILL");
+      await Promise.race([
+        new Promise(resolve=>{
+          if(child.exitCode!==null||child.signalCode!==null)return resolve();
+          child.once("exit",resolve);
+        }),
+        sleep(3000),
+      ]);
+      // Fail closed on all Chrome failures, malformed geckodriver replies,
+      // genuine admission errors, and the second real Firefox timeout.
+      if(!mayRetry)throw error;
+      console.log("ALPHA_M1_FIREFOX_STARTUP_RETRY "+JSON.stringify({
+        browser:browser.name,failedAttempt:attempt,
+        cause:"W3C new-session timeout before gameplay admission",
+        originalDriverPort:port,nextDriverPort:nativeDriverPortForAttempt(browser,1),
+        originalProcessGroupKilled:true,
+      }));
+    }
+  }
+  throw Error(browser.name+" exceeded exact native WebDriver attempts");
 }
 async function openGame(s,game,staticPort) {
   const u=new URL(`http://127.0.0.1:${staticPort}/web/index.html`);
