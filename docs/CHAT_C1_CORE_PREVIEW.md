@@ -162,3 +162,14 @@ ACK/progress assertions remain active. This is an explicit four-browser
 **local C1 arena** acceptance, NOT four independently operated
 Greyhaven/Blacksmith clients across two hosts, a production room,
 a real weapon transfer, or live public chat.
+
+### Native keyboard ownership while composing chat (all browser matrices)
+
+The original source real-server runner also uses genuine WebDriver key events
+to open the in-arena chat composer, type W, E and Space, and prove every one
+of these **combat/movement hotkeys** was delivered to the input instead of
+the arena canvas. Escape must clear the unsent draft, restore arena focus,
+and a subsequent genuine W must reach the arena. The typing action must
+never create an outgoing chat row. This is browser-event focus ownership
+evidence, not a standalone proof that the authoritative server received
+neutral inputs throughout an active 4-human combat fight.
