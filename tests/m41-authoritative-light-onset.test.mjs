@@ -37,9 +37,9 @@ test("M41 schedules exactly one native Firefox wheel only after trusted server l
     sendWheel: () => { events.push("firefox-real-wheel"); },
   });
   assert.equal(actual.serverTick, 300);
-  assert.equal(actual.wheelAfterLightMs, 0);
+  assert.equal(actual.wheelAfterLightMs, 8);
   assert.deepEqual(events, [
-    "chrome-real-short-gesture", "wait:4", "wait:4", "firefox-real-wheel",
+    "chrome-real-short-gesture", "wait:4", "wait:4", "wait:8", "firefox-real-wheel",
   ]);
 });
 
