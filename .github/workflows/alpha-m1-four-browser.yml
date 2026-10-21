@@ -32,7 +32,7 @@ jobs:
       - name: Build real authoritative Rust game server
         run: cargo build --locked --manifest-path server/Cargo.toml --bin myaso-server
       - name: Run four independent Chrome/Firefox WebDriver sessions on real QUIC
-        run: node scripts/alpha_m1_four_real_browser_flight.mjs
+        run: timeout --signal=TERM --kill-after=5s 180s node scripts/alpha_m1_four_real_browser_flight.mjs
       - name: Retain genuine browser screenshots when artifact quota allows
         if: always()
         continue-on-error: true
