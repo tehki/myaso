@@ -118,3 +118,55 @@ fn server_static_solver_still_rejects_smith_wall_and_invalid_sweeps() {
         "invalid server collision queries must fail closed"
     );
 }
+
+#[test]
+fn actual_core_static_solver_preserves_four_native_west_first_armory_routes() {
+    // The genuine four-browser Core 8A #608 test observed an actor wedged
+    // against Smith's east wall on a north-first route. This is a WORLD
+    // source regression on the safe cardinal approach, not a browser input
+    // script, dynamic pathfinder, signed location or item interaction.
+    assert_eq!(STATIC_SOLIDS.len(), 23);
+    let spawn_source = include_str!("../src/alpha_spawn.rs");
+    let socket_source = include_str!("../../src/world/alpha-armory.mjs");
+    for (x, y) in WORLD9_SPAWNS {
+        assert!(
+            spawn_source.contains(&format!("({x:.1}, {y:.1})")),
+            "staging spawn changed: refresh World/Core reviewed route together"
+        );
+    }
+    for (i, stand) in WORLD9_RACK_STANDS.into_iter().enumerate() {
+        assert!(
+            socket_source.contains(&format!("makeSocket({},{})", i + 1, stand.0 as i32)),
+            "authored physical socket changed: review path before accepting"
+        );
+        assert!(
+            socket_source.contains("approach:Object.freeze({x,y:4088})"),
+            "Blacksmith standing Y contract changed"
+        );
+        let spawn = WORLD9_SPAWNS[i];
+        let west_then_north_corner: Point = (stand.0, spawn.1);
+        assert!(spawn.0 > stand.0 && spawn.1 > stand.1);
+        assert_static_segment_clear(
+            spawn,
+            west_then_north_corner,
+            &format!("native browser {} west-first southern leg", i + 1),
+        );
+        assert_static_segment_clear(
+            west_then_north_corner,
+            stand,
+            &format!("native browser {} northward rack approach", i + 1),
+        );
+        // assert_static_segment_clear verifies both directions, including
+        // touch/overlap at each end. A static pass does not prove true
+        // time-stepped input arrival or any sword authorization.
+    }
+    assert_eq!(
+        swept_circle_hits_known_static_solid(
+            (4110.0, 4020.0),
+            (3820.0, 4020.0),
+            FIGHTER_RADIUS,
+        ),
+        Ok(true),
+        "north-first Smith wall shortcut MUST remain blocked"
+    );
+}
