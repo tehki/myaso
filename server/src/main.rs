@@ -8,8 +8,8 @@ use myaso_server::{
     reliable::{try_enqueue_reliable, ReliableQueueError},
     simulation::{CombatEvent, InputIntent, World},
     snapshot::{ReplicationFrame, SnapshotSession},
-    AdmissionGate, InputIngressWindow, InputSample, CONSERVATIVE_DATAGRAM_BYTES, PROTOCOL_VERSION,
-    TARGET_PLAYERS_PER_MAP,
+    AcceptedInputBatch, AdmissionGate, InputIngressWindow, InputSample,
+    CONSERVATIVE_DATAGRAM_BYTES, PROTOCOL_VERSION, TARGET_PLAYERS_PER_MAP,
 };
 use std::{
     collections::{BTreeMap, VecDeque},
@@ -240,6 +240,15 @@ impl SharedGame {
 
 fn next_client_input_deadline(now: tokio::time::Instant) -> tokio::time::Instant {
     now + CLIENT_INPUT_IDLE_TIMEOUT
+}
+
+// Input bytes being well-formed and arriving on an established QUIC session
+// are NOT proof of current gameplay input. An attacker can replay a previously
+// accepted datagram indefinitely, with a fresh packet sequence but the same
+// redundant client ticks. Only samples admitted by the actual server ingress
+// dedup/window gate may renew the bounded fighter/admission lease.
+fn accepted_gameplay_renews_session(accepted: &AcceptedInputBatch) -> bool {
+    !accepted.is_empty()
 }
 
 fn should_enqueue_reliable_catchup(
@@ -710,7 +719,10 @@ async fn handle_connection(
                         continue;
                     }
                 };
-                input_idle_timeout.as_mut().reset(next_client_input_deadline(tokio::time::Instant::now()));
+                // The QUIC transport alone is not gameplay liveness. Do NOT
+                // reset the fighter lease on syntactically valid replayed
+                // packets or ACK-only old input. The genuine ingest decision
+                // below determines whether any new client tick was accepted.
 
                 if game.drop_new_action_datagrams {
                     if let Some(action_tick) =
@@ -735,6 +747,11 @@ async fn handle_connection(
                 }
 
                 let accepted = ingress.ingest(&packet);
+                if accepted_gameplay_renews_session(&accepted) {
+                    input_idle_timeout
+                        .as_mut()
+                        .reset(next_client_input_deadline(tokio::time::Instant::now()));
+                }
                 let coalesced: Option<(u32, InputIntent)> =
                     coalesce_accepted_input_batch(accepted.as_slice())
                         .map(|sample| (sample.tick, sample.into()));
@@ -1096,6 +1113,49 @@ mod tests {
         assert_eq!(extended - deadline, Duration::from_secs(18));
         assert!(RELIABLE_OPEN_TIMEOUT < CLIENT_INPUT_IDLE_TIMEOUT);
         assert!(CLIENT_INPUT_IDLE_TIMEOUT > Duration::from_secs(5));
+    }
+
+    #[test]
+    fn p0_replayed_valid_quic_input_cannot_keep_disconnected_fighter_alive() {
+        // The exact same valid transport-level input bytes would renew the
+        // session forever under the previous pre-ingress timer reset, even
+        // though Rust's authoritative ingress has already seen its ticks.
+        let mut bytes = vec![0_u8; 22]; // 16-byte header + one 6-byte sample
+        bytes[0] = PROTOCOL_VERSION;
+        bytes[1] = 1; // input datagram type
+        bytes[2] = 1; // exactly one redundant input sample
+        bytes[4..6].copy_from_slice(&9_u16.to_le_bytes());
+        bytes[8..12].copy_from_slice(&100_u32.to_le_bytes());
+        let first = decode_input_packet(&bytes).expect("actual wire parser accepts packet");
+        let mut ingress = InputIngressWindow::default();
+        assert!(accepted_gameplay_renews_session(&ingress.ingest(&first)));
+
+        // Replaying identical samples with a newer transport sequence/ACK
+        // must not renew the fighter lease without a NEW accepted input tick.
+        for sequence in 10..32_u16 {
+            bytes[4..6].copy_from_slice(&sequence.to_le_bytes());
+            bytes[6..8].copy_from_slice(&sequence.to_le_bytes());
+            let replay = decode_input_packet(&bytes).expect("well-formed stale replay");
+            assert!(
+                !accepted_gameplay_renews_session(&ingress.ingest(&replay)),
+                "stale QUIC datagram sequence {sequence} extended fighter liveness"
+            );
+        }
+
+        // Real new input samples still renew, including a wrapped client tick
+        // in an independent fresh session, even if a redundant sample repeats.
+        bytes[8..12].copy_from_slice(&101_u32.to_le_bytes());
+        let newer = decode_input_packet(&bytes).expect("next genuine browser tick");
+        assert!(accepted_gameplay_renews_session(&ingress.ingest(&newer)));
+        assert!(!accepted_gameplay_renews_session(&ingress.ingest(&newer)));
+
+        let mut wrap = InputIngressWindow::default();
+        bytes[8..12].copy_from_slice(&u32::MAX.to_le_bytes());
+        let before_wrap = decode_input_packet(&bytes).unwrap();
+        assert!(accepted_gameplay_renews_session(&wrap.ingest(&before_wrap)));
+        bytes[8..12].copy_from_slice(&0_u32.to_le_bytes());
+        let after_wrap = decode_input_packet(&bytes).unwrap();
+        assert!(accepted_gameplay_renews_session(&wrap.ingest(&after_wrap)));
     }
 
     #[test]

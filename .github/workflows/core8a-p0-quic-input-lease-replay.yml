@@ -1,0 +1,25 @@
+name: Core 8A P0 QUIC ingress freshness cannot renew expired input lease
+
+on:
+  pull_request:
+    paths:
+      - "server/src/main.rs"
+      - "server/src/lib.rs"
+      - "server/Cargo.toml"
+      - ".github/workflows/core8a-p0-quic-input-lease-replay.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  reject-stale-session-keepalive:
+    runs-on: ubuntu-latest
+    timeout-minutes: 9
+    steps:
+      - uses: actions/checkout@v4
+      - name: Original rustfmt and source hygiene (no waived checks)
+        run: cargo fmt --all --check --manifest-path server/Cargo.toml
+      - name: Compile original Rust QUIC binary and prove real decoded replay refusal
+        run: cargo test --locked --manifest-path server/Cargo.toml --bin myaso-server tests::p0_replayed_valid_quic_input_cannot_keep_disconnected_fighter_alive -- --exact --nocapture
+      - name: Strict real server Clippy regression
+        run: cargo clippy --locked --manifest-path server/Cargo.toml --bin myaso-server -- -D warnings
