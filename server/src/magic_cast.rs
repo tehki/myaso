@@ -499,5 +499,3 @@ mod tests {
         assert_eq!(magic.pending_ember_intents().count(), 0);
     }
 }
-
-[executed on device: Serj (3e40bd2b-5db8-48a7-8e78-f84cd7273888)]
