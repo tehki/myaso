@@ -14,8 +14,9 @@ use std::sync::atomic::{AtomicU64, Ordering};
 
 use crate::character_identity::CharacterId;
 use crate::loot::{
-    Corpse, EquipmentSlot, GroundDrop, Inventory, ItemKind, ItemStack, LootAuthority,
-    LootStateSnapshot, ParkedInventory, Point, LOOT_STATE_SCHEMA_VERSION, MAX_OPERATION_WATERMARKS,
+    Corpse, CurrentRackSword, EquipmentSlot, GroundDrop, Inventory, ItemKind, ItemStack,
+    LootAuthority, LootError, LootStateSnapshot, ParkedInventory, Point, ProposedRackSocket,
+    LOOT_STATE_SCHEMA_VERSION, MAX_OPERATION_WATERMARKS,
 };
 use crate::zone::ZoneId;
 
@@ -32,6 +33,8 @@ pub enum CheckpointError {
     InvalidState,
     Corrupt,
     TooLarge,
+    /// A valid checkpoint contains ambiguous or invalid authored rack contents.
+    RackProjection(LootError),
 }
 
 impl From<std::io::Error> for CheckpointError {
@@ -509,6 +512,60 @@ pub(crate) fn atomic_write(path: &Path, bytes: &[u8]) -> Result<(), CheckpointEr
     outcome
 }
 
+/// Offline Items-only checkpoint evidence, derived from ONE bounded, fully
+/// decoded and validated MYASOL03 byte read. The source's four ground/item
+/// pairs come from real persisted Items state and cannot be supplied as a
+/// second, independently fabricated manifest.
+///
+/// The FNV-64 checksum is UNKEYED and collision-prone: it detects accidental
+/// corruption, NOT tampering, authenticity, anti-rollback or write epoch.
+/// Neither this structure nor its exact IDs can authorize network pickup.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct QuiescentRackCheckpointView {
+    pub checkpoint_length: usize,
+    pub unkeyed_legacy_checksum: u64,
+    pub caller_observation_time_ms: u64,
+    pub slots: [Option<CurrentRackSword>; 4],
+}
+
+/// Offline migration review input ONLY. Inspect the exact single file bytes,
+/// fully validate MYASOL03 state and derive all four current rack bindings
+/// from that same snapshot, failing closed on corrupt/ambiguous contents.
+///
+/// Caller must supply four trusted World-authored socket coordinates, the
+/// zone, and a server-observed time. This cannot verify their origin; it
+/// does not observe an authoritative world tick or prevent checkpoint replay.
+/// Revalidate under the chosen SINGLE fenced Core item writer before commit.
+/// Never expose this nonauthenticated view to a live browser or as an ACK.
+pub fn read_quiescent_four_rack_checkpoint(
+    path: &Path,
+    zone: ZoneId,
+    sockets: [ProposedRackSocket; 4],
+    now_ms: u64,
+) -> Result<QuiescentRackCheckpointView, CheckpointError> {
+    if fs::metadata(path)?.len() > MAX_FILE_BYTES as u64 {
+        return Err(CheckpointError::TooLarge);
+    }
+    // One byte read, then decode AND project from exactly that buffer. Any
+    // concurrent mutation could still yield a valid historical checkpoint:
+    // this routine does not provide a live writer fence or epoch.
+    let bytes = fs::read(path)?;
+    let snapshot = decode(&bytes)?;
+    let world = LootAuthority::restore_state(snapshot).map_err(|_| CheckpointError::Corrupt)?;
+    let slots = world
+        .proposed_current_rack_swords(zone, sockets, now_ms)
+        .map_err(CheckpointError::RackProjection)?;
+    let digest_at = bytes.len() - 8; // decode checked format and length
+    let unkeyed_legacy_checksum =
+        u64::from_le_bytes(bytes[digest_at..].try_into().expect("decoded suffix"));
+    Ok(QuiescentRackCheckpointView {
+        checkpoint_length: bytes.len(),
+        unkeyed_legacy_checksum,
+        caller_observation_time_ms: now_ms,
+        slots,
+    })
+}
+
 /// Load a fully validated checkpoint. A corrupt file fails closed rather
 /// than returning partial inventories or minting replacement loot.
 pub fn load_quiescent(path: &Path) -> Result<LootAuthority, CheckpointError> {
@@ -567,6 +624,135 @@ mod tests {
             "myaso-checkpoint-{}-{number}.bin",
             std::process::id()
         ))
+    }
+
+    #[test]
+    fn quiescent_rack_checkpoint_source_is_exact_but_not_rollback_safe() {
+        use crate::loot::{ItemKind, LootError, Point};
+        let sockets = [3740.0_f32, 3780.0, 3820.0, 3860.0].map(|x| ProposedRackSocket {
+            at: Point { x, y: 4038.0 },
+        });
+        let mut loot = LootAuthority::new();
+        let mut world = World::new(8192.0, 8192.0);
+        let mut identity = SessionIdentityRegistry::new();
+        for (i, socket) in sockets.iter().enumerate() {
+            let actor = (i + 1) as u32;
+            assert!(world.add_player_at(actor, socket.at.x, socket.at.y, 0.0));
+            let lease = SessionLease::new(actor, 1).unwrap();
+            identity
+                .bind_verified(lease, CharacterId::new(u64::from(actor)).unwrap())
+                .unwrap();
+            loot.register(actor).unwrap();
+            let sword = loot
+                .grant(
+                    actor,
+                    if i % 2 == 0 {
+                        ItemKind::RustySword
+                    } else {
+                        ItemKind::IronSword
+                    },
+                    1,
+                )
+                .unwrap();
+            loot.drop_backpack(
+                actor,
+                world.fighter(actor).unwrap(),
+                ZoneId::Moonvale,
+                sword,
+                1,
+            )
+            .unwrap();
+        }
+        let initial = loot
+            .proposed_current_rack_swords(ZoneId::Moonvale, sockets, 2)
+            .unwrap();
+        for actor in 1..=4 {
+            loot.park_inventory(&identity, SessionLease::new(actor, 1).unwrap())
+                .unwrap();
+        }
+        let path = checkpoint_path();
+        save_quiescent(&path, &loot).unwrap();
+        let first_bytes = fs::read(&path).unwrap();
+        let first =
+            read_quiescent_four_rack_checkpoint(&path, ZoneId::Moonvale, sockets, 2).unwrap();
+        assert_eq!(first.slots, initial);
+        assert_eq!(first.checkpoint_length, first_bytes.len());
+        assert_eq!(
+            first.unkeyed_legacy_checksum,
+            checksum(&first_bytes[..first_bytes.len() - 8])
+        );
+        assert!(read_quiescent_four_rack_checkpoint(
+            &path,
+            ZoneId::Moonvale,
+            sockets,
+            crate::loot::GROUND_DECAY_MS + 1,
+        )
+        .unwrap()
+        .slots
+        .iter()
+        .all(Option::is_none));
+
+        // A real player pickup and quiescent checkpoint removes one physical
+        // source slot; no snapshot function remints or guesses an item ID.
+        let mut restored = load_quiescent(&path).unwrap();
+        let lease = SessionLease::new(1, 1).unwrap();
+        restored.resume_inventory(&identity, lease).unwrap();
+        assert_eq!(
+            restored
+                .take_ground(
+                    1,
+                    world.fighter(1).unwrap(),
+                    ZoneId::Moonvale,
+                    initial[0].unwrap().ground_entity_id,
+                    3
+                )
+                .unwrap()
+                .id,
+            initial[0].unwrap().item_id
+        );
+        restored.park_inventory(&identity, lease).unwrap();
+        save_quiescent(&path, &restored).unwrap();
+        let next =
+            read_quiescent_four_rack_checkpoint(&path, ZoneId::Moonvale, sockets, 4).unwrap();
+        assert_eq!(next.slots[0], None);
+        assert_eq!(next.slots[1..], first.slots[1..]);
+        assert_ne!(next.unkeyed_legacy_checksum, first.unkeyed_legacy_checksum);
+
+        // A single-byte corrupt source fails before any rack binding is
+        // returned. Valid bytes copied from an OLD snapshot still decode:
+        // checksum verification is NOT an epoch fence or rollback defense.
+        let next_bytes = fs::read(&path).unwrap();
+        let mut corrupt = next_bytes.clone();
+        corrupt[15] ^= 0x42;
+        fs::write(&path, corrupt).unwrap();
+        assert!(matches!(
+            read_quiescent_four_rack_checkpoint(&path, ZoneId::Moonvale, sockets, 4),
+            Err(CheckpointError::Corrupt)
+        ));
+        fs::write(&path, &first_bytes).unwrap();
+        let replay =
+            read_quiescent_four_rack_checkpoint(&path, ZoneId::Moonvale, sockets, 4).unwrap();
+        assert_eq!(replay.slots, first.slots);
+        assert_ne!(replay.slots, next.slots, "stale but valid bytes CAN replay");
+        fs::write(&path, &next_bytes).unwrap();
+
+        // A fully valid checkpoint with conflicting physical occupancy
+        // refuses the ENTIRE candidate set instead of picking a first item.
+        let mut snapshot = restored.export_state().unwrap();
+        let duplicate = snapshot.ground[&initial[1].unwrap().ground_entity_id].clone();
+        let another_id = snapshot.next_id;
+        snapshot.next_id += 2;
+        let mut another = duplicate;
+        another.entity_id = another_id;
+        another.item.id = another_id + 1;
+        snapshot.ground.insert(another_id, another);
+        let ambiguous = LootAuthority::restore_state(snapshot).unwrap();
+        save_quiescent(&path, &ambiguous).unwrap();
+        assert!(matches!(
+            read_quiescent_four_rack_checkpoint(&path, ZoneId::Moonvale, sockets, 4),
+            Err(CheckpointError::RackProjection(LootError::InvalidState))
+        ));
+        let _ = fs::remove_file(&path);
     }
 
     #[test]
