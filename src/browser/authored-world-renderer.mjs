@@ -105,7 +105,7 @@ function paintCityWalls(ctx,city) {
   ctx.textAlign="center";ctx.fillText(city.name,x+w/2,y+120);
 }
 
-function paintOverworld(ctx,map,tileBounds) {
+function paintOverworld(ctx,map,tileBounds,replacedBuildings) {
   ctx.fillStyle="#627751";ctx.fillRect(0,0,map.width,map.height);
   // Authored agricultural plots, not generated terrain.
   for(const f of map.fields){
@@ -159,8 +159,11 @@ function paintOverworld(ctx,map,tileBounds) {
     }
   if(visibleBounds(tileBounds,map.city.x,map.city.y,map.city.w,map.city.h,100))
     paintCityWalls(ctx,map.city);
+  // Only World-validated opt-in IDs may suppress a baked placeholder.
+  // Never erase a cached building using a post-paint rectangle: keep the
+  // authentic terrain/road/facade depth unchanged under replacement art.
   for(const b of map.buildings)
-    if(visibleBounds(tileBounds,b.x,b.y,b.w,b.h,45))paintBuilding(ctx,b);
+    if(!replacedBuildings.has(b.id) && visibleBounds(tileBounds,b.x,b.y,b.w,b.h,45))paintBuilding(ctx,b);
   paintGreyhavenLightingFixtures(ctx,map,tileBounds);
   for(const p of map.portals){
     if(!visibleBounds(tileBounds,p.x,p.y,0,0,23))continue;
@@ -228,10 +231,30 @@ export function visibleWorldTiles(camera,width,height,zoom,tileSize=WORLD_TILE_S
 }
 
 export function createAuthoredWorldRenderer({makeCanvas=()=>document.createElement("canvas"),
-  cacheCap=WORLD_CACHE_CAP,buildLimit=3}={}) {
+  cacheCap=WORLD_CACHE_CAP,buildLimit=3,replacedBuildingIds=[],worldReplacementValidator=null}={}) {
   if(!Number.isInteger(cacheCap)||cacheCap<1||cacheCap>64
     ||!Number.isInteger(buildLimit)||buildLimit<0||buildLimit>8)
     throw new RangeError("invalid authored world cache");
+  // This 3C branch is stacked on World #336: World #521's canonical
+  // presentation validator is NOT in our parent source. Require it to be
+  // explicitly injected for any nonempty replacement request. No World-owned
+  // Red Lion allowlist or facade coordinates are replicated into Graphics 3C.
+  if(!Array.isArray(replacedBuildingIds) ||
+     (worldReplacementValidator!==null && typeof worldReplacementValidator!=="function"))
+    throw new RangeError("invalid World building replacement options");
+  if(replacedBuildingIds.length && !worldReplacementValidator)
+    throw new RangeError("World building replacement validator required");
+  const approved=worldReplacementValidator
+    ?worldReplacementValidator(MAP_IDS.overworld,replacedBuildingIds)
+    :Object.freeze([]);
+  const authored=getAuthoredMap(MAP_IDS.overworld);
+  if(!Array.isArray(approved)||approved.length!==replacedBuildingIds.length ||
+     new Set(approved).size!==approved.length ||
+     approved.some((id,i)=>id!==replacedBuildingIds[i] ||
+       typeof id!=="string" || !authored.buildings.some(b=>b.id===id)))
+    throw new RangeError("World building replacement validator returned invalid IDs");
+  const normalizedReplacements=Object.freeze([...approved]);
+  const replacedBuildings=new Set(normalizedReplacements);
   const cache=new Map();
   const stats={cached:0,created:0,visible:0};
   function makeTile(map,x,y){
@@ -241,11 +264,14 @@ export function createAuthoredWorldRenderer({makeCanvas=()=>document.createEleme
     if(!c)throw new Error("2D world canvas unavailable");
     c.save();c.translate(-x*WORLD_TILE_SIZE,-y*WORLD_TILE_SIZE);
     paintOverworld(c,map,{x:x*WORLD_TILE_SIZE,y:y*WORLD_TILE_SIZE,
-      width:WORLD_TILE_SIZE,height:WORLD_TILE_SIZE});c.restore();
+      width:WORLD_TILE_SIZE,height:WORLD_TILE_SIZE},replacedBuildings);c.restore();
     return texture;
   }
   return {
     stats,
+    // Replacement identity is fixed when the Canvas cache is built. Changing
+    // World facade options requires a fresh renderer/cache, not cache reuse.
+    replacedBuildingIds:normalizedReplacements,
     clear(){cache.clear();stats.cached=0;},
     draw(ctx,mapId,camera,width,height,zoom){
       const map=getAuthoredMap(mapId);

@@ -1,0 +1,64 @@
+{
+  "pins": {
+    "world521": "3178b9aad8757ceb3594ff04b9e3099dced6b729",
+    "graphics3cAtCapture": "8a470d914db834dc4acbbd997a52ff55502e05d9"
+  },
+  "sourceHashes": {
+    "/src/browser/authored-world-renderer.mjs": "14290d457a0d6bedc0c3d5b98334b9964007130190b7a8881bd3e2bd7fb2cb06",
+    "/src/browser/greyhaven-terrain-materials.mjs": "cfc22bbf2c5ab9847ba40ef85773efe7b382041ed27784cd7eee3cc4fdb59a58",
+    "/src/browser/greyhaven-atmosphere.mjs": "452a11ed33ed842372ea39d11e532083c71177cb18261328b8a14ecf1312622f",
+    "/src/world/authored-maps.mjs": "21e7663303b14cc89f7dece7d73fda3b7e1fd4b70cc97b8753cd2c793209e144",
+    "/src/world/building-presentation.mjs": "c2e2ad0350fbc5d0c8408a48a151c280b4cc85500c53f4b8e705b21e97147e33"
+  },
+  "scope": "Original World validator + actual 3C cached Canvas pixel test only",
+  "results": [
+    {
+      "browser": "chrome",
+      "version": "Chrome/154.0.8037.99",
+      "redLionChanged": 50766,
+      "smithChanged": 0,
+      "createdTiles": [
+        6,
+        6,
+        6,
+        6
+      ],
+      "defaultIds": [],
+      "normalizedIds": [
+        "red-lion"
+      ],
+      "screenshot": "world521_red_lion_3c_chrome.png",
+      "pageErrors": [],
+      "realFacadeRendered": false,
+      "realActorsTested": false
+    },
+    {
+      "browser": "firefox",
+      "version": "firefox/153.4.0",
+      "redLionChanged": 50766,
+      "smithChanged": 0,
+      "createdTiles": [
+        6,
+        6,
+        6,
+        6
+      ],
+      "defaultIds": [],
+      "normalizedIds": [
+        "red-lion"
+      ],
+      "screenshot": "world521_red_lion_3c_firefox.png",
+      "pageErrors": [],
+      "realFacadeRendered": false,
+      "realActorsTested": false
+    }
+  ],
+  "release": {
+    "actualPlayers": false,
+    "actualRedLionFacadeAsset": false,
+    "authoritativeZones": false,
+    "actualItemPickup": false,
+    "productionApproved": false
+  },
+  "status": "WORLD521_3C_SOURCE_PIXELS_PASS"
+}
