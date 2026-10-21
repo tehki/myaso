@@ -241,11 +241,44 @@ async function run() {
     observed.push({browser:sessions[i].name,remote:fighter(state,1),tick:state.tick});
     await saveScreenshot(sessions[i],"remote-movement");
   }
+
+  // Bidirectional Chrome/Firefox acceptance: player #4 must also produce
+  // native Firefox W3C keyboard input, and BOTH Chrome browsers plus Firefox
+  // #2 must observe player #4's movement in the authoritative world state.
+  // Take each observer's baseline immediately before Firefox movement, not
+  // from a stale login-time snapshot; require monotonic server ticks.
+  const firefoxMover = sessions[3];
+  const firefoxObservers = await Promise.all(sessions.slice(0, 3).map(snapshot));
+  const firefoxChange = await moveGenuinely(firefoxMover);
+  console.log("ALPHA_M1_FOUR_BROWSER_FIREFOX_MOVED "+JSON.stringify({
+    player:4,browser:firefoxMover.name,...firefoxChange,
+  }));
+  const firefoxObserved = [];
+  for (let i=0;i<3;i++) {
+    const original=fighter(firefoxObservers[i],4);
+    assert(original, sessions[i].name+" missing Firefox #4 before movement");
+    const state=await waitFor(async()=>{
+      const value=await snapshot(sessions[i]),newPos=fighter(value,4);
+      return {ok:fourVisible(value) && value.tick>firefoxObservers[i].tick
+        && !!newPos && Math.hypot(newPos.x-original.x,newPos.y-original.y)>4,value};
+    },sessions[i].name+" real remote replication of Firefox player4 movement",12_000);
+    firefoxObserved.push({browser:sessions[i].name,remote:fighter(state,4),tick:state.tick});
+    await saveScreenshot(sessions[i],"firefox-remote-movement");
+  }
+  // Strict post-action health: four authoritative identities still visible in
+  // every real browser, with later server ticks (not cached initial state).
+  const finalStates=await Promise.all(sessions.map(async (s,i)=>waitFor(async()=>{
+    const value=await snapshot(s);
+    return {ok:fourVisible(value) && value.tick>views[i].tick,value};
+  },s.name+" post-movement four-player liveness",9000)));
+
   // No client spoofing, simulated actors, manual injection or test bypass.
   console.log("ALPHA_M1_FOUR_REAL_BROWSER_SHARED_WORLD_PASS "+JSON.stringify({
     sessions:sessions.map((s,i)=>({browser:s.name,playerId:i+1})),
     actualRustServer:true,authenticatedQuic:true,validScoreboard:true,
     nativeW3cInput:true,replicatedMovementInOtherThreeBrowsers:true,observed,
+    firefoxNativeW3cInput:true,firefoxReplicatedToOtherThreeBrowsers:true,
+    firefoxObserved,postActionFourPlayerLiveness:finalStates.map(s=>s.tick),
     scope:"single GitHub-hosted localhost arena, NOT Greyhaven or independent network",
   }));
 }
