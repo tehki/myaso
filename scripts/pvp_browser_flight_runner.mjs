@@ -8078,7 +8078,7 @@ async function runOnlineUiParryFlight(entries, postParrySleepMs = 80, roles = nu
         fighterId: attackerReady.playerNetId,
         sendAttack: () => performArenaAttackHold(attacker, attackerElementId, attackOffset, 35),
         sendWheel: () => setArenaBlock(defender, defenderElementId, true),
-        wheelAfterLightMs: 0,
+        wheelAfterLightMs: 8,
         sleep,
       });
       console.log("M41_AUTHORITATIVE_LIGHT_WINDUP " + JSON.stringify(m41Proof));
