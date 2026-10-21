@@ -299,7 +299,9 @@ mod tests {
         assert_eq!(magic.mana(character), 85);
         assert_eq!(loot.inventory(1).unwrap().backpack()[0].amount, 1);
         assert_eq!(
-            inspect_joint_ember_recovery_holds(&checkpoint).unwrap().len(),
+            inspect_joint_ember_recovery_holds(&checkpoint)
+                .unwrap()
+                .len(),
             1
         );
 
@@ -332,7 +334,10 @@ mod tests {
                 completed_tick: world.tick,
             },
         );
-        assert!(matches!(result, Ok(crate::magic::EmberEffectStatus::Interrupted)));
+        assert!(matches!(
+            result,
+            Ok(crate::magic::EmberEffectStatus::Interrupted)
+        ));
         assert!(inspect_joint_ember_recovery_holds(&checkpoint)
             .unwrap()
             .is_empty());
@@ -343,9 +348,16 @@ mod tests {
         assert!(restored_magic.knows_spell(character, Spell::Ember));
         assert_eq!(restored_magic.pending_ember_intents().count(), 0);
         assert_eq!(restored_magic.resolved_ember_intents().count(), 1);
-        assert_eq!(restored_loot.committed_operation_sequence(character), Some(45));
         assert_eq!(
-            restored_loot.parked_inventory(character).unwrap().backpack()[0].amount,
+            restored_loot.committed_operation_sequence(character),
+            Some(45)
+        );
+        assert_eq!(
+            restored_loot
+                .parked_inventory(character)
+                .unwrap()
+                .backpack()[0]
+                .amount,
             1
         );
         let _ = fs::remove_file(&checkpoint);
