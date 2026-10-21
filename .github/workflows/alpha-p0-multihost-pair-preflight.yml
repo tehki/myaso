@@ -5,12 +5,14 @@ on:
     paths:
       - "scripts/alpha_p0_host_pair_*.mjs"
       - "tests/alpha_p0_host_pair_config.test.mjs"
+      - "tests/alpha_p0_host_pair_capability_preflight.test.mjs"
       - ".github/workflows/alpha-p0-multihost-pair-preflight.yml"
   push:
     branches: [main]
     paths:
       - "scripts/alpha_p0_host_pair_*.mjs"
       - "tests/alpha_p0_host_pair_config.test.mjs"
+      - "tests/alpha_p0_host_pair_capability_preflight.test.mjs"
       - ".github/workflows/alpha-p0-multihost-pair-preflight.yml"
 
 permissions:
@@ -28,8 +30,10 @@ jobs:
           node --check scripts/alpha_p0_host_pair_config.mjs
           node --check scripts/alpha_p0_host_pair_flight.mjs
           node --check scripts/alpha_p0_host_pair_verify.mjs
+          node --check scripts/alpha_p0_host_pair_capability_preflight.mjs
           node --check tests/alpha_p0_host_pair_config.test.mjs
+          node --check tests/alpha_p0_host_pair_capability_preflight.test.mjs
       - name: Fail-closed isolated staging and SYNTHETIC offline evidence unit tests
-        run: node --test tests/alpha_p0_host_pair_config.test.mjs
+        run: node --test tests/alpha_p0_host_pair_config.test.mjs tests/alpha_p0_host_pair_capability_preflight.test.mjs
       - name: Assert no remote server traffic is represented by this workflow
         run: echo 'CORE8A_P0_MULTIHOST_OFFLINE_PREFLIGHT_ONLY_NOT_A_REMOTE_GAME_PASS'
