@@ -8180,7 +8180,12 @@ async function runOnlineUiParryFlight(entries, postParrySleepMs = 80, roles = nu
         fighterId: attackerReady.playerNetId,
         sendAttack: () => performArenaAttackHold(attacker, attackerElementId, attackOffset, 35),
         sendWheel: () => setArenaBlock(defender, defenderElementId, true),
-        wheelAfterLightMs: 8,
+        // CI #39635515351: a genuine Block starting at windup T+1
+        // ages 8 simulation ticks by active T+8 (133ms > 125ms) and
+        // correctly yields -38 guard. Aim ONE genuine W3C wheel about
+        // one server tick later so Block begins at T+2 or later, while
+        // keeping all original hit/parry server, pixel and W3C gates.
+        wheelAfterLightMs: 18,
         sleep,
       });
       console.log("M41_AUTHORITATIVE_LIGHT_WINDUP " + JSON.stringify(m41Proof));

@@ -71,7 +71,7 @@ test("M41 uses server-onset-led genuine W3C wheel without changing M33/M146 or s
   assert.ok(parry.includes("await dispatchM41NativeParryOnLightOnset({"));
   assert.ok(parry.includes("readOutput: m201ServerOutput, afterOffset: m41AuthLogStart"));
   assert.ok(parry.includes("fighterId: attackerReady.playerNetId"));
-  assert.ok(parry.includes("wheelAfterLightMs: 8"));
+  assert.ok(parry.includes("wheelAfterLightMs: 18"));
   assert.ok(parry.includes("sendAttack: () => performArenaAttackHold(attacker, attackerElementId, attackOffset, 35)"));
   assert.ok(parry.includes("sendWheel: () => setArenaBlock(defender, defenderElementId, true)"));
   assert.ok(parry.includes("const releaseToStrikeParryDelayMs = 95"));
