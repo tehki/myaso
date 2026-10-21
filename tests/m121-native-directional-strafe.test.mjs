@@ -31,7 +31,7 @@ test("M121 real WebDriver helper retains strict directional-sweep recovery gates
     '"Hit taken - 34 HP."',
     '"LEFT WINDUP"', '"LEFT SWEEP"',
     '"directional-attack-recovery"', '"Sweep recovery"',
-    '"M121 left-sweep readability was incomplete"',
+    'M121 left-sweep readability was incomplete',
   ]) assert.ok(flight.includes(required), "required original M121 gate: " + required);
   assert.doesNotMatch(flight, /dispatchEvent|forceSweep|fakeRecovery|skipAssertion/);
 });
