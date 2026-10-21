@@ -439,6 +439,209 @@ async fn require_quic_input_ack(
     }
 }
 
+/// The new occupant's initial full roster isn't enough: every surviving
+/// real QUIC client must ALSO be told to erase the departed fighter, then
+/// discover replacement #5. Test the actual delta tombstone on the wire,
+/// not direct Rust World state or a reset full snapshot.
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn three_live_quic_peers_receive_departed_tombstone_and_new_player() -> Result<()> {
+    use myaso_server::snapshot::SNAPSHOT_FIELD_REMOVED;
+
+    let (_server, url, pin) = start_private_staging_server(true)?;
+    let endpoint = Endpoint::client(
+        ClientConfig::builder()
+            .with_bind_default()
+            .with_server_certificate_hashes([pin])
+            .build(),
+    )?;
+    let mut sessions = Vec::new();
+    for index in 0..4 {
+        let connection = timeout(Duration::from_secs(6), endpoint.connect(url.as_str()))
+            .await
+            .context("tombstone baseline connect timeout")?
+            .context("tombstone baseline connection refused")?;
+        let (send, mut recv) = timeout(Duration::from_secs(5), connection.open_bi())
+            .await
+            .context("tombstone reliable opening timeout")??
+            .await
+            .context("tombstone reliable opening rejected")?;
+        let mut header = [0_u8; 2];
+        timeout(Duration::from_secs(5), recv.read_exact(&mut header))
+            .await
+            .context("tombstone baseline frame length timeout")??;
+        let size = u16::from_le_bytes(header) as usize;
+        if !(14..=4096).contains(&size) {
+            bail!("tombstone baseline invalid frame size {size}");
+        }
+        let mut payload = vec![0; size];
+        timeout(Duration::from_secs(5), recv.read_exact(&mut payload))
+            .await
+            .context("tombstone baseline payload timeout")??;
+        let snapshot = decode_snapshot(&payload)
+            .map_err(|e| anyhow::anyhow!("tombstone baseline invalid: {e:?}"))?;
+        if !snapshot.full || snapshot.records.len() != index + 1 {
+            bail!("client {} initial roster is not server-authored", index + 1);
+        }
+        let mut view = [None; 4];
+        fold_quic_peer_positions(&mut view, &snapshot.records);
+        sessions.push((connection, send, recv, snapshot.sequence, view));
+    }
+
+    // Before disconnection, every survivor must actually SEE and ACK the
+    // old fighter #2. An initial baseline for player #1 may predate #2
+    // joining; without this priming, absence is not an observed removal.
+    for index in [0_usize, 2, 3] {
+        let id = index as u32 + 1;
+        let session = &mut sessions[index];
+        send_held_direction(&session.0, session.3, 40_000 + id, (0, 0))?;
+        let deadline = Instant::now() + Duration::from_secs(5);
+        let latest_snapshot_sequence = loop {
+            let remaining = deadline.saturating_duration_since(Instant::now());
+            if remaining.is_zero() {
+                bail!("client {id} did not observe full old four-player roster");
+            }
+            let received = timeout(remaining, session.0.receive_datagram())
+                .await
+                .context("prime four-player roster timeout")??;
+            let bytes = received.as_ref();
+            if bytes.len() < 14 || bytes[0] != 1 || bytes[1] != 2 {
+                continue;
+            }
+            let snapshot = decode_snapshot(bytes)
+                .map_err(|e| anyhow::anyhow!("prime roster decode: {e:?}"))?;
+            fold_quic_peer_positions(&mut session.4, &snapshot.records);
+            if session.4.iter().all(Option::is_some) {
+                break snapshot.sequence;
+            }
+        };
+        if session.4[1] != Some(SPAWNS[1]) {
+            bail!("survivor {id} never observed original fighter #2 spawn");
+        }
+        // A current acknowledged snapshot containing #2 is essential:
+        // the server's delta history then has an actual removal baseline.
+        send_held_direction(&session.0, latest_snapshot_sequence, 41_000 + id, (0, 0))?;
+        require_quic_input_ack(&session.0, 41_000 + id, id).await?;
+    }
+
+    let (departed, departed_send, departed_recv, _) = {
+        let (connection, send, recv, sequence, _view) = sessions.remove(1);
+        (connection, send, recv, sequence)
+    };
+    departed.close(VarInt::from_u32(0), b"delta removal proof");
+    drop((departed_send, departed_recv, departed));
+
+    // Check each survivor got the explicit authoritative REMOVED flag
+    // for exactly departed #2; preserve peers #1/#3/#4 in local replica.
+    for (index, (connection, _, _, _, view)) in sessions.iter_mut().enumerate() {
+        let id = [1, 3, 4][index];
+        let deadline = Instant::now() + Duration::from_secs(5);
+        loop {
+            let remaining = deadline.saturating_duration_since(Instant::now());
+            if remaining.is_zero() {
+                bail!("surviving QUIC client {id} never received #2 REMOVED tombstone");
+            }
+            let received = timeout(remaining, connection.receive_datagram())
+                .await
+                .context("survivor tombstone receive timeout")??;
+            let bytes = received.as_ref();
+            if bytes.len() < 14 || bytes[0] != 1 || bytes[1] != 2 {
+                continue;
+            }
+            let snapshot = decode_snapshot(bytes)
+                .map_err(|e| anyhow::anyhow!("survivor tombstone invalid: {e:?}"))?;
+            let old_departed = snapshot
+                .records
+                .iter()
+                .any(|record| record.net_id == 2 && record.mask & SNAPSHOT_FIELD_REMOVED != 0);
+            fold_quic_peer_positions(view, &snapshot.records);
+            if old_departed {
+                if view[1].is_some() {
+                    bail!("survivor {id} retained stale player #2 after REMOVED frame");
+                }
+                println!(
+                    "ALPHA_8C_REAL_QUIC_REMOVAL observer={id} removed=2 tick={}",
+                    snapshot.server_tick
+                );
+                break;
+            }
+        }
+    }
+
+    let replacement = timeout(Duration::from_secs(6), endpoint.connect(url.as_str()))
+        .await
+        .context("replacement after tombstones connect timeout")?
+        .context("replacement after tombstones refused")?;
+    let (_send, mut recv) = timeout(Duration::from_secs(5), replacement.open_bi())
+        .await
+        .context("replacement roster stream timeout")??
+        .await
+        .context("replacement roster stream refused")?;
+    let mut length = [0_u8; 2];
+    timeout(Duration::from_secs(5), recv.read_exact(&mut length))
+        .await
+        .context("replacement baseline length timeout")??;
+    let size = u16::from_le_bytes(length) as usize;
+    if !(14..=4096).contains(&size) {
+        bail!("replacement invalid baseline size {size}");
+    }
+    let mut payload = vec![0_u8; size];
+    timeout(Duration::from_secs(5), recv.read_exact(&mut payload))
+        .await
+        .context("replacement baseline body timeout")??;
+    let snapshot = decode_snapshot(&payload)
+        .map_err(|e| anyhow::anyhow!("replacement baseline invalid: {e:?}"))?;
+    let expected: BTreeSet<u32> = [1, 3, 4, 5].into_iter().collect();
+    let ids: BTreeSet<u32> = snapshot.records.iter().map(|r| r.net_id).collect();
+    if !snapshot.full || ids != expected {
+        bail!("replacement did not see exact new authoritative roster: {ids:?}");
+    }
+
+    for (index, (connection, _, _, baseline, view)) in sessions.iter_mut().enumerate() {
+        let id = [1, 3, 4][index];
+        // The survivors are already realtime-ready: no second join
+        // handshake and no restart of their existing World identity.
+        let deadline = Instant::now() + Duration::from_secs(5);
+        let mut seen_new = false;
+        while !seen_new {
+            let remaining = deadline.saturating_duration_since(Instant::now());
+            if remaining.is_zero() {
+                bail!("survivor {id} never received replacement net ID #5");
+            }
+            let received = timeout(remaining, connection.receive_datagram())
+                .await
+                .context("survivor replacement snapshot timeout")??;
+            let bytes = received.as_ref();
+            if bytes.len() < 14 || bytes[0] != 1 || bytes[1] != 2 {
+                continue;
+            }
+            let snapshot = decode_snapshot(bytes)
+                .map_err(|e| anyhow::anyhow!("survivor replacement invalid: {e:?}"))?;
+            fold_quic_peer_positions(view, &snapshot.records);
+            if let Some(actual) = snapshot
+                .records
+                .iter()
+                .find(|record| record.net_id == 5 && record.mask & SNAPSHOT_FIELD_POSITION != 0)
+            {
+                let observed = (actual.x as f32 / 4.0, actual.y as f32 / 4.0);
+                if observed != SPAWNS[1] || view[1].is_some() {
+                    bail!("survivor {id} saw ghost #2 or incorrect new fighter position");
+                }
+                seen_new = true;
+                println!(
+                    "ALPHA_8C_REAL_QUIC_REPLACEMENT observer={id} new_id=5 tick={}",
+                    snapshot.server_tick
+                );
+            }
+        }
+        send_held_direction(connection, *baseline, 42_000 + id, (0, 0))?;
+        require_quic_input_ack(connection, 42_000 + id, id).await?;
+    }
+    send_held_direction(&replacement, snapshot.sequence, 42_005, (0, 0))?;
+    require_quic_input_ack(&replacement, 42_005, 5).await?;
+    println!("ALPHA_8C_REAL_QUIC_TOMBSTONES_PASS survivors=1,3,4 departed=2 replacement=5");
+    Ok(())
+}
+
 /// Test the *real* authoritative QUIC stream and replicated state. No direct
 /// Rust simulation calls or client-controlled teleports are used. The matched
 /// OFF run is a negative control; the ON run must stop before the smith wall.

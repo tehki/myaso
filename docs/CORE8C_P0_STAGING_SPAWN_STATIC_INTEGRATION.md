@@ -180,6 +180,40 @@ restore. It proves bounded World slot and admission ownership, not
 independent-host M5 or persistent crash recovery. No public listener
 or production settings are changed.
 
+## Core 8C — three surviving clients observe real QUIC leave and rejoin
+
+The additional test
+three_live_quic_peers_receive_departed_tombstone_and_new_player
+exercises the actual server wire delta lifecycle, not an isolated
+in-memory World::remove_player unit call.
+
+Four separate certificate-pinned loopback QUIC connections join the
+same server. Each surviving client (#1, #3, #4) first observes and
+**acknowledges** a real four-player authoritative roster containing
+fighter #2. This is necessary: checking a client that never saw #2
+cannot prove correct removal. Client #2 then closes its original real
+QUIC connection. The original server terminates that session.
+
+All **three** surviving players must receive an explicit replicated
+SNAPSHOT_FIELD_REMOVED tombstone for exactly #2, with their own live
+delta cache clearing its now-departed position. After a new fifth
+connection is admitted into the vacated slot, its first reliable
+baseline must show exactly network IDs {1,3,4,5}. Each of the three
+**already connected** old players must then receive a positive server
+position record identifying new net ID #5 at the original #2
+Greyhaven spawn (4206,4160), and none may continue retaining #2.
+Every survivor and newcomer must still exchange an individually
+addressed, server-generated INPUT_ACK.
+
+This verifies removal/arrival propagation through the **real shared
+authoritative server** and independent QUIC per-client delta streams,
+while the preceding child #532 case covers four concurrent approaches
+and mutual visibility at the Blacksmith. It does not imply that #5 is
+the same authenticated person or inherits #2's gear/account/inventory.
+The entire experiment uses the existing loopback-only static-collision
+profile; it does not create, bind or expose a separate public service,
+and makes no 2-host browser or sword pickup claim.
+
 ## Nonclaims and release HOLD
 
 This is **not** full geometry authority. World #509's 23 static AABBs omit
