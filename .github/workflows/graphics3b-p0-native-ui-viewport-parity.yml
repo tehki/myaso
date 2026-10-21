@@ -1,0 +1,47 @@
+name: Graphics 3B P0 actual Chrome Firefox equal-viewport layout QA
+
+on:
+  pull_request:
+    paths:
+      - "scripts/graphics3b_native_viewport_parity.mjs"
+      - "scripts/graphics3b_gameplay_fold_budget.mjs"
+      - "scripts/graphics3b_native_layout_parity.mjs"
+      - "tests/graphics3b-native-viewport-parity.test.mjs"
+      - "tests/graphics3b-gameplay-fold-budget.test.mjs"
+      - "tests/graphics3b-native-layout-parity.test.mjs"
+      - "web/index.html"
+      - "web/styles.css"
+      - ".github/workflows/graphics3b-p0-native-ui-viewport-parity.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  real-original-game-page-parity:
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check strict native viewport instrumentation and source contract
+        run: |
+          node --check scripts/graphics3b_native_viewport_parity.mjs
+          node --check scripts/graphics3b_gameplay_fold_budget.mjs
+          node --check scripts/graphics3b_native_layout_parity.mjs
+          node --test tests/graphics3b-native-viewport-parity.test.mjs tests/graphics3b-native-layout-parity.test.mjs tests/graphics3b-gameplay-fold-budget.test.mjs
+      - name: Require both genuine Chrome and Firefox W3C browser engines
+        run: |
+          google-chrome --version
+          firefox --version
+          chromedriver --version
+          geckodriver --version
+      - name: Reproduce original myaso UI at BOTH native 1280x720 and 1366x682 content viewports
+        run: timeout --signal=TERM --kill-after=5s 180s node scripts/graphics3b_native_layout_parity.mjs
+      - name: Preserve authentic Chrome Firefox page layout screenshots and CSS metrics
+        if: always()
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: graphics3b-native-original-page-viewport-parity
+          path: alpha-p0-graphics3b-native-page-parity-evidence/*
+          if-no-files-found: ignore
+          retention-days: 3
