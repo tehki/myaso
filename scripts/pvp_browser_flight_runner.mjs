@@ -12,6 +12,7 @@ import { summarizeM214ConfirmedFeedback } from "./m214-confirmed-feedback-latenc
 import { summarizeM215SuccessfulRollLatency } from "./m215-successful-roll-latency.mjs";
 import { summarizeM216ParryPunishLatency } from "./m216-successful-parry-punish-latency.mjs";
 import { summarizeM217SuccessfulKickLatency } from "./m217-successful-kick-latency.mjs";
+import { summarizeSpartanConnectedKickFlight } from "./graphics3a-spartan-connected-receipt.mjs";
 import { correlateM230HeavyReplayEvidence } from "./m230-heavy-replay-correlation.mjs";
 import { withM231M108FailureEvidence } from "./m231-m108-failure-path.mjs";
 import { summarizeM232SpatialHandoffFailure } from "./m232-spatial-handoff-failure.mjs";
@@ -36,6 +37,12 @@ import { isTickNewer32 } from "../src/browser/reconciliation.mjs";
 const root = process.cwd();
 const durationMs = Number(process.env.MYASO_PVP_FLIGHT_DURATION_MS ?? 7000);
 const scenario = process.env.MYASO_PVP_SCENARIO ?? "damage";
+// Manually executed Graphics 3A acceptance extension; existing protected
+// Combat flights remain EXACTLY unchanged when this environment variable is off.
+const spartanFlight = process.env.MYASO_GRAPHICS3A_SPARTAN_FLIGHT === "1";
+if (spartanFlight && scenario !== "uikickbuffer") {
+  throw new Error("Graphics3A actual server flight requires MYASO_PVP_SCENARIO=uikickbuffer");
+}
 // Headless Firefox can occasionally stall longer than a 40 ms DOM key tap.
 // Keep the real E key depressed across multiple browser/input frames so the
 // authoritative client has a fair opportunity to sample the genuine gesture.
@@ -591,6 +598,11 @@ async function navigate(session, gameUrl, certificateHash) {
   const url = new URL(`http://127.0.0.1:${staticPort}/web/${page}`);
   url.searchParams.set("server", gameUrl);
   url.searchParams.set("cert", certificateHash);
+  if (spartanFlight) {
+    // Existing client-double-opt-in only; never enable Knight source by default.
+    url.searchParams.set("knights", "1");
+    url.searchParams.set("knightKickSource", "1");
+  }
   if (scenario !== "ui") {
     url.searchParams.set("duration", String(durationMs));
     url.searchParams.set("scenario", scenario);
@@ -6805,6 +6817,47 @@ async function runOnlineUiKickKnockdownFfaFocusFlight(entries) {
   }));
 }
 
+// Native WebDriver-backed instrumentation exists ONLY in the explicitly
+// requested real-server flight. It watches real Canvas drawImage calls; it
+// neither changes game state nor invokes client mock action setters.
+async function installSpartanKickDrawProbe(session) {
+  return await execute(session.base, session.sessionId, `
+    if (!window.__graphics3aSpartanDrawProbe) {
+      const original=CanvasRenderingContext2D.prototype.drawImage;
+      const data={draws:[],installed:true};
+      CanvasRenderingContext2D.prototype.drawImage=function(image,...args){
+        const src=typeof image?.src==="string" ? image.src : "";
+        if(src.endsWith("/silver_kick.webp") && args.length===8) {
+          const frame=args[0]/160, direction=args[1]/160;
+          if (data.draws.length<2048) data.draws.push({
+            frame,direction,epochMs:Date.now()});
+        }
+        return original.call(this,image,...args);
+      };
+      window.__graphics3aSpartanDrawProbe=data;
+    }
+    return window.__graphics3aSpartanDrawProbe.installed;
+  `);
+}
+
+async function readSpartanKickDrawProbe(session) {
+  const observed=await execute(session.base,session.sessionId,`
+    const data=window.__graphics3aSpartanDrawProbe;
+    // Event text changes after hits; the acceptance observer retains the
+    // authenticated connection label and authoritative server receipt.
+    const online=window.__MYASO_M30_UI__?.online??"";
+    const m=online.match(new RegExp("player #([0-9]+)"));
+    const receipt=window.__MYASO_ACCEPTANCE_STATE__;
+    return {
+      probeInstalled:data?.installed===true,
+      draws:data?.draws??[],
+      serverConnected:Boolean(m)&&Number(receipt?.serverTick??0)>0,
+      netId:m?Number(m[1]):0,
+    };
+  `);
+  return {...observed,engine:session.name};
+}
+
 async function runOnlineUiKickBufferFlight(entries) {
   const staged = await prepareHeavyCounterplayFlight(
     entries,
@@ -6812,6 +6865,14 @@ async function runOnlineUiKickBufferFlight(entries) {
     { attackerName: "chrome", defenderName: "firefox", movementMs: 150 },
   );
   const { attacker, defender, attackerElementId, movementCode } = staged;
+  if (spartanFlight) {
+    // Instrument the actual imported browser game renderer. No mock actions
+    // are ever sent to the server; only native input and existing M133 events.
+    for (const session of [attacker, defender]) {
+      const installed = await installSpartanKickDrawProbe(session);
+      if (!installed) throw new Error("Graphics3A source draw probe failed in "+session.name);
+    }
+  }
   const attackOffset = movementCode === "KeyD" ? 200 : -200;
   const beforeAttacker = await readUiEvidence(attacker);
   const pointerOffset = beforeAttacker.pointers.length;
@@ -6973,8 +7034,21 @@ async function runOnlineUiKickBufferFlight(entries) {
     throw new Error(`M133 kick-buffer flight accidentally resolved as parry: ${JSON.stringify(evidence)}`);
   }
 
+  let spartanReceipt = null;
+  if (spartanFlight) {
+    const observations = await Promise.all(
+      [attacker, defender].map(readSpartanKickDrawProbe));
+    spartanReceipt = summarizeSpartanConnectedKickFlight({
+      attackerTransitions: ownTransitions,
+      defenderTransitions: focusTransitions,
+      clients: observations,
+    });
+    console.log("GRAPHICS3A_SPARTAN_CONNECTED_KICK_FLIGHT "
+      + JSON.stringify(spartanReceipt));
+  }
   return evidence.map((entry) => ({
     ...entry,
+    graphics3aSpartanReceipt: spartanReceipt,
     kickBufferPointerDownEpochMs: entry.browser === attacker.name ? rightDown.epochMs : null,
     kickBufferPointerUpEpochMs: entry.browser === attacker.name ? rightUp.epochMs : null,
     kickBufferRecoveryEpochMs: entry.browser === attacker.name ? ownRecovery.epochMs : null,

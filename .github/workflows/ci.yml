@@ -101,6 +101,16 @@ jobs:
           node --check web/online-game.mjs
           node --test tests/r1-network-diagnostics.test.mjs tests/m6-browser-authority.test.mjs
 
+      - name: Validate Graphics 3A connected Spartan kick receipt (offline, fail-closed)
+        run: |
+          # Deterministic negative-path validator ONLY. Does not label
+          # simulated inputs as a genuine two-browser local Rust server flight.
+          # Real Chrome+Firefox acceptance must be run manually on a QA host.
+          node --check scripts/graphics3a-spartan-connected-receipt.mjs
+          node --check scripts/pvp_browser_flight_runner.mjs
+          node --check tests/graphics3a-connected-spartan-kick-receipt.test.mjs
+          node --test tests/graphics3a-connected-spartan-kick-receipt.test.mjs
+
       - name: Validate browser runtime hot path
         run: |
           node --check src/browser/m224-dodge-completion.mjs
