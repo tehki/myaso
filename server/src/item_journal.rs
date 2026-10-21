@@ -463,8 +463,23 @@ mod tests {
             fs::create_dir(&path).expect("private test directory");
             Self(path)
         }
+        /// Used only after test-controlled writer handoff. Concurrent
+        /// subprocess tests may be in fork/exec descriptor teardown;
+        /// postpone recovery parsing briefly until the OS lock clears.
+        /// Never change production DurableItemJournal::open fail-fast.
+        fn open_after_handoff(&self) -> Result<DurableItemJournal, ItemJournalError> {
+            let deadline = std::time::Instant::now() + std::time::Duration::from_millis(500);
+            loop {
+                match DurableItemJournal::open(&self.0) {
+                    Err(ItemJournalError::WriterBusy) if std::time::Instant::now() < deadline => {
+                        std::thread::sleep(std::time::Duration::from_millis(5));
+                    }
+                    result => return result,
+                }
+            }
+        }
         fn open(&self) -> DurableItemJournal {
-            DurableItemJournal::open(&self.0).expect("open journal")
+            self.open_after_handoff().expect("open journal")
         }
         fn record(&self, seq: u64) -> PathBuf {
             self.0.join(canonical_name(seq))
@@ -848,7 +863,7 @@ mod tests {
         drop(recovered);
         fs::write(root.record(1), b"partially-written-canonical").expect("simulate damage");
         assert!(matches!(
-            DurableItemJournal::open(&root.0),
+            root.open_after_handoff(),
             Err(ItemJournalError::InvalidRecord(_))
         ));
     }
