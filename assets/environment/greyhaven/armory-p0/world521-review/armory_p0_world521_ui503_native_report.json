@@ -1,0 +1,2078 @@
+{
+  "milestone": "Graphics 3B First Playable exact consolidated World #521 + original Blender + UI503 native pointer compatibility",
+  "sourceHeads": {
+    "world": "3178b9aad8757ceb3594ff04b9e3099dced6b729",
+    "ui": "8d500d8ddeb4058f15dbc704bf78d685d1ca31ef",
+    "graphicsParent": "2a11b923591a682bbae3cffe6d9f70b0d2036de8"
+  },
+  "externalSourceHashes": {
+    "/__world493__/src/world/alpha-armory.mjs": "305a7764d67af9115d85000bde5e922cbae64db2455e15fbf7d3d22b01c5c3bf",
+    "/__world493__/src/world/authored-maps.mjs": "21e7663303b14cc89f7dece7d73fda3b7e1fd4b70cc97b8753cd2c793209e144",
+    "/__world493__/src/browser/authored-world-renderer.mjs": "2006dbff24401cc5e262363fb11f89546bbf769cb11bcffddcbeb8819dd4ca7a",
+    "/__ui503__/src/browser/alpha-sword-gesture.mjs": "a8b6a85fe17b1cab6ab1f2033002c1fb0526b287fb81a234264df1cb288b081c",
+    "/__ui503__/src/browser/sword-canvas-pointer.mjs": "cc4b60779cc744a66ccf4ca20be1b6243c8ee935a86a795ed425c3b6f796efd6",
+    "/__world493__/src/world/building-presentation.mjs": "c2e2ad0350fbc5d0c8408a48a151c280b4cc85500c53f4b8e705b21e97147e33"
+  },
+  "graphicsSourceHashes": {
+    "src/browser/armory-rack-visual.mjs": "3eec34073d4056411df063677e4b435bafa9ad0c684bed450e8c319f91cf5fdc",
+    "src/browser/armory-world493-visual-bridge.mjs": "f7862e3931a150c5b8ac2e11054183d8de12ef498ab22be5cca192f819d46f69",
+    "assets/environment/greyhaven/armory-p0/armory_rack.webp": "83d0d228785f80e95efd18fa6ef46a77d4ce8500a3fd5cf777d0f1f5ee3917b8",
+    "assets/environment/greyhaven/armory-p0/armory_sword.webp": "795874620d07652e55f5e8a76952d2075f17196fc892eff88d46b165638a3b31"
+  },
+  "consolidatedSourceHashes": {
+    "src/world/alpha-solid-geometry.mjs": "e49fe3e3937849f3b46c5539ab0361025fc510db201695a7dbaaad69bf895ddf",
+    "assets/world/greyhaven-alpha-solids-v1.json": "186c9f6966749f25c26840dd26bd53771daf677ffe486702afcaa4a054482ebe"
+  },
+  "consolidatedWorld521Candidate": true,
+  "browserResults": [
+    {
+      "engine": "chrome",
+      "version": "Chrome/154.0.8037.99",
+      "errors": [],
+      "maskOverlap": {
+        "count": 4,
+        "pairs": [
+          {
+            "ids": [
+              "ART-ONLY-NO-SERVER-0",
+              "ART-ONLY-NO-SERVER-1"
+            ],
+            "sourceMaskOverlapPixels": 0
+          },
+          {
+            "ids": [
+              "ART-ONLY-NO-SERVER-0",
+              "ART-ONLY-NO-SERVER-2"
+            ],
+            "sourceMaskOverlapPixels": 0
+          },
+          {
+            "ids": [
+              "ART-ONLY-NO-SERVER-0",
+              "ART-ONLY-NO-SERVER-3"
+            ],
+            "sourceMaskOverlapPixels": 0
+          },
+          {
+            "ids": [
+              "ART-ONLY-NO-SERVER-1",
+              "ART-ONLY-NO-SERVER-2"
+            ],
+            "sourceMaskOverlapPixels": 0
+          },
+          {
+            "ids": [
+              "ART-ONLY-NO-SERVER-1",
+              "ART-ONLY-NO-SERVER-3"
+            ],
+            "sourceMaskOverlapPixels": 0
+          },
+          {
+            "ids": [
+              "ART-ONLY-NO-SERVER-2",
+              "ART-ONLY-NO-SERVER-3"
+            ],
+            "sourceMaskOverlapPixels": 0
+          }
+        ],
+        "maxOverlap": 0,
+        "sourceMaskOnly": true,
+        "liveRenderedGameOcclusionValidated": false
+      },
+      "stableHit": {
+        "x": 20,
+        "y": 55,
+        "radius": 2,
+        "minimumNeighborhoodAlpha": 224,
+        "qaLandmarkOnly": true,
+        "expandsHitBox": false
+      },
+      "allSwordClicks": [
+        {
+          "mode": "scaled-dpr2",
+          "index": 0,
+          "itemId": "ART-ONLY-NO-SERVER-0",
+          "pointerCanvasXY": [
+            269.1,
+            260.5
+          ],
+          "cssWidth": 358,
+          "visualIntentOnly": true,
+          "realPickupCommitted": false
+        },
+        {
+          "mode": "scaled-dpr2",
+          "index": 1,
+          "itemId": "ART-ONLY-NO-SERVER-1",
+          "pointerCanvasXY": [
+            302.7,
+            260.5
+          ],
+          "cssWidth": 358,
+          "visualIntentOnly": true,
+          "realPickupCommitted": false
+        },
+        {
+          "mode": "scaled-dpr2",
+          "index": 2,
+          "itemId": "ART-ONLY-NO-SERVER-2",
+          "pointerCanvasXY": [
+            336.3,
+            260.5
+          ],
+          "cssWidth": 358,
+          "visualIntentOnly": true,
+          "realPickupCommitted": false
+        },
+        {
+          "mode": "scaled-dpr2",
+          "index": 3,
+          "itemId": "ART-ONLY-NO-SERVER-3",
+          "pointerCanvasXY": [
+            369.9,
+            260.5
+          ],
+          "cssWidth": 358,
+          "visualIntentOnly": true,
+          "realPickupCommitted": false
+        },
+        {
+          "mode": "desktop",
+          "index": 0,
+          "itemId": "ART-ONLY-NO-SERVER-0",
+          "pointerCanvasXY": [
+            269.1,
+            260.5
+          ],
+          "cssWidth": 640,
+          "visualIntentOnly": true,
+          "realPickupCommitted": false
+        },
+        {
+          "mode": "desktop",
+          "index": 1,
+          "itemId": "ART-ONLY-NO-SERVER-1",
+          "pointerCanvasXY": [
+            302.7,
+            260.5
+          ],
+          "cssWidth": 640,
+          "visualIntentOnly": true,
+          "realPickupCommitted": false
+        },
+        {
+          "mode": "desktop",
+          "index": 2,
+          "itemId": "ART-ONLY-NO-SERVER-2",
+          "pointerCanvasXY": [
+            336.3,
+            260.5
+          ],
+          "cssWidth": 640,
+          "visualIntentOnly": true,
+          "realPickupCommitted": false
+        },
+        {
+          "mode": "desktop",
+          "index": 3,
+          "itemId": "ART-ONLY-NO-SERVER-3",
+          "pointerCanvasXY": [
+            369.9,
+            260.5
+          ],
+          "cssWidth": 640,
+          "visualIntentOnly": true,
+          "realPickupCommitted": false
+        }
+      ],
+      "world521BuildingPresentationCheck": {
+        "smithReplacementForbidden": true,
+        "redLionVisibleDifferencePixels": 36012,
+        "blacksmithPixelsChangedByRedLionReplacement": 0,
+        "observedGameRendererIntegration": false,
+        "productionApproved": false
+      },
+      "afterAllFourSourcePixelClicks": {
+        "ready": true,
+        "worldHead": "3178b9aad8757ceb3594ff04b9e3099dced6b729",
+        "uiHead": "8d500d8ddeb4058f15dbc704bf78d685d1ca31ef",
+        "originalWorldImported": true,
+        "originalUiGestureImported": true,
+        "sourceWorldSocketPositions": [
+          [
+            3740,
+            4038
+          ],
+          [
+            3780,
+            4038
+          ],
+          [
+            3820,
+            4038
+          ],
+          [
+            3860,
+            4038
+          ]
+        ],
+        "lastPresentedFrameId": 10,
+        "frameId": 10,
+        "visibleIds": [
+          "ART-ONLY-NO-SERVER-0",
+          "ART-ONLY-NO-SERVER-1",
+          "ART-ONLY-NO-SERVER-2",
+          "ART-ONLY-NO-SERVER-3"
+        ],
+        "swordRects": [
+          {
+            "id": "ART-ONLY-NO-SERVER-0",
+            "x": 248.60000000000002,
+            "y": 205,
+            "width": 42,
+            "height": 115,
+            "socketId": "greyhaven-rack-1",
+            "revision": 0
+          },
+          {
+            "id": "ART-ONLY-NO-SERVER-1",
+            "x": 282.2,
+            "y": 205,
+            "width": 42,
+            "height": 115,
+            "socketId": "greyhaven-rack-2",
+            "revision": 0
+          },
+          {
+            "id": "ART-ONLY-NO-SERVER-2",
+            "x": 315.8,
+            "y": 205,
+            "width": 42,
+            "height": 115,
+            "socketId": "greyhaven-rack-3",
+            "revision": 0
+          },
+          {
+            "id": "ART-ONLY-NO-SERVER-3",
+            "x": 349.4,
+            "y": 205,
+            "width": 42,
+            "height": 115,
+            "socketId": "greyhaven-rack-4",
+            "revision": 0
+          }
+        ],
+        "swordCount": 4,
+        "sourcePaintCompleted": true,
+        "drawnRackCount": 1,
+        "drawnSwordCount": 4,
+        "visualIntents": [
+          "ART-ONLY-NO-SERVER-0",
+          "ART-ONLY-NO-SERVER-0",
+          "ART-ONLY-NO-SERVER-0",
+          "ART-ONLY-NO-SERVER-1",
+          "ART-ONLY-NO-SERVER-2",
+          "ART-ONLY-NO-SERVER-3",
+          "ART-ONLY-NO-SERVER-0",
+          "ART-ONLY-NO-SERVER-1",
+          "ART-ONLY-NO-SERVER-2",
+          "ART-ONLY-NO-SERVER-3"
+        ],
+        "combatFallback": 1,
+        "cancelled": 3,
+        "browserPointerEvents": [
+          "down:mouse:1",
+          "up:mouse:1",
+          "down:mouse:1",
+          "up:mouse:1",
+          "down:mouse:1",
+          "up:mouse:1",
+          "down:mouse:1",
+          "up:mouse:1",
+          "down:mouse:1",
+          "up:mouse:1",
+          "down:mouse:1",
+          "up:mouse:1",
+          "down:mouse:1",
+          "up:mouse:1",
+          "down:mouse:1",
+          "up:mouse:1",
+          "down:mouse:1",
+          "up:mouse:1",
+          "down:mouse:1",
+          "up:mouse:1",
+          "down:mouse:1",
+          "up:mouse:1",
+          "down:mouse:1",
+          "up:mouse:1",
+          "down:mouse:1",
+          "up:mouse:1",
+          "down:mouse:1",
+          "up:mouse:1"
+        ],
+        "actualServerEvents": 0,
+        "serverAuthenticatedItems": false,
+        "serverOwnedItemIds": false,
+        "combatHandlerActuallyCalled": false,
+        "gameClientIntegrated": false,
+        "productionApproved": false,
+        "upHandled": true,
+        "upCandidate": "ART-ONLY-NO-SERVER-3"
+      },
+      "sourcePins": [
+        [
+          3740,
+          4038
+        ],
+        [
+          3780,
+          4038
+        ],
+        [
+          3820,
+          4038
+        ],
+        [
+          3860,
+          4038
+        ]
+      ],
+      "opaqueSourcePixel": [
+        20,
+        13
+      ],
+      "adversarial": {
+        "outside": {
+          "handled": false,
+          "itemId": null
+        },
+        "mismatch": {
+          "handled": false,
+          "itemId": null
+        },
+        "transparent": {
+          "handled": false,
+          "itemId": null
+        },
+        "frame": {
+          "handled": false,
+          "itemId": null
+        },
+        "sourceTransparentAlpha": 0
+      },
+      "alphaSampler": {
+        "visiblePixels": 1082,
+        "clickablePixels": 1007,
+        "stableSourcePixel": {
+          "x": 20,
+          "y": 55,
+          "radius": 2,
+          "minimumNeighborhoodAlpha": 224,
+          "qaLandmarkOnly": true,
+          "expandsHitBox": false
+        },
+        "sourceShaExpected": "795874620d07652e55f5e8a76952d2075f17196fc892eff88d46b165638a3b31",
+        "alphaOpaquePixel": 159,
+        "alphaTransparentPixel": 0,
+        "productionApproved": false
+      },
+      "initial": {
+        "ready": true,
+        "worldHead": "3178b9aad8757ceb3594ff04b9e3099dced6b729",
+        "uiHead": "8d500d8ddeb4058f15dbc704bf78d685d1ca31ef",
+        "originalWorldImported": true,
+        "originalUiGestureImported": true,
+        "sourceWorldSocketPositions": [
+          [
+            3740,
+            4038
+          ],
+          [
+            3780,
+            4038
+          ],
+          [
+            3820,
+            4038
+          ],
+          [
+            3860,
+            4038
+          ]
+        ],
+        "lastPresentedFrameId": 7,
+        "frameId": 7,
+        "visibleIds": [
+          "ART-ONLY-NO-SERVER-0",
+          "ART-ONLY-NO-SERVER-1",
+          "ART-ONLY-NO-SERVER-2",
+          "ART-ONLY-NO-SERVER-3"
+        ],
+        "swordRects": [
+          {
+            "id": "ART-ONLY-NO-SERVER-0",
+            "x": 248.60000000000002,
+            "y": 205,
+            "width": 42,
+            "height": 115,
+            "socketId": "greyhaven-rack-1",
+            "revision": 0
+          },
+          {
+            "id": "ART-ONLY-NO-SERVER-1",
+            "x": 282.2,
+            "y": 205,
+            "width": 42,
+            "height": 115,
+            "socketId": "greyhaven-rack-2",
+            "revision": 0
+          },
+          {
+            "id": "ART-ONLY-NO-SERVER-2",
+            "x": 315.8,
+            "y": 205,
+            "width": 42,
+            "height": 115,
+            "socketId": "greyhaven-rack-3",
+            "revision": 0
+          },
+          {
+            "id": "ART-ONLY-NO-SERVER-3",
+            "x": 349.4,
+            "y": 205,
+            "width": 42,
+            "height": 115,
+            "socketId": "greyhaven-rack-4",
+            "revision": 0
+          }
+        ],
+        "swordCount": 4,
+        "sourcePaintCompleted": true,
+        "drawnRackCount": 1,
+        "drawnSwordCount": 4,
+        "visualIntents": [],
+        "combatFallback": 0,
+        "cancelled": 0,
+        "browserPointerEvents": [],
+        "actualServerEvents": 0,
+        "serverAuthenticatedItems": false,
+        "serverOwnedItemIds": false,
+        "combatHandlerActuallyCalled": false,
+        "gameClientIntegrated": false,
+        "productionApproved": false
+      },
+      "afterOpaque": {
+        "ready": true,
+        "worldHead": "3178b9aad8757ceb3594ff04b9e3099dced6b729",
+        "uiHead": "8d500d8ddeb4058f15dbc704bf78d685d1ca31ef",
+        "originalWorldImported": true,
+        "originalUiGestureImported": true,
+        "sourceWorldSocketPositions": [
+          [
+            3740,
+            4038
+          ],
+          [
+            3780,
+            4038
+          ],
+          [
+            3820,
+            4038
+          ],
+          [
+            3860,
+            4038
+          ]
+        ],
+        "lastPresentedFrameId": 7,
+        "frameId": 7,
+        "visibleIds": [
+          "ART-ONLY-NO-SERVER-0",
+          "ART-ONLY-NO-SERVER-1",
+          "ART-ONLY-NO-SERVER-2",
+          "ART-ONLY-NO-SERVER-3"
+        ],
+        "swordRects": [
+          {
+            "id": "ART-ONLY-NO-SERVER-0",
+            "x": 248.60000000000002,
+            "y": 205,
+            "width": 42,
+            "height": 115,
+            "socketId": "greyhaven-rack-1",
+            "revision": 0
+          },
+          {
+            "id": "ART-ONLY-NO-SERVER-1",
+            "x": 282.2,
+            "y": 205,
+            "width": 42,
+            "height": 115,
+            "socketId": "greyhaven-rack-2",
+            "revision": 0
+          },
+          {
+            "id": "ART-ONLY-NO-SERVER-2",
+            "x": 315.8,
+            "y": 205,
+            "width": 42,
+            "height": 115,
+            "socketId": "greyhaven-rack-3",
+            "revision": 0
+          },
+          {
+            "id": "ART-ONLY-NO-SERVER-3",
+            "x": 349.4,
+            "y": 205,
+            "width": 42,
+            "height": 115,
+            "socketId": "greyhaven-rack-4",
+            "revision": 0
+          }
+        ],
+        "swordCount": 4,
+        "sourcePaintCompleted": true,
+        "drawnRackCount": 1,
+        "drawnSwordCount": 4,
+        "visualIntents": [
+          "ART-ONLY-NO-SERVER-0"
+        ],
+        "combatFallback": 0,
+        "cancelled": 0,
+        "browserPointerEvents": [
+          "down:mouse:1",
+          "up:mouse:1"
+        ],
+        "actualServerEvents": 0,
+        "serverAuthenticatedItems": false,
+        "serverOwnedItemIds": false,
+        "combatHandlerActuallyCalled": false,
+        "gameClientIntegrated": false,
+        "productionApproved": false,
+        "upHandled": true,
+        "upCandidate": "ART-ONLY-NO-SERVER-0"
+      },
+      "afterClear": {
+        "ready": true,
+        "worldHead": "3178b9aad8757ceb3594ff04b9e3099dced6b729",
+        "uiHead": "8d500d8ddeb4058f15dbc704bf78d685d1ca31ef",
+        "originalWorldImported": true,
+        "originalUiGestureImported": true,
+        "sourceWorldSocketPositions": [
+          [
+            3740,
+            4038
+          ],
+          [
+            3780,
+            4038
+          ],
+          [
+            3820,
+            4038
+          ],
+          [
+            3860,
+            4038
+          ]
+        ],
+        "lastPresentedFrameId": 7,
+        "frameId": 7,
+        "visibleIds": [
+          "ART-ONLY-NO-SERVER-0",
+          "ART-ONLY-NO-SERVER-1",
+          "ART-ONLY-NO-SERVER-2",
+          "ART-ONLY-NO-SERVER-3"
+        ],
+        "swordRects": [
+          {
+            "id": "ART-ONLY-NO-SERVER-0",
+            "x": 248.60000000000002,
+            "y": 205,
+            "width": 42,
+            "height": 115,
+            "socketId": "greyhaven-rack-1",
+            "revision": 0
+          },
+          {
+            "id": "ART-ONLY-NO-SERVER-1",
+            "x": 282.2,
+            "y": 205,
+            "width": 42,
+            "height": 115,
+            "socketId": "greyhaven-rack-2",
+            "revision": 0
+          },
+          {
+            "id": "ART-ONLY-NO-SERVER-2",
+            "x": 315.8,
+            "y": 205,
+            "width": 42,
+            "height": 115,
+            "socketId": "greyhaven-rack-3",
+            "revision": 0
+          },
+          {
+            "id": "ART-ONLY-NO-SERVER-3",
+            "x": 349.4,
+            "y": 205,
+            "width": 42,
+            "height": 115,
+            "socketId": "greyhaven-rack-4",
+            "revision": 0
+          }
+        ],
+        "swordCount": 4,
+        "sourcePaintCompleted": true,
+        "drawnRackCount": 1,
+        "drawnSwordCount": 4,
+        "visualIntents": [
+          "ART-ONLY-NO-SERVER-0"
+        ],
+        "combatFallback": 1,
+        "cancelled": 0,
+        "browserPointerEvents": [
+          "down:mouse:1",
+          "up:mouse:1",
+          "down:mouse:1",
+          "up:mouse:1"
+        ],
+        "actualServerEvents": 0,
+        "serverAuthenticatedItems": false,
+        "serverOwnedItemIds": false,
+        "combatHandlerActuallyCalled": false,
+        "gameClientIntegrated": false,
+        "productionApproved": false,
+        "upHandled": false,
+        "upCandidate": null
+      },
+      "afterDrag": {
+        "ready": true,
+        "worldHead": "3178b9aad8757ceb3594ff04b9e3099dced6b729",
+        "uiHead": "8d500d8ddeb4058f15dbc704bf78d685d1ca31ef",
+        "originalWorldImported": true,
+        "originalUiGestureImported": true,
+        "sourceWorldSocketPositions": [
+          [
+            3740,
+            4038
+          ],
+          [
+            3780,
+            4038
+          ],
+          [
+            3820,
+            4038
+          ],
+          [
+            3860,
+            4038
+          ]
+        ],
+        "lastPresentedFrameId": 7,
+        "frameId": 7,
+        "visibleIds": [
+          "ART-ONLY-NO-SERVER-0",
+          "ART-ONLY-NO-SERVER-1",
+          "ART-ONLY-NO-SERVER-2",
+          "ART-ONLY-NO-SERVER-3"
+        ],
+        "swordRects": [
+          {
+            "id": "ART-ONLY-NO-SERVER-0",
+            "x": 248.60000000000002,
+            "y": 205,
+            "width": 42,
+            "height": 115,
+            "socketId": "greyhaven-rack-1",
+            "revision": 0
+          },
+          {
+            "id": "ART-ONLY-NO-SERVER-1",
+            "x": 282.2,
+            "y": 205,
+            "width": 42,
+            "height": 115,
+            "socketId": "greyhaven-rack-2",
+            "revision": 0
+          },
+          {
+            "id": "ART-ONLY-NO-SERVER-2",
+            "x": 315.8,
+            "y": 205,
+            "width": 42,
+            "height": 115,
+            "socketId": "greyhaven-rack-3",
+            "revision": 0
+          },
+          {
+            "id": "ART-ONLY-NO-SERVER-3",
+            "x": 349.4,
+            "y": 205,
+            "width": 42,
+            "height": 115,
+            "socketId": "greyhaven-rack-4",
+            "revision": 0
+          }
+        ],
+        "swordCount": 4,
+        "sourcePaintCompleted": true,
+        "drawnRackCount": 1,
+        "drawnSwordCount": 4,
+        "visualIntents": [
+          "ART-ONLY-NO-SERVER-0"
+        ],
+        "combatFallback": 1,
+        "cancelled": 1,
+        "browserPointerEvents": [
+          "down:mouse:1",
+          "up:mouse:1",
+          "down:mouse:1",
+          "up:mouse:1",
+          "down:mouse:1",
+          "up:mouse:1"
+        ],
+        "actualServerEvents": 0,
+        "serverAuthenticatedItems": false,
+        "serverOwnedItemIds": false,
+        "combatHandlerActuallyCalled": false,
+        "gameClientIntegrated": false,
+        "productionApproved": false,
+        "upHandled": true,
+        "upCandidate": null
+      },
+      "afterRevision": {
+        "ready": true,
+        "worldHead": "3178b9aad8757ceb3594ff04b9e3099dced6b729",
+        "uiHead": "8d500d8ddeb4058f15dbc704bf78d685d1ca31ef",
+        "originalWorldImported": true,
+        "originalUiGestureImported": true,
+        "sourceWorldSocketPositions": [
+          [
+            3740,
+            4038
+          ],
+          [
+            3780,
+            4038
+          ],
+          [
+            3820,
+            4038
+          ],
+          [
+            3860,
+            4038
+          ]
+        ],
+        "lastPresentedFrameId": 8,
+        "frameId": 8,
+        "visibleIds": [
+          "ART-ONLY-NO-SERVER-0",
+          "ART-ONLY-NO-SERVER-1",
+          "ART-ONLY-NO-SERVER-2",
+          "ART-ONLY-NO-SERVER-3"
+        ],
+        "swordRects": [
+          {
+            "id": "ART-ONLY-NO-SERVER-0",
+            "x": 248.60000000000002,
+            "y": 205,
+            "width": 42,
+            "height": 115,
+            "socketId": "greyhaven-rack-1",
+            "revision": 1
+          },
+          {
+            "id": "ART-ONLY-NO-SERVER-1",
+            "x": 282.2,
+            "y": 205,
+            "width": 42,
+            "height": 115,
+            "socketId": "greyhaven-rack-2",
+            "revision": 0
+          },
+          {
+            "id": "ART-ONLY-NO-SERVER-2",
+            "x": 315.8,
+            "y": 205,
+            "width": 42,
+            "height": 115,
+            "socketId": "greyhaven-rack-3",
+            "revision": 0
+          },
+          {
+            "id": "ART-ONLY-NO-SERVER-3",
+            "x": 349.4,
+            "y": 205,
+            "width": 42,
+            "height": 115,
+            "socketId": "greyhaven-rack-4",
+            "revision": 0
+          }
+        ],
+        "swordCount": 4,
+        "sourcePaintCompleted": true,
+        "drawnRackCount": 1,
+        "drawnSwordCount": 4,
+        "visualIntents": [
+          "ART-ONLY-NO-SERVER-0"
+        ],
+        "combatFallback": 1,
+        "cancelled": 2,
+        "browserPointerEvents": [
+          "down:mouse:1",
+          "up:mouse:1",
+          "down:mouse:1",
+          "up:mouse:1",
+          "down:mouse:1",
+          "up:mouse:1",
+          "down:mouse:1",
+          "up:mouse:1"
+        ],
+        "actualServerEvents": 0,
+        "serverAuthenticatedItems": false,
+        "serverOwnedItemIds": false,
+        "combatHandlerActuallyCalled": false,
+        "gameClientIntegrated": false,
+        "productionApproved": false,
+        "upHandled": true,
+        "upCandidate": null
+      },
+      "afterItemRemoval": {
+        "ready": true,
+        "worldHead": "3178b9aad8757ceb3594ff04b9e3099dced6b729",
+        "uiHead": "8d500d8ddeb4058f15dbc704bf78d685d1ca31ef",
+        "originalWorldImported": true,
+        "originalUiGestureImported": true,
+        "sourceWorldSocketPositions": [
+          [
+            3740,
+            4038
+          ],
+          [
+            3780,
+            4038
+          ],
+          [
+            3820,
+            4038
+          ],
+          [
+            3860,
+            4038
+          ]
+        ],
+        "lastPresentedFrameId": 9,
+        "frameId": 9,
+        "visibleIds": [
+          "ART-ONLY-NO-SERVER-1",
+          "ART-ONLY-NO-SERVER-2",
+          "ART-ONLY-NO-SERVER-3"
+        ],
+        "swordRects": [
+          {
+            "id": "ART-ONLY-NO-SERVER-1",
+            "x": 282.2,
+            "y": 205,
+            "width": 42,
+            "height": 115,
+            "socketId": "greyhaven-rack-2",
+            "revision": 0
+          },
+          {
+            "id": "ART-ONLY-NO-SERVER-2",
+            "x": 315.8,
+            "y": 205,
+            "width": 42,
+            "height": 115,
+            "socketId": "greyhaven-rack-3",
+            "revision": 0
+          },
+          {
+            "id": "ART-ONLY-NO-SERVER-3",
+            "x": 349.4,
+            "y": 205,
+            "width": 42,
+            "height": 115,
+            "socketId": "greyhaven-rack-4",
+            "revision": 0
+          }
+        ],
+        "swordCount": 3,
+        "sourcePaintCompleted": true,
+        "drawnRackCount": 1,
+        "drawnSwordCount": 3,
+        "visualIntents": [
+          "ART-ONLY-NO-SERVER-0"
+        ],
+        "combatFallback": 1,
+        "cancelled": 3,
+        "browserPointerEvents": [
+          "down:mouse:1",
+          "up:mouse:1",
+          "down:mouse:1",
+          "up:mouse:1",
+          "down:mouse:1",
+          "up:mouse:1",
+          "down:mouse:1",
+          "up:mouse:1",
+          "down:mouse:1",
+          "up:mouse:1"
+        ],
+        "actualServerEvents": 0,
+        "serverAuthenticatedItems": false,
+        "serverOwnedItemIds": false,
+        "combatHandlerActuallyCalled": false,
+        "gameClientIntegrated": false,
+        "productionApproved": false,
+        "upHandled": true,
+        "upCandidate": null
+      },
+      "afterDpr2": {
+        "ready": true,
+        "worldHead": "3178b9aad8757ceb3594ff04b9e3099dced6b729",
+        "uiHead": "8d500d8ddeb4058f15dbc704bf78d685d1ca31ef",
+        "originalWorldImported": true,
+        "originalUiGestureImported": true,
+        "sourceWorldSocketPositions": [
+          [
+            3740,
+            4038
+          ],
+          [
+            3780,
+            4038
+          ],
+          [
+            3820,
+            4038
+          ],
+          [
+            3860,
+            4038
+          ]
+        ],
+        "lastPresentedFrameId": 10,
+        "frameId": 10,
+        "visibleIds": [
+          "ART-ONLY-NO-SERVER-0",
+          "ART-ONLY-NO-SERVER-1",
+          "ART-ONLY-NO-SERVER-2",
+          "ART-ONLY-NO-SERVER-3"
+        ],
+        "swordRects": [
+          {
+            "id": "ART-ONLY-NO-SERVER-0",
+            "x": 248.60000000000002,
+            "y": 205,
+            "width": 42,
+            "height": 115,
+            "socketId": "greyhaven-rack-1",
+            "revision": 0
+          },
+          {
+            "id": "ART-ONLY-NO-SERVER-1",
+            "x": 282.2,
+            "y": 205,
+            "width": 42,
+            "height": 115,
+            "socketId": "greyhaven-rack-2",
+            "revision": 0
+          },
+          {
+            "id": "ART-ONLY-NO-SERVER-2",
+            "x": 315.8,
+            "y": 205,
+            "width": 42,
+            "height": 115,
+            "socketId": "greyhaven-rack-3",
+            "revision": 0
+          },
+          {
+            "id": "ART-ONLY-NO-SERVER-3",
+            "x": 349.4,
+            "y": 205,
+            "width": 42,
+            "height": 115,
+            "socketId": "greyhaven-rack-4",
+            "revision": 0
+          }
+        ],
+        "swordCount": 4,
+        "sourcePaintCompleted": true,
+        "drawnRackCount": 1,
+        "drawnSwordCount": 4,
+        "visualIntents": [
+          "ART-ONLY-NO-SERVER-0",
+          "ART-ONLY-NO-SERVER-0"
+        ],
+        "combatFallback": 1,
+        "cancelled": 3,
+        "browserPointerEvents": [
+          "down:mouse:1",
+          "up:mouse:1",
+          "down:mouse:1",
+          "up:mouse:1",
+          "down:mouse:1",
+          "up:mouse:1",
+          "down:mouse:1",
+          "up:mouse:1",
+          "down:mouse:1",
+          "up:mouse:1",
+          "down:mouse:1",
+          "up:mouse:1"
+        ],
+        "actualServerEvents": 0,
+        "serverAuthenticatedItems": false,
+        "serverOwnedItemIds": false,
+        "combatHandlerActuallyCalled": false,
+        "gameClientIntegrated": false,
+        "productionApproved": false,
+        "upHandled": true,
+        "upCandidate": "ART-ONLY-NO-SERVER-0"
+      },
+      "cssCanvasWidth": 358,
+      "deviceScaleFactor": 2,
+      "screenshots": [
+        "armory_world521_ui503_chrome_initial.png",
+        "armory_world521_ui503_chrome_dpr2.png"
+      ],
+      "realInputEvents": 12,
+      "genuineGameCombat": false,
+      "serverNetworkMessages": 0,
+      "authoritativeItemOwnership": false,
+      "productionApproved": false
+    },
+    {
+      "engine": "firefox",
+      "version": "firefox/153.4.0",
+      "errors": [],
+      "maskOverlap": {
+        "count": 4,
+        "pairs": [
+          {
+            "ids": [
+              "ART-ONLY-NO-SERVER-0",
+              "ART-ONLY-NO-SERVER-1"
+            ],
+            "sourceMaskOverlapPixels": 0
+          },
+          {
+            "ids": [
+              "ART-ONLY-NO-SERVER-0",
+              "ART-ONLY-NO-SERVER-2"
+            ],
+            "sourceMaskOverlapPixels": 0
+          },
+          {
+            "ids": [
+              "ART-ONLY-NO-SERVER-0",
+              "ART-ONLY-NO-SERVER-3"
+            ],
+            "sourceMaskOverlapPixels": 0
+          },
+          {
+            "ids": [
+              "ART-ONLY-NO-SERVER-1",
+              "ART-ONLY-NO-SERVER-2"
+            ],
+            "sourceMaskOverlapPixels": 0
+          },
+          {
+            "ids": [
+              "ART-ONLY-NO-SERVER-1",
+              "ART-ONLY-NO-SERVER-3"
+            ],
+            "sourceMaskOverlapPixels": 0
+          },
+          {
+            "ids": [
+              "ART-ONLY-NO-SERVER-2",
+              "ART-ONLY-NO-SERVER-3"
+            ],
+            "sourceMaskOverlapPixels": 0
+          }
+        ],
+        "maxOverlap": 0,
+        "sourceMaskOnly": true,
+        "liveRenderedGameOcclusionValidated": false
+      },
+      "stableHit": {
+        "x": 20,
+        "y": 55,
+        "radius": 2,
+        "minimumNeighborhoodAlpha": 224,
+        "qaLandmarkOnly": true,
+        "expandsHitBox": false
+      },
+      "allSwordClicks": [
+        {
+          "mode": "scaled-dpr2",
+          "index": 0,
+          "itemId": "ART-ONLY-NO-SERVER-0",
+          "pointerCanvasXY": [
+            269.1,
+            260.5
+          ],
+          "cssWidth": 358,
+          "visualIntentOnly": true,
+          "realPickupCommitted": false
+        },
+        {
+          "mode": "scaled-dpr2",
+          "index": 1,
+          "itemId": "ART-ONLY-NO-SERVER-1",
+          "pointerCanvasXY": [
+            302.7,
+            260.5
+          ],
+          "cssWidth": 358,
+          "visualIntentOnly": true,
+          "realPickupCommitted": false
+        },
+        {
+          "mode": "scaled-dpr2",
+          "index": 2,
+          "itemId": "ART-ONLY-NO-SERVER-2",
+          "pointerCanvasXY": [
+            336.3,
+            260.5
+          ],
+          "cssWidth": 358,
+          "visualIntentOnly": true,
+          "realPickupCommitted": false
+        },
+        {
+          "mode": "scaled-dpr2",
+          "index": 3,
+          "itemId": "ART-ONLY-NO-SERVER-3",
+          "pointerCanvasXY": [
+            369.9,
+            260.5
+          ],
+          "cssWidth": 358,
+          "visualIntentOnly": true,
+          "realPickupCommitted": false
+        },
+        {
+          "mode": "desktop",
+          "index": 0,
+          "itemId": "ART-ONLY-NO-SERVER-0",
+          "pointerCanvasXY": [
+            269.1,
+            260.5
+          ],
+          "cssWidth": 640,
+          "visualIntentOnly": true,
+          "realPickupCommitted": false
+        },
+        {
+          "mode": "desktop",
+          "index": 1,
+          "itemId": "ART-ONLY-NO-SERVER-1",
+          "pointerCanvasXY": [
+            302.7,
+            260.5
+          ],
+          "cssWidth": 640,
+          "visualIntentOnly": true,
+          "realPickupCommitted": false
+        },
+        {
+          "mode": "desktop",
+          "index": 2,
+          "itemId": "ART-ONLY-NO-SERVER-2",
+          "pointerCanvasXY": [
+            336.3,
+            260.5
+          ],
+          "cssWidth": 640,
+          "visualIntentOnly": true,
+          "realPickupCommitted": false
+        },
+        {
+          "mode": "desktop",
+          "index": 3,
+          "itemId": "ART-ONLY-NO-SERVER-3",
+          "pointerCanvasXY": [
+            369.9,
+            260.5
+          ],
+          "cssWidth": 640,
+          "visualIntentOnly": true,
+          "realPickupCommitted": false
+        }
+      ],
+      "world521BuildingPresentationCheck": {
+        "smithReplacementForbidden": true,
+        "redLionVisibleDifferencePixels": 36155,
+        "blacksmithPixelsChangedByRedLionReplacement": 0,
+        "observedGameRendererIntegration": false,
+        "productionApproved": false
+      },
+      "afterAllFourSourcePixelClicks": {
+        "ready": true,
+        "worldHead": "3178b9aad8757ceb3594ff04b9e3099dced6b729",
+        "uiHead": "8d500d8ddeb4058f15dbc704bf78d685d1ca31ef",
+        "originalWorldImported": true,
+        "originalUiGestureImported": true,
+        "sourceWorldSocketPositions": [
+          [
+            3740,
+            4038
+          ],
+          [
+            3780,
+            4038
+          ],
+          [
+            3820,
+            4038
+          ],
+          [
+            3860,
+            4038
+          ]
+        ],
+        "lastPresentedFrameId": 10,
+        "frameId": 10,
+        "visibleIds": [
+          "ART-ONLY-NO-SERVER-0",
+          "ART-ONLY-NO-SERVER-1",
+          "ART-ONLY-NO-SERVER-2",
+          "ART-ONLY-NO-SERVER-3"
+        ],
+        "swordRects": [
+          {
+            "id": "ART-ONLY-NO-SERVER-0",
+            "x": 248.60000000000002,
+            "y": 205,
+            "width": 42,
+            "height": 115,
+            "socketId": "greyhaven-rack-1",
+            "revision": 0
+          },
+          {
+            "id": "ART-ONLY-NO-SERVER-1",
+            "x": 282.2,
+            "y": 205,
+            "width": 42,
+            "height": 115,
+            "socketId": "greyhaven-rack-2",
+            "revision": 0
+          },
+          {
+            "id": "ART-ONLY-NO-SERVER-2",
+            "x": 315.8,
+            "y": 205,
+            "width": 42,
+            "height": 115,
+            "socketId": "greyhaven-rack-3",
+            "revision": 0
+          },
+          {
+            "id": "ART-ONLY-NO-SERVER-3",
+            "x": 349.4,
+            "y": 205,
+            "width": 42,
+            "height": 115,
+            "socketId": "greyhaven-rack-4",
+            "revision": 0
+          }
+        ],
+        "swordCount": 4,
+        "sourcePaintCompleted": true,
+        "drawnRackCount": 1,
+        "drawnSwordCount": 4,
+        "visualIntents": [
+          "ART-ONLY-NO-SERVER-0",
+          "ART-ONLY-NO-SERVER-0",
+          "ART-ONLY-NO-SERVER-0",
+          "ART-ONLY-NO-SERVER-1",
+          "ART-ONLY-NO-SERVER-2",
+          "ART-ONLY-NO-SERVER-3",
+          "ART-ONLY-NO-SERVER-0",
+          "ART-ONLY-NO-SERVER-1",
+          "ART-ONLY-NO-SERVER-2",
+          "ART-ONLY-NO-SERVER-3"
+        ],
+        "combatFallback": 1,
+        "cancelled": 3,
+        "browserPointerEvents": [
+          "down:mouse:0",
+          "up:mouse:0",
+          "down:mouse:0",
+          "up:mouse:0",
+          "down:mouse:0",
+          "up:mouse:0",
+          "down:mouse:0",
+          "up:mouse:0",
+          "down:mouse:0",
+          "up:mouse:0",
+          "down:mouse:0",
+          "up:mouse:0",
+          "down:mouse:0",
+          "up:mouse:0",
+          "down:mouse:0",
+          "up:mouse:0",
+          "down:mouse:0",
+          "up:mouse:0",
+          "down:mouse:0",
+          "up:mouse:0",
+          "down:mouse:0",
+          "up:mouse:0",
+          "down:mouse:0",
+          "up:mouse:0",
+          "down:mouse:0",
+          "up:mouse:0",
+          "down:mouse:0",
+          "up:mouse:0"
+        ],
+        "actualServerEvents": 0,
+        "serverAuthenticatedItems": false,
+        "serverOwnedItemIds": false,
+        "combatHandlerActuallyCalled": false,
+        "gameClientIntegrated": false,
+        "productionApproved": false,
+        "upHandled": true,
+        "upCandidate": "ART-ONLY-NO-SERVER-3"
+      },
+      "sourcePins": [
+        [
+          3740,
+          4038
+        ],
+        [
+          3780,
+          4038
+        ],
+        [
+          3820,
+          4038
+        ],
+        [
+          3860,
+          4038
+        ]
+      ],
+      "opaqueSourcePixel": [
+        20,
+        13
+      ],
+      "adversarial": {
+        "outside": {
+          "handled": false,
+          "itemId": null
+        },
+        "mismatch": {
+          "handled": false,
+          "itemId": null
+        },
+        "transparent": {
+          "handled": false,
+          "itemId": null
+        },
+        "frame": {
+          "handled": false,
+          "itemId": null
+        },
+        "sourceTransparentAlpha": 0
+      },
+      "alphaSampler": {
+        "visiblePixels": 1082,
+        "clickablePixels": 1007,
+        "stableSourcePixel": {
+          "x": 20,
+          "y": 55,
+          "radius": 2,
+          "minimumNeighborhoodAlpha": 224,
+          "qaLandmarkOnly": true,
+          "expandsHitBox": false
+        },
+        "sourceShaExpected": "795874620d07652e55f5e8a76952d2075f17196fc892eff88d46b165638a3b31",
+        "alphaOpaquePixel": 159,
+        "alphaTransparentPixel": 0,
+        "productionApproved": false
+      },
+      "initial": {
+        "ready": true,
+        "worldHead": "3178b9aad8757ceb3594ff04b9e3099dced6b729",
+        "uiHead": "8d500d8ddeb4058f15dbc704bf78d685d1ca31ef",
+        "originalWorldImported": true,
+        "originalUiGestureImported": true,
+        "sourceWorldSocketPositions": [
+          [
+            3740,
+            4038
+          ],
+          [
+            3780,
+            4038
+          ],
+          [
+            3820,
+            4038
+          ],
+          [
+            3860,
+            4038
+          ]
+        ],
+        "lastPresentedFrameId": 7,
+        "frameId": 7,
+        "visibleIds": [
+          "ART-ONLY-NO-SERVER-0",
+          "ART-ONLY-NO-SERVER-1",
+          "ART-ONLY-NO-SERVER-2",
+          "ART-ONLY-NO-SERVER-3"
+        ],
+        "swordRects": [
+          {
+            "id": "ART-ONLY-NO-SERVER-0",
+            "x": 248.60000000000002,
+            "y": 205,
+            "width": 42,
+            "height": 115,
+            "socketId": "greyhaven-rack-1",
+            "revision": 0
+          },
+          {
+            "id": "ART-ONLY-NO-SERVER-1",
+            "x": 282.2,
+            "y": 205,
+            "width": 42,
+            "height": 115,
+            "socketId": "greyhaven-rack-2",
+            "revision": 0
+          },
+          {
+            "id": "ART-ONLY-NO-SERVER-2",
+            "x": 315.8,
+            "y": 205,
+            "width": 42,
+            "height": 115,
+            "socketId": "greyhaven-rack-3",
+            "revision": 0
+          },
+          {
+            "id": "ART-ONLY-NO-SERVER-3",
+            "x": 349.4,
+            "y": 205,
+            "width": 42,
+            "height": 115,
+            "socketId": "greyhaven-rack-4",
+            "revision": 0
+          }
+        ],
+        "swordCount": 4,
+        "sourcePaintCompleted": true,
+        "drawnRackCount": 1,
+        "drawnSwordCount": 4,
+        "visualIntents": [],
+        "combatFallback": 0,
+        "cancelled": 0,
+        "browserPointerEvents": [],
+        "actualServerEvents": 0,
+        "serverAuthenticatedItems": false,
+        "serverOwnedItemIds": false,
+        "combatHandlerActuallyCalled": false,
+        "gameClientIntegrated": false,
+        "productionApproved": false
+      },
+      "afterOpaque": {
+        "ready": true,
+        "worldHead": "3178b9aad8757ceb3594ff04b9e3099dced6b729",
+        "uiHead": "8d500d8ddeb4058f15dbc704bf78d685d1ca31ef",
+        "originalWorldImported": true,
+        "originalUiGestureImported": true,
+        "sourceWorldSocketPositions": [
+          [
+            3740,
+            4038
+          ],
+          [
+            3780,
+            4038
+          ],
+          [
+            3820,
+            4038
+          ],
+          [
+            3860,
+            4038
+          ]
+        ],
+        "lastPresentedFrameId": 7,
+        "frameId": 7,
+        "visibleIds": [
+          "ART-ONLY-NO-SERVER-0",
+          "ART-ONLY-NO-SERVER-1",
+          "ART-ONLY-NO-SERVER-2",
+          "ART-ONLY-NO-SERVER-3"
+        ],
+        "swordRects": [
+          {
+            "id": "ART-ONLY-NO-SERVER-0",
+            "x": 248.60000000000002,
+            "y": 205,
+            "width": 42,
+            "height": 115,
+            "socketId": "greyhaven-rack-1",
+            "revision": 0
+          },
+          {
+            "id": "ART-ONLY-NO-SERVER-1",
+            "x": 282.2,
+            "y": 205,
+            "width": 42,
+            "height": 115,
+            "socketId": "greyhaven-rack-2",
+            "revision": 0
+          },
+          {
+            "id": "ART-ONLY-NO-SERVER-2",
+            "x": 315.8,
+            "y": 205,
+            "width": 42,
+            "height": 115,
+            "socketId": "greyhaven-rack-3",
+            "revision": 0
+          },
+          {
+            "id": "ART-ONLY-NO-SERVER-3",
+            "x": 349.4,
+            "y": 205,
+            "width": 42,
+            "height": 115,
+            "socketId": "greyhaven-rack-4",
+            "revision": 0
+          }
+        ],
+        "swordCount": 4,
+        "sourcePaintCompleted": true,
+        "drawnRackCount": 1,
+        "drawnSwordCount": 4,
+        "visualIntents": [
+          "ART-ONLY-NO-SERVER-0"
+        ],
+        "combatFallback": 0,
+        "cancelled": 0,
+        "browserPointerEvents": [
+          "down:mouse:0",
+          "up:mouse:0"
+        ],
+        "actualServerEvents": 0,
+        "serverAuthenticatedItems": false,
+        "serverOwnedItemIds": false,
+        "combatHandlerActuallyCalled": false,
+        "gameClientIntegrated": false,
+        "productionApproved": false,
+        "upHandled": true,
+        "upCandidate": "ART-ONLY-NO-SERVER-0"
+      },
+      "afterClear": {
+        "ready": true,
+        "worldHead": "3178b9aad8757ceb3594ff04b9e3099dced6b729",
+        "uiHead": "8d500d8ddeb4058f15dbc704bf78d685d1ca31ef",
+        "originalWorldImported": true,
+        "originalUiGestureImported": true,
+        "sourceWorldSocketPositions": [
+          [
+            3740,
+            4038
+          ],
+          [
+            3780,
+            4038
+          ],
+          [
+            3820,
+            4038
+          ],
+          [
+            3860,
+            4038
+          ]
+        ],
+        "lastPresentedFrameId": 7,
+        "frameId": 7,
+        "visibleIds": [
+          "ART-ONLY-NO-SERVER-0",
+          "ART-ONLY-NO-SERVER-1",
+          "ART-ONLY-NO-SERVER-2",
+          "ART-ONLY-NO-SERVER-3"
+        ],
+        "swordRects": [
+          {
+            "id": "ART-ONLY-NO-SERVER-0",
+            "x": 248.60000000000002,
+            "y": 205,
+            "width": 42,
+            "height": 115,
+            "socketId": "greyhaven-rack-1",
+            "revision": 0
+          },
+          {
+            "id": "ART-ONLY-NO-SERVER-1",
+            "x": 282.2,
+            "y": 205,
+            "width": 42,
+            "height": 115,
+            "socketId": "greyhaven-rack-2",
+            "revision": 0
+          },
+          {
+            "id": "ART-ONLY-NO-SERVER-2",
+            "x": 315.8,
+            "y": 205,
+            "width": 42,
+            "height": 115,
+            "socketId": "greyhaven-rack-3",
+            "revision": 0
+          },
+          {
+            "id": "ART-ONLY-NO-SERVER-3",
+            "x": 349.4,
+            "y": 205,
+            "width": 42,
+            "height": 115,
+            "socketId": "greyhaven-rack-4",
+            "revision": 0
+          }
+        ],
+        "swordCount": 4,
+        "sourcePaintCompleted": true,
+        "drawnRackCount": 1,
+        "drawnSwordCount": 4,
+        "visualIntents": [
+          "ART-ONLY-NO-SERVER-0"
+        ],
+        "combatFallback": 1,
+        "cancelled": 0,
+        "browserPointerEvents": [
+          "down:mouse:0",
+          "up:mouse:0",
+          "down:mouse:0",
+          "up:mouse:0"
+        ],
+        "actualServerEvents": 0,
+        "serverAuthenticatedItems": false,
+        "serverOwnedItemIds": false,
+        "combatHandlerActuallyCalled": false,
+        "gameClientIntegrated": false,
+        "productionApproved": false,
+        "upHandled": false,
+        "upCandidate": null
+      },
+      "afterDrag": {
+        "ready": true,
+        "worldHead": "3178b9aad8757ceb3594ff04b9e3099dced6b729",
+        "uiHead": "8d500d8ddeb4058f15dbc704bf78d685d1ca31ef",
+        "originalWorldImported": true,
+        "originalUiGestureImported": true,
+        "sourceWorldSocketPositions": [
+          [
+            3740,
+            4038
+          ],
+          [
+            3780,
+            4038
+          ],
+          [
+            3820,
+            4038
+          ],
+          [
+            3860,
+            4038
+          ]
+        ],
+        "lastPresentedFrameId": 7,
+        "frameId": 7,
+        "visibleIds": [
+          "ART-ONLY-NO-SERVER-0",
+          "ART-ONLY-NO-SERVER-1",
+          "ART-ONLY-NO-SERVER-2",
+          "ART-ONLY-NO-SERVER-3"
+        ],
+        "swordRects": [
+          {
+            "id": "ART-ONLY-NO-SERVER-0",
+            "x": 248.60000000000002,
+            "y": 205,
+            "width": 42,
+            "height": 115,
+            "socketId": "greyhaven-rack-1",
+            "revision": 0
+          },
+          {
+            "id": "ART-ONLY-NO-SERVER-1",
+            "x": 282.2,
+            "y": 205,
+            "width": 42,
+            "height": 115,
+            "socketId": "greyhaven-rack-2",
+            "revision": 0
+          },
+          {
+            "id": "ART-ONLY-NO-SERVER-2",
+            "x": 315.8,
+            "y": 205,
+            "width": 42,
+            "height": 115,
+            "socketId": "greyhaven-rack-3",
+            "revision": 0
+          },
+          {
+            "id": "ART-ONLY-NO-SERVER-3",
+            "x": 349.4,
+            "y": 205,
+            "width": 42,
+            "height": 115,
+            "socketId": "greyhaven-rack-4",
+            "revision": 0
+          }
+        ],
+        "swordCount": 4,
+        "sourcePaintCompleted": true,
+        "drawnRackCount": 1,
+        "drawnSwordCount": 4,
+        "visualIntents": [
+          "ART-ONLY-NO-SERVER-0"
+        ],
+        "combatFallback": 1,
+        "cancelled": 1,
+        "browserPointerEvents": [
+          "down:mouse:0",
+          "up:mouse:0",
+          "down:mouse:0",
+          "up:mouse:0",
+          "down:mouse:0",
+          "up:mouse:0"
+        ],
+        "actualServerEvents": 0,
+        "serverAuthenticatedItems": false,
+        "serverOwnedItemIds": false,
+        "combatHandlerActuallyCalled": false,
+        "gameClientIntegrated": false,
+        "productionApproved": false,
+        "upHandled": true,
+        "upCandidate": null
+      },
+      "afterRevision": {
+        "ready": true,
+        "worldHead": "3178b9aad8757ceb3594ff04b9e3099dced6b729",
+        "uiHead": "8d500d8ddeb4058f15dbc704bf78d685d1ca31ef",
+        "originalWorldImported": true,
+        "originalUiGestureImported": true,
+        "sourceWorldSocketPositions": [
+          [
+            3740,
+            4038
+          ],
+          [
+            3780,
+            4038
+          ],
+          [
+            3820,
+            4038
+          ],
+          [
+            3860,
+            4038
+          ]
+        ],
+        "lastPresentedFrameId": 8,
+        "frameId": 8,
+        "visibleIds": [
+          "ART-ONLY-NO-SERVER-0",
+          "ART-ONLY-NO-SERVER-1",
+          "ART-ONLY-NO-SERVER-2",
+          "ART-ONLY-NO-SERVER-3"
+        ],
+        "swordRects": [
+          {
+            "id": "ART-ONLY-NO-SERVER-0",
+            "x": 248.60000000000002,
+            "y": 205,
+            "width": 42,
+            "height": 115,
+            "socketId": "greyhaven-rack-1",
+            "revision": 1
+          },
+          {
+            "id": "ART-ONLY-NO-SERVER-1",
+            "x": 282.2,
+            "y": 205,
+            "width": 42,
+            "height": 115,
+            "socketId": "greyhaven-rack-2",
+            "revision": 0
+          },
+          {
+            "id": "ART-ONLY-NO-SERVER-2",
+            "x": 315.8,
+            "y": 205,
+            "width": 42,
+            "height": 115,
+            "socketId": "greyhaven-rack-3",
+            "revision": 0
+          },
+          {
+            "id": "ART-ONLY-NO-SERVER-3",
+            "x": 349.4,
+            "y": 205,
+            "width": 42,
+            "height": 115,
+            "socketId": "greyhaven-rack-4",
+            "revision": 0
+          }
+        ],
+        "swordCount": 4,
+        "sourcePaintCompleted": true,
+        "drawnRackCount": 1,
+        "drawnSwordCount": 4,
+        "visualIntents": [
+          "ART-ONLY-NO-SERVER-0"
+        ],
+        "combatFallback": 1,
+        "cancelled": 2,
+        "browserPointerEvents": [
+          "down:mouse:0",
+          "up:mouse:0",
+          "down:mouse:0",
+          "up:mouse:0",
+          "down:mouse:0",
+          "up:mouse:0",
+          "down:mouse:0",
+          "up:mouse:0"
+        ],
+        "actualServerEvents": 0,
+        "serverAuthenticatedItems": false,
+        "serverOwnedItemIds": false,
+        "combatHandlerActuallyCalled": false,
+        "gameClientIntegrated": false,
+        "productionApproved": false,
+        "upHandled": true,
+        "upCandidate": null
+      },
+      "afterItemRemoval": {
+        "ready": true,
+        "worldHead": "3178b9aad8757ceb3594ff04b9e3099dced6b729",
+        "uiHead": "8d500d8ddeb4058f15dbc704bf78d685d1ca31ef",
+        "originalWorldImported": true,
+        "originalUiGestureImported": true,
+        "sourceWorldSocketPositions": [
+          [
+            3740,
+            4038
+          ],
+          [
+            3780,
+            4038
+          ],
+          [
+            3820,
+            4038
+          ],
+          [
+            3860,
+            4038
+          ]
+        ],
+        "lastPresentedFrameId": 9,
+        "frameId": 9,
+        "visibleIds": [
+          "ART-ONLY-NO-SERVER-1",
+          "ART-ONLY-NO-SERVER-2",
+          "ART-ONLY-NO-SERVER-3"
+        ],
+        "swordRects": [
+          {
+            "id": "ART-ONLY-NO-SERVER-1",
+            "x": 282.2,
+            "y": 205,
+            "width": 42,
+            "height": 115,
+            "socketId": "greyhaven-rack-2",
+            "revision": 0
+          },
+          {
+            "id": "ART-ONLY-NO-SERVER-2",
+            "x": 315.8,
+            "y": 205,
+            "width": 42,
+            "height": 115,
+            "socketId": "greyhaven-rack-3",
+            "revision": 0
+          },
+          {
+            "id": "ART-ONLY-NO-SERVER-3",
+            "x": 349.4,
+            "y": 205,
+            "width": 42,
+            "height": 115,
+            "socketId": "greyhaven-rack-4",
+            "revision": 0
+          }
+        ],
+        "swordCount": 3,
+        "sourcePaintCompleted": true,
+        "drawnRackCount": 1,
+        "drawnSwordCount": 3,
+        "visualIntents": [
+          "ART-ONLY-NO-SERVER-0"
+        ],
+        "combatFallback": 1,
+        "cancelled": 3,
+        "browserPointerEvents": [
+          "down:mouse:0",
+          "up:mouse:0",
+          "down:mouse:0",
+          "up:mouse:0",
+          "down:mouse:0",
+          "up:mouse:0",
+          "down:mouse:0",
+          "up:mouse:0",
+          "down:mouse:0",
+          "up:mouse:0"
+        ],
+        "actualServerEvents": 0,
+        "serverAuthenticatedItems": false,
+        "serverOwnedItemIds": false,
+        "combatHandlerActuallyCalled": false,
+        "gameClientIntegrated": false,
+        "productionApproved": false,
+        "upHandled": true,
+        "upCandidate": null
+      },
+      "afterDpr2": {
+        "ready": true,
+        "worldHead": "3178b9aad8757ceb3594ff04b9e3099dced6b729",
+        "uiHead": "8d500d8ddeb4058f15dbc704bf78d685d1ca31ef",
+        "originalWorldImported": true,
+        "originalUiGestureImported": true,
+        "sourceWorldSocketPositions": [
+          [
+            3740,
+            4038
+          ],
+          [
+            3780,
+            4038
+          ],
+          [
+            3820,
+            4038
+          ],
+          [
+            3860,
+            4038
+          ]
+        ],
+        "lastPresentedFrameId": 10,
+        "frameId": 10,
+        "visibleIds": [
+          "ART-ONLY-NO-SERVER-0",
+          "ART-ONLY-NO-SERVER-1",
+          "ART-ONLY-NO-SERVER-2",
+          "ART-ONLY-NO-SERVER-3"
+        ],
+        "swordRects": [
+          {
+            "id": "ART-ONLY-NO-SERVER-0",
+            "x": 248.60000000000002,
+            "y": 205,
+            "width": 42,
+            "height": 115,
+            "socketId": "greyhaven-rack-1",
+            "revision": 0
+          },
+          {
+            "id": "ART-ONLY-NO-SERVER-1",
+            "x": 282.2,
+            "y": 205,
+            "width": 42,
+            "height": 115,
+            "socketId": "greyhaven-rack-2",
+            "revision": 0
+          },
+          {
+            "id": "ART-ONLY-NO-SERVER-2",
+            "x": 315.8,
+            "y": 205,
+            "width": 42,
+            "height": 115,
+            "socketId": "greyhaven-rack-3",
+            "revision": 0
+          },
+          {
+            "id": "ART-ONLY-NO-SERVER-3",
+            "x": 349.4,
+            "y": 205,
+            "width": 42,
+            "height": 115,
+            "socketId": "greyhaven-rack-4",
+            "revision": 0
+          }
+        ],
+        "swordCount": 4,
+        "sourcePaintCompleted": true,
+        "drawnRackCount": 1,
+        "drawnSwordCount": 4,
+        "visualIntents": [
+          "ART-ONLY-NO-SERVER-0",
+          "ART-ONLY-NO-SERVER-0"
+        ],
+        "combatFallback": 1,
+        "cancelled": 3,
+        "browserPointerEvents": [
+          "down:mouse:0",
+          "up:mouse:0",
+          "down:mouse:0",
+          "up:mouse:0",
+          "down:mouse:0",
+          "up:mouse:0",
+          "down:mouse:0",
+          "up:mouse:0",
+          "down:mouse:0",
+          "up:mouse:0",
+          "down:mouse:0",
+          "up:mouse:0"
+        ],
+        "actualServerEvents": 0,
+        "serverAuthenticatedItems": false,
+        "serverOwnedItemIds": false,
+        "combatHandlerActuallyCalled": false,
+        "gameClientIntegrated": false,
+        "productionApproved": false,
+        "upHandled": true,
+        "upCandidate": "ART-ONLY-NO-SERVER-0"
+      },
+      "cssCanvasWidth": 358,
+      "deviceScaleFactor": 2,
+      "screenshots": [
+        "armory_world521_ui503_firefox_initial.png",
+        "armory_world521_ui503_firefox_dpr2.png"
+      ],
+      "realInputEvents": 12,
+      "genuineGameCombat": false,
+      "serverNetworkMessages": 0,
+      "authoritativeItemOwnership": false,
+      "productionApproved": false
+    }
+  ],
+  "screenshots": 4,
+  "realGameClientExecuted": false,
+  "realMultiplayerUsers": 0,
+  "realServerTryPickup": false,
+  "combatHandlerExecuted": false,
+  "allSourcesUnchanged": true,
+  "productionApproved": false
+}
