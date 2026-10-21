@@ -31,6 +31,7 @@ import { qualifyM150ParryGeometry } from "./m150-replicated-geometry.mjs";
 import { awaitM223HeavyWindup, planM223WheelDelay } from "./m223-server-heavy-windup.mjs";
 import { dispatchR2ReleaseLedShortBlock } from "./r2-release-led-short-block.mjs";
 import { dispatchM41NativeParryOnLightOnset } from "./m41-authoritative-light-onset.mjs";
+import { readM161OpeningKickProof } from "./m161-opening-kick-proof.mjs";
 import { createM221TrustedWheelRegistry } from "./m221-trusted-wheel-attestation.mjs";
 import { attachM325TrustedWheelSocket } from "./m325-trusted-wheel-socket.mjs";
 import { requiresM338GuardBreakWheelSocket } from "./m338-guard-break-wheel-scenarios.mjs";
@@ -521,7 +522,9 @@ async function startStaticServer() {
 }
 
 async function startGameServer() {
-  const child = spawn("cargo", ["run", "--locked", "--manifest-path", "server/Cargo.toml", "--bin", "myaso-server", "--quiet"], {
+  const serverBinary = process.env.MYASO_PVP_SERVER_BINARY;
+  const child = spawn(serverBinary || "cargo", serverBinary ? []
+    : ["run", "--locked", "--manifest-path", "server/Cargo.toml", "--bin", "myaso-server", "--quiet"], {
     cwd: root,
     env: {
       ...process.env,
@@ -533,6 +536,7 @@ async function startGameServer() {
         || scenario === "uiheavyblock" || scenario === "uiheavyparry"
         || scenario === "uiheavydodge"
         || scenario === "uikickknockdownffahit"
+        || scenario === "uikickknockdownbounded"
         || scenario === "uimultiknockdownffahit"
         || scenario === "uimultirecoveryffa"
         || scenario === "uimultirecoveryspatial") ? "1" : "0",
@@ -6482,40 +6486,55 @@ async function runOnlineUiBoundedKickKnockdownFlight(entries) {
     "const a=window.__MYASO_ACCEPTANCE_STATE__; return { focusNetId:a?.focusNetId ?? 0, ownActionTransitions:(a?.ownActionTransitions ?? []).map((item)=>({...item})), focusActionTransitions:(a?.focusActionTransitions ?? []).map((item)=>({...item})) };",
   );
 
-  const [defenderBefore, openerBefore, suppressorBefore] = await Promise.all([
+  const [defenderBefore, suppressorBefore] = await Promise.all([
     readOwnActions(defender),
-    readOwnActions(opener),
     readOwnActions(suppressor),
   ]);
   const defenderOffset = defenderBefore.length;
-  const openerOffsetActions = openerBefore.length;
   const suppressorOffsetActions = suppressorBefore.length;
   const suppressorPointerOffset = (await readUiEvidence(suppressor)).pointers.length;
 
-  await performArenaRecoveryBufferedKick(opener, openerElementId, openerOffset, 45);
+  const openingAuthStart = m201ServerOutput().length;
+  // The opening W3C HTTP ACK can arrive after the entire knockdown. Start
+  // the one real gesture, then observe its actual server contact without
+  // waiting for that ACK or a WebDriver read of a remote snapshot.
+  let openingKickError = null;
+  const openingKickRequest = performArenaRecoveryBufferedKick(opener, openerElementId, openerOffset, 45, true)
+    .catch(error => { openingKickError = error; });
 
-  let firstKnockdown = null;
-  let openerKickActive = null;
+  let openingKickProof = null;
   const firstDeadline = Date.now() + COMBAT.kick.windupMs + COMBAT.kick.activeMs + 320;
-  while (Date.now() < firstDeadline && (!firstKnockdown || !openerKickActive)) {
-    const [defenderActions, openerActions] = await Promise.all([
-      readOwnActions(defender),
-      readOwnActions(opener),
-    ]);
-    firstKnockdown = defenderActions.slice(defenderOffset).find((entry) =>
-      entry.action === COMBAT_ACTION.knockdown && Number.isFinite(entry.epochMs)) ?? null;
-    openerKickActive = openerActions.slice(openerOffsetActions).find((entry) =>
-      entry.action === COMBAT_ACTION.kickActive && Number.isFinite(entry.epochMs)) ?? openerKickActive;
-    if (!firstKnockdown) await sleep(2);
+  while (Date.now() < firstDeadline && !openingKickProof && !openingKickError) {
+    openingKickProof = readM161OpeningKickProof(m201ServerOutput().slice(openingAuthStart), {
+      kickerId: openerId, defenderId,
+    });
+    if (!openingKickProof) await sleep(2);
   }
-  if (!firstKnockdown || !openerKickActive) {
+  if (!openingKickProof || openingKickError) {
+    await openingKickRequest;
+    if (openingKickError) throw openingKickError;
     throw new Error(milestone + " opener never produced the first authoritative kick knockdown: "
       + JSON.stringify(await Promise.all(entries.map(readUiEvidence))));
   }
 
-  // Emit one genuine short RMB from #3 while #2 is already down. M160 must
-  // consume this control contact without resetting #2's original 360 ms timer.
-  await performArenaRecoveryBufferedKick(suppressor, suppressorElementId, suppressorOffset, 45);
+  // Issue exactly one genuine short RMB from #3 after actual server-owned
+  // contact, while #2 is still down. Both original W3C ACKs remain required.
+  await Promise.all([
+    openingKickRequest,
+    performArenaRecoveryBufferedKick(suppressor, suppressorElementId, suppressorOffset, 45, true),
+  ]);
+  if (openingKickError) throw openingKickError;
+  const defenderActionsAfterOpening = await readOwnActions(defender);
+  const firstKnockdown = defenderActionsAfterOpening.slice(defenderOffset).find((entry) =>
+    entry.action === COMBAT_ACTION.knockdown && Number.isFinite(entry.epochMs)) ?? null;
+  if (!firstKnockdown
+    || !Number.isSafeInteger(firstKnockdown.serverTick)
+    || firstKnockdown.serverTick < openingKickProof.knockdown.tick
+    || firstKnockdown.serverTick > openingKickProof.knockdown.tick
+      + Math.ceil(COMBAT.kick.knockdownMs * 60 / 1000)) {
+    throw new Error(milestone + " opener never produced the first authoritative kick knockdown: "
+      + JSON.stringify(await Promise.all(entries.map(readUiEvidence))));
+  }
 
   let suppressedKickActive = null;
   let originalRecovery = null;
@@ -6615,7 +6634,7 @@ async function runOnlineUiBoundedKickKnockdownFlight(entries) {
   const verifySuppressorOffset = suppressorActionsBeforeVerify.length;
   const verifyPointerOffset = (await readUiEvidence(suppressor)).pointers.length;
 
-  await performArenaRecoveryBufferedKick(suppressor, suppressorElementId, suppressorOffset, 45);
+  await performArenaRecoveryBufferedKick(suppressor, suppressorElementId, suppressorOffset, 45, true);
 
   let verificationKnockdown = null;
   let verificationKickActive = null;
@@ -6668,6 +6687,7 @@ async function runOnlineUiBoundedKickKnockdownFlight(entries) {
     m161DefenderId: defenderId,
     m161SuppressorId: suppressorId,
     m161FirstKnockdownEpochMs: firstKnockdown.epochMs,
+    m161OpeningKickProof: openingKickProof,
     m161SuppressedKickActiveEpochMs: suppressedKickActive.epochMs,
     m161OriginalRecoveryEpochMs: originalRecovery.epochMs,
     m161OriginalDurationObservedMs: originalDurationObserved,
@@ -12606,7 +12626,7 @@ async function performArenaKickAttackChord(session, elementId, xOffset = 200, ho
   });
 }
 
-async function performArenaRecoveryBufferedKick(session, elementId, xOffset = 200, holdMs = 45) {
+async function performArenaRecoveryBufferedKick(session, elementId, xOffset = 200, holdMs = 45, preAimed = false) {
   const origin = { "element-6066-11e4-a52e-4f735466cecf": elementId };
   const boundedHoldMs = Math.max(25, Math.min(120, Math.trunc(holdMs)));
   await webdriver(session.base, "POST", `/session/${session.sessionId}/actions`, {
@@ -12615,7 +12635,7 @@ async function performArenaRecoveryBufferedKick(session, elementId, xOffset = 20
       id: `mouse-${session.name}`,
       parameters: { pointerType: "mouse" },
       actions: [
-        { type: "pointerMove", duration: 0, origin, x: xOffset, y: 0 },
+        ...(preAimed ? [] : [{ type: "pointerMove", duration: 0, origin, x: xOffset, y: 0 }]),
         { type: "pointerDown", button: 2 },
         { type: "pause", duration: boundedHoldMs },
         { type: "pointerUp", button: 2 },
@@ -12755,6 +12775,17 @@ async function installUiObserver(session) {
     const threatGuardArc = document.querySelector('#threat-guard-arc');
     if (!target || !arena || !arenaStage || !overlay || !recovery || !focusLabel || !threat || !threatCount || !threatSecondary || !threatSecondaryBearing || !threatSecondaryPhase || !threatSecondaryGuardArc || !threatBearing || !threatGuardArc) throw new Error('missing online UI flight target');
     const state = { events: [], eventTransitions: [], keys: [], keyTransitions: [], pointers: [], wheels: [], overlayTransitions: [], feedbackTransitions: [], recoveryTransitions: [], focusTransitions: [], threatTransitions: [], recoveryTellMaxPixels: 0, parryTellMaxPixels: 0, online: '', startedAt: performance.now() };
+    if (!window.__MYASO_BROWSER_ERROR_OBSERVER__) {
+      window.__MYASO_BROWSER_ERROR_OBSERVER__ = true;
+      window.__MYASO_BROWSER_ERRORS__ = [];
+      const recordBrowserError = (kind, detail) => {
+        const errors = window.__MYASO_BROWSER_ERRORS__;
+        errors.push({ epochMs: Date.now(), kind, detail: String(detail).slice(0, 1200) });
+        if (errors.length > 8) errors.shift();
+      };
+      window.addEventListener('error', event => recordBrowserError('error', event.error?.stack ?? event.message));
+      window.addEventListener('unhandledrejection', event => recordBrowserError('unhandledrejection', event.reason?.stack ?? event.reason));
+    }
     // M338/M339: M151/M152 and M40 share the exact M194 guard-break wheel verifier.
     // Open the same real Firefox-only, localhost trusted-proof socket in all
     // four scenarios. Parent FFA flights reinstall UI observers: reuse the
@@ -13968,6 +13999,7 @@ async function readUiEvidence(session) {
     return {
       title: document.title,
       activeElement: document.activeElement?.id ?? null,
+      browserErrors: (window.__MYASO_BROWSER_ERRORS__ ?? []).map(entry => ({ ...entry })),
       playerNetId: match ? Number(match[1]) : 0,
       eventText: document.querySelector('#event-text')?.textContent?.trim() ?? '',
       playerHp: Number(document.querySelector('#player-hp-value')?.textContent ?? NaN),
@@ -14027,6 +14059,7 @@ async function readUiEvidence(session) {
         lastSubmittedClientTick: window.__MYASO_ACCEPTANCE_STATE__.lastSubmittedClientTick ?? null,
         lastSubmittedAtEpochMs: window.__MYASO_ACCEPTANCE_STATE__.lastSubmittedAtEpochMs ?? null,
         inputSubmissions: (window.__MYASO_ACCEPTANCE_STATE__.inputSubmissions ?? []).slice(-32).map((entry) => ({ ...entry })),
+        clearedInputIntents: (window.__MYASO_ACCEPTANCE_STATE__.clearedInputIntents ?? []).slice(-8).map((entry) => ({ ...entry })),
         playerNetId: Number(window.__MYASO_ACCEPTANCE_STATE__.playerNetId ?? 0),
         focusNetId: Number(window.__MYASO_ACCEPTANCE_STATE__.focusNetId ?? 0),
         serverTick: Number(window.__MYASO_ACCEPTANCE_STATE__.serverTick ?? 0),

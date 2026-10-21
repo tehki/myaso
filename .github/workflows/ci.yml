@@ -757,6 +757,7 @@ jobs:
         run: |
           node --check web/online-game.mjs
           node --check scripts/pvp_browser_flight_runner.mjs
+          node --test tests/m161-opening-kick-proof.test.mjs
           node --test --test-name-pattern="kick cannot refresh|kick knockdown" tests/combat-model.test.mjs
           node scripts/pvp_browser_flight_runner.mjs
 

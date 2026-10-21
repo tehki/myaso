@@ -692,7 +692,20 @@ function updateMouse(event) {
   mouse.y = ((event.clientY - rect.top) / rect.height) * canvas.height;
 }
 
-function releaseInputs() {
+function releaseInputs(reason = "lifecycle") {
+  if (acceptanceScenario === "uimultirecoveryspatial" || acceptanceScenario === "uimultirecoveryffa") {
+    const debug = window.__MYASO_ACCEPTANCE_STATE__;
+    if (debug) {
+      debug.clearedInputIntents ??= [];
+      debug.clearedInputIntents.push({
+        epochMs: Date.now(), reason: typeof reason === "string" ? reason : reason?.type,
+        hidden: document.hidden, focused: document.hasFocus(),
+        attack: attackRequested, heavyAttack: heavyAttackRequested,
+        jump: jumpRequested, leftButtonDown,
+      });
+      if (debug.clearedInputIntents.length > 8) debug.clearedInputIntents.shift();
+    }
+  }
   keys.clear();
   dashGesture.clearTaps();
   dashRequested = false;
@@ -758,7 +771,7 @@ function simulatePrediction(stepMs) {
     // Space+LMB without authoritative action may mean no 30Hz input sampled
     // during the genuine W3C hold. Record what the production sender actually
     // submitted, with no replay, network payload or gameplay change.
-    if (acceptanceScenario === "uimultirecoveryspatial") {
+    if (acceptanceScenario === "uimultirecoveryspatial" || acceptanceScenario === "uimultirecoveryffa") {
       const debug = window.__MYASO_ACCEPTANCE_STATE__;
       if (debug) {
         debug.lastSubmittedClientTick = outgoingTick;
