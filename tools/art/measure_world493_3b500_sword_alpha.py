@@ -9,8 +9,6 @@ import math
 import sys
 from pathlib import Path
 
-from PIL import Image
-
 if len(sys.argv) != 4:
     raise SystemExit("usage: measure_world493_3b500_sword_alpha.py <pinned3b-worktree> <pinned3c-source-art-JSON> <output-JSON>")
 art_dir = Path(sys.argv[1])
@@ -19,12 +17,29 @@ sword_path = art_dir / "assets/environment/greyhaven/armory-p0/armory_sword.webp
 blob = sword_path.read_bytes()
 sword_sha = hashlib.sha256(blob).hexdigest()
 assert sword_sha == source["originalAssetHashes"]["sword"]["sha256"], "Source WebP digest mismatch"
-im = Image.open(sword_path).convert("RGBA")
-assert im.size == (42, 115), "3B actual sword dimensions changed"
-alpha = im.getchannel("A")
+# Accept real source alpha on hosts with Pillow OR ImageMagick. Both decode
+# the original lossless WebP without modifying any game/asset bytes.
+try:
+    from PIL import Image
+    im = Image.open(sword_path).convert("RGBA")
+    width, height = im.size
+    image_alpha = im.getchannel("A")
+    def alpha_at(x, y):
+        return image_alpha.getpixel((x, y))
+    decoder = "Pillow"
+except ImportError:
+    from subprocess import check_output
+    width, height = (42, 115)
+    decoded = check_output(["magick", str(sword_path), "-alpha", "extract",
+                            "-depth", "8", "gray:-"])
+    assert len(decoded) == width * height, "ImageMagick did not yield raw 8-bit alpha"
+    def alpha_at(x, y):
+        return decoded[y * width + x]
+    decoder = "ImageMagick"
+assert (width, height) == (42, 115), "3B actual sword dimensions changed"
 cutoff = 64
-opaque_points = [(x, y) for y in range(im.height) for x in range(im.width)
-                 if alpha.getpixel((x, y)) >= cutoff]
+opaque_points = [(x, y) for y in range(height) for x in range(width)
+                 if alpha_at(x, y) >= cutoff]
 assert opaque_points
 bbox = (min(x for x,y in opaque_points), min(y for x,y in opaque_points),
         max(x for x,y in opaque_points) + 1, max(y for x,y in opaque_points) + 1)
@@ -37,19 +52,20 @@ for left, right in zip(source_px, source_px[1:]):
     ambiguous = {}
     for offset in offsets:
         shared = 0
-        for y in range(im.height):
-            for x in range(offset, im.width):
-                if alpha.getpixel((x, y)) >= cutoff and alpha.getpixel((x-offset, y)) >= cutoff:
+        for y in range(height):
+            for x in range(offset, width):
+                if alpha_at(x, y) >= cutoff and alpha_at(x-offset, y) >= cutoff:
                     shared += 1
         ambiguous[str(offset)] = shared
-    all_pairs.append({"anchorGapPx": gap, "overlappingRectWidthPx": im.width-gap,
+    all_pairs.append({"anchorGapPx": gap, "overlappingRectWidthPx": width-gap,
                       "testPixelOffsets": offsets, "ambiguousOpaquePixels": ambiguous})
 assert all(all(value == 0 for value in item["ambiguousOpaquePixels"].values())
            for item in all_pairs), "Real opaque sword pixels overlap; requires 3B/World re-layout"
 out = {
     "status": "ART_SOURCE_ALPHA_SPACING_PASS_ONLY",
     "sourceWebpSha256": sword_sha,
-    "sourceSize": list(im.size),
+    "sourceSize": [width, height],
+    "alphaDecoder": decoder,
     "hitThresholdAlpha": cutoff,
     "opaqueBoundingBoxSource": list(bbox),
     "countOpaqueSourcePixels": len(opaque_points),

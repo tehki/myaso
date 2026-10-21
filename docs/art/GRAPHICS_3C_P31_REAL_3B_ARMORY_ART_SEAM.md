@@ -38,7 +38,7 @@ python tools/art/measure_world493_3b500_sword_alpha.py \
   assets/environment/greyhaven/3c-p31-source-art-review/world493_3b500_alpha_pixels.json
 ```
 
-Requires Python Pillow only for optional WebP alpha decoding; the production quality workflow adds **only JavaScript syntax check** and never fetches draft branch repos in CI. Raw exact-source SHA/projection and transparency evidence is in `assets/environment/greyhaven/3c-p31-source-art-review/`.
+Optional WebP alpha decoding uses installed Python Pillow or installed ImageMagick (raw 8-bit alpha fallback, no game dependency); the production quality workflow adds **only JavaScript syntax check** and never fetches draft branch repos in CI. Raw exact-source SHA/projection and transparency evidence is in `assets/environment/greyhaven/3c-p31-source-art-review/`.
 
 **Outstanding First Playable acceptance:** actual approved rack origin and live committed Core item presence; Chrome/Firefox four independently operated humans seeing four original sword WebPs; native pointer alpha hit for each visual sword under moving camera/zoom; zero attack for valid pickup, preserved attack for empty space; authoritative single-winner item removal, equip/drop/death/reconnect state on all clients and real fist/sword PvP. Neither Graphics 3C nor this offline source evidence implements or proves any of these.
 

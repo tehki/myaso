@@ -5,6 +5,7 @@
     42,
     115
   ],
+  "alphaDecoder": "Pillow",
   "hitThresholdAlpha": 64,
   "opaqueBoundingBoxSource": [
     7,
