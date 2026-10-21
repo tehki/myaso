@@ -29,6 +29,7 @@ const npc = createNpcChatPanel({
 });
 p.roster = value => npc.setRoster(value);
 p.receive = value => npc.receive(value);
+p.focus = () => npc.focus();
 p.snapshot = () => ({
  hidden: document.querySelector(".npc-pilot").hidden,
  active: document.activeElement?.id || document.activeElement?.tagName,
@@ -156,6 +157,24 @@ try {
  await keys(canvas,"a");
  assert.ok((await snapshot()).gameKeys.includes("a"),"native game keyboard restored");
 
+ // The canvas Enter shortcut calls npc.focus(). That method must rely on
+ // the native input-focus event exactly once, never explicitly release a
+ // second time on the same transition.
+ await execute("window.__probe.roster([{id:3,name:'Rowan',role:'Guard',x:155,y:205}]);");
+ await request(base,"POST",e+"/element/"+canvas+"/click",{});
+ const priorFocus = await snapshot();
+ await execute("window.__probe.focus();");
+ const afterFocus = await snapshot();
+ assert.equal(afterFocus.active,"INPUT","arena Enter must move native input focus");
+ assert.equal(afterFocus.focused,priorFocus.focused+1,
+   "one arena Enter transition must trigger exactly one input release");
+ await execute("window.__probe.focus();");
+ assert.equal((await snapshot()).focused,afterFocus.focused,
+   "repeated programmatic focus on same input must not release a second time");
+ await execute("window.__probe.roster([]);");
+ assert.equal((await snapshot()).active,"arena",
+   "single-transition focus test must restore canvas on roster revocation");
+
  // Exercise the real browser's focus behavior for the selector and Speak
  // button, not merely simulated DOM focus in the Node fixture. Revoking a
  // roster must never strand the player in a newly hidden pilot control.
@@ -195,6 +214,7 @@ try {
   npcOffHidden:true,earlyReplyOrdered:true,revocationRestoresFocus:true,
   nativeSelectorRevokeRestoresFocus:true,nativeSubmitRevokeRestoresFocus:true,
   nativeSelectorReleasesHeldInput:true,nativeSubmitReleasesHeldInput:true,
+  nativeProgrammaticFocusSingleRelease:true,
   serverConnection:false,independentHost:false
  }));
 } finally {

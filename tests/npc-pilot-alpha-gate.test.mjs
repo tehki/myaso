@@ -36,9 +36,13 @@ class Element {
     if (index >= 0) this.parent.children.splice(index, 1);
   }
   focus() {
+    // Native HTMLElement.focus() emits a focus event only when focus moves.
+    // Keep the isolated DOM fixture aligned with real Chromium behavior.
+    if (globalThis.document.activeElement === this) return;
     if (globalThis.document.activeElement) globalThis.document.activeElement.focused = false;
     globalThis.document.activeElement = this;
     this.focused = true;
+    this.listeners.get("focus")?.();
   }
   blur() {
     if (globalThis.document.activeElement === this) globalThis.document.activeElement = null;
@@ -502,17 +506,14 @@ test("P0 entering any visible NPC control releases held gameplay input", () => {
     const panel = stage.children[0];
     const selector = panel.children[2];
     const [input, button] = panel.children[6].children;
-    // The isolated DOM fixture does not synthesize real browser FocusEvents;
-    // dispatch the module's installed handler after explicit focus instead.
+    // The fixture dispatches native-style focus events on actual focus changes.
     for (const control of [selector, input, button]) {
       control.focus();
-      control.listeners.get("focus")();
       assert.equal(releases, 0, "hidden pilot cannot divert combat controls");
     }
     npc.setRoster([{ id: 3, name: "Rowan", role: "Sentinel" }]);
     for (const control of [selector, input, button]) {
       control.focus();
-      control.listeners.get("focus")();
       assert.equal(globalThis.document.activeElement, control);
     }
     assert.equal(releases, 3,
@@ -520,9 +521,45 @@ test("P0 entering any visible NPC control releases held gameplay input", () => {
     npc.setRoster([]);
     for (const control of [selector, input, button]) {
       control.focus();
-      control.listeners.get("focus")();
     }
     assert.equal(releases, 3, "revoked pilot cannot re-arm input interception");
+  } finally {
+    restore();
+  }
+});
+
+
+test("P0 arena Enter focus releases held input exactly once per transition", () => {
+  const { stage, canvas, restore } = installDocument();
+  try {
+    let releases = 0;
+    const npc = createNpcChatPanel({
+      onSend: async () => {},
+      onFocus() { releases += 1; },
+    });
+    canvas.focus();
+    npc.focus();
+    assert.equal(globalThis.document.activeElement, canvas);
+    assert.equal(releases, 0, "NPC-off focus cannot intercept active arena");
+
+    npc.setRoster([{ id: 3, name: "Rowan", role: "Sentinel" }]);
+    npc.focus(); // models Enter from #arena into the pilot text input
+    const input = stage.children[0].children[6].children[0];
+    assert.equal(globalThis.document.activeElement, input);
+    assert.equal(releases, 1,
+      "onFocus must run once, not through both focus() and focus listener");
+
+    npc.focus();
+    assert.equal(releases, 1,
+      "refocusing an already-focused input cannot clear held controls twice");
+    canvas.focus();
+    npc.focus();
+    assert.equal(releases, 2, "a new canvas-to-input transition releases once");
+
+    npc.setRoster([]);
+    assert.equal(globalThis.document.activeElement, canvas);
+    npc.focus();
+    assert.equal(releases, 2, "revoked pilot never steals focus");
   } finally {
     restore();
   }

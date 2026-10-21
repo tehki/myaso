@@ -456,3 +456,29 @@ pickup, or Firefox / independent-host acceptance.
 For First Playable, leave the NPC pilot OFF; parent #353 and stacked
 review branches remain draft / unmerged until the orchestrator
 reviews Core 8A session dispatch, trusted zones and real gameplay.
+
+
+## P0 native focus transitions — release once, not twice
+
+The browser game invokes `npcUI.focus()` from the arena's Enter
+shortcut. Previously this method called `onFocus()` explicitly **and**
+called `input.focus()`, whose native focus event independently called
+`onFocus()` again. After the #630 change made all three visible NPC
+controls release held gameplay input on actual focus, this double
+invocation remained for programmatic input focus.
+
+The optional panel now relies on the **single native focus event**.
+Repeated `npcUI.focus()` while the same input already holds focus is
+inert, while a new canvas-to-input transition releases gameplay once.
+This avoids redundant Combat input resets and keeps the disabled pilot
+completely inert; it does not create, read, or modify any network stream.
+
+The isolated Node DOM fixture now emits realistic focus events when an
+element actually becomes the active element, and asserts exactly one
+callback per genuine visible focus change (**10 focused Node tests**).
+A genuine headless Chromium W3C smoke gate also calls `npcUI.focus()`
+through the pilot probe, checks one release, checks no repeat on an
+already focused input, and checks that roster revocation returns focus
+to the arena. These checks do **not** exercise real server QUIC, live
+Greyhaven Sentinels, four browsers, or Core 8A connection/session epochs.
+The three NPC opt-in flags remain disabled for First Playable.
