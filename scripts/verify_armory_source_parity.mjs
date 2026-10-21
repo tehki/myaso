@@ -55,9 +55,34 @@ async function verify(worldPath,corePath) {
 }
 
 if (process.argv.includes("--help")) {
-  console.log("Usage: node scripts/verify_armory_source_parity.mjs <World-src/world/alpha-armory.mjs> <Core-server/src/alpha_armory_mapping_preflight.rs>");
+  console.log("Usage: node scripts/verify_armory_source_parity.mjs [--self-test] <World-src/world/alpha-armory.mjs> <Core-server/src/alpha_armory_mapping_preflight.rs>");
 } else {
-  if (process.argv.length!==4) fail("two explicit source paths are required; do not fetch main or guess a branch");
-  const rows=await verify(process.argv[2],process.argv[3]);
+  const selfTest=process.argv.includes("--self-test");
+  const paths=process.argv.slice(2).filter(arg=>arg!=="--self-test");
+  if (paths.length!==2) fail("two explicit source paths are required; do not fetch main or guess a branch");
+  const rows=await verify(paths[0],paths[1]);
   console.log(`PASS M2 World V1 <-> Core 8B four sockets: ${JSON.stringify(rows)}`);
+  if (selfTest) {
+    // Negative tests run wholly in memory. A CI worker need not create
+    // writable temp fixtures, and these edits cannot affect the real files.
+    const source=readFileSync(resolve(paths[1]),"utf8");
+    const variants=[
+      ["coordinate drift", source.replace('("greyhaven-rack-3", 3820, 4038)', '("greyhaven-rack-3", 3819, 4038)')],
+      ["duplicate socket identity", source.replace('("greyhaven-rack-2", 3780, 4038)', '("greyhaven-rack-1", 3780, 4038)')],
+      ["missing fourth socket", source.replace('("greyhaven-rack-4", 3860, 4038),', '')],
+      ["wrong review constant", source.replace("GREYHAVEN_RACK_V1","GREYHAVEN_RACK_V0")],
+    ];
+    for (const [name,corrupted] of variants) {
+      if (corrupted===source) fail(`negative fixture substitution for ${name} did not apply`);
+      let rejected=false;
+      try {
+        const parsed=parseCoreSocketManifest(corrupted);
+        rejected=JSON.stringify(parsed)!==JSON.stringify(rows);
+      } catch {
+        rejected=true;
+      }
+      if (!rejected) fail(`unsafe mutation unexpectedly accepted: ${name}`);
+      console.log(`PASS M2 fail-closed negative case: ${name}`);
+    }
+  }
 }
