@@ -116,15 +116,15 @@ try {
  await evaljs(a,"document.querySelector('.local-chat-input').value=arguments[0]",[maxOver]);
  await key(a,"\uE007");
  const rejected = await evaljs(a,
-   "const x=document.querySelector('[data-local-chat]');const text=arguments[0];return {focused:document.activeElement===x.querySelector('input'),error:x.querySelector('.local-chat-status').textContent,outgoing:[...x.querySelectorAll('li.local-chat-item .local-chat-text')].filter(e=>e.textContent===text).length,inputValue:x.querySelector('input').value};",
+   "const x=document.querySelector('[data-local-chat]');const text=arguments[0];return {focused:document.activeElement===x.querySelector('input'),feedback:x.querySelector('.local-chat-status').textContent,outgoing:[...x.querySelectorAll('li.local-chat-item .local-chat-text')].filter(e=>e.textContent===text).length,inputValue:x.querySelector('input').value};",
    [maxOver]);
  assert.equal(rejected.focused,true,"failed compose stays editable");
- assert.match(rejected.error,/too long/i,"oversized payload rejected locally");
+ assert.match(rejected.feedback,/too long/i,"oversized payload rejected locally");
  assert.equal(rejected.outgoing,0,"rejected chat must not create optimistic row");
  assert.equal(rejected.inputValue,maxOver,"rejected chat remains editable");
  const remoteInvalid = await evaljs(b,"return [...document.querySelectorAll('.local-chat-item .local-chat-text')].some(x=>x.textContent===arguments[0])",[maxOver]);
  assert.equal(remoteInvalid,false,"242-byte invalid message never reached B");
- console.log("UTF8_242_REJECT_PASS",JSON.stringify({bytes:242,error:rejected.error}));
+ console.log("UTF8_242_REJECT_PASS",JSON.stringify({bytes:242,error:rejected.feedback}));
 
  // A native Escape from a rejected/unsent message returns focus to the
  // arena and clears input without submitting or leaking gameplay state.
