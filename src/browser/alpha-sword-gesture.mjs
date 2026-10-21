@@ -31,10 +31,13 @@ function acceptedCandidate(candidate, scene, point) {
     || !Number.isSafeInteger(candidate.sourcePixel.y)) return null;
   // Do not accept an unrelated or fabricated candidate not present in the
   // last-presented committed World/Graphics visual plan.
-  const sprite = scene.plan.swords.find(s =>
+  const spriteIndex = scene.plan.swords.findIndex(s =>
     s && s.kind === "sword" && s.id === candidate.itemId
     && s.socketId === candidate.socketId && s.revision === candidate.revision);
-  if (!sprite) return null;
+  if (spriteIndex < 0) return null;
+  const sprite = scene.plan.swords[spriteIndex];
+  // The candidate must have been painted, not hidden or omitted by Graphics.
+  if (sprite.rendered === false || sprite.occluded === true) return null;
   // Defense in depth against stale/incorrect visual hit callbacks: the
   // candidate must be the precise decoded source pixel under this actual
   // painted sprite, not merely an item ID found somewhere in the rack.
@@ -56,6 +59,28 @@ function acceptedCandidate(candidate, scene, point) {
   // do not reserve Combat over genuinely transparent image source pixels.
   const actualAlpha = scene.sampleAlpha(sprite.asset, u, v);
   if (!Number.isFinite(actualAlpha) || actualAlpha < 64) return null;
+
+  // Graphics' callback is an untrusted selection hint. Later plan entries
+  // are painted over earlier ones; a visible opaque foreground sword must
+  // prevent selecting a covered sword even if that callback returns it.
+  for (let i = spriteIndex + 1; i < scene.plan.swords.length; i++) {
+    const front = scene.plan.swords[i];
+    if (!front || front.kind !== "sword" || front.rendered === false
+      || front.occluded === true) continue;
+    if (!Number.isFinite(front.x) || !Number.isFinite(front.y)
+      || !Number.isFinite(front.width) || !Number.isFinite(front.height)
+      || front.width <= 0 || front.height <= 0
+      || !Number.isSafeInteger(front.sourceWidth)
+      || !Number.isSafeInteger(front.sourceHeight)
+      || front.sourceWidth <= 0 || front.sourceHeight <= 0) return null;
+    if (point.x < front.x || point.y < front.y
+      || point.x >= front.x + front.width
+      || point.y >= front.y + front.height) continue;
+    const fx = Math.floor((point.x - front.x) * front.sourceWidth / front.width);
+    const fy = Math.floor((point.y - front.y) * front.sourceHeight / front.height);
+    const foregroundAlpha = scene.sampleAlpha(front.asset, fx, fy);
+    if (!Number.isFinite(foregroundAlpha) || foregroundAlpha >= 64) return null;
+  }
   return {
     itemId: candidate.itemId,
     socketId: candidate.socketId,

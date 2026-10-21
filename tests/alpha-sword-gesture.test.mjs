@@ -118,3 +118,45 @@ test("P0 independently rechecks Graphics source WebP alpha and sprite dimensions
   assert.deepEqual(g.down(down(),{...scene(),plan:{...scene().plan,
     swords:[{...scene().plan.swords[0],sourceWidth:0}]} }),{handled:false,itemId:null});
 });
+
+test("P0 rejects a painted-but-occluded or explicitly omitted sword visual",()=>{
+  const g=createAlphaSwordGestureGate(graphicsHit),base=scene();
+  for(const flag of [{occluded:true},{rendered:false}]){
+    const s={...base,plan:{...base.plan,swords:[{...base.plan.swords[0],...flag}]}};
+    assert.deepEqual(g.down(down(19),s),{handled:false,itemId:null});
+  }
+});
+test("P0 rejects wrong rear sword when later-painted opaque sword covers its pixel",()=>{
+  // Deliberately faulty Graphics callback always claims the rear sword.
+  const rearCandidate=(plan,p)=>({
+    itemId:plan.swords[0].id,socketId:plan.swords[0].socketId,
+    revision:plan.swords[0].revision,alpha:255,
+    sourcePixel:{x:Math.floor(p.x-600),y:Math.floor(p.y-300)},
+    visualCandidateOnly:true,serverPickupCommitted:false,
+  });
+  const g=createAlphaSwordGestureGate(rearCandidate);
+  const s=scene(), rear=s.plan.swords[0];
+  const front={...sprite("opaque:item/front",2,"rack-socket-front"),
+    x:605,y:325,asset:"/assets/foreground-sword.webp"};
+  const plan={...s.plan,swords:[rear,front]};
+  assert.deepEqual(g.down(down(20),{...s,plan,sampleAlpha:()=>255}),
+    {handled:false,itemId:null},"covered rear cannot reserve a pickup");
+  // Transparent foreground reveals the rear; clicking the real rear pixel is valid.
+  const revealed={...s,plan,sampleAlpha:(asset)=>asset===front.asset?0:255};
+  assert.deepEqual(g.down(down(20),revealed),{handled:true,itemId:null});
+  assert.deepEqual(g.up(up(20),revealed),{handled:true,itemId:rear.id});
+});
+test("P0 malformed foreground source alpha fails closed instead of selecting behind it",()=>{
+  const s=scene(),front={...sprite("opaque:item/front",2,"rack-socket-front"),
+    x:605,y:325,asset:"/assets/foreground-sword.webp"};
+  const plan={...s.plan,swords:[s.plan.swords[0],front]};
+  const g=createAlphaSwordGestureGate((p,point)=>({
+    itemId:p.swords[0].id,socketId:p.swords[0].socketId,
+    revision:p.swords[0].revision,alpha:255,
+    sourcePixel:{x:Math.floor(point.x-600),y:Math.floor(point.y-300)},
+    visualCandidateOnly:true,serverPickupCommitted:false,
+  }));
+  assert.deepEqual(g.down(down(30),{...s,plan,
+    sampleAlpha:(asset)=>asset===front.asset?NaN:255}),
+    {handled:false,itemId:null});
+});
