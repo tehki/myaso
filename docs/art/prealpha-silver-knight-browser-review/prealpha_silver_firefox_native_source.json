@@ -1,0 +1,46 @@
+{
+  "browser": "firefox/153.4.0",
+  "engine": "firefox",
+  "clips": [
+    {
+      "clip": "idle",
+      "source": "silver_idle",
+      "directions": 8
+    },
+    {
+      "clip": "walk",
+      "source": "silver_walk",
+      "directions": 8
+    },
+    {
+      "clip": "sprint",
+      "source": "silver_sprint",
+      "directions": 8
+    },
+    {
+      "clip": "roll",
+      "source": "silver_roll",
+      "directions": 8
+    },
+    {
+      "clip": "jump",
+      "source": "silver_jump",
+      "directions": 8
+    }
+  ],
+  "sourceCellChecks": 40,
+  "unsupportedFallbackChecks": 13,
+  "npcRejected": true,
+  "realGameServer": false,
+  "realMultiplayer": false,
+  "authPlayers": false,
+  "sourceApprovedSpartanKickIncluded": false,
+  "screenCaptures": [
+    "prealpha_silver_firefox_idle_8way.png",
+    "prealpha_silver_firefox_walk_8way.png",
+    "prealpha_silver_firefox_sprint_8way.png",
+    "prealpha_silver_firefox_roll_8way.png",
+    "prealpha_silver_firefox_jump_8way.png"
+  ],
+  "pageErrors": []
+}
