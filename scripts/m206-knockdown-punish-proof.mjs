@@ -4,6 +4,43 @@ import { parseM201ServerProof } from "./m201-authoritative-phase-proof.mjs";
 // All comparisons in this verifier use only server ticks; browser epochs never
 // provide proof of an action-active transition.
 export const M206_KNOCKDOWN_TICKS = 22;
+
+// M155 true native proof: the punisher's OWN genuine rendered knockdown cue
+// precedes their actual W3C pointerDown. A different victim browser can see
+// the SAME server action later; its receive epoch cannot invalidate this click.
+// This is ONLY a browser cue gate, NOT proof of damage. The subsequent M206
+// Rust ACTION/HIT verifier must still prove one 34HP punish INSIDE 22 ticks.
+export function verifyM155RealCueBeforeNativePunish(
+  observed, { punisherId, defenderId, pointerDownEpochMs, cueDeadlineMs = 360 },
+) {
+  if (!Number.isSafeInteger(punisherId) || punisherId <= 0
+    || !Number.isSafeInteger(defenderId) || defenderId <= 0
+    || punisherId === defenderId
+    || !observed || observed.playerNetId !== punisherId
+    || observed.targetNetId !== defenderId
+    || !observed.cue?.visible || observed.cue.state !== "knockdown"
+    || observed.cue.label !== "PUNISH"
+    || !Number.isSafeInteger(observed.serverTick)
+    || observed.serverTick < 0 || observed.serverTick > 0xffffffff
+    || !Array.isArray(observed.fighters)
+    || !observed.fighters.some(f => f.netId === defenderId && f.action === 19)
+    || !Number.isFinite(observed.cue.epochMs)
+    || !Number.isFinite(pointerDownEpochMs)
+    || !Number.isFinite(cueDeadlineMs) || cueDeadlineMs !== 360
+    || pointerDownEpochMs < observed.cue.epochMs
+    || pointerDownEpochMs - observed.cue.epochMs >= cueDeadlineMs) {
+    throw new Error("M155 genuine native pointer not tied to current punisher knockdown cue");
+  }
+  return {
+    punisherId, defenderId,
+    cueServerTick: observed.serverTick,
+    cueEpochMs: observed.cue.epochMs,
+    pointerDownEpochMs,
+    cueToPointerMs: pointerDownEpochMs - observed.cue.epochMs,
+  };
+}
+
+
 export function verifyM206ServerKnockdownPunish(output, { kickerId, defenderId, punisherId }) {
   const ids = [kickerId, defenderId, punisherId];
   if (!ids.every(Number.isSafeInteger) || ids.some(id => id <= 0)

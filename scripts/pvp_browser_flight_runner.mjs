@@ -23,7 +23,7 @@ import { observeM219RollBufferIngress } from "./m219-buffered-roll-ingress-evide
 import { summarizeM220KnockdownFocusTimeline } from "./m220-knockdown-focus-timeline.mjs";
 import { mustAwaitM202GuardConvergence } from "./m202-guardbreak-convergence.mjs";
 import { verifyM201ServerPunishProof } from "./m201-authoritative-phase-proof.mjs";
-import { verifyM206ServerKnockdownPunish } from "./m206-knockdown-punish-proof.mjs";
+import { verifyM155RealCueBeforeNativePunish, verifyM206ServerKnockdownPunish } from "./m206-knockdown-punish-proof.mjs";
 import { verifyM147AuthoritativeRecoveryPunish } from "./m147-authoritative-recovery-punish.mjs";
 import { createM147RecoveryCueReceipt, dispatchM147CuePunish,
   planM147OrdinaryFocusRetreat, M147_BROWSER_CUE_OBSERVER } from "./m147-recovery-cue-receipt.mjs";
@@ -4733,14 +4733,23 @@ async function runOnlineUiKickKnockdownFfaHitFlight(entries) {
   const punishAimValid = punishDown
     && Math.abs(punishDown.y - 0.5) <= 0.15
     && (punisherId < defenderId ? punishDown.x >= 0.6 : punishDown.x <= 0.4);
-  const knockdownEndEpochMs = conversion.knockdownTransition.epochMs + COMBAT.kick.knockdownMs;
   if (punishDowns.length !== 1 || punishUps.length !== 1 || !punishAimValid
     || !Number.isFinite(punishDown?.epochMs)
-    || punishDown.epochMs < conversion.knockdownTransition.epochMs
-    || punishDown.epochMs >= knockdownEndEpochMs) {
-    throw new Error(milestone + " genuine third-party LMB missed the authoritative knockdown window: "
-      + JSON.stringify({ punishPointers, knockdownTransition: conversion.knockdownTransition, knockdownEndEpochMs }));
+    || !Number.isFinite(punishUps[0]?.epochMs)
+    || punishUps[0].epochMs <= punishDown.epochMs
+    || punishUps[0].epochMs - punishDown.epochMs >= 100) {
+    throw new Error(milestone + " missing one genuine aimed sub-heavy W3C punish: "
+      + JSON.stringify({ punishPointers, knockdownTransition: conversion.knockdownTransition }));
   }
+  // #39652908814: Firefox/punisher saw valid server-owned KNOCKDOWN cue
+  // at epoch4036 and physically clicked at4044; the victim's separate Chrome
+  // replica was received at4064, 20ms AFTER that real click. Do not use
+  // unrelated client snapshot-arrival wall epochs as a server action fence.
+  const nativeCueProof = verifyM155RealCueBeforeNativePunish(observed, {
+    punisherId, defenderId, pointerDownEpochMs: punishDown.epochMs,
+    cueDeadlineMs: COMBAT.kick.knockdownMs,
+  });
+  console.log("M155_NATIVE_CUE_TO_POINTER_PROOF " + JSON.stringify(nativeCueProof));
 
   // M206: the normal 50ms snapshots can miss the unchanged 80ms
   // light active state even though the real Chrome2 W3C LMB hit landed.
