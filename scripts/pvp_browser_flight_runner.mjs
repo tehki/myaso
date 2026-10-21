@@ -35,6 +35,8 @@ import { readM161OpeningKickProof } from "./m161-opening-kick-proof.mjs";
 import { readM171RejectedFeintProof } from "./m171-rejected-feint-proof.mjs";
 import { dispatchM107NativeDodge } from "./m107-native-dodge-plan.mjs";
 import { awaitM194ServerBlock } from "./m194-authoritative-block-onset.mjs";
+import { observeM54NativeThreat } from "./m54-native-threat-observation.mjs";
+import { readM54AuthoritativeHit } from "./m54-authoritative-threat-proof.mjs";
 import { createM221TrustedWheelRegistry } from "./m221-trusted-wheel-attestation.mjs";
 import { attachM325TrustedWheelSocket } from "./m325-trusted-wheel-socket.mjs";
 import { requiresM338GuardBreakWheelSocket } from "./m338-guard-break-wheel-scenarios.mjs";
@@ -536,6 +538,7 @@ async function startGameServer() {
         || scenario === "uiguardbreak" || scenario === "uiguardbreaktell"
         || scenario === "uiparrytell"
         || scenario === "uidirectionallight" || scenario === "uifeint"
+        || scenario === "uithreat" || scenario === "uithreatbearing"
         || scenario === "uiheavyblock" || scenario === "uiheavyparry"
         || scenario === "uiheavydodge"
         || scenario === "uikickknockdownffahit"
@@ -10363,51 +10366,57 @@ async function runOnlineUiThreatAwarenessFlight(entries, requireBearing = false)
   await sleep(60);
 
   const leftId = ordered[0].playerNetId;
-  let evidence = null;
-  for (let attempt = 0; attempt < 3 && !evidence; attempt += 1) {
-    await performArenaAttack(left, leftArena, 200);
-    // Keep all three real browser sessions scheduled while the 135 ms windup and
-    // 80 ms active phase are live. Sleeping through the entire exchange lets a
-    // headless tab skip the short STRIKE render even though authority resolves it.
-    const states = await sampleUiEvidenceWhileActive(entries, 420);
-    const leftState = states.find((entry) => entry.browser === left.name);
-    const centerState = states.find((entry) => entry.browser === center.name);
-    const rightState = states.find((entry) => entry.browser === right.name);
-    if (!leftState || !centerState || !rightState) {
-      throw new Error(`${milestone} incomplete threat evidence: ${JSON.stringify(states)}`);
-    }
-    const visibleCenter = centerState.threatTransitions.filter((event) => event.visible && event.label === `#${leftId}`);
-    const sawWindup = visibleCenter.some((event) => event.state === "windup" && event.phase === "WINDUP");
-    const sawStrike = visibleCenter.some((event) => event.state === "strike" && event.phase === "STRIKE");
-    const leftFalsePositive = leftState.threatTransitions.some((event) => event.visible);
-    const rightFalsePositive = rightState.threatTransitions.some((event) => event.visible);
-    if (leftFalsePositive || rightFalsePositive) {
-      throw new Error(`${milestone} threat cue leaked to non-target clients: ${JSON.stringify(states)}`);
-    }
-    if (centerState.playerHp === 66) {
-      if (!sawWindup || !sawStrike) {
-        throw new Error(`${milestone} authoritative hit resolved without complete incoming-threat phases: ${JSON.stringify(states)}`);
-      }
-      if (requireBearing && !visibleCenter.some((event) => event.bearing === "FROM LEFT")) {
-        throw new Error(`M57 primary threat bearing did not identify the real left-side attacker: ${JSON.stringify(states)}`);
-      }
-      if (leftState.playerHp !== 100 || rightState.playerHp !== 100) {
-        throw new Error(`${milestone} threat exchange damaged a non-target fighter: ${JSON.stringify(states)}`);
-      }
-      evidence = states;
-      break;
-    }
-    if (states.some((entry) => entry.playerHp !== 100 || entry.playerGuard !== 100)) {
-      throw new Error(`${milestone} retry ${attempt + 1} resolved an unexpected exchange: ${JSON.stringify(states)}`);
-    }
-    await sleep(520);
-    if (attempt < 2) await pulseMovementKey(left, "d", 40);
+  const serverOutputStart = m201ServerOutput().length;
+  // One genuine gesture only. A stale DOM HP100 after a real hit must never
+  // authorize another strike or combine phases from two different attacks.
+  const observation = await observeM54NativeThreat({
+    attack: () => performArenaAttack(left, leftArena, 200),
+    sampleVictim: ({ nativeStatus }) => sampleUiEvidenceDuringNative(center, nativeStatus, 420),
+    readAll: () => Promise.all(entries.map(readUiEvidence)),
+  });
+  const evidence = observation.states;
+  const output = m201ServerOutput().slice(serverOutputStart);
+  console.log(`${milestone}_NATIVE_THREAT_OBSERVATION ` + JSON.stringify({
+    attackerId: leftId, victimId: ordered[1].playerNetId,
+    sampledBrowser: center.name, ...observation.timing,
+    serverPhases: output.split(/\r?\n/)
+      .filter(line => /^M201_AUTH_(ACTION|HIT) /.test(line)).slice(-24),
+  }));
+  const proof = readM54AuthoritativeHit(output, { attackerId: leftId, victimId: ordered[1].playerNetId });
+  if (!proof) throw new Error(`${milestone} sole native attack has no authoritative hit: ${JSON.stringify(evidence)}`);
+  const leftState = evidence.find(entry => entry.browser === left.name);
+  const centerState = evidence.find(entry => entry.browser === center.name);
+  const rightState = evidence.find(entry => entry.browser === right.name);
+  if (!leftState || !centerState || !rightState) {
+    throw new Error(`${milestone} incomplete threat evidence: ${JSON.stringify(evidence)}`);
   }
-  if (!evidence) {
-    throw new Error(`${milestone} real attack never produced authoritative target damage: ${JSON.stringify(await Promise.all(entries.map(readUiEvidence)))}`);
+  const visibleCenter = centerState.threatTransitions.filter(event => event.visible && event.label === `#${leftId}`);
+  const sawWindup = visibleCenter.some(event => event.state === "windup" && event.phase === "WINDUP");
+  const sawStrike = visibleCenter.some(event => event.state === "strike" && event.phase === "STRIKE");
+  const leftFalsePositive = leftState.threatTransitions.some(event => event.visible);
+  const rightFalsePositive = rightState.threatTransitions.some(event => event.visible);
+  if (leftFalsePositive || rightFalsePositive) {
+    throw new Error(`${milestone} threat cue leaked to non-target clients: ${JSON.stringify(evidence)}`);
+  }
+  if (centerState.playerNetId !== ordered[1].playerNetId || centerState.playerHp !== 66
+    || !Number.isSafeInteger(centerState.acceptance?.serverTick)
+    || centerState.acceptance.serverTick < proof.hit.tick) {
+    throw new Error(`${milestone} victim DOM/replica is stale or mismatches the sole authoritative hit: ${JSON.stringify(evidence)}`);
+  }
+  if (!sawWindup || !sawStrike) {
+    throw new Error(`${milestone} authoritative hit resolved without complete incoming-threat phases: ${JSON.stringify(evidence)}`);
+  }
+  if (requireBearing && !visibleCenter.some(event => event.bearing === "FROM LEFT")) {
+    throw new Error(`M57 primary threat bearing did not identify the real left-side attacker: ${JSON.stringify(evidence)}`);
+  }
+  if (leftState.playerHp !== 100 || rightState.playerHp !== 100) {
+    throw new Error(`${milestone} threat exchange damaged a non-target fighter: ${JSON.stringify(evidence)}`);
   }
   const attackerState = evidence.find((entry) => entry.browser === left.name);
-  if (!attackerState?.pointers.some((event) => event.type === "pointerdown" && event.button === 0)) {
+  const downs = attackerState?.pointers.filter(event => event.type === "pointerdown" && event.button === 0) ?? [];
+  const ups = attackerState?.pointers.filter(event => event.type === "pointerup" && event.button === 0) ?? [];
+  if (downs.length !== 1 || ups.length !== 1 || !Number.isFinite(downs[0].epochMs)
+    || !Number.isFinite(ups[0].epochMs) || ups[0].epochMs <= downs[0].epochMs) {
     throw new Error(`${milestone} threat attack lacked real pointer provenance: ${JSON.stringify(attackerState)}`);
   }
   return evidence;
@@ -12758,6 +12767,18 @@ async function sampleUiEvidenceWhileActive(entries, durationMs, intervalMs = 20)
   return states;
 }
 
+async function sampleUiEvidenceDuringNative(session, nativeStatus, afterAckMs = 420) {
+  let state;
+  while (true) {
+    state = await readUiEvidence(session);
+    const status = nativeStatus();
+    // Retain the original full 420ms after-ACK observation budget, and also
+    // observe beforehand. An ACK is a bound here, never input-delivery proof.
+    if (status.failed || (status.complete && Date.now() >= status.ackEpochMs + afterAckMs)) return state;
+    await sleep(20);
+  }
+}
+
 async function installUiObserver(session) {
   await execute(session.base, session.sessionId, `
     const target = document.querySelector('#event-text');
@@ -12799,7 +12820,7 @@ async function installUiObserver(session) {
           "ws://" + location.host + "/__myaso_m325_trusted_wheel");
       }
     }
-    const epochEvidence = ['uiguardbreak', 'uiguardbreaktell', 'uiparrytell', 'uiheavyguardbreakpunish', 'uidodge', 'uirollbuffer', 'uijumpbuffer', 'uijumpattack', 'uijumpattackinputloss', 'uijumpattackpunish', 'uijumpattacktelegraph', 'uijumpffaprimary', 'uijumpffasecondary', 'uijumprecoveryffa', 'uijumppunishffa', 'uimultirecoveryffa', 'uimultirecoveryspatial', 'uimultirecoverypunish', 'uiparrypunishwindow', 'uiparrypunishffa', 'uiparrypunishffahit', 'uiguardbreakpunishffa', 'uiguardbreakpunishffahit', 'uikickknockdownffa', 'uikickknockdownffahit', 'uikickknockdownbounded', 'uirollknockdownbounded', 'uistaminaauth', 'uistaminaexhaustion', 'uistaminafeedback', 'uistaminaconfirmed', 'uifeint', 'uirollknockdownffahit', 'uimultiknockdownffa', 'uimultiknockdownffahit', 'uirollknockdownffa', 'uijumpattackblock', 'uijumpattackparry', 'uijumpattackdodge', 'uijumpattackbuffer', 'uikickbuffer'].includes(new URLSearchParams(location.search).get('scenario'));
+    const epochEvidence = ['uithreat', 'uithreatbearing', 'uiguardbreak', 'uiguardbreaktell', 'uiparrytell', 'uiheavyguardbreakpunish', 'uidodge', 'uirollbuffer', 'uijumpbuffer', 'uijumpattack', 'uijumpattackinputloss', 'uijumpattackpunish', 'uijumpattacktelegraph', 'uijumpffaprimary', 'uijumpffasecondary', 'uijumprecoveryffa', 'uijumppunishffa', 'uimultirecoveryffa', 'uimultirecoveryspatial', 'uimultirecoverypunish', 'uiparrypunishwindow', 'uiparrypunishffa', 'uiparrypunishffahit', 'uiguardbreakpunishffa', 'uiguardbreakpunishffahit', 'uikickknockdownffa', 'uikickknockdownffahit', 'uikickknockdownbounded', 'uirollknockdownbounded', 'uistaminaauth', 'uistaminaexhaustion', 'uistaminafeedback', 'uistaminaconfirmed', 'uifeint', 'uirollknockdownffahit', 'uimultiknockdownffa', 'uimultiknockdownffahit', 'uirollknockdownffa', 'uijumpattackblock', 'uijumpattackparry', 'uijumpattackdodge', 'uijumpattackbuffer', 'uikickbuffer'].includes(new URLSearchParams(location.search).get('scenario'));
     const record = () => {
       const text = target.textContent?.trim() ?? '';
       if (/^Online - player #\\d+ - server tick \\d+$/.test(text)) state.online = text;
@@ -14071,6 +14092,7 @@ async function readUiEvidence(session) {
         staminaDenialTransitions: (window.__MYASO_ACCEPTANCE_STATE__.staminaDenialTransitions ?? []).map((entry) => ({ ...entry })),
         ownActionTransitions: (window.__MYASO_ACCEPTANCE_STATE__.ownActionTransitions ?? []).map((entry) => ({ ...entry })),
         focusActionTransitions: (window.__MYASO_ACCEPTANCE_STATE__.focusActionTransitions ?? []).map((entry) => ({ ...entry })),
+        threatReplicaTransitions: (window.__MYASO_ACCEPTANCE_STATE__.threatReplicaTransitions ?? []).slice(-64).map((entry) => ({ ...entry })),
         fighters: (window.__MYASO_ACCEPTANCE_STATE__.fighters ?? []).map((fighter) => ({ ...fighter })),
         m233RecoveryHandoff: (window.__MYASO_ACCEPTANCE_STATE__.m233RecoveryHandoff ?? []).slice(-96).map((entry) => ({
           ...entry,
