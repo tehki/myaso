@@ -2,7 +2,8 @@
 // A valid JSON pair is NOT cryptographic proof of physical host independence;
 // match server-side QUIC logs + actual machine identities before release.
 import {readFile} from "node:fs/promises";
-import {resolve} from "node:path";
+import {createHash} from "node:crypto";
+import {resolve,dirname,sep} from "node:path";
 import {pathToFileURL} from "node:url";
 import {privateIpv4} from "./alpha_p0_host_pair_config.mjs";
 
@@ -95,11 +96,35 @@ export function verifyPairEvidence(first,second){
     notReleaseApproval:true
   });
 }
+// Report JSON alone is insufficient: hash the original screenshots on disk.
+export async function verifyCaptureFiles(report,reportFile){
+  if(!report || !Array.isArray(report.screenshots) || report.screenshots.length!==2)
+    fail("missing two native screenshot records");
+  const base=dirname(resolve(reportFile));
+  const verified=[];
+  for(const image of report.screenshots){
+    const pathname=resolve(base,image.relativeFile);
+    if(!pathname.startsWith(base+sep))fail("screenshot path escapes report directory");
+    let pixels;
+    try{pixels=await readFile(pathname)}
+    catch{fail("genuine screenshot file missing: "+image.relativeFile)}
+    if(pixels.length!==image.bytes||pixels.length<=256
+      ||!pixels.subarray(0,8).equals(Buffer.from("89504e470d0a1a0a","hex"))
+      ||createHash("sha256").update(pixels).digest("hex")!==image.sha256)
+      fail("PNG bytes/hash do not match W3C report: "+image.relativeFile);
+    verified.push({family:image.family,bytes:pixels.length,sha256:image.sha256});
+  }
+  return Object.freeze(verified);
+}
 if(process.argv[1]&&pathToFileURL(resolve(process.argv[1])).href===import.meta.url){
   if(process.argv.length!==4){console.error("Usage: node scripts/alpha_p0_host_pair_verify.mjs <A-evidence.json> <B-evidence.json>");process.exitCode=2}
   else try{
     const a=JSON.parse(await readFile(process.argv[2],"utf8"));
     const b=JSON.parse(await readFile(process.argv[3],"utf8"));
-    console.log("MYASO_P0_PAIR_STRUCTURAL_CHECK "+JSON.stringify(verifyPairEvidence(a,b)));
+    const structural=verifyPairEvidence(a,b);
+    const screenshotsA=await verifyCaptureFiles(a,process.argv[2]);
+    const screenshotsB=await verifyCaptureFiles(b,process.argv[3]);
+    console.log("MYASO_P0_PAIR_EVIDENCE_FILES_VERIFIED "+JSON.stringify({screenshotsA,screenshotsB}));
+    console.log("MYASO_P0_PAIR_STRUCTURAL_CHECK "+JSON.stringify(structural));
   }catch(e){console.error("MYASO_P0_PAIR_STRUCTURAL_FAIL "+e.message);process.exitCode=1}
 }
