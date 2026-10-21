@@ -42,7 +42,7 @@ test("P0 four frozen distinct rack sockets represent render fixtures, never item
  assert.equal(WORLD_ALPHA_SWORD_RACK_SOCKETS.length,4);
  assert.equal(new Set(WORLD_ALPHA_SWORD_RACK_SOCKETS.map(s=>s.socketId)).size,4);
  assert.ok(WORLD_ALPHA_SWORD_RACK_SOCKETS.every(s=>Object.isFrozen(s)&&Object.isFrozen(s.approach)));
- assert.ok(WORLD_ALPHA_SWORD_RACK_SOCKETS.every(s=>s.itemKind==="practice-sword"));
+ assert.ok(WORLD_ALPHA_SWORD_RACK_SOCKETS.every(s=>s.displayCategory==="sword"));
  assert.ok(WORLD_ALPHA_SWORD_RACK_SOCKETS.every(s=>!("worldItemId" in s)&&!("owner" in s)&&!("clickShape" in s)));
  assert.equal(validateWorldAlphaArmoryLayout(),true);
 });
