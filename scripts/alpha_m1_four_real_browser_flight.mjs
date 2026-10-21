@@ -10,6 +10,7 @@ import process from "node:process";
 import { setTimeout as sleep } from "node:timers/promises";
 import {WORLD_ALPHA_SWORD_RACK_SOCKETS,validateWorldAlphaArmoryLayout} from "../src/world/alpha-armory.mjs";
 import {nextNativeWalkPulse,nativeRackArrived,proposedNativeRackReachPoint,nativeRackWithinProposedReach,verifyNativeRackPeerConsensus,verifyNativeRackRecoveryPeerConsensus} from "./alpha_p0_rack_walk_math.mjs";
+import {assessNativeSameTickRackClearance} from "./alpha_p0_native_same_tick_clearance.mjs";
 
 const root = process.cwd();
 const greyhavenModeValue = process.env.MYASO_ALPHA_NATIVE_GREYHAVEN;
@@ -35,6 +36,13 @@ if(rackCrashValue!==undefined&&!["0","1"].includes(rackCrashValue))
 const rackCrashRejoin=rackCrashValue==="1";
 if(rackCrashRejoin&&!nativeRackReach)
   throw Error("rack crash/rejoin requires actual native proposed rack reach mode");
+const sameTickValue=process.env.MYASO_ALPHA_NATIVE_RACK_SAME_TICK_CLEARANCE;
+if(sameTickValue!==undefined&&!["0","1"].includes(sameTickValue))
+  throw Error("MYASO_ALPHA_NATIVE_RACK_SAME_TICK_CLEARANCE must be unset, 0 or 1");
+const sameTickClearance=sameTickValue==="1";
+if(sameTickClearance&&!nativeRackReach)
+  throw Error("same-tick four-fighter separation requires original native reach evidence");
+const clearanceObservations=[];
 const GREYHAVEN_SPAWNS = new Map([
   [1,{x:4110,y:4160}],[2,{x:4206,y:4160}],
   [3,{x:4110,y:4256}],[4,{x:4206,y:4256}],
@@ -469,6 +477,13 @@ async function nativeFourRackApproaches(views) {
   const peerConsensus=nativeRackReach
     ? verifyNativeRackPeerConsensus(peers,witnessed,WORLD_ALPHA_SWORD_RACK_SOCKETS)
     : null;
+  if(sameTickClearance){
+    const report=assessNativeSameTickRackClearance(peers,
+      WORLD_ALPHA_SWORD_RACK_SOCKETS,"initial");
+    clearanceObservations.push(report);
+    console.log("ALPHA_P0_NATIVE_RACK_SAME_TICK_CLEARANCE_OBSERVATION "+
+      JSON.stringify(report));
+  }
   console.log((nativeRackReach?"ALPHA_P0_FOUR_NATIVE_GREYHAVEN_PROPOSED_REACH_PASS "
     :"ALPHA_P0_FOUR_NATIVE_GREYHAVEN_RACK_APPROACH_PASS ")+JSON.stringify({
     actualBrowsers:sessions.map(s=>s.name),witnessed,
@@ -516,6 +531,13 @@ async function nativeRackCrashRecovery() {
   },s.name+" full replacement roster and fresh server tick",10000)));
   const recovered=verifyNativeRackRecoveryPeerConsensus(peers,
     WORLD_ALPHA_SWORD_RACK_SOCKETS,afterReplacementTick);
+  if(sameTickClearance){
+    const report=assessNativeSameTickRackClearance(peers,
+      WORLD_ALPHA_SWORD_RACK_SOCKETS,"after-replacement");
+    clearanceObservations.push(report);
+    console.log("ALPHA_P0_NATIVE_RACK_SAME_TICK_CLEARANCE_OBSERVATION "+
+      JSON.stringify(report));
+  }
   for(const session of sessions)
     await saveScreenshot(session,"rack-rejoin-auth-no-ghost");
   console.log("ALPHA_P0_FOUR_NATIVE_RACK_SIGKILL_REJOIN_PASS "+JSON.stringify({
@@ -552,6 +574,22 @@ async function run() {
     if(rackCrashRejoin){
       await crashAndRejoin(game,staticServer.address().port);
       await nativeRackCrashRecovery();
+    }
+    if(sameTickClearance){
+      const expected=rackCrashRejoin?2:1;
+      assert(clearanceObservations.length===expected,
+        "missing genuine same-tick four-player radius-18 snapshots");
+      const bad=clearanceObservations.filter(record=>!record.ok);
+      if(bad.length){
+        console.error("ALPHA_P0_NATIVE_RACK_SAME_TICK_CLEARANCE_FAIL "+
+          JSON.stringify({failed:bad,all:clearanceObservations}));
+        throw Error("four-player P0 actor-clearance blocker: "+JSON.stringify(bad));
+      }
+      console.log("ALPHA_P0_NATIVE_RACK_SAME_TICK_CLEARANCE_PASS "+
+        JSON.stringify({phases:clearanceObservations,actualWebDriverSessions:4,
+          radiusWorldUnits:18,physicalSwordAndEquippedProof:false,
+          liveDynamicCollisionAuthorityNotActivated:true,
+          scope:"single loopback Rust snapshot per phase; no actor overlap claimed beyond samples"}));
     }
     return;
   }
