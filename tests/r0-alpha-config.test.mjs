@@ -1,4 +1,5 @@
 import "./world-sword-pointer.test.mjs";
+import "./sword-canvas-pointer.test.mjs";
 import "./alpha-practice-link.test.mjs";
 import assert from "node:assert/strict";
 import test from "node:test";
