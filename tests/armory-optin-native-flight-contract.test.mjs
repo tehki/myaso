@@ -1,0 +1,37 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import {readFileSync} from "node:fs";
+const read=p=>readFileSync(new URL("../"+p,import.meta.url),"utf8");
+test("P0 native opt-in four browsers retain actual original Rust authority and genuine W3C receive checks",()=>{
+ const s=read("scripts/alpha_p0_four_native_armory_rack_preview.mjs");
+ const unchanged=read("scripts/alpha_p0_four_native_rendered_greyhaven.mjs");
+ assert.match(s,/MYASO_ALPHA_SPAWN:"greyhaven"/);
+ assert.match(s,/MYASO_ALPHA_STATIC_COLLISION:"reviewed-static-only"/);
+ assert.match(s,/spawn\(path\.join\(root,"server","target","debug","myaso-server"\)/);
+ assert.match(s,/const browsers=\[\{name:"chrome-1".*firefox-4"/);
+ assert.match(s,/u\.searchParams\.set\("armoryart","1"\)/);
+ assert.match(s,/nativeWorldLivenessAdvanced\(before\[i\],v\)/);
+ assert.match(s,/v\.tick>before\[i\]\.tick/);
+ assert.match(s,/s\.armory\.painted>0/);
+ assert.match(s,/s\.armory\.drawnSwords===0/);
+ assert.match(s,/s\.armory\.canonicalItems===false/);
+ assert.match(s,/s\.armory\.serverTryPickup===false/);
+ assert.match(s,/s\.armory\.actualCanvas===true/);
+ assert.match(s,/u\.searchParams\.set\("world","1"\)/);
+ assert.match(unchanged,/nativeWorldLivenessAdvanced\(before\[i\],v\)/);
+ assert.doesNotMatch(unchanged,/armoryart|__MYASO_ARMORY_RACK_REVIEW__/);
+ assert.doesNotMatch(s,/ART-ONLY-NO-SERVER|fakeSnapshot|mockServer|injectedItemIds/);
+});
+test("P0 dedicated full real-browser workflow does not weaken protected Core/Combat quality",()=>{
+ const workflow=read(".github/workflows/graphics3b-p0-real-native-rack.yml");
+ assert.match(workflow,/runs-on: ubuntu-latest/);
+ assert.match(workflow,/node --test tests\/armory-optin-live-rack\.test\.mjs/);
+ assert.match(workflow,/cargo build --locked --manifest-path server\/Cargo\.toml --bin myaso-server/);
+ assert.match(workflow,/node scripts\/alpha_p0_four_native_armory_rack_preview\.mjs/);
+ assert.doesNotMatch(workflow,/continue-on-error: true[\s\S]*?name: Four real authenticated/);
+ const game=read("web/online-game.mjs");
+ assert.match(game,/armoryRackReviewEnabled/);
+ assert.match(game,/ctx\.scale\(1 \/ ARENA_VIEW_ZOOM, 1 \/ ARENA_VIEW_ZOOM\)/);
+ assert.match(game,/drawnSwords:armoryRackReview\?\.status\(\)\?\.drawnSwordCount \?\? 0/);
+ assert.match(game,/canonicalItems:false,serverTryPickup:false/);
+});
