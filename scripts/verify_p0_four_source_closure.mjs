@@ -20,7 +20,7 @@ import { resolve } from "node:path";
 const owners = ["core", "items", "world", "core8c"];
 const requiredModules = [
   "alpha_armory_mapping_preflight", "alpha_mainhand_snapshot",
-  "alpha_pickup_ack_proof", "alpha_greyhaven_geometry", "alpha_spawn",
+  "alpha_pickup_ack_proof", "alpha_greyhaven_geometry",
   "character_identity", "identity", "item_journal", "item_ownership",
   "legacy_gear_preflight", "loot", "loot_persistence", "loot_transaction",
   "magic", "magic_cast", "magic_checkpoint", "magic_combat_death",
@@ -182,6 +182,10 @@ function main() {
   if(changes) fail("disposable local merged checkout must be CLEAN");
   const head=ensureAncestry(root,args);
   const moduleCount=readModules(readFileSync(resolve(root,"server/src/lib.rs"),"utf8"));
+  // 8C's spawn module belongs to the executable, NOT the shared library.
+  const mainSource=readFileSync(resolve(root,"server/src/main.rs"),"utf8");
+  if ([...mainSource.matchAll(/^mod alpha_spawn;$/gm)].length!==1)
+    fail("expected exactly one Core 8C executable-only alpha_spawn declaration");
   let verified=0;
   for(const owner of owners) {
     for(const path of sourceClaims[owner]) {
