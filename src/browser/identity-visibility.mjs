@@ -18,7 +18,13 @@ export function idrLabelFromProjection(projection) {
     || /[\p{Cc}\u202a-\u202e\u2066-\u2069\u200e\u200f]/u.test(projection.label)) {
     return IDR_UNKNOWN;
   }
-  return projection.label;
+  // A claimed alias must never have the same presentation as a server-
+  // verified identity. Plain "Aldric" from a future projection is NOT proof.
+  if (projection.certainty === "claimed") {
+    const name = projection.label.trim().replace(/^Calls themselves\s+/iu, "");
+    return name ? "Calls themselves " + name : IDR_UNKNOWN;
+  }
+  return projection.label.trim();
 }
 
 export function idrScoreboardRows(rows) {
