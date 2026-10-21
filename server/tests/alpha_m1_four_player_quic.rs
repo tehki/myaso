@@ -134,7 +134,7 @@ async fn actual_server_preserves_four_distinct_players_and_denies_fifth() -> Res
         let connection = timeout(Duration::from_secs(6), endpoint.connect(url.as_str()))
             .await
             .context("pinned QUIC client connection timeout")??;
-        let (_send, mut recv) = timeout(Duration::from_secs(4), connection.open_bi())
+        let (send, mut recv) = timeout(Duration::from_secs(4), connection.open_bi())
             .await
             .context("reliable game stream creation timeout")??
             .await?;
@@ -166,13 +166,17 @@ async fn actual_server_preserves_four_distinct_players_and_denies_fifth() -> Res
                 expected
             );
         }
-        live.push(connection);
+        println!("ALPHA_M1_JOINED id={} baseline_id_count={}", index + 1, observed.len());
+        // Hold both halves of the reliable game stream for the whole session;
+        // dropping it early would make the real server close this player.
+        live.push((connection, send, recv));
     }
 
-    for (index, connection) in live.iter().enumerate() {
+    for (index, (connection, _, _)) in live.iter().enumerate() {
         let tick = 501 + index as u32;
         connection.send_datagram(input_packet(index as u16 + 1, tick))?;
         authoritative_input_ack(connection, tick).await?;
+        println!("ALPHA_M1_ACK id={} tick={tick}", index + 1);
     }
 
     // A fifth authenticated connection must be refused by the *real* server
@@ -184,8 +188,8 @@ async fn actual_server_preserves_four_distinct_players_and_denies_fifth() -> Res
     }
 
     // Confirm the admission rejection did not evict the original player #1.
-    live[0].send_datagram(input_packet(5, 601))?;
-    authoritative_input_ack(&live[0], 601).await?;
+    live[0].0.send_datagram(input_packet(5, 601))?;
+    authoritative_input_ack(&live[0].0, 601).await?;
     println!("ALPHA_M1_FOUR_PLAYER_REAL_SERVER_QUIC_PASS cap=4 ids=1,2,3,4 rejected=5");
     Ok(())
 }
