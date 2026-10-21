@@ -6,14 +6,15 @@ window.__graphProbe={phase:"boot",done:false,log:[],error:null,
  const record=(stage,other={})=>probe.log.push({stage,at:t(),...other});
  const params=new URL(location.href).searchParams;
  const mode=params.get("mode");
- if(!["minimal","graph","draw"].includes(mode))throw Error("Unknown mode");
+ if(!["minimal","world","graphics","graph","draw"].includes(mode))throw Error("Unknown mode");
  record("boot",{mode});
  let original=null;
  if(mode!=="minimal"){
   record("graph:begin");
   const mod=await import("./armory-p0-graph-load-probe.mjs");
-  original=window.__graphProbeGraphics;
-  if(!original)throw Error("Missing original World/Graphics exports");
+  original=await mod.loadSourceGroup(mode);
+  if(!original)throw Error("Missing original source group exports");
+  record("graph:ready",{loadedWorld:original.loadedWorld,loadedGraphics:original.loadedGraphics});
  }
  record("image:begin");
  const load=async(name,expected)=>{
