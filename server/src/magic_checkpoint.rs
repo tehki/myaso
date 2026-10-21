@@ -303,7 +303,10 @@ pub fn transact_world_teacher_lesson(
     if tick.completed_tick == 0 || tick.world.tick != tick.completed_tick {
         return Err(JointCheckpointError::StaleWorldTick);
     }
-    if !tick.world.now_ms.is_finite() || tick.world.now_ms < 0.0 {
+    if !tick.world.now_ms.is_finite()
+        || tick.world.now_ms < 0.0
+        || tick.world.now_ms >= u64::MAX as f32
+    {
         return Err(JointCheckpointError::InvalidWorldTime);
     }
     let fighter = tick
