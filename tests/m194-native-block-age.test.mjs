@@ -17,6 +17,6 @@ test("M194 genuine W3C wheel gets bounded 40ms age before one light release", ()
   assert.match(flight, /if \(!trustedWheelBeforeRelease\)/);
   assert.match(flight, /M193 guard-break exchange \$\{attempt \+ 1\} resolved as parry instead of -38 guard/);
   assert.match(flight, /defenderState\?\.playerHp !== 100/);
-  assert.match(flight, /M201_AUTH_(?:ACTION|BLOCK|PARRY|BREAK)/);
+  assert.match(flight, /M320_GUARD_BREAK_AUTH_TRACE/);
   assert.doesNotMatch(flight, /dispatchEvent|setTimeout\(.*wheel|forceParry|fakeGuard/);
 });
