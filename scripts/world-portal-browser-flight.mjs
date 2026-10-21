@@ -109,7 +109,7 @@ try{
     failure("D19 initial spawn incorrectly inside trigger",start);
   await press("e");
   const distant=await snapshot();
-  if(distant.place!==start.place||distant.door.includes("Return to Greyhaven"))
+  if(!distant.place?.includes("Moonvale · 4365,4150")||distant.door?.includes("Return to Greyhaven"))
     failure("D19 E triggered transfer while distant",distant);
 
   // Read a session-only story then choose an unrelated expedition. Both must
