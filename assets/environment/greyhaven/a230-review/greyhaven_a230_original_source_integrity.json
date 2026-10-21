@@ -1,0 +1,182 @@
+{
+  "source": "blood_iron_greyhaven_a22.blend",
+  "derived": "blood_iron_red_lion_a230_joinery.blend",
+  "sourceMeshSignatures": {
+    "Red Lion / chimney": {
+      "vertices": 72,
+      "xyzSha256": "ca89d1a8015b8bc74b55ac0ca63dc43bd7675dac66fb1f976510b655734d2fe1",
+      "materialNames": [
+        "A2 | worn limestone / procedural",
+        "A2 | warm oak joinery"
+      ]
+    },
+    "Red Lion / door_front": {
+      "vertices": 156,
+      "xyzSha256": "282e2c0890b9797e0e283d4aa26ae39fd45db4140a31d4bc33a12ad1b9fa4979",
+      "materialNames": [
+        "A2 | warm oak joinery",
+        "A2 | aged oak grain",
+        "A2 | forged black iron"
+      ]
+    },
+    "Red Lion / entrance_steps": {
+      "vertices": 48,
+      "xyzSha256": "349d74d913f8dee6bc8b4850b25e584dfc81e7cb379cbafd5dde29eba9411807",
+      "materialNames": [
+        "A2 | worn limestone / procedural"
+      ]
+    },
+    "Red Lion / foundation_stone": {
+      "vertices": 456,
+      "xyzSha256": "2c3d94af48eb3386065f278fe0ee33bd870b20f84a6fa5822ad365e2f2f6b5a7",
+      "materialNames": [
+        "A2 | worn limestone / procedural"
+      ]
+    },
+    "Red Lion / gables": {
+      "vertices": 102,
+      "xyzSha256": "5032477a72b1ac9db5ea5cce42f4e14a2ed87b454b1dd3e5057117fb49f6b55b",
+      "materialNames": [
+        "A2 | rain-stained lime plaster",
+        "A2 | aged oak grain"
+      ]
+    },
+    "Red Lion / lantern_mount": {
+      "vertices": 48,
+      "xyzSha256": "37cd8536a8a9e1a65dfcb01cc6980afcaf13bdaa0653e17137257fb744474e83",
+      "materialNames": [
+        "A2 | forged black iron"
+      ]
+    },
+    "Red Lion / limewash_walls": {
+      "vertices": 24,
+      "xyzSha256": "6d01c348bb7578719511a737ca364d7407576e337c8716df8af275f31105c1ce",
+      "materialNames": [
+        "A2 | rain-stained lime plaster"
+      ]
+    },
+    "Red Lion / red_lion_sign": {
+      "vertices": 132,
+      "xyzSha256": "497eee4156e739936f953f2f7890169a5b6be35110066411f15b36349f8b14a9",
+      "materialNames": [
+        "A2 | warm oak joinery",
+        "A2 | painted red lion",
+        "A2 | forged black iron"
+      ]
+    },
+    "Red Lion / roof_ridge": {
+      "vertices": 24,
+      "xyzSha256": "24b19b180cf7f69f7e41b0a221441ed4a784989fddf724d03ede8445d5b8cb73",
+      "materialNames": [
+        "A2 | aged oak grain"
+      ]
+    },
+    "Red Lion / roof_slopes": {
+      "vertices": 8,
+      "xyzSha256": "83e0d80acc04dc7390d9ea0983ab4b8fe4be40d695c53204f7797e14a36f5995",
+      "materialNames": [
+        "A2 | fired clay tiles"
+      ]
+    },
+    "Red Lion / roof_tile_courses": {
+      "vertices": 288,
+      "xyzSha256": "71e66898c864ecf90fa0297315d2c26146d2b1cfe36f15adcaa781643e584d98",
+      "materialNames": [
+        "A2 | warm oak joinery"
+      ]
+    },
+    "Red Lion / timber_frame_bands": {
+      "vertices": 384,
+      "xyzSha256": "17494587cd0ffd9c3c561fd26155d0489227bad245e455a3760ef523c5de02f3",
+      "materialNames": [
+        "A2 | aged oak grain"
+      ]
+    },
+    "Red Lion / timber_frame_posts": {
+      "vertices": 336,
+      "xyzSha256": "3ff05b8e4aa5de17653047ba0edb9267b54779b5861801868d120342ed610844",
+      "materialNames": [
+        "A2 | aged oak grain"
+      ]
+    },
+    "Red Lion / windows_and_shutters": {
+      "vertices": 288,
+      "xyzSha256": "99e8694bad2dd0acb0e21718c435fa1ff365516cc1f7b131437fac6ba8b56a27",
+      "materialNames": [
+        "A2 | warm oak joinery",
+        "A2 | leaded smoke glass",
+        "A2 | aged oak grain"
+      ]
+    },
+    "Red Lion A2.1 / batched individually coloured clay roof tiles": {
+      "vertices": 1408,
+      "xyzSha256": "b74a318bbc0ab81d4de6b5c3302c1970f7b8b39f4561a68c4ac9b1d85cf34c0c",
+      "materialNames": [
+        "A2.1 | handmade fired tile / russet",
+        "A2.1 | handmade fired tile / dark sienna",
+        "A2.1 | handmade fired tile / moss tint",
+        "A2.1 | handmade fired tile / ash faded"
+      ]
+    },
+    "Red Lion A2.1 / batched oak joinery pegs": {
+      "vertices": 96,
+      "xyzSha256": "b4a6b639d1b33031eb255cd24f55c109f6329702b43a0a98c0d5b38146856a00",
+      "materialNames": [
+        "A2.1 | end-grain oak",
+        "A2.1 | tarred oak / wet joints"
+      ]
+    },
+    "Red Lion A2.1 / coursed uneven foundation dressing": {
+      "vertices": 448,
+      "xyzSha256": "97f0f216293694a9367d878aaf70ca346bdaa01cd27cbac57ae22b9f89509578",
+      "materialNames": [
+        "A2.1 | low-course limestone / grey",
+        "A2.1 | low-course limestone / tan",
+        "A2.1 | low-course limestone / damp"
+      ]
+    }
+  },
+  "allOriginalMeshCoordinatesAndMaterialsUnchanged": true,
+  "extraMeshCount": 35,
+  "extraNames": [
+    "A2.30 facade depth /central oak mullion east",
+    "A2.30 facade depth /central oak mullion west",
+    "A2.30 facade depth /corner quoin east 0",
+    "A2.30 facade depth /corner quoin east 1",
+    "A2.30 facade depth /corner quoin east 2",
+    "A2.30 facade depth /corner quoin east 3",
+    "A2.30 facade depth /corner quoin west 0",
+    "A2.30 facade depth /corner quoin west 1",
+    "A2.30 facade depth /corner quoin west 2",
+    "A2.30 facade depth /corner quoin west 3",
+    "A2.30 facade depth /door lintel carving 1",
+    "A2.30 facade depth /forged jamb nail left 0.55",
+    "A2.30 facade depth /forged jamb nail left 1.2",
+    "A2.30 facade depth /forged jamb nail left 1.87",
+    "A2.30 facade depth /forged jamb nail left 2.3",
+    "A2.30 facade depth /forged jamb nail right 0.55",
+    "A2.30 facade depth /forged jamb nail right 1.2",
+    "A2.30 facade depth /forged jamb nail right 1.87",
+    "A2.30 facade depth /forged jamb nail right 2.3",
+    "A2.30 facade depth /oak carved door lintel",
+    "A2.30 facade depth /oak door jamb left",
+    "A2.30 facade depth /oak door jamb right",
+    "A2.30 facade depth /sill east",
+    "A2.30 facade depth /sill inner edge east",
+    "A2.30 facade depth /sill inner edge west",
+    "A2.30 facade depth /sill west",
+    "A2.30 facade depth /stone doorway threshold",
+    "A2.30 facade depth /window lower rail east",
+    "A2.30 facade depth /window lower rail west",
+    "A2.30 facade depth /window nail east -0.4",
+    "A2.30 facade depth /window nail east 0.4",
+    "A2.30 facade depth /window nail west -0.4",
+    "A2.30 facade depth /window nail west 0.4",
+    "A2.30 facade depth /window upper rail east",
+    "A2.30 facade depth /window upper rail west"
+  ],
+  "originalRoofMeshUnchanged": true,
+  "newVisualMeshesOnly": true,
+  "gameplayModified": false,
+  "productionApproved": false
+}

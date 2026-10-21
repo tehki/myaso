@@ -1,0 +1,160 @@
+{
+  "milestone": "Blood & Iron A2.28 Chrome and Firefox original facade lighting art review",
+  "authenticKnightHead": "c74fcf90e227f3bc4788728f000cfe6aa083c7ef",
+  "originalKnightIdleSha256": "828cf05dd873d0c8f35e887f5e46c35af87f084ac321977e358c985e7a2106b4",
+  "actualProjectionModule": "src/browser/arena-viewport.mjs",
+  "results": [
+    {
+      "browser": "chrome",
+      "version": "Chrome/154.0.8037.99",
+      "errors": [],
+      "screenshots": 2,
+      "entrance": {
+        "ready": true,
+        "browserRendering": true,
+        "sourceKnightHead": "c74fcf90e227f3bc4788728f000cfe6aa083c7ef",
+        "gameXY": [
+          320,
+          320
+        ],
+        "gameXYErrorPx": 0,
+        "dx": 0,
+        "dy": 0,
+        "opacity": 0.6,
+        "sourceToDay": {
+          "changedCanvasPixels": 53138,
+          "alphaPixelDifferences": 0
+        },
+        "sourceToDusk": {
+          "changedCanvasPixels": 408617,
+          "alphaPixelDifferences": 0
+        },
+        "frameRenderSamplesMs": {
+          "source": 5.5,
+          "day": 8.200000047683716,
+          "dusk": 5.400000095367432
+        },
+        "roofBinaryIdentical": true,
+        "authoritativePortalValidated": false,
+        "dynamicRoofOcclusionValidated": false,
+        "networkGameplayModified": false,
+        "productionApproved": false
+      },
+      "east": {
+        "ready": true,
+        "browserRendering": true,
+        "sourceKnightHead": "c74fcf90e227f3bc4788728f000cfe6aa083c7ef",
+        "gameXY": [
+          387.2,
+          311.6
+        ],
+        "gameXYErrorPx": 0,
+        "dx": 80,
+        "dy": -10,
+        "opacity": 0.6,
+        "sourceToDay": {
+          "changedCanvasPixels": 53026,
+          "alphaPixelDifferences": 0
+        },
+        "sourceToDusk": {
+          "changedCanvasPixels": 408682,
+          "alphaPixelDifferences": 0
+        },
+        "frameRenderSamplesMs": {
+          "source": 5.700000047683716,
+          "day": 13.700000047683716,
+          "dusk": 4.8999998569488525
+        },
+        "roofBinaryIdentical": true,
+        "authoritativePortalValidated": false,
+        "dynamicRoofOcclusionValidated": false,
+        "networkGameplayModified": false,
+        "productionApproved": false
+      },
+      "type": "isolated Chrome/Firefox original Canvas art preview only",
+      "multiplayerPerformanceVerified": false,
+      "automaticLightingEngineValidated": false,
+      "physicalOcclusionValidated": false,
+      "productionApproved": false
+    },
+    {
+      "browser": "firefox",
+      "version": "firefox/153.4.0",
+      "errors": [],
+      "screenshots": 2,
+      "entrance": {
+        "ready": true,
+        "browserRendering": true,
+        "sourceKnightHead": "c74fcf90e227f3bc4788728f000cfe6aa083c7ef",
+        "gameXY": [
+          320,
+          320
+        ],
+        "gameXYErrorPx": 0,
+        "dx": 0,
+        "dy": 0,
+        "opacity": 0.6,
+        "sourceToDay": {
+          "changedCanvasPixels": 53131,
+          "alphaPixelDifferences": 0
+        },
+        "sourceToDusk": {
+          "changedCanvasPixels": 408617,
+          "alphaPixelDifferences": 0
+        },
+        "frameRenderSamplesMs": {
+          "source": 5,
+          "day": 6,
+          "dusk": 9
+        },
+        "roofBinaryIdentical": true,
+        "authoritativePortalValidated": false,
+        "dynamicRoofOcclusionValidated": false,
+        "networkGameplayModified": false,
+        "productionApproved": false
+      },
+      "east": {
+        "ready": true,
+        "browserRendering": true,
+        "sourceKnightHead": "c74fcf90e227f3bc4788728f000cfe6aa083c7ef",
+        "gameXY": [
+          387.2,
+          311.6
+        ],
+        "gameXYErrorPx": 0,
+        "dx": 80,
+        "dy": -10,
+        "opacity": 0.6,
+        "sourceToDay": {
+          "changedCanvasPixels": 53016,
+          "alphaPixelDifferences": 0
+        },
+        "sourceToDusk": {
+          "changedCanvasPixels": 408649,
+          "alphaPixelDifferences": 0
+        },
+        "frameRenderSamplesMs": {
+          "source": 5,
+          "day": 7,
+          "dusk": 5
+        },
+        "roofBinaryIdentical": true,
+        "authoritativePortalValidated": false,
+        "dynamicRoofOcclusionValidated": false,
+        "networkGameplayModified": false,
+        "productionApproved": false
+      },
+      "type": "isolated Chrome/Firefox original Canvas art preview only",
+      "multiplayerPerformanceVerified": false,
+      "automaticLightingEngineValidated": false,
+      "physicalOcclusionValidated": false,
+      "productionApproved": false
+    }
+  ],
+  "originalRoofModified": false,
+  "sourceBlenderModified": false,
+  "gameRuntimeModified": false,
+  "playerCombatReadabilityValidated": false,
+  "measuredFrameTimesNotLiveGame": true,
+  "productionApproved": false
+}

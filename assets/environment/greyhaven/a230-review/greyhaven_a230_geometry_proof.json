@@ -1,0 +1,84 @@
+{
+  "milestone": "Blood & Iron A2.30 Blender-authored dimensional Red Lion facade joinery",
+  "originalScene": "blood_iron_greyhaven_a22.blend",
+  "originalSceneSha256": "d891665e7202585e99bc0a6a9a6f0b726d68ad0635a9eecc30d13457f6dffe9d",
+  "originalSceneUntouched": true,
+  "derivedBlenderScene": "blood_iron_red_lion_a230_joinery.blend",
+  "derivedBlenderSha256": "61620d76fafa75bbe26c8fd92fde4da5e79e8cc88132100ebb651fc52e5eef61",
+  "sourceMeshObjects": 17,
+  "sourceVertices": 4318,
+  "originalSourceMeshCoordinatesPreservedInDerivedScene": true,
+  "newMeshes": 35,
+  "newMeshNames": [
+    "A2.30 facade depth /oak door jamb left",
+    "A2.30 facade depth /forged jamb nail left 0.55",
+    "A2.30 facade depth /forged jamb nail left 1.2",
+    "A2.30 facade depth /forged jamb nail left 1.87",
+    "A2.30 facade depth /forged jamb nail left 2.3",
+    "A2.30 facade depth /oak door jamb right",
+    "A2.30 facade depth /forged jamb nail right 0.55",
+    "A2.30 facade depth /forged jamb nail right 1.2",
+    "A2.30 facade depth /forged jamb nail right 1.87",
+    "A2.30 facade depth /forged jamb nail right 2.3",
+    "A2.30 facade depth /oak carved door lintel",
+    "A2.30 facade depth /door lintel carving 1",
+    "A2.30 facade depth /stone doorway threshold",
+    "A2.30 facade depth /sill west",
+    "A2.30 facade depth /sill inner edge west",
+    "A2.30 facade depth /central oak mullion west",
+    "A2.30 facade depth /window upper rail west",
+    "A2.30 facade depth /window lower rail west",
+    "A2.30 facade depth /window nail west -0.4",
+    "A2.30 facade depth /window nail west 0.4",
+    "A2.30 facade depth /sill east",
+    "A2.30 facade depth /sill inner edge east",
+    "A2.30 facade depth /central oak mullion east",
+    "A2.30 facade depth /window upper rail east",
+    "A2.30 facade depth /window lower rail east",
+    "A2.30 facade depth /window nail east -0.4",
+    "A2.30 facade depth /window nail east 0.4",
+    "A2.30 facade depth /corner quoin west 0",
+    "A2.30 facade depth /corner quoin west 1",
+    "A2.30 facade depth /corner quoin west 2",
+    "A2.30 facade depth /corner quoin west 3",
+    "A2.30 facade depth /corner quoin east 0",
+    "A2.30 facade depth /corner quoin east 1",
+    "A2.30 facade depth /corner quoin east 2",
+    "A2.30 facade depth /corner quoin east 3"
+  ],
+  "roofGeometryEdited": false,
+  "roofTextureEdited": false,
+  "sourceVisualDoorCanvasPx": [
+    320,
+    320
+  ],
+  "cameraZoom": 0.84,
+  "metersPerWorldUnit": 0.025,
+  "groundBasisPxPerSourceMeter": {
+    "x": [
+      33.6,
+      0
+    ],
+    "y": [
+      0,
+      33.6
+    ]
+  },
+  "visualOnly": true,
+  "renderProof": {
+    "baseline": {
+      "file": "red_lion_a230_baseline_facade.png",
+      "bytes": 185469,
+      "sha256": "addc2f44ebf2f18c5866dc3fc1a8219cec80683d5e336ccf19770f088dd27d45"
+    },
+    "dimensional": {
+      "file": "red_lion_a230_dimensional_facade.png",
+      "bytes": 186020,
+      "sha256": "3756bafdb0acdf791576b68526c9566f68be9efde2c1a6883c867a9eecf6d43b"
+    }
+  },
+  "gameRuntimeChanged": false,
+  "serverCollisionOrDoorChanged": false,
+  "graphics3CAtmosphereChanged": false,
+  "productionApproved": false
+}

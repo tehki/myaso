@@ -1,0 +1,135 @@
+{
+  "milestone": "Blood & Iron A2.30 original dimensional Blender facade Chrome/Firefox source-art review",
+  "authenticKnightHead": "c74fcf90e227f3bc4788728f000cfe6aa083c7ef",
+  "originalKnightSha256": "828cf05dd873d0c8f35e887f5e46c35af87f084ac321977e358c985e7a2106b4",
+  "projection": "src/browser/arena-viewport.mjs",
+  "nativeBrowsers": [
+    {
+      "engine": "chrome",
+      "version": "Chrome/154.0.8037.99",
+      "screenCaptures": 2,
+      "errors": [],
+      "observations": [
+        {
+          "screenshot": "greyhaven_a230_chrome_door.png",
+          "state": {
+            "ready": true,
+            "dx": 0,
+            "dy": 0,
+            "roofOpacity": 0.65,
+            "pointXY": [
+              320,
+              320
+            ],
+            "sourceHead": "e4d718be52a5ee3816704cdd5afbb2700c465ad9",
+            "originalBlenderSourceIntegrity": true,
+            "newSourceMeshes": 35,
+            "roofUnchanged": true,
+            "changedOnScreenRGBPixels": 13622,
+            "onScreenAlphaDifferences": 0,
+            "gameXYErrorPx": 0,
+            "originalKnightSha256": "828cf05dd873d0c8f35e887f5e46c35af87f084ac321977e358c985e7a2106b4",
+            "actualGameRendererValidated": false,
+            "automaticOcclusionValidated": false,
+            "authoritativePortalValidated": false,
+            "productionApproved": false
+          }
+        },
+        {
+          "screenshot": "greyhaven_a230_chrome_street.png",
+          "state": {
+            "ready": true,
+            "dx": 80,
+            "dy": -10,
+            "roofOpacity": 0.65,
+            "pointXY": [
+              387.2,
+              311.6
+            ],
+            "sourceHead": "e4d718be52a5ee3816704cdd5afbb2700c465ad9",
+            "originalBlenderSourceIntegrity": true,
+            "newSourceMeshes": 35,
+            "roofUnchanged": true,
+            "changedOnScreenRGBPixels": 13551,
+            "onScreenAlphaDifferences": 0,
+            "gameXYErrorPx": 0,
+            "originalKnightSha256": "828cf05dd873d0c8f35e887f5e46c35af87f084ac321977e358c985e7a2106b4",
+            "actualGameRendererValidated": false,
+            "automaticOcclusionValidated": false,
+            "authoritativePortalValidated": false,
+            "productionApproved": false
+          }
+        }
+      ],
+      "realMultiplayerValidated": false,
+      "gameplayFPSValidated": false,
+      "productionApproved": false
+    },
+    {
+      "engine": "firefox",
+      "version": "firefox/153.4.0",
+      "screenCaptures": 2,
+      "errors": [],
+      "observations": [
+        {
+          "screenshot": "greyhaven_a230_firefox_door.png",
+          "state": {
+            "ready": true,
+            "dx": 0,
+            "dy": 0,
+            "roofOpacity": 0.65,
+            "pointXY": [
+              320,
+              320
+            ],
+            "sourceHead": "e4d718be52a5ee3816704cdd5afbb2700c465ad9",
+            "originalBlenderSourceIntegrity": true,
+            "newSourceMeshes": 35,
+            "roofUnchanged": true,
+            "changedOnScreenRGBPixels": 13631,
+            "onScreenAlphaDifferences": 0,
+            "gameXYErrorPx": 0,
+            "originalKnightSha256": "828cf05dd873d0c8f35e887f5e46c35af87f084ac321977e358c985e7a2106b4",
+            "actualGameRendererValidated": false,
+            "automaticOcclusionValidated": false,
+            "authoritativePortalValidated": false,
+            "productionApproved": false
+          }
+        },
+        {
+          "screenshot": "greyhaven_a230_firefox_street.png",
+          "state": {
+            "ready": true,
+            "dx": 80,
+            "dy": -10,
+            "roofOpacity": 0.65,
+            "pointXY": [
+              387.2,
+              311.6
+            ],
+            "sourceHead": "e4d718be52a5ee3816704cdd5afbb2700c465ad9",
+            "originalBlenderSourceIntegrity": true,
+            "newSourceMeshes": 35,
+            "roofUnchanged": true,
+            "changedOnScreenRGBPixels": 13552,
+            "onScreenAlphaDifferences": 0,
+            "gameXYErrorPx": 0,
+            "originalKnightSha256": "828cf05dd873d0c8f35e887f5e46c35af87f084ac321977e358c985e7a2106b4",
+            "actualGameRendererValidated": false,
+            "automaticOcclusionValidated": false,
+            "authoritativePortalValidated": false,
+            "productionApproved": false
+          }
+        }
+      ],
+      "realMultiplayerValidated": false,
+      "gameplayFPSValidated": false,
+      "productionApproved": false
+    }
+  ],
+  "sourceGeometryNotCollision": true,
+  "originalRoofUnchanged": true,
+  "dynamicRoofOcclusionValidated": false,
+  "gameRuntimeIntegrated": false,
+  "productionApproved": false
+}
