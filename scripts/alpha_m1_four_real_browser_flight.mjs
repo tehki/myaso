@@ -10,6 +10,7 @@ import process from "node:process";
 import { setTimeout as sleep } from "node:timers/promises";
 import {WORLD_ALPHA_SWORD_RACK_SOCKETS,validateWorldAlphaArmoryLayout} from "../src/world/alpha-armory.mjs";
 import {nextNativeWalkPulse,nativeRackArrived,proposedNativeRackReachPoint,nativeRackWithinProposedReach,verifyNativeRackPeerConsensus,verifyNativeRackRecoveryPeerConsensus} from "./alpha_p0_rack_walk_math.mjs";
+import {assessNativeSameTickRackClearance} from "./alpha_p0_native_same_tick_clearance.mjs";
 
 const root = process.cwd();
 const greyhavenModeValue = process.env.MYASO_ALPHA_NATIVE_GREYHAVEN;
@@ -35,6 +36,13 @@ if(rackCrashValue!==undefined&&!["0","1"].includes(rackCrashValue))
 const rackCrashRejoin=rackCrashValue==="1";
 if(rackCrashRejoin&&!nativeRackReach)
   throw Error("rack crash/rejoin requires actual native proposed rack reach mode");
+const sameTickValue=process.env.MYASO_ALPHA_NATIVE_RACK_SAME_TICK_CLEARANCE;
+if(sameTickValue!==undefined&&!["0","1"].includes(sameTickValue))
+  throw Error("MYASO_ALPHA_NATIVE_RACK_SAME_TICK_CLEARANCE must be unset, 0 or 1");
+const sameTickClearance=sameTickValue==="1";
+if(sameTickClearance&&!nativeRackReach)
+  throw Error("same-tick four-fighter separation requires original native reach evidence");
+const clearanceObservations=[];
 const GREYHAVEN_SPAWNS = new Map([
   [1,{x:4110,y:4160}],[2,{x:4206,y:4160}],
   [3,{x:4110,y:4256}],[4,{x:4206,y:4256}],
@@ -456,6 +464,11 @@ async function nativeFourRackApproaches(views) {
       JSON.stringify(witnessed[witnessed.length-1]));
     await saveScreenshot(s,nativeRackReach?"rack-proposed-reach-"+id:"rack-approach-"+id);
   }
+  // All four final owner-witnessed walk ticks must precede each viewer's
+  // later real Rust snapshot. Waiting for fresh frames is STRICTER than
+  // accepting a stale view; do not infer freshness from wall-clock sleep.
+  const newestActualArrivalTick=nativeRackReach
+    ? Math.max(...witnessed.map(w=>w.proposedReach.serverTick)) : 0;
   const peers=await Promise.all(sessions.map(s=>waitFor(async()=>{
     const value=await snapshot(s);
     const all=WORLD_ALPHA_SWORD_RACK_SOCKETS.every((slot,i)=>
@@ -463,9 +476,20 @@ async function nativeFourRackApproaches(views) {
         ? nativeRackArrived(fighter(value,i+1),proposedNativeRackReachPoint(slot))
           &&nativeRackWithinProposedReach(fighter(value,i+1),slot)
         : nativeRackArrived(fighter(value,i+1),slot.approach));
-    return {ok:fourVisible(value)&&all,value};
-  },s.name+(nativeRackReach?" all four proposed near-sword positions visible"
+    return {ok:fourVisible(value)
+      &&(!nativeRackReach||value.tick>newestActualArrivalTick)&&all,value};
+  },s.name+(nativeRackReach?" all four FRESH proposed near-sword positions visible"
     :" all four physical rack approaches visible"),7500)));
+  // Evidence is read-only. Record the single-tick radius-18 body
+  // disposition before the independent own-arrival/peer replication gate
+  // might throw, so a genuine overlap cannot disappear from CI logs.
+  if(sameTickClearance){
+    const report=assessNativeSameTickRackClearance(peers,
+      WORLD_ALPHA_SWORD_RACK_SOCKETS,"initial");
+    clearanceObservations.push(report);
+    console.log("ALPHA_P0_NATIVE_RACK_SAME_TICK_CLEARANCE_OBSERVATION "+
+      JSON.stringify(report));
+  }
   const peerConsensus=nativeRackReach
     ? verifyNativeRackPeerConsensus(peers,witnessed,WORLD_ALPHA_SWORD_RACK_SOCKETS)
     : null;
@@ -516,6 +540,13 @@ async function nativeRackCrashRecovery() {
   },s.name+" full replacement roster and fresh server tick",10000)));
   const recovered=verifyNativeRackRecoveryPeerConsensus(peers,
     WORLD_ALPHA_SWORD_RACK_SOCKETS,afterReplacementTick);
+  if(sameTickClearance){
+    const report=assessNativeSameTickRackClearance(peers,
+      WORLD_ALPHA_SWORD_RACK_SOCKETS,"after-replacement");
+    clearanceObservations.push(report);
+    console.log("ALPHA_P0_NATIVE_RACK_SAME_TICK_CLEARANCE_OBSERVATION "+
+      JSON.stringify(report));
+  }
   for(const session of sessions)
     await saveScreenshot(session,"rack-rejoin-auth-no-ghost");
   console.log("ALPHA_P0_FOUR_NATIVE_RACK_SIGKILL_REJOIN_PASS "+JSON.stringify({
@@ -552,6 +583,22 @@ async function run() {
     if(rackCrashRejoin){
       await crashAndRejoin(game,staticServer.address().port);
       await nativeRackCrashRecovery();
+    }
+    if(sameTickClearance){
+      const expected=rackCrashRejoin?2:1;
+      assert(clearanceObservations.length===expected,
+        "missing genuine same-tick four-player radius-18 snapshots");
+      const bad=clearanceObservations.filter(record=>!record.ok);
+      if(bad.length){
+        console.error("ALPHA_P0_NATIVE_RACK_SAME_TICK_CLEARANCE_FAIL "+
+          JSON.stringify({failed:bad,all:clearanceObservations}));
+        throw Error("four-player P0 actor-clearance blocker: "+JSON.stringify(bad));
+      }
+      console.log("ALPHA_P0_NATIVE_RACK_SAME_TICK_CLEARANCE_PASS "+
+        JSON.stringify({phases:clearanceObservations,actualWebDriverSessions:4,
+          radiusWorldUnits:18,physicalSwordAndEquippedProof:false,
+          liveDynamicCollisionAuthorityNotActivated:true,
+          scope:"single loopback Rust snapshot per phase; no actor overlap claimed beyond samples"}));
     }
     return;
   }
