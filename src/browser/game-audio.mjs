@@ -397,6 +397,7 @@ export function installGameAudioControls(audio, root = globalThis.document) {
 // A repeated/reordered packet or resimulation cannot replay a remote sound.
 export function createRemoteActionAudioTracker({ hearingRadius = 440 } = {}) {
   const previous = new Map();
+  let currentOwnId = null;
   const onset = new Map([
     [1, "light"], [24, "light"], [27, "light"], [21, "light"],
     [9, "heavy"], [12, "kick"], [4, "roll"], [30, "roll"],
@@ -406,7 +407,13 @@ export function createRemoteActionAudioTracker({ hearingRadius = 440 } = {}) {
     observe(state, ownId, play) {
       if (!(state instanceof Map) || !ownId || typeof play !== "function") return;
       const own = state.get(ownId);
-      if (!own) return;
+      // Reconnect/respawn may reuse net IDs in a new authoritative session.
+      // Never replay a previous session's stale action on its first snapshot.
+      if (!own) { previous.clear(); currentOwnId = null; return; }
+      if (currentOwnId !== ownId) {
+        previous.clear();
+        currentOwnId = ownId;
+      }
       const seen = new Set();
       for (const fighter of state.values()) {
         if (!Number.isInteger(fighter.netId)) continue;
@@ -426,7 +433,7 @@ export function createRemoteActionAudioTracker({ hearingRadius = 440 } = {}) {
       }
       for (const id of previous.keys()) if (!seen.has(id)) previous.delete(id);
     },
-    reset() { previous.clear(); },
+    reset() { previous.clear(); currentOwnId = null; },
   };
 }
 
