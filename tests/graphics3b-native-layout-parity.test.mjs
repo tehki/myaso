@@ -24,3 +24,11 @@ test("equal-height browser QA drives native Chrome and Firefox without game auth
  assert.match(probe,/worldOrItemWriterTouched:false/);
  assert.doesNotMatch(probe,/setPlayerPosition\(|TryPickup\(|scrollTo\(|scrollIntoView\(/);
 });
+test("both problematic short CSS viewports use identical measured native browser dimensions",()=>{
+ const probe=source("scripts/graphics3b_native_layout_parity.mjs");
+ assert.match(probe,/viewportTargets=Object\.freeze\(\[P0_CONTENT_VIEWPORT,Object\.freeze\(\{width:1366,height:682\}\)\]\)/);
+ assert.match(probe,/for\(const target of viewportTargets\)result\.push\(await inspect\(browser,target\)\)/);
+ assert.match(probe,/viewportTarget:target/);
+ assert.match(probe,/sameCssViewport:true/);
+ assert.match(probe,/await measureContentViewport\(browser,target\)/);
+});
