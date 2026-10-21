@@ -49,3 +49,7 @@ jobs:
         env:
           C1_BROWSER_MATRIX: chrome,firefox,chrome,chrome
         run: node scripts/chat_c1_three_browser_acceptance.mjs
+      - name: Four genuine Greyhaven staging players and orthogonal local chat
+        env:
+          C1_BROWSER_MATRIX: chrome,firefox,chrome,chrome
+        run: node scripts/chat_c1_four_greyhaven_acceptance.mjs
