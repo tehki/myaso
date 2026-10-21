@@ -1,0 +1,27 @@
+{
+  "rackOriginalMeshCount": 28,
+  "swordOriginalMeshCount": 6,
+  "originalBlenderSource": "blacksmith_armory_p0_source.blend",
+  "renders": {
+    "rack": {
+      "file": "armory_rack_source.png",
+      "sourcePixels": [
+        240,
+        166
+      ],
+      "bytes": 30355
+    },
+    "sword": {
+      "file": "armory_sword_source.png",
+      "sourcePixels": [
+        42,
+        115
+      ],
+      "bytes": 5575
+    }
+  },
+  "worldSocketCoordinatesApproved": false,
+  "serverItemIdentityAssigned": false,
+  "graphicsOnly": true,
+  "productionApproved": false
+}

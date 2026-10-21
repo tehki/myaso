@@ -1,0 +1,61 @@
+{
+  "milestone": "Graphics 3B First Playable armory P0 — genuine Blender sword alpha click preview",
+  "browsers": [
+    {
+      "engine": "chrome",
+      "version": "Chrome/154.0.8037.99",
+      "errors": [],
+      "screenshots": [
+        "armory_p0_chrome_hover.png",
+        "armory_p0_chrome_four_swords.png"
+      ],
+      "totalDrawn": 4,
+      "opaquePixel": {
+        "x": 19,
+        "y": 20
+      },
+      "clickedSourceItem": "DEMO-SWORD-NOT-SERVER-0",
+      "transparentClickIgnored": true,
+      "candidateCount": 1,
+      "networkPickupEvents": 0,
+      "combatAttackEvents": 0,
+      "sourceItemRemovalPreviewOnly": true,
+      "actualServerItemIds": false,
+      "worldSocketCoordinatesApproved": false,
+      "gameRendererIntegrated": false,
+      "productionApproved": false
+    },
+    {
+      "engine": "firefox",
+      "version": "firefox/153.4.0",
+      "errors": [],
+      "screenshots": [
+        "armory_p0_firefox_hover.png",
+        "armory_p0_firefox_four_swords.png"
+      ],
+      "totalDrawn": 4,
+      "opaquePixel": {
+        "x": 19,
+        "y": 20
+      },
+      "clickedSourceItem": "DEMO-SWORD-NOT-SERVER-0",
+      "transparentClickIgnored": true,
+      "candidateCount": 1,
+      "networkPickupEvents": 0,
+      "combatAttackEvents": 0,
+      "sourceItemRemovalPreviewOnly": true,
+      "actualServerItemIds": false,
+      "worldSocketCoordinatesApproved": false,
+      "gameRendererIntegrated": false,
+      "productionApproved": false
+    }
+  ],
+  "sourceArtBlender": true,
+  "actualWorldSockets": false,
+  "canonicalItemIdentity": false,
+  "realCoreItemPickup": false,
+  "realCombatInputArbitration": false,
+  "realFourPlayerScene": false,
+  "actualOnlineGameIntegration": false,
+  "productionApproved": false
+}
