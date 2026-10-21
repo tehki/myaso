@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="icon" href="data:,"><title>myaso.io — Adult Animation Review R1</title>
+<style>
+:root{color-scheme:dark}*{box-sizing:border-box}body{background:#141b1d;color:#ebe5d9;font:14px/1.5 system-ui;margin:0}
+header{background:#212d2b;border-bottom:1px solid #52635b;padding:14px 24px}
+h1{margin:0;font:700 25px Georgia,serif}.muted{color:#b4c0b8}.critical{color:#efb17c}
+main{max-width:1470px;margin:auto;padding:16px}
+#controls{display:flex;gap:12px;align-items:center;flex-wrap:wrap;padding:12px;background:#26342f;border:1px solid #53695e;border-radius:6px}
+label{display:flex;align-items:center;gap:7px}select,button,input{font:inherit}select,button{background:#34493f;color:#f9edda;border:1px solid #708977;border-radius:4px;padding:6px 9px}button{cursor:pointer}
+#scrub{min-width:170px;accent-color:#e0b67c}output{color:#e5c28a;font-variant-numeric:tabular-nums}
+figure{margin:0;background:#25332e;border:1px solid #53675e;padding:10px;border-radius:8px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:15px;margin-top:13px}
+canvas{width:100%;display:block;background:#353f41;border:1px solid #63716e}
+figcaption{margin:8px 0;color:#d3dace;font-size:13px}
+section{margin-top:17px}.notes{background:#26352e;padding:12px;border:1px solid #62765e;border-radius:6px}
+small{color:#b6c2b8}.stats{font:12px/1.7 monospace;color:#e5c99c;white-space:pre-wrap;margin-top:12px}
+.gallery{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+.gallery img{width:100%;border:1px solid #596862;background:#313d3b}
+a{color:#eac184}
+@media(max-width:960px){.grid{grid-template-columns:1fr}.gallery{grid-template-columns:repeat(2,1fr)}}
+</style></head>
+<body><header><h1>⚔️ myaso.io — Adult Animation Visual Review R1</h1>
+<div class="critical">HOLD · Not animation-approved · Neutral source evidence + Greyhaven art reference, NOT live in-game acceptance</div>
+<div class="muted">First-party A0/A1/A2 adult atlases · authentic Silver Knight PR #408 · authored Greyhaven / Red Lion A2.24 reference · 0.84 gameplay XY projection</div></header>
+<main>
+<div id="controls">
+<label>Motion <select id="clip"><option value="idle">Idle</option><option value="walk">Walk</option><option value="run">Run</option><option value="roll">Forward roll · 350 ms</option></select></label>
+<label>Direction <select id="direction"><option value="0">South</option><option value="1">Southwest</option><option value="2">West</option><option value="3">Northwest</option><option value="4">North</option><option value="5">Northeast</option><option value="6">East</option><option value="7">Southeast</option></select></label>
+<button id="toggle">Pause</button><button id="prev">◀ Frame</button><button id="next">Frame ▶</button>
+<label>Scrub <input type="range" id="scrub" min="0" max="3" step="1" value="0"><output id="frame-label">1 / 4</output></label>
+<label>Speed <select id="speed"><option value=".25">25%</option><option value=".5">50%</option><option value="1" selected>100%</option></select></label>
+<label>Roof opacity <input type="range" id="roof" min="0" max="100" value="28" step="1"></label>
+<button id="reset">Reset</button>
+<span id="ready">Waiting for 14 pinned atlases/reference files…</span>
+</div>
+<div class="grid">
+<figure><canvas width="670" height="460" id="neutral" aria-label="Live neutral animation preview side by side for both adults and Knight"></canvas>
+<figcaption><b>1. NEUTRAL SOURCE PREVIEW</b> — adult masculine · adult feminine · Silver Knight. Same clip category and facing, with expected fighter-origin crosses. Preview playback does not establish server movement timing.</figcaption></figure>
+<figure><canvas width="670" height="460" id="world" aria-label="Greyhaven Red Lion artwork composite at game camera zoom, not runtime integration"></canvas>
+<figcaption><b>2. GREYHAVEN ART REFERENCE ONLY</b> — genuine unmerged Graphics 3B facade/roof pixels and actual <code>projectArenaPoint</code> zoom 0.84, not the live runtime. Ground, collision, camera follow and occlusion remain unvalidated.</figcaption></figure>
+</div>
+<section><figure><canvas width="1120" height="368" id="eight" aria-label="All eight directions for male female and Silver Knight simultaneously"></canvas>
+<figcaption><b>3. ALL EIGHT DIRECTIONS</b> — S / SW / W / NW / N / NE / E / SE. Adult masculine, adult feminine and Silver Knight shown in three rows; use Pause and Frame to inspect each source pose precisely.</figcaption></figure></section>
+<section><figure><canvas width="1120" height="280" id="comparison" aria-label="Idle walk run and three stages of adult forward roll side by side"></canvas>
+<figcaption><b>4. REQUIRED COMPARISONS</b> — idle · walk · run · forward roll start / middle / end, all for both adult bodies. The source 350ms roll uses nonuniform Blender sample frames; inspect its actual progression.</figcaption></figure></section>
+<section><div class="notes">
+<b>Ground contact warning:</b> A 160px source-frame silhouette-bottom proxy is measured against the approved 96px standing / 134px roll drawing rectangle. It is <strong>not</strong> a foot-bone contact, collision, or animation-deformation test. Adult animation remains blocked until Greyhaven live integration and human visual inspection.
+<div id="stats" class="stats">Loading...</div>
+</div></section>
+<section><h2>Loop previews — both bodies, all eight directions</h2>
+<div class="gallery">
+<a href="../docs/art/adult-animation-review-r1/adult-idle-both-bodies-8-directions.gif"><img alt="Idle 8-direction male/female original loop" src="../docs/art/adult-animation-review-r1/adult-idle-both-bodies-8-directions.gif">Idle · animated contact sheet</a>
+<a href="../docs/art/adult-animation-review-r1/adult-walk-both-bodies-8-directions.gif"><img alt="Walk 8-direction male/female original loop" src="../docs/art/adult-animation-review-r1/adult-walk-both-bodies-8-directions.gif">Walk · animated contact sheet</a>
+<a href="../docs/art/adult-animation-review-r1/adult-run-both-bodies-8-directions.gif"><img alt="Run 8-direction male/female original loop" src="../docs/art/adult-animation-review-r1/adult-run-both-bodies-8-directions.gif">Run · animated contact sheet</a>
+<a href="../docs/art/adult-animation-review-r1/adult-roll-both-bodies-8-directions.gif"><img alt="Roll 8-direction male/female original loop" src="../docs/art/adult-animation-review-r1/adult-roll-both-bodies-8-directions.gif">Roll · 350ms animated contact sheet</a>
+</div></section>
+<p class="muted">Unavailable adult clips: jump, unarmed attack, parry/block, kick/shove, stun/hit, death/knockdown. Never substitute idle/walk for these Combat states. No character gameplay/authority/physics source changed.</p>
+</main>
+<script type="module" src="./adult-animation-review-r1.mjs"></script>
+</body></html>

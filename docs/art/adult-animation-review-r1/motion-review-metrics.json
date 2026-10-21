@@ -1,0 +1,3621 @@
+{
+  "source": "original A0/A1/A2 committed WebP atlases, NOT live in-world",
+  "frameTimings": {
+    "idleMsPerFrame": 280,
+    "walkMsPerFrame": 220,
+    "runMsPerFrame": 125,
+    "rollVisualTargetMs": 350,
+    "rollSampleElapsedMs": [
+      0,
+      33.3,
+      66.7,
+      100,
+      133.3,
+      166.7,
+      233.3,
+      350
+    ],
+    "rollCurrentUniformPreviewFramesMs": [
+      0.0,
+      43.75,
+      87.5,
+      131.25,
+      175.0,
+      218.75,
+      262.5,
+      306.25
+    ]
+  },
+  "silhouetteBottomOffsetFromOriginPxByBodyClip": {
+    "adult-masculine:idle": {
+      "min": 22.8,
+      "max": 27.0,
+      "spreadPx": 4.2,
+      "mean": 25.57,
+      "frames": [
+        {
+          "dir": "S",
+          "frame": 0,
+          "silhouetteBottomFromOriginPx": 25.8,
+          "alphaBounds": [
+            38,
+            20,
+            122,
+            147
+          ]
+        },
+        {
+          "dir": "S",
+          "frame": 1,
+          "silhouetteBottomFromOriginPx": 25.8,
+          "alphaBounds": [
+            38,
+            20,
+            122,
+            147
+          ]
+        },
+        {
+          "dir": "S",
+          "frame": 2,
+          "silhouetteBottomFromOriginPx": 25.8,
+          "alphaBounds": [
+            38,
+            20,
+            122,
+            147
+          ]
+        },
+        {
+          "dir": "S",
+          "frame": 3,
+          "silhouetteBottomFromOriginPx": 25.8,
+          "alphaBounds": [
+            38,
+            19,
+            122,
+            147
+          ]
+        },
+        {
+          "dir": "SW",
+          "frame": 0,
+          "silhouetteBottomFromOriginPx": 27.0,
+          "alphaBounds": [
+            46,
+            20,
+            109,
+            149
+          ]
+        },
+        {
+          "dir": "SW",
+          "frame": 1,
+          "silhouetteBottomFromOriginPx": 27.0,
+          "alphaBounds": [
+            47,
+            20,
+            109,
+            149
+          ]
+        },
+        {
+          "dir": "SW",
+          "frame": 2,
+          "silhouetteBottomFromOriginPx": 27.0,
+          "alphaBounds": [
+            46,
+            20,
+            109,
+            149
+          ]
+        },
+        {
+          "dir": "SW",
+          "frame": 3,
+          "silhouetteBottomFromOriginPx": 27.0,
+          "alphaBounds": [
+            46,
+            19,
+            108,
+            149
+          ]
+        },
+        {
+          "dir": "W",
+          "frame": 0,
+          "silhouetteBottomFromOriginPx": 26.4,
+          "alphaBounds": [
+            61,
+            19,
+            94,
+            148
+          ]
+        },
+        {
+          "dir": "W",
+          "frame": 1,
+          "silhouetteBottomFromOriginPx": 26.4,
+          "alphaBounds": [
+            61,
+            19,
+            94,
+            148
+          ]
+        },
+        {
+          "dir": "W",
+          "frame": 2,
+          "silhouetteBottomFromOriginPx": 26.4,
+          "alphaBounds": [
+            61,
+            19,
+            94,
+            148
+          ]
+        },
+        {
+          "dir": "W",
+          "frame": 3,
+          "silhouetteBottomFromOriginPx": 26.4,
+          "alphaBounds": [
+            61,
+            19,
+            94,
+            148
+          ]
+        },
+        {
+          "dir": "NW",
+          "frame": 0,
+          "silhouetteBottomFromOriginPx": 24.6,
+          "alphaBounds": [
+            46,
+            19,
+            109,
+            145
+          ]
+        },
+        {
+          "dir": "NW",
+          "frame": 1,
+          "silhouetteBottomFromOriginPx": 24.6,
+          "alphaBounds": [
+            47,
+            19,
+            109,
+            145
+          ]
+        },
+        {
+          "dir": "NW",
+          "frame": 2,
+          "silhouetteBottomFromOriginPx": 24.6,
+          "alphaBounds": [
+            46,
+            19,
+            109,
+            145
+          ]
+        },
+        {
+          "dir": "NW",
+          "frame": 3,
+          "silhouetteBottomFromOriginPx": 24.6,
+          "alphaBounds": [
+            46,
+            19,
+            109,
+            145
+          ]
+        },
+        {
+          "dir": "N",
+          "frame": 0,
+          "silhouetteBottomFromOriginPx": 22.8,
+          "alphaBounds": [
+            38,
+            19,
+            122,
+            142
+          ]
+        },
+        {
+          "dir": "N",
+          "frame": 1,
+          "silhouetteBottomFromOriginPx": 22.8,
+          "alphaBounds": [
+            38,
+            19,
+            122,
+            142
+          ]
+        },
+        {
+          "dir": "N",
+          "frame": 2,
+          "silhouetteBottomFromOriginPx": 22.8,
+          "alphaBounds": [
+            38,
+            19,
+            122,
+            142
+          ]
+        },
+        {
+          "dir": "N",
+          "frame": 3,
+          "silhouetteBottomFromOriginPx": 22.8,
+          "alphaBounds": [
+            38,
+            20,
+            122,
+            142
+          ]
+        },
+        {
+          "dir": "NE",
+          "frame": 0,
+          "silhouetteBottomFromOriginPx": 24.6,
+          "alphaBounds": [
+            52,
+            19,
+            114,
+            145
+          ]
+        },
+        {
+          "dir": "NE",
+          "frame": 1,
+          "silhouetteBottomFromOriginPx": 24.6,
+          "alphaBounds": [
+            51,
+            19,
+            114,
+            145
+          ]
+        },
+        {
+          "dir": "NE",
+          "frame": 2,
+          "silhouetteBottomFromOriginPx": 24.6,
+          "alphaBounds": [
+            52,
+            19,
+            114,
+            145
+          ]
+        },
+        {
+          "dir": "NE",
+          "frame": 3,
+          "silhouetteBottomFromOriginPx": 24.6,
+          "alphaBounds": [
+            52,
+            20,
+            114,
+            145
+          ]
+        },
+        {
+          "dir": "E",
+          "frame": 0,
+          "silhouetteBottomFromOriginPx": 26.4,
+          "alphaBounds": [
+            66,
+            19,
+            99,
+            148
+          ]
+        },
+        {
+          "dir": "E",
+          "frame": 1,
+          "silhouetteBottomFromOriginPx": 26.4,
+          "alphaBounds": [
+            66,
+            19,
+            99,
+            148
+          ]
+        },
+        {
+          "dir": "E",
+          "frame": 2,
+          "silhouetteBottomFromOriginPx": 26.4,
+          "alphaBounds": [
+            66,
+            19,
+            99,
+            148
+          ]
+        },
+        {
+          "dir": "E",
+          "frame": 3,
+          "silhouetteBottomFromOriginPx": 26.4,
+          "alphaBounds": [
+            66,
+            19,
+            99,
+            148
+          ]
+        },
+        {
+          "dir": "SE",
+          "frame": 0,
+          "silhouetteBottomFromOriginPx": 27.0,
+          "alphaBounds": [
+            52,
+            19,
+            114,
+            149
+          ]
+        },
+        {
+          "dir": "SE",
+          "frame": 1,
+          "silhouetteBottomFromOriginPx": 27.0,
+          "alphaBounds": [
+            51,
+            20,
+            114,
+            149
+          ]
+        },
+        {
+          "dir": "SE",
+          "frame": 2,
+          "silhouetteBottomFromOriginPx": 27.0,
+          "alphaBounds": [
+            52,
+            19,
+            114,
+            149
+          ]
+        },
+        {
+          "dir": "SE",
+          "frame": 3,
+          "silhouetteBottomFromOriginPx": 27.0,
+          "alphaBounds": [
+            52,
+            19,
+            114,
+            149
+          ]
+        }
+      ]
+    },
+    "adult-masculine:walk": {
+      "min": 22.2,
+      "max": 27.6,
+      "spreadPx": 5.4,
+      "mean": 25.35,
+      "frames": [
+        {
+          "dir": "S",
+          "frame": 0,
+          "silhouetteBottomFromOriginPx": 25.8,
+          "alphaBounds": [
+            38,
+            20,
+            122,
+            147
+          ]
+        },
+        {
+          "dir": "S",
+          "frame": 1,
+          "silhouetteBottomFromOriginPx": 27.6,
+          "alphaBounds": [
+            38,
+            21,
+            122,
+            150
+          ]
+        },
+        {
+          "dir": "S",
+          "frame": 2,
+          "silhouetteBottomFromOriginPx": 25.8,
+          "alphaBounds": [
+            38,
+            20,
+            122,
+            147
+          ]
+        },
+        {
+          "dir": "S",
+          "frame": 3,
+          "silhouetteBottomFromOriginPx": 27.6,
+          "alphaBounds": [
+            38,
+            21,
+            122,
+            150
+          ]
+        },
+        {
+          "dir": "SW",
+          "frame": 0,
+          "silhouetteBottomFromOriginPx": 27.0,
+          "alphaBounds": [
+            43,
+            20,
+            108,
+            149
+          ]
+        },
+        {
+          "dir": "SW",
+          "frame": 1,
+          "silhouetteBottomFromOriginPx": 23.4,
+          "alphaBounds": [
+            44,
+            20,
+            113,
+            143
+          ]
+        },
+        {
+          "dir": "SW",
+          "frame": 2,
+          "silhouetteBottomFromOriginPx": 27.0,
+          "alphaBounds": [
+            43,
+            20,
+            108,
+            149
+          ]
+        },
+        {
+          "dir": "SW",
+          "frame": 3,
+          "silhouetteBottomFromOriginPx": 27.6,
+          "alphaBounds": [
+            34,
+            20,
+            113,
+            150
+          ]
+        },
+        {
+          "dir": "W",
+          "frame": 0,
+          "silhouetteBottomFromOriginPx": 26.4,
+          "alphaBounds": [
+            61,
+            19,
+            94,
+            148
+          ]
+        },
+        {
+          "dir": "W",
+          "frame": 1,
+          "silhouetteBottomFromOriginPx": 24.0,
+          "alphaBounds": [
+            43,
+            19,
+            113,
+            144
+          ]
+        },
+        {
+          "dir": "W",
+          "frame": 2,
+          "silhouetteBottomFromOriginPx": 26.4,
+          "alphaBounds": [
+            61,
+            19,
+            94,
+            148
+          ]
+        },
+        {
+          "dir": "W",
+          "frame": 3,
+          "silhouetteBottomFromOriginPx": 24.0,
+          "alphaBounds": [
+            43,
+            19,
+            113,
+            144
+          ]
+        },
+        {
+          "dir": "NW",
+          "frame": 0,
+          "silhouetteBottomFromOriginPx": 24.6,
+          "alphaBounds": [
+            43,
+            19,
+            108,
+            145
+          ]
+        },
+        {
+          "dir": "NW",
+          "frame": 1,
+          "silhouetteBottomFromOriginPx": 26.4,
+          "alphaBounds": [
+            34,
+            19,
+            113,
+            148
+          ]
+        },
+        {
+          "dir": "NW",
+          "frame": 2,
+          "silhouetteBottomFromOriginPx": 24.6,
+          "alphaBounds": [
+            43,
+            19,
+            108,
+            145
+          ]
+        },
+        {
+          "dir": "NW",
+          "frame": 3,
+          "silhouetteBottomFromOriginPx": 22.2,
+          "alphaBounds": [
+            44,
+            18,
+            113,
+            141
+          ]
+        },
+        {
+          "dir": "N",
+          "frame": 0,
+          "silhouetteBottomFromOriginPx": 22.8,
+          "alphaBounds": [
+            38,
+            19,
+            122,
+            142
+          ]
+        },
+        {
+          "dir": "N",
+          "frame": 1,
+          "silhouetteBottomFromOriginPx": 25.8,
+          "alphaBounds": [
+            38,
+            18,
+            122,
+            147
+          ]
+        },
+        {
+          "dir": "N",
+          "frame": 2,
+          "silhouetteBottomFromOriginPx": 22.8,
+          "alphaBounds": [
+            38,
+            19,
+            122,
+            142
+          ]
+        },
+        {
+          "dir": "N",
+          "frame": 3,
+          "silhouetteBottomFromOriginPx": 25.8,
+          "alphaBounds": [
+            38,
+            19,
+            122,
+            147
+          ]
+        },
+        {
+          "dir": "NE",
+          "frame": 0,
+          "silhouetteBottomFromOriginPx": 24.6,
+          "alphaBounds": [
+            52,
+            19,
+            117,
+            145
+          ]
+        },
+        {
+          "dir": "NE",
+          "frame": 1,
+          "silhouetteBottomFromOriginPx": 22.2,
+          "alphaBounds": [
+            46,
+            19,
+            116,
+            141
+          ]
+        },
+        {
+          "dir": "NE",
+          "frame": 2,
+          "silhouetteBottomFromOriginPx": 24.6,
+          "alphaBounds": [
+            52,
+            19,
+            117,
+            145
+          ]
+        },
+        {
+          "dir": "NE",
+          "frame": 3,
+          "silhouetteBottomFromOriginPx": 26.4,
+          "alphaBounds": [
+            47,
+            19,
+            125,
+            148
+          ]
+        },
+        {
+          "dir": "E",
+          "frame": 0,
+          "silhouetteBottomFromOriginPx": 26.4,
+          "alphaBounds": [
+            66,
+            19,
+            99,
+            148
+          ]
+        },
+        {
+          "dir": "E",
+          "frame": 1,
+          "silhouetteBottomFromOriginPx": 24.0,
+          "alphaBounds": [
+            46,
+            19,
+            117,
+            144
+          ]
+        },
+        {
+          "dir": "E",
+          "frame": 2,
+          "silhouetteBottomFromOriginPx": 26.4,
+          "alphaBounds": [
+            66,
+            19,
+            99,
+            148
+          ]
+        },
+        {
+          "dir": "E",
+          "frame": 3,
+          "silhouetteBottomFromOriginPx": 24.0,
+          "alphaBounds": [
+            46,
+            19,
+            117,
+            144
+          ]
+        },
+        {
+          "dir": "SE",
+          "frame": 0,
+          "silhouetteBottomFromOriginPx": 27.0,
+          "alphaBounds": [
+            52,
+            20,
+            116,
+            149
+          ]
+        },
+        {
+          "dir": "SE",
+          "frame": 1,
+          "silhouetteBottomFromOriginPx": 27.6,
+          "alphaBounds": [
+            47,
+            20,
+            126,
+            150
+          ]
+        },
+        {
+          "dir": "SE",
+          "frame": 2,
+          "silhouetteBottomFromOriginPx": 27.0,
+          "alphaBounds": [
+            52,
+            20,
+            116,
+            149
+          ]
+        },
+        {
+          "dir": "SE",
+          "frame": 3,
+          "silhouetteBottomFromOriginPx": 23.4,
+          "alphaBounds": [
+            46,
+            20,
+            116,
+            143
+          ]
+        }
+      ]
+    },
+    "adult-masculine:run": {
+      "min": 17.4,
+      "max": 27.0,
+      "spreadPx": 9.6,
+      "mean": 23.83,
+      "frames": [
+        {
+          "dir": "S",
+          "frame": 0,
+          "silhouetteBottomFromOriginPx": 25.8,
+          "alphaBounds": [
+            38,
+            21,
+            122,
+            147
+          ]
+        },
+        {
+          "dir": "S",
+          "frame": 1,
+          "silhouetteBottomFromOriginPx": 27.0,
+          "alphaBounds": [
+            38,
+            21,
+            122,
+            149
+          ]
+        },
+        {
+          "dir": "S",
+          "frame": 2,
+          "silhouetteBottomFromOriginPx": 25.8,
+          "alphaBounds": [
+            38,
+            21,
+            122,
+            147
+          ]
+        },
+        {
+          "dir": "S",
+          "frame": 3,
+          "silhouetteBottomFromOriginPx": 26.4,
+          "alphaBounds": [
+            38,
+            21,
+            123,
+            148
+          ]
+        },
+        {
+          "dir": "SW",
+          "frame": 0,
+          "silhouetteBottomFromOriginPx": 27.0,
+          "alphaBounds": [
+            41,
+            21,
+            108,
+            149
+          ]
+        },
+        {
+          "dir": "SW",
+          "frame": 1,
+          "silhouetteBottomFromOriginPx": 22.2,
+          "alphaBounds": [
+            35,
+            21,
+            125,
+            141
+          ]
+        },
+        {
+          "dir": "SW",
+          "frame": 2,
+          "silhouetteBottomFromOriginPx": 27.0,
+          "alphaBounds": [
+            41,
+            21,
+            108,
+            149
+          ]
+        },
+        {
+          "dir": "SW",
+          "frame": 3,
+          "silhouetteBottomFromOriginPx": 26.4,
+          "alphaBounds": [
+            26,
+            21,
+            115,
+            148
+          ]
+        },
+        {
+          "dir": "W",
+          "frame": 0,
+          "silhouetteBottomFromOriginPx": 26.4,
+          "alphaBounds": [
+            61,
+            19,
+            94,
+            148
+          ]
+        },
+        {
+          "dir": "W",
+          "frame": 1,
+          "silhouetteBottomFromOriginPx": 17.4,
+          "alphaBounds": [
+            30,
+            20,
+            128,
+            133
+          ]
+        },
+        {
+          "dir": "W",
+          "frame": 2,
+          "silhouetteBottomFromOriginPx": 26.4,
+          "alphaBounds": [
+            61,
+            19,
+            94,
+            148
+          ]
+        },
+        {
+          "dir": "W",
+          "frame": 3,
+          "silhouetteBottomFromOriginPx": 20.4,
+          "alphaBounds": [
+            30,
+            20,
+            128,
+            138
+          ]
+        },
+        {
+          "dir": "NW",
+          "frame": 0,
+          "silhouetteBottomFromOriginPx": 24.6,
+          "alphaBounds": [
+            41,
+            18,
+            108,
+            145
+          ]
+        },
+        {
+          "dir": "NW",
+          "frame": 1,
+          "silhouetteBottomFromOriginPx": 22.8,
+          "alphaBounds": [
+            27,
+            18,
+            115,
+            142
+          ]
+        },
+        {
+          "dir": "NW",
+          "frame": 2,
+          "silhouetteBottomFromOriginPx": 24.6,
+          "alphaBounds": [
+            41,
+            18,
+            108,
+            145
+          ]
+        },
+        {
+          "dir": "NW",
+          "frame": 3,
+          "silhouetteBottomFromOriginPx": 18.6,
+          "alphaBounds": [
+            35,
+            18,
+            124,
+            135
+          ]
+        },
+        {
+          "dir": "N",
+          "frame": 0,
+          "silhouetteBottomFromOriginPx": 22.8,
+          "alphaBounds": [
+            38,
+            18,
+            123,
+            142
+          ]
+        },
+        {
+          "dir": "N",
+          "frame": 1,
+          "silhouetteBottomFromOriginPx": 22.8,
+          "alphaBounds": [
+            38,
+            18,
+            122,
+            142
+          ]
+        },
+        {
+          "dir": "N",
+          "frame": 2,
+          "silhouetteBottomFromOriginPx": 22.8,
+          "alphaBounds": [
+            38,
+            18,
+            123,
+            142
+          ]
+        },
+        {
+          "dir": "N",
+          "frame": 3,
+          "silhouetteBottomFromOriginPx": 22.8,
+          "alphaBounds": [
+            38,
+            17,
+            122,
+            142
+          ]
+        },
+        {
+          "dir": "NE",
+          "frame": 0,
+          "silhouetteBottomFromOriginPx": 24.6,
+          "alphaBounds": [
+            52,
+            19,
+            119,
+            145
+          ]
+        },
+        {
+          "dir": "NE",
+          "frame": 1,
+          "silhouetteBottomFromOriginPx": 18.0,
+          "alphaBounds": [
+            36,
+            18,
+            126,
+            134
+          ]
+        },
+        {
+          "dir": "NE",
+          "frame": 2,
+          "silhouetteBottomFromOriginPx": 24.6,
+          "alphaBounds": [
+            52,
+            19,
+            119,
+            145
+          ]
+        },
+        {
+          "dir": "NE",
+          "frame": 3,
+          "silhouetteBottomFromOriginPx": 22.8,
+          "alphaBounds": [
+            45,
+            19,
+            134,
+            142
+          ]
+        },
+        {
+          "dir": "E",
+          "frame": 0,
+          "silhouetteBottomFromOriginPx": 26.4,
+          "alphaBounds": [
+            66,
+            19,
+            99,
+            148
+          ]
+        },
+        {
+          "dir": "E",
+          "frame": 1,
+          "silhouetteBottomFromOriginPx": 20.4,
+          "alphaBounds": [
+            32,
+            19,
+            130,
+            138
+          ]
+        },
+        {
+          "dir": "E",
+          "frame": 2,
+          "silhouetteBottomFromOriginPx": 26.4,
+          "alphaBounds": [
+            66,
+            19,
+            99,
+            148
+          ]
+        },
+        {
+          "dir": "E",
+          "frame": 3,
+          "silhouetteBottomFromOriginPx": 17.4,
+          "alphaBounds": [
+            32,
+            19,
+            130,
+            133
+          ]
+        },
+        {
+          "dir": "SE",
+          "frame": 0,
+          "silhouetteBottomFromOriginPx": 27.0,
+          "alphaBounds": [
+            52,
+            20,
+            119,
+            149
+          ]
+        },
+        {
+          "dir": "SE",
+          "frame": 1,
+          "silhouetteBottomFromOriginPx": 26.4,
+          "alphaBounds": [
+            45,
+            21,
+            134,
+            148
+          ]
+        },
+        {
+          "dir": "SE",
+          "frame": 2,
+          "silhouetteBottomFromOriginPx": 27.0,
+          "alphaBounds": [
+            52,
+            20,
+            119,
+            149
+          ]
+        },
+        {
+          "dir": "SE",
+          "frame": 3,
+          "silhouetteBottomFromOriginPx": 21.6,
+          "alphaBounds": [
+            36,
+            21,
+            125,
+            140
+          ]
+        }
+      ]
+    },
+    "adult-masculine:roll": {
+      "min": 2.4,
+      "max": 56.0,
+      "spreadPx": 53.6,
+      "mean": 39.34,
+      "frames": [
+        {
+          "dir": "S",
+          "frame": 0,
+          "silhouetteBottomFromOriginPx": 45.11,
+          "alphaBounds": [
+            38,
+            20,
+            122,
+            147
+          ]
+        },
+        {
+          "dir": "S",
+          "frame": 1,
+          "silhouetteBottomFromOriginPx": 32.55,
+          "alphaBounds": [
+            38,
+            22,
+            122,
+            132
+          ]
+        },
+        {
+          "dir": "S",
+          "frame": 2,
+          "silhouetteBottomFromOriginPx": 2.4,
+          "alphaBounds": [
+            38,
+            57,
+            122,
+            96
+          ]
+        },
+        {
+          "dir": "S",
+          "frame": 3,
+          "silhouetteBottomFromOriginPx": 35.9,
+          "alphaBounds": [
+            38,
+            22,
+            122,
+            136
+          ]
+        },
+        {
+          "dir": "S",
+          "frame": 4,
+          "silhouetteBottomFromOriginPx": 32.55,
+          "alphaBounds": [
+            38,
+            46,
+            123,
+            132
+          ]
+        },
+        {
+          "dir": "S",
+          "frame": 5,
+          "silhouetteBottomFromOriginPx": 25.85,
+          "alphaBounds": [
+            38,
+            50,
+            122,
+            124
+          ]
+        },
+        {
+          "dir": "S",
+          "frame": 6,
+          "silhouetteBottomFromOriginPx": 43.44,
+          "alphaBounds": [
+            38,
+            12,
+            122,
+            145
+          ]
+        },
+        {
+          "dir": "S",
+          "frame": 7,
+          "silhouetteBottomFromOriginPx": 45.11,
+          "alphaBounds": [
+            38,
+            20,
+            122,
+            147
+          ]
+        },
+        {
+          "dir": "SW",
+          "frame": 0,
+          "silhouetteBottomFromOriginPx": 46.79,
+          "alphaBounds": [
+            46,
+            20,
+            109,
+            149
+          ]
+        },
+        {
+          "dir": "SW",
+          "frame": 1,
+          "silhouetteBottomFromOriginPx": 38.41,
+          "alphaBounds": [
+            52,
+            23,
+            122,
+            139
+          ]
+        },
+        {
+          "dir": "SW",
+          "frame": 2,
+          "silhouetteBottomFromOriginPx": 14.96,
+          "alphaBounds": [
+            56,
+            57,
+            156,
+            111
+          ]
+        },
+        {
+          "dir": "SW",
+          "frame": 3,
+          "silhouetteBottomFromOriginPx": 34.22,
+          "alphaBounds": [
+            63,
+            26,
+            147,
+            134
+          ]
+        },
+        {
+          "dir": "SW",
+          "frame": 4,
+          "silhouetteBottomFromOriginPx": 38.41,
+          "alphaBounds": [
+            64,
+            43,
+            146,
+            139
+          ]
+        },
+        {
+          "dir": "SW",
+          "frame": 5,
+          "silhouetteBottomFromOriginPx": 25.85,
+          "alphaBounds": [
+            43,
+            56,
+            147,
+            124
+          ]
+        },
+        {
+          "dir": "SW",
+          "frame": 6,
+          "silhouetteBottomFromOriginPx": 45.11,
+          "alphaBounds": [
+            52,
+            16,
+            124,
+            147
+          ]
+        },
+        {
+          "dir": "SW",
+          "frame": 7,
+          "silhouetteBottomFromOriginPx": 46.79,
+          "alphaBounds": [
+            46,
+            20,
+            109,
+            149
+          ]
+        },
+        {
+          "dir": "W",
+          "frame": 0,
+          "silhouetteBottomFromOriginPx": 45.95,
+          "alphaBounds": [
+            61,
+            19,
+            94,
+            148
+          ]
+        },
+        {
+          "dir": "W",
+          "frame": 1,
+          "silhouetteBottomFromOriginPx": 45.95,
+          "alphaBounds": [
+            70,
+            23,
+            125,
+            148
+          ]
+        },
+        {
+          "dir": "W",
+          "frame": 2,
+          "silhouetteBottomFromOriginPx": 25.01,
+          "alphaBounds": [
+            56,
+            52,
+            160,
+            123
+          ]
+        },
+        {
+          "dir": "W",
+          "frame": 3,
+          "silhouetteBottomFromOriginPx": 34.22,
+          "alphaBounds": [
+            58,
+            44,
+            160,
+            134
+          ]
+        },
+        {
+          "dir": "W",
+          "frame": 4,
+          "silhouetteBottomFromOriginPx": 51.81,
+          "alphaBounds": [
+            72,
+            43,
+            148,
+            155
+          ]
+        },
+        {
+          "dir": "W",
+          "frame": 5,
+          "silhouetteBottomFromOriginPx": 19.99,
+          "alphaBounds": [
+            42,
+            60,
+            160,
+            117
+          ]
+        },
+        {
+          "dir": "W",
+          "frame": 6,
+          "silhouetteBottomFromOriginPx": 44.28,
+          "alphaBounds": [
+            60,
+            28,
+            128,
+            146
+          ]
+        },
+        {
+          "dir": "W",
+          "frame": 7,
+          "silhouetteBottomFromOriginPx": 45.95,
+          "alphaBounds": [
+            61,
+            19,
+            94,
+            148
+          ]
+        },
+        {
+          "dir": "NW",
+          "frame": 0,
+          "silhouetteBottomFromOriginPx": 43.44,
+          "alphaBounds": [
+            46,
+            19,
+            109,
+            145
+          ]
+        },
+        {
+          "dir": "NW",
+          "frame": 1,
+          "silhouetteBottomFromOriginPx": 51.81,
+          "alphaBounds": [
+            53,
+            23,
+            122,
+            155
+          ]
+        },
+        {
+          "dir": "NW",
+          "frame": 2,
+          "silhouetteBottomFromOriginPx": 42.6,
+          "alphaBounds": [
+            56,
+            48,
+            156,
+            144
+          ]
+        },
+        {
+          "dir": "NW",
+          "frame": 3,
+          "silhouetteBottomFromOriginPx": 35.9,
+          "alphaBounds": [
+            63,
+            64,
+            147,
+            136
+          ]
+        },
+        {
+          "dir": "NW",
+          "frame": 4,
+          "silhouetteBottomFromOriginPx": 56.0,
+          "alphaBounds": [
+            64,
+            46,
+            145,
+            160
+          ]
+        },
+        {
+          "dir": "NW",
+          "frame": 5,
+          "silhouetteBottomFromOriginPx": 30.04,
+          "alphaBounds": [
+            43,
+            71,
+            148,
+            129
+          ]
+        },
+        {
+          "dir": "NW",
+          "frame": 6,
+          "silhouetteBottomFromOriginPx": 42.6,
+          "alphaBounds": [
+            51,
+            40,
+            124,
+            144
+          ]
+        },
+        {
+          "dir": "NW",
+          "frame": 7,
+          "silhouetteBottomFromOriginPx": 43.44,
+          "alphaBounds": [
+            46,
+            19,
+            109,
+            145
+          ]
+        },
+        {
+          "dir": "N",
+          "frame": 0,
+          "silhouetteBottomFromOriginPx": 40.92,
+          "alphaBounds": [
+            38,
+            19,
+            122,
+            142
+          ]
+        },
+        {
+          "dir": "N",
+          "frame": 1,
+          "silhouetteBottomFromOriginPx": 51.81,
+          "alphaBounds": [
+            38,
+            24,
+            122,
+            155
+          ]
+        },
+        {
+          "dir": "N",
+          "frame": 2,
+          "silhouetteBottomFromOriginPx": 48.46,
+          "alphaBounds": [
+            38,
+            45,
+            123,
+            151
+          ]
+        },
+        {
+          "dir": "N",
+          "frame": 3,
+          "silhouetteBottomFromOriginPx": 36.74,
+          "alphaBounds": [
+            38,
+            75,
+            122,
+            137
+          ]
+        },
+        {
+          "dir": "N",
+          "frame": 4,
+          "silhouetteBottomFromOriginPx": 56.0,
+          "alphaBounds": [
+            38,
+            49,
+            123,
+            160
+          ]
+        },
+        {
+          "dir": "N",
+          "frame": 5,
+          "silhouetteBottomFromOriginPx": 38.41,
+          "alphaBounds": [
+            38,
+            76,
+            122,
+            139
+          ]
+        },
+        {
+          "dir": "N",
+          "frame": 6,
+          "silhouetteBottomFromOriginPx": 40.09,
+          "alphaBounds": [
+            38,
+            45,
+            122,
+            141
+          ]
+        },
+        {
+          "dir": "N",
+          "frame": 7,
+          "silhouetteBottomFromOriginPx": 40.92,
+          "alphaBounds": [
+            38,
+            19,
+            122,
+            142
+          ]
+        },
+        {
+          "dir": "NE",
+          "frame": 0,
+          "silhouetteBottomFromOriginPx": 43.44,
+          "alphaBounds": [
+            52,
+            19,
+            114,
+            145
+          ]
+        },
+        {
+          "dir": "NE",
+          "frame": 1,
+          "silhouetteBottomFromOriginPx": 52.65,
+          "alphaBounds": [
+            38,
+            23,
+            107,
+            156
+          ]
+        },
+        {
+          "dir": "NE",
+          "frame": 2,
+          "silhouetteBottomFromOriginPx": 42.6,
+          "alphaBounds": [
+            4,
+            47,
+            104,
+            144
+          ]
+        },
+        {
+          "dir": "NE",
+          "frame": 3,
+          "silhouetteBottomFromOriginPx": 36.74,
+          "alphaBounds": [
+            13,
+            65,
+            98,
+            137
+          ]
+        },
+        {
+          "dir": "NE",
+          "frame": 4,
+          "silhouetteBottomFromOriginPx": 56.0,
+          "alphaBounds": [
+            15,
+            46,
+            96,
+            160
+          ]
+        },
+        {
+          "dir": "NE",
+          "frame": 5,
+          "silhouetteBottomFromOriginPx": 29.2,
+          "alphaBounds": [
+            13,
+            70,
+            117,
+            128
+          ]
+        },
+        {
+          "dir": "NE",
+          "frame": 6,
+          "silhouetteBottomFromOriginPx": 42.6,
+          "alphaBounds": [
+            36,
+            40,
+            109,
+            144
+          ]
+        },
+        {
+          "dir": "NE",
+          "frame": 7,
+          "silhouetteBottomFromOriginPx": 43.44,
+          "alphaBounds": [
+            52,
+            19,
+            114,
+            145
+          ]
+        },
+        {
+          "dir": "E",
+          "frame": 0,
+          "silhouetteBottomFromOriginPx": 45.95,
+          "alphaBounds": [
+            66,
+            19,
+            99,
+            148
+          ]
+        },
+        {
+          "dir": "E",
+          "frame": 1,
+          "silhouetteBottomFromOriginPx": 46.79,
+          "alphaBounds": [
+            35,
+            23,
+            91,
+            149
+          ]
+        },
+        {
+          "dir": "E",
+          "frame": 2,
+          "silhouetteBottomFromOriginPx": 25.85,
+          "alphaBounds": [
+            0,
+            52,
+            104,
+            124
+          ]
+        },
+        {
+          "dir": "E",
+          "frame": 3,
+          "silhouetteBottomFromOriginPx": 34.22,
+          "alphaBounds": [
+            0,
+            44,
+            101,
+            134
+          ]
+        },
+        {
+          "dir": "E",
+          "frame": 4,
+          "silhouetteBottomFromOriginPx": 51.81,
+          "alphaBounds": [
+            12,
+            43,
+            89,
+            155
+          ]
+        },
+        {
+          "dir": "E",
+          "frame": 5,
+          "silhouetteBottomFromOriginPx": 19.99,
+          "alphaBounds": [
+            0,
+            60,
+            118,
+            117
+          ]
+        },
+        {
+          "dir": "E",
+          "frame": 6,
+          "silhouetteBottomFromOriginPx": 44.28,
+          "alphaBounds": [
+            32,
+            28,
+            100,
+            146
+          ]
+        },
+        {
+          "dir": "E",
+          "frame": 7,
+          "silhouetteBottomFromOriginPx": 45.95,
+          "alphaBounds": [
+            66,
+            19,
+            99,
+            148
+          ]
+        },
+        {
+          "dir": "SE",
+          "frame": 0,
+          "silhouetteBottomFromOriginPx": 46.79,
+          "alphaBounds": [
+            52,
+            19,
+            114,
+            149
+          ]
+        },
+        {
+          "dir": "SE",
+          "frame": 1,
+          "silhouetteBottomFromOriginPx": 38.41,
+          "alphaBounds": [
+            39,
+            22,
+            107,
+            139
+          ]
+        },
+        {
+          "dir": "SE",
+          "frame": 2,
+          "silhouetteBottomFromOriginPx": 14.96,
+          "alphaBounds": [
+            4,
+            57,
+            104,
+            111
+          ]
+        },
+        {
+          "dir": "SE",
+          "frame": 3,
+          "silhouetteBottomFromOriginPx": 35.06,
+          "alphaBounds": [
+            13,
+            26,
+            98,
+            135
+          ]
+        },
+        {
+          "dir": "SE",
+          "frame": 4,
+          "silhouetteBottomFromOriginPx": 38.41,
+          "alphaBounds": [
+            14,
+            43,
+            96,
+            139
+          ]
+        },
+        {
+          "dir": "SE",
+          "frame": 5,
+          "silhouetteBottomFromOriginPx": 25.01,
+          "alphaBounds": [
+            13,
+            56,
+            117,
+            123
+          ]
+        },
+        {
+          "dir": "SE",
+          "frame": 6,
+          "silhouetteBottomFromOriginPx": 45.11,
+          "alphaBounds": [
+            36,
+            17,
+            109,
+            147
+          ]
+        },
+        {
+          "dir": "SE",
+          "frame": 7,
+          "silhouetteBottomFromOriginPx": 46.79,
+          "alphaBounds": [
+            52,
+            19,
+            114,
+            149
+          ]
+        }
+      ]
+    },
+    "adult-feminine:idle": {
+      "min": 22.8,
+      "max": 27.0,
+      "spreadPx": 4.2,
+      "mean": 25.57,
+      "frames": [
+        {
+          "dir": "S",
+          "frame": 0,
+          "silhouetteBottomFromOriginPx": 25.8,
+          "alphaBounds": [
+            38,
+            20,
+            122,
+            147
+          ]
+        },
+        {
+          "dir": "S",
+          "frame": 1,
+          "silhouetteBottomFromOriginPx": 25.8,
+          "alphaBounds": [
+            38,
+            20,
+            122,
+            147
+          ]
+        },
+        {
+          "dir": "S",
+          "frame": 2,
+          "silhouetteBottomFromOriginPx": 25.8,
+          "alphaBounds": [
+            38,
+            20,
+            122,
+            147
+          ]
+        },
+        {
+          "dir": "S",
+          "frame": 3,
+          "silhouetteBottomFromOriginPx": 25.8,
+          "alphaBounds": [
+            38,
+            19,
+            122,
+            147
+          ]
+        },
+        {
+          "dir": "SW",
+          "frame": 0,
+          "silhouetteBottomFromOriginPx": 27.0,
+          "alphaBounds": [
+            46,
+            20,
+            108,
+            149
+          ]
+        },
+        {
+          "dir": "SW",
+          "frame": 1,
+          "silhouetteBottomFromOriginPx": 27.0,
+          "alphaBounds": [
+            47,
+            20,
+            108,
+            149
+          ]
+        },
+        {
+          "dir": "SW",
+          "frame": 2,
+          "silhouetteBottomFromOriginPx": 27.0,
+          "alphaBounds": [
+            46,
+            20,
+            108,
+            149
+          ]
+        },
+        {
+          "dir": "SW",
+          "frame": 3,
+          "silhouetteBottomFromOriginPx": 27.0,
+          "alphaBounds": [
+            46,
+            19,
+            108,
+            149
+          ]
+        },
+        {
+          "dir": "W",
+          "frame": 0,
+          "silhouetteBottomFromOriginPx": 26.4,
+          "alphaBounds": [
+            61,
+            19,
+            94,
+            148
+          ]
+        },
+        {
+          "dir": "W",
+          "frame": 1,
+          "silhouetteBottomFromOriginPx": 26.4,
+          "alphaBounds": [
+            61,
+            19,
+            94,
+            148
+          ]
+        },
+        {
+          "dir": "W",
+          "frame": 2,
+          "silhouetteBottomFromOriginPx": 26.4,
+          "alphaBounds": [
+            61,
+            19,
+            94,
+            148
+          ]
+        },
+        {
+          "dir": "W",
+          "frame": 3,
+          "silhouetteBottomFromOriginPx": 26.4,
+          "alphaBounds": [
+            61,
+            19,
+            94,
+            148
+          ]
+        },
+        {
+          "dir": "NW",
+          "frame": 0,
+          "silhouetteBottomFromOriginPx": 24.6,
+          "alphaBounds": [
+            46,
+            19,
+            108,
+            145
+          ]
+        },
+        {
+          "dir": "NW",
+          "frame": 1,
+          "silhouetteBottomFromOriginPx": 24.6,
+          "alphaBounds": [
+            46,
+            19,
+            109,
+            145
+          ]
+        },
+        {
+          "dir": "NW",
+          "frame": 2,
+          "silhouetteBottomFromOriginPx": 24.6,
+          "alphaBounds": [
+            46,
+            19,
+            108,
+            145
+          ]
+        },
+        {
+          "dir": "NW",
+          "frame": 3,
+          "silhouetteBottomFromOriginPx": 24.6,
+          "alphaBounds": [
+            46,
+            19,
+            108,
+            145
+          ]
+        },
+        {
+          "dir": "N",
+          "frame": 0,
+          "silhouetteBottomFromOriginPx": 22.8,
+          "alphaBounds": [
+            38,
+            19,
+            122,
+            142
+          ]
+        },
+        {
+          "dir": "N",
+          "frame": 1,
+          "silhouetteBottomFromOriginPx": 22.8,
+          "alphaBounds": [
+            38,
+            19,
+            122,
+            142
+          ]
+        },
+        {
+          "dir": "N",
+          "frame": 2,
+          "silhouetteBottomFromOriginPx": 22.8,
+          "alphaBounds": [
+            38,
+            19,
+            122,
+            142
+          ]
+        },
+        {
+          "dir": "N",
+          "frame": 3,
+          "silhouetteBottomFromOriginPx": 22.8,
+          "alphaBounds": [
+            38,
+            20,
+            122,
+            142
+          ]
+        },
+        {
+          "dir": "NE",
+          "frame": 0,
+          "silhouetteBottomFromOriginPx": 24.6,
+          "alphaBounds": [
+            52,
+            19,
+            114,
+            145
+          ]
+        },
+        {
+          "dir": "NE",
+          "frame": 1,
+          "silhouetteBottomFromOriginPx": 24.6,
+          "alphaBounds": [
+            52,
+            19,
+            114,
+            145
+          ]
+        },
+        {
+          "dir": "NE",
+          "frame": 2,
+          "silhouetteBottomFromOriginPx": 24.6,
+          "alphaBounds": [
+            52,
+            19,
+            114,
+            145
+          ]
+        },
+        {
+          "dir": "NE",
+          "frame": 3,
+          "silhouetteBottomFromOriginPx": 24.6,
+          "alphaBounds": [
+            52,
+            20,
+            114,
+            145
+          ]
+        },
+        {
+          "dir": "E",
+          "frame": 0,
+          "silhouetteBottomFromOriginPx": 26.4,
+          "alphaBounds": [
+            66,
+            19,
+            99,
+            148
+          ]
+        },
+        {
+          "dir": "E",
+          "frame": 1,
+          "silhouetteBottomFromOriginPx": 26.4,
+          "alphaBounds": [
+            66,
+            19,
+            99,
+            148
+          ]
+        },
+        {
+          "dir": "E",
+          "frame": 2,
+          "silhouetteBottomFromOriginPx": 26.4,
+          "alphaBounds": [
+            66,
+            19,
+            99,
+            148
+          ]
+        },
+        {
+          "dir": "E",
+          "frame": 3,
+          "silhouetteBottomFromOriginPx": 26.4,
+          "alphaBounds": [
+            66,
+            19,
+            99,
+            148
+          ]
+        },
+        {
+          "dir": "SE",
+          "frame": 0,
+          "silhouetteBottomFromOriginPx": 27.0,
+          "alphaBounds": [
+            52,
+            19,
+            114,
+            149
+          ]
+        },
+        {
+          "dir": "SE",
+          "frame": 1,
+          "silhouetteBottomFromOriginPx": 27.0,
+          "alphaBounds": [
+            52,
+            20,
+            114,
+            149
+          ]
+        },
+        {
+          "dir": "SE",
+          "frame": 2,
+          "silhouetteBottomFromOriginPx": 27.0,
+          "alphaBounds": [
+            52,
+            19,
+            114,
+            149
+          ]
+        },
+        {
+          "dir": "SE",
+          "frame": 3,
+          "silhouetteBottomFromOriginPx": 27.0,
+          "alphaBounds": [
+            52,
+            19,
+            114,
+            149
+          ]
+        }
+      ]
+    },
+    "adult-feminine:walk": {
+      "min": 22.2,
+      "max": 27.6,
+      "spreadPx": 5.4,
+      "mean": 25.35,
+      "frames": [
+        {
+          "dir": "S",
+          "frame": 0,
+          "silhouetteBottomFromOriginPx": 25.8,
+          "alphaBounds": [
+            38,
+            20,
+            122,
+            147
+          ]
+        },
+        {
+          "dir": "S",
+          "frame": 1,
+          "silhouetteBottomFromOriginPx": 27.6,
+          "alphaBounds": [
+            38,
+            21,
+            122,
+            150
+          ]
+        },
+        {
+          "dir": "S",
+          "frame": 2,
+          "silhouetteBottomFromOriginPx": 25.8,
+          "alphaBounds": [
+            38,
+            20,
+            122,
+            147
+          ]
+        },
+        {
+          "dir": "S",
+          "frame": 3,
+          "silhouetteBottomFromOriginPx": 27.6,
+          "alphaBounds": [
+            38,
+            21,
+            122,
+            150
+          ]
+        },
+        {
+          "dir": "SW",
+          "frame": 0,
+          "silhouetteBottomFromOriginPx": 27.0,
+          "alphaBounds": [
+            43,
+            20,
+            107,
+            149
+          ]
+        },
+        {
+          "dir": "SW",
+          "frame": 1,
+          "silhouetteBottomFromOriginPx": 23.4,
+          "alphaBounds": [
+            44,
+            20,
+            113,
+            143
+          ]
+        },
+        {
+          "dir": "SW",
+          "frame": 2,
+          "silhouetteBottomFromOriginPx": 27.0,
+          "alphaBounds": [
+            43,
+            20,
+            107,
+            149
+          ]
+        },
+        {
+          "dir": "SW",
+          "frame": 3,
+          "silhouetteBottomFromOriginPx": 27.6,
+          "alphaBounds": [
+            34,
+            20,
+            112,
+            150
+          ]
+        },
+        {
+          "dir": "W",
+          "frame": 0,
+          "silhouetteBottomFromOriginPx": 26.4,
+          "alphaBounds": [
+            61,
+            19,
+            94,
+            148
+          ]
+        },
+        {
+          "dir": "W",
+          "frame": 1,
+          "silhouetteBottomFromOriginPx": 24.0,
+          "alphaBounds": [
+            43,
+            19,
+            113,
+            144
+          ]
+        },
+        {
+          "dir": "W",
+          "frame": 2,
+          "silhouetteBottomFromOriginPx": 26.4,
+          "alphaBounds": [
+            61,
+            19,
+            94,
+            148
+          ]
+        },
+        {
+          "dir": "W",
+          "frame": 3,
+          "silhouetteBottomFromOriginPx": 24.0,
+          "alphaBounds": [
+            43,
+            19,
+            113,
+            144
+          ]
+        },
+        {
+          "dir": "NW",
+          "frame": 0,
+          "silhouetteBottomFromOriginPx": 24.6,
+          "alphaBounds": [
+            43,
+            19,
+            107,
+            145
+          ]
+        },
+        {
+          "dir": "NW",
+          "frame": 1,
+          "silhouetteBottomFromOriginPx": 26.4,
+          "alphaBounds": [
+            34,
+            19,
+            112,
+            148
+          ]
+        },
+        {
+          "dir": "NW",
+          "frame": 2,
+          "silhouetteBottomFromOriginPx": 24.6,
+          "alphaBounds": [
+            43,
+            19,
+            107,
+            145
+          ]
+        },
+        {
+          "dir": "NW",
+          "frame": 3,
+          "silhouetteBottomFromOriginPx": 22.2,
+          "alphaBounds": [
+            44,
+            18,
+            113,
+            141
+          ]
+        },
+        {
+          "dir": "N",
+          "frame": 0,
+          "silhouetteBottomFromOriginPx": 22.8,
+          "alphaBounds": [
+            38,
+            19,
+            122,
+            142
+          ]
+        },
+        {
+          "dir": "N",
+          "frame": 1,
+          "silhouetteBottomFromOriginPx": 25.8,
+          "alphaBounds": [
+            38,
+            18,
+            122,
+            147
+          ]
+        },
+        {
+          "dir": "N",
+          "frame": 2,
+          "silhouetteBottomFromOriginPx": 22.8,
+          "alphaBounds": [
+            38,
+            19,
+            122,
+            142
+          ]
+        },
+        {
+          "dir": "N",
+          "frame": 3,
+          "silhouetteBottomFromOriginPx": 25.8,
+          "alphaBounds": [
+            38,
+            19,
+            122,
+            147
+          ]
+        },
+        {
+          "dir": "NE",
+          "frame": 0,
+          "silhouetteBottomFromOriginPx": 24.6,
+          "alphaBounds": [
+            53,
+            19,
+            117,
+            145
+          ]
+        },
+        {
+          "dir": "NE",
+          "frame": 1,
+          "silhouetteBottomFromOriginPx": 22.2,
+          "alphaBounds": [
+            46,
+            19,
+            116,
+            141
+          ]
+        },
+        {
+          "dir": "NE",
+          "frame": 2,
+          "silhouetteBottomFromOriginPx": 24.6,
+          "alphaBounds": [
+            53,
+            19,
+            117,
+            145
+          ]
+        },
+        {
+          "dir": "NE",
+          "frame": 3,
+          "silhouetteBottomFromOriginPx": 26.4,
+          "alphaBounds": [
+            47,
+            19,
+            125,
+            148
+          ]
+        },
+        {
+          "dir": "E",
+          "frame": 0,
+          "silhouetteBottomFromOriginPx": 26.4,
+          "alphaBounds": [
+            66,
+            19,
+            99,
+            148
+          ]
+        },
+        {
+          "dir": "E",
+          "frame": 1,
+          "silhouetteBottomFromOriginPx": 24.0,
+          "alphaBounds": [
+            46,
+            19,
+            117,
+            144
+          ]
+        },
+        {
+          "dir": "E",
+          "frame": 2,
+          "silhouetteBottomFromOriginPx": 26.4,
+          "alphaBounds": [
+            66,
+            19,
+            99,
+            148
+          ]
+        },
+        {
+          "dir": "E",
+          "frame": 3,
+          "silhouetteBottomFromOriginPx": 24.0,
+          "alphaBounds": [
+            46,
+            19,
+            117,
+            144
+          ]
+        },
+        {
+          "dir": "SE",
+          "frame": 0,
+          "silhouetteBottomFromOriginPx": 27.0,
+          "alphaBounds": [
+            53,
+            20,
+            116,
+            149
+          ]
+        },
+        {
+          "dir": "SE",
+          "frame": 1,
+          "silhouetteBottomFromOriginPx": 27.6,
+          "alphaBounds": [
+            48,
+            20,
+            126,
+            150
+          ]
+        },
+        {
+          "dir": "SE",
+          "frame": 2,
+          "silhouetteBottomFromOriginPx": 27.0,
+          "alphaBounds": [
+            53,
+            20,
+            116,
+            149
+          ]
+        },
+        {
+          "dir": "SE",
+          "frame": 3,
+          "silhouetteBottomFromOriginPx": 23.4,
+          "alphaBounds": [
+            46,
+            20,
+            116,
+            143
+          ]
+        }
+      ]
+    },
+    "adult-feminine:run": {
+      "min": 17.4,
+      "max": 27.0,
+      "spreadPx": 9.6,
+      "mean": 23.83,
+      "frames": [
+        {
+          "dir": "S",
+          "frame": 0,
+          "silhouetteBottomFromOriginPx": 25.8,
+          "alphaBounds": [
+            38,
+            21,
+            122,
+            147
+          ]
+        },
+        {
+          "dir": "S",
+          "frame": 1,
+          "silhouetteBottomFromOriginPx": 27.0,
+          "alphaBounds": [
+            38,
+            21,
+            122,
+            149
+          ]
+        },
+        {
+          "dir": "S",
+          "frame": 2,
+          "silhouetteBottomFromOriginPx": 25.8,
+          "alphaBounds": [
+            38,
+            21,
+            122,
+            147
+          ]
+        },
+        {
+          "dir": "S",
+          "frame": 3,
+          "silhouetteBottomFromOriginPx": 26.4,
+          "alphaBounds": [
+            38,
+            21,
+            123,
+            148
+          ]
+        },
+        {
+          "dir": "SW",
+          "frame": 0,
+          "silhouetteBottomFromOriginPx": 27.0,
+          "alphaBounds": [
+            41,
+            21,
+            107,
+            149
+          ]
+        },
+        {
+          "dir": "SW",
+          "frame": 1,
+          "silhouetteBottomFromOriginPx": 22.2,
+          "alphaBounds": [
+            35,
+            21,
+            125,
+            141
+          ]
+        },
+        {
+          "dir": "SW",
+          "frame": 2,
+          "silhouetteBottomFromOriginPx": 27.0,
+          "alphaBounds": [
+            41,
+            21,
+            107,
+            149
+          ]
+        },
+        {
+          "dir": "SW",
+          "frame": 3,
+          "silhouetteBottomFromOriginPx": 26.4,
+          "alphaBounds": [
+            26,
+            21,
+            115,
+            148
+          ]
+        },
+        {
+          "dir": "W",
+          "frame": 0,
+          "silhouetteBottomFromOriginPx": 26.4,
+          "alphaBounds": [
+            61,
+            19,
+            94,
+            148
+          ]
+        },
+        {
+          "dir": "W",
+          "frame": 1,
+          "silhouetteBottomFromOriginPx": 17.4,
+          "alphaBounds": [
+            30,
+            20,
+            128,
+            133
+          ]
+        },
+        {
+          "dir": "W",
+          "frame": 2,
+          "silhouetteBottomFromOriginPx": 26.4,
+          "alphaBounds": [
+            61,
+            19,
+            94,
+            148
+          ]
+        },
+        {
+          "dir": "W",
+          "frame": 3,
+          "silhouetteBottomFromOriginPx": 20.4,
+          "alphaBounds": [
+            30,
+            20,
+            128,
+            138
+          ]
+        },
+        {
+          "dir": "NW",
+          "frame": 0,
+          "silhouetteBottomFromOriginPx": 24.6,
+          "alphaBounds": [
+            41,
+            18,
+            107,
+            145
+          ]
+        },
+        {
+          "dir": "NW",
+          "frame": 1,
+          "silhouetteBottomFromOriginPx": 22.8,
+          "alphaBounds": [
+            27,
+            18,
+            115,
+            142
+          ]
+        },
+        {
+          "dir": "NW",
+          "frame": 2,
+          "silhouetteBottomFromOriginPx": 24.6,
+          "alphaBounds": [
+            41,
+            18,
+            107,
+            145
+          ]
+        },
+        {
+          "dir": "NW",
+          "frame": 3,
+          "silhouetteBottomFromOriginPx": 18.6,
+          "alphaBounds": [
+            35,
+            18,
+            124,
+            135
+          ]
+        },
+        {
+          "dir": "N",
+          "frame": 0,
+          "silhouetteBottomFromOriginPx": 22.8,
+          "alphaBounds": [
+            38,
+            18,
+            123,
+            142
+          ]
+        },
+        {
+          "dir": "N",
+          "frame": 1,
+          "silhouetteBottomFromOriginPx": 22.8,
+          "alphaBounds": [
+            38,
+            18,
+            122,
+            142
+          ]
+        },
+        {
+          "dir": "N",
+          "frame": 2,
+          "silhouetteBottomFromOriginPx": 22.8,
+          "alphaBounds": [
+            38,
+            18,
+            123,
+            142
+          ]
+        },
+        {
+          "dir": "N",
+          "frame": 3,
+          "silhouetteBottomFromOriginPx": 22.8,
+          "alphaBounds": [
+            38,
+            17,
+            122,
+            142
+          ]
+        },
+        {
+          "dir": "NE",
+          "frame": 0,
+          "silhouetteBottomFromOriginPx": 24.6,
+          "alphaBounds": [
+            53,
+            19,
+            119,
+            145
+          ]
+        },
+        {
+          "dir": "NE",
+          "frame": 1,
+          "silhouetteBottomFromOriginPx": 18.0,
+          "alphaBounds": [
+            36,
+            18,
+            126,
+            134
+          ]
+        },
+        {
+          "dir": "NE",
+          "frame": 2,
+          "silhouetteBottomFromOriginPx": 24.6,
+          "alphaBounds": [
+            53,
+            19,
+            119,
+            145
+          ]
+        },
+        {
+          "dir": "NE",
+          "frame": 3,
+          "silhouetteBottomFromOriginPx": 22.8,
+          "alphaBounds": [
+            45,
+            19,
+            134,
+            142
+          ]
+        },
+        {
+          "dir": "E",
+          "frame": 0,
+          "silhouetteBottomFromOriginPx": 26.4,
+          "alphaBounds": [
+            66,
+            19,
+            99,
+            148
+          ]
+        },
+        {
+          "dir": "E",
+          "frame": 1,
+          "silhouetteBottomFromOriginPx": 20.4,
+          "alphaBounds": [
+            32,
+            19,
+            130,
+            138
+          ]
+        },
+        {
+          "dir": "E",
+          "frame": 2,
+          "silhouetteBottomFromOriginPx": 26.4,
+          "alphaBounds": [
+            66,
+            19,
+            99,
+            148
+          ]
+        },
+        {
+          "dir": "E",
+          "frame": 3,
+          "silhouetteBottomFromOriginPx": 17.4,
+          "alphaBounds": [
+            32,
+            19,
+            130,
+            133
+          ]
+        },
+        {
+          "dir": "SE",
+          "frame": 0,
+          "silhouetteBottomFromOriginPx": 27.0,
+          "alphaBounds": [
+            52,
+            20,
+            119,
+            149
+          ]
+        },
+        {
+          "dir": "SE",
+          "frame": 1,
+          "silhouetteBottomFromOriginPx": 26.4,
+          "alphaBounds": [
+            45,
+            21,
+            134,
+            148
+          ]
+        },
+        {
+          "dir": "SE",
+          "frame": 2,
+          "silhouetteBottomFromOriginPx": 27.0,
+          "alphaBounds": [
+            52,
+            20,
+            119,
+            149
+          ]
+        },
+        {
+          "dir": "SE",
+          "frame": 3,
+          "silhouetteBottomFromOriginPx": 21.6,
+          "alphaBounds": [
+            36,
+            21,
+            125,
+            140
+          ]
+        }
+      ]
+    },
+    "adult-feminine:roll": {
+      "min": 2.4,
+      "max": 56.0,
+      "spreadPx": 53.6,
+      "mean": 39.63,
+      "frames": [
+        {
+          "dir": "S",
+          "frame": 0,
+          "silhouetteBottomFromOriginPx": 45.11,
+          "alphaBounds": [
+            38,
+            20,
+            122,
+            147
+          ]
+        },
+        {
+          "dir": "S",
+          "frame": 1,
+          "silhouetteBottomFromOriginPx": 32.55,
+          "alphaBounds": [
+            38,
+            22,
+            122,
+            132
+          ]
+        },
+        {
+          "dir": "S",
+          "frame": 2,
+          "silhouetteBottomFromOriginPx": 2.4,
+          "alphaBounds": [
+            38,
+            57,
+            122,
+            96
+          ]
+        },
+        {
+          "dir": "S",
+          "frame": 3,
+          "silhouetteBottomFromOriginPx": 35.9,
+          "alphaBounds": [
+            38,
+            22,
+            122,
+            136
+          ]
+        },
+        {
+          "dir": "S",
+          "frame": 4,
+          "silhouetteBottomFromOriginPx": 32.55,
+          "alphaBounds": [
+            38,
+            46,
+            123,
+            132
+          ]
+        },
+        {
+          "dir": "S",
+          "frame": 5,
+          "silhouetteBottomFromOriginPx": 25.85,
+          "alphaBounds": [
+            38,
+            46,
+            122,
+            124
+          ]
+        },
+        {
+          "dir": "S",
+          "frame": 6,
+          "silhouetteBottomFromOriginPx": 43.44,
+          "alphaBounds": [
+            38,
+            12,
+            122,
+            145
+          ]
+        },
+        {
+          "dir": "S",
+          "frame": 7,
+          "silhouetteBottomFromOriginPx": 45.11,
+          "alphaBounds": [
+            38,
+            20,
+            122,
+            147
+          ]
+        },
+        {
+          "dir": "SW",
+          "frame": 0,
+          "silhouetteBottomFromOriginPx": 46.79,
+          "alphaBounds": [
+            46,
+            20,
+            108,
+            149
+          ]
+        },
+        {
+          "dir": "SW",
+          "frame": 1,
+          "silhouetteBottomFromOriginPx": 38.41,
+          "alphaBounds": [
+            52,
+            23,
+            122,
+            139
+          ]
+        },
+        {
+          "dir": "SW",
+          "frame": 2,
+          "silhouetteBottomFromOriginPx": 14.96,
+          "alphaBounds": [
+            59,
+            57,
+            156,
+            111
+          ]
+        },
+        {
+          "dir": "SW",
+          "frame": 3,
+          "silhouetteBottomFromOriginPx": 34.22,
+          "alphaBounds": [
+            63,
+            26,
+            147,
+            134
+          ]
+        },
+        {
+          "dir": "SW",
+          "frame": 4,
+          "silhouetteBottomFromOriginPx": 38.41,
+          "alphaBounds": [
+            64,
+            43,
+            146,
+            139
+          ]
+        },
+        {
+          "dir": "SW",
+          "frame": 5,
+          "silhouetteBottomFromOriginPx": 25.85,
+          "alphaBounds": [
+            43,
+            51,
+            147,
+            124
+          ]
+        },
+        {
+          "dir": "SW",
+          "frame": 6,
+          "silhouetteBottomFromOriginPx": 45.11,
+          "alphaBounds": [
+            52,
+            16,
+            122,
+            147
+          ]
+        },
+        {
+          "dir": "SW",
+          "frame": 7,
+          "silhouetteBottomFromOriginPx": 46.79,
+          "alphaBounds": [
+            46,
+            20,
+            108,
+            149
+          ]
+        },
+        {
+          "dir": "W",
+          "frame": 0,
+          "silhouetteBottomFromOriginPx": 45.95,
+          "alphaBounds": [
+            61,
+            19,
+            94,
+            148
+          ]
+        },
+        {
+          "dir": "W",
+          "frame": 1,
+          "silhouetteBottomFromOriginPx": 45.95,
+          "alphaBounds": [
+            65,
+            23,
+            125,
+            148
+          ]
+        },
+        {
+          "dir": "W",
+          "frame": 2,
+          "silhouetteBottomFromOriginPx": 25.01,
+          "alphaBounds": [
+            56,
+            52,
+            160,
+            123
+          ]
+        },
+        {
+          "dir": "W",
+          "frame": 3,
+          "silhouetteBottomFromOriginPx": 37.58,
+          "alphaBounds": [
+            58,
+            44,
+            160,
+            138
+          ]
+        },
+        {
+          "dir": "W",
+          "frame": 4,
+          "silhouetteBottomFromOriginPx": 51.81,
+          "alphaBounds": [
+            72,
+            43,
+            151,
+            155
+          ]
+        },
+        {
+          "dir": "W",
+          "frame": 5,
+          "silhouetteBottomFromOriginPx": 19.99,
+          "alphaBounds": [
+            42,
+            60,
+            160,
+            117
+          ]
+        },
+        {
+          "dir": "W",
+          "frame": 6,
+          "silhouetteBottomFromOriginPx": 44.28,
+          "alphaBounds": [
+            60,
+            28,
+            128,
+            146
+          ]
+        },
+        {
+          "dir": "W",
+          "frame": 7,
+          "silhouetteBottomFromOriginPx": 45.95,
+          "alphaBounds": [
+            61,
+            19,
+            94,
+            148
+          ]
+        },
+        {
+          "dir": "NW",
+          "frame": 0,
+          "silhouetteBottomFromOriginPx": 43.44,
+          "alphaBounds": [
+            46,
+            19,
+            108,
+            145
+          ]
+        },
+        {
+          "dir": "NW",
+          "frame": 1,
+          "silhouetteBottomFromOriginPx": 51.81,
+          "alphaBounds": [
+            53,
+            23,
+            122,
+            155
+          ]
+        },
+        {
+          "dir": "NW",
+          "frame": 2,
+          "silhouetteBottomFromOriginPx": 42.6,
+          "alphaBounds": [
+            59,
+            48,
+            156,
+            144
+          ]
+        },
+        {
+          "dir": "NW",
+          "frame": 3,
+          "silhouetteBottomFromOriginPx": 40.92,
+          "alphaBounds": [
+            63,
+            64,
+            147,
+            142
+          ]
+        },
+        {
+          "dir": "NW",
+          "frame": 4,
+          "silhouetteBottomFromOriginPx": 56.0,
+          "alphaBounds": [
+            64,
+            46,
+            145,
+            160
+          ]
+        },
+        {
+          "dir": "NW",
+          "frame": 5,
+          "silhouetteBottomFromOriginPx": 30.04,
+          "alphaBounds": [
+            43,
+            71,
+            148,
+            129
+          ]
+        },
+        {
+          "dir": "NW",
+          "frame": 6,
+          "silhouetteBottomFromOriginPx": 42.6,
+          "alphaBounds": [
+            51,
+            40,
+            122,
+            144
+          ]
+        },
+        {
+          "dir": "NW",
+          "frame": 7,
+          "silhouetteBottomFromOriginPx": 43.44,
+          "alphaBounds": [
+            46,
+            19,
+            108,
+            145
+          ]
+        },
+        {
+          "dir": "N",
+          "frame": 0,
+          "silhouetteBottomFromOriginPx": 40.92,
+          "alphaBounds": [
+            38,
+            19,
+            122,
+            142
+          ]
+        },
+        {
+          "dir": "N",
+          "frame": 1,
+          "silhouetteBottomFromOriginPx": 51.81,
+          "alphaBounds": [
+            38,
+            24,
+            122,
+            155
+          ]
+        },
+        {
+          "dir": "N",
+          "frame": 2,
+          "silhouetteBottomFromOriginPx": 48.46,
+          "alphaBounds": [
+            38,
+            45,
+            123,
+            151
+          ]
+        },
+        {
+          "dir": "N",
+          "frame": 3,
+          "silhouetteBottomFromOriginPx": 40.09,
+          "alphaBounds": [
+            38,
+            75,
+            122,
+            141
+          ]
+        },
+        {
+          "dir": "N",
+          "frame": 4,
+          "silhouetteBottomFromOriginPx": 56.0,
+          "alphaBounds": [
+            38,
+            49,
+            123,
+            160
+          ]
+        },
+        {
+          "dir": "N",
+          "frame": 5,
+          "silhouetteBottomFromOriginPx": 38.41,
+          "alphaBounds": [
+            38,
+            76,
+            122,
+            139
+          ]
+        },
+        {
+          "dir": "N",
+          "frame": 6,
+          "silhouetteBottomFromOriginPx": 40.09,
+          "alphaBounds": [
+            38,
+            45,
+            122,
+            141
+          ]
+        },
+        {
+          "dir": "N",
+          "frame": 7,
+          "silhouetteBottomFromOriginPx": 40.92,
+          "alphaBounds": [
+            38,
+            19,
+            122,
+            142
+          ]
+        },
+        {
+          "dir": "NE",
+          "frame": 0,
+          "silhouetteBottomFromOriginPx": 43.44,
+          "alphaBounds": [
+            52,
+            19,
+            114,
+            145
+          ]
+        },
+        {
+          "dir": "NE",
+          "frame": 1,
+          "silhouetteBottomFromOriginPx": 52.65,
+          "alphaBounds": [
+            38,
+            23,
+            107,
+            156
+          ]
+        },
+        {
+          "dir": "NE",
+          "frame": 2,
+          "silhouetteBottomFromOriginPx": 42.6,
+          "alphaBounds": [
+            4,
+            47,
+            101,
+            144
+          ]
+        },
+        {
+          "dir": "NE",
+          "frame": 3,
+          "silhouetteBottomFromOriginPx": 40.09,
+          "alphaBounds": [
+            13,
+            65,
+            98,
+            141
+          ]
+        },
+        {
+          "dir": "NE",
+          "frame": 4,
+          "silhouetteBottomFromOriginPx": 56.0,
+          "alphaBounds": [
+            15,
+            46,
+            96,
+            160
+          ]
+        },
+        {
+          "dir": "NE",
+          "frame": 5,
+          "silhouetteBottomFromOriginPx": 29.2,
+          "alphaBounds": [
+            13,
+            70,
+            117,
+            128
+          ]
+        },
+        {
+          "dir": "NE",
+          "frame": 6,
+          "silhouetteBottomFromOriginPx": 42.6,
+          "alphaBounds": [
+            38,
+            40,
+            109,
+            144
+          ]
+        },
+        {
+          "dir": "NE",
+          "frame": 7,
+          "silhouetteBottomFromOriginPx": 43.44,
+          "alphaBounds": [
+            52,
+            19,
+            114,
+            145
+          ]
+        },
+        {
+          "dir": "E",
+          "frame": 0,
+          "silhouetteBottomFromOriginPx": 45.95,
+          "alphaBounds": [
+            66,
+            19,
+            99,
+            148
+          ]
+        },
+        {
+          "dir": "E",
+          "frame": 1,
+          "silhouetteBottomFromOriginPx": 46.79,
+          "alphaBounds": [
+            35,
+            23,
+            94,
+            149
+          ]
+        },
+        {
+          "dir": "E",
+          "frame": 2,
+          "silhouetteBottomFromOriginPx": 25.85,
+          "alphaBounds": [
+            0,
+            52,
+            104,
+            124
+          ]
+        },
+        {
+          "dir": "E",
+          "frame": 3,
+          "silhouetteBottomFromOriginPx": 37.58,
+          "alphaBounds": [
+            0,
+            44,
+            101,
+            138
+          ]
+        },
+        {
+          "dir": "E",
+          "frame": 4,
+          "silhouetteBottomFromOriginPx": 51.81,
+          "alphaBounds": [
+            9,
+            43,
+            89,
+            155
+          ]
+        },
+        {
+          "dir": "E",
+          "frame": 5,
+          "silhouetteBottomFromOriginPx": 19.99,
+          "alphaBounds": [
+            0,
+            60,
+            118,
+            117
+          ]
+        },
+        {
+          "dir": "E",
+          "frame": 6,
+          "silhouetteBottomFromOriginPx": 44.28,
+          "alphaBounds": [
+            32,
+            28,
+            100,
+            146
+          ]
+        },
+        {
+          "dir": "E",
+          "frame": 7,
+          "silhouetteBottomFromOriginPx": 45.95,
+          "alphaBounds": [
+            66,
+            19,
+            99,
+            148
+          ]
+        },
+        {
+          "dir": "SE",
+          "frame": 0,
+          "silhouetteBottomFromOriginPx": 46.79,
+          "alphaBounds": [
+            52,
+            19,
+            114,
+            149
+          ]
+        },
+        {
+          "dir": "SE",
+          "frame": 1,
+          "silhouetteBottomFromOriginPx": 38.41,
+          "alphaBounds": [
+            39,
+            22,
+            107,
+            139
+          ]
+        },
+        {
+          "dir": "SE",
+          "frame": 2,
+          "silhouetteBottomFromOriginPx": 14.96,
+          "alphaBounds": [
+            4,
+            57,
+            101,
+            111
+          ]
+        },
+        {
+          "dir": "SE",
+          "frame": 3,
+          "silhouetteBottomFromOriginPx": 35.06,
+          "alphaBounds": [
+            13,
+            26,
+            98,
+            135
+          ]
+        },
+        {
+          "dir": "SE",
+          "frame": 4,
+          "silhouetteBottomFromOriginPx": 38.41,
+          "alphaBounds": [
+            14,
+            43,
+            96,
+            139
+          ]
+        },
+        {
+          "dir": "SE",
+          "frame": 5,
+          "silhouetteBottomFromOriginPx": 25.01,
+          "alphaBounds": [
+            13,
+            50,
+            117,
+            123
+          ]
+        },
+        {
+          "dir": "SE",
+          "frame": 6,
+          "silhouetteBottomFromOriginPx": 45.11,
+          "alphaBounds": [
+            37,
+            17,
+            109,
+            147
+          ]
+        },
+        {
+          "dir": "SE",
+          "frame": 7,
+          "silhouetteBottomFromOriginPx": 46.79,
+          "alphaBounds": [
+            52,
+            19,
+            114,
+            149
+          ]
+        }
+      ]
+    }
+  },
+  "boundsAreSilhouetteNotAnatomicalFoot": true,
+  "gameGroundPivotVerified": false,
+  "sourceRigFootJointVerified": false,
+  "footSlidingVerified": false,
+  "runningGame": false,
+  "approvalReady": false
+}

@@ -1,0 +1,56 @@
+{
+  "artMilestone": "Graphics 3A adult motion review R1",
+  "assetRole": "pinned evidence fixtures, nonactivated, no runtime registration",
+  "liveGreyhavenIntegrated": false,
+  "gameplayFootContactVerified": false,
+  "sourceFiles": [
+    {
+      "local": "knight_silver_idle.webp",
+      "ref": "c712679c50644e2af5a7b5ac41323c5ffc792a14",
+      "path": "web/assets/knights/silver_idle.webp",
+      "sha256": "828cf05dd873d0c8f35e887f5e46c35af87f084ac321977e358c985e7a2106b4",
+      "bytes": 79814,
+      "purpose": "cross-PR standalone browser review only; NOT production asset"
+    },
+    {
+      "local": "knight_silver_walk.webp",
+      "ref": "c712679c50644e2af5a7b5ac41323c5ffc792a14",
+      "path": "web/assets/knights/silver_walk.webp",
+      "sha256": "8fd421ea2d96a38a70afd9e05bec1297e90bffd8fde586a79c6a0907413adbb7",
+      "bytes": 178278,
+      "purpose": "cross-PR standalone browser review only; NOT production asset"
+    },
+    {
+      "local": "knight_silver_sprint.webp",
+      "ref": "c712679c50644e2af5a7b5ac41323c5ffc792a14",
+      "path": "web/assets/knights/silver_sprint.webp",
+      "sha256": "3ec5b5c2b6a24d8bbad3639984f2020bec0519be08f8021be30d8d20b1e9f271",
+      "bytes": 179226,
+      "purpose": "cross-PR standalone browser review only; NOT production asset"
+    },
+    {
+      "local": "knight_silver_roll.webp",
+      "ref": "c712679c50644e2af5a7b5ac41323c5ffc792a14",
+      "path": "web/assets/knights/silver_roll.webp",
+      "sha256": "31c774ac930a5cf1060640f1fc2914b02d6d5ddccd7d56591123efd098909426",
+      "bytes": 67306,
+      "purpose": "cross-PR standalone browser review only; NOT production asset"
+    },
+    {
+      "local": "greyhaven_red_lion_base.webp",
+      "ref": "c07c6e8bf1dca3941bed805e87d1fc9ff44a1dd7",
+      "path": "assets/environment/greyhaven/a224-review/red_lion_a224_base.webp",
+      "sha256": "b9d8e1888c26a63cb11b69381db81c352cb45750ea32ad3c7d567d60b2f244ff",
+      "bytes": 42650,
+      "purpose": "cross-PR standalone browser review only; NOT production asset"
+    },
+    {
+      "local": "greyhaven_red_lion_roof.webp",
+      "ref": "c07c6e8bf1dca3941bed805e87d1fc9ff44a1dd7",
+      "path": "assets/environment/greyhaven/a224-review/red_lion_a224_roof.webp",
+      "sha256": "31664c803ec73e1b89ce5a717976bb6d9de58bb69a8bb30e45e09449d030f2c9",
+      "bytes": 37406,
+      "purpose": "cross-PR standalone browser review only; NOT production asset"
+    }
+  ]
+}

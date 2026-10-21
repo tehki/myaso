@@ -1,0 +1,512 @@
+{
+  "browser": "firefox/153.4.0",
+  "browserType": "firefox",
+  "actualSourcesLoaded": 14,
+  "adultBodies": 2,
+  "clips": [
+    "idle",
+    "walk",
+    "run",
+    "roll"
+  ],
+  "directions": 8,
+  "tested": 96,
+  "passes": 96,
+  "captures": [
+    "adult_review_firefox_idle.png",
+    "adult_review_firefox_walk.png",
+    "adult_review_firefox_run.png",
+    "adult_review_firefox_roll.png",
+    "adult_review_firefox_roll_frame3.png",
+    "adult_review_firefox_roll_frame7.png"
+  ],
+  "failures": [],
+  "realSilverKnightReference": true,
+  "realGreyhavenReferenceFromUnmergedGraphicsPR": true,
+  "actualGameRuntime": false,
+  "gameplayFootContact": false,
+  "humanVisualApproval": false,
+  "releaseAllowed": false,
+  "testScenarios": [
+    {
+      "clip": "idle",
+      "direction": 0,
+      "frame": 0
+    },
+    {
+      "clip": "idle",
+      "direction": 0,
+      "frame": 2
+    },
+    {
+      "clip": "idle",
+      "direction": 0,
+      "frame": 3
+    },
+    {
+      "clip": "idle",
+      "direction": 1,
+      "frame": 0
+    },
+    {
+      "clip": "idle",
+      "direction": 1,
+      "frame": 2
+    },
+    {
+      "clip": "idle",
+      "direction": 1,
+      "frame": 3
+    },
+    {
+      "clip": "idle",
+      "direction": 2,
+      "frame": 0
+    },
+    {
+      "clip": "idle",
+      "direction": 2,
+      "frame": 2
+    },
+    {
+      "clip": "idle",
+      "direction": 2,
+      "frame": 3
+    },
+    {
+      "clip": "idle",
+      "direction": 3,
+      "frame": 0
+    },
+    {
+      "clip": "idle",
+      "direction": 3,
+      "frame": 2
+    },
+    {
+      "clip": "idle",
+      "direction": 3,
+      "frame": 3
+    },
+    {
+      "clip": "idle",
+      "direction": 4,
+      "frame": 0
+    },
+    {
+      "clip": "idle",
+      "direction": 4,
+      "frame": 2
+    },
+    {
+      "clip": "idle",
+      "direction": 4,
+      "frame": 3
+    },
+    {
+      "clip": "idle",
+      "direction": 5,
+      "frame": 0
+    },
+    {
+      "clip": "idle",
+      "direction": 5,
+      "frame": 2
+    },
+    {
+      "clip": "idle",
+      "direction": 5,
+      "frame": 3
+    },
+    {
+      "clip": "idle",
+      "direction": 6,
+      "frame": 0
+    },
+    {
+      "clip": "idle",
+      "direction": 6,
+      "frame": 2
+    },
+    {
+      "clip": "idle",
+      "direction": 6,
+      "frame": 3
+    },
+    {
+      "clip": "idle",
+      "direction": 7,
+      "frame": 0
+    },
+    {
+      "clip": "idle",
+      "direction": 7,
+      "frame": 2
+    },
+    {
+      "clip": "idle",
+      "direction": 7,
+      "frame": 3
+    },
+    {
+      "clip": "walk",
+      "direction": 0,
+      "frame": 0
+    },
+    {
+      "clip": "walk",
+      "direction": 0,
+      "frame": 2
+    },
+    {
+      "clip": "walk",
+      "direction": 0,
+      "frame": 3
+    },
+    {
+      "clip": "walk",
+      "direction": 1,
+      "frame": 0
+    },
+    {
+      "clip": "walk",
+      "direction": 1,
+      "frame": 2
+    },
+    {
+      "clip": "walk",
+      "direction": 1,
+      "frame": 3
+    },
+    {
+      "clip": "walk",
+      "direction": 2,
+      "frame": 0
+    },
+    {
+      "clip": "walk",
+      "direction": 2,
+      "frame": 2
+    },
+    {
+      "clip": "walk",
+      "direction": 2,
+      "frame": 3
+    },
+    {
+      "clip": "walk",
+      "direction": 3,
+      "frame": 0
+    },
+    {
+      "clip": "walk",
+      "direction": 3,
+      "frame": 2
+    },
+    {
+      "clip": "walk",
+      "direction": 3,
+      "frame": 3
+    },
+    {
+      "clip": "walk",
+      "direction": 4,
+      "frame": 0
+    },
+    {
+      "clip": "walk",
+      "direction": 4,
+      "frame": 2
+    },
+    {
+      "clip": "walk",
+      "direction": 4,
+      "frame": 3
+    },
+    {
+      "clip": "walk",
+      "direction": 5,
+      "frame": 0
+    },
+    {
+      "clip": "walk",
+      "direction": 5,
+      "frame": 2
+    },
+    {
+      "clip": "walk",
+      "direction": 5,
+      "frame": 3
+    },
+    {
+      "clip": "walk",
+      "direction": 6,
+      "frame": 0
+    },
+    {
+      "clip": "walk",
+      "direction": 6,
+      "frame": 2
+    },
+    {
+      "clip": "walk",
+      "direction": 6,
+      "frame": 3
+    },
+    {
+      "clip": "walk",
+      "direction": 7,
+      "frame": 0
+    },
+    {
+      "clip": "walk",
+      "direction": 7,
+      "frame": 2
+    },
+    {
+      "clip": "walk",
+      "direction": 7,
+      "frame": 3
+    },
+    {
+      "clip": "run",
+      "direction": 0,
+      "frame": 0
+    },
+    {
+      "clip": "run",
+      "direction": 0,
+      "frame": 2
+    },
+    {
+      "clip": "run",
+      "direction": 0,
+      "frame": 3
+    },
+    {
+      "clip": "run",
+      "direction": 1,
+      "frame": 0
+    },
+    {
+      "clip": "run",
+      "direction": 1,
+      "frame": 2
+    },
+    {
+      "clip": "run",
+      "direction": 1,
+      "frame": 3
+    },
+    {
+      "clip": "run",
+      "direction": 2,
+      "frame": 0
+    },
+    {
+      "clip": "run",
+      "direction": 2,
+      "frame": 2
+    },
+    {
+      "clip": "run",
+      "direction": 2,
+      "frame": 3
+    },
+    {
+      "clip": "run",
+      "direction": 3,
+      "frame": 0
+    },
+    {
+      "clip": "run",
+      "direction": 3,
+      "frame": 2
+    },
+    {
+      "clip": "run",
+      "direction": 3,
+      "frame": 3
+    },
+    {
+      "clip": "run",
+      "direction": 4,
+      "frame": 0
+    },
+    {
+      "clip": "run",
+      "direction": 4,
+      "frame": 2
+    },
+    {
+      "clip": "run",
+      "direction": 4,
+      "frame": 3
+    },
+    {
+      "clip": "run",
+      "direction": 5,
+      "frame": 0
+    },
+    {
+      "clip": "run",
+      "direction": 5,
+      "frame": 2
+    },
+    {
+      "clip": "run",
+      "direction": 5,
+      "frame": 3
+    },
+    {
+      "clip": "run",
+      "direction": 6,
+      "frame": 0
+    },
+    {
+      "clip": "run",
+      "direction": 6,
+      "frame": 2
+    },
+    {
+      "clip": "run",
+      "direction": 6,
+      "frame": 3
+    },
+    {
+      "clip": "run",
+      "direction": 7,
+      "frame": 0
+    },
+    {
+      "clip": "run",
+      "direction": 7,
+      "frame": 2
+    },
+    {
+      "clip": "run",
+      "direction": 7,
+      "frame": 3
+    },
+    {
+      "clip": "roll",
+      "direction": 0,
+      "frame": 0
+    },
+    {
+      "clip": "roll",
+      "direction": 0,
+      "frame": 4
+    },
+    {
+      "clip": "roll",
+      "direction": 0,
+      "frame": 7
+    },
+    {
+      "clip": "roll",
+      "direction": 1,
+      "frame": 0
+    },
+    {
+      "clip": "roll",
+      "direction": 1,
+      "frame": 4
+    },
+    {
+      "clip": "roll",
+      "direction": 1,
+      "frame": 7
+    },
+    {
+      "clip": "roll",
+      "direction": 2,
+      "frame": 0
+    },
+    {
+      "clip": "roll",
+      "direction": 2,
+      "frame": 4
+    },
+    {
+      "clip": "roll",
+      "direction": 2,
+      "frame": 7
+    },
+    {
+      "clip": "roll",
+      "direction": 3,
+      "frame": 0
+    },
+    {
+      "clip": "roll",
+      "direction": 3,
+      "frame": 4
+    },
+    {
+      "clip": "roll",
+      "direction": 3,
+      "frame": 7
+    },
+    {
+      "clip": "roll",
+      "direction": 4,
+      "frame": 0
+    },
+    {
+      "clip": "roll",
+      "direction": 4,
+      "frame": 4
+    },
+    {
+      "clip": "roll",
+      "direction": 4,
+      "frame": 7
+    },
+    {
+      "clip": "roll",
+      "direction": 5,
+      "frame": 0
+    },
+    {
+      "clip": "roll",
+      "direction": 5,
+      "frame": 4
+    },
+    {
+      "clip": "roll",
+      "direction": 5,
+      "frame": 7
+    },
+    {
+      "clip": "roll",
+      "direction": 6,
+      "frame": 0
+    },
+    {
+      "clip": "roll",
+      "direction": 6,
+      "frame": 4
+    },
+    {
+      "clip": "roll",
+      "direction": 6,
+      "frame": 7
+    },
+    {
+      "clip": "roll",
+      "direction": 7,
+      "frame": 0
+    },
+    {
+      "clip": "roll",
+      "direction": 7,
+      "frame": 4
+    },
+    {
+      "clip": "roll",
+      "direction": 7,
+      "frame": 7
+    }
+  ]
+}
