@@ -107,6 +107,106 @@ pub fn review_offline_quiescent_greyhaven_rack(
     })
 }
 
+/// A single LOCAL Core-journal head matched to one offline Items checkpoint.
+/// The local journal is assumed to be the selected writer, not independently
+/// verified against another machine, a signed 8C epoch or a live Items writer.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct OfflineCoreRackMatch {
+    pub offline_source: OfflineQuiescentRackReview,
+    pub local_journal_head: u64,
+    pub local_item_mutation_sequences: [u64; 4],
+}
+
+#[derive(Debug)]
+pub enum OfflineCoreRackMatchError {
+    Source(OfflineRackReviewError),
+    Journal(crate::item_journal::ItemJournalError),
+    ItemAbsentOrMoved { socket: u8 },
+    InconsistentLocalJournalHead,
+    ChangedLocalJournalHead,
+    ChangedItemRevision { socket: u8 },
+}
+
+/// Reconcile one ONE-file, historical Items read with the CURRENT exclusive
+/// Core journal's four exact physical items and exact Ground locations,
+/// without importing, minting, mutating or locking an autonomous second writer.
+/// This rejects OLD checkpoint ghosts *once Core has moved the sword*.
+/// It CANNOT reject an old-but-valid checkpoint if Core history has not
+/// changed, prove a globally fenced writer, or authenticate actor/LOS.
+/// Returned state is an offline review witness, NEVER a client ACK or live
+/// rack-occupancy source.
+pub fn review_offline_rack_against_existing_core(
+    journal: &crate::item_journal::DurableItemJournal,
+    checkpoint_path: &Path,
+    imported: &LegacyImportPreflight,
+    proposed_mapping: ProposedWorldToCentimeter,
+    caller_observation_time_ms: u64,
+) -> Result<OfflineCoreRackMatch, OfflineCoreRackMatchError> {
+    let offline_source = review_offline_quiescent_greyhaven_rack(
+        checkpoint_path,
+        imported,
+        proposed_mapping,
+        caller_observation_time_ms,
+    )
+    .map_err(OfflineCoreRackMatchError::Source)?;
+    let mut head = None;
+    let mut revs = [0_u64; 4];
+    for (index, row) in offline_source.proposed_core_swords.iter().enumerate() {
+        let (current_head, mutation) = journal
+            .checked_ground_membership(row.canonical_item, row.ground)
+            .map_err(OfflineCoreRackMatchError::Journal)?;
+        if let Some(prior) = head {
+            if prior != current_head {
+                return Err(OfflineCoreRackMatchError::InconsistentLocalJournalHead);
+            }
+        } else {
+            head = Some(current_head);
+        }
+        revs[index] = mutation.ok_or(OfflineCoreRackMatchError::ItemAbsentOrMoved {
+            socket: (index + 1) as u8,
+        })?;
+    }
+    Ok(OfflineCoreRackMatch {
+        offline_source,
+        local_journal_head: head.ok_or(OfflineCoreRackMatchError::InconsistentLocalJournalHead)?,
+        local_item_mutation_sequences: revs,
+    })
+}
+
+/// Pin an EXISTING local witness against the very same journal lineage.
+/// Strictly deny even a sword that moved away and returned to its old rack:
+/// its per-item mutation and canonical journal head have advanced (ABA).
+/// An independent/new journal with cloned bytes can imitate this witness:
+/// caller still must enforce sole globally fenced writer lineage.
+pub fn recheck_original_offline_core_rack_match(
+    journal: &crate::item_journal::DurableItemJournal,
+    originally: &OfflineCoreRackMatch,
+) -> Result<(), OfflineCoreRackMatchError> {
+    for (index, row) in originally
+        .offline_source
+        .proposed_core_swords
+        .iter()
+        .enumerate()
+    {
+        let (head, current_revision) = journal
+            .checked_ground_membership(row.canonical_item, row.ground)
+            .map_err(OfflineCoreRackMatchError::Journal)?;
+        if head != originally.local_journal_head {
+            return Err(OfflineCoreRackMatchError::ChangedLocalJournalHead);
+        }
+        let current_revision =
+            current_revision.ok_or(OfflineCoreRackMatchError::ItemAbsentOrMoved {
+                socket: (index + 1) as u8,
+            })?;
+        if current_revision != originally.local_item_mutation_sequences[index] {
+            return Err(OfflineCoreRackMatchError::ChangedItemRevision {
+                socket: (index + 1) as u8,
+            });
+        }
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -377,5 +477,146 @@ mod tests {
             review_offline_quiescent_greyhaven_rack(&corrupt, &f.imported, mapping(), 2),
             Err(OfflineRackReviewError::Checkpoint(CheckpointError::Corrupt))
         ));
+    }
+
+    #[test]
+    fn core_journal_reconciliation_denies_old_items_ghost_and_prior_aba_revision() {
+        use crate::{
+            alpha_bound_pickup::ProposedRackPickupEnvelope,
+            identity::CharacterId,
+            item_journal::DurableItemJournal,
+            item_ownership::{ItemLocation, OwnershipOp, OwnershipTxnId},
+        };
+        let f = fixture();
+        let root = f.dir.join("one-core-writer");
+        let mut journal = DurableItemJournal::open(&root).unwrap();
+        let offline =
+            review_offline_quiescent_greyhaven_rack(&f.checkpoint, &f.imported, mapping(), 2)
+                .unwrap();
+
+        // The checkpoint alone can NEVER mint these swords. The fixture
+        // deliberately stages the four Core items through the same sole
+        // writer, to test subsequent READ-ONLY concordance.
+        assert!(matches!(
+            review_offline_rack_against_existing_core(
+                &journal,
+                &f.checkpoint,
+                &f.imported,
+                mapping(),
+                2
+            ),
+            Err(OfflineCoreRackMatchError::ItemAbsentOrMoved { socket: 1 })
+        ));
+        let create: Vec<_> = offline
+            .proposed_core_swords
+            .iter()
+            .map(|row| OwnershipOp::Create {
+                item: row.canonical_item,
+                at: row.ground,
+            })
+            .collect();
+        let txn = |n| OwnershipTxnId::new(n).unwrap();
+        journal.apply(txn(10), &create).unwrap();
+
+        let baseline = review_offline_rack_against_existing_core(
+            &journal,
+            &f.checkpoint,
+            &f.imported,
+            mapping(),
+            2,
+        )
+        .unwrap();
+        assert_eq!(baseline.local_journal_head, 1);
+        assert_eq!(baseline.local_item_mutation_sequences, [1; 4]);
+        recheck_original_offline_core_rack_match(&journal, &baseline).unwrap();
+
+        // Core V2 commits the EXACT real imported sword into another owner.
+        // The unchanged Items checkpoint is still checksum-valid and STILL
+        // says 4/4: this read-only cross-check must deny its ground ghost.
+        let sword = baseline.offline_source.proposed_core_swords[0];
+        let actor = CharacterId::new(123).unwrap();
+        let equipped = ItemLocation::Equipped {
+            character_id: actor,
+            slot: 0,
+        };
+        journal
+            .apply_proposed_bound_rack_pickup(
+                txn(11),
+                OwnershipOp::Move {
+                    item: sword.canonical_item,
+                    from: sword.ground,
+                    to: equipped,
+                },
+                ProposedRackPickupEnvelope {
+                    rack_socket: 1,
+                    ground_entity: sword.canonical_ground_entity,
+                    character: actor,
+                    session_generation: 1,
+                    world_authority_epoch: 1,
+                    completed_world_tick: 1,
+                    world_map_revision: 1,
+                    observed_item_mutation_sequence: 1,
+                },
+            )
+            .unwrap();
+        assert_eq!(journal.item_count(), 4);
+        assert_eq!(journal.location(sword.canonical_item), Some(equipped));
+        assert!(
+            review_offline_quiescent_greyhaven_rack(&f.checkpoint, &f.imported, mapping(), 3)
+                .is_ok(),
+            "old Items checkpoint remains valid, but is not current"
+        );
+        assert!(matches!(
+            review_offline_rack_against_existing_core(
+                &journal,
+                &f.checkpoint,
+                &f.imported,
+                mapping(),
+                3
+            ),
+            Err(OfflineCoreRackMatchError::ItemAbsentOrMoved { socket: 1 })
+        ));
+        assert!(matches!(
+            recheck_original_offline_core_rack_match(&journal, &baseline),
+            Err(OfflineCoreRackMatchError::ChangedLocalJournalHead)
+        ));
+
+        // ABA: original physical sword comes back to the EXACT same point.
+        // A new offline matching review can describe current local state,
+        // but must never resurrect the previously pinned pickup watermark.
+        journal
+            .apply(
+                txn(12),
+                &[OwnershipOp::Move {
+                    item: sword.canonical_item,
+                    from: equipped,
+                    to: sword.ground,
+                }],
+            )
+            .unwrap();
+        let later = review_offline_rack_against_existing_core(
+            &journal,
+            &f.checkpoint,
+            &f.imported,
+            mapping(),
+            4,
+        )
+        .unwrap();
+        assert_eq!(later.local_journal_head, 3);
+        assert_eq!(later.local_item_mutation_sequences, [3, 1, 1, 1]);
+        assert_eq!(journal.item_count(), 4);
+        assert!(matches!(
+            recheck_original_offline_core_rack_match(&journal, &baseline),
+            Err(OfflineCoreRackMatchError::ChangedLocalJournalHead)
+        ));
+        drop(journal);
+        let reopened = DurableItemJournal::open(&root).unwrap();
+        assert!(matches!(
+            recheck_original_offline_core_rack_match(&reopened, &baseline),
+            Err(OfflineCoreRackMatchError::ChangedLocalJournalHead)
+        ));
+        recheck_original_offline_core_rack_match(&reopened, &later).unwrap();
+        assert_eq!(reopened.location(sword.canonical_item), Some(sword.ground));
+        assert_eq!(reopened.item_count(), 4);
     }
 }
