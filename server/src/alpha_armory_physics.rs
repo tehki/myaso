@@ -13,14 +13,14 @@ const MAX_AUTHORITY_COUNTER: u64 = i64::MAX as u64;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct GeometryFence {
-    pub zone_id: u32,
+    pub zone_id: u64,
     pub worker_epoch: u64,
     pub map_revision: u64,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct WorldPoint {
-    pub zone_id: u32,
+    pub zone_id: u64,
     pub x: f32,
     pub y: f32,
 }
@@ -119,7 +119,8 @@ pub fn verify_pickup_geometry(
     expected_current: GeometryFence,
     reach: f32,
 ) -> Result<(), PickupGeometryReject> {
-    if expected_current.worker_epoch == 0
+    if expected_current.zone_id > MAX_AUTHORITY_COUNTER
+        || expected_current.worker_epoch == 0
         || expected_current.worker_epoch > MAX_AUTHORITY_COUNTER
         || expected_current.map_revision > MAX_AUTHORITY_COUNTER
         || window.fence != expected_current
@@ -527,6 +528,96 @@ mod tests {
             verify_pickup_geometry(closed_origin, closed_destination, &fixture, CURRENT, 96.0,),
             Err(PickupGeometryReject::Occluded),
             "the solid wall beside the gate must block pickup line of sight"
+        );
+    }
+
+    #[test]
+    fn core_8c_u64_zone_key_is_not_truncated_to_32_bits() {
+        // Core C4d #393 stores ZoneKey(NonZeroU64) in a positive signed
+        // 63-bit SQL bigint, not an ephemeral u32 network actor ID.
+        let high_zone = u64::from(u32::MAX) + 17;
+        let current = GeometryFence {
+            zone_id: high_zone,
+            worker_epoch: 11,
+            map_revision: 23,
+        };
+        let trusted_actor = WorldPoint {
+            zone_id: high_zone,
+            ..actor()
+        };
+        let trusted_sword = WorldPoint {
+            zone_id: high_zone,
+            ..sword()
+        };
+        let fixture = GeometryWindow {
+            fence: current,
+            ..window(&[])
+        };
+        assert_eq!(
+            verify_pickup_geometry(trusted_actor, trusted_sword, &fixture, current, 64.0),
+            Ok(())
+        );
+
+        // A stale u32-truncated/low-bits session must NOT match Core's zone.
+        let truncated_actor = WorldPoint {
+            zone_id: high_zone & u64::from(u32::MAX),
+            ..trusted_actor
+        };
+        assert_eq!(
+            verify_pickup_geometry(truncated_actor, trusted_sword, &fixture, current, 64.0),
+            Err(PickupGeometryReject::StaleAuthority)
+        );
+    }
+
+    #[test]
+    fn core_8c_signed_bigint_zone_overflow_is_fail_closed() {
+        // Core C4d's zone SQL binding rejects >i64::MAX. The pure Physics
+        // geometry primitive must reject it even if all inputs agree.
+        let invalid = GeometryFence {
+            zone_id: u64::MAX,
+            ..CURRENT
+        };
+        let fixture = GeometryWindow {
+            fence: invalid,
+            ..window(&[])
+        };
+        let trusted_actor = WorldPoint {
+            zone_id: invalid.zone_id,
+            ..actor()
+        };
+        let trusted_sword = WorldPoint {
+            zone_id: invalid.zone_id,
+            ..sword()
+        };
+        assert_eq!(
+            verify_pickup_geometry(trusted_actor, trusted_sword, &fixture, invalid, 64.0),
+            Err(PickupGeometryReject::StaleAuthority)
+        );
+        let largest = GeometryFence {
+            zone_id: i64::MAX as u64,
+            ..CURRENT
+        };
+        let largest_actor = WorldPoint {
+            zone_id: largest.zone_id,
+            ..actor()
+        };
+        let largest_sword = WorldPoint {
+            zone_id: largest.zone_id,
+            ..sword()
+        };
+        let largest_window = GeometryWindow {
+            fence: largest,
+            ..window(&[])
+        };
+        assert_eq!(
+            verify_pickup_geometry(
+                largest_actor,
+                largest_sword,
+                &largest_window,
+                largest,
+                64.0,
+            ),
+            Ok(())
         );
     }
 
