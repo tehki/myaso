@@ -1,12 +1,26 @@
+#[cfg(test)]
+mod alpha_armory_ownership_tests;
+#[cfg(test)]
+mod alpha_bound_journal_tests;
 use std::sync::{
     atomic::{AtomicUsize, Ordering},
     Arc,
 };
 
+pub mod alpha_armory_mapping_preflight;
 pub mod alpha_armory_physics;
+pub mod alpha_bound_pickup;
+pub mod alpha_current_rack_bindings;
 pub mod alpha_greyhaven_geometry;
+pub mod alpha_mainhand_snapshot;
+pub mod alpha_pickup_ack_proof;
+pub mod alpha_quiescent_rack_handoff;
 pub mod character_identity;
+pub mod identity;
+pub mod item_journal;
+pub mod item_ownership;
 pub mod kill_event;
+pub mod legacy_gear_preflight;
 pub mod loot;
 pub mod loot_persistence;
 pub mod loot_transaction;
@@ -21,6 +35,7 @@ pub mod reliable;
 pub mod simulation;
 pub mod snapshot;
 pub mod zone;
+pub mod zone_item_transfer;
 
 pub const PROTOCOL_VERSION: u8 = 1;
 pub const INPUT_PACKET_TYPE: u8 = 1;

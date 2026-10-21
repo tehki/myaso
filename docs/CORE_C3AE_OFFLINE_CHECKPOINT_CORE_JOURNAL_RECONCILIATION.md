@@ -1,0 +1,20 @@
+# Core 8B C3ae — read-only cross-check of offline rack snapshot against current local Core journal
+
+**myaso.io — Moon Games First Playable Alpha, P0; DRAFT, NOT LIVE.**
+Direct additive child of Core+Items [#642](https://github.com/tehki/myaso/pull/642), itself stacked on two-parent #629. No production Core writer, Items checkpoint writer, public packet, network, UI/World, Physics, Combat or CI workflow was modified.
+
+## Verified in code
+
+- `review_offline_rack_against_existing_core` first reads ONE bounded valid `MYASOL03` snapshot and derives all four genuine physical sword IDs and distinct ground entity IDs via the existing #642 collision-checked typed Core `u128` mapping. It **does not import, create, move, drop or grant any item**.
+- It then reads each of those exact canonical swords at its exact approved-*candidate* Ground location from the currently opened **same local exclusive Core journal** using `checked_ground_membership`. It rejects any item not previously imported/minted inside that existing journal, any item moved/equipped elsewhere, any poisoned journal, inconsistent local head or absent per-item mutation. All four results carry one committed local journal sequence and four committed per-item mutation revisions.
+- `recheck_original_offline_core_rack_match` compares a previously pinned local journal head and per-item mutation revisions against the SAME local journal lineage, rejecting a changed head or mutation. A sword moved Ground→MainHand→Ground can have the same Ground location again, but its old pinned read is *not* resurrected: higher canonical head and mutation watermark deny. This second check reads **no Items checkpoint**, writes nothing and cannot be used alone to certify physical ground/entity freshness.
+
+## Executable negative acceptance
+
+An actual Items-domain quiescent checkpoint describes four real swords. A synthetic fixture *explicitly* creates the four typed physical items in the Core journal through that existing sole local writer. The read-only reconciliation then sees 4/4 at journal sequence1. Core's own fully durable C3z V2 atomic Ground→MainHand move commits sword1 as player MainHand, while the original checksum-valid Items checkpoint still reports that physical sword Ground 4/4. The **raw offline checkpoint reader still accepts** the old file (intentionally); the **cross-journal read-only reconciler now rejects** socket1 as absent at Ground. A valid Core drop of exactly that same original sword back to its exact same authored rack allows a NEW read-only current-local review, but **the old pinned witness is rejected**, including after a real close/reopen of the sole journal. No ghost sword is minted; journal item_count remains four.
+
+## Hard boundary
+
+This improves **relative consistency with an already-selected local Core journal** only. It does NOT establish fresh/anti-rollback Items checkpoints, signed/current world epoch, approved coordinate scale, complete dynamic Physics LOS, authenticated 8A session, global distributed epoch fencing, actual subscriber ACK, active Items writer quiescence or production migration. An old checksum-valid file could still pass if Core history also matches (for example before its first pickup), or if a cloned/restored journal lineage is supplied. A current local Core journal cannot stop a separately active Items writer: the real durable split-brain counterexample in parent #629 remains. **Do not use these views as live 4/4 racks, authoritative item feeds or pickup acceptance.**
+
+**Local source:** Serj Linux Rust1.89, new focused `core_journal_reconciliation_denies_old_items_ghost_and_prior_aba_revision` PASS, 4/4 module-focused tests PASS, combined **242/242** Rust library PASS (4 intentional subprocess helpers ignored). Full protected exact-head quality, strict Clippy, rustfmt and clean worktree must pass before integration review. Main Orchestrator [#360](https://github.com/tehki/myaso/issues/360) decides global writer, migration and release. **No live writer, DB migration, merge to main or deployment.**
