@@ -79,6 +79,39 @@ serialization**, not synthetic sequential authorization.
 These are **two additional post-restart races**, not two independent primary
 crashes. Both callers use real `psql` connections to the same disposable
 database. There is no test-only bypass to the SQL fencing function.
+
+## C4d concurrency deadlock correction (review required)
+
+The first live two-client test failed on the original C4d implementation
+with a **real PostgreSQL deadlock**. Both distinct mutation IDs insert a
+receipt referencing the entity. Its foreign-key check takes a KEY SHARE
+lock on that same entity. Two concurrent callers can each hold KEY SHARE,
+then try to promote their own lock to FOR UPDATE, producing a cycle.
+The failed CI log showed one process waiting on the other while both
+were locking a tuple in `core_zone.entities`.
+
+The narrow `002_fenced_world_mutations.sql` correction changes only the
+authority entity-row SELECT in `commit_world_mutation` to
+`FOR NO KEY UPDATE`. It is compatible with the preexisting foreign-key
+KEY SHARE locks but mutually excludes other NO KEY UPDATE or UPDATE
+writers. The authoritative owner, epoch and revision are **still checked
+inside the same SQL transaction and under a conflicting writer lock**.
+The primary key is never changed by this operation. Neither the mutation
+inputs/results nor receipt/outbox schema are changed.
+
+This source SQL is a reference migration, not an automatic upgrade of an
+already-running database. Existing deployments would require an approved
+controlled reapplication/replacement of the stored function. A broader
+lock-mode audit is still required for handoff/other item-ledger paths;
+**this regression does not claim to qualify all lock interactions**.
+
+Regression evidence: initial exact-head C4h [run #39518862247]
+(https://github.com/tehki/myaso/actions/runs/39518862247) exposed the
+deadlock. Corrected exact-head [run #39519078738]
+(https://github.com/tehki/myaso/actions/runs/39519078738) passes both
+post-crash real-client races, and separately the C4d world mutation and
+C4g client-crash workflows pass on the same head.
+
 This proves that each transaction executed but had not committed before
 PostgreSQL is killed; there is no fixed-delay guess.
 
