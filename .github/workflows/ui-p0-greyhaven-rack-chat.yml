@@ -1,0 +1,38 @@
+name: UI P0 real Greyhaven Blacksmith rack and local chat
+
+on:
+  pull_request:
+    paths:
+      - "scripts/alpha_p0_four_native_greyhaven_rack_chat.mjs"
+      - ".github/workflows/ui-p0-greyhaven-rack-chat.yml"
+      - "web/online-game.mjs"
+      - "src/browser/armory-optin-live-rack.mjs"
+      - "src/browser/local-chat.mjs"
+      - "server/src/chat.rs"
+      - "server/src/main.rs"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  four-real-world-browsers:
+    name: Four real browsers render original empty rack and deliver proximity chat
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout exact integrated PR
+        uses: actions/checkout@v4
+      - name: Check exact native-browser acceptance source
+        run: |
+          node --check scripts/alpha_p0_four_native_greyhaven_rack_chat.mjs
+          chromedriver --version
+          geckodriver --version
+          google-chrome --version
+          firefox --version
+      - name: Build actual Rust Greyhaven and Chat C1 server
+        run: cargo build --locked --manifest-path server/Cargo.toml --bin myaso-server
+      - name: Four real Chrome Firefox Greyhaven clients with rack and chat
+        env:
+          C1_BROWSER_MATRIX: chrome,firefox,chrome,firefox
+        run: timeout --signal=TERM --kill-after=5s 180s node scripts/alpha_p0_four_native_greyhaven_rack_chat.mjs
