@@ -12,7 +12,12 @@ pub const GRID_STEP: i32 = 5;
 const MAX_WINDOW_CELLS: usize = 10_201;
 const MAX_BLOCKERS: usize = 48;
 const MAX_AXIS_CELLS: i32 = 101;
-const AGENT_CLEARANCE: i32 = 8;
+// Preserve the isolated legacy pilot's 8-unit obstacle buffer; it is not
+// sufficient evidence for a collidable shared-world actor.
+const PILOT_AGENT_CLEARANCE: i32 = 8;
+// Core 8C's candidate Greyhaven player routes conservatively use radius 18.
+// Future Sentinel body size must be agreed with Physics before live activation.
+const ZONE_AGENT_CLEARANCE: i32 = 18;
 const COLLISION_MANIFEST_VERSION: u16 = 1;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -40,12 +45,12 @@ pub struct Collider {
 }
 
 impl Collider {
-    fn expanded_contains(self, x: i32, y: i32) -> bool {
+    fn expanded_contains(self, x: i32, y: i32, clearance: i32) -> bool {
         // Constructor validates 32-bit coordinate/width constraints before use.
-        x >= self.x - AGENT_CLEARANCE
-            && x <= self.x + self.width + AGENT_CLEARANCE
-            && y >= self.y - AGENT_CLEARANCE
-            && y <= self.y + self.height + AGENT_CLEARANCE
+        x >= self.x - clearance
+            && x <= self.x + self.width + clearance
+            && y >= self.y - clearance
+            && y <= self.y + self.height + clearance
     }
 }
 
@@ -67,6 +72,7 @@ pub enum NavigationError {
 pub struct CollisionWindow {
     space: NavigationSpace,
     revision: u32,
+    clearance: i32,
     bounds: NavBounds,
     blockers: Vec<Collider>,
     width: usize,
@@ -81,6 +87,10 @@ impl CollisionWindow {
         bounds: NavBounds,
         blockers: &[Collider],
     ) -> Result<Self, NavigationError> {
+        let clearance = match space {
+            NavigationSpace::Pilot => PILOT_AGENT_CLEARANCE,
+            NavigationSpace::Zone(_) => ZONE_AGENT_CLEARANCE,
+        };
         if version != COLLISION_MANIFEST_VERSION {
             return Err(NavigationError::InvalidVersion);
         }
@@ -110,10 +120,10 @@ impl CollisionWindow {
         if let NavigationSpace::Zone(zone) = space {
             let (max_zone_x, max_zone_y) = zone.bounds();
             // Leave authoritative fighter/NPC safety margin at world edges.
-            if bounds.min_x < 18
-                || bounds.min_y < 18
-                || bounds.max_x > max_zone_x as i32 - 18
-                || bounds.max_y > max_zone_y as i32 - 18
+            if bounds.min_x < clearance
+                || bounds.min_y < clearance
+                || bounds.max_x > max_zone_x as i32 - clearance
+                || bounds.max_y > max_zone_y as i32 - clearance
             {
                 return Err(NavigationError::InvalidBounds);
             }
@@ -143,6 +153,7 @@ impl CollisionWindow {
         Ok(Self {
             space,
             revision,
+            clearance,
             bounds,
             blockers: blockers.to_vec(),
             width: cells_x as usize,
@@ -178,6 +189,9 @@ impl CollisionWindow {
     pub fn revision(&self) -> u32 {
         self.revision
     }
+    pub fn clearance(&self) -> i32 {
+        self.clearance
+    }
 
     fn grid_index(&self, x: i32, y: i32) -> Option<usize> {
         if x < self.bounds.min_x
@@ -203,7 +217,7 @@ impl CollisionWindow {
     pub fn contains_obstacle(&self, x: i32, y: i32) -> bool {
         self.blockers
             .iter()
-            .any(|barrier| barrier.expanded_contains(x, y))
+            .any(|barrier| barrier.expanded_contains(x, y, self.clearance))
     }
 
     pub fn plan(
@@ -429,6 +443,25 @@ mod tests {
         assert!(path
             .iter()
             .all(|p| p.0 >= 4100 && p.0 <= 4500 && p.1 >= 3900 && p.1 <= 4200));
+    }
+
+    #[test]
+    fn future_zone_navigation_uses_conservative_core_clearance_not_pilot_buffer() {
+        let zone = trusted();
+        let pilot = CollisionWindow::pilot(BOUNDS, &[BLOCKER]).unwrap();
+        assert_eq!(zone.clearance(), 18);
+        assert_eq!(pilot.clearance(), 8);
+        // 15 units west of a known wall is acceptable to the pilot's
+        // legacy 8-unit sprite test, but not to a radius-18 world actor.
+        let near_wall = (4275, 4025);
+        assert!(zone.contains_obstacle(near_wall.0, near_wall.1));
+        assert!(!pilot.contains_obstacle(near_wall.0, near_wall.1));
+        assert_eq!(
+            zone.plan(near_wall, (4390, 4025)).unwrap_err(),
+            NavigationError::BlockedEndpoint
+        );
+        assert!(pilot.plan(near_wall, (4390, 4025)).is_ok());
+        // This typed future-zone constraint is not live Greyhaven authority.
     }
 
     #[test]
