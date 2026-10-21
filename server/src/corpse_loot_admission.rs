@@ -21,10 +21,7 @@ use std::num::{NonZeroU128, NonZeroU64};
 pub trait TrustedCorpseLootVerifier {
     type Claim;
 
-    fn verify_loot(
-        &self,
-        claim: &Self::Claim,
-    ) -> Result<VerifiedCorpseLoot, LootAdmissionError>;
+    fn verify_loot(&self, claim: &Self::Claim) -> Result<VerifiedCorpseLoot, LootAdmissionError>;
 }
 
 /// A claim issued by a trusted admission adapter, not by the HTTP handler.
@@ -450,7 +447,10 @@ mod tests {
             NonZeroU64::new(1).unwrap(),
             b"payload",
         );
-        assert!(matches!(result, Err(LootAdmissionError::ConflictingOperationId)));
+        assert!(matches!(
+            result,
+            Err(LootAdmissionError::ConflictingOperationId)
+        ));
         let result = CorpseLootCommand::admit(
             &TestWorkerVerifier,
             &worker,
@@ -463,7 +463,10 @@ mod tests {
             NonZeroU64::new(1).unwrap(),
             b"payload",
         );
-        assert!(matches!(result, Err(LootAdmissionError::ItemRevisionOutOfRange)));
+        assert!(matches!(
+            result,
+            Err(LootAdmissionError::ItemRevisionOutOfRange)
+        ));
         let result = CorpseLootCommand::admit(
             &TestWorkerVerifier,
             &worker,
@@ -497,9 +500,7 @@ mod tests {
             (5, 3, 3, 0),
         ] {
             assert!(matches!(
-                CorpseLootReceipt::from_sql(
-                    invalid.0, invalid.1, invalid.2, invalid.3, false
-                ),
+                CorpseLootReceipt::from_sql(invalid.0, invalid.1, invalid.2, invalid.3, false),
                 Err(LootAdmissionError::World(
                     WorldMutationContractError::InvalidReceipt
                 ))
