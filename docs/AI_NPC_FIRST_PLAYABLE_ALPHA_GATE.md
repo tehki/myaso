@@ -178,3 +178,36 @@ not solve Core 8A's one-reader/type-allocation integration blocker.
 Real WebTransport sword ownership/receipt acceptance is mandatory
 and remains separate. First Playable still ships with all three
 NPC opt-in flags unset.
+
+## P0 NPC pilot roster lifecycle and stale async chat safety
+
+The optional browser pilot now tracks a **local roster generation**.
+Whenever the server advertises a replacement or empty NPC roster,
+the pilot clears previous conversation text and unsent drafts and
+invalidates any awaiting local send completion from the old roster.
+An old \`onSend\` success or exception can no longer append stale
+transcript/error text or erase a newer draft after roster replacement.
+New rosters re-enable the submit control cleanly, while empty
+rosters hide it, blur NPC input, and restore the arena canvas focus
+when the NPC text input held focus. Hidden pilot UI also discards
+unsolicited reply text and cannot invoke the focus callback.
+
+This improves First Playable isolation without touching authoritative
+fighter input, movement, packet types, item ownership, connection
+transport, or Combat. The test executes the **real NPC panel module**
+under an isolated DOM fixture with controlled delayed send promises,
+rejected in-flight messages, and roster revocation/reinstatement.
+The existing default-off roster test continues to pass.
+
+**Truth boundary:** the game currently lacks a Core-owned
+disconnect/reconnect event wired to \`npcUI.setRoster([])\`;
+automatic teardown on actual transport loss is therefore **not
+proved**. The reliable NPC response frame has no request/session
+epoch, so a stale reply arriving *after a new roster is active*
+cannot be distinguished by this UI alone. Such transport-level
+correlation and cleanup belong to Core 8A's future single
+session-reader/dispatcher contract. Do not treat this pilot UI
+hardening as a substitute for authentic independent-host browser,
+Items ACK, real sword pickup, or reconnect acceptance.
+
+Keep the experimental pilot disabled for First Playable Alpha.

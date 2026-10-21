@@ -39,6 +39,9 @@ export function createNpcChatPanel({ onSend, onFocus }) {
   let lastWorksiteRevision = null;
   let lastStateTick = null;
   let lastSuppliesTick = null;
+  // Invalidates in-flight chat send completions after roster replacement.
+  // Old drafts and conversation text must not survive a revoked pilot roster.
+  let rosterGeneration = 0;
 
   function appendLine(text) {
     const li = document.createElement("li");
@@ -49,7 +52,16 @@ export function createNpcChatPanel({ onSend, onFocus }) {
     history.scrollTop = history.scrollHeight;
   }
   function setRoster(entries) {
+    rosterGeneration += 1;
     npcs = entries;
+    history.replaceChildren();
+    input.value = "";
+    submit.disabled = false;
+    if (!entries.length) {
+      const wasFocused = document.activeElement === input;
+      input.blur();
+      if (wasFocused) document.querySelector("#arena")?.focus();
+    }
     roster.replaceChildren();
     for (const npc of entries) {
       const option = document.createElement("option");
@@ -99,23 +111,31 @@ export function createNpcChatPanel({ onSend, onFocus }) {
   }
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
+    if (panel.hidden) return;
     const text = input.value.trim();
     if (!text) return;
     const id = Number(roster.value);
     const target = npcs.find((npc) => npc.id === id);
     if (!target) return;
+    const requestGeneration = rosterGeneration;
     submit.disabled = true;
     try {
       await onSend(id, text);
+      if (requestGeneration !== rosterGeneration || panel.hidden) return;
       appendLine(`You → ${target.name}: ${text}`);
-      input.value = "";
+      // Preserve a newer draft entered while the send was pending.
+      if (input.value.trim() === text) input.value = "";
     } catch {
-      appendLine("Unable to send your message.");
+      if (requestGeneration === rosterGeneration && !panel.hidden) {
+        appendLine("Unable to send your message.");
+      }
     } finally {
-      submit.disabled = false;
+      if (requestGeneration === rosterGeneration) submit.disabled = false;
     }
   });
-  input.addEventListener("focus", onFocus);
+  input.addEventListener("focus", () => {
+    if (!panel.hidden) onFocus();
+  });
   input.addEventListener("keydown", (event) => {
     event.stopPropagation();
     if (event.key === "Escape") {
@@ -148,7 +168,9 @@ export function createNpcChatPanel({ onSend, onFocus }) {
     setRoster,
     updateState,
     updateSupplies,
-    receive({ text }) { appendLine(text); },
+    receive({ text }) {
+      if (!panel.hidden) appendLine(text);
+    },
     focus() { if (!panel.hidden) { onFocus(); input.focus(); } },
     get enabled() { return !panel.hidden; },
   };

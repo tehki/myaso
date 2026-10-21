@@ -35,7 +35,15 @@ class Element {
     const index = this.parent?.children.indexOf(this);
     if (index >= 0) this.parent.children.splice(index, 1);
   }
-  focus() { this.focused = true; }
+  focus() {
+    if (globalThis.document.activeElement) globalThis.document.activeElement.focused = false;
+    globalThis.document.activeElement = this;
+    this.focused = true;
+  }
+  blur() {
+    if (globalThis.document.activeElement === this) globalThis.document.activeElement = null;
+    this.focused = false;
+  }
   get firstElementChild() { return this.children[0] ?? null; }
   get options() { return this.children; }
   get scrollHeight() { return this.children.length; }
@@ -46,6 +54,7 @@ function installDocument() {
   const canvas = new Element("canvas");
   const original = globalThis.document;
   globalThis.document = {
+    activeElement: null,
     createElement(tag) { return new Element(tag); },
     querySelector(selector) {
       if (selector === ".arena-wrap") return stage;
@@ -123,7 +132,78 @@ test("P0 NPC-off alpha has no accessible conversation or send until valid pilot 
     npc.focus();
     assert.equal(sent.length, 1);
     assert.equal(divertedFocus, 1);
-    assert.ok(history.children.length >= 1);
+    assert.equal(history.children.length, 0, "revoked pilot transcript is cleared");
+    assert.equal(globalThis.document.activeElement?.tag, "canvas",
+      "revoking the focused NPC roster restores gameplay input focus");
+  } finally {
+    restore();
+  }
+});
+
+test("pilot roster generation fences stale async sends and recycled UI state", async () => {
+  const { stage, restore } = installDocument();
+  try {
+    const pending = [];
+    const npc = createNpcChatPanel({
+      onSend(id, text) {
+        return new Promise((resolve, reject) => pending.push({ id, text, resolve, reject }));
+      },
+      onFocus() {},
+    });
+    const panel = stage.children[0];
+    const [,, roster,,, history, form] = panel.children;
+    const [input, sendButton] = form.children;
+    const submit = () => form.listeners.get("submit")({ preventDefault() {} });
+    const rowan = [{ id: 3, x: 155, y: 205, name: "Rowan", role: "Guard" }];
+    const tomas = [{ id: 5, x: 270, y: 220, name: "Tomas", role: "Laborer" }];
+
+    npc.setRoster(rowan);
+    input.value = "Old session message";
+    const first = submit();
+    assert.equal(sendButton.disabled, true);
+    assert.deepEqual(pending.map(({ id, text }) => [id, text]), [[3, "Old session message"]]);
+
+    npc.setRoster([]);
+    assert.equal(panel.hidden, true);
+    assert.equal(sendButton.disabled, false);
+    assert.equal(input.value, "");
+    assert.equal(history.children.length, 0);
+    npc.receive({ text: "Late reply for revoked session" });
+    assert.equal(history.children.length, 0);
+
+    npc.setRoster(tomas);
+    assert.equal(roster.value, "5");
+    input.value = "New session draft";
+    pending[0].resolve();
+    await first;
+    assert.equal(input.value, "New session draft",
+      "an old promise cannot erase a new session's typed text");
+    assert.equal(history.children.length, 0,
+      "an old successful send cannot appear under a newer NPC roster");
+    assert.equal(sendButton.disabled, false);
+
+    const second = submit();
+    assert.deepEqual(pending.at(-1) && [pending.at(-1).id, pending.at(-1).text],
+      [5, "New session draft"]);
+    pending.at(-1).resolve();
+    await second;
+    assert.equal(history.children.length, 1);
+    assert.match(history.children[0].textContent, /Tomas: New session draft/);
+    assert.equal(input.value, "");
+
+    input.value = "Pending old failure";
+    const third = submit();
+    assert.equal(sendButton.disabled, true);
+    npc.setRoster([]);
+    npc.setRoster(rowan);
+    pending.at(-1).reject(new Error("Connection closed"));
+    await third;
+    assert.equal(sendButton.disabled, false);
+    assert.equal(history.children.length, 0,
+      "an old failed request cannot leak error text into a new roster");
+    npc.receive({ text: "Current uncorrelated server response" });
+    assert.equal(history.children.length, 1,
+      "server replies after a newly active roster are still possible without a wire request epoch");
   } finally {
     restore();
   }
