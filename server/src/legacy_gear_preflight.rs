@@ -23,14 +23,6 @@ pub enum LegacyDomain {
     Operation,
 }
 impl LegacyDomain {
-    const ALL: [Self; 5] = [
-        Self::Character,
-        Self::Item,
-        Self::Corpse,
-        Self::GroundEntity,
-        Self::Operation,
-    ];
-
     const fn index(self) -> usize {
         match self {
             Self::Character => 0,
@@ -144,6 +136,10 @@ impl LegacyItemKind {
     pub const fn is_alpha_sword(self) -> bool {
         matches!(self, Self::RustySword | Self::IronSword)
     }
+
+    pub fn require_checkpoint_kind(code: u8) -> Result<Self, LegacyMigrationError> {
+        Self::from_checkpoint_code(code).ok_or(LegacyMigrationError::InvalidKindCode)
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -155,6 +151,8 @@ pub enum LegacyMigrationError {
     CanonicalIdCollision,
     DuplicateSourceIdentity,
     UnregisteredSourceIdentity,
+    InvalidSlotCode,
+    InvalidKindCode,
 }
 
 /// A five-domain high-64 namespace proposal. Do NOT hard-code its values in
@@ -270,10 +268,8 @@ impl LegacyImportPreflight {
         legacy_character: u64,
         checkpoint_slot: u8,
     ) -> Result<Option<ItemLocation>, LegacyMigrationError> {
-        let slot = match LegacyEquipmentSlot::from_checkpoint_code(checkpoint_slot) {
-            Some(slot) => slot,
-            None => return Ok(None),
-        };
+        let slot = LegacyEquipmentSlot::from_checkpoint_code(checkpoint_slot)
+            .ok_or(LegacyMigrationError::InvalidSlotCode)?;
         Ok(Some(ItemLocation::Equipped {
             character_id: self.core_character(legacy_character)?,
             slot: slot.proposed_core_slot(),
@@ -379,7 +375,10 @@ mod tests {
                 slot: 0,
             })
         );
-        assert_eq!(m.proposed_equipped(17, 255), Ok(None));
+        assert_eq!(
+            m.proposed_equipped(17, 255),
+            Err(LegacyMigrationError::InvalidSlotCode)
+        );
     }
 
     #[test]
@@ -389,6 +388,10 @@ mod tests {
             assert_eq!(kind.checkpoint_code(), code);
             assert_eq!(kind.is_alpha_sword(), code == 0 || code == 8);
         }
+        assert_eq!(
+            LegacyItemKind::require_checkpoint_kind(14),
+            Err(LegacyMigrationError::InvalidKindCode)
+        );
         assert!(LegacyItemKind::from_checkpoint_code(14).is_none());
         assert!(LegacyItemKind::from_checkpoint_code(255).is_none());
         assert_eq!(
