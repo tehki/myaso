@@ -78,12 +78,20 @@ try{
   await evaluate(id,[
    "if(!window.__SILVER_UI_QA__){",
    "const p=CanvasRenderingContext2D.prototype,original=p.drawImage;",
-   "const proof={draws:0,burst:0,maxBurst:0,lastTime:0,bad:0,assets:{}};",
+   "const proof={draws:0,maxFrameDraws:0,activeFrame:false,bad:0,assets:{}};",
+   "const raf=window.requestAnimationFrame;",
+   "window.requestAnimationFrame=function(callback){",
+   "return raf.call(this,function(timestamp){",
+   "const before=proof.draws;proof.activeFrame=true;",
+   "try{return callback(timestamp);}finally{",
+   "proof.activeFrame=false;",
+   "proof.maxFrameDraws=Math.max(proof.maxFrameDraws,proof.draws-before);",
+   "}",
+   "});",
+   "};",
    "p.drawImage=function(...args){",
    "const im=args[0],uri=im?.currentSrc||im?.src||'';",
-   "if(this.canvas?.id==='arena'&&uri.includes('/assets/knights/silver_')&&uri.includes('.webp')){",
-   "const t=performance.now();if(t-proof.lastTime>75)proof.burst=0;",
-   "proof.burst++;proof.lastTime=t;proof.maxBurst=Math.max(proof.maxBurst,proof.burst);",
+   "if(this.canvas?.id==='arena'&&proof.activeFrame&&uri.includes('/assets/knights/silver_')&&uri.includes('.webp')){",
    "proof.draws++;const name=uri.split('/').pop();",
    "proof.assets[name]=(proof.assets[name]||0)+1;",
    "if(im.naturalHeight!==1280||im.naturalWidth%160!==0)proof.bad++;",
@@ -103,12 +111,12 @@ try{
   const p=await poll(families[i]+" genuine Silver arena renders "+i,async()=>{
    const s=await evaluate(sessions[i],"return window.__SILVER_UI_QA__?.()");
    return {...s,ok:s?.flag==="1"&&s.roster?.length===4&&
-    s.draws>=12&&s.maxBurst>=4&&s.bad===0&&s.actualCanvas&&
+    s.draws>=12&&s.maxFrameDraws>=4&&s.bad===0&&s.actualCanvas&&
     (s.assets?.["silver_idle.webp"]||0)>0&&/Online - player #\d+/.test(s.status)};
   },30000);
   proofs.push(p);
   console.log("SILVER_AUTHENTIC_CANVAS",JSON.stringify({browser:families[i],
-   player:i+1,roster:p.roster,draws:p.draws,maxBurst:p.maxBurst,
+   player:i+1,roster:p.roster,draws:p.draws,maxFrameDraws:p.maxFrameDraws,
    idle:p.assets["silver_idle.webp"],status:p.status,bad:p.bad}));
  }
  const a=sessions[0],before=await evaluate(a,"return window.__SILVER_UI_QA__()");
@@ -127,7 +135,7 @@ try{
  assert(after.draws>before.draws);
  console.log("PREALPHA_SILVER_FOUR_NATIVE_PASS",JSON.stringify({
   browsers:families,fourRealAuthenticated:true,
-  originalSilverAtlasOnActualCanvas:true,localAndRemote:true,
+  originalSilverAtlasOnActualCanvas:true,fourKnightsInSameRaf:true,
   actualServerTicksAdvance:true,authenticWInput:true,
   realPickup:false,instantLightFixed:false,releaseApproved:false
  }));
