@@ -936,7 +936,11 @@ mod tests {
         }
         assert_eq!(swords.len(), 4);
         assert_eq!(
-            swords.iter().map(|(id, _)| *id).collect::<BTreeSet<_>>().len(),
+            swords
+                .iter()
+                .map(|(id, _)| *id)
+                .collect::<BTreeSet<_>>()
+                .len(),
             4
         );
 
@@ -1023,7 +1027,10 @@ mod tests {
         assert_eq!(equipped, swords.iter().map(|(id, _)| *id).collect());
 
         let (restored, restored_magic) = load_joint(&path).unwrap();
-        assert_eq!(restored_magic.encode_progression().unwrap(), unchanged_magic);
+        assert_eq!(
+            restored_magic.encode_progression().unwrap(),
+            unchanged_magic
+        );
         assert_eq!(restored_magic.pending_ember_intents().count(), 0);
         for id in 1_u32..=4 {
             let hero = character(u64::from(id));
