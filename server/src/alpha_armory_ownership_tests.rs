@@ -63,10 +63,11 @@ fn rack(index: i32) -> ItemLocation {
     }
 }
 fn equipped(owner: u128) -> ItemLocation {
-    // Slot 1 is fixture-only; final MainHand enum/code is a P0 #432 decision.
+    // Magic #424 MYWLD003 MainHand is slot 0, NOT OffHand's slot 1.
+    // This remains a proposed fixture mapping until P0 #432 sign-off.
     ItemLocation::Equipped {
         character_id: character(owner),
-        slot: 1,
+        slot: 0,
     }
 }
 fn inventory(owner: u128) -> ItemLocation {
