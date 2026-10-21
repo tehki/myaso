@@ -20,6 +20,7 @@ pub enum HitJournalError {
     InvalidCapacity,
     InvalidActor,
     FutureCursor,
+    NonMonotonicTick { last_tick: u32, attempted_tick: u32 },
     InvalidEvent(HitReceiptError),
 }
 
@@ -43,6 +44,7 @@ pub enum HitJournalRead {
 pub struct HitReceiptJournal {
     receipts: VecDeque<HitReceipt>,
     next_sequence: u32,
+    last_server_tick: Option<u32>,
     limit: usize,
 }
 
@@ -54,6 +56,7 @@ impl HitReceiptJournal {
         Ok(Self {
             receipts: VecDeque::with_capacity(limit),
             next_sequence: 0,
+            last_server_tick: None,
             limit,
         })
     }
@@ -78,6 +81,18 @@ impl HitReceiptJournal {
         server_tick: u32,
         events: &[CombatEvent],
     ) -> Result<usize, HitJournalError> {
+        // A server tick may be published once, including an empty event batch.
+        // Replaying an already published tick could otherwise duplicate a HIT
+        // receipt and send a second attacker's hit-confirm on reconnect.
+        // Gaps in tick numbers are valid; modulo ordering permits u32 wrap.
+        if let Some(last_tick) = self.last_server_tick {
+            if !newer32(server_tick, last_tick) {
+                return Err(HitJournalError::NonMonotonicTick {
+                    last_tick,
+                    attempted_tick: server_tick,
+                });
+            }
+        }
         let mut count = 0;
         for event in events {
             if HitReceipt::from_combat_event(0, server_tick, event)
@@ -99,6 +114,9 @@ impl HitReceiptJournal {
                 self.receipts.push_back(receipt);
             }
         }
+        // Publish this fence only after the entire tick was validated and
+        // every server-authored HIT receipt was safely journaled.
+        self.last_server_tick = Some(server_tick);
         Ok(count)
     }
 
@@ -167,6 +185,70 @@ mod tests {
             damage,
             hp,
         }
+    }
+
+    #[test]
+    fn duplicate_or_stale_world_tick_cannot_publish_duplicate_hit_receipts() {
+        let mut journal = HitReceiptJournal::new(4).unwrap();
+        assert_eq!(journal.record_tick(41, &[hit(2, 1, 34, 66)]), Ok(1));
+        let cursor_after = journal.next_cursor();
+        assert_eq!(
+            journal.record_tick(41, &[hit(2, 1, 34, 66)]),
+            Err(HitJournalError::NonMonotonicTick {
+                last_tick: 41,
+                attempted_tick: 41,
+            })
+        );
+        assert_eq!(
+            journal.record_tick(40, &[hit(2, 1, 34, 66)]),
+            Err(HitJournalError::NonMonotonicTick {
+                last_tick: 41,
+                attempted_tick: 40,
+            })
+        );
+        assert_eq!(journal.len(), 1);
+        assert_eq!(journal.next_cursor(), cursor_after);
+        assert_eq!(
+            journal.read_for_actor(2, cursor_after),
+            Ok(HitJournalRead::CaughtUp {
+                next_cursor: cursor_after
+            })
+        );
+        // Even an empty server tick consumes the one-publication tick fence.
+        assert_eq!(journal.record_tick(42, &[]), Ok(0));
+        assert_eq!(
+            journal.record_tick(42, &[hit(2, 1, 34, 66)]),
+            Err(HitJournalError::NonMonotonicTick {
+                last_tick: 42,
+                attempted_tick: 42,
+            })
+        );
+        assert_eq!(journal.len(), 1);
+        assert_eq!(journal.next_cursor(), cursor_after);
+    }
+
+    #[test]
+    fn tick_fence_wraps_forward_and_invalid_tick_does_not_advance_it() {
+        let mut journal = HitReceiptJournal::new(4).unwrap();
+        assert_eq!(journal.record_tick(u32::MAX, &[hit(2, 1, 34, 66)]), Ok(1));
+        assert_eq!(
+            journal.record_tick(0, &[hit(2, 2, 34, 66)]),
+            Err(HitJournalError::InvalidEvent(
+                HitReceiptError::InvalidActors
+            ))
+        );
+        // The invalid tick did not advance the fence, so its corrected batch
+        // can publish once and only once after the previous wrapped tick.
+        assert_eq!(journal.record_tick(0, &[hit(2, 1, 34, 32)]), Ok(1));
+        assert_eq!(
+            journal.record_tick(u32::MAX, &[]),
+            Err(HitJournalError::NonMonotonicTick {
+                last_tick: 0,
+                attempted_tick: u32::MAX,
+            })
+        );
+        assert_eq!(journal.next_cursor(), 2);
+        assert_eq!(journal.len(), 2);
     }
 
     #[test]
