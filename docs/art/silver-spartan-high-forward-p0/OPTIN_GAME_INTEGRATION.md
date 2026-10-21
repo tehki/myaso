@@ -14,7 +14,7 @@ The live client already feeds the renderer the local player after ACK reconcilia
 
 Frame limits are hard tied to observed server-reported *phase enum*, not raw input: windup permits only authentic frames 0–2; active permits only frames 3–4; recovery permits only 5–7. Within an observed phase, bounded visual interpolation starts at the first received phase sample. It **never advances to contact without server-confirmed `kickActive`**; rejected stamina/input results do not create local ghost kicks. This is **not an exact subframe synchronization protocol**: there are 20Hz snapshots, no independently validated server action-start timestamp in the renderer contract, and phase start is observed late by variable network delay. No fabricated impact/knockback/hit confirmation, change to damaged health, hitbox, input, movement or authority.
 
-The atlas is a byte-for-byte copy of the approved, source-authored **160px 8×8** PR #611 original Silver Knight high-forward kick, not a generated illustration or new Blender scene. All normal Knight assets and 120% / 100% fallback presentation are retained.
+The atlas is the original approved, source-authored **160px 8×8** PR #611 Silver Knight high-forward kick, now uniformly presentation-aligned within the same 160px tile (1.30× per frame with no clipping; original approved source remains unmodified and SHA-pinned), not a generated illustration or new Blender scene. All normal Knight assets and 120% / 100% fallback presentation are retained.
 
 ## Status and strict remaining gates
 

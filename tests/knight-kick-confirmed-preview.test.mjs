@@ -60,7 +60,7 @@ test("kick frames never jump into active/contact/recovery without confirmed acti
   assert.equal(knightKickSourceFrame(COMBAT_ACTION.idle,50),null);
   assert.equal(knightKickSourceFrame(999,50),null);
 });
-test("authenticated local and remote Silver use the same exact original atlas and phase-gated frames",()=>{
+test("mock local and remote player roles share the same original-source derived aligned atlas and phase-gated frames",()=>{
   loaded.length=0;frames.length=0;
   const r=createKnightSpriteRenderer({ImageCtor:FakeImage,
     sourceKickPreview:true,assetBase:new URL("https://test.invalid/assets/")});
@@ -96,12 +96,25 @@ test("authenticated local and remote Silver use the same exact original atlas an
     actorKind:"npc",remote:true,nowMs:2210}),false,
     "remote authenticated human cannot be misclassified as T1 NPC");
 });
-test("source atlas is the exact approved PR #611 byte-for-byte art, opt-in only",()=>{
+test("opt-in atlas uniformly scales original approved source to match existing Knight idle, no geometry change",()=>{
   const load=p=>readFileSync(new URL(p,base));
   const a=load("web/assets/knights/silver_kick.webp");
   const b=load("docs/art/silver-spartan-high-forward-p0/silver_spartan_high_forward_p0.webp");
   const hash=x=>createHash("sha256").update(x).digest("hex");
-  assert.equal(hash(a),hash(b));
+  const alignment=JSON.parse(load("docs/art/silver-spartan-high-forward-p0/game_scale_alignment.json").toString("utf8"));
+  assert.equal(hash(b),alignment.sourceSha256,"owner-approved source remains unchanged");
+  assert.equal(hash(a),alignment.alignedSha256,"only opt-in presented bitmap is re-packed");
+  assert.notEqual(hash(a),hash(b),"only viewport packing changes, not the source file");
+  assert.equal(alignment.uniformScale,1.3);
+  assert.equal(alignment.sourceUnmodified,true);
+  assert.equal(alignment.serverHitboxesUnchanged,true);
+  assert.equal(alignment.actorWorldRootUnchanged,true);
+  assert.equal(alignment.notLiveMultiplayerProof,true);
+  assert.equal(alignment.realFloorContactVerified,false);
+  assert.equal(alignment.totalFrames,64);
+  assert.ok(alignment.averageAlignedKnightHeightPx>alignment.averageSourceKnightHeightPx*1.25);
+  assert.ok(Math.abs(alignment.averageAlignedKnightHeightPx-
+    alignment.averageExistingIdleKnightHeightPx)<12);
   assert.equal(a.toString("ascii",0,4),"RIFF");
   const client=load("web/online-game.mjs").toString("utf8");
   assert.match(client,/knightQuery\.get\("knights"\) === "1"/);
