@@ -588,6 +588,216 @@ mod tests {
     }
 
     #[test]
+    fn world_p0_greyhaven_four_distinct_sockets_accept_real_ground_item_positions() {
+        use crate::loot::{GroundDrop, Point, PICKUP_REACH};
+        use crate::magic_checkpoint::load_joint;
+        use std::collections::BTreeSet;
+
+        // Test-only physical-item projection of World #493's four immutable
+        // Blacksmith sockets. The strings are World socket IDs, NOT item IDs;
+        // Core 8B must still mint and durably assign canonical item IDs.
+        let sockets = [
+            ("greyhaven-rack-1", 3740.0_f32),
+            ("greyhaven-rack-2", 3780.0),
+            ("greyhaven-rack-3", 3820.0),
+            ("greyhaven-rack-4", 3860.0),
+        ];
+        let mut world = World::new(8192.0, 8192.0);
+        let mut zones = ZoneAuthority::new();
+        let mut identity = SessionIdentityRegistry::new();
+        let mut loot = LootAuthority::new();
+        for (idx, (_, x)) in sockets.iter().enumerate() {
+            let player = (idx + 1) as u32;
+            assert!(world.add_player_at(player, *x, 4088.0, 0.0));
+            zones.register(player).unwrap();
+            identity
+                .bind_verified(lease(player), CharacterId::new(u64::from(player)).unwrap())
+                .unwrap();
+            loot.register(player).unwrap();
+            assert!(loot.inventory(player).unwrap().backpack().is_empty());
+            assert!(loot
+                .inventory(player)
+                .unwrap()
+                .equipped(EquipmentSlot::MainHand)
+                .is_none());
+        }
+
+        // An isolated, trusted snapshot fixture projects FOUR distinct physical
+        // item instances at the authored sockets; this is NOT a live rack
+        // allocator and intentionally does not provide any respawn hook.
+        let mut fixture = loot.export_state().unwrap();
+        fixture.next_id = 1_000;
+        for (idx, (socket_name, x)) in sockets.iter().enumerate() {
+            assert!(socket_name.starts_with("greyhaven-rack-"));
+            let item_id = 101 + idx as u64;
+            let entity_id = 201 + idx as u64;
+            assert!(fixture
+                .ground
+                .insert(
+                    entity_id,
+                    GroundDrop {
+                        entity_id,
+                        zone: ZoneId::Moonvale,
+                        at: Point { x: *x, y: 4038.0 },
+                        expires_at_ms: crate::loot::GROUND_DECAY_MS,
+                        item: ItemStack {
+                            id: item_id,
+                            kind: ItemKind::RustySword,
+                            amount: 1,
+                        },
+                    },
+                )
+                .is_none());
+            let actor = world.fighter((idx + 1) as u32).unwrap();
+            let dx = actor.x - x;
+            let dy = actor.y - 4038.0;
+            assert_eq!(dy, 50.0);
+            assert!(dx.mul_add(dx, dy * dy) <= PICKUP_REACH * PICKUP_REACH);
+        }
+        loot = LootAuthority::restore_state(fixture).unwrap();
+        let magic = MagicAuthority::new();
+        let path = checkpoint_path();
+        let op = |id, seq| VerifiedLootOperation {
+            lease: lease(id),
+            sequence: seq,
+        };
+        let tick = || PickupWorldTick {
+            world: &world,
+            completed_tick: world.tick,
+            zones: &zones,
+        };
+
+        // At 40-unit horizontal socket spacing, an actor at one approach
+        // cannot grab the adjacent socket 50 units away in the vertical axis.
+        assert!(matches!(
+            commit_verified_ground_sword_equip(
+                &path,
+                &mut loot,
+                &magic,
+                &identity,
+                tick(),
+                op(1, 1),
+                202
+            ),
+            Err(PickupCommitError::Loot(LootError::OutOfReach))
+        ));
+        for id in 1_u32..=4 {
+            let item = commit_verified_ground_sword_equip(
+                &path,
+                &mut loot,
+                &magic,
+                &identity,
+                tick(),
+                op(id, 1),
+                200 + u64::from(id),
+            )
+            .unwrap();
+            assert_eq!(item.id, 100 + u64::from(id));
+        }
+        assert!(loot.ground().is_empty());
+        let unique = (1..=4)
+            .map(|id| {
+                loot.inventory(id)
+                    .unwrap()
+                    .equipped(EquipmentSlot::MainHand)
+                    .unwrap()
+                    .id
+            })
+            .collect::<BTreeSet<_>>();
+        assert_eq!(unique, BTreeSet::from([101, 102, 103, 104]));
+        assert_eq!(loot.inventory(1).unwrap().stack_count(), 1);
+
+        // After a valid drop, an adjacent player can take the SAME physical
+        // sword identity; the first owner cannot keep phantom equipped gear.
+        commit_verified_equipment(
+            &path,
+            &mut loot,
+            &magic,
+            &identity,
+            tick(),
+            op(1, 2),
+            VerifiedEquipmentAction::Unequip {
+                slot: EquipmentSlot::MainHand,
+            },
+        )
+        .unwrap();
+        let drop = commit_verified_equipment(
+            &path,
+            &mut loot,
+            &magic,
+            &identity,
+            tick(),
+            op(1, 3),
+            VerifiedEquipmentAction::Drop {
+                item_id: 101,
+                amount: 1,
+            },
+        )
+        .unwrap();
+        let dropped_entity = match drop {
+            EquipmentActionResult::Dropped { entity_id } => entity_id,
+            _ => panic!("expected a physical sword on the ground"),
+        };
+        commit_verified_equipment(
+            &path,
+            &mut loot,
+            &magic,
+            &identity,
+            tick(),
+            op(2, 2),
+            VerifiedEquipmentAction::Unequip {
+                slot: EquipmentSlot::MainHand,
+            },
+        )
+        .unwrap();
+        assert_eq!(
+            commit_verified_ground_sword_equip(
+                &path,
+                &mut loot,
+                &magic,
+                &identity,
+                tick(),
+                op(2, 3),
+                dropped_entity
+            )
+            .unwrap()
+            .id,
+            101
+        );
+        assert_eq!(loot.inventory(1).unwrap().stack_count(), 0);
+        assert_eq!(
+            loot.inventory(2)
+                .unwrap()
+                .equipped(EquipmentSlot::MainHand)
+                .unwrap()
+                .id,
+            101
+        );
+        assert_eq!(loot.inventory(2).unwrap().backpack()[0].id, 102);
+
+        let (restored, _) = load_joint(&path).unwrap();
+        let mut ids = BTreeSet::new();
+        for id in 1_u32..=4 {
+            let inventory = restored
+                .parked_inventory(CharacterId::new(u64::from(id)).unwrap())
+                .unwrap();
+            for stack in inventory.backpack() {
+                assert!(ids.insert(stack.id));
+            }
+            if let Some(stack) = inventory.equipped(EquipmentSlot::MainHand) {
+                assert!(ids.insert(stack.id));
+            }
+        }
+        assert_eq!(ids, BTreeSet::from([101, 102, 103, 104]));
+        assert!(restored.ground().is_empty());
+        assert_eq!(
+            restored.committed_operation_sequence(CharacterId::new(2).unwrap()),
+            Some(3)
+        );
+        let _ = fs::remove_file(path);
+    }
+
+    #[test]
     fn four_player_ground_swords_equip_without_duplication_or_partial_commit() {
         use crate::magic_checkpoint::load_joint;
 
