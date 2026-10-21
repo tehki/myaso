@@ -45,7 +45,7 @@ fn start_actual_server() -> Result<(TestServer, String, Sha256Digest)> {
     let stdout = child.stdout.take().context("server stdout unavailable")?;
     let stderr = child.stderr.take().context("server stderr unavailable")?;
     thread::spawn(move || {
-        for line in BufReader::new(stderr).lines().map_while(Result::ok) {
+        for line in BufReader::new(stderr).lines().map_while(|line| line.ok()) {
             eprintln!("ALPHA_M1_SERVER_STDERR {line}");
         }
     });
