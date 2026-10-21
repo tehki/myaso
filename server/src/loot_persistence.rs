@@ -8,7 +8,7 @@
 //! loss until server-side write ordering and account authentication exist.
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs::{self, OpenOptions};
-use std::io::Write;
+use std::io::{Read, Write};
 use std::path::Path;
 use std::sync::atomic::{AtomicU64, Ordering};
 
@@ -543,13 +543,12 @@ pub fn read_quiescent_four_rack_checkpoint(
     sockets: [ProposedRackSocket; 4],
     now_ms: u64,
 ) -> Result<QuiescentRackCheckpointView, CheckpointError> {
-    if fs::metadata(path)?.len() > MAX_FILE_BYTES as u64 {
-        return Err(CheckpointError::TooLarge);
-    }
-    // One byte read, then decode AND project from exactly that buffer. Any
-    // concurrent mutation could still yield a valid historical checkpoint:
-    // this routine does not provide a live writer fence or epoch.
-    let bytes = fs::read(path)?;
+    // One actually bounded file read, then decode AND project from exactly
+    // that buffer. A separate metadata check followed by fs::read would race
+    // a growing file and could read beyond MAX_FILE_BYTES into memory.
+    // Concurrent replacement may still present a valid historical snapshot:
+    // this is NOT a signed epoch or active writer fence.
+    let bytes = read_bounded_quiescent_bytes(path)?;
     let snapshot = decode(&bytes)?;
     let world = LootAuthority::restore_state(snapshot).map_err(|_| CheckpointError::Corrupt)?;
     let slots = world
@@ -566,13 +565,23 @@ pub fn read_quiescent_four_rack_checkpoint(
     })
 }
 
+/// Read no more than the configured maximum PLUS ONE discriminating byte
+/// from the opened file handle. Bounds allocations even if a file grows
+/// between metadata inspection and reading; no TOCTOU size assumption.
+fn read_bounded_quiescent_bytes(path: &Path) -> Result<Vec<u8>, CheckpointError> {
+    let mut reader = fs::File::open(path)?.take(MAX_FILE_BYTES as u64 + 1);
+    let mut bytes = Vec::new();
+    reader.read_to_end(&mut bytes)?;
+    if bytes.len() > MAX_FILE_BYTES {
+        return Err(CheckpointError::TooLarge);
+    }
+    Ok(bytes)
+}
+
 /// Load a fully validated checkpoint. A corrupt file fails closed rather
 /// than returning partial inventories or minting replacement loot.
 pub fn load_quiescent(path: &Path) -> Result<LootAuthority, CheckpointError> {
-    if fs::metadata(path)?.len() > MAX_FILE_BYTES as u64 {
-        return Err(CheckpointError::TooLarge);
-    }
-    let snapshot = decode(&fs::read(path)?)?;
+    let snapshot = decode(&read_bounded_quiescent_bytes(path)?)?;
     LootAuthority::restore_state(snapshot).map_err(|_| CheckpointError::Corrupt)
 }
 
@@ -753,6 +762,32 @@ mod tests {
             Err(CheckpointError::RackProjection(LootError::InvalidState))
         ));
         let _ = fs::remove_file(&path);
+    }
+
+    #[test]
+    fn bounded_checkpoint_reads_reject_sparse_oversize_without_trusting_metadata() {
+        use crate::loot::{Point, ProposedRackSocket};
+
+        // A sparse source file is cheap to create. Neither the offline
+        // provenance view nor the regular quiescent recovery path may read
+        // unbounded bytes if file size changes after an initial stat.
+        let path = checkpoint_path();
+        fs::File::create(&path)
+            .unwrap()
+            .set_len(MAX_FILE_BYTES as u64 + 1)
+            .unwrap();
+        let sockets = [3740.0_f32, 3780.0, 3820.0, 3860.0].map(|x| ProposedRackSocket {
+            at: Point { x, y: 4038.0 },
+        });
+        assert!(matches!(
+            read_quiescent_four_rack_checkpoint(&path, ZoneId::Moonvale, sockets, 1),
+            Err(CheckpointError::TooLarge)
+        ));
+        assert!(matches!(
+            load_quiescent(&path),
+            Err(CheckpointError::TooLarge)
+        ));
+        fs::remove_file(path).unwrap();
     }
 
     #[test]
