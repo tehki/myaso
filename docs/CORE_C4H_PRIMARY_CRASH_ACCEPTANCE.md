@@ -109,8 +109,14 @@ cases that differ from the competing-ID tests:
   clients then concurrently commit that same transfer ID; both receive
   the same epoch 2, and exactly one owner transition persists. Reusing
   the original operation ID with conflicting target data must fail.
+- **Character 85 (opposing recovery decisions):** after a durable
+  prepared handoff, independent clients simultaneously try `commit_transfer`
+  and `abort_transfer` using the **same operation ID**. Exactly one may
+  succeed without deadlock. Committed means target alone owns epoch 2;
+  aborted means source alone retains epoch 1. The losing decision must
+  fail on the final phase, and retries cannot change the outcome.
 
-These are **seven post-restart contention/replay cases**, not seven separate
+These are **eight post-restart contention/replay/resolution cases**, not eight separate
 primary crashes. All contenders use distinct real `psql` connections to
 one disposable primary. Character 82's direct DML is **test-only staging**
 of a held FK row lock; the authority grant still happens strictly through
@@ -120,6 +126,11 @@ The added same-ID concurrency acceptance passed in dedicated exact-code
 [C4h run #39527147376](https://github.com/tehki/myaso/actions/runs/39527147376).
 Companion C4c, C4d and C4g database acceptance workflows passed on that
 same code head.
+The additional opposing commit/abort decision race passed in the
+[isolated exact-code C4h run #39529040957]
+(https://github.com/tehki/myaso/actions/runs/39529040957), alongside
+C4c #39529040949, C4d #39529040951 and C4g #39529040971
+(all PASS at code head `dc702fd36e4c4cc5f793e36a6d65c5a8076b8c6c`).
 
 ## C4d concurrency deadlock correction (review required)
 
