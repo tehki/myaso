@@ -95,11 +95,31 @@ Additional post-restart races exercise the handoff boundary:
   must fail stale, **not deadlock**. The staged loser transaction must
   roll back its provisional handoff row.
 
-These are five post-restart contention cases, not five primary crashes.
-All contenders use distinct real `psql` connections to one disposable
-primary. Character 82's direct DML is **test-only staging** of a held FK
-row lock; the authority grant still happens strictly through the original
-`prepare_transfer` stored function.
+Two additional **same-operation-ID acknowledgment replay** races cover
+cases that differ from the competing-ID tests:
+
+- **Character 83:** two independent SQL clients concurrently submit the
+  *same immutable world mutation ID*, expected revision, worker/epoch and
+  payload after database restart. Exactly one receives a fresh receipt,
+  the other a historical replay with the same sequence. The database
+  retains one state revision, one receipt and one outbox event; a later
+  attempt to change the payload under the same ID is rejected.
+- **Character 84:** two clients concurrently submit an identical handoff
+  prepare ID and both receive a durable prepared acknowledgment. Two
+  clients then concurrently commit that same transfer ID; both receive
+  the same epoch 2, and exactly one owner transition persists. Reusing
+  the original operation ID with conflicting target data must fail.
+
+These are **seven post-restart contention/replay cases**, not seven separate
+primary crashes. All contenders use distinct real `psql` connections to
+one disposable primary. Character 82's direct DML is **test-only staging**
+of a held FK row lock; the authority grant still happens strictly through
+the original `prepare_transfer` stored function.
+
+The added same-ID concurrency acceptance passed in dedicated exact-code
+[C4h run #39527147376](https://github.com/tehki/myaso/actions/runs/39527147376).
+Companion C4c, C4d and C4g database acceptance workflows passed on that
+same code head.
 
 ## C4d concurrency deadlock correction (review required)
 
