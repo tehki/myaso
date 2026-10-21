@@ -5,8 +5,9 @@ function validPointer(p) {
   return p && Number.isFinite(p.x) && Number.isFinite(p.y);
 }
 function validItemId(id) {
-  return typeof id === "string" && id.length > 0 && id.length <= 64
-    && /^[A-Za-z0-9_-]+$/.test(id);
+  // Opaque Core/Items identifier: no local numeric/ASCII-only remapping.
+  // Matches Graphics 3B / UI alpha gate; server still validates identity.
+  return typeof id === "string" && id.length > 0 && id.length <= 160;
 }
 function hit(r, p) {
   return r && Number.isFinite(r.x) && Number.isFinite(r.y)
@@ -41,6 +42,8 @@ export function createSwordPointerGate() {
   return {
     down({ button, pointerId, x, y }, renderedSprites) {
       if (button !== 0 || !Number.isSafeInteger(pointerId)) return noInteraction;
+      // A repeated down cannot silently change the originally reserved sword.
+      if (pending.has(pointerId)) return reservedOnly;
       const id = pickRenderedSword({ x, y }, renderedSprites);
       if (id === null) return noInteraction;
       pending.set(pointerId, id);
