@@ -28,6 +28,36 @@ cleanup() { rm -rf -- "$scratch"; }
 trap cleanup EXIT
 # Pinned source: archive committed HEAD, not a floating branch or remote artifact.
 git -C "$repo" archive --format=tar "$revision" web src ops/alpha | tar -xf - -C "$scratch"
+# QA and authored-city preview HTML are NOT part of the playable arena. Keep
+# original repository source/CI unchanged, but don't publish those development
+# entrypoints on the Pre-Alpha website (no Greyhaven/Red Lion implied).
+rm -f -- "$scratch/web/flight.html" "$scratch/web/pvp-flight.html" \
+  "$scratch/web/pvp-flight.mjs" "$scratch/web/red-lion-art-preview.html"
+# The expanded Pre-Alpha must be a COMPLETE already-qualified small game:
+# preserve original R4 recorded Foley/music, Silver human sprites, the live
+# multiplayer client, HUD and same-origin lobby in the immutable distribution.
+# Fail BEFORE building a binary if anything required was omitted from HEAD.
+for required in \
+  web/alpha.html web/alpha.mjs web/alpha-config.mjs \
+  web/index.html web/online-game.mjs web/knight-sprites.mjs \
+  web/assets/knights/silver_idle.webp web/assets/knights/silver_walk.webp \
+  web/assets/knights/silver_sprint.webp web/assets/knights/silver_roll.webp \
+  web/assets/knights/silver_jump.webp web/audio/credits.html web/audio/SOURCES.md \
+  web/audio/music/moonlight-sonata-adagio.mp3 \
+  web/audio/music/vivaldi-autumn-adagio.mp3 \
+  web/audio/music/vivaldi-winter.mp3 web/audio/music/track-04-untitled.mp3 \
+  src/browser/game-audio.mjs src/browser/combat-readability.mjs; do
+  [[ -s "$scratch/$required" ]] || {
+    echo "Pre-Alpha ready-content missing: $required" >&2
+    exit 4
+  }
+done
+# Use the exact ORIGINAL R4 set; don't quietly bundle only a subset.
+foley_count=$(find "$scratch/web/audio/foley" -maxdepth 1 -type f -name '*.ogg' | wc -l)
+[[ $foley_count -eq 24 ]] || {
+  echo "Pre-Alpha must include all 24 original recorded OGG Foley files (got $foley_count)" >&2
+  exit 4
+}
 cargo build --locked --release --manifest-path "$repo/server/Cargo.toml" --bin myaso-server
 binary="$repo/server/target/release/myaso-server"
 [[ -s "$binary" && -x "$binary" ]] || { echo "Missing executable server release binary" >&2; exit 4; }

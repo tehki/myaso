@@ -41,3 +41,27 @@ test("Pre-Alpha remains arena-only; no Greyhaven or canonical sword requirement 
   assert.match(script, /web src ops\/alpha/);
   assert.doesNotMatch(script, /(?:git archive|cp|install|mv).*?(?:world\.json|sentinel|inventory|wallet)/i);
 });
+
+test("expanded Pre-Alpha package fails closed without authentic Silver and R4 audio", () => {
+  for (const name of ["silver_idle", "silver_walk", "silver_sprint", "silver_roll", "silver_jump"]) {
+    assert.match(script, new RegExp("web/assets/knights/" + name + String.raw`\.webp`));
+  }
+  assert.match(script, /web\/audio\/music\/moonlight-sonata-adagio\.mp3/);
+  assert.match(script, /web\/audio\/music\/vivaldi-autumn-adagio\.mp3/);
+  assert.match(script, /web\/audio\/music\/vivaldi-winter\.mp3/);
+  assert.match(script, /web\/audio\/music\/track-04-untitled\.mp3/);
+  assert.match(script, /src\/browser\/game-audio\.mjs/);
+  assert.match(script, /src\/browser\/combat-readability\.mjs/);
+  assert.match(script, /web\/alpha-config\.mjs/);
+  assert.match(script, /foley_count/);
+  assert.match(script, /-eq 24/);
+  assert.match(script, /ready-content missing/);
+});
+
+test("immutable Pre-Alpha excludes dev browser flights and the unqualified Red Lion preview", () => {
+  assert.match(script, /rm -f -- "\$scratch\/web\/flight\.html"/);
+  assert.match(script, /"\$scratch\/web\/pvp-flight\.html"/);
+  assert.match(script, /"\$scratch\/web\/pvp-flight\.mjs"/);
+  assert.match(script, /"\$scratch\/web\/red-lion-art-preview\.html"/);
+  assert.match(script, /git -C "\$repo" archive --format=tar/);
+});

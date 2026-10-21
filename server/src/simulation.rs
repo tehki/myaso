@@ -938,8 +938,17 @@ fn begin_requested_action(
                 ATTACK_WINDUP_MS
             })
     {
+        // Preserve the actual server-observed light windup time. Only a
+        // still-held LMB combo enters READY mode; a standalone KeyE upgrade
+        // retains its existing non-held action semantics.
+        let light_elapsed_ms = fighter.action_elapsed_ms;
+        let held_lmb = input.attack && input.heavy_attack;
         fighter.attack_hit_targets.clear();
         fighter.set_action(Action::HeavyAttackWindup, HEAVY_ATTACK_WINDUP_MS);
+        if held_lmb {
+            fighter.action_elapsed_ms = light_elapsed_ms;
+            fighter.charging_heavy = true;
+        }
         return;
     }
 
@@ -1037,6 +1046,12 @@ fn begin_requested_action(
     }
 
     if edges.heavy_attack && fighter.action == Action::Idle {
+        // A delayed heavy edge while the SAME LMB remains held must never
+        // start a second attack after its original light already recovered.
+        // Preserve an independent standalone KeyE with attack=false.
+        if input.attack && fighter.attack_input_was_down {
+            return;
+        }
         fighter.attack_hit_targets.clear();
         fighter.set_action(Action::HeavyAttackWindup, HEAVY_ATTACK_WINDUP_MS);
         return;
