@@ -1,0 +1,41 @@
+name: UI P0 native Blender sword alpha and UI gesture (ART-ONLY)
+
+on:
+  pull_request:
+    paths:
+      - "scripts/ui_p0_native_source_alpha.mjs"
+      - "src/browser/alpha-sword-gesture.mjs"
+      - "src/browser/sword-canvas-pointer.mjs"
+      - "src/browser/armory-rack-visual.mjs"
+      - "assets/environment/greyhaven/armory-p0/armory_sword.webp"
+      - ".github/workflows/ui-p0-native-alpha-source.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  source-alpha-chrome-firefox:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify source and existing regressions
+        run: |
+          node --check scripts/ui_p0_native_source_alpha.mjs
+          google-chrome --version
+          firefox --version
+          node --test tests/world-sword-pointer.test.mjs tests/sword-canvas-pointer.test.mjs tests/alpha-sword-gesture.test.mjs tests/armory-p0-visual-rack.test.mjs tests/armory-p0-browser.test.mjs
+      - name: Install pinned Puppeteer driver
+        env:
+          PUPPETEER_SKIP_DOWNLOAD: "1"
+        run: npm install --no-audit --no-fund --prefix "$RUNNER_TEMP/ui-p0-native" puppeteer@25.12.0
+      - name: Genuine Chrome source-alpha pointer acceptance
+        env:
+          PUPPETEER_MODULE_URL: ${{ runner.temp }}/ui-p0-native/node_modules/puppeteer/lib/puppeteer/puppeteer.js
+        run: UI_BROWSER_EXECUTABLE="$(command -v google-chrome)" timeout --signal=TERM --kill-after=5s 120s node scripts/ui_p0_native_source_alpha.mjs
+      - name: Genuine Firefox source-alpha pointer acceptance
+        env:
+          PUPPETEER_MODULE_URL: ${{ runner.temp }}/ui-p0-native/node_modules/puppeteer/lib/puppeteer/puppeteer.js
+          UI_TEST_BROWSER: firefox
+        run: UI_BROWSER_EXECUTABLE="$(command -v firefox)" timeout --signal=TERM --kill-after=5s 120s node scripts/ui_p0_native_source_alpha.mjs
