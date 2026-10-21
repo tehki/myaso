@@ -1,0 +1,220 @@
+{
+  "milestone": "P0 Graphics 3B exact source World493 + Blender rack Chrome/Firefox",
+  "pinnedWorldHead": "07060f981b8a1dac89184b621b6893dd970a08ae",
+  "sourceFileHashes": {
+    "/__world493__/src/world/alpha-armory.mjs": "305a7764d67af9115d85000bde5e922cbae64db2455e15fbf7d3d22b01c5c3bf",
+    "/__world493__/src/world/authored-maps.mjs": "21e7663303b14cc89f7dece7d73fda3b7e1fd4b70cc97b8753cd2c793209e144",
+    "/__world493__/src/browser/authored-world-renderer.mjs": "db5274b9ad3ea8e28f4a2ef44358cfed247d0625785dc353577a3ee6d136f9e9"
+  },
+  "browsers": [
+    {
+      "engine": "chrome",
+      "version": "Chrome/154.0.8037.99",
+      "errors": [],
+      "initial": {
+        "ready": true,
+        "worldSourceVersion": 1,
+        "worldLayoutId": "greyhaven-smith-open-front",
+        "officialSocketIds": [
+          "greyhaven-rack-1",
+          "greyhaven-rack-2",
+          "greyhaven-rack-3",
+          "greyhaven-rack-4"
+        ],
+        "officialSwordAnchors": [
+          [
+            3740,
+            4038
+          ],
+          [
+            3780,
+            4038
+          ],
+          [
+            3820,
+            4038
+          ],
+          [
+            3860,
+            4038
+          ]
+        ],
+        "realWorldTerrainRenderer": true,
+        "renderedSwords": 4,
+        "renderedWorldItemIds": [
+          "ART-ONLY-NO-SERVER-0",
+          "ART-ONLY-NO-SERVER-1",
+          "ART-ONLY-NO-SERVER-2",
+          "ART-ONLY-NO-SERVER-3"
+        ],
+        "swordRects": [
+          {
+            "id": "ART-ONLY-NO-SERVER-0",
+            "x": 248.60000000000002,
+            "y": 205,
+            "width": 42,
+            "height": 115
+          },
+          {
+            "id": "ART-ONLY-NO-SERVER-1",
+            "x": 282.2,
+            "y": 205,
+            "width": 42,
+            "height": 115
+          },
+          {
+            "id": "ART-ONLY-NO-SERVER-2",
+            "x": 315.8,
+            "y": 205,
+            "width": 42,
+            "height": 115
+          },
+          {
+            "id": "ART-ONLY-NO-SERVER-3",
+            "x": 349.4,
+            "y": 205,
+            "width": 42,
+            "height": 115
+          }
+        ],
+        "rackRect": {
+          "x": 200,
+          "y": 154,
+          "width": 240,
+          "height": 166
+        },
+        "cachedTiles": 6,
+        "createdTiles": 0,
+        "clicks": 0,
+        "lastCandidate": null,
+        "authenticatedServerItems": false,
+        "worldCollisionApproved": false,
+        "playerInputIntegrated": false,
+        "pickupCommitted": false,
+        "productionApproved": false
+      },
+      "opaqueClick": "ART-ONLY-NO-SERVER-0",
+      "afterTransparent": null,
+      "expectedSourcePixel": {
+        "x": 20,
+        "y": 13
+      },
+      "screenshots": [
+        "armory_world493_chrome_four_swords.png",
+        "armory_world493_chrome_transparent_rejected.png"
+      ],
+      "fullWorldSourceRendererInvoked": true,
+      "claimedServerItemPickups": 0,
+      "claimedCombatSuppression": 0,
+      "realGameRendered": false
+    },
+    {
+      "engine": "firefox",
+      "version": "firefox/153.4.0",
+      "errors": [],
+      "initial": {
+        "ready": true,
+        "worldSourceVersion": 1,
+        "worldLayoutId": "greyhaven-smith-open-front",
+        "officialSocketIds": [
+          "greyhaven-rack-1",
+          "greyhaven-rack-2",
+          "greyhaven-rack-3",
+          "greyhaven-rack-4"
+        ],
+        "officialSwordAnchors": [
+          [
+            3740,
+            4038
+          ],
+          [
+            3780,
+            4038
+          ],
+          [
+            3820,
+            4038
+          ],
+          [
+            3860,
+            4038
+          ]
+        ],
+        "realWorldTerrainRenderer": true,
+        "renderedSwords": 4,
+        "renderedWorldItemIds": [
+          "ART-ONLY-NO-SERVER-0",
+          "ART-ONLY-NO-SERVER-1",
+          "ART-ONLY-NO-SERVER-2",
+          "ART-ONLY-NO-SERVER-3"
+        ],
+        "swordRects": [
+          {
+            "id": "ART-ONLY-NO-SERVER-0",
+            "x": 248.60000000000002,
+            "y": 205,
+            "width": 42,
+            "height": 115
+          },
+          {
+            "id": "ART-ONLY-NO-SERVER-1",
+            "x": 282.2,
+            "y": 205,
+            "width": 42,
+            "height": 115
+          },
+          {
+            "id": "ART-ONLY-NO-SERVER-2",
+            "x": 315.8,
+            "y": 205,
+            "width": 42,
+            "height": 115
+          },
+          {
+            "id": "ART-ONLY-NO-SERVER-3",
+            "x": 349.4,
+            "y": 205,
+            "width": 42,
+            "height": 115
+          }
+        ],
+        "rackRect": {
+          "x": 200,
+          "y": 154,
+          "width": 240,
+          "height": 166
+        },
+        "cachedTiles": 6,
+        "createdTiles": 0,
+        "clicks": 0,
+        "lastCandidate": null,
+        "authenticatedServerItems": false,
+        "worldCollisionApproved": false,
+        "playerInputIntegrated": false,
+        "pickupCommitted": false,
+        "productionApproved": false
+      },
+      "opaqueClick": "ART-ONLY-NO-SERVER-0",
+      "afterTransparent": null,
+      "expectedSourcePixel": {
+        "x": 20,
+        "y": 13
+      },
+      "screenshots": [
+        "armory_world493_firefox_four_swords.png",
+        "armory_world493_firefox_transparent_rejected.png"
+      ],
+      "fullWorldSourceRendererInvoked": true,
+      "claimedServerItemPickups": 0,
+      "claimedCombatSuppression": 0,
+      "realGameRendered": false
+    }
+  ],
+  "originalWorldSourcesUnmodified": true,
+  "socketsFromOriginalWorldModule": true,
+  "canonicalItemIdsPresent": false,
+  "serverCollisionAttested": false,
+  "onlineGameIntegration": false,
+  "realFourPlayers": false,
+  "productionApproved": false
+}
