@@ -1,0 +1,65 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import {readFileSync} from "node:fs";
+import {createHash} from "node:crypto";
+const root=new URL("../",import.meta.url);
+const dir="assets/environment/greyhaven/armory-p0/facade-p37-review/";
+const read=path=>readFileSync(new URL(path,root));
+const r=JSON.parse(read(dir+"red_lion_3c_p37_native.json"));
+test("P0 true World #521 + Graphics 3C P37 + original Blender 3B A2.31 input heads and unchanged roof",()=>{
+ const pins=Object.fromEntries(r.pins.map(([k,path,sha])=>[k,sha]));
+ assert.equal(pins.world,"3178b9aad8757ceb3594ff04b9e3099dced6b729");
+ assert.equal(pins["3C"],"efdbf0b0c985fffbc4cf89285f41fcdc8ad983ac");
+ assert.equal(pins["3B"],"0cbf33adf70beda55b8fcb8bef4ba2efb36084e5");
+ assert.equal(r.hashes["/__3ba231__/assets/environment/greyhaven/a231-review/red_lion_a231_day_dimensional.webp"],"f45ca685364666e7911128b75180eb1dea5636b48ab2ae5538cc37523ec2dfd0");
+ assert.equal(r.hashes["/__3ba231__/assets/environment/greyhaven/a231-review/red_lion_a231_dusk_dimensional.webp"],"4b7d58f1dc3469ec612c3ac861089ed6665c2118fa27eb7b2fbb1914f55776c3");
+ assert.equal(r.hashes["/__3ba231__/assets/environment/greyhaven/a231-review/red_lion_a231_roof_unchanged.webp"],"f65554286ea1bb8b80562c72539d82172fd3ea8cc97e6b9d0d3203057a1aedc1");
+ assert.equal(r.hashes["/__world521__/src/world/building-presentation.mjs"],"c2e2ad0350fbc5d0c8408a48a151c280b4cc85500c53f4b8e705b21e97147e33");
+ assert.equal(r.hashes["/__3cp37__/src/browser/authored-world-renderer.mjs"],"14290d457a0d6bedc0c3d5b98334b9964007130190b7a8881bd3e2bd7fb2cb06");
+ assert.equal(r.hashes["/__3cp37__/src/world/authored-maps.mjs"],r.hashes["/__world521__/src/world/authored-maps.mjs"]);
+});
+test("P0 Chrome and Firefox source Real Red Lion facade replaces exactly one World placeholder without altering Blacksmith",()=>{
+ assert.equal(r.results.length,2);
+ for(const e of ["chrome","firefox"]){
+  const item=r.results.find(x=>x.engine===e);
+  assert.ok(item);
+  assert.match(item.version,e==="chrome"?/^Chrome\/154\./:/^firefox\/153/);
+  assert.deepEqual(item.errors,[]);
+  const s=item.data;
+  assert.equal(s.actualFirstParty3CPainter,true);
+  assert.equal(s.actualOriginal3BFacade,true);
+  assert.equal(s.originalWorldValidator,true);
+  assert.equal(s.suppressedDefaultPlaceholder,true);
+  assert.equal(s.missingValidatorRejected,true);
+  assert.equal(s.smithNotReplaceable,true);
+  assert.equal(s.smithDiff,0);
+  assert.ok(s.redLionReplacementDifference>10000);
+  assert.ok(s.replacedDayPixelDiff>10000);
+  assert.ok(s.replacedDuskPixelDiff>10000);
+  assert.ok(s.dayDuskDiff>0);
+  assert.equal(s.dayDuskSourceDistinct,true);
+  assert.equal(s.frozenRoofByteSourcePreserved,true);
+  assert.equal(s.originalZoneAndPortalPreserved,true);
+  assert.ok(s.dayDrawnCache>=1);
+  assert.ok(s.duskDrawnCache>=1);
+  assert.equal(s.onlineGameIntegrated,false);
+  assert.equal(s.real3AActorDepthTested,false);
+  assert.equal(s.approvedForRelease,false);
+  const png=read(dir+item.file);
+  assert.equal(png.subarray(0,8).toString("hex"),"89504e470d0a1a0a");
+  assert.ok(png.length>50000);
+ }
+});
+test("P0 art composite stays isolated with no live door, Combat or server authority",()=>{
+ assert.equal(r.gameExecuted,false);
+ assert.equal(r.serverGameplay,false);
+ const source=read("web/armory-p0-world521-3c-p37-facade.mjs").toString("utf8");
+ const verifier=read("tools/art/verify_p0_original_facade_3c_p37.mjs").toString("utf8");
+ assert.match(source,/worldBuildingPresentation/);
+ assert.match(source,/normalizeWorldBuildingReplacementIds/);
+ assert.match(source,/createAuthoredWorldRenderer/);
+ assert.match(source,/red_lion_a231_day_dimensional\.webp/);
+ assert.match(verifier,/execFileSync/);
+ assert.doesNotMatch(source,/WebSocket|TryPickup|XMLHttpRequest/);
+ assert.doesNotMatch(read("web/online-game.mjs").toString("utf8"),/armory-p0-world521-3c-p37-facade/);
+});

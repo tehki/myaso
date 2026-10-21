@@ -1,0 +1,101 @@
+{
+  "pins": [
+    [
+      "world",
+      "D:\\myaso-world521-pinned-20261021",
+      "3178b9aad8757ceb3594ff04b9e3099dced6b729"
+    ],
+    [
+      "3C",
+      "D:\\myaso-graphics3c-p37-pinned-20261021",
+      "efdbf0b0c985fffbc4cf89285f41fcdc8ad983ac"
+    ],
+    [
+      "3B",
+      "D:\\myaso-graphics3b-a231-20261021",
+      "0cbf33adf70beda55b8fcb8bef4ba2efb36084e5"
+    ]
+  ],
+  "hashes": {
+    "/__world521__/src/world/building-presentation.mjs": "c2e2ad0350fbc5d0c8408a48a151c280b4cc85500c53f4b8e705b21e97147e33",
+    "/__world521__/src/world/authored-maps.mjs": "21e7663303b14cc89f7dece7d73fda3b7e1fd4b70cc97b8753cd2c793209e144",
+    "/__3cp37__/src/browser/authored-world-renderer.mjs": "14290d457a0d6bedc0c3d5b98334b9964007130190b7a8881bd3e2bd7fb2cb06",
+    "/__3cp37__/src/browser/greyhaven-atmosphere.mjs": "ddd5b8ea3111107a8786bc890baec9f740f2fe9de4c8fdd392fe82b227597600",
+    "/__3cp37__/src/browser/greyhaven-terrain-materials.mjs": "cfc22bbf2c5ab9847ba40ef85773efe7b382041ed27784cd7eee3cc4fdb59a58",
+    "/__3cp37__/src/world/authored-maps.mjs": "21e7663303b14cc89f7dece7d73fda3b7e1fd4b70cc97b8753cd2c793209e144",
+    "/__3ba231__/assets/environment/greyhaven/a231-review/red_lion_a231_day_dimensional.webp": "f45ca685364666e7911128b75180eb1dea5636b48ab2ae5538cc37523ec2dfd0",
+    "/__3ba231__/assets/environment/greyhaven/a231-review/red_lion_a231_dusk_dimensional.webp": "4b7d58f1dc3469ec612c3ac861089ed6665c2118fa27eb7b2fbb1914f55776c3",
+    "/__3ba231__/assets/environment/greyhaven/a231-review/red_lion_a231_roof_unchanged.webp": "f65554286ea1bb8b80562c72539d82172fd3ea8cc97e6b9d0d3203057a1aedc1",
+    "/web/armory-p0-world521-3c-p37-facade.html": "272e6bfe130bf3c623561e6ecf056fb60f20cb5d31b9bcee08ac3f56848fe1f0",
+    "/web/armory-p0-world521-3c-p37-facade.mjs": "6de1f49551fb7b5f230ebb40444e78c9f802b4995ce88cf6ba5b5e6de51262a4",
+    "/src/browser/arena-viewport.mjs": "bfe67165fe9fc6a1dd847bb98320a2f0d6dcf64637e960600c761c38dd23669c"
+  },
+  "results": [
+    {
+      "engine": "chrome",
+      "version": "Chrome/154.0.8037.99",
+      "data": {
+        "ready": true,
+        "sourceWorld": "3178b9aad8757ceb3594ff04b9e3099dced6b729",
+        "source3C": "efdbf0b0c985fffbc4cf89285f41fcdc8ad983ac",
+        "source3B": "0cbf33adf70beda55b8fcb8bef4ba2efb36084e5",
+        "actualFirstParty3CPainter": true,
+        "actualOriginal3BFacade": true,
+        "originalWorldValidator": true,
+        "suppressedDefaultPlaceholder": true,
+        "redLionReplacementDifference": 35936,
+        "replacedDayPixelDiff": 62727,
+        "replacedDuskPixelDiff": 62727,
+        "dayDuskDiff": 23786,
+        "smithDiff": 0,
+        "smithNotReplaceable": true,
+        "missingValidatorRejected": true,
+        "dayDrawnCache": 6,
+        "duskDrawnCache": 6,
+        "dayDuskSourceDistinct": true,
+        "frozenRoofByteSourcePreserved": true,
+        "originalZoneAndPortalPreserved": true,
+        "onlineGameIntegrated": false,
+        "real3AActorDepthTested": false,
+        "original3CAtmosphereReauthored": false,
+        "approvedForRelease": false
+      },
+      "file": "red_lion_3c_p37_3b_chrome.png",
+      "errors": []
+    },
+    {
+      "engine": "firefox",
+      "version": "firefox/153.4.0",
+      "data": {
+        "ready": true,
+        "sourceWorld": "3178b9aad8757ceb3594ff04b9e3099dced6b729",
+        "source3C": "efdbf0b0c985fffbc4cf89285f41fcdc8ad983ac",
+        "source3B": "0cbf33adf70beda55b8fcb8bef4ba2efb36084e5",
+        "actualFirstParty3CPainter": true,
+        "actualOriginal3BFacade": true,
+        "originalWorldValidator": true,
+        "suppressedDefaultPlaceholder": true,
+        "redLionReplacementDifference": 36079,
+        "replacedDayPixelDiff": 62727,
+        "replacedDuskPixelDiff": 62727,
+        "dayDuskDiff": 23786,
+        "smithDiff": 0,
+        "smithNotReplaceable": true,
+        "missingValidatorRejected": true,
+        "dayDrawnCache": 6,
+        "duskDrawnCache": 6,
+        "dayDuskSourceDistinct": true,
+        "frozenRoofByteSourcePreserved": true,
+        "originalZoneAndPortalPreserved": true,
+        "onlineGameIntegrated": false,
+        "real3AActorDepthTested": false,
+        "original3CAtmosphereReauthored": false,
+        "approvedForRelease": false
+      },
+      "file": "red_lion_3c_p37_3b_firefox.png",
+      "errors": []
+    }
+  ],
+  "gameExecuted": false,
+  "serverGameplay": false
+}
