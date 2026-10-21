@@ -1,0 +1,64 @@
+{
+  "project": "myaso.io Graphics 3B P0 physically visible rack sword",
+  "sourceScene": {
+    "file": "blacksmith_armory_p0_source.blend",
+    "sha256": "db5f256c7d0e6e3f9e026966cdbe475bc16b532f77a8858e15345870e7b68dd6",
+    "rackMeshCount": 28,
+    "swordMeshCount": 6
+  },
+  "assets": {
+    "rack": {
+      "file": "armory_rack.webp",
+      "sha256": "83d0d228785f80e95efd18fa6ef46a77d4ce8500a3fd5cf777d0f1f5ee3917b8",
+      "sourcePng": "armory_rack_source.png",
+      "sourceSha256": "a95e2314e7839835c20ce138a23ab3e1b31acfd53cf606bcb953de758b0a7534",
+      "pixels": [
+        240,
+        166
+      ],
+      "visibleAlphaPixels": 13266,
+      "alphaBounds": [
+        0,
+        33,
+        240,
+        112
+      ],
+      "losslessRGBA": true,
+      "bytes": 15428
+    },
+    "sword": {
+      "file": "armory_sword.webp",
+      "sha256": "795874620d07652e55f5e8a76952d2075f17196fc892eff88d46b165638a3b31",
+      "sourcePng": "armory_sword_source.png",
+      "sourceSha256": "167a919281ffa380f4eb2f23d24be87ef0fcdce0e811ac1380e1a383ce12b621",
+      "pixels": [
+        42,
+        115
+      ],
+      "visibleAlphaPixels": 1082,
+      "alphaBounds": [
+        7,
+        11,
+        36,
+        109
+      ],
+      "losslessRGBA": true,
+      "bytes": 2682
+    }
+  },
+  "visualOnly": true,
+  "realGameIntegrated": false,
+  "socketWorldCoordinatesApproved": false,
+  "canonicalItemIdsAssigned": false,
+  "worldBuilding": "smith",
+  "worldBuildingFootprint": [
+    3710,
+    3850,
+    182,
+    162
+  ],
+  "authoritativeOwnership": "Core 8B + Items 2B, not graphics",
+  "sourceFrameUsesTransparentRGBA": true,
+  "productionApproved": false,
+  "artOnlyMontage": "armory_p0_art_only_montage.png"
+}
