@@ -1,0 +1,49 @@
+name: Economics E2j PostgreSQL acceptance
+
+on:
+  pull_request:
+    paths:
+      - scripts/economics_e2j_pg_lab.sql
+      - scripts/verify_economics_pg_lab.py
+      - .github/workflows/economics-e2j-postgres.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  pg16-economics-lab:
+    name: E2j disposable PostgreSQL 16 settlement
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: e2j_disposable_ci_only
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d postgres"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 12
+    env:
+      MYASO_E2J_TEST_ONLY: '1'
+      PGHOST: 127.0.0.1
+      PGPORT: '5432'
+      PGUSER: postgres
+      PGPASSWORD: e2j_disposable_ci_only
+      PGDATABASE: myaso_e2j_test
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install PostgreSQL client
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client
+      - name: Create exclusively named disposable acceptance database
+        env:
+          PGDATABASE: postgres
+        run: psql -X -v ON_ERROR_STOP=1 -c 'CREATE DATABASE myaso_e2j_test'
+      - name: Check isolated Economics E2j PG16 settlement
+        run: python3 scripts/verify_economics_pg_lab.py -v
