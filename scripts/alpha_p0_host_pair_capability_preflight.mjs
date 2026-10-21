@@ -26,6 +26,20 @@ function browserFallbacks(platform,env){
     firefox:dirs.map(d=>path.win32.join(d,"Mozilla Firefox","firefox.exe"))
   };
 }
+// Read Windows PE product-version metadata without executing the browser.
+function readWindowsFileVersion(exec,pathname){
+  if(typeof pathname!=="string"||!path.win32.isAbsolute(pathname))return null;
+  const quoted=pathname.replaceAll("'","''");
+  try{
+    const r=exec("powershell.exe",[
+      "-NoProfile","-NonInteractive","-Command",
+      "(Get-Item -LiteralPath '"+quoted+"').VersionInfo.ProductVersion",
+    ],{encoding:"utf8",timeout:2500,windowsHide:true,stdio:["ignore","pipe","pipe"]});
+    if(r.error||r.status!==0)return null;
+    const version=String(r.stdout??"").trim();
+    return /^\d{2,3}\.\d+(?:\.\d+){0,3}$/.test(version)?version:null;
+  }catch{return null}
+}
 function firstUsableCommand(exec,names){
   for(const name of names){
     const output=commandVersion(exec,name);
@@ -33,11 +47,15 @@ function firstUsableCommand(exec,names){
   }
   return null;
 }
-function browserEvidence(exec,exists,commands,fallbacks) {
+function browserEvidence(exec,exists,commands,fallbacks,fileVersion) {
   const byCommand=firstUsableCommand(exec,commands);
   if(byCommand)return byCommand;
   const installed=fallbacks.find(p=>exists(p));
-  if(installed)return {found:true,command:installed,version:null,method:"WINDOWS_INSTALL_PATH_ONLY"};
+  if(installed){
+    const version=fileVersion(installed);
+    return {found:true,command:installed,version,
+      method:version?"WINDOWS_READ_ONLY_PE_VERSION":"WINDOWS_INSTALL_PATH_VERSION_UNVERIFIED"};
+  }
   return {found:false,command:null,version:null,method:"NOT_FOUND"};
 }
 function majorFromVersion(value){
@@ -48,12 +66,13 @@ function majorFromVersion(value){
 export function probeHostCapabilities({
   exec=spawnSync,exists=existsSync,platform=process.platform,
   env=process.env,nodeVersion=process.versions.node,host=hostname(),
+  fileVersion=(pathname)=>readWindowsFileVersion(exec,pathname),
 }={}){
   const fallback=browserFallbacks(platform,env);
   const nodeMajor=Number.parseInt(String(nodeVersion).split(".")[0],10);
   const chrome=browserEvidence(exec,exists,
-    ["google-chrome","chromium","chromium-browser","chrome"],fallback.chrome);
-  const firefox=browserEvidence(exec,exists,["firefox"],fallback.firefox);
+    ["google-chrome","chromium","chromium-browser","chrome"],fallback.chrome,fileVersion);
+  const firefox=browserEvidence(exec,exists,["firefox"],fallback.firefox,fileVersion);
   const driverChrome=firstUsableCommand(exec,["chromedriver"]);
   const driverFirefox=firstUsableCommand(exec,["geckodriver"]);
   const missing=[];
@@ -64,6 +83,8 @@ export function probeHostCapabilities({
   if(!driverFirefox)missing.push("geckodriver on PATH");
   const chromeMajor=majorFromVersion(chrome.version);
   const driverMajor=majorFromVersion(driverChrome?.version);
+  if(chrome.found&&chromeMajor===null)missing.push("Chrome/Chromium version cannot be verified");
+  if(driverChrome&&driverMajor===null)missing.push("ChromeDriver version cannot be verified");
   const majorMismatch=chromeMajor!==null&&driverMajor!==null&&chromeMajor!==driverMajor;
   if(majorMismatch)missing.push("ChromeDriver major does not match Chrome/Chromium major");
   const ready=missing.length===0;
