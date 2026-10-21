@@ -129,6 +129,22 @@ test("verifier rejects cached world state, missing Firefox movement and forged m
   }
 });
 
+test("offline verifier rejects moving but divergent four-browser authoritative positions",()=>{
+  // Both reports contain authentic-looking movement and increasing ticks.
+  // Their inconsistent observations must not count as a shared-world flight.
+  for(const change of [
+    (a,b)=>{b.observed[0].find(f=>f.netId===3).x+=70},
+    (a,b)=>{a.observed[1].find(f=>f.netId===1).y-=70},
+  ]){
+    const a=fixture("A"),b=fixture("B");
+    change(a,b);
+    assert.throws(()=>verifyPairEvidence(a,b),/observers disagree on authoritative fighter/);
+  }
+  const a=fixture("A"),b=fixture("B");
+  b.observed[0].find(f=>f.netId===3).x+=4;
+  assert.doesNotThrow(()=>verifyPairEvidence(a,b));
+});
+
 test("capture-file verifier hashes real disk bytes, rejects missing/tampered PNG (synthetic fixture)",async()=>{
   const d=await mkdtemp(path.join(tmpdir(),"core8a-p0-pair-unit-"));
   try{
