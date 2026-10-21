@@ -69,9 +69,16 @@ pub fn coalesce_accepted_input_batch(samples: &[InputSample]) -> Option<InputSam
         newest.jump = action_sample.jump;
         newest.dash = action_sample.dash;
         newest.facing_radians = action_sample.facing_radians;
-        if action_sample.dodge || action_sample.jump || action_sample.dash {
+        if (action_sample.attack && !action_sample.heavy_attack)
+            || action_sample.dodge
+            || action_sample.jump
+            || action_sample.dash
+        {
             newest.move_x = action_sample.move_x;
             newest.move_y = action_sample.move_y;
+        }
+        if action_sample.attack && !action_sample.heavy_attack {
+            newest.run = action_sample.run;
         }
     }
     Some(newest)
@@ -638,8 +645,11 @@ mod tests {
         let coalesced =
             coalesce_accepted_input_batch(&[older_attack, newest_idle]).expect("non-empty batch");
         assert_eq!(coalesced.tick, 101);
-        assert_eq!(coalesced.move_x, 0.75);
-        assert_eq!(coalesced.move_y, -0.25);
+        assert_eq!(coalesced.move_x, 0.0, "light keeps release movement");
+        assert_eq!(
+            coalesced.move_y, 0.0,
+            "later strafe cannot change the committed lane"
+        );
         assert_eq!(
             coalesced.facing_radians, 0.25,
             "recovered attack must keep its original committed facing"
@@ -651,6 +661,35 @@ mod tests {
         );
         assert!(!coalesced.heavy_attack);
         assert!(!coalesced.dodge);
+    }
+
+    #[test]
+    fn recovered_directional_light_keeps_release_lane_through_world_sampling() {
+        use simulation::{Action, World};
+        for (move_y, expected) in [
+            (-1.0, Action::AttackLeftWindup),
+            (1.0, Action::AttackRightWindup),
+        ] {
+            let release = InputSample {
+                tick: 100,
+                attack: true,
+                move_y,
+                ..EMPTY_INPUT_SAMPLE
+            };
+            let neutral = InputSample {
+                tick: 101,
+                ..EMPTY_INPUT_SAMPLE
+            };
+            let coalesced = coalesce_accepted_input_batch(&[release, neutral]).unwrap();
+            assert_eq!(coalesced.tick, 101);
+            assert_eq!(coalesced.move_y, move_y);
+            let mut world = World::new(800.0, 600.0);
+            world.add_player_at(1, 250.0, 300.0, 0.0);
+            world.set_input(1, coalesced.into());
+            world.set_input(1, simulation::InputIntent::default());
+            world.step();
+            assert_eq!(world.fighter(1).unwrap().action, expected);
+        }
     }
 
     #[test]

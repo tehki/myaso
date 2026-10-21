@@ -529,6 +529,7 @@ async function startGameServer() {
       MYASO_FLIGHT_ACTION_PROOF: (scenario === "uiguardbreakpunishffahit"
         || scenario === "uiguardbreak" || scenario === "uiguardbreaktell"
         || scenario === "uiparrytell"
+        || scenario === "uidirectionallight"
         || scenario === "uiheavyblock" || scenario === "uiheavyparry"
         || scenario === "uiheavydodge"
         || scenario === "uikickknockdownffahit"
@@ -1587,6 +1588,7 @@ async function runOnlineUiDirectionalLightFlight(entries) {
   const strafeCode = attackRight ? "KeyW" : "KeyS";
   const attackOffset = attackRight ? 200 : -200;
 
+  const directionalAuthStart = m201ServerOutput().length;
   await performArenaDirectionalLight(attacker, attackerElementId, strafeKey, attackOffset);
 
   const deadline = Date.now() + 900;
@@ -1619,6 +1621,15 @@ async function runOnlineUiDirectionalLightFlight(entries) {
   if (!attackerResult || !defenderResult) {
     throw new Error(`M121 directional light incomplete evidence: ${JSON.stringify(evidence)}`);
   }
+  console.log("M121_DIRECTIONAL_CAUSAL_TRACE " + JSON.stringify({
+    attackerId: attackerResult.playerNetId,
+    defenderId: defenderResult.playerNetId,
+    keys: attackerResult.keyTransitions?.slice(-6),
+    pointers: attackerResult.pointers?.slice(-2),
+    events: attackerResult.eventTransitions?.slice(-6),
+    auth: m201ServerOutput().slice(directionalAuthStart).split(/\r?\n/)
+      .filter(line => line.startsWith("M201_AUTH_")).slice(-24),
+  }));
 
   const lightDown = attackerResult.pointers.find((event) =>
     event.type === "pointerdown" && event.button === 0);
