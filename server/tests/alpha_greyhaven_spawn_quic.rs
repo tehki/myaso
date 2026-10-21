@@ -15,7 +15,7 @@ use std::{
 use tokio::time::timeout;
 use wtransport::{
     tls::{Sha256Digest, Sha256DigestFmt},
-    ClientConfig, Connection, Endpoint,
+    ClientConfig, Endpoint,
 };
 
 const SPAWNS: [(f32, f32); 4] = [
