@@ -241,6 +241,15 @@ jobs:
           node --test tests/m121-native-directional-strafe.test.mjs
           node scripts/pvp_browser_flight_runner.mjs
 
+      - name: Validate M194 native block-only pressure after trusted wheel age
+        env:
+          MYASO_PVP_SCENARIO: "uiguardbreak"
+        run: |
+          # Real Chrome/Firefox genuine wheel and LMB, unmodified combat 125/240ms.
+          # Three actual -38 guard exchanges, zero parry/HP loss, no fake inputs.
+          node --test tests/m194-native-block-age.test.mjs
+          node scripts/pvp_browser_flight_runner.mjs
+
       - name: Validate M188 repeated real heavy counterplay windows
         run: |
           # Three fresh Chrome/Firefox sessions for each real defensive read.
