@@ -19,7 +19,10 @@ test("Sound A2: fists and physical swords have separate fail-silent authoritativ
     { kind: "SWORD", itemId: "../forged" },
   ]) assert.equal(cueForAuthoritativeStrike(mode, "light"), null,
     "unknown, client-optimistic or invalid equipment must not sound like a sword");
-  assert.equal(cueForAuthoritativeStrike({ kind: "UNARMED", itemId: null }, "parry"), null);
+  for (const action of ["parry", "toString", "constructor", "__proto__", "valueOf"]) {
+    assert.equal(cueForAuthoritativeStrike({ kind: "UNARMED", itemId: null }, action), null);
+    assert.equal(cueForAuthoritativeStrike({ kind: "SWORD", itemId: "canonical-sword-1" }, action), null);
+  }
 });
 
 test("Sound A2: four distinct authoritative sword claims yield exactly four cues", () => {
