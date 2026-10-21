@@ -97,9 +97,9 @@ async function httpServer() {
   return server;
 }
 async function startRealGameServer() {
-  const child = spawn("cargo", [
-    "run","--locked","--manifest-path","server/Cargo.toml","--bin","myaso-server","--quiet",
-  ], {
+  // The focused workflow already builds this exact binary. Spawn it
+  // directly so SIGTERM reaps the real server, not just a cargo parent.
+  const child = spawn(path.join(root, "server", "target", "debug", "myaso-server"), [], {
     cwd: root,
     env: { ...process.env, MYASO_BIND:"127.0.0.1:0", MYASO_MAX_PLAYERS:"4",
       MYASO_FLIGHT_BACKGROUND_PLAYERS:"0", MYASO_FLIGHT_NEAR_PRESSURE_PLAYERS:"0" },
@@ -243,5 +243,11 @@ catch(error){console.error("ALPHA_M1_FOUR_REAL_BROWSER_FAIL "+(error.stack??erro
 finally {
   for(const s of sessions)try{await webdriver(s.base,"DELETE",`/session/${s.id}`);}catch{}
   for(const child of children)terminate(child);
-  if(staticServer)await new Promise(resolve=>staticServer.close(resolve));
+  if (staticServer) {
+    staticServer.closeAllConnections?.();
+    await Promise.race([
+      new Promise(resolve=>staticServer.close(resolve)),
+      sleep(2000),
+    ]);
+  }
 }
