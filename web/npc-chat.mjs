@@ -222,7 +222,9 @@ export function createNpcChatPanel({ onSend, onFocus }) {
       if (expected.sent) appendLine(text);
       else expected.stagedText = text;
     },
-    focus() { if (!panel.hidden) { onFocus(); input.focus(); } },
+    // The native focus event already calls onFocus -> releaseInputs().
+    // Avoid calling it again here: Enter from arena is one focus transition.
+    focus() { if (!panel.hidden) input.focus(); },
     get enabled() { return !panel.hidden; },
   };
 }
