@@ -9,6 +9,13 @@ import process from "node:process";
 import { setTimeout as sleep } from "node:timers/promises";
 
 const root = process.cwd();
+// Explicit CI-only staging mode. Never accept arbitrary inherited user flags.
+const profile = process.env.MYASO_ALPHA_BROWSER_GREYHAVEN;
+if (profile !== undefined && profile !== "reviewed-static-only") {
+  throw Error("MYASO_ALPHA_BROWSER_GREYHAVEN must be unset or reviewed-static-only");
+}
+const greyhavenStaging = profile === "reviewed-static-only";
+const greyhavenSpawns = [[4110,4160],[4206,4160],[4110,4256],[4206,4256]];
 const deadlineMs = 155_000;
 const expiry = Date.now() + deadlineMs;
 const children = new Set();
@@ -104,10 +111,18 @@ async function httpServer() {
 async function startRealGameServer() {
   // The focused workflow already builds this exact binary. Spawn it
   // directly so SIGTERM reaps the real server, not just a cargo parent.
+  const env = { ...process.env, MYASO_BIND:"127.0.0.1:0", MYASO_MAX_PLAYERS:"4",
+    MYASO_FLIGHT_BACKGROUND_PLAYERS:"0", MYASO_FLIGHT_NEAR_PRESSURE_PLAYERS:"0" };
+  // No accidental activation of inherited staging flags in baseline M1.
+  delete env.MYASO_ALPHA_SPAWN;
+  delete env.MYASO_ALPHA_STATIC_COLLISION;
+  if (greyhavenStaging) {
+    env.MYASO_ALPHA_SPAWN = "greyhaven";
+    env.MYASO_ALPHA_STATIC_COLLISION = "reviewed-static-only";
+  }
   const child = spawn(path.join(root, "server", "target", "debug", "myaso-server"), [], {
     cwd: root,
-    env: { ...process.env, MYASO_BIND:"127.0.0.1:0", MYASO_MAX_PLAYERS:"4",
-      MYASO_FLIGHT_BACKGROUND_PLAYERS:"0", MYASO_FLIGHT_NEAR_PRESSURE_PLAYERS:"0" },
+    env,
     stdio:["ignore","pipe","pipe"],
     detached: process.platform !== "win32",
   });
@@ -128,10 +143,19 @@ async function startRealGameServer() {
   child.stderr.on("data",chunk=>process.stderr.write("[actual-rust-server-err] "+chunk));
   await waitFor(async()=>{
     if (child.exitCode !== null) throw Error("server exited "+child.exitCode);
-    return {ok:!!url && !!hash && output.includes("myaso admission cap: 4 concurrent players"),
-      value:{url,hash}};
+    const trustedGreyhaven = output.includes("staging-only Greyhaven spawn selected; no server obstacle/portal authority");
+    const trustedStatic = output.includes("staging-only Greyhaven fixed static sweep enabled; river/dynamic solids NOT authoritative");
+    return {ok:!!url && !!hash && output.includes("myaso admission cap: 4 concurrent players")
+      && (greyhavenStaging ? trustedGreyhaven && trustedStatic : !trustedGreyhaven && !trustedStatic),
+      value:{url,hash,greyhavenStaging,trustedGreyhaven,trustedStatic}};
   }, "real server pinned localhost / cap four",45_000);
   assert(url.startsWith("https://127.0.0.1:") && url.endsWith("/game"),"server must bind loopback");
+  if (greyhavenStaging) {
+    console.log("ALPHA_8C_NATIVE_GREYHAVEN_STAGING_PINNED " + JSON.stringify({
+      privateLoopback:true, cap:4, spawn:"greyhaven", staticCollision:"reviewed-static-only",
+      fixedStaticOnly:true, riverAndDynamicObstaclesUnverified:true,
+    }));
+  }
   return {url,hash};
 }
 async function driver(browser) {
@@ -241,6 +265,12 @@ async function crashAndRejoin(game, staticPort) {
   sessions.push(replacement);
   const joined = await openGame(replacement,game,staticPort);
   assert(joined.id === 5, "replacement must receive a fresh server-issued ID #5, got "+joined.id);
+  if (greyhavenStaging) {
+    const actual = fighter(joined,5);
+    const [x,y] = greyhavenSpawns[1];
+    assert(actual && Math.hypot(actual.x-x,actual.y-y)<0.75,
+      "real Firefox replacement did not reuse released Greyhaven spawn 2: "+JSON.stringify(actual));
+  }
   const expectedAfter = [1,3,4,5];
   const validRoster = state => state.id > 0 && state.tick > 0
     && state.fighters.map(f=>f.netId).sort((a,b)=>a-b).join(",") === expectedAfter.join(",")
@@ -263,7 +293,9 @@ async function crashAndRejoin(game, staticPort) {
     noGracefulClose:true,crashedId:2,replacementId:5,ghostRemovedWithinMs:removalMs,
     authoritativeFourRoster:expectedAfter,realFirefoxMovement:movement,
     independentSurvivorObservations:surviving.map((s,i)=>({browser:s.name,tick:observed[i].tick,player5:fighter(observed[i],5)})),
-    exactClientSource:true,scope:"isolated localhost CI only; not WAN, city, armory, or Combat release",
+    exactClientSource:true,scope:greyhavenStaging
+      ? "isolated real-browser Greyhaven spawn/static-collision; not armory pickup, PvP or two-host release"
+      : "isolated localhost CI only; not WAN, city, armory, or Combat release",
   }));
 }
 async function run() {
@@ -275,10 +307,30 @@ async function run() {
     sessions.push(session);
     const admitted=await openGame(session,game,staticServer.address().port);
     assert(admitted.id===i+1,`expected player #${i+1}; got #${admitted.id}`);
+    if (greyhavenStaging) {
+      const actual = fighter(admitted, admitted.id);
+      const [x,y] = greyhavenSpawns[i];
+      assert(actual && Math.hypot(actual.x-x,actual.y-y)<0.75,
+        `real ${session.name} expected authoritative Greyhaven spawn ${x},${y}; got ${JSON.stringify(actual)}`);
+    }
   }
   const views=await Promise.all(sessions.map(async s=>waitFor(async()=>{
     const value=await snapshot(s);return{ok:fourVisible(value),value};
   },s.name+" four authoritative identities+scoreboard",25_000)));
+  if (greyhavenStaging) {
+    for (const view of views) {
+      for (let i=0;i<4;i++) {
+        const actual = fighter(view,i+1);
+        const [x,y] = greyhavenSpawns[i];
+        assert(actual && Math.hypot(actual.x-x,actual.y-y)<0.75,
+          `browser #${view.id} did not receive server-selected Greyhaven spawn for player ${i+1}: ${JSON.stringify(actual)}`);
+      }
+    }
+    console.log("ALPHA_8C_FOUR_NATIVE_BROWSER_GREYHAVEN_SPAWNS_PASS " + JSON.stringify({
+      browsers:browsers.map(b=>b.name),positions:greyhavenSpawns,allFourObservers:true,
+      serverSelected:true,realWebTransport:true,staticCollisionPreview:true,
+    }));
+  }
   for (let i=0;i<sessions.length;i++){
     await saveScreenshot(sessions[i],"four-visible");
     console.log("ALPHA_M1_FOUR_BROWSER_VISIBLE "+JSON.stringify({
@@ -341,9 +393,19 @@ async function run() {
     nativeW3cInput:true,replicatedMovementInOtherThreeBrowsers:true,observed,
     firefoxNativeW3cInput:true,firefoxReplicatedToOtherThreeBrowsers:true,
     firefoxObserved,postActionFourPlayerLiveness:finalStates.map(s=>s.tick),
-    scope:"single GitHub-hosted localhost arena, NOT Greyhaven or independent network",
+    scope:greyhavenStaging
+      ? "one real Rust Greyhaven static-collision server, four Chrome/Firefox clients, loopback only"
+      : "single GitHub-hosted localhost arena, NOT Greyhaven or independent network",
   }));
   await crashAndRejoin(game,staticServer.address().port);
+  if (greyhavenStaging) {
+    console.log("ALPHA_8C_FOUR_NATIVE_GREYHAVEN_BROWSER_PASS " + JSON.stringify({
+      fourOriginalBrowsers:true,originalServerOwnedSpawns:greyhavenSpawns,
+      collisionFlag:"reviewed-static-only",nativeChromeAndFirefoxMovement:true,
+      allOtherBrowsersObservedBothMovers:true,realFirefoxCrashGhostRemoval:true,
+      newFirefoxReusedReleasedAnchor:true,scope:"loopback staging only; no sword pickup, cross-host or complete geometry proof",
+    }));
+  }
 }
 try {await run();}
 catch(error){console.error("ALPHA_M1_FOUR_REAL_BROWSER_FAIL "+(error.stack??error));process.exitCode=1;}
