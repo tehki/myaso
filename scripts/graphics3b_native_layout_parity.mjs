@@ -63,12 +63,13 @@ async function runLocalPageServer(){
 }
 async function launch(name,port){
  const chrome=name==="chrome";
- const binary=chrome?(process.env.CHROMEWEBDRIVER||"chromedriver"):(process.env.GECKOWEBDRIVER||"geckodriver");
+ const binary=chrome?(process.env.CHROMEWEBDRIVER?join(process.env.CHROMEWEBDRIVER,"chromedriver"):"chromedriver"):(process.env.GECKOWEBDRIVER?join(process.env.GECKOWEBDRIVER,"geckodriver"):"geckodriver");
  const command=chrome?["--port="+port]:["--host","127.0.0.1","--port",String(port)];
  const proc=spawn(binary,command,{stdio:["ignore","ignore","pipe"]});
  children.push(proc);
  let stderr="";
  proc.stderr.on("data",data=>{stderr+=String(data);stderr=stderr.slice(-1500)});
+ proc.on("error",error=>{stderr+=String(error);stderr=stderr.slice(-1500)});
  const browser={name,base:"http://127.0.0.1:"+port,proc};
  let up=false;
  for(let i=0;i<80;i++){
