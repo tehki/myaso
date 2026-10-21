@@ -172,7 +172,7 @@ impl CanonicalIdrBridge {
         leases: &SessionLeaseRegistry,
         observer: CharacterId,
         claimed_name: &str,
-    ) -> Result<(), CanonicalIdrError> {
+    ) -> Result<u64, CanonicalIdrError> {
         self.require_current_player(speaker, lease, leases)?;
         if !self.canonical.contains_key(&observer) {
             return Err(CanonicalIdrError::UnknownCanonicalActor);
@@ -182,7 +182,34 @@ impl CanonicalIdrBridge {
                 crate::identity_disguise::IdentityError::InvalidName,
             ));
         }
-        Ok(())
+        // Read only the *subject's* server-owned presentation epoch. A
+        // caller cannot choose a future epoch and invalidate every previous
+        // observer's knowledge before any actual appearance transition.
+        self.subjects
+            .observe(
+                subject_for_authenticated_canonical_character(observer),
+                subject_for_authenticated_canonical_character(speaker),
+            )
+            .map(|view| view.presentation_epoch)
+            .map_err(CanonicalIdrError::DormantIdr)
+    }
+
+    /// Test ONLY: emulate a transition that will require actual trusted
+    /// World8C+Physics validated witnesses and a durable appearance event.
+    /// This cannot be compiled into the production server.
+    #[cfg(test)]
+    pub(crate) fn advance_server_appearance_for_claim_journal_test(
+        &mut self,
+        canonical: CharacterId,
+    ) -> Result<(), CanonicalIdrError> {
+        self.subjects
+            .change_appearance(
+                subject_for_authenticated_canonical_character(canonical),
+                "different-appearance",
+                true,
+                &[],
+            )
+            .map_err(CanonicalIdrError::DormantIdr)
     }
 
     /// Optional verbal self-introduction: a player may lie, and no observer

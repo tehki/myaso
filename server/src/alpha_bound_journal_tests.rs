@@ -33,7 +33,22 @@ impl Root {
     }
 
     fn open(&self) -> DurableItemJournal {
-        DurableItemJournal::open(&self.0).expect("sole canonical local writer")
+        // TEST FIXTURE ONLY: subprocess/parallel tests can observe a brief
+        // writer-descriptor handoff after the previous holder was dropped.
+        // Retry only WriterBusy for a strictly bounded scheduling window,
+        // exactly as the existing C3y independent fixture does. Production
+        // DurableItemJournal::open keeps its fail-fast exclusive lock.
+        use std::time::{Duration, Instant};
+        let deadline = Instant::now() + Duration::from_millis(500);
+        loop {
+            match DurableItemJournal::open(&self.0) {
+                Ok(writer) => return writer,
+                Err(ItemJournalError::WriterBusy) if Instant::now() < deadline => {
+                    std::thread::sleep(Duration::from_millis(5));
+                }
+                Err(error) => panic!("sole canonical local writer: {error:?}"),
+            }
+        }
     }
 
     fn record(&self, n: u64) -> PathBuf {
