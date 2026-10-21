@@ -94,3 +94,62 @@ revisions.
 This source-only doctor does **not** select the single live item
 authority, establish a journal/MYWLD003 writer cutover, import
 real item IDs, validate signed zone/epoch or generate observer ACKs.
+
+
+## Physical reach overlap preflight (P0 exact-target safety)
+
+The separate `scripts/verify_armory_reach_overlap.mjs` adds an **integration-only**
+cross-owner doctor. It imports the real reviewed World armory module,
+parses Items' single literal `pub const PICKUP_REACH: f32` (no default),
+runs the World V1 layout validator, and uses the source-owned approach
+points to check all four physical sword distances. It requires each
+authored player stand to have exactly **one** nearby sword while also
+requiring the midpoints of each adjacent pair to demonstrate exactly
+**two** in-reach swords. This is deliberate negative selection evidence:
+**reach by itself does not pick a canonical item**.
+
+Run from a checkout that contains the exact sources:
+
+```sh
+node scripts/verify_armory_reach_overlap.mjs --self-test \
+  src/world/alpha-armory.mjs \
+  server/src/loot.rs
+```
+
+At Items' reviewed inclusive `PICKUP_REACH=56` **world units**:
+
+- Own stand distance to the corresponding rack sword: **50**, in reach.
+- Nearest adjacent sword from that stand: **sqrt(40²+50²) ≈ 64.03**,
+  outside reach.
+- Intermediate x between adjacent stands, y=4088: two sword distances
+  each **sqrt(20²+50²) ≈ 53.85**, both in reach.
+
+The check must reject an invalid source constant or missing World
+authoring; `--self-test` mutates source radius to **49** (own stand
+out of reach) and **65** (adjacent also in reach), and deliberately
+removes/duplicates Items' constant, requiring all four negative
+cases to be rejected.
+
+**Verified** on Serj Linux against actual file bytes: World #537
+`78537cd0285582b4d71497c9cf431988e042857e`, source blob
+`70b7a6cd3c635dba3c08e659f98652e318375274`; Items #539
+`f98df142a270dcbbbec4191c6b455bdc518c4448`, source blob
+`25e3327e8fe541498d5eda32b987c7ddfcb75dda`.
+These are **byte-identical** to the respective World/Items source files
+used in the disposable integration checkout. `node --check` PASS;
+4/4 own-stand candidates PASS, 3/3 intermediate ambiguous cases
+identified, 4/4 negative mutations rejected.
+
+**Release implication:** a player positioned between rack sockets
+may legitimately have two actionable swords under current geometry.
+Future Core 8A/UI/Items must bind the click to **one explicitly chosen,
+server-validated ground entity AND exact physical item ID**; do not
+infer a unique sword from proximity, nearest socket, raw numeric IDs,
+or render order. Items must revalidate eligibility at COMMIT in the
+single chosen live item authority; no positive visualization or source
+parity authorizes an item write.
+
+This static source doctor does **not** prove Physics LOS, dynamic
+collision, packet/authenticated session, actual click hitbox, or
+same-tick world/item receipt. The scale/zone choice and sole live
+writer remain unsigned at #432.
