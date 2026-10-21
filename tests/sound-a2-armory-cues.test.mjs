@@ -91,6 +91,48 @@ test("Sound A2: denied local pickup, stale session, drop/re-pick and reconnect a
   }), null);
 });
 
+test("Sound A2: per-item u64 revisions compare losslessly across the JS-safe boundary", () => {
+  const gate = createConfirmedArmoryCueGate();
+  assert.equal(gate.beginSession("epoch-u64"), true);
+  const receipt = {
+    source: "authoritative", status: "COMMITTED", sessionEpoch: "epoch-u64",
+    operation: "PICKUP", actorNetId: 4, itemId: "canonical-128bit-sword",
+    receiptId: "tx-1", itemRevision: "9007199254740993",
+  };
+  const first = gate.consume(receipt);
+  assert.equal(first.cue, "swordPickup");
+  assert.equal(first.itemRevision, "9007199254740993", "never round a u64 revision to JS Number");
+  for (const stale of ["9007199254740992", "9007199254740993", 9007199254740992, 0]) {
+    assert.equal(gate.consume({ ...receipt, receiptId: "replayed-" + stale,
+      itemRevision: stale }), null, "stale revision must not cause phantom pickup");
+  }
+  assert.equal(gate.consume({ ...receipt, receiptId: "tx-2",
+    operation: "DROP", itemRevision: "18446744073709551614" }).cue, "swordDrop");
+  assert.equal(gate.consume({ ...receipt, receiptId: "tx-3",
+    operation: "PICKUP", itemRevision: "18446744073709551615" }).itemRevision,
+  "18446744073709551615", "u64::MAX must be preserved");
+  for (const invalid of [
+    "18446744073709551616", "99999999999999999999", "09007199254740994",
+    "0", "-1", "+1", "1.0", "1e3", " 1", "1 ", "", 1.25, NaN, Infinity,
+    Number.MAX_SAFE_INTEGER + 1, -1, 1n, null, undefined, {}, [],
+  ]) {
+    assert.equal(gate.consume({ ...receipt, receiptId: "bad-" + String(invalid),
+      itemRevision: invalid }), null, "noncanonical / unsafe revision must not play");
+  }
+  assert.equal(gate.consume({ ...receipt, itemRevision: "18446744073709551614",
+    receiptId: "late-after-u64-max" }), null);
+  const legacyGate = createConfirmedArmoryCueGate();
+  assert.equal(legacyGate.beginSession("safe-small"), true);
+  assert.equal(legacyGate.consume({ ...receipt, sessionEpoch: "safe-small",
+    itemRevision: 1, receiptId: "safe-1" }).itemRevision, "1",
+  "safe numeric test fixtures become canonical decimal output");
+  assert.equal(legacyGate.consume({ ...receipt, sessionEpoch: "safe-small",
+    itemRevision: "2", receiptId: "safe-2" }).itemRevision, "2");
+  assert.equal(legacyGate.consume({ ...receipt, sessionEpoch: "safe-small",
+    itemRevision: 2, receiptId: "safe-same-rev" }), null,
+  "mixed safe number/string formats cannot duplicate an item event");
+});
+
 test("Sound A2: the dormant palette reuses bundled recorded samples without changing approved tracks", () => {
   const source = readFileSync(new URL("../src/browser/game-audio.mjs", import.meta.url), "utf8");
   const contract = readFileSync(new URL("../src/browser/armory-audio-contract.mjs", import.meta.url), "utf8");
