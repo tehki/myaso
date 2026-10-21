@@ -94,4 +94,46 @@ All Magic branches remain drafts. Passing nested child CI **does not** replace a
 - **CI:** exact-head Rust fmt/check/Clippy/tests and full protected Chrome/Firefox Combat acceptance; do not weaken failing M143/M121/M147 assertions to accelerate activation.
 - **Performance:** bounded zone loot queries, no whole-world disk writes per trivial pickup as a final performance design without Core 8B/8C measurement, conservative Combat tick latency.
 
+
+## 7. First Playable Alpha alignment — priority amendment (2026-10-21)
+
+**Directive:** [P0 First Playable central gate #480](https://github.com/tehki/myaso/issues/480), coordinated through [#360](https://github.com/tehki/myaso/issues/360). This amendment **does not change Item/Magic ownership, durable guarantees or future gameplay approval**. It decouples unfinished features from a genuinely enjoyable *initial* shared-world release. First Playable itself is NOT yet accepted.
+
+### P0 — Must not regress the first playable
+
+- **Existing stable Combat/Core arena stays authoritative, playable and unarmed by default.** The optional Loot/Magic drafts are not imported, registered, called or silently switched on by this document. The live baseline may retain existing legacy Combat semantics until Combat explicitly implements and validates a real unarmed loadout: do not mislabel a fixed arena 34-HP strike as real fists.
+- Preserve existing account/session boundaries, movement, facing, blocking/parry, kick, roll, jump, damage/death, respawn, reconnect and authoritative state replication exactly as the reviewed game requires. Do not redefine or bypass Combat/Core wire validation in Items or Magic.
+- No hidden spawning sword or armor should be *granted by an activated Items service*; conversely, the experimental `empty backpack` invariant does **not** justify wiring incomplete LootAuthority into the live browser server before its identity/death/recovery proof.
+- Retain all protected Rust/JS/native Chrome+Firefox CI acceptance. Real independent-machine First Playable multiplayer remains Core/Combat/World/UI and Main Orchestrator responsibility, not a simulated Items acceptance.
+- All departmental work stays **isolated/dormant by default**. Do not force the unmerged PR stack into an early release, change production DB schemas, alter real wallets, or require new GUI commands for playable unarmed Combat.
+
+### P1 — Minimum additive contribution when the center requests it
+
+- Provide **read-only, server-derived capability declarations** at the reviewed Core/UI boundary, e.g. whether the live server has opted into inventory/equipment/Magic. Until real authority is accepted, the effective state is `inventory=false, equipment=false, spells=false, full_loot=false` and a client must neither show a misleading operational control nor send hypothetical item/spell intents. This paragraph is a **proposed future interface**, NOT an implemented packet field or CI-verified runtime state.
+- Define an additive test for the accepted game candidate that starts two real browsers without experimental item/Magic extensions and exercises movement, skills, health, death, respawn and reconnect with no imported inventory or spell prerequisite. Core + Combat + UI own implementation of that acceptance; Department 2 supplies only compatibility expectations.
+- If the central Main Orchestrator selects an independently qualified gear/loot element for the alpha, require an explicit scoped GO, exact-head and integrated CI, one canonical Core 8B item identity/receipt, fenced 8C World and 8A protocol, reliable observer UI, rollback, and two real independent clients before activation. No implied requirement to activate *all* magic or inventory.
+
+### P2 — Continue independently behind review gates
+
+- **Items 2B:** physical catalog, backpack, equip/unequip/drop/pickup, corpses, redacted nearby visibility, private inventory, replay/reconnect rejection. Current specialist efforts include [#428](https://github.com/tehki/myaso/pull/428), [#437](https://github.com/tehki/myaso/pull/437), [#444](https://github.com/tehki/myaso/pull/444), [#449](https://github.com/tehki/myaso/pull/449), [#464](https://github.com/tehki/myaso/pull/464), and Core migration audit [#454](https://github.com/tehki/myaso/pull/454).
+- **Magic 2A:** read-only permanent knowledge, World-authorized lessons, Ember resource costs, stun/death interruption and recovery. Specialist integration candidates [#467](https://github.com/tehki/myaso/pull/467) and [#476](https://github.com/tehki/myaso/pull/476) have isolated full-quality evidence; real spell effects, teacher content and network commands remain separate releases.
+- **Items + Core 8B/8C:** canonical ID/slot/quantity codec, one-writer durable item ledger, no dual writers, multi-entity Combat/loot/Magic atomicity and rollback. Track [#432](https://github.com/tehki/myaso/issues/432).
+- **Cross-department vertical slice:** [#460](https://github.com/tehki/myaso/issues/460) requires real first-sword independent-client pickup/equip/drop/transfer, physical full-loot death and crash recovery, **not** a First Playable P0 prerequisite unless central scope changes.
+
+### Current factual evidence and readiness words
+
+| Change | Exact verified head | CI evidence (at alignment audit) | Classification |
+| --- | --- | --- | --- |
+| Protected `main` | `4ed368d911eb5250a0a09a133500037ff5518c12` | [quality #39509423836](https://github.com/tehki/myaso/actions/runs/39509423836), attempt 2 PASS (165/165), separate [#39515499562](https://github.com/tehki/myaso/actions/runs/39515499562) PASS | **TESTED stable baseline**, not proof of a running production artifact |
+| Shared Department 2 contract [#429](https://github.com/tehki/myaso/pull/429) | Previous `77cd09345f6fee102d430ec5ccd98562f5225e23` | [quality #39515016372](https://github.com/tehki/myaso/actions/runs/39515016372) PASS; this amendment needs its **own** exact-head result | Shared design **IMPLEMENTED**, new HEAD unverified until CI |
+| Items gear prototype [#424](https://github.com/tehki/myaso/pull/424) | `dc98944b754a59d615684d465bba2c2e436bc0bd` | [quality #39512461503](https://github.com/tehki/myaso/actions/runs/39512461503) PASS | **TESTED isolated only**, not network-integrated |
+| Item pickup parent [#409](https://github.com/tehki/myaso/pull/409) | `a345bb173356b790cd13b959650fb5c3c82a2588` | [quality #39511207641](https://github.com/tehki/myaso/actions/runs/39511207641), attempts 1/2 FAIL M143/M158 | **BLOCKED** for integration |
+| Magic 2A [#476](https://github.com/tehki/myaso/pull/476) | `bc1a7244dc4b60092ddd64b63889813393111624` | [quality #39529512822](https://github.com/tehki/myaso/actions/runs/39529512822) PASS | **TESTED isolated**; Magic live **EXPERIMENTAL** |
+| Items 2B [#464](https://github.com/tehki/myaso/pull/464) | `b29936e8732faea0540e9d9ee6587759bcfed0d4` | [quality #39524741239](https://github.com/tehki/myaso/actions/runs/39524741239) FAIL | **BLOCKED** for integration |
+
+**Do not conflate**: `IMPLEMENTED` code exists; `TESTED` checks passed in branch; `INTEGRATION-READY` explicit interfaces plus all required gates have been verified; `INTEGRATED` accepted into the shared release candidate; `PLAYABLE` real shared-world independent-client acceptance has actually passed. Department 2's live Magic, equipment, full loot and canonical ledger remain **EXPERIMENTAL/BLOCKED**, and none is INTEGRATED or PLAYABLE.
+
+**One next handoff to Main Orchestrator:** accept the minimum unarmed arena as First Playable scope without waiting for #460 or #432, retain all experimental Magic/Items drafts OFF, and use their validated compatibility contracts only when the center selects a separately reviewed incremental integration. Preserve stable `main` and rollback. A general "first playable" mandate is **not** approval for optional full-loot item loss or irreversible persistence migrations.
+
+
 The main R2 multiplayer release must not be blocked by unfinished Magic/Items. **No production activation, irreversible migration, real-money trading, real MOCMP wallet/custody or main merge under this document alone.**
