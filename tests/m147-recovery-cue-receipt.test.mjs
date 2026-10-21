@@ -182,3 +182,20 @@ test("M147 failed native punish still drains the attacker's real pending ACK", a
   acknowledge(); await assert.rejects(task, /native punish rejected/);
   assert.equal(drained, true); assert.equal(f.timers.size, 0);
 });
+
+test("M155 kick observation requires an idle punisher and actual knockdown, retaining the 360ms deadline", async () => {
+  let time=1050;
+  const channel=createM147RecoveryCueReceipt({mode:"kick",now:()=>time,makeToken:()=>"actual-kick-test-token"});
+  const lease=channel.arm({observerId:3,targetId:2,ids:[1,2,3]});
+  const packet={token:lease.token,playerNetId:3,targetNetId:2,serverTick:346,observedEpochMs:1050,
+    cue:{visible:true,state:"knockdown",label:"PUNISH",detail:"Knockdown recovery",epochMs:1050},
+    fighters:[{netId:1,x:132,y:42,action:13,hp:100,guard:100},
+      {netId:2,x:186,y:42,action:19,hp:100,guard:100},{netId:3,x:302,y:42,action:0,hp:100,guard:100}]};
+  for(const change of [p=>{p.fighters[2].action=19;},p=>{p.fighters[1].action=0;},p=>{p.cue.state="jump-attack-recovery";}]) {
+    const bad=structuredClone(packet);change(bad);assert.equal(channel.receive(bad),false);
+  }
+  time=1410;assert.equal(channel.receive(packet),false);
+  time=1050;assert.equal(channel.receive(packet),true);
+  assert.equal((await lease.wait()).targetNetId,2);
+  assert.throws(()=>createM147RecoveryCueReceipt({mode:"unknown"}),RangeError);
+});

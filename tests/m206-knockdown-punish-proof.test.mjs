@@ -49,6 +49,19 @@ test("M206 is wired only into real W3C third-party punish loopback flight",()=>{
   assert.ok(section.includes("punishDowns.length !== 1"));
   assert.ok(section.includes("punishUps.length !== 1"));
   assert.ok(section.includes("punishAimValid"));
-  assert.ok(section.includes("performArenaAttack(punisher, punisherElementId, punishOffset)"));
+  assert.ok(section.includes("performPunish: () => performArenaM221GuardBreakClick(punisher, 5)"));
   assert.ok(section.includes("defenderState?.playerHp === 66"));
+});
+
+// Captured protected CI39628862270: admission at359, active/HIT368 equals recovery.
+test("M206 preserves rejection of the captured M155 same-recovery-tick hit", () => {
+  const late = [
+    "M201_AUTH_ACTION tick=346 fighter=1 from=12 to=13",
+    "M201_AUTH_ACTION tick=346 fighter=2 from=0 to=19",
+    "M201_AUTH_ACTION tick=360 fighter=3 from=0 to=1",
+    "M201_AUTH_ACTION tick=368 fighter=2 from=19 to=0",
+    "M201_AUTH_ACTION tick=368 fighter=3 from=1 to=2",
+    "M201_AUTH_HIT tick=368 attacker=3 target=2 damage=34 hp=66",
+  ].join("\n") + "\n";
+  assert.throws(() => verifyM206ServerKnockdownPunish(late, roles), /active|recovery/);
 });

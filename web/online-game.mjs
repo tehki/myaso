@@ -491,6 +491,7 @@ function recordAcceptanceState(state, ownId) {
     );
   }
   if (acceptanceScenario === "uijumppunishffa"
+    || acceptanceScenario === "uikickknockdownffahit"
     || acceptanceScenario === "uiparrypunishffahit"
     || acceptanceScenario === "uirollknockdownbounded"
     || acceptanceScenario === "uimultiknockdownffa"

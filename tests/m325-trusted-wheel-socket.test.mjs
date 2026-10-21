@@ -73,7 +73,7 @@ test("M325 leaves M194's authoritative guard, HP and parry gates strict", () => 
   assert.ok(start >= 0 && end > start);
   const flight = source.slice(start, end);
   assert.ok(source.includes("attachM325TrustedWheelSocket(server, m221Registry, {"));
-  assert.ok(source.includes('m147Receipt: scenario === "uijumppunishffa" ? m147CueReceipt : null'));
+  assert.ok(source.includes('m147Receipt: ["uijumppunishffa", "uikickknockdownffahit"].includes(scenario) ? m147CueReceipt : null'));
   assert.ok(source.includes("new WebSocket("));
   assert.ok(source.includes("event.isTrusted === true && event.deltaY > 0"));
   assert.ok(source.includes("if (channel.readyState === WebSocket.OPEN) channel.send(receipt);"));

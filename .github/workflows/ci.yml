@@ -734,6 +734,8 @@ jobs:
           node --check web/online-game.mjs
           node --check scripts/pvp_browser_flight_runner.mjs
           node --test --test-name-pattern="FFA knockdown punish focus|kick stun|shoved or rolled over|knockdown owns" tests/m29-combat-readability.test.mjs
+          node --check scripts/m155-native-staging.mjs
+          node --test tests/m155-native-staging.test.mjs tests/m147-recovery-cue-receipt.test.mjs tests/m206-knockdown-punish-proof.test.mjs
           node scripts/pvp_browser_flight_runner.mjs
 
       - name: Validate M157 knockdown arbitration contract

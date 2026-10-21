@@ -4,8 +4,16 @@ import { COMBAT } from "../src/combat/model.mjs";
 // Test-only observation channel. A DOM cue is NOT a gameplay receipt or HIT
 // authority. The native flight must still verify pointers, phases and vitals.
 export function createM147RecoveryCueReceipt({
-  now = Date.now, schedule = setTimeout, cancel = clearTimeout, makeToken = randomUUID,
+  now = Date.now, schedule = setTimeout, cancel = clearTimeout, makeToken = randomUUID, mode = "jump",
 } = {}) {
+  const profile = mode === "jump" ? {
+    action: 18, state: "jump-attack-recovery", detail: "Jump attack recovery",
+    focusPrefix: "PUNISH TARGET #", maxAgeMs: COMBAT.jumpAttack.recoveryMs, otherActions: [0],
+  } : mode === "kick" ? {
+    action: 19, state: "knockdown", detail: "Knockdown recovery",
+    focusPrefix: "KNOCKDOWN #", maxAgeMs: COMBAT.kick.knockdownMs, otherActions: [0, 12, 13, 14],
+  } : null;
+  if (!profile) throw new RangeError("Unknown native cue observation mode");
   let current = null;
   return {
     arm({ observerId, targetId, ids }) {
@@ -29,6 +37,8 @@ export function createM147RecoveryCueReceipt({
       current = { token, observerId, targetId, ids: [...ids], armedAt: now(), finish };
       return {
         token,
+        observerProfile: Object.freeze({ action: profile.action, state: profile.state,
+          detail: profile.detail, focusPrefix: profile.focusPrefix }),
         // Start the unchanged 900ms observation budget AFTER the browser has
         // armed/preconnected, never spend it waiting for that driver's ACK.
         wait() {
@@ -44,18 +54,19 @@ export function createM147RecoveryCueReceipt({
         || packet.playerNetId !== lease.observerId || packet.targetNetId !== lease.targetId
         || !Number.isSafeInteger(packet.serverTick) || packet.serverTick <= 0
         || !Number.isFinite(packet.observedEpochMs) || !Number.isFinite(packet.cue?.epochMs)
-        || packet.cue.visible !== true || packet.cue.state !== "jump-attack-recovery"
-        || packet.cue.label !== "PUNISH" || packet.cue.detail !== "Jump attack recovery"
+        || packet.cue.visible !== true || packet.cue.state !== profile.state
+        || packet.cue.label !== "PUNISH" || packet.cue.detail !== profile.detail
         || packet.cue.epochMs < lease.armedAt - 25
         || packet.observedEpochMs < packet.cue.epochMs
         || packet.observedEpochMs > now() + 25
-        || now() - packet.observedEpochMs >= COMBAT.jumpAttack.recoveryMs
-        || packet.observedEpochMs - packet.cue.epochMs >= COMBAT.jumpAttack.recoveryMs
+        || now() - packet.observedEpochMs >= profile.maxAgeMs
+        || packet.observedEpochMs - packet.cue.epochMs >= profile.maxAgeMs
         || !Array.isArray(packet.fighters) || packet.fighters.length !== 3
         || new Set(packet.fighters.map(f => f?.netId)).size !== 3
         || !packet.fighters.every(f => f && lease.ids.includes(f.netId)
           && Number.isFinite(f.x) && Number.isFinite(f.y) && f.hp === 100 && f.guard === 100
-          && f.action === (f.netId === lease.targetId ? 18 : 0))) return false;
+          && (f.netId === lease.targetId ? f.action === profile.action
+            : f.netId === lease.observerId ? f.action === 0 : profile.otherActions.includes(f.action)))) return false;
       lease.finish({ ...packet, cue: { ...packet.cue }, fighters: packet.fighters.map(f => ({ ...f })), receivedEpochMs: now() });
       return true;
     },
@@ -63,12 +74,12 @@ export function createM147RecoveryCueReceipt({
   };
 }
 
-export async function dispatchM147CuePunish({ lease, armBrowser, performJump, performPunish }) {
+export async function dispatchM147CuePunish({ lease, armBrowser, performJump, performAttack = performJump, performPunish }) {
   let jump;
   try {
     if (await armBrowser() !== true) throw new Error("M147 browser cue observer did not arm");
     const cue = lease.wait();
-    jump = Promise.resolve().then(performJump)
+    jump = Promise.resolve().then(performAttack)
       .then(() => ({ ok: true }), error => ({ ok: false, error }));
     const observed = await cue;
     if (!observed) {
@@ -115,6 +126,8 @@ export function planM147OrdinaryFocusRetreat(fighters, { jumpId, observerId, clo
 // that gesture begins. Only actual rendered cue + actual replica are observed.
 export const M147_BROWSER_CUE_OBSERVER = `
   const [token,targetId,offset] = arguments;
+  const profile=typeof arguments[3]==='object'?arguments[3]:{
+    action:18,state:'jump-attack-recovery',detail:'Jump attack recovery',focusPrefix:'PUNISH TARGET #'};
   const done=arguments[arguments.length-1];
   const started=performance.now();
   let reported=false;
@@ -125,13 +138,13 @@ export const M147_BROWSER_CUE_OBSERVER = `
     if(socket.readyState!==WebSocket.OPEN)return;
     const a=window.__MYASO_ACCEPTANCE_STATE__;
     const rows=window.__MYASO_M30_UI__?.recoveryTransitions??[];
-    const cue=rows.slice(offset).findLast(x=>x.visible&&x.state==="jump-attack-recovery"
-      &&x.label==="PUNISH"&&x.detail==="Jump attack recovery");
+    const cue=rows.slice(offset).findLast(x=>x.visible&&x.state===profile.state
+      &&x.label==="PUNISH"&&x.detail===profile.detail);
     const recovery=document.querySelector('#opponent-recovery');
     const focus=document.querySelector('#focus-label')?.textContent?.trim();
     const target=a?.fighters?.find(x=>x.netId===targetId);
-    if(cue&&recovery&&!recovery.hidden&&recovery.dataset.state==="jump-attack-recovery"
-      &&focus==="PUNISH TARGET #"+targetId&&a?.focusNetId===targetId&&target?.action===18){
+    if(cue&&recovery&&!recovery.hidden&&recovery.dataset.state===profile.state
+      &&focus===profile.focusPrefix+targetId&&a?.focusNetId===targetId&&target?.action===profile.action){
       clearInterval(timer);
       socket.send(JSON.stringify({token,playerNetId:a.playerNetId,targetNetId:targetId,cue,
         serverTick:a.serverTick,fighters:a.fighters.map(x=>({...x})),observedEpochMs:Date.now()}));

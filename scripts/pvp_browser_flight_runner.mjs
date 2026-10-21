@@ -1,3 +1,4 @@
+import { planM155NativeStaging } from "./m155-native-staging.mjs";
 import { spawn } from "node:child_process";
 import { createServer } from "node:http";
 import { readFile, stat } from "node:fs/promises";
@@ -151,7 +152,7 @@ let staticServer;
 let m325Dispose = () => {};
 let gameServer;
 let m201ServerOutput = () => "";
-const m147CueReceipt = createM147RecoveryCueReceipt();
+const m147CueReceipt = createM147RecoveryCueReceipt({ mode: scenario === "uikickknockdownffahit" ? "kick" : "jump" });
 const m221Registry = createM221TrustedWheelRegistry();
 const m227Registry = createM227TrustedLightRegistry();
 
@@ -525,7 +526,7 @@ async function startStaticServer() {
   // M325: receive a genuine Firefox wheel from a pre-connected local socket.
   // Unlike a per-wheel fetch, it does not need to establish HTTP transport.
   m325Dispose = attachM325TrustedWheelSocket(server, m221Registry, {
-    m147Receipt: scenario === "uijumppunishffa" ? m147CueReceipt : null,
+    m147Receipt: ["uijumppunishffa", "uikickknockdownffahit"].includes(scenario) ? m147CueReceipt : null,
   });
   await new Promise((resolve, reject) => {
     server.once("error", reject);
@@ -4529,14 +4530,35 @@ async function runOnlineUiKickKnockdownFfaHitFlight(entries) {
   const kickerElementId = await resolveArenaElement(kicker, milestone + " kicker");
   const punisherElementId = await resolveArenaElement(punisher, milestone + " punisher");
   const kickRight = kickerId < defenderId;
-  const movementKey = kickRight ? "d" : "a";
   const kickOffset = kickRight ? 200 : -200;
   const punishOffset = punisherId < defenderId ? 200 : -200;
 
-  // #3 starts on the far side of #2. The unchanged 52-unit kick knockback
-  // moves #2 into #3's unchanged 76-unit light reach, so a third fighter can
-  // convert the 360 ms knockdown without widening any gameplay timing.
-  await pulseMovementKey(kicker, movementKey, 180);
+  const stagingRoles = { kickerId, defenderId, punisherId };
+  for (let move = 0; ; move += 1) {
+    const actual = await readUiEvidence(punisher);
+    const plan = planM155NativeStaging(actual.acceptance?.fighters, stagingRoles);
+    if (!plan) break;
+    if (move >= 6) throw new Error(milestone + " native staging did not converge");
+    const actor = plan.actorId === kickerId ? kicker : punisher;
+    await webdriver(actor.base, "POST", `/session/${actor.sessionId}/actions`, {
+      actions: [{ type: "key", id: `keyboard-${actor.name}`, actions: [
+        { type: "keyDown", value: plan.key }, { type: "pause", duration: plan.holdMs },
+        { type: "keyUp", value: plan.key },
+      ] }],
+    });
+    // Separate actual key releases beyond the unchanged double-tap dash window.
+    await sleep(300);
+  }
+  const staged = await readUiEvidence(punisher);
+  await sleep(100);
+  const settled = await readUiEvidence(punisher);
+  if (planM155NativeStaging(settled.acceptance?.fighters, stagingRoles)
+    || !(settled.acceptance.serverTick > staged.acceptance.serverTick)
+    || settled.acceptance.fighters.some(f => {
+      const before = staged.acceptance.fighters.find(x => x.netId === f.netId);
+      return !before || Math.hypot(f.x - before.x, f.y - before.y) > 2;
+    })) throw new Error(milestone + " native staging did not settle");
+  console.log("M155_NATIVE_STAGING " + JSON.stringify(settled.acceptance));
   await aimArena(kicker, kickerElementId, kickOffset);
   await aimArena(punisher, punisherElementId, punishOffset);
   await sleep(60);
@@ -4548,7 +4570,7 @@ async function runOnlineUiKickKnockdownFfaHitFlight(entries) {
   );
 
   let conversion = null;
-  for (let attempt = 1; attempt <= 3 && !conversion; attempt += 1) {
+  for (let attempt = 1; attempt <= 1 && !conversion; attempt += 1) {
     const [kickerBefore, defenderBefore, punisherBefore] = await Promise.all([
       readUiEvidence(kicker),
       readUiEvidence(defender),
@@ -4558,11 +4580,21 @@ async function runOnlineUiKickKnockdownFfaHitFlight(entries) {
     const defenderActionOffset = defenderBefore.acceptance?.ownActionTransitions?.length ?? 0;
     const punishPointerOffset = punisherBefore.pointers.length;
 
-    await performArenaRecoveryBufferedKick(kicker, kickerElementId, kickOffset, 45);
+    const cueLease = m147CueReceipt.arm({ observerId: punisherId, targetId: defenderId,
+      ids: [kickerId, defenderId, punisherId] });
+    const observed = await dispatchM147CuePunish({
+      lease: cueLease,
+      armBrowser: () => webdriver(punisher.base, "POST", `/session/${punisher.sessionId}/execute/async`, {
+        script: M147_BROWSER_CUE_OBSERVER,
+        args: [cueLease.token, defenderId, punisherBefore.recoveryTransitions.length, cueLease.observerProfile],
+      }),
+      performAttack: () => performArenaRecoveryBufferedKick(kicker, kickerElementId, kickOffset, 45),
+      performPunish: () => performArenaM221GuardBreakClick(punisher, 5),
+    });
+    console.log("M155_NATIVE_CUE_OBSERVATION " + JSON.stringify(observed));
 
-    // Poll only #2's authoritative action stream so the real LMB can start on
-    // the first knockdown snapshot. Kick phase/HUD provenance may replicate a
-    // frame later and is validated after the punish has already been committed.
+    // Independently require the victim's own actual knockdown transition.
+    // The peer cue never substitutes for this server replica evidence.
     const setupDeadline = Date.now() + COMBAT.kick.windupMs + COMBAT.kick.activeMs
       + COMBAT.kick.knockdownMs + 160;
     let knockdownTransition = null;
@@ -4579,7 +4611,7 @@ async function runOnlineUiKickKnockdownFfaHitFlight(entries) {
         punishPointerOffset,
         knockdownTransition,
       };
-      await performArenaAttack(punisher, punisherElementId, punishOffset);
+
 
       const provenanceDeadline = Date.now() + 280;
       while (Date.now() < provenanceDeadline) {
@@ -4647,13 +4679,7 @@ async function runOnlineUiKickKnockdownFfaHitFlight(entries) {
       break;
     }
 
-    if (attempt < 3) {
-      await sleep(COMBAT.kick.knockdownMs + COMBAT.kick.recoveryMs + 120);
-      await pulseMovementKey(kicker, movementKey, 70);
-      await aimArena(kicker, kickerElementId, kickOffset);
-      await aimArena(punisher, punisherElementId, punishOffset);
-      await sleep(50);
-    }
+
   }
 
   if (!conversion) {
