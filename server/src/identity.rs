@@ -365,4 +365,63 @@ mod tests {
         assert!(registry.is_current(first_lease));
         assert!(registry.activate_committed(second, connection(52)).is_ok());
     }
+    /// P0 contract for abrupt close/rejoin and reused transport IDs.
+    /// This is in-memory only; the live transport and durable authentication
+    /// adapters still have to enforce these preconditions.
+    #[test]
+    fn abrupt_disconnect_rejoin_and_connection_reuse_never_resurrect_ghost() {
+        let mut registry = SessionLeaseRegistry::default();
+        let a = CharacterRecord::new(character(41));
+        let b = CharacterRecord::new(character(42));
+        let a_first_record = a.next_generation().unwrap();
+        let old = registry
+            .activate_committed(a_first_record, connection(77))
+            .unwrap();
+        assert!(registry.is_current(old));
+
+        // Transport drops; delayed duplicate close is harmless.
+        assert!(registry.release(old));
+        assert!(!registry.release(old));
+        assert!(!registry.is_current(old));
+        assert_eq!(
+            registry.activate_committed(a_first_record, connection(78)),
+            Err(LeaseError::StaleOrDuplicateGeneration)
+        );
+
+        // A new durably committed generation may reclaim character A.
+        let a_second_record = a_first_record.next_generation().unwrap();
+        let fresh = registry
+            .activate_committed(a_second_record, connection(78))
+            .unwrap();
+        assert!(registry.is_current(fresh));
+        assert!(!registry.release(old));
+        assert!(registry.is_current(fresh));
+
+        let b_first_record = b.next_generation().unwrap();
+        assert_eq!(
+            registry.activate_committed(b_first_record, connection(78)),
+            Err(LeaseError::ConnectionAlreadyActive)
+        );
+        assert!(registry.release(fresh));
+
+        // Reuse connection ID 78 for B; A's old release cannot evict B.
+        let other = registry
+            .activate_committed(b_first_record, connection(78))
+            .unwrap();
+        assert!(!registry.is_current(fresh));
+        assert!(!registry.release(fresh));
+        assert!(registry.is_current(other));
+
+        // Restarting the transport alone cannot reuse A's old generation.
+        assert_eq!(
+            registry.activate_committed(a_second_record, connection(79)),
+            Err(LeaseError::StaleOrDuplicateGeneration)
+        );
+        let latest = registry
+            .activate_committed(a_second_record.next_generation().unwrap(), connection(79))
+            .unwrap();
+        assert!(registry.is_current(latest));
+        assert!(registry.is_current(other));
+    }
+
 }
