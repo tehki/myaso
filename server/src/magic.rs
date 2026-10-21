@@ -1091,6 +1091,180 @@ mod tests {
         let _ = std::fs::remove_file(&path);
     }
 
+    /// A real physical sword transaction must never turn a forged or
+    /// unbacked P2 Ember intent into an acknowledged, recoverable state.
+    /// Conversely, already checkpointed pending intents belong permanently
+    /// to their casting CHARACTER, never to the physical sword's next owner.
+    #[test]
+    fn checked_sword_transfer_fences_unbacked_ember_intent_and_preserves_backed_one() {
+        use crate::loot_transaction::{
+            commit_verified_equipped_sword_drop_checked,
+            commit_verified_ground_sword_equip_checked, GroundSwordAuthority, PickupCommitError,
+            PickupWorldTick, VerifiedLootOperation,
+        };
+        use crate::magic_checkpoint::{load_joint, save_joint, JointCheckpointError};
+        use crate::zone::ZoneAuthority;
+        use std::sync::atomic::{AtomicU64, Ordering};
+
+        static CHECKPOINT_SEQ: AtomicU64 = AtomicU64::new(1);
+        let count = CHECKPOINT_SEQ.fetch_add(1, Ordering::Relaxed);
+        let path = std::env::temp_dir().join(format!(
+            "myaso-magic2a-sword-pending-intent-{}-{count}.bin",
+            std::process::id()
+        ));
+        let mut world = World::new(800.0, 600.0);
+        let mut zones = ZoneAuthority::new();
+        let mut identity = SessionIdentityRegistry::new();
+        let mut loot = LootAuthority::new();
+        for (id, x) in [(1, 200.0_f32), (2, 224.0)] {
+            assert!(world.add_player_at(id, x, 200.0, 0.0));
+            zones.register(id).unwrap();
+            identity
+                .bind_verified(lease(id, 1), character(u64::from(id)))
+                .unwrap();
+            loot.register(id).unwrap();
+        }
+        let physical_id = loot.grant(1, ItemKind::RustySword, 1).unwrap();
+        loot.equip(1, physical_id, EquipmentSlot::MainHand)
+            .unwrap();
+
+        // Deliberately staged in a dormant server-side test fixture, NOT a
+        // real spell cast or an authorization to activate Ember in gameplay.
+        let mut magic = MagicAuthority::new();
+        magic
+            .grant_lesson(award(11, character(1), Lesson::Rune(Rune::Fire)))
+            .unwrap();
+        magic
+            .grant_lesson(award(12, character(1), Lesson::Spell(Spell::Ember)))
+            .unwrap();
+        magic
+            .stage_ember_intent(
+                character(1),
+                7,
+                ZoneId::Moonvale,
+                200.0,
+                200.0,
+                0.0,
+            )
+            .unwrap();
+        let pending = *magic.ember_intent(character(1), 7).unwrap();
+        assert_eq!(pending.status, EmberEffectStatus::Pending);
+        let progression = magic.encode_progression().unwrap();
+
+        macro_rules! authority {
+            ($id:expr, $seq:expr) => {
+                GroundSwordAuthority {
+                    path: &path,
+                    loot: &mut loot,
+                    magic: &magic,
+                    identity: &identity,
+                    tick: PickupWorldTick {
+                        world: &world,
+                        completed_tick: world.tick,
+                        zones: &zones,
+                    },
+                    operation: VerifiedLootOperation {
+                        lease: lease($id, 1),
+                        sequence: $seq,
+                    },
+                }
+            };
+        }
+
+        // seq7 has NO backing committed operation. Writing a new sword
+        // checkpoint at seq1 must fail CLOSED rather than persist a pending
+        // future damage intent with no durable command provenance.
+        assert!(matches!(
+            commit_verified_equipped_sword_drop_checked(authority!(1, 1), |_, _| Ok(())),
+            Err(PickupCommitError::JointCheckpoint(JointCheckpointError::Corrupt))
+        ));
+        assert!(!path.exists());
+        assert!(loot.ground().is_empty());
+        assert_eq!(loot.committed_operation_sequence(character(1)), None);
+        assert_eq!(
+            loot.inventory(1)
+                .unwrap()
+                .equipped(EquipmentSlot::MainHand)
+                .unwrap()
+                .id,
+            physical_id
+        );
+        assert_eq!(magic.encode_progression().unwrap(), progression);
+
+        // Simulate a previously authenticated/committed spell operation
+        // watermark in a test-only fixture, then actually persist BOTH
+        // Loot and Magic before the later unrelated sword transaction.
+        loot.record_operation(character(1), 7).unwrap();
+        save_joint(&path, &loot, &identity, &magic).unwrap();
+        let (prior_loot, prior_magic) = load_joint(&path).unwrap();
+        assert_eq!(prior_loot.committed_operation_sequence(character(1)), Some(7));
+        assert_eq!(prior_magic.ember_intent(character(1), 7), Some(&pending));
+        assert_eq!(prior_magic.encode_progression().unwrap(), progression);
+
+        // Later successful physical sword drop is sequence 8. The intent
+        // remains pending, tied to character1, not moved with the sword.
+        let dropped =
+            commit_verified_equipped_sword_drop_checked(authority!(1, 8), |fighter, zone| {
+                assert_eq!(fighter.net_id, 1);
+                assert_eq!(zone, ZoneId::Moonvale);
+                Ok(())
+            })
+            .unwrap();
+        assert_eq!(dropped.expected_item_id, physical_id);
+        assert_eq!(loot.ground()[&dropped.ground_entity_id].item.id, physical_id);
+        assert_eq!(magic.encode_progression().unwrap(), progression);
+
+        let claimed = commit_verified_ground_sword_equip_checked(
+            authority!(2, 1),
+            dropped,
+            |fighter, ground, zone| {
+                assert_eq!(fighter.net_id, 2);
+                assert_eq!(ground.item.id, physical_id);
+                assert_eq!(ground.zone, zone);
+                Ok(())
+            },
+        )
+        .unwrap();
+        assert_eq!(claimed.id, physical_id);
+        assert!(loot.ground().is_empty());
+        assert!(loot
+            .inventory(1)
+            .unwrap()
+            .equipped(EquipmentSlot::MainHand)
+            .is_none());
+        assert_eq!(
+            loot.inventory(2)
+                .unwrap()
+                .equipped(EquipmentSlot::MainHand)
+                .unwrap()
+                .id,
+            physical_id
+        );
+        assert!(!magic.knows_rune(character(2), Rune::Fire));
+        assert!(!magic.knows_spell(character(2), Spell::Ember));
+        assert!(magic.ember_intent(character(2), 7).is_none());
+        assert_eq!(magic.ember_intent(character(1), 7), Some(&pending));
+
+        let (recovered, recovered_magic) = load_joint(&path).unwrap();
+        assert_eq!(recovered_magic.encode_progression().unwrap(), progression);
+        assert_eq!(recovered_magic.ember_intent(character(1), 7), Some(&pending));
+        assert!(recovered_magic.ember_intent(character(2), 7).is_none());
+        assert_eq!(recovered_magic.pending_ember_intents().count(), 1);
+        assert_eq!(recovered.committed_operation_sequence(character(1)), Some(8));
+        assert_eq!(recovered.committed_operation_sequence(character(2)), Some(1));
+        assert!(recovered.ground().is_empty());
+        assert_eq!(
+            recovered
+                .parked_inventory(character(2))
+                .unwrap()
+                .equipped(EquipmentSlot::MainHand)
+                .unwrap()
+                .id,
+            physical_id
+        );
+        let _ = std::fs::remove_file(&path);
+    }
+
     #[test]
     fn new_character_has_no_magic_and_spells_must_be_earned() {
         let mut magic = MagicAuthority::new();
