@@ -1,0 +1,399 @@
+{
+  "milestone": "Blood & Iron A2.33 isolated source-faithful visual depth stage proposal",
+  "pins": {
+    "c3": "8e85584b6007b38e1a00155b77473e92b0afec6a",
+    "knight": "c74fcf90e227f3bc4788728f000cfe6aa083c7ef",
+    "adult": "91f1c2c4737b8f0275bb22bfbca4acc1501daa00"
+  },
+  "results": [
+    {
+      "engine": "chrome",
+      "version": "Chrome/154.0.8037.99",
+      "errors": [],
+      "cases": [
+        {
+          "filename": "greyhaven_a233_chrome_northminus20.png",
+          "northY": -20,
+          "changedViewportPixels": 1122,
+          "state": {
+            "ready": true,
+            "northY": -20,
+            "roofOpacity": 0.3,
+            "source3CVersion": "3c-p24-1",
+            "originalWorldEntrance": [
+              4365,
+              4060
+            ],
+            "visualDoor": [
+              4365,
+              4075
+            ],
+            "lanternXY": [
+              4365,
+              4045
+            ],
+            "poolXY": [
+              4365,
+              4069
+            ],
+            "thresholdAlphaHazardCount": 69,
+            "stageNames": [
+              "background",
+              "behind-facade-actors",
+              "facade",
+              "in-front-of-facade-actors",
+              "roof-review"
+            ],
+            "behindIds": [
+              "north"
+            ],
+            "frontIds": [
+              "west",
+              "south"
+            ],
+            "sortedFeet": [
+              {
+                "id": "north",
+                "y": 4055
+              },
+              {
+                "id": "west",
+                "y": 4075
+              },
+              {
+                "id": "south",
+                "y": 4091
+              }
+            ],
+            "alphaPixelMaskPixelsChanged": 69,
+            "actualGameRendererIntegrated": false,
+            "serverPortalOrCollisionChanged": false,
+            "realOcclusionValidated": false,
+            "roofLogicEnabled": false,
+            "productionApproved": false
+          }
+        },
+        {
+          "filename": "greyhaven_a233_chrome_northplus0.png",
+          "northY": 0,
+          "changedViewportPixels": 0,
+          "state": {
+            "ready": true,
+            "northY": 0,
+            "roofOpacity": 0.3,
+            "source3CVersion": "3c-p24-1",
+            "originalWorldEntrance": [
+              4365,
+              4060
+            ],
+            "visualDoor": [
+              4365,
+              4075
+            ],
+            "lanternXY": [
+              4365,
+              4045
+            ],
+            "poolXY": [
+              4365,
+              4069
+            ],
+            "thresholdAlphaHazardCount": 69,
+            "stageNames": [
+              "background",
+              "behind-facade-actors",
+              "facade",
+              "in-front-of-facade-actors",
+              "roof-review"
+            ],
+            "behindIds": [],
+            "frontIds": [
+              "north",
+              "west",
+              "south"
+            ],
+            "sortedFeet": [
+              {
+                "id": "north",
+                "y": 4075
+              },
+              {
+                "id": "west",
+                "y": 4075
+              },
+              {
+                "id": "south",
+                "y": 4091
+              }
+            ],
+            "alphaPixelMaskPixelsChanged": 69,
+            "actualGameRendererIntegrated": false,
+            "serverPortalOrCollisionChanged": false,
+            "realOcclusionValidated": false,
+            "roofLogicEnabled": false,
+            "productionApproved": false
+          }
+        },
+        {
+          "filename": "greyhaven_a233_chrome_northplus20.png",
+          "northY": 20,
+          "changedViewportPixels": 0,
+          "state": {
+            "ready": true,
+            "northY": 20,
+            "roofOpacity": 0.3,
+            "source3CVersion": "3c-p24-1",
+            "originalWorldEntrance": [
+              4365,
+              4060
+            ],
+            "visualDoor": [
+              4365,
+              4075
+            ],
+            "lanternXY": [
+              4365,
+              4045
+            ],
+            "poolXY": [
+              4365,
+              4069
+            ],
+            "thresholdAlphaHazardCount": 69,
+            "stageNames": [
+              "background",
+              "behind-facade-actors",
+              "facade",
+              "in-front-of-facade-actors",
+              "roof-review"
+            ],
+            "behindIds": [],
+            "frontIds": [
+              "west",
+              "south",
+              "north"
+            ],
+            "sortedFeet": [
+              {
+                "id": "north",
+                "y": 4095
+              },
+              {
+                "id": "west",
+                "y": 4075
+              },
+              {
+                "id": "south",
+                "y": 4091
+              }
+            ],
+            "alphaPixelMaskPixelsChanged": 69,
+            "actualGameRendererIntegrated": false,
+            "serverPortalOrCollisionChanged": false,
+            "realOcclusionValidated": false,
+            "roofLogicEnabled": false,
+            "productionApproved": false
+          }
+        }
+      ],
+      "originalWorldRendererUsed": false
+    },
+    {
+      "engine": "firefox",
+      "version": "firefox/153.4.0",
+      "errors": [],
+      "cases": [
+        {
+          "filename": "greyhaven_a233_firefox_northminus20.png",
+          "northY": -20,
+          "changedViewportPixels": 1153,
+          "state": {
+            "ready": true,
+            "northY": -20,
+            "roofOpacity": 0.3,
+            "source3CVersion": "3c-p24-1",
+            "originalWorldEntrance": [
+              4365,
+              4060
+            ],
+            "visualDoor": [
+              4365,
+              4075
+            ],
+            "lanternXY": [
+              4365,
+              4045
+            ],
+            "poolXY": [
+              4365,
+              4069
+            ],
+            "thresholdAlphaHazardCount": 69,
+            "stageNames": [
+              "background",
+              "behind-facade-actors",
+              "facade",
+              "in-front-of-facade-actors",
+              "roof-review"
+            ],
+            "behindIds": [
+              "north"
+            ],
+            "frontIds": [
+              "west",
+              "south"
+            ],
+            "sortedFeet": [
+              {
+                "id": "north",
+                "y": 4055
+              },
+              {
+                "id": "west",
+                "y": 4075
+              },
+              {
+                "id": "south",
+                "y": 4091
+              }
+            ],
+            "alphaPixelMaskPixelsChanged": 69,
+            "actualGameRendererIntegrated": false,
+            "serverPortalOrCollisionChanged": false,
+            "realOcclusionValidated": false,
+            "roofLogicEnabled": false,
+            "productionApproved": false
+          }
+        },
+        {
+          "filename": "greyhaven_a233_firefox_northplus0.png",
+          "northY": 0,
+          "changedViewportPixels": 0,
+          "state": {
+            "ready": true,
+            "northY": 0,
+            "roofOpacity": 0.3,
+            "source3CVersion": "3c-p24-1",
+            "originalWorldEntrance": [
+              4365,
+              4060
+            ],
+            "visualDoor": [
+              4365,
+              4075
+            ],
+            "lanternXY": [
+              4365,
+              4045
+            ],
+            "poolXY": [
+              4365,
+              4069
+            ],
+            "thresholdAlphaHazardCount": 69,
+            "stageNames": [
+              "background",
+              "behind-facade-actors",
+              "facade",
+              "in-front-of-facade-actors",
+              "roof-review"
+            ],
+            "behindIds": [],
+            "frontIds": [
+              "north",
+              "west",
+              "south"
+            ],
+            "sortedFeet": [
+              {
+                "id": "north",
+                "y": 4075
+              },
+              {
+                "id": "west",
+                "y": 4075
+              },
+              {
+                "id": "south",
+                "y": 4091
+              }
+            ],
+            "alphaPixelMaskPixelsChanged": 69,
+            "actualGameRendererIntegrated": false,
+            "serverPortalOrCollisionChanged": false,
+            "realOcclusionValidated": false,
+            "roofLogicEnabled": false,
+            "productionApproved": false
+          }
+        },
+        {
+          "filename": "greyhaven_a233_firefox_northplus20.png",
+          "northY": 20,
+          "changedViewportPixels": 0,
+          "state": {
+            "ready": true,
+            "northY": 20,
+            "roofOpacity": 0.3,
+            "source3CVersion": "3c-p24-1",
+            "originalWorldEntrance": [
+              4365,
+              4060
+            ],
+            "visualDoor": [
+              4365,
+              4075
+            ],
+            "lanternXY": [
+              4365,
+              4045
+            ],
+            "poolXY": [
+              4365,
+              4069
+            ],
+            "thresholdAlphaHazardCount": 69,
+            "stageNames": [
+              "background",
+              "behind-facade-actors",
+              "facade",
+              "in-front-of-facade-actors",
+              "roof-review"
+            ],
+            "behindIds": [],
+            "frontIds": [
+              "west",
+              "south",
+              "north"
+            ],
+            "sortedFeet": [
+              {
+                "id": "north",
+                "y": 4095
+              },
+              {
+                "id": "west",
+                "y": 4075
+              },
+              {
+                "id": "south",
+                "y": 4091
+              }
+            ],
+            "alphaPixelMaskPixelsChanged": 69,
+            "actualGameRendererIntegrated": false,
+            "serverPortalOrCollisionChanged": false,
+            "realOcclusionValidated": false,
+            "roofLogicEnabled": false,
+            "productionApproved": false
+          }
+        }
+      ],
+      "originalWorldRendererUsed": false
+    }
+  ],
+  "screenshots": 6,
+  "actualOnlineGameRendererIntegrated": false,
+  "authoritativeDoorCollisionChanged": false,
+  "automaticRoofFadeEnabled": false,
+  "productionApproved": false
+}
