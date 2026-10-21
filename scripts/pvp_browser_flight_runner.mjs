@@ -528,6 +528,7 @@ async function startGameServer() {
       MYASO_BIND: "127.0.0.1:0",
       MYASO_FLIGHT_ACTION_PROOF: (scenario === "uiguardbreakpunishffahit"
         || scenario === "uiguardbreak" || scenario === "uiguardbreaktell"
+        || scenario === "uiparrytell"
         || scenario === "uiheavyblock" || scenario === "uiheavyparry"
         || scenario === "uiheavydodge"
         || scenario === "uikickknockdownffahit"
@@ -8067,6 +8068,9 @@ async function runOnlineUiParryFlight(entries, postParrySleepMs = 80, roles = nu
     // prediction, fake input, changed 125ms parry/240ms block, or retries.
     // Other M33/M146 scenarios preserve their existing calibrated proof.
     const releaseToStrikeParryDelayMs = 95;
+    // M41 diagnosis: record a bounded loopback-only authoritative 60 Hz
+    // trace for THIS real Chrome/Firefox gesture, not a scheduling signal.
+    const m41AuthLogStart = scenario === "uiparrytell" ? m201ServerOutput().length : 0;
     // Any actual -38 guard block or 34 HP hit remains a terminal failure.
     if (scenario === "uiparrytell") {
       await dispatchM41NativeParryAfterRelease({
@@ -8090,6 +8094,31 @@ async function runOnlineUiParryFlight(entries, postParrySleepMs = 80, roles = nu
     evidence = await waitForUiParryEvidence(entries, attacker, defender, 350, false, lastAttemptBaseline);
     if (!evidence) {
       const after = await Promise.all(entries.map(readUiEvidence));
+      if (scenario === "uiparrytell") {
+        const actor = after.find((entry) => entry.browser === attacker.name);
+        const peer = after.find((entry) => entry.browser === defender.name);
+        const release = actor?.pointers?.filter((entry) =>
+          entry.type === "pointerup" && entry.button === 0).at(-1);
+        const wheel = peer?.wheels?.filter((entry) => entry.deltaY > 0).at(-1);
+        const auth = m201ServerOutput().slice(m41AuthLogStart)
+          .split(/\r?\n/)
+          .filter((line) => /^M201_AUTH_(ACTION|BLOCK|PARRY|HIT|BREAK) /.test(line))
+          .slice(-32);
+        console.log("M41_M33_CAUSAL_TRACE " + JSON.stringify({
+          attackerNetId: actor?.playerNetId, defenderNetId: peer?.playerNetId,
+          chromeReleaseEpochMs: release?.epochMs ?? null,
+          firefoxWheelEpochMs: wheel?.epochMs ?? null,
+          wheelMinusReleaseMs: Number.isFinite(release?.epochMs)
+            && Number.isFinite(wheel?.epochMs)
+            ? wheel.epochMs - release.epochMs : null,
+          browserResults: after.map((entry) => ({
+            browser: entry.browser, hp: entry.playerHp,
+            guard: entry.playerGuard, feedback: entry.feedbackTransitions,
+            events: entry.eventTransitions?.slice(-5),
+            pointers: entry.pointers?.slice(-2), wheels: entry.wheels?.slice(-1),
+          })), auth,
+        }));
+      }
       const stagedAttacker = after.find((entry) => entry.browser === attacker.name);
       const stagedDefender = after.find((entry) => entry.browser === defender.name);
       const attackerBefore = lastAttemptBaseline.find((entry) => entry.browser === attacker.name);
@@ -12735,7 +12764,7 @@ async function installUiObserver(session) {
           "ws://" + location.host + "/__myaso_m325_trusted_wheel");
       }
     }
-    const epochEvidence = ['uiguardbreak', 'uiguardbreaktell', 'uiheavyguardbreakpunish', 'uidodge', 'uirollbuffer', 'uijumpbuffer', 'uijumpattack', 'uijumpattackinputloss', 'uijumpattackpunish', 'uijumpattacktelegraph', 'uijumpffaprimary', 'uijumpffasecondary', 'uijumprecoveryffa', 'uijumppunishffa', 'uimultirecoveryffa', 'uimultirecoveryspatial', 'uimultirecoverypunish', 'uiparrypunishwindow', 'uiparrypunishffa', 'uiparrypunishffahit', 'uiguardbreakpunishffa', 'uiguardbreakpunishffahit', 'uikickknockdownffa', 'uikickknockdownffahit', 'uikickknockdownbounded', 'uirollknockdownbounded', 'uistaminaauth', 'uistaminaexhaustion', 'uistaminafeedback', 'uistaminaconfirmed', 'uifeint', 'uirollknockdownffahit', 'uimultiknockdownffa', 'uimultiknockdownffahit', 'uirollknockdownffa', 'uijumpattackblock', 'uijumpattackparry', 'uijumpattackdodge', 'uijumpattackbuffer', 'uikickbuffer'].includes(new URLSearchParams(location.search).get('scenario'));
+    const epochEvidence = ['uiguardbreak', 'uiguardbreaktell', 'uiparrytell', 'uiheavyguardbreakpunish', 'uidodge', 'uirollbuffer', 'uijumpbuffer', 'uijumpattack', 'uijumpattackinputloss', 'uijumpattackpunish', 'uijumpattacktelegraph', 'uijumpffaprimary', 'uijumpffasecondary', 'uijumprecoveryffa', 'uijumppunishffa', 'uimultirecoveryffa', 'uimultirecoveryspatial', 'uimultirecoverypunish', 'uiparrypunishwindow', 'uiparrypunishffa', 'uiparrypunishffahit', 'uiguardbreakpunishffa', 'uiguardbreakpunishffahit', 'uikickknockdownffa', 'uikickknockdownffahit', 'uikickknockdownbounded', 'uirollknockdownbounded', 'uistaminaauth', 'uistaminaexhaustion', 'uistaminafeedback', 'uistaminaconfirmed', 'uifeint', 'uirollknockdownffahit', 'uimultiknockdownffa', 'uimultiknockdownffahit', 'uirollknockdownffa', 'uijumpattackblock', 'uijumpattackparry', 'uijumpattackdodge', 'uijumpattackbuffer', 'uikickbuffer'].includes(new URLSearchParams(location.search).get('scenario'));
     const record = () => {
       const text = target.textContent?.trim() ?? '';
       if (/^Online - player #\\d+ - server tick \\d+$/.test(text)) state.online = text;
