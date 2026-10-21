@@ -1562,6 +1562,36 @@ async fn four_real_quic_players_observe_kill_and_immutable_greyhaven_respawn() -
         "ALPHA_8C_REENVELOPED_DEAD_SAMPLE_FENCED original_sample_tick=70850          new_packet_tick=70900 witnesses=4 victim1_hp=100 peer_ticks={wrapped1},{wrapped3},{wrapped4},{wrapped5}"
     );
 
+    // The integrated real-browser authoritative Combat profile has an
+    // 82u heavy reach (not the older isolated 130u profile). The revived
+    // #5 ended its earlier positive east movement at x4232 while fighter
+    // #1 is near x4116: 116u is too far for an honest heavy hit. Approach
+    // through normal WEST gameplay input and independently observe the
+    // new server-owned #5 position before attempting the same attack.
+    send_held_direction_with_server_ack(&replacement, move5.1, 73_905, wrapped5, (-127, 0))?;
+    require_quic_input_ack(&replacement, 73_905, 5).await?;
+    let approach_deadline = Instant::now() + Duration::from_secs(3);
+    let approach = loop {
+        let position = next_authoritative_position(&replacement, 5, approach_deadline).await?;
+        if position.0 <= 4188.0 {
+            if !(4160.0..=4188.0).contains(&position.0) || (position.1 - SPAWNS[1].1).abs() > 5.0 {
+                bail!("restarted fighter approached outside real melee corridor: {position:?}");
+            }
+            break position;
+        }
+    };
+    send_held_direction_with_server_ack(&replacement, move5.1, 73_906, wrapped5, (0, 0))?;
+    require_quic_input_ack(&replacement, 73_906, 5).await?;
+    let (approach1, approach3, approach4) = tokio::try_join!(
+        observe_reborn_real_melee_approach(&sessions[0].0, 1, wrapped1),
+        observe_reborn_real_melee_approach(&sessions[1].0, 3, wrapped3),
+        observe_reborn_real_melee_approach(&sessions[2].0, 4, wrapped4),
+    )?;
+    println!(
+        "ALPHA_8C_INTEGRATED_REBORN_82U_REACH server_x={:.1} peer1_x={approach1:.1}          peer3_x={approach3:.1} peer4_x={approach4:.1} real_input=yes",
+         approach.0
+    );
+
     // The original Dead-state abuse test tried a heavy attack from #5,
     // which the server must ignore while Dead. Prove the complement:
     // the SAME authentic net ID #5, on the SAME QUIC connection, may now
@@ -1657,6 +1687,51 @@ async fn observe_no_stale_dead_attack_reexecution(
                 "ALPHA_8C_REPLAYED_DEAD_HEAVY_DENIED observer={observer} alive=5 victim=1 hp=100 ticks=28"
             );
             return Ok(snapshot.server_tick);
+        }
+    }
+}
+
+/// Require three other independent actual QUIC peers to see revived #5
+/// reach valid 82u server-heavy contact distance via normal movement;
+/// its own connection's authoritative position was verified separately.
+async fn observe_reborn_real_melee_approach(
+    connection: &wtransport::Connection,
+    observer: u32,
+    after_replay_tick: u32,
+) -> Result<f32> {
+    use myaso_server::snapshot::SNAPSHOT_FIELD_VITALS;
+    let deadline = Instant::now() + Duration::from_secs(4);
+    loop {
+        let remaining = deadline.saturating_duration_since(Instant::now());
+        if remaining.is_zero() {
+            bail!("observer {observer} did not see revived fighter approach live 82u heavy range");
+        }
+        let incoming = timeout(remaining, connection.receive_datagram())
+            .await
+            .context("post-replay real heavy approach snapshot timeout")??;
+        let bytes = incoming.as_ref();
+        if bytes.len() < 14 || bytes[0] != 1 || bytes[1] != 2 {
+            continue;
+        }
+        let snapshot = decode_snapshot(bytes)
+            .map_err(|e| anyhow::anyhow!("post-replay approach snapshot invalid: {e:?}"))?;
+        if snapshot.server_tick <= after_replay_tick {
+            continue;
+        }
+        for record in snapshot.records {
+            if record.net_id != 5 {
+                continue;
+            }
+            if record.mask & SNAPSHOT_FIELD_VITALS != 0 && record.hp != 100 {
+                bail!("observer {observer} saw revived attacker lose health during approach");
+            }
+            if record.mask & SNAPSHOT_FIELD_POSITION != 0 {
+                let x = record.x as f32 / 4.0;
+                let y = record.y as f32 / 4.0;
+                if (4160.0..=4188.0).contains(&x) && (y - SPAWNS[1].1).abs() <= 5.0 {
+                    return Ok(x);
+                }
+            }
         }
     }
 }

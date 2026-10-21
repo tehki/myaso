@@ -7,6 +7,9 @@ on:
       - "scripts/alpha_p0_rack_walk_math.mjs"
       - "tests/core8-real-rendered-rack-walk-contract.test.mjs"
       - "web/online-game.mjs"
+      # Re-run real native browsers when Core 8C authority is integrated.
+      - "server/tests/alpha_greyhaven_spawn_quic.rs"
+      - "docs/CORE8_P0_8C_REACH_INTEGRATION.md"
       - ".github/workflows/core8-p0-four-native-rendered-rack-walk.yml"
 
 permissions:
